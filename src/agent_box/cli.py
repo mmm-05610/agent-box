@@ -9,6 +9,7 @@ from typing import List, Optional
 
 from . import config
 from . import launch
+from . import library
 from . import profile
 
 
@@ -47,8 +48,8 @@ def _build_parser() -> argparse.ArgumentParser:
     p_create.add_argument(
         "--provider",
         required=True,
-        choices=list(config.SUPPORTED_PROVIDERS),
-        help="Model provider for this profile",
+        choices=config.supported_providers(),
+        help="Model provider for this profile (run \'agent-box component list --type provider\' for all)",
     )
     p_create.set_defaults(func=cmd_create)
 
@@ -111,6 +112,84 @@ def _build_parser() -> argparse.ArgumentParser:
     p_test = sub.add_parser("test", help="Test API connectivity for a profile")
     p_test.add_argument("name", help="Profile name")
     p_test.set_defaults(func=cmd_test)
+
+    # component (v0.2.0: library catalog) -------------------------------
+    p_comp = sub.add_parser(
+        "component",
+        help="Manage the component library (providers, MCP servers, ...)",
+    )
+    comp_sub = p_comp.add_subparsers(dest="component_command", required=True)
+
+    # component list
+    p_clist = comp_sub.add_parser("list", help="List components")
+    p_clist.add_argument(
+        "--type", "-t",
+        choices=["provider", "mcp_server"],
+        help="Filter by component type",
+    )
+    p_clist.add_argument(
+        "--region",
+        help="Filter by region (e.g. cn, us, eu, local, global)",
+    )
+    p_clist.add_argument(
+        "--tag",
+        help="Filter by tag (e.g. cn, aggregator, hosting)",
+    )
+    p_clist.add_argument(
+        "--json", action="store_true",
+        help="Emit JSON",
+    )
+    p_clist.add_argument(
+        "--user-only", action="store_true",
+        help="Only show user-added components (hide built-ins)",
+    )
+    p_clist.set_defaults(func=cmd_component_list)
+
+    # component show
+    p_cshow = comp_sub.add_parser("show", help="Show one component")
+    p_cshow.add_argument("id", help="Component id")
+    p_cshow.add_argument(
+        "--type", "-t",
+        choices=["provider", "mcp_server"],
+        help="Component type (default: search both)",
+    )
+    p_cshow.add_argument("--json", action="store_true", help="Emit JSON")
+    p_cshow.set_defaults(func=cmd_component_show)
+
+    # component add
+    p_cadd = comp_sub.add_parser("add", help="Add a user-defined component")
+    p_cadd.add_argument(
+        "--type", "-t", required=True,
+        choices=["provider", "mcp_server"],
+        help="Component type",
+    )
+    p_cadd.add_argument("--id", required=True, help="Component id (must be unique within type)")
+    p_cadd.add_argument("--name", required=True, help="Human-readable name")
+    p_cadd.add_argument(
+        "--config", required=True,
+        help="Component config (JSON string). For provider: {\"base_url\": \"...\", \"model\": \"...\"}",
+    )
+    p_cadd.add_argument("--label", default="", help="Short label (CN/EN)")
+    p_cadd.add_argument("--region", default="", help="Region (cn, us, eu, global, local, ...)")
+    p_cadd.add_argument(
+        "--tag", action="append", default=[],
+        help="Tag (can be repeated)",
+    )
+    p_cadd.set_defaults(func=cmd_component_add)
+
+    # component delete
+    p_cdel = comp_sub.add_parser("delete", help="Delete a user-defined component")
+    p_cdel.add_argument("id", help="Component id")
+    p_cdel.add_argument(
+        "--type", "-t",
+        choices=["provider", "mcp_server"],
+        help="Component type (default: search both)",
+    )
+    p_cdel.add_argument(
+        "--force", action="store_true",
+        help="Don't error if the component does not exist",
+    )
+    p_cdel.set_defaults(func=cmd_component_delete)
 
     return parser
 
@@ -297,3 +376,181 @@ def main(argv: Optional[List[str]] = None) -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
+# --- component subcommand implementations --------------------------------
+
+def cmd_component_list(args: argparse.Namespace) -> int:
+    try:
+        rows = library.list_components(
+            type=args.type,
+            region=args.region,
+            tag=args.tag,
+            include_builtin=not args.user_only,
+        )
+    except library.LibraryError as exc:
+        print(f"agent-box: {exc}", file=sys.stderr)
+        return 2
+
+    if args.json:
+        json.dump(rows, sys.stdout, indent=2, ensure_ascii=False)
+        sys.stdout.write("\n")
+        return 0
+
+    if not rows:
+        print("(no components)")
+        return 0
+
+    # Tabular output: built-in marked with *, custom with +, MCP rows get
+    # an icon. Width auto-derived from the rows.
+    id_w = max(len(r["id"]) for r in rows)
+    name_w = max(_visible_len(r["name"]) for r in rows)
+    type_w = max(len(r["type"]) for r in rows)
+    region_w = max(len(r["region"] or "-") for r in rows)
+
+    builtin_count = library.builtin_count()
+    for r in rows:
+        marker = "*" if r["built_in"] else "+"
+        name_disp = r["name"]
+        if r["type"] == "mcp_server":
+            cfg = r["config"]
+            cmd = cfg.get("command", "")
+            name_disp = f"{r['name']}  ({cmd})"
+        print(
+            f"{marker} {r['id']:<{id_w}}  {r['type']:<{type_w}}  "
+            f"{r['region'] or '-':<{region_w}}  {name_disp}"
+        )
+
+    # Footer summary
+    print()
+    print(
+        f"total: {len(rows)}  "
+        f"(built-in: provider={builtin_count.get('provider', 0)}, "
+        f"mcp_server={builtin_count.get('mcp_server', 0)})"
+    )
+    print("  * = built-in   + = user-added")
+    return 0
+
+
+def _visible_len(s: str) -> int:
+    """Width for table layout (we don't go full wcwidth, ASCII is fine)."""
+    return len(s)
+
+
+def cmd_component_show(args: argparse.Namespace) -> int:
+    # If --type omitted, search both types. If multiple matches, error
+    # with a disambiguation hint. If none, error.
+    if args.type:
+        try:
+            info = library.show_component(args.type, args.id)
+        except library.LibraryError as exc:
+            print(f"agent-box: {exc}", file=sys.stderr)
+            return 2
+    else:
+        matches = []
+        for t in ("provider", "mcp_server"):
+            try:
+                matches.append(library.show_component(t, args.id))
+            except library.LibraryError:
+                continue
+        if not matches:
+            print(
+                f"agent-box: component not found: {args.id!r}. "
+                f"Try: agent-box component list",
+                file=sys.stderr,
+            )
+            return 2
+        if len(matches) > 1:
+            types = ", ".join(m["type"] for m in matches)
+            print(
+                f"agent-box: {args.id!r} is ambiguous ({types}); "
+                f"re-run with --type",
+                file=sys.stderr,
+            )
+            return 2
+        info = matches[0]
+
+    if args.json:
+        json.dump(info, sys.stdout, indent=2, ensure_ascii=False)
+        sys.stdout.write("\n")
+        return 0
+
+    print(f"id:        {info['id']}")
+    print(f"type:      {info['type']}")
+    print(f"name:      {info['name']}")
+    if info.get("label"):
+        print(f"label:     {info['label']}")
+    if info.get("region"):
+        print(f"region:    {info['region']}")
+    if info.get("tags"):
+        print(f"tags:      {', '.join(info['tags'])}")
+    print(f"built_in:  {bool(info['built_in'])}")
+    print(f"created:   {info.get('created_at', '?')}")
+    print("config:")
+    print(json.dumps(info["config"], indent=2, ensure_ascii=False))
+    return 0
+
+
+def cmd_component_add(args: argparse.Namespace) -> int:
+    try:
+        cfg = json.loads(args.config)
+    except json.JSONDecodeError as exc:
+        print(f"agent-box: --config is not valid JSON: {exc}", file=sys.stderr)
+        return 2
+    if not isinstance(cfg, dict):
+        print("agent-box: --config must be a JSON object", file=sys.stderr)
+        return 2
+    try:
+        library.add_component(
+            type=args.type,
+            id=args.id,
+            name=args.name,
+            config=cfg,
+            label=args.label or "",
+            region=args.region or "",
+            tags=args.tag or [],
+        )
+    except library.LibraryError as exc:
+        print(f"agent-box: {exc}", file=sys.stderr)
+        return 2
+    print(f"added {args.type} {args.id!r} ({args.name})")
+    return 0
+
+
+def cmd_component_delete(args: argparse.Namespace) -> int:
+    if not args.type:
+        # Same lookup logic as `show`
+        target_type = None
+        for t in ("provider", "mcp_server"):
+            try:
+                library.show_component(t, args.id)
+                if target_type:
+                    print(
+                        f"agent-box: {args.id!r} is ambiguous "
+                        f"(in both {target_type} and {t}); re-run with --type",
+                        file=sys.stderr,
+                    )
+                    return 2
+                target_type = t
+            except library.LibraryError:
+                continue
+        if not target_type:
+            if args.force:
+                print(f"no such component {args.id!r} (nothing to delete)")
+                return 0
+            print(
+                f"agent-box: component not found: {args.id!r}",
+                file=sys.stderr,
+            )
+            return 2
+        args.type = target_type
+    try:
+        ok = library.delete_component(args.type, args.id, force=args.force)
+    except library.LibraryError as exc:
+        print(f"agent-box: {exc}", file=sys.stderr)
+        return 2
+    if ok:
+        print(f"deleted {args.type} {args.id!r}")
+    else:
+        print(f"no such {args.type} {args.id!r} (nothing to delete)")
+    return 0

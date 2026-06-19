@@ -254,10 +254,23 @@ def _inject_provider_env(settings_path: Path, provider: str) -> None:
 
 def create(name: str, provider: str) -> Path:
     config.validate_profile_name(name)
-    if provider not in config.SUPPORTED_PROVIDERS:
+    # v0.2.0: provider resolution is library-driven. `providers.get(name)`
+    # looks up the library first, then the hard-coded fallback. If the
+    # name is unknown to both, raise with a hint to the new component command.
+    try:
+        providers.get(provider)
+    except KeyError:
+        try:
+            from . import library
+            n = len(library.list_components(type="provider"))
+        except Exception:
+            n = 0
+        sample = list(config.supported_providers())[:8]
         raise ProfileError(
             f"unsupported provider {provider!r}. "
-            f"Choose one of: {', '.join(config.SUPPORTED_PROVIDERS)}"
+            f"Run \'agent-box component list --type provider\' "
+            f"({n} available, e.g. {', '.join(sample)}). "
+            f"To add a custom provider: agent-box component add --type provider --id <id> --config '{{...}}'."
         )
 
     root = config.profile_dir(name)

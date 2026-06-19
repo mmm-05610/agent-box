@@ -1,76 +1,100 @@
 """Per-provider CC configuration table.
 
-Each provider entry maps a logical name (deepseek, minimax, anthropic, ...) to
-the settings.json `env` block that CC consumes, plus display metadata.
+Originally a hard-coded dict of three providers (deepseek, minimax,
+anthropic). v0.2.0 still ships the same dict as a *fallback* — used only
+if the SQLite component library has been wiped — but the canonical
+source of truth is now `agent_box.library` (see `_BUILTIN_PROVIDERS`).
 
-All three tier model env vars (DEFAULT_HAIKU/SONNET/OPUS_MODEL) are set to the
-same value as the primary ANTHROPIC_MODEL so that /model inside CC consistently
-shows the provider's flagship model regardless of the tier CC picks internally.
+Public API kept stable:
+
+* `ProviderSpec` namedtuple (legacy shape: name, base_url, model, label)
+* `PROVIDERS` dict (fallback)
+* `get(name)` — library first, fallback second
+* `env_block(name)` — library first, fallback second
+* `describe(name)` — library first, fallback second
+* `SUPPORTED_PROVIDERS` — derived from library (cached at import time
+  but cheap to recompute; the CLI uses `config.SUPPORTED_PROVIDERS` which
+  is a thin wrapper that hits the library).
 """
 from __future__ import annotations
 
-from typing import Any, Dict, NamedTuple
+from typing import Any, Dict, NamedTuple, Optional
 
 
 class ProviderSpec(NamedTuple):
     name: str
-    base_url: str          # value of ANTHROPIC_BASE_URL (empty = use CC default)
-    model: str             # primary ANTHROPIC_MODEL
-    label: str             # human-readable name for `show` / `list`
+    base_url: str
+    model: str
+    label: str
 
 
-# Keep the spec table tiny and explicit. The official CC tier env vars all
-# default to the same model per the v2 spec, so we always set them equal.
-#
-# Default CC settings we apply to every profile (tier models + timeouts +
-# telemetry opt-out). The actual API key is a placeholder; users fill it in.
+# Hard-coded fallback table — only consulted if the library has no row.
 _API_KEY_PLACEHOLDER = "sk-REPLACE_ME"
 _API_TIMEOUT_MS = "3000000"
 _DISABLE_TRAFFIC = "1"
 
-
-def _spec(name: str, base_url: str, model: str, label: str) -> ProviderSpec:
-    return ProviderSpec(name=name, base_url=base_url, model=model, label=label)
-
-
-# (name -> ProviderSpec)
-PROVIDERS: Dict[str, ProviderSpec] = {
+_FALLBACK_PROVIDERS: Dict[str, ProviderSpec] = {
     p.name: p
     for p in (
-        _spec(
-            "deepseek",
-            "https://api.deepseek.com/anthropic",
-            "deepseek-v4-pro",
-            "DeepSeek (deepseek-v4-pro)",
+        ProviderSpec(
+            name="deepseek",
+            base_url="https://api.deepseek.com/anthropic",
+            model="deepseek-v4-pro",
+            label="DeepSeek (deepseek-v4-pro)",
         ),
-        _spec(
-            "minimax",
-            "https://api.minimaxi.com/anthropic",
-            "MiniMax-M2.7",
-            "MiniMax (MiniMax-M2.7)",
+        ProviderSpec(
+            name="minimax",
+            base_url="https://api.minimaxi.com/anthropic",
+            model="MiniMax-M2.7",
+            label="MiniMax (MiniMax-M2.7)",
         ),
-        _spec(
-            "anthropic",
-            "https://api.anthropic.com",
-            "claude-sonnet-4-6",
-            "Anthropic (claude-sonnet-4-6)",
+        ProviderSpec(
+            name="anthropic",
+            base_url="https://api.anthropic.com",
+            model="claude-sonnet-4-6",
+            label="Anthropic (claude-sonnet-4-6)",
         ),
     )
 }
 
 
 def get(name: str) -> ProviderSpec:
-    if name not in PROVIDERS:
-        raise KeyError(name)
-    return PROVIDERS[name]
+    """Return the ProviderSpec for `name`. Raises KeyError if unknown.
+
+    Library takes precedence; fallback table is consulted only if the
+    library is unavailable (e.g. first-run race on a fresh checkout
+    where sqlite3 has not yet been imported).
+    """
+    try:
+        from . import library  # local import to break a cycle
+        p = library.get_provider(name)
+        if p is not None:
+            return ProviderSpec(
+                name=p.id,
+                base_url=p.base_url,
+                model=p.model,
+                label=p.label or p.name,
+            )
+    except Exception:
+        # Library unavailable — fall through to the hard-coded table.
+        pass
+    if name in _FALLBACK_PROVIDERS:
+        return _FALLBACK_PROVIDERS[name]
+    raise KeyError(name)
 
 
 def env_block(provider: str) -> Dict[str, str]:
-    """Build the settings.json `env` block for a given provider name.
-
-    Raises KeyError if `provider` is unknown (caller maps to a friendly error).
-    """
-    spec = get(provider)
+    """Build the settings.json `env` block for a given provider name."""
+    try:
+        from . import library
+        p = library.get_provider(provider)
+        if p is not None:
+            return p.env_block()
+    except Exception:
+        pass
+    spec = _FALLBACK_PROVIDERS.get(provider)
+    if spec is None:
+        raise KeyError(provider)
     return {
         "ANTHROPIC_BASE_URL": spec.base_url,
         "ANTHROPIC_MODEL": spec.model,
@@ -85,10 +109,28 @@ def env_block(provider: str) -> Dict[str, str]:
 
 def describe(provider: str) -> Dict[str, Any]:
     """Return a display-friendly dict for `show`."""
-    spec = get(provider)
+    try:
+        from . import library
+        p = library.get_provider(provider)
+        if p is not None:
+            return {
+                "name": p.id,
+                "label": p.label or p.name,
+                "base_url": p.base_url,
+                "model": p.model,
+            }
+    except Exception:
+        pass
+    spec = _FALLBACK_PROVIDERS.get(provider)
+    if spec is None:
+        raise KeyError(provider)
     return {
         "name": spec.name,
         "label": spec.label,
         "base_url": spec.base_url,
         "model": spec.model,
     }
+
+
+# Legacy constants — still exported so older import paths keep working.
+PROVIDERS = _FALLBACK_PROVIDERS

@@ -21,6 +21,8 @@ v2 layout (root = AGENT_BOX_HOME, default ~/.agent-box):
             skills/ -> ~/.claude/skills
             projects/               # CC auto-maintains
         dot-claude.json
+
+    library.db                      # component library (v0.2.0+)
 """
 from __future__ import annotations
 
@@ -31,10 +33,9 @@ AGENT_BOX_HOME_ENV = "AGENT_BOX_HOME"
 
 AGENT_TYPE_CC = "cc"
 
-# Order matters: this is also the display order in --help choices.
-SUPPORTED_PROVIDERS = ("deepseek", "minimax", "anthropic")
-
-# Bwrap settings we always pass.
+# Hard-coded fallback used by tests and by `providers.py` when the
+# library has not been bootstrapped yet. The argparse `--provider`
+# choices use `supported_providers()` (which hits the library).
 BWRAP = "bwrap"
 CLAUDE_BIN = "claude"
 
@@ -138,3 +139,29 @@ def profile_settings_local_json(name: str) -> Path:
 def profile_claude_md(name: str) -> Path:
     """~/.agent-box/profiles/<name>/dot-claude/CLAUDE.md"""
     return profile_dot_claude(name) / "CLAUDE.md"
+
+
+# --- supported providers (v0.2.0: derived from library) ------------------
+
+def supported_providers() -> tuple:
+    """Return the sorted list of provider ids available in the library.
+
+    Falls back to the hard-coded trio if the library cannot be reached
+    (fresh checkout with no sqlite3 available, etc.). The result is
+    sorted alphabetically; the order is consumed by argparse as
+    `choices=`.
+    """
+    try:
+        from . import library
+        rows = library.list_components(type="provider")
+        ids = sorted({r["id"] for r in rows})
+        if ids:
+            return tuple(ids)
+    except Exception:
+        pass
+    return ("anthropic", "deepseek", "minimax")
+
+
+# Backwards-compat constant. Process-level cache; the library is the
+# real source of truth. Used by `cli.py`'s `--provider` choices list.
+SUPPORTED_PROVIDERS = supported_providers()

@@ -125,6 +125,10 @@ other.
 | `agent-box config <name> [<key> [<value>]]`     | Get/set individual config values (e.g. `api-key`, `model`, `base-url`)|
 | `agent-box test <name>`                         | Test API connectivity for a profile                                  |
 | `agent-box cc <name> [--cwd DIR]`               | Launch Claude Code under a profile (the headline command)             |
+| `agent-box component list [--type] [--region] [--tag] [--user-only]` | List built-in and user components (providers, MCP servers) |
+| `agent-box component show <id> [--type]`          | Show one component's full config                                    |
+| `agent-box component add --type <t> --id <id> --name <n> --config '{...}'` | Add a user-defined component              |
+| `agent-box component delete <id> [--type]`         | Delete a user-defined component (built-ins are protected)           |
 | `agent-box delete <name> [--force]`             | Delete a profile                                                      |
 | `agent-box --help`                              | Full CLI help                                                         |
 
