@@ -1,0 +1,39 @@
+# --- Python build / venv ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+env/
+
+# --- IDE / editor ---
+.idea/
+.vscode/
+.cursor/
+*.swp
+*.swo
+*~
+
+# --- OS / shell ---
+.DS_Store
+Thumbs.db
+nul
+*.log
+
+# --- Local agent config dirs (per-host, never commit) ---
+# These are agent runtimes that store identity/credentials on the host.
+# They should never appear inside the agent-box source tree.
+.claude/
+.claude.json
+.codex/
+.agents/
+.hermes/
+.agent-box-local/
+
+# --- Secrets / credentials (defense in depth) ---
+*.auth
+*credentials*
