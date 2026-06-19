@@ -1,6 +1,8 @@
 # agent-box
 
 > **Isolated HOME launcher for coding agents** — run Claude Code as multiple
+
+[English](README.md) | [简体中文](README_CN.md)
 > identities (different providers, different prompts) on the same machine, with
 > **kernel-level isolation** via [bubblewrap](https://github.com/containers/bubblewrap)
 > bind mounts.
