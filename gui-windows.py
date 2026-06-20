@@ -91,7 +91,7 @@ def build_launch_argv(name: str, agent_type: str, mode: str) -> List[str]:
     # Ensure ~/.local/bin and ~/.npm-global/bin are on PATH (login shell
     # may not source .bashrc for non-interactive sessions).
     setup = "export PATH=\"$HOME/.npm-global/bin:$HOME/.local/bin:$PATH\""
-    return ["wt.exe", "wsl.exe", "bash", "-lc", f"{setup} && {cmdline}"]
+    return ["cmd", "/c", "start", "\"Agent Box\"", "wsl.exe", "bash", "-lc", f"{setup} && {cmdline}"]
 
 
 def _shell_quote(token: str) -> str:
