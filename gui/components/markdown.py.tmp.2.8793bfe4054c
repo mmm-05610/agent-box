@@ -1,0 +1,229 @@
+"""Markdown editor — toolbar + debounced auto-save.
+
+Used in the Profile detail (CLAUDE.md tab). Edits are persisted after
+``SAVE_DEBOUNCE_MS`` of inactivity. The status indicator switches
+between ``Idle`` / ``Saving…`` / ``Saved ✓`` / ``Error`` depending on
+the last save result.
+
+The editor wraps ``CTkTextbox`` (no syntax highlighting — out of scope
+for P0). The toolbar provides the common shortcuts (Bold, Italic,
+Code, Link) by wrapping selected text.
+"""
+from __future__ import annotations
+
+import threading
+from pathlib import Path
+from typing import Optional
+
+import customtkinter as ctk
+
+from ..theme import C
+from ..tokens import (
+    FONT_BODY,
+    FONT_BOLD,
+    FONT_CAPTION,
+    FONT_LABEL,
+    FONT_MICRO,
+    FONT_MONO,
+    RADIUS_MD,
+    SPACE_LG,
+    SPACE_MD,
+    SPACE_SM,
+)
+from .button import ghost_button
+
+
+SAVE_DEBOUNCE_MS = 1000  # how long to wait after last keystroke before saving
+
+
+class MarkdownEditor(ctk.CTkFrame):
+    """Editor with toolbar, debounced save, and status indicator.
+
+    Usage::
+
+        editor = MarkdownEditor(parent, file_path=Path("CLAUDE.md"))
+        editor.pack(fill="both", expand=True)
+        # … user edits …
+        editor.read()         # returns current text
+        editor.on_save = lambda path, txt: ...
+    """
+
+    def __init__(self, master, file_path: Path, **kwargs):
+        super().__init__(master, fg_color=C("bg"), **kwargs)
+        self._file_path = file_path
+        self._save_job: Optional[str] = None
+        self._status_text: str = "Idle"
+        self._status_color_key: str = "fg_subtle"
+        self._loading = False  # suppress Modified events during load/save
+        self._write_lock = threading.Lock()
+        self.on_save = None  # type: ignore[assignment]
+
+        # Toolbar
+        toolbar = ctk.CTkFrame(self, fg_color=C("bg_elevated"), height=40,
+                               corner_radius=0)
+        toolbar.pack(fill="x", padx=0, pady=(0, 0))
+        toolbar.pack_propagate(False)
+
+        ghost_button(toolbar, "B",   self._wrap_bold,   width=32).pack(
+            side="left", padx=(SPACE_MD, 2), pady=6,
+        )
+        ghost_button(toolbar, "I",   self._wrap_italic, width=32).pack(
+            side="left", padx=2, pady=6,
+        )
+        ghost_button(toolbar, "</>", self._wrap_code,   width=40).pack(
+            side="left", padx=2, pady=6,
+        )
+        ghost_button(toolbar, "🔗", self._wrap_link,   width=40).pack(
+            side="left", padx=2, pady=6,
+        )
+
+        # File path label (left of status, fills middle)
+        path_lbl = ctk.CTkLabel(
+            toolbar, text=str(file_path),
+            text_color=C("fg_subtle"), font=FONT_MICRO,
+            anchor="w",
+        )
+        path_lbl.pack(side="left", fill="x", expand=True, padx=SPACE_LG)
+
+        # Status indicator
+        self._status_lbl = ctk.CTkLabel(
+            toolbar, text=self._status_text,
+            text_color=C(self._status_color_key), font=FONT_MICRO,
+        )
+        self._status_lbl.pack(side="right", padx=SPACE_LG)
+
+        # Editor
+        self._editor = ctk.CTkTextbox(
+            self, font=FONT_MONO, fg_color=C("bg"),
+            text_color=C("fg"), corner_radius=0,
+            border_width=1, border_color=C("border"),
+            wrap="word",
+        )
+        self._editor.pack(fill="both", expand=True, padx=0, pady=0)
+
+        # Bind modification → debounced save. CustomTkinter forwards
+        # ``<<Modified>>`` whenever the buffer changes.
+        self._editor.bind("<<Modified>>", self._on_modified)
+
+        # Load existing content
+        self._load()
+
+    # ---- public API ----------------------------------------------------
+
+    def read(self) -> str:
+        """Return the current buffer contents."""
+        return self._editor.get("1.0", "end-1c")
+
+    def set_text(self, text: str) -> None:
+        """Replace buffer contents (cancels any pending save)."""
+        self._cancel_pending_save()
+        self._loading = True
+        self._editor.delete("1.0", "end")
+        self._editor.insert("1.0", text)
+        self._editor.edit_modified(False)
+        self._loading = False
+        self._set_status("Loaded", "fg_subtle")
+
+    # ---- loading / saving ---------------------------------------------
+
+    def _load(self) -> None:
+        if not self._file_path.exists():
+            self._set_status("New file", "fg_subtle")
+            return
+        try:
+            text = self._file_path.read_text(encoding="utf-8")
+        except OSError as exc:
+            self._set_status(f"Read error: {exc}", "error")
+            return
+        self.set_text(text)
+
+    def _save_async(self) -> None:
+        """Write the current buffer to disk in a background thread."""
+        text = self.read()
+        path = self._file_path
+        self._set_status("Saving…", "warning")
+
+        def _do_save() -> None:
+            try:
+                with self._write_lock:
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_text(text, encoding="utf-8")
+                self.after(0, lambda: self._set_status("Saved ✓", "success"))
+                if self.on_save is not None:
+                    try:
+                        self.on_save(path, text)
+                    except Exception:
+                        pass
+            except OSError as exc:
+                self.after(0, lambda e=exc: self._set_status(
+                    f"Save failed: {e}", "error",
+                ))
+
+        threading.Thread(target=_do_save, daemon=True).start()
+
+    def _cancel_pending_save(self) -> None:
+        if self._save_job is not None:
+            try:
+                self.after_cancel(self._save_job)
+            except Exception:
+                pass
+            self._save_job = None
+
+    def _on_modified(self, _event) -> None:
+        # CTk emits <<Modified>> once per text mutation. Reset the
+        # modified flag so the next mutation fires it again, and
+        # reschedule the debounced save.
+        if self._loading:
+            return
+        self._editor.edit_modified(False)
+        self._set_status("Editing…", "fg_muted")
+        self._cancel_pending_save()
+        self._save_job = self.after(SAVE_DEBOUNCE_MS, self._save_async)
+
+    def _set_status(self, text: str, color_key: str) -> None:
+        self._status_text = text
+        self._status_color_key = color_key
+        if hasattr(self, "_status_lbl"):
+            self._status_lbl.configure(
+                text=text, text_color=C(color_key),
+            )
+
+    # ---- toolbar helpers ----------------------------------------------
+
+    def _wrap_selection(self, prefix: str, suffix: Optional[str] = None,
+                        placeholder: str = "") -> None:
+        """Wrap selected text with ``prefix`` / ``suffix``."""
+        if suffix is None:
+            suffix = prefix
+        try:
+            sel_start = self._editor.index("sel.first")
+            sel_end = self._editor.index("sel.last")
+            has_sel = True
+        except Exception:
+            sel_start = self._editor.index("insert")
+            sel_end = sel_start
+            has_sel = False
+
+        if has_sel:
+            selected = self._editor.get(sel_start, sel_end)
+            new_text = f"{prefix}{selected}{suffix}"
+            self._editor.delete(sel_start, sel_end)
+            self._editor.insert(sel_start, new_text)
+        else:
+            new_text = f"{prefix}{placeholder}{suffix}"
+            self._editor.insert(sel_start, new_text)
+
+    def _wrap_bold(self) -> None:
+        self._wrap_selection("**", "**", "bold")
+
+    def _wrap_italic(self) -> None:
+        self._wrap_selection("_", "_", "italic")
+
+    def _wrap_code(self) -> None:
+        self._wrap_selection("`", "`", "code")
+
+    def _wrap_link(self) -> None:
+        self._wrap_selection("[", "](https://)", "text")
+
+
+__all__ = ["MarkdownEditor", "SAVE_DEBOUNCE_MS"]

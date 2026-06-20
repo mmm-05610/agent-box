@@ -458,11 +458,15 @@ class ProfileRow(Card):
         browse_dir(self.cwd_var)
 
     def _open_detail(self) -> None:
-        # Stage A placeholder — Phase 4 wires up the real detail view.
-        self._toast.show(
-            f"Detail view for '{self._profile['name']}' — Stage B",
-            kind="info",
-        )
+        # Hand off to the page's on_action callback so the app can route
+        # navigation properly (with cache + return-to semantics).
+        if self._on_action is not None:
+            self._on_action(self._profile, "open_detail")
+        else:
+            self._toast.show(
+                f"Detail view for '{self._profile['name']}' — coming soon",
+                kind="info",
+            )
 
     def _quick_launch(self) -> None:
         cwd = self.cwd_var.get().strip()

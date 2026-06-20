@@ -11,13 +11,22 @@ from __future__ import annotations
 import sys
 import threading
 from collections import OrderedDict
+from pathlib import Path
 from tkinter import messagebox
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import customtkinter as ctk
 
 from .components import NAV_ITEMS, Sidebar, ToastManager
-from .pages import HelpPage, HomePage, ProfilesPage, SessionsPage, SettingsPage
+from .pages import (
+    CreationWizard,
+    HelpPage,
+    HomePage,
+    ProfileDetailPage,
+    ProfilesPage,
+    SessionsPage,
+    SettingsPage,
+)
 from .state import fetch_sessions
 from .theme import C, Theme
 from .tokens import FONT_MICRO, SPACE_LG
@@ -27,6 +36,11 @@ from .wsl import MODE_RESUME, fetch_profiles, launch_profile
 # Maximum number of page instances kept in the cache. Older pages are
 # discarded when the cap is exceeded (LRU).
 _PAGE_CACHE_CAP = 5
+
+# Default location of profile files on the WSL side. This is a
+# placeholder for Phase 4 — in a follow-up we'll resolve the real
+# path from the agent-box CLI.
+PROFILE_ROOT = Path.home() / ".agent-box" / "profiles"
 
 
 class AgentBoxApp:
@@ -51,6 +65,9 @@ class AgentBoxApp:
         self._status_text: str = "Ready."
         self._pages: "OrderedDict[str, ctk.CTkBaseClass]" = OrderedDict()
         self._refreshing = False
+        # When set, the next ``_show_page`` returns here instead of the
+        # sidebar's last key — used by the detail / wizard "back" buttons.
+        self._return_to: Optional[str] = None
         self.toast = ToastManager(self.root)
 
         # Build layout
@@ -103,12 +120,19 @@ class AgentBoxApp:
     def _on_nav(self, key: str) -> None:
         if key not in {k for k, _, _ in NAV_ITEMS}:
             return
+        # Sidebar nav always clears the "return to" target
+        self._return_to = None
         self._show_page(key)
 
     # --- page caching ---------------------------------------------------
 
     def _build_page(self, key: str) -> ctk.CTkBaseClass:
-        """Instantiate a fresh page object for ``key``."""
+        """Instantiate a fresh page object for ``key``.
+
+        Detail / wizard pages are addressed by special keys that include
+        a payload suffix (e.g. ``detail:dw``) so we can cache multiple
+        detail pages independently.
+        """
         if key == "home":
             return HomePage(self.content, self._on_nav,
                             self._profiles, fetch_sessions)
@@ -126,6 +150,32 @@ class AgentBoxApp:
                                 on_theme_change=self._apply_theme)
         if key == "help":
             return HelpPage(self.content)
+        if key == "wizard":
+            return CreationWizard(
+                self.content,
+                toast=self.toast,
+                on_finish=self._on_wizard_finish,
+                on_cancel=self._on_wizard_cancel,
+            )
+        if key.startswith("detail:"):
+            name = key.split(":", 1)[1]
+            profile = next(
+                (p for p in self._profiles if p.get("name") == name),
+                {"name": name, "agent_type": "cc"},
+            )
+            return ProfileDetailPage(
+                self.content,
+                profile=profile,
+                profile_root=PROFILE_ROOT / name,
+                on_back=lambda: self._on_nav(
+                    self._return_to or "profiles"
+                ),
+                on_provider_change=lambda _p: None,
+                on_delete=lambda n: self.toast.show(
+                    f"Delete {n} (Phase 4.x)", kind="info",
+                ),
+                toast=self.toast,
+            )
         raise KeyError(f"unknown page key: {key!r}")
 
     def _evict_if_needed(self) -> None:
@@ -174,7 +224,9 @@ class AgentBoxApp:
         page.grid(row=0, column=0, sticky="nsew")
 
         self._current_page = key
-        self.sidebar.set_active(key)
+        # Only highlight the sidebar for top-level nav keys
+        if key in {k for k, _, _ in NAV_ITEMS}:
+            self.sidebar.set_active(key)
 
     def _invalidate_pages(self, keys: Optional[List[str]] = None) -> None:
         """Drop cached pages so the next navigation rebuilds them."""
@@ -195,7 +247,6 @@ class AgentBoxApp:
         self.sidebar.update_status()
 
     def _on_profile_action(self, profile: dict, action: str) -> None:
-        # Stage A: actions are minimal. Stage B will handle edit/detail/etc.
         if action == "launch":
             try:
                 launch_profile(
@@ -203,17 +254,51 @@ class AgentBoxApp:
                     MODE_RESUME, "",
                 )
                 self.toast.show(
-                    f"Launched {profile['name']} (resume last)", kind="success",
+                    f"Launched {profile['name']} (resume last)",
+                    kind="success",
                 )
             except RuntimeError as exc:
                 messagebox.showerror("Launch failed", str(exc))
                 self.toast.show(f"Launch failed: {exc}", kind="error")
+        elif action == "open_detail":
+            self._return_to = "profiles"
+            self._show_page(f"detail:{profile['name']}")
 
     def _on_new_profile(self) -> None:
-        # Stage A placeholder — Stage B will implement the wizard.
-        self.toast.show(
-            "Create-profile wizard — coming in Stage B", kind="info",
-        )
+        """Open the creation wizard."""
+        self._return_to = "profiles"
+        # Evict any stale wizard instance
+        if "wizard" in self._pages:
+            try:
+                self._pages["wizard"].destroy()
+            except Exception:
+                pass
+            del self._pages["wizard"]
+        self._show_page("wizard")
+
+    def _on_wizard_finish(self, payload: Dict[str, Any]) -> None:
+        # In a real implementation we'd shell out to
+        # ``agent-box create ...`` here. For now the payload has been
+        # collected and a toast has been shown.
+        if "wizard" in self._pages:
+            try:
+                self._pages["wizard"].destroy()
+            except Exception:
+                pass
+            del self._pages["wizard"]
+        # Refresh profile list so the new profile appears (when CLI
+        # integration is wired up); for now just navigate back.
+        self.refresh()
+        self._on_nav("profiles")
+
+    def _on_wizard_cancel(self) -> None:
+        if "wizard" in self._pages:
+            try:
+                self._pages["wizard"].destroy()
+            except Exception:
+                pass
+            del self._pages["wizard"]
+        self._on_nav(self._return_to or "profiles")
 
     # --- refresh (Phase 3.2 — async) ------------------------------------
 
