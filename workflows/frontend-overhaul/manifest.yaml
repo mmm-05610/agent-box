@@ -1,0 +1,65 @@
+# Frontend Overhaul Workflow Manifest
+# 执行者：DW (Decision Writer)
+# 输入：docs/specs/frontend-overhaul.md + gui-redesign.py
+# 输出：gui/ 模块化目录 + 改造后的应用
+
+name: frontend-overhaul
+version: "1.0"
+description: agent-box GUI 全面改造 — 架构重构 + 视觉打磨 + 交互优化 + 功能补全
+
+# 执行顺序
+phases:
+  - id: phase-1
+    name: "架构重构"
+    description: "单文件拆分为模块化目录"
+    tasks:
+      - task-1.1-extract-theme
+      - task-1.2-extract-wsl-state
+      - task-1.3-extract-components
+      - task-1.4-extract-pages
+      - task-1.5-verify-imports
+
+  - id: phase-2
+    name: "视觉打磨"
+    description: "组件化 + 样式改造"
+    tasks:
+      - task-2.1-button-components
+      - task-2.2-card-components
+      - task-2.3-profile-row-redesign
+      - task-2.4-tab-styling
+      - task-2.5-empty-state
+      - task-2.6-color-tuning
+
+  - id: phase-3
+    name: "交互优化"
+    description: "消除闪烁 + 异步刷新 + 线程安全"
+    tasks:
+      - task-3.1-page-caching
+      - task-3.2-async-refresh
+      - task-3.3-sqlite-thread-safety
+      - task-3.4-incremental-list-update
+
+  - id: phase-4
+    name: "功能补全"
+    description: "Profile 详情页 + 创建向导 + Provider 切换"
+    tasks:
+      - task-4.1-detail-page-meta
+      - task-4.2-detail-page-settings
+      - task-4.3-detail-page-claude-md
+      - task-4.4-detail-page-other-tabs
+      - task-4.5-creation-wizard
+      - task-4.6-provider-selector
+
+# 依赖关系
+dependencies:
+  phase-2: [phase-1]
+  phase-3: [phase-1]
+  phase-4: [phase-1, phase-2]
+
+# 验证标准
+validation:
+  - "python gui-redesign.py 启动无报错"
+  - "所有 5 个页面可正常导航"
+  - "Profile 列表正常显示"
+  - "深色/浅色主题切换正常"
+  - "Launch 流程正常工作"

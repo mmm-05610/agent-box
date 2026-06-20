@@ -107,6 +107,10 @@ def create(name: str, agent_type: str = "cc") -> Path:
     target = config.profile_agent_dir(name, agent_type)
     shutil.copytree(template_dir, target, symlinks=True)
 
+    # CC: also seed dot-claude.json at the profile root
+    if agent_type == "cc":
+        (root / "dot-claude.json").write_text("{}\n")
+
     # Copy the secondary data template directory (e.g. OpenCode auth)
     data_template = library.get_template_data_dir(agent_type)
     if data_template is not None:

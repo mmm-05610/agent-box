@@ -13,11 +13,12 @@ from . import config
 from . import profile
 
 
-def launch(name: str) -> None:
+def launch(name: str, extra_args: list | None = None) -> None:
     """Bind-mount the profile's config dir and exec the agent binary.
 
-    Reads ``meta.yaml`` to determine agent_type. Never returns on
-    success (os.execvpe replaces the process).
+    Reads ``meta.yaml`` to determine agent_type. ``extra_args`` are
+    passed through to the agent binary (e.g. ``-c`` for hermes,
+    ``--continue`` for claude). Never returns on success.
     """
     meta = profile.load_meta(name)
     agent_type = meta.get("agent_type") or config.AGENT_TYPE_CC
@@ -60,6 +61,17 @@ def launch(name: str) -> None:
         "--share-net",
     ]
 
+    # CC: also bind-mount dot-claude.json → ~/.claude.json
+    if agent_type == "cc":
+        pjson = config.profile_dir(name) / "dot-claude.json"
+        rjson = config.real_agent_dir("cc").with_name(".claude.json")
+        if pjson.is_file():
+            if not rjson.exists():
+                rjson.touch()
+            argv.insert(4, str(rjson))
+            argv.insert(4, str(pjson))
+            argv.insert(4, "--bind")
+
     # Secondary data dir mount (e.g. OpenCode auth)
     pdata = config.profile_agent_data_dir(name, agent_type)
     rdata = config.real_agent_data_dir(agent_type)
@@ -71,6 +83,8 @@ def launch(name: str) -> None:
         argv.insert(4, "--bind")
 
     argv.append(binary)
+    if extra_args:
+        argv.extend(extra_args)
 
     env = dict(os.environ)
     print(

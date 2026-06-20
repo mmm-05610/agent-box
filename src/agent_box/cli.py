@@ -41,12 +41,16 @@ def _build_parser() -> argparse.ArgumentParser:
     # launch ---------------------------------------------------------------
     p_launch = sub.add_parser("launch", help="Launch a profile (bwrap)")
     p_launch.add_argument("name", help="Profile name")
+    p_launch.add_argument("extra", nargs=argparse.REMAINDER,
+                          help="Extra args passed through to the agent binary")
     p_launch.set_defaults(func=cmd_launch)
 
     # cc / codex / hermes / opencode ---------------------------------------
     for at in library.get_agent_types():
         p = sub.add_parser(at, help=f"Shortcut for: agent-box launch <name> ({at} profile)")
         p.add_argument("name", help=f"{at} profile name to launch")
+        p.add_argument("extra", nargs=argparse.REMAINDER,
+                       help="Extra args passed through to the agent binary")
         p.set_defaults(func=cmd_launch)
 
     # gui ------------------------------------------------------------------
@@ -103,7 +107,7 @@ def cmd_list(args: argparse.Namespace) -> int:
 def cmd_launch(args: argparse.Namespace) -> int:
     try:
         config.validate_profile_name(args.name)
-        launch.launch(args.name)
+        launch.launch(args.name, extra_args=args.extra)
     except (ValueError, profile.ProfileError) as exc:
         print(f"agent-box: {exc}", file=sys.stderr)
         return 2
