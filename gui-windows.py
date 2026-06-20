@@ -90,15 +90,26 @@ def build_launch_argv(name: str, agent_type: str, mode: str, cwd: str = "") -> L
 
 
 def _browse_dir(cwd_var: tk.StringVar) -> None:
-    """Open a Windows directory picker, convert the result to a WSL path."""
+    """Open a Windows directory picker, convert via wslpath to WSL path."""
     initial = "\\\\wsl$\\Ubuntu\\home\\maoqh\\projects"
     path = filedialog.askdirectory(initialdir=initial, title="Select project directory")
     if path:
-        # Convert UNC path \\wsl$\Ubuntu\... → /...
-        if path.startswith("\\\\wsl$\\Ubuntu\\"):
-            path = "/" + path[len("\\\\wsl$\\Ubuntu\\"):].replace("\\", "/")
-        elif path.startswith("\\\\wsl.localhost\\Ubuntu\\"):
-            path = "/" + path[len("\\\\wsl.localhost\\Ubuntu\\"):].replace("\\", "/")
+        try:
+            r = subprocess.run(
+                ["wsl.exe", "wslpath", path],
+                capture_output=True, text=True, timeout=5, cwd="C:\\",
+            )
+            wsl_path = r.stdout.strip()
+            if wsl_path:
+                cwd_var.set(wsl_path)
+                return
+        except Exception:
+            pass
+        # Fallback: if wslpath fails, strip UNC prefix manually
+        for prefix in ("\\\\wsl$\\Ubuntu\\", "\\\\wsl.localhost\\Ubuntu\\"):
+            if path.startswith(prefix):
+                path = "/" + path[len(prefix):].replace("\\", "/")
+                break
         cwd_var.set(path)
 
 
