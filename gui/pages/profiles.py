@@ -48,7 +48,12 @@ AGENT_BADGE_VARIANT = {
 
 
 class ProfilesPage(ctk.CTkFrame):
-    """Profile list with horizontal agent-type tabs."""
+    """Profile list with horizontal agent-type tabs.
+
+    Phase 3.4: incremental list update. Instead of destroying every
+    child of ``list_holder`` on tab switch / refresh, we cache
+    ``ProfileRow`` instances keyed by profile name and reuse them.
+    """
 
     def __init__(
         self,
@@ -64,6 +69,11 @@ class ProfilesPage(ctk.CTkFrame):
         self._on_new = on_new
         self._toast = toast
         self._active_tab = "all"
+
+        # Cached rows: profile_name -> ProfileRow instance.
+        # ``_empty_card`` is shown when no rows match the active tab.
+        self._rows: Dict[str, "ProfileRow"] = {}
+        self._empty_card: Optional[ctk.CTkBaseClass] = None
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(2, weight=1)
@@ -143,45 +153,87 @@ class ProfilesPage(ctk.CTkFrame):
                 indicator.configure(fg_color="transparent")
         self._rebuild_list()
 
-    def _rebuild_list(self) -> None:
-        for w in self.list_holder.winfo_children():
-            w.destroy()
-
+    def _visible_profiles(self) -> List[Dict[str, str]]:
         if self._active_tab == "all":
-            visible = self._profiles
-        else:
-            visible = [p for p in self._profiles
-                       if p.get("agent_type") == self._active_tab]
+            return list(self._profiles)
+        return [p for p in self._profiles
+                if p.get("agent_type") == self._active_tab]
 
-        if not visible:
-            self._render_empty(self.list_holder)
-            return
+    def _active_set(self) -> set:
+        return {s["profile"] for s in fetch_sessions(active_only=True)}
 
-        active_profiles = {s["profile"] for s in fetch_sessions(active_only=True)}
-
-        last_cwd_by_profile: Dict[str, str] = {}
+    def _last_cwd_map(self) -> Dict[str, str]:
+        out: Dict[str, str] = {}
         for s in fetch_sessions(limit=200):
             cwd = s.get("cwd") or ""
-            if cwd and s["profile"] not in last_cwd_by_profile:
-                last_cwd_by_profile[s["profile"]] = cwd
+            if cwd and s["profile"] not in out:
+                out[s["profile"]] = cwd
+        return out
 
-        for i, p in enumerate(visible):
-            ProfileRow(
-                self.list_holder, p,
-                active=(p["name"] in active_profiles),
-                on_action=self._on_profile_action,
-                toast=self._toast,
-                last_cwd=last_cwd_by_profile.get(p["name"], ""),
-            ).grid(row=i, column=0, sticky="ew", pady=(0, 8))
+    def _rebuild_list(self) -> None:
+        """Phase 3.4 incremental update.
 
-    @staticmethod
-    def _render_empty(parent: ctk.CTkBaseClass) -> None:
-        """Centered empty-state card with CTA-style headline.
-
-        Phase 2.5 — replaces the plain centered label with a Card.
+        Hide rows that aren't visible, create rows for new profiles,
+        destroy rows whose profiles no longer exist, then re-grid.
         """
-        empty = Card(parent)
-        empty.grid(row=0, column=0, sticky="ew", padx=0, pady=48)
+        visible = self._visible_profiles()
+        visible_names = {p["name"] for p in visible}
+
+        # Hide cached rows that aren't visible in the current tab
+        for name, row in list(self._rows.items()):
+            if name not in visible_names:
+                row.grid_forget()
+
+        # Remove rows for profiles that no longer exist (e.g. deleted
+        # via the CLI between refreshes).
+        for name in list(self._rows.keys()):
+            if name not in {p["name"] for p in self._profiles}:
+                self._rows[name].destroy()
+                del self._rows[name]
+
+        # Hide the empty card if we'll have rows; remove it otherwise
+        if visible:
+            if self._empty_card is not None:
+                self._empty_card.destroy()
+                self._empty_card = None
+        else:
+            if self._empty_card is None:
+                self._empty_card = self._make_empty_card()
+            # Hide rows so the empty card is the only visible thing
+            for row in self._rows.values():
+                row.grid_forget()
+            self._empty_card.grid(row=0, column=0, sticky="ew",
+                                  padx=0, pady=48)
+            return
+
+        # Build any missing rows + re-grid visible ones in correct order
+        active_profiles = self._active_set()
+        last_cwd = self._last_cwd_map()
+        for i, p in enumerate(visible):
+            name = p["name"]
+            row = self._rows.get(name)
+            if row is None:
+                row = ProfileRow(
+                    self.list_holder, p,
+                    active=(name in active_profiles),
+                    on_action=self._on_profile_action,
+                    toast=self._toast,
+                    last_cwd=last_cwd.get(name, ""),
+                )
+                self._rows[name] = row
+            else:
+                # Refresh active status / cwd hint in case state changed
+                row.update_state(
+                    active=(name in active_profiles),
+                    last_cwd=last_cwd.get(name, ""),
+                )
+            row.grid(row=i, column=0, sticky="ew", pady=(0, 8))
+
+    def _make_empty_card(self) -> ctk.CTkBaseClass:
+        """Build the centered empty-state card (lazy — only on first show)."""
+        from ..components.card import Card
+
+        empty = Card(self.list_holder)
         empty.grid_columnconfigure(0, weight=1)
 
         icon = ctk.CTkLabel(
@@ -202,6 +254,20 @@ class ProfilesPage(ctk.CTkFrame):
             text_color=C("fg_muted"), font=FONT_CAPTION,
         )
         body.grid(row=2, column=0, pady=(SPACE_XS, SPACE_LG))
+        return empty
+
+    @staticmethod
+    def _render_empty(parent: ctk.CTkBaseClass) -> None:
+        """Backward-compat helper for direct callers (mostly tests).
+
+        Use :meth:`ProfilesPage._make_empty_card` from the page itself —
+        it returns the card so the page can keep a reference and avoid
+        rebuilding it on every tab switch.
+        """
+        page = ProfilesPage.__new__(ProfilesPage)
+        card = page._make_empty_card()
+        card.grid(row=0, column=0, sticky="ew", padx=0, pady=48)
+        return card
 
 
 class ProfileRow(Card):
@@ -278,14 +344,13 @@ class ProfileRow(Card):
         )
 
         # --- Meta row (row 1): Agent type · Status · Runtime ---
-        meta_text = self._compose_meta_text()
-        meta = ctk.CTkLabel(
-            self, text=meta_text, text_color=C("fg_muted"),
+        self._meta_lbl = ctk.CTkLabel(
+            self, text=self._compose_meta_text(), text_color=C("fg_muted"),
             font=FONT_CAPTION, anchor="w",
         )
-        meta.grid(row=1, column=1, columnspan=2, sticky="ew",
-                  padx=(SPACE_SM, SPACE_SM), pady=(2, SPACE_SM))
-        meta.bind("<Button-1>", lambda e: self._open_detail())
+        self._meta_lbl.grid(row=1, column=1, columnspan=2, sticky="ew",
+                            padx=(SPACE_SM, SPACE_SM), pady=(2, SPACE_SM))
+        self._meta_lbl.bind("<Button-1>", lambda e: self._open_detail())
 
         # --- CWD row (row 2): path text + Edit ⋯ button ---
         cwd_label = ctk.CTkLabel(
@@ -296,15 +361,15 @@ class ProfileRow(Card):
         cwd_label.grid(row=2, column=1, sticky="ew",
                        padx=(SPACE_SM, SPACE_SM), pady=(0, SPACE_LG))
 
-        edit_btn = ctk.CTkButton(
+        self._edit_btn = ctk.CTkButton(
             self, text="Edit  ⋯", width=90, height=28,
             corner_radius=RADIUS_MD,
             fg_color="transparent", hover_color=C("bg_hover"),
             text_color=C("fg_muted"), font=FONT_BODY,
             command=self._open_detail,
         )
-        edit_btn.grid(row=2, column=2, padx=(0, SPACE_SM),
-                      pady=(0, SPACE_LG), sticky="e")
+        self._edit_btn.grid(row=2, column=2, padx=(0, SPACE_SM),
+                            pady=(0, SPACE_LG), sticky="e")
 
         # Mode dropdown (right of edit, used on launch — kept compact)
         mode_menu = ctk.CTkOptionMenu(
@@ -330,6 +395,21 @@ class ProfileRow(Card):
         )
         browse_btn.grid(row=2, column=0, padx=(SPACE_LG, 0),
                         pady=(0, SPACE_LG), sticky="w")
+
+    def update_state(self, *, active: bool, last_cwd: str) -> None:
+        """Phase 3.4 incremental-update hook.
+
+        Called by ``ProfilesPage._rebuild_list`` when reusing a cached
+        ``ProfileRow`` instance. Only the parts that can change without
+        rebuilding the layout (status pill, meta text, cwd hint) are
+        touched.
+        """
+        if active != self._active:
+            self._active = active
+            self._status_pill.set_status("running" if active else "stopped")
+        self.cwd_var.set(last_cwd or "~")
+        if hasattr(self, "_meta_lbl"):
+            self._meta_lbl.configure(text=self._compose_meta_text())
 
     def _compose_meta_text(self) -> str:
         at = self._profile.get("agent_type", "")

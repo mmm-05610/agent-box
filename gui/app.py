@@ -9,8 +9,10 @@ Run directly: ``python -m gui.app``
 from __future__ import annotations
 
 import sys
+import threading
+from collections import OrderedDict
 from tkinter import messagebox
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import customtkinter as ctk
 
@@ -22,8 +24,19 @@ from .tokens import FONT_MICRO, SPACE_LG
 from .wsl import MODE_RESUME, fetch_profiles, launch_profile
 
 
+# Maximum number of page instances kept in the cache. Older pages are
+# discarded when the cap is exceeded (LRU).
+_PAGE_CACHE_CAP = 5
+
+
 class AgentBoxApp:
-    """Top-level controller for the agent-box desktop GUI."""
+    """Top-level controller for the agent-box desktop GUI.
+
+    Page caching (Phase 3.1): instead of destroying + rebuilding every
+    child of ``self.content`` on each navigation, we keep page instances
+    alive in an LRU cache and just show/hide them. This eliminates the
+    flicker users reported when switching between Home and Profiles.
+    """
 
     def __init__(self, root: ctk.CTk) -> None:
         self.root = root
@@ -36,6 +49,8 @@ class AgentBoxApp:
         self._profiles: List[dict] = []
         self._current_page: str = "home"
         self._status_text: str = "Ready."
+        self._pages: "OrderedDict[str, ctk.CTkBaseClass]" = OrderedDict()
+        self._refreshing = False
         self.toast = ToastManager(self.root)
 
         # Build layout
@@ -90,36 +105,93 @@ class AgentBoxApp:
             return
         self._show_page(key)
 
-    def _show_page(self, key: str) -> None:
-        for w in self.content.winfo_children():
-            w.destroy()
-        self._current_page = key
-        self.sidebar.set_active(key)
+    # --- page caching ---------------------------------------------------
 
+    def _build_page(self, key: str) -> ctk.CTkBaseClass:
+        """Instantiate a fresh page object for ``key``."""
         if key == "home":
-            page = HomePage(self.content, self._on_nav,
+            return HomePage(self.content, self._on_nav,
                             self._profiles, fetch_sessions)
-        elif key == "profiles":
-            page = ProfilesPage(
+        if key == "profiles":
+            return ProfilesPage(
                 self.content, self._profiles,
                 on_profile_action=self._on_profile_action,
                 on_new=self._on_new_profile,
                 toast=self.toast,
             )
-        elif key == "sessions":
-            page = SessionsPage(self.content, fetch_sessions)
-        elif key == "settings":
-            page = SettingsPage(self.content,
+        if key == "sessions":
+            return SessionsPage(self.content, fetch_sessions)
+        if key == "settings":
+            return SettingsPage(self.content,
                                 on_theme_change=self._apply_theme)
-        elif key == "help":
-            page = HelpPage(self.content)
-        else:
-            return
+        if key == "help":
+            return HelpPage(self.content)
+        raise KeyError(f"unknown page key: {key!r}")
+
+    def _evict_if_needed(self) -> None:
+        """Drop the oldest cached pages beyond the cap."""
+        while len(self._pages) > _PAGE_CACHE_CAP:
+            _, old = self._pages.popitem(last=False)
+            try:
+                old.destroy()
+            except Exception:
+                pass
+
+    def _show_page(self, key: str, *, force_rebuild: bool = False) -> None:
+        """Navigate to ``key``. Reuses cached instances when possible.
+
+        ``force_rebuild=True`` evicts the cached instance first; used by
+        the theme change handler so colors pick up the new palette.
+        """
+        # Hide whatever is currently shown
+        current = self._pages.get(self._current_page)
+        if current is not None:
+            try:
+                current.grid_forget()
+            except Exception:
+                pass
+
+        # Drop the cached page if a rebuild is requested (theme change,
+        # explicit refresh, etc.)
+        if force_rebuild and key in self._pages:
+            try:
+                self._pages[key].destroy()
+            except Exception:
+                pass
+            del self._pages[key]
+
+        # Get or create the target page
+        page = self._pages.get(key)
+        if page is None:
+            page = self._build_page(key)
+            self._pages[key] = page
+            self._evict_if_needed()
+
+        # Refresh LRU order
+        self._pages.move_to_end(key)
+
+        # Show the target page
         page.grid(row=0, column=0, sticky="nsew")
 
+        self._current_page = key
+        self.sidebar.set_active(key)
+
+    def _invalidate_pages(self, keys: Optional[List[str]] = None) -> None:
+        """Drop cached pages so the next navigation rebuilds them."""
+        targets = keys if keys is not None else list(self._pages.keys())
+        for k in targets:
+            if k in self._pages:
+                try:
+                    self._pages[k].destroy()
+                except Exception:
+                    pass
+                del self._pages[k]
+
+    # --- actions --------------------------------------------------------
+
     def _apply_theme(self) -> None:
-        """Rebuild current page so all colors pick up new theme."""
-        self._show_page(self._current_page)
+        """Rebuild the current page so all colors pick up new theme."""
+        self._show_page(self._current_page, force_rebuild=True)
         self.sidebar.update_status()
 
     def _on_profile_action(self, profile: dict, action: str) -> None:
@@ -143,23 +215,54 @@ class AgentBoxApp:
             "Create-profile wizard — coming in Stage B", kind="info",
         )
 
-    # --- refresh --------------------------------------------------------
+    # --- refresh (Phase 3.2 — async) ------------------------------------
 
     def refresh(self) -> None:
-        self._status_text = "Refreshing…"
-        self.status_bar.configure(text=self._status_text)
-        self.root.update_idletasks()
-        try:
-            self._profiles = fetch_profiles()
-            self._status_text = f"Loaded {len(self._profiles)} profile(s)."
-        except RuntimeError as exc:
-            self._profiles = []
-            self._status_text = f"Error: {exc}"
-        self.status_bar.configure(text=self._status_text)
+        """Kick off an async profile fetch.
+
+        Falls back to a blocking refresh if a refresh is already in
+        flight (prevents overlapping ``wsl.exe`` calls).
+        """
+        if self._refreshing:
+            return
+        self._refreshing = True
+        self._set_status("Refreshing…")
+
+        def _worker() -> None:
+            try:
+                profiles = fetch_profiles()
+                self.root.after(0, lambda: self._on_profiles_loaded(profiles))
+            except RuntimeError as exc:
+                self.root.after(0, lambda e=exc: self._on_profiles_error(e))
+
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _on_profiles_loaded(self, profiles: List[dict]) -> None:
+        self._refreshing = False
+        self._profiles = profiles
+        self._set_status(f"Loaded {len(profiles)} profile(s).")
         self.sidebar.update_status()
-        # Re-render current page if it depends on profile data
+        # Re-render pages that depend on profile data
+        for key in ("home", "profiles"):
+            if key in self._pages:
+                self._invalidate_pages([key])
         if self._current_page in ("home", "profiles"):
             self._show_page(self._current_page)
+
+    def _on_profiles_error(self, exc: RuntimeError) -> None:
+        self._refreshing = False
+        self._profiles = []
+        self._set_status(f"Error: {exc}")
+        self.sidebar.update_status()
+        for key in ("home", "profiles"):
+            if key in self._pages:
+                self._invalidate_pages([key])
+        if self._current_page in ("home", "profiles"):
+            self._show_page(self._current_page)
+
+    def _set_status(self, text: str) -> None:
+        self._status_text = text
+        self.status_bar.configure(text=text)
 
 
 # ---------------------------------------------------------------------------
