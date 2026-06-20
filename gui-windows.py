@@ -74,23 +74,17 @@ def fetch_profiles() -> List[Dict[str, str]]:
     return data
 
 
-def build_launch_argv(name: str, agent_type: str, mode: str) -> List[str]:
-    """Build the argv passed to ``subprocess.Popen`` to launch a profile.
-
-    Example::
-
-        ["wt.exe", "wsl.exe", "bash", "-lc",
-         "agent-box launch dw --continue"]
-    """
+def build_launch_argv(name: str, agent_type: str, mode: str, cwd: str = "") -> List[str]:
+    """Build the argv passed to ``subprocess.Popen`` to launch a profile."""
     argv: List[str] = ["agent-box", "launch", name]
     if mode == MODE_RESUME and agent_type in RESUME_ARGS:
         extra = RESUME_ARGS[agent_type]
         if extra:
             argv.extend(extra)
     cmdline = " ".join(_shell_quote(a) for a in argv)
-    # Ensure ~/.local/bin and ~/.npm-global/bin are on PATH (login shell
-    # may not source .bashrc for non-interactive sessions).
     setup = "export PATH=\"$HOME/.npm-global/bin:$HOME/.local/bin:$PATH\""
+    if cwd:
+        setup = f"cd {_shell_quote(cwd)} && {setup}"
     script = f"{setup} && {cmdline} || {{ ec=$?; echo; echo agent-box failed code $ec; read -p Enter...; }}"
     return ["wsl.exe", "bash", "-lc", script]
 
@@ -102,9 +96,9 @@ def _shell_quote(token: str) -> str:
     return token
 
 
-def launch_profile(name: str, agent_type: str, mode: str) -> None:
+def launch_profile(name: str, agent_type: str, mode: str, cwd: str = "") -> None:
     """Spawn a new console window with the agent command. Non-blocking."""
-    argv = build_launch_argv(name, agent_type, mode)
+    argv = build_launch_argv(name, agent_type, mode, cwd)
     kwargs = dict(close_fds=True, cwd="C:\\")
     if sys.platform == "win32":
         kwargs["creationflags"] = subprocess.CREATE_NEW_CONSOLE
@@ -216,45 +210,50 @@ class AgentBoxApp:
             row = ttk.Frame(self.body)
             row.pack(fill="x", padx=8, pady=2)
 
-            ttk.Label(row, text=name, width=20, anchor="w").pack(side="left")
+            ttk.Label(row, text=name, width=18, anchor="w").pack(side="left")
             launch_btn = ttk.Button(
                 row,
                 text="\u25b6 Launch",
                 width=10,
                 command=lambda n=name, t=agent_type: self._on_launch(n, t),
             )
-            launch_btn.pack(side="left", padx=(6, 4))
+            launch_btn.pack(side="left", padx=(4, 4))
             mode_var = tk.StringVar(value=MODE_NEW)
             combo = ttk.Combobox(
                 row,
                 textvariable=mode_var,
                 values=LAUNCH_MODES,
                 state="readonly",
-                width=12,
+                width=10,
             )
             combo.pack(side="left")
+            cwd_var = tk.StringVar(value="~")
+            cwd_entry = ttk.Entry(row, textvariable=cwd_var, width=24)
+            cwd_entry.pack(side="left", padx=(4, 0))
             self.rows.append({
                 "name": name,
                 "agent_type": agent_type,
                 "mode_var": mode_var,
+                "cwd_var": cwd_var,
                 "button": launch_btn,
             })
 
     # --- launch handler ---------------------------------------------------
     def _on_launch(self, name: str, agent_type: str) -> None:
-        # find the row's selected mode (combo is per-row, look it up)
         mode = MODE_NEW
+        cwd = ""
         for r in self.rows:
             if r["name"] == name and r["agent_type"] == agent_type:
                 mode = r["mode_var"].get()
+                cwd = r["cwd_var"].get().strip()
                 break
         try:
-            launch_profile(name, agent_type, mode)
+            launch_profile(name, agent_type, mode, cwd)
         except RuntimeError as exc:
             messagebox.showerror("Launch failed", str(exc))
             self.status_var.set(f"Launch failed: {exc}")
             return
-        self.status_var.set(f"Launched {agent_type}/{name} ({mode}).")
+        self.status_var.set(f"Launched {agent_type}/{name} ({mode})" + (f" in {cwd}" if cwd else ""))
 
 
 def main() -> int:
