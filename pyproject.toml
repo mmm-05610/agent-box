@@ -9,6 +9,9 @@ description = "Isolated HOME launcher for coding agents (Claude Code MVP)"
 requires-python = ">=3.9"
 dependencies = []
 
+[project.optional-dependencies]
+gui = ["nicegui>=2.0"]
+
 [project.scripts]
 agent-box = "agent_box.cli:main"
 

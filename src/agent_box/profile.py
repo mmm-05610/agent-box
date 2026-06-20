@@ -22,7 +22,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from . import config
-from . import library as _lib
+from . import library
+from . import library as _lib  # legacy alias
 from . import providers  # legacy view (still used by `show`)
 
 
@@ -89,12 +90,17 @@ def load_meta(name: str) -> Dict[str, str]:
         data = _parse_simple_yaml(meta_file.read_text())
     except OSError as exc:
         raise ProfileError(f"{name}: meta.yaml unreadable: {exc}") from exc
-    for required in ("name", "agent_type", "provider"):
+    for required in ("name", "agent_type"):
         if required not in data:
             raise ProfileError(
                 f"{name}: meta.yaml corrupted (missing {required!r}). "
                 f"Try: agent-box delete {name} && agent-box create {name}"
             )
+    # `provider` is required for CC profiles, optional for the new
+    # non-CC agent types (v0.4.0). Missing key is fine; we just default
+    # to '' for callers that always want a string.
+    if "provider" not in data:
+        data["provider"] = ""
     if data["name"] != name:
         raise ProfileError(
             f"{name}: meta.yaml name mismatch ({data['name']!r}). "
@@ -324,25 +330,20 @@ def apply_provider(name: str, provider: str) -> None:
     write_meta(root, meta)
 
 
-def create(name: str, provider: str) -> Path:
+def create(name: str, agent_type: str = "cc", provider: Optional[str] = None) -> Path:
+    """Create a new profile.
+
+    v0.4.0+: ``agent_type`` selects the agent family; ``provider`` is only
+    required for ``cc`` (legacy behaviour). For codex/hermes/opencode the
+    profile's config dir is seeded from the per-agent template files
+    returned by ``library.get_template_files(agent_type)``; no provider
+    is injected and no settings.json is touched.
+    """
     config.validate_profile_name(name)
-    # v0.2.0: provider resolution is library-driven. `providers.get(name)`
-    # looks up the library first, then the hard-coded fallback. If the
-    # name is unknown to both, raise with a hint to the new component command.
-    try:
-        providers.get(provider)
-    except KeyError:
-        try:
-            from . import library
-            n = len(library.list_components(type="provider"))
-        except Exception:
-            n = 0
-        sample = list(config.supported_providers())[:8]
+    if agent_type not in library.get_agent_types():
         raise ProfileError(
-            f"unsupported provider {provider!r}. "
-            f"Run \'agent-box component list --type provider\' "
-            f"({n} available, e.g. {', '.join(sample)}). "
-            f"To add a custom provider: agent-box component add --type provider --id <id> --config '{{...}}'."
+            f"unknown agent_type {agent_type!r}. "
+            f"Valid: {', '.join(library.get_agent_types())}"
         )
 
     root = config.profile_dir(name)
@@ -352,9 +353,55 @@ def create(name: str, provider: str) -> Path:
             f"Use: agent-box delete {name} first"
         )
 
+    # ----- non-CC path: seed template files only, no provider logic -----
+    if agent_type != config.AGENT_TYPE_CC:
+        target = config.profile_agent_dir(name, agent_type)
+        target.mkdir(parents=True, exist_ok=False)
+        # Main config dir: write all template files
+        for fname, content in library.get_template_files(agent_type).items():
+            (target / fname).write_text(content)
+        # Secondary data dir (e.g. OpenCode auth.json at ~/.local/share/opencode/)
+        data_dir = config.agent_data_dir(agent_type)
+        if data_dir is not None:
+            pdata = config.profile_agent_data_dir(name, agent_type)
+            pdata.mkdir(parents=True, exist_ok=True)
+            # auth.json is the only data-dir file for now
+            (pdata / "auth.json").write_text(library._TEMPLATE_OPENCODE_AUTH_JSON)
+        write_meta(
+            root,
+            {
+                "name": name,
+                "agent_type": agent_type,
+                "provider": "",  # unused for non-CC
+            },
+        )
+        return root
+
+    # ----- legacy CC path (unchanged) ---------------------------------
+    if not provider:
+        raise ProfileError(
+            f"agent_type={agent_type!r} requires --provider"
+        )
+    # v0.2.0: provider resolution is library-driven. `providers.get(name)`
+    # looks up the library first, then the hard-coded fallback. If the
+    # name is unknown to both, raise with a hint to the new component command.
+    try:
+        providers.get(provider)
+    except KeyError:
+        try:
+            n = len(library.list_components(type="provider"))
+        except Exception:
+            n = 0
+        sample = list(config.supported_providers())[:8]
+        raise ProfileError(
+            f"unsupported provider {provider!r}. "
+            f"Run 'agent-box component list --type provider' "
+            f"({n} available, e.g. {', '.join(sample)}). "
+            f"To add a custom provider: agent-box component add --type provider --id <id> --config '{{...}}'."
+        )
+
     # 1) settings.json = library template constants (+ optional legacy
     #    overlay) + provider env block
-    from . import library
     settings = _load_template_settings()
     settings["env"] = _lib.get_provider_env(provider)
     if settings["env"] is None:
@@ -397,8 +444,6 @@ def create(name: str, provider: str) -> Path:
     return root
 
 
-# --- list / show / delete --------------------------------------------------
-
 def list_profiles() -> List[Dict[str, str]]:
     pdir = config.profiles_dir()
     if not pdir.is_dir():
@@ -431,27 +476,38 @@ def show(name: str) -> Dict[str, Any]:
     if not root.is_dir():
         raise ProfileError(f"{name}: profile not found at {root}")
     meta = load_meta(name)
+    agent_type = meta.get("agent_type", "cc")
 
     # Best-effort: surface the model + base URL the CC process will see.
     info: Dict[str, Any] = {
         "path": str(root),
         "meta": meta,
+        "agent_type": agent_type,
     }
-    try:
-        info["provider"] = providers.describe(meta["provider"])
-    except KeyError:
-        info["provider"] = None
 
-    settings_path = config.profile_dot_claude(name) / "settings.json"
-    if settings_path.is_file():
+    if agent_type == "cc":
+        # Legacy provider-driven path
         try:
-            data = _read_json(settings_path)
-            env = data.get("env") or {}
-            if isinstance(env, dict):
-                info["model"] = env.get("ANTHROPIC_MODEL")
-                info["base_url"] = env.get("ANTHROPIC_BASE_URL")
-        except (OSError, json.JSONDecodeError):
-            pass
+            info["provider"] = providers.describe(meta["provider"]) if meta.get("provider") else None
+        except KeyError:
+            info["provider"] = None
+        info["config_dir"] = str(config.profile_dot_claude(name))
+        settings_path = info["config_dir"] + "/settings.json"
+        settings_path = Path(settings_path)
+        if settings_path.is_file():
+            try:
+                data = _read_json(settings_path)
+                env = data.get("env") or {}
+                if isinstance(env, dict):
+                    info["model"] = env.get("ANTHROPIC_MODEL")
+                    info["base_url"] = env.get("ANTHROPIC_BASE_URL")
+            except (OSError, json.JSONDecodeError):
+                pass
+    else:
+        # New agent types: no provider, no settings.json. Just point at
+        # the per-profile config dir copy the launcher will bind-mount.
+        info["provider"] = None
+        info["config_dir"] = str(config.profile_agent_dir(name, agent_type))
     return info
 
 

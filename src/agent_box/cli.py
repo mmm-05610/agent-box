@@ -42,14 +42,21 @@ def _build_parser() -> argparse.ArgumentParser:
     # create --------------------------------------------------------------
     p_create = sub.add_parser(
         "create",
-        help="Create a new CC profile (auto-inits the template if missing)",
+        help="Create a new profile (auto-inits the template for CC)",
     )
     p_create.add_argument("name", help="Profile name")
     p_create.add_argument(
+        "--type", "-t",
+        choices=library.get_agent_types(),
+        default="cc",
+        help="Agent family (default: cc). Non-CC profiles do not need --provider.",
+    )
+    p_create.add_argument(
         "--provider",
-        required=True,
         choices=config.supported_providers(),
-        help="Model provider for this profile (run \'agent-box component list --type provider\' for all)",
+        help="Model provider for CC profiles "
+             "(run \'agent-box component list --type provider\' for all). "
+             "Ignored for non-CC agent types.",
     )
     p_create.set_defaults(func=cmd_create)
 
@@ -72,6 +79,35 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Resume the previous CC session (passes --continue)",
     )
     p_cc.set_defaults(func=cmd_cc)
+
+    # launch -------------------------------------------------------------
+    p_launch = sub.add_parser(
+        "launch",
+        help="Launch a profile using the agent declared in its meta.yaml "
+             "(bwrap + per-agent config dir mount)",
+    )
+    p_launch.add_argument("name", help="Profile name to launch")
+    p_launch.set_defaults(func=cmd_launch)
+
+    # codex / hermes / opencode -----------------------------------------
+    p_codex = sub.add_parser("codex", help="Shortcut for: agent-box launch <name> (codex profile)")
+    p_codex.add_argument("name", help="Codex profile name to launch")
+    p_codex.set_defaults(func=cmd_codex)
+
+    p_hermes = sub.add_parser("hermes", help="Shortcut for: agent-box launch <name> (hermes profile)")
+    p_hermes.add_argument("name", help="Hermes profile name to launch")
+    p_hermes.set_defaults(func=cmd_hermes)
+
+    p_opencode = sub.add_parser("opencode", help="Shortcut for: agent-box launch <name> (opencode profile)")
+    p_opencode.add_argument("name", help="OpenCode profile name to launch")
+    p_opencode.set_defaults(func=cmd_opencode)
+
+    # gui ----------------------------------------------------------------
+    p_gui = sub.add_parser(
+        "gui",
+        help="Launch the NiceGUI web admin panel (http://127.0.0.1:8080)",
+    )
+    p_gui.set_defaults(func=cmd_gui)
 
     # delete --------------------------------------------------------------
     p_delete = sub.add_parser("delete", help="Delete a profile")
@@ -214,16 +250,28 @@ def cmd_init_template(args: argparse.Namespace) -> int:
 def cmd_create(args: argparse.Namespace) -> int:
     try:
         config.validate_profile_name(args.name)
-        root = profile.create(args.name, args.provider)
+        # For non-CC profiles, --provider is ignored. We still call
+        # profile.create with provider=None so the create() function
+        # takes its non-CC branch.
+        provider = args.provider if args.type == "cc" else None
+        root = profile.create(args.name, agent_type=args.type, provider=provider)
     except (ValueError, profile.ProfileError) as exc:
         print(f"agent-box: {exc}", file=sys.stderr)
         return 2
-    pdc = config.profile_dot_claude(args.name)
-    print(f"created profile {args.name!r} ({args.provider}) at {root}")
-    print(
-        f"  next: edit {pdc}/settings.json to set your ANTHROPIC_AUTH_TOKEN,\n"
-        f"        then run: agent-box cc {args.name}"
-    )
+    if args.type == "cc":
+        pdc = config.profile_dot_claude(args.name)
+        print(f"created profile {args.name!r} (cc/{args.provider}) at {root}")
+        print(
+            f"  next: edit {pdc}/settings.json to set your ANTHROPIC_AUTH_TOKEN,\n"
+            f"        then run: agent-box cc {args.name}"
+        )
+    else:
+        pdir = config.profile_agent_dir(args.name, args.type)
+        print(f"created profile {args.name!r} ({args.type}) at {root}")
+        print(
+            f"  next: edit {pdir}/ to fill in your API key and model,\n"
+            f"        then run: agent-box launch {args.name}  (or: agent-box {args.type} {args.name})"
+        )
     return 0
 
 
@@ -260,6 +308,46 @@ def cmd_cc(args: argparse.Namespace) -> int:
     return 1
 
 
+def cmd_launch(args: argparse.Namespace) -> int:
+    """Generic launcher: dispatches to CC or the per-agent mount path."""
+    try:
+        config.validate_profile_name(args.name)
+        launch.launch(args.name)
+    except (ValueError, profile.ProfileError) as exc:
+        print(f"agent-box: {exc}", file=sys.stderr)
+        return 2
+    # launch.launch only returns on error (execvpe replaces the process).
+    return 1
+
+
+def cmd_codex(args: argparse.Namespace) -> int:
+    return cmd_launch(args)
+
+
+def cmd_hermes(args: argparse.Namespace) -> int:
+    return cmd_launch(args)
+
+
+def cmd_opencode(args: argparse.Namespace) -> int:
+    return cmd_launch(args)
+
+
+def cmd_gui(args: argparse.Namespace) -> int:
+    """Start the NiceGUI web admin panel."""
+    try:
+        from . import gui as _gui
+    except ImportError as exc:
+        print(
+            f"agent-box: {exc}\n"
+            f"  Install the GUI extra with: pip install 'agent-box[gui]' (or: pip install nicegui)",
+            file=sys.stderr,
+        )
+        return 2
+    _gui.main()
+    # ui.run() blocks; we only get here on a clean shutdown.
+    return 0
+
+
 def cmd_delete(args: argparse.Namespace) -> int:
     try:
         config.validate_profile_name(args.name)
@@ -290,6 +378,7 @@ def cmd_show(args: argparse.Namespace) -> int:
     if "base_url" in info:
         print(f"base_url:   {info['base_url']}")
     print(f"path:       {info['path']}")
+    print(f"config_dir: {info.get('config_dir', '-')}")
     return 0
 
 

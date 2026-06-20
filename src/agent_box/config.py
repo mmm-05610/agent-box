@@ -141,6 +141,88 @@ def profile_claude_md(name: str) -> Path:
     return profile_dot_claude(name) / "CLAUDE.md"
 
 
+# --- multi-agent paths (v0.4.0: generic config-dir mount) --------------
+
+def agent_config_dir(agent_type: str) -> str:
+    """Return the *unexpanded* config-dir path for an agent type (e.g. '~/.codex').
+
+    Uses the library registry when available so the two stay in sync.
+    """
+    try:
+        from . import library
+        info = library.get_agent_config(agent_type)
+        if info is not None:
+            return info["config_dir"]
+    except Exception:
+        pass
+    # Fallback mirrors the registry so this module stays import-safe even
+    # if library has a problem.
+    fallback = {
+        "cc":       "~/.claude",
+        "codex":    "~/.codex",
+        "hermes":   "~/.hermes",
+        "opencode": "~/.config/opencode",
+    }
+    return fallback.get(agent_type, f"~/.{agent_type}")
+
+
+def real_agent_dir(agent_type: str) -> Path:
+    """Resolve the real (host) config dir for an agent type to an absolute Path."""
+    return Path(os.path.expanduser(agent_config_dir(agent_type))).resolve()
+
+
+def profile_agent_dir(name: str, agent_type: str) -> Path:
+    """Return the profile-local config-dir copy for a non-CC agent type.
+
+    CC keeps the historical 'dot-claude' name; everything else uses
+    'dot-<agent_type>' to keep the layout grep-friendly and avoid
+    collisions if a user later adds e.g. a second 'cc' variant.
+    """
+    suffix = "dot-claude" if agent_type == "cc" else f"dot-{agent_type}"
+    return profile_dir(name) / suffix
+
+
+def agent_binary(agent_type: str) -> str:
+    """Return the executable name to invoke for an agent type."""
+    try:
+        from . import library
+        info = library.get_agent_config(agent_type)
+        if info is not None:
+            return info["binary"]
+    except Exception:
+        pass
+    return {"cc": "claude", "codex": "codex", "hermes": "hermes", "opencode": "opencode"}.get(agent_type, agent_type)
+
+
+def agent_data_dir(agent_type: str) -> Optional[str]:
+    """Return the secondary data dir path for an agent type, if any.
+
+    e.g. OpenCode stores auth at ~/.local/share/opencode/, separate from
+    its main config at ~/.config/opencode/.
+    """
+    try:
+        from . import library
+        info = library.get_agent_config(agent_type)
+        if info is not None:
+            return info.get("data_dir")
+    except Exception:
+        pass
+    return None
+
+
+def real_agent_data_dir(agent_type: str) -> Optional[Path]:
+    """Resolved absolute path to the secondary data dir, or None."""
+    d = agent_data_dir(agent_type)
+    return Path(os.path.expanduser(d)).resolve() if d else None
+
+
+def profile_agent_data_dir(name: str, agent_type: str) -> Optional[Path]:
+    """Profile-local copy of the secondary data dir, or None."""
+    if agent_data_dir(agent_type) is None:
+        return None
+    return profile_dir(name) / f"dot-{agent_type}-data"
+
+
 # --- supported providers (v0.2.0: derived from library) ------------------
 
 def supported_providers() -> tuple:

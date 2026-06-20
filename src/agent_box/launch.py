@@ -175,3 +175,80 @@ def launch_cc(name: str, provider_id: str | None = None, resume: bool = False) -
     os.execvpe(bwrap, argv, env)
     # execvpe only returns on failure.
     raise profile.ProfileError(f"failed to exec {bwrap}")
+
+
+# ---------------------------------------------------------------------------
+# Generic multi-agent dispatcher (v0.4.0)
+# ---------------------------------------------------------------------------
+
+def launch(name: str) -> None:
+    """Launch a profile's agent inside a bwrap namespace.
+
+    For CC profiles this is a thin wrapper over ``launch_cc`` (unchanged
+    behaviour). For codex / hermes / opencode profiles it bind-mounts
+    the profile's per-agent config dir over the real config dir and
+    execs the agent binary. Never returns on success.
+    """
+    meta = profile.load_meta(name)
+    agent_type = meta.get("agent_type") or config.AGENT_TYPE_CC
+
+    if agent_type == config.AGENT_TYPE_CC:
+        launch_cc(name)
+        return  # unreachable; launch_cc execvpe's or raises
+
+    pdir = config.profile_agent_dir(name, agent_type)
+    rdir = config.real_agent_dir(agent_type)
+    binary = shutil.which(config.agent_binary(agent_type))
+    bwrap = shutil.which(config.BWRAP)
+
+    if not bwrap:
+        raise profile.ProfileError(
+            f"bwrap not found in PATH. "
+            f"Install with: sudo apt install bubblewrap (or equivalent)"
+        )
+    if not binary:
+        raise profile.ProfileError(
+            f"{config.agent_binary(agent_type)!r} not found in PATH. "
+            f"Install the {agent_type} CLI first."
+        )
+    if not pdir.is_dir():
+        raise profile.ProfileError(
+            f"{name}: profile dir missing: {pdir}"
+        )
+    if not rdir.exists():
+        rdir.mkdir(parents=True, exist_ok=True)
+
+    argv = [
+        bwrap,
+        "--bind", "/", "/",
+        "--bind", str(pdir), str(rdir),
+        "--dev", "/dev",
+        "--proc", "/proc",
+        "--tmpfs", "/tmp",
+        "--unshare-ipc",
+        "--unshare-pid",
+        "--unshare-uts",
+        "--share-net",
+    ]
+
+    # Secondary data dir mount (e.g. OpenCode auth at ~/.local/share/opencode/)
+    pdata = config.profile_agent_data_dir(name, agent_type)
+    rdata = config.real_agent_data_dir(agent_type)
+    if pdata is not None and pdata.is_dir() and rdata is not None:
+        if not rdata.exists():
+            rdata.mkdir(parents=True, exist_ok=True)
+        argv.insert(4, str(rdata))
+        argv.insert(4, str(pdata))
+        argv.insert(4, "--bind")
+
+    argv.append(binary)
+
+    env = dict(os.environ)
+    print(
+        f"agent-box: launching {agent_type} as profile {name!r} "
+        f"(bwrap mount={pdir} \u2192 {rdir})",
+        file=sys.stderr,
+    )
+    os.execvpe(bwrap, argv, env)
+    # execvpe only returns on failure.
+    raise profile.ProfileError(f"failed to exec {bwrap}")

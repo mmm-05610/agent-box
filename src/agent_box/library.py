@@ -1347,3 +1347,123 @@ def get_provider_env(provider_id: str) -> Optional[Dict[str, Any]]:
 def get_provider_ids() -> List[str]:
     """Sorted list of built-in provider ids."""
     return sorted(p["id"] for p in _BUILTIN_PROVIDERS)
+
+
+# ---------------------------------------------------------------------------
+# Agent type registry (v0.4.0: multi-agent support)
+# ---------------------------------------------------------------------------
+#
+# Each agent type maps to:
+#   * config_dir - the host config directory the profile is going to
+#     bind-mount over inside the bwrap namespace.
+#   * binary     - the executable name (looked up via shutil.which) that
+#     is invoked as bwrap's child process.
+#
+# CC is the legacy path: the profile keeps its dot-claude/ + provider
+# injection. The other three types use a single "copy the whole config
+# directory and bind-mount it" strategy - no provider injection, no
+# settings.json manipulation.
+# ---------------------------------------------------------------------------
+
+_AGENT_TYPES: Dict[str, Dict[str, Any]] = {
+    "cc":       {"config_dir": "~/.claude",          "binary": "claude"},
+    "codex":    {"config_dir": "~/.codex",           "binary": "codex"},
+    "hermes":   {"config_dir": "~/.hermes",          "binary": "hermes"},
+    "opencode": {"config_dir": "~/.config/opencode", "binary": "opencode",
+                 "data_dir": "~/.local/share/opencode"},
+}
+
+
+def get_agent_types() -> List[str]:
+    """Sorted list of supported agent type ids."""
+    return sorted(_AGENT_TYPES.keys())
+
+
+def get_agent_config(agent_type: str) -> Optional[Dict[str, Any]]:
+    """Return {config_dir, binary [, data_dir]} for an agent type, or None if unknown."""
+    return _AGENT_TYPES.get(agent_type)
+
+
+# ---------------------------------------------------------------------------
+# Per-agent template files (only used for the non-CC agent types)
+# ---------------------------------------------------------------------------
+
+_TEMPLATE_CODEX_CONFIG_TOML = """\
+model_provider = "custom"
+model = "REPLACE_MODEL"
+model_reasoning_effort = "high"
+disable_response_storage = true
+
+[model_providers]
+[model_providers.custom]
+name = "custom"
+base_url = "REPLACE_BASE_URL"
+wire_api = "responses"
+requires_openai_auth = true
+"""
+
+_TEMPLATE_CODEX_AUTH_JSON = '{\n  "OPENAI_API_KEY": ""\n}\n'
+
+_TEMPLATE_HERMES_CONFIG_YAML = """\
+model:
+  default: REPLACE_MODEL
+  provider: custom
+  base_url: REPLACE_BASE_URL
+  api_key: ""
+terminal:
+  backend: local
+  cwd: .
+  timeout: 180
+memory:
+  memory_enabled: true
+  user_profile_enabled: true
+compression:
+  enabled: true
+  threshold: 0.5
+display:
+  compact: false
+  streaming: true
+"""
+
+_TEMPLATE_HERMES_ENV = """\
+# Hermes Agent Environment
+# Provider=custom → reads OPENAI_API_KEY from here
+OPENAI_API_KEY=
+"""
+
+_TEMPLATE_OPENCODE_CONFIG_JSONC = """\
+{
+  "$schema": "https://opencode.ai/config.json"
+}
+"""
+
+_TEMPLATE_OPENCODE_AUTH_JSON = """\
+{}
+"""
+
+
+def get_template_files(agent_type: str) -> Dict[str, str]:
+    """Return the {filename: contents} map to seed a new profile's config dir.
+
+    CC has no template here (it uses the library._TEMPLATE_SETTINGS machinery
+    and provider injection instead). Unknown agent types return an empty dict.
+
+    OpenCode's auth.json lives in ~/.local/share/opencode/, a separate
+    directory from the main config. The profile stores it at
+    ``dot-opencode-data/auth.json`` and bind-mounts it separately.
+    """
+    if agent_type == "codex":
+        return {
+            "config.toml": _TEMPLATE_CODEX_CONFIG_TOML,
+            "auth.json": _TEMPLATE_CODEX_AUTH_JSON,
+        }
+    if agent_type == "hermes":
+        return {
+            "config.yaml": _TEMPLATE_HERMES_CONFIG_YAML,
+            ".env": _TEMPLATE_HERMES_ENV,
+        }
+    if agent_type == "opencode":
+        # auth.json lives in the secondary data dir (see profile.create /
+        # launch.launch), not in the main config dir.
+        return {"opencode.jsonc": _TEMPLATE_OPENCODE_CONFIG_JSONC}
+    return {}
