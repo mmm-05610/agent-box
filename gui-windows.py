@@ -53,6 +53,7 @@ def fetch_profiles() -> List[Dict[str, str]]:
             capture_output=True,
             text=True,
             timeout=15,
+            cwd="C:\\",
         )
     except subprocess.TimeoutExpired as exc:
         raise RuntimeError("wsl.exe agent-box list --json timed out") from exc
@@ -87,7 +88,10 @@ def build_launch_argv(name: str, agent_type: str, mode: str) -> List[str]:
         if extra:
             argv.extend(extra)
     cmdline = " ".join(_shell_quote(a) for a in argv)
-    return ["wt.exe", "wsl.exe", "bash", "-lc", cmdline]
+    # Ensure ~/.local/bin and ~/.npm-global/bin are on PATH (login shell
+    # may not source .bashrc for non-interactive sessions).
+    setup = "export PATH=\"$HOME/.npm-global/bin:$HOME/.local/bin:$PATH\""
+    return ["wt.exe", "wsl.exe", "bash", "-lc", f"{setup} && {cmdline}"]
 
 
 def _shell_quote(token: str) -> str:
@@ -103,8 +107,9 @@ def launch_profile(name: str, agent_type: str, mode: str) -> None:
     if wt is None:
         raise RuntimeError("wt.exe (Windows Terminal) not found in PATH.")
     argv = build_launch_argv(name, agent_type, mode)
-    # detach: WT must outlive this GUI process
-    subprocess.Popen(argv, close_fds=True)
+    # detach: WT must outlive this GUI process; use C:\ as cwd so
+    # wsl.exe doesn't fail translating a UNC / pushd drive letter.
+    subprocess.Popen(argv, close_fds=True, cwd="C:\\")
 
 
 # --- Tkinter UI -----------------------------------------------------------
