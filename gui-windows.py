@@ -16,7 +16,7 @@ import shutil
 import subprocess
 import sys
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import filedialog, ttk, messagebox
 from typing import Any, Dict, List, Optional, Tuple
 
 
@@ -89,6 +89,19 @@ def build_launch_argv(name: str, agent_type: str, mode: str, cwd: str = "") -> L
     return ["wsl.exe", "bash", "-lc", script]
 
 
+def _browse_dir(cwd_var: tk.StringVar) -> None:
+    """Open a Windows directory picker, convert the result to a WSL path."""
+    initial = "\\\\wsl$\\Ubuntu\\home\\maoqh\\projects"
+    path = filedialog.askdirectory(initialdir=initial, title="Select project directory")
+    if path:
+        # Convert UNC path \\wsl$\Ubuntu\... → /...
+        if path.startswith("\\\\wsl$\\Ubuntu\\"):
+            path = "/" + path[len("\\\\wsl$\\Ubuntu\\"):].replace("\\", "/")
+        elif path.startswith("\\\\wsl.localhost\\Ubuntu\\"):
+            path = "/" + path[len("\\\\wsl.localhost\\Ubuntu\\"):].replace("\\", "/")
+        cwd_var.set(path)
+
+
 def _shell_quote(token: str) -> str:
     """Quote a single argv element for use inside a ``bash -lc \"...\"`` string."""
     if token == "" or any(ch in token for ch in (" ", "\t", '"', "'", "\\", "$", "`", "\n")):
@@ -111,7 +124,7 @@ class AgentBoxApp:
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
         self.root.title("Agent Box")
-        self.root.minsize(520, 320)
+        self.root.minsize(650, 360)
 
         self.status_var = tk.StringVar(value="Ready.")
         self.rows: List[Dict[str, Any]] = []  # widget refs per profile row
@@ -228,8 +241,13 @@ class AgentBoxApp:
             )
             combo.pack(side="left")
             cwd_var = tk.StringVar(value="~")
-            cwd_entry = ttk.Entry(row, textvariable=cwd_var, width=24)
+            cwd_entry = ttk.Entry(row, textvariable=cwd_var, width=22)
             cwd_entry.pack(side="left", padx=(4, 0))
+            browse_btn = ttk.Button(
+                row, text="...", width=3,
+                command=lambda v=cwd_var: _browse_dir(v),
+            )
+            browse_btn.pack(side="left", padx=(2, 0))
             self.rows.append({
                 "name": name,
                 "agent_type": agent_type,
