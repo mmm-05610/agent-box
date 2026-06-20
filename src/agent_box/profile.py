@@ -353,26 +353,27 @@ def create(name: str, agent_type: str = "cc", provider: Optional[str] = None) ->
             f"Use: agent-box delete {name} first"
         )
 
-    # ----- non-CC path: seed template files only, no provider logic -----
+    # ----- non-CC path: copy the whole template directory ------------
     if agent_type != config.AGENT_TYPE_CC:
+        template_dir = library.get_template_dir(agent_type)
+        if template_dir is None:
+            raise ProfileError(
+                f"no template directory for agent_type {agent_type!r}"
+            )
         target = config.profile_agent_dir(name, agent_type)
-        target.mkdir(parents=True, exist_ok=False)
-        # Main config dir: write all template files
-        for fname, content in library.get_template_files(agent_type).items():
-            (target / fname).write_text(content)
-        # Secondary data dir (e.g. OpenCode auth.json at ~/.local/share/opencode/)
-        data_dir = config.agent_data_dir(agent_type)
-        if data_dir is not None:
-            pdata = config.profile_agent_data_dir(name, agent_type)
-            pdata.mkdir(parents=True, exist_ok=True)
-            # auth.json is the only data-dir file for now
-            (pdata / "auth.json").write_text(library._TEMPLATE_OPENCODE_AUTH_JSON)
+        shutil.copytree(template_dir, target, symlinks=True)
+        # Secondary data dir if this agent splits config across two locations
+        data_template = library.get_template_data_dir(agent_type)
+        if data_template is not None:
+            data_target = config.profile_agent_data_dir(name, agent_type)
+            if data_target is not None:
+                shutil.copytree(data_template, data_target, symlinks=True)
         write_meta(
             root,
             {
                 "name": name,
                 "agent_type": agent_type,
-                "provider": "",  # unused for non-CC
+                "provider": "",
             },
         )
         return root

@@ -1,0 +1,11 @@
+model_provider = "custom"
+model = ""
+model_reasoning_effort = "high"
+disable_response_storage = true
+
+[model_providers]
+[model_providers.custom]
+name = "custom"
+base_url = ""
+wire_api = "responses"
+requires_openai_auth = true

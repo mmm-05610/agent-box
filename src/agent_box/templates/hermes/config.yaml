@@ -1,0 +1,18 @@
+model:
+  default: ""
+  provider: custom
+  base_url: ""
+  api_key: ""
+terminal:
+  backend: local
+  cwd: .
+  timeout: 180
+memory:
+  memory_enabled: true
+  user_profile_enabled: true
+compression:
+  enabled: true
+  threshold: 0.5
+display:
+  compact: false
+  streaming: true

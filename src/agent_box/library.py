@@ -1385,85 +1385,37 @@ def get_agent_config(agent_type: str) -> Optional[Dict[str, Any]]:
 
 
 # ---------------------------------------------------------------------------
-# Per-agent template files (only used for the non-CC agent types)
+# Per-agent template directories
 # ---------------------------------------------------------------------------
-
-_TEMPLATE_CODEX_CONFIG_TOML = """\
-model_provider = "custom"
-model = "REPLACE_MODEL"
-model_reasoning_effort = "high"
-disable_response_storage = true
-
-[model_providers]
-[model_providers.custom]
-name = "custom"
-base_url = "REPLACE_BASE_URL"
-wire_api = "responses"
-requires_openai_auth = true
-"""
-
-_TEMPLATE_CODEX_AUTH_JSON = '{\n  "OPENAI_API_KEY": ""\n}\n'
-
-_TEMPLATE_HERMES_CONFIG_YAML = """\
-model:
-  default: REPLACE_MODEL
-  provider: custom
-  base_url: REPLACE_BASE_URL
-  api_key: ""
-terminal:
-  backend: local
-  cwd: .
-  timeout: 180
-memory:
-  memory_enabled: true
-  user_profile_enabled: true
-compression:
-  enabled: true
-  threshold: 0.5
-display:
-  compact: false
-  streaming: true
-"""
-
-_TEMPLATE_HERMES_ENV = """\
-# Hermes Agent Environment
-# Provider=custom → reads OPENAI_API_KEY from here
-OPENAI_API_KEY=
-"""
-
-_TEMPLATE_OPENCODE_CONFIG_JSONC = """\
-{
-  "$schema": "https://opencode.ai/config.json"
-}
-"""
-
-_TEMPLATE_OPENCODE_AUTH_JSON = """\
-{}
-"""
+#
+# Each non-CC agent type has a template *directory* under
+# ``agent_box/templates/<type>/`` containing a minimal, valid config.
+# ``profile.create`` copies the whole directory into the profile;
+# ``launch.launch`` bind-mounts the copy over the real config dir.
+#
+# CC uses the legacy _TEMPLATE_SETTINGS etc. constants (above) instead,
+# because its config structure (settings.json with env block) warrants
+# more granular handling.
 
 
-def get_template_files(agent_type: str) -> Dict[str, str]:
-    """Return the {filename: contents} map to seed a new profile's config dir.
+def get_template_dir(agent_type: str) -> Optional[Path]:
+    """Absolute path to the template directory for *agent_type*.
 
-    CC has no template here (it uses the library._TEMPLATE_SETTINGS machinery
-    and provider injection instead). Unknown agent types return an empty dict.
-
-    OpenCode's auth.json lives in ~/.local/share/opencode/, a separate
-    directory from the main config. The profile stores it at
-    ``dot-opencode-data/auth.json`` and bind-mounts it separately.
+    Returns *None* for ``cc`` (handled separately) and for unknown
+    types. The directory is guaranteed to exist on disk for all types
+    shipped with the package.
     """
-    if agent_type == "codex":
-        return {
-            "config.toml": _TEMPLATE_CODEX_CONFIG_TOML,
-            "auth.json": _TEMPLATE_CODEX_AUTH_JSON,
-        }
-    if agent_type == "hermes":
-        return {
-            "config.yaml": _TEMPLATE_HERMES_CONFIG_YAML,
-            ".env": _TEMPLATE_HERMES_ENV,
-        }
-    if agent_type == "opencode":
-        # auth.json lives in the secondary data dir (see profile.create /
-        # launch.launch), not in the main config dir.
-        return {"opencode.jsonc": _TEMPLATE_OPENCODE_CONFIG_JSONC}
-    return {}
+    if agent_type == "cc":
+        return None
+    p = Path(__file__).resolve().parent / "templates" / agent_type
+    return p if p.is_dir() else None
+
+
+def get_template_data_dir(agent_type: str) -> Optional[Path]:
+    """Absolute path to the secondary data template directory, or *None*.
+
+    Only relevant for agents that store config across two locations
+    (e.g. OpenCode: config at ~/.config/opencode/, auth at ~/.local/share/opencode/).
+    """
+    p = Path(__file__).resolve().parent / "templates" / f"{agent_type}-data"
+    return p if p.is_dir() else None
