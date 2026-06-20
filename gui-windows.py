@@ -89,28 +89,29 @@ def build_launch_argv(name: str, agent_type: str, mode: str, cwd: str = "") -> L
     return ["wsl.exe", "bash", "-lc", script]
 
 
+def _to_wsl_path(windows_path: str) -> str:
+    """Convert a Windows path (drive letter or WSL UNC) to a WSL path."""
+    p = windows_path.replace("\\", "/")
+    # WSL UNC paths: //wsl$/Ubuntu/... or //wsl.localhost/Ubuntu/...
+    for prefix in ("//wsl$/Ubuntu/", "//wsl.localhost/Ubuntu/"):
+        if p.startswith(prefix) or p.startswith(prefix.lstrip("/")):
+            idx = p.find("/Ubuntu/")
+            if idx != -1:
+                return p[idx + len("/Ubuntu"):]
+    # Drive-letter paths: C:/... → /mnt/c/...
+    if len(p) >= 2 and p[1] == ":":
+        drive = p[0].lower()
+        rest = p[2:]
+        return f"/mnt/{drive}{rest}"
+    return p
+
+
 def _browse_dir(cwd_var: tk.StringVar) -> None:
-    """Open a Windows directory picker, convert via wslpath to WSL path."""
+    """Open a Windows directory picker and convert to a WSL path."""
     initial = "\\\\wsl$\\Ubuntu\\home\\maoqh\\projects"
     path = filedialog.askdirectory(initialdir=initial, title="Select project directory")
     if path:
-        try:
-            r = subprocess.run(
-                ["wsl.exe", "wslpath", path],
-                capture_output=True, text=True, timeout=5, cwd="C:\\",
-            )
-            wsl_path = r.stdout.strip()
-            if wsl_path:
-                cwd_var.set(wsl_path)
-                return
-        except Exception:
-            pass
-        # Fallback: if wslpath fails, strip UNC prefix manually
-        for prefix in ("\\\\wsl$\\Ubuntu\\", "\\\\wsl.localhost\\Ubuntu\\"):
-            if path.startswith(prefix):
-                path = "/" + path[len(prefix):].replace("\\", "/")
-                break
-        cwd_var.set(path)
+        cwd_var.set(_to_wsl_path(path))
 
 
 def _shell_quote(token: str) -> str:
