@@ -64,11 +64,11 @@ The home directory contains ONLY the config for that specific agent type.
 
 ```yaml
 name: DW
-agent_type: cc              # 决定启动哪个 CLI（cc|codex|opencode|hermes）
-provider: minimax            # 模型供应商
+agent_type: cc # 决定启动哪个 CLI（cc|codex|opencode|hermes）
+provider: minimax # 模型供应商
 description: DW 多步骤编排执行者
 shared:
-  symlinks:                  # 哪些系统文件从真实 HOME symlink
+  symlinks: # 哪些系统文件从真实 HOME symlink
     - .gitconfig
     - .ssh
 ```

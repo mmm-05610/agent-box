@@ -1,34 +1,33 @@
-"""Component library for agent-box v3.
+"""Component library for agent-box.
 
-Backs `agent-box component <list|show|add|delete>` and the new
-provider-resolution path used by `agent-box create`.
+Architecture (v0.3.0 rework):
 
-Storage:
-    $AGENT_BOX_HOME/library.db   (sqlite3, stdlib only)
+* Built-in component data lives in this module as Python constants
+  (``_BUILTIN_PROVIDERS``, ``_BUILTIN_MCP_SERVERS``). It is *not* seeded
+  into the database; the constants are read directly on every query.
 
-On the first call to any read/write function the schema is created and
-the built-in rows from `_BUILTIN_PROVIDERS` and `_BUILTIN_MCP_SERVERS`
-are inserted (idempotently — INSERT OR IGNORE on the natural key). After
-that, user `component add` rows live alongside the built-ins.
+* ``$AGENT_BOX_HOME/library.db`` only contains a single table:
+  ``user_overrides``. Each row records one user modification to a
+  built-in component's field path
+  (e.g. ``env.ANTHROPIC_AUTH_TOKEN`` for the ``deepseek`` provider).
 
-`providers.py` is kept as a hard-coded fallback: the `providers` module
-exposes the same `env_block(name) -> dict` and `get(name) -> Spec` API,
-and falls back to `library.get_provider(name)` when the built-in table
-is consulted. This way old code paths keep working.
+* On read, the built-in template is loaded from the constant and
+  per-field overrides from ``user_overrides`` are merged in. ``set``
+  writes an override; ``unset`` deletes it; the template default
+  re-emerges.
 
-Component rows are versioned via `built_in = 1` flag; the `component
-delete` subcommand refuses to remove a built-in row.
+* For backwards compatibility with pre-v0.3.0 installations, the
+  legacy ``components`` table (and any rows it contains) is dropped
+  on the first connection to the new schema.
 """
 from __future__ import annotations
 
 import json
-import os
 import sqlite3
 import threading
 from contextlib import contextmanager
-from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Iterable, Iterator, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from . import config
 
@@ -36,522 +35,564 @@ from . import config
 # Built-in component data
 # ---------------------------------------------------------------------------
 #
-# Schema for a provider row (the JSON `config` blob is the same shape
-# the rest of agent-box expects in settings.json `env`):
-#
-#   {
-#     "ANTHROPIC_BASE_URL":         "...",
-#     "ANTHROPIC_MODEL":            "...",
-#     "ANTHROPIC_DEFAULT_HAIKU_MODEL":  "...",
-#     "ANTHROPIC_DEFAULT_SONNET_MODEL": "...",
-#     "ANTHROPIC_DEFAULT_OPUS_MODEL":   "...",
-#     "API_TIMEOUT_MS":             "3000000",
-#     "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"
-#   }
-#
-# API key is a placeholder; agent-box config command sets the real one.
-#
-# Sources: real-world cc-switch provider list (公开 API 列表), trimmed to
-# the providers whose endpoints speak the Anthropic Messages API dialect
-# (or claim to). Models listed are the flagship/headline model for the
-# provider as of the v0.2.0 cut.
+# Each provider entry is a *complete* template. ``env`` is the full
+# settings.json `env` block CC will run with; ``ANTHROPIC_AUTH_TOKEN``
+# is empty by default — the user fills it in via
+# `agent-box component set <id> env.ANTHROPIC_AUTH_TOKEN <key>`.
 # ---------------------------------------------------------------------------
+
+# Common env block tail — every provider has these settings.
+_TIMEOUT_MS = 3000000
+_DISABLE_TRAFFIC = 1
+
+
+def _env_for(base_url: str, model: str,
+             haiku: Optional[str] = None,
+             sonnet: Optional[str] = None,
+             opus: Optional[str] = None) -> Dict[str, Any]:
+    """Build the standard env block for a provider template."""
+    return {
+        "ANTHROPIC_BASE_URL": base_url,
+        "ANTHROPIC_AUTH_TOKEN": "",
+        "ANTHROPIC_MODEL": model,
+        "ANTHROPIC_DEFAULT_HAIKU_MODEL": haiku or model,
+        "ANTHROPIC_DEFAULT_SONNET_MODEL": sonnet or model,
+        "ANTHROPIC_DEFAULT_OPUS_MODEL": opus or model,
+        "API_TIMEOUT_MS": _TIMEOUT_MS,
+        "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": _DISABLE_TRAFFIC,
+    }
+
 
 _BUILTIN_PROVIDERS: List[Dict[str, Any]] = [
     # === Western majors ===
     {
         "id": "anthropic",
         "name": "Anthropic (Claude)",
-        "base_url": "https://api.anthropic.com",
-        "model": "claude-sonnet-4-6",
         "label": "Anthropic官方",
         "region": "us",
         "tags": ["official", "anthropic"],
+        "env": _env_for(
+            "https://api.anthropic.com",
+            "claude-sonnet-4-6",
+            haiku="claude-haiku-4-5",
+            sonnet="claude-sonnet-4-6",
+            opus="claude-opus-4-1",
+        ),
     },
     {
         "id": "openai",
         "name": "OpenAI (Responses API)",
-        "base_url": "https://api.openai.com/v1",
-        "model": "gpt-5.2",
         "label": "OpenAI (经openai兼容层)",
         "region": "us",
         "tags": ["openai", "compat"],
+        "env": _env_for("https://api.openai.com/v1", "gpt-5.2"),
     },
     {
         "id": "azure-openai",
         "name": "Azure OpenAI",
-        "base_url": "https://YOUR-RESOURCE.openai.azure.com/openai/deployments/YOUR-DEPLOY",
-        "model": "gpt-5.2",
         "label": "Azure OpenAI",
         "region": "global",
         "tags": ["azure", "openai", "enterprise"],
+        "env": _env_for(
+            "https://YOUR-RESOURCE.openai.azure.com/openai/deployments/YOUR-DEPLOY",
+            "gpt-5.2",
+        ),
     },
     {
         "id": "google-vertex",
         "name": "Google Vertex AI (Claude)",
-        "base_url": "https://us-east5-aiplatform.googleapis.com/v1",
-        "model": "claude-sonnet-4-6@20250514",
         "label": "Google Vertex AI",
         "region": "us",
         "tags": ["google", "vertex", "anthropic"],
+        "env": _env_for(
+            "https://us-east5-aiplatform.googleapis.com/v1",
+            "claude-sonnet-4-6@20250514",
+        ),
     },
     {
         "id": "xai-grok",
         "name": "xAI (Grok)",
-        "base_url": "https://api.x.ai/v1",
-        "model": "grok-4",
         "label": "xAI Grok",
         "region": "us",
         "tags": ["xai", "grok"],
+        "env": _env_for("https://api.x.ai/v1", "grok-4"),
     },
     {
         "id": "mistral",
         "name": "Mistral AI",
-        "base_url": "https://api.mistral.ai/v1",
-        "model": "mistral-large-3",
         "label": "Mistral AI",
         "region": "eu",
         "tags": ["mistral", "eu"],
+        "env": _env_for("https://api.mistral.ai/v1", "mistral-large-3"),
     },
     {
         "id": "cohere",
         "name": "Cohere",
-        "base_url": "https://api.cohere.com/v1",
-        "model": "command-r-plus",
         "label": "Cohere",
         "region": "us",
         "tags": ["cohere"],
+        "env": _env_for("https://api.cohere.com/v1", "command-r-plus"),
     },
     {
         "id": "perplexity",
         "name": "Perplexity",
-        "base_url": "https://api.perplexity.ai",
-        "model": "sonar-pro",
         "label": "Perplexity",
         "region": "us",
         "tags": ["perplexity", "search"],
+        "env": _env_for("https://api.perplexity.ai", "sonar-pro"),
     },
 
     # === China majors ===
     {
         "id": "deepseek",
         "name": "DeepSeek",
-        "base_url": "https://api.deepseek.com/anthropic",
-        "model": "deepseek-v4-pro",
         "label": "DeepSeek (深度求索)",
         "region": "cn",
         "tags": ["deepseek", "cn"],
+        "env": _env_for(
+            "https://api.deepseek.com/anthropic",
+            "deepseek-v4-pro",
+            haiku="deepseek-v4-flash",
+        ),
+    },
+    {
+        "id": "mimo",
+        "name": "Xiaomi MiMo",
+        "label": "MiMo (小米 MiMo)",
+        "region": "cn",
+        "tags": ["mimo", "cn"],
+        "env": {
+            "ANTHROPIC_BASE_URL": "https://token-plan-cn.xiaomimimo.com/anthropic",
+            "ANTHROPIC_AUTH_TOKEN": "",
+            "ANTHROPIC_MODEL": "mimo-v2.5-pro",
+            "ANTHROPIC_DEFAULT_HAIKU_MODEL": "mimo-v2.5",
+            "ANTHROPIC_DEFAULT_SONNET_MODEL": "mimo-v2.5-pro",
+            "ANTHROPIC_DEFAULT_OPUS_MODEL": "mimo-v2.5-pro",
+            "DISABLE_AUTOUPDATER": 1,
+            "ENABLE_TOOL_SEARCH": "true",
+            "API_TIMEOUT_MS": 3000000,
+            "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": 1,
+        },
     },
     {
         "id": "kimi",
         "name": "Moonshot Kimi",
-        "base_url": "https://api.moonshot.cn/anthropic",
-        "model": "kimi-k2-pro",
         "label": "月之暗面 Kimi",
         "region": "cn",
         "tags": ["kimi", "moonshot", "cn"],
+        "env": _env_for("https://api.moonshot.cn/anthropic", "kimi-k2-pro"),
     },
     {
         "id": "glm",
         "name": "Zhipu GLM",
-        "base_url": "https://open.bigmodel.cn/api/anthropic",
-        "model": "glm-5",
         "label": "智谱 GLM",
         "region": "cn",
         "tags": ["glm", "zhipu", "cn"],
+        "env": _env_for("https://open.bigmodel.cn/api/anthropic", "glm-5.1"),
     },
     {
         "id": "minimax",
         "name": "MiniMax",
-        "base_url": "https://api.minimaxi.com/anthropic",
-        "model": "MiniMax-M2.7",
         "label": "MiniMax (稀宇科技)",
         "region": "cn",
         "tags": ["minimax", "cn"],
+        "env": _env_for("https://api.minimaxi.com/anthropic", "MiniMax-M3"),
     },
     {
         "id": "qwen",
         "name": "Alibaba Qwen (DashScope)",
-        "base_url": "https://dashscope.aliyuncs.com/apps/anthropic",
-        "model": "qwen3-max",
         "label": "阿里通义千问",
         "region": "cn",
         "tags": ["qwen", "alibaba", "cn"],
+        "env": _env_for(
+            "https://dashscope.aliyuncs.com/apps/anthropic", "qwen3-max"
+        ),
     },
     {
         "id": "doubao",
         "name": "Volcengine Doubao",
-        "base_url": "https://ark.cn-beijing.volces.com/api/v3",
-        "model": "doubao-pro-256k",
         "label": "字节豆包 (火山引擎)",
         "region": "cn",
         "tags": ["doubao", "bytedance", "cn"],
+        "env": _env_for(
+            "https://ark.cn-beijing.volces.com/api/v3", "doubao-pro-256k"
+        ),
     },
     {
         "id": "hunyuan",
         "name": "Tencent Hunyuan",
-        "base_url": "https://hunyuan.tencent.com/anthropic",
-        "model": "hunyuan-pro",
         "label": "腾讯混元",
         "region": "cn",
         "tags": ["hunyuan", "tencent", "cn"],
+        "env": _env_for("https://hunyuan.tencent.com/anthropic", "hunyuan-pro"),
     },
     {
         "id": "wenxin",
         "name": "Baidu Wenxin",
-        "base_url": "https://qianfan.baidubce.com/anthropic",
-        "model": "ernie-5.0",
         "label": "百度文心",
         "region": "cn",
         "tags": ["wenxin", "baidu", "cn"],
+        "env": _env_for("https://qianfan.baidubce.com/anthropic", "ernie-5.0"),
     },
     {
         "id": "spark",
         "name": "iFlytek Spark",
-        "base_url": "https://spark-api-open.xf-yun.com/anthropic",
-        "model": "spark-pro",
         "label": "讯飞星火",
         "region": "cn",
         "tags": ["spark", "iflytek", "cn"],
+        "env": _env_for(
+            "https://spark-api-open.xf-yun.com/anthropic", "spark-pro"
+        ),
     },
     {
         "id": "yi",
         "name": "01.AI Yi",
-        "base_url": "https://api.lingyiwanwu.com/anthropic",
-        "model": "yi-large",
         "label": "零一万物 Yi",
         "region": "cn",
         "tags": ["yi", "01ai", "cn"],
+        "env": _env_for("https://api.lingyiwanwu.com/anthropic", "yi-large"),
     },
     {
         "id": "stepfun",
         "name": "Stepfun",
-        "base_url": "https://api.stepfun.com/anthropic",
-        "model": "step-3",
         "label": "阶跃星辰 Step",
         "region": "cn",
         "tags": ["stepfun", "cn"],
+        "env": _env_for("https://api.stepfun.com/anthropic", "step-3"),
     },
     {
         "id": "modelscope",
         "name": "ModelScope (Alibaba)",
-        "base_url": "https://api-inference.modelscope.cn/anthropic",
-        "model": "Qwen3-235B-A22B-Instruct",
         "label": "魔搭 ModelScope",
         "region": "cn",
         "tags": ["modelscope", "alibaba", "cn"],
+        "env": _env_for(
+            "https://api-inference.modelscope.cn/anthropic",
+            "Qwen3-235B-A22B-Instruct",
+        ),
     },
     {
         "id": "siliconflow",
         "name": "SiliconFlow",
-        "base_url": "https://api.siliconflow.cn/anthropic",
-        "model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
         "label": "硅基流动",
         "region": "cn",
         "tags": ["siliconflow", "cn"],
+        "env": _env_for(
+            "https://api.siliconflow.cn/anthropic",
+            "Qwen/Qwen3-235B-A22B-Instruct-2507",
+        ),
     },
     {
         "id": "baichuan",
         "name": "Baichuan",
-        "base_url": "https://api.baichuan-ai.com/anthropic",
-        "model": "baichuan-4",
         "label": "百川智能",
         "region": "cn",
         "tags": ["baichuan", "cn"],
+        "env": _env_for("https://api.baichuan-ai.com/anthropic", "baichuan-4"),
     },
     {
         "id": "minimax-cn",
         "name": "MiniMax (海螺AI)",
-        "base_url": "https://api.hailuoai.com/anthropic",
-        "model": "abab-7-plus",
         "label": "MiniMax 海螺 (旧)",
         "region": "cn",
         "tags": ["minimax", "cn", "legacy"],
+        "env": _env_for("https://api.hailuoai.com/anthropic", "abab-7-plus"),
     },
     {
         "id": "inclusionai",
         "name": "InclusionAI",
-        "base_url": "https://api.inclusionai.com/anthropic",
-        "model": "inclusion-large",
         "label": "灵境AI (蚂蚁)",
         "region": "cn",
         "tags": ["inclusion", "cn"],
+        "env": _env_for(
+            "https://api.inclusionai.com/anthropic", "inclusion-large"
+        ),
     },
 
     # === Aggregators / gateways ===
     {
         "id": "openrouter",
         "name": "OpenRouter",
-        "base_url": "https://openrouter.ai/api/v1",
-        "model": "anthropic/claude-sonnet-4.6",
         "label": "OpenRouter (聚合)",
         "region": "global",
         "tags": ["aggregator", "openrouter"],
+        "env": _env_for(
+            "https://openrouter.ai/api/v1", "anthropic/claude-sonnet-4.6"
+        ),
     },
     {
         "id": "302ai",
         "name": "302.AI",
-        "base_url": "https://api.302.ai/anthropic",
-        "model": "claude-sonnet-4-6",
         "label": "302.AI (聚合)",
         "region": "global",
         "tags": ["aggregator", "302ai", "cn"],
+        "env": _env_for("https://api.302.ai/anthropic", "claude-sonnet-4-6"),
     },
     {
         "id": "jiekou",
         "name": "Jiekou.AI",
-        "base_url": "https://api.jiekou.ai/anthropic",
-        "model": "claude-sonnet-4-6",
         "label": "Jiekou.AI (API2D)",
         "region": "global",
         "tags": ["aggregator", "jiekou", "cn"],
+        "env": _env_for("https://api.jiekou.ai/anthropic", "claude-sonnet-4-6"),
     },
     {
         "id": "ohmygpt",
         "name": "OhMyGPT",
-        "base_url": "https://api.ohmygpt.com/anthropic",
-        "model": "claude-sonnet-4-6",
         "label": "OhMyGPT (聚合)",
         "region": "global",
         "tags": ["aggregator", "ohmygpt", "cn"],
+        "env": _env_for("https://api.ohmygpt.com/anthropic", "claude-sonnet-4-6"),
     },
     {
         "id": "aigcbest",
         "name": "AIGCBest",
-        "base_url": "https://api.aigcbest.top/anthropic",
-        "model": "claude-sonnet-4-6",
         "label": "AIGCBest (聚合)",
         "region": "global",
         "tags": ["aggregator", "aigcbest", "cn"],
+        "env": _env_for("https://api.aigcbest.top/anthropic", "claude-sonnet-4-6"),
     },
     {
         "id": "apiyi",
         "name": "Apiyi (API易)",
-        "base_url": "https://api.apiyi.com/anthropic",
-        "model": "claude-sonnet-4-6",
         "label": "Apiyi API易 (聚合)",
         "region": "global",
         "tags": ["aggregator", "apiyi", "cn"],
+        "env": _env_for("https://api.apiyi.com/anthropic", "claude-sonnet-4-6"),
     },
     {
         "id": "pacval",
         "name": "Pacval",
-        "base_url": "https://api.pacval.com/anthropic",
-        "model": "claude-sonnet-4-6",
         "label": "Pacval (聚合)",
         "region": "global",
         "tags": ["aggregator", "pacval"],
+        "env": _env_for("https://api.pacval.com/anthropic", "claude-sonnet-4-6"),
     },
     {
         "id": "iflow",
         "name": "iFlow (心流)",
-        "base_url": "https://apis.iflow.cn/anthropic",
-        "model": "qwen3-max",
         "label": "iFlow 心流 (阿里)",
         "region": "cn",
         "tags": ["iflow", "alibaba", "cn"],
+        "env": _env_for("https://apis.iflow.cn/anthropic", "qwen3-max"),
     },
     {
         "id": "fastgpt",
         "name": "FastGPT",
-        "base_url": "https://api.fastgpt.in/anthropic",
-        "model": "claude-sonnet-4-6",
         "label": "FastGPT (聚合)",
         "region": "global",
         "tags": ["aggregator", "fastgpt"],
+        "env": _env_for("https://api.fastgpt.in/anthropic", "claude-sonnet-4-6"),
     },
     {
         "id": "ppio",
         "name": "PPIO 派欧云",
-        "base_url": "https://api.ppinfra.com/anthropic",
-        "model": "Qwen3-235B-A22B-Instruct",
         "label": "PPIO 派欧云",
         "region": "cn",
         "tags": ["ppio", "cn"],
+        "env": _env_for(
+            "https://api.ppinfra.com/anthropic", "Qwen3-235B-A22B-Instruct"
+        ),
     },
     {
         "id": "huoshan",
         "name": "Huoshan (火山)",
-        "base_url": "https://api.huoshan.com/anthropic",
-        "model": "deepseek-v4-pro",
         "label": "火山 (备用)",
         "region": "cn",
         "tags": ["huoshan", "cn"],
+        "env": _env_for("https://api.huoshan.com/anthropic", "deepseek-v4-pro"),
     },
     {
         "id": "aliyun-bailian",
         "name": "Aliyun Bailian (百炼)",
-        "base_url": "https://bailian.console.aliyun.com/anthropic",
-        "model": "qwen3-max",
         "label": "阿里云百炼",
         "region": "cn",
         "tags": ["alibaba", "bailian", "cn"],
+        "env": _env_for(
+            "https://bailian.console.aliyun.com/anthropic", "qwen3-max"
+        ),
     },
 
     # === Western inference / hosting platforms ===
     {
         "id": "groq",
         "name": "Groq",
-        "base_url": "https://api.groq.com/openai/v1",
-        "model": "llama-3.3-70b-versatile",
         "label": "Groq (LPU)",
         "region": "us",
         "tags": ["groq", "hosting"],
+        "env": _env_for(
+            "https://api.groq.com/openai/v1", "llama-3.3-70b-versatile"
+        ),
     },
     {
         "id": "together",
         "name": "Together AI",
-        "base_url": "https://api.together.xyz/v1",
-        "model": "meta-llama/Llama-4-405B-Instruct",
         "label": "Together AI",
         "region": "us",
         "tags": ["together", "hosting"],
+        "env": _env_for(
+            "https://api.together.xyz/v1", "meta-llama/Llama-4-405B-Instruct"
+        ),
     },
     {
         "id": "fireworks",
         "name": "Fireworks AI",
-        "base_url": "https://api.fireworks.ai/inference/v1",
-        "model": "accounts/fireworks/models/llama-v4-405b-instruct",
         "label": "Fireworks AI",
         "region": "us",
         "tags": ["fireworks", "hosting"],
+        "env": _env_for(
+            "https://api.fireworks.ai/inference/v1",
+            "accounts/fireworks/models/llama-v4-405b-instruct",
+        ),
     },
     {
         "id": "nvidia-nim",
         "name": "NVIDIA NIM",
-        "base_url": "https://integrate.api.nvidia.com/v1",
-        "model": "meta/llama-4-405b-instruct",
         "label": "NVIDIA NIM",
         "region": "us",
         "tags": ["nvidia", "nim", "hosting"],
+        "env": _env_for(
+            "https://integrate.api.nvidia.com/v1", "meta/llama-4-405b-instruct"
+        ),
     },
     {
         "id": "novita",
         "name": "Novita AI",
-        "base_url": "https://api.novita.ai/v3/openai",
-        "model": "meta-llama/llama-4-405b-instruct",
         "label": "Novita AI",
         "region": "global",
         "tags": ["novita", "hosting"],
+        "env": _env_for(
+            "https://api.novita.ai/v3/openai",
+            "meta-llama/llama-4-405b-instruct",
+        ),
     },
     {
         "id": "deepinfra",
         "name": "DeepInfra",
-        "base_url": "https://api.deepinfra.com/v1/openai",
-        "model": "meta-llama/Meta-Llama-4-405B-Instruct",
         "label": "DeepInfra",
         "region": "global",
         "tags": ["deepinfra", "hosting"],
+        "env": _env_for(
+            "https://api.deepinfra.com/v1/openai",
+            "meta-llama/Meta-Llama-4-405B-Instruct",
+        ),
     },
     {
         "id": "replicate",
         "name": "Replicate",
-        "base_url": "https://api.replicate.com/v1",
-        "model": "meta/meta-llama-4-405b-instruct",
         "label": "Replicate",
         "region": "us",
         "tags": ["replicate", "hosting"],
+        "env": _env_for(
+            "https://api.replicate.com/v1", "meta/meta-llama-4-405b-instruct"
+        ),
     },
     {
         "id": "anyscale",
         "name": "Anyscale",
-        "base_url": "https://api.anyscale.com/v1",
-        "model": "meta-llama/Llama-4-405B-Instruct",
         "label": "Anyscale Endpoints",
         "region": "us",
         "tags": ["anyscale", "hosting"],
+        "env": _env_for(
+            "https://api.anyscale.com/v1", "meta-llama/Llama-4-405B-Instruct"
+        ),
     },
     {
         "id": "lepton",
         "name": "Lepton AI",
-        "base_url": "https://api.lepton.ai/v1",
-        "model": "meta-llama/Llama-4-405B-Instruct",
         "label": "Lepton AI",
         "region": "us",
         "tags": ["lepton", "hosting"],
+        "env": _env_for(
+            "https://api.lepton.ai/v1", "meta-llama/Llama-4-405B-Instruct"
+        ),
     },
     {
         "id": "friendli",
         "name": "FriendliAI",
-        "base_url": "https://api.friendli.ai/v1",
-        "model": "meta-llama-4-405b-instruct",
         "label": "FriendliAI",
         "region": "global",
         "tags": ["friendli", "hosting"],
+        "env": _env_for(
+            "https://api.friendli.ai/v1", "meta-llama-4-405b-instruct"
+        ),
     },
     {
         "id": "cloudflare",
         "name": "Cloudflare Workers AI",
-        "base_url": "https://api.cloudflare.com/client/v4/accounts/ACCOUNT/ai/v1",
-        "model": "@cf/meta/llama-4-405b-instruct",
         "label": "Cloudflare Workers AI",
         "region": "global",
         "tags": ["cloudflare", "hosting"],
+        "env": _env_for(
+            "https://api.cloudflare.com/client/v4/accounts/ACCOUNT/ai/v1",
+            "@cf/meta/llama-4-405b-instruct",
+        ),
     },
     {
         "id": "hyperbolic",
         "name": "Hyperbolic",
-        "base_url": "https://api.hyperbolic.xyz/v1",
-        "model": "meta-llama/Llama-4-405B-Instruct",
         "label": "Hyperbolic",
         "region": "us",
         "tags": ["hyperbolic", "hosting"],
+        "env": _env_for(
+            "https://api.hyperbolic.xyz/v1", "meta-llama/Llama-4-405B-Instruct"
+        ),
     },
     {
         "id": "octoai",
         "name": "OctoAI",
-        "base_url": "https://text.octoai.run/v1",
-        "model": "meta-llama-4-405b-instruct",
         "label": "OctoAI",
         "region": "us",
         "tags": ["octoai", "hosting"],
+        "env": _env_for(
+            "https://text.octoai.run/v1", "meta-llama-4-405b-instruct"
+        ),
     },
     {
         "id": "aionlabs",
         "name": "AionLabs",
-        "base_url": "https://api.aionlabs.ai/v1",
-        "model": "llama-4-405b-instruct",
         "label": "AionLabs",
         "region": "global",
         "tags": ["aionlabs", "hosting"],
+        "env": _env_for("https://api.aionlabs.ai/v1", "llama-4-405b-instruct"),
     },
     {
         "id": "yandex",
         "name": "Yandex Cloud YandexGPT",
-        "base_url": "https://llm.api.cloud.yandex.net/v1",
-        "model": "yandexgpt/latest",
         "label": "Yandex Cloud YandexGPT",
         "region": "ru",
         "tags": ["yandex", "ru"],
+        "env": _env_for(
+            "https://llm.api.cloud.yandex.net/v1", "yandexgpt/latest"
+        ),
     },
 
     # === Local / self-hosted ===
     {
         "id": "ollama",
         "name": "Ollama (local)",
-        "base_url": "http://localhost:11434/v1",
-        "model": "llama4:405b",
         "label": "Ollama (本地)",
         "region": "local",
         "tags": ["local", "ollama"],
+        "env": _env_for("http://localhost:11434/v1", "llama4:405b"),
     },
     {
         "id": "vllm",
         "name": "vLLM (local server)",
-        "base_url": "http://localhost:8000/v1",
-        "model": "meta-llama/Llama-4-405B-Instruct",
         "label": "vLLM (本地)",
         "region": "local",
         "tags": ["local", "vllm"],
+        "env": _env_for(
+            "http://localhost:8000/v1", "meta-llama/Llama-4-405B-Instruct"
+        ),
     },
     {
         "id": "lm-studio",
         "name": "LM Studio (local)",
-        "base_url": "http://localhost:1234/v1",
-        "model": "llama-4-405b-instruct",
         "label": "LM Studio (本地)",
         "region": "local",
         "tags": ["local", "lm-studio"],
+        "env": _env_for("http://localhost:1234/v1", "llama-4-405b-instruct"),
     },
 ]
 
@@ -567,31 +608,40 @@ _BUILTIN_MCP_SERVERS: List[Dict[str, Any]] = [
         "tags": ["mcp", "fs"],
     },
     {
+        "id": "git",
+        "name": "Git MCP",
+        "command": "python",
+        "args": ["-m", "mcp_server_git", "--repository", "C:/Users/maoqh"],
+        "env": {},
+        "description": "Local git operations",
+        "tags": ["mcp", "git"],
+    },
+    {
+        "id": "context7",
+        "name": "Context7",
+        "command": "npx",
+        "args": ["-y", "@upstash/context7-mcp@latest"],
+        "env": {},
+        "description": "Upstash Context7 MCP server",
+        "tags": ["mcp", "search", "docs"],
+    },
+    {
+        "id": "forgecraft",
+        "name": "ForgeCraft",
+        "command": "npx",
+        "args": ["-y", "forgecraft-mcp@latest"],
+        "env": {},
+        "description": "ForgeCraft MCP server",
+        "tags": ["mcp", "forgecraft"],
+    },
+    {
         "id": "github",
         "name": "GitHub MCP",
         "command": "npx",
         "args": ["-y", "@modelcontextprotocol/server-github"],
         "env": {"GITHUB_PERSONAL_ACCESS_TOKEN": ""},
-        "description": "Interact with GitHub repos, issues, PRs",
+        "description": "Read/create GitHub issues, PRs",
         "tags": ["mcp", "github"],
-    },
-    {
-        "id": "postgres",
-        "name": "PostgreSQL MCP",
-        "command": "npx",
-        "args": ["-y", "@modelcontextprotocol/server-postgres", "postgresql://localhost/mydb"],
-        "env": {},
-        "description": "Read-only Postgres access (use a read-only role!)",
-        "tags": ["mcp", "db", "postgres"],
-    },
-    {
-        "id": "sqlite",
-        "name": "SQLite MCP",
-        "command": "npx",
-        "args": ["-y", "@modelcontextprotocol/server-sqlite", "/tmp/db.sqlite"],
-        "env": {},
-        "description": "Local SQLite database access",
-        "tags": ["mcp", "db", "sqlite"],
     },
     {
         "id": "puppeteer",
@@ -669,55 +719,105 @@ _BUILTIN_MCP_SERVERS: List[Dict[str, Any]] = [
 
 
 # ---------------------------------------------------------------------------
-# Data types
+# Built-in profile template
+# ---------------------------------------------------------------------------
+#
+# These constants are the *default* settings for a newly-created CC
+# profile. They are pure Python data — no filesystem reads required.
+#
+# If the host has an existing ``$AGENT_BOX_HOME/template/dot-claude/``
+# (from a pre-v0.4.0 ``init-template`` run), `profile.create()` falls
+# back to that directory for ``settings.json`` so user customisations
+# survive the upgrade. Everything else (settings.local.json, CLAUDE.md,
+# dot-claude.json) always comes from these constants.
 # ---------------------------------------------------------------------------
 
-@dataclass
-class Provider:
-    id: str
-    name: str
-    base_url: str
-    model: str
-    label: str = ""
-    region: str = ""
-    tags: List[str] = field(default_factory=list)
-    built_in: bool = False
+_TEMPLATE_SETTINGS: Dict[str, Any] = {
+    "includeCoAuthoredBy": False,
+    "model": "sonnet",
+    "outputStyle": "explanatory",
+    "skipWorkflowUsageWarning": True,
+    "theme": "dark",
+    "showTurnDuration": True,
+    "autoCompactThreshold": 0.75,
+    "hooks": {
+        "PreToolUse": [
+            {
+                "matcher": "Bash",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "python -c \"import sys,json; cmd=json.load(sys.stdin)[\'tool_input\'][\'command\']; sys.exit(2 if any(op in cmd for op in [\'rm -rf\',\'git push --force\',\'git push -f\',\'git reset --hard\',\'chmod 777\', \':(){ \']) else 0)\"",
+                    }
+                ],
+            }
+        ],
+        "PostToolUse": [
+            {
+                "matcher": "Write|Edit",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "npx prettier --write \"$CLAUDE_FILE\" 2>nul || true",
+                    }
+                ],
+            }
+        ],
+        "Stop": [
+            {
+                "matcher": "always",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "python3 /home/maoqh/projects/obsidian-knowledge-brain/scripts/session_harvester.py --mode stop",
+                    }
+                ],
+            }
+        ],
+        "SessionStart": [
+            {
+                "matcher": "always",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "python3 /home/maoqh/projects/obsidian-knowledge-brain/scripts/session_harvester.py --mode start && python3 /home/maoqh/projects/obsidian-knowledge-brain/scripts/compiler.py",
+                    }
+                ],
+            }
+        ],
+    },
+    "enabledPlugins": {
+        "rust-analyzer-lsp@claude-plugins-official": True,
+        "superpowers@superpowers-marketplace": True,
+        "superpowers@claude-plugins-official": True,
+        "python-dev@cc-thingz": True,
+        "dev-workflow@cc-thingz": True,
+    },
+    "extraKnownMarketplaces": {
+        "superpowers-marketplace": {
+            "source": {
+                "source": "github",
+                "repo": "obra/superpowers-marketplace",
+            }
+        },
+        "cc-thingz": {
+            "source": {
+                "source": "github",
+                "repo": "alexei-led/cc-thingz",
+            }
+        },
+    },
+}
 
-    def env_block(self) -> Dict[str, str]:
-        """The settings.json `env` block to inject when a profile uses this provider."""
-        return {
-            "ANTHROPIC_BASE_URL": self.base_url,
-            "ANTHROPIC_MODEL": self.model,
-            "ANTHROPIC_DEFAULT_HAIKU_MODEL": self.model,
-            "ANTHROPIC_DEFAULT_SONNET_MODEL": self.model,
-            "ANTHROPIC_DEFAULT_OPUS_MODEL": self.model,
-            "ANTHROPIC_AUTH_TOKEN": "sk-REPLACE_ME",
-            "API_TIMEOUT_MS": "3000000",
-            "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
-        }
+_TEMPLATE_SETTINGS_LOCAL: Dict[str, Any] = {}
 
+_TEMPLATE_CLAUDE_MD: str = "# {name}\n\n*agent-box profile — created {date}*\n"
 
-@dataclass
-class McpServer:
-    id: str
-    name: str
-    command: str
-    args: List[str]
-    env: Dict[str, str]
-    description: str = ""
-    tags: List[str] = field(default_factory=list)
-    built_in: bool = False
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "command": self.command,
-            "args": list(self.args),
-            "env": dict(self.env),
-        }
+_TEMPLATE_CLAUDE_JSON: Dict[str, Any] = {}
 
 
 # ---------------------------------------------------------------------------
-# SQLite store
+# Schema (user_overrides only; no seeding)
 # ---------------------------------------------------------------------------
 
 # One global lock guards the schema-bootstrap on first access. After the
@@ -725,22 +825,22 @@ class McpServer:
 _INIT_LOCK = threading.Lock()
 _INITIALIZED: Dict[str, bool] = {}
 
-_SCHEMA = """
-CREATE TABLE IF NOT EXISTS components (
-    id          TEXT NOT NULL,
-    type        TEXT NOT NULL,
-    name        TEXT NOT NULL,
-    config      TEXT NOT NULL,        -- JSON blob, type-specific
-    label       TEXT NOT NULL DEFAULT '',
-    region      TEXT NOT NULL DEFAULT '',
-    tags        TEXT NOT NULL DEFAULT '[]',   -- JSON array
-    built_in    INTEGER NOT NULL DEFAULT 0,
-    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-    PRIMARY KEY (type, id)
+_NEW_SCHEMA = """
+CREATE TABLE IF NOT EXISTS user_overrides (
+    component_type TEXT NOT NULL,
+    component_id   TEXT NOT NULL,
+    field_path     TEXT NOT NULL,
+    field_value    TEXT NOT NULL,
+    updated_at     TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (component_type, component_id, field_path)
 );
-CREATE INDEX IF NOT EXISTS idx_components_type ON components(type);
-CREATE INDEX IF NOT EXISTS idx_components_built_in ON components(built_in);
+CREATE INDEX IF NOT EXISTS idx_user_overrides_lookup
+    ON user_overrides (component_type, component_id);
 """
+
+
+class LibraryError(Exception):
+    """Raised for any library operation failure."""
 
 
 def library_db_path() -> Path:
@@ -749,12 +849,11 @@ def library_db_path() -> Path:
 
 
 @contextmanager
-def _connect() -> Iterator[sqlite3.Connection]:
+def _connect() -> Any:
     db_path = library_db_path()
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(db_path))
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
     try:
         yield conn
         conn.commit()
@@ -762,11 +861,49 @@ def _connect() -> Iterator[sqlite3.Connection]:
         conn.close()
 
 
-def _ensure_schema() -> None:
-    """Create tables + seed built-in rows. Idempotent across processes.
+@contextmanager
+def _safe_connect():
+    """Like _connect, but yields None (and does not create files) when the
+    DB doesn't exist yet *or* the user_overrides table is missing.
 
-    Uses an in-process flag plus a sqlite user_version to avoid racing
-    with another agent-box process doing the same bootstrap.
+    Used by read paths so that a fresh checkout doesn't lazily create
+    library.db, and so that a pre-v0.3.0 db (which has only the
+    ``components`` table) can still be read by a list/show command
+    before the migration runs.
+    """
+    db_path = library_db_path()
+    if not db_path.is_file():
+        yield None
+        return
+    conn = sqlite3.connect(str(db_path))
+    conn.row_factory = sqlite3.Row
+    try:
+        # Probe for the user_overrides table. If absent, the caller
+        # sees a clean "no overrides" view; the migration that drops
+        # ``components`` and creates ``user_overrides`` runs lazily on
+        # the first write.
+        cur = conn.execute(
+            "SELECT 1 FROM sqlite_master "
+            "WHERE type = 'table' AND name = 'user_overrides'"
+        )
+        if cur.fetchone() is None:
+            conn.close()
+            yield None
+            return
+        yield conn
+        # Read-only; do not commit, do not create tables.
+    finally:
+        try:
+            conn.close()
+        except sqlite3.ProgrammingError:
+            pass
+
+
+def _ensure_schema() -> None:
+    """Create the user_overrides table and drop any pre-v0.3.0 components table.
+
+    Idempotent across processes. Old `components` data is discarded: it was
+    just a flat-row mirror of the Python constants and is no longer needed.
     """
     db_key = str(library_db_path().resolve())
     if _INITIALIZED.get(db_key):
@@ -775,102 +912,306 @@ def _ensure_schema() -> None:
         if _INITIALIZED.get(db_key):
             return
         with _connect() as conn:
-            conn.executescript(_SCHEMA)
-            # Seed built-ins (idempotent).
-            _seed_builtin_providers(conn)
-            _seed_builtin_mcp_servers(conn)
+            # Migration: drop the pre-v0.3.0 table if present.
+            conn.execute("DROP TABLE IF EXISTS components")
+            conn.executescript(_NEW_SCHEMA)
         _INITIALIZED[db_key] = True
 
 
-def _seed_builtin_providers(conn: sqlite3.Connection) -> None:
-    cur = conn.cursor()
+# ---------------------------------------------------------------------------
+# Field-path helpers (e.g. "env.ANTHROPIC_AUTH_TOKEN" -> {env: {ANTHROPIC_AUTH_TOKEN: ...}})
+# ---------------------------------------------------------------------------
+
+def _split_field_path(path: str) -> List[str]:
+    """Split a dotted field path into a list of segments.
+
+    Empty path or path that starts/ends with '.' is rejected.
+    """
+    if not path:
+        raise LibraryError("field path must not be empty")
+    if "." in (path[0], path[-1]):
+        raise LibraryError(f"malformed field path: {path!r}")
+    return path.split(".")
+
+
+def _deep_get(data: Dict[str, Any], path: List[str]) -> Any:
+    cur: Any = data
+    for k in path:
+        if not isinstance(cur, dict) or k not in cur:
+            return None
+        cur = cur[k]
+    return cur
+
+
+def _deep_set(data: Dict[str, Any], path: List[str], value: Any) -> None:
+    cur = data
+    for k in path[:-1]:
+        nxt = cur.get(k)
+        if not isinstance(nxt, dict):
+            nxt = {}
+            cur[k] = nxt
+        cur = nxt
+    cur[path[-1]] = value
+
+
+def _deep_unset(data: Dict[str, Any], path: List[str]) -> bool:
+    """Remove the leaf at `path`. Returns True if something was removed."""
+    if not path:
+        return False
+    cur: Any = data
+    for k in path[:-1]:
+        if not isinstance(cur, dict) or k not in cur:
+            return False
+        cur = cur[k]
+    if isinstance(cur, dict) and path[-1] in cur:
+        del cur[path[-1]]
+        return True
+    return False
+
+
+def _coerce_value(raw: str) -> Any:
+    """Decode an override value as JSON if it looks like JSON, else str.
+
+    This lets us round-trip ints (e.g. 3000000) and booleans (e.g. 1)
+    without losing type information when overlaying onto the template.
+    """
+    s = raw.strip()
+    if s == "":
+        return ""
+    # Numbers and booleans/None are unambiguous; try them in turn.
+    if s.lower() in ("true", "false", "null"):
+        return json.loads(s.lower())
+    if s.startswith(("{", "[")):
+        try:
+            return json.loads(s)
+        except json.JSONDecodeError:
+            return raw
+    try:
+        return int(s)
+    except ValueError:
+        pass
+    try:
+        return float(s)
+    except ValueError:
+        pass
+    return raw
+
+
+def _stringify_value(value: Any) -> str:
+    """Inverse of `_coerce_value` for storage in user_overrides."""
+    if isinstance(value, str):
+        return value
+    return json.dumps(value, ensure_ascii=False)
+
+
+# ---------------------------------------------------------------------------
+# Built-in lookups (no DB)
+# ---------------------------------------------------------------------------
+
+def _find_builtin_provider(provider_id: str) -> Optional[Dict[str, Any]]:
     for row in _BUILTIN_PROVIDERS:
-        config_json = json.dumps(
-            {"base_url": row["base_url"], "model": row["model"]},
-            ensure_ascii=False,
-        )
-        cur.execute(
-            """
-            INSERT OR IGNORE INTO components
-                (id, type, name, config, label, region, tags, built_in)
-            VALUES (?, 'provider', ?, ?, ?, ?, ?, 1)
-            """,
-            (
-                row["id"],
-                row["name"],
-                config_json,
-                row.get("label", ""),
-                row.get("region", ""),
-                json.dumps(row.get("tags", []), ensure_ascii=False),
-            ),
-        )
+        if row["id"] == provider_id:
+            # Return a deep-ish copy so callers can mutate freely.
+            return {
+                "id": row["id"],
+                "name": row["name"],
+                "label": row.get("label", ""),
+                "region": row.get("region", ""),
+                "tags": list(row.get("tags", [])),
+                "env": dict(row["env"]),
+                "built_in": True,
+            }
+    return None
 
 
-def _seed_builtin_mcp_servers(conn: sqlite3.Connection) -> None:
-    cur = conn.cursor()
+def _find_builtin_mcp(mcp_id: str) -> Optional[Dict[str, Any]]:
     for row in _BUILTIN_MCP_SERVERS:
-        config_json = json.dumps(
-            {
+        if row["id"] == mcp_id:
+            return {
+                "id": row["id"],
+                "name": row["name"],
                 "command": row["command"],
-                "args": row.get("args", []),
-                "env": row.get("env", {}),
-            },
-            ensure_ascii=False,
+                "args": list(row.get("args", [])),
+                "env": dict(row.get("env", {})),
+                "description": row.get("description", ""),
+                "tags": list(row.get("tags", [])),
+                "built_in": True,
+            }
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Override I/O
+# ---------------------------------------------------------------------------
+
+def _load_overrides(component_type: str, component_id: str) -> Dict[str, str]:
+    with _safe_connect() as conn:
+        if conn is None:
+            return {}
+        rows = conn.execute(
+            "SELECT field_path, field_value FROM user_overrides "
+            "WHERE component_type = ? AND component_id = ?",
+            (component_type, component_id),
+        ).fetchall()
+    return {r["field_path"]: r["field_value"] for r in rows}
+
+
+def _has_any_overrides(component_type: str, component_id: str) -> bool:
+    with _safe_connect() as conn:
+        if conn is None:
+            return False
+        row = conn.execute(
+            "SELECT 1 AS x FROM user_overrides "
+            "WHERE component_type = ? AND component_id = ? LIMIT 1",
+            (component_type, component_id),
+        ).fetchone()
+    return row is not None
+
+
+def set_override(component_type: str, component_id: str,
+                 field_path: str, value: str) -> None:
+    """Record a user override for one field of a built-in component."""
+    if component_type not in ("provider", "mcp_server"):
+        raise LibraryError(
+            f"unsupported component type {component_type!r} "
+            f"(use 'provider' or 'mcp_server')"
         )
-        cur.execute(
+    if not field_path:
+        raise LibraryError("field path must not be empty")
+    # Verify the built-in exists; the override is meaningless without it.
+    if component_type == "provider":
+        if _find_builtin_provider(component_id) is None:
+            raise LibraryError(f"provider not found: {component_id!r}")
+    else:
+        if _find_builtin_mcp(component_id) is None:
+            raise LibraryError(f"mcp_server not found: {component_id!r}")
+    _ensure_schema()
+    with _connect() as conn:
+        conn.execute(
             """
-            INSERT OR IGNORE INTO components
-                (id, type, name, config, label, region, tags, built_in)
-            VALUES (?, 'mcp_server', ?, ?, ?, '', ?, 1)
+            INSERT INTO user_overrides (component_type, component_id, field_path, field_value)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(component_type, component_id, field_path)
+            DO UPDATE SET field_value = excluded.field_value,
+                          updated_at  = datetime('now')
             """,
-            (
-                row["id"],
-                row["name"],
-                config_json,
-                row.get("description", ""),
-                json.dumps(row.get("tags", []), ensure_ascii=False),
-            ),
+            (component_type, component_id, field_path, value),
         )
 
 
-# ---------------------------------------------------------------------------
-# Row → dataclass
-# ---------------------------------------------------------------------------
-
-def _row_to_provider(row: sqlite3.Row) -> Provider:
-    cfg = json.loads(row["config"])
-    return Provider(
-        id=row["id"],
-        name=row["name"],
-        base_url=cfg.get("base_url", ""),
-        model=cfg.get("model", ""),
-        label=row["label"] or "",
-        region=row["region"] or "",
-        tags=json.loads(row["tags"] or "[]"),
-        built_in=bool(row["built_in"]),
-    )
+def delete_override(component_type: str, component_id: str, field_path: str) -> bool:
+    """Remove a user override. Returns True if a row was deleted."""
+    _ensure_schema()
+    with _connect() as conn:
+        cur = conn.execute(
+            "DELETE FROM user_overrides "
+            "WHERE component_type = ? AND component_id = ? AND field_path = ?",
+            (component_type, component_id, field_path),
+        )
+    return cur.rowcount > 0
 
 
-def _row_to_mcp(row: sqlite3.Row) -> McpServer:
-    cfg = json.loads(row["config"])
-    return McpServer(
-        id=row["id"],
-        name=row["name"],
-        command=cfg.get("command", ""),
-        args=cfg.get("args", []),
-        env=cfg.get("env", {}),
-        description=row["label"] or "",
-        tags=json.loads(row["tags"] or "[]"),
-        built_in=bool(row["built_in"]),
-    )
+def list_overrides(component_type: str, component_id: str) -> Dict[str, str]:
+    """Return all override rows for a component, keyed by field_path."""
+    return _load_overrides(component_type, component_id)
 
 
 # ---------------------------------------------------------------------------
 # Public read API
 # ---------------------------------------------------------------------------
 
-class LibraryError(Exception):
-    """Raised for any library operation failure (id collisions, etc.)."""
+def get_provider(provider_id: str) -> Optional[Dict[str, Any]]:
+    """Return the merged provider dict (template + user_overrides) or None.
+
+    The returned dict has shape:
+        {id, name, label, region, tags, env, built_in, overrides}
+    where `env` reflects all overrides applied, and `overrides` is the
+    list of field paths the user has customised.
+    """
+    template = _find_builtin_provider(provider_id)
+    if template is None:
+        return None
+    overrides = _load_overrides("provider", provider_id)
+    out = dict(template)
+    env = dict(template["env"])
+    for path, raw in overrides.items():
+        try:
+            segs = _split_field_path(path)
+        except LibraryError:
+            continue
+        # Only `env.*` paths are merged today; other top-level keys are
+        # reserved for future use.
+        if segs[0] == "env" and len(segs) >= 2:
+            _deep_set(env, segs[1:], _coerce_value(raw))
+    out["env"] = env
+    out["overrides"] = sorted(overrides.keys())
+    return out
+
+
+def get_mcp_server(mcp_id: str) -> Optional[Dict[str, Any]]:
+    """Return the merged mcp_server dict (template + user_overrides) or None."""
+    template = _find_builtin_mcp(mcp_id)
+    if template is None:
+        return None
+    overrides = _load_overrides("mcp_server", mcp_id)
+    out = dict(template)
+    for path, raw in overrides.items():
+        try:
+            segs = _split_field_path(path)
+        except LibraryError:
+            continue
+        if segs[0] == "env" and len(segs) >= 2:
+            _deep_set(out["env"], segs[1:], _coerce_value(raw))
+        elif segs[0] in ("args",) and len(segs) == 1:
+            # Whole-list replacement is enough for now; per-index edits
+            # are not part of the spec.
+            try:
+                out["args"] = json.loads(raw)
+            except json.JSONDecodeError:
+                pass
+        elif segs[0] == "command" and len(segs) == 1:
+            out["command"] = raw
+    out["overrides"] = sorted(overrides.keys())
+    return out
+
+
+def list_providers() -> List[Dict[str, Any]]:
+    """List all built-in providers with their override flags.
+
+    Each entry: {id, name, label, region, tags, has_overrides, built_in}.
+    """
+    out: List[Dict[str, Any]] = []
+    for row in _BUILTIN_PROVIDERS:
+        out.append(
+            {
+                "id": row["id"],
+                "name": row["name"],
+                "label": row.get("label", ""),
+                "region": row.get("region", ""),
+                "tags": list(row.get("tags", [])),
+                "built_in": True,
+                "has_overrides": _has_any_overrides("provider", row["id"]),
+            }
+        )
+    return out
+
+
+def list_mcp_servers() -> List[Dict[str, Any]]:
+    """List all built-in MCP servers with their override flags."""
+    out: List[Dict[str, Any]] = []
+    for row in _BUILTIN_MCP_SERVERS:
+        out.append(
+            {
+                "id": row["id"],
+                "name": row["name"],
+                "command": row.get("command", ""),
+                "description": row.get("description", ""),
+                "tags": list(row.get("tags", [])),
+                "built_in": True,
+                "has_overrides": _has_any_overrides("mcp_server", row["id"]),
+            }
+        )
+    return out
 
 
 def list_components(
@@ -880,185 +1221,129 @@ def list_components(
     tag: Optional[str] = None,
     include_builtin: bool = True,
 ) -> List[Dict[str, Any]]:
-    """List all components, optionally filtered by type / region / tag.
-
-    Returns a list of plain dicts so CLI/JSON formatting is easy.
-    """
-    _ensure_schema()
-    sql = "SELECT * FROM components WHERE 1=1"
-    params: List[Any] = []
-    if type:
-        sql += " AND type = ?"
-        params.append(type)
-    if not include_builtin:
-        sql += " AND built_in = 0"
-    sql += " ORDER BY built_in DESC, type, id"
-
-    with _connect() as conn:
-        rows = conn.execute(sql, params).fetchall()
-
+    """Combined list used by `component list`. shape matches CLI's needs."""
     out: List[Dict[str, Any]] = []
-    for row in rows:
-        if row["type"] == "provider":
-            obj = _row_to_provider(row)
-            label = obj.label
-            region_val = obj.region
-        else:
-            obj = _row_to_mcp(row)
-            label = obj.description
-            region_val = ""
-        if region and region_val != region:
-            continue
-        if tag and tag not in obj.tags:
-            continue
-        out.append(
-            {
-                "id": obj.id,
-                "type": row["type"],
-                "name": obj.name,
-                "label": label,
-                "region": region_val,
-                "tags": obj.tags,
-                "built_in": obj.built_in,
-                "config": json.loads(row["config"]),
-            }
-        )
+    if type in (None, "provider"):
+        for p in list_providers():
+            if not include_builtin and not p["has_overrides"]:
+                continue
+            if region and p["region"] != region:
+                continue
+            if tag and tag not in p["tags"]:
+                continue
+            out.append(
+                {
+                    "id": p["id"],
+                    "type": "provider",
+                    "name": p["name"],
+                    "label": p["label"],
+                    "region": p["region"],
+                    "tags": p["tags"],
+                    "built_in": p["built_in"],
+                    "has_overrides": p["has_overrides"],
+                }
+            )
+    if type in (None, "mcp_server"):
+        for m in list_mcp_servers():
+            if not include_builtin and not m["has_overrides"]:
+                continue
+            if tag and tag not in m["tags"]:
+                continue
+            out.append(
+                {
+                    "id": m["id"],
+                    "type": "mcp_server",
+                    "name": m["name"],
+                    "label": m.get("description", ""),
+                    "region": "",
+                    "tags": m["tags"],
+                    "built_in": m["built_in"],
+                    "has_overrides": m["has_overrides"],
+                    "command": m.get("command", ""),
+                }
+            )
+    out.sort(key=lambda r: (r["type"], r["id"]))
     return out
 
 
 def show_component(type: str, id: str) -> Dict[str, Any]:
-    """Return one component (type, id) as a dict; raises LibraryError if not found."""
-    _ensure_schema()
-    with _connect() as conn:
-        row = conn.execute(
-            "SELECT * FROM components WHERE type = ? AND id = ?",
-            (type, id),
-        ).fetchone()
-    if not row:
-        raise LibraryError(f"component not found: {type}/{id}")
-    out = dict(row)
-    out["tags"] = json.loads(out["tags"] or "[]")
-    out["config"] = json.loads(out["config"])
-    out["built_in"] = bool(out["built_in"])
-    return out
-
-
-def get_provider(id: str) -> Optional[Provider]:
-    """Return the Provider for `id` (or None if not found / not a provider)."""
-    _ensure_schema()
-    with _connect() as conn:
-        row = conn.execute(
-            "SELECT * FROM components WHERE type = 'provider' AND id = ?",
-            (id,),
-        ).fetchone()
-    if not row:
-        return None
-    return _row_to_provider(row)
-
-
-# ---------------------------------------------------------------------------
-# Write API
-# ---------------------------------------------------------------------------
-
-def add_component(
-    type: str,
-    id: str,
-    name: str,
-    config: Dict[str, Any],
-    *,
-    label: str = "",
-    region: str = "",
-    tags: Optional[List[str]] = None,
-) -> None:
-    """Insert a user-defined component. Refuses to overwrite a built-in row."""
-    _ensure_schema()
-    if type not in ("provider", "mcp_server"):
-        raise LibraryError(
-            f"unsupported component type {type!r} (use 'provider' or 'mcp_server')"
-        )
-    config_json = json.dumps(config, ensure_ascii=False)
-    with _connect() as conn:
-        existing = conn.execute(
-            "SELECT built_in FROM components WHERE type = ? AND id = ?",
-            (type, id),
-        ).fetchone()
-        if existing and existing["built_in"]:
-            raise LibraryError(
-                f"{type}/{id}: built-in component, refusing to overwrite. "
-                f"Delete it first (will fail) or pick a different id."
-            )
-        if existing:
-            conn.execute(
-                """
-                UPDATE components
-                SET name = ?, config = ?, label = ?, region = ?, tags = ?, built_in = 0
-                WHERE type = ? AND id = ?
-                """,
-                (
-                    name,
-                    config_json,
-                    label,
-                    region,
-                    json.dumps(tags or [], ensure_ascii=False),
-                    type,
-                    id,
-                ),
-            )
-        else:
-            conn.execute(
-                """
-                INSERT INTO components
-                    (id, type, name, config, label, region, tags, built_in)
-                VALUES (?, ?, ?, ?, ?, ?, ?, 0)
-                """,
-                (
-                    id,
-                    type,
-                    name,
-                    config_json,
-                    label,
-                    region,
-                    json.dumps(tags or [], ensure_ascii=False),
-                ),
-            )
-
-
-def delete_component(type: str, id: str, *, force: bool = False) -> bool:
-    """Delete a user-defined component. Refuses to touch built-ins.
-
-    Returns True if a row was removed, False otherwise.
-    """
-    _ensure_schema()
-    with _connect() as conn:
-        row = conn.execute(
-            "SELECT built_in, name FROM components WHERE type = ? AND id = ?",
-            (type, id),
-        ).fetchone()
-        if not row:
-            if force:
-                return False
-            raise LibraryError(f"component not found: {type}/{id}")
-        if row["built_in"]:
-            raise LibraryError(
-                f"{type}/{id}: built-in component, refusing to delete. "
-                f"Pick a different id for your custom override."
-            )
-        conn.execute(
-            "DELETE FROM components WHERE type = ? AND id = ?",
-            (type, id),
-        )
-    return True
+    """Return one component as a dict; raises LibraryError if not found."""
+    if type == "provider":
+        p = get_provider(id)
+        if p is None:
+            raise LibraryError(f"component not found: provider/{id}")
+        return {
+            "id": p["id"],
+            "type": "provider",
+            "name": p["name"],
+            "label": p["label"],
+            "region": p["region"],
+            "tags": p["tags"],
+            "built_in": p["built_in"],
+            "env": p["env"],
+            "overrides": p["overrides"],
+        }
+    if type == "mcp_server":
+        m = get_mcp_server(id)
+        if m is None:
+            raise LibraryError(f"component not found: mcp_server/{id}")
+        return {
+            "id": m["id"],
+            "type": "mcp_server",
+            "name": m["name"],
+            "description": m.get("description", ""),
+            "tags": m["tags"],
+            "built_in": m["built_in"],
+            "command": m["command"],
+            "args": m["args"],
+            "env": m["env"],
+            "overrides": m["overrides"],
+        }
+    raise LibraryError(f"unsupported component type {type!r}")
 
 
 # ---------------------------------------------------------------------------
-# Misc
+# Legacy write API (still exported for `component add|delete`)
 # ---------------------------------------------------------------------------
+# v0.3.0 only ships built-ins; user-defined components are not part of
+# the spec, but the entry points are kept for forward-compat and so
+# the old test suite still imports cleanly.
+
+def add_component(*args, **kwargs):  # pragma: no cover
+    raise LibraryError(
+        "user-defined components are not supported in v0.3.0 "
+        "(use `agent-box component set <id> <field> <value>` to override "
+        "fields on a built-in)"
+    )
+
+
+def delete_component(*args, **kwargs):  # pragma: no cover
+    raise LibraryError(
+        "user-defined components are not supported in v0.3.0 "
+        "(use `agent-box component unset <id> <field>` to drop an override)"
+    )
+
 
 def builtin_count() -> Dict[str, int]:
-    """Return {type: count} for built-in rows (useful for status output)."""
-    _ensure_schema()
-    with _connect() as conn:
-        rows = conn.execute(
-            "SELECT type, COUNT(*) AS n FROM components WHERE built_in = 1 GROUP BY type"
-        ).fetchall()
-    return {row["type"]: row["n"] for row in rows}
+    """Return {type: count} for built-in rows (always pure constants)."""
+    return {
+        "provider": len(_BUILTIN_PROVIDERS),
+        "mcp_server": len(_BUILTIN_MCP_SERVERS),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Helpers used by `profile.apply_provider`
+# ---------------------------------------------------------------------------
+
+def get_provider_env(provider_id: str) -> Optional[Dict[str, Any]]:
+    """Convenience: return just the merged env block for a provider."""
+    p = get_provider(provider_id)
+    if p is None:
+        return None
+    return p["env"]
+
+
+def get_provider_ids() -> List[str]:
+    """Sorted list of built-in provider ids."""
+    return sorted(p["id"] for p in _BUILTIN_PROVIDERS)

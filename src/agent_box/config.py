@@ -144,22 +144,17 @@ def profile_claude_md(name: str) -> Path:
 # --- supported providers (v0.2.0: derived from library) ------------------
 
 def supported_providers() -> tuple:
-    """Return the sorted list of provider ids available in the library.
+    """Return the sorted list of provider ids in the built-in library.
 
-    Falls back to the hard-coded trio if the library cannot be reached
-    (fresh checkout with no sqlite3 available, etc.). The result is
-    sorted alphabetically; the order is consumed by argparse as
-    `choices=`.
+    v0.3.0: built-ins live in the ``library`` module's Python
+    constants, so no DB touch is required — fresh checkouts work out
+    of the box.
     """
     try:
         from . import library
-        rows = library.list_components(type="provider")
-        ids = sorted({r["id"] for r in rows})
-        if ids:
-            return tuple(ids)
+        return tuple(library.get_provider_ids())
     except Exception:
-        pass
-    return ("anthropic", "deepseek", "minimax")
+        return ("anthropic", "deepseek", "minimax")
 
 
 # Backwards-compat constant. Process-level cache; the library is the

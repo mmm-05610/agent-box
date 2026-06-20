@@ -13,6 +13,7 @@ The on-disk layout is documented in `config.py`. Two main operations:
 """
 from __future__ import annotations
 
+import datetime
 import json
 import os
 import shutil
@@ -21,7 +22,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from . import config
-from . import providers
+from . import library as _lib
+from . import providers  # legacy view (still used by `show`)
 
 
 class ProfileError(Exception):
@@ -110,6 +112,44 @@ def _read_json(path: Path) -> Dict[str, Any]:
 def _write_json(path: Path, payload: Dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2) + "\n")
+
+
+def _write_text(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content)
+
+
+def _load_template_settings() -> Dict[str, Any]:
+    """Return the baseline settings.json for a new profile.
+
+    Starts from ``library._TEMPLATE_SETTINGS`` (the canonical built-in
+    template). If a legacy ``$AGENT_BOX_HOME/template/dot-claude/settings.json``
+    exists from a pre-v0.4.0 ``init-template`` run, the constants are
+    treated as defaults and that file's keys overlay on top — so a
+    user's custom template customisations survive the upgrade.
+
+    If the legacy file is unreadable / unparsable, we silently fall
+    back to the constants (the warning is logged to stderr so a stray
+    broken file can't break `create`).
+    """
+    from . import library
+    settings = dict(library._TEMPLATE_SETTINGS)
+    legacy = config.template_dir() / "dot-claude" / "settings.json"
+    if legacy.is_file():
+        try:
+            data = json.loads(legacy.read_text())
+        except (OSError, json.JSONDecodeError) as exc:
+            print(
+                f"agent-box: warning: legacy template at {legacy} is "
+                f"unreadable ({exc}); using built-in defaults",
+                file=sys.stderr,
+            )
+            data = None
+        if isinstance(data, dict):
+            # Library constants are defaults; legacy file wins on conflicts.
+            for k, v in data.items():
+                settings[k] = v
+    return settings
 
 
 def _copy_dir(src: Path, dst: Path) -> None:
@@ -243,13 +283,45 @@ def ensure_template() -> Path:
 # --- create ----------------------------------------------------------------
 
 def _inject_provider_env(settings_path: Path, provider: str) -> None:
-    """Read settings.json, replace the `env` block with the provider's defaults."""
+    """Read settings.json, replace the `env` block with the provider's defaults.
+
+    The env block comes from the merged library view (template + user
+    overrides). Unknown provider ids raise ProfileError.
+    """
+    env = _lib.get_provider_env(provider)
+    if env is None:
+        raise ProfileError(
+            f"unknown provider {provider!r}. "
+            f"Run 'agent-box component list --type provider' for the list."
+        )
     try:
         data = _read_json(settings_path)
     except (OSError, json.JSONDecodeError) as exc:
         raise ProfileError(f"failed to read {settings_path}: {exc}") from exc
-    data["env"] = providers.env_block(provider)
+    data["env"] = env
     _write_json(settings_path, data)
+
+
+def apply_provider(name: str, provider: str) -> None:
+    """Replace a profile's settings.json `env` block with `provider`'s env.
+
+    Equivalent to running `agent-box create <name> --provider <provider>`
+    on the env block alone — the rest of the profile (CLAUDE.md,
+    settings.local.json, etc.) is left untouched.
+    """
+    config.validate_profile_name(name)
+    root = config.profile_dir(name)
+    if not root.is_dir():
+        raise ProfileError(
+            f"{name!r}: profile not found at {root}. "
+            f"Run 'agent-box list' to see available profiles."
+        )
+    _inject_provider_env(config.profile_settings_json(name), provider)
+    # Update meta.yaml so `agent-box list` / `show` reflect the new
+    # provider without requiring a separate edit.
+    meta = load_meta(name)
+    meta["provider"] = provider
+    write_meta(root, meta)
 
 
 def create(name: str, provider: str) -> Path:
@@ -280,24 +352,39 @@ def create(name: str, provider: str) -> Path:
             f"Use: agent-box delete {name} first"
         )
 
-    # Auto-init template if missing (spec: `create` should be one-shot).
-    ensure_template()
+    # 1) settings.json = library template constants (+ optional legacy
+    #    overlay) + provider env block
+    from . import library
+    settings = _load_template_settings()
+    settings["env"] = _lib.get_provider_env(provider)
+    if settings["env"] is None:
+        raise ProfileError(
+            f"unknown provider {provider!r}. "
+            f"Run 'agent-box component list --type provider' for the list."
+        )
 
-    # 1) copy template/dot-claude/ -> profile/dot-claude/
+    # 2) build per-profile files from the rest of the constants
+    settings_local = dict(library._TEMPLATE_SETTINGS_LOCAL)
+    claude_md = library._TEMPLATE_CLAUDE_MD.format(
+        name=name,
+        date=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    )
+    dot_claude_json = dict(library._TEMPLATE_CLAUDE_JSON)
+
+    # 3) write everything
     pdc = config.profile_dot_claude(name)
-    _copy_dir(config.template_dot_claude(), pdc)
+    _write_json(config.profile_settings_json(name), settings)
+    _write_json(config.profile_settings_local_json(name), settings_local)
+    _write_text(config.profile_claude_md(name), claude_md)
+    _write_json(config.profile_dot_claude_json(name), dot_claude_json)
+    (pdc / "commands").mkdir(exist_ok=True)
+    # skills -> best-effort symlink to host's skills dir
+    real_skills = config.real_claude_dir() / "skills"
+    profile_skills = pdc / "skills"
+    if real_skills.exists() and not profile_skills.exists():
+        profile_skills.symlink_to(real_skills)
 
-    # 2) copy template/dot-claude.json -> profile/dot-claude.json
-    pdj = config.profile_dot_claude_json(name)
-    shutil.copy2(config.template_dot_claude_json(), pdj)
-
-    # 3) provider injection into settings.json
-    _inject_provider_env(pdc / "settings.json", provider)
-
-    # 4) write CLAUDE.md
-    (pdc / "CLAUDE.md").write_text(f"# {name} agent profile\n")
-
-    # 5) write meta.yaml
+    # 4) meta.yaml
     write_meta(
         root,
         {

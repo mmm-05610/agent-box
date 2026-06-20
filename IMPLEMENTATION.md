@@ -160,8 +160,8 @@ launch:
 | `home/.hermes/config.yaml`      | managed | `create`           | agent-box            |
 | `home/.hermes/hermes-agent/`    | auto    | pip install        | Hermes               |
 | `home/.config/opencode/`        | auto    | agent 运行时       | OpenCode             |
-| `home/.gitconfig`               | symlink | `create`（默认） | agent-box            |
-| `home/.ssh/`                    | symlink | `create`（默认） | agent-box            |
+| `home/.gitconfig`               | symlink | `create`（默认）   | agent-box            |
+| `home/.ssh/`                    | symlink | `create`（默认）   | agent-box            |
 
 ### 2.5 Symlink 策略（D3 修订版）
 
@@ -496,8 +496,8 @@ __pycache__/
 | #   | 维度   | 风险                                                                                                                  | 缓解                                                                                                                               | 状态        |
 | --- | ------ | --------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ----------- |
 | R1  | 启动   | `sudo -i` / `systemd --user` / `cron` / `tmux server` 中 `$HOME` ≠ `${AGENT_BOX_HOME}/profiles/<name>/home`，隔离失效 | launch 阶段强制 `os.environ['HOME'] == str(profile_home)` 检查，不匹配 abort + 打印 diff；提供 systemd `.service` 模板与 cron 用法 | 文档化      |
-| R2  | 隔离   | `.ssh` symlink 导致多 profile 密钥身份串号                                                                            | 默认共享 symlink，meta.yaml 可显式改为 isolated；警告多 profile 需独立管理密钥                                      | §2.5 已定   |
-| R3  | 隔离   | `.gitconfig` symlink 让多身份 `user.name/email` 冲突                                                                  | 默认共享 symlink；meta.yaml 提供 `git_config` 字段按 profile 覆盖 `user.name`/`user.email`                            | §2.3 已定   |
+| R2  | 隔离   | `.ssh` symlink 导致多 profile 密钥身份串号                                                                            | 默认共享 symlink，meta.yaml 可显式改为 isolated；警告多 profile 需独立管理密钥                                                     | §2.5 已定   |
+| R3  | 隔离   | `.gitconfig` symlink 让多身份 `user.name/email` 冲突                                                                  | 默认共享 symlink；meta.yaml 提供 `git_config` 字段按 profile 覆盖 `user.name`/`user.email`                                         | §2.3 已定   |
 | R4  | 隔离   | CC `.claude.json` onboarding 共享破坏 per-profile 身份                                                                | `create` 时显式写入 profile_home/.claude.json，**不** symlink                                                                      | §1.2 已定   |
 | R5  | 存储   | `AGENT_BOX_HOME` 指向 NFS/SMB/FUSE 时 `symlink(2)` 挂起或权限错乱                                                     | 启动前 `statvfs` 探测；探测到网络 FS 时降级为 copy-in                                                                              | 实施        |
 | R6  | 存储   | profile 跨机器 rsync 后绝对路径 symlink 全部 dangling                                                                 | `agent-box doctor` 重新解析 `${REAL_HOME}` 重建 symlink                                                                            | §5.5 已定   |

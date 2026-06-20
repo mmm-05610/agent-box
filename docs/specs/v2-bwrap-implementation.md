@@ -83,21 +83,21 @@ bwrap \
 
 ## Provider 配置模板
 
-| Provider | ANTHROPIC_BASE_URL | ANTHROPIC_MODEL |
-|----------|-------------------|-----------------|
-| deepseek | `https://api.deepseek.com/anthropic` | `deepseek-v4-pro` |
-| minimax | `https://api.minimaxi.com/anthropic` | `MiniMax-M2.7` |
-| anthropic | `https://api.anthropic.com` | `claude-sonnet-4-6` |
+| Provider  | ANTHROPIC_BASE_URL                   | ANTHROPIC_MODEL     |
+| --------- | ------------------------------------ | ------------------- |
+| deepseek  | `https://api.deepseek.com/anthropic` | `deepseek-v4-pro`   |
+| minimax   | `https://api.minimaxi.com/anthropic` | `MiniMax-M2.7`      |
+| anthropic | `https://api.anthropic.com`          | `claude-sonnet-4-6` |
 
 ## 错误处理
 
-| 场景 | 输出 |
-|------|------|
-| profile 不存在 | `agent-box: <name>: profile not found. agent-box list` |
-| bwrap 未安装 | `agent-box: bubblewrap not installed. sudo apt install bubblewrap` |
-| CC 未安装 | `agent-box: claude not found` |
-| template 不存在 | `agent-box: template not initialized. agent-box init-template` |
-| 无效 provider | `agent-box: unknown provider. Supported: deepseek, minimax, anthropic` |
+| 场景            | 输出                                                                   |
+| --------------- | ---------------------------------------------------------------------- |
+| profile 不存在  | `agent-box: <name>: profile not found. agent-box list`                 |
+| bwrap 未安装    | `agent-box: bubblewrap not installed. sudo apt install bubblewrap`     |
+| CC 未安装       | `agent-box: claude not found`                                          |
+| template 不存在 | `agent-box: template not initialized. agent-box init-template`         |
+| 无效 provider   | `agent-box: unknown provider. Supported: deepseek, minimax, anthropic` |
 
 ## 代码结构
 

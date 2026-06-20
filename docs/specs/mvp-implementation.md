@@ -63,11 +63,11 @@ agent-box delete <name>                          # Delete a profile
 
 ## Provider Templates
 
-| Provider | ANTHROPIC_BASE_URL | ANTHROPIC_MODEL |
-|----------|-------------------|-----------------|
-| deepseek | `https://api.deepseek.com/anthropic` | `deepseek-v4-pro` |
-| minimax | (user provides) | `minimax-m3` |
-| anthropic | (default, empty base_url) | `claude-sonnet-4-6` |
+| Provider  | ANTHROPIC_BASE_URL                   | ANTHROPIC_MODEL     |
+| --------- | ------------------------------------ | ------------------- |
+| deepseek  | `https://api.deepseek.com/anthropic` | `deepseek-v4-pro`   |
+| minimax   | (user provides)                      | `minimax-m3`        |
+| anthropic | (default, empty base_url)            | `claude-sonnet-4-6` |
 
 API key: leave placeholder `"sk-REPLACE_ME"` in settings.json. User edits later.
 

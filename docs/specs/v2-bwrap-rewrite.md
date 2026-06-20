@@ -59,21 +59,23 @@ agent-box show <name>
 5. 创建 `profiles/<name>/dot-claude/skills/` symlink → `~/.claude/skills`
 6. 按 provider 注入 `settings.json` 的 `env` 块：
 
-| provider | ANTHROPIC_BASE_URL | ANTHROPIC_MODEL |
-|----------|-------------------|-----------------|
-| deepseek | `https://api.deepseek.com/anthropic` | `deepseek-v4-pro` |
-| minimax | `https://api.minimaxi.com/anthropic` | `MiniMax-M2.7` |
-| anthropic | (empty, 用默认) | `claude-sonnet-4-6` |
+| provider  | ANTHROPIC_BASE_URL                   | ANTHROPIC_MODEL     |
+| --------- | ------------------------------------ | ------------------- |
+| deepseek  | `https://api.deepseek.com/anthropic` | `deepseek-v4-pro`   |
+| minimax   | `https://api.minimaxi.com/anthropic` | `MiniMax-M2.7`      |
+| anthropic | (empty, 用默认)                      | `claude-sonnet-4-6` |
 
 默认所有 tier model 同主模型。API key 留 `sk-REPLACE_ME`。API_TIMEOUT_MS=3000000，CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1。
 
 7. 写 `CLAUDE.md` = `# <name> agent profile`
 8. 写 `meta.yaml`：
+
 ```yaml
 name: <name>
 agent_type: cc
 provider: <provider>
 ```
+
 9. 输出成功 + 下一步提示
 
 ## `list [--json]`
@@ -86,6 +88,7 @@ provider: <provider>
 2. 读取 `meta.yaml`、`settings.json` 的 env block
 3. 如果 `--cwd DIR`：先 `os.chdir(DIR)`
 4. 调用 bwrap：
+
 ```
 bwrap \
   --bind / / \
@@ -98,6 +101,7 @@ bwrap \
   --share-net \
   claude
 ```
+
 5. API key 从 settings.json env block 注入进程环境变量（bwrap 传递）
 6. 如果 bwrap 不存在，报错提示安装
 

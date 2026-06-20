@@ -3,6 +3,7 @@
 > **Isolated HOME launcher for coding agents** — run Claude Code as multiple
 
 [English](README.md) | [简体中文](README_CN.md)
+
 > identities (different providers, different prompts) on the same machine, with
 > **kernel-level isolation** via [bubblewrap](https://github.com/containers/bubblewrap)
 > bind mounts.
@@ -115,30 +116,30 @@ other.
 
 ## Command Reference
 
-| Command                                         | What it does                                                          |
-| ----------------------------------------------- | --------------------------------------------------------------------- |
-| `agent-box init-template [--force]`             | Extract a clean template from `~/.claude/` (strips secrets)           |
-| `agent-box create <name> --provider <p>`        | Create a new profile (auto-inits template if missing)                 |
-| `agent-box list [--json]`                       | List all profiles                                                     |
-| `agent-box show <name>`                         | Show metadata, provider, model, base_url for a profile                |
-| `agent-box edit <name> [--claude-md \| --local]`| Open a profile config file in `$EDITOR`                               |
-| `agent-box config <name> [<key> [<value>]]`     | Get/set individual config values (e.g. `api-key`, `model`, `base-url`)|
-| `agent-box test <name>`                         | Test API connectivity for a profile                                  |
-| `agent-box cc <name> [--cwd DIR]`               | Launch Claude Code under a profile (the headline command)             |
-| `agent-box component list [--type] [--region] [--tag] [--user-only]` | List built-in and user components (providers, MCP servers) |
-| `agent-box component show <id> [--type]`          | Show one component's full config                                    |
-| `agent-box component add --type <t> --id <id> --name <n> --config '{...}'` | Add a user-defined component              |
-| `agent-box component delete <id> [--type]`         | Delete a user-defined component (built-ins are protected)           |
-| `agent-box delete <name> [--force]`             | Delete a profile                                                      |
-| `agent-box --help`                              | Full CLI help                                                         |
+| Command                                                                    | What it does                                                           |
+| -------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `agent-box init-template [--force]`                                        | Extract a clean template from `~/.claude/` (strips secrets)            |
+| `agent-box create <name> --provider <p>`                                   | Create a new profile (auto-inits template if missing)                  |
+| `agent-box list [--json]`                                                  | List all profiles                                                      |
+| `agent-box show <name>`                                                    | Show metadata, provider, model, base_url for a profile                 |
+| `agent-box edit <name> [--claude-md \| --local]`                           | Open a profile config file in `$EDITOR`                                |
+| `agent-box config <name> [<key> [<value>]]`                                | Get/set individual config values (e.g. `api-key`, `model`, `base-url`) |
+| `agent-box test <name>`                                                    | Test API connectivity for a profile                                    |
+| `agent-box cc <name> [--cwd DIR]`                                          | Launch Claude Code under a profile (the headline command)              |
+| `agent-box component list [--type] [--region] [--tag] [--user-only]`       | List built-in and user components (providers, MCP servers)             |
+| `agent-box component show <id> [--type]`                                   | Show one component's full config                                       |
+| `agent-box component add --type <t> --id <id> --name <n> --config '{...}'` | Add a user-defined component                                           |
+| `agent-box component delete <id> [--type]`                                 | Delete a user-defined component (built-ins are protected)              |
+| `agent-box delete <name> [--force]`                                        | Delete a profile                                                       |
+| `agent-box --help`                                                         | Full CLI help                                                          |
 
 ### Providers
 
-| Provider     | Base URL                              | Model              |
-| ------------ | ------------------------------------- | ------------------ |
-| `deepseek`   | `https://api.deepseek.com/anthropic`  | `deepseek-v4-pro`  |
-| `minimax`    | `https://api.minimaxi.com/anthropic`  | `MiniMax-M2.7`     |
-| `anthropic`  | `https://api.anthropic.com`           | `claude-sonnet-4-6`|
+| Provider    | Base URL                             | Model               |
+| ----------- | ------------------------------------ | ------------------- |
+| `deepseek`  | `https://api.deepseek.com/anthropic` | `deepseek-v4-pro`   |
+| `minimax`   | `https://api.minimaxi.com/anthropic` | `MiniMax-M2.7`      |
+| `anthropic` | `https://api.anthropic.com`          | `claude-sonnet-4-6` |
 
 All three CC tier model env vars (`HAIKU`/`SONNET`/`OPUS`) default to the
 provider's primary model, so `/model` inside CC consistently shows one model
@@ -200,10 +201,10 @@ Key properties:
 
 ### v1 vs v2
 
-| Version | Mechanism                  | Defeatable by `os.userInfo().homedir`? | Result            |
-| ------- | -------------------------- | :-----------------------------------: | ----------------- |
-| v1      | `HOME=<profile> claude`    | ✅ Yes                                | Partial isolation |
-| v2      | `bwrap` bind mount         | ❌ No                                 | **Full isolation**|
+| Version | Mechanism               | Defeatable by `os.userInfo().homedir`? | Result             |
+| ------- | ----------------------- | :------------------------------------: | ------------------ |
+| v1      | `HOME=<profile> claude` |                 ✅ Yes                 | Partial isolation  |
+| v2      | `bwrap` bind mount      |                 ❌ No                  | **Full isolation** |
 
 ---
 
@@ -247,14 +248,14 @@ agent-box/
 
 ### Source map
 
-| File                          | Responsibility                                              |
-| ----------------------------- | ----------------------------------------------------------- |
-| `cli.py`                      | argparse tree; one `cmd_*` per subcommand                   |
-| `config.py`                   | `$AGENT_BOX_HOME` resolution, path helpers, name validation |
-| `providers.py`                | Per-provider base URL / model / tier env block table        |
-| `profile.py`                  | `init-template`, `create`, `list`, `show`, `delete`         |
-| `edit.py`                     | `subprocess.Popen([$EDITOR, path])`                         |
-| `launch.py`                   | `build_bwrap_argv`, `build_child_env`, `os.execvpe`         |
+| File           | Responsibility                                              |
+| -------------- | ----------------------------------------------------------- |
+| `cli.py`       | argparse tree; one `cmd_*` per subcommand                   |
+| `config.py`    | `$AGENT_BOX_HOME` resolution, path helpers, name validation |
+| `providers.py` | Per-provider base URL / model / tier env block table        |
+| `profile.py`   | `init-template`, `create`, `list`, `show`, `delete`         |
+| `edit.py`      | `subprocess.Popen([$EDITOR, path])`                         |
+| `launch.py`    | `build_bwrap_argv`, `build_child_env`, `os.execvpe`         |
 
 ---
 

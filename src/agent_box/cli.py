@@ -61,11 +61,15 @@ def _build_parser() -> argparse.ArgumentParser:
     # cc ------------------------------------------------------------------
     p_cc = sub.add_parser("cc", help="Launch Claude Code under a profile (bwrap)")
     p_cc.add_argument("name", help="Profile name to launch as")
+    # (no --cwd — use cd before launching: cd ~/projects/xxx && agent-box cc <profile>)
     p_cc.add_argument(
-        "--cwd",
-        type=Path,
-        default=None,
-        help="Project directory to chdir into before exec",
+        "--provider",
+        help="Switch this profile to <provider> before launching "
+             "(overwrites settings.json env block)",
+    )
+    p_cc.add_argument(
+        "--resume", action="store_true",
+        help="Resume the previous CC session (passes --continue)",
     )
     p_cc.set_defaults(func=cmd_cc)
 
@@ -242,7 +246,13 @@ def cmd_list(args: argparse.Namespace) -> int:
 def cmd_cc(args: argparse.Namespace) -> int:
     try:
         config.validate_profile_name(args.name)
-        launch.launch_cc(args.name, project_dir=args.cwd)
+        if args.provider:
+            profile.apply_provider(args.name, args.provider)
+        launch.launch_cc(
+            args.name,
+            provider_id=args.provider,
+            resume=bool(args.resume),
+        )
     except (ValueError, profile.ProfileError) as exc:
         print(f"agent-box: {exc}", file=sys.stderr)
         return 2
@@ -368,16 +378,6 @@ def cmd_test(args: argparse.Namespace) -> int:
         return 2
 
 
-def main(argv: Optional[List[str]] = None) -> int:
-    parser = _build_parser()
-    args = parser.parse_args(argv)
-    return args.func(args)
-
-
-if __name__ == "__main__":
-    sys.exit(main())
-
-
 # --- component subcommand implementations --------------------------------
 
 def cmd_component_list(args: argparse.Namespace) -> int:
@@ -413,8 +413,7 @@ def cmd_component_list(args: argparse.Namespace) -> int:
         marker = "*" if r["built_in"] else "+"
         name_disp = r["name"]
         if r["type"] == "mcp_server":
-            cfg = r["config"]
-            cmd = cfg.get("command", "")
+            cmd = r.get("command", "")
             name_disp = f"{r['name']}  ({cmd})"
         print(
             f"{marker} {r['id']:<{id_w}}  {r['type']:<{type_w}}  "
@@ -485,9 +484,12 @@ def cmd_component_show(args: argparse.Namespace) -> int:
     if info.get("tags"):
         print(f"tags:      {', '.join(info['tags'])}")
     print(f"built_in:  {bool(info['built_in'])}")
-    print(f"created:   {info.get('created_at', '?')}")
     print("config:")
-    print(json.dumps(info["config"], indent=2, ensure_ascii=False))
+    if info["type"] == "mcp_server":
+        cfg = {"command": info.get("command", ""), "args": info.get("args", []), "env": info.get("env", {})}
+    else:
+        cfg = info.get("env", {})
+    print(json.dumps(cfg, indent=2, ensure_ascii=False))
     return 0
 
 
@@ -554,3 +556,13 @@ def cmd_component_delete(args: argparse.Namespace) -> int:
     else:
         print(f"no such {args.type} {args.id!r} (nothing to delete)")
     return 0
+
+
+def main(argv: Optional[List[str]] = None) -> int:
+    parser = _build_parser()
+    args = parser.parse_args(argv)
+    return args.func(args)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

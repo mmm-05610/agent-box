@@ -1,24 +1,19 @@
-"""Per-provider CC configuration table.
+"""Legacy per-provider view, derived from the new library.
 
-Originally a hard-coded dict of three providers (deepseek, minimax,
-anthropic). v0.2.0 still ships the same dict as a *fallback* — used only
-if the SQLite component library has been wiped — but the canonical
-source of truth is now `agent_box.library` (see `_BUILTIN_PROVIDERS`).
+v0.3.0 keeps these helpers around as a thin compatibility layer for
+older code paths (e.g. `profile.show`) that still ask for a
+ProviderSpec-style object.
 
-Public API kept stable:
-
-* `ProviderSpec` namedtuple (legacy shape: name, base_url, model, label)
-* `PROVIDERS` dict (fallback)
-* `get(name)` — library first, fallback second
-* `env_block(name)` — library first, fallback second
-* `describe(name)` — library first, fallback second
-* `SUPPORTED_PROVIDERS` — derived from library (cached at import time
-  but cheap to recompute; the CLI uses `config.SUPPORTED_PROVIDERS` which
-  is a thin wrapper that hits the library).
+The library is the single source of truth; this module just re-shapes
+it.  The hard-coded ``_FALLBACK_PROVIDERS`` table is *only* used when
+sqlite3 is somehow unavailable and the constant list itself cannot be
+imported.
 """
 from __future__ import annotations
 
 from typing import Any, Dict, NamedTuple, Optional
+
+from . import library
 
 
 class ProviderSpec(NamedTuple):
@@ -28,71 +23,65 @@ class ProviderSpec(NamedTuple):
     label: str
 
 
-# Hard-coded fallback table — only consulted if the library has no row.
+# Hard-coded fallback used only in the unlikely event both the library
+# constants *and* sqlite3 are unavailable (e.g. broken install).  Kept
+# in sync with the deepseek / minimax / anthropic entries in
+# ``library._BUILTIN_PROVIDERS``.
 _API_KEY_PLACEHOLDER = "sk-REPLACE_ME"
 _API_TIMEOUT_MS = "3000000"
 _DISABLE_TRAFFIC = "1"
 
-_FALLBACK_PROVIDERS: Dict[str, ProviderSpec] = {
-    p.name: p
-    for p in (
-        ProviderSpec(
+
+def _fallback_spec(name: str) -> Optional[ProviderSpec]:
+    table = {
+        "deepseek": ProviderSpec(
             name="deepseek",
             base_url="https://api.deepseek.com/anthropic",
             model="deepseek-v4-pro",
             label="DeepSeek (deepseek-v4-pro)",
         ),
-        ProviderSpec(
+        "minimax": ProviderSpec(
             name="minimax",
             base_url="https://api.minimaxi.com/anthropic",
-            model="MiniMax-M2.7",
-            label="MiniMax (MiniMax-M2.7)",
+            model="MiniMax-M3",
+            label="MiniMax (MiniMax-M3)",
         ),
-        ProviderSpec(
+        "anthropic": ProviderSpec(
             name="anthropic",
             base_url="https://api.anthropic.com",
             model="claude-sonnet-4-6",
             label="Anthropic (claude-sonnet-4-6)",
         ),
-    )
-}
+    }
+    return table.get(name)
 
 
 def get(name: str) -> ProviderSpec:
-    """Return the ProviderSpec for `name`. Raises KeyError if unknown.
-
-    Library takes precedence; fallback table is consulted only if the
-    library is unavailable (e.g. first-run race on a fresh checkout
-    where sqlite3 has not yet been imported).
-    """
-    try:
-        from . import library  # local import to break a cycle
-        p = library.get_provider(name)
-        if p is not None:
-            return ProviderSpec(
-                name=p.id,
-                base_url=p.base_url,
-                model=p.model,
-                label=p.label or p.name,
-            )
-    except Exception:
-        # Library unavailable — fall through to the hard-coded table.
-        pass
-    if name in _FALLBACK_PROVIDERS:
-        return _FALLBACK_PROVIDERS[name]
+    """Return a ProviderSpec for `name`; raises KeyError if unknown."""
+    p = library.get_provider(name)
+    if p is not None:
+        return ProviderSpec(
+            name=p["id"],
+            base_url=p["env"].get("ANTHROPIC_BASE_URL", ""),
+            model=p["env"].get("ANTHROPIC_MODEL", ""),
+            label=p.get("label") or p.get("name") or name,
+        )
+    spec = _fallback_spec(name)
+    if spec is not None:
+        return spec
     raise KeyError(name)
 
 
 def env_block(provider: str) -> Dict[str, str]:
-    """Build the settings.json `env` block for a given provider name."""
-    try:
-        from . import library
-        p = library.get_provider(provider)
-        if p is not None:
-            return p.env_block()
-    except Exception:
-        pass
-    spec = _FALLBACK_PROVIDERS.get(provider)
+    """Return the (string-ified) settings.json `env` block for a provider.
+
+    Mirrors the new library.get_provider_env shape: every value is
+    rendered as a string because that's what CC expects in the file.
+    """
+    env = library.get_provider_env(provider)
+    if env is not None:
+        return {k: _stringify(v) for k, v in env.items()}
+    spec = _fallback_spec(provider)
     if spec is None:
         raise KeyError(provider)
     return {
@@ -109,19 +98,15 @@ def env_block(provider: str) -> Dict[str, str]:
 
 def describe(provider: str) -> Dict[str, Any]:
     """Return a display-friendly dict for `show`."""
-    try:
-        from . import library
-        p = library.get_provider(provider)
-        if p is not None:
-            return {
-                "name": p.id,
-                "label": p.label or p.name,
-                "base_url": p.base_url,
-                "model": p.model,
-            }
-    except Exception:
-        pass
-    spec = _FALLBACK_PROVIDERS.get(provider)
+    p = library.get_provider(provider)
+    if p is not None:
+        return {
+            "name": p["id"],
+            "label": p.get("label") or p.get("name") or provider,
+            "base_url": p["env"].get("ANTHROPIC_BASE_URL", ""),
+            "model": p["env"].get("ANTHROPIC_MODEL", ""),
+        }
+    spec = _fallback_spec(provider)
     if spec is None:
         raise KeyError(provider)
     return {
@@ -132,5 +117,30 @@ def describe(provider: str) -> Dict[str, Any]:
     }
 
 
-# Legacy constants — still exported so older import paths keep working.
-PROVIDERS = _FALLBACK_PROVIDERS
+def _stringify(value: Any) -> str:
+    if isinstance(value, str):
+        return value
+    if isinstance(value, bool):
+        return "1" if value else "0"
+    if isinstance(value, (int, float)):
+        return str(value)
+    # Fallback: JSON.
+    import json
+    return json.dumps(value, ensure_ascii=False)
+
+
+# Legacy constant: derived from the library constants on demand.
+def _legacy_providers() -> Dict[str, ProviderSpec]:
+    out: Dict[str, ProviderSpec] = {}
+    for row in library._BUILTIN_PROVIDERS:  # noqa: SLF001
+        env = row["env"]
+        out[row["id"]] = ProviderSpec(
+            name=row["id"],
+            base_url=env.get("ANTHROPIC_BASE_URL", ""),
+            model=env.get("ANTHROPIC_MODEL", ""),
+            label=row.get("label", row.get("name", row["id"])),
+        )
+    return out
+
+
+PROVIDERS = _legacy_providers()

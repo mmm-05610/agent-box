@@ -85,7 +85,9 @@ def build_bwrap_argv(
         "--dev", "/dev",
         "--proc", "/proc",
         "--tmpfs", "/tmp",
-        "--unshare-all",
+        "--unshare-ipc",
+        "--unshare-pid",
+        "--unshare-uts",
         "--share-net",
         *claude_argv,
     ]
@@ -109,7 +111,7 @@ def build_child_env(settings_env: Dict[str, str]) -> Dict[str, str]:
     return env
 
 
-def launch_cc(name: str, project_dir: Optional[Path] = None) -> None:
+def launch_cc(name: str, provider_id: str | None = None, resume: bool = False) -> None:
     """Bind-mount the profile's dot-claude/ and exec bwrap -> claude.
 
     Never returns on success (execvpe replaces the process). Raises
@@ -144,14 +146,7 @@ def launch_cc(name: str, project_dir: Optional[Path] = None) -> None:
         "Install with: sudo apt install bubblewrap (or equivalent for your distro)",
     )
 
-    if project_dir is not None:
-        project_dir = project_dir.expanduser().resolve()
-        if not project_dir.is_dir():
-            raise profile.ProfileError(
-                f"project directory not found: {project_dir}"
-            )
-        os.chdir(project_dir)
-
+    # project_dir removed — use `cd ~/projects/xxx && agent-box cc <profile>`
     claude_argv = [claude]
     # `--cwd` is also available on CC, but the user asked for shell chdir
     # which is the more general mechanism. Keep claude_argv minimal here.
