@@ -26,18 +26,18 @@ class Theme:
         "bg":              "#0F1115",   # main content
         "bg_canvas":       "#0A0C10",   # outermost, darkest
         "bg_sidebar":      "#14171D",   # sidebar — 1 step lighter than bg
-        "bg_elevated":     "#1A1E25",   # cards — 2 steps lighter
+        "bg_elevated":     "#1E2228",   # cards — 2 steps lighter (Phase 2.6 tuned)
         "bg_elevated_2":   "#22272F",   # controls — 3 steps lighter
         "bg_hover":        "#262B33",
         "bg_active":       "#2E343D",
-        "surface":         "#1A1E25",
+        "surface":         "#1E2228",
         "surface_overlay": "#22272F",
 
-        # Borders
-        "border":          "#2A2F38",
+        # Borders — Phase 2.6: a touch stronger for clearer card edges
+        "border":          "#2E3340",
         "border_subtle":   "#1F232B",
         "border_strong":   "#3D4350",
-        "border_focus":    "#7B6CF6",
+        "border_focus":    "#818CF8",
 
         # Text
         "fg":              "#E6E8EC",
@@ -46,18 +46,18 @@ class Theme:
         "fg_disabled":     "#3F4550",
         "fg_inverse":      "#0F1115",
 
-        # Brand / Primary
-        "primary":         "#7B6CF6",
-        "primary_hover":   "#8E7FF9",
+        # Brand / Primary — Phase 2.6: brighter #818CF8 for better dark-mode contrast
+        "primary":         "#818CF8",
+        "primary_hover":   "#92A0FB",
         "primary_pressed": "#6E5FE6",
-        "primary_subtle":  "#2A2547",   # bg-tinted for hover surfaces
+        "primary_subtle":  "#2A2547",
         "primary_fg":      "#FFFFFF",
         "accent":          "#56B6F9",
 
-        # Status — text/icon
-        "success":         "#7FB069",
+        # Status — Phase 2.6: brighter success / error colors
+        "success":         "#4ADE80",
         "warning":         "#E0A458",
-        "error":           "#E06C75",
+        "error":           "#F87171",
         "info":            "#56B6F9",
 
         # Status — subtle backgrounds (for pills, badges)
@@ -68,10 +68,10 @@ class Theme:
         "neutral_subtle":  "#22272F",
 
         # Status — dot color (slightly muted from main)
-        "status_running":  "#7FB069",
+        "status_running":  "#4ADE80",
         "status_stopped":  "#5C6270",
         "status_warning":  "#E0A458",
-        "status_error":    "#E06C75",
+        "status_error":    "#F87171",
     }
 
     LIGHT = {

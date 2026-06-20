@@ -5,16 +5,15 @@ from typing import Any, Callable, Dict, List
 
 import customtkinter as ctk
 
+from ..components.card import StatCard
+from ..components.status import StatusPill
 from ..theme import C
 from ..tokens import (
-    FONT_BIG,
     FONT_BODY,
     FONT_CAPTION,
     FONT_DISPLAY,
-    FONT_ICON_LG,
     FONT_LABEL,
     FONT_MICRO,
-    FONT_MONO_SMALL,
     FONT_SUBTITLE,
     RADIUS_LG,
     SPACE_2XL,
@@ -24,7 +23,6 @@ from ..tokens import (
     SPACE_XL,
 )
 from ..wsl import AGENT_ORDER
-from ..components.status import StatusPill
 
 
 class HomePage(ctk.CTkFrame):
@@ -69,7 +67,7 @@ class HomePage(ctk.CTkFrame):
                   padx=SPACE_2XL, pady=(0, SPACE_LG))
         body.grid_columnconfigure(0, weight=1)
 
-        # 1. Status cards row (polished)
+        # 1. Status cards row (uses StatCard component)
         cards_row = ctk.CTkFrame(body, fg_color="transparent")
         cards_row.grid(row=0, column=0, sticky="ew", pady=(0, SPACE_XL))
         cards_row.grid_columnconfigure((0, 1, 2), weight=1)
@@ -78,12 +76,12 @@ class HomePage(ctk.CTkFrame):
         profile_total = len(self._profiles)
         agent_types = len({p.get("agent_type", "") for p in self._profiles})
 
-        self._stat_card(cards_row, 0, "RUNNING", str(active_count),
-                        C("status_running"), "▶")
-        self._stat_card(cards_row, 1, "PROFILES", str(profile_total),
-                        C("primary"), "◫")
-        self._stat_card(cards_row, 2, "AGENT TYPES", f"{agent_types} / 4",
-                        C("accent"), "▦")
+        self._stat(cards_row, 0, "▶", "RUNNING", str(active_count),
+                   C("status_running"))
+        self._stat(cards_row, 1, "◫", "PROFILES", str(profile_total),
+                   C("primary"))
+        self._stat(cards_row, 2, "▦", "AGENT TYPES", f"{agent_types} / 4",
+                   C("accent"))
 
         # 2. Quick launch
         self._section_label(body, 1, "QUICK LAUNCH")
@@ -135,35 +133,15 @@ class HomePage(ctk.CTkFrame):
         )
         lbl.grid(row=row, column=0, sticky="ew", pady=(0, SPACE_SM))
 
-    def _stat_card(self, master, col: int, label: str, value: str,
-                   accent: str, icon: str) -> None:
-        card = ctk.CTkFrame(
-            master, fg_color=C("bg_elevated"), corner_radius=RADIUS_LG,
-            border_width=1, border_color=C("border"),
-        )
+    def _stat(self, master, col: int, icon: str, label: str,
+              value: str, accent: str) -> None:
+        """Stat tile — uses the StatCard component."""
+        card = StatCard(master, icon=icon, value=value, label=label,
+                        accent=accent)
         card.grid(
             row=0, column=col, sticky="ew",
             padx=(0 if col == 0 else SPACE_SM, SPACE_SM if col < 2 else 0),
         )
-        card.grid_columnconfigure(1, weight=1)
-
-        icon_lbl = ctk.CTkLabel(
-            card, text=icon, text_color=accent, font=FONT_ICON_LG,
-        )
-        icon_lbl.grid(row=0, column=0, sticky="w",
-                      padx=(SPACE_LG, 0), pady=(SPACE_LG, 0))
-
-        top_lbl = ctk.CTkLabel(
-            card, text=label, text_color=C("fg_muted"), font=FONT_LABEL,
-        )
-        top_lbl.grid(row=0, column=1, sticky="e",
-                     padx=(SPACE_SM, SPACE_LG), pady=(SPACE_LG, 0))
-
-        val = ctk.CTkLabel(
-            card, text=value, text_color=accent, font=FONT_BIG, anchor="w",
-        )
-        val.grid(row=1, column=0, columnspan=2, sticky="w",
-                 padx=SPACE_LG, pady=(SPACE_SM, SPACE_LG))
 
     def _quick_row(self, master, s: Dict[str, Any]) -> None:
         star = ctk.CTkLabel(
