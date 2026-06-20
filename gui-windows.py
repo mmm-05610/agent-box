@@ -91,17 +91,8 @@ def build_launch_argv(name: str, agent_type: str, mode: str) -> List[str]:
     # Ensure ~/.local/bin and ~/.npm-global/bin are on PATH (login shell
     # may not source .bashrc for non-interactive sessions).
     setup = "export PATH=\"$HOME/.npm-global/bin:$HOME/.local/bin:$PATH\""
-    script = f"{setup} && {cmdline}"
-    return [
-        "powershell", "-Command",
-        f"Start-Process wsl.exe -ArgumentList 'bash','-lc',{_ps_quote(script)}"
-    ]
-
-
-def _ps_quote(s: str) -> str:
-    """Quote a string for use inside a PowerShell ArgumentList."""
-    escaped = s.replace("'", "''")
-    return f"'{escaped}'"
+    script = f"{setup} && {cmdline} || {{ ec=$?; echo; echo agent-box failed code $ec; read -p Enter...; }}"
+    return ["wsl.exe", "bash", "-lc", script]
 
 
 def _shell_quote(token: str) -> str:
@@ -112,14 +103,12 @@ def _shell_quote(token: str) -> str:
 
 
 def launch_profile(name: str, agent_type: str, mode: str) -> None:
-    """Spawn Windows Terminal with the agent command. Non-blocking."""
-    wt = shutil.which("wt.exe")
-    if wt is None:
-        raise RuntimeError("wt.exe (Windows Terminal) not found in PATH.")
+    """Spawn a new console window with the agent command. Non-blocking."""
     argv = build_launch_argv(name, agent_type, mode)
-    # detach: WT must outlive this GUI process; use C:\ as cwd so
-    # wsl.exe doesn't fail translating a UNC / pushd drive letter.
-    subprocess.Popen(argv, close_fds=True, cwd="C:\\")
+    kwargs = dict(close_fds=True, cwd="C:\\")
+    if sys.platform == "win32":
+        kwargs["creationflags"] = subprocess.CREATE_NEW_CONSOLE
+    subprocess.Popen(argv, **kwargs)
 
 
 # --- Tkinter UI -----------------------------------------------------------
