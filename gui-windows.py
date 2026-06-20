@@ -91,7 +91,17 @@ def build_launch_argv(name: str, agent_type: str, mode: str) -> List[str]:
     # Ensure ~/.local/bin and ~/.npm-global/bin are on PATH (login shell
     # may not source .bashrc for non-interactive sessions).
     setup = "export PATH=\"$HOME/.npm-global/bin:$HOME/.local/bin:$PATH\""
-    return ["cmd", "/c", "start", "\"Agent Box\"", "wsl.exe", "bash", "-lc", f"{setup} && {cmdline}"]
+    script = f"{setup} && {cmdline}"
+    return [
+        "powershell", "-Command",
+        f"Start-Process wsl.exe -ArgumentList 'bash','-lc',{_ps_quote(script)}"
+    ]
+
+
+def _ps_quote(s: str) -> str:
+    """Quote a string for use inside a PowerShell ArgumentList."""
+    escaped = s.replace("'", "''")
+    return f"'{escaped}'"
 
 
 def _shell_quote(token: str) -> str:
