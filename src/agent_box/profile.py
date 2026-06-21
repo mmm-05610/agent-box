@@ -75,12 +75,26 @@ def load_meta(name: str) -> Dict[str, str]:
         raise ProfileError(
             f"{name}: meta.yaml name mismatch ({data['name']!r})."
         )
+    # Optional v0.4 fields — forward/back compatible. Old profiles without
+    # them still load (just return None).
+    for opt in ("display_name", "description", "provider", "preset"):
+        if opt not in data:
+            data[opt] = None
     return data
 
 
 # --- create ----------------------------------------------------------------
 
-def create(name: str, agent_type: str = "cc") -> Path:
+def create(
+    name: str,
+    agent_type: str = "cc",
+    *,
+    display_name: Optional[str] = None,
+    description: Optional[str] = None,
+    provider: Optional[str] = None,
+    claude_md: Optional[str] = None,
+    preset: Optional[str] = None,
+) -> Path:
     """Create a new profile by copying the agent type's template directory.
 
     The profile directory will be at ``profiles/<name>/`` and contain
@@ -118,7 +132,29 @@ def create(name: str, agent_type: str = "cc") -> Path:
         if data_target is not None:
             shutil.copytree(data_template, data_target, symlinks=True)
 
-    write_meta(root, {"name": name, "agent_type": agent_type})
+    # v0.4: write the wizard-chosen CLAUDE.md body for CC profiles. The
+    # template ships an empty CLAUDE.md; the wizard's template step
+    # populates it here. Non-CC agent types are out of scope for v0.4
+    # (Hermes has SOUL.md but the template does not seed one yet, and
+    # the wizard's template step is CC-focused).
+    # TODO(WS5): non-CC role templates (Hermes SOUL.md, etc.)
+    if claude_md is not None and agent_type == "cc":
+        claude_md_path = target / "CLAUDE.md"
+        claude_md_path.write_text(claude_md)
+
+    # v0.4: store preset name in meta. Resolution / file expansion is
+    # Workstream 5; for now it is a record-only field.
+    # TODO(WS5): apply preset
+    meta: Dict[str, str] = {"name": name, "agent_type": agent_type}
+    if display_name is not None:
+        meta["display_name"] = display_name
+    if description is not None:
+        meta["description"] = description
+    if provider is not None:
+        meta["provider"] = provider
+    if preset is not None:
+        meta["preset"] = preset
+    write_meta(root, meta)
     return root
 
 
@@ -164,6 +200,11 @@ def show(name: str) -> Dict[str, Any]:
     }
     if data_dir and data_dir.is_dir():
         info["data_dir"] = str(data_dir)
+    # v0.4: surface optional meta fields at top level for `show` output.
+    for k in ("display_name", "description", "provider", "preset"):
+        v = meta.get(k)
+        if v is not None:
+            info[k] = v
     return info
 
 

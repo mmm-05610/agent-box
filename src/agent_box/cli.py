@@ -31,6 +31,24 @@ def _build_parser() -> argparse.ArgumentParser:
         default="cc",
         help="Agent type (default: cc)",
     )
+    p_create.add_argument(
+        "--display-name", default=None,
+        help="Human-readable profile display name (stored in meta.yaml)",
+    )
+    p_create.add_argument(
+        "--description", default=None,
+        help="Free-form description of what this profile is for (stored in meta.yaml)",
+    )
+    p_create.add_argument(
+        "--provider", default=None,
+        help="Provider key (e.g. anthropic, bedrock, vertex) — record-only in v0.4 "
+             "(stored in meta.yaml; no apply logic). v0.5: apply_provider.",
+    )
+    p_create.add_argument(
+        "--claude-md", default=None,
+        help="Path to a file whose contents become the new profile's CLAUDE.md "
+             "(CC profiles only in v0.4). Avoids shell-quoting a multi-line body.",
+    )
     p_create.set_defaults(func=cmd_create)
 
     # list ----------------------------------------------------------------
@@ -75,8 +93,26 @@ def _build_parser() -> argparse.ArgumentParser:
 # --- subcommand implementations -------------------------------------------
 
 def cmd_create(args: argparse.Namespace) -> int:
+    claude_md_body: Optional[str] = None
+    if args.claude_md is not None:
+        try:
+            with open(args.claude_md, "r", encoding="utf-8") as fh:
+                claude_md_body = fh.read()
+        except OSError as exc:
+            print(
+                f"agent-box: cannot read --claude-md {args.claude_md!r}: {exc}",
+                file=sys.stderr,
+            )
+            return 2
     try:
-        root = profile.create(args.name, agent_type=args.type)
+        root = profile.create(
+            args.name,
+            agent_type=args.type,
+            display_name=args.display_name,
+            description=args.description,
+            provider=args.provider,
+            claude_md=claude_md_body,
+        )
     except (ValueError, profile.ProfileError) as exc:
         print(f"agent-box: {exc}", file=sys.stderr)
         return 2
@@ -121,6 +157,11 @@ def cmd_show(args: argparse.Namespace) -> int:
     print(f"config_dir: {info['config_dir']}")
     if info.get("data_dir"):
         print(f"data_dir:   {info['data_dir']}")
+    # v0.4: surface optional meta fields in plain `show` output.
+    for k in ("display_name", "description", "provider", "preset"):
+        v = info["meta"].get(k)
+        if v is not None:
+            print(f"{k + ':':<11} {v}")
     return 0
 
 

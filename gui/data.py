@@ -21,7 +21,10 @@ def get_profile_data(profile_root, agent_type: str) -> Dict[str, Any]:
         {
             "name": str,
             "agent_type": str,
-            "provider": str,
+            "display_name": str | None,  # v0.4
+            "description": str | None,   # v0.4
+            "provider": str,             # v0.4: prefer meta.provider, else inline-detected
+            "preset": str | None,        # v0.4
             "model": str,
             "config_dir": str,
             "settings": dict,      # For CC
@@ -53,6 +56,9 @@ def get_profile_data(profile_root, agent_type: str) -> Dict[str, Any]:
     result = {
         "name": profile_root.name,
         "agent_type": agent_type,
+        "display_name": None,
+        "description": None,
+        "preset": None,
         "provider": "—",
         "model": "—",
         "config_dir": "—",
@@ -74,13 +80,22 @@ def get_profile_data(profile_root, agent_type: str) -> Dict[str, Any]:
         meta = read_yaml_file(profile_root / "meta.yaml") or {}
         result["name"] = meta.get("name", profile_root.name)
         result["agent_type"] = meta.get("agent_type", agent_type)
+        # v0.4: surface optional meta fields to the UI.
+        for k in ("display_name", "description", "preset"):
+            v = meta.get(k)
+            if v is not None:
+                result[k] = v
 
         # Create config reader
         reader = ProfileConfigReader(profile_root, agent_type)
         result["config_dir"] = reader.config_dir.as_posix()
 
-        # Get provider and model
-        result["provider"] = reader.get_provider()
+        # Get provider and model.
+        # v0.4: prefer the wizard-stored meta.provider; fall back to
+        # the inline-detected provider from settings.json/config.toml
+        # (existing behavior for old profiles without the field).
+        meta_provider = meta.get("provider")
+        result["provider"] = meta_provider or reader.get_provider()
         result["model"] = reader.get_model()
 
         # Debug

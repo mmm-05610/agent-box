@@ -266,8 +266,21 @@ def delete_profile(name: str) -> bool:
     return True
 
 
-def create_profile(name: str, agent_type: str = "cc") -> bool:
-    """Create a new agent-box profile. Returns True on success."""
+def create_profile(
+    name: str,
+    agent_type: str = "cc",
+    *,
+    display_name: Optional[str] = None,
+    description: Optional[str] = None,
+    provider: Optional[str] = None,
+) -> bool:
+    """Create a new agent-box profile. Returns True on success.
+
+    Scalar meta fields (display_name / description / provider) are
+    passed via CLI flags. The CLAUDE.md body is intentionally NOT
+    passed here (multi-line content is fragile to shell-quote);
+    the GUI writes it after create returns via :func:`save_file`.
+    """
     wsl = shutil.which("wsl.exe")
     if wsl is None:
         raise RuntimeError("wsl.exe not found in PATH (install WSL).")
@@ -276,10 +289,19 @@ def create_profile(name: str, agent_type: str = "cc") -> bool:
     if sys.platform == "win32":
         kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
 
+    cmd = (
+        f"agent-box create {_shell_quote(name)} --type {_shell_quote(agent_type)}"
+    )
+    if display_name:
+        cmd += f" --display-name {_shell_quote(display_name)}"
+    if description:
+        cmd += f" --description {_shell_quote(description)}"
+    if provider:
+        cmd += f" --provider {_shell_quote(provider)}"
+
     try:
         proc = subprocess.run(
-            [wsl, "bash", "-lc",
-             f"agent-box create {_shell_quote(name)} --type {_shell_quote(agent_type)}"],
+            [wsl, "bash", "-lc", cmd],
             capture_output=True,
             timeout=15,
             cwd="C:\\",

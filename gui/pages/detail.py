@@ -640,12 +640,17 @@ class ProfileDetailPage(ctk.CTkFrame):
         card.grid(row=0, column=0, sticky="ew", pady=(0, SPACE_LG))
         card.grid_columnconfigure(1, weight=1)
 
+        # v0.4: surface display_name / description / preset from meta
+        # alongside the inline-detected fields.
         rows = [
-            ("Name",       self._data.get("name", "—")),
-            ("Agent Type", (self._data.get("agent_type", "—") or "—").upper()),
-            ("Provider",   self._data.get("provider", "—")),
-            ("Model",      self._data.get("model", "—")),
-            ("Config Dir", self._data.get("config_dir", "—")),
+            ("Name",         self._data.get("name", "—")),
+            ("Display Name", self._data.get("display_name") or "—"),
+            ("Description",  self._data.get("description") or "—"),
+            ("Agent Type",   (self._data.get("agent_type", "—") or "—").upper()),
+            ("Provider",     self._data.get("provider", "—")),
+            ("Preset",       self._data.get("preset") or "—"),
+            ("Model",        self._data.get("model", "—")),
+            ("Config Dir",   self._data.get("config_dir", "—")),
         ]
         for r, (label, value) in enumerate(rows):
             ctk.CTkLabel(

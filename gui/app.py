@@ -326,13 +326,35 @@ class AgentBoxApp:
             self._on_nav("profiles")
             return
 
+        # v0.4: pull optional meta scalars and the CLAUDE.md body out
+        # of the wizard payload. Scalars go through CLI flags; the
+        # body is sent AFTER create via save_file (multi-line content
+        # does not survive shell quoting reliably).
+        display_name = (payload.get("display_name") or "").strip() or None
+        description = (payload.get("description") or "").strip() or None
+        provider = (payload.get("provider") or "").strip() or None
+        claude_md = payload.get("claude_md") or ""
+        write_claude_md = bool(claude_md) and agent_type == "cc"
+        claude_md_wsl_path = (
+            f"{_PROFILE_ROOT_STR}/{name}/dot-claude/CLAUDE.md"
+            if write_claude_md else ""
+        )
+
         self.toast.show(f"Creating '{name}'…", kind="info")
 
         import threading
 
         def _worker() -> None:
             try:
-                create_profile(name, agent_type)
+                create_profile(
+                    name, agent_type,
+                    display_name=display_name,
+                    description=description,
+                    provider=provider,
+                )
+                if write_claude_md:
+                    from .wsl import save_file
+                    save_file(claude_md_wsl_path, claude_md)
                 self.root.after(0, _on_ok)
             except Exception as exc:
                 self.root.after(0, lambda e=exc: _on_err(e))
