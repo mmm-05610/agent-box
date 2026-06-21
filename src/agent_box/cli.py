@@ -53,10 +53,6 @@ def _build_parser() -> argparse.ArgumentParser:
                        help="Extra args passed through to the agent binary")
         p.set_defaults(func=cmd_launch)
 
-    # gui ------------------------------------------------------------------
-    p_gui = sub.add_parser("gui", help="Launch the web admin panel (http://127.0.0.1:8080)")
-    p_gui.set_defaults(func=cmd_gui)
-
     # show ----------------------------------------------------------------
     p_show = sub.add_parser("show", help="Show profile info")
     p_show.add_argument("name", help="Profile name")
@@ -112,17 +108,6 @@ def cmd_launch(args: argparse.Namespace) -> int:
         print(f"agent-box: {exc}", file=sys.stderr)
         return 2
     return 1  # unreachable; launch execvpe's
-
-
-def cmd_gui(args: argparse.Namespace) -> int:
-    try:
-        from . import gui as _gui
-    except ImportError as exc:
-        print(f"agent-box: {exc}", file=sys.stderr)
-        print("  Install with: pip install nicegui", file=sys.stderr)
-        return 2
-    _gui.main()
-    return 0
 
 
 def cmd_show(args: argparse.Namespace) -> int:
