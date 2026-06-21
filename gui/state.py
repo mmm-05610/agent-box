@@ -14,6 +14,7 @@ and the Tk main thread now share the same connection safely.
 from __future__ import annotations
 
 import sqlite3
+import sys
 import threading
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -164,3 +165,49 @@ def fetch_sessions(active_only: bool = False, limit: int = 50) -> List[Dict[str,
 
 def latest_cwd_for(profile: str) -> Optional[str]:
     return SessionDB.instance().latest_cwd_for(profile)
+
+
+def cleanup_stale_sessions() -> int:
+    """Mark sessions as exited if their PID is no longer alive.
+
+    Called on GUI startup to clean up zombie sessions from previous runs.
+    Returns the number of sessions cleaned up.
+    """
+    import os
+    import signal
+    from datetime import datetime
+
+    db = SessionDB.instance()
+    stale = db.fetch_sessions(active_only=True)
+    cleaned = 0
+
+    for s in stale:
+        pid = s.get("pid")
+        if not pid:
+            continue
+
+        # Check if PID is still alive
+        alive = False
+        try:
+            if sys.platform == "win32":
+                # On Windows, use ctypes to check process
+                import ctypes
+                kernel32 = ctypes.windll.kernel32
+                handle = kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+                if handle:
+                    exit_code = ctypes.c_ulong()
+                    if kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code)):
+                        alive = (exit_code.value == 259)  # STILL_ACTIVE
+                    kernel32.CloseHandle(handle)
+            else:
+                # On Unix, use kill(pid, 0)
+                os.kill(pid, 0)
+                alive = True
+        except (OSError, ProcessLookupError):
+            alive = False
+
+        if not alive:
+            db.record_exit(s["id"], -1)  # -1 = unknown exit
+            cleaned += 1
+
+    return cleaned

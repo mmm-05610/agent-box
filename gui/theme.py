@@ -1,11 +1,11 @@
-"""Theme — color tokens for the Slate Indigo theme (dark + light).
+"""Theme — color tokens (cc-switch / shadcn/ui style).
 
 Single source of truth for every color used in the GUI. Components and
 pages read colors via the ``C(key)`` convenience alias and switch
 between palettes via :meth:`Theme.set_mode`.
 
-Reference: docs/specs/gui-redesign-p2.md §1.2.
-Tokens are grouped by purpose: backgrounds, borders, text, brand, status.
+Style reference: docs/specs/cc-switch-style-guide.md
+Inspired by: shadcn/ui Zinc palette, cc-switch desktop app.
 """
 from __future__ import annotations
 
@@ -15,109 +15,114 @@ import customtkinter as ctk
 
 
 class Theme:
-    """Color tokens for Slate Indigo theme (dark + light)."""
+    """Color tokens — cc-switch / shadcn/ui Zinc style (dark + light)."""
 
     DARK = {
-        # 4-tier background hierarchy (darkest -> lightest)
-        # canvas: outermost frame (status bar background)
-        # bg:     main content area
-        # sidebar: navigation rail (1 step up from bg)
-        # elevated: cards / panels on top of bg
-        "bg":              "#0F1115",   # main content
-        "bg_canvas":       "#0A0C10",   # outermost, darkest
-        "bg_sidebar":      "#14171D",   # sidebar — 1 step lighter than bg
-        "bg_elevated":     "#1E2228",   # cards — 2 steps lighter (Phase 2.6 tuned)
-        "bg_elevated_2":   "#22272F",   # controls — 3 steps lighter
-        "bg_hover":        "#262B33",
-        "bg_active":       "#2E343D",
-        "surface":         "#1E2228",
-        "surface_overlay": "#22272F",
+        # Backgrounds — near-pure-black, minimal hierarchy
+        "bg":              "#09090B",   # main content (near-black)
+        "bg_canvas":       "#09090B",   # outermost = same as bg (flat)
+        "bg_sidebar":      "#0F0F11",   # sidebar — barely lighter
+        "bg_elevated":     "#18181B",   # cards — Zinc 900
+        "bg_elevated_2":   "#27272A",   # controls — Zinc 800
+        "bg_hover":        "#27272A",   # hover state
+        "bg_active":       "#3F3F46",   # pressed / selected
+        "bg_input":        "#27272A",   # input fields
+        "surface":         "#18181B",
+        "surface_overlay": "#27272A",
 
-        # Borders — Phase 2.6: a touch stronger for clearer card edges
-        "border":          "#2E3340",
-        "border_subtle":   "#1F232B",
-        "border_strong":   "#3D4350",
-        "border_focus":    "#818CF8",
+        # Borders — extremely subtle, almost invisible
+        "border":          "#27272A",   # Zinc 800 — low contrast
+        "border_subtle":   "#1E1E21",   # even more subtle
+        "border_strong":   "#3F3F46",   # stronger for focus rings
+        "border_focus":    "#A1A1AA",   # Zinc 400 — focus ring
 
-        # Text
-        "fg":              "#E6E8EC",
-        "fg_muted":        "#9CA1AC",
-        "fg_subtle":       "#5C6270",
-        "fg_disabled":     "#3F4550",
-        "fg_inverse":      "#0F1115",
+        # Text — Zinc palette
+        "fg":              "#FAFAFA",   # Zinc 50 — primary text
+        "fg_muted":        "#A1A1AA",   # Zinc 400 — secondary text
+        "fg_subtle":       "#71717A",   # Zinc 500 — tertiary text
+        "fg_disabled":     "#52525B",   # Zinc 600 — disabled
+        "fg_inverse":      "#09090B",   # text on light bg
 
-        # Brand / Primary — Phase 2.6: brighter #818CF8 for better dark-mode contrast
-        "primary":         "#818CF8",
-        "primary_hover":   "#92A0FB",
-        "primary_pressed": "#6E5FE6",
-        "primary_subtle":  "#2A2547",
-        "primary_fg":      "#FFFFFF",
-        "accent":          "#56B6F9",
+        # Primary — WHITE in dark mode (cc-switch style: primary = foreground)
+        "primary":         "#FAFAFA",   # white button
+        "primary_hover":   "#E4E4E7",   # Zinc 200
+        "primary_pressed": "#D4D4D8",   # Zinc 300
+        "primary_subtle":  "#27272A",   # subtle primary bg
+        "primary_fg":      "#09090B",   # black text on white button
+        "accent":          "#3B82F6",   # Blue 500 — rare accent
 
-        # Status — Phase 2.6: brighter success / error colors
-        "success":         "#4ADE80",
-        "warning":         "#E0A458",
-        "error":           "#F87171",
-        "info":            "#56B6F9",
+        # Status — Tailwind defaults, muted
+        "success":         "#22C55E",   # Green 500
+        "warning":         "#F59E0B",   # Amber 500
+        "error":           "#EF4444",   # Red 500
+        "info":            "#3B82F6",   # Blue 500
 
-        # Status — subtle backgrounds (for pills, badges)
-        "success_subtle":  "#1F2A1E",
-        "warning_subtle":  "#2D2418",
-        "error_subtle":    "#2D1E20",
-        "info_subtle":     "#19242C",
-        "neutral_subtle":  "#22272F",
+        # Status — subtle backgrounds
+        "success_subtle":  "#052E16",   # Green 950
+        "warning_subtle":  "#422006",   # Amber 950
+        "error_subtle":    "#450A0A",   # Red 950
+        "info_subtle":     "#172554",   # Blue 950
+        "neutral_subtle":  "#18181B",   # Zinc 900
 
-        # Status — dot color (slightly muted from main)
-        "status_running":  "#4ADE80",
-        "status_stopped":  "#5C6270",
-        "status_warning":  "#E0A458",
-        "status_error":    "#F87171",
+        # Status — dot colors
+        "status_running":  "#22C55E",   # Green 500
+        "status_stopped":  "#71717A",   # Zinc 500
+        "status_warning":  "#F59E0B",   # Amber 500
+        "status_error":    "#EF4444",   # Red 500
     }
 
     LIGHT = {
-        "bg":              "#FAFAFB",
-        "bg_canvas":       "#F4F5F7",
-        "bg_sidebar":      "#FFFFFF",
+        # Backgrounds — pure white, minimal hierarchy
+        "bg":              "#FFFFFF",
+        "bg_canvas":       "#FFFFFF",
+        "bg_sidebar":      "#FAFAFA",   # Zinc 50
         "bg_elevated":     "#FFFFFF",
-        "bg_elevated_2":   "#FFFFFF",
-        "bg_hover":        "#EEF0F4",
-        "bg_active":       "#E4E8EE",
+        "bg_elevated_2":   "#F4F4F5",   # Zinc 100
+        "bg_hover":        "#F4F4F5",   # Zinc 100
+        "bg_active":       "#E4E4E7",   # Zinc 200
+        "bg_input":        "#F4F4F5",   # Zinc 100
         "surface":         "#FFFFFF",
         "surface_overlay": "#FFFFFF",
 
-        "border":          "#E1E4EA",
-        "border_subtle":   "#EDEFF3",
-        "border_strong":   "#C4C9D2",
-        "border_focus":    "#5945D6",
+        # Borders — subtle
+        "border":          "#E4E4E7",   # Zinc 200
+        "border_subtle":   "#F4F4F5",   # Zinc 100
+        "border_strong":   "#D4D4D8",   # Zinc 300
+        "border_focus":    "#71717A",   # Zinc 500
 
-        "fg":              "#15171C",
-        "fg_muted":        "#5C6270",
-        "fg_subtle":       "#8A8F9A",
-        "fg_disabled":     "#B8BDC5",
-        "fg_inverse":      "#FFFFFF",
+        # Text
+        "fg":              "#09090B",   # Zinc 950
+        "fg_muted":        "#71717A",   # Zinc 500
+        "fg_subtle":       "#A1A1AA",   # Zinc 400
+        "fg_disabled":     "#D4D4D8",   # Zinc 300
+        "fg_inverse":      "#FAFAFA",
 
-        "primary":         "#5945D6",
-        "primary_hover":   "#6E5BE0",
-        "primary_pressed": "#4A38BD",
-        "primary_subtle":  "#EBE7FB",
-        "primary_fg":      "#FFFFFF",
-        "accent":          "#1976D2",
+        # Primary — BLACK in light mode
+        "primary":         "#18181B",   # Zinc 900 — black button
+        "primary_hover":   "#27272A",   # Zinc 800
+        "primary_pressed": "#3F3F46",   # Zinc 700
+        "primary_subtle":  "#F4F4F5",   # Zinc 100
+        "primary_fg":      "#FAFAFA",   # white text on black button
+        "accent":          "#2563EB",   # Blue 600
 
-        "success":         "#3F8E3F",
-        "warning":         "#C77F30",
-        "error":           "#C1353F",
-        "info":            "#1976D2",
+        # Status
+        "success":         "#16A34A",   # Green 600
+        "warning":         "#D97706",   # Amber 600
+        "error":           "#DC2626",   # Red 600
+        "info":            "#2563EB",   # Blue 600
 
-        "success_subtle":  "#E2F0DE",
-        "warning_subtle":  "#F5E8D2",
-        "error_subtle":    "#F5DCDF",
-        "info_subtle":     "#DCEAF7",
-        "neutral_subtle":  "#EEF0F4",
+        # Status — subtle backgrounds
+        "success_subtle":  "#F0FDF4",   # Green 50
+        "warning_subtle":  "#FFFBEB",   # Amber 50
+        "error_subtle":    "#FEF2F2",   # Red 50
+        "info_subtle":     "#EFF6FF",   # Blue 50
+        "neutral_subtle":  "#F4F4F5",   # Zinc 100
 
-        "status_running":  "#3F8E3F",
-        "status_stopped":  "#8A8F9A",
-        "status_warning":  "#C77F30",
-        "status_error":    "#C1353F",
+        # Status — dot colors
+        "status_running":  "#16A34A",
+        "status_stopped":  "#A1A1AA",
+        "status_warning":  "#D97706",
+        "status_error":    "#DC2626",
     }
 
     _current: Dict[str, str] = dict(DARK)

@@ -1,3 +1,23 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "custom-provider": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Custom Provider",
+      "options": {
+        "baseURL": "",
+        "apiKey": "",
+        "setCacheKey": true
+      },
+      "models": {
+        "model-name": {
+          "name": "Model Display Name",
+          "limit": {
+            "context": 128000,
+            "output": 4096
+          }
+        }
+      }
+    }
+  }
 }

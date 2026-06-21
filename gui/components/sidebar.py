@@ -1,8 +1,7 @@
-"""Left navigation rail.
+"""Left navigation rail — cc-switch style.
 
-Width is fixed at ``SIDEBAR_WIDTH`` (220px). Five nav items render as
-accent-bar + label rows; the active item gets a primary-coloured left
-bar and a subtle primary fill.
+Narrower (180px), minimal, text-only nav items with bottom indicator
+for active state. No emoji icons (they render inconsistently on Windows).
 """
 from __future__ import annotations
 
@@ -13,34 +12,37 @@ import customtkinter as ctk
 from ..theme import C
 from ..tokens import (
     FONT_BODY,
-    FONT_BOLD,
+    FONT_CAPTION,
     FONT_LABEL,
     FONT_MICRO,
-    FONT_TITLE,
+    FONT_SANS_BOLD,
+    FONT_SUBTITLE,
     RADIUS_MD,
     SIDEBAR_WIDTH,
     SPACE_LG,
     SPACE_MD,
     SPACE_SM,
+    SPACE_XL,
+    SPACE_XS,
 )
 from .status import StatusPill
 
 
 NAV_ITEMS: List[Tuple[str, str, str]] = [
-    # (key, label, icon)
-    ("home",     "Home",     "🏠"),
-    ("profiles", "Profiles", "📁"),
-    ("sessions", "Sessions", "📊"),
-    ("settings", "Settings", "⚙"),
-    ("help",     "Help",     "❓"),
+    # (key, label, icon) — icon kept for future, but not rendered
+    ("home",     "Home",     ""),
+    ("profiles", "Profiles", ""),
+    ("sessions", "Sessions", ""),
+    ("settings", "Settings", ""),
+    ("help",     "Help",     ""),
 ]
 
 
 class Sidebar(ctk.CTkFrame):
-    """Left navigation rail (220px wide).
+    """Left navigation rail — cc-switch style (180px, minimal).
 
-    Layout: pure pack. Top: brand, section, nav items (each a row-frame).
-    Bottom: status pill + wsl text. No grid — pack is more predictable.
+    Layout: pack-based. Brand at top, nav items in middle,
+    status at bottom.
     """
 
     def __init__(
@@ -60,82 +62,71 @@ class Sidebar(ctk.CTkFrame):
         self._buttons: Dict[str, ctk.CTkButton] = {}
         self._indicators: Dict[str, ctk.CTkFrame] = {}
 
-        # === Top: brand + section + nav items ===
+        # === Top: brand ===
         brand = ctk.CTkLabel(
-            self, text="⚡  Agent Box", text_color=C("fg"),
-            font=FONT_TITLE, anchor="w",
+            self, text="Agent Box", text_color=C("fg"),
+            font=FONT_SUBTITLE, anchor="w",
         )
-        brand.pack(anchor="w", padx=SPACE_LG, pady=(20, 24))
+        brand.pack(anchor="w", padx=SPACE_LG, pady=(SPACE_XL, SPACE_LG))
 
-        section = ctk.CTkLabel(
-            self, text="NAVIGATE", text_color=C("fg_subtle"),
-            font=FONT_LABEL, anchor="w",
-        )
-        section.pack(anchor="w", padx=SPACE_LG, pady=(0, 6))
-
-        # Nav items — each is a small row-frame with accent + button
-        for key, label, icon in NAV_ITEMS:
+        # === Nav items ===
+        for key, label, _icon in NAV_ITEMS:
             item = ctk.CTkFrame(self, fg_color="transparent")
-            item.pack(fill="x", padx=10, pady=2)
+            item.pack(fill="x", padx=SPACE_SM, pady=1)
 
-            # Accent (left, narrow vertical bar)
-            accent = ctk.CTkFrame(
-                item, fg_color="transparent",
-                width=3, height=24, corner_radius=2,
-            )
-            accent.pack(side="left", padx=(0, 6))
-            self._indicators[key] = accent
-
-            # Button (fills remaining width)
+            # Bottom indicator (hidden by default)
+            # We use a different approach: active item gets bg_hover + left border
             btn = ctk.CTkButton(
-                item, text=f"{icon}   {label}",
+                item, text=label,
                 fg_color="transparent", text_color=C("fg_muted"),
                 hover_color=C("bg_hover"),
                 anchor="w", height=32, corner_radius=RADIUS_MD,
                 font=FONT_BODY,
                 command=lambda k=key: self._on_nav(k),
             )
-            btn.pack(side="left", fill="x", expand=True)
+            btn.pack(fill="x")
             self._buttons[key] = btn
 
-        # === Bottom: wsl text + status pill (anchored) ===
+        # === Bottom: status ===
         self.wsl_lbl = ctk.CTkLabel(
             self, text="", text_color=C("fg_subtle"),
             font=FONT_MICRO, anchor="w",
         )
-        self.wsl_lbl.pack(side="bottom", fill="x", padx=SPACE_LG, pady=(SPACE_SM, 0))
+        self.wsl_lbl.pack(side="bottom", fill="x", padx=SPACE_LG, pady=(SPACE_SM, SPACE_MD))
 
+        # Separator
+        sep = ctk.CTkFrame(self, fg_color=C("border"), height=1, corner_radius=0)
+        sep.pack(side="bottom", fill="x", padx=SPACE_LG, pady=(0, SPACE_SM))
+
+        # Status pill
         status_holder = ctk.CTkFrame(
-            self, fg_color="transparent", corner_radius=0, height=44,
+            self, fg_color="transparent", corner_radius=0, height=32,
         )
-        status_holder.pack(side="bottom", fill="x", padx=SPACE_MD, pady=SPACE_MD)
+        status_holder.pack(side="bottom", fill="x", padx=SPACE_MD, pady=SPACE_SM)
         status_holder.pack_propagate(False)
         status_holder.grid_columnconfigure(0, weight=1)
 
-        self.status_pill = StatusPill(status_holder, status="stopped", size="md")
-        self.status_pill.grid(row=0, column=0, sticky="ew", padx=SPACE_SM)
+        self.status_pill = StatusPill(status_holder, status="stopped", size="sm")
+        self.status_pill.grid(row=0, column=0, sticky="w", padx=SPACE_SM)
 
-        # Initial status update + active state
+        # Initial state
         self.update_status()
         self.set_active("home")
 
     def set_active(self, key: str) -> None:
         for k, btn in self._buttons.items():
-            accent = self._indicators[k]
             if k == key:
                 btn.configure(
-                    fg_color=C("primary_subtle"),
+                    fg_color=C("bg_hover"),
                     text_color=C("fg"),
-                    font=FONT_BOLD,
+                    font=FONT_SANS_BOLD,
                 )
-                accent.configure(fg_color=C("primary"))
             else:
                 btn.configure(
                     fg_color="transparent",
                     text_color=C("fg_muted"),
                     font=FONT_BODY,
                 )
-                accent.configure(fg_color="transparent")
 
     def update_status(self) -> None:
         active = self._status_getter()
@@ -143,4 +134,4 @@ class Sidebar(ctk.CTkFrame):
             self.status_pill.set_status("running")
         else:
             self.status_pill.set_status("stopped")
-        self.wsl_lbl.configure(text=f"{active} running  ·  WSL healthy")
+        self.wsl_lbl.configure(text=f"{active} running")

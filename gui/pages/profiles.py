@@ -292,6 +292,7 @@ class ProfileRow(Card):
         self._profile = profile
         self._toast = toast
         self._active = active
+        self._on_action = on_action
 
         # Per-row state (preserved across rebuilds via sessions.db history)
         self.cwd_var = ctk.StringVar(value=last_cwd or "~")
@@ -304,6 +305,9 @@ class ProfileRow(Card):
         at = profile.get("agent_type", "cc")
         self._build_layout(at)
 
+        # Bind click to specific non-interactive areas only
+        self._bind_detail_clicks()
+
     def _build_layout(self, at: str) -> None:
         # --- Title row (row 0): StatusPill + Name + Agent Badge + Launch ---
         self._status_pill = StatusPill(
@@ -314,6 +318,7 @@ class ProfileRow(Card):
             pady=(SPACE_LG, 0), sticky="w",
         )
         self._status_pill.bind("<Button-1>", lambda e: self._open_detail())
+        self._status_pill.configure(cursor="hand2")
 
         title_text = self._profile.get("name", "?")
         title = ctk.CTkLabel(
@@ -323,6 +328,7 @@ class ProfileRow(Card):
         title.grid(row=0, column=1, sticky="w",
                    padx=(SPACE_SM, SPACE_SM), pady=(SPACE_LG, 2))
         title.bind("<Button-1>", lambda e: self._open_detail())
+        title.configure(cursor="hand2")
 
         # Agent type badge next to name (Phase 2 visual upgrade)
         variant = AGENT_BADGE_VARIANT.get(at, "neutral")
@@ -351,6 +357,7 @@ class ProfileRow(Card):
         self._meta_lbl.grid(row=1, column=1, columnspan=2, sticky="ew",
                             padx=(SPACE_SM, SPACE_SM), pady=(2, SPACE_SM))
         self._meta_lbl.bind("<Button-1>", lambda e: self._open_detail())
+        self._meta_lbl.configure(cursor="hand2")
 
         # --- CWD row (row 2): path text + Edit ⋯ button ---
         cwd_label = ctk.CTkLabel(
@@ -372,7 +379,7 @@ class ProfileRow(Card):
                             pady=(0, SPACE_LG), sticky="e")
 
         # Mode dropdown (right of edit, used on launch — kept compact)
-        mode_menu = ctk.CTkOptionMenu(
+        self._mode_menu = ctk.CTkOptionMenu(
             self, variable=self.mode_var,
             values=list(LAUNCH_MODES),
             width=100, height=28, corner_radius=RADIUS_MD,
@@ -383,18 +390,18 @@ class ProfileRow(Card):
             dropdown_hover_color=C("bg_hover"),
             font=FONT_CAPTION, dropdown_font=FONT_CAPTION,
         )
-        mode_menu.grid(row=2, column=3, sticky="e",
-                       padx=(0, SPACE_LG), pady=(0, SPACE_LG))
+        self._mode_menu.grid(row=2, column=3, sticky="e",
+                             padx=(0, SPACE_LG), pady=(0, SPACE_LG))
 
         # Browse button for cwd (small icon button in cwd row, column 0)
-        browse_btn = ctk.CTkButton(
+        self._browse_btn = ctk.CTkButton(
             self, text="📁", width=28, height=28, corner_radius=RADIUS_MD,
             fg_color=C("bg_elevated_2"), hover_color=C("bg_hover"),
             text_color=C("fg_muted"), font=FONT_CAPTION,
             command=self._browse_cwd,
         )
-        browse_btn.grid(row=2, column=0, padx=(SPACE_LG, 0),
-                        pady=(0, SPACE_LG), sticky="w")
+        self._browse_btn.grid(row=2, column=0, padx=(SPACE_LG, 0),
+                              pady=(0, SPACE_LG), sticky="w")
 
     def update_state(self, *, active: bool, last_cwd: str) -> None:
         """Phase 3.4 incremental-update hook.
@@ -441,6 +448,18 @@ class ProfileRow(Card):
                     return f"{secs // 60}m"
                 return f"{secs // 3600}h {(secs % 3600) // 60}m"
         return ""
+
+    def _bind_detail_clicks(self) -> None:
+        """Bind click to open detail on specific non-interactive areas only.
+
+        Only binds to: StatusPill, title, meta label.
+        Does NOT bind to: Launch button, Edit button, mode dropdown, browse button.
+        """
+        # These widgets were already bound in _build_layout
+        # - self._status_pill
+        # - title
+        # - self._meta_lbl
+        pass  # No additional binding needed
 
     def _set_hover(self, hover: bool) -> None:
         # Card.set_hover handles bg + border swap; preserves our overrides

@@ -54,13 +54,19 @@ def fetch_profiles() -> List[Dict[str, str]]:
     wsl = shutil.which("wsl.exe")
     if wsl is None:
         raise RuntimeError("wsl.exe not found in PATH (install WSL).")
+
+    # On Windows, hide the console window
+    kwargs = {}
+    if sys.platform == "win32":
+        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+
     try:
         proc = subprocess.run(
             [wsl, "bash", "-lc", "agent-box list --json"],
             capture_output=True,
-            text=True,
             timeout=15,
             cwd="C:\\",
+            **kwargs,
         )
     except subprocess.TimeoutExpired as exc:
         raise RuntimeError("wsl.exe agent-box list --json timed out") from exc
@@ -68,13 +74,13 @@ def fetch_profiles() -> List[Dict[str, str]]:
         raise RuntimeError(f"failed to invoke wsl.exe: {exc}") from exc
 
     if proc.returncode != 0:
-        stderr = (proc.stderr or "").strip()
+        stderr = proc.stderr.decode("utf-8", errors="replace").strip()
         raise RuntimeError(
             f"agent-box list failed (exit {proc.returncode}): "
             f"{stderr or '<no stderr>'}"
         )
     try:
-        data = json.loads(proc.stdout)
+        data = json.loads(proc.stdout.decode("utf-8", errors="replace"))
     except json.JSONDecodeError as exc:
         raise RuntimeError(f"invalid JSON from agent-box list: {exc}") from exc
     if not isinstance(data, list):

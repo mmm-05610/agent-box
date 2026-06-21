@@ -1,11 +1,10 @@
-"""Reusable card containers.
+"""Reusable card containers — cc-switch / shadcn/ui style.
 
 Two flavors:
-- ``Card`` — generic elevated surface with border and hover state.
-- ``StatCard`` — pre-laid-out card for the dashboard's stat tiles
-  (icon + label + big value).
+- ``Card`` — generic elevated surface with subtle border, no shadow.
+- ``StatCard`` — pre-laid-out card for the dashboard's stat tiles.
 
-See ``docs/specs/frontend-overhaul.md §4.2`` for the layout.
+Style: minimal, 8px radius, 1px border nearly invisible, no hover flash.
 """
 from __future__ import annotations
 
@@ -14,37 +13,40 @@ import customtkinter as ctk
 from ..theme import C
 from ..tokens import (
     FONT_BIG,
+    FONT_CAPTION,
     FONT_ICON_LG,
     FONT_LABEL,
+    FONT_MICRO,
     RADIUS_LG,
     SPACE_LG,
     SPACE_SM,
+    SPACE_XL,
 )
 
 
 class Card(ctk.CTkFrame):
-    """Generic elevated surface.
+    """Generic elevated surface — cc-switch style.
 
-    Use as a container for grouped content. ``set_hover`` swaps to the
-    hover palette so list items can adopt this widget without writing
-    the bind/leave boilerplate themselves.
+    Minimal: bg_card + 1px subtle border + 8px radius.
+    No shadow, no dramatic hover effects.
     """
 
     def __init__(self, master, **kwargs):
         super().__init__(
             master,
-            fg_color=C("bg_elevated"),
-            corner_radius=RADIUS_LG,
-            border_width=1,
-            border_color=C("border"),
+            fg_color=kwargs.pop("fg_color", C("bg_elevated")),
+            corner_radius=kwargs.pop("corner_radius", RADIUS_LG),
+            border_width=kwargs.pop("border_width", 1),
+            border_color=kwargs.pop("border_color", C("border")),
             **kwargs,
         )
 
     def set_hover(self, hover: bool) -> None:
+        """Subtle hover — cc-switch uses very muted bg change."""
         if hover:
             self.configure(
                 fg_color=C("bg_hover"),
-                border_color=C("border_strong"),
+                border_color=C("border"),
             )
         else:
             self.configure(
@@ -54,46 +56,49 @@ class Card(ctk.CTkFrame):
 
 
 class StatCard(Card):
-    """Dashboard tile — accent icon + uppercase label + large value.
+    """Dashboard tile — cc-switch style: compact, left-aligned.
 
-    Layout (2-col grid):
-        row 0: icon (left) | label (right, uppercase)
-        row 1: value spans both columns
+    Layout:
+        Icon (left) | Value (big) + Label (small, right)
     """
 
     def __init__(self, master, icon: str, value: str, label: str,
                  accent: str | None = None, **kwargs):
         super().__init__(master, **kwargs)
         if accent is None:
-            accent = C("primary")
+            accent = C("fg")
 
         self.grid_columnconfigure(1, weight=1)
 
+        # Icon — muted, not accent-colored
         icon_lbl = ctk.CTkLabel(
-            self, text=icon, text_color=accent,
+            self, text=icon, text_color=C("fg_subtle"),
             font=FONT_ICON_LG,
         )
         icon_lbl.grid(
-            row=0, column=0, sticky="w",
-            padx=(SPACE_LG, 0), pady=(SPACE_LG, 0),
+            row=0, column=0, rowspan=2,
+            padx=(SPACE_LG, SPACE_SM), pady=SPACE_LG,
+            sticky="w",
         )
 
-        top_lbl = ctk.CTkLabel(
-            self, text=label, text_color=C("fg_muted"),
-            font=FONT_LABEL,
-        )
-        top_lbl.grid(
-            row=0, column=1, sticky="e",
-            padx=(SPACE_SM, SPACE_LG), pady=(SPACE_LG, 0),
-        )
-
+        # Value — big, primary text color
         val = ctk.CTkLabel(
-            self, text=value, text_color=accent,
+            self, text=value, text_color=C("fg"),
             font=FONT_BIG, anchor="w",
         )
         val.grid(
-            row=1, column=0, columnspan=2, sticky="w",
-            padx=SPACE_LG, pady=(SPACE_SM, SPACE_LG),
+            row=0, column=1, sticky="sw",
+            padx=(0, SPACE_LG), pady=(SPACE_LG, 0),
+        )
+
+        # Label — muted, small
+        top_lbl = ctk.CTkLabel(
+            self, text=label, text_color=C("fg_muted"),
+            font=FONT_MICRO,
+        )
+        top_lbl.grid(
+            row=1, column=1, sticky="nw",
+            padx=(0, SPACE_LG), pady=(0, SPACE_LG),
         )
 
 

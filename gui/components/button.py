@@ -1,6 +1,11 @@
 """Reusable button factories — primary / ghost / danger / icon.
 
-All buttons use the same height + corner_radius from the design system.
+cc-switch / shadcn/ui style:
+- Primary: white bg + black text (dark) / black bg + white text (light)
+- Ghost: transparent, no border
+- Destructive: red bg
+- All: 36px height, 6px radius, medium weight
+
 If you need a one-off button, build it inline; if it appears 3+ times,
 add a factory here.
 """
@@ -13,8 +18,8 @@ import customtkinter as ctk
 from ..theme import C
 from ..tokens import (
     BUTTON_HEIGHT,
-    FONT_BOLD,
     FONT_BODY,
+    FONT_SANS_BOLD,
     FONT_SUBTITLE,
     RADIUS_MD,
 )
@@ -36,11 +41,17 @@ def primary_button(
     command: Optional[Callable] = None,
     **kwargs: Any,
 ) -> ctk.CTkButton:
-    """Standard primary CTA — filled with brand color."""
+    """Standard primary CTA — filled with brand color.
+
+    cc-switch style: white bg + black text (dark mode),
+    black bg + white text (light mode).
+    """
     return _base(
         master, text=text, command=command,
-        fg_color=C("primary"), hover_color=C("primary_hover"),
-        text_color=C("primary_fg"), font=FONT_BOLD,
+        fg_color=C("primary"),
+        hover_color=C("primary_hover"),
+        text_color=C("primary_fg"),
+        font=FONT_SANS_BOLD,
         **kwargs,
     )
 
@@ -51,11 +62,16 @@ def ghost_button(
     command: Optional[Callable] = None,
     **kwargs: Any,
 ) -> ctk.CTkButton:
-    """Secondary action — transparent background, muted text."""
+    """Secondary action — transparent background, muted text.
+
+    cc-switch style: no border, hover shows subtle bg.
+    """
     return _base(
         master, text=text, command=command,
-        fg_color="transparent", hover_color=C("bg_hover"),
-        text_color=C("fg_muted"), font=FONT_BODY,
+        fg_color="transparent",
+        hover_color=C("bg_hover"),
+        text_color=C("fg_muted"),
+        font=FONT_BODY,
         **kwargs,
     )
 
@@ -69,8 +85,10 @@ def danger_button(
     """Destructive action — red fill."""
     return _base(
         master, text=text, command=command,
-        fg_color=C("error"), hover_color="#C0505A",
-        text_color="#FFFFFF", font=FONT_BOLD,
+        fg_color=C("error"),
+        hover_color="#DC2626",
+        text_color="#FFFFFF",
+        font=FONT_SANS_BOLD,
         **kwargs,
     )
 
@@ -80,7 +98,7 @@ def icon_button(
     glyph: str,
     command: Optional[Callable] = None,
     *,
-    width: int = 40,
+    width: int = 36,
     primary: bool = False,
     **kwargs: Any,
 ) -> ctk.CTkButton:

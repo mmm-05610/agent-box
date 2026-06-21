@@ -27,7 +27,7 @@ from .pages import (
     SessionsPage,
     SettingsPage,
 )
-from .state import fetch_sessions
+from .state import cleanup_stale_sessions, fetch_sessions
 from .theme import C, Theme
 from .tokens import FONT_MICRO, SPACE_LG
 from .wsl import MODE_RESUME, fetch_profiles, launch_profile
@@ -37,10 +37,18 @@ from .wsl import MODE_RESUME, fetch_profiles, launch_profile
 # discarded when the cap is exceeded (LRU).
 _PAGE_CACHE_CAP = 5
 
-# Default location of profile files on the WSL side. This is a
-# placeholder for Phase 4 — in a follow-up we'll resolve the real
-# path from the agent-box CLI.
-PROFILE_ROOT = Path.home() / ".agent-box" / "profiles"
+# All paths are WSL-side paths with forward slashes.
+# The GUI runs on Windows for rendering, but all config operations
+# happen in WSL. We use a string to preserve forward slashes.
+_PROFILE_ROOT_STR = "/home/maoqh/.agent-box/profiles"
+
+# Agent type → config directory name mapping
+AGENT_CONFIG_DIR = {
+    "cc":       "dot-claude",
+    "codex":    "dot-codex",
+    "hermes":   "dot-hermes",
+    "opencode": "dot-opencode",
+}
 
 
 class AgentBoxApp:
@@ -108,6 +116,11 @@ class AgentBoxApp:
         self.status_bar.grid(row=1, column=0, sticky="ew",
                              padx=SPACE_LG, pady=4)
 
+        # Clean up zombie sessions from previous runs
+        cleaned = cleanup_stale_sessions()
+        if cleaned > 0:
+            self._status_text = f"Cleaned {cleaned} stale session(s)."
+
         # Initial load + render
         self.refresh()
         self._show_page("home")
@@ -163,10 +176,15 @@ class AgentBoxApp:
                 (p for p in self._profiles if p.get("name") == name),
                 {"name": name, "agent_type": "cc"},
             )
+            agent_type = profile.get("agent_type", "cc")
+            config_dir = AGENT_CONFIG_DIR.get(agent_type, "dot-claude")
+            profile_root = _PROFILE_ROOT_STR + "/" + name
+            config_root = profile_root + "/" + config_dir
             return ProfileDetailPage(
                 self.content,
                 profile=profile,
-                profile_root=PROFILE_ROOT / name,
+                profile_root=profile_root,
+                config_root=config_root,
                 on_back=lambda: self._on_nav(
                     self._return_to or "profiles"
                 ),
