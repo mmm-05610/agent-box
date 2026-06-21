@@ -163,6 +163,142 @@ def _shell_quote(token: str) -> str:
     return token
 
 
+# ---------------------------------------------------------------------------
+# Profile CRUD + file save (Phase 4.x)
+# ---------------------------------------------------------------------------
+
+def read_file(wsl_path: str) -> Optional[str]:
+    """Read a file from WSL. Returns content or None on failure."""
+    wsl = shutil.which("wsl.exe")
+    if wsl is None:
+        raise RuntimeError("wsl.exe not found in PATH (install WSL).")
+
+    kwargs: Dict[str, Any] = {}
+    if sys.platform == "win32":
+        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+
+    try:
+        proc = subprocess.run(
+            [wsl, "bash", "-lc", f"cat {_shell_quote(wsl_path)}"],
+            capture_output=True,
+            timeout=10,
+            cwd="C:\\",
+            **kwargs,
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return None
+
+    if proc.returncode != 0:
+        return None
+    return proc.stdout.decode("utf-8", errors="replace")
+
+
+def save_file(wsl_path: str, content: str) -> bool:
+    """Write *content* to a file in WSL.
+
+    Uses base64 encoding to safely handle any byte content (including
+    newlines, quotes, backslashes) without worrying about shell escaping.
+    Returns True on success.
+    """
+    import base64
+
+    wsl = shutil.which("wsl.exe")
+    if wsl is None:
+        raise RuntimeError("wsl.exe not found in PATH (install WSL).")
+
+    encoded = base64.b64encode(content.encode("utf-8"))
+    kwargs: Dict[str, Any] = {}
+    if sys.platform == "win32":
+        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+
+    try:
+        proc = subprocess.run(
+            [wsl, "bash", "-lc", f"base64 -d > {_shell_quote(wsl_path)}"],
+            input=encoded,
+            capture_output=True,
+            timeout=10,
+            cwd="C:\\",
+            **kwargs,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(f"save_file timed out for {wsl_path}") from exc
+    except OSError as exc:
+        raise RuntimeError(f"failed to invoke wsl.exe: {exc}") from exc
+
+    if proc.returncode != 0:
+        stderr = proc.stderr.decode("utf-8", errors="replace").strip()
+        raise RuntimeError(
+            f"save_file failed (exit {proc.returncode}): "
+            f"{stderr or '<no stderr>'}"
+        )
+    return True
+
+
+def delete_profile(name: str) -> bool:
+    """Delete an agent-box profile. Returns True on success."""
+    wsl = shutil.which("wsl.exe")
+    if wsl is None:
+        raise RuntimeError("wsl.exe not found in PATH (install WSL).")
+
+    kwargs: Dict[str, Any] = {}
+    if sys.platform == "win32":
+        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+
+    try:
+        proc = subprocess.run(
+            [wsl, "bash", "-lc", f"agent-box delete {_shell_quote(name)} --force"],
+            capture_output=True,
+            timeout=15,
+            cwd="C:\\",
+            **kwargs,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(f"agent-box delete {name} timed out") from exc
+    except OSError as exc:
+        raise RuntimeError(f"failed to invoke wsl.exe: {exc}") from exc
+
+    if proc.returncode != 0:
+        stderr = proc.stderr.decode("utf-8", errors="replace").strip()
+        raise RuntimeError(
+            f"agent-box delete failed (exit {proc.returncode}): "
+            f"{stderr or '<no stderr>'}"
+        )
+    return True
+
+
+def create_profile(name: str, agent_type: str = "cc") -> bool:
+    """Create a new agent-box profile. Returns True on success."""
+    wsl = shutil.which("wsl.exe")
+    if wsl is None:
+        raise RuntimeError("wsl.exe not found in PATH (install WSL).")
+
+    kwargs: Dict[str, Any] = {}
+    if sys.platform == "win32":
+        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+
+    try:
+        proc = subprocess.run(
+            [wsl, "bash", "-lc",
+             f"agent-box create {_shell_quote(name)} --type {_shell_quote(agent_type)}"],
+            capture_output=True,
+            timeout=15,
+            cwd="C:\\",
+            **kwargs,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(f"agent-box create {name} timed out") from exc
+    except OSError as exc:
+        raise RuntimeError(f"failed to invoke wsl.exe: {exc}") from exc
+
+    if proc.returncode != 0:
+        stderr = proc.stderr.decode("utf-8", errors="replace").strip()
+        raise RuntimeError(
+            f"agent-box create failed (exit {proc.returncode}): "
+            f"{stderr or '<no stderr>'}"
+        )
+    return True
+
+
 __all__ = [
     "AGENT_ORDER",
     "LAUNCH_MODES",
@@ -171,7 +307,11 @@ __all__ = [
     "RESUME_ARGS",
     "browse_dir",
     "build_launch_argv",
+    "create_profile",
+    "delete_profile",
     "fetch_profiles",
     "launch_profile",
+    "read_file",
+    "save_file",
     "to_wsl_path",
 ]

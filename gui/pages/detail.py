@@ -1,6 +1,8 @@
 """Profile detail page — dynamic tabs based on agent type.
 
-This module ONLY renders data. All data fetching is done in gui/data.py.
+Tabs are editable where applicable (settings, config, claude_md,
+persona, env).  The Meta tab has action buttons (Delete, Open in
+Terminal).
 """
 from __future__ import annotations
 
@@ -10,7 +12,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 import customtkinter as ctk
 
-from ..components.button import ghost_button
+from ..components.button import danger_button, ghost_button, primary_button
 from ..components.card import Card
 from ..components.toast import ToastManager
 from ..data import get_profile_data
@@ -21,6 +23,7 @@ from ..tokens import (
     FONT_CAPTION,
     FONT_DISPLAY,
     FONT_LABEL,
+    FONT_MICRO,
     FONT_MONO_SMALL,
     FONT_SUBTITLE,
     RADIUS_MD,
@@ -70,6 +73,14 @@ AGENT_TABS: Dict[str, List[tuple]] = {
     ],
 }
 
+# Agent-type -> (config dir name, config file name) for raw reads
+_CONFIG_FILE_MAP: Dict[str, tuple] = {
+    "cc":       ("dot-claude",   "settings.json"),
+    "codex":    ("dot-codex",    "config.toml"),
+    "hermes":   ("dot-hermes",   "config.yaml"),
+    "opencode": ("dot-opencode", "opencode.jsonc"),
+}
+
 
 # ---------------------------------------------------------------------------
 # Main page
@@ -91,6 +102,7 @@ class ProfileDetailPage(ctk.CTkFrame):
         on_back: Callable[[], None],
         on_provider_change: Callable[[str], None],
         on_delete: Callable[[str], None],
+        on_launch: Callable[[], None],
         toast: ToastManager,
     ):
         super().__init__(master, fg_color=C("bg"), corner_radius=0)
@@ -98,9 +110,12 @@ class ProfileDetailPage(ctk.CTkFrame):
         self._profile_root = profile_root
         self._config_root = config_root
         self._on_back = on_back
+        self._on_delete = on_delete
+        self._on_launch = on_launch
         self._toast = toast
         self._active_tab: str = "meta"
         self._tab_frames: Dict[str, ctk.CTkBaseClass] = {}
+        self._dirty_tabs: set = set()  # tabs with unsaved changes
 
         # Fetch ALL data once, store as dict
         agent_type = profile.get("agent_type", "cc")
@@ -131,17 +146,16 @@ class ProfileDetailPage(ctk.CTkFrame):
         header.grid_columnconfigure(1, weight=1)
 
         back = ghost_button(header, "←  Back",
-                            command=self._on_back, height=32)
+                            command=self._on_back_clicked, height=32)
         back.grid(row=0, column=0, sticky="w")
 
-        name = self._data.get("name", "—")
-        agent_type = self._data.get("agent_type", "").upper()
-        title = ctk.CTkLabel(
-            header, text=name,
+        self._name_label = ctk.CTkLabel(
+            header, text=self._data.get("name", "—"),
             text_color=C("fg"), font=FONT_DISPLAY, anchor="w",
         )
-        title.grid(row=0, column=1, sticky="w", padx=SPACE_LG)
+        self._name_label.grid(row=0, column=1, sticky="w", padx=SPACE_LG)
 
+        agent_type = self._data.get("agent_type", "").upper()
         badge = ctk.CTkLabel(
             header, text=agent_type,
             text_color=C("fg_muted"), font=FONT_CAPTION,
@@ -149,6 +163,12 @@ class ProfileDetailPage(ctk.CTkFrame):
             padx=SPACE_SM, pady=2,
         )
         badge.grid(row=0, column=2, sticky="w", padx=SPACE_SM)
+
+        # Refresh button — reload all data from WSL
+        refresh_btn = ghost_button(
+            header, "↻  Refresh", command=self._refresh_data, height=32,
+        )
+        refresh_btn.grid(row=0, column=3, sticky="e")
 
     # --- tabs ----------------------------------------------------------
 
@@ -194,6 +214,12 @@ class ProfileDetailPage(ctk.CTkFrame):
         self._body.grid_rowconfigure(0, weight=1)
 
     def _show_tab(self, key: str) -> None:
+        # --- dirty guard: warn before leaving an unsaved tab ---
+        if self._active_tab != key and self._active_tab in self._dirty_tabs:
+            if not self._confirm_discard(self._active_tab):
+                return  # user chose to stay
+            self._dirty_tabs.discard(self._active_tab)
+
         for k, btn in self._tab_buttons.items():
             ind = self._tab_indicators[k]
             if k == key:
@@ -232,12 +258,384 @@ class ProfileDetailPage(ctk.CTkFrame):
             return self._build_placeholder_tab(key)
         return builder()
 
+    # --- dirty tracking + refresh -------------------------------------
+
+    def _mark_tab_dirty(self, tab_key: str) -> None:
+        """Mark a tab as having unsaved changes."""
+        self._dirty_tabs.add(tab_key)
+
+    def _mark_tab_clean(self, tab_key: str) -> None:
+        """Mark a tab as saved (no unsaved changes)."""
+        self._dirty_tabs.discard(tab_key)
+
+    def _has_unsaved_changes(self) -> bool:
+        """Return True if any tab has unsaved edits."""
+        return bool(self._dirty_tabs)
+
+    def _confirm_discard(self, tab_key: str) -> bool:
+        """Ask the user to confirm discarding unsaved changes.
+
+        Returns True if the user agrees to discard (or there's nothing
+        to discard), False if the user wants to stay.
+        """
+        from tkinter import messagebox
+        if tab_key not in self._dirty_tabs:
+            return True
+        return messagebox.askyesno(
+            "Unsaved Changes",
+            f"The '{tab_key}' tab has unsaved changes.\n\n"
+            "Discard and continue?",
+        )
+
+    def _on_back_clicked(self) -> None:
+        """Back button handler — warns about unsaved changes."""
+        if self._has_unsaved_changes():
+            from tkinter import messagebox
+            if not messagebox.askyesno(
+                "Unsaved Changes",
+                "You have unsaved changes in one or more tabs.\n\n"
+                "Leave without saving?",
+            ):
+                return
+            self._dirty_tabs.clear()
+        self._on_back()
+
+    def _refresh_data(self) -> None:
+        """Re-fetch all profile data from WSL and rebuild tabs.
+
+        Called after a successful save and by the Refresh button.
+        """
+        from ..data import get_profile_data
+
+        agent_type = self._profile.get("agent_type", "cc")
+        self._data = get_profile_data(self._profile_root, agent_type)
+
+        # Update header name (in case it changed)
+        if hasattr(self, "_name_label"):
+            self._name_label.configure(text=self._data.get("name", "—"))
+
+        # Destroy all cached tab frames — they'll rebuild from fresh data
+        for frame in self._tab_frames.values():
+            try:
+                frame.destroy()
+            except Exception:
+                pass
+        self._tab_frames.clear()
+        self._dirty_tabs.clear()
+
+        # Rebuild the active tab
+        self._show_tab(self._active_tab)
+
+    # --- editable tab helper -------------------------------------------
+
+    def _get_config_raw(self) -> Optional[str]:
+        """Return raw config file content for the current agent type."""
+        agent_type = self._data.get("agent_type", "cc")
+        mapping = _CONFIG_FILE_MAP.get(agent_type)
+        if mapping is None:
+            return None
+        dir_name, file_name = mapping
+        root = str(self._profile_root)
+        path = f"{root}/{dir_name}/{file_name}"
+        from ..config import read_text_file
+        return read_text_file(Path(path))
+
+    def _build_editable_tab(
+        self, content: str, wsl_path: str, *, tab_key: str = "",
+    ) -> ctk.CTkFrame:
+        """Build a cc-switch style editor with View/Edit modes.
+
+        P0: View/Edit mode toggle (default = view/read-only).
+        P0: Staleness detection (re-reads file before save).
+        P1: FileInfoBar (line count, file size).
+        P1: originalContent baseline (precise dirty tracking).
+
+        *content* is the initial text.  *wsl_path* is the absolute WSL
+        path written to on save.  *tab_key* is used for dirty tracking.
+        """
+        frame = ctk.CTkFrame(self._body, fg_color=C("bg"), corner_radius=0)
+        frame.grid_columnconfigure(0, weight=1)
+        frame.grid_rowconfigure(1, weight=1)
+
+        # --- state ------------------------------------------------------
+        original_content = content  # baseline for staleness + dirty
+        mode = {"v": "view"}        # "view" | "edit"
+        fname = wsl_path.rsplit("/", 1)[-1] if "/" in wsl_path else wsl_path
+        line_count = content.count("\n") + 1
+        size_bytes = len(content.encode("utf-8"))
+        size_str = (
+            f"{size_bytes / 1024:.1f} KB" if size_bytes >= 1024
+            else f"{size_bytes} B"
+        )
+
+        # --- file header bar -------------------------------------------
+        header = ctk.CTkFrame(
+            frame, fg_color=C("bg_elevated"),
+            corner_radius=RADIUS_MD, border_width=1, border_color=C("border"),
+        )
+        header.grid(row=0, column=0, sticky="ew", pady=(0, SPACE_SM))
+
+        # File name
+        ctk.CTkLabel(
+            header, text=f"  {fname}", text_color=C("fg"),
+            font=FONT_BOLD, anchor="w",
+        ).pack(side="left", padx=(SPACE_SM, 0))
+
+        # Full path
+        ctk.CTkLabel(
+            header, text=wsl_path, text_color=C("fg_subtle"),
+            font=FONT_MICRO, anchor="w",
+        ).pack(side="left", padx=(SPACE_MD, 0))
+
+        # Line count + size (P1: FileInfoBar)
+        info_text = f"{line_count} lines  ·  {size_str}"
+        ctk.CTkLabel(
+            header, text=info_text, text_color=C("fg_subtle"),
+            font=FONT_MICRO, anchor="w",
+        ).pack(side="left", padx=(SPACE_MD, 0))
+
+        # Edit / Done button (right side)
+        edit_btn = ctk.CTkButton(
+            header, text="Edit", width=60, height=28,
+            corner_radius=RADIUS_MD,
+            fg_color="transparent", hover_color=C("bg_hover"),
+            text_color=C("fg_muted"), font=FONT_BODY,
+        )
+        edit_btn.pack(side="right", padx=(0, SPACE_SM))
+
+        # --- textbox (cc-switch style: bg_input, focus border) ----------
+        textbox = ctk.CTkTextbox(
+            frame, font=FONT_MONO_SMALL,
+            fg_color=C("bg_input"), text_color=C("fg"),
+            corner_radius=RADIUS_MD, border_width=1, border_color=C("border"),
+            wrap="word",
+        )
+        textbox.grid(row=1, column=0, sticky="nsew")
+        textbox.insert("1.0", content)
+        textbox.configure(state="disabled")  # default: view mode
+
+        # Focus border effect (only meaningful in edit mode)
+        def _on_focus_in(_e=None) -> None:
+            if mode["v"] == "edit":
+                textbox.configure(border_color=C("border_focus"))
+
+        def _on_focus_out(_e=None) -> None:
+            textbox.configure(border_color=C("border"))
+        textbox.bind("<FocusIn>", _on_focus_in)
+        textbox.bind("<FocusOut>", _on_focus_out)
+
+        # --- toolbar (hidden in view mode) ------------------------------
+        bar = ctk.CTkFrame(frame, fg_color="transparent")
+        bar.grid(row=2, column=0, sticky="ew", pady=(SPACE_SM, 0))
+        bar.grid_columnconfigure(1, weight=1)
+        bar.grid_remove()  # hidden until edit mode
+
+        # Status dot
+        status_dot = ctk.CTkLabel(
+            bar, text="●", text_color=C("warning"),
+            font=FONT_MICRO, width=12,
+        )
+
+        # Status text
+        status_lbl = ctk.CTkLabel(
+            bar, text="modified", text_color=C("fg_muted"),
+            font=FONT_CAPTION, anchor="w",
+        )
+
+        # Keyboard hint
+        hint_lbl = ctk.CTkLabel(
+            bar, text="Ctrl+S save  ·  Esc cancel", text_color=C("fg_subtle"),
+            font=FONT_MICRO, anchor="e",
+        )
+        hint_lbl.grid(row=0, column=1, sticky="e", padx=(0, SPACE_MD))
+
+        # Save button
+        save_btn = primary_button(bar, "Save", width=80, height=36)
+        save_btn.grid(row=0, column=2, sticky="e")
+        save_btn.configure(state="disabled")
+
+        # --- dirty tracking (P1: originalContent baseline) --------------
+        def _check_dirty() -> None:
+            """Compare current content against original baseline."""
+            current = textbox.get("1.0", "end-1c")
+            is_dirty = current != original_content
+            if is_dirty:
+                status_dot.grid(row=0, column=0, padx=(0, SPACE_XS))
+                status_lbl.grid(row=0, column=1, sticky="w")
+                hint_lbl.grid_remove()
+                save_btn.configure(state="normal")
+                if tab_key:
+                    self._mark_tab_dirty(tab_key)
+            else:
+                status_dot.grid_forget()
+                status_lbl.grid_forget()
+                hint_lbl.grid(row=0, column=1, sticky="e", padx=(0, SPACE_MD))
+                save_btn.configure(state="disabled")
+                if tab_key:
+                    self._mark_tab_clean(tab_key)
+
+        def _on_text_change(_event=None) -> None:
+            if mode["v"] == "edit":
+                _check_dirty()
+
+        textbox.bind("<KeyRelease>", _on_text_change)
+        textbox.bind("<<Modified>>", lambda _e: (
+            _on_text_change() if mode["v"] == "edit" else None,
+            textbox.edit_modified(False),
+        ))
+
+        # --- View / Edit mode toggle (P0) -------------------------------
+        def _enter_edit() -> None:
+            """Switch from view → edit mode."""
+            mode["v"] = "edit"
+            textbox.configure(state="normal")
+            edit_btn.configure(text="Done", text_color=C("fg"))
+            bar.grid()
+            _check_dirty()
+
+        def _exit_edit(*, save_first: bool = False) -> None:
+            """Switch from edit → view mode.
+
+            If *save_first* is True, triggers save (which will rebuild).
+            Otherwise discards changes and reverts to original.
+            """
+            if save_first:
+                _save()
+                return
+            # Discard changes — revert to original
+            mode["v"] = "view"
+            textbox.configure(state="normal")
+            textbox.delete("1.0", "end")
+            textbox.insert("1.0", original_content)
+            textbox.configure(state="disabled")
+            edit_btn.configure(text="Edit", text_color=C("fg_muted"))
+            bar.grid_remove()
+            if tab_key:
+                self._mark_tab_clean(tab_key)
+
+        def _toggle_mode() -> None:
+            if mode["v"] == "view":
+                _enter_edit()
+            else:
+                # In edit mode, "Done" button: if dirty → save, else → view
+                current = textbox.get("1.0", "end-1c")
+                if current != original_content:
+                    _exit_edit(save_first=True)
+                else:
+                    _exit_edit(save_first=False)
+
+        edit_btn.configure(command=_toggle_mode)
+
+        # Esc to cancel editing
+        def _on_esc(_event=None) -> str:
+            if mode["v"] == "edit":
+                current = textbox.get("1.0", "end-1c")
+                if current != original_content:
+                    from tkinter import messagebox
+                    if not messagebox.askyesno(
+                        "Discard Changes",
+                        "You have unsaved edits. Discard them?",
+                    ):
+                        return "break"
+                _exit_edit(save_first=False)
+            return "break"
+        textbox.bind("<Escape>", _on_esc)
+
+        # Ctrl+S shortcut
+        def _on_ctrl_s(_event=None) -> str:
+            if mode["v"] == "edit":
+                current = textbox.get("1.0", "end-1c")
+                if current != original_content:
+                    _save()
+            return "break"
+        textbox.bind("<Control-s>", _on_ctrl_s)
+
+        # --- save logic with staleness detection (P0) -------------------
+        def _save() -> None:
+            new_content = textbox.get("1.0", "end-1c")
+            save_btn.configure(state="disabled", text="Saving…")
+            self.update_idletasks()
+
+            import threading
+
+            def _worker() -> None:
+                from ..wsl import save_file, read_file
+                try:
+                    # P0: Staleness check — re-read file before writing
+                    current_on_disk = read_file(wsl_path)
+                    if (current_on_disk is not None
+                            and current_on_disk != original_content):
+                        # File was modified externally
+                        self.after(0, lambda: _on_stale(current_on_disk))
+                        return
+                    save_file(wsl_path, new_content)
+                    self.after(0, _on_ok)
+                except Exception as exc:
+                    self.after(0, lambda e=exc: _on_err(e))
+
+            def _on_stale(disk_content: str) -> None:
+                from tkinter import messagebox
+                save_btn.configure(text="Save", state="normal")
+                overwrite = messagebox.askyesno(
+                    "File Modified Externally",
+                    f"'{fname}' was modified outside the editor.\n\n"
+                    "Overwrite with your changes?",
+                )
+                if overwrite:
+                    # Force save without staleness check
+                    _force_save(new_content)
+                # else: user chose to keep disk version, do nothing
+
+            def _on_ok() -> None:
+                if tab_key:
+                    self._mark_tab_clean(tab_key)
+                self._toast.show("Saved.", kind="success")
+                # Re-fetch data and rebuild (enters view mode via _refresh_data)
+                self._refresh_data()
+
+            def _on_err(exc: Exception) -> None:
+                save_btn.configure(text="Save", state="normal")
+                self._toast.show(f"Save failed: {exc}", kind="error")
+
+            threading.Thread(target=_worker, daemon=True).start()
+
+        def _force_save(new_content: str) -> None:
+            """Save without staleness check (user confirmed overwrite)."""
+            save_btn.configure(state="disabled", text="Saving…")
+            self.update_idletasks()
+
+            import threading
+
+            def _worker() -> None:
+                from ..wsl import save_file
+                try:
+                    save_file(wsl_path, new_content)
+                    self.after(0, _on_ok)
+                except Exception as exc:
+                    self.after(0, lambda e=exc: _on_err(e))
+
+            def _on_ok() -> None:
+                if tab_key:
+                    self._mark_tab_clean(tab_key)
+                self._toast.show("Saved.", kind="success")
+                self._refresh_data()
+
+            def _on_err(exc: Exception) -> None:
+                save_btn.configure(text="Save", state="normal")
+                self._toast.show(f"Save failed: {exc}", kind="error")
+
+            threading.Thread(target=_worker, daemon=True).start()
+
+        save_btn.configure(command=_save)
+        return frame
+
     # --- Meta tab ------------------------------------------------------
 
     def _build_meta_tab(self) -> ctk.CTkFrame:
         frame = ctk.CTkFrame(self._body, fg_color=C("bg"), corner_radius=0)
         frame.grid_columnconfigure(0, weight=1)
 
+        # --- info card -------------------------------------------------
         card = Card(frame)
         card.grid(row=0, column=0, sticky="ew", pady=(0, SPACE_LG))
         card.grid_columnconfigure(1, weight=1)
@@ -259,57 +657,80 @@ class ProfileDetailPage(ctk.CTkFrame):
                 font=FONT_BODY, anchor="w",
             ).grid(row=r, column=1, sticky="w", padx=SPACE_SM, pady=SPACE_SM)
 
+        # --- action buttons --------------------------------------------
+        actions = ctk.CTkFrame(frame, fg_color="transparent")
+        actions.grid(row=1, column=0, sticky="ew")
+
+        delete_btn = danger_button(
+            actions, "Delete Profile", width=140, height=36,
+            command=self._confirm_delete,
+        )
+        delete_btn.pack(side="left")
+
+        launch_btn = primary_button(
+            actions, "Open in Terminal", width=160, height=36,
+            command=self._on_launch,
+        )
+        launch_btn.pack(side="left", padx=(SPACE_MD, 0))
+
         return frame
+
+    def _confirm_delete(self) -> None:
+        """Show a confirmation dialog, then delete the profile."""
+        from tkinter import messagebox
+
+        name = self._data.get("name", "?")
+        if not messagebox.askyesno(
+            "Delete Profile",
+            f"Are you sure you want to delete '{name}'?\n\n"
+            "This cannot be undone.",
+        ):
+            return
+
+        self._toast.show(f"Deleting {name}…", kind="info")
+
+        import threading
+
+        def _worker() -> None:
+            from ..wsl import delete_profile
+            try:
+                delete_profile(name)
+                self.after(0, _on_ok)
+            except Exception as exc:
+                self.after(0, lambda e=exc: _on_err(e))
+
+        def _on_ok() -> None:
+            self._toast.show(f"Deleted {name}.", kind="success")
+            self._on_delete(name)
+
+        def _on_err(exc: Exception) -> None:
+            self._toast.show(f"Delete failed: {exc}", kind="error")
+
+        threading.Thread(target=_worker, daemon=True).start()
 
     # --- Settings tab (CC: settings.json) ------------------------------
 
     def _build_settings_tab(self) -> ctk.CTkFrame:
-        settings = self._data.get("settings", {})
-        if not settings:
+        content = self._get_config_raw()
+        if not content:
             return self._build_placeholder_tab("Settings")
 
-        frame = ctk.CTkFrame(self._body, fg_color=C("bg"), corner_radius=0)
-        frame.grid_columnconfigure(0, weight=1)
-        frame.grid_rowconfigure(0, weight=1)
-
-        textbox = ctk.CTkTextbox(
-            frame, font=FONT_MONO_SMALL,
-            fg_color=C("bg_elevated"), text_color=C("fg"),
-            corner_radius=RADIUS_MD, border_width=1, border_color=C("border"),
-            wrap="word",
-        )
-        textbox.grid(row=0, column=0, sticky="nsew")
-
-        formatted = json.dumps(settings, indent=2, ensure_ascii=False)
-        textbox.insert("1.0", formatted)
-        textbox.configure(state="disabled")
-
-        return frame
+        wsl_path = f"{self._profile_root}/dot-claude/settings.json"
+        return self._build_editable_tab(content, wsl_path, tab_key="settings")
 
     # --- Config tab (Codex/Hermes/OpenCode) ----------------------------
 
     def _build_config_tab(self) -> ctk.CTkFrame:
-        config = self._data.get("config", {})
-        if not config:
+        content = self._get_config_raw()
+        if not content:
             return self._build_placeholder_tab("Config")
 
-        frame = ctk.CTkFrame(self._body, fg_color=C("bg"), corner_radius=0)
-        frame.grid_columnconfigure(0, weight=1)
-        frame.grid_rowconfigure(0, weight=1)
-
-        textbox = ctk.CTkTextbox(
-            frame, font=FONT_MONO_SMALL,
-            fg_color=C("bg_elevated"), text_color=C("fg"),
-            corner_radius=RADIUS_MD, border_width=1, border_color=C("border"),
-            wrap="word",
-        )
-        textbox.grid(row=0, column=0, sticky="nsew")
-
-        formatted = json.dumps(config, indent=2, ensure_ascii=False)
-        textbox.insert("1.0", formatted)
-        textbox.configure(state="disabled")
-
-        return frame
+        agent_type = self._data.get("agent_type", "codex")
+        mapping = _CONFIG_FILE_MAP.get(agent_type)
+        dir_name = mapping[0] if mapping else "dot-codex"
+        file_name = mapping[1] if mapping else "config.toml"
+        wsl_path = f"{self._profile_root}/{dir_name}/{file_name}"
+        return self._build_editable_tab(content, wsl_path, tab_key="config")
 
     # --- CLAUDE.md tab (CC only) ---------------------------------------
 
@@ -318,21 +739,8 @@ class ProfileDetailPage(ctk.CTkFrame):
         if not content:
             return self._build_placeholder_tab("CLAUDE.md")
 
-        frame = ctk.CTkFrame(self._body, fg_color=C("bg"), corner_radius=0)
-        frame.grid_columnconfigure(0, weight=1)
-        frame.grid_rowconfigure(0, weight=1)
-
-        textbox = ctk.CTkTextbox(
-            frame, font=FONT_MONO_SMALL,
-            fg_color=C("bg_elevated"), text_color=C("fg"),
-            corner_radius=RADIUS_MD, border_width=1, border_color=C("border"),
-            wrap="word",
-        )
-        textbox.grid(row=0, column=0, sticky="nsew")
-        textbox.insert("1.0", content)
-        textbox.configure(state="disabled")
-
-        return frame
+        wsl_path = f"{self._profile_root}/dot-claude/CLAUDE.md"
+        return self._build_editable_tab(content, wsl_path, tab_key="claude_md")
 
     # --- Persona tab (Hermes: SOUL.md) ---------------------------------
 
@@ -341,21 +749,8 @@ class ProfileDetailPage(ctk.CTkFrame):
         if not content:
             return self._build_placeholder_tab("SOUL.md")
 
-        frame = ctk.CTkFrame(self._body, fg_color=C("bg"), corner_radius=0)
-        frame.grid_columnconfigure(0, weight=1)
-        frame.grid_rowconfigure(0, weight=1)
-
-        textbox = ctk.CTkTextbox(
-            frame, font=FONT_MONO_SMALL,
-            fg_color=C("bg_elevated"), text_color=C("fg"),
-            corner_radius=RADIUS_MD, border_width=1, border_color=C("border"),
-            wrap="word",
-        )
-        textbox.grid(row=0, column=0, sticky="nsew")
-        textbox.insert("1.0", content)
-        textbox.configure(state="disabled")
-
-        return frame
+        wsl_path = f"{self._profile_root}/dot-hermes/SOUL.md"
+        return self._build_editable_tab(content, wsl_path, tab_key="persona")
 
     # --- Hooks tab (CC) ------------------------------------------------
 
@@ -500,21 +895,8 @@ class ProfileDetailPage(ctk.CTkFrame):
         if not content:
             return self._build_placeholder_tab("Environment")
 
-        frame = ctk.CTkFrame(self._body, fg_color=C("bg"), corner_radius=0)
-        frame.grid_columnconfigure(0, weight=1)
-        frame.grid_rowconfigure(0, weight=1)
-
-        textbox = ctk.CTkTextbox(
-            frame, font=FONT_MONO_SMALL,
-            fg_color=C("bg_elevated"), text_color=C("fg"),
-            corner_radius=RADIUS_MD, border_width=1, border_color=C("border"),
-            wrap="word",
-        )
-        textbox.grid(row=0, column=0, sticky="nsew")
-        textbox.insert("1.0", content)
-        textbox.configure(state="disabled")
-
-        return frame
+        wsl_path = f"{self._profile_root}/dot-hermes/.env"
+        return self._build_editable_tab(content, wsl_path, tab_key="env")
 
     # --- Rules tab (Codex) ---------------------------------------------
 

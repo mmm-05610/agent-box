@@ -421,11 +421,7 @@ class CreationWizard(ctk.CTkFrame):
         # If the user picked a template, expand it into a CLAUDE.md body
         tpl = payload.pop("claude_md_template", "blank")
         payload["claude_md"] = CLAUDE_MD_BODIES.get(tpl, CLAUDE_MD_BODIES["blank"])
-        self._toast.show(
-            f"Profile '{payload.get('name', '?')}' created "
-            f"({payload.get('agent_type', '?')})",
-            kind="success",
-        )
+        # Toast is handled by the caller after CLI creation succeeds/fails
         self._on_finish(payload)
 
 

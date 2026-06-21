@@ -30,7 +30,7 @@ from .pages import (
 from .state import cleanup_stale_sessions, fetch_sessions
 from .theme import C, Theme
 from .tokens import FONT_MICRO, SPACE_LG
-from .wsl import MODE_RESUME, fetch_profiles, launch_profile
+from .wsl import MODE_RESUME, create_profile, fetch_profiles, launch_profile
 
 
 # Maximum number of page instances kept in the cache. Older pages are
@@ -180,6 +180,23 @@ class AgentBoxApp:
             config_dir = AGENT_CONFIG_DIR.get(agent_type, "dot-claude")
             profile_root = _PROFILE_ROOT_STR + "/" + name
             config_root = profile_root + "/" + config_dir
+            def _on_detail_delete(_name: str = name) -> None:
+                self._invalidate_pages([f"detail:{_name}"])
+                self.refresh()
+                self._on_nav(self._return_to or "profiles")
+
+            def _on_detail_launch() -> None:
+                try:
+                    launch_profile(
+                        name, profile.get("agent_type", "cc"),
+                        MODE_RESUME, "",
+                    )
+                    self.toast.show(
+                        f"Launched {name} (resume last)", kind="success",
+                    )
+                except RuntimeError as exc:
+                    self.toast.show(f"Launch failed: {exc}", kind="error")
+
             return ProfileDetailPage(
                 self.content,
                 profile=profile,
@@ -189,9 +206,8 @@ class AgentBoxApp:
                     self._return_to or "profiles"
                 ),
                 on_provider_change=lambda _p: None,
-                on_delete=lambda n: self.toast.show(
-                    f"Delete {n} (Phase 4.x)", kind="info",
-                ),
+                on_delete=_on_detail_delete,
+                on_launch=_on_detail_launch,
                 toast=self.toast,
             )
         raise KeyError(f"unknown page key: {key!r}")
@@ -295,19 +311,48 @@ class AgentBoxApp:
         self._show_page("wizard")
 
     def _on_wizard_finish(self, payload: Dict[str, Any]) -> None:
-        # In a real implementation we'd shell out to
-        # ``agent-box create ...`` here. For now the payload has been
-        # collected and a toast has been shown.
+        # Clean up wizard page
         if "wizard" in self._pages:
             try:
                 self._pages["wizard"].destroy()
             except Exception:
                 pass
             del self._pages["wizard"]
-        # Refresh profile list so the new profile appears (when CLI
-        # integration is wired up); for now just navigate back.
-        self.refresh()
-        self._on_nav("profiles")
+
+        name = payload.get("name", "")
+        agent_type = payload.get("agent_type", "cc")
+        if not name:
+            self.toast.show("Missing profile name.", kind="error")
+            self._on_nav("profiles")
+            return
+
+        self.toast.show(f"Creating '{name}'…", kind="info")
+
+        import threading
+
+        def _worker() -> None:
+            try:
+                create_profile(name, agent_type)
+                self.root.after(0, _on_ok)
+            except Exception as exc:
+                self.root.after(0, lambda e=exc: _on_err(e))
+
+        def _on_ok() -> None:
+            self.toast.show(
+                f"Profile '{name}' created ({agent_type.upper()}).",
+                kind="success",
+            )
+            self._return_to = "profiles"
+            self.refresh()
+            # Invalidate and navigate to the new profile's detail page
+            self._invalidate_pages([f"detail:{name}"])
+            self._show_page(f"detail:{name}")
+
+        def _on_err(exc: Exception) -> None:
+            self.toast.show(f"Create failed: {exc}", kind="error")
+            self._on_nav("profiles")
+
+        threading.Thread(target=_worker, daemon=True).start()
 
     def _on_wizard_cancel(self) -> None:
         if "wizard" in self._pages:

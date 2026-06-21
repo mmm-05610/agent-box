@@ -7,17 +7,17 @@
       "options": {
         "baseURL": "",
         "apiKey": "",
-        "setCacheKey": true
+        "setCacheKey": true,
       },
       "models": {
         "model-name": {
           "name": "Model Display Name",
           "limit": {
             "context": 128000,
-            "output": 4096
-          }
-        }
-      }
-    }
-  }
+            "output": 4096,
+          },
+        },
+      },
+    },
+  },
 }
