@@ -1,8 +1,11 @@
+# agent-box hermes template — targets v0.17.0; sections are
+# a subset. See docs/planning/dw-round1-results.md T7 for the full
+# refresh list (deferred).
 model:
   default: ""
   provider: custom
   base_url: ""
-  api_key: ""
+  api_key: ${HERMES_API_KEY}
 terminal:
   backend: local
   cwd: .

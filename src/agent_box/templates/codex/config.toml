@@ -1,9 +1,14 @@
-model_provider = "custom"
+# ~/.codex/config.toml — agent-box codex template
 model = ""
+model_provider = "custom"
+approval_policy = "never"
+sandbox_mode = "workspace-write"
 model_reasoning_effort = "high"
-disable_response_storage = true
+web_search = "disabled"
 
-[model_providers]
+[history]
+persistence = "none"
+
 [model_providers.custom]
 name = "custom"
 base_url = ""

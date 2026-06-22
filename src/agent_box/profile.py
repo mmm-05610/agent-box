@@ -86,12 +86,34 @@ def load_meta(name: str) -> Dict[str, str]:
 
 # --- create ----------------------------------------------------------------
 
+def _deep_merge(base: dict, overlay: dict) -> dict:
+    """Recursively merge ``overlay`` onto ``base``.
+
+    Nested dicts merge recursively; lists and scalars from ``overlay``
+    replace the base's.  Standard overlay semantics — overlay wins
+    on conflicts, but sibling keys are preserved.
+    """
+    out = dict(base)
+    for k, v in overlay.items():
+        if (
+            k in out
+            and isinstance(out[k], dict)
+            and isinstance(v, dict)
+        ):
+            out[k] = _deep_merge(out[k], v)
+        else:
+            out[k] = v
+    return out
+
+
 def _apply_preset(target: Path, agent_type: str, preset_name: str) -> None:
     """Copy a preset's files onto an already-created profile.
 
     Currently CC-only: copies ``CLAUDE.md``, optionally ``hooks/hooks.json``,
-    and shallow-merges ``settings.overlay.json`` onto ``settings.json``.
-    Other agent types are out of scope for v0.4 (TODO(v0.4.1): non-CC presets).
+    and deep-merges ``settings.overlay.json`` onto ``settings.json``
+    (nested dicts merge recursively; lists/scalars from the overlay
+    replace the base's).  Other agent types are out of scope for v0.4
+    (TODO(v0.4.1): non-CC presets).
     """
     preset_dir = library.get_preset_dir(agent_type, preset_name)
     if preset_dir is None:
@@ -119,7 +141,7 @@ def _apply_preset(target: Path, agent_type: str, preset_name: str) -> None:
         hooks_dst.parent.mkdir(parents=True, exist_ok=True)
         hooks_dst.write_text(hooks_src.read_text(encoding="utf-8"))
 
-    # settings.overlay.json — shallow merge onto the template's settings.json.
+    # settings.overlay.json — deep merge onto the template's settings.json.
     overlay_src = preset_dir / "settings.overlay.json"
     if overlay_src.is_file():
         settings_path = target / "settings.json"
@@ -141,7 +163,7 @@ def _apply_preset(target: Path, agent_type: str, preset_name: str) -> None:
             raise ProfileError(
                 f"preset {preset_name!r}: settings overlay requires object base + overlay"
             )
-        merged = {**base, **overlay}
+        merged = _deep_merge(base, overlay)
         settings_path.write_text(json.dumps(merged, indent=2) + "\n")
 
 

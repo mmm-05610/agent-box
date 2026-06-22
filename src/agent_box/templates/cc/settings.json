@@ -1,1 +1,18 @@
-{}
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "env": {
+    "BASH_DEFAULT_TIMEOUT_MS": "30000",
+    "DISABLE_TELEMETRY": "1"
+  },
+  "permissions": {
+    "defaultMode": "default",
+    "deny": [
+      "Bash(rm -rf *)",
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(~/.ssh/**)"
+    ]
+  },
+  "cleanupPeriodDays": 7,
+  "autoMemoryEnabled": true
+}
