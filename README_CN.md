@@ -267,7 +267,6 @@ agent-box/
 - Team 模式——多 Agent tmux 编排
 - 会话历史管理
 - profile 导入 / 导出
-- PyPI 发布
 
 **明确不做：** web 前端。agent-box 是轻量 WSL 工具，web 栈带来的复杂度与隔离收益不成比例。
 

@@ -325,7 +325,6 @@ test spine.
 - Team mode — multi-agent tmux orchestration
 - Session history management
 - Profile import/export
-- PyPI release
 
 **Explicitly not building:** a web frontend. agent-box is a lightweight WSL
 tool; a web stack adds disproportionate complexity for no isolation gain.
