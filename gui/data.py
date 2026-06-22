@@ -37,6 +37,8 @@ def get_profile_data(profile_root, agent_type: str) -> Dict[str, Any]:
             "auth": dict,          # For Codex/OpenCode
             "rules": list,         # For Codex
             "skills": list,        # For Codex/Hermes
+            "config_raw": str | None,   # Raw text of main config file (all agent types)
+            "hooks_raw": str | None,    # CC only: raw text of hooks/hooks.json if separate file exists
             "error": str,          # Error message if any
         }
     """
@@ -50,6 +52,7 @@ def get_profile_data(profile_root, agent_type: str) -> Dict[str, Any]:
         CodexConfig,
         HermesConfig,
         OpenCodeConfig,
+        read_text_file,
         read_yaml_file,
     )
 
@@ -72,6 +75,8 @@ def get_profile_data(profile_root, agent_type: str) -> Dict[str, Any]:
         "auth": {},
         "rules": [],
         "skills": [],
+        "config_raw": None,
+        "hooks_raw": None,
         "error": None,
     }
 
@@ -101,6 +106,46 @@ def get_profile_data(profile_root, agent_type: str) -> Dict[str, Any]:
         # Debug
         import sys
         print(f"[DATA] provider={result['provider']}, model={result['model']}", file=sys.stderr)
+
+        # ----------------------------------------------------------------
+        # Preload raw config + hooks text (all wsl reads happen here, off
+        # the UI thread).  Same mechanism as CCConfig.read_claude_md.
+        #
+        # config_raw: raw text of the main config file for every agent
+        # type, used by the Settings/Config tabs in detail.py.
+        # hooks_raw: CC only.  After surveying the 4 CC profiles
+        # (decision, dw, frontend-designer, strategy-advisor) we found
+        # CC hooks live INLINE in dot-claude/settings.json (top-level
+        # "hooks" key).  No separate dot-claude/hooks/hooks.json exists
+        # in any of them.  So hooks_raw stays None for CC, and the Hooks
+        # tab will show a one-line note pointing the user to the
+        # Settings tab.  If a future profile gets a separate hooks
+        # file, preload that file's text here.
+        # ----------------------------------------------------------------
+        _raw_config_files = {
+            "cc":       "settings.json",
+            "codex":    "config.toml",
+            "hermes":   "config.yaml",
+            "opencode": "opencode.jsonc",
+        }
+        _raw_file = _raw_config_files.get(agent_type)
+        if _raw_file is not None:
+            try:
+                result["config_raw"] = read_text_file(
+                    reader.config_dir / _raw_file
+                )
+            except Exception:
+                result["config_raw"] = None
+        if agent_type == "cc":
+            _hooks_file = reader.config_dir / "hooks" / "hooks.json"
+            try:
+                # Only preload when the separate hooks file actually
+                # exists on disk.  Inline-only hooks (current state) get
+                # hooks_raw = None and the tab shows a note.
+                if _hooks_file.exists():
+                    result["hooks_raw"] = read_text_file(_hooks_file)
+            except Exception:
+                result["hooks_raw"] = None
 
         # Get agent-specific data
         if agent_type == "cc":

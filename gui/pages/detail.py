@@ -328,18 +328,6 @@ class ProfileDetailPage(ctk.CTkFrame):
 
     # --- editable tab helper -------------------------------------------
 
-    def _get_config_raw(self) -> Optional[str]:
-        """Return raw config file content for the current agent type."""
-        agent_type = self._data.get("agent_type", "cc")
-        mapping = _CONFIG_FILE_MAP.get(agent_type)
-        if mapping is None:
-            return None
-        dir_name, file_name = mapping
-        root = str(self._profile_root)
-        path = f"{root}/{dir_name}/{file_name}"
-        from ..config import read_text_file
-        return read_text_file(Path(path))
-
     def _build_editable_tab(
         self, content: str, wsl_path: str, *, tab_key: str = "",
     ) -> ctk.CTkFrame:
@@ -716,7 +704,9 @@ class ProfileDetailPage(ctk.CTkFrame):
     # --- Settings tab (CC: settings.json) ------------------------------
 
     def _build_settings_tab(self) -> ctk.CTkFrame:
-        content = self._get_config_raw()
+        # Raw text is preloaded off the UI thread by get_profile_data into
+        # self._data["config_raw"].  No sync wsl read here.
+        content = self._data.get("config_raw") or ""
         if not content:
             return self._build_placeholder_tab("Settings")
 
@@ -726,7 +716,9 @@ class ProfileDetailPage(ctk.CTkFrame):
     # --- Config tab (Codex/Hermes/OpenCode) ----------------------------
 
     def _build_config_tab(self) -> ctk.CTkFrame:
-        content = self._get_config_raw()
+        # Raw text is preloaded off the UI thread by get_profile_data into
+        # self._data["config_raw"].  No sync wsl read here.
+        content = self._data.get("config_raw") or ""
         if not content:
             return self._build_placeholder_tab("Config")
 
@@ -738,6 +730,11 @@ class ProfileDetailPage(ctk.CTkFrame):
         return self._build_editable_tab(content, wsl_path, tab_key="config")
 
     # --- CLAUDE.md tab (CC only) ---------------------------------------
+    # Reference implementation for the raw-edit pattern: the raw text
+    # is preloaded off the UI thread by get_profile_data into
+    # self._data["claude_md"], and this tab just hands it to
+    # _build_editable_tab.  Settings/Config/Hooks now follow the same
+    # pattern (see _data["config_raw"] / _data["hooks_raw"]).
 
     def _build_claude_md_tab(self) -> ctk.CTkFrame:
         content = self._data.get("claude_md")
@@ -748,6 +745,7 @@ class ProfileDetailPage(ctk.CTkFrame):
         return self._build_editable_tab(content, wsl_path, tab_key="claude_md")
 
     # --- Persona tab (Hermes: SOUL.md) ---------------------------------
+    # Same raw-edit pattern as CLAUDE.md (see comment above).
 
     def _build_persona_tab(self) -> ctk.CTkFrame:
         content = self._data.get("persona")
@@ -758,16 +756,49 @@ class ProfileDetailPage(ctk.CTkFrame):
         return self._build_editable_tab(content, wsl_path, tab_key="persona")
 
     # --- Hooks tab (CC) ------------------------------------------------
-
+    #
+    # Two cases, based on what get_profile_data preloaded:
+    #   hooks_raw is not None  -> separate dot-claude/hooks/hooks.json
+    #                              file exists; use the raw editor.
+    #   hooks_raw is None      -> hooks live inline in settings.json
+    #                              (current state for all CC profiles);
+    #                              keep read-only display + add a one-
+    #                              line note pointing to the Settings
+    #                              tab.
     def _build_hooks_tab(self) -> ctk.CTkFrame:
+        hooks_raw = self._data.get("hooks_raw")
+        if hooks_raw is not None:
+            hooks_wsl_path = f"{self._profile_root}/dot-claude/hooks/hooks.json"
+            return self._build_editable_tab(
+                hooks_raw, hooks_wsl_path, tab_key="hooks",
+            )
+
+        # Inline case: read-only summary + note.
         hooks = self._data.get("hooks", {})
         if not hooks:
-            return self._build_placeholder_tab("Hooks")
+            # No hooks at all -> still show the inline note so the user
+            # knows where to add them.
+            frame = ctk.CTkFrame(self._body, fg_color=C("bg"), corner_radius=0)
+            frame.grid_columnconfigure(0, weight=1)
+            ctk.CTkLabel(
+                frame,
+                text="Hooks are defined inline in settings.json — "
+                     "edit them on the Settings tab.",
+                text_color=C("fg_muted"), font=FONT_CAPTION,
+            ).grid(row=0, column=0, sticky="w", padx=SPACE_MD, pady=SPACE_MD)
+            return frame
 
         frame = ctk.CTkFrame(self._body, fg_color=C("bg"), corner_radius=0)
         frame.grid_columnconfigure(0, weight=1)
 
-        row = 0
+        ctk.CTkLabel(
+            frame,
+            text="Hooks are defined inline in settings.json — "
+                 "edit them on the Settings tab.",
+            text_color=C("fg_muted"), font=FONT_CAPTION,
+        ).grid(row=0, column=0, sticky="w", padx=SPACE_MD, pady=SPACE_MD)
+
+        row = 1
         for event_name, hook_list in hooks.items():
             ctk.CTkLabel(
                 frame, text=event_name,
