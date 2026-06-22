@@ -1,0 +1,13 @@
+{
+  "PostStop": [
+    {
+      "matcher": "*",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "echo \"agent-box: session ended at $(date -Iseconds)\""
+        }
+      ]
+    }
+  ]
+}

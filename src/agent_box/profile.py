@@ -6,6 +6,7 @@ and a ``meta.yaml`` file.
 """
 from __future__ import annotations
 
+import json
 import shutil
 import sys
 from pathlib import Path
@@ -85,6 +86,65 @@ def load_meta(name: str) -> Dict[str, str]:
 
 # --- create ----------------------------------------------------------------
 
+def _apply_preset(target: Path, agent_type: str, preset_name: str) -> None:
+    """Copy a preset's files onto an already-created profile.
+
+    Currently CC-only: copies ``CLAUDE.md``, optionally ``hooks/hooks.json``,
+    and shallow-merges ``settings.overlay.json`` onto ``settings.json``.
+    Other agent types are out of scope for v0.4 (TODO(v0.4.1): non-CC presets).
+    """
+    preset_dir = library.get_preset_dir(agent_type, preset_name)
+    if preset_dir is None:
+        raise ProfileError(
+            f"unknown preset {preset_name!r} for agent_type {agent_type!r}. "
+            f"Available: {', '.join(library.list_presets(agent_type)) or '(none)'}"
+        )
+
+    if agent_type != "cc":
+        # v0.4 ships CC presets only — refuse loudly for non-CC.
+        raise ProfileError(
+            f"presets are not yet supported for agent_type {agent_type!r} "
+            f"(v0.4 ships CC presets only)"
+        )
+
+    # CLAUDE.md override (replace the template's empty file).
+    claude_md_src = preset_dir / "CLAUDE.md"
+    if claude_md_src.is_file():
+        (target / "CLAUDE.md").write_text(claude_md_src.read_text(encoding="utf-8"))
+
+    # hooks.json → dot-claude/hooks/hooks.json (CC schema).
+    hooks_src = preset_dir / "hooks.json"
+    if hooks_src.is_file():
+        hooks_dst = target / "hooks" / "hooks.json"
+        hooks_dst.parent.mkdir(parents=True, exist_ok=True)
+        hooks_dst.write_text(hooks_src.read_text(encoding="utf-8"))
+
+    # settings.overlay.json — shallow merge onto the template's settings.json.
+    overlay_src = preset_dir / "settings.overlay.json"
+    if overlay_src.is_file():
+        settings_path = target / "settings.json"
+        try:
+            base = (
+                json.loads(settings_path.read_text(encoding="utf-8"))
+                if settings_path.is_file()
+                else {}
+            )
+        except json.JSONDecodeError:
+            base = {}
+        try:
+            overlay = json.loads(overlay_src.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise ProfileError(
+                f"preset {preset_name!r}: invalid settings.overlay.json: {exc}"
+            ) from exc
+        if not isinstance(base, dict) or not isinstance(overlay, dict):
+            raise ProfileError(
+                f"preset {preset_name!r}: settings overlay requires object base + overlay"
+            )
+        merged = {**base, **overlay}
+        settings_path.write_text(json.dumps(merged, indent=2) + "\n")
+
+
 def create(
     name: str,
     agent_type: str = "cc",
@@ -132,19 +192,17 @@ def create(
         if data_target is not None:
             shutil.copytree(data_template, data_target, symlinks=True)
 
-    # v0.4: write the wizard-chosen CLAUDE.md body for CC profiles. The
-    # template ships an empty CLAUDE.md; the wizard's template step
-    # populates it here. Non-CC agent types are out of scope for v0.4
-    # (Hermes has SOUL.md but the template does not seed one yet, and
-    # the wizard's template step is CC-focused).
-    # TODO(WS5): non-CC role templates (Hermes SOUL.md, etc.)
-    if claude_md is not None and agent_type == "cc":
-        claude_md_path = target / "CLAUDE.md"
-        claude_md_path.write_text(claude_md)
+    # v0.4: CLAUDE.md body can come from one of two paths (CC only).
+    #   1. preset (preferred — ships in src/agent_box/presets/cc/<name>/)
+    #   2. explicit claude_md body (legacy path; GUI/CLI without --preset)
+    # If both are supplied, --preset wins (the preset is the source of
+    # truth for the shipped role content).
+    # TODO(v0.4.1): non-CC role templates (Hermes SOUL.md, etc.)
+    if agent_type == "cc" and preset is not None:
+        _apply_preset(target, agent_type, preset)
+    elif claude_md is not None and agent_type == "cc":
+        (target / "CLAUDE.md").write_text(claude_md)
 
-    # v0.4: store preset name in meta. Resolution / file expansion is
-    # Workstream 5; for now it is a record-only field.
-    # TODO(WS5): apply preset
     meta: Dict[str, str] = {"name": name, "agent_type": agent_type}
     if display_name is not None:
         meta["display_name"] = display_name

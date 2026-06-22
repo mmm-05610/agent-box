@@ -336,8 +336,13 @@ class AgentBoxApp:
         display_name = (payload.get("display_name") or "").strip() or None
         description = (payload.get("description") or "").strip() or None
         provider = (payload.get("provider") or "").strip() or None
+        # WS5: wizard now ships a preset NAME, not a CLAUDE.md body. The
+        # preset's CLAUDE.md is applied by profile.create on the WSL side.
+        # Keep the legacy "claude_md body via save_file" path as back-compat
+        # for any caller that still emits a body without a preset.
+        preset = (payload.get("preset") or "").strip() or None
         claude_md = payload.get("claude_md") or ""
-        write_claude_md = bool(claude_md) and agent_type == "cc"
+        write_claude_md = (not preset) and bool(claude_md) and agent_type == "cc"
         claude_md_wsl_path = (
             f"{resolve_profile_root()}/{name}/dot-claude/CLAUDE.md"
             if write_claude_md else ""
@@ -354,6 +359,7 @@ class AgentBoxApp:
                     display_name=display_name,
                     description=description,
                     provider=provider,
+                    preset=preset,
                 )
                 if write_claude_md:
                     from .wsl import save_file

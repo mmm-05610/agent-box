@@ -49,6 +49,12 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Path to a file whose contents become the new profile's CLAUDE.md "
              "(CC profiles only in v0.4). Avoids shell-quoting a multi-line body.",
     )
+    p_create.add_argument(
+        "--preset", default=None,
+        help="Optional preset name (see: agent-box presets). Copies a preset's "
+             "CLAUDE.md, hooks.json, and settings.overlay.json onto the new "
+             "profile (CC only in v0.4). Overrides --claude-md if both given.",
+    )
     p_create.set_defaults(func=cmd_create)
 
     # list ----------------------------------------------------------------
@@ -81,6 +87,22 @@ def _build_parser() -> argparse.ArgumentParser:
     p_edit.add_argument("name", help="Profile name")
     p_edit.set_defaults(func=cmd_edit)
 
+    # presets ------------------------------------------------------------
+    p_presets = sub.add_parser(
+        "presets", help="List available presets (optionally per agent type)"
+    )
+    p_presets.add_argument(
+        "--type", "-t",
+        choices=library.get_agent_types(),
+        default=None,
+        help="Restrict to one agent type (default: all types)",
+    )
+    p_presets.add_argument(
+        "--json", action="store_true",
+        help="Emit JSON (object: {agent_type: [preset_name, ...]})",
+    )
+    p_presets.set_defaults(func=cmd_presets)
+
     # delete --------------------------------------------------------------
     p_delete = sub.add_parser("delete", help="Delete a profile")
     p_delete.add_argument("name", help="Profile name")
@@ -112,6 +134,7 @@ def cmd_create(args: argparse.Namespace) -> int:
             description=args.description,
             provider=args.provider,
             claude_md=claude_md_body,
+            preset=args.preset,
         )
     except (ValueError, profile.ProfileError) as exc:
         print(f"agent-box: {exc}", file=sys.stderr)
@@ -162,6 +185,38 @@ def cmd_show(args: argparse.Namespace) -> int:
         v = info["meta"].get(k)
         if v is not None:
             print(f"{k + ':':<11} {v}")
+    return 0
+
+
+def cmd_presets(args: argparse.Namespace) -> int:
+    if args.json:
+        out: Dict[str, List[str]] = {}
+        types = [args.type] if args.type else library.get_agent_types()
+        for at in types:
+            out[at] = library.list_presets(at)
+        json.dump(out, sys.stdout, indent=2)
+        sys.stdout.write("\n")
+        return 0
+    if args.type is not None:
+        rows = library.list_presets(args.type)
+        if not rows:
+            print(f"(no presets for type {args.type!r})")
+            return 0
+        for name in rows:
+            print(name)
+        return 0
+    # No type filter: list per type, grouped.
+    any_out = False
+    for at in library.get_agent_types():
+        rows = library.list_presets(at)
+        if not rows:
+            continue
+        any_out = True
+        print(f"{at}:")
+        for name in rows:
+            print(f"  {name}")
+    if not any_out:
+        print("(no presets shipped)")
     return 0
 
 

@@ -4,6 +4,12 @@ Each agent type maps to the host config directory (bind-mounted inside
 bwrap) and the binary to execute. Profile creation copies from
 ``templates/<type>/`` — a directory representing a fresh install of
 that agent's default config.
+
+In addition to the required ``templates/`` tree, the package ships
+``presets/<type>/<name>/`` — optional profile seeds (CLAUDE.md,
+hooks.json, settings.overlay.json). A preset is a starting point
+applied on top of the base template, not a replacement for it. See
+:func:`list_presets` and :func:`get_preset_dir`.
 """
 from __future__ import annotations
 
@@ -54,4 +60,22 @@ def get_template_data_dir(agent_type: str) -> Optional[Path]:
     (e.g. OpenCode).
     """
     p = Path(__file__).resolve().parent / "templates" / f"{agent_type}-data"
+    return p if p.is_dir() else None
+
+
+# ---------------------------------------------------------------------------
+# Preset registry (WS5)
+# ---------------------------------------------------------------------------
+
+def list_presets(agent_type: str) -> List[str]:
+    """Sorted preset names for *agent_type* (empty list if none / unknown type)."""
+    base = Path(__file__).resolve().parent / "presets" / agent_type
+    if not base.is_dir():
+        return []
+    return sorted(d.name for d in base.iterdir() if d.is_dir())
+
+
+def get_preset_dir(agent_type: str, name: str) -> Optional[Path]:
+    """Absolute path to a preset dir, or None if the preset doesn't exist."""
+    p = Path(__file__).resolve().parent / "presets" / agent_type / name
     return p if p.is_dir() else None

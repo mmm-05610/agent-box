@@ -40,7 +40,7 @@ from ..tokens import (
     SPACE_SM,
     SPACE_XL,
 )
-from ..wsl import AGENT_ORDER
+from ..wsl import AGENT_ORDER, fetch_presets
 
 
 # ---------------------------------------------------------------------------
@@ -53,31 +53,6 @@ AGENT_TYPE_CARDS: List[Dict[str, str]] = [
     {"key": "hermes",   "title": "Hermes",   "sub": "Custom"},
     {"key": "opencode", "title": "OpenCode", "sub": "Multi"},
 ]
-
-CLAUDE_MD_TEMPLATES: List[Dict[str, str]] = [
-    {"key": "blank",    "title": "Blank",
-     "sub": "Start from scratch"},
-    {"key": "decision", "title": "Decision Writer",
-     "sub": "Multi-step decision orchestration"},
-    {"key": "spec",     "title": "Spec Writer",
-     "sub": "Technical specification author"},
-]
-
-# Minimal markdown skeletons — Phase 4.5 ships with stubs; richer
-# templates can be added later.
-CLAUDE_MD_BODIES: Dict[str, str] = {
-    "blank":    "# Profile: <name>\n\nDescribe this agent's purpose, "
-                "scope, and any conventions.\n",
-    "decision": "# Decision Writer\n\nMulti-step decision orchestration "
-                "agent. Breaks ambiguous goals into ordered sub-tasks, "
-                "gates each step on user confirmation, and never "
-                "commits destructive actions without explicit approval.\n",
-    "spec":     "# Spec Writer\n\nTechnical specification author. "
-                "Writes docs/specs/*.md in the project's standard "
-                "format (Goal, Architecture, Tech Stack, Task Plan, "
-                "Acceptance Criteria).\n",
-}
-
 
 # ---------------------------------------------------------------------------
 # Per-step frames
@@ -216,19 +191,43 @@ class _ProviderStep(_StepFrame):
 
 
 class _TemplateStep(_StepFrame):
-    def __init__(self, master, on_validity_change):
+    """Pick a starting preset for the profile's CLAUDE.md.
+
+    Pulls the live preset list via :func:`fetch_presets` so the wizard
+    stays in sync with whatever the package ships. Always offers a
+    "blank" card (safe default); WSL failures collapse to blank-only
+    rather than blocking the wizard.
+    """
+
+    def __init__(self, master, on_validity_change,
+                 agent_type: str = "cc"):
         super().__init__(master, on_validity_change)
+        self._agent_type = agent_type
         self._selected: Optional[str] = None
         self._cards: Dict[str, ctk.CTkFrame] = {}
 
         self.grid_columnconfigure(0, weight=1)
 
         ctk.CTkLabel(
-            self, text="Pick a starting template for CLAUDE.md.",
+            self, text="Pick a starting preset for CLAUDE.md.",
             text_color=C("fg_muted"), font=FONT_BODY, anchor="w",
         ).grid(row=0, column=0, sticky="ew", pady=(0, SPACE_LG))
 
-        for i, tpl in enumerate(CLAUDE_MD_TEMPLATES):
+        # Build card list: live presets first, then ensure "blank" is present.
+        cards: List[Dict[str, str]] = []
+        try:
+            cards.extend(fetch_presets(agent_type))
+        except Exception:
+            # Defensive: never let a WSL hiccup block the wizard.
+            cards = []
+        if not any(c.get("name") == "blank" for c in cards):
+            cards.append({
+                "name": "blank",
+                "title": "Blank",
+                "sub": "Start from scratch",
+            })
+
+        for i, tpl in enumerate(cards):
             card = self._make_card(tpl, on_select=self._on_select)
             card.grid(row=i + 1, column=0, sticky="ew",
                       pady=(0, SPACE_SM))
@@ -239,22 +238,24 @@ class _TemplateStep(_StepFrame):
         card = Card(self)
         card.grid_columnconfigure(0, weight=1)
         title = ctk.CTkLabel(
-            card, text=data["title"], text_color=C("fg"),
+            card, text=data.get("title", data.get("name", "")),
+            text_color=C("fg"),
             font=FONT_SUBTITLE, anchor="w",
         )
         title.grid(row=0, column=0, sticky="w",
                    padx=SPACE_LG, pady=(SPACE_LG, 2))
         sub = ctk.CTkLabel(
-            card, text=data["sub"], text_color=C("fg_muted"),
+            card, text=data.get("sub", ""), text_color=C("fg_muted"),
             font=FONT_CAPTION, anchor="w",
         )
         sub.grid(row=1, column=0, sticky="w",
                  padx=SPACE_LG, pady=(0, SPACE_LG))
+        key = data.get("name", data.get("key", ""))
         for w in (card, title, sub):
-            w.bind("<Button-1>", lambda _e, k=data["key"]: on_select(k))
-        self._cards[data["key"]] = card
+            w.bind("<Button-1>", lambda _e, k=key: on_select(k))
+        self._cards[key] = card
         # Default: blank
-        if data["key"] == "blank":
+        if key == "blank":
             card.configure(border_color=C("primary"))
         return card
 
@@ -266,7 +267,7 @@ class _TemplateStep(_StepFrame):
         self._selected = key
 
     def collect(self) -> Dict[str, Any]:
-        return {"claude_md_template": self._selected or "blank"}
+        return {"preset": self._selected or "blank"}
 
 
 # ---------------------------------------------------------------------------
@@ -370,7 +371,11 @@ class CreationWizard(ctk.CTkFrame):
 
         # Instantiate the new step
         key, cls, title = self.STEPS[index]
-        frame = cls(self._body, on_validity_change=self._on_validity)
+        step_kwargs: Dict[str, Any] = {"on_validity_change": self._on_validity}
+        if cls is _TemplateStep:
+            # Step 3 needs the agent_type to fetch the right preset list.
+            step_kwargs["agent_type"] = self._data.get("agent_type", "cc")
+        frame = cls(self._body, **step_kwargs)
         frame.grid(row=0, column=0, sticky="nsew")
         self._step_frames.append(frame)
 
@@ -418,9 +423,10 @@ class CreationWizard(ctk.CTkFrame):
 
     def _finish(self) -> None:
         payload = dict(self._data)
-        # If the user picked a template, expand it into a CLAUDE.md body
-        tpl = payload.pop("claude_md_template", "blank")
-        payload["claude_md"] = CLAUDE_MD_BODIES.get(tpl, CLAUDE_MD_BODIES["blank"])
+        # Step 3 now emits the preset *name* (str). The actual CLAUDE.md
+        # body is applied on the WSL side by profile.create when it sees
+        # --preset; no body needs to travel through the wizard payload.
+        # ``payload["claude_md"]`` is intentionally not set here.
         # Toast is handled by the caller after CLI creation succeeds/fails
         self._on_finish(payload)
 

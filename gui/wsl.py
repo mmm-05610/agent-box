@@ -45,6 +45,10 @@ LAUNCH_MODES = (MODE_NEW, MODE_RESUME)
 # Cached result of resolve_profile_root() — shells WSL once per process.
 _PROFILE_ROOT_CACHE: Optional[str] = None
 
+# Cached fetch_presets() results per agent_type. Presets are package-data
+# that don't change at runtime, so caching is safe for the process lifetime.
+_PRESETS_CACHE: Dict[str, List[Dict[str, str]]] = {}
+
 # ---------------------------------------------------------------------------
 # WSL subprocess calls
 # ---------------------------------------------------------------------------
@@ -132,6 +136,62 @@ def fetch_profiles() -> List[Dict[str, str]]:
     if not isinstance(data, list):
         raise RuntimeError("agent-box list --json did not return a JSON array")
     return data
+
+
+
+def fetch_presets(agent_type: str) -> List[Dict[str, str]]:
+    """Return presets for *agent_type* from the WSL side (``agent-box presets --type X --json``).
+
+    Cached per ``agent_type``. Returns a list of dicts with keys ``name``,
+    ``title``, ``sub`` (suitable for direct use in wizard cards). On any
+    failure (WSL missing, CLI error, JSON parse error) returns an empty
+    list — the caller is expected to fall back to a safe default.
+    """
+    if agent_type in _PRESETS_CACHE:
+        return _PRESETS_CACHE[agent_type]
+
+    wsl = shutil.which("wsl.exe")
+    if wsl is None:
+        _PRESETS_CACHE[agent_type] = []
+        return []
+
+    kwargs: Dict[str, Any] = {}
+    if sys.platform == "win32":
+        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+
+    try:
+        proc = subprocess.run(
+            [wsl, "bash", "-lc",
+             f"agent-box presets --type {_shell_quote(agent_type)} --json"],
+            capture_output=True,
+            timeout=15,
+            cwd="C:\\",
+            **kwargs,
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        _PRESETS_CACHE[agent_type] = []
+        return []
+
+    if proc.returncode != 0:
+        _PRESETS_CACHE[agent_type] = []
+        return []
+    try:
+        data = json.loads(proc.stdout.decode("utf-8", errors="replace"))
+    except json.JSONDecodeError:
+        _PRESETS_CACHE[agent_type] = []
+        return []
+
+    # `agent-box presets --type X --json` emits {X: [name, ...]} (string list).
+    names: List[str] = data.get(agent_type, []) if isinstance(data, dict) else []
+    cards: List[Dict[str, str]] = []
+    for name in names:
+        cards.append({
+            "name": name,
+            "title": name.replace("-", " ").replace("_", " ").title(),
+            "sub": "CLAUDE.md preset",
+        })
+    _PRESETS_CACHE[agent_type] = cards
+    return cards
 
 
 def build_launch_argv(name: str, agent_type: str, mode: str,
@@ -377,6 +437,7 @@ __all__ = [
     "build_launch_argv",
     "create_profile",
     "delete_profile",
+    "fetch_presets",
     "fetch_profiles",
     "launch_profile",
     "read_file",
