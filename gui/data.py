@@ -39,6 +39,7 @@ def get_profile_data(profile_root, agent_type: str) -> Dict[str, Any]:
             "skills": list,        # For Codex/Hermes
             "config_raw": str | None,   # Raw text of main config file (all agent types)
             "hooks_raw": str | None,    # CC only: raw text of hooks/hooks.json if separate file exists
+            "auth_raw": str | None,     # Codex/OpenCode: raw text of auth.json (editable)
             "error": str,          # Error message if any
         }
     """
@@ -77,6 +78,7 @@ def get_profile_data(profile_root, agent_type: str) -> Dict[str, Any]:
         "skills": [],
         "config_raw": None,
         "hooks_raw": None,
+        "auth_raw": None,
         "error": None,
     }
 
@@ -146,6 +148,28 @@ def get_profile_data(profile_root, agent_type: str) -> Dict[str, Any]:
                     result["hooks_raw"] = read_text_file(_hooks_file)
             except Exception:
                 result["hooks_raw"] = None
+
+        # auth_raw: raw text of auth.json for codex and opencode.
+        # Codex:  dot-codex/auth.json
+        # OpenCode: dot-opencode-data/auth.json
+        # Loaded off the UI thread (same mechanism as config_raw) so the
+        # Auth tab can hand it to _build_editable_tab.  The read-only
+        # view that masked secrets with "***" is gone — the real file
+        # is what we save back, so showing the real text is required.
+        if agent_type == "codex":
+            try:
+                result["auth_raw"] = read_text_file(
+                    reader.config_dir / "auth.json"
+                )
+            except Exception:
+                result["auth_raw"] = None
+        elif agent_type == "opencode":
+            try:
+                result["auth_raw"] = read_text_file(
+                    profile_root / "dot-opencode-data" / "auth.json"
+                )
+            except Exception:
+                result["auth_raw"] = None
 
         # Get agent-specific data
         if agent_type == "cc":

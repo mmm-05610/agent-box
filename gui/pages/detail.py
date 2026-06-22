@@ -891,8 +891,26 @@ class ProfileDetailPage(ctk.CTkFrame):
         return frame
 
     # --- Auth tab (Codex, OpenCode) ------------------------------------
-
+    # Same raw-edit pattern as Settings/Config/Hooks.  The raw auth.json
+    # text is preloaded off the UI thread by get_profile_data into
+    # self._data["auth_raw"].  The previous read-only textbox used to
+    # mask secret values with "***" before display — that is GONE: the
+    # stored file holds the real secrets, so the raw editor must show
+    # them too (otherwise the user could not actually edit them).
     def _build_auth_tab(self) -> ctk.CTkFrame:
+        auth_raw = self._data.get("auth_raw")
+        if auth_raw is not None:
+            agent_type = self._data.get("agent_type", "codex")
+            if agent_type == "opencode":
+                wsl_path = f"{self._profile_root}/dot-opencode-data/auth.json"
+            else:
+                wsl_path = f"{self._profile_root}/dot-codex/auth.json"
+            return self._build_editable_tab(
+                auth_raw, wsl_path, tab_key="auth",
+            )
+
+        # No auth file on disk (or read failed): fall back to the
+        # old read-only view of the parsed dict, with secrets masked.
         auth = self._data.get("auth", {})
         if not auth:
             return self._build_placeholder_tab("Auth")
