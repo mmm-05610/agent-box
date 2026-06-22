@@ -1,38 +1,38 @@
 # agent-box
 
-> **AI Agent 配置隔离启动器** — 在同一台机器上以多个身份（不同 Provider、不同提示词）运行 Claude Code，通过 [bubblewrap](https://github.com/containers/bubblewrap) bind mount 实现**内核级隔离**。
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/)
-[![v0.1.0](https://img.shields.io/badge/version-0.1.0-orange.svg)](#)
+> **AI Agent 配置隔离启动器** — 在同一台机器上以多个隔离身份（不同 Provider、不同提示词、不同凭证）运行 Claude Code、Codex、Hermes、OpenCode，通过 [bubblewrap](https://github.com/containers/bubblewrap) bind mount 实现**内核级隔离**。
 
 [English](README.md) | 简体中文
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/)
+[![v0.4.0](https://img.shields.io/badge/version-0.4.0-orange.svg)](#)
+
 ---
 
-## 痛点
+## 为什么需要
 
-AI Agent CLI（Claude Code、Codex、Hermes 等）从单一的 `~/.claude/`（或 `~/.codex/` 等）目录读取身份、模型供应商和项目记忆。在同一台机器上跑多个 Agent 身份意味着不断手动编辑配置文件、互相覆盖状态。
+编码 Agent CLI（Claude Code、Codex、Hermes、OpenCode）从单一配置目录（`~/.claude/`、`~/.codex/`、`~/.hermes/`、`~/.config/opencode/`）读取身份、模型供应商、凭证和项目记忆。在同一台机器上跑多个 Agent 身份意味着不断手动编辑配置文件、互相覆盖状态——而且一个 Agent 的凭证还会泄漏到下一个会话里。
 
-`agent-box` 给每个身份独立的 profile 目录，通过 `bwrap` 挂载命名空间将 profile bind mount 到真实 `~/.claude/` 上。Agent 看到的是自己的世界，宿主机文件系统毫发无损。
+`agent-box` 为每个身份创建独立的 profile 目录，并在 `bwrap` mount namespace 内启动 Agent，把 profile 绑定挂载到真实配置目录之上。Agent 看到的是自己的世界；宿主文件系统毫发无损。
 
-```bash
-agent-box cc decision     # CC + DeepSeek，决策者
-agent-box cc dw           # CC + MiniMax，DW 执行
-agent-box cc spec         # CC + Anthropic，spec 写作
+```
+agent-box cc decision       # 一个 Claude Code 身份
+agent-box codex builder     # 一个 Codex 身份，并行运行
+agent-box opencode alt      # 一个 OpenCode 身份，并行运行
 ```
 
-每个身份在不同终端并行运行，配置、凭证、项目记忆完全隔离。
+每个身份在独立终端运行，配置、凭证、历史、项目记忆完全隔离，互不污染。
 
 ---
 
 ## 安装
 
-### 环境要求
+### 依赖
 
-- **Python 3.9+**（仅标准库，零 Python 依赖）
-- **`bubblewrap`**（`bwrap`）— 系统包，见下方
-- **Claude Code**（`claude` CLI）— 通过 npm 全局安装一次
+- **Python 3.9+**（仅用标准库——CLI 零 Python 运行时依赖）
+- **`bubblewrap`**（`bwrap`）—— 系统包，见下
+- 一个或多个你要启动的 Agent CLI（`claude`、`codex`、`hermes`、`opencode`）
 
 ### 系统包
 
@@ -46,25 +46,31 @@ sudo dnf install bubblewrap
 # Arch
 sudo pacman -S bubblewrap
 
-# macOS — bwrap 不可用；v2 bwrap 隔离需要 Linux
+# macOS —— 无 bwrap；agent-box 需要 Linux（WSL2 完美适用）
 ```
 
-### Claude Code
+### agent-box 本体
 
-```bash
-npm install -g @anthropic-ai/claude-code
-```
-
-### agent-box
-
-从源码安装：
+从源码检出：
 
 ```bash
 git clone https://github.com/mmm-05610/agent-box.git
 cd agent-box
 pip install -e .
-# 或者不安装直接运行：
-./agent-box --help
+# 或不安装直接运行：
+python -m agent_box.cli --help
+```
+
+从 PyPI（发布后）：
+
+```bash
+pip install agent-box
+```
+
+Windows 桌面 GUI 是可选 extra（依赖 CustomTkinter）：
+
+```bash
+pip install -e .[gui]
 ```
 
 ---
@@ -72,191 +78,225 @@ pip install -e .
 ## 快速开始
 
 ```bash
-# 1. 从真实 ~/.claude/ 生成模板（一次性）
-agent-box init-template
+# 1. 为每个 Agent 身份创建一个 profile。模板内置在包里——无需初始化步骤。
+agent-box create decision --type cc
+agent-box create builder   --type codex
+agent-box create dev        --type cc --preset python-dev   # 自带 CLAUDE.md + hooks + settings 覆盖
 
-# 2. 每个 Agent 身份创建一个 profile
-agent-box create decision --provider deepseek
-agent-box create dw       --provider minimax
-agent-box create spec     --provider anthropic
+# 2. 把真实 API key / 凭证填进 profile。模板是空 key 占位符——
+#    打开配置目录填进去：
+agent-box edit decision        # 在 $EDITOR 中打开 profile 的配置目录
+#  → ~/.agent-box/profiles/decision/dot-claude/settings.json
+#  → 把空的 env / apiKey 占位符替换成你的真实值
 
-# 3. 设置 API key
-agent-box edit decision
-#  → 打开 ~/.agent-box/profiles/decision/dot-claude/settings.json
-#  → 把 sk-REPLACE_ME 替换为真实的 ANTHROPIC_AUTH_TOKEN
-
-# 4. 启动 — 每个命令都是一个完全隔离的 CC 会话
+# 3. 启动——每条命令都是完全隔离的 Agent 会话
 agent-box cc decision
-agent-box cc dw
-agent-box cc spec --cwd ~/projects/my-app
+agent-box codex builder
+agent-box opencode alt
 ```
 
-在终端 A 跑 `agent-box cc dw`，终端 B 跑 `agent-box cc decision` — 两者同时在线，各自看到自己的配置，互不泄漏。
+在终端 A 跑 `agent-box cc decision`，终端 B 跑 `agent-box codex builder`——两者同时在线，各自看到自己的配置，互不泄漏。
 
 ---
 
-## 命令速查
+## 命令参考
 
-| 命令                                             | 说明                                                |
-| ------------------------------------------------ | --------------------------------------------------- |
-| `agent-box init-template [--force]`              | 从 `~/.claude/` 抽取干净模板（清除敏感信息）        |
-| `agent-box create <name> --provider <p>`         | 创建新 profile（模板不存在时自动初始化）            |
-| `agent-box list [--json]`                        | 列出所有 profile                                    |
-| `agent-box show <name>`                          | 查看 profile 的元信息、provider、模型、base_url     |
-| `agent-box edit <name> [--claude-md \| --local]` | 用 `$EDITOR` 打开 profile 配置文件                  |
-| `agent-box config <name> [<key> [<value>]]`      | 读写单个配置项（如 `api-key`、`model`、`base-url`） |
-| `agent-box test <name>`                          | 测试 profile 的 API 连通性                          |
-| `agent-box cc <name> [--cwd DIR]`                | 以 profile 身份启动 Claude Code（核心命令）         |
-| `agent-box delete <name> [--force]`              | 删除 profile                                        |
-| `agent-box --help`                               | 完整 CLI 帮助                                       |
+| 命令 | 作用 |
+| --- | --- |
+| `agent-box create <name> [--type <t>] [--preset <p>] [--provider <p>] [--display-name <s>] [--description <s>] [--claude-md <file>]` | 复制 Agent 类型的模板创建新 profile |
+| `agent-box list [--json]` | 列出所有 profile |
+| `agent-box show <name>` | 显示 profile 的元数据、路径及可选字段 |
+| `agent-box edit <name>` | 在 `$EDITOR` 中打开 profile 的配置目录 |
+| `agent-box presets [--type <t>] [--json]` | 列出自带预设 |
+| `agent-box launch <name> [extra...]` | 在 bwrap namespace 内启动 profile |
+| `agent-box cc \| codex \| hermes \| opencode <name> [extra...]` | 快捷方式：启动该类型的 profile |
+| `agent-box delete <name> [--force]` | 删除 profile |
+| `agent-box --help` | 完整 CLI 帮助 |
 
-### Provider 预设
+profile 名之后的 `extra` 参数会透传给 Agent 二进制（如 `agent-box cc decision --resume`）。
 
-| Provider    | Base URL                             | 模型                |
-| ----------- | ------------------------------------ | ------------------- |
-| `deepseek`  | `https://api.deepseek.com/anthropic` | `deepseek-v4-pro`   |
-| `minimax`   | `https://api.minimaxi.com/anthropic` | `MiniMax-M2.7`      |
-| `anthropic` | `https://api.anthropic.com`          | `claude-sonnet-4-6` |
+### `create` 选项
 
-三个 CC 模型等级的环境变量（`HAIKU`/`SONNET`/`OPUS`）默认均指向 provider 的主模型，因此 CC 内 `/model` 始终显示统一模型名。
+- `--type / -t` —— Agent 类型：`cc`（默认）、`codex`、`hermes`、`opencode`。
+- `--preset` —— 应用一个自带预设（v0.4 仅 CC）。复制预设的 `CLAUDE.md`、`hooks/hooks.json`，并把 `settings.overlay.json` 深合并到模板的 `settings.json` 上。若同时给 `--claude-md`，`--preset` 优先。
+- `--provider` —— Provider 键（如 `anthropic`、`deepseek`）。**v0.4 仅作记录**——存入 `meta.yaml`，无应用逻辑（v0.5 接入）。
+- `--display-name` / `--description` —— 人类可读元数据，存入 `meta.yaml`。
+- `--claude-md <file>` —— 该文件内容成为 profile 的 `CLAUDE.md`（v0.4 仅 CC）。避免在 shell 里拼多行正文。
+
+### 自带预设（CC）
+
+`blank`、`decision-maker`、`python-dev`、`spec-writer`——见 `src/agent_box/presets/cc/`。用 `agent-box presets --type cc` 查看。
 
 ---
 
-## 原理
+## 工作原理
 
 ### 隔离问题
 
-v1 的 `HOME` 环境变量覆盖方案被 CC 内部的 `os.userInfo().homedir` 绕过 — Agent 重新推导真实 home 目录，读到了宿主机的 `~/.claude/`。**部分隔离，已废弃。**
+仅靠 `HOME` 环境变量覆盖会被 Agent 内部的 `os.userInfo().homedir` 击穿——它会重新解析出真实 home 并读取宿主真实配置目录。**部分隔离，已失效。**
 
-### v2 方案：bwrap bind mount
+### 解决方案：bwrap bind mount
 
-`agent-box v2` 使用 `bubblewrap` 进入挂载命名空间，在内核 VFS 层将 profile 的 `dot-claude/` 目录 bind mount 到真实 `~/.claude/` 之上。在命名空间内，无论 Agent 通过何种方式解析路径，读到的都是隔离后的配置。
+`agent-box` 进入 `bubblewrap` mount namespace，在**内核 VFS 层**把 profile 的配置目录绑定挂载到 Agent 的真实配置目录之上。namespace 内路径已被改写，无论 Agent 如何解析都看不到宿主配置。
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│  宿主机文件系统                                       │
+│  宿主文件系统                                        │
 │                                                     │
-│  /home/user/.claude/          ← 真实、未改动          │
+│  /home/user/.claude/          ← 真实，未被触碰        │
 │         ▲                                           │
 │         │ bind mount (bwrap)                        │
 │         │                                           │
-│  /home/user/.agent-box/profiles/dw/dot-claude/      │
+│  /home/user/.agent-box/profiles/decision/dot-claude/│
 │         (profile 的 settings.json, CLAUDE.md, ...)  │
 └─────────────────────────────────────────────────────┘
           │
           ▼
 ┌─────────────────────────────────────────────────────┐
-│  bwrap 命名空间                                      │
+│  bwrap namespace                                    │
 │                                                     │
 │  --bind / /                                         │
 │  --bind <profile>/dot-claude   /home/user/.claude   │
-│  --bind <profile>/dot-claude.json  /home/user/.claude.json │
+│  --bind <profile>/dot-claude.json  /home/user/.claude.json   (仅 CC)
+│  --bind <profile>/dot-opencode-data  ~/.local/share/opencode (仅 OpenCode)
 │  --dev /dev --proc /proc --tmpfs /tmp               │
-│  --unshare-all --share-net                          │
-│  claude                                             │
+│  --unshare-ipc --unshare-pid --unshare-uts --share-net│
+│  <agent 二进制>                                      │
 │                                                     │
-│  ⇒ execvpe 替换当前进程；CC 继承 tty、信号、Ctrl-C    │
+│  ⇒ os.execvpe 替换我们的 PID；Agent 继承 tty、      │
+│    信号处理，Ctrl-C 仍有效。                         │
 └─────────────────────────────────────────────────────┘
 ```
 
-关键属性：
+关键特性：
 
-- **内核级隔离** — Agent 在命名空间内无法读取宿主机真实 `~/.claude/`
-- **保留 PID/tty** — `os.execvpe` 用 bwrap 替换当前进程，bwrap exec `claude`，终端会话不变，Ctrl-C 直达 CC
-- **共享网络**（`--share-net`）— Agent 需要 API 访问
-- **模板/Profile 分离** — `init-template` **仅一次**读取宿主机 `~/.claude/`，清除 `env`、`permissions`、`_marker`；`create` 仅从模板复制，此后不再触碰宿主机真实配置
-- **`--cwd` 支持** — `agent-box cc --cwd DIR` 在 execvpe 前 `os.chdir`，Agent 看到正确项目根目录
+- **内核级隔离** —— Agent 在 namespace 内无法读取宿主真实配置目录。
+- **PID/tty 保留** —— `os.execvpe` 把我们的进程替换为 `bwrap`，后者再 exec Agent。终端会话不变，Ctrl-C 仍发给 Agent。
+- **网络共享**（`--share-net`）—— Agent 需要 API 访问。
+- **凭证存在 profile 里** —— API key 放在 profile 自己的 `settings.json` / `auth.json` / `.env` 中，Agent 在 namespace *内部*读取。`agent-box` 不注入也不改写它们，只确保 Agent 看到的是 profile 的副本而非宿主的。
+- **模板 / profile 分离** —— 模板内置在包里（`src/agent_box/templates/<type>/`），是空 key 占位符；`create` 把模板复制成 profile。宿主真实配置目录永不被写入。
+- **按 Agent 类型的附加绑定** —— CC 额外绑定 `dot-claude.json` → `~/.claude.json`；OpenCode 额外绑定其二级数据目录（`dot-opencode-data` → `~/.local/share/opencode`），使 `auth.json` 也被隔离。
 
-### v1 vs v2
+### 预设
 
-| 版本 | 机制                    | 能否被 `os.userInfo().homedir` 绕过？ | 结果         |
-| ---- | ----------------------- | :-----------------------------------: | ------------ |
-| v1   | `HOME=<profile> claude` |                 ✅ 能                 | 部分隔离     |
-| v2   | `bwrap` bind mount      |                ❌ 不能                | **完全隔离** |
+预设是一个目录（`src/agent_box/presets/<type>/<name>/`），可包含 `CLAUDE.md`、`hooks/hooks.json`、`settings.overlay.json`。`create --preset` 时复制 `CLAUDE.md` 和 hooks，并把 settings 覆盖**深合并**到模板的 `settings.json` 上——冲突时覆盖方胜出，但兄弟键保留（所以预设的 `permissions.allow` 不会抹掉模板的 `permissions.deny`）。所选预设记入 `meta.yaml`。
 
 ---
 
-## 目录结构
+## Windows 桌面 GUI
+
+CLI 在 WSL 中运行；可选的 Windows 桌面 GUI（`gui-redesign.py` → `gui/app.py`，基于 [CustomTkinter](https://github.com/TomSchimansky/CustomTkinter)）让你在 Windows 上管理 profile：创建、列出、查看，并直接编辑每个 profile 的原始配置文件（settings、hooks、auth、CLAUDE.md），覆盖全部四种 Agent 类型，采用 cc-switch / shadcn-Zinc 设计系统与深浅主题。
+
+它通过 `wsl.exe` 与 WSL 通信，所以真正的隔离工作仍由 CLI 和 bwrap 完成——GUI 只是同一棵 profile 树之上的便利层。
+
+启动器：`launch-gui.bat` / `launch-gui.ps1`（项目根），或桌面快捷方式。
+
+---
+
+## 项目结构
 
 ```
 agent-box/
-├── agent-box                       # 启动 shim（源码直接执行）
-├── pyproject.toml                  # setuptools + console_script 入口
+├── pyproject.toml                  # setuptools + console_script + [gui]/[dev] extras
 ├── LICENSE                         # MIT
-├── README.md
-├── README_CN.md                    # 本文档
+├── README.md  /  README_CN.md
 ├── .gitignore
 │
-├── src/agent_box/                  # 核心包（零运行时依赖）
-│   ├── __init__.py
-│   ├── cli.py                      # argparse，子命令分发
-│   ├── config.py                   # 路径解析、名称校验
-│   ├── providers.py                # provider → env 配置表
-│   ├── profile.py                  # init-template / create / list / show / delete
-│   ├── edit.py                     # $EDITOR 启动器
-│   └── launch.py                   # bwrap 参数构建 + execvpe
+├── src/agent_box/                  # 包本体（零运行时依赖）
+│   ├── cli.py                      # argparse、子命令分发
+│   ├── config.py                   # AGENT_BOX_HOME 解析、路径 + 名称校验
+│   ├── library.py                  # Agent 类型注册表（模板、预设、二进制、目录）
+│   ├── profile.py                  # create / list / show / delete、meta IO、预设应用、_deep_merge
+│   ├── edit.py                     # $EDITOR 启动
+│   ├── launch.py                   # bwrap argv 构造 + execvpe
+│   ├── templates/<type>/           # 自带 Agent 配置模板（空 key 占位符）
+│   └── presets/<type>/<name>/      # 自带预设（CLAUDE.md, hooks.json, settings.overlay.json）
 │
-├── docs/
-│   ├── REQUIREMENTS.md             # v1 设计思路
-│   ├── IMPLEMENTATION.md           # 完整设计 + 调研笔记
-│   └── specs/
-│       ├── mvp-implementation.md
-│       ├── v2-bwrap-implementation.md
-│       └── v2-bwrap-rewrite.md     # v2 规范文档
+├── gui/                            # Windows 桌面 GUI（CustomTkinter）—— [gui] extra
+│   ├── app.py  tokens.py  theme.py  state.py  data.py  config.py
+│   ├── pages/  components/
 │
-└── (运行时，在宿主机上，不在仓库中)
-    ~/.agent-box/
-    ├── template/                   # `init-template` 生成
-    │   ├── dot-claude/             #    settings.json + skills/ 软链
-    │   └── dot-claude.json         #    初始化占位
-    └── profiles/<name>/
-        ├── meta.yaml               #    name, agent_type, provider
-        ├── dot-claude/             #    settings.json + CLAUDE.md + projects/
-        └── dot-claude.json         #    初始化占位
+├── tests/                          # 回归测试脊梁（WS7）—— [dev] extra
+└── docs/
+    ├── ARCHITECTURE.md  ROADMAP.md
+    ├── specs/  troubleshooting/  planning/
 ```
+
+### 运行时布局（在宿主上，不在仓库里）
+
+```
+~/.agent-box/                       # 或 $AGENT_BOX_HOME
+└── profiles/<name>/
+    ├── meta.yaml                   # name, agent_type,（+ display_name/description/provider/preset）
+    ├── dot-claude/                 # bwrap 绑定挂载的配置目录（CC）
+    ├── dot-claude.json             # → ~/.claude.json  (仅 CC)
+    └── dot-<type>/                 # dot-codex / dot-hermes / dot-opencode
+    └── dot-<type>-data/            # 二级数据目录（OpenCode: dot-opencode-data → ~/.local/share/opencode）
+```
+
+### 源码地图
+
+| 文件 | 职责 |
+| --- | --- |
+| `cli.py` | argparse 树；每个子命令一个 `cmd_*` |
+| `config.py` | `$AGENT_BOX_HOME` 解析、路径辅助、名称校验 |
+| `library.py` | Agent 类型注册表：配置目录、二进制、数据目录、模板、预设 |
+| `profile.py` | `create`、`list`、`show`、`delete`、meta IO、`_apply_preset`、`_deep_merge` |
+| `edit.py` | 在 `$EDITOR` 中打开 profile 的配置目录 |
+| `launch.py` | `launch`：构造 bwrap argv + `os.execvpe` |
 
 ---
 
 ## 设计原则
 
-- **零 Python 运行时依赖** — 仅标准库。`bwrap` 和 `claude` 是系统依赖，非 Python 依赖
-- **无数据库** — profile 即目录树，文件系统即真实数据源
-- **不修改 Agent** — `agent-box` 是启动器，非包装器。CC 本身不变，只改变它看到的世界
-- **不写入宿主机真实 `~/.claude/`** — `init-template` 是唯一读取它的代码，且仅用于生成模板
-- **人可读的 profile** — profile 中每个文件都是纯 JSON/YAML/Markdown。CLI 是便利工具，不是牢笼
-- **一次安装，N 个身份** — 新增一个身份的成本就是一行 `agent-box create` 命令
+- **CLI 零 Python 运行时依赖** —— 仅标准库。`bwrap` 和 Agent CLI 是系统依赖，不是 Python 依赖。
+- **无数据库** —— profile 是目录树；文件系统即真相之源。
+- **不改 Agent** —— `agent-box` 是启动器，不是包装器。Agent 不变，我们只改变它看到的东西。
+- **不写入宿主真实配置目录** —— `create` 只从内置模板复制。宿主真实 `~/.claude/` 等永不被写入。
+- **人类可编辑的 profile** —— profile 里每个文件都是普通的 JSON / TOML / YAML / Markdown 文档。CLI 是便利，不是牢笼。
+- **一次安装，N 个身份** —— 新增身份的成本是一条 `agent-box create` 命令。
 
 ---
 
-## Phase 2（尚未实现）
+## 路线图
 
-- tmux 布局集成（单终端多 Agent 面板）
-- NiceGUI Web profile 编辑器
-- 会话历史追踪
-- Profile 导入/导出
-- 知识库 MCP 共享层
+**v0.4.0（当前）：** 四 Agent 启动 + bwrap 隔离、预设管道、带原始配置编辑的 Windows GUI、模板修正、回归测试脊梁。
+
+**下一步：**
+- GUI 内结构化配置表单（在原始编辑之上）
+- Team 模式——多 Agent tmux 编排
+- 会话历史管理
+- profile 导入 / 导出
+- PyPI 发布
+
+**明确不做：** web 前端。agent-box 是轻量 WSL 工具，web 栈带来的复杂度与隔离收益不成比例。
 
 ---
 
 ## 开发
 
 ```bash
-# 源码直接运行（无需安装）
-./agent-box --help
+# 带 dev + gui extras 的可编辑安装
+pip install -e .[dev,gui]
 
-# 可编辑安装
-pip install -e .
-
-# 直接运行子命令
+# 不安装直接从源码运行
 python -m agent_box.cli list
+
+# 运行 GUI
+python gui-redesign.py
 ```
 
 ### 测试
 
-v0.1.0 无测试套件。MVP 通过 spec 验收清单手动验证（`docs/specs/v2-bwrap-rewrite.md` §验收）。
+```bash
+pip install -e .[dev]
+pytest -q
+```
+
+测试套件是封闭的：测试把 `AGENT_BOX_HOME` 指向临时目录，并 monkeypatch `os.execvpe` / `shutil.which` / `subprocess.run`，因此不会跑真实的 bwrap、不会调真实的 `wsl.exe`、也不会触碰真实的 `~/.agent-box`。覆盖 meta 往返 + 向后兼容、profile 生命周期、`_deep_merge`（预设覆盖回归）、library 注册表、launch argv 构造、wsl base64 往返 + shell 引号、以及预设解析。
 
 ---
 
-## License
+## 许可证
 
-MIT — 详见 [LICENSE](LICENSE)。
+MIT —— 见 [LICENSE](LICENSE)。

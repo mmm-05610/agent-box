@@ -1,39 +1,40 @@
 # agent-box
 
-> **Isolated HOME launcher for coding agents** — run Claude Code as multiple
+> **Isolated HOME launcher for coding agents** — run Claude Code, Codex, Hermes,
+> and OpenCode as multiple isolated identities (different providers, different
+> prompts, different credentials) on the same machine, with **kernel-level
+> isolation** via [bubblewrap](https://github.com/containers/bubblewrap) bind
+> mounts.
 
 [English](README.md) | [简体中文](README_CN.md)
 
-> identities (different providers, different prompts) on the same machine, with
-> **kernel-level isolation** via [bubblewrap](https://github.com/containers/bubblewrap)
-> bind mounts.
-
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/)
-[![v0.1.0](https://img.shields.io/badge/version-0.1.0-orange.svg)](#)
+[![v0.4.0](https://img.shields.io/badge/version-0.4.0-orange.svg)](#)
 
 ---
 
 ## Why
 
-AI agent CLIs (Claude Code, Codex, Hermes, ...) read their identity, model
-provider, and per-project memory from a single `~/.claude/` (or `~/.codex/`,
-etc.) directory. Running two agent identities on the same machine means
-constantly editing config files and fighting the on-disk state.
+Coding-agent CLIs (Claude Code, Codex, Hermes, OpenCode) read their identity,
+model provider, credentials, and per-project memory from a single config
+directory (`~/.claude/`, `~/.codex/`, `~/.hermes/`, `~/.config/opencode/`).
+Running two agent identities on the same machine means constantly editing config
+files and fighting on-disk state — and one agent's credentials leak into the
+next session.
 
-`agent-box` solves this by giving each identity its own profile directory and
-launching the agent inside a `bwrap` mount namespace where the profile is
-bind-mounted over the real `~/.claude/`. The agent sees its own world; the
-host filesystem is untouched.
+`agent-box` gives each identity its own profile directory and launches the agent
+inside a `bwrap` mount namespace where the profile is bind-mounted over the real
+config directory. The agent sees its own world; the host filesystem is untouched.
 
 ```
-agent-box cc decision     # CC + DeepSeek, 决策者
-agent-box cc dw           # CC + MiniMax,   DW 执行
-agent-box cc spec         # CC + Anthropic,  spec 写作
+agent-box cc decision       # a Claude Code identity
+agent-box codex builder     # a Codex identity, in parallel
+agent-box opencode alt      # an OpenCode identity, in parallel
 ```
 
-Each identity runs in parallel, in separate terminals, with fully isolated
-config, credentials, and per-project memory.
+Each identity runs in a separate terminal, with fully isolated config,
+credentials, history, and per-project memory. They never touch each other.
 
 ---
 
@@ -41,9 +42,10 @@ config, credentials, and per-project memory.
 
 ### Requirements
 
-- **Python 3.9+** (stdlib only — no Python dependencies)
+- **Python 3.9+** (stdlib only — zero Python runtime dependencies for the CLI)
 - **`bubblewrap`** (`bwrap`) — system package, see below
-- **Claude Code** (`claude` CLI) — installed once globally via npm
+- One or more agent CLIs you want to launch (`claude`, `codex`, `hermes`,
+  `opencode`)
 
 ### System packages
 
@@ -57,13 +59,7 @@ sudo dnf install bubblewrap
 # Arch
 sudo pacman -S bubblewrap
 
-# macOS — bwrap is unavailable; v2 bwrap isolation requires Linux
-```
-
-### Claude Code
-
-```bash
-npm install -g @anthropic-ai/claude-code
+# macOS — bwrap is unavailable; agent-box requires Linux (WSL2 works great)
 ```
 
 ### agent-box itself
@@ -75,7 +71,7 @@ git clone https://github.com/mmm-05610/agent-box.git
 cd agent-box
 pip install -e .
 # or, no install needed:
-./agent-box --help
+python -m agent_box.cli --help
 ```
 
 From PyPI (once published):
@@ -84,31 +80,36 @@ From PyPI (once published):
 pip install agent-box
 ```
 
+The Windows desktop GUI is an optional extra (requires CustomTkinter):
+
+```bash
+pip install -e .[gui]
+```
+
 ---
 
 ## Quick Start
 
 ```bash
-# 1. Bootstrap the template from your real ~/.claude/ (one time)
-agent-box init-template
+# 1. Create one profile per agent identity. Templates ship in the package —
+#    no init step needed.
+agent-box create decision --type cc
+agent-box create builder   --type codex
+agent-box create dev        --type cc --preset python-dev   # ships a CLAUDE.md + hooks + settings overlay
 
-# 2. Create one profile per agent identity
-agent-box create decision --provider deepseek
-agent-box create dw       --provider minimax
-agent-box create spec     --provider anthropic
+# 2. Put your real API key / credentials into the profile. Templates are
+#    empty-key placeholders — open the config dir and fill them in:
+agent-box edit decision        # opens the profile's config dir in $EDITOR
+#  → ~/.agent-box/profiles/decision/dot-claude/settings.json
+#  → replace the empty env / apiKey placeholders with your real values
 
-# 3. Set the API key in the profile you want to use
-agent-box edit decision
-#  → opens ~/.agent-box/profiles/decision/dot-claude/settings.json
-#  → replace sk-REPLACE_ME with your real ANTHROPIC_AUTH_TOKEN
-
-# 4. Launch — each command is a fully isolated CC session
+# 3. Launch — each command is a fully isolated agent session
 agent-box cc decision
-agent-box cc dw
-agent-box cc spec --cwd ~/projects/my-app
+agent-box codex builder
+agent-box opencode alt
 ```
 
-That's it. Run `agent-box cc dw` in terminal A and `agent-box cc decision` in
+Run `agent-box cc decision` in terminal A and `agent-box codex builder` in
 terminal B — both are live, both see their own config, neither leaks into the
 other.
 
@@ -116,34 +117,37 @@ other.
 
 ## Command Reference
 
-| Command                                                                    | What it does                                                           |
-| -------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| `agent-box init-template [--force]`                                        | Extract a clean template from `~/.claude/` (strips secrets)            |
-| `agent-box create <name> --provider <p>`                                   | Create a new profile (auto-inits template if missing)                  |
-| `agent-box list [--json]`                                                  | List all profiles                                                      |
-| `agent-box show <name>`                                                    | Show metadata, provider, model, base_url for a profile                 |
-| `agent-box edit <name> [--claude-md \| --local]`                           | Open a profile config file in `$EDITOR`                                |
-| `agent-box config <name> [<key> [<value>]]`                                | Get/set individual config values (e.g. `api-key`, `model`, `base-url`) |
-| `agent-box test <name>`                                                    | Test API connectivity for a profile                                    |
-| `agent-box cc <name> [--cwd DIR]`                                          | Launch Claude Code under a profile (the headline command)              |
-| `agent-box component list [--type] [--region] [--tag] [--user-only]`       | List built-in and user components (providers, MCP servers)             |
-| `agent-box component show <id> [--type]`                                   | Show one component's full config                                       |
-| `agent-box component add --type <t> --id <id> --name <n> --config '{...}'` | Add a user-defined component                                           |
-| `agent-box component delete <id> [--type]`                                 | Delete a user-defined component (built-ins are protected)              |
-| `agent-box delete <name> [--force]`                                        | Delete a profile                                                       |
-| `agent-box --help`                                                         | Full CLI help                                                          |
+| Command | What it does |
+| --- | --- |
+| `agent-box create <name> [--type <t>] [--preset <p>] [--provider <p>] [--display-name <s>] [--description <s>] [--claude-md <file>]` | Create a new profile by copying the agent type's template |
+| `agent-box list [--json]` | List all profiles |
+| `agent-box show <name>` | Show a profile's metadata, paths, and optional fields |
+| `agent-box edit <name>` | Open a profile's config directory in `$EDITOR` |
+| `agent-box presets [--type <t>] [--json]` | List shipped presets |
+| `agent-box launch <name> [extra...]` | Launch a profile inside a bwrap namespace |
+| `agent-box cc \| codex \| hermes \| opencode <name> [extra...]` | Shortcut: launch a profile of that agent type |
+| `agent-box delete <name> [--force]` | Delete a profile |
+| `agent-box --help` | Full CLI help |
 
-### Providers
+`extra` args after the profile name are passed through to the agent binary
+(e.g. `agent-box cc decision --resume`).
 
-| Provider    | Base URL                             | Model               |
-| ----------- | ------------------------------------ | ------------------- |
-| `deepseek`  | `https://api.deepseek.com/anthropic` | `deepseek-v4-pro`   |
-| `minimax`   | `https://api.minimaxi.com/anthropic` | `MiniMax-M2.7`      |
-| `anthropic` | `https://api.anthropic.com`          | `claude-sonnet-4-6` |
+### `create` options
 
-All three CC tier model env vars (`HAIKU`/`SONNET`/`OPUS`) default to the
-provider's primary model, so `/model` inside CC consistently shows one model
-regardless of the tier CC selects internally.
+- `--type / -t` — agent type: `cc` (default), `codex`, `hermes`, `opencode`.
+- `--preset` — apply a shipped preset (CC only in v0.4). Copies the preset's
+  `CLAUDE.md`, `hooks/hooks.json`, and deep-merges `settings.overlay.json` onto
+  the template's `settings.json`. Overrides `--claude-md` if both given.
+- `--provider` — provider key (e.g. `anthropic`, `deepseek`). **Record-only in
+  v0.4** — stored in `meta.yaml`, no apply logic. (v0.5 will wire it.)
+- `--display-name` / `--description` — human metadata, stored in `meta.yaml`.
+- `--claude-md <file>` — file whose contents become the profile's `CLAUDE.md`
+  (CC only in v0.4). Avoids shell-quoting a multi-line body.
+
+### Shipped presets (CC)
+
+`blank`, `decision-maker`, `python-dev`, `spec-writer` — see
+`src/agent_box/presets/cc/`. Inspect with `agent-box presets --type cc`.
 
 ---
 
@@ -151,16 +155,16 @@ regardless of the tier CC selects internally.
 
 ### The isolation problem
 
-`HOME` override (v1) is defeated by `os.userInfo().homedir` inside CC. The
-agent re-derives the real home and reads the host's real `~/.claude/`. **Partial
-isolation. Broken.**
+A `HOME` environment override is defeated by `os.userInfo().homedir` inside the
+agent — it re-derives the real home and reads the host's real config dir.
+**Partial isolation. Broken.**
 
-### The v2 solution: bwrap bind mount
+### The solution: bwrap bind mount
 
-`agent-box v2` uses `bubblewrap` to enter a mount namespace and bind the
-profile's `dot-claude/` directory over the real `~/.claude/` **at the kernel
-VFS layer**. Inside the namespace, the path is rewritten regardless of how
-the agent resolves it.
+`agent-box` enters a `bubblewrap` mount namespace and bind-mounts the profile's
+config directory over the agent's real config directory **at the kernel VFS
+layer**. Inside the namespace, the path is rewritten regardless of how the agent
+resolves it.
 
 ```
 ┌─────────────────────────────────────────────────────┐
@@ -170,7 +174,7 @@ the agent resolves it.
 │         ▲                                           │
 │         │ bind mount (bwrap)                        │
 │         │                                           │
-│  /home/user/.agent-box/profiles/dw/dot-claude/      │
+│  /home/user/.agent-box/profiles/decision/dot-claude/│
 │         (profile's settings.json, CLAUDE.md, ...)   │
 └─────────────────────────────────────────────────────┘
           │
@@ -180,31 +184,62 @@ the agent resolves it.
 │                                                     │
 │  --bind / /                                         │
 │  --bind <profile>/dot-claude   /home/user/.claude   │
-│  --bind <profile>/dot-claude.json  /home/user/.claude.json │
+│  --bind <profile>/dot-claude.json  /home/user/.claude.json   (CC only)
+│  --bind <profile>/dot-opencode-data  ~/.local/share/opencode (OpenCode only)
 │  --dev /dev --proc /proc --tmpfs /tmp               │
-│  --unshare-all --share-net                          │
-│  claude                                             │
+│  --unshare-ipc --unshare-pid --unshare-uts --share-net│
+│  <agent binary>                                     │
 │                                                     │
-│  ⇒ execvpe replaces our PID; CC inherits tty,       │
-│    signal handlers, Ctrl-C still works.             │
+│  ⇒ os.execvpe replaces our PID; the agent inherits  │
+│    the tty, signal handlers, Ctrl-C still works.     │
 └─────────────────────────────────────────────────────┘
 ```
 
 Key properties:
 
-- **Kernel-level isolation** — there is no way for the agent to read the host's real `~/.claude/` from inside the namespace.
-- **PID/tty preserved** — `os.execvpe` replaces our process with `bwrap`, which execs `claude`. The terminal session is unchanged; Ctrl-C still goes to CC.
-- **Network shared** (`--share-net`) — the agent needs API access to Anthropic/DeepSeek/MiniMax.
-- **Template / profile split** — `init-template` reads the host's real `~/.claude/` **once** and strips secrets (`env`, `permissions`, `_marker`); `create` only copies from the template. The host's real config is never written to after that.
-- **No `os.chdir` hack** — `--cwd` on `agent-box cc` is honored by `os.chdir` in the parent process before `execvpe`, so the agent sees the right project root.
-- **API key injection** — `settings.json`'s `env` block is overlaid onto the bwrap child environment, with placeholders (`sk-REPLACE_ME`, empty strings) skipped to force the user to fix them.
+- **Kernel-level isolation** — there is no way for the agent to read the host's
+  real config dir from inside the namespace.
+- **PID/tty preserved** — `os.execvpe` replaces our process with `bwrap`, which
+  execs the agent. The terminal session is unchanged; Ctrl-C still goes to the
+  agent.
+- **Network shared** (`--share-net`) — the agent needs API access.
+- **Credentials live in the profile** — API keys sit in the profile's own
+  `settings.json` / `auth.json` / `.env`, which the agent reads from *inside*
+  the namespace. `agent-box` does not inject or rewrite them; it just makes
+  sure the agent sees the profile's copy, not the host's.
+- **Template / profile split** — templates ship in the package
+  (`src/agent_box/templates/<type>/`) as empty-key placeholders; `create` copies
+  a template into a profile. The host's real config dir is never written to.
+- **Per-agent-type extras** — CC also bind-mounts `dot-claude.json` →
+  `~/.claude.json`; OpenCode also bind-mounts its secondary data dir
+  (`dot-opencode-data` → `~/.local/share/opencode`) so `auth.json` is isolated
+  too.
 
-### v1 vs v2
+### Presets
 
-| Version | Mechanism               | Defeatable by `os.userInfo().homedir`? | Result             |
-| ------- | ----------------------- | :------------------------------------: | ------------------ |
-| v1      | `HOME=<profile> claude` |                 ✅ Yes                 | Partial isolation  |
-| v2      | `bwrap` bind mount      |                 ❌ No                  | **Full isolation** |
+A preset is a directory (`src/agent_box/presets/<type>/<name>/`) shipping
+optional `CLAUDE.md`, `hooks/hooks.json`, and `settings.overlay.json`. On
+`create --preset`, the preset's `CLAUDE.md` and hooks are copied in, and the
+settings overlay is **deep-merged** onto the template's `settings.json` —
+overlay wins on conflicts, but sibling keys are preserved (so a preset's
+`permissions.allow` does not clobber the template's `permissions.deny`). The
+chosen preset is recorded in `meta.yaml`.
+
+---
+
+## Windows Desktop GUI
+
+The CLI runs in WSL; the optional Windows desktop GUI (`gui-redesign.py` →
+`gui/app.py`, built on [CustomTkinter](https://github.com/TomSchimansky/CustomTkinter))
+lets you manage profiles from Windows: create, list, inspect, and edit each
+profile's raw config files (settings, hooks, auth, CLAUDE.md) across all four
+agent types, with a cc-switch / shadcn-Zinc design system and dark/light themes.
+
+It communicates with WSL via `wsl.exe`, so the CLI and bwrap isolation do the
+real work — the GUI is a convenience layer over the same profile tree.
+
+Launchers: `launch-gui.bat` / `launch-gui.ps1` (project root), or a desktop
+shortcut.
 
 ---
 
@@ -212,97 +247,117 @@ Key properties:
 
 ```
 agent-box/
-├── agent-box                       # launcher shim (direct exec from source)
-├── pyproject.toml                  # setuptools + console_script entry point
+├── pyproject.toml                  # setuptools + console_script + [gui]/[dev] extras
 ├── LICENSE                         # MIT
-├── README.md
+├── README.md  /  README_CN.md
 ├── .gitignore
 │
 ├── src/agent_box/                  # the package (zero runtime deps)
-│   ├── __init__.py
 │   ├── cli.py                      # argparse, subcommand dispatch
-│   ├── config.py                   # path resolution, name validation
-│   ├── providers.py                # provider → env block table
-│   ├── profile.py                  # init-template / create / list / show / delete
+│   ├── config.py                   # AGENT_BOX_HOME resolution, path + name validation
+│   ├── library.py                  # agent-type registry (templates, presets, binary, dirs)
+│   ├── profile.py                  # create / list / show / delete, meta IO, preset apply, _deep_merge
 │   ├── edit.py                     # $EDITOR launcher
-│   └── launch.py                   # bwrap argv construction + execvpe
+│   ├── launch.py                   # bwrap argv construction + execvpe
+│   ├── templates/<type>/           # shipped agent config templates (empty-key placeholders)
+│   └── presets/<type>/<name>/      # shipped presets (CLAUDE.md, hooks.json, settings.overlay.json)
 │
-├── docs/
-│   ├── REQUIREMENTS.md             # v1 design rationale
-│   ├── IMPLEMENTATION.md           # full design + research notes
-│   └── specs/
-│       ├── mvp-implementation.md
-│       ├── v2-bwrap-implementation.md
-│       └── v2-bwrap-rewrite.md     # canonical v2 spec
+├── gui/                            # Windows desktop GUI (CustomTkinter) — [gui] extra
+│   ├── app.py  tokens.py  theme.py  state.py  data.py  config.py
+│   ├── pages/  components/
 │
-└── (runtime, on the host, not in repo)
-    ~/.agent-box/
-    ├── template/                   # produced by `init-template`
-    │   ├── dot-claude/             #    settings.json + skills/ symlink
-    │   └── dot-claude.json         #    onboarding placeholder
-    └── profiles/<name>/
-        ├── meta.yaml               #    name, agent_type, provider
-        ├── dot-claude/             #    settings.json + CLAUDE.md + projects/
-        └── dot-claude.json         #    onboarding placeholder
+├── tests/                          # regression spine (WS7) — [dev] extra
+└── docs/
+    ├── ARCHITECTURE.md  ROADMAP.md
+    ├── specs/  troubleshooting/  planning/
+```
+
+### Runtime layout (on the host, not in repo)
+
+```
+~/.agent-box/                       # or $AGENT_BOX_HOME
+└── profiles/<name>/
+    ├── meta.yaml                   # name, agent_type, (+ display_name/description/provider/preset)
+    ├── dot-claude/                 # the config dir bwrap bind-mounts (CC)
+    ├── dot-claude.json             # → ~/.claude.json  (CC only)
+    └── dot-<type>/                 # dot-codex / dot-hermes / dot-opencode
+    └── dot-<type>-data/            # secondary data dir (OpenCode: dot-opencode-data → ~/.local/share/opencode)
 ```
 
 ### Source map
 
-| File           | Responsibility                                              |
-| -------------- | ----------------------------------------------------------- |
-| `cli.py`       | argparse tree; one `cmd_*` per subcommand                   |
-| `config.py`    | `$AGENT_BOX_HOME` resolution, path helpers, name validation |
-| `providers.py` | Per-provider base URL / model / tier env block table        |
-| `profile.py`   | `init-template`, `create`, `list`, `show`, `delete`         |
-| `edit.py`      | `subprocess.Popen([$EDITOR, path])`                         |
-| `launch.py`    | `build_bwrap_argv`, `build_child_env`, `os.execvpe`         |
+| File | Responsibility |
+| --- | --- |
+| `cli.py` | argparse tree; one `cmd_*` per subcommand |
+| `config.py` | `$AGENT_BOX_HOME` resolution, path helpers, name validation |
+| `library.py` | agent-type registry: config dir, binary, data dir, templates, presets |
+| `profile.py` | `create`, `list`, `show`, `delete`, meta IO, `_apply_preset`, `_deep_merge` |
+| `edit.py` | open a profile's config dir in `$EDITOR` |
+| `launch.py` | `launch`: build bwrap argv + `os.execvpe` |
 
 ---
 
 ## Design Principles
 
-- **Zero Python runtime dependencies** — stdlib only. `bwrap` and `claude` are
-  system dependencies, not Python dependencies.
-- **No database** — profiles are a directory tree; the filesystem is the
-  source of truth.
-- **Don't modify the agent** — `agent-box` is a launcher, not a wrapper. CC is
-  unchanged; we only change what it sees.
-- **Don't write to the host's real `~/.claude/`** — `init-template` is the
-  only code that ever reads it, and only to produce the template.
-- **Human-editable profiles** — every file in a profile is a plain JSON /
+- **Zero Python runtime dependencies** (CLI) — stdlib only. `bwrap` and the
+  agent CLIs are system dependencies, not Python dependencies.
+- **No database** — profiles are a directory tree; the filesystem is the source
+  of truth.
+- **Don't modify the agent** — `agent-box` is a launcher, not a wrapper. The
+  agent is unchanged; we only change what it sees.
+- **Don't write to the host's real config dir** — `create` only copies from
+  shipped templates. The host's real `~/.claude/` etc. is never written to.
+- **Human-editable profiles** — every file in a profile is a plain JSON / TOML /
   YAML / Markdown document. The CLI is a convenience, not a cage.
 - **One install, N identities** — the cost of adding a new identity is one
   `agent-box create` command.
 
 ---
 
-## Phase 2 (not yet implemented)
+## Roadmap
 
-- tmux layout integration (multi-agent panels in one terminal)
-- NiceGUI web profile editor
-- Session history tracking
-- Import/export profiles
-- Knowledge-base MCP sharing layer
+**v0.4.0 (current):** 4-agent launch + bwrap isolation, presets pipeline,
+Windows GUI with raw-config editing, shipped template corrections, regression
+test spine.
+
+**Next:**
+- Structured config forms in the GUI (on top of raw editing)
+- Team mode — multi-agent tmux orchestration
+- Session history management
+- Profile import/export
+- PyPI release
+
+**Explicitly not building:** a web frontend. agent-box is a lightweight WSL
+tool; a web stack adds disproportionate complexity for no isolation gain.
 
 ---
 
 ## Development
 
 ```bash
+# Editable install with dev + gui extras
+pip install -e .[dev,gui]
+
 # Run from a source checkout without installing
-./agent-box --help
-
-# Editable install
-pip install -e .
-
-# Run a single subcommand directly
 python -m agent_box.cli list
+
+# Run the GUI
+python gui-redesign.py
 ```
 
 ### Testing
 
-There is no test suite in v0.1.0. The MVP is verified manually via the spec
-acceptance checklist (`docs/specs/v2-bwrap-rewrite.md` §验收).
+```bash
+pip install -e .[dev]
+pytest -q
+```
+
+The suite is hermetic: tests point `AGENT_BOX_HOME` at a tmp directory and
+monkeypatch `os.execvpe` / `shutil.which` / `subprocess.run`, so no real bwrap,
+no real `wsl.exe`, and the real `~/.agent-box` is never touched. Covers meta
+round-trip + back-compat, profile lifecycle, `_deep_merge` (preset overlay
+regression), library registry, launch argv construction, wsl base64 round-trip +
+shell-quoting, and preset resolution.
 
 ---
 
