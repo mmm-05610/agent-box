@@ -42,9 +42,55 @@ MODE_RESUME = "继续上次"
 LAUNCH_MODES = (MODE_NEW, MODE_RESUME)
 
 
+# Cached result of resolve_profile_root() — shells WSL once per process.
+_PROFILE_ROOT_CACHE: Optional[str] = None
+
 # ---------------------------------------------------------------------------
 # WSL subprocess calls
 # ---------------------------------------------------------------------------
+
+def resolve_profile_root() -> str:
+    """Return the WSL-side absolute path to the profiles directory.
+
+    Asks WSL once (uses the CLI's own ``agent_box.config.profiles_dir`` so
+    ``AGENT_BOX_HOME`` is honored exactly like the CLI does). Caches the
+    result for the lifetime of this Python process.
+    """
+    global _PROFILE_ROOT_CACHE
+    if _PROFILE_ROOT_CACHE is not None:
+        return _PROFILE_ROOT_CACHE
+
+    wsl = shutil.which("wsl.exe")
+    if wsl is None:
+        raise RuntimeError("wsl.exe not found in PATH (install WSL).")
+
+    kwargs: Dict[str, Any] = {}
+    if sys.platform == "win32":
+        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+
+    try:
+        proc = subprocess.run(
+            [wsl, "bash", "-lc",
+             'python3 -c "from agent_box.config import profiles_dir; print(profiles_dir())"'],
+            capture_output=True,
+            timeout=15,
+            cwd="C:\\",
+            **kwargs,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError("wsl.exe profile-root lookup timed out") from exc
+    except OSError as exc:
+        raise RuntimeError(f"failed to invoke wsl.exe: {exc}") from exc
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f"profile-root lookup failed: {proc.stderr.decode(errors='replace').strip()}"
+        )
+    root = proc.stdout.decode(errors="replace").strip()
+    if not root:
+        raise RuntimeError("profile-root lookup returned empty path")
+    _PROFILE_ROOT_CACHE = root
+    return root
+
 
 def fetch_profiles() -> List[Dict[str, str]]:
     """Return profiles from ``wsl.exe agent-box list --json``.
@@ -334,6 +380,7 @@ __all__ = [
     "fetch_profiles",
     "launch_profile",
     "read_file",
+    "resolve_profile_root",
     "save_file",
     "to_wsl_path",
 ]

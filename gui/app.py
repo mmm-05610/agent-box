@@ -30,17 +30,20 @@ from .pages import (
 from .state import cleanup_stale_sessions, fetch_sessions
 from .theme import C, Theme
 from .tokens import FONT_MICRO, SPACE_LG
-from .wsl import MODE_RESUME, create_profile, fetch_profiles, launch_profile
+from .wsl import (
+    MODE_RESUME,
+    create_profile,
+    fetch_profiles,
+    launch_profile,
+    resolve_profile_root,
+)
 
 
 # Maximum number of page instances kept in the cache. Older pages are
 # discarded when the cap is exceeded (LRU).
 _PAGE_CACHE_CAP = 5
 
-# All paths are WSL-side paths with forward slashes.
-# The GUI runs on Windows for rendering, but all config operations
-# happen in WSL. We use a string to preserve forward slashes.
-_PROFILE_ROOT_STR = "/home/maoqh/.agent-box/profiles"
+# Profile root is resolved lazily from WSL at runtime (see gui.wsl.resolve_profile_root).
 
 # Agent type → config directory name mapping
 AGENT_CONFIG_DIR = {
@@ -178,7 +181,7 @@ class AgentBoxApp:
             )
             agent_type = profile.get("agent_type", "cc")
             config_dir = AGENT_CONFIG_DIR.get(agent_type, "dot-claude")
-            profile_root = _PROFILE_ROOT_STR + "/" + name
+            profile_root = resolve_profile_root() + "/" + name
             config_root = profile_root + "/" + config_dir
             def _on_detail_delete(_name: str = name) -> None:
                 self._invalidate_pages([f"detail:{_name}"])
@@ -336,7 +339,7 @@ class AgentBoxApp:
         claude_md = payload.get("claude_md") or ""
         write_claude_md = bool(claude_md) and agent_type == "cc"
         claude_md_wsl_path = (
-            f"{_PROFILE_ROOT_STR}/{name}/dot-claude/CLAUDE.md"
+            f"{resolve_profile_root()}/{name}/dot-claude/CLAUDE.md"
             if write_claude_md else ""
         )
 

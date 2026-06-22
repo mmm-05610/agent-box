@@ -4,16 +4,40 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agent-box"
-version = "0.1.0"
-description = "Isolated HOME launcher for coding agents (Claude Code MVP)"
+version = "0.4.0"
+description = "Isolated config launcher for coding agents (Claude Code / Codex / Hermes / OpenCode)"
+readme = "README.md"
 requires-python = ">=3.9"
+license = {text = "MIT"}
+keywords = ["claude-code", "codex", "agent", "sandbox", "bwrap", "wsl"]
+authors = [{name = "agent-box"}]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Testing",
+]
 dependencies = []
 
+[project.urls]
+Homepage = "https://github.com/mmm-05610/agent-box"
+Repository = "https://github.com/mmm-05610/agent-box"
+
 [project.optional-dependencies]
-gui = ["nicegui>=2.0"]
+gui = ["customtkinter>=5.2"]
+dev = ["pytest>=7"]
 
 [project.scripts]
 agent-box = "agent_box.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+agent_box = ["templates/**", "presets/**"]
