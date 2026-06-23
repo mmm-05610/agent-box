@@ -68,6 +68,10 @@ npm install -g @anthropic-ai/claude-code   # Claude Code
 
 ## Quick Start
 
+<p align="center">
+  <img src="GUI截图.png" alt="agent-box GUI screenshot" width="720">
+</p>
+
 ### GUI (Windows)
 
 1. Install from the [latest release](https://github.com/mmm-05610/agent-box/releases)

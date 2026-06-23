@@ -14,18 +14,33 @@
 
 ---
 
-## 这是什么
+## 解决什么问题
 
-`claude` 或 `codex` 启动时从 `~/.claude/`、`~/.codex/` 读取配置。如果你有多个客户、多个
-Provider、或多套提示词策略，每次切换都得手动改文件。
+你用 `claude` 或 `codex` 时，Agent 自动从 `~/.claude/`、`~/.codex/` 读取 API Key、
+Provider、权限等配置。**这是单身份的——一套配置走天下。**
 
-**agent-box 给每个身份一个独立的 profile。** 启动时通过 bwrap bind-mount 将 profile 挂载到 Agent 的真实配置目录上（内核 VFS 层）。Agent 只能看到自己的世界——配置不泄漏，凭证不串台。
+当你同时面临三种场景：
+
+- 🏢 **项目 A**：公司内部项目，用 DeepSeek，Prompt 风格偏保守
+- 🤝 **项目 B**：甲方外包，用 Anthropic 官方 Key，Prompt 需要详细输出
+- 🔬 **项目 C**：个人实验，用 OpenRouter 中转，权限全开
+
+**没有 agent-box 的日常：** 每次切项目 → 手动改 `settings.json` → 祈祷别忘记 →
+改完忘记换回来 → A 项目的代码跑到了 B 客户的账单上 → 崩溃。
+
+`HOME=...` 环境变量？Agent 内部会绕过它。 Docker？太重，终端交互割裂。
+
+**agent-box 怎么做：** 每个身份一个 profile。启动时通过 bwrap **内核级 bind-mount**，
+把 profile 的配置目录覆盖到 Agent 看到的路径上。Agent 以为自己在独享整套配置，
+实际上每个 profile 完全隔离——就像三个不同的机器。
 
 ```
-agent-box cc dev          # Claude Code + DeepSeek
-agent-box cc architect    # Claude Code + Anthropic — 同一台机器，互不干扰
-agent-box codex builder   # Codex 身份，并行终端
+agent-box cc project-a    # DeepSeek，保守风格
+agent-box cc project-b    # Anthropic，详细输出
+agent-box cc project-c    # OpenRouter，自由实验
 ```
+
+三条命令，零手动切换。终端、Ctrl-C、信号全部正常——`os.execvpe` 原地接管进程。
 
 ---
 
@@ -61,6 +76,10 @@ npm install -g @anthropic-ai/claude-code   # Claude Code
 ---
 
 ## 快速上手
+
+<p align="center">
+  <img src="GUI截图.png" alt="agent-box GUI" width="720">
+</p>
 
 ### GUI（Windows）
 
