@@ -6,7 +6,6 @@
 #define MyAppPublisher "mmm-05610"
 #define MyAppURL "https://github.com/mmm-05610/agent-box"
 #define MyAppExeName "agent-box-gui.exe"
-#define MyAppOutputName "agent-box-setup-{#MyAppVersion}"
 
 [Setup]
 AppId={{9B3F8C72-A5E2-4D11-B7C8-F3A2E9D1B064}
@@ -21,7 +20,7 @@ DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
 ; LicenseFile=LICENSE
 OutputDir=dist
-OutputBaseFilename={#MyAppOutputName}
+OutputBaseFilename=agent-box-setup-0.4.0
 SetupIconFile=logo.ico
 Compression=lzma2/max
 SolidCompression=yes
@@ -32,7 +31,6 @@ PrivilegesRequiredOverridesAllowed=dialog
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
-Name: "chinesesimplified"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Shortcuts:"; Flags: checkablealone
