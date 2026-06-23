@@ -157,5 +157,5 @@ def test_save_file_failure_raises_runtime_error(monkeypatch):
     monkeypatch.setattr("gui.wsl.subprocess.run",
                         lambda *a, **kw: _FakeProc(returncode=2, stderr=b"boom"))
 
-    with pytest.raises(RuntimeError, match="save_file failed"):
+    with pytest.raises(RuntimeError, match="wsl command failed"):
         save_file("/p/x", "data")

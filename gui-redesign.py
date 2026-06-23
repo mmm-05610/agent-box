@@ -19,7 +19,7 @@ Stability notes
 2. **Writes errors to a log file** when stderr isn't visible. pythonw
    is windowless, so any exception during launch would otherwise be
    completely invisible. The log lives next to this script as
-   ``gui-redesign-launch.log`` and is overwritten on each run.
+   ``logs/gui-redesign-launch.log`` and is overwritten on each run.
 """
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ from pathlib import Path
 
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
-_LOG_PATH = _SCRIPT_DIR / "gui-redesign-launch.log"
+_LOG_PATH = _SCRIPT_DIR / "logs" / "gui-redesign-launch.log"
 
 
 def _log(msg: str) -> None:
@@ -97,8 +97,13 @@ except Exception:
     pass
 
 try:
-    _app = _bootstrap()
-    main = _app.main
+    if getattr(sys, "frozen", False):
+        # pyinstaller — UNC workaround unnecessary, files are local.
+        import gui.app as _app_mod
+        main = _app_mod.main
+    else:
+        _app = _bootstrap()
+        main = _app.main
     _log("shim ready; main is callable")
 except BaseException as exc:
     # Catch BaseException (not just Exception) so KeyboardInterrupt and
@@ -109,10 +114,14 @@ except BaseException as exc:
 
     # Best-effort: write a clear message to stderr too, in case the
     # log write fails or the launcher is capturing stderr.
-    sys.stderr.write(
-        f"\n[agent-box] Failed to launch GUI: {type(exc).__name__}: {exc}\n"
-        f"  See {_LOG_PATH} for the full traceback.\n"
-    )
+    try:
+        if sys.stderr is not None:
+            sys.stderr.write(
+                f"\n[agent-box] Failed to launch GUI: {type(exc).__name__}: {exc}\n"
+                f"  See {_LOG_PATH} for the full traceback.\n"
+            )
+    except Exception:
+        pass
     raise
 
 

@@ -10,6 +10,17 @@ def test_get_agent_types():
     assert set(types) == {"cc", "codex", "hermes", "opencode"}
 
 
+def test_get_agent_config_known():
+    info = library.get_agent_config("cc")
+    assert info is not None
+    assert info["config_dir"] == "~/.claude"
+    assert info["binary"] == "claude"
+
+
+def test_get_agent_config_unknown():
+    assert library.get_agent_config("nope") is None
+
+
 def test_get_template_dir_known():
     for t in ("cc", "codex", "hermes", "opencode"):
         d = library.get_template_dir(t)

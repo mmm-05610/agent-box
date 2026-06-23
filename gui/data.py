@@ -105,10 +105,6 @@ def get_profile_data(profile_root, agent_type: str) -> Dict[str, Any]:
         result["provider"] = meta_provider or reader.get_provider()
         result["model"] = reader.get_model()
 
-        # Debug
-        import sys
-        print(f"[DATA] provider={result['provider']}, model={result['model']}", file=sys.stderr)
-
         # ----------------------------------------------------------------
         # Preload raw config + hooks text (all wsl reads happen here, off
         # the UI thread).  Same mechanism as CCConfig.read_claude_md.

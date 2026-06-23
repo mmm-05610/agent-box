@@ -1,7 +1,8 @@
-"""Settings page — theme switcher and WSL info."""
+"""Settings page — theme, environment info, and health re-check."""
 from __future__ import annotations
 
 import shutil
+from tkinter import messagebox
 from typing import Callable
 
 import customtkinter as ctk
@@ -19,70 +20,50 @@ from ..tokens import (
     SPACE_2XL,
     SPACE_LG,
     SPACE_MD,
-    SPACE_SM,
-    SPACE_XL,
 )
 
 
 class SettingsPage(ctk.CTkFrame):
-    """Theme switcher + WSL info + about panel."""
+    """Theme switcher + environment info + health re-check."""
 
-    def __init__(self, master,
-                 on_theme_change: Callable[[], None]):
+    def __init__(self, master, on_theme_change: Callable[[], None]):
         super().__init__(master, fg_color=C("bg"), corner_radius=0)
         self._on_theme_change = on_theme_change
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
 
-        # Title block
+        # Title
         title_block = ctk.CTkFrame(self, fg_color="transparent")
         title_block.grid(row=0, column=0, sticky="ew",
                          padx=SPACE_2XL, pady=(SPACE_2XL, SPACE_LG))
-        title_block.grid_columnconfigure(0, weight=1)
-
         title = ctk.CTkLabel(
             title_block, text="Settings", text_color=C("fg"),
             font=FONT_DISPLAY, anchor="w",
         )
         title.grid(row=0, column=0, sticky="w")
 
-        subtitle = ctk.CTkLabel(
-            title_block, text="App preferences and WSL configuration",
-            text_color=C("fg_muted"), font=FONT_CAPTION, anchor="w",
-        )
-        subtitle.grid(row=1, column=0, sticky="w", pady=(2, 0))
-
         body = ctk.CTkScrollableFrame(self, fg_color=C("bg"), corner_radius=0)
         body.grid(row=1, column=0, sticky="nsew",
                   padx=SPACE_2XL, pady=(0, SPACE_LG))
         body.grid_columnconfigure(0, weight=1)
 
-        # Section: Appearance
-        sec1 = ctk.CTkLabel(
-            body, text="APPEARANCE", text_color=C("fg_subtle"),
-            font=FONT_MICRO, anchor="w",
-        )
-        sec1.grid(row=0, column=0, sticky="ew", pady=(0, 8))
-
-        ap_card = ctk.CTkFrame(
-            body, fg_color=C("bg_elevated"), corner_radius=RADIUS_LG,
-            border_width=1, border_color=C("border"),
-        )
-        ap_card.grid(row=1, column=0, sticky="ew", pady=(0, SPACE_XL))
-        ap_card.grid_columnconfigure(1, weight=1)
-
+        # ----------------------------------------------------------------
+        # Appearance
+        # ----------------------------------------------------------------
+        self._section_label(body, 0, "APPEARANCE")
+        card = self._card(body, 1)
         theme_lbl = ctk.CTkLabel(
-            ap_card, text="Theme", text_color=C("fg"),
-            font=FONT_BODY, anchor="w",
+            card, text="Theme", text_color=C("fg"), font=FONT_BODY, anchor="w",
         )
         theme_lbl.grid(row=0, column=0, padx=SPACE_LG, pady=SPACE_LG, sticky="w")
 
-        theme_var = ctk.StringVar(value=Theme.current_mode().title() or "System")
+        mode = Theme.current_mode()
+        theme_var = ctk.StringVar(value=mode.title())
         theme_menu = ctk.CTkOptionMenu(
-            ap_card, variable=theme_var,
-            values=["System", "Dark", "Light"],
-            width=130, height=32, corner_radius=RADIUS_MD,
+            card, variable=theme_var,
+            values=["Dark", "Light", "System"],
+            width=120, height=32, corner_radius=RADIUS_MD,
             fg_color=C("bg_elevated_2"), button_color=C("bg_hover"),
             button_hover_color=C("bg_active"),
             text_color=C("fg"), dropdown_text_color=C("fg"),
@@ -93,56 +74,115 @@ class SettingsPage(ctk.CTkFrame):
         )
         theme_menu.grid(row=0, column=1, padx=SPACE_LG, pady=SPACE_LG, sticky="e")
 
-        # Section: WSL
-        sec2 = ctk.CTkLabel(
-            body, text="WSL", text_color=C("fg_subtle"),
-            font=FONT_LABEL, anchor="w",
-        )
-        sec2.grid(row=2, column=0, sticky="ew", pady=(0, SPACE_SM))
+        # ----------------------------------------------------------------
+        # Environment
+        # ----------------------------------------------------------------
+        env_info = self._env_info()
 
-        wsl_card = ctk.CTkFrame(
-            body, fg_color=C("bg_elevated"), corner_radius=RADIUS_LG,
+        row = 2
+        for _label, _value in env_info:
+            if _label == "—":  # section separator
+                row += 1
+                continue
+            self._section_label(body, row, _label)
+            row += 1
+            c = self._card(body, row)
+            val = ctk.CTkLabel(
+                c, text=_value, text_color=C("fg_muted"),
+                font=FONT_MONO_SMALL, anchor="w",
+            )
+            val.grid(row=0, column=0, padx=SPACE_LG, pady=SPACE_MD, sticky="w")
+            row += 1
+
+        # ----------------------------------------------------------------
+        # Health re-check button
+        # ----------------------------------------------------------------
+        row += 1
+        recheck = ctk.CTkButton(
+            body, text="重新检查环境", font=FONT_CAPTION,
+            fg_color=C("bg_elevated_2"), hover_color=C("bg_active"),
+            text_color=C("fg"), corner_radius=RADIUS_MD,
+            height=32, command=self._recheck,
+        )
+        recheck.grid(row=row, column=0, sticky="w", pady=(SPACE_LG, 0))
+
+    # ------------------------------------------------------------------
+    # helpers
+    # ------------------------------------------------------------------
+
+    def _section_label(self, parent, row: int, text: str) -> None:
+        lbl = ctk.CTkLabel(
+            parent, text=text.upper(), text_color=C("fg_subtle"),
+            font=FONT_MICRO, anchor="w",
+        )
+        lbl.grid(row=row, column=0, sticky="ew", pady=(SPACE_LG, SPACE_MD))
+
+    def _card(self, parent, row: int) -> ctk.CTkFrame:
+        card = ctk.CTkFrame(
+            parent, fg_color=C("bg_elevated"), corner_radius=RADIUS_LG,
             border_width=1, border_color=C("border"),
         )
-        wsl_card.grid(row=3, column=0, sticky="ew", pady=(0, SPACE_XL))
-        wsl_card.grid_columnconfigure(1, weight=1)
+        card.grid(row=row, column=0, sticky="ew", pady=(0, SPACE_MD))
+        card.grid_columnconfigure(0, weight=1)
+        return card
 
-        wsl_path = shutil.which("wsl.exe") or "(wsl.exe not found)"
-        wsl_lbl = ctk.CTkLabel(
-            wsl_card, text="wsl.exe", text_color=C("fg"),
-            font=FONT_BODY, anchor="w",
-        )
-        wsl_lbl.grid(row=0, column=0, padx=SPACE_LG, pady=SPACE_LG, sticky="w")
+    def _env_info(self):
+        from ..wsl import resolve_profile_root, _wsl_try_output, _wsl_check_output
 
-        wsl_val = ctk.CTkLabel(
-            wsl_card, text=wsl_path, text_color=C("fg_muted"),
-            font=FONT_MONO_SMALL, anchor="e",
-        )
-        wsl_val.grid(row=0, column=1, padx=SPACE_LG, pady=SPACE_LG, sticky="e")
+        info = []
 
-        # Section: About
-        sec3 = ctk.CTkLabel(
-            body, text="ABOUT", text_color=C("fg_subtle"),
-            font=FONT_LABEL, anchor="w",
-        )
-        sec3.grid(row=4, column=0, sticky="ew", pady=(0, SPACE_SM))
+        # Agent Box
+        try:
+            ver = _wsl_check_output("agent-box --version", timeout=10)
+        except Exception:
+            ver = "(未安装)"
+        info.append(("AGENT-BOX", f"CLI v{ver}"))
 
-        about_card = ctk.CTkFrame(
-            body, fg_color=C("bg_elevated"), corner_radius=RADIUS_LG,
-            border_width=1, border_color=C("border"),
-        )
-        about_card.grid(row=5, column=0, sticky="ew", pady=(0, SPACE_LG))
+        try:
+            root = resolve_profile_root()
+        except Exception:
+            root = "(不可用)"
+        info.append(("PROFILE ROOT", root))
 
-        about_lbl = ctk.CTkLabel(
-            about_card,
-            text="agent-box — isolated config launcher for AI agents\n"
-                 "Stage A (visual rebuild) · CustomTkinter · Slate Indigo theme\n"
-                 "See docs/specs/gui-redesign-p1.md and gui-redesign-p2.md",
-            text_color=C("fg_muted"), font=FONT_CAPTION,
-            justify="left", anchor="w",
-        )
-        about_lbl.pack(anchor="w", padx=SPACE_LG, pady=SPACE_LG)
+        # WSL
+        wsl_path = shutil.which("wsl.exe") or "C:\\Windows\\System32\\wsl.exe"
+        info.append(("WSL", wsl_path))
+
+        bw = _wsl_try_output("which bwrap && bwrap --version", timeout=10)
+        if bw:
+            # "which bwrap && bwrap --version" outputs two lines
+            lines = bw.strip().splitlines()
+            bw_path = lines[0] if lines else "?"
+            bw_ver = lines[1] if len(lines) > 1 else ""
+            info.append(("BWRAP", f"{bw_path}    {bw_ver}"))
+        else:
+            info.append(("BWRAP", "(未安装)"))
+
+        # Python
+        py = _wsl_try_output("python3 --version", timeout=10)
+        info.append(("PYTHON", py or "(未安装)"))
+
+        return info
+
+    # ------------------------------------------------------------------
+    # actions
+    # ------------------------------------------------------------------
 
     def _change_theme(self, mode: str) -> None:
         Theme.set_mode(mode)
         self._on_theme_change()
+
+    def _recheck(self) -> None:
+        from ..wsl import health_check
+
+        try:
+            problems = health_check()
+        except Exception:
+            messagebox.showwarning("环境检查", "无法连接 WSL。")
+            return
+
+        if problems:
+            lines = "\n".join(f"  • {desc}" for desc, _ in problems)
+            messagebox.showwarning("环境检查", f"以下依赖缺失：\n\n{lines}")
+        else:
+            messagebox.showinfo("环境检查", "所有依赖正常，环境就绪。")

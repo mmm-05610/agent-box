@@ -10,7 +10,7 @@ from ..components.button import primary_button
 from ..components.card import Card
 from ..components.status import Badge, StatusPill
 from ..components.toast import ToastManager
-from ..state import fetch_sessions
+from ..wsl import fetch_sessions
 from ..theme import C
 from ..tokens import (
     FONT_BODY,

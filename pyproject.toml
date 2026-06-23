@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.9"
 license = {text = "MIT"}
 keywords = ["claude-code", "codex", "agent", "sandbox", "bwrap", "wsl"]
-authors = [{name = "agent-box"}]
+authors = [{name = "mmm-05610", email = "2760376727@qq.com"}]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",

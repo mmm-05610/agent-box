@@ -11,6 +11,12 @@ import sys
 
 from . import config
 from . import profile
+from . import sessions
+
+
+# Mode labels stored in sessions.db. The GUI uses the same strings.
+MODE_NEW = "新会话"
+MODE_RESUME = "继续上次"
 
 
 def launch(name: str, extra_args: list | None = None) -> None:
@@ -92,5 +98,13 @@ def launch(name: str, extra_args: list | None = None) -> None:
         f"(mount: {pdir} → {rdir})",
         file=sys.stderr,
     )
+
+    # Record the launch BEFORE execvpe replaces this process. bwrap
+    # inherits our PID, so the recorded pid matches the long-running
+    # namespace process. The GUI's watcher will later call
+    # `agent-box sessions --exit <id> <code>` to close the row.
+    mode = MODE_RESUME if extra_args else MODE_NEW
+    sessions.record_launch(name, agent_type, os.getcwd(), mode, os.getpid())
+
     os.execvpe(bwrap, argv, env)
     raise profile.ProfileError(f"failed to exec {bwrap}")

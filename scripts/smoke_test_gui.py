@@ -4,19 +4,17 @@ Run:  .venv/bin/python scripts/smoke_test_gui.py
 """
 from __future__ import annotations
 
-from gui.app import AgentBoxApp, main
+from agent_box import sessions
 from gui.theme import Theme, C
 from gui.tokens import (
     FONT_BODY, FONT_BOLD, FONT_CAPTION, FONT_DISPLAY,
     SPACE_LG, SPACE_MD, RADIUS_LG, BUTTON_HEIGHT, SIDEBAR_WIDTH,
 )
-from gui.state import init_db, fetch_sessions, record_launch, record_exit, latest_cwd_for
 from gui.wsl import (
     fetch_profiles, launch_profile, build_launch_argv, to_wsl_path,
     AGENT_ORDER, MODE_RESUME, MODE_NEW, LAUNCH_MODES, RESUME_ARGS,
+    fetch_sessions,
 )
-from gui.components import StatusPill, Badge, Divider, ToastManager, Sidebar, NAV_ITEMS
-from gui.pages import HomePage, ProfilesPage, ProfileRow, SessionsPage, SettingsPage, HelpPage
 
 
 def main() -> int:
@@ -42,14 +40,11 @@ def main() -> int:
     assert to_wsl_path("//wsl.localhost/Ubuntu/home/x") == "/home/x"
     print("to_wsl_path: PASS")
 
-    # SQLite schema
-    conn = init_db()
-    rows = conn.execute(
-        "SELECT name FROM sqlite_master WHERE type='table'"
-    ).fetchall()
-    tables = [r[0] for r in rows]
-    assert "sessions" in tables, f"sessions table missing: {tables}"
-    print(f"SQLite: PASS (tables={tables})")
+    # sessions module: insert + read
+    sid = sessions.record_launch("smoke", "cc", "/tmp", "新会话", 99999)
+    rows = fetch_sessions(active_only=True)
+    assert any(r["id"] == sid for r in rows), f"row {sid} not in active set"
+    print(f"sessions: PASS (sid={sid}, active={len(rows)})")
 
     # Resume args
     for at in AGENT_ORDER:
@@ -62,12 +57,15 @@ def main() -> int:
     assert "/tmp/test" in argv[-1], "cwd not in script"
     print("build_launch_argv: PASS")
 
-    # Latest cwd (empty before any launches)
-    assert latest_cwd_for("nonexistent") is None
+    # Latest cwd (empty before any launches for an unknown profile)
+    assert sessions.latest_cwd_for("nonexistent-profile-xyz") is None
     print("latest_cwd_for: PASS")
 
+    # Cleanup the test row
+    sessions.record_exit(sid, 0)
+
     print()
-    print("=== Phase 1.5 smoke test PASSED ===")
+    print("=== Smoke test PASSED ===")
     return 0
 
 

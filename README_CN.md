@@ -101,17 +101,19 @@ agent-box opencode alt
 
 ## 命令参考
 
-| 命令 | 作用 |
-| --- | --- |
-| `agent-box create <name> [--type <t>] [--preset <p>] [--provider <p>] [--display-name <s>] [--description <s>] [--claude-md <file>]` | 复制 Agent 类型的模板创建新 profile |
-| `agent-box list [--json]` | 列出所有 profile |
-| `agent-box show <name>` | 显示 profile 的元数据、路径及可选字段 |
-| `agent-box edit <name>` | 在 `$EDITOR` 中打开 profile 的配置目录 |
-| `agent-box presets [--type <t>] [--json]` | 列出自带预设 |
-| `agent-box launch <name> [extra...]` | 在 bwrap namespace 内启动 profile |
-| `agent-box cc \| codex \| hermes \| opencode <name> [extra...]` | 快捷方式：启动该类型的 profile |
-| `agent-box delete <name> [--force]` | 删除 profile |
-| `agent-box --help` | 完整 CLI 帮助 |
+| 命令                                                                                                                                 | 作用                                   |
+| ------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------- |
+| `agent-box create <name> [--type <t>] [--preset <p>] [--provider <p>] [--display-name <s>] [--description <s>] [--claude-md <file>]` | 复制 Agent 类型的模板创建新 profile    |
+| `agent-box list [--json]`                                                                                                            | 列出所有 profile                       |
+| `agent-box show <name>`                                                                                                              | 显示 profile 的元数据、路径及可选字段  |
+| `agent-box edit <name>`                                                                                                              | 在 `$EDITOR` 中打开 profile 的配置目录 |
+| `agent-box presets [--type <t>] [--json]`                                                                                            | 列出自带预设                           |
+| `agent-box launch <name> [extra...]`                                                                                                 | 在 bwrap namespace 内启动 profile      |
+| `agent-box cc \| codex \| hermes \| opencode <name> [extra...]`                                                                      | 快捷方式：启动该类型的 profile         |
+| `agent-box delete <name> [--force]`                                                                                                  | 删除 profile                           |
+| `agent-box sessions [--json] [--active] [--cleanup] [--exit <id> <code>]`                                                            | 查看/管理启动会话历史                  |
+| `agent-box --help`                                                                                                                   | 完整 CLI 帮助                          |
+| `agent-box --version`                                                                                                                | 打印版本号                             |
 
 profile 名之后的 `extra` 参数会透传给 Agent 二进制（如 `agent-box cc decision --resume`）。
 
@@ -189,7 +191,7 @@ CLI 在 WSL 中运行；可选的 Windows 桌面 GUI（`gui-redesign.py` → `gu
 
 它通过 `wsl.exe` 与 WSL 通信，所以真正的隔离工作仍由 CLI 和 bwrap 完成——GUI 只是同一棵 profile 树之上的便利层。
 
-启动器：`launch-gui.bat` / `launch-gui.ps1`（项目根），或桌面快捷方式。
+直接用 `python gui-redesign.py` 启动，或使用桌面快捷方式。
 
 ---
 
@@ -209,17 +211,18 @@ agent-box/
 │   ├── profile.py                  # create / list / show / delete、meta IO、预设应用、_deep_merge
 │   ├── edit.py                     # $EDITOR 启动
 │   ├── launch.py                   # bwrap argv 构造 + execvpe
+│   ├── sessions.py                 # 会话追踪（启动历史 SQLite）
 │   ├── templates/<type>/           # 自带 Agent 配置模板（空 key 占位符）
 │   └── presets/<type>/<name>/      # 自带预设（CLAUDE.md, hooks.json, settings.overlay.json）
 │
 ├── gui/                            # Windows 桌面 GUI（CustomTkinter）—— [gui] extra
-│   ├── app.py  tokens.py  theme.py  state.py  data.py  config.py
+│   ├── app.py  tokens.py  theme.py  data.py  config.py  wsl.py
 │   ├── pages/  components/
 │
 ├── tests/                          # 回归测试脊梁（WS7）—— [dev] extra
 └── docs/
-    ├── ARCHITECTURE.md  ROADMAP.md
-    ├── specs/  troubleshooting/  planning/
+    ├── ARCHITECTURE.md  ROADMAP.md  REQUIREMENTS.md
+    ├── specs/  troubleshooting/
 ```
 
 ### 运行时布局（在宿主上，不在仓库里）
@@ -236,14 +239,15 @@ agent-box/
 
 ### 源码地图
 
-| 文件 | 职责 |
-| --- | --- |
-| `cli.py` | argparse 树；每个子命令一个 `cmd_*` |
-| `config.py` | `$AGENT_BOX_HOME` 解析、路径辅助、名称校验 |
-| `library.py` | Agent 类型注册表：配置目录、二进制、数据目录、模板、预设 |
-| `profile.py` | `create`、`list`、`show`、`delete`、meta IO、`_apply_preset`、`_deep_merge` |
-| `edit.py` | 在 `$EDITOR` 中打开 profile 的配置目录 |
-| `launch.py` | `launch`：构造 bwrap argv + `os.execvpe` |
+| 文件          | 职责                                                                        |
+| ------------- | --------------------------------------------------------------------------- |
+| `cli.py`      | argparse 树；每个子命令一个 `cmd_*`                                         |
+| `config.py`   | `$AGENT_BOX_HOME` 解析、路径辅助、名称校验                                  |
+| `library.py`  | Agent 类型注册表：配置目录、二进制、数据目录、模板、预设                    |
+| `profile.py`  | `create`、`list`、`show`、`delete`、meta IO、`_apply_preset`、`_deep_merge` |
+| `sessions.py` | 会话追踪：记录启动/退出、查询历史、清理僵尸会话                             |
+| `edit.py`     | 在 `$EDITOR` 中打开 profile 的配置目录                                      |
+| `launch.py`   | `launch`：构造 bwrap argv + `os.execvpe`                                    |
 
 ---
 
@@ -263,6 +267,7 @@ agent-box/
 **v0.4.0（当前）：** 四 Agent 启动 + bwrap 隔离、预设管道、带原始配置编辑的 Windows GUI、模板修正、回归测试脊梁。
 
 **下一步：**
+
 - GUI 内结构化配置表单（在原始编辑之上）
 - Team 模式——多 Agent tmux 编排
 - 会话历史管理

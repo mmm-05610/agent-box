@@ -77,10 +77,10 @@ def load_meta(name: str) -> Dict[str, str]:
             f"{name}: meta.yaml name mismatch ({data['name']!r})."
         )
     # Optional v0.4 fields — forward/back compatible. Old profiles without
-    # them still load (just return None).
+    # them still load (empty string sentinel).
     for opt in ("display_name", "description", "provider", "preset"):
         if opt not in data:
-            data[opt] = None
+            data[opt] = ""
     return data
 
 
@@ -283,7 +283,7 @@ def show(name: str) -> Dict[str, Any]:
     # v0.4: surface optional meta fields at top level for `show` output.
     for k in ("display_name", "description", "provider", "preset"):
         v = meta.get(k)
-        if v is not None:
+        if v:
             info[k] = v
     return info
 

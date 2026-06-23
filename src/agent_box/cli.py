@@ -4,12 +4,14 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from typing import List, Optional
+from typing import Dict, List, Optional
 
+from . import __version__
 from . import config
 from . import launch
 from . import library
 from . import profile
+from . import sessions
 
 
 PROG = "agent-box"
@@ -19,6 +21,10 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog=PROG,
         description="Isolated config launcher for coding agents (bwrap bind mount).",
+    )
+    parser.add_argument(
+        "--version", action="version",
+        version=f"%(prog)s {__version__}",
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -109,6 +115,33 @@ def _build_parser() -> argparse.ArgumentParser:
     p_delete.add_argument("--force", action="store_true", help="Skip confirmation")
     p_delete.set_defaults(func=cmd_delete)
 
+    # sessions ----------------------------------------------------------
+    p_sessions = sub.add_parser(
+        "sessions",
+        help="List/manage recorded launch sessions",
+    )
+    p_sessions.add_argument(
+        "--json", action="store_true",
+        help="Emit sessions as JSON",
+    )
+    p_sessions.add_argument(
+        "--active", action="store_true",
+        help="Only show currently-running sessions (no exited_at/exit_code)",
+    )
+    p_sessions.add_argument(
+        "--cleanup", action="store_true",
+        help="Mark zombie sessions as exited and print the cleanup count",
+    )
+    p_sessions.add_argument(
+        "--exit", dest="exit_id", type=int, default=None, metavar="ID",
+        help="Record exit for session ID (used by the GUI watcher)",
+    )
+    p_sessions.add_argument(
+        "exit_code", type=int, nargs="?", default=None, metavar="CODE",
+        help="Exit code (with --exit)",
+    )
+    p_sessions.set_defaults(func=cmd_sessions)
+
     return parser
 
 
@@ -183,7 +216,7 @@ def cmd_show(args: argparse.Namespace) -> int:
     # v0.4: surface optional meta fields in plain `show` output.
     for k in ("display_name", "description", "provider", "preset"):
         v = info["meta"].get(k)
-        if v is not None:
+        if v:
             print(f"{k + ':':<11} {v}")
     return 0
 
@@ -242,6 +275,62 @@ def cmd_delete(args: argparse.Namespace) -> int:
         return 2
     if ok:
         print(f"deleted profile {args.name!r}")
+    return 0
+
+
+def cmd_sessions(args: argparse.Namespace) -> int:
+    # --exit ID CODE: record exit and return.
+    if args.exit_id is not None:
+        code = args.exit_code
+        if code is None:
+            print("agent-box: --exit requires an exit code", file=sys.stderr)
+            return 2
+        sessions.record_exit(args.exit_id, code)
+        print("ok")
+        return 0
+
+    # --cleanup: print count to stdout (pure integer) and return.
+    if args.cleanup:
+        n = sessions.cleanup_stale_sessions()
+        print(n)
+        return 0
+
+    # Otherwise: list sessions.
+    rows = sessions.fetch_sessions(active_only=args.active)
+
+    if args.json:
+        json.dump(rows, sys.stdout, indent=2, ensure_ascii=False)
+        sys.stdout.write("\n")
+        return 0
+
+    if not rows:
+        print("(no sessions)")
+        return 0
+
+    # Table layout: id, profile, agent_type, mode, pid, launched_at, [exited_at, exit_code]
+    id_w = max(len(str(r["id"])) for r in rows)
+    name_w = max(len(r["profile"]) for r in rows)
+    type_w = max(len(r["agent_type"]) for r in rows)
+    mode_w = max(len(r.get("mode") or "") for r in rows)
+    pid_w = max(len(str(r.get("pid") or "")) for r in rows)
+    launched_w = max(len(r.get("launched_at") or "") for r in rows)
+
+    header = (
+        f"{'ID':<{id_w}}  {'PROFILE':<{name_w}}  {'AGENT':<{type_w}}  "
+        f"{'MODE':<{mode_w}}  {'PID':<{pid_w}}  {'LAUNCHED':<{launched_w}}"
+    )
+    print(header)
+    for r in rows:
+        line = (
+            f"{r['id']:<{id_w}}  {r['profile']:<{name_w}}  "
+            f"{r['agent_type']:<{type_w}}  "
+            f"{(r.get('mode') or ''):<{mode_w}}  "
+            f"{str(r.get('pid') or ''):<{pid_w}}  "
+            f"{(r.get('launched_at') or ''):<{launched_w}}"
+        )
+        if not args.active and r.get("exited_at"):
+            line += f"  {r['exited_at']}  exit={r.get('exit_code')}"
+        print(line)
     return 0
 
 

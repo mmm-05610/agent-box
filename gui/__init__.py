@@ -5,8 +5,8 @@ Replaces the monolithic ``gui-redesign.py`` with a layered structure:
 - ``app``        — entry point + ``AgentBoxApp`` orchestrator
 - ``theme``      — color tokens (Slate Indigo, dark/light)
 - ``tokens``     — typography, spacing, radii, component sizes
-- ``state``      — SQLite session tracking
-- ``wsl``        — WSL subprocess wrapper, path conversion, launch flow
+- ``wsl``        — WSL subprocess wrapper, path conversion, launch flow,
+                   and CLI-side session tracking wrappers
 - ``components`` — reusable CustomTkinter widgets (button, card, status…)
 - ``pages``      — top-level views (home, profiles, sessions, …)
 

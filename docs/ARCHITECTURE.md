@@ -155,7 +155,7 @@ _AGENT_TYPES = {
 - 路径：`gui/`（CustomTkinter）。不是 `agent-box` 包的子模块，不通过
   `agent-box` CLI 启动。
 - 启动方式：Windows 上跑 `gui-redesign.py`；内部通过 `wsl.exe bash -lc
-  agent-box ...` 调 CLI 子命令（list / create / delete / launch）。
+agent-box ...` 调 CLI 子命令（list / create / delete / launch）。
 - 关键文件：
   - `gui/app.py` — 主窗口 + 路由（主页 / wizard / detail）
   - `gui/pages/detail.py` — 详情页：可编辑 tab + Ctrl+S + 脏页/陈旧检测

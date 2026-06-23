@@ -35,20 +35,11 @@ def profile_meta(name: str) -> Path:
 
 def agent_config_dir(agent_type: str) -> str:
     """Unexpanded config-dir path (e.g. '~/.codex')."""
-    try:
-        from . import library
-        info = library.get_agent_config(agent_type)
-        if info is not None:
-            return info["config_dir"]
-    except Exception:
-        pass
-    fallback = {
-        "cc":       "~/.claude",
-        "codex":    "~/.codex",
-        "hermes":   "~/.hermes",
-        "opencode": "~/.config/opencode",
-    }
-    return fallback.get(agent_type, f"~/.{agent_type}")
+    from . import library
+    info = library.get_agent_config(agent_type)
+    if info is None:
+        raise ValueError(f"Unknown agent type: {agent_type!r}")
+    return info["config_dir"]
 
 
 def real_agent_dir(agent_type: str) -> Path:
@@ -64,26 +55,20 @@ def profile_agent_dir(name: str, agent_type: str) -> Path:
 
 def agent_binary(agent_type: str) -> str:
     """The executable name for an agent type."""
-    try:
-        from . import library
-        info = library.get_agent_config(agent_type)
-        if info is not None:
-            return info["binary"]
-    except Exception:
-        pass
-    return {"cc": "claude", "codex": "codex", "hermes": "hermes", "opencode": "opencode"}.get(agent_type, agent_type)
+    from . import library
+    info = library.get_agent_config(agent_type)
+    if info is None:
+        raise ValueError(f"Unknown agent type: {agent_type!r}")
+    return info["binary"]
 
 
 def agent_data_dir(agent_type: str) -> Optional[str]:
     """Secondary data dir path, if any (e.g. OpenCode auth)."""
-    try:
-        from . import library
-        info = library.get_agent_config(agent_type)
-        if info is not None:
-            return info.get("data_dir")
-    except Exception:
-        pass
-    return None
+    from . import library
+    info = library.get_agent_config(agent_type)
+    if info is None:
+        raise ValueError(f"Unknown agent type: {agent_type!r}")
+    return info.get("data_dir")
 
 
 def real_agent_data_dir(agent_type: str) -> Optional[Path]:

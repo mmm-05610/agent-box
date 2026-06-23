@@ -117,17 +117,19 @@ other.
 
 ## Command Reference
 
-| Command | What it does |
-| --- | --- |
+| Command                                                                                                                              | What it does                                              |
+| ------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------- |
 | `agent-box create <name> [--type <t>] [--preset <p>] [--provider <p>] [--display-name <s>] [--description <s>] [--claude-md <file>]` | Create a new profile by copying the agent type's template |
-| `agent-box list [--json]` | List all profiles |
-| `agent-box show <name>` | Show a profile's metadata, paths, and optional fields |
-| `agent-box edit <name>` | Open a profile's config directory in `$EDITOR` |
-| `agent-box presets [--type <t>] [--json]` | List shipped presets |
-| `agent-box launch <name> [extra...]` | Launch a profile inside a bwrap namespace |
-| `agent-box cc \| codex \| hermes \| opencode <name> [extra...]` | Shortcut: launch a profile of that agent type |
-| `agent-box delete <name> [--force]` | Delete a profile |
-| `agent-box --help` | Full CLI help |
+| `agent-box list [--json]`                                                                                                            | List all profiles                                         |
+| `agent-box show <name>`                                                                                                              | Show a profile's metadata, paths, and optional fields     |
+| `agent-box edit <name>`                                                                                                              | Open a profile's config directory in `$EDITOR`            |
+| `agent-box presets [--type <t>] [--json]`                                                                                            | List shipped presets                                      |
+| `agent-box launch <name> [extra...]`                                                                                                 | Launch a profile inside a bwrap namespace                 |
+| `agent-box cc \| codex \| hermes \| opencode <name> [extra...]`                                                                      | Shortcut: launch a profile of that agent type             |
+| `agent-box delete <name> [--force]`                                                                                                  | Delete a profile                                          |
+| `agent-box sessions [--json] [--active] [--cleanup] [--exit <id> <code>]`                                                            | List/manage launch session history                        |
+| `agent-box --help`                                                                                                                   | Full CLI help                                             |
+| `agent-box --version`                                                                                                                | Print version                                             |
 
 `extra` args after the profile name are passed through to the agent binary
 (e.g. `agent-box cc decision --resume`).
@@ -204,7 +206,7 @@ Key properties:
   agent.
 - **Network shared** (`--share-net`) — the agent needs API access.
 - **Credentials live in the profile** — API keys sit in the profile's own
-  `settings.json` / `auth.json` / `.env`, which the agent reads from *inside*
+  `settings.json` / `auth.json` / `.env`, which the agent reads from _inside_
   the namespace. `agent-box` does not inject or rewrite them; it just makes
   sure the agent sees the profile's copy, not the host's.
 - **Template / profile split** — templates ship in the package
@@ -238,8 +240,7 @@ agent types, with a cc-switch / shadcn-Zinc design system and dark/light themes.
 It communicates with WSL via `wsl.exe`, so the CLI and bwrap isolation do the
 real work — the GUI is a convenience layer over the same profile tree.
 
-Launchers: `launch-gui.bat` / `launch-gui.ps1` (project root), or a desktop
-shortcut.
+Launch with `python gui-redesign.py` or use a desktop shortcut.
 
 ---
 
@@ -259,17 +260,18 @@ agent-box/
 │   ├── profile.py                  # create / list / show / delete, meta IO, preset apply, _deep_merge
 │   ├── edit.py                     # $EDITOR launcher
 │   ├── launch.py                   # bwrap argv construction + execvpe
+│   ├── sessions.py                 # session tracking (launch history SQLite)
 │   ├── templates/<type>/           # shipped agent config templates (empty-key placeholders)
 │   └── presets/<type>/<name>/      # shipped presets (CLAUDE.md, hooks.json, settings.overlay.json)
 │
 ├── gui/                            # Windows desktop GUI (CustomTkinter) — [gui] extra
-│   ├── app.py  tokens.py  theme.py  state.py  data.py  config.py
+│   ├── app.py  tokens.py  theme.py  data.py  config.py  wsl.py
 │   ├── pages/  components/
 │
-├── tests/                          # regression spine (WS7) — [dev] extra
+├── tests/                          # regression spine — [dev] extra
 └── docs/
-    ├── ARCHITECTURE.md  ROADMAP.md
-    ├── specs/  troubleshooting/  planning/
+    ├── ARCHITECTURE.md  ROADMAP.md  REQUIREMENTS.md
+    ├── specs/  troubleshooting/
 ```
 
 ### Runtime layout (on the host, not in repo)
@@ -286,14 +288,15 @@ agent-box/
 
 ### Source map
 
-| File | Responsibility |
-| --- | --- |
-| `cli.py` | argparse tree; one `cmd_*` per subcommand |
-| `config.py` | `$AGENT_BOX_HOME` resolution, path helpers, name validation |
-| `library.py` | agent-type registry: config dir, binary, data dir, templates, presets |
-| `profile.py` | `create`, `list`, `show`, `delete`, meta IO, `_apply_preset`, `_deep_merge` |
-| `edit.py` | open a profile's config dir in `$EDITOR` |
-| `launch.py` | `launch`: build bwrap argv + `os.execvpe` |
+| File          | Responsibility                                                              |
+| ------------- | --------------------------------------------------------------------------- |
+| `cli.py`      | argparse tree; one `cmd_*` per subcommand                                   |
+| `config.py`   | `$AGENT_BOX_HOME` resolution, path helpers, name validation                 |
+| `library.py`  | agent-type registry: config dir, binary, data dir, templates, presets       |
+| `profile.py`  | `create`, `list`, `show`, `delete`, meta IO, `_apply_preset`, `_deep_merge` |
+| `sessions.py` | session tracking: record launch/exit, fetch history, cleanup stale sessions |
+| `edit.py`     | open a profile's config dir in `$EDITOR`                                    |
+| `launch.py`   | `launch`: build bwrap argv + `os.execvpe`                                   |
 
 ---
 
@@ -321,6 +324,7 @@ Windows GUI with raw-config editing, shipped template corrections, regression
 test spine.
 
 **Next:**
+
 - Structured config forms in the GUI (on top of raw editing)
 - Team mode — multi-agent tmux orchestration
 - Session history management

@@ -30,13 +30,20 @@ the canonical docs and flags known landmines.
   interactions, and the diagnostic workflow. **Read this first** when the
   user reports "GUI won't launch".
 
+## Agent workspace convention
+
+**All AI-generated work products MUST go in `workspace/`** (gitignored).
+Never create new top-level directories or files for agent output — use
+`workspace/<descriptive-slug>/` instead. Examples:
+
+- `workspace/planning/` — DW / Codex planning artifacts
+- `workspace/frontend-overhaul/` — DW workflow run records
+
 ## Entry points
 
 - **GUI (Windows desktop)**: `gui-redesign.py` shim → `gui/app.py`.
 - **CLI (WSL)**: `src/agent_box/cli.py`.
-- **Launcher scripts**:
-  - `C:\Users\maoqh\Desktop\AgentBox.bat` (user's desktop)
-  - `launch-gui.bat` / `launch-gui.ps1` (project root)
+- **Desktop launcher**: `C:\Users\maoqh\Desktop\AgentBox.bat`
 
 ## Known landmines
 

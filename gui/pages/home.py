@@ -72,7 +72,10 @@ class HomePage(ctk.CTkFrame):
         cards_row.grid(row=0, column=0, sticky="ew", pady=(0, SPACE_XL))
         cards_row.grid_columnconfigure((0, 1, 2), weight=1)
 
-        active_count = sum(1 for s in self._sessions_getter(active_only=True))
+        try:
+            active_count = sum(1 for s in self._sessions_getter(active_only=True))
+        except RuntimeError:
+            active_count = 0
         profile_total = len(self._profiles)
         agent_types = len({p.get("agent_type", "") for p in self._profiles})
 

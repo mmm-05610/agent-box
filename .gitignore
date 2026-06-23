@@ -1,5 +1,6 @@
 # --- Python build / venv ---
 __pycache__/
+.pytest_cache/
 *.pyc
 *.pyo
 *.pyd
@@ -21,8 +22,13 @@ env/
 # --- OS / shell ---
 .DS_Store
 Thumbs.db
-nul
 *.log
+
+# --- Agent workspace (AI-generated artifacts, never commit) ---
+workspace/
+
+# --- Dev logs ---
+logs/
 
 # --- Local agent config dirs (per-host, never commit) ---
 # These are agent runtimes that store identity/credentials on the host.

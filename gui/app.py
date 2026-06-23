@@ -12,7 +12,6 @@ import sys
 import threading
 from collections import OrderedDict
 from pathlib import Path
-from tkinter import messagebox
 from typing import Any, Dict, List, Optional
 
 import customtkinter as ctk
@@ -27,7 +26,7 @@ from .pages import (
     SessionsPage,
     SettingsPage,
 )
-from .state import cleanup_stale_sessions, fetch_sessions
+from .wsl import fetch_sessions, health_check, install_dependency, sessions_cleanup
 from .theme import C, Theme
 from .tokens import FONT_MICRO, SPACE_LG
 from .wsl import (
@@ -120,18 +119,57 @@ class AgentBoxApp:
                              padx=SPACE_LG, pady=4)
 
         # Clean up zombie sessions from previous runs
-        cleaned = cleanup_stale_sessions()
+        try:
+            cleaned = sessions_cleanup()
+        except RuntimeError:
+            cleaned = 0
         if cleaned > 0:
             self._status_text = f"Cleaned {cleaned} stale session(s)."
 
-        # Initial load + render
+        # Initial load + render — profiles load immediately
         self.refresh()
         self._show_page("home")
+
+        # Health check runs after UI is visible (non-blocking)
+        self.root.after(500, self._run_health_check)
+
+    def _run_health_check(self) -> None:
+        """Run health check and show dialog if deps are missing."""
+        try:
+            problems = health_check()
+        except RuntimeError:
+            problems = [("WSL 连接失败", "")]
+        if not problems:
+            return
+        self._show_missing_deps(problems)
+
+    def _show_missing_deps(self, problems) -> None:
+        """Show a dialog for each missing dependency with an install option."""
+        from tkinter import messagebox
+
+        for desc, cmd in problems:
+            if not cmd:
+                messagebox.showwarning("环境检查", f"检测到 {desc}。\n请确认 WSL 已安装并运行后重启本程序。")
+                continue
+            ok = messagebox.askokcancel(
+                "环境检查",
+                f"检测到 {desc}，将无法启动 agent 实例。\n\n"
+                f"是否现在安装？",
+            )
+            if ok:
+                install_dependency(cmd)
+                messagebox.showinfo(
+                    "正在安装",
+                    f"安装终端已打开。\n请在终端中完成操作后重新启动本程序。",
+                )
 
     # --- state ----------------------------------------------------------
 
     def _active_count(self) -> int:
-        return len(fetch_sessions(active_only=True))
+        try:
+            return len(fetch_sessions(active_only=True))
+        except RuntimeError:
+            return 0
 
     def _on_nav(self, key: str) -> None:
         if key not in {k for k, _, _ in NAV_ITEMS}:
@@ -294,8 +332,9 @@ class AgentBoxApp:
                     f"Launched {profile['name']} (resume last)",
                     kind="success",
                 )
+                self.sidebar.update_status()
+                self._invalidate_pages(["sessions"])
             except RuntimeError as exc:
-                messagebox.showerror("Launch failed", str(exc))
                 self.toast.show(f"Launch failed: {exc}", kind="error")
         elif action == "open_detail":
             self._return_to = "profiles"
@@ -365,7 +404,7 @@ class AgentBoxApp:
                     from .wsl import save_file
                     save_file(claude_md_wsl_path, claude_md)
                 self.root.after(0, _on_ok)
-            except Exception as exc:
+            except RuntimeError as exc:
                 self.root.after(0, lambda e=exc: _on_err(e))
 
         def _on_ok() -> None:

@@ -126,6 +126,7 @@ class Theme:
     }
 
     _current: Dict[str, str] = dict(DARK)
+    _mode: str = "dark"
 
     @classmethod
     def get(cls, key: str) -> str:
@@ -134,15 +135,14 @@ class Theme:
     @classmethod
     def set_mode(cls, mode: str) -> None:
         """mode = "dark" | "light" | "system"."""
-        actual = mode
-        if mode == "system":
-            actual = ctk.get_appearance_mode().lower()
+        cls._mode = mode
+        actual = ctk.get_appearance_mode().lower() if mode == "system" else mode
         cls._current = dict(cls.DARK if actual == "dark" else cls.LIGHT)
         ctk.set_appearance_mode(mode)
 
     @classmethod
     def current_mode(cls) -> str:
-        return ctk.get_appearance_mode().lower()
+        return cls._mode
 
 
 def C(key: str) -> str:
