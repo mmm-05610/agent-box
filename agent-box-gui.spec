@@ -3,7 +3,7 @@ from PyInstaller.utils.hooks import collect_all
 
 datas = [('logo.png', '.'), ('logo.ico', '.')]
 binaries = []
-hiddenimports = []
+hiddenimports = ['PIL', 'PIL.Image']
 tmp_ret = collect_all('gui')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 
