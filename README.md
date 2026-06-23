@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="logo.png" alt="agent-box" width="128" height="128">
+</p>
+
 # agent-box
 
 > **Isolated HOME launcher for coding agents** — run Claude Code, Codex, Hermes,

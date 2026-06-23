@@ -491,6 +491,22 @@ def main() -> int:
     Theme.set_mode("system")
     ctk.set_default_color_theme("blue")  # accent palette (overridden by Theme)
     root = ctk.CTk()
+
+    # Set window icon — look next to this file (source checkout) or in
+    # PyInstaller's bundled directory.
+    import os as _os
+    _candidates = [
+        _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "logo.ico"),
+        _os.path.join(sys._MEIPASS, "logo.ico") if getattr(sys, "frozen", False) else "",
+    ]
+    for _p in _candidates:
+        if _p and _os.path.isfile(_p):
+            try:
+                root.iconbitmap(_p)
+                break
+            except Exception:
+                pass
+
     try:
         AgentBoxApp(root)
     except Exception:

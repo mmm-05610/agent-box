@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="logo.png" alt="agent-box" width="128" height="128">
+</p>
+
 # agent-box
 
 > **AI Agent 配置隔离启动器** — 在同一台机器上以多个隔离身份（不同 Provider、不同提示词、不同凭证）运行 Claude Code、Codex、Hermes、OpenCode，通过 [bubblewrap](https://github.com/containers/bubblewrap) bind mount 实现**内核级隔离**。

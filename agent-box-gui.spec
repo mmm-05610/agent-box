@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 
-datas = []
+datas = [('logo.ico', '.')]
 binaries = []
 hiddenimports = []
 tmp_ret = collect_all('gui')
@@ -30,6 +30,7 @@ exe = EXE(
     a.datas,
     [],
     name='agent-box-gui',
+    icon='logo.ico',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
