@@ -5,9 +5,11 @@ for active state. No emoji icons (they render inconsistently on Windows).
 """
 from __future__ import annotations
 
+import sys
 from typing import Callable, Dict, List, Tuple
 
 import customtkinter as ctk
+from PIL import Image
 
 from ..theme import C
 from ..tokens import (
@@ -38,6 +40,21 @@ NAV_ITEMS: List[Tuple[str, str, str]] = [
 ]
 
 
+def _find_logo() -> str | None:
+    """Return the path to logo.png, working in both source and frozen modes."""
+    import os
+    candidates = [
+        # Source checkout: gui/components/sidebar.py → ../.. → project root
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "logo.png"),
+    ]
+    if getattr(sys, "frozen", False):
+        candidates.append(os.path.join(sys._MEIPASS, "logo.png"))
+    for p in candidates:
+        if os.path.isfile(p):
+            return p
+    return None
+
+
 class Sidebar(ctk.CTkFrame):
     """Left navigation rail — cc-switch style (180px, minimal).
 
@@ -63,11 +80,18 @@ class Sidebar(ctk.CTkFrame):
         self._indicators: Dict[str, ctk.CTkFrame] = {}
 
         # === Top: brand ===
-        brand = ctk.CTkLabel(
-            self, text="Agent Box", text_color=C("fg"),
-            font=FONT_SUBTITLE, anchor="w",
-        )
-        brand.pack(anchor="w", padx=SPACE_LG, pady=(SPACE_XL, SPACE_LG))
+        if _logo_path := _find_logo():
+            self._logo_img = ctk.CTkImage(light_image=Image.open(_logo_path), size=(28, 28))
+            brand_holder = ctk.CTkFrame(self, fg_color="transparent")
+            brand_holder.pack(anchor="w", padx=SPACE_LG, pady=(SPACE_XL, SPACE_LG))
+            ctk.CTkLabel(brand_holder, image=self._logo_img, text="").pack(
+                side="left", padx=(0, SPACE_SM))
+            ctk.CTkLabel(brand_holder, text="Agent Box", text_color=C("fg"),
+                         font=FONT_SUBTITLE, anchor="w").pack(side="left")
+        else:
+            ctk.CTkLabel(self, text="Agent Box", text_color=C("fg"),
+                         font=FONT_SUBTITLE, anchor="w").pack(
+                anchor="w", padx=SPACE_LG, pady=(SPACE_XL, SPACE_LG))
 
         # === Nav items ===
         for key, label, _icon in NAV_ITEMS:
