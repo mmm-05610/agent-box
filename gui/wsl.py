@@ -135,7 +135,7 @@ def health_check() -> List[Tuple[str, str]]:
     try:
         _wsl_check_output("agent-box --version")
     except RuntimeError:
-        problems.append(("agent-box CLI 未安装", "pip install --break-system-packages agent-box"))
+        problems.append(("agent-box CLI 未安装", "pip install --break-system-packages agent-box-cli"))
     return problems
 
 

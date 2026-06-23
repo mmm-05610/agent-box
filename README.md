@@ -70,7 +70,7 @@ health — no terminal needed.
 sudo apt install bubblewrap
 
 # 2. Install agent-box
-pip install agent-box
+pip install agent-box-cli
 
 # 3. Install your agents (at least one)
 npm install -g @anthropic-ai/claude-code   # Claude Code

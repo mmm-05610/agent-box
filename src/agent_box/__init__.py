@@ -5,7 +5,7 @@ from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 try:
-    __version__ = version("agent-box")
+    __version__ = version("agent-box-cli")
 except PackageNotFoundError:
     # Source checkout — read the single source of truth from pyproject.toml
     _pyproject = Path(__file__).resolve().parent.parent.parent / "pyproject.toml"
