@@ -4,9 +4,9 @@
 
 # agent-box
 
-> **Isolated launcher for AI coding agents.** Run Claude Code, Codex, Hermes,
-> and OpenCode as multiple identities — each with its own config, credentials,
-> and memory — on the same machine. No Docker. No config juggling.
+> **Isolated launcher for AI coding agents.** Create multiple fully-configured
+> agents — each with its own system prompt, permissions, hooks, and tools — on
+> the same machine. Kernel-level isolation via bwrap. No Docker.
 
 [English](README.md) | [简体中文](README_CN.md)
 
@@ -18,19 +18,37 @@
 
 ## What is agent-box?
 
-You run `claude` or `codex` — they read config from `~/.claude/` or `~/.codex/`.
-If you have two clients, two providers, or two prompt strategies, you're stuck
-editing files every time you switch.
+A coding agent is defined by its config stack: **CLAUDE.md** (system-level
+instructions), **settings.json** (permissions, tools), **hooks**, and **MCP
+servers**. Out of the box, you get one agent = one config directory.
 
-**agent-box gives each identity its own profile.** When you launch, the profile
-is bind-mounted over the agent's real config directory at the kernel VFS layer.
-The agent sees only its own world. No config leaks. No credential cross-talk.
+But what if you want more than one?
+
+- A **decision-maker** — focused on architecture, limited edit permissions
+- A **researcher** — broad access, different tools, exhaustive output
+- A **code-reviewer** — read-only, diff-focused
+
+Each is a **complete agent**, not just a skill preset. Each needs its own
+conversation history, its own memory, its own config stack. Without agent-box,
+you're stuck manually swapping config files every time you switch roles.
+
+**agent-box gives each agent its own isolated profile.** Launch one — or all
+three in parallel — and each sees only its own config directory. bwrap
+bind-mounts the profile at the kernel VFS layer: the agent cannot read the
+host's real config, no matter how it resolves paths.
 
 ```
-agent-box cc dev          # Claude Code with DeepSeek
-agent-box cc architect    # Claude Code with Anthropic — same machine, no conflict
-agent-box codex builder   # Codex identity, parallel terminal
+agent-box create decision --type cc --preset decision-maker
+agent-box create research --type cc --preset spec-writer
+agent-box create reviewer  --type cc --preset blank
+
+agent-box cc decision    # architecture + decisions
+agent-box cc research    # deep investigation
+agent-box cc reviewer    # code review
 ```
+
+Three agents, three config stacks, three isolated histories. Same machine. Zero
+manual switching.
 
 ---
 

@@ -4,7 +4,7 @@
 
 # agent-box
 
-> **AI 编码 Agent 隔离启动器。** 在同一台机器上以多个身份运行 Claude Code、Codex、Hermes、OpenCode——各自拥有独立的配置、凭证和记忆。无需 Docker，无需手动切换配置。
+> **AI 编码 Agent 隔离启动器。** 创建多个完整配置的 Agent——每个拥有独立的系统提示词、权限、钩子和工具——在同一台机器上同时运行。基于 bwrap 内核级隔离，无需 Docker。
 
 [English](README.md) | 简体中文
 
@@ -16,31 +16,34 @@
 
 ## 解决什么问题
 
-你用 `claude` 或 `codex` 时，Agent 自动从 `~/.claude/`、`~/.codex/` 读取 API Key、
-Provider、权限等配置。**这是单身份的——一套配置走天下。**
+一个 AI 编码 Agent 的完整定义，不只是 prompt，而是整个配置栈：
+**CLAUDE.md**（系统级指令）、**settings.json**（权限、工具）、**hooks**（钩子）、
+**MCP 服务器**。默认情况下，你只有一个 Agent = 一套配置目录。
 
-当你同时面临三种场景：
+但你想创建的远不止一个：
 
-- 🏢 **项目 A**：公司内部项目，用 DeepSeek，Prompt 风格偏保守
-- 🤝 **项目 B**：甲方外包，用 Anthropic 官方 Key，Prompt 需要详细输出
-- 🔬 **项目 C**：个人实验，用 OpenRouter 中转，权限全开
+- 🧠 **决策者** — 只做架构设计，编辑权限受限，有结构化输出偏好
+- 🔍 **调研者** — 广泛访问权限，不同的工具配置，输出详尽
+- 👀 **代码审查员** — 只读模式，专注 diff 分析
 
-**没有 agent-box 的日常：** 每次切项目 → 手动改 `settings.json` → 祈祷别忘记 →
-改完忘记换回来 → A 项目的代码跑到了 B 客户的账单上 → 崩溃。
+每个都是**完整的 Agent**，不只是换个 skill。每个都需要独立的对话历史、独立的记忆、
+独立的配置。没有 agent-box，你只能手动备份切换配置文件——或者放弃同时拥有它们。
 
-`HOME=...` 环境变量？Agent 内部会绕过它。 Docker？太重，终端交互割裂。
+**agent-box 给每个 Agent 一个独立的 profile。** 启动时 bwrap 在内核 VFS 层做
+bind-mount，把 profile 的配置目录覆盖到 Agent 看到的路径。Agent 完全不知道其他
+profile 的存在，无论它怎么解析路径都读不到宿主机的真实配置。
 
-**agent-box 怎么做：** 每个身份一个 profile。启动时通过 bwrap **内核级 bind-mount**，
-把 profile 的配置目录覆盖到 Agent 看到的路径上。Agent 以为自己在独享整套配置，
-实际上每个 profile 完全隔离——就像三个不同的机器。
+```bash
+agent-box create decision --type cc --preset decision-maker
+agent-box create research --type cc --preset spec-writer
+agent-box create reviewer  --type cc --preset blank
 
+agent-box cc decision    # 架构与决策
+agent-box cc research    # 深度调研
+agent-box cc reviewer    # 代码审查
 ```
-agent-box cc project-a    # DeepSeek，保守风格
-agent-box cc project-b    # Anthropic，详细输出
-agent-box cc project-c    # OpenRouter，自由实验
-```
 
-三条命令，零手动切换。终端、Ctrl-C、信号全部正常——`os.execvpe` 原地接管进程。
+三个 Agent，三套配置栈，三段独立的历史。同一台机器，零手动切换。
 
 ---
 
