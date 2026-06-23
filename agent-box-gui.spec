@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 
-datas = [('logo.png', '.'), ('logo.ico', '.')]
+datas = [('logo.png', '.'), ('logo.ico', '.'), ('gui/logo-sidebar.png', 'gui')]
 binaries = []
 hiddenimports = []
 tmp_ret = collect_all('gui')

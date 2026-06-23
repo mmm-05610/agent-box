@@ -40,14 +40,14 @@ NAV_ITEMS: List[Tuple[str, str, str]] = [
 
 
 def _find_logo() -> str | None:
-    """Return the path to logo.png, working in both source and frozen modes."""
+    """Return the path to logo-sidebar.png, working in both source and frozen modes."""
     import os
     candidates = [
-        # Source checkout: gui/components/sidebar.py → ../.. → project root
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "logo.png"),
+        # Source checkout: gui/components/sidebar.py → ../logo-sidebar.png
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "logo-sidebar.png"),
     ]
     if getattr(sys, "frozen", False):
-        candidates.append(os.path.join(sys._MEIPASS, "logo.png"))
+        candidates.append(os.path.join(sys._MEIPASS, "gui", "logo-sidebar.png"))
     for p in candidates:
         if os.path.isfile(p):
             return p
