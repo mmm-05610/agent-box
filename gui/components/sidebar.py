@@ -9,7 +9,6 @@ import sys
 from typing import Callable, Dict, List, Tuple
 
 import customtkinter as ctk
-from PIL import Image
 
 from ..theme import C
 from ..tokens import (
@@ -80,8 +79,16 @@ class Sidebar(ctk.CTkFrame):
         self._indicators: Dict[str, ctk.CTkFrame] = {}
 
         # === Top: brand ===
+        logo_img = None
         if _logo_path := _find_logo():
-            self._logo_img = ctk.CTkImage(light_image=Image.open(_logo_path), size=(28, 28))
+            try:
+                from PIL import Image as _PILImage
+                logo_img = _PILImage.open(_logo_path)
+            except Exception:
+                pass
+
+        if logo_img:
+            self._logo_img = ctk.CTkImage(light_image=logo_img, size=(28, 28))
             brand_holder = ctk.CTkFrame(self, fg_color="transparent")
             brand_holder.pack(anchor="w", padx=SPACE_LG, pady=(SPACE_XL, SPACE_LG))
             ctk.CTkLabel(brand_holder, image=self._logo_img, text="").pack(
