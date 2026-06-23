@@ -90,7 +90,7 @@ class ProfilesPage(ctk.CTkFrame):
         title.grid(row=0, column=0, sticky="w")
 
         # Header uses the shared primary_button factory
-        new_btn = primary_button(header, text="+ New profile", command=on_new)
+        new_btn = primary_button(header, text="+ New profile", command=on_new, state="disabled")
         new_btn.grid(row=0, column=1, sticky="e")
 
         # Agent type tabs
