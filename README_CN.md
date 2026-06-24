@@ -4,7 +4,8 @@
 
 # agent-box
 
-> **AI 编码 Agent 隔离启动器。** 创建多个完整配置的 Agent——每个拥有独立的系统提示词、权限、钩子和工具——在同一台机器上同时运行。基于 bwrap 内核级隔离，无需 Docker。
+> **AI Agent 组合管理与运行工具。** 将模型、Agent 框架与配置组织为可复用的
+> Profile——相互隔离、可并行运行、不绑定框架。
 
 [English](README.md) | 简体中文
 
@@ -14,36 +15,60 @@
 
 ---
 
-## 解决什么问题
+## 什么是 Agent
 
-一个 AI 编码 Agent 的完整定义，不只是 prompt，而是整个配置栈：
-**CLAUDE.md**（系统级指令）、**settings.json**（权限、工具）、**hooks**（钩子）、
-**MCP 服务器**。默认情况下，你只有一个 Agent = 一套配置目录。
+社区讨论 AI 编码 Agent 时，焦点常常集中在单一维度：**模型**（Claude、GPT-4、DeepSeek）
+或 **Agent 框架**（Claude Code、Codex、OpenCode）。
 
-但你想创建的远不止一个：
+实践中，一个 Agent 的实际行为来自三个层次共同作用：
 
-- 🧠 **决策者** — 只做架构设计，编辑权限受限，有结构化输出偏好
-- 🔍 **调研者** — 广泛访问权限，不同的工具配置，输出详尽
-- 👀 **代码审查员** — 只读模式，专注 diff 分析
+| 层             | 示例                                             |
+| -------------- | ------------------------------------------------ |
+| **模型**       | Claude、GPT-4、DeepSeek、MiniMax                 |
+| **Agent 框架** | Claude Code、Codex、Hermes、OpenCode             |
+| **配置**       | CLAUDE.md、权限、Hooks、MCP 服务、工具、对话历史 |
 
-每个都是**完整的 Agent**，不只是换个 skill。每个都需要独立的对话历史、独立的记忆、
-独立的配置。没有 agent-box，你只能手动备份切换配置文件——或者放弃同时拥有它们。
+不同任务需要不同组合。**架构 Agent** 可能用 Claude × Claude Code × 受限权限；
+**调研 Agent** 可能用不同模型、不同框架、完全不同的配置栈。编码、审查、调试——
+每种场景都适合不同的组合。
 
-**agent-box 给每个 Agent 一个独立的 profile。** 启动时 bwrap 在内核 VFS 层做
-bind-mount，把 profile 的配置目录覆盖到 Agent 看到的路径。Agent 完全不知道其他
-profile 的存在，无论它怎么解析路径都读不到宿主机的真实配置。
+**agent-box 不提供上述任何一层能力。** 它不提供模型、不提供 Agent 框架、也不提供
+提示词库。它提供的是：帮助你把创建的组合组织起来、隔离开来、管理起来、复用起来。
+
+---
+
+## 为什么需要 agent-box
+
+多个 Agent 组合并存时，管理很快就会失控。每个组合需要独立的：
+
+- **系统提示词**（CLAUDE.md 或等价物）
+- **权限**（只读 vs 完整访问、工具白名单）
+- **Hooks**（提交前校验、响应后动作）
+- **MCP 服务**（不同角色需要不同工具）
+- **对话历史**（上下文不应在任务间泄漏）
+
+这些配置很容易互相干扰——审查 Agent 误用了编辑权限、调研 Agent 冗长的 hooks
+污染了编码会话、对话上下文从一个任务泄漏到另一个。
+
+agent-box 将每个组合封装为**隔离的 Profile**。每个 Profile 是磁盘上的一个目录——
+纯 JSON、YAML、Markdown 文件。启动 Profile，Agent 运行在私有命名空间中，
+只能看到该 Profile 的配置，无法感知或影响外部任何东西。
+
+- **可复用** — 创建一次 Profile，随时启动该角色
+- **可隔离** — 内核级 bind-mount 确保配置互不干扰
+- **可并行** — 同一台机器同时运行多个 Profile
 
 ```bash
 agent-box create decision --type cc --preset decision-maker
 agent-box create research --type cc --preset spec-writer
 agent-box create reviewer  --type cc --preset blank
 
-agent-box cc decision    # 架构与决策
+agent-box cc decision    # 架构与设计决策
 agent-box cc research    # 深度调研
 agent-box cc reviewer    # 代码审查
 ```
 
-三个 Agent，三套配置栈，三段独立的历史。同一台机器，零手动切换。
+三种组合，三套配置栈，三段独立历史。同一台机器，零手动切换。
 
 ---
 
@@ -120,6 +145,19 @@ Ctrl-C、终端颜色、信号处理全部正常工作。
 | 🪟 **Windows 桌面 GUI** | 管理 profile、编辑配置、查看会话——全在桌面应用中完成。深色/浅色主题。                                     |
 | ⚡ **零 Python 依赖**   | CLI：纯标准库。`bwrap` 和 Agent CLI 是系统依赖，不是 Python 依赖。                                        |
 | 📂 **文件系统即数据库** | 每个 profile 就是磁盘上的 JSON/YAML/Markdown 文件。用任何编辑器都能改。                                   |
+
+---
+
+## 不绑定框架（Framework-Agnostic）
+
+agent-box 并不试图将不同 Agent 框架统一到一个共同接口后面。
+Claude Code、Codex、Hermes、OpenCode 各有自己的 CLI 惯例、配置布局和长处。
+这种多样性是有意保留的。
+
+不同场景适合不同框架。一次快速重构可能 Codex 最顺手；深度架构讨论可能受益于
+Claude Code 的权限模型；调研任务可能适合 OpenCode 的工作流。agent-box 支持多种
+框架，不是为了抹平它们的差异，而是让你能为每个 Profile 选择合适的框架——
+并且在不同框架间切换时不需要从零开始重新配置。
 
 ---
 

@@ -4,9 +4,9 @@
 
 # agent-box
 
-> **Isolated launcher for AI coding agents.** Create multiple fully-configured
-> agents — each with its own system prompt, permissions, hooks, and tools — on
-> the same machine. Kernel-level isolation via bwrap. No Docker.
+> **Management layer for organizing and running AI agent combinations.**
+> Keep model, agent framework, and configuration together as reusable
+> profiles — isolated, parallel, and framework-agnostic.
 
 [English](README.md) | [简体中文](README_CN.md)
 
@@ -16,39 +16,68 @@
 
 ---
 
-## What is agent-box?
+## What is an Agent?
 
-A coding agent is defined by its config stack: **CLAUDE.md** (system-level
-instructions), **settings.json** (permissions, tools), **hooks**, and **MCP
-servers**. Out of the box, you get one agent = one config directory.
+When the community discusses AI coding agents, the conversation often centers on
+one dimension: the **model** (Claude, GPT-4, DeepSeek) or the **agent framework**
+(Claude Code, Codex, OpenCode).
 
-But what if you want more than one?
+In practice, an agent's behavior emerges from three layers working together:
 
-- A **decision-maker** — focused on architecture, limited edit permissions
-- A **researcher** — broad access, different tools, exhaustive output
-- A **code-reviewer** — read-only, diff-focused
+| Layer               | Examples                                                   |
+| ------------------- | ---------------------------------------------------------- |
+| **Model**           | Claude, GPT-4, DeepSeek, MiniMax                           |
+| **Agent Framework** | Claude Code, Codex, Hermes, OpenCode                       |
+| **Configuration**   | CLAUDE.md, permissions, hooks, MCP servers, tools, history |
 
-Each is a **complete agent**, not just a skill preset. Each needs its own
-conversation history, its own memory, its own config stack. Without agent-box,
-you're stuck manually swapping config files every time you switch roles.
+Different tasks call for different combinations. An **architecture agent** might
+use Claude with Claude Code and a restrictive permission set; a **research agent**
+might use a different model, a different framework, and an entirely different
+config stack. Coding, reviewing, debugging — each benefits from its own
+combination.
 
-**agent-box gives each agent its own isolated profile.** Launch one — or all
-three in parallel — and each sees only its own config directory. bwrap
-bind-mounts the profile at the kernel VFS layer: the agent cannot read the
-host's real config, no matter how it resolves paths.
+**agent-box does not provide any of these layers.** It does not ship a model, an
+agent framework, or a prompt library. What it provides is a way to organize,
+isolate, manage, and reuse the combinations you create.
+
+---
+
+## Why agent-box?
+
+When you work with multiple agent combinations, things get messy fast. Each
+combination needs its own:
+
+- **System prompt** (CLAUDE.md or equivalent)
+- **Permissions** (read-only vs. full access, tool allowlists)
+- **Hooks** (pre-commit validators, post-response actions)
+- **MCP servers** (different tools for different roles)
+- **Conversation history** (context shouldn't leak between tasks)
+
+These configurations are easy to mix up. A reviewer accidentally running with
+edit permissions. A researcher's verbose hooks polluting a coding session.
+Conversation context bleeding from one task to another.
+
+agent-box wraps each combination into an **isolated profile**. Each profile is
+its own directory on disk — plain JSON, YAML, and Markdown files. Launch a
+profile and the agent runs in a private namespace where only that profile's
+configuration is visible. The agent cannot see or affect anything outside.
+
+- **Reusable** — create a profile once, launch it whenever you need that role
+- **Isolated** — kernel-level bind-mounts keep configs from interfering
+- **Parallel** — run multiple profiles simultaneously on the same machine
 
 ```
 agent-box create decision --type cc --preset decision-maker
 agent-box create research --type cc --preset spec-writer
 agent-box create reviewer  --type cc --preset blank
 
-agent-box cc decision    # architecture + decisions
+agent-box cc decision    # architecture + design decisions
 agent-box cc research    # deep investigation
 agent-box cc reviewer    # code review
 ```
 
-Three agents, three config stacks, three isolated histories. Same machine. Zero
-manual switching.
+Three combinations, three config stacks, three isolated histories. Same machine.
+Zero manual switching.
 
 ---
 
@@ -127,6 +156,21 @@ profile's config. Ctrl-C, terminal colors, and signals all work normally.
 | 🪟 **Windows GUI**            | Manage profiles, edit raw config, track sessions — all from a desktop app. Dark/light themes.                                                |
 | ⚡ **Zero Python deps**       | CLI: stdlib only. `bwrap` and agent CLIs are system deps, not Python deps.                                                                   |
 | 📂 **Filesystem-native**      | Every profile is plain JSON/YAML/Markdown on disk. Edit with anything. No database for profile storage.                                      |
+
+---
+
+## Framework-Agnostic
+
+agent-box does not try to unify agent frameworks behind a common interface.
+Claude Code, Codex, Hermes, and OpenCode each have their own CLI conventions,
+their own config layout, and their own strengths. That diversity is intentional.
+
+Different scenarios suit different frameworks. A quick refactor might work best
+in Codex; a deep architecture discussion might benefit from Claude Code's
+permission model; a research task might fit OpenCode's workflow. agent-box
+supports multiple frameworks not to make them look the same, but to make it
+easy to pick the right one for each profile — and to switch between them
+without reconfiguring everything from scratch.
 
 ---
 
