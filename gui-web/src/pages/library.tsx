@@ -1,8 +1,11 @@
 /**
  * Library Page — Provider & Claude.md management
  *
- * Displays providers and Claude.md templates for the selected agent type.
- * Supports CRUD, inline editing, applying to profiles, and search filtering.
+ * Redesigned to match cc-switch's visual patterns:
+ * - Rounded-xl cards with hover-reveal actions
+ * - Segmented agent type switcher
+ * - Color-coded category badges
+ * - Inline edit/apply panels
  */
 
 import { useCallback, useMemo, useState } from 'react'
@@ -23,30 +26,42 @@ import {
   fetchProviderDetail,
 } from '@/api'
 
-// ── Category helpers ─────────────────────────────────────────────────────
+// ── Category styling (cc-switch badge pattern) ──────────────────────────
 
-const CATEGORY_BADGE_VARIANT: Record<string, 'warning' | 'success' | 'info' | 'primary' | 'destructive' | 'neutral'> = {
-  anthropic: 'warning',
-  openai: 'success',
-  deepseek: 'info',
-  openrouter: 'primary',
-  google: 'destructive',
+const CATEGORY_COLORS: Record<string, { bg: string; text: string; badge: string }> = {
+  anthropic: {
+    bg: 'bg-amber-100 dark:bg-amber-900/40',
+    text: 'text-amber-700 dark:text-amber-300',
+    badge: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
+  },
+  openai: {
+    bg: 'bg-emerald-100 dark:bg-emerald-900/40',
+    text: 'text-emerald-700 dark:text-emerald-300',
+    badge: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
+  },
+  deepseek: {
+    bg: 'bg-sky-100 dark:bg-sky-900/40',
+    text: 'text-sky-700 dark:text-sky-300',
+    badge: 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300',
+  },
+  openrouter: {
+    bg: 'bg-violet-100 dark:bg-violet-900/40',
+    text: 'text-violet-700 dark:text-violet-300',
+    badge: 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300',
+  },
+  google: {
+    bg: 'bg-blue-100 dark:bg-blue-900/40',
+    text: 'text-blue-700 dark:text-blue-300',
+    badge: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+  },
 }
 
-function getCategoryBadgeVariant(category?: string) {
-  return CATEGORY_BADGE_VARIANT[category ?? ''] ?? 'neutral'
-}
-
-const CATEGORY_ICON_COLORS: Record<string, string> = {
-  anthropic: 'bg-warning-subtle text-warning',
-  openai: 'bg-success-subtle text-success',
-  deepseek: 'bg-info-subtle text-info',
-  openrouter: 'bg-primary/10 text-primary',
-  google: 'bg-destructive-subtle text-destructive',
-}
-
-function getCategoryIconColor(category?: string) {
-  return CATEGORY_ICON_COLORS[category ?? ''] ?? 'bg-muted text-muted-foreground'
+function getCategoryStyle(category?: string) {
+  return CATEGORY_COLORS[category ?? ''] ?? {
+    bg: 'bg-muted',
+    text: 'text-muted-foreground',
+    badge: 'bg-muted text-muted-foreground',
+  }
 }
 
 function getInitial(name: string): string {
@@ -110,7 +125,7 @@ export function LibraryPage() {
       const haystack = [
         p.name,
         p.id,
-        p.settings.env.ANTHROPIC_BASE_URL ?? '',
+        p.settings?.env?.ANTHROPIC_BASE_URL ?? '',
       ]
         .join(' ')
         .toLowerCase()
@@ -133,23 +148,16 @@ export function LibraryPage() {
   const handleStartEdit = useCallback(
     async (type: TabKey, id: string) => {
       setEditError(null)
+      setApplying(null)
+      setShowAddPanel(false)
       if (type === 'providers') {
-        // Fetch full detail to get settings
         try {
           const detail = await fetchProviderDetail(agentType, id)
-          if (detail?.settings) {
-            setEditing({
-              type: 'provider',
-              id,
-              content: JSON.stringify(detail.settings, null, 2),
-            })
-          } else {
-            setEditing({
-              type: 'provider',
-              id,
-              content: '{}',
-            })
-          }
+          setEditing({
+            type: 'provider',
+            id,
+            content: JSON.stringify(detail?.settings ?? {}, null, 2),
+          })
         } catch {
           setEditError('Failed to load provider details')
         }
@@ -169,10 +177,7 @@ export function LibraryPage() {
     setEditError(null)
     try {
       if (editing.type === 'provider') {
-        // Validate JSON
-        try {
-          JSON.parse(editing.content)
-        } catch {
+        try { JSON.parse(editing.content) } catch {
           setEditError('Invalid JSON format')
           setSaving(false)
           return
@@ -192,11 +197,6 @@ export function LibraryPage() {
     }
   }, [editing, agentType, refresh, toast])
 
-  const handleCancelEdit = useCallback(() => {
-    setEditing(null)
-    setEditError(null)
-  }, [])
-
   // ── Delete handlers ──────────────────────────────────────────────────
 
   const handleDelete = useCallback(
@@ -211,10 +211,7 @@ export function LibraryPage() {
         }
         refresh()
       } catch (e) {
-        toast({
-          type: 'error',
-          message: e instanceof Error ? e.message : 'Delete failed',
-        })
+        toast({ type: 'error', message: e instanceof Error ? e.message : 'Delete failed' })
       }
     },
     [agentType, refresh, toast],
@@ -227,12 +224,11 @@ export function LibraryPage() {
       try {
         const allProfiles = await fetchProfiles()
         setProfiles(allProfiles)
+        setEditing(null)
+        setShowAddPanel(false)
         setApplying({ type, id, profileName: allProfiles[0]?.name ?? '' })
       } catch (e) {
-        toast({
-          type: 'error',
-          message: e instanceof Error ? e.message : 'Failed to load profiles',
-        })
+        toast({ type: 'error', message: e instanceof Error ? e.message : 'Failed to load profiles' })
       }
     },
     [toast],
@@ -244,41 +240,29 @@ export function LibraryPage() {
     try {
       if (applying.type === 'providers') {
         await applyProviderToProfile(applying.profileName, applying.id)
-        toast({ type: 'success', message: `Provider applied to ${applying.profileName}` })
+        toast({ type: 'success', message: `Applied to ${applying.profileName}` })
       } else {
         await applyClaudeMdToProfile(applying.profileName, applying.id)
-        toast({ type: 'success', message: `Claude.md applied to ${applying.profileName}` })
+        toast({ type: 'success', message: `Applied to ${applying.profileName}` })
       }
       setApplying(null)
       refreshProfiles()
     } catch (e) {
-      toast({
-        type: 'error',
-        message: e instanceof Error ? e.message : 'Apply failed',
-      })
+      toast({ type: 'error', message: e instanceof Error ? e.message : 'Apply failed' })
     } finally {
       setSaving(false)
     }
   }, [applying, refreshProfiles, toast])
 
-  const handleCancelApply = useCallback(() => {
-    setApplying(null)
-  }, [])
-
   // ── Add handlers ─────────────────────────────────────────────────────
 
   const handleCreate = useCallback(async () => {
-    if (!addId.trim()) {
-      setAddError('ID is required')
-      return
-    }
+    if (!addId.trim()) { setAddError('ID is required'); return }
     setCreating(true)
     setAddError(null)
     try {
       if (activeTab === 'providers') {
-        try {
-          JSON.parse(addContent)
-        } catch {
+        try { JSON.parse(addContent) } catch {
           setAddError('Invalid JSON format')
           setCreating(false)
           return
@@ -300,65 +284,55 @@ export function LibraryPage() {
     }
   }, [addId, addContent, activeTab, agentType, refresh, toast])
 
-  const handleCancelAdd = useCallback(() => {
-    setShowAddPanel(false)
-    setAddId('')
-    setAddContent('')
-    setAddError(null)
-  }, [])
-
   // ── Render ───────────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-6 pt-6 pb-4">
-        <h1 className="text-xl font-bold text-foreground">Library</h1>
-        <select
-          value={agentType}
-          onChange={(e) => setAgentType(e.target.value as AgentType)}
-          className="bg-card border border-input rounded-md px-3 h-9 text-sm text-foreground"
-        >
-          {AGENT_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* Tabs */}
-      <div className="px-6">
-        <div className="flex gap-6 border-b border-card-border">
-          <TabButton
-            active={activeTab === 'providers'}
-            onClick={() => setActiveTab('providers')}
-            count={filteredProviders.length}
+        <h1 className="text-xl font-semibold text-foreground">Library</h1>
+        <div className="flex items-center gap-3">
+          {/* Agent type segmented control */}
+          <AgentTypeSwitcher value={agentType} onChange={setAgentType} />
+          {/* Add button — orange FAB style like cc-switch */}
+          <button
+            onClick={() => {
+              setEditing(null)
+              setApplying(null)
+              setShowAddPanel(true)
+            }}
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-500 text-white shadow-lg shadow-orange-500/30 transition-colors hover:bg-orange-600 dark:shadow-orange-500/40"
+            title={activeTab === 'providers' ? 'Add provider' : 'Add Claude.md'}
           >
-            Providers
-          </TabButton>
-          <TabButton
-            active={activeTab === 'claudeMds'}
-            onClick={() => setActiveTab('claudeMds')}
-            count={filteredClaudeMds.length}
-          >
-            Claude.md
-          </TabButton>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </button>
         </div>
       </div>
 
-      {/* Search */}
-      <div className="px-6 py-3">
-        <Input
-          size="sm"
-          placeholder="Search by name, id, or url..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+      {/* Tabs + Search */}
+      <div className="px-6 pb-4 flex items-center gap-4">
+        <div className="flex gap-1 bg-muted rounded-xl p-1">
+          <TabButton active={activeTab === 'providers'} onClick={() => setActiveTab('providers')} count={filteredProviders.length}>
+            Providers
+          </TabButton>
+          <TabButton active={activeTab === 'claudeMds'} onClick={() => setActiveTab('claudeMds')} count={filteredClaudeMds.length}>
+            Claude.md
+          </TabButton>
+        </div>
+        <div className="flex-1 max-w-xs">
+          <Input
+            size="sm"
+            placeholder="Search..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto px-6 pb-6">
+      <div className="flex-1 overflow-y-auto px-6 pb-6">
         {loading ? (
           <Loading variant="skeleton" rows={4} />
         ) : error ? (
@@ -375,21 +349,14 @@ export function LibraryPage() {
             profiles={profiles}
             onStartEdit={(id) => handleStartEdit('providers', id)}
             onSaveEdit={handleSaveEdit}
-            onCancelEdit={handleCancelEdit}
-            onEditContentChange={(c) =>
-              setEditing((prev) => (prev ? { ...prev, content: c } : null))
-            }
+            onCancelEdit={() => setEditing(null)}
+            onEditContentChange={(c) => setEditing((prev) => prev ? { ...prev, content: c } : null)}
             onDelete={(id) => handleDelete('providers', id)}
             onStartApply={(id) => handleStartApply('providers', id)}
             onApply={handleApply}
-            onCancelApply={handleCancelApply}
-            onApplyProfileChange={(name) =>
-              setApplying((prev) => (prev ? { ...prev, profileName: name } : null))
-            }
-            onAdd={() => {
-              setActiveTab('providers')
-              setShowAddPanel(true)
-            }}
+            onCancelApply={() => setApplying(null)}
+            onApplyProfileChange={(name) => setApplying((prev) => prev ? { ...prev, profileName: name } : null)}
+            onAdd={() => setShowAddPanel(true)}
           />
         ) : (
           <ClaudeMdsList
@@ -401,29 +368,22 @@ export function LibraryPage() {
             profiles={profiles}
             onStartEdit={(id) => handleStartEdit('claudeMds', id)}
             onSaveEdit={handleSaveEdit}
-            onCancelEdit={handleCancelEdit}
-            onEditContentChange={(c) =>
-              setEditing((prev) => (prev ? { ...prev, content: c } : null))
-            }
+            onCancelEdit={() => setEditing(null)}
+            onEditContentChange={(c) => setEditing((prev) => prev ? { ...prev, content: c } : null)}
             onDelete={(id) => handleDelete('claudeMds', id)}
             onStartApply={(id) => handleStartApply('claudeMds', id)}
             onApply={handleApply}
-            onCancelApply={handleCancelApply}
-            onApplyProfileChange={(name) =>
-              setApplying((prev) => (prev ? { ...prev, profileName: name } : null))
-            }
-            onAdd={() => {
-              setActiveTab('claudeMds')
-              setShowAddPanel(true)
-            }}
+            onCancelApply={() => setApplying(null)}
+            onApplyProfileChange={(name) => setApplying((prev) => prev ? { ...prev, profileName: name } : null)}
+            onAdd={() => setShowAddPanel(true)}
           />
         )}
 
-        {/* Add Panel */}
+        {/* Add Panel — inline, cc-switch style */}
         {showAddPanel && (
-          <div className="mt-4 rounded-lg border border-card-border bg-card p-4">
+          <div className="mt-4 rounded-xl border border-border bg-card p-4">
             <h3 className="mb-3 text-sm font-semibold text-foreground">
-              {activeTab === 'providers' ? 'Add Provider' : 'Add Claude.md'}
+              {activeTab === 'providers' ? 'New Provider' : 'New Claude.md'}
             </h3>
             <div className="flex flex-col gap-3">
               <Input
@@ -435,16 +395,16 @@ export function LibraryPage() {
               <Textarea
                 placeholder={
                   activeTab === 'providers'
-                    ? '{\n  "name": "My Provider",\n  "env": {\n    "ANTHROPIC_API_KEY": "sk-..."\n  }\n}'
-                    : '# Claude.md content\n\nInstructions here...'
+                    ? '{\n  "env": {\n    "ANTHROPIC_API_KEY": "sk-..."\n  }\n}'
+                    : '# Claude.md content...'
                 }
                 rows={6}
                 value={addContent}
                 onChange={(e) => setAddContent(e.target.value)}
                 error={addError ?? undefined}
               />
-              <div className="flex items-center gap-2">
-                <Button variant="ghost" size="sm" onClick={handleCancelAdd}>
+              <div className="flex items-center gap-2 justify-end">
+                <Button variant="ghost" size="sm" onClick={() => { setShowAddPanel(false); setAddId(''); setAddContent(''); setAddError(null) }}>
                   Cancel
                 </Button>
                 <Button size="sm" isLoading={creating} onClick={handleCreate}>
@@ -459,14 +419,35 @@ export function LibraryPage() {
   )
 }
 
-// ── Tab Button ───────────────────────────────────────────────────────────
+// ── Agent Type Segmented Control ─────────────────────────────────────────
 
-function TabButton({
-  active,
-  onClick,
-  count,
-  children,
-}: {
+function AgentTypeSwitcher({ value, onChange }: { value: AgentType; onChange: (t: AgentType) => void }) {
+  return (
+    <div className="inline-flex bg-muted rounded-xl p-1 gap-1">
+      {AGENT_TYPES.map((t) => {
+        const isActive = value === t
+        return (
+          <button
+            key={t}
+            onClick={() => onChange(t)}
+            className={cn(
+              'inline-flex items-center px-3 h-8 rounded-md text-sm font-medium transition-all duration-200',
+              isActive
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground hover:bg-background/50',
+            )}
+          >
+            {t}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+// ── Tab Button (cc-switch segmented style) ───────────────────────────────
+
+function TabButton({ active, onClick, count, children }: {
   active: boolean
   onClick: () => void
   count: number
@@ -476,23 +457,20 @@ function TabButton({
     <button
       onClick={onClick}
       className={cn(
-        'relative pb-3 text-sm font-medium transition-colors',
+        'inline-flex items-center px-3 h-8 rounded-md text-sm font-medium transition-all duration-200',
         active
-          ? 'text-foreground'
-          : 'text-muted-foreground hover:text-foreground',
+          ? 'bg-background text-foreground shadow-sm'
+          : 'text-muted-foreground hover:text-foreground hover:bg-background/50',
       )}
     >
       {children} ({count})
-      {active && (
-        <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-foreground rounded-full" />
-      )}
     </button>
   )
 }
 
 // ── Providers List ───────────────────────────────────────────────────────
 
-interface ProvidersListProps {
+function ProvidersList({ items, editing, applying, editError, saving, profiles, onStartEdit, onSaveEdit, onCancelEdit, onEditContentChange, onDelete, onStartApply, onApply, onCancelApply, onApplyProfileChange, onAdd }: {
   items: Provider[]
   editing: EditingState | null
   applying: ApplyingState | null
@@ -509,43 +487,20 @@ interface ProvidersListProps {
   onCancelApply: () => void
   onApplyProfileChange: (name: string) => void
   onAdd: () => void
-}
-
-function ProvidersList({
-  items,
-  editing,
-  applying,
-  editError,
-  saving,
-  profiles,
-  onStartEdit,
-  onSaveEdit,
-  onCancelEdit,
-  onEditContentChange,
-  onDelete,
-  onStartApply,
-  onApply,
-  onCancelApply,
-  onApplyProfileChange,
-  onAdd,
-}: ProvidersListProps) {
+}) {
   if (items.length === 0) {
     return (
       <EmptyState
         icon="🔌"
         title="No providers yet"
         description="Add a provider to configure API endpoints and credentials."
-        action={
-          <Button size="sm" onClick={onAdd}>
-            Add provider
-          </Button>
-        }
+        action={<Button size="sm" onClick={onAdd}>Add provider</Button>}
       />
     )
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="space-y-3">
       {items.map((provider) => (
         <ProviderCard
           key={provider.id}
@@ -572,27 +527,9 @@ function ProvidersList({
   )
 }
 
-// ── Provider Card ────────────────────────────────────────────────────────
+// ── Provider Card (cc-switch style) ──────────────────────────────────────
 
-function ProviderCard({
-  provider,
-  isEditing,
-  isApplying,
-  editing,
-  applying,
-  editError,
-  saving,
-  profiles,
-  onStartEdit,
-  onSaveEdit,
-  onCancelEdit,
-  onEditContentChange,
-  onDelete,
-  onStartApply,
-  onApply,
-  onCancelApply,
-  onApplyProfileChange,
-}: {
+function ProviderCard({ provider, isEditing, isApplying, editing, applying, editError, saving, profiles, onStartEdit, onSaveEdit, onCancelEdit, onEditContentChange, onDelete, onStartApply, onApply, onCancelApply, onApplyProfileChange }: {
   provider: Provider
   isEditing: boolean
   isApplying: boolean
@@ -614,40 +551,39 @@ function ProviderCard({
   const baseUrl = extractBaseUrl(provider.settings?.env)
   const model = extractModel(provider.settings?.env)
   const category = provider.category
+  const catStyle = getCategoryStyle(category)
 
   return (
     <div
       className={cn(
-        'rounded-lg border border-card-border bg-card transition-all duration-fast',
-        (isEditing || isApplying) && 'ring-1 ring-ring',
+        'relative overflow-hidden rounded-xl border border-border p-4 transition-all duration-300 bg-card text-card-foreground group',
+        (isEditing || isApplying) && 'ring-1 ring-primary/50',
       )}
     >
-      {/* Card header */}
-      <div className="flex items-center gap-3 p-4">
+      {/* Card content */}
+      <div className="relative flex items-center gap-3">
         {/* Icon */}
-        <div
-          className={cn(
-            'flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-sm font-bold',
-            getCategoryIconColor(category),
-          )}
-        >
+        <div className={cn(
+          'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border text-sm font-bold transition-transform duration-300 group-hover:scale-105',
+          catStyle.bg, catStyle.text,
+        )}>
           {getInitial(provider.name)}
         </div>
 
         {/* Info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-foreground truncate">
+            <span className="text-base font-semibold leading-none text-foreground">
               {provider.name}
             </span>
             {category && (
-              <Badge variant={getCategoryBadgeVariant(category)}>
+              <span className={cn('inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold', catStyle.badge)}>
                 {category}
-              </Badge>
+              </span>
             )}
           </div>
           {baseUrl && (
-            <p className="text-xs text-muted-foreground truncate mt-0.5">
+            <p className="text-sm text-muted-foreground truncate mt-1">
               {baseUrl}
             </p>
           )}
@@ -658,76 +594,71 @@ function ProviderCard({
           )}
         </div>
 
-        {/* Actions */}
-        {!isEditing && !isApplying && (
-          <div className="flex items-center gap-1 shrink-0">
-            <Button variant="ghost" size="sm" onClick={onStartEdit}>
-              Edit
-            </Button>
-            <Button variant="ghost" size="sm" onClick={onStartApply}>
-              Apply
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-destructive hover:text-destructive"
-              onClick={onDelete}
-            >
-              Delete
-            </Button>
-          </div>
-        )}
+        {/* Actions — hidden by default, revealed on hover (cc-switch pattern) */}
+        <div className="flex items-center gap-1.5 flex-shrink-0 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity duration-200">
+          <button
+            onClick={onStartEdit}
+            className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            title="Edit"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M11.5 2.5a2.121 2.121 0 013 3L6 14H3v-3L11.5 2.5z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+          <button
+            onClick={onStartApply}
+            className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-emerald-600 dark:hover:text-emerald-400"
+            title="Apply to profile"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M13 5l-5 5-2-2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+          <button
+            onClick={onDelete}
+            className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-red-500 dark:hover:text-red-400"
+            title="Delete"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M2 4h12M5.333 4V2.667a1.333 1.333 0 011.334-1.334h2.666a1.333 1.333 0 011.334 1.334V4m2 0v9.333a1.333 1.333 0 01-1.334 1.334H4.667a1.333 1.333 0 01-1.334-1.334V4h9.334z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        </div>
       </div>
 
-      {/* Inline edit mode */}
+      {/* Inline edit panel */}
       {isEditing && editing && (
-        <div className="px-4 pb-4 border-t border-card-border pt-3">
+        <div className="mt-4 pt-4 border-t border-border">
           <Textarea
             rows={8}
             value={editing.content}
             onChange={(e) => onEditContentChange(e.target.value)}
             error={editError ?? undefined}
+            className="font-mono text-xs"
           />
-          <div className="flex items-center gap-2 mt-3">
-            <Button variant="ghost" size="sm" onClick={onCancelEdit}>
-              Cancel
-            </Button>
-            <Button size="sm" isLoading={saving} onClick={onSaveEdit}>
-              Save
-            </Button>
+          <div className="flex items-center gap-2 mt-3 justify-end">
+            <Button variant="ghost" size="sm" onClick={onCancelEdit}>Cancel</Button>
+            <Button size="sm" isLoading={saving} onClick={onSaveEdit}>Save</Button>
           </div>
         </div>
       )}
 
-      {/* Apply mode */}
+      {/* Apply panel */}
       {isApplying && applying && (
-        <div className="px-4 pb-4 border-t border-card-border pt-3">
+        <div className="mt-4 pt-4 border-t border-border">
           <div className="flex items-center gap-3">
             <select
               value={applying.profileName}
               onChange={(e) => onApplyProfileChange(e.target.value)}
-              className="bg-card border border-input rounded-md px-3 h-9 text-sm text-foreground flex-1"
+              className="bg-card border border-input rounded-lg px-3 h-9 text-sm text-foreground flex-1"
             >
-              {profiles.length === 0 && (
-                <option value="">No profiles available</option>
-              )}
+              {profiles.length === 0 && <option value="">No profiles</option>}
               {profiles.map((p) => (
-                <option key={p.name} value={p.name}>
-                  {p.displayName ?? p.name}
-                </option>
+                <option key={p.name} value={p.name}>{p.displayName ?? p.name}</option>
               ))}
             </select>
-            <Button variant="ghost" size="sm" onClick={onCancelApply}>
-              Cancel
-            </Button>
-            <Button
-              size="sm"
-              isLoading={saving}
-              onClick={onApply}
-              disabled={!applying.profileName}
-            >
-              Apply
-            </Button>
+            <Button variant="ghost" size="sm" onClick={onCancelApply}>Cancel</Button>
+            <Button size="sm" isLoading={saving} onClick={onApply} disabled={!applying.profileName}>Apply</Button>
           </div>
         </div>
       )}
@@ -737,7 +668,7 @@ function ProviderCard({
 
 // ── Claude.md List ───────────────────────────────────────────────────────
 
-interface ClaudeMdsListProps {
+function ClaudeMdsList({ items, editing, applying, editError, saving, profiles, onStartEdit, onSaveEdit, onCancelEdit, onEditContentChange, onDelete, onStartApply, onApply, onCancelApply, onApplyProfileChange, onAdd }: {
   items: ClaudeMd[]
   editing: EditingState | null
   applying: ApplyingState | null
@@ -754,43 +685,20 @@ interface ClaudeMdsListProps {
   onCancelApply: () => void
   onApplyProfileChange: (name: string) => void
   onAdd: () => void
-}
-
-function ClaudeMdsList({
-  items,
-  editing,
-  applying,
-  editError,
-  saving,
-  profiles,
-  onStartEdit,
-  onSaveEdit,
-  onCancelEdit,
-  onEditContentChange,
-  onDelete,
-  onStartApply,
-  onApply,
-  onCancelApply,
-  onApplyProfileChange,
-  onAdd,
-}: ClaudeMdsListProps) {
+}) {
   if (items.length === 0) {
     return (
       <EmptyState
         icon="📄"
-        title="No Claude.md templates yet"
+        title="No Claude.md templates"
         description="Add a Claude.md template to define agent instructions."
-        action={
-          <Button size="sm" onClick={onAdd}>
-            Add Claude.md
-          </Button>
-        }
+        action={<Button size="sm" onClick={onAdd}>Add Claude.md</Button>}
       />
     )
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="space-y-3">
       {items.map((md) => (
         <ClaudeMdCard
           key={md.id}
@@ -817,27 +725,9 @@ function ClaudeMdsList({
   )
 }
 
-// ── Claude.md Card ───────────────────────────────────────────────────────
+// ── Claude.md Card (cc-switch style) ─────────────────────────────────────
 
-function ClaudeMdCard({
-  md,
-  isEditing,
-  isApplying,
-  editing,
-  applying,
-  editError,
-  saving,
-  profiles,
-  onStartEdit,
-  onSaveEdit,
-  onCancelEdit,
-  onEditContentChange,
-  onDelete,
-  onStartApply,
-  onApply,
-  onCancelApply,
-  onApplyProfileChange,
-}: {
+function ClaudeMdCard({ md, isEditing, isApplying, editing, applying, editError, saving, profiles, onStartEdit, onSaveEdit, onCancelEdit, onEditContentChange, onDelete, onStartApply, onApply, onCancelApply, onApplyProfileChange }: {
   md: ClaudeMd
   isEditing: boolean
   isApplying: boolean
@@ -859,102 +749,86 @@ function ClaudeMdCard({
   return (
     <div
       className={cn(
-        'rounded-lg border border-card-border bg-card transition-all duration-fast',
-        (isEditing || isApplying) && 'ring-1 ring-ring',
+        'relative overflow-hidden rounded-xl border border-border p-4 transition-all duration-300 bg-card text-card-foreground group',
+        (isEditing || isApplying) && 'ring-1 ring-primary/50',
       )}
     >
-      {/* Card header */}
-      <div className="flex items-center gap-3 p-4">
+      <div className="relative flex items-center gap-3">
         {/* Icon */}
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-muted text-sm font-bold text-muted-foreground">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted border border-border text-sm font-bold text-muted-foreground transition-transform duration-300 group-hover:scale-105">
           {getInitial(md.name)}
         </div>
 
         {/* Info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-foreground truncate">
+            <span className="text-base font-semibold leading-none text-foreground">
               {md.name}
             </span>
-            <Badge variant="neutral">markdown</Badge>
+            <span className="inline-flex items-center rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+              markdown
+            </span>
           </div>
           {md.description && (
-            <p className="text-xs text-muted-foreground truncate mt-0.5">
+            <p className="text-sm text-muted-foreground truncate mt-1">
               {md.description}
             </p>
           )}
         </div>
 
-        {/* Actions */}
-        {!isEditing && !isApplying && (
-          <div className="flex items-center gap-1 shrink-0">
-            <Button variant="ghost" size="sm" onClick={onStartEdit}>
-              Edit
-            </Button>
-            <Button variant="ghost" size="sm" onClick={onStartApply}>
-              Apply
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-destructive hover:text-destructive"
-              onClick={onDelete}
-            >
-              Delete
-            </Button>
-          </div>
-        )}
+        {/* Actions — hover reveal */}
+        <div className="flex items-center gap-1.5 flex-shrink-0 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity duration-200">
+          <button onClick={onStartEdit} className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" title="Edit">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M11.5 2.5a2.121 2.121 0 013 3L6 14H3v-3L11.5 2.5z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+          <button onClick={onStartApply} className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-emerald-600 dark:hover:text-emerald-400" title="Apply to profile">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M13 5l-5 5-2-2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+          <button onClick={onDelete} className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-red-500 dark:hover:text-red-400" title="Delete">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M2 4h12M5.333 4V2.667a1.333 1.333 0 011.334-1.334h2.666a1.333 1.333 0 011.334 1.334V4m2 0v9.333a1.333 1.333 0 01-1.334 1.334H4.667a1.333 1.333 0 01-1.334-1.334V4h9.334z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        </div>
       </div>
 
-      {/* Inline edit mode */}
+      {/* Inline edit panel */}
       {isEditing && editing && (
-        <div className="px-4 pb-4 border-t border-card-border pt-3">
+        <div className="mt-4 pt-4 border-t border-border">
           <Textarea
             rows={8}
             value={editing.content}
             onChange={(e) => onEditContentChange(e.target.value)}
             error={editError ?? undefined}
+            className="font-mono text-xs"
           />
-          <div className="flex items-center gap-2 mt-3">
-            <Button variant="ghost" size="sm" onClick={onCancelEdit}>
-              Cancel
-            </Button>
-            <Button size="sm" isLoading={saving} onClick={onSaveEdit}>
-              Save
-            </Button>
+          <div className="flex items-center gap-2 mt-3 justify-end">
+            <Button variant="ghost" size="sm" onClick={onCancelEdit}>Cancel</Button>
+            <Button size="sm" isLoading={saving} onClick={onSaveEdit}>Save</Button>
           </div>
         </div>
       )}
 
-      {/* Apply mode */}
+      {/* Apply panel */}
       {isApplying && applying && (
-        <div className="px-4 pb-4 border-t border-card-border pt-3">
+        <div className="mt-4 pt-4 border-t border-border">
           <div className="flex items-center gap-3">
             <select
               value={applying.profileName}
               onChange={(e) => onApplyProfileChange(e.target.value)}
-              className="bg-card border border-input rounded-md px-3 h-9 text-sm text-foreground flex-1"
+              className="bg-card border border-input rounded-lg px-3 h-9 text-sm text-foreground flex-1"
             >
-              {profiles.length === 0 && (
-                <option value="">No profiles available</option>
-              )}
+              {profiles.length === 0 && <option value="">No profiles</option>}
               {profiles.map((p) => (
-                <option key={p.name} value={p.name}>
-                  {p.displayName ?? p.name}
-                </option>
+                <option key={p.name} value={p.name}>{p.displayName ?? p.name}</option>
               ))}
             </select>
-            <Button variant="ghost" size="sm" onClick={onCancelApply}>
-              Cancel
-            </Button>
-            <Button
-              size="sm"
-              isLoading={saving}
-              onClick={onApply}
-              disabled={!applying.profileName}
-            >
-              Apply
-            </Button>
+            <Button variant="ghost" size="sm" onClick={onCancelApply}>Cancel</Button>
+            <Button size="sm" isLoading={saving} onClick={onApply} disabled={!applying.profileName}>Apply</Button>
           </div>
         </div>
       )}
