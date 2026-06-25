@@ -24,16 +24,16 @@ from ..components.status import Badge
 from ..components.toast import ToastManager
 from ..theme import C
 from ..tokens import (
-    FONT_BODY,
     FONT_BOLD,
     FONT_CAPTION,
     FONT_DISPLAY,
-    FONT_LABEL,
+    FONT_MICRO,
     FONT_MONO_SMALL,
     FONT_SUBTITLE,
     RADIUS_LG,
     RADIUS_MD,
     SPACE_2XL,
+    SPACE_3XL,
     SPACE_LG,
     SPACE_MD,
     SPACE_SM,
@@ -54,6 +54,48 @@ from ..wsl import (
 
 
 # --- helpers ------------------------------------------------------------
+
+
+def _extract_display_info(settings: Dict[str, Any]) -> Dict[str, str]:
+    """Extract human-readable display info from provider settings.
+
+    Returns ``{"base_url": "api.deepseek.com/v1", "model": "deepseek-chat"}``.
+    """
+    env = settings.get("env") or {}
+    base_url = ""
+    model = ""
+
+    # Find base URL from env values
+    for val in env.values():
+        if isinstance(val, str) and "://" in val:
+            # Strip protocol for display
+            display = val.replace("https://", "").replace("http://", "")
+            base_url = display.rstrip("/")
+            break
+
+    # Find model from env or top-level settings
+    for key in ("ANTHROPIC_MODEL", "OPENAI_MODEL", "model"):
+        if key in env and env[key]:
+            model = str(env[key])
+            break
+    if not model:
+        model = str(settings.get("model") or "")
+
+    return {"base_url": base_url, "model": model}
+
+
+# Badge color map (category → variant)
+_BADGE_VARIANT: Dict[str, str] = {
+    "anthropic": "warning",   # orange
+    "openai": "success",      # green
+    "deepseek": "info",       # blue
+    "openrouter": "primary",  # purple-ish
+    "google": "error",        # red
+    "aws": "warning",         # orange
+    "mistral": "info",
+    "groq": "success",
+    "together": "info",
+}
 
 
 def _infer_category(settings: Dict[str, Any]) -> str:
@@ -113,6 +155,8 @@ class _ItemRow(ctk.CTkFrame):
         on_delete: Callable[[], None],
         on_apply: Callable[[str, Callable[[], None]], None],
         # (profile_name, on_done) -> None
+        base_url: str = "",   # provider base URL for display
+        model: str = "",      # model name for display
     ):
         super().__init__(
             master, fg_color=C("bg_elevated"),
@@ -126,6 +170,8 @@ class _ItemRow(ctk.CTkFrame):
         self._badge_text = badge_text
         self._edit_content = edit_content
         self._edit_kind = edit_kind
+        self._base_url = base_url
+        self._model = model
         self._profiles = profiles
         self._on_save = on_save
         self._on_delete = on_delete
@@ -159,39 +205,78 @@ class _ItemRow(ctk.CTkFrame):
 
     def _build_view(self) -> None:
         self._view_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self._view_frame.grid(row=0, column=0, sticky="ew", padx=SPACE_LG, pady=SPACE_MD)
-        self._view_frame.grid_columnconfigure(0, weight=1)
+        self._view_frame.grid(row=0, column=0, sticky="ew",
+                              padx=SPACE_LG, pady=SPACE_MD)
+        self._view_frame.grid_columnconfigure(1, weight=1)
 
-        # Left: name + meta
-        left = ctk.CTkFrame(self._view_frame, fg_color="transparent")
-        left.grid(row=0, column=0, sticky="w")
-        left.grid_columnconfigure(1, weight=1)
+        # --- Left: Icon (initial letter in colored square) ---
+        initial = (self._display_name[0] if self._display_name else "?").upper()
+        # Pick icon color from category
+        _ICON_COLORS = {
+            "anthropic": "#D97706", "openai": "#10B981",
+            "deepseek": "#3B82F6", "openrouter": "#8B5CF6",
+            "google": "#EF4444", "aws": "#F59E0B",
+            "mistral": "#3B82F6", "groq": "#10B981",
+        }
+        icon_bg = _ICON_COLORS.get(self._badge_text, C("bg_elevated_2"))
+        icon_fg = "#FFFFFF"
 
-        title = ctk.CTkLabel(
-            left, text=self._display_name,
+        icon_frame = ctk.CTkFrame(
+            self._view_frame, width=40, height=40,
+            fg_color=icon_bg, corner_radius=RADIUS_MD,
+        )
+        icon_frame.grid(row=0, column=0, rowspan=2, padx=(0, SPACE_MD))
+        icon_frame.grid_propagate(False)
+        icon_frame.grid_columnconfigure(0, weight=1)
+        icon_frame.grid_rowconfigure(0, weight=1)
+        ctk.CTkLabel(
+            icon_frame, text=initial, text_color=icon_fg,
+            font=("Segoe UI", 18, "bold"),
+        ).grid(row=0, column=0)
+
+        # --- Center: name + info ---
+        center = ctk.CTkFrame(self._view_frame, fg_color="transparent")
+        center.grid(row=0, column=1, sticky="ew")
+        center.grid_columnconfigure(0, weight=1)
+
+        # Row 0: name + badge
+        name_row = ctk.CTkFrame(center, fg_color="transparent")
+        name_row.grid(row=0, column=0, sticky="w")
+        ctk.CTkLabel(
+            name_row, text=self._display_name,
             text_color=C("fg"), font=FONT_SUBTITLE, anchor="w",
-        )
-        title.grid(row=0, column=0, sticky="w", padx=(0, SPACE_SM))
-
+        ).pack(side="left", padx=(0, SPACE_SM))
         if self._badge_text:
-            Badge(left, text=self._badge_text, variant="neutral").grid(
-                row=0, column=1, sticky="w", padx=(0, SPACE_SM),
-            )
+            variant = _BADGE_VARIANT.get(self._badge_text, "neutral")
+            Badge(name_row, text=self._badge_text,
+                  variant=variant).pack(side="left")
 
-        meta = ctk.CTkLabel(
-            left, text=self._meta_text or "—",
-            text_color=C("fg_muted"), font=FONT_CAPTION, anchor="w",
-        )
-        meta.grid(row=1, column=0, columnspan=2, sticky="w", pady=(2, 0))
+        # Row 1: base URL or meta
+        info_text = self._base_url or self._meta_text or ""
+        if info_text:
+            ctk.CTkLabel(
+                center, text=info_text,
+                text_color=C("fg_muted"), font=FONT_CAPTION, anchor="w",
+            ).grid(row=1, column=0, sticky="w", pady=(2, 0))
 
-        # Right: action buttons
+        # Row 2: model
+        if self._model:
+            ctk.CTkLabel(
+                center, text=f"model: {self._model}",
+                text_color=C("fg_subtle"), font=FONT_MICRO, anchor="w",
+            ).grid(row=2, column=0, sticky="w", pady=(1, 0))
+
+        # --- Right: action buttons ---
         actions = ctk.CTkFrame(self._view_frame, fg_color="transparent")
         actions.grid(row=0, column=1, sticky="e")
         ghost_button(actions, text="Edit", width=64,
-                     command=self._enter_edit).pack(side="left", padx=(0, SPACE_XS))
+                     command=self._enter_edit).pack(side="left",
+                                                    padx=(0, SPACE_XS))
         ghost_button(actions, text="Apply", width=64,
-                     command=self._enter_apply).pack(side="left", padx=(0, SPACE_XS))
+                     command=self._enter_apply).pack(side="left",
+                                                     padx=(0, SPACE_XS))
         ghost_button(actions, text="Delete", width=64,
+                     text_color=C("error"),
                      command=self._confirm_delete).pack(side="left")
 
     def _show_view(self) -> None:
@@ -1002,7 +1087,8 @@ class LibraryPage(ctk.CTkFrame):
             )
         except (TypeError, ValueError):
             edit_content = ""
-        # Use a descriptive meta line: the JSON keys list, if any.
+        # Extract display info from settings
+        display = _extract_display_info(settings)
         env_keys = list((settings.get("env") or {}).keys())
         meta_text = f"id: {item_id}" + (
             f"   ·   env: {', '.join(env_keys[:4])}"
@@ -1020,6 +1106,8 @@ class LibraryPage(ctk.CTkFrame):
             badge_text=category or _infer_category(settings),
             edit_content=edit_content,
             edit_kind="json",
+            base_url=display["base_url"],
+            model=display["model"],
             profiles=profiles,
             on_save=lambda content, _pid=item_id: self._on_provider_save(
                 _pid, content,
