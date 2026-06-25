@@ -55,31 +55,6 @@ from ..wsl import (
 
 # --- helpers ------------------------------------------------------------
 
-# Known env key → provider category mapping.
-# Keep in sync with src/agent_box/providers.py _ENV_CATEGORY.
-_ENV_CATEGORY_MAP: Dict[str, str] = {
-    "ANTHROPIC_API_KEY": "anthropic",
-    "ANTHROPIC_AUTH_TOKEN": "anthropic",
-    "OPENAI_API_KEY": "openai",
-    "GOOGLE_API_KEY": "google",
-    "GEMINI_API_KEY": "google",
-    "AWS_ACCESS_KEY_ID": "aws",
-    "AWS_SECRET_ACCESS_KEY": "aws",
-    "AWS_BEDROCK_API_KEY": "aws",
-    "DEEPSEEK_API_KEY": "deepseek",
-    "OPENROUTER_API_KEY": "openrouter",
-    "MISTRAL_API_KEY": "mistral",
-    "GROQ_API_KEY": "groq",
-    "TOGETHER_API_KEY": "together",
-    "COHERE_API_KEY": "cohere",
-    "REPLICATE_API_TOKEN": "replicate",
-    "HF_TOKEN": "huggingface",
-    "HUGGING_FACE_HUB_TOKEN": "huggingface",
-    "FIREWORKS_API_KEY": "fireworks",
-    "PERPLEXITY_API_KEY": "perplexity",
-    "SILICONFLOW_API_KEY": "siliconflow",
-}
-
 
 def _infer_category(settings: Dict[str, Any]) -> str:
     """Infer provider category from settings.
