@@ -66,3 +66,19 @@ export async function launchProfile(
     undefined,
   )
 }
+
+/**
+ * Get last used cwd for each profile from session history.
+ * Returns {profile_name: last_cwd_path}.
+ */
+export async function getLastCwdMap(): Promise<Record<string, string>> {
+  return call<Record<string, string>>((api) => api.last_cwd_map(), {})
+}
+
+/**
+ * Open native folder picker dialog.
+ * Returns the selected WSL path, or empty string if cancelled.
+ */
+export async function browseDir(): Promise<string> {
+  return call<string>((api) => api.browse_dir(), '')
+}

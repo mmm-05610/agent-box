@@ -273,6 +273,52 @@ class Api:
         except Exception as e:
             return json.dumps({"ok": True, "data": ""})
 
+    def last_cwd_map(self) -> str:
+        """Return {profile_name: last_cwd} from recent sessions."""
+        try:
+            out = _wsl_run(f"{AGENT_BOX_CMD} sessions --json", timeout=10)
+            rows = json.loads(out)
+            result: dict[str, str] = {}
+            for s in rows:
+                name = s.get("profile", "")
+                cwd = s.get("cwd") or ""
+                if name and cwd and name not in result:
+                    result[name] = cwd
+            return json.dumps({"ok": True, "data": result})
+        except Exception as e:
+            return json.dumps({"ok": True, "data": {}})
+
+    def browse_dir(self) -> str:
+        """Open a native folder picker and return the selected path (WSL format)."""
+        try:
+            import tkinter as tk
+            from tkinter import filedialog
+            root = tk.Tk()
+            root.withdraw()
+            root.attributes("-topmost", True)
+            path = filedialog.askdirectory(
+                initialdir=r"\\wsl$\Ubuntu\home",
+                title="Select project directory",
+            )
+            root.destroy()
+            if not path:
+                return json.dumps({"ok": True, "data": ""})
+            # Convert Windows path to WSL path
+            p = path.replace("\\", "/")
+            for prefix in ("//wsl$/Ubuntu/", "//wsl.localhost/Ubuntu/"):
+                if p.startswith(prefix):
+                    idx = p.find("/Ubuntu/")
+                    if idx != -1:
+                        wsl_path = p[idx + len("/Ubuntu"):]
+                        return json.dumps({"ok": True, "data": wsl_path})
+            if len(p) >= 2 and p[1] == ":":
+                drive = p[0].lower()
+                rest = p[2:]
+                return json.dumps({"ok": True, "data": f"/mnt/{drive}{rest}"})
+            return json.dumps({"ok": True, "data": p})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
     def list_dir(self, path: str) -> str:
         """List files in a directory. Returns empty string if directory not found."""
         try:

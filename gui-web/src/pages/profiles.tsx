@@ -5,7 +5,7 @@
  * launch (with mode/cwd), and delete actions.
  */
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button, Card, Badge, Input } from '@/components/ui'
 import { EmptyState, Loading } from '@/components/feedback'
 import { useToast } from '@/components/feedback/toast'
@@ -13,7 +13,7 @@ import { useProfiles } from '@/hooks'
 import { cn } from '@/lib/utils'
 import { formatRelativeTime } from '@/lib/utils'
 import type { AgentType, Profile } from '@/api'
-import { AGENT_TYPES, AGENT_TYPE_COLORS, deleteProfile, launchProfile } from '@/api'
+import { AGENT_TYPES, AGENT_TYPE_COLORS, deleteProfile, launchProfile, getLastCwdMap, browseDir } from '@/api'
 
 // ── Agent type icons ────────────────────────────────────────────────────
 
@@ -47,6 +47,12 @@ export function ProfilesPage({ onOpenDetail }: ProfilesPageProps) {
 
   const [activeFilter, setActiveFilter] = useState<FilterTab>('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const [lastCwdMap, setLastCwdMap] = useState<Record<string, string>>({})
+
+  // Load last cwd from session history
+  useEffect(() => {
+    getLastCwdMap().then(setLastCwdMap).catch(() => {})
+  }, [])
 
   // ── Filtered & searched profiles ────────────────────────────────────
 
@@ -181,6 +187,7 @@ export function ProfilesPage({ onOpenDetail }: ProfilesPageProps) {
             <ProfileCard
               key={profile.name}
               profile={profile}
+              lastCwd={lastCwdMap[profile.name] ?? ''}
               onLaunch={handleLaunch}
               onDelete={handleDelete}
               onView={handleView}
@@ -235,14 +242,23 @@ function FilterTabs({
 }
 
 // ── Profile Card ────────────────────────────────────────────────────────
+//
+// Layout (matches old GUI):
+//   ● profile-name  [CLAUDE]                ▶ Launch
+//     Display Name · description
+//     provider: xxx · created: 2h ago
+//     ~/projects/dw                              [Edit ...]
+//     [📁] [Mode: New Session ▾]              [View] [Delete]
 
 function ProfileCard({
   profile,
+  lastCwd,
   onLaunch,
   onDelete,
   onView,
 }: {
   profile: Profile
+  lastCwd: string
   onLaunch: (name: string, mode: string, cwd: string) => void
   onDelete: (name: string) => void
   onView: (name: string) => void
@@ -250,11 +266,25 @@ function ProfileCard({
   const { name, agentType, displayName, description, providerRef, createdAt } =
     profile
 
-  const [mode, setMode] = useState<string>('新会话')
-  const [cwd, setCwd] = useState<string>('')
+  const [mode, setMode] = useState<string>('继续上次')
+  const [cwd, setCwd] = useState<string>(lastCwd || '~')
+
+  // Update cwd when lastCwd changes (on initial load)
+  useEffect(() => {
+    if (lastCwd) setCwd(lastCwd)
+  }, [lastCwd])
 
   const badgeVariant = AGENT_TYPE_COLORS[agentType]
   const icon = AGENT_TYPE_ICONS[agentType]
+
+  const handleBrowse = async () => {
+    try {
+      const path = await browseDir()
+      if (path) setCwd(path)
+    } catch {
+      // silently ignore — user cancelled or bridge unavailable
+    }
+  }
 
   return (
     <Card hoverable>
@@ -266,9 +296,12 @@ function ProfileCard({
 
         {/* Content */}
         <div className="flex min-w-0 flex-1 flex-col gap-1">
-          {/* Row 1: name + badge + launch */}
+          {/* Row 1: name + badge + launch button */}
           <div className="flex items-center gap-3">
-            <span className="truncate font-semibold text-foreground">
+            <span
+              className="truncate font-semibold text-foreground cursor-pointer hover:text-primary transition-colors"
+              onClick={() => onView(name)}
+            >
               {name}
             </span>
             <Badge variant={badgeVariant as 'neutral' | 'primary' | 'success' | 'warning' | 'destructive' | 'info'}>
@@ -300,8 +333,32 @@ function ProfileCard({
             )}
           </div>
 
-          {/* Row 4: mode + cwd + actions */}
-          <div className="flex items-center gap-2 pt-2">
+          {/* Row 4: cwd display + edit */}
+          <div className="flex items-center gap-2 pt-1">
+            <span className="flex-1 truncate font-mono text-xs text-muted-foreground">
+              {cwd || '~'}
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onView(name)}
+              className="shrink-0 text-xs text-muted-foreground"
+            >
+              Edit ...
+            </Button>
+          </div>
+
+          {/* Row 5: browse + mode selector + actions */}
+          <div className="flex items-center gap-2 pt-1">
+            {/* Browse button */}
+            <button
+              onClick={handleBrowse}
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-input bg-card text-sm transition-colors hover:bg-muted"
+              title="Browse for directory"
+            >
+              📁
+            </button>
+
             {/* Mode selector */}
             <select
               value={mode}
@@ -315,13 +372,8 @@ function ProfileCard({
               ))}
             </select>
 
-            {/* CWD input */}
-            <Input
-              placeholder="Working directory (optional)"
-              value={cwd}
-              onChange={(e) => setCwd(e.target.value)}
-              className="h-7 text-xs flex-1"
-            />
+            {/* Spacer */}
+            <div className="flex-1" />
 
             {/* Action buttons */}
             <div className="flex items-center gap-1 shrink-0">
