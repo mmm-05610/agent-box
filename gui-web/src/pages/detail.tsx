@@ -102,7 +102,7 @@ export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProp
   const [settings, setSettings] = useState<string>('')
   const [claudeMd, setClaudeMd] = useState<string>('')
   const [hooks, setHooks] = useState<string>('')
-  const [plugins, setPlugins] = useState<string>('')
+  const [plugins, setPlugins] = useState<Record<string, boolean>>({})
   const [storage, setStorage] = useState<string>('')
 
   // Load profile detail
@@ -154,9 +154,15 @@ export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProp
         setHooks(hooksContent)
       }
 
-      // Load plugins/skills
-      const pluginsContent = await listDir(`${configDir}/plugins`).catch(() => '')
-      setPlugins(pluginsContent)
+      // Load plugins from settings.json (claude only)
+      if (agentType === 'claude' && settingsContent) {
+        try {
+          const settingsJson = JSON.parse(settingsContent)
+          setPlugins(settingsJson.enabledPlugins ?? {})
+        } catch {
+          setPlugins({})
+        }
+      }
 
       // Load storage info
       const storageContent = await listDir(`${configDir}`).catch(() => '')
@@ -262,7 +268,7 @@ function TabContent({
   settings: string
   claudeMd: string
   hooks: string
-  plugins: string
+  plugins: Record<string, boolean>
   storage: string
 }) {
   const { meta } = detail
@@ -382,20 +388,38 @@ function TabContent({
       )
 
     case 'plugins':
+      return (
+        <Card>
+          <Card.Header>
+            <Card.Title>Plugins</Card.Title>
+          </Card.Header>
+          <Card.Content>
+            {Object.keys(plugins).length > 0 ? (
+              <div className="space-y-2">
+                {Object.entries(plugins).map(([name, enabled]) => (
+                  <div key={name} className="flex items-center gap-3 p-2 rounded-md bg-muted">
+                    <span className={enabled ? 'text-success' : 'text-muted-foreground'}>
+                      {enabled ? '✓' : '✗'}
+                    </span>
+                    <span className="text-sm font-mono text-foreground">{name}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No plugins installed</p>
+            )}
+          </Card.Content>
+        </Card>
+      )
+
     case 'skills':
       return (
         <Card>
           <Card.Header>
-            <Card.Title>{tab === 'plugins' ? 'Plugins' : 'Skills'}</Card.Title>
+            <Card.Title>Skills</Card.Title>
           </Card.Header>
           <Card.Content>
-            {plugins ? (
-              <pre className="text-sm text-foreground font-mono whitespace-pre-wrap bg-muted p-4 rounded-md overflow-auto max-h-[600px]">
-                {plugins}
-              </pre>
-            ) : (
-              <p className="text-sm text-muted-foreground">No {tab} installed</p>
-            )}
+            <p className="text-sm text-muted-foreground">No skills installed</p>
           </Card.Content>
         </Card>
       )
