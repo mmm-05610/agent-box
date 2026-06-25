@@ -196,20 +196,28 @@ class Api:
     # ── File I/O ──────────────────────────────────────────────────────────
 
     def read_file(self, path: str) -> str:
-        """Read a file from WSL and return its content."""
+        """Read a file from WSL and return its content. Returns empty string if file not found."""
         try:
+            # Check if file exists first
+            check = _wsl_run(f"test -f {path} && echo exists || echo missing")
+            if "missing" in check:
+                return json.dumps({"ok": True, "data": ""})
             content = _wsl_run(f"cat {path}")
             return json.dumps({"ok": True, "data": content})
         except Exception as e:
-            return json.dumps({"ok": False, "error": str(e)})
+            return json.dumps({"ok": True, "data": ""})
 
     def list_dir(self, path: str) -> str:
-        """List files in a directory."""
+        """List files in a directory. Returns empty string if directory not found."""
         try:
+            # Check if directory exists first
+            check = _wsl_run(f"test -d {path} && echo exists || echo missing")
+            if "missing" in check:
+                return json.dumps({"ok": True, "data": ""})
             out = _wsl_run(f"ls -la {path}")
             return json.dumps({"ok": True, "data": out})
         except Exception as e:
-            return json.dumps({"ok": False, "error": str(e)})
+            return json.dumps({"ok": True, "data": ""})
 
     # ── Apply ───────────────────────────────────────────────────────────
 
