@@ -6,27 +6,49 @@ Same pattern as the old gui/wsl.py.
 """
 
 import json
+import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 import webview
 
-WSL_CMD = "wsl.exe"
 AGENT_BOX_CMD = "agent-box"
 
 
-def _wsl_run(cmd: str, timeout: int = 15) -> str:
-    """Run a command in WSL and return stdout."""
-    result = subprocess.run(
-        [WSL_CMD, "bash", "-lc", cmd],
-        capture_output=True,
-        text=True,
-        timeout=timeout,
-    )
+def _wsl_run(cmd: str, timeout: float = 15) -> str:
+    """Run a command via wsl.exe bash -lc and return stdout.
+
+    Follows the same pattern as gui/wsl.py _wsl_run.
+    """
+    wsl = shutil.which("wsl.exe")
+    if wsl is None:
+        raise RuntimeError("wsl.exe not found in PATH (install WSL).")
+
+    kwargs = {}
+    if sys.platform == "win32":
+        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+
+    try:
+        result = subprocess.run(
+            [wsl, "bash", "-lc", cmd],
+            capture_output=True,
+            timeout=timeout,
+            cwd="C:\\",
+            **kwargs,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(f"wsl.exe command timed out: {exc}") from exc
+    except OSError as exc:
+        raise RuntimeError(f"failed to invoke wsl.exe: {exc}") from exc
+
     if result.returncode != 0:
-        raise RuntimeError(result.stderr.strip() or f"Command failed: {cmd}")
-    return result.stdout.strip()
+        stderr = result.stderr.decode("utf-8", errors="replace").strip()
+        raise RuntimeError(
+            f"wsl command failed (exit {result.returncode}): {stderr or '<no stderr>'}"
+        )
+    return result.stdout.decode("utf-8", errors="replace").strip()
 
 
 class Api:
@@ -191,14 +213,22 @@ class Api:
 def main():
     api = Api()
 
-    # Default to Vite dev server (must be running in WSL)
+    # Determine frontend URL
+    # Priority: --url flag > --prod (built files) > localhost:5173 (dev server)
     url = "http://localhost:5173"
 
-    # If --prod flag, try loading built files
     if "--prod" in sys.argv:
         frontend_dir = Path(__file__).parent / "dist"
         if frontend_dir.exists():
             url = str(frontend_dir / "index.html")
+            print(f"Loading built files from: {url}")
+    elif "--url" in sys.argv:
+        idx = sys.argv.index("--url")
+        if idx + 1 < len(sys.argv):
+            url = sys.argv[idx + 1]
+
+    print(f"Loading frontend from: {url}")
+    print(f"Bridge API available: {api}")
 
     window = webview.create_window(
         title="Agent Box",
