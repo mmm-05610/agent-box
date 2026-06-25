@@ -279,7 +279,7 @@ function ProfileCard({
 
   const handleBrowse = async () => {
     try {
-      const path = await browseDir('~/projects')
+      const path = await browseDir()
       if (path) setCwd(path)
     } catch {
       // silently ignore — user cancelled or bridge unavailable

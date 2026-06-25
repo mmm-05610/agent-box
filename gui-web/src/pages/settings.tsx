@@ -1,10 +1,12 @@
 /**
- * Settings Page — Theme preferences and app info
+ * Settings Page — Theme, projects directory, and app info
  */
 
 import { useEffect, useState } from 'react'
-import { Card } from '@/components/ui'
+import { Button, Card, Input } from '@/components/ui'
+import { useToast } from '@/components/feedback/toast'
 import { cn } from '@/lib/utils'
+import { getSettings, saveSettings } from '@/api'
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -44,7 +46,17 @@ const themeOptions: { value: Theme; icon: string; label: string }[] = [
 // ── Component ──────────────────────────────────────────────────────────
 
 export function SettingsPage() {
+  const { toast } = useToast()
   const [theme, setTheme] = useState<Theme>(readStoredTheme)
+  const [projectsDir, setProjectsDir] = useState('~/projects')
+  const [saving, setSaving] = useState(false)
+
+  // Load settings from bridge
+  useEffect(() => {
+    getSettings().then((s) => {
+      if (s.projects_dir) setProjectsDir(s.projects_dir)
+    }).catch(() => {})
+  }, [])
 
   // Apply theme on mount and whenever it changes
   useEffect(() => {
@@ -62,11 +74,57 @@ export function SettingsPage() {
     return () => mq.removeEventListener('change', handler)
   }, [theme])
 
+  const handleSaveProjectsDir = async () => {
+    setSaving(true)
+    try {
+      await saveSettings({ projects_dir: projectsDir })
+      toast({ type: 'success', message: 'Projects directory saved' })
+    } catch {
+      toast({ type: 'error', message: 'Failed to save' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <div className="p-8 max-w-2xl">
-      {/* ── Appearance ────────────────────────────────────────────────── */}
       <h1 className="mb-6 text-xl font-bold text-foreground">Settings</h1>
 
+      {/* ── Projects Directory ──────────────────────────────────────── */}
+      <section className="mb-8">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          Projects Directory
+        </h2>
+
+        <Card>
+          <div className="p-4">
+            <p className="mb-3 text-sm text-muted-foreground">
+              Default directory for browsing and launching projects.
+              Used as the starting point for the folder picker.
+            </p>
+            <div className="flex items-center gap-2">
+              <Input
+                value={projectsDir}
+                onChange={(e) => setProjectsDir(e.target.value)}
+                placeholder="~/projects"
+                className="flex-1 font-mono text-sm"
+              />
+              <Button
+                size="sm"
+                onClick={handleSaveProjectsDir}
+                disabled={saving}
+              >
+                {saving ? 'Saving...' : 'Save'}
+              </Button>
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Use WSL paths (e.g. ~/projects, /home/user/work)
+            </p>
+          </div>
+        </Card>
+      </section>
+
+      {/* ── Appearance ──────────────────────────────────────────────── */}
       <section className="mb-8">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
           Appearance

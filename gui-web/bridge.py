@@ -19,6 +19,33 @@ import webview
 
 AGENT_BOX_CMD = "agent-box"
 
+# GUI settings file (Windows side, persists across sessions)
+_SETTINGS_DIR = Path(os.environ.get("APPDATA", "~")) / "agent-box"
+_SETTINGS_FILE = _SETTINGS_DIR / "gui-settings.json"
+_DEFAULT_SETTINGS = {
+    "projects_dir": "~/projects",
+}
+
+
+def _load_settings() -> dict:
+    try:
+        if _SETTINGS_FILE.exists():
+            with open(_SETTINGS_FILE, encoding="utf-8") as f:
+                data = json.load(f)
+            # Merge with defaults so new keys are always present
+            merged = dict(_DEFAULT_SETTINGS)
+            merged.update(data)
+            return merged
+    except Exception:
+        pass
+    return dict(_DEFAULT_SETTINGS)
+
+
+def _save_settings(data: dict) -> None:
+    _SETTINGS_DIR.mkdir(parents=True, exist_ok=True)
+    with open(_SETTINGS_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
 
 def _wsl_run(cmd: str, timeout: float = 15) -> str:
     """Run a command via wsl.exe bash -lc and return stdout.
@@ -56,6 +83,24 @@ def _wsl_run(cmd: str, timeout: float = 15) -> str:
 
 class Api:
     """JavaScript-accessible API via window.api."""
+
+    # ── Settings ────────────────────────────────────────────────────────
+
+    def get_settings(self) -> str:
+        try:
+            return json.dumps({"ok": True, "data": _load_settings()})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    def save_settings(self, settings_json: str) -> str:
+        try:
+            data = json.loads(settings_json)
+            current = _load_settings()
+            current.update(data)
+            _save_settings(current)
+            return json.dumps({"ok": True, "data": current})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
 
     # ── Providers ───────────────────────────────────────────────────────
 
@@ -298,9 +343,14 @@ class Api:
         """Open a native folder picker and return the selected path (WSL format).
 
         Uses PyWebView's native dialog (no Tk conflict).
-        *initial* is a WSL path like ~/projects; converted to Windows path for the dialog.
+        *initial* is a WSL path; if empty, uses projects_dir from settings.
         """
         try:
+            # Use settings' projects_dir as default
+            if not initial:
+                settings = _load_settings()
+                initial = settings.get("projects_dir", "~/projects")
+
             # Resolve initial directory
             initial_win = ""
             if initial:
