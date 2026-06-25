@@ -14,7 +14,7 @@ import { Loading } from '@/components/feedback'
 import { cn } from '@/lib/utils'
 import type { AgentType } from '@/api'
 import { AGENT_TYPE_COLORS, fetchProfileDetail } from '@/api'
-import { readFile } from '@/api/files'
+import { readFile, listDir } from '@/api/files'
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -154,8 +154,12 @@ export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProp
         setHooks(hooksContent)
       }
 
+      // Load plugins/skills
+      const pluginsContent = await listDir(`${configDir}/plugins`).catch(() => '')
+      setPlugins(pluginsContent)
+
       // Load storage info
-      const storageContent = await readFile(`${configDir}/`).catch(() => '')
+      const storageContent = await listDir(`${configDir}`).catch(() => '')
       setStorage(storageContent)
     }
     void loadFiles()
