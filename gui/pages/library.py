@@ -61,8 +61,15 @@ def _infer_category(settings: Dict[str, Any]) -> str:
 
     Claude Code uses ``ANTHROPIC_*`` env vars for ALL providers — the
     actual provider identity comes from the ``ANTHROPIC_BASE_URL`` domain.
+    For other agent types, check ``settings.name`` and env URLs.
     """
     from ..config import _extract_provider_name
+
+    _KNOWN = [
+        "anthropic", "openai", "deepseek", "openrouter", "google",
+        "mistral", "groq", "together", "fireworks", "perplexity",
+        "siliconflow", "cohere", "replicate", "minimax", "aws",
+    ]
 
     env = settings.get("env") or {}
 
@@ -72,26 +79,26 @@ def _infer_category(settings: Dict[str, Any]) -> str:
         name = _extract_provider_name(base_url)
         if name:
             return name
-        # URL present but unrecognised domain — still not Anthropic official
         return "custom"
-    # No ANTHROPIC_BASE_URL → official Anthropic endpoint.
-    # But only claim "anthropic" if there IS an Anthropic key.
     if "ANTHROPIC_API_KEY" in env or "ANTHROPIC_AUTH_TOKEN" in env:
         return "anthropic"
 
-    # 2. Non-Claude agent types: check other known URL env vars.
-    _URL_ENV_KEYS = [
-        "OPENAI_BASE_URL", "GOOGLE_API_BASE", "DEEPSEEK_BASE_URL",
-        "OPENROUTER_BASE_URL", "MISTRAL_BASE_URL", "GROQ_BASE_URL",
-    ]
-    for key in _URL_ENV_KEYS:
+    # 2. Check settings.name against known providers.
+    settings_name = (settings.get("name") or "").lower()
+    for known in _KNOWN:
+        if known in settings_name:
+            return known
+
+    # 3. Check other known URL env vars.
+    for key in ("OPENAI_BASE_URL", "GOOGLE_API_BASE", "DEEPSEEK_BASE_URL",
+                "OPENROUTER_BASE_URL", "MISTRAL_BASE_URL", "GROQ_BASE_URL"):
         url = env.get(key, "")
         if url:
             name = _extract_provider_name(url)
             if name:
                 return name
 
-    # 3. Fallback: scan all env values for any URL.
+    # 4. Scan all env values for any URL.
     for val in env.values():
         if isinstance(val, str) and "://" in val:
             name = _extract_provider_name(val)

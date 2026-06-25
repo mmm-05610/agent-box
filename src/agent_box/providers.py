@@ -30,15 +30,23 @@ def _infer_category(settings: Dict[str, Any]) -> str:
 
     Claude Code uses ``ANTHROPIC_*`` env vars for ALL providers — the
     actual provider identity comes from the ``ANTHROPIC_BASE_URL`` domain.
+    For other agent types, check ``settings.name`` and env URLs.
 
     Resolution order:
     1. Explicit ``category`` key in settings → manual override.
     2. ``ANTHROPIC_BASE_URL`` domain → real provider (Claude Code).
-    3. Other known URL env vars.
-    4. Scan all env values for URLs.
+    3. ``settings.name`` match against known providers.
+    4. Other known URL env vars.
+    5. Scan all env values for URLs.
 
     Returns a lowercase string like ``"anthropic"`` or ``""`` if unknown.
     """
+    _KNOWN = [
+        "anthropic", "openai", "deepseek", "openrouter", "google",
+        "mistral", "groq", "together", "fireworks", "perplexity",
+        "siliconflow", "cohere", "replicate", "minimax", "aws",
+    ]
+
     # 1. Manual override
     manual = settings.get("category")
     if manual and isinstance(manual, str):
@@ -53,11 +61,16 @@ def _infer_category(settings: Dict[str, Any]) -> str:
         if name:
             return name
         return "custom"
-    # No BASE_URL → official Anthropic (if key present).
     if "ANTHROPIC_API_KEY" in env or "ANTHROPIC_AUTH_TOKEN" in env:
         return "anthropic"
 
-    # 3. Other known URL env vars (non-Claude agent types).
+    # 3. Check settings.name against known providers.
+    settings_name = (settings.get("name") or "").lower()
+    for known in _KNOWN:
+        if known in settings_name:
+            return known
+
+    # 4. Other known URL env vars (non-Claude agent types).
     for key in ("OPENAI_BASE_URL", "GOOGLE_API_BASE", "DEEPSEEK_BASE_URL",
                 "OPENROUTER_BASE_URL", "MISTRAL_BASE_URL", "GROQ_BASE_URL"):
         url = env.get(key, "")
@@ -66,7 +79,7 @@ def _infer_category(settings: Dict[str, Any]) -> str:
             if name:
                 return name
 
-    # 4. Scan all env values for any URL.
+    # 5. Scan all env values for any URL.
     for val in env.values():
         if isinstance(val, str) and "://" in val:
             name = _extract_provider_from_url(val)
