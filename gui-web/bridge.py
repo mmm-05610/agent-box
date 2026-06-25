@@ -16,16 +16,18 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from agent_box import config, library, profile, sessions
 from agent_box.providers import (
+    apply_provider,
     delete_provider,
     get_provider,
     list_providers,
-    save_provider,
+    upsert_provider,
 )
 from agent_box.claude_mds import (
+    apply_claude_md,
     delete_claude_md,
     get_claude_md,
     list_claude_mds,
-    save_claude_md,
+    upsert_claude_md,
 )
 
 
@@ -55,7 +57,7 @@ class Api:
     ) -> str:
         """Save a provider. Returns the saved provider as JSON."""
         try:
-            p = save_provider(agent_type, provider_id, settings_json)
+            p = upsert_provider(agent_type, provider_id, settings_json)
             return json.dumps({"ok": True, "data": p})
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
@@ -96,7 +98,7 @@ class Api:
     ) -> str:
         """Save a Claude.md template."""
         try:
-            m = save_claude_md(
+            m = upsert_claude_md(
                 agent_type,
                 md_id,
                 content,
@@ -167,7 +169,7 @@ class Api:
     def list_sessions(self) -> str:
         """Return all sessions as JSON."""
         try:
-            s = sessions.list_sessions()
+            s = sessions.fetch_sessions()
             return json.dumps({"ok": True, "data": s})
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
@@ -175,7 +177,7 @@ class Api:
     def cleanup_sessions(self) -> str:
         """Clean up stale sessions."""
         try:
-            count = sessions.cleanup()
+            count = sessions.cleanup_stale_sessions()
             return json.dumps({"ok": True, "data": count})
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
@@ -203,9 +205,7 @@ class Api:
     def apply_provider(self, profile_name: str, provider_id: str) -> str:
         """Apply a provider to a profile."""
         try:
-            from agent_box.providers import apply_provider as _apply
-
-            _apply(profile_name, provider_id)
+            apply_provider(profile_name, provider_id)
             return json.dumps({"ok": True})
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
@@ -213,9 +213,7 @@ class Api:
     def apply_claude_md(self, profile_name: str, md_id: str) -> str:
         """Apply a Claude.md to a profile."""
         try:
-            from agent_box.claude_mds import apply_claude_md as _apply
-
-            _apply(profile_name, md_id)
+            apply_claude_md(profile_name, md_id)
             return json.dumps({"ok": True})
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
