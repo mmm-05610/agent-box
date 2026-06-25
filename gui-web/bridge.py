@@ -191,11 +191,14 @@ class Api:
 def main():
     api = Api()
 
-    frontend_dir = Path(__file__).parent / "dist"
-    if frontend_dir.exists():
-        url = str(frontend_dir / "index.html")
-    else:
-        url = "http://localhost:5173"
+    # Default to Vite dev server (must be running in WSL)
+    url = "http://localhost:5173"
+
+    # If --prod flag, try loading built files
+    if "--prod" in sys.argv:
+        frontend_dir = Path(__file__).parent / "dist"
+        if frontend_dir.exists():
+            url = str(frontend_dir / "index.html")
 
     window = webview.create_window(
         title="Agent Box",
