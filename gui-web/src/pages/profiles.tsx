@@ -30,7 +30,11 @@ type FilterTab = AgentType | 'all'
 
 // ── Component ───────────────────────────────────────────────────────────
 
-export function ProfilesPage() {
+interface ProfilesPageProps {
+  onOpenDetail?: (name: string) => void
+}
+
+export function ProfilesPage({ onOpenDetail }: ProfilesPageProps) {
   const { profiles, loading, error, refresh, filterByType } = useProfiles()
   const { toast } = useToast()
 
@@ -93,10 +97,13 @@ export function ProfilesPage() {
 
   const handleView = useCallback(
     (name: string) => {
-      // TODO: Navigate to detail page
-      toast({ type: 'info', message: `Detail page for "${name}" — not implemented yet` })
+      if (onOpenDetail) {
+        onOpenDetail(name)
+      } else {
+        toast({ type: 'info', message: `Detail page for "${name}" — not available` })
+      }
     },
-    [toast],
+    [onOpenDetail, toast],
   )
 
   // ── Loading / error states ──────────────────────────────────────────
