@@ -87,7 +87,7 @@ def _infer_category(settings: Dict[str, Any]) -> str:
     Claude Code uses ``ANTHROPIC_*`` env vars for ALL providers — the
     actual provider identity comes from the ``ANTHROPIC_BASE_URL`` domain.
     """
-    from .config import _extract_provider_name
+    from ..config import _extract_provider_name
 
     env = settings.get("env") or {}
 
