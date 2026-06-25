@@ -75,9 +75,11 @@ class Api:
 
     def save_provider(self, agent_type: str, provider_id: str, settings_json: str) -> str:
         try:
-            # Pipe JSON via stdin
+            wsl = shutil.which("wsl.exe")
+            if wsl is None:
+                return json.dumps({"ok": False, "error": "wsl.exe not found"})
             result = subprocess.run(
-                [WSL_CMD, "bash", "-lc", f"{AGENT_BOX_CMD} provider upsert {agent_type} {provider_id}"],
+                [wsl, "bash", "-lc", f"{AGENT_BOX_CMD} provider upsert {agent_type} {provider_id}"],
                 input=settings_json,
                 capture_output=True,
                 text=True,
@@ -115,13 +117,16 @@ class Api:
     def save_claude_md(self, agent_type: str, md_id: str, content: str,
                        name: str = "", description: str = "") -> str:
         try:
+            wsl = shutil.which("wsl.exe")
+            if wsl is None:
+                return json.dumps({"ok": False, "error": "wsl.exe not found"})
             flags = ""
             if name:
                 flags += f" --name {name}"
             if description:
                 flags += f" --description {description}"
             result = subprocess.run(
-                [WSL_CMD, "bash", "-lc",
+                [wsl, "bash", "-lc",
                  f"{AGENT_BOX_CMD} claude-md upsert {agent_type} {md_id}{flags}"],
                 input=content,
                 capture_output=True,
@@ -264,11 +269,12 @@ class Api:
     def read_file(self, path: str) -> str:
         """Read a file from WSL and return its content. Returns empty string if file not found."""
         try:
-            # Check if file exists first
-            check = _wsl_run(f"test -f {path} && echo exists || echo missing")
+            # Quote path for shell safety
+            quoted = f"'{path}'" if " " in path else path
+            check = _wsl_run(f"test -f {quoted} && echo exists || echo missing")
             if "missing" in check:
                 return json.dumps({"ok": True, "data": ""})
-            content = _wsl_run(f"cat {path}")
+            content = _wsl_run(f"cat {quoted}")
             return json.dumps({"ok": True, "data": content})
         except Exception as e:
             return json.dumps({"ok": True, "data": ""})
@@ -322,11 +328,11 @@ class Api:
     def list_dir(self, path: str) -> str:
         """List files in a directory. Returns empty string if directory not found."""
         try:
-            # Check if directory exists first
-            check = _wsl_run(f"test -d {path} && echo exists || echo missing")
+            quoted = f"'{path}'" if " " in path else path
+            check = _wsl_run(f"test -d {quoted} && echo exists || echo missing")
             if "missing" in check:
                 return json.dumps({"ok": True, "data": ""})
-            out = _wsl_run(f"ls -la {path}")
+            out = _wsl_run(f"ls -la {quoted}")
             return json.dumps({"ok": True, "data": out})
         except Exception as e:
             return json.dumps({"ok": True, "data": ""})
