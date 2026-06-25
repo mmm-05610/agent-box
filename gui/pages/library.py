@@ -57,55 +57,23 @@ from ..wsl import (
 
 
 def _infer_category(settings: Dict[str, Any]) -> str:
-    """Infer provider category from settings.
-
-    Claude Code uses ``ANTHROPIC_*`` env vars for ALL providers — the
-    actual provider identity comes from the ``ANTHROPIC_BASE_URL`` domain.
-    For other agent types, check ``settings.name`` and env URLs.
-    """
+    """Infer provider category from settings by scanning for URLs."""
     from ..config import _extract_provider_name
 
-    _KNOWN = [
-        "anthropic", "openai", "deepseek", "openrouter", "google",
-        "mistral", "groq", "together", "fireworks", "perplexity",
-        "siliconflow", "cohere", "replicate", "minimax", "aws",
-    ]
-
-    env = settings.get("env") or {}
-
-    # 1. Claude Code: ANTHROPIC_BASE_URL determines the real provider.
-    base_url = env.get("ANTHROPIC_BASE_URL", "")
-    if base_url:
-        name = _extract_provider_name(base_url)
-        if name:
-            return name
-        return "custom"
-    if "ANTHROPIC_API_KEY" in env or "ANTHROPIC_AUTH_TOKEN" in env:
-        return "anthropic"
-
-    # 2. Check settings.name against known providers.
-    settings_name = (settings.get("name") or "").lower()
-    for known in _KNOWN:
-        if known in settings_name:
-            return known
-
-    # 3. Check other known URL env vars.
-    for key in ("OPENAI_BASE_URL", "GOOGLE_API_BASE", "DEEPSEEK_BASE_URL",
-                "OPENROUTER_BASE_URL", "MISTRAL_BASE_URL", "GROQ_BASE_URL"):
-        url = env.get(key, "")
-        if url:
-            name = _extract_provider_name(url)
+    # Scan all string values in the entire settings dict for URLs.
+    def _scan(obj: Any) -> str:
+        if isinstance(obj, str) and "://" in obj:
+            name = _extract_provider_name(obj)
             if name:
                 return name
+        elif isinstance(obj, dict):
+            for v in obj.values():
+                r = _scan(v)
+                if r:
+                    return r
+        return ""
 
-    # 4. Scan all env values for any URL.
-    for val in env.values():
-        if isinstance(val, str) and "://" in val:
-            name = _extract_provider_name(val)
-            if name:
-                return name
-
-    return ""
+    return _scan(settings)
 
 
 # Tab keys

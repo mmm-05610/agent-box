@@ -26,67 +26,30 @@ from .profile import ProfileError, load_meta
 
 
 def _infer_category(settings: Dict[str, Any]) -> str:
-    """Infer provider category from *settings*.
+    """Infer provider category from *settings* by scanning for URLs.
 
-    Claude Code uses ``ANTHROPIC_*`` env vars for ALL providers — the
-    actual provider identity comes from the ``ANTHROPIC_BASE_URL`` domain.
-    For other agent types, check ``settings.name`` and env URLs.
-
-    Resolution order:
     1. Explicit ``category`` key in settings → manual override.
-    2. ``ANTHROPIC_BASE_URL`` domain → real provider (Claude Code).
-    3. ``settings.name`` match against known providers.
-    4. Other known URL env vars.
-    5. Scan all env values for URLs.
-
-    Returns a lowercase string like ``"anthropic"`` or ``""`` if unknown.
+    2. Scan all string values for URLs → match domain.
     """
-    _KNOWN = [
-        "anthropic", "openai", "deepseek", "openrouter", "google",
-        "mistral", "groq", "together", "fireworks", "perplexity",
-        "siliconflow", "cohere", "replicate", "minimax", "aws",
-    ]
-
     # 1. Manual override
     manual = settings.get("category")
     if manual and isinstance(manual, str):
         return manual.strip().lower()
 
-    env = settings.get("env") or {}
-
-    # 2. Claude Code: ANTHROPIC_BASE_URL determines the real provider.
-    base_url = env.get("ANTHROPIC_BASE_URL", "")
-    if base_url:
-        name = _extract_provider_from_url(base_url)
-        if name:
-            return name
-        return "custom"
-    if "ANTHROPIC_API_KEY" in env or "ANTHROPIC_AUTH_TOKEN" in env:
-        return "anthropic"
-
-    # 3. Check settings.name against known providers.
-    settings_name = (settings.get("name") or "").lower()
-    for known in _KNOWN:
-        if known in settings_name:
-            return known
-
-    # 4. Other known URL env vars (non-Claude agent types).
-    for key in ("OPENAI_BASE_URL", "GOOGLE_API_BASE", "DEEPSEEK_BASE_URL",
-                "OPENROUTER_BASE_URL", "MISTRAL_BASE_URL", "GROQ_BASE_URL"):
-        url = env.get(key, "")
-        if url:
-            name = _extract_provider_from_url(url)
+    # 2. Scan all string values for URLs.
+    def _scan(obj: Any) -> str:
+        if isinstance(obj, str) and "://" in obj:
+            name = _extract_provider_from_url(obj)
             if name:
                 return name
+        elif isinstance(obj, dict):
+            for v in obj.values():
+                r = _scan(v)
+                if r:
+                    return r
+        return ""
 
-    # 5. Scan all env values for any URL.
-    for val in env.values():
-        if isinstance(val, str) and "://" in val:
-            name = _extract_provider_from_url(val)
-            if name:
-                return name
-
-    return ""
+    return _scan(settings)
 
 
 def _extract_provider_from_url(url: str) -> str:
