@@ -101,7 +101,7 @@ export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProp
   // File contents
   const [settings, setSettings] = useState<string>('')
   const [claudeMd, setClaudeMd] = useState<string>('')
-  const [hooks, setHooks] = useState<string>('')
+  const [hooks, setHooks] = useState<Record<string, unknown>>({})
   const [plugins, setPlugins] = useState<Record<string, boolean>>({})
   const [storage, setStorage] = useState<string>('')
 
@@ -148,18 +148,14 @@ export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProp
         setClaudeMd(personaContent)
       }
 
-      // Load hooks (claude only)
-      if (agentType === 'claude') {
-        const hooksContent = await readFile(`${configDir}/hooks.json`).catch(() => '')
-        setHooks(hooksContent)
-      }
-
-      // Load plugins from settings.json (claude only)
+      // Load hooks and plugins from settings.json (claude only)
       if (agentType === 'claude' && settingsContent) {
         try {
           const settingsJson = JSON.parse(settingsContent)
+          setHooks(settingsJson.hooks ?? {})
           setPlugins(settingsJson.enabledPlugins ?? {})
         } catch {
+          setHooks({})
           setPlugins({})
         }
       }
@@ -267,7 +263,7 @@ function TabContent({
   detail: ProfileDetail
   settings: string
   claudeMd: string
-  hooks: string
+  hooks: Record<string, unknown>
   plugins: Record<string, boolean>
   storage: string
 }) {
@@ -376,10 +372,28 @@ function TabContent({
             <Card.Title>Hooks</Card.Title>
           </Card.Header>
           <Card.Content>
-            {hooks ? (
-              <pre className="text-sm text-foreground font-mono whitespace-pre-wrap bg-muted p-4 rounded-md overflow-auto max-h-[600px]">
-                {hooks}
-              </pre>
+            {Object.keys(hooks).length > 0 ? (
+              <div className="space-y-4">
+                {Object.entries(hooks).map(([event, hookList]) => (
+                  <div key={event}>
+                    <h4 className="text-sm font-semibold text-foreground mb-2">{event}</h4>
+                    <div className="space-y-2">
+                      {(hookList as Array<{matcher: string; hooks: Array<{type: string; command: string}>}>).map((hook, i) => (
+                        <div key={i} className="p-3 rounded-md bg-muted">
+                          <p className="text-xs text-muted-foreground mb-1">
+                            Matcher: <span className="font-mono">{hook.matcher}</span>
+                          </p>
+                          {hook.hooks.map((h, j) => (
+                            <pre key={j} className="text-sm font-mono text-foreground whitespace-pre-wrap break-all">
+                              {h.command}
+                            </pre>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : (
               <p className="text-sm text-muted-foreground">No hooks configured</p>
             )}
