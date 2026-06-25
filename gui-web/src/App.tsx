@@ -5,7 +5,14 @@
 import { useState } from 'react'
 import { Shell, type NavKey } from '@/components/layout'
 import { ToastProvider } from '@/components/feedback'
-import { HomePage, PlaceholderPage } from '@/pages'
+import {
+  HelpPage,
+  HomePage,
+  LibraryPage,
+  ProfilesPage,
+  SessionsPage,
+  SettingsPage,
+} from '@/pages'
 
 function App() {
   const [page, setPage] = useState<NavKey>('home')
@@ -24,15 +31,15 @@ function PageRouter({ page }: { page: NavKey }) {
     case 'home':
       return <HomePage />
     case 'profiles':
-      return <PlaceholderPage title="Profiles" icon="◻" />
+      return <ProfilesPage />
     case 'library':
-      return <PlaceholderPage title="Library" icon="◈" />
+      return <LibraryPage />
     case 'sessions':
-      return <PlaceholderPage title="Sessions" icon="⟳" />
+      return <SessionsPage />
     case 'settings':
-      return <PlaceholderPage title="Settings" icon="⚙" />
+      return <SettingsPage />
     case 'help':
-      return <PlaceholderPage title="Help" icon="?" />
+      return <HelpPage />
     default:
       return <HomePage />
   }
