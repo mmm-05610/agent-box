@@ -1,15 +1,18 @@
 /**
  * Sessions API — Query and manage sessions
  *
- * Currently returns empty data. Will be connected to PyWebView bridge.
+ * Calls PyWebView bridge functions.
  */
 
+import { call } from '@/lib/bridge'
 import type { Session } from './types'
 
 export async function fetchSessions(): Promise<Session[]> {
-  return []
+  // @ts-expect-error
+  return call<Session[]>(() => window.api.list_sessions(), [])
 }
 
 export async function cleanupSessions(): Promise<number> {
-  throw new Error('Not connected to backend')
+  // @ts-expect-error
+  return call<number>(() => window.api.cleanup_sessions(), 0)
 }
