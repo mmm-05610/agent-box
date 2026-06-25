@@ -26,9 +26,8 @@ export async function fetchProfiles(): Promise<Profile[]> {
   return raw.map(toProfile)
 }
 
-export async function fetchProfileDetail(name: string): Promise<Profile | null> {
-  const raw = await call<Record<string, unknown> | null>((api) => api.get_profile(name), null)
-  return raw ? toProfile(raw) : null
+export async function fetchProfileDetail(name: string): Promise<Record<string, unknown> | null> {
+  return call<Record<string, unknown> | null>((api) => api.get_profile(name), null)
 }
 
 export async function createProfile(

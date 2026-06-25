@@ -2,11 +2,10 @@
  * Profile Detail Page — View and edit a single profile's configuration
  */
 
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button, Card, Badge } from '@/components/ui'
-import { Loading, useToast } from '@/components/feedback'
-import { cn } from '@/lib/utils'
-import type { AgentType, Profile } from '@/api'
+import { Loading } from '@/components/feedback'
+import type { AgentType } from '@/api'
 import { AGENT_TYPE_COLORS, fetchProfileDetail } from '@/api'
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -36,7 +35,6 @@ export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProp
   const [detail, setDetail] = useState<ProfileDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const { toast } = useToast()
 
   useEffect(() => {
     async function load() {
@@ -45,21 +43,7 @@ export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProp
       try {
         const data = await fetchProfileDetail(profileName)
         if (data) {
-          // The API returns a Profile, but we need the raw detail
-          // For now, construct a basic detail from the profile
-          setDetail({
-            path: '',
-            meta: {
-              name: data.name,
-              agent_type: data.agentType,
-              display_name: data.displayName ?? '',
-              description: data.description ?? '',
-              provider: data.providerRef ?? '',
-              claude_md: data.claudeMdRef ?? '',
-              preset: '',
-            },
-            config_dir: '',
-          })
+          setDetail(data as unknown as ProfileDetail)
         } else {
           setError('Profile not found')
         }
@@ -186,7 +170,7 @@ export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProp
             <Card.Title>Claude.md</Card.Title>
           </Card.Header>
           <Card.Content>
-            <pre className="text-sm text-foreground font-mono whitespace-pre-wrap bg-muted p-4 rounded-md">
+            <pre className="text-sm text-foreground font-mono whitespace-pre-wrap bg-muted p-4 rounded-md overflow-auto max-h-96">
               {meta.claude_md}
             </pre>
           </Card.Content>
