@@ -294,21 +294,41 @@ class Api:
         except Exception as e:
             return json.dumps({"ok": True, "data": {}})
 
-    def browse_dir(self) -> str:
-        """Open a native folder picker and return the selected path (WSL format)."""
+    def browse_dir(self, initial: str = "") -> str:
+        """Open a native folder picker and return the selected path (WSL format).
+
+        Uses PyWebView's native dialog (no Tk conflict).
+        *initial* is a WSL path like ~/projects; converted to Windows path for the dialog.
+        """
         try:
-            import tkinter as tk
-            from tkinter import filedialog
-            root = tk.Tk()
-            root.withdraw()
-            root.attributes("-topmost", True)
-            path = filedialog.askdirectory(
-                initialdir=r"\\wsl$\Ubuntu\home",
-                title="Select project directory",
+            # Resolve initial directory
+            initial_win = ""
+            if initial:
+                # Expand ~ to WSL home
+                if initial.startswith("~"):
+                    try:
+                        home = _wsl_run("echo -n $HOME")
+                        initial = home + initial[1:]
+                    except Exception:
+                        pass
+                # Convert WSL path to Windows path for the dialog
+                if initial.startswith("/mnt/") and len(initial) > 5:
+                    drive = initial[5].upper()
+                    rest = initial[6:].replace("/", "\\")
+                    initial_win = f"{drive}:{rest}"
+                else:
+                    initial_win = r"\\wsl$\Ubuntu" + initial.replace("/", "\\")
+
+            result = webview.windows[0].create_file_dialog(
+                webview.FOLDER_DIALOG,
+                directory=initial_win or None,
             )
-            root.destroy()
-            if not path:
+            if not result:
                 return json.dumps({"ok": True, "data": ""})
+
+            # result is a tuple of paths; take the first
+            path = result[0] if isinstance(result, (list, tuple)) else str(result)
+
             # Convert Windows path to WSL path
             p = path.replace("\\", "/")
             for prefix in ("//wsl$/Ubuntu/", "//wsl.localhost/Ubuntu/"):

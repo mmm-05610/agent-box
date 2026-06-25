@@ -78,7 +78,8 @@ export async function getLastCwdMap(): Promise<Record<string, string>> {
 /**
  * Open native folder picker dialog.
  * Returns the selected WSL path, or empty string if cancelled.
+ * @param initial - WSL path to start in (e.g. ~/projects)
  */
-export async function browseDir(): Promise<string> {
-  return call<string>((api) => api.browse_dir(), '')
+export async function browseDir(initial?: string): Promise<string> {
+  return call<string>((api) => api.browse_dir(initial ?? ''), '')
 }
