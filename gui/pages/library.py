@@ -19,8 +19,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 import customtkinter as ctk
 
-from ..components.button import danger_button, ghost_button, primary_button
-from ..components.card import Card
+from ..components.button import ghost_button, primary_button
 from ..components.status import Badge
 from ..components.toast import ToastManager
 from ..theme import C
@@ -52,6 +51,48 @@ from ..wsl import (
     save_claude_md,
     save_provider,
 )
+
+
+# --- helpers ------------------------------------------------------------
+
+# Known env key → provider category mapping.
+_ENV_CATEGORY_MAP: Dict[str, str] = {
+    "ANTHROPIC_API_KEY": "anthropic",
+    "OPENAI_API_KEY": "openai",
+    "GOOGLE_API_KEY": "google",
+    "GEMINI_API_KEY": "google",
+    "AWS_ACCESS_KEY_ID": "aws",
+    "AWS_SECRET_ACCESS_KEY": "aws",
+    "DEEPSEEK_API_KEY": "deepseek",
+    "OPENROUTER_API_KEY": "openrouter",
+    "MISTRAL_API_KEY": "mistral",
+    "GROQ_API_KEY": "groq",
+    "TOGETHER_API_KEY": "together",
+    "COHERE_API_KEY": "cohere",
+    "REPLICATE_API_TOKEN": "replicate",
+    "HF_TOKEN": "huggingface",
+    "HUGGING_FACE_HUB_TOKEN": "huggingface",
+}
+
+
+def _infer_category(settings: Dict[str, Any]) -> str:
+    """Infer provider category from env keys in settings."""
+    env = settings.get("env") or {}
+    for key, cat in _ENV_CATEGORY_MAP.items():
+        if key in env:
+            return cat
+    # Fallback: check base_url domain
+    base_url = (settings.get("base_url") or settings.get("baseURL") or
+                settings.get("api_base") or "")
+    for domain, cat in [
+        ("anthropic", "anthropic"), ("openai", "openai"),
+        ("deepseek", "deepseek"), ("openrouter", "openrouter"),
+        ("google", "google"), ("mistral", "mistral"),
+        ("groq", "groq"), ("together", "together"),
+    ]:
+        if domain in base_url.lower():
+            return cat
+    return ""
 
 
 # Tab keys
@@ -89,7 +130,8 @@ class _ItemRow(ctk.CTkFrame):
         profiles: List[Dict[str, str]],
         on_save: Callable[[str], None],   # (new_content) -> None
         on_delete: Callable[[], None],
-        on_apply: Callable[[str], None],        # (profile_name) -> None
+        on_apply: Callable[[str, Callable[[], None]], None],
+        # (profile_name, on_done) -> None
     ):
         super().__init__(
             master, fg_color=C("bg_elevated"),
@@ -356,13 +398,16 @@ class _ItemRow(ctk.CTkFrame):
             self._apply_btn.configure(state="disabled", text="Applying…")
         if self._apply_err is not None:
             self._apply_err.configure(text="")
-        self._on_apply(profile_name)
-        self._applying = False
-        try:
-            if self._apply_btn is not None and self._apply_btn.winfo_exists():
-                self._apply_btn.configure(state="normal", text="Apply")
-        except Exception:
-            pass
+
+        def on_done() -> None:
+            self._applying = False
+            try:
+                if self._apply_btn is not None and self._apply_btn.winfo_exists():
+                    self._apply_btn.configure(state="normal", text="Apply")
+            except Exception:
+                pass
+
+        self._on_apply(profile_name, on_done)
 
     # --- delete --------------------------------------------------------
 
@@ -397,7 +442,11 @@ class _ItemRow(ctk.CTkFrame):
 
 
 class _AddPanel(ctk.CTkFrame):
-    """Top-of-list "+ Add" panel. Inline form: id + (name/desc) + textbox."""
+    """Collapsible top-of-list "+ Add" panel.
+
+    Collapsed: single clickable row with "+ Add {kind}" label.
+    Expanded: full inline form with id + (name/desc) + textbox + Create.
+    """
 
     def __init__(
         self,
@@ -419,75 +468,122 @@ class _AddPanel(ctk.CTkFrame):
         self._edit_kind = edit_kind
         self._on_create = on_create
         self._saving = False
+        self._expanded = False
 
-        self.grid_columnconfigure(1, weight=1)
-        self.grid_rowconfigure(3, weight=1)
+        self.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(
-            self, text=f"+ Add {kind.replace('_', '.')}",
-            text_color=C("fg"), font=FONT_SUBTITLE, anchor="w",
-        ).grid(row=0, column=0, columnspan=3, sticky="w",
-               padx=SPACE_LG, pady=(SPACE_MD, SPACE_SM))
+        # --- Collapsed header (always visible) ---
+        self._header = ctk.CTkFrame(self, fg_color="transparent")
+        self._header.grid(row=0, column=0, sticky="ew",
+                          padx=SPACE_LG, pady=SPACE_MD)
+        self._header.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(self, text="ID", text_color=C("fg_muted"),
+        self._header_label = ctk.CTkLabel(
+            self._header,
+            text=f"+  Add {kind.replace('_', '.')}",
+            text_color=C("fg_muted"), font=FONT_SUBTITLE, anchor="w",
+        )
+        self._header_label.grid(row=0, column=0, sticky="w")
+
+        # Make the header clickable
+        for widget in (self._header, self._header_label):
+            widget.bind("<Button-1>", lambda _e: self._toggle())
+            widget.configure(cursor="hand2")
+
+        # --- Expandable form body (hidden initially) ---
+        self._body = ctk.CTkFrame(self, fg_color="transparent")
+        self._body.grid_columnconfigure(1, weight=1)
+        self._body.grid_rowconfigure(3, weight=1)
+
+        ctk.CTkLabel(self._body, text="ID", text_color=C("fg_muted"),
                      font=FONT_CAPTION, anchor="w").grid(
-            row=1, column=0, sticky="w", padx=(SPACE_LG, SPACE_SM))
+            row=0, column=0, sticky="w", padx=(SPACE_LG, SPACE_SM),
+            pady=(SPACE_SM, SPACE_XS))
         self._id_var = ctk.StringVar()
         ctk.CTkEntry(
-            self, textvariable=self._id_var,
+            self._body, textvariable=self._id_var,
             fg_color=C("bg_input"), text_color=C("fg"),
             border_color=C("border"), border_width=1,
             corner_radius=RADIUS_MD, height=32, font=FONT_CAPTION,
             placeholder_text="my-provider-id (a-z, 0-9, '-', '_')",
-        ).grid(row=1, column=1, sticky="ew", padx=(0, SPACE_LG), pady=(0, SPACE_SM))
+        ).grid(row=0, column=1, sticky="ew", padx=(0, SPACE_LG),
+               pady=(SPACE_SM, SPACE_XS))
 
         # Optional name / description row (for claude_md)
         self._name_var: Optional[ctk.StringVar] = None
-        self._desc_var: Optional[ctk.StringVar] = None
         if kind == "claude_md":
-            ctk.CTkLabel(self, text="Name", text_color=C("fg_muted"),
+            ctk.CTkLabel(self._body, text="Name", text_color=C("fg_muted"),
                          font=FONT_CAPTION, anchor="w").grid(
-                row=2, column=0, sticky="w", padx=(SPACE_LG, SPACE_SM))
+                row=1, column=0, sticky="w", padx=(SPACE_LG, SPACE_SM),
+                pady=(0, SPACE_XS))
             self._name_var = ctk.StringVar()
             ctk.CTkEntry(
-                self, textvariable=self._name_var,
+                self._body, textvariable=self._name_var,
                 fg_color=C("bg_input"), text_color=C("fg"),
                 border_color=C("border"), border_width=1,
                 corner_radius=RADIUS_MD, height=32, font=FONT_CAPTION,
-            ).grid(row=2, column=1, sticky="ew",
-                   padx=(0, SPACE_LG), pady=(0, SPACE_SM))
-            # Skip a row to leave room for the textbox label / content
+            ).grid(row=1, column=1, sticky="ew",
+                   padx=(0, SPACE_LG), pady=(0, SPACE_XS))
 
         # Content textbox
-        ctk.CTkLabel(self, text="Content", text_color=C("fg_muted"),
+        ctk.CTkLabel(self._body, text="Content", text_color=C("fg_muted"),
                      font=FONT_CAPTION, anchor="w").grid(
-            row=3, column=0, sticky="nw",
+            row=2, column=0, sticky="nw",
             padx=(SPACE_LG, SPACE_SM), pady=(SPACE_XS, 0))
         self._textbox = ctk.CTkTextbox(
-            self, font=FONT_MONO_SMALL,
+            self._body, font=FONT_MONO_SMALL,
             fg_color=C("bg_input"), text_color=C("fg"),
             corner_radius=RADIUS_MD, border_width=1,
             border_color=C("border"), wrap="word", height=160,
         )
-        self._textbox.grid(row=3, column=1, sticky="nsew",
+        self._textbox.grid(row=2, column=1, sticky="nsew",
                            padx=(0, SPACE_LG), pady=(SPACE_XS, SPACE_SM))
         self._textbox.insert("1.0", template_content)
         self._template_content = template_content
 
         # Error + actions
         self._error_lbl = ctk.CTkLabel(
-            self, text="", text_color=C("error"),
+            self._body, text="", text_color=C("error"),
             font=FONT_CAPTION, anchor="w",
         )
-        self._error_lbl.grid(row=4, column=0, columnspan=2, sticky="w",
+        self._error_lbl.grid(row=3, column=0, columnspan=2, sticky="w",
                              padx=SPACE_LG, pady=(0, SPACE_XS))
 
-        btn_row = ctk.CTkFrame(self, fg_color="transparent")
-        btn_row.grid(row=5, column=0, columnspan=2, sticky="e",
+        btn_row = ctk.CTkFrame(self._body, fg_color="transparent")
+        btn_row.grid(row=4, column=0, columnspan=2, sticky="e",
                      padx=SPACE_LG, pady=(0, SPACE_MD))
+        ghost_button(btn_row, text="Cancel", width=80,
+                     command=self._collapse).pack(side="left", padx=(0, SPACE_SM))
         self._create_btn = primary_button(btn_row, text="Create", width=100,
                                           command=self._do_create)
         self._create_btn.pack(side="left")
+
+    # --- expand / collapse -----------------------------------------------
+
+    def _toggle(self) -> None:
+        if self._expanded:
+            self._collapse()
+        else:
+            self._expand()
+
+    def _expand(self) -> None:
+        if self._expanded:
+            return
+        self._expanded = True
+        self._header_label.configure(text_color=C("fg"))
+        self._body.grid(row=1, column=0, sticky="ew")
+        self._id_var.set("")  # clear stale input
+        if self._name_var is not None:
+            self._name_var.set("")
+
+    def _collapse(self) -> None:
+        if not self._expanded:
+            return
+        self._expanded = False
+        self._header_label.configure(text_color=C("fg_muted"))
+        self._body.grid_forget()
+
+    # --- create ----------------------------------------------------------
 
     def _do_create(self) -> None:
         if self._saving:
@@ -511,9 +607,6 @@ class _AddPanel(ctk.CTkFrame):
                 return
         name = (self._name_var.get().strip()
                 if self._name_var is not None else None) or None
-        # We don't collect description in this panel (kept minimal) —
-        # claude_md upsert treats None as "leave alone" but for INSERT
-        # we want to actually set something; pass empty string explicitly.
         description: Optional[str] = "" if self._kind == "claude_md" else None
 
         self._saving = True
@@ -530,13 +623,14 @@ class _AddPanel(ctk.CTkFrame):
                 pass
 
     def reset(self) -> None:
-        """Clear the form (called after a successful create)."""
+        """Clear the form and collapse (called after a successful create)."""
         self._id_var.set("")
         if self._name_var is not None:
             self._name_var.set("")
         self._textbox.delete("1.0", "end")
         self._textbox.insert("1.0", self._template_content)
         self._error_lbl.configure(text="")
+        self._collapse()
 
 
 class LibraryPage(ctk.CTkFrame):
@@ -578,8 +672,9 @@ class LibraryPage(ctk.CTkFrame):
         self._claude_md_details: Dict[str, Optional[Dict[str, Any]]] = {}
         self._loading: bool = False
 
-        # Per-row edit bookkeeping (when we get a save result)
-        self._row_owners: Dict[Any, _ItemRow] = {}  # id(row) -> row
+        # Per-row edit bookkeeping — separate per tab to avoid cross-tab loss.
+        self._provider_row_owners: Dict[int, _ItemRow] = {}
+        self._md_row_owners: Dict[int, _ItemRow] = {}
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(2, weight=1)
@@ -691,7 +786,31 @@ class LibraryPage(ctk.CTkFrame):
             self, text="Loading…", text_color=C("fg_muted"),
             font=FONT_CAPTION,
         )
-        # Positioned on demand by _set_loading
+        # Error state frame (shown on load failure with Retry button)
+        self._error_frame = ctk.CTkFrame(
+            self._body, fg_color="transparent",
+        )
+        self._error_frame.grid_columnconfigure(0, weight=1)
+        self._error_icon = ctk.CTkLabel(
+            self._error_frame, text="⚠", text_color=C("warning"),
+            font=("Segoe UI Emoji", 28),
+        )
+        self._error_title = ctk.CTkLabel(
+            self._error_frame, text="Failed to load",
+            text_color=C("fg"), font=FONT_SUBTITLE,
+        )
+        self._error_detail = ctk.CTkLabel(
+            self._error_frame, text="",
+            text_color=C("fg_muted"), font=FONT_CAPTION, wraplength=400,
+        )
+        self._retry_btn = ghost_button(
+            self._error_frame, text="Retry",
+            command=self._load_data,
+        )
+        self._error_icon.grid(row=0, column=0, pady=(SPACE_XL, SPACE_SM))
+        self._error_title.grid(row=1, column=0, pady=(0, SPACE_XS))
+        self._error_detail.grid(row=2, column=0, pady=(0, SPACE_MD))
+        self._retry_btn.grid(row=3, column=0)
 
     # --- tab switching -------------------------------------------------
 
@@ -728,6 +847,11 @@ class LibraryPage(ctk.CTkFrame):
     def _set_loading(self, on: bool) -> None:
         self._loading = on
         if on:
+            # Hide error state if visible
+            try:
+                self._error_frame.grid_forget()
+            except Exception:
+                pass
             self._loading_lbl.place(relx=0.5, rely=0.5, anchor="center")
         else:
             try:
@@ -785,6 +909,12 @@ class LibraryPage(ctk.CTkFrame):
     def _on_data_error(self, exc: RuntimeError) -> None:
         self._set_loading(False)
         self._toast.show(f"Library load failed: {exc}", kind="error")
+        # Show inline error state with retry option
+        self._error_detail.configure(text=str(exc))
+        self._error_frame.grid(
+            row=0, column=0, sticky="nsew",
+            padx=SPACE_2XL, pady=SPACE_3XL,
+        )
         # Keep last-known data; just re-render in case rows were stale
         self._render_providers()
         self._render_mds()
@@ -805,7 +935,8 @@ class LibraryPage(ctk.CTkFrame):
         self._load_data()
 
     def _has_unsaved(self) -> bool:
-        for row in self._row_owners.values():
+        for row in (*self._provider_row_owners.values(),
+                    *self._md_row_owners.values()):
             if row._mode == "edit":  # noqa: SLF001 (intentional)
                 return True
         return False
@@ -827,7 +958,7 @@ class LibraryPage(ctk.CTkFrame):
                 w.destroy()
             except Exception:
                 pass
-        self._row_owners.clear()
+        self._provider_row_owners.clear()
 
         # Place the add panel at row 0
         self._add_provider_panel.grid(
@@ -859,7 +990,7 @@ class LibraryPage(ctk.CTkFrame):
                 w.destroy()
             except Exception:
                 pass
-        self._row_owners.clear()
+        self._md_row_owners.clear()
 
         self._add_md_panel.grid(
             row=0, column=0, sticky="ew",
@@ -905,7 +1036,7 @@ class LibraryPage(ctk.CTkFrame):
             item_id=item_id,
             display_name=display_name,
             meta_text=meta_text,
-            badge_text=category or "anthropic",
+            badge_text=category or _infer_category(settings),
             edit_content=edit_content,
             edit_kind="json",
             profiles=profiles,
@@ -913,12 +1044,12 @@ class LibraryPage(ctk.CTkFrame):
                 _pid, content,
             ),
             on_delete=lambda _pid=item_id: self._on_provider_delete(_pid),
-            on_apply=lambda profile, _pid=item_id: self._on_provider_apply(
-                _pid, profile,
+            on_apply=lambda profile, done, _pid=item_id: self._on_provider_apply(
+                _pid, profile, done,
             ),
         )
         # Stash the row by id(row) so we can address it from async callbacks
-        self._row_owners[id(row)] = row
+        self._provider_row_owners[id(row)] = row
         return row
 
     def _build_md_row(self, m: Dict[str, Any]) -> _ItemRow:
@@ -943,11 +1074,11 @@ class LibraryPage(ctk.CTkFrame):
                 _mid, content,
             ),
             on_delete=lambda _mid=item_id: self._on_md_delete(_mid),
-            on_apply=lambda profile, _mid=item_id: self._on_md_apply(
-                _mid, profile,
+            on_apply=lambda profile, done, _mid=item_id: self._on_md_apply(
+                _mid, profile, done,
             ),
         )
-        self._row_owners[id(row)] = row
+        self._md_row_owners[id(row)] = row
         return row
 
     def _current_profiles(self) -> List[Dict[str, Any]]:
@@ -986,15 +1117,20 @@ class LibraryPage(ctk.CTkFrame):
 
         threading.Thread(target=_worker, daemon=True).start()
 
-    def _on_provider_apply(self, provider_id: str, profile: str) -> None:
+    def _on_provider_apply(
+        self, provider_id: str, profile: str, on_done: Callable[[], None],
+    ) -> None:
         def _worker() -> None:
             try:
                 apply_provider_to_profile(profile, provider_id)
-                self.after(0, lambda: self._on_apply_done(
-                    f"Applied provider {provider_id!r} → {profile!r}.",
+                self.after(0, lambda: (
+                    self._on_apply_done(
+                        f"Applied provider {provider_id!r} → {profile!r}.",
+                    ),
+                    on_done(),
                 ))
             except RuntimeError as exc:
-                self.after(0, lambda e=exc: self._on_save_error(e))
+                self.after(0, lambda e=exc: (self._on_save_error(e), on_done()))
 
         threading.Thread(target=_worker, daemon=True).start()
 
@@ -1024,15 +1160,20 @@ class LibraryPage(ctk.CTkFrame):
 
         threading.Thread(target=_worker, daemon=True).start()
 
-    def _on_md_apply(self, md_id: str, profile: str) -> None:
+    def _on_md_apply(
+        self, md_id: str, profile: str, on_done: Callable[[], None],
+    ) -> None:
         def _worker() -> None:
             try:
                 apply_claude_md_to_profile(profile, md_id)
-                self.after(0, lambda: self._on_apply_done(
-                    f"Applied Claude.md {md_id!r} → {profile!r}.",
+                self.after(0, lambda: (
+                    self._on_apply_done(
+                        f"Applied Claude.md {md_id!r} → {profile!r}.",
+                    ),
+                    on_done(),
                 ))
             except RuntimeError as exc:
-                self.after(0, lambda e=exc: self._on_save_error(e))
+                self.after(0, lambda e=exc: (self._on_save_error(e), on_done()))
 
         threading.Thread(target=_worker, daemon=True).start()
 
@@ -1102,7 +1243,8 @@ class LibraryPage(ctk.CTkFrame):
         msg = str(exc)
         self._toast.show(f"Failed: {msg}", kind="error")
         # Try to surface in any row currently in edit mode
-        for row in self._row_owners.values():
+        for row in (*self._provider_row_owners.values(),
+                    *self._md_row_owners.values()):
             if row._mode == "edit":  # noqa: SLF001
                 row.show_error(msg)
                 break
