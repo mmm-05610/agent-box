@@ -275,9 +275,10 @@ class _ItemRow(ctk.CTkFrame):
         ghost_button(actions, text="Apply", width=64,
                      command=self._enter_apply).pack(side="left",
                                                      padx=(0, SPACE_XS))
-        ghost_button(actions, text="Delete", width=64,
-                     text_color=C("error"),
-                     command=self._confirm_delete).pack(side="left")
+        del_btn = ghost_button(actions, text="Delete", width=64,
+                               command=self._confirm_delete)
+        del_btn.configure(text_color=C("error"))
+        del_btn.pack(side="left")
 
     def _show_view(self) -> None:
         self._hide_all()
