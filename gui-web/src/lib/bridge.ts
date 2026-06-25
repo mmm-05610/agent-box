@@ -2,8 +2,7 @@
  * PyWebView Bridge — JavaScript ↔ Python communication
  *
  * PyWebView exposes js_api as window.pywebview.api.
- * The _pywebviewready event fires when the API is available.
- * All bridge methods return Promises (async).
+ * Polls for API availability since _pywebviewready may fire before React mounts.
  */
 
 interface ApiResponse<T> {
@@ -18,35 +17,26 @@ type ApiMethod = (...args: string[]) => Promise<string>
 let cachedApi: Record<string, ApiMethod> | null = null
 
 /**
- * Wait for PyWebView API to be ready.
+ * Poll for PyWebView API to be ready.
  * Returns the API object, or null if not running in PyWebView.
  */
 async function getApi(): Promise<Record<string, ApiMethod> | null> {
   // Return cached if available
   if (cachedApi) return cachedApi
 
-  // @ts-expect-error — pywebview is injected by PyWebView at runtime
-  if (window.pywebview?.api) {
+  // Poll every 100ms for up to 5 seconds
+  for (let i = 0; i < 50; i++) {
     // @ts-expect-error
-    cachedApi = window.pywebview.api as Record<string, ApiMethod>
-    return cachedApi
+    const api = window.pywebview?.api
+    if (api) {
+      cachedApi = api as Record<string, ApiMethod>
+      return cachedApi
+    }
+    await new Promise((r) => setTimeout(r, 100))
   }
 
-  // Wait for _pywebviewready event (max 5 seconds)
-  return new Promise((resolve) => {
-    const timeout = setTimeout(() => {
-      console.warn('PyWebView bridge not available after 5s, using fallback')
-      resolve(null)
-    }, 5000)
-
-    // @ts-expect-error
-    window.addEventListener('_pywebviewready', () => {
-      clearTimeout(timeout)
-      // @ts-expect-error
-      cachedApi = window.pywebview.api as Record<string, ApiMethod>
-      resolve(cachedApi)
-    })
-  })
+  console.warn('PyWebView bridge not available after 5s')
+  return null
 }
 
 /**
@@ -60,7 +50,6 @@ async function call<T>(
   try {
     const api = await getApi()
     if (!api) {
-      console.warn('PyWebView bridge not available, using fallback')
       return fallback
     }
     const result = await fn(api)
