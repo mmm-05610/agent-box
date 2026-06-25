@@ -20,16 +20,16 @@ function App() {
   return (
     <ToastProvider>
       <Shell active={page} onNav={setPage} runningCount={0}>
-        <PageRouter page={page} />
+        <PageRouter page={page} onNav={setPage} />
       </Shell>
     </ToastProvider>
   )
 }
 
-function PageRouter({ page }: { page: NavKey }) {
+function PageRouter({ page, onNav }: { page: NavKey; onNav: (key: NavKey) => void }) {
   switch (page) {
     case 'home':
-      return <HomePage />
+      return <HomePage onNav={onNav} />
     case 'profiles':
       return <ProfilesPage />
     case 'library':
@@ -41,7 +41,7 @@ function PageRouter({ page }: { page: NavKey }) {
     case 'help':
       return <HelpPage />
     default:
-      return <HomePage />
+      return <HomePage onNav={onNav} />
   }
 }
 

@@ -1,18 +1,34 @@
 /**
  * Profiles API — CRUD operations for profiles
  *
- * Calls PyWebView bridge functions via window.pywebview.api
+ * Calls PyWebView bridge functions via window.pywebview.api (async)
+ * Converts snake_case fields from CLI to camelCase.
  */
 
 import { call } from '@/lib/bridge'
 import type { AgentType, Profile } from './types'
 
+/** Convert snake_case profile from CLI to camelCase */
+function toProfile(raw: Record<string, unknown>): Profile {
+  return {
+    name: raw.name as string,
+    agentType: raw.agent_type as AgentType,
+    displayName: raw.display_name as string | undefined,
+    description: raw.description as string | undefined,
+    providerRef: raw.provider_ref as string | undefined,
+    claudeMdRef: raw.claude_md_ref as string | undefined,
+    createdAt: raw.created_at as number | undefined,
+  }
+}
+
 export async function fetchProfiles(): Promise<Profile[]> {
-  return call<Profile[]>((api) => api.list_profiles(), [])
+  const raw = await call<Record<string, unknown>[]>((api) => api.list_profiles(), [])
+  return raw.map(toProfile)
 }
 
 export async function fetchProfileDetail(name: string): Promise<Profile | null> {
-  return call<Profile | null>((api) => api.get_profile(name), null)
+  const raw = await call<Record<string, unknown> | null>((api) => api.get_profile(name), null)
+  return raw ? toProfile(raw) : null
 }
 
 export async function createProfile(
@@ -20,7 +36,7 @@ export async function createProfile(
   agentType: AgentType,
   options?: { displayName?: string; description?: string; preset?: string },
 ): Promise<Profile> {
-  return call<Profile>(
+  const raw = await call<Record<string, unknown>>(
     (api) => api.create_profile(
       name,
       agentType,
@@ -28,8 +44,9 @@ export async function createProfile(
       options?.description ?? '',
       options?.preset ?? '',
     ),
-    {} as Profile,
+    {} as Record<string, unknown>,
   )
+  return toProfile(raw)
 }
 
 export async function deleteProfile(name: string): Promise<void> {
@@ -40,6 +57,5 @@ export async function launchProfile(
   _name: string,
   _options?: { cwd?: string; mode?: string },
 ): Promise<void> {
-  // Launch is handled by the OS/CLI, not through the bridge
   throw new Error('Launch not available in web mode')
 }
