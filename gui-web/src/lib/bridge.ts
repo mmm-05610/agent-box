@@ -2,6 +2,7 @@
  * PyWebView Bridge — JavaScript ↔ Python communication
  *
  * PyWebView exposes js_api as window.pywebview.api.
+ * The _pywebviewready event fires when the API is available.
  * All bridge methods return Promises (async).
  */
 
@@ -13,17 +14,39 @@ interface ApiResponse<T> {
 
 type ApiMethod = (...args: string[]) => Promise<string>
 
+// Cache the API reference once it's available
+let cachedApi: Record<string, ApiMethod> | null = null
+
 /**
- * Get the PyWebView API object.
- * Returns null if not running in PyWebView.
+ * Wait for PyWebView API to be ready.
+ * Returns the API object, or null if not running in PyWebView.
  */
-function getApi(): Record<string, ApiMethod> | null {
+async function getApi(): Promise<Record<string, ApiMethod> | null> {
+  // Return cached if available
+  if (cachedApi) return cachedApi
+
   // @ts-expect-error — pywebview is injected by PyWebView at runtime
-  const pywebview = window.pywebview
-  if (!pywebview?.api) {
-    return null
+  if (window.pywebview?.api) {
+    // @ts-expect-error
+    cachedApi = window.pywebview.api as Record<string, ApiMethod>
+    return cachedApi
   }
-  return pywebview.api as Record<string, ApiMethod>
+
+  // Wait for _pywebviewready event (max 5 seconds)
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => {
+      console.warn('PyWebView bridge not available after 5s, using fallback')
+      resolve(null)
+    }, 5000)
+
+    // @ts-expect-error
+    window.addEventListener('_pywebviewready', () => {
+      clearTimeout(timeout)
+      // @ts-expect-error
+      cachedApi = window.pywebview.api as Record<string, ApiMethod>
+      resolve(cachedApi)
+    })
+  })
 }
 
 /**
@@ -35,7 +58,7 @@ async function call<T>(
   fallback: T,
 ): Promise<T> {
   try {
-    const api = getApi()
+    const api = await getApi()
     if (!api) {
       console.warn('PyWebView bridge not available, using fallback')
       return fallback
@@ -56,7 +79,7 @@ async function call<T>(
  * Check if PyWebView bridge is available.
  */
 export function isBridgeAvailable(): boolean {
-  return getApi() !== null
+  return cachedApi !== null
 }
 
 export { call }
