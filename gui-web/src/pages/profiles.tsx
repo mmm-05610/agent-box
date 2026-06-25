@@ -71,13 +71,14 @@ export function ProfilesPage({ onOpenDetail }: ProfilesPageProps) {
   const handleLaunch = useCallback(
     async (name: string) => {
       try {
-        await launchProfile(name)
+        const profile = profiles.find((p) => p.name === name)
+        await launchProfile(name, { agentType: profile?.agentType ?? 'claude' })
         toast({ type: 'success', message: `Launched "${name}"` })
       } catch {
         toast({ type: 'error', message: `Failed to launch "${name}"` })
       }
     },
-    [toast],
+    [profiles, toast],
   )
 
   const handleDelete = useCallback(

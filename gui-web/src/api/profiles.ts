@@ -53,8 +53,16 @@ export async function deleteProfile(name: string): Promise<void> {
 }
 
 export async function launchProfile(
-  _name: string,
-  _options?: { cwd?: string; mode?: string },
+  name: string,
+  options?: { agentType?: string; mode?: string; cwd?: string },
 ): Promise<void> {
-  throw new Error('Launch not available in web mode')
+  await call<void>(
+    (api) => api.launch_profile(
+      name,
+      options?.agentType ?? 'claude',
+      options?.mode ?? 'interactive',
+      options?.cwd ?? '',
+    ),
+    undefined,
+  )
 }

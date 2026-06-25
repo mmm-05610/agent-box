@@ -10,7 +10,10 @@ import os
 import shutil
 import subprocess
 import sys
+import threading
+import time
 from pathlib import Path
+from typing import Optional
 
 import webview
 
@@ -174,6 +177,42 @@ class Api:
         try:
             _wsl_run(f"{AGENT_BOX_CMD} delete {name} --force")
             return json.dumps({"ok": True})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    def launch_profile(self, name: str, agent_type: str, mode: str, cwd: str = "") -> str:
+        """Launch a profile in a new console window."""
+        try:
+            # Build the launch command
+            cmd = f"{AGENT_BOX_CMD} launch {name}"
+            if mode:
+                cmd += f" --mode {mode}"
+            if cwd:
+                cmd += f" --cwd {cwd}"
+
+            # Get wsl.exe path
+            wsl = shutil.which("wsl.exe")
+            if wsl is None:
+                return json.dumps({"ok": False, "error": "wsl.exe not found"})
+
+            # Spawn new console window
+            kwargs = {"close_fds": True, "cwd": "C:\\"}
+            if sys.platform == "win32":
+                kwargs["creationflags"] = subprocess.CREATE_NEW_CONSOLE
+
+            proc = subprocess.Popen([wsl, "bash", "-lc", cmd], **kwargs)
+
+            # Start watcher thread to track exit
+            def _watch():
+                exit_code = proc.wait()
+                try:
+                    _wsl_run(f"{AGENT_BOX_CMD} sessions --exit 0 {exit_code}")
+                except Exception:
+                    pass
+
+            threading.Thread(target=_watch, daemon=True).start()
+
+            return json.dumps({"ok": True, "data": {"pid": proc.pid}})
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
 
