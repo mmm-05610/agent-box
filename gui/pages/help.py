@@ -47,8 +47,8 @@ class HelpPage(ctk.CTkFrame):
         self._card(body, 1, [
             ("CLI 帮助", "agent-box --help"),
             ("列出 profile", "agent-box list"),
-            ("创建 profile", "agent-box create <name> --type cc"),
-            ("启动 profile", "agent-box cc <name>"),
+            ("创建 profile", "agent-box create <name> --type claude"),
+            ("启动 profile", "agent-box claude <name>"),
             ("查看预设", "agent-box presets"),
             ("会话历史", "agent-box sessions"),
         ])

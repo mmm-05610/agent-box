@@ -22,7 +22,8 @@ from typing import Any, Dict, List, Optional
 # ---------------------------------------------------------------------------
 
 CONFIG_DIR_NAMES: Dict[str, str] = {
-    "cc":       "dot-claude",
+    "claude":   "dot-claude",
+    "cc":       "dot-claude",  # deprecated key, kept for back-compat
     "codex":    "dot-codex",
     "hermes":   "dot-hermes",
     "opencode": "dot-opencode",
@@ -30,7 +31,8 @@ CONFIG_DIR_NAMES: Dict[str, str] = {
 
 # Data directory (separate from config for some agents)
 DATA_DIR_NAMES: Dict[str, Optional[str]] = {
-    "cc":       None,
+    "claude":   None,
+    "cc":       None,  # deprecated key
     "codex":    None,
     "hermes":   None,
     "opencode": "dot-opencode-data",
@@ -512,7 +514,7 @@ class ProfileConfigReader:
 
     def get_model(self) -> str:
         """Get the configured model from actual config files."""
-        if self.agent_type == "cc":
+        if self.agent_type in ("cc", "claude"):
             return CCConfig.get_model(self.config_dir)
         elif self.agent_type == "codex":
             return CodexConfig.get_model(self.config_dir)
@@ -526,7 +528,7 @@ class ProfileConfigReader:
         Always reads from settings.json / config.toml / config.yaml.
         Extracts friendly name from URL if possible.
         """
-        if self.agent_type == "cc":
+        if self.agent_type in ("cc", "claude"):
             raw = CCConfig.get_provider(self.config_dir)
         elif self.agent_type == "codex":
             raw = CodexConfig.get_provider(self.config_dir)
@@ -541,7 +543,7 @@ class ProfileConfigReader:
 
     def get_config(self) -> Dict[str, Any]:
         """Get the full configuration."""
-        if self.agent_type == "cc":
+        if self.agent_type in ("cc", "claude"):
             return CCConfig.read(self.config_dir)
         elif self.agent_type == "codex":
             return CodexConfig.read(self.config_dir)
@@ -561,7 +563,7 @@ class ProfileConfigReader:
     def get_tabs(self) -> List[tuple]:
         """Get the list of tabs for this agent type."""
         from .pages.detail import AGENT_TABS
-        return AGENT_TABS.get(self.agent_type, AGENT_TABS["cc"])
+        return AGENT_TABS.get(self.agent_type, AGENT_TABS["claude"])
 
 
 __all__ = [

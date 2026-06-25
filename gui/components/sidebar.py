@@ -33,6 +33,7 @@ NAV_ITEMS: List[Tuple[str, str, str]] = [
     # (key, label, icon) — icon kept for future, but not rendered
     ("home",     "Home",     ""),
     ("profiles", "Profiles", ""),
+    ("library",  "Library",  ""),
     ("sessions", "Sessions", ""),
     ("settings", "Settings", ""),
     ("help",     "Help",     ""),

@@ -6,14 +6,15 @@ The ``tmp_agent_box_home`` fixture isolates all profile ops to a
 ``~/.agent-box`` — monkeypatching the env var is the only way to
 guarantee that.
 
-It also drops any cached sessions-DB connection so the new
-``AGENT_BOX_HOME`` is picked up the next time ``sessions.*`` is called.
+It also drops the cached ``agent-box.db`` connection (and the
+``sessions._migrated`` sentinel) so a previous test's
+``AGENT_BOX_HOME`` doesn't leak into this one.
 """
 from __future__ import annotations
 
 import pytest
 
-from agent_box import sessions
+from agent_box import db, sessions
 
 
 @pytest.fixture
@@ -22,7 +23,8 @@ def tmp_agent_box_home(tmp_path, monkeypatch):
     home = tmp_path / "ab-home"
     home.mkdir()
     monkeypatch.setenv("AGENT_BOX_HOME", str(home))
-    # Drop the cached sessions connection so a previous test's
-    # AGENT_BOX_HOME doesn't leak into this one.
+    # Drop the cached db connection (shared by db.py / sessions.py)
+    # and the sessions-migration sentinel.
+    db._reset_connection_for_tests()
     sessions._reset_connection_for_tests()
     yield home

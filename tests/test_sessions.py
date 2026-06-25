@@ -20,7 +20,7 @@ from agent_box import cli, sessions
 
 def test_record_launch_and_exit(tmp_agent_box_home):
     """record_launch inserts a row, record_exit marks it exited."""
-    sid = sessions.record_launch("p1", "cc", "/tmp/work", "新会话", 4242)
+    sid = sessions.record_launch("p1", "claude", "/tmp/work", "新会话", 4242)
     assert sid > 0
 
     # Active fetch shows the row, no exit columns
@@ -29,7 +29,7 @@ def test_record_launch_and_exit(tmp_agent_box_home):
     row = active[0]
     assert row["id"] == sid
     assert row["profile"] == "p1"
-    assert row["agent_type"] == "cc"
+    assert row["agent_type"] == "claude"
     assert row["cwd"] == "/tmp/work"
     assert row["mode"] == "新会话"
     assert row["pid"] == 4242
@@ -64,9 +64,9 @@ def test_record_launch_multiple_profiles_newest_first(tmp_agent_box_home):
     falls through to insertion order in that case — so we just assert
     the count and that every inserted id is present.
     """
-    s1 = sessions.record_launch("first",  "cc", "/a", "新会话",   1000)
-    s2 = sessions.record_launch("second", "cc", "/b", "继续上次", 2000)
-    s3 = sessions.record_launch("third",  "cc", "/c", "新会话",   3000)
+    s1 = sessions.record_launch("first",  "claude", "/a", "新会话",   1000)
+    s2 = sessions.record_launch("second", "claude", "/b", "继续上次", 2000)
+    s3 = sessions.record_launch("third",  "claude", "/c", "新会话",   3000)
 
     rows = sessions.fetch_sessions()
     ids = {r["id"] for r in rows}
@@ -78,8 +78,8 @@ def test_record_launch_multiple_profiles_newest_first(tmp_agent_box_home):
 
 def test_fetch_active_only(tmp_agent_box_home):
     """active_only=True returns only rows with exited_at IS NULL."""
-    a = sessions.record_launch("alive", "cc", "/x", "新会话", 5000)
-    b = sessions.record_launch("dead",  "cc", "/y", "新会话", 5001)
+    a = sessions.record_launch("alive", "claude", "/x", "新会话", 5000)
+    b = sessions.record_launch("dead",  "claude", "/y", "新会话", 5001)
     sessions.record_exit(b, 1)
 
     active = sessions.fetch_sessions(active_only=True)
@@ -95,7 +95,7 @@ def test_fetch_active_only(tmp_agent_box_home):
 def test_fetch_sessions_limit(tmp_agent_box_home):
     """limit caps the number of returned rows."""
     for i in range(5):
-        sessions.record_launch(f"p{i}", "cc", f"/{i}", "新会话", 6000 + i)
+        sessions.record_launch(f"p{i}", "claude", f"/{i}", "新会话", 6000 + i)
     rows = sessions.fetch_sessions(limit=3)
     assert len(rows) == 3
 
@@ -119,22 +119,22 @@ def test_latest_cwd(tmp_agent_box_home, monkeypatch):
         conn.execute(
             "INSERT INTO sessions (profile, agent_type, cwd, mode, pid, launched_at) "
             "VALUES (?, ?, ?, ?, ?, ?)",
-            ("p", "cc", "/old",  "新会话", 7000, "2026-01-01 00:00:00"),
+            ("p", "claude", "/old",  "新会话", 7000, "2026-01-01 00:00:00"),
         )
         conn.execute(
             "INSERT INTO sessions (profile, agent_type, cwd, mode, pid, launched_at) "
             "VALUES (?, ?, ?, ?, ?, ?)",
-            ("p", "cc", "/newer", "新会话", 7001, "2026-01-01 00:00:01"),
+            ("p", "claude", "/newer", "新会话", 7001, "2026-01-01 00:00:01"),
         )
         conn.execute(
             "INSERT INTO sessions (profile, agent_type, cwd, mode, pid, launched_at) "
             "VALUES (?, ?, ?, ?, ?, ?)",
-            ("p", "cc", "",      "新会话", 7002, "2026-01-01 00:00:02"),  # empty ignored
+            ("p", "claude", "",      "新会话", 7002, "2026-01-01 00:00:02"),  # empty ignored
         )
         conn.execute(
             "INSERT INTO sessions (profile, agent_type, cwd, mode, pid, launched_at) "
             "VALUES (?, ?, ?, ?, ?, ?)",
-            ("other", "cc", "/other", "新会话", 7003, "2026-01-01 00:00:03"),
+            ("other", "claude", "/other", "新会话", 7003, "2026-01-01 00:00:03"),
         )
         conn.commit()
 
@@ -155,8 +155,8 @@ def test_cleanup_stale(tmp_agent_box_home):
     dead_pid = 999_999_999  # almost certainly not running
     current_pid = os.getpid()
 
-    dead_sid = sessions.record_launch("dead",  "cc", "/x", "新会话", dead_pid)
-    live_sid = sessions.record_launch("alive", "cc", "/y", "新会话", current_pid)
+    dead_sid = sessions.record_launch("dead",  "claude", "/x", "新会话", dead_pid)
+    live_sid = sessions.record_launch("alive", "claude", "/y", "新会话", current_pid)
 
     cleaned = sessions.cleanup_stale_sessions()
     assert cleaned == 1, f"expected 1 cleaned, got {cleaned}"
@@ -190,17 +190,17 @@ def _run_cli(argv: List[str]) -> tuple[int, str, str]:
 
 def test_cli_sessions_lists_inserts(tmp_agent_box_home):
     """agent-box sessions prints the inserted rows as a table."""
-    sessions.record_launch("p1", "cc", "/x", "新会话", 1000)
+    sessions.record_launch("p1", "claude", "/x", "新会话", 1000)
     rc, out, err = _run_cli(["sessions"])
     assert rc == 0, f"stderr: {err}"
     assert "p1" in out
-    assert "cc" in out
+    assert "claude" in out
     assert "新会话" in out
 
 
 def test_cli_sessions_json(tmp_agent_box_home):
     """agent-box sessions --json emits a JSON array."""
-    sid = sessions.record_launch("p1", "cc", "/x", "新会话", 1000)
+    sid = sessions.record_launch("p1", "claude", "/x", "新会话", 1000)
     rc, out, _ = _run_cli(["sessions", "--json"])
     assert rc == 0
     data = json.loads(out)
@@ -212,8 +212,8 @@ def test_cli_sessions_json(tmp_agent_box_home):
 
 def test_cli_sessions_active_flag(tmp_agent_box_home):
     """--active returns only rows that haven't exited."""
-    a = sessions.record_launch("a", "cc", "/x", "新会话", 1)
-    sessions.record_launch("b", "cc", "/x", "新会话", 2)
+    a = sessions.record_launch("a", "claude", "/x", "新会话", 1)
+    sessions.record_launch("b", "claude", "/x", "新会话", 2)
     sessions.record_exit(a, 0)
 
     rc, out, _ = _run_cli(["sessions", "--active", "--json"])
@@ -225,8 +225,8 @@ def test_cli_sessions_active_flag(tmp_agent_box_home):
 
 def test_cli_sessions_cleanup_prints_count(tmp_agent_box_home):
     """--cleanup prints the count as a plain integer on stdout."""
-    sessions.record_launch("a", "cc", "/x", "新会话", 999_999_999)
-    sessions.record_launch("b", "cc", "/x", "新会话", 999_999_998)
+    sessions.record_launch("a", "claude", "/x", "新会话", 999_999_999)
+    sessions.record_launch("b", "claude", "/x", "新会话", 999_999_998)
 
     rc, out, _ = _run_cli(["sessions", "--cleanup"])
     assert rc == 0
@@ -235,7 +235,7 @@ def test_cli_sessions_cleanup_prints_count(tmp_agent_box_home):
 
 def test_cli_sessions_exit_records_exit(tmp_agent_box_home):
     """--exit ID CODE marks the session exited and prints 'ok'."""
-    sid = sessions.record_launch("p", "cc", "/x", "新会话", os.getpid())
+    sid = sessions.record_launch("p", "claude", "/x", "新会话", os.getpid())
     rc, out, _ = _run_cli(["sessions", "--exit", str(sid), "42"])
     assert rc == 0
     assert out.strip() == "ok"
@@ -260,3 +260,54 @@ def test_cli_sessions_empty(tmp_agent_box_home):
     rc, out, _ = _run_cli(["sessions"])
     assert rc == 0
     assert "(no sessions)" in out
+
+
+# --- v0.4 sessions.db migration ------------------------------------------
+
+def test_legacy_sessions_db_migrated(tmp_agent_box_home):
+    """A v0.4 ``sessions.db`` is migrated into ``agent-box.db`` on first use.
+
+    The legacy file is renamed to ``sessions.db.migrated``; its rows
+    end up in the shared ``sessions`` table of ``agent-box.db``.
+    """
+    import sqlite3
+    legacy_path = tmp_agent_box_home / "sessions.db"
+    legacy = sqlite3.connect(str(legacy_path))
+    legacy.execute(
+        "CREATE TABLE sessions ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+        "profile TEXT NOT NULL, agent_type TEXT NOT NULL, "
+        "cwd TEXT, mode TEXT, pid INTEGER, "
+        "launched_at TEXT NOT NULL, exited_at TEXT, exit_code INTEGER)"
+    )
+    legacy.execute(
+        "INSERT INTO sessions (profile, agent_type, cwd, mode, pid, "
+        "launched_at, exited_at, exit_code) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        ("p_legacy", "claude", "/old", "新会话", 1234,
+         "2026-01-01 00:00:00", "2026-01-01 00:01:00", 0),
+    )
+    legacy.execute(
+        "INSERT INTO sessions (profile, agent_type, cwd, mode, pid, "
+        "launched_at, exited_at, exit_code) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        ("p_legacy", "claude", "/old2", "继续上次", 1235,
+         "2026-01-01 00:02:00", None, None),
+    )
+    legacy.commit()
+    legacy.close()
+
+    # First sessions.* call triggers the migration.
+    rows = sessions.fetch_sessions(limit=50)
+    assert len(rows) == 2
+    profiles = {r["profile"] for r in rows}
+    assert profiles == {"p_legacy"}
+
+    # Legacy file renamed.
+    assert not legacy_path.exists()
+    assert (tmp_agent_box_home / "sessions.db.migrated").is_file()
+
+    # Subsequent calls don't re-migrate.
+    sessions._reset_connection_for_tests()  # force the migration code to run again
+    rows2 = sessions.fetch_sessions(limit=50)
+    assert len(rows2) == 2

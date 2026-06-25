@@ -48,7 +48,7 @@ from ..wsl import AGENT_ORDER, fetch_presets
 # ---------------------------------------------------------------------------
 
 AGENT_TYPE_CARDS: List[Dict[str, str]] = [
-    {"key": "cc",       "title": "CC",       "sub": "Claude Code"},
+    {"key": "claude",   "title": "Claude",   "sub": "Claude Code"},
     {"key": "codex",    "title": "Codex",    "sub": "OpenAI"},
     {"key": "hermes",   "title": "Hermes",   "sub": "Custom"},
     {"key": "opencode", "title": "OpenCode", "sub": "Multi"},
@@ -200,7 +200,7 @@ class _TemplateStep(_StepFrame):
     """
 
     def __init__(self, master, on_validity_change,
-                 agent_type: str = "cc"):
+                 agent_type: str = "claude"):
         super().__init__(master, on_validity_change)
         self._agent_type = agent_type
         self._selected: Optional[str] = None
@@ -374,7 +374,7 @@ class CreationWizard(ctk.CTkFrame):
         step_kwargs: Dict[str, Any] = {"on_validity_change": self._on_validity}
         if cls is _TemplateStep:
             # Step 3 needs the agent_type to fetch the right preset list.
-            step_kwargs["agent_type"] = self._data.get("agent_type", "cc")
+            step_kwargs["agent_type"] = self._data.get("agent_type", "claude")
         frame = cls(self._body, **step_kwargs)
         frame.grid(row=0, column=0, sticky="nsew")
         self._step_frames.append(frame)

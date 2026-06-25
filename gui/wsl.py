@@ -28,11 +28,12 @@ from typing import Any, Dict, List, Optional, Tuple
 # Agent-type → resume-args mapping
 # ---------------------------------------------------------------------------
 
-AGENT_ORDER: Tuple[str, ...] = ("cc", "codex", "hermes", "opencode")
+AGENT_ORDER: Tuple[str, ...] = ("claude", "codex", "hermes", "opencode")
 
 # None == "新会话" (no resume args passed to the agent)
 RESUME_ARGS: Dict[str, Optional[Tuple[str, ...]]] = {
-    "cc":       ("--continue",),
+    "claude":   ("--continue",),
+    "cc":       ("--continue",),  # deprecated key
     "codex":    ("resume", "--last"),
     "hermes":   ("-c",),
     "opencode": None,
@@ -236,7 +237,7 @@ def fetch_presets(agent_type: str) -> List[Dict[str, str]]:
 
 def create_profile(
     name: str,
-    agent_type: str = "cc",
+    agent_type: str = "claude",
     *,
     preset: Optional[str] = None,
     display_name: Optional[str] = None,
@@ -261,6 +262,152 @@ def delete_profile(name: str) -> bool:
     """Delete an agent-box profile. Returns True on success."""
     _wsl_check_output(f"agent-box delete {_shell_quote(name)} --force")
     return True
+
+
+# ---------------------------------------------------------------------------
+# Library: providers + claude-md (WSL bridge for the GUI Library page)
+#
+# The GUI runs on Windows, so ``$EDITOR`` is unavailable. Each function
+# below either wraps a read-only list/show (--json) or uses the
+# ``agent-box ... upsert`` subcommands (Batch 3) which read their content
+# from stdin — sidestepping $EDITOR entirely.
+# ---------------------------------------------------------------------------
+
+# Library: providers + claude-md (WSL bridge for the GUI Library page)
+#
+# The GUI runs on Windows, so ``$EDITOR`` is unavailable. Each function
+# below either wraps a read-only list/show (--json) or uses the
+# ``agent-box ... upsert`` subcommands (Batch 3) which read their content
+# from stdin — sidestepping $EDITOR entirely.
+# ---------------------------------------------------------------------------
+
+def fetch_providers(agent_type: str = "claude") -> List[Dict[str, Any]]:
+    """Return providers list via ``agent-box provider list --type X --json``."""
+    raw = _wsl_check_output(
+        f"agent-box provider list --type {_shell_quote(agent_type)} --json"
+    )
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"invalid JSON from agent-box provider list: {exc}") from exc
+    if not isinstance(data, list):
+        raise RuntimeError("agent-box provider list --json did not return a list")
+    return data
+
+
+def fetch_provider_detail(
+    agent_type: str, provider_id: str,
+) -> Optional[Dict[str, Any]]:
+    """Return a single provider's full details via --json, or None on miss."""
+    raw = _wsl_try_output(
+        f"agent-box provider show {_shell_quote(agent_type)} "
+        f"{_shell_quote(provider_id)} --json"
+    )
+    if raw is None:
+        return None
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+
+
+def save_provider(
+    agent_type: str, provider_id: str, settings_json: str,
+) -> Dict[str, Any]:
+    """Insert/update a provider, piping JSON content via stdin."""
+    proc = _wsl_run(
+        f"agent-box provider upsert {_shell_quote(agent_type)} "
+        f"{_shell_quote(provider_id)}",
+        input_data=settings_json.encode("utf-8"),
+        check=True,
+    )
+    stdout = proc.stdout.decode("utf-8", errors="replace")
+    return json.loads(stdout)
+
+
+def delete_provider(agent_type: str, provider_id: str) -> bool:
+    """Delete a provider. Returns True on success."""
+    _wsl_check_output(
+        f"agent-box provider delete {_shell_quote(agent_type)} "
+        f"{_shell_quote(provider_id)}"
+    )
+    return True
+
+
+def fetch_claude_mds(agent_type: str = "claude") -> List[Dict[str, Any]]:
+    """Return ClaudeMD list via CLI."""
+    raw = _wsl_check_output(
+        f"agent-box claude-md list --type {_shell_quote(agent_type)} --json"
+    )
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"invalid JSON from agent-box claude-md list: {exc}") from exc
+    if not isinstance(data, list):
+        raise RuntimeError("agent-box claude-md list --json did not return a list")
+    return data
+
+
+def fetch_claude_md_detail(
+    agent_type: str, md_id: str,
+) -> Optional[Dict[str, Any]]:
+    """Return a single ClaudeMD's full details, or None on miss."""
+    raw = _wsl_try_output(
+        f"agent-box claude-md show {_shell_quote(agent_type)} "
+        f"{_shell_quote(md_id)} --json"
+    )
+    if raw is None:
+        return None
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+
+
+def save_claude_md(
+    agent_type: str, md_id: str, content: str, *,
+    name: Optional[str] = None,
+    description: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Insert/update a ClaudeMD, piping content via stdin."""
+    cmd = (
+        f"agent-box claude-md upsert {_shell_quote(agent_type)} "
+        f"{_shell_quote(md_id)}"
+    )
+    if name:
+        cmd += f" --name {_shell_quote(name)}"
+    if description:
+        cmd += f" --description {_shell_quote(description)}"
+    proc = _wsl_run(
+        cmd, input_data=content.encode("utf-8"), check=True,
+    )
+    stdout = proc.stdout.decode("utf-8", errors="replace")
+    return json.loads(stdout)
+
+
+def delete_claude_md(agent_type: str, md_id: str) -> bool:
+    """Delete a ClaudeMD. Returns True on success."""
+    _wsl_check_output(
+        f"agent-box claude-md delete {_shell_quote(agent_type)} "
+        f"{_shell_quote(md_id)}"
+    )
+    return True
+
+
+def apply_provider_to_profile(profile_name: str, provider_id: str) -> None:
+    """Apply a provider's env to a profile (Claude only)."""
+    _wsl_check_output(
+        f"agent-box provider apply {_shell_quote(profile_name)} "
+        f"{_shell_quote(provider_id)}"
+    )
+
+
+def apply_claude_md_to_profile(profile_name: str, md_id: str) -> None:
+    """Apply a ClaudeMD to a profile (Claude only)."""
+    _wsl_check_output(
+        f"agent-box claude-md apply {_shell_quote(profile_name)} "
+        f"{_shell_quote(md_id)}"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -435,6 +582,26 @@ def _shell_quote(token: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Profile meta (DB-backed, replaces reading meta.yaml directly)
+# ---------------------------------------------------------------------------
+
+def fetch_profile_meta(name: str) -> Optional[Dict[str, Any]]:
+    """Return profile metadata from the DB via ``agent-box show --json``.
+
+    Returns None on any failure (profile not found, WSL down, etc.).
+    """
+    raw = _wsl_try_output(
+        f"agent-box show {_shell_quote(name)} --json"
+    )
+    if raw is None:
+        return None
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -444,13 +611,24 @@ __all__ = [
     "MODE_NEW",
     "MODE_RESUME",
     "RESUME_ARGS",
+    "apply_claude_md_to_profile",
+    "apply_provider_to_profile",
     "browse_dir",
     "build_launch_argv",
     "create_profile",
+    "delete_claude_md",
+    "delete_provider",
     "delete_profile",
+    "fetch_claude_md_detail",
+    "fetch_claude_mds",
+    "fetch_provider_detail",
+    "fetch_providers",
     "fetch_presets",
+    "fetch_profile_meta",
     "fetch_profiles",
     "launch_profile",
+    "save_claude_md",
+    "save_provider",
     "sessions_cleanup",
     "sessions_record_exit",
     "read_file",

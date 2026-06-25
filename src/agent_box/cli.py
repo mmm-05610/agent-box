@@ -7,10 +7,12 @@ import sys
 from typing import Dict, List, Optional
 
 from . import __version__
+from . import claude_mds
 from . import config
 from . import launch
 from . import library
 from . import profile
+from . import providers
 from . import sessions
 
 
@@ -34,7 +36,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p_create.add_argument(
         "--type", "-t",
         choices=library.get_agent_types(),
-        default="cc",
+        default="claude",
         help="Agent type (default: cc)",
     )
     p_create.add_argument(
@@ -86,6 +88,7 @@ def _build_parser() -> argparse.ArgumentParser:
     # show ----------------------------------------------------------------
     p_show = sub.add_parser("show", help="Show profile info")
     p_show.add_argument("name", help="Profile name")
+    p_show.add_argument("--json", action="store_true", help="Emit JSON")
     p_show.set_defaults(func=cmd_show)
 
     # edit ----------------------------------------------------------------
@@ -114,6 +117,88 @@ def _build_parser() -> argparse.ArgumentParser:
     p_delete.add_argument("name", help="Profile name")
     p_delete.add_argument("--force", action="store_true", help="Skip confirmation")
     p_delete.set_defaults(func=cmd_delete)
+
+    # provider ---------------------------------------------------------
+    p_provider = sub.add_parser("provider", help="Manage provider configurations")
+    sub_provider = p_provider.add_subparsers(dest="provider_command", required=True)
+
+    pp = sub_provider.add_parser("list", help="List providers for an agent type")
+    pp.add_argument("--type", "-t", choices=library.get_agent_types(), required=True)
+    pp.add_argument("--json", action="store_true", help="Emit JSON")
+    pp.set_defaults(func=cmd_provider_list)
+
+    pp = sub_provider.add_parser("show", help="Show provider details")
+    pp.add_argument("type", choices=library.get_agent_types())
+    pp.add_argument("id")
+    pp.add_argument("--json", action="store_true", help="Emit JSON")
+    pp.set_defaults(func=cmd_provider_show)
+
+    pp = sub_provider.add_parser("add", help="Add a new provider (opens $EDITOR)")
+    pp.add_argument("type", choices=library.get_agent_types())
+    pp.add_argument("id")
+    pp.set_defaults(func=cmd_provider_add)
+
+    pp = sub_provider.add_parser("edit", help="Edit an existing provider")
+    pp.add_argument("type", choices=library.get_agent_types())
+    pp.add_argument("id")
+    pp.set_defaults(func=cmd_provider_edit)
+
+    pp = sub_provider.add_parser("upsert", help="Insert or update a provider (JSON from stdin)")
+    pp.add_argument("type", choices=library.get_agent_types())
+    pp.add_argument("id")
+    pp.set_defaults(func=cmd_provider_upsert)
+
+    pp = sub_provider.add_parser("delete", help="Delete a provider")
+    pp.add_argument("type", choices=library.get_agent_types())
+    pp.add_argument("id")
+    pp.set_defaults(func=cmd_provider_delete)
+
+    pp = sub_provider.add_parser("apply", help="Apply provider env to a profile's settings.json")
+    pp.add_argument("profile", help="Target profile name")
+    pp.add_argument("provider", help="Provider id (must match the provider's DB id)")
+    pp.set_defaults(func=cmd_provider_apply)
+
+    # claude-md ---------------------------------------------------------
+    p_md = sub.add_parser("claude-md", help="Manage Claude.md templates")
+    sub_md = p_md.add_subparsers(dest="claude_md_command", required=True)
+
+    pm = sub_md.add_parser("list", help="List Claude.md templates")
+    pm.add_argument("--type", "-t", choices=library.get_agent_types(), required=True)
+    pm.add_argument("--json", action="store_true", help="Emit JSON")
+    pm.set_defaults(func=cmd_claude_md_list)
+
+    pm = sub_md.add_parser("show", help="Show Claude.md template details")
+    pm.add_argument("type", choices=library.get_agent_types())
+    pm.add_argument("id")
+    pm.add_argument("--json", action="store_true", help="Emit JSON")
+    pm.set_defaults(func=cmd_claude_md_show)
+
+    pm = sub_md.add_parser("add", help="Add a new Claude.md template (opens $EDITOR)")
+    pm.add_argument("type", choices=library.get_agent_types())
+    pm.add_argument("id")
+    pm.set_defaults(func=cmd_claude_md_add)
+
+    pm = sub_md.add_parser("edit", help="Edit an existing Claude.md template")
+    pm.add_argument("type", choices=library.get_agent_types())
+    pm.add_argument("id")
+    pm.set_defaults(func=cmd_claude_md_edit)
+
+    pm = sub_md.add_parser("upsert", help="Insert or update a Claude.md template (content from stdin)")
+    pm.add_argument("type", choices=library.get_agent_types())
+    pm.add_argument("id")
+    pm.add_argument("--name", default=None)
+    pm.add_argument("--description", default=None)
+    pm.set_defaults(func=cmd_claude_md_upsert)
+
+    pm = sub_md.add_parser("delete", help="Delete a Claude.md template")
+    pm.add_argument("type", choices=library.get_agent_types())
+    pm.add_argument("id")
+    pm.set_defaults(func=cmd_claude_md_delete)
+
+    pm = sub_md.add_parser("apply", help="Apply a Claude.md template to a profile (overwrites CLAUDE.md)")
+    pm.add_argument("profile", help="Target profile name")
+    pm.add_argument("id", help="Claude.md id to apply")
+    pm.set_defaults(func=cmd_claude_md_apply)
 
     # sessions ----------------------------------------------------------
     p_sessions = sub.add_parser(
@@ -208,6 +293,11 @@ def cmd_show(args: argparse.Namespace) -> int:
     except (ValueError, profile.ProfileError) as exc:
         print(f"agent-box: {exc}", file=sys.stderr)
         return 2
+    if args.json:
+        import json
+        json.dump(info, sys.stdout, indent=2, ensure_ascii=False)
+        sys.stdout.write("\n")
+        return 0
     print(f"name:       {info['meta'].get('name')}")
     print(f"agent_type: {info['meta'].get('agent_type')}")
     print(f"config_dir: {info['config_dir']}")
@@ -260,7 +350,7 @@ def cmd_edit(args: argparse.Namespace) -> int:
     except (ValueError, profile.ProfileError) as exc:
         print(f"agent-box: {exc}", file=sys.stderr)
         return 2
-    agent_type = meta.get("agent_type", "cc")
+    agent_type = meta.get("agent_type", "claude")
     target = config.profile_agent_dir(args.name, agent_type)
     from . import edit as edit_mod
     edit_mod.open_editor(target)
@@ -331,6 +421,213 @@ def cmd_sessions(args: argparse.Namespace) -> int:
         if not args.active and r.get("exited_at"):
             line += f"  {r['exited_at']}  exit={r.get('exit_code')}"
         print(line)
+    return 0
+
+
+# --- provider subcommands --------------------------------------------------
+
+def cmd_provider_list(args: argparse.Namespace) -> int:
+    try:
+        rows = providers.list_providers(args.type)
+    except Exception as exc:
+        print(f"agent-box: {exc}", file=sys.stderr)
+        return 2
+    if args.json:
+        json.dump(rows, sys.stdout, indent=2, ensure_ascii=False)
+        sys.stdout.write("\n")
+        return 0
+    if not rows:
+        print(f"(no providers for {args.type!r})")
+        return 0
+    id_w = max((len(r["id"]) for r in rows), default=2)
+    name_w = max((len(r["name"]) for r in rows), default=4)
+    for r in rows:
+        marker = "*" if r["is_current"] else " "
+        fq = "F" if r["in_failover_queue"] else " "
+        cat = f"  [{r['category']}]" if r["category"] else ""
+        print(f"{marker}{fq} {r['id']:<{id_w}}  {r['name']:<{name_w}}{cat}")
+    return 0
+
+
+def cmd_provider_show(args: argparse.Namespace) -> int:
+    try:
+        row = providers.get_provider(args.type, args.id)
+    except Exception as exc:
+        print(f"agent-box: {exc}", file=sys.stderr)
+        return 2
+    if row is None:
+        print(f"agent-box: provider {args.id!r} for {args.type!r} not found", file=sys.stderr)
+        return 2
+    if args.json:
+        json.dump(row, sys.stdout, indent=2, ensure_ascii=False)
+        sys.stdout.write("\n")
+        return 0
+    print(f"id:          {row['id']}")
+    print(f"app_type:    {row['app_type']}")
+    print(f"name:        {row['name']}")
+    if row["website_url"]:
+        print(f"website:     {row['website_url']}")
+    if row["category"]:
+        print(f"category:    {row['category']}")
+    if row["endpoints"]:
+        print("endpoints:")
+        for ep in row["endpoints"]:
+            print(f"  - {ep['url']}")
+    print("settings:")
+    print(json.dumps(row["settings"], indent=2, ensure_ascii=False))
+    return 0
+
+
+def cmd_provider_add(args: argparse.Namespace) -> int:
+    try:
+        providers.add_provider(args.type, args.id)
+    except (ValueError, profile.ProfileError) as exc:
+        print(f"agent-box: {exc}", file=sys.stderr)
+        return 2
+    print(f"added provider {args.id!r} for {args.type!r}")
+    return 0
+
+
+def cmd_provider_edit(args: argparse.Namespace) -> int:
+    try:
+        providers.edit_provider(args.type, args.id)
+    except (ValueError, profile.ProfileError) as exc:
+        print(f"agent-box: {exc}", file=sys.stderr)
+        return 2
+    print(f"updated provider {args.id!r}")
+    return 0
+
+
+def cmd_provider_delete(args: argparse.Namespace) -> int:
+    try:
+        providers.delete_provider(args.type, args.id)
+    except (ValueError, profile.ProfileError) as exc:
+        print(f"agent-box: {exc}", file=sys.stderr)
+        return 2
+    print(f"deleted provider {args.id!r}")
+    return 0
+
+
+def cmd_provider_apply(args: argparse.Namespace) -> int:
+    try:
+        providers.apply_provider(args.profile, args.provider)
+    except (ValueError, profile.ProfileError) as exc:
+        print(f"agent-box: {exc}", file=sys.stderr)
+        return 2
+    print(f"applied provider {args.provider!r} to profile {args.profile!r}")
+    return 0
+
+
+def cmd_provider_upsert(args: argparse.Namespace) -> int:
+    try:
+        stdin_content = sys.stdin.read()
+        result = providers.upsert_provider(args.type, args.id, stdin_content)
+    except (ValueError, profile.ProfileError) as exc:
+        print(f"agent-box: {exc}", file=sys.stderr)
+        return 2
+    json.dump(result, sys.stdout, indent=2, ensure_ascii=False)
+    sys.stdout.write("\n")
+    return 0
+
+
+# --- claude-md subcommands ------------------------------------------------
+
+def cmd_claude_md_list(args: argparse.Namespace) -> int:
+    try:
+        rows = claude_mds.list_claude_mds(args.type)
+    except Exception as exc:
+        print(f"agent-box: {exc}", file=sys.stderr)
+        return 2
+    if args.json:
+        json.dump(rows, sys.stdout, indent=2, ensure_ascii=False)
+        sys.stdout.write("\n")
+        return 0
+    if not rows:
+        print(f"(no claude-md templates for {args.type!r})")
+        return 0
+    id_w = max((len(r["id"]) for r in rows), default=2)
+    name_w = max((len(r["name"]) for r in rows), default=4)
+    for r in rows:
+        marker = "*" if r["enabled"] else " "
+        print(f"{marker} {r['id']:<{id_w}}  {r['name']:<{name_w}}")
+    return 0
+
+
+def cmd_claude_md_show(args: argparse.Namespace) -> int:
+    try:
+        row = claude_mds.get_claude_md(args.type, args.id)
+    except Exception as exc:
+        print(f"agent-box: {exc}", file=sys.stderr)
+        return 2
+    if row is None:
+        print(f"agent-box: claude-md {args.id!r} for {args.type!r} not found", file=sys.stderr)
+        return 2
+    if args.json:
+        json.dump(row, sys.stdout, indent=2, ensure_ascii=False)
+        sys.stdout.write("\n")
+        return 0
+    print(f"id:          {row['id']}")
+    print(f"app_type:    {row['app_type']}")
+    print(f"name:        {row['name']}")
+    if row["description"]:
+        print(f"description: {row['description']}")
+    print("---")
+    print(row["content"] or "")
+    return 0
+
+
+def cmd_claude_md_add(args: argparse.Namespace) -> int:
+    try:
+        claude_mds.add_claude_md(args.type, args.id)
+    except (ValueError, profile.ProfileError) as exc:
+        print(f"agent-box: {exc}", file=sys.stderr)
+        return 2
+    print(f"added claude-md {args.id!r} for {args.type!r}")
+    return 0
+
+
+def cmd_claude_md_edit(args: argparse.Namespace) -> int:
+    try:
+        claude_mds.edit_claude_md(args.type, args.id)
+    except (ValueError, profile.ProfileError) as exc:
+        print(f"agent-box: {exc}", file=sys.stderr)
+        return 2
+    print(f"updated claude-md {args.id!r}")
+    return 0
+
+
+def cmd_claude_md_upsert(args: argparse.Namespace) -> int:
+    try:
+        stdin_content = sys.stdin.read()
+        result = claude_mds.upsert_claude_md(
+            args.type, args.id, stdin_content,
+            name=args.name, description=args.description,
+        )
+    except (ValueError, profile.ProfileError) as exc:
+        print(f"agent-box: {exc}", file=sys.stderr)
+        return 2
+    json.dump(result, sys.stdout, indent=2, ensure_ascii=False)
+    sys.stdout.write("\n")
+    return 0
+
+
+def cmd_claude_md_delete(args: argparse.Namespace) -> int:
+    try:
+        claude_mds.delete_claude_md(args.type, args.id)
+    except (ValueError, profile.ProfileError) as exc:
+        print(f"agent-box: {exc}", file=sys.stderr)
+        return 2
+    print(f"deleted claude-md {args.id!r}")
+    return 0
+
+
+def cmd_claude_md_apply(args: argparse.Namespace) -> int:
+    try:
+        claude_mds.apply_claude_md(args.profile, args.id)
+    except (ValueError, profile.ProfileError) as exc:
+        print(f"agent-box: {exc}", file=sys.stderr)
+        return 2
+    print(f"applied claude-md {args.id!r} to profile {args.profile!r}")
     return 0
 
 

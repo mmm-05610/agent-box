@@ -40,7 +40,7 @@ from ..wsl import (
 
 # Map raw agent_type to the badge variant used in the redesigned row.
 AGENT_BADGE_VARIANT = {
-    "cc":       "primary",
+    "claude":   "primary",
     "codex":    "info",
     "hermes":   "warning",
     "opencode": "neutral",
@@ -302,7 +302,7 @@ class ProfileRow(Card):
         self.bind("<Enter>", lambda e: self._set_hover(True))
         self.bind("<Leave>", lambda e: self._set_hover(False))
 
-        at = profile.get("agent_type", "cc")
+        at = profile.get("agent_type", "claude")
         self._build_layout(at)
 
         # Bind click to specific non-interactive areas only
@@ -493,7 +493,7 @@ class ProfileRow(Card):
         try:
             launch_profile(
                 self._profile["name"],
-                self._profile.get("agent_type", "cc"),
+                self._profile.get("agent_type", "claude"),
                 mode, cwd,
             )
             launch_label = (

@@ -67,7 +67,7 @@ def fake_exec(monkeypatch, tmp_path):
 
 def _create_cc_profile(name: str) -> Path:
     """Create a cc profile under the current AGENT_BOX_HOME."""
-    return profile.create(name, "cc")
+    return profile.create(name, "claude")
 
 
 def test_launch_cc_argv(tmp_agent_box_home, fake_exec):
@@ -81,12 +81,12 @@ def test_launch_cc_argv(tmp_agent_box_home, fake_exec):
     assert args[-1] == "/usr/bin/claude"
     # Has the main --bind / → / and --bind <pdir> → <rdir>
     assert "--bind" in args
-    pdir = str(config.profile_agent_dir("cc1", "cc"))
-    rdir = str(config.real_agent_dir("cc"))
+    pdir = str(config.profile_agent_dir("cc1", "claude"))
+    rdir = str(config.real_agent_dir("claude"))
     assert pdir in args and rdir in args
     # CC also bind-mounts dot-claude.json → ~/.claude.json
     pjson = str(config.profile_dir("cc1") / "dot-claude.json")
-    rjson = str(config.real_agent_dir("cc").with_name(".claude.json"))
+    rjson = str(config.real_agent_dir("claude").with_name(".claude.json"))
     assert pjson in args
     assert rjson in args
     # The CC .claude.json --bind block was inserted at position 4

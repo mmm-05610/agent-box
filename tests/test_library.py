@@ -7,11 +7,11 @@ from agent_box import library
 def test_get_agent_types():
     types = library.get_agent_types()
     assert types == sorted(types)
-    assert set(types) == {"cc", "codex", "hermes", "opencode"}
+    assert set(types) == {"claude", "codex", "hermes", "opencode"}
 
 
 def test_get_agent_config_known():
-    info = library.get_agent_config("cc")
+    info = library.get_agent_config("claude")
     assert info is not None
     assert info["config_dir"] == "~/.claude"
     assert info["binary"] == "claude"
@@ -22,7 +22,7 @@ def test_get_agent_config_unknown():
 
 
 def test_get_template_dir_known():
-    for t in ("cc", "codex", "hermes", "opencode"):
+    for t in ("claude", "codex", "hermes", "opencode"):
         d = library.get_template_dir(t)
         assert d is not None
         assert d.is_dir()
@@ -41,11 +41,11 @@ def test_get_template_data_dir_opencode():
 
 def test_get_template_data_dir_cc_is_none():
     """CC has no secondary data dir."""
-    assert library.get_template_data_dir("cc") is None
+    assert library.get_template_data_dir("claude") is None
 
 
 def test_list_presets_cc():
-    presets = library.list_presets("cc")
+    presets = library.list_presets("claude")
     assert set(presets) >= {"blank", "decision-maker", "python-dev", "spec-writer"}
 
 
@@ -55,10 +55,10 @@ def test_list_presets_unknown_agent_type():
 
 
 def test_get_preset_dir_known():
-    d = library.get_preset_dir("cc", "python-dev")
+    d = library.get_preset_dir("claude", "python-dev")
     assert d is not None
     assert d.is_dir()
 
 
 def test_get_preset_dir_unknown():
-    assert library.get_preset_dir("cc", "nope") is None
+    assert library.get_preset_dir("claude", "nope") is None

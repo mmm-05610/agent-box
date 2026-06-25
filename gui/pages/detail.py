@@ -41,7 +41,7 @@ from ..tokens import (
 # ---------------------------------------------------------------------------
 
 AGENT_TABS: Dict[str, List[tuple]] = {
-    "cc": [
+    "claude": [
         ("meta",      "Meta",      "Profile info"),
         ("settings",  "Settings",  "settings.json"),
         ("claude_md", "CLAUDE.md", "System prompt"),
@@ -75,7 +75,7 @@ AGENT_TABS: Dict[str, List[tuple]] = {
 
 # Agent-type -> (config dir name, config file name) for raw reads
 _CONFIG_FILE_MAP: Dict[str, tuple] = {
-    "cc":       ("dot-claude",   "settings.json"),
+    "claude":   ("dot-claude",   "settings.json"),
     "codex":    ("dot-codex",    "config.toml"),
     "hermes":   ("dot-hermes",   "config.yaml"),
     "opencode": ("dot-opencode", "opencode.jsonc"),
@@ -118,9 +118,9 @@ class ProfileDetailPage(ctk.CTkFrame):
         self._dirty_tabs: set = set()  # tabs with unsaved changes
 
         # Fetch ALL data once, store as dict
-        agent_type = profile.get("agent_type", "cc")
+        agent_type = profile.get("agent_type", "claude")
         self._data = get_profile_data(profile_root, agent_type)
-        self._tabs = AGENT_TABS.get(agent_type, AGENT_TABS["cc"])
+        self._tabs = AGENT_TABS.get(agent_type, AGENT_TABS["claude"])
 
         # Debug: print what we got
         import sys
@@ -307,7 +307,7 @@ class ProfileDetailPage(ctk.CTkFrame):
         """
         from ..data import get_profile_data
 
-        agent_type = self._profile.get("agent_type", "cc")
+        agent_type = self._profile.get("agent_type", "claude")
         self._data = get_profile_data(self._profile_root, agent_type)
 
         # Update header name (in case it changed)

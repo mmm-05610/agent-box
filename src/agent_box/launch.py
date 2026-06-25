@@ -68,9 +68,9 @@ def launch(name: str, extra_args: list | None = None) -> None:
     ]
 
     # CC: also bind-mount dot-claude.json → ~/.claude.json
-    if agent_type == "cc":
+    if agent_type == "claude":
         pjson = config.profile_dir(name) / "dot-claude.json"
-        rjson = config.real_agent_dir("cc").with_name(".claude.json")
+        rjson = config.real_agent_dir("claude").with_name(".claude.json")
         if pjson.is_file():
             if not rjson.exists():
                 rjson.touch()

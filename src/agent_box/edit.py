@@ -29,4 +29,9 @@ def open_editor(file_path: Path) -> None:
         )
         sys.exit(2)
     file_path.parent.mkdir(parents=True, exist_ok=True)
-    os.execvpe(editor, [editor, str(file_path)], os.environ)
+    # Use subprocess.run (not os.execvpe) so the caller can read the
+    # file back after the editor exits — see providers.add_provider
+    # / claude_mds.add_claude_md for the add/edit flows that depend
+    # on the editor returning.
+    import subprocess
+    subprocess.run([editor, str(file_path)], env=os.environ, check=False)

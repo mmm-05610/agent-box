@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Optional
 
 AGENT_BOX_HOME_ENV = "AGENT_BOX_HOME"
-AGENT_TYPE_CC = "cc"
+AGENT_TYPE_CLAUDE = "claude"
 BWRAP = "bwrap"
 
 
@@ -21,6 +21,11 @@ def agent_box_home() -> Path:
 
 def profiles_dir() -> Path:
     return agent_box_home() / "profiles"
+
+
+def library_db() -> Path:
+    """Path to the agent-box SQLite database (``agent-box.db``)."""
+    return agent_box_home() / "agent-box.db"
 
 
 def profile_dir(name: str) -> Path:
@@ -49,7 +54,7 @@ def real_agent_dir(agent_type: str) -> Path:
 
 def profile_agent_dir(name: str, agent_type: str) -> Path:
     """Profile-local copy of the agent config directory."""
-    suffix = "dot-claude" if agent_type == "cc" else f"dot-{agent_type}"
+    suffix = "dot-claude" if agent_type == "claude" else f"dot-{agent_type}"
     return profile_dir(name) / suffix
 
 

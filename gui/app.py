@@ -21,6 +21,7 @@ from .pages import (
     CreationWizard,
     HelpPage,
     HomePage,
+    LibraryPage,
     ProfileDetailPage,
     ProfilesPage,
     SessionsPage,
@@ -46,7 +47,8 @@ _PAGE_CACHE_CAP = 5
 
 # Agent type → config directory name mapping
 AGENT_CONFIG_DIR = {
-    "cc":       "dot-claude",
+    "claude":   "dot-claude",
+    "cc":       "dot-claude",  # deprecated key, kept for back-compat
     "codex":    "dot-codex",
     "hermes":   "dot-hermes",
     "opencode": "dot-opencode",
@@ -197,6 +199,13 @@ class AgentBoxApp:
                 on_new=self._on_new_profile,
                 toast=self.toast,
             )
+        if key == "library":
+            return LibraryPage(
+                self.content,
+                toast=self.toast,
+                profiles=self._profiles,
+                on_profiles_needed=lambda: self._profiles,
+            )
         if key == "sessions":
             return SessionsPage(self.content, fetch_sessions)
         if key == "settings":
@@ -215,9 +224,9 @@ class AgentBoxApp:
             name = key.split(":", 1)[1]
             profile = next(
                 (p for p in self._profiles if p.get("name") == name),
-                {"name": name, "agent_type": "cc"},
+                {"name": name, "agent_type": "claude"},
             )
-            agent_type = profile.get("agent_type", "cc")
+            agent_type = profile.get("agent_type", "claude")
             config_dir = AGENT_CONFIG_DIR.get(agent_type, "dot-claude")
             profile_root = resolve_profile_root() + "/" + name
             config_root = profile_root + "/" + config_dir
@@ -229,7 +238,7 @@ class AgentBoxApp:
             def _on_detail_launch() -> None:
                 try:
                     launch_profile(
-                        name, profile.get("agent_type", "cc"),
+                        name, profile.get("agent_type", "claude"),
                         MODE_RESUME, "",
                     )
                     self.toast.show(
@@ -325,7 +334,7 @@ class AgentBoxApp:
         if action == "launch":
             try:
                 launch_profile(
-                    profile["name"], profile.get("agent_type", "cc"),
+                    profile["name"], profile.get("agent_type", "claude"),
                     MODE_RESUME, "",
                 )
                 self.toast.show(
@@ -362,7 +371,7 @@ class AgentBoxApp:
             del self._pages["wizard"]
 
         name = payload.get("name", "")
-        agent_type = payload.get("agent_type", "cc")
+        agent_type = payload.get("agent_type", "claude")
         if not name:
             self.toast.show("Missing profile name.", kind="error")
             self._on_nav("profiles")
@@ -381,7 +390,7 @@ class AgentBoxApp:
         # for any caller that still emits a body without a preset.
         preset = (payload.get("preset") or "").strip() or None
         claude_md = payload.get("claude_md") or ""
-        write_claude_md = (not preset) and bool(claude_md) and agent_type == "cc"
+        write_claude_md = (not preset) and bool(claude_md) and agent_type in ("cc", "claude")
         claude_md_wsl_path = (
             f"{resolve_profile_root()}/{name}/dot-claude/CLAUDE.md"
             if write_claude_md else ""

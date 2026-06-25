@@ -25,7 +25,7 @@ from typing import Any, Dict, List, Optional
 # ---------------------------------------------------------------------------
 
 _AGENT_TYPES: Dict[str, Dict[str, Any]] = {
-    "cc":       {"config_dir": "~/.claude",          "binary": "claude"},
+    "claude":   {"config_dir": "~/.claude",          "binary": "claude"},
     "codex":    {"config_dir": "~/.codex",           "binary": "codex"},
     "hermes":   {"config_dir": "~/.hermes",          "binary": "hermes"},
     "opencode": {"config_dir": "~/.config/opencode", "binary": "opencode",

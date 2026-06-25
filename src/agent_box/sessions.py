@@ -1,15 +1,14 @@
 """SQLite-backed session tracking (CLI side).
 
-Stores launch history and active PIDs at ``~/.agent-box/sessions.db``
-(``AGENT_BOX_HOME`` is honored via :func:`agent_box.config.agent_box_home`).
+Sessions live in the shared ``agent-box.db`` (the same database that
+holds providers, prompts, and profiles — see :mod:`.db`). The
+connection is shared via :func:`agent_box.db.get_conn`; the module
+keeps its own ``threading.Lock`` to serialize writes through this
+module's API.
 
-The module exposes a flat function API (``record_launch``, ``record_exit``,
-``fetch_sessions``, ``latest_cwd_for``, ``cleanup_stale_sessions``) backed
-by a single module-level connection guarded by ``threading.Lock``.
-
-This replaces the previous ``gui.state`` module: the DB now lives on the
-WSL side so the GUI can read it via ``agent-box sessions ...`` instead
-of keeping its own copy.
+For backward compatibility, the first call to :func:`_get_conn` will
+migrate a legacy ``sessions.db`` (v0.4) into ``agent-box.db`` and
+rename the legacy file to ``sessions.db.migrated``.
 """
 from __future__ import annotations
 
@@ -21,39 +20,79 @@ from typing import Any, Dict, List, Optional
 from . import config
 
 
-# Module-level connection + lock. The CLI is single-threaded per process,
-# so we don't need check_same_thread=False; the lock is here for
-# defensive correctness (e.g. future async use) and to serialize writes.
-_conn: Optional[sqlite3.Connection] = None
+# Module-level lock. The connection is owned by :mod:`.db` (cached
+# module-level) — we just serialize our own writes through it.
 _lock = threading.Lock()
+_migrated: bool = False
+
+
+def _migrate_legacy_sessions_db() -> None:
+    """If a v0.4 ``sessions.db`` exists, copy rows into ``agent-box.db``.
+
+    Idempotent. The legacy file is renamed to ``sessions.db.migrated``
+    on success. Safe to call repeatedly; after the first rename, the
+    guard ``_migrated`` short-circuits subsequent calls.
+    """
+    global _migrated
+    if _migrated:
+        return
+    from . import db
+    legacy_path = config.agent_box_home() / "sessions.db"
+    if not legacy_path.is_file():
+        _migrated = True
+        return
+    # Open read-only the legacy DB.
+    try:
+        legacy = sqlite3.connect(f"file:{legacy_path}?mode=ro", uri=True, timeout=10.0)
+    except sqlite3.OperationalError:
+        # Unreadable / not a real DB — leave it for the user.
+        _migrated = True
+        return
+    try:
+        try:
+            rows = legacy.execute(
+                "SELECT profile, agent_type, cwd, mode, pid, "
+                "launched_at, exited_at, exit_code FROM sessions"
+            ).fetchall()
+        except sqlite3.OperationalError:
+            # No sessions table — nothing to migrate.
+            _migrated = True
+            return
+        if not rows:
+            _migrated = True
+            try:
+                legacy_path.rename(legacy_path.with_suffix(legacy_path.suffix + ".migrated"))
+            except OSError:
+                pass
+            return
+        conn = db.get_conn()
+        with _lock:
+            for r in rows:
+                conn.execute(
+                    "INSERT INTO sessions "
+                    "(profile, agent_type, cwd, mode, pid, launched_at, "
+                    "exited_at, exit_code) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    r,
+                )
+            conn.commit()
+    finally:
+        try:
+            legacy.close()
+        except Exception:
+            pass
+    try:
+        legacy_path.rename(legacy_path.with_suffix(legacy_path.suffix + ".migrated"))
+    except OSError:
+        pass
+    _migrated = True
 
 
 def _get_conn() -> sqlite3.Connection:
-    """Return the module-level connection, creating it on first use."""
-    global _conn
-    if _conn is None:
-        db_path = config.agent_box_home() / "sessions.db"
-        db_path.parent.mkdir(parents=True, exist_ok=True)
-        _conn = sqlite3.connect(str(db_path), timeout=10.0)
-        _conn.execute("PRAGMA journal_mode=WAL")
-        _conn.execute("PRAGMA synchronous=NORMAL")
-        _conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS sessions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                profile TEXT NOT NULL,
-                agent_type TEXT NOT NULL,
-                cwd TEXT,
-                mode TEXT,
-                pid INTEGER,
-                launched_at TEXT NOT NULL,
-                exited_at TEXT,
-                exit_code INTEGER
-            )
-            """
-        )
-        _conn.commit()
-    return _conn
+    """Return the shared :mod:`.db` connection (runs the legacy migration once)."""
+    _migrate_legacy_sessions_db()
+    from . import db
+    return db.get_conn()
 
 
 # ---------------------------------------------------------------------------
@@ -155,7 +194,6 @@ def cleanup_stale_sessions() -> int:
         except (OSError, ProcessLookupError):
             alive = False
         except ValueError:
-            # Non-int pid in the DB — treat as stale.
             alive = False
         if not alive:
             record_exit(int(s["id"]), -1)
@@ -173,17 +211,15 @@ __all__ = [
 
 
 # ---------------------------------------------------------------------------
-# Test helper (not part of the public CLI surface)
+# Test helpers
 # ---------------------------------------------------------------------------
 
 def _reset_connection_for_tests() -> None:
-    """Close and drop the cached connection. Tests use this so the
-    next call rebuilds against the current ``AGENT_BOX_HOME``."""
-    global _conn
+    """Drop the migration sentinel so the next call re-runs migration.
+
+    The connection itself is owned by :mod:`.db`; tests that need a
+    fresh connection should call :func:`agent_box.db._reset_connection_for_tests`.
+    """
+    global _migrated
     with _lock:
-        if _conn is not None:
-            try:
-                _conn.close()
-            except Exception:
-                pass
-        _conn = None
+        _migrated = False

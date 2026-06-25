@@ -15,7 +15,7 @@ def get_profile_data(profile_root, agent_type: str) -> Dict[str, Any]:
 
     Args:
         profile_root: WSL path as string (e.g. "/home/maoqh/.agent-box/profiles/decision")
-        agent_type: Agent type (cc, codex, hermes, opencode)
+        agent_type: Agent type (claude, codex, hermes, opencode)
 
     Returns:
         {
@@ -83,25 +83,46 @@ def get_profile_data(profile_root, agent_type: str) -> Dict[str, Any]:
     }
 
     try:
-        # Read meta.yaml
-        meta = read_yaml_file(profile_root / "meta.yaml") or {}
-        result["name"] = meta.get("name", profile_root.name)
-        result["agent_type"] = meta.get("agent_type", agent_type)
-        # v0.4: surface optional meta fields to the UI.
-        for k in ("display_name", "description", "preset"):
-            v = meta.get(k)
-            if v is not None:
-                result[k] = v
+        # v1: profile meta lives in agent-box.db (profiles table), not
+        # meta.yaml. Fetch it via the CLI so the GUI always sees the DB
+        # view — this also transparently triggers legacy meta.yaml
+        # migration on first access.
+        from .wsl import fetch_profile_meta
+        profile_name = str(profile_root.name) if isinstance(profile_root, Path) else Path(profile_root).name
+        db_meta = fetch_profile_meta(profile_name)
+        if db_meta is not None:
+            inner = db_meta.get("meta", {})
+            result["name"] = inner.get("name", profile_name)
+            # Normalize deprecated "cc" key to "claude"
+            raw_type = inner.get("agent_type", agent_type)
+            result["agent_type"] = "claude" if raw_type == "cc" else raw_type
+            for k in ("display_name", "description", "preset"):
+                v = inner.get(k) or db_meta.get(k)
+                if v:
+                    result[k] = v
+            # provider is top-level in show output
+            meta_provider = db_meta.get("provider") or inner.get("provider")
+        else:
+            # Fallback: WSL or profile not found — keep the caller-provided
+            # agent_type and try legacy meta.yaml for old profiles.
+            meta = read_yaml_file(profile_root / "meta.yaml") or {}
+            result["name"] = meta.get("name", profile_name)
+            raw_type = meta.get("agent_type", agent_type)
+            result["agent_type"] = "claude" if raw_type == "cc" else raw_type
+            for k in ("display_name", "description", "preset"):
+                v = meta.get(k)
+                if v is not None:
+                    result[k] = v
+            meta_provider = meta.get("provider")
 
-        # Create config reader
-        reader = ProfileConfigReader(profile_root, agent_type)
+        # Create config reader (agent_type already normalized above)
+        normalized_type = result["agent_type"]
+        reader = ProfileConfigReader(profile_root, normalized_type)
         result["config_dir"] = reader.config_dir.as_posix()
 
         # Get provider and model.
-        # v0.4: prefer the wizard-stored meta.provider; fall back to
-        # the inline-detected provider from settings.json/config.toml
-        # (existing behavior for old profiles without the field).
-        meta_provider = meta.get("provider")
+        # Prefer the DB-stored provider_ref; fall back to inline-detected
+        # provider from settings.json/config.toml.
         result["provider"] = meta_provider or reader.get_provider()
         result["model"] = reader.get_model()
 
@@ -121,7 +142,7 @@ def get_profile_data(profile_root, agent_type: str) -> Dict[str, Any]:
         # file, preload that file's text here.
         # ----------------------------------------------------------------
         _raw_config_files = {
-            "cc":       "settings.json",
+            "claude":   "settings.json",
             "codex":    "config.toml",
             "hermes":   "config.yaml",
             "opencode": "opencode.jsonc",
@@ -134,7 +155,7 @@ def get_profile_data(profile_root, agent_type: str) -> Dict[str, Any]:
                 )
             except Exception:
                 result["config_raw"] = None
-        if agent_type == "cc":
+        if agent_type in ("cc", "claude"):
             _hooks_file = reader.config_dir / "hooks" / "hooks.json"
             try:
                 # Only preload when the separate hooks file actually
@@ -168,7 +189,7 @@ def get_profile_data(profile_root, agent_type: str) -> Dict[str, Any]:
                 result["auth_raw"] = None
 
         # Get agent-specific data
-        if agent_type == "cc":
+        if agent_type in ("cc", "claude"):
             result["settings"] = CCConfig.read(reader.config_dir)
             result["claude_md"] = CCConfig.read_claude_md(reader.config_dir)
             result["hooks"] = CCConfig.get_hooks(reader.config_dir)
