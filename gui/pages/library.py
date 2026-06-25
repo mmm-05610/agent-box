@@ -1036,7 +1036,7 @@ class LibraryPage(ctk.CTkFrame):
             item_id=item_id,
             display_name=display_name,
             meta_text=meta_text,
-            badge_text=category or _infer_category(settings),
+            badge_text=category or _infer_category(settings) or self._agent_type,
             edit_content=edit_content,
             edit_kind="json",
             profiles=profiles,
