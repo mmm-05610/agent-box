@@ -193,6 +193,24 @@ class Api:
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
 
+    # ── File I/O ──────────────────────────────────────────────────────────
+
+    def read_file(self, path: str) -> str:
+        """Read a file from WSL and return its content."""
+        try:
+            content = _wsl_run(f"cat {path}")
+            return json.dumps({"ok": True, "data": content})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    def list_dir(self, path: str) -> str:
+        """List files in a directory."""
+        try:
+            out = _wsl_run(f"ls -la {path}")
+            return json.dumps({"ok": True, "data": out})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
     # ── Apply ───────────────────────────────────────────────────────────
 
     def apply_provider(self, profile_name: str, provider_id: str) -> str:

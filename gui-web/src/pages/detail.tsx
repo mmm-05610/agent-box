@@ -7,6 +7,7 @@ import { Button, Card, Badge } from '@/components/ui'
 import { Loading } from '@/components/feedback'
 import type { AgentType } from '@/api'
 import { AGENT_TYPE_COLORS, fetchProfileDetail } from '@/api'
+import { readFile } from '@/api/files'
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -33,6 +34,8 @@ interface ProfileDetailPageProps {
 
 export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProps) {
   const [detail, setDetail] = useState<ProfileDetail | null>(null)
+  const [settings, setSettings] = useState<string>('')
+  const [claudeMd, setClaudeMd] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -41,11 +44,23 @@ export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProp
       setLoading(true)
       setError(null)
       try {
+        // Fetch profile detail
         const data = await fetchProfileDetail(profileName)
-        if (data) {
-          setDetail(data as unknown as ProfileDetail)
-        } else {
+        if (!data) {
           setError('Profile not found')
+          return
+        }
+        const detailData = data as unknown as ProfileDetail
+        setDetail(detailData)
+
+        // Read settings.json and CLAUDE.md from the config directory
+        if (detailData.config_dir) {
+          const [settingsContent, claudeMdContent] = await Promise.all([
+            readFile(`${detailData.config_dir}/settings.json`).catch(() => ''),
+            readFile(`${detailData.config_dir}/CLAUDE.md`).catch(() => ''),
+          ])
+          setSettings(settingsContent)
+          setClaudeMd(claudeMdContent)
         }
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Failed to load profile')
@@ -62,7 +77,7 @@ export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProp
         <Button variant="ghost" size="sm" onClick={onBack} className="mb-4">
           ← Back
         </Button>
-        <Loading variant="skeleton" rows={4} />
+        <Loading variant="skeleton" rows={6} />
       </div>
     )
   }
@@ -163,15 +178,29 @@ export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProp
         </Card>
       )}
 
-      {/* Claude.md */}
-      {meta.claude_md && (
-        <Card>
+      {/* Settings */}
+      {settings && (
+        <Card className="mb-4">
           <Card.Header>
-            <Card.Title>Claude.md</Card.Title>
+            <Card.Title>Settings (settings.json)</Card.Title>
           </Card.Header>
           <Card.Content>
             <pre className="text-sm text-foreground font-mono whitespace-pre-wrap bg-muted p-4 rounded-md overflow-auto max-h-96">
-              {meta.claude_md}
+              {settings}
+            </pre>
+          </Card.Content>
+        </Card>
+      )}
+
+      {/* Claude.md */}
+      {claudeMd && (
+        <Card>
+          <Card.Header>
+            <Card.Title>CLAUDE.md</Card.Title>
+          </Card.Header>
+          <Card.Content>
+            <pre className="text-sm text-foreground font-mono whitespace-pre-wrap bg-muted p-4 rounded-md overflow-auto max-h-96">
+              {claudeMd}
             </pre>
           </Card.Content>
         </Card>
