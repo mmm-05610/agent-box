@@ -23,6 +23,94 @@ from ._io import atomic_write_json, deep_merge
 from .profile import ProfileError, load_meta
 
 
+# --- category inference --------------------------------------------------
+
+# env key → category (checked against the ``env`` dict in settings_config).
+_ENV_CATEGORY: Dict[str, str] = {
+    "ANTHROPIC_API_KEY": "anthropic",
+    "ANTHROPIC_AUTH_TOKEN": "anthropic",
+    "OPENAI_API_KEY": "openai",
+    "GOOGLE_API_KEY": "google",
+    "GEMINI_API_KEY": "google",
+    "AWS_ACCESS_KEY_ID": "aws",
+    "AWS_SECRET_ACCESS_KEY": "aws",
+    "AWS_BEDROCK_API_KEY": "aws",
+    "DEEPSEEK_API_KEY": "deepseek",
+    "OPENROUTER_API_KEY": "openrouter",
+    "MISTRAL_API_KEY": "mistral",
+    "GROQ_API_KEY": "groq",
+    "TOGETHER_API_KEY": "together",
+    "COHERE_API_KEY": "cohere",
+    "REPLICATE_API_TOKEN": "replicate",
+    "HF_TOKEN": "huggingface",
+    "HUGGING_FACE_HUB_TOKEN": "huggingface",
+    "FIREWORKS_API_KEY": "fireworks",
+    "PERPLEXITY_API_KEY": "perplexity",
+    "SILICONFLOW_API_KEY": "siliconflow",
+}
+
+# URL domain substring → category (checked against any URL found in env).
+_URL_CATEGORY: List[tuple] = [
+    ("anthropic", "anthropic"),
+    ("openai", "openai"),
+    ("deepseek", "deepseek"),
+    ("openrouter", "openrouter"),
+    ("google", "google"),
+    ("gemini", "google"),
+    ("bedrock", "aws"),
+    ("mistral", "mistral"),
+    ("groq", "groq"),
+    ("together", "together"),
+    ("fireworks", "fireworks"),
+    ("perplexity", "perplexity"),
+    ("siliconflow", "siliconflow"),
+    ("minimaxi", "minimax"),
+    ("xiaomimimo", "xiaomimimo"),
+    ("zhipu", "zhipu"),
+    ("moonshot", "moonshot"),
+    ("qwen", "qwen"),
+    ("baichuan", "baichuan"),
+    ("volcengine", "volcengine"),
+    ("baidu", "baidu"),
+    ("tencent", "tencent"),
+    ("alibaba", "alibaba"),
+    ("cohere", "cohere"),
+    ("replicate", "replicate"),
+]
+
+
+def _infer_category(settings: Dict[str, Any]) -> str:
+    """Infer provider category from *settings*.
+
+    Resolution order:
+    1. Explicit ``category`` key in settings → manual override (highest priority).
+    2. Env key match (e.g. ``ANTHROPIC_API_KEY`` → ``"anthropic"``).
+    3. URL domain match in any env value.
+
+    Returns a lowercase string like ``"anthropic"`` or ``""`` if unknown.
+    """
+    # 1. Manual override
+    manual = settings.get("category")
+    if manual and isinstance(manual, str):
+        return manual.strip().lower()
+
+    env = settings.get("env") or {}
+    # 2. Direct env key match
+    for key, cat in _ENV_CATEGORY.items():
+        if key in env:
+            return cat
+    # 3. URL domain match (check all values that look like URLs)
+    for val in env.values():
+        if not isinstance(val, str):
+            continue
+        val_lower = val.lower()
+        if "://" in val_lower or val_lower.startswith("http"):
+            for domain_key, cat in _URL_CATEGORY:
+                if domain_key in val_lower:
+                    return cat
+    return ""
+
+
 # --- list / get -----------------------------------------------------------
 
 def list_providers(agent_type: str) -> List[Dict[str, Any]]:
@@ -187,6 +275,7 @@ def upsert_provider(agent_type: str, provider_id: str, settings_json: str) -> Di
     if not isinstance(data.get("env"), dict):
         raise ProfileError("provider settings 'env' must be an object")
     settings_config = json.dumps(data, ensure_ascii=False)
+    category = _infer_category(data)
     now_ms = int(__import__("time").time() * 1000)
     conn = db.get_conn()
     existing = conn.execute(
@@ -196,17 +285,18 @@ def upsert_provider(agent_type: str, provider_id: str, settings_json: str) -> Di
     if existing is None:
         conn.execute(
             "INSERT INTO providers "
-            "(id, app_type, name, settings_config, meta, created_at, sort_index) "
-            "VALUES (?, ?, ?, ?, '{}', ?, 0)",
+            "(id, app_type, name, settings_config, category, meta, "
+            "created_at, sort_index) "
+            "VALUES (?, ?, ?, ?, ?, '{}', ?, 0)",
             (provider_id, agent_type, data.get("name") or provider_id,
-             settings_config, now_ms),
+             settings_config, category or None, now_ms),
         )
     else:
         conn.execute(
-            "UPDATE providers SET settings_config = ?, name = ? "
+            "UPDATE providers SET settings_config = ?, name = ?, category = ? "
             "WHERE id = ? AND app_type = ?",
             (settings_config, data.get("name") or provider_id,
-             provider_id, agent_type),
+             category or None, provider_id, agent_type),
         )
     conn.commit()
     result = get_provider(agent_type, provider_id)
@@ -223,13 +313,15 @@ def edit_provider(agent_type: str, provider_id: str) -> Dict[str, Any]:
         )
     initial = current.get("settings") or _template_settings(provider_id)
     data = _open_json_in_editor(initial)
+    settings_config = json.dumps(data, ensure_ascii=False)
+    category = _infer_category(data)
     from . import db
     conn = db.get_conn()
     conn.execute(
-        "UPDATE providers SET settings_config = ?, name = ? "
+        "UPDATE providers SET settings_config = ?, name = ?, category = ? "
         "WHERE id = ? AND app_type = ?",
-        (json.dumps(data, ensure_ascii=False),
-         data.get("name") or provider_id, provider_id, agent_type),
+        (settings_config, data.get("name") or provider_id,
+         category or None, provider_id, agent_type),
     )
     conn.commit()
     result = get_provider(agent_type, provider_id)
