@@ -181,14 +181,14 @@ class Api:
 
     def list_sessions(self) -> str:
         try:
-            out = _wsl_run(f"{AGENT_BOX_CMD} sessions list --json")
+            out = _wsl_run(f"{AGENT_BOX_CMD} sessions --json")
             return json.dumps({"ok": True, "data": json.loads(out)})
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
 
     def cleanup_sessions(self) -> str:
         try:
-            out = _wsl_run(f"{AGENT_BOX_CMD} sessions cleanup")
+            out = _wsl_run(f"{AGENT_BOX_CMD} sessions --cleanup")
             return json.dumps({"ok": True, "data": 0})
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
