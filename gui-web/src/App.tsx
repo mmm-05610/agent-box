@@ -20,13 +20,19 @@ function App() {
   const [page, setPage] = useState<NavKey>('home')
   const [detailProfile, setDetailProfile] = useState<string | null>(null)
 
+  // Navigate to a page and close any open detail
+  const handleNav = (key: NavKey) => {
+    setDetailProfile(null)
+    setPage(key)
+  }
+
   return (
     <ToastProvider>
-      <Shell active={page} onNav={setPage} runningCount={0}>
+      <Shell active={page} onNav={handleNav} runningCount={0}>
         <PageRouter
           page={page}
           detailProfile={detailProfile}
-          onNav={setPage}
+          onNav={handleNav}
           onOpenDetail={setDetailProfile}
           onCloseDetail={() => setDetailProfile(null)}
         />
