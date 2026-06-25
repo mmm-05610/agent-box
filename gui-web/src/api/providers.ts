@@ -1,7 +1,7 @@
 /**
  * Providers API — CRUD operations for providers and Claude.md
  *
- * Calls PyWebView bridge functions via window.pywebview.api
+ * Calls PyWebView bridge functions via window.pywebview.api (async)
  */
 
 import { call } from '@/lib/bridge'

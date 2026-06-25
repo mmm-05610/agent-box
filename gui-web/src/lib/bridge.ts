@@ -1,8 +1,8 @@
 /**
  * PyWebView Bridge — JavaScript ↔ Python communication
  *
- * PyWebView exposes js_api as window.pywebview.api (not window.api).
- * The _pywebviewready event fires when the API is available.
+ * PyWebView exposes js_api as window.pywebview.api.
+ * All bridge methods return Promises (async).
  */
 
 interface ApiResponse<T> {
@@ -11,31 +11,36 @@ interface ApiResponse<T> {
   error?: string
 }
 
+type ApiMethod = (...args: string[]) => Promise<string>
+
 /**
  * Get the PyWebView API object.
  * Returns null if not running in PyWebView.
  */
-function getApi(): Record<string, (...args: string[]) => string> | null {
+function getApi(): Record<string, ApiMethod> | null {
   // @ts-expect-error — pywebview is injected by PyWebView at runtime
   const pywebview = window.pywebview
   if (!pywebview?.api) {
     return null
   }
-  return pywebview.api
+  return pywebview.api as Record<string, ApiMethod>
 }
 
 /**
  * Call a PyWebView bridge function and parse the JSON response.
- * Falls back to empty data if bridge is not available (dev mode).
+ * Bridge methods are async and return JSON strings.
  */
-async function call<T>(fn: (api: Record<string, (...args: string[]) => string>) => string, fallback: T): Promise<T> {
+async function call<T>(
+  fn: (api: Record<string, ApiMethod>) => Promise<string>,
+  fallback: T,
+): Promise<T> {
   try {
     const api = getApi()
     if (!api) {
       console.warn('PyWebView bridge not available, using fallback')
       return fallback
     }
-    const result = fn(api)
+    const result = await fn(api)
     const parsed: ApiResponse<T> = JSON.parse(result)
     if (!parsed.ok) {
       throw new Error(parsed.error ?? 'Unknown error')
