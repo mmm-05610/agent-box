@@ -52,14 +52,14 @@ function getInitial(name: string): string {
   return (name[0] ?? '?').toUpperCase()
 }
 
-function extractBaseUrl(env: Record<string, string>): string | undefined {
-  const url = env.ANTHROPIC_BASE_URL
+function extractBaseUrl(env?: Record<string, string>): string | undefined {
+  const url = env?.ANTHROPIC_BASE_URL
   if (!url) return undefined
   return url.replace(/^https?:\/\//, '')
 }
 
-function extractModel(env: Record<string, string>): string | undefined {
-  return env.ANTHROPIC_MODEL
+function extractModel(env?: Record<string, string>): string | undefined {
+  return env?.ANTHROPIC_MODEL
 }
 
 // ── Types ────────────────────────────────────────────────────────────────
@@ -599,8 +599,8 @@ function ProviderCard({
   onCancelApply: () => void
   onApplyProfileChange: (name: string) => void
 }) {
-  const baseUrl = extractBaseUrl(provider.settings.env)
-  const model = extractModel(provider.settings.env)
+  const baseUrl = extractBaseUrl(provider.settings?.env)
+  const model = extractModel(provider.settings?.env)
   const category = provider.category
 
   return (
