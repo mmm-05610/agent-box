@@ -181,14 +181,41 @@ class Api:
             return json.dumps({"ok": False, "error": str(e)})
 
     def launch_profile(self, name: str, agent_type: str, mode: str, cwd: str = "") -> str:
-        """Launch a profile in a new console window."""
+        """Launch a profile in a new console window.
+
+        Args:
+            name: Profile name
+            agent_type: Agent type (claude, codex, hermes, opencode)
+            mode: Launch mode (新会话 or 继续上次)
+            cwd: Working directory (optional)
+        """
         try:
+            # Resume args per agent type
+            RESUME_ARGS = {
+                "claude": ("--continue",),
+                "codex": ("resume", "--last"),
+                "hermes": ("-c",),
+                "opencode": None,
+            }
+
             # Build the launch command
-            cmd = f"{AGENT_BOX_CMD} launch {name}"
-            if mode:
-                cmd += f" --mode {mode}"
+            argv = [AGENT_BOX_CMD, "launch", name]
+            if mode == "继续上次" and agent_type in RESUME_ARGS:
+                extra = RESUME_ARGS[agent_type]
+                if extra:
+                    argv.extend(extra)
+
+            # Quote arguments and build command line
+            cmdline = " ".join(f"'{a}'" if " " in a else a for a in argv)
+
+            # Build shell script
+            setup = 'export PATH="$HOME/.npm-global/bin:$HOME/.local/bin:$PATH"'
             if cwd:
-                cmd += f" --cwd {cwd}"
+                setup = f"cd '{cwd}' && {setup}"
+            script = (
+                f"{setup} && {cmdline} || "
+                "{ ec=$?; echo; echo agent-box failed code $ec; read -p Enter...; }"
+            )
 
             # Get wsl.exe path
             wsl = shutil.which("wsl.exe")
@@ -200,7 +227,7 @@ class Api:
             if sys.platform == "win32":
                 kwargs["creationflags"] = subprocess.CREATE_NEW_CONSOLE
 
-            proc = subprocess.Popen([wsl, "bash", "-lc", cmd], **kwargs)
+            proc = subprocess.Popen([wsl, "bash", "-lc", script], **kwargs)
 
             # Start watcher thread to track exit
             def _watch():

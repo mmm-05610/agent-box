@@ -2,7 +2,7 @@
  * Profiles Page — Manage agent configuration profiles
  *
  * Lists profiles grouped by agent type, with search, filtering,
- * launch, and delete actions.
+ * launch (with mode/cwd), and delete actions.
  */
 
 import { useCallback, useMemo, useState } from 'react'
@@ -23,6 +23,13 @@ const AGENT_TYPE_ICONS: Record<AgentType, string> = {
   hermes: '◈',
   opencode: '◇',
 }
+
+// ── Launch modes ────────────────────────────────────────────────────────
+
+const LAUNCH_MODES = [
+  { value: '新会话', label: 'New Session' },
+  { value: '继续上次', label: 'Resume Last' },
+] as const
 
 // ── Filter tab type ─────────────────────────────────────────────────────
 
@@ -69,11 +76,15 @@ export function ProfilesPage({ onOpenDetail }: ProfilesPageProps) {
   // ── Handlers ────────────────────────────────────────────────────────
 
   const handleLaunch = useCallback(
-    async (name: string) => {
+    async (name: string, mode: string, cwd: string) => {
       try {
         const profile = profiles.find((p) => p.name === name)
-        await launchProfile(name, { agentType: profile?.agentType ?? 'claude' })
-        toast({ type: 'success', message: `Launched "${name}"` })
+        await launchProfile(name, {
+          agentType: profile?.agentType ?? 'claude',
+          mode,
+          cwd,
+        })
+        toast({ type: 'success', message: `Launched "${name}" (${mode})` })
       } catch {
         toast({ type: 'error', message: `Failed to launch "${name}"` })
       }
@@ -100,11 +111,9 @@ export function ProfilesPage({ onOpenDetail }: ProfilesPageProps) {
     (name: string) => {
       if (onOpenDetail) {
         onOpenDetail(name)
-      } else {
-        toast({ type: 'info', message: `Detail page for "${name}" — not available` })
       }
     },
-    [onOpenDetail, toast],
+    [onOpenDetail],
   )
 
   // ── Loading / error states ──────────────────────────────────────────
@@ -123,7 +132,7 @@ export function ProfilesPage({ onOpenDetail }: ProfilesPageProps) {
       <div className="p-8">
         <h1 className="mb-6 text-xl font-bold text-foreground">Profiles</h1>
         <div className="flex flex-col items-center gap-3 py-16 text-destructive">
-          <p className="text-sm">{error}</p>
+          <p>{error}</p>
           <Button variant="ghost" size="sm" onClick={refresh}>
             Retry
           </Button>
@@ -132,14 +141,11 @@ export function ProfilesPage({ onOpenDetail }: ProfilesPageProps) {
     )
   }
 
-  // ── Render ──────────────────────────────────────────────────────────
-
   return (
-    <div className="flex flex-col gap-6 p-8">
+    <div className="p-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="mb-6 flex items-center justify-between">
         <h1 className="text-xl font-bold text-foreground">Profiles</h1>
-        <Button size="sm">New Profile</Button>
       </div>
 
       {/* Filter tabs */}
@@ -149,28 +155,24 @@ export function ProfilesPage({ onOpenDetail }: ProfilesPageProps) {
         onChange={setActiveFilter}
       />
 
-      {/* Search bar */}
-      <Input
-        size="sm"
-        placeholder="Search profiles..."
-        value={searchQuery}
-        onChange={(e) => setSearchQuery(e.target.value)}
-      />
+      {/* Search */}
+      <div className="mb-4">
+        <Input
+          placeholder="Search profiles..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
+      </div>
 
       {/* Profile list */}
       {filteredProfiles.length === 0 ? (
         <EmptyState
-          icon="📋"
+          icon="📭"
           title={searchQuery ? 'No matches' : 'No profiles yet'}
           description={
             searchQuery
-              ? 'Try a different search term.'
-              : 'Create your first profile to get started.'
-          }
-          action={
-            !searchQuery && (
-              <Button size="sm">Create your first profile</Button>
-            )
+              ? 'Try a different search query'
+              : 'Create a profile to get started'
           }
         />
       ) : (
@@ -194,7 +196,10 @@ export function ProfilesPage({ onOpenDetail }: ProfilesPageProps) {
 
 const FILTER_TABS: { key: FilterTab; label: string }[] = [
   { key: 'all', label: 'All' },
-  ...AGENT_TYPES.map((t) => ({ key: t as FilterTab, label: capitalize(t) })),
+  { key: 'claude', label: 'Claude' },
+  { key: 'codex', label: 'Codex' },
+  { key: 'hermes', label: 'Hermes' },
+  { key: 'opencode', label: 'OpenCode' },
 ]
 
 function FilterTabs({
@@ -204,10 +209,10 @@ function FilterTabs({
 }: {
   active: FilterTab
   counts: Record<FilterTab, number>
-  onChange: (tab: FilterTab) => void
+  onChange: (key: FilterTab) => void
 }) {
   return (
-    <div className="flex gap-1 border-b border-card-border">
+    <div className="mb-4 flex gap-1 border-b border-card-border">
       {FILTER_TABS.map(({ key, label }) => {
         const isActive = active === key
         return (
@@ -215,17 +220,13 @@ function FilterTabs({
             key={key}
             onClick={() => onChange(key)}
             className={cn(
-              'relative px-3 py-2 text-sm font-medium transition-colors',
+              'px-4 py-2 text-sm font-medium transition-colors',
               isActive
-                ? 'text-foreground'
+                ? 'border-b-2 border-primary text-foreground'
                 : 'text-muted-foreground hover:text-foreground',
             )}
           >
             {label} ({counts[key] ?? 0})
-            {/* Underline indicator */}
-            {isActive && (
-              <span className="absolute inset-x-0 -bottom-px h-0.5 bg-foreground" />
-            )}
           </button>
         )
       })}
@@ -242,12 +243,15 @@ function ProfileCard({
   onView,
 }: {
   profile: Profile
-  onLaunch: (name: string) => void
+  onLaunch: (name: string, mode: string, cwd: string) => void
   onDelete: (name: string) => void
   onView: (name: string) => void
 }) {
   const { name, agentType, displayName, description, providerRef, createdAt } =
     profile
+
+  const [mode, setMode] = useState<string>('新会话')
+  const [cwd, setCwd] = useState<string>('')
 
   const badgeVariant = AGENT_TYPE_COLORS[agentType]
   const icon = AGENT_TYPE_ICONS[agentType]
@@ -271,58 +275,71 @@ function ProfileCard({
               {agentType}
             </Badge>
             <div className="ml-auto shrink-0">
-              <Button size="sm" onClick={() => onLaunch(name)}>
-                Launch
+              <Button size="sm" onClick={() => onLaunch(name, mode, cwd)}>
+                ▶ Launch
               </Button>
             </div>
           </div>
 
-          {/* Row 2: display_name + description */}
+          {/* Row 2: description */}
           {(displayName || description) && (
-            <p className="text-sm text-muted-foreground">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
               {displayName && <span>{displayName}</span>}
-              {displayName && description && (
-                <span className="mx-1.5 opacity-40">·</span>
-              )}
+              {displayName && description && <span>·</span>}
               {description && <span>{description}</span>}
-            </p>
+            </div>
           )}
 
           {/* Row 3: provider + created */}
           <div className="flex items-center gap-4 text-xs text-muted-foreground">
             {providerRef && (
-              <span>
-                provider:{' '}
-                <span className="text-foreground">{providerRef}</span>
-              </span>
+              <span>provider: {providerRef}</span>
             )}
             {createdAt != null && (
               <span>created: {formatRelativeTime(createdAt)}</span>
             )}
           </div>
 
-          {/* Row 4: actions */}
-          <div className="flex items-center gap-1 pt-1">
-            <Button variant="ghost" size="sm" onClick={() => onView(name)}>
-              View
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-destructive hover:text-destructive"
-              onClick={() => onDelete(name)}
+          {/* Row 4: mode + cwd + actions */}
+          <div className="flex items-center gap-2 pt-2">
+            {/* Mode selector */}
+            <select
+              value={mode}
+              onChange={(e) => setMode(e.target.value)}
+              className="h-7 rounded-md border border-input bg-card px-2 text-xs text-foreground"
             >
-              Delete
-            </Button>
+              {LAUNCH_MODES.map((m) => (
+                <option key={m.value} value={m.value}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+
+            {/* CWD input */}
+            <Input
+              placeholder="Working directory (optional)"
+              value={cwd}
+              onChange={(e) => setCwd(e.target.value)}
+              className="h-7 text-xs flex-1"
+            />
+
+            {/* Action buttons */}
+            <div className="flex items-center gap-1 shrink-0">
+              <Button variant="ghost" size="sm" onClick={() => onView(name)}>
+                View
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-destructive hover:text-destructive"
+                onClick={() => onDelete(name)}
+              >
+                Delete
+              </Button>
+            </div>
           </div>
         </div>
       </div>
     </Card>
   )
-}
-
-// ── Helpers ─────────────────────────────────────────────────────────────
-
-function capitalize(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1)
 }
