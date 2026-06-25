@@ -20,6 +20,7 @@ import {
   deleteClaudeMd,
   applyClaudeMdToProfile,
   fetchProfiles,
+  fetchProviderDetail,
 } from '@/api'
 
 // ── Category helpers ─────────────────────────────────────────────────────
@@ -133,22 +134,33 @@ export function LibraryPage() {
     async (type: TabKey, id: string) => {
       setEditError(null)
       if (type === 'providers') {
-        const provider = providers.find((p) => p.id === id)
-        if (provider) {
-          setEditing({
-            type: 'provider',
-            id,
-            content: JSON.stringify(provider.settings, null, 2),
-          })
+        // Fetch full detail to get settings
+        try {
+          const detail = await fetchProviderDetail(agentType, id)
+          if (detail?.settings) {
+            setEditing({
+              type: 'provider',
+              id,
+              content: JSON.stringify(detail.settings, null, 2),
+            })
+          } else {
+            setEditing({
+              type: 'provider',
+              id,
+              content: '{}',
+            })
+          }
+        } catch {
+          setEditError('Failed to load provider details')
         }
       } else {
         const md = claudeMds.find((m) => m.id === id)
         if (md) {
-          setEditing({ type: 'claudeMd', id, content: md.content })
+          setEditing({ type: 'claudeMd', id, content: md.content ?? '' })
         }
       }
     },
-    [providers, claudeMds],
+    [agentType, claudeMds],
   )
 
   const handleSaveEdit = useCallback(async () => {

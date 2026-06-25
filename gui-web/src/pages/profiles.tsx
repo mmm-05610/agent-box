@@ -91,6 +91,14 @@ export function ProfilesPage() {
     [toast, refresh],
   )
 
+  const handleView = useCallback(
+    (name: string) => {
+      // TODO: Navigate to detail page
+      toast({ type: 'info', message: `Detail page for "${name}" — not implemented yet` })
+    },
+    [toast],
+  )
+
   // ── Loading / error states ──────────────────────────────────────────
 
   if (loading) {
@@ -165,6 +173,7 @@ export function ProfilesPage() {
               profile={profile}
               onLaunch={handleLaunch}
               onDelete={handleDelete}
+              onView={handleView}
             />
           ))}
         </div>
@@ -222,10 +231,12 @@ function ProfileCard({
   profile,
   onLaunch,
   onDelete,
+  onView,
 }: {
   profile: Profile
   onLaunch: (name: string) => void
   onDelete: (name: string) => void
+  onView: (name: string) => void
 }) {
   const { name, agentType, displayName, description, providerRef, createdAt } =
     profile
@@ -284,7 +295,7 @@ function ProfileCard({
 
           {/* Row 4: actions */}
           <div className="flex items-center gap-1 pt-1">
-            <Button variant="ghost" size="sm">
+            <Button variant="ghost" size="sm" onClick={() => onView(name)}>
               View
             </Button>
             <Button
