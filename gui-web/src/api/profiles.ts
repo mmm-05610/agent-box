@@ -1,20 +1,18 @@
 /**
  * Profiles API — CRUD operations for profiles
  *
- * Calls PyWebView bridge functions.
+ * Calls PyWebView bridge functions via window.pywebview.api
  */
 
 import { call } from '@/lib/bridge'
 import type { AgentType, Profile } from './types'
 
 export async function fetchProfiles(): Promise<Profile[]> {
-  // @ts-expect-error
-  return call<Profile[]>(() => window.api.list_profiles(), [])
+  return call<Profile[]>((api) => api.list_profiles(), [])
 }
 
 export async function fetchProfileDetail(name: string): Promise<Profile | null> {
-  // @ts-expect-error
-  return call<Profile | null>(() => window.api.get_profile(name), null)
+  return call<Profile | null>((api) => api.get_profile(name), null)
 }
 
 export async function createProfile(
@@ -22,9 +20,8 @@ export async function createProfile(
   agentType: AgentType,
   options?: { displayName?: string; description?: string; preset?: string },
 ): Promise<Profile> {
-  // @ts-expect-error
   return call<Profile>(
-    () => window.api.create_profile(
+    (api) => api.create_profile(
       name,
       agentType,
       options?.displayName ?? '',
@@ -36,8 +33,7 @@ export async function createProfile(
 }
 
 export async function deleteProfile(name: string): Promise<void> {
-  // @ts-expect-error
-  await call<void>(() => window.api.delete_profile(name), undefined)
+  await call<void>((api) => api.delete_profile(name), undefined)
 }
 
 export async function launchProfile(

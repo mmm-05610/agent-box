@@ -1,18 +1,16 @@
 /**
  * Sessions API — Query and manage sessions
  *
- * Calls PyWebView bridge functions.
+ * Calls PyWebView bridge functions via window.pywebview.api
  */
 
 import { call } from '@/lib/bridge'
 import type { Session } from './types'
 
 export async function fetchSessions(): Promise<Session[]> {
-  // @ts-expect-error
-  return call<Session[]>(() => window.api.list_sessions(), [])
+  return call<Session[]>((api) => api.list_sessions(), [])
 }
 
 export async function cleanupSessions(): Promise<number> {
-  // @ts-expect-error
-  return call<number>(() => window.api.cleanup_sessions(), 0)
+  return call<number>((api) => api.cleanup_sessions(), 0)
 }
