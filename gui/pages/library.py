@@ -82,31 +82,47 @@ _ENV_CATEGORY_MAP: Dict[str, str] = {
 
 
 def _infer_category(settings: Dict[str, Any]) -> str:
-    """Infer provider category from env keys and URLs in settings."""
+    """Infer provider category from settings.
+
+    Claude Code uses ``ANTHROPIC_*`` env vars for ALL providers — the
+    actual provider identity comes from the ``ANTHROPIC_BASE_URL`` domain.
+    """
+    from .config import _extract_provider_name
+
     env = settings.get("env") or {}
-    # 1. Direct env key match
-    for key, cat in _ENV_CATEGORY_MAP.items():
-        if key in env:
-            return cat
-    # 2. Scan env values for URLs and match domain
-    _URL_PATTERNS = [
-        ("anthropic", "anthropic"), ("openai", "openai"),
-        ("deepseek", "deepseek"), ("openrouter", "openrouter"),
-        ("google", "google"), ("gemini", "google"),
-        ("bedrock", "aws"), ("mistral", "mistral"),
-        ("groq", "groq"), ("together", "together"),
-        ("fireworks", "fireworks"), ("perplexity", "perplexity"),
-        ("siliconflow", "siliconflow"), ("minimaxi", "minimax"),
-        ("cohere", "cohere"), ("replicate", "replicate"),
+
+    # 1. Claude Code: ANTHROPIC_BASE_URL determines the real provider.
+    base_url = env.get("ANTHROPIC_BASE_URL", "")
+    if base_url:
+        name = _extract_provider_name(base_url)
+        if name:
+            return name
+        # URL present but unrecognised domain — still not Anthropic official
+        return "custom"
+    # No ANTHROPIC_BASE_URL → official Anthropic endpoint.
+    # But only claim "anthropic" if there IS an Anthropic key.
+    if "ANTHROPIC_API_KEY" in env or "ANTHROPIC_AUTH_TOKEN" in env:
+        return "anthropic"
+
+    # 2. Non-Claude agent types: check other known URL env vars.
+    _URL_ENV_KEYS = [
+        "OPENAI_BASE_URL", "GOOGLE_API_BASE", "DEEPSEEK_BASE_URL",
+        "OPENROUTER_BASE_URL", "MISTRAL_BASE_URL", "GROQ_BASE_URL",
     ]
+    for key in _URL_ENV_KEYS:
+        url = env.get(key, "")
+        if url:
+            name = _extract_provider_name(url)
+            if name:
+                return name
+
+    # 3. Fallback: scan all env values for any URL.
     for val in env.values():
-        if not isinstance(val, str):
-            continue
-        val_lower = val.lower()
-        if "://" in val_lower:
-            for domain_key, cat in _URL_PATTERNS:
-                if domain_key in val_lower:
-                    return cat
+        if isinstance(val, str) and "://" in val:
+            name = _extract_provider_name(val)
+            if name:
+                return name
+
     return ""
 
 

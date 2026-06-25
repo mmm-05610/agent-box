@@ -23,69 +23,19 @@ from ._io import atomic_write_json, deep_merge
 from .profile import ProfileError, load_meta
 
 
-# --- category inference --------------------------------------------------
-
-# env key → category (checked against the ``env`` dict in settings_config).
-_ENV_CATEGORY: Dict[str, str] = {
-    "ANTHROPIC_API_KEY": "anthropic",
-    "ANTHROPIC_AUTH_TOKEN": "anthropic",
-    "OPENAI_API_KEY": "openai",
-    "GOOGLE_API_KEY": "google",
-    "GEMINI_API_KEY": "google",
-    "AWS_ACCESS_KEY_ID": "aws",
-    "AWS_SECRET_ACCESS_KEY": "aws",
-    "AWS_BEDROCK_API_KEY": "aws",
-    "DEEPSEEK_API_KEY": "deepseek",
-    "OPENROUTER_API_KEY": "openrouter",
-    "MISTRAL_API_KEY": "mistral",
-    "GROQ_API_KEY": "groq",
-    "TOGETHER_API_KEY": "together",
-    "COHERE_API_KEY": "cohere",
-    "REPLICATE_API_TOKEN": "replicate",
-    "HF_TOKEN": "huggingface",
-    "HUGGING_FACE_HUB_TOKEN": "huggingface",
-    "FIREWORKS_API_KEY": "fireworks",
-    "PERPLEXITY_API_KEY": "perplexity",
-    "SILICONFLOW_API_KEY": "siliconflow",
-}
-
-# URL domain substring → category (checked against any URL found in env).
-_URL_CATEGORY: List[tuple] = [
-    ("anthropic", "anthropic"),
-    ("openai", "openai"),
-    ("deepseek", "deepseek"),
-    ("openrouter", "openrouter"),
-    ("google", "google"),
-    ("gemini", "google"),
-    ("bedrock", "aws"),
-    ("mistral", "mistral"),
-    ("groq", "groq"),
-    ("together", "together"),
-    ("fireworks", "fireworks"),
-    ("perplexity", "perplexity"),
-    ("siliconflow", "siliconflow"),
-    ("minimaxi", "minimax"),
-    ("xiaomimimo", "xiaomimimo"),
-    ("zhipu", "zhipu"),
-    ("moonshot", "moonshot"),
-    ("qwen", "qwen"),
-    ("baichuan", "baichuan"),
-    ("volcengine", "volcengine"),
-    ("baidu", "baidu"),
-    ("tencent", "tencent"),
-    ("alibaba", "alibaba"),
-    ("cohere", "cohere"),
-    ("replicate", "replicate"),
-]
 
 
 def _infer_category(settings: Dict[str, Any]) -> str:
     """Infer provider category from *settings*.
 
+    Claude Code uses ``ANTHROPIC_*`` env vars for ALL providers — the
+    actual provider identity comes from the ``ANTHROPIC_BASE_URL`` domain.
+
     Resolution order:
-    1. Explicit ``category`` key in settings → manual override (highest priority).
-    2. Env key match (e.g. ``ANTHROPIC_API_KEY`` → ``"anthropic"``).
-    3. URL domain match in any env value.
+    1. Explicit ``category`` key in settings → manual override.
+    2. ``ANTHROPIC_BASE_URL`` domain → real provider (Claude Code).
+    3. Other known URL env vars.
+    4. Scan all env values for URLs.
 
     Returns a lowercase string like ``"anthropic"`` or ``""`` if unknown.
     """
@@ -95,19 +45,59 @@ def _infer_category(settings: Dict[str, Any]) -> str:
         return manual.strip().lower()
 
     env = settings.get("env") or {}
-    # 2. Direct env key match
-    for key, cat in _ENV_CATEGORY.items():
-        if key in env:
-            return cat
-    # 3. URL domain match (check all values that look like URLs)
+
+    # 2. Claude Code: ANTHROPIC_BASE_URL determines the real provider.
+    base_url = env.get("ANTHROPIC_BASE_URL", "")
+    if base_url:
+        name = _extract_provider_from_url(base_url)
+        if name:
+            return name
+        return "custom"
+    # No BASE_URL → official Anthropic (if key present).
+    if "ANTHROPIC_API_KEY" in env or "ANTHROPIC_AUTH_TOKEN" in env:
+        return "anthropic"
+
+    # 3. Other known URL env vars (non-Claude agent types).
+    for key in ("OPENAI_BASE_URL", "GOOGLE_API_BASE", "DEEPSEEK_BASE_URL",
+                "OPENROUTER_BASE_URL", "MISTRAL_BASE_URL", "GROQ_BASE_URL"):
+        url = env.get(key, "")
+        if url:
+            name = _extract_provider_from_url(url)
+            if name:
+                return name
+
+    # 4. Scan all env values for any URL.
     for val in env.values():
-        if not isinstance(val, str):
-            continue
-        val_lower = val.lower()
-        if "://" in val_lower or val_lower.startswith("http"):
-            for domain_key, cat in _URL_CATEGORY:
-                if domain_key in val_lower:
-                    return cat
+        if isinstance(val, str) and "://" in val:
+            name = _extract_provider_from_url(val)
+            if name:
+                return name
+
+    return ""
+
+
+def _extract_provider_from_url(url: str) -> str:
+    """Extract provider name from URL domain. Returns ``""`` if unknown."""
+    if not url:
+        return ""
+    url_clean = url.replace("https://", "").replace("http://", "")
+    domain = url_clean.split("/")[0].lower()
+    known = [
+        ("minimaxi", "minimax"), ("xiaomimimo", "xiaomimimo"),
+        ("openrouter", "openrouter"), ("deepseek", "deepseek"),
+        ("anthropic", "anthropic"), ("openai", "openai"),
+        ("siliconflow", "siliconflow"), ("zhipu", "zhipu"),
+        ("moonshot", "moonshot"), ("qwen", "qwen"),
+        ("baichuan", "baichuan"), ("volcengine", "volcengine"),
+        ("baidu", "baidu"), ("tencent", "tencent"),
+        ("alibaba", "alibaba"), ("google", "google"),
+        ("mistral", "mistral"), ("cohere", "cohere"),
+        ("groq", "groq"), ("together", "together"),
+        ("fireworks", "fireworks"), ("perplexity", "perplexity"),
+    ]
+    for key, name in known:
+        if key in domain:
+            return name
     return ""
 
 
