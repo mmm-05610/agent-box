@@ -117,7 +117,7 @@ npm install -g @anthropic-ai/claude-code   # Claude Code
 
 <p align="center">
   <img src="截图/v0.5.0/Home.png" alt="Home" width="48%">
-  <img src="截图/v0.5.0/Profiles.png" alt="Profiles" width="48%">
+  <img src="截图/v0.5.0/Profile.png" alt="Profiles" width="48%">
 </p>
 <p align="center">
   <img src="截图/v0.5.0/Profile-detail.png" alt="Profile Detail" width="48%">
