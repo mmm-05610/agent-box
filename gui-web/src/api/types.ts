@@ -33,6 +33,50 @@ export interface ClaudeMd {
   createdAt?: number
 }
 
+// ── MCP Server ─────────────────────────────────────────────────────────
+
+/** Unified MCP server_config shape (matches Python backend). */
+export interface McpServerConfig {
+  type: 'stdio' | 'sse' | 'http'
+  command?: string
+  args?: string[]
+  env?: Record<string, string>
+  url?: string
+  headers?: Record<string, string>
+  [key: string]: unknown
+}
+
+export interface McpServer {
+  id: string
+  name: string
+  description?: string
+  homepage?: string
+  docs?: string
+  tags: string[]
+  /** Agent types this server is enabled for (resolved from join table). */
+  agentTypes: AgentType[]
+  /** Raw server_config JSON string from the DB. */
+  serverConfig?: string
+  /** Parsed server_config object (only on detail / show response). */
+  serverConfigParsed?: McpServerConfig
+}
+
+// ── Skill ──────────────────────────────────────────────────────────────
+
+export interface Skill {
+  id: string
+  name: string
+  description?: string
+  directory?: string
+  repoOwner?: string
+  repoName?: string
+  repoBranch?: string
+  readmeUrl?: string
+  /** Agent types this skill is enabled for (resolved from join table). */
+  agentTypes: AgentType[]
+  installedAt?: number
+}
+
 // ── Profile ────────────────────────────────────────────────────────────
 
 export interface Profile {

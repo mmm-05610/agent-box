@@ -11,11 +11,11 @@ import { createPortal } from 'react-dom'
 import { Button, Input, Textarea } from '@/components/ui'
 import { EmptyState, Loading, useToast } from '@/components/feedback'
 import { PageHeader } from '@/components/layout'
-import { useProviders, useProfiles } from '@/hooks'
+import { useProviders, useProfiles, useMcpServers, useSkills } from '@/hooks'
 import { cn } from '@/lib/utils'
 import { ProviderIcon } from '@/components/ProviderIcon'
 import { getIconMetadata, hasIcon } from '@/icons/extracted'
-import type { AgentType, Provider, ClaudeMd, Profile } from '@/api'
+import type { AgentType, Provider, ClaudeMd, Profile, McpServer, McpServerConfig, Skill } from '@/api'
 import {
   AGENT_TYPES,
   saveProvider,
@@ -25,6 +25,13 @@ import {
   deleteClaudeMd,
   applyClaudeMdToProfile,
   fetchProviderDetail,
+  fetchMcpServerDetail,
+  saveMcpServer,
+  deleteMcpServer,
+  setMcpAgent,
+  saveSkill,
+  deleteSkill,
+  setSkillAgent,
 } from '@/api'
 
 // ── Helpers ────────────────────────────────────────────────────────────
@@ -88,11 +95,65 @@ function iconForProvider(provider: Provider): string | undefined {
 
 // ── Types ──────────────────────────────────────────────────────────────
 
-type TabKey = 'providers' | 'claudeMds'
+type TabKey = 'providers' | 'claudeMds' | 'mcp' | 'skills'
+
+/** Per-agent-type tab visibility. */
+const TAB_VISIBILITY: Record<AgentType, TabKey[]> = {
+  claude: ['providers', 'claudeMds', 'mcp', 'skills'],
+  codex: ['providers', 'mcp', 'skills'],
+  hermes: ['providers', 'mcp', 'skills'],
+  opencode: ['providers', 'mcp', 'skills'],
+}
+
+/** Singular noun shown in the "+ Add X" button. */
+const ADD_TAB_LABELS: Record<TabKey, string> = {
+  providers: 'provider',
+  claudeMds: 'Claude.md',
+  mcp: 'MCP server',
+  skills: 'skill',
+}
+
+/** Placeholder text for the add-panel body. */
+const ADD_PLACEHOLDERS: Record<TabKey, string> = {
+  providers: '{\n  "env": {\n    "ANTHROPIC_API_KEY": "sk-..."\n  }\n}',
+  claudeMds: '# Claude.md content...',
+  mcp: '{\n  "type": "stdio",\n  "command": "npx",\n  "args": ["-y", "@modelcontextprotocol/server-filesystem"]\n}',
+  skills: 'description = Browse and search the local filesystem\ndirectory = /home/maoqh/projects/my-skill\nrepoOwner = my-org\nrepoName = my-skill',
+}
+
+/** Human-friendly label for each tab. */
+const TAB_LABELS: Record<TabKey, string> = {
+  providers: 'Providers',
+  claudeMds: 'Claude.md',
+  mcp: 'MCP',
+  skills: 'Skills',
+}
+
+/** Per-tab count selector. */
+const TAB_COUNTS: Record<TabKey, (lists: { providers: Provider[]; claudeMds: ClaudeMd[]; mcp: McpServer[]; skills: Skill[] }) => number> = {
+  providers: (l) => l.providers.length,
+  claudeMds: (l) => l.claudeMds.length,
+  mcp: (l) => l.mcp.length,
+  skills: (l) => l.skills.length,
+}
+
+/** Serialize a Skill to a key=value text block (for inline editing). */
+function skillToForm(skill: Skill): string {
+  const lines: string[] = []
+  if (skill.name) lines.push(`name = ${skill.name}`)
+  if (skill.description) lines.push(`description = ${skill.description}`)
+  if (skill.directory) lines.push(`directory = ${skill.directory}`)
+  if (skill.repoOwner) lines.push(`repoOwner = ${skill.repoOwner}`)
+  if (skill.repoName) lines.push(`repoName = ${skill.repoName}`)
+  if (skill.repoBranch) lines.push(`repoBranch = ${skill.repoBranch}`)
+  if (skill.readmeUrl) lines.push(`readmeUrl = ${skill.readmeUrl}`)
+  return lines.join("\n")
+}
 
 interface EditingState {
-  type: 'provider' | 'claudeMd'
+  type: 'provider' | 'claudeMd' | 'mcp' | 'skill'
   id: string
+  /** Raw content of the inline editor (JSON for provider/mcp, key/value form for skill). */
   content: string
 }
 
@@ -123,8 +184,20 @@ export function LibraryPage() {
   const [creating, setCreating] = useState(false)
 
   const { providers, claudeMds, loading, error, refresh } = useProviders(agentType)
+  const { mcpServers, loading: mcpLoading, error: mcpError, refresh: refreshMcp } = useMcpServers(agentType)
+  const { skills, loading: skillsLoading, error: skillsError, refresh: refreshSkills } = useSkills(agentType)
   const { profiles: allProfiles, refresh: refreshProfiles } = useProfiles()
   const { toast } = useToast()
+
+  // Snap activeTab to a tab that's visible for the current agent type.
+  useEffect(() => {
+    const visible = TAB_VISIBILITY[agentType]
+    if (!visible.includes(activeTab)) {
+      // The first tab is always defined (TAB_VISIBILITY is non-empty per agent type).
+      const next = visible[0] ?? 'providers'
+      setActiveTab(next)
+    }
+  }, [agentType, activeTab])
 
   const query = search.toLowerCase().trim()
 
@@ -151,6 +224,43 @@ export function LibraryPage() {
     })
   }, [claudeMds, query])
 
+  const filteredMcp = useMemo(() => {
+    if (!query) return mcpServers
+    return mcpServers.filter((s) => {
+      const cfg = s.serverConfigParsed
+      const haystack = [
+        s.name,
+        s.id,
+        s.description ?? '',
+        cfg?.type ?? '',
+        cfg?.command ?? '',
+        cfg?.url ?? '',
+        ...(s.tags ?? []),
+      ]
+        .join(' ')
+        .toLowerCase()
+      return haystack.includes(query)
+    })
+  }, [mcpServers, query])
+
+  const filteredSkills = useMemo(() => {
+    if (!query) return skills
+    return skills.filter((s) => {
+      const haystack = [
+        s.name,
+        s.id,
+        s.description ?? '',
+        s.directory ?? '',
+        s.repoOwner ?? '',
+        s.repoName ?? '',
+        s.readmeUrl ?? '',
+      ]
+        .join(' ')
+        .toLowerCase()
+      return haystack.includes(query)
+    })
+  }, [skills, query])
+
   const handleStartEdit = useCallback(
     async (type: TabKey, id: string) => {
       setEditError(null)
@@ -167,14 +277,35 @@ export function LibraryPage() {
         } catch {
           setEditError('Failed to load provider details')
         }
-      } else {
+      } else if (type === 'claudeMds') {
         const md = claudeMds.find((m) => m.id === id)
         if (md) {
           setEditing({ type: 'claudeMd', id, content: md.content ?? '' })
         }
+      } else if (type === 'mcp') {
+        try {
+          const detail = await fetchMcpServerDetail(id)
+          const cfg = detail?.serverConfigParsed ?? {
+            type: 'stdio',
+            command: '',
+            args: [],
+          }
+          setEditing({
+            type: 'mcp',
+            id,
+            content: JSON.stringify(cfg, null, 2),
+          })
+        } catch {
+          setEditError('Failed to load MCP server details')
+        }
+      } else {
+        const skill = skills.find((s) => s.id === id)
+        if (skill) {
+          setEditing({ type: 'skill', id, content: skillToForm(skill) })
+        }
       }
     },
-    [agentType, claudeMds],
+    [agentType, claudeMds, skills],
   )
 
   const handleSaveEdit = useCallback(async () => {
@@ -192,18 +323,46 @@ export function LibraryPage() {
         }
         await saveProvider(agentType, editing.id, editing.content)
         toast({ type: 'success', message: 'Provider saved' })
-      } else {
+        refresh()
+      } else if (editing.type === 'claudeMd') {
         await saveClaudeMd(agentType, editing.id, editing.content)
         toast({ type: 'success', message: 'Claude.md saved' })
+        refresh()
+      } else if (editing.type === 'mcp') {
+        let parsed: unknown
+        try {
+          parsed = JSON.parse(editing.content)
+        } catch {
+          setEditError('Invalid JSON format')
+          setSaving(false)
+          return
+        }
+        const cfg = (parsed ?? {}) as McpServerConfig
+        const detail = await fetchMcpServerDetail(editing.id)
+        const payload = {
+          name: detail?.name ?? editing.id,
+          description: detail?.description ?? '',
+          homepage: detail?.homepage ?? '',
+          docs: detail?.docs ?? '',
+          tags: detail?.tags ?? [],
+          server_config: cfg,
+        }
+        await saveMcpServer(editing.id, JSON.stringify(payload))
+        toast({ type: 'success', message: 'MCP server saved' })
+        refreshMcp()
+      } else {
+        // skill — content is a key=value form, one per line
+        await saveSkill(editing.id, editing.content)
+        toast({ type: 'success', message: 'Skill saved' })
+        refreshSkills()
       }
       setEditing(null)
-      refresh()
     } catch (e) {
       setEditError(e instanceof Error ? e.message : 'Save failed')
     } finally {
       setSaving(false)
     }
-  }, [editing, agentType, refresh, toast])
+  }, [editing, agentType, refresh, refreshMcp, refreshSkills, toast])
 
   const handleDelete = useCallback(
     async (type: TabKey, id: string) => {
@@ -211,16 +370,57 @@ export function LibraryPage() {
         if (type === 'providers') {
           await deleteProvider(agentType, id)
           toast({ type: 'success', message: 'Provider deleted' })
-        } else {
+          refresh()
+        } else if (type === 'claudeMds') {
           await deleteClaudeMd(agentType, id)
           toast({ type: 'success', message: 'Claude.md deleted' })
+          refresh()
+        } else if (type === 'mcp') {
+          await deleteMcpServer(id)
+          toast({ type: 'success', message: 'MCP server deleted' })
+          refreshMcp()
+        } else {
+          await deleteSkill(id)
+          toast({ type: 'success', message: 'Skill deleted' })
+          refreshSkills()
         }
-        refresh()
       } catch (e) {
         toast({ type: 'error', message: e instanceof Error ? e.message : 'Delete failed' })
       }
     },
-    [agentType, refresh, toast],
+    [agentType, refresh, refreshMcp, refreshSkills, toast],
+  )
+
+  /** Toggle an MCP server's agent association and refresh the list. */
+  const handleToggleMcpAgent = useCallback(
+    async (serverId: string, t: AgentType, nextEnabled: boolean) => {
+      try {
+        await setMcpAgent(serverId, t, nextEnabled)
+        refreshMcp()
+      } catch (e) {
+        toast({
+          type: 'error',
+          message: e instanceof Error ? e.message : 'Failed to update agent',
+        })
+      }
+    },
+    [refreshMcp, toast],
+  )
+
+  /** Toggle a skill's agent association and refresh the list. */
+  const handleToggleSkillAgent = useCallback(
+    async (skillId: string, t: AgentType, nextEnabled: boolean) => {
+      try {
+        await setSkillAgent(skillId, t, nextEnabled)
+        refreshSkills()
+      } catch (e) {
+        toast({
+          type: 'error',
+          message: e instanceof Error ? e.message : 'Failed to update agent',
+        })
+      }
+    },
+    [refreshSkills, toast],
   )
 
   // Profiles that share this provider's agent_type — these are the
@@ -367,20 +567,48 @@ export function LibraryPage() {
         }
         await saveProvider(agentType, addId.trim(), addContent)
         toast({ type: 'success', message: 'Provider created' })
-      } else {
+        refresh()
+      } else if (activeTab === 'claudeMds') {
         await saveClaudeMd(agentType, addId.trim(), addContent)
         toast({ type: 'success', message: 'Claude.md created' })
+        refresh()
+      } else if (activeTab === 'mcp') {
+        let parsed: unknown
+        try {
+          parsed = addContent.trim() ? JSON.parse(addContent) : { type: 'stdio' }
+        } catch {
+          setAddError('Invalid JSON format')
+          setCreating(false)
+          return
+        }
+        const cfg = (parsed ?? {}) as McpServerConfig
+        const payload = {
+          name: addId.trim(),
+          description: '',
+          homepage: '',
+          docs: '',
+          tags: [],
+          server_config: cfg,
+        }
+        await saveMcpServer(addId.trim(), JSON.stringify(payload))
+        toast({ type: 'success', message: 'MCP server created' })
+        refreshMcp()
+      } else {
+        // skills — content is the key=value form
+        await saveSkill(addId.trim(), addContent)
+        toast({ type: 'success', message: 'Skill created' })
+        refreshSkills()
       }
       setShowAddPanel(false)
       setAddId('')
       setAddContent('')
-      refresh()
+      setAddError(null)
     } catch (e) {
       setAddError(e instanceof Error ? e.message : 'Create failed')
     } finally {
       setCreating(false)
     }
-  }, [addId, addContent, activeTab, agentType, refresh, toast])
+  }, [addId, addContent, activeTab, agentType, refresh, refreshMcp, refreshSkills, toast])
 
   return (
     <div className="mx-auto flex h-full w-full max-w-5xl flex-col px-8 py-10">
@@ -391,7 +619,15 @@ export function LibraryPage() {
           <>
             <span>{filteredProviders.length} providers</span>
             <span className="mx-2 text-border">·</span>
-            <span>{filteredClaudeMds.length} Claude.md templates</span>
+            {TAB_VISIBILITY[agentType].includes('claudeMds') && (
+              <>
+                <span>{filteredClaudeMds.length} Claude.md templates</span>
+                <span className="mx-2 text-border">·</span>
+              </>
+            )}
+            <span>{filteredMcp.length} MCP servers</span>
+            <span className="mx-2 text-border">·</span>
+            <span>{filteredSkills.length} skills</span>
             <span className="mx-2 text-border">·</span>
             <span className="font-mono">catalog</span>
           </>
@@ -405,7 +641,7 @@ export function LibraryPage() {
               setShowAddPanel(true)
             }}
           >
-            + Add {activeTab === 'providers' ? 'provider' : 'Claude.md'}
+            + Add {ADD_TAB_LABELS[activeTab]}
           </Button>
         }
         className="mb-6"
@@ -416,10 +652,16 @@ export function LibraryPage() {
         <AgentTypeSwitcher value={agentType} onChange={setAgentType} />
         <div className="flex items-center gap-3">
           <SegmentedTabs
-            tabs={[
-              { key: 'providers', label: 'Providers', count: filteredProviders.length },
-              { key: 'claudeMds', label: 'Claude.md', count: filteredClaudeMds.length },
-            ]}
+            tabs={TAB_VISIBILITY[agentType].map((k) => ({
+              key: k,
+              label: TAB_LABELS[k],
+              count: TAB_COUNTS[k]({
+                providers: filteredProviders,
+                claudeMds: filteredClaudeMds,
+                mcp: filteredMcp,
+                skills: filteredSkills,
+              }),
+            }))}
             active={activeTab}
             onChange={(k) => setActiveTab(k as TabKey)}
           />
@@ -434,74 +676,128 @@ export function LibraryPage() {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto -mx-2 px-2">
-        {loading ? (
-          <Loading variant="skeleton" rows={4} />
-        ) : error ? (
-          <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-10 text-center">
-            <p className="text-sm font-medium text-destructive">{error}</p>
-          </div>
-        ) : activeTab === 'providers' ? (
-          <ProvidersList
-            items={filteredProviders}
-            editing={editing}
-            linking={linking}
-            editError={editError}
-            saving={saving}
-            allProfiles={linkableProfiles}
-            onStartEdit={(id) => handleStartEdit('providers', id)}
-            onSaveEdit={handleSaveEdit}
-            onCancelEdit={() => setEditing(null)}
-            onEditContentChange={(c) =>
-              setEditing((prev) => (prev ? { ...prev, content: c } : null))
-            }
-            onDelete={(id) => handleDelete('providers', id)}
-            onOpenLinking={handleOpenLinking}
-            onToggleLinkSelection={handleToggleLinkSelection}
-            onConfirmLink={handleConfirmLink}
-            onCancelLinking={() => setLinking(null)}
-          />
-        ) : (
-          <ClaudeMdsList
-            items={filteredClaudeMds}
-            editing={editing}
-            mdLinking={mdLinking}
-            editError={editError}
-            saving={saving}
-            profiles={linkableProfiles}
-            onStartEdit={(id) => handleStartEdit('claudeMds', id)}
-            onSaveEdit={handleSaveEdit}
-            onCancelEdit={() => setEditing(null)}
-            onEditContentChange={(c) =>
-              setEditing((prev) => (prev ? { ...prev, content: c } : null))
-            }
-            onDelete={(id) => handleDelete('claudeMds', id)}
-            onStartApply={handleOpenMdLinking}
-            onApply={handleConfirmMdLink}
-            onCancelApply={() => setMdLinking(null)}
-            onApplyProfileChange={(name) =>
-              setMdLinking((prev) => (prev ? { ...prev, profileName: name } : null))
-            }
-          />
-        )}
+        {(() => {
+          // Per-tab loading + error routing
+          const tabLoading =
+            activeTab === 'providers' || activeTab === 'claudeMds'
+              ? loading
+              : activeTab === 'mcp'
+                ? mcpLoading
+                : skillsLoading
+          const tabError =
+            activeTab === 'providers' || activeTab === 'claudeMds'
+              ? error
+              : activeTab === 'mcp'
+                ? mcpError
+                : skillsError
+          if (tabLoading) {
+            return <Loading variant="skeleton" rows={4} />
+          }
+          if (tabError) {
+            return (
+              <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-10 text-center">
+                <p className="text-sm font-medium text-destructive">{tabError}</p>
+              </div>
+            )
+          }
+          if (activeTab === 'providers') {
+            return (
+              <ProvidersList
+                items={filteredProviders}
+                editing={editing}
+                linking={linking}
+                editError={editError}
+                saving={saving}
+                allProfiles={linkableProfiles}
+                onStartEdit={(id) => handleStartEdit('providers', id)}
+                onSaveEdit={handleSaveEdit}
+                onCancelEdit={() => setEditing(null)}
+                onEditContentChange={(c) =>
+                  setEditing((prev) => (prev ? { ...prev, content: c } : null))
+                }
+                onDelete={(id) => handleDelete('providers', id)}
+                onOpenLinking={handleOpenLinking}
+                onToggleLinkSelection={handleToggleLinkSelection}
+                onConfirmLink={handleConfirmLink}
+                onCancelLinking={() => setLinking(null)}
+              />
+            )
+          }
+          if (activeTab === 'claudeMds') {
+            return (
+              <ClaudeMdsList
+                items={filteredClaudeMds}
+                editing={editing}
+                mdLinking={mdLinking}
+                editError={editError}
+                saving={saving}
+                profiles={linkableProfiles}
+                onStartEdit={(id) => handleStartEdit('claudeMds', id)}
+                onSaveEdit={handleSaveEdit}
+                onCancelEdit={() => setEditing(null)}
+                onEditContentChange={(c) =>
+                  setEditing((prev) => (prev ? { ...prev, content: c } : null))
+                }
+                onDelete={(id) => handleDelete('claudeMds', id)}
+                onStartApply={handleOpenMdLinking}
+                onApply={handleConfirmMdLink}
+                onCancelApply={() => setMdLinking(null)}
+                onApplyProfileChange={(name) =>
+                  setMdLinking((prev) => (prev ? { ...prev, profileName: name } : null))
+                }
+              />
+            )
+          }
+          if (activeTab === 'mcp') {
+            return (
+              <McpList
+                items={filteredMcp}
+                editing={editing}
+                editError={editError}
+                saving={saving}
+                onStartEdit={(id) => handleStartEdit('mcp', id)}
+                onSaveEdit={handleSaveEdit}
+                onCancelEdit={() => setEditing(null)}
+                onEditContentChange={(c) =>
+                  setEditing((prev) => (prev ? { ...prev, content: c } : null))
+                }
+                onDelete={(id) => handleDelete('mcp', id)}
+                onToggleAgent={handleToggleMcpAgent}
+              />
+            )
+          }
+          return (
+            <SkillsList
+              items={filteredSkills}
+              editing={editing}
+              editError={editError}
+              saving={saving}
+              onStartEdit={(id) => handleStartEdit('skills', id)}
+              onSaveEdit={handleSaveEdit}
+              onCancelEdit={() => setEditing(null)}
+              onEditContentChange={(c) =>
+                setEditing((prev) => (prev ? { ...prev, content: c } : null))
+              }
+              onDelete={(id) => handleDelete('skills', id)}
+              onToggleAgent={handleToggleSkillAgent}
+            />
+          )
+        })()}
 
         {/* Add Panel */}
         {showAddPanel && (
           <div className="mt-4 rounded-xl bg-card  p-6 shadow-sm">
             <h3 className="mb-3 text-sm font-semibold text-foreground">
-              New {activeTab === 'providers' ? 'Provider' : 'Claude.md'}
+              New {ADD_TAB_LABELS[activeTab]}
             </h3>
             <div className="flex flex-col gap-3">
               <Input
-                placeholder="ID (e.g. my-provider)"
+                placeholder={`ID (e.g. my-${ADD_TAB_LABELS[activeTab].replace(/\s+/g, '-').toLowerCase()})`}
                 value={addId}
                 onChange={(e) => setAddId(e.target.value)}
               />
               <Textarea
-                placeholder={
-                  activeTab === 'providers'
-                    ? '{\n  "env": {\n    "ANTHROPIC_API_KEY": "sk-..."\n  }\n}'
-                    : '# Claude.md content...'
-                }
+                placeholder={ADD_PLACEHOLDERS[activeTab]}
                 rows={6}
                 value={addContent}
                 onChange={(e) => setAddContent(e.target.value)}
@@ -1426,6 +1722,443 @@ function SwitchConfirmDialog({
           </Button>
         </div>
       </div>
+    </div>
+  )
+}
+
+// ── MCP List ────────────────────────────────────────────────────────────
+
+function McpList({
+  items,
+  editing,
+  editError,
+  saving,
+  onStartEdit,
+  onSaveEdit,
+  onCancelEdit,
+  onEditContentChange,
+  onDelete,
+  onToggleAgent,
+}: {
+  items: McpServer[]
+  editing: EditingState | null
+  editError: string | null
+  saving: boolean
+  onStartEdit: (id: string) => void
+  onSaveEdit: () => void
+  onCancelEdit: () => void
+  onEditContentChange: (content: string) => void
+  onDelete: (id: string) => void
+  onToggleAgent: (id: string, t: AgentType, enabled: boolean) => void
+}) {
+  if (items.length === 0) {
+    return (
+      <EmptyState
+        icon="◈"
+        title="No MCP servers yet"
+        description="Add an MCP server to expose tools to your agent."
+      />
+    )
+  }
+  return (
+    <div className="flex flex-col gap-2.5">
+      {items.map((server) => (
+        <McpCard
+          key={server.id}
+          server={server}
+          isEditing={editing?.type === 'mcp' && editing.id === server.id}
+          editing={editing}
+          editError={editError}
+          saving={saving}
+          onStartEdit={() => onStartEdit(server.id)}
+          onSaveEdit={onSaveEdit}
+          onCancelEdit={onCancelEdit}
+          onEditContentChange={onEditContentChange}
+          onDelete={() => onDelete(server.id)}
+          onToggleAgent={(t, next) => onToggleAgent(server.id, t, next)}
+        />
+      ))}
+    </div>
+  )
+}
+
+// ── MCP Card ────────────────────────────────────────────────────────────
+
+function McpCard({
+  server,
+  isEditing,
+  editing,
+  editError,
+  saving,
+  onStartEdit,
+  onSaveEdit,
+  onCancelEdit,
+  onEditContentChange,
+  onDelete,
+  onToggleAgent,
+}: {
+  server: McpServer
+  isEditing: boolean
+  editing: EditingState | null
+  editError: string | null
+  saving: boolean
+  onStartEdit: () => void
+  onSaveEdit: () => void
+  onCancelEdit: () => void
+  onEditContentChange: (content: string) => void
+  onDelete: () => void
+  onToggleAgent: (t: AgentType, enabled: boolean) => void
+}) {
+  const cfg = server.serverConfigParsed
+  const cfgType = cfg?.type ?? 'stdio'
+  return (
+    <div
+      className={cn(
+        'group relative overflow-hidden rounded-xl bg-card',
+        'transition-all duration-normal hover:shadow-md',
+        isEditing && 'ring-1 ring-accent/30 shadow-md',
+      )}
+    >
+      {/* Glass shine on left edge (cyan/violet to evoke "network") */}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-y-0 left-0 w-1 rounded-l-xl overflow-hidden"
+        style={{
+          background: 'linear-gradient(90deg, #06B6D425, transparent)',
+          boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.06)',
+        }}
+      />
+
+      <div className="flex items-center gap-4 px-5 py-4">
+        {/* Icon — network/box glyph */}
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-500/10 ring-1 ring-cyan-500/20 overflow-hidden">
+          <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5 text-cyan-500">
+            <rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.75" />
+            <rect x="14" y="3" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.75" />
+            <rect x="3" y="14" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.75" />
+            <rect x="14" y="14" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.75" />
+            <path d="M10 6.5h4M6.5 10v4M17.5 10v4M10 17.5h4" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+          </svg>
+        </div>
+
+        {/* Info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3 className="text-sm font-semibold text-foreground truncate">{server.name}</h3>
+            <span
+              className={cn(
+                'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider',
+                cfgType === 'stdio'
+                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                  : cfgType === 'sse'
+                    ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                    : 'bg-sky-500/10 text-sky-600 dark:text-sky-400',
+              )}
+            >
+              {cfgType}
+            </span>
+            {server.tags.slice(0, 3).map((t) => (
+              <span
+                key={t}
+                className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground"
+              >
+                {t}
+              </span>
+            ))}
+          </div>
+          {server.description && (
+            <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1">{server.description}</p>
+          )}
+          <AgentTypePicker enabled={server.agentTypes} onToggle={onToggleAgent} />
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center gap-1 opacity-0 pointer-events-none transition-opacity duration-fast group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto">
+          <IconAction label="Edit MCP server" onClick={onStartEdit}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 20h9" />
+              <path d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4 12.5-12.5z" />
+            </svg>
+          </IconAction>
+          <IconAction label="Delete MCP server" onClick={onDelete} variant="danger">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 6h18" />
+              <path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+              <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
+            </svg>
+          </IconAction>
+        </div>
+      </div>
+
+      {/* Inline editor (JSON of server_config) */}
+      {isEditing && editing && (
+        <div className="border-t border-border bg-muted/20 px-5 py-4">
+          <Textarea
+            rows={8}
+            value={editing.content}
+            onChange={(e) => onEditContentChange(e.target.value)}
+            error={editError ?? undefined}
+            className="font-mono text-xs"
+          />
+          <p className="mt-2 text-[10px] text-muted-foreground">
+            server_config schema: <code>{`{ type: "stdio" | "sse" | "http", command?, args?, env?, url?, headers? }`}</code>
+          </p>
+          <div className="mt-3 flex items-center justify-end gap-2">
+            <Button variant="ghost" size="sm" onClick={onCancelEdit}>
+              Cancel
+            </Button>
+            <Button size="sm" isLoading={saving} onClick={onSaveEdit}>
+              Save changes
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Skills List ─────────────────────────────────────────────────────────
+
+function SkillsList({
+  items,
+  editing,
+  editError,
+  saving,
+  onStartEdit,
+  onSaveEdit,
+  onCancelEdit,
+  onEditContentChange,
+  onDelete,
+  onToggleAgent,
+}: {
+  items: Skill[]
+  editing: EditingState | null
+  editError: string | null
+  saving: boolean
+  onStartEdit: (id: string) => void
+  onSaveEdit: () => void
+  onCancelEdit: () => void
+  onEditContentChange: (content: string) => void
+  onDelete: (id: string) => void
+  onToggleAgent: (id: string, t: AgentType, enabled: boolean) => void
+}) {
+  if (items.length === 0) {
+    return (
+      <EmptyState
+        icon="◈"
+        title="No skills yet"
+        description="Add a skill to teach your agent a new capability."
+      />
+    )
+  }
+  return (
+    <div className="flex flex-col gap-2.5">
+      {items.map((skill) => (
+        <SkillCard
+          key={skill.id}
+          skill={skill}
+          isEditing={editing?.type === 'skill' && editing.id === skill.id}
+          editing={editing}
+          editError={editError}
+          saving={saving}
+          onStartEdit={() => onStartEdit(skill.id)}
+          onSaveEdit={onSaveEdit}
+          onCancelEdit={onCancelEdit}
+          onEditContentChange={onEditContentChange}
+          onDelete={() => onDelete(skill.id)}
+          onToggleAgent={(t, next) => onToggleAgent(skill.id, t, next)}
+        />
+      ))}
+    </div>
+  )
+}
+
+// ── Skill Card ──────────────────────────────────────────────────────────
+
+function SkillCard({
+  skill,
+  isEditing,
+  editing,
+  editError,
+  saving,
+  onStartEdit,
+  onSaveEdit,
+  onCancelEdit,
+  onEditContentChange,
+  onDelete,
+  onToggleAgent,
+}: {
+  skill: Skill
+  isEditing: boolean
+  editing: EditingState | null
+  editError: string | null
+  saving: boolean
+  onStartEdit: () => void
+  onSaveEdit: () => void
+  onCancelEdit: () => void
+  onEditContentChange: (content: string) => void
+  onDelete: () => void
+  onToggleAgent: (t: AgentType, enabled: boolean) => void
+}) {
+  const repo = skill.repoOwner && skill.repoName ? `${skill.repoOwner}/${skill.repoName}` : null
+  return (
+    <div
+      className={cn(
+        'group relative overflow-hidden rounded-xl bg-card',
+        'transition-all duration-normal hover:shadow-md',
+        isEditing && 'ring-1 ring-accent/30 shadow-md',
+      )}
+    >
+      {/* Glass shine on left edge (amber for "skill") */}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-y-0 left-0 w-1 rounded-l-xl overflow-hidden"
+        style={{
+          background: 'linear-gradient(90deg, #F59E0B25, transparent)',
+          boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.06)',
+        }}
+      />
+
+      <div className="flex items-center gap-4 px-5 py-4">
+        {/* Icon — sparkle/glyph */}
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 ring-1 ring-amber-500/20 overflow-hidden">
+          <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5 text-amber-500">
+            <path d="M12 3l1.7 4.6L18 9.3l-4.3 1.7L12 15.6l-1.7-4.6L6 9.3l4.3-1.7L12 3z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+            <path d="M19 14l.7 1.8L21.5 16.5l-1.8.7L19 19l-.7-1.8L16.5 16.5l1.8-.7L19 14z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+            <path d="M5 17l.5 1.3L6.8 18.8l-1.3.5L5 20.6l-.5-1.3L3.2 18.8l1.3-.5L5 17z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+          </svg>
+        </div>
+
+        {/* Info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3 className="text-sm font-semibold text-foreground truncate">{skill.name}</h3>
+            <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-amber-600 dark:text-amber-400">
+              skill
+            </span>
+            {repo && (
+              <span
+                title={`${repo}@${skill.repoBranch ?? 'main'}`}
+                className="inline-flex items-center gap-1 rounded-md bg-muted/60 px-2 py-0.5 text-[10px] font-mono text-muted-foreground"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
+                  <path d="M9 19c-5 1.5-5-2.5-7-3" />
+                  <path d="M15 22v-4a3.37 3.37 0 00-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0020 4.77 5.07 5.07 0 0019.91 1S18.73.65 16 2.48a13.38 13.38 0 00-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 005 4.77a5.44 5.44 0 00-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 009 18.13V22" />
+                </svg>
+                {repo}
+              </span>
+            )}
+          </div>
+          {skill.description && (
+            <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1">{skill.description}</p>
+          )}
+          {skill.directory && (
+            <p
+              title={skill.directory}
+              className="mt-0.5 font-mono text-[10px] text-muted-foreground/70 truncate"
+            >
+              {skill.directory}
+            </p>
+          )}
+          <AgentTypePicker enabled={skill.agentTypes} onToggle={onToggleAgent} />
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center gap-1 opacity-0 pointer-events-none transition-opacity duration-fast group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto">
+          <IconAction label="Edit skill" onClick={onStartEdit}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 20h9" />
+              <path d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4 12.5-12.5z" />
+            </svg>
+          </IconAction>
+          <IconAction label="Delete skill" onClick={onDelete} variant="danger">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 6h18" />
+              <path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+              <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
+            </svg>
+          </IconAction>
+        </div>
+      </div>
+
+      {/* Inline editor (key=value lines) */}
+      {isEditing && editing && (
+        <div className="border-t border-border bg-muted/20 px-5 py-4">
+          <Textarea
+            rows={6}
+            value={editing.content}
+            onChange={(e) => onEditContentChange(e.target.value)}
+            error={editError ?? undefined}
+            className="font-mono text-xs"
+          />
+          <p className="mt-2 text-[10px] text-muted-foreground">
+            Supported keys: <code>name</code>, <code>description</code>,{' '}
+            <code>directory</code> (absolute path), <code>repoOwner</code>,{' '}
+            <code>repoName</code>, <code>repoBranch</code>, <code>readmeUrl</code>.
+            One per line, <code>key = value</code> or <code>key: value</code>.
+          </p>
+          <div className="mt-3 flex items-center justify-end gap-2">
+            <Button variant="ghost" size="sm" onClick={onCancelEdit}>
+              Cancel
+            </Button>
+            <Button size="sm" isLoading={saving} onClick={onSaveEdit}>
+              Save changes
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Agent Type Multi-Select ─────────────────────────────────────────────
+
+/** Inline row of agent-type checkboxes for a Library item. */
+function AgentTypePicker({
+  enabled,
+  onToggle,
+}: {
+  enabled: AgentType[]
+  onToggle: (t: AgentType, next: boolean) => void
+}) {
+  return (
+    <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+      <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground shrink-0">
+        Agents
+      </span>
+      {AGENT_TYPES.map((t) => {
+        const on = enabled.includes(t)
+        return (
+          <button
+            key={t}
+            type="button"
+            onClick={() => onToggle(t, !on)}
+            title={on ? `Disable for ${t}` : `Enable for ${t}`}
+            className={cn(
+              'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-mono',
+              'transition-colors duration-fast cursor-pointer',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-1',
+              on
+                ? 'bg-foreground text-background'
+                : 'bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground',
+            )}
+          >
+            <span
+              className={cn(
+                'flex h-2.5 w-2.5 shrink-0 items-center justify-center rounded-sm border',
+                on ? 'border-background bg-background/20' : 'border-border',
+              )}
+            >
+              {on && (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" className="h-2 w-2 text-background">
+                  <path d="M5 12l5 5L20 7" />
+                </svg>
+              )}
+            </span>
+            {t}
+          </button>
+        )
+      })}
     </div>
   )
 }

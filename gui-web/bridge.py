@@ -191,7 +191,123 @@ class Api:
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
 
-    # ── Profiles ────────────────────────────────────────────────────────
+    # ── MCP Servers ────────────────────────────────────────────────────────────────
+
+    def list_mcp_servers(self, agent_type: str) -> str:
+        try:
+            out = _wsl_run(f"{AGENT_BOX_CMD} mcp-server list --type {agent_type} --json")
+            return json.dumps({"ok": True, "data": json.loads(out)})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    def get_mcp_server(self, server_id: str) -> str:
+        try:
+            out = _wsl_run(f"{AGENT_BOX_CMD} mcp-server show {server_id} --json")
+            return json.dumps({"ok": True, "data": json.loads(out)})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    def save_mcp_server(self, server_id: str, data_json: str) -> str:
+        try:
+            wsl = shutil.which("wsl.exe")
+            if wsl is None:
+                return json.dumps({"ok": False, "error": "wsl.exe not found"})
+            result = subprocess.run(
+                [wsl, "bash", "-lc",
+                 f"{AGENT_BOX_CMD} mcp-server upsert {server_id}"],
+                input=data_json,
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+            if result.returncode != 0:
+                raise RuntimeError(result.stderr.strip())
+            return json.dumps({"ok": True, "data": json.loads(result.stdout.strip())})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    def delete_mcp_server(self, server_id: str) -> str:
+        try:
+            _wsl_run(f"{AGENT_BOX_CMD} mcp-server delete {server_id} --force")
+            return json.dumps({"ok": True})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    def set_mcp_agent(self, server_id: str, agent_type: str, enabled: str) -> str:
+        try:
+            flag = "--enable" if enabled.lower() in ("true", "1", "yes") else "--disable"
+            _wsl_run(f"{AGENT_BOX_CMD} mcp-server agents {server_id} {flag} {agent_type}")
+            return json.dumps({"ok": True})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    # ── Skills ────────────────────────────────────────────────────────────────
+
+    def list_skills(self, agent_type: str) -> str:
+        try:
+            out = _wsl_run(f"{AGENT_BOX_CMD} skill list --type {agent_type} --json")
+            return json.dumps({"ok": True, "data": json.loads(out)})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    def get_skill(self, skill_id: str) -> str:
+        try:
+            out = _wsl_run(f"{AGENT_BOX_CMD} skill show {skill_id} --json")
+            return json.dumps({"ok": True, "data": json.loads(out)})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    def save_skill(self, skill_id: str, data_json: str) -> str:
+        try:
+            data = json.loads(data_json) if data_json.strip() else {}
+            if not isinstance(data, dict):
+                data = {}
+            flags = f"{AGENT_BOX_CMD} skill upsert {skill_id}"
+            name = data.get("name")
+            if name:
+                flags += f" --name {name}"
+            desc = data.get("description")
+            if desc:
+                flags += f" --description {desc}"
+            directory = data.get("directory")
+            if directory:
+                flags += f" --directory {directory}"
+            repo_owner = data.get("repoOwner") or data.get("repo_owner")
+            if repo_owner:
+                flags += f" --repo-owner {repo_owner}"
+            repo_name = data.get("repoName") or data.get("repo_name")
+            if repo_name:
+                flags += f" --repo-name {repo_name}"
+            repo_branch = data.get("repoBranch") or data.get("repo_branch")
+            if repo_branch:
+                flags += f" --repo-branch {repo_branch}"
+            readme_url = data.get("readmeUrl") or data.get("readme_url")
+            if readme_url:
+                flags += f" --readme-url {readme_url}"
+            out = _wsl_run(flags)
+            # Re-fetch and return as JSON
+            detail_out = _wsl_run(f"{AGENT_BOX_CMD} skill show {skill_id} --json")
+            return json.dumps({"ok": True, "data": json.loads(detail_out)})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    def delete_skill(self, skill_id: str) -> str:
+        try:
+            _wsl_run(f"{AGENT_BOX_CMD} skill delete {skill_id} --force")
+            return json.dumps({"ok": True})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    def set_skill_agent(self, skill_id: str, agent_type: str, enabled: str) -> str:
+        try:
+            flag = "--enable" if enabled.lower() in ("true", "1", "yes") else "--disable"
+            _wsl_run(f"{AGENT_BOX_CMD} skill agents {skill_id} {flag} {agent_type}")
+            return json.dumps({"ok": True})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+
+    # ── Profiles ────────────────────────────────────────────────────────────────
 
     def list_profiles(self) -> str:
         try:
