@@ -41,16 +41,18 @@ Never create new top-level directories or files for agent output — use
 
 ## Entry points
 
-- **GUI (Windows desktop)**: `gui-redesign.py` shim → `gui/app.py`.
+- **GUI (Windows desktop)**: `gui-web/bridge.py --prod` (PyWebView + React).
+  Build frontend first: `cd gui-web && npm run build`.
 - **CLI (WSL)**: `src/agent_box/cli.py`.
 - **Desktop launcher**: `C:\Users\maoqh\Desktop\AgentBox.bat`
 
 ## Known landmines
 
-- **Tk font weights**: only `"normal"` and `"bold"` work. CSS-style
-  `"medium"` / `"semibold"` raise `_tkinter.TclError`. See
-  `gui/tokens.py`.
 - **Bat file encoding**: keep ASCII only. Em-dash (—) corrupts to `€?`
-  on Chinese Windows GBK. See troubleshooting doc §5.
-- **shim + UNC**: `from gui.app import main` fails silently on UNC paths.
-  Use `importlib.util` as `gui-redesign.py` does. See troubleshooting §1.
+  on Chinese Windows GBK.
+- **PyWebView + PyInstaller**: bridge.py must detect `sys.frozen` to find
+  bundled frontend at `sys._MEIPASS/gui-web/dist/`.
+- **Vite build before PyInstaller**: always run `cd gui-web && npm run build`
+  before packaging, otherwise the exe will be missing the frontend.
+- **Inno Setup paths**: `setup.iss` paths are relative to CWD when running
+  `iscc`, not relative to the script location.

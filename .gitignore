@@ -43,3 +43,4 @@ logs/
 # --- Secrets / credentials (defense in depth) ---
 *.auth
 *credentials*
+nul

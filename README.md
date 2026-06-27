@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="logo.png" alt="agent-box" width="128" height="128">
+  <img src="assets/logo.png" alt="agent-box" width="128" height="128">
 </p>
 
 # agent-box

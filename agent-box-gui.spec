@@ -2,8 +2,8 @@
 from PyInstaller.utils.hooks import collect_all
 
 datas = [
-    ('logo.png', '.'),
-    ('logo.ico', '.'),
+    ('assets/logo.png', '.'),
+    ('assets/logo.ico', '.'),
     ('gui-web/dist', 'gui-web/dist'),
 ]
 binaries = []
@@ -42,7 +42,7 @@ exe = EXE(
     a.datas,
     [],
     name='agent-box-gui',
-    icon='logo.ico',
+    icon='assets/logo.ico',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

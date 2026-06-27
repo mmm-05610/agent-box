@@ -6,8 +6,8 @@
 ## 设计原则（来自对话 + 代码现状）
 
 1. **零外部依赖** — CLI is stdlib only (`sqlite3` 是标准库，`bwrap` 是
-   系统工具)。GUI (CustomTkinter) is a separate Windows-launched
-   process (`gui-redesign.py`), not part of the CLI package.
+   系统工具)。GUI (PyWebView + React) is a separate Windows-launched
+   process (`gui-web/bridge.py`), not part of the CLI package.
 2. **模板是 package data** — `src/agent_box/templates/<agent_type>/`，
    `pip install` 后随 wheel 一起分发。`library.get_template_dir()` 解析。
 3. **Profile = 模板的拷贝** — `profile.create()` 拷贝模板目录到
@@ -152,15 +152,14 @@ _AGENT_TYPES = {
 
 ## GUI（独立于 CLI 包）
 
-- 路径：`gui/`（CustomTkinter）。不是 `agent-box` 包的子模块，不通过
+- 路径：`gui-web/`（PyWebView + React + Vite + Tailwind）。不是 `agent-box` 包的子模块，不通过
   `agent-box` CLI 启动。
-- 启动方式：Windows 上跑 `gui-redesign.py`；内部通过 `wsl.exe bash -lc
-agent-box ...` 调 CLI 子命令（list / create / delete / launch）。
+- 启动方式：Windows 上跑 `gui-web/bridge.py --prod`（开发模式连 `localhost:5173`）；
+  内部通过 `wsl.exe bash -lc agent-box ...` 调 CLI 子命令（list / create / delete / launch）。
 - 关键文件：
-  - `gui/app.py` — 主窗口 + 路由（主页 / wizard / detail）
-  - `gui/pages/detail.py` — 详情页：可编辑 tab + Ctrl+S + 脏页/陈旧检测
-  - `gui/pages/wizard.py` — 新建 profile 向导
-  - `gui/wsl.py` — WSL 边界调用封装（profile CRUD + 文件读/写 + 启动 argv）
+  - `gui-web/bridge.py` — PyWebView 窗口 + Python API bridge
+  - `gui-web/src/pages/` — React 页面（home / profiles / library / sessions / settings）
+  - `gui-web/src/components/layout/sidebar.tsx` — 侧边栏导航
 
 ## Future (not implemented)
 
