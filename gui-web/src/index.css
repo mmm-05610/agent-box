@@ -80,53 +80,53 @@
 
   /* ── Dark mode (cool, near-black) ─────────────────────────────────── */
   .dark {
-    --background: 220 14% 7%;
-    --foreground: 220 14% 95%;
+    --background: 220 14% 6%;
+    --foreground: 220 14% 96%;
 
-    --card: 220 14% 10%;
-    --card-foreground: 220 14% 95%;
-    --card-border: 220 14% 16%;
-    --card-hover: 220 14% 14%;
+    --card: 220 14% 11%;
+    --card-foreground: 220 14% 96%;
+    --card-border: 220 14% 22%;
+    --card-hover: 220 14% 15%;
 
-    --primary: 220 14% 95%;
-    --primary-foreground: 220 14% 7%;
+    --primary: 220 14% 96%;
+    --primary-foreground: 220 14% 6%;
     --primary-hover: 220 14% 88%;
 
-    --secondary: 220 14% 14%;
-    --secondary-foreground: 220 14% 95%;
-    --secondary-hover: 220 14% 18%;
+    --secondary: 220 14% 15%;
+    --secondary-foreground: 220 14% 96%;
+    --secondary-hover: 220 14% 20%;
 
-    --muted: 220 14% 14%;
-    --muted-foreground: 220 10% 65%;
+    --muted: 220 14% 15%;
+    --muted-foreground: 220 10% 70%;
 
-    --destructive: 0 62% 45%;
+    --destructive: 0 62% 50%;
     --destructive-foreground: 0 0% 98%;
-    --destructive-hover: 0 62% 38%;
-    --destructive-subtle: 0 50% 15%;
+    --destructive-hover: 0 62% 42%;
+    --destructive-subtle: 0 50% 16%;
 
-    --success: 142 50% 50%;
+    --success: 142 50% 52%;
     --success-foreground: 0 0% 98%;
-    --success-subtle: 142 30% 14%;
+    --success-subtle: 142 30% 16%;
 
-    --warning: 32 70% 50%;
+    --warning: 32 70% 52%;
     --warning-foreground: 0 0% 98%;
-    --warning-subtle: 32 30% 14%;
+    --warning-subtle: 32 30% 16%;
 
-    --info: 217 60% 55%;
+    --info: 217 60% 58%;
     --info-foreground: 0 0% 98%;
-    --info-subtle: 217 30% 14%;
+    --info-subtle: 217 30% 16%;
 
-    --border: 220 14% 16%;
-    --input: 220 14% 16%;
+    --border: 220 14% 24%;
+    --input: 220 14% 24%;
     --ring: 220 14% 80%;
 
-    --accent: 16 70% 56%;
+    --accent: 16 70% 58%;
     --accent-foreground: 220 14% 10%;
-    --accent-subtle: 16 50% 18%;
+    --accent-subtle: 16 50% 20%;
 
-    --sidebar: 220 14% 6%;
-    --sidebar-foreground: 220 14% 95%;
-    --sidebar-accent: 220 14% 14%;
+    --sidebar: 220 14% 5%;
+    --sidebar-foreground: 220 14% 96%;
+    --sidebar-accent: 220 14% 15%;
 
     --shadow-color: 0 0% 0%;
   }

@@ -432,15 +432,20 @@ def main():
     api = Api()
 
     # Determine frontend URL
-    # Priority: --url flag > --prod (built files) > localhost:5173 (dev server)
+    # Priority: --url flag > built files > localhost:5173 (dev server)
     url = "http://localhost:5173"
 
-    if "--prod" in sys.argv:
+    # PyInstaller bundle: frontend is extracted to sys._MEIPASS/gui-web/dist/
+    if getattr(sys, "frozen", False):
+        frontend_dir = Path(sys._MEIPASS) / "gui-web" / "dist"
+        if frontend_dir.exists():
+            url = str(frontend_dir / "index.html")
+    elif "--prod" in sys.argv:
         frontend_dir = Path(__file__).parent / "dist"
         if frontend_dir.exists():
             url = str(frontend_dir / "index.html")
-            print(f"Loading built files from: {url}")
-    elif "--url" in sys.argv:
+
+    if "--url" in sys.argv:
         idx = sys.argv.index("--url")
         if idx + 1 < len(sys.argv):
             url = sys.argv[idx + 1]

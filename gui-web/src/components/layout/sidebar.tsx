@@ -114,16 +114,6 @@ function PlusIcon() {
   )
 }
 
-function LayersIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-      <path d="M4 7l8-4 8 4-8 4-8-4z" />
-      <path d="M4 12l8 4 8-4" />
-      <path d="M4 17l8 4 8-4" />
-    </svg>
-  )
-}
-
 // ── Nav data ───────────────────────────────────────────────────────────
 
 const NAV_ITEMS: NavItem[] = [
@@ -153,12 +143,11 @@ export function Sidebar({ active, onNav, runningCount = 0 }: SidebarProps) {
 
       {/* ── Brand ────────────────────────────────────────────────── */}
       <div className="relative flex items-center gap-3 px-4 pt-5 pb-4">
-        <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-stone-900 to-stone-700 text-stone-50 shadow-md dark:from-stone-100 dark:to-stone-300 dark:text-stone-900">
-          <LayersIcon />
-          {/* Brand glow accent dot */}
-          <span
-            aria-hidden="true"
-            className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-accent ring-2 ring-stone-50 dark:ring-stone-950"
+        <div className="relative flex h-9 w-9 shrink-0 items-center justify-center">
+          <img
+            src="/logo.png"
+            alt="Agent Box"
+            className="h-9 w-9 object-contain"
           />
         </div>
         <div className="min-w-0 flex-1">

@@ -6,7 +6,8 @@
  * the provider's real brand logo (color preserved).
  */
 
-import { useCallback, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useMemo, useRef, useState, useEffect, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { Button, Input, Textarea } from '@/components/ui'
 import { EmptyState, Loading, useToast } from '@/components/feedback'
 import { PageHeader } from '@/components/layout'
@@ -51,6 +52,16 @@ const PROVIDER_ICON_ALIASES: Record<string, string> = {
 }
 
 /** Map a provider name or category to an icon registry key (lowercase). */
+function isLightColor(color: string): boolean {
+  if (!color || color === 'currentColor' || color === 'transparent') return true
+  const c = color.replace('#', '')
+  if (c.length !== 6) return false
+  const r = parseInt(c.substring(0, 2), 16)
+  const g = parseInt(c.substring(2, 4), 16)
+  const b = parseInt(c.substring(4, 6), 16)
+  return (r * 0.299 + g * 0.587 + b * 0.114) / 255 > 0.8
+}
+
 function iconForProvider(provider: Provider): string | undefined {
   const name = provider.name.toLowerCase()
 
@@ -740,7 +751,11 @@ function ProviderCard({
   const baseUrl = extractBaseUrl(provider.settings?.env)
   const model = extractModel(provider.settings?.env)
   const iconName = iconForProvider(provider)
-  const iconColor = iconName ? getIconMetadata(iconName)?.defaultColor : undefined
+  const rawColor = iconName ? getIconMetadata(iconName)?.defaultColor : undefined
+  // Normalize: currentColor/transparent/empty → fallback gray so gradient & shine work
+  const iconColor = rawColor && rawColor.startsWith('#') ? rawColor : '#71717a'
+  // If original color was non-hex (white/transparent), use slightly off-white bg
+  const isLight = !rawColor || !rawColor.startsWith('#') || isLightColor(rawColor)
 
   // Profiles on this agent_type that AREN'T linked to this provider yet
   // — the "Add to profile" picker candidates. Includes profiles that
@@ -756,13 +771,16 @@ function ProviderCard({
     allProviders.map((p) => [p.id, p.name]),
   )
 
+  const linkBtnRef = useRef<HTMLButtonElement>(null)
+
 
   return (
     <div
       className={cn(
-        'group relative overflow-hidden rounded-xl bg-card',
+        'group relative overflow-hidden rounded-xl',
         'transition-all duration-normal',
         'hover:shadow-md',
+        isLight ? 'bg-[#f5f5f5] dark:bg-[#1a1a1a]' : 'bg-card',
       )}
       style={
         iconColor
@@ -776,7 +794,7 @@ function ProviderCard({
       {iconColor && (
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute inset-y-0 left-0 w-1"
+          className="pointer-events-none absolute inset-y-0 left-0 w-1 rounded-l-xl overflow-hidden"
           style={{
             background: `linear-gradient(90deg, ${iconColor}25, transparent)`,
             boxShadow: `inset 0 1px 0 0 rgba(255,255,255,0.06)`,
@@ -830,16 +848,46 @@ function ProviderCard({
               </span>
             )}
           </div>
-          {baseUrl && (
-            <p className="mt-1 font-mono text-xs text-muted-foreground truncate">
-              {baseUrl}
-            </p>
-          )}
-          {model && (
-            <p className="mt-0.5 text-[11px] text-muted-foreground">
-              model: <span className="font-mono">{model}</span>
-            </p>
-          )}
+          <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground shrink-0">
+              Used by
+            </span>
+            {linkedProfiles.length === 0 ? (
+              <span className="text-[10px] text-muted-foreground/50 italic">no profile</span>
+            ) : (
+              linkedProfiles.map((p) => (
+                <span
+                  key={p.name}
+                  className="inline-flex items-center gap-1 rounded-md bg-muted/60 px-2 py-0.5 text-[10px] text-muted-foreground"
+                  title={`Profile: ${p.displayName || p.name}`}
+                >
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  {p.displayName || p.name}
+                </span>
+              ))
+            )}
+            {unlinkedCandidates.length > 0 && (
+              <button
+                ref={linkBtnRef}
+                type="button"
+                onClick={onOpenLinking}
+                disabled={isLinking}
+                className={cn(
+                  'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px]',
+                  'transition-colors duration-fast',
+                  'text-muted-foreground hover:text-foreground hover:bg-muted',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-1',
+                  'disabled:opacity-50 cursor-pointer',
+                )}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                Link
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Actions — hover reveal */}
@@ -859,56 +907,13 @@ function ProviderCard({
               <path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2" />
               <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
             </svg>
-          </IconAction>
-        </div>
-      </div>
-
-      {/* Linked profiles row */}
-      <div className="px-5 pb-4 -mt-1 flex items-center gap-2 flex-wrap">
-        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground shrink-0">
-          Used by
-        </span>
-        {linkedProfiles.length === 0 ? (
-          <span className="text-xs text-muted-foreground/60 italic">
-            no profile
-          </span>
-        ) : (
-          linkedProfiles.map((p) => (
-            <span
-              key={p.name}
-              className="inline-flex items-center gap-1 rounded-md bg-muted/60 px-2 py-0.5 text-xs text-foreground"
-              title={`Profile: ${p.displayName || p.name}`}
-            >
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              {p.displayName || p.name}
-            </span>
-          ))
-        )}
-        {unlinkedCandidates.length > 0 && (
-          <button
-            type="button"
-            onClick={onOpenLinking}
-            disabled={isLinking}
-            className={cn(
-              'inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs',
-              'transition-colors duration-fast',
-              'text-muted-foreground hover:text-foreground hover:bg-muted',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-1',
-              'disabled:opacity-50 cursor-pointer',
-            )}
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            Link profile
-          </button>
-        )}
+           </IconAction>
+          </div>
       </div>
 
       {/* Inline edit panel */}
       {isEditing && editing && (
-        <div className="border-t border-border/30 bg-muted/20 px-5 py-4">
+        <div className="border-t border-border bg-muted/20 px-5 py-4">
           <Textarea
             rows={8}
             value={editing.content}
@@ -927,97 +932,155 @@ function ProviderCard({
         </div>
       )}
 
-      {/* Link profile picker */}
+      {/* Link profile popover — portal */}
       {isLinking && linking && (
-        <div className="border-t border-border/30 bg-muted/20 px-5 py-4">
-          <div className="mb-3 flex items-center justify-between">
-            <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Link to profiles
-            </span>
-            <span className="text-xs font-medium tabular-nums text-foreground">
-              {linking.selectedProfiles.size} selected
-            </span>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 mb-3">
-            {unlinkedCandidates.length === 0 && (
-              <span className="text-xs text-muted-foreground/60 italic">
-                no profile to link
-              </span>
-            )}
-            {unlinkedCandidates
-              // Sort switch candidates (already linked to another provider)
-              // to the END so unlinked profiles stay prominent.
-              .slice()
-              .sort((a, b) => {
-                const aSwitch = a.providerRef ? 1 : 0
-                const bSwitch = b.providerRef ? 1 : 0
-                return aSwitch - bSwitch
-              })
-              .map((p) => {
-                const selected = linking.selectedProfiles.has(p.name)
-                const isSwitch = !!p.providerRef
-                const currentProviderLabel = isSwitch
-                  ? providerLabelById.get(p.providerRef!) ?? p.providerRef
-                  : null
-                return (
-                  <button
-                    key={p.name}
-                    type="button"
-                    onClick={() => onToggleLinkSelection(p.name)}
-                    title={
-                      isSwitch
-                        ? `Currently uses ${currentProviderLabel} — selecting will switch to ${provider.name}`
-                        : undefined
-                    }
-                    className={cn(
-                      'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs',
-                      'transition-all duration-fast cursor-pointer shadow-sm',
-                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-1',
-                      selected
-                        ? 'bg-foreground text-background shadow-md'
-                        : isSwitch
-                          ? 'bg-muted/40 text-muted-foreground ring-1 ring-border hover:bg-muted hover:text-foreground'
-                          : 'bg-card text-foreground ring-1 ring-border hover:bg-muted',
-                    )}
-                  >
-                    {selected ? (
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
-                        <path d="M5 12l5 5L20 7" />
-                      </svg>
-                    ) : isSwitch ? (
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3 opacity-70">
-                        <path d="M17 1l4 4-4 4" />
-                        <path d="M3 11V9a4 4 0 014-4h14" />
-                        <path d="M7 23l-4-4 4-4" />
-                        <path d="M21 13v2a4 4 0 01-4 4H3" />
-                      </svg>
-                    ) : null}
-                    <span>{p.displayName || p.name}</span>
-                    {isSwitch && (
-                      <span className="text-[10px] opacity-80">
-                        ↻ {currentProviderLabel}
-                      </span>
-                    )}
-                  </button>
-                )
-              })}
-          </div>
-          <div className="flex items-center justify-end gap-2">
-            <Button variant="ghost" size="sm" onClick={onCancelLinking}>
-              Cancel
-            </Button>
-            <Button
-              size="sm"
-              isLoading={saving}
-              onClick={onConfirmLink}
-              disabled={linking.selectedProfiles.size === 0}
-            >
-              Link {linking.selectedProfiles.size > 0 && `(${linking.selectedProfiles.size})`}
-            </Button>
-          </div>
-        </div>
+        <LinkPopover
+          anchorRef={linkBtnRef}
+          provider={provider}
+          linking={linking}
+          unlinkedCandidates={unlinkedCandidates}
+          providerLabelById={providerLabelById}
+          saving={saving}
+          onToggleLinkSelection={onToggleLinkSelection}
+          onConfirmLink={onConfirmLink}
+          onCancelLinking={onCancelLinking}
+        />
       )}
     </div>
+  )
+}
+
+// ── Link Profile Popover ────────────────────────────────────────────────
+
+function LinkPopover({
+  anchorRef,
+  provider,
+  linking,
+  unlinkedCandidates,
+  providerLabelById,
+  saving,
+  onToggleLinkSelection,
+  onConfirmLink,
+  onCancelLinking,
+}: {
+  anchorRef: React.RefObject<HTMLButtonElement | null>
+  provider: Provider
+  linking: LinkingState
+  unlinkedCandidates: Profile[]
+  providerLabelById: Map<string, string>
+  saving: boolean
+  onToggleLinkSelection: (name: string) => void
+  onConfirmLink: () => void
+  onCancelLinking: () => void
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState({ top: 0, left: 0 })
+
+  useEffect(() => {
+    if (anchorRef.current) {
+      const rect = anchorRef.current.getBoundingClientRect()
+      setPos({ top: rect.bottom + 4, left: rect.left })
+    }
+  }, [anchorRef])
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        onCancelLinking()
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [onCancelLinking])
+
+  return createPortal(
+    <div
+      ref={ref}
+      className="fixed z-[9999] w-[280px] rounded-xl bg-card shadow-xl ring-1 ring-border p-3"
+      style={{ top: pos.top, left: pos.left }}
+    >
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-xs font-medium text-foreground">Link profiles</span>
+        <span className="text-[10px] tabular-nums text-muted-foreground">
+          {linking.selectedProfiles.size} selected
+        </span>
+      </div>
+      <div className="flex flex-col gap-1 max-h-[200px] overflow-y-auto mb-2">
+        {unlinkedCandidates.length === 0 && (
+          <span className="text-xs text-muted-foreground/60 italic py-2 text-center">
+            no profile to link
+          </span>
+        )}
+        {unlinkedCandidates
+          .slice()
+          .sort((a, b) => {
+            const aSwitch = a.providerRef ? 1 : 0
+            const bSwitch = b.providerRef ? 1 : 0
+            return aSwitch - bSwitch
+          })
+          .map((p) => {
+            const selected = linking.selectedProfiles.has(p.name)
+            const isSwitch = !!p.providerRef
+            const currentProviderLabel = isSwitch
+              ? providerLabelById.get(p.providerRef!) ?? p.providerRef
+              : null
+            return (
+              <button
+                key={p.name}
+                type="button"
+                onClick={() => onToggleLinkSelection(p.name)}
+                title={
+                  isSwitch
+                    ? `Currently uses ${currentProviderLabel} — selecting will switch to ${provider.name}`
+                    : undefined
+                }
+                className={cn(
+                  'flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-left w-full',
+                  'transition-all duration-fast cursor-pointer',
+                  selected
+                    ? 'bg-foreground text-background'
+                    : 'hover:bg-muted text-foreground',
+                )}
+              >
+                <span
+                  className={cn(
+                    'flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
+                    selected
+                      ? 'bg-background border-background text-foreground'
+                      : 'border-border',
+                  )}
+                >
+                  {selected && (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
+                      <path d="M5 12l5 5L20 7" />
+                    </svg>
+                  )}
+                </span>
+                <span className="flex-1 truncate">{p.displayName || p.name}</span>
+                {isSwitch && (
+                  <span className="text-[10px] opacity-60 shrink-0">
+                    ↻ {currentProviderLabel}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+      </div>
+      <div className="flex items-center justify-end gap-2 pt-1 border-t border-border">
+        <Button variant="ghost" size="sm" onClick={onCancelLinking}>
+          Cancel
+        </Button>
+        <Button
+          size="sm"
+          isLoading={saving}
+          onClick={onConfirmLink}
+          disabled={linking.selectedProfiles.size === 0}
+        >
+          Link {linking.selectedProfiles.size > 0 && `(${linking.selectedProfiles.size})`}
+        </Button>
+      </div>
+      </div>,
+    document.body,
   )
 }
 
@@ -1165,39 +1228,67 @@ function ClaudeMdCard({
   onCancelApply: () => void
   onApplyProfileChange: (name: string) => void
 }) {
+  const linkedProfiles = profiles.filter((p) => p.claudeMdRef === md.id)
+
   return (
     <div
       className={cn(
-        'group relative overflow-hidden rounded-xl bg-card ',
+        'group relative overflow-hidden rounded-xl bg-card',
         'transition-all duration-normal',
-        'hover:-translate-y-1 hover:border-foreground/25 hover:shadow-md hover:bg-card-hover/20',
-        'motion-safe:hover:scale-[1.005]',
-        (isEditing || isApplying) && 'ring-1 ring-black/10 shadow-md',
+        'hover:shadow-md',
+        (isEditing || isApplying) && 'ring-1 ring-accent/30 shadow-md',
       )}
     >
+      {/* Glass shine on left edge */}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-y-0 left-0 w-1 rounded-l-xl overflow-hidden"
+        style={{
+          background: 'linear-gradient(90deg, #8B5CF625, transparent)',
+          boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.06)',
+        }}
+      />
+
       <div className="flex items-center gap-4 px-5 py-4">
         {/* Icon — markdown file glyph */}
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted ring-1 ring-black/[0.05]">
-          <span className="font-mono text-sm font-bold text-muted-foreground">
-            M↓
-          </span>
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-500/10 ring-1 ring-violet-500/20 overflow-hidden">
+          <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5 text-violet-500">
+            <rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" strokeWidth="1.75" />
+            <path d="M6 16V8l3 3.5L12 8v8" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M17 14l2 2-2 2" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M15 18h-1.5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
         </div>
 
         {/* Info */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <h3 className="text-sm font-semibold text-foreground truncate">
               {md.name}
             </h3>
-            <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            <span className="inline-flex items-center rounded-full bg-violet-500/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-violet-600 dark:text-violet-400">
               markdown
             </span>
           </div>
-          {md.description && (
-            <p className="mt-1 text-xs text-muted-foreground truncate">
-              {md.description}
-            </p>
-          )}
+          <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground shrink-0">
+              Applied to
+            </span>
+            {linkedProfiles.length === 0 ? (
+              <span className="text-[10px] text-muted-foreground/50 italic">no profile</span>
+            ) : (
+              linkedProfiles.map((p) => (
+                <span
+                  key={p.name}
+                  className="inline-flex items-center gap-1 rounded-md bg-muted/60 px-2 py-0.5 text-[10px] text-muted-foreground"
+                  title={p.displayName || p.name}
+                >
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  {p.displayName || p.name}
+                </span>
+              ))
+            )}
+          </div>
         </div>
 
         {/* Actions — hover reveal */}
@@ -1224,7 +1315,7 @@ function ClaudeMdCard({
       </div>
 
       {isEditing && editing && (
-        <div className="bg-muted/20 bg-muted/20 px-5 py-4">
+        <div className="border-t border-border bg-muted/20 px-5 py-4">
           <Textarea
             rows={8}
             value={editing.content}
@@ -1244,7 +1335,7 @@ function ClaudeMdCard({
       )}
 
       {isApplying && mdLinking && (
-        <div className="bg-muted/20 bg-muted/20 px-5 py-4">
+        <div className="border-t border-border bg-muted/20 px-5 py-4">
           <div className="flex items-center gap-3">
             <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground shrink-0">
               Apply to
@@ -1252,7 +1343,7 @@ function ClaudeMdCard({
             <select
               value={mdLinking.profileName}
               onChange={(e) => onApplyProfileChange(e.target.value)}
-              className="h-9 flex-1 rounded-md bg-card shadow-sm bg-card px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-1"
+              className="h-9 flex-1 rounded-md bg-card shadow-sm px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-1"
             >
               {profiles.length === 0 && <option value="">No profiles</option>}
               {profiles.map((p) => (
@@ -1297,7 +1388,7 @@ function SwitchConfirmDialog({
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm"
+      className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 backdrop-blur-sm"
       onClick={onCancel}
     >
       <div

@@ -6,11 +6,11 @@
  */
 
 import { useEffect, useState, type ReactNode } from 'react'
-import { Button, Card, Input } from '@/components/ui'
+import { Button, Card } from '@/components/ui'
 import { useToast } from '@/components/feedback/toast'
 import { PageHeader } from '@/components/layout'
 import { cn } from '@/lib/utils'
-import { getSettings, saveSettings } from '@/api'
+import { getSettings, saveSettings, browseDir } from '@/api'
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -84,7 +84,6 @@ export function SettingsPage() {
   const { toast } = useToast()
   const [theme, setTheme] = useState<Theme>(readStoredTheme)
   const [projectsDir, setProjectsDir] = useState('~/projects')
-  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     getSettings()
@@ -107,15 +106,16 @@ export function SettingsPage() {
     return () => mq.removeEventListener('change', handler)
   }, [theme])
 
-  const handleSaveProjectsDir = async () => {
-    setSaving(true)
+  const handleBrowse = async () => {
     try {
-      await saveSettings({ projects_dir: projectsDir })
-      toast({ type: 'success', message: 'Projects directory saved' })
+      const dir = await browseDir(projectsDir)
+      if (dir) {
+        setProjectsDir(dir)
+        await saveSettings({ projects_dir: dir })
+        toast({ type: 'success', message: 'Projects directory updated' })
+      }
     } catch {
-      toast({ type: 'error', message: 'Failed to save' })
-    } finally {
-      setSaving(false)
+      toast({ type: 'error', message: 'Failed to browse directory' })
     }
   }
 
@@ -144,26 +144,23 @@ export function SettingsPage() {
               Default directory for browsing and launching projects. Used as
               the starting point for the folder picker.
             </p>
-            <div className="flex items-center gap-2">
-              <Input
-                value={projectsDir}
-                onChange={(e) => setProjectsDir(e.target.value)}
-                placeholder="~/projects"
-                className="flex-1 font-mono"
-              />
+            <div className="flex items-center gap-3">
+              <div className="flex-1 flex items-center gap-2 rounded-lg bg-muted/40 px-3.5 py-2.5">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-muted-foreground shrink-0">
+                  <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" />
+                </svg>
+                <span className="text-sm font-mono text-foreground truncate">
+                  {projectsDir || 'No directory set'}
+                </span>
+              </div>
               <Button
+                variant="outline"
                 size="md"
-                onClick={handleSaveProjectsDir}
-                disabled={saving}
-                isLoading={saving}
+                onClick={handleBrowse}
               >
-                Save
+                Change folder
               </Button>
             </div>
-            <p className="mt-2 text-xs text-muted-foreground">
-              Use WSL paths (e.g. <code className="font-mono">~/projects</code>,{' '}
-              <code className="font-mono">/home/user/work</code>).
-            </p>
           </div>
         </Card>
       </Section>

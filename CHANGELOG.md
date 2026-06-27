@@ -2,6 +2,36 @@
 
 All notable changes to agent-box will be documented in this file.
 
+## [0.5.0] — 2026-06-27
+
+### Added
+
+- **New GUI frontend (gui-web)** — complete React + Vite + Tailwind CSS 4 + PyWebView rewrite replacing the old CustomTkinter desktop GUI.
+  - 6 pages: Home, Profiles, Library, Sessions, Settings, Help.
+  - Profile detail page with per-agent-type tabs (settings, hooks, auth, CLAUDE.md).
+  - Profile launch with mode selector (new session / continue) and working directory input.
+  - Library page with cc-switch style provider cards, category badges, and collapsible add panel.
+  - Settings page with configurable projects directory.
+  - Native folder browse dialog via PyWebView.
+  - Last CWD per profile inferred from session history.
+  - Bridge API connecting React frontend to WSL CLI via subprocess.
+- **`--prod` / frozen detection** — bridge auto-serves built frontend in production mode; detects PyInstaller bundle via `sys.frozen`.
+
+### Changed
+
+- **Desktop packaging switched to gui-web** — PyInstaller spec now uses `gui-web/bridge.py` as entry point instead of `gui-redesign.py`.
+- **Sidebar brand area** — replaced placeholder icon with actual Agent Box logo.
+
+### Removed
+
+- **Old CustomTkinter GUI** — `gui-redesign.py` and `gui/` package are superseded by gui-web. The old PyWebView-unaware implementation is no longer packaged.
+
+### Fixed
+
+- PyWebView bridge: WSL command quoting, async API polling, CLI syntax for sessions, snake_case conversion.
+- Library: category inference from settings values, badge display, import paths.
+- Detail page: hooks/plugins read from correct settings.json fields, sidebar nav closes detail page.
+
 ## [0.4.0] — 2026-06-22
 
 ### Added

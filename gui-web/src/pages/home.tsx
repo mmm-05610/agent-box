@@ -16,7 +16,12 @@ import { PageHeader, type NavKey } from '@/components/layout'
 import { fetchProfiles } from '@/api/profiles'
 import { fetchProviders } from '@/api/providers'
 import { fetchSessions } from '@/api/sessions'
-import { cn } from '@/lib/utils'
+import { cn, formatRelativeTime } from '@/lib/utils'
+import type { AgentType } from '@/api'
+import claudeLogo from '@/icons/extracted/claude.svg'
+import codexLogo from '@/icons/extracted/openai.svg'
+import hermesLogo from '@/icons/extracted/hermes.png'
+import opencodeLogo from '@/icons/extracted/opencode-logo-light.svg'
 
 interface HomePageProps {
   onNav: (key: NavKey) => void
@@ -31,13 +36,27 @@ interface StatTile {
   accent: 'accent' | 'success' | 'info' | 'warning'
 }
 
+const AGENT_TYPE_LOGOS: Record<AgentType, string> = {
+  claude: claudeLogo,
+  codex: codexLogo,
+  hermes: hermesLogo,
+  opencode: opencodeLogo,
+}
+
+const AGENT_TYPE_HEX: Record<string, string> = {
+  claude: '#D97757',
+  codex: '#10A37F',
+  hermes: '#8B5CF6',
+  opencode: '#3B82F6',
+}
+
 export function HomePage({ onNav }: HomePageProps) {
   const [profileCount, setProfileCount] = useState(0)
   const [providerCount, setProviderCount] = useState(0)
   const [sessionCount, setSessionCount] = useState(0)
   const [runningCount, setRunningCount] = useState(0)
   const [recentSessions, setRecentSessions] = useState<
-    Array<{ profile: string; mode: string; cwd: string; exitedAt: number | null; launchedAt: number }>
+    Array<{ profile: string; agentType: AgentType; mode: string; cwd: string; exitedAt: number | null; launchedAt: number }>
   >([])
   const [loading, setLoading] = useState(true)
 
@@ -57,6 +76,7 @@ export function HomePage({ onNav }: HomePageProps) {
         setRecentSessions(
           sessions.slice(0, 5).map((s) => ({
             profile: s.profile,
+            agentType: s.agentType,
             mode: s.mode ?? 'interactive',
             cwd: s.cwd,
             exitedAt: s.exitedAt,
@@ -230,48 +250,57 @@ export function HomePage({ onNav }: HomePageProps) {
               </Button>
             </div>
           ) : (
-            <div className="flex flex-col gap-1.5">
-              {recentSessions.map((s, i) => (
-                <div
-                  key={i}
-                  className={cn(
-                    'group flex items-center gap-4 rounded-lg px-3 py-2.5 cursor-pointer',
-                    'transition-colors duration-fast',
-                    // Running rows have a subtle accent tint
-                    !s.exitedAt && 'bg-accent/[0.04]',
-                    // Hover lift — the row becomes more prominent on hover
-                    'hover:bg-muted/70 hover:translate-x-0.5',
-                  )}
-                >
-                  <StatusDot
-                    variant={s.exitedAt ? 'stopped' : 'running'}
-                    size="md"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-foreground truncate">
-                        {s.profile}
-                      </span>
-                      <span className="text-[11px] font-mono text-muted-foreground/70 truncate">
-                        {s.mode}
-                      </span>
-                    </div>
-                    <div className="text-xs text-muted-foreground font-mono truncate mt-0.5">
-                      {s.cwd}
-                    </div>
-                  </div>
-                  <span
+            <div className="flex flex-col gap-2">
+              {recentSessions.map((s, i) => {
+                const isRunning = !s.exitedAt
+                const accentColor = AGENT_TYPE_HEX[s.agentType] ?? '#888'
+                const logo = AGENT_TYPE_LOGOS[s.agentType]
+                return (
+                  <div
+                    key={i}
                     className={cn(
-                      'shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium',
-                      s.exitedAt
-                        ? 'bg-muted text-muted-foreground'
-                        : 'bg-accent/10 text-accent',
+                      'group relative flex items-center gap-3 rounded-xl px-3.5 py-2.5 cursor-pointer',
+                      'transition-all duration-fast',
+                      isRunning && 'bg-emerald-500/[0.04]',
+                      'hover:bg-muted/60',
                     )}
                   >
-                    {s.exitedAt ? 'exited' : 'running'}
-                  </span>
-                </div>
-              ))}
+                    {/* Agent type dot */}
+                    <div
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg overflow-hidden"
+                      style={{ backgroundColor: `${accentColor}14` }}
+                    >
+                      {logo ? (
+                        <img src={logo} alt={s.agentType} className="h-5 w-5 object-contain" />
+                      ) : (
+                        <span className="text-xs font-bold" style={{ color: accentColor }}>
+                          {s.agentType[0].toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-foreground truncate">
+                          {s.profile}
+                        </span>
+                        {isRunning && (
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        )}
+                      </div>
+                      <div className="text-[11px] text-muted-foreground font-mono truncate">
+                        {s.cwd}
+                      </div>
+                    </div>
+
+                    {/* Time */}
+                    <span className="shrink-0 text-[11px] text-muted-foreground/60 font-mono">
+                      {formatRelativeTime(s.launchedAt)}
+                    </span>
+                  </div>
+                )
+              })}
             </div>
           )}
         </section>

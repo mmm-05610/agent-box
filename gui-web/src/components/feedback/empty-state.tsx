@@ -48,7 +48,7 @@ export function EmptyState({
           className={cn(
             'mb-5 flex items-center justify-center rounded-full',
             'bg-gradient-to-br from-muted to-stone-100 dark:from-muted dark:to-stone-900',
-            'ring-1 ring-black/[0.06]',
+            'ring-1 ring-border',
             compact ? 'h-14 w-14 text-2xl' : 'h-20 w-20 text-3xl',
             'text-muted-foreground',
             'shadow-inner',

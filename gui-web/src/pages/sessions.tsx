@@ -1,8 +1,8 @@
 /**
  * Sessions Page — Active agent sessions
  *
- * Compact table-style layout: 40px row height, monospace PID/timestamps,
- * color-coded status pill (green pulse for running).
+ * Card-style layout matching ProfileCard/ProviderCard design language.
+ * Each session is a card with agent type accent, status, and metadata.
  */
 
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
@@ -13,14 +13,25 @@ import { PageHeader } from '@/components/layout'
 import { useSessions } from '@/hooks'
 import { cn, formatRelativeTime } from '@/lib/utils'
 import { cleanupSessions } from '@/api'
-import type { Session, SessionStatus } from '@/api'
+import type { Session, SessionStatus, AgentType } from '@/api'
 import { AGENT_TYPE_COLORS } from '@/api'
+import claudeLogo from '@/icons/extracted/claude.svg'
+import codexLogo from '@/icons/extracted/openai.svg'
+import hermesLogo from '@/icons/extracted/hermes.png'
+import opencodeLogo from '@/icons/extracted/opencode-logo-light.svg'
 
 // ── Filter tab type ─────────────────────────────────────────────────────
 
 type FilterTab = 'all' | SessionStatus
 
-// ── Agent type hint (small accent dot next to profile name) ─────────────
+// ── Agent type constants ────────────────────────────────────────────────
+
+const AGENT_TYPE_LOGOS: Record<AgentType, string> = {
+  claude: claudeLogo,
+  codex: codexLogo,
+  hermes: hermesLogo,
+  opencode: opencodeLogo,
+}
 
 const AGENT_TYPE_HEX: Record<string, string> = {
   claude: '#D97757',
@@ -157,18 +168,9 @@ export function SessionsPage() {
           description="Launch a profile to start a new session."
         />
       ) : (
-        <div className="overflow-hidden rounded-xl bg-card ">
-          {/* Table header */}
-          <div className="flex items-center gap-4 bg-muted/20 px-4 py-2.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-            <div className="flex-1 min-w-0">Profile</div>
-            <div className="hidden md:block w-48 shrink-0">CWD</div>
-            <div className="hidden sm:block w-24 shrink-0">Mode</div>
-            <div className="w-20 shrink-0 text-right">Started</div>
-            <div className="w-24 shrink-0 text-right">Status</div>
-          </div>
-
+        <div className="flex flex-col gap-2.5">
           {filteredSessions.map((session) => (
-            <SessionRow key={session.id} session={session} />
+            <SessionCard key={session.id} session={session} />
           ))}
         </div>
       )}
@@ -184,112 +186,115 @@ const FILTER_TABS: { key: FilterTab; label: string }[] = [
   { key: 'exited', label: 'Exited' },
 ]
 
-// ── Session Row ─────────────────────────────────────────────────────────
+// ── Session Card ────────────────────────────────────────────────────────
 
-function SessionRow({ session }: { session: Session }) {
+function SessionCard({ session }: { session: Session }) {
   const { profile, agentType, cwd, mode, pid, launchedAt, exitedAt, exitCode } =
     session
 
   const isRunning = !exitedAt
-  const badgeVariant = AGENT_TYPE_COLORS[agentType]
   const accentColor = AGENT_TYPE_HEX[agentType] ?? '#888'
+  const logo = AGENT_TYPE_LOGOS[agentType]
 
   return (
     <div
       className={cn(
-        'group flex items-center gap-4 px-4 py-2.5',
-        'transition-all duration-normal cursor-pointer',
-        // Running rows get a subtle accent-tint background — alive
-        isRunning && 'bg-accent/[0.04]',
-        'hover:bg-muted/60 hover:translate-x-0.5',
+        'group relative overflow-hidden rounded-xl bg-card',
+        'transition-all duration-normal',
+        'hover:shadow-md',
+        isRunning && 'ring-1 ring-emerald-500/20',
       )}
     >
-      {/* Profile name + agent type badge */}
-      <div className="flex min-w-0 flex-1 items-center gap-3">
-        {/* Agent type colored dot */}
-        <span
-          aria-hidden="true"
-          className="h-2 w-2 shrink-0 rounded-full"
-          style={{ backgroundColor: accentColor }}
-        />
-        <span className="truncate text-sm font-medium text-foreground">
-          {profile}
-        </span>
-        <Badge
-          variant={
-            badgeVariant as
-              | 'neutral'
-              | 'primary'
-              | 'success'
-              | 'warning'
-              | 'destructive'
-              | 'info'
-          }
+      {/* Glass shine on left edge */}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-y-0 left-0 w-1 rounded-l-xl overflow-hidden"
+        style={{
+          background: `linear-gradient(90deg, ${accentColor}25, transparent)`,
+          boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.06)',
+        }}
+      />
+
+      <div className="flex items-center gap-4 px-5 py-4">
+        {/* Agent type logo */}
+        <div
+          className={cn(
+            'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl overflow-hidden',
+            'transition-transform duration-normal group-hover:scale-105',
+          )}
+          style={{
+            backgroundColor: `${accentColor}14`,
+          }}
         >
-          {agentType}
-        </Badge>
-      </div>
+          {logo ? (
+            <img src={logo} alt={agentType} className="h-6 w-6 object-contain" />
+          ) : (
+            <span className="text-sm font-bold" style={{ color: accentColor }}>
+              {agentType[0].toUpperCase()}
+            </span>
+          )}
+        </div>
 
-      {/* CWD path */}
-      <span className="hidden md:block w-48 shrink-0 truncate font-mono text-xs text-muted-foreground">
-        {cwd}
-      </span>
-
-      {/* Mode + PID */}
-      <div className="hidden sm:flex w-24 shrink-0 flex-col items-start gap-0.5">
-        <span className="text-xs text-muted-foreground truncate">
-          {mode ?? 'interactive'}
-        </span>
-        {pid != null && (
-          <span className="font-mono text-[10px] text-muted-foreground/60">
-            PID {pid}
-          </span>
-        )}
-      </div>
-
-      {/* Launched time */}
-      <span className="w-20 shrink-0 text-right font-mono text-xs text-muted-foreground tabular-nums">
-        {formatRelativeTime(launchedAt)}
-      </span>
-
-      {/* Status indicator */}
-      <div className="w-24 shrink-0 text-right">
-        <StatusBadge running={isRunning} exitCode={exitCode} />
+        {/* Info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3 className="text-sm font-semibold text-foreground truncate">
+              {profile}
+            </h3>
+            <Badge
+              variant={
+                AGENT_TYPE_COLORS[agentType] as
+                  | 'neutral'
+                  | 'primary'
+                  | 'success'
+                  | 'warning'
+                  | 'destructive'
+                  | 'info'
+              }
+            >
+              {agentType}
+            </Badge>
+            {isRunning && (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                running
+              </span>
+            )}
+            {!isRunning && exitCode === 0 && (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                exited
+              </span>
+            )}
+            {!isRunning && exitCode !== undefined && exitCode !== 0 && (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-medium text-destructive">
+                exited ({exitCode})
+              </span>
+            )}
+          </div>
+          <div className="mt-1 flex items-center gap-3 flex-wrap text-[11px] text-muted-foreground">
+            {cwd && (
+              <span className="font-mono truncate max-w-[200px]" title={cwd}>
+                {cwd}
+              </span>
+            )}
+            {mode && (
+              <span className="flex items-center gap-1">
+                <span className="text-muted-foreground/40">·</span>
+                {mode}
+              </span>
+            )}
+            {pid != null && (
+              <span className="font-mono text-muted-foreground/50">
+                PID {pid}
+              </span>
+            )}
+            <span className="flex items-center gap-1">
+              <span className="text-muted-foreground/40">·</span>
+              {formatRelativeTime(launchedAt)}
+            </span>
+          </div>
+        </div>
       </div>
     </div>
-  )
-}
-
-// ── Status Badge ────────────────────────────────────────────────────────
-
-function StatusBadge({
-  running,
-  exitCode,
-}: {
-  running: boolean
-  exitCode?: number
-}) {
-  if (running) {
-    return (
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-success-subtle px-2.5 py-1 text-[11px] font-medium text-success">
-        <StatusDot variant="running" />
-        running
-      </span>
-    )
-  }
-
-  const isCleanExit = exitCode === 0
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium',
-        isCleanExit
-          ? 'bg-muted text-muted-foreground'
-          : 'bg-destructive/10 text-destructive',
-      )}
-    >
-      <StatusDot variant={isCleanExit ? 'stopped' : 'error'} />
-      {isCleanExit ? 'exited' : `exited (${exitCode ?? '?'})`}
-    </span>
   )
 }

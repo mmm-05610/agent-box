@@ -1,17 +1,27 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 
-datas = [('logo.png', '.'), ('logo.ico', '.'), ('gui/logo-sidebar.png', 'gui')]
+datas = [
+    ('logo.png', '.'),
+    ('logo.ico', '.'),
+    ('gui-web/dist', 'gui-web/dist'),
+]
 binaries = []
 hiddenimports = []
-tmp_ret = collect_all('gui')
+
+# PyWebView
+tmp_ret = collect_all('webview')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
-tmp_ret = collect_all('PIL')
+
+# PyWebView uses bottle/gevent for the internal server
+tmp_ret = collect_all('bottle')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+tmp_ret = collect_all('gevent')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 
 
 a = Analysis(
-    ['gui-redesign.py'],
+    ['gui-web/bridge.py'],
     pathex=[],
     binaries=binaries,
     datas=datas,

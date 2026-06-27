@@ -42,7 +42,7 @@ function SkeletonRows({ rows, className }: { rows: number; className?: string })
       {Array.from({ length: rows }).map((_, i) => (
         <div
           key={i}
-          className="h-14 animate-pulse rounded-xl ring-1 ring-black/[0.06] bg-gradient-to-r from-muted via-muted/60 to-muted"
+          className="h-14 animate-pulse rounded-xl ring-1 ring-border bg-gradient-to-r from-muted via-muted/60 to-muted"
           style={{
             width: `${80 + ((i * 7) % 20)}%`,
           }}
