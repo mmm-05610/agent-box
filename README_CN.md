@@ -11,7 +11,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/)
-[![v0.4.0](https://img.shields.io/badge/version-0.4.0-orange.svg)](https://github.com/mmm-05610/agent-box/releases)
+[![v0.5.0](https://img.shields.io/badge/version-0.5.0-orange.svg)](https://github.com/mmm-05610/agent-box/releases)
 
 ---
 
@@ -106,7 +106,12 @@ npm install -g @anthropic-ai/claude-code   # Claude Code
 ## 快速上手
 
 <p align="center">
-  <img src="GUI截图.png" alt="agent-box GUI" width="720">
+  <img src="截图/v0.5.0/Home.png" alt="主页" width="48%">
+  <img src="截图/v0.5.0/Profiles.png" alt="Profiles" width="48%">
+</p>
+<p align="center">
+  <img src="截图/v0.5.0/Profile-detail.png" alt="Profile 详情" width="48%">
+  <img src="截图/v0.5.0/Library.png" alt="Library" width="48%">
 </p>
 
 ### GUI（Windows）
@@ -236,8 +241,9 @@ agent-box presets --type cc          # 列出所有 CC 预设
 git clone https://github.com/mmm-05610/agent-box.git
 cd agent-box
 pip install -e .[dev,gui]
-pytest -q                           # 53 个测试，完全隔离
-python gui-redesign.py              # 从源码启动 GUI
+pytest -q                           # 53 tests, hermetic
+cd gui-web && npm run build && cd ..  # 构建前端
+python gui-web/bridge.py --prod       # 从源码启动 GUI
 ```
 
 → [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
