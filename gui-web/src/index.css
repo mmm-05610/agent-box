@@ -1,105 +1,134 @@
 @import "tailwindcss";
 
 /*
- * Design System — CSS Custom Properties
+ * Design System — agent-box (Stone warm palette)
  *
- * Light/dark mode is toggled by adding/removing the "dark" class on <html>.
- * Colors are defined as HSL values without the hsl() wrapper.
+ * Light mode is primary (project runs as a Windows desktop tool in daytime
+ * office environments). Dark mode is supported and uses warm Zinc-stone blends.
+ *
+ * Brand accent: a refined Claude orange (#D97757) used sparingly for
+ * primary actions and active states. Saturation chosen so it reads as
+ * "warm tool" not "playful".
+ *
+ * Palette choice: Stone (warm gray) over Zinc (cool gray) — feels like a
+ * crafted developer instrument, not a hospital UI.
  */
 
 @layer base {
   /* ── Light mode (default) ──────────────────────────────────────────── */
   :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
+    /* Cool zinc-tinted canvas — not warm, not beige. Reads as "screen"
+       not "paper". Shadows do the depth work, not borders. */
+    --background: 220 14% 95%;
+    --foreground: 220 13% 12%;
 
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-    --card-border: 240 5.9% 90%;
-    --card-hover: 240 4.8% 95.9%;
+    --card-foreground: 220 13% 12%;
+    /* Border is reserved for true dividers; cards use ring-1 ring-black/5
+       so the visible edge is barely-there, like a sheet of paper resting
+       on a desk. */
+    --card-border: 220 13% 88%;
+    --card-hover: 220 14% 92%;
 
-    --primary: 240 5.9% 10%;
-    --primary-foreground: 0 0% 98%;
-    --primary-hover: 240 5.9% 20%;
+    --primary: 220 13% 12%;             /* near-black CTA */
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 220 13% 8%;       /* darker on hover */
 
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --secondary-hover: 240 4.8% 90%;
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 220 13% 12%;
+    --secondary-hover: 220 14% 92%;
 
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 46%;
 
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 98%;
-    --destructive-hover: 0 72% 51%;
+    --destructive-hover: 0 72% 44%;
     --destructive-subtle: 0 86% 97%;
 
-    --success: 142 76% 36%;
+    --success: 142 71% 45%;
     --success-foreground: 0 0% 98%;
-    --success-subtle: 144 76% 94%;
+    --success-subtle: 138 76% 96%;
 
-    --warning: 38 92% 50%;
+    --warning: 32 95% 44%;
     --warning-foreground: 0 0% 98%;
-    --warning-subtle: 48 96% 89%;
+    --warning-subtle: 48 100% 95%;
 
-    --info: 217 91% 60%;
+    --info: 221 83% 53%;
     --info-foreground: 0 0% 98%;
     --info-subtle: 214 95% 93%;
 
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 240 5.9% 10%;
+    --border: 220 13% 88%;
+    --input: 220 13% 88%;
+    --ring: 220 13% 12%;
 
-    --sidebar: 240 4.8% 95.9%;
-    --sidebar-foreground: 240 5.9% 10%;
-    --sidebar-accent: 240 4.8% 90%;
+    /* Brand accent — same Claude orange. The cool bg + warm accent
+       combination is the visual signature: "professional tool with a
+       warm personality". */
+    --accent: 16 70% 52%;
+    --accent-foreground: 0 0% 100%;
+    --accent-subtle: 16 70% 96%;
+
+    /* Sidebar gets a very slight tint so the "two surfaces" relationship
+       is felt without a visible line between them. */
+    --sidebar: 220 14% 92%;
+    --sidebar-foreground: 220 13% 12%;
+    --sidebar-accent: 220 14% 88%;
+
+    --shadow-color: 220 30% 12%;
   }
 
-  /* ── Dark mode ─────────────────────────────────────────────────────── */
+  /* ── Dark mode (cool, near-black) ─────────────────────────────────── */
   .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
+    --background: 220 14% 7%;
+    --foreground: 220 14% 95%;
 
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --card-border: 240 3.7% 15.9%;
-    --card-hover: 240 3.7% 20%;
+    --card: 220 14% 10%;
+    --card-foreground: 220 14% 95%;
+    --card-border: 220 14% 16%;
+    --card-hover: 220 14% 14%;
 
-    --primary: 0 0% 98%;
-    --primary-foreground: 240 5.9% 10%;
-    --primary-hover: 0 0% 90%;
+    --primary: 220 14% 95%;
+    --primary-foreground: 220 14% 7%;
+    --primary-hover: 220 14% 88%;
 
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --secondary-hover: 240 3.7% 25%;
+    --secondary: 220 14% 14%;
+    --secondary-foreground: 220 14% 95%;
+    --secondary-hover: 220 14% 18%;
 
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
+    --muted: 220 14% 14%;
+    --muted-foreground: 220 10% 65%;
 
-    --destructive: 0 62.8% 30.6%;
+    --destructive: 0 62% 45%;
     --destructive-foreground: 0 0% 98%;
-    --destructive-hover: 0 72% 40%;
+    --destructive-hover: 0 62% 38%;
     --destructive-subtle: 0 50% 15%;
 
-    --success: 142 76% 36%;
+    --success: 142 50% 50%;
     --success-foreground: 0 0% 98%;
-    --success-subtle: 144 50% 15%;
+    --success-subtle: 142 30% 14%;
 
-    --warning: 38 92% 50%;
+    --warning: 32 70% 50%;
     --warning-foreground: 0 0% 98%;
-    --warning-subtle: 48 50% 15%;
+    --warning-subtle: 32 30% 14%;
 
-    --info: 217 91% 60%;
+    --info: 217 60% 55%;
     --info-foreground: 0 0% 98%;
-    --info-subtle: 214 50% 15%;
+    --info-subtle: 217 30% 14%;
 
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
+    --border: 220 14% 16%;
+    --input: 220 14% 16%;
+    --ring: 220 14% 80%;
 
-    --sidebar: 240 5% 6.9%;
-    --sidebar-foreground: 0 0% 98%;
-    --sidebar-accent: 240 3.7% 15.9%;
+    --accent: 16 70% 56%;
+    --accent-foreground: 220 14% 10%;
+    --accent-subtle: 16 50% 18%;
+
+    --sidebar: 220 14% 6%;
+    --sidebar-foreground: 220 14% 95%;
+    --sidebar-accent: 220 14% 14%;
+
+    --shadow-color: 0 0% 0%;
   }
 }
 
@@ -111,9 +140,41 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     margin: 0;
+    letter-spacing: -0.005em;
   }
 
   html {
     scroll-behavior: smooth;
   }
+
+  /* Headings get tighter tracking by default — feels more crafted */
+  h1, h2, h3, h4, h5, h6 {
+    letter-spacing: -0.02em;
+  }
+}
+
+@keyframes active-glow {
+  0%, 100% {
+    box-shadow: 0 0 8px 0 var(--glow-color, rgba(34, 197, 94, 0.3));
+  }
+  50% {
+    box-shadow: 0 0 16px 2px var(--glow-color, rgba(34, 197, 94, 0.5));
+  }
+}
+
+.animate-active-glow {
+  animation: active-glow 2s ease-in-out infinite;
+}
+
+@keyframes active-text {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.animate-active-text {
+  animation: active-text 2s ease-in-out infinite;
 }

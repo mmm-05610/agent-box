@@ -4,7 +4,7 @@
 
 import { useState } from 'react'
 import { Shell, type NavKey } from '@/components/layout'
-import { ToastProvider } from '@/components/feedback'
+import { ErrorBoundary, ToastProvider } from '@/components/feedback'
 import {
   HelpPage,
   HomePage,
@@ -16,7 +16,7 @@ import {
   SettingsPage,
 } from '@/pages'
 
-function App() {
+export default function App() {
   const [page, setPage] = useState<NavKey>('home')
   const [detailProfile, setDetailProfile] = useState<string | null>(null)
 
@@ -29,13 +29,15 @@ function App() {
   return (
     <ToastProvider>
       <Shell active={page} onNav={handleNav} runningCount={0}>
-        <PageRouter
-          page={page}
-          detailProfile={detailProfile}
-          onNav={handleNav}
-          onOpenDetail={setDetailProfile}
-          onCloseDetail={() => setDetailProfile(null)}
-        />
+        <ErrorBoundary name="App">
+          <PageRouter
+            page={page}
+            detailProfile={detailProfile}
+            onNav={handleNav}
+            onOpenDetail={setDetailProfile}
+            onCloseDetail={() => setDetailProfile(null)}
+          />
+        </ErrorBoundary>
       </Shell>
     </ToastProvider>
   )
@@ -54,7 +56,6 @@ function PageRouter({
   onOpenDetail: (name: string) => void
   onCloseDetail: () => void
 }) {
-  // If a detail profile is open, show detail page
   if (detailProfile) {
     return <ProfileDetailPage profileName={detailProfile} onBack={onCloseDetail} />
   }
@@ -76,5 +77,3 @@ function PageRouter({
       return <HomePage onNav={onNav} />
   }
 }
-
-export default App

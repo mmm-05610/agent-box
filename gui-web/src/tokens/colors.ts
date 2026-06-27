@@ -1,172 +1,140 @@
 /**
  * Color Design Tokens
  *
- * Based on shadcn/ui Zinc palette + cc-switch style.
- * All colors are semantic tokens — never use raw hex values directly.
+ * Mirror the CSS custom properties in index.css. Single source of truth
+ * is the CSS file; this object exists for:
+ *   1. Programmatic access (animations, dynamic styles)
+ *   2. Documentation
  *
- * Usage:
- *   import { colors } from '@/tokens/colors'
- *   className="bg-background text-foreground"
- *
- * Or via Tailwind classes that reference these tokens.
+ * All values use HSL components (no hsl() wrapper) so Tailwind's
+ * `hsl(var(--…) / <alpha-value>)` syntax works.
  */
 
 export const colors = {
-  // ── Backgrounds ─────────────────────────────────────────────────────
-  background: {
-    DEFAULT: 'hsl(0 0% 100%)',       // Main background
-    subtle: 'hsl(240 4.8% 95.9%)',   // Subtle background variation
-    muted: 'hsl(240 4.8% 95.9%)',    // Muted background
-  },
+  background: '36 14% 95%',
+  foreground: '24 10% 10%',
 
-  // ── Foreground (text) ───────────────────────────────────────────────
-  foreground: {
-    DEFAULT: 'hsl(240 10% 3.9%)',    // Primary text
-    muted: 'hsl(240 3.8% 46.1%)',    // Secondary text
-    subtle: 'hsl(240 5% 64.9%)',     // Tertiary text
-    inverse: 'hsl(0 0% 98%)',        // Text on dark backgrounds
-  },
-
-  // ── Card / Surface ──────────────────────────────────────────────────
   card: {
-    DEFAULT: 'hsl(0 0% 100%)',       // Card background
-    foreground: 'hsl(240 10% 3.9%)', // Card text
-    border: 'hsl(240 5.9% 90%)',     // Card border
-    hover: 'hsl(240 4.8% 95.9%)',    // Card hover state
+    DEFAULT: '0 0% 100%',
+    foreground: '24 10% 10%',
+    border: '30 6% 90%',
+    hover: '36 14% 96%',
   },
 
-  // ── Primary (brand) ─────────────────────────────────────────────────
   primary: {
-    DEFAULT: 'hsl(240 5.9% 10%)',    // Primary button bg (dark)
-    foreground: 'hsl(0 0% 98%)',     // Primary button text
-    hover: 'hsl(240 5.9% 20%)',      // Primary hover
+    DEFAULT: '24 10% 10%',
+    foreground: '36 14% 98%',
+    hover: '24 10% 18%',
   },
 
-  // ── Secondary ───────────────────────────────────────────────────────
-  secondary: {
-    DEFAULT: 'hsl(240 4.8% 95.9%)',  // Secondary button bg
-    foreground: 'hsl(240 5.9% 10%)', // Secondary button text
-    hover: 'hsl(240 4.8% 90%)',      // Secondary hover
-  },
-
-  // ── Muted ───────────────────────────────────────────────────────────
-  muted: {
-    DEFAULT: 'hsl(240 4.8% 95.9%)',  // Muted element bg
-    foreground: 'hsl(240 3.8% 46.1%)', // Muted text
-  },
-
-  // ── Accent ──────────────────────────────────────────────────────────
   accent: {
-    DEFAULT: 'hsl(240 4.8% 95.9%)',  // Accent bg
-    foreground: 'hsl(240 5.9% 10%)', // Accent text
+    DEFAULT: '18 65% 55%',
+    foreground: '0 0% 100%',
+    subtle: '18 75% 94%',
   },
 
-  // ── Destructive (danger) ────────────────────────────────────────────
+  muted: {
+    DEFAULT: '30 6% 92%',
+    foreground: '25 5% 45%',
+  },
+
   destructive: {
-    DEFAULT: 'hsl(0 84.2% 60.2%)',   // Red button bg
-    foreground: 'hsl(0 0% 98%)',     // Red button text
-    hover: 'hsl(0 72% 51%)',         // Red hover
-    subtle: 'hsl(0 86% 97%)',        // Light red bg
+    DEFAULT: '0 72% 51%',
+    foreground: '0 0% 98%',
+    hover: '0 72% 44%',
+    subtle: '0 86% 97%',
   },
 
-  // ── Success ─────────────────────────────────────────────────────────
   success: {
-    DEFAULT: 'hsl(142 76% 36%)',     // Green
-    foreground: 'hsl(0 0% 98%)',
-    subtle: 'hsl(144 76% 94%)',      // Light green bg
+    DEFAULT: '142 71% 45%',
+    foreground: '0 0% 98%',
+    subtle: '138 76% 96%',
   },
 
-  // ── Warning ─────────────────────────────────────────────────────────
   warning: {
-    DEFAULT: 'hsl(38 92% 50%)',      // Amber/orange
-    foreground: 'hsl(0 0% 98%)',
-    subtle: 'hsl(48 96% 89%)',       // Light amber bg
+    DEFAULT: '32 95% 44%',
+    foreground: '0 0% 98%',
+    subtle: '48 100% 95%',
   },
 
-  // ── Info ────────────────────────────────────────────────────────────
   info: {
-    DEFAULT: 'hsl(217 91% 60%)',     // Blue
-    foreground: 'hsl(0 0% 98%)',
-    subtle: 'hsl(214 95% 93%)',      // Light blue bg
+    DEFAULT: '221 83% 53%',
+    foreground: '0 0% 98%',
+    subtle: '214 95% 93%',
   },
 
-  // ── Border / Input / Ring ───────────────────────────────────────────
-  border: 'hsl(240 5.9% 90%)',
-  input: 'hsl(240 5.9% 90%)',
-  ring: 'hsl(240 5.9% 10%)',
+  border: '30 6% 88%',
+  input: '30 6% 88%',
+  ring: '24 10% 10%',
 
-  // ── Sidebar ─────────────────────────────────────────────────────────
   sidebar: {
-    DEFAULT: 'hsl(240 4.8% 95.9%)',  // Sidebar bg
-    foreground: 'hsl(240 5.9% 10%)', // Sidebar text
-    accent: 'hsl(240 4.8% 90%)',     // Sidebar active item
+    DEFAULT: '36 14% 97%',
+    foreground: '24 10% 10%',
+    accent: '30 6% 90%',
   },
 } as const
 
-/** Dark mode overrides — same structure, different values */
+/** Dark mode overrides */
 export const colorsDark = {
-  background: {
-    DEFAULT: 'hsl(240 10% 3.9%)',
-    subtle: 'hsl(240 3.7% 15.9%)',
-    muted: 'hsl(240 3.7% 15.9%)',
-  },
-  foreground: {
-    DEFAULT: 'hsl(0 0% 98%)',
-    muted: 'hsl(240 5% 64.9%)',
-    subtle: 'hsl(240 5% 44.9%)',
-    inverse: 'hsl(240 10% 3.9%)',
-  },
+  background: '24 10% 7%',
+  foreground: '36 14% 95%',
+
   card: {
-    DEFAULT: 'hsl(240 10% 3.9%)',
-    foreground: 'hsl(0 0% 98%)',
-    border: 'hsl(240 3.7% 15.9%)',
-    hover: 'hsl(240 3.7% 20%)',
+    DEFAULT: '24 10% 9%',
+    foreground: '36 14% 95%',
+    border: '24 8% 18%',
+    hover: '24 8% 14%',
   },
+
   primary: {
-    DEFAULT: 'hsl(0 0% 98%)',
-    foreground: 'hsl(240 5.9% 10%)',
-    hover: 'hsl(0 0% 90%)',
+    DEFAULT: '36 14% 95%',
+    foreground: '24 10% 10%',
+    hover: '36 14% 88%',
   },
-  secondary: {
-    DEFAULT: 'hsl(240 3.7% 15.9%)',
-    foreground: 'hsl(0 0% 98%)',
-    hover: 'hsl(240 3.7% 25%)',
-  },
-  muted: {
-    DEFAULT: 'hsl(240 3.7% 15.9%)',
-    foreground: 'hsl(240 5% 64.9%)',
-  },
+
   accent: {
-    DEFAULT: 'hsl(240 3.7% 15.9%)',
-    foreground: 'hsl(0 0% 98%)',
+    DEFAULT: '18 65% 60%',
+    foreground: '24 10% 10%',
+    subtle: '18 40% 16%',
   },
+
+  muted: {
+    DEFAULT: '24 8% 14%',
+    foreground: '25 5% 60%',
+  },
+
   destructive: {
-    DEFAULT: 'hsl(0 62.8% 30.6%)',
-    foreground: 'hsl(0 0% 98%)',
-    hover: 'hsl(0 72% 40%)',
-    subtle: 'hsl(0 50% 15%)',
+    DEFAULT: '0 62% 45%',
+    foreground: '0 0% 98%',
+    hover: '0 62% 38%',
+    subtle: '0 50% 15%',
   },
+
   success: {
-    DEFAULT: 'hsl(142 76% 36%)',
-    foreground: 'hsl(0 0% 98%)',
-    subtle: 'hsl(144 50% 15%)',
+    DEFAULT: '142 50% 50%',
+    foreground: '0 0% 98%',
+    subtle: '142 30% 14%',
   },
+
   warning: {
-    DEFAULT: 'hsl(38 92% 50%)',
-    foreground: 'hsl(0 0% 98%)',
-    subtle: 'hsl(48 50% 15%)',
+    DEFAULT: '32 70% 50%',
+    foreground: '0 0% 98%',
+    subtle: '32 30% 14%',
   },
+
   info: {
-    DEFAULT: 'hsl(217 91% 60%)',
-    foreground: 'hsl(0 0% 98%)',
-    subtle: 'hsl(214 50% 15%)',
+    DEFAULT: '217 60% 55%',
+    foreground: '0 0% 98%',
+    subtle: '217 30% 14%',
   },
-  border: 'hsl(240 3.7% 15.9%)',
-  input: 'hsl(240 3.7% 15.9%)',
-  ring: 'hsl(240 4.9% 83.9%)',
+
+  border: '24 8% 18%',
+  input: '24 8% 18%',
+  ring: '36 14% 80%',
+
   sidebar: {
-    DEFAULT: 'hsl(240 5% 6.9%)',
-    foreground: 'hsl(0 0% 98%)',
-    accent: 'hsl(240 3.7% 15.9%)',
+    DEFAULT: '24 10% 6%',
+    foreground: '36 14% 95%',
+    accent: '24 8% 16%',
   },
 } as const

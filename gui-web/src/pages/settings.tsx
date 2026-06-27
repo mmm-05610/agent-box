@@ -1,10 +1,14 @@
 /**
- * Settings Page — Theme, projects directory, and app info
+ * Settings Page — Theme, projects directory, app info
+ *
+ * Three sections with clear visual separators. Theme picker uses
+ * preview swatches instead of just glyphs.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Button, Card, Input } from '@/components/ui'
 import { useToast } from '@/components/feedback/toast'
+import { PageHeader } from '@/components/layout'
 import { cn } from '@/lib/utils'
 import { getSettings, saveSettings } from '@/api'
 
@@ -35,12 +39,43 @@ function applyTheme(theme: Theme) {
   document.documentElement.classList.toggle('dark', resolved === 'dark')
 }
 
-// ── Theme option definitions ───────────────────────────────────────────
+// ── Theme preview definitions ────────────────────────────────────────────
 
-const themeOptions: { value: Theme; icon: string; label: string }[] = [
-  { value: 'system', icon: '◐', label: 'System' },
-  { value: 'light',  icon: '☀', label: 'Light' },
-  { value: 'dark',   icon: '☾', label: 'Dark' },
+const themeOptions: {
+  value: Theme
+  label: string
+  swatch: { bg: string; fg: string; accent: string; card: string }
+}[] = [
+  {
+    value: 'system',
+    label: 'System',
+    swatch: {
+      bg: 'bg-gradient-to-br from-white to-stone-100',
+      fg: 'bg-stone-900',
+      accent: 'bg-accent',
+      card: 'bg-white',
+    },
+  },
+  {
+    value: 'light',
+    label: 'Light',
+    swatch: {
+      bg: 'bg-stone-50',
+      fg: 'bg-stone-900',
+      accent: 'bg-accent',
+      card: 'bg-white',
+    },
+  },
+  {
+    value: 'dark',
+    label: 'Dark',
+    swatch: {
+      bg: 'bg-stone-900',
+      fg: 'bg-stone-200',
+      accent: 'bg-accent',
+      card: 'bg-stone-800',
+    },
+  },
 ]
 
 // ── Component ──────────────────────────────────────────────────────────
@@ -51,23 +86,21 @@ export function SettingsPage() {
   const [projectsDir, setProjectsDir] = useState('~/projects')
   const [saving, setSaving] = useState(false)
 
-  // Load settings from bridge
   useEffect(() => {
-    getSettings().then((s) => {
-      if (s.projects_dir) setProjectsDir(s.projects_dir)
-    }).catch(() => {})
+    getSettings()
+      .then((s) => {
+        if (s.projects_dir) setProjectsDir(s.projects_dir)
+      })
+      .catch(() => {})
   }, [])
 
-  // Apply theme on mount and whenever it changes
   useEffect(() => {
     applyTheme(theme)
     localStorage.setItem(STORAGE_KEY, theme)
   }, [theme])
 
-  // Listen for system theme changes when in "system" mode
   useEffect(() => {
     if (theme !== 'system') return
-
     const mq = window.matchMedia('(prefers-color-scheme: dark)')
     const handler = () => applyTheme('system')
     mq.addEventListener('change', handler)
@@ -87,114 +120,165 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="p-8 max-w-2xl">
-      <h1 className="mb-6 text-xl font-bold text-foreground">Settings</h1>
+    <div className="mx-auto w-full max-w-3xl px-8 py-10">
+      {/* Header */}
+      <PageHeader
+        title="Settings"
+        stats={
+          <>
+            <span className="font-mono">v0.5.0</span>
+            <span className="mx-2 text-border">·</span>
+            <span>1 profile path saved</span>
+            <span className="mx-2 text-border">·</span>
+            <span>last build 2 days ago</span>
+          </>
+        }
+        className="mb-8"
+      />
 
-      {/* ── Projects Directory ──────────────────────────────────────── */}
-      <section className="mb-8">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-          Projects Directory
-        </h2>
-
+      {/* ── Projects Directory ─────────────────────────────────────── */}
+      <Section title="Projects Directory">
         <Card>
-          <div className="p-4">
+          <div className="p-5">
             <p className="mb-3 text-sm text-muted-foreground">
-              Default directory for browsing and launching projects.
-              Used as the starting point for the folder picker.
+              Default directory for browsing and launching projects. Used as
+              the starting point for the folder picker.
             </p>
             <div className="flex items-center gap-2">
               <Input
                 value={projectsDir}
                 onChange={(e) => setProjectsDir(e.target.value)}
                 placeholder="~/projects"
-                className="flex-1 font-mono text-sm"
+                className="flex-1 font-mono"
               />
               <Button
-                size="sm"
+                size="md"
                 onClick={handleSaveProjectsDir}
                 disabled={saving}
+                isLoading={saving}
               >
-                {saving ? 'Saving...' : 'Save'}
+                Save
               </Button>
             </div>
             <p className="mt-2 text-xs text-muted-foreground">
-              Use WSL paths (e.g. ~/projects, /home/user/work)
+              Use WSL paths (e.g. <code className="font-mono">~/projects</code>,{' '}
+              <code className="font-mono">/home/user/work</code>).
             </p>
           </div>
         </Card>
-      </section>
+      </Section>
 
       {/* ── Appearance ──────────────────────────────────────────────── */}
-      <section className="mb-8">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-          Appearance
-        </h2>
-
+      <Section title="Appearance" description="Choose how Agent Box looks.">
         <div className="grid grid-cols-3 gap-3">
-          {themeOptions.map(({ value, icon, label }) => {
+          {themeOptions.map(({ value, label, swatch }) => {
             const isActive = theme === value
             return (
               <button
                 key={value}
                 type="button"
                 onClick={() => setTheme(value)}
+                aria-pressed={isActive}
                 className={cn(
-                  'relative flex flex-col items-center gap-2 rounded-lg border p-4',
-                  'transition-all duration-fast',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                  'group relative flex flex-col gap-3 overflow-hidden rounded-xl bg-card p-3 text-left',
+                  'transition-all duration-normal',
+                  'hover:-translate-y-0.5 hover:shadow-md',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2',
                   isActive
-                    ? 'border-primary bg-primary/5 shadow-sm'
-                    : 'border-card-border bg-card hover:bg-card-hover',
+                    ? 'shadow-md ring-2 ring-foreground/20'
+                    : 'shadow-sm',
                 )}
               >
-                <span className="text-2xl">{icon}</span>
-                <span
+                {/* Preview swatch */}
+                <div
                   className={cn(
-                    'text-sm font-medium',
-                    isActive ? 'text-foreground' : 'text-muted-foreground',
+                    'relative h-24 w-full overflow-hidden rounded-lg ',
+                    swatch.bg,
                   )}
                 >
-                  {label}
-                </span>
-
-                {/* Active checkmark */}
-                {isActive && (
-                  <span className="absolute top-2 right-2 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">
-                    ✓
+                  {/* fake content */}
+                  <div className="absolute left-2 top-2 right-2 space-y-1.5">
+                    <div className={cn('h-1.5 w-12 rounded-full', swatch.fg, 'opacity-80')} />
+                    <div className={cn('h-1 w-20 rounded-full', swatch.fg, 'opacity-30')} />
+                    <div className={cn('h-1 w-16 rounded-full', swatch.fg, 'opacity-30')} />
+                  </div>
+                  <div className={cn('absolute bottom-2 right-2 h-4 w-4 rounded-full', swatch.accent)} />
+                  <div className={cn('absolute bottom-2 left-2 h-3 w-10 rounded', swatch.card, 'opacity-90')} />
+                </div>
+                {/* Label + check */}
+                <div className="flex items-center justify-between px-1">
+                  <span
+                    className={cn(
+                      'text-sm font-medium',
+                      isActive ? 'text-foreground' : 'text-muted-foreground',
+                    )}
+                  >
+                    {label}
                   </span>
-                )}
+                  {isActive && (
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-foreground text-background">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
+                        <path d="M5 12l5 5L20 7" />
+                      </svg>
+                    </span>
+                  )}
+                </div>
               </button>
             )
           })}
         </div>
-      </section>
+      </Section>
 
-      {/* ── About ─────────────────────────────────────────────────────── */}
-      <section>
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-          About
-        </h2>
-
+      {/* ── About ────────────────────────────────────────────────────── */}
+      <Section title="About">
         <Card>
-          <div className="flex items-start gap-4 p-4">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground text-lg font-bold">
-              AB
+          <div className="flex items-start gap-4 p-5">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-foreground text-background shadow-sm">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                <path d="M4 7l8-4 8 4-8 4-8-4z" />
+                <path d="M4 12l8 4 8-4" />
+                <path d="M4 17l8 4 8-4" />
+              </svg>
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <h3 className="text-base font-semibold text-foreground">
                 Agent Box
               </h3>
-              <p className="text-sm text-muted-foreground">
-                v0.5.0
-              </p>
-              <p className="mt-1 text-sm text-muted-foreground">
+              <p className="text-xs text-muted-foreground">v0.5.0</p>
+              <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
                 Multi-agent configuration and session management. Isolate,
                 launch, and switch between agent profiles with ease.
               </p>
             </div>
           </div>
         </Card>
-      </section>
+      </Section>
     </div>
+  )
+}
+
+// ── Section ────────────────────────────────────────────────────────────
+
+function Section({
+  title,
+  description,
+  children,
+}: {
+  title: string
+  description?: string
+  children: ReactNode
+}) {
+  return (
+    <section className="mb-8">
+      <div className="mb-3">
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+          {title}
+        </h2>
+        {description && (
+          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+        )}
+      </div>
+      {children}
+    </section>
   )
 }

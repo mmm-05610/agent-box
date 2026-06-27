@@ -9,7 +9,7 @@ interface PlaceholderPageProps {
   icon?: string
 }
 
-export function PlaceholderPage({ title, icon = '🚧' }: PlaceholderPageProps) {
+export function PlaceholderPage({ title, icon = '⚠' }: PlaceholderPageProps) {
   return (
     <div className="p-8">
       <h1 className="mb-6 text-xl font-bold text-foreground">{title}</h1>

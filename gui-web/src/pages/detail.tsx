@@ -9,9 +9,8 @@
  */
 
 import { useCallback, useEffect, useState } from 'react'
-import { Button, Card, Badge } from '@/components/ui'
+import { Button, Card, CardHeader, CardTitle, CardContent, Badge, Tabs } from '@/components/ui'
 import { Loading } from '@/components/feedback'
-import { cn } from '@/lib/utils'
 import type { AgentType } from '@/api'
 import { AGENT_TYPE_COLORS, fetchProfileDetail } from '@/api'
 import { readFile, listDir } from '@/api/files'
@@ -204,35 +203,32 @@ export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProp
   const badgeVariant = AGENT_TYPE_COLORS[agentType as AgentType] ?? 'neutral'
 
   return (
-    <div className="p-8">
+    <div className="mx-auto w-full max-w-5xl px-8 py-10">
       {/* Header */}
       <div className="mb-6 flex items-center gap-4">
         <Button variant="ghost" size="sm" onClick={onBack}>
-          ← Back
+          ← Back to Profiles
         </Button>
-        <h1 className="text-xl font-bold text-foreground">{meta.name}</h1>
+        <div className="flex-1">
+          <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+            Profile
+          </p>
+          <h1 className="mt-2 text-3xl font-bold tracking-tight text-foreground">
+            {meta.name}
+          </h1>
+        </div>
         <Badge variant={badgeVariant as 'neutral' | 'primary' | 'success' | 'warning' | 'destructive' | 'info'}>
           {agentType}
         </Badge>
       </div>
 
       {/* Tab bar */}
-      <div className="mb-6 flex gap-1 border-b border-card-border">
-        {tabs.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => handleTabClick(tab.key)}
-            className={cn(
-              'px-4 py-2 text-sm font-medium transition-colors',
-              activeTab === tab.key
-                ? 'border-b-2 border-primary text-foreground'
-                : 'text-muted-foreground hover:text-foreground',
-            )}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      <Tabs
+        tabs={tabs.map((tab) => ({ key: tab.key, label: tab.label }))}
+        active={activeTab}
+        onChange={(key) => handleTabClick(key)}
+        className="mb-6"
+      />
 
       {/* Tab content */}
       <TabContent
@@ -273,10 +269,10 @@ function TabContent({
     case 'meta':
       return (
         <Card>
-          <Card.Header>
-            <Card.Title>Profile Info</Card.Title>
-          </Card.Header>
-          <Card.Content>
+          <CardHeader>
+            <CardTitle>Profile Info</CardTitle>
+          </CardHeader>
+          <CardContent>
             <dl className="grid grid-cols-2 gap-4">
               <div>
                 <dt className="text-xs text-muted-foreground mb-1">Name</dt>
@@ -323,7 +319,7 @@ function TabContent({
                 </div>
               </dl>
             )}
-          </Card.Content>
+          </CardContent>
         </Card>
       )
 
@@ -331,10 +327,10 @@ function TabContent({
     case 'config':
       return (
         <Card>
-          <Card.Header>
-            <Card.Title>{CONFIG_FILES[meta.agent_type] ?? 'Config'}</Card.Title>
-          </Card.Header>
-          <Card.Content>
+          <CardHeader>
+            <CardTitle>{CONFIG_FILES[meta.agent_type] ?? 'Config'}</CardTitle>
+          </CardHeader>
+          <CardContent>
             {settings ? (
               <pre className="text-sm text-foreground font-mono whitespace-pre-wrap bg-muted p-4 rounded-md overflow-auto max-h-[600px]">
                 {settings}
@@ -342,7 +338,7 @@ function TabContent({
             ) : (
               <p className="text-sm text-muted-foreground">No config file found</p>
             )}
-          </Card.Content>
+          </CardContent>
         </Card>
       )
 
@@ -350,10 +346,10 @@ function TabContent({
     case 'persona':
       return (
         <Card>
-          <Card.Header>
-            <Card.Title>{meta.agent_type === 'hermes' ? 'SOUL.md' : 'CLAUDE.md'}</Card.Title>
-          </Card.Header>
-          <Card.Content>
+          <CardHeader>
+            <CardTitle>{meta.agent_type === 'hermes' ? 'SOUL.md' : 'CLAUDE.md'}</CardTitle>
+          </CardHeader>
+          <CardContent>
             {claudeMd ? (
               <pre className="text-sm text-foreground font-mono whitespace-pre-wrap bg-muted p-4 rounded-md overflow-auto max-h-[600px]">
                 {claudeMd}
@@ -361,17 +357,17 @@ function TabContent({
             ) : (
               <p className="text-sm text-muted-foreground">No {meta.agent_type === 'hermes' ? 'SOUL.md' : 'CLAUDE.md'} found</p>
             )}
-          </Card.Content>
+          </CardContent>
         </Card>
       )
 
     case 'hooks':
       return (
         <Card>
-          <Card.Header>
-            <Card.Title>Hooks</Card.Title>
-          </Card.Header>
-          <Card.Content>
+          <CardHeader>
+            <CardTitle>Hooks</CardTitle>
+          </CardHeader>
+          <CardContent>
             {Object.keys(hooks).length > 0 ? (
               <div className="space-y-4">
                 {Object.entries(hooks).map(([event, hookList]) => (
@@ -397,17 +393,17 @@ function TabContent({
             ) : (
               <p className="text-sm text-muted-foreground">No hooks configured</p>
             )}
-          </Card.Content>
+          </CardContent>
         </Card>
       )
 
     case 'plugins':
       return (
         <Card>
-          <Card.Header>
-            <Card.Title>Plugins</Card.Title>
-          </Card.Header>
-          <Card.Content>
+          <CardHeader>
+            <CardTitle>Plugins</CardTitle>
+          </CardHeader>
+          <CardContent>
             {Object.keys(plugins).length > 0 ? (
               <div className="space-y-2">
                 {Object.entries(plugins).map(([name, enabled]) => (
@@ -422,77 +418,77 @@ function TabContent({
             ) : (
               <p className="text-sm text-muted-foreground">No plugins installed</p>
             )}
-          </Card.Content>
+          </CardContent>
         </Card>
       )
 
     case 'skills':
       return (
         <Card>
-          <Card.Header>
-            <Card.Title>Skills</Card.Title>
-          </Card.Header>
-          <Card.Content>
+          <CardHeader>
+            <CardTitle>Skills</CardTitle>
+          </CardHeader>
+          <CardContent>
             <p className="text-sm text-muted-foreground">No skills installed</p>
-          </Card.Content>
+          </CardContent>
         </Card>
       )
 
     case 'env':
       return (
         <Card>
-          <Card.Header>
-            <Card.Title>Environment Variables</Card.Title>
-          </Card.Header>
-          <Card.Content>
+          <CardHeader>
+            <CardTitle>Environment Variables</CardTitle>
+          </CardHeader>
+          <CardContent>
             <p className="text-sm text-muted-foreground">Environment variables from settings.json</p>
-          </Card.Content>
+          </CardContent>
         </Card>
       )
 
     case 'auth':
       return (
         <Card>
-          <Card.Header>
-            <Card.Title>Authentication</Card.Title>
-          </Card.Header>
-          <Card.Content>
+          <CardHeader>
+            <CardTitle>Authentication</CardTitle>
+          </CardHeader>
+          <CardContent>
             <p className="text-sm text-muted-foreground">API keys and authentication config</p>
-          </Card.Content>
+          </CardContent>
         </Card>
       )
 
     case 'rules':
       return (
         <Card>
-          <Card.Header>
-            <Card.Title>Rules</Card.Title>
-          </Card.Header>
-          <Card.Content>
+          <CardHeader>
+            <CardTitle>Rules</CardTitle>
+          </CardHeader>
+          <CardContent>
             <p className="text-sm text-muted-foreground">Custom rules configuration</p>
-          </Card.Content>
+          </CardContent>
         </Card>
       )
 
     case 'storage':
       return (
         <Card>
-          <Card.Header>
-            <Card.Title>Storage</Card.Title>
-          </Card.Header>
-          <Card.Content>
+          <CardHeader>
+            <CardTitle>Storage</CardTitle>
+          </CardHeader>
+          <CardContent>
             <p className="text-sm text-foreground font-mono break-all">{detail.path}</p>
             <p className="text-sm text-muted-foreground mt-2">Config directory: {detail.config_dir}</p>
-          </Card.Content>
+          </CardContent>
         </Card>
       )
 
     default:
       return (
         <Card>
-          <Card.Content>
+          <CardContent>
             <p className="text-sm text-muted-foreground">Tab not implemented: {tab}</p>
-          </Card.Content>
+          </CardContent>
         </Card>
       )
   }

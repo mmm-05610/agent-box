@@ -261,6 +261,10 @@ class Api:
             # Build shell script
             setup = 'export PATH="$HOME/.npm-global/bin:$HOME/.local/bin:$PATH"'
             if cwd:
+                # Expand ~ to WSL home before quoting (bash won't expand ~ in quotes)
+                if cwd.startswith("~"):
+                    home = _wsl_run("echo -n $HOME")
+                    cwd = cwd.replace("~", home, 1)
                 setup = f"cd '{cwd}' && {setup}"
             script = (
                 f"{setup} && {cmdline} || "

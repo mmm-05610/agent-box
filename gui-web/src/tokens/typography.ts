@@ -2,10 +2,10 @@
  * Typography Design Tokens
  *
  * Font family, size, weight, and line height definitions.
- * Follows a modular type scale (1.25 ratio).
+ * Hierarchy driven by size + weight, not by raw color.
  *
  * Usage:
- *   import { font, fontSize, fontWeight } from '@/tokens/typography'
+ *   import { fontSize, fontWeight, typography } from '@/tokens/typography'
  *   className="font-sans text-base font-normal"
  */
 
@@ -23,14 +23,13 @@ export const fontFamily = {
     'sans-serif',
   ].join(', '),
   mono: [
+    '"JetBrains Mono"',
     '"Cascadia Code"',
     '"Cascadia Mono"',
-    '"JetBrains Mono"',
-    '"Fira Code"',
     '"SF Mono"',
+    'Menlo',
     'Consolas',
     '"Liberation Mono"',
-    'Menlo',
     'monospace',
   ].join(', '),
 } as const
@@ -38,19 +37,28 @@ export const fontFamily = {
 /**
  * Font size scale (px → rem)
  * Base: 16px = 1rem
+ *
+ * Hierarchy (use these consistently):
+ *   display  - Page hero / welcome (30px)
+ *   title    - Section heading within a page (18px)
+ *   subtitle - Card title / row heading (14px)
+ *   body     - Default paragraph (13px)
+ *   caption  - Secondary text / metadata (12px)
+ *   micro    - Tertiary / timestamps (11px)
  */
 export const fontSize = {
-  xs: ['0.6875rem', { lineHeight: '1rem' }],      // 11px — micro
-  sm: ['0.75rem', { lineHeight: '1rem' }],         // 12px — caption
-  base: ['0.8125rem', { lineHeight: '1.25rem' }],  // 13px — body
-  md: ['0.875rem', { lineHeight: '1.25rem' }],     // 14px — subtitle
-  lg: ['1.0625rem', { lineHeight: '1.5rem' }],     // 17px — section title
-  xl: ['1.375rem', { lineHeight: '1.75rem' }],     // 22px — page title
-  '2xl': ['1.5rem', { lineHeight: '2rem' }],       // 24px
-  '3xl': ['1.875rem', { lineHeight: '2.25rem' }],  // 30px
+  xs: ['0.6875rem', { lineHeight: '1rem', letterSpacing: '0.01em' }],         // 11px — micro
+  sm: ['0.75rem', { lineHeight: '1.125rem', letterSpacing: '0.005em' }],       // 12px — caption
+  base: ['0.8125rem', { lineHeight: '1.375rem', letterSpacing: '-0.003em' }],  // 13px — body
+  md: ['0.875rem', { lineHeight: '1.375rem', letterSpacing: '-0.005em' }],     // 14px — subtitle
+  lg: ['1.0625rem', { lineHeight: '1.625rem', letterSpacing: '-0.012em' }],   // 17px — title
+  xl: ['1.375rem', { lineHeight: '1.875rem', letterSpacing: '-0.018em' }],     // 22px — display
+  '2xl': ['1.75rem', { lineHeight: '2.125rem', letterSpacing: '-0.022em' }],   // 28px
+  '3xl': ['2rem', { lineHeight: '2.375rem', letterSpacing: '-0.025em' }],      // 32px — display+
+  '4xl': ['2.5rem', { lineHeight: '3rem', letterSpacing: '-0.028em' }],         // 40px
 } as const
 
-/** Font weight — Tkinter only supports normal/bold, but web has full range */
+/** Font weight — web side has full range, Tk side is binary */
 export const fontWeight = {
   normal: '400',
   medium: '500',
@@ -60,54 +68,41 @@ export const fontWeight = {
 
 /** Semantic typography presets (combine size + weight + tracking) */
 export const typography = {
-  // Page titles — 22px bold
   display: {
-    fontSize: fontSize.xl[0],
-    lineHeight: fontSize.xl[1].lineHeight,
+    fontSize: fontSize['3xl'][0],
+    lineHeight: fontSize['3xl'][1].lineHeight,
     fontWeight: fontWeight.bold,
-    letterSpacing: '-0.025em',
+    letterSpacing: fontSize['3xl'][1].letterSpacing,
   },
-  // Section titles — 17px semibold
   title: {
     fontSize: fontSize.lg[0],
     lineHeight: fontSize.lg[1].lineHeight,
     fontWeight: fontWeight.semibold,
-    letterSpacing: '-0.016em',
+    letterSpacing: fontSize.lg[1].letterSpacing,
   },
-  // Card/row titles — 14px medium
   subtitle: {
     fontSize: fontSize.md[0],
     lineHeight: fontSize.md[1].lineHeight,
-    fontWeight: fontWeight.medium,
-    letterSpacing: '0',
+    fontWeight: fontWeight.semibold,
+    letterSpacing: fontSize.md[1].letterSpacing,
   },
-  // Body text — 13px normal
   body: {
     fontSize: fontSize.base[0],
     lineHeight: fontSize.base[1].lineHeight,
     fontWeight: fontWeight.normal,
-    letterSpacing: '0',
+    letterSpacing: fontSize.base[1].letterSpacing,
   },
-  // Secondary text — 12px normal
   caption: {
     fontSize: fontSize.sm[0],
     lineHeight: fontSize.sm[1].lineHeight,
     fontWeight: fontWeight.normal,
-    letterSpacing: '0',
+    letterSpacing: fontSize.sm[1].letterSpacing,
   },
-  // Tertiary text — 11px normal
   micro: {
     fontSize: fontSize.xs[0],
     lineHeight: fontSize.xs[1].lineHeight,
-    fontWeight: fontWeight.normal,
-    letterSpacing: '0.01em',
-  },
-  // Uppercase labels — 10px bold
-  label: {
-    fontSize: '0.625rem',
-    lineHeight: '1rem',
-    fontWeight: fontWeight.bold,
-    letterSpacing: '0.05em',
+    fontWeight: fontWeight.medium,
+    letterSpacing: fontSize.xs[1].letterSpacing,
     textTransform: 'uppercase' as const,
   },
 } as const
