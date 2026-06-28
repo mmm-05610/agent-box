@@ -9,11 +9,14 @@ from typing import Dict, List, Optional
 from . import __version__
 from . import claude_mds
 from . import config
+from . import hooks
 from . import launch
 from . import library
+from . import mcp
 from . import profile
 from . import providers
 from . import sessions
+from . import skills
 
 
 PROG = "agent-box"
@@ -92,8 +95,24 @@ def _build_parser() -> argparse.ArgumentParser:
     p_show.set_defaults(func=cmd_show)
 
     # edit ----------------------------------------------------------------
-    p_edit = sub.add_parser("edit", help="Open profile config dir in $EDITOR")
+    p_edit = sub.add_parser(
+        "edit",
+        help="Edit profile metadata or open config dir in $EDITOR",
+        description=(
+            "Without any flags, opens the profile's config directory "
+            "in $EDITOR. With one or more flags, updates the profile's "
+            "metadata in the profiles table (structured, fast, no editor)."
+        ),
+    )
     p_edit.add_argument("name", help="Profile name")
+    p_edit.add_argument("--display-name", default=None,
+                       help="Set the human-readable display name")
+    p_edit.add_argument("--description", default=None,
+                       help="Set the free-form description")
+    p_edit.add_argument("--provider", default=None,
+                       help="Set the provider key (record-only)")
+    p_edit.add_argument("--claude-md", default=None,
+                       help="Set the claude-md reference")
     p_edit.set_defaults(func=cmd_edit)
 
     # presets ------------------------------------------------------------
@@ -199,6 +218,101 @@ def _build_parser() -> argparse.ArgumentParser:
     pm.add_argument("profile", help="Target profile name")
     pm.add_argument("id", help="Claude.md id to apply")
     pm.set_defaults(func=cmd_claude_md_apply)
+
+    # mcp-server -------------------------------------------------------
+    p_mcp = sub.add_parser("mcp-server", help="Manage MCP server library entries")
+    sub_mcp = p_mcp.add_subparsers(dest="mcp_command", required=True)
+
+    pmcp = sub_mcp.add_parser("list", help="List MCP servers")
+    pmcp.add_argument("--type", "-t", choices=library.get_agent_types(), default=None,
+                      help="Filter by agent_type (shows only servers enabled for that type)")
+    pmcp.add_argument("--json", action="store_true", help="Emit JSON")
+    pmcp.set_defaults(func=cmd_mcp_list)
+
+    pmcp = sub_mcp.add_parser("show", help="Show MCP server details")
+    pmcp.add_argument("id", help="MCP server id")
+    pmcp.add_argument("--json", action="store_true", help="Emit JSON")
+    pmcp.set_defaults(func=cmd_mcp_show)
+
+    pmcp = sub_mcp.add_parser("upsert", help="Insert or update an MCP server (JSON from stdin)")
+    pmcp.add_argument("id", help="MCP server id")
+    pmcp.add_argument("--name", default=None, help="Display name (defaults to id)")
+    pmcp.set_defaults(func=cmd_mcp_upsert)
+
+    pmcp = sub_mcp.add_parser("delete", help="Delete an MCP server")
+    pmcp.add_argument("id", help="MCP server id")
+    pmcp.add_argument("--force", action="store_true", help="Skip confirmation")
+    pmcp.set_defaults(func=cmd_mcp_delete)
+
+    pmcp = sub_mcp.add_parser("apply", help="Apply an MCP server to a profile's agent config")
+    pmcp.add_argument("profile", help="Target profile name")
+    pmcp.add_argument("id", help="MCP server id")
+    pmcp.set_defaults(func=cmd_mcp_apply)
+
+    pmcp = sub_mcp.add_parser("agents", help="Enable/disable an MCP server for an agent type")
+    pmcp.add_argument("id", help="MCP server id")
+    pmcp.add_argument("--enable", dest="agent_type", default=None,
+                      help="Agent type to enable (e.g. claude, codex, hermes, opencode)")
+    pmcp.add_argument("--disable", dest="disable_type", default=None,
+                      help="Agent type to disable")
+    pmcp.set_defaults(func=cmd_mcp_agents)
+
+    # skill ------------------------------------------------------------
+    p_skill = sub.add_parser("skill", help="Manage skill library entries")
+    sub_skill = p_skill.add_subparsers(dest="skill_command", required=True)
+
+    psk = sub_skill.add_parser("list", help="List skills")
+    psk.add_argument("--type", "-t", choices=library.get_agent_types(), default=None,
+                     help="Filter by agent_type")
+    psk.add_argument("--json", action="store_true", help="Emit JSON")
+    psk.set_defaults(func=cmd_skill_list)
+
+    psk = sub_skill.add_parser("show", help="Show skill details")
+    psk.add_argument("id", help="Skill id")
+    psk.add_argument("--json", action="store_true", help="Emit JSON")
+    psk.set_defaults(func=cmd_skill_show)
+
+    psk = sub_skill.add_parser("upsert", help="Insert or update a skill")
+    psk.add_argument("id", help="Skill id")
+    psk.add_argument("--name", default=None, help="Display name (defaults to id)")
+    psk.add_argument("--description", default=None, help="Skill description")
+    psk.add_argument("--directory", default=None, help="Absolute path to the skill's source directory")
+    psk.add_argument("--repo-owner", default=None, help="GitHub repo owner (optional)")
+    psk.add_argument("--repo-name", default=None, help="GitHub repo name (optional)")
+    psk.add_argument("--repo-branch", default=None, help="GitHub repo branch (default: main)")
+    psk.add_argument("--readme-url", default=None, help="README URL (optional)")
+    psk.set_defaults(func=cmd_skill_upsert)
+
+    psk = sub_skill.add_parser("delete", help="Delete a skill")
+    psk.add_argument("id", help="Skill id")
+    psk.add_argument("--force", action="store_true", help="Skip confirmation")
+    psk.set_defaults(func=cmd_skill_delete)
+
+    psk = sub_skill.add_parser("apply", help="Copy a skill directory into a profile's agent skills dir")
+    psk.add_argument("profile", help="Target profile name")
+    psk.add_argument("id", help="Skill id")
+    psk.set_defaults(func=cmd_skill_apply)
+
+    psk = sub_skill.add_parser("agents", help="Enable/disable a skill for an agent type")
+    psk.add_argument("id", help="Skill id")
+    psk.add_argument("--enable", dest="agent_type", default=None,
+                     help="Agent type to enable")
+    psk.add_argument("--disable", dest="disable_type", default=None,
+                     help="Agent type to disable")
+    psk.set_defaults(func=cmd_skill_agents)
+
+    # hooks ------------------------------------------------------------
+    p_hooks = sub.add_parser("hooks", help="Manage Claude Code hooks.json (file-level)")
+    sub_hooks = p_hooks.add_subparsers(dest="hooks_command", required=True)
+
+    ph = sub_hooks.add_parser("show", help="Show a profile's hooks.json")
+    ph.add_argument("profile", help="Target profile name")
+    ph.add_argument("--json", action="store_true", help="Emit JSON")
+    ph.set_defaults(func=cmd_hooks_show)
+
+    ph = sub_hooks.add_parser("upsert", help="Overwrite a profile's hooks.json (JSON from stdin)")
+    ph.add_argument("profile", help="Target profile name")
+    ph.set_defaults(func=cmd_hooks_upsert)
 
     # sessions ----------------------------------------------------------
     p_sessions = sub.add_parser(
@@ -344,6 +458,32 @@ def cmd_presets(args: argparse.Namespace) -> int:
 
 
 def cmd_edit(args: argparse.Namespace) -> int:
+    # If any structured flags are set, do a DB-level meta update.
+    if any(getattr(args, f, None) is not None
+           for f in ("display_name", "description", "provider", "claude_md")):
+        try:
+            result = profile.update_meta(
+                args.name,
+                display_name=args.display_name,
+                description=args.description,
+                provider=args.provider,
+                claude_md=args.claude_md,
+            )
+        except (ValueError, profile.ProfileError) as exc:
+            print(f"agent-box: {exc}", file=sys.stderr)
+            return 2
+        print(f"updated profile {args.name!r}")
+        if args.display_name is not None:
+            print(f"  display_name: {result['display_name']}")
+        if args.description is not None:
+            print(f"  description: {result['description']}")
+        if args.provider is not None:
+            print(f"  provider: {result['provider']}")
+        if args.claude_md is not None:
+            print(f"  claude_md: {result['claude_md']}")
+        return 0
+
+    # No flags → open config dir in $EDITOR (legacy behaviour).
     try:
         config.validate_profile_name(args.name)
         meta = profile.load_meta(args.name)
@@ -628,6 +768,283 @@ def cmd_claude_md_apply(args: argparse.Namespace) -> int:
         print(f"agent-box: {exc}", file=sys.stderr)
         return 2
     print(f"applied claude-md {args.id!r} to profile {args.profile!r}")
+    return 0
+
+
+# --- mcp-server subcommands -----------------------------------------------
+
+def cmd_mcp_list(args: argparse.Namespace) -> int:
+    try:
+        rows = mcp.list_mcp_servers(agent_type=args.type)
+    except Exception as exc:
+        print(f"agent-box: {exc}", file=sys.stderr)
+        return 2
+    if args.json:
+        json.dump(rows, sys.stdout, indent=2, ensure_ascii=False)
+        sys.stdout.write("\n")
+        return 0
+    if not rows:
+        msg = f"(no mcp-servers{' for type ' + args.type if args.type else ''})"
+        print(msg)
+        return 0
+    id_w = max((len(r["id"]) for r in rows), default=2)
+    name_w = max((len(r["name"]) for r in rows), default=4)
+    for r in rows:
+        print(f"{r['id']:<{id_w}}  {r['name']:<{name_w}}")
+    return 0
+
+
+def cmd_mcp_show(args: argparse.Namespace) -> int:
+    try:
+        row = mcp.get_mcp_server(args.id)
+    except Exception as exc:
+        print(f"agent-box: {exc}", file=sys.stderr)
+        return 2
+    if row is None:
+        print(f"agent-box: mcp-server {args.id!r} not found", file=sys.stderr)
+        return 2
+    if args.json:
+        json.dump(row, sys.stdout, indent=2, ensure_ascii=False)
+        sys.stdout.write("\n")
+        return 0
+    print(f"id:          {row['id']}")
+    print(f"name:        {row['name']}")
+    if row.get("description"):
+        print(f"description: {row['description']}")
+    if row.get("homepage"):
+        print(f"homepage:    {row['homepage']}")
+    if row.get("docs"):
+        print(f"docs:        {row['docs']}")
+    if row.get("tags"):
+        print(f"tags:        {', '.join(row['tags'])}")
+    if row.get("agent_types"):
+        print(f"agent_types: {', '.join(row['agent_types'])}")
+    print("server_config:")
+    print(json.dumps(row.get("server_config_parsed") or {}, indent=2, ensure_ascii=False))
+    return 0
+
+
+def cmd_mcp_upsert(args: argparse.Namespace) -> int:
+    try:
+        stdin_content = sys.stdin.read()
+        # Allow the user to override the name from --name. If they passed
+        # --name, inject it into the JSON payload before validation.
+        if args.name:
+            try:
+                payload = json.loads(stdin_content) if stdin_content.strip() else {}
+            except json.JSONDecodeError:
+                payload = {}
+            if not isinstance(payload, dict):
+                payload = {}
+            payload["name"] = args.name
+            stdin_content = json.dumps(payload, ensure_ascii=False)
+        result = mcp.upsert_mcp_server(args.id, stdin_content)
+    except (ValueError, profile.ProfileError) as exc:
+        print(f"agent-box: {exc}", file=sys.stderr)
+        return 2
+    json.dump(result, sys.stdout, indent=2, ensure_ascii=False)
+    sys.stdout.write("\n")
+    return 0
+
+
+def cmd_mcp_delete(args: argparse.Namespace) -> int:
+    if not args.force:
+        confirm = input(f"Delete mcp-server {args.id!r}? [y/N] ").strip().lower()
+        if confirm not in ("y", "yes"):
+            print("aborted.", file=sys.stderr)
+            return 0
+    try:
+        deleted = mcp.delete_mcp_server(args.id)
+    except (ValueError, profile.ProfileError) as exc:
+        print(f"agent-box: {exc}", file=sys.stderr)
+        return 2
+    if not deleted:
+        print(f"agent-box: mcp-server {args.id!r} not found", file=sys.stderr)
+        return 2
+    print(f"deleted mcp-server {args.id!r}")
+    return 0
+
+
+def cmd_mcp_apply(args: argparse.Namespace) -> int:
+    try:
+        mcp.apply_mcp_server(args.profile, args.id)
+    except (ValueError, profile.ProfileError) as exc:
+        print(f"agent-box: {exc}", file=sys.stderr)
+        return 2
+    print(f"applied mcp-server {args.id!r} to profile {args.profile!r}")
+    return 0
+
+
+def cmd_mcp_agents(args: argparse.Namespace) -> int:
+    if not args.agent_type and not args.disable_type:
+        print("agent-box: --enable or --disable is required", file=sys.stderr)
+        return 2
+    if args.agent_type and args.disable_type:
+        print("agent-box: --enable and --disable are mutually exclusive", file=sys.stderr)
+        return 2
+    target = args.agent_type or args.disable_type
+    enabled = bool(args.agent_type)
+    try:
+        mcp.set_mcp_agent(args.id, target, enabled)
+    except (ValueError, profile.ProfileError) as exc:
+        print(f"agent-box: {exc}", file=sys.stderr)
+        return 2
+    action = "enabled" if enabled else "disabled"
+    print(f"{action} mcp-server {args.id!r} for {target!r}")
+    return 0
+
+
+# --- skill subcommands ----------------------------------------------------
+
+def cmd_skill_list(args: argparse.Namespace) -> int:
+    try:
+        rows = skills.list_skills(agent_type=args.type)
+    except Exception as exc:
+        print(f"agent-box: {exc}", file=sys.stderr)
+        return 2
+    if args.json:
+        json.dump(rows, sys.stdout, indent=2, ensure_ascii=False)
+        sys.stdout.write("\n")
+        return 0
+    if not rows:
+        msg = f"(no skills{' for type ' + args.type if args.type else ''})"
+        print(msg)
+        return 0
+    id_w = max((len(r["id"]) for r in rows), default=2)
+    name_w = max((len(r["name"]) for r in rows), default=4)
+    for r in rows:
+        print(f"{r['id']:<{id_w}}  {r['name']:<{name_w}}")
+    return 0
+
+
+def cmd_skill_show(args: argparse.Namespace) -> int:
+    try:
+        row = skills.get_skill(args.id)
+    except Exception as exc:
+        print(f"agent-box: {exc}", file=sys.stderr)
+        return 2
+    if row is None:
+        print(f"agent-box: skill {args.id!r} not found", file=sys.stderr)
+        return 2
+    if args.json:
+        json.dump(row, sys.stdout, indent=2, ensure_ascii=False)
+        sys.stdout.write("\n")
+        return 0
+    print(f"id:          {row['id']}")
+    print(f"name:        {row['name']}")
+    if row.get("description"):
+        print(f"description: {row['description']}")
+    if row.get("directory"):
+        print(f"directory:   {row['directory']}")
+    if row.get("repo_owner") or row.get("repo_name"):
+        repo = f"{row.get('repo_owner') or ''}/{row.get('repo_name') or ''}"
+        branch = f"@{row.get('repo_branch') or 'main'}"
+        print(f"repo:        {repo}{branch}")
+    if row.get("readme_url"):
+        print(f"readme_url:  {row['readme_url']}")
+    if row.get("agent_types"):
+        print(f"agent_types: {', '.join(row['agent_types'])}")
+    if row.get("content_hash"):
+        print(f"hash:        {row['content_hash'][:16]}…")
+    return 0
+
+
+def cmd_skill_upsert(args: argparse.Namespace) -> int:
+    try:
+        result = skills.upsert_skill(
+            args.id,
+            name=args.name or "",
+            description=args.description or "",
+            directory=args.directory or "",
+            repo_owner=args.repo_owner or "",
+            repo_name=args.repo_name or "",
+            repo_branch=args.repo_branch or "main",
+            readme_url=args.readme_url or "",
+        )
+    except (ValueError, profile.ProfileError) as exc:
+        print(f"agent-box: {exc}", file=sys.stderr)
+        return 2
+    json.dump(result, sys.stdout, indent=2, ensure_ascii=False)
+    sys.stdout.write("\n")
+    return 0
+
+
+def cmd_skill_delete(args: argparse.Namespace) -> int:
+    if not args.force:
+        confirm = input(f"Delete skill {args.id!r}? [y/N] ").strip().lower()
+        if confirm not in ("y", "yes"):
+            print("aborted.", file=sys.stderr)
+            return 0
+    try:
+        deleted = skills.delete_skill(args.id)
+    except (ValueError, profile.ProfileError) as exc:
+        print(f"agent-box: {exc}", file=sys.stderr)
+        return 2
+    if not deleted:
+        print(f"agent-box: skill {args.id!r} not found", file=sys.stderr)
+        return 2
+    print(f"deleted skill {args.id!r}")
+    return 0
+
+
+def cmd_skill_apply(args: argparse.Namespace) -> int:
+    try:
+        skills.apply_skill(args.profile, args.id)
+    except (ValueError, profile.ProfileError) as exc:
+        print(f"agent-box: {exc}", file=sys.stderr)
+        return 2
+    print(f"applied skill {args.id!r} to profile {args.profile!r}")
+    return 0
+
+
+def cmd_skill_agents(args: argparse.Namespace) -> int:
+    if not args.agent_type and not args.disable_type:
+        print("agent-box: --enable or --disable is required", file=sys.stderr)
+        return 2
+    if args.agent_type and args.disable_type:
+        print("agent-box: --enable and --disable are mutually exclusive", file=sys.stderr)
+        return 2
+    target = args.agent_type or args.disable_type
+    enabled = bool(args.agent_type)
+    try:
+        skills.set_skill_agent(args.id, target, enabled)
+    except (ValueError, profile.ProfileError) as exc:
+        print(f"agent-box: {exc}", file=sys.stderr)
+        return 2
+    action = "enabled" if enabled else "disabled"
+    print(f"{action} skill {args.id!r} for {target!r}")
+    return 0
+
+
+# --- hooks subcommands ----------------------------------------------------
+
+def cmd_hooks_show(args: argparse.Namespace) -> int:
+    try:
+        data = hooks.get_hooks(args.profile)
+    except (ValueError, profile.ProfileError) as exc:
+        print(f"agent-box: {exc}", file=sys.stderr)
+        return 2
+    if data is None:
+        print(f"agent-box: profile {args.profile!r} has no hooks.json", file=sys.stderr)
+        return 2
+    if args.json:
+        json.dump(data, sys.stdout, indent=2, ensure_ascii=False)
+        sys.stdout.write("\n")
+        return 0
+    json.dump(data, sys.stdout, indent=2, ensure_ascii=False)
+    sys.stdout.write("\n")
+    return 0
+
+
+def cmd_hooks_upsert(args: argparse.Namespace) -> int:
+    try:
+        stdin_content = sys.stdin.read()
+        result = hooks.upsert_hooks(args.profile, stdin_content)
+    except (ValueError, profile.ProfileError) as exc:
+        print(f"agent-box: {exc}", file=sys.stderr)
+        return 2
+    json.dump(result, sys.stdout, indent=2, ensure_ascii=False)
+    sys.stdout.write("\n")
     return 0
 
 

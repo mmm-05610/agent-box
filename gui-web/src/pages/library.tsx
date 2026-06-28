@@ -15,6 +15,13 @@ import { useProviders, useProfiles, useMcpServers, useSkills } from '@/hooks'
 import { cn } from '@/lib/utils'
 import { ProviderIcon } from '@/components/ProviderIcon'
 import { getIconMetadata, hasIcon } from '@/icons/extracted'
+import { testEndpoint } from '@/api/files'
+import {
+  ProviderFormFields,
+  defaultFormValues,
+  formValuesToSettings,
+  type ProviderFormValues,
+} from '@/components/provider/ProviderFormFields'
 import type { AgentType, Provider, ClaudeMd, Profile, McpServer, McpServerConfig, Skill } from '@/api'
 import {
   AGENT_TYPES,
@@ -153,7 +160,7 @@ function skillToForm(skill: Skill): string {
 interface EditingState {
   type: 'provider' | 'claudeMd' | 'mcp' | 'skill'
   id: string
-  /** Raw content of the inline editor (JSON for provider/mcp, key/value form for skill). */
+  /** Raw content of the inline editor (JSON for mcp, key/value form for skill/claudeMd). */
   content: string
 }
 
@@ -173,6 +180,7 @@ export function LibraryPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('providers')
   const [search, setSearch] = useState('')
   const [editing, setEditing] = useState<EditingState | null>(null)
+  const [editingProviderForm, setEditingProviderForm] = useState<ProviderFormValues | null>(null)
   const [linking, setLinking] = useState<LinkingState | null>(null)
   const [mdLinking, setMdLinking] = useState<MdLinkingState | null>(null)
   const [editError, setEditError] = useState<string | null>(null)
@@ -269,11 +277,10 @@ export function LibraryPage() {
       if (type === 'providers') {
         try {
           const detail = await fetchProviderDetail(agentType, id)
-          setEditing({
-            type: 'provider',
-            id,
-            content: JSON.stringify(detail?.settings ?? {}, null, 2),
-          })
+          const settings = detail?.settings ?? {}
+          const env = settings.env ?? {}
+          setEditing({ type: 'provider', id, content: JSON.stringify(settings) })
+          setEditingProviderForm(defaultFormValues(env, undefined, undefined, settings))
         } catch {
           setEditError('Failed to load provider details')
         }
@@ -314,14 +321,12 @@ export function LibraryPage() {
     setEditError(null)
     try {
       if (editing.type === 'provider') {
-        try {
-          JSON.parse(editing.content)
-        } catch {
-          setEditError('Invalid JSON format')
-          setSaving(false)
-          return
-        }
-        await saveProvider(agentType, editing.id, editing.content)
+        const fv = editingProviderForm ?? defaultFormValues()
+        const settings = formValuesToSettings(fv)
+        settings.name = fv.name
+        settings.notes = fv.notes
+        settings.website_url = fv.websiteUrl
+        await saveProvider(agentType, editing.id, JSON.stringify(settings))
         toast({ type: 'success', message: 'Provider saved' })
         refresh()
       } else if (editing.type === 'claudeMd') {
@@ -705,21 +710,34 @@ export function LibraryPage() {
               <ProvidersList
                 items={filteredProviders}
                 editing={editing}
+                editingProviderForm={editingProviderForm}
                 linking={linking}
                 editError={editError}
                 saving={saving}
                 allProfiles={linkableProfiles}
                 onStartEdit={(id) => handleStartEdit('providers', id)}
                 onSaveEdit={handleSaveEdit}
-                onCancelEdit={() => setEditing(null)}
+                onCancelEdit={() => { setEditing(null); setEditingProviderForm(null) }}
                 onEditContentChange={(c) =>
                   setEditing((prev) => (prev ? { ...prev, content: c } : null))
                 }
+                onEditProviderFormChange={setEditingProviderForm}
                 onDelete={(id) => handleDelete('providers', id)}
                 onOpenLinking={handleOpenLinking}
                 onToggleLinkSelection={handleToggleLinkSelection}
                 onConfirmLink={handleConfirmLink}
                 onCancelLinking={() => setLinking(null)}
+                onTest={(url) => {
+                  testEndpoint(url).then((r) => {
+                    if (r) {
+                      const ok = r.status > 0 && r.status < 500
+                      toast({
+                        type: ok ? 'success' : 'error',
+                        message: `${ok ? r.status + ' · ' + r.latency_ms + 'ms' : 'Unreachable'}`,
+                      })
+                    }
+                  })
+                }}
               />
             )
           }
@@ -931,6 +949,7 @@ function SegmentedTabs<T extends string>({
 function ProvidersList({
   items,
   editing,
+  editingProviderForm,
   linking,
   editError,
   saving,
@@ -939,14 +958,17 @@ function ProvidersList({
   onSaveEdit,
   onCancelEdit,
   onEditContentChange,
+  onEditProviderFormChange,
   onDelete,
   onOpenLinking,
   onToggleLinkSelection,
   onConfirmLink,
   onCancelLinking,
+  onTest,
 }: {
   items: Provider[]
   editing: EditingState | null
+  editingProviderForm: ProviderFormValues | null
   linking: LinkingState | null
   editError: string | null
   saving: boolean
@@ -955,11 +977,13 @@ function ProvidersList({
   onSaveEdit: () => void
   onCancelEdit: () => void
   onEditContentChange: (content: string) => void
+  onEditProviderFormChange: (fv: ProviderFormValues) => void
   onDelete: (id: string) => void
   onOpenLinking: (id: string) => void
   onToggleLinkSelection: (profileName: string) => void
   onConfirmLink: () => void
   onCancelLinking: () => void
+  onTest?: (url: string) => void
 }) {
   if (items.length === 0) {
     return (
@@ -981,6 +1005,7 @@ function ProvidersList({
           linkableProfiles={allProfiles}
           allProviders={items}
           isEditing={editing?.type === 'provider' && editing.id === provider.id}
+          editingProviderForm={editingProviderForm}
           isLinking={linking?.providerId === provider.id}
           linking={linking}
           editing={editing}
@@ -990,11 +1015,13 @@ function ProvidersList({
           onSaveEdit={onSaveEdit}
           onCancelEdit={onCancelEdit}
           onEditContentChange={onEditContentChange}
+          onEditProviderFormChange={onEditProviderFormChange}
           onDelete={() => onDelete(provider.id)}
           onOpenLinking={() => onOpenLinking(provider.id)}
           onToggleLinkSelection={onToggleLinkSelection}
           onConfirmLink={onConfirmLink}
           onCancelLinking={onCancelLinking}
+          onTest={onTest}
         />
       ))}
     </div>
@@ -1009,6 +1036,7 @@ function ProviderCard({
   linkableProfiles,
   allProviders,
   isEditing,
+  editingProviderForm,
   isLinking,
   editing,
   linking,
@@ -1018,17 +1046,20 @@ function ProviderCard({
   onSaveEdit,
   onCancelEdit,
   onEditContentChange,
+  onEditProviderFormChange,
   onDelete,
   onOpenLinking,
   onToggleLinkSelection,
   onConfirmLink,
   onCancelLinking,
+  onTest,
 }: {
   provider: Provider
   linkedProfiles: Profile[]
   linkableProfiles: Profile[]
   allProviders: Provider[]
   isEditing: boolean
+  editingProviderForm: ProviderFormValues | null
   isLinking: boolean
   editing: EditingState | null
   linking: LinkingState | null
@@ -1038,11 +1069,13 @@ function ProviderCard({
   onSaveEdit: () => void
   onCancelEdit: () => void
   onEditContentChange: (content: string) => void
+  onEditProviderFormChange: (fv: ProviderFormValues) => void
   onDelete: () => void
   onOpenLinking: () => void
   onToggleLinkSelection: (profileName: string) => void
   onConfirmLink: () => void
   onCancelLinking: () => void
+  onTest?: (url: string) => void
 }) {
   const baseUrl = extractBaseUrl(provider.settings?.env)
   const model = extractModel(provider.settings?.env)
@@ -1129,22 +1162,17 @@ function ProviderCard({
                 {provider.category}
               </span>
             )}
-            {provider.isCurrent && (
-              <span
-                title="Marked as current in catalog"
-                className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-emerald-600 dark:text-emerald-400"
-              >
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                current
-              </span>
+          </div>
+          {/* Model + Base URL */}
+          <div className="mt-1 space-y-0.5">
+            {model && (
+              <p className="text-xs text-foreground/80 font-mono truncate">{model}</p>
             )}
-            {provider.inFailoverQueue && (
-              <span className="inline-flex items-center rounded-full bg-sky-500/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-sky-600 dark:text-sky-400">
-                failover
-              </span>
+            {baseUrl && (
+              <p className="text-[10px] text-muted-foreground/70 font-mono truncate">{baseUrl}</p>
             )}
           </div>
-          <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+          <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
             <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground shrink-0">
               Used by
             </span>
@@ -1189,6 +1217,18 @@ function ProviderCard({
         {/* Actions — hover reveal */}
         <div className="flex items-center gap-1 opacity-0 pointer-events-none transition-opacity duration-fast group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto">
           <IconAction
+            label="Test endpoint"
+            onClick={() => {
+              const url = provider.settings?.env?.ANTHROPIC_BASE_URL
+              if (url && onTest) onTest(url)
+            }}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+              <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
+              <polyline points="22 4 12 14.01 9 11.01" />
+            </svg>
+          </IconAction>
+          <IconAction
             label="Edit provider"
             onClick={onStartEdit}
           >
@@ -1207,24 +1247,29 @@ function ProviderCard({
           </div>
       </div>
 
-      {/* Inline edit panel */}
-      {isEditing && editing && (
-        <div className="border-t border-border bg-muted/20 px-5 py-4">
-          <Textarea
-            rows={8}
-            value={editing.content}
-            onChange={(e) => onEditContentChange(e.target.value)}
-            error={editError ?? undefined}
-            className="font-mono text-xs"
+      {/* Inline edit panel — cc-switch style form */}
+      {isEditing && editingProviderForm && (
+        <div className="bg-muted/30 px-5 py-4">
+          <ProviderFormFields
+            values={editingProviderForm}
+            onChange={onEditProviderFormChange}
+            showBasicFields
           />
-          <div className="mt-3 flex items-center justify-end gap-2">
-            <Button variant="ghost" size="sm" onClick={onCancelEdit}>
-              Cancel
-            </Button>
-            <Button size="sm" isLoading={saving} onClick={onSaveEdit}>
-              Save changes
-            </Button>
+          <div className="mt-4 flex items-center justify-between">
+            <p className="text-[10px] text-muted-foreground">
+              {provider.name} · {extractBaseUrl(provider.settings?.env) ?? 'no endpoint'}
+            </p>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={onCancelEdit}>Cancel</Button>
+              <Button size="sm" isLoading={saving} onClick={onSaveEdit}>Save</Button>
+            </div>
           </div>
+          {editError && <p className="mt-2 text-xs text-destructive">{editError}</p>}
+        </div>
+      )}
+      {isEditing && !editingProviderForm && (
+        <div className="bg-muted/30 px-5 py-4">
+          <p className="text-sm text-muted-foreground">Loading...</p>
         </div>
       )}
 
@@ -1362,7 +1407,7 @@ function LinkPopover({
             )
           })}
       </div>
-      <div className="flex items-center justify-end gap-2 pt-1 border-t border-border">
+      <div className="flex items-center justify-end gap-2 pt-1">
         <Button variant="ghost" size="sm" onClick={onCancelLinking}>
           Cancel
         </Button>
@@ -1611,7 +1656,7 @@ function ClaudeMdCard({
       </div>
 
       {isEditing && editing && (
-        <div className="border-t border-border bg-muted/20 px-5 py-4">
+        <div className="bg-muted/30 px-5 py-4">
           <Textarea
             rows={8}
             value={editing.content}
@@ -1631,7 +1676,7 @@ function ClaudeMdCard({
       )}
 
       {isApplying && mdLinking && (
-        <div className="border-t border-border bg-muted/20 px-5 py-4">
+        <div className="bg-muted/30 px-5 py-4">
           <div className="flex items-center gap-3">
             <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground shrink-0">
               Apply to
@@ -1892,7 +1937,7 @@ function McpCard({
 
       {/* Inline editor (JSON of server_config) */}
       {isEditing && editing && (
-        <div className="border-t border-border bg-muted/20 px-5 py-4">
+        <div className="bg-muted/30 px-5 py-4">
           <Textarea
             rows={8}
             value={editing.content}
@@ -2083,7 +2128,7 @@ function SkillCard({
 
       {/* Inline editor (key=value lines) */}
       {isEditing && editing && (
-        <div className="border-t border-border bg-muted/20 px-5 py-4">
+        <div className="bg-muted/30 px-5 py-4">
           <Textarea
             rows={6}
             value={editing.content}

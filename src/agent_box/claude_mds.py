@@ -25,7 +25,7 @@ def list_claude_mds(agent_type: str) -> List[Dict[str, Any]]:
     from . import db
     conn = db.get_conn()
     rows = conn.execute(
-        "SELECT id, name, description, enabled, created_at, updated_at "
+        "SELECT id, name, description, content, enabled, created_at, updated_at "
         "FROM prompts WHERE app_type = ? ORDER BY name, id",
         (agent_type,),
     ).fetchall()
@@ -34,6 +34,7 @@ def list_claude_mds(agent_type: str) -> List[Dict[str, Any]]:
             "id": r["id"],
             "name": r["name"],
             "description": r["description"] or "",
+            "content": r["content"] or "",
             "enabled": bool(r["enabled"]),
         }
         for r in rows

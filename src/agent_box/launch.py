@@ -78,6 +78,18 @@ def launch(name: str, extra_args: list | None = None) -> None:
             argv.insert(4, str(pjson))
             argv.insert(4, "--bind")
 
+        # Bind-mount dot-agents/ → ~/.agents/ so skills installed
+        # via agent-box-skill-apply are isolated per profile.
+        pagents = config.profile_dir(name) / "dot-agents"
+        ragents = config.real_agent_dir("claude").with_name(".agents")
+        if not pagents.is_dir():
+            pagents.mkdir(parents=True, exist_ok=True)
+        if not ragents.exists():
+            ragents.mkdir(parents=True, exist_ok=True)
+        argv.insert(4, str(ragents))
+        argv.insert(4, str(pagents))
+        argv.insert(4, "--bind")
+
     # Secondary data dir mount (e.g. OpenCode auth)
     pdata = config.profile_agent_data_dir(name, agent_type)
     rdata = config.real_agent_data_dir(agent_type)

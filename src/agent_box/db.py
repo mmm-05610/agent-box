@@ -54,6 +54,9 @@ def get_conn() -> sqlite3.Connection:
                 _conn.row_factory = sqlite3.Row
                 _conn.execute("PRAGMA journal_mode=WAL")
                 _conn.execute("PRAGMA synchronous=NORMAL")
+                # Enable FK enforcement so ON DELETE CASCADE works
+                # (default is OFF in SQLite, which silently no-ops FK clauses).
+                _conn.execute("PRAGMA foreign_keys = ON")
                 _conn.executescript(_read_schema())
                 _conn.commit()
     return _conn

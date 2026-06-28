@@ -1,23 +1,33 @@
 /**
- * Profile Detail Page — View and edit a single profile's configuration
+ * Profile Detail Page — View and edit a single profile's configuration.
  *
- * Tabs per agent type:
- * - claude: meta, settings, claude_md, hooks, plugins, storage
- * - codex: meta, config, auth, rules, skills, storage
- * - hermes: meta, config, env, persona, skills, storage
- * - opencode: meta, config, auth, storage
+ * Claude tabs:
+ *   Meta / Model&Env / Permissions / Hooks / Plugins / CLAUDE.md / MCP / Skills / Storage
+ *
+ * Each tab that edits settings.json uses patchJsonFile() to replace only
+ * its own key, so tabs never conflict.  Storage is the escape hatch with
+ * a file tree + raw JSON editor for every file in the profile.
  */
 
 import { useCallback, useEffect, useState } from 'react'
-import { Button, Card, CardHeader, CardTitle, CardContent, Badge, Tabs } from '@/components/ui'
+import { Button, Badge, Tabs } from '@/components/ui'
 import { Loading } from '@/components/feedback'
 import type { AgentType } from '@/api'
 import { AGENT_TYPE_COLORS, fetchProfileDetail } from '@/api'
-import { readFile, listDir } from '@/api/files'
+import { readFile, findFiles } from '@/api/files'
+import { MetaEditor } from './detail/MetaEditor'
+import { ProviderEditor } from './detail/ProviderEditor'
+import { PermissionsEditor } from './detail/PermissionsEditor'
+import { HooksEditor } from './detail/HooksEditor'
+import { PluginsEditor } from './detail/PluginsEditor'
+import { FileTextEditor } from './detail/FileTextEditor'
+import { McpTab } from './detail/McpTab'
+import { SkillsTab } from './detail/SkillsTab'
+import { StorageExplorer } from './detail/StorageExplorer'
 
 // ── Types ──────────────────────────────────────────────────────────────
 
-interface ProfileDetail {
+export interface ProfileDetail {
   path: string
   meta: {
     name: string
@@ -31,55 +41,42 @@ interface ProfileDetail {
   config_dir: string
 }
 
-type TabKey = string
+export type TabKey = string
 
 interface TabDef {
   key: TabKey
   label: string
-  description: string
 }
 
-// ── Tab definitions per agent type ─────────────────────────────────────
+// ── Tab definitions ────────────────────────────────────────────────────
 
-const AGENT_TABS: Record<string, TabDef[]> = {
-  claude: [
-    { key: 'meta', label: 'Meta', description: 'Profile info' },
-    { key: 'settings', label: 'Settings', description: 'settings.json' },
-    { key: 'claude_md', label: 'CLAUDE.md', description: 'System prompt' },
-    { key: 'hooks', label: 'Hooks', description: 'Pre/Post tool hooks' },
-    { key: 'plugins', label: 'Plugins', description: 'Installed plugins' },
-    { key: 'storage', label: 'Storage', description: 'Files & size' },
-  ],
+const CLAUDE_TABS: TabDef[] = [
+  { key: 'meta',       label: 'Meta' },
+  { key: 'provider',   label: 'Provider' },
+  { key: 'permissions',label: 'Permissions' },
+  { key: 'hooks',      label: 'Hooks' },
+  { key: 'plugins',    label: 'Plugins' },
+  { key: 'claude-md',  label: 'CLAUDE.md' },
+  { key: 'mcp',        label: 'MCP' },
+  { key: 'skills',     label: 'Skills' },
+  { key: 'storage',    label: 'Storage' },
+]
+
+const OTHER_TABS: Record<string, TabDef[]> = {
   codex: [
-    { key: 'meta', label: 'Meta', description: 'Profile info' },
-    { key: 'config', label: 'Config', description: 'config.toml' },
-    { key: 'auth', label: 'Auth', description: 'API keys' },
-    { key: 'rules', label: 'Rules', description: 'Custom rules' },
-    { key: 'skills', label: 'Skills', description: 'Installed skills' },
-    { key: 'storage', label: 'Storage', description: 'Files & size' },
+    { key: 'meta',       label: 'Meta' },
+    { key: 'claude-md',  label: 'Rules' },
+    { key: 'storage',    label: 'Storage' },
   ],
   hermes: [
-    { key: 'meta', label: 'Meta', description: 'Profile info' },
-    { key: 'config', label: 'Config', description: 'config.yaml' },
-    { key: 'env', label: 'Env', description: 'Environment vars' },
-    { key: 'persona', label: 'Persona', description: 'SOUL.md' },
-    { key: 'skills', label: 'Skills', description: 'Installed skills' },
-    { key: 'storage', label: 'Storage', description: 'Files & size' },
+    { key: 'meta',       label: 'Meta' },
+    { key: 'claude-md',  label: 'Persona' },
+    { key: 'storage',    label: 'Storage' },
   ],
   opencode: [
-    { key: 'meta', label: 'Meta', description: 'Profile info' },
-    { key: 'config', label: 'Config', description: 'opencode.jsonc' },
-    { key: 'auth', label: 'Auth', description: 'API keys' },
-    { key: 'storage', label: 'Storage', description: 'Files & size' },
+    { key: 'meta',       label: 'Meta' },
+    { key: 'storage',    label: 'Storage' },
   ],
-}
-
-// Config file per agent type
-const CONFIG_FILES: Record<string, string> = {
-  claude: 'settings.json',
-  codex: 'config.toml',
-  hermes: 'config.yaml',
-  opencode: 'opencode.jsonc',
 }
 
 // ── Component ──────────────────────────────────────────────────────────
@@ -93,89 +90,65 @@ export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProp
   const [detail, setDetail] = useState<ProfileDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
-  // Tab state
   const [activeTab, setActiveTab] = useState<TabKey>('meta')
 
-  // File contents
-  const [settings, setSettings] = useState<string>('')
-  const [claudeMd, setClaudeMd] = useState<string>('')
-  const [hooks, setHooks] = useState<Record<string, unknown>>({})
-  const [plugins, setPlugins] = useState<Record<string, boolean>>({})
-  const [storage, setStorage] = useState<string>('')
+  // Loaded file contents
+  const [settingsRaw, setSettingsRaw] = useState<string>('{}')
+  const [claudeMdRaw, setClaudeMdRaw] = useState<string>('')
+  const [claudeDotJson, setClaudeDotJson] = useState<string>('{}')
+  const [fileTree, setFileTree] = useState<string[]>([])
 
-  // Load profile detail
+  // Reload trigger (incremented after save to refresh dependent tabs)
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  // ── Load ───────────────────────────────────────────────────────────
+
   useEffect(() => {
+    let cancelled = false
     async function load() {
-      setLoading(true)
+      // Only show loading skeleton on first mount; refresh is silent.
+      if (detail === null) setLoading(true)
       setError(null)
       try {
         const data = await fetchProfileDetail(profileName)
-        if (!data) {
-          setError('Profile not found')
-          return
-        }
-        setDetail(data as unknown as ProfileDetail)
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Failed to load profile')
+        if (cancelled) return
+        if (!data) { setError('Profile not found'); return }
+        const d = data as unknown as ProfileDetail
+        setDetail(d)
+
+        const configDir = d.config_dir
+        const [s, md, cj, tree] = await Promise.all([
+          readFile(`${configDir}/settings.json`).catch(() => '{}'),
+          readFile(`${configDir}/CLAUDE.md`).catch(() => ''),
+          readFile(`${d.path}/dot-claude.json`).catch(() => '{}'),
+          findFiles(`${d.path}`).catch(() => [] as string[]),
+        ] as const)
+        if (cancelled) return
+        setSettingsRaw(s)
+        setClaudeMdRaw(md)
+        setClaudeDotJson(cj)
+        setFileTree(tree)
+      } catch (e: unknown) {
+        if (cancelled) return
+        setError(e instanceof Error ? e.message : 'Failed to load')
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
     void load()
-  }, [profileName])
+    return () => { cancelled = true }
+  }, [profileName, refreshKey])
 
-  // Load file contents when detail is available
-  useEffect(() => {
-    if (!detail?.config_dir) return
-
-    async function loadFiles() {
-      const configDir = detail!.config_dir
-      const agentType = detail!.meta.agent_type
-
-      // Load config file
-      const configFile = CONFIG_FILES[agentType] ?? 'settings.json'
-      const settingsContent = await readFile(`${configDir}/${configFile}`).catch(() => '')
-      setSettings(settingsContent)
-
-      // Load CLAUDE.md or persona
-      if (agentType === 'claude') {
-        const claudeMdContent = await readFile(`${configDir}/CLAUDE.md`).catch(() => '')
-        setClaudeMd(claudeMdContent)
-      } else if (agentType === 'hermes') {
-        const personaContent = await readFile(`${configDir}/SOUL.md`).catch(() => '')
-        setClaudeMd(personaContent)
-      }
-
-      // Load hooks and plugins from settings.json (claude only)
-      if (agentType === 'claude' && settingsContent) {
-        try {
-          const settingsJson = JSON.parse(settingsContent)
-          setHooks(settingsJson.hooks ?? {})
-          setPlugins(settingsJson.enabledPlugins ?? {})
-        } catch {
-          setHooks({})
-          setPlugins({})
-        }
-      }
-
-      // Load storage info
-      const storageContent = await listDir(`${configDir}`).catch(() => '')
-      setStorage(storageContent)
-    }
-    void loadFiles()
-  }, [detail])
-
-  const handleTabClick = useCallback((key: TabKey) => {
-    setActiveTab(key)
+  const triggerRefresh = useCallback(() => {
+    setRefreshKey((k) => k + 1)
   }, [])
+
+  // ── Render ─────────────────────────────────────────────────────────
 
   if (loading) {
     return (
       <div className="p-8">
-        <Button variant="ghost" size="sm" onClick={onBack} className="mb-4">
-          ← Back
-        </Button>
+        <Button variant="ghost" size="sm" onClick={onBack} className="mb-4">← Back</Button>
         <Loading variant="skeleton" rows={6} />
       </div>
     )
@@ -184,14 +157,10 @@ export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProp
   if (error || !detail) {
     return (
       <div className="p-8">
-        <Button variant="ghost" size="sm" onClick={onBack} className="mb-4">
-          ← Back
-        </Button>
+        <Button variant="ghost" size="sm" onClick={onBack} className="mb-4">← Back</Button>
         <div className="flex flex-col items-center gap-3 py-16 text-destructive">
           <p>{error ?? 'Profile not found'}</p>
-          <Button variant="ghost" size="sm" onClick={onBack}>
-            Go back
-          </Button>
+          <Button variant="ghost" size="sm" onClick={onBack}>Go back</Button>
         </div>
       </div>
     )
@@ -199,297 +168,101 @@ export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProp
 
   const { meta } = detail
   const agentType = meta.agent_type
-  const tabs = AGENT_TABS[agentType] ?? AGENT_TABS['claude']!
+  const tabs = agentType === 'claude' ? CLAUDE_TABS : (OTHER_TABS[agentType] ?? OTHER_TABS['codex']!)
   const badgeVariant = AGENT_TYPE_COLORS[agentType as AgentType] ?? 'neutral'
+  const configDir = detail.config_dir
+  const settingsPath = `${configDir}/settings.json`
+  const claudeMdPath = `${configDir}/${agentType === 'hermes' ? 'SOUL.md' : 'CLAUDE.md'}`
 
   return (
     <div className="mx-auto w-full max-w-5xl px-8 py-10">
       {/* Header */}
       <div className="mb-6 flex items-center gap-4">
-        <Button variant="ghost" size="sm" onClick={onBack}>
-          ← Back to Profiles
-        </Button>
+        <Button variant="ghost" size="sm" onClick={onBack}>← Back to Profiles</Button>
         <div className="flex-1">
-          <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
-            Profile
-          </p>
-          <h1 className="mt-2 text-3xl font-bold tracking-tight text-foreground">
-            {meta.name}
-          </h1>
+          <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Profile</p>
+          <h1 className="mt-2 text-3xl font-bold tracking-tight text-foreground">{meta.name}</h1>
         </div>
         <Badge variant={badgeVariant as 'neutral' | 'primary' | 'success' | 'warning' | 'destructive' | 'info'}>
           {agentType}
         </Badge>
       </div>
 
-      {/* Tab bar */}
       <Tabs
-        tabs={tabs.map((tab) => ({ key: tab.key, label: tab.label }))}
+        tabs={tabs.map((t) => ({ key: t.key, label: t.label }))}
         active={activeTab}
-        onChange={(key) => handleTabClick(key)}
+        onChange={setActiveTab}
         className="mb-6"
       />
 
-      {/* Tab content */}
       <TabContent
         tab={activeTab}
         detail={detail}
-        settings={settings}
-        claudeMd={claudeMd}
-        hooks={hooks}
-        plugins={plugins}
-        storage={storage}
+        settingsPath={settingsPath}
+        settingsRaw={settingsRaw}
+        claudeMdPath={claudeMdPath}
+        claudeMdRaw={claudeMdRaw}
+        claudeDotJson={claudeDotJson}
+        fileTree={fileTree}
+        onRefresh={triggerRefresh}
       />
     </div>
   )
 }
 
-// ── Tab Content ────────────────────────────────────────────────────────
+// ── Tab Content Router ─────────────────────────────────────────────────
 
 function TabContent({
-  tab,
-  detail,
-  settings,
-  claudeMd,
-  hooks,
-  plugins,
-  storage,
+  tab, detail, settingsPath, settingsRaw, claudeMdPath, claudeMdRaw,
+  claudeDotJson, fileTree, onRefresh,
 }: {
   tab: TabKey
   detail: ProfileDetail
-  settings: string
-  claudeMd: string
-  hooks: Record<string, unknown>
-  plugins: Record<string, boolean>
-  storage: string
+  settingsPath: string
+  settingsRaw: string
+  claudeMdPath: string
+  claudeMdRaw: string
+  claudeDotJson: string
+  fileTree: string[]
+  onRefresh: () => void
 }) {
-  const { meta } = detail
+  const profilePath = detail.path
+  const agentType = detail.meta.agent_type
 
   switch (tab) {
     case 'meta':
-      return (
-        <Card>
-          <CardHeader>
-            <CardTitle>Profile Info</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <dl className="grid grid-cols-2 gap-4">
-              <div>
-                <dt className="text-xs text-muted-foreground mb-1">Name</dt>
-                <dd className="text-sm text-foreground font-mono">{meta.name}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground mb-1">Agent Type</dt>
-                <dd className="text-sm text-foreground">{meta.agent_type}</dd>
-              </div>
-              {meta.display_name && (
-                <div>
-                  <dt className="text-xs text-muted-foreground mb-1">Display Name</dt>
-                  <dd className="text-sm text-foreground">{meta.display_name}</dd>
-                </div>
-              )}
-              {meta.description && (
-                <div>
-                  <dt className="text-xs text-muted-foreground mb-1">Description</dt>
-                  <dd className="text-sm text-foreground">{meta.description}</dd>
-                </div>
-              )}
-              {meta.provider && (
-                <div>
-                  <dt className="text-xs text-muted-foreground mb-1">Provider</dt>
-                  <dd className="text-sm text-foreground font-mono">{meta.provider}</dd>
-                </div>
-              )}
-              {meta.preset && (
-                <div>
-                  <dt className="text-xs text-muted-foreground mb-1">Preset</dt>
-                  <dd className="text-sm text-foreground">{meta.preset}</dd>
-                </div>
-              )}
-            </dl>
-            {detail.path && (
-              <dl className="mt-4 space-y-2">
-                <div>
-                  <dt className="text-xs text-muted-foreground mb-1">Profile Directory</dt>
-                  <dd className="text-sm text-foreground font-mono break-all">{detail.path}</dd>
-                </div>
-                <div>
-                  <dt className="text-xs text-muted-foreground mb-1">Config Directory</dt>
-                  <dd className="text-sm text-foreground font-mono break-all">{detail.config_dir}</dd>
-                </div>
-              </dl>
-            )}
-          </CardContent>
-        </Card>
-      )
-
-    case 'settings':
-    case 'config':
-      return (
-        <Card>
-          <CardHeader>
-            <CardTitle>{CONFIG_FILES[meta.agent_type] ?? 'Config'}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {settings ? (
-              <pre className="text-sm text-foreground font-mono whitespace-pre-wrap bg-muted p-4 rounded-md overflow-auto max-h-[600px]">
-                {settings}
-              </pre>
-            ) : (
-              <p className="text-sm text-muted-foreground">No config file found</p>
-            )}
-          </CardContent>
-        </Card>
-      )
-
-    case 'claude_md':
-    case 'persona':
-      return (
-        <Card>
-          <CardHeader>
-            <CardTitle>{meta.agent_type === 'hermes' ? 'SOUL.md' : 'CLAUDE.md'}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {claudeMd ? (
-              <pre className="text-sm text-foreground font-mono whitespace-pre-wrap bg-muted p-4 rounded-md overflow-auto max-h-[600px]">
-                {claudeMd}
-              </pre>
-            ) : (
-              <p className="text-sm text-muted-foreground">No {meta.agent_type === 'hermes' ? 'SOUL.md' : 'CLAUDE.md'} found</p>
-            )}
-          </CardContent>
-        </Card>
-      )
-
+      return <MetaEditor detail={detail} onRefresh={onRefresh} />
+    case 'provider':
+      return <ProviderEditor path={settingsPath} content={settingsRaw} onRefresh={onRefresh} agentType={agentType} />
+    case 'permissions':
+      return <PermissionsEditor path={settingsPath} content={settingsRaw} onRefresh={onRefresh} />
     case 'hooks':
-      return (
-        <Card>
-          <CardHeader>
-            <CardTitle>Hooks</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {Object.keys(hooks).length > 0 ? (
-              <div className="space-y-4">
-                {Object.entries(hooks).map(([event, hookList]) => (
-                  <div key={event}>
-                    <h4 className="text-sm font-semibold text-foreground mb-2">{event}</h4>
-                    <div className="space-y-2">
-                      {(hookList as Array<{matcher: string; hooks: Array<{type: string; command: string}>}>).map((hook, i) => (
-                        <div key={i} className="p-3 rounded-md bg-muted">
-                          <p className="text-xs text-muted-foreground mb-1">
-                            Matcher: <span className="font-mono">{hook.matcher}</span>
-                          </p>
-                          {hook.hooks.map((h, j) => (
-                            <pre key={j} className="text-sm font-mono text-foreground whitespace-pre-wrap break-all">
-                              {h.command}
-                            </pre>
-                          ))}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">No hooks configured</p>
-            )}
-          </CardContent>
-        </Card>
-      )
-
+      return <HooksEditor path={settingsPath} content={settingsRaw} onRefresh={onRefresh} />
     case 'plugins':
+      return <PluginsEditor path={settingsPath} content={settingsRaw} onRefresh={onRefresh} />
+    case 'claude-md':
       return (
-        <Card>
-          <CardHeader>
-            <CardTitle>Plugins</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {Object.keys(plugins).length > 0 ? (
-              <div className="space-y-2">
-                {Object.entries(plugins).map(([name, enabled]) => (
-                  <div key={name} className="flex items-center gap-3 p-2 rounded-md bg-muted">
-                    <span className={enabled ? 'text-success' : 'text-muted-foreground'}>
-                      {enabled ? '✓' : '✗'}
-                    </span>
-                    <span className="text-sm font-mono text-foreground">{name}</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">No plugins installed</p>
-            )}
-          </CardContent>
-        </Card>
+        <FileTextEditor
+          path={claudeMdPath}
+          content={claudeMdRaw}
+          label={agentType === 'hermes' ? 'SOUL.md' : 'CLAUDE.md'}
+          placeholder="# Custom instructions"
+          onRefresh={onRefresh}
+        />
       )
-
+    case 'mcp':
+      return <McpTab profileName={detail.meta.name} profilePath={profilePath} />
     case 'skills':
-      return (
-        <Card>
-          <CardHeader>
-            <CardTitle>Skills</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">No skills installed</p>
-          </CardContent>
-        </Card>
-      )
-
-    case 'env':
-      return (
-        <Card>
-          <CardHeader>
-            <CardTitle>Environment Variables</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">Environment variables from settings.json</p>
-          </CardContent>
-        </Card>
-      )
-
-    case 'auth':
-      return (
-        <Card>
-          <CardHeader>
-            <CardTitle>Authentication</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">API keys and authentication config</p>
-          </CardContent>
-        </Card>
-      )
-
-    case 'rules':
-      return (
-        <Card>
-          <CardHeader>
-            <CardTitle>Rules</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">Custom rules configuration</p>
-          </CardContent>
-        </Card>
-      )
-
+      return <SkillsTab profileName={detail.meta.name} configDir={detail.config_dir} />
     case 'storage':
       return (
-        <Card>
-          <CardHeader>
-            <CardTitle>Storage</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-foreground font-mono break-all">{detail.path}</p>
-            <p className="text-sm text-muted-foreground mt-2">Config directory: {detail.config_dir}</p>
-          </CardContent>
-        </Card>
+        <StorageExplorer
+          profilePath={profilePath}
+          fileTree={fileTree}
+          onRefresh={onRefresh}
+        />
       )
-
     default:
-      return (
-        <Card>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">Tab not implemented: {tab}</p>
-          </CardContent>
-        </Card>
-      )
+      return <p className="text-sm text-muted-foreground p-4">Tab not implemented: {tab}</p>
   }
 }

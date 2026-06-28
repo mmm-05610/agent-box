@@ -749,7 +749,7 @@ for item in nav_items:
 | Stop              | ■     | U+25A0  |
 | Pause             | ⏸     | U+23F8  |
 | Edit              | ✎     | U+270E  |
-| Delete            | 🗑    | U+1F5D1 |
+| Delete            | 🗑     | U+1F5D1 |
 | Add / New         | ＋    | U+FF0B  |
 | Refresh           | ⟳     | U+27F3  |
 | Settings / Config | ⚙     | U+2699  |

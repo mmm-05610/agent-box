@@ -1,5 +1,5 @@
 /**
- * Files API — Read files from WSL
+ * Files API — Read/write files from WSL
  */
 
 import { call } from '@/lib/bridge'
@@ -8,6 +8,38 @@ export async function readFile(path: string): Promise<string> {
   return call<string>((api) => api.read_file(path), '')
 }
 
+export async function saveFile(path: string, content: string): Promise<boolean> {
+  return call<boolean>((api) => api.save_file(path, content), false)
+}
+
+/**
+ * Replace a single key in a JSON file, preserving all other top-level keys.
+ * Creates the file (and parent dirs) if it doesn't exist.
+ */
+export async function patchJsonFile(
+  path: string, key: string, value: unknown,
+): Promise<boolean> {
+  return call<boolean>(
+    (api) => api.patch_json_file(path, key, JSON.stringify(value)),
+    false,
+  )
+}
+
 export async function listDir(path: string): Promise<string> {
   return call<string>((api) => api.list_dir(path), '')
+}
+
+/** Test HTTP reachability of an endpoint. Returns {status, latency_ms}. */
+export async function testEndpoint(url: string): Promise<{ status: number; latency_ms: number; error?: string } | null> {
+  return call<{ status: number; latency_ms: number; error?: string } | null>(
+    (api) => api.test_endpoint(url, 5),
+    null,
+  )
+}
+
+/**
+ * Return absolute paths of all files under *path* (find -type f).
+ */
+export async function findFiles(path: string): Promise<string[]> {
+  return call<string[]>((api) => api.find_files(path), [])
 }

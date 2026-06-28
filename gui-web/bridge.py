@@ -346,6 +346,31 @@ class Api:
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
 
+    def edit_profile(
+        self, name: str,
+        display_name: str = "", description: str = "",
+        provider: str = "", claude_md: str = "",
+    ) -> str:
+        """Update profile metadata fields. Empty strings mean "don't change"."""
+        try:
+            flags = ""
+            if display_name:
+                flags += f" --display-name {display_name}"
+            if description:
+                flags += f" --description {description}"
+            if provider:
+                flags += f" --provider {provider}"
+            if claude_md:
+                flags += f" --claude-md {claude_md}"
+            if not flags:
+                return json.dumps({"ok": False, "error": "no fields to update"})
+            _wsl_run(f"{AGENT_BOX_CMD} edit {name}{flags}")
+            # Re-read to return updated meta.
+            out = _wsl_run(f"{AGENT_BOX_CMD} show {name} --json")
+            return json.dumps({"ok": True, "data": json.loads(out)})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
     def launch_profile(self, name: str, agent_type: str, mode: str, cwd: str = "") -> str:
         """Launch a profile in a new console window.
 
@@ -444,6 +469,47 @@ class Api:
         except Exception as e:
             return json.dumps({"ok": True, "data": ""})
 
+    def save_file(self, path: str, content: str) -> str:
+        """Write *content* to *path* in WSL. Creates parent dirs if needed."""
+        try:
+            import base64
+            # Use base64 via stdin to avoid shell quoting hell for multi-line content.
+            encoded = base64.b64encode(content.encode("utf-8")).decode("ascii")
+            dirname = "/".join(path.split("/")[:-1]) or "/"
+            _wsl_run(
+                f"mkdir -p {dirname} && echo {encoded} | base64 -d > '{path}'",
+                timeout=10,
+            )
+            return json.dumps({"ok": True})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    def patch_json_file(self, path: str, key: str, value_json: str) -> str:
+        """Replace *key* in a JSON file at *path* with *value_json* (parsed).
+        Other top-level keys are preserved. Creates the file + key if missing."""
+        try:
+            import base64
+            existing = {}
+            check = _wsl_run(f"test -f '{path}' && echo exists || echo missing")
+            if "exists" in check:
+                raw = _wsl_run(f"cat '{path}'")
+                if raw.strip():
+                    existing = json.loads(raw)
+            if not isinstance(existing, dict):
+                existing = {}
+            parsed = json.loads(value_json)
+            existing[key] = parsed
+            new_content = json.dumps(existing, indent=2, ensure_ascii=False) + "\n"
+            encoded = base64.b64encode(new_content.encode("utf-8")).decode("ascii")
+            dirname = "/".join(path.split("/")[:-1]) or "/"
+            _wsl_run(
+                f"mkdir -p {dirname} && echo {encoded} | base64 -d > '{path}'",
+                timeout=10,
+            )
+            return json.dumps({"ok": True})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
     def last_cwd_map(self) -> str:
         """Return {profile_name: last_cwd} from recent sessions."""
         try:
@@ -458,6 +524,21 @@ class Api:
             return json.dumps({"ok": True, "data": result})
         except Exception as e:
             return json.dumps({"ok": True, "data": {}})
+
+    def test_endpoint(self, url: str, timeout_sec: int = 5) -> str:
+        """Check HTTP reachability of *url*. Returns status code + latency ms."""
+        try:
+            import base64, time
+            start = time.monotonic()
+            out = _wsl_run(
+                f"curl -s -o /dev/null -w '%{{http_code}}' --max-time {timeout_sec} '{url}'",
+                timeout=timeout_sec + 3,
+            )
+            elapsed_ms = int((time.monotonic() - start) * 1000)
+            code = out.strip()
+            return json.dumps({"ok": True, "data": {"status": int(code) if code.isdigit() else 0, "latency_ms": elapsed_ms}})
+        except Exception as e:
+            return json.dumps({"ok": True, "data": {"status": 0, "latency_ms": 0, "error": str(e)}})
 
     def browse_dir(self, initial: str = "") -> str:
         """Open a native folder picker and return the selected path (WSL format).
@@ -516,7 +597,7 @@ class Api:
             return json.dumps({"ok": False, "error": str(e)})
 
     def list_dir(self, path: str) -> str:
-        """List files in a directory. Returns empty string if directory not found."""
+        """List files in a directory (ls -la format). Returns empty string if not found."""
         try:
             quoted = f"'{path}'" if " " in path else path
             check = _wsl_run(f"test -d {quoted} && echo exists || echo missing")
@@ -526,6 +607,19 @@ class Api:
             return json.dumps({"ok": True, "data": out})
         except Exception as e:
             return json.dumps({"ok": True, "data": ""})
+
+    def find_files(self, path: str) -> str:
+        """Return absolute paths of all files under *path* (find -type f)."""
+        try:
+            quoted = f"'{path}'" if " " in path else path
+            check = _wsl_run(f"test -d {quoted} && echo exists || echo missing")
+            if "missing" in check:
+                return json.dumps({"ok": True, "data": "[]"})
+            out = _wsl_run(f"find {quoted} -type f 2>/dev/null", timeout=10)
+            paths = [l.strip() for l in out.split('\n') if l.strip()]
+            return json.dumps({"ok": True, "data": paths})
+        except Exception as e:
+            return json.dumps({"ok": True, "data": "[]"})
 
     # ── Apply ───────────────────────────────────────────────────────────
 

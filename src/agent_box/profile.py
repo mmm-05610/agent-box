@@ -146,6 +146,54 @@ def load_meta(name: str) -> Dict[str, str]:
     return _row_to_meta(row)
 
 
+def update_meta(
+    name: str,
+    *,
+    display_name: Optional[str] = None,
+    description: Optional[str] = None,
+    provider: Optional[str] = None,
+    claude_md: Optional[str] = None,
+) -> Dict[str, str]:
+    """Update editable metadata fields for *name*.
+
+    Only the fields that are explicitly provided (not ``None``) are
+    updated in the ``profiles`` table. Returns the full meta dict
+    after the update.
+    """
+    config.validate_profile_name(name)
+    from . import db
+    conn = db.get_conn()
+    row = conn.execute(
+        "SELECT 1 FROM profiles WHERE name = ?", (name,)
+    ).fetchone()
+    if row is None:
+        raise ProfileError(
+            f"{name}: profile not found. Try: agent-box create {name} --type claude"
+        )
+
+    updates: Dict[str, Any] = {}
+    if display_name is not None:
+        updates["display_name"] = display_name
+    if description is not None:
+        updates["description"] = description
+    if provider is not None:
+        updates["provider_ref"] = provider
+    if claude_md is not None:
+        updates["claude_md_ref"] = claude_md
+
+    if not updates:
+        return load_meta(name)
+
+    set_clause = ", ".join(f"{k} = ?" for k in updates)
+    values = list(updates.values()) + [name]
+    conn.execute(
+        f"UPDATE profiles SET {set_clause} WHERE name = ?",
+        values,
+    )
+    conn.commit()
+    return load_meta(name)
+
+
 # --- create ---------------------------------------------------------------
 
 def create(
@@ -198,9 +246,10 @@ def create(
     target = config.profile_agent_dir(name, agent_type)
     shutil.copytree(template_dir, target, symlinks=True)
 
-    # CC: also seed dot-claude.json at the profile root
+    # CC: also seed dot-claude.json and dot-agents/ at the profile root
     if agent_type == "claude":
         (root / "dot-claude.json").write_text("{}\n")
+        (root / "dot-agents").mkdir(parents=True, exist_ok=True)
 
     # Copy the secondary data template directory (e.g. OpenCode auth)
     data_template = library.get_template_data_dir(agent_type)
@@ -282,14 +331,19 @@ def _apply_preset(target: Path, agent_type: str, preset_name: str) -> None:
 
 # --- list / show / delete -------------------------------------------------
 
-def list_profiles() -> List[Dict[str, str]]:
-    """Return all profiles (newest first) from the ``profiles`` table."""
+def list_profiles() -> List[Dict[str, Any]]:
+    """Return all profiles (newest first) from the ``profiles`` table.
+
+    Returns full meta so the GUI can show which provider each profile
+    references without an extra round-trip per profile.
+    """
     from . import db
     conn = db.get_conn()
     rows = conn.execute(
-        "SELECT name, agent_type FROM profiles ORDER BY id DESC"
+        "SELECT name, agent_type, display_name, provider_ref, claude_md_ref "
+        "FROM profiles ORDER BY id DESC"
     ).fetchall()
-    return [{"name": r["name"], "agent_type": r["agent_type"]} for r in rows]
+    return [dict(r) for r in rows]
 
 
 def show(name: str) -> Dict[str, Any]:

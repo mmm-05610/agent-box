@@ -76,6 +76,26 @@ export async function getLastCwdMap(): Promise<Record<string, string>> {
 }
 
 /**
+ * Update profile metadata fields.
+ * Only non-empty fields are changed; empty strings are ignored.
+ */
+export async function editProfile(
+  name: string,
+  fields: { displayName?: string; description?: string; provider?: string; claudeMd?: string },
+): Promise<Record<string, unknown> | null> {
+  return call<Record<string, unknown> | null>(
+    (api) => api.edit_profile(
+      name,
+      fields.displayName ?? '',
+      fields.description ?? '',
+      fields.provider ?? '',
+      fields.claudeMd ?? '',
+    ),
+    null,
+  )
+}
+
+/**
  * Open native folder picker dialog.
  * Returns the selected WSL path, or empty string if cancelled.
  * @param initial - WSL path to start in (e.g. ~/projects)

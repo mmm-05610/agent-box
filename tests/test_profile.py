@@ -143,6 +143,42 @@ def test_load_meta_corrupt_yaml_left_alone(tmp_agent_box_home):
     assert not (root / "meta.yaml.migrated").exists()
 
 
+# --- update_meta -----------------------------------------------------------
+
+def test_update_meta_single_field(tmp_agent_box_home):
+    """Update one field, verify only that field changes."""
+    profile.create("mycc", "claude", display_name="Original")
+    result = profile.update_meta("mycc", display_name="Updated")
+    assert result["display_name"] == "Updated"
+    assert result["agent_type"] == "claude"
+
+
+def test_update_meta_multiple_fields(tmp_agent_box_home):
+    """Update several fields at once."""
+    profile.create("mycc", "claude")
+    result = profile.update_meta(
+        "mycc",
+        display_name="Test Profile",
+        description="A test profile",
+        provider="anthropic",
+    )
+    assert result["display_name"] == "Test Profile"
+    assert result["description"] == "A test profile"
+    assert result["provider"] == "anthropic"
+
+
+def test_update_meta_no_flags_is_noop(tmp_agent_box_home):
+    """Calling update_meta with no kwargs returns current meta unchanged."""
+    profile.create("mycc", "claude", display_name="Keep")
+    result = profile.update_meta("mycc")
+    assert result["display_name"] == "Keep"
+
+
+def test_update_meta_unknown_profile(tmp_agent_box_home):
+    with pytest.raises(ProfileError, match="not found"):
+        profile.update_meta("nope", display_name="x")
+
+
 # --- WS8 _deep_merge (regression) ----------------------------------------
 
 def test_deep_merge():
