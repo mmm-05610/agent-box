@@ -29,9 +29,16 @@ export async function listDir(path: string): Promise<string> {
   return call<string>((api) => api.list_dir(path), '')
 }
 
-/** Test HTTP reachability of an endpoint. Returns {status, latency_ms}. */
-export async function testEndpoint(url: string): Promise<{ status: number; latency_ms: number; error?: string } | null> {
-  return call<{ status: number; latency_ms: number; error?: string } | null>(
+export interface EndpointTestResult {
+  status: 'operational' | 'degraded' | 'failed'
+  message: string
+  response_time_ms: number
+  http_status?: number
+}
+
+/** Connectivity check like cc-switch. Returns structured result with operational/degraded/failed. */
+export async function testEndpoint(url: string): Promise<EndpointTestResult | null> {
+  return call<EndpointTestResult | null>(
     (api) => api.test_endpoint(url, 5),
     null,
   )

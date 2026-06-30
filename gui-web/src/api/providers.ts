@@ -16,6 +16,7 @@ function toProvider(raw: Record<string, unknown>): Provider {
     category: raw.category as string | undefined,
     websiteUrl: raw.website_url as string | undefined,
     settings: raw.settings as Provider['settings'] | undefined,
+    meta: raw.meta as Provider['meta'] | undefined,
     createdAt: raw.created_at as number | undefined,
     isCurrent: raw.is_current as boolean | undefined,
   }
@@ -53,6 +54,70 @@ export async function deleteProvider(
   providerId: string,
 ): Promise<void> {
   await call<void>((api) => api.delete_provider(agentType, providerId), undefined)
+}
+
+export async function duplicateProvider(
+  agentType: AgentType,
+  providerId: string,
+  newId: string,
+): Promise<Provider> {
+  const raw = await call<Record<string, unknown>>(
+    (api) => api.duplicate_provider(agentType, providerId, newId),
+    {} as Record<string, unknown>,
+  )
+  return toProvider(raw)
+}
+
+export async function fetchPresets(agentType: AgentType): Promise<ProviderPreset[]> {
+  return call<ProviderPreset[]>((api) => api.get_presets(agentType), [])
+}
+
+// ── Usage ────────────────────────────────────────────────────────────────
+
+export interface UsageData {
+  planName?: string
+  remaining?: number
+  used?: number
+  total?: number
+  unit?: string
+  isValid?: boolean
+  invalidMessage?: string
+  extra?: string
+}
+
+export interface UsageResult {
+  success: boolean
+  data?: UsageData[]
+  error?: string
+}
+
+export interface UsageScript {
+  enabled: boolean
+  code: string
+  timeout: number
+  autoQueryInterval: number
+  templateType: string
+}
+
+export async function queryUsage(
+  agentType: AgentType,
+  providerId: string,
+): Promise<UsageResult> {
+  return call<UsageResult>(
+    (api) => api.query_usage(agentType, providerId),
+    { success: false, error: 'Unknown' },
+  )
+}
+
+export async function saveUsageScript(
+  agentType: AgentType,
+  providerId: string,
+  script: UsageScript,
+): Promise<boolean> {
+  return call<boolean>(
+    (api) => api.save_usage_script(agentType, providerId, JSON.stringify(script)),
+    false,
+  )
 }
 
 export async function applyProviderToProfile(

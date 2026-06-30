@@ -172,6 +172,26 @@ def _build_parser() -> argparse.ArgumentParser:
     pp.add_argument("id")
     pp.set_defaults(func=cmd_provider_delete)
 
+    pp = sub_provider.add_parser("duplicate", help="Copy a provider under a new id")
+    pp.add_argument("type", choices=library.get_agent_types())
+    pp.add_argument("id")
+    pp.add_argument("new_id")
+    pp.set_defaults(func=cmd_provider_duplicate)
+
+    pp = sub_provider.add_parser("presets", help="List provider presets (JSON)")
+    pp.add_argument("--type", "-t", choices=library.get_agent_types(), default="claude")
+    pp.set_defaults(func=cmd_provider_presets)
+
+    pp = sub_provider.add_parser("usage", help="Query provider usage (runs usage script)")
+    pp.add_argument("type", choices=library.get_agent_types())
+    pp.add_argument("id")
+    pp.set_defaults(func=cmd_provider_usage)
+
+    pp = sub_provider.add_parser("usage-script", help="Save usage script for a provider (JSON from stdin)")
+    pp.add_argument("type", choices=library.get_agent_types())
+    pp.add_argument("id")
+    pp.set_defaults(func=cmd_provider_usage_script)
+
     pp = sub_provider.add_parser("apply", help="Apply provider env to a profile's settings.json")
     pp.add_argument("profile", help="Target profile name")
     pp.add_argument("provider", help="Provider id (must match the provider's DB id)")
@@ -655,6 +675,43 @@ def cmd_provider_apply(args: argparse.Namespace) -> int:
         print(f"agent-box: {exc}", file=sys.stderr)
         return 2
     print(f"applied provider {args.provider!r} to profile {args.profile!r}")
+    return 0
+
+
+def cmd_provider_duplicate(args: argparse.Namespace) -> int:
+    try:
+        result = providers.duplicate_provider(args.type, args.id, args.new_id)
+    except (ValueError, profile.ProfileError) as exc:
+        print(f"agent-box: {exc}", file=sys.stderr)
+        return 2
+    json.dump(result, sys.stdout, indent=2, ensure_ascii=False)
+    sys.stdout.write("\n")
+    return 0
+
+
+def cmd_provider_presets(args: argparse.Namespace) -> int:
+    presets = providers.get_presets(args.type)
+    json.dump(presets, sys.stdout, indent=2, ensure_ascii=False)
+    sys.stdout.write("\n")
+    return 0
+
+
+def cmd_provider_usage(args: argparse.Namespace) -> int:
+    result = providers.query_provider_usage(args.type, args.id)
+    json.dump(result, sys.stdout, indent=2, ensure_ascii=False)
+    sys.stdout.write("\n")
+    return 0
+
+
+def cmd_provider_usage_script(args: argparse.Namespace) -> int:
+    try:
+        stdin_content = sys.stdin.read()
+        result = providers.save_usage_script(args.type, args.id, stdin_content)
+    except (ValueError, profile.ProfileError) as exc:
+        print(f"agent-box: {exc}", file=sys.stderr)
+        return 2
+    json.dump(result, sys.stdout, indent=2, ensure_ascii=False)
+    sys.stdout.write("\n")
     return 0
 
 

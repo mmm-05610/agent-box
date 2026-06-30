@@ -20,3 +20,4 @@ export {
 export { Input, type InputProps } from './input'
 export { Tabs, type TabItem } from './tabs'
 export { Textarea, type TextareaProps } from './textarea'
+export { ConfirmDialog, type ConfirmDialogProps } from './confirm-dialog'

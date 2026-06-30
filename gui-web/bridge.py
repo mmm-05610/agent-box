@@ -143,6 +143,52 @@ class Api:
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
 
+    def duplicate_provider(self, agent_type: str, provider_id: str, new_id: str) -> str:
+        try:
+            out = _wsl_run(
+                f"{AGENT_BOX_CMD} provider duplicate {agent_type} {provider_id} {new_id}"
+            )
+            return json.dumps({"ok": True, "data": json.loads(out)})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    def get_presets(self, agent_type: str) -> str:
+        try:
+            out = _wsl_run(f"{AGENT_BOX_CMD} provider presets --type {agent_type}")
+            return json.dumps({"ok": True, "data": json.loads(out)})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    def query_usage(self, agent_type: str, provider_id: str) -> str:
+        try:
+            out = _wsl_run(
+                f"{AGENT_BOX_CMD} provider usage {agent_type} {provider_id}"
+            )
+            result = json.loads(out)
+            return json.dumps({"ok": True, "data": result})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    def save_usage_script(self, agent_type: str, provider_id: str,
+                          script_json: str) -> str:
+        try:
+            wsl = shutil.which("wsl.exe")
+            if wsl is None:
+                return json.dumps({"ok": False, "error": "wsl.exe not found"})
+            result = subprocess.run(
+                [wsl, "bash", "-lc",
+                 f"{AGENT_BOX_CMD} provider usage-script {agent_type} {provider_id}"],
+                input=script_json,
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+            if result.returncode != 0:
+                raise RuntimeError(result.stderr.strip())
+            return json.dumps({"ok": True, "data": json.loads(result.stdout.strip())})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
     # ── Claude.md ───────────────────────────────────────────────────────
 
     def list_claude_mds(self, agent_type: str) -> str:
@@ -526,19 +572,64 @@ class Api:
             return json.dumps({"ok": True, "data": {}})
 
     def test_endpoint(self, url: str, timeout_sec: int = 5) -> str:
-        """Check HTTP reachability of *url*. Returns status code + latency ms."""
+        """Connectivity check like cc-switch — checks base_url reachability.
+
+        Returns structured result:
+          { status: "operational" | "degraded" | "failed",
+            message: str, response_time_ms: int, http_status?: int }
+        """
+        import time
         try:
-            import base64, time
             start = time.monotonic()
             out = _wsl_run(
-                f"curl -s -o /dev/null -w '%{{http_code}}' --max-time {timeout_sec} '{url}'",
+                f"curl -s -o /dev/null -w '%{{http_code}}|%{{time_total}}|%{{time_connect}}|%{{time_starttransfer}}'"
+                f" --connect-timeout {timeout_sec} --max-time {timeout_sec} '{url}'",
                 timeout=timeout_sec + 3,
             )
             elapsed_ms = int((time.monotonic() - start) * 1000)
-            code = out.strip()
-            return json.dumps({"ok": True, "data": {"status": int(code) if code.isdigit() else 0, "latency_ms": elapsed_ms}})
+            parts = out.strip().split("|")
+            code = int(parts[0]) if parts[0].isdigit() else 0
+            response_time_ms = int(float(parts[1]) * 1000) if len(parts) > 1 and parts[1].replace(".", "").isdigit() else elapsed_ms
+
+            if 200 <= code < 500:
+                if response_time_ms <= 3000:
+                    return json.dumps({
+                        "ok": True,
+                        "data": {"status": "operational", "message": "Reachable",
+                                 "response_time_ms": response_time_ms, "http_status": code},
+                    })
+                else:
+                    return json.dumps({
+                        "ok": True,
+                        "data": {"status": "degraded", "message": "Reachable but slow",
+                                 "response_time_ms": response_time_ms, "http_status": code},
+                    })
+            elif code > 0:
+                return json.dumps({
+                    "ok": True,
+                    "data": {"status": "failed", "message": f"HTTP {code}",
+                             "response_time_ms": response_time_ms, "http_status": code},
+                })
+            else:
+                return json.dumps({
+                    "ok": True,
+                    "data": {"status": "failed", "message": "No HTTP response",
+                             "response_time_ms": response_time_ms},
+                })
         except Exception as e:
-            return json.dumps({"ok": True, "data": {"status": 0, "latency_ms": 0, "error": str(e)}})
+            msg = str(e)
+            if "timed out" in msg.lower() or "timeout" in msg.lower():
+                msg = "Connection timed out"
+            elif "could not resolve" in msg.lower() or "name resolution" in msg.lower():
+                msg = "DNS resolution failed"
+            elif "connection refused" in msg.lower():
+                msg = "Connection refused"
+            elif "ssl" in msg.lower() or "tls" in msg.lower() or "certificate" in msg.lower():
+                msg = "TLS/SSL error"
+            return json.dumps({
+                "ok": True,
+                "data": {"status": "failed", "message": msg, "response_time_ms": 0},
+            })
 
     def browse_dir(self, initial: str = "") -> str:
         """Open a native folder picker and return the selected path (WSL format).

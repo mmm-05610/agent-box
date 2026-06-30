@@ -6,12 +6,24 @@
 
 // ── Provider ───────────────────────────────────────────────────────────
 
+export interface ProviderMeta {
+  usage_script?: {
+    enabled: boolean
+    code: string
+    timeout: number
+    autoQueryInterval: number
+    [key: string]: unknown
+  }
+  [key: string]: unknown
+}
+
 export interface Provider {
   id: string
   name: string
   category?: string
   websiteUrl?: string
   settings: ProviderSettings
+  meta?: ProviderMeta
   createdAt?: number
   isCurrent?: boolean
 }
@@ -121,4 +133,15 @@ export type SessionStatus = 'running' | 'exited'
 export interface Preset {
   name: string
   agentType: AgentType
+}
+
+export interface ProviderPreset {
+  id: string
+  name: string
+  cat: string
+  url: string
+  env: Record<string, string>
+  notes?: string
+  apiFormat?: string
+  isPartner?: boolean
 }

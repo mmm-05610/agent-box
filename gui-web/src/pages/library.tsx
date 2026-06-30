@@ -8,7 +8,7 @@
 
 import { useCallback, useMemo, useRef, useState, useEffect, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { Button, Input, Textarea } from '@/components/ui'
+import { Button, Input, Textarea, ConfirmDialog } from '@/components/ui'
 import { EmptyState, Loading, useToast } from '@/components/feedback'
 import { PageHeader } from '@/components/layout'
 import { useProviders, useProfiles, useMcpServers, useSkills } from '@/hooks'
@@ -22,12 +22,17 @@ import {
   formValuesToSettings,
   type ProviderFormValues,
 } from '@/components/provider/ProviderFormFields'
-import type { AgentType, Provider, ClaudeMd, Profile, McpServer, McpServerConfig, Skill } from '@/api'
+import { ProviderPresetSelector } from '@/components/provider/ProviderPresetSelector'
+import { UsageFooter } from '@/components/UsageFooter'
+import type { AgentType, Provider, ClaudeMd, Profile, McpServer, McpServerConfig, Skill, ProviderPreset, UsageScript } from '@/api'
 import {
   AGENT_TYPES,
   saveProvider,
   deleteProvider,
+  duplicateProvider,
   applyProviderToProfile,
+  fetchPresets,
+  saveUsageScript,
   saveClaudeMd,
   deleteClaudeMd,
   applyClaudeMdToProfile,
@@ -188,8 +193,21 @@ export function LibraryPage() {
   const [showAddPanel, setShowAddPanel] = useState(false)
   const [addId, setAddId] = useState('')
   const [addContent, setAddContent] = useState('')
+  const [addPresetId, setAddPresetId] = useState<string | null>(null)
+  const [addFormValues, setAddFormValues] = useState<ProviderFormValues>(defaultFormValues())
   const [addError, setAddError] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
+  const [presets, setPresets] = useState<ProviderPreset[]>([])
+  const [testingProvider, setTestingProvider] = useState<string | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<
+    | {
+        type: Extract<TabKey, 'providers' | 'claudeMds'>
+        id: string
+        name: string
+      }
+    | null
+  >(null)
+  const [deleting, setDeleting] = useState(false)
 
   const { providers, claudeMds, loading, error, refresh } = useProviders(agentType)
   const { mcpServers, loading: mcpLoading, error: mcpError, refresh: refreshMcp } = useMcpServers(agentType)
@@ -367,9 +385,9 @@ export function LibraryPage() {
     } finally {
       setSaving(false)
     }
-  }, [editing, agentType, refresh, refreshMcp, refreshSkills, toast])
+  }, [editing, editingProviderForm, agentType, refresh, refreshMcp, refreshSkills, toast])
 
-  const handleDelete = useCallback(
+  const runDelete = useCallback(
     async (type: TabKey, id: string) => {
       try {
         if (type === 'providers') {
@@ -395,6 +413,35 @@ export function LibraryPage() {
     },
     [agentType, refresh, refreshMcp, refreshSkills, toast],
   )
+
+  const handleDelete = useCallback(
+    (type: TabKey, id: string) => {
+      // For destructive targets (providers, claudeMds) gate behind a confirm
+      // dialog — a stray click must not nuke config that's wired to a profile.
+      if (type === 'providers' || type === 'claudeMds') {
+        const name =
+          type === 'providers'
+            ? providers.find((p) => p.id === id)?.name ?? id
+            : claudeMds.find((m) => m.id === id)?.name ?? id
+        setPendingDelete({ type, id, name })
+        return
+      }
+      // mcp / skill: keep the original fast path; can be upgraded later.
+      void runDelete(type, id)
+    },
+    [providers, claudeMds, runDelete],
+  )
+
+  const confirmDelete = useCallback(async () => {
+    if (!pendingDelete) return
+    setDeleting(true)
+    try {
+      await runDelete(pendingDelete.type, pendingDelete.id)
+      setPendingDelete(null)
+    } finally {
+      setDeleting(false)
+    }
+  }, [pendingDelete, runDelete])
 
   /** Toggle an MCP server's agent association and refresh the list. */
   const handleToggleMcpAgent = useCallback(
@@ -536,6 +583,45 @@ export function LibraryPage() {
     [allProfiles, agentType],
   )
 
+  // Load presets when add panel opens for providers
+  useEffect(() => {
+    if (showAddPanel && activeTab === 'providers') {
+      fetchPresets(agentType).then(setPresets).catch(() => setPresets([]))
+    }
+  }, [showAddPanel, activeTab, agentType])
+
+  const handlePresetSelect = useCallback(
+    (presetId: string, preset: ProviderPreset | null) => {
+      setAddPresetId(presetId)
+      if (preset) {
+        setAddFormValues(defaultFormValues(preset.env, undefined, undefined, {
+          name: preset.name,
+          websiteUrl: preset.url,
+          apiFormat: preset.apiFormat,
+        }))
+        setAddId(preset.id)
+      } else {
+        setAddFormValues(defaultFormValues())
+        setAddId('')
+      }
+    },
+    [],
+  )
+
+  const handleDuplicate = useCallback(
+    async (providerId: string) => {
+      const newId = `${providerId}-copy-${Date.now().toString(36)}`
+      try {
+        await duplicateProvider(agentType, providerId, newId)
+        toast({ type: 'success', message: `Duplicated as ${newId}` })
+        refresh()
+      } catch (e) {
+        toast({ type: 'error', message: e instanceof Error ? e.message : 'Duplicate failed' })
+      }
+    },
+    [agentType, refresh, toast],
+  )
+
   const handleConfirmMdLink = useCallback(async () => {
     if (!mdLinking || !mdLinking.profileName) return
     setSaving(true)
@@ -563,14 +649,20 @@ export function LibraryPage() {
     setAddError(null)
     try {
       if (activeTab === 'providers') {
-        try {
-          JSON.parse(addContent)
-        } catch {
-          setAddError('Invalid JSON format')
-          setCreating(false)
-          return
+        // Build settings from form values + preset
+        const settings = formValuesToSettings(addFormValues)
+        settings.name = addFormValues.name || addId.trim()
+        settings.notes = addFormValues.notes || ''
+        settings.website_url = addFormValues.websiteUrl || ''
+        if (addPresetId && addPresetId !== 'custom' && presets.length > 0) {
+          const preset = presets.find((p) => p.id === addPresetId)
+          if (preset) {
+            settings.name = settings.name || preset.name
+            settings.website_url = settings.website_url || preset.url
+            settings.category = preset.cat
+          }
         }
-        await saveProvider(agentType, addId.trim(), addContent)
+        await saveProvider(agentType, addId.trim(), JSON.stringify(settings))
         toast({ type: 'success', message: 'Provider created' })
         refresh()
       } else if (activeTab === 'claudeMds') {
@@ -607,13 +699,15 @@ export function LibraryPage() {
       setShowAddPanel(false)
       setAddId('')
       setAddContent('')
+      setAddPresetId(null)
+      setAddFormValues(defaultFormValues())
       setAddError(null)
     } catch (e) {
       setAddError(e instanceof Error ? e.message : 'Create failed')
     } finally {
       setCreating(false)
     }
-  }, [addId, addContent, activeTab, agentType, refresh, refreshMcp, refreshSkills, toast])
+  }, [addId, addContent, addPresetId, addFormValues, presets, activeTab, agentType, refresh, refreshMcp, refreshSkills, toast])
 
   return (
     <div className="mx-auto flex h-full w-full max-w-5xl flex-col px-8 py-10">
@@ -644,6 +738,8 @@ export function LibraryPage() {
               setEditing(null)
               setLinking(null)
               setShowAddPanel(true)
+              setAddPresetId(null)
+              setAddFormValues(defaultFormValues())
             }}
           >
             + Add {ADD_TAB_LABELS[activeTab]}
@@ -715,6 +811,8 @@ export function LibraryPage() {
                 editError={editError}
                 saving={saving}
                 allProfiles={linkableProfiles}
+                agentType={agentType}
+                testingProvider={testingProvider}
                 onStartEdit={(id) => handleStartEdit('providers', id)}
                 onSaveEdit={handleSaveEdit}
                 onCancelEdit={() => { setEditing(null); setEditingProviderForm(null) }}
@@ -723,20 +821,29 @@ export function LibraryPage() {
                 }
                 onEditProviderFormChange={setEditingProviderForm}
                 onDelete={(id) => handleDelete('providers', id)}
+                onDuplicate={(id) => handleDuplicate(id)}
+                onRefresh={refresh}
                 onOpenLinking={handleOpenLinking}
                 onToggleLinkSelection={handleToggleLinkSelection}
                 onConfirmLink={handleConfirmLink}
                 onCancelLinking={() => setLinking(null)}
-                onTest={(url) => {
+                onTest={(url, providerId) => {
+                  setTestingProvider(providerId)
                   testEndpoint(url).then((r) => {
-                    if (r) {
-                      const ok = r.status > 0 && r.status < 500
-                      toast({
-                        type: ok ? 'success' : 'error',
-                        message: `${ok ? r.status + ' · ' + r.latency_ms + 'ms' : 'Unreachable'}`,
-                      })
+                    setTestingProvider(null)
+                    if (!r) return
+                    const name = filteredProviders.find((p) => {
+                      const env = p.settings?.env
+                      return env?.ANTHROPIC_BASE_URL === url
+                    })?.name ?? url
+                    if (r.status === 'operational') {
+                      toast({ type: 'success', message: `${name} reachable (${r.response_time_ms}ms)` })
+                    } else if (r.status === 'degraded') {
+                      toast({ type: 'warning', message: `${name} reachable but slow (${r.response_time_ms}ms)` })
+                    } else {
+                      toast({ type: 'error', message: `${name} unreachable: ${r.message}` })
                     }
-                  })
+                  }).catch(() => setTestingProvider(null))
                 }}
               />
             )
@@ -804,42 +911,88 @@ export function LibraryPage() {
 
         {/* Add Panel */}
         {showAddPanel && (
-          <div className="mt-4 rounded-xl bg-card  p-6 shadow-sm">
-            <h3 className="mb-3 text-sm font-semibold text-foreground">
+          <div className="mt-4 rounded-xl bg-card p-6 shadow-sm">
+            <h3 className="mb-4 text-sm font-semibold text-foreground">
               New {ADD_TAB_LABELS[activeTab]}
             </h3>
-            <div className="flex flex-col gap-3">
-              <Input
-                placeholder={`ID (e.g. my-${ADD_TAB_LABELS[activeTab].replace(/\s+/g, '-').toLowerCase()})`}
-                value={addId}
-                onChange={(e) => setAddId(e.target.value)}
-              />
-              <Textarea
-                placeholder={ADD_PLACEHOLDERS[activeTab]}
-                rows={6}
-                value={addContent}
-                onChange={(e) => setAddContent(e.target.value)}
-                error={addError ?? undefined}
-                className="font-mono text-xs"
-              />
-              <div className="flex items-center justify-end gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setShowAddPanel(false)
-                    setAddId('')
-                    setAddContent('')
-                    setAddError(null)
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button size="sm" isLoading={creating} onClick={handleCreate}>
-                  Create
-                </Button>
+            {activeTab === 'providers' ? (
+              <div className="space-y-4">
+                <ProviderPresetSelector
+                  presets={presets}
+                  selectedId={addPresetId}
+                  onSelect={handlePresetSelect}
+                />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs text-muted-foreground block mb-1">Provider ID</label>
+                    <Input
+                      placeholder="e.g. my-provider"
+                      value={addId}
+                      onChange={(e) => setAddId(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <ProviderFormFields
+                  values={addFormValues}
+                  onChange={setAddFormValues}
+                  showBasicFields
+                />
+                {addError && <p className="text-xs text-destructive">{addError}</p>}
+                <div className="flex items-center justify-end gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setShowAddPanel(false)
+                      setAddId('')
+                      setAddPresetId(null)
+                      setAddFormValues(defaultFormValues())
+                      setAddError(null)
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button size="sm" isLoading={creating} onClick={handleCreate}>
+                    Create
+                  </Button>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                <Input
+                  placeholder={`ID (e.g. my-${ADD_TAB_LABELS[activeTab].replace(/\s+/g, '-').toLowerCase()})`}
+                  value={addId}
+                  onChange={(e) => setAddId(e.target.value)}
+                />
+                <Textarea
+                  placeholder={ADD_PLACEHOLDERS[activeTab]}
+                  rows={6}
+                  value={addContent}
+                  onChange={(e) => setAddContent(e.target.value)}
+                  error={addError ?? undefined}
+                  className="font-mono text-xs"
+                />
+                <div className="flex items-center justify-end gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setShowAddPanel(false)
+                      setAddId('')
+                      setAddContent('')
+                      setAddPresetId(null)
+                      setAddFormValues(defaultFormValues())
+                      setAddError(null)
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button size="sm" isLoading={creating} onClick={handleCreate}>
+                    Create
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -861,6 +1014,28 @@ export function LibraryPage() {
             onCancel={handleCancelSwitch}
           />
         )}
+
+        <ConfirmDialog
+          open={pendingDelete !== null}
+          title={
+            pendingDelete?.type === 'providers' ? 'Delete provider?' : 'Delete Claude.md?'
+          }
+          description={
+            pendingDelete
+              ? pendingDelete.type === 'providers'
+                ? `This removes "${pendingDelete.name}" from the library. Any profile linked to it will be left without a provider — re-link or apply another provider before launching.`
+                : `This removes the "${pendingDelete.name}" Claude.md template. Profiles linked to it will fall back to default behavior.`
+              : ''
+          }
+          confirmLabel={
+            pendingDelete?.type === 'providers' ? 'Delete provider' : 'Delete Claude.md'
+          }
+          busy={deleting}
+          onConfirm={confirmDelete}
+          onCancel={() => {
+            if (!deleting) setPendingDelete(null)
+          }}
+        />
       </div>
     </div>
   )
@@ -954,17 +1129,21 @@ function ProvidersList({
   editError,
   saving,
   allProfiles,
+  agentType,
   onStartEdit,
   onSaveEdit,
   onCancelEdit,
   onEditContentChange,
   onEditProviderFormChange,
   onDelete,
+  onDuplicate,
+  onRefresh,
   onOpenLinking,
   onToggleLinkSelection,
   onConfirmLink,
   onCancelLinking,
   onTest,
+  testingProvider,
 }: {
   items: Provider[]
   editing: EditingState | null
@@ -973,17 +1152,22 @@ function ProvidersList({
   editError: string | null
   saving: boolean
   allProfiles: Profile[]
+  agentType: AgentType
+  testingProvider?: string | null
   onStartEdit: (id: string) => void
   onSaveEdit: () => void
   onCancelEdit: () => void
   onEditContentChange: (content: string) => void
   onEditProviderFormChange: (fv: ProviderFormValues) => void
   onDelete: (id: string) => void
+  onDuplicate: (id: string) => void
+  onRefresh: () => void
   onOpenLinking: (id: string) => void
   onToggleLinkSelection: (profileName: string) => void
   onConfirmLink: () => void
   onCancelLinking: () => void
-  onTest?: (url: string) => void
+  onTest?: (url: string, providerId: string) => void
+  testingProvider?: string | null
 }) {
   if (items.length === 0) {
     return (
@@ -1001,6 +1185,7 @@ function ProvidersList({
         <ProviderCard
           key={provider.id}
           provider={provider}
+          agentType={agentType}
           linkedProfiles={allProfiles.filter((p) => p.providerRef === provider.id)}
           linkableProfiles={allProfiles}
           allProviders={items}
@@ -1017,6 +1202,9 @@ function ProvidersList({
           onEditContentChange={onEditContentChange}
           onEditProviderFormChange={onEditProviderFormChange}
           onDelete={() => onDelete(provider.id)}
+          onDuplicate={() => onDuplicate(provider.id)}
+          onRefresh={onRefresh}
+          isTesting={testingProvider === provider.id}
           onOpenLinking={() => onOpenLinking(provider.id)}
           onToggleLinkSelection={onToggleLinkSelection}
           onConfirmLink={onConfirmLink}
@@ -1032,6 +1220,7 @@ function ProvidersList({
 
 function ProviderCard({
   provider,
+  agentType,
   linkedProfiles,
   linkableProfiles,
   allProviders,
@@ -1048,13 +1237,17 @@ function ProviderCard({
   onEditContentChange,
   onEditProviderFormChange,
   onDelete,
+  onDuplicate,
+  onRefresh,
   onOpenLinking,
   onToggleLinkSelection,
   onConfirmLink,
   onCancelLinking,
   onTest,
+  isTesting,
 }: {
   provider: Provider
+  agentType: AgentType
   linkedProfiles: Profile[]
   linkableProfiles: Profile[]
   allProviders: Provider[]
@@ -1071,20 +1264,33 @@ function ProviderCard({
   onEditContentChange: (content: string) => void
   onEditProviderFormChange: (fv: ProviderFormValues) => void
   onDelete: () => void
+  onDuplicate: () => void
+  onRefresh: () => void
   onOpenLinking: () => void
   onToggleLinkSelection: (profileName: string) => void
   onConfirmLink: () => void
   onCancelLinking: () => void
   onTest?: (url: string) => void
+  isTesting?: boolean
 }) {
   const baseUrl = extractBaseUrl(provider.settings?.env)
   const model = extractModel(provider.settings?.env)
+  const notes = (provider.settings as Record<string, unknown>)?.notes as string | undefined
+  const websiteUrl = provider.websiteUrl
+  const apiFormat = (provider.settings as Record<string, unknown>)?.apiFormat as string | undefined
   const iconName = iconForProvider(provider)
   const rawColor = iconName ? getIconMetadata(iconName)?.defaultColor : undefined
   // Normalize: currentColor/transparent/empty → fallback gray so gradient & shine work
   const iconColor = rawColor && rawColor.startsWith('#') ? rawColor : '#71717a'
   // If original color was non-hex (white/transparent), use slightly off-white bg
   const isLight = !rawColor || !rawColor.startsWith('#') || isLightColor(rawColor)
+
+  // Display URL: notes > websiteUrl > baseUrl
+  const displayUrl = notes?.trim() || websiteUrl || (baseUrl ? `https://${baseUrl}` : undefined)
+
+  // Badge logic
+  const isOfficial = provider.category === 'official'
+  const needsRouting = !isOfficial && apiFormat && apiFormat !== 'anthropic'
 
   // Profiles on this agent_type that AREN'T linked to this provider yet
   // — the "Add to profile" picker candidates. Includes profiles that
@@ -1099,6 +1305,13 @@ function ProviderCard({
   const providerLabelById = new Map(
     allProviders.map((p) => [p.id, p.name]),
   )
+
+  // Usage config local state (expands inline like edit form)
+  const [showUsageConfig, setShowUsageConfig] = useState(false)
+  const [localUsageCode, setLocalUsageCode] = useState('')
+  const [localUsageEnabled, setLocalUsageEnabled] = useState(false)
+  const [localUsageTemplate, setLocalUsageTemplate] = useState('balance')
+  const [savingUsage, setSavingUsage] = useState(false)
 
   const linkBtnRef = useRef<HTMLButtonElement>(null)
 
@@ -1131,11 +1344,11 @@ function ProviderCard({
         />
       )}
 
-      <div className="flex items-center gap-4 px-5 py-4">
-        {/* Brand icon — 40×40, color preserved */}
+      <div className="flex items-center gap-3 px-4 py-3">
+        {/* Brand icon — 36×36, color preserved */}
         <div
           className={cn(
-            'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl overflow-hidden',
+            'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg overflow-hidden',
             'transition-transform duration-normal group-hover:scale-105',
           )}
           style={{
@@ -1146,49 +1359,67 @@ function ProviderCard({
           <ProviderIcon
             icon={iconName}
             name={provider.name}
-            size={24}
+            size={22}
             showFallback
           />
         </div>
 
         {/* Info */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
+          {/* Row 1: Name + badges */}
+          <div className="flex items-center gap-1.5 flex-wrap">
             <h3 className="text-sm font-semibold text-foreground truncate">
               {provider.name}
             </h3>
-            {provider.category && (
-              <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            {isOfficial && (
+              <span className="inline-flex items-center rounded-full bg-slate-200 dark:bg-slate-700/60 px-1.5 py-0 text-[10px] font-semibold text-slate-700 dark:text-slate-200">
+                Official
+              </span>
+            )}
+            {needsRouting && (
+              <span className="inline-flex items-center rounded-full bg-sky-100 dark:bg-sky-900/40 px-1.5 py-0 text-[10px] font-semibold text-sky-700 dark:text-sky-300">
+                Needs Routing
+              </span>
+            )}
+            {provider.category && !isOfficial && !needsRouting && (
+              <span className="inline-flex items-center rounded-full bg-muted px-1.5 py-0 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                 {provider.category}
               </span>
             )}
           </div>
-          {/* Model + Base URL */}
-          <div className="mt-1 space-y-0.5">
+          {/* Row 2: URL · model · notes · profiles (single compact line) */}
+          <div className="flex items-center gap-1.5 flex-wrap text-[10px] text-muted-foreground mt-0.5">
+            {notes && notes.trim() && (
+              <span className="truncate max-w-[200px]" title={notes.trim()}>{notes.trim()}</span>
+            )}
+            {displayUrl && (
+              <a
+                href={displayUrl.startsWith('http') ? displayUrl : `https://${displayUrl}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="text-blue-500 hover:underline dark:text-blue-400 font-mono truncate max-w-[300px]"
+                title={displayUrl}
+              >
+                {displayUrl.replace(/^https?:\/\//, '')}
+              </a>
+            )}
             {model && (
-              <p className="text-xs text-foreground/80 font-mono truncate">{model}</p>
+              <span className="font-mono truncate text-foreground/70">{model}</span>
             )}
-            {baseUrl && (
-              <p className="text-[10px] text-muted-foreground/70 font-mono truncate">{baseUrl}</p>
-            )}
-          </div>
-          <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
-            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground shrink-0">
-              Used by
-            </span>
-            {linkedProfiles.length === 0 ? (
-              <span className="text-[10px] text-muted-foreground/50 italic">no profile</span>
-            ) : (
-              linkedProfiles.map((p) => (
-                <span
-                  key={p.name}
-                  className="inline-flex items-center gap-1 rounded-md bg-muted/60 px-2 py-0.5 text-[10px] text-muted-foreground"
-                  title={`Profile: ${p.displayName || p.name}`}
-                >
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                  {p.displayName || p.name}
-                </span>
-              ))
+            {linkedProfiles.length > 0 && (
+              <>
+                <span className="text-border">·</span>
+                {linkedProfiles.slice(0, 3).map((p) => (
+                  <span key={p.name} className="inline-flex items-center gap-0.5 rounded bg-muted/50 px-1 py-0 text-[10px]" title={p.displayName || p.name}>
+                    <span className="h-1 w-1 rounded-full bg-emerald-500" />
+                    {p.displayName || p.name}
+                  </span>
+                ))}
+                {linkedProfiles.length > 3 && (
+                  <span className="text-muted-foreground/50">+{linkedProfiles.length - 3}</span>
+                )}
+              </>
             )}
             {unlinkedCandidates.length > 0 && (
               <button
@@ -1196,28 +1427,27 @@ function ProviderCard({
                 type="button"
                 onClick={onOpenLinking}
                 disabled={isLinking}
-                className={cn(
-                  'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px]',
-                  'transition-colors duration-fast',
-                  'text-muted-foreground hover:text-foreground hover:bg-muted',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-1',
-                  'disabled:opacity-50 cursor-pointer',
-                )}
+                className="inline-flex items-center gap-0.5 rounded px-1 py-0 text-[10px] text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50"
               >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
-                  <line x1="12" y1="5" x2="12" y2="19" />
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
-                Link
+                +Link
               </button>
             )}
           </div>
         </div>
 
+        {/* Usage footer */}
+        <UsageFooter
+          provider={provider}
+          agentType={agentType}
+          usageScript={provider.meta?.usage_script as UsageScript | null | undefined}
+          autoQueryInterval={provider.meta?.usage_script?.autoQueryInterval}
+        />
+
         {/* Actions — hover reveal */}
-        <div className="flex items-center gap-1 opacity-0 pointer-events-none transition-opacity duration-fast group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto">
+        <div className="flex items-center gap-0.5 opacity-0 pointer-events-none transition-opacity duration-fast group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto">
           <IconAction
             label="Test endpoint"
+            loading={isTesting}
             onClick={() => {
               const url = provider.settings?.env?.ANTHROPIC_BASE_URL
               if (url && onTest) onTest(url)
@@ -1237,6 +1467,55 @@ function ProviderCard({
               <path d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4 12.5-12.5z" />
             </svg>
           </IconAction>
+          <IconAction
+            label="Duplicate provider"
+            onClick={onDuplicate}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+              <rect x="9" y="9" width="13" height="13" rx="2" />
+              <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+            </svg>
+          </IconAction>
+          <IconAction
+            label="Configure usage query"
+            onClick={() => {
+              const baseUrl = provider.settings?.env?.ANTHROPIC_BASE_URL ?? ''
+              const balanceDetected =
+                baseUrl.includes('api.deepseek.com') || baseUrl.includes('api.stepfun.ai') ||
+                baseUrl.includes('api.siliconflow.cn') || baseUrl.includes('api.siliconflow.com') ||
+                baseUrl.includes('openrouter.ai') || baseUrl.includes('api.novita.ai')
+              const tokenPlanDetected =
+                baseUrl.includes('api.minimaxi.com') || baseUrl.includes('api.minimax.io') ||
+                baseUrl.includes('api.kimi.com/coding') || baseUrl.includes('bigmodel.cn') ||
+                baseUrl.includes('api.z.ai')
+
+              if (provider.meta?.usage_script) {
+                const us = provider.meta.usage_script
+                setLocalUsageCode(us.code || '')
+                setLocalUsageEnabled(us.enabled || false)
+                setLocalUsageTemplate(us.templateType || 'balance')
+              } else if (tokenPlanDetected) {
+                setLocalUsageCode('')
+                setLocalUsageEnabled(false)
+                setLocalUsageTemplate('token_plan')
+              } else if (balanceDetected) {
+                setLocalUsageCode('')
+                setLocalUsageEnabled(false)
+                setLocalUsageTemplate('balance')
+              } else {
+                setLocalUsageCode('curl -s --max-time 10 -H "Authorization: Bearer $ANTHROPIC_AUTH_TOKEN" "$ANTHROPIC_BASE_URL/user/balance"')
+                setLocalUsageEnabled(false)
+                setLocalUsageTemplate('general')
+              }
+              setShowUsageConfig(!showUsageConfig)
+            }}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+              <line x1="18" y1="20" x2="18" y2="10" />
+              <line x1="12" y1="20" x2="12" y2="4" />
+              <line x1="6" y1="20" x2="6" y2="14" />
+            </svg>
+          </IconAction>
           <IconAction label="Delete provider" onClick={onDelete} variant="danger">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 6h18" />
@@ -1246,6 +1525,125 @@ function ProviderCard({
            </IconAction>
           </div>
       </div>
+
+      {/* Usage query config panel (inline expand) */}
+      {showUsageConfig && (() => {
+        const cfgBaseUrl = provider.settings?.env?.ANTHROPIC_BASE_URL ?? ''
+        const balanceName = (() => {
+          for (const [pat, name] of [
+            ['api.deepseek.com', 'DeepSeek'],
+            ['api.stepfun.ai', 'StepFun'],
+            ['api.siliconflow.cn', 'SiliconFlow'],
+            ['api.siliconflow.com', 'SiliconFlow'],
+            ['openrouter.ai', 'OpenRouter'],
+            ['api.novita.ai', 'Novita AI'],
+          ] as const) { if (cfgBaseUrl.includes(pat)) return name }
+          return null
+        })()
+        const tokenPlanName = (() => {
+          for (const [pat, name] of [
+            ['api.minimaxi.com', 'MiniMax'],
+            ['api.minimax.io', 'MiniMax'],
+            ['api.kimi.com/coding', 'Kimi'],
+            ['bigmodel.cn', 'Zhipu'],
+            ['api.z.ai', 'Zhipu'],
+          ] as const) { if (cfgBaseUrl.includes(pat)) return name }
+          return null
+        })()
+        const isNative = (localUsageTemplate === 'balance' && !!balanceName) ||
+                         (localUsageTemplate === 'token_plan' && !!tokenPlanName)
+        const needsCode = localUsageTemplate === 'general' || localUsageTemplate === 'newapi' || localUsageTemplate === 'custom'
+
+        const handleSave = async () => {
+          setSavingUsage(true)
+          try {
+            const script: UsageScript = {
+              enabled: localUsageEnabled,
+              code: localUsageCode,
+              timeout: 10,
+              autoQueryInterval: 5,
+              templateType: localUsageTemplate,
+            }
+            await saveUsageScript(agentType, provider.id, script)
+            onRefresh()
+            setShowUsageConfig(false)
+          } catch (e) {
+            // keep panel open on error
+          } finally {
+            setSavingUsage(false)
+          }
+        }
+
+        return (
+          <div className="bg-muted/30 px-5 py-4">
+            <h4 className="text-xs font-semibold text-foreground mb-3">Usage Query</h4>
+
+            {/* Template presets */}
+            <div className="mb-3">
+              <div className="flex gap-1.5 flex-wrap">
+                {tokenPlanName && (
+                  <button type="button" onClick={() => { setLocalUsageTemplate('token_plan'); setLocalUsageCode('') }}
+                    className={`px-2 py-1 rounded-md text-[10px] font-medium transition-colors cursor-pointer ${
+                      localUsageTemplate === 'token_plan' ? 'bg-blue-500 text-white' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}>
+                    📊 {tokenPlanName} Token Plan
+                  </button>
+                )}
+                {balanceName && (
+                  <button type="button" onClick={() => { setLocalUsageTemplate('balance'); setLocalUsageCode('') }}
+                    className={`px-2 py-1 rounded-md text-[10px] font-medium transition-colors cursor-pointer ${
+                      localUsageTemplate === 'balance' ? 'bg-blue-500 text-white' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}>
+                    💰 {balanceName}
+                  </button>
+                )}
+                <button type="button" onClick={() => { setLocalUsageTemplate('general'); setLocalUsageCode('curl -s --max-time 10 -H "Authorization: Bearer $ANTHROPIC_AUTH_TOKEN" "$ANTHROPIC_BASE_URL/user/balance"') }}
+                  className={`px-2 py-1 rounded-md text-[10px] font-medium transition-colors cursor-pointer ${
+                    localUsageTemplate === 'general' ? 'bg-blue-500 text-white' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}>
+                  General
+                </button>
+                <button type="button" onClick={() => { setLocalUsageTemplate('newapi'); setLocalUsageCode('RESP=$(curl -s --max-time 10 -H "Authorization: Bearer $ANTHROPIC_AUTH_TOKEN" -H "Content-Type: application/json" "$ANTHROPIC_BASE_URL/api/user/self")\necho "$RESP" | python3 -c "import sys,json; d=json.load(sys.stdin).get(\"data\",json.load(sys.stdin)); print(json.dumps({\"remaining\": (d.get(\"quota\",0)-d.get(\"used_quota\",0))/500000, \"used\": d.get(\"used_quota\",0)/500000, \"total\": d.get(\"quota\",0)/500000, \"unit\": \"USD\"}))"') }}
+                  className={`px-2 py-1 rounded-md text-[10px] font-medium transition-colors cursor-pointer ${
+                    localUsageTemplate === 'newapi' ? 'bg-blue-500 text-white' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}>
+                  New-API
+                </button>
+                <button type="button" onClick={() => { setLocalUsageTemplate('custom'); if (!localUsageCode) setLocalUsageCode('curl -s -H "Authorization: Bearer $ANTHROPIC_AUTH_TOKEN" "$ANTHROPIC_BASE_URL/user/balance"') }}
+                  className={`px-2 py-1 rounded-md text-[10px] font-medium transition-colors cursor-pointer ${
+                    localUsageTemplate === 'custom' ? 'bg-blue-500 text-white' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}>
+                  Custom
+                </button>
+              </div>
+            </div>
+
+            {isNative && (
+              <div className="mb-3 p-2 rounded-md bg-emerald-500/10 text-[10px] text-emerald-700 dark:text-emerald-300">
+                ✅ Native query — no script needed
+              </div>
+            )}
+
+            {needsCode && (
+              <div className="mb-3">
+                <Textarea rows={5} value={localUsageCode}
+                  onChange={(e) => setLocalUsageCode(e.target.value)}
+                  className="font-mono text-[10px]" />
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Env: <code>$ANTHROPIC_AUTH_TOKEN</code>, <code>$ANTHROPIC_BASE_URL</code>
+                </p>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2 text-[10px]">
+                <input type="checkbox" checked={localUsageEnabled}
+                  onChange={(e) => setLocalUsageEnabled(e.target.checked)} className="rounded" />
+                <span className="text-muted-foreground">Auto-query every 5 min</span>
+              </label>
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" onClick={() => setShowUsageConfig(false)}>Cancel</Button>
+                <Button size="sm" isLoading={savingUsage} onClick={handleSave}>Save</Button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Inline edit panel — cc-switch style form */}
       {isEditing && editingProviderForm && (
@@ -1337,7 +1735,7 @@ function LinkPopover({
   return createPortal(
     <div
       ref={ref}
-      className="fixed z-[9999] w-[280px] rounded-xl bg-card shadow-xl ring-1 ring-border p-3"
+      className="fixed z-[9999] w-[280px] rounded-xl bg-card/95 backdrop-blur-xl shadow-xl ring-1 ring-border p-3"
       style={{ top: pos.top, left: pos.left }}
     >
       <div className="mb-2 flex items-center justify-between">
@@ -1431,28 +1829,42 @@ function IconAction({
   label,
   onClick,
   variant = 'default',
+  loading = false,
   children,
 }: {
   label: string
   onClick: () => void
   variant?: 'default' | 'danger'
+  loading?: boolean
   children: ReactNode
 }) {
   return (
     <button
       onClick={onClick}
+      disabled={loading}
       aria-label={label}
       title={label}
       className={cn(
-        'flex h-8 w-8 items-center justify-center rounded-md transition-colors duration-fast',
+        'flex h-8 w-8 items-center justify-center rounded-md transition-all duration-fast',
+        'hover:scale-110 active:scale-95',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-1',
+        'disabled:opacity-70 disabled:scale-100',
         variant === 'default' &&
-          'text-muted-foreground hover:bg-muted hover:text-foreground',
+          'text-muted-foreground hover:bg-muted hover:text-foreground hover:shadow-sm',
         variant === 'danger' &&
-          'text-muted-foreground hover:bg-destructive/10 hover:text-destructive',
+          'text-muted-foreground hover:bg-destructive/10 hover:text-destructive hover:shadow-sm',
       )}
     >
-      <span className="h-4 w-4">{children}</span>
+      <span className="h-4 w-4">
+        {loading ? (
+          <svg viewBox="0 0 24 24" fill="none" className="animate-spin h-4 w-4">
+            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25" />
+            <path d="M12 2a10 10 0 019.95 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+          </svg>
+        ) : (
+          children
+        )}
+      </span>
     </button>
   )
 }

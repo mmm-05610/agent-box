@@ -124,6 +124,16 @@ export function formValuesToSettings(v: ProviderFormValues): Record<string, unkn
 
 // ── Component ──────────────────────────────────────────────────────────
 
+/** Soft validation: returns warning messages, does not block save. */
+export function getSoftWarnings(v: ProviderFormValues): string[] {
+  const w: string[] = []
+  if (!v.name.trim()) w.push('Provider name is empty')
+  if (!v.baseUrl.trim() && !v.authValue.trim()) w.push('No endpoint or API key configured — provider may not work')
+  else if (!v.baseUrl.trim()) w.push('API endpoint is empty — provider may not work')
+  else if (!v.authValue.trim()) w.push('API key / auth token is empty — provider may not work')
+  return w
+}
+
 export function ProviderFormFields({
   values,
   onChange,
@@ -143,9 +153,21 @@ export function ProviderFormFields({
   const [billingOpen, setBillingOpen] = useState(false)
 
   const set = (patch: Partial<ProviderFormValues>) => onChange({ ...values, ...patch })
+  const warnings = getSoftWarnings(values)
 
   return (
     <div className="space-y-4">
+      {/* Soft validation warnings */}
+      {warnings.length > 0 && (
+        <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2">
+          {warnings.map((w, i) => (
+            <p key={i} className="text-xs text-amber-700 dark:text-amber-300">
+              ⚠ {w}
+            </p>
+          ))}
+        </div>
+      )}
+
       {/* ── Basic Info (Library only) ───────────────────────────────── */}
       {showBasicFields && (
         <>
