@@ -23,7 +23,7 @@ import { PluginsEditor } from './detail/PluginsEditor'
 import { FileTextEditor } from './detail/FileTextEditor'
 import { McpTab } from './detail/McpTab'
 import { SkillsTab } from './detail/SkillsTab'
-import { StorageExplorer } from './detail/StorageExplorer'
+import { StorageExplorer } from './detail/storage/StorageExplorer'
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -259,7 +259,6 @@ function TabContent({
         <StorageExplorer
           profilePath={profilePath}
           fileTree={fileTree}
-          onRefresh={onRefresh}
         />
       )
     default:
