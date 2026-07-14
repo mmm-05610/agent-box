@@ -890,11 +890,17 @@ class Api:
             return json.dumps({"ok": True, "data": "[]"})
 
     def list_dir_tree(self, path: str, max_depth: int = 4) -> str:
-        """Return a directory tree (depth-limited). Hidden files excluded."""
+        """Return a directory tree (depth-limited). Hidden files excluded.
+
+        Errors are surfaced as ``{"ok": False, "error": str(e)}`` so the
+        frontend can react; ``None`` from the worker means the WSL command
+        failed (path missing, permission, etc.), which is NOT the same as
+        "empty directory" and must not be reported as success.
+        """
         try:
             node = _dir_tree_node(path, max_depth)
             if node is None:
-                return json.dumps({"ok": True, "data": {"path": path, "type": "dir", "children": []}})
+                return json.dumps({"ok": False, "error": f"path not found or unreadable: {path}"})
             return json.dumps({"ok": True, "data": node})
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
