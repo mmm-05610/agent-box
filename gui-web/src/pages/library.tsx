@@ -6,8 +6,7 @@
  * the provider's real brand logo (color preserved).
  */
 
-import { useCallback, useMemo, useRef, useState, useEffect, type ReactNode } from 'react'
-import { createPortal } from 'react-dom'
+import { useCallback, useMemo, useState, useEffect, type ReactNode } from 'react'
 import { Button, Input, Textarea, ConfirmDialog } from '@/components/ui'
 import { EmptyState, Loading, useToast } from '@/components/feedback'
 import { PageHeader } from '@/components/layout'
@@ -16,27 +15,18 @@ import { cn } from '@/lib/utils'
 import { ProviderIcon } from '@/components/ProviderIcon'
 import { getIconMetadata, hasIcon } from '@/icons/extracted'
 import { testEndpoint } from '@/api/files'
-import {
-  ProviderFormFields,
-  defaultFormValues,
-  formValuesToSettings,
-  type ProviderFormValues,
-} from '@/components/provider/ProviderFormFields'
-import { ProviderPresetSelector } from '@/components/provider/ProviderPresetSelector'
+import { AddProviderDialog } from '@/components/provider/AddProviderDialog'
+import { EditProviderDialog } from '@/components/provider/EditProviderDialog'
 import { UsageFooter } from '@/components/UsageFooter'
-import type { AgentType, Provider, ClaudeMd, Profile, McpServer, McpServerConfig, Skill, ProviderPreset, UsageScript } from '@/api'
+import type { AgentType, Provider, ClaudeMd, Profile, McpServer, McpServerConfig, Skill, UsageScript } from '@/api'
 import {
   AGENT_TYPES,
-  saveProvider,
   deleteProvider,
   duplicateProvider,
-  applyProviderToProfile,
-  fetchPresets,
   saveUsageScript,
   saveClaudeMd,
   deleteClaudeMd,
   applyClaudeMdToProfile,
-  fetchProviderDetail,
   fetchMcpServerDetail,
   saveMcpServer,
   deleteMcpServer,
@@ -115,6 +105,7 @@ const TAB_VISIBILITY: Record<AgentType, TabKey[]> = {
   codex: ['providers', 'mcp', 'skills'],
   hermes: ['providers', 'mcp', 'skills'],
   opencode: ['providers', 'mcp', 'skills'],
+  mimocode: ['providers', 'mcp', 'skills'],
 }
 
 /** Singular noun shown in the "+ Add X" button. */
@@ -163,15 +154,15 @@ function skillToForm(skill: Skill): string {
 }
 
 interface EditingState {
-  type: 'provider' | 'claudeMd' | 'mcp' | 'skill'
+  type: 'claudeMd' | 'mcp' | 'skill'
+  /** Agent type when editing was opened. claudeMd has per-agent rows (the
+   * same id can exist across types — minimax/deepseek/etc. show up under
+   * all 4 agent types), so this is required to route the save to the
+   * correct app_type. mcp / skill rows are globally unique. */
+  agentType: AgentType
   id: string
   /** Raw content of the inline editor (JSON for mcp, key/value form for skill/claudeMd). */
   content: string
-}
-
-interface LinkingState {
-  providerId: string
-  selectedProfiles: Set<string>
 }
 
 interface MdLinkingState {
@@ -185,19 +176,16 @@ export function LibraryPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('providers')
   const [search, setSearch] = useState('')
   const [editing, setEditing] = useState<EditingState | null>(null)
-  const [editingProviderForm, setEditingProviderForm] = useState<ProviderFormValues | null>(null)
-  const [linking, setLinking] = useState<LinkingState | null>(null)
+  const [addDialogOpen, setAddDialogOpen] = useState(false)
+  const [editDialogTarget, setEditDialogTarget] = useState<string | null>(null)
   const [mdLinking, setMdLinking] = useState<MdLinkingState | null>(null)
   const [editError, setEditError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [showAddPanel, setShowAddPanel] = useState(false)
   const [addId, setAddId] = useState('')
   const [addContent, setAddContent] = useState('')
-  const [addPresetId, setAddPresetId] = useState<string | null>(null)
-  const [addFormValues, setAddFormValues] = useState<ProviderFormValues>(defaultFormValues())
   const [addError, setAddError] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
-  const [presets, setPresets] = useState<ProviderPreset[]>([])
   const [testingProvider, setTestingProvider] = useState<string | null>(null)
   const [pendingDelete, setPendingDelete] = useState<
     | {
@@ -290,22 +278,11 @@ export function LibraryPage() {
   const handleStartEdit = useCallback(
     async (type: TabKey, id: string) => {
       setEditError(null)
-      setLinking(null)
       setShowAddPanel(false)
-      if (type === 'providers') {
-        try {
-          const detail = await fetchProviderDetail(agentType, id)
-          const settings = detail?.settings ?? {}
-          const env = settings.env ?? {}
-          setEditing({ type: 'provider', id, content: JSON.stringify(settings) })
-          setEditingProviderForm(defaultFormValues(env, undefined, undefined, settings))
-        } catch {
-          setEditError('Failed to load provider details')
-        }
-      } else if (type === 'claudeMds') {
+      if (type === 'claudeMds') {
         const md = claudeMds.find((m) => m.id === id)
         if (md) {
-          setEditing({ type: 'claudeMd', id, content: md.content ?? '' })
+          setEditing({ type: 'claudeMd', agentType, id, content: md.content ?? '' })
         }
       } else if (type === 'mcp') {
         try {
@@ -317,6 +294,7 @@ export function LibraryPage() {
           }
           setEditing({
             type: 'mcp',
+            agentType,
             id,
             content: JSON.stringify(cfg, null, 2),
           })
@@ -326,7 +304,7 @@ export function LibraryPage() {
       } else {
         const skill = skills.find((s) => s.id === id)
         if (skill) {
-          setEditing({ type: 'skill', id, content: skillToForm(skill) })
+          setEditing({ type: 'skill', agentType, id, content: skillToForm(skill) })
         }
       }
     },
@@ -338,16 +316,7 @@ export function LibraryPage() {
     setSaving(true)
     setEditError(null)
     try {
-      if (editing.type === 'provider') {
-        const fv = editingProviderForm ?? defaultFormValues()
-        const settings = formValuesToSettings(fv)
-        settings.name = fv.name
-        settings.notes = fv.notes
-        settings.website_url = fv.websiteUrl
-        await saveProvider(agentType, editing.id, JSON.stringify(settings))
-        toast({ type: 'success', message: 'Provider saved' })
-        refresh()
-      } else if (editing.type === 'claudeMd') {
+      if (editing.type === 'claudeMd') {
         await saveClaudeMd(agentType, editing.id, editing.content)
         toast({ type: 'success', message: 'Claude.md saved' })
         refresh()
@@ -385,7 +354,7 @@ export function LibraryPage() {
     } finally {
       setSaving(false)
     }
-  }, [editing, editingProviderForm, agentType, refresh, refreshMcp, refreshSkills, toast])
+  }, [editing, agentType, refresh, refreshMcp, refreshSkills, toast])
 
   const runDelete = useCallback(
     async (type: TabKey, id: string) => {
@@ -475,101 +444,6 @@ export function LibraryPage() {
     [refreshSkills, toast],
   )
 
-  // Profiles that share this provider's agent_type — these are the
-  // candidates the user can link to. Computed once per render so
-  // ProviderCard doesn't need to know about AgentType.
-  const linkableProfiles = useMemo(
-    () => allProfiles.filter((p) => p.agentType === agentType),
-    [allProfiles, agentType],
-  )
-
-  const handleOpenLinking = useCallback(
-    (providerId: string) => {
-      setEditing(null)
-      setShowAddPanel(false)
-      setLinking({ providerId, selectedProfiles: new Set() })
-    },
-    [],
-  )
-
-  const handleToggleLinkSelection = useCallback((profileName: string) => {
-    setLinking((prev) => {
-      if (!prev) return prev
-      const next = new Set(prev.selectedProfiles)
-      if (next.has(profileName)) next.delete(profileName)
-      else next.add(profileName)
-      return { ...prev, selectedProfiles: next }
-    })
-  }, [])
-
-  // Pending provider-switch confirmation. When non-null, a modal asks
-  // the user before overwriting profiles' existing provider_ref.
-  const [pendingSwitch, setPendingSwitch] = useState<{
-    providerId: string
-    picks: string[]
-    switches: { profileName: string; currentProviderId: string }[]
-  } | null>(null)
-
-  const runLink = useCallback(
-    async (providerId: string, picks: string[]) => {
-      setSaving(true)
-      try {
-        for (const profileName of picks) {
-          await applyProviderToProfile(profileName, providerId)
-        }
-        toast({
-          type: 'success',
-          message:
-            picks.length === 1
-              ? `Linked to ${picks[0]}`
-              : `Linked to ${picks.length} profiles`,
-        })
-        setLinking(null)
-        setPendingSwitch(null)
-        refreshProfiles()
-      } catch (e) {
-        toast({ type: 'error', message: e instanceof Error ? e.message : 'Link failed' })
-      } finally {
-        setSaving(false)
-      }
-    },
-    [refreshProfiles, toast],
-  )
-
-  const handleConfirmLink = useCallback(() => {
-    if (!linking) return
-    const picks = Array.from(linking.selectedProfiles)
-    if (picks.length === 0) {
-      setLinking(null)
-      return
-    }
-    // Find profiles that already reference a DIFFERENT provider.
-    // Those will overwrite an existing assignment — require confirmation.
-    const switches = picks
-      .map((name) => {
-        const p = allProfiles.find((x) => x.name === name)
-        if (!p || !p.providerRef || p.providerRef === linking.providerId) return null
-        return { profileName: name, currentProviderId: p.providerRef }
-      })
-      .filter((x): x is { profileName: string; currentProviderId: string } => x !== null)
-
-    if (switches.length > 0) {
-      setPendingSwitch({ providerId: linking.providerId, picks, switches })
-      return
-    }
-    // No switches — execute directly.
-    void runLink(linking.providerId, picks)
-  }, [linking, allProfiles, runLink])
-
-  const handleConfirmSwitch = useCallback(() => {
-    if (!pendingSwitch) return
-    void runLink(pendingSwitch.providerId, pendingSwitch.picks)
-  }, [pendingSwitch, runLink])
-
-  const handleCancelSwitch = useCallback(() => {
-    setPendingSwitch(null)
-  }, [])
-
   const handleOpenMdLinking = useCallback(
     (mdId: string) => {
       setEditing(null)
@@ -583,29 +457,11 @@ export function LibraryPage() {
     [allProfiles, agentType],
   )
 
-  // Load presets when add panel opens for providers
-  useEffect(() => {
-    if (showAddPanel && activeTab === 'providers') {
-      fetchPresets(agentType).then(setPresets).catch(() => setPresets([]))
-    }
-  }, [showAddPanel, activeTab, agentType])
-
-  const handlePresetSelect = useCallback(
-    (presetId: string, preset: ProviderPreset | null) => {
-      setAddPresetId(presetId)
-      if (preset) {
-        setAddFormValues(defaultFormValues(preset.env, undefined, undefined, {
-          name: preset.name,
-          websiteUrl: preset.url,
-          apiFormat: preset.apiFormat,
-        }))
-        setAddId(preset.id)
-      } else {
-        setAddFormValues(defaultFormValues())
-        setAddId('')
-      }
-    },
-    [],
+  // Profiles on the current agent type — used by ClaudeMdsList to populate
+  // the apply target picker.
+  const linkableProfiles = useMemo(
+    () => allProfiles.filter((p) => p.agentType === agentType),
+    [allProfiles, agentType],
   )
 
   const handleDuplicate = useCallback(
@@ -648,24 +504,7 @@ export function LibraryPage() {
     setCreating(true)
     setAddError(null)
     try {
-      if (activeTab === 'providers') {
-        // Build settings from form values + preset
-        const settings = formValuesToSettings(addFormValues)
-        settings.name = addFormValues.name || addId.trim()
-        settings.notes = addFormValues.notes || ''
-        settings.website_url = addFormValues.websiteUrl || ''
-        if (addPresetId && addPresetId !== 'custom' && presets.length > 0) {
-          const preset = presets.find((p) => p.id === addPresetId)
-          if (preset) {
-            settings.name = settings.name || preset.name
-            settings.website_url = settings.website_url || preset.url
-            settings.category = preset.cat
-          }
-        }
-        await saveProvider(agentType, addId.trim(), JSON.stringify(settings))
-        toast({ type: 'success', message: 'Provider created' })
-        refresh()
-      } else if (activeTab === 'claudeMds') {
+      if (activeTab === 'claudeMds') {
         await saveClaudeMd(agentType, addId.trim(), addContent)
         toast({ type: 'success', message: 'Claude.md created' })
         refresh()
@@ -699,15 +538,13 @@ export function LibraryPage() {
       setShowAddPanel(false)
       setAddId('')
       setAddContent('')
-      setAddPresetId(null)
-      setAddFormValues(defaultFormValues())
       setAddError(null)
     } catch (e) {
       setAddError(e instanceof Error ? e.message : 'Create failed')
     } finally {
       setCreating(false)
     }
-  }, [addId, addContent, addPresetId, addFormValues, presets, activeTab, agentType, refresh, refreshMcp, refreshSkills, toast])
+  }, [addId, addContent, activeTab, agentType, refresh, refreshMcp, refreshSkills, toast])
 
   return (
     <div className="mx-auto flex h-full w-full max-w-5xl flex-col px-8 py-10">
@@ -736,10 +573,11 @@ export function LibraryPage() {
             size="lg"
             onClick={() => {
               setEditing(null)
-              setLinking(null)
-              setShowAddPanel(true)
-              setAddPresetId(null)
-              setAddFormValues(defaultFormValues())
+              if (activeTab === 'providers') {
+                setAddDialogOpen(true)
+              } else {
+                setShowAddPanel(true)
+              }
             }}
           >
             + Add {ADD_TAB_LABELS[activeTab]}
@@ -805,28 +643,12 @@ export function LibraryPage() {
             return (
               <ProvidersList
                 items={filteredProviders}
-                editing={editing}
-                editingProviderForm={editingProviderForm}
-                linking={linking}
-                editError={editError}
-                saving={saving}
-                allProfiles={linkableProfiles}
                 agentType={agentType}
                 testingProvider={testingProvider}
-                onStartEdit={(id) => handleStartEdit('providers', id)}
-                onSaveEdit={handleSaveEdit}
-                onCancelEdit={() => { setEditing(null); setEditingProviderForm(null) }}
-                onEditContentChange={(c) =>
-                  setEditing((prev) => (prev ? { ...prev, content: c } : null))
-                }
-                onEditProviderFormChange={setEditingProviderForm}
+                onStartEdit={(id) => setEditDialogTarget(id)}
                 onDelete={(id) => handleDelete('providers', id)}
                 onDuplicate={(id) => handleDuplicate(id)}
                 onRefresh={refresh}
-                onOpenLinking={handleOpenLinking}
-                onToggleLinkSelection={handleToggleLinkSelection}
-                onConfirmLink={handleConfirmLink}
-                onCancelLinking={() => setLinking(null)}
                 onTest={(url, providerId) => {
                   setTestingProvider(providerId)
                   testEndpoint(url).then((r) => {
@@ -909,109 +731,62 @@ export function LibraryPage() {
           )
         })()}
 
-        {/* Add Panel */}
+        {/* Add Panel — used for non-provider tabs (provider uses AddProviderDialog) */}
         {showAddPanel && (
           <div className="mt-4 rounded-xl bg-card p-6 shadow-sm">
             <h3 className="mb-4 text-sm font-semibold text-foreground">
               New {ADD_TAB_LABELS[activeTab]}
             </h3>
-            {activeTab === 'providers' ? (
-              <div className="space-y-4">
-                <ProviderPresetSelector
-                  presets={presets}
-                  selectedId={addPresetId}
-                  onSelect={handlePresetSelect}
-                />
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs text-muted-foreground block mb-1">Provider ID</label>
-                    <Input
-                      placeholder="e.g. my-provider"
-                      value={addId}
-                      onChange={(e) => setAddId(e.target.value)}
-                    />
-                  </div>
-                </div>
-                <ProviderFormFields
-                  values={addFormValues}
-                  onChange={setAddFormValues}
-                  showBasicFields
-                />
-                {addError && <p className="text-xs text-destructive">{addError}</p>}
-                <div className="flex items-center justify-end gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setShowAddPanel(false)
-                      setAddId('')
-                      setAddPresetId(null)
-                      setAddFormValues(defaultFormValues())
-                      setAddError(null)
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                  <Button size="sm" isLoading={creating} onClick={handleCreate}>
-                    Create
-                  </Button>
-                </div>
+            <div className="flex flex-col gap-3">
+              <Input
+                placeholder={`ID (e.g. my-${ADD_TAB_LABELS[activeTab].replace(/\s+/g, '-').toLowerCase()})`}
+                value={addId}
+                onChange={(e) => setAddId(e.target.value)}
+              />
+              <Textarea
+                placeholder={ADD_PLACEHOLDERS[activeTab]}
+                rows={6}
+                value={addContent}
+                onChange={(e) => setAddContent(e.target.value)}
+                error={addError ?? undefined}
+                className="font-mono text-xs"
+              />
+              <div className="flex items-center justify-end gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setShowAddPanel(false)
+                    setAddId('')
+                    setAddContent('')
+                    setAddError(null)
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button size="sm" isLoading={creating} onClick={handleCreate}>
+                  Create
+                </Button>
               </div>
-            ) : (
-              <div className="flex flex-col gap-3">
-                <Input
-                  placeholder={`ID (e.g. my-${ADD_TAB_LABELS[activeTab].replace(/\s+/g, '-').toLowerCase()})`}
-                  value={addId}
-                  onChange={(e) => setAddId(e.target.value)}
-                />
-                <Textarea
-                  placeholder={ADD_PLACEHOLDERS[activeTab]}
-                  rows={6}
-                  value={addContent}
-                  onChange={(e) => setAddContent(e.target.value)}
-                  error={addError ?? undefined}
-                  className="font-mono text-xs"
-                />
-                <div className="flex items-center justify-end gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setShowAddPanel(false)
-                      setAddId('')
-                      setAddContent('')
-                      setAddPresetId(null)
-                      setAddFormValues(defaultFormValues())
-                      setAddError(null)
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                  <Button size="sm" isLoading={creating} onClick={handleCreate}>
-                    Create
-                  </Button>
-                </div>
-              </div>
-            )}
+            </div>
           </div>
         )}
 
-        {/* Provider-switch confirmation modal */}
-        {pendingSwitch && (
-          <SwitchConfirmDialog
-            providerLabel={
-              providers.find((p) => p.id === pendingSwitch.providerId)?.name ??
-              pendingSwitch.providerId
-            }
-            switches={pendingSwitch.switches.map((s) => ({
-              profileName: s.profileName,
-              currentProviderLabel:
-                providers.find((p) => p.id === s.currentProviderId)?.name ??
-                s.currentProviderId,
-            }))}
-            isLoading={saving}
-            onConfirm={handleConfirmSwitch}
-            onCancel={handleCancelSwitch}
+        <AddProviderDialog
+          open={addDialogOpen}
+          onClose={() => setAddDialogOpen(false)}
+          agentType={agentType}
+          onCreated={refresh}
+          toast={(msg) => toast(msg)}
+        />
+        {editDialogTarget && (
+          <EditProviderDialog
+            open={true}
+            onClose={() => setEditDialogTarget(null)}
+            agentType={agentType}
+            providerId={editDialogTarget}
+            onSaved={refresh}
+            toast={(msg) => toast(msg)}
           />
         )}
 
@@ -1123,49 +898,21 @@ function SegmentedTabs<T extends string>({
 
 function ProvidersList({
   items,
-  editing,
-  editingProviderForm,
-  linking,
-  editError,
-  saving,
-  allProfiles,
   agentType,
   onStartEdit,
-  onSaveEdit,
-  onCancelEdit,
-  onEditContentChange,
-  onEditProviderFormChange,
   onDelete,
   onDuplicate,
   onRefresh,
-  onOpenLinking,
-  onToggleLinkSelection,
-  onConfirmLink,
-  onCancelLinking,
   onTest,
   testingProvider,
 }: {
   items: Provider[]
-  editing: EditingState | null
-  editingProviderForm: ProviderFormValues | null
-  linking: LinkingState | null
-  editError: string | null
-  saving: boolean
-  allProfiles: Profile[]
   agentType: AgentType
   testingProvider?: string | null
   onStartEdit: (id: string) => void
-  onSaveEdit: () => void
-  onCancelEdit: () => void
-  onEditContentChange: (content: string) => void
-  onEditProviderFormChange: (fv: ProviderFormValues) => void
   onDelete: (id: string) => void
   onDuplicate: (id: string) => void
   onRefresh: () => void
-  onOpenLinking: (id: string) => void
-  onToggleLinkSelection: (profileName: string) => void
-  onConfirmLink: () => void
-  onCancelLinking: () => void
   onTest?: (url: string, providerId: string) => void
   testingProvider?: string | null
 }) {
@@ -1186,29 +933,11 @@ function ProvidersList({
           key={provider.id}
           provider={provider}
           agentType={agentType}
-          linkedProfiles={allProfiles.filter((p) => p.providerRef === provider.id)}
-          linkableProfiles={allProfiles}
-          allProviders={items}
-          isEditing={editing?.type === 'provider' && editing.id === provider.id}
-          editingProviderForm={editingProviderForm}
-          isLinking={linking?.providerId === provider.id}
-          linking={linking}
-          editing={editing}
-          editError={editError}
-          saving={saving}
           onStartEdit={() => onStartEdit(provider.id)}
-          onSaveEdit={onSaveEdit}
-          onCancelEdit={onCancelEdit}
-          onEditContentChange={onEditContentChange}
-          onEditProviderFormChange={onEditProviderFormChange}
           onDelete={() => onDelete(provider.id)}
           onDuplicate={() => onDuplicate(provider.id)}
           onRefresh={onRefresh}
           isTesting={testingProvider === provider.id}
-          onOpenLinking={() => onOpenLinking(provider.id)}
-          onToggleLinkSelection={onToggleLinkSelection}
-          onConfirmLink={onConfirmLink}
-          onCancelLinking={onCancelLinking}
           onTest={onTest}
         />
       ))}
@@ -1221,55 +950,19 @@ function ProvidersList({
 function ProviderCard({
   provider,
   agentType,
-  linkedProfiles,
-  linkableProfiles,
-  allProviders,
-  isEditing,
-  editingProviderForm,
-  isLinking,
-  editing,
-  linking,
-  editError,
-  saving,
   onStartEdit,
-  onSaveEdit,
-  onCancelEdit,
-  onEditContentChange,
-  onEditProviderFormChange,
   onDelete,
   onDuplicate,
   onRefresh,
-  onOpenLinking,
-  onToggleLinkSelection,
-  onConfirmLink,
-  onCancelLinking,
   onTest,
   isTesting,
 }: {
   provider: Provider
   agentType: AgentType
-  linkedProfiles: Profile[]
-  linkableProfiles: Profile[]
-  allProviders: Provider[]
-  isEditing: boolean
-  editingProviderForm: ProviderFormValues | null
-  isLinking: boolean
-  editing: EditingState | null
-  linking: LinkingState | null
-  editError: string | null
-  saving: boolean
   onStartEdit: () => void
-  onSaveEdit: () => void
-  onCancelEdit: () => void
-  onEditContentChange: (content: string) => void
-  onEditProviderFormChange: (fv: ProviderFormValues) => void
   onDelete: () => void
   onDuplicate: () => void
   onRefresh: () => void
-  onOpenLinking: () => void
-  onToggleLinkSelection: (profileName: string) => void
-  onConfirmLink: () => void
-  onCancelLinking: () => void
   onTest?: (url: string) => void
   isTesting?: boolean
 }) {
@@ -1292,28 +985,12 @@ function ProviderCard({
   const isOfficial = provider.category === 'official'
   const needsRouting = !isOfficial && apiFormat && apiFormat !== 'anthropic'
 
-  // Profiles on this agent_type that AREN'T linked to this provider yet
-  // — the "Add to profile" picker candidates. Includes profiles that
-  // currently reference a different provider (those will get visually
-  // flagged as a "switch" candidate — see Picker candidate rendering).
-  const unlinkedCandidates = linkableProfiles.filter(
-    (p) => p.providerRef !== provider.id,
-  )
-
-  // id → display label for cross-provider resolution (e.g. when showing
-  // "currently uses: MiniMax" on a switch candidate).
-  const providerLabelById = new Map(
-    allProviders.map((p) => [p.id, p.name]),
-  )
-
   // Usage config local state (expands inline like edit form)
   const [showUsageConfig, setShowUsageConfig] = useState(false)
   const [localUsageCode, setLocalUsageCode] = useState('')
   const [localUsageEnabled, setLocalUsageEnabled] = useState(false)
   const [localUsageTemplate, setLocalUsageTemplate] = useState('balance')
   const [savingUsage, setSavingUsage] = useState(false)
-
-  const linkBtnRef = useRef<HTMLButtonElement>(null)
 
 
   return (
@@ -1406,31 +1083,6 @@ function ProviderCard({
             )}
             {model && (
               <span className="font-mono truncate text-foreground/70">{model}</span>
-            )}
-            {linkedProfiles.length > 0 && (
-              <>
-                <span className="text-border">·</span>
-                {linkedProfiles.slice(0, 3).map((p) => (
-                  <span key={p.name} className="inline-flex items-center gap-0.5 rounded bg-muted/50 px-1 py-0 text-[10px]" title={p.displayName || p.name}>
-                    <span className="h-1 w-1 rounded-full bg-emerald-500" />
-                    {p.displayName || p.name}
-                  </span>
-                ))}
-                {linkedProfiles.length > 3 && (
-                  <span className="text-muted-foreground/50">+{linkedProfiles.length - 3}</span>
-                )}
-              </>
-            )}
-            {unlinkedCandidates.length > 0 && (
-              <button
-                ref={linkBtnRef}
-                type="button"
-                onClick={onOpenLinking}
-                disabled={isLinking}
-                className="inline-flex items-center gap-0.5 rounded px-1 py-0 text-[10px] text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50"
-              >
-                +Link
-              </button>
             )}
           </div>
         </div>
@@ -1645,181 +1297,7 @@ function ProviderCard({
         )
       })()}
 
-      {/* Inline edit panel — cc-switch style form */}
-      {isEditing && editingProviderForm && (
-        <div className="bg-muted/30 px-5 py-4">
-          <ProviderFormFields
-            values={editingProviderForm}
-            onChange={onEditProviderFormChange}
-            showBasicFields
-          />
-          <div className="mt-4 flex items-center justify-between">
-            <p className="text-[10px] text-muted-foreground">
-              {provider.name} · {extractBaseUrl(provider.settings?.env) ?? 'no endpoint'}
-            </p>
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" onClick={onCancelEdit}>Cancel</Button>
-              <Button size="sm" isLoading={saving} onClick={onSaveEdit}>Save</Button>
-            </div>
-          </div>
-          {editError && <p className="mt-2 text-xs text-destructive">{editError}</p>}
-        </div>
-      )}
-      {isEditing && !editingProviderForm && (
-        <div className="bg-muted/30 px-5 py-4">
-          <p className="text-sm text-muted-foreground">Loading...</p>
-        </div>
-      )}
-
-      {/* Link profile popover — portal */}
-      {isLinking && linking && (
-        <LinkPopover
-          anchorRef={linkBtnRef}
-          provider={provider}
-          linking={linking}
-          unlinkedCandidates={unlinkedCandidates}
-          providerLabelById={providerLabelById}
-          saving={saving}
-          onToggleLinkSelection={onToggleLinkSelection}
-          onConfirmLink={onConfirmLink}
-          onCancelLinking={onCancelLinking}
-        />
-      )}
     </div>
-  )
-}
-
-// ── Link Profile Popover ────────────────────────────────────────────────
-
-function LinkPopover({
-  anchorRef,
-  provider,
-  linking,
-  unlinkedCandidates,
-  providerLabelById,
-  saving,
-  onToggleLinkSelection,
-  onConfirmLink,
-  onCancelLinking,
-}: {
-  anchorRef: React.RefObject<HTMLButtonElement | null>
-  provider: Provider
-  linking: LinkingState
-  unlinkedCandidates: Profile[]
-  providerLabelById: Map<string, string>
-  saving: boolean
-  onToggleLinkSelection: (name: string) => void
-  onConfirmLink: () => void
-  onCancelLinking: () => void
-}) {
-  const ref = useRef<HTMLDivElement>(null)
-  const [pos, setPos] = useState({ top: 0, left: 0 })
-
-  useEffect(() => {
-    if (anchorRef.current) {
-      const rect = anchorRef.current.getBoundingClientRect()
-      setPos({ top: rect.bottom + 4, left: rect.left })
-    }
-  }, [anchorRef])
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        onCancelLinking()
-      }
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [onCancelLinking])
-
-  return createPortal(
-    <div
-      ref={ref}
-      className="fixed z-[9999] w-[280px] rounded-xl bg-card/95 backdrop-blur-xl shadow-xl ring-1 ring-border p-3"
-      style={{ top: pos.top, left: pos.left }}
-    >
-      <div className="mb-2 flex items-center justify-between">
-        <span className="text-xs font-medium text-foreground">Link profiles</span>
-        <span className="text-[10px] tabular-nums text-muted-foreground">
-          {linking.selectedProfiles.size} selected
-        </span>
-      </div>
-      <div className="flex flex-col gap-1 max-h-[200px] overflow-y-auto mb-2">
-        {unlinkedCandidates.length === 0 && (
-          <span className="text-xs text-muted-foreground/60 italic py-2 text-center">
-            no profile to link
-          </span>
-        )}
-        {unlinkedCandidates
-          .slice()
-          .sort((a, b) => {
-            const aSwitch = a.providerRef ? 1 : 0
-            const bSwitch = b.providerRef ? 1 : 0
-            return aSwitch - bSwitch
-          })
-          .map((p) => {
-            const selected = linking.selectedProfiles.has(p.name)
-            const isSwitch = !!p.providerRef
-            const currentProviderLabel = isSwitch
-              ? providerLabelById.get(p.providerRef!) ?? p.providerRef
-              : null
-            return (
-              <button
-                key={p.name}
-                type="button"
-                onClick={() => onToggleLinkSelection(p.name)}
-                title={
-                  isSwitch
-                    ? `Currently uses ${currentProviderLabel} — selecting will switch to ${provider.name}`
-                    : undefined
-                }
-                className={cn(
-                  'flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-left w-full',
-                  'transition-all duration-fast cursor-pointer',
-                  selected
-                    ? 'bg-foreground text-background'
-                    : 'hover:bg-muted text-foreground',
-                )}
-              >
-                <span
-                  className={cn(
-                    'flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
-                    selected
-                      ? 'bg-background border-background text-foreground'
-                      : 'border-border',
-                  )}
-                >
-                  {selected && (
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
-                      <path d="M5 12l5 5L20 7" />
-                    </svg>
-                  )}
-                </span>
-                <span className="flex-1 truncate">{p.displayName || p.name}</span>
-                {isSwitch && (
-                  <span className="text-[10px] opacity-60 shrink-0">
-                    ↻ {currentProviderLabel}
-                  </span>
-                )}
-              </button>
-            )
-          })}
-      </div>
-      <div className="flex items-center justify-end gap-2 pt-1">
-        <Button variant="ghost" size="sm" onClick={onCancelLinking}>
-          Cancel
-        </Button>
-        <Button
-          size="sm"
-          isLoading={saving}
-          onClick={onConfirmLink}
-          disabled={linking.selectedProfiles.size === 0}
-        >
-          Link {linking.selectedProfiles.size > 0 && `(${linking.selectedProfiles.size})`}
-        </Button>
-      </div>
-      </div>,
-    document.body,
   )
 }
 
@@ -1920,7 +1398,11 @@ function ClaudeMdsList({
         <ClaudeMdCard
           key={md.id}
           md={md}
-          isEditing={editing?.type === 'claudeMd' && editing.id === md.id}
+          isEditing={
+            editing?.type === 'claudeMd' &&
+            editing.agentType === agentType &&
+            editing.id === md.id
+          }
           isApplying={mdLinking?.mdId === md.id}
           editing={editing}
           mdLinking={mdLinking}
@@ -2122,67 +1604,6 @@ function ClaudeMdCard({
     </div>
   )
 }
-// ── Provider-switch Confirmation Dialog ────────────────────────────────
-
-function SwitchConfirmDialog({
-  providerLabel,
-  switches,
-  isLoading,
-  onConfirm,
-  onCancel,
-}: {
-  providerLabel: string
-  switches: { profileName: string; currentProviderLabel: string }[]
-  isLoading: boolean
-  onConfirm: () => void
-  onCancel: () => void
-}) {
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 backdrop-blur-sm"
-      onClick={onCancel}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md rounded-xl bg-card p-6 shadow-xl ring-1 ring-border"
-      >
-        <h3 className="text-base font-semibold text-foreground">
-          Switch {switches.length === 1 ? 'profile' : `${switches.length} profiles`} to {providerLabel}?
-        </h3>
-        <p className="mt-1 text-sm text-muted-foreground">
-          These profiles are already linked to another provider. Linking will
-          replace their current provider:
-        </p>
-        <ul className="mt-3 flex flex-col gap-1.5">
-          {switches.map((s) => (
-            <li
-              key={s.profileName}
-              className="flex items-center justify-between rounded-md bg-muted/40 px-3 py-2 text-sm"
-            >
-              <span className="font-medium text-foreground">{s.profileName}</span>
-              <span className="text-xs text-muted-foreground">
-                <span className="text-foreground/70">{s.currentProviderLabel}</span>
-                <span className="mx-1.5">→</span>
-                <span className="font-medium text-foreground">{providerLabel}</span>
-              </span>
-            </li>
-          ))}
-        </ul>
-        <div className="mt-5 flex items-center justify-end gap-2">
-          <Button variant="ghost" size="sm" onClick={onCancel} disabled={isLoading}>
-            Cancel
-          </Button>
-          <Button size="sm" onClick={onConfirm} isLoading={isLoading}>
-            Switch &amp; link
-          </Button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ── MCP List ────────────────────────────────────────────────────────────
 
 function McpList({
