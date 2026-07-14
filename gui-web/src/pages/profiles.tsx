@@ -32,6 +32,7 @@ const AGENT_TYPE_LOGOS: Record<AgentType, string> = {
   codex: codexLogo,
   hermes: hermesLogo,
   opencode: opencodeLogo,
+  mimocode: opencodeLogo,  // MiMo Code is an OpenCode fork
 }
 
 const AGENT_TYPE_HEX: Record<AgentType, string> = {
@@ -39,6 +40,7 @@ const AGENT_TYPE_HEX: Record<AgentType, string> = {
   codex: '#10A37F',
   hermes: '#8B5CF6',
   opencode: '#3B82F6',
+  mimocode: '#6366f1',  // MiMo Code indigo
 }
 
 // ── Provider icon resolution ────────────────────────────────────────────
@@ -82,6 +84,7 @@ const FILTER_TABS: { key: FilterTab; label: string }[] = [
   { key: 'codex', label: 'Codex' },
   { key: 'hermes', label: 'Hermes' },
   { key: 'opencode', label: 'OpenCode' },
+  { key: 'mimocode', label: 'MiMo Code' },
 ]
 
 // ── Component ───────────────────────────────────────────────────────────

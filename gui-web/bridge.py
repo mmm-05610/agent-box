@@ -631,6 +631,130 @@ class Api:
                 "data": {"status": "failed", "message": msg, "response_time_ms": 0},
             })
 
+    def fetch_models(self, base_url: str, api_key: str, models_url: str = "",
+                     is_full_url: bool = False, timeout_sec: int = 10) -> str:
+        """Fetch available models from an API endpoint.
+
+        Tries multiple candidate URLs (OpenAI-compatible /v1/models).
+        Returns: { ok: true, data: [ { id: str, owned_by: str|null }, ... ] }
+        """
+        import re
+
+        KNOWN_COMPAT_SUFFIXES = [
+            "/api/claudecode", "/api/anthropic", "/apps/anthropic",
+            "/api/coding", "/claudecode", "/anthropic",
+            "/step_plan", "/coding", "/claude",
+        ]
+
+        def _strip_compat_suffix(url: str):
+            lower = url.lower()
+            for suffix in sorted(KNOWN_COMPAT_SUFFIXES, key=len, reverse=True):
+                if lower.endswith(suffix):
+                    return url[: -len(suffix)]
+            return None
+
+        def _ends_with_version(url: str) -> bool:
+            last = url.rsplit("/", 1)[-1]
+            return bool(re.match(r"^v\d+$", last))
+
+        def _build_candidates(base: str, full_url: bool, override: str):
+            if override and override.strip():
+                return [override.strip()]
+
+            base = base.strip().rstrip("/")
+            if not base:
+                return []
+
+            candidates = []
+
+            if full_url:
+                idx = base.find("/v1/")
+                if idx != -1:
+                    candidates.append(f"{base[:idx]}/v1/models")
+                else:
+                    idx = base.rfind("/")
+                    if idx > 0:
+                        root = base[:idx]
+                        if "://" in root and len(root) > root.index("://") + 3:
+                            candidates.append(f"{root}/v1/models")
+                return candidates
+
+            # Normal mode
+            if _ends_with_version(base):
+                candidates.append(f"{base}/models")
+                if not base.endswith("/v1"):
+                    candidates.append(f"{base}/v1/models")
+            else:
+                candidates.append(f"{base}/v1/models")
+
+            # Compat suffix: also try root
+            stripped = _strip_compat_suffix(base)
+            if stripped:
+                root = stripped.rstrip("/")
+                if root and "://" in root:
+                    candidates.append(f"{root}/v1/models")
+                    candidates.append(f"{root}/models")
+
+            # Deduplicate preserving order
+            seen = set()
+            unique = []
+            for u in candidates:
+                if u not in seen:
+                    seen.add(u)
+                    unique.append(u)
+            return unique
+
+        candidates = _build_candidates(base_url, is_full_url, models_url)
+        if not candidates:
+            return json.dumps({"ok": False, "data": [], "error": "No candidate URLs"})
+
+        import shlex
+
+        last_err = ""
+        for url in candidates:
+            try:
+                auth_arg = f"-H {shlex.quote(f'Authorization: Bearer {api_key}')}" if api_key else ""
+                cmd = (
+                    f"curl -s -w '\\n%{{http_code}}' --connect-timeout {timeout_sec} --max-time {timeout_sec}"
+                    f" {auth_arg} {shlex.quote(url)}"
+                )
+                out = _wsl_run(cmd, timeout=timeout_sec + 3)
+                lines = out.strip().rsplit("\n", 1)
+                body = lines[0] if len(lines) > 1 else out
+                code_str = lines[-1] if len(lines) > 1 else ""
+                code = int(code_str) if code_str.isdigit() else 0
+
+                if code == 0:
+                    last_err = f"连接失败 (HTTP 0): {body[:200] if body else '无响应'}"
+                    continue
+
+                if 200 <= code < 300:
+                    data = json.loads(body)
+                    models_raw = data.get("data", data) if isinstance(data, dict) else data
+                    if isinstance(models_raw, list):
+                        models = []
+                        for m in models_raw:
+                            if isinstance(m, dict) and "id" in m:
+                                models.append({"id": m["id"], "owned_by": m.get("owned_by")})
+                            elif isinstance(m, str):
+                                models.append({"id": m, "owned_by": None})
+                        models.sort(key=lambda x: x["id"])
+                        return json.dumps({"ok": True, "data": models})
+                    return json.dumps({"ok": True, "data": []})
+
+                # 404/405: try next candidate
+                if code in (404, 405):
+                    last_err = f"HTTP {code}"
+                    continue
+
+                # Other errors: fail immediately
+                return json.dumps({"ok": False, "data": [], "error": f"HTTP {code}: {body[:200]}"})
+            except Exception as e:
+                last_err = str(e)
+                continue
+
+        return json.dumps({"ok": False, "data": [], "error": f"All candidates failed: {last_err}"})
+
     def browse_dir(self, initial: str = "") -> str:
         """Open a native folder picker and return the selected path (WSL format).
 
