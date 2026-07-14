@@ -15,7 +15,7 @@ Profiles 页在本 spec **无改动**（现有卡片已经"一眼看清"，保�
 |---|---|
 | Detail 页 tab 重构（schema 驱动） | Profiles 页重构（已成，无需动） |
 | Storage tab 强化（真树 + Monaco + JSON 校验） | 创建 Profile 流程（下一轮） |
-| Codex / Hermes / OpenCode / MiMoCode 高频表单 tab | Library 页 MCP / Skills 全局编辑（下一轮） |
+| Codex / Hermes / OpenCode 高频表单 tab（MiMoCode 本轮不做） | Library 页 MCP / Skills 全局编辑（下一轮） |
 | Hooks / Permissions / Plugins 现有表单的健壮性 | 后端 CLI 改造（不在 Phase 1） |
 | 静态 TS Schema 注册表 | Creator Profile（属于 Phase 2） |
 
@@ -23,10 +23,10 @@ Profiles 页在本 spec **无改动**（现有卡片已经"一眼看清"，保�
 
 ## 1. Goals
 
-1. 用户打开 Detail 页后，能在不切换 tab 的前提下看到关键摘要（name / agentType / 当前 provider / last cwd / session 状态）。
-2. Storage tab 像 VSCode — 左目录树、右 Monaco editor，JSON 文件保存前先验证语法。
-3. 任何 agent-type 都有合适的表单 tab 覆盖高频配置 key；新增 agent-type 只需在 schema 中加一行。
-4. 现有 Claude 的 9 个 tab 完全回归不破。
+1. Storage tab 像 VSCode — 左目录树、右 Monaco editor，JSON 文件保存前先验证语法。
+2. 任何 agent-type 都有合适的表单 tab 覆盖高频配置 key；新增 agent-type 只需在 schema 中加一行。
+3. 现有 Claude 的 9 个 tab 完全回归不破。
+4. Header 信息架构**保持现有**：back / name / agentType badge 之外不加任何快捷按钮或摘要信息（用户明确）。
 
 ## 2. Non-goals
 
@@ -266,9 +266,11 @@ Meta → Providers → Model → Instructions → Storage
 - **Model**：从已配置 providers 的 models 里选默认值
 - **Instructions**：`instructions: string[]` 列表式，每行可写 markdown snippet
 
-### 6.5 MiMoCode（待调研更新）
+### 6.5 MiMoCode（**本轮不做** — 用户决定）
 
 按 OpenCode 同 schema 处理；MiMo provider 内置（无需添加）。
+但 **本轮不调研、不接入** MiMoCode tab；现有 tab 列表保持默认（沿用 OpenCode 行为即可视为占位）。
+下轮单独处理。
 
 ---
 
@@ -340,9 +342,9 @@ cd gui-web && npm run test -- --run     # vitest exit 0
 3. **PR 3: Codex tabs** —— 等 PR 2
 4. **PR 4: Hermes tabs** —— 等 PR 2
 5. **PR 5: OpenCode tabs** —— 等 PR 2
-6. **PR 6: MiMoCode tabs** —— 复用 OpenCode 组件
 
-（PR 1 单独交付，PR 2 与 PR 3-6 解耦可以并行实施；PR 3-6 也可合并为一个 PR。）
+（MiMoCode tabs **不在本轮交付**，见 §11。）
+（PR 1 单独交付，PR 2 与 PR 3-5 解耦可以并行实施；PR 3-5 也可合并为一个 PR。）
 
 ---
 
@@ -363,6 +365,8 @@ cd gui-web && npm run test -- --run     # vitest exit 0
 - 创建 Profile 流程（属于 Roadmap 一、阶段 第 4 条）
 - Library 页 MCP / Skills 全局编辑（Roadmap 一、阶段 第 3 条）
 - Provider 切换的快捷入口（在 header）：用户已确认**不在本轮加**
+- Detail Header 上的额外摘要信息（current provider / last cwd / session 状态）：用户已确认**不在本轮加**
 - 新建 Profile 模板选择器（Roadmap 一、阶段 第 4 条）
+- MiMoCode 高频表单 tab：用户明确本轮**不调研、不接入**，等后续轮次
 - Phase 2/3 的 CLI 补全、Creator Profile、Team 协作（Roadmap 二/三/四）
 
