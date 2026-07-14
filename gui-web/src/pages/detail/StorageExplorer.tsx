@@ -12,9 +12,10 @@ import { useToast } from '@/components/feedback/toast'
 import { buildTreeFromFlatList, type TreeNode } from './buildTreeFromFlatList'
 import { FileTree } from './FileTree'
 
-export function StorageExplorer({ profilePath, fileTree }: {
+export function StorageExplorer({ profilePath, fileTree, onRefresh: _onRefresh }: {
   profilePath: string
   fileTree: string[]
+  onRefresh?: () => void
 }) {
   const { toast } = useToast()
   const [tree, setTree] = useState<TreeNode[]>([])

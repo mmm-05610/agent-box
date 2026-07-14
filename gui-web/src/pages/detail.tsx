@@ -14,10 +14,16 @@ import { Button, Badge, Tabs } from '@/components/ui'
 import { Loading } from '@/components/feedback'
 import type { AgentType } from '@/api'
 import { AGENT_TYPE_COLORS, fetchProfileDetail } from '@/api'
-import { readFile, listDirTree } from '@/api/files'
-import type { FlatFile } from './detail/storage/buildTreeFromFlatList'
-import { flattenDirTree } from './detail/storage/flattenDirTree'
-import { tabsFor, type ProfileDetailLike, type TabSpec } from './detail/schema'
+import { readFile, findFiles } from '@/api/files'
+import { MetaEditor } from './detail/MetaEditor'
+import { ProviderEditor } from './detail/ProviderEditor'
+import { PermissionsEditor } from './detail/PermissionsEditor'
+import { HooksEditor } from './detail/HooksEditor'
+import { PluginsEditor } from './detail/PluginsEditor'
+import { FileTextEditor } from './detail/FileTextEditor'
+import { McpTab } from './detail/McpTab'
+import { SkillsTab } from './detail/SkillsTab'
+import { StorageExplorer } from './detail/StorageExplorer'
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -37,6 +43,42 @@ export interface ProfileDetail {
 
 export type TabKey = string
 
+interface TabDef {
+  key: TabKey
+  label: string
+}
+
+// ── Tab definitions ────────────────────────────────────────────────────
+
+const CLAUDE_TABS: TabDef[] = [
+  { key: 'meta',       label: 'Meta' },
+  { key: 'provider',   label: 'Provider' },
+  { key: 'permissions',label: 'Permissions' },
+  { key: 'hooks',      label: 'Hooks' },
+  { key: 'plugins',    label: 'Plugins' },
+  { key: 'claude-md',  label: 'CLAUDE.md' },
+  { key: 'mcp',        label: 'MCP' },
+  { key: 'skills',     label: 'Skills' },
+  { key: 'storage',    label: 'Storage' },
+]
+
+const OTHER_TABS: Record<string, TabDef[]> = {
+  codex: [
+    { key: 'meta',       label: 'Meta' },
+    { key: 'claude-md',  label: 'Rules' },
+    { key: 'storage',    label: 'Storage' },
+  ],
+  hermes: [
+    { key: 'meta',       label: 'Meta' },
+    { key: 'claude-md',  label: 'Persona' },
+    { key: 'storage',    label: 'Storage' },
+  ],
+  opencode: [
+    { key: 'meta',       label: 'Meta' },
+    { key: 'storage',    label: 'Storage' },
+  ],
+}
+
 // ── Component ──────────────────────────────────────────────────────────
 
 interface ProfileDetailPageProps {
@@ -54,7 +96,7 @@ export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProp
   const [settingsRaw, setSettingsRaw] = useState<string>('{}')
   const [claudeMdRaw, setClaudeMdRaw] = useState<string>('')
   const [claudeDotJson, setClaudeDotJson] = useState<string>('{}')
-  const [fileTree, setFileTree] = useState<FlatFile[]>([])
+  const [fileTree, setFileTree] = useState<string[]>([])
 
   // Reload trigger (incremented after save to refresh dependent tabs)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -75,20 +117,17 @@ export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProp
         setDetail(d)
 
         const configDir = d.config_dir
-        const [s, md, cj, treeNode] = await Promise.all([
+        const [s, md, cj, tree] = await Promise.all([
           readFile(`${configDir}/settings.json`).catch(() => '{}'),
           readFile(`${configDir}/CLAUDE.md`).catch(() => ''),
           readFile(`${d.path}/dot-claude.json`).catch(() => '{}'),
-          // I-1: replace findFiles (eager, no depth bound) with the
-          // depth-bounded lazy tree the spec calls for. maxDepth=4 keeps
-          // typical profiles readable while preserving hidden-file handling.
-          listDirTree(d.path, 4).catch(() => null),
+          findFiles(`${d.path}`).catch(() => [] as string[]),
         ] as const)
         if (cancelled) return
         setSettingsRaw(s)
         setClaudeMdRaw(md)
         setClaudeDotJson(cj)
-        setFileTree(flattenDirTree(treeNode))
+        setFileTree(tree)
       } catch (e: unknown) {
         if (cancelled) return
         setError(e instanceof Error ? e.message : 'Failed to load')
@@ -129,9 +168,7 @@ export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProp
 
   const { meta } = detail
   const agentType = meta.agent_type
-  const tabSpecs: TabSpec[] = tabsFor(detail as unknown as ProfileDetailLike)
-  const tabs = tabSpecs.map((t) => ({ key: t.key, label: t.label }))
-  const activeTabSpec = tabSpecs.find((t) => t.key === activeTab)
+  const tabs = agentType === 'claude' ? CLAUDE_TABS : (OTHER_TABS[agentType] ?? OTHER_TABS['codex']!)
   const badgeVariant = AGENT_TYPE_COLORS[agentType as AgentType] ?? 'neutral'
   const configDir = detail.config_dir
   const settingsPath = `${configDir}/settings.json`
@@ -158,21 +195,17 @@ export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProp
         className="mb-6"
       />
 
-      {activeTabSpec ? (
-        <TabContent
-          spec={activeTabSpec}
-          detail={detail}
-          settingsPath={settingsPath}
-          settingsRaw={settingsRaw}
-          claudeMdPath={claudeMdPath}
-          claudeMdRaw={claudeMdRaw}
-          claudeDotJson={claudeDotJson}
-          fileTree={fileTree}
-          onRefresh={triggerRefresh}
-        />
-      ) : (
-        <p className="text-sm text-muted-foreground p-4">Tab not implemented: {activeTab}</p>
-      )}
+      <TabContent
+        tab={activeTab}
+        detail={detail}
+        settingsPath={settingsPath}
+        settingsRaw={settingsRaw}
+        claudeMdPath={claudeMdPath}
+        claudeMdRaw={claudeMdRaw}
+        claudeDotJson={claudeDotJson}
+        fileTree={fileTree}
+        onRefresh={triggerRefresh}
+      />
     </div>
   )
 }
@@ -180,30 +213,56 @@ export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProp
 // ── Tab Content Router ─────────────────────────────────────────────────
 
 function TabContent({
-  spec, detail, settingsPath, settingsRaw, claudeMdPath, claudeMdRaw,
+  tab, detail, settingsPath, settingsRaw, claudeMdPath, claudeMdRaw,
   claudeDotJson, fileTree, onRefresh,
 }: {
-  spec: TabSpec
+  tab: TabKey
   detail: ProfileDetail
   settingsPath: string
   settingsRaw: string
   claudeMdPath: string
   claudeMdRaw: string
   claudeDotJson: string
-  fileTree: FlatFile[]
+  fileTree: string[]
   onRefresh: () => void
 }) {
-  const Component = spec.Component
-  const props = spec.propsFor({
-    ...detail,
-    settingsPath,
-    settingsRaw,
-    claudeMdPath,
-    claudeMdRaw,
-    claudeDotJson,
-    fileTree,
-    onRefresh,
-  } as unknown as ProfileDetailLike)
+  const profilePath = detail.path
+  const agentType = detail.meta.agent_type
 
-  return <Component {...props as never} />
+  switch (tab) {
+    case 'meta':
+      return <MetaEditor detail={detail} onRefresh={onRefresh} />
+    case 'provider':
+      return <ProviderEditor path={settingsPath} content={settingsRaw} onRefresh={onRefresh} agentType={agentType} />
+    case 'permissions':
+      return <PermissionsEditor path={settingsPath} content={settingsRaw} onRefresh={onRefresh} />
+    case 'hooks':
+      return <HooksEditor path={settingsPath} content={settingsRaw} onRefresh={onRefresh} />
+    case 'plugins':
+      return <PluginsEditor path={settingsPath} content={settingsRaw} onRefresh={onRefresh} />
+    case 'claude-md':
+      return (
+        <FileTextEditor
+          path={claudeMdPath}
+          content={claudeMdRaw}
+          label={agentType === 'hermes' ? 'SOUL.md' : 'CLAUDE.md'}
+          placeholder="# Custom instructions"
+          onRefresh={onRefresh}
+        />
+      )
+    case 'mcp':
+      return <McpTab profileName={detail.meta.name} profilePath={profilePath} />
+    case 'skills':
+      return <SkillsTab profileName={detail.meta.name} configDir={detail.config_dir} />
+    case 'storage':
+      return (
+        <StorageExplorer
+          profilePath={profilePath}
+          fileTree={fileTree}
+          onRefresh={onRefresh}
+        />
+      )
+    default:
+      return <p className="text-sm text-muted-foreground p-4">Tab not implemented: {tab}</p>
+  }
 }
