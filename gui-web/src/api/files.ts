@@ -62,3 +62,19 @@ export async function fetchModels(baseUrl: string, apiKey: string, modelsUrl?: s
     [],
   )
 }
+
+export interface DirTreeNode {
+  path: string
+  type: 'dir' | 'file'
+  size?: number
+  mtime?: number
+  children?: DirTreeNode[]
+}
+
+/**
+ * Lazy-loaded recursive tree. `maxDepth` defaults to 4; pass 1
+ * for "one level" then refetch with deeper values on expansion.
+ */
+export async function listDirTree(path: string, maxDepth = 4): Promise<DirTreeNode | null> {
+  return call<DirTreeNode | null>((api) => api.list_dir_tree(path, maxDepth), null)
+}

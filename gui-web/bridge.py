@@ -81,6 +81,36 @@ def _wsl_run(cmd: str, timeout: float = 15) -> str:
     return result.stdout.decode("utf-8", errors="replace").strip()
 
 
+def _dir_tree_node(path: str, max_depth: int = 1) -> Optional[dict]:
+    """Build one level of a dir tree rooted at *path*.
+
+    Returns None if path doesn't exist or isn't a directory.
+    Children are directories at depth < max_depth; deeper dirs are leaves
+    (returned as `type: 'dir'` without `children`).
+    """
+    import os
+    try:
+        st = os.lstat(path)
+    except OSError:
+        return None
+    if not os.path.isdir(path):
+        return {"path": path, "type": "file", "size": st.st_size, "mtime": int(st.st_mtime * 1000)}
+    if max_depth <= 0:
+        return {"path": path, "type": "dir"}
+    children = []
+    try:
+        for name in sorted(os.listdir(path)):
+            if name.startswith("."):
+                continue
+            full = os.path.join(path, name)
+            node = _dir_tree_node(full, max_depth - 1)
+            if node is not None:
+                children.append(node)
+    except OSError:
+        pass
+    return {"path": path, "type": "dir", "children": children}
+
+
 class Api:
     """JavaScript-accessible API via window.api."""
 
@@ -835,6 +865,20 @@ class Api:
             return json.dumps({"ok": True, "data": paths})
         except Exception as e:
             return json.dumps({"ok": True, "data": "[]"})
+
+    def list_dir_tree(self, path: str, max_depth: int = 4) -> str:
+        """Return a directory tree (depth-limited). Hidden files excluded."""
+        try:
+            # Expand leading ~
+            if path.startswith("~"):
+                home = _wsl_run("echo -n $HOME")
+                path = home + path[1:]
+            node = _dir_tree_node(path, max_depth)
+            if node is None:
+                return json.dumps({"ok": True, "data": {"path": path, "type": "dir", "children": []}})
+            return json.dumps({"ok": True, "data": node})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
 
     # ── Apply ───────────────────────────────────────────────────────────
 
