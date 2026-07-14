@@ -14,7 +14,9 @@ import { Button, Badge, Tabs } from '@/components/ui'
 import { Loading } from '@/components/feedback'
 import type { AgentType } from '@/api'
 import { AGENT_TYPE_COLORS, fetchProfileDetail } from '@/api'
-import { readFile, findFiles } from '@/api/files'
+import { readFile, listDirTree } from '@/api/files'
+import type { FlatFile } from './detail/storage/buildTreeFromFlatList'
+import { flattenDirTree } from './detail/storage/flattenDirTree'
 import { tabsFor, type ProfileDetailLike, type TabSpec } from './detail/schema'
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -52,7 +54,7 @@ export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProp
   const [settingsRaw, setSettingsRaw] = useState<string>('{}')
   const [claudeMdRaw, setClaudeMdRaw] = useState<string>('')
   const [claudeDotJson, setClaudeDotJson] = useState<string>('{}')
-  const [fileTree, setFileTree] = useState<string[]>([])
+  const [fileTree, setFileTree] = useState<FlatFile[]>([])
 
   // Reload trigger (incremented after save to refresh dependent tabs)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -73,17 +75,20 @@ export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProp
         setDetail(d)
 
         const configDir = d.config_dir
-        const [s, md, cj, tree] = await Promise.all([
+        const [s, md, cj, treeNode] = await Promise.all([
           readFile(`${configDir}/settings.json`).catch(() => '{}'),
           readFile(`${configDir}/CLAUDE.md`).catch(() => ''),
           readFile(`${d.path}/dot-claude.json`).catch(() => '{}'),
-          findFiles(`${d.path}`).catch(() => [] as string[]),
+          // I-1: replace findFiles (eager, no depth bound) with the
+          // depth-bounded lazy tree the spec calls for. maxDepth=4 keeps
+          // typical profiles readable while preserving hidden-file handling.
+          listDirTree(d.path, 4).catch(() => null),
         ] as const)
         if (cancelled) return
         setSettingsRaw(s)
         setClaudeMdRaw(md)
         setClaudeDotJson(cj)
-        setFileTree(tree)
+        setFileTree(flattenDirTree(treeNode))
       } catch (e: unknown) {
         if (cancelled) return
         setError(e instanceof Error ? e.message : 'Failed to load')
@@ -185,7 +190,7 @@ function TabContent({
   claudeMdPath: string
   claudeMdRaw: string
   claudeDotJson: string
-  fileTree: string[]
+  fileTree: FlatFile[]
   onRefresh: () => void
 }) {
   const Component = spec.Component
