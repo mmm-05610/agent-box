@@ -50,3 +50,15 @@ export async function testEndpoint(url: string): Promise<EndpointTestResult | nu
 export async function findFiles(path: string): Promise<string[]> {
   return call<string[]>((api) => api.find_files(path), [])
 }
+
+export interface FetchedModel {
+  id: string
+  owned_by: string | null
+}
+
+export async function fetchModels(baseUrl: string, apiKey: string, modelsUrl?: string, isFullUrl?: boolean): Promise<FetchedModel[]> {
+  return call<FetchedModel[]>(
+    (api) => api.fetch_models(baseUrl, apiKey, modelsUrl || '', isFullUrl || false),
+    [],
+  )
+}

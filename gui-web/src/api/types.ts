@@ -101,15 +101,16 @@ export interface Profile {
   createdAt?: number
 }
 
-export type AgentType = 'claude' | 'codex' | 'hermes' | 'opencode'
+export type AgentType = 'claude' | 'codex' | 'hermes' | 'opencode' | 'mimocode'
 
-export const AGENT_TYPES: AgentType[] = ['claude', 'codex', 'hermes', 'opencode']
+export const AGENT_TYPES: AgentType[] = ['claude', 'codex', 'hermes', 'opencode', 'mimocode']
 
 export const AGENT_TYPE_COLORS: Record<AgentType, string> = {
   claude: 'warning',    // orange
   codex: 'success',     // green
   hermes: 'info',       // blue
   opencode: 'primary',  // neutral
+  mimocode: 'primary',  // neutral (OpenCode fork)
 }
 
 // ── Session ────────────────────────────────────────────────────────────
@@ -144,4 +145,7 @@ export interface ProviderPreset {
   notes?: string
   apiFormat?: string
   isPartner?: boolean
+  apiKeyUrl?: string
+  endpointCandidates?: string[]
+  modelsUrl?: string
 }
