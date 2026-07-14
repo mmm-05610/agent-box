@@ -81,34 +81,57 @@ def _wsl_run(cmd: str, timeout: float = 15) -> str:
     return result.stdout.decode("utf-8", errors="replace").strip()
 
 
-def _dir_tree_node(path: str, max_depth: int = 1) -> Optional[dict]:
-    """Build one level of a dir tree rooted at *path*.
+def _dir_tree_node(path: str, max_depth: int = 4) -> Optional[dict]:
+    """Build a directory tree via `find -printf`. Returns None if path doesn't exist.
 
-    Returns None if path doesn't exist or isn't a directory.
-    Children are directories at depth < max_depth; deeper dirs are leaves
-    (returned as `type: 'dir'` without `children`).
+    Runs entirely inside WSL via `_wsl_run`, so this works even when the
+    bridge host is Windows-side PyWebView. Hidden files (`.`-prefix) are
+    excluded. Children are returned as a flat list — the frontend performs
+    its own lazy expansion by re-calling with the appropriate sub-path.
     """
-    import os
+    if path.startswith("~"):
+        try:
+            home = _wsl_run("echo -n $HOME", timeout=5)
+            path = home + path[1:]
+        except Exception:
+            return None
+    quoted = f"'{path}'" if " " in path else path
     try:
-        st = os.lstat(path)
-    except OSError:
+        # Sentinel `test -e` lets us distinguish a missing path from an empty dir.
+        out = _wsl_run(
+            f"test -e {quoted} && find {quoted} -maxdepth {max_depth} "
+            f"-mindepth 1 -not -path '*/.*' "
+            f"-printf '%y|%p|%s|%T@\\n' 2>/dev/null || true",
+            timeout=15,
+        )
+    except Exception:
         return None
-    if not os.path.isdir(path):
-        return {"path": path, "type": "file", "size": st.st_size, "mtime": int(st.st_mtime * 1000)}
-    if max_depth <= 0:
-        return {"path": path, "type": "dir"}
-    children = []
-    try:
-        for name in sorted(os.listdir(path)):
-            if name.startswith("."):
-                continue
-            full = os.path.join(path, name)
-            node = _dir_tree_node(full, max_depth - 1)
-            if node is not None:
-                children.append(node)
-    except OSError:
-        pass
-    return {"path": path, "type": "dir", "children": children}
+    if not out:
+        # Path missing or no children — let caller decide.
+        return None
+    entries = []
+    for line in out.splitlines():
+        parts = line.split("|", 3)
+        if len(parts) != 4:
+            continue
+        kind, fullpath, size, mtime = parts
+        if fullpath == path:
+            continue
+        size_val = int(size) if size.isdigit() else None
+        try:
+            mtime_val = int(float(mtime) * 1000)  # ms
+        except ValueError:
+            mtime_val = None
+        if kind == "d":
+            entries.append({"path": fullpath, "type": "dir"})
+        else:
+            entry: dict = {"path": fullpath, "type": "file"}
+            if size_val is not None:
+                entry["size"] = size_val
+            if mtime_val is not None:
+                entry["mtime"] = mtime_val
+            entries.append(entry)
+    return {"path": path, "type": "dir", "children": entries}
 
 
 class Api:
@@ -869,10 +892,6 @@ class Api:
     def list_dir_tree(self, path: str, max_depth: int = 4) -> str:
         """Return a directory tree (depth-limited). Hidden files excluded."""
         try:
-            # Expand leading ~
-            if path.startswith("~"):
-                home = _wsl_run("echo -n $HOME")
-                path = home + path[1:]
             node = _dir_tree_node(path, max_depth)
             if node is None:
                 return json.dumps({"ok": True, "data": {"path": path, "type": "dir", "children": []}})
