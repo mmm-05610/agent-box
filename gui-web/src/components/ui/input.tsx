@@ -29,12 +29,13 @@ export function Input({ size = 'md', error, label, className, ...props }: InputP
       )}
       <input
         className={cn(
-          'w-full rounded-md bg-card px-3 text-foreground placeholder:text-muted-foreground',
-          'transition-all duration-fast',
-          'focus:outline-none focus:ring-2 focus:ring-accent/30 focus:shadow-md',
-          'hover:shadow-sm',
+          'w-full rounded-md bg-input px-3 text-foreground placeholder:text-muted-foreground',
+          'border border-border',
+          'transition-colors duration-fast',
+          'focus:outline-none focus:border-foreground/30',
+          'hover:border-foreground/20',
           'disabled:cursor-not-allowed disabled:opacity-50',
-          error ? 'ring-1 ring-destructive' : 'shadow-sm',
+          error ? 'border-destructive' : '',
           sizeStyles[size],
           className,
         )}

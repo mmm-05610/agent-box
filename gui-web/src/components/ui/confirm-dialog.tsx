@@ -27,6 +27,7 @@ export interface ConfirmDialogProps {
   confirmLabel?: string
   cancelLabel?: string
   busy?: boolean
+  variant?: 'destructive' | 'info'
   onConfirm: () => void | Promise<void>
   onCancel: () => void
 }
@@ -38,6 +39,7 @@ export function ConfirmDialog({
   confirmLabel = 'Delete',
   cancelLabel = 'Cancel',
   busy = false,
+  variant = 'destructive',
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -77,12 +79,24 @@ export function ConfirmDialog({
         className="w-full max-w-md rounded-xl bg-card shadow-2xl ring-1 ring-border p-5"
       >
         <div className="flex items-start gap-3 mb-4">
-          <div className="mt-0.5 h-8 w-8 shrink-0 rounded-full bg-destructive/15 text-destructive flex items-center justify-center">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-              <path d="M12 9v4" />
-              <path d="M12 17h.01" />
-              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-            </svg>
+          <div className={`mt-0.5 h-8 w-8 shrink-0 rounded-full flex items-center justify-center ${
+            variant === 'info'
+              ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+              : 'bg-destructive/15 text-destructive'
+          }`}>
+            {variant === 'info' ? (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 16v-4" />
+                <path d="M12 8h.01" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                <path d="M12 9v4" />
+                <path d="M12 17h.01" />
+                <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+              </svg>
+            )}
           </div>
           <div className="flex-1 min-w-0">
             <h2 className="text-base font-semibold text-foreground">{title}</h2>
@@ -105,8 +119,10 @@ export function ConfirmDialog({
               'inline-flex items-center justify-center gap-2',
               'rounded-md font-medium tracking-tight cursor-pointer select-none',
               'h-8 px-3 text-sm',
-              'bg-destructive text-destructive-foreground',
-              'hover:bg-destructive-hover hover:shadow-md hover:-translate-y-px',
+              variant === 'info'
+                ? 'bg-primary text-primary-foreground hover:bg-primary-hover'
+                : 'bg-destructive text-destructive-foreground hover:bg-destructive-hover',
+              'hover:shadow-md hover:-translate-y-px',
               'focus-visible:outline-none transition-[color,background-color,box-shadow,transform] duration-normal',
               'disabled:opacity-50 disabled:pointer-events-none disabled:cursor-not-allowed',
             ].join(' ')}

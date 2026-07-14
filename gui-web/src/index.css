@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@config "../tailwind.config.ts";
 
 /*
  * Design System — agent-box (Stone warm palette)
@@ -83,10 +84,10 @@
     --background: 220 14% 6%;
     --foreground: 220 14% 96%;
 
-    --card: 220 14% 11%;
+    --card: 220 14% 16%;
     --card-foreground: 220 14% 96%;
     --card-border: 220 14% 22%;
-    --card-hover: 220 14% 15%;
+    --card-hover: 220 14% 20%;
 
     --primary: 220 14% 96%;
     --primary-foreground: 220 14% 6%;
@@ -116,8 +117,8 @@
     --info-foreground: 0 0% 98%;
     --info-subtle: 217 30% 16%;
 
-    --border: 220 14% 24%;
-    --input: 220 14% 24%;
+    --border: 220 14% 26%;
+    --input: 220 14% 22%;
     --ring: 220 14% 80%;
 
     --accent: 16 70% 58%;
