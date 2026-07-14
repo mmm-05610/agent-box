@@ -50,4 +50,19 @@ describe('buildTreeFromFlatList', () => {
     const tree = buildTreeFromFlatList(files, '/root')
     expect(tree).toEqual([{ type: 'file', path: '/root/y.json' }])
   })
+
+  it('nests directories 3 levels deep', () => {
+    const files: FlatFile[] = [
+      { path: '/root/a/b/c.md' },
+      { path: '/root/a/x.md' },
+    ]
+    const tree = buildTreeFromFlatList(files, '/root')
+    const a = tree.find((n) => n.path === '/root/a' && n.type === 'dir')
+    expect(a).toBeDefined()
+    const aChildren = a!.children!
+    const b = aChildren.find((n) => n.path === '/root/a/b' && n.type === 'dir')
+    expect(b).toBeDefined()
+    expect(b!.children).toEqual([{ type: 'file', path: '/root/a/b/c.md' }])
+    expect(aChildren.find((n) => n.path === '/root/a/x.md')).toMatchObject({ type: 'file' })
+  })
 })

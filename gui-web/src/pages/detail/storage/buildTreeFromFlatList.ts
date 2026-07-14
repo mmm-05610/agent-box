@@ -30,14 +30,20 @@ export function buildTreeFromFlatList(
     const rel = f.path.slice(rootPrefix.length)
     if (!rel) continue
     const parts = rel.split('/')
-    // ensure all parent dirs exist in `dirs`
+    // ensure all parent dirs exist in `dirs`, nested under each other
     let cursor = rootPrefix.replace(/\/$/, '')
+    let parent: TreeNode | undefined = undefined
     for (let i = 0; i < parts.length - 1; i++) {
       cursor = cursor + '/' + parts[i]
-      if (!dirs.has(cursor)) {
-        const node: TreeNode = { type: 'dir', path: cursor, children: [] }
+      let node = dirs.get(cursor)
+      if (!node) {
+        node = { type: 'dir', path: cursor, children: [] }
         dirs.set(cursor, node)
+        if (parent && parent.children) {
+          parent.children.push(node)
+        }
       }
+      parent = node
     }
     const fileNode: TreeNode = {
       type: 'file',
