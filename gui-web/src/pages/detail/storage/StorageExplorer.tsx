@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui'
 import { readFile, saveFile } from '@/api/files'
 import { useToast } from '@/components/feedback/toast'
-import { buildTreeFromFlatList, type TreeNode } from './buildTreeFromFlatList'
+import { buildTreeFromFlatList, type FlatFile, type TreeNode } from './buildTreeFromFlatList'
 import { validateJson } from './validateJson'
 import { useOpenFiles } from './useOpenFiles'
 import { FileTree } from './FileTree'
@@ -16,31 +16,41 @@ import { SaveBar } from './SaveBar'
 
 export function StorageExplorer({ profilePath, fileTree }: {
   profilePath: string
-  fileTree: string[]
+  fileTree: FlatFile[]
 }) {
   const { toast } = useToast()
   const [tree, setTree] = useState<TreeNode[]>([])
-  const { openFiles, active, open, setActive, updateContent, markClean } =
+  const { openFiles, active, open, setActive, updateContent, markClean, wouldEvictDirty } =
     useOpenFiles({ max: 5 })
   const [saving, setSaving] = useState(false)
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null)
 
-  // Build tree from flat list (findFiles result)
+  // Build tree from the flat list returned by `flattenDirTree` (which feeds
+  // off `list_dir_tree` on the bridge). Size and mtime are preserved so the
+  // file tree can show them next to each leaf.
   useEffect(() => {
-    setTree(buildTreeFromFlatList(fileTree.map((p) => ({ path: p })), profilePath))
+    setTree(buildTreeFromFlatList(fileTree, profilePath))
   }, [fileTree, profilePath])
 
   const openFile = useCallback(
     async (path: string) => {
       try {
+        // C-1 guard: opening this path would silently discard unsaved
+        // changes from a dirty LRU-evictable file. Ask before proceeding.
+        const { evictPath } = wouldEvictDirty(path)
+        if (evictPath && evictPath !== path) {
+          const ok = window.confirm(
+            `Opening ${path.split('/').pop()} will discard unsaved changes in ${evictPath.split('/').pop()}. Continue?`,
+          )
+          if (!ok) return
+        }
         const content = await readFile(path)
         open(path, content)
-        setLastSavedAt(Date.now())
       } catch {
         toast({ type: 'error', message: `Failed to read ${path}` })
       }
     },
-    [open, toast],
+    [open, toast, wouldEvictDirty],
   )
 
   const handleSave = useCallback(async () => {
