@@ -15,15 +15,7 @@ import { Loading } from '@/components/feedback'
 import type { AgentType } from '@/api'
 import { AGENT_TYPE_COLORS, fetchProfileDetail } from '@/api'
 import { readFile, findFiles } from '@/api/files'
-import { MetaEditor } from './detail/MetaEditor'
-import { ProviderEditor } from './detail/ProviderEditor'
-import { PermissionsEditor } from './detail/PermissionsEditor'
-import { HooksEditor } from './detail/HooksEditor'
-import { PluginsEditor } from './detail/PluginsEditor'
-import { FileTextEditor } from './detail/FileTextEditor'
-import { McpTab } from './detail/McpTab'
-import { SkillsTab } from './detail/SkillsTab'
-import { StorageExplorer } from './detail/storage/StorageExplorer'
+import { tabsFor, type ProfileDetailLike, type TabSpec } from './detail/schema'
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -42,42 +34,6 @@ export interface ProfileDetail {
 }
 
 export type TabKey = string
-
-interface TabDef {
-  key: TabKey
-  label: string
-}
-
-// ── Tab definitions ────────────────────────────────────────────────────
-
-const CLAUDE_TABS: TabDef[] = [
-  { key: 'meta',       label: 'Meta' },
-  { key: 'provider',   label: 'Provider' },
-  { key: 'permissions',label: 'Permissions' },
-  { key: 'hooks',      label: 'Hooks' },
-  { key: 'plugins',    label: 'Plugins' },
-  { key: 'claude-md',  label: 'CLAUDE.md' },
-  { key: 'mcp',        label: 'MCP' },
-  { key: 'skills',     label: 'Skills' },
-  { key: 'storage',    label: 'Storage' },
-]
-
-const OTHER_TABS: Record<string, TabDef[]> = {
-  codex: [
-    { key: 'meta',       label: 'Meta' },
-    { key: 'claude-md',  label: 'Rules' },
-    { key: 'storage',    label: 'Storage' },
-  ],
-  hermes: [
-    { key: 'meta',       label: 'Meta' },
-    { key: 'claude-md',  label: 'Persona' },
-    { key: 'storage',    label: 'Storage' },
-  ],
-  opencode: [
-    { key: 'meta',       label: 'Meta' },
-    { key: 'storage',    label: 'Storage' },
-  ],
-}
 
 // ── Component ──────────────────────────────────────────────────────────
 
@@ -168,7 +124,9 @@ export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProp
 
   const { meta } = detail
   const agentType = meta.agent_type
-  const tabs = agentType === 'claude' ? CLAUDE_TABS : (OTHER_TABS[agentType] ?? OTHER_TABS['codex']!)
+  const tabSpecs: TabSpec[] = tabsFor(detail as unknown as ProfileDetailLike)
+  const tabs = tabSpecs.map((t) => ({ key: t.key, label: t.label }))
+  const activeTabSpec = tabSpecs.find((t) => t.key === activeTab)
   const badgeVariant = AGENT_TYPE_COLORS[agentType as AgentType] ?? 'neutral'
   const configDir = detail.config_dir
   const settingsPath = `${configDir}/settings.json`
@@ -195,17 +153,21 @@ export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProp
         className="mb-6"
       />
 
-      <TabContent
-        tab={activeTab}
-        detail={detail}
-        settingsPath={settingsPath}
-        settingsRaw={settingsRaw}
-        claudeMdPath={claudeMdPath}
-        claudeMdRaw={claudeMdRaw}
-        claudeDotJson={claudeDotJson}
-        fileTree={fileTree}
-        onRefresh={triggerRefresh}
-      />
+      {activeTabSpec ? (
+        <TabContent
+          spec={activeTabSpec}
+          detail={detail}
+          settingsPath={settingsPath}
+          settingsRaw={settingsRaw}
+          claudeMdPath={claudeMdPath}
+          claudeMdRaw={claudeMdRaw}
+          claudeDotJson={claudeDotJson}
+          fileTree={fileTree}
+          onRefresh={triggerRefresh}
+        />
+      ) : (
+        <p className="text-sm text-muted-foreground p-4">Tab not implemented: {activeTab}</p>
+      )}
     </div>
   )
 }
@@ -213,10 +175,10 @@ export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProp
 // ── Tab Content Router ─────────────────────────────────────────────────
 
 function TabContent({
-  tab, detail, settingsPath, settingsRaw, claudeMdPath, claudeMdRaw,
+  spec, detail, settingsPath, settingsRaw, claudeMdPath, claudeMdRaw,
   claudeDotJson, fileTree, onRefresh,
 }: {
-  tab: TabKey
+  spec: TabSpec
   detail: ProfileDetail
   settingsPath: string
   settingsRaw: string
@@ -226,42 +188,17 @@ function TabContent({
   fileTree: string[]
   onRefresh: () => void
 }) {
-  const profilePath = detail.path
-  const agentType = detail.meta.agent_type
+  const Component = spec.Component
+  const props = spec.propsFor({
+    ...detail,
+    settingsPath,
+    settingsRaw,
+    claudeMdPath,
+    claudeMdRaw,
+    claudeDotJson,
+    fileTree,
+    onRefresh,
+  } as unknown as ProfileDetailLike)
 
-  switch (tab) {
-    case 'meta':
-      return <MetaEditor detail={detail} onRefresh={onRefresh} />
-    case 'provider':
-      return <ProviderEditor path={settingsPath} content={settingsRaw} onRefresh={onRefresh} agentType={agentType} />
-    case 'permissions':
-      return <PermissionsEditor path={settingsPath} content={settingsRaw} onRefresh={onRefresh} />
-    case 'hooks':
-      return <HooksEditor path={settingsPath} content={settingsRaw} onRefresh={onRefresh} />
-    case 'plugins':
-      return <PluginsEditor path={settingsPath} content={settingsRaw} onRefresh={onRefresh} />
-    case 'claude-md':
-      return (
-        <FileTextEditor
-          path={claudeMdPath}
-          content={claudeMdRaw}
-          label={agentType === 'hermes' ? 'SOUL.md' : 'CLAUDE.md'}
-          placeholder="# Custom instructions"
-          onRefresh={onRefresh}
-        />
-      )
-    case 'mcp':
-      return <McpTab profileName={detail.meta.name} profilePath={profilePath} />
-    case 'skills':
-      return <SkillsTab profileName={detail.meta.name} configDir={detail.config_dir} />
-    case 'storage':
-      return (
-        <StorageExplorer
-          profilePath={profilePath}
-          fileTree={fileTree}
-        />
-      )
-    default:
-      return <p className="text-sm text-muted-foreground p-4">Tab not implemented: {tab}</p>
-  }
+  return <Component {...props as never} />
 }
