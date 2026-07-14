@@ -211,3 +211,149 @@ def test_upsert_provider_env_not_dict(tmp_agent_box_home):
     """upsert_provider rejects env values that aren't objects."""
     with pytest.raises(ProfileError, match="'env' must be an object"):
         providers.upsert_provider("claude", "bad-env", json.dumps({"env": "oops"}))
+
+
+# ── resolve_usage_credentials ─────────────────────────────────────────────
+#
+# Mirrors the per-app credential extraction contract in cc-switch's
+# `Provider::resolve_usage_credentials` (provider.rs) and the TS sibling
+# `getProviderCredentials` in UsageScriptModal.tsx. If you change a branch
+# here, update the corresponding TS/Rust side too.
+
+_CLAUDE_SETTINGS = {
+    "env": {
+        "ANTHROPIC_BASE_URL": "https://api.deepseek.com/anthropic",
+        "ANTHROPIC_AUTH_TOKEN": "sk-claude",
+    }
+}
+_CODEX_AUTH_TOML = (
+    'model_provider = "deepseek"\n'
+    "\n"
+    "[model_providers.deepseek]\n"
+    'base_url = "https://api.deepseek.com"\n'
+)
+_CODEX_BEARER_TOML = (
+    'model_provider = "custom"\n'
+    'experimental_bearer_token = "sk-bearer"\n'
+    "\n"
+    "[model_providers.custom]\n"
+    'base_url = "https://custom.example.com"\n'
+)
+
+
+def _wrap(settings):
+    """Wrap a settings dict the way get_provider() would."""
+    return {"id": "p", "settings": settings}
+
+
+def test_resolve_claude_basic():
+    r = providers.resolve_usage_credentials("claude", _wrap(_CLAUDE_SETTINGS))
+    assert r["api_key"] == "sk-claude"
+    assert r["base_url"] == "https://api.deepseek.com/anthropic"
+    # Legacy keys mirror so existing bash scripts keep working.
+    assert r["ANTHROPIC_AUTH_TOKEN"] == "sk-claude"
+    assert r["ANTHROPIC_BASE_URL"] == "https://api.deepseek.com/anthropic"
+
+
+def test_resolve_claude_openrouter_fallback():
+    """When ANTHROPIC_* keys are absent, fall back to OpenRouter / Google."""
+    s = {"env": {"ANTHROPIC_BASE_URL": "https://openrouter.ai/api/v1",
+                 "OPENROUTER_API_KEY": "sk-or"}}
+    r = providers.resolve_usage_credentials("claude", _wrap(s))
+    assert r["api_key"] == "sk-or"
+    assert r["base_url"] == "https://openrouter.ai/api/v1"
+
+
+def test_resolve_claude_skips_empty_token():
+    """Empty ANTHROPIC_AUTH_TOKEN must not block later fallback keys."""
+    s = {"env": {"ANTHROPIC_BASE_URL": "https://or.ai",
+                 "ANTHROPIC_AUTH_TOKEN": "",
+                 "ANTHROPIC_API_KEY": "",
+                 "OPENROUTER_API_KEY": "sk-or"}}
+    r = providers.resolve_usage_credentials("claude", _wrap(s))
+    assert r["api_key"] == "sk-or"
+
+
+def test_resolve_claude_trims_trailing_slash():
+    s = {"env": {"ANTHROPIC_BASE_URL": "https://x.example.com/"}}
+    r = providers.resolve_usage_credentials("claude", _wrap(s))
+    assert r["base_url"] == "https://x.example.com"
+    # The mirror key keeps the original (downstream callers may rely on it).
+    assert r["ANTHROPIC_BASE_URL"] == "https://x.example.com/"
+
+
+def test_resolve_codex_auth_and_active_section_toml():
+    """Codex: prefer auth.OPENAI_API_KEY; resolve base_url from active section."""
+    r = providers.resolve_usage_credentials(
+        "codex",
+        _wrap({"auth": {"OPENAI_API_KEY": "sk-codex"}, "config": _CODEX_AUTH_TOML}),
+    )
+    assert r["api_key"] == "sk-codex"
+    assert r["base_url"] == "https://api.deepseek.com"
+    assert r["OPENAI_API_KEY"] == "sk-codex"
+
+
+def test_resolve_codex_falls_back_to_bearer_token():
+    """When auth.OPENAI_API_KEY is absent, lift experimental_bearer_token."""
+    r = providers.resolve_usage_credentials(
+        "codex", _wrap({"config": _CODEX_BEARER_TOML}),
+    )
+    assert r["api_key"] == "sk-bearer"
+    assert r["base_url"] == "https://custom.example.com"
+
+
+def test_resolve_codex_top_level_base_url_fallback():
+    """If no active section, fall back to the top-level base_url key."""
+    s = {"config": 'base_url = "https://top.example.com"\n'}
+    r = providers.resolve_usage_credentials("codex", _wrap(s))
+    assert r["api_key"] == ""
+    assert r["base_url"] == "https://top.example.com"
+
+
+def test_resolve_hermes_snake_case_top_level():
+    r = providers.resolve_usage_credentials(
+        "hermes",
+        _wrap({"base_url": "https://hermes.example.com", "api_key": "sk-hermes"}),
+    )
+    assert r["api_key"] == "sk-hermes"
+    assert r["base_url"] == "https://hermes.example.com"
+
+
+def test_resolve_opencode_nested_in_options():
+    r = providers.resolve_usage_credentials(
+        "opencode",
+        _wrap({"options": {"baseURL": "https://oc.example.com/v1",
+                            "apiKey": "sk-oc"}}),
+    )
+    assert r["api_key"] == "sk-oc"
+    assert r["base_url"] == "https://oc.example.com/v1"
+
+
+def test_resolve_gemini_legacy_google_key():
+    """Gemini: GOOGLE_API_KEY is the legacy fallback for GEMINI_API_KEY."""
+    s = {"env": {"GOOGLE_GEMINI_BASE_URL": "https://generativelanguage.googleapis.com",
+                 "GOOGLE_API_KEY": "g-legacy"}}
+    r = providers.resolve_usage_credentials("gemini", _wrap(s))
+    assert r["api_key"] == "g-legacy"
+    assert r["base_url"] == "https://generativelanguage.googleapis.com"
+
+
+def test_resolve_unknown_agent_type_returns_empty():
+    """Unknown agent types gracefully return empty credentials."""
+    r = providers.resolve_usage_credentials("not-a-real-agent",
+                                             _wrap({"env": {"X": "y"}}))
+    assert r["api_key"] == ""
+    assert r["base_url"] == ""
+
+
+def test_resolve_handles_missing_settings():
+    """provider with no settings key (or empty settings) returns empty creds."""
+    r = providers.resolve_usage_credentials("claude", {"id": "x"})
+    assert r["api_key"] == ""
+    assert r["base_url"] == ""
+
+
+def test_resolve_handles_non_dict_settings():
+    r = providers.resolve_usage_credentials("claude", {"id": "x", "settings": "not-a-dict"})
+    assert r["api_key"] == ""
+    assert r["base_url"] == ""

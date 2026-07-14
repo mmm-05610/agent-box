@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import tempfile
 from pathlib import Path
@@ -438,13 +439,239 @@ def get_presets(agent_type: str) -> List[Dict[str, Any]]:
 
 # ── Usage query ────────────────────────────────────────────────────────────
 
-def _get_usage_credentials(provider: Dict[str, Any]) -> Dict[str, str]:
-    """Extract API key and base URL from provider settings for usage queries."""
+# Agent-type → which env/JSON key holds the API key (for the bash usage scripts).
+# Mirrors cc-switch `Provider::resolve_usage_credentials` so per-app fallback
+# chains stay in sync (OpenRouter/Google on Claude, bearer-token fallback on
+# Codex, top-level keys on Hermes, options.* on OpenCode).
+_AGENT_API_KEY_VARS: Dict[str, tuple] = {
+    "claude": ("ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_API_KEY",
+               "OPENROUTER_API_KEY", "GOOGLE_API_KEY"),
+    "gemini": ("GEMINI_API_KEY", "GOOGLE_API_KEY"),
+    # codex/hermes/opencode use non-env shapes — see resolve_usage_credentials
+}
+
+# Regex used to lift ``base_url = "..."`` out of a Codex TOML config string.
+# Matches the active ``[model_providers.<X>]`` section first; falls back to
+# the top-level ``base_url`` key. Mirrors cc-switch's extractCodexBaseUrl
+# (providerConfigUtils.ts) which has the same precedence rules.
+_COEX_M = re.MULTILINE  # local alias — the per-line patterns below
+# require MULTILINE so ``$`` anchors per-line end-of-string, not end-of-buffer.
+# (Without it, a TOML body with multiple lines silently fails to match —
+# re.search without MULTILINE anchors ``$`` to the end of the whole string.)
+_CODEX_SECTION_HEADER_RE = re.compile(r"^\s*\[([^\]\r\n]+)\]\s*$", _COEX_M)
+_CODEX_BASE_URL_RE = re.compile(
+    r"""^[ \t]*base_url[ \t]*=[ \t]*(?:"((?:\\.|[^"\\\r\n])*)"|'([^'\r\n]*)')(?:[ \t]*(?:#[^\r\n]*)?)?$""",
+    _COEX_M,
+)
+_CODEX_BEARER_TOKEN_RE = re.compile(
+    r"""^[ \t]*experimental_bearer_token[ \t]*=[ \t]*(["'])([^"'\r\n]+)\1(?:[ \t]*(?:#[^\r\n]*)?)?$""",
+    _COEX_M,
+)
+_CODEX_MODEL_PROVIDER_RE = re.compile(
+    r"""^[ \t]*model_provider[ \t]*=[ \t]*(["'])([^"'\r\n]+)\1(?:[ \t]*(?:#[^\r\n]*)?)?$""",
+    _COEX_M,
+)
+del _COEX_M
+_CODEX_RESERVED_PROVIDER_IDS = frozenset({
+    "amazon-bedrock", "openai", "ollama", "lmstudio",
+})
+
+
+def _first_non_empty(mapping: Optional[Dict[str, Any]], keys: tuple) -> str:
+    """Return the first value among *keys* that is a non-empty string.
+
+    Mirrors the JS ``a || b || c`` semantics: keys that are absent *or*
+    present-but-empty are both skipped. Presets seed ``ANTHROPIC_AUTH_TOKEN``
+    as a present-but-empty placeholder, so a plain ``mapping.get(k) or ...``
+    chain would stop at the first empty value — this helper continues.
+    """
+    if not mapping:
+        return ""
+    for k in keys:
+        v = mapping.get(k)
+        if isinstance(v, str) and v.strip():
+            return v
+    return ""
+
+
+def _extract_codex_active_provider(config_text: str) -> Optional[str]:
+    """Return the active ``model_provider`` name from a Codex config.toml body.
+
+    Returns None if unset. Reserved provider ids (openai, ollama, ...) are
+    still returned — cc-switch filters them for *experimental_bearer_token*
+    fallback only, not for base_url extraction.
+    """
+    m = _CODEX_MODEL_PROVIDER_RE.search(config_text)
+    if not m:
+        return None
+    name = m.group(2).strip()
+    return name or None
+
+
+def _extract_codex_base_url(config_text: str) -> Optional[str]:
+    """Resolve Codex base_url, preferring the active ``[model_providers.<X>]``
+    section over the top-level ``base_url`` key.
+
+    Mirrors ``extractCodexBaseUrl`` in cc-switch (TS). Returns None on any
+    parse failure (the TS version swallows errors too).
+    """
+    if not config_text:
+        return None
+    active = _extract_codex_active_provider(config_text)
+    in_active_section = False
+    in_top_level = True  # top-level assignments end at the first [section]
+    for raw_line in config_text.splitlines():
+        section = _CODEX_SECTION_HEADER_RE.match(raw_line)
+        if section:
+            header = section.group(1).strip()
+            in_active_section = bool(
+                active and header == f"model_providers.{active}"
+            )
+            in_top_level = False
+            continue
+        m = _CODEX_BASE_URL_RE.match(raw_line)
+        if not m:
+            continue
+        value = (m.group(1) or m.group(2) or "").strip()
+        if in_active_section:
+            return value
+        # Top-level: only valid before any [section] appears
+        if in_top_level:
+            return value
+    return None
+
+
+def _extract_codex_bearer_token(config_text: str) -> Optional[str]:
+    """Resolve ``experimental_bearer_token`` for Codex, preferring the active
+    custom provider's section over the top-level key.
+
+    Mirrors ``extractCodexExperimentalBearerToken`` in cc-switch (TS).
+    Reserved provider ids (openai/ollama/...) are skipped — only custom
+    providers get the section-scoped lookup; for those we still fall back to
+    the top-level value.
+    """
+    if not config_text:
+        return None
+    active = _extract_codex_active_provider(config_text)
+    # If active is a reserved id, don't look in [model_providers.<active>].
+    want_section = bool(
+        active and active not in _CODEX_RESERVED_PROVIDER_IDS
+    )
+    in_active_section = False
+    in_top_level = True
+    for raw_line in config_text.splitlines():
+        section = _CODEX_SECTION_HEADER_RE.match(raw_line)
+        if section:
+            header = section.group(1).strip()
+            in_active_section = want_section and header == f"model_providers.{active}"
+            in_top_level = False
+            continue
+        m = _CODEX_BEARER_TOKEN_RE.match(raw_line)
+        if not m:
+            continue
+        value = m.group(2).strip()
+        if in_active_section:
+            return value
+        if in_top_level:
+            return value
+    return None
+
+
+def resolve_usage_credentials(
+    agent_type: str, provider: Dict[str, Any]
+) -> Dict[str, str]:
+    """Extract ``(api_key, base_url)`` for the given agent_type's settings.
+
+    Mirrors cc-switch's ``Provider::resolve_usage_credentials`` (provider.rs).
+    Returns a dict whose keys depend on the app — callers either read the
+    type-specific keys (``ANTHROPIC_AUTH_TOKEN`` for Claude, ``OPENAI_API_KEY``
+    for Codex, …) or the generic ``api_key``/``base_url`` aliases.
+
+    Each app keeps the env-var names the agent binary actually reads, so
+    bash usage scripts that source ``$ANTHROPIC_AUTH_TOKEN`` or
+    ``$OPENAI_API_KEY`` continue to work.
+    """
     settings = provider.get("settings") or {}
-    env = settings.get("env", {}) if isinstance(settings.get("env"), dict) else {}
-    api_key = env.get("ANTHROPIC_API_KEY") or env.get("ANTHROPIC_AUTH_TOKEN") or ""
-    base_url = env.get("ANTHROPIC_BASE_URL") or ""
-    return {"ANTHROPIC_AUTH_TOKEN": api_key, "ANTHROPIC_BASE_URL": base_url.rstrip("/")}
+    if not isinstance(settings, dict):
+        settings = {}
+
+    base: Dict[str, str] = {"api_key": "", "base_url": ""}
+
+    if agent_type == "claude":
+        env = settings.get("env") or {}
+        if isinstance(env, dict):
+            base["api_key"] = _first_non_empty(env, _AGENT_API_KEY_VARS["claude"])
+            v = env.get("ANTHROPIC_BASE_URL")
+            if isinstance(v, str):
+                base["base_url"] = v
+        # Mirror the legacy key names so existing bash scripts keep working.
+        if base["api_key"]:
+            base["ANTHROPIC_AUTH_TOKEN"] = base["api_key"]
+        if base["base_url"]:
+            base["ANTHROPIC_BASE_URL"] = base["base_url"]
+
+    elif agent_type == "codex":
+        auth = settings.get("auth") or {}
+        config_text = settings.get("config") or ""
+        if isinstance(auth, dict):
+            key = auth.get("OPENAI_API_KEY")
+            if isinstance(key, str) and key.strip():
+                base["api_key"] = key.strip()
+        if not base["api_key"] and isinstance(config_text, str):
+            tok = _extract_codex_bearer_token(config_text)
+            if tok:
+                base["api_key"] = tok
+        if isinstance(config_text, str):
+            url = _extract_codex_base_url(config_text)
+            if url:
+                base["base_url"] = url
+        if base["api_key"]:
+            base["OPENAI_API_KEY"] = base["api_key"]
+        if base["base_url"]:
+            base["base_url"] = base["base_url"]  # already trimmed below
+
+    elif agent_type == "gemini":
+        env = settings.get("env") or {}
+        if isinstance(env, dict):
+            base["api_key"] = _first_non_empty(env, _AGENT_API_KEY_VARS["gemini"])
+            v = env.get("GOOGLE_GEMINI_BASE_URL")
+            if isinstance(v, str):
+                base["base_url"] = v
+        if base["api_key"]:
+            base["GEMINI_API_KEY"] = base["api_key"]
+        if base["base_url"]:
+            base["GOOGLE_GEMINI_BASE_URL"] = base["base_url"]
+
+    elif agent_type == "hermes":
+        v = settings.get("api_key")
+        if isinstance(v, str) and v.strip():
+            base["api_key"] = v.strip()
+        v = settings.get("base_url")
+        if isinstance(v, str) and v.strip():
+            base["base_url"] = v.strip()
+        if base["api_key"]:
+            base["API_KEY"] = base["api_key"]
+        if base["base_url"]:
+            base["BASE_URL"] = base["base_url"]
+
+    elif agent_type == "opencode" or agent_type == "mimocode":
+        options = settings.get("options") or {}
+        if isinstance(options, dict):
+            v = options.get("apiKey")
+            if isinstance(v, str) and v.strip():
+                base["api_key"] = v.strip()
+            v = options.get("baseURL")
+            if isinstance(v, str) and v.strip():
+                base["base_url"] = v.strip()
+        if base["api_key"]:
+            base["API_KEY"] = base["api_key"]
+        if base["base_url"]:
+            base["BASE_URL"] = base["base_url"]
+
+    # Trim trailing slash on base_url — matches cc-switch behavior so script
+    # paths like ``$ANTHROPIC_BASE_URL/user/balance`` never double-slash.
+    base["base_url"] = base["base_url"].rstrip("/")
+    return base
 
 
 # ── Native balance queries for known providers ──────────────────────────
@@ -819,16 +1046,16 @@ def query_provider_usage(agent_type: str, provider_id: str) -> Dict[str, Any]:
 
     timeout = usage_script.get("timeout", 10) or 10
     template_type = usage_script.get("templateType", "custom")
-    creds = _get_usage_credentials(provider)
+    creds = resolve_usage_credentials(agent_type, provider)
     code = (usage_script.get("code") or "").strip()
 
-    # 1) Native balance query for known providers
+    # 1) Native balance query for known providers (URL pattern match on base_url)
     if template_type == "balance":
-        balance_provider = _detect_balance_provider(creds.get("ANTHROPIC_BASE_URL", ""))
+        balance_provider = _detect_balance_provider(creds.get("base_url", ""))
         if balance_provider:
             return _native_balance_query(
-                creds.get("ANTHROPIC_AUTH_TOKEN", ""),
-                creds.get("ANTHROPIC_BASE_URL", ""),
+                creds.get("api_key", ""),
+                creds.get("base_url", ""),
                 balance_provider, timeout)
         if code:
             return _execute_script_query(code, creds, timeout)
@@ -836,10 +1063,10 @@ def query_provider_usage(agent_type: str, provider_id: str) -> Dict[str, Any]:
 
     # 1b) Native coding plan / token plan query
     if template_type == "token_plan":
-        cp_provider = _detect_coding_plan_provider(creds.get("ANTHROPIC_BASE_URL", ""))
+        cp_provider = _detect_coding_plan_provider(creds.get("base_url", ""))
         if cp_provider:
             return _native_coding_plan_query(
-                creds.get("ANTHROPIC_AUTH_TOKEN", ""),
+                creds.get("api_key", ""),
                 cp_provider, timeout)
         if code:
             return _execute_script_query(code, creds, timeout)
@@ -888,6 +1115,7 @@ __all__ = [
     "get_provider",
     "list_providers",
     "query_provider_usage",
+    "resolve_usage_credentials",
     "save_usage_script",
     "upsert_provider",
 ]

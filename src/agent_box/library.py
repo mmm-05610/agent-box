@@ -30,6 +30,8 @@ _AGENT_TYPES: Dict[str, Dict[str, Any]] = {
     "hermes":   {"config_dir": "~/.hermes",          "binary": "hermes"},
     "opencode": {"config_dir": "~/.config/opencode", "binary": "opencode",
                  "data_dir": "~/.local/share/opencode"},
+    "mimocode": {"config_dir": "~/.config/mimocode", "binary": "mimo",
+                 "data_dir": "~/.local/share/mimocode"},
 }
 
 

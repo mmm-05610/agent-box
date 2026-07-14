@@ -7,7 +7,7 @@ from agent_box import library
 def test_get_agent_types():
     types = library.get_agent_types()
     assert types == sorted(types)
-    assert set(types) == {"claude", "codex", "hermes", "opencode"}
+    assert set(types) == {"claude", "codex", "hermes", "opencode", "mimocode"}
 
 
 def test_get_agent_config_known():
