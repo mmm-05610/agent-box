@@ -9,6 +9,11 @@ interface AgentProviderDraftState {
   codexReasoning: CodexChatReasoning
   codexProxyHeaders: string
   codexProxyBody: string
+  /** Claude-only: outer-dialog state for the local proxy overrides UI. */
+  claudeProxyHeaders: string
+  claudeProxyBody: string
+  /** Claude-only: outer-dialog state for the common-config (raw JSON) editor. */
+  claudeSettingsJson: string
   modelsJson: string
   hermesApiMode: HermesApiMode
   hermesModels: HermesModel[]
@@ -19,6 +24,7 @@ interface AgentProviderDraftState {
 
 const emptyAgentDraft = (): AgentProviderDraftState => ({
   codexConfig: '', codexCatalogModels: [], codexReasoning: {}, codexProxyHeaders: '', codexProxyBody: '',
+  claudeProxyHeaders: '', claudeProxyBody: '', claudeSettingsJson: '',
   modelsJson: '', hermesApiMode: 'openai_compatible', hermesModels: [], hermesRateLimit: undefined,
   opencodeExtraOptions: {}, opencodeNpm: '@ai-sdk/openai-compatible',
 })
@@ -31,6 +37,8 @@ export function useAgentProviderDraft() {
     ...draft,
     setCodexConfig: setter('codexConfig'), setCodexCatalogModels: setter('codexCatalogModels'),
     setCodexReasoning: setter('codexReasoning'), setCodexProxyHeaders: setter('codexProxyHeaders'), setCodexProxyBody: setter('codexProxyBody'),
+    setClaudeProxyHeaders: setter('claudeProxyHeaders'), setClaudeProxyBody: setter('claudeProxyBody'),
+    setClaudeSettingsJson: setter('claudeSettingsJson'),
     setModelsJson: setter('modelsJson'), setHermesApiMode: setter('hermesApiMode'), setHermesModels: setter('hermesModels'),
     setHermesRateLimit: setter('hermesRateLimit'), setOpencodeExtraOptions: setter('opencodeExtraOptions'), setOpencodeNpm: setter('opencodeNpm'),
     resetAgentDraft,

@@ -41,3 +41,16 @@ export {
   FlaskIcon, CoinsIcon, DownloadIcon,
   PlusIcon, TrashIcon, WandIcon, SpinnerIcon, ClockIcon,
 } from './icons'
+
+// ── Provider-wide config (Test + Billing + Local Proxy) ─────────────
+export { ProviderAdvancedConfig } from './ProviderAdvancedConfig'
+export type {
+  ProviderAdvancedConfigProps,
+  PricingModelSourceOption,
+} from './ProviderAdvancedConfig'
+export { LocalProxyRequestOverridesField } from './LocalProxyRequestOverridesField'
+export type { LocalProxyRequestOverridesFieldProps } from './LocalProxyRequestOverridesField'
+
+// ── Outer dialog: Common Config JSON editor ──────────────────────────
+export { CommonConfigEditor } from './CommonConfigEditor'
+export type { CommonConfigEditorProps } from './CommonConfigEditor'

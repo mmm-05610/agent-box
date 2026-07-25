@@ -1,21 +1,28 @@
 /**
  * ClaudeProviderForm — agent-type specific form for Claude providers.
  *
- * Fields (top to bottom):
- *   Basic:  Name, Notes, Website URL, Get API Key link
- *   Auth:   Auth Token (or API Key toggle)
- *   Endpoint: Base URL
- *   Advanced (collapsible): API Format, Model Mapping (4 roles with Quick Set + 1M),
- *     Default Model, Effort, Timeout, checkboxes, Custom User-Agent
+ * Layout (top → bottom):
+ *   Basic:  Name / Notes / Website URL / Get API Key link
+ *   Auth:   Auth Token (or API Key selector)
+ *   Endpoint: Base URL (+ full URL toggle + speed test)
+ *   Advanced (collapsible, hidden when category === 'official'):
+ *     - API Format (hidden when category === 'cloud_provider')
+ *     - Auth Field Select (ANTHROPIC_AUTH_TOKEN / ANTHROPIC_API_KEY)
+ *     - Model Mapping grid (Sonnet/Opus/Fable/Haiku + 1M toggle)
+ *     - Default Model + Effort + Timeout + checkboxes
+ *     - Custom User-Agent
+ *     - Local Proxy Request Overrides (Headers + Body JSON)
+ *
+ * Note: the `settings.json` raw editor is intentionally NOT in this form.
+ * cc-switch exposes it as a separate "Common Config" editor rendered by the
+ * outer dialog. We follow the same separation.
  */
 
-import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
-import { Input, Button, Textarea } from '@/components/ui'
+import { useCallback, useEffect, useState, type ChangeEvent } from 'react'
+import { Input } from '@/components/ui'
 import type { ProviderFormValues } from '../ProviderFormFields'
 import { getSoftWarnings } from '../ProviderFormFields'
-import { EndpointSpeedTest } from '../EndpointSpeedTest'
-import type { FetchedModel } from '@/api'
-import { ApiKeySection, ProviderIdentityFields } from './shared'
+import { ApiKeySection, ProviderIdentityFields, LocalProxyRequestOverridesField } from './shared'
 import { useFetchedModels } from './hooks/useFetchedModels'
 
 // ── 1M marker helpers ──────────────────────────────────────────────────
@@ -54,7 +61,27 @@ const MODEL_ROLES: ModelRoleRow[] = [
   { role: 'haiku',  label: 'Haiku',  modelField: 'ANTHROPIC_DEFAULT_HAIKU_MODEL',  nameField: 'ANTHROPIC_DEFAULT_HAIKU_MODEL_NAME',  supportsOneM: false },
 ]
 
-// ── Component ──────────────────────────────────────────────────────────
+// ── Auth field options ─────────────────────────────────────────────────
+
+type AuthFieldOption = 'ANTHROPIC_AUTH_TOKEN' | 'ANTHROPIC_API_KEY'
+
+const AUTH_FIELD_OPTIONS: ReadonlyArray<{ value: AuthFieldOption; label: string }> = [
+  { value: 'ANTHROPIC_AUTH_TOKEN', label: 'ANTHROPIC_AUTH_TOKEN（默认）' },
+  { value: 'ANTHROPIC_API_KEY', label: 'ANTHROPIC_API_KEY' },
+]
+
+// ── API format options ─────────────────────────────────────────────────
+
+type ApiFormatOption = 'anthropic' | 'openai_chat' | 'openai_responses' | 'gemini_native'
+
+const API_FORMAT_OPTIONS: ReadonlyArray<{ value: ApiFormatOption; label: string }> = [
+  { value: 'anthropic', label: 'Anthropic Messages（原生）' },
+  { value: 'openai_chat', label: 'OpenAI Chat Completions（需转换）' },
+  { value: 'openai_responses', label: 'OpenAI Responses API（需转换）' },
+  { value: 'gemini_native', label: 'Gemini Native generateContent（需转换）' },
+]
+
+// ── Props ──────────────────────────────────────────────────────────────
 
 export interface ClaudeProviderFormProps {
   values: ProviderFormValues
@@ -63,71 +90,54 @@ export interface ClaudeProviderFormProps {
   presetApiKeyUrl?: string
   endpointCandidates?: string[]
   mode?: 'library' | 'profile'
-  settingsJson?: string
-  onSettingsJsonChange?: (next: string) => void
+  /** Provider category — controls Advanced/API Format visibility. */
+  category?: string
+  /** Local proxy headers override (advanced, JSON string). */
+  localProxyHeadersOverride?: string
+  onLocalProxyHeadersOverrideChange?: (next: string) => void
+  localProxyBodyOverride?: string
+  onLocalProxyBodyOverrideChange?: (next: string) => void
 }
 
-export function ClaudeProviderForm({ values, onChange, readOnly, presetApiKeyUrl, endpointCandidates, mode = 'library', settingsJson = '', onSettingsJsonChange }: ClaudeProviderFormProps) {
+// ── Component ──────────────────────────────────────────────────────────
+
+export function ClaudeProviderForm({
+  values,
+  onChange,
+  readOnly,
+  presetApiKeyUrl,
+  endpointCandidates,
+  category,
+  localProxyHeadersOverride = '',
+  onLocalProxyHeadersOverrideChange,
+  localProxyBodyOverride = '',
+  onLocalProxyBodyOverrideChange,
+}: ClaudeProviderFormProps) {
+  const { models: fetchedModels, fetching: fetchingModels, error: fetchError, fetch: handleFetchModels } = useFetchedModels(values.baseUrl, values.authValue, values.isFullUrl)
+  const set = (patch: Partial<ProviderFormValues>) => onChange({ ...values, ...patch })
+
+  // Auto-open advanced when there's any non-default value, so pre-filled
+  // presets don't leave the user wondering where the mapping went.
   const [advancedOpen, setAdvancedOpen] = useState(
     Object.values(values.roleModels).some((r) => r.model || r.name) ||
     !!values.fallbackModel || !!values.apiFormat || values.enableToolSearch || values.includeCoAuthoredBy,
   )
-  const { models: fetchedModels, fetching: fetchingModels, error: fetchError, fetch: handleFetchModels } = useFetchedModels(values.baseUrl, values.authValue, values.isFullUrl)
-  const [settingsJsonLocal, setSettingsJsonLocal] = useState(settingsJson)
-  const lastSentSettingsJsonRef = useRef(settingsJson)
 
-  const set = (patch: Partial<ProviderFormValues>) => onChange({ ...values, ...patch })
+  // cc-switch parity: hide entire Advanced Options when category === 'official'.
+  // Hide just API Format when category === 'cloud_provider'.
+  const showAdvanced = category !== 'official'
+  const showApiFormat = category !== 'cloud_provider'
 
-  useEffect(() => {
-    setSettingsJsonLocal((current) => settingsJson === current ? current : settingsJson)
-  }, [settingsJson])
-
-  // Live preview JSON — mirrors applyClaudeEdits so the user can see exactly
-  // what the saved config will look like.
-  const previewSettingsJson = useMemo(() => {
-    const env: Record<string, string> = {
-      ...(((values as unknown) as Record<string, unknown>)?.env as Record<string, string> | undefined ?? {}),
-    }
-    if (values.baseUrl) env.ANTHROPIC_BASE_URL = values.baseUrl
-    env[values.useApiKey ? 'ANTHROPIC_API_KEY' : 'ANTHROPIC_AUTH_TOKEN'] = values.authValue
-    if (values.fallbackModel) env.ANTHROPIC_MODEL = values.fallbackModel
-    for (const [role, rm] of Object.entries(values.roleModels ?? {})) {
-      const ROLE_FIELD: Record<string, { modelField: string; nameField: string }> = {
-        opus: { modelField: 'ANTHROPIC_DEFAULT_OPUS_MODEL', nameField: 'ANTHROPIC_DEFAULT_OPUS_MODEL_NAME' },
-        sonnet: { modelField: 'ANTHROPIC_DEFAULT_SONNET_MODEL', nameField: 'ANTHROPIC_DEFAULT_SONNET_MODEL_NAME' },
-        haiku: { modelField: 'ANTHROPIC_DEFAULT_HAIKU_MODEL', nameField: 'ANTHROPIC_DEFAULT_HAIKU_MODEL_NAME' },
-      }
-      const fields = ROLE_FIELD[role]
-      if (!fields) continue
-      if (rm.model) env[fields.modelField] = rm.model
-      if (rm.name) env[fields.nameField] = rm.name
-    }
-    if (values.timeoutMs) env.API_TIMEOUT_MS = values.timeoutMs
-    if (values.disableAutoUpdates) env.DISABLE_AUTOUPDATER = '1'
-    for (const k of Object.keys(env)) if (!env[k]) delete env[k]
-    const settings: Record<string, unknown> = {}
-    if (Object.keys(env).length > 0) settings.env = env
-    if (values.apiFormat && values.apiFormat !== 'anthropic') settings.apiFormat = values.apiFormat
-    if (values.effortLevel) settings.effortLevel = values.effortLevel
-    if (values.includeCoAuthoredBy) settings.includeCoAuthoredBy = true
-    if (values.enableToolSearch) settings.ENABLE_TOOL_SEARCH = true
-    if (values.skipWebFetchPreflight) settings.skipWebFetchPreflight = true
-    if (values.customUserAgent) settings.customUserAgent = values.customUserAgent
-    return JSON.stringify(settings, null, 2)
-  }, [values.baseUrl, values.authValue, values.useApiKey, values.fallbackModel, values.roleModels, values.timeoutMs, values.disableAutoUpdates, values.apiFormat, values.effortLevel, values.includeCoAuthoredBy, values.enableToolSearch, values.skipWebFetchPreflight, values.customUserAgent])
-
-  const parentProvided = Boolean(onSettingsJsonChange)
-  const effectiveSettingsJson = parentProvided ? settingsJson : (settingsJson || previewSettingsJson)
-  const setSettingsJson = (next: string) => {
-    if (onSettingsJsonChange) {
-      if (next === lastSentSettingsJsonRef.current) return
-      lastSentSettingsJsonRef.current = next
-      onSettingsJsonChange(next)
-    } else {
-      setSettingsJsonLocal(next)
-    }
-  }
-  const warnings = getSoftWarnings(values)
+  const authFieldValue: AuthFieldOption = values.useApiKey ? 'ANTHROPIC_API_KEY' : 'ANTHROPIC_AUTH_TOKEN'
+  const handleAuthFieldChange = useCallback(
+    (event: ChangeEvent<HTMLSelectElement>) => {
+      set({ useApiKey: event.target.value === 'ANTHROPIC_API_KEY' })
+    },
+    // set is recreated every render but is referentially stable across patches
+    // when values don't change, so eslint is happy.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [set],
+  )
 
   // Quick Set: pick first non-empty model and apply to all roles
   const handleQuickSet = () => {
@@ -165,6 +175,8 @@ export function ClaudeProviderForm({ values, onChange, readOnly, presetApiKeyUrl
     })
   }
 
+  const warnings = getSoftWarnings(values)
+
   return (
     <div className="space-y-4">
       {warnings.length > 0 && (
@@ -178,7 +190,15 @@ export function ClaudeProviderForm({ values, onChange, readOnly, presetApiKeyUrl
       )}
 
       {/* ── Basic ──────────────────────────────────────────────────── */}
-      <ProviderIdentityFields name={values.name} notes={values.notes} websiteUrl={values.websiteUrl} onChange={set} readOnly={readOnly} apiKeyUrl={presetApiKeyUrl} namePlaceholder="Provider name" />
+      <ProviderIdentityFields
+        name={values.name}
+        notes={values.notes}
+        websiteUrl={values.websiteUrl}
+        onChange={set}
+        readOnly={readOnly}
+        apiKeyUrl={presetApiKeyUrl}
+        namePlaceholder="Provider name"
+      />
 
       {/* ── Auth ───────────────────────────────────────────────────── */}
       <ApiKeySection
@@ -212,278 +232,275 @@ export function ClaudeProviderForm({ values, onChange, readOnly, presetApiKeyUrl
           disabled={readOnly}
         />
         {endpointCandidates && endpointCandidates.length > 1 && (
-          <div className="mt-2">
-            <EndpointSpeedTest
-              endpoints={endpointCandidates}
-              selected={values.baseUrl}
-              onSelect={(url) => set({ baseUrl: url })}
-            />
-          </div>
+          <p className="mt-1 text-xs text-muted-foreground">提供 {endpointCandidates.length} 个候选端点；上方按钮可触发速度测试。</p>
         )}
       </div>
 
       {/* ── Advanced ────────────────────────────────────────────────── */}
-      <div>
-        <button
-          type="button"
-          onClick={() => setAdvancedOpen(!advancedOpen)}
-          className="flex items-center gap-1.5 text-sm font-medium text-foreground hover:opacity-70"
-        >
-          <span>{advancedOpen ? '▾' : '▸'}</span> Advanced Options
-        </button>
+      {showAdvanced && (
+        <div className="rounded-lg border border-border/60 bg-card p-3">
+          <button
+            type="button"
+            onClick={() => setAdvancedOpen(!advancedOpen)}
+            className="flex items-center gap-1.5 text-sm font-medium text-foreground hover:opacity-70"
+          >
+            <span>{advancedOpen ? '▾' : '▸'}</span> Advanced Options
+          </button>
+          {!advancedOpen && (
+            <p className="ml-1 mt-1 text-xs text-muted-foreground">
+              包含 API 格式 / 模型映射 / 思考能力 / 自定义 User-Agent 等。
+            </p>
+          )}
 
-        {advancedOpen && (
-          <div className="space-y-4 pt-3 ml-4">
-            {/* API Format */}
-            <div>
-              <label className="text-xs text-muted-foreground block mb-1">API Format</label>
-              <select
-                value={values.apiFormat}
-                onChange={(e) => set({ apiFormat: e.target.value })}
-                className="w-full h-9 rounded-md bg-muted px-3 text-sm text-foreground"
-                disabled={readOnly}
-              >
-                <option value="anthropic">Anthropic Messages (原生)</option>
-                <option value="openai_chat">OpenAI Chat Completions (需转换)</option>
-                <option value="openai_responses">OpenAI Responses API (需转换)</option>
-                <option value="gemini_native">Gemini Native generateContent (需转换)</option>
-              </select>
-            </div>
-
-            {/* Auth field selector */}
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={values.useApiKey}
-                onChange={(e) => set({ useApiKey: e.target.checked })}
-                className="rounded"
-                disabled={readOnly}
-              />
-              <span className="text-xs text-muted-foreground">Use ANTHROPIC_API_KEY instead of ANTHROPIC_AUTH_TOKEN</span>
-            </label>
-
-            {/* Model mapping grid */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-xs text-muted-foreground">Model Mapping (per-role)</label>
-                <div className="flex items-center gap-1.5">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleFetchModels}
-                    disabled={readOnly || fetchingModels}
-                    className="h-7 gap-1 text-xs"
-                    title="从 API 拉取可用模型列表"
+          {advancedOpen && (
+            <div className="ml-4 space-y-4 pt-3">
+              {/* API Format */}
+              {showApiFormat && (
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1">API Format</label>
+                  <select
+                    value={values.apiFormat}
+                    onChange={(e) => set({ apiFormat: e.target.value })}
+                    disabled={readOnly}
+                    className="w-full h-9 rounded-md bg-input px-3 text-sm text-foreground border border-border focus:border-foreground/30 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {fetchingModels ? (
-                      <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                      </svg>
-                    ) : (
+                    {API_FORMAT_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-muted-foreground">选择供应商 API 的输入格式</p>
+                </div>
+              )}
+
+              {/* Auth field selector (replaces the old checkbox) */}
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1">认证字段</label>
+                <select
+                  value={authFieldValue}
+                  onChange={handleAuthFieldChange}
+                  disabled={readOnly}
+                  className="w-full h-9 rounded-md bg-input px-3 text-sm text-foreground border border-border focus:border-foreground/30 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {AUTH_FIELD_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-muted-foreground">选择写入配置的认证环境变量名</p>
+              </div>
+
+              {/* Model mapping grid */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs text-muted-foreground">Model Mapping（per-role）</label>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={handleFetchModels}
+                      disabled={readOnly || fetchingModels}
+                      className="h-7 gap-1 text-xs inline-flex items-center rounded-md border border-border bg-muted px-2 text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                      title="从 API 拉取可用模型列表"
+                    >
+                      {fetchingModels ? (
+                        <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                        </svg>
+                      ) : (
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
+                        </svg>
+                      )}
+                      拉取模型
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleQuickSet}
+                      disabled={readOnly || (!values.fallbackModel && !Object.values(values.roleModels).some((r) => r.model))}
+                      className="h-7 gap-1 text-xs inline-flex items-center rounded-md border border-border bg-muted px-2 text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                      title="将当前已有模型名一键应用到所有角色"
+                    >
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
+                        <path d="M15 4V2" /><path d="M15 16v-2" /><path d="M8 9h2" /><path d="M20 9h2" /><path d="M17.8 11.8 19 13" /><path d="M15 9h.01" /><path d="M17.8 6.2 19 5" /><path d="m3 21 9-9" /><path d="M12.2 6.2 11 5" />
                       </svg>
-                    )}
-                    拉取模型
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleQuickSet}
-                    disabled={readOnly || (!values.fallbackModel && !Object.values(values.roleModels).some((r) => r.model))}
-                    className="h-7 gap-1 text-xs"
-                    title="将当前已有模型名一键应用到所有角色"
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
-                      <path d="M15 4V2" /><path d="M15 16v-2" /><path d="M8 9h2" /><path d="M20 9h2" /><path d="M17.8 11.8 19 13" /><path d="M15 9h.01" /><path d="M17.8 6.2 19 5" /><path d="m3 21 9-9" /><path d="M12.2 6.2 11 5" />
-                    </svg>
-                    一键设置
-                  </Button>
+                      一键设置
+                    </button>
+                  </div>
+                </div>
+                {fetchError && (
+                  <p className="text-xs text-red-500 mt-1">{fetchError}</p>
+                )}
+                <div className="space-y-2">
+                  {MODEL_ROLES.map((row) => {
+                    const roleModel = values.roleModels[row.role]?.model ?? ''
+                    const usesOneM = row.supportsOneM && hasOneMMarker(roleModel)
+                    return (
+                      <div key={row.role} className="grid grid-cols-1 md:grid-cols-[100px_1fr_1fr_auto] gap-2 items-center">
+                        <div className="flex h-9 items-center rounded-md bg-muted border border-border px-3 text-xs font-medium text-muted-foreground">
+                          {row.label}
+                        </div>
+                        <Input
+                          value={values.roleModels[row.role]?.name ?? ''}
+                          onChange={(e) =>
+                            set({
+                              roleModels: {
+                                ...values.roleModels,
+                                [row.role]: { ...values.roleModels[row.role], name: e.target.value },
+                              },
+                            })
+                          }
+                          placeholder="Display name"
+                          className="text-sm font-mono"
+                          disabled={readOnly}
+                        />
+                        <ModelDropdown
+                          value={roleModel}
+                          onChange={(v) =>
+                            set({
+                              roleModels: {
+                                ...values.roleModels,
+                                [row.role]: { ...values.roleModels[row.role], model: v },
+                              },
+                            })
+                          }
+                          models={fetchedModels}
+                          placeholder={row.modelField}
+                          disabled={readOnly}
+                        />
+                        {row.supportsOneM ? (
+                          <label className="flex h-9 items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={usesOneM}
+                              onChange={(e) => handleOneMToggle(row, e.target.checked)}
+                              className="rounded"
+                              disabled={readOnly}
+                            />
+                            1M
+                          </label>
+                        ) : (
+                          <div className="hidden md:block" />
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  选择模型角色后，CC Switch 会自动生成 Claude 兼容路由；菜单显示名可以填品牌模型名，实际请求模型按右侧填写内容发送。
+                </p>
+              </div>
+
+              {/* Default Model */}
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1">Default Model (ANTHROPIC_MODEL)</label>
+                <Input
+                  value={values.fallbackModel}
+                  onChange={(e) => set({ fallbackModel: e.target.value })}
+                  placeholder="claude-opus-4-8"
+                  className="text-sm font-mono"
+                  disabled={readOnly}
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  未明确落到 Sonnet/Opus/Fable/Haiku 角色的请求会使用此模型。使用第三方/中转端点时建议填写，否则这些请求会以原始 Claude 模型名透传给上游，可能因上游无此模型而报错。
+                </p>
+              </div>
+
+              {/* Effort + Timeout */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1">Effort Level</label>
+                  <Input
+                    value={values.effortLevel}
+                    onChange={(e) => set({ effortLevel: e.target.value })}
+                    placeholder="medium"
+                    className="text-sm font-mono"
+                    disabled={readOnly}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1">API Timeout (ms)</label>
+                  <Input
+                    value={values.timeoutMs}
+                    onChange={(e) => set({ timeoutMs: e.target.value })}
+                    placeholder="60000"
+                    className="text-sm font-mono"
+                    disabled={readOnly}
+                  />
                 </div>
               </div>
-              {fetchError && (
-                <p className="text-xs text-red-500 mt-1">{fetchError}</p>
-              )}
+
+              {/* Checkboxes */}
               <div className="space-y-2">
-                {MODEL_ROLES.map((row) => {
-                  const roleModel = values.roleModels[row.role]?.model ?? ''
-                  const usesOneM = row.supportsOneM && hasOneMMarker(roleModel)
-                  return (
-                    <div key={row.role} className="grid grid-cols-1 md:grid-cols-[100px_1fr_1fr_auto] gap-2 items-center">
-                      <div className="flex h-9 items-center rounded-md bg-muted border border-border px-3 text-xs font-medium text-muted-foreground">
-                        {row.label}
-                      </div>
-                      <Input
-                        value={values.roleModels[row.role]?.name ?? ''}
-                        onChange={(e) =>
-                          set({
-                            roleModels: {
-                              ...values.roleModels,
-                              [row.role]: { ...values.roleModels[row.role], name: e.target.value },
-                            },
-                          })
-                        }
-                        placeholder="Display name"
-                        className="text-sm font-mono"
-                        disabled={readOnly}
-                      />
-                      <ModelDropdown
-                        value={roleModel}
-                        onChange={(v) =>
-                          set({
-                            roleModels: {
-                              ...values.roleModels,
-                              [row.role]: { ...values.roleModels[row.role], model: v },
-                            },
-                          })
-                        }
-                        models={fetchedModels}
-                        placeholder={row.modelField}
-                        disabled={readOnly}
-                      />
-                      {row.supportsOneM ? (
-                        <label className="flex h-9 items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
-                          <input
-                            type="checkbox"
-                            checked={usesOneM}
-                            onChange={(e) => handleOneMToggle(row, e.target.checked)}
-                            className="rounded"
-                            disabled={readOnly}
-                          />
-                          1M
-                        </label>
-                      ) : (
-                        <div className="hidden md:block" />
-                      )}
-                    </div>
-                  )
-                })}
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={values.includeCoAuthoredBy}
+                    onChange={(e) => set({ includeCoAuthoredBy: e.target.checked })}
+                    className="rounded"
+                    disabled={readOnly}
+                  />
+                  <span className="text-xs text-muted-foreground">Include co-authored-by attribution</span>
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={values.enableToolSearch}
+                    onChange={(e) => set({ enableToolSearch: e.target.checked })}
+                    className="rounded"
+                    disabled={readOnly}
+                  />
+                  <span className="text-xs text-muted-foreground">Enable tool search (ENABLE_TOOL_SEARCH)</span>
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={values.skipWebFetchPreflight}
+                    onChange={(e) => set({ skipWebFetchPreflight: e.target.checked })}
+                    className="rounded"
+                    disabled={readOnly}
+                  />
+                  <span className="text-xs text-muted-foreground">Skip WebFetch preflight check</span>
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={values.disableAutoUpdates}
+                    onChange={(e) => set({ disableAutoUpdates: e.target.checked })}
+                    className="rounded"
+                    disabled={readOnly}
+                  />
+                  <span className="text-xs text-muted-foreground">Disable auto-updates</span>
+                </label>
               </div>
-            </div>
 
-            {/* Default Model */}
-            <div>
-              <label className="text-xs text-muted-foreground block mb-1">Default Model (ANTHROPIC_MODEL)</label>
-              <Input
-                value={values.fallbackModel}
-                onChange={(e) => set({ fallbackModel: e.target.value })}
-                placeholder="claude-opus-4-8"
-                className="text-sm font-mono"
-                disabled={readOnly}
-              />
-            </div>
-
-            {/* Effort + Timeout */}
-            <div className="grid grid-cols-2 gap-4">
+              {/* Custom User-Agent */}
               <div>
-                <label className="text-xs text-muted-foreground block mb-1">Effort Level</label>
+                <label className="text-xs text-muted-foreground block mb-1">Custom User-Agent</label>
                 <Input
-                  value={values.effortLevel}
-                  onChange={(e) => set({ effortLevel: e.target.value })}
-                  placeholder="medium"
+                  value={values.customUserAgent}
+                  onChange={(e) => set({ customUserAgent: e.target.value })}
+                  placeholder="Optional"
                   className="text-sm font-mono"
                   disabled={readOnly}
                 />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  自定义 User-Agent。预设供应商已自动配置；自定义供应商会按名称/地址自动推断。仅当自动识别不准时才需手动覆盖。
+                </p>
               </div>
-              <div>
-                <label className="text-xs text-muted-foreground block mb-1">API Timeout (ms)</label>
-                <Input
-                  value={values.timeoutMs}
-                  onChange={(e) => set({ timeoutMs: e.target.value })}
-                  placeholder="60000"
-                  className="text-sm font-mono"
-                  disabled={readOnly}
-                />
-              </div>
-            </div>
 
-            {/* Checkboxes */}
-            <div className="space-y-2">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={values.includeCoAuthoredBy}
-                  onChange={(e) => set({ includeCoAuthoredBy: e.target.checked })}
-                  className="rounded"
+              {/* Local Proxy Request Overrides */}
+              {onLocalProxyHeadersOverrideChange && onLocalProxyBodyOverrideChange && (
+                <LocalProxyRequestOverridesField
+                  headersJson={localProxyHeadersOverride}
+                  bodyJson={localProxyBodyOverride}
+                  onHeadersJsonChange={onLocalProxyHeadersOverrideChange}
+                  onBodyJsonChange={onLocalProxyBodyOverrideChange}
                   disabled={readOnly}
                 />
-                <span className="text-xs text-muted-foreground">Include co-authored-by attribution</span>
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={values.enableToolSearch}
-                  onChange={(e) => set({ enableToolSearch: e.target.checked })}
-                  className="rounded"
-                  disabled={readOnly}
-                />
-                <span className="text-xs text-muted-foreground">Enable tool search (ENABLE_TOOL_SEARCH)</span>
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={values.skipWebFetchPreflight}
-                  onChange={(e) => set({ skipWebFetchPreflight: e.target.checked })}
-                  className="rounded"
-                  disabled={readOnly}
-                />
-                <span className="text-xs text-muted-foreground">Skip WebFetch preflight check</span>
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={values.disableAutoUpdates}
-                  onChange={(e) => set({ disableAutoUpdates: e.target.checked })}
-                  className="rounded"
-                  disabled={readOnly}
-                />
-                <span className="text-xs text-muted-foreground">Disable auto-updates</span>
-              </label>
+              )}
             </div>
-
-            {/* Custom User-Agent */}
-            <div>
-              <label className="text-xs text-muted-foreground block mb-1">Custom User-Agent</label>
-              <Input
-                value={values.customUserAgent}
-                onChange={(e) => set({ customUserAgent: e.target.value })}
-                placeholder="Optional"
-                className="text-sm font-mono"
-                disabled={readOnly}
-              />
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="rounded-lg border border-border bg-card p-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h4 className="text-base font-medium">settings.json (JSON)</h4>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              {parentProvided
-                ? '该供应商的完整 settings_config JSON（env + apiFormat + effortLevel 等）；修改后会被原样写入 Claude Code 配置。普通编辑请使用上方结构化字段。'
-                : '上方结构化字段对应的 settings_config JSON 预览（只读）；保存时由结构化字段自动生成。'}
-            </p>
-          </div>
-          {!parentProvided && (
-            <span className="rounded-md bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">实时预览</span>
           )}
         </div>
-        <Textarea
-          value={effectiveSettingsJson}
-          onChange={(event) => setSettingsJson(event.target.value)}
-          rows={Math.min(16, Math.max(6, effectiveSettingsJson.split('\n').length + 1))}
-          readOnly={!parentProvided}
-          className="mt-3 font-mono text-sm"
-          disabled={readOnly && !parentProvided}
-        />
-      </div>
-
-      {mode === 'profile' && <p className="text-xs text-muted-foreground">Profile 模式保存到当前 Claude Code 配置文件。</p>}
+      )}
     </div>
   )
 }
@@ -499,23 +516,24 @@ function ModelDropdown({
 }: {
   value: string
   onChange: (v: string) => void
-  models: FetchedModel[]
+  models: { id: string; owned_by?: string }[]
   placeholder?: string
   disabled?: boolean
 }) {
   const [open, setOpen] = useState(false)
-  const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false)
+      const target = e.target as HTMLElement | null
+      if (!target) return
+      if (!target.closest?.('[data-model-dropdown-root]')) setOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
   // Group by vendor
-  const grouped: Record<string, FetchedModel[]> = {}
+  const grouped: Record<string, typeof models> = {}
   for (const m of models) {
     const vendor = m.owned_by || 'Other'
     if (!grouped[vendor]) grouped[vendor] = []
@@ -524,7 +542,7 @@ function ModelDropdown({
   const vendors = Object.keys(grouped).sort()
 
   return (
-      <div ref={containerRef} className="relative">
+    <div className="relative" data-model-dropdown-root>
       <div className="flex gap-1">
         <input
           value={value}
@@ -578,5 +596,3 @@ function ModelDropdown({
     </div>
   )
 }
-
-// ── Auth input ─────────────────────────────────────────────────────────

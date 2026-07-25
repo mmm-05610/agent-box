@@ -7,6 +7,7 @@ import type { OpenCodeNpmPackage } from '../forms/OpenCodeProviderForm'
 
 export interface ProviderEditorDraft {
   values: ProviderFormValues
+  claude: { proxyHeaders: string; proxyBody: string; settingsJson: string }
   codex: { config: string; catalogModels: CodexCatalogModel[]; reasoning: CodexChatReasoning; proxyHeaders: string; proxyBody: string }
   hermes: { apiMode: HermesApiMode; models: HermesModel[]; rateLimitDelay?: number }
   opencode: { npm: OpenCodeNpmPackage; modelsJson: string; extraOptions: Record<string, unknown> }
@@ -20,6 +21,11 @@ export function readProviderEditorDraft(agentType: string, settings: Record<stri
   const apiMode = settings.api_mode
   return {
     values: getInitialFormValues(agentType, settings),
+    claude: {
+      proxyHeaders: typeof settings.localProxyHeadersOverride === 'string' ? settings.localProxyHeadersOverride : '',
+      proxyBody: typeof settings.localProxyBodyOverride === 'string' ? settings.localProxyBodyOverride : '',
+      settingsJson: typeof settings._settingsJsonOverride === 'string' ? settings._settingsJsonOverride : '',
+    },
     codex: {
       config: typeof settings.config === 'string' ? settings.config : '',
       catalogModels: readCodexCatalogModels(settings),
@@ -76,6 +82,30 @@ export function writeProviderEditorDraft(agentType: string, original: Record<str
     next.npm = draft.opencode.npm
     if (draft.opencode.modelsJson.trim()) next.models = JSON.parse(draft.opencode.modelsJson) as Record<string, unknown>
     else delete next.models
+  }
+  if (agentType === 'claude') {
+    if (draft.claude.proxyHeaders.trim()) next.localProxyHeadersOverride = draft.claude.proxyHeaders
+    else delete next.localProxyHeadersOverride
+    if (draft.claude.proxyBody.trim()) next.localProxyBodyOverride = draft.claude.proxyBody
+    else delete next.localProxyBodyOverride
+    if (draft.claude.settingsJson.trim()) {
+      try {
+        // Outer-dialog JSON overrides the structured-field-derived settings.
+        // Parse + re-stringify to strip comments / normalize whitespace, then
+        // overwrite `next` keys so the user's raw edit wins.
+        const parsed = JSON.parse(draft.claude.settingsJson)
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          for (const [key, value] of Object.entries(parsed)) {
+            next[key] = value
+          }
+        }
+      } catch {
+        // Malformed JSON — keep structured fields, ignore override. A toast
+        // should be surfaced by the caller.
+      }
+    } else {
+      delete next._settingsJsonOverride
+    }
   }
   return next
 }

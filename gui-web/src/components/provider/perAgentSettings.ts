@@ -198,6 +198,35 @@ function applyClaudeEdits(
   if (fv.enableToolSearch) next.ENABLE_TOOL_SEARCH = true; else delete next.ENABLE_TOOL_SEARCH
   if (fv.skipWebFetchPreflight) next.skipWebFetchPreflight = true; else delete next.skipWebFetchPreflight
   if (fv.customUserAgent) next.customUserAgent = fv.customUserAgent; else delete next.customUserAgent
+  // Test config — written when enabled OR when individual values are present,
+  // deleted otherwise. Matches the cc-switch schema: { enabled, timeoutSecs,
+  // degradedThresholdMs, maxRetries }.
+  if (fv.testConfigEnabled || fv.testTimeout || fv.testDegradedThreshold || fv.testMaxRetries) {
+    next.testConfig = {
+      enabled: true,
+      ...(fv.testTimeout ? { timeoutSecs: Number(fv.testTimeout) } : {}),
+      ...(fv.testDegradedThreshold ? { degradedThresholdMs: Number(fv.testDegradedThreshold) } : {}),
+      ...(fv.testMaxRetries ? { maxRetries: Number(fv.testMaxRetries) } : {}),
+    }
+  } else {
+    delete next.testConfig
+  }
+  // Billing config — costMultiplier + pricingModelSource. Only persists when
+  // enabled OR a non-default value is set, so the JSON stays minimal for
+  // providers that don't customize billing.
+  if (fv.pricingConfigEnabled || (fv.costMultiplier && fv.costMultiplier !== '1') || (fv.pricingModelSource && fv.pricingModelSource !== 'inherit')) {
+    next.pricingConfig = {
+      enabled: fv.pricingConfigEnabled,
+      costMultiplier: fv.costMultiplier ? Number(fv.costMultiplier) : 1,
+      pricingModelSource: fv.pricingModelSource || 'inherit',
+    }
+    if (fv.costMultiplier) next.costMultiplier = Number(fv.costMultiplier)
+    if (fv.pricingModelSource) next.pricingModelSource = fv.pricingModelSource
+  } else {
+    delete next.pricingConfig
+    delete next.costMultiplier
+    delete next.pricingModelSource
+  }
   return next
 }
 
@@ -237,8 +266,15 @@ function applyCodexEdits(
     delete next.testConfig
     delete next.testConfigEnabled
   }
-  // 计费配置（costMultiplier / pricingModelSource / pricingConfigEnabled）暂未启用：
-  // 表单里没有对应 UI，下游也没有 reader。等使用统计/成本面板上线后再恢复这段逻辑。
+  // Billing config — same shape as applyClaudeEdits, but Codex's TOML block
+  // doesn't include these keys, so we only persist to top-level next.
+  if (fv.pricingConfigEnabled || (fv.costMultiplier && fv.costMultiplier !== '1') || (fv.pricingModelSource && fv.pricingModelSource !== 'inherit')) {
+    next.costMultiplier = fv.costMultiplier ? Number(fv.costMultiplier) : 1
+    next.pricingModelSource = fv.pricingModelSource || 'inherit'
+  } else {
+    delete next.costMultiplier
+    delete next.pricingModelSource
+  }
   return next
 }
 

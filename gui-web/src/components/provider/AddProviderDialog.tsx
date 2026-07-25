@@ -141,6 +141,7 @@ export function AddProviderDialog({
     try {
       const settings = writeProviderEditorDraft(agentType, {}, {
         values: formValues,
+        claude: { proxyHeaders: claudeProxyHeaders, proxyBody: claudeProxyBody, settingsJson: claudeSettingsJson },
         codex: { config: codexConfig, catalogModels: codexCatalogModels, reasoning: codexReasoning, proxyHeaders: codexProxyHeaders, proxyBody: codexProxyBody },
         hermes: { apiMode: hermesApiMode, models: hermesModels, rateLimitDelay: hermesRateLimit },
         opencode: { npm: opencodeNpm, modelsJson, extraOptions: opencodeExtraOptions },
@@ -202,8 +203,15 @@ export function AddProviderDialog({
 
           <AgentTypeForm
             agentType={agentType}
+            category={category}
             values={formValues}
             onChange={setFormValues}
+            claudeProxyHeaders={claudeProxyHeaders}
+            onClaudeProxyHeadersChange={setClaudeProxyHeaders}
+            claudeProxyBody={claudeProxyBody}
+            onClaudeProxyBodyChange={setClaudeProxyBody}
+            claudeSettingsJson={claudeSettingsJson}
+            onClaudeSettingsJsonChange={setClaudeSettingsJson}
             codexConfig={codexConfig}
             onCodexConfigChange={setCodexConfig}
             catalogModels={codexCatalogModels}
@@ -229,6 +237,32 @@ export function AddProviderDialog({
             opencodeNpm={opencodeNpm}
             onOpencodeNpmChange={setOpencodeNpm}
           />
+        </div>
+
+        {/* ── Provider-wide advanced (Test + Billing + Common Config) ─── */}
+        <div className="border-t border-border px-5 py-3 space-y-3">
+          <ProviderAdvancedConfig
+            testConfigEnabled={formValues.testConfigEnabled}
+            testTimeout={formValues.testTimeout}
+            testDegradedThreshold={formValues.testDegradedThreshold}
+            testMaxRetries={formValues.testMaxRetries}
+            pricingConfigEnabled={formValues.pricingConfigEnabled}
+            costMultiplier={formValues.costMultiplier}
+            pricingModelSource={formValues.pricingModelSource}
+            onTestConfigEnabledChange={(enabled) => setFormValues({ ...formValues, testConfigEnabled: enabled })}
+            onTestTimeoutChange={(value) => setFormValues({ ...formValues, testTimeout: value })}
+            onTestDegradedThresholdChange={(value) => setFormValues({ ...formValues, testDegradedThreshold: value })}
+            onTestMaxRetriesChange={(value) => setFormValues({ ...formValues, testMaxRetries: value })}
+            onPricingConfigEnabledChange={(enabled) => setFormValues({ ...formValues, pricingConfigEnabled: enabled })}
+            onCostMultiplierChange={(value) => setFormValues({ ...formValues, costMultiplier: value })}
+            onPricingModelSourceChange={(value) => setFormValues({ ...formValues, pricingModelSource: value })}
+          />
+          {agentType === 'claude' && (
+            <CommonConfigEditor
+              value={claudeSettingsJson}
+              onChange={setClaudeSettingsJson}
+            />
+          )}
         </div>
 
         {/* ── Footer ─────────────────────────────────────────────────── */}
@@ -271,6 +305,7 @@ export function AddProviderDialog({
 
 function AgentTypeForm(props: {
   agentType: AgentType
+  category?: string
   values: ProviderFormValues
   onChange: (next: ProviderFormValues) => void
   codexConfig: string
@@ -283,6 +318,12 @@ function AgentTypeForm(props: {
   onCodexProxyHeadersChange: (next: string) => void
   codexProxyBody: string
   onCodexProxyBodyChange: (next: string) => void
+  claudeProxyHeaders: string
+  onClaudeProxyHeadersChange: (next: string) => void
+  claudeProxyBody: string
+  onClaudeProxyBodyChange: (next: string) => void
+  claudeSettingsJson: string
+  onClaudeSettingsJsonChange: (next: string) => void
   modelsJson: string
   onModelsJsonChange: (s: string) => void
   presetApiKeyUrl?: string
@@ -306,6 +347,11 @@ function AgentTypeForm(props: {
           onChange={props.onChange}
           presetApiKeyUrl={props.presetApiKeyUrl}
           endpointCandidates={props.endpointCandidates}
+          category={props.category}
+          localProxyHeadersOverride={props.claudeProxyHeaders}
+          onLocalProxyHeadersOverrideChange={props.onClaudeProxyHeadersChange}
+          localProxyBodyOverride={props.claudeProxyBody}
+          onLocalProxyBodyOverrideChange={props.onClaudeProxyBodyChange}
         />
       )
     case 'codex':

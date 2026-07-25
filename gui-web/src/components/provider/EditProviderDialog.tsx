@@ -23,6 +23,7 @@ import { CodexProviderForm, readCodexCatalogModels, type CodexCatalogModel, type
 import { HermesProviderForm, readHermesModels, type HermesApiMode, type HermesModel } from './forms/HermesProviderForm'
 import { OpenCodeProviderForm, type OpenCodeNpmPackage } from './forms/OpenCodeProviderForm'
 import { useAgentProviderDraft } from './forms/hooks/useAgentProviderDraft'
+import { ProviderAdvancedConfig, CommonConfigEditor } from './forms/shared'
 
 export interface EditProviderDialogProps {
   open: boolean
@@ -42,7 +43,24 @@ export function EditProviderDialog({
   toast,
 }: EditProviderDialogProps) {
   const [formValues, setFormValues] = useState<ProviderFormValues>(defaultFormValues())
-  const { codexConfig, setCodexConfig, codexCatalogModels, setCodexCatalogModels, codexReasoning, setCodexReasoning, codexProxyHeaders, setCodexProxyHeaders, codexProxyBody, setCodexProxyBody, modelsJson, setModelsJson, hermesApiMode, setHermesApiMode, hermesModels, setHermesModels, hermesRateLimit, setHermesRateLimit, opencodeExtraOptions, setOpencodeExtraOptions, opencodeNpm, setOpencodeNpm, resetAgentDraft } = useAgentProviderDraft()
+  const {
+    codexConfig, setCodexConfig,
+    codexCatalogModels, setCodexCatalogModels,
+    codexReasoning, setCodexReasoning,
+    codexProxyHeaders, setCodexProxyHeaders,
+    codexProxyBody, setCodexProxyBody,
+    claudeProxyHeaders, setClaudeProxyHeaders,
+    claudeProxyBody, setClaudeProxyBody,
+    claudeSettingsJson, setClaudeSettingsJson,
+    modelsJson, setModelsJson,
+    hermesApiMode, setHermesApiMode,
+    hermesModels, setHermesModels,
+    hermesRateLimit, setHermesRateLimit,
+    opencodeExtraOptions, setOpencodeExtraOptions,
+    opencodeNpm, setOpencodeNpm,
+    resetAgentDraft,
+  } = useAgentProviderDraft()
+  const [category, setCategory] = useState<string | undefined>(undefined)
   const [originalSettings, setOriginalSettings] = useState<Record<string, unknown>>({})
   const [providerName, setProviderName] = useState('')
   const [loading, setLoading] = useState(false)
@@ -72,6 +90,7 @@ export function EditProviderDialog({
         setOriginalSettings(settings)
         setFormValues(draft.values)
         setProviderName((detail?.name as string | undefined) ?? providerId)
+        setCategory(detail?.category)
         setCodexConfig(draft.codex.config)
         setCodexCatalogModels(draft.codex.catalogModels)
         setCodexReasoning(draft.codex.reasoning)
@@ -83,6 +102,9 @@ export function EditProviderDialog({
         setHermesApiMode(draft.hermes.apiMode)
         setHermesModels(draft.hermes.models)
         setHermesRateLimit(draft.hermes.rateLimitDelay)
+        setClaudeProxyHeaders(draft.claude.proxyHeaders)
+        setClaudeProxyBody(draft.claude.proxyBody)
+        setClaudeSettingsJson(draft.claude.settingsJson)
       })
       .catch((e) => {
         if (cancelled) return
@@ -130,6 +152,7 @@ export function EditProviderDialog({
     try {
       const settings = writeProviderEditorDraft(agentType, originalSettings, {
         values: formValues,
+        claude: { proxyHeaders: claudeProxyHeaders, proxyBody: claudeProxyBody, settingsJson: claudeSettingsJson },
         codex: { config: codexConfig, catalogModels: codexCatalogModels, reasoning: codexReasoning, proxyHeaders: codexProxyHeaders, proxyBody: codexProxyBody },
         hermes: { apiMode: hermesApiMode, models: hermesModels, rateLimitDelay: hermesRateLimit },
         opencode: { npm: opencodeNpm, modelsJson, extraOptions: opencodeExtraOptions },
@@ -179,6 +202,7 @@ export function EditProviderDialog({
           ) : (
             <AgentTypeForm
               agentType={agentType}
+              category={category}
               values={formValues}
               onChange={setFormValues}
               codexConfig={codexConfig}
@@ -191,6 +215,12 @@ export function EditProviderDialog({
               onCodexProxyHeadersChange={setCodexProxyHeaders}
               codexProxyBody={codexProxyBody}
               onCodexProxyBodyChange={setCodexProxyBody}
+              claudeProxyHeaders={claudeProxyHeaders}
+              onClaudeProxyHeadersChange={setClaudeProxyHeaders}
+              claudeProxyBody={claudeProxyBody}
+              onClaudeProxyBodyChange={setClaudeProxyBody}
+              claudeSettingsJson={claudeSettingsJson}
+              onClaudeSettingsJsonChange={setClaudeSettingsJson}
               modelsJson={modelsJson}
               onModelsJsonChange={setModelsJson}
               hermesApiMode={hermesApiMode}
@@ -206,6 +236,34 @@ export function EditProviderDialog({
             />
           )}
         </div>
+
+        {/* ── Provider-wide advanced (Test + Billing + Common Config) ─── */}
+        {!loading && (
+          <div className="border-t border-border px-5 py-3 space-y-3">
+            <ProviderAdvancedConfig
+              testConfigEnabled={formValues.testConfigEnabled}
+              testTimeout={formValues.testTimeout}
+              testDegradedThreshold={formValues.testDegradedThreshold}
+              testMaxRetries={formValues.testMaxRetries}
+              pricingConfigEnabled={formValues.pricingConfigEnabled}
+              costMultiplier={formValues.costMultiplier}
+              pricingModelSource={formValues.pricingModelSource}
+              onTestConfigEnabledChange={(enabled) => setFormValues({ ...formValues, testConfigEnabled: enabled })}
+              onTestTimeoutChange={(value) => setFormValues({ ...formValues, testTimeout: value })}
+              onTestDegradedThresholdChange={(value) => setFormValues({ ...formValues, testDegradedThreshold: value })}
+              onTestMaxRetriesChange={(value) => setFormValues({ ...formValues, testMaxRetries: value })}
+              onPricingConfigEnabledChange={(enabled) => setFormValues({ ...formValues, pricingConfigEnabled: enabled })}
+              onCostMultiplierChange={(value) => setFormValues({ ...formValues, costMultiplier: value })}
+              onPricingModelSourceChange={(value) => setFormValues({ ...formValues, pricingModelSource: value })}
+            />
+            {agentType === 'claude' && (
+              <CommonConfigEditor
+                value={claudeSettingsJson}
+                onChange={setClaudeSettingsJson}
+              />
+            )}
+          </div>
+        )}
 
         {/* ── Footer ─────────────────────────────────────────────────── */}
         <div className="border-t border-border px-5 py-3 space-y-2">
@@ -247,6 +305,7 @@ export function EditProviderDialog({
 
 function AgentTypeForm(props: {
   agentType: AgentType
+  category?: string
   values: ProviderFormValues
   onChange: (next: ProviderFormValues) => void
   codexConfig: string
@@ -259,6 +318,12 @@ function AgentTypeForm(props: {
   onCodexProxyHeadersChange: (next: string) => void
   codexProxyBody: string
   onCodexProxyBodyChange: (next: string) => void
+  claudeProxyHeaders: string
+  onClaudeProxyHeadersChange: (next: string) => void
+  claudeProxyBody: string
+  onClaudeProxyBodyChange: (next: string) => void
+  claudeSettingsJson: string
+  onClaudeSettingsJsonChange: (next: string) => void
   modelsJson: string
   onModelsJsonChange: (s: string) => void
   hermesApiMode?: HermesApiMode
@@ -274,7 +339,18 @@ function AgentTypeForm(props: {
 }): ReactNode {
   switch (props.agentType) {
     case 'claude':
-      return <ClaudeProviderForm values={props.values} onChange={props.onChange} presetApiKeyUrl={props.values.websiteUrl || undefined} />
+      return (
+        <ClaudeProviderForm
+          values={props.values}
+          onChange={props.onChange}
+          presetApiKeyUrl={props.values.websiteUrl || undefined}
+          category={props.category}
+          localProxyHeadersOverride={props.claudeProxyHeaders}
+          onLocalProxyHeadersOverrideChange={props.onClaudeProxyHeadersChange}
+          localProxyBodyOverride={props.claudeProxyBody}
+          onLocalProxyBodyOverrideChange={props.onClaudeProxyBodyChange}
+        />
+      )
     case 'codex':
       return (
         <CodexProviderForm
