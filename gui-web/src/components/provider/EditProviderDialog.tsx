@@ -200,6 +200,7 @@ export function EditProviderDialog({
           {loading ? (
             <p className="text-sm text-muted-foreground py-8 text-center">Loading...</p>
           ) : (
+            <>
             <AgentTypeForm
               agentType={agentType}
               category={category}
@@ -234,36 +235,35 @@ export function EditProviderDialog({
               opencodeNpm={opencodeNpm}
               onOpencodeNpmChange={setOpencodeNpm}
             />
+
+            {/* ── Provider-wide advanced (Test + Billing + Common Config) ─── */}
+            <div className="border-t border-border pt-3 space-y-3">
+              <ProviderAdvancedConfig
+                testConfigEnabled={formValues.testConfigEnabled}
+                testTimeout={formValues.testTimeout}
+                testDegradedThreshold={formValues.testDegradedThreshold}
+                testMaxRetries={formValues.testMaxRetries}
+                pricingConfigEnabled={formValues.pricingConfigEnabled}
+                costMultiplier={formValues.costMultiplier}
+                pricingModelSource={formValues.pricingModelSource}
+                onTestConfigEnabledChange={(enabled) => setFormValues({ ...formValues, testConfigEnabled: enabled })}
+                onTestTimeoutChange={(value) => setFormValues({ ...formValues, testTimeout: value })}
+                onTestDegradedThresholdChange={(value) => setFormValues({ ...formValues, testDegradedThreshold: value })}
+                onTestMaxRetriesChange={(value) => setFormValues({ ...formValues, testMaxRetries: value })}
+                onPricingConfigEnabledChange={(enabled) => setFormValues({ ...formValues, pricingConfigEnabled: enabled })}
+                onCostMultiplierChange={(value) => setFormValues({ ...formValues, costMultiplier: value })}
+                onPricingModelSourceChange={(value) => setFormValues({ ...formValues, pricingModelSource: value })}
+              />
+              {agentType === 'claude' && (
+                <CommonConfigEditor
+                  value={claudeSettingsJson}
+                  onChange={setClaudeSettingsJson}
+                />
+              )}
+            </div>
+            </>
           )}
         </div>
-
-        {/* ── Provider-wide advanced (Test + Billing + Common Config) ─── */}
-        {!loading && (
-          <div className="border-t border-border px-5 py-3 space-y-3">
-            <ProviderAdvancedConfig
-              testConfigEnabled={formValues.testConfigEnabled}
-              testTimeout={formValues.testTimeout}
-              testDegradedThreshold={formValues.testDegradedThreshold}
-              testMaxRetries={formValues.testMaxRetries}
-              pricingConfigEnabled={formValues.pricingConfigEnabled}
-              costMultiplier={formValues.costMultiplier}
-              pricingModelSource={formValues.pricingModelSource}
-              onTestConfigEnabledChange={(enabled) => setFormValues({ ...formValues, testConfigEnabled: enabled })}
-              onTestTimeoutChange={(value) => setFormValues({ ...formValues, testTimeout: value })}
-              onTestDegradedThresholdChange={(value) => setFormValues({ ...formValues, testDegradedThreshold: value })}
-              onTestMaxRetriesChange={(value) => setFormValues({ ...formValues, testMaxRetries: value })}
-              onPricingConfigEnabledChange={(enabled) => setFormValues({ ...formValues, pricingConfigEnabled: enabled })}
-              onCostMultiplierChange={(value) => setFormValues({ ...formValues, costMultiplier: value })}
-              onPricingModelSourceChange={(value) => setFormValues({ ...formValues, pricingModelSource: value })}
-            />
-            {agentType === 'claude' && (
-              <CommonConfigEditor
-                value={claudeSettingsJson}
-                onChange={setClaudeSettingsJson}
-              />
-            )}
-          </div>
-        )}
 
         {/* ── Footer ─────────────────────────────────────────────────── */}
         <div className="border-t border-border px-5 py-3 space-y-2">

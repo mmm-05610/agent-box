@@ -237,10 +237,9 @@ export function AddProviderDialog({
             opencodeNpm={opencodeNpm}
             onOpencodeNpmChange={setOpencodeNpm}
           />
-        </div>
 
-        {/* ── Provider-wide advanced (Test + Billing + Common Config) ─── */}
-        <div className="border-t border-border px-5 py-3 space-y-3">
+          {/* ── Provider-wide advanced (Test + Billing + Common Config) ─── */}
+          <div className="border-t border-border pt-3 space-y-3">
           <ProviderAdvancedConfig
             testConfigEnabled={formValues.testConfigEnabled}
             testTimeout={formValues.testTimeout}
@@ -263,6 +262,7 @@ export function AddProviderDialog({
               onChange={setClaudeSettingsJson}
             />
           )}
+          </div>
         </div>
 
         {/* ── Footer ─────────────────────────────────────────────────── */}
