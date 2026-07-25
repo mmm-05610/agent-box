@@ -11,13 +11,13 @@ Profiles 页在本 spec **无改动**（现有卡片已经"一眼看清"，保�
 
 ### 范围
 
-| In | Out（不做） |
-|---|---|
-| Detail 页 tab 重构（schema 驱动） | Profiles 页重构（已成，无需动） |
-| Storage tab 强化（真树 + Monaco + JSON 校验） | 创建 Profile 流程（下一轮） |
+| In                                                          | Out（不做）                                |
+| ----------------------------------------------------------- | ------------------------------------------ |
+| Detail 页 tab 重构（schema 驱动）                           | Profiles 页重构（已成，无需动）            |
+| Storage tab 强化（真树 + Monaco + JSON 校验）               | 创建 Profile 流程（下一轮）                |
 | Codex / Hermes / OpenCode 高频表单 tab（MiMoCode 本轮不做） | Library 页 MCP / Skills 全局编辑（下一轮） |
-| Hooks / Permissions / Plugins 现有表单的健壮性 | 后端 CLI 改造（不在 Phase 1） |
-| 静态 TS Schema 注册表 | Creator Profile（属于 Phase 2） |
+| Hooks / Permissions / Plugins 现有表单的健壮性              | 后端 CLI 改造（不在 Phase 1）              |
+| 静态 TS Schema 注册表                                       | Creator Profile（属于 Phase 2）            |
 
 ---
 
@@ -97,8 +97,8 @@ gui-web/src/pages/detail/
     "monaco-editor": "^0.52.0",
     "zod": "^3.23.0",
     "@hookform/resolvers": "^3.9.0",
-    "react-hook-form": "^7.53.0"
-  }
+    "react-hook-form": "^7.53.0",
+  },
 }
 ```
 
@@ -111,47 +111,47 @@ gui-web/src/pages/detail/
 
 ```ts
 // gui-web/src/pages/detail/schema.ts
-import type { AgentType } from '@/api'
+import type { AgentType } from "@/api";
 
 export interface TabSpec<TProps = unknown> {
   /** 唯一 ID，用于 Tabs active state */
-  key: string
+  key: string;
   /** 顶部 tab bar 显示的文字 */
-  label: string
+  label: string;
   /** 是否仅在 profile 内存在某些文件时才显示。返回 boolean；
    *  异步判断需要在 `propsFor` 内部做，并在组件内显示「未配置」或加载态。
    *  Tab bar 列表始终同步渲染（不被 conditional 控制）。 */
-  conditional?: (ctx: ProfileDetail) => boolean
+  conditional?: (ctx: ProfileDetail) => boolean;
   /** Tab 内容组件 */
-  Component: React.ComponentType<TProps>
+  Component: React.ComponentType<TProps>;
   /** 透传给组件的 props 函数 */
-  propsFor: (ctx: ProfileDetail) => TProps
+  propsFor: (ctx: ProfileDetail) => TProps;
 }
 
 export interface ProfileDetail {
-  path: string
+  path: string;
   meta: {
-    name: string
-    agent_type: string
-    display_name: string
-    description: string
-    provider: string
-    claude_md: string
-    preset: string
-  }
-  config_dir: string
+    name: string;
+    agent_type: string;
+    display_name: string;
+    description: string;
+    provider: string;
+    claude_md: string;
+    preset: string;
+  };
+  config_dir: string;
 }
 
 export interface AgentTabSchema {
-  agentType: AgentType
-  tabs: TabSpec[]
+  agentType: AgentType;
+  tabs: TabSpec[];
 }
 
-export const AGENT_TAB_SCHEMAS: Record<AgentType, AgentTabSchema>
+export const AGENT_TAB_SCHEMAS: Record<AgentType, AgentTabSchema>;
 
 // 用于 detail.tsx：返回该 profile 的 tab 列表
 export function tabsFor(profile: ProfileDetail): TabSpec[] {
-  return AGENT_TAB_SCHEMAS[profile.meta.agent_type as AgentType]?.tabs ?? []
+  return AGENT_TAB_SCHEMAS[profile.meta.agent_type as AgentType]?.tabs ?? [];
 }
 ```
 
@@ -205,12 +205,12 @@ export function tabsFor(profile: ProfileDetail): TabSpec[] {
 
 必须先产出 `docs/superpowers/research/per-agent-config-keys.md`，内容包含：
 
-| agentType | 所有顶层 / 常用配置 key | 优先级（高频=表单 tab / 低频=Storage tab 内） | 来源 |
-|---|---|---|---|
-| codex | 由调研产出 | … | https://github.com/openai/codex README |
-| hermes | 由调研产出 | … | 本地 + https://hermes-agent.dev docs |
-| opencode | 由调研产出 | … | https://opencode.ai/docs |
-| mimocode | 由调研产出 | … | (若官网无文档，按 OpenCode 同 schema) |
+| agentType | 所有顶层 / 常用配置 key | 优先级（高频=表单 tab / 低频=Storage tab 内） | 来源                                   |
+| --------- | ----------------------- | --------------------------------------------- | -------------------------------------- |
+| codex     | 由调研产出              | …                                             | https://github.com/openai/codex README |
+| hermes    | 由调研产出              | …                                             | 本地 + https://hermes-agent.dev docs   |
+| opencode  | 由调研产出              | …                                             | https://opencode.ai/docs               |
+| mimocode  | 由调研产出              | …                                             | (若官网无文档，按 OpenCode 同 schema)  |
 
 调研输出**作为子 spec 单独 commit**。本 spec 的 §6.1 ~ §6.5 是「调研后会填的占位」。
 
@@ -225,6 +225,7 @@ Meta → Provider → Permissions → Hooks → Plugins → CLAUDE.md → MCP �
 （保留原顺序）
 
 **变更**：
+
 - Storage 替换为新版 §5
 - Hooks 迁移到 `react-hook-form + zod`（schema：`HookConfigSchema`，数组元素 `matcher? + hooks: HookHandler[]`）
 - Permissions 不变（保持 JSON 边角样板）
@@ -303,13 +304,13 @@ def list_dir_tree(self, path: str, max_depth: int = 1) -> str:
 
 ### 8.1 单元测试（vitest）
 
-| 文件 | 覆盖 |
-|---|---|
-| `detail/storage/buildTreeFromFlatList.test.ts` | flat `string[]` → tree 转换 |
-| `detail/storage/validateJson.test.ts` | good / bad / empty / non-JSON |
-| `detail/storage/useOpenFile.test.tsx` | 模型挂载、错误状态、未保存拦截 |
-| `pages/detail/schema.test.ts` | `tabsFor` 在每个 agentType 下返回正确顺序 |
-| `pages/detail/codex/ModelEditor.test.tsx` | 表单加载、保存、`auth.json` 写入路径正确 |
+| 文件                                             | 覆盖                                                          |
+| ------------------------------------------------ | ------------------------------------------------------------- |
+| `detail/storage/buildTreeFromFlatList.test.ts`   | flat `string[]` → tree 转换                                   |
+| `detail/storage/validateJson.test.ts`            | good / bad / empty / non-JSON                                 |
+| `detail/storage/useOpenFile.test.tsx`            | 模型挂载、错误状态、未保存拦截                                |
+| `pages/detail/schema.test.ts`                    | `tabsFor` 在每个 agentType 下返回正确顺序                     |
+| `pages/detail/codex/ModelEditor.test.tsx`        | 表单加载、保存、`auth.json` 写入路径正确                      |
 | `pages/detail/opencode/ProvidersEditor.test.tsx` | 增删 provider、API key 写入 `auth.json` 而非 `opencode.jsonc` |
 
 ### 8.2 端到端（手测清单）
@@ -350,13 +351,13 @@ cd gui-web && npm run test -- --run     # vitest exit 0
 
 ## 10. Risks
 
-| 风险 | 缓解 |
-|---|---|
-| Monaco Bundle 进 PyInstaller 后体积过大 | 使用 CDN loader，离线模式可配 fallback；预估离线资源 ~2MB，可接受 |
-| `@monaco-editor/react` 在 WSL ↔ Windows 的 PyWebView render 异常 | 端到端手测；如有 fallback 走 textarea |
-| Hooks/Plugins 的 zod schema 解析错误导致现有用户 config 失效 | 第一阶段 Hooks 只读模式（显示 + 手动导入 zod schema），后续才启用保存 |
-| 多 Tab 模型占用内存 | 限制 5 个，超出 LRU 关闭最久未访问 |
-| 调研产出 §6 与 spec 实际编码产生偏差 | 调研产出后回填 §6 章节；改动做成 §6 子模块的微改 PR，不影响主 spec |
+| 风险                                                             | 缓解                                                                  |
+| ---------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Monaco Bundle 进 PyInstaller 后体积过大                          | 使用 CDN loader，离线模式可配 fallback；预估离线资源 ~2MB，可接受     |
+| `@monaco-editor/react` 在 WSL ↔ Windows 的 PyWebView render 异常 | 端到端手测；如有 fallback 走 textarea                                 |
+| Hooks/Plugins 的 zod schema 解析错误导致现有用户 config 失效     | 第一阶段 Hooks 只读模式（显示 + 手动导入 zod schema），后续才启用保存 |
+| 多 Tab 模型占用内存                                              | 限制 5 个，超出 LRU 关闭最久未访问                                    |
+| 调研产出 §6 与 spec 实际编码产生偏差                             | 调研产出后回填 §6 章节；改动做成 §6 子模块的微改 PR，不影响主 spec    |
 
 ---
 
@@ -369,4 +370,3 @@ cd gui-web && npm run test -- --run     # vitest exit 0
 - 新建 Profile 模板选择器（Roadmap 一、阶段 第 4 条）
 - MiMoCode 高频表单 tab：用户明确本轮**不调研、不接入**，等后续轮次
 - Phase 2/3 的 CLI 补全、Creator Profile、Team 协作（Roadmap 二/三/四）
-
