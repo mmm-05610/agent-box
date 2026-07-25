@@ -245,7 +245,7 @@ export function HermesProviderViewer({
       <Card>
         <CardHeader><CardTitle>Provider Settings</CardTitle></CardHeader>
         <CardContent className="space-y-4">
-          <HermesProviderForm values={values} onChange={setValues} mode="profile" category="official" />
+          <HermesProviderForm values={values} onChange={setValues} mode="library" category="official" />
           <Button onClick={handleSave} disabled={saving} className="w-full">
             {saving ? 'Saving...' : 'Save Provider Settings'}
           </Button>

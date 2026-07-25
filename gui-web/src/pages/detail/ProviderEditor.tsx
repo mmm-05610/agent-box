@@ -12,8 +12,8 @@ import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from '@/compo
 import { useToast } from '@/components/feedback/toast'
 import { applyProviderToProfile, fetchProviders } from '@/api/providers'
 import { patchJsonFile } from '@/api/files'
+import { ClaudeProviderForm } from '@/components/provider/forms/ClaudeProviderForm'
 import {
-  ProviderFormFields,
   defaultFormValues,
   formValuesToEnv,
   type ProviderFormValues,
@@ -177,7 +177,7 @@ export function ProviderEditor({
       <Card>
         <CardHeader><CardTitle>Provider Settings</CardTitle></CardHeader>
         <CardContent className="space-y-4">
-          <ProviderFormFields values={values} onChange={setValues} mode="profile" />
+          <ClaudeProviderForm values={values} onChange={setValues} />
           <Button onClick={handleSave} disabled={saving} className="w-full">
             {saving ? 'Saving...' : 'Save Provider Settings'}
           </Button>
