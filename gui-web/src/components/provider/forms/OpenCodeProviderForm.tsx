@@ -50,6 +50,10 @@ export interface OpenCodeProviderFormProps {
   onNpmPackageChange?: (next: OpenCodeNpmPackage) => void
   settingsJson?: string
   onSettingsJsonChange?: (next: string) => void
+  // Headers + Token Limits
+  headers?: Record<string, string>
+  onHeadersChange?: (next: Record<string, string>) => void
+  modelsWithLimits?: Record<string, OpenCodeModel>  // models with limit.context / limit.output
 }
 
 const selectClassName =
@@ -68,6 +72,7 @@ export function OpenCodeProviderForm(props: OpenCodeProviderFormProps) {
     endpointCandidates = [],
     npmPackage, onNpmPackageChange,
     settingsJson = '', onSettingsJsonChange,
+    headers = {}, onHeadersChange,
   } = props
 
   // Back-compat: accept either `npm`/`onNpmChange` or the newer `npmPackage`/`onNpmPackageChange`
@@ -152,6 +157,31 @@ export function OpenCodeProviderForm(props: OpenCodeProviderFormProps) {
       </Field>
 
       <EndpointField value={values.baseUrl} onChange={(baseUrl) => set({ baseUrl })} candidates={endpointCandidates} label="API 请求地址 (options.baseURL)" readOnly={readOnly} hint={<div className="mt-2 flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-700"><LinkIcon /><span>OpenCode 通过 options.baseURL 读取请求地址；不同 npm 包要求的路径格式可能不同。</span></div>} />
+
+      {/* Headers */}
+      <div className="rounded-lg border border-border bg-card p-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h4 className="text-base font-medium">Headers</h4>
+            <p className="mt-0.5 text-xs text-muted-foreground">发送到供应商的自定义 HTTP 头，例如 X-Title、HTTP-Referer。</p>
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={() => onHeadersChange?.({ ...headers, [`header-${Date.now()}`]: '' })} disabled={readOnly || !onHeadersChange} className="h-7 gap-1">
+            <PlusIcon />添加
+          </Button>
+        </div>
+        <div className="mt-3">
+          <KeyValueEditor
+            value={headers as Record<string, unknown>}
+            onChange={(v) => onHeadersChange?.(v as Record<string, string>)}
+            readOnly={readOnly}
+            emptyLabel="暂无自定义 Headers"
+            keyPlaceholder="X-Title"
+            valuePlaceholder="CC Switch"
+            keyLabel="Header"
+            valueLabel="Value"
+          />
+        </div>
+      </div>
 
       <div className="rounded-lg border border-border bg-card p-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -313,7 +343,39 @@ function ModelRowView({
         </button>
       </div>
       {expanded && (
-        <div className="mt-3 grid grid-cols-1 gap-4 border-t border-border pt-3 md:grid-cols-2">
+        <div className="mt-3 space-y-3 border-t border-border pt-3">
+          {/* Token Limits */}
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Context Limit" hint="最大上下文 token 数">
+              <Input
+                value={(config.limit as Record<string, unknown>)?.context as string ?? ''}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/\D/g, '')
+                  const limit = { ...(config.limit as Record<string, unknown> || {}) }
+                  if (v) limit.context = parseInt(v, 10); else delete limit.context
+                  onAttributesChange({ ...attrs, limit: Object.keys(limit).length > 0 ? limit : undefined })
+                }}
+                placeholder="1048576"
+                className="font-mono text-sm"
+                disabled={readOnly}
+              />
+            </Field>
+            <Field label="Output Limit" hint="最大输出 token 数">
+              <Input
+                value={(config.limit as Record<string, unknown>)?.output as string ?? ''}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/\D/g, '')
+                  const limit = { ...(config.limit as Record<string, unknown> || {}) }
+                  if (v) limit.output = parseInt(v, 10); else delete limit.output
+                  onAttributesChange({ ...attrs, limit: Object.keys(limit).length > 0 ? limit : undefined })
+                }}
+                placeholder="131072"
+                className="font-mono text-sm"
+                disabled={readOnly}
+              />
+            </Field>
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="space-y-2">
             <h5 className="text-xs font-medium">模型属性</h5>
             <KeyValueEditor value={attributes} onChange={(next) => onAttributesChange({ ...Object.fromEntries(Object.keys(attributes).map((key) => [key, undefined])), ...next })} readOnly={readOnly} emptyLabel="暂无模型属性" />
@@ -322,6 +384,7 @@ function ModelRowView({
             <h5 className="text-xs font-medium">SDK 选项</h5>
             <KeyValueEditor value={options as Record<string, unknown>} onChange={onOptionsChange} readOnly={readOnly} emptyLabel="暂无 SDK 选项" />
           </div>
+        </div>
         </div>
       )}
     </div>

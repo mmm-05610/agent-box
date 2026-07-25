@@ -11,7 +11,9 @@ import {
 } from './shared'
 import { useFetchedModels } from './hooks/useFetchedModels'
 
-export type CodexApiFormat = 'openai_responses' | 'openai_chat'
+export type CodexApiFormat = 'openai_responses' | 'openai_chat' | 'anthropic'
+export type ClaudeApiKeyField = 'ANTHROPIC_AUTH_TOKEN' | 'ANTHROPIC_API_KEY'
+export type PromptCacheRoutingMode = 'auto' | 'enabled' | 'disabled'
 export interface CodexChatReasoning { supportsThinking?: boolean; supportsEffort?: boolean; effortParam?: string }
 export interface CodexCatalogModel { model: string; displayName: string; contextWindow?: number | string }
 type CatalogRow = CodexCatalogModel & { rowId: string }
@@ -53,6 +55,14 @@ export interface CodexProviderFormProps {
   isEndpointModalOpen?: boolean; onEndpointModalToggle?: (open?: boolean) => void; autoSelect?: boolean; onAutoSelectChange?: (next: boolean) => void
   canEditReasoning?: boolean; mode?: 'library' | 'profile'
   endpointCandidates?: string[]
+  // Default model (config.toml top-level `model`)
+  codexModel?: string; onCodexModelChange?: (next: string) => void
+  // Anthropic upstream (when apiFormat === 'anthropic')
+  anthropicAuthField?: ClaudeApiKeyField; onAnthropicAuthFieldChange?: (next: ClaudeApiKeyField) => void
+  impersonateClaudeCode?: boolean; onImpersonateClaudeCodeChange?: (next: boolean) => void
+  maxOutputTokens?: string; onMaxOutputTokensChange?: (next: string) => void
+  // Prompt Cache Routing (when apiFormat === 'openai_chat')
+  promptCacheRouting?: PromptCacheRoutingMode; onPromptCacheRoutingChange?: (next: PromptCacheRoutingMode) => void
 }
 
 const selectClassName = 'h-9 w-full rounded-md bg-muted px-3 text-sm text-foreground outline-none disabled:opacity-50'
@@ -66,7 +76,10 @@ function makeRow(seed?: CodexCatalogModel): CatalogRow { return { rowId: crypto.
 function sameModels(rows: CatalogRow[], models: CodexCatalogModel[]) { return rows.length === models.length && rows.every((row, index) => row.model === (models[index].model ?? '') && row.displayName === (models[index].displayName ?? '') && String(row.contextWindow ?? '') === String(models[index].contextWindow ?? '')) }
 
 export function CodexProviderForm(props: CodexProviderFormProps) {
-  const { values, onChange, readOnly, codexConfig, onCodexConfigChange, model = '', onModelChange, apiFormat = 'openai_responses', onApiFormatChange, codexChatReasoning = {}, onCodexChatReasoningChange, catalogModels = [], onCatalogModelsChange, customUserAgent, onCustomUserAgentChange, localProxyHeadersOverride = '', onLocalProxyHeadersOverrideChange, localProxyBodyOverride = '', onLocalProxyBodyOverrideChange, category, shouldShowSpeedTest = true, isFullUrl, onFullUrlChange, mode = 'library', endpointCandidates = [] } = props
+  const { values, onChange, readOnly, codexConfig, onCodexConfigChange, model = '', onModelChange, apiFormat = 'openai_responses', onApiFormatChange, codexChatReasoning = {}, onCodexChatReasoningChange, catalogModels = [], onCatalogModelsChange, customUserAgent, onCustomUserAgentChange, localProxyHeadersOverride = '', onLocalProxyHeadersOverrideChange, localProxyBodyOverride = '', onLocalProxyBodyOverrideChange, category, shouldShowSpeedTest = true, isFullUrl, onFullUrlChange, mode = 'library', endpointCandidates = [],
+    // New fields — Default Model + Anthropic upstream + Prompt Cache Routing
+    codexModel = '', onCodexModelChange, anthropicAuthField = 'ANTHROPIC_AUTH_TOKEN', onAnthropicAuthFieldChange, impersonateClaudeCode = false, onImpersonateClaudeCodeChange, maxOutputTokens = '', onMaxOutputTokensChange, promptCacheRouting = 'auto', onPromptCacheRoutingChange,
+  } = props
   const { toast } = useToast()
   const [reasoningOpen, setReasoningOpen] = useState(false)
   const [testOpen, setTestOpen] = useState(Boolean(values.testConfigEnabled || values.testTimeout || values.testDegradedThreshold || values.testMaxRetries))
@@ -106,8 +119,85 @@ export function CodexProviderForm(props: CodexProviderFormProps) {
             })()}<div className="mt-2 flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-700"><BulbIcon /><span>填写兼容 OpenAI Responses 格式的服务端点地址</span></div></div>
 
     {category !== 'official' && <>
-      {shouldShowSpeedTest && <div className="rounded-lg border border-border bg-card p-3"><SwitchRow title="需要本地路由映射" hint={needsLocalRouting ? localOnHint : localOffHint} checked={needsLocalRouting} onChange={(checked) => setFormat(checked ? 'openai_chat' : 'openai_responses')} disabled={readOnly} /></div>}
-      {needsLocalRouting && <div className="rounded-lg border border-border bg-card"><button type="button" onClick={() => setReasoningOpen((open) => !open)} className="flex w-full items-start gap-2 p-3 text-left"><span className="mt-0.5 text-muted-foreground"><ChevronIcon open={reasoningOpen} /></span><span><span className="block text-sm font-medium">思考能力（高级·通常自动识别）</span><span className="mt-1 block text-xs text-muted-foreground">{reasoningHint}</span></span></button>{reasoningOpen && <div className="space-y-4 border-t border-border p-3"><SwitchRow title="支持思考模式" hint={thinkingHint} checked={supportsThinking} onChange={(checked) => setReasoning({ ...effectiveReasoning, supportsThinking: checked, supportsEffort: checked ? effectiveReasoning.supportsEffort : false })} disabled={readOnly} /><div className="border-t border-border pt-3"><SwitchRow title="支持思考等级" hint={effortHint} checked={supportsEffort} onChange={(checked) => setReasoning({ ...effectiveReasoning, supportsThinking: checked ? true : effectiveReasoning.supportsThinking, supportsEffort: checked, effortParam: checked ? effectiveReasoning.effortParam ?? 'reasoning_effort' : 'none' })} disabled={readOnly} /></div></div>}</div>}
+      {/* Upstream Format */}
+      {category !== 'official' && shouldShowSpeedTest && (
+        <div className="rounded-lg border border-border bg-card p-3">
+          <Field label="上游请求格式 (Upstream Format)">
+            <select value={effectiveFormat} onChange={(e) => setFormat(e.target.value as CodexApiFormat)} className={selectClassName} disabled={readOnly}>
+              <option value="openai_responses">Responses（原生）</option>
+              <option value="openai_chat">Chat Completions（需开启路由）</option>
+              <option value="anthropic">Anthropic Messages（需开启路由）</option>
+            </select>
+          </Field>
+          <p className="mt-2 text-xs text-muted-foreground">
+            {effectiveFormat === 'anthropic'
+              ? '将 Codex 的请求转换为 Anthropic Messages 格式发送到供应商；需在下方配置 Anthropic 认证字段。'
+              : effectiveFormat === 'openai_chat'
+              ? '将 Codex 的 Responses 请求转换为 Chat Completions 格式；需保持本地路由开启。'
+              : 'Codex 原生 Responses API，无需格式转换；GPT 系列模型默认使用此格式。'}
+          </p>
+        </div>
+      )}
+
+      {/* Anthropic-specific settings */}
+      {effectiveFormat === 'anthropic' && (
+        <div className="rounded-lg border border-border bg-card p-3 space-y-3">
+          <Field label="Anthropic 认证字段">
+            <select value={anthropicAuthField} onChange={(e) => onAnthropicAuthFieldChange?.(e.target.value as ClaudeApiKeyField)} className={selectClassName} disabled={readOnly}>
+              <option value="ANTHROPIC_AUTH_TOKEN">ANTHROPIC_AUTH_TOKEN</option>
+              <option value="ANTHROPIC_API_KEY">ANTHROPIC_API_KEY</option>
+            </select>
+          </Field>
+          <SwitchRow title="伪装为 Claude Code 客户端" hint="发送模拟 Claude Code 的 User-Agent / anthropic-beta / x-app 请求头。" checked={impersonateClaudeCode} onChange={(v) => onImpersonateClaudeCodeChange?.(v)} disabled={readOnly} />
+          <Field label="最大输出 Token 数 (Max Output Tokens)" hint="覆盖默认 8192 输出上限；留空使用默认值。仅允许数字。">
+            <Input value={maxOutputTokens} onChange={(e) => onMaxOutputTokensChange?.(e.target.value.replace(/\D/g, ''))} placeholder="8192" className="font-mono text-sm" disabled={readOnly} />
+          </Field>
+        </div>
+      )}
+
+      {/* Prompt Cache Routing (Chat format only) */}
+      {effectiveFormat === 'openai_chat' && (
+        <div className="rounded-lg border border-border bg-card p-3">
+          <Field label="Prompt Cache 路由" hint="控制 prompt_cache_key 的缓存路由行为。auto 为自动决定；enabled 总启用缓存；disabled 禁用缓存路由。">
+            <select value={promptCacheRouting} onChange={(e) => onPromptCacheRoutingChange?.(e.target.value as PromptCacheRoutingMode)} className={selectClassName} disabled={readOnly}>
+              <option value="auto">auto（自动）</option>
+              <option value="enabled">enabled（启用）</option>
+              <option value="disabled">disabled（禁用）</option>
+            </select>
+          </Field>
+        </div>
+      )}
+
+      {/* Thinking ability (Chat format) */}
+      {effectiveFormat === 'openai_chat' && (
+        <div className="rounded-lg border border-border bg-card">
+          <button type="button" onClick={() => setReasoningOpen((open) => !open)} className="flex w-full items-start gap-2 p-3 text-left">
+            <span className="mt-0.5 text-muted-foreground"><ChevronIcon open={reasoningOpen} /></span>
+            <span><span className="block text-sm font-medium">思考能力（高级·通常自动识别）</span><span className="mt-1 block text-xs text-muted-foreground">{reasoningHint}</span></span>
+          </button>
+          {reasoningOpen && (
+            <div className="space-y-4 border-t border-border p-3">
+              <SwitchRow title="支持思考模式" hint={thinkingHint} checked={supportsThinking} onChange={(checked) => setReasoning({ ...effectiveReasoning, supportsThinking: checked, supportsEffort: checked ? effectiveReasoning.supportsEffort : false })} disabled={readOnly} />
+              <div className="border-t border-border pt-3">
+                <SwitchRow title="支持思考等级" hint={effortHint} checked={supportsEffort} onChange={(checked) => setReasoning({ ...effectiveReasoning, supportsThinking: checked ? true : effectiveReasoning.supportsThinking, supportsEffort: checked, effortParam: checked ? effectiveReasoning.effortParam ?? 'reasoning_effort' : 'none' })} disabled={readOnly} />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      {/* Default Model */}
+      <div className="rounded-lg border border-border bg-card p-3">
+        <Field label="默认模型 (Default Model)" hint="config.toml 顶层 model 字段；当请求未指定模型时使用此值。">
+          <div className="flex items-center gap-2">
+            <Input value={codexModel} onChange={(e) => onCodexModelChange?.(e.target.value)} placeholder="例如 gpt-5.1" className="font-mono text-sm flex-1" disabled={readOnly} />
+            {codexModel.trim() && !rows.some((r) => r.model.trim() === codexModel.trim()) && onCatalogModelsChange && (
+              <Button size="sm" variant="ghost" onClick={() => { onCatalogModelsChange?.([...catalogModels, { model: codexModel.trim(), displayName: codexModel.trim() }]) }} disabled={readOnly}>
+                + 加入映射
+              </Button>
+            )}
+          </div>
+        </Field>
+      </div>
       <CatalogCard rows={rows} fetchedModels={fetchedModels} fetching={fetching} fetchError={fetchError} readOnly={readOnly} onFetch={fetchCatalog} onAdd={() => setRows((current) => [...current, makeRow()])} onUpdate={updateRow} onRemove={(index) => setRows((current) => current.filter((_, rowIndex) => rowIndex !== index))} />
       <Field label="Custom User-Agent"><Input value={customUserAgent ?? values.customUserAgent} onChange={(event) => { onCustomUserAgentChange?.(event.target.value); if (!onCustomUserAgentChange) set({ customUserAgent: event.target.value }) }} placeholder="留空使用 Codex 默认 User-Agent" className="font-mono text-sm" disabled={readOnly} /></Field>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

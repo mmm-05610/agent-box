@@ -352,14 +352,21 @@ export function ClaudeProviderForm({
                         />
                         <ModelDropdown
                           value={roleModel}
-                          onChange={(v) =>
+                          onChange={(v) => {
+                            const oldName = values.roleModels[row.role]?.name ?? ''
+                            const oldModelBase = stripOneMMarker(values.roleModels[row.role]?.model ?? '')
+                            const shouldSync = !oldName || oldName === oldModelBase
                             set({
                               roleModels: {
                                 ...values.roleModels,
-                                [row.role]: { ...values.roleModels[row.role], model: v },
+                                [row.role]: {
+                                  ...values.roleModels[row.role],
+                                  model: v,
+                                  name: shouldSync ? stripOneMMarker(v) : oldName,
+                                },
                               },
                             })
-                          }
+                          }}
                           models={fetchedModels}
                           placeholder={row.modelField}
                           disabled={readOnly}
