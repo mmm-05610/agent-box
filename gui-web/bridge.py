@@ -932,6 +932,23 @@ class Api:
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
 
+    def launch_acs(self) -> str:
+        """Launch ACS (agent-config-store) as a separate process."""
+        import subprocess as _sp
+        import os as _os
+        acs_binary = Path(__file__).resolve().parent.parent / "acs" / "src-tauri" / "target" / "release" / "cc-switch"
+        if not acs_binary.exists():
+            return json.dumps({"ok": False, "error": f"ACS binary not found: {acs_binary}"})
+        try:
+            _sp.Popen(
+                [str(acs_binary)],
+                stdout=_sp.DEVNULL, stderr=_sp.DEVNULL,
+                start_new_session=True,
+            )
+            return json.dumps({"ok": True})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
 
 def main():
     api = Api()
