@@ -933,17 +933,18 @@ class Api:
             return json.dumps({"ok": False, "error": str(e)})
 
     def launch_acs(self) -> str:
-        """Launch ACS (agent-config-store) as a separate process."""
+        """Launch ACS (agent-config-store) in a new WSL console."""
         import subprocess as _sp
-        import os as _os
-        acs_binary = Path(__file__).resolve().parent.parent / "acs" / "src-tauri" / "target" / "release" / "cc-switch"
-        if not acs_binary.exists():
-            return json.dumps({"ok": False, "error": f"ACS binary not found: {acs_binary}"})
+        acs_binary = "/home/maoqh/projects/agent-box/acs/src-tauri/target/release/cc-switch"
+        script = f"nohup {acs_binary} >/dev/null 2>&1 &"
+        wsl = shutil.which("wsl.exe")
+        if wsl is None:
+            return json.dumps({"ok": False, "error": "wsl.exe not found"})
         try:
             _sp.Popen(
-                [str(acs_binary)],
-                stdout=_sp.DEVNULL, stderr=_sp.DEVNULL,
-                start_new_session=True,
+                [wsl, "-e", "bash", "-lc", script],
+                close_fds=True,
+                creationflags=_sp.CREATE_NEW_CONSOLE if sys.platform == "win32" else 0,
             )
             return json.dumps({"ok": True})
         except Exception as e:
