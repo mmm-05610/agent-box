@@ -326,15 +326,16 @@ APPLY_SUPPORTED = {"claude"}
 
 
 def apply_provider(profile_name: str, provider_id: str) -> None:
-    """Merge a provider's ``env`` block into a profile's settings.json.
+    """Write a provider's full settings into a profile's settings.json.
 
     Steps:
       1. load_meta → resolve the profile's agent_type
       2. non-claude → raise ProfileError (apply not yet supported)
-      3. read provider.settings_config → extract ``env`` object
+      3. read provider.settings_config → env + metadata
       4. read profile's settings.json (if any)
-      5. deep_merge(provider_env, existing_settings["env"])
-         (provider wins on conflict, other top-level settings keys untouched)
+      5. overwrite ``env`` with provider's env, write ``_provider`` with
+         full metadata (name, notes, website_url, icon, icon_color, category)
+         so the frontend can render the complete provider form
       6. atomic write the result
       7. UPDATE profiles SET provider_ref = provider_id
     """
@@ -351,7 +352,8 @@ def apply_provider(profile_name: str, provider_id: str) -> None:
         raise ProfileError(
             f"provider {provider_id!r} for agent_type {agent_type!r} not found"
         )
-    provider_env = (provider.get("settings") or {}).get("env") or {}
+    provider_settings = provider.get("settings") or {}
+    provider_env = provider_settings.get("env") or {}
     if not isinstance(provider_env, dict):
         raise ProfileError(
             f"provider {provider_id!r}: env must be a JSON object"
@@ -369,11 +371,24 @@ def apply_provider(profile_name: str, provider_id: str) -> None:
         if not isinstance(existing, dict):
             existing = {}
 
-    existing_env = existing.get("env")
-    if not isinstance(existing_env, dict):
-        existing_env = {}
-    merged_env = deep_merge(existing_env, provider_env)
-    existing["env"] = merged_env
+    existing["env"] = provider_env
+
+    # Write full provider metadata so the frontend can render the form
+    existing["_provider"] = {
+        "id": provider.get("id"),
+        "name": provider.get("name"),
+        "notes": provider_settings.get("notes", ""),
+        "website_url": provider.get("website_url", "") or provider_settings.get("website_url", ""),
+        "icon": provider.get("icon"),
+        "icon_color": provider.get("icon_color"),
+        "category": provider.get("category"),
+        "apiFormat": provider_env.get("ANTHROPIC_API_FORMAT", ""),
+    }
+
+    # Ensure provider env keys are stripped from top-level _provider (keep only metadata)
+    for k in list(existing["_provider"].keys()):
+        if existing["_provider"][k] is None:
+            del existing["_provider"][k]
 
     atomic_write_json(settings_path, existing)
 

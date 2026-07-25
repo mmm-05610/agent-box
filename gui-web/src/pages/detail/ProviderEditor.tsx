@@ -26,6 +26,16 @@ interface ParsedSettings {
   env: Record<string, string>
   model?: string
   effortLevel?: string
+  providerMeta?: {
+    id?: string
+    name?: string
+    notes?: string
+    website_url?: string
+    icon?: string
+    icon_color?: string
+    category?: string
+    apiFormat?: string
+  }
 }
 
 function parseSettings(content: string): ParsedSettings {
@@ -35,6 +45,7 @@ function parseSettings(content: string): ParsedSettings {
       env: data.env ?? {},
       model: data.model,
       effortLevel: data.effortLevel,
+      providerMeta: data._provider,
     }
   } catch {
     return { env: {} }
@@ -82,9 +93,18 @@ export function ProviderEditor({
   const effectiveContent = contentOverride ?? content
   const parsed = useMemo(() => parseSettings(effectiveContent), [effectiveContent])
 
-  const [values, setValues] = useState<ProviderFormValues>(
-    () => defaultFormValues(parsed.env, parsed.model, parsed.effortLevel),
-  )
+  const [values, setValues] = useState<ProviderFormValues>(() => {
+    const def = defaultFormValues(parsed.env, parsed.model, parsed.effortLevel)
+    // Merge _provider metadata into form values
+    const meta = parsed.providerMeta
+    if (meta) {
+      if (meta.name) def.name = meta.name
+      if (meta.notes) def.notes = meta.notes
+      if (meta.website_url) def.websiteUrl = meta.website_url
+      if (meta.apiFormat) def.apiFormat = meta.apiFormat
+    }
+    return def
+  })
   const [saving, setSaving] = useState(false)
   const [libraryProviders, setLibraryProviders] = useState<Provider[]>([])
   const [applyingId, setApplyingId] = useState<string | null>(null)
@@ -93,8 +113,16 @@ export function ProviderEditor({
   // Sync form values when the underlying parsed settings change
   // (e.g. after onRefresh brings new content, or after a library apply).
   useEffect(() => {
-    setValues(defaultFormValues(parsed.env, parsed.model, parsed.effortLevel))
-  }, [parsed.env, parsed.model, parsed.effortLevel])
+    const def = defaultFormValues(parsed.env, parsed.model, parsed.effortLevel)
+    const meta = parsed.providerMeta
+    if (meta) {
+      if (meta.name) def.name = meta.name
+      if (meta.notes) def.notes = meta.notes
+      if (meta.website_url) def.websiteUrl = meta.website_url
+      if (meta.apiFormat) def.apiFormat = meta.apiFormat
+    }
+    setValues(def)
+  }, [parsed.env, parsed.model, parsed.effortLevel, parsed.providerMeta?.id])
 
   useEffect(() => {
     if (agentType !== 'claude') return
