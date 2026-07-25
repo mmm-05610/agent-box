@@ -27,12 +27,13 @@ import {
   defaultFormValues,
   type ProviderFormValues,
 } from './ProviderFormFields'
-import { settingsFromFormValues } from './perAgentSettings'
+import { writeProviderEditorDraft } from './serialization'
 import { ProviderPresetSelector } from './ProviderPresetSelector'
 import { ClaudeProviderForm } from './forms/ClaudeProviderForm'
-import { CodexProviderForm } from './forms/CodexProviderForm'
-import { HermesProviderForm } from './forms/HermesProviderForm'
-import { OpenCodeProviderForm } from './forms/OpenCodeProviderForm'
+import { CodexProviderForm, type CodexCatalogModel, type CodexChatReasoning } from './forms/CodexProviderForm'
+import { HermesProviderForm, type HermesApiMode, type HermesModel } from './forms/HermesProviderForm'
+import { OpenCodeProviderForm, type OpenCodeNpmPackage } from './forms/OpenCodeProviderForm'
+import { useAgentProviderDraft } from './forms/hooks/useAgentProviderDraft'
 
 export interface AddProviderDialogProps {
   open: boolean
@@ -55,8 +56,7 @@ export function AddProviderDialog({
   const [endpointCandidates, setEndpointCandidates] = useState<string[]>([])
   const [presets, setPresets] = useState<ProviderPreset[]>([])
   const [formValues, setFormValues] = useState<ProviderFormValues>(defaultFormValues())
-  const [codexConfig, setCodexConfig] = useState('')
-  const [modelsJson, setModelsJson] = useState('')
+  const { codexConfig, setCodexConfig, codexCatalogModels, setCodexCatalogModels, codexReasoning, setCodexReasoning, codexProxyHeaders, setCodexProxyHeaders, codexProxyBody, setCodexProxyBody, modelsJson, setModelsJson, hermesApiMode, setHermesApiMode, hermesModels, setHermesModels, hermesRateLimit, setHermesRateLimit, opencodeExtraOptions, setOpencodeExtraOptions, opencodeNpm, setOpencodeNpm, resetAgentDraft } = useAgentProviderDraft()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [softIssues, setSoftIssues] = useState<string[] | null>(null)
@@ -75,12 +75,11 @@ export function AddProviderDialog({
     setPresetApiKeyUrl(undefined)
     setEndpointCandidates([])
     setFormValues(defaultFormValues())
-    setCodexConfig('')
-    setModelsJson('')
+    resetAgentDraft()
     setSaving(false)
     setError(null)
     setSoftIssues(null)
-  }, [open])
+  }, [open, resetAgentDraft])
 
   if (!open) return null
 
@@ -140,22 +139,12 @@ export function AddProviderDialog({
     setError(null)
     setSoftIssues(null)
     try {
-      const settings = settingsFromFormValues(agentType, {}, formValues)
-      if (agentType === 'codex') {
-        if (codexConfig.trim().length > 0) {
-          settings.config = codexConfig
-        }
-      }
-      if ((agentType === 'opencode' || agentType === 'mimocode') && modelsJson.trim().length > 0) {
-        try {
-          const parsed = JSON.parse(modelsJson) as Record<string, unknown>
-          settings.models = parsed
-        } catch {
-          setError('Models JSON is invalid')
-          setSaving(false)
-          return
-        }
-      }
+      const settings = writeProviderEditorDraft(agentType, {}, {
+        values: formValues,
+        codex: { config: codexConfig, catalogModels: codexCatalogModels, reasoning: codexReasoning, proxyHeaders: codexProxyHeaders, proxyBody: codexProxyBody },
+        hermes: { apiMode: hermesApiMode, models: hermesModels, rateLimitDelay: hermesRateLimit },
+        opencode: { npm: opencodeNpm, modelsJson, extraOptions: opencodeExtraOptions },
+      })
       settings.name = formValues.name || id
       await saveProvider(agentType, id, JSON.stringify(settings))
       toast({ type: 'success', message: 'Provider added' })
@@ -217,10 +206,28 @@ export function AddProviderDialog({
             onChange={setFormValues}
             codexConfig={codexConfig}
             onCodexConfigChange={setCodexConfig}
+            catalogModels={codexCatalogModels}
+            onCatalogModelsChange={setCodexCatalogModels}
+            codexReasoning={codexReasoning}
+            onCodexReasoningChange={setCodexReasoning}
+            codexProxyHeaders={codexProxyHeaders}
+            onCodexProxyHeadersChange={setCodexProxyHeaders}
+            codexProxyBody={codexProxyBody}
+            onCodexProxyBodyChange={setCodexProxyBody}
             modelsJson={modelsJson}
             onModelsJsonChange={setModelsJson}
             presetApiKeyUrl={presetApiKeyUrl}
             endpointCandidates={endpointCandidates}
+            hermesApiMode={hermesApiMode}
+            onHermesApiModeChange={setHermesApiMode}
+            hermesModels={hermesModels}
+            onHermesModelsChange={setHermesModels}
+            hermesRateLimit={hermesRateLimit}
+            onHermesRateLimitChange={setHermesRateLimit}
+            opencodeExtraOptions={opencodeExtraOptions}
+            onOpencodeExtraOptionsChange={setOpencodeExtraOptions}
+            opencodeNpm={opencodeNpm}
+            onOpencodeNpmChange={setOpencodeNpm}
           />
         </div>
 
@@ -268,10 +275,28 @@ function AgentTypeForm(props: {
   onChange: (next: ProviderFormValues) => void
   codexConfig: string
   onCodexConfigChange: (s: string) => void
+  catalogModels: CodexCatalogModel[]
+  onCatalogModelsChange: (models: CodexCatalogModel[]) => void
+  codexReasoning: CodexChatReasoning
+  onCodexReasoningChange: (next: CodexChatReasoning) => void
+  codexProxyHeaders: string
+  onCodexProxyHeadersChange: (next: string) => void
+  codexProxyBody: string
+  onCodexProxyBodyChange: (next: string) => void
   modelsJson: string
   onModelsJsonChange: (s: string) => void
   presetApiKeyUrl?: string
   endpointCandidates?: string[]
+  hermesApiMode?: HermesApiMode
+  onHermesApiModeChange?: (mode: HermesApiMode) => void
+  hermesModels?: HermesModel[]
+  onHermesModelsChange?: (models: HermesModel[]) => void
+  hermesRateLimit?: number
+  onHermesRateLimitChange?: (delay: number | undefined) => void
+  opencodeExtraOptions?: Record<string, unknown>
+  onOpencodeExtraOptionsChange?: (next: Record<string, unknown>) => void
+  opencodeNpm: OpenCodeNpmPackage
+  onOpencodeNpmChange: (next: OpenCodeNpmPackage) => void
 }): ReactNode {
   switch (props.agentType) {
     case 'claude':
@@ -290,6 +315,15 @@ function AgentTypeForm(props: {
           onChange={props.onChange}
           codexConfig={props.codexConfig}
           onCodexConfigChange={props.onCodexConfigChange}
+          catalogModels={props.catalogModels}
+          onCatalogModelsChange={props.onCatalogModelsChange}
+          codexChatReasoning={props.codexReasoning}
+          onCodexChatReasoningChange={props.onCodexReasoningChange}
+          localProxyHeadersOverride={props.codexProxyHeaders}
+          onLocalProxyHeadersOverrideChange={props.onCodexProxyHeadersChange}
+          localProxyBodyOverride={props.codexProxyBody}
+          onLocalProxyBodyOverrideChange={props.onCodexProxyBodyChange}
+          endpointCandidates={props.endpointCandidates}
         />
       )
     case 'hermes':
@@ -297,16 +331,26 @@ function AgentTypeForm(props: {
         <HermesProviderForm
           values={props.values}
           onChange={props.onChange}
+          endpointCandidates={props.endpointCandidates}
+          apiMode={props.hermesApiMode}
+          onApiModeChange={props.onHermesApiModeChange}
+          models={props.hermesModels}
+          onModelsChange={props.onHermesModelsChange}
+          rateLimitDelay={props.hermesRateLimit}
+          onRateLimitDelayChange={props.onHermesRateLimitChange}
         />
       )
     case 'opencode':
-    case 'mimocode':
       return (
         <OpenCodeProviderForm
           values={props.values}
           onChange={props.onChange}
           modelsJson={props.modelsJson}
           onModelsJsonChange={props.onModelsJsonChange}
+          extraOptions={props.opencodeExtraOptions}
+          onExtraOptionsChange={props.onOpencodeExtraOptionsChange}
+          npm={props.opencodeNpm}
+          onNpmChange={props.onOpencodeNpmChange}
         />
       )
   }

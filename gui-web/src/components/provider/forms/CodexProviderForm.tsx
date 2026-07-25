@@ -1,118 +1,206 @@
-/**
- * CodexProviderForm — agent-type specific form for Codex providers.
- *
- * Fields (top to bottom):
- *   Basic:  Name, Notes, Website URL
- *   Auth:   API Key (auth.OPENAI_API_KEY)
- *   Endpoint: Base URL (lifted from active [model_providers.<X>] TOML block)
- *   Config:  full TOML textarea (so users can edit the rest of the config)
- *
- * The baseUrl field stays in sync with the active model_providers block in
- * the TOML (via perAgentSettings.patchCodexBaseUrl at save time). Saving
- * with both fields unchanged round-trips the existing TOML; the user can
- * freely edit additional keys in the textarea.
- */
-
-import { Input, Textarea } from '@/components/ui'
+import { useEffect, useRef, useState } from 'react'
+import type { FetchedModel } from '@/api/models'
+import { testEndpoint } from '@/api/files'
+import { useToast } from '@/components/feedback/toast'
+import { Button, Input, Textarea } from '@/components/ui'
+import { EndpointSpeedTest } from '../EndpointSpeedTest'
 import type { ProviderFormValues } from '../ProviderFormFields'
+import {
+  Field, SwitchRow, AdvancedCard, Toggle, ProviderIdentityFields, ApiKeySection, ModelFetchActions, ModelIdInput,
+  LinkIcon, ZapIcon, BulbIcon, ChevronIcon, TrashIcon, FlaskIcon,
+} from './shared'
+import { useFetchedModels } from './hooks/useFetchedModels'
 
-export interface CodexProviderFormProps {
-  values: ProviderFormValues
-  onChange: (next: ProviderFormValues) => void
-  readOnly?: boolean
-  /** Raw Codex config.toml body — separate from the unified form values
-   *  since the form only lifts base_url out of it. */
-  codexConfig: string
-  onCodexConfigChange: (next: string) => void
+export type CodexApiFormat = 'openai_responses' | 'openai_chat'
+export interface CodexChatReasoning { supportsThinking?: boolean; supportsEffort?: boolean; effortParam?: string }
+export interface CodexCatalogModel { model: string; displayName: string; contextWindow?: number | string }
+type CatalogRow = CodexCatalogModel & { rowId: string }
+
+export function readCodexCatalogModels(settings: Record<string, unknown> | undefined): CodexCatalogModel[] {
+  const catalog = settings?.modelCatalog as Record<string, unknown> | undefined
+  if (Array.isArray(catalog?.models)) {
+    const models = catalog.models.flatMap((item) => {
+      if (!item || typeof item !== 'object') return []
+      const value = item as Record<string, unknown>
+      const model = typeof value.model === 'string' ? value.model : ''
+      if (!model.trim()) return []
+      return [{
+        model,
+        displayName: typeof value.displayName === 'string' ? value.displayName : typeof value.display_name === 'string' ? value.display_name : model,
+        contextWindow: typeof value.contextWindow === 'string' || typeof value.contextWindow === 'number' ? value.contextWindow : typeof value.context_window === 'string' || typeof value.context_window === 'number' ? value.context_window : '',
+      }]
+    })
+    if (models.length > 0) return models
+  }
+
+  const directModel = typeof settings?.model === 'string' ? settings.model.trim() : ''
+  const config = typeof settings?.config === 'string' ? settings.config : ''
+  const tomlModel = config.match(/^\s*model\s*=\s*["']([^"']+)["']/m)?.[1]?.trim() ?? ''
+  const configuredModel = directModel || tomlModel
+  return configuredModel ? [{ model: configuredModel, displayName: configuredModel, contextWindow: '' }] : []
 }
 
-export function CodexProviderForm({
-  values,
-  onChange,
-  readOnly,
-  codexConfig,
-  onCodexConfigChange,
-}: CodexProviderFormProps) {
+export interface CodexProviderFormProps {
+  values: ProviderFormValues; onChange: (next: ProviderFormValues) => void; readOnly?: boolean
+  codexConfig: string; onCodexConfigChange: (next: string) => void; model?: string; onModelChange?: (next: string) => void
+  apiFormat?: CodexApiFormat; onApiFormatChange?: (next: CodexApiFormat) => void
+  codexChatReasoning?: CodexChatReasoning; onCodexChatReasoningChange?: (next: CodexChatReasoning) => void
+  catalogModels?: CodexCatalogModel[]; onCatalogModelsChange?: (next: CodexCatalogModel[]) => void
+  customUserAgent?: string; onCustomUserAgentChange?: (next: string) => void
+  localProxyHeadersOverride?: string; onLocalProxyHeadersOverrideChange?: (next: string) => void
+  localProxyBodyOverride?: string; onLocalProxyBodyOverrideChange?: (next: string) => void
+  providerId?: string; category?: string; shouldShowSpeedTest?: boolean; isFullUrl?: boolean; onFullUrlChange?: (next: boolean) => void
+  isEndpointModalOpen?: boolean; onEndpointModalToggle?: (open?: boolean) => void; autoSelect?: boolean; onAutoSelectChange?: (next: boolean) => void
+  canEditReasoning?: boolean; mode?: 'library' | 'profile'
+  endpointCandidates?: string[]
+}
+
+const selectClassName = 'h-9 w-full rounded-md bg-muted px-3 text-sm text-foreground outline-none disabled:opacity-50'
+const localOnHint = 'Codex 目前仅原生支持 OpenAI Responses API 与 GPT 系列模型；如果您的供应商使用 Chat Completions 协议或非 GPT 模型（如 DeepSeek、Kimi），则需要打开本开关，并在使用过程中保持本地路由开启。'
+const localOffHint = '如果您的供应商不是原生 OpenAI Responses API，或者模型名不是 Codex 默认的 GPT 系列，请打开此开关。'
+const reasoningHint = '预设供应商已自动配置；自定义供应商会按名称/地址自动推断。仅当自动识别不准时才需展开手动覆盖。'
+const thinkingHint = '上游 Chat Completions 接口支持开启或关闭 thinking 时启用。Kimi、GLM、Qwen 等通常属于这一类。'
+const effortHint = '上游支持 low/high/max 等思考深度控制时启用。启用后会自动启用思考模式，并把 Codex 的 reasoning.effort 转成上游 Chat 参数。'
+
+function makeRow(seed?: CodexCatalogModel): CatalogRow { return { rowId: crypto.randomUUID(), model: seed?.model ?? '', displayName: seed?.displayName ?? '', contextWindow: seed?.contextWindow ?? '' } }
+function sameModels(rows: CatalogRow[], models: CodexCatalogModel[]) { return rows.length === models.length && rows.every((row, index) => row.model === (models[index].model ?? '') && row.displayName === (models[index].displayName ?? '') && String(row.contextWindow ?? '') === String(models[index].contextWindow ?? '')) }
+
+export function CodexProviderForm(props: CodexProviderFormProps) {
+  const { values, onChange, readOnly, codexConfig, onCodexConfigChange, model = '', onModelChange, apiFormat = 'openai_responses', onApiFormatChange, codexChatReasoning = {}, onCodexChatReasoningChange, catalogModels = [], onCatalogModelsChange, customUserAgent, onCustomUserAgentChange, localProxyHeadersOverride = '', onLocalProxyHeadersOverrideChange, localProxyBodyOverride = '', onLocalProxyBodyOverrideChange, category, shouldShowSpeedTest = true, isFullUrl, onFullUrlChange, mode = 'library', endpointCandidates = [] } = props
+  const { toast } = useToast()
+  const [reasoningOpen, setReasoningOpen] = useState(false)
+  const [testOpen, setTestOpen] = useState(Boolean(values.testConfigEnabled || values.testTimeout || values.testDegradedThreshold || values.testMaxRetries))
+  // 计费配置字段（costMultiplier / pricingModelSource / pricingConfigEnabled）保留在
+  // ProviderFormValues 里以兼容 settings_config 中已存的数据，但当前没有任何下游消费方
+  // 会读取它们，等使用统计/成本面板上线后再恢复卡片并接入 reader。
+  const [endpointToolsOpen, setEndpointToolsOpen] = useState(false)
+  const { models: fetchedModels, fetching, error: fetchError, fetch: fetchCatalog } = useFetchedModels(values.baseUrl, values.authValue)
+  const [localReasoning, setLocalReasoning] = useState(codexChatReasoning)
+  const [localModels, setLocalModels] = useState(catalogModels)
+  const effectiveReasoning = onCodexChatReasoningChange ? codexChatReasoning : localReasoning
+  const effectiveModels = onCatalogModelsChange ? catalogModels : localModels
+  const effectiveFormat = onApiFormatChange ? apiFormat : values.apiFormat === 'openai_chat' ? 'openai_chat' : 'openai_responses'
+  const fullUrl = onFullUrlChange ? Boolean(isFullUrl) : values.isFullUrl
+  const needsLocalRouting = effectiveFormat === 'openai_chat'
+  const supportsThinking = effectiveReasoning.supportsThinking === true || effectiveReasoning.supportsEffort === true
+  const supportsEffort = effectiveReasoning.supportsEffort === true
+  const [rows, setRows] = useState<CatalogRow[]>(() => effectiveModels.map(makeRow))
+  const lastSentModelsRef = useRef<CodexCatalogModel[]>(effectiveModels)
   const set = (patch: Partial<ProviderFormValues>) => onChange({ ...values, ...patch })
 
+  useEffect(() => { setRows((current) => sameModels(current, effectiveModels) ? current : effectiveModels.map(makeRow)); lastSentModelsRef.current = effectiveModels }, [effectiveModels])
+  useEffect(() => { if (sameModels(rows, lastSentModelsRef.current)) return; const next = rows.map(({ rowId: _rowId, ...rest }) => rest); lastSentModelsRef.current = next; onCatalogModelsChange?.(next); if (!onCatalogModelsChange) setLocalModels(next) }, [rows, onCatalogModelsChange])
+  const setFormat = (next: CodexApiFormat) => { onApiFormatChange?.(next); if (!onApiFormatChange) set({ apiFormat: next }) }
+  const setReasoning = (next: CodexChatReasoning) => { onCodexChatReasoningChange?.(next); if (!onCodexChatReasoningChange) setLocalReasoning(next) }
+  const updateRow = (index: number, patch: Partial<CodexCatalogModel>) => setRows((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, ...patch } : row))
+  const testCurrentEndpoint = async () => { if (!values.baseUrl.trim()) return toast({ type: 'warning', message: '请先填写 API 请求地址' }); try { const result = await testEndpoint(values.baseUrl); if (!result) throw new Error('No response'); toast({ type: result.status === 'failed' ? 'error' : 'success', message: result.status === 'failed' ? result.message : `${result.response_time_ms} ms` }) } catch (error) { toast({ type: 'error', message: error instanceof Error ? error.message : '测试失败' }) } }
+  const authJson = JSON.stringify({ OPENAI_API_KEY: values.authValue }, null, 2)
+  const updateAuthJson = (raw: string) => { try { const parsed = JSON.parse(raw) as Record<string, unknown>; if (typeof parsed.OPENAI_API_KEY === 'string') set({ authValue: parsed.OPENAI_API_KEY }) } catch { /* keep editor permissive */ } }
+
+  return <div className="space-y-4">
+    <ProviderIdentityFields name={values.name} notes={values.notes} websiteUrl={values.websiteUrl} onChange={set} readOnly={readOnly} namePlaceholder="例如：DeepSeek" />
+    <ApiKeySection value={values.authValue} onChange={(value) => set({ authValue: value })} readOnly={readOnly} />
+    <div><div className="mb-1 flex flex-wrap items-center justify-between gap-2"><div className="flex items-center gap-3"><label className="text-xs text-muted-foreground">API 请求地址</label><div className="flex items-center gap-1.5 rounded-full border border-border bg-muted/30 px-2 py-0.5"><span className="flex items-center gap-1 text-[10px] text-muted-foreground"><LinkIcon />完整 URL</span><Toggle checked={fullUrl} onChange={(checked) => { onFullUrlChange?.(checked); if (!onFullUrlChange) set({ isFullUrl: checked }) }} disabled={readOnly} /></div></div><Button type="button" variant="ghost" size="sm" onClick={() => setEndpointToolsOpen((open) => !open)} disabled={readOnly} className="h-7 gap-1 text-xs"><ZapIcon />{endpointToolsOpen ? '收起测速' : '管理与测速'}</Button></div><Input value={values.baseUrl} onChange={(event) => set({ baseUrl: event.target.value })} placeholder="https://api.example.com" className="text-sm font-mono" disabled={readOnly} />{endpointToolsOpen && (() => {
+              const endpoints = Array.from(new Set([values.baseUrl, ...endpointCandidates].filter(Boolean)))
+              return <div className="mt-2">{endpoints.length > 0 ? <EndpointSpeedTest endpoints={endpoints} selected={values.baseUrl} onSelect={(url) => set({ baseUrl: url })} /> : <p className="rounded-md border border-dashed border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">请先填写 API 请求地址，再使用管理与测速功能。</p>}</div>
+            })()}<div className="mt-2 flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-700"><BulbIcon /><span>填写兼容 OpenAI Responses 格式的服务端点地址</span></div></div>
+
+    {category !== 'official' && <>
+      {shouldShowSpeedTest && <div className="rounded-lg border border-border bg-card p-3"><SwitchRow title="需要本地路由映射" hint={needsLocalRouting ? localOnHint : localOffHint} checked={needsLocalRouting} onChange={(checked) => setFormat(checked ? 'openai_chat' : 'openai_responses')} disabled={readOnly} /></div>}
+      {needsLocalRouting && <div className="rounded-lg border border-border bg-card"><button type="button" onClick={() => setReasoningOpen((open) => !open)} className="flex w-full items-start gap-2 p-3 text-left"><span className="mt-0.5 text-muted-foreground"><ChevronIcon open={reasoningOpen} /></span><span><span className="block text-sm font-medium">思考能力（高级·通常自动识别）</span><span className="mt-1 block text-xs text-muted-foreground">{reasoningHint}</span></span></button>{reasoningOpen && <div className="space-y-4 border-t border-border p-3"><SwitchRow title="支持思考模式" hint={thinkingHint} checked={supportsThinking} onChange={(checked) => setReasoning({ ...effectiveReasoning, supportsThinking: checked, supportsEffort: checked ? effectiveReasoning.supportsEffort : false })} disabled={readOnly} /><div className="border-t border-border pt-3"><SwitchRow title="支持思考等级" hint={effortHint} checked={supportsEffort} onChange={(checked) => setReasoning({ ...effectiveReasoning, supportsThinking: checked ? true : effectiveReasoning.supportsThinking, supportsEffort: checked, effortParam: checked ? effectiveReasoning.effortParam ?? 'reasoning_effort' : 'none' })} disabled={readOnly} /></div></div>}</div>}
+      <CatalogCard rows={rows} fetchedModels={fetchedModels} fetching={fetching} fetchError={fetchError} readOnly={readOnly} onFetch={fetchCatalog} onAdd={() => setRows((current) => [...current, makeRow()])} onUpdate={updateRow} onRemove={(index) => setRows((current) => current.filter((_, rowIndex) => rowIndex !== index))} />
+      <Field label="Custom User-Agent"><Input value={customUserAgent ?? values.customUserAgent} onChange={(event) => { onCustomUserAgentChange?.(event.target.value); if (!onCustomUserAgentChange) set({ customUserAgent: event.target.value }) }} placeholder="留空使用 Codex 默认 User-Agent" className="font-mono text-sm" disabled={readOnly} /></Field>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <Field label="代理请求 Headers (JSON)"><Textarea value={localProxyHeadersOverride} onChange={(event) => onLocalProxyHeadersOverrideChange?.(event.target.value)} rows={5} className="font-mono text-sm" placeholder='{"X-Custom-Header":"value"}' disabled={readOnly || !onLocalProxyHeadersOverrideChange} /></Field>
+        <Field label="代理请求 Body (JSON)"><Textarea value={localProxyBodyOverride} onChange={(event) => onLocalProxyBodyOverrideChange?.(event.target.value)} rows={5} className="font-mono text-sm" placeholder='{"temperature":0.7}' disabled={readOnly || !onLocalProxyBodyOverrideChange} /></Field>
+      </div>
+    </>}
+
+    <Field label="auth.json (JSON) *"><Textarea value={authJson} onChange={(event) => updateAuthJson(event.target.value)} rows={4} className="font-mono text-sm" disabled={readOnly} /><p className="mt-1 text-xs text-muted-foreground">Codex auth.json 配置内容</p></Field>
+    <Field label="config.toml (TOML)"><Textarea value={codexConfig} onChange={(event) => onCodexConfigChange(event.target.value)} rows={14} className="font-mono text-sm" disabled={readOnly} /><p className="mt-1 text-xs text-muted-foreground">Codex config.toml 配置内容</p></Field>
+    <AdvancedCard icon={<FlaskIcon />} title="模型测试配置" enabled={testOpen} onEnabledChange={(enabled) => { setTestOpen(enabled); set({ testConfigEnabled: enabled, ...(enabled ? {} : { testTimeout: '', testDegradedThreshold: '', testMaxRetries: '' }) }) }}><p className="text-sm text-muted-foreground">为此供应商配置单独的模型测试参数，不启用时使用全局配置。</p><div className="grid grid-cols-1 gap-4 md:grid-cols-2"><Field label="测试模型"><Input value={model} onChange={(event) => onModelChange?.(event.target.value)} placeholder="留空使用全局配置" disabled={!testOpen || readOnly} /></Field><Field label="超时时间（秒）"><Input type="number" value={values.testTimeout} onChange={(event) => set({ testTimeout: event.target.value })} placeholder="45" disabled={!testOpen || readOnly} /></Field><Field label="降级阈值（毫秒）"><Input type="number" value={values.testDegradedThreshold} onChange={(event) => set({ testDegradedThreshold: event.target.value })} placeholder="6000" disabled={!testOpen || readOnly} /></Field><Field label="最大重试次数"><Input type="number" value={values.testMaxRetries} onChange={(event) => set({ testMaxRetries: event.target.value })} placeholder="2" disabled={!testOpen || readOnly} /></Field></div></AdvancedCard>
+    {mode === 'profile' && <p className="text-xs text-muted-foreground">Profile 模式保存到当前 Codex 配置文件。</p>}
+  </div>
+}
+
+
+
+// ── CatalogCard + CatalogRowView (Codex-specific) ──────────────────────
+
+function CatalogCard({ rows, fetchedModels, fetching, fetchError, readOnly, onFetch, onAdd, onUpdate, onRemove }: {
+  rows: CatalogRow[]
+  fetchedModels: FetchedModel[]
+  fetching: boolean
+  fetchError: string | null
+  readOnly?: boolean
+  onFetch: () => void
+  onAdd: () => void
+  onUpdate: (index: number, patch: Partial<CodexCatalogModel>) => void
+  onRemove: (index: number) => void
+}) {
   return (
-    <div className="space-y-4">
-      {/* ── Basic ──────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-4">
+    <div className="rounded-lg border border-border bg-card p-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <label className="text-xs text-muted-foreground block mb-1">Name</label>
-          <Input
-            value={values.name}
-            onChange={(e) => set({ name: e.target.value })}
-            placeholder="Provider name"
-            className="text-sm"
-            disabled={readOnly}
-          />
+          <h4 className="text-base font-medium">模型映射</h4>
+          <p className="mt-1 max-w-3xl text-xs leading-relaxed text-muted-foreground">生成 Codex model_catalog.json，让 /model 命令显示这些第三方模型名；表中条目按填写内容原样保存。修改后需要重启 Codex 才能刷新模型列表。</p>
         </div>
-        <div>
-          <label className="text-xs text-muted-foreground block mb-1">Notes</label>
-          <Input
-            value={values.notes}
-            onChange={(e) => set({ notes: e.target.value })}
-            placeholder="Optional notes"
-            className="text-sm"
-            disabled={readOnly}
-          />
+        <ModelFetchActions fetching={fetching} onFetch={onFetch} onAdd={onAdd} fetchDisabled={readOnly} addDisabled={readOnly} />
+      </div>
+      {(fetchError) && <p className="mt-2 text-xs text-red-500">{fetchError}</p>}
+      {rows.length === 0 ? (
+        <p className="mt-3 rounded-md border border-dashed p-4 text-center text-xs text-muted-foreground">暂无模型，点击「获取模型列表」或「添加模型」。</p>
+      ) : (
+        <div className="mt-3 divide-y divide-border rounded-md border border-border bg-card">
+          {rows.map((row, index) => (
+            <CatalogRowView
+              key={row.rowId}
+              index={index}
+              row={row}
+              fetchedModels={fetchedModels}
+              readOnly={readOnly}
+              onUpdate={onUpdate}
+              onRemove={onRemove}
+            />
+          ))}
         </div>
-      </div>
-      <div>
-        <label className="text-xs text-muted-foreground block mb-1">Website URL</label>
-        <Input
-          value={values.websiteUrl}
-          onChange={(e) => set({ websiteUrl: e.target.value })}
-          placeholder="https://..."
-          className="text-sm font-mono"
-          disabled={readOnly}
-        />
-      </div>
+      )}
+    </div>
+  )
+}
 
-      {/* ── Auth ───────────────────────────────────────────────────── */}
-      <div>
-        <label className="text-xs text-muted-foreground block mb-1">API Key (auth.OPENAI_API_KEY)</label>
-        <Input
-          value={values.authValue}
-          onChange={(e) => set({ authValue: e.target.value })}
-          placeholder="sk-..."
-          className="text-sm font-mono"
-          type="password"
+function CatalogRowView({ index, row, fetchedModels, readOnly, onUpdate, onRemove }: {
+  index: number
+  row: CatalogRow
+  fetchedModels: FetchedModel[]
+  readOnly?: boolean
+  onUpdate: (index: number, patch: Partial<CodexCatalogModel>) => void
+  onRemove: (index: number) => void
+}) {
+  const [contextOpen, setContextOpen] = useState(false)
+  const isFirst = index === 0
+  return (
+    <div className="px-3 py-3">
+      <div className="flex items-center gap-2">
+        <span className={`inline-flex h-5 shrink-0 items-center rounded px-1.5 text-[10px] font-medium ${isFirst ? 'bg-blue-500/15 text-blue-600 dark:text-blue-300' : 'bg-muted text-muted-foreground'}`}>
+          {isFirst ? '默认模型' : '备选模型'}
+        </span>
+        <ModelIdInput value={row.model} models={fetchedModels} onChange={(value) => onUpdate(index, { model: value, displayName: row.displayName.trim() ? row.displayName : value })} disabled={readOnly} placeholder="实际请求模型 ID" />
+        <Input value={row.displayName ?? ''} onChange={(event) => onUpdate(index, { displayName: event.target.value })} placeholder="显示名称（可选）" className="text-sm" disabled={readOnly} />
+        <button type="button" onClick={() => setContextOpen((open) => !open)} className="flex h-9 shrink-0 items-center gap-1 rounded-md border border-border bg-muted px-2.5 text-xs text-muted-foreground hover:text-foreground" title={contextOpen ? '收起高级' : '展开高级'} disabled={readOnly}>
+          <ChevronIcon open={contextOpen} /><span>高级选项</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => onRemove(index)}
+          className="flex h-9 w-8 shrink-0 items-center justify-center text-muted-foreground hover:text-destructive"
+          title="删除模型"
           disabled={readOnly}
-        />
+        >
+          <TrashIcon />
+        </button>
       </div>
-
-      {/* ── Endpoint (lifted from active model_providers block) ────── */}
-      <div>
-        <label className="text-xs text-muted-foreground block mb-1">
-          Base URL (active <code className="font-mono">[model_providers.&lt;X&gt;]</code>)
-        </label>
-        <Input
-          value={values.baseUrl}
-          onChange={(e) => set({ baseUrl: e.target.value })}
-          placeholder="https://api.openai.com/v1"
-          className="text-sm font-mono"
-          disabled={readOnly}
-        />
-        <p className="mt-1 text-[10px] text-muted-foreground">
-          Editing this updates the <code className="font-mono">base_url</code> in the TOML below. Other TOML keys are preserved.
-        </p>
-      </div>
-
-      {/* ── Full Config TOML ───────────────────────────────────────── */}
-      <div>
-        <label className="text-xs text-muted-foreground block mb-1">Config (TOML)</label>
-        <Textarea
-          value={codexConfig}
-          onChange={(e) => onCodexConfigChange(e.target.value)}
-          rows={10}
-          placeholder={'model_provider = "custom"\n\n[model_providers.custom]\nbase_url = "..."\n'}
-          className="font-mono text-xs"
-          disabled={readOnly}
-        />
-      </div>
+      {contextOpen && <div className="mt-3 max-w-md border-t border-border pt-3"><Field label="上下文长度（tokens）"><Input type="number" min="1" value={row.contextWindow ?? ''} onChange={(event) => onUpdate(index, { contextWindow: event.target.value ? Number(event.target.value) : undefined })} placeholder="例如 200000" className="font-mono text-sm" disabled={readOnly} /><p className="mt-1 text-[11px] text-muted-foreground">覆盖自动推断的上下文窗口；留空使用模型默认值。</p></Field></div>}
     </div>
   )
 }

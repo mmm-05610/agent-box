@@ -51,10 +51,12 @@ export interface ProviderFormValues {
   timeoutMs: string
   customUserAgent: string
   // Test config
+  testConfigEnabled: boolean
   testTimeout: string
   testDegradedThreshold: string
   testMaxRetries: string
   // Billing
+  pricingConfigEnabled: boolean
   costMultiplier: string
   pricingModelSource: string
 }
@@ -76,7 +78,7 @@ export function defaultFormValues(
     useApiKey,
     authValue: get(useApiKey ? 'ANTHROPIC_API_KEY' : 'ANTHROPIC_AUTH_TOKEN'),
     baseUrl: get('ANTHROPIC_BASE_URL'),
-    isFullUrl: false,
+    isFullUrl: (extra?.isFullUrl as boolean) ?? false,
     roleModels: roles,
     fallbackModel: get('ANTHROPIC_MODEL') || model || '',
     apiFormat: (extra?.apiFormat as string) ?? 'anthropic',
@@ -87,11 +89,13 @@ export function defaultFormValues(
     disableAutoUpdates: (extra?.disableAutoUpdates as boolean) ?? false,
     timeoutMs: get('API_TIMEOUT_MS'),
     customUserAgent: (extra?.customUserAgent as string) ?? '',
-    testTimeout: '',
-    testDegradedThreshold: '',
-    testMaxRetries: '',
-    costMultiplier: '',
-    pricingModelSource: 'inherit',
+    testConfigEnabled: Boolean(extra?.testConfigEnabled) || Boolean(extra?.testTimeout) || Boolean(extra?.testDegradedThreshold) || Boolean(extra?.testMaxRetries),
+    testTimeout: (extra?.testTimeout as string) ?? '',
+    testDegradedThreshold: (extra?.testDegradedThreshold as string) ?? '',
+    testMaxRetries: (extra?.testMaxRetries as string) ?? '',
+    pricingConfigEnabled: Boolean(extra?.pricingConfigEnabled) || Boolean(extra?.costMultiplier) || ((extra?.pricingModelSource as string) && (extra?.pricingModelSource as string) !== 'inherit'),
+    costMultiplier: (extra?.costMultiplier as string) ?? '',
+    pricingModelSource: (extra?.pricingModelSource as string) ?? 'inherit',
   }
 }
 
@@ -139,11 +143,13 @@ export function ProviderFormFields({
   onChange,
   readOnly,
   showBasicFields, // Library: true, Profile: false
+  mode = 'library',
 }: {
   values: ProviderFormValues
   onChange: (next: ProviderFormValues) => void
   readOnly?: boolean
   showBasicFields?: boolean
+  mode?: 'library' | 'profile'
 }) {
   const [advancedOpen, setAdvancedOpen] = useState(
     Object.values(values.roleModels).some((r) => r.model || r.name) ||
@@ -292,16 +298,19 @@ export function ProviderFormFields({
               </label>
             </div>
 
-            {/* Custom User-Agent */}
-            <div>
-              <label className="text-xs text-muted-foreground block mb-1">Custom User-Agent</label>
-              <Input value={values.customUserAgent} onChange={(e) => set({ customUserAgent: e.target.value })} placeholder="Optional" className="text-sm font-mono" disabled={readOnly} />
-            </div>
+            {/* Custom User-Agent — hidden in profile mode (not serialized). */}
+            {mode === 'library' && (
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1">Custom User-Agent</label>
+                <Input value={values.customUserAgent} onChange={(e) => set({ customUserAgent: e.target.value })} placeholder="Optional" className="text-sm font-mono" disabled={readOnly} />
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      {/* ── Model Test Config ────────────────────────────────────────── */}
+      {/* ── Model Test Config (hidden in profile mode — not serialized) ── */}
+      {mode === 'library' && (
       <CollapsibleSection title="Model Test Config" open={testOpen} onToggle={setTestOpen}>
         <div className="grid grid-cols-3 gap-4">
           <div>
@@ -319,7 +328,9 @@ export function ProviderFormFields({
         </div>
       </CollapsibleSection>
 
-      {/* ── Billing Config ───────────────────────────────────────────── */}
+      )}
+      {/* ── Billing Config (hidden in profile mode — not serialized) ──── */}
+      {mode === 'library' && (
       <CollapsibleSection title="Billing Config" open={billingOpen} onToggle={setBillingOpen}>
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -341,6 +352,7 @@ export function ProviderFormFields({
           </div>
         </div>
       </CollapsibleSection>
+      )}
     </div>
   )
 }

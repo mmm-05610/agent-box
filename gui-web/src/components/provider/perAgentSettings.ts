@@ -20,6 +20,7 @@
  */
 import type { ProviderFormValues } from './ProviderFormFields'
 import { defaultFormValues } from './ProviderFormFields'
+import type { HermesApiMode, HermesModel } from './forms/HermesProviderForm'
 
 // ── Read: settings_config → form values ──────────────────────────────────
 
@@ -38,7 +39,6 @@ export function getInitialFormValues(
     case 'hermes':
       return getInitialHermesFormValues(settings)
     case 'opencode':
-    case 'mimocode':
       return getInitialOpencodeFormValues(settings)
     case 'claude':
     default:
@@ -61,11 +61,21 @@ function getInitialCodexFormValues(
   const baseUrl = extractCodexBaseUrl(configText) ?? ''
   const authValue =
     typeof auth.OPENAI_API_KEY === 'string' ? auth.OPENAI_API_KEY : ''
+  const testConfig = (settings?.testConfig as Record<string, unknown> | undefined) ?? {}
   return defaultFormValues(
     injectClaudeShape(baseUrl, authValue),
     undefined,
     undefined,
-    settings,
+    {
+      ...settings,
+      apiFormat: settings?.apiFormat ?? 'openai_responses',
+      isFullUrl: settings?.isFullUrl ?? false,
+      testTimeout: testConfig.timeoutSecs !== undefined ? String(testConfig.timeoutSecs) : '',
+      testDegradedThreshold: testConfig.degradedThresholdMs !== undefined ? String(testConfig.degradedThresholdMs) : '',
+      testMaxRetries: testConfig.maxRetries !== undefined ? String(testConfig.maxRetries) : '',
+      costMultiplier: settings?.costMultiplier !== undefined ? String(settings.costMultiplier) : '',
+      pricingModelSource: settings?.pricingModelSource ?? 'inherit',
+    },
   )
 }
 
@@ -132,6 +142,10 @@ export function settingsFromFormValues(
   currentSettings: Record<string, unknown>,
   fv: ProviderFormValues,
   presetDefaults?: Record<string, unknown>,
+  extras?: {
+    hermes?: { apiMode?: HermesApiMode; models?: HermesModel[]; rateLimitDelay?: number }
+    opencode?: { extraOptions?: Record<string, unknown> }
+  },
 ): Record<string, unknown> {
   // Shared shape (claude + meta overrides)
   const next: Record<string, unknown> = { ...currentSettings }
@@ -145,10 +159,9 @@ export function settingsFromFormValues(
     case 'codex':
       return applyCodexEdits(next, fv, currentSettings, presetDefaults)
     case 'hermes':
-      return applyHermesEdits(next, fv, currentSettings, presetDefaults)
+      return applyHermesEdits(next, fv, currentSettings, presetDefaults, extras?.hermes)
     case 'opencode':
-    case 'mimocode':
-      return applyOpencodeEdits(next, fv, currentSettings, presetDefaults)
+      return applyOpencodeEdits(next, fv, currentSettings, presetDefaults, extras?.opencode)
     case 'claude':
     default:
       return applyClaudeEdits(next, fv, currentSettings)
@@ -167,6 +180,7 @@ function applyClaudeEdits(
     ANTHROPIC_BASE_URL: fv.baseUrl,
     [fv.useApiKey ? 'ANTHROPIC_API_KEY' : 'ANTHROPIC_AUTH_TOKEN']: fv.authValue,
   }
+  delete env[fv.useApiKey ? 'ANTHROPIC_AUTH_TOKEN' : 'ANTHROPIC_API_KEY']
   if (fv.fallbackModel) env.ANTHROPIC_MODEL = fv.fallbackModel
   for (const r of MODEL_ROLES) {
     const rm = fv.roleModels[r.role]
@@ -178,12 +192,12 @@ function applyClaudeEdits(
   // Strip empty values to avoid clobbering
   for (const k of Object.keys(env)) if (!env[k]) delete env[k]
   next.env = env
-  if (fv.apiFormat && fv.apiFormat !== 'anthropic') next.apiFormat = fv.apiFormat
-  if (fv.effortLevel) next.effortLevel = fv.effortLevel
-  if (fv.includeCoAuthoredBy) next.includeCoAuthoredBy = true
-  if (fv.enableToolSearch) next.ENABLE_TOOL_SEARCH = true
-  if (fv.skipWebFetchPreflight) next.skipWebFetchPreflight = true
-  if (fv.customUserAgent) next.customUserAgent = fv.customUserAgent
+  if (fv.apiFormat && fv.apiFormat !== 'anthropic') next.apiFormat = fv.apiFormat; else delete next.apiFormat
+  if (fv.effortLevel) next.effortLevel = fv.effortLevel; else delete next.effortLevel
+  if (fv.includeCoAuthoredBy) next.includeCoAuthoredBy = true; else delete next.includeCoAuthoredBy
+  if (fv.enableToolSearch) next.ENABLE_TOOL_SEARCH = true; else delete next.ENABLE_TOOL_SEARCH
+  if (fv.skipWebFetchPreflight) next.skipWebFetchPreflight = true; else delete next.skipWebFetchPreflight
+  if (fv.customUserAgent) next.customUserAgent = fv.customUserAgent; else delete next.customUserAgent
   return next
 }
 
@@ -198,6 +212,7 @@ function applyCodexEdits(
   // auth.OPENAI_API_KEY from the form's authValue
   const auth = { ...((current.auth as Record<string, unknown>) ?? {}) }
   if (fv.authValue) auth.OPENAI_API_KEY = fv.authValue
+  else delete auth.OPENAI_API_KEY
   next.auth = auth
   // config TOML — re-extract base_url and patch it into the active section.
   // Falls back to ``[model_providers.custom]`` if no model_provider line yet.
@@ -206,6 +221,24 @@ function applyCodexEdits(
     (presetDefaults?.config as string | undefined) ??
     defaultCodexToml()
   next.config = patchCodexBaseUrl(currentConfig, fv.baseUrl)
+  next.apiFormat = fv.apiFormat === 'openai_chat' ? 'openai_chat' : 'openai_responses'
+  next.isFullUrl = fv.isFullUrl
+  if (fv.customUserAgent) next.customUserAgent = fv.customUserAgent
+  else delete next.customUserAgent
+  if (fv.testConfigEnabled || fv.testTimeout || fv.testDegradedThreshold || fv.testMaxRetries) {
+    next.testConfig = {
+      enabled: true,
+      ...(fv.testTimeout ? { timeoutSecs: Number(fv.testTimeout) } : {}),
+      ...(fv.testDegradedThreshold ? { degradedThresholdMs: Number(fv.testDegradedThreshold) } : {}),
+      ...(fv.testMaxRetries ? { maxRetries: Number(fv.testMaxRetries) } : {}),
+    }
+    next.testConfigEnabled = true
+  } else {
+    delete next.testConfig
+    delete next.testConfigEnabled
+  }
+  // 计费配置（costMultiplier / pricingModelSource / pricingConfigEnabled）暂未启用：
+  // 表单里没有对应 UI，下游也没有 reader。等使用统计/成本面板上线后再恢复这段逻辑。
   return next
 }
 
@@ -214,13 +247,65 @@ function applyHermesEdits(
   fv: ProviderFormValues,
   current: Record<string, unknown>,
   presetDefaults?: Record<string, unknown>,
+  extras?: {
+    apiMode?: HermesApiMode
+    models?: HermesModel[]
+    rateLimitDelay?: number
+  },
 ): Record<string, unknown> {
   delete next.env
   // base_url + api_key live at the top level for hermes (config.yaml)
   if (fv.baseUrl) next.base_url = fv.baseUrl.replace(/\/+$/, '')
   else if (current.base_url === undefined && presetDefaults?.base_url)
     next.base_url = presetDefaults.base_url
+  else delete next.base_url
   if (fv.authValue) next.api_key = fv.authValue
+  else delete next.api_key
+
+  // apiMode — written as a top-level string so Hermes CLI can pick it up.
+  const apiMode =
+    extras?.apiMode ??
+    (current.api_mode as HermesApiMode | undefined) ??
+    (presetDefaults?.api_mode as HermesApiMode | undefined)
+  if (apiMode) next.api_mode = apiMode
+  else delete next.api_mode
+
+  // models — list of { id, name?, context_length? } entries. Drop empties.
+  const rawModels =
+    extras?.models ??
+    (Array.isArray(current.models) ? (current.models as HermesModel[]) : undefined) ??
+    (Array.isArray(presetDefaults?.models) ? (presetDefaults.models as HermesModel[]) : undefined) ??
+    []
+  const models = rawModels
+    .map((model) => ({
+      id: typeof model.id === 'string' ? model.id.trim() : '',
+      name: typeof model.name === 'string' ? model.name.trim() : '',
+      context_length:
+        typeof model.contextLength === 'number'
+          ? model.contextLength
+          : typeof model.context_length === 'number'
+            ? model.context_length
+            : undefined,
+    }))
+    .filter((model) => model.id)
+    .map((model) => {
+      const out: Record<string, unknown> = { id: model.id }
+      if (model.name) out.name = model.name
+      if (typeof model.context_length === 'number') out.context_length = model.context_length
+      return out
+    })
+  if (models.length > 0) next.models = models
+  else delete next.models
+
+  // rate_limit_delay — number of seconds; omit when undefined / 0.
+  const delay =
+    extras?.rateLimitDelay ??
+    (typeof current.rate_limit_delay === 'number' ? current.rate_limit_delay : undefined) ??
+    (typeof presetDefaults?.rate_limit_delay === 'number'
+      ? presetDefaults.rate_limit_delay
+      : undefined)
+  if (typeof delay === 'number' && delay > 0) next.rate_limit_delay = delay
+  else delete next.rate_limit_delay
   return next
 }
 
@@ -229,19 +314,40 @@ function applyOpencodeEdits(
   fv: ProviderFormValues,
   current: Record<string, unknown>,
   presetDefaults?: Record<string, unknown>,
+  extras?: { extraOptions?: Record<string, unknown> },
 ): Record<string, unknown> {
   delete next.env
   // Preserve npm / models if the current row has them; otherwise seed from preset.
   if (current.npm === undefined && presetDefaults?.npm) next.npm = presetDefaults.npm
   if (current.models === undefined && presetDefaults?.models) next.models = presetDefaults.models
-  // options.{baseURL, apiKey, ...} — patch only the two fields the form edits
+  // options.{baseURL, apiKey, ...} — patch baseURL + apiKey, then layer extraOptions on top
+  // so the form-level fields always win.
   const options = {
     ...((current.options as Record<string, unknown>) ??
       (presetDefaults?.options as Record<string, unknown> | undefined) ??
       {}),
   }
+  // Apply extraOptions first (anything that isn't a reserved key) so form fields can override.
+  if (extras?.extraOptions) {
+    for (const key of Object.keys(options)) {
+      if (key !== 'baseURL' && key !== 'apiKey') delete options[key]
+    }
+    for (const [key, value] of Object.entries(extras.extraOptions)) {
+      if (key === 'baseURL' || key === 'apiKey') continue
+      if (value === undefined || value === '') delete options[key]
+      else options[key] = value
+    }
+  }
   if (fv.baseUrl) options.baseURL = fv.baseUrl
   if (fv.authValue) options.apiKey = fv.authValue
+  // If extraOptions explicitly cleared baseURL/apiKey, honor that.
+  if (extras?.extraOptions?.baseURL === '' || extras?.extraOptions?.baseURL === undefined) {
+    // only delete if not set by fv
+    if (!fv.baseUrl) delete options.baseURL
+  }
+  if (extras?.extraOptions?.apiKey === '' || extras?.extraOptions?.apiKey === undefined) {
+    if (!fv.authValue) delete options.apiKey
+  }
   next.options = options
   return next
 }
@@ -292,7 +398,7 @@ export function extractCodexBaseUrl(configText: string): string | undefined {
  * section; if the section is missing or the file is empty, seed a minimal
  * TOML with a ``[model_providers.custom]`` block.
  */
-function patchCodexBaseUrl(configText: string, newBaseUrl: string): string {
+export function patchCodexBaseUrl(configText: string, newBaseUrl: string): string {
   const escaped = newBaseUrl.replace(/"/g, '\\"')
   const lines = configText ? configText.split(/\r?\n/) : []
   const active = (() => {

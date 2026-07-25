@@ -9,12 +9,14 @@
  *     Default Model, Effort, Timeout, checkboxes, Custom User-Agent
  */
 
-import { useState, useCallback, useRef, useEffect } from 'react'
-import { Input, Button } from '@/components/ui'
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
+import { Input, Button, Textarea } from '@/components/ui'
 import type { ProviderFormValues } from '../ProviderFormFields'
 import { getSoftWarnings } from '../ProviderFormFields'
 import { EndpointSpeedTest } from '../EndpointSpeedTest'
-import { fetchModels, type FetchedModel } from '@/api'
+import type { FetchedModel } from '@/api'
+import { ApiKeySection, ProviderIdentityFields } from './shared'
+import { useFetchedModels } from './hooks/useFetchedModels'
 
 // ── 1M marker helpers ──────────────────────────────────────────────────
 
@@ -60,41 +62,72 @@ export interface ClaudeProviderFormProps {
   readOnly?: boolean
   presetApiKeyUrl?: string
   endpointCandidates?: string[]
+  mode?: 'library' | 'profile'
+  settingsJson?: string
+  onSettingsJsonChange?: (next: string) => void
 }
 
-export function ClaudeProviderForm({ values, onChange, readOnly, presetApiKeyUrl, endpointCandidates }: ClaudeProviderFormProps) {
+export function ClaudeProviderForm({ values, onChange, readOnly, presetApiKeyUrl, endpointCandidates, mode = 'library', settingsJson = '', onSettingsJsonChange }: ClaudeProviderFormProps) {
   const [advancedOpen, setAdvancedOpen] = useState(
     Object.values(values.roleModels).some((r) => r.model || r.name) ||
     !!values.fallbackModel || !!values.apiFormat || values.enableToolSearch || values.includeCoAuthoredBy,
   )
-  const [fetchedModels, setFetchedModels] = useState<FetchedModel[]>([])
-  const [fetchingModels, setFetchingModels] = useState(false)
-  const [fetchError, setFetchError] = useState<string | null>(null)
+  const { models: fetchedModels, fetching: fetchingModels, error: fetchError, fetch: handleFetchModels } = useFetchedModels(values.baseUrl, values.authValue, values.isFullUrl)
+  const [settingsJsonLocal, setSettingsJsonLocal] = useState(settingsJson)
+  const lastSentSettingsJsonRef = useRef(settingsJson)
 
   const set = (patch: Partial<ProviderFormValues>) => onChange({ ...values, ...patch })
-  const warnings = getSoftWarnings(values)
 
-  // Fetch models from API
-  const handleFetchModels = useCallback(async () => {
-    if (!values.baseUrl) {
-      setFetchError('请先填写 Base URL')
-      return
+  useEffect(() => {
+    setSettingsJsonLocal((current) => settingsJson === current ? current : settingsJson)
+  }, [settingsJson])
+
+  // Live preview JSON — mirrors applyClaudeEdits so the user can see exactly
+  // what the saved config will look like.
+  const previewSettingsJson = useMemo(() => {
+    const env: Record<string, string> = {
+      ...(((values as unknown) as Record<string, unknown>)?.env as Record<string, string> | undefined ?? {}),
     }
-    setFetchingModels(true)
-    setFetchError(null)
-    try {
-      const models = await fetchModels(values.baseUrl, values.authValue || '', undefined, values.isFullUrl)
-      setFetchedModels(models)
-      if (models.length === 0) {
-        setFetchError('未返回任何模型，请检查 API 地址和 Key')
+    if (values.baseUrl) env.ANTHROPIC_BASE_URL = values.baseUrl
+    env[values.useApiKey ? 'ANTHROPIC_API_KEY' : 'ANTHROPIC_AUTH_TOKEN'] = values.authValue
+    if (values.fallbackModel) env.ANTHROPIC_MODEL = values.fallbackModel
+    for (const [role, rm] of Object.entries(values.roleModels ?? {})) {
+      const ROLE_FIELD: Record<string, { modelField: string; nameField: string }> = {
+        opus: { modelField: 'ANTHROPIC_DEFAULT_OPUS_MODEL', nameField: 'ANTHROPIC_DEFAULT_OPUS_MODEL_NAME' },
+        sonnet: { modelField: 'ANTHROPIC_DEFAULT_SONNET_MODEL', nameField: 'ANTHROPIC_DEFAULT_SONNET_MODEL_NAME' },
+        haiku: { modelField: 'ANTHROPIC_DEFAULT_HAIKU_MODEL', nameField: 'ANTHROPIC_DEFAULT_HAIKU_MODEL_NAME' },
       }
-    } catch (err) {
-      setFetchedModels([])
-      setFetchError(err instanceof Error ? err.message : '拉取失败')
-    } finally {
-      setFetchingModels(false)
+      const fields = ROLE_FIELD[role]
+      if (!fields) continue
+      if (rm.model) env[fields.modelField] = rm.model
+      if (rm.name) env[fields.nameField] = rm.name
     }
-  }, [values.baseUrl, values.authValue, values.isFullUrl])
+    if (values.timeoutMs) env.API_TIMEOUT_MS = values.timeoutMs
+    if (values.disableAutoUpdates) env.DISABLE_AUTOUPDATER = '1'
+    for (const k of Object.keys(env)) if (!env[k]) delete env[k]
+    const settings: Record<string, unknown> = {}
+    if (Object.keys(env).length > 0) settings.env = env
+    if (values.apiFormat && values.apiFormat !== 'anthropic') settings.apiFormat = values.apiFormat
+    if (values.effortLevel) settings.effortLevel = values.effortLevel
+    if (values.includeCoAuthoredBy) settings.includeCoAuthoredBy = true
+    if (values.enableToolSearch) settings.ENABLE_TOOL_SEARCH = true
+    if (values.skipWebFetchPreflight) settings.skipWebFetchPreflight = true
+    if (values.customUserAgent) settings.customUserAgent = values.customUserAgent
+    return JSON.stringify(settings, null, 2)
+  }, [values.baseUrl, values.authValue, values.useApiKey, values.fallbackModel, values.roleModels, values.timeoutMs, values.disableAutoUpdates, values.apiFormat, values.effortLevel, values.includeCoAuthoredBy, values.enableToolSearch, values.skipWebFetchPreflight, values.customUserAgent])
+
+  const parentProvided = Boolean(onSettingsJsonChange)
+  const effectiveSettingsJson = parentProvided ? settingsJson : (settingsJson || previewSettingsJson)
+  const setSettingsJson = (next: string) => {
+    if (onSettingsJsonChange) {
+      if (next === lastSentSettingsJsonRef.current) return
+      lastSentSettingsJsonRef.current = next
+      onSettingsJsonChange(next)
+    } else {
+      setSettingsJsonLocal(next)
+    }
+  }
+  const warnings = getSoftWarnings(values)
 
   // Quick Set: pick first non-empty model and apply to all roles
   const handleQuickSet = () => {
@@ -145,52 +178,10 @@ export function ClaudeProviderForm({ values, onChange, readOnly, presetApiKeyUrl
       )}
 
       {/* ── Basic ──────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="text-xs text-muted-foreground block mb-1">Name</label>
-          <Input
-            value={values.name}
-            onChange={(e) => set({ name: e.target.value })}
-            placeholder="Provider name"
-            className="text-sm"
-            disabled={readOnly}
-          />
-        </div>
-        <div>
-          <label className="text-xs text-muted-foreground block mb-1">Notes</label>
-          <Input
-            value={values.notes}
-            onChange={(e) => set({ notes: e.target.value })}
-            placeholder="Optional notes"
-            className="text-sm"
-            disabled={readOnly}
-          />
-        </div>
-      </div>
-      <div>
-        <label className="text-xs text-muted-foreground block mb-1">Website URL</label>
-        <Input
-          value={values.websiteUrl}
-          onChange={(e) => set({ websiteUrl: e.target.value })}
-          placeholder="https://..."
-          className="text-sm font-mono"
-          disabled={readOnly}
-        />
-        {/* Get API Key link */}
-        {presetApiKeyUrl && (
-          <a
-            href={presetApiKeyUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-1.5 inline-block text-xs text-blue-500 hover:text-blue-400 hover:underline"
-          >
-            获取 API Key →
-          </a>
-        )}
-      </div>
+      <ProviderIdentityFields name={values.name} notes={values.notes} websiteUrl={values.websiteUrl} onChange={set} readOnly={readOnly} apiKeyUrl={presetApiKeyUrl} namePlaceholder="Provider name" />
 
       {/* ── Auth ───────────────────────────────────────────────────── */}
-      <AuthInput
+      <ApiKeySection
         label={values.useApiKey ? 'API Key (ANTHROPIC_API_KEY)' : 'Auth Token (ANTHROPIC_AUTH_TOKEN)'}
         value={values.authValue}
         onChange={(v) => set({ authValue: v })}
@@ -467,6 +458,32 @@ export function ClaudeProviderForm({ values, onChange, readOnly, presetApiKeyUrl
           </div>
         )}
       </div>
+
+      <div className="rounded-lg border border-border bg-card p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h4 className="text-base font-medium">settings.json (JSON)</h4>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {parentProvided
+                ? '该供应商的完整 settings_config JSON（env + apiFormat + effortLevel 等）；修改后会被原样写入 Claude Code 配置。普通编辑请使用上方结构化字段。'
+                : '上方结构化字段对应的 settings_config JSON 预览（只读）；保存时由结构化字段自动生成。'}
+            </p>
+          </div>
+          {!parentProvided && (
+            <span className="rounded-md bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">实时预览</span>
+          )}
+        </div>
+        <Textarea
+          value={effectiveSettingsJson}
+          onChange={(event) => setSettingsJson(event.target.value)}
+          rows={Math.min(16, Math.max(6, effectiveSettingsJson.split('\n').length + 1))}
+          readOnly={!parentProvided}
+          className="mt-3 font-mono text-sm"
+          disabled={readOnly && !parentProvided}
+        />
+      </div>
+
+      {mode === 'profile' && <p className="text-xs text-muted-foreground">Profile 模式保存到当前 Claude Code 配置文件。</p>}
     </div>
   )
 }
@@ -563,52 +580,3 @@ function ModelDropdown({
 }
 
 // ── Auth input ─────────────────────────────────────────────────────────
-
-function AuthInput({
-  label,
-  value,
-  onChange,
-  placeholder,
-  readOnly,
-}: {
-  label: string
-  value: string
-  onChange: (v: string) => void
-  placeholder: string
-  readOnly?: boolean
-}) {
-  const [visible, setVisible] = useState(false)
-  return (
-    <div>
-      <label className="text-xs text-muted-foreground block mb-1">{label}</label>
-      <div className="relative">
-        <Input
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          className="text-sm font-mono pr-14"
-          type={visible ? 'text' : 'password'}
-          disabled={readOnly}
-        />
-        <button
-          type="button"
-          onClick={() => setVisible(!visible)}
-          className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
-          tabIndex={-1}
-        >
-          {visible ? (
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-              <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24" />
-              <line x1="1" y1="1" x2="23" y2="23" />
-            </svg>
-          ) : (
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-              <circle cx="12" cy="12" r="3" />
-            </svg>
-          )}
-        </button>
-      </div>
-    </div>
-  )
-}
