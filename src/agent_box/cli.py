@@ -588,10 +588,14 @@ def cmd_sessions(args: argparse.Namespace) -> int:
 
 def cmd_provider_list(args: argparse.Namespace) -> int:
     try:
-        rows = providers.list_providers(args.type)
-    except Exception as exc:
-        print(f"agent-box: {exc}", file=sys.stderr)
-        return 2
+        from .ccswitch_adapter import list_providers as cs_list_providers
+        rows = cs_list_providers(args.type)
+    except Exception:
+        try:
+            rows = providers.list_providers(args.type)
+        except Exception as exc:
+            print(f"agent-box: {exc}", file=sys.stderr)
+            return 2
     if args.json:
         json.dump(rows, sys.stdout, indent=2, ensure_ascii=False)
         sys.stdout.write("\n")
@@ -611,10 +615,14 @@ def cmd_provider_list(args: argparse.Namespace) -> int:
 
 def cmd_provider_show(args: argparse.Namespace) -> int:
     try:
-        row = providers.get_provider(args.type, args.id)
-    except Exception as exc:
-        print(f"agent-box: {exc}", file=sys.stderr)
-        return 2
+        from .ccswitch_adapter import get_provider as cs_get_provider
+        row = cs_get_provider(args.type, args.id)
+    except Exception:
+        try:
+            row = providers.get_provider(args.type, args.id)
+        except Exception as exc:
+            print(f"agent-box: {exc}", file=sys.stderr)
+            return 2
     if row is None:
         print(f"agent-box: provider {args.id!r} for {args.type!r} not found", file=sys.stderr)
         return 2
