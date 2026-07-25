@@ -119,7 +119,7 @@ function PlusIcon() {
 const NAV_ITEMS: NavItem[] = [
   { key: 'home', label: 'Home', icon: <HomeIcon /> },
   { key: 'profiles', label: 'Profiles', icon: <ProfilesIcon /> },
-  { key: 'library', label: 'Library', icon: <LibraryIcon /> },
+  // { key: 'library', label: 'Library', icon: <LibraryIcon /> },  {/* ACS migration: hidden */}
   { key: 'sessions', label: 'Sessions', icon: <SessionsIcon /> },
   { key: 'settings', label: 'Settings', icon: <SettingsIcon /> },
   { key: 'help', label: 'Help', icon: <HelpIcon /> },
