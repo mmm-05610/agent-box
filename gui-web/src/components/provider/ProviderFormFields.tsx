@@ -22,7 +22,8 @@ const MODEL_ROLES: ModelRoleRow[] = [
   { role: 'sonnet', label: 'Sonnet', modelField: 'ANTHROPIC_DEFAULT_SONNET_MODEL', nameField: 'ANTHROPIC_DEFAULT_SONNET_MODEL_NAME' },
   { role: 'opus',   label: 'Opus',   modelField: 'ANTHROPIC_DEFAULT_OPUS_MODEL',   nameField: 'ANTHROPIC_DEFAULT_OPUS_MODEL_NAME' },
   { role: 'fable',  label: 'Fable',  modelField: 'ANTHROPIC_DEFAULT_FABLE_MODEL',  nameField: 'ANTHROPIC_DEFAULT_FABLE_MODEL_NAME' },
-  { role: 'haiku',  label: 'Haiku',  modelField: 'ANTHROPIC_DEFAULT_HAIKU_MODEL',  nameField: 'ANTHROPIC_DEFAULT_HAIKU_MODEL_NAME' },
+  { role: 'haiku',    label: 'Haiku',    modelField: 'ANTHROPIC_DEFAULT_HAIKU_MODEL',  nameField: 'ANTHROPIC_DEFAULT_HAIKU_MODEL_NAME' },
+  { role: 'subagent', label: 'Subagent', modelField: 'CLAUDE_CODE_SUBAGENT_MODEL',     nameField: 'CLAUDE_CODE_SUBAGENT_MODEL_NAME' },
 ]
 
 // ── Types ──────────────────────────────────────────────────────────────

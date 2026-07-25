@@ -58,7 +58,8 @@ const MODEL_ROLES: ModelRoleRow[] = [
   { role: 'sonnet', label: 'Sonnet', modelField: 'ANTHROPIC_DEFAULT_SONNET_MODEL', nameField: 'ANTHROPIC_DEFAULT_SONNET_MODEL_NAME', supportsOneM: true },
   { role: 'opus',   label: 'Opus',   modelField: 'ANTHROPIC_DEFAULT_OPUS_MODEL',   nameField: 'ANTHROPIC_DEFAULT_OPUS_MODEL_NAME',   supportsOneM: true },
   { role: 'fable',  label: 'Fable',  modelField: 'ANTHROPIC_DEFAULT_FABLE_MODEL',  nameField: 'ANTHROPIC_DEFAULT_FABLE_MODEL_NAME',  supportsOneM: true },
-  { role: 'haiku',  label: 'Haiku',  modelField: 'ANTHROPIC_DEFAULT_HAIKU_MODEL',  nameField: 'ANTHROPIC_DEFAULT_HAIKU_MODEL_NAME',  supportsOneM: false },
+  { role: 'haiku',    label: 'Haiku',    modelField: 'ANTHROPIC_DEFAULT_HAIKU_MODEL',    nameField: 'ANTHROPIC_DEFAULT_HAIKU_MODEL_NAME',    supportsOneM: false },
+  { role: 'subagent', label: 'Subagent', modelField: 'CLAUDE_CODE_SUBAGENT_MODEL',       nameField: 'CLAUDE_CODE_SUBAGENT_MODEL_NAME',       supportsOneM: true },
 ]
 
 // ── Auth field options ─────────────────────────────────────────────────
@@ -142,10 +143,7 @@ export function ClaudeProviderForm({
   // Quick Set: pick first non-empty model and apply to all roles
   const handleQuickSet = () => {
     const source = values.fallbackModel
-      || values.roleModels['sonnet']?.model
-      || values.roleModels['opus']?.model
-      || values.roleModels['fable']?.model
-      || values.roleModels['haiku']?.model
+      || MODEL_ROLES.reduce((acc, row) => acc || values.roleModels[row.role]?.model, '' as string)
     if (!source) return
     const next = { ...values.roleModels }
     for (const row of MODEL_ROLES) {
