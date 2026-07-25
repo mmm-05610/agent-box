@@ -933,18 +933,20 @@ class Api:
             return json.dumps({"ok": False, "error": str(e)})
 
     def launch_acs(self) -> str:
-        """Launch ACS (agent-config-store) in a new WSL console."""
+        """Launch ACS GUI via WSLg (WSL 2 built-in GUI support)."""
         import subprocess as _sp
-        acs_binary = "/home/maoqh/projects/agent-box/acs/src-tauri/target/release/cc-switch"
-        script = f"nohup {acs_binary} >/dev/null 2>&1 &"
+        import os as _os
+        acs_binary = "/home/maoqh/projects/agent-config-store/src-tauri/target/release/cc-switch"
         wsl = shutil.which("wsl.exe")
         if wsl is None:
             return json.dumps({"ok": False, "error": "wsl.exe not found"})
         try:
+            # WSLg provides Wayland/X11 forwarding automatically.
+            # DISPLAY / WAYLAND_DISPLAY are set inside WSL 2 by default.
             _sp.Popen(
-                [wsl, "-e", "bash", "-lc", script],
-                close_fds=True,
-                creationflags=_sp.CREATE_NEW_CONSOLE if sys.platform == "win32" else 0,
+                [wsl, "-e", acs_binary],
+                stdout=_sp.DEVNULL, stderr=_sp.DEVNULL,
+                start_new_session=True,
             )
             return json.dumps({"ok": True})
         except Exception as e:
