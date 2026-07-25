@@ -97,6 +97,7 @@ export function HermesProviderForm(props: HermesProviderFormProps) {
 
   const { models: fetchedModels, fetching, error: fetchError, fetch: handleFetch } = useFetchedModels(values.baseUrl, values.authValue)
   const [rateLimitEnabled, setRateLimitEnabled] = useState(rateLimitDelay !== undefined)
+  const [baseUrlTouched, setBaseUrlTouched] = useState(false)
   const [localMode, setLocalMode] = useState<HermesApiMode>(apiMode)
   const [localModels, setLocalModels] = useState<HermesModel[]>(models)
   const [localRateLimit, setLocalRateLimit] = useState<number | undefined>(rateLimitDelay)
@@ -189,7 +190,11 @@ export function HermesProviderForm(props: HermesProviderFormProps) {
         <p className="mt-1 text-xs text-muted-foreground">{apiModeHint}</p>
       </Field>
 
-      <EndpointField value={values.baseUrl} onChange={(baseUrl) => set({ baseUrl })} candidates={endpointCandidates} label="API 请求地址 (base_url)" readOnly={readOnly} hint={<div className="mt-2 flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-700"><LinkIcon /><span>请使用 Hermes CLI 支持的 base_url（不包含 /v1 等路径）。</span></div>} />
+      <EndpointField value={values.baseUrl} onChange={(baseUrl) => { set({ baseUrl }); setBaseUrlTouched(true) }} candidates={endpointCandidates} label="API 请求地址 (base_url)" readOnly={readOnly} hint={<div className="mt-2 flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-700"><LinkIcon /><span>请使用 Hermes CLI 支持的 base_url（不包含 /v1 等路径）。</span></div>} />
+      {baseUrlTouched && values.baseUrl.trim() === '' && (
+        <p className="mt-1 text-xs text-destructive">base_url 不能为空</p>
+      )}
+      {baseUrlTouched && values.baseUrl.trim() !== '' && (() => { try { const u = new URL(values.baseUrl); if (!['http:', 'https:'].includes(u.protocol)) return <p className="mt-1 text-xs text-destructive">仅支持 http/https 协议</p> } catch { return <p className="mt-1 text-xs text-destructive">URL 格式无效</p> } return null })()}
 
       <ModelsCard
         rows={rows}
@@ -258,17 +263,16 @@ export function HermesProviderForm(props: HermesProviderFormProps) {
                 : '上方结构化字段对应的 settings_config JSON 预览（只读）；保存时由结构化字段自动生成。'}
             </p>
           </div>
-          {!parentProvided && (
-            <span className="rounded-md bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">实时预览</span>
-          )}
+          <span className="rounded-md bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+            {parentProvided ? '可编辑' : '实时预览（可编辑）'}
+          </span>
         </div>
         <Textarea
           value={effectiveSettingsJson}
           onChange={(event) => setSettingsJson(event.target.value)}
           rows={Math.min(16, Math.max(6, effectiveSettingsJson.split('\n').length + 1))}
-          readOnly={!parentProvided}
           className="mt-3 font-mono text-sm"
-          disabled={readOnly && !parentProvided}
+          disabled={readOnly}
         />
       </div>}
 
