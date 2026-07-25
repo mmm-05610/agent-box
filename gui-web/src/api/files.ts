@@ -4,6 +4,8 @@
 
 import { call } from '@/lib/bridge'
 
+export type { FetchedModel } from './models'
+
 export async function readFile(path: string): Promise<string> {
   return call<string>((api) => api.read_file(path), '')
 }
@@ -48,16 +50,23 @@ export async function testEndpoint(url: string): Promise<EndpointTestResult | nu
  * Return absolute paths of all files under *path* (find -type f).
  */
 export async function findFiles(path: string): Promise<string[]> {
-  return call<string[]>((api) => api.find_files(path), [])
+  // Normalize — backend can return null/non-array when the directory is missing.
+  const result = await call<string[] | null>((api) => api.find_files(path), null)
+  return Array.isArray(result) ? result : []
 }
 
-export interface FetchedModel {
+/** Delete a file or directory recursively. */
+export async function deletePath(path: string): Promise<boolean> {
+  return call<boolean>((api) => api.delete_path(path), false)
+}
+
+export interface LegacyFetchedModel {
   id: string
   owned_by: string | null
 }
 
-export async function fetchModels(baseUrl: string, apiKey: string, modelsUrl?: string, isFullUrl?: boolean): Promise<FetchedModel[]> {
-  return call<FetchedModel[]>(
+export async function fetchModels(baseUrl: string, apiKey: string, modelsUrl?: string, isFullUrl?: boolean): Promise<LegacyFetchedModel[]> {
+  return call<LegacyFetchedModel[]>(
     (api) => api.fetch_models(baseUrl, apiKey, modelsUrl || '', isFullUrl || false),
     [],
   )

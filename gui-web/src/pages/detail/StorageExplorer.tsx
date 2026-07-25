@@ -12,7 +12,7 @@ import { useToast } from '@/components/feedback/toast'
 import { buildTreeFromFlatList, type TreeNode } from './buildTreeFromFlatList'
 import { FileTree } from './FileTree'
 
-export function StorageExplorer({ profilePath, fileTree, onRefresh: _onRefresh }: {
+export function StorageExplorer({ profilePath, fileTree, onRefresh }: {
   profilePath: string
   fileTree: string[]
   onRefresh?: () => void
@@ -55,12 +55,13 @@ export function StorageExplorer({ profilePath, fileTree, onRefresh: _onRefresh }
       setOriginalContent(content)
       setLastSavedAt(Date.now())
       toast({ type: 'success', message: `Saved ${selected.split('/').pop()}` })
+      onRefresh?.()
     } catch (e: unknown) {
       toast({ type: 'error', message: e instanceof Error ? e.message : 'Save failed' })
     } finally {
       setSaving(false)
     }
-  }, [selected, content, toast])
+  }, [selected, content, onRefresh, toast])
 
   const activeFile = useMemo(() => {
     if (!selected) return null

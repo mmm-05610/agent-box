@@ -12,9 +12,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Button, Badge, Tabs } from '@/components/ui'
 import { Loading } from '@/components/feedback'
-import type { AgentType } from '@/api'
+import type { AgentType, McpServer } from '@/api'
 import { AGENT_TYPE_COLORS, fetchProfileDetail } from '@/api'
 import { readFile, findFiles } from '@/api/files'
+import { fetchMcpServers } from '@/api/mcp'
 import { MetaEditor } from './detail/MetaEditor'
 import { ProviderEditor } from './detail/ProviderEditor'
 import { PermissionsEditor } from './detail/PermissionsEditor'
@@ -24,6 +25,13 @@ import { FileTextEditor } from './detail/FileTextEditor'
 import { McpTab } from './detail/McpTab'
 import { SkillsTab } from './detail/SkillsTab'
 import { StorageExplorer } from './detail/StorageExplorer'
+import { CodexProviderViewer } from './detail/CodexProviderViewer'
+import { RulesTab } from './detail/RulesTab'
+import { HermesProviderViewer } from './detail/HermesProviderViewer'
+import { HermesMemoriesTab } from './detail/HermesMemoriesTab'
+import { HermesHooksViewer } from './detail/HermesHooksViewer'
+import { OpenCodeProviderViewer } from './detail/OpenCodeProviderViewer'
+import { OpenCodeInstructionsTab } from './detail/OpenCodeInstructionsTab'
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -65,17 +73,28 @@ const CLAUDE_TABS: TabDef[] = [
 const OTHER_TABS: Record<string, TabDef[]> = {
   codex: [
     { key: 'meta',       label: 'Meta' },
-    { key: 'claude-md',  label: 'Rules' },
+    { key: 'provider',   label: 'Provider' },
+    { key: 'agents-md',  label: 'AGENTS.md' },
+    { key: 'rules',      label: 'Rules' },
+    { key: 'skills',     label: 'Skills' },
     { key: 'storage',    label: 'Storage' },
   ],
   hermes: [
     { key: 'meta',       label: 'Meta' },
-    { key: 'claude-md',  label: 'Persona' },
+    { key: 'provider',   label: 'Provider' },
+    { key: 'soul-md',    label: 'SOUL.md' },
+    { key: 'memories',   label: 'Memories' },
+    { key: 'skills',     label: 'Skills' },
+    { key: 'hooks',      label: 'Hooks' },
     { key: 'storage',    label: 'Storage' },
   ],
   opencode: [
-    { key: 'meta',       label: 'Meta' },
-    { key: 'storage',    label: 'Storage' },
+    { key: 'meta',         label: 'Meta' },
+    { key: 'provider',     label: 'Provider' },
+    { key: 'agents-md',    label: 'AGENTS.md' },
+    { key: 'instructions', label: 'Instructions' },
+    { key: 'skills',       label: 'Skills' },
+    { key: 'storage',      label: 'Storage' },
   ],
 }
 
@@ -84,9 +103,11 @@ const OTHER_TABS: Record<string, TabDef[]> = {
 interface ProfileDetailPageProps {
   profileName: string
   onBack: () => void
+  /** Optional: navigate to the Library page (wired from App if available). */
+  onNavigateLibrary?: () => void
 }
 
-export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProps) {
+export function ProfileDetailPage({ profileName, onBack, onNavigateLibrary }: ProfileDetailPageProps) {
   const [detail, setDetail] = useState<ProfileDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -96,6 +117,14 @@ export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProp
   const [settingsRaw, setSettingsRaw] = useState<string>('{}')
   const [claudeMdRaw, setClaudeMdRaw] = useState<string>('')
   const [claudeDotJson, setClaudeDotJson] = useState<string>('{}')
+  const [codexConfigToml, setCodexConfigToml] = useState<string>('')
+  const [codexAuthJson, setCodexAuthJson] = useState<string>('')
+  const [codexAgentsMd, setCodexAgentsMd] = useState<string>('')
+  const [opencodeJsonc, setOpencodeJsonc] = useState<string>('')
+  const [opencodeAuthJson, setOpencodeAuthJson] = useState<string>('')
+  const [opencodeAgentsMd, setOpencodeAgentsMd] = useState<string>('')
+  const [hermesConfigYaml, setHermesConfigYaml] = useState<string>('')
+  const [hermesEnvContent, setHermesEnvContent] = useState<string>('')
   const [fileTree, setFileTree] = useState<string[]>([])
 
   // Reload trigger (incremented after save to refresh dependent tabs)
@@ -117,16 +146,35 @@ export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProp
         setDetail(d)
 
         const configDir = d.config_dir
-        const [s, md, cj, tree] = await Promise.all([
+        const agentTypeLocal = d.meta.agent_type
+        const isOpencodeLike = agentTypeLocal === 'opencode' 
+        const isHermes = agentTypeLocal === 'hermes'
+        const [s, md, cj, codexToml, codexAuth, codexMd, ocJsonc, ocAuth, ocAgentsMd, hYaml, hEnv, tree] = await Promise.all([
           readFile(`${configDir}/settings.json`).catch(() => '{}'),
-          readFile(`${configDir}/CLAUDE.md`).catch(() => ''),
+          isHermes ? readFile(`${configDir}/SOUL.md`).catch(() => '') : agentTypeLocal === 'codex' ? Promise.resolve('') : readFile(`${configDir}/CLAUDE.md`).catch(() => ''),
           readFile(`${d.path}/dot-claude.json`).catch(() => '{}'),
+          agentTypeLocal === 'codex' ? readFile(`${configDir}/config.toml`).catch(() => '') : Promise.resolve(''),
+          agentTypeLocal === 'codex' ? readFile(`${configDir}/auth.json`).catch(() => '') : Promise.resolve(''),
+          agentTypeLocal === 'codex' ? readFile(`${configDir}/AGENTS.md`).catch(() => '') : Promise.resolve(''),
+          isOpencodeLike ? readFile(`${configDir}/opencode.jsonc`).catch(() => '') : Promise.resolve(''),
+          isOpencodeLike ? readFile(`${d.path}/dot-opencode-data/auth.json`).catch(() => '') : Promise.resolve(''),
+          isOpencodeLike ? readFile(`${configDir}/AGENTS.md`).catch(() => '') : Promise.resolve(''),
+          isHermes ? readFile(`${configDir}/config.yaml`).catch(() => '') : Promise.resolve(''),
+          isHermes ? readFile(`${configDir}/.env`).catch(() => '') : Promise.resolve(''),
           findFiles(`${d.path}`).catch(() => [] as string[]),
         ] as const)
         if (cancelled) return
         setSettingsRaw(s)
         setClaudeMdRaw(md)
         setClaudeDotJson(cj)
+        setCodexConfigToml(codexToml)
+        setCodexAuthJson(codexAuth)
+        setCodexAgentsMd(codexMd)
+        setOpencodeJsonc(ocJsonc)
+        setOpencodeAuthJson(ocAuth)
+        setOpencodeAgentsMd(ocAgentsMd)
+        setHermesConfigYaml(hYaml)
+        setHermesEnvContent(hEnv)
         setFileTree(tree)
       } catch (e: unknown) {
         if (cancelled) return
@@ -172,7 +220,12 @@ export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProp
   const badgeVariant = AGENT_TYPE_COLORS[agentType as AgentType] ?? 'neutral'
   const configDir = detail.config_dir
   const settingsPath = `${configDir}/settings.json`
-  const claudeMdPath = `${configDir}/${agentType === 'hermes' ? 'SOUL.md' : 'CLAUDE.md'}`
+  // Per-agent persona/agent-file path. Codex uses AGENTS.md, Hermes uses SOUL.md, others CLAUDE.md.
+  const claudeMdPath =
+    agentType === 'codex' ? `${configDir}/AGENTS.md` :
+    agentType === 'opencode' ? `${configDir}/AGENTS.md` :
+    agentType === 'hermes' ? `${configDir}/SOUL.md` :
+    `${configDir}/CLAUDE.md`
 
   return (
     <div className="mx-auto w-full max-w-5xl px-8 py-10">
@@ -203,8 +256,18 @@ export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProp
         claudeMdPath={claudeMdPath}
         claudeMdRaw={claudeMdRaw}
         claudeDotJson={claudeDotJson}
+        codexConfigToml={codexConfigToml}
+        codexAuthJson={codexAuthJson}
+        codexAgentsMd={codexAgentsMd}
+        opencodeJsonc={opencodeJsonc}
+        opencodeAuthJson={opencodeAuthJson}
+        opencodeAgentsMd={opencodeAgentsMd}
+        hermesConfigYaml={hermesConfigYaml}
+        hermesEnvContent={hermesEnvContent}
         fileTree={fileTree}
         onRefresh={triggerRefresh}
+        refreshKey={refreshKey}
+        onNavigateLibrary={onNavigateLibrary}
       />
     </div>
   )
@@ -214,7 +277,10 @@ export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProp
 
 function TabContent({
   tab, detail, settingsPath, settingsRaw, claudeMdPath, claudeMdRaw,
-  claudeDotJson, fileTree, onRefresh,
+  claudeDotJson, codexConfigToml, codexAuthJson, codexAgentsMd,
+  opencodeJsonc, opencodeAuthJson, opencodeAgentsMd,
+  hermesConfigYaml, hermesEnvContent,
+  fileTree, onRefresh, refreshKey, onNavigateLibrary,
 }: {
   tab: TabKey
   detail: ProfileDetail
@@ -223,26 +289,46 @@ function TabContent({
   claudeMdPath: string
   claudeMdRaw: string
   claudeDotJson: string
+  codexConfigToml: string
+  codexAuthJson: string
+  codexAgentsMd: string
+  opencodeJsonc: string
+  opencodeAuthJson: string
+  opencodeAgentsMd: string
+  hermesConfigYaml: string
+  hermesEnvContent: string
   fileTree: string[]
   onRefresh: () => void
+  refreshKey: number
+  onNavigateLibrary?: () => void
 }) {
   const profilePath = detail.path
   const agentType = detail.meta.agent_type
 
+  // Library MCP list — only meaningful for claude agents; mirror ProviderEditor's
+  // conditional fetch so non-claude profiles don't burn a round-trip.
+  const [libraryMcpServers, setLibraryMcpServers] = useState<McpServer[]>([])
+  useEffect(() => {
+    if (agentType !== 'claude') {
+      setLibraryMcpServers([])
+      return
+    }
+    fetchMcpServers('claude')
+      .then(setLibraryMcpServers)
+      .catch(() => setLibraryMcpServers([]))
+  }, [agentType, refreshKey])
+
   switch (tab) {
     case 'meta':
-      return <MetaEditor detail={detail} onRefresh={onRefresh} />
-    case 'provider':
-      return <ProviderEditor path={settingsPath} content={settingsRaw} onRefresh={onRefresh} agentType={agentType} />
+      return <MetaEditor key={refreshKey} detail={detail} onRefresh={onRefresh} />
     case 'permissions':
-      return <PermissionsEditor path={settingsPath} content={settingsRaw} onRefresh={onRefresh} />
-    case 'hooks':
-      return <HooksEditor path={settingsPath} content={settingsRaw} onRefresh={onRefresh} />
+      return <PermissionsEditor key={refreshKey} path={settingsPath} content={settingsRaw} onRefresh={onRefresh} />
     case 'plugins':
-      return <PluginsEditor path={settingsPath} content={settingsRaw} onRefresh={onRefresh} />
+      return <PluginsEditor key={refreshKey} path={settingsPath} content={settingsRaw} onRefresh={onRefresh} />
     case 'claude-md':
       return (
         <FileTextEditor
+          key={refreshKey}
           path={claudeMdPath}
           content={claudeMdRaw}
           label={agentType === 'hermes' ? 'SOUL.md' : 'CLAUDE.md'}
@@ -250,13 +336,99 @@ function TabContent({
           onRefresh={onRefresh}
         />
       )
+    case 'provider':
+      if (agentType === 'codex') {
+        return (
+          <CodexProviderViewer
+            key={refreshKey}
+            configToml={codexConfigToml}
+            authJson={codexAuthJson}
+            configDir={detail.config_dir}
+            profileName={detail.meta.name}
+            onRefresh={onRefresh}
+          />
+        )
+      }
+      if (agentType === 'opencode' ) {
+        return (
+          <OpenCodeProviderViewer
+            key={refreshKey}
+            configJsonc={opencodeJsonc}
+            authJson={opencodeAuthJson}
+            configDir={detail.config_dir}
+            dataDir={`${detail.path}/dot-opencode-data`}
+            profileName={detail.meta.name}
+            onRefresh={onRefresh}
+          />
+        )
+      }
+      if (agentType === 'hermes') {
+        return (
+          <HermesProviderViewer
+            key={refreshKey}
+            configYaml={hermesConfigYaml}
+            envContent={hermesEnvContent}
+            configDir={detail.config_dir}
+            profileName={detail.meta.name}
+            onRefresh={onRefresh}
+          />
+        )
+      }
+      return <ProviderEditor key={refreshKey} path={settingsPath} content={settingsRaw} onRefresh={onRefresh} agentType={agentType} />
+    case 'soul-md':
+      return (
+        <FileTextEditor
+          key={refreshKey}
+          path={claudeMdPath}
+          content={claudeMdRaw}
+          label="SOUL.md"
+          placeholder="# Persona — who the agent is, tone, boundaries"
+          onRefresh={onRefresh}
+        />
+      )
+    case 'memories':
+      return <HermesMemoriesTab key={refreshKey} configDir={detail.config_dir} />
+    case 'hooks':
+      return agentType === 'hermes'
+        ? <HermesHooksViewer key={refreshKey} configYaml={hermesConfigYaml} configDir={detail.config_dir} onRefresh={onRefresh} />
+        : <HooksEditor key={refreshKey} path={settingsPath} content={settingsRaw} onRefresh={onRefresh} />
+    case 'agents-md':
+      if (agentType === 'opencode' ) {
+        return (
+          <FileTextEditor
+            key={refreshKey}
+            path={claudeMdPath}
+            content={opencodeAgentsMd}
+            label="AGENTS.md"
+            placeholder="# Custom agent instructions"
+            onRefresh={onRefresh}
+          />
+        )
+      }
+      if (agentType === 'codex') {
+        return <FileTextEditor key={refreshKey} path={claudeMdPath} content={codexAgentsMd} label="AGENTS.md" placeholder="# Custom agent instructions" onRefresh={onRefresh} />
+      }
+    case 'instructions':
+      return <OpenCodeInstructionsTab key={refreshKey} configJsonc={opencodeJsonc} profilePath={profilePath} />
+    case 'rules':
+      return <RulesTab key={refreshKey} configDir={detail.config_dir} profileName={detail.meta.name} refreshKey={refreshKey} />
     case 'mcp':
-      return <McpTab profileName={detail.meta.name} profilePath={profilePath} />
+      return (
+        <McpTab
+          key={refreshKey}
+          profileName={detail.meta.name}
+          profilePath={profilePath}
+          mcpJson={claudeDotJson}
+          libraryMcp={libraryMcpServers}
+          onNavigateLibrary={onNavigateLibrary}
+        />
+      )
     case 'skills':
-      return <SkillsTab profileName={detail.meta.name} configDir={detail.config_dir} />
+      return <SkillsTab key={refreshKey} profileName={detail.meta.name} configDir={detail.config_dir} refreshKey={refreshKey} />
     case 'storage':
       return (
         <StorageExplorer
+          key={refreshKey}
           profilePath={profilePath}
           fileTree={fileTree}
           onRefresh={onRefresh}

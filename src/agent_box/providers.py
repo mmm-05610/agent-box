@@ -654,7 +654,7 @@ def resolve_usage_credentials(
         if base["base_url"]:
             base["BASE_URL"] = base["base_url"]
 
-    elif agent_type == "opencode" or agent_type == "mimocode":
+    elif agent_type == "opencode":
         options = settings.get("options") or {}
         if isinstance(options, dict):
             v = options.get("apiKey")

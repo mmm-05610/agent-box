@@ -26,38 +26,38 @@
 
 ### Created
 
-| Path | Responsibility |
-|---|---|
-| `gui-web/src/pages/detail/schema.ts` | Single source of truth: `AGENT_TAB_SCHEMAS[AgentType]` |
-| `gui-web/src/pages/detail/storage/FileTree.tsx` | Recursive lazy-loaded tree from flat path list |
-| `gui-web/src/pages/detail/storage/MonacoEditorPanel.tsx` | Monaco wrapper, language detection, multi-tab model registry |
-| `gui-web/src/pages/detail/storage/StorageExplorer.tsx` | Container — tree pane + editor pane + SaveBar |
-| `gui-web/src/pages/detail/storage/validateJson.ts` | JSON.parse + zod schema map + `validateJson(path, content)` |
-| `gui-web/src/pages/detail/storage/schemaMaps.ts` | Zod schemas keyed by relative path (settings.json → ClaudeHooksSchema) |
-| `gui-web/src/pages/detail/storage/buildTreeFromFlatList.ts` | Pure function: `string[]` (full file paths) → `TreeNode[]` |
-| `gui-web/src/pages/detail/storage/useOpenFiles.ts` | Multi-tab state, max 5 LRU, dirty tracking per file |
-| `gui-web/src/pages/detail/storage/SaveBar.tsx` | Dirty indicator + Save button + last-saved time |
-| `gui-web/src/pages/detail/shared/SaveStatusBar.tsx` | Shared across editors (used by Storage + future form tabs) |
-| `gui-web/src/pages/detail/shared/FormField.tsx` | label + input + description slot |
-| `gui-web/src/pages/detail/codex/ModelEditor.tsx` | Codex `config.toml` form + auth.json writer |
-| `gui-web/src/pages/detail/codex/codectoml.ts` | Parse/serialize `config.toml` (basic; first round only flat top-level + `[history]` + `[model_providers.custom]`) |
-| `gui-web/src/pages/detail/hermes/ModelEnvEditor.tsx` | Hermes `config.yaml` `model` + `terminal` form |
-| `gui-web/src/pages/detail/hermes/MemoryEditor.tsx` | `memory` + `compression` toggle + slider |
-| `gui-web/src/pages/detail/hermes/DisplayEditor.tsx` | `display.{compact,streaming}` |
-| `gui-web/src/pages/detail/opencode/ProvidersEditor.tsx` | `opencode.jsonc` `provider` dict editor + auth.json writer |
-| `gui-web/src/pages/detail/opencode/ModelEditor.tsx` | Default model selector (picker reads from providers) |
-| `gui-web/src/pages/detail/opencode/InstructionsEditor.tsx` | `instructions: string[]` list-of-strings editor |
-| `docs/superpowers/research/per-agent-config-keys.md` | PR 2 deliverable — research output on agent config keys |
+| Path                                                        | Responsibility                                                                                                    |
+| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `gui-web/src/pages/detail/schema.ts`                        | Single source of truth: `AGENT_TAB_SCHEMAS[AgentType]`                                                            |
+| `gui-web/src/pages/detail/storage/FileTree.tsx`             | Recursive lazy-loaded tree from flat path list                                                                    |
+| `gui-web/src/pages/detail/storage/MonacoEditorPanel.tsx`    | Monaco wrapper, language detection, multi-tab model registry                                                      |
+| `gui-web/src/pages/detail/storage/StorageExplorer.tsx`      | Container — tree pane + editor pane + SaveBar                                                                     |
+| `gui-web/src/pages/detail/storage/validateJson.ts`          | JSON.parse + zod schema map + `validateJson(path, content)`                                                       |
+| `gui-web/src/pages/detail/storage/schemaMaps.ts`            | Zod schemas keyed by relative path (settings.json → ClaudeHooksSchema)                                            |
+| `gui-web/src/pages/detail/storage/buildTreeFromFlatList.ts` | Pure function: `string[]` (full file paths) → `TreeNode[]`                                                        |
+| `gui-web/src/pages/detail/storage/useOpenFiles.ts`          | Multi-tab state, max 5 LRU, dirty tracking per file                                                               |
+| `gui-web/src/pages/detail/storage/SaveBar.tsx`              | Dirty indicator + Save button + last-saved time                                                                   |
+| `gui-web/src/pages/detail/shared/SaveStatusBar.tsx`         | Shared across editors (used by Storage + future form tabs)                                                        |
+| `gui-web/src/pages/detail/shared/FormField.tsx`             | label + input + description slot                                                                                  |
+| `gui-web/src/pages/detail/codex/ModelEditor.tsx`            | Codex `config.toml` form + auth.json writer                                                                       |
+| `gui-web/src/pages/detail/codex/codectoml.ts`               | Parse/serialize `config.toml` (basic; first round only flat top-level + `[history]` + `[model_providers.custom]`) |
+| `gui-web/src/pages/detail/hermes/ModelEnvEditor.tsx`        | Hermes `config.yaml` `model` + `terminal` form                                                                    |
+| `gui-web/src/pages/detail/hermes/MemoryEditor.tsx`          | `memory` + `compression` toggle + slider                                                                          |
+| `gui-web/src/pages/detail/hermes/DisplayEditor.tsx`         | `display.{compact,streaming}`                                                                                     |
+| `gui-web/src/pages/detail/opencode/ProvidersEditor.tsx`     | `opencode.jsonc` `provider` dict editor + auth.json writer                                                        |
+| `gui-web/src/pages/detail/opencode/ModelEditor.tsx`         | Default model selector (picker reads from providers)                                                              |
+| `gui-web/src/pages/detail/opencode/InstructionsEditor.tsx`  | `instructions: string[]` list-of-strings editor                                                                   |
+| `docs/superpowers/research/per-agent-config-keys.md`        | PR 2 deliverable — research output on agent config keys                                                           |
 
 ### Modified
 
-| Path | Change |
-|---|---|
-| `gui-web/package.json` | Add monaco, zod, react-hook-form, @hookform/resolvers; add `vitest` test script |
-| `gui-web/src/pages/detail.tsx` | Replace `CLAUDE_TABS / OTHER_TABS` constants with `tabsFor(profile)` from schema |
+| Path                                           | Change                                                                                                                          |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `gui-web/package.json`                         | Add monaco, zod, react-hook-form, @hookform/resolvers; add `vitest` test script                                                 |
+| `gui-web/src/pages/detail.tsx`                 | Replace `CLAUDE_TABS / OTHER_TABS` constants with `tabsFor(profile)` from schema                                                |
 | `gui-web/src/pages/detail/StorageExplorer.tsx` | Replaced by re-export from new location, OR delete and remove import in detail.tsx. Plan deletes this file (we don't keep two). |
-| `gui-web/src/api/files.ts` | Add `listDirTree(path, maxDepth=4) → DirTreeNode[]` |
-| `gui-web/bridge.py` | Add `Api.list_dir_tree(path, max_depth=4)` method |
+| `gui-web/src/api/files.ts`                     | Add `listDirTree(path, maxDepth=4) → DirTreeNode[]`                                                                             |
+| `gui-web/bridge.py`                            | Add `Api.list_dir_tree(path, max_depth=4)` method                                                                               |
 
 ### Removed
 
@@ -83,6 +83,7 @@ PR 1 stands alone. PR 3–5 depend on PR 2 (need the research output to fill in 
 ## Task 1: Add vitest + new dependencies to package.json
 
 **Files:**
+
 - Modify: `gui-web/package.json`
 
 - [ ] **Step 1: Edit dependencies block**
@@ -132,6 +133,7 @@ git commit -m "build(deps): add monaco-editor, zod, react-hook-form, vitest"
 ## Task 2: Backend `list_dir_tree` bridge method
 
 **Files:**
+
 - Modify: `gui-web/bridge.py` (append method to class `Api`)
 - Modify: `gui-web/src/api/files.ts` (add TS wrapper)
 
@@ -196,19 +198,25 @@ In `gui-web/src/api/files.ts`, append:
 
 ```ts
 export interface DirTreeNode {
-  path: string
-  type: 'dir' | 'file'
-  size?: number
-  mtime?: number
-  children?: DirTreeNode[]
+  path: string;
+  type: "dir" | "file";
+  size?: number;
+  mtime?: number;
+  children?: DirTreeNode[];
 }
 
 /**
  * Lazy-loaded recursive tree. `maxDepth` defaults to 4; pass 1
  * for "one level" then refetch with deeper values on expansion.
  */
-export async function listDirTree(path: string, maxDepth = 4): Promise<DirTreeNode | null> {
-  return call<DirTreeNode | null>((api) => api.list_dir_tree(path, maxDepth), null)
+export async function listDirTree(
+  path: string,
+  maxDepth = 4,
+): Promise<DirTreeNode | null> {
+  return call<DirTreeNode | null>(
+    (api) => api.list_dir_tree(path, maxDepth),
+    null,
+  );
 }
 ```
 
@@ -245,6 +253,7 @@ git commit -m "feat(bridge): add list_dir_tree for VSCode-like storage pane"
 ## Task 3: `buildTreeFromFlatList` utility + tests
 
 **Files:**
+
 - Create: `gui-web/src/pages/detail/storage/buildTreeFromFlatList.ts`
 - Create: `gui-web/src/pages/detail/storage/buildTreeFromFlatList.test.ts`
 - Create: `gui-web/vitest.config.ts`
@@ -253,59 +262,59 @@ git commit -m "feat(bridge): add list_dir_tree for VSCode-like storage pane"
 
 ```ts
 // gui-web/src/pages/detail/storage/buildTreeFromFlatList.test.ts
-import { describe, it, expect } from 'vitest'
-import { buildTreeFromFlatList, type FlatFile } from './buildTreeFromFlatList'
+import { describe, it, expect } from "vitest";
+import { buildTreeFromFlatList, type FlatFile } from "./buildTreeFromFlatList";
 
-describe('buildTreeFromFlatList', () => {
-  it('groups files by directory', () => {
+describe("buildTreeFromFlatList", () => {
+  it("groups files by directory", () => {
     const files: FlatFile[] = [
-      { path: '/root/a/x.md' },
-      { path: '/root/a/y.json' },
-      { path: '/root/b/z.txt' },
-    ]
-    const tree = buildTreeFromFlatList(files, '/root')
+      { path: "/root/a/x.md" },
+      { path: "/root/a/y.json" },
+      { path: "/root/b/z.txt" },
+    ];
+    const tree = buildTreeFromFlatList(files, "/root");
     expect(tree).toEqual([
       {
-        type: 'dir',
-        path: '/root/a',
+        type: "dir",
+        path: "/root/a",
         children: [
-          { type: 'file', path: '/root/a/x.md' },
-          { type: 'file', path: '/root/a/y.json' },
+          { type: "file", path: "/root/a/x.md" },
+          { type: "file", path: "/root/a/y.json" },
         ],
       },
       {
-        type: 'dir',
-        path: '/root/b',
-        children: [{ type: 'file', path: '/root/b/z.txt' }],
+        type: "dir",
+        path: "/root/b",
+        children: [{ type: "file", path: "/root/b/z.txt" }],
       },
-    ])
-  })
+    ]);
+  });
 
-  it('puts files at root when no subdirectory', () => {
+  it("puts files at root when no subdirectory", () => {
     const files: FlatFile[] = [
-      { path: '/root/x.md' },
-      { path: '/root/y.json' },
-    ]
-    const tree = buildTreeFromFlatList(files, '/root')
+      { path: "/root/x.md" },
+      { path: "/root/y.json" },
+    ];
+    const tree = buildTreeFromFlatList(files, "/root");
     expect(tree).toEqual([
-      { type: 'file', path: '/root/x.md' },
-      { type: 'file', path: '/root/y.json' },
-    ])
-  })
+      { type: "file", path: "/root/x.md" },
+      { type: "file", path: "/root/y.json" },
+    ]);
+  });
 
-  it('returns empty array for empty input', () => {
-    expect(buildTreeFromFlatList([], '/root')).toEqual([])
-  })
+  it("returns empty array for empty input", () => {
+    expect(buildTreeFromFlatList([], "/root")).toEqual([]);
+  });
 
-  it('ignores files outside the root prefix', () => {
+  it("ignores files outside the root prefix", () => {
     const files: FlatFile[] = [
-      { path: '/other/x.md' },
-      { path: '/root/y.json' },
-    ]
-    const tree = buildTreeFromFlatList(files, '/root')
-    expect(tree).toEqual([{ type: 'file', path: '/root/y.json' }])
-  })
-})
+      { path: "/other/x.md" },
+      { path: "/root/y.json" },
+    ];
+    const tree = buildTreeFromFlatList(files, "/root");
+    expect(tree).toEqual([{ type: "file", path: "/root/y.json" }]);
+  });
+});
 ```
 
 - [ ] **Step 2: Run test, verify failure**
@@ -314,20 +323,20 @@ Create a minimal vitest config first:
 
 ```ts
 // gui-web/vitest.config.ts
-import { defineConfig } from 'vitest/config'
-import path from 'node:path'
+import { defineConfig } from "vitest/config";
+import path from "node:path";
 
 export default defineConfig({
   test: {
-    environment: 'node',
-    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    environment: "node",
+    include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
   },
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      "@": path.resolve(__dirname, "./src"),
     },
   },
-})
+});
 ```
 
 Run: `cd /home/maoqh/projects/agent-box/gui-web && npm run test:run -- src/pages/detail/storage/buildTreeFromFlatList.test.ts`
@@ -338,17 +347,17 @@ Expected: FAIL — module not found.
 ```ts
 // gui-web/src/pages/detail/storage/buildTreeFromFlatList.ts
 export interface FlatFile {
-  path: string
-  size?: number
-  mtime?: number
+  path: string;
+  size?: number;
+  mtime?: number;
 }
 
 export interface TreeNode {
-  type: 'dir' | 'file'
-  path: string
-  children?: TreeNode[]
-  size?: number
-  mtime?: number
+  type: "dir" | "file";
+  path: string;
+  children?: TreeNode[];
+  size?: number;
+  mtime?: number;
 }
 
 /**
@@ -360,55 +369,55 @@ export function buildTreeFromFlatList(
   files: FlatFile[],
   root: string,
 ): TreeNode[] {
-  const rootPrefix = root.endsWith('/') ? root : root + '/'
-  const dirs = new Map<string, TreeNode>()
-  const result: TreeNode[] = []
+  const rootPrefix = root.endsWith("/") ? root : root + "/";
+  const dirs = new Map<string, TreeNode>();
+  const result: TreeNode[] = [];
 
   for (const f of files) {
-    if (!f.path.startsWith(rootPrefix)) continue
-    const rel = f.path.slice(rootPrefix.length)
-    if (!rel) continue
-    const parts = rel.split('/')
+    if (!f.path.startsWith(rootPrefix)) continue;
+    const rel = f.path.slice(rootPrefix.length);
+    if (!rel) continue;
+    const parts = rel.split("/");
     // ensure all parent dirs exist in `dirs`
-    let cursor = rootPrefix.replace(/\/$/, '')
+    let cursor = rootPrefix.replace(/\/$/, "");
     for (let i = 0; i < parts.length - 1; i++) {
-      cursor = cursor + '/' + parts[i]
+      cursor = cursor + "/" + parts[i];
       if (!dirs.has(cursor)) {
-        const node: TreeNode = { type: 'dir', path: cursor, children: [] }
-        dirs.set(cursor, node)
+        const node: TreeNode = { type: "dir", path: cursor, children: [] };
+        dirs.set(cursor, node);
       }
     }
     const fileNode: TreeNode = {
-      type: 'file',
+      type: "file",
       path: f.path,
       size: f.size,
       mtime: f.mtime,
-    }
+    };
     if (parts.length === 1) {
-      result.push(fileNode)
+      result.push(fileNode);
     } else {
-      const parentPath = rootPrefix + parts.slice(0, -1).join('/')
-      dirs.get(parentPath)!.children!.push(fileNode)
+      const parentPath = rootPrefix + parts.slice(0, -1).join("/");
+      dirs.get(parentPath)!.children!.push(fileNode);
     }
   }
 
   // sort: dirs first then files; alphabetical within each
   const sortRec = (nodes: TreeNode[]) => {
     nodes.sort((a, b) => {
-      if (a.type !== b.type) return a.type === 'dir' ? -1 : 1
-      return a.path.localeCompare(b.path)
-    })
-    nodes.forEach((n) => n.children && sortRec(n.children))
-  }
+      if (a.type !== b.type) return a.type === "dir" ? -1 : 1;
+      return a.path.localeCompare(b.path);
+    });
+    nodes.forEach((n) => n.children && sortRec(n.children));
+  };
 
   // attach root-level dirs to result
   const rootDirs = Array.from(dirs.values()).filter((d) => {
-    const rel = d.path.slice(rootPrefix.length - 1) // leading slash
-    return !rel.slice(1).includes('/')
-  })
-  sortRec(rootDirs)
-  sortRec(result)
-  return [...rootDirs, ...result]
+    const rel = d.path.slice(rootPrefix.length - 1); // leading slash
+    return !rel.slice(1).includes("/");
+  });
+  sortRec(rootDirs);
+  sortRec(result);
+  return [...rootDirs, ...result];
 }
 ```
 
@@ -430,6 +439,7 @@ git commit -m "feat(storage): flat-file → tree conversion utility (TDD)"
 ## Task 4: `validateJson` utility + tests
 
 **Files:**
+
 - Create: `gui-web/src/pages/detail/storage/validateJson.ts`
 - Create: `gui-web/src/pages/detail/storage/schemaMaps.ts`
 - Create: `gui-web/src/pages/detail/storage/validateJson.test.ts`
@@ -438,46 +448,46 @@ git commit -m "feat(storage): flat-file → tree conversion utility (TDD)"
 
 ```ts
 // gui-web/src/pages/detail/storage/validateJson.test.ts
-import { describe, it, expect } from 'vitest'
-import { validateJson, schemaForPath } from './validateJson'
+import { describe, it, expect } from "vitest";
+import { validateJson, schemaForPath } from "./validateJson";
 
-describe('validateJson', () => {
-  it('passes non-JSON files through with no error', () => {
-    expect(validateJson('/root/notes.md', 'hello').ok).toBe(true)
-    expect(validateJson('/root/.env', 'KEY=value').ok).toBe(true)
-  })
+describe("validateJson", () => {
+  it("passes non-JSON files through with no error", () => {
+    expect(validateJson("/root/notes.md", "hello").ok).toBe(true);
+    expect(validateJson("/root/.env", "KEY=value").ok).toBe(true);
+  });
 
-  it('flags JSON syntax error with line:col', () => {
-    const r = validateJson('/root/settings.json', '{"a": ,}')
-    expect(r.ok).toBe(false)
+  it("flags JSON syntax error with line:col", () => {
+    const r = validateJson("/root/settings.json", '{"a": ,}');
+    expect(r.ok).toBe(false);
     if (!r.ok) {
-      expect(r.error).toMatch(/line \d+/)
-      expect(r.error).toMatch(/column \d+/)
+      expect(r.error).toMatch(/line \d+/);
+      expect(r.error).toMatch(/column \d+/);
     }
-  })
+  });
 
-  it('accepts valid JSON without registered schema', () => {
-    const r = validateJson('/root/anything.json', '{"x":1}')
-    expect(r.ok).toBe(true)
-  })
+  it("accepts valid JSON without registered schema", () => {
+    const r = validateJson("/root/anything.json", '{"x":1}');
+    expect(r.ok).toBe(true);
+  });
 
-  it('rejects JSON invalid against registered schema', () => {
+  it("rejects JSON invalid against registered schema", () => {
     // Test schema: object with required `name: string`
-    const spy = schemaForPath
-    expect(spy).toBeTypeOf('function')
+    const spy = schemaForPath;
+    expect(spy).toBeTypeOf("function");
 
     // uses a built-in schema in schemaMaps.ts for codex/config.toml? No — only `.json`
     // So we test the registered claude/settings.json schema
     const r = validateJson(
-      '/root/profiles/claude-foo/settings.json',
+      "/root/profiles/claude-foo/settings.json",
       '{"hooks": "not-an-object"}',
-    )
-    expect(r.ok).toBe(false)
+    );
+    expect(r.ok).toBe(false);
     if (!r.ok) {
-      expect(r.error.toLowerCase()).toContain('expected')
+      expect(r.error.toLowerCase()).toContain("expected");
     }
-  })
-})
+  });
+});
 ```
 
 - [ ] **Step 2: Run test, verify failure**
@@ -489,7 +499,7 @@ Expected: FAIL — module not found.
 
 ```ts
 // gui-web/src/pages/detail/storage/schemaMaps.ts
-import { z } from 'zod'
+import { z } from "zod";
 
 // Claude settings.json → only validates the keys we care about for save safety.
 // Other keys are accepted via .passthrough() to avoid clobbering user data.
@@ -510,11 +520,11 @@ export const ClaudeSettingsSchema = z
     hooks: z.record(z.string(), z.unknown()).optional(),
     plugins: z.record(z.string(), z.unknown()).optional(),
   })
-  .passthrough()
+  .passthrough();
 
 // Anything parseable as JSON object. We don't constrain field types here
 // unless a more specific schema exists.
-export const GenericJsonSchema = z.object({}).passthrough()
+export const GenericJsonSchema = z.object({}).passthrough();
 
 /**
  * Map of regex → zod schema. Matched against the file path.
@@ -523,64 +533,62 @@ export const GenericJsonSchema = z.object({}).passthrough()
 export const SCHEMA_REGISTRY: Array<{ test: RegExp; schema: z.ZodTypeAny }> = [
   { test: /profiles\/[^/]+\/settings\.json$/, schema: ClaudeSettingsSchema },
   { test: /\.json$/, schema: GenericJsonSchema },
-]
+];
 ```
 
 - [ ] **Step 4: Implement validateJson.ts**
 
 ```ts
 // gui-web/src/pages/detail/storage/validateJson.ts
-import { z } from 'zod'
-import { SCHEMA_REGISTRY } from './schemaMaps'
+import { z } from "zod";
+import { SCHEMA_REGISTRY } from "./schemaMaps";
 
-export type ValidationResult =
-  | { ok: true }
-  | { ok: false; error: string }
+export type ValidationResult = { ok: true } | { ok: false; error: string };
 
 export function schemaForPath(path: string): z.ZodTypeAny | null {
   for (const entry of SCHEMA_REGISTRY) {
-    if (entry.test.test(path)) return entry.schema
+    if (entry.test.test(path)) return entry.schema;
   }
-  return null
+  return null;
 }
 
 export function validateJson(path: string, content: string): ValidationResult {
   // Non-JSON files: no validation, always ok.
-  if (!path.endsWith('.json')) return { ok: true }
+  if (!path.endsWith(".json")) return { ok: true };
 
   // Syntax check
   try {
-    JSON.parse(content)
+    JSON.parse(content);
   } catch (e) {
-    const msg = e instanceof Error ? e.message : 'invalid JSON'
-    const m = msg.match(/position (\d+)/)
+    const msg = e instanceof Error ? e.message : "invalid JSON";
+    const m = msg.match(/position (\d+)/);
     if (m) {
-      const pos = Number(m[1])
-      const upto = content.slice(0, pos)
-      const lines = upto.split('\n')
-      const line = lines.length
-      const col = lines[lines.length - 1].length + 1
+      const pos = Number(m[1]);
+      const upto = content.slice(0, pos);
+      const lines = upto.split("\n");
+      const line = lines.length;
+      const col = lines[lines.length - 1].length + 1;
       return {
         ok: false,
         error: `JSON syntax error at line ${line} column ${col}: ${msg}`,
-      }
+      };
     }
-    return { ok: false, error: `JSON syntax error: ${msg}` }
+    return { ok: false, error: `JSON syntax error: ${msg}` };
   }
 
   // Schema check
-  const schema = schemaForPath(path)
-  if (!schema) return { ok: true }
-  const parsed: unknown = JSON.parse(content)
-  const result = schema.safeParse(parsed)
+  const schema = schemaForPath(path);
+  if (!schema) return { ok: true };
+  const parsed: unknown = JSON.parse(content);
+  const result = schema.safeParse(parsed);
   if (!result.success) {
-    const issue = result.error.issues[0]
+    const issue = result.error.issues[0];
     return {
       ok: false,
-      error: `${issue.path.join('.') || '<root>'}: ${issue.message}`,
-    }
+      error: `${issue.path.join(".") || "<root>"}: ${issue.message}`,
+    };
   }
-  return { ok: true }
+  return { ok: true };
 }
 ```
 
@@ -602,6 +610,7 @@ git commit -m "feat(storage): JSON validation with zod schema registry (TDD)"
 ## Task 5: `useOpenFiles` multi-tab hook + tests
 
 **Files:**
+
 - Create: `gui-web/src/pages/detail/storage/useOpenFiles.ts`
 - Create: `gui-web/src/pages/detail/storage/useOpenFiles.test.tsx`
 
@@ -609,54 +618,58 @@ git commit -m "feat(storage): JSON validation with zod schema registry (TDD)"
 
 ```tsx
 // gui-web/src/pages/detail/storage/useOpenFiles.test.tsx
-import { describe, it, expect } from 'vitest'
-import { renderHook, act } from '@testing-library/react'
-import { useOpenFiles } from './useOpenFiles'
+import { describe, it, expect } from "vitest";
+import { renderHook, act } from "@testing-library/react";
+import { useOpenFiles } from "./useOpenFiles";
 
-describe('useOpenFiles', () => {
-  it('opens a file and reports dirty status', () => {
-    const { result } = renderHook(() => useOpenFiles({ max: 5 }))
-    act(() => result.current.open('/a/b.md', 'hello'))
-    expect(result.current.openFiles[0]).toMatchObject({ path: '/a/b.md', content: 'hello', dirty: false })
-    act(() => result.current.updateContent('/a/b.md', 'hello!'))
-    expect(result.current.openFiles[0].dirty).toBe(true)
-  })
+describe("useOpenFiles", () => {
+  it("opens a file and reports dirty status", () => {
+    const { result } = renderHook(() => useOpenFiles({ max: 5 }));
+    act(() => result.current.open("/a/b.md", "hello"));
+    expect(result.current.openFiles[0]).toMatchObject({
+      path: "/a/b.md",
+      content: "hello",
+      dirty: false,
+    });
+    act(() => result.current.updateContent("/a/b.md", "hello!"));
+    expect(result.current.openFiles[0].dirty).toBe(true);
+  });
 
-  it('switches active file', () => {
-    const { result } = renderHook(() => useOpenFiles({ max: 5 }))
+  it("switches active file", () => {
+    const { result } = renderHook(() => useOpenFiles({ max: 5 }));
     act(() => {
-      result.current.open('/a.md', 'A')
-      result.current.open('/b.md', 'B')
-    })
-    expect(result.current.active).toBe('/b.md')
-    act(() => result.current.setActive('/a.md'))
-    expect(result.current.active).toBe('/a.md')
-  })
+      result.current.open("/a.md", "A");
+      result.current.open("/b.md", "B");
+    });
+    expect(result.current.active).toBe("/b.md");
+    act(() => result.current.setActive("/a.md"));
+    expect(result.current.active).toBe("/a.md");
+  });
 
-  it('evicts least-recently-used when over max', () => {
-    const { result } = renderHook(() => useOpenFiles({ max: 2 }))
+  it("evicts least-recently-used when over max", () => {
+    const { result } = renderHook(() => useOpenFiles({ max: 2 }));
     act(() => {
-      result.current.open('/a.md', 'A')
-      result.current.open('/b.md', 'B')
-      result.current.open('/c.md', 'C')
-    })
-    const paths = result.current.openFiles.map((f) => f.path)
-    expect(paths).not.toContain('/a.md')
-    expect(paths).toContain('/b.md')
-    expect(paths).toContain('/c.md')
-  })
+      result.current.open("/a.md", "A");
+      result.current.open("/b.md", "B");
+      result.current.open("/c.md", "C");
+    });
+    const paths = result.current.openFiles.map((f) => f.path);
+    expect(paths).not.toContain("/a.md");
+    expect(paths).toContain("/b.md");
+    expect(paths).toContain("/c.md");
+  });
 
-  it('marks clean after successful save', () => {
-    const { result } = renderHook(() => useOpenFiles({ max: 5 }))
+  it("marks clean after successful save", () => {
+    const { result } = renderHook(() => useOpenFiles({ max: 5 }));
     act(() => {
-      result.current.open('/x.md', 'orig')
-      result.current.updateContent('/x.md', 'edit')
-    })
-    expect(result.current.openFiles[0].dirty).toBe(true)
-    act(() => result.current.markClean('/x.md'))
-    expect(result.current.openFiles[0].dirty).toBe(false)
-  })
-})
+      result.current.open("/x.md", "orig");
+      result.current.updateContent("/x.md", "edit");
+    });
+    expect(result.current.openFiles[0].dirty).toBe(true);
+    act(() => result.current.markClean("/x.md"));
+    expect(result.current.openFiles[0].dirty).toBe(false);
+  });
+});
 ```
 
 - [ ] **Step 2: Run test, verify failure**
@@ -675,59 +688,67 @@ npm install --save-dev @testing-library/react @testing-library/react-hooks
 
 ```ts
 // gui-web/src/pages/detail/storage/useOpenFiles.ts
-import { useCallback, useState } from 'react'
+import { useCallback, useState } from "react";
 
 export interface OpenFile {
-  path: string
-  content: string
+  path: string;
+  content: string;
   /** Last saved snapshot of the content on disk. */
-  savedContent: string
-  dirty: boolean
+  savedContent: string;
+  dirty: boolean;
 }
 
 export function useOpenFiles({ max }: { max: number }) {
-  const [openFiles, setOpenFiles] = useState<OpenFile[]>([])
-  const [active, setActive] = useState<string | null>(null)
+  const [openFiles, setOpenFiles] = useState<OpenFile[]>([]);
+  const [active, setActive] = useState<string | null>(null);
 
   const open = useCallback(
     (path: string, content: string) => {
       setOpenFiles((prev) => {
-        const existing = prev.find((f) => f.path === path)
-        let next: OpenFile[]
+        const existing = prev.find((f) => f.path === path);
+        let next: OpenFile[];
         if (existing) {
           // move to front
-          next = [{ ...existing, content, savedContent: content, dirty: false }, ...prev.filter((f) => f.path !== path)]
+          next = [
+            { ...existing, content, savedContent: content, dirty: false },
+            ...prev.filter((f) => f.path !== path),
+          ];
         } else {
-          next = [{ path, content, savedContent: content, dirty: false }, ...prev]
-          if (next.length > max) next = next.slice(0, max)
+          next = [
+            { path, content, savedContent: content, dirty: false },
+            ...prev,
+          ];
+          if (next.length > max) next = next.slice(0, max);
         }
-        return next
-      })
-      setActive(path)
+        return next;
+      });
+      setActive(path);
     },
     [max],
-  )
+  );
 
   const updateContent = useCallback((path: string, content: string) => {
     setOpenFiles((prev) =>
       prev.map((f) =>
-        f.path === path ? { ...f, content, dirty: content !== f.savedContent } : f,
+        f.path === path
+          ? { ...f, content, dirty: content !== f.savedContent }
+          : f,
       ),
-    )
-  }, [])
+    );
+  }, []);
 
   const markClean = useCallback((path: string) => {
     setOpenFiles((prev) =>
       prev.map((f) =>
         f.path === path ? { ...f, savedContent: f.content, dirty: false } : f,
       ),
-    )
-  }, [])
+    );
+  }, []);
 
   const close = useCallback((path: string) => {
-    setOpenFiles((prev) => prev.filter((f) => f.path !== path))
-    setActive((cur) => (cur === path ? null : cur))
-  }, [])
+    setOpenFiles((prev) => prev.filter((f) => f.path !== path));
+    setActive((cur) => (cur === path ? null : cur));
+  }, []);
 
   return {
     openFiles,
@@ -737,7 +758,7 @@ export function useOpenFiles({ max }: { max: number }) {
     updateContent,
     markClean,
     close,
-  }
+  };
 }
 ```
 
@@ -759,6 +780,7 @@ git commit -m "feat(storage): LRU open-files hook (TDD)"
 ## Task 6: `FileTree` component
 
 **Files:**
+
 - Create: `gui-web/src/pages/detail/storage/FileTree.tsx`
 
 (No tests for this visual tree in PR 1 — covered by manual smoke in Task 9.)
@@ -767,32 +789,37 @@ git commit -m "feat(storage): LRU open-files hook (TDD)"
 
 ```tsx
 // gui-web/src/pages/detail/storage/FileTree.tsx
-import { useState } from 'react'
-import type { TreeNode } from './buildTreeFromFlatList'
-import { cn } from '@/lib/utils'
+import { useState } from "react";
+import type { TreeNode } from "./buildTreeFromFlatList";
+import { cn } from "@/lib/utils";
 
 function fileIcon(filename: string): string {
-  if (filename.endsWith('.json') || filename.endsWith('.jsonc')) return '📋'
-  if (filename.endsWith('.md')) return '📘'
-  if (filename.endsWith('.toml')) return '⚙'
-  if (filename.endsWith('.yaml') || filename.endsWith('.yml')) return '📄'
-  return '📄'
+  if (filename.endsWith(".json") || filename.endsWith(".jsonc")) return "📋";
+  if (filename.endsWith(".md")) return "📘";
+  if (filename.endsWith(".toml")) return "⚙";
+  if (filename.endsWith(".yaml") || filename.endsWith(".yml")) return "📄";
+  return "📄";
 }
 
 function fmtSize(size?: number): string {
-  if (size === undefined) return ''
-  if (size < 1024) return `${size}B`
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)}K`
-  return `${(size / (1024 * 1024)).toFixed(1)}M`
+  if (size === undefined) return "";
+  if (size < 1024) return `${size}B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)}K`;
+  return `${(size / (1024 * 1024)).toFixed(1)}M`;
 }
 
-function Folder({ node, depth, onSelect, selected }: {
-  node: TreeNode
-  depth: number
-  selected: string | null
-  onSelect: (path: string) => void
+function Folder({
+  node,
+  depth,
+  onSelect,
+  selected,
+}: {
+  node: TreeNode;
+  depth: number;
+  selected: string | null;
+  onSelect: (path: string) => void;
 }) {
-  const [open, setOpen] = useState(depth < 1)
+  const [open, setOpen] = useState(depth < 1);
   return (
     <div>
       <button
@@ -802,30 +829,39 @@ function Folder({ node, depth, onSelect, selected }: {
         style={{ paddingLeft: depth * 12 + 8 }}
         title={node.path}
       >
-        <span className="inline-block w-3">{open ? '▼' : '▶'}</span> {node.path.split('/').pop()}
+        <span className="inline-block w-3">{open ? "▼" : "▶"}</span>{" "}
+        {node.path.split("/").pop()}
       </button>
       {open && node.children && (
         <div>
           {node.children.map((child) =>
-            child.type === 'dir' ? (
-              <Folder key={child.path} node={child} depth={depth + 1} selected={selected} onSelect={onSelect} />
+            child.type === "dir" ? (
+              <Folder
+                key={child.path}
+                node={child}
+                depth={depth + 1}
+                selected={selected}
+                onSelect={onSelect}
+              />
             ) : (
               <button
                 key={child.path}
                 type="button"
                 onClick={() => onSelect(child.path)}
                 className={cn(
-                  'block w-full text-left text-xs font-mono px-2 py-0.5 rounded truncate',
+                  "block w-full text-left text-xs font-mono px-2 py-0.5 rounded truncate",
                   selected === child.path
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
                 )}
                 style={{ paddingLeft: (depth + 1) * 12 + 8 }}
                 title={`${child.path} · ${fmtSize(child.size)}`}
               >
-                {fileIcon(child.path)} {child.path.split('/').pop()}
+                {fileIcon(child.path)} {child.path.split("/").pop()}
                 {child.size !== undefined && (
-                  <span className="ml-2 text-[10px] opacity-60">{fmtSize(child.size)}</span>
+                  <span className="ml-2 text-[10px] opacity-60">
+                    {fmtSize(child.size)}
+                  </span>
                 )}
               </button>
             ),
@@ -833,41 +869,54 @@ function Folder({ node, depth, onSelect, selected }: {
         </div>
       )}
     </div>
-  )
+  );
 }
 
-export function FileTree({ tree, rootLabel, selected, onSelect }: {
-  tree: TreeNode[]
-  rootLabel: string
-  selected: string | null
-  onSelect: (path: string) => void
+export function FileTree({
+  tree,
+  rootLabel,
+  selected,
+  onSelect,
+}: {
+  tree: TreeNode[];
+  rootLabel: string;
+  selected: string | null;
+  onSelect: (path: string) => void;
 }) {
   return (
     <div className="text-xs">
-      <div className="px-2 py-1 font-medium text-foreground/80">{rootLabel}</div>
+      <div className="px-2 py-1 font-medium text-foreground/80">
+        {rootLabel}
+      </div>
       {tree.map((node) =>
-        node.type === 'dir' ? (
-          <Folder key={node.path} node={node} depth={0} selected={selected} onSelect={onSelect} />
+        node.type === "dir" ? (
+          <Folder
+            key={node.path}
+            node={node}
+            depth={0}
+            selected={selected}
+            onSelect={onSelect}
+          />
         ) : (
           <button
             key={node.path}
             type="button"
             onClick={() => onSelect(node.path)}
             className={cn(
-              'block w-full text-left text-xs font-mono px-2 py-0.5 rounded truncate',
+              "block w-full text-left text-xs font-mono px-2 py-0.5 rounded truncate",
               selected === node.path
-                ? 'bg-primary/10 text-primary'
-                : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                ? "bg-primary/10 text-primary"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground",
             )}
             style={{ paddingLeft: 8 }}
             title={node.path}
           >
-            {fileIcon(node.path)} {node.path.split('/').pop()}
+            {fileIcon(node.path)} {node.path.split("/").pop()}
           </button>
         ),
       )}
     </div>
-  )
+  );
 }
 ```
 
@@ -884,54 +933,60 @@ git commit -m "feat(storage): recursive FileTree component"
 ## Task 7: Monaco editor panel
 
 **Files:**
+
 - Create: `gui-web/src/pages/detail/storage/MonacoEditorPanel.tsx`
 
 - [ ] **Step 1: Implement**
 
 ```tsx
 // gui-web/src/pages/detail/storage/MonacoEditorPanel.tsx
-import Editor, { loader } from '@monaco-editor/react'
-import { useCallback } from 'react'
+import Editor, { loader } from "@monaco-editor/react";
+import { useCallback } from "react";
 
-const MONACO_VERSION = '0.52.0'
-const LOCAL_VS_PATH = '/monaco'
-const CDN_VS_PATH = `https://cdn.jsdelivr.net/npm/monaco-editor@${MONACO_VERSION}/min/vs`
+const MONACO_VERSION = "0.52.0";
+const LOCAL_VS_PATH = "/monaco";
+const CDN_VS_PATH = `https://cdn.jsdelivr.net/npm/monaco-editor@${MONACO_VERSION}/min/vs`;
 
-let configured = false
+let configured = false;
 function configureMonaco() {
-  if (configured) return
-  configured = true
+  if (configured) return;
+  configured = true;
   if (import.meta.env.PROD) {
     // Try local; if 404 the loader will fall back to CDN itself by failing
-    loader.config({ paths: { vs: LOCAL_VS_PATH } })
+    loader.config({ paths: { vs: LOCAL_VS_PATH } });
   }
 }
 
 function detectLanguage(path: string): string {
-  if (path.endsWith('.json') || path.endsWith('.jsonc')) return 'json'
-  if (path.endsWith('.md')) return 'markdown'
-  if (path.endsWith('.toml')) return 'ini'
-  if (path.endsWith('.yaml') || path.endsWith('.yml')) return 'yaml'
-  return 'plaintext'
+  if (path.endsWith(".json") || path.endsWith(".jsonc")) return "json";
+  if (path.endsWith(".md")) return "markdown";
+  if (path.endsWith(".toml")) return "ini";
+  if (path.endsWith(".yaml") || path.endsWith(".yml")) return "yaml";
+  return "plaintext";
 }
 
 export interface MonacoEditorPanelProps {
-  value: string
-  language: string
-  onChange: (next: string) => void
-  onMount?: () => void
+  value: string;
+  language: string;
+  onChange: (next: string) => void;
+  onMount?: () => void;
 }
 
-export function MonacoEditorPanel({ value, language, onChange, onMount }: MonacoEditorPanelProps) {
-  configureMonaco()
-  const handleMount = useCallback(() => onMount?.(), [onMount])
+export function MonacoEditorPanel({
+  value,
+  language,
+  onChange,
+  onMount,
+}: MonacoEditorPanelProps) {
+  configureMonaco();
+  const handleMount = useCallback(() => onMount?.(), [onMount]);
   return (
     <Editor
       height="100%"
       theme="vs-dark"
       language={language}
       value={value}
-      onChange={(v) => onChange(v ?? '')}
+      onChange={(v) => onChange(v ?? "")}
       onMount={handleMount}
       options={{
         fontSize: 13,
@@ -939,9 +994,11 @@ export function MonacoEditorPanel({ value, language, onChange, onMount }: Monaco
         scrollBeyondLastLine: false,
         tabSize: 2,
       }}
-      loading={<p className="p-4 text-xs text-muted-foreground">Loading editor...</p>}
+      loading={
+        <p className="p-4 text-xs text-muted-foreground">Loading editor...</p>
+      }
     />
-  )
+  );
 }
 ```
 
@@ -958,14 +1015,15 @@ git commit -m "feat(storage): Monaco editor panel wrapper"
 ## Task 8: `SaveBar` component
 
 **Files:**
+
 - Create: `gui-web/src/pages/detail/storage/SaveBar.tsx`
 
 - [ ] **Step 1: Implement**
 
 ```tsx
 // gui-web/src/pages/detail/storage/SaveBar.tsx
-import { Button } from '@/components/ui'
-import { formatRelativeTime } from '@/lib/utils'
+import { Button } from "@/components/ui";
+import { formatRelativeTime } from "@/lib/utils";
 
 export function SaveBar({
   dirty,
@@ -974,38 +1032,37 @@ export function SaveBar({
   onSave,
   path,
 }: {
-  dirty: boolean
-  saving: boolean
-  lastSavedAt: number | null
-  onSave: () => void
-  path: string | null
+  dirty: boolean;
+  saving: boolean;
+  lastSavedAt: number | null;
+  onSave: () => void;
+  path: string | null;
 }) {
-  const tip = path ?? 'No file selected'
+  const tip = path ?? "No file selected";
   return (
     <div className="flex items-center justify-between border-t border-border bg-muted/30 px-3 py-2">
-      <span className="font-mono text-xs text-muted-foreground truncate" title={tip}>
+      <span
+        className="font-mono text-xs text-muted-foreground truncate"
+        title={tip}
+      >
         {tip}
       </span>
       <div className="flex items-center gap-3">
         <span className="text-xs text-muted-foreground">
           {saving
-            ? 'Saving…'
+            ? "Saving…"
             : dirty
-              ? 'Unsaved changes'
+              ? "Unsaved changes"
               : lastSavedAt
                 ? `Saved · ${formatRelativeTime(lastSavedAt)}`
-                : ''}
+                : ""}
         </span>
-        <Button
-          size="sm"
-          onClick={onSave}
-          disabled={!path || !dirty || saving}
-        >
+        <Button size="sm" onClick={onSave} disabled={!path || !dirty || saving}>
           Save
         </Button>
       </div>
     </div>
-  )
+  );
 }
 ```
 
@@ -1022,6 +1079,7 @@ git commit -m "feat(storage): SaveBar with dirty/saving state"
 ## Task 9: New `StorageExplorer` (FS-style) and remove old one
 
 **Files:**
+
 - Create: `gui-web/src/pages/detail/storage/StorageExplorer.tsx`
 - Delete: `gui-web/src/pages/detail/StorageExplorer.tsx`
 - Modify: `gui-web/src/pages/detail.tsx` (change import path)
@@ -1030,71 +1088,95 @@ git commit -m "feat(storage): SaveBar with dirty/saving state"
 
 ```tsx
 // gui-web/src/pages/detail/storage/StorageExplorer.tsx
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui'
-import { readFile, saveFile } from '@/api/files'
-import { useToast } from '@/components/feedback/toast'
-import { buildTreeFromFlatList, type TreeNode } from './buildTreeFromFlatList'
-import { validateJson } from './validateJson'
-import { useOpenFiles } from './useOpenFiles'
-import { FileTree } from './FileTree'
-import { MonacoEditorPanel } from './MonacoEditorPanel'
-import { SaveBar } from './SaveBar'
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui";
+import { readFile, saveFile } from "@/api/files";
+import { useToast } from "@/components/feedback/toast";
+import { buildTreeFromFlatList, type TreeNode } from "./buildTreeFromFlatList";
+import { validateJson } from "./validateJson";
+import { useOpenFiles } from "./useOpenFiles";
+import { FileTree } from "./FileTree";
+import { MonacoEditorPanel } from "./MonacoEditorPanel";
+import { SaveBar } from "./SaveBar";
 
-export function StorageExplorer({ profilePath, fileTree }: {
-  profilePath: string
-  fileTree: string[]
+export function StorageExplorer({
+  profilePath,
+  fileTree,
+}: {
+  profilePath: string;
+  fileTree: string[];
 }) {
-  const { toast } = useToast()
-  const [tree, setTree] = useState<TreeNode[]>([])
-  const { openFiles, active, open, setActive, updateContent, markClean, close } =
-    useOpenFiles({ max: 5 })
-  const [saving, setSaving] = useState(false)
-  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null)
+  const { toast } = useToast();
+  const [tree, setTree] = useState<TreeNode[]>([]);
+  const {
+    openFiles,
+    active,
+    open,
+    setActive,
+    updateContent,
+    markClean,
+    close,
+  } = useOpenFiles({ max: 5 });
+  const [saving, setSaving] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
 
   // Build tree from flat list (findFiles result)
   useEffect(() => {
-    setTree(buildTreeFromFlatList(fileTree.map((p) => ({ path: p })), profilePath))
-  }, [fileTree, profilePath])
+    setTree(
+      buildTreeFromFlatList(
+        fileTree.map((p) => ({ path: p })),
+        profilePath,
+      ),
+    );
+  }, [fileTree, profilePath]);
 
   const openFile = useCallback(
     async (path: string) => {
       try {
-        const content = await readFile(path)
-        open(path, content)
-        setLastSavedAt(Date.now())
+        const content = await readFile(path);
+        open(path, content);
+        setLastSavedAt(Date.now());
       } catch {
-        toast({ type: 'error', message: `Failed to read ${path}` })
+        toast({ type: "error", message: `Failed to read ${path}` });
       }
     },
     [open, toast],
-  )
+  );
 
   const handleSave = useCallback(async () => {
-    if (!active) return
-    const file = openFiles.find((f) => f.path === active)
-    if (!file) return
+    if (!active) return;
+    const file = openFiles.find((f) => f.path === active);
+    if (!file) return;
 
-    const validation = validateJson(file.path, file.content)
+    const validation = validateJson(file.path, file.content);
     if (!validation.ok) {
-      toast({ type: 'error', message: validation.error })
-      return
+      toast({ type: "error", message: validation.error });
+      return;
     }
 
-    setSaving(true)
+    setSaving(true);
     try {
-      await saveFile(file.path, file.content)
-      markClean(file.path)
-      setLastSavedAt(Date.now())
-      toast({ type: 'success', message: `Saved ${file.path.split('/').pop()}` })
+      await saveFile(file.path, file.content);
+      markClean(file.path);
+      setLastSavedAt(Date.now());
+      toast({
+        type: "success",
+        message: `Saved ${file.path.split("/").pop()}`,
+      });
     } catch (e: unknown) {
-      toast({ type: 'error', message: e instanceof Error ? e.message : 'Save failed' })
+      toast({
+        type: "error",
+        message: e instanceof Error ? e.message : "Save failed",
+      });
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
-  }, [active, openFiles, markClean, toast])
+  }, [active, openFiles, markClean, toast]);
 
-  const activeFile = useMemo(() => openFiles.find((f) => f.path === active), [openFiles, active])
+  const activeFile = useMemo(
+    () => openFiles.find((f) => f.path === active),
+    [openFiles, active],
+  );
 
   return (
     <div className="grid grid-cols-[35%_1fr] gap-3 h-[640px]">
@@ -1105,7 +1187,7 @@ export function StorageExplorer({ profilePath, fileTree }: {
         <CardContent className="overflow-auto p-2">
           <FileTree
             tree={tree}
-            rootLabel={profilePath.split('/').pop() ?? profilePath}
+            rootLabel={profilePath.split("/").pop() ?? profilePath}
             selected={active}
             onSelect={openFile}
           />
@@ -1120,13 +1202,13 @@ export function StorageExplorer({ profilePath, fileTree }: {
               onClick={() => setActive(f.path)}
               className={`text-xs px-2 py-1 rounded font-mono whitespace-nowrap ${
                 active === f.path
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
               }`}
               title={f.path}
             >
-              {f.dirty && '● '}
-              {f.path.split('/').pop()}
+              {f.dirty && "● "}
+              {f.path.split("/").pop()}
             </button>
           ))}
         </div>
@@ -1138,7 +1220,9 @@ export function StorageExplorer({ profilePath, fileTree }: {
               onChange={(next) => updateContent(activeFile.path, next)}
             />
           ) : (
-            <p className="p-4 text-xs text-muted-foreground">Click a file on the left to edit.</p>
+            <p className="p-4 text-xs text-muted-foreground">
+              Click a file on the left to edit.
+            </p>
           )}
         </CardContent>
         <SaveBar
@@ -1150,16 +1234,16 @@ export function StorageExplorer({ profilePath, fileTree }: {
         />
       </Card>
     </div>
-  )
+  );
 }
 
 // helper kept here to keep `MonacoEditorPanel`'s language detection colocated
 function f_endsWithDetecting(path: string): string {
-  if (path.endsWith('.json') || path.endsWith('.jsonc')) return 'json'
-  if (path.endsWith('.md')) return 'markdown'
-  if (path.endsWith('.toml')) return 'ini'
-  if (path.endsWith('.yaml') || path.endsWith('.yml')) return 'yaml'
-  return 'plaintext'
+  if (path.endsWith(".json") || path.endsWith(".jsonc")) return "json";
+  if (path.endsWith(".md")) return "markdown";
+  if (path.endsWith(".toml")) return "ini";
+  if (path.endsWith(".yaml") || path.endsWith(".yml")) return "yaml";
+  return "plaintext";
 }
 ```
 
@@ -1199,13 +1283,13 @@ rm /home/maoqh/projects/agent-box/gui-web/src/pages/detail/StorageExplorer.tsx
 Open `gui-web/src/pages/detail.tsx`. Find line 26:
 
 ```ts
-import { StorageExplorer } from './detail/StorageExplorer'
+import { StorageExplorer } from "./detail/StorageExplorer";
 ```
 
 Replace with:
 
 ```ts
-import { StorageExplorer } from './detail/storage/StorageExplorer'
+import { StorageExplorer } from "./detail/storage/StorageExplorer";
 ```
 
 Also update the prop signature: the new StorageExplorer takes only `profilePath` and `fileTree`, not `onRefresh`. The `<StorageExplorer ... onRefresh={triggerRefresh} />` JSX in detail.tsx needs the `onRefresh` prop removed:
@@ -1245,59 +1329,63 @@ If the first commit also recorded the deletion due to overlap, this is one commi
 ## Task 10: Tab schema registry
 
 **Files:**
+
 - Create: `gui-web/src/pages/detail/schema.ts`
 
 - [ ] **Step 1: Implement**
 
 ```ts
 // gui-web/src/pages/detail/schema.ts
-import type { ComponentType } from 'react'
-import type { AgentType } from '@/api'
+import type { ComponentType } from "react";
+import type { AgentType } from "@/api";
 
 export interface ProfileMeta {
-  name: string
-  agent_type: string
-  display_name: string
-  description: string
-  provider: string
-  claude_md: string
-  preset: string
+  name: string;
+  agent_type: string;
+  display_name: string;
+  description: string;
+  provider: string;
+  claude_md: string;
+  preset: string;
 }
 
 export interface ProfileDetailLike {
-  path: string
-  meta: ProfileMeta
-  config_dir: string
+  path: string;
+  meta: ProfileMeta;
+  config_dir: string;
 }
 
-export interface TabSpec<T extends ProfileDetailLike = ProfileDetailLike, P = unknown> {
-  key: string
-  label: string
-  Component: ComponentType<P>
+export interface TabSpec<
+  T extends ProfileDetailLike = ProfileDetailLike,
+  P = unknown,
+> {
+  key: string;
+  label: string;
+  Component: ComponentType<P>;
   /** Returns the props to pass to Component. Sync only. */
-  propsFor: (ctx: T) => P
+  propsFor: (ctx: T) => P;
   /** Hide the tab if false. Sync only. Default true. */
-  visible?: (ctx: T) => boolean
+  visible?: (ctx: T) => boolean;
 }
 
 export interface AgentTabSchema {
-  agentType: AgentType
-  tabs: TabSpec[]
+  agentType: AgentType;
+  tabs: TabSpec[];
 }
 
 export const AGENT_TAB_SCHEMAS: Record<AgentType, AgentTabSchema> = {
   // filled by Task 11 / 12 / PR 3-5 (codex, hermes, opencode) — see PR 3.
-  claude: { agentType: 'claude', tabs: [] },
-  codex: { agentType: 'codex', tabs: [] },
-  hermes: { agentType: 'hermes', tabs: [] },
-  opencode: { agentType: 'opencode', tabs: [] },
-  mimocode: { agentType: 'mimocode', tabs: [] },
-}
+  claude: { agentType: "claude", tabs: [] },
+  codex: { agentType: "codex", tabs: [] },
+  hermes: { agentType: "hermes", tabs: [] },
+  opencode: { agentType: "opencode", tabs: [] },
+  mimocode: { agentType: "mimocode", tabs: [] },
+};
 
 export function tabsFor(profile: ProfileDetailLike): TabSpec[] {
-  const entry = AGENT_TAB_SCHEMAS[profile.meta.agent_type as AgentType]
-  if (!entry) return []
-  return entry.tabs.filter((t) => (t.visible ? t.visible(profile) : true))
+  const entry = AGENT_TAB_SCHEMAS[profile.meta.agent_type as AgentType];
+  if (!entry) return [];
+  return entry.tabs.filter((t) => (t.visible ? t.visible(profile) : true));
 }
 ```
 
@@ -1306,35 +1394,45 @@ export function tabsFor(profile: ProfileDetailLike): TabSpec[] {
 Create `gui-web/src/pages/detail/schema.test.ts`:
 
 ```ts
-import { describe, it, expect } from 'vitest'
-import { tabsFor } from './schema'
+import { describe, it, expect } from "vitest";
+import { tabsFor } from "./schema";
 
-describe('tabsFor', () => {
-  it('returns empty array for unknown agent types', () => {
+describe("tabsFor", () => {
+  it("returns empty array for unknown agent types", () => {
     const r = tabsFor({
-      path: '/x',
-      config_dir: '/x',
+      path: "/x",
+      config_dir: "/x",
       meta: {
-        name: 'n', agent_type: 'unknown', display_name: '', description: '',
-        provider: '', claude_md: '', preset: '',
+        name: "n",
+        agent_type: "unknown",
+        display_name: "",
+        description: "",
+        provider: "",
+        claude_md: "",
+        preset: "",
       },
-    } as never)
-    expect(r).toEqual([])
-  })
+    } as never);
+    expect(r).toEqual([]);
+  });
 
-  it('filters out tabs whose visible() returns false', () => {
+  it("filters out tabs whose visible() returns false", () => {
     // we don't yet have populated schemas; this validates the filter wiring
     const r = tabsFor({
-      path: '/x',
-      config_dir: '/x',
+      path: "/x",
+      config_dir: "/x",
       meta: {
-        name: 'n', agent_type: 'claude', display_name: '', description: '',
-        provider: '', claude_md: '', preset: '',
+        name: "n",
+        agent_type: "claude",
+        display_name: "",
+        description: "",
+        provider: "",
+        claude_md: "",
+        preset: "",
       },
-    } as never)
-    expect(Array.isArray(r)).toBe(true)
-  })
-})
+    } as never);
+    expect(Array.isArray(r)).toBe(true);
+  });
+});
 ```
 
 - [ ] **Step 3: Run tests, verify pass**
@@ -1355,6 +1453,7 @@ git commit -m "feat(detail): static tab schema registry (TDD)"
 ## Task 11: Migrate Claude tabs into schema registry
 
 **Files:**
+
 - Modify: `gui-web/src/pages/detail/schema.ts`
 - Modify: `gui-web/src/pages/detail.tsx`
 
@@ -1365,16 +1464,16 @@ Open `gui-web/src/pages/detail.tsx`. Delete the `CLAUDE_TABS` (lines 53–63) an
 Delete the import of the in-file tab constants (only used by `tabs = agentType === 'claude' ? CLAUDE_TABS : ...`). Replace with import:
 
 ```ts
-import { tabsFor, type ProfileDetailLike, type TabSpec } from './detail/schema'
-import { MetaEditor } from './detail/claude/MetaEditor'
-import { ProviderEditor } from './detail/claude/ProviderEditor'
-import { PermissionsEditor } from './detail/claude/PermissionsEditor'
-import { HooksEditor } from './detail/claude/HooksEditor'
-import { PluginsEditor } from './detail/claude/PluginsEditor'
-import { FileTextEditor as ClaudeFileTextEditor } from './detail/claude/FileTextEditor'
-import { McpTab as ClaudeMcpTab } from './detail/claude/McpTab'
-import { SkillsTab as ClaudeSkillsTab } from './detail/claude/SkillsTab'
-import { StorageExplorer } from './detail/storage/StorageExplorer'
+import { tabsFor, type ProfileDetailLike, type TabSpec } from "./detail/schema";
+import { MetaEditor } from "./detail/claude/MetaEditor";
+import { ProviderEditor } from "./detail/claude/ProviderEditor";
+import { PermissionsEditor } from "./detail/claude/PermissionsEditor";
+import { HooksEditor } from "./detail/claude/HooksEditor";
+import { PluginsEditor } from "./detail/claude/PluginsEditor";
+import { FileTextEditor as ClaudeFileTextEditor } from "./detail/claude/FileTextEditor";
+import { McpTab as ClaudeMcpTab } from "./detail/claude/McpTab";
+import { SkillsTab as ClaudeSkillsTab } from "./detail/claude/SkillsTab";
+import { StorageExplorer } from "./detail/storage/StorageExplorer";
 ```
 
 > **Wait** — existing imports in detail.tsx don't have this path style. Plan only - the implementer should copy each existing tab file into `detail/claude/` first OR keep imports as-is from `detail/*` and only fix the storage one. **Decision** (this is the simpler risk-free path): do not move Claude tab files in PR 1 — only rewire the storage import + replace the constant arrays. Move them to `claude/*` only when needed for per-type organization.
@@ -1393,8 +1492,8 @@ Then, replace the constant declarations with the schema-import-based flow. In `d
 Delete that line and use:
 
 ```ts
-const tabSpecs: TabSpec[] = tabsFor(detail as unknown as ProfileDetailLike)
-const tabs = tabSpecs.map((t) => ({ key: t.key, label: t.label }))
+const tabSpecs: TabSpec[] = tabsFor(detail as unknown as ProfileDetailLike);
+const tabs = tabSpecs.map((t) => ({ key: t.key, label: t.label }));
 ```
 
 Then update the tab renderer: Tabs are still driven by the `tabs` array's `key`. The existing `TabContent` switch-case hard-codes Claude tab keys (e.g. `'meta'`, `'provider'`). Replace the switch with a dispatch:
@@ -1484,6 +1583,7 @@ git commit -m "refactor(detail): wire Claude tabs through schema registry"
 ## Task 12: PyInstaller Monaco asset pipeline
 
 **Files:**
+
 - Modify: `gui-web/vite.config.ts`
 
 - [ ] **Step 1: Configure vite to copy monaco to dist on build**
@@ -1492,20 +1592,26 @@ Open `gui-web/vite.config.ts`. Inside the Vite config, ensure the public folder 
 
 ```ts
 // gui-web/vite.config.ts (snippet — only add this to existing config, don't rewrite)
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import tailwindcss from '@tailwindcss/vite'
-import { copyFileSync, mkdirSync, existsSync, readdirSync, statSync } from 'node:fs'
-import { join } from 'node:path'
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
+import {
+  copyFileSync,
+  mkdirSync,
+  existsSync,
+  readdirSync,
+  statSync,
+} from "node:fs";
+import { join } from "node:path";
 
 function copyDir(src: string, dest: string) {
-  if (!existsSync(src)) return
-  if (!existsSync(dest)) mkdirSync(dest, { recursive: true })
+  if (!existsSync(src)) return;
+  if (!existsSync(dest)) mkdirSync(dest, { recursive: true });
   for (const name of readdirSync(src)) {
-    const from = join(src, name)
-    const to = join(dest, name)
-    if (statSync(from).isDirectory()) copyDir(from, to)
-    else copyFileSync(from, to)
+    const from = join(src, name);
+    const to = join(dest, name);
+    if (statSync(from).isDirectory()) copyDir(from, to);
+    else copyFileSync(from, to);
   }
 }
 
@@ -1514,18 +1620,18 @@ export default defineConfig({
     tailwindcss(),
     react(),
     {
-      name: 'monaco-asset-pipeline',
+      name: "monaco-asset-pipeline",
       closeBundle() {
-        const monacoSrc = 'node_modules/monaco-editor/min/vs'
-        const monacoDest = 'dist/monaco/vs'
+        const monacoSrc = "node_modules/monaco-editor/min/vs";
+        const monacoDest = "dist/monaco/vs";
         if (existsSync(monacoSrc)) {
-          copyDir(monacoSrc, monacoDest)
-          console.log(`[monaco] copied to ${monacoDest}`)
+          copyDir(monacoSrc, monacoDest);
+          console.log(`[monaco] copied to ${monacoDest}`);
         }
       },
     },
   ],
-})
+});
 ```
 
 - [ ] **Step 2: Build and check dist/monaco**
@@ -1546,6 +1652,7 @@ git commit -m "build: copy Monaco editor assets into dist for PyInstaller bundli
 ## Task 13: Smoke test Storage tab end-to-end
 
 **Files:**
+
 - (no files; manual smoke)
 
 - [ ] **Step 1: Run dev mode**
@@ -1585,6 +1692,7 @@ No code changes; this is the manual gate before merging PR 1.
 ## End of PR 1
 
 PR 1 ships:
+
 - Static schema registry with Claude tabs registered.
 - VSCode-style Storage tab (tree + Monaco + JSON validation).
 - New `bridge.list_dir_tree` interface.
@@ -1599,6 +1707,7 @@ PR 1 ships:
 ## Task 14: Research all relevant agent config keys
 
 **Files:**
+
 - Create: `docs/superpowers/research/per-agent-config-keys.md`
 
 - [ ] **Step 1: Sources**
@@ -1633,30 +1742,35 @@ git commit -m "docs(research): catalog config keys for codex/hermes/opencode"
 ## Task 15: Codex config TOML parse/serialize
 
 **Files:**
+
 - Create: `gui-web/src/pages/detail/codex/codectoml.ts`
 - Create: `gui-web/src/pages/detail/codex/codectoml.test.ts`
 
 - [ ] **Step 1: Failing test** (round-trip for a small flat toml doc)
 
 ```ts
-import { parseToml, serializeToml } from './codectoml'
+import { parseToml, serializeToml } from "./codectoml";
 
-describe('codectoml', () => {
-  it('round-trips a flat toml', () => {
-    const src = `model = "gpt"\napproval_policy = "never"\n`
-    expect(serializeToml(parseToml(src))).toBe(src)
-  })
+describe("codectoml", () => {
+  it("round-trips a flat toml", () => {
+    const src = `model = "gpt"\napproval_policy = "never"\n`;
+    expect(serializeToml(parseToml(src))).toBe(src);
+  });
 
-  it('parses [history] section', () => {
-    const p = parseToml('[history]\npersistence = "none"\n')
-    expect(p).toEqual({ history: { persistence: 'none' } })
-  })
+  it("parses [history] section", () => {
+    const p = parseToml('[history]\npersistence = "none"\n');
+    expect(p).toEqual({ history: { persistence: "none" } });
+  });
 
-  it('parses [model_providers.custom] section', () => {
-    const p = parseToml(`[model_providers.custom]\nname = "x"\nbase_url = ""\n`)
-    expect(p).toEqual({ model_providers: { custom: { name: 'x', base_url: '' } } })
-  })
-})
+  it("parses [model_providers.custom] section", () => {
+    const p = parseToml(
+      `[model_providers.custom]\nname = "x"\nbase_url = ""\n`,
+    );
+    expect(p).toEqual({
+      model_providers: { custom: { name: "x", base_url: "" } },
+    });
+  });
+});
 ```
 
 - [ ] **Step 2: Run, fail**
@@ -1673,14 +1787,14 @@ npm install smol-toml
 
 ```ts
 // gui-web/src/pages/detail/codex/codectoml.ts
-import { parse as smolParse, stringify as smolStringify } from 'smol-toml'
+import { parse as smolParse, stringify as smolStringify } from "smol-toml";
 
 export function parseToml(src: string): Record<string, unknown> {
-  return smolParse(src) as Record<string, unknown>
+  return smolParse(src) as Record<string, unknown>;
 }
 
 export function serializeToml(obj: Record<string, unknown>): string {
-  return smolStringify(obj as never)
+  return smolStringify(obj as never);
 }
 ```
 
@@ -1702,63 +1816,78 @@ git commit -m "feat(codex): toml parse/serialize wrapper (TDD)"
 ## Task 16: Codex ModelEditor
 
 **Files:**
+
 - Create: `gui-web/src/pages/detail/codex/ModelEditor.tsx`
 
 - [ ] **Step 1: Implement**
 
 ```tsx
 // gui-web/src/pages/detail/codex/ModelEditor.tsx
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Button, Card, CardHeader, CardTitle, CardContent, Input } from '@/components/ui'
-import { useToast } from '@/components/feedback/toast'
-import { readFile, saveFile } from '@/api/files'
-import { parseToml, serializeToml } from './codectoml'
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Button,
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  Input,
+} from "@/components/ui";
+import { useToast } from "@/components/feedback/toast";
+import { readFile, saveFile } from "@/api/files";
+import { parseToml, serializeToml } from "./codectoml";
 
 interface Props {
-  profileName: string
-  configDir: string
+  profileName: string;
+  configDir: string;
 }
 
 export function CodexModelEditor({ profileName, configDir }: Props) {
-  const { toast } = useToast()
-  const [tomlText, setTomlText] = useState('')
-  const [apiKey, setApiKey] = useState('')
-  const [saving, setSaving] = useState(false)
+  const { toast } = useToast();
+  const [tomlText, setTomlText] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  const configPath = `${configDir}/config.toml`
-  const authPath = `${configDir}/auth.json`
+  const configPath = `${configDir}/config.toml`;
+  const authPath = `${configDir}/auth.json`;
 
   useEffect(() => {
     Promise.all([readFile(configPath), readFile(authPath)]).then(([t, a]) => {
-      setTomlText(t)
+      setTomlText(t);
       try {
-        const parsed = JSON.parse(a) as Record<string, string>
-        setApiKey(parsed.OPENAI_API_KEY ?? '')
+        const parsed = JSON.parse(a) as Record<string, string>;
+        setApiKey(parsed.OPENAI_API_KEY ?? "");
       } catch {
-        setApiKey('')
+        setApiKey("");
       }
-    })
-  }, [configPath, authPath])
+    });
+  }, [configPath, authPath]);
 
   const handleSave = useCallback(async () => {
-    setSaving(true)
+    setSaving(true);
     try {
       // Update toml text → parse → write
-      const parsed = parseToml(tomlText)
-      await saveFile(configPath, serializeToml(parsed))
+      const parsed = parseToml(tomlText);
+      await saveFile(configPath, serializeToml(parsed));
       // Update auth.json
       const existing = (() => {
-        try { return JSON.parse(tomlText) } catch { return {} }
-      })() as Record<string, string>
-      const merged = { ...existing, OPENAI_API_KEY: apiKey }
-      await saveFile(authPath, JSON.stringify(merged, null, 2))
-      toast({ type: 'success', message: 'Saved Codex model config' })
+        try {
+          return JSON.parse(tomlText);
+        } catch {
+          return {};
+        }
+      })() as Record<string, string>;
+      const merged = { ...existing, OPENAI_API_KEY: apiKey };
+      await saveFile(authPath, JSON.stringify(merged, null, 2));
+      toast({ type: "success", message: "Saved Codex model config" });
     } catch (e: unknown) {
-      toast({ type: 'error', message: e instanceof Error ? e.message : 'Save failed' })
+      toast({
+        type: "error",
+        message: e instanceof Error ? e.message : "Save failed",
+      });
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
-  }, [tomlText, apiKey, configPath, authPath, toast])
+  }, [tomlText, apiKey, configPath, authPath, toast]);
 
   return (
     <div className="space-y-4">
@@ -1790,10 +1919,10 @@ export function CodexModelEditor({ profileName, configDir }: Props) {
         </CardContent>
       </Card>
       <Button onClick={handleSave} disabled={saving}>
-        {saving ? 'Saving…' : 'Save'}
+        {saving ? "Saving…" : "Save"}
       </Button>
     </div>
-  )
+  );
 }
 ```
 
@@ -1812,6 +1941,7 @@ git commit -m "feat(codex): ModelEditor (auth.json + config.toml placeholder)"
 ## Task 17: Wire Codex into schema
 
 **Files:**
+
 - Modify: `gui-web/src/pages/detail/schema.ts`
 
 - [ ] **Step 1: Add Codex tab entries**
@@ -1872,6 +2002,7 @@ No commit; PR 3 is the manual gate.
 ## Task 19: YAML parser
 
 **Files:**
+
 - Create: `gui-web/src/pages/detail/hermes/yaml.ts`
 - Create: `gui-web/src/pages/detail/hermes/yaml.test.ts`
 
@@ -1885,14 +2016,14 @@ npm install yaml
 - [ ] **Step 2: Failing test**
 
 ```ts
-import { parseYaml, stringifyYaml } from './yaml'
+import { parseYaml, stringifyYaml } from "./yaml";
 
-describe('hermes yaml', () => {
-  it('round-trips', () => {
-    const src = `model:\n  default: ""\n  provider: custom\n`
-    expect(stringifyYaml(parseYaml(src))).toBe(src)
-  })
-})
+describe("hermes yaml", () => {
+  it("round-trips", () => {
+    const src = `model:\n  default: ""\n  provider: custom\n`;
+    expect(stringifyYaml(parseYaml(src))).toBe(src);
+  });
+});
 ```
 
 - [ ] **Step 3: Run, fail**
@@ -1903,14 +2034,14 @@ Expected: FAIL.
 - [ ] **Step 4: Implement**
 
 ```ts
-import { parseDocument, stringify as yamlStringify } from 'yaml'
+import { parseDocument, stringify as yamlStringify } from "yaml";
 
 export function parseYaml(src: string): Record<string, unknown> {
-  return parseDocument(src).toJS() as Record<string, unknown>
+  return parseDocument(src).toJS() as Record<string, unknown>;
 }
 
 export function stringifyYaml(obj: Record<string, unknown>): string {
-  return yamlStringify(obj)
+  return yamlStringify(obj);
 }
 ```
 
@@ -1932,6 +2063,7 @@ git commit -m "feat(hermes): yaml wrapper (TDD)"
 ## Task 20: Hermes form tabs
 
 **Files:**
+
 - Create: `gui-web/src/pages/detail/hermes/ModelEnvEditor.tsx`
 - Create: `gui-web/src/pages/detail/hermes/MemoryEditor.tsx`
 - Create: `gui-web/src/pages/detail/hermes/DisplayEditor.tsx`
@@ -1940,6 +2072,7 @@ git commit -m "feat(hermes): yaml wrapper (TDD)"
 - [ ] **Step 1: Implement editors**
 
 Each editor:
+
 - Loads `${configDir}/config.yaml` via `readFile`.
 - Splits config into the keys the editor owns; preserves other keys untouched.
 - On save: merges changed section back into the full YAML, then `saveFile`.
@@ -1949,74 +2082,140 @@ Use `react-hook-form` + `zod` for each form. Schemas should follow PR 2 research
 `ModelEnvEditor.tsx` (sketch — fill in real fields after PR 2 research):
 
 ```tsx
-import { useEffect, useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle, Input } from '@/components/ui'
-import { Button } from '@/components/ui'
-import { useToast } from '@/components/feedback/toast'
-import { readFile, saveFile } from '@/api/files'
-import { parseYaml, stringifyYaml } from './yaml'
+import { useEffect, useState } from "react";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Input,
+} from "@/components/ui";
+import { Button } from "@/components/ui";
+import { useToast } from "@/components/feedback/toast";
+import { readFile, saveFile } from "@/api/files";
+import { parseYaml, stringifyYaml } from "./yaml";
 
-interface Props { configDir: string }
+interface Props {
+  configDir: string;
+}
 export function HermesModelEnvEditor({ configDir }: Props) {
-  const { toast } = useToast()
-  const [full, setFull] = useState<Record<string, unknown>>({})
-  const [model, setModel] = useState<Record<string, string>>({ default: '', provider: '', base_url: '' })
-  const [terminal, setTerminal] = useState<Record<string, unknown>>({ backend: 'local', cwd: '.', timeout: 180 })
-  const [apiKey, setApiKey] = useState('')
-  const [saving, setSaving] = useState(false)
+  const { toast } = useToast();
+  const [full, setFull] = useState<Record<string, unknown>>({});
+  const [model, setModel] = useState<Record<string, string>>({
+    default: "",
+    provider: "",
+    base_url: "",
+  });
+  const [terminal, setTerminal] = useState<Record<string, unknown>>({
+    backend: "local",
+    cwd: ".",
+    timeout: 180,
+  });
+  const [apiKey, setApiKey] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     readFile(`${configDir}/config.yaml`).then((s) => {
-      const p = parseYaml(s)
-      setFull(p)
-      setModel((p.model ?? {}) as Record<string, string>)
-      setTerminal((p.terminal ?? {}) as Record<string, unknown>)
-    })
+      const p = parseYaml(s);
+      setFull(p);
+      setModel((p.model ?? {}) as Record<string, string>);
+      setTerminal((p.terminal ?? {}) as Record<string, unknown>);
+    });
     readFile(`${configDir}/.env`).then((s) => {
-      const m = s.split('\n').find((l) => l.startsWith('HERMES_API_KEY='))
-      if (m) setApiKey(m.slice('HERMES_API_KEY='.length))
-    })
-  }, [configDir])
+      const m = s.split("\n").find((l) => l.startsWith("HERMES_API_KEY="));
+      if (m) setApiKey(m.slice("HERMES_API_KEY=".length));
+    });
+  }, [configDir]);
 
   const handleSave = async () => {
-    setSaving(true)
+    setSaving(true);
     try {
-      const next = { ...full, model: { ...(full.model as object ?? {}), ...model, api_key: '${HERMES_API_KEY}' }, terminal }
-      await saveFile(`${configDir}/config.yaml`, stringifyYaml(next))
-      await saveFile(`${configDir}/.env`, `HERMES_API_KEY=${apiKey}\n`)
-      toast({ type: 'success', message: 'Saved Hermes model/env' })
+      const next = {
+        ...full,
+        model: {
+          ...((full.model as object) ?? {}),
+          ...model,
+          api_key: "${HERMES_API_KEY}",
+        },
+        terminal,
+      };
+      await saveFile(`${configDir}/config.yaml`, stringifyYaml(next));
+      await saveFile(`${configDir}/.env`, `HERMES_API_KEY=${apiKey}\n`);
+      toast({ type: "success", message: "Saved Hermes model/env" });
     } catch (e: unknown) {
-      toast({ type: 'error', message: e instanceof Error ? e.message : 'Save failed' })
-    } finally { setSaving(false) }
-  }
+      toast({
+        type: "error",
+        message: e instanceof Error ? e.message : "Save failed",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader><CardTitle>Model</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle>Model</CardTitle>
+        </CardHeader>
         <CardContent className="space-y-2">
-          {(['default', 'provider', 'base_url'] as const).map((k) => (
-            <Input key={k} placeholder={k} value={model[k] ?? ''} onChange={(e) => setModel({ ...model, [k]: e.target.value })} className="font-mono text-sm" />
+          {(["default", "provider", "base_url"] as const).map((k) => (
+            <Input
+              key={k}
+              placeholder={k}
+              value={model[k] ?? ""}
+              onChange={(e) => setModel({ ...model, [k]: e.target.value })}
+              className="font-mono text-sm"
+            />
           ))}
         </CardContent>
       </Card>
       <Card>
-        <CardHeader><CardTitle>API Key (.env)</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle>API Key (.env)</CardTitle>
+        </CardHeader>
         <CardContent>
-          <Input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="HERMES_API_KEY" className="font-mono" />
+          <Input
+            type="password"
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            placeholder="HERMES_API_KEY"
+            className="font-mono"
+          />
         </CardContent>
       </Card>
       <Card>
-        <CardHeader><CardTitle>Terminal</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle>Terminal</CardTitle>
+        </CardHeader>
         <CardContent className="grid grid-cols-3 gap-2">
-          <Input placeholder="backend" value={String(terminal.backend ?? 'local')} onChange={(e) => setTerminal({ ...terminal, backend: e.target.value })} />
-          <Input placeholder="cwd" value={String(terminal.cwd ?? '.')} onChange={(e) => setTerminal({ ...terminal, cwd: e.target.value })} />
-          <Input type="number" placeholder="timeout" value={String(terminal.timeout ?? 180)} onChange={(e) => setTerminal({ ...terminal, timeout: Number(e.target.value) })} />
+          <Input
+            placeholder="backend"
+            value={String(terminal.backend ?? "local")}
+            onChange={(e) =>
+              setTerminal({ ...terminal, backend: e.target.value })
+            }
+          />
+          <Input
+            placeholder="cwd"
+            value={String(terminal.cwd ?? ".")}
+            onChange={(e) => setTerminal({ ...terminal, cwd: e.target.value })}
+          />
+          <Input
+            type="number"
+            placeholder="timeout"
+            value={String(terminal.timeout ?? 180)}
+            onChange={(e) =>
+              setTerminal({ ...terminal, timeout: Number(e.target.value) })
+            }
+          />
         </CardContent>
       </Card>
-      <Button onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
+      <Button onClick={handleSave} disabled={saving}>
+        {saving ? "Saving…" : "Save"}
+      </Button>
     </div>
-  )
+  );
 }
 ```
 
@@ -2074,6 +2273,7 @@ git commit -m "feat(hermes): form-style Model/Memory/Display tabs"
 ## Task 22: OpenCode providers form
 
 **Files:**
+
 - Create: `gui-web/src/pages/detail/opencode/ProvidersEditor.tsx`
 - Modify: `gui-web/src/pages/detail/schema.ts`
 
@@ -2091,15 +2291,17 @@ git commit -m "feat(hermes): form-style Model/Memory/Display tabs"
 
 ```ts
 // gui-web/src/pages/detail/opencode/jsonc.ts
-import { parse, modify, applyEdits } from 'jsonc-parser'
+import { parse, modify, applyEdits } from "jsonc-parser";
 
 export function parseJsonc<T = unknown>(src: string): T {
-  return parse(src) as T
+  return parse(src) as T;
 }
 
 export function serializeJsonc(src: string, newValue: unknown): string {
-  const edits = modify(src, 0, newValue, { formattingOptions: { tabSize: 2, insertSpaces: true } })
-  return applyEdits(src, edits)
+  const edits = modify(src, 0, newValue, {
+    formattingOptions: { tabSize: 2, insertSpaces: true },
+  });
+  return applyEdits(src, edits);
 }
 ```
 

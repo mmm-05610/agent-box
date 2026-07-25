@@ -57,7 +57,7 @@ function PageRouter({
   onCloseDetail: () => void
 }) {
   if (detailProfile) {
-    return <ProfileDetailPage profileName={detailProfile} onBack={onCloseDetail} />
+    return <ProfileDetailPage profileName={detailProfile} onBack={onCloseDetail} onNavigateLibrary={() => onNav('library')} />
   }
 
   switch (page) {

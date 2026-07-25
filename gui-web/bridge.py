@@ -889,6 +889,17 @@ class Api:
         except Exception as e:
             return json.dumps({"ok": True, "data": "[]"})
 
+    def delete_path(self, path: str) -> str:
+        """Delete a file or directory from WSL."""
+        try:
+            if not path or path.strip() in {"/", ".", "..", "~"}:
+                raise ValueError("refusing to delete an unsafe path")
+            import shlex
+            _wsl_run(f"rm -rf -- {shlex.quote(path)}", timeout=10)
+            return json.dumps({"ok": True, "data": True})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
     def list_dir_tree(self, path: str, max_depth: int = 4) -> str:
         """Return a directory tree (depth-limited). Hidden files excluded.
 
