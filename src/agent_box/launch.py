@@ -130,7 +130,7 @@ def launch(name: str, extra_args: list | None = None) -> None:
     sid = sessions.record_launch(name, agent_type, os.getcwd(), mode, pid)
 
     # Use subprocess instead of execvpe so we can record exit
-    proc = _sp.Popen([bwrap, *argv], env=env)
+    proc = _sp.Popen(argv, env=env)
     exit_code = proc.wait()
     sessions.record_exit(sid, exit_code)
     # Exit with the same code so the shell script can report failures
