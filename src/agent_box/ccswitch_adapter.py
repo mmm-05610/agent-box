@@ -123,3 +123,22 @@ def list_mcp_servers(agent_type: str) -> List[Dict[str, Any]]:
         })
     conn.close()
     return out
+
+
+# ── Prompts ────────────────────────────────────────────────────────────────
+
+def list_prompts(agent_type: str) -> List[Dict[str, Any]]:
+    conn = _conn()
+    rows = conn.execute(
+        "SELECT id, name, content, description FROM prompts "
+        "WHERE app_type = ? AND enabled = 1 ORDER BY name, id",
+        (agent_type,),
+    ).fetchall()
+    out: List[Dict[str, Any]] = []
+    for r in rows:
+        out.append({
+            "id": r["id"], "name": r["name"],
+            "content": r["content"] or "", "description": r["description"] or "",
+        })
+    conn.close()
+    return out

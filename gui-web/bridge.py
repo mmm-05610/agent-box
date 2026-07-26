@@ -949,6 +949,17 @@ class Api:
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
 
+    def list_library_prompts(self, agent_type: str) -> str:
+        try:
+            out = _wsl_run(
+                f"python3 -c 'from agent_box.ccswitch_adapter import list_prompts; "
+                f"import json; print(json.dumps(list_prompts(\"{agent_type}\")))'",
+                timeout=10,
+            )
+            return json.dumps({"ok": True, "data": out})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
     def list_library_mcp(self, agent_type: str) -> str:
         try:
             out = _wsl_run(

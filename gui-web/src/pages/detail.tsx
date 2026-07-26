@@ -340,16 +340,7 @@ function TabContent({
     case 'plugins':
       return <PluginsEditor key={refreshKey} path={settingsPath} content={settingsRaw} onRefresh={onRefresh} />
     case 'claude-md':
-      return (
-        <FileTextEditor
-          key={refreshKey}
-          path={claudeMdPath}
-          content={claudeMdRaw}
-          label={agentType === 'hermes' ? 'SOUL.md' : 'CLAUDE.md'}
-          placeholder="# Custom instructions"
-          onRefresh={onRefresh}
-        />
-      )
+      return <PromptTab key={refreshKey} configPath={claudeMdPath} content={claudeMdRaw} agentType={agentType} label="CLAUDE.md" placeholder="# Custom instructions" onRefresh={onRefresh} />
     case 'provider':
       return <ProviderTab
         key={refreshKey}
@@ -359,16 +350,7 @@ function TabContent({
         onRefresh={onRefresh}
       />
     case 'soul-md':
-      return (
-        <FileTextEditor
-          key={refreshKey}
-          path={claudeMdPath}
-          content={claudeMdRaw}
-          label="SOUL.md"
-          placeholder="# Persona — who the agent is, tone, boundaries"
-          onRefresh={onRefresh}
-        />
-      )
+      return <PromptTab key={refreshKey} configPath={claudeMdPath} content={claudeMdRaw} agentType={agentType} label="SOUL.md" placeholder="# Persona — who the agent is, tone, boundaries" onRefresh={onRefresh} />
     case 'memories':
       return <HermesMemoriesTab key={refreshKey} configDir={detail.config_dir} />
     case 'hooks':
