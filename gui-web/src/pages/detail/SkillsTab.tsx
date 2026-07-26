@@ -146,7 +146,11 @@ function SkillDetailModal({ skill, onClose, onSaved }: { skill: InstalledSkill; 
               <p className="text-xs text-muted-foreground line-clamp-1">{skill.description}</p>
             </div>
           </div>
-          <Button variant="ghost" size="sm" onClick={onClose} className="shrink-0">✕</Button>
+          <Button variant="ghost" size="sm" onClick={onClose} className="shrink-0" title="Close">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </Button>
         </div>
 
         {/* Scroll body */}
@@ -323,8 +327,10 @@ export function SkillsTab({ configDir, profileName, agentType, refreshKey }: {
         <CardContent>
           <div className="mb-3 flex gap-2">
             <Input placeholder="Filter installed..." value={installedFilter} onChange={e => setInstalledFilter(e.target.value)} className="flex-1" />
-            <Button size="sm" variant="ghost" onClick={() => setInstalledFilter('')} title="Clear">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><path d="M18 6 6 18M6 6l12 12" /></svg>
+            <Button size="sm" variant="ghost" onClick={() => setInstalledFilter('')} title="Clear filter">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
             </Button>
           </div>
           {loading ? <p className="text-xs text-muted-foreground py-2">Loading...</p>
