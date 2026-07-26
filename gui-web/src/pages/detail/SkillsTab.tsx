@@ -53,7 +53,7 @@ function relativePath(path: string, root: string): string {
   return path.startsWith(`${r}/`) ? path.slice(r.length + 1) : path
 }
 
-async function loadInstalled(dir: string): Promise<InstalledSkill[]> {
+async function loadInstalled(dir: string, root: string): Promise<InstalledSkill[]> {
   const paths = await findFiles(dir).catch(() => [] as string[])
   const pathList = Array.isArray(paths) ? paths : []
   const byDir = new Map<string, { skillMd: string | null; descMd: string | null }>()
@@ -73,12 +73,13 @@ async function loadInstalled(dir: string): Promise<InstalledSkill[]> {
       const fn = entry.skillMd ? 'SKILL.md' : 'DESCRIPTION.md'
       const content = await readFile(fp).catch(() => '')
       const fm = parseFrontmatter(content)
-      const id = relativePath(dir, dir)
+      const id = relativePath(dir, root)
       const files = pathList.filter(p => p.startsWith(`${dir}/`)).map(p => relativePath(p, dir)).sort((a, b) => a.localeCompare(b))
       return { id, name: fm.name || id, description: fm.description || '', directory: dir, skillFilePath: fp, skillFileName: fn, frontmatter: fm, content, files } satisfies InstalledSkill
     })
   )
   return results.filter((s): s is InstalledSkill => s !== null).sort((a, b) => a.name.localeCompare(b.name))
+}
 }
 
 // ── Detail Modal ──────────────────────────────────────────────────────────
@@ -221,7 +222,7 @@ export function SkillsTab({ configDir, profileName, agentType, refreshKey }: {
   useEffect(() => {
     let cancelled = false
     setLoading(true); setLoadError('')
-    loadInstalled(skillsDir).then(s => { if (!cancelled) setInstalled(s) })
+    loadInstalled(skillsDir, skillsDir).then(s => { if (!cancelled) setInstalled(s) })
       .catch(e => { if (!cancelled) { setInstalled([]); setLoadError(e instanceof Error ? e.message : 'Failed') } })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
@@ -252,7 +253,7 @@ export function SkillsTab({ configDir, profileName, agentType, refreshKey }: {
     setApplyingId(skillId)
     try {
       await call<void>(api => api.apply_skill_to_profile(profileName, skillId), undefined)
-      await loadInstalled(skillsDir).then(setInstalled)
+      await loadInstalled(skillsDir, skillsDir).then(setInstalled)
       setTick(t => t + 1)
       toast({ type: 'success', message: `${skillId} applied` })
     } catch (e) {
