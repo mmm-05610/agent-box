@@ -83,7 +83,6 @@ async function loadInstalled(dir: string): Promise<InstalledSkill[]> {
   )
   return results.filter(Boolean) as InstalledSkill[]
 }
-}
 
 export function SkillsTab({ configDir, profileName, agentType: agentTypeProp, refreshKey }: SkillsTabProps) {
   const skillsDir = `${configDir}/skills`
