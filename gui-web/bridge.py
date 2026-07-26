@@ -942,9 +942,10 @@ class Api:
         try:
             out = _wsl_run(
                 f"python3 -c 'from agent_box.ccswitch_adapter import list_skills; "
-                f"import json; print(json.dumps(list_skills(\"{agent_type}\")))'"
+                f"import json; print(json.dumps(list_skills(\"{agent_type}\")))'",
+                timeout=30,
             )
-            return json.dumps({"ok": True, "data": json.loads(out)})
+            return json.dumps({"ok": True, "data": out})
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
 
