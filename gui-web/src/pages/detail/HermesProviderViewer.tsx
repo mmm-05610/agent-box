@@ -109,6 +109,51 @@ function libraryApiMode(provider: Provider): string | null {
   return null
 }
 
+function buildHermesYamlFromProvider(provider: Provider): string {
+  const s = (provider.settings ?? {}) as Record<string, unknown>
+  const baseUrl = (s.base_url as string) ?? ''
+  const apiKey = (s.api_key as string) ?? ''
+  const apiMode = (s.api_mode as string) ?? 'openai_compatible'
+  const envApiKey = ((s.env as Record<string, string> | undefined) ?? {}).api_key
+
+  // Map ACS api_mode to Hermes config format
+  const modeMap: Record<string, string> = {
+    'chat_completions': 'openai_compatible',
+    'openai_compatible': 'openai_compatible',
+    'anthropic': 'anthropic',
+    'codex_responses': 'codex_responses',
+  }
+  const mappedMode = modeMap[apiMode] ?? apiMode
+
+  const lines: string[] = []
+  lines.push(`base_url: "${baseUrl}"`)
+  lines.push(`api_key: "${apiKey || envApiKey || ''}"`)
+  lines.push(`api_mode: "${mappedMode}"`)
+
+  const models = s.models as Array<Record<string, unknown>> | undefined
+  if (Array.isArray(models) && models.length > 0) {
+    const first = models[0]
+    const defaultModel = (first.id ?? first.model ?? '') as string
+    if (defaultModel) lines.push(`default: "${defaultModel}"`)
+    lines.push('models:')
+    for (const m of models) {
+      const id = (m.id ?? m.model ?? '') as string
+      const name = (m.name ?? m.id ?? m.model ?? '') as string
+      const ctx = (m.context_length ?? m.contextLength) as number | undefined
+      if (id) {
+        lines.push(`  - id: "${id}"`)
+        lines.push(`    name: "${name}"`)
+        if (ctx) lines.push(`    context_length: ${ctx}`)
+      }
+    }
+  } else {
+    const defaultModel = (s.default_model as string) ?? ''
+    if (defaultModel) lines.push(`default: "${defaultModel}"`)
+  }
+
+  return lines.join('\n')
+}
+
 function libraryDefaultModel(provider: Provider): string | null {
   const settings = (provider.settings ?? {}) as Record<string, unknown>
   // ACS-style structured models array
@@ -219,18 +264,8 @@ export function HermesProviderViewer({
     if (!provider) return
     setApplyingId(providerId)
     try {
-      const libBaseUrl = libraryBaseUrl(provider) ?? ''
-      const libApiKey = libraryApiKey(provider)
-      const libApiMode = libraryApiMode(provider)
-      const libModels = libraryModels(provider)
-      const libModel = libraryDefaultModel(provider)
-
-      let nextYaml = effectiveYaml
-      nextYaml = patchHermesBaseUrl(nextYaml, libBaseUrl)
-      if (libApiMode) nextYaml = patchHermesApiMode(nextYaml, libApiMode)
-      if (libModel) nextYaml = patchHermesModelDefault(nextYaml, libModel)
-      if (libModels.length > 0) nextYaml = patchHermesModels(nextYaml, libModels)
-      if (libApiKey) nextYaml = patchHermesApiKey(nextYaml, libApiKey)
+      // Build complete YAML from ACS provider settings (full overwrite)
+      const nextYaml = buildHermesYamlFromProvider(provider)
       const nextEnv = libApiKey
         ? patchHermesEnv(effectiveEnv, libApiKey)
         : effectiveEnv

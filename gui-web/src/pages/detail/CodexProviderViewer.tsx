@@ -246,14 +246,11 @@ export function CodexProviderViewer({
     try {
       const libSettings = (provider.settings ?? {}) as Record<string, unknown>
       const libConfig = typeof libSettings.config === 'string' ? (libSettings.config as string) : ''
-      const libAuth = (libSettings.auth as Record<string, unknown> | undefined) ?? {}
       const libApiKey = libraryApiKey(provider)
       const libBaseUrl = libraryBaseUrl(provider) ?? ''
       const libModel = libraryModel(provider)
       const libCatalog = readCodexCatalogModels(libSettings)
 
-      // Merge: provider wins on base_url/model, but preserve any TOML keys
-      // already in the profile that the library TOML doesn't carry.
       const mergedToml = libConfig
         ? patchCodexBaseUrl(codexConfig || libConfig, libBaseUrl)
         : patchCodexBaseUrl(codexConfig, libBaseUrl)
@@ -272,8 +269,6 @@ export function CodexProviderViewer({
         icon: (provider as any).icon, icon_color: (provider as any).icon_color,
         category: provider.category,
       }, null, 2))
-
-      void libAuth
 
       setConfigTomlOverride(finalToml)
       setAuthJsonOverride(mergedAuth)
