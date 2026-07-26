@@ -320,13 +320,20 @@ export function extractHermesApiKey(envContent: string): string {
 }
 
 /** Read scalar fields from the ``model:`` block of config.yaml. */
+export interface HermesModelItem {
+  id?: string
+  name?: string
+  context_length?: number
+}
+
 export function extractHermesModelFields(yaml: string): {
   defaultModel: string | null
   baseUrl: string | null
   apiKey: string | null
+  models: HermesModelItem[]
 } {
   const lines = yaml.split(/\r?\n/)
-  const out = { defaultModel: null as string | null, baseUrl: null as string | null, apiKey: null as string | null }
+  const out = { defaultModel: null as string | null, baseUrl: null as string | null, apiKey: null as string | null, models: [] as HermesModelItem[] }
   let inModel = false
   for (const raw of lines) {
     if (/^model\s*:\s*$/.test(raw)) { inModel = true; continue }
@@ -339,5 +346,55 @@ export function extractHermesModelFields(yaml: string): {
     else if (m[1] === 'base_url') out.baseUrl = value
     else if (m[1] === 'api_key') out.apiKey = value
   }
+
+  // Parse models list
+  out.models = parseHermesModelsFromYaml(yaml)
   return out
+}
+
+function parseHermesModelsFromYaml(yaml: string): HermesModelItem[] {
+  const models: HermesModelItem[] = []
+  const lines = yaml.split(/\r?\n/)
+  let inModels = false
+  let current: HermesModelItem | null = null
+
+  for (const raw of lines) {
+    // Detect start of models section
+    if (/^models\s*:/.test(raw)) {
+      inModels = true
+      continue
+    }
+    if (!inModels) continue
+    // Top-level key → models section ended
+    if (/^[A-Za-z_]/.test(raw)) break
+    // New model entry: "- id: ..."
+    const listMatch = raw.match(/^\s{2}-\s+(.+)$/)
+    if (listMatch) {
+      if (current) models.push(current)
+      current = {}
+      const inline = listMatch[1].trim()
+      const kvMatch = inline.match(/^([A-Za-z_]+)\s*:\s*(.+?)\s*$/)
+      if (kvMatch) {
+        const key = kvMatch[1]
+        let value = kvMatch[2].trim().replace(/^(['"])(.*)\1$/, '$2')
+        if (key === 'id') current.id = value
+        else if (key === 'name') current.name = value
+        else if (key === 'context_length') current.context_length = parseInt(value, 10) || undefined
+      }
+      continue
+    }
+    // Continuation line: "    name: ..."
+    if (current) {
+      const cm = raw.match(/^\s{4}([A-Za-z_]+)\s*:\s*(.+?)\s*$/)
+      if (cm) {
+        const key = cm[1]
+        let value = cm[2].trim().replace(/^(['"])(.*)\1$/, '$2')
+        if (key === 'id') current.id = value
+        else if (key === 'name') current.name = value
+        else if (key === 'context_length') current.context_length = parseInt(value, 10) || undefined
+      }
+    }
+  }
+  if (current) models.push(current)
+  return models
 }

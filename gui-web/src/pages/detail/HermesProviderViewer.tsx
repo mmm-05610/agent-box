@@ -62,17 +62,22 @@ interface HermesProviderViewerProps {
 
 type MatchStatus = 'active' | 'modified' | 'none'
 
+interface HermesModel {
+  id?: string
+  name?: string
+  context_length?: number
+}
+
 interface CurrentFields {
   baseUrl: string
   apiKey: string
   defaultModel: string | null
+  models: HermesModel[]
   hasYaml: boolean
 }
 
 function readCurrent(configYaml: string, envContent: string): CurrentFields {
   const fields = extractHermesModelFields(configYaml)
-  // api_key in YAML is often a literal, but template uses ${HERMES_API_KEY}.
-  // Prefer the .env value if the YAML references an env var (template default).
   let apiKey = fields.apiKey ?? ''
   const isEnvRef = !!apiKey && /^\$\{.+\}$/.test(apiKey)
   if (isEnvRef) apiKey = extractHermesApiKey(envContent)
@@ -80,6 +85,7 @@ function readCurrent(configYaml: string, envContent: string): CurrentFields {
     baseUrl: fields.baseUrl ?? '',
     apiKey,
     defaultModel: fields.defaultModel,
+    models: fields.models ?? [],
     hasYaml: configYaml.trim().length > 0,
   }
 }
@@ -322,7 +328,7 @@ export function HermesProviderViewer({
       <Card>
         <CardHeader><CardTitle>Provider Settings</CardTitle></CardHeader>
         <CardContent className="space-y-4">
-          <HermesProviderForm values={values} onChange={setValues} mode="library" category="official" />
+          <HermesProviderForm values={values} onChange={setValues} mode="library" category="official" models={current.models} />
           <Button onClick={handleSave} disabled={saving} className="w-full">
             {saving ? 'Saving...' : 'Save Provider Settings'}
           </Button>
