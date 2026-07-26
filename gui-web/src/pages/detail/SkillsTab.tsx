@@ -234,18 +234,18 @@ export function SkillsTab({ configDir, profileName, agentType, refreshKey }: {
       .catch(() => {})
   }, [at])
 
-  // Paginate
-  const effective = search.trim() ? searchResults : library
+  // Filter + Paginate (filter first)
+  const installedIds = useMemo(() => new Set(installed.map(s => s.id)), [installed])
+  const effective = (search.trim() ? searchResults : library)
+    .filter(s => !installedIds.has(s.id) && s.source_available !== false)
   const totalPages = Math.max(1, Math.ceil(effective.length / PER_PAGE))
   const pageItems = effective.slice(page * PER_PAGE, (page + 1) * PER_PAGE)
-
-  const installedIds = useMemo(() => new Set(installed.map(s => s.id)), [installed])
 
   const handleSearch = (q: string) => {
     setSearch(q); setPage(0)
     if (!q.trim()) { setSearchResults([]); return }
     const needle = q.toLowerCase()
-    setSearchResults(library.filter(s => s.name.toLowerCase().includes(needle) || s.description.toLowerCase().includes(needle)))
+    setSearchResults(library.filter(s => s.name.toLowerCase().includes(needle) || s.description.toLowerCase().includes(needle)).filter(s => !installedIds.has(s.id) && s.source_available !== false))
   }
 
   const handleApply = useCallback(async (skillId: string) => {
@@ -287,9 +287,7 @@ export function SkillsTab({ configDir, profileName, agentType, refreshKey }: {
           ) : (
             <>
               <div className="space-y-1">
-                {pageItems
-                  .filter(s => !installedIds.has(s.id) && s.source_available !== false)
-                  .map(s => (
+                {pageItems.map(s => (
                     <div key={s.id} className="flex items-center gap-3 rounded-lg border border-border px-3 py-1.5">
                       <div className="min-w-0 flex-1"><div className="text-sm font-medium">{s.name}</div>{s.description && <div className="text-[11px] text-muted-foreground truncate">{s.description}</div>}</div>
                       <Button size="sm" variant="ghost" isLoading={applyingId === s.id} onClick={() => handleApply(s.id)}>Add</Button>
