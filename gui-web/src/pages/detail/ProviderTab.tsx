@@ -50,7 +50,7 @@ const ADDITIVE_TYPES: AgentType[] = ['hermes', 'opencode']
 
 /** Extract model.provider from a Hermes config.yaml to find the active provider. */
 function parseActiveProvider(yamlContent: string): string | null {
-  const m = yamlContent.match(/^provider:\s*["']?([^"'\s]+)/m)
+  const m = yamlContent.match(/^\s+provider:\s*["']?([^"'\s]+)/m)
   return m ? m[1] : null
 }
 
