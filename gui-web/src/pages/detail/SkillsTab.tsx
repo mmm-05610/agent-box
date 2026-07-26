@@ -252,8 +252,7 @@ export function SkillsTab({ configDir, profileName, agentType, refreshKey }: {
     setApplyingId(skillId)
     try {
       await call<void>(api => api.apply_skill_to_profile(profileName, skillId), undefined)
-      const fresh = await loadInstalled(skillsDir)
-      setInstalled(fresh)
+      await loadInstalled(skillsDir).then(setInstalled)
       setTick(t => t + 1)
       toast({ type: 'success', message: `${skillId} applied` })
     } catch (e) {
@@ -277,7 +276,7 @@ export function SkillsTab({ configDir, profileName, agentType, refreshKey }: {
   return (
     <div className="space-y-6">
       {/* ── Available Skills ─────────────────────────────────────── */}
-      <Card key={`available-${tick}`}>
+      <Card key={`available-${tick}-${installed.length}`}>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm">Available Skills ({effective.length})</CardTitle>
         </CardHeader>
