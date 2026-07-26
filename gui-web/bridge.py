@@ -949,6 +949,24 @@ class Api:
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
 
+    def list_library_mcp(self, agent_type: str) -> str:
+        try:
+            out = _wsl_run(
+                f"python3 -c 'from agent_box.ccswitch_adapter import list_mcp_servers; "
+                f"import json; print(json.dumps(list_mcp_servers(\"{agent_type}\")))'",
+                timeout=15,
+            )
+            return json.dumps({"ok": True, "data": out})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    def apply_mcp_to_profile(self, profile_name: str, mcp_id: str) -> str:
+        try:
+            _wsl_run(f"{AGENT_BOX_CMD} mcp-server apply {profile_name} {mcp_id}")
+            return json.dumps({"ok": True})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
     def apply_skill_to_profile(self, profile_name: str, skill_id: str) -> str:
         """Copy a skill from ACS to the profile's skills directory."""
         try:

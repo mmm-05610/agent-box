@@ -1,324 +1,244 @@
 /**
- * MCP Tab — shows MCP servers applied to this profile.
- *
- * Pure display + delete component. Receives the parsed dot-claude.json
- * contents (`mcpJson`) and the library MCP list (`libraryMcp`) as props.
- * The parent is responsible for fetching and refreshing both.
- *
- * Removal writes back to `${profilePath}/dot-claude.json` via patchJsonFile.
+ * MCP Tab — Available (ACS library) + Installed (from profile config).
+ * Each installed MCP has a Detail button → modal with full config.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import {
-  Badge,
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  ConfirmDialog,
-} from '@/components/ui'
+import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Textarea } from '@/components/ui'
 import { useToast } from '@/components/feedback/toast'
-import { patchJsonFile } from '@/api/files'
-import type { McpServer, McpServerConfig } from '@/api/types'
-
-type McpType = McpServerConfig['type']
+import { readFile, saveFile } from '@/api/files'
+import { call } from '@/lib/bridge'
 
 interface McpEntry {
-  type: McpType | string
+  id: string
+  name: string
+  description: string
+  type?: string
   command?: string
   args?: string[]
   url?: string
-  env?: Record<string, string>
-  headers?: Record<string, string>
+  raw: Record<string, unknown>
+}
+
+interface LibraryMcp {
+  id: string
+  name: string
+  description: string
+  tags: string[]
+  server_config: Record<string, unknown>
 }
 
 interface McpTabProps {
-  profileName: string
-  /** Profile directory on disk — used to construct the patchJsonFile path. */
+  configDir: string
+  agentType: string
   profilePath: string
-  /** Raw contents of dot-claude.json. Parent re-fetches this on refresh. */
-  mcpJson: string
-  /** Library records — entries are matched by id when provided. */
-  libraryMcp?: McpServer[]
-  /** Optional: navigate to the Library page (e.g. for empty-state CTA). */
-  onNavigateLibrary?: () => void
+  profileName: string
+  refreshKey?: number
 }
 
-function typeBadgeVariant(type: string): 'success' | 'info' | 'neutral' {
-  if (type === 'stdio') return 'success'
-  if (type === 'sse') return 'info'
-  return 'neutral' // http + unknown
+const CONFIG_FILE: Record<string, string> = {
+  claude: 'dot-claude.json', codex: 'config.toml',
+  hermes: 'config.yaml', opencode: 'opencode.jsonc',
 }
 
-function summarizeEntry(entry: McpEntry): string {
-  if (entry.command) {
-    const args = entry.args?.length ? ` ${entry.args.join(' ')}` : ''
-    return `${entry.command}${args}`
-  }
-  if (entry.url) return entry.url
-  return '(no command or url)'
-}
-
-function parseMcpServers(raw: string): { servers: Record<string, McpEntry>; error: string | null } {
+function parseInstalledMcp(agentType: string, raw: string): McpEntry[] {
+  if (!raw.trim()) return []
   try {
-    const parsed = JSON.parse(raw || '{}')
-    return { servers: parsed.mcpServers ?? {}, error: null }
-  } catch (error) {
-    return {
-      servers: {},
-      error: error instanceof Error ? error.message : 'Failed to parse dot-claude.json',
+    if (agentType === 'claude') {
+      const d = JSON.parse(raw)
+      const servers = d.mcpServers || {}
+      return Object.entries(servers).map(([id, s]) => ({
+        id, name: id, description: '',
+        type: (s as any).type, command: (s as any).command,
+        args: (s as any).args, url: (s as any).url,
+        raw: s as Record<string, unknown>,
+      }))
     }
-  }
+    if (agentType === 'opencode') {
+      const d = JSON.parse(raw.replace(/\/\/.*?\n|\/\*.*?\*\//g, '').replace(/,(\s*[}\]])/g, '$1'))
+      const mcp = d.mcp || {}
+      const servers = mcp.servers || {}
+      return Object.entries(servers).map(([id, s]) => ({
+        id, name: id, description: '',
+        type: (s as any).type === 'remote' ? 'http' : 'stdio',
+        command: (s as any).command?.[0], args: (s as any).command?.slice(1),
+        url: (s as any).url, raw: s as Record<string, unknown>,
+      }))
+    }
+    return []
+  } catch { return [] }
 }
 
-export function McpTab({
-  profileName, profilePath, mcpJson, libraryMcp, onNavigateLibrary,
-}: McpTabProps) {
-  const mcpPath = `${profilePath}/dot-claude.json`
-  const [servers, setServers] = useState<Record<string, McpEntry>>({})
-  const [parseError, setParseError] = useState<string | null>(null)
-  const [expanded, setExpanded] = useState<Set<string>>(new Set())
-  const [pendingDelete, setPendingDelete] = useState<{ id: string; label: string } | null>(null)
-  const [deleting, setDeleting] = useState(false)
+export function McpTab({ configDir, agentType, profilePath, profileName, refreshKey }: McpTabProps) {
+  const at = agentType || 'claude'
+  const configPath = `${configDir}/${CONFIG_FILE[at] ?? 'dot-claude.json'}`
   const { toast } = useToast()
 
-  const libraryById = useMemo(() => {
-    const map = new Map<string, McpServer>()
-    for (const item of libraryMcp ?? []) map.set(item.id, item)
-    return map
-  }, [libraryMcp])
+  const [installed, setInstalled] = useState<McpEntry[]>([])
+  const [configRaw, setConfigRaw] = useState('')
+  const [loading, setLoading] = useState(true)
 
-  // Sync `servers` whenever the parent-provided `mcpJson` changes
-  // (e.g. after library apply triggers an `onRefresh` round-trip).
-  useEffect(() => {
-    const { servers: parsed, error } = parseMcpServers(mcpJson)
-    setServers(parsed)
-    setParseError(error)
-  }, [mcpJson])
+  const [search, setSearch] = useState('')
+  const [searchInput, setSearchInput] = useState('')
+  const [library, setLibrary] = useState<LibraryMcp[]>([])
+  const [searchResults, setSearchResults] = useState<LibraryMcp[]>([])
+  const [page, setPage] = useState(0)
+  const PER_PAGE = 5
+  const [applyingId, setApplyingId] = useState<string | null>(null)
+  const [removingId, setRemovingId] = useState<string | null>(null)
+  const [detailMcp, setDetailMcp] = useState<McpEntry | null>(null)
+  const [tick, setTick] = useState(0)
 
-  const toggleExpanded = (id: string) => {
-    setExpanded((current) => {
-      const next = new Set(current)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
-
-  const confirmRemove = async () => {
-    if (!pendingDelete) return
-    setDeleting(true)
-    const { id } = pendingDelete
+  const reloadInstalled = useCallback(async () => {
+    setLoading(true)
     try {
-      const next = { ...servers }
-      delete next[id]
-      await patchJsonFile(mcpPath, 'mcpServers', next)
-      setServers(next)
-      setExpanded((current) => {
-        const nextSet = new Set(current)
-        nextSet.delete(id)
-        return nextSet
-      })
-      toast({ type: 'success', message: `${id} removed from ${profileName}` })
-      setPendingDelete(null)
-    } catch (error) {
-      toast({ type: 'error', message: error instanceof Error ? error.message : 'Failed to remove MCP server' })
-    } finally {
-      setDeleting(false)
-    }
-  }
+      const raw = await readFile(configPath).catch(() => '{}')
+      setConfigRaw(raw)
+      setInstalled(parseInstalledMcp(at, raw))
+    } catch { setInstalled([]) }
+    finally { setLoading(false) }
+  }, [configPath, at])
 
-  const entries = Object.entries(servers)
-  const canNavigate = typeof onNavigateLibrary === 'function'
+  useEffect(() => { reloadInstalled() }, [reloadInstalled, refreshKey])
+
+  useEffect(() => {
+    call<string>(api => api.list_library_mcp(at), '[]')
+      .then(raw => { try { setLibrary(JSON.parse(raw)) } catch {} })
+      .catch(() => {})
+  }, [at])
+
+  const installedIds = useMemo(() => new Set(installed.map(s => s.id)), [installed])
+
+  const doSearch = useCallback((q: string) => {
+    setSearch(q); setPage(0)
+    if (!q.trim()) { setSearchResults([]); return }
+    const needle = q.toLowerCase()
+    setSearchResults(library.filter(s =>
+      (s.name.toLowerCase().includes(needle) || s.description.toLowerCase().includes(needle))
+      && !installedIds.has(s.id)
+    ))
+  }, [library, installedIds])
+
+  const effective = (search.trim() ? searchResults : library).filter(s => !installedIds.has(s.id))
+  const totalPages = Math.max(1, Math.ceil(effective.length / PER_PAGE))
+  const pageItems = effective.slice(page * PER_PAGE, (page + 1) * PER_PAGE)
+
+  const handleApply = useCallback(async (mcpId: string) => {
+    setApplyingId(mcpId)
+    try {
+      await call<void>(api => api.apply_mcp_to_profile(profileName, mcpId), undefined)
+      await reloadInstalled()
+      setTick(t => t + 1)
+      toast({ type: 'success', message: `${mcpId} applied` })
+    } catch (e) {
+      toast({ type: 'error', message: e instanceof Error ? e.message : 'Apply failed' })
+    } finally { setApplyingId(null) }
+  }, [profileName, reloadInstalled, toast])
+
+  const handleRemove = useCallback(async (mcpId: string) => {
+    setRemovingId(mcpId)
+    try {
+      const servers = installed.filter(s => s.id !== mcpId)
+      const updated = JSON.parse(configRaw)
+      if (at === 'claude') {
+        updated.mcpServers = {}
+        for (const s of servers) {
+          updated.mcpServers[s.id] = { type: s.type, ...(s.command ? { command: s.command, args: s.args || [] } : {}), ...(s.url ? { url: s.url } : {}) }
+        }
+      }
+      await saveFile(configPath, JSON.stringify(updated, null, 2))
+      await reloadInstalled()
+      setTick(t => t + 1)
+      toast({ type: 'success', message: `${mcpId} removed` })
+    } catch (e) {
+      toast({ type: 'error', message: e instanceof Error ? e.message : 'Remove failed' })
+    } finally { setRemovingId(null) }
+  }, [installed, configRaw, configPath, at, reloadInstalled, toast])
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>MCP Servers ({entries.length})</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {parseError ? (
-          <p className="text-sm text-destructive">Failed to parse dot-claude.json: {parseError}</p>
-        ) : entries.length === 0 ? (
-          <EmptyState canNavigate={canNavigate} onNavigate={onNavigateLibrary} />
-        ) : (
-          entries.map(([id, cfg]) => {
-            const libraryMatch = libraryById.get(id)
-            const displayName = libraryMatch?.name ?? id
-            const description = libraryMatch?.description ?? ''
-            const isExpanded = expanded.has(id)
-            const summary = summarizeEntry(cfg)
-            const envKeys = cfg.env ? Object.keys(cfg.env) : []
-            const headerKeys = cfg.headers ? Object.keys(cfg.headers) : []
-            const args = cfg.args ?? []
-
-            return (
-              <Card key={id} elevation="flat" className="ring-1 ring-border/60">
-                <div className="flex items-start gap-3 p-4">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
-                      <rect x="3" y="4" width="18" height="6" rx="1.5" />
-                      <rect x="3" y="14" width="18" height="6" rx="1.5" />
-                      <circle cx="7" cy="7" r="1" fill="currentColor" />
-                      <circle cx="7" cy="17" r="1" fill="currentColor" />
-                    </svg>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h4 className="font-medium text-foreground">{displayName}</h4>
-                      <Badge variant={typeBadgeVariant(cfg.type)}>{cfg.type || 'unknown'}</Badge>
-                      {libraryMatch && (
-                        <Badge variant="primary">library</Badge>
-                      )}
+    <div className="space-y-6">
+      <Card key={`mcp-avail-${tick}-${installed.length}`}>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">Available MCP Servers ({effective.length})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="mb-3 flex gap-2">
+            <Input placeholder={`Search ${at} MCP servers...`} value={searchInput} onChange={e => setSearchInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') doSearch(searchInput) }} className="flex-1" />
+            <Button size="sm" variant="ghost" onClick={() => doSearch(searchInput)} title="Search">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
+            </Button>
+          </div>
+          {pageItems.length === 0 ? (
+            <p className="text-xs text-muted-foreground py-2">{search.trim() ? 'No matching MCP servers.' : 'No MCP servers available for this agent.'}</p>
+          ) : (
+            <>
+              <div className="space-y-1">
+                {pageItems.map(s => (
+                  <div key={s.id} className="flex items-center gap-3 rounded-lg border border-border px-3 py-1.5">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">{s.name}</span>
+                        <Badge variant="neutral" className="text-[10px] px-1.5 py-0">{(s.server_config as any)?.type ?? 'stdio'}</Badge>
+                      </div>
+                      {s.description && <div className="text-[11px] text-muted-foreground truncate">{s.description}</div>}
                     </div>
-                    {libraryMatch && libraryMatch.name !== id && (
-                      <p className="mt-0.5 font-mono text-xs text-muted-foreground">{id}</p>
-                    )}
-                    {description ? (
-                      <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-muted-foreground">{description}</p>
-                    ) : (
-                      <p className="mt-1 truncate font-mono text-xs text-muted-foreground">{summary}</p>
-                    )}
+                    <Button size="sm" variant="ghost" isLoading={applyingId === s.id} onClick={() => handleApply(s.id)}>Add</Button>
                   </div>
-                  <div className="flex shrink-0 items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      aria-expanded={isExpanded}
-                      onClick={() => toggleExpanded(id)}
-                    >
-                      {isExpanded ? 'Hide details' : 'Details'}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setPendingDelete({ id, label: displayName })}
-                    >
-                      Remove
-                    </Button>
-                  </div>
+                ))}
+              </div>
+              {totalPages > 1 && (
+                <div className="mt-2 flex items-center justify-center gap-2 text-xs">
+                  <Button size="sm" variant="ghost" disabled={page === 0} onClick={() => setPage(p => p - 1)}>← Prev</Button>
+                  <span className="text-muted-foreground">{page + 1} / {totalPages}</span>
+                  <Button size="sm" variant="ghost" disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)}>Next →</Button>
                 </div>
-                {isExpanded && (
-                  <div className="space-y-3 border-t border-border/60 px-4 py-3 text-sm">
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div>
-                        <p className="mb-1 font-medium text-foreground">Type</p>
-                        <code className="break-all text-xs text-muted-foreground">{cfg.type || 'unknown'}</code>
-                      </div>
-                      <div>
-                        <p className="mb-1 font-medium text-foreground">Server ID</p>
-                        <code className="break-all text-xs text-muted-foreground">{id}</code>
-                      </div>
-                    </div>
-                    {cfg.command && (
-                      <div>
-                        <p className="mb-1 font-medium text-foreground">Command</p>
-                        <code className="break-all text-xs text-muted-foreground">{cfg.command}</code>
-                      </div>
-                    )}
-                    {cfg.url && (
-                      <div>
-                        <p className="mb-1 font-medium text-foreground">URL</p>
-                        <code className="break-all text-xs text-muted-foreground">{cfg.url}</code>
-                      </div>
-                    )}
-                    {cfg.type === 'stdio' && (
-                      <div>
-                        <p className="mb-1 font-medium text-foreground">Args ({args.length})</p>
-                        {args.length === 0 ? (
-                          <p className="text-xs text-muted-foreground">No arguments.</p>
-                        ) : (
-                          <ul className="max-h-40 space-y-1 overflow-y-auto rounded-md bg-muted/60 p-2 font-mono text-xs text-muted-foreground">
-                            {args.map((arg, index) => (
-                              <li key={`${index}-${arg}`} className="break-all">{arg}</li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                    )}
-                    {envKeys.length > 0 && (
-                      <div>
-                        <p className="mb-1 font-medium text-foreground">Env vars ({envKeys.length})</p>
-                        <p className="mb-1 text-xs text-muted-foreground">Keys only — values are hidden.</p>
-                        <ul className="max-h-40 space-y-1 overflow-y-auto rounded-md bg-muted/60 p-2 font-mono text-xs text-muted-foreground">
-                          {envKeys.map((key) => (
-                            <li key={key} className="break-all">{key}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {headerKeys.length > 0 && (
-                      <div>
-                        <p className="mb-1 font-medium text-foreground">Headers ({headerKeys.length})</p>
-                        <p className="mb-1 text-xs text-muted-foreground">Keys only — values are hidden.</p>
-                        <ul className="max-h-40 space-y-1 overflow-y-auto rounded-md bg-muted/60 p-2 font-mono text-xs text-muted-foreground">
-                          {headerKeys.map((key) => (
-                            <li key={key} className="break-all">{key}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {libraryMatch && (
-                      <div>
-                        <p className="mb-1 font-medium text-foreground">Library</p>
-                        <p className="text-xs text-muted-foreground">
-                          Matched library entry: <span className="font-mono">{libraryMatch.id}</span>
-                          {libraryMatch.tags.length > 0 && ` · tags: ${libraryMatch.tags.join(', ')}`}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </Card>
-            )
-          })
-        )}
-      </CardContent>
-      <ConfirmDialog
-        open={pendingDelete != null}
-        title="Remove MCP server?"
-        description={pendingDelete ? `This will remove “${pendingDelete.label}” from mcpServers in ${profileName}.` : undefined}
-        confirmLabel="Remove"
-        busy={deleting}
-        onConfirm={confirmRemove}
-        onCancel={() => setPendingDelete(null)}
-      />
-    </Card>
-  )
-}
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
 
-function EmptyState({ canNavigate, onNavigate }: { canNavigate: boolean; onNavigate?: () => void }) {
-  return (
-    <div className="flex flex-col items-start gap-3 rounded-lg border border-dashed border-border/60 bg-muted/20 p-4">
-      <div className="flex items-start gap-3">
-        <div
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground"
-          aria-hidden="true"
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
-            <rect x="3" y="4" width="18" height="6" rx="1.5" />
-            <rect x="3" y="14" width="18" height="6" rx="1.5" />
-            <circle cx="7" cy="7" r="1" fill="currentColor" />
-            <circle cx="7" cy="17" r="1" fill="currentColor" />
-          </svg>
+      <Card key={`mcp-inst-${installed.length}`}>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">Installed MCP Servers ({installed.length})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loading ? <p className="text-xs text-muted-foreground py-2">Loading...</p>
+          : installed.length === 0 ? <p className="text-xs text-muted-foreground py-2">No MCP servers installed. Search above to add.</p>
+          : (
+            <div className="space-y-1">
+              {installed.map(s => (
+                <div key={s.id} className="flex items-center gap-3 rounded-lg border border-border px-3 py-1.5">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">{s.name}</span>
+                      <Badge variant="neutral" className="text-[10px] px-1.5 py-0">{s.type || 'stdio'}</Badge>
+                    </div>
+                    {s.command && <div className="text-[10px] font-mono text-muted-foreground truncate">{s.command}</div>}
+                  </div>
+                  <Button size="sm" variant="ghost" onClick={() => setDetailMcp(s)}>Detail</Button>
+                  <Button size="sm" variant="ghost" isLoading={removingId === s.id} onClick={() => handleRemove(s.id)} className="text-destructive hover:text-destructive">Remove</Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {detailMcp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setDetailMcp(null)}>
+          <div className="relative max-h-[85vh] w-full max-w-lg rounded-xl bg-card shadow-xl flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="sticky top-0 z-10 flex items-center justify-between gap-3 px-5 py-3 border-b border-border/60 bg-card rounded-t-xl shrink-0">
+              <div><h3 className="font-semibold text-foreground">{detailMcp.name}</h3><p className="text-xs text-muted-foreground">{detailMcp.type} server</p></div>
+              <Button variant="ghost" size="sm" onClick={() => setDetailMcp(null)}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+              </Button>
+            </div>
+            <div className="overflow-y-auto p-5">
+              <Textarea value={JSON.stringify(detailMcp.raw, null, 2)} rows={14} readOnly className="font-mono text-xs" />
+            </div>
+          </div>
         </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm text-foreground">
-            No MCP servers applied to this profile.
-          </p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Apply one from the Library page, or edit{' '}
-            <code className="font-mono">dot-claude.json</code> in the Storage tab.
-          </p>
-        </div>
-      </div>
-      {canNavigate ? (
-        <Button size="sm" onClick={onNavigate}>Open Library</Button>
-      ) : (
-        <p className="text-xs text-muted-foreground">
-          Use the sidebar to go to the Library page and apply an MCP server.
-        </p>
       )}
     </div>
   )

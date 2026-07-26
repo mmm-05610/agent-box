@@ -399,11 +399,11 @@ function TabContent({
       return (
         <McpTab
           key={refreshKey}
+          configDir={detail.config_dir}
+          agentType={agentType}
+          profilePath={detail.path}
           profileName={detail.meta.name}
-          profilePath={profilePath}
-          mcpJson={claudeDotJson}
-          libraryMcp={libraryMcpServers}
-          onNavigateLibrary={onNavigateLibrary}
+          refreshKey={refreshKey}
         />
       )
     case 'skills':
