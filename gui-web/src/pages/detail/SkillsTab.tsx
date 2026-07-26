@@ -208,6 +208,7 @@ export function SkillsTab({ configDir, profileName, agentType, refreshKey }: {
   const [loadError, setLoadError] = useState('')
   const [removingId, setRemovingId] = useState<string | null>(null)
   const [detailSkill, setDetailSkill] = useState<InstalledSkill | null>(null)
+  const [tick, setTick] = useState(0)
 
   // Library
   const [search, setSearch] = useState('')
@@ -253,6 +254,7 @@ export function SkillsTab({ configDir, profileName, agentType, refreshKey }: {
       await call<void>(api => api.apply_skill_to_profile(profileName, skillId), undefined)
       const fresh = await loadInstalled(skillsDir)
       setInstalled(fresh)
+      setTick(t => t + 1)
       toast({ type: 'success', message: `${skillId} applied` })
     } catch (e) {
       toast({ type: 'error', message: e instanceof Error ? e.message : 'Apply failed' })
@@ -264,9 +266,10 @@ export function SkillsTab({ configDir, profileName, agentType, refreshKey }: {
     try {
       await call<void>(api => api.remove_skill_from_profile(profileName, skillId), undefined)
       setInstalled(prev => prev.filter(s => s.id !== skillId))
+      setTick(t => t + 1)
       toast({ type: 'success', message: `${skillId} removed` })
     } catch {
-      try { await deletePath(`${skillsDir}/${skillId}`); setInstalled(prev => prev.filter(s => s.id !== skillId)); toast({ type: 'success', message: `${skillId} removed` }) }
+      try { await deletePath(`${skillsDir}/${skillId}`); setInstalled(prev => prev.filter(s => s.id !== skillId)); setTick(t => t + 1); toast({ type: 'success', message: `${skillId} removed` }) }
       catch { toast({ type: 'error', message: 'Remove failed' }) }
     } finally { setRemovingId(null) }
   }, [profileName, skillsDir, toast])
@@ -274,7 +277,7 @@ export function SkillsTab({ configDir, profileName, agentType, refreshKey }: {
   return (
     <div className="space-y-6">
       {/* ── Available Skills ─────────────────────────────────────── */}
-      <Card>
+      <Card key={`available-${tick}`}>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm">Available Skills ({effective.length})</CardTitle>
         </CardHeader>
