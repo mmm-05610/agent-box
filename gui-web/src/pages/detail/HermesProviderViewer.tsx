@@ -193,9 +193,6 @@ export function HermesProviderViewer({
     if (!provider) return
     setApplyingId(providerId)
     try {
-      const { applyProviderToProfile } = await import('@/api/providers')
-      await applyProviderToProfile(profileName, providerId)
-
       const libBaseUrl = libraryBaseUrl(provider) ?? ''
       const libApiKey = libraryApiKey(provider)
       const libModel = libraryDefaultModel(provider)
@@ -212,9 +209,7 @@ export function HermesProviderViewer({
         saveFile(`${configDir}/config.yaml`, nextYaml),
         saveFile(`${configDir}/.env`, nextEnv),
       ])
-      if (!ok1 || !ok2) {
-        console.warn('Hermes file write failed — apply still succeeded via backend')
-      }
+      if (!ok1 || !ok2) throw new Error('Failed to write Hermes files')
 
       setConfigYamlOverride(nextYaml)
       setEnvContentOverride(nextEnv)
