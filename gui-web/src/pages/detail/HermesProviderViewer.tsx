@@ -289,14 +289,13 @@ export function HermesProviderViewer({
 
       setConfigYamlOverride(nextYaml)
       setEnvContentOverride(nextEnv)
-      onRefresh()
       toast({ type: 'success', message: `${provider.name} applied to ${profileName}` })
     } catch (error) {
       toast({ type: 'error', message: error instanceof Error ? error.message : 'Failed to apply provider' })
     } finally {
       setApplyingId(null)
     }
-  }, [libraryProviders, effectiveYaml, effectiveEnv, configDir, profileName, onRefresh, toast])
+  }, [libraryProviders, effectiveEnv, configDir, profileName, toast])
 
   return (
     <div className="space-y-4">
