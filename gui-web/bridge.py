@@ -937,6 +937,33 @@ class Api:
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
 
+    def list_library_skills(self, agent_type: str) -> str:
+        """List skills from ACS database for *agent_type*."""
+        try:
+            out = _wsl_run(
+                f"python3 -c 'from agent_box.ccswitch_adapter import list_skills; "
+                f"import json; print(json.dumps(list_skills(\"{agent_type}\")))'"
+            )
+            return json.dumps({"ok": True, "data": json.loads(out)})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    def apply_skill_to_profile(self, profile_name: str, skill_id: str) -> str:
+        """Copy a skill from ACS to the profile's skills directory."""
+        try:
+            _wsl_run(f"{AGENT_BOX_CMD} skill apply {profile_name} {skill_id}")
+            return json.dumps({"ok": True})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    def remove_skill_from_profile(self, profile_name: str, skill_id: str) -> str:
+        """Delete a skill from the profile's skills directory."""
+        try:
+            _wsl_run(f"{AGENT_BOX_CMD} skill profile-remove {profile_name} {skill_id}")
+            return json.dumps({"ok": True})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
     def launch_acs(self) -> str:
         """Launch ACS GUI via WSLg (WSL 2 built-in GUI support)."""
         import subprocess as _sp

@@ -322,6 +322,11 @@ def _build_parser() -> argparse.ArgumentParser:
     psk.add_argument("id", help="Skill id")
     psk.set_defaults(func=cmd_skill_apply)
 
+    psk = sub_skill.add_parser("profile-remove", help="Remove a skill from a profile")
+    psk.add_argument("profile", help="Target profile name")
+    psk.add_argument("id", help="Skill id to remove")
+    psk.set_defaults(func=cmd_skill_profile_remove)
+
     psk = sub_skill.add_parser("agents", help="Enable/disable a skill for an agent type")
     psk.add_argument("id", help="Skill id")
     psk.add_argument("--enable", dest="agent_type", default=None,
@@ -1106,6 +1111,19 @@ def cmd_skill_apply(args: argparse.Namespace) -> int:
         return 2
     print(f"applied skill {args.id!r} to profile {args.profile!r}")
     return 0
+
+
+def cmd_skill_profile_remove(args: argparse.Namespace) -> int:
+    try:
+        ok = skills.remove_skill_from_profile(args.profile, args.id)
+        if not ok:
+            print(f"agent-box: skill {args.id!r} not found in profile {args.profile!r}", file=sys.stderr)
+            return 2
+        print(f"removed skill {args.id!r} from profile {args.profile!r}")
+        return 0
+    except (ValueError, profile.ProfileError) as exc:
+        print(f"agent-box: {exc}", file=sys.stderr)
+        return 2
 
 
 def cmd_skill_agents(args: argparse.Namespace) -> int:

@@ -243,45 +243,24 @@ def get_skill_agents(skill_id: str) -> List[str]:
 # --- apply ----------------------------------------------------------------
 
 def apply_skill(profile_name: str, skill_id: str) -> None:
-    """Copy a skill's directory into the profile's per-agent skills location.
-
-    Steps:
-      1. load_meta → resolve the profile's agent_type
-      2. fetch the skill row + its enabled agent_types
-      3. for the profile's agent_type: copy directory to
-         ``<profile>/<agent-skills-dir>/<skill_id>/`` (overwrite if
-         present, symlinks are followed).
-    """
+    """Copy a skill's directory from ACS into the profile's skills location."""
     meta = load_meta(profile_name)
     profile_agent_type = meta["agent_type"]
 
-    skill = get_skill(skill_id)
+    # Read from ACS
+    from .ccswitch_adapter import list_skills as acs_list_skills
+    skills = acs_list_skills(profile_agent_type)
+    skill = next((s for s in skills if s["id"] == skill_id), None)
     if skill is None:
-        raise ProfileError(f"skill {skill_id!r} not found")
+        raise ProfileError(f"skill {skill_id!r} not found for {profile_agent_type!r}")
 
-    enabled_agents = set(skill.get("agent_types") or [])
-    if profile_agent_type not in enabled_agents:
-        raise ProfileError(
-            f"skill {skill_id!r} is not enabled for agent_type "
-            f"{profile_agent_type!r}. Use: agent-box skill agents "
-            f"{skill_id} --enable {profile_agent_type}"
-        )
-
-    src = skill.get("directory") or ""
-    if not src:
-        raise ProfileError(
-            f"skill {skill_id!r}: directory is empty (set it via: "
-            f"agent-box skill upsert {skill_id} --directory <path>)"
-        )
-    src_path = Path(src)
+    src_dir = skill.get("directory") or skill_id
+    src_path = Path.home() / ".agent-box" / "config" / "skills" / src_dir
     if not src_path.is_dir():
-        raise ProfileError(
-            f"skill {skill_id!r}: directory does not exist: {src!r}"
-        )
+        raise ProfileError(f"skill source directory does not exist: {src_path}")
 
     skills_dir = _skills_dir_for(profile_agent_type, profile_name)
     target = skills_dir / skill_id
-    # Remove existing copy so deletions in the source propagate.
     if target.exists():
         if target.is_symlink() or target.is_file():
             target.unlink()
@@ -291,9 +270,25 @@ def apply_skill(profile_name: str, skill_id: str) -> None:
     shutil.copytree(src_path, target, symlinks=True)
 
 
+def remove_skill_from_profile(profile_name: str, skill_id: str) -> bool:
+    """Delete a skill directory from a profile's skills location."""
+    meta = load_meta(profile_name)
+    profile_agent_type = meta["agent_type"]
+    skills_dir = _skills_dir_for(profile_agent_type, profile_name)
+    target = skills_dir / skill_id
+    if target.exists():
+        if target.is_symlink() or target.is_file():
+            target.unlink()
+        else:
+            shutil.rmtree(target)
+        return True
+    return False
+
+
 __all__ = [
     "apply_skill",
     "delete_skill",
+    "remove_skill_from_profile",
     "get_skill",
     "get_skill_agents",
     "list_skills",

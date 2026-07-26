@@ -77,3 +77,27 @@ def get_provider(agent_type: str, provider_id: str) -> Optional[Dict[str, Any]]:
 
     conn.close()
     return result
+
+
+def list_skills(agent_type: str) -> List[Dict[str, Any]]:
+    """Return skills enabled for *agent_type* from ACS database."""
+    col = f"enabled_{agent_type}"
+    conn = _conn()
+    rows = conn.execute(
+        f"SELECT id, name, description, directory, repo_owner, repo_name, "
+        f"repo_branch, readme_url FROM skills WHERE {col} = 1 ORDER BY name, id"
+    ).fetchall()
+    out: List[Dict[str, Any]] = []
+    for r in rows:
+        out.append({
+            "id": r["id"],
+            "name": r["name"],
+            "description": r["description"] or "",
+            "directory": r["directory"] or "",
+            "repo_owner": r["repo_owner"] or "",
+            "repo_name": r["repo_name"] or "",
+            "repo_branch": r["repo_branch"] or "main",
+            "readme_url": r["readme_url"] or "",
+        })
+    conn.close()
+    return out
