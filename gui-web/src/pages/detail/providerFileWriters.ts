@@ -274,6 +274,19 @@ export function patchHermesApiKey(yaml: string, apiKey: string): string {
   return patchModelScalar(yaml, 'api_key', value)
 }
 
+/** Set api_mode (openai_compatible / chat_completions / anthropic / codex_responses). */
+export function patchHermesApiMode(yaml: string, apiMode: string): string {
+  // Map ACS api_mode values to Hermes config values
+  const modeMap: Record<string, string> = {
+    'chat_completions': 'openai_compatible',
+    'openai_compatible': 'openai_compatible',
+    'anthropic': 'anthropic',
+    'codex_responses': 'codex_responses',
+  }
+  const mapped = modeMap[apiMode] ?? apiMode
+  return patchModelScalar(yaml, 'api_mode', mapped)
+}
+
 /**
  * Read/write ``HERMES_API_KEY=`` from a .env file. Returns the new full
  * contents. Comment lines and unrelated keys are preserved.

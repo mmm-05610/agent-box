@@ -49,6 +49,7 @@ import {
   patchHermesEnv,
   patchHermesModelDefault,
   patchHermesModels,
+  patchHermesApiMode,
 } from './providerFileWriters'
 
 interface HermesProviderViewerProps {
@@ -99,6 +100,13 @@ function libraryApiKey(provider: Provider): string {
   if (typeof v === 'string' && v.trim()) return v.trim()
   if (typeof env.api_key === 'string') return env.api_key
   return ''
+}
+
+function libraryApiMode(provider: Provider): string | null {
+  const settings = (provider.settings ?? {}) as Record<string, unknown>
+  const mode = settings.api_mode as string | undefined
+  if (typeof mode === 'string' && mode.trim()) return mode.trim()
+  return null
 }
 
 function libraryDefaultModel(provider: Provider): string | null {
@@ -213,11 +221,13 @@ export function HermesProviderViewer({
     try {
       const libBaseUrl = libraryBaseUrl(provider) ?? ''
       const libApiKey = libraryApiKey(provider)
+      const libApiMode = libraryApiMode(provider)
       const libModels = libraryModels(provider)
       const libModel = libraryDefaultModel(provider)
 
       let nextYaml = effectiveYaml
       nextYaml = patchHermesBaseUrl(nextYaml, libBaseUrl)
+      if (libApiMode) nextYaml = patchHermesApiMode(nextYaml, libApiMode)
       if (libModel) nextYaml = patchHermesModelDefault(nextYaml, libModel)
       if (libModels.length > 0) nextYaml = patchHermesModels(nextYaml, libModels)
       if (libApiKey) nextYaml = patchHermesApiKey(nextYaml, libApiKey)
