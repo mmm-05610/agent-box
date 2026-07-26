@@ -254,10 +254,18 @@ def apply_skill(profile_name: str, skill_id: str) -> None:
     if skill is None:
         raise ProfileError(f"skill {skill_id!r} not found for {profile_agent_type!r}")
 
-    src_dir = skill.get("directory") or skill_id
-    src_path = Path.home() / ".agent-box" / "config" / "skills" / src_dir
-    if not src_path.is_dir():
-        raise ProfileError(f"skill source directory does not exist: {src_path}")
+    src_dir = skill.get("directory") or ""
+    # Try multiple source locations
+    candidates = [
+        Path(src_dir) if src_dir.startswith("/") else None,
+        Path.home() / ".agent-box" / "config" / "skills" / (src_dir or skill_id),
+        Path.home() / ".claude" / "skills" / (src_dir or skill_id),
+        Path.home() / ".agents" / "skills" / (src_dir or skill_id),
+    ]
+    src_path = next((c for c in candidates if c and c.is_dir()), None)
+    if src_path is None:
+        tried = [str(c) for c in candidates if c]
+        raise ProfileError(f"skill {skill_id!r}: source not found (tried: {tried})")
 
     skills_dir = _skills_dir_for(profile_agent_type, profile_name)
     target = skills_dir / skill_id

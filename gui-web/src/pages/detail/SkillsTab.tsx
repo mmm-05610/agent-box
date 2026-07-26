@@ -17,7 +17,11 @@ interface InstalledSkill {
   name: string
   description: string
   directory: string
+  skillFilePath: string
+  skillFileName: string
+  content: string
   files: string[]
+  frontmatter: Record<string, string>
 }
 
 interface LibrarySkill {
@@ -54,8 +58,9 @@ async function loadInstalled(dir: string): Promise<InstalledSkill[]> {
     if (parts.length < 2) continue
     const skillId = parts[0]
     const entry = byDir.get(skillId) ?? { md: null, files: [] }
-    if (parts[1] === 'SKILL.md' || parts[1] === 'DESCRIPTION.md') entry.md = p
-    entry.files.push(parts.slice(1).join('/'))
+    if (parts[1] === 'SKILL.md') { entry.md = p; entry.files.push(parts[1]) }
+    else if (parts[1] === 'DESCRIPTION.md') { if (!entry.md) entry.md = p; entry.files.push(parts[1]) }
+    else entry.files.push(parts.slice(1).join('/'))
     byDir.set(skillId, entry)
   }
   const results = await Promise.all(
@@ -67,12 +72,17 @@ async function loadInstalled(dir: string): Promise<InstalledSkill[]> {
         id,
         name: fm.name || id,
         description: fm.description || '',
-        directory: entry.md.replace('/' + entry.files.find(f => f === id + '.skill' || f === 'SKILL.md' || f.includes('/') === false) || '', '').split('/').slice(0, -1).join('/') || entry.md,
-        files: entry.files,
+        directory: `${dir}/${id}`,
+        skillFilePath: entry.md,
+        skillFileName: entry.md.endsWith('SKILL.md') ? 'SKILL.md' : 'DESCRIPTION.md',
+        content,
+        files: entry.files.sort(),
+        frontmatter: fm,
       } as InstalledSkill
     })
   )
   return results.filter(Boolean) as InstalledSkill[]
+}
 }
 
 export function SkillsTab({ configDir, profileName, agentType: agentTypeProp, refreshKey }: SkillsTabProps) {
@@ -86,6 +96,7 @@ export function SkillsTab({ configDir, profileName, agentType: agentTypeProp, re
   const [loading, setLoading] = useState(false)
   const [applyingId, setApplyingId] = useState<string | null>(null)
   const [removingId, setRemovingId] = useState<string | null>(null)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const reloadInstalled = useCallback(async () => {
     const list = await loadInstalled(skillsDir).catch(() => [] as InstalledSkill[])
@@ -160,18 +171,42 @@ export function SkillsTab({ configDir, profileName, agentType: agentTypeProp, re
             <p className="text-xs text-muted-foreground py-2">No skills installed. Search below to add.</p>
           ) : (
             <div className="space-y-1">
-              {installed.map(s => (
-                <div key={s.id} className="flex items-center gap-3 rounded-lg border border-border px-3 py-1.5">
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium">{s.name}</div>
-                    {s.description && <div className="text-[11px] text-muted-foreground truncate">{s.description}</div>}
+              {installed.map(s => {
+                const expanded = expandedId === s.id
+                return (
+                  <div key={s.id}>
+                    <div className="flex items-center gap-3 rounded-lg border border-border px-3 py-1.5">
+                      <button className="flex-1 text-left min-w-0" onClick={() => setExpandedId(expanded ? null : s.id)}>
+                        <div className="text-sm font-medium">{s.name}</div>
+                        {s.description && <div className="text-[11px] text-muted-foreground truncate">{s.description}</div>}
+                      </button>
+                      <span className="text-[10px] text-muted-foreground">{s.skillFileName}</span>
+                      <Button size="sm" variant="ghost" isLoading={removingId === s.id}
+                        onClick={() => handleRemove(s.id)} className="text-destructive hover:text-destructive">
+                        Remove
+                      </Button>
+                    </div>
+                    {expanded && (
+                      <div className="mt-1 rounded-lg border border-border bg-muted/30 p-3 space-y-2">
+                        <div className="text-xs text-muted-foreground">
+                          {Object.entries(s.frontmatter).filter(([k]) => k !== 'name' && k !== 'description').map(([k, v]) =>
+                            <span key={k} className="mr-3"><b>{k}:</b> {v}</span>
+                          )}
+                        </div>
+                        {s.files.length > 0 && (
+                          <details>
+                            <summary className="text-xs cursor-pointer text-muted-foreground">Files ({s.files.length})</summary>
+                            <div className="mt-1 text-[10px] font-mono text-muted-foreground max-h-32 overflow-y-auto">
+                              {s.files.map(f => <div key={f}>{f}</div>)}
+                            </div>
+                          </details>
+                        )}
+                        <div className="text-xs text-muted-foreground truncate">Path: {s.skillFilePath}</div>
+                      </div>
+                    )}
                   </div>
-                  <Button size="sm" variant="ghost" isLoading={removingId === s.id}
-                    onClick={() => handleRemove(s.id)} className="text-destructive hover:text-destructive">
-                    Remove
-                  </Button>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </CardContent>
