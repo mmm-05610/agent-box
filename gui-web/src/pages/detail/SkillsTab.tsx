@@ -127,27 +127,29 @@ function SkillDetailModal({ skill, onClose, onSaved }: { skill: InstalledSkill; 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
-      <div className="relative max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-card shadow-xl" onClick={e => e.stopPropagation()}>
-        {/* Header */}
-        <div className="flex items-start gap-3 p-5 border-b border-border/60">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
-              <path d="M12 2a2 2 0 0 0-2 2v1.2a6.5 6.5 0 0 0-2 .8L7.1 5a2 2 0 1 0-2.8 2.8l1 .9a6.5 6.5 0 0 0-.8 2H3a2 2 0 1 0 0 4h1.2a6.5 6.5 0 0 0 .8 2l-.9.9a2 2 0 1 0 2.8 2.8l.9-1a6.5 6.5 0 0 0 2 .8V22a2 2 0 1 0 4 0v-1.2a6.5 6.5 0 0 0 2-.8l.9 1a2 2 0 1 0 2.8-2.8l-1-.9a6.5 6.5 0 0 0 .8-2H21a2 2 0 1 0 0-4h-1.2a6.5 6.5 0 0 0-.8-2l1-.9a2 2 0 1 0-2.8-2.8l-.9 1a6.5 6.5 0 0 0-2-.8V4a2 2 0 0 0-2-2Z" />
-              <circle cx="12" cy="13" r="2.5" />
-            </svg>
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="font-semibold text-foreground">{skill.name}</h3>
-              <Badge variant="neutral" className="text-[10px] px-1.5 py-0">{skill.skillFileName}</Badge>
+      <div className="relative max-h-[85vh] w-full max-w-2xl rounded-xl bg-card shadow-xl flex flex-col" onClick={e => e.stopPropagation()}>
+        {/* Sticky header */}
+        <div className="sticky top-0 z-10 flex items-center justify-between gap-3 px-5 py-3 border-b border-border/60 bg-card rounded-t-xl shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
+                <path d="M12 2a2 2 0 0 0-2 2v1.2a6.5 6.5 0 0 0-2 .8L7.1 5a2 2 0 1 0-2.8 2.8l1 .9a6.5 6.5 0 0 0-.8 2H3a2 2 0 1 0 0 4h1.2a6.5 6.5 0 0 0 .8 2l-.9.9a2 2 0 1 0 2.8 2.8l.9-1a6.5 6.5 0 0 0 2 .8V22a2 2 0 1 0 4 0v-1.2a6.5 6.5 0 0 0 2-.8l.9 1a2 2 0 1 0 2.8-2.8l-1-.9a6.5 6.5 0 0 0 .8-2H21a2 2 0 1 0 0-4h-1.2a6.5 6.5 0 0 0-.8-2l1-.9a2 2 0 1 0-2.8-2.8l-.9 1a6.5 6.5 0 0 0-2-.8V4a2 2 0 0 0-2-2Z" />
+                <circle cx="12" cy="13" r="2.5" />
+              </svg>
             </div>
-            <p className="mt-1 text-sm text-muted-foreground">{skill.description}</p>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="font-semibold text-foreground truncate">{skill.name}</h3>
+                <Badge variant="neutral" className="text-[10px] px-1.5 py-0">{skill.skillFileName}</Badge>
+              </div>
+              <p className="text-xs text-muted-foreground line-clamp-1">{skill.description}</p>
+            </div>
           </div>
-          <Button variant="ghost" size="sm" onClick={onClose}>✕</Button>
+          <Button variant="ghost" size="sm" onClick={onClose} className="shrink-0">✕</Button>
         </div>
 
-        {/* Body */}
-        <div className="space-y-4 p-5 text-sm">
+        {/* Scroll body */}
+        <div className="overflow-y-auto p-5 space-y-4 text-sm">
           {Object.keys(skill.frontmatter).length > 0 && (
             <FrontmatterTable frontmatter={skill.frontmatter} excludeKeys={['name', 'description']} />
           )}
