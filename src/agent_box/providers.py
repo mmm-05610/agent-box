@@ -613,12 +613,7 @@ def _apply_hermes(profile_name: str, provider: Dict[str, Any], settings: Dict[st
             output += entry + "\n"
 
     config_path.write_text(output, encoding="utf-8")
-
-    # .env
-    api_key = settings.get("api_key") or ""
-    env_api_key = (settings.get("env") or {}).get("api_key") or ""
-    if api_key or env_api_key:
-        (config_dir / ".env").write_text(f"HERMES_API_KEY={api_key or env_api_key}\n", encoding="utf-8")
+    # API key lives in custom_providers entry — .env is not managed for additive mode
 
 
 def _apply_opencode(profile_name: str, provider: Dict[str, Any], settings: Dict[str, Any]) -> None:

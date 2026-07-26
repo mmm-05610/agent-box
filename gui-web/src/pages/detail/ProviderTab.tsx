@@ -48,6 +48,12 @@ interface ProviderTabProps {
 
 const ADDITIVE_TYPES: AgentType[] = ['hermes', 'opencode']
 
+/** Extract model.provider from a Hermes config.yaml to find the active provider. */
+function parseActiveProvider(yamlContent: string): string | null {
+  const m = yamlContent.match(/^provider:\s*["']?([^"'\s]+)/m)
+  return m ? m[1] : null
+}
+
 // ── Component ─────────────────────────────────────────────────────────────
 
 export function ProviderTab({ agentType, profileName, configFiles, onRefresh }: ProviderTabProps) {
@@ -136,40 +142,55 @@ export function ProviderTab({ agentType, profileName, configFiles, onRefresh }: 
   return (
     <div className="space-y-6">
       {/* ── Added Providers (additive only) ────────────────────────── */}
-      {isAdditive && profileProviders.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Profile Providers</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {profileProviders.map((pp) => {
-              const icon = resolveIconKey(pp.name)
-              return (
-                <div key={pp.id} className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-2.5">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted">
-                    <ProviderIcon icon={icon} name={pp.name} size={18} showFallback />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium truncate">{pp.name}</div>
-                    {pp.website_url && (
-                      <span className="text-[10px] text-muted-foreground truncate block">
-                        {pp.website_url.replace(/^https?:\/\//, '')}
+      {isAdditive && profileProviders.length > 0 && (() => {
+        const hermesYaml = configFiles.find(f => f.label === 'config.yaml')?.content ?? ''
+        const activeProvider = agentType === 'hermes' ? parseActiveProvider(hermesYaml) : null
+        const isActive = (id: string) => activeProvider === id
+
+        return (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Profile Providers</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {profileProviders.map((pp) => {
+                const icon = resolveIconKey(pp.name)
+                const active = isActive(pp.id)
+                return (
+                  <div key={pp.id}
+                    className={`flex items-center gap-3 rounded-lg border px-4 py-2.5 ${active ? 'border-accent bg-accent/5' : 'border-border bg-card'}`}
+                  >
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted">
+                      <ProviderIcon icon={icon} name={pp.name} size={18} showFallback />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium truncate">{pp.name}</div>
+                      {pp.website_url && (
+                        <span className="text-[10px] text-muted-foreground truncate block">
+                          {pp.website_url.replace(/^https?:\/\//, '')}
+                        </span>
+                      )}
+                    </div>
+                    {active ? (
+                      <span className="inline-flex items-center rounded-full bg-accent/10 px-2.5 py-0.5 text-xs font-medium text-accent">
+                        Active
                       </span>
+                    ) : (
+                      <Button size="sm" variant="ghost" onClick={() => handleApply(pp.id)} isLoading={applyingId === pp.id}>
+                        Activate
+                      </Button>
                     )}
+                    <Button size="sm" variant="ghost" onClick={() => handleRemove(pp.id)} isLoading={removingId === pp.id}
+                      className="text-destructive hover:text-destructive">
+                      Remove
+                    </Button>
                   </div>
-                  <Button size="sm" variant="ghost" onClick={() => handleApply(pp.id)} isLoading={applyingId === pp.id}>
-                    Activate
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => handleRemove(pp.id)} isLoading={removingId === pp.id}
-                    className="text-destructive hover:text-destructive">
-                    Remove
-                  </Button>
-                </div>
-              )
-            })}
-          </CardContent>
-        </Card>
-      )}
+                )
+              })}
+            </CardContent>
+          </Card>
+        )
+      })()}
 
       {/* ── Apply from Library ──────────────────────────────────────── */}
       {libraryProviders.length > 0 && (
