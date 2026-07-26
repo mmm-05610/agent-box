@@ -144,15 +144,44 @@ def record_exit_by_pid(pid: int, exit_code: int) -> None:
             conn.commit()
 
 
+def _is_pid_alive(pid: int) -> bool:
+    """Check whether *pid* refers to a running process."""
+    try:
+        os.kill(pid, 0)
+        return True
+    except (OSError, ProcessLookupError):
+        return False
+
+
+def _auto_cleanup_zombies(conn: sqlite3.Connection) -> int:
+    """Mark running sessions whose PID is no longer alive as exited."""
+    rows = conn.execute(
+        "SELECT id, pid FROM sessions WHERE exited_at IS NULL"
+    ).fetchall()
+    cleaned = 0
+    for r in rows:
+        if not _is_pid_alive(r["pid"]):
+            conn.execute(
+                "UPDATE sessions SET exited_at = datetime('now'), "
+                "exit_code = -1 WHERE id = ?",
+                (r["id"],),
+            )
+            cleaned += 1
+    return cleaned
+
+
 def fetch_sessions(active_only: bool = False,
                    limit: int = 50) -> List[Dict[str, Any]]:
-    """Return sessions, newest first.
+    """Return sessions, newest first. Auto-cleans zombie PIDs.
 
     ``active_only=True`` returns rows with ``exited_at IS NULL`` and
     drops the exit columns (they'd always be NULL anyway).
     """
     conn = _get_conn()
     with _lock:
+        _auto_cleanup_zombies(conn)
+        conn.commit()
+
         if active_only:
             rows = conn.execute(
                 "SELECT id, profile, agent_type, cwd, mode, pid, "
