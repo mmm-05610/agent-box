@@ -145,6 +145,7 @@ export function ProviderTab({ agentType, profileName, configFiles, onRefresh }: 
       {isAdditive && profileProviders.length > 0 && (() => {
         const hermesYaml = configFiles.find(f => f.label === 'config.yaml')?.content ?? ''
         const activeProvider = agentType === 'hermes' ? parseActiveProvider(hermesYaml) : null
+        const hasActive = agentType === 'hermes'
         const isActive = (id: string) => activeProvider === id
 
         return (
@@ -155,7 +156,7 @@ export function ProviderTab({ agentType, profileName, configFiles, onRefresh }: 
             <CardContent className="space-y-2">
               {profileProviders.map((pp) => {
                 const icon = resolveIconKey(pp.name)
-                const active = isActive(pp.id)
+                const active = hasActive && isActive(pp.id)
                 return (
                   <div key={pp.id}
                     className={`flex items-center gap-3 rounded-lg border px-4 py-2.5 ${active ? 'border-accent bg-accent/5' : 'border-border bg-card'}`}
@@ -171,14 +172,12 @@ export function ProviderTab({ agentType, profileName, configFiles, onRefresh }: 
                         </span>
                       )}
                     </div>
-                    {active ? (
-                      <span className="inline-flex items-center rounded-full bg-accent/10 px-2.5 py-0.5 text-xs font-medium text-accent">
-                        Active
-                      </span>
-                    ) : (
-                      <Button size="sm" variant="ghost" onClick={() => handleApply(pp.id)} isLoading={applyingId === pp.id}>
-                        Activate
-                      </Button>
+                    {hasActive && (
+                      active ? (
+                        <span className="inline-flex items-center rounded-full bg-accent/10 px-2.5 py-0.5 text-xs font-medium text-accent">Active</span>
+                      ) : (
+                        <Button size="sm" variant="ghost" onClick={() => handleApply(pp.id)} isLoading={applyingId === pp.id}>Activate</Button>
+                      )
                     )}
                     <Button size="sm" variant="ghost" onClick={() => handleRemove(pp.id)} isLoading={removingId === pp.id}
                       className="text-destructive hover:text-destructive">
