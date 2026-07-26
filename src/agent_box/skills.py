@@ -255,10 +255,11 @@ def apply_skill(profile_name: str, skill_id: str) -> None:
         raise ProfileError(f"skill {skill_id!r} not found for {profile_agent_type!r}")
 
     src_dir = skill.get("directory") or ""
-    # Try multiple source locations
+    # Try multiple source locations (new ACS path, old CC Switch paths)
     candidates = [
         Path(src_dir) if src_dir.startswith("/") else None,
         Path.home() / ".agent-box" / "config" / "skills" / (src_dir or skill_id),
+        Path("/mnt/c/Users/maoqh/.cc-switch/skills") / (src_dir or skill_id),
         Path.home() / ".claude" / "skills" / (src_dir or skill_id),
         Path.home() / ".agents" / "skills" / (src_dir or skill_id),
     ]
