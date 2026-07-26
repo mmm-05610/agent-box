@@ -123,12 +123,15 @@ def launch(name: str, extra_args: list | None = None) -> None:
         file=sys.stderr,
     )
 
-    # Record the launch BEFORE execvpe replaces this process. bwrap
-    # inherits our PID, so the recorded pid matches the long-running
-    # namespace process. The GUI's watcher will later call
-    # `agent-box sessions --exit <id> <code>` to close the row.
-    mode = MODE_RESUME if extra_args else MODE_NEW
-    sessions.record_launch(name, agent_type, os.getcwd(), mode, os.getpid())
+    import subprocess as _sp
 
-    os.execvpe(bwrap, argv, env)
-    raise profile.ProfileError(f"failed to exec {bwrap}")
+    mode = MODE_RESUME if extra_args else MODE_NEW
+    pid = os.getpid()
+    sid = sessions.record_launch(name, agent_type, os.getcwd(), mode, pid)
+
+    # Use subprocess instead of execvpe so we can record exit
+    proc = _sp.Popen([bwrap, *argv], env=env)
+    exit_code = proc.wait()
+    sessions.record_exit(sid, exit_code)
+    # Exit with the same code so the shell script can report failures
+    raise SystemExit(exit_code)

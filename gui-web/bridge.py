@@ -523,16 +523,6 @@ class Api:
 
             proc = subprocess.Popen([wsl, "bash", "-lc", script], **kwargs)
 
-            # Start watcher thread to track exit
-            def _watch():
-                exit_code = proc.wait()
-                try:
-                    _wsl_run(f"{AGENT_BOX_CMD} sessions --exit-by-pid {proc.pid} {exit_code}")
-                except Exception:
-                    pass
-
-            threading.Thread(target=_watch, daemon=True).start()
-
             return json.dumps({"ok": True, "data": {"pid": proc.pid}})
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
