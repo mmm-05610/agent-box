@@ -527,7 +527,7 @@ class Api:
             def _watch():
                 exit_code = proc.wait()
                 try:
-                    _wsl_run(f"{AGENT_BOX_CMD} sessions --exit 0 {exit_code}")
+                    _wsl_run(f"{AGENT_BOX_CMD} sessions --exit-by-pid {proc.pid} {exit_code}")
                 except Exception:
                     pass
 

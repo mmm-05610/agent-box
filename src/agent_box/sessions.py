@@ -125,6 +125,25 @@ def record_exit(session_id: int, exit_code: int) -> None:
         conn.commit()
 
 
+def record_exit_by_pid(pid: int, exit_code: int) -> None:
+    """Mark the most recent session with *pid* as exited."""
+    conn = _get_conn()
+    with _lock:
+        # Find the most recent running session with this PID
+        row = conn.execute(
+            "SELECT id FROM sessions WHERE pid = ? AND exited_at IS NULL "
+            "ORDER BY launched_at DESC LIMIT 1",
+            (pid,),
+        ).fetchone()
+        if row:
+            conn.execute(
+                "UPDATE sessions SET exited_at = datetime('now'), "
+                "exit_code = ? WHERE id = ?",
+                (exit_code, row["id"]),
+            )
+            conn.commit()
+
+
 def fetch_sessions(active_only: bool = False,
                    limit: int = 50) -> List[Dict[str, Any]]:
     """Return sessions, newest first.

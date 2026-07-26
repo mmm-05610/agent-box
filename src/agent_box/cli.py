@@ -365,8 +365,12 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Record exit for session ID (used by the GUI watcher)",
     )
     p_sessions.add_argument(
+        "--exit-by-pid", dest="exit_pid", type=int, default=None, metavar="PID",
+        help="Record exit for the most recent session with this PID",
+    )
+    p_sessions.add_argument(
         "exit_code", type=int, nargs="?", default=None, metavar="CODE",
-        help="Exit code (with --exit)",
+        help="Exit code (with --exit or --exit-by-pid)",
     )
     p_sessions.set_defaults(func=cmd_sessions)
 
@@ -538,6 +542,13 @@ def cmd_delete(args: argparse.Namespace) -> int:
 
 
 def cmd_sessions(args: argparse.Namespace) -> int:
+    # --exit-by-pid PID CODE: record exit by PID and return.
+    if args.exit_pid is not None:
+        code = args.exit_code if args.exit_code is not None else 0
+        sessions.record_exit_by_pid(args.exit_pid, code)
+        print(f"recorded exit for pid {args.exit_pid} code {code}")
+        return 0
+
     # --exit ID CODE: record exit and return.
     if args.exit_id is not None:
         code = args.exit_code
