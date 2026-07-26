@@ -241,12 +241,12 @@ export function SkillsTab({ configDir, profileName, agentType, refreshKey }: {
   const totalPages = Math.max(1, Math.ceil(effective.length / PER_PAGE))
   const pageItems = effective.slice(page * PER_PAGE, (page + 1) * PER_PAGE)
 
-  const handleSearch = (q: string) => {
+  const handleSearch = useCallback((q: string) => {
     setSearch(q); setPage(0)
     if (!q.trim()) { setSearchResults([]); return }
     const needle = q.toLowerCase()
-    setSearchResults(library.filter(s => s.name.toLowerCase().includes(needle) || s.description.toLowerCase().includes(needle)).filter(s => !installedIds.has(s.id) && s.source_available !== false))
-  }
+    setSearchResults(library.filter(s => (s.name.toLowerCase().includes(needle) || s.description.toLowerCase().includes(needle)) && !installedIds.has(s.id) && s.source_available !== false))
+  }, [library, installedIds])
 
   const handleApply = useCallback(async (skillId: string) => {
     setApplyingId(skillId)
