@@ -215,7 +215,7 @@ export function SkillsTab({ configDir, profileName, agentType, refreshKey }: {
   const [library, setLibrary] = useState<LibrarySkill[]>([])
   const [searchResults, setSearchResults] = useState<LibrarySkill[]>([])
   const [page, setPage] = useState(0)
-  const PER_PAGE = 10
+  const PER_PAGE = 5
   const [applyingId, setApplyingId] = useState<string | null>(null)
 
   useEffect(() => {
