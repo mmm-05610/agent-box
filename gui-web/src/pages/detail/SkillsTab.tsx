@@ -30,6 +30,7 @@ interface LibrarySkill {
   id: string
   name: string
   description: string
+  source_available?: boolean
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────
@@ -291,6 +292,8 @@ export function SkillsTab({ configDir, profileName, agentType, refreshKey }: {
                       <div className="min-w-0 flex-1"><div className="text-sm font-medium">{s.name}</div>{s.description && <div className="text-[11px] text-muted-foreground truncate">{s.description}</div>}</div>
                       {added
                         ? <span className="text-xs text-muted-foreground px-2">Installed</span>
+                        : s.source_available === false
+                        ? <span className="text-xs text-muted-foreground px-2" title="Source not found on disk">—</span>
                         : <Button size="sm" variant="ghost" isLoading={applyingId === s.id} onClick={() => handleApply(s.id)}>Add</Button>}
                     </div>
                   )

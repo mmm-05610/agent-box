@@ -89,15 +89,25 @@ def list_skills(agent_type: str) -> List[Dict[str, Any]]:
     ).fetchall()
     out: List[Dict[str, Any]] = []
     for r in rows:
+        src_dir = r["directory"] or ""
+        # Check source availability
+        src_candidates = [
+            Path(src_dir) if src_dir.startswith("/") else None,
+            Path.home() / ".agent-box" / "config" / "skills" / (src_dir or r["id"]),
+            Path.home() / ".claude" / "skills" / (src_dir or r["id"]),
+            Path.home() / ".agents" / "skills" / (src_dir or r["id"]),
+        ]
+        source_available = any(c and c.is_dir() for c in src_candidates)
         out.append({
             "id": r["id"],
             "name": r["name"],
             "description": r["description"] or "",
-            "directory": r["directory"] or "",
+            "directory": src_dir,
             "repo_owner": r["repo_owner"] or "",
             "repo_name": r["repo_name"] or "",
             "repo_branch": r["repo_branch"] or "main",
             "readme_url": r["readme_url"] or "",
+            "source_available": source_available,
         })
     conn.close()
     return out
