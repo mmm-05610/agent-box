@@ -211,6 +211,7 @@ export function SkillsTab({ configDir, profileName, agentType, refreshKey }: {
   const [tick, setTick] = useState(0)
 
   // Library
+  const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [library, setLibrary] = useState<LibrarySkill[]>([])
   const [searchResults, setSearchResults] = useState<LibrarySkill[]>([])
@@ -241,7 +242,7 @@ export function SkillsTab({ configDir, profileName, agentType, refreshKey }: {
   const totalPages = Math.max(1, Math.ceil(effective.length / PER_PAGE))
   const pageItems = effective.slice(page * PER_PAGE, (page + 1) * PER_PAGE)
 
-  const handleSearch = useCallback((q: string) => {
+  const doSearch = useCallback((q: string) => {
     setSearch(q); setPage(0)
     if (!q.trim()) { setSearchResults([]); return }
     const needle = q.toLowerCase()
@@ -281,7 +282,14 @@ export function SkillsTab({ configDir, profileName, agentType, refreshKey }: {
           <CardTitle className="text-sm">Available Skills ({effective.length})</CardTitle>
         </CardHeader>
         <CardContent>
-          <Input placeholder={`Search ${at} skills...`} value={search} onChange={e => handleSearch(e.target.value)} className="mb-3" />
+          <div className="mb-3 flex gap-2">
+            <Input placeholder={`Search ${at} skills...`} value={searchInput} onChange={e => { setSearchInput(e.target.value); if (!e.target.value.trim()) doSearch('') }} onKeyDown={e => { if (e.key === 'Enter') doSearch(searchInput) }} className="flex-1" />
+            <Button size="sm" variant="ghost" onClick={() => doSearch(searchInput)} title="Search">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
+              </svg>
+            </Button>
+          </div>
           {pageItems.length === 0 ? (
             <p className="text-xs text-muted-foreground py-2">{search.trim() ? 'No matching skills.' : 'Loading...'}</p>
           ) : (
