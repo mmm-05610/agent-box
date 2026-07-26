@@ -236,7 +236,6 @@ export function ProfileDetailPage({ profileName, onBack, onNavigateLibrary }: Pr
     ] :
     agentType === 'opencode' ? [
       { label: 'opencode.jsonc', path: `${configDir}/opencode.jsonc`, content: opencodeJsonc },
-      { label: 'auth.json', path: `${detail.path}/dot-opencode-data/auth.json`, content: opencodeAuthJson },
     ] : []
   )
 
