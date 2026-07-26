@@ -295,7 +295,7 @@ function TabContent({
   claudeDotJson, codexConfigToml, codexAuthJson, codexAgentsMd,
   opencodeJsonc, opencodeAuthJson, opencodeAgentsMd,
   hermesConfigYaml, hermesEnvContent,
-  fileTree, onRefresh, refreshKey, onNavigateLibrary,
+  fileTree, onRefresh, refreshKey, onNavigateLibrary, configFiles,
 }: {
   tab: TabKey
   detail: ProfileDetail
