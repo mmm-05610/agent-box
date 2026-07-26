@@ -80,7 +80,6 @@ async function loadInstalled(dir: string, root: string): Promise<InstalledSkill[
   )
   return results.filter((s): s is InstalledSkill => s !== null).sort((a, b) => a.name.localeCompare(b.name))
 }
-}
 
 // ── Detail Modal ──────────────────────────────────────────────────────────
 
