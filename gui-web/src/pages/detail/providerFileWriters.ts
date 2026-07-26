@@ -211,6 +211,57 @@ export function patchHermesModelDefault(yaml: string, model: string): string {
   return patchModelScalar(yaml, 'default', model)
 }
 
+/** Write the full models list into Hermes config.yaml. */
+export function patchHermesModels(
+  yaml: string,
+  models: Array<{ id: string; name: string; context_length?: number }>,
+): string {
+  const lines = yaml.split('\n')
+  const modelIndex = lines.findIndex((l) => /^\s*models\s*:/.test(l))
+  const indent = '  '
+
+  if (modelIndex === -1) {
+    // models section doesn't exist — append at end
+    const modelLines = ['models:']
+    for (const m of models) {
+      modelLines.push(`${indent}- id: ${quoteYaml(m.id)}`)
+      modelLines.push(`${indent}  name: ${quoteYaml(m.name)}`)
+      if (m.context_length) {
+        modelLines.push(`${indent}  context_length: ${m.context_length}`)
+      }
+    }
+    return [...lines, '', ...modelLines].join('\n')
+  }
+
+  // Find the end of the models section (next top-level key, no indent)
+  let endIndex = modelIndex + 1
+  while (endIndex < lines.length) {
+    const l = lines[endIndex]
+    if (l.trim() === '' || /^\S/.test(l)) break
+    endIndex++
+  }
+
+  const prefix = lines.slice(0, modelIndex)
+  const suffix = lines.slice(endIndex + 1) // skip trailing blank line too
+  const modelLines = ['models:']
+  for (const m of models) {
+    modelLines.push(`${indent}- id: ${quoteYaml(m.id)}`)
+    modelLines.push(`${indent}  name: ${quoteYaml(m.name)}`)
+    if (m.context_length) {
+      modelLines.push(`${indent}  context_length: ${m.context_length}`)
+    }
+  }
+
+  return [...prefix, ...modelLines, ...suffix].join('\n')
+}
+
+function quoteYaml(s: string): string {
+  if (/[:\{\}\[\],&\*\?\|<>=!%@`'\"#]/.test(s) || s.includes(' ') || s === '') {
+    return `"${s.replace(/"/g, '\\"')}"`
+  }
+  return s
+}
+
 /** Set model.base_url (used by library apply). */
 export function patchHermesBaseUrl(yaml: string, baseUrl: string): string {
   return patchModelScalar(yaml, 'base_url', baseUrl.replace(/\/+$/, ''))

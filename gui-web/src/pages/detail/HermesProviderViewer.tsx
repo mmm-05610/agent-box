@@ -48,6 +48,7 @@ import {
   patchHermesBaseUrl,
   patchHermesEnv,
   patchHermesModelDefault,
+  patchHermesModels,
 } from './providerFileWriters'
 
 interface HermesProviderViewerProps {
@@ -102,7 +103,11 @@ function libraryApiKey(provider: Provider): string {
 
 function libraryDefaultModel(provider: Provider): string | null {
   const settings = (provider.settings ?? {}) as Record<string, unknown>
-  // The YAML body lives under settings.config (string) for hermes too.
+  // ACS-style structured models array
+  const models = settings.models as Array<Record<string, unknown>> | undefined
+  if (Array.isArray(models) && models.length > 0) {
+    return (models[0].id as string) ?? (models[0].model as string) ?? null
+  }
   const config = typeof settings.config === 'string' ? (settings.config as string) : null
   if (config) {
     const fields = extractHermesModelFields(config)
@@ -110,6 +115,19 @@ function libraryDefaultModel(provider: Provider): string | null {
   }
   if (typeof settings.default_model === 'string') return settings.default_model as string
   return null
+}
+
+function libraryModels(provider: Provider): Array<{ id: string; name: string; context_length?: number }> {
+  const settings = (provider.settings ?? {}) as Record<string, unknown>
+  const models = settings.models as Array<Record<string, unknown>> | undefined
+  if (Array.isArray(models) && models.length > 0) {
+    return models.map((m) => ({
+      id: (m.id ?? m.model ?? '') as string,
+      name: (m.name ?? m.id ?? m.model ?? '') as string,
+      context_length: (m.context_length ?? m.contextLength) as number | undefined,
+    })).filter((m) => m.id)
+  }
+  return []
 }
 
 function matchStatus(provider: Provider, current: CurrentFields): MatchStatus {
@@ -195,11 +213,13 @@ export function HermesProviderViewer({
     try {
       const libBaseUrl = libraryBaseUrl(provider) ?? ''
       const libApiKey = libraryApiKey(provider)
+      const libModels = libraryModels(provider)
       const libModel = libraryDefaultModel(provider)
 
       let nextYaml = effectiveYaml
-      if (libModel) nextYaml = patchHermesModelDefault(nextYaml, libModel)
       nextYaml = patchHermesBaseUrl(nextYaml, libBaseUrl)
+      if (libModel) nextYaml = patchHermesModelDefault(nextYaml, libModel)
+      if (libModels.length > 0) nextYaml = patchHermesModels(nextYaml, libModels)
       if (libApiKey) nextYaml = patchHermesApiKey(nextYaml, libApiKey)
       const nextEnv = libApiKey
         ? patchHermesEnv(effectiveEnv, libApiKey)
