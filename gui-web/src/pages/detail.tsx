@@ -233,7 +233,6 @@ export function ProfileDetailPage({ profileName, onBack, onNavigateLibrary }: Pr
     ] :
     agentType === 'hermes' ? [
       { label: 'config.yaml', path: `${configDir}/config.yaml`, content: hermesConfigYaml },
-      { label: '.env', path: `${configDir}/.env`, content: hermesEnvContent },
     ] :
     agentType === 'opencode' ? [
       { label: 'opencode.jsonc', path: `${configDir}/opencode.jsonc`, content: opencodeJsonc },
