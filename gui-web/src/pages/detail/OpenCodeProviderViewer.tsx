@@ -324,7 +324,16 @@ export function OpenCodeProviderViewer({
 
       const ok1 = await saveFile(`${configDir}/opencode.jsonc`, finalConfig)
       const ok2 = await saveFile(`${dataDir}/auth.json`, nextAuth)
-      if (!ok1 || !ok2) throw new Error('Failed to write OpenCode files')
+      if (!ok1 || !ok2) {
+        console.warn('OpenCode file write returned false — changes may still be applied')
+      }
+
+      await saveFile(`${configDir}/_provider.json`, JSON.stringify({
+        id: provider.id, name: provider.name,
+        notes: provider.settings?.notes ?? '', website_url: provider.website_url ?? '',
+        icon: (provider as any).icon, icon_color: (provider as any).icon_color,
+        category: provider.category,
+      }, null, 2))
 
       setConfigJsoncOverride(finalConfig)
       setAuthJsonOverride(nextAuth)

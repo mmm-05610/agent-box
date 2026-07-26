@@ -571,12 +571,13 @@ class Api:
     def save_file(self, path: str, content: str) -> str:
         """Write *content* to *path* in WSL. Creates parent dirs if needed."""
         try:
-            import base64
-            # Use base64 via stdin to avoid shell quoting hell for multi-line content.
+            import base64, shlex
             encoded = base64.b64encode(content.encode("utf-8")).decode("ascii")
             dirname = "/".join(path.split("/")[:-1]) or "/"
+            safe_path = shlex.quote(path)
+            safe_dir = shlex.quote(dirname)
             _wsl_run(
-                f"mkdir -p {dirname} && echo {encoded} | base64 -d > '{path}'",
+                f"mkdir -p {safe_dir} && echo {shlex.quote(encoded)} | base64 -d > {safe_path}",
                 timeout=10,
             )
             return json.dumps({"ok": True})

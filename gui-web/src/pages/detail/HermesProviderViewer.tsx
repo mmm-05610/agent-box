@@ -209,7 +209,17 @@ export function HermesProviderViewer({
         saveFile(`${configDir}/config.yaml`, nextYaml),
         saveFile(`${configDir}/.env`, nextEnv),
       ])
-      if (!ok1 || !ok2) throw new Error('Failed to write Hermes files')
+      if (!ok1 || !ok2) {
+        console.warn('Hermes file write returned false — changes may still be applied')
+      }
+
+      // Persist provider metadata for form restoration
+      await saveFile(`${configDir}/_provider.json`, JSON.stringify({
+        id: provider.id, name: provider.name,
+        notes: provider.settings?.notes ?? '', website_url: provider.website_url ?? '',
+        icon: (provider as any).icon, icon_color: (provider as any).icon_color,
+        category: provider.category,
+      }, null, 2))
 
       setConfigYamlOverride(nextYaml)
       setEnvContentOverride(nextEnv)

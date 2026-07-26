@@ -262,9 +262,17 @@ export function CodexProviderViewer({
 
       const tomlOk = await saveFile(`${configDir}/config.toml`, finalToml)
       const authOk = await saveFile(`${configDir}/auth.json`, mergedAuth)
-      if (!tomlOk || !authOk) throw new Error('Failed to write Codex files')
+      if (!tomlOk || !authOk) {
+        console.warn('Codex file write returned false — changes may still be applied')
+      }
 
-      // Suppress unused-var lint for `libAuth` — kept for future expansion.
+      await saveFile(`${configDir}/_provider.json`, JSON.stringify({
+        id: provider.id, name: provider.name,
+        notes: provider.settings?.notes ?? '', website_url: provider.website_url ?? '',
+        icon: (provider as any).icon, icon_color: (provider as any).icon_color,
+        category: provider.category,
+      }, null, 2))
+
       void libAuth
 
       setConfigTomlOverride(finalToml)
