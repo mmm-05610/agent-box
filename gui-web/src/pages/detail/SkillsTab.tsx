@@ -209,6 +209,7 @@ export function SkillsTab({ configDir, profileName, agentType, refreshKey }: {
   const [removingId, setRemovingId] = useState<string | null>(null)
   const [detailSkill, setDetailSkill] = useState<InstalledSkill | null>(null)
   const [tick, setTick] = useState(0)
+  const [installedFilter, setInstalledFilter] = useState('')
 
   // Library
   const [searchInput, setSearchInput] = useState('')
@@ -315,17 +316,23 @@ export function SkillsTab({ configDir, profileName, agentType, refreshKey }: {
       </Card>
 
       {/* ── Installed Skills ─────────────────────────────────────── */}
-      <Card>
+      <Card key={`installed-${installed.length}`}>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm">Installed Skills ({installed.length})</CardTitle>
         </CardHeader>
         <CardContent>
+          <div className="mb-3 flex gap-2">
+            <Input placeholder="Filter installed..." value={installedFilter} onChange={e => setInstalledFilter(e.target.value)} className="flex-1" />
+            <Button size="sm" variant="ghost" onClick={() => setInstalledFilter('')} title="Clear">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><path d="M18 6 6 18M6 6l12 12" /></svg>
+            </Button>
+          </div>
           {loading ? <p className="text-xs text-muted-foreground py-2">Loading...</p>
           : loadError ? <p className="text-xs text-destructive py-2">{loadError}</p>
           : installed.length === 0 ? <p className="text-xs text-muted-foreground py-2">No skills installed. Search above to add.</p>
           : (
             <div className="space-y-1">
-              {installed.map(s => (
+              {installed.filter(s => !installedFilter.trim() || s.name.toLowerCase().includes(installedFilter.toLowerCase())).map(s => (
                 <div key={s.id} className="flex items-center gap-3 rounded-lg border border-border px-3 py-1.5">
                   <div className="min-w-0 flex-1"><div className="text-sm font-medium">{s.name}</div>{s.description && <div className="text-[11px] text-muted-foreground truncate">{s.description}</div>}</div>
                   <Button size="sm" variant="ghost" onClick={() => setDetailSkill(s)}>Detail</Button>
