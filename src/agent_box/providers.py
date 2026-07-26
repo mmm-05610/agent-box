@@ -321,76 +321,46 @@ def delete_provider(agent_type: str, provider_id: str) -> None:
 
 # --- apply ----------------------------------------------------------------
 
-# Agent types that support apply in v1. Non-CC apply raises ProfileError.
-APPLY_SUPPORTED = {"claude"}
+APPLY_SUPPORTED = {"claude", "codex", "hermes", "opencode"}
 
 
 def apply_provider(profile_name: str, provider_id: str) -> None:
-    """Write a provider's full settings into a profile's settings.json.
+    """Write a provider's settings to the profile's config file.
 
-    Steps:
-      1. load_meta → resolve the profile's agent_type
-      2. non-claude → raise ProfileError (apply not yet supported)
-      3. read provider.settings_config → env + metadata
-      4. read profile's settings.json (if any)
-      5. overwrite ``env`` with provider's env, write ``_provider`` with
-         full metadata (name, notes, website_url, icon, icon_color, category)
-         so the frontend can render the complete provider form
-      6. atomic write the result
-      7. UPDATE profiles SET provider_ref = provider_id
+    Per agent type:
+      Claude:   overwrite settings.json.env + _provider metadata
+      Codex:    overwrite config.toml + auth.json
+      Hermes:   overwrite config.yaml + .env
+      OpenCode: write provider section to opencode.jsonc + auth.json
     """
     meta = load_meta(profile_name)
     agent_type = meta["agent_type"]
     if agent_type not in APPLY_SUPPORTED:
         raise ProfileError(
-            f"apply is not yet supported for agent_type {agent_type!r} "
-            f"(v1 supports: {', '.join(sorted(APPLY_SUPPORTED))})"
+            f"apply: {agent_type!r} not yet supported "
+            f"(supported: {', '.join(sorted(APPLY_SUPPORTED))})"
         )
 
-    provider = get_provider(agent_type, provider_id)
+    # Read from ACS (cc-switch) database
+    from .ccswitch_adapter import get_provider as acs_get_provider
+    provider = acs_get_provider(agent_type, provider_id)
+    if provider is None:
+        # Fallback to agent-box's own DB
+        provider = get_provider(agent_type, provider_id)
     if provider is None:
         raise ProfileError(
-            f"provider {provider_id!r} for agent_type {agent_type!r} not found"
+            f"provider {provider_id!r} for {agent_type!r} not found"
         )
     provider_settings = provider.get("settings") or {}
-    provider_env = provider_settings.get("env") or {}
-    if not isinstance(provider_env, dict):
-        raise ProfileError(
-            f"provider {provider_id!r}: env must be a JSON object"
-        )
 
-    settings_path = config.profile_agent_dir(profile_name, agent_type) / "settings.json"
-    existing: Dict[str, Any] = {}
-    if settings_path.is_file():
-        try:
-            existing = json.loads(settings_path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError as exc:
-            raise ProfileError(
-                f"{profile_name}: settings.json is not valid JSON: {exc}"
-            ) from exc
-        if not isinstance(existing, dict):
-            existing = {}
-
-    existing["env"] = provider_env
-
-    # Write full provider metadata so the frontend can render the form
-    existing["_provider"] = {
-        "id": provider.get("id"),
-        "name": provider.get("name"),
-        "notes": provider_settings.get("notes", ""),
-        "website_url": provider.get("website_url", "") or provider_settings.get("website_url", ""),
-        "icon": provider.get("icon"),
-        "icon_color": provider.get("icon_color"),
-        "category": provider.get("category"),
-        "apiFormat": provider_env.get("ANTHROPIC_API_FORMAT", ""),
-    }
-
-    # Ensure provider env keys are stripped from top-level _provider (keep only metadata)
-    for k in list(existing["_provider"].keys()):
-        if existing["_provider"][k] is None:
-            del existing["_provider"][k]
-
-    atomic_write_json(settings_path, existing)
+    if agent_type == "claude":
+        _apply_claude(profile_name, provider, provider_settings)
+    elif agent_type == "codex":
+        _apply_codex(profile_name, provider, provider_settings)
+    elif agent_type == "hermes":
+        _apply_hermes(profile_name, provider, provider_settings)
+    elif agent_type == "opencode":
+        _apply_opencode(profile_name, provider, provider_settings)
 
     from . import db
     conn = db.get_conn()
@@ -399,6 +369,145 @@ def apply_provider(profile_name: str, provider_id: str) -> None:
         (provider_id, profile_name),
     )
     conn.commit()
+
+
+def _apply_claude(profile_name: str, provider: Dict[str, Any], settings: Dict[str, Any]) -> None:
+    provider_env = settings.get("env") or {}
+    if not isinstance(provider_env, dict):
+        raise ProfileError(f"provider {provider['id']}: env must be a JSON object")
+
+    settings_path = config.profile_agent_dir(profile_name, "claude") / "settings.json"
+    existing: Dict[str, Any] = {}
+    if settings_path.is_file():
+        try:
+            existing = json.loads(settings_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise ProfileError(f"{profile_name}: invalid settings.json: {exc}") from exc
+    if not isinstance(existing, dict):
+        existing = {}
+
+    existing["env"] = provider_env
+    existing["_provider"] = {
+        "id": provider.get("id"),
+        "name": provider.get("name"),
+        "notes": settings.get("notes", ""),
+        "website_url": provider.get("website_url", "") or settings.get("website_url", ""),
+        "icon": provider.get("icon"),
+        "icon_color": provider.get("icon_color"),
+        "category": provider.get("category"),
+    }
+    existing["_provider"] = {k: v for k, v in existing["_provider"].items() if v is not None}
+    atomic_write_json(settings_path, existing)
+
+
+def _apply_codex(profile_name: str, provider: Dict[str, Any], settings: Dict[str, Any]) -> None:
+    config_dir = config.profile_agent_dir(profile_name, "codex")
+    config_dir.mkdir(parents=True, exist_ok=True)
+
+    # config.toml
+    config_text = settings.get("config")
+    if isinstance(config_text, str) and config_text.strip():
+        config_toml_path = config_dir / "config.toml"
+        config_toml_path.write_text(config_text, encoding="utf-8")
+
+    # auth.json
+    auth = settings.get("auth")
+    if isinstance(auth, dict):
+        auth_path = config_dir / "auth.json"
+        atomic_write_json(auth_path, auth)
+
+
+def _apply_hermes(profile_name: str, provider: Dict[str, Any], settings: Dict[str, Any]) -> None:
+    config_dir = config.profile_agent_dir(profile_name, "hermes")
+    config_dir.mkdir(parents=True, exist_ok=True)
+
+    base_url = settings.get("base_url") or ""
+    api_key = settings.get("api_key") or ""
+    api_mode = settings.get("api_mode") or ""
+    env_api_key = (settings.get("env") or {}).get("api_key") or ""
+
+    # Map ACS api_mode to Hermes format
+    mode_map = {"chat_completions": "openai_compatible", "openai_compatible": "openai_compatible",
+                "anthropic": "anthropic", "codex_responses": "codex_responses"}
+    mapped_mode = mode_map.get(api_mode, api_mode or "openai_compatible")
+
+    lines = [
+        f'base_url: "{base_url}"',
+        f'api_key: "{api_key or env_api_key}"',
+        f'api_mode: "{mapped_mode}"',
+    ]
+
+    models = settings.get("models")
+    if isinstance(models, list) and models:
+        first = models[0] if isinstance(models[0], dict) else {}
+        default_model = (first.get("id") or first.get("model") or "")
+        if default_model:
+            lines.append(f'default: "{default_model}"')
+        lines.append("models:")
+        for m in models:
+            if not isinstance(m, dict):
+                continue
+            mid = m.get("id") or m.get("model") or ""
+            mname = m.get("name") or mid
+            ctx = m.get("context_length")
+            if mid:
+                lines.append(f'  - id: "{mid}"')
+                lines.append(f'    name: "{mname}"')
+                if ctx is not None:
+                    lines.append(f"    context_length: {ctx}")
+    else:
+        default_model = settings.get("default_model") or ""
+        if default_model:
+            lines.append(f'default: "{default_model}"')
+
+    (config_dir / "config.yaml").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    # .env
+    if api_key or env_api_key:
+        (config_dir / ".env").write_text(f"HERMES_API_KEY={api_key or env_api_key}\n", encoding="utf-8")
+
+
+def _apply_opencode(profile_name: str, provider: Dict[str, Any], settings: Dict[str, Any]) -> None:
+    config_dir = config.profile_agent_dir(profile_name, "opencode")
+    config_dir.mkdir(parents=True, exist_ok=True)
+
+    provider_name = (provider.get("id") or "") .replace("/", "_")
+    npm = settings.get("npm") or ""
+    options = settings.get("options") or {}
+
+    # Build provider section
+    provider_config: Dict[str, Any] = {}
+    if isinstance(options, dict):
+        provider_config.update(options)
+    elif isinstance(npm, str) and npm:
+        provider_config["npm"] = npm
+
+    models = settings.get("models") or {}
+    if isinstance(models, dict) and models:
+        provider_config["models"] = models
+
+    # Read existing opencode.jsonc, update provider section
+    jsonc_path = config_dir / "opencode.jsonc"
+    existing: Dict[str, Any] = {}
+    if jsonc_path.is_file():
+        try:
+            raw = jsonc_path.read_text(encoding="utf-8")
+            # Strip comments
+            import re
+            cleaned = re.sub(r'//.*?\n|/\*.*?\*/', '', raw, flags=re.DOTALL)
+            cleaned = re.sub(r',(\s*[}\]])', r'\1', cleaned)
+            existing = json.loads(cleaned)
+        except (json.JSONDecodeError, ValueError):
+            existing = {}
+    if not isinstance(existing, dict):
+        existing = {}
+
+    existing["provider"] = existing.get("provider") or {}
+    if isinstance(existing["provider"], dict) and provider_name:
+        existing["provider"][provider_name] = provider_config
+
+    from ._io import atomic_write_text
+    atomic_write_text(jsonc_path, json.dumps(existing, indent=2, ensure_ascii=False) + "\n")
 
 
 def duplicate_provider(agent_type: str, provider_id: str, new_id: str) -> Dict[str, Any]:
