@@ -420,24 +420,22 @@ def _apply_codex(profile_name: str, provider: Dict[str, Any], settings: Dict[str
         atomic_write_json(auth_path, auth)
 
 
-def _apply_hermes(profile_name: str, provider: Dict[str, Any], settings: Dict[str, Any]) -> None:
-    config_dir = config.profile_agent_dir(profile_name, "hermes")
-    config_dir.mkdir(parents=True, exist_ok=True)
-
+def _build_hermes_yaml_entry(provider_id: str, settings: Dict[str, Any]) -> str:
+    """Build a YAML entry for a single Hermes provider."""
     base_url = settings.get("base_url") or ""
     api_key = settings.get("api_key") or ""
     api_mode = settings.get("api_mode") or ""
     env_api_key = (settings.get("env") or {}).get("api_key") or ""
 
-    # Map ACS api_mode to Hermes format
     mode_map = {"chat_completions": "openai_compatible", "openai_compatible": "openai_compatible",
                 "anthropic": "anthropic", "codex_responses": "codex_responses"}
     mapped_mode = mode_map.get(api_mode, api_mode or "openai_compatible")
 
     lines = [
-        f'base_url: "{base_url}"',
-        f'api_key: "{api_key or env_api_key}"',
-        f'api_mode: "{mapped_mode}"',
+        f"  {provider_id}:",
+        f'    base_url: "{base_url}"',
+        f'    api_key: "{api_key or env_api_key}"',
+        f'    api_mode: "{mapped_mode}"',
     ]
 
     models = settings.get("models")
@@ -445,8 +443,8 @@ def _apply_hermes(profile_name: str, provider: Dict[str, Any], settings: Dict[st
         first = models[0] if isinstance(models[0], dict) else {}
         default_model = (first.get("id") or first.get("model") or "")
         if default_model:
-            lines.append(f'default: "{default_model}"')
-        lines.append("models:")
+            lines.append(f'    default: "{default_model}"')
+        lines.append("    models:")
         for m in models:
             if not isinstance(m, dict):
                 continue
@@ -454,16 +452,107 @@ def _apply_hermes(profile_name: str, provider: Dict[str, Any], settings: Dict[st
             mname = m.get("name") or mid
             ctx = m.get("context_length")
             if mid:
-                lines.append(f'  - id: "{mid}"')
-                lines.append(f'    name: "{mname}"')
+                lines.append(f'      - id: "{mid}"')
+                lines.append(f'        name: "{mname}"')
                 if ctx is not None:
-                    lines.append(f"    context_length: {ctx}")
+                    lines.append(f"        context_length: {ctx}")
     else:
         default_model = settings.get("default_model") or ""
         if default_model:
-            lines.append(f'default: "{default_model}"')
+            lines.append(f'    default: "{default_model}"')
 
-    (config_dir / "config.yaml").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return "\n".join(lines)
+
+
+def _apply_hermes(profile_name: str, provider: Dict[str, Any], settings: Dict[str, Any]) -> None:
+    """Activate a Hermes provider: copy to top-level config + add to providers section."""
+    config_dir = config.profile_agent_dir(profile_name, "hermes")
+    config_dir.mkdir(parents=True, exist_ok=True)
+
+    config_path = config_dir / "config.yaml"
+    existing_lines: List[str] = []
+    if config_path.is_file():
+        existing_lines = config_path.read_text(encoding="utf-8").split("\n")
+
+    provider_id = str(provider.get("id") or "")
+
+    # Build the provider entry for the top-level (active) and providers section
+    base_url = settings.get("base_url") or ""
+    api_key = settings.get("api_key") or ""
+    api_mode = settings.get("api_mode") or ""
+    env_api_key = (settings.get("env") or {}).get("api_key") or ""
+
+    mode_map = {"chat_completions": "openai_compatible", "openai_compatible": "openai_compatible",
+                "anthropic": "anthropic", "codex_responses": "codex_responses"}
+    mapped_mode = mode_map.get(api_mode, api_mode or "openai_compatible")
+
+    # Top-level (active) section
+    top_lines = [
+        f'base_url: "{base_url}"',
+        f'api_key: "{api_key or env_api_key}"',
+        f'api_mode: "{mapped_mode}"',
+    ]
+    models = settings.get("models")
+    if isinstance(models, list) and models:
+        first = models[0] if isinstance(models[0], dict) else {}
+        default_model = (first.get("id") or first.get("model") or "")
+        if default_model:
+            top_lines.append(f'default: "{default_model}"')
+        top_lines.append("models:")
+        for m in models:
+            if not isinstance(m, dict):
+                continue
+            mid = m.get("id") or m.get("model") or ""
+            mname = m.get("name") or mid
+            ctx = m.get("context_length")
+            if mid:
+                top_lines.append(f'  - id: "{mid}"')
+                top_lines.append(f'    name: "{mname}"')
+                if ctx is not None:
+                    top_lines.append(f"    context_length: {ctx}")
+    else:
+        default_model = settings.get("default_model") or ""
+        if default_model:
+            top_lines.append(f'default: "{default_model}"')
+
+    # Parse existing file: separate top-level section from providers section
+    top_section: List[str] = []
+    providers_section: Dict[str, str] = {}
+    current_provider: Optional[str] = None
+    current_entry_lines: List[str] = []
+
+    in_providers = False
+    for line in existing_lines:
+        stripped = line.rstrip()
+        if stripped.strip() == "providers:":
+            in_providers = True
+            continue
+        if in_providers:
+            m = re.match(r'^  (\S+):\s*$', stripped)
+            if m:
+                if current_provider and current_entry_lines:
+                    providers_section[current_provider] = "\n".join(current_entry_lines)
+                current_provider = m.group(1)
+                current_entry_lines = [stripped]
+            elif current_provider:
+                current_entry_lines.append(stripped)
+        else:
+            top_section.append(stripped)
+
+    if current_provider and current_entry_lines:
+        providers_section[current_provider] = "\n".join(current_entry_lines)
+
+    # Update/add the provider entry in providers section
+    providers_section[provider_id] = _build_hermes_yaml_entry(provider_id, settings)
+
+    # Write: top-level (active) + blank + providers section
+    output = "\n".join(top_lines) + "\n"
+    if providers_section:
+        output += "\nproviders:\n"
+        for _pid, entry in providers_section.items():
+            output += entry + "\n"
+
+    config_path.write_text(output, encoding="utf-8")
 
     # .env
     if api_key or env_api_key:
