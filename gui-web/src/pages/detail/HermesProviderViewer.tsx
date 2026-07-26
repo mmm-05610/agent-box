@@ -266,6 +266,7 @@ export function HermesProviderViewer({
     try {
       // Build complete YAML from ACS provider settings (full overwrite)
       const nextYaml = buildHermesYamlFromProvider(provider)
+      const libApiKey = libraryApiKey(provider)
       const nextEnv = libApiKey
         ? patchHermesEnv(effectiveEnv, libApiKey)
         : effectiveEnv
