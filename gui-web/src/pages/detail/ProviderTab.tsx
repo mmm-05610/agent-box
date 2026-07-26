@@ -112,6 +112,7 @@ export function ProviderTab({ agentType, profileName, configFiles, onRefresh }: 
     try {
       await removeProfileProvider(profileName, providerId)
       setProfileProviders(prev => prev.filter(p => p.id !== providerId))
+      onRefresh()
       const provider = profileProviders.find(p => p.id === providerId)
       toast({ type: 'success', message: `${provider?.name ?? providerId} removed` })
     } catch (error) {
