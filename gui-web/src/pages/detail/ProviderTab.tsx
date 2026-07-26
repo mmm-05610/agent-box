@@ -63,6 +63,7 @@ export function ProviderTab({ agentType, profileName, configFiles, onRefresh }: 
   // Library providers (from ACS)
   const [libraryProviders, setLibraryProviders] = useState<Provider[]>([])
   const [applyingId, setApplyingId] = useState<string | null>(null)
+  const [activeProviderId, setActiveProviderId] = useState<string | null>(null)
 
   // Profile-local providers (additive mode)
   const [profileProviders, setProfileProviders] = useState<ProfileProvider[]>([])
@@ -79,6 +80,30 @@ export function ProviderTab({ agentType, profileName, configFiles, onRefresh }: 
     }
   }, [agentType, profileName, isAdditive])
 
+  // Detect active provider from config files (Claude / Codex)
+  useEffect(() => {
+    if (isAdditive) return
+    if (agentType === 'claude') {
+      const settingsFile = configFiles.find(f => f.label === 'settings.json')
+      if (settingsFile) {
+        try {
+          const d = JSON.parse(settingsFile.content)
+          setActiveProviderId(d._provider?.id ?? null)
+        } catch { setActiveProviderId(null) }
+      }
+    } else if (agentType === 'codex') {
+      const authFile = configFiles.find(f => f.label === 'auth.json')
+      if (authFile && authFile.content.trim()) {
+        // Find matching provider by comparing apiKey in auth
+        const libProv = libraryProviders.find(p => {
+          const auth = (p.settings as Record<string, unknown>)?.auth as Record<string, unknown> | undefined
+          try { return JSON.parse(authFile.content).OPENAI_API_KEY === auth?.OPENAI_API_KEY } catch { return false }
+        })
+        setActiveProviderId(libProv?.id ?? null)
+      }
+    }
+  }, [configFiles, agentType, isAdditive, libraryProviders])
+
   useEffect(() => {
     const init: Record<string, string> = {}
     for (const f of configFiles) init[f.path] = f.content
@@ -93,6 +118,7 @@ export function ProviderTab({ agentType, profileName, configFiles, onRefresh }: 
     setApplyingId(providerId)
     try {
       await applyProviderToProfile(profileName, providerId)
+      if (!isAdditive) setActiveProviderId(providerId)
       onRefresh()
       if (isAdditive) {
         const list = await fetchProfileProviders(profileName).catch(() => [] as ProfileProvider[])
@@ -205,8 +231,11 @@ export function ProviderTab({ agentType, profileName, configFiles, onRefresh }: 
               .filter(p => !isAdditive || !profileProviders.some(pp => pp.id === p.id))
               .map((p) => {
               const icon = resolveIconKey(p.name)
+              const isActive = !isAdditive && activeProviderId === p.id
               return (
-                <div key={p.id} className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-2.5">
+                <div key={p.id}
+                  className={`flex items-center gap-3 rounded-lg border px-4 py-2.5 ${isActive ? 'border-accent bg-accent/5' : 'border-border bg-card'}`}
+                >
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted">
                     <ProviderIcon icon={icon} name={p.name} size={18} showFallback />
                   </div>
@@ -219,9 +248,13 @@ export function ProviderTab({ agentType, profileName, configFiles, onRefresh }: 
                       </a>
                     )}
                   </div>
-                  <Button size="sm" isLoading={applyingId === p.id} onClick={() => handleApply(p.id)}>
-                    {isAdditive ? 'Add' : 'Apply'}
-                  </Button>
+                  {isActive ? (
+                    <span className="inline-flex items-center rounded-full bg-accent/10 px-2.5 py-0.5 text-xs font-medium text-accent">Active</span>
+                  ) : (
+                    <Button size="sm" isLoading={applyingId === p.id} onClick={() => handleApply(p.id)}>
+                      {isAdditive ? 'Add' : 'Apply'}
+                    </Button>
+                  )}
                 </div>
               )
             })}
