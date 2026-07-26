@@ -697,7 +697,7 @@ def cmd_provider_apply(args: argparse.Namespace) -> int:
 
 def cmd_provider_profile_list(args: argparse.Namespace) -> int:
     try:
-        meta = load_meta(args.profile)
+        meta = profile.load_meta(args.profile)
         rows = providers.list_profile_providers(args.profile, meta["agent_type"])
     except Exception as exc:
         print(f"agent-box: {exc}", file=sys.stderr)
@@ -709,7 +709,7 @@ def cmd_provider_profile_list(args: argparse.Namespace) -> int:
 
 def cmd_provider_profile_remove(args: argparse.Namespace) -> int:
     try:
-        meta = load_meta(args.profile)
+        meta = profile.load_meta(args.profile)
         ok = providers.remove_profile_provider(args.profile, meta["agent_type"], args.provider)
         if not ok:
             print(f"agent-box: provider {args.provider!r} not found in profile {args.profile!r}", file=sys.stderr)
