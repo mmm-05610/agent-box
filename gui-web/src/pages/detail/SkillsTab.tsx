@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Badge, Button, Card, CardContent, CardHeader, CardTitle,
-  ConfirmDialog, Input, Textarea,
+  Input, Textarea,
 } from '@/components/ui'
 import { useToast } from '@/components/feedback/toast'
 import { deletePath, findFiles, readFile, saveFile } from '@/api/files'
@@ -82,23 +82,43 @@ async function loadInstalled(dir: string): Promise<InstalledSkill[]> {
 
 // ── Detail Modal ──────────────────────────────────────────────────────────
 
-function SkillDetailModal({ skill, onClose, onSaved }: {
-  skill: InstalledSkill
-  onClose: () => void
-  onSaved: (s: InstalledSkill) => void
-}) {
-  const [editContent, setEditContent] = useState(skill.content)
+function FrontmatterTable({ frontmatter, excludeKeys }: { frontmatter: Record<string, string>; excludeKeys: string[] }) {
+  const excluded = new Set(excludeKeys)
+  const entries = Object.entries(frontmatter).filter(([k]) => !excluded.has(k))
+  if (entries.length === 0) return null
+  return (
+    <div>
+      <p className="mb-1 font-medium text-foreground">Frontmatter</p>
+      <div className="overflow-x-auto rounded-md ring-1 ring-border/60">
+        <table className="w-full text-xs">
+          <tbody className="divide-y divide-border/40">
+            {entries.map(([key, value]) => (
+              <tr key={key}>
+                <td className="w-1/3 align-top bg-muted/40 px-3 py-1.5 font-mono text-muted-foreground">{key}</td>
+                <td className="break-all px-3 py-1.5 font-mono text-foreground/90">{value}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+function SkillDetailModal({ skill, onClose, onSaved }: { skill: InstalledSkill; onClose: () => void; onSaved: (s: InstalledSkill) => void }) {
+  const [draft, setDraft] = useState(skill.content)
+  const [isEditing, setIsEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const { toast } = useToast()
-  const isEditing = editContent !== skill.content
 
   const handleSave = async () => {
     setSaving(true)
     try {
-      await saveFile(skill.skillFilePath, editContent)
-      const fresh = await readFile(skill.skillFilePath).catch(() => editContent)
+      await saveFile(skill.skillFilePath, draft)
+      const fresh = await readFile(skill.skillFilePath).catch(() => draft)
       const fm = parseFrontmatter(fresh)
       onSaved({ ...skill, content: fresh, frontmatter: fm, name: fm.name || skill.name, description: fm.description || skill.description })
+      setIsEditing(false)
       toast({ type: 'success', message: `${skill.name} saved` })
     } catch (e) {
       toast({ type: 'error', message: e instanceof Error ? e.message : 'Save failed' })
@@ -107,26 +127,60 @@ function SkillDetailModal({ skill, onClose, onSaved }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
-      <div className="relative max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-card p-6 shadow-xl" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold">{skill.name}</h3>
+      <div className="relative max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-card shadow-xl" onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-start gap-3 p-5 border-b border-border/60">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
+              <path d="M12 2a2 2 0 0 0-2 2v1.2a6.5 6.5 0 0 0-2 .8L7.1 5a2 2 0 1 0-2.8 2.8l1 .9a6.5 6.5 0 0 0-.8 2H3a2 2 0 1 0 0 4h1.2a6.5 6.5 0 0 0 .8 2l-.9.9a2 2 0 1 0 2.8 2.8l.9-1a6.5 6.5 0 0 0 2 .8V22a2 2 0 1 0 4 0v-1.2a6.5 6.5 0 0 0 2-.8l.9 1a2 2 0 1 0 2.8-2.8l-1-.9a6.5 6.5 0 0 0 .8-2H21a2 2 0 1 0 0-4h-1.2a6.5 6.5 0 0 0-.8-2l1-.9a2 2 0 1 0-2.8-2.8l-.9 1a6.5 6.5 0 0 0-2-.8V4a2 2 0 0 0-2-2Z" />
+              <circle cx="12" cy="13" r="2.5" />
+            </svg>
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="font-semibold text-foreground">{skill.name}</h3>
+              <Badge variant="neutral" className="text-[10px] px-1.5 py-0">{skill.skillFileName}</Badge>
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">{skill.description}</p>
+          </div>
           <Button variant="ghost" size="sm" onClick={onClose}>✕</Button>
         </div>
-        <p className="text-sm text-muted-foreground mb-3">{skill.description}</p>
-        <div className="mb-3 flex flex-wrap gap-2">
-          {Object.entries(skill.frontmatter).filter(([k]) => k !== 'name' && k !== 'description').map(([k, v]) =>
-            <Badge key={k} variant="neutral">{k}: {v}</Badge>
+
+        {/* Body */}
+        <div className="space-y-4 p-5 text-sm">
+          {Object.keys(skill.frontmatter).length > 0 && (
+            <FrontmatterTable frontmatter={skill.frontmatter} excludeKeys={['name', 'description']} />
           )}
-        </div>
-        <details className="mb-3">
-          <summary className="cursor-pointer text-xs text-muted-foreground">Files ({skill.files.length})</summary>
-          <div className="mt-1 max-h-40 overflow-y-auto rounded bg-muted/50 p-2 font-mono text-[10px]">{skill.files.map(f => <div key={f}>{f}</div>)}</div>
-        </details>
-        <div className="text-xs text-muted-foreground mb-3 font-mono truncate">{skill.skillFilePath}</div>
-        <Textarea value={editContent} onChange={e => setEditContent(e.target.value)} rows={14} className="font-mono text-xs" />
-        <div className="mt-3 flex justify-end gap-2">
-          {isEditing && <Button variant="ghost" size="sm" onClick={() => setEditContent(skill.content)}>Cancel</Button>}
-          <Button size="sm" isLoading={saving} onClick={handleSave} disabled={!isEditing}>Save</Button>
+          <div>
+            <p className="mb-1 font-medium text-foreground">Directory</p>
+            <code className="break-all text-xs text-muted-foreground">{skill.directory}</code>
+          </div>
+          <div>
+            <p className="mb-1 font-medium text-foreground">Files ({skill.files.length})</p>
+            <ul className="max-h-40 space-y-1 overflow-y-auto rounded-md bg-muted/60 p-2 font-mono text-xs text-muted-foreground">
+              {skill.files.map(f => <li key={f} className="break-all">{f}</li>)}
+            </ul>
+          </div>
+          <div>
+            <div className="mb-1 flex items-center justify-between">
+              <p className="font-medium text-foreground">{skill.skillFileName} content</p>
+              {!isEditing ? (
+                <Button size="sm" variant="ghost" onClick={() => setIsEditing(true)}>Edit</Button>
+              ) : (
+                <div className="flex items-center gap-1">
+                  <Button size="sm" onClick={handleSave} isLoading={saving} disabled={draft === skill.content}>Save</Button>
+                  <Button size="sm" variant="ghost" onClick={() => { setDraft(skill.content); setIsEditing(false) }} disabled={saving}>Cancel</Button>
+                </div>
+              )}
+            </div>
+            <Textarea
+              value={draft}
+              onChange={e => setDraft(e.target.value)}
+              rows={Math.min(20, Math.max(8, draft.split('\n').length + 1))}
+              readOnly={!isEditing}
+              className="text-xs font-mono"
+            />
+          </div>
         </div>
       </div>
     </div>
