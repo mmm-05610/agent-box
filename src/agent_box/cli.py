@@ -192,10 +192,19 @@ def _build_parser() -> argparse.ArgumentParser:
     pp.add_argument("id")
     pp.set_defaults(func=cmd_provider_usage_script)
 
-    pp = sub_provider.add_parser("apply", help="Apply provider env to a profile's settings.json")
+    pp = sub_provider.add_parser("apply", help="Apply provider to a profile")
     pp.add_argument("profile", help="Target profile name")
     pp.add_argument("provider", help="Provider id (must match the provider's DB id)")
     pp.set_defaults(func=cmd_provider_apply)
+
+    pp = sub_provider.add_parser("profile-list", help="List providers added to a profile (Hermes/OpenCode)")
+    pp.add_argument("profile", help="Profile name")
+    pp.set_defaults(func=cmd_provider_profile_list)
+
+    pp = sub_provider.add_parser("profile-remove", help="Remove a provider from a profile (Hermes/OpenCode)")
+    pp.add_argument("profile", help="Profile name")
+    pp.add_argument("provider", help="Provider id to remove")
+    pp.set_defaults(func=cmd_provider_profile_remove)
 
     # claude-md ---------------------------------------------------------
     p_md = sub.add_parser("claude-md", help="Manage Claude.md templates")
@@ -684,6 +693,32 @@ def cmd_provider_apply(args: argparse.Namespace) -> int:
         return 2
     print(f"applied provider {args.provider!r} to profile {args.profile!r}")
     return 0
+
+
+def cmd_provider_profile_list(args: argparse.Namespace) -> int:
+    try:
+        meta = load_meta(args.profile)
+        rows = providers.list_profile_providers(args.profile, meta["agent_type"])
+    except Exception as exc:
+        print(f"agent-box: {exc}", file=sys.stderr)
+        return 2
+    json.dump(rows, sys.stdout, indent=2, ensure_ascii=False)
+    sys.stdout.write("\n")
+    return 0
+
+
+def cmd_provider_profile_remove(args: argparse.Namespace) -> int:
+    try:
+        meta = load_meta(args.profile)
+        ok = providers.remove_profile_provider(args.profile, meta["agent_type"], args.provider)
+        if not ok:
+            print(f"agent-box: provider {args.provider!r} not found in profile {args.profile!r}", file=sys.stderr)
+            return 2
+        print(f"removed provider {args.provider!r} from profile {args.profile!r}")
+        return 0
+    except Exception as exc:
+        print(f"agent-box: {exc}", file=sys.stderr)
+        return 2
 
 
 def cmd_provider_duplicate(args: argparse.Namespace) -> int:

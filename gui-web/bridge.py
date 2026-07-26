@@ -933,6 +933,20 @@ class Api:
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
 
+    def list_profile_providers(self, profile_name: str) -> str:
+        try:
+            out = _wsl_run(f"{AGENT_BOX_CMD} provider profile-list {profile_name}")
+            return json.dumps({"ok": True, "data": json.loads(out)})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    def remove_profile_provider(self, profile_name: str, provider_id: str) -> str:
+        try:
+            _wsl_run(f"{AGENT_BOX_CMD} provider profile-remove {profile_name} {provider_id}")
+            return json.dumps({"ok": True})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
     def launch_acs(self) -> str:
         """Launch ACS GUI via WSLg (WSL 2 built-in GUI support)."""
         import subprocess as _sp

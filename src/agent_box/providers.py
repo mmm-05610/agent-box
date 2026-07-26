@@ -357,10 +357,13 @@ def apply_provider(profile_name: str, provider_id: str) -> None:
         _apply_claude(profile_name, provider, provider_settings)
     elif agent_type == "codex":
         _apply_codex(profile_name, provider, provider_settings)
-    elif agent_type == "hermes":
-        _apply_hermes(profile_name, provider, provider_settings)
-    elif agent_type == "opencode":
-        _apply_opencode(profile_name, provider, provider_settings)
+    elif agent_type in ("hermes", "opencode"):
+        # Additive mode: append to _providers.json + write live config
+        _add_to_providers_store(profile_name, agent_type, provider)
+        if agent_type == "hermes":
+            _apply_hermes(profile_name, provider, provider_settings)
+        else:
+            _apply_opencode(profile_name, provider, provider_settings)
 
     from . import db
     conn = db.get_conn()
@@ -508,6 +511,65 @@ def _apply_opencode(profile_name: str, provider: Dict[str, Any], settings: Dict[
 
     from ._io import atomic_write_text
     atomic_write_text(jsonc_path, json.dumps(existing, indent=2, ensure_ascii=False) + "\n")
+
+
+# ── Additive provider store (Hermes / OpenCode) ────────────────────────────
+
+def _providers_store_path(profile_name: str, agent_type: str) -> Path:
+    return config.profile_agent_dir(profile_name, agent_type) / "_providers.json"
+
+
+def _add_to_providers_store(profile_name: str, agent_type: str,
+                             provider: Dict[str, Any]) -> None:
+    store_path = _providers_store_path(profile_name, agent_type)
+    store_path.parent.mkdir(parents=True, exist_ok=True)
+    entries: Dict[str, Any] = {}
+    if store_path.is_file():
+        try:
+            entries = json.loads(store_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            entries = {}
+    if not isinstance(entries, dict):
+        entries = {}
+    provider_id = str(provider.get("id") or "")
+    entries[provider_id] = {
+        "id": provider_id,
+        "name": provider.get("name") or provider_id,
+        "settings": provider.get("settings") or {},
+        "website_url": provider.get("website_url") or "",
+        "icon": provider.get("icon") or None,
+        "icon_color": provider.get("icon_color") or None,
+        "category": provider.get("category") or "",
+    }
+    atomic_write_json(store_path, entries)
+
+
+def list_profile_providers(profile_name: str, agent_type: str) -> List[Dict[str, Any]]:
+    store_path = _providers_store_path(profile_name, agent_type)
+    if not store_path.is_file():
+        return []
+    try:
+        entries = json.loads(store_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    if not isinstance(entries, dict):
+        return []
+    return sorted(entries.values(), key=lambda e: e.get("name", ""))
+
+
+def remove_profile_provider(profile_name: str, agent_type: str, provider_id: str) -> bool:
+    store_path = _providers_store_path(profile_name, agent_type)
+    if not store_path.is_file():
+        return False
+    try:
+        entries = json.loads(store_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    if not isinstance(entries, dict) or provider_id not in entries:
+        return False
+    del entries[provider_id]
+    atomic_write_json(store_path, entries)
+    return True
 
 
 def duplicate_provider(agent_type: str, provider_id: str, new_id: str) -> Dict[str, Any]:

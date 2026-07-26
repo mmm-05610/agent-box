@@ -1,16 +1,18 @@
 /**
  * Provider Tab — Apply from Library + Config file viewer.
  *
- * Replaces the per-agent provider editor/viewer components with a unified
- * layout:
- *   1. Apply from Library — ACS provider list with Apply button
- *   2. Raw config file editor — textarea per config file
+ * Claude / Codex: single-provider overwrite.
+ * Hermes / OpenCode: additive mode — multiple provider entries, Add / Remove.
  */
 
 import { useCallback, useEffect, useState } from 'react'
 import { Button, Card, CardContent, CardHeader, CardTitle, Textarea } from '@/components/ui'
 import { useToast } from '@/components/feedback/toast'
-import { fetchProviders, applyProviderToProfile } from '@/api/providers'
+import {
+  fetchProviders, applyProviderToProfile,
+  fetchProfileProviders, removeProfileProvider,
+  type ProfileProvider,
+} from '@/api/providers'
 import { saveFile } from '@/api/files'
 import { ProviderIcon } from '@/components/ProviderIcon'
 import { hasIcon } from '@/icons/extracted'
@@ -19,11 +21,8 @@ import type { AgentType, Provider } from '@/api'
 // ── Icon helpers ──────────────────────────────────────────────────────────
 
 const PROVIDER_ICON_ALIASES: Record<string, string> = {
-  'claude official': 'claude',
-  'openai official': 'openai',
-  'xiaomi mimo': 'xiaomimimo',
-  'zhipu glm': 'zhipu',
-  'anthropic claude': 'claude',
+  'claude official': 'claude', 'openai official': 'openai',
+  'xiaomi mimo': 'xiaomimimo', 'zhipu glm': 'zhipu', 'anthropic claude': 'claude',
 }
 
 function resolveIconKey(name: string): string | undefined {
@@ -36,15 +35,9 @@ function resolveIconKey(name: string): string | undefined {
   return undefined
 }
 
-// ── Config file descriptor ─────────────────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────────────────
 
-export interface ConfigFile {
-  label: string
-  path: string
-  content: string
-}
-
-// ── Component props ────────────────────────────────────────────────────────
+export interface ConfigFile { label: string; path: string; content: string }
 
 interface ProviderTabProps {
   agentType: AgentType
@@ -53,22 +46,33 @@ interface ProviderTabProps {
   onRefresh: () => void
 }
 
+const ADDITIVE_TYPES: AgentType[] = ['hermes', 'opencode']
+
 // ── Component ─────────────────────────────────────────────────────────────
 
 export function ProviderTab({ agentType, profileName, configFiles, onRefresh }: ProviderTabProps) {
-  const [libraryProviders, setLibraryProviders] = useState<Provider[]>([])
-  const [applyingId, setApplyingId] = useState<string | null>(null)
-  const [editedContents, setEditedContents] = useState<Record<string, string>>({})
-  const [savingFile, setSavingFile] = useState<string | null>(null)
+  const isAdditive = ADDITIVE_TYPES.includes(agentType)
   const { toast } = useToast()
 
-  useEffect(() => {
-    fetchProviders(agentType)
-      .then(setLibraryProviders)
-      .catch(() => setLibraryProviders([]))
-  }, [agentType])
+  // Library providers (from ACS)
+  const [libraryProviders, setLibraryProviders] = useState<Provider[]>([])
+  const [applyingId, setApplyingId] = useState<string | null>(null)
 
-  // Reset edited contents when configFiles change
+  // Profile-local providers (additive mode)
+  const [profileProviders, setProfileProviders] = useState<ProfileProvider[]>([])
+  const [removingId, setRemovingId] = useState<string | null>(null)
+
+  // Config file editing
+  const [editedContents, setEditedContents] = useState<Record<string, string>>({})
+  const [savingFile, setSavingFile] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetchProviders(agentType).then(setLibraryProviders).catch(() => setLibraryProviders([]))
+    if (isAdditive) {
+      fetchProfileProviders(profileName).then(setProfileProviders).catch(() => setProfileProviders([]))
+    }
+  }, [agentType, profileName, isAdditive])
+
   useEffect(() => {
     const init: Record<string, string> = {}
     for (const f of configFiles) init[f.path] = f.content
@@ -77,11 +81,17 @@ export function ProviderTab({ agentType, profileName, configFiles, onRefresh }: 
 
   const getEdited = (path: string) => editedContents[path] ?? configFiles.find(f => f.path === path)?.content ?? ''
 
+  // ── Apply (single / additive) ─────────────────────────────────────────
+
   const handleApply = useCallback(async (providerId: string) => {
     setApplyingId(providerId)
     try {
       await applyProviderToProfile(profileName, providerId)
       onRefresh()
+      if (isAdditive) {
+        const list = await fetchProfileProviders(profileName).catch(() => [] as ProfileProvider[])
+        setProfileProviders(list)
+      }
       const provider = libraryProviders.find(p => p.id === providerId)
       toast({ type: 'success', message: `${provider?.name ?? providerId} applied to ${profileName}` })
     } catch (error) {
@@ -89,13 +99,28 @@ export function ProviderTab({ agentType, profileName, configFiles, onRefresh }: 
     } finally {
       setApplyingId(null)
     }
-  }, [profileName, libraryProviders, onRefresh, toast])
+  }, [profileName, libraryProviders, onRefresh, toast, isAdditive])
+
+  const handleRemove = useCallback(async (providerId: string) => {
+    setRemovingId(providerId)
+    try {
+      await removeProfileProvider(profileName, providerId)
+      setProfileProviders(prev => prev.filter(p => p.id !== providerId))
+      const provider = profileProviders.find(p => p.id === providerId)
+      toast({ type: 'success', message: `${provider?.name ?? providerId} removed` })
+    } catch (error) {
+      toast({ type: 'error', message: error instanceof Error ? error.message : 'Failed to remove provider' })
+    } finally {
+      setRemovingId(null)
+    }
+  }, [profileName, profileProviders, toast])
+
+  // ── Save config file ────────────────────────────────────────────────────
 
   const handleSaveFile = useCallback(async (path: string) => {
     setSavingFile(path)
     try {
-      const content = editedContents[path] ?? ''
-      const ok = await saveFile(path, content)
+      const ok = await saveFile(path, editedContents[path] ?? '')
       if (!ok) throw new Error('Save returned false')
       toast({ type: 'success', message: 'File saved' })
       onRefresh()
@@ -106,22 +131,61 @@ export function ProviderTab({ agentType, profileName, configFiles, onRefresh }: 
     }
   }, [editedContents, onRefresh, toast])
 
+  // ── Render ──────────────────────────────────────────────────────────────
+
   return (
     <div className="space-y-6">
+      {/* ── Added Providers (additive only) ────────────────────────── */}
+      {isAdditive && profileProviders.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Profile Providers</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {profileProviders.map((pp) => {
+              const icon = resolveIconKey(pp.name)
+              return (
+                <div key={pp.id} className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-2.5">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted">
+                    <ProviderIcon icon={icon} name={pp.name} size={18} showFallback />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium truncate">{pp.name}</div>
+                    {pp.website_url && (
+                      <span className="text-[10px] text-muted-foreground truncate block">
+                        {pp.website_url.replace(/^https?:\/\//, '')}
+                      </span>
+                    )}
+                  </div>
+                  <Button size="sm" variant="ghost" onClick={() => handleApply(pp.id)} isLoading={applyingId === pp.id}>
+                    Activate
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => handleRemove(pp.id)} isLoading={removingId === pp.id}
+                    className="text-destructive hover:text-destructive">
+                    Remove
+                  </Button>
+                </div>
+              )
+            })}
+          </CardContent>
+        </Card>
+      )}
+
       {/* ── Apply from Library ──────────────────────────────────────── */}
       {libraryProviders.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Apply from Library</CardTitle>
+            <CardTitle className="text-sm">
+              {isAdditive ? 'Add from Library' : 'Apply from Library'}
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {libraryProviders.map((p) => {
+            {libraryProviders
+              .filter(p => !isAdditive || !profileProviders.some(pp => pp.id === p.id))
+              .map((p) => {
               const icon = resolveIconKey(p.name)
               return (
-                <div
-                  key={p.id}
-                  className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-2.5"
-                >
+                <div key={p.id} className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-2.5">
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted">
                     <ProviderIcon icon={icon} name={p.name} size={18} showFallback />
                   </div>
@@ -134,12 +198,8 @@ export function ProviderTab({ agentType, profileName, configFiles, onRefresh }: 
                       </a>
                     )}
                   </div>
-                  <Button
-                    size="sm"
-                    isLoading={applyingId === p.id}
-                    onClick={() => handleApply(p.id)}
-                  >
-                    Apply
+                  <Button size="sm" isLoading={applyingId === p.id} onClick={() => handleApply(p.id)}>
+                    {isAdditive ? 'Add' : 'Apply'}
                   </Button>
                 </div>
               )
@@ -154,12 +214,8 @@ export function ProviderTab({ agentType, profileName, configFiles, onRefresh }: 
           <CardHeader className="pb-1">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm font-mono">{file.label}</CardTitle>
-              <Button
-                size="sm"
-                variant="ghost"
-                isLoading={savingFile === file.path}
-                onClick={() => handleSaveFile(file.path)}
-              >
+              <Button size="sm" variant="ghost" isLoading={savingFile === file.path}
+                onClick={() => handleSaveFile(file.path)}>
                 Save
               </Button>
             </div>
