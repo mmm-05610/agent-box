@@ -17,7 +17,8 @@ import { AGENT_TYPE_COLORS, fetchProfileDetail } from '@/api'
 import { readFile, findFiles } from '@/api/files'
 import { fetchMcpServers } from '@/api/mcp'
 import { MetaEditor } from './detail/MetaEditor'
-import { ProviderEditor } from './detail/ProviderEditor'
+import { ProviderTab } from './detail/ProviderTab'
+import type { ConfigFile } from './detail/ProviderTab'
 import { PermissionsEditor } from './detail/PermissionsEditor'
 import { HooksEditor } from './detail/HooksEditor'
 import { PluginsEditor } from './detail/PluginsEditor'
@@ -25,12 +26,9 @@ import { FileTextEditor } from './detail/FileTextEditor'
 import { McpTab } from './detail/McpTab'
 import { SkillsTab } from './detail/SkillsTab'
 import { StorageExplorer } from './detail/StorageExplorer'
-import { CodexProviderViewer } from './detail/CodexProviderViewer'
 import { RulesTab } from './detail/RulesTab'
-import { HermesProviderViewer } from './detail/HermesProviderViewer'
 import { HermesMemoriesTab } from './detail/HermesMemoriesTab'
 import { HermesHooksViewer } from './detail/HermesHooksViewer'
-import { OpenCodeProviderViewer } from './detail/OpenCodeProviderViewer'
 import { OpenCodeInstructionsTab } from './detail/OpenCodeInstructionsTab'
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -227,6 +225,22 @@ export function ProfileDetailPage({ profileName, onBack, onNavigateLibrary }: Pr
     agentType === 'hermes' ? `${configDir}/SOUL.md` :
     `${configDir}/CLAUDE.md`
 
+  const configFiles: ConfigFile[] = (
+    agentType === 'claude' ? [{ label: 'settings.json', path: settingsPath, content: settingsRaw }] :
+    agentType === 'codex' ? [
+      { label: 'config.toml', path: `${configDir}/config.toml`, content: codexConfigToml },
+      { label: 'auth.json', path: `${configDir}/auth.json`, content: codexAuthJson },
+    ] :
+    agentType === 'hermes' ? [
+      { label: 'config.yaml', path: `${configDir}/config.yaml`, content: hermesConfigYaml },
+      { label: '.env', path: `${configDir}/.env`, content: hermesEnvContent },
+    ] :
+    agentType === 'opencode' ? [
+      { label: 'opencode.jsonc', path: `${configDir}/opencode.jsonc`, content: opencodeJsonc },
+      { label: 'auth.json', path: `${detail.path}/dot-opencode-data/auth.json`, content: opencodeAuthJson },
+    ] : []
+  )
+
   return (
     <div className="mx-auto w-full max-w-5xl px-8 py-10">
       {/* Header */}
@@ -337,44 +351,13 @@ function TabContent({
         />
       )
     case 'provider':
-      if (agentType === 'codex') {
-        return (
-          <CodexProviderViewer
-            key={refreshKey}
-            configToml={codexConfigToml}
-            authJson={codexAuthJson}
-            configDir={detail.config_dir}
-            profileName={detail.meta.name}
-            onRefresh={onRefresh}
-          />
-        )
-      }
-      if (agentType === 'opencode' ) {
-        return (
-          <OpenCodeProviderViewer
-            key={refreshKey}
-            configJsonc={opencodeJsonc}
-            authJson={opencodeAuthJson}
-            configDir={detail.config_dir}
-            dataDir={`${detail.path}/dot-opencode-data`}
-            profileName={detail.meta.name}
-            onRefresh={onRefresh}
-          />
-        )
-      }
-      if (agentType === 'hermes') {
-        return (
-          <HermesProviderViewer
-            key={refreshKey}
-            configYaml={hermesConfigYaml}
-            envContent={hermesEnvContent}
-            configDir={detail.config_dir}
-            profileName={detail.meta.name}
-            onRefresh={onRefresh}
-          />
-        )
-      }
-      return <ProviderEditor key={refreshKey} path={settingsPath} content={settingsRaw} onRefresh={onRefresh} agentType={agentType} />
+      return <ProviderTab
+        key={refreshKey}
+        agentType={agentType}
+        profileName={detail.meta.name}
+        configFiles={configFiles}
+        onRefresh={onRefresh}
+      />
     case 'soul-md':
       return (
         <FileTextEditor
