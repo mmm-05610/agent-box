@@ -287,19 +287,14 @@ export function SkillsTab({ configDir, profileName, agentType, refreshKey }: {
           ) : (
             <>
               <div className="space-y-1">
-                {pageItems.map(s => {
-                  const added = installedIds.has(s.id)
-                  return (
+                {pageItems
+                  .filter(s => !installedIds.has(s.id) && s.source_available !== false)
+                  .map(s => (
                     <div key={s.id} className="flex items-center gap-3 rounded-lg border border-border px-3 py-1.5">
                       <div className="min-w-0 flex-1"><div className="text-sm font-medium">{s.name}</div>{s.description && <div className="text-[11px] text-muted-foreground truncate">{s.description}</div>}</div>
-                      {added
-                        ? <span className="text-xs text-muted-foreground px-2">Installed</span>
-                        : s.source_available === false
-                        ? <span className="text-xs text-muted-foreground px-2" title="Source not found on disk">—</span>
-                        : <Button size="sm" variant="ghost" isLoading={applyingId === s.id} onClick={() => handleApply(s.id)}>Add</Button>}
+                      <Button size="sm" variant="ghost" isLoading={applyingId === s.id} onClick={() => handleApply(s.id)}>Add</Button>
                     </div>
-                  )
-                })}
+                  ))}
               </div>
               {totalPages > 1 && (
                 <div className="mt-2 flex items-center justify-center gap-2 text-xs">
