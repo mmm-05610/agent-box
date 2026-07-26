@@ -641,10 +641,7 @@ def _apply_opencode(profile_name: str, provider: Dict[str, Any], settings: Dict[
     if jsonc_path.is_file():
         try:
             raw = jsonc_path.read_text(encoding="utf-8")
-            # Strip comments
-            import re
-            cleaned = re.sub(r'//.*?\n|/\*.*?\*/', '', raw, flags=re.DOTALL)
-            cleaned = re.sub(r',(\s*[}\]])', r'\1', cleaned)
+            cleaned = _strip_jsonc_comments(raw)
             existing = json.loads(cleaned)
         except (json.JSONDecodeError, ValueError):
             existing = {}
@@ -657,6 +654,55 @@ def _apply_opencode(profile_name: str, provider: Dict[str, Any], settings: Dict[
 
     from ._io import atomic_write_text
     atomic_write_text(jsonc_path, json.dumps(existing, indent=2, ensure_ascii=False) + "\n")
+
+
+def _strip_jsonc_comments(raw: str) -> str:
+    """Strip JSONC comments without touching // inside strings."""
+    result: List[str] = []
+    i = 0
+    in_string = False
+    in_block_comment = False
+    while i < len(raw):
+        c = raw[i]
+        if in_block_comment:
+            if c == '*' and i + 1 < len(raw) and raw[i + 1] == '/':
+                in_block_comment = False
+                i += 2
+                continue
+            i += 1
+            continue
+        if in_string:
+            result.append(c)
+            if c == '\\' and i + 1 < len(raw):
+                result.append(raw[i + 1])
+                i += 2
+                continue
+            if c == '"':
+                in_string = False
+            i += 1
+            continue
+        if c == '"':
+            in_string = True
+            result.append(c)
+            i += 1
+            continue
+        if c == '/' and i + 1 < len(raw):
+            nxt = raw[i + 1]
+            if nxt == '/':
+                # Line comment — skip to end of line
+                while i < len(raw) and raw[i] != '\n':
+                    i += 1
+                continue
+            if nxt == '*':
+                in_block_comment = True
+                i += 2
+                continue
+        result.append(c)
+        i += 1
+    cleaned = ''.join(result)
+    # Strip trailing commas
+    cleaned = re.sub(r',(\s*[}\]])', r'\1', cleaned)
+    return cleaned
 
 
 # ── Additive provider store (Hermes / OpenCode) ────────────────────────────
@@ -755,8 +801,7 @@ def remove_profile_provider(profile_name: str, agent_type: str, provider_id: str
         jsonc_path = config.profile_agent_dir(profile_name, "opencode") / "opencode.jsonc"
         if jsonc_path.is_file():
             raw = jsonc_path.read_text(encoding="utf-8")
-            cleaned = re.sub(r'//.*?\n|/\*.*?\*/', '', raw, flags=re.DOTALL)
-            cleaned = re.sub(r',(\s*[}\]])', r'\1', cleaned)
+            cleaned = _strip_jsonc_comments(raw)
             try:
                 config_json = json.loads(cleaned)
                 if isinstance(config_json.get("provider"), dict):
