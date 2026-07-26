@@ -282,6 +282,7 @@ export function ProfileDetailPage({ profileName, onBack, onNavigateLibrary }: Pr
         onRefresh={triggerRefresh}
         refreshKey={refreshKey}
         onNavigateLibrary={onNavigateLibrary}
+        configFiles={configFiles}
       />
     </div>
   )
@@ -315,6 +316,7 @@ function TabContent({
   onRefresh: () => void
   refreshKey: number
   onNavigateLibrary?: () => void
+  configFiles: ConfigFile[]
 }) {
   const profilePath = detail.path
   const agentType = detail.meta.agent_type
