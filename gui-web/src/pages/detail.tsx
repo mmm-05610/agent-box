@@ -407,7 +407,7 @@ function TabContent({
         />
       )
     case 'skills':
-      return <SkillsTab key={refreshKey} profileName={detail.meta.name} configDir={detail.config_dir} refreshKey={refreshKey} />
+      return <SkillsTab key={refreshKey} profileName={detail.meta.name} configDir={detail.config_dir} agentType={agentType} refreshKey={refreshKey} />
     case 'storage':
       return (
         <StorageExplorer
