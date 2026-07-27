@@ -8,8 +8,6 @@ import { ErrorBoundary, ToastProvider } from '@/components/feedback'
 import {
   HelpPage,
   HomePage,
-  LibraryPage,
-  PlaceholderPage,
   ProfileDetailPage,
   ProfilesPage,
   SessionsPage,
@@ -19,6 +17,7 @@ import {
 export default function App() {
   const [page, setPage] = useState<NavKey>('home')
   const [detailProfile, setDetailProfile] = useState<string | null>(null)
+  const [autoOpenCreate, setAutoOpenCreate] = useState(false)
 
   // Navigate to a page and close any open detail
   const handleNav = (key: NavKey) => {
@@ -26,13 +25,22 @@ export default function App() {
     setPage(key)
   }
 
+  // Navigate to profiles and auto-open the create modal
+  const handleNewProfile = () => {
+    setDetailProfile(null)
+    setPage('profiles')
+    setAutoOpenCreate(true)
+  }
+
   return (
     <ToastProvider>
-      <Shell active={page} onNav={handleNav} runningCount={0}>
+      <Shell active={page} onNav={handleNav} onNewProfile={handleNewProfile} runningCount={0}>
         <ErrorBoundary name="App">
           <PageRouter
             page={page}
             detailProfile={detailProfile}
+            autoOpenCreate={autoOpenCreate}
+            onAutoOpenCreateHandled={() => setAutoOpenCreate(false)}
             onNav={handleNav}
             onOpenDetail={setDetailProfile}
             onCloseDetail={() => setDetailProfile(null)}
@@ -46,25 +54,29 @@ export default function App() {
 function PageRouter({
   page,
   detailProfile,
+  autoOpenCreate,
+  onAutoOpenCreateHandled,
   onNav,
   onOpenDetail,
   onCloseDetail,
 }: {
   page: NavKey
   detailProfile: string | null
+  autoOpenCreate: boolean
+  onAutoOpenCreateHandled: () => void
   onNav: (key: NavKey) => void
   onOpenDetail: (name: string) => void
   onCloseDetail: () => void
 }) {
   if (detailProfile) {
-    return <ProfileDetailPage profileName={detailProfile} onBack={onCloseDetail} onNavigateLibrary={() => onNav('library')} />
+    return <ProfileDetailPage profileName={detailProfile} onBack={onCloseDetail} />
   }
 
   switch (page) {
     case 'home':
       return <HomePage onNav={onNav} />
     case 'profiles':
-      return <ProfilesPage onOpenDetail={onOpenDetail} />
+      return <ProfilesPage onOpenDetail={onOpenDetail} autoOpenCreate={autoOpenCreate} onAutoOpenCreateHandled={onAutoOpenCreateHandled} />
     // case 'library':   {/* ACS migration: hidden */}
     //   return <LibraryPage />
     case 'sessions':

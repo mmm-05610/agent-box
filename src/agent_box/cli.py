@@ -286,6 +286,11 @@ def _build_parser() -> argparse.ArgumentParser:
                       help="Agent type to disable")
     pmcp.set_defaults(func=cmd_mcp_agents)
 
+    pmcp = sub_mcp.add_parser("profile-remove", help="Remove an MCP server from a profile")
+    pmcp.add_argument("profile", help="Target profile name")
+    pmcp.add_argument("id", help="MCP server id")
+    pmcp.set_defaults(func=cmd_mcp_profile_remove)
+
     # skill ------------------------------------------------------------
     p_skill = sub.add_parser("skill", help="Manage skill library entries")
     sub_skill = p_skill.add_subparsers(dest="skill_command", required=True)
@@ -988,6 +993,16 @@ def cmd_mcp_apply(args: argparse.Namespace) -> int:
         print(f"agent-box: {exc}", file=sys.stderr)
         return 2
     print(f"applied mcp-server {args.id!r} to profile {args.profile!r}")
+    return 0
+
+
+def cmd_mcp_profile_remove(args: argparse.Namespace) -> int:
+    try:
+        mcp.remove_mcp_from_profile(args.profile, args.id)
+    except (ValueError, profile.ProfileError) as exc:
+        print(f"agent-box: {exc}", file=sys.stderr)
+        return 2
+    print(f"removed mcp-server {args.id!r} from profile {args.profile!r}")
     return 0
 
 

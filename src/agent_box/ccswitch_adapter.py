@@ -125,6 +125,43 @@ def list_mcp_servers(agent_type: str) -> List[Dict[str, Any]]:
     return out
 
 
+def get_mcp_server(server_id: str) -> Optional[Dict[str, Any]]:
+    """Read a single MCP server from ACS, including enabled agent types."""
+    conn = _conn()
+    row = conn.execute(
+        "SELECT id, name, server_config, description, homepage, docs, tags, "
+        "enabled_claude, enabled_codex, enabled_gemini, enabled_hermes, "
+        "enabled_opencode, enabled_grokbuild "
+        "FROM mcp_servers WHERE id = ?", (server_id,)
+    ).fetchone()
+    if row is None:
+        conn.close()
+        return None
+    cfg = {}
+    try:
+        cfg = json.loads(row["server_config"] or "{}")
+    except json.JSONDecodeError:
+        pass
+    tags = []
+    try:
+        tags = json.loads(row["tags"] or "[]")
+    except json.JSONDecodeError:
+        pass
+    enabled_agents = [
+        at for at in ("claude", "codex", "gemini", "hermes", "opencode", "grokbuild")
+        if row[f"enabled_{at}"]
+    ]
+    conn.close()
+    return {
+        "id": row["id"], "name": row["name"],
+        "description": row["description"] or "",
+        "homepage": row["homepage"] or "", "docs": row["docs"] or "",
+        "tags": tags, "server_config": cfg,
+        "server_config_parsed": cfg,
+        "agent_types": enabled_agents,
+    }
+
+
 # ── Prompts ────────────────────────────────────────────────────────────────
 
 def list_prompts(agent_type: str) -> List[Dict[str, Any]]:

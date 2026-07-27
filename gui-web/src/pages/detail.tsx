@@ -12,10 +12,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Button, Badge, Tabs } from '@/components/ui'
 import { Loading } from '@/components/feedback'
-import type { AgentType, McpServer } from '@/api'
+import type { AgentType } from '@/api'
 import { AGENT_TYPE_COLORS, fetchProfileDetail } from '@/api'
 import { readFile, findFiles } from '@/api/files'
-import { fetchMcpServers } from '@/api/mcp'
 import { MetaEditor } from './detail/MetaEditor'
 import { ProviderTab } from './detail/ProviderTab'
 import type { ConfigFile } from './detail/ProviderTab'
@@ -26,6 +25,7 @@ import { FileTextEditor } from './detail/FileTextEditor'
 import { McpTab } from './detail/McpTab'
 import { SkillsTab } from './detail/SkillsTab'
 import { StorageExplorer } from './detail/StorageExplorer'
+import { PromptTab } from './detail/PromptTab'
 import { RulesTab } from './detail/RulesTab'
 import { HermesMemoriesTab } from './detail/HermesMemoriesTab'
 import { HermesHooksViewer } from './detail/HermesHooksViewer'
@@ -74,6 +74,7 @@ const OTHER_TABS: Record<string, TabDef[]> = {
     { key: 'provider',   label: 'Provider' },
     { key: 'agents-md',  label: 'AGENTS.md' },
     { key: 'rules',      label: 'Rules' },
+    { key: 'mcp',        label: 'MCP' },
     { key: 'skills',     label: 'Skills' },
     { key: 'storage',    label: 'Storage' },
   ],
@@ -82,6 +83,7 @@ const OTHER_TABS: Record<string, TabDef[]> = {
     { key: 'provider',   label: 'Provider' },
     { key: 'soul-md',    label: 'SOUL.md' },
     { key: 'memories',   label: 'Memories' },
+    { key: 'mcp',        label: 'MCP' },
     { key: 'skills',     label: 'Skills' },
     { key: 'hooks',      label: 'Hooks' },
     { key: 'storage',    label: 'Storage' },
@@ -91,6 +93,7 @@ const OTHER_TABS: Record<string, TabDef[]> = {
     { key: 'provider',     label: 'Provider' },
     { key: 'agents-md',    label: 'AGENTS.md' },
     { key: 'instructions', label: 'Instructions' },
+    { key: 'mcp',          label: 'MCP' },
     { key: 'skills',       label: 'Skills' },
     { key: 'storage',      label: 'Storage' },
   ],
@@ -319,19 +322,6 @@ function TabContent({
   const profilePath = detail.path
   const agentType = detail.meta.agent_type
 
-  // Library MCP list — only meaningful for claude agents; mirror ProviderEditor's
-  // conditional fetch so non-claude profiles don't burn a round-trip.
-  const [libraryMcpServers, setLibraryMcpServers] = useState<McpServer[]>([])
-  useEffect(() => {
-    if (agentType !== 'claude') {
-      setLibraryMcpServers([])
-      return
-    }
-    fetchMcpServers('claude')
-      .then(setLibraryMcpServers)
-      .catch(() => setLibraryMcpServers([]))
-  }, [agentType, refreshKey])
-
   switch (tab) {
     case 'meta':
       return <MetaEditor key={refreshKey} detail={detail} onRefresh={onRefresh} />
@@ -373,6 +363,7 @@ function TabContent({
       if (agentType === 'codex') {
         return <FileTextEditor key={refreshKey} path={claudeMdPath} content={codexAgentsMd} label="AGENTS.md" placeholder="# Custom agent instructions" onRefresh={onRefresh} />
       }
+      return <p className="text-sm text-muted-foreground p-4">Tab not implemented: {tab}</p>
     case 'instructions':
       return <OpenCodeInstructionsTab key={refreshKey} configJsonc={opencodeJsonc} profilePath={profilePath} />
     case 'rules':

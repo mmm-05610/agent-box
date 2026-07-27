@@ -36,6 +36,7 @@ interface SidebarProps {
   active: NavKey
   onNav: (key: NavKey) => void
   runningCount?: number
+  onNewProfile?: () => void
 }
 
 // ── Inline SVG icon set (16×16, stroke 1.75) ────────────────────────
@@ -127,7 +128,7 @@ const NAV_ITEMS: NavItem[] = [
 
 // ── Component ──────────────────────────────────────────────────────────
 
-export function Sidebar({ active, onNav, runningCount = 0 }: SidebarProps) {
+export function Sidebar({ active, onNav, runningCount = 0, onNewProfile }: SidebarProps) {
   return (
     <aside
       className={cn(
@@ -164,7 +165,7 @@ export function Sidebar({ active, onNav, runningCount = 0 }: SidebarProps) {
       <div className="relative px-3 pb-4">
         <button
           type="button"
-          onClick={() => onNav('profiles')}
+          onClick={() => onNewProfile ? onNewProfile() : onNav('profiles')}
           className={cn(
             'group flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-medium',
             'bg-foreground text-background',

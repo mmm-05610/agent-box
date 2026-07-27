@@ -19,15 +19,16 @@ interface ShellProps {
   active: NavKey
   onNav: (key: NavKey) => void
   runningCount?: number
+  onNewProfile?: () => void
   children: ReactNode
 }
 
 // ── Component ──────────────────────────────────────────────────────────
 
-export function Shell({ active, onNav, runningCount, children }: ShellProps) {
+export function Shell({ active, onNav, runningCount, onNewProfile, children }: ShellProps) {
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-background">
-      <Sidebar active={active} onNav={onNav} runningCount={runningCount} />
+      <Sidebar active={active} onNav={onNav} runningCount={runningCount} onNewProfile={onNewProfile} />
       {/* Main canvas: clean cool-gray surface, no decorative texture.
           Cards float on this via shadow, not via borders. */}
       <main

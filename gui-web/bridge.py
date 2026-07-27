@@ -967,6 +967,7 @@ class Api:
                 f"import json; print(json.dumps(list_mcp_servers(\"{agent_type}\")))'",
                 timeout=15,
             )
+            # Return raw string (not parsed) so frontend JSON.parse works
             return json.dumps({"ok": True, "data": out})
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
@@ -974,6 +975,24 @@ class Api:
     def apply_mcp_to_profile(self, profile_name: str, mcp_id: str) -> str:
         try:
             _wsl_run(f"{AGENT_BOX_CMD} mcp-server apply {profile_name} {mcp_id}")
+            return json.dumps({"ok": True})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    def get_profile_mcp(self, profile_name: str) -> str:
+        try:
+            out = _wsl_run(
+                f"python3 -c 'from agent_box.mcp import list_profile_mcp_servers; "
+                f"import json; print(json.dumps(list_profile_mcp_servers(\"{profile_name}\")))'",
+                timeout=15,
+            )
+            return json.dumps({"ok": True, "data": json.loads(out)})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    def remove_mcp_from_profile(self, profile_name: str, mcp_id: str) -> str:
+        try:
+            _wsl_run(f"{AGENT_BOX_CMD} mcp-server profile-remove {profile_name} {mcp_id}")
             return json.dumps({"ok": True})
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})

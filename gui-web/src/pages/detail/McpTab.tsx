@@ -1,18 +1,16 @@
 /**
  * MCP Tab — Available (ACS library) + Installed (from profile config).
- * Each installed MCP has a Detail button → modal with full config.
+ * All data access via bridge API — no direct file I/O.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Textarea } from '@/components/ui'
 import { useToast } from '@/components/feedback/toast'
-import { readFile, saveFile } from '@/api/files'
 import { call } from '@/lib/bridge'
 
 interface McpEntry {
   id: string
   name: string
-  description: string
   type?: string
   command?: string
   args?: string[]
@@ -36,46 +34,11 @@ interface McpTabProps {
   refreshKey?: number
 }
 
-const CONFIG_FILE: Record<string, string> = {
-  claude: 'dot-claude.json', codex: 'config.toml',
-  hermes: 'config.yaml', opencode: 'opencode.jsonc',
-}
-
-function parseInstalledMcp(agentType: string, raw: string): McpEntry[] {
-  if (!raw.trim()) return []
-  try {
-    if (agentType === 'claude') {
-      const d = JSON.parse(raw)
-      const servers = d.mcpServers || {}
-      return Object.entries(servers).map(([id, s]) => ({
-        id, name: id, description: '',
-        type: (s as any).type, command: (s as any).command,
-        args: (s as any).args, url: (s as any).url,
-        raw: s as Record<string, unknown>,
-      }))
-    }
-    if (agentType === 'opencode') {
-      const d = JSON.parse(raw.replace(/\/\/.*?\n|\/\*.*?\*\//g, '').replace(/,(\s*[}\]])/g, '$1'))
-      const mcp = d.mcp || {}
-      const servers = mcp.servers || {}
-      return Object.entries(servers).map(([id, s]) => ({
-        id, name: id, description: '',
-        type: (s as any).type === 'remote' ? 'http' : 'stdio',
-        command: (s as any).command?.[0], args: (s as any).command?.slice(1),
-        url: (s as any).url, raw: s as Record<string, unknown>,
-      }))
-    }
-    return []
-  } catch { return [] }
-}
-
-export function McpTab({ configDir, agentType, profilePath, profileName, refreshKey }: McpTabProps) {
+export function McpTab({ agentType, profileName, refreshKey }: McpTabProps) {
   const at = agentType || 'claude'
-  const configPath = `${configDir}/${CONFIG_FILE[at] ?? 'dot-claude.json'}`
   const { toast } = useToast()
 
   const [installed, setInstalled] = useState<McpEntry[]>([])
-  const [configRaw, setConfigRaw] = useState('')
   const [loading, setLoading] = useState(true)
 
   const [search, setSearch] = useState('')
@@ -92,12 +55,13 @@ export function McpTab({ configDir, agentType, profilePath, profileName, refresh
   const reloadInstalled = useCallback(async () => {
     setLoading(true)
     try {
-      const raw = await readFile(configPath).catch(() => '{}')
-      setConfigRaw(raw)
-      setInstalled(parseInstalledMcp(at, raw))
+      const data = await call<McpEntry[] | null>(
+        api => api.get_profile_mcp(profileName), null
+      )
+      setInstalled(data ?? [])
     } catch { setInstalled([]) }
     finally { setLoading(false) }
-  }, [configPath, at])
+  }, [profileName])
 
   useEffect(() => { reloadInstalled() }, [reloadInstalled, refreshKey])
 
@@ -138,22 +102,14 @@ export function McpTab({ configDir, agentType, profilePath, profileName, refresh
   const handleRemove = useCallback(async (mcpId: string) => {
     setRemovingId(mcpId)
     try {
-      const servers = installed.filter(s => s.id !== mcpId)
-      const updated = JSON.parse(configRaw)
-      if (at === 'claude') {
-        updated.mcpServers = {}
-        for (const s of servers) {
-          updated.mcpServers[s.id] = { type: s.type, ...(s.command ? { command: s.command, args: s.args || [] } : {}), ...(s.url ? { url: s.url } : {}) }
-        }
-      }
-      await saveFile(configPath, JSON.stringify(updated, null, 2))
+      await call<void>(api => api.remove_mcp_from_profile(profileName, mcpId), undefined)
       await reloadInstalled()
       setTick(t => t + 1)
       toast({ type: 'success', message: `${mcpId} removed` })
     } catch (e) {
       toast({ type: 'error', message: e instanceof Error ? e.message : 'Remove failed' })
     } finally { setRemovingId(null) }
-  }, [installed, configRaw, configPath, at, reloadInstalled, toast])
+  }, [profileName, reloadInstalled, toast])
 
   return (
     <div className="space-y-6">
