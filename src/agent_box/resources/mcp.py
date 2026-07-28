@@ -26,6 +26,7 @@ from typing import Any, Dict, List, Optional
 from .. import config
 from ..profile import ProfileError, load_meta
 from .. import ccswitch_adapter as _acs
+from ..core.io import read_jsonc, read_toml, write_toml, write_yaml
 
 
 # --- list / get -----------------------------------------------------------
@@ -357,13 +358,13 @@ def _apply_codex(profile_name: str, server_id: str,
     table for stdio and ``url``/``headers`` for sse/http.
     """
     target = config.profile_agent_dir(profile_name, "codex") / "config.toml"
-    existing = _read_toml(target)
+    existing = read_toml(target)
     mcp_section = existing.get("mcp_servers")
     if not isinstance(mcp_section, dict):
         mcp_section = {}
     mcp_section[server_id] = _codex_entry(server_config)
     existing["mcp_servers"] = mcp_section
-    _write_toml(target, existing)
+    write_toml(target, existing)
 
 
 def _codex_entry(server_config: Dict[str, Any]) -> Dict[str, Any]:
@@ -420,7 +421,7 @@ def _apply_hermes(profile_name: str, server_id: str,
     entry = {k: v for k, v in server_config.items() if k != "type"}
     mcp_section[server_id] = entry
     existing["mcp_servers"] = mcp_section
-    _write_yaml(target, existing)
+    write_yaml(target, existing)
 
 
 def _apply_opencode(profile_name: str, server_id: str,
@@ -436,7 +437,7 @@ def _apply_opencode(profile_name: str, server_id: str,
     if target.is_file():
         text = target.read_text(encoding="utf-8")
         try:
-            existing = _read_jsonc(text)
+            existing = read_jsonc(text)
         except json.JSONDecodeError as exc:
             raise ProfileError(
                 f"{profile_name}: opencode.jsonc is not valid JSON: {exc}"
@@ -487,7 +488,7 @@ def _to_opencode_format(server_config: Dict[str, Any]) -> Dict[str, Any]:
 
 # --- TOML helpers ---------------------------------------------------------
 
-def _read_toml(path: Path) -> Dict[str, Any]:
+def read_toml(path: Path) -> Dict[str, Any]:
     """Read a TOML file into a dict. Returns empty dict if missing/empty."""
     if not path.is_file():
         return {}
@@ -499,7 +500,7 @@ def _read_toml(path: Path) -> Dict[str, Any]:
         return tomllib.load(fh) or {}
 
 
-def _write_toml(path: Path, data: Dict[str, Any]) -> None:
+def write_toml(path: Path, data: Dict[str, Any]) -> None:
     """Write a dict to TOML. Codex config is small enough that a simple
     hand-rolled serializer is preferable to a third-party dep.
 
@@ -569,7 +570,7 @@ def _toml_scalar(v: Any) -> str:
 
 # --- YAML helpers ---------------------------------------------------------
 
-def _write_yaml(path: Path, data: Dict[str, Any]) -> None:
+def write_yaml(path: Path, data: Dict[str, Any]) -> None:
     """Write a dict to YAML (requires PyYAML)."""
     try:
         import yaml
@@ -585,7 +586,7 @@ def _write_yaml(path: Path, data: Dict[str, Any]) -> None:
 
 # --- JSONC helpers --------------------------------------------------------
 
-def _read_jsonc(text: str) -> Dict[str, Any]:
+def read_jsonc(text: str) -> Dict[str, Any]:
     """Parse a JSONC string (// line comments, /* block comments */,
     trailing commas).
 
@@ -691,7 +692,7 @@ def _list_claude_mcp(profile_name: str) -> List[Dict[str, Any]]:
 
 def _list_codex_mcp(profile_name: str) -> List[Dict[str, Any]]:
     target = config.profile_agent_dir(profile_name, "codex") / "config.toml"
-    existing = _read_toml(target)
+    existing = read_toml(target)
     mcp_section = existing.get("mcp_servers")
     if not isinstance(mcp_section, dict):
         return []
@@ -723,7 +724,7 @@ def _list_opencode_mcp(profile_name: str) -> List[Dict[str, Any]]:
     if not target.is_file():
         return []
     try:
-        data = _read_jsonc(target.read_text(encoding="utf-8"))
+        data = read_jsonc(target.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         return []
     if not isinstance(data, dict):
@@ -785,7 +786,7 @@ def _remove_claude_mcp(profile_name: str, mcp_id: str) -> None:
 
 def _remove_codex_mcp(profile_name: str, mcp_id: str) -> None:
     target = config.profile_agent_dir(profile_name, "codex") / "config.toml"
-    existing = _read_toml(target)
+    existing = read_toml(target)
     mcp_section = existing.get("mcp_servers")
     if isinstance(mcp_section, dict):
         mcp_section.pop(mcp_id, None)
@@ -793,7 +794,7 @@ def _remove_codex_mcp(profile_name: str, mcp_id: str) -> None:
             existing["mcp_servers"] = mcp_section
         else:
             existing.pop("mcp_servers", None)
-    _write_toml(target, existing)
+    write_toml(target, existing)
 
 
 def _remove_hermes_mcp(profile_name: str, mcp_id: str) -> None:
@@ -817,7 +818,7 @@ def _remove_hermes_mcp(profile_name: str, mcp_id: str) -> None:
             data["mcp_servers"] = servers
         else:
             data.pop("mcp_servers", None)
-    _write_yaml(target, data)
+    write_yaml(target, data)
 
 
 def _remove_opencode_mcp(profile_name: str, mcp_id: str) -> None:
@@ -825,7 +826,7 @@ def _remove_opencode_mcp(profile_name: str, mcp_id: str) -> None:
     data: Dict[str, Any] = {}
     if target.is_file():
         try:
-            data = _read_jsonc(target.read_text(encoding="utf-8"))
+            data = read_jsonc(target.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
             data = {}
     if not isinstance(data, dict):
