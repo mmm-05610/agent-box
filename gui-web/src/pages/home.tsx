@@ -144,20 +144,6 @@ export function HomePage({ onNav }: HomePageProps) {
       ),
     },
     {
-      key: 'library',
-      label: 'Providers',
-      value: providerCount,
-      hint: 'configured',
-      accent: 'info',
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M3 5h7v14H3z" />
-          <path d="M10 5h7v14h-7z" />
-          <path d="M17 5h4v14h-4z" />
-        </svg>
-      ),
-    },
-    {
       key: 'sessions',
       label: 'Sessions',
       value: sessionCount,
@@ -317,18 +303,6 @@ export function HomePage({ onNav }: HomePageProps) {
                 <path d="M2.5 20a6.5 6.5 0 0113 0" />
                 <circle cx="17" cy="9" r="2.5" />
                 <path d="M21.5 18a4.5 4.5 0 00-7-3.7" />
-              </svg>
-            }
-          />
-          <RailCard
-            title="Provider library"
-            description="Switch API endpoints, manage Claude.md templates."
-            onClick={() => onNav('library')}
-            icon={
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M3 5h7v14H3z" />
-                <path d="M10 5h7v14h-7z" />
-                <path d="M17 5h4v14h-4z" />
               </svg>
             }
           />

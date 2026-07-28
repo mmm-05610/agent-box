@@ -192,10 +192,19 @@ def _build_parser() -> argparse.ArgumentParser:
     pp.add_argument("id")
     pp.set_defaults(func=cmd_provider_usage_script)
 
-    pp = sub_provider.add_parser("apply", help="Apply provider env to a profile's settings.json")
+    pp = sub_provider.add_parser("apply", help="Apply provider to a profile")
     pp.add_argument("profile", help="Target profile name")
     pp.add_argument("provider", help="Provider id (must match the provider's DB id)")
     pp.set_defaults(func=cmd_provider_apply)
+
+    pp = sub_provider.add_parser("profile-list", help="List providers added to a profile (Hermes/OpenCode)")
+    pp.add_argument("profile", help="Profile name")
+    pp.set_defaults(func=cmd_provider_profile_list)
+
+    pp = sub_provider.add_parser("profile-remove", help="Remove a provider from a profile (Hermes/OpenCode)")
+    pp.add_argument("profile", help="Profile name")
+    pp.add_argument("provider", help="Provider id to remove")
+    pp.set_defaults(func=cmd_provider_profile_remove)
 
     # claude-md ---------------------------------------------------------
     p_md = sub.add_parser("claude-md", help="Manage Claude.md templates")
@@ -277,6 +286,11 @@ def _build_parser() -> argparse.ArgumentParser:
                       help="Agent type to disable")
     pmcp.set_defaults(func=cmd_mcp_agents)
 
+    pmcp = sub_mcp.add_parser("profile-remove", help="Remove an MCP server from a profile")
+    pmcp.add_argument("profile", help="Target profile name")
+    pmcp.add_argument("id", help="MCP server id")
+    pmcp.set_defaults(func=cmd_mcp_profile_remove)
+
     # skill ------------------------------------------------------------
     p_skill = sub.add_parser("skill", help="Manage skill library entries")
     sub_skill = p_skill.add_subparsers(dest="skill_command", required=True)
@@ -312,6 +326,11 @@ def _build_parser() -> argparse.ArgumentParser:
     psk.add_argument("profile", help="Target profile name")
     psk.add_argument("id", help="Skill id")
     psk.set_defaults(func=cmd_skill_apply)
+
+    psk = sub_skill.add_parser("profile-remove", help="Remove a skill from a profile")
+    psk.add_argument("profile", help="Target profile name")
+    psk.add_argument("id", help="Skill id to remove")
+    psk.set_defaults(func=cmd_skill_profile_remove)
 
     psk = sub_skill.add_parser("agents", help="Enable/disable a skill for an agent type")
     psk.add_argument("id", help="Skill id")
@@ -356,8 +375,12 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Record exit for session ID (used by the GUI watcher)",
     )
     p_sessions.add_argument(
+        "--exit-by-pid", dest="exit_pid", type=int, default=None, metavar="PID",
+        help="Record exit for the most recent session with this PID",
+    )
+    p_sessions.add_argument(
         "exit_code", type=int, nargs="?", default=None, metavar="CODE",
-        help="Exit code (with --exit)",
+        help="Exit code (with --exit or --exit-by-pid)",
     )
     p_sessions.set_defaults(func=cmd_sessions)
 
@@ -529,6 +552,13 @@ def cmd_delete(args: argparse.Namespace) -> int:
 
 
 def cmd_sessions(args: argparse.Namespace) -> int:
+    # --exit-by-pid PID CODE: record exit by PID and return.
+    if args.exit_pid is not None:
+        code = args.exit_code if args.exit_code is not None else 0
+        sessions.record_exit_by_pid(args.exit_pid, code)
+        print(f"recorded exit for pid {args.exit_pid} code {code}")
+        return 0
+
     # --exit ID CODE: record exit and return.
     if args.exit_id is not None:
         code = args.exit_code
@@ -588,10 +618,14 @@ def cmd_sessions(args: argparse.Namespace) -> int:
 
 def cmd_provider_list(args: argparse.Namespace) -> int:
     try:
-        rows = providers.list_providers(args.type)
-    except Exception as exc:
-        print(f"agent-box: {exc}", file=sys.stderr)
-        return 2
+        from .ccswitch_adapter import list_providers as cs_list_providers
+        rows = cs_list_providers(args.type)
+    except Exception:
+        try:
+            rows = providers.list_providers(args.type)
+        except Exception as exc:
+            print(f"agent-box: {exc}", file=sys.stderr)
+            return 2
     if args.json:
         json.dump(rows, sys.stdout, indent=2, ensure_ascii=False)
         sys.stdout.write("\n")
@@ -611,10 +645,14 @@ def cmd_provider_list(args: argparse.Namespace) -> int:
 
 def cmd_provider_show(args: argparse.Namespace) -> int:
     try:
-        row = providers.get_provider(args.type, args.id)
-    except Exception as exc:
-        print(f"agent-box: {exc}", file=sys.stderr)
-        return 2
+        from .ccswitch_adapter import get_provider as cs_get_provider
+        row = cs_get_provider(args.type, args.id)
+    except Exception:
+        try:
+            row = providers.get_provider(args.type, args.id)
+        except Exception as exc:
+            print(f"agent-box: {exc}", file=sys.stderr)
+            return 2
     if row is None:
         print(f"agent-box: provider {args.id!r} for {args.type!r} not found", file=sys.stderr)
         return 2
@@ -676,6 +714,32 @@ def cmd_provider_apply(args: argparse.Namespace) -> int:
         return 2
     print(f"applied provider {args.provider!r} to profile {args.profile!r}")
     return 0
+
+
+def cmd_provider_profile_list(args: argparse.Namespace) -> int:
+    try:
+        meta = profile.load_meta(args.profile)
+        rows = providers.list_profile_providers(args.profile, meta["agent_type"])
+    except Exception as exc:
+        print(f"agent-box: {exc}", file=sys.stderr)
+        return 2
+    json.dump(rows, sys.stdout, indent=2, ensure_ascii=False)
+    sys.stdout.write("\n")
+    return 0
+
+
+def cmd_provider_profile_remove(args: argparse.Namespace) -> int:
+    try:
+        meta = profile.load_meta(args.profile)
+        ok = providers.remove_profile_provider(args.profile, meta["agent_type"], args.provider)
+        if not ok:
+            print(f"agent-box: provider {args.provider!r} not found in profile {args.profile!r}", file=sys.stderr)
+            return 2
+        print(f"removed provider {args.provider!r} from profile {args.profile!r}")
+        return 0
+    except Exception as exc:
+        print(f"agent-box: {exc}", file=sys.stderr)
+        return 2
 
 
 def cmd_provider_duplicate(args: argparse.Namespace) -> int:
@@ -932,6 +996,16 @@ def cmd_mcp_apply(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_mcp_profile_remove(args: argparse.Namespace) -> int:
+    try:
+        mcp.remove_mcp_from_profile(args.profile, args.id)
+    except (ValueError, profile.ProfileError) as exc:
+        print(f"agent-box: {exc}", file=sys.stderr)
+        return 2
+    print(f"removed mcp-server {args.id!r} from profile {args.profile!r}")
+    return 0
+
+
 def cmd_mcp_agents(args: argparse.Namespace) -> int:
     if not args.agent_type and not args.disable_type:
         print("agent-box: --enable or --disable is required", file=sys.stderr)
@@ -1052,6 +1126,19 @@ def cmd_skill_apply(args: argparse.Namespace) -> int:
         return 2
     print(f"applied skill {args.id!r} to profile {args.profile!r}")
     return 0
+
+
+def cmd_skill_profile_remove(args: argparse.Namespace) -> int:
+    try:
+        ok = skills.remove_skill_from_profile(args.profile, args.id)
+        if not ok:
+            print(f"agent-box: skill {args.id!r} not found in profile {args.profile!r}", file=sys.stderr)
+            return 2
+        print(f"removed skill {args.id!r} from profile {args.profile!r}")
+        return 0
+    except (ValueError, profile.ProfileError) as exc:
+        print(f"agent-box: {exc}", file=sys.stderr)
+        return 2
 
 
 def cmd_skill_agents(args: argparse.Namespace) -> int:

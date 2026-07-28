@@ -180,3 +180,23 @@ export async function applyClaudeMdToProfile(
 ): Promise<void> {
   await call<void>((api) => api.apply_claude_md(profileName, mdId), undefined)
 }
+
+// ── Profile Provider Store (Hermes / OpenCode) ──────────────────────────
+
+export interface ProfileProvider {
+  id: string
+  name: string
+  settings: Record<string, unknown>
+  website_url?: string
+  icon?: string
+  icon_color?: string
+  category?: string
+}
+
+export async function fetchProfileProviders(profileName: string): Promise<ProfileProvider[]> {
+  return call<ProfileProvider[]>((api) => api.list_profile_providers(profileName), [])
+}
+
+export async function removeProfileProvider(profileName: string, providerId: string): Promise<boolean> {
+  return call<boolean>((api) => api.remove_profile_provider(profileName, providerId), false)
+}

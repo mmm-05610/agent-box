@@ -17,11 +17,13 @@ import {
   defaultFormValues,
   type ProviderFormValues,
 } from './ProviderFormFields'
-import { getInitialFormValues, settingsFromFormValues } from './perAgentSettings'
+import { readProviderEditorDraft, writeProviderEditorDraft } from './serialization'
 import { ClaudeProviderForm } from './forms/ClaudeProviderForm'
-import { CodexProviderForm } from './forms/CodexProviderForm'
-import { HermesProviderForm } from './forms/HermesProviderForm'
-import { OpenCodeProviderForm } from './forms/OpenCodeProviderForm'
+import { CodexProviderForm, readCodexCatalogModels, type CodexCatalogModel, type CodexChatReasoning } from './forms/CodexProviderForm'
+import { HermesProviderForm, readHermesModels, type HermesApiMode, type HermesModel } from './forms/HermesProviderForm'
+import { OpenCodeProviderForm, type OpenCodeNpmPackage } from './forms/OpenCodeProviderForm'
+import { useAgentProviderDraft } from './forms/hooks/useAgentProviderDraft'
+import { ProviderAdvancedConfig, CommonConfigEditor } from './forms/shared'
 
 export interface EditProviderDialogProps {
   open: boolean
@@ -41,8 +43,24 @@ export function EditProviderDialog({
   toast,
 }: EditProviderDialogProps) {
   const [formValues, setFormValues] = useState<ProviderFormValues>(defaultFormValues())
-  const [codexConfig, setCodexConfig] = useState('')
-  const [modelsJson, setModelsJson] = useState('')
+  const {
+    codexConfig, setCodexConfig,
+    codexCatalogModels, setCodexCatalogModels,
+    codexReasoning, setCodexReasoning,
+    codexProxyHeaders, setCodexProxyHeaders,
+    codexProxyBody, setCodexProxyBody,
+    claudeProxyHeaders, setClaudeProxyHeaders,
+    claudeProxyBody, setClaudeProxyBody,
+    claudeSettingsJson, setClaudeSettingsJson,
+    modelsJson, setModelsJson,
+    hermesApiMode, setHermesApiMode,
+    hermesModels, setHermesModels,
+    hermesRateLimit, setHermesRateLimit,
+    opencodeExtraOptions, setOpencodeExtraOptions,
+    opencodeNpm, setOpencodeNpm,
+    resetAgentDraft,
+  } = useAgentProviderDraft()
+  const [category, setCategory] = useState<string | undefined>(undefined)
   const [originalSettings, setOriginalSettings] = useState<Record<string, unknown>>({})
   const [providerName, setProviderName] = useState('')
   const [loading, setLoading] = useState(false)
@@ -54,8 +72,7 @@ export function EditProviderDialog({
   useEffect(() => {
     if (!open) {
       setFormValues(defaultFormValues())
-      setCodexConfig('')
-      setModelsJson('')
+      resetAgentDraft()
       setOriginalSettings({})
       setProviderName('')
       setError(null)
@@ -69,20 +86,25 @@ export function EditProviderDialog({
       .then((detail) => {
         if (cancelled) return
         const settings = (detail?.settings ?? {}) as Record<string, unknown>
+        const draft = readProviderEditorDraft(agentType, settings)
         setOriginalSettings(settings)
-        setFormValues(getInitialFormValues(agentType, settings))
+        setFormValues(draft.values)
         setProviderName((detail?.name as string | undefined) ?? providerId)
-        // Codex: keep raw TOML for the textarea
-        if (agentType === 'codex') {
-          setCodexConfig((settings?.config as string | undefined) ?? '')
-        }
-        // OpenCode / MiMoCode: keep raw models JSON
-        if (agentType === 'opencode' || agentType === 'mimocode') {
-          const models = settings?.models
-          if (models !== undefined) {
-            setModelsJson(JSON.stringify(models, null, 2))
-          }
-        }
+        setCategory(detail?.category)
+        setCodexConfig(draft.codex.config)
+        setCodexCatalogModels(draft.codex.catalogModels)
+        setCodexReasoning(draft.codex.reasoning)
+        setCodexProxyHeaders(draft.codex.proxyHeaders)
+        setCodexProxyBody(draft.codex.proxyBody)
+        setModelsJson(draft.opencode.modelsJson)
+        setOpencodeExtraOptions(draft.opencode.extraOptions)
+        setOpencodeNpm(draft.opencode.npm)
+        setHermesApiMode(draft.hermes.apiMode)
+        setHermesModels(draft.hermes.models)
+        setHermesRateLimit(draft.hermes.rateLimitDelay)
+        setClaudeProxyHeaders(draft.claude.proxyHeaders)
+        setClaudeProxyBody(draft.claude.proxyBody)
+        setClaudeSettingsJson(draft.claude.settingsJson)
       })
       .catch((e) => {
         if (cancelled) return
@@ -94,7 +116,7 @@ export function EditProviderDialog({
     return () => {
       cancelled = true
     }
-  }, [open, agentType, providerId])
+  }, [open, agentType, providerId, resetAgentDraft])
 
   if (!open) return null
 
@@ -128,19 +150,13 @@ export function EditProviderDialog({
     setError(null)
     setSoftIssues(null)
     try {
-      const settings = settingsFromFormValues(agentType, originalSettings, formValues)
-      if (agentType === 'codex') {
-        settings.config = codexConfig
-      }
-      if ((agentType === 'opencode' || agentType === 'mimocode') && modelsJson.trim().length > 0) {
-        try {
-          settings.models = JSON.parse(modelsJson) as Record<string, unknown>
-        } catch {
-          setError('Models JSON is invalid')
-          setSaving(false)
-          return
-        }
-      }
+      const settings = writeProviderEditorDraft(agentType, originalSettings, {
+        values: formValues,
+        claude: { proxyHeaders: claudeProxyHeaders, proxyBody: claudeProxyBody, settingsJson: claudeSettingsJson },
+        codex: { config: codexConfig, catalogModels: codexCatalogModels, reasoning: codexReasoning, proxyHeaders: codexProxyHeaders, proxyBody: codexProxyBody },
+        hermes: { apiMode: hermesApiMode, models: hermesModels, rateLimitDelay: hermesRateLimit },
+        opencode: { npm: opencodeNpm, modelsJson, extraOptions: opencodeExtraOptions },
+      })
       settings.name = formValues.name
       await saveProvider(agentType, providerId, JSON.stringify(settings))
       toast({ type: 'success', message: 'Provider saved' })
@@ -184,15 +200,68 @@ export function EditProviderDialog({
           {loading ? (
             <p className="text-sm text-muted-foreground py-8 text-center">Loading...</p>
           ) : (
+            <>
             <AgentTypeForm
               agentType={agentType}
+              category={category}
               values={formValues}
               onChange={setFormValues}
               codexConfig={codexConfig}
               onCodexConfigChange={setCodexConfig}
+              catalogModels={codexCatalogModels}
+              onCatalogModelsChange={setCodexCatalogModels}
+              codexReasoning={codexReasoning}
+              onCodexReasoningChange={setCodexReasoning}
+              codexProxyHeaders={codexProxyHeaders}
+              onCodexProxyHeadersChange={setCodexProxyHeaders}
+              codexProxyBody={codexProxyBody}
+              onCodexProxyBodyChange={setCodexProxyBody}
+              claudeProxyHeaders={claudeProxyHeaders}
+              onClaudeProxyHeadersChange={setClaudeProxyHeaders}
+              claudeProxyBody={claudeProxyBody}
+              onClaudeProxyBodyChange={setClaudeProxyBody}
+              claudeSettingsJson={claudeSettingsJson}
+              onClaudeSettingsJsonChange={setClaudeSettingsJson}
               modelsJson={modelsJson}
               onModelsJsonChange={setModelsJson}
+              hermesApiMode={hermesApiMode}
+              onHermesApiModeChange={setHermesApiMode}
+              hermesModels={hermesModels}
+              onHermesModelsChange={setHermesModels}
+              hermesRateLimit={hermesRateLimit}
+              onHermesRateLimitChange={setHermesRateLimit}
+              opencodeExtraOptions={opencodeExtraOptions}
+              onOpencodeExtraOptionsChange={setOpencodeExtraOptions}
+              opencodeNpm={opencodeNpm}
+              onOpencodeNpmChange={setOpencodeNpm}
             />
+
+            {/* ── Provider-wide advanced (Test + Billing + Common Config) ─── */}
+            <div className="border-t border-border pt-3 space-y-3">
+              <ProviderAdvancedConfig
+                testConfigEnabled={formValues.testConfigEnabled}
+                testTimeout={formValues.testTimeout}
+                testDegradedThreshold={formValues.testDegradedThreshold}
+                testMaxRetries={formValues.testMaxRetries}
+                pricingConfigEnabled={formValues.pricingConfigEnabled}
+                costMultiplier={formValues.costMultiplier}
+                pricingModelSource={formValues.pricingModelSource}
+                onTestConfigEnabledChange={(enabled) => setFormValues({ ...formValues, testConfigEnabled: enabled })}
+                onTestTimeoutChange={(value) => setFormValues({ ...formValues, testTimeout: value })}
+                onTestDegradedThresholdChange={(value) => setFormValues({ ...formValues, testDegradedThreshold: value })}
+                onTestMaxRetriesChange={(value) => setFormValues({ ...formValues, testMaxRetries: value })}
+                onPricingConfigEnabledChange={(enabled) => setFormValues({ ...formValues, pricingConfigEnabled: enabled })}
+                onCostMultiplierChange={(value) => setFormValues({ ...formValues, costMultiplier: value })}
+                onPricingModelSourceChange={(value) => setFormValues({ ...formValues, pricingModelSource: value })}
+              />
+              {agentType === 'claude' && (
+                <CommonConfigEditor
+                  value={claudeSettingsJson}
+                  onChange={setClaudeSettingsJson}
+                />
+              )}
+            </div>
+            </>
           )}
         </div>
 
@@ -236,16 +305,52 @@ export function EditProviderDialog({
 
 function AgentTypeForm(props: {
   agentType: AgentType
+  category?: string
   values: ProviderFormValues
   onChange: (next: ProviderFormValues) => void
   codexConfig: string
   onCodexConfigChange: (s: string) => void
+  catalogModels: CodexCatalogModel[]
+  onCatalogModelsChange: (models: CodexCatalogModel[]) => void
+  codexReasoning: CodexChatReasoning
+  onCodexReasoningChange: (next: CodexChatReasoning) => void
+  codexProxyHeaders: string
+  onCodexProxyHeadersChange: (next: string) => void
+  codexProxyBody: string
+  onCodexProxyBodyChange: (next: string) => void
+  claudeProxyHeaders: string
+  onClaudeProxyHeadersChange: (next: string) => void
+  claudeProxyBody: string
+  onClaudeProxyBodyChange: (next: string) => void
+  claudeSettingsJson: string
+  onClaudeSettingsJsonChange: (next: string) => void
   modelsJson: string
   onModelsJsonChange: (s: string) => void
+  hermesApiMode?: HermesApiMode
+  onHermesApiModeChange?: (mode: HermesApiMode) => void
+  hermesModels?: HermesModel[]
+  onHermesModelsChange?: (models: HermesModel[]) => void
+  hermesRateLimit?: number
+  onHermesRateLimitChange?: (delay: number | undefined) => void
+  opencodeExtraOptions?: Record<string, unknown>
+  onOpencodeExtraOptionsChange?: (next: Record<string, unknown>) => void
+  opencodeNpm: OpenCodeNpmPackage
+  onOpencodeNpmChange: (next: OpenCodeNpmPackage) => void
 }): ReactNode {
   switch (props.agentType) {
     case 'claude':
-      return <ClaudeProviderForm values={props.values} onChange={props.onChange} presetApiKeyUrl={props.values.websiteUrl || undefined} />
+      return (
+        <ClaudeProviderForm
+          values={props.values}
+          onChange={props.onChange}
+          presetApiKeyUrl={props.values.websiteUrl || undefined}
+          category={props.category}
+          localProxyHeadersOverride={props.claudeProxyHeaders}
+          onLocalProxyHeadersOverrideChange={props.onClaudeProxyHeadersChange}
+          localProxyBodyOverride={props.claudeProxyBody}
+          onLocalProxyBodyOverrideChange={props.onClaudeProxyBodyChange}
+        />
+      )
     case 'codex':
       return (
         <CodexProviderForm
@@ -253,18 +358,40 @@ function AgentTypeForm(props: {
           onChange={props.onChange}
           codexConfig={props.codexConfig}
           onCodexConfigChange={props.onCodexConfigChange}
+          catalogModels={props.catalogModels}
+          onCatalogModelsChange={props.onCatalogModelsChange}
+          codexChatReasoning={props.codexReasoning}
+          onCodexChatReasoningChange={props.onCodexReasoningChange}
+          localProxyHeadersOverride={props.codexProxyHeaders}
+          onLocalProxyHeadersOverrideChange={props.onCodexProxyHeadersChange}
+          localProxyBodyOverride={props.codexProxyBody}
+          onLocalProxyBodyOverrideChange={props.onCodexProxyBodyChange}
         />
       )
     case 'hermes':
-      return <HermesProviderForm values={props.values} onChange={props.onChange} />
+      return (
+        <HermesProviderForm
+          values={props.values}
+          onChange={props.onChange}
+          apiMode={props.hermesApiMode}
+          onApiModeChange={props.onHermesApiModeChange}
+          models={props.hermesModels}
+          onModelsChange={props.onHermesModelsChange}
+          rateLimitDelay={props.hermesRateLimit}
+          onRateLimitDelayChange={props.onHermesRateLimitChange}
+        />
+      )
     case 'opencode':
-    case 'mimocode':
       return (
         <OpenCodeProviderForm
           values={props.values}
           onChange={props.onChange}
           modelsJson={props.modelsJson}
           onModelsJsonChange={props.onModelsJsonChange}
+          extraOptions={props.opencodeExtraOptions}
+          onExtraOptionsChange={props.onOpencodeExtraOptionsChange}
+          npm={props.opencodeNpm}
+          onNpmChange={props.onOpencodeNpmChange}
         />
       )
   }

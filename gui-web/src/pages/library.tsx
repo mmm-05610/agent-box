@@ -105,7 +105,6 @@ const TAB_VISIBILITY: Record<AgentType, TabKey[]> = {
   codex: ['providers', 'mcp', 'skills'],
   hermes: ['providers', 'mcp', 'skills'],
   opencode: ['providers', 'mcp', 'skills'],
-  mimocode: ['providers', 'mcp', 'skills'],
 }
 
 /** Singular noun shown in the "+ Add X" button. */

@@ -15,7 +15,7 @@ import { useSessions } from '@/hooks'
 import { cn } from '@/lib/utils'
 import { formatRelativeTime } from '@/lib/utils'
 import type { AgentType, Profile } from '@/api'
-import { AGENT_TYPES, AGENT_TYPE_COLORS, deleteProfile, launchProfile, getLastCwdMap, browseDir } from '@/api'
+import { AGENT_TYPES, AGENT_TYPE_COLORS, createProfile, deleteProfile, launchProfile, getLastCwdMap, browseDir } from '@/api'
 import { ProviderIcon } from '@/components/ProviderIcon'
 import { hasIcon, getIconMetadata } from '@/icons/extracted'
 
@@ -32,7 +32,6 @@ const AGENT_TYPE_LOGOS: Record<AgentType, string> = {
   codex: codexLogo,
   hermes: hermesLogo,
   opencode: opencodeLogo,
-  mimocode: opencodeLogo,  // MiMo Code is an OpenCode fork
 }
 
 const AGENT_TYPE_HEX: Record<AgentType, string> = {
@@ -40,7 +39,6 @@ const AGENT_TYPE_HEX: Record<AgentType, string> = {
   codex: '#10A37F',
   hermes: '#8B5CF6',
   opencode: '#3B82F6',
-  mimocode: '#6366f1',  // MiMo Code indigo
 }
 
 // ── Provider icon resolution ────────────────────────────────────────────
@@ -84,16 +82,17 @@ const FILTER_TABS: { key: FilterTab; label: string }[] = [
   { key: 'codex', label: 'Codex' },
   { key: 'hermes', label: 'Hermes' },
   { key: 'opencode', label: 'OpenCode' },
-  { key: 'mimocode', label: 'MiMo Code' },
 ]
 
 // ── Component ───────────────────────────────────────────────────────────
 
 interface ProfilesPageProps {
   onOpenDetail?: (name: string) => void
+  autoOpenCreate?: boolean
+  onAutoOpenCreateHandled?: () => void
 }
 
-export function ProfilesPage({ onOpenDetail }: ProfilesPageProps) {
+export function ProfilesPage({ onOpenDetail, autoOpenCreate, onAutoOpenCreateHandled }: ProfilesPageProps) {
   const { profiles, loading, error, refresh, filterByType } = useProfiles()
   const { sessions } = useSessions()
   const { toast } = useToast()
@@ -101,6 +100,16 @@ export function ProfilesPage({ onOpenDetail }: ProfilesPageProps) {
   const [activeFilter, setActiveFilter] = useState<FilterTab>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [lastCwdMap, setLastCwdMap] = useState<Record<string, string>>({})
+  const [showCreate, setShowCreate] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+
+  // Auto-open create modal when navigated from sidebar "New profile" button
+  useEffect(() => {
+    if (autoOpenCreate) {
+      setShowCreate(true)
+      onAutoOpenCreateHandled?.()
+    }
+  }, [autoOpenCreate, onAutoOpenCreateHandled])
 
   // Set of profile names that have running sessions
   const runningProfiles = useMemo(
@@ -158,19 +167,22 @@ export function ProfilesPage({ onOpenDetail }: ProfilesPageProps) {
   )
 
   const handleDelete = useCallback(
-    async (name: string) => {
-      const ok = window.confirm(`Delete profile "${name}"? This cannot be undone.`)
-      if (!ok) return
-      try {
-        await deleteProfile(name)
-        toast({ type: 'success', message: `Deleted "${name}"` })
-        refresh()
-      } catch {
-        toast({ type: 'error', message: `Failed to delete "${name}"` })
-      }
-    },
-    [toast, refresh],
+    (name: string) => { setDeleteTarget(name) },
+    [],
   )
+
+  const confirmDelete = useCallback(async () => {
+    const name = deleteTarget
+    if (!name) return
+    setDeleteTarget(null)
+    try {
+      await deleteProfile(name)
+      toast({ type: 'success', message: `Deleted "${name}"` })
+      refresh()
+    } catch {
+      toast({ type: 'error', message: `Failed to delete "${name}"` })
+    }
+  }, [deleteTarget, toast, refresh])
 
   const handleView = useCallback(
     (name: string) => {
@@ -224,7 +236,7 @@ export function ProfilesPage({ onOpenDetail }: ProfilesPageProps) {
           </>
         }
         action={
-          <Button size="lg">
+          <Button size="lg" onClick={() => setShowCreate(true)}>
             + New Profile
           </Button>
         }
@@ -278,11 +290,170 @@ export function ProfilesPage({ onOpenDetail }: ProfilesPageProps) {
           ))}
         </div>
       )}
+
+      {/* Create Profile Modal */}
+      {showCreate && (
+        <CreateProfileModal
+          onClose={() => setShowCreate(false)}
+          onCreated={() => { setShowCreate(false); refresh() }}
+        />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setDeleteTarget(null)}>
+          <div
+            className="relative w-full max-w-sm rounded-xl bg-card shadow-xl flex flex-col"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="px-5 py-4">
+              <h3 className="font-semibold text-foreground">Delete Profile</h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Are you sure you want to delete <span className="font-medium text-foreground">{deleteTarget}</span>?
+                This action cannot be undone.
+              </p>
+            </div>
+            <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-border/60">
+              <Button variant="outline" size="sm" onClick={() => setDeleteTarget(null)}>Cancel</Button>
+              <Button size="sm" variant="destructive" onClick={confirmDelete}>Delete</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
 
+
+// ── Create Profile Modal ─────────────────────────────────────────────────
+
+function CreateProfileModal({
+  onClose,
+  onCreated,
+}: {
+  onClose: () => void
+  onCreated: () => void
+}) {
+  const { toast } = useToast()
+
+  const [name, setName] = useState('')
+  const [agentType, setAgentType] = useState<AgentType>('claude')
+  const [displayName, setDisplayName] = useState('')
+  const [description, setDescription] = useState('')
+  const [creating, setCreating] = useState(false)
+
+  const handleCreate = async () => {
+    if (!name.trim()) return
+    setCreating(true)
+    try {
+      await createProfile(name.trim(), agentType, {
+        displayName: displayName.trim() || undefined,
+        description: description.trim() || undefined,
+      })
+      toast({ type: 'success', message: `Created "${name.trim()}"` })
+      onCreated()
+    } catch (e) {
+      toast({ type: 'error', message: e instanceof Error ? e.message : 'Create failed' })
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div
+        className="relative w-full max-w-md rounded-xl bg-card shadow-xl flex flex-col"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="sticky top-0 z-10 flex items-center justify-between gap-3 px-5 py-3 border-b border-border/60 bg-card rounded-t-xl shrink-0">
+          <h3 className="font-semibold text-foreground">Create Profile</h3>
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+          </Button>
+        </div>
+
+        {/* Body */}
+        <div className="overflow-y-auto p-5 space-y-4">
+          {/* Agent Type */}
+          <div>
+            <label className="text-sm font-medium text-foreground mb-2 block">Agent Type</label>
+            <div className="grid grid-cols-2 gap-2">
+              {AGENT_TYPES.map((at) => (
+                <button
+                  key={at}
+                  onClick={() => setAgentType(at)}
+                  className={cn(
+                    'flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-all',
+                    at === agentType
+                      ? 'border-primary bg-primary/10 text-primary font-medium'
+                      : 'border-border hover:border-muted-foreground/30 text-muted-foreground',
+                  )}
+                >
+                  <img
+                    src={AGENT_TYPE_LOGOS[at]}
+                    alt={at}
+                    className="h-5 w-5 object-contain"
+                  />
+                  {at === 'claude' ? 'Claude Code' : at === 'codex' ? 'Codex' : at === 'hermes' ? 'Hermes' : 'OpenCode'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Name */}
+          <div>
+            <label className="text-sm font-medium text-foreground mb-1 block" htmlFor="profile-name">
+              Profile Name <span className="text-destructive">*</span>
+            </label>
+            <Input
+              id="profile-name"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              placeholder="e.g. my-codex-dev"
+              onKeyDown={e => { if (e.key === 'Enter') handleCreate() }}
+            />
+          </div>
+
+          {/* Display Name */}
+          <div>
+            <label className="text-sm font-medium text-foreground mb-1 block" htmlFor="profile-display">
+              Display Name
+            </label>
+            <Input
+              id="profile-display"
+              value={displayName}
+              onChange={e => setDisplayName(e.target.value)}
+              placeholder="Optional display name"
+            />
+          </div>
+
+          {/* Description */}
+          <div>
+            <label className="text-sm font-medium text-foreground mb-1 block" htmlFor="profile-desc">
+              Description
+            </label>
+            <Input
+              id="profile-desc"
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              placeholder="Optional description"
+            />
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-border/60 rounded-b-xl">
+          <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
+          <Button size="sm" onClick={handleCreate} disabled={!name.trim() || creating} isLoading={creating}>
+            Create
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 // ── Profile Card ────────────────────────────────────────────────────────
 //

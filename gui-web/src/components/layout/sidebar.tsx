@@ -36,6 +36,7 @@ interface SidebarProps {
   active: NavKey
   onNav: (key: NavKey) => void
   runningCount?: number
+  onNewProfile?: () => void
 }
 
 // ── Inline SVG icon set (16×16, stroke 1.75) ────────────────────────
@@ -119,7 +120,7 @@ function PlusIcon() {
 const NAV_ITEMS: NavItem[] = [
   { key: 'home', label: 'Home', icon: <HomeIcon /> },
   { key: 'profiles', label: 'Profiles', icon: <ProfilesIcon /> },
-  { key: 'library', label: 'Library', icon: <LibraryIcon /> },
+  // { key: 'library', label: 'Library', icon: <LibraryIcon /> },  {/* ACS migration: hidden */}
   { key: 'sessions', label: 'Sessions', icon: <SessionsIcon /> },
   { key: 'settings', label: 'Settings', icon: <SettingsIcon /> },
   { key: 'help', label: 'Help', icon: <HelpIcon /> },
@@ -127,7 +128,7 @@ const NAV_ITEMS: NavItem[] = [
 
 // ── Component ──────────────────────────────────────────────────────────
 
-export function Sidebar({ active, onNav, runningCount = 0 }: SidebarProps) {
+export function Sidebar({ active, onNav, runningCount = 0, onNewProfile }: SidebarProps) {
   return (
     <aside
       className={cn(
@@ -164,7 +165,7 @@ export function Sidebar({ active, onNav, runningCount = 0 }: SidebarProps) {
       <div className="relative px-3 pb-4">
         <button
           type="button"
-          onClick={() => onNav('profiles')}
+          onClick={() => onNewProfile ? onNewProfile() : onNav('profiles')}
           className={cn(
             'group flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-medium',
             'bg-foreground text-background',
@@ -228,6 +229,32 @@ export function Sidebar({ active, onNav, runningCount = 0 }: SidebarProps) {
           )
         })}
       </nav>
+
+      {/* ── ACS launcher ────────────────────────────────────────────── */}
+      <div className="relative px-3 pb-2">
+        <button
+          type="button"
+          onClick={() => {
+            try {
+              window.pywebview?.api?.launch_acs()
+            } catch {
+              // silently fail — ACS is optional
+            }
+          }}
+          className={cn(
+            'flex w-full items-center gap-2 rounded-md px-3 py-2 text-xs',
+            'text-muted-foreground hover:bg-muted hover:text-foreground',
+            'transition-colors duration-fast',
+          )}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+            <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z" />
+            <polyline points="3.27,6.96 12,12.01 20.73,6.96" />
+            <line x1="12" y1="22.08" x2="12" y2="12" />
+          </svg>
+          <span>Config</span>
+        </button>
+      </div>
 
       {/* ── Status footer ────────────────────────────────────────── */}
       {/* No border line above — just spacing + subtle accent dot in

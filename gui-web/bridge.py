@@ -523,16 +523,6 @@ class Api:
 
             proc = subprocess.Popen([wsl, "bash", "-lc", script], **kwargs)
 
-            # Start watcher thread to track exit
-            def _watch():
-                exit_code = proc.wait()
-                try:
-                    _wsl_run(f"{AGENT_BOX_CMD} sessions --exit 0 {exit_code}")
-                except Exception:
-                    pass
-
-            threading.Thread(target=_watch, daemon=True).start()
-
             return json.dumps({"ok": True, "data": {"pid": proc.pid}})
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
@@ -571,12 +561,13 @@ class Api:
     def save_file(self, path: str, content: str) -> str:
         """Write *content* to *path* in WSL. Creates parent dirs if needed."""
         try:
-            import base64
-            # Use base64 via stdin to avoid shell quoting hell for multi-line content.
+            import base64, shlex
             encoded = base64.b64encode(content.encode("utf-8")).decode("ascii")
             dirname = "/".join(path.split("/")[:-1]) or "/"
+            safe_path = shlex.quote(path)
+            safe_dir = shlex.quote(dirname)
             _wsl_run(
-                f"mkdir -p {dirname} && echo {encoded} | base64 -d > '{path}'",
+                f"mkdir -p {safe_dir} && echo {shlex.quote(encoded)} | base64 -d > {safe_path}",
                 timeout=10,
             )
             return json.dumps({"ok": True})
@@ -889,6 +880,17 @@ class Api:
         except Exception as e:
             return json.dumps({"ok": True, "data": "[]"})
 
+    def delete_path(self, path: str) -> str:
+        """Delete a file or directory from WSL."""
+        try:
+            if not path or path.strip() in {"/", ".", "..", "~"}:
+                raise ValueError("refusing to delete an unsafe path")
+            import shlex
+            _wsl_run(f"rm -rf -- {shlex.quote(path)}", timeout=10)
+            return json.dumps({"ok": True, "data": True})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
     def list_dir_tree(self, path: str, max_depth: int = 4) -> str:
         """Return a directory tree (depth-limited). Hidden files excluded.
 
@@ -917,6 +919,116 @@ class Api:
     def apply_claude_md(self, profile_name: str, md_id: str) -> str:
         try:
             _wsl_run(f"{AGENT_BOX_CMD} claude-md apply {profile_name} {md_id}")
+            return json.dumps({"ok": True})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    def list_profile_providers(self, profile_name: str) -> str:
+        try:
+            out = _wsl_run(f"{AGENT_BOX_CMD} provider profile-list {profile_name}")
+            return json.dumps({"ok": True, "data": json.loads(out)})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    def remove_profile_provider(self, profile_name: str, provider_id: str) -> str:
+        try:
+            _wsl_run(f"{AGENT_BOX_CMD} provider profile-remove {profile_name} {provider_id}")
+            return json.dumps({"ok": True})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    def list_library_skills(self, agent_type: str) -> str:
+        """List skills from ACS database for *agent_type*."""
+        try:
+            out = _wsl_run(
+                f"python3 -c 'from agent_box.ccswitch_adapter import list_skills; "
+                f"import json; print(json.dumps(list_skills(\"{agent_type}\")))'",
+                timeout=30,
+            )
+            return json.dumps({"ok": True, "data": out})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    def list_library_prompts(self, agent_type: str) -> str:
+        try:
+            out = _wsl_run(
+                f"python3 -c 'from agent_box.ccswitch_adapter import list_prompts; "
+                f"import json; print(json.dumps(list_prompts(\"{agent_type}\")))'",
+                timeout=10,
+            )
+            return json.dumps({"ok": True, "data": out})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    def list_library_mcp(self, agent_type: str) -> str:
+        try:
+            out = _wsl_run(
+                f"python3 -c 'from agent_box.ccswitch_adapter import list_mcp_servers; "
+                f"import json; print(json.dumps(list_mcp_servers(\"{agent_type}\")))'",
+                timeout=15,
+            )
+            # Return raw string (not parsed) so frontend JSON.parse works
+            return json.dumps({"ok": True, "data": out})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    def apply_mcp_to_profile(self, profile_name: str, mcp_id: str) -> str:
+        try:
+            _wsl_run(f"{AGENT_BOX_CMD} mcp-server apply {profile_name} {mcp_id}")
+            return json.dumps({"ok": True})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    def get_profile_mcp(self, profile_name: str) -> str:
+        try:
+            out = _wsl_run(
+                f"python3 -c 'from agent_box.mcp import list_profile_mcp_servers; "
+                f"import json; print(json.dumps(list_profile_mcp_servers(\"{profile_name}\")))'",
+                timeout=15,
+            )
+            return json.dumps({"ok": True, "data": json.loads(out)})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    def remove_mcp_from_profile(self, profile_name: str, mcp_id: str) -> str:
+        try:
+            _wsl_run(f"{AGENT_BOX_CMD} mcp-server profile-remove {profile_name} {mcp_id}")
+            return json.dumps({"ok": True})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    def apply_skill_to_profile(self, profile_name: str, skill_id: str) -> str:
+        """Copy a skill from ACS to the profile's skills directory."""
+        try:
+            _wsl_run(f"{AGENT_BOX_CMD} skill apply {profile_name} {skill_id}")
+            return json.dumps({"ok": True})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    def remove_skill_from_profile(self, profile_name: str, skill_id: str) -> str:
+        """Delete a skill from the profile's skills directory."""
+        try:
+            _wsl_run(f"{AGENT_BOX_CMD} skill profile-remove {profile_name} {skill_id}")
+            return json.dumps({"ok": True})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    def launch_acs(self) -> str:
+        """Launch ACS GUI via WSLg (WSL 2 built-in GUI support)."""
+        import subprocess as _sp
+        import os as _os
+        acs_binary = "/home/maoqh/projects/agent-config-store/src-tauri/target/release/cc-switch"
+        wsl = shutil.which("wsl.exe")
+        if wsl is None:
+            return json.dumps({"ok": False, "error": "wsl.exe not found"})
+        try:
+            # WSLg provides Wayland/X11 forwarding automatically.
+            # DISPLAY / WAYLAND_DISPLAY are set inside WSL 2 by default.
+            _sp.Popen(
+                [wsl, "-e", acs_binary],
+                stdout=_sp.DEVNULL, stderr=_sp.DEVNULL,
+                start_new_session=True,
+            )
             return json.dumps({"ok": True})
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})

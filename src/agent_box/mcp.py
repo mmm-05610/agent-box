@@ -25,6 +25,7 @@ from typing import Any, Dict, List, Optional
 
 from . import config
 from .profile import ProfileError, load_meta
+from . import ccswitch_adapter as _acs
 
 
 # --- list / get -----------------------------------------------------------
@@ -277,16 +278,15 @@ def apply_mcp_server(profile_name: str, server_id: str) -> None:
     meta = load_meta(profile_name)
     profile_agent_type = meta["agent_type"]
 
-    server = get_mcp_server(server_id)
+    server = _acs.get_mcp_server(server_id)
     if server is None:
-        raise ProfileError(f"mcp-server {server_id!r} not found")
+        raise ProfileError(f"mcp-server {server_id!r} not found in ACS")
 
     enabled_agents = set(server.get("agent_types") or [])
     if profile_agent_type not in enabled_agents:
         raise ProfileError(
             f"mcp-server {server_id!r} is not enabled for agent_type "
-            f"{profile_agent_type!r}. Use: agent-box mcp-server agents "
-            f"{server_id} --enable {profile_agent_type}"
+            f"{profile_agent_type!r}"
         )
 
     server_config = server.get("server_config_parsed") or {}
@@ -635,12 +635,218 @@ def _read_jsonc(text: str) -> Dict[str, Any]:
     return json.loads(raw)
 
 
+def list_profile_mcp_servers(profile_name: str) -> List[Dict[str, Any]]:
+    """Read a profile's agent config file and return its installed MCP servers.
+
+    Returns ``[{id, name, type, command, args, url, raw}]``.
+    """
+    meta = load_meta(profile_name)
+    at = meta["agent_type"]
+
+    if at == "claude":
+        return _list_claude_mcp(profile_name)
+    elif at == "codex":
+        return _list_codex_mcp(profile_name)
+    elif at == "hermes":
+        return _list_hermes_mcp(profile_name)
+    elif at == "opencode":
+        return _list_opencode_mcp(profile_name)
+    raise ProfileError(f"list mcp not supported for {at!r}")
+
+
+def remove_mcp_from_profile(profile_name: str, mcp_id: str) -> None:
+    """Remove an MCP server entry from a profile's agent config file."""
+    meta = load_meta(profile_name)
+    at = meta["agent_type"]
+
+    if at == "claude":
+        _remove_claude_mcp(profile_name, mcp_id)
+    elif at == "codex":
+        _remove_codex_mcp(profile_name, mcp_id)
+    elif at == "hermes":
+        _remove_hermes_mcp(profile_name, mcp_id)
+    elif at == "opencode":
+        _remove_opencode_mcp(profile_name, mcp_id)
+    else:
+        raise ProfileError(f"remove mcp not supported for {at!r}")
+
+
+# ── list_profile_mcp_servers helpers ──────────────────────────────────────
+
+def _list_claude_mcp(profile_name: str) -> List[Dict[str, Any]]:
+    target = config.profile_dir(profile_name) / "dot-claude.json"
+    if not target.is_file():
+        return []
+    try:
+        data = json.loads(target.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return []
+    servers = data.get("mcpServers") if isinstance(data, dict) else None
+    if not isinstance(servers, dict):
+        return []
+    return [_mcp_entry(mcp_id, s) for mcp_id, s in servers.items()]
+
+
+def _list_codex_mcp(profile_name: str) -> List[Dict[str, Any]]:
+    target = config.profile_agent_dir(profile_name, "codex") / "config.toml"
+    existing = _read_toml(target)
+    mcp_section = existing.get("mcp_servers")
+    if not isinstance(mcp_section, dict):
+        return []
+    return [_mcp_entry(mcp_id, s) for mcp_id, s in mcp_section.items()]
+
+
+def _list_hermes_mcp(profile_name: str) -> List[Dict[str, Any]]:
+    target = config.profile_agent_dir(profile_name, "hermes") / "config.yaml"
+    if not target.is_file():
+        return []
+    try:
+        import yaml
+    except ImportError:
+        return []
+    try:
+        data = yaml.safe_load(target.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError:
+        return []
+    if not isinstance(data, dict):
+        return []
+    servers = data.get("mcp_servers")
+    if not isinstance(servers, dict):
+        return []
+    return [_mcp_entry(mcp_id, s) for mcp_id, s in servers.items()]
+
+
+def _list_opencode_mcp(profile_name: str) -> List[Dict[str, Any]]:
+    target = config.profile_agent_dir(profile_name, "opencode") / "opencode.jsonc"
+    if not target.is_file():
+        return []
+    try:
+        data = _read_jsonc(target.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return []
+    if not isinstance(data, dict):
+        return []
+    mcp = data.get("mcp")
+    if not isinstance(mcp, dict):
+        return []
+    servers = mcp.get("servers")
+    if not isinstance(servers, dict):
+        return []
+    return [_mcp_entry(mcp_id, s) for mcp_id, s in servers.items()]
+
+
+def _mcp_entry(mcp_id: str, server_cfg: Dict[str, Any]) -> Dict[str, Any]:
+    """Build a standardized MCP entry dict from a raw server config."""
+    typ = server_cfg.get("type", "")
+    # Normalize OpenCode types (local→stdio, remote→sse/http based on url)
+    if typ == "local":
+        typ = "stdio"
+    elif typ == "remote":
+        exists_url = isinstance(server_cfg.get("url"), str) and server_cfg["url"]
+        typ = "http" if exists_url else "sse"
+    cmd = server_cfg.get("command")
+    args = server_cfg.get("args")
+    # OpenCode stores command as [cmd, ...args]
+    if isinstance(cmd, list):
+        args = cmd[1:] if len(cmd) > 1 else []
+        cmd = cmd[0] if cmd else ""
+    return {
+        "id": mcp_id,
+        "name": mcp_id,
+        "type": typ or "stdio",
+        "command": cmd if isinstance(cmd, str) else "",
+        "args": args if isinstance(args, list) else [],
+        "url": server_cfg.get("url", ""),
+        "raw": server_cfg,
+    }
+
+
+# ── remove_mcp_from_profile helpers ───────────────────────────────────────
+
+def _remove_claude_mcp(profile_name: str, mcp_id: str) -> None:
+    target = config.profile_dir(profile_name) / "dot-claude.json"
+    data: Dict[str, Any] = {}
+    if target.is_file():
+        try:
+            data = json.loads(target.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            data = {}
+    if not isinstance(data, dict):
+        data = {}
+    servers = data.get("mcpServers")
+    if isinstance(servers, dict):
+        servers.pop(mcp_id, None)
+        data["mcpServers"] = servers
+    from ._io import atomic_write_json
+    atomic_write_json(target, data)
+
+
+def _remove_codex_mcp(profile_name: str, mcp_id: str) -> None:
+    target = config.profile_agent_dir(profile_name, "codex") / "config.toml"
+    existing = _read_toml(target)
+    mcp_section = existing.get("mcp_servers")
+    if isinstance(mcp_section, dict):
+        mcp_section.pop(mcp_id, None)
+        if mcp_section:
+            existing["mcp_servers"] = mcp_section
+        else:
+            existing.pop("mcp_servers", None)
+    _write_toml(target, existing)
+
+
+def _remove_hermes_mcp(profile_name: str, mcp_id: str) -> None:
+    target = config.profile_agent_dir(profile_name, "hermes") / "config.yaml"
+    data: Dict[str, Any] = {}
+    if target.is_file():
+        try:
+            import yaml
+        except ImportError as exc:
+            raise ProfileError("PyYAML is required") from exc
+        try:
+            data = yaml.safe_load(target.read_text(encoding="utf-8")) or {}
+        except yaml.YAMLError:
+            data = {}
+    if not isinstance(data, dict):
+        data = {}
+    servers = data.get("mcp_servers")
+    if isinstance(servers, dict):
+        servers.pop(mcp_id, None)
+        if servers:
+            data["mcp_servers"] = servers
+        else:
+            data.pop("mcp_servers", None)
+    _write_yaml(target, data)
+
+
+def _remove_opencode_mcp(profile_name: str, mcp_id: str) -> None:
+    target = config.profile_agent_dir(profile_name, "opencode") / "opencode.jsonc"
+    data: Dict[str, Any] = {}
+    if target.is_file():
+        try:
+            data = _read_jsonc(target.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            data = {}
+    if not isinstance(data, dict):
+        data = {}
+    mcp = data.get("mcp")
+    if isinstance(mcp, dict):
+        servers = mcp.get("servers")
+        if isinstance(servers, dict):
+            servers.pop(mcp_id, None)
+            mcp["servers"] = servers
+            data["mcp"] = mcp
+    from ._io import atomic_write_json
+    atomic_write_json(target, data)
+
+
 __all__ = [
     "apply_mcp_server",
     "delete_mcp_server",
     "get_mcp_agents",
     "get_mcp_server",
     "list_mcp_servers",
+    "list_profile_mcp_servers",
+    "remove_mcp_from_profile",
     "set_mcp_agent",
     "upsert_mcp_server",
 ]
