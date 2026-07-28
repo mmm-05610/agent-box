@@ -9,6 +9,21 @@ AGENT_TYPE_CLAUDE = "claude"
 BWRAP = "bwrap"
 
 
+# --- package resolution ─────────────────────────────────────────────────
+
+_PKG_DIR = Path(__file__).resolve().parent
+
+
+def package_dir() -> Path:
+    """Absolute path to the :mod:`agent_box` package directory.
+
+    Used to resolve package data like ``schema.sql``, ``templates/``,
+    and ``presets/`` without relying on ``__file__`` relative hacks in
+    callers.
+    """
+    return _PKG_DIR
+
+
 # --- root resolution -------------------------------------------------------
 
 def agent_box_home() -> Path:
@@ -86,6 +101,13 @@ def profile_agent_data_dir(name: str, agent_type: str) -> Path | None:
     if agent_data_dir(agent_type) is None:
         return None
     return profile_dir(name) / f"dot-{agent_type}-data"
+
+
+def profile_skills_dir(name: str, agent_type: str) -> Path:
+    """Profile's per-agent skills directory (copy target for skill apply)."""
+    if agent_type == "claude":
+        return profile_agent_dir(name, "claude") / "skills"
+    return profile_agent_dir(name, agent_type) / "skills"
 
 
 # --- validation ------------------------------------------------------------
