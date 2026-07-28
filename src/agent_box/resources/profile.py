@@ -90,7 +90,7 @@ def _migrate_legacy_meta_yaml(name: str) -> Dict[str, str] | None:
     }
 
     # Insert into profiles table.
-    from .. import db
+    from ..core import db
     conn = db.get_conn()
     conn.execute(
         "INSERT OR IGNORE INTO profiles "
@@ -124,7 +124,7 @@ def load_meta(name: str) -> Dict[str, str]:
     profile does not exist in either form.
     """
     config.validate_profile_name(name)
-    from .. import db
+    from ..core import db
     conn = db.get_conn()
     row = conn.execute(
         "SELECT name, agent_type, display_name, description, "
@@ -161,7 +161,7 @@ def update_meta(
     after the update.
     """
     config.validate_profile_name(name)
-    from .. import db
+    from ..core import db
     conn = db.get_conn()
     row = conn.execute(
         "SELECT 1 FROM profiles WHERE name = ?", (name,)
@@ -219,7 +219,7 @@ def create(
             f"Valid: {', '.join(library.get_agent_types())}"
         )
 
-    from .. import db
+    from ..core import db
     conn = db.get_conn()
     # DB uniqueness check (cheap; avoids relying on the directory's
     # presence for duplicate detection).
@@ -337,7 +337,7 @@ def list_profiles() -> List[Dict[str, Any]]:
     Returns full meta so the GUI can show which provider each profile
     references without an extra round-trip per profile.
     """
-    from .. import db
+    from ..core import db
     conn = db.get_conn()
     rows = conn.execute(
         "SELECT name, agent_type, display_name, provider_ref, claude_md_ref "
@@ -376,7 +376,7 @@ def delete(name: str, force: bool = False) -> bool:
     A failed rmtree raises ProfileError but the DB row stays removed.
     """
     config.validate_profile_name(name)
-    from .. import db
+    from ..core import db
     conn = db.get_conn()
     row = conn.execute(
         "SELECT 1 FROM profiles WHERE name = ?", (name,)

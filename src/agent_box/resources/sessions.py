@@ -36,7 +36,7 @@ def _migrate_legacy_sessions_db() -> None:
     global _migrated
     if _migrated:
         return
-    from .. import db
+    from ..core import db
     legacy_path = config.agent_box_home() / "sessions.db"
     if not legacy_path.is_file():
         _migrated = True
@@ -91,7 +91,7 @@ def _migrate_legacy_sessions_db() -> None:
 def _get_conn() -> sqlite3.Connection:
     """Return the shared :mod:`.db` connection (runs the legacy migration once)."""
     _migrate_legacy_sessions_db()
-    from .. import db
+    from ..core import db
     return db.get_conn()
 
 

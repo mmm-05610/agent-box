@@ -20,7 +20,8 @@ from typing import Any, Dict, List
 
 import pytest
 
-from agent_box import db, sessions
+from agent_box.core.db import _reset_connection_for_tests
+from agent_box import sessions
 
 
 @pytest.fixture
@@ -31,7 +32,7 @@ def tmp_agent_box_home(tmp_path, monkeypatch):
     monkeypatch.setenv("AGENT_BOX_HOME", str(home))
     # Drop the cached db connection (shared by db.py / sessions.py)
     # and the sessions-migration sentinel.
-    db._reset_connection_for_tests()
+    _reset_connection_for_tests()
     sessions._reset_connection_for_tests()
     yield home
 

@@ -71,7 +71,7 @@ def apply_provider(profile_name: str, provider_id: str) -> None:
         else:
             _apply_opencode(profile_name, provider, provider_settings)
 
-    from ... import db
+    from ...core import db
     conn = db.get_conn()
     conn.execute(
         "UPDATE profiles SET provider_ref = ? WHERE name = ?",

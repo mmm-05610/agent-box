@@ -24,7 +24,7 @@ def apply_claude_md(profile_name: str, md_id: str) -> None:
     target = config.profile_agent_dir(profile_name, agent_type) / "CLAUDE.md"
     atomic_write_text(target, prompt.get("content") or "")
 
-    from ... import db
+    from ...core import db
     conn = db.get_conn()
     conn.execute(
         "UPDATE profiles SET claude_md_ref = ? WHERE name = ?",
