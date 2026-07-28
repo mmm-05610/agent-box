@@ -4,8 +4,8 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
+from ... import config
 from ...profile import ProfileError, load_meta
-from .crud import _skills_dir_for, list_skills
 
 
 def apply_skill(profile_name: str, skill_id: str) -> None:
@@ -13,16 +13,14 @@ def apply_skill(profile_name: str, skill_id: str) -> None:
     meta = load_meta(profile_name)
     profile_agent_type = meta["agent_type"]
 
-    # Read from ACS first, fall back to agent-box DB
-    from ...ccswitch_adapter import list_skills as acs_list_skills
-    skills = acs_list_skills(profile_agent_type)
+    # Read from ACS (single source of truth — no agent-box DB fallback)
+    from ... import ccswitch_adapter as _acs
+    skills = _acs.list_skills(profile_agent_type)
     skill = next((s for s in skills if s["id"] == skill_id), None)
     if skill is None:
-        # Fallback to local (agent-box DB) skills
-        local = list_skills(agent_type=profile_agent_type)
-        skill = next((s for s in local if s["id"] == skill_id), None)
-    if skill is None:
-        raise ProfileError(f"skill {skill_id!r} not found for {profile_agent_type!r}")
+        raise ProfileError(
+            f"skill {skill_id!r} not found in ACS for {profile_agent_type!r}"
+        )
 
     src_dir = skill.get("directory") or ""
     candidates = [
@@ -36,7 +34,7 @@ def apply_skill(profile_name: str, skill_id: str) -> None:
         tried = [str(c) for c in candidates if c]
         raise ProfileError(f"skill {skill_id!r}: source not found (tried: {tried})")
 
-    skills_dir = _skills_dir_for(profile_agent_type, profile_name)
+    skills_dir = config.profile_skills_dir(profile_name, profile_agent_type)
     target = skills_dir / skill_id
     if target.exists():
         if target.is_symlink() or target.is_file():
@@ -51,7 +49,7 @@ def remove_skill_from_profile(profile_name: str, skill_id: str) -> bool:
     """Delete a skill directory from a profile's skills location."""
     meta = load_meta(profile_name)
     profile_agent_type = meta["agent_type"]
-    skills_dir = _skills_dir_for(profile_agent_type, profile_name)
+    skills_dir = config.profile_skills_dir(profile_name, profile_agent_type)
     target = skills_dir / skill_id
     if target.exists():
         if target.is_symlink() or target.is_file():

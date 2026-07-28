@@ -1,3 +1,3 @@
-"""Shim — real implementation moved to :mod:`agent_box.resources.prompts`."""
+"""Shim — apply only. Real implementation in :mod:`agent_box.resources.prompts`."""
 
-from .prompts import *
+from .prompts import apply_claude_md

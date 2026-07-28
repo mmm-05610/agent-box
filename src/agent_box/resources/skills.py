@@ -1,3 +1,3 @@
-"""Shim — real implementation moved to :mod:`agent_box.resources.skills`."""
+"""Shim — apply only. Real implementation in :mod:`agent_box.resources.skills`."""
 
-from .skills import *
+from .skills import apply_skill, remove_skill_from_profile

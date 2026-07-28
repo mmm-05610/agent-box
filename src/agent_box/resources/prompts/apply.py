@@ -1,28 +1,28 @@
-"""Prompt apply — write Claude.md content to profile CLAUDE.md files."""
+"""Prompt apply — write Claude.md content from ACS to profile files."""
 from __future__ import annotations
 
 from ... import config
-from ..._io import atomic_write_text
+from ... import ccswitch_adapter as _acs
+from ...core.io import atomic_write_text
 from ...profile import ProfileError, load_meta
-from .crud import get_claude_md
 
 
 def apply_claude_md(profile_name: str, md_id: str) -> None:
-    """Write a ClaudeMD's content to a profile's CLAUDE.md (overwrite)."""
+    """Write a prompt's content from ACS to a profile's CLAUDE.md (overwrite)."""
     meta = load_meta(profile_name)
     agent_type = meta["agent_type"]
     if agent_type != "claude":
         raise ProfileError(
-            f"claude-md apply is not yet supported for agent_type {agent_type!r} "
-            f"(v1 supports: claude)"
+            f"claude-md apply is not yet supported for agent_type {agent_type!r}"
         )
-    row = get_claude_md(agent_type, md_id)
-    if row is None:
+    prompts = _acs.list_prompts(agent_type)
+    prompt = next((p for p in prompts if p["id"] == md_id), None)
+    if prompt is None:
         raise ProfileError(
-            f"claude-md {md_id!r} for agent_type {agent_type!r} not found"
+            f"claude-md {md_id!r} not found in ACS for {agent_type!r}"
         )
     target = config.profile_agent_dir(profile_name, agent_type) / "CLAUDE.md"
-    atomic_write_text(target, row["content"] or "")
+    atomic_write_text(target, prompt.get("content") or "")
 
     from ... import db
     conn = db.get_conn()

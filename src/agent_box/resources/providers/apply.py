@@ -22,7 +22,6 @@ from typing import Any, Dict, List
 
 from ... import config
 from ...core.io import atomic_write_json, deep_merge
-from .crud import get_provider
 from ...profile import ProfileError, load_meta
 
 
@@ -51,15 +50,12 @@ def apply_provider(profile_name: str, provider_id: str) -> None:
             f"(supported: {', '.join(sorted(APPLY_SUPPORTED))})"
         )
 
-    # Read from ACS (cc-switch) database
-    from ...ccswitch_adapter import get_provider as acs_get_provider
-    provider = acs_get_provider(agent_type, provider_id)
-    if provider is None:
-        # Fallback to agent-box's own DB
-        provider = get_provider(agent_type, provider_id)
+    # Read from ACS (single source of truth — no agent-box DB fallback)
+    from ... import ccswitch_adapter as _acs
+    provider = _acs.get_provider(agent_type, provider_id)
     if provider is None:
         raise ProfileError(
-            f"provider {provider_id!r} for {agent_type!r} not found"
+            f"provider {provider_id!r} for {agent_type!r} not found in ACS"
         )
     provider_settings = provider.get("settings") or {}
 

@@ -13,7 +13,6 @@ from ... import config
 from ...profile import ProfileError, load_meta
 from ... import ccswitch_adapter as _acs
 from ...core.io import read_jsonc, read_toml, write_toml, write_yaml
-from .crud import get_mcp_server
 
 
 # --- apply ----------------------------------------------------------------
@@ -46,9 +45,7 @@ def apply_mcp_server(profile_name: str, server_id: str) -> None:
 
     server = _acs.get_mcp_server(server_id)
     if server is None:
-        server = get_mcp_server(server_id)  # fallback to agent-box DB
-    if server is None:
-        raise ProfileError(f"mcp-server {server_id!r} not found")
+        raise ProfileError(f"mcp-server {server_id!r} not found in ACS")
 
     enabled_agents = set(server.get("agent_types") or [])
     if profile_agent_type not in enabled_agents:
@@ -457,12 +454,6 @@ def _remove_opencode_mcp(profile_name: str, mcp_id: str) -> None:
 
 __all__ = [
     "apply_mcp_server",
-    "delete_mcp_server",
-    "get_mcp_agents",
-    "get_mcp_server",
-    "list_mcp_servers",
     "list_profile_mcp_servers",
     "remove_mcp_from_profile",
-    "set_mcp_agent",
-    "upsert_mcp_server",
 ]
