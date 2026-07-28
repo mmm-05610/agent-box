@@ -11,7 +11,7 @@ from typing import Any, Dict, List
 
 from ... import config
 from ..profile import ProfileError, load_meta
-from ... import ccswitch_adapter as _acs
+from ...adapters import acs as _acs
 from ...core.io import read_jsonc, read_toml, write_toml, write_yaml
 
 

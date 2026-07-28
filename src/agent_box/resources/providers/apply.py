@@ -51,7 +51,7 @@ def apply_provider(profile_name: str, provider_id: str) -> None:
         )
 
     # Read from ACS (single source of truth — no agent-box DB fallback)
-    from ... import ccswitch_adapter as _acs
+    from ...adapters import acs as _acs
     provider = _acs.get_provider(agent_type, provider_id)
     if provider is None:
         raise ProfileError(

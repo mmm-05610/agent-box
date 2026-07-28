@@ -14,7 +14,7 @@ def apply_skill(profile_name: str, skill_id: str) -> None:
     profile_agent_type = meta["agent_type"]
 
     # Read from ACS (single source of truth — no agent-box DB fallback)
-    from ... import ccswitch_adapter as _acs
+    from ...adapters import acs as _acs
     skills = _acs.list_skills(profile_agent_type)
     skill = next((s for s in skills if s["id"] == skill_id), None)
     if skill is None:

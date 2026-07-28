@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from ... import config
-from ... import ccswitch_adapter as _acs
+from ...adapters import acs as _acs
 from ...core.io import atomic_write_text
 from ..profile import ProfileError, load_meta
 

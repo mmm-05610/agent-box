@@ -52,20 +52,20 @@ class AcsStub:
         self._providers: Dict[tuple[str, str], Dict[str, Any]] = {}
         self._prompts: Dict[tuple[str, str], Dict[str, Any]] = {}
 
-        # Apply paths import ACS via ccswitch_adapter (the package-level
+        # Apply paths import ACS via acs (the package-level
         # shim). Patch the symbols it actually looks at.
-        from agent_box import ccswitch_adapter
-        monkeypatch.setattr(ccswitch_adapter, "get_mcp_server",
+        from agent_box.adapters import acs
+        monkeypatch.setattr(acs, "get_mcp_server",
                             self._get_mcp_server)
-        monkeypatch.setattr(ccswitch_adapter, "list_mcp_servers",
+        monkeypatch.setattr(acs, "list_mcp_servers",
                             self._list_mcp_servers)
-        monkeypatch.setattr(ccswitch_adapter, "get_provider",
+        monkeypatch.setattr(acs, "get_provider",
                             self._get_provider)
-        monkeypatch.setattr(ccswitch_adapter, "list_providers",
+        monkeypatch.setattr(acs, "list_providers",
                             self._list_providers)
-        monkeypatch.setattr(ccswitch_adapter, "list_skills",
+        monkeypatch.setattr(acs, "list_skills",
                             self._list_skills)
-        monkeypatch.setattr(ccswitch_adapter, "list_prompts",
+        monkeypatch.setattr(acs, "list_prompts",
                             self._list_prompts)
 
     # ── MCP ─────────────────────────────────────────────────────────
