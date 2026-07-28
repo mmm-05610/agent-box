@@ -6,17 +6,17 @@ import json
 import sys
 from typing import Dict, List, Optional
 
-from . import __version__
-from . import claude_mds
-from . import config
-from . import hooks
-from . import launch
-from . import library
-from . import mcp
-from . import profile
-from . import providers
-from . import sessions
-from . import skills
+from .. import __version__
+from .. import claude_mds
+from .. import config
+from .. import hooks
+from .. import launch
+from .. import library
+from .. import mcp
+from .. import profile
+from .. import providers
+from .. import sessions
+from .. import skills
 
 
 PROG = "agent-box"
@@ -618,7 +618,7 @@ def cmd_sessions(args: argparse.Namespace) -> int:
 
 def cmd_provider_list(args: argparse.Namespace) -> int:
     try:
-        from .ccswitch_adapter import list_providers as cs_list_providers
+        from ..ccswitch_adapter import list_providers as cs_list_providers
         rows = cs_list_providers(args.type)
     except Exception:
         try:
@@ -645,7 +645,7 @@ def cmd_provider_list(args: argparse.Namespace) -> int:
 
 def cmd_provider_show(args: argparse.Namespace) -> int:
     try:
-        from .ccswitch_adapter import get_provider as cs_get_provider
+        from ..ccswitch_adapter import get_provider as cs_get_provider
         row = cs_get_provider(args.type, args.id)
     except Exception:
         try:
