@@ -81,8 +81,6 @@ def get_conn() -> sqlite3.Connection:
                 db_path = config.library_db()
                 _conn = sqlite3.connect(str(db_path), timeout=10.0)
                 _conn.row_factory = sqlite3.Row
-                _conn.execute("PRAGMA journal_mode=WAL")
-                _conn.execute("PRAGMA synchronous=NORMAL")
                 _conn.execute("PRAGMA foreign_keys = ON")
                 _run_migrations(_conn)
     return _conn
