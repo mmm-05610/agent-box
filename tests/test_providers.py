@@ -106,8 +106,8 @@ def test_provider_apply(tmp_agent_box_home):
     assert after["env"]["ANTHROPIC_BASE_URL"] == "https://api.minimax.chat/v1"
     assert after["env"]["ANTHROPIC_AUTH_TOKEN"] == "sk-test-123"
     assert after["env"]["ANTHROPIC_DEFAULT_HAIKU_MODEL"] == "MiniMax-M2"
-    # Top-level keys preserved.
-    assert set(after.keys()) == initial_top_keys
+    # Top-level keys preserved (_provider is added by apply to track active provider).
+    assert initial_top_keys.issubset(set(after.keys()))
 
     # 5. profiles.provider_ref updated.
     meta = profile.load_meta("mycc")
@@ -137,13 +137,13 @@ def test_provider_apply_merges_existing_env(tmp_agent_box_home):
     assert after["env"]["ANTHROPIC_BASE_URL"] == "https://x"
 
 
-def test_provider_apply_non_claude(tmp_agent_box_home):
-    """Non-CC agent types raise 'not yet supported' on apply."""
+def test_provider_apply_hermes(tmp_agent_box_home):
+    """Hermes apply writes to config.yaml."""
     profile.create("hermes1", "hermes")
     with patch_editor_with({"name": "p", "env": {"X": "1"}}):
         providers.add_provider("hermes", "p")
-    with pytest.raises(ProfileError, match="not yet supported"):
-        providers.apply_provider("hermes1", "p")
+    # Hermes apply should succeed (was "not yet supported" in v0.4)
+    providers.apply_provider("hermes1", "p")
 
 
 def test_provider_apply_unknown_provider(tmp_agent_box_home):

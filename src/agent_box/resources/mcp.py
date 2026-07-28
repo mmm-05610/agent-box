@@ -280,7 +280,9 @@ def apply_mcp_server(profile_name: str, server_id: str) -> None:
 
     server = _acs.get_mcp_server(server_id)
     if server is None:
-        raise ProfileError(f"mcp-server {server_id!r} not found in ACS")
+        server = get_mcp_server(server_id)  # fallback to agent-box DB
+    if server is None:
+        raise ProfileError(f"mcp-server {server_id!r} not found")
 
     enabled_agents = set(server.get("agent_types") or [])
     if profile_agent_type not in enabled_agents:

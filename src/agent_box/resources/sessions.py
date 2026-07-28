@@ -229,32 +229,22 @@ def cleanup_stale_sessions() -> int:
     on Linux (incl. WSL) — raises ``OSError`` (or ``ProcessLookupError``)
     when the process is gone.
     """
-    rows = fetch_sessions(active_only=True)
-    cleaned = 0
-    for s in rows:
-        pid = s.get("pid")
-        if not pid:
-            continue
-        alive = False
-        try:
-            os.kill(int(pid), 0)
-            alive = True
-        except (OSError, ProcessLookupError):
-            alive = False
-        except ValueError:
-            alive = False
-        if not alive:
-            record_exit(int(s["id"]), -1)
-            cleaned += 1
+    conn = _get_conn()
+    with _lock:
+        cleaned = _auto_cleanup_zombies(conn)
+        conn.commit()
     return cleaned
 
 
 __all__ = [
+    "_get_conn",
+    "_lock",
     "_reset_connection_for_tests",
     "cleanup_stale_sessions",
     "fetch_sessions",
     "latest_cwd_for",
     "record_exit",
+    "record_exit_by_pid",
     "record_launch",
 ]
 

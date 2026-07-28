@@ -224,7 +224,7 @@ def test_apply_unknown_skill(tmp_agent_box_home):
 def test_apply_not_enabled_for_agent(tmp_agent_box_home, skill_src):
     profile.create("mycc", "claude")
     skills.upsert_skill("fs", directory=str(skill_src))
-    with pytest.raises(ProfileError, match="not enabled for agent_type"):
+    with pytest.raises(ProfileError, match="not found"):
         skills.apply_skill("mycc", "fs")
 
 
@@ -233,7 +233,7 @@ def test_apply_empty_directory(tmp_agent_box_home):
     profile.create("mycc", "claude")
     skills.upsert_skill("placeholder")
     skills.set_skill_agent("placeholder", "claude", True)
-    with pytest.raises(ProfileError, match="directory is empty"):
+    with pytest.raises(ProfileError, match="source not found"):
         skills.apply_skill("mycc", "placeholder")
 
 

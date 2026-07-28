@@ -4,6 +4,10 @@ This is the single integration point between agent-box and ACS
 (agent-config-store, the CC Switch fork). Every read of provider/MCP/
 skill/prompt data from ACS goes through this module.
 
+If the ACS database doesn't exist (not yet set up, or test environment),
+all functions return empty/None gracefully so callers can fall back to
+the agent-box database.
+
 If the data source changes in the future (e.g. ACS becomes an HTTP API),
 only this file needs to change.
 """
@@ -20,6 +24,9 @@ _CS_DB = config.agent_box_home() / "config" / "cc-switch.db"
 
 
 def _conn():
+    """Return a connection, or None if the ACS database doesn't exist."""
+    if not _CS_DB.is_file():
+        return None
     c = sqlite3.connect(str(_CS_DB))
     c.row_factory = sqlite3.Row
     return c
@@ -29,6 +36,8 @@ def _conn():
 
 def list_providers(agent_type: str) -> List[Dict[str, Any]]:
     conn = _conn()
+    if conn is None:
+        return []
     rows = conn.execute(
         "SELECT id, name, website_url, category, sort_index, notes, icon, "
         "icon_color, is_current, in_failover_queue, meta, settings_config "
@@ -54,6 +63,8 @@ def list_providers(agent_type: str) -> List[Dict[str, Any]]:
 
 def get_provider(agent_type: str, provider_id: str) -> Optional[Dict[str, Any]]:
     conn = _conn()
+    if conn is None:
+        return None
     row = conn.execute(
         "SELECT * FROM providers WHERE id = ? AND app_type = ?",
         (provider_id, agent_type),
@@ -79,6 +90,8 @@ def get_provider(agent_type: str, provider_id: str) -> Optional[Dict[str, Any]]:
 def list_skills(agent_type: str) -> List[Dict[str, Any]]:
     col = f"enabled_{agent_type}"
     conn = _conn()
+    if conn is None:
+        return []
     rows = conn.execute(
         f"SELECT id, name, description, directory, repo_owner, repo_name, "
         f"repo_branch, readme_url FROM skills WHERE {col} = 1 ORDER BY name, id"
@@ -108,6 +121,8 @@ def list_skills(agent_type: str) -> List[Dict[str, Any]]:
 def list_mcp_servers(agent_type: str) -> List[Dict[str, Any]]:
     col = f"enabled_{agent_type}"
     conn = _conn()
+    if conn is None:
+        return []
     rows = conn.execute(
         f"SELECT id, name, server_config, description, homepage, docs, tags "
         f"FROM mcp_servers WHERE {col} = 1 ORDER BY name, id"
@@ -137,6 +152,8 @@ def list_mcp_servers(agent_type: str) -> List[Dict[str, Any]]:
 def get_mcp_server(server_id: str) -> Optional[Dict[str, Any]]:
     """Read a single MCP server from ACS, including enabled agent types."""
     conn = _conn()
+    if conn is None:
+        return None
     row = conn.execute(
         "SELECT id, name, server_config, description, homepage, docs, tags, "
         "enabled_claude, enabled_codex, enabled_gemini, enabled_hermes, "
@@ -175,6 +192,8 @@ def get_mcp_server(server_id: str) -> Optional[Dict[str, Any]]:
 
 def list_prompts(agent_type: str) -> List[Dict[str, Any]]:
     conn = _conn()
+    if conn is None:
+        return []
     rows = conn.execute(
         "SELECT id, name, content, description FROM prompts "
         "WHERE app_type = ? AND enabled = 1 ORDER BY name, id",

@@ -411,4 +411,5 @@ __all__ = [
     "list_profiles",
     "load_meta",
     "show",
+    "update_meta",
 ]

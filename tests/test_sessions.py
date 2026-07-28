@@ -20,7 +20,7 @@ from agent_box import cli, sessions
 
 def test_record_launch_and_exit(tmp_agent_box_home):
     """record_launch inserts a row, record_exit marks it exited."""
-    sid = sessions.record_launch("p1", "claude", "/tmp/work", "新会话", 4242)
+    sid = sessions.record_launch("p1", "claude", "/tmp/work", "新会话", os.getpid())
     assert sid > 0
 
     # Active fetch shows the row, no exit columns
@@ -32,7 +32,7 @@ def test_record_launch_and_exit(tmp_agent_box_home):
     assert row["agent_type"] == "claude"
     assert row["cwd"] == "/tmp/work"
     assert row["mode"] == "新会话"
-    assert row["pid"] == 4242
+    assert row["pid"] == os.getpid()
     assert row["launched_at"]  # datetime string from SQLite
     assert "exited_at" not in row  # active_only drops the exit columns
 
@@ -64,9 +64,9 @@ def test_record_launch_multiple_profiles_newest_first(tmp_agent_box_home):
     falls through to insertion order in that case — so we just assert
     the count and that every inserted id is present.
     """
-    s1 = sessions.record_launch("first",  "claude", "/a", "新会话",   1000)
-    s2 = sessions.record_launch("second", "claude", "/b", "继续上次", 2000)
-    s3 = sessions.record_launch("third",  "claude", "/c", "新会话",   3000)
+    s1 = sessions.record_launch("first",  "claude", "/a", "新会话",   os.getpid())
+    s2 = sessions.record_launch("second", "claude", "/b", "继续上次", os.getpid())
+    s3 = sessions.record_launch("third",  "claude", "/c", "新会话",   os.getpid())
 
     rows = sessions.fetch_sessions()
     ids = {r["id"] for r in rows}
@@ -78,8 +78,8 @@ def test_record_launch_multiple_profiles_newest_first(tmp_agent_box_home):
 
 def test_fetch_active_only(tmp_agent_box_home):
     """active_only=True returns only rows with exited_at IS NULL."""
-    a = sessions.record_launch("alive", "claude", "/x", "新会话", 5000)
-    b = sessions.record_launch("dead",  "claude", "/y", "新会话", 5001)
+    a = sessions.record_launch("alive", "claude", "/x", "新会话", os.getpid())
+    b = sessions.record_launch("dead",  "claude", "/y", "新会话", os.getpid())
     sessions.record_exit(b, 1)
 
     active = sessions.fetch_sessions(active_only=True)
@@ -95,7 +95,7 @@ def test_fetch_active_only(tmp_agent_box_home):
 def test_fetch_sessions_limit(tmp_agent_box_home):
     """limit caps the number of returned rows."""
     for i in range(5):
-        sessions.record_launch(f"p{i}", "claude", f"/{i}", "新会话", 6000 + i)
+        sessions.record_launch(f"p{i}", "claude", f"/{i}", "新会话", os.getpid())
     rows = sessions.fetch_sessions(limit=3)
     assert len(rows) == 3
 

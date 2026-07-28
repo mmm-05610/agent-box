@@ -247,10 +247,14 @@ def apply_skill(profile_name: str, skill_id: str) -> None:
     meta = load_meta(profile_name)
     profile_agent_type = meta["agent_type"]
 
-    # Read from ACS
+    # Read from ACS first, fall back to agent-box DB
     from ..ccswitch_adapter import list_skills as acs_list_skills
     skills = acs_list_skills(profile_agent_type)
     skill = next((s for s in skills if s["id"] == skill_id), None)
+    if skill is None:
+        # Fallback to local (agent-box DB) skills
+        local = list_skills(agent_type=profile_agent_type)
+        skill = next((s for s in local if s["id"] == skill_id), None)
     if skill is None:
         raise ProfileError(f"skill {skill_id!r} not found for {profile_agent_type!r}")
 
