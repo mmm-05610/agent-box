@@ -11,7 +11,7 @@ import sys
 
 from . import config
 from . import profile
-from . import sessions
+from .resources import sessions
 
 
 # Mode labels stored in sessions.db. The GUI uses the same strings.

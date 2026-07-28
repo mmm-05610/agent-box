@@ -13,7 +13,8 @@ from typing import List
 
 import pytest
 
-from agent_box import cli, sessions
+from agent_box import cli
+from agent_box.resources import sessions
 
 
 # --- core record_launch / record_exit -------------------------------------
@@ -110,7 +111,7 @@ def test_latest_cwd(tmp_agent_box_home, monkeypatch):
     string and grows monotonically with insertion order.
     """
     import sqlite3
-    from agent_box import sessions as sess_mod
+    from agent_box.resources import sessions as sess_mod
 
     # Use the live _get_conn and INSERT with explicit timestamps instead
     # of datetime('now').

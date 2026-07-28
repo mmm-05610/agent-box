@@ -21,7 +21,7 @@ from typing import Any, Dict, List
 import pytest
 
 from agent_box.core.db import _reset_connection_for_tests
-from agent_box import sessions
+from agent_box.resources import sessions
 
 
 @pytest.fixture

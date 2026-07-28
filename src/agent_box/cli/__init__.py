@@ -12,7 +12,7 @@ from ..resources import hooks
 from .. import launch
 from ..core import library
 from .. import profile
-from .. import sessions
+from ..resources import sessions
 
 
 PROG = "agent-box"
