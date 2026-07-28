@@ -1,7 +1,7 @@
 """Tests for the agent/preset registry in agent_box.library."""
 from __future__ import annotations
 
-from agent_box import library
+from agent_box.core import library
 
 
 def test_get_agent_types():

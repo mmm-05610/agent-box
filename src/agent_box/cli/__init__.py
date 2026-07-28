@@ -10,7 +10,7 @@ from .. import __version__
 from .. import config
 from .. import hooks
 from .. import launch
-from .. import library
+from ..core import library
 from .. import profile
 from .. import sessions
 

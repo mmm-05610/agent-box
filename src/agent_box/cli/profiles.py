@@ -6,7 +6,9 @@ import json
 import sys
 from typing import Dict, List
 
-from .. import config, launch, library, profile, sessions
+from .. import config, launch
+from ..core import library
+from ..resources import profile, sessions
 
 
 def cmd_create(args: argparse.Namespace) -> int:

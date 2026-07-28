@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from .. import config
-from .. import library
+from ..core import library
 from .._io import deep_merge
 
 

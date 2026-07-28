@@ -54,7 +54,7 @@ def profile_meta(name: str) -> Path:
 
 def agent_config_dir(agent_type: str) -> str:
     """Unexpanded config-dir path (e.g. '~/.codex')."""
-    from . import library
+    from .core import library
     info = library.get_agent_config(agent_type)
     if info is None:
         raise ValueError(f"Unknown agent type: {agent_type!r}")
@@ -74,7 +74,7 @@ def profile_agent_dir(name: str, agent_type: str) -> Path:
 
 def agent_binary(agent_type: str) -> str:
     """The executable name for an agent type."""
-    from . import library
+    from .core import library
     info = library.get_agent_config(agent_type)
     if info is None:
         raise ValueError(f"Unknown agent type: {agent_type!r}")
@@ -83,7 +83,7 @@ def agent_binary(agent_type: str) -> str:
 
 def agent_data_dir(agent_type: str) -> str | None:
     """Secondary data dir path, if any (e.g. OpenCode auth)."""
-    from . import library
+    from .core import library
     info = library.get_agent_config(agent_type)
     if info is None:
         raise ValueError(f"Unknown agent type: {agent_type!r}")
