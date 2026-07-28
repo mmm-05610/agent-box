@@ -20,14 +20,16 @@ from typing import Any, Dict, List, Optional
 
 from .. import config
 
-_CS_DB = config.agent_box_home() / "config" / "cc-switch.db"
+def _cs_db_path() -> Path:
+    return config.agent_box_home() / "config" / "cc-switch.db"
 
 
 def _conn():
     """Return a connection, or None if the ACS database doesn't exist."""
-    if not _CS_DB.is_file():
+    db_path = _cs_db_path()
+    if not db_path.is_file():
         return None
-    c = sqlite3.connect(str(_CS_DB))
+    c = sqlite3.connect(str(db_path))
     c.row_factory = sqlite3.Row
     return c
 
