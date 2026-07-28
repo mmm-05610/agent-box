@@ -34,7 +34,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 from .. import config
-from .._io import atomic_write_json
+from ..core.io import atomic_write_json
 from ..profile import ProfileError, load_meta
 
 

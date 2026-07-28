@@ -19,7 +19,7 @@ from typing import Any, Dict, List
 
 from .. import config
 from ..core import library
-from .._io import deep_merge
+from ..core.io import deep_merge
 
 
 class ProfileError(Exception):
