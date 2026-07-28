@@ -8,7 +8,7 @@ from typing import Dict, List
 
 from .. import __version__
 from .. import config
-from .. import hooks
+from ..resources import hooks
 from .. import launch
 from ..core import library
 from .. import profile

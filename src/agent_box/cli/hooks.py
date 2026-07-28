@@ -6,7 +6,8 @@ import json
 import sys
 from typing import Dict, List
 
-from .. import config, hooks, profile
+from .. import config
+from ..resources import hooks, profile
 
 
 def cmd_hooks_show(args: argparse.Namespace) -> int:
