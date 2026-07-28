@@ -941,7 +941,7 @@ class Api:
         """List skills from ACS database for *agent_type*."""
         try:
             out = _wsl_run(
-                f"python3 -c 'from agent_box.ccswitch_adapter import list_skills; "
+                f"python3 -c 'from agent_box.adapters.acs import list_skills; "
                 f"import json; print(json.dumps(list_skills(\"{agent_type}\")))'",
                 timeout=30,
             )
@@ -952,7 +952,7 @@ class Api:
     def list_library_prompts(self, agent_type: str) -> str:
         try:
             out = _wsl_run(
-                f"python3 -c 'from agent_box.ccswitch_adapter import list_prompts; "
+                f"python3 -c 'from agent_box.adapters.acs import list_prompts; "
                 f"import json; print(json.dumps(list_prompts(\"{agent_type}\")))'",
                 timeout=10,
             )
@@ -963,7 +963,7 @@ class Api:
     def list_library_mcp(self, agent_type: str) -> str:
         try:
             out = _wsl_run(
-                f"python3 -c 'from agent_box.ccswitch_adapter import list_mcp_servers; "
+                f"python3 -c 'from agent_box.adapters.acs import list_mcp_servers; "
                 f"import json; print(json.dumps(list_mcp_servers(\"{agent_type}\")))'",
                 timeout=15,
             )
@@ -982,7 +982,7 @@ class Api:
     def get_profile_mcp(self, profile_name: str) -> str:
         try:
             out = _wsl_run(
-                f"python3 -c 'from agent_box.mcp import list_profile_mcp_servers; "
+                f"python3 -c 'from agent_box.resources.mcp import list_profile_mcp_servers; "
                 f"import json; print(json.dumps(list_profile_mcp_servers(\"{profile_name}\")))'",
                 timeout=15,
             )
