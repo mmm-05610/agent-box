@@ -14,7 +14,7 @@ applied on top of the base template, not a replacement for it. See
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 # ---------------------------------------------------------------------------
 # Agent type registry
@@ -41,12 +41,12 @@ def get_agent_types() -> List[str]:
     return sorted(_AGENT_TYPES.keys())
 
 
-def get_agent_config(agent_type: str) -> Optional[Dict[str, Any]]:
+def get_agent_config(agent_type: str) -> Dict[str, Any] | None:
     """Return {config_dir, binary [, data_dir]} for an agent type, or None."""
     return _AGENT_TYPES.get(agent_type)
 
 
-def get_template_dir(agent_type: str) -> Optional[Path]:
+def get_template_dir(agent_type: str) -> Path | None:
     """Absolute path to the template directory for *agent_type*.
 
     Returns *None* for unknown types. The directory is guaranteed to
@@ -56,7 +56,7 @@ def get_template_dir(agent_type: str) -> Optional[Path]:
     return p if p.is_dir() else None
 
 
-def get_template_data_dir(agent_type: str) -> Optional[Path]:
+def get_template_data_dir(agent_type: str) -> Path | None:
     """Absolute path to the secondary data template directory, or *None*.
 
     Only relevant for agents that split config across two locations
@@ -78,7 +78,7 @@ def list_presets(agent_type: str) -> List[str]:
     return sorted(d.name for d in base.iterdir() if d.is_dir())
 
 
-def get_preset_dir(agent_type: str, name: str) -> Optional[Path]:
+def get_preset_dir(agent_type: str, name: str) -> Path | None:
     """Absolute path to a preset dir, or None if the preset doesn't exist."""
     p = _PKG_DIR / "presets" / agent_type / name
     return p if p.is_dir() else None

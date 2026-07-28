@@ -16,7 +16,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from .. import config
 
@@ -63,7 +63,7 @@ def list_providers(agent_type: str) -> List[Dict[str, Any]]:
     return out
 
 
-def get_provider(agent_type: str, provider_id: str) -> Optional[Dict[str, Any]]:
+def get_provider(agent_type: str, provider_id: str) -> Dict[str, Any] | None:
     conn = _conn()
     if conn is None:
         return None
@@ -151,7 +151,7 @@ def list_mcp_servers(agent_type: str) -> List[Dict[str, Any]]:
     return out
 
 
-def get_mcp_server(server_id: str) -> Optional[Dict[str, Any]]:
+def get_mcp_server(server_id: str) -> Dict[str, Any] | None:
     """Read a single MCP server from ACS, including enabled agent types."""
     conn = _conn()
     if conn is None:

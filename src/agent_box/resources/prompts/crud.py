@@ -5,7 +5,7 @@ import os
 import tempfile
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from ... import config
 from ..._io import atomic_write_text
@@ -35,7 +35,7 @@ def list_claude_mds(agent_type: str) -> List[Dict[str, Any]]:
     ]
 
 
-def get_claude_md(agent_type: str, md_id: str) -> Optional[Dict[str, Any]]:
+def get_claude_md(agent_type: str, md_id: str) -> Dict[str, Any] | None:
     """Return the full row, or ``None`` if missing."""
     from ... import db
     conn = db.get_conn()
@@ -125,8 +125,8 @@ def add_claude_md(agent_type: str, md_id: str) -> Dict[str, Any]:
 
 
 def upsert_claude_md(agent_type: str, md_id: str, content: str, *,
-                     name: Optional[str] = None,
-                     description: Optional[str] = None) -> Dict[str, Any]:
+                     name: str | None = None,
+                     description: str | None = None) -> Dict[str, Any]:
     """Insert or update a ClaudeMD row, bypassing ``$EDITOR``.
 
     *content* is the markdown body. If *md_id* already exists for

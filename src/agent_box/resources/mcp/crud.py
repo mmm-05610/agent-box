@@ -2,14 +2,14 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from ...profile import ProfileError
 
 
 # --- list / get -----------------------------------------------------------
 
-def list_mcp_servers(agent_type: Optional[str] = None) -> List[Dict[str, Any]]:
+def list_mcp_servers(agent_type: str | None = None) -> List[Dict[str, Any]]:
     """Return one entry per MCP server, optionally filtered by agent_type.
 
     When *agent_type* is given, only servers with a row in
@@ -34,7 +34,7 @@ def list_mcp_servers(agent_type: Optional[str] = None) -> List[Dict[str, Any]]:
     return [_row_to_summary(r) for r in rows]
 
 
-def get_mcp_server(server_id: str) -> Optional[Dict[str, Any]]:
+def get_mcp_server(server_id: str) -> Dict[str, Any] | None:
     """Return the full MCP server row + agent_types, or ``None`` if missing."""
     from ... import db
     conn = db.get_conn()

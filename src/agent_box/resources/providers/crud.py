@@ -18,7 +18,7 @@ import re
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from ... import config
 from ...core.io import atomic_write_json, deep_merge
@@ -111,7 +111,7 @@ def list_providers(agent_type: str) -> List[Dict[str, Any]]:
     return out
 
 
-def get_provider(agent_type: str, provider_id: str) -> Optional[Dict[str, Any]]:
+def get_provider(agent_type: str, provider_id: str) -> Dict[str, Any] | None:
     """Return the full provider row + endpoints, or ``None`` if missing."""
     from ... import db
     conn = db.get_conn()

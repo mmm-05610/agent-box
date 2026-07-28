@@ -31,7 +31,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from .. import config
 from .._io import atomic_write_json
@@ -75,7 +75,7 @@ def _read_settings(profile_name: str) -> Dict[str, Any]:
     return data
 
 
-def get_hooks(profile_name: str) -> Optional[Dict[str, Any]]:
+def get_hooks(profile_name: str) -> Dict[str, Any] | None:
     """Return the hooks from ``settings.json``, or ``None`` if not set.
 
     Raises :class:`ProfileError` if settings.json is invalid JSON,

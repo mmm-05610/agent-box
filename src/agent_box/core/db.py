@@ -18,13 +18,12 @@ from __future__ import annotations
 import sqlite3
 import threading
 from pathlib import Path
-from typing import Optional
 
 from .. import config
 
 
 # Module-level connection + lock. See module docstring.
-_conn: Optional[sqlite3.Connection] = None
+_conn: sqlite3.Connection | None = None
 _lock = threading.Lock()
 
 _SCHEMA_PATH = Path(__file__).resolve().parent.parent / "schema.sql"

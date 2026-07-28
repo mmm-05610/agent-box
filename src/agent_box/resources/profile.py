@@ -15,7 +15,7 @@ from __future__ import annotations
 import shutil
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from .. import config
 from .. import library
@@ -51,7 +51,7 @@ def _legacy_meta_yaml_path(name: str) -> Path:
     return config.profile_dir(name) / "meta.yaml"
 
 
-def _migrate_legacy_meta_yaml(name: str) -> Optional[Dict[str, str]]:
+def _migrate_legacy_meta_yaml(name: str) -> Dict[str, str] | None:
     """If a legacy ``meta.yaml`` exists for *name*, migrate it.
 
     Returns the migrated meta dict (also INSERTed into the ``profiles``
@@ -149,10 +149,10 @@ def load_meta(name: str) -> Dict[str, str]:
 def update_meta(
     name: str,
     *,
-    display_name: Optional[str] = None,
-    description: Optional[str] = None,
-    provider: Optional[str] = None,
-    claude_md: Optional[str] = None,
+    display_name: str | None = None,
+    description: str | None = None,
+    provider: str | None = None,
+    claude_md: str | None = None,
 ) -> Dict[str, str]:
     """Update editable metadata fields for *name*.
 
@@ -200,11 +200,11 @@ def create(
     name: str,
     agent_type: str = "claude",
     *,
-    display_name: Optional[str] = None,
-    description: Optional[str] = None,
-    provider: Optional[str] = None,
-    claude_md: Optional[str] = None,
-    preset: Optional[str] = None,
+    display_name: str | None = None,
+    description: str | None = None,
+    provider: str | None = None,
+    claude_md: str | None = None,
+    preset: str | None = None,
 ) -> Path:
     """Create a new profile by copying the agent type's template directory.
 

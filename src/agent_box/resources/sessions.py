@@ -15,7 +15,7 @@ from __future__ import annotations
 import os
 import sqlite3
 import threading
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from .. import config
 
@@ -209,7 +209,7 @@ def fetch_sessions(active_only: bool = False,
     return out
 
 
-def latest_cwd_for(profile: str) -> Optional[str]:
+def latest_cwd_for(profile: str) -> str | None:
     """Return the most-recent non-empty ``cwd`` recorded for *profile*."""
     conn = _get_conn()
     with _lock:

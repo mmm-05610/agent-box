@@ -4,13 +4,13 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 from .. import config, launch, library, profile, sessions
 
 
 def cmd_create(args: argparse.Namespace) -> int:
-    claude_md_body: Optional[str] = None
+    claude_md_body: str | None = None
     if args.claude_md is not None:
         try:
             with open(args.claude_md, "r", encoding="utf-8") as fh:

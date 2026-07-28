@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Optional
 
 AGENT_BOX_HOME_ENV = "AGENT_BOX_HOME"
 AGENT_TYPE_CLAUDE = "claude"
@@ -67,7 +66,7 @@ def agent_binary(agent_type: str) -> str:
     return info["binary"]
 
 
-def agent_data_dir(agent_type: str) -> Optional[str]:
+def agent_data_dir(agent_type: str) -> str | None:
     """Secondary data dir path, if any (e.g. OpenCode auth)."""
     from . import library
     info = library.get_agent_config(agent_type)
@@ -76,13 +75,13 @@ def agent_data_dir(agent_type: str) -> Optional[str]:
     return info.get("data_dir")
 
 
-def real_agent_data_dir(agent_type: str) -> Optional[Path]:
+def real_agent_data_dir(agent_type: str) -> Path | None:
     """Resolved absolute path to the secondary data dir, or None."""
     d = agent_data_dir(agent_type)
     return Path(os.path.expanduser(d)).resolve() if d else None
 
 
-def profile_agent_data_dir(name: str, agent_type: str) -> Optional[Path]:
+def profile_agent_data_dir(name: str, agent_type: str) -> Path | None:
     """Profile-local copy of the secondary data dir, or None."""
     if agent_data_dir(agent_type) is None:
         return None

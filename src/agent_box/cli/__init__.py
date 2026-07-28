@@ -4,7 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 from .. import __version__
 from .. import claude_mds
@@ -399,7 +399,7 @@ from .hooks import cmd_hooks_show, cmd_hooks_upsert
 
 # --- entry point ----------------------------------------------------------
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: List[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
     return args.func(args)

@@ -5,7 +5,7 @@ import hashlib
 import os
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from ... import config
 from ...profile import ProfileError
@@ -20,7 +20,7 @@ def _skills_dir_for(agent_type: str, profile_name: str) -> Path:
 
 # --- list / get -----------------------------------------------------------
 
-def list_skills(agent_type: Optional[str] = None) -> List[Dict[str, Any]]:
+def list_skills(agent_type: str | None = None) -> List[Dict[str, Any]]:
     """Return one entry per skill, optionally filtered by agent_type."""
     from ... import db
     conn = db.get_conn()
@@ -44,7 +44,7 @@ def list_skills(agent_type: Optional[str] = None) -> List[Dict[str, Any]]:
     return [_row_to_summary(r) for r in rows]
 
 
-def get_skill(skill_id: str) -> Optional[Dict[str, Any]]:
+def get_skill(skill_id: str) -> Dict[str, Any] | None:
     """Return the full skill row + agent_types, or ``None`` if missing."""
     from ... import db
     conn = db.get_conn()

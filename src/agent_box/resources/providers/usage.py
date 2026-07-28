@@ -18,7 +18,7 @@ import re
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from ... import config
 from ...core.io import atomic_write_json, deep_merge
@@ -61,7 +61,7 @@ _CODEX_RESERVED_PROVIDER_IDS = frozenset({
 })
 
 
-def _first_non_empty(mapping: Optional[Dict[str, Any]], keys: tuple) -> str:
+def _first_non_empty(mapping: Dict[str, Any] | None, keys: tuple) -> str:
     """Return the first value among *keys* that is a non-empty string.
 
     Mirrors the JS ``a || b || c`` semantics: keys that are absent *or*
@@ -78,7 +78,7 @@ def _first_non_empty(mapping: Optional[Dict[str, Any]], keys: tuple) -> str:
     return ""
 
 
-def _extract_codex_active_provider(config_text: str) -> Optional[str]:
+def _extract_codex_active_provider(config_text: str) -> str | None:
     """Return the active ``model_provider`` name from a Codex config.toml body.
 
     Returns None if unset. Reserved provider ids (openai, ollama, ...) are
@@ -92,7 +92,7 @@ def _extract_codex_active_provider(config_text: str) -> Optional[str]:
     return name or None
 
 
-def _extract_codex_base_url(config_text: str) -> Optional[str]:
+def _extract_codex_base_url(config_text: str) -> str | None:
     """Resolve Codex base_url, preferring the active ``[model_providers.<X>]``
     section over the top-level ``base_url`` key.
 
@@ -125,7 +125,7 @@ def _extract_codex_base_url(config_text: str) -> Optional[str]:
     return None
 
 
-def _extract_codex_bearer_token(config_text: str) -> Optional[str]:
+def _extract_codex_bearer_token(config_text: str) -> str | None:
     """Resolve ``experimental_bearer_token`` for Codex, preferring the active
     custom provider's section over the top-level key.
 
@@ -295,7 +295,7 @@ CODING_PLAN_PROVIDERS = {
     },
 }
 
-def _detect_coding_plan_provider(base_url: str) -> Optional[Dict[str, Any]]:
+def _detect_coding_plan_provider(base_url: str) -> Dict[str, Any] | None:
     """Detect which coding plan provider matches the given base_url."""
     if not base_url:
         return None
@@ -442,7 +442,7 @@ BALANCE_PROVIDERS = {
     },
 }
 
-def _detect_balance_provider(base_url: str) -> Optional[Dict[str, Any]]:
+def _detect_balance_provider(base_url: str) -> Dict[str, Any] | None:
     """Detect which balance provider matches the given base_url."""
     if not base_url:
         return None
@@ -453,7 +453,7 @@ def _detect_balance_provider(base_url: str) -> Optional[Dict[str, Any]]:
     return None
 
 
-def _format_reset_countdown(timestamp_ms) -> Optional[str]:
+def _format_reset_countdown(timestamp_ms) -> str | None:
     """Format reset timestamp as countdown like '1h9m' or '10h9m'."""
     import time
     if not timestamp_ms:
