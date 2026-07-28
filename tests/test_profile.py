@@ -13,7 +13,7 @@ from agent_box import config
 from agent_box.core import library
 from agent_box.resources import profile
 from agent_box.core.io import deep_merge
-from agent_box.profile import ProfileError
+from agent_box.resources.profile import ProfileError
 
 
 # --- DB-backed create / list / show / delete ------------------------------

@@ -35,7 +35,7 @@ from typing import Any, Dict
 
 from .. import config
 from ..core.io import atomic_write_json
-from ..profile import ProfileError, load_meta
+from .profile import ProfileError, load_meta
 
 
 def _settings_path(profile_name: str) -> Path:

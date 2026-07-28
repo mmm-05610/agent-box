@@ -4,7 +4,8 @@ from __future__ import annotations
 import argparse
 import sys
 
-from .. import config, profile, skills
+from .. import config
+from ..resources import profile, skills
 
 
 def cmd_skill_apply(args: argparse.Namespace) -> int:

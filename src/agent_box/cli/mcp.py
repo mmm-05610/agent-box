@@ -4,7 +4,8 @@ from __future__ import annotations
 import argparse
 import sys
 
-from .. import config, mcp, profile
+from .. import config
+from ..resources import mcp, profile
 
 
 def cmd_mcp_apply(args: argparse.Namespace) -> int:

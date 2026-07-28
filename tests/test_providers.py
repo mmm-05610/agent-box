@@ -3,7 +3,8 @@ from __future__ import annotations
 
 import json
 
-from agent_box import config, profile, providers
+from agent_box import config
+from agent_box.resources import profile, providers
 
 
 def test_provider_apply(tmp_agent_box_home, acs_stub):

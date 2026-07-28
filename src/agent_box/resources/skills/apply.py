@@ -5,7 +5,7 @@ import shutil
 from pathlib import Path
 
 from ... import config
-from ...profile import ProfileError, load_meta
+from ..profile import ProfileError, load_meta
 
 
 def apply_skill(profile_name: str, skill_id: str) -> None:

@@ -5,8 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from agent_box import config, profile, skills
-from agent_box.profile import ProfileError
+from agent_box import config
+from agent_box.resources import profile, skills
+from agent_box.resources.profile import ProfileError
 
 
 # --- helpers --------------------------------------------------------------

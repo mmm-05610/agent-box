@@ -6,8 +6,9 @@ from pathlib import Path
 
 import pytest
 
-from agent_box import config, mcp, profile
-from agent_box.profile import ProfileError
+from agent_box import config
+from agent_box.resources import mcp, profile
+from agent_box.resources.profile import ProfileError
 
 
 # --- apply ----------------------------------------------------------------

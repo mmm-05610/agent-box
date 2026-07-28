@@ -14,7 +14,7 @@ import pytest
 from agent_box import config
 from agent_box.core import library
 from agent_box.resources import profile
-from agent_box.profile import ProfileError
+from agent_box.resources.profile import ProfileError
 
 
 def _settings_json(profile_name: str) -> dict:

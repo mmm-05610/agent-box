@@ -11,7 +11,7 @@ from .. import config
 from ..resources import hooks
 from .. import launch
 from ..core import library
-from .. import profile
+from ..resources import profile
 from ..resources import sessions
 
 

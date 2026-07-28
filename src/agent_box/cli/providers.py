@@ -5,7 +5,8 @@ import argparse
 import json
 import sys
 
-from .. import config, profile, providers
+from .. import config
+from ..resources import profile, providers
 
 
 def cmd_provider_apply(args: argparse.Namespace) -> int:

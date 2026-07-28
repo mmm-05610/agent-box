@@ -9,7 +9,7 @@ import pytest
 
 from agent_box import config
 from agent_box.resources import hooks, profile
-from agent_box.profile import ProfileError
+from agent_box.resources.profile import ProfileError
 
 
 _HOOKS_BODY = {

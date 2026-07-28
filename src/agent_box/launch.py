@@ -10,7 +10,7 @@ import shutil
 import sys
 
 from . import config
-from . import profile
+from .resources import profile
 from .resources import sessions
 
 

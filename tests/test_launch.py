@@ -15,7 +15,8 @@ from pathlib import Path
 
 import pytest
 
-from agent_box import config, launch, profile
+from agent_box import config, launch
+from agent_box.resources import profile
 
 
 class _ExecStop(Exception):

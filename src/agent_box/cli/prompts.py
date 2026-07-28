@@ -4,7 +4,8 @@ from __future__ import annotations
 import argparse
 import sys
 
-from .. import claude_mds, config, profile
+from .. import config
+from ..resources import profile
 
 
 def cmd_claude_md_apply(args: argparse.Namespace) -> int:

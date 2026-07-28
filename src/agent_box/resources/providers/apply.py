@@ -22,7 +22,7 @@ from typing import Any, Dict, List
 
 from ... import config
 from ...core.io import atomic_write_json, deep_merge
-from ...profile import ProfileError, load_meta
+from ..profile import ProfileError, load_meta
 
 
 
