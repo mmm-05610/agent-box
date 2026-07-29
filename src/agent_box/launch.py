@@ -98,13 +98,12 @@ def launch(name: str, extra_args: list | None = None) -> None:
         argv.insert(4, str(pdata))
         argv.insert(4, "--bind")
 
-    # Hermes: preserve hermes-agent/ (venv) from host — profile config
-    # dirs don't ship a Python virtualenv. Append mount AFTER the main
-    # config-dir mount so it overrides the hermes-agent/ subdirectory.
-    if agent_type == "hermes":
-        agent_dir = rdir / "hermes-agent"
-        profile_agent_dir = pdir / "hermes-agent"
-        venv_binary = profile_agent_dir / "venv" / "bin" / "hermes"
+    venv_preserve = agent_config.get("venv_preserve")
+    if venv_preserve:
+        host_venv = rdir / venv_preserve
+        profile_venv = pdir / venv_preserve
+        agent_dir = host_venv.parent
+        venv_binary = profile_venv / "bin" / agent_config["binary"]
         if agent_dir.is_dir() and not venv_binary.is_file():
             argv.append("--bind")
             argv.append(str(agent_dir))
