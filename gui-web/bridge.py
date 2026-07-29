@@ -17,6 +17,8 @@ from typing import Optional
 
 import webview
 
+from agent_box.core.library import get_agent_config
+
 AGENT_BOX_CMD = "agent-box"
 
 # GUI settings file (Windows side, persists across sessions)
@@ -480,20 +482,15 @@ class Api:
             cwd: Working directory (optional)
         """
         try:
-            # Resume args per agent type
-            RESUME_ARGS = {
-                "claude": ("--continue",),
-                "codex": ("resume", "--last"),
-                "hermes": ("-c",),
-                "opencode": None,
-            }
+            agent_config = get_agent_config(agent_type)
+            resume_args = (
+                agent_config.get("resume_args") if agent_config is not None else None
+            )
 
             # Build the launch command
             argv = [AGENT_BOX_CMD, "launch", name]
-            if mode == "继续上次" and agent_type in RESUME_ARGS:
-                extra = RESUME_ARGS[agent_type]
-                if extra:
-                    argv.extend(extra)
+            if mode == "继续上次" and resume_args:
+                argv.extend(resume_args)
 
             # Quote arguments and build command line
             cmdline = " ".join(f"'{a}'" if " " in a else a for a in argv)
