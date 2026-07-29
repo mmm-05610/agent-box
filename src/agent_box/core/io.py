@@ -39,13 +39,23 @@ def write_text(path: Path, text: str) -> None:
         raise
 
 
+# ── Read primitive ──────────────────────────────────────────────────────────
+
+def read_text(path: Path) -> str | None:
+    """Return file contents as a string, or ``None`` when the file is absent."""
+    if not path.is_file():
+        return None
+    return path.read_text(encoding="utf-8")
+
+
 # ── JSON ───────────────────────────────────────────────────────────────────
 
 def read_json(path: Path) -> Dict[str, Any]:
     """Return the parsed JSON object, or ``{}`` when the file is absent."""
-    if not path.is_file():
+    text = read_text(path)
+    if text is None:
         return {}
-    return json.loads(path.read_text(encoding="utf-8"))
+    return json.loads(text)
 
 
 def write_json(path: Path, data: Any) -> None:
@@ -63,9 +73,10 @@ def read_jsonc(path: Path) -> Dict[str, Any]:
     strings, so URLs like ``https://api.example.com/v1`` are preserved.
     Returns ``{}`` when the file is absent.
     """
-    if not path.is_file():
+    text = read_text(path)
+    if text is None:
         return {}
-    return _parse_jsonc(path.read_text(encoding="utf-8"))
+    return _parse_jsonc(text)
 
 
 def _parse_jsonc(text: str) -> Dict[str, Any]:
@@ -181,7 +192,8 @@ def _toml_literal(v: Any) -> str:
 
 def read_yaml(path: Path) -> Dict[str, Any]:
     """Read a YAML file. Returns empty dict if missing / unreadable."""
-    if not path.is_file():
+    text = read_text(path)
+    if text is None:
         return {}
     try:
         import yaml
@@ -191,7 +203,7 @@ def read_yaml(path: Path) -> Dict[str, Any]:
             "(install with: pip install pyyaml)"
         )
     try:
-        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        data = yaml.safe_load(text) or {}
     except yaml.YAMLError:
         return {}
     return data if isinstance(data, dict) else {}
