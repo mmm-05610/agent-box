@@ -246,10 +246,15 @@ def create(
     target = config.profile_agent_dir(name, agent_type)
     shutil.copytree(template_dir, target, symlinks=True)
 
-    # CC: also seed dot-claude.json and dot-agents/ at the profile root
-    if agent_type == "claude":
-        (root / "dot-claude.json").write_text("{}\n")
-        (root / "dot-agents").mkdir(parents=True, exist_ok=True)
+    agent_config = library.get_agent_config(agent_type)
+    if agent_config is None:
+        raise ProfileError(f"unknown agent_type {agent_type!r}")
+    for relative_path in agent_config.get("extra_profile_files", []):
+        extra_path = root / relative_path.rstrip("/")
+        if relative_path.endswith("/"):
+            extra_path.mkdir(parents=True, exist_ok=True)
+        else:
+            extra_path.write_text("{}\n", encoding="utf-8")
 
     # Copy the secondary data template directory (e.g. OpenCode auth)
     data_template = library.get_template_data_dir(agent_type)

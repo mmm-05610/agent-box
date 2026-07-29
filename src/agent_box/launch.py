@@ -10,6 +10,7 @@ import shutil
 import sys
 
 from . import config
+from .core.library import get_agent_config
 from .resources import profile
 from .resources import sessions
 
@@ -28,6 +29,9 @@ def launch(name: str, extra_args: list | None = None) -> None:
     """
     meta = profile.load_meta(name)
     agent_type = meta.get("agent_type") or config.AGENT_TYPE_CC
+    agent_config = get_agent_config(agent_type)
+    if agent_config is None:
+        raise profile.ProfileError(f"unknown agent_type {agent_type!r}")
 
     # --- resolve paths ---
     pdir = config.profile_agent_dir(name, agent_type)
@@ -67,27 +71,21 @@ def launch(name: str, extra_args: list | None = None) -> None:
         "--share-net",
     ]
 
-    # CC: also bind-mount dot-claude.json → ~/.claude.json
-    if agent_type == "claude":
-        pjson = config.profile_dir(name) / "dot-claude.json"
-        rjson = config.real_agent_dir("claude").with_name(".claude.json")
-        if pjson.is_file():
-            if not rjson.exists():
-                rjson.touch()
-            argv.insert(4, str(rjson))
-            argv.insert(4, str(pjson))
-            argv.insert(4, "--bind")
-
-        # Bind-mount dot-agents/ → ~/.agents/ so skills installed
-        # via agent-box-skill-apply are isolated per profile.
-        pagents = config.profile_dir(name) / "dot-agents"
-        ragents = config.real_agent_dir("claude").with_name(".agents")
-        if not pagents.is_dir():
-            pagents.mkdir(parents=True, exist_ok=True)
-        if not ragents.exists():
-            ragents.mkdir(parents=True, exist_ok=True)
-        argv.insert(4, str(ragents))
-        argv.insert(4, str(pagents))
+    for relative_path in agent_config.get("extra_profile_files", []):
+        extra_name = relative_path.rstrip("/")
+        profile_extra = config.profile_dir(name) / extra_name
+        real_name = f".{profile_extra.name.removeprefix('dot-')}"
+        real_extra = rdir.with_name(real_name)
+        if relative_path.endswith("/"):
+            profile_extra.mkdir(parents=True, exist_ok=True)
+            real_extra.mkdir(parents=True, exist_ok=True)
+        elif profile_extra.is_file():
+            if not real_extra.exists():
+                real_extra.touch()
+        else:
+            continue
+        argv.insert(4, str(real_extra))
+        argv.insert(4, str(profile_extra))
         argv.insert(4, "--bind")
 
     # Secondary data dir mount (e.g. OpenCode auth)
