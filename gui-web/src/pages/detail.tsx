@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Button, Badge, Tabs } from '@/components/ui'
 import { Loading } from '@/components/feedback'
-import type { AgentType } from '@/api'
+import type { AgentFeature, AgentType } from '@/api'
 import { AGENT_TYPE_COLORS, AGENT_TYPE_CONFIGS, fetchProfileDetail } from '@/api'
 import { readFile, findFiles } from '@/api/files'
 import { MetaEditor } from './detail/MetaEditor'
@@ -97,6 +97,14 @@ const OTHER_TABS: Record<string, TabDef[]> = {
     { key: 'skills',       label: 'Skills' },
     { key: 'storage',      label: 'Storage' },
   ],
+}
+
+const TAB_FEATURES: Partial<Record<TabKey, AgentFeature>> = {
+  permissions: 'permissions',
+  plugins: 'plugins',
+  rules: 'rules',
+  memories: 'memories',
+  instructions: 'instructions',
 }
 
 // ── Component ──────────────────────────────────────────────────────────
@@ -219,11 +227,16 @@ export function ProfileDetailPage({ profileName, onBack, onNavigateLibrary }: Pr
 
   const { meta } = detail
   const agentType = meta.agent_type
-  const tabs = agentType === 'claude' ? CLAUDE_TABS : (OTHER_TABS[agentType] ?? OTHER_TABS['codex']!)
+  const agentConfig = AGENT_TYPE_CONFIGS[agentType as AgentType]
+  const tabCandidates = agentType === 'claude' ? CLAUDE_TABS : (OTHER_TABS[agentType] ?? OTHER_TABS['codex']!)
+  const tabs = tabCandidates.filter(({ key }) => {
+    const feature = TAB_FEATURES[key]
+    return feature === undefined || agentConfig.features.includes(feature)
+  })
   const badgeVariant = AGENT_TYPE_COLORS[agentType as AgentType] ?? 'neutral'
   const configDir = detail.config_dir
   const settingsPath = `${configDir}/settings.json`
-  const promptFile = AGENT_TYPE_CONFIGS[agentType as AgentType].prompt_file
+  const promptFile = agentConfig.prompt_file
   const claudeMdPath = `${configDir}/${promptFile}`
 
   const configFiles: ConfigFile[] = (
