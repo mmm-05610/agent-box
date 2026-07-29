@@ -14,6 +14,7 @@ from .io import (
     write_yaml,
 )
 from .library import (
+    ACS_EXTRA_TYPES,
     get_agent_config,
     get_agent_types,
     get_template_data_dir,
@@ -21,6 +22,7 @@ from .library import (
 )
 
 __all__ = [
+    "ACS_EXTRA_TYPES",
     "deep_merge",
     "get_agent_config",
     "get_agent_types",

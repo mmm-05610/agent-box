@@ -82,6 +82,12 @@ _AGENT_TYPES: Dict[str, Dict[str, Any]] = {
 
 
 
+# Agent types that exist in the ACS database but are not yet
+# supported as agent-box profile types. Their ``enabled_*`` columns
+# must still be read when querying per-type metadata from ACS.
+ACS_EXTRA_TYPES: tuple[str, ...] = ("gemini", "grokbuild")
+
+
 def get_agent_types() -> List[str]:
     """Sorted list of supported agent type ids."""
     return sorted(_AGENT_TYPES.keys())

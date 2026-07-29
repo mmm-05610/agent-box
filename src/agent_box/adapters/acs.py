@@ -5,8 +5,8 @@ This is the single integration point between agent-box and ACS
 skill/prompt data from ACS goes through this module.
 
 If the ACS database doesn't exist (not yet set up, or test environment),
-all functions return empty/None gracefully so callers can fall back to
-the agent-box database.
+all functions return empty/None gracefully. ACS is the single source of
+truth for provider/MCP/skill/prompt data — there is no local fallback.
 
 If the data source changes in the future (e.g. ACS becomes an HTTP API),
 only this file needs to change.
@@ -19,10 +19,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from .. import config
-from ..core.library import get_agent_config, get_agent_types
-
-
-_ACS_EXTRA_AGENT_TYPES = ("gemini", "grokbuild")
+from ..core.library import ACS_EXTRA_TYPES, get_agent_config, get_agent_types
 
 
 def _acs_column(agent_type: str) -> str:
@@ -36,7 +33,7 @@ def _cs_db_path() -> Path:
     return config.agent_box_home() / "config" / "cc-switch.db"
 
 
-def _conn():
+def _conn() -> sqlite3.Connection | None:
     """Return a connection, or None if the ACS database doesn't exist."""
     db_path = _cs_db_path()
     if not db_path.is_file():
@@ -175,7 +172,7 @@ def get_mcp_server(server_id: str) -> Dict[str, Any] | None:
     }
     agent_columns.update({
         agent_type: f"enabled_{agent_type}"
-        for agent_type in _ACS_EXTRA_AGENT_TYPES
+        for agent_type in ACS_EXTRA_TYPES
     })
     column_names = ", ".join(agent_columns.values())
     row = conn.execute(
