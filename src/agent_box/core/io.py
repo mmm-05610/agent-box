@@ -12,7 +12,14 @@ import os
 from pathlib import Path
 from typing import Any, Dict
 
+import json5
 import tomli_w
+
+# Python 3.11+ ships tomllib in stdlib; fall back to tomli for 3.9/3.10.
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib  # type: ignore[no-redef]
 
 
 # ── Atomic write primitives ────────────────────────────────────────────────
@@ -77,7 +84,6 @@ def read_jsonc(path: Path) -> Dict[str, Any]:
     text = read_text(path)
     if text is None:
         return {}
-    import json5
     return json5.loads(text)
 
 
@@ -87,10 +93,6 @@ def read_toml(path: Path) -> Dict[str, Any]:
     """Read a TOML file. Returns empty dict if missing / empty."""
     if not path.is_file():
         return {}
-    try:
-        import tomllib  # Python 3.11+
-    except ImportError:
-        import tomli as tomllib  # type: ignore[no-redef]
     with open(path, "rb") as fh:
         return tomllib.load(fh) or {}
 
@@ -101,20 +103,26 @@ def write_toml(path: Path, data: Dict[str, Any]) -> None:
 
 # ── YAML ───────────────────────────────────────────────────────────────────
 
+def _require_yaml():
+    """Import PyYAML (optional dep, only needed for Hermes)."""
+    try:
+        import yaml
+        return yaml
+    except ImportError:
+        raise RuntimeError(
+            "PyYAML is required to read/write Hermes config.yaml "
+            "(install with: pip install pyyaml)"
+        )
+
+
 def read_yaml(path: Path) -> Dict[str, Any]:
     """Read a YAML file. Returns empty dict if missing / unreadable."""
     text = read_text(path)
     if text is None:
         return {}
+    yaml = _require_yaml()
     try:
-        import yaml
-    except ImportError:
-        raise RuntimeError(
-            "PyYAML is required to read Hermes config.yaml "
-            "(install with: pip install pyyaml)"
-        )
-    try:
-        data = yaml.safe_load(text) or {}
+        data = yaml.safe_load(text)
     except yaml.YAMLError:
         return {}
     return data if isinstance(data, dict) else {}
@@ -122,14 +130,8 @@ def read_yaml(path: Path) -> Dict[str, Any]:
 
 def write_yaml(path: Path, data: Dict[str, Any]) -> None:
     """Write *data* to *path* as YAML (requires PyYAML)."""
-    try:
-        import yaml
-    except ImportError as exc:
-        raise RuntimeError(
-            "PyYAML is required to write Hermes config.yaml "
-            "(install with: pip install pyyaml)"
-        ) from exc
-    text = yaml.safe_dump(data, sort_keys=False, allow_unicode=True)
+    yaml = _require_yaml()
+    text = yaml.safe_dump(data, sort_keys=True, allow_unicode=True)
     write_text(path, text)
 
 

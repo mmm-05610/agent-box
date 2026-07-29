@@ -13,8 +13,9 @@ applied on top of the base template, not a replacement for it. See
 """
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any, Dict, List
+
+from .. import config
 
 # ---------------------------------------------------------------------------
 # Agent type registry
@@ -32,8 +33,6 @@ _AGENT_TYPES: Dict[str, Dict[str, Any]] = {
                  "data_dir": "~/.local/share/opencode"},
 }
 
-# Path relative to this file → one level up to agent_box root
-_PKG_DIR = Path(__file__).resolve().parent.parent
 
 
 def get_agent_types() -> List[str]:
@@ -52,7 +51,7 @@ def get_template_dir(agent_type: str) -> Path | None:
     Returns *None* for unknown types. The directory is guaranteed to
     exist on disk for all types shipped with the package.
     """
-    p = _PKG_DIR / "templates" / agent_type
+    p = config.package_dir() / "templates" / agent_type
     return p if p.is_dir() else None
 
 
@@ -62,7 +61,7 @@ def get_template_data_dir(agent_type: str) -> Path | None:
     Only relevant for agents that split config across two locations
     (e.g. OpenCode).
     """
-    p = _PKG_DIR / "templates" / f"{agent_type}-data"
+    p = config.package_dir() / "templates" / f"{agent_type}-data"
     return p if p.is_dir() else None
 
 
@@ -72,7 +71,7 @@ def get_template_data_dir(agent_type: str) -> Path | None:
 
 def list_presets(agent_type: str) -> List[str]:
     """Sorted preset names for *agent_type* (empty list if none / unknown type)."""
-    base = _PKG_DIR / "presets" / agent_type
+    base = config.package_dir() / "presets" / agent_type
     if not base.is_dir():
         return []
     return sorted(d.name for d in base.iterdir() if d.is_dir())
@@ -80,5 +79,5 @@ def list_presets(agent_type: str) -> List[str]:
 
 def get_preset_dir(agent_type: str, name: str) -> Path | None:
     """Absolute path to a preset dir, or None if the preset doesn't exist."""
-    p = _PKG_DIR / "presets" / agent_type / name
+    p = config.package_dir() / "presets" / agent_type / name
     return p if p.is_dir() else None
