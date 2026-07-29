@@ -12,7 +12,7 @@ from typing import Any, Dict, List
 from ... import config
 from ..profile import ProfileError, load_meta
 from ...adapters import acs as _acs
-from ...core.io import _parse_jsonc, read_jsonc, read_toml, write_toml, write_yaml
+from ...core.io import read_jsonc, read_toml, write_toml, write_yaml
 
 
 # --- apply ----------------------------------------------------------------
@@ -199,7 +199,7 @@ def _apply_opencode(profile_name: str, server_id: str,
     if target.is_file():
         text = target.read_text(encoding="utf-8")
         try:
-            existing = _parse_jsonc(text)
+            existing = read_jsonc(target)
         except json.JSONDecodeError as exc:
             raise ProfileError(
                 f"{profile_name}: opencode.jsonc is not valid JSON: {exc}"

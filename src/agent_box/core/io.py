@@ -9,9 +9,10 @@ from __future__ import annotations
 
 import json
 import os
-import re
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict
+
+import tomli_w
 
 
 # ── Atomic write primitives ────────────────────────────────────────────────
@@ -80,43 +81,9 @@ def read_jsonc(path: Path) -> Dict[str, Any]:
 
 
 def _parse_jsonc(text: str) -> Dict[str, Any]:
-    cleaned: List[str] = []
-    i = 0
-    in_string = False
-    string_quote = ""
-    while i < len(text):
-        c = text[i]
-        if in_string:
-            cleaned.append(c)
-            if c == "\\" and i + 1 < len(text):
-                cleaned.append(text[i + 1])
-                i += 2
-                continue
-            if c == string_quote:
-                in_string = False
-            i += 1
-            continue
-        if c == "/" and i + 1 < len(text):
-            nxt = text[i + 1]
-            if nxt == "/":
-                while i < len(text) and text[i] != "\n":
-                    i += 1
-                continue
-            if nxt == "*":
-                i += 2
-                while i + 1 < len(text) and not (text[i] == "*" and text[i + 1] == "/"):
-                    i += 1
-                i += 2
-                continue
-        if c in ('"', "'"):
-            in_string = True
-            string_quote = c
-        cleaned.append(c)
-        i += 1
-    raw = "".join(cleaned)
-    raw = re.sub(r",(\s*[}\]])", r"\1", raw)
-    return json.loads(raw)
-
+    """Parse JSONC text. Thin wrapper around json5.loads."""
+    import json5
+    return json5.loads(text)
 
 # ── TOML ───────────────────────────────────────────────────────────────────
 
@@ -133,60 +100,8 @@ def read_toml(path: Path) -> Dict[str, Any]:
 
 
 def write_toml(path: Path, data: Dict[str, Any]) -> None:
-    """Write *data* to *path* as TOML (no third-party dependency)."""
-    lines: List[str] = []
-    top_scalars: Dict[str, Any] = {}
-    top_tables: Dict[str, Dict[str, Any]] = {}
-    for k, v in data.items():
-        if isinstance(v, dict):
-            top_tables[str(k)] = v
-        else:
-            top_scalars[str(k)] = v
-    for k, v in top_scalars.items():
-        lines.append(f"{k} = {_toml_literal(v)}")
-    if top_scalars and top_tables:
-        lines.append("")
-    for name, value in top_tables.items():
-        if lines and lines[-1] != "":
-            lines.append("")
-        _emit_toml_section(lines, [name], value)
-    text = "\n".join(lines).rstrip("\n") + "\n"
-    write_text(path, text)
-
-
-def _emit_toml_section(lines: List[str], path_parts: List[str],
-                       value: Dict[str, Any]) -> None:
-    lines.append(f"[{'.'.join(path_parts)}]")
-    sub_scalars: Dict[str, Any] = {}
-    sub_tables: Dict[str, Dict[str, Any]] = {}
-    for k, v in value.items():
-        if isinstance(v, dict):
-            sub_tables[str(k)] = v
-        else:
-            sub_scalars[str(k)] = v
-    for k, v in sub_scalars.items():
-        lines.append(f"{k} = {_toml_literal(v)}")
-    for sub_name, sub_value in sub_tables.items():
-        lines.append("")
-        _emit_toml_section(lines, path_parts + [sub_name], sub_value)
-
-
-def _toml_literal(v: Any) -> str:
-    if isinstance(v, bool):
-        return "true" if v else "false"
-    if isinstance(v, int):
-        return str(v)
-    if isinstance(v, float):
-        return repr(v)
-    if isinstance(v, str):
-        return json.dumps(v, ensure_ascii=False)
-    if isinstance(v, list):
-        return "[" + ", ".join(_toml_literal(x) for x in v) + "]"
-    if isinstance(v, dict):
-        items = ", ".join(f"{k} = {_toml_literal(val)}" for k, val in v.items())
-        return "{" + items + "}"
-    raise ValueError(f"unsupported TOML value type: {type(v).__name__}")
-
+    """Write *data* to *path* as TOML."""
+    write_text(path, tomli_w.dumps(data))
 
 # ── YAML ───────────────────────────────────────────────────────────────────
 

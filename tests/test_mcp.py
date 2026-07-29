@@ -57,7 +57,7 @@ def test_apply_codex(tmp_agent_box_home, acs_stub):
     target = config.profile_agent_dir("mycodex", "codex") / "config.toml"
     assert target.is_file()
     text = target.read_text(encoding="utf-8")
-    assert "[mcp_servers]" in text
+    assert "[mcp_servers.fs]" in text
     assert "command = " in text
     assert "npx" in text
     # Top-level template keys preserved.
