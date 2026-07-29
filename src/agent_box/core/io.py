@@ -77,13 +77,9 @@ def read_jsonc(path: Path) -> Dict[str, Any]:
     text = read_text(path)
     if text is None:
         return {}
-    return _parse_jsonc(text)
-
-
-def _parse_jsonc(text: str) -> Dict[str, Any]:
-    """Parse JSONC text. Thin wrapper around json5.loads."""
     import json5
     return json5.loads(text)
+
 
 # ── TOML ───────────────────────────────────────────────────────────────────
 
