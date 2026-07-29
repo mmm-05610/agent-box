@@ -19,6 +19,15 @@ PROG = "agent-box"
 
 
 def _build_parser() -> argparse.ArgumentParser:
+    agent_configs = [
+        agent_config
+        for agent_type in library.get_agent_types()
+        if (agent_config := library.get_agent_config(agent_type)) is not None
+    ]
+    prompt_files = ", ".join(sorted({
+        agent_config["prompt_file"]
+        for agent_config in agent_configs
+    }))
     parser = argparse.ArgumentParser(
         prog=PROG,
         description="Isolated config launcher for coding agents (bwrap bind mount).",
@@ -53,14 +62,16 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p_create.add_argument(
         "--claude-md", default=None,
-        help="Path to a file whose contents become the new profile's CLAUDE.md "
-             "(CC profiles only in v0.4). Avoids shell-quoting a multi-line body.",
+        help="Path to a file whose contents become the new profile's prompt file "
+             f"({prompt_files}, depending on --type). Avoids shell-quoting a "
+             "multi-line body.",
     )
     p_create.add_argument(
         "--preset", default=None,
-        help="Optional preset name (see: agent-box presets). Copies a preset's "
-             "CLAUDE.md, hooks.json, and settings.overlay.json onto the new "
-             "profile (CC only in v0.4). Overrides --claude-md if both given.",
+        help="Optional preset name (see: agent-box presets). Copies the preset's "
+             f"prompt file ({prompt_files}, depending on --type) and related "
+             "config files onto the new profile. Overrides --claude-md if both "
+             "are given.",
     )
     p_create.set_defaults(func=cmd_create)
 

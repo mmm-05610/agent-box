@@ -110,13 +110,30 @@ export type AgentFeature = 'permissions' | 'plugins' | 'rules' | 'memories' | 'i
 export interface AgentTypeConfig {
   prompt_file: string
   features: AgentFeature[]
+  config_files: string[]
 }
 
 export const AGENT_TYPE_CONFIGS: Record<AgentType, AgentTypeConfig> = {
-  claude: { prompt_file: 'CLAUDE.md', features: ['permissions', 'plugins'] },
-  codex: { prompt_file: 'AGENTS.md', features: ['rules'] },
-  hermes: { prompt_file: 'SOUL.md', features: ['memories'] },
-  opencode: { prompt_file: 'AGENTS.md', features: ['instructions'] },
+  claude: {
+    prompt_file: 'CLAUDE.md',
+    features: ['permissions', 'plugins'],
+    config_files: ['settings.json'],
+  },
+  codex: {
+    prompt_file: 'AGENTS.md',
+    features: ['rules'],
+    config_files: ['config.toml', 'auth.json'],
+  },
+  hermes: {
+    prompt_file: 'SOUL.md',
+    features: ['memories'],
+    config_files: ['config.yaml', '.env'],
+  },
+  opencode: {
+    prompt_file: 'AGENTS.md',
+    features: ['instructions'],
+    config_files: ['opencode.jsonc'],
+  },
 }
 
 export const AGENT_TYPE_COLORS: Record<AgentType, string> = {

@@ -123,17 +123,12 @@ export function ProfileDetailPage({ profileName, onBack, onNavigateLibrary }: Pr
   const [activeTab, setActiveTab] = useState<TabKey>('meta')
 
   // Loaded file contents
-  const [settingsRaw, setSettingsRaw] = useState<string>('{}')
+  const [configFileContents, setConfigFileContents] = useState<Record<string, string>>({})
   const [claudeMdRaw, setClaudeMdRaw] = useState<string>('')
   const [claudeDotJson, setClaudeDotJson] = useState<string>('{}')
-  const [codexConfigToml, setCodexConfigToml] = useState<string>('')
-  const [codexAuthJson, setCodexAuthJson] = useState<string>('')
   const [codexAgentsMd, setCodexAgentsMd] = useState<string>('')
-  const [opencodeJsonc, setOpencodeJsonc] = useState<string>('')
   const [opencodeAuthJson, setOpencodeAuthJson] = useState<string>('')
   const [opencodeAgentsMd, setOpencodeAgentsMd] = useState<string>('')
-  const [hermesConfigYaml, setHermesConfigYaml] = useState<string>('')
-  const [hermesEnvContent, setHermesEnvContent] = useState<string>('')
   const [fileTree, setFileTree] = useState<string[]>([])
 
   // Reload trigger (incremented after save to refresh dependent tabs)
@@ -156,36 +151,32 @@ export function ProfileDetailPage({ profileName, onBack, onNavigateLibrary }: Pr
 
         const configDir = d.config_dir
         const agentTypeLocal = d.meta.agent_type
-        const promptFile = AGENT_TYPE_CONFIGS[agentTypeLocal as AgentType].prompt_file
+        const agentTypeConfig = AGENT_TYPE_CONFIGS[agentTypeLocal as AgentType]
+        const promptFile = agentTypeConfig.prompt_file
         const promptPath = `${configDir}/${promptFile}`
         const isOpencodeLike = agentTypeLocal === 'opencode' 
-        const isHermes = agentTypeLocal === 'hermes'
-        const [s, md, cj, codexToml, codexAuth, codexMd, ocJsonc, ocAuth, ocAgentsMd, hYaml, hEnv, tree] = await Promise.all([
-          readFile(`${configDir}/settings.json`).catch(() => '{}'),
+        const configFilesPromise = Promise.all(
+          agentTypeConfig.config_files.map(async (filename) => [
+            filename,
+            await readFile(`${configDir}/${filename}`).catch(() => filename === 'settings.json' ? '{}' : ''),
+          ] as const),
+        )
+        const [configFiles, md, cj, codexMd, ocAuth, ocAgentsMd, tree] = await Promise.all([
+          configFilesPromise,
           agentTypeLocal === 'codex' || isOpencodeLike ? Promise.resolve('') : readFile(promptPath).catch(() => ''),
           readFile(`${d.path}/dot-claude.json`).catch(() => '{}'),
-          agentTypeLocal === 'codex' ? readFile(`${configDir}/config.toml`).catch(() => '') : Promise.resolve(''),
-          agentTypeLocal === 'codex' ? readFile(`${configDir}/auth.json`).catch(() => '') : Promise.resolve(''),
           agentTypeLocal === 'codex' ? readFile(promptPath).catch(() => '') : Promise.resolve(''),
-          isOpencodeLike ? readFile(`${configDir}/opencode.jsonc`).catch(() => '') : Promise.resolve(''),
           isOpencodeLike ? readFile(`${d.path}/dot-opencode-data/auth.json`).catch(() => '') : Promise.resolve(''),
           isOpencodeLike ? readFile(promptPath).catch(() => '') : Promise.resolve(''),
-          isHermes ? readFile(`${configDir}/config.yaml`).catch(() => '') : Promise.resolve(''),
-          isHermes ? readFile(`${configDir}/.env`).catch(() => '') : Promise.resolve(''),
           findFiles(`${d.path}`).catch(() => [] as string[]),
         ] as const)
         if (cancelled) return
-        setSettingsRaw(s)
+        setConfigFileContents(Object.fromEntries(configFiles))
         setClaudeMdRaw(md)
         setClaudeDotJson(cj)
-        setCodexConfigToml(codexToml)
-        setCodexAuthJson(codexAuth)
         setCodexAgentsMd(codexMd)
-        setOpencodeJsonc(ocJsonc)
         setOpencodeAuthJson(ocAuth)
         setOpencodeAgentsMd(ocAgentsMd)
-        setHermesConfigYaml(hYaml)
-        setHermesEnvContent(hEnv)
         setFileTree(tree)
       } catch (e: unknown) {
         if (cancelled) return
@@ -236,22 +227,23 @@ export function ProfileDetailPage({ profileName, onBack, onNavigateLibrary }: Pr
   const badgeVariant = AGENT_TYPE_COLORS[agentType as AgentType] ?? 'neutral'
   const configDir = detail.config_dir
   const settingsPath = `${configDir}/settings.json`
+  const getConfigFileContent = (filename: string) => (
+    configFileContents[filename] ?? (filename === 'settings.json' ? '{}' : '')
+  )
+  const settingsRaw = getConfigFileContent('settings.json')
+  const codexConfigToml = getConfigFileContent('config.toml')
+  const codexAuthJson = getConfigFileContent('auth.json')
+  const opencodeJsonc = getConfigFileContent('opencode.jsonc')
+  const hermesConfigYaml = getConfigFileContent('config.yaml')
+  const hermesEnvContent = getConfigFileContent('.env')
   const promptFile = agentConfig.prompt_file
   const claudeMdPath = `${configDir}/${promptFile}`
 
-  const configFiles: ConfigFile[] = (
-    agentType === 'claude' ? [{ label: 'settings.json', path: settingsPath, content: settingsRaw }] :
-    agentType === 'codex' ? [
-      { label: 'config.toml', path: `${configDir}/config.toml`, content: codexConfigToml },
-      { label: 'auth.json', path: `${configDir}/auth.json`, content: codexAuthJson },
-    ] :
-    agentType === 'hermes' ? [
-      { label: 'config.yaml', path: `${configDir}/config.yaml`, content: hermesConfigYaml },
-    ] :
-    agentType === 'opencode' ? [
-      { label: 'opencode.jsonc', path: `${configDir}/opencode.jsonc`, content: opencodeJsonc },
-    ] : []
-  )
+  const configFiles: ConfigFile[] = agentConfig.config_files.map((filename) => ({
+    label: filename,
+    path: `${configDir}/${filename}`,
+    content: getConfigFileContent(filename),
+  }))
 
   return (
     <div className="mx-auto w-full max-w-5xl px-8 py-10">
