@@ -19,6 +19,18 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from .. import config
+from ..core.library import get_agent_config, get_agent_types
+
+
+_ACS_EXTRA_AGENT_TYPES = ("gemini", "grokbuild")
+
+
+def _acs_column(agent_type: str) -> str:
+    agent_config = get_agent_config(agent_type)
+    if agent_config is None:
+        raise ValueError(f"Unknown agent type: {agent_type!r}")
+    return agent_config["acs_column"]
+
 
 def _cs_db_path() -> Path:
     return config.agent_box_home() / "config" / "cc-switch.db"
@@ -90,7 +102,7 @@ def get_provider(agent_type: str, provider_id: str) -> Dict[str, Any] | None:
 # ── Skills ─────────────────────────────────────────────────────────────────
 
 def list_skills(agent_type: str) -> List[Dict[str, Any]]:
-    col = f"enabled_{agent_type}"
+    col = _acs_column(agent_type)
     conn = _conn()
     if conn is None:
         return []
@@ -121,7 +133,7 @@ def list_skills(agent_type: str) -> List[Dict[str, Any]]:
 # ── MCP Servers ───────────────────────────────────────────────────────────
 
 def list_mcp_servers(agent_type: str) -> List[Dict[str, Any]]:
-    col = f"enabled_{agent_type}"
+    col = _acs_column(agent_type)
     conn = _conn()
     if conn is None:
         return []
@@ -156,11 +168,19 @@ def get_mcp_server(server_id: str) -> Dict[str, Any] | None:
     conn = _conn()
     if conn is None:
         return None
+    registered_types = get_agent_types()
+    agent_columns = {
+        agent_type: _acs_column(agent_type)
+        for agent_type in registered_types
+    }
+    agent_columns.update({
+        agent_type: f"enabled_{agent_type}"
+        for agent_type in _ACS_EXTRA_AGENT_TYPES
+    })
+    column_names = ", ".join(agent_columns.values())
     row = conn.execute(
         "SELECT id, name, server_config, description, homepage, docs, tags, "
-        "enabled_claude, enabled_codex, enabled_gemini, enabled_hermes, "
-        "enabled_opencode, enabled_grokbuild "
-        "FROM mcp_servers WHERE id = ?", (server_id,)
+        f"{column_names} FROM mcp_servers WHERE id = ?", (server_id,)
     ).fetchone()
     if row is None:
         conn.close()
@@ -176,8 +196,9 @@ def get_mcp_server(server_id: str) -> Dict[str, Any] | None:
     except json.JSONDecodeError:
         pass
     enabled_agents = [
-        at for at in ("claude", "codex", "gemini", "hermes", "opencode", "grokbuild")
-        if row[f"enabled_{at}"]
+        agent_type
+        for agent_type, column_name in agent_columns.items()
+        if row[column_name]
     ]
     conn.close()
     return {
