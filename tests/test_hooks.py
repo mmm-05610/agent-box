@@ -111,7 +111,7 @@ def test_upsert_hooks_not_object(tmp_agent_box_home):
 
 def test_upsert_hooks_non_claude_profile(tmp_agent_box_home):
     profile.create("mycodex", "codex")
-    with pytest.raises(ProfileError, match="only supported for claude profiles"):
+    with pytest.raises(ProfileError, match="not supported for codex profiles"):
         hooks.upsert_hooks("mycodex", _hooks_json())
 
 
@@ -148,7 +148,7 @@ def test_show_hooks_non_object(tmp_agent_box_home):
 
 def test_show_hooks_non_claude_profile(tmp_agent_box_home):
     profile.create("mycodex", "codex")
-    with pytest.raises(ProfileError, match="only supported for claude profiles"):
+    with pytest.raises(ProfileError, match="not supported for codex profiles"):
         hooks.get_hooks("mycodex")
 
 

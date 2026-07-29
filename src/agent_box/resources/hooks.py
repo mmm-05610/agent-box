@@ -35,6 +35,7 @@ from typing import Any, Dict
 
 from .. import config
 from ..core.io import write_json
+from ..core.library import get_agent_config
 from .profile import ProfileError, load_meta
 
 
@@ -46,10 +47,10 @@ def _settings_path(profile_name: str) -> Path:
 def _require_claude_profile(profile_name: str) -> None:
     """Raise :class:`ProfileError` unless *profile_name* is a Claude profile."""
     meta = load_meta(profile_name)
-    if meta["agent_type"] != "claude":
+    agent_config = get_agent_config(meta["agent_type"])
+    if not agent_config or not agent_config.get("supports_hooks"):
         raise ProfileError(
-            f"hooks are only supported for claude profiles "
-            f"(profile {profile_name!r} is {meta['agent_type']!r})"
+            f"hooks are not supported for {meta['agent_type']} profiles"
         )
 
 
