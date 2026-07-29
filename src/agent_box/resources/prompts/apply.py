@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from ... import config
 from ...adapters import acs as _acs
-from ...core.io import atomic_write_text
+from ...core.io import write_text
 from ..profile import ProfileError, load_meta
 
 
@@ -22,7 +22,7 @@ def apply_claude_md(profile_name: str, md_id: str) -> None:
             f"claude-md {md_id!r} not found in ACS for {agent_type!r}"
         )
     target = config.profile_agent_dir(profile_name, agent_type) / "CLAUDE.md"
-    atomic_write_text(target, prompt.get("content") or "")
+    write_text(target, prompt.get("content") or "")
 
     from ...core import db
     conn = db.get_conn()

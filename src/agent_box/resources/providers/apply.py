@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from ... import config
-from ...core.io import atomic_write_json, deep_merge
+from ...core.io import write_json, deep_merge
 from ..profile import ProfileError, load_meta
 
 
@@ -106,7 +106,7 @@ def _apply_claude(profile_name: str, provider: Dict[str, Any], settings: Dict[st
         "category": provider.get("category"),
     }
     existing["_provider"] = {k: v for k, v in existing["_provider"].items() if v is not None}
-    atomic_write_json(settings_path, existing)
+    write_json(settings_path, existing)
 
 
 def _apply_codex(profile_name: str, provider: Dict[str, Any], settings: Dict[str, Any]) -> None:
@@ -123,7 +123,7 @@ def _apply_codex(profile_name: str, provider: Dict[str, Any], settings: Dict[str
     auth = settings.get("auth")
     if isinstance(auth, dict):
         auth_path = config_dir / "auth.json"
-        atomic_write_json(auth_path, auth)
+        write_json(auth_path, auth)
 
 
 def _build_hermes_yaml_entry(provider_id: str, settings: Dict[str, Any]) -> str:
@@ -358,8 +358,8 @@ def _apply_opencode(profile_name: str, provider: Dict[str, Any], settings: Dict[
     if isinstance(existing["provider"], dict) and provider_name:
         existing["provider"][provider_name] = provider_config
 
-    from ...core.io import atomic_write_text
-    atomic_write_text(jsonc_path, json.dumps(existing, indent=2, ensure_ascii=False) + "\n")
+    from ...core.io import write_text
+    write_text(jsonc_path, json.dumps(existing, indent=2, ensure_ascii=False) + "\n")
 
 
 def _strip_jsonc_comments(raw: str) -> str:
@@ -439,7 +439,7 @@ def _add_to_providers_store(profile_name: str, agent_type: str,
         "icon_color": provider.get("icon_color") or None,
         "category": provider.get("category") or "",
     }
-    atomic_write_json(store_path, entries)
+    write_json(store_path, entries)
 
 
 def list_profile_providers(profile_name: str, agent_type: str) -> List[Dict[str, Any]]:
@@ -466,7 +466,7 @@ def remove_profile_provider(profile_name: str, agent_type: str, provider_id: str
     if not isinstance(entries, dict) or provider_id not in entries:
         return False
     del entries[provider_id]
-    atomic_write_json(store_path, entries)
+    write_json(store_path, entries)
 
     # Also remove from Hermes config.yaml custom_providers
     if agent_type == "hermes":
@@ -512,8 +512,8 @@ def remove_profile_provider(profile_name: str, agent_type: str, provider_id: str
                 config_json = json.loads(cleaned)
                 if isinstance(config_json.get("provider"), dict):
                     config_json["provider"].pop(provider_id, None)
-                from ...core.io import atomic_write_text
-                atomic_write_text(jsonc_path, json.dumps(config_json, indent=2, ensure_ascii=False) + "\n")
+                from ...core.io import write_text
+                write_text(jsonc_path, json.dumps(config_json, indent=2, ensure_ascii=False) + "\n")
             except json.JSONDecodeError:
                 pass
 

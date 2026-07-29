@@ -1,6 +1,9 @@
-"""Filesystem and data utilities shared across modules.
+"""Format-agnostic I/O for profile configuration files.
 
-Pure stdlib (json / os / pathlib) with optional PyYAML for Hermes config.
+Every write uses :func:`write_text` internally — data is first serialised
+to a string, then written to a temp file + fsync + atomic rename. Every
+read accepts a :class:`pathlib.Path` and returns a ``dict`` (or empty
+dict when the file is missing / unreadable).
 """
 from __future__ import annotations
 
@@ -11,10 +14,15 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 
-# ── Atomic I/O ────────────────────────────────────────────────────────────
+# ── Atomic write primitives ────────────────────────────────────────────────
 
-def atomic_write_text(path: Path, text: str) -> None:
-    """Write *text* to *path* atomically."""
+def write_text(path: Path, text: str) -> None:
+    """Write *text* to *path* atomically.
+
+    Writes to a temp file in the same directory, fsyncs, then renames
+    over the destination.  Readers see either the old content or the
+    complete new content — never a partial write.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + f".tmp.{os.getpid()}")
     try:
@@ -23,7 +31,7 @@ def atomic_write_text(path: Path, text: str) -> None:
             fh.flush()
             os.fsync(fh.fileno())
         os.rename(tmp, path)
-    except Exception:
+    except OSError:
         try:
             tmp.unlink()
         except OSError:
@@ -31,41 +39,36 @@ def atomic_write_text(path: Path, text: str) -> None:
         raise
 
 
-def atomic_write_json(path: Path, data: Any) -> None:
+# ── JSON ───────────────────────────────────────────────────────────────────
+
+def read_json(path: Path) -> Dict[str, Any]:
+    """Return the parsed JSON object, or ``{}`` when the file is absent."""
+    if not path.is_file():
+        return {}
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def write_json(path: Path, data: Any) -> None:
     """Atomic JSON dump with sorted keys for deterministic output."""
     text = json.dumps(data, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
-    atomic_write_text(path, text)
-
-
-def deep_merge(base: Dict[str, Any], overlay: Dict[str, Any]) -> Dict[str, Any]:
-    """Recursively merge *overlay* onto *base*. Returns a new dict."""
-    out: Dict[str, Any] = dict(base)
-    for k, v in overlay.items():
-        if k in out and isinstance(out[k], dict) and isinstance(v, dict):
-            out[k] = deep_merge(out[k], v)
-        else:
-            out[k] = v
-    return out
-
-
-# ── JSON helpers ──────────────────────────────────────────────────────────
-
-def safe_json_loads(text: str, default: Any = None) -> Any:
-    """``json.loads`` that returns *default* on failure instead of raising."""
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        return default
+    write_text(path, text)
 
 
 # ── JSONC (JSON with Comments) ────────────────────────────────────────────
 
-def read_jsonc(text: str) -> Dict[str, Any]:
-    """Parse JSONC — // line comments, /* block comments */, trailing commas.
+def read_jsonc(path: Path) -> Dict[str, Any]:
+    """Parse a JSONC file — ``//`` and ``/* */`` comments, trailing commas.
 
-    String-aware: does NOT strip ``//`` or ``/*`` inside quoted strings,
-    so URLs like ``https://api.example.com/v1`` are preserved.
+    String-aware: does **not** strip ``//`` or ``/*`` inside quoted
+    strings, so URLs like ``https://api.example.com/v1`` are preserved.
+    Returns ``{}`` when the file is absent.
     """
+    if not path.is_file():
+        return {}
+    return _parse_jsonc(path.read_text(encoding="utf-8"))
+
+
+def _parse_jsonc(text: str) -> Dict[str, Any]:
     cleaned: List[str] = []
     i = 0
     in_string = False
@@ -104,10 +107,10 @@ def read_jsonc(text: str) -> Dict[str, Any]:
     return json.loads(raw)
 
 
-# ── TOML helpers ──────────────────────────────────────────────────────────
+# ── TOML ───────────────────────────────────────────────────────────────────
 
 def read_toml(path: Path) -> Dict[str, Any]:
-    """Read a TOML file. Returns empty dict if missing/empty."""
+    """Read a TOML file. Returns empty dict if missing / empty."""
     if not path.is_file():
         return {}
     try:
@@ -119,7 +122,7 @@ def read_toml(path: Path) -> Dict[str, Any]:
 
 
 def write_toml(path: Path, data: Dict[str, Any]) -> None:
-    """Write a dict to TOML (hand-rolled, no third-party dep)."""
+    """Write *data* to *path* as TOML (no third-party dependency)."""
     lines: List[str] = []
     top_scalars: Dict[str, Any] = {}
     top_tables: Dict[str, Dict[str, Any]] = {}
@@ -137,7 +140,7 @@ def write_toml(path: Path, data: Dict[str, Any]) -> None:
             lines.append("")
         _emit_toml_section(lines, [name], value)
     text = "\n".join(lines).rstrip("\n") + "\n"
-    atomic_write_text(path, text)
+    write_text(path, text)
 
 
 def _emit_toml_section(lines: List[str], path_parts: List[str],
@@ -158,7 +161,6 @@ def _emit_toml_section(lines: List[str], path_parts: List[str],
 
 
 def _toml_literal(v: Any) -> str:
-    """Serialize a Python scalar/list/dict to a TOML literal."""
     if isinstance(v, bool):
         return "true" if v else "false"
     if isinstance(v, int):
@@ -175,16 +177,19 @@ def _toml_literal(v: Any) -> str:
     raise ValueError(f"unsupported TOML value type: {type(v).__name__}")
 
 
-# ── YAML helpers ──────────────────────────────────────────────────────────
+# ── YAML ───────────────────────────────────────────────────────────────────
 
 def read_yaml(path: Path) -> Dict[str, Any]:
-    """Read a YAML file. Returns empty dict if missing/invalid."""
+    """Read a YAML file. Returns empty dict if missing / unreadable."""
     if not path.is_file():
         return {}
     try:
         import yaml
     except ImportError:
-        return {}
+        raise RuntimeError(
+            "PyYAML is required to read Hermes config.yaml "
+            "(install with: pip install pyyaml)"
+        )
     try:
         data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     except yaml.YAMLError:
@@ -193,7 +198,7 @@ def read_yaml(path: Path) -> Dict[str, Any]:
 
 
 def write_yaml(path: Path, data: Dict[str, Any]) -> None:
-    """Write a dict to YAML (requires PyYAML)."""
+    """Write *data* to *path* as YAML (requires PyYAML)."""
     try:
         import yaml
     except ImportError as exc:
@@ -202,4 +207,17 @@ def write_yaml(path: Path, data: Dict[str, Any]) -> None:
             "(install with: pip install pyyaml)"
         ) from exc
     text = yaml.safe_dump(data, sort_keys=False, allow_unicode=True)
-    atomic_write_text(path, text)
+    write_text(path, text)
+
+
+# ── Dict utilities ─────────────────────────────────────────────────────────
+
+def deep_merge(base: Dict[str, Any], overlay: Dict[str, Any]) -> Dict[str, Any]:
+    """Recursively merge *overlay* onto *base*. Returns a new dict."""
+    out: Dict[str, Any] = dict(base)
+    for k, v in overlay.items():
+        if k in out and isinstance(out[k], dict) and isinstance(v, dict):
+            out[k] = deep_merge(out[k], v)
+        else:
+            out[k] = v
+    return out

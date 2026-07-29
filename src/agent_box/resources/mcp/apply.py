@@ -12,7 +12,7 @@ from typing import Any, Dict, List
 from ... import config
 from ..profile import ProfileError, load_meta
 from ...adapters import acs as _acs
-from ...core.io import read_jsonc, read_toml, write_toml, write_yaml
+from ...core.io import _parse_jsonc, read_jsonc, read_toml, write_toml, write_yaml
 
 
 # --- apply ----------------------------------------------------------------
@@ -106,8 +106,8 @@ def _apply_claude(profile_name: str, server_id: str,
         )
     servers[server_id] = server_config
     existing["mcpServers"] = servers
-    from ...core.io import atomic_write_json
-    atomic_write_json(target, existing)
+    from ...core.io import write_json
+    write_json(target, existing)
 
 
 def _apply_codex(profile_name: str, server_id: str,
@@ -199,7 +199,7 @@ def _apply_opencode(profile_name: str, server_id: str,
     if target.is_file():
         text = target.read_text(encoding="utf-8")
         try:
-            existing = read_jsonc(text)
+            existing = _parse_jsonc(text)
         except json.JSONDecodeError as exc:
             raise ProfileError(
                 f"{profile_name}: opencode.jsonc is not valid JSON: {exc}"
@@ -215,8 +215,8 @@ def _apply_opencode(profile_name: str, server_id: str,
     servers[server_id] = _to_opencode_format(server_config)
     mcp_section["servers"] = servers
     existing["mcp"] = mcp_section
-    from ...core.io import atomic_write_json
-    atomic_write_json(target, existing)
+    from ...core.io import write_json
+    write_json(target, existing)
 
 
 def _to_opencode_format(server_config: Dict[str, Any]) -> Dict[str, Any]:
@@ -334,7 +334,7 @@ def _list_opencode_mcp(profile_name: str) -> List[Dict[str, Any]]:
     if not target.is_file():
         return []
     try:
-        data = read_jsonc(target.read_text(encoding="utf-8"))
+        data = read_jsonc(target)
     except (json.JSONDecodeError, OSError):
         return []
     if not isinstance(data, dict):
@@ -390,8 +390,8 @@ def _remove_claude_mcp(profile_name: str, mcp_id: str) -> None:
     if isinstance(servers, dict):
         servers.pop(mcp_id, None)
         data["mcpServers"] = servers
-    from ...core.io import atomic_write_json
-    atomic_write_json(target, data)
+    from ...core.io import write_json
+    write_json(target, data)
 
 
 def _remove_codex_mcp(profile_name: str, mcp_id: str) -> None:
@@ -436,7 +436,7 @@ def _remove_opencode_mcp(profile_name: str, mcp_id: str) -> None:
     data: Dict[str, Any] = {}
     if target.is_file():
         try:
-            data = read_jsonc(target.read_text(encoding="utf-8"))
+            data = read_jsonc(target)
         except (json.JSONDecodeError, OSError):
             data = {}
     if not isinstance(data, dict):
@@ -448,8 +448,8 @@ def _remove_opencode_mcp(profile_name: str, mcp_id: str) -> None:
             servers.pop(mcp_id, None)
             mcp["servers"] = servers
             data["mcp"] = mcp
-    from ...core.io import atomic_write_json
-    atomic_write_json(target, data)
+    from ...core.io import write_json
+    write_json(target, data)
 
 
 __all__ = [

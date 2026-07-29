@@ -34,7 +34,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 from .. import config
-from ..core.io import atomic_write_json
+from ..core.io import write_json
 from .profile import ProfileError, load_meta
 
 
@@ -121,7 +121,7 @@ def upsert_hooks(profile_name: str, data_json: str) -> Dict[str, Any]:
     settings = _read_settings(profile_name)
     settings["hooks"] = data
     target = _settings_path(profile_name)
-    atomic_write_json(target, settings)
+    write_json(target, settings)
     return data
 
 
