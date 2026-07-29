@@ -13,6 +13,7 @@ applied on top of the base template, not a replacement for it. See
 """
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Dict, List
 
 from .. import config
@@ -26,11 +27,57 @@ from .. import config
 # ---------------------------------------------------------------------------
 
 _AGENT_TYPES: Dict[str, Dict[str, Any]] = {
-    "claude":   {"config_dir": "~/.claude",          "binary": "claude"},
-    "codex":    {"config_dir": "~/.codex",           "binary": "codex"},
-    "hermes":   {"config_dir": "~/.hermes",          "binary": "hermes"},
-    "opencode": {"config_dir": "~/.config/opencode", "binary": "opencode",
-                 "data_dir": "~/.local/share/opencode"},
+    "claude": {
+        "config_dir": "~/.claude",
+        "binary": "claude",
+        "prompt_file": "CLAUDE.md",
+        "resume_args": ("--continue",),
+        "acs_column": "enabled_claude",
+        "supports_hooks": True,
+        "features": ("permissions", "plugins"),
+        "config_files": ["settings.json"],
+        "extra_profile_files": ["dot-claude.json", "dot-agents/"],
+        "mcp_config": None,
+        "provider_apply_mode": "overwrite",
+    },
+    "codex": {
+        "config_dir": "~/.codex",
+        "binary": "codex",
+        "prompt_file": "AGENTS.md",
+        "resume_args": ("resume", "--last"),
+        "acs_column": "enabled_codex",
+        "supports_hooks": False,
+        "features": ("rules",),
+        "config_files": ["config.toml", "auth.json"],
+        "mcp_config": {"filename": "config.toml", "root_key": "mcp_servers"},
+        "provider_apply_mode": "overwrite",
+    },
+    "hermes": {
+        "config_dir": "~/.hermes",
+        "binary": "hermes",
+        "prompt_file": "SOUL.md",
+        "resume_args": ("-c",),
+        "acs_column": "enabled_hermes",
+        "supports_hooks": True,
+        "features": ("memories",),
+        "config_files": ["config.yaml", ".env"],
+        "venv_preserve": "hermes-agent/venv/",
+        "mcp_config": {"filename": "config.yaml", "root_key": "mcp_servers"},
+        "provider_apply_mode": "additive",
+    },
+    "opencode": {
+        "config_dir": "~/.config/opencode",
+        "binary": "opencode",
+        "data_dir": "~/.local/share/opencode",
+        "prompt_file": "AGENTS.md",
+        "resume_args": None,
+        "acs_column": "enabled_opencode",
+        "supports_hooks": False,
+        "features": ("instructions",),
+        "config_files": ["opencode.jsonc"],
+        "mcp_config": {"filename": "opencode.jsonc", "root_key": "mcp"},
+        "provider_apply_mode": "additive",
+    },
 }
 
 
@@ -41,7 +88,7 @@ def get_agent_types() -> List[str]:
 
 
 def get_agent_config(agent_type: str) -> Dict[str, Any] | None:
-    """Return {config_dir, binary [, data_dir]} for an agent type, or None."""
+    """Return the registry entry for an agent type, or None."""
     return _AGENT_TYPES.get(agent_type)
 
 
