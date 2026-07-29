@@ -13,22 +13,23 @@ from ... import config
 from ..profile import ProfileError, load_meta
 from ...adapters import acs as _acs
 from ...core.io import read_jsonc, read_toml, write_toml, write_yaml
+from ...core.library import get_agent_config
 
 
 # --- apply ----------------------------------------------------------------
 
-# Per-agent MCP file locations. For Claude, the MCP servers live in
-# ``dot-claude.json`` at the profile root (bind-mounted to
-# ``~/.claude.json``) — NOT in ``dot-claude/claude.json``. The file
-# is dual-purpose: CC stores app state there, so we must merge
-# ``mcpServers`` without touching those fields.
-_AGENT_PATHS: Dict[str, Dict[str, str]] = {
-    # claude is special — handled in _apply_claude() via profile_dir(), not
-    # profile_agent_dir(). Included here for reference only.
-    "codex":    {"filename": "config.toml",   "root_key": "mcp_servers"},
-    "hermes":   {"filename": "config.yaml",   "root_key": "mcp_servers"},
-    "opencode": {"filename": "opencode.jsonc", "root_key": "mcp"},
-}
+def _mcp_target(profile_name: str, agent_type: str) -> tuple[Path, str]:
+    agent_config = get_agent_config(agent_type)
+    if agent_config is None:
+        raise ProfileError(f"unknown agent_type {agent_type!r}")
+    mcp_config = agent_config.get("mcp_config")
+    if not isinstance(mcp_config, dict):
+        raise ProfileError(f"mcp config is not supported for {agent_type!r}")
+    target = (
+        config.profile_agent_dir(profile_name, agent_type)
+        / mcp_config["filename"]
+    )
+    return target, mcp_config["root_key"]
 
 
 def apply_mcp_server(profile_name: str, server_id: str) -> None:
@@ -119,13 +120,13 @@ def _apply_codex(profile_name: str, server_id: str,
     representation — Codex accepts a flat ``command``/``args``/``env``
     table for stdio and ``url``/``headers`` for sse/http.
     """
-    target = config.profile_agent_dir(profile_name, "codex") / "config.toml"
+    target, root_key = _mcp_target(profile_name, "codex")
     existing = read_toml(target)
-    mcp_section = existing.get("mcp_servers")
+    mcp_section = existing.get(root_key)
     if not isinstance(mcp_section, dict):
         mcp_section = {}
     mcp_section[server_id] = _codex_entry(server_config)
-    existing["mcp_servers"] = mcp_section
+    existing[root_key] = mcp_section
     write_toml(target, existing)
 
 
@@ -159,30 +160,30 @@ def _apply_hermes(profile_name: str, server_id: str,
     Hermes infers the transport from presence of ``command`` (stdio)
     or ``url`` (sse/http). We strip the unified ``type`` key.
     """
-    target = config.profile_agent_dir(profile_name, "hermes") / "config.yaml"
+    target, root_key = _mcp_target(profile_name, "hermes")
     existing: Dict[str, Any] = {}
     if target.is_file():
         try:
             import yaml
         except ImportError as exc:
             raise ProfileError(
-                "PyYAML is required to read/write Hermes config.yaml "
+                f"PyYAML is required to read/write Hermes {target.name} "
                 "(install with: pip install pyyaml)"
             ) from exc
         try:
             existing = yaml.safe_load(target.read_text(encoding="utf-8")) or {}
         except yaml.YAMLError as exc:
             raise ProfileError(
-                f"{profile_name}: config.yaml is not valid YAML: {exc}"
+                f"{profile_name}: {target.name} is not valid YAML: {exc}"
             ) from exc
         if not isinstance(existing, dict):
             existing = {}
-    mcp_section = existing.get("mcp_servers")
+    mcp_section = existing.get(root_key)
     if not isinstance(mcp_section, dict):
         mcp_section = {}
     entry = {k: v for k, v in server_config.items() if k != "type"}
     mcp_section[server_id] = entry
-    existing["mcp_servers"] = mcp_section
+    existing[root_key] = mcp_section
     write_yaml(target, existing)
 
 
@@ -194,19 +195,18 @@ def _apply_opencode(profile_name: str, server_id: str,
       * stdio → local (command+args → command array, env → environment)
       * sse/http → remote (url + headers preserved)
     """
-    target = config.profile_agent_dir(profile_name, "opencode") / "opencode.jsonc"
+    target, root_key = _mcp_target(profile_name, "opencode")
     existing: Dict[str, Any] = {}
     if target.is_file():
-        text = target.read_text(encoding="utf-8")
         try:
             existing = read_jsonc(target)
         except json.JSONDecodeError as exc:
             raise ProfileError(
-                f"{profile_name}: opencode.jsonc is not valid JSON: {exc}"
+                f"{profile_name}: {target.name} is not valid JSON: {exc}"
             ) from exc
         if not isinstance(existing, dict):
             existing = {}
-    mcp_section = existing.get("mcp")
+    mcp_section = existing.get(root_key)
     if not isinstance(mcp_section, dict):
         mcp_section = {}
     servers = mcp_section.get("servers")
@@ -214,7 +214,7 @@ def _apply_opencode(profile_name: str, server_id: str,
         servers = {}
     servers[server_id] = _to_opencode_format(server_config)
     mcp_section["servers"] = servers
-    existing["mcp"] = mcp_section
+    existing[root_key] = mcp_section
     from ...core.io import write_json
     write_json(target, existing)
 
@@ -301,16 +301,16 @@ def _list_claude_mcp(profile_name: str) -> List[Dict[str, Any]]:
 
 
 def _list_codex_mcp(profile_name: str) -> List[Dict[str, Any]]:
-    target = config.profile_agent_dir(profile_name, "codex") / "config.toml"
+    target, root_key = _mcp_target(profile_name, "codex")
     existing = read_toml(target)
-    mcp_section = existing.get("mcp_servers")
+    mcp_section = existing.get(root_key)
     if not isinstance(mcp_section, dict):
         return []
     return [_mcp_entry(mcp_id, s) for mcp_id, s in mcp_section.items()]
 
 
 def _list_hermes_mcp(profile_name: str) -> List[Dict[str, Any]]:
-    target = config.profile_agent_dir(profile_name, "hermes") / "config.yaml"
+    target, root_key = _mcp_target(profile_name, "hermes")
     if not target.is_file():
         return []
     try:
@@ -323,14 +323,14 @@ def _list_hermes_mcp(profile_name: str) -> List[Dict[str, Any]]:
         return []
     if not isinstance(data, dict):
         return []
-    servers = data.get("mcp_servers")
+    servers = data.get(root_key)
     if not isinstance(servers, dict):
         return []
     return [_mcp_entry(mcp_id, s) for mcp_id, s in servers.items()]
 
 
 def _list_opencode_mcp(profile_name: str) -> List[Dict[str, Any]]:
-    target = config.profile_agent_dir(profile_name, "opencode") / "opencode.jsonc"
+    target, root_key = _mcp_target(profile_name, "opencode")
     if not target.is_file():
         return []
     try:
@@ -339,7 +339,7 @@ def _list_opencode_mcp(profile_name: str) -> List[Dict[str, Any]]:
         return []
     if not isinstance(data, dict):
         return []
-    mcp = data.get("mcp")
+    mcp = data.get(root_key)
     if not isinstance(mcp, dict):
         return []
     servers = mcp.get("servers")
@@ -395,20 +395,20 @@ def _remove_claude_mcp(profile_name: str, mcp_id: str) -> None:
 
 
 def _remove_codex_mcp(profile_name: str, mcp_id: str) -> None:
-    target = config.profile_agent_dir(profile_name, "codex") / "config.toml"
+    target, root_key = _mcp_target(profile_name, "codex")
     existing = read_toml(target)
-    mcp_section = existing.get("mcp_servers")
+    mcp_section = existing.get(root_key)
     if isinstance(mcp_section, dict):
         mcp_section.pop(mcp_id, None)
         if mcp_section:
-            existing["mcp_servers"] = mcp_section
+            existing[root_key] = mcp_section
         else:
-            existing.pop("mcp_servers", None)
+            existing.pop(root_key, None)
     write_toml(target, existing)
 
 
 def _remove_hermes_mcp(profile_name: str, mcp_id: str) -> None:
-    target = config.profile_agent_dir(profile_name, "hermes") / "config.yaml"
+    target, root_key = _mcp_target(profile_name, "hermes")
     data: Dict[str, Any] = {}
     if target.is_file():
         try:
@@ -421,18 +421,18 @@ def _remove_hermes_mcp(profile_name: str, mcp_id: str) -> None:
             data = {}
     if not isinstance(data, dict):
         data = {}
-    servers = data.get("mcp_servers")
+    servers = data.get(root_key)
     if isinstance(servers, dict):
         servers.pop(mcp_id, None)
         if servers:
-            data["mcp_servers"] = servers
+            data[root_key] = servers
         else:
-            data.pop("mcp_servers", None)
+            data.pop(root_key, None)
     write_yaml(target, data)
 
 
 def _remove_opencode_mcp(profile_name: str, mcp_id: str) -> None:
-    target = config.profile_agent_dir(profile_name, "opencode") / "opencode.jsonc"
+    target, root_key = _mcp_target(profile_name, "opencode")
     data: Dict[str, Any] = {}
     if target.is_file():
         try:
@@ -441,13 +441,13 @@ def _remove_opencode_mcp(profile_name: str, mcp_id: str) -> None:
             data = {}
     if not isinstance(data, dict):
         data = {}
-    mcp = data.get("mcp")
+    mcp = data.get(root_key)
     if isinstance(mcp, dict):
         servers = mcp.get("servers")
         if isinstance(servers, dict):
             servers.pop(mcp_id, None)
             mcp["servers"] = servers
-            data["mcp"] = mcp
+            data[root_key] = mcp
     from ...core.io import write_json
     write_json(target, data)
 
