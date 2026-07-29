@@ -105,6 +105,17 @@ export type AgentType = 'claude' | 'codex' | 'hermes' | 'opencode'
 
 export const AGENT_TYPES: AgentType[] = ['claude', 'codex', 'hermes', 'opencode']
 
+export interface AgentTypeConfig {
+  prompt_file: string
+}
+
+export const AGENT_TYPE_CONFIGS: Record<AgentType, AgentTypeConfig> = {
+  claude: { prompt_file: 'CLAUDE.md' },
+  codex: { prompt_file: 'AGENTS.md' },
+  hermes: { prompt_file: 'SOUL.md' },
+  opencode: { prompt_file: 'AGENTS.md' },
+}
+
 export const AGENT_TYPE_COLORS: Record<AgentType, string> = {
   claude: 'warning',    // orange
   codex: 'success',     // green

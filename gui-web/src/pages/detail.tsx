@@ -13,7 +13,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Badge, Tabs } from '@/components/ui'
 import { Loading } from '@/components/feedback'
 import type { AgentType } from '@/api'
-import { AGENT_TYPE_COLORS, fetchProfileDetail } from '@/api'
+import { AGENT_TYPE_COLORS, AGENT_TYPE_CONFIGS, fetchProfileDetail } from '@/api'
 import { readFile, findFiles } from '@/api/files'
 import { MetaEditor } from './detail/MetaEditor'
 import { ProviderTab } from './detail/ProviderTab'
@@ -148,18 +148,20 @@ export function ProfileDetailPage({ profileName, onBack, onNavigateLibrary }: Pr
 
         const configDir = d.config_dir
         const agentTypeLocal = d.meta.agent_type
+        const promptFile = AGENT_TYPE_CONFIGS[agentTypeLocal as AgentType].prompt_file
+        const promptPath = `${configDir}/${promptFile}`
         const isOpencodeLike = agentTypeLocal === 'opencode' 
         const isHermes = agentTypeLocal === 'hermes'
         const [s, md, cj, codexToml, codexAuth, codexMd, ocJsonc, ocAuth, ocAgentsMd, hYaml, hEnv, tree] = await Promise.all([
           readFile(`${configDir}/settings.json`).catch(() => '{}'),
-          isHermes ? readFile(`${configDir}/SOUL.md`).catch(() => '') : agentTypeLocal === 'codex' ? Promise.resolve('') : readFile(`${configDir}/CLAUDE.md`).catch(() => ''),
+          agentTypeLocal === 'codex' || isOpencodeLike ? Promise.resolve('') : readFile(promptPath).catch(() => ''),
           readFile(`${d.path}/dot-claude.json`).catch(() => '{}'),
           agentTypeLocal === 'codex' ? readFile(`${configDir}/config.toml`).catch(() => '') : Promise.resolve(''),
           agentTypeLocal === 'codex' ? readFile(`${configDir}/auth.json`).catch(() => '') : Promise.resolve(''),
-          agentTypeLocal === 'codex' ? readFile(`${configDir}/AGENTS.md`).catch(() => '') : Promise.resolve(''),
+          agentTypeLocal === 'codex' ? readFile(promptPath).catch(() => '') : Promise.resolve(''),
           isOpencodeLike ? readFile(`${configDir}/opencode.jsonc`).catch(() => '') : Promise.resolve(''),
           isOpencodeLike ? readFile(`${d.path}/dot-opencode-data/auth.json`).catch(() => '') : Promise.resolve(''),
-          isOpencodeLike ? readFile(`${configDir}/AGENTS.md`).catch(() => '') : Promise.resolve(''),
+          isOpencodeLike ? readFile(promptPath).catch(() => '') : Promise.resolve(''),
           isHermes ? readFile(`${configDir}/config.yaml`).catch(() => '') : Promise.resolve(''),
           isHermes ? readFile(`${configDir}/.env`).catch(() => '') : Promise.resolve(''),
           findFiles(`${d.path}`).catch(() => [] as string[]),
@@ -221,12 +223,8 @@ export function ProfileDetailPage({ profileName, onBack, onNavigateLibrary }: Pr
   const badgeVariant = AGENT_TYPE_COLORS[agentType as AgentType] ?? 'neutral'
   const configDir = detail.config_dir
   const settingsPath = `${configDir}/settings.json`
-  // Per-agent persona/agent-file path. Codex uses AGENTS.md, Hermes uses SOUL.md, others CLAUDE.md.
-  const claudeMdPath =
-    agentType === 'codex' ? `${configDir}/AGENTS.md` :
-    agentType === 'opencode' ? `${configDir}/AGENTS.md` :
-    agentType === 'hermes' ? `${configDir}/SOUL.md` :
-    `${configDir}/CLAUDE.md`
+  const promptFile = AGENT_TYPE_CONFIGS[agentType as AgentType].prompt_file
+  const claudeMdPath = `${configDir}/${promptFile}`
 
   const configFiles: ConfigFile[] = (
     agentType === 'claude' ? [{ label: 'settings.json', path: settingsPath, content: settingsRaw }] :
