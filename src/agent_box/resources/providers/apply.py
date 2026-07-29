@@ -1,14 +1,7 @@
 """Provider CRUD + apply — operates on the ``providers`` table.
 
-The ``settings_config`` column stores the raw JSON the user edits in
-``$EDITOR`` (the same shape cc-switch uses — a top-level object with
-``name`` / ``description`` / ``env`` keys). Apply extracts only the
-``env`` block and merges it into the profile's ``settings.json``
-under the ``env`` key, preserving every other settings key.
-
-Only Claude Code (``agent_type == "claude"``) supports apply in v1;
-other agent types raise :class:`ProfileError` with a "not yet
-supported" message (cc-switch parity).
+Provider application behavior is selected from the agent type registry,
+then delegated to the format-specific overwrite or additive writer.
 """
 from __future__ import annotations
 
@@ -22,6 +15,7 @@ from typing import Any, Dict, List
 
 from ... import config
 from ...core.io import write_json, deep_merge
+from ...core.library import get_agent_config
 from ..profile import ProfileError, load_meta
 
 
@@ -29,9 +23,6 @@ from ..profile import ProfileError, load_meta
 
 
 # --- apply ----------------------------------------------------------------
-
-APPLY_SUPPORTED = {"claude", "codex", "hermes", "opencode"}
-
 
 def apply_provider(profile_name: str, provider_id: str) -> None:
     """Write a provider's settings to the profile's config file.
@@ -44,11 +35,10 @@ def apply_provider(profile_name: str, provider_id: str) -> None:
     """
     meta = load_meta(profile_name)
     agent_type = meta["agent_type"]
-    if agent_type not in APPLY_SUPPORTED:
-        raise ProfileError(
-            f"apply: {agent_type!r} not yet supported "
-            f"(supported: {', '.join(sorted(APPLY_SUPPORTED))})"
-        )
+    agent_config = get_agent_config(agent_type)
+    mode = agent_config.get("provider_apply_mode") if agent_config else None
+    if mode is None:
+        raise ProfileError(f"provider apply is not supported for {agent_type!r}")
 
     # Read from ACS (single source of truth — no agent-box DB fallback)
     from ...adapters import acs as _acs
@@ -59,17 +49,18 @@ def apply_provider(profile_name: str, provider_id: str) -> None:
         )
     provider_settings = provider.get("settings") or {}
 
-    if agent_type == "claude":
-        _apply_claude(profile_name, provider, provider_settings)
-    elif agent_type == "codex":
-        _apply_codex(profile_name, provider, provider_settings)
-    elif agent_type in ("hermes", "opencode"):
-        # Additive mode: append to _providers.json + write live config
-        _add_to_providers_store(profile_name, agent_type, provider)
-        if agent_type == "hermes":
-            _apply_hermes(profile_name, provider, provider_settings)
-        else:
-            _apply_opencode(profile_name, provider, provider_settings)
+    if mode == "overwrite":
+        _apply_overwrite(
+            profile_name, agent_type, provider, provider_settings
+        )
+    elif mode == "additive":
+        _apply_additive(
+            profile_name, agent_type, provider, provider_settings
+        )
+    else:
+        raise ProfileError(
+            f"unknown provider apply mode {mode!r} for {agent_type!r}"
+        )
 
     from ...core import db
     conn = db.get_conn()
@@ -78,6 +69,40 @@ def apply_provider(profile_name: str, provider_id: str) -> None:
         (provider_id, profile_name),
     )
     conn.commit()
+
+
+def _apply_overwrite(
+    profile_name: str,
+    agent_type: str,
+    provider: Dict[str, Any],
+    settings: Dict[str, Any],
+) -> None:
+    if agent_type == "claude":
+        _apply_claude(profile_name, provider, settings)
+    elif agent_type == "codex":
+        _apply_codex(profile_name, provider, settings)
+    else:
+        raise ProfileError(
+            f"overwrite provider apply is not implemented for {agent_type!r}"
+        )
+
+
+def _apply_additive(
+    profile_name: str,
+    agent_type: str,
+    provider: Dict[str, Any],
+    settings: Dict[str, Any],
+) -> None:
+    if agent_type == "hermes":
+        apply_settings = _apply_hermes
+    elif agent_type == "opencode":
+        apply_settings = _apply_opencode
+    else:
+        raise ProfileError(
+            f"additive provider apply is not implemented for {agent_type!r}"
+        )
+    _add_to_providers_store(profile_name, agent_type, provider)
+    apply_settings(profile_name, provider, settings)
 
 
 def _apply_claude(profile_name: str, provider: Dict[str, Any], settings: Dict[str, Any]) -> None:
@@ -518,5 +543,3 @@ def remove_profile_provider(profile_name: str, agent_type: str, provider_id: str
                 pass
 
     return True
-
-

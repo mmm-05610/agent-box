@@ -16,6 +16,7 @@ import {
 import { saveFile } from '@/api/files'
 import { ProviderIcon } from '@/components/ProviderIcon'
 import { hasIcon } from '@/icons/extracted'
+import { AGENT_TYPE_CONFIGS } from '@/api'
 import type { AgentType, Provider } from '@/api'
 
 // ── Icon helpers ──────────────────────────────────────────────────────────
@@ -46,8 +47,6 @@ interface ProviderTabProps {
   onRefresh: () => void
 }
 
-const ADDITIVE_TYPES: AgentType[] = ['hermes', 'opencode']
-
 /** Extract model.provider from a Hermes config.yaml to find the active provider. */
 function parseActiveProvider(yamlContent: string): string | null {
   const m = yamlContent.match(/^\s+provider:\s*["']?([^"'\s]+)/m)
@@ -57,7 +56,7 @@ function parseActiveProvider(yamlContent: string): string | null {
 // ── Component ─────────────────────────────────────────────────────────────
 
 export function ProviderTab({ agentType, profileName, configFiles, onRefresh }: ProviderTabProps) {
-  const isAdditive = ADDITIVE_TYPES.includes(agentType)
+  const isAdditive = AGENT_TYPE_CONFIGS[agentType].provider_apply_mode === 'additive'
   const { toast } = useToast()
 
   // Library providers (from ACS)
