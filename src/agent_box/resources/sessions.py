@@ -79,7 +79,7 @@ def _migrate_legacy_sessions_db() -> None:
     finally:
         try:
             legacy.close()
-        except Exception:
+        except sqlite3.Error:
             pass
     try:
         legacy_path.rename(legacy_path.with_suffix(legacy_path.suffix + ".migrated"))
