@@ -77,9 +77,17 @@ def real_agent_dir(agent_type: str) -> Path:
 
 
 def profile_agent_dir(name: str, agent_type: str) -> Path:
-    """Profile-local copy of the agent config directory."""
-    suffix = "dot-claude" if agent_type == "claude" else f"dot-{agent_type}"
-    return profile_dir(name) / suffix
+    """Profile-local copy of the agent config directory.
+
+    The directory suffix comes from the agent-type registry's
+    ``profile_dir_suffix`` field (Rule 5) — adding a new agent type
+    is a registry-only change.
+    """
+    from .core import library
+    info = library.get_agent_config(agent_type)
+    if info is None:
+        raise ValueError(f"Unknown agent type: {agent_type!r}")
+    return profile_dir(name) / info["profile_dir_suffix"]
 
 
 def agent_binary(agent_type: str) -> str:
@@ -115,8 +123,6 @@ def profile_agent_data_dir(name: str, agent_type: str) -> Path | None:
 
 def profile_skills_dir(name: str, agent_type: str) -> Path:
     """Profile's per-agent skills directory (copy target for skill apply)."""
-    if agent_type == "claude":
-        return profile_agent_dir(name, "claude") / "skills"
     return profile_agent_dir(name, agent_type) / "skills"
 
 
