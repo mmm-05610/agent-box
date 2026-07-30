@@ -60,8 +60,8 @@ def _settings_path(profile_name: str) -> Path:
     return config.profile_agent_dir(profile_name, agent_type) / config_files[0]
 
 
-def _require_claude_profile(profile_name: str) -> None:
-    """Raise :class:`ProfileError` unless *profile_name* is a Claude profile."""
+def _require_hooks_support(profile_name: str) -> None:
+    """Raise :class:`ProfileError` unless *profile_name* supports hooks."""
     meta = load_meta(profile_name)
     agent_config = get_agent_config(meta["agent_type"])
     if not agent_config or not agent_config.get("supports_hooks"):
@@ -99,7 +99,7 @@ def get_hooks(profile_name: str) -> Dict[str, Any] | None:
     Raises :class:`ProfileError` if settings.json is invalid JSON,
     or if the profile isn't a Claude profile.
     """
-    _require_claude_profile(profile_name)
+    _require_hooks_support(profile_name)
     settings = _read_settings(profile_name)
     hooks = settings.get("hooks")
     if hooks is None:
@@ -123,7 +123,7 @@ def upsert_hooks(profile_name: str, data_json: str) -> Dict[str, Any]:
     Raises :class:`ProfileError` for invalid JSON, non-object shapes,
     or non-Claude profiles.
     """
-    _require_claude_profile(profile_name)
+    _require_hooks_support(profile_name)
     try:
         data = json.loads(data_json)
     except json.JSONDecodeError as exc:
