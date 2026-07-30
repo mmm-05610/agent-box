@@ -13,9 +13,9 @@ from __future__ import annotations
 import re
 import sqlite3
 import threading
-from pathlib import Path
 
 from .. import config
+from .io import read_text
 
 
 # Module-level connection + lock. See module docstring.
@@ -57,7 +57,7 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
 
     for f in files:
         version = int(pattern.match(f.name).group(1))
-        conn.executescript(f.read_text(encoding="utf-8"))
+        conn.executescript(read_text(f))
         conn.execute(
             "INSERT INTO schema_versions (version) VALUES (?)",
             (version,),
