@@ -166,14 +166,14 @@ def _build_parser() -> argparse.ArgumentParser:
     pp.add_argument("id", help="Provider id to remove")
     pp.set_defaults(func=cmd_provider_profile_remove)
 
-    # claude-md ---------------------------------------------------------
-    p_md = sub.add_parser("claude-md", help="Manage Claude.md templates")
-    sub_md = p_md.add_subparsers(dest="claude_md_command", required=True)
+    # prompt -----------------------------------------------------------
+    p_prompt = sub.add_parser("prompt", help="Manage prompt templates")
+    sub_prompt = p_prompt.add_subparsers(dest="prompt_command", required=True)
 
-    pm = sub_md.add_parser("apply", help="Apply a Claude.md template to a profile (overwrites CLAUDE.md)")
+    pm = sub_prompt.add_parser("apply", help="Apply a prompt to a profile's prompt file")
     pm.add_argument("profile", help="Target profile name")
-    pm.add_argument("id", help="Claude.md id in ACS")
-    pm.set_defaults(func=cmd_claude_md_apply)
+    pm.add_argument("id", help="Prompt id in ACS")
+    pm.set_defaults(func=cmd_prompt_apply)
 
     # mcp-server -------------------------------------------------------
     p_mcp = sub.add_parser("mcp-server", help="Manage MCP server library entries")
@@ -266,7 +266,7 @@ from .profiles import cmd_create, cmd_delete, cmd_edit, cmd_launch, cmd_list, cm
 from .providers import cmd_provider_apply, cmd_provider_profile_list, cmd_provider_profile_remove
 from .mcp import cmd_mcp_apply, cmd_mcp_profile_remove
 from .skills import cmd_skill_apply, cmd_skill_profile_remove
-from .prompts import cmd_claude_md_apply
+from .prompts import cmd_prompt_apply
 from .hooks import cmd_hooks_add, cmd_hooks_remove, cmd_hooks_set, cmd_hooks_show
 
 # --- entry point ----------------------------------------------------------

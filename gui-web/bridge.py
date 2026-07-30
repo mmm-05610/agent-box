@@ -913,9 +913,9 @@ class Api:
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
 
-    def apply_claude_md(self, profile_name: str, md_id: str) -> str:
+    def apply_prompt(self, profile_name: str, md_id: str) -> str:
         try:
-            _wsl_run(f"{AGENT_BOX_CMD} claude-md apply {profile_name} {md_id}")
+            _wsl_run(f"{AGENT_BOX_CMD} prompt apply {profile_name} {md_id}")
             return json.dumps({"ok": True})
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})

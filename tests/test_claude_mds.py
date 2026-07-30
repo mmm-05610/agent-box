@@ -5,7 +5,7 @@ import pytest
 
 from agent_box import config
 from agent_box.resources import profile
-from agent_box.resources.prompts import apply_claude_md
+from agent_box.resources.prompts import apply_prompt
 from agent_box.resources.profile import ProfileError
 
 
@@ -21,7 +21,7 @@ def test_claude_md_apply(tmp_agent_box_home, acs_stub):
     assert claude_path.is_file()
     assert claude_path.read_text(encoding="utf-8") == ""
 
-    apply_claude_md("mycc", "decision-maker")
+    apply_prompt("mycc", "decision-maker")
 
     assert claude_path.read_text(encoding="utf-8") == body
 
@@ -34,4 +34,4 @@ def test_claude_md_apply_unknown(tmp_agent_box_home):
     """apply raises for unknown prompt id."""
     profile.create("mycc", "claude")
     with pytest.raises(ProfileError, match="not found in ACS"):
-        apply_claude_md("mycc", "nope")
+        apply_prompt("mycc", "nope")
