@@ -12,7 +12,7 @@ from typing import Any, Dict, List
 from ... import config
 from ..profile import ProfileError, load_meta
 from ...adapters import acs as _acs
-from ...core.io import read_jsonc, read_toml, write_json, write_toml, write_yaml
+from ...core.io import read_json, read_jsonc, read_toml, read_yaml, write_json, write_toml, write_yaml
 from ...core.library import get_agent_config
 
 
@@ -61,36 +61,31 @@ def apply_mcp_server(profile_name: str, server_id: str) -> None:
             f"mcp-server {server_id!r}: server_config is missing or empty"
         )
 
-    if profile_agent_type == "claude":
-        _apply_claude(profile_name, server_id, server_config)
-    elif profile_agent_type == "codex":
-        _apply_codex(profile_name, server_id, server_config)
-    elif profile_agent_type == "hermes":
-        _apply_hermes(profile_name, server_id, server_config)
-    elif profile_agent_type == "opencode":
-        _apply_opencode(profile_name, server_id, server_config)
-    else:
+    writer = _APPLY_WRITERS.get(profile_agent_type)
+    if writer is None:
         raise ProfileError(
             f"mcp-server apply is not yet supported for agent_type "
             f"{profile_agent_type!r}"
         )
+    writer(profile_name, server_id, server_config)
 
 
 def _apply_claude(profile_name: str, server_id: str,
                   server_config: Dict[str, Any]) -> None:
     """Merge this server into ``dot-claude.json::mcpServers``.
 
-    ``dot-claude.json`` is at the profile root (bind-mounted to
-    ``~/.claude.json``). CC stores its own state in this file
-    (firstStartTime, userID, machineID, projects, …), so we must
-    only touch the ``mcpServers`` key and leave everything else
-    untouched.
+    Note: ``dot-claude.json`` is *not* in the agent-type registry because
+    it lives at the **profile root** (bind-mounted by bwrap to
+    ``~/.claude.json``), not under ``dot-claude/``. This is a bwrap
+    concern, not an agent-type config filename. CC stores its own state
+    here (firstStartTime, userID, machineID, projects, …), so we must
+    only touch the ``mcpServers`` key and leave everything else untouched.
     """
     target = config.profile_dir(profile_name) / "dot-claude.json"
     existing: Dict[str, Any] = {}
     if target.is_file():
         try:
-            existing = json.loads(target.read_text(encoding="utf-8"))
+            existing = read_json(target)
         except json.JSONDecodeError as exc:
             raise ProfileError(
                 f"{profile_name}: dot-claude.json is not valid JSON: {exc}"
@@ -163,15 +158,8 @@ def _apply_hermes(profile_name: str, server_id: str,
     existing: Dict[str, Any] = {}
     if target.is_file():
         try:
-            import yaml
-        except ImportError as exc:
-            raise ProfileError(
-                f"PyYAML is required to read/write Hermes {target.name} "
-                "(install with: pip install pyyaml)"
-            ) from exc
-        try:
-            existing = yaml.safe_load(target.read_text(encoding="utf-8")) or {}
-        except yaml.YAMLError as exc:
+            existing = read_yaml(target)
+        except Exception as exc:  # read_yaml already returns {} on error
             raise ProfileError(
                 f"{profile_name}: {target.name} is not valid YAML: {exc}"
             ) from exc
@@ -254,15 +242,10 @@ def list_profile_mcp_servers(profile_name: str) -> List[Dict[str, Any]]:
     meta = load_meta(profile_name)
     at = meta["agent_type"]
 
-    if at == "claude":
-        return _list_claude_mcp(profile_name)
-    elif at == "codex":
-        return _list_codex_mcp(profile_name)
-    elif at == "hermes":
-        return _list_hermes_mcp(profile_name)
-    elif at == "opencode":
-        return _list_opencode_mcp(profile_name)
-    raise ProfileError(f"list mcp not supported for {at!r}")
+    list_fn = _LIST_WRITERS.get(at)
+    if list_fn is None:
+        raise ProfileError(f"list mcp not supported for {at!r}")
+    return list_fn(profile_name)
 
 
 def remove_mcp_from_profile(profile_name: str, mcp_id: str) -> None:
@@ -270,16 +253,10 @@ def remove_mcp_from_profile(profile_name: str, mcp_id: str) -> None:
     meta = load_meta(profile_name)
     at = meta["agent_type"]
 
-    if at == "claude":
-        _remove_claude_mcp(profile_name, mcp_id)
-    elif at == "codex":
-        _remove_codex_mcp(profile_name, mcp_id)
-    elif at == "hermes":
-        _remove_hermes_mcp(profile_name, mcp_id)
-    elif at == "opencode":
-        _remove_opencode_mcp(profile_name, mcp_id)
-    else:
+    remove_fn = _REMOVE_WRITERS.get(at)
+    if remove_fn is None:
         raise ProfileError(f"remove mcp not supported for {at!r}")
+    remove_fn(profile_name, mcp_id)
 
 
 # ── list_profile_mcp_servers helpers ──────────────────────────────────────
@@ -289,7 +266,7 @@ def _list_claude_mcp(profile_name: str) -> List[Dict[str, Any]]:
     if not target.is_file():
         return []
     try:
-        data = json.loads(target.read_text(encoding="utf-8"))
+        data = read_json(target)
     except (json.JSONDecodeError, OSError):
         return []
     servers = data.get("mcpServers") if isinstance(data, dict) else None
@@ -312,12 +289,8 @@ def _list_hermes_mcp(profile_name: str) -> List[Dict[str, Any]]:
     if not target.is_file():
         return []
     try:
-        import yaml
-    except ImportError:
-        return []
-    try:
-        data = yaml.safe_load(target.read_text(encoding="utf-8")) or {}
-    except yaml.YAMLError:
+        data = read_yaml(target)
+    except Exception:
         return []
     if not isinstance(data, dict):
         return []
@@ -379,8 +352,8 @@ def _remove_claude_mcp(profile_name: str, mcp_id: str) -> None:
     data: Dict[str, Any] = {}
     if target.is_file():
         try:
-            data = json.loads(target.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
+            data = read_json(target)
+        except (json.JSONDecodeError, OSError):
             data = {}
     if not isinstance(data, dict):
         data = {}
@@ -409,12 +382,8 @@ def _remove_hermes_mcp(profile_name: str, mcp_id: str) -> None:
     data: Dict[str, Any] = {}
     if target.is_file():
         try:
-            import yaml
-        except ImportError as exc:
-            raise ProfileError("PyYAML is required") from exc
-        try:
-            data = yaml.safe_load(target.read_text(encoding="utf-8")) or {}
-        except yaml.YAMLError:
+            data = read_yaml(target)
+        except Exception:
             data = {}
     if not isinstance(data, dict):
         data = {}
@@ -447,6 +416,38 @@ def _remove_opencode_mcp(profile_name: str, mcp_id: str) -> None:
             data[root_key] = mcp
     write_json(target, data)
 
+
+
+
+# ── Agent-type writer dispatch (registry-driven) ────────────────────────────
+# Each per-agent-type writer is registered locally because the function
+# objects live in this module.  The registry (_AGENT_TYPES) still owns the
+# metadata (e.g. ``mcp_config`` for codex/hermes/opencode); these dicts
+# just pick the right per-format writer for a given agent type. Adding a
+# new agent type = one entry in each dict + a matching ``mcp_config`` field
+# (Claude's bwrap special case stays at the profile root — see
+# ``_apply_claude``).
+
+_APPLY_WRITERS = {
+    "claude":   _apply_claude,
+    "codex":    _apply_codex,
+    "hermes":   _apply_hermes,
+    "opencode": _apply_opencode,
+}
+
+_LIST_WRITERS = {
+    "claude":   _list_claude_mcp,
+    "codex":    _list_codex_mcp,
+    "hermes":   _list_hermes_mcp,
+    "opencode": _list_opencode_mcp,
+}
+
+_REMOVE_WRITERS = {
+    "claude":   _remove_claude_mcp,
+    "codex":    _remove_codex_mcp,
+    "hermes":   _remove_hermes_mcp,
+    "opencode": _remove_opencode_mcp,
+}
 
 __all__ = [
     "apply_mcp_server",
