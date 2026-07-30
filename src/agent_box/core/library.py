@@ -28,6 +28,7 @@ from .. import config
 
 _AGENT_TYPES: Dict[str, Dict[str, Any]] = {
     "claude": {
+        "profile_dir_suffix": "dot-claude",
         "config_dir": "~/.claude",
         "binary": "claude",
         "prompt_file": "CLAUDE.md",
@@ -47,6 +48,7 @@ _AGENT_TYPES: Dict[str, Dict[str, Any]] = {
         },
     },
     "codex": {
+        "profile_dir_suffix": "dot-codex",
         "config_dir": "~/.codex",
         "binary": "codex",
         "prompt_file": "AGENTS.md",
@@ -59,6 +61,7 @@ _AGENT_TYPES: Dict[str, Dict[str, Any]] = {
         "provider_apply_mode": "overwrite",
     },
     "hermes": {
+        "profile_dir_suffix": "dot-hermes",
         "config_dir": "~/.hermes",
         "binary": "hermes",
         "prompt_file": "SOUL.md",
@@ -72,6 +75,7 @@ _AGENT_TYPES: Dict[str, Dict[str, Any]] = {
         "provider_apply_mode": "additive",
     },
     "opencode": {
+        "profile_dir_suffix": "dot-opencode",
         "config_dir": "~/.config/opencode",
         "binary": "opencode",
         "data_dir": "~/.local/share/opencode",
