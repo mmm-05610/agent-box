@@ -263,16 +263,18 @@ def _apply_preset(
     name: str, agent_type: str,
     preset_name: str | None, claude_md_body: str | None,
 ) -> None:
-    """Write preset prompt / hooks / settings overlay (CC only for now)."""
-    import json as _json
+    """Apply preset files or inline prompt content.
 
+    Preset behaviour is type-agnostic — the file list and merge rules
+    come from :data:`library._AGENT_TYPES` ``preset_files``.  If the
+    agent type has no preset files, preset_name is silently skipped.
+    """
     target = config.profile_agent_dir(name, agent_type)
     agent_config = library.get_agent_config(agent_type)
     if agent_config is None:
         raise ProfileError(f"unknown agent_type {agent_type!r}")
-    prompt_file = agent_config["prompt_file"]
 
-    if agent_type == "claude" and preset_name is not None:
+    if preset_name is not None and agent_config.get("preset_files"):
         preset_dir = library.get_preset_dir(agent_type, preset_name)
         if preset_dir is None:
             raise ProfileError(
@@ -280,8 +282,10 @@ def _apply_preset(
                 f"Available: {', '.join(library.list_presets(agent_type)) or '(none)'}"
             )
         _merge_preset_dir(preset_dir, target, agent_type)
-    elif claude_md_body is not None and agent_type == "claude":
-        (target / prompt_file).write_text(claude_md_body)
+    elif claude_md_body is not None:
+        prompt_file = agent_config.get("prompt_file")
+        if prompt_file:
+            (target / prompt_file).write_text(claude_md_body)
 
 
 def create(
