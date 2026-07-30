@@ -24,25 +24,26 @@ class ProfileError(Exception):
     """Raised for any profile-level operation failure."""
 
 
+def _row_to_dict(row: Any) -> Dict[str, str]:
+    """Map a ``profiles`` table row to the public meta dict."""
+    d = dict(row)
+    return {
+        "name": d.get("name") or "",
+        "agent_type": d.get("agent_type") or "",
+        "display_name": d.get("display_name") or "",
+        "description": d.get("description") or "",
+        "provider": d.get("provider_ref") or "",
+        "claude_md": d.get("claude_md_ref") or "",
+        "preset": "",
+    }
+
+
 # ---------------------------------------------------------------------------
 # Repository — data access only
 # ---------------------------------------------------------------------------
 
 class ProfileRepo:
     """Data access for the ``profiles`` table."""
-
-    @staticmethod
-    def _row_to_dict(row: Any) -> Dict[str, str]:
-        d = dict(row)
-        return {
-            "name": d.get("name") or "",
-            "agent_type": d.get("agent_type") or "",
-            "display_name": d.get("display_name") or "",
-            "description": d.get("description") or "",
-            "provider": d.get("provider_ref") or "",
-            "claude_md": d.get("claude_md_ref") or "",
-            "preset": "",
-        }
 
     @staticmethod
     def _ensure_exists(name: str) -> None:
@@ -68,7 +69,7 @@ class ProfileRepo:
                 f"{name}: profile not found. "
                 f"Try: agent-box create {name} --type claude"
             )
-        return self._row_to_dict(row)
+        return _row_to_dict(row)
 
     def update(
         self,
