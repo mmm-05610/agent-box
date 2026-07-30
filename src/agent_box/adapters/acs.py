@@ -92,21 +92,6 @@ def get_provider(agent_type: str, provider_id: str) -> Dict[str, Any] | None:
     return result
 
 
-def skill_source_dir(skill_id: str, directory: str = "") -> Path | None:
-    """Resolve a skill's on-disk source directory.
-
-    Uses the *directory* recorded in ACS when available (must be an
-    absolute path).  Falls back to ``skills_source_dir / <directory or
-    skill_id>`` when *directory* is empty or relative.
-    Returns the first path that exists on disk, or ``None``.
-    """
-    candidates = [
-        Path(directory) if directory.startswith("/") else None,
-        config.skills_source_dir() / (directory or skill_id),
-    ]
-    return next((c for c in candidates if c and c.is_dir()), None)
-
-
 # ── Skills ─────────────────────────────────────────────────────────────────
 
 def list_skills(agent_type: str) -> List[Dict[str, Any]]:
@@ -126,7 +111,7 @@ def list_skills(agent_type: str) -> List[Dict[str, Any]]:
             "directory": src_dir, "repo_owner": r["repo_owner"] or "",
             "repo_name": r["repo_name"] or "", "repo_branch": r["repo_branch"] or "main",
             "readme_url": r["readme_url"] or "",
-            "source_available": skill_source_dir(r["id"], src_dir) is not None,
+            "source_available": bool(src_dir and Path(src_dir).is_dir()),
         })
     conn.close()
     return out
