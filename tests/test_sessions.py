@@ -111,12 +111,11 @@ def test_latest_cwd(tmp_agent_box_home, monkeypatch):
     string and grows monotonically with insertion order.
     """
     import sqlite3
-    from agent_box.resources import sessions as sess_mod
+    from agent_box.core.db import get_conn, write_lock
 
-    # Use the live _get_conn and INSERT with explicit timestamps instead
+    # Use the live connection and INSERT with explicit timestamps instead
     # of datetime('now').
-    conn = sess_mod._get_conn()
-    from agent_box.core.db import write_lock
+    conn = get_conn()
     with write_lock:
         conn.execute(
             "INSERT INTO sessions (profile, agent_type, cwd, mode, pid, launched_at) "
