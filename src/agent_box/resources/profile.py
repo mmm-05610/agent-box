@@ -3,7 +3,7 @@
 Profiles are created by copying the agent type's template directory
 into ``$AGENT_BOX_HOME/profiles/<name>/dot-<type>/``. Profile metadata
 (name, agent_type, display_name, description, provider_ref, claude_md_ref)
-lives in the ``profiles`` table of ``agent-box.db`` (see :mod:`.db`).
+lives in the ``profiles`` table of ``agent-box.db`` (see :mod:`agent_box.core.db`).
 
 For backward compatibility with v0.4 profiles (which stored meta in
 ``profiles/<name>/meta.yaml``), :func:`load_meta` lazily migrates a
