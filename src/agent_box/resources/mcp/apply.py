@@ -12,7 +12,7 @@ from typing import Any, Dict, List
 from ... import config
 from ..profile import ProfileError, load_meta
 from ...adapters import acs as _acs
-from ...core.io import read_jsonc, read_toml, write_toml, write_yaml
+from ...core.io import read_jsonc, read_toml, write_json, write_toml, write_yaml
 from ...core.library import get_agent_config
 
 
@@ -107,7 +107,6 @@ def _apply_claude(profile_name: str, server_id: str,
         )
     servers[server_id] = server_config
     existing["mcpServers"] = servers
-    from ...core.io import write_json
     write_json(target, existing)
 
 
@@ -215,7 +214,6 @@ def _apply_opencode(profile_name: str, server_id: str,
     servers[server_id] = _to_opencode_format(server_config)
     mcp_section["servers"] = servers
     existing[root_key] = mcp_section
-    from ...core.io import write_json
     write_json(target, existing)
 
 
@@ -390,7 +388,6 @@ def _remove_claude_mcp(profile_name: str, mcp_id: str) -> None:
     if isinstance(servers, dict):
         servers.pop(mcp_id, None)
         data["mcpServers"] = servers
-    from ...core.io import write_json
     write_json(target, data)
 
 
@@ -448,7 +445,6 @@ def _remove_opencode_mcp(profile_name: str, mcp_id: str) -> None:
             servers.pop(mcp_id, None)
             mcp["servers"] = servers
             data[root_key] = mcp
-    from ...core.io import write_json
     write_json(target, data)
 
 
