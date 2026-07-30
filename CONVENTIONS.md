@@ -134,3 +134,27 @@ Existing registry fields (see `core/library.py` for the full dict):
 | `mcp_config`     | dict  | `{"filename": "config.toml", "root_key": "mcp_servers"}`     |
 | `features`       | tuple | `("permissions", "plugins")`                                 |
 | `supports_hooks` | bool  | `true`                                                       |
+
+## 6. Registry list fields are for iteration, not positional selection
+
+Fields like `config_files` and `extra_profile_files` are lists
+because their semantics are "all of these things" — they exist to be
+iterated over. When a piece of code needs **one specific file** from
+that list, the registry must expose a dedicated named field. Never
+use positional indices (`[0]`, `[1]`) to pick an item out of a list.
+
+```python
+# ❌ Wrong — assumes hooks live in the first config file
+profile_dir / agent_config["config_files"][0]
+
+# ✅ Correct — registry names the file explicitly
+profile_dir / agent_config["hooks_config_file"]
+```
+
+Looping over the whole list is always fine:
+
+```python
+# ✅ Correct — apply every config file
+for filename in agent_config["config_files"]:
+    ...
+```
