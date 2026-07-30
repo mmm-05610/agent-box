@@ -21,7 +21,11 @@ from ...core.library import get_agent_config
 # ── apply ───────────────────────────────────────────────────────────────────
 
 def apply_mcp_server(profile_name: str, server_id: str) -> None:
-    """Write an MCP server's config to a profile's per-agent file."""
+    """Write an MCP server's config to a profile's per-agent file.
+
+    The agent type determines the target file, root key, and I/O
+    format — all resolved from the registry.  No per-agent branching.
+    """
     meta, agent_config = resolve_profile(profile_name)
     profile_agent_type = meta["agent_type"]
 
@@ -42,44 +46,10 @@ def apply_mcp_server(profile_name: str, server_id: str) -> None:
             f"mcp-server {server_id!r}: server_config is missing or empty"
         )
 
-    if profile_agent_type == "claude":
-        _apply_claude(profile_name, server_id, server_config)
-    else:
-        _apply_config(profile_name, profile_agent_type, server_id, server_config)
+    _write_mcp(profile_name, profile_agent_type, server_id, server_config)
 
 
-def _apply_claude(profile_name: str, server_id: str,
-                  server_config: Dict[str, Any]) -> None:
-    """Merge this server into ``dot-claude.json::mcpServers``.
 
-    dot-claude.json lives at the **profile root** (bind-mounted by
-    bwrap to ``~/.claude.json``), not under ``dot-claude/``.  CC
-    stores its own state here, so we only touch ``mcpServers``.
-    """
-    target = config.profile_dir(profile_name) / "dot-claude.json"
-    existing: Dict[str, Any] = {}
-    if target.is_file():
-        try:
-            existing = read_json(target)
-        except json.JSONDecodeError as exc:
-            raise ProfileError(
-                f"{profile_name}: dot-claude.json is not valid JSON: {exc}"
-            ) from exc
-        if not isinstance(existing, dict):
-            existing = {}
-    servers = existing.get("mcpServers")
-    if not isinstance(servers, dict):
-        servers = {}
-    if "type" not in server_config:
-        raise ProfileError(
-            f"mcp-server {server_id!r}: server_config is missing 'type'"
-        )
-    servers[server_id] = server_config
-    existing["mcpServers"] = servers
-    write_json(target, existing)
-
-
-# ── generic config-file writer (codex / hermes / opencode) ──────────────────
 
 def _mcp_target(profile_name: str, agent_type: str) -> tuple[Path, str]:
     agent_config = get_agent_config(agent_type)
@@ -88,14 +58,15 @@ def _mcp_target(profile_name: str, agent_type: str) -> tuple[Path, str]:
     mcp_config = agent_config.get("mcp_config")
     if not isinstance(mcp_config, dict):
         raise ProfileError(f"mcp config is not supported for {agent_type!r}")
-    target = (
-        config.profile_agent_dir(profile_name, agent_type)
-        / mcp_config["filename"]
+    base = (
+        config.profile_dir(profile_name)
+        if mcp_config.get("at_profile_root")
+        else config.profile_agent_dir(profile_name, agent_type)
     )
-    return target, mcp_config["root_key"]
+    return base / mcp_config["filename"], mcp_config["root_key"]
 
 
-def _apply_config(profile_name: str, agent_type: str,
+def _write_mcp(profile_name: str, agent_type: str,
                   server_id: str, server_config: Dict[str, Any]) -> None:
     """Merge *server_config* into the MCP section of the profile's config."""
     target, root_key = _mcp_target(profile_name, agent_type)

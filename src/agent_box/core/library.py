@@ -42,7 +42,7 @@ _AGENT_TYPES: Dict[str, Dict[str, Any]] = {
         "features": ("permissions", "plugins"),
         "config_files": ["settings.json"],
         "extra_profile_files": ["dot-claude.json", "dot-agents/"],
-        "mcp_config": None,
+        "mcp_config": {"filename": "dot-claude.json", "root_key": "mcpServers", "at_profile_root": True},
         "provider_apply_mode": "overwrite",
         "preset_files": {
             "CLAUDE.md":             {"dest": "CLAUDE.md",        "merge": "copy"},
