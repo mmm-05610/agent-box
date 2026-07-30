@@ -91,7 +91,7 @@ _AGENT_TYPES: Dict[str, Dict[str, Any]] = {
         "supports_hooks": False,
         "features": ("instructions",),
         "config_files": ["opencode.jsonc"],
-        "mcp_config": {"filename": "opencode.jsonc", "root_key": "mcp"},
+        "mcp_config": {"filename": "opencode.jsonc", "root_key": "mcp", "servers_key": "servers"},
         "provider_apply_mode": "additive",
     },
 }

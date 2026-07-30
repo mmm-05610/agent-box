@@ -5,7 +5,6 @@ and OpenCode (opencode.jsonc) with format conversion.
 """
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -66,26 +65,49 @@ def _mcp_target(profile_name: str, agent_type: str) -> tuple[Path, str]:
     return base / mcp_config["filename"], mcp_config["root_key"]
 
 
+def _mcp_servers_dict(existing: Dict[str, Any], agent_type: str,
+                      mcp_config: Dict[str, Any]) -> tuple[Dict[str, Any], str]:
+    """Return ``(servers_dict, sub_key)`` for the given MCP config section.
+
+    For most types *sub_key* is the same as *mcp_config["root_key"]*.
+    For OpenCode it's ``mcp_config["servers_key"]`` (one level deeper).
+    """
+    section = existing.get(mcp_config["root_key"])
+    if not isinstance(section, dict):
+        return {}, mcp_config["root_key"]
+    sub_key = mcp_config.get("servers_key")
+    if sub_key:
+        servers = section.get(sub_key)
+        if not isinstance(servers, dict):
+            servers = {}
+        return servers, sub_key
+    return section, mcp_config["root_key"]
+
+
 def _write_mcp(profile_name: str, agent_type: str,
                   server_id: str, server_config: Dict[str, Any]) -> None:
-    """Merge *server_config* into the MCP section of the profile's config."""
+    """Merge *server_config* into the MCP section of the profile's config.
+
+    The target file, root key, and optional sub-key are resolved from
+    the agent-type registry — no per-agent branching.
+    """
     if "type" not in server_config:
         raise ProfileError(
             f"mcp-server {server_id!r}: server_config is missing 'type'"
         )
     target, root_key = _mcp_target(profile_name, agent_type)
     existing = _read_config(target)
+    mcp_config = get_agent_config(agent_type).get("mcp_config") or {}
 
-    if agent_type == "opencode":
-        _write_opencode(target, root_key, existing, server_id, server_config)
+    servers, _ = _mcp_servers_dict(existing, agent_type, mcp_config)
+    entry = server_config if agent_type == "claude" else _convert_entry(server_config)
+    servers[server_id] = entry
+
+    if mcp_config.get("servers_key"):
+        existing.setdefault(root_key, {})[mcp_config["servers_key"]] = servers
     else:
-        mcp_section = existing.get(root_key)
-        if not isinstance(mcp_section, dict):
-            mcp_section = {}
-        entry = server_config if agent_type == "claude" else _convert_entry(server_config)
-        mcp_section[server_id] = entry
-        existing[root_key] = mcp_section
-        _write_config(target, existing)
+        existing[root_key] = servers
+    _write_config(target, existing)
 
 
 def _read_config(target: Path) -> Dict[str, Any]:
@@ -138,82 +160,31 @@ def _convert_entry(server_config: Dict[str, Any]) -> Dict[str, Any]:
     return entry
 
 
-def _write_opencode(target: Path, root_key: str,
-                    existing: Dict[str, Any],
-                    server_id: str,
-                    server_config: Dict[str, Any]) -> None:
-    """OpenCode-specific write — nested ``servers`` key + format conversion."""
-    mcp_section = existing.get(root_key)
-    if not isinstance(mcp_section, dict):
-        mcp_section = {}
-    servers = mcp_section.get("servers")
-    if not isinstance(servers, dict):
-        servers = {}
-
-    typ = server_config.get("type")
-    entry: Dict[str, Any] = {"enabled": True}
-    if typ == "stdio":
-        entry["type"] = "local"
-        cmd = server_config.get("command", "")
-        args = server_config.get("args") or []
-        if not isinstance(args, list):
-            args = [str(args)]
-        entry["command"] = [str(cmd), *[str(a) for a in args]]
-        env = server_config.get("env")
-        if isinstance(env, dict) and env:
-            entry["environment"] = {str(k): str(v) for k, v in env.items()}
-    elif typ in ("sse", "http"):
-        entry["type"] = "remote"
-        if "url" in server_config:
-            entry["url"] = server_config["url"]
-        headers = server_config.get("headers")
-        if isinstance(headers, dict) and headers:
-            entry["headers"] = {str(k): str(v) for k, v in headers.items()}
-    servers[server_id] = entry
-    mcp_section["servers"] = servers
-    existing[root_key] = mcp_section
-    write_json(target, existing)
-
-
-# ── profile-level list / remove ────────────────────────────────────────────
-
 
 def list_profile_mcp_servers(profile_name: str) -> List[Dict[str, Any]]:
     """Read installed MCP servers from a profile's config file."""
     meta, agent_config = resolve_profile(profile_name)
-    target, root_key = _mcp_target(profile_name, meta["agent_type"])
+    mcp_config = agent_config.get("mcp_config") or {}
+    target, _ = _mcp_target(profile_name, meta["agent_type"])
     existing = _read_config(target)
-    root = existing.get(root_key) if isinstance(existing, dict) else None
-    if meta["agent_type"] == "opencode":
-        servers = root.get("servers") if isinstance(root, dict) else None
-    else:
-        servers = root if isinstance(root, dict) else None
-    if not isinstance(servers, dict):
-        return []
-    return [_mcp_summary(sid, s) for sid, s in servers.items()]
+    servers, _ = _mcp_servers_dict(existing, meta["agent_type"], mcp_config)
+    return [_mcp_summary(sid, s) for sid, s in servers.items()] if servers else []
 
 
 def remove_mcp_from_profile(profile_name: str, mcp_id: str) -> None:
     """Remove an MCP server from a profile's config file."""
     meta, agent_config = resolve_profile(profile_name)
+    mcp_config = agent_config.get("mcp_config") or {}
     target, root_key = _mcp_target(profile_name, meta["agent_type"])
     existing = _read_config(target) if target.is_file() else {}
-    if not isinstance(existing, dict):
+    servers, sub_key = _mcp_servers_dict(existing, meta["agent_type"], mcp_config)
+    if mcp_id not in servers:
         return
-    if meta["agent_type"] == "opencode":
-        mcp = existing.get(root_key) if isinstance(existing, dict) else None
-        if isinstance(mcp, dict):
-            servers = mcp.get("servers")
-            if isinstance(servers, dict) and mcp_id in servers:
-                servers.pop(mcp_id)
-                mcp["servers"] = servers
-                existing[root_key] = mcp
+    servers.pop(mcp_id)
+    if sub_key != root_key:
+        existing.setdefault(root_key, {})[sub_key] = servers
+    elif servers:
+        existing[root_key] = servers
     else:
-        section = existing.get(root_key)
-        if isinstance(section, dict) and mcp_id in section:
-            section.pop(mcp_id)
-            if section:
-                existing[root_key] = section
-            else:
-                existing.pop(root_key, None)
+        existing.pop(root_key, None)
     _write_config(target, existing)
