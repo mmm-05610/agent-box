@@ -82,7 +82,7 @@ def _write_mcp(profile_name: str, agent_type: str,
         mcp_section = existing.get(root_key)
         if not isinstance(mcp_section, dict):
             mcp_section = {}
-        entry = server_config if agent_type == "claude" else _convert_entry(agent_type, server_config)
+        entry = server_config if agent_type == "claude" else _convert_entry(server_config)
         mcp_section[server_id] = entry
         existing[root_key] = mcp_section
         _write_config(target, existing)
@@ -111,30 +111,31 @@ def _write_config(target: Path, data: Dict[str, Any]) -> None:
         write_json(target, data)
 
 
-def _convert_entry(agent_type: str,
-                   server_config: Dict[str, Any]) -> Dict[str, Any]:
-    """Convert ACS unified format → agent-specific entry shape."""
-    if agent_type == "codex":
-        typ = server_config.get("type")
-        entry: Dict[str, Any] = {}
-        if typ == "stdio":
-            entry["command"] = server_config.get("command", "")
-            args = server_config.get("args")
-            if isinstance(args, list) and args:
-                entry["args"] = [str(a) for a in args]
-            env = server_config.get("env")
-            if isinstance(env, dict) and env:
-                entry["env"] = {str(k): str(v) for k, v in env.items()}
-            cwd = server_config.get("cwd")
-            if isinstance(cwd, str) and cwd:
-                entry["cwd"] = cwd
-        else:
-            entry["url"] = server_config.get("url", "")
-            headers = server_config.get("headers")
-            if isinstance(headers, dict) and headers:
-                entry["headers"] = {str(k): str(v) for k, v in headers.items()}
-        return entry
-    return {k: v for k, v in server_config.items() if k != "type"}
+def _convert_entry(server_config: Dict[str, Any]) -> Dict[str, Any]:
+    """Convert ACS unified MCP format to a flat per-server entry.
+
+    Stdio servers become ``{command, args, env, cwd}``, sse/http servers
+    become ``{url, headers}``.  The ``type`` key is always stripped.
+    """
+    typ = server_config.get("type")
+    entry: Dict[str, Any] = {}
+    if typ == "stdio":
+        entry["command"] = server_config.get("command", "")
+        args = server_config.get("args")
+        if isinstance(args, list) and args:
+            entry["args"] = [str(a) for a in args]
+        env = server_config.get("env")
+        if isinstance(env, dict) and env:
+            entry["env"] = {str(k): str(v) for k, v in env.items()}
+        cwd = server_config.get("cwd")
+        if isinstance(cwd, str) and cwd:
+            entry["cwd"] = cwd
+    else:
+        entry["url"] = server_config.get("url", "")
+        headers = server_config.get("headers")
+        if isinstance(headers, dict) and headers:
+            entry["headers"] = {str(k): str(v) for k, v in headers.items()}
+    return entry
 
 
 def _write_opencode(target: Path, root_key: str,
