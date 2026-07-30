@@ -199,18 +199,6 @@ def _write_opencode(target: Path, root_key: str,
 # ── profile-level list / remove ────────────────────────────────────────────
 
 
-# Per-agent MCP file locations. For Claude, the MCP servers live in
-# ``dot-claude.json`` at the profile root (bind-mounted to
-# ``~/.claude.json``) — NOT in ``dot-claude/claude.json``. The file
-# is dual-purpose: CC stores app state there, so we must merge
-# ``mcpServers`` without touching those fields.
-_AGENT_PATHS: Dict[str, Dict[str, str]] = {
-    "codex":    {"filename": "config.toml",   "root_key": "mcp_servers"},
-    "hermes":   {"filename": "config.yaml",   "root_key": "mcp_servers"},
-    "opencode": {"filename": "opencode.jsonc", "root_key": "mcp"},
-}
-
-
 def list_profile_mcp_servers(profile_name: str) -> List[Dict[str, Any]]:
     """Read a profile's agent config file and return its installed MCP servers."""
     meta = load_meta(profile_name)
