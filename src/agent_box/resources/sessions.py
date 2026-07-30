@@ -138,7 +138,7 @@ class SessionRepo:
                 "ORDER BY launched_at DESC LIMIT 1",
                 (profile,),
             ).fetchone()
-            return row[0] if row else None
+            return row["cwd"] if row else None
 
     def cleanup_stale(self) -> int:
         """Mark dead-PID sessions as exited. Returns count cleaned."""
