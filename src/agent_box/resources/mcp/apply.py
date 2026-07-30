@@ -100,7 +100,7 @@ def _write_mcp(profile_name: str, agent_type: str,
 
     servers, _ = _mcp_servers_dict(existing, agent_type, mcp_config)
     fmt = mcp_config.get("entry_format", "default")
-    if agent_type == "claude":
+    if fmt == "passthrough":
         entry = server_config
     elif fmt == "opencode":
         entry = _convert_entry(server_config, for_opencode=True)
