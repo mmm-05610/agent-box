@@ -118,7 +118,7 @@ def _apply_claude(profile_name: str, provider: Dict[str, Any], settings: Dict[st
     existing["_provider"] = {
         "id": provider.get("id"),
         "name": provider.get("name"),
-        "notes": settings.get("notes", ""),
+        "notes": provider.get("notes", ""),
         "website_url": provider.get("website_url", "") or settings.get("website_url", ""),
         "icon": provider.get("icon"),
         "icon_color": provider.get("icon_color"),
