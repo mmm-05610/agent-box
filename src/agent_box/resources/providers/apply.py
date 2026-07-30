@@ -6,20 +6,14 @@ then delegated to the format-specific overwrite or additive writer.
 from __future__ import annotations
 
 import json
-import os
 import re
-import subprocess
-import tempfile
 from pathlib import Path
 from typing import Any, Dict, List
 
 from ... import config
-from ...core.io import write_json, deep_merge
+from ...core.io import write_json
 from ...core.library import get_agent_config
 from ..profile import ProfileError, load_meta
-
-
-
 
 
 # --- apply ----------------------------------------------------------------
