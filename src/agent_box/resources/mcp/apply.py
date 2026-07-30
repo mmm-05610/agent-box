@@ -100,7 +100,13 @@ def _write_mcp(profile_name: str, agent_type: str,
     mcp_config = get_agent_config(agent_type).get("mcp_config") or {}
 
     servers, _ = _mcp_servers_dict(existing, agent_type, mcp_config)
-    entry = server_config if agent_type == "claude" else _convert_entry(server_config)
+    fmt = mcp_config.get("entry_format", "default")
+    if agent_type == "claude":
+        entry = server_config
+    elif fmt == "opencode":
+        entry = _convert_entry(server_config, for_opencode=True)
+    else:
+        entry = _convert_entry(server_config)
     servers[server_id] = entry
 
     if mcp_config.get("servers_key"):
@@ -133,26 +139,41 @@ def _write_config(target: Path, data: Dict[str, Any]) -> None:
         write_json(target, data)
 
 
-def _convert_entry(server_config: Dict[str, Any]) -> Dict[str, Any]:
-    """Convert ACS unified MCP format to a flat per-server entry.
+def _convert_entry(server_config: Dict[str, Any],
+                   for_opencode: bool = False) -> Dict[str, Any]:
+    """Convert ACS unified MCP format to a per-server entry.
 
-    Stdio servers become ``{command, args, env, cwd}``, sse/http servers
-    become ``{url, headers}``.  The ``type`` key is always stripped.
+    For OpenCode this uses ``local``/``remote`` naming and nests
+    ``command`` as a list.  For all other types the flat format is used.
     """
     typ = server_config.get("type")
     entry: Dict[str, Any] = {}
+
     if typ == "stdio":
-        entry["command"] = server_config.get("command", "")
-        args = server_config.get("args")
-        if isinstance(args, list) and args:
-            entry["args"] = [str(a) for a in args]
-        env = server_config.get("env")
-        if isinstance(env, dict) and env:
-            entry["env"] = {str(k): str(v) for k, v in env.items()}
-        cwd = server_config.get("cwd")
-        if isinstance(cwd, str) and cwd:
-            entry["cwd"] = cwd
+        if for_opencode:
+            entry["type"] = "local"
+            cmd = server_config.get("command", "")
+            args = server_config.get("args") or []
+            if not isinstance(args, list):
+                args = [str(args)]
+            entry["command"] = [str(cmd), *[str(a) for a in args]]
+            env = server_config.get("env")
+            if isinstance(env, dict) and env:
+                entry["environment"] = {str(k): str(v) for k, v in env.items()}
+        else:
+            entry["command"] = server_config.get("command", "")
+            args = server_config.get("args")
+            if isinstance(args, list) and args:
+                entry["args"] = [str(a) for a in args]
+            env = server_config.get("env")
+            if isinstance(env, dict) and env:
+                entry["env"] = {str(k): str(v) for k, v in env.items()}
+            cwd = server_config.get("cwd")
+            if isinstance(cwd, str) and cwd:
+                entry["cwd"] = cwd
     else:
+        if for_opencode:
+            entry["type"] = "remote"
         entry["url"] = server_config.get("url", "")
         headers = server_config.get("headers")
         if isinstance(headers, dict) and headers:
