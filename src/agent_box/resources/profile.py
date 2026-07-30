@@ -110,8 +110,8 @@ class ProfileRepo:
         name: str, agent_type: str,
         display_name: str = "",
         description: str = "",
-        provider: str | None = None,
-        claude_md: str | None = None,
+        provider_ref: str | None = None,
+        prompt_ref: str | None = None,
     ) -> None:
         """INSERT a new profile row.  Does NOT create directories or files."""
         conn = _core_db.get_conn()
@@ -119,7 +119,7 @@ class ProfileRepo:
             "INSERT INTO profiles "
             "(name, agent_type, display_name, description, provider_ref, claude_md_ref) "
             "VALUES (?, ?, ?, ?, ?, ?)",
-            (name, agent_type, display_name, description, provider, claude_md),
+            (name, agent_type, display_name, description, provider_ref, prompt_ref),
         )
         conn.commit()
 
@@ -292,13 +292,13 @@ def create(
     display_name: str | None = None,
     description: str | None = None,
     provider: str | None = None,
-    claude_md: str | None = None,
+    prompt_body: str | None = None,
     preset: str | None = None,
 ) -> Path:
     """Create a new profile.
 
     1. Copy the agent type template to disk
-    2. Apply optional preset overlay
+    2. Apply optional preset overlay, or write inline prompt content
     3. INSERT into the profiles table
     """
     config.validate_profile_name(name)
@@ -309,14 +309,15 @@ def create(
         )
 
     # Guard against duplicates (both DB and disk).
-    conn = _core_db.get_conn()
-    if conn.execute(
-        "SELECT 1 FROM profiles WHERE name = ?", (name,)
-    ).fetchone() is not None:
+    try:
+        _repo.find_by_name(name)
         raise ProfileError(
             f"profile {name!r} already exists. "
             f"Use: agent-box delete {name} first"
         )
+    except ProfileError:
+        pass  # not found — good
+
     root = config.profile_dir(name)
     if root.exists():
         raise ProfileError(
@@ -327,16 +328,16 @@ def create(
     _copy_template(name, agent_type)
     if preset is not None:
         _apply_preset(name, agent_type, preset)
-    elif claude_md is not None:
+    elif prompt_body is not None:
         agent_config = library.get_agent_config(agent_type)
         if agent_config and agent_config.get("prompt_file"):
             (config.profile_agent_dir(name, agent_type)
-             / agent_config["prompt_file"]).write_text(claude_md)
+             / agent_config["prompt_file"]).write_text(prompt_body)
     _repo.insert(name, agent_type,
                  display_name=display_name or "",
                  description=description or "",
-                 provider=provider,
-                 claude_md=claude_md)
+                 provider_ref=provider,
+                 prompt_ref=prompt_body)
     return root
 
 

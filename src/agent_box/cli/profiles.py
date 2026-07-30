@@ -30,7 +30,7 @@ def cmd_create(args: argparse.Namespace) -> int:
             display_name=args.display_name,
             description=args.description,
             provider=args.provider,
-            claude_md=claude_md_body,
+            prompt_body=claude_md_body,
             preset=args.preset,
         )
     except (ValueError, profile.ProfileError) as exc:
