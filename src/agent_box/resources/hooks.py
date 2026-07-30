@@ -67,24 +67,23 @@ def _hooks_key(profile_name: str) -> str:
 
 
 def _settings_path(profile_name: str) -> Path:
-    """Absolute path to the profile's settings file (the one that hosts hooks).
+    """Absolute path to the config file that hosts hooks.
 
-    The filename comes from the agent-type registry's ``config_files[0]``
-    so adding a new agent type that supports hooks is a registry-only
-    change (Rule 5).  Today only Claude has ``supports_hooks: True`` and
-    lists ``settings.json`` as its first config file.
+    The filename comes from ``hooks_config_file`` in the agent-type
+    registry — adding a new agent type that supports hooks is a
+    registry-only change (Rule 5).
     """
     meta = load_meta(profile_name)
     agent_type = meta["agent_type"]
     agent_config = get_agent_config(agent_type)
     if agent_config is None:
         raise ProfileError(f"unknown agent_type {agent_type!r}")
-    config_files = list(agent_config.get("config_files") or [])
-    if not config_files:
+    filename = agent_config.get("hooks_config_file")
+    if not filename:
         raise ProfileError(
-            f"agent_type {agent_type!r} has no config_files"
+            f"agent_type {agent_type!r} has no hooks_config_file"
         )
-    return config.profile_agent_dir(profile_name, agent_type) / config_files[0]
+    return config.profile_agent_dir(profile_name, agent_type) / filename
 
 
 def _require_hooks_support(profile_name: str) -> None:
