@@ -37,6 +37,11 @@ def profiles_dir() -> Path:
     return agent_box_home() / "profiles"
 
 
+def acs_db() -> Path:
+    """Path to the ACS (agent-config-store) SQLite database."""
+    return agent_box_home() / "config" / "cc-switch.db"
+
+
 def library_db() -> Path:
     """Path to the agent-box SQLite database (``agent-box.db``)."""
     return agent_box_home() / "agent-box.db"

@@ -29,13 +29,9 @@ def _acs_column(agent_type: str) -> str:
     return agent_config["acs_column"]
 
 
-def _cs_db_path() -> Path:
-    return config.agent_box_home() / "config" / "cc-switch.db"
-
-
 def _conn() -> sqlite3.Connection | None:
     """Return a connection, or None if the ACS database doesn't exist."""
-    db_path = _cs_db_path()
+    db_path = config.acs_db()
     if not db_path.is_file():
         return None
     c = sqlite3.connect(str(db_path))
