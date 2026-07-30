@@ -116,7 +116,8 @@ def test_latest_cwd(tmp_agent_box_home, monkeypatch):
     # Use the live _get_conn and INSERT with explicit timestamps instead
     # of datetime('now').
     conn = sess_mod._get_conn()
-    with sess_mod._lock:
+    from agent_box.core.db import write_lock
+    with write_lock:
         conn.execute(
             "INSERT INTO sessions (profile, agent_type, cwd, mode, pid, launched_at) "
             "VALUES (?, ?, ?, ?, ?, ?)",

@@ -22,6 +22,11 @@ from .io import read_text
 _conn: sqlite3.Connection | None = None
 _lock = threading.Lock()
 
+# Public alias — Repositories use this to serialise write operations.
+# (SQLite connections are not thread-safe; a single lock shared by all
+# callers prevents interleaved SQL when multiple repos write concurrently.)
+write_lock = _lock
+
 
 def _run_migrations(conn: sqlite3.Connection) -> None:
     """Ensure the database schema is up to date.

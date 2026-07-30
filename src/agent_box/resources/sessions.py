@@ -7,14 +7,10 @@ from __future__ import annotations
 
 import os
 import sqlite3
-import threading
 from typing import Any, Dict, List
 
 from .. import config
 from ..core import db as _core_db
-
-
-_lock = threading.Lock()
 
 
 # ---------------------------------------------------------------------------
@@ -71,7 +67,7 @@ class SessionRepo:
                 return
 
             conn = _core_db.get_conn()
-            with _lock:
+            with _core_db.write_lock:
                 for r in rows:
                     conn.execute(
                         "INSERT INTO sessions "
@@ -127,7 +123,7 @@ class SessionRepo:
         """Insert a new session row. Returns the new session id."""
         self._ensure_migrated()
         conn = _core_db.get_conn()
-        with _lock:
+        with _core_db.write_lock:
             cur = conn.execute(
                 "INSERT INTO sessions (profile, agent_type, cwd, mode, pid, "
                 "launched_at) VALUES (?, ?, ?, ?, ?, datetime('now'))",
@@ -139,7 +135,7 @@ class SessionRepo:
     def record_exit(self, session_id: int, exit_code: int) -> None:
         """Mark a session as exited."""
         conn = _core_db.get_conn()
-        with _lock:
+        with _core_db.write_lock:
             conn.execute(
                 "UPDATE sessions SET exited_at = datetime('now'), "
                 "exit_code = ? WHERE id = ?",
@@ -150,7 +146,7 @@ class SessionRepo:
     def record_exit_by_pid(self, pid: int, exit_code: int) -> None:
         """Mark the most recent running session with *pid* as exited."""
         conn = _core_db.get_conn()
-        with _lock:
+        with _core_db.write_lock:
             row = conn.execute(
                 "SELECT id FROM sessions WHERE pid = ? AND exited_at IS NULL "
                 "ORDER BY launched_at DESC LIMIT 1",
@@ -173,7 +169,7 @@ class SessionRepo:
         """
         self._ensure_migrated()
         conn = _core_db.get_conn()
-        with _lock:
+        with _core_db.write_lock:
             self._cleanup_zombies(conn)
             conn.commit()
 
@@ -207,7 +203,7 @@ class SessionRepo:
     def latest_cwd_for(self, profile: str) -> str | None:
         """Return the most-recent non-empty cwd for *profile*."""
         conn = _core_db.get_conn()
-        with _lock:
+        with _core_db.write_lock:
             row = conn.execute(
                 "SELECT cwd FROM sessions WHERE profile = ? "
                 "AND cwd IS NOT NULL AND cwd != '' "
@@ -219,7 +215,7 @@ class SessionRepo:
     def cleanup_stale(self) -> int:
         """Mark dead-PID sessions as exited. Returns count cleaned."""
         conn = _core_db.get_conn()
-        with _lock:
+        with _core_db.write_lock:
             cleaned = self._cleanup_zombies(conn)
             conn.commit()
             return cleaned
@@ -250,7 +246,6 @@ _get_conn = lambda: _core_db.get_conn()
 
 __all__ = [
     "_get_conn",
-    "_lock",
     "_reset_connection_for_tests",
     "cleanup_stale_sessions",
     "fetch_sessions",
