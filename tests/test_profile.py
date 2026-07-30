@@ -37,7 +37,7 @@ def test_create_with_optional_fields(tmp_agent_box_home):
         display_name="My Display",
         description="for testing",
         provider="custom",
-        claude_md="# custom body\n",
+        prompt_body="# custom body\n",
     )
     meta = profile.load_meta("p1")
     assert meta["display_name"] == "My Display"
