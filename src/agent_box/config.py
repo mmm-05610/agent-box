@@ -38,8 +38,18 @@ def profiles_dir() -> Path:
 
 
 def skills_source_dir() -> Path:
-    """Path to the local skills directory (ACS-managed skill sources)."""
+    """ACS-managed skill source directory."""
     return agent_box_home() / "config" / "skills"
+
+
+def claude_skills_dir() -> Path:
+    """Standard ``~/.claude/skills/`` directory (upstream Claude Code default)."""
+    return Path.home() / ".claude" / "skills"
+
+
+def agents_skills_dir() -> Path:
+    """Standard ``~/.agents/skills/`` directory (upstream agent skills location)."""
+    return Path.home() / ".agents" / "skills"
 
 
 def acs_db() -> Path:
