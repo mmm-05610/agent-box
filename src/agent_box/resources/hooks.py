@@ -34,9 +34,36 @@ from pathlib import Path
 from typing import Any, Dict
 
 from .. import config
-from ..core.io import read_json, write_json
+from ..core.io import read_json, read_yaml, write_json, write_yaml
 from ..core.library import get_agent_config
 from .profile import ProfileError, load_meta
+
+# Registry-driven format dispatch (Rule 5).
+_READERS = {"json": read_json, "yaml": read_yaml}
+_WRITERS = {"json": write_json, "yaml": write_yaml}
+
+
+def _hooks_format(profile_name: str) -> str:
+    """Return the serialization format for hooks (``json`` / ``yaml``)."""
+    meta = load_meta(profile_name)
+    agent_config = get_agent_config(meta["agent_type"])
+    if agent_config is None:
+        raise ProfileError(f"unknown agent_type {meta['agent_type']!r}")
+    fmt = agent_config.get("hooks_format")
+    if fmt is None:
+        raise ProfileError(
+            f"hooks format not configured for {meta['agent_type']!r}"
+        )
+    return fmt
+
+
+def _hooks_key(profile_name: str) -> str:
+    """Return the top-level key that holds hooks in the config file."""
+    meta = load_meta(profile_name)
+    agent_config = get_agent_config(meta["agent_type"])
+    if agent_config is None:
+        raise ProfileError(f"unknown agent_type {meta['agent_type']!r}")
+    return agent_config.get("hooks_key", "hooks")
 
 
 def _settings_path(profile_name: str) -> Path:
@@ -73,21 +100,23 @@ def _require_hooks_support(profile_name: str) -> None:
 def _read_settings(profile_name: str) -> Dict[str, Any]:
     """Read the profile's settings file, returning an empty dict if missing.
 
-    Raises :class:`ProfileError` if the file exists but isn't valid JSON
-    or is not a JSON object.
+    The file format (JSON / YAML) is determined by the agent-type
+    registry's ``hooks_format`` field.
     """
     path = _settings_path(profile_name)
     if not path.is_file():
         return {}
+    fmt = _hooks_format(profile_name)
+    reader = _READERS[fmt]
     try:
-        data = read_json(path)
-    except json.JSONDecodeError as exc:
+        data = reader(path)
+    except (json.JSONDecodeError, Exception) as exc:
         raise ProfileError(
-            f"{profile_name}: {path.name} is not valid JSON: {exc}"
+            f"{profile_name}: {path.name} is not valid {fmt}: {exc}"
         ) from exc
     if not isinstance(data, dict):
         raise ProfileError(
-            f"{profile_name}: {path.name} must be a JSON object, got "
+            f"{profile_name}: {path.name} must be a dict, got "
             f"{type(data).__name__}"
         )
     return data
@@ -101,12 +130,13 @@ def get_hooks(profile_name: str) -> Dict[str, Any] | None:
     """
     _require_hooks_support(profile_name)
     settings = _read_settings(profile_name)
-    hooks = settings.get("hooks")
+    key = _hooks_key(profile_name)
+    hooks = settings.get(key)
     if hooks is None:
         return None
     if not isinstance(hooks, dict):
         raise ProfileError(
-            f"{profile_name}: settings.json 'hooks' must be a JSON object, "
+            f"{profile_name}: {key!r} must be an object, "
             f"got {type(hooks).__name__}"
         )
     return hooks
@@ -132,14 +162,15 @@ def upsert_hooks(profile_name: str, data_json: str) -> Dict[str, Any]:
         ) from exc
     if not isinstance(data, dict):
         raise ProfileError(
-            f"hooks data must be a JSON object, got {type(data).__name__}"
+            f"hooks data must be an object, got {type(data).__name__}"
         )
 
-    # Read existing settings, replace only the hooks key, write back.
     settings = _read_settings(profile_name)
-    settings["hooks"] = data
+    key = _hooks_key(profile_name)
+    settings[key] = data
     target = _settings_path(profile_name)
-    write_json(target, settings)
+    fmt = _hooks_format(profile_name)
+    _WRITERS[fmt](target, settings)
     return data
 
 

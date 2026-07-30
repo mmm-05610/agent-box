@@ -99,13 +99,13 @@ def test_upsert_hooks_preserves_other_keys(tmp_agent_box_home):
 
 def test_upsert_hooks_invalid_json(tmp_agent_box_home):
     profile.create("mycc", "claude")
-    with pytest.raises(ProfileError, match="not valid JSON"):
+    with pytest.raises(ProfileError, match="not valid"):
         hooks.upsert_hooks("mycc", "not-json")
 
 
 def test_upsert_hooks_not_object(tmp_agent_box_home):
     profile.create("mycc", "claude")
-    with pytest.raises(ProfileError, match="must be a JSON object"):
+    with pytest.raises(ProfileError, match="must be an object"):
         hooks.upsert_hooks("mycc", "[]")
 
 
@@ -134,7 +134,7 @@ def test_show_hooks_corrupt_file(tmp_agent_box_home):
     """Corrupt settings.json → ProfileError."""
     profile.create("mycc", "claude")
     _settings_path("mycc").write_text("{ not valid json")
-    with pytest.raises(ProfileError, match="not valid JSON"):
+    with pytest.raises(ProfileError, match="not valid"):
         hooks.get_hooks("mycc")
 
 
@@ -142,7 +142,7 @@ def test_show_hooks_non_object(tmp_agent_box_home):
     """settings.json → hooks is a list → ProfileError."""
     profile.create("mycc", "claude")
     _settings_path("mycc").write_text('{"hooks": []}\n')
-    with pytest.raises(ProfileError, match="'hooks' must be a JSON object"):
+    with pytest.raises(ProfileError, match="must be an object"):
         hooks.get_hooks("mycc")
 
 
