@@ -8,7 +8,6 @@ from typing import Dict, List
 
 from .. import __version__
 from .. import config
-from ..resources import hooks
 from .. import launch
 from ..core import library
 from ..resources import profile
@@ -205,17 +204,26 @@ def _build_parser() -> argparse.ArgumentParser:
     psk.set_defaults(func=cmd_skill_profile_remove)
 
     # hooks ------------------------------------------------------------
-    p_hooks = sub.add_parser("hooks", help="Manage Claude Code hooks.json (file-level)")
+    p_hooks = sub.add_parser("hooks", help="Manage agent hooks (file-level)")
     sub_hooks = p_hooks.add_subparsers(dest="hooks_command", required=True)
 
-    ph = sub_hooks.add_parser("show", help="Show a profile's hooks.json")
+    ph = sub_hooks.add_parser("show", help="Show hooks for a profile")
     ph.add_argument("profile", help="Target profile name")
     ph.add_argument("--json", action="store_true", help="Emit JSON")
     ph.set_defaults(func=cmd_hooks_show)
 
-    ph = sub_hooks.add_parser("upsert", help="Overwrite a profile's hooks.json (JSON from stdin)")
+    ph = sub_hooks.add_parser("set", help="Replace all hooks (JSON from stdin)")
     ph.add_argument("profile", help="Target profile name")
-    ph.set_defaults(func=cmd_hooks_upsert)
+    ph.set_defaults(func=cmd_hooks_set)
+
+    ph = sub_hooks.add_parser("add", help="Add hooks on top of existing (JSON from stdin)")
+    ph.add_argument("profile", help="Target profile name")
+    ph.set_defaults(func=cmd_hooks_add)
+
+    ph = sub_hooks.add_parser("remove", help="Remove a hook event or clear all")
+    ph.add_argument("profile", help="Target profile name")
+    ph.add_argument("--key", default=None, help="Event key to remove (omit to clear all)")
+    ph.set_defaults(func=cmd_hooks_remove)
 
     # sessions ----------------------------------------------------------
     p_sessions = sub.add_parser(
@@ -259,7 +267,7 @@ from .providers import cmd_provider_apply, cmd_provider_profile_list, cmd_provid
 from .mcp import cmd_mcp_apply, cmd_mcp_profile_remove
 from .skills import cmd_skill_apply, cmd_skill_profile_remove
 from .prompts import cmd_claude_md_apply
-from .hooks import cmd_hooks_show, cmd_hooks_upsert
+from .hooks import cmd_hooks_add, cmd_hooks_remove, cmd_hooks_set, cmd_hooks_show
 
 # --- entry point ----------------------------------------------------------
 

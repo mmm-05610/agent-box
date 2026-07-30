@@ -1,31 +1,15 @@
-"""Hooks read/write — embedded in Claude Code ``settings.json``.
+"""Hooks read/write — embedded in agent config files.
 
-Claude Code reads hooks from the ``"hooks"`` key inside
-``settings.json`` — there is no standalone hooks file for user or
-project config (``hooks/hooks.json`` is for plugins only).
+Hooks live inside the main config file (``settings.json`` for Claude,
+``config.yaml`` for Hermes) under a top-level key named in the registry
+(``hooks_key``).  The on-disk format (JSON / YAML) is dispatched from
+the registry's ``hooks_format`` field.
 
-Why no DB table?
-  * Hooks live inside settings.json, which agent-box reads/writes
-    as a JSON object. The hooks key is extracted/merged on the fly.
-  * If we ever need shared hook templates, add a ``hooks`` table then.
-
-The on-disk shape matches Claude Code's documented schema::
-
-    {
-      "hooks": {
-        "PostToolUse": [
-          { "matcher": "Write|Edit",
-            "hooks": [
-              { "type": "command", "command": "npx biome format --write $FILE_PATH" }
-            ]
-          }
-        ]
-      }
-    }
-
-Each top-level key under ``"hooks"`` is a Claude Code event name
-(PreToolUse, PostToolUse, Notification, Stop, SubagentStop,
-SessionStart, SessionEnd, …). Values are arrays of matcher objects.
+The public API follows a uniform CRUD convention:
+  get_hooks(name)        — read all hooks
+  set_hooks(name, data)  — replace all hooks
+  add_hooks(name, data)  — merge new hooks on top of existing
+  remove_hooks(name, key?) — remove one hook event or clear all
 """
 from __future__ import annotations
 
@@ -34,7 +18,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 from .. import config
-from ..core.io import read_json, read_yaml, write_json, write_yaml
+from ..core.io import deep_merge, read_json, read_yaml, write_json, write_yaml
 from ..core.library import get_agent_config
 from .profile import ProfileError, load_meta
 
@@ -43,137 +27,125 @@ _READERS = {"json": read_json, "yaml": read_yaml}
 _WRITERS = {"json": write_json, "yaml": write_yaml}
 
 
-def _hooks_format(profile_name: str) -> str:
-    """Return the serialization format for hooks (``json`` / ``yaml``)."""
-    meta = load_meta(profile_name)
-    agent_config = get_agent_config(meta["agent_type"])
-    if agent_config is None:
-        raise ProfileError(f"unknown agent_type {meta['agent_type']!r}")
-    fmt = agent_config.get("hooks_format")
-    if fmt is None:
-        raise ProfileError(
-            f"hooks format not configured for {meta['agent_type']!r}"
-        )
-    return fmt
-
-
-def _hooks_key(profile_name: str) -> str:
-    """Return the top-level key that holds hooks in the config file."""
-    meta = load_meta(profile_name)
-    agent_config = get_agent_config(meta["agent_type"])
-    if agent_config is None:
-        raise ProfileError(f"unknown agent_type {meta['agent_type']!r}")
-    return agent_config.get("hooks_key", "hooks")
-
-
-def _settings_path(profile_name: str) -> Path:
-    """Absolute path to the config file that hosts hooks.
-
-    The filename comes from ``hooks_config_file`` in the agent-type
-    registry — adding a new agent type that supports hooks is a
-    registry-only change (Rule 5).
-    """
+def _hooks_config(profile_name: str) -> tuple[Path, str, str, str]:
+    """Return (path, format, hooks_key, agent_type) from registry."""
     meta = load_meta(profile_name)
     agent_type = meta["agent_type"]
     agent_config = get_agent_config(agent_type)
     if agent_config is None:
         raise ProfileError(f"unknown agent_type {agent_type!r}")
+    if not agent_config.get("supports_hooks"):
+        raise ProfileError(
+            f"hooks are not supported for {agent_type!r} profiles"
+        )
     filename = agent_config.get("hooks_config_file")
     if not filename:
-        raise ProfileError(
-            f"agent_type {agent_type!r} has no hooks_config_file"
-        )
-    return config.profile_agent_dir(profile_name, agent_type) / filename
+        raise ProfileError(f"hooks_config_file not configured for {agent_type!r}")
+    fmt = agent_config.get("hooks_format")
+    if fmt is None:
+        raise ProfileError(f"hooks_format not configured for {agent_type!r}")
+    key = agent_config.get("hooks_key", "hooks")
+    path = config.profile_agent_dir(profile_name, agent_type) / filename
+    return path, fmt, key, agent_type
 
 
-def _require_hooks_support(profile_name: str) -> None:
-    """Raise :class:`ProfileError` unless *profile_name* supports hooks."""
-    meta = load_meta(profile_name)
-    agent_config = get_agent_config(meta["agent_type"])
-    if not agent_config or not agent_config.get("supports_hooks"):
-        raise ProfileError(
-            f"hooks are not supported for {meta['agent_type']} profiles"
-        )
-
-
-def _read_settings(profile_name: str) -> Dict[str, Any]:
-    """Read the profile's settings file, returning an empty dict if missing.
-
-    The file format (JSON / YAML) is determined by the agent-type
-    registry's ``hooks_format`` field.
-    """
-    path = _settings_path(profile_name)
+def _read_settings(path: Path, fmt: str) -> Dict[str, Any]:
+    """Read a profile's config file, returning empty dict if missing."""
     if not path.is_file():
         return {}
-    fmt = _hooks_format(profile_name)
-    reader = _READERS[fmt]
     try:
-        data = reader(path)
+        data = _READERS[fmt](path)
     except (json.JSONDecodeError, Exception) as exc:
         raise ProfileError(
-            f"{profile_name}: {path.name} is not valid {fmt}: {exc}"
+            f"{path.name} is not valid {fmt}: {exc}"
         ) from exc
     if not isinstance(data, dict):
         raise ProfileError(
-            f"{profile_name}: {path.name} must be a dict, got "
-            f"{type(data).__name__}"
+            f"{path.name} must be a dict, got {type(data).__name__}"
         )
     return data
 
 
-def get_hooks(profile_name: str) -> Dict[str, Any] | None:
-    """Return the hooks from ``settings.json``, or ``None`` if not set.
+def _write_settings(path: Path, fmt: str, data: Dict[str, Any]) -> None:
+    """Write *data* back to *path* using the correct format."""
+    _WRITERS[fmt](path, data)
 
-    Raises :class:`ProfileError` if settings.json is invalid JSON,
-    or if the profile isn't a Claude profile.
-    """
-    _require_hooks_support(profile_name)
-    settings = _read_settings(profile_name)
-    key = _hooks_key(profile_name)
+
+# ── public API ────────────────────────────────────────────────────────────
+
+def get_hooks(profile_name: str) -> Dict[str, Any] | None:
+    """Return the hooks dict, or ``None`` if no hooks are configured."""
+    path, fmt, key, _ = _hooks_config(profile_name)
+    settings = _read_settings(path, fmt)
     hooks = settings.get(key)
     if hooks is None:
         return None
     if not isinstance(hooks, dict):
         raise ProfileError(
-            f"{profile_name}: {key!r} must be an object, "
+            f"{profile_name}: hooks key {key!r} must be an object, "
             f"got {type(hooks).__name__}"
         )
     return hooks
 
 
-def upsert_hooks(profile_name: str, data_json: str) -> Dict[str, Any]:
-    """Write hooks into the profile's ``settings.json`` → ``"hooks"`` key.
-
-    The input must be a JSON object (the top-level Claude Code hooks
-    schema: event-name → array of matcher objects). All other keys in
-    settings.json are preserved untouched — only ``"hooks"`` is
-    overwritten.
-
-    Raises :class:`ProfileError` for invalid JSON, non-object shapes,
-    or non-Claude profiles.
-    """
-    _require_hooks_support(profile_name)
-    try:
-        data = json.loads(data_json)
-    except json.JSONDecodeError as exc:
-        raise ProfileError(
-            f"hooks data is not valid JSON: {exc}"
-        ) from exc
+def _require_hooks_dict(data: Any) -> Dict[str, Any]:
+    """Raise if *data* isn't a dict."""
     if not isinstance(data, dict):
         raise ProfileError(
             f"hooks data must be an object, got {type(data).__name__}"
         )
-
-    settings = _read_settings(profile_name)
-    key = _hooks_key(profile_name)
-    settings[key] = data
-    target = _settings_path(profile_name)
-    fmt = _hooks_format(profile_name)
-    _WRITERS[fmt](target, settings)
     return data
 
 
+def set_hooks(profile_name: str, data: Dict[str, Any]) -> Dict[str, Any]:
+    """Replace the entire hooks key with *data*."""
+    data = _require_hooks_dict(data)
+    path, fmt, key, _ = _hooks_config(profile_name)
+    settings = _read_settings(path, fmt)
+    settings[key] = data
+    _write_settings(path, fmt, settings)
+    return data
+
+
+def add_hooks(profile_name: str, data: Dict[str, Any]) -> Dict[str, Any]:
+    """Merge *data* on top of existing hooks (``deep_merge`` semantics)."""
+    data = _require_hooks_dict(data)
+    path, fmt, key, _ = _hooks_config(profile_name)
+    settings = _read_settings(path, fmt)
+    hooks = settings.get(key)
+    if not isinstance(hooks, dict):
+        hooks = {}
+    settings[key] = deep_merge(hooks, data)
+    _write_settings(path, fmt, settings)
+    return settings[key]
+
+
+def remove_hooks(profile_name: str, event_key: str | None = None) -> bool:
+    """Remove *event_key* from hooks, or clear all hooks if no key given.
+
+    Returns ``True`` if something was removed, ``False`` if there was
+    nothing to remove.
+    """
+    path, fmt, key, _ = _hooks_config(profile_name)
+    settings = _read_settings(path, fmt)
+    hooks = settings.get(key)
+    if not isinstance(hooks, dict):
+        return False
+    if event_key is None:
+        del settings[key]
+        _write_settings(path, fmt, settings)
+        return True
+    if event_key in hooks:
+        del hooks[event_key]
+        settings[key] = hooks
+        _write_settings(path, fmt, settings)
+        return True
+    return False
+
+
 __all__ = [
+    "add_hooks",
     "get_hooks",
-    "upsert_hooks",
+    "remove_hooks",
+    "set_hooks",
 ]
