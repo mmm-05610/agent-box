@@ -1,7 +1,7 @@
 """SQLite-backed session tracking (CLI side).
 
 Sessions live in the shared ``agent-box.db`` (the same database that
-holds providers, prompts, and profiles — see :mod:`.db`). The
+holds profiles and sessions — see :mod:`.db`). The
 connection is shared via :func:`agent_box.db.get_conn`; the module
 keeps its own ``threading.Lock`` to serialize writes through this
 module's API.
