@@ -21,17 +21,9 @@ def apply_skill(profile_name: str, skill_id: str) -> None:
             f"skill {skill_id!r} not found in ACS for {profile_agent_type!r}"
         )
 
-    src_dir = skill.get("directory") or ""
-    candidates = [
-        Path(src_dir) if src_dir.startswith("/") else None,
-        Path.home() / ".agent-box" / "config" / "skills" / (src_dir or skill_id),
-        Path.home() / ".claude" / "skills" / (src_dir or skill_id),
-        Path.home() / ".agents" / "skills" / (src_dir or skill_id),
-    ]
-    src_path = next((c for c in candidates if c and c.is_dir()), None)
+    src_path = _acs.skill_source_dir(skill_id, skill.get("directory") or "")
     if src_path is None:
-        tried = [str(c) for c in candidates if c]
-        raise ProfileError(f"skill {skill_id!r}: source not found (tried: {tried})")
+        raise ProfileError(f"skill {skill_id!r}: source not found on disk")
 
     skills_dir = config.profile_skills_dir(profile_name, profile_agent_type)
     target = skills_dir / skill_id

@@ -92,6 +92,31 @@ def get_provider(agent_type: str, provider_id: str) -> Dict[str, Any] | None:
     return result
 
 
+def skill_source_dir(skill_id: str, directory: str = "") -> Path | None:
+    """Resolve a skill's on-disk source directory.
+
+    Tries, in order:
+      1. *directory* (if it is an absolute path)
+      2. ``~/.agent-box/config/skills/<dir_or_id>/``
+      3. ``~/.claude/skills/<dir_or_id>/``
+      4. ``~/.agents/skills/<dir_or_id>/``
+
+    Returns the first existing directory, or ``None``.
+    """
+    candidates = [
+        Path(directory) if directory.startswith("/") else None,
+        config.agent_box_home() / "config" / "skills" / (directory or skill_id),
+        Path.home() / ".claude" / "skills" / (directory or skill_id),
+        Path.home() / ".agents" / "skills" / (directory or skill_id),
+    ]
+    return next((c for c in candidates if c and c.is_dir()), None)
+
+
+def _skill_source_dir(skill_id: str, directory: str = "") -> Path | None:
+    # Alias kept for internal use in list_skills (semantically identical).
+    return skill_source_dir(skill_id, directory)
+
+
 # ── Skills ─────────────────────────────────────────────────────────────────
 
 def list_skills(agent_type: str) -> List[Dict[str, Any]]:
@@ -106,18 +131,12 @@ def list_skills(agent_type: str) -> List[Dict[str, Any]]:
     out: List[Dict[str, Any]] = []
     for r in rows:
         src_dir = r["directory"] or ""
-        candidates = [
-            Path(src_dir) if src_dir.startswith("/") else None,
-            config.agent_box_home() / "config" / "skills" / (src_dir or r["id"]),
-            Path.home() / ".claude" / "skills" / (src_dir or r["id"]),
-            Path.home() / ".agents" / "skills" / (src_dir or r["id"]),
-        ]
         out.append({
             "id": r["id"], "name": r["name"], "description": r["description"] or "",
             "directory": src_dir, "repo_owner": r["repo_owner"] or "",
             "repo_name": r["repo_name"] or "", "repo_branch": r["repo_branch"] or "main",
             "readme_url": r["readme_url"] or "",
-            "source_available": any(c and c.is_dir() for c in candidates),
+            "source_available": _skill_source_dir(r["id"], src_dir) is not None,
         })
     conn.close()
     return out
