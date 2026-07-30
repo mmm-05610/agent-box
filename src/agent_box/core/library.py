@@ -40,9 +40,9 @@ _AGENT_TYPES: Dict[str, Dict[str, Any]] = {
         "mcp_config": None,
         "provider_apply_mode": "overwrite",
         "preset_files": {
-            "prompt": "CLAUDE.md",
-            "hooks": "hooks.json",
-            "overlay": "settings.overlay.json",
+            "CLAUDE.md":             {"dest": "CLAUDE.md",        "merge": "copy"},
+            "hooks.json":            {"dest": "hooks/hooks.json", "merge": "copy"},
+            "settings.overlay.json": {"dest": "settings.json",    "merge": "deep_merge"},
         },
     },
     "codex": {

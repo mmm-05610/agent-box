@@ -211,47 +211,50 @@ def _copy_template(name: str, agent_type: str) -> None:
             shutil.copytree(data_template, data_target, symlinks=True)
 
 
-def _merge_preset_dir(src: Path, dest: Path, prompt_file: str) -> None:
-    """Merge every file in *src* into *dest*.
+def _merge_preset_dir(src: Path, dest: Path, agent_type: str) -> None:
+    """Apply every file from *src* into *dest*.
 
-    ``settings.overlay.json`` deep-merges into ``settings.json``.
-    ``hooks.json`` is copied to ``hooks/hooks.json``.
-    Everything else lands at ``dest / <filename>``.
+    The source→destination mapping lives in :data:`library._AGENT_TYPES`
+    under ``preset_files``.  Files not listed there are skipped.
     """
     import json as _json
 
-    for entry in src.iterdir():
-        if entry.name == "settings.overlay.json":
-            settings_path = dest / "settings.json"
-            settings_text = read_text(settings_path)
-            if settings_text is None:
-                raise ProfileError("preset: missing base settings.json")
-            overlay_text = read_text(entry)
-            if overlay_text is None:
+    agent_config = library.get_agent_config(agent_type)
+    if agent_config is None:
+        raise ProfileError(f"unknown agent_type {agent_type!r}")
+    file_map = agent_config.get("preset_files")
+    if not isinstance(file_map, dict):
+        return
+
+    for src_name, spec in file_map.items():
+        src_file = src / src_name
+        if not src_file.is_file():
+            continue
+        dst = dest / spec["dest"]
+
+        if spec.get("merge") == "deep_merge":
+            base_text = read_text(dst)
+            if base_text is None:
                 raise ProfileError(
-                    f"preset: cannot read {entry.name}"
+                    f"preset '{src_name}': missing base file at {spec['dest']}"
                 )
+            overlay_text = read_text(src_file)
+            if overlay_text is None:
+                raise ProfileError(f"preset: cannot read {src_name}")
             try:
-                base = _json.loads(settings_text)
+                base = _json.loads(base_text)
                 overlay = _json.loads(overlay_text)
             except _json.JSONDecodeError as exc:
                 raise ProfileError(
-                    "preset: settings overlay requires object base + overlay"
+                    f"preset '{src_name}': requires object base + overlay"
                 ) from exc
             if not isinstance(base, dict) or not isinstance(overlay, dict):
                 raise ProfileError(
-                    "preset: settings overlay requires object base + overlay"
+                    f"preset '{src_name}': requires object base + overlay"
                 )
-            write_text(settings_path,
-                       _json.dumps(deep_merge(base, overlay), indent=2) + "\n")
-        elif entry.name == "hooks.json":
-            dst = dest / "hooks" / "hooks.json"
-            content = read_text(entry)
-            if content is not None:
-                write_text(dst, content)
-        elif entry.is_file():
-            dst = dest / entry.name
-            content = read_text(entry)
+            write_text(dst, _json.dumps(deep_merge(base, overlay), indent=2) + "\n")
+        else:
+            content = read_text(src_file)
             if content is not None:
                 write_text(dst, content)
 
@@ -276,7 +279,7 @@ def _apply_preset(
                 f"unknown preset {preset_name!r} for {agent_type!r}. "
                 f"Available: {', '.join(library.list_presets(agent_type)) or '(none)'}"
             )
-        _merge_preset_dir(preset_dir, target, prompt_file)
+        _merge_preset_dir(preset_dir, target, agent_type)
     elif claude_md_body is not None and agent_type == "claude":
         (target / prompt_file).write_text(claude_md_body)
 
