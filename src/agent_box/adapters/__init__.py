@@ -2,7 +2,9 @@
 
 from .acs import (
     get_mcp_server,
+    get_prompt,
     get_provider,
+    get_skill,
     list_mcp_servers,
     list_prompts,
     list_providers,
@@ -11,7 +13,9 @@ from .acs import (
 
 __all__ = [
     "get_mcp_server",
+    "get_prompt",
     "get_provider",
+    "get_skill",
     "list_mcp_servers",
     "list_prompts",
     "list_providers",
