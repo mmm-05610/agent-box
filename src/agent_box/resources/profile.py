@@ -370,7 +370,7 @@ def show(name: str) -> Dict[str, Any]:
     belong in the data-access layer — Rule 3).
     """
     info = _repo.show_data(name)
-    agent_type = info["meta"].get("agent_type", "claude")
+    agent_type = info["meta"]["agent_type"]
     data_dir = config.profile_agent_data_dir(name, agent_type)
     if data_dir and data_dir.is_dir():
         info["data_dir"] = str(data_dir)
