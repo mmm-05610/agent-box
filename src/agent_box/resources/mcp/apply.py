@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from ... import config
+from .._shared import resolve_profile
 from ..profile import ProfileError, load_meta
 from ...adapters import acs as _acs
 from ...core.io import read_json, read_jsonc, read_toml, read_yaml, write_json, write_toml, write_yaml
