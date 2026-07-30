@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from ... import config
 from ...adapters import acs as _acs
+from ...core import db
 from ...core.io import write_text
 from ...core.library import get_agent_config
 from ..profile import ProfileError, load_meta
@@ -30,7 +31,6 @@ def apply_claude_md(profile_name: str, md_id: str) -> None:
     )
     write_text(target, prompt.get("content") or "")
 
-    from ...core import db
     conn = db.get_conn()
     conn.execute(
         "UPDATE profiles SET claude_md_ref = ? WHERE name = ?",
