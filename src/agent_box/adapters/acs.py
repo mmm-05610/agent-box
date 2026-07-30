@@ -106,12 +106,20 @@ def list_skills(agent_type: str) -> List[Dict[str, Any]]:
     out: List[Dict[str, Any]] = []
     for r in rows:
         src_dir = r["directory"] or ""
+        # Resolve relative paths against skills_source_dir.
+        if src_dir and src_dir.startswith("/"):
+            source_path = Path(src_dir)
+        elif src_dir:
+            source_path = config.skills_source_dir() / src_dir
+        else:
+            source_path = None
         out.append({
             "id": r["id"], "name": r["name"], "description": r["description"] or "",
             "directory": src_dir, "repo_owner": r["repo_owner"] or "",
             "repo_name": r["repo_name"] or "", "repo_branch": r["repo_branch"] or "main",
             "readme_url": r["readme_url"] or "",
-            "source_available": bool(src_dir and Path(src_dir).is_dir()),
+            "source_available": source_path is not None and source_path.is_dir(),
+            "source_path": str(source_path) if source_path and source_path.is_dir() else None,
         })
     conn.close()
     return out

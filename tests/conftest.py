@@ -16,6 +16,7 @@ prompts on the stub and ACS calls return the stub data.
 """
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Dict, List
 
 import pytest
@@ -102,6 +103,8 @@ class AcsStub:
             "name": name or skill_id,
             "description": description,
             "directory": directory,
+            "source_available": bool(directory and Path(directory).is_dir()),
+            "source_path": directory if directory and Path(directory).is_dir() else None,
             "repo_owner": "",
             "repo_name": "",
             "repo_branch": "main",
