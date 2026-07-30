@@ -105,6 +105,34 @@ class ProfileRepo:
         conn.commit()
         return self.find_by_name(name)
 
+    def set_provider_ref(self, name: str, provider_ref: str) -> None:
+        """Update only the ``provider_ref`` column for *name*.
+
+        Called by the providers apply path so the DB write lives in
+        the repository layer (Rule 3 — no raw SQL outside repositories).
+        """
+        self._ensure_exists(name)
+        conn = _core_db.get_conn()
+        conn.execute(
+            "UPDATE profiles SET provider_ref = ? WHERE name = ?",
+            (provider_ref, name),
+        )
+        conn.commit()
+
+    def set_prompt_ref(self, name: str, prompt_ref: str) -> None:
+        """Update only the ``claude_md_ref`` column for *name*.
+
+        Called by the prompts/apply path so the DB write lives in
+        the repository layer (Rule 3 — no raw SQL outside repositories).
+        """
+        self._ensure_exists(name)
+        conn = _core_db.get_conn()
+        conn.execute(
+            "UPDATE profiles SET claude_md_ref = ? WHERE name = ?",
+            (prompt_ref, name),
+        )
+        conn.commit()
+
     def insert(
         self,
         name: str, agent_type: str,
