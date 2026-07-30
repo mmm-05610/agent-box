@@ -42,16 +42,6 @@ def skills_source_dir() -> Path:
     return agent_box_home() / "config" / "skills"
 
 
-def claude_skills_dir() -> Path:
-    """Standard ``~/.claude/skills/`` directory (upstream Claude Code default)."""
-    return Path.home() / ".claude" / "skills"
-
-
-def agents_skills_dir() -> Path:
-    """Standard ``~/.agents/skills/`` directory (upstream agent skills location)."""
-    return Path.home() / ".agents" / "skills"
-
-
 def acs_db() -> Path:
     """Path to the ACS (agent-config-store) SQLite database."""
     return agent_box_home() / "config" / "cc-switch.db"

@@ -95,19 +95,14 @@ def get_provider(agent_type: str, provider_id: str) -> Dict[str, Any] | None:
 def skill_source_dir(skill_id: str, directory: str = "") -> Path | None:
     """Resolve a skill's on-disk source directory.
 
-    Tries, in order:
-      1. *directory* (if it is an absolute path)
-      2. ``~/.agent-box/config/skills/<dir_or_id>/``
-      3. ``~/.claude/skills/<dir_or_id>/``
-      4. ``~/.agents/skills/<dir_or_id>/``
-
-    Returns the first existing directory, or ``None``.
+    Uses the *directory* recorded in ACS when available (must be an
+    absolute path).  Falls back to ``skills_source_dir / <directory or
+    skill_id>`` when *directory* is empty or relative.
+    Returns the first path that exists on disk, or ``None``.
     """
     candidates = [
         Path(directory) if directory.startswith("/") else None,
         config.skills_source_dir() / (directory or skill_id),
-        config.claude_skills_dir() / (directory or skill_id),
-        config.agents_skills_dir() / (directory or skill_id),
     ]
     return next((c for c in candidates if c and c.is_dir()), None)
 
