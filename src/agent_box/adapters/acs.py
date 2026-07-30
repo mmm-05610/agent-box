@@ -164,19 +164,11 @@ def get_mcp_server(server_id: str) -> Dict[str, Any] | None:
     conn = _conn()
     if conn is None:
         return None
-    registered_types = get_agent_types()
-    agent_columns = {
-        agent_type: _acs_column(agent_type)
-        for agent_type in registered_types
-    }
-    agent_columns.update({
-        agent_type: f"enabled_{agent_type}"
-        for agent_type in ACS_EXTRA_TYPES
-    })
-    column_names = ", ".join(agent_columns.values())
     row = conn.execute(
         "SELECT id, name, server_config, description, homepage, docs, tags, "
-        f"{column_names} FROM mcp_servers WHERE id = ?", (server_id,)
+        "enabled_claude, enabled_codex, enabled_gemini, "
+        "enabled_hermes, enabled_opencode, enabled_grokbuild "
+        "FROM mcp_servers WHERE id = ?", (server_id,)
     ).fetchone()
     if row is None:
         conn.close()
@@ -191,10 +183,12 @@ def get_mcp_server(server_id: str) -> Dict[str, Any] | None:
         tags = json.loads(row["tags"] or "[]")
     except json.JSONDecodeError:
         pass
+    # Resolve which agent types this server is enabled for.
+    # The ACS schema uses wide booleans (enabled_claude, …) rather than a
+    # join table — scan every known column and pick the ones that are true.
     enabled_agents = [
-        agent_type
-        for agent_type, column_name in agent_columns.items()
-        if row[column_name]
+        at for at in (*get_agent_types(), *ACS_EXTRA_TYPES)
+        if row.get(f"enabled_{at}")
     ]
     conn.close()
     return {
