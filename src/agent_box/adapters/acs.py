@@ -105,7 +105,7 @@ def skill_source_dir(skill_id: str, directory: str = "") -> Path | None:
     """
     candidates = [
         Path(directory) if directory.startswith("/") else None,
-        config.agent_box_home() / "config" / "skills" / (directory or skill_id),
+        config.skills_source_dir() / (directory or skill_id),
         Path.home() / ".claude" / "skills" / (directory or skill_id),
         Path.home() / ".agents" / "skills" / (directory or skill_id),
     ]

@@ -37,6 +37,11 @@ def profiles_dir() -> Path:
     return agent_box_home() / "profiles"
 
 
+def skills_source_dir() -> Path:
+    """Path to the local skills directory (ACS-managed skill sources)."""
+    return agent_box_home() / "config" / "skills"
+
+
 def acs_db() -> Path:
     """Path to the ACS (agent-config-store) SQLite database."""
     return agent_box_home() / "config" / "cc-switch.db"
