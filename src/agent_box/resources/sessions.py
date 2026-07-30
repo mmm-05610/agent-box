@@ -134,6 +134,7 @@ class SessionRepo:
 
     def record_exit(self, session_id: int, exit_code: int) -> None:
         """Mark a session as exited."""
+        self._ensure_migrated()
         conn = _core_db.get_conn()
         with _core_db.write_lock:
             conn.execute(
@@ -145,6 +146,7 @@ class SessionRepo:
 
     def record_exit_by_pid(self, pid: int, exit_code: int) -> None:
         """Mark the most recent running session with *pid* as exited."""
+        self._ensure_migrated()
         conn = _core_db.get_conn()
         with _core_db.write_lock:
             row = conn.execute(
@@ -202,6 +204,7 @@ class SessionRepo:
 
     def latest_cwd_for(self, profile: str) -> str | None:
         """Return the most-recent non-empty cwd for *profile*."""
+        self._ensure_migrated()
         conn = _core_db.get_conn()
         with _core_db.write_lock:
             row = conn.execute(
