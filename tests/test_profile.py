@@ -84,65 +84,10 @@ def test_show_includes_optional_fields(tmp_agent_box_home):
     assert info["meta"]["agent_type"] == "claude"
 
 
-# --- legacy meta.yaml migration ------------------------------------------
-
-def test_load_meta_migrates_legacy_yaml(tmp_agent_box_home):
-    """A v0.4 meta.yaml is transparently migrated into the profiles table.
-
-    Verifies:
-      * load_meta returns the right dict after migration
-      * ``agent_type: cc`` is normalized to ``claude``
-      * the legacy file is renamed to ``meta.yaml.migrated``
-      * the profiles table has the row (so a second load_meta is a hit,
-        not another migration)
-    """
-    root = config.profile_dir("legacy")
-    root.mkdir(parents=True)
-    (root / "meta.yaml").write_text(
-        "name: legacy\n"
-        "agent_type: cc\n"
-        "display_name: Legacy\n"
-        "description: from yaml\n"
-        "provider: anthropic\n"
-        "preset: blank\n",
-        encoding="utf-8",
-    )
-
-    meta = profile.load_meta("legacy")
-    assert meta["name"] == "legacy"
-    assert meta["agent_type"] == "claude"  # normalized
-    assert meta["display_name"] == "Legacy"
-    assert meta["description"] == "from yaml"
-    assert meta["provider"] == "anthropic"
-    # Preset isn't a DB column \u2014 it's dropped, which is fine for v1.
-
-    # Legacy file renamed; profiles row inserted.
-    assert not (root / "meta.yaml").exists()
-    assert (root / "meta.yaml.migrated").is_file()
-
-    # Second load_meta is a cache hit (no re-migration).
-    meta2 = profile.load_meta("legacy")
-    assert meta2 == meta
-
-
 def test_load_meta_missing_raises(tmp_agent_box_home):
-    """Unknown profile with no legacy yaml raises ProfileError."""
+    """Unknown profile raises ProfileError."""
     with pytest.raises(ProfileError, match="not found"):
         profile.load_meta("nope")
-
-
-def test_load_meta_corrupt_yaml_left_alone(tmp_agent_box_home):
-    """A corrupt legacy YAML is left for the user to inspect (no raise)."""
-    root = config.profile_dir("corrupt")
-    root.mkdir(parents=True)
-    (root / "meta.yaml").write_text(
-        "this is not: valid: yaml: at all\n", encoding="utf-8"
-    )
-    with pytest.raises(ProfileError, match="not found"):
-        profile.load_meta("corrupt")
-    # Corrupt file is left in place so the user can fix it.
-    assert (root / "meta.yaml").is_file()
-    assert not (root / "meta.yaml.migrated").exists()
 
 
 # --- update_meta -----------------------------------------------------------

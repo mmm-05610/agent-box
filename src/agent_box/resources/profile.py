@@ -46,82 +46,10 @@ def _row_to_meta(row: Any) -> Dict[str, str]:
     }
 
 
-def _legacy_meta_yaml_path(name: str) -> Path:
-    """Path to a v0.4-era ``meta.yaml`` for *name* (may not exist)."""
-    return config.profile_dir(name) / "meta.yaml"
-
-
-def _migrate_legacy_meta_yaml(name: str) -> Dict[str, str] | None:
-    """If a legacy ``meta.yaml`` exists for *name*, migrate it.
-
-    Returns the migrated meta dict (also INSERTed into the ``profiles``
-    table) or ``None`` if no legacy YAML was found. The legacy file
-    is renamed to ``meta.yaml.migrated`` on success.
-
-    Normalizations applied:
-      * ``agent_type: cc`` → ``claude``
-      * provider / claude_md fields stored under their ``_ref`` columns
-    """
-    legacy = _legacy_meta_yaml_path(name)
-    if not legacy.is_file():
-        return None
-
-    from .. import _legacy_yaml  # local: only the migration path needs it
-    try:
-        raw = _legacy_yaml._parse_simple_yaml(legacy.read_text(encoding="utf-8"))
-    except (OSError, _legacy_yaml.LegacyYamlError):
-        # Corrupt YAML — leave it for the user to inspect.
-        return None
-
-    if not raw.get("name") or not raw.get("agent_type"):
-        return None
-
-    agent_type = raw["agent_type"]
-    if agent_type == "cc":
-        agent_type = "claude"  # normalize to v1 key
-
-    meta = {
-        "name": raw["name"],
-        "agent_type": agent_type,
-        "display_name": raw.get("display_name") or "",
-        "description": raw.get("description") or "",
-        "provider": raw.get("provider") or "",
-        "claude_md": raw.get("claude_md") or "",
-    }
-
-    # Insert into profiles table.
-    from ..core import db
-    conn = db.get_conn()
-    conn.execute(
-        "INSERT OR IGNORE INTO profiles "
-        "(name, agent_type, display_name, description, provider_ref, claude_md_ref) "
-        "VALUES (?, ?, ?, ?, ?, ?)",
-        (
-            meta["name"],
-            meta["agent_type"],
-            meta["display_name"],
-            meta["description"],
-            meta["provider"] or None,
-            meta["claude_md"] or None,
-        ),
-    )
-    conn.commit()
-
-    # Rename so the next call doesn't re-migrate.
-    try:
-        legacy.rename(legacy.with_suffix(legacy.suffix + ".migrated"))
-    except OSError:
-        pass
-
-    return meta
-
-
 def load_meta(name: str) -> Dict[str, str]:
-    """Load profile metadata for *name* from the ``profiles`` table.
+    """Load profile metadata from the ``profiles`` table.
 
-    On a cache miss, transparently migrates a legacy ``meta.yaml`` file
-    (v0.4 layout) and uses that. Raises :class:`ProfileError` if the
-    profile does not exist in either form.
+    Raises :class:`ProfileError` if the profile does not exist.
     """
     config.validate_profile_name(name)
     from ..core import db
@@ -131,14 +59,6 @@ def load_meta(name: str) -> Dict[str, str]:
         "provider_ref, claude_md_ref FROM profiles WHERE name = ?",
         (name,),
     ).fetchone()
-    if row is None:
-        migrated = _migrate_legacy_meta_yaml(name)
-        if migrated is not None:
-            row = conn.execute(
-                "SELECT name, agent_type, display_name, description, "
-                "provider_ref, claude_md_ref FROM profiles WHERE name = ?",
-                (name,),
-            ).fetchone()
     if row is None:
         raise ProfileError(
             f"{name}: profile not found. Try: agent-box create {name} --type claude"
