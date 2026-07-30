@@ -215,10 +215,14 @@ def _apply_preset(
     name: str, agent_type: str,
     preset_name: str | None, claude_md_body: str | None,
 ) -> None:
-    """Write preset CLAUDE.md / hooks / settings overlay (CC only)."""
+    """Write preset prompt / hooks / settings overlay (CC only for now)."""
     import json as _json
 
     target = config.profile_agent_dir(name, agent_type)
+    agent_config = library.get_agent_config(agent_type)
+    if agent_config is None:
+        raise ProfileError(f"unknown agent_type {agent_type!r}")
+    prompt_file = agent_config["prompt_file"]
 
     if agent_type == "claude" and preset_name is not None:
         preset_dir = library.get_preset_dir(agent_type, preset_name)
@@ -228,9 +232,9 @@ def _apply_preset(
                 f"Available: {', '.join(library.list_presets(agent_type)) or '(none)'}"
             )
 
-        claude_md_src = preset_dir / "CLAUDE.md"
+        claude_md_src = preset_dir / prompt_file
         if claude_md_src.is_file():
-            (target / "CLAUDE.md").write_text(
+            (target / prompt_file).write_text(
                 claude_md_src.read_text(encoding="utf-8")
             )
 
@@ -264,7 +268,7 @@ def _apply_preset(
                 _json.dumps(deep_merge(base, overlay), indent=2) + "\n"
             )
     elif claude_md_body is not None and agent_type == "claude":
-        (target / "CLAUDE.md").write_text(claude_md_body)
+        (target / prompt_file).write_text(claude_md_body)
 
 
 def create(
