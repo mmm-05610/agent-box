@@ -3,20 +3,23 @@ from __future__ import annotations
 
 from ... import config
 from ...adapters import acs as _acs
-from ...core import db
 from ...core.io import write_text
 from ...core.library import get_agent_config
-from ..profile import ProfileError, load_meta
+from ..profile import ProfileError, _repo, load_meta
 
 
 def apply_claude_md(profile_name: str, md_id: str) -> None:
-    """Write a prompt's content from ACS to a profile's CLAUDE.md (overwrite)."""
+    """Write a prompt's content from ACS to a profile's prompt file (overwrite).
+
+    Only agent types whose registry entry has ``supports_prompt_apply: True``
+    support this operation — currently only Claude (via ``CLAUDE.md``).
+    """
     meta = load_meta(profile_name)
     agent_type = meta["agent_type"]
     agent_config = get_agent_config(agent_type)
     if agent_config is None:
         raise ProfileError(f"unknown agent_type {agent_type!r}")
-    if agent_type != "claude":
+    if not agent_config.get("supports_prompt_apply"):
         raise ProfileError(
             f"claude-md apply is not yet supported for agent_type {agent_type!r}"
         )
@@ -31,9 +34,4 @@ def apply_claude_md(profile_name: str, md_id: str) -> None:
     )
     write_text(target, prompt.get("content") or "")
 
-    conn = db.get_conn()
-    conn.execute(
-        "UPDATE profiles SET claude_md_ref = ? WHERE name = ?",
-        (md_id, profile_name),
-    )
-    conn.commit()
+    _repo.set_prompt_ref(profile_name, md_id)
