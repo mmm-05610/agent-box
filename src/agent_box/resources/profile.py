@@ -17,7 +17,7 @@ from typing import Any, Dict, List
 from .. import config
 from ..core import db as _core_db
 from ..core import library
-from ..core.io import deep_merge
+from ..core.io import deep_merge, read_text, write_text
 
 
 class ProfileError(Exception):
@@ -223,11 +223,17 @@ def _merge_preset_dir(src: Path, dest: Path, prompt_file: str) -> None:
     for entry in src.iterdir():
         if entry.name == "settings.overlay.json":
             settings_path = dest / "settings.json"
-            if not settings_path.is_file():
+            settings_text = read_text(settings_path)
+            if settings_text is None:
                 raise ProfileError("preset: missing base settings.json")
+            overlay_text = read_text(entry)
+            if overlay_text is None:
+                raise ProfileError(
+                    f"preset: cannot read {entry.name}"
+                )
             try:
-                base = _json.loads(settings_path.read_text(encoding="utf-8"))
-                overlay = _json.loads(entry.read_text(encoding="utf-8"))
+                base = _json.loads(settings_text)
+                overlay = _json.loads(overlay_text)
             except _json.JSONDecodeError as exc:
                 raise ProfileError(
                     "preset: settings overlay requires object base + overlay"
@@ -236,17 +242,18 @@ def _merge_preset_dir(src: Path, dest: Path, prompt_file: str) -> None:
                 raise ProfileError(
                     "preset: settings overlay requires object base + overlay"
                 )
-            settings_path.write_text(
-                _json.dumps(deep_merge(base, overlay), indent=2) + "\n"
-            )
+            write_text(settings_path,
+                       _json.dumps(deep_merge(base, overlay), indent=2) + "\n")
         elif entry.name == "hooks.json":
             dst = dest / "hooks" / "hooks.json"
-            dst.parent.mkdir(parents=True, exist_ok=True)
-            dst.write_text(entry.read_text(encoding="utf-8"))
+            content = read_text(entry)
+            if content is not None:
+                write_text(dst, content)
         elif entry.is_file():
             dst = dest / entry.name
-            dst.parent.mkdir(parents=True, exist_ok=True)
-            dst.write_text(entry.read_text(encoding="utf-8"))
+            content = read_text(entry)
+            if content is not None:
+                write_text(dst, content)
 
 
 def _apply_preset(
