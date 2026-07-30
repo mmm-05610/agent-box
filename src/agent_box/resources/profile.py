@@ -159,49 +159,39 @@ class ProfileRepo:
         ).fetchall()
         return [dict(r) for r in rows]
 
-    def show(self, name: str) -> Dict[str, Any]:
+    def show_data(self, name: str) -> Dict[str, Any]:
+        """Return show()'s core dict from SQL only — no filesystem checks.
+
+        The module-level :func:`show` wrapper adds the optional
+        ``data_dir`` field (filesystem-dependent) on top of this.
+        """
         config.validate_profile_name(name)
         meta = self.find_by_name(name)
         agent_type = meta.get("agent_type", "claude")
         config_dir = config.profile_agent_dir(name, agent_type)
-        data_dir = config.profile_agent_data_dir(name, agent_type)
-
         info: Dict[str, Any] = {
             "path": str(config.profile_dir(name)),
             "meta": meta,
             "config_dir": str(config_dir),
         }
-        if data_dir and data_dir.is_dir():
-            info["data_dir"] = str(data_dir)
         for k in ("display_name", "description", "provider", "preset"):
             v = meta.get(k)
             if v:
                 info[k] = v
         return info
 
-    def delete(self, name: str, force: bool = False) -> bool:
+    def delete_row(self, name: str) -> None:
+        """DELETE the profiles row for *name* — no I/O, no rmtree.
+
+        Raises :class:`ProfileError` if the row does not exist. The
+        module-level :func:`delete` wrapper handles the confirmation
+        prompt and the on-disk tree removal on top of this.
+        """
         config.validate_profile_name(name)
         self._ensure_exists(name)
-
-        if not force:
-            confirm = input(f"Delete profile {name!r}? [y/N] ").strip().lower()
-            if confirm not in ("y", "yes"):
-                print("aborted.", file=sys.stderr)
-                return False
-
         conn = _core_db.get_conn()
         conn.execute("DELETE FROM profiles WHERE name = ?", (name,))
         conn.commit()
-
-        root = config.profile_dir(name)
-        if root.exists():
-            try:
-                shutil.rmtree(root)
-            except OSError as exc:
-                raise ProfileError(
-                    f"{name}: removed from DB, but rmtree failed: {exc}"
-                ) from exc
-        return True
 
 
 # ---------------------------------------------------------------------------
@@ -229,7 +219,7 @@ def _copy_template(name: str, agent_type: str) -> None:
         if relative_path.endswith("/"):
             extra_path.mkdir(parents=True, exist_ok=True)
         else:
-            extra_path.write_text("{}\n", encoding="utf-8")
+            write_text(extra_path, "{}\n")
 
     # Secondary data template (e.g. OpenCode auth.json)
     data_template = library.get_template_data_dir(agent_type)
@@ -359,8 +349,11 @@ def create(
     elif prompt_body is not None:
         agent_config = library.get_agent_config(agent_type)
         if agent_config and agent_config.get("prompt_file"):
-            (config.profile_agent_dir(name, agent_type)
-             / agent_config["prompt_file"]).write_text(prompt_body)
+            write_text(
+                config.profile_agent_dir(name, agent_type)
+                / agent_config["prompt_file"],
+                prompt_body,
+            )
     _repo.insert(name, agent_type,
                  display_name=display_name or "",
                  description=description or "",
@@ -369,12 +362,52 @@ def create(
     return root
 
 
+def show(name: str) -> Dict[str, Any]:
+    """Return a human-friendly view of *name* — DB row + on-disk info.
+
+    Wraps :meth:`ProfileRepo.show_data` and adds the optional
+    ``data_dir`` field (a filesystem-dependent check that does not
+    belong in the data-access layer — Rule 3).
+    """
+    info = _repo.show_data(name)
+    agent_type = info["meta"].get("agent_type", "claude")
+    data_dir = config.profile_agent_data_dir(name, agent_type)
+    if data_dir and data_dir.is_dir():
+        info["data_dir"] = str(data_dir)
+    return info
+
+
+def delete(name: str, force: bool = False) -> bool:
+    """Delete *name* — DB row + profile tree, with a confirm prompt.
+
+    Wraps :meth:`ProfileRepo.delete_row` and adds the user-facing
+    confirmation + on-disk ``rmtree`` (both orchestration, not
+    data access — Rule 3).
+    """
+    config.validate_profile_name(name)
+
+    if not force:
+        confirm = input(f"Delete profile {name!r}? [y/N] ").strip().lower()
+        if confirm not in ("y", "yes"):
+            print("aborted.", file=sys.stderr)
+            return False
+
+    _repo.delete_row(name)
+    root = config.profile_dir(name)
+    if root.exists():
+        try:
+            shutil.rmtree(root)
+        except OSError as exc:
+            raise ProfileError(
+                f"{name}: removed from DB, but rmtree failed: {exc}"
+            ) from exc
+    return True
+
+
 # Module-level wrappers
 load_meta    = _repo.find_by_name
 update_meta  = _repo.update
 list_profiles = _repo.list_all
-show         = _repo.show
-delete       = _repo.delete
 
 
 __all__ = [
