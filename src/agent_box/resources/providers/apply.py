@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from ... import config
-from ...core.io import write_json
+from ...core.io import write_json, write_text
 from ...core.library import get_agent_config
 from ..profile import ProfileError, load_meta
 
@@ -136,7 +136,7 @@ def _apply_codex(profile_name: str, provider: Dict[str, Any], settings: Dict[str
     config_text = settings.get("config")
     if isinstance(config_text, str) and config_text.strip():
         config_toml_path = config_dir / "config.toml"
-        config_toml_path.write_text(config_text, encoding="utf-8")
+        write_text(config_toml_path, config_text)
 
     # auth.json
     auth = settings.get("auth")
