@@ -145,50 +145,6 @@ def _apply_codex(profile_name: str, provider: Dict[str, Any], settings: Dict[str
         write_json(auth_path, auth)
 
 
-def _build_hermes_yaml_entry(provider_id: str, settings: Dict[str, Any]) -> str:
-    """Build a YAML entry for a single Hermes provider."""
-    base_url = settings.get("base_url") or ""
-    api_key = settings.get("api_key") or ""
-    api_mode = settings.get("api_mode") or ""
-    env_api_key = (settings.get("env") or {}).get("api_key") or ""
-
-    mode_map = {"chat_completions": "openai_compatible", "openai_compatible": "openai_compatible",
-                "anthropic": "anthropic", "codex_responses": "codex_responses"}
-    mapped_mode = mode_map.get(api_mode, api_mode or "openai_compatible")
-
-    lines = [
-        f"  {provider_id}:",
-        f'    base_url: "{base_url}"',
-        f'    api_key: "{api_key or env_api_key}"',
-        f'    api_mode: "{mapped_mode}"',
-    ]
-
-    models = settings.get("models")
-    if isinstance(models, list) and models:
-        first = models[0] if isinstance(models[0], dict) else {}
-        default_model = (first.get("id") or first.get("model") or "")
-        if default_model:
-            lines.append(f'    default: "{default_model}"')
-        lines.append("    models:")
-        for m in models:
-            if not isinstance(m, dict):
-                continue
-            mid = m.get("id") or m.get("model") or ""
-            mname = m.get("name") or mid
-            ctx = m.get("context_length")
-            if mid:
-                lines.append(f'      - id: "{mid}"')
-                lines.append(f'        name: "{mname}"')
-                if ctx is not None:
-                    lines.append(f"        context_length: {ctx}")
-    else:
-        default_model = settings.get("default_model") or ""
-        if default_model:
-            lines.append(f'    default: "{default_model}"')
-
-    return "\n".join(lines)
-
-
 def _build_hermes_custom_entry(provider_id: str, settings: Dict[str, Any]) -> str:
     """Build a single custom_providers YAML entry matching CC Switch format."""
     base_url = settings.get("base_url") or ""
