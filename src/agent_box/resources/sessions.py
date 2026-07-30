@@ -2,7 +2,7 @@
 
 Sessions live in the shared ``agent-box.db`` (the same database that
 holds profiles and sessions — see :mod:`.db`). The
-connection is shared via :func:`agent_box.db.get_conn`; the module
+connection is shared via :func:`agent_box.core.db.get_conn`; the module
 keeps its own ``threading.Lock`` to serialize writes through this
 module's API.
 
@@ -257,7 +257,7 @@ def _reset_connection_for_tests() -> None:
     """Drop the migration sentinel so the next call re-runs migration.
 
     The connection itself is owned by :mod:`.db`; tests that need a
-    fresh connection should call :func:`agent_box.db._reset_connection_for_tests`.
+    fresh connection should call :func:`agent_box.core.db._reset_connection_for_tests`.
     """
     global _migrated
     with _lock:
