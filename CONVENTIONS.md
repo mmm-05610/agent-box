@@ -153,8 +153,24 @@ profile_dir / agent_config["hooks_config_file"]
 
 Looping over the whole list is always fine:
 
-```python
+````python
 # ✅ Correct — apply every config file
 for filename in agent_config["config_files"]:
     ...
+
+## 7. Access SQLite rows by column name, not index
+
+`sqlite3.Row` supports both `row[0]` and `row["name"]`. Always use
+the column name — it survives schema changes and is self-documenting.
+
+```python
+# ✅ Correct
+r["id"], r["profile"], r["launched_at"]
+
+# ❌ Wrong
+r[0], r[1], r[6]
+````
+
+```
+
 ```

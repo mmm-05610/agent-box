@@ -117,13 +117,14 @@ class SessionRepo:
         out: List[Dict[str, Any]] = []
         for r in rows:
             rec: Dict[str, Any] = {
-                "id": r[0], "profile": r[1], "agent_type": r[2],
-                "cwd": r[3], "mode": r[4], "pid": r[5],
-                "launched_at": r[6],
+                "id": r["id"], "profile": r["profile"],
+                "agent_type": r["agent_type"], "cwd": r["cwd"],
+                "mode": r["mode"], "pid": r["pid"],
+                "launched_at": r["launched_at"],
             }
-            if not active_only and len(r) > 7:
-                rec["exited_at"] = r[7]
-                rec["exit_code"] = r[8]
+            if not active_only:
+                rec["exited_at"] = r["exited_at"]
+                rec["exit_code"] = r["exit_code"]
             out.append(rec)
         return out
 
@@ -159,12 +160,7 @@ record_exit_by_pid     = _repo.record_exit_by_pid
 fetch_sessions         = _repo.fetch
 latest_cwd_for         = _repo.latest_cwd_for
 cleanup_stale_sessions = _repo.cleanup_stale
-# Expose internal that tests need.
-_get_conn = lambda: _core_db.get_conn()
-
-
 __all__ = [
-    "_get_conn",
     "cleanup_stale_sessions",
     "fetch_sessions",
     "latest_cwd_for",
