@@ -34,14 +34,30 @@ from pathlib import Path
 from typing import Any, Dict
 
 from .. import config
-from ..core.io import write_json
+from ..core.io import read_json, write_json
 from ..core.library import get_agent_config
 from .profile import ProfileError, load_meta
 
 
 def _settings_path(profile_name: str) -> Path:
-    """Absolute path to the profile's ``dot-claude/settings.json``."""
-    return config.profile_agent_dir(profile_name, "claude") / "settings.json"
+    """Absolute path to the profile's settings file (the one that hosts hooks).
+
+    The filename comes from the agent-type registry's ``config_files[0]``
+    so adding a new agent type that supports hooks is a registry-only
+    change (Rule 5).  Today only Claude has ``supports_hooks: True`` and
+    lists ``settings.json`` as its first config file.
+    """
+    meta = load_meta(profile_name)
+    agent_type = meta["agent_type"]
+    agent_config = get_agent_config(agent_type)
+    if agent_config is None:
+        raise ProfileError(f"unknown agent_type {agent_type!r}")
+    config_files = list(agent_config.get("config_files") or [])
+    if not config_files:
+        raise ProfileError(
+            f"agent_type {agent_type!r} has no config_files"
+        )
+    return config.profile_agent_dir(profile_name, agent_type) / config_files[0]
 
 
 def _require_claude_profile(profile_name: str) -> None:
@@ -55,22 +71,23 @@ def _require_claude_profile(profile_name: str) -> None:
 
 
 def _read_settings(profile_name: str) -> Dict[str, Any]:
-    """Read the profile's settings.json, returning an empty dict if missing.
+    """Read the profile's settings file, returning an empty dict if missing.
 
-    Raises :class:`ProfileError` if the file exists but isn't valid JSON.
+    Raises :class:`ProfileError` if the file exists but isn't valid JSON
+    or is not a JSON object.
     """
     path = _settings_path(profile_name)
     if not path.is_file():
         return {}
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = read_json(path)
     except json.JSONDecodeError as exc:
         raise ProfileError(
-            f"{profile_name}: settings.json is not valid JSON: {exc}"
+            f"{profile_name}: {path.name} is not valid JSON: {exc}"
         ) from exc
     if not isinstance(data, dict):
         raise ProfileError(
-            f"{profile_name}: settings.json must be a JSON object, got "
+            f"{profile_name}: {path.name} must be a JSON object, got "
             f"{type(data).__name__}"
         )
     return data
