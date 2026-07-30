@@ -112,11 +112,6 @@ def skill_source_dir(skill_id: str, directory: str = "") -> Path | None:
     return next((c for c in candidates if c and c.is_dir()), None)
 
 
-def _skill_source_dir(skill_id: str, directory: str = "") -> Path | None:
-    # Alias kept for internal use in list_skills (semantically identical).
-    return skill_source_dir(skill_id, directory)
-
-
 # ── Skills ─────────────────────────────────────────────────────────────────
 
 def list_skills(agent_type: str) -> List[Dict[str, Any]]:
@@ -136,7 +131,7 @@ def list_skills(agent_type: str) -> List[Dict[str, Any]]:
             "directory": src_dir, "repo_owner": r["repo_owner"] or "",
             "repo_name": r["repo_name"] or "", "repo_branch": r["repo_branch"] or "main",
             "readme_url": r["readme_url"] or "",
-            "source_available": _skill_source_dir(r["id"], src_dir) is not None,
+            "source_available": skill_source_dir(r["id"], src_dir) is not None,
         })
     conn.close()
     return out
