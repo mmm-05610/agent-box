@@ -34,6 +34,7 @@ _AGENT_TYPES: Dict[str, Dict[str, Any]] = {
         "resume_args": ("--continue",),
         "acs_column": "enabled_claude",
         "supports_hooks": True,
+        "supports_prompt_apply": True,
         "features": ("permissions", "plugins"),
         "config_files": ["settings.json"],
         "extra_profile_files": ["dot-claude.json", "dot-agents/"],
