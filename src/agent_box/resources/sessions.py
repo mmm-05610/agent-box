@@ -18,78 +18,7 @@ from ..core import db as _core_db
 # ---------------------------------------------------------------------------
 
 class SessionRepo:
-    """Data access for the ``sessions`` table.
-
-    On first use, migrates a legacy ``sessions.db`` (v0.4) into
-    ``agent-box.db`` and renames the legacy file to
-    ``sessions.db.migrated`` (idempotent).
-    """
-
-    def __init__(self) -> None:
-        self._migrated: bool = False
-
-    # ── helpers ─────────────────────────────────────────────────────────
-
-    def _ensure_migrated(self) -> None:
-        if self._migrated:
-            return
-        legacy_path = config.agent_box_home() / "sessions.db"
-        if not legacy_path.is_file():
-            self._migrated = True
-            return
-
-        try:
-            legacy = sqlite3.connect(
-                f"file:{legacy_path}?mode=ro", uri=True, timeout=10.0
-            )
-        except sqlite3.OperationalError:
-            self._migrated = True
-            return
-
-        try:
-            try:
-                rows = legacy.execute(
-                    "SELECT profile, agent_type, cwd, mode, pid, "
-                    "launched_at, exited_at, exit_code FROM sessions"
-                ).fetchall()
-            except sqlite3.OperationalError:
-                self._migrated = True
-                return
-
-            if not rows:
-                self._migrated = True
-                try:
-                    legacy_path.rename(
-                        legacy_path.with_suffix(legacy_path.suffix + ".migrated")
-                    )
-                except OSError:
-                    pass
-                return
-
-            conn = _core_db.get_conn()
-            with _core_db.write_lock:
-                for r in rows:
-                    conn.execute(
-                        "INSERT INTO sessions "
-                        "(profile, agent_type, cwd, mode, pid, launched_at, "
-                        "exited_at, exit_code) "
-                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                        r,
-                    )
-                conn.commit()
-        finally:
-            try:
-                legacy.close()
-            except sqlite3.Error:
-                pass
-
-        try:
-            legacy_path.rename(
-                legacy_path.with_suffix(legacy_path.suffix + ".migrated")
-            )
-        except OSError:
-            pass
-        self._migrated = True
+    """Data access for the ``sessions`` table."""
 
     @staticmethod
     def _is_pid_alive(pid: int) -> bool:
@@ -121,7 +50,6 @@ class SessionRepo:
         self, profile: str, agent_type: str, cwd: str, mode: str, pid: int,
     ) -> int:
         """Insert a new session row. Returns the new session id."""
-        self._ensure_migrated()
         conn = _core_db.get_conn()
         with _core_db.write_lock:
             cur = conn.execute(
@@ -134,7 +62,6 @@ class SessionRepo:
 
     def record_exit(self, session_id: int, exit_code: int) -> None:
         """Mark a session as exited."""
-        self._ensure_migrated()
         conn = _core_db.get_conn()
         with _core_db.write_lock:
             conn.execute(
@@ -146,7 +73,6 @@ class SessionRepo:
 
     def record_exit_by_pid(self, pid: int, exit_code: int) -> None:
         """Mark the most recent running session with *pid* as exited."""
-        self._ensure_migrated()
         conn = _core_db.get_conn()
         with _core_db.write_lock:
             row = conn.execute(
@@ -169,7 +95,6 @@ class SessionRepo:
 
         ``active_only=True`` omits exit columns (they'd always be NULL).
         """
-        self._ensure_migrated()
         conn = _core_db.get_conn()
         with _core_db.write_lock:
             self._cleanup_zombies(conn)
@@ -204,7 +129,6 @@ class SessionRepo:
 
     def latest_cwd_for(self, profile: str) -> str | None:
         """Return the most-recent non-empty cwd for *profile*."""
-        self._ensure_migrated()
         conn = _core_db.get_conn()
         with _core_db.write_lock:
             row = conn.execute(
@@ -223,12 +147,6 @@ class SessionRepo:
             conn.commit()
             return cleaned
 
-    def reset_for_tests(self) -> None:
-        """Drop the cached migration sentinel so the next call re-runs
-        the legacy migration against the current ``AGENT_BOX_HOME``."""
-        self._migrated = False
-
-
 # ---------------------------------------------------------------------------
 # Module-level API — thin wrappers around the singleton repository
 # ---------------------------------------------------------------------------
@@ -241,15 +159,12 @@ record_exit_by_pid     = _repo.record_exit_by_pid
 fetch_sessions         = _repo.fetch
 latest_cwd_for         = _repo.latest_cwd_for
 cleanup_stale_sessions = _repo.cleanup_stale
-_reset_connection_for_tests = _repo.reset_for_tests
-
-# Expose internals that tests need.
+# Expose internal that tests need.
 _get_conn = lambda: _core_db.get_conn()
 
 
 __all__ = [
     "_get_conn",
-    "_reset_connection_for_tests",
     "cleanup_stale_sessions",
     "fetch_sessions",
     "latest_cwd_for",

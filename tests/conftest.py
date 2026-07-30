@@ -34,7 +34,6 @@ def tmp_agent_box_home(tmp_path, monkeypatch):
     # Drop the cached db connection (shared by db.py / sessions.py)
     # and the sessions-migration sentinel.
     _reset_connection_for_tests()
-    sessions._reset_connection_for_tests()
     yield home
 
 
