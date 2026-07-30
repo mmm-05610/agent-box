@@ -57,11 +57,10 @@ def _mcp_target(profile_name: str, agent_type: str) -> tuple[Path, str]:
     mcp_config = agent_config.get("mcp_config")
     if not isinstance(mcp_config, dict):
         raise ProfileError(f"mcp config is not supported for {agent_type!r}")
-    base = (
-        config.profile_dir(profile_name)
-        if mcp_config.get("at_profile_root")
-        else config.profile_agent_dir(profile_name, agent_type)
-    )
+    if mcp_config.get("at_profile_root"):
+        base = config.profile_dir(profile_name)
+    else:
+        base = config.profile_agent_dir(profile_name, agent_type)
     return base / mcp_config["filename"], mcp_config["root_key"]
 
 
