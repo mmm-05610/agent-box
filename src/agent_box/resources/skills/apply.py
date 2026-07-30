@@ -4,6 +4,7 @@ from __future__ import annotations
 import shutil
 
 from ... import config
+from ...adapters import acs as _acs
 from ..profile import ProfileError, load_meta
 
 
@@ -13,7 +14,6 @@ def apply_skill(profile_name: str, skill_id: str) -> None:
     profile_agent_type = meta["agent_type"]
 
     # Read from ACS (single source of truth — no agent-box DB fallback)
-    from ...adapters import acs as _acs
     skill = _acs.get_skill(profile_agent_type, skill_id)
     if skill is None:
         raise ProfileError(
