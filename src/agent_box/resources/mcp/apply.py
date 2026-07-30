@@ -102,7 +102,7 @@ def _write_mcp(profile_name: str, agent_type: str,
     fmt = mcp_config.get("entry_format", "default")
     if fmt == "passthrough":
         entry = server_config
-    elif fmt == "opencode":
+    elif fmt == "structured":
         entry = _convert_entry(server_config, for_opencode=True)
     else:
         entry = _convert_entry(server_config)
