@@ -211,6 +211,44 @@ def _copy_template(name: str, agent_type: str) -> None:
             shutil.copytree(data_template, data_target, symlinks=True)
 
 
+def _merge_preset_dir(src: Path, dest: Path, prompt_file: str) -> None:
+    """Merge every file in *src* into *dest*.
+
+    ``settings.overlay.json`` deep-merges into ``settings.json``.
+    ``hooks.json`` is copied to ``hooks/hooks.json``.
+    Everything else lands at ``dest / <filename>``.
+    """
+    import json as _json
+
+    for entry in src.iterdir():
+        if entry.name == "settings.overlay.json":
+            settings_path = dest / "settings.json"
+            if not settings_path.is_file():
+                raise ProfileError("preset: missing base settings.json")
+            try:
+                base = _json.loads(settings_path.read_text(encoding="utf-8"))
+                overlay = _json.loads(entry.read_text(encoding="utf-8"))
+            except _json.JSONDecodeError as exc:
+                raise ProfileError(
+                    "preset: settings overlay requires object base + overlay"
+                ) from exc
+            if not isinstance(base, dict) or not isinstance(overlay, dict):
+                raise ProfileError(
+                    "preset: settings overlay requires object base + overlay"
+                )
+            settings_path.write_text(
+                _json.dumps(deep_merge(base, overlay), indent=2) + "\n"
+            )
+        elif entry.name == "hooks.json":
+            dst = dest / "hooks" / "hooks.json"
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            dst.write_text(entry.read_text(encoding="utf-8"))
+        elif entry.is_file():
+            dst = dest / entry.name
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            dst.write_text(entry.read_text(encoding="utf-8"))
+
+
 def _apply_preset(
     name: str, agent_type: str,
     preset_name: str | None, claude_md_body: str | None,
@@ -231,42 +269,7 @@ def _apply_preset(
                 f"unknown preset {preset_name!r} for {agent_type!r}. "
                 f"Available: {', '.join(library.list_presets(agent_type)) or '(none)'}"
             )
-
-        claude_md_src = preset_dir / prompt_file
-        if claude_md_src.is_file():
-            (target / prompt_file).write_text(
-                claude_md_src.read_text(encoding="utf-8")
-            )
-
-        hooks_src = preset_dir / "hooks.json"
-        if hooks_src.is_file():
-            hooks_dst = target / "hooks" / "hooks.json"
-            hooks_dst.parent.mkdir(parents=True, exist_ok=True)
-            hooks_dst.write_text(hooks_src.read_text(encoding="utf-8"))
-
-        overlay_src = preset_dir / "settings.overlay.json"
-        if overlay_src.is_file():
-            settings_path = target / "settings.json"
-            if not settings_path.is_file():
-                raise ProfileError(
-                    f"preset {preset_name!r}: missing base settings.json"
-                )
-            try:
-                base = _json.loads(settings_path.read_text(encoding="utf-8"))
-                overlay = _json.loads(overlay_src.read_text(encoding="utf-8"))
-            except _json.JSONDecodeError as exc:
-                raise ProfileError(
-                    f"preset {preset_name!r}: settings overlay requires "
-                    f"object base + overlay"
-                ) from exc
-            if not isinstance(base, dict) or not isinstance(overlay, dict):
-                raise ProfileError(
-                    f"preset {preset_name!r}: settings overlay requires "
-                    f"object base + overlay"
-                )
-            settings_path.write_text(
-                _json.dumps(deep_merge(base, overlay), indent=2) + "\n"
-            )
+        _merge_preset_dir(preset_dir, target, prompt_file)
     elif claude_md_body is not None and agent_type == "claude":
         (target / prompt_file).write_text(claude_md_body)
 

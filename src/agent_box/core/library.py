@@ -39,6 +39,11 @@ _AGENT_TYPES: Dict[str, Dict[str, Any]] = {
         "extra_profile_files": ["dot-claude.json", "dot-agents/"],
         "mcp_config": None,
         "provider_apply_mode": "overwrite",
+        "preset_files": {
+            "prompt": "CLAUDE.md",
+            "hooks": "hooks.json",
+            "overlay": "settings.overlay.json",
+        },
     },
     "codex": {
         "config_dir": "~/.codex",
