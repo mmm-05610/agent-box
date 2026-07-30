@@ -69,6 +69,10 @@ def _mcp_target(profile_name: str, agent_type: str) -> tuple[Path, str]:
 def _write_mcp(profile_name: str, agent_type: str,
                   server_id: str, server_config: Dict[str, Any]) -> None:
     """Merge *server_config* into the MCP section of the profile's config."""
+    if "type" not in server_config:
+        raise ProfileError(
+            f"mcp-server {server_id!r}: server_config is missing 'type'"
+        )
     target, root_key = _mcp_target(profile_name, agent_type)
     existing = _read_config(target)
 
@@ -78,12 +82,15 @@ def _write_mcp(profile_name: str, agent_type: str,
         mcp_section = existing.get(root_key)
         if not isinstance(mcp_section, dict):
             mcp_section = {}
-        mcp_section[server_id] = _convert_entry(agent_type, server_config)
+        entry = server_config if agent_type == "claude" else _convert_entry(agent_type, server_config)
+        mcp_section[server_id] = entry
         existing[root_key] = mcp_section
         _write_config(target, existing)
 
 
 def _read_config(target: Path) -> Dict[str, Any]:
+    if not target.is_file():
+        return {}
     fmt = target.suffix.lstrip(".")
     if fmt == "toml":
         return read_toml(target)
@@ -91,7 +98,7 @@ def _read_config(target: Path) -> Dict[str, Any]:
         return read_yaml(target)
     if fmt == "jsonc":
         return read_jsonc(target)
-    return {}
+    return read_json(target)  # .json is the default
 
 
 def _write_config(target: Path, data: Dict[str, Any]) -> None:
