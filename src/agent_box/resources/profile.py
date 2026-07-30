@@ -28,7 +28,7 @@ class ProfileError(Exception):
 
 # --- meta IO (DB-backed) -------------------------------------------------
 
-def _row_to_meta(row: Any) -> Dict[str, str]:
+def _db_row_to_meta_dict(row: Any) -> Dict[str, str]:
     """Map a ``profiles`` table row to the public meta dict.
 
     Always returns a dict with all v0.4 keys present (empty string for
@@ -63,7 +63,7 @@ def load_meta(name: str) -> Dict[str, str]:
         raise ProfileError(
             f"{name}: profile not found. Try: agent-box create {name} --type claude"
         )
-    return _row_to_meta(row)
+    return _db_row_to_meta_dict(row)
 
 
 def update_meta(
