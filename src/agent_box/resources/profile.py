@@ -260,32 +260,29 @@ def _merge_preset_dir(src: Path, dest: Path, agent_type: str) -> None:
 
 
 def _apply_preset(
-    name: str, agent_type: str,
-    preset_name: str | None, claude_md_body: str | None,
+    name: str, agent_type: str, preset_name: str,
 ) -> None:
-    """Apply preset files or inline prompt content.
+    """Apply preset files to a profile.
 
-    Preset behaviour is type-agnostic — the file list and merge rules
-    come from :data:`library._AGENT_TYPES` ``preset_files``.  If the
-    agent type has no preset files, preset_name is silently skipped.
+    The file list and merge rules come from
+    :data:`library._AGENT_TYPES` ``preset_files``.
     """
     target = config.profile_agent_dir(name, agent_type)
     agent_config = library.get_agent_config(agent_type)
     if agent_config is None:
         raise ProfileError(f"unknown agent_type {agent_type!r}")
+    if not agent_config.get("preset_files"):
+        raise ProfileError(
+            f"presets are not supported for {agent_type!r}"
+        )
 
-    if preset_name is not None and agent_config.get("preset_files"):
-        preset_dir = library.get_preset_dir(agent_type, preset_name)
-        if preset_dir is None:
-            raise ProfileError(
-                f"unknown preset {preset_name!r} for {agent_type!r}. "
-                f"Available: {', '.join(library.list_presets(agent_type)) or '(none)'}"
-            )
-        _merge_preset_dir(preset_dir, target, agent_type)
-    elif claude_md_body is not None:
-        prompt_file = agent_config.get("prompt_file")
-        if prompt_file:
-            (target / prompt_file).write_text(claude_md_body)
+    preset_dir = library.get_preset_dir(agent_type, preset_name)
+    if preset_dir is None:
+        raise ProfileError(
+            f"unknown preset {preset_name!r} for {agent_type!r}. "
+            f"Available: {', '.join(library.list_presets(agent_type)) or '(none)'}"
+        )
+    _merge_preset_dir(preset_dir, target, agent_type)
 
 
 def create(
@@ -328,7 +325,13 @@ def create(
         )
 
     _copy_template(name, agent_type)
-    _apply_preset(name, agent_type, preset, claude_md)
+    if preset is not None:
+        _apply_preset(name, agent_type, preset)
+    elif claude_md is not None:
+        agent_config = library.get_agent_config(agent_type)
+        if agent_config and agent_config.get("prompt_file"):
+            (config.profile_agent_dir(name, agent_type)
+             / agent_config["prompt_file"]).write_text(claude_md)
     _repo.insert(name, agent_type,
                  display_name=display_name or "",
                  description=description or "",
