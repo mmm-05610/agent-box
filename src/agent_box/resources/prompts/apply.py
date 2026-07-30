@@ -19,8 +19,7 @@ def apply_claude_md(profile_name: str, md_id: str) -> None:
         raise ProfileError(
             f"claude-md apply is not yet supported for agent_type {agent_type!r}"
         )
-    prompts = _acs.list_prompts(agent_type)
-    prompt = next((p for p in prompts if p["id"] == md_id), None)
+    prompt = _acs.get_prompt(agent_type, md_id)
     if prompt is None:
         raise ProfileError(
             f"claude-md {md_id!r} not found in ACS for {agent_type!r}"

@@ -127,6 +127,13 @@ def list_skills(agent_type: str) -> List[Dict[str, Any]]:
     return out
 
 
+def get_skill(agent_type: str, skill_id: str) -> Dict[str, Any] | None:
+    """Read a single skill from ACS, or None."""
+    return next(
+        (s for s in list_skills(agent_type) if s["id"] == skill_id), None
+    )
+
+
 # ── MCP Servers ───────────────────────────────────────────────────────────
 
 def list_mcp_servers(agent_type: str) -> List[Dict[str, Any]]:
@@ -227,3 +234,10 @@ def list_prompts(agent_type: str) -> List[Dict[str, Any]]:
         })
     conn.close()
     return out
+
+
+def get_prompt(agent_type: str, prompt_id: str) -> Dict[str, Any] | None:
+    """Read a single prompt from ACS, or None."""
+    return next(
+        (p for p in list_prompts(agent_type) if p["id"] == prompt_id), None
+    )
