@@ -153,10 +153,11 @@ profile_dir / agent_config["hooks_config_file"]
 
 Looping over the whole list is always fine:
 
-````python
+```python
 # ✅ Correct — apply every config file
 for filename in agent_config["config_files"]:
     ...
+```
 
 ## 7. Access SQLite rows by column name, not index
 
@@ -169,8 +170,210 @@ r["id"], r["profile"], r["launched_at"]
 
 # ❌ Wrong
 r[0], r[1], r[6]
-````
-
 ```
 
+## 8. Strategy registry — dispatch by semantic key, not brand name
+
+Agent-type-specific behaviour is dispatched through a **strategy
+registry**, not through `if/elif` chains keyed on agent type names.
+The dispatch key must describe **what** the behaviour is, not **who**
+uses it.
+
+```python
+# ❌ Wrong — dispatch key is a brand name
+_OVERWRITE_WRITERS = {"claude": _apply_claude, "codex": _apply_codex}
+_ADDITIVE_WRITERS  = {"hermes": _apply_hermes, "opencode": _apply_opencode}
+
+# ✅ Correct — dispatch key describes the format / strategy
+_STRATEGIES = {
+    "json_merge":              _strategy_json_merge,
+    "multi_file":              _strategy_multi_file,
+    "yaml_custom_providers":   _strategy_yaml_custom_providers,
+    "jsonc_provider":          _strategy_jsonc_provider,
+}
 ```
+
+The mapping from agent type → strategy lives exclusively in the
+registry (`_AGENT_TYPES["provider_config"]["strategy"]`). Adding a
+new agent type that reuses an existing strategy requires zero code
+changes — one line of registry configuration.
+
+This pattern generalises beyond agent types: any system with multiple
+consumers that share behavioural categories (payment gateways, auth
+providers, file formats, build targets) benefits from semantic
+dispatch keys over brand-name dispatch keys.
+
+## 9. Data in registry, logic in function
+
+Agent-type-specific **data** (field names, key names, mapping tables)
+must be declared in the registry. Strategy functions contain only
+generic **logic** (iteration, conditionals, format conversion).
+
+```python
+# library.py — registry (data)
+"metadata_fields": ["id", "name", "notes", "website_url", "icon", "icon_color", "category"],
+"managed_yaml_keys": ["base_url", "api_key", "api_mode", "default", "models", ...],
+"api_mode_mapping": {"chat_completions": "openai_compatible", ...},
+"entry_yaml_spec": {
+    "fields": [
+        {"yaml_key": "base_url", "settings_key": "base_url"},
+        {"yaml_key": "api_key",  "settings_key": "api_key", "env_fallback": True},
+    ],
+    "model_list": {"settings_key": "models", "id_key": "id", "name_key": "name", ...},
+},
+
+# apply.py — strategy function (logic)
+for field in provider_cfg.get("metadata_fields") or []:
+    val = provider.get(field)
+    ...
+```
+
+When a function body contains a hardcoded field name like `"base_url"`
+or `"api_key"`, ask: "is this an agent-type-specific fact or a
+generic behaviour?" If the former, move it to the registry.
+
+## 10. Single source of truth for constants
+
+A value that appears in multiple files is a change waiting to break.
+The single definition point carries the **semantic intent** (the name
+tells you _why_ this value exists), not just the value.
+
+This applies to:
+
+- **Default values** (e.g. the default agent type)
+- **Project identity** (e.g. the CLI display name used in prompts, error
+  messages, and help text)
+- **Any string literal** whose meaning spans multiple modules
+
+```python
+# ❌ Wrong — "agent-box" scattered across the codebase
+_GLOBAL_PROMPT = "agent-box> "              # shell.py
+PROG = "agent-box"                          # cli/__init__.py
+self._cmd.perror("agent-box: ...")          # core.py (×12)
+print("agent-box: no editor found")         # edit.py
+
+# ✅ Correct — one constant, all references point to it
+# config.py
+DISPLAY_NAME = "agent-box"
+
+# everywhere else
+_GLOBAL_PROMPT = f"{config.DISPLAY_NAME}> "
+PROG = config.DISPLAY_NAME
+self._cmd.perror(f"{config.DISPLAY_NAME}: ...")
+```
+
+The defining characteristic is: **if you renamed the project, how many
+files would you edit?** The answer should be one.
+
+## 11. Symmetric operations use symmetric dispatch
+
+Apply and remove are two sides of the same operation. Their dispatch
+structures must mirror each other:
+
+```python
+_STRATEGIES = {
+    "yaml_custom_providers": _strategy_yaml_custom_providers,
+    "jsonc_provider":        _strategy_jsonc_provider,
+}
+
+_REMOVE_HANDLERS = {
+    "yaml_custom_providers": _remove_from_yaml_custom_providers,
+    "jsonc_provider":        _remove_from_jsonc_provider,
+}
+```
+
+If one side uses a dispatch table and the other uses `if/elif`,
+adding a new strategy will inevitably miss one. Asymmetric dispatch
+structures are a bug source — the asymmetry itself is the defect.
+
+Strategies with `"overwrite"` mode don't need remove handlers (the
+next apply naturally overwrites), but the deliberate absence should
+be explicit, not accidental.
+
+## 12. Format dispatch belongs in the infrastructure layer
+
+"Read/write a config file and pick the parser by extension" is a
+general capability, not business logic. It must not live in
+individual resource modules.
+
+```python
+# ❌ Wrong — format dispatch duplicated in mcp/apply.py
+def _read_config(target):
+    fmt = target.suffix.lstrip(".")
+    if fmt == "toml":  return read_toml(target)
+    if fmt == "yaml":  return read_yaml(target)
+    ...
+
+# ✅ Correct — single implementation in core/io.py, everyone imports it
+from ...core.io import read_config, write_config
+
+existing = read_config(target)
+write_config(target, data)
+```
+
+`core/io.py` is the single entry point for all file-format concerns.
+Resource modules import only the generic `read_config` / `write_config`
+(or the specific reader/writer they need), never reimplement format
+dispatch.
+
+## 13. Migrations are a sequence, not a conditional
+
+Schema changes are applied as a numbered sequence of migration files.
+The initial schema stays frozen; each change is a new `.sql` file.
+
+```
+migrations/
+  001_init.sql              ← frozen — never edited after deployment
+  002_rename_claude_md_ref.sql  ← one change = one file
+```
+
+- Fresh installs replay the full sequence (001 → 002 → ...).
+- Existing installs replay only unapplied migrations.
+- All paths converge to the same final state.
+- No `IF EXISTS` guards, no "check if column exists before altering".
+
+This applies regardless of project maturity. The habit of explicit
+state transitions matters more than the presence of production data.
+
+## 14. Git workflow — atomic commits + layered branches + merge approval
+
+Based on the two-level Git Flow model (feature → integration → main),
+adapted for single-developer multi-task work.
+
+```
+main                  ← only trunk, always releasable
+  └── <integration>    ← one big theme (refactor/xxx, feat/xxx), off main
+        └── <feature>  ← one independent task, off integration, merged back
+```
+
+**Atomic commits.** Each commit is one complete, independent logical unit —
+one bug fix, one feature, one refactor. After every commit the code must
+build, run, and be revertible. Never mix unrelated changes in one commit;
+never commit broken half-work.
+
+**Why**: `git bisect` must pinpoint the exact change that broke something;
+`git revert` must roll back one logical unit without collateral damage.
+
+**Branch levels.**
+
+- `main` — updated only at release points; a fresh clone always works.
+- integration — one big work theme, carries the finished work of all its
+  small tasks.
+- feature — one independent task, branched from the integration branch,
+  merged back when complete.
+
+**Merge approval boundary.** This defines what an AI agent may do without
+asking:
+
+| Operation                    | Allowed                     |
+| ---------------------------- | --------------------------- |
+| create feature branch        | agent, autonomous           |
+| atomic commits               | agent, autonomous           |
+| feature → integration merge  | agent, autonomous           |
+| integration-internal testing | agent, autonomous           |
+| **integration → main merge** | **human approval required** |
+
+`main` is a hard line: any merge into it must stop, report the changes, and
+wait for explicit human approval. Inside the integration branch, work is
+autonomous. Based on [Git Flow](https://nvie.com/posts/a-successful-git-branching-model/)
+(Driessen) and the trunk-releasability principle.
