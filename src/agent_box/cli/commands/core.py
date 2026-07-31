@@ -18,6 +18,20 @@ from ...resources import profile, sessions
 if TYPE_CHECKING:
     from ..shell import AgentBoxShell
 
+# ── helpers ────────────────────────────────────────────────────────────────
+
+def _list_entries(cmd, entries, args, label_singular: str) -> None:
+    """Display a list of id/name entries (providers / mcp / etc.)."""
+    if args.json:
+        cmd.poutput(json.dumps(entries, indent=2, ensure_ascii=False))
+        return
+    if not entries:
+        cmd.poutput(f"(no {label_singular}s)")
+        return
+    for e in entries:
+        cmd.poutput(f"{e['id']:20s}  {e.get('name', '')}")
+
+
 # ── list ────────────────────────────────────────────────────────────────────
 
 list_parser = Cmd2ArgumentParser()
@@ -155,30 +169,20 @@ def do_list(self, args: argparse.Namespace) -> None:
         except Exception as exc:
             self._cmd.perror(f"agent-box: {exc}")
             return
-        if args.json:
-            self._cmd.poutput(json.dumps(entries, indent=2, ensure_ascii=False))
-            return
-        if not entries:
-            self._cmd.poutput("(no providers)")
-            return
-        for e in entries:
-            self._cmd.poutput(f"{e['id']:20s}  {e.get('name', '')}")
+        _list_entries(self._cmd, entries, args, "provider")
+        return
 
-    elif resource == "mcp":
+    if resource == "mcp":
         try:
             from ...resources import mcp as _mcp
             entries = _mcp.list_profile_mcp_servers(ctx.profile_name)
         except Exception as exc:
             self._cmd.perror(f"agent-box: {exc}")
             return
-        if args.json:
-            self._cmd.poutput(json.dumps(entries, indent=2, ensure_ascii=False))
-            return
-        if not entries:
-            self._cmd.poutput("(no MCP servers)")
-            return
-        for e in entries:
-            self._cmd.poutput(f"{e['id']:20s}  {e.get('name', '')}")
+        _list_entries(self._cmd, entries, args, "MCP server")
+        return
+
+    self._cmd.perror(f"list: unknown resource {resource!r}")
 
 # ── create ─────────────────────────────────────────────────────────────────
 
