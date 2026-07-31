@@ -13,7 +13,7 @@ from cmd2 import Cmd2ArgumentParser, CommandSet, with_argparser, with_category
 
 from ... import config, launch
 from ...core import library
-from ...resources import profile, sessions
+from ...resources import mcp, profile, providers, sessions
 
 if TYPE_CHECKING:
     from ..shell import AgentBoxShell
@@ -164,8 +164,9 @@ def do_list(self, args: argparse.Namespace) -> None:
 
     if resource == "providers":
         try:
-            from ...resources import providers as _prov
-            entries = _prov.list_profile_providers(ctx.profile_name, ctx.agent_type)
+            entries = providers.list_profile_providers(
+                ctx.profile_name, ctx.agent_type,
+            )
         except Exception as exc:
             self._cmd.perror(f"agent-box: {exc}")
             return
@@ -174,8 +175,7 @@ def do_list(self, args: argparse.Namespace) -> None:
 
     if resource == "mcp":
         try:
-            from ...resources import mcp as _mcp
-            entries = _mcp.list_profile_mcp_servers(ctx.profile_name)
+            entries = mcp.list_profile_mcp_servers(ctx.profile_name)
         except Exception as exc:
             self._cmd.perror(f"agent-box: {exc}")
             return
