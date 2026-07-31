@@ -38,6 +38,40 @@ list_parser = Cmd2ArgumentParser()
 _LIST_RESOURCES = ["profiles", "sessions", "presets"]
 _CTX_LIST_RESOURCES = ["providers", "mcp"]
 
+
+# ── sessions (mutations) ───────────────────────────────────────────────────
+
+sessions_parser = Cmd2ArgumentParser()
+sessions_parser.add_argument("--exit", dest="exit_id", type=int, default=None,
+                              help="Record exit by session ID")
+sessions_parser.add_argument("--exit-by-pid", dest="exit_pid", type=int, default=None,
+                              help="Record exit by most recent session with this PID")
+sessions_parser.add_argument("exit_code", type=int, nargs="?", default=None,
+                              help="Exit code (with --exit or --exit-by-pid)")
+
+
+@with_argparser(sessions_parser)
+@with_category("Session & Context")
+def do_sessions(self, args: argparse.Namespace) -> None:
+    """Manage recorded launch sessions: record exits."""
+    if args.exit_pid is not None:
+        code = args.exit_code if args.exit_code is not None else 0
+        sessions.record_exit_by_pid(args.exit_pid, code)
+        self._cmd.poutput(f"recorded exit for pid {args.exit_pid} code {code}")
+        return
+    if args.exit_id is not None:
+        if args.exit_code is None:
+            self._cmd.perror("agent-box: --exit requires an exit code")
+            return
+        sessions.record_exit(args.exit_id, args.exit_code)
+        self._cmd.poutput("ok")
+        return
+    self._cmd.perror(
+        "sessions: no action specified (use --exit or --exit-by-pid; "
+        "for listing use: list sessions)"
+    )
+
+
 list_parser.add_argument(
     "resource",
     choices=_LIST_RESOURCES + _CTX_LIST_RESOURCES,
@@ -48,12 +82,6 @@ list_parser.add_argument("--active", action="store_true", help="(sessions only) 
 list_parser.add_argument("--cleanup", action="store_true", help="(sessions only) clean up zombies")
 list_parser.add_argument("--type", "-t", choices=library.get_agent_types(),
                           default=None, help="(presets only) filter by agent type")
-list_parser.add_argument("--exit", dest="exit_id", type=int, default=None,
-                          help="(sessions only) record exit by session ID")
-list_parser.add_argument("--exit-by-pid", dest="exit_pid", type=int, default=None,
-                          help="(sessions only) record exit by PID")
-list_parser.add_argument("exit_code", type=int, nargs="?", default=None,
-                          help="Exit code (with --exit or --exit-by-pid)")
 
 
 @with_argparser(list_parser)
@@ -62,20 +90,8 @@ def do_list(self, args: argparse.Namespace) -> None:
     """List resources: profiles, sessions, or presets."""
     resource = args.resource
 
-    # ── sessions (special: has cleanup / exit sub-modes) ──
+    # ── sessions (listing only — mutations live in ``do_sessions``) ──
     if resource == "sessions":
-        if args.exit_pid is not None:
-            code = args.exit_code if args.exit_code is not None else 0
-            sessions.record_exit_by_pid(args.exit_pid, code)
-            self._cmd.poutput(f"recorded exit for pid {args.exit_pid} code {code}")
-            return
-        if args.exit_id is not None:
-            if args.exit_code is None:
-                self._cmd.perror("agent-box: --exit requires an exit code")
-                return
-            sessions.record_exit(args.exit_id, args.exit_code)
-            self._cmd.poutput("ok")
-            return
         if args.cleanup:
             n = sessions.cleanup_stale_sessions()
             self._cmd.poutput(str(n))
@@ -437,3 +453,4 @@ class CoreCommands(CommandSet):
     do_configure = do_configure
     do_use = do_use
     do_launch = do_launch
+    do_sessions = do_sessions
