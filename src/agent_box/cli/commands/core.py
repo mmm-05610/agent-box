@@ -143,8 +143,7 @@ def do_list(self, args: argparse.Namespace) -> None:
         return
 
     # ── context-only listing (providers / mcp / skills) ──
-    shell: AgentBoxShell = self._cmd  # type: ignore[assignment]
-    ctx = shell._profile_ctx if hasattr(shell, "_profile_ctx") else None
+    ctx = self._cmd.get_context()
     if ctx is None:
         self._cmd.perror(f"list {resource}: not available in global scope — use a profile first")
         return
@@ -252,8 +251,7 @@ show_parser.add_argument("--json", action="store_true")
 @with_category("Information")
 def do_show(self, args: argparse.Namespace) -> None:
     """Show profile details or full configuration overview."""
-    shell: AgentBoxShell = self._cmd  # type: ignore[assignment]
-    ctx = shell._profile_ctx if hasattr(shell, "_profile_ctx") else None
+    ctx = self._cmd.get_context()
 
     # ── profile context ──
     if ctx is not None:
@@ -331,8 +329,7 @@ configure_parser.add_argument("--claude-md", default=None, help="Set the prompt 
 @with_category("Profile Management")
 def do_configure(self, args: argparse.Namespace) -> None:
     """Edit profile metadata or open config dir in $EDITOR."""
-    shell: AgentBoxShell = self._cmd  # type: ignore[assignment]
-    ctx = shell._profile_ctx if hasattr(shell, "_profile_ctx") else None
+    ctx = self._cmd.get_context()
 
     profile_name = args.name
     if profile_name is None:
@@ -406,8 +403,7 @@ launch_parser.add_argument("extra", nargs=argparse.REMAINDER,
 def do_launch(self, args: argparse.Namespace) -> None:
     """Launch a profile via bwrap.  In profile context, launch the current
     profile without needing to repeat its name."""
-    shell: AgentBoxShell = self._cmd  # type: ignore[assignment]
-    ctx = shell._profile_ctx if hasattr(shell, "_profile_ctx") else None
+    ctx = self._cmd.get_context()
 
     profile_name = args.name
     if profile_name is None:
