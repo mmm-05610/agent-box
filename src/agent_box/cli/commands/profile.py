@@ -28,6 +28,11 @@ class ProfileCommands(CommandSet):
     @with_category("Information")
     def do_options(self, _args: argparse.Namespace) -> None:
         """Show full configuration overview for the current profile."""
+        self._show_options()
+
+    @with_category("Information")
+    def _show_options(self) -> None:
+        """Show full configuration overview for the current profile."""
         try:
             info = profile.show(self.profile_name)
         except (ValueError, profile.ProfileError) as exc:

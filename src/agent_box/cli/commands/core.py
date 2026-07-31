@@ -276,7 +276,9 @@ def do_show(self, args: argparse.Namespace) -> None:
     # ── profile context ──
     if ctx is not None:
         if args.target == "options":
-            ctx.do_options(args)
+            # Delegate directly to ProfileCommands._show_options — don't
+            # route through cmd2's command-handler machinery from here.
+            ctx._show_options()
             return
         if args.target is None:
             _show_profile(self, ctx.profile_name, args)
