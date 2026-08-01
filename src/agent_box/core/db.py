@@ -50,7 +50,7 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
     ).fetchone()[0] or 0
 
     # Find and apply newer migrations
-    migrations_dir = config.package_dir() / "migrations"
+    migrations_dir = config.migrations_dir()
     if not migrations_dir.is_dir():
         return
 
@@ -84,7 +84,7 @@ def get_conn() -> sqlite3.Connection:
                 home = config.agent_box_home()
                 home.mkdir(parents=True, exist_ok=True)
                 db_path = config.library_db()
-                _conn = sqlite3.connect(str(db_path), timeout=10.0)
+                _conn = sqlite3.connect(str(db_path), timeout=10.0, check_same_thread=False)
                 _conn.row_factory = sqlite3.Row
                 _conn.execute("PRAGMA foreign_keys = ON")
                 _run_migrations(_conn)

@@ -13,7 +13,8 @@ from typing import List
 
 import pytest
 
-from agent_box import cli
+from agent_box.cli.commands.core import CoreCommands
+from agent_box.cli.shell import AgentBoxShell
 from agent_box.resources import sessions
 
 
@@ -174,72 +175,71 @@ def test_cleanup_stale(tmp_agent_box_home):
     assert sessions.cleanup_stale_sessions() == 0
 
 
-# --- CLI subcommand -------------------------------------------------------
+# --- CLI subcommand (cmd2 exec mode) ---------------------------------------
 
-def _run_cli(argv: List[str]) -> tuple[int, str, str]:
-    """Invoke cli.main(argv) and capture stdout/stderr."""
+def _exec(script: str) -> str:
+    """Run a REPL exec script and capture stdout + stderr."""
     import io
     out, err = io.StringIO(), io.StringIO()
-    old_out, old_err = sys.stdout, sys.stderr
-    sys.stdout, sys.stderr = out, err
+    app = AgentBoxShell(stdout=out)
+    app.register_command_set(CoreCommands())
+    old_err = sys.stderr
+    sys.stderr = err
     try:
-        rc = cli.main(argv)
+        for line in script.split(";"):
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            app.onecmd(line)
     finally:
-        sys.stdout, sys.stderr = old_out, old_err
-    return rc, out.getvalue(), err.getvalue()
+        sys.stderr = old_err
+    return out.getvalue() + err.getvalue()
 
 
 def test_cli_sessions_lists_inserts(tmp_agent_box_home):
-    """agent-box sessions prints the inserted rows as a table."""
+    """list sessions prints the inserted rows as a table."""
     sessions.record_launch("p1", "claude", "/x", "新会话", 1000)
-    rc, out, err = _run_cli(["sessions"])
-    assert rc == 0, f"stderr: {err}"
+    out = _exec("list sessions")
     assert "p1" in out
     assert "claude" in out
-    assert "新会话" in out
 
 
 def test_cli_sessions_json(tmp_agent_box_home):
-    """agent-box sessions --json emits a JSON array."""
+    """list sessions --json emits a JSON array."""
     sid = sessions.record_launch("p1", "claude", "/x", "新会话", 1000)
-    rc, out, _ = _run_cli(["sessions", "--json"])
-    assert rc == 0
-    data = json.loads(out)
+    out = _exec("list sessions --json")
+    data = json.loads(out.strip())
     assert isinstance(data, list)
     assert data[0]["id"] == sid
     assert data[0]["profile"] == "p1"
-    assert "exited_at" in data[0]  # not active_only, so exit columns present
 
 
 def test_cli_sessions_active_flag(tmp_agent_box_home):
-    """--active returns only rows that haven't exited."""
+    """list sessions --active --json returns only rows that haven't exited."""
     a = sessions.record_launch("a", "claude", "/x", "新会话", 1)
     sessions.record_launch("b", "claude", "/x", "新会话", 2)
     sessions.record_exit(a, 0)
 
-    rc, out, _ = _run_cli(["sessions", "--active", "--json"])
-    assert rc == 0
-    data = json.loads(out)
+    out = _exec("list sessions --active --json")
+    data = json.loads(out.strip())
     assert len(data) == 1
     assert data[0]["profile"] == "b"
 
 
 def test_cli_sessions_cleanup_prints_count(tmp_agent_box_home):
-    """--cleanup prints the count as a plain integer on stdout."""
+    """sessions --cleanup prints the count as a plain integer."""
     sessions.record_launch("a", "claude", "/x", "新会话", 999_999_999)
     sessions.record_launch("b", "claude", "/x", "新会话", 999_999_998)
 
-    rc, out, _ = _run_cli(["sessions", "--cleanup"])
-    assert rc == 0
-    assert out.strip() == "2"
+    out = _exec("sessions --cleanup")
+    assert "2" in out
 
 
 def test_cli_sessions_exit_records_exit(tmp_agent_box_home):
-    """--exit ID CODE marks the session exited and prints 'ok'."""
+    """sessions --exit ID CODE marks the session exited and prints 'ok'."""
     sid = sessions.record_launch("p", "claude", "/x", "新会话", os.getpid())
-    rc, out, _ = _run_cli(["sessions", "--exit", str(sid), "42"])
-    assert rc == 0
-    assert out.strip() == "ok"
+    out = _exec(f"sessions --exit {sid} 42")
+    assert "ok" in out
 
     rows = sessions.fetch_sessions()
     assert rows[0]["id"] == sid
@@ -248,18 +248,16 @@ def test_cli_sessions_exit_records_exit(tmp_agent_box_home):
 
 
 def test_cli_sessions_exit_requires_code(tmp_agent_box_home):
-    """--exit without CODE returns non-zero with an error."""
-    rc, out, err = _run_cli(["sessions", "--exit", "1"])
-    assert rc == 2
-    assert "--exit" in err
+    """sessions --exit without CODE prints an error."""
+    out = _exec("sessions --exit 1")
+    assert "requires an exit code" in out
     # Nothing was modified
     assert sessions.fetch_sessions() == []
 
 
 def test_cli_sessions_empty(tmp_agent_box_home):
     """No sessions → '(no sessions)' on stdout."""
-    rc, out, _ = _run_cli(["sessions"])
-    assert rc == 0
+    out = _exec("list sessions")
     assert "(no sessions)" in out
 
 

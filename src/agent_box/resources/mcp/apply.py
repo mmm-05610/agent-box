@@ -12,8 +12,7 @@ from ... import config
 from .._shared import resolve_profile
 from ..profile import ProfileError
 from ...adapters import acs as _acs
-from ...core.io import read_json, read_jsonc, read_toml, read_yaml
-from ...core.io import write_json, write_toml, write_yaml
+from ...core.io import read_config, write_config
 from ...core.library import get_agent_config
 
 
@@ -95,7 +94,7 @@ def _write_mcp(profile_name: str, agent_type: str,
             f"mcp-server {server_id!r}: server_config is missing 'type'"
         )
     target, root_key = _mcp_target(profile_name, agent_type)
-    existing = _read_config(target)
+    existing = read_config(target)
     mcp_config = get_agent_config(agent_type).get("mcp_config") or {}
 
     servers, _ = _mcp_servers_dict(existing, agent_type, mcp_config)
@@ -103,7 +102,7 @@ def _write_mcp(profile_name: str, agent_type: str,
     if fmt == "passthrough":
         entry = server_config
     elif fmt == "structured":
-        entry = _convert_entry(server_config, for_opencode=True)
+        entry = _convert_entry(server_config, structured=True)
     else:
         entry = _convert_entry(server_config)
     servers[server_id] = entry
@@ -112,44 +111,23 @@ def _write_mcp(profile_name: str, agent_type: str,
         existing.setdefault(root_key, {})[mcp_config["servers_key"]] = servers
     else:
         existing[root_key] = servers
-    _write_config(target, existing)
-
-
-def _read_config(target: Path) -> Dict[str, Any]:
-    if not target.is_file():
-        return {}
-    fmt = target.suffix.lstrip(".")
-    if fmt == "toml":
-        return read_toml(target)
-    if fmt in ("yaml", "yml"):
-        return read_yaml(target)
-    if fmt == "jsonc":
-        return read_jsonc(target)
-    return read_json(target)  # .json is the default
-
-
-def _write_config(target: Path, data: Dict[str, Any]) -> None:
-    fmt = target.suffix.lstrip(".")
-    if fmt == "toml":
-        write_toml(target, data)
-    elif fmt in ("yaml", "yml"):
-        write_yaml(target, data)
-    else:
-        write_json(target, data)
+    write_config(target, existing)
 
 
 def _convert_entry(server_config: Dict[str, Any],
-                   for_opencode: bool = False) -> Dict[str, Any]:
+                   structured: bool = False) -> Dict[str, Any]:
     """Convert ACS unified MCP format to a per-server entry.
 
-    For OpenCode this uses ``local``/``remote`` naming and nests
-    ``command`` as a list.  For all other types the flat format is used.
+    When *structured* is True, uses ``local``/``remote`` type names
+    and nests ``command`` as a list (the format expected by config
+    files whose ``entry_format`` is ``"structured"``).  Otherwise a
+    flat format with ``command``/``args``/``env`` keys is used.
     """
     typ = server_config.get("type")
     entry: Dict[str, Any] = {}
 
     if typ == "stdio":
-        if for_opencode:
+        if structured:
             entry["type"] = "local"
             cmd = server_config.get("command", "")
             args = server_config.get("args") or []
@@ -171,7 +149,7 @@ def _convert_entry(server_config: Dict[str, Any],
             if isinstance(cwd, str) and cwd:
                 entry["cwd"] = cwd
     else:
-        if for_opencode:
+        if structured:
             entry["type"] = "remote"
         entry["url"] = server_config.get("url", "")
         headers = server_config.get("headers")
@@ -186,7 +164,7 @@ def list_profile_mcp_servers(profile_name: str) -> List[Dict[str, Any]]:
     meta, agent_config = resolve_profile(profile_name)
     mcp_config = agent_config.get("mcp_config") or {}
     target, _ = _mcp_target(profile_name, meta["agent_type"])
-    existing = _read_config(target)
+    existing = read_config(target)
     servers, _ = _mcp_servers_dict(existing, meta["agent_type"], mcp_config)
     return [_mcp_summary(sid, s) for sid, s in servers.items()] if servers else []
 
@@ -196,7 +174,7 @@ def remove_mcp_from_profile(profile_name: str, mcp_id: str) -> None:
     meta, agent_config = resolve_profile(profile_name)
     mcp_config = agent_config.get("mcp_config") or {}
     target, root_key = _mcp_target(profile_name, meta["agent_type"])
-    existing = _read_config(target) if target.is_file() else {}
+    existing = read_config(target) if target.is_file() else {}
     servers, sub_key = _mcp_servers_dict(existing, meta["agent_type"], mcp_config)
     if mcp_id not in servers:
         return
@@ -207,4 +185,4 @@ def remove_mcp_from_profile(profile_name: str, mcp_id: str) -> None:
         existing[root_key] = servers
     else:
         existing.pop(root_key, None)
-    _write_config(target, existing)
+    write_config(target, existing)

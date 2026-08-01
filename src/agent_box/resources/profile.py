@@ -33,7 +33,7 @@ def _row_to_dict(row: Any) -> Dict[str, str]:
         "display_name": d.get("display_name") or "",
         "description": d.get("description") or "",
         "provider": d.get("provider_ref") or "",
-        "claude_md": d.get("claude_md_ref") or "",
+        "prompt": d.get("prompt_ref") or "",
         "preset": "",
     }
 
@@ -53,7 +53,7 @@ class ProfileRepo:
         ).fetchone() is None:
             raise ProfileError(
                 f"{name}: profile not found. "
-                f"Try: agent-box create {name} --type claude"
+                f"Try: agent-box create {name} --type {config.DEFAULT_AGENT_TYPE}"
             )
 
     def find_by_name(self, name: str) -> Dict[str, str]:
@@ -61,13 +61,13 @@ class ProfileRepo:
         conn = _core_db.get_conn()
         row = conn.execute(
             "SELECT name, agent_type, display_name, description, "
-            "provider_ref, claude_md_ref FROM profiles WHERE name = ?",
+            "provider_ref, prompt_ref FROM profiles WHERE name = ?",
             (name,),
         ).fetchone()
         if row is None:
             raise ProfileError(
                 f"{name}: profile not found. "
-                f"Try: agent-box create {name} --type claude"
+                f"Try: agent-box create {name} --type {config.DEFAULT_AGENT_TYPE}"
             )
         return _row_to_dict(row)
 
@@ -78,7 +78,7 @@ class ProfileRepo:
         display_name: str | None = None,
         description: str | None = None,
         provider: str | None = None,
-        claude_md: str | None = None,
+        prompt: str | None = None,
     ) -> Dict[str, str]:
         config.validate_profile_name(name)
         self._ensure_exists(name)
@@ -90,8 +90,8 @@ class ProfileRepo:
             updates["description"] = description
         if provider is not None:
             updates["provider_ref"] = provider
-        if claude_md is not None:
-            updates["claude_md_ref"] = claude_md
+        if prompt is not None:
+            updates["prompt_ref"] = prompt
 
         if not updates:
             return self.find_by_name(name)
@@ -120,7 +120,7 @@ class ProfileRepo:
         conn.commit()
 
     def set_prompt_ref(self, name: str, prompt_ref: str) -> None:
-        """Update only the ``claude_md_ref`` column for *name*.
+        """Update only the ``prompt_ref`` column for *name*.
 
         Called by the prompts/apply path so the DB write lives in
         the repository layer (Rule 3 — no raw SQL outside repositories).
@@ -128,7 +128,7 @@ class ProfileRepo:
         self._ensure_exists(name)
         conn = _core_db.get_conn()
         conn.execute(
-            "UPDATE profiles SET claude_md_ref = ? WHERE name = ?",
+            "UPDATE profiles SET prompt_ref = ? WHERE name = ?",
             (prompt_ref, name),
         )
         conn.commit()
@@ -145,7 +145,7 @@ class ProfileRepo:
         conn = _core_db.get_conn()
         conn.execute(
             "INSERT INTO profiles "
-            "(name, agent_type, display_name, description, provider_ref, claude_md_ref) "
+            "(name, agent_type, display_name, description, provider_ref, prompt_ref) "
             "VALUES (?, ?, ?, ?, ?, ?)",
             (name, agent_type, display_name, description, provider_ref, prompt_ref),
         )
@@ -154,7 +154,7 @@ class ProfileRepo:
     def list_all(self) -> List[Dict[str, Any]]:
         conn = _core_db.get_conn()
         rows = conn.execute(
-            "SELECT name, agent_type, display_name, provider_ref, claude_md_ref "
+            "SELECT name, agent_type, display_name, provider_ref, prompt_ref "
             "FROM profiles ORDER BY id DESC"
         ).fetchall()
         return [dict(r) for r in rows]
@@ -167,7 +167,7 @@ class ProfileRepo:
         """
         config.validate_profile_name(name)
         meta = self.find_by_name(name)
-        agent_type = meta.get("agent_type", "claude")
+        agent_type = meta.get("agent_type", config.DEFAULT_AGENT_TYPE)
         config_dir = config.profile_agent_dir(name, agent_type)
         info: Dict[str, Any] = {
             "path": str(config.profile_dir(name)),
@@ -305,7 +305,7 @@ def _apply_preset(
 
 def create(
     name: str,
-    agent_type: str = "claude",
+    agent_type: str = config.DEFAULT_AGENT_TYPE,
     *,
     display_name: str | None = None,
     description: str | None = None,

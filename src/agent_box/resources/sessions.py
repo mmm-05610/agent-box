@@ -21,7 +21,9 @@ class SessionRepo:
     """Data access for the ``sessions`` table."""
 
     @staticmethod
-    def _is_pid_alive(pid: int) -> bool:
+    def _is_pid_alive(pid: int | None) -> bool:
+        if pid is None:
+            return False
         try:
             os.kill(pid, 0)
             return True

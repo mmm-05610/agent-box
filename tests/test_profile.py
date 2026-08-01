@@ -43,7 +43,7 @@ def test_create_with_optional_fields(tmp_agent_box_home):
     assert meta["display_name"] == "My Display"
     assert meta["description"] == "for testing"
     assert meta["provider"] == "custom"
-    assert meta["claude_md"] == "# custom body\n"
+    assert meta["prompt"] == "# custom body\n"
 
 
 def test_create_duplicate_raises(tmp_agent_box_home):

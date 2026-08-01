@@ -188,7 +188,7 @@ def get_mcp_server(server_id: str) -> Dict[str, Any] | None:
     # join table — scan every known column and pick the ones that are true.
     enabled_agents = [
         at for at in (*get_agent_types(), *ACS_EXTRA_TYPES)
-        if row.get(f"enabled_{at}")
+        if row[f"enabled_{at}"]
     ]
     conn.close()
     return {

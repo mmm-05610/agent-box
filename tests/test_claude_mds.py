@@ -25,9 +25,9 @@ def test_claude_md_apply(tmp_agent_box_home, acs_stub):
 
     assert claude_path.read_text(encoding="utf-8") == body
 
-    # profiles.claude_md_ref updated.
+    # profiles.prompt_ref updated.
     meta = profile.load_meta("mycc")
-    assert meta["claude_md"] == "decision-maker"
+    assert meta["prompt"] == "decision-maker"
 
 
 def test_claude_md_apply_unknown(tmp_agent_box_home):

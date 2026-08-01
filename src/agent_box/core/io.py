@@ -135,6 +135,43 @@ def write_yaml(path: Path, data: Dict[str, Any]) -> None:
     write_text(path, text)
 
 
+# ── Format-agnostic dispatch ──────────────────────────────────────────────
+
+def read_config(path: Path) -> Dict[str, Any]:
+    """Read a config file, dispatching by extension.
+
+    ``.json`` → :func:`read_json`, ``.jsonc`` → :func:`read_jsonc`,
+    ``.toml`` → :func:`read_toml`, ``.yaml`` / ``.yml`` → :func:`read_yaml`.
+    Returns ``{}`` when the file is absent.
+    """
+    if not path.is_file():
+        return {}
+    fmt = path.suffix.lstrip(".")
+    if fmt == "toml":
+        return read_toml(path)
+    if fmt in ("yaml", "yml"):
+        return read_yaml(path)
+    if fmt == "jsonc":
+        return read_jsonc(path)
+    return read_json(path)
+
+
+def write_config(path: Path, data: Dict[str, Any]) -> None:
+    """Write *data* to *path*, dispatching by extension.
+
+    ``.json`` / ``.jsonc`` → :func:`write_json`,
+    ``.toml`` → :func:`write_toml`,
+    ``.yaml`` / ``.yml`` → :func:`write_yaml`.
+    """
+    fmt = path.suffix.lstrip(".")
+    if fmt == "toml":
+        write_toml(path, data)
+    elif fmt in ("yaml", "yml"):
+        write_yaml(path, data)
+    else:
+        write_json(path, data)
+
+
 # ── Dict utilities ─────────────────────────────────────────────────────────
 
 def deep_merge(base: Dict[str, Any], overlay: Dict[str, Any]) -> Dict[str, Any]:

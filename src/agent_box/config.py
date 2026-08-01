@@ -5,8 +5,13 @@ import os
 from pathlib import Path
 
 AGENT_BOX_HOME_ENV = "AGENT_BOX_HOME"
-AGENT_TYPE_CLAUDE = "claude"
+DISPLAY_NAME = "agent-box"
+DEFAULT_AGENT_TYPE = "claude"
 BWRAP = "bwrap"
+
+# Session mode labels — written to sessions.db, read by GUI launch dialog.
+MODE_NEW = "新会话"
+MODE_RESUME = "继续上次"
 
 
 # --- package resolution ─────────────────────────────────────────────────
@@ -22,6 +27,11 @@ def package_dir() -> Path:
     callers.
     """
     return _PKG_DIR
+
+
+def migrations_dir() -> Path:
+    """Absolute path to the SQL migration files directory."""
+    return package_dir() / "migrations"
 
 
 # --- root resolution -------------------------------------------------------
@@ -50,6 +60,11 @@ def acs_db() -> Path:
 def library_db() -> Path:
     """Path to the agent-box SQLite database (``agent-box.db``)."""
     return agent_box_home() / "agent-box.db"
+
+
+def history_file() -> Path:
+    """Path to the REPL command-history file."""
+    return agent_box_home() / "history"
 
 
 def profile_dir(name: str) -> Path:
@@ -124,6 +139,11 @@ def profile_agent_data_dir(name: str, agent_type: str) -> Path | None:
 def profile_skills_dir(name: str, agent_type: str) -> Path:
     """Profile's per-agent skills directory (copy target for skill apply)."""
     return profile_agent_dir(name, agent_type) / "skills"
+
+
+def profile_providers_store(name: str, agent_type: str) -> Path:
+    """Profile's per-agent provider store (additive-mode _providers.json)."""
+    return profile_agent_dir(name, agent_type) / "_providers.json"
 
 
 # --- validation ------------------------------------------------------------
