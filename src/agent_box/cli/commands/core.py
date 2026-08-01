@@ -9,11 +9,24 @@ import argparse
 import json
 from typing import TYPE_CHECKING
 
-from cmd2 import Cmd2ArgumentParser, CommandSet, with_argparser, with_category
+from cmd2 import Choices, Cmd2ArgumentParser, CommandSet, with_argparser, with_category
 
-from ... import config, launch
+from ... import config, edit as edit_mod, launch
 from ...core import library
 from ...resources import mcp, profile, providers, sessions
+
+
+def _profile_choices(*_args) -> Choices:
+    """Tab-completion candidates: existing profile names."""
+    try:
+        return Choices([p["name"] for p in profile.list_profiles()])
+    except Exception:
+        return Choices([])
+
+# Optional profile metadata fields displayed by ``show`` / ``options``.
+# Order here = display order.  Defined in the CLI because display is a
+# UI concern — the Repository just provides data.
+_PROFILE_DISPLAY_FIELDS = ("display_name", "description", "provider", "preset", "prompt")
 
 if TYPE_CHECKING:
     from ..shell import AgentBoxShell
@@ -46,6 +59,8 @@ sessions_parser.add_argument("--exit", dest="exit_id", type=int, default=None,
                               help="Record exit by session ID")
 sessions_parser.add_argument("--exit-by-pid", dest="exit_pid", type=int, default=None,
                               help="Record exit by most recent session with this PID")
+sessions_parser.add_argument("--cleanup", action="store_true",
+                              help="Mark zombie sessions as exited")
 sessions_parser.add_argument("exit_code", type=int, nargs="?", default=None,
                               help="Exit code (with --exit or --exit-by-pid)")
 
@@ -53,7 +68,7 @@ sessions_parser.add_argument("exit_code", type=int, nargs="?", default=None,
 @with_argparser(sessions_parser)
 @with_category("Session & Context")
 def do_sessions(self, args: argparse.Namespace) -> None:
-    """Manage recorded launch sessions: record exits."""
+    """Manage recorded launch sessions: record exits, cleanup zombies."""
     if args.exit_pid is not None:
         code = args.exit_code if args.exit_code is not None else 0
         sessions.record_exit_by_pid(args.exit_pid, code)
@@ -61,13 +76,19 @@ def do_sessions(self, args: argparse.Namespace) -> None:
         return
     if args.exit_id is not None:
         if args.exit_code is None:
-            self._cmd.perror("agent-box: --exit requires an exit code")
+            self._cmd.perror(f"{config.DISPLAY_NAME}: --exit requires an exit code")
             return
         sessions.record_exit(args.exit_id, args.exit_code)
         self._cmd.poutput("ok")
         return
+    if args.cleanup:
+        n = sessions.cleanup_stale_sessions()
+        self._cmd.poutput(str(n))
+        return
+
     self._cmd.perror(
-        "sessions: no action specified (use --exit or --exit-by-pid; "
+        f"{config.DISPLAY_NAME}: sessions: no action specified "
+        "(use --exit, --exit-by-pid, or --cleanup; "
         "for listing use: list sessions)"
     )
 
@@ -79,24 +100,24 @@ list_parser.add_argument(
 )
 list_parser.add_argument("--json", action="store_true")
 list_parser.add_argument("--active", action="store_true", help="(sessions only) show only running")
-list_parser.add_argument("--cleanup", action="store_true", help="(sessions only) clean up zombies")
 list_parser.add_argument("--type", "-t", choices=library.get_agent_types(),
                           default=None, help="(presets only) filter by agent type")
 
 
-@with_argparser(list_parser)
+@with_argparser(list_parser, with_unknown_args=True)
 @with_category("Information")
-def do_list(self, args: argparse.Namespace) -> None:
+def do_list(self, args: argparse.Namespace, unknown_args) -> None:
     """List resources: profiles, sessions, or presets."""
     resource = args.resource
 
     # ── sessions (listing only — mutations live in ``do_sessions``) ──
+    if unknown_args and resource == "sessions":
+        self._cmd.perror(
+            "list sessions: --exit/--cleanup/--exit-by-pid moved to the "
+            "sessions command (try: sessions --exit 5 42)"
+        )
+        return
     if resource == "sessions":
-        if args.cleanup:
-            n = sessions.cleanup_stale_sessions()
-            self._cmd.poutput(str(n))
-            return
-
         rows = sessions.fetch_sessions(active_only=args.active)
         if args.json:
             self._cmd.poutput(json.dumps(rows, indent=2, ensure_ascii=False))
@@ -184,7 +205,7 @@ def do_list(self, args: argparse.Namespace) -> None:
                 ctx.profile_name, ctx.agent_type,
             )
         except Exception as exc:
-            self._cmd.perror(f"agent-box: {exc}")
+            self._cmd.perror(f"{config.DISPLAY_NAME}: {exc}")
             return
         _list_entries(self._cmd, entries, args, "provider")
         return
@@ -193,7 +214,7 @@ def do_list(self, args: argparse.Namespace) -> None:
         try:
             entries = mcp.list_profile_mcp_servers(ctx.profile_name)
         except Exception as exc:
-            self._cmd.perror(f"agent-box: {exc}")
+            self._cmd.perror(f"{config.DISPLAY_NAME}: {exc}")
             return
         _list_entries(self._cmd, entries, args, "MCP server")
         return
@@ -211,7 +232,7 @@ create_parser.add_argument(
 create_parser.add_argument("--display-name", default=None)
 create_parser.add_argument("--description", default=None)
 create_parser.add_argument("--provider", default=None)
-create_parser.add_argument("--claude-md", default=None, help="Path to prompt file")
+create_parser.add_argument("--prompt", default=None, help="Path to prompt file")
 create_parser.add_argument("--preset", default=None)
 
 
@@ -220,12 +241,12 @@ create_parser.add_argument("--preset", default=None)
 def do_create(self, args: argparse.Namespace) -> None:
     """Create a new profile."""
     prompt_body: str | None = None
-    if args.claude_md is not None:
+    if args.prompt is not None:
         try:
-            with open(args.claude_md, encoding="utf-8") as fh:
+            with open(args.prompt, encoding="utf-8") as fh:
                 prompt_body = fh.read()
         except OSError as exc:
-            self._cmd.perror(f"agent-box: cannot read {args.claude_md!r}: {exc}")
+            self._cmd.perror(f"{config.DISPLAY_NAME}: cannot read {args.prompt!r}: {exc}")
             return
     try:
         root = profile.create(
@@ -234,7 +255,7 @@ def do_create(self, args: argparse.Namespace) -> None:
             provider=args.provider, prompt_body=prompt_body, preset=args.preset,
         )
     except (ValueError, profile.ProfileError) as exc:
-        self._cmd.perror(f"agent-box: {exc}")
+        self._cmd.perror(f"{config.DISPLAY_NAME}: {exc}")
         return
     self._cmd.poutput(f"created profile {args.name!r} ({args.type}) at {root}")
 
@@ -242,7 +263,7 @@ def do_create(self, args: argparse.Namespace) -> None:
 # ── delete ─────────────────────────────────────────────────────────────────
 
 delete_parser = Cmd2ArgumentParser()
-delete_parser.add_argument("name", help="Profile name")
+delete_parser.add_argument("name", help="Profile name", choices_provider=_profile_choices)
 delete_parser.add_argument("--force", action="store_true")
 
 
@@ -253,7 +274,7 @@ def do_delete(self, args: argparse.Namespace) -> None:
     try:
         ok = profile.delete(args.name, force=args.force)
     except (ValueError, profile.ProfileError) as exc:
-        self._cmd.perror(f"agent-box: {exc}")
+        self._cmd.perror(f"{config.DISPLAY_NAME}: {exc}")
         return
     if ok:
         self._cmd.poutput(f"deleted profile {args.name!r}")
@@ -276,9 +297,7 @@ def do_show(self, args: argparse.Namespace) -> None:
     # ── profile context ──
     if ctx is not None:
         if args.target == "options":
-            # Delegate directly to ProfileCommands._show_options — don't
-            # route through cmd2's command-handler machinery from here.
-            ctx._show_options()
+            ctx.do_options(args)
             return
         if args.target is None:
             _show_profile(self, ctx.profile_name, args)
@@ -297,7 +316,7 @@ def _show_profile(self, profile_name: str, args: argparse.Namespace) -> None:
     try:
         info = profile.show(profile_name)
     except (ValueError, profile.ProfileError) as exc:
-        self._cmd.perror(f"agent-box: {exc}")
+        self._cmd.perror(f"{config.DISPLAY_NAME}: {exc}")
         return
     if args.json:
         self._cmd.poutput(json.dumps(info, indent=2, ensure_ascii=False))
@@ -308,7 +327,7 @@ def _show_profile(self, profile_name: str, args: argparse.Namespace) -> None:
     self._cmd.poutput(f"config_dir: {info['config_dir']}")
     if info.get("data_dir"):
         self._cmd.poutput(f"data_dir:   {info['data_dir']}")
-    for k in ("display_name", "description", "provider", "preset", "prompt"):
+    for k in _PROFILE_DISPLAY_FIELDS:
         v = meta.get(k)
         if v:
             self._cmd.poutput(f"{k + ':':<11} {v}")
@@ -340,11 +359,12 @@ configure_parser = Cmd2ArgumentParser(
     description="Update profile metadata or open config dir in $EDITOR",
 )
 configure_parser.add_argument("name", nargs="?", default=None,
-                              help="Profile name (omit to edit current context)")
+                              help="Profile name (omit to edit current context)",
+                              choices_provider=_profile_choices)
 configure_parser.add_argument("--display-name", default=None)
 configure_parser.add_argument("--description", default=None)
 configure_parser.add_argument("--provider", default=None)
-configure_parser.add_argument("--claude-md", default=None, help="Set the prompt reference")
+configure_parser.add_argument("--prompt", default=None, help="Set the prompt reference")
 
 
 @with_argparser(configure_parser)
@@ -358,42 +378,41 @@ def do_configure(self, args: argparse.Namespace) -> None:
         if ctx is not None:
             profile_name = ctx.profile_name
         else:
-            self._cmd.perror("agent-box: specify a profile name or use a profile first")
+            self._cmd.perror(f"{config.DISPLAY_NAME}: specify a profile name or use a profile first")
             return
 
     if any(getattr(args, f, None) is not None
-           for f in ("display_name", "description", "provider", "claude_md")):
+           for f in ("display_name", "description", "provider", "prompt")):
         try:
             result = profile.update_meta(
                 profile_name,
                 display_name=args.display_name, description=args.description,
-                provider=args.provider, prompt=args.claude_md,
+                provider=args.provider, prompt=args.prompt,
             )
         except (ValueError, profile.ProfileError) as exc:
-            self._cmd.perror(f"agent-box: {exc}")
+            self._cmd.perror(f"{config.DISPLAY_NAME}: {exc}")
             return
         self._cmd.poutput(f"updated profile {profile_name!r}")
         for k in ("display_name", "description", "provider"):
             if getattr(args, k, None) is not None:
                 self._cmd.poutput(f"  {k}: {result[k]}")
-        if args.claude_md is not None:
+        if args.prompt is not None:
             self._cmd.poutput(f"  prompt: {result['prompt']}")
         return
     # Open config dir in $EDITOR
     try:
         meta = profile.load_meta(profile_name)
     except (ValueError, profile.ProfileError) as exc:
-        self._cmd.perror(f"agent-box: {exc}")
+        self._cmd.perror(f"{config.DISPLAY_NAME}: {exc}")
         return
     target = config.profile_agent_dir(profile_name, meta["agent_type"])
-    from ... import edit as edit_mod
     edit_mod.open_editor(target)
 
 
 # ── use ─────────────────────────────────────────────────────────────────────
 
 use_parser = Cmd2ArgumentParser()
-use_parser.add_argument("profile", help="Profile name to enter")
+use_parser.add_argument("profile", help="Profile name to enter", choices_provider=_profile_choices)
 
 
 @with_argparser(use_parser)
@@ -403,7 +422,7 @@ def do_use(self, args: argparse.Namespace) -> None:
     try:
         meta = profile.load_meta(args.profile)
     except (ValueError, profile.ProfileError) as exc:
-        self._cmd.perror(f"agent-box: {exc}")
+        self._cmd.perror(f"{config.DISPLAY_NAME}: {exc}")
         return
     self._cmd.enter_context(args.profile, meta["agent_type"])
     self._cmd.poutput(
@@ -415,30 +434,51 @@ def do_use(self, args: argparse.Namespace) -> None:
 
 launch_parser = Cmd2ArgumentParser()
 launch_parser.add_argument("name", nargs="?", default=None,
-                           help="Profile name (omit to launch current context)")
+                           help="Profile name (omit to launch current context)",
+                           choices_provider=_profile_choices)
 launch_parser.add_argument("extra", nargs=argparse.REMAINDER,
                            help="Extra args passed to the agent binary")
 
 
-@with_argparser(launch_parser)
+@with_argparser(launch_parser, with_unknown_args=True)
 @with_category("Session & Context")
-def do_launch(self, args: argparse.Namespace) -> None:
+def do_launch(self, args: argparse.Namespace, unknown_args: list) -> None:
     """Launch a profile via bwrap.  In profile context, launch the current
-    profile without needing to repeat its name."""
+    profile without needing to repeat its name.
+
+    Extra args pass straight through to the agent binary, including
+    option-like ones: ``launch --continue``, ``launch --resume xxx``,
+    ``launch -c "do thing"``.  A leading ``--`` is treated as a separator
+    and dropped.
+    """
     ctx = self._cmd.get_context()
 
-    profile_name = args.name
+    # Parse from the raw token list, not argparse's name/extra split:
+    # the first non-`-` token is the profile name, everything else is
+    # extra args for the agent (including option-like ones).  A literal
+    # `--` is the standard separator and is dropped.
+    statement = getattr(args, "cmd2_statement", None)
+    tokens = list(statement.arg_list) if statement is not None else []
+
+    if tokens and not tokens[0].startswith("-"):
+        profile_name = tokens[0]
+        extra_args = tokens[1:]
+    else:
+        profile_name = None
+        extra_args = tokens
+    extra_args = [t for t in extra_args if t != "--"]
+
     if profile_name is None:
         if ctx is not None:
             profile_name = ctx.profile_name
         else:
-            self._cmd.perror("agent-box: specify a profile name or use a profile first")
+            self._cmd.perror(f"{config.DISPLAY_NAME}: specify a profile name or use a profile first")
             return
 
     try:
-        launch.launch(profile_name, extra_args=args.extra)
+        launch.launch(profile_name, extra_args=extra_args)
     except (ValueError, profile.ProfileError) as exc:
-        self._cmd.perror(f"agent-box: {exc}")
+        self._cmd.perror(f"{config.DISPLAY_NAME}: {exc}")
 
 
 # ── CoreCommands class ─────────────────────────────────────────────────────
