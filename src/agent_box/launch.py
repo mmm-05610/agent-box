@@ -15,9 +15,6 @@ from .resources import profile
 from .resources import sessions
 
 
-# Mode labels stored in sessions.db. The GUI uses the same strings.
-MODE_NEW = "新会话"
-MODE_RESUME = "继续上次"
 
 
 def launch(name: str, extra_args: list | None = None) -> None:
@@ -28,7 +25,7 @@ def launch(name: str, extra_args: list | None = None) -> None:
     ``--continue`` for claude). Never returns on success.
     """
     meta = profile.load_meta(name)
-    agent_type = meta.get("agent_type") or config.AGENT_TYPE_CC
+    agent_type = meta.get("agent_type") or config.DEFAULT_AGENT_TYPE
     agent_config = get_agent_config(agent_type)
     if agent_config is None:
         raise profile.ProfileError(f"unknown agent_type {agent_type!r}")
@@ -57,19 +54,37 @@ def launch(name: str, extra_args: list | None = None) -> None:
     if not rdir.exists():
         rdir.mkdir(parents=True, exist_ok=True)
 
+    # ── sandbox policy (registry-driven) ─────────────────────────────
+    sandbox = agent_config.get("sandbox_config") or {}
+
     # Build bwrap argv
-    argv = [
-        bwrap,
-        "--bind", "/", "/",
-        "--bind", str(pdir), str(rdir),
-        "--dev", "/dev",
-        "--proc", "/proc",
-        "--tmpfs", "/tmp",
-        "--unshare-ipc",
-        "--unshare-pid",
-        "--unshare-uts",
-        "--share-net",
-    ]
+    argv = [bwrap]
+
+    # Root filesystem + additional bind-mounts
+    for mount in sandbox.get("bind_mounts") or []:
+        argv.extend(["--bind", mount, mount])
+
+    # Fresh virtual filesystems: bwrap's --dev/--proc create new
+    # filesystems tied to the child namespaces.  Binding the host's
+    # /dev or /proc instead breaks PID mapping (host procfs under a new
+    # --unshare-pid namespace) and leaves device nodes unusable.
+    for mount in sandbox.get("dev_mounts") or []:
+        argv.extend(["--dev", mount])
+    for mount in sandbox.get("proc_mounts") or []:
+        argv.extend(["--proc", mount])
+
+    # Profile config bind-mount (always done — core of agent-box)
+    argv.extend(["--bind", str(pdir), str(rdir)])
+
+    # tmpfs mounts
+    for tmp in sandbox.get("tmpfs") or []:
+        argv.extend(["--tmpfs", tmp])
+
+    # Namespace isolation
+    for flag in sandbox.get("unshare") or []:
+        argv.append(f"--unshare-{flag}")
+    for flag in sandbox.get("share") or []:
+        argv.append(f"--share-{flag}")
 
     for relative_path in agent_config.get("extra_profile_files", []):
         extra_name = relative_path.rstrip("/")
@@ -115,14 +130,14 @@ def launch(name: str, extra_args: list | None = None) -> None:
 
     env = dict(os.environ)
     print(
-        f"agent-box: launching {agent_type} as profile {name!r} "
+        f"{config.DISPLAY_NAME}: launching {agent_type} as profile {name!r} "
         f"(mount: {pdir} → {rdir})",
         file=sys.stderr,
     )
 
     import subprocess as _sp
 
-    mode = MODE_RESUME if extra_args else MODE_NEW
+    mode = config.MODE_RESUME if extra_args else config.MODE_NEW
     pid = os.getpid()
     sid = sessions.record_launch(name, agent_type, os.getcwd(), mode, pid)
 
