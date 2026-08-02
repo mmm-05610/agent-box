@@ -12,6 +12,7 @@ import { findFiles, readFile } from '@/api/files'
 import type { ProfileMcp, ProfileProvider } from '@/api'
 import { fetchProfileMcp, fetchProfileProviders } from '@/api'
 import { useProfileConfigDir } from './useProfileConfigDir'
+import i18n from '@/i18n'
 
 // ── Installed skills (file-backed) ─────────────────────────────────────
 
@@ -127,7 +128,7 @@ export function useProfileResources(
     } catch (e) {
       setProviders([])
       setMcp([])
-      setError(e instanceof Error ? e.message : 'Failed to load profile resources')
+      setError(e instanceof Error ? e.message : i18n.t('error.loadProfileResources'))
     } finally {
       setLoading(false)
     }

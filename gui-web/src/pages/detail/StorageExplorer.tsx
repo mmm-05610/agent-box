@@ -6,6 +6,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button, Card, CardHeader, CardTitle, CardContent } from '@/components/ui'
 import { readFile, saveFile } from '@/api/files'
 import { useToast } from '@/components/feedback/toast'
@@ -17,6 +18,7 @@ export function StorageExplorer({ profilePath, fileTree, onRefresh }: {
   fileTree: string[]
   onRefresh?: () => void
 }) {
+  const { t } = useTranslation()
   const { toast } = useToast()
   const [tree, setTree] = useState<TreeNode[]>([])
   const [selected, setSelected] = useState<string | null>(null)
@@ -41,7 +43,7 @@ export function StorageExplorer({ profilePath, fileTree, onRefresh }: {
         setOriginalContent(text)
         setLastSavedAt(Date.now())
       } catch {
-        toast({ type: 'error', message: `Failed to read ${path}` })
+        toast({ type: 'error', message: t('storage.toast.readFailed', { path }) })
       }
     },
     [toast],
@@ -54,10 +56,10 @@ export function StorageExplorer({ profilePath, fileTree, onRefresh }: {
       await saveFile(selected, content)
       setOriginalContent(content)
       setLastSavedAt(Date.now())
-      toast({ type: 'success', message: `Saved ${selected.split('/').pop()}` })
+      toast({ type: 'success', message: t('storage.toast.saved', { name: selected.split('/').pop() }) })
       onRefresh?.()
     } catch (e: unknown) {
-      toast({ type: 'error', message: e instanceof Error ? e.message : 'Save failed' })
+      toast({ type: 'error', message: e instanceof Error ? e.message : t('storage.toast.saveFailed') })
     } finally {
       setSaving(false)
     }
@@ -73,7 +75,7 @@ export function StorageExplorer({ profilePath, fileTree, onRefresh }: {
       {/* File tree */}
       <Card className="col-span-1">
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Files</CardTitle>
+          <CardTitle className="text-sm">{t('storage.files')}</CardTitle>
         </CardHeader>
         <CardContent className="max-h-[600px] overflow-auto p-2">
           <FileTree
@@ -89,7 +91,7 @@ export function StorageExplorer({ profilePath, fileTree, onRefresh }: {
       <Card className="col-span-2">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-mono">
-            {activeFile ? activeFile.name : 'Select a file'}
+            {activeFile ? activeFile.name : t('storage.selectFile')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -104,22 +106,21 @@ export function StorageExplorer({ profilePath, fileTree, onRefresh }: {
               <div className="flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">
                   {saving
-                    ? 'Saving…'
+                    ? t('storage.saving')
                     : dirty
-                      ? 'Unsaved changes'
+                      ? t('storage.unsaved')
                       : lastSavedAt
-                        ? `Saved · ${new Date(lastSavedAt).toLocaleTimeString()}`
+                        ? t('storage.savedAt', { time: new Date(lastSavedAt).toLocaleTimeString() })
                         : ''}
                 </span>
                 <Button size="sm" onClick={handleSave} disabled={!dirty || saving}>
-                  {saving ? 'Saving...' : 'Save'}
+                  {saving ? t('common.saving') : t('storage.save')}
                 </Button>
               </div>
             </>
           ) : (
             <p className="text-sm text-muted-foreground">
-              Click a file on the left to edit it here.
-              Use this for settings keys not covered by the other tabs.
+              {t('storage.hint')}
             </p>
           )}
         </CardContent>

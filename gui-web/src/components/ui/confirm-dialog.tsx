@@ -18,6 +18,7 @@
  */
 import { useEffect, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui'
 
 export interface ConfirmDialogProps {
@@ -36,13 +37,16 @@ export function ConfirmDialog({
   open,
   title,
   description,
-  confirmLabel = 'Delete',
-  cancelLabel = 'Cancel',
+  confirmLabel,
+  cancelLabel,
   busy = false,
   variant = 'destructive',
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const { t } = useTranslation()
+  const resolvedConfirmLabel = confirmLabel ?? t('common.delete')
+  const resolvedCancelLabel = cancelLabel ?? t('common.cancel')
   const confirmRef = useRef<HTMLButtonElement>(null)
 
   // Autofocus the destructive button so Enter confirms.
@@ -108,7 +112,7 @@ export function ConfirmDialog({
 
         <div className="flex justify-end gap-2">
           <Button variant="ghost" size="sm" onClick={onCancel} disabled={busy}>
-            {cancelLabel}
+            {resolvedCancelLabel}
           </Button>
           <button
             ref={confirmRef}
@@ -133,7 +137,7 @@ export function ConfirmDialog({
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
               </svg>
             )}
-            {confirmLabel}
+            {resolvedConfirmLabel}
           </button>
         </div>
       </div>

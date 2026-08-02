@@ -9,6 +9,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Trans, useTranslation } from 'react-i18next'
 import {
   Button,
   Card,
@@ -60,6 +61,7 @@ export function RulesTab({ configDir, profileName, refreshKey }: {
   configDir: string
   refreshKey?: number
 }) {
+  const { t } = useTranslation()
   const [rules, setRules] = useState<RuleFile[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -79,7 +81,7 @@ export function RulesTab({ configDir, profileName, refreshKey }: {
       setRules(loaded)
     } catch (error) {
       setRules([])
-      setLoadError(error instanceof Error ? error.message : 'Failed to load rules')
+      setLoadError(error instanceof Error ? error.message : t('rules.loadFailed', { error: '' }))
     } finally {
       setLoading(false)
     }
@@ -123,9 +125,9 @@ export function RulesTab({ configDir, profileName, refreshKey }: {
         ? { ...r, content: draft, ruleCount: countRules(draft) }
         : r))
       cancelEditing(rule.id)
-      toast({ type: 'success', message: `${rule.id}.rules saved` })
+      toast({ type: 'success', message: t('rules.toast.saved', { name: rule.id }) })
     } catch (error) {
-      toast({ type: 'error', message: error instanceof Error ? error.message : 'Failed to save rule' })
+      toast({ type: 'error', message: error instanceof Error ? error.message : t('rules.toast.saveFailed') })
     } finally {
       setSaving(null)
     }
@@ -144,10 +146,10 @@ export function RulesTab({ configDir, profileName, refreshKey }: {
         return next
       })
       cancelEditing(removedId)
-      toast({ type: 'success', message: `${pendingDelete.id}.rules removed from ${profileName}` })
+      toast({ type: 'success', message: t('rules.toast.removed', { name: pendingDelete.id, profile: profileName }) })
       setPendingDelete(null)
     } catch (error) {
-      toast({ type: 'error', message: error instanceof Error ? error.message : 'Failed to remove rule' })
+      toast({ type: 'error', message: error instanceof Error ? error.message : t('rules.toast.removeFailed') })
     } finally {
       setDeleting(false)
     }
@@ -159,22 +161,28 @@ export function RulesTab({ configDir, profileName, refreshKey }: {
     <Card>
       <CardHeader>
         <CardTitle>
-          Rules <span className="text-muted-foreground font-normal">({totalRules} across {rules.length} files)</span>
+          {t('rules.title')}{' '}
+          <span className="text-muted-foreground font-normal">{t('rules.count', { count: totalRules, files: rules.length })}</span>
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          Each <code className="font-mono">.rules</code> file holds a list of{' '}
-          <code className="font-mono">prefix_rule(...)</code> entries.
+          <Trans
+            i18nKey="rules.subtitle"
+            components={{ code: <code className="font-mono" /> }}
+          />
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
         {loading ? (
-          <p className="text-sm text-muted-foreground">Loading...</p>
+          <p className="text-sm text-muted-foreground">{t('rules.loading')}</p>
         ) : loadError ? (
-          <p className="text-sm text-destructive">Failed to load rules: {loadError}</p>
+          <p className="text-sm text-destructive">{t('rules.loadFailed', { error: loadError })}</p>
         ) : rules.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No rule files in <code className="font-mono">{rulesDir}</code>.
-            Apply from Library or create <code className="font-mono">*.rules</code> files directly.
+            <Trans
+              i18nKey="rules.empty"
+              values={{ dir: rulesDir }}
+              components={{ code: <code className="font-mono" /> }}
+            />
           </p>
         ) : (
           rules.map((rule) => {
@@ -199,7 +207,7 @@ export function RulesTab({ configDir, profileName, refreshKey }: {
                       <h4 className="font-mono font-medium text-foreground">{rule.id}</h4>
                       <span className="text-xs text-muted-foreground">.rules</span>
                       <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold tabular-nums text-muted-foreground ring-1 ring-inset ring-border">
-                        {rule.ruleCount} {rule.ruleCount === 1 ? 'rule' : 'rules'}
+                        {t(rule.ruleCount === 1 ? 'rules.countBadgeOne' : 'rules.countBadge', { count: rule.ruleCount })}
                       </span>
                     </div>
                   </div>
@@ -210,22 +218,22 @@ export function RulesTab({ configDir, profileName, refreshKey }: {
                       aria-expanded={isExpanded}
                       onClick={() => toggleExpanded(rule.id)}
                     >
-                      {isExpanded ? 'Hide details' : 'Details'}
+                      {isExpanded ? t('common.hideDetails') : t('common.details')}
                     </Button>
                     <Button variant="ghost" size="sm" onClick={() => setPendingDelete(rule)}>
-                      Remove
+                      {t('rules.remove')}
                     </Button>
                   </div>
                 </div>
                 {isExpanded && (
                   <div className="space-y-3 border-t border-border/60 px-4 py-3 text-sm">
                     <div>
-                      <p className="mb-1 font-medium text-foreground">Path</p>
+                      <p className="mb-1 font-medium text-foreground">{t('rules.path')}</p>
                       <code className="break-all text-xs text-muted-foreground">{rule.path}</code>
                     </div>
                     <div>
                       <div className="mb-1 flex items-center justify-between">
-                        <p className="font-medium text-foreground">Content</p>
+                        <p className="font-medium text-foreground">{t('rules.content')}</p>
                         {!isEditing ? (
                           <Button size="sm" variant="ghost" onClick={() => startEditing(rule)}>
                             Edit
@@ -237,7 +245,7 @@ export function RulesTab({ configDir, profileName, refreshKey }: {
                               onClick={() => saveEditing(rule)}
                               disabled={isSaving || draft === rule.content}
                             >
-                              {isSaving ? 'Saving...' : 'Save'}
+                              {isSaving ? t('common.saving') : t('rules.save')}
                             </Button>
                             <Button
                               size="sm"
@@ -245,7 +253,7 @@ export function RulesTab({ configDir, profileName, refreshKey }: {
                               onClick={() => cancelEditing(rule.id)}
                               disabled={isSaving}
                             >
-                              Cancel
+                              {t('common.cancel')}
                             </Button>
                           </div>
                         )}
@@ -256,7 +264,7 @@ export function RulesTab({ configDir, profileName, refreshKey }: {
                         rows={Math.min(12, Math.max(6, draft.split('\n').length + 1))}
                         readOnly={!isEditing}
                         className="text-xs font-mono"
-                        placeholder='prefix_rule(pattern=["cmd", "arg"], decision="allow")'
+                        placeholder={t('rules.placeholder')}
                       />
                     </div>
                   </div>
@@ -268,9 +276,9 @@ export function RulesTab({ configDir, profileName, refreshKey }: {
       </CardContent>
       <ConfirmDialog
         open={pendingDelete != null}
-        title="Remove rule file?"
-        description={pendingDelete ? `This will permanently remove “${pendingDelete.id}.rules”.` : undefined}
-        confirmLabel="Remove"
+        title={t('rules.confirmRemoveTitle')}
+        description={pendingDelete ? t('rules.confirmRemoveDesc', { name: pendingDelete.id }) : undefined}
+        confirmLabel={t('common.remove')}
         busy={deleting}
         onConfirm={confirmDelete}
         onCancel={() => setPendingDelete(null)}

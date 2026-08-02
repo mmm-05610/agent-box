@@ -7,6 +7,7 @@
  */
 
 import { useCallback, useMemo, useState } from 'react'
+import { Trans, useTranslation } from 'react-i18next'
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from '@/components/ui'
 import { readFile } from '@/api/files'
 
@@ -76,6 +77,7 @@ export function HermesHooksViewer({
    *  prop is declared but not yet consumed inside. */
   onRefresh?: () => void
 }) {
+  const { t } = useTranslation()
   // Resolve hook command paths. Paths like /home/maoqh/.hermes/hooks/foo.sh
   // refer to the bwrap mount — on the real filesystem they live under
   // configDir/hooks/. Translate the prefix.
@@ -109,7 +111,7 @@ export function HermesHooksViewer({
         setLoadingScript((l) => new Set(l).add(key))
         readFile(resolvePath(command))
           .then((content) => setScriptContents((s) => ({ ...s, [key]: content })))
-          .catch(() => setScriptContents((s) => ({ ...s, [key]: '(failed to read script)' })))
+          .catch(() => setScriptContents((s) => ({ ...s, [key]: t('hooksViewer.failedToRead') })))
           .finally(() => setLoadingScript((l) => {
             const next = new Set(l)
             next.delete(key)
@@ -125,20 +127,29 @@ export function HermesHooksViewer({
     <Card>
       <CardHeader>
         <CardTitle>
-          Hooks{' '}
+          {t('hooksViewer.title')}{' '}
           <span className="text-muted-foreground font-normal">
-            ({totalHooks} across {Object.keys(phases).length} {Object.keys(phases).length === 1 ? 'phase' : 'phases'})
+            {t('hooksViewer.count', {
+              count: totalHooks,
+              phases: Object.keys(phases).length,
+              phaseWord: t(Object.keys(phases).length === 1 ? 'hooksViewer.phase' : 'hooksViewer.phases'),
+            })}
           </span>
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          Read-only summary of the <code className="font-mono">hooks:</code> block in{' '}
-          <code className="font-mono">config.yaml</code>. Expand a command to view the script.
+          <Trans
+            i18nKey="hooksViewer.subtitle"
+            components={{ code: <code className="font-mono" /> }}
+          />
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
         {Object.keys(phases).length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No hooks configured. Add a <code className="font-mono">hooks:</code> block in config.yaml via the Storage tab.
+            <Trans
+              i18nKey="hooksViewer.empty"
+              components={{ code: <code className="font-mono" /> }}
+            />
           </p>
         ) : (
           Object.keys(phases).sort(phaseOrder).map((phase) => {
@@ -149,10 +160,10 @@ export function HermesHooksViewer({
                   <div className="flex items-center gap-2">
                     <h4 className="font-mono text-sm font-medium text-foreground">{phase}</h4>
                     <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold tabular-nums text-muted-foreground ring-1 ring-inset ring-border">
-                      {entries.length} {entries.length === 1 ? 'command' : 'commands'}
+                      {t(entries.length === 1 ? 'hooksViewer.commandsOne' : 'hooksViewer.commands', { count: entries.length })}
                     </span>
                   </div>
-                  <Badge variant="primary">hooks</Badge>
+                  <Badge variant="primary">{t('hooksViewer.hooksBadge')}</Badge>
                 </div>
                 <ul className="divide-y divide-border/40">
                   {entries.map((entry, index) => {
@@ -174,14 +185,14 @@ export function HermesHooksViewer({
                             aria-expanded={isExpanded}
                             onClick={() => toggleExpand(phase, index, entry.command)}
                           >
-                            {isExpanded ? 'Hide' : 'Details'}
+                            {isExpanded ? t('common.hide') : t('common.details')}
                           </Button>
                         </div>
                         {isExpanded && (
                           <div className="border-t border-border/40 px-4 py-3">
-                            <p className="mb-2 text-xs font-medium text-foreground">Script content</p>
+                            <p className="mb-2 text-xs font-medium text-foreground">{t('hooksViewer.scriptContent')}</p>
                             {isLoading ? (
-                              <p className="text-xs text-muted-foreground">Loading...</p>
+                              <p className="text-xs text-muted-foreground">{t('common.loading')}</p>
                             ) : (
                               <pre className="max-h-64 overflow-auto rounded-md bg-muted/60 p-3 font-mono text-xs text-foreground/85 whitespace-pre-wrap">
                                 {scriptContents[key] ?? ''}

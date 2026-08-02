@@ -13,6 +13,7 @@
  */
 
 import { type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import { StatusDot } from '@/components/feedback'
 
@@ -27,7 +28,7 @@ export type NavKey =
 
 interface NavItem {
   key: NavKey
-  label: string
+  labelKey: string
   icon: ReactNode
 }
 
@@ -107,16 +108,17 @@ function PlusIcon() {
 // ── Nav data ───────────────────────────────────────────────────────────
 
 const NAV_ITEMS: NavItem[] = [
-  { key: 'home', label: 'Home', icon: <HomeIcon /> },
-  { key: 'profiles', label: 'Profiles', icon: <ProfilesIcon /> },
-  { key: 'sessions', label: 'Sessions', icon: <SessionsIcon /> },
-  { key: 'settings', label: 'Settings', icon: <SettingsIcon /> },
-  { key: 'help', label: 'Help', icon: <HelpIcon /> },
+  { key: 'home', labelKey: 'nav.home', icon: <HomeIcon /> },
+  { key: 'profiles', labelKey: 'nav.profiles', icon: <ProfilesIcon /> },
+  { key: 'sessions', labelKey: 'nav.sessions', icon: <SessionsIcon /> },
+  { key: 'settings', labelKey: 'nav.settings', icon: <SettingsIcon /> },
+  { key: 'help', labelKey: 'nav.help', icon: <HelpIcon /> },
 ]
 
 // ── Component ──────────────────────────────────────────────────────────
 
 export function Sidebar({ active, onNav, runningCount = 0, onNewProfile }: SidebarProps) {
+  const { t } = useTranslation()
   return (
     <aside
       className={cn(
@@ -164,7 +166,7 @@ export function Sidebar({ active, onNav, runningCount = 0, onNewProfile }: Sideb
           )}
         >
           <PlusIcon />
-          <span>New profile</span>
+          <span>{t('nav.newProfile')}</span>
           <kbd className="ml-auto rounded bg-background/20 px-1.5 py-0.5 text-[10px] font-mono tracking-wide">
             N
           </kbd>
@@ -206,7 +208,7 @@ export function Sidebar({ active, onNav, runningCount = 0, onNewProfile }: Sideb
               >
                 {item.icon}
               </span>
-              <span>{item.label}</span>
+              <span>{t(item.labelKey)}</span>
               {isActive && (
                 <span
                   aria-hidden="true"
@@ -240,7 +242,7 @@ export function Sidebar({ active, onNav, runningCount = 0, onNewProfile }: Sideb
             <polyline points="3.27,6.96 12,12.01 20.73,6.96" />
             <line x1="12" y1="22.08" x2="12" y2="12" />
           </svg>
-          <span>Config</span>
+          <span>{t('nav.config')}</span>
         </button>
       </div>
 
@@ -252,7 +254,7 @@ export function Sidebar({ active, onNav, runningCount = 0, onNewProfile }: Sideb
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <StatusDot variant={runningCount > 0 ? 'running' : 'stopped'} />
           <span className="tabular-nums">
-            {runningCount > 0 ? `${runningCount} running` : 'All idle'}
+            {runningCount > 0 ? t('nav.running', { count: runningCount }) : t('nav.allIdle')}
           </span>
         </div>
       </div>

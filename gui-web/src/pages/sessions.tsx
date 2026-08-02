@@ -5,7 +5,8 @@
  * Each session is a card with agent type accent, status, and metadata.
  */
 
-import { useCallback, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button, Badge, Tabs } from '@/components/ui'
 import { EmptyState, Loading, StatusDot } from '@/components/feedback'
 import { useToast } from '@/components/feedback/toast'
@@ -43,6 +44,7 @@ const AGENT_TYPE_HEX: Record<string, string> = {
 // ── Component ───────────────────────────────────────────────────────────
 
 export function SessionsPage() {
+  const { t } = useTranslation()
   const { sessions, running, exited, loading, error, refresh } = useSessions()
   const { toast } = useToast()
 
@@ -75,11 +77,11 @@ export function SessionsPage() {
       const count = await cleanupSessions()
       toast({
         type: 'success',
-        message: `Cleaned up ${count} session${count !== 1 ? 's' : ''}`,
+        message: t(count === 1 ? 'sessions.toast.cleanedUpOne' : 'sessions.toast.cleanedUpOther', { count }),
       })
       refresh()
     } catch {
-      toast({ type: 'error', message: 'Failed to clean up sessions' })
+      toast({ type: 'error', message: t('sessions.toast.cleanupFailed') })
     } finally {
       setCleaning(false)
     }
@@ -89,9 +91,8 @@ export function SessionsPage() {
     return (
       <div className="mx-auto w-full max-w-6xl px-8 py-10">
         <PageHeader
-          eyebrow="Sessions"
-          title="Active sessions"
-          description="Watch agents as they run, manage their lifecycle."
+          title={t('sessions.title')}
+          description={t('sessions.description')}
           className="mb-6"
         />
         <Loading variant="skeleton" rows={6} />
@@ -103,15 +104,14 @@ export function SessionsPage() {
     return (
       <div className="mx-auto w-full max-w-6xl px-8 py-10">
         <PageHeader
-          eyebrow="Sessions"
-          title="Active sessions"
-          description="Watch agents as they run, manage their lifecycle."
+          title={t('sessions.title')}
+          description={t('sessions.description')}
           className="mb-6"
         />
         <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-10 text-center">
           <p className="text-sm font-medium text-destructive">{error}</p>
-          <Button variant="outline" size="sm" className="mt-4" onClick={refresh}>
-            Retry
+          <Button variant="ghost" size="sm" className="mt-4" onClick={refresh}>
+            {t('common.retry')}
           </Button>
         </div>
       </div>
@@ -121,7 +121,7 @@ export function SessionsPage() {
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col px-8 py-10">
       <PageHeader
-        title="Sessions"
+        title={t('sessions.title')}
         stats={
           <>
             <StatusDot
@@ -129,31 +129,31 @@ export function SessionsPage() {
               className="inline-block align-[-1px] mr-1.5"
             />
             <span className="text-foreground font-medium">
-              {running.length} running now
+              {t('sessions.stats.runningNow', { count: running.length })}
             </span>
             <span className="mx-2 text-border">·</span>
-            <span>{exited.length} exited</span>
+            <span>{t('sessions.stats.exited', { count: exited.length })}</span>
             <span className="mx-2 text-border">·</span>
-            <span>{sessions.length} all time</span>
+            <span>{t('sessions.stats.allTime', { count: sessions.length })}</span>
           </>
         }
         action={
           <Button
-            variant="outline"
+            variant="ghost"
             size="lg"
             isLoading={cleaning}
             onClick={handleCleanup}
           >
-            Cleanup exited
+            {t('sessions.cleanup')}
           </Button>
         }
         className="mb-6"
       />
 
       <Tabs<FilterTab>
-        tabs={FILTER_TABS.map(({ key, label }) => ({
+        tabs={FILTER_TABS.map(({ key, labelKey }) => ({
           key,
-          label,
+          label: t(labelKey),
           count: counts[key] ?? 0,
         }))}
         active={activeFilter}
@@ -164,8 +164,8 @@ export function SessionsPage() {
       {filteredSessions.length === 0 ? (
         <EmptyState
           icon="◇"
-          title="No sessions"
-          description="Launch a profile to start a new session."
+          title={t('sessions.empty.title')}
+          description={t('sessions.empty.description')}
         />
       ) : (
         <div className="flex flex-col gap-2.5">
@@ -180,15 +180,16 @@ export function SessionsPage() {
 
 // ── Filter Tabs ─────────────────────────────────────────────────────────
 
-const FILTER_TABS: { key: FilterTab; label: string }[] = [
-  { key: 'all', label: 'All' },
-  { key: 'running', label: 'Running' },
-  { key: 'exited', label: 'Exited' },
+const FILTER_TABS: { key: FilterTab; labelKey: string }[] = [
+  { key: 'all', labelKey: 'sessions.filter.all' },
+  { key: 'running', labelKey: 'sessions.filter.running' },
+  { key: 'exited', labelKey: 'sessions.filter.exited' },
 ]
 
 // ── Session Card ────────────────────────────────────────────────────────
 
 function SessionCard({ session }: { session: Session }) {
+  const { t } = useTranslation()
   const { profile, agentType, cwd, mode, pid, launchedAt, exitedAt, exitCode } =
     session
 
@@ -257,17 +258,17 @@ function SessionCard({ session }: { session: Session }) {
             {isRunning && (
               <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                running
+                {t('sessions.card.running')}
               </span>
             )}
             {!isRunning && exitCode === 0 && (
               <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                exited
+                {t('sessions.card.exited')}
               </span>
             )}
             {!isRunning && exitCode !== undefined && exitCode !== 0 && (
               <span className="inline-flex items-center gap-1.5 rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-medium text-destructive">
-                exited ({exitCode})
+                {t('sessions.card.exitedCode', { code: exitCode })}
               </span>
             )}
           </div>
@@ -285,7 +286,7 @@ function SessionCard({ session }: { session: Session }) {
             )}
             {pid != null && (
               <span className="font-mono text-muted-foreground/50">
-                PID {pid}
+                {t('sessions.card.pid', { pid })}
               </span>
             )}
             <span className="flex items-center gap-1">

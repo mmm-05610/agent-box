@@ -23,6 +23,7 @@ import {
   useRef,
   useState,
 } from 'react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -168,6 +169,7 @@ function ToastItem({
   toast: Toast
   onDismiss: () => void
 }) {
+  const { t } = useTranslation()
   const isExiting = toast.status === 'exiting'
 
   return (
@@ -191,7 +193,7 @@ function ToastItem({
       <button
         onClick={onDismiss}
         className="ml-auto text-current opacity-60 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-1 rounded-sm"
-        aria-label="Dismiss notification"
+        aria-label={t('common.dismiss')}
       >
         ✕
       </button>

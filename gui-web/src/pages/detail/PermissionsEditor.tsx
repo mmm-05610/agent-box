@@ -12,6 +12,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Button,
   Card,
@@ -33,23 +34,23 @@ interface Permissions {
   defaultMode?: string
 }
 
-const RULE_GROUPS: { key: RuleGroup; label: string; description: string; accent: string }[] = [
+const RULE_GROUPS: { key: RuleGroup; labelKey: string; descriptionKey: string; accent: string }[] = [
   {
     key: 'allow',
-    label: 'Allow',
-    description: 'Tools that run without confirmation.',
+    labelKey: 'permissions.group.allow',
+    descriptionKey: 'permissions.group.allowDesc',
     accent: 'text-success bg-success-subtle ring-success/20',
   },
   {
     key: 'deny',
-    label: 'Deny',
-    description: 'Tools that are blocked outright.',
+    labelKey: 'permissions.group.deny',
+    descriptionKey: 'permissions.group.denyDesc',
     accent: 'text-destructive bg-destructive-subtle ring-destructive/20',
   },
   {
     key: 'ask',
-    label: 'Ask',
-    description: 'Tools that prompt before each invocation.',
+    labelKey: 'permissions.group.ask',
+    descriptionKey: 'permissions.group.askDesc',
     accent: 'text-warning bg-warning-subtle ring-warning/20',
   },
 ]
@@ -142,6 +143,7 @@ function GroupIcon({ group }: { group: RuleGroup }) {
 export function PermissionsEditor({ path, content, onRefresh }: {
   path: string; content: string; onRefresh: () => void
 }) {
+  const { t } = useTranslation()
   const initial = useMemo(() => parse(content), [content])
 
   const [allow, setAllow] = useState<string[]>(initial.allow ?? [])
@@ -205,9 +207,9 @@ export function PermissionsEditor({ path, content, onRefresh }: {
     try {
       await patchJsonFile(path, 'permissions', { allow, deny, ask, defaultMode })
       onRefresh()
-      toast({ type: 'success', message: 'Permissions saved' })
+      toast({ type: 'success', message: t('permissions.toast.saved') })
     } catch (error) {
-      toast({ type: 'error', message: error instanceof Error ? error.message : 'Failed to save permissions' })
+      toast({ type: 'error', message: error instanceof Error ? error.message : t('permissions.toast.failed') })
     } finally {
       setSaving(false)
     }
@@ -219,26 +221,26 @@ export function PermissionsEditor({ path, content, onRefresh }: {
     <Card>
       <CardHeader>
         <CardTitle>
-          Permissions{' '}
-          <span className="text-muted-foreground font-normal">({totalRules} rules)</span>
+          {t('permissions.title')}{' '}
+          <span className="text-muted-foreground font-normal">{t('permissions.rulesCount', { count: totalRules })}</span>
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          Control which tools Claude can use without confirmation. Changes apply after Save.
+          {t('permissions.subtitle')}
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
         {totalRules === 0 && (
           <p className="text-sm text-muted-foreground">
-            No permission rules configured. Add rules below or paste a list via Edit raw.
+            {t('permissions.noRules')}
           </p>
         )}
 
-        {RULE_GROUPS.map(({ key, label, description, accent }) => (
+        {RULE_GROUPS.map(({ key, labelKey, descriptionKey, accent }) => (
           <RuleGroupCard
             key={key}
             group={key}
-            label={label}
-            description={description}
+            label={t(labelKey)}
+            description={t(descriptionKey)}
             accent={accent}
             rules={ruleGroups[key]}
             onAdd={(tool, pattern) => {
@@ -260,16 +262,19 @@ export function PermissionsEditor({ path, content, onRefresh }: {
 
         <div className="flex items-center justify-end gap-2 pt-2">
           <Button onClick={handleSave} disabled={saving}>
-            {saving ? 'Saving...' : 'Save Permissions'}
+            {saving ? t('common.saving') : t('permissions.save')}
           </Button>
         </div>
       </CardContent>
 
       <ConfirmDialog
         open={pendingRemove != null}
-        title="Remove rule?"
-        description={pendingRemove ? `Remove "${pendingRemove.rule}" from ${pendingRemove.group}?` : undefined}
-        confirmLabel="Remove"
+        title={t('permissions.confirmRemoveTitle')}
+        description={pendingRemove ? t('permissions.confirmRemoveDesc', {
+          rule: pendingRemove.rule,
+          group: t(RULE_GROUPS.find((g) => g.key === pendingRemove.group)?.labelKey ?? 'permissions.group.allow'),
+        }) : undefined}
+        confirmLabel={t('common.remove')}
         onConfirm={confirmRemove}
         onCancel={() => setPendingRemove(null)}
       />
@@ -290,6 +295,7 @@ interface RuleGroupCardProps {
 }
 
 function RuleGroupCard({ group, label, description, accent, rules, onAdd, onRemove }: RuleGroupCardProps) {
+  const { t } = useTranslation()
   const [adding, setAdding] = useState(false)
   const [tool, setTool] = useState('')
   const [pattern, setPattern] = useState('')
@@ -315,7 +321,7 @@ function RuleGroupCard({ group, label, description, accent, rules, onAdd, onRemo
         </div>
         {!adding && (
           <Button variant="ghost" size="sm" onClick={() => setAdding(true)}>
-            + Add rule
+            {t('permissions.addRule')}
           </Button>
         )}
       </div>
@@ -330,7 +336,7 @@ function RuleGroupCard({ group, label, description, accent, rules, onAdd, onRemo
 
       {rules.length === 0 && !adding && (
         <p className="border-t border-border/60 px-4 py-3 text-xs text-muted-foreground">
-          No {group} rules yet.
+          {t('permissions.noGroupRules', { group: label })}
         </p>
       )}
 
@@ -340,7 +346,7 @@ function RuleGroupCard({ group, label, description, accent, rules, onAdd, onRemo
             <Input
               size="sm"
               list={`${group}-tools`}
-              placeholder="tool (optional)"
+              placeholder={t('permissions.toolOptional')}
               value={tool}
               onChange={(e) => setTool(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') submit() }}
@@ -352,7 +358,7 @@ function RuleGroupCard({ group, label, description, accent, rules, onAdd, onRemo
             <span className="font-mono text-sm text-muted-foreground">(</span>
             <Input
               size="sm"
-              placeholder="pattern, e.g. npm run *"
+              placeholder={t('permissions.patternExample')}
               value={pattern}
               onChange={(e) => setPattern(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') submit() }}
@@ -361,14 +367,16 @@ function RuleGroupCard({ group, label, description, accent, rules, onAdd, onRemo
             />
             <span className="font-mono text-sm text-muted-foreground">)</span>
             <Button size="sm" onClick={submit} disabled={!pattern.trim()}>
-              Add
+              {t('common.add')}
             </Button>
             <Button size="sm" variant="ghost" onClick={() => { setAdding(false); setTool(''); setPattern('') }}>
-              Cancel
+              {t('common.cancel')}
             </Button>
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
-            Press <kbd className="rounded border border-border bg-background px-1 py-0.5 text-[10px]">Enter</kbd> to add, or leave tool blank for a raw pattern.
+            {t('permissions.enterHintPrefix')}{' '}
+            <kbd className="rounded border border-border bg-background px-1 py-0.5 text-[10px]">Enter</kbd>{' '}
+            {t('permissions.enterHintSuffix')}
           </p>
         </div>
       )}
@@ -377,6 +385,7 @@ function RuleGroupCard({ group, label, description, accent, rules, onAdd, onRemo
 }
 
 function RuleRow({ rule, onRemove }: { rule: string; onRemove: () => void }) {
+  const { t } = useTranslation()
   const { tool, pattern } = splitRule(rule)
   return (
     <li className="group flex items-center gap-3 px-4 py-2 transition-colors hover:bg-muted/40">
@@ -399,7 +408,7 @@ function RuleRow({ rule, onRemove }: { rule: string; onRemove: () => void }) {
       <button
         type="button"
         onClick={onRemove}
-        aria-label={`Remove ${rule}`}
+        aria-label={t('permissions.removeRule', { rule })}
         className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-all hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100 focus:opacity-100"
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
@@ -411,6 +420,7 @@ function RuleRow({ rule, onRemove }: { rule: string; onRemove: () => void }) {
 }
 
 function DefaultModeCard({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const { t } = useTranslation()
   const isKnown = DEFAULT_MODES.includes(value as typeof DEFAULT_MODES[number])
   return (
     <Card elevation="flat" className="ring-1 ring-border/60">
@@ -424,7 +434,7 @@ function DefaultModeCard({ value, onChange }: { value: string; onChange: (v: str
         <div className="min-w-0 flex-1">
           <h4 className="font-medium text-foreground">defaultMode</h4>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Fallback mode when a tool isn&apos;t matched by any rule above.
+            {t('permissions.defaultModeDesc')}
           </p>
         </div>
         <select
@@ -436,7 +446,7 @@ function DefaultModeCard({ value, onChange }: { value: string; onChange: (v: str
           {DEFAULT_MODES.map((mode) => (
             <option key={mode} value={mode}>{mode}</option>
           ))}
-          {!isKnown && <option value={value}>{value} (custom)</option>}
+          {!isKnown && <option value={value}>{t('permissions.customMode', { value })}</option>}
         </select>
       </div>
     </Card>
@@ -454,6 +464,7 @@ function RawEditorPanel({
   onTextChange: (next: string) => void
   onToggle: () => void
 }) {
+  const { t } = useTranslation()
   return (
     <Card elevation="flat" className="ring-1 ring-border/60">
       <button
@@ -469,9 +480,11 @@ function RawEditorPanel({
             </svg>
           </div>
           <div>
-            <h4 className="text-sm font-medium text-foreground">Edit raw</h4>
+            <h4 className="text-sm font-medium text-foreground">{t('permissions.editRaw')}</h4>
             <p className="text-xs text-muted-foreground">
-              Bulk-paste rules in <code className="font-mono">group: tool(pattern)</code> form.
+              {t('permissions.editRawDescPrefix')}{' '}
+              <code className="font-mono">group: tool(pattern)</code>{' '}
+              {t('permissions.editRawDescSuffix')}
             </p>
           </div>
         </div>
@@ -489,14 +502,14 @@ function RawEditorPanel({
       {open && (
         <div className="space-y-2 border-t border-border/60 px-4 py-3">
           <p className="text-xs text-muted-foreground">
-            One rule per line. Closing this panel re-parses the text into the cards above.
+            {t('permissions.editRawHint')}
           </p>
           <textarea
             value={text}
             onChange={(e) => onTextChange(e.target.value)}
             rows={10}
             className="w-full rounded-md border border-border bg-input p-3 text-sm font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/30"
-            placeholder="allow: Bash(npm run *)\ndeny: Read(./.env)"
+            placeholder={t('permissions.rawPlaceholder')}
           />
         </div>
       )}

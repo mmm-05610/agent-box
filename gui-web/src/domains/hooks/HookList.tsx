@@ -11,6 +11,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Trans, useTranslation } from 'react-i18next'
 import { useToast } from '@/components/feedback/toast'
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from '@/components/ui'
 import { Textarea } from '@/components/ui'
@@ -86,6 +87,7 @@ interface HookListProps {
 }
 
 export function HookList({ profileName }: HookListProps) {
+  const { t } = useTranslation()
   const configDir = useProfileConfigDir(profileName)
   const path = configDir === null ? null : `${configDir}/settings.json`
 
@@ -122,17 +124,17 @@ export function HookList({ profileName }: HookListProps) {
     try {
       const next = JSON.parse(hooksJson)
       if (typeof next !== 'object' || Array.isArray(next) || next === null) {
-        throw new Error('Hooks must be a JSON object')
+        throw new Error(t('hooks.mustBeObject'))
       }
       await patchJsonFile(path, 'hooks', next)
       const fresh = await readFile(path).catch(() => '')
       setContent(fresh)
-      toast({ type: 'success', message: 'Hooks saved' })
+      toast({ type: 'success', message: t('hooks.toast.saved') })
     } catch (error) {
       if (error instanceof SyntaxError) {
-        toast({ type: 'error', message: `Invalid JSON: ${error.message}` })
+        toast({ type: 'error', message: t('hooks.toast.invalidJson', { error: error.message }) })
       } else {
-        toast({ type: 'error', message: error instanceof Error ? error.message : 'Failed to save hooks' })
+        toast({ type: 'error', message: error instanceof Error ? error.message : t('hooks.toast.failed') })
       }
     } finally {
       setSaving(false)
@@ -143,35 +145,35 @@ export function HookList({ profileName }: HookListProps) {
     <Card>
       <CardHeader>
         <CardTitle>
-          Hooks{' '}
+          {t('hooks.title')}{' '}
           <span className="text-muted-foreground font-normal">
-            ({summary.total} {summary.total === 1 ? 'hook' : 'hooks'} across {summary.events.length} {summary.events.length === 1 ? 'event' : 'events'})
+            {t('hooks.count', { hooks: summary.total, events: summary.events.length })}
           </span>
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          Each top-level key is a Claude Code event name. Values are arrays of matcher objects.
+          {t('hooks.subtitle')}
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
         <EventsSummaryCard events={summary.events} />
 
         <div className="space-y-2">
-          <h4 className="text-sm font-medium text-foreground">Raw JSON</h4>
+          <h4 className="text-sm font-medium text-foreground">{t('hooks.rawJson')}</h4>
           <p className="text-xs text-muted-foreground">
-            Edit below or switch to Storage → settings.json for raw editing.
+            {t('hooks.rawHint')}
           </p>
           <Textarea
             value={hooksJson}
             onChange={(e) => setHooksJson(e.target.value)}
             rows={16}
             className="text-sm font-mono"
-            placeholder={`{\n  "PostToolUse": [\n    {\n      "matcher": "Edit|Write",\n      "hooks": [\n        {"type": "command", "command": "npx biome format --write $FILE_PATH"}\n      ]\n    }\n  ]\n}`}
+            placeholder={t('hooks.rawPlaceholder')}
           />
         </div>
 
         <div className="flex justify-end">
           <Button onClick={handleSave} disabled={saving}>
-            {saving ? 'Saving...' : 'Save Hooks'}
+            {saving ? t('common.saving') : t('hooks.save')}
           </Button>
         </div>
       </CardContent>
@@ -182,6 +184,7 @@ export function HookList({ profileName }: HookListProps) {
 // ── Events summary card ────────────────────────────────────────────────
 
 function EventsSummaryCard({ events }: { events: EventSummary[] }) {
+  const { t } = useTranslation()
   if (events.length === 0) {
     return (
       <Card elevation="flat" className="ring-1 ring-border/60">
@@ -195,10 +198,12 @@ function EventsSummaryCard({ events }: { events: EventSummary[] }) {
             </svg>
           </div>
           <div className="min-w-0 flex-1">
-            <h4 className="font-medium text-foreground">No hooks configured</h4>
+            <h4 className="font-medium text-foreground">{t('hooks.emptyTitle')}</h4>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Add event keys like <code className="font-mono">PostToolUse</code>,{' '}
-              <code className="font-mono">PreToolUse</code>, or <code className="font-mono">Notification</code>.
+              <Trans
+                i18nKey="hooks.emptyDesc"
+                components={{ code: <code className="font-mono" /> }}
+              />
             </p>
           </div>
         </div>
@@ -219,10 +224,10 @@ function EventsSummaryCard({ events }: { events: EventSummary[] }) {
         </div>
         <div className="min-w-0 flex-1">
           <h4 className="font-medium text-foreground">
-            Configured Events <span className="text-muted-foreground">({events.length})</span>
+            {t('hooks.configuredEvents', { count: events.length })}
           </h4>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Click an event to see its matchers and the commands each one runs.
+            {t('hooks.clickHint')}
           </p>
         </div>
       </div>
@@ -236,6 +241,7 @@ function EventsSummaryCard({ events }: { events: EventSummary[] }) {
 }
 
 function EventRow({ event }: { event: EventSummary }) {
+  const { t } = useTranslation()
   const [expanded, setExpanded] = useState(false)
   return (
     <li>
@@ -263,11 +269,11 @@ function EventRow({ event }: { event: EventSummary }) {
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <Badge variant="neutral">
-            {event.matcherCount} {event.matcherCount === 1 ? 'matcher' : 'matchers'}
+            {t('hooks.matcherBadge', { count: event.matcherCount })}
           </Badge>
           <span className="text-xs text-muted-foreground">·</span>
           <Badge variant="primary">
-            {event.hookCount} {event.hookCount === 1 ? 'hook' : 'hooks'}
+            {t('hooks.hookBadge', { count: event.hookCount })}
           </Badge>
         </div>
       </button>
@@ -277,7 +283,7 @@ function EventRow({ event }: { event: EventSummary }) {
           className="space-y-3 border-t border-border/40 bg-muted/20 px-4 py-3"
         >
           {event.matchers.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No matchers in this event.</p>
+            <p className="text-xs text-muted-foreground">{t('hooks.noMatchers')}</p>
           ) : (
             event.matchers.map((matcher, index) => (
               <MatcherBlock key={`${event.name}-${index}-${matcher.matcher}`} matcher={matcher} index={index} />
@@ -290,14 +296,15 @@ function EventRow({ event }: { event: EventSummary }) {
 }
 
 function MatcherBlock({ matcher, index }: { matcher: MatcherSummary; index: number }) {
+  const { t } = useTranslation()
   return (
     <div className="rounded-md bg-background/60 p-3 ring-1 ring-border/60">
       <div className="flex items-center gap-2">
         <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-          matcher {index + 1}
+          {t('hooks.matcherLabel', { count: index + 1 })}
         </span>
         {matcher.matcher === '*' ? (
-          <Badge variant="info">all tools</Badge>
+          <Badge variant="info">{t('hooks.allTools')}</Badge>
         ) : (
           <code className="truncate font-mono text-xs text-foreground/90" title={matcher.matcher}>
             {matcher.matcher}
@@ -305,7 +312,7 @@ function MatcherBlock({ matcher, index }: { matcher: MatcherSummary; index: numb
         )}
       </div>
       {matcher.hookDescriptions.length === 0 ? (
-        <p className="mt-2 text-xs text-muted-foreground">No hooks in this matcher.</p>
+        <p className="mt-2 text-xs text-muted-foreground">{t('hooks.noHooksInMatcher')}</p>
       ) : (
         <ul className="mt-2 max-h-48 space-y-1 overflow-y-auto rounded-md bg-muted/60 p-2 font-mono text-xs text-muted-foreground">
           {matcher.hookDescriptions.map((description, idx) => (
