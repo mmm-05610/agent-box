@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { AgentType, ClaudeMd, McpServer, Provider, Skill } from '@/api'
 import { fetchClaudeMds, fetchMcpServers, fetchProviders, fetchSkills } from '@/api'
+import i18n from '@/i18n'
 
 export type LibraryKey = 'providers' | 'mcpServers' | 'skills' | 'prompts'
 
@@ -106,7 +107,7 @@ export function useLibrary(agentType: AgentType, keys: LibraryKey[] = ALL_KEYS):
         if (!cancelled) setState(snapshot(agentType, keyList))
       })
       .catch((e) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load library data')
+        if (!cancelled) setError(e instanceof Error ? e.message : i18n.t('error.loadLibrary'))
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -121,7 +122,7 @@ export function useLibrary(agentType: AgentType, keys: LibraryKey[] = ALL_KEYS):
     setError(null)
     Promise.all(target.map((key) => loadSlice(agentType, key)))
       .then(() => setState(snapshot(agentType, target)))
-      .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load library data'))
+      .catch((e) => setError(e instanceof Error ? e.message : i18n.t('error.loadLibrary')))
       .finally(() => setLoading(false))
   }, [agentType, keyList])
 

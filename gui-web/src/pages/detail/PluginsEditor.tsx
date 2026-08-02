@@ -10,6 +10,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Badge,
   Button,
@@ -62,6 +63,7 @@ function formatInstalledAt(value?: string): string {
 export function PluginsEditor({ path, content, onRefresh }: {
   path: string; content: string; onRefresh: () => void
 }) {
+  const { t } = useTranslation()
   const enabledMap = useMemo(() => parseEnabledPlugins(content), [content])
 
   const [installedMap, setInstalledMap] = useState<Record<string, InstalledPluginMeta[]>>({})
@@ -116,7 +118,7 @@ export function PluginsEditor({ path, content, onRefresh }: {
       await patchJsonFile(path, 'enabledPlugins', next)
       onRefresh()
     } catch (error) {
-      toast({ type: 'error', message: error instanceof Error ? error.message : 'Failed to update plugin' })
+      toast({ type: 'error', message: error instanceof Error ? error.message : t('plugins.toast.failed') })
     } finally {
       setSaving(null)
     }
@@ -134,7 +136,7 @@ export function PluginsEditor({ path, content, onRefresh }: {
   if (metaLoading) {
     return (
       <Card>
-        <CardContent className="p-4 text-sm text-muted-foreground">Loading...</CardContent>
+        <CardContent className="p-4 text-sm text-muted-foreground">{t('common.loading')}</CardContent>
       </Card>
     )
   }
@@ -142,15 +144,15 @@ export function PluginsEditor({ path, content, onRefresh }: {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Plugins ({rows.length})</CardTitle>
+        <CardTitle>{t('plugins.title', { count: rows.length })}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         {metaError ? (
-          <p className="text-sm text-destructive">Failed to load plugin metadata: {metaError}</p>
+          <p className="text-sm text-destructive">{t('plugins.metaError', { error: metaError })}</p>
         ) : null}
         {rows.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No plugins installed. Use <code className="font-mono">/plugin install</code> in CC.
+            {t('plugins.empty', { cmd: '/plugin install' })}
           </p>
         ) : (
           rows.map((row) => {
@@ -170,7 +172,7 @@ export function PluginsEditor({ path, content, onRefresh }: {
                       {meta?.version && <Badge variant="neutral">v{meta.version}</Badge>}
                       {meta?.marketplace && <Badge variant="primary">{meta.marketplace}</Badge>}
                       <span className={`text-xs ${enabled ? 'text-success' : 'text-muted-foreground'}`}>
-                        {enabled ? 'enabled' : 'disabled'}
+                        {enabled ? t('plugins.enabled') : t('plugins.disabled')}
                       </span>
                     </div>
                   </div>
@@ -181,7 +183,7 @@ export function PluginsEditor({ path, content, onRefresh }: {
                       aria-expanded={isExpanded}
                       onClick={() => toggleExpanded(name)}
                     >
-                      {isExpanded ? 'Hide details' : 'Details'}
+                      {isExpanded ? t('common.hideDetails') : t('common.details')}
                     </Button>
                     <Button
                       variant="ghost"
@@ -189,7 +191,7 @@ export function PluginsEditor({ path, content, onRefresh }: {
                       disabled={isSaving}
                       onClick={() => toggle(name, !enabled)}
                     >
-                      {isSaving ? '...' : enabled ? 'Disable' : 'Enable'}
+                      {isSaving ? '...' : enabled ? t('plugins.disable') : t('plugins.enable')}
                     </Button>
                   </div>
                 </div>
@@ -197,42 +199,42 @@ export function PluginsEditor({ path, content, onRefresh }: {
                   <div className="space-y-3 border-t border-border/60 px-4 py-3 text-sm">
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div>
-                        <p className="mb-1 font-medium text-foreground">Name</p>
+                        <p className="mb-1 font-medium text-foreground">{t('plugins.field.name')}</p>
                         <code className="break-all text-xs text-muted-foreground">{name}</code>
                       </div>
                       <div>
-                        <p className="mb-1 font-medium text-foreground">Status</p>
+                        <p className="mb-1 font-medium text-foreground">{t('plugins.field.status')}</p>
                         <p className={`text-xs ${enabled ? 'text-success' : 'text-muted-foreground'}`}>
-                          {enabled ? 'enabled' : 'disabled'}
+                          {enabled ? t('plugins.enabled') : t('plugins.disabled')}
                         </p>
                       </div>
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div>
-                        <p className="mb-1 font-medium text-foreground">Version</p>
+                        <p className="mb-1 font-medium text-foreground">{t('plugins.field.version')}</p>
                         <code className="break-all text-xs text-muted-foreground">
                           {meta?.version ? `v${meta.version}` : '—'}
                         </code>
                       </div>
                       <div>
-                        <p className="mb-1 font-medium text-foreground">Marketplace</p>
+                        <p className="mb-1 font-medium text-foreground">{t('plugins.field.marketplace')}</p>
                         <code className="break-all text-xs text-muted-foreground">
                           {meta?.marketplace ?? '—'}
                         </code>
                       </div>
                     </div>
                     <div>
-                      <p className="mb-1 font-medium text-foreground">Install path</p>
+                      <p className="mb-1 font-medium text-foreground">{t('plugins.field.installPath')}</p>
                       {meta?.installPath ? (
                         <code className="break-all text-xs text-muted-foreground">{meta.installPath}</code>
                       ) : (
                         <p className="text-xs text-muted-foreground">
-                          No install path recorded (plugin may be enabled manually in settings.json).
+                          {t('plugins.noInstallPath')}
                         </p>
                       )}
                     </div>
                     <div>
-                      <p className="mb-1 font-medium text-foreground">Installed at</p>
+                      <p className="mb-1 font-medium text-foreground">{t('plugins.field.installedAt')}</p>
                       <p className="text-xs text-muted-foreground">
                         {meta?.installedAt ? formatInstalledAt(meta.installedAt) : '—'}
                       </p>

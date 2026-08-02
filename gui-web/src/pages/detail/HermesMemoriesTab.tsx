@@ -6,6 +6,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react'
+import { Trans, useTranslation } from 'react-i18next'
 import { Button, Card, CardContent, CardHeader, CardTitle, Textarea } from '@/components/ui'
 import { useToast } from '@/components/feedback/toast'
 import { readFile, saveFile } from '@/api/files'
@@ -13,23 +14,24 @@ import { readFile, saveFile } from '@/api/files'
 interface MemoryFile {
   path: string
   label: string
-  description: string
+  descriptionKey: string
 }
 
 const FILES: MemoryFile[] = [
   {
     path: '', // resolved at runtime
     label: 'MEMORY.md',
-    description: 'Agent-side memory — notes the agent persists across sessions.',
+    descriptionKey: 'memories.memoryDesc',
   },
   {
     path: '',
     label: 'USER.md',
-    description: 'User profile — facts about you that should persist across sessions.',
+    descriptionKey: 'memories.userDesc',
   },
 ]
 
 export function HermesMemoriesTab({ configDir }: { configDir: string }) {
+  const { t } = useTranslation()
   const memoriesDir = `${configDir.replace(/\/+$/, '')}/memories`
   const fileEntries: MemoryFile[] = FILES.map((f) => ({ ...f, path: `${memoriesDir}/${f.label}` }))
 
@@ -66,9 +68,9 @@ export function HermesMemoriesTab({ configDir }: { configDir: string }) {
     try {
       await saveFile(file.path, next)
       setOriginal((current) => ({ ...current, [file.label]: next }))
-      toast({ type: 'success', message: `${file.label} saved` })
+      toast({ type: 'success', message: t('memories.toast.saved', { file: file.label }) })
     } catch (error) {
-      toast({ type: 'error', message: error instanceof Error ? error.message : `Failed to save ${file.label}` })
+      toast({ type: 'error', message: error instanceof Error ? error.message : t('memories.toast.saveFailed', { file: file.label }) })
     } finally {
       setSaving(null)
     }
@@ -81,14 +83,18 @@ export function HermesMemoriesTab({ configDir }: { configDir: string }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Memories</CardTitle>
+        <CardTitle>{t('memories.title')}</CardTitle>
         <p className="text-sm text-muted-foreground">
-          Files in <code className="font-mono">{memoriesDir}</code>. Save creates the file if it doesn&apos;t exist.
+          <Trans
+            i18nKey="memories.subtitle"
+            values={{ dir: memoriesDir }}
+            components={{ code: <code className="font-mono" /> }}
+          />
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
         {loading ? (
-          <p className="text-sm text-muted-foreground">Loading...</p>
+          <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
         ) : (
           fileEntries.map((file) => {
             const text = texts[file.label] ?? ''
@@ -102,14 +108,14 @@ export function HermesMemoriesTab({ configDir }: { configDir: string }) {
                     <div className="flex items-center gap-2">
                       <h4 className="font-mono text-sm font-medium text-foreground">{file.label}</h4>
                     </div>
-                    <p className="mt-0.5 text-xs text-muted-foreground">{file.description}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{t(file.descriptionKey)}</p>
                   </div>
                   <Button
                     size="sm"
                     onClick={() => handleSave(file)}
                     disabled={isSaving || !isDirty}
                   >
-                    {isSaving ? 'Saving...' : 'Save'}
+                    {isSaving ? t('common.saving') : t('common.save')}
                   </Button>
                 </div>
                 <div className="px-4 py-3">
@@ -118,7 +124,7 @@ export function HermesMemoriesTab({ configDir }: { configDir: string }) {
                     onChange={(e) => setText(file.label, e.target.value)}
                     rows={10}
                     className="text-sm font-mono"
-                    placeholder={`# ${file.label.replace('.md', '')}\n\nNotes stored across sessions...`}
+                    placeholder={t('memories.placeholder', { name: file.label.replace('.md', '') })}
                   />
                 </div>
               </div>

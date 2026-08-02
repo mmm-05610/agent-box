@@ -4,6 +4,7 @@
  */
 
 import { useCallback, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Textarea } from '@/components/ui'
 import { useToast } from '@/components/feedback/toast'
 import { useLibrary, useProfileResources } from '@/hooks'
@@ -19,6 +20,7 @@ interface McpListProps {
 }
 
 export function McpList({ profileName, agentType }: McpListProps) {
+  const { t } = useTranslation()
   const at = agentType ?? 'claude'
   const { toast } = useToast()
   const { mcpServers: library } = useLibrary(at, ['mcpServers'])
@@ -56,9 +58,9 @@ export function McpList({ profileName, agentType }: McpListProps) {
       await applyMcpToProfile(profileName, mcpId)
       await reloadInstalled()
       setTick(t => t + 1)
-      toast({ type: 'success', message: `${mcpId} applied` })
+      toast({ type: 'success', message: t('mcp.toast.applied', { name: mcpId }) })
     } catch (e) {
-      toast({ type: 'error', message: e instanceof Error ? e.message : 'Apply failed' })
+      toast({ type: 'error', message: e instanceof Error ? e.message : t('mcp.toast.applyFailed') })
     } finally { setApplyingId(null) }
   }, [reloadInstalled, toast])
 
@@ -68,9 +70,9 @@ export function McpList({ profileName, agentType }: McpListProps) {
       await removeMcpFromProfile(profileName, mcpId)
       await reloadInstalled()
       setTick(t => t + 1)
-      toast({ type: 'success', message: `${mcpId} removed` })
+      toast({ type: 'success', message: t('mcp.toast.removed', { name: mcpId }) })
     } catch (e) {
-      toast({ type: 'error', message: e instanceof Error ? e.message : 'Remove failed' })
+      toast({ type: 'error', message: e instanceof Error ? e.message : t('mcp.toast.removeFailed') })
     } finally { setRemovingId(null) }
   }, [reloadInstalled, toast])
 
@@ -78,17 +80,17 @@ export function McpList({ profileName, agentType }: McpListProps) {
     <div className="space-y-6">
       <Card key={`mcp-avail-${tick}-${installed.length}`}>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Available MCP Servers ({effective.length})</CardTitle>
+          <CardTitle className="text-sm">{t('mcp.availableTitle', { count: effective.length })}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="mb-3 flex gap-2">
-            <Input placeholder={`Search ${at} MCP servers...`} value={searchInput} onChange={e => setSearchInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') doSearch(searchInput) }} className="flex-1" />
-            <Button size="sm" variant="ghost" onClick={() => doSearch(searchInput)} title="Search">
+            <Input placeholder={t('mcp.searchPlaceholder', { agent: at })} value={searchInput} onChange={e => setSearchInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') doSearch(searchInput) }} className="flex-1" />
+            <Button size="sm" variant="ghost" onClick={() => doSearch(searchInput)} title={t('common.search')}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
             </Button>
           </div>
           {pageItems.length === 0 ? (
-            <p className="text-xs text-muted-foreground py-2">{search.trim() ? 'No matching MCP servers.' : 'No MCP servers available for this agent.'}</p>
+            <p className="text-xs text-muted-foreground py-2">{search.trim() ? t('mcp.noMatches') : t('mcp.noneAvailable')}</p>
           ) : (
             <>
               <div className="space-y-1">
@@ -101,15 +103,15 @@ export function McpList({ profileName, agentType }: McpListProps) {
                       </div>
                       {s.description && <div className="text-[11px] text-muted-foreground truncate">{s.description}</div>}
                     </div>
-                    <Button size="sm" variant="ghost" isLoading={applyingId === s.id} onClick={() => handleApply(s.id)}>Add</Button>
+                    <Button size="sm" variant="ghost" isLoading={applyingId === s.id} onClick={() => handleApply(s.id)}>{t('common.add')}</Button>
                   </div>
                 ))}
               </div>
               {totalPages > 1 && (
                 <div className="mt-2 flex items-center justify-center gap-2 text-xs">
-                  <Button size="sm" variant="ghost" disabled={page === 0} onClick={() => setPage(p => p - 1)}>← Prev</Button>
+                  <Button size="sm" variant="ghost" disabled={page === 0} onClick={() => setPage(p => p - 1)}>{t('common.prev')}</Button>
                   <span className="text-muted-foreground">{page + 1} / {totalPages}</span>
-                  <Button size="sm" variant="ghost" disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)}>Next →</Button>
+                  <Button size="sm" variant="ghost" disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)}>{t('common.next')}</Button>
                 </div>
               )}
             </>
@@ -119,11 +121,11 @@ export function McpList({ profileName, agentType }: McpListProps) {
 
       <Card key={`mcp-inst-${installed.length}`}>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Installed MCP Servers ({installed.length})</CardTitle>
+          <CardTitle className="text-sm">{t('mcp.installedTitle', { count: installed.length })}</CardTitle>
         </CardHeader>
         <CardContent>
-          {loading ? <p className="text-xs text-muted-foreground py-2">Loading...</p>
-          : installed.length === 0 ? <p className="text-xs text-muted-foreground py-2">No MCP servers installed. Search above to add.</p>
+          {loading ? <p className="text-xs text-muted-foreground py-2">{t('common.loading')}</p>
+          : installed.length === 0 ? <p className="text-xs text-muted-foreground py-2">{t('mcp.noneInstalled')}</p>
           : (
             <div className="space-y-1">
               {installed.map(s => (
@@ -135,8 +137,8 @@ export function McpList({ profileName, agentType }: McpListProps) {
                     </div>
                     {s.command && <div className="text-[10px] font-mono text-muted-foreground truncate">{s.command}</div>}
                   </div>
-                  <Button size="sm" variant="ghost" onClick={() => setDetailMcp(s)}>Detail</Button>
-                  <Button size="sm" variant="ghost" isLoading={removingId === s.id} onClick={() => handleRemove(s.id)} className="text-destructive hover:text-destructive">Remove</Button>
+                  <Button size="sm" variant="ghost" onClick={() => setDetailMcp(s)}>{t('common.details')}</Button>
+                  <Button size="sm" variant="ghost" isLoading={removingId === s.id} onClick={() => handleRemove(s.id)} className="text-destructive hover:text-destructive">{t('common.remove')}</Button>
                 </div>
               ))}
             </div>
@@ -148,7 +150,7 @@ export function McpList({ profileName, agentType }: McpListProps) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setDetailMcp(null)}>
           <div className="relative max-h-[85vh] w-full max-w-lg rounded-xl bg-card shadow-xl flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="sticky top-0 z-10 flex items-center justify-between gap-3 px-5 py-3 border-b border-border/60 bg-card rounded-t-xl shrink-0">
-              <div><h3 className="font-semibold text-foreground">{detailMcp.name}</h3><p className="text-xs text-muted-foreground">{detailMcp.type} server</p></div>
+              <div><h3 className="font-semibold text-foreground">{detailMcp.name}</h3><p className="text-xs text-muted-foreground">{t('mcp.detailServerType', { type: detailMcp.type })}</p></div>
               <Button variant="ghost" size="sm" onClick={() => setDetailMcp(null)}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
               </Button>

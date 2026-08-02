@@ -9,6 +9,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react'
+import { Trans, useTranslation } from 'react-i18next'
 import {
   Badge,
   Card,
@@ -75,6 +76,7 @@ function parseInstructions(raw: string): string[] {
 }
 
 export function OpenCodeInstructionsTab({ configJsonc, profilePath }: OpenCodeInstructionsTabProps) {
+  const { t } = useTranslation()
   const rawEntries = useMemo(() => parseInstructions(configJsonc), [configJsonc])
   const [existsMap, setExistsMap] = useState<Record<string, boolean | null>>({})
 
@@ -108,29 +110,39 @@ export function OpenCodeInstructionsTab({ configJsonc, profilePath }: OpenCodeIn
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Instructions</CardTitle>
+        <CardTitle>{t('opencode.title')}</CardTitle>
         <p className="text-sm text-muted-foreground">
-          Files, globs, and URLs referenced by the <code className="font-mono">instructions</code>{' '}
-          array in <code className="font-mono">opencode.jsonc</code>. Read-only — edit the array in the Storage tab.
+          <Trans
+            i18nKey="opencode.subtitle"
+            components={{ code: <code className="font-mono" /> }}
+          />
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
         {!hasConfig && (
           <p className="text-sm text-muted-foreground">
-            No <code className="font-mono">opencode.jsonc</code> found for this profile.
+            <Trans
+              i18nKey="opencode.noConfig"
+              components={{ code: <code className="font-mono" /> }}
+            />
           </p>
         )}
 
         {hasParseError && (
           <p className="text-sm text-destructive">
-            Could not parse <code className="font-mono">opencode.jsonc</code> as JSON. Check the Storage tab.
+            <Trans
+              i18nKey="opencode.parseError"
+              components={{ code: <code className="font-mono" /> }}
+            />
           </p>
         )}
 
         {hasConfig && !hasParseError && rows.length === 0 && (
           <p className="text-sm text-muted-foreground">
-            No custom instructions configured. Add paths/globs/URLs to the{' '}
-            <code className="font-mono">instructions</code> array in opencode.jsonc.
+            <Trans
+              i18nKey="opencode.noInstructions"
+              components={{ code: <code className="font-mono" /> }}
+            />
           </p>
         )}
 
@@ -153,29 +165,31 @@ export function OpenCodeInstructionsTab({ configJsonc, profilePath }: OpenCodeIn
 }
 
 function KindBadge({ kind }: { kind: InstructionRow['kind'] }) {
+  const { t } = useTranslation()
   switch (kind) {
     case 'url':
-      return <Badge variant="info">URL</Badge>
+      return <Badge variant="info">{t('opencode.kind.url')}</Badge>
     case 'glob':
-      return <Badge variant="neutral">glob</Badge>
+      return <Badge variant="neutral">{t('opencode.kind.glob')}</Badge>
     case 'absolute':
-      return <Badge variant="neutral">path</Badge>
+      return <Badge variant="neutral">{t('opencode.kind.path')}</Badge>
     case 'relative':
-      return <Badge variant="neutral">path</Badge>
+      return <Badge variant="neutral">{t('opencode.kind.path')}</Badge>
     default:
-      return <Badge variant="warning">unknown</Badge>
+      return <Badge variant="warning">{t('opencode.kind.unknown')}</Badge>
   }
 }
 
 function ExistenceMark({ kind, exists }: { kind: InstructionRow['kind']; exists: boolean | null }) {
+  const { t } = useTranslation()
   if (kind === 'url' || kind === 'glob') {
     return <span className="shrink-0 text-xs text-muted-foreground">—</span>
   }
   if (exists === null) {
-    return <span className="shrink-0 text-xs text-muted-foreground">checking…</span>
+    return <span className="shrink-0 text-xs text-muted-foreground">{t('opencode.checking')}</span>
   }
   if (exists) {
-    return <Badge variant="success">exists</Badge>
+    return <Badge variant="success">{t('opencode.exists')}</Badge>
   }
-  return <Badge variant="warning">missing</Badge>
+  return <Badge variant="warning">{t('opencode.missing')}</Badge>
 }

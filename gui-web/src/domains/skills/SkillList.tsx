@@ -5,6 +5,7 @@
  */
 
 import { useCallback, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Badge, Button, Card, CardContent, CardHeader, CardTitle,
   Input, Textarea,
@@ -19,12 +20,13 @@ import type { AgentType, Skill } from '@/api'
 // ── Detail Modal ──────────────────────────────────────────────────────────
 
 function FrontmatterTable({ frontmatter, excludeKeys }: { frontmatter: Record<string, string>; excludeKeys: string[] }) {
+  const { t } = useTranslation()
   const excluded = new Set(excludeKeys)
   const entries = Object.entries(frontmatter).filter(([k]) => !excluded.has(k))
   if (entries.length === 0) return null
   return (
     <div>
-      <p className="mb-1 font-medium text-foreground">Frontmatter</p>
+      <p className="mb-1 font-medium text-foreground">{t('skills.modal.frontmatter')}</p>
       <div className="overflow-x-auto rounded-md ring-1 ring-border/60">
         <table className="w-full text-xs">
           <tbody className="divide-y divide-border/40">
@@ -42,6 +44,7 @@ function FrontmatterTable({ frontmatter, excludeKeys }: { frontmatter: Record<st
 }
 
 function SkillDetailModal({ skill, onClose, onSaved }: { skill: InstalledSkill; onClose: () => void; onSaved: (s: InstalledSkill) => void }) {
+  const { t } = useTranslation()
   const [draft, setDraft] = useState(skill.content)
   const [isEditing, setIsEditing] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -55,9 +58,9 @@ function SkillDetailModal({ skill, onClose, onSaved }: { skill: InstalledSkill; 
       const fm = parseFrontmatter(fresh)
       onSaved({ ...skill, content: fresh, frontmatter: fm, name: fm.name || skill.name, description: fm.description || skill.description })
       setIsEditing(false)
-      toast({ type: 'success', message: `${skill.name} saved` })
+      toast({ type: 'success', message: t('skills.toast.saved', { name: skill.name }) })
     } catch (e) {
-      toast({ type: 'error', message: e instanceof Error ? e.message : 'Save failed' })
+      toast({ type: 'error', message: e instanceof Error ? e.message : t('skills.toast.saveFailed') })
     } finally { setSaving(false) }
   }
 
@@ -81,7 +84,7 @@ function SkillDetailModal({ skill, onClose, onSaved }: { skill: InstalledSkill; 
               <p className="text-xs text-muted-foreground line-clamp-1">{skill.description}</p>
             </div>
           </div>
-          <Button variant="ghost" size="sm" onClick={onClose} className="shrink-0" title="Close">
+          <Button variant="ghost" size="sm" onClick={onClose} className="shrink-0" title={t('common.close')}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
               <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
             </svg>
@@ -94,24 +97,24 @@ function SkillDetailModal({ skill, onClose, onSaved }: { skill: InstalledSkill; 
             <FrontmatterTable frontmatter={skill.frontmatter} excludeKeys={['name', 'description']} />
           )}
           <div>
-            <p className="mb-1 font-medium text-foreground">Directory</p>
+            <p className="mb-1 font-medium text-foreground">{t('skills.modal.directory')}</p>
             <code className="break-all text-xs text-muted-foreground">{skill.directory}</code>
           </div>
           <div>
-            <p className="mb-1 font-medium text-foreground">Files ({skill.files.length})</p>
+            <p className="mb-1 font-medium text-foreground">{t('skills.modal.files', { count: skill.files.length })}</p>
             <ul className="max-h-40 space-y-1 overflow-y-auto rounded-md bg-muted/60 p-2 font-mono text-xs text-muted-foreground">
               {skill.files.map(f => <li key={f} className="break-all">{f}</li>)}
             </ul>
           </div>
           <div>
             <div className="mb-1 flex items-center justify-between">
-              <p className="font-medium text-foreground">{skill.skillFileName} content</p>
+              <p className="font-medium text-foreground">{t('skills.modal.content', { name: skill.skillFileName })}</p>
               {!isEditing ? (
-                <Button size="sm" variant="ghost" onClick={() => setIsEditing(true)}>Edit</Button>
+                <Button size="sm" variant="ghost" onClick={() => setIsEditing(true)}>{t('common.edit')}</Button>
               ) : (
                 <div className="flex items-center gap-1">
-                  <Button size="sm" onClick={handleSave} isLoading={saving} disabled={draft === skill.content}>Save</Button>
-                  <Button size="sm" variant="ghost" onClick={() => { setDraft(skill.content); setIsEditing(false) }} disabled={saving}>Cancel</Button>
+                  <Button size="sm" onClick={handleSave} isLoading={saving} disabled={draft === skill.content}>{t('common.save')}</Button>
+                  <Button size="sm" variant="ghost" onClick={() => { setDraft(skill.content); setIsEditing(false) }} disabled={saving}>{t('common.cancel')}</Button>
                 </div>
               )}
             </div>
@@ -137,6 +140,7 @@ interface SkillListProps {
 }
 
 export function SkillList({ profileName, agentType }: SkillListProps) {
+  const { t } = useTranslation()
   const at = agentType ?? 'claude'
   const { toast } = useToast()
   const { skills: library } = useLibrary(at, ['skills'])
@@ -184,9 +188,9 @@ export function SkillList({ profileName, agentType }: SkillListProps) {
       await applySkillToProfile(profileName, skillId)
       await refreshInstalled()
       setTick(t => t + 1)
-      toast({ type: 'success', message: `${skillId} applied` })
+      toast({ type: 'success', message: t('skills.toast.applied', { name: skillId }) })
     } catch (e) {
-      toast({ type: 'error', message: e instanceof Error ? e.message : 'Apply failed' })
+      toast({ type: 'error', message: e instanceof Error ? e.message : t('skills.toast.applyFailed') })
     } finally { setApplyingId(null) }
   }, [profileName, skillsDir, toast, refreshInstalled])
 
@@ -197,10 +201,10 @@ export function SkillList({ profileName, agentType }: SkillListProps) {
       await removeSkillFromProfile(profileName, skillId)
       await refreshInstalled()
       setTick(t => t + 1)
-      toast({ type: 'success', message: `${skillId} removed` })
+      toast({ type: 'success', message: t('skills.toast.removed', { name: skillId }) })
     } catch {
-      try { await deletePath(`${skillsDir}/${skillId}`); await refreshInstalled(); setTick(t => t + 1); toast({ type: 'success', message: `${skillId} removed` }) }
-      catch { toast({ type: 'error', message: 'Remove failed' }) }
+      try { await deletePath(`${skillsDir}/${skillId}`); await refreshInstalled(); setTick(t => t + 1); toast({ type: 'success', message: t('skills.toast.removed', { name: skillId }) }) }
+      catch { toast({ type: 'error', message: t('skills.toast.removeFailed') }) }
     } finally { setRemovingId(null) }
   }, [profileName, skillsDir, toast, refreshInstalled])
 
@@ -209,34 +213,34 @@ export function SkillList({ profileName, agentType }: SkillListProps) {
       {/* ── Available Skills ─────────────────────────────────────── */}
       <Card key={`available-${tick}-${installed.length}`}>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Available Skills ({effective.length})</CardTitle>
+          <CardTitle className="text-sm">{t('skills.availableTitle', { count: effective.length })}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="mb-3 flex gap-2">
-            <Input placeholder={`Search ${at} skills...`} value={searchInput} onChange={e => { setSearchInput(e.target.value); if (!e.target.value.trim()) doSearch('') }} onKeyDown={e => { if (e.key === 'Enter') doSearch(searchInput) }} className="flex-1" />
-            <Button size="sm" variant="ghost" onClick={() => doSearch(searchInput)} title="Search">
+            <Input placeholder={t('skills.searchPlaceholder', { agent: at })} value={searchInput} onChange={e => { setSearchInput(e.target.value); if (!e.target.value.trim()) doSearch('') }} onKeyDown={e => { if (e.key === 'Enter') doSearch(searchInput) }} className="flex-1" />
+            <Button size="sm" variant="ghost" onClick={() => doSearch(searchInput)} title={t('common.search')}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
                 <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
               </svg>
             </Button>
           </div>
           {pageItems.length === 0 ? (
-            <p className="text-xs text-muted-foreground py-2">{search.trim() ? 'No matching skills.' : 'Loading...'}</p>
+            <p className="text-xs text-muted-foreground py-2">{search.trim() ? t('skills.noMatches') : t('common.loading')}</p>
           ) : (
             <>
               <div className="space-y-1">
                 {pageItems.map(s => (
                     <div key={s.id} className="flex items-center gap-3 rounded-lg border border-border px-3 py-1.5">
                       <div className="min-w-0 flex-1"><div className="text-sm font-medium">{s.name}</div>{s.description && <div className="text-[11px] text-muted-foreground truncate">{s.description}</div>}</div>
-                      <Button size="sm" variant="ghost" isLoading={applyingId === s.id} onClick={() => handleApply(s.id)}>Add</Button>
+                      <Button size="sm" variant="ghost" isLoading={applyingId === s.id} onClick={() => handleApply(s.id)}>{t('common.add')}</Button>
                     </div>
                   ))}
               </div>
               {totalPages > 1 && (
                 <div className="mt-2 flex items-center justify-center gap-2 text-xs">
-                  <Button size="sm" variant="ghost" disabled={page === 0} onClick={() => setPage(p => p - 1)}>← Prev</Button>
+                  <Button size="sm" variant="ghost" disabled={page === 0} onClick={() => setPage(p => p - 1)}>{t('common.prev')}</Button>
                   <span className="text-muted-foreground">{page + 1} / {totalPages}</span>
-                  <Button size="sm" variant="ghost" disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)}>Next →</Button>
+                  <Button size="sm" variant="ghost" disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)}>{t('common.next')}</Button>
                 </div>
               )}
             </>
@@ -247,27 +251,27 @@ export function SkillList({ profileName, agentType }: SkillListProps) {
       {/* ── Installed Skills ─────────────────────────────────────── */}
       <Card key={`installed-${installed.length}`}>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Installed Skills ({installed.length})</CardTitle>
+          <CardTitle className="text-sm">{t('skills.installedTitle', { count: installed.length })}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="mb-3 flex gap-2">
-            <Input placeholder="Filter installed..." value={installedFilter} onChange={e => { setInstalledFilter(e.target.value) }} onKeyDown={e => { if (e.key === 'Enter') setInstalledFilter(e.currentTarget.value) }} className="flex-1" />
-            <Button size="sm" variant="ghost" onClick={() => setInstalledFilter('')} title="Clear filter">
+            <Input placeholder={t('skills.filterPlaceholder')} value={installedFilter} onChange={e => { setInstalledFilter(e.target.value) }} onKeyDown={e => { if (e.key === 'Enter') setInstalledFilter(e.currentTarget.value) }} className="flex-1" />
+            <Button size="sm" variant="ghost" onClick={() => setInstalledFilter('')} title={t('common.clearFilter')}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
                 <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
               </svg>
             </Button>
           </div>
-          {loading ? <p className="text-xs text-muted-foreground py-2">Loading...</p>
+          {loading ? <p className="text-xs text-muted-foreground py-2">{t('common.loading')}</p>
           : loadError ? <p className="text-xs text-destructive py-2">{loadError}</p>
-          : installed.length === 0 ? <p className="text-xs text-muted-foreground py-2">No skills installed. Search above to add.</p>
+          : installed.length === 0 ? <p className="text-xs text-muted-foreground py-2">{t('skills.noneInstalled')}</p>
           : (
             <div className="space-y-1">
               {installed.filter(s => !installedFilter.trim() || s.name.toLowerCase().includes(installedFilter.toLowerCase())).map(s => (
                 <div key={s.id} className="flex items-center gap-3 rounded-lg border border-border px-3 py-1.5">
                   <div className="min-w-0 flex-1"><div className="text-sm font-medium">{s.name}</div>{s.description && <div className="text-[11px] text-muted-foreground truncate">{s.description}</div>}</div>
-                  <Button size="sm" variant="ghost" onClick={() => setDetailSkill(s)}>Detail</Button>
-                  <Button size="sm" variant="ghost" isLoading={removingId === s.id} onClick={() => handleRemove(s.id)} className="text-destructive hover:text-destructive">Remove</Button>
+                  <Button size="sm" variant="ghost" onClick={() => setDetailSkill(s)}>{t('common.details')}</Button>
+                  <Button size="sm" variant="ghost" isLoading={removingId === s.id} onClick={() => handleRemove(s.id)} className="text-destructive hover:text-destructive">{t('common.remove')}</Button>
                 </div>
               ))}
             </div>

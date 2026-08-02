@@ -10,6 +10,7 @@
  */
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui'
 import { Loading, StatusDot } from '@/components/feedback'
 import { PageHeader, type NavKey } from '@/components/layout'
@@ -51,6 +52,7 @@ const AGENT_TYPE_HEX: Record<string, string> = {
 }
 
 export function HomePage({ onNav }: HomePageProps) {
+  const { t, i18n } = useTranslation()
   const [profileCount, setProfileCount] = useState(0)
   const [providerCount, setProviderCount] = useState(0)
   const [sessionCount, setSessionCount] = useState(0)
@@ -94,21 +96,20 @@ export function HomePage({ onNav }: HomePageProps) {
 
   const greeting = useMemo(() => {
     const h = new Date().getHours()
-    if (h < 5) return 'Working late'
-    if (h < 12) return 'Good morning'
-    if (h < 18) return 'Good afternoon'
-    return 'Good evening'
-  }, [])
+    if (h < 5) return t('home.greeting.late')
+    if (h < 12) return t('home.greeting.morning')
+    if (h < 18) return t('home.greeting.afternoon')
+    return t('home.greeting.evening')
+  }, [t])
 
   const currentDate = useMemo(() => {
-    const d = new Date()
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-    const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-    ]
-    return `${days[d.getDay()]} ${d.getDate()} ${months[d.getMonth()]}`
-  }, [])
+    const locale = i18n.resolvedLanguage === 'zh' ? 'zh-CN' : 'en-US'
+    return new Date().toLocaleDateString(locale, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+    })
+  }, [i18n.resolvedLanguage])
 
   if (loading) {
     return <Loading className="py-16" />
@@ -117,9 +118,9 @@ export function HomePage({ onNav }: HomePageProps) {
   const tiles: StatTile[] = [
     {
       key: 'sessions',
-      label: 'Running',
+      label: t('home.stat.running'),
       value: runningCount,
-      hint: runningCount > 0 ? 'active now' : 'all idle',
+      hint: runningCount > 0 ? t('home.stat.runningHintActive') : t('home.stat.runningHintIdle'),
       accent: 'success',
       icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -130,9 +131,9 @@ export function HomePage({ onNav }: HomePageProps) {
     },
     {
       key: 'profiles',
-      label: 'Profiles',
+      label: t('home.stat.profiles'),
       value: profileCount,
-      hint: 'across 4 types',
+      hint: t('home.stat.profilesHint'),
       accent: 'accent',
       icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -145,9 +146,9 @@ export function HomePage({ onNav }: HomePageProps) {
     },
     {
       key: 'sessions',
-      label: 'Sessions',
+      label: t('home.stat.sessions'),
       value: sessionCount,
-      hint: 'all time',
+      hint: t('home.stat.sessionsHint'),
       accent: 'warning',
       icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -176,19 +177,19 @@ export function HomePage({ onNav }: HomePageProps) {
               className="inline-block align-[-1px] mr-1.5"
             />
             <span className="text-foreground font-medium">
-              {runningCount > 0 ? `${runningCount} running now` : 'All idle'}
+              {runningCount > 0 ? t('home.stats.runningNow', { count: runningCount }) : t('home.stats.allIdle')}
             </span>
             <span className="mx-2 text-border">·</span>
-            <span>{profileCount} profiles</span>
+            <span>{t('home.stats.profiles', { count: profileCount })}</span>
             <span className="mx-2 text-border">·</span>
-            <span>{providerCount} providers</span>
+            <span>{t('home.stats.providers', { count: providerCount })}</span>
             <span className="mx-2 text-border">·</span>
             <span className="font-mono">v0.5.0</span>
           </>
         }
         action={
           <Button variant="default" size="lg" onClick={() => onNav('profiles')}>
-            Launch a profile →
+            {t('home.launchProfile')}
           </Button>
         }
         className="mb-10"
@@ -208,10 +209,10 @@ export function HomePage({ onNav }: HomePageProps) {
           <div className="mb-5 flex items-center justify-between">
             <div>
               <h2 className="text-base font-semibold tracking-tight text-foreground">
-                Recent sessions
+                {t('home.recentSessions')}
               </h2>
               <p className="text-xs text-muted-foreground">
-                Last {recentSessions.length} launches
+                {t('home.lastLaunches', { count: recentSessions.length })}
               </p>
             </div>
             <Button
@@ -220,19 +221,19 @@ export function HomePage({ onNav }: HomePageProps) {
               onClick={() => onNav('sessions')}
               className="text-muted-foreground"
             >
-              View all →
+              {t('home.viewAll')}
             </Button>
           </div>
 
           {recentSessions.length === 0 ? (
             <div className="rounded-lg bg-muted/30 p-10 text-center">
-              <p className="text-sm text-muted-foreground">No sessions yet</p>
+              <p className="text-sm text-muted-foreground">{t('home.noSessions')}</p>
               <Button
                 size="sm"
                 className="mt-3"
                 onClick={() => onNav('profiles')}
               >
-                Launch your first profile
+                {t('home.launchFirstProfile')}
               </Button>
             </div>
           ) : (
@@ -294,8 +295,8 @@ export function HomePage({ onNav }: HomePageProps) {
         {/* Side rail — links to other pages */}
         <section className="space-y-3">
           <RailCard
-            title="Manage profiles"
-            description="Create, edit, switch between agent profiles."
+            title={t('home.rail.manageProfiles')}
+            description={t('home.rail.manageProfilesDesc')}
             onClick={() => onNav('profiles')}
             icon={
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -307,8 +308,8 @@ export function HomePage({ onNav }: HomePageProps) {
             }
           />
           <RailCard
-            title="Settings"
-            description="Theme, projects directory, about."
+            title={t('home.rail.settings')}
+            description={t('home.rail.settingsDesc')}
             onClick={() => onNav('settings')}
             icon={
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">

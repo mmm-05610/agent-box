@@ -9,6 +9,7 @@
  * the per-provider model test config.
  */
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { FetchedModel } from '@/api/models'
 import { Button, Input, Textarea } from '@/components/ui'
 import { EndpointSpeedTest } from '@/components/provider/EndpointSpeedTest'
@@ -52,9 +53,6 @@ export function readCodexCatalogModels(settings: Record<string, unknown> | undef
 }
 
 const selectClassName = 'h-9 w-full rounded-md bg-muted px-3 text-sm text-foreground outline-none disabled:opacity-50'
-const reasoningHint = '预设供应商已自动配置；自定义供应商会按名称/地址自动推断。仅当自动识别不准时才需展开手动覆盖。'
-const thinkingHint = '上游 Chat Completions 接口支持开启或关闭 thinking 时启用。Kimi、GLM、Qwen 等通常属于这一类。'
-const effortHint = '上游支持 low/high/max 等思考深度控制时启用。启用后会自动启用思考模式，并把 Codex 的 reasoning.effort 转成上游 Chat 参数。'
 
 function makeRow(seed?: CodexCatalogModel): CatalogRow {
   return { rowId: crypto.randomUUID(), model: seed?.model ?? '', displayName: seed?.displayName ?? '', contextWindow: seed?.contextWindow ?? '' }
@@ -64,6 +62,7 @@ function sameModels(rows: CatalogRow[], models: CodexCatalogModel[]) {
 }
 
 export function CodexFields(props: ProviderFieldsProps) {
+  const { t } = useTranslation()
   const {
     values, onChange, readOnly, codexConfig = '', onCodexConfigChange,
     model = '', onModelChange,
@@ -133,14 +132,14 @@ export function CodexFields(props: ProviderFieldsProps) {
     <div>
       <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-3">
-          <label className="text-xs text-muted-foreground">API 请求地址</label>
+          <label className="text-xs text-muted-foreground">{t('providerForm.endpointLabel')}</label>
           <div className="flex items-center gap-1.5 rounded-full border border-border bg-muted/30 px-2 py-0.5">
-            <span className="flex items-center gap-1 text-[10px] text-muted-foreground"><LinkIcon />完整 URL</span>
+            <span className="flex items-center gap-1 text-[10px] text-muted-foreground"><LinkIcon />{t('providerForm.fullUrl')}</span>
             <Toggle checked={fullUrl} onChange={(checked) => { onFullUrlChange?.(checked); if (!onFullUrlChange) set({ isFullUrl: checked }) }} disabled={readOnly} />
           </div>
         </div>
         <Button type="button" variant="ghost" size="sm" onClick={() => setEndpointToolsOpen((open) => !open)} disabled={readOnly} className="h-7 gap-1 text-xs">
-          <ZapIcon />{endpointToolsOpen ? '收起测速' : '管理与测速'}
+          <ZapIcon />{endpointToolsOpen ? t('providerForm.endpointTools.collapse') : t('providerForm.endpointTools.manage')}
         </Button>
       </div>
       <Input value={values.baseUrl} onChange={(event) => set({ baseUrl: event.target.value })} placeholder="https://api.example.com" className="text-sm font-mono" disabled={readOnly} />
@@ -149,11 +148,11 @@ export function CodexFields(props: ProviderFieldsProps) {
         return <div className="mt-2">
           {endpoints.length > 0
             ? <EndpointSpeedTest endpoints={endpoints} selected={values.baseUrl} onSelect={(url) => set({ baseUrl: url })} />
-            : <p className="rounded-md border border-dashed border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">请先填写 API 请求地址，再使用管理与测速功能。</p>}
+            : <p className="rounded-md border border-dashed border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">{t('providerForm.endpointTools.emptyHint')}</p>}
         </div>
       })()}
       <div className="mt-2 flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-700">
-        <BulbIcon /><span>填写兼容 OpenAI Responses 格式的服务端点地址</span>
+        <BulbIcon /><span>{t('providerForm.codex.endpointHint')}</span>
       </div>
     </div>
 
@@ -161,19 +160,19 @@ export function CodexFields(props: ProviderFieldsProps) {
       {/* Upstream Format */}
       {shouldShowSpeedTest && (
         <div className="rounded-lg border border-border bg-card p-3">
-          <Field label="上游请求格式 (Upstream Format)">
+          <Field label={t('providerForm.codex.upstreamFormat')}>
             <select value={effectiveFormat} onChange={(e) => setFormat(e.target.value as CodexApiFormat)} className={selectClassName} disabled={readOnly}>
-              <option value="openai_responses">Responses（原生）</option>
-              <option value="openai_chat">Chat Completions（需开启路由）</option>
-              <option value="anthropic">Anthropic Messages（需开启路由）</option>
+              <option value="openai_responses">{t('providerForm.codex.upstreamFormatOption.responses')}</option>
+              <option value="openai_chat">{t('providerForm.codex.upstreamFormatOption.chat')}</option>
+              <option value="anthropic">{t('providerForm.codex.upstreamFormatOption.anthropic')}</option>
             </select>
           </Field>
           <p className="mt-2 text-xs text-muted-foreground">
             {effectiveFormat === 'anthropic'
-              ? '将 Codex 的请求转换为 Anthropic Messages 格式发送到供应商；需在下方配置 Anthropic 认证字段。'
+              ? t('providerForm.codex.formatHint.anthropic')
               : effectiveFormat === 'openai_chat'
-                ? '将 Codex 的 Responses 请求转换为 Chat Completions 格式；需保持本地路由开启。'
-                : 'Codex 原生 Responses API，无需格式转换；GPT 系列模型默认使用此格式。'}
+                ? t('providerForm.codex.formatHint.chat')
+                : t('providerForm.codex.formatHint.responses')}
           </p>
         </div>
       )}
@@ -181,14 +180,14 @@ export function CodexFields(props: ProviderFieldsProps) {
       {/* Anthropic-specific settings */}
       {effectiveFormat === 'anthropic' && (
         <div className="rounded-lg border border-border bg-card p-3 space-y-3">
-          <Field label="Anthropic 认证字段">
+          <Field label={t('providerForm.codex.anthropicAuthField')}>
             <select value={anthropicAuthField} onChange={(e) => onAnthropicAuthFieldChange?.(e.target.value as ClaudeApiKeyField)} className={selectClassName} disabled={readOnly}>
               <option value="ANTHROPIC_AUTH_TOKEN">ANTHROPIC_AUTH_TOKEN</option>
               <option value="ANTHROPIC_API_KEY">ANTHROPIC_API_KEY</option>
             </select>
           </Field>
-          <SwitchRow title="伪装为 Claude Code 客户端" hint="发送模拟 Claude Code 的 User-Agent / anthropic-beta / x-app 请求头。" checked={impersonateClaudeCode} onChange={(v) => onImpersonateClaudeCodeChange?.(v)} disabled={readOnly} />
-          <Field label="最大输出 Token 数 (Max Output Tokens)" hint="覆盖默认 8192 输出上限；留空使用默认值。仅允许数字。">
+          <SwitchRow title={t('providerForm.codex.impersonateClaudeCode')} hint={t('providerForm.codex.impersonateHint')} checked={impersonateClaudeCode} onChange={(v) => onImpersonateClaudeCodeChange?.(v)} disabled={readOnly} />
+          <Field label={t('providerForm.codex.maxOutputTokens')} hint={t('providerForm.codex.maxOutputTokensHint')}>
             <Input value={maxOutputTokens} onChange={(e) => onMaxOutputTokensChange?.(e.target.value.replace(/\D/g, ''))} placeholder="8192" className="font-mono text-sm" disabled={readOnly} />
           </Field>
         </div>
@@ -197,11 +196,11 @@ export function CodexFields(props: ProviderFieldsProps) {
       {/* Prompt Cache Routing (Chat format only) */}
       {effectiveFormat === 'openai_chat' && (
         <div className="rounded-lg border border-border bg-card p-3">
-          <Field label="Prompt Cache 路由" hint="控制 prompt_cache_key 的缓存路由行为。auto 为自动决定；enabled 总启用缓存；disabled 禁用缓存路由。">
+          <Field label={t('providerForm.codex.promptCacheRouting')} hint={t('providerForm.codex.promptCacheHint')}>
             <select value={promptCacheRouting} onChange={(e) => onPromptCacheRoutingChange?.(e.target.value as PromptCacheRoutingMode)} className={selectClassName} disabled={readOnly}>
-              <option value="auto">auto（自动）</option>
-              <option value="enabled">enabled（启用）</option>
-              <option value="disabled">disabled（禁用）</option>
+              <option value="auto">{t('providerForm.codex.promptCacheOption.auto')}</option>
+              <option value="enabled">{t('providerForm.codex.promptCacheOption.enabled')}</option>
+              <option value="disabled">{t('providerForm.codex.promptCacheOption.disabled')}</option>
             </select>
           </Field>
         </div>
@@ -212,13 +211,13 @@ export function CodexFields(props: ProviderFieldsProps) {
         <div className="rounded-lg border border-border bg-card">
           <button type="button" onClick={() => setReasoningOpen((open) => !open)} className="flex w-full items-start gap-2 p-3 text-left">
             <span className="mt-0.5 text-muted-foreground"><ChevronIcon open={reasoningOpen} /></span>
-            <span><span className="block text-sm font-medium">思考能力（高级·通常自动识别）</span><span className="mt-1 block text-xs text-muted-foreground">{reasoningHint}</span></span>
+            <span><span className="block text-sm font-medium">{t('providerForm.codex.thinkingTitle')}</span><span className="mt-1 block text-xs text-muted-foreground">{t('providerForm.codex.reasoningHint')}</span></span>
           </button>
           {reasoningOpen && (
             <div className="space-y-4 border-t border-border p-3">
-              <SwitchRow title="支持思考模式" hint={thinkingHint} checked={supportsThinking} onChange={(checked) => setReasoning({ ...effectiveReasoning, supportsThinking: checked, supportsEffort: checked ? effectiveReasoning.supportsEffort : false })} disabled={readOnly} />
+              <SwitchRow title={t('providerForm.codex.supportThinking')} hint={t('providerForm.codex.thinkingHint')} checked={supportsThinking} onChange={(checked) => setReasoning({ ...effectiveReasoning, supportsThinking: checked, supportsEffort: checked ? effectiveReasoning.supportsEffort : false })} disabled={readOnly} />
               <div className="border-t border-border pt-3">
-                <SwitchRow title="支持思考等级" hint={effortHint} checked={supportsEffort} onChange={(checked) => setReasoning({ ...effectiveReasoning, supportsThinking: checked ? true : effectiveReasoning.supportsThinking, supportsEffort: checked, effortParam: checked ? effectiveReasoning.effortParam ?? 'reasoning_effort' : 'none' })} disabled={readOnly} />
+                <SwitchRow title={t('providerForm.codex.supportEffort')} hint={t('providerForm.codex.effortHint')} checked={supportsEffort} onChange={(checked) => setReasoning({ ...effectiveReasoning, supportsThinking: checked ? true : effectiveReasoning.supportsThinking, supportsEffort: checked, effortParam: checked ? effectiveReasoning.effortParam ?? 'reasoning_effort' : 'none' })} disabled={readOnly} />
               </div>
             </div>
           )}
@@ -227,65 +226,65 @@ export function CodexFields(props: ProviderFieldsProps) {
 
       {/* Default Model */}
       <div className="rounded-lg border border-border bg-card p-3">
-        <Field label="默认模型 (Default Model)" hint="config.toml 顶层 model 字段；当请求未指定模型时使用此值。">
+        <Field label={t('providerForm.codex.defaultModelLabel')} hint={t('providerForm.codex.defaultModelHint')}>
           <div className="flex items-center gap-2">
-            <Input value={codexModel} onChange={(e) => onCodexModelChange?.(e.target.value)} placeholder="例如 gpt-5.1" className="font-mono text-sm flex-1" disabled={readOnly} />
+            <Input value={codexModel} onChange={(e) => onCodexModelChange?.(e.target.value)} placeholder={t('providerForm.codex.modelPlaceholder')} className="font-mono text-sm flex-1" disabled={readOnly} />
             {codexModel.trim() && !rows.some((r) => r.model.trim() === codexModel.trim()) && onCatalogModelsChange && (
               <Button size="sm" variant="ghost" onClick={() => { onCatalogModelsChange?.([...catalogModels, { model: codexModel.trim(), displayName: codexModel.trim() }]) }} disabled={readOnly}>
-                + 加入映射
+                {t('providerForm.codex.addToMapping')}
               </Button>
             )}
           </div>
         </Field>
       </div>
       <CatalogCard rows={rows} fetchedModels={fetchedModels} fetching={fetching} fetchError={fetchError} readOnly={readOnly} onFetch={fetchCatalog} onAdd={() => setRows((current) => [...current, makeRow()])} onUpdate={updateRow} onRemove={(index) => setRows((current) => current.filter((_, rowIndex) => rowIndex !== index))} />
-      <Field label="Custom User-Agent">
-        <Input value={customUserAgent ?? values.customUserAgent} onChange={(event) => { onCustomUserAgentChange?.(event.target.value); if (!onCustomUserAgentChange) set({ customUserAgent: event.target.value }) }} placeholder="留空使用 Codex 默认 User-Agent" className="font-mono text-sm" disabled={readOnly} />
+      <Field label={t('providerForm.customUserAgent')}>
+        <Input value={customUserAgent ?? values.customUserAgent} onChange={(event) => { onCustomUserAgentChange?.(event.target.value); if (!onCustomUserAgentChange) set({ customUserAgent: event.target.value }) }} placeholder={t('providerForm.codex.userAgentPlaceholder')} className="font-mono text-sm" disabled={readOnly} />
       </Field>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <Field label="代理请求 Headers (JSON)">
+        <Field label={t('providerForm.codex.proxyHeaders')}>
           <Textarea value={localProxyHeadersOverride} onChange={(event) => onLocalProxyHeadersOverrideChange?.(event.target.value)} rows={5} className="font-mono text-sm" placeholder='{"X-Custom-Header":"value"}' disabled={readOnly || !onLocalProxyHeadersOverrideChange} />
         </Field>
-        <Field label="代理请求 Body (JSON)">
+        <Field label={t('providerForm.codex.proxyBody')}>
           <Textarea value={localProxyBodyOverride} onChange={(event) => onLocalProxyBodyOverrideChange?.(event.target.value)} rows={5} className="font-mono text-sm" placeholder='{"temperature":0.7}' disabled={readOnly || !onLocalProxyBodyOverrideChange} />
         </Field>
       </div>
     </>}
 
-    <Field label="auth.json (JSON) *">
+    <Field label={t('providerForm.codex.authJson')}>
       <Textarea value={authJson} onChange={(event) => updateAuthJson(event.target.value)} rows={4} className="font-mono text-sm" disabled={readOnly} />
-      <p className="mt-1 text-xs text-muted-foreground">Codex auth.json 配置内容</p>
+      <p className="mt-1 text-xs text-muted-foreground">{t('providerForm.codex.authJsonHint')}</p>
     </Field>
-    <Field label="config.toml (TOML)">
+    <Field label={t('providerForm.codex.configToml')}>
       <Textarea value={codexConfig} onChange={(event) => onCodexConfigChange?.(event.target.value)} rows={14} className="font-mono text-sm" disabled={readOnly} />
-      <p className="mt-1 text-xs text-muted-foreground">Codex config.toml 配置内容</p>
+      <p className="mt-1 text-xs text-muted-foreground">{t('providerForm.codex.configTomlHint')}</p>
     </Field>
     <AdvancedCard
       icon={<FlaskIcon />}
-      title="模型测试配置"
+      title={t('providerForm.modelTestConfig')}
       enabled={testOpen}
       onEnabledChange={(enabled) => {
         setTestOpen(enabled)
         set({ testConfigEnabled: enabled, ...(enabled ? {} : { testTimeout: '', testDegradedThreshold: '', testMaxRetries: '' }) })
       }}
     >
-      <p className="text-sm text-muted-foreground">为此供应商配置单独的模型测试参数，不启用时使用全局配置。</p>
+      <p className="text-sm text-muted-foreground">{t('providerForm.codex.testDesc')}</p>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <Field label="测试模型">
-          <Input value={model} onChange={(event) => onModelChange?.(event.target.value)} placeholder="留空使用全局配置" disabled={!testOpen || readOnly} />
+        <Field label={t('providerForm.codex.testModel')}>
+          <Input value={model} onChange={(event) => onModelChange?.(event.target.value)} placeholder={t('providerForm.codex.testModelPlaceholder')} disabled={!testOpen || readOnly} />
         </Field>
-        <Field label="超时时间（秒）">
+        <Field label={t('providerForm.testTimeoutSec')}>
           <Input type="number" value={values.testTimeout} onChange={(event) => set({ testTimeout: event.target.value })} placeholder="45" disabled={!testOpen || readOnly} />
         </Field>
-        <Field label="降级阈值（毫秒）">
+        <Field label={t('providerForm.testDegradedThresholdMs')}>
           <Input type="number" value={values.testDegradedThreshold} onChange={(event) => set({ testDegradedThreshold: event.target.value })} placeholder="6000" disabled={!testOpen || readOnly} />
         </Field>
-        <Field label="最大重试次数">
+        <Field label={t('providerForm.testMaxRetries')}>
           <Input type="number" value={values.testMaxRetries} onChange={(event) => set({ testMaxRetries: event.target.value })} placeholder="2" disabled={!testOpen || readOnly} />
         </Field>
       </div>
     </AdvancedCard>
-    {mode === 'profile' && <p className="text-xs text-muted-foreground">Profile 模式保存到当前 Codex 配置文件。</p>}
+    {mode === 'profile' && <p className="text-xs text-muted-foreground">{t('providerForm.profileModeHint', { agent: 'Codex' })}</p>}
   </div>
 }
 
@@ -302,18 +301,19 @@ function CatalogCard({ rows, fetchedModels, fetching, fetchError, readOnly, onFe
   onUpdate: (index: number, patch: Partial<CodexCatalogModel>) => void
   onRemove: (index: number) => void
 }) {
+  const { t } = useTranslation()
   return (
     <div className="rounded-lg border border-border bg-card p-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h4 className="text-base font-medium">模型映射</h4>
-          <p className="mt-1 max-w-3xl text-xs leading-relaxed text-muted-foreground">生成 Codex model_catalog.json，让 /model 命令显示这些第三方模型名；表中条目按填写内容原样保存。修改后需要重启 Codex 才能刷新模型列表。</p>
+          <h4 className="text-base font-medium">{t('providerForm.codex.catalogTitle')}</h4>
+          <p className="mt-1 max-w-3xl text-xs leading-relaxed text-muted-foreground">{t('providerForm.codex.catalogDesc')}</p>
         </div>
         <ModelFetchActions fetching={fetching} onFetch={onFetch} onAdd={onAdd} fetchDisabled={readOnly} addDisabled={readOnly} />
       </div>
       {fetchError && <p className="mt-2 text-xs text-red-500">{fetchError}</p>}
       {rows.length === 0 ? (
-        <p className="mt-3 rounded-md border border-dashed p-4 text-center text-xs text-muted-foreground">暂无模型，点击「获取模型列表」或「添加模型」。</p>
+        <p className="mt-3 rounded-md border border-dashed p-4 text-center text-xs text-muted-foreground">{t('providerForm.emptyModels')}</p>
       ) : (
         <div className="mt-3 divide-y divide-border rounded-md border border-border bg-card">
           {rows.map((row, index) => (
@@ -341,24 +341,25 @@ function CatalogRowView({ index, row, fetchedModels, readOnly, onUpdate, onRemov
   onUpdate: (index: number, patch: Partial<CodexCatalogModel>) => void
   onRemove: (index: number) => void
 }) {
+  const { t } = useTranslation()
   const [contextOpen, setContextOpen] = useState(false)
   const isFirst = index === 0
   return (
     <div className="px-3 py-3">
       <div className="flex items-center gap-2">
         <span className={`inline-flex h-5 shrink-0 items-center rounded px-1.5 text-[10px] font-medium ${isFirst ? 'bg-blue-500/15 text-blue-600 dark:text-blue-300' : 'bg-muted text-muted-foreground'}`}>
-          {isFirst ? '默认模型' : '备选模型'}
+          {isFirst ? t('providerForm.modelBadge.default') : t('providerForm.modelBadge.fallback')}
         </span>
-        <ModelIdInput value={row.model} models={fetchedModels} onChange={(value) => onUpdate(index, { model: value, displayName: row.displayName.trim() ? row.displayName : value })} disabled={readOnly} placeholder="实际请求模型 ID" />
-        <Input value={row.displayName ?? ''} onChange={(event) => onUpdate(index, { displayName: event.target.value })} placeholder="显示名称（可选）" className="text-sm" disabled={readOnly} />
-        <button type="button" onClick={() => setContextOpen((open) => !open)} className="flex h-9 shrink-0 items-center gap-1 rounded-md border border-border bg-muted px-2.5 text-xs text-muted-foreground hover:text-foreground" title={contextOpen ? '收起高级' : '展开高级'} disabled={readOnly}>
-          <ChevronIcon open={contextOpen} /><span>高级选项</span>
+        <ModelIdInput value={row.model} models={fetchedModels} onChange={(value) => onUpdate(index, { model: value, displayName: row.displayName.trim() ? row.displayName : value })} disabled={readOnly} placeholder={t('providerForm.codex.modelIdPlaceholder')} />
+        <Input value={row.displayName ?? ''} onChange={(event) => onUpdate(index, { displayName: event.target.value })} placeholder={t('providerForm.displayNameOptional')} className="text-sm" disabled={readOnly} />
+        <button type="button" onClick={() => setContextOpen((open) => !open)} className="flex h-9 shrink-0 items-center gap-1 rounded-md border border-border bg-muted px-2.5 text-xs text-muted-foreground hover:text-foreground" title={contextOpen ? t('providerForm.advancedToggle.collapse') : t('providerForm.advancedToggle.expand')} disabled={readOnly}>
+          <ChevronIcon open={contextOpen} /><span>{t('providerForm.advancedOptions')}</span>
         </button>
         <button
           type="button"
           onClick={() => onRemove(index)}
           className="flex h-9 w-8 shrink-0 items-center justify-center text-muted-foreground hover:text-destructive"
-          title="删除模型"
+          title={t('providerForm.deleteModel')}
           disabled={readOnly}
         >
           <TrashIcon />
@@ -366,9 +367,9 @@ function CatalogRowView({ index, row, fetchedModels, readOnly, onUpdate, onRemov
       </div>
       {contextOpen && (
         <div className="mt-3 max-w-md border-t border-border pt-3">
-          <Field label="上下文长度（tokens）">
-            <Input type="number" min="1" value={row.contextWindow ?? ''} onChange={(event) => onUpdate(index, { contextWindow: event.target.value ? Number(event.target.value) : undefined })} placeholder="例如 200000" className="font-mono text-sm" disabled={readOnly} />
-            <p className="mt-1 text-[11px] text-muted-foreground">覆盖自动推断的上下文窗口；留空使用模型默认值。</p>
+          <Field label={t('providerForm.contextLength')}>
+            <Input type="number" min="1" value={row.contextWindow ?? ''} onChange={(event) => onUpdate(index, { contextWindow: event.target.value ? Number(event.target.value) : undefined })} placeholder={t('providerForm.contextLengthPlaceholder')} className="font-mono text-sm" disabled={readOnly} />
+            <p className="mt-1 text-[11px] text-muted-foreground">{t('providerForm.contextLengthHint')}</p>
           </Field>
         </div>
       )}

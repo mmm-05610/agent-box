@@ -12,6 +12,7 @@
  */
 
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button, Badge, Tabs } from '@/components/ui'
 import { Loading } from '@/components/feedback'
 import type { AgentFeature, AgentType } from '@/api'
@@ -52,21 +53,22 @@ interface DetailTab {
   render: () => ReactNode
 }
 
-/** Resource tab labels — literal until i18n lands (stage 6). */
+/** Resource tab label keys (translated at render time in the page). */
 const RESOURCE_LABELS: Record<string, string> = {
-  provider: 'Provider',
-  mcp: 'MCP',
-  skill: 'Skills',
-  hook: 'Hooks',
+  provider: 'tab.provider',
+  mcp: 'tab.mcp',
+  skill: 'tab.skill',
+  hook: 'tab.hook',
 }
 
 /** The prompt resource edits the per-agent prompt file, which the old
- *  detail page exposed under per-agent tab labels. Keep those labels. */
+ *  detail page exposed under per-agent tab labels. Keep those labels
+ *  (filenames — identical in both language packs). */
 const PROMPT_TAB_LABELS: Record<AgentType, string> = {
-  claude: 'CLAUDE.md',
-  codex: 'AGENTS.md',
-  hermes: 'SOUL.md',
-  opencode: 'AGENTS.md',
+  claude: 'tab.prompt.claude',
+  codex: 'tab.prompt.codex',
+  hermes: 'tab.prompt.hermes',
+  opencode: 'tab.prompt.opencode',
 }
 
 interface AgentTabContext {
@@ -86,27 +88,27 @@ interface AgentTabContext {
  */
 const AGENT_SPECIFIC_TABS: Record<string, { label: string; feature: AgentFeature; render: (ctx: AgentTabContext) => ReactNode }> = {
   permissions: {
-    label: 'Permissions',
+    label: 'tab.permissions',
     feature: 'permissions',
     render: (c) => <PermissionsEditor key={c.refreshKey} path={c.settingsPath} content={c.settingsRaw} onRefresh={c.onRefresh} />,
   },
   plugins: {
-    label: 'Plugins',
+    label: 'tab.plugins',
     feature: 'plugins',
     render: (c) => <PluginsEditor key={c.refreshKey} path={c.settingsPath} content={c.settingsRaw} onRefresh={c.onRefresh} />,
   },
   rules: {
-    label: 'Rules',
+    label: 'tab.rules',
     feature: 'rules',
     render: (c) => <RulesTab key={c.refreshKey} configDir={c.configDir} profileName={c.profileName} refreshKey={c.refreshKey} />,
   },
   memories: {
-    label: 'Memories',
+    label: 'tab.memories',
     feature: 'memories',
     render: (c) => <HermesMemoriesTab key={c.refreshKey} configDir={c.configDir} />,
   },
   instructions: {
-    label: 'Instructions',
+    label: 'tab.instructions',
     feature: 'instructions',
     render: (c) => <OpenCodeInstructionsTab key={c.refreshKey} configJsonc={c.opencodeJsonc} profilePath={c.profilePath} />,
   },
@@ -156,6 +158,7 @@ interface ProfileDetailPageProps {
 }
 
 export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProps) {
+  const { t } = useTranslation()
   const [detail, setDetail] = useState<ProfileDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -179,7 +182,7 @@ export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProp
       try {
         const data = await fetchProfileDetail(profileName)
         if (cancelled) return
-        if (!data) { setError('Profile not found'); return }
+        if (!data) { setError(t('detail.profileNotFound')); return }
         const d = data as unknown as ProfileDetail
         setDetail(d)
 
@@ -197,7 +200,7 @@ export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProp
         setFileTree(tree)
       } catch (e: unknown) {
         if (cancelled) return
-        setError(e instanceof Error ? e.message : 'Failed to load')
+        setError(e instanceof Error ? e.message : t('detail.failedToLoad'))
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -215,7 +218,7 @@ export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProp
   if (loading) {
     return (
       <div className="p-8">
-        <Button variant="ghost" size="sm" onClick={onBack} className="mb-4">← Back</Button>
+        <Button variant="ghost" size="sm" onClick={onBack} className="mb-4">← {t('common.back')}</Button>
         <Loading variant="skeleton" rows={6} />
       </div>
     )
@@ -224,10 +227,10 @@ export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProp
   if (error || !detail) {
     return (
       <div className="p-8">
-        <Button variant="ghost" size="sm" onClick={onBack} className="mb-4">← Back</Button>
+        <Button variant="ghost" size="sm" onClick={onBack} className="mb-4">← {t('common.back')}</Button>
         <div className="flex flex-col items-center gap-3 py-16 text-destructive">
-          <p>{error ?? 'Profile not found'}</p>
-          <Button variant="ghost" size="sm" onClick={onBack}>Go back</Button>
+          <p>{error ?? t('detail.profileNotFound')}</p>
+          <Button variant="ghost" size="sm" onClick={onBack}>{t('detail.goBack')}</Button>
         </div>
       </div>
     )
@@ -261,7 +264,7 @@ export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProp
   // ── Tab build: meta + registry/agent-specific resources + storage ──
   const resourceRegistry = RESOURCES as Record<string, ResourceDef>
   const tabs: DetailTab[] = [
-    { key: 'meta', label: 'Meta', render: () => <MetaEditor key={refreshKey} detail={detail} onRefresh={triggerRefresh} /> },
+    { key: 'meta', label: t('tab.meta'), render: () => <MetaEditor key={refreshKey} detail={detail} onRefresh={triggerRefresh} /> },
   ]
 
   for (const { key, label } of resolveResourceTabs(agentType, agentTabs.tabs, resourceRegistry, agentConfig.features)) {
@@ -273,7 +276,7 @@ export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProp
       if (key === 'hook' && agentType === 'hermes') {
         tabs.push({
           key,
-          label,
+          label: t(label),
           render: () => (
             <HermesHooksViewer
               key={refreshKey}
@@ -287,7 +290,7 @@ export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProp
       }
       tabs.push({
         key,
-        label,
+        label: t(label),
         render: () => <res.List profileName={meta.name} agentType={agentType} />,
       })
       continue
@@ -295,13 +298,13 @@ export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProp
 
     const agentTab = AGENT_SPECIFIC_TABS[key]
     if (agentTab) {
-      tabs.push({ key, label, render: () => agentTab.render(agentTabContext) })
+      tabs.push({ key, label: t(label), render: () => agentTab.render(agentTabContext) })
     }
   }
 
   tabs.push({
     key: 'storage',
-    label: 'Storage',
+    label: t('tab.storage'),
     render: () => <StorageExplorer key={refreshKey} profilePath={detail.path} fileTree={fileTree} onRefresh={triggerRefresh} />,
   })
 
@@ -311,9 +314,9 @@ export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProp
     <div className="mx-auto w-full max-w-5xl px-8 py-10">
       {/* Header */}
       <div className="mb-6 flex items-center gap-4">
-        <Button variant="ghost" size="sm" onClick={onBack}>← Back to Profiles</Button>
+        <Button variant="ghost" size="sm" onClick={onBack}>← {t('detail.backToProfiles')}</Button>
         <div className="flex-1">
-          <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Profile</p>
+          <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">{t('detail.profile')}</p>
           <h1 className="mt-2 text-3xl font-bold tracking-tight text-foreground">{meta.name}</h1>
         </div>
         <Badge variant={badgeVariant as 'neutral' | 'primary' | 'success' | 'warning' | 'destructive' | 'info'}>
@@ -330,7 +333,7 @@ export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProp
 
       {activeTabDef
         ? activeTabDef.render()
-        : <p className="text-sm text-muted-foreground p-4">Tab not implemented: {activeTab}</p>}
+        : <p className="text-sm text-muted-foreground p-4">{t('detail.tabNotImplemented', { tab: activeTab })}</p>}
     </div>
   )
 }

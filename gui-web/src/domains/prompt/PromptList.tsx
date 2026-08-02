@@ -4,6 +4,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button, Card, CardContent, CardHeader, CardTitle, Textarea } from '@/components/ui'
 import { useToast } from '@/components/feedback/toast'
 import { readFile, saveFile } from '@/api/files'
@@ -18,6 +19,7 @@ interface PromptListProps {
 }
 
 export function PromptList({ profileName, agentType }: PromptListProps) {
+  const { t } = useTranslation()
   const { toast } = useToast()
   const configDir = useProfileConfigDir(profileName)
   const promptFile = AGENT_TYPE_CONFIGS[agentType].prompt_file
@@ -44,9 +46,9 @@ export function PromptList({ profileName, agentType }: PromptListProps) {
     try {
       await saveFile(promptPath, p.content)
       setEditedContent(p.content)
-      toast({ type: 'success', message: `${p.name} applied to ${promptFile}` })
+      toast({ type: 'success', message: t('prompt.toast.applied', { name: p.name, file: promptFile }) })
     } catch (e) {
-      toast({ type: 'error', message: e instanceof Error ? e.message : 'Apply failed' })
+      toast({ type: 'error', message: e instanceof Error ? e.message : t('prompt.toast.applyFailed') })
     } finally { setApplyingId(null) }
   }, [library, promptPath, promptFile, toast])
 
@@ -55,9 +57,9 @@ export function PromptList({ profileName, agentType }: PromptListProps) {
     setSaving(true)
     try {
       await saveFile(promptPath, editedContent)
-      toast({ type: 'success', message: `${promptFile} saved` })
+      toast({ type: 'success', message: t('prompt.toast.saved', { file: promptFile }) })
     } catch (e) {
-      toast({ type: 'error', message: e instanceof Error ? e.message : 'Save failed' })
+      toast({ type: 'error', message: e instanceof Error ? e.message : t('prompt.toast.saveFailed') })
     } finally { setSaving(false) }
   }, [promptPath, editedContent, promptFile, toast])
 
@@ -66,7 +68,7 @@ export function PromptList({ profileName, agentType }: PromptListProps) {
       {library.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Apply from Library ({library.length})</CardTitle>
+            <CardTitle className="text-sm">{t('prompt.applyFromLibrary', { count: library.length })}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-1">
@@ -76,7 +78,7 @@ export function PromptList({ profileName, agentType }: PromptListProps) {
                     <div className="text-sm font-medium">{p.name}</div>
                     {p.description && <div className="text-[11px] text-muted-foreground truncate">{p.description}</div>}
                   </div>
-                  <Button size="sm" variant="ghost" isLoading={applyingId === p.id} onClick={() => handleApply(p.id)}>Apply</Button>
+                  <Button size="sm" variant="ghost" isLoading={applyingId === p.id} onClick={() => handleApply(p.id)}>{t('prompt.apply')}</Button>
                 </div>
               ))}
             </div>
@@ -88,7 +90,7 @@ export function PromptList({ profileName, agentType }: PromptListProps) {
         <CardHeader className="pb-1">
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm font-mono">{promptFile}</CardTitle>
-            <Button size="sm" variant="ghost" isLoading={saving} onClick={handleSave}>Save</Button>
+            <Button size="sm" variant="ghost" isLoading={saving} onClick={handleSave}>{t('common.save')}</Button>
           </div>
         </CardHeader>
         <CardContent>
@@ -97,7 +99,7 @@ export function PromptList({ profileName, agentType }: PromptListProps) {
             onChange={e => setEditedContent(e.target.value)}
             rows={Math.min(30, Math.max(12, editedContent.split('\n').length + 2))}
             className="font-mono text-xs"
-            placeholder="# Custom instructions"
+            placeholder={t('prompt.placeholder')}
           />
         </CardContent>
       </Card>

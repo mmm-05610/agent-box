@@ -4,6 +4,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import type { AgentType, Profile } from '@/api'
+import i18n from '@/i18n'
 import { fetchProfiles } from '@/api'
 
 interface UseProfilesReturn {
@@ -26,7 +27,7 @@ export function useProfiles(): UseProfilesReturn {
       const data = await fetchProfiles()
       setProfiles(data)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load')
+      setError(e instanceof Error ? e.message : i18n.t('error.load'))
     } finally {
       setLoading(false)
     }

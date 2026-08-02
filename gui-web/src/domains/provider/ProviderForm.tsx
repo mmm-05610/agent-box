@@ -17,6 +17,7 @@
  * schemas in ./schema.ts mirror the same shapes for structural validation.
  */
 import { useMemo, type FormEvent } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui'
 import type { AgentType } from '@/api'
 import { AGENT_CONFIG } from '@/config'
@@ -24,13 +25,13 @@ import { getSoftWarnings } from '@/components/provider/ProviderFormFields'
 import { ProviderIdentityFields } from '@/components/provider/forms/shared'
 import { FIELD_REGISTRY, type ProviderFieldsProps } from './fields'
 
-// Per-agent name placeholder — matches what each old form passed to the
+// Per-agent name placeholder keys — matches what each old form passed to the
 // shared identity fields.
-const NAME_PLACEHOLDERS: Record<AgentType, string> = {
-  claude: 'Provider name',
-  codex: '例如：DeepSeek',
-  hermes: '例如：DeepSeek',
-  opencode: '例如：OpenRouter',
+const NAME_PLACEHOLDER_KEYS: Record<AgentType, string> = {
+  claude: 'providerForm.namePlaceholder.claude',
+  codex: 'providerForm.namePlaceholder.codex',
+  hermes: 'providerForm.namePlaceholder.hermes',
+  opencode: 'providerForm.namePlaceholder.opencode',
 }
 
 export interface ProviderFormProps extends ProviderFieldsProps {
@@ -60,6 +61,7 @@ export function ProviderForm({
   namePlaceholder,
   ...fieldProps
 }: ProviderFormProps) {
+  const { t } = useTranslation()
   const Fields = FIELD_REGISTRY[agentType] ?? FIELD_REGISTRY.claude
   // Fact source (stage 1) — agent identity drives per-agent defaults/display.
   const agentConfig = AGENT_CONFIG[agentType]
@@ -93,7 +95,7 @@ export function ProviderForm({
         onChange={identityOnChange}
         readOnly={readOnly}
         apiKeyUrl={presetApiKeyUrl}
-        namePlaceholder={namePlaceholder ?? NAME_PLACEHOLDERS[agentType]}
+        namePlaceholder={namePlaceholder ?? t(NAME_PLACEHOLDER_KEYS[agentType])}
       />
 
       <Fields
@@ -110,12 +112,12 @@ export function ProviderForm({
       <div className="flex items-center gap-2 pt-1">
         {onSave && (
           <Button type="submit" disabled={saving || readOnly} className="flex-1">
-            {saving ? 'Saving...' : (saveLabel ?? 'Save Provider Settings')}
+            {saving ? t('common.saving') : (saveLabel ?? t('providerForm.saveSettings'))}
           </Button>
         )}
         {onCancel && (
           <Button type="button" variant="ghost" onClick={onCancel} disabled={saving}>
-            Cancel
+            {t('common.cancel')}
           </Button>
         )}
       </div>

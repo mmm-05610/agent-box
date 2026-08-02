@@ -6,6 +6,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button, Card, Badge, Input, Tabs } from '@/components/ui'
 import { EmptyState, Loading } from '@/components/feedback'
 import { useToast } from '@/components/feedback/toast'
@@ -69,21 +70,29 @@ function resolveIconKey(name: string): string | undefined {
 // ── Launch modes ────────────────────────────────────────────────────────
 
 const LAUNCH_MODES = [
-  { value: '新会话', label: 'New Session' },
-  { value: '继续上次', label: 'Resume Last' },
+  { value: '新会话', labelKey: 'profiles.launchMode.newSession' },
+  { value: '继续上次', labelKey: 'profiles.launchMode.resumeLast' },
 ] as const
 
 // ── Filter tab type ─────────────────────────────────────────────────────
 
 type FilterTab = AgentType | 'all'
 
-const FILTER_TABS: { key: FilterTab; label: string }[] = [
-  { key: 'all', label: 'All' },
-  { key: 'claude', label: 'Claude' },
-  { key: 'codex', label: 'Codex' },
-  { key: 'hermes', label: 'Hermes' },
-  { key: 'opencode', label: 'OpenCode' },
+const FILTER_TABS: { key: FilterTab; labelKey: string }[] = [
+  { key: 'all', labelKey: 'profiles.filter.all' },
+  { key: 'claude', labelKey: 'agent.claude' },
+  { key: 'codex', labelKey: 'agent.codex' },
+  { key: 'hermes', labelKey: 'agent.hermes' },
+  { key: 'opencode', labelKey: 'agent.opencode' },
 ]
+
+/** Create-modal agent display names (brand names, identical in both packs). */
+const CREATE_AGENT_KEYS: Record<AgentType, string> = {
+  claude: 'agent.claudeCode',
+  codex: 'agent.codex',
+  hermes: 'agent.hermes',
+  opencode: 'agent.opencode',
+}
 
 // ── Component ───────────────────────────────────────────────────────────
 
@@ -94,6 +103,7 @@ interface ProfilesPageProps {
 }
 
 export function ProfilesPage({ onOpenDetail, autoOpenCreate, onAutoOpenCreateHandled }: ProfilesPageProps) {
+  const { t } = useTranslation()
   const { profiles, loading, error, refresh, filterByType } = useProfiles()
   const { sessions } = useSessions()
   const { toast } = useToast()
@@ -159,9 +169,9 @@ export function ProfilesPage({ onOpenDetail, autoOpenCreate, onAutoOpenCreateHan
           mode,
           cwd,
         })
-        toast({ type: 'success', message: `Launched "${name}" (${mode})` })
+        toast({ type: 'success', message: t('profiles.toast.launched', { name, mode }) })
       } catch {
-        toast({ type: 'error', message: `Failed to launch "${name}"` })
+        toast({ type: 'error', message: t('profiles.toast.launchFailed', { name }) })
       }
     },
     [profiles, toast],
@@ -178,10 +188,10 @@ export function ProfilesPage({ onOpenDetail, autoOpenCreate, onAutoOpenCreateHan
     setDeleteTarget(null)
     try {
       await deleteProfile(name)
-      toast({ type: 'success', message: `Deleted "${name}"` })
+      toast({ type: 'success', message: t('profiles.toast.deleted', { name }) })
       refresh()
     } catch {
-      toast({ type: 'error', message: `Failed to delete "${name}"` })
+      toast({ type: 'error', message: t('profiles.toast.deleteFailed', { name }) })
     }
   }, [deleteTarget, toast, refresh])
 
@@ -200,8 +210,8 @@ export function ProfilesPage({ onOpenDetail, autoOpenCreate, onAutoOpenCreateHan
     return (
       <div className="mx-auto w-full max-w-6xl px-8 py-10">
         <PageHeader
-          title="Profiles"
-          description="Manage agent configuration profiles."
+          title={t('profiles.title')}
+          description={t('profiles.description')}
           className="mb-6"
         />
         <Loading variant="skeleton" rows={4} />
@@ -213,14 +223,14 @@ export function ProfilesPage({ onOpenDetail, autoOpenCreate, onAutoOpenCreateHan
     return (
       <div className="mx-auto w-full max-w-6xl px-8 py-10">
         <PageHeader
-          title="Profiles"
-          description="Manage agent configuration profiles."
+          title={t('profiles.title')}
+          description={t('profiles.description')}
           className="mb-6"
         />
         <div className="flex flex-col items-center gap-3 py-16 text-destructive">
           <p>{error}</p>
           <Button variant="ghost" size="sm" onClick={refresh}>
-            Retry
+            {t('common.retry')}
           </Button>
         </div>
       </div>
@@ -230,15 +240,15 @@ export function ProfilesPage({ onOpenDetail, autoOpenCreate, onAutoOpenCreateHan
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col px-8 py-10">
       <PageHeader
-        title="Profiles"
+        title={t('profiles.title')}
         stats={
           <>
-            <span className="text-foreground font-medium">{profiles.length} profiles</span>
+            <span className="text-foreground font-medium">{t('profiles.count', { count: profiles.length })}</span>
           </>
         }
         action={
           <Button size="lg" onClick={() => setShowCreate(true)}>
-            + New Profile
+            {t('profiles.new')}
           </Button>
         }
         className="mb-6"
@@ -246,9 +256,9 @@ export function ProfilesPage({ onOpenDetail, autoOpenCreate, onAutoOpenCreateHan
 
       {/* Filter tabs */}
       <Tabs<FilterTab>
-        tabs={FILTER_TABS.map(({ key, label }) => ({
+        tabs={FILTER_TABS.map(({ key, labelKey }) => ({
           key,
-          label,
+          label: t(labelKey),
           count: countByType[key] ?? 0,
         }))}
         active={activeFilter}
@@ -259,7 +269,7 @@ export function ProfilesPage({ onOpenDetail, autoOpenCreate, onAutoOpenCreateHan
       {/* Search */}
       <div className="mb-4">
         <Input
-          placeholder="Search profiles..."
+          placeholder={t('profiles.searchPlaceholder')}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
         />
@@ -269,11 +279,11 @@ export function ProfilesPage({ onOpenDetail, autoOpenCreate, onAutoOpenCreateHan
       {filteredProfiles.length === 0 ? (
         <EmptyState
           icon="📭"
-          title={searchQuery ? 'No matches' : 'No profiles yet'}
+          title={searchQuery ? t('profiles.empty.noMatches') : t('profiles.empty.noProfiles')}
           description={
             searchQuery
-              ? 'Try a different search query'
-              : 'Create a profile to get started'
+              ? t('profiles.empty.noMatchesDesc')
+              : t('profiles.empty.noProfilesDesc')
           }
         />
       ) : (
@@ -308,15 +318,14 @@ export function ProfilesPage({ onOpenDetail, autoOpenCreate, onAutoOpenCreateHan
             onClick={e => e.stopPropagation()}
           >
             <div className="px-5 py-4">
-              <h3 className="font-semibold text-foreground">Delete Profile</h3>
+              <h3 className="font-semibold text-foreground">{t('profiles.delete.title')}</h3>
               <p className="mt-2 text-sm text-muted-foreground">
-                Are you sure you want to delete <span className="font-medium text-foreground">{deleteTarget}</span>?
-                This action cannot be undone.
+                {t('profiles.delete.message', { name: deleteTarget })}
               </p>
             </div>
             <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-border/60">
-              <Button variant="outline" size="sm" onClick={() => setDeleteTarget(null)}>Cancel</Button>
-              <Button size="sm" variant="destructive" onClick={confirmDelete}>Delete</Button>
+              <Button variant="outline" size="sm" onClick={() => setDeleteTarget(null)}>{t('common.cancel')}</Button>
+              <Button size="sm" variant="destructive" onClick={confirmDelete}>{t('profiles.delete.confirm')}</Button>
             </div>
           </div>
         </div>
@@ -336,6 +345,7 @@ function CreateProfileModal({
   onClose: () => void
   onCreated: () => void
 }) {
+  const { t } = useTranslation()
   const { toast } = useToast()
 
   const [name, setName] = useState('')
@@ -352,10 +362,10 @@ function CreateProfileModal({
         displayName: displayName.trim() || undefined,
         description: description.trim() || undefined,
       })
-      toast({ type: 'success', message: `Created "${name.trim()}"` })
+      toast({ type: 'success', message: t('profiles.toast.created', { name: name.trim() }) })
       onCreated()
     } catch (e) {
-      toast({ type: 'error', message: e instanceof Error ? e.message : 'Create failed' })
+      toast({ type: 'error', message: e instanceof Error ? e.message : t('profiles.toast.createFailed') })
     } finally {
       setCreating(false)
     }
@@ -369,7 +379,7 @@ function CreateProfileModal({
       >
         {/* Header */}
         <div className="sticky top-0 z-10 flex items-center justify-between gap-3 px-5 py-3 border-b border-border/60 bg-card rounded-t-xl shrink-0">
-          <h3 className="font-semibold text-foreground">Create Profile</h3>
+          <h3 className="font-semibold text-foreground">{t('profiles.create.title')}</h3>
           <Button variant="ghost" size="sm" onClick={onClose}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
           </Button>
@@ -379,7 +389,7 @@ function CreateProfileModal({
         <div className="overflow-y-auto p-5 space-y-4">
           {/* Agent Type */}
           <div>
-            <label className="text-sm font-medium text-foreground mb-2 block">Agent Type</label>
+            <label className="text-sm font-medium text-foreground mb-2 block">{t('profiles.create.agentType')}</label>
             <div className="grid grid-cols-2 gap-2">
               {AGENT_TYPES.map((at) => (
                 <button
@@ -397,7 +407,7 @@ function CreateProfileModal({
                     alt={at}
                     className="h-5 w-5 object-contain"
                   />
-                  {at === 'claude' ? 'Claude Code' : at === 'codex' ? 'Codex' : at === 'hermes' ? 'Hermes' : 'OpenCode'}
+                  {t(CREATE_AGENT_KEYS[at])}
                 </button>
               ))}
             </div>
@@ -406,13 +416,13 @@ function CreateProfileModal({
           {/* Name */}
           <div>
             <label className="text-sm font-medium text-foreground mb-1 block" htmlFor="profile-name">
-              Profile Name <span className="text-destructive">*</span>
+              {t('profiles.create.name')} <span className="text-destructive">*</span>
             </label>
             <Input
               id="profile-name"
               value={name}
               onChange={e => setName(e.target.value)}
-              placeholder="e.g. my-codex-dev"
+              placeholder={t('profiles.create.namePlaceholder')}
               onKeyDown={e => { if (e.key === 'Enter') handleCreate() }}
             />
           </div>
@@ -420,35 +430,35 @@ function CreateProfileModal({
           {/* Display Name */}
           <div>
             <label className="text-sm font-medium text-foreground mb-1 block" htmlFor="profile-display">
-              Display Name
+              {t('profiles.create.displayName')}
             </label>
             <Input
               id="profile-display"
               value={displayName}
               onChange={e => setDisplayName(e.target.value)}
-              placeholder="Optional display name"
+              placeholder={t('profiles.create.displayNamePlaceholder')}
             />
           </div>
 
           {/* Description */}
           <div>
             <label className="text-sm font-medium text-foreground mb-1 block" htmlFor="profile-desc">
-              Description
+              {t('profiles.create.description')}
             </label>
             <Input
               id="profile-desc"
               value={description}
               onChange={e => setDescription(e.target.value)}
-              placeholder="Optional description"
+              placeholder={t('profiles.create.descriptionPlaceholder')}
             />
           </div>
         </div>
 
         {/* Footer */}
         <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-border/60 rounded-b-xl">
-          <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
+          <Button variant="outline" size="sm" onClick={onClose}>{t('common.cancel')}</Button>
           <Button size="sm" onClick={handleCreate} disabled={!name.trim() || creating} isLoading={creating}>
-            Create
+            {t('profiles.create.create')}
           </Button>
         </div>
       </div>
@@ -480,6 +490,7 @@ function ProfileCard({
   onDelete: (name: string) => void
   onView: (name: string) => void
 }) {
+  const { t } = useTranslation()
   const { name, agentType, displayName, description, providerRef, createdAt } =
     profile
 
@@ -561,7 +572,7 @@ function ProfileCard({
                   : 'bg-muted text-muted-foreground',
               )}
             >
-              {isRunning ? 'Active' : 'Idle'}
+              {isRunning ? t('profiles.card.active') : t('profiles.card.idle')}
             </span>
             {providerRef && (
               <span
@@ -599,7 +610,7 @@ function ProfileCard({
           <button
             onClick={handleBrowse}
             className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-fast cursor-pointer hover:scale-110"
-            title="Browse for directory"
+            title={t('profiles.card.browse')}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
               <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" />
@@ -608,7 +619,7 @@ function ProfileCard({
           <button
             onClick={() => onView(name)}
             className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-fast cursor-pointer hover:scale-110"
-            title="View profile"
+            title={t('profiles.card.view')}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
               <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
@@ -618,7 +629,7 @@ function ProfileCard({
           <button
             onClick={() => onDelete(name)}
             className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all duration-fast cursor-pointer hover:scale-110"
-            title="Delete profile"
+            title={t('profiles.card.delete')}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 6h18" />
@@ -637,7 +648,7 @@ function ProfileCard({
           >
             {LAUNCH_MODES.map((m) => (
               <option key={m.value} value={m.value}>
-                {m.label}
+                {t(m.labelKey)}
               </option>
             ))}
           </select>
@@ -648,7 +659,7 @@ function ProfileCard({
               <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0" />
               <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" />
             </svg>
-            Launch
+            {t('profiles.card.launch')}
           </Button>
         </div>
       </div>

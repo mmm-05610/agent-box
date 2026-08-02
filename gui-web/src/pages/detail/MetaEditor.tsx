@@ -8,6 +8,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Button,
   Card,
@@ -22,6 +23,7 @@ import { editProfile } from '@/api'
 import type { ProfileDetail } from '../detail'
 
 export function MetaEditor({ detail, onRefresh }: { detail: ProfileDetail; onRefresh: () => void }) {
+  const { t } = useTranslation()
   const { meta } = detail
   const [displayName, setDisplayName] = useState(meta.display_name ?? '')
   const [description, setDescription] = useState(meta.description ?? '')
@@ -41,9 +43,9 @@ export function MetaEditor({ detail, onRefresh }: { detail: ProfileDetail; onRef
     try {
       await editProfile(meta.name, { displayName, description })
       onRefresh()
-      toast({ type: 'success', message: 'Profile metadata saved' })
+      toast({ type: 'success', message: t('meta.toast.saved') })
     } catch (error) {
-      toast({ type: 'error', message: error instanceof Error ? error.message : 'Failed to save' })
+      toast({ type: 'error', message: error instanceof Error ? error.message : t('meta.toast.failed') })
     } finally {
       setSaving(false)
     }
@@ -57,39 +59,39 @@ export function MetaEditor({ detail, onRefresh }: { detail: ProfileDetail; onRef
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle>Profile Info</CardTitle>
+          <CardTitle>{t('meta.title')}</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Identity is read-only. Edit the friendly fields below to customize how this profile appears.
+            {t('meta.subtitle')}
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Identity — read-only */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <ReadOnlyField label="Name" value={meta.name} mono />
-            <ReadOnlyField label="Agent Type" value={meta.agent_type} />
+            <ReadOnlyField label={t('meta.name')} value={meta.name} mono />
+            <ReadOnlyField label={t('meta.agentType')} value={meta.agent_type} />
           </div>
 
           {/* Editable friendly fields */}
           <div className="space-y-3">
             <div>
               <label className="mb-1 block text-xs font-medium text-muted-foreground">
-                Display Name
+                {t('meta.displayName')}
               </label>
               <Input
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="Human-readable name"
+                placeholder={t('meta.displayNamePlaceholder')}
                 className="text-sm"
               />
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-muted-foreground">
-                Description
+                {t('meta.description')}
               </label>
               <Textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="What this profile is for..."
+                placeholder={t('meta.descriptionPlaceholder')}
                 rows={3}
                 className="text-sm"
               />
@@ -99,14 +101,14 @@ export function MetaEditor({ detail, onRefresh }: { detail: ProfileDetail; onRef
           {/* Library references */}
           {(meta.provider || meta.preset) && (
             <div className="grid grid-cols-1 gap-4 border-t border-border/60 pt-4 sm:grid-cols-2">
-              {meta.provider && <ReadOnlyField label="Provider" value={meta.provider} mono />}
-              {meta.preset && <ReadOnlyField label="Preset" value={meta.preset} mono />}
+              {meta.provider && <ReadOnlyField label={t('meta.provider')} value={meta.provider} mono />}
+              {meta.preset && <ReadOnlyField label={t('meta.preset')} value={meta.preset} mono />}
             </div>
           )}
 
           <div className="flex justify-end pt-2">
             <Button onClick={handleSave} disabled={saving || !isDirty}>
-              {saving ? 'Saving...' : 'Save Changes'}
+              {saving ? t('common.saving') : t('meta.saveChanges')}
             </Button>
           </div>
         </CardContent>
@@ -143,6 +145,7 @@ function PathsCard({
   open: boolean
   onToggle: () => void
 }) {
+  const { t } = useTranslation()
   return (
     <Card elevation="flat" className="ring-1 ring-border/60">
       <button
@@ -161,9 +164,9 @@ function PathsCard({
             </svg>
           </div>
           <div>
-            <h4 className="text-sm font-medium text-foreground">Paths</h4>
+            <h4 className="text-sm font-medium text-foreground">{t('meta.paths')}</h4>
             <p className="text-xs text-muted-foreground">
-              Filesystem locations used by this profile.
+              {t('meta.pathsDesc')}
             </p>
           </div>
         </div>
@@ -180,8 +183,8 @@ function PathsCard({
       </button>
       {open && (
         <div className="space-y-2 border-t border-border/60 px-4 py-3">
-          <PathRow label="Profile" path={profilePath} />
-          <PathRow label="Config" path={configDir} />
+          <PathRow label={t('meta.pathProfile')} path={profilePath} />
+          <PathRow label={t('meta.pathConfig')} path={configDir} />
         </div>
       )}
     </Card>
@@ -189,6 +192,7 @@ function PathsCard({
 }
 
 function PathRow({ label, path }: { label: string; path: string }) {
+  const { t } = useTranslation()
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(path)
@@ -205,8 +209,8 @@ function PathRow({ label, path }: { label: string; path: string }) {
       <button
         type="button"
         onClick={handleCopy}
-        aria-label={`Copy ${label} path`}
-        title="Copy to clipboard"
+        aria-label={t('meta.copyPath', { label })}
+        title={t('meta.copyToClipboard')}
         className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-card hover:text-foreground focus:outline-none focus:ring-2 focus:ring-accent/30"
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
