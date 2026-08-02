@@ -1,5 +1,5 @@
 /**
- * Rules Tab — Codex rules directory.
+ * Rules — Codex rules directory.
  *
  * Reads `*.rules` files from `${configDir}/rules`, shows rule count, an
  * expandable preview, an inline textarea editor and a delete confirm.
@@ -21,6 +21,7 @@ import {
 } from '@/components/ui'
 import { useToast } from '@/components/feedback/toast'
 import { deletePath, findFiles, readFile, saveFile } from '@/api/files'
+import { useProfileConfigDir } from '../useProfileConfigDir'
 
 interface RuleFile {
   /** Filename without `.rules` extension. */
@@ -56,12 +57,10 @@ async function loadRules(rulesDir: string): Promise<RuleFile[]> {
   return loaded.sort((left, right) => left.id.localeCompare(right.id))
 }
 
-export function RulesTab({ configDir, profileName, refreshKey }: {
-  profileName: string
-  configDir: string
-  refreshKey?: number
-}) {
+export function RulesList({ profileName }: { profileName: string }) {
   const { t } = useTranslation()
+  const configDir = useProfileConfigDir(profileName)
+  const [refreshKey, setRefreshKey] = useState(0)
   const [rules, setRules] = useState<RuleFile[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -71,9 +70,15 @@ export function RulesTab({ configDir, profileName, refreshKey }: {
   const [pendingDelete, setPendingDelete] = useState<RuleFile | null>(null)
   const [deleting, setDeleting] = useState(false)
   const { toast } = useToast()
-  const rulesDir = `${configDir.replace(/\/+$/, '')}/rules`
+  const rulesDir = configDir === null ? null : `${configDir.replace(/\/+$/, '')}/rules`
 
   const refresh = useCallback(async () => {
+    if (!rulesDir) {
+      setRules([])
+      setLoading(false)
+      setLoadError('')
+      return
+    }
     setLoading(true)
     setLoadError('')
     try {
@@ -126,6 +131,7 @@ export function RulesTab({ configDir, profileName, refreshKey }: {
         : r))
       cancelEditing(rule.id)
       toast({ type: 'success', message: t('rules.toast.saved', { name: rule.id }) })
+      setRefreshKey((k) => k + 1)
     } catch (error) {
       toast({ type: 'error', message: error instanceof Error ? error.message : t('rules.toast.saveFailed') })
     } finally {
@@ -148,6 +154,7 @@ export function RulesTab({ configDir, profileName, refreshKey }: {
       cancelEditing(removedId)
       toast({ type: 'success', message: t('rules.toast.removed', { name: pendingDelete.id, profile: profileName }) })
       setPendingDelete(null)
+      setRefreshKey((k) => k + 1)
     } catch (error) {
       toast({ type: 'error', message: error instanceof Error ? error.message : t('rules.toast.removeFailed') })
     } finally {
@@ -180,7 +187,7 @@ export function RulesTab({ configDir, profileName, refreshKey }: {
           <p className="text-sm text-muted-foreground">
             <Trans
               i18nKey="rules.empty"
-              values={{ dir: rulesDir }}
+              values={{ dir: rulesDir ?? '' }}
               components={{ code: <code className="font-mono" /> }}
             />
           </p>

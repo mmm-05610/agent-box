@@ -1,7 +1,7 @@
 /**
- * Permissions Editor — structured allow/deny/ask rule editor.
+ * Permissions — structured allow/deny/ask rule editor (Claude).
  *
- * Reads/writes settings.json → permissions key.
+ * Reads/writes settings.json → permissions key for the given profile.
  *
  * Two modes:
  *   - Visual (default): three rule groups (allow/deny/ask) with per-group cards,
@@ -23,7 +23,8 @@ import {
   Input,
 } from '@/components/ui'
 import { useToast } from '@/components/feedback/toast'
-import { patchJsonFile } from '@/api/files'
+import { patchJsonFile, readFile } from '@/api/files'
+import { useProfileConfigDir } from '../useProfileConfigDir'
 
 type RuleGroup = 'allow' | 'deny' | 'ask'
 
@@ -140,10 +141,12 @@ function GroupIcon({ group }: { group: RuleGroup }) {
 
 // ── Main component ─────────────────────────────────────────────────────
 
-export function PermissionsEditor({ path, content, onRefresh }: {
-  path: string; content: string; onRefresh: () => void
-}) {
+export function PermissionsList({ profileName }: { profileName: string }) {
   const { t } = useTranslation()
+  const configDir = useProfileConfigDir(profileName)
+  const path = configDir === null ? null : `${configDir}/settings.json`
+  const [content, setContent] = useState('{}')
+  const [refreshKey, setRefreshKey] = useState(0)
   const initial = useMemo(() => parse(content), [content])
 
   const [allow, setAllow] = useState<string[]>(initial.allow ?? [])
@@ -157,6 +160,16 @@ export function PermissionsEditor({ path, content, onRefresh }: {
   const [saving, setSaving] = useState(false)
   const [pendingRemove, setPendingRemove] = useState<{ group: RuleGroup; rule: string } | null>(null)
   const { toast } = useToast()
+
+  // Self-fetch settings.json → permissions for the profile.
+  useEffect(() => {
+    if (!path) return
+    let cancelled = false
+    readFile(path)
+      .then((raw) => { if (!cancelled) setContent(raw) })
+      .catch(() => { if (!cancelled) setContent('{}') })
+    return () => { cancelled = true }
+  }, [path, refreshKey])
 
   // Re-sync from content when it changes externally (e.g. onRefresh invalidation).
   useEffect(() => {
@@ -203,17 +216,18 @@ export function PermissionsEditor({ path, content, onRefresh }: {
   }, [rawOpen, closeRawPanel])
 
   const handleSave = useCallback(async () => {
+    if (!path) return
     setSaving(true)
     try {
       await patchJsonFile(path, 'permissions', { allow, deny, ask, defaultMode })
-      onRefresh()
+      setRefreshKey((k) => k + 1)
       toast({ type: 'success', message: t('permissions.toast.saved') })
     } catch (error) {
       toast({ type: 'error', message: error instanceof Error ? error.message : t('permissions.toast.failed') })
     } finally {
       setSaving(false)
     }
-  }, [path, allow, deny, ask, defaultMode, onRefresh, toast])
+  }, [path, allow, deny, ask, defaultMode, toast])
 
   const totalRules = allow.length + deny.length + ask.length
 

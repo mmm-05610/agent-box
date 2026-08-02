@@ -1,6 +1,6 @@
 /**
- * OpenCode Instructions Tab — read-only display of the `instructions` array
- * from opencode.jsonc. Each entry can be a local path, glob, or URL.
+ * Instructions — read-only display of the `instructions` array from
+ * opencode.jsonc (OpenCode). Each entry can be a local path, glob, or URL.
  *
  * For local-path entries we best-effort detect file existence via findFiles
  * on the parent directory. URLs and globs are always marked "URL / glob".
@@ -17,12 +17,9 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui'
-import { findFiles } from '@/api/files'
-
-interface OpenCodeInstructionsTabProps {
-  configJsonc: string
-  profilePath: string
-}
+import { findFiles, readFile } from '@/api/files'
+import { useProfileConfigDir } from '../useProfileConfigDir'
+import { useProfilePath } from '../useProfilePath'
 
 interface InstructionRow {
   raw: string
@@ -75,14 +72,30 @@ function parseInstructions(raw: string): string[] {
   }
 }
 
-export function OpenCodeInstructionsTab({ configJsonc, profilePath }: OpenCodeInstructionsTabProps) {
+export function InstructionsList({ profileName }: { profileName: string }) {
   const { t } = useTranslation()
+  const configDir = useProfileConfigDir(profileName)
+  const profilePath = useProfilePath(profileName)
+  const [configJsonc, setConfigJsonc] = useState('')
+  const configPath = configDir === null ? null : `${configDir}/opencode.jsonc`
+
+  // Self-fetch opencode.jsonc → instructions for the profile.
+  useEffect(() => {
+    if (!configPath) return
+    let cancelled = false
+    readFile(configPath)
+      .then((raw) => { if (!cancelled) setConfigJsonc(raw) })
+      .catch(() => { if (!cancelled) setConfigJsonc('') })
+    return () => { cancelled = true }
+  }, [configPath])
+
   const rawEntries = useMemo(() => parseInstructions(configJsonc), [configJsonc])
   const [existsMap, setExistsMap] = useState<Record<string, boolean | null>>({})
 
   useEffect(() => {
     let cancelled = false
     async function probe() {
+      if (!profilePath) return
       const updates: Record<string, boolean | null> = {}
       for (const raw of rawEntries) {
         const kind = classify(raw)
