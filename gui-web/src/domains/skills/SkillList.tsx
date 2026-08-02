@@ -1,85 +1,20 @@
 /**
  * Skills List — Available (ACS library) on top + Installed below.
  * Each installed skill has a Detail button → modal with full info + edit.
- * Library data via useSkills; profile data via the api layer.
+ * Library data via useLibrary; installed skills via useProfileResources.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import {
   Badge, Button, Card, CardContent, CardHeader, CardTitle,
   Input, Textarea,
 } from '@/components/ui'
 import { useToast } from '@/components/feedback/toast'
-import { deletePath, findFiles, readFile, saveFile } from '@/api/files'
-import { useSkills } from '@/hooks'
+import { deletePath, readFile, saveFile } from '@/api/files'
+import { useLibrary, useProfileResources } from '@/hooks'
+import { parseFrontmatter, type InstalledSkill } from '@/hooks/useProfileResources'
 import { applySkillToProfile, removeSkillFromProfile } from '@/api'
 import type { AgentType, Skill } from '@/api'
-import { useProfileConfigDir } from '../useProfileConfigDir'
-
-// ── Types ─────────────────────────────────────────────────────────────────
-
-interface InstalledSkill {
-  id: string
-  name: string
-  description: string
-  directory: string
-  skillFilePath: string
-  skillFileName: 'SKILL.md' | 'DESCRIPTION.md'
-  frontmatter: Record<string, string>
-  content: string
-  files: string[]
-}
-
-// ── Helpers ──────────────────────────────────────────────────────────────
-
-function parseFrontmatter(content: string): Record<string, string> {
-  const normalized = content.replace(/\r\n/g, '\n')
-  const match = normalized.match(/^---\s*\n([\s\S]*?)\n---(?:\s*\n|$)/)
-  if (!match) return {}
-  const values: Record<string, string> = {}
-  const body = match[1] ?? ''
-  for (const line of body.split('\n')) {
-    const field = line.match(/^([A-Za-z0-9_-]+):\s*(.*)$/)
-    if (!field) continue
-    const key = field[1] ?? ''
-    const value = field[2] ?? ''
-    values[key] = value.trim().replace(/^(['"])(.*)\1$/, '$2')
-  }
-  return values
-}
-
-function relativePath(path: string, root: string): string {
-  const r = root.replace(/\/+$/, '')
-  return path.startsWith(`${r}/`) ? path.slice(r.length + 1) : path
-}
-
-async function loadInstalled(dir: string, root: string): Promise<InstalledSkill[]> {
-  const paths = await findFiles(dir).catch(() => [] as string[])
-  const pathList = Array.isArray(paths) ? paths : []
-  const byDir = new Map<string, { skillMd: string | null; descMd: string | null }>()
-  for (const p of pathList) {
-    const base = p.split('/').pop()
-    if (base !== 'SKILL.md' && base !== 'DESCRIPTION.md') continue
-    const d = p.slice(0, -(base.length + 1))
-    const entry = byDir.get(d) ?? { skillMd: null, descMd: null }
-    if (base === 'SKILL.md') entry.skillMd = p
-    else entry.descMd = p
-    byDir.set(d, entry)
-  }
-  const results = await Promise.all(
-    Array.from(byDir.entries()).map(async ([dir, entry]) => {
-      const fp = entry.skillMd ?? entry.descMd
-      if (!fp) return null
-      const fn = entry.skillMd ? 'SKILL.md' : 'DESCRIPTION.md'
-      const content = await readFile(fp).catch(() => '')
-      const fm = parseFrontmatter(content)
-      const id = relativePath(dir, root)
-      const files = pathList.filter(p => p.startsWith(`${dir}/`)).map(p => relativePath(p, dir)).sort((a, b) => a.localeCompare(b))
-      return { id, name: fm.name || id, description: fm.description || '', directory: dir, skillFilePath: fp, skillFileName: fn, frontmatter: fm, content, files } satisfies InstalledSkill
-    })
-  )
-  return results.filter((s): s is InstalledSkill => s !== null).sort((a, b) => a.name.localeCompare(b.name))
-}
 
 // ── Detail Modal ──────────────────────────────────────────────────────────
 
@@ -204,36 +139,29 @@ interface SkillListProps {
 export function SkillList({ profileName, agentType }: SkillListProps) {
   const at = agentType ?? 'claude'
   const { toast } = useToast()
-  const configDir = useProfileConfigDir(profileName)
+  const { skills: library } = useLibrary(at, ['skills'])
+  const {
+    skills: installed,
+    configDir,
+    skillsLoading: loading,
+    error: loadError,
+    refresh: refreshInstalled,
+    updateSkill,
+  } = useProfileResources(profileName, { includeSkills: true })
   const skillsDir = configDir === null ? null : `${configDir.replace(/\/+$/, '')}/skills`
 
-  // Installed
-  const [installed, setInstalled] = useState<InstalledSkill[]>([])
-  const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState('')
   const [removingId, setRemovingId] = useState<string | null>(null)
   const [detailSkill, setDetailSkill] = useState<InstalledSkill | null>(null)
   const [tick, setTick] = useState(0)
   const [installedFilter, setInstalledFilter] = useState('')
 
   // Library
-  const { skills: library } = useSkills(at)
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [searchResults, setSearchResults] = useState<Skill[]>([])
   const [page, setPage] = useState(0)
   const PER_PAGE = 5
   const [applyingId, setApplyingId] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (!skillsDir) return
-    let cancelled = false
-    setLoading(true); setLoadError('')
-    loadInstalled(skillsDir, skillsDir).then(s => { if (!cancelled) setInstalled(s) })
-      .catch(e => { if (!cancelled) { setInstalled([]); setLoadError(e instanceof Error ? e.message : 'Failed') } })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
-  }, [skillsDir])
 
   // Filter + Paginate (filter first)
   const installedIds = useMemo(() => new Set(installed.map(s => s.id)), [installed])
@@ -254,27 +182,27 @@ export function SkillList({ profileName, agentType }: SkillListProps) {
     setApplyingId(skillId)
     try {
       await applySkillToProfile(profileName, skillId)
-      await loadInstalled(skillsDir, skillsDir).then(setInstalled)
+      await refreshInstalled()
       setTick(t => t + 1)
       toast({ type: 'success', message: `${skillId} applied` })
     } catch (e) {
       toast({ type: 'error', message: e instanceof Error ? e.message : 'Apply failed' })
     } finally { setApplyingId(null) }
-  }, [profileName, skillsDir, toast])
+  }, [profileName, skillsDir, toast, refreshInstalled])
 
   const handleRemove = useCallback(async (skillId: string) => {
     if (!skillsDir) return
     setRemovingId(skillId)
     try {
       await removeSkillFromProfile(profileName, skillId)
-      setInstalled(prev => prev.filter(s => s.id !== skillId))
+      await refreshInstalled()
       setTick(t => t + 1)
       toast({ type: 'success', message: `${skillId} removed` })
     } catch {
-      try { await deletePath(`${skillsDir}/${skillId}`); setInstalled(prev => prev.filter(s => s.id !== skillId)); setTick(t => t + 1); toast({ type: 'success', message: `${skillId} removed` }) }
+      try { await deletePath(`${skillsDir}/${skillId}`); await refreshInstalled(); setTick(t => t + 1); toast({ type: 'success', message: `${skillId} removed` }) }
       catch { toast({ type: 'error', message: 'Remove failed' }) }
     } finally { setRemovingId(null) }
-  }, [profileName, skillsDir, toast])
+  }, [profileName, skillsDir, toast, refreshInstalled])
 
   return (
     <div className="space-y-6">
@@ -350,7 +278,7 @@ export function SkillList({ profileName, agentType }: SkillListProps) {
       {/* Detail Modal */}
       {detailSkill && (
         <SkillDetailModal skill={detailSkill} onClose={() => setDetailSkill(null)}
-          onSaved={updated => { setInstalled(prev => prev.map(s => s.id === updated.id ? updated : s)); setDetailSkill(updated) }}
+          onSaved={updated => { updateSkill(updated); setDetailSkill(updated) }}
         />
       )}
     </div>

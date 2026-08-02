@@ -4,7 +4,7 @@
  * Claude / Codex: single-provider overwrite.
  * Hermes / OpenCode: additive mode — multiple provider entries, Add / Remove.
  *
- * Library data via useProviders; profile config files are read through the
+ * Library data via useLibrary; profile config files are read through the
  * api layer (config dir resolved from the profile).
  */
 
@@ -12,16 +12,14 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Card, CardContent, CardHeader, CardTitle, Textarea } from '@/components/ui'
 import { useToast } from '@/components/feedback/toast'
 import {
-  applyProvider, fetchProfileProviders, removeProfileProvider,
-  type ProfileProvider,
+  applyProvider, removeProfileProvider,
 } from '@/api/providers'
 import { readFile, saveFile } from '@/api/files'
 import { ProviderIcon } from '@/components/ProviderIcon'
 import { hasIcon } from '@/icons/extracted'
 import { AGENT_TYPE_CONFIGS } from '@/api'
-import { useProviders } from '@/hooks'
+import { useLibrary, useProfileResources } from '@/hooks'
 import type { AgentType } from '@/api'
-import { useProfileConfigDir } from '../useProfileConfigDir'
 
 // ── Icon helpers ──────────────────────────────────────────────────────────
 
@@ -60,15 +58,18 @@ function parseActiveProvider(yamlContent: string): string | null {
 export function ProviderList({ agentType, profileName }: ProviderListProps) {
   const isAdditive = AGENT_TYPE_CONFIGS[agentType].provider_apply_mode === 'additive'
   const { toast } = useToast()
-  const configDir = useProfileConfigDir(profileName)
 
   // Library providers (from ACS)
-  const { providers: libraryProviders } = useProviders(agentType)
+  const { providers: libraryProviders } = useLibrary(agentType, ['providers'])
   const [applyingId, setApplyingId] = useState<string | null>(null)
   const [activeProviderId, setActiveProviderId] = useState<string | null>(null)
 
-  // Profile-local providers (additive mode)
-  const [profileProviders, setProfileProviders] = useState<ProfileProvider[]>([])
+  // Profile-local providers (additive mode) + config dir (from the object hook)
+  const {
+    providers: profileProviders,
+    configDir,
+    refresh: refreshProfileProviders,
+  } = useProfileResources(profileName)
   const [removingId, setRemovingId] = useState<string | null>(null)
 
   // Config file editing
@@ -88,12 +89,6 @@ export function ProviderList({ agentType, profileName }: ProviderListProps) {
   }, [configDir, agentType])
 
   useEffect(() => { void reloadConfigFiles() }, [reloadConfigFiles])
-
-  useEffect(() => {
-    if (isAdditive) {
-      fetchProfileProviders(profileName).then(setProfileProviders).catch(() => setProfileProviders([]))
-    }
-  }, [agentType, profileName, isAdditive])
 
   // Detect active provider from config files (Claude / Codex)
   useEffect(() => {
@@ -134,10 +129,7 @@ export function ProviderList({ agentType, profileName }: ProviderListProps) {
     try {
       await applyProvider(profileName, providerId)
       if (!isAdditive) setActiveProviderId(providerId)
-      if (isAdditive) {
-        const list = await fetchProfileProviders(profileName).catch(() => [] as ProfileProvider[])
-        setProfileProviders(list)
-      }
+      if (isAdditive) await refreshProfileProviders()
       await reloadConfigFiles()
       const provider = libraryProviders.find(p => p.id === providerId)
       toast({ type: 'success', message: `${provider?.name ?? providerId} applied to ${profileName}` })
@@ -146,13 +138,13 @@ export function ProviderList({ agentType, profileName }: ProviderListProps) {
     } finally {
       setApplyingId(null)
     }
-  }, [profileName, libraryProviders, toast, isAdditive, reloadConfigFiles])
+  }, [profileName, libraryProviders, toast, isAdditive, reloadConfigFiles, refreshProfileProviders])
 
   const handleRemove = useCallback(async (providerId: string) => {
     setRemovingId(providerId)
     try {
       await removeProfileProvider(profileName, providerId)
-      setProfileProviders(prev => prev.filter(p => p.id !== providerId))
+      await refreshProfileProviders()
       await reloadConfigFiles()
       const provider = profileProviders.find(p => p.id === providerId)
       toast({ type: 'success', message: `${provider?.name ?? providerId} removed` })
@@ -161,7 +153,7 @@ export function ProviderList({ agentType, profileName }: ProviderListProps) {
     } finally {
       setRemovingId(null)
     }
-  }, [profileName, profileProviders, toast, reloadConfigFiles])
+  }, [profileName, profileProviders, toast, reloadConfigFiles, refreshProfileProviders])
 
   // ── Save config file ────────────────────────────────────────────────────
 
