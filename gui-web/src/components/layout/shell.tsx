@@ -4,10 +4,6 @@
  * Provides the sidebar + content area structure.
  * All pages are rendered inside the Shell.
  *
- * @example
- *   <Shell active="library" onNav={setPage}>
- *     <LibraryPage />
- *   </Shell>
  */
 
 import { type ReactNode } from 'react'

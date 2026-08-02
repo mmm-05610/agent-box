@@ -32,14 +32,6 @@ export async function fetchSkills(agentType: AgentType): Promise<Skill[]> {
   return raw.map(toSkill)
 }
 
-export async function fetchSkillDetail(skillId: string): Promise<Skill | null> {
-  const raw = await call<Record<string, unknown> | null>(
-    (api) => api.get_skill(skillId),
-    null,
-  )
-  return raw ? toSkill(raw) : null
-}
-
 export async function saveSkill(
   skillId: string,
   dataJson: string,

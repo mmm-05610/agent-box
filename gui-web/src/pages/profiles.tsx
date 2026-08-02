@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils'
 import { formatRelativeTime } from '@/lib/utils'
 import type { AgentType, Profile } from '@/api'
 import { AGENT_TYPES, AGENT_TYPE_COLORS, createProfile, deleteProfile, launchProfile, getLastCwdMap, browseDir } from '@/api'
+import { readSettings } from '@/lib/settings'
 import { ProviderIcon } from '@/components/ProviderIcon'
 import { hasIcon, getIconMetadata } from '@/icons/extracted'
 
@@ -497,7 +498,7 @@ function ProfileCard({
 
   const handleBrowse = async () => {
     try {
-      const path = await browseDir()
+      const path = await browseDir(readSettings().projects_dir)
       if (path) setCwd(path)
     } catch {
       // silently ignore

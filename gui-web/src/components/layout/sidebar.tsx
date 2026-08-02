@@ -21,7 +21,6 @@ import { StatusDot } from '@/components/feedback'
 export type NavKey =
   | 'home'
   | 'profiles'
-  | 'library'
   | 'sessions'
   | 'settings'
   | 'help'
@@ -58,16 +57,6 @@ function ProfilesIcon() {
       <path d="M2.5 20a6.5 6.5 0 0113 0" />
       <circle cx="17" cy="9" r="2.5" />
       <path d="M21.5 18a4.5 4.5 0 00-7-3.7" />
-    </svg>
-  )
-}
-
-function LibraryIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-      <path d="M3 5h7v14H3z" />
-      <path d="M10 5h7v14h-7z" />
-      <path d="M17 5h4v14h-4z" />
     </svg>
   )
 }
@@ -120,7 +109,6 @@ function PlusIcon() {
 const NAV_ITEMS: NavItem[] = [
   { key: 'home', label: 'Home', icon: <HomeIcon /> },
   { key: 'profiles', label: 'Profiles', icon: <ProfilesIcon /> },
-  // { key: 'library', label: 'Library', icon: <LibraryIcon /> },  {/* ACS migration: hidden */}
   { key: 'sessions', label: 'Sessions', icon: <SessionsIcon /> },
   { key: 'settings', label: 'Settings', icon: <SettingsIcon /> },
   { key: 'help', label: 'Help', icon: <HelpIcon /> },

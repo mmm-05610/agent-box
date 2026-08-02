@@ -77,8 +77,6 @@ function PageRouter({
       return <HomePage onNav={onNav} />
     case 'profiles':
       return <ProfilesPage onOpenDetail={onOpenDetail} autoOpenCreate={autoOpenCreate} onAutoOpenCreateHandled={onAutoOpenCreateHandled} />
-    // case 'library':   {/* ACS migration: hidden */}
-    //   return <LibraryPage />
     case 'sessions':
       return <SessionsPage />
     case 'settings':

@@ -10,28 +10,15 @@ import { Button, Card } from '@/components/ui'
 import { useToast } from '@/components/feedback/toast'
 import { PageHeader } from '@/components/layout'
 import { cn } from '@/lib/utils'
-import { getSettings, saveSettings, browseDir } from '@/api'
-
-// ── Types ──────────────────────────────────────────────────────────────
-
-type Theme = 'system' | 'light' | 'dark'
+import { browseDir } from '@/api'
+import { readSettings, writeSettings, type Theme } from '@/lib/settings'
 
 // ── Helpers ────────────────────────────────────────────────────────────
-
-const STORAGE_KEY = 'agent-box-theme'
 
 function getSystemTheme(): 'light' | 'dark' {
   return window.matchMedia('(prefers-color-scheme: dark)').matches
     ? 'dark'
     : 'light'
-}
-
-function readStoredTheme(): Theme {
-  const stored = localStorage.getItem(STORAGE_KEY)
-  if (stored === 'light' || stored === 'dark' || stored === 'system') {
-    return stored
-  }
-  return 'system'
 }
 
 function applyTheme(theme: Theme) {
@@ -82,20 +69,12 @@ const themeOptions: {
 
 export function SettingsPage() {
   const { toast } = useToast()
-  const [theme, setTheme] = useState<Theme>(readStoredTheme)
-  const [projectsDir, setProjectsDir] = useState('~/projects')
-
-  useEffect(() => {
-    getSettings()
-      .then((s) => {
-        if (s.projects_dir) setProjectsDir(s.projects_dir)
-      })
-      .catch(() => {})
-  }, [])
+  const [theme, setTheme] = useState<Theme>(() => readSettings().theme)
+  const [projectsDir, setProjectsDir] = useState(() => readSettings().projects_dir)
 
   useEffect(() => {
     applyTheme(theme)
-    localStorage.setItem(STORAGE_KEY, theme)
+    writeSettings({ theme })
   }, [theme])
 
   useEffect(() => {
@@ -111,7 +90,7 @@ export function SettingsPage() {
       const dir = await browseDir(projectsDir)
       if (dir) {
         setProjectsDir(dir)
-        await saveSettings({ projects_dir: dir })
+        writeSettings({ projects_dir: dir })
         toast({ type: 'success', message: 'Projects directory updated' })
       }
     } catch {
