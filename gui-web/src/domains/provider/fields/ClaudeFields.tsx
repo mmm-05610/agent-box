@@ -12,6 +12,7 @@
  * CommonConfigEditor), same separation as the old form.
  */
 import { useCallback, useEffect, useState, type ChangeEvent } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Input } from '@/components/ui'
 import type { ProviderFormValues } from '@/components/provider/ProviderFormFields'
 import { ApiKeySection, LocalProxyRequestOverridesField } from '@/components/provider/forms/shared'
@@ -44,17 +45,17 @@ interface RoleModel { model: string; name: string }
 
 interface ModelRoleRow {
   role: string
-  label: string
+  labelKey: string
   modelField: string
   nameField: string
   supportsOneM: boolean
 }
 const MODEL_ROLES: ModelRoleRow[] = [
-  { role: 'sonnet', label: 'Sonnet', modelField: 'ANTHROPIC_DEFAULT_SONNET_MODEL', nameField: 'ANTHROPIC_DEFAULT_SONNET_MODEL_NAME', supportsOneM: true },
-  { role: 'opus',   label: 'Opus',   modelField: 'ANTHROPIC_DEFAULT_OPUS_MODEL',   nameField: 'ANTHROPIC_DEFAULT_OPUS_MODEL_NAME',   supportsOneM: true },
-  { role: 'fable',  label: 'Fable',  modelField: 'ANTHROPIC_DEFAULT_FABLE_MODEL',  nameField: 'ANTHROPIC_DEFAULT_FABLE_MODEL_NAME',  supportsOneM: true },
-  { role: 'haiku',  label: 'Haiku',  modelField: 'ANTHROPIC_DEFAULT_HAIKU_MODEL',  nameField: 'ANTHROPIC_DEFAULT_HAIKU_MODEL_NAME',  supportsOneM: false },
-  { role: 'subagent', label: 'Subagent', modelField: 'CLAUDE_CODE_SUBAGENT_MODEL', nameField: 'CLAUDE_CODE_SUBAGENT_MODEL_NAME',     supportsOneM: true },
+  { role: 'sonnet', labelKey: 'providerForm.role.sonnet', modelField: 'ANTHROPIC_DEFAULT_SONNET_MODEL', nameField: 'ANTHROPIC_DEFAULT_SONNET_MODEL_NAME', supportsOneM: true },
+  { role: 'opus',   labelKey: 'providerForm.role.opus',   modelField: 'ANTHROPIC_DEFAULT_OPUS_MODEL',   nameField: 'ANTHROPIC_DEFAULT_OPUS_MODEL_NAME',   supportsOneM: true },
+  { role: 'fable',  labelKey: 'providerForm.role.fable',  modelField: 'ANTHROPIC_DEFAULT_FABLE_MODEL',  nameField: 'ANTHROPIC_DEFAULT_FABLE_MODEL_NAME',  supportsOneM: true },
+  { role: 'haiku',  labelKey: 'providerForm.role.haiku',  modelField: 'ANTHROPIC_DEFAULT_HAIKU_MODEL',  nameField: 'ANTHROPIC_DEFAULT_HAIKU_MODEL_NAME',  supportsOneM: false },
+  { role: 'subagent', labelKey: 'providerForm.role.subagent', modelField: 'CLAUDE_CODE_SUBAGENT_MODEL', nameField: 'CLAUDE_CODE_SUBAGENT_MODEL_NAME',     supportsOneM: true },
 ]
 
 // ── Auth field options ─────────────────────────────────────────────────
@@ -62,8 +63,8 @@ const MODEL_ROLES: ModelRoleRow[] = [
 type AuthFieldOption = 'ANTHROPIC_AUTH_TOKEN' | 'ANTHROPIC_API_KEY'
 
 const AUTH_FIELD_OPTIONS: ReadonlyArray<{ value: AuthFieldOption; label: string }> = [
-  { value: 'ANTHROPIC_AUTH_TOKEN', label: 'ANTHROPIC_AUTH_TOKEN（默认）' },
-  { value: 'ANTHROPIC_API_KEY', label: 'ANTHROPIC_API_KEY' },
+  { value: 'ANTHROPIC_AUTH_TOKEN', label: 'providerForm.claude.authFieldOption.tokenDefault' },
+  { value: 'ANTHROPIC_API_KEY', label: 'providerForm.claude.authFieldOption.apiKey' },
 ]
 
 // ── API format options ─────────────────────────────────────────────────
@@ -71,10 +72,10 @@ const AUTH_FIELD_OPTIONS: ReadonlyArray<{ value: AuthFieldOption; label: string 
 type ApiFormatOption = 'anthropic' | 'openai_chat' | 'openai_responses' | 'gemini_native'
 
 const API_FORMAT_OPTIONS: ReadonlyArray<{ value: ApiFormatOption; label: string }> = [
-  { value: 'anthropic', label: 'Anthropic Messages（原生）' },
-  { value: 'openai_chat', label: 'OpenAI Chat Completions（需转换）' },
-  { value: 'openai_responses', label: 'OpenAI Responses API（需转换）' },
-  { value: 'gemini_native', label: 'Gemini Native generateContent（需转换）' },
+  { value: 'anthropic', label: 'providerForm.apiFormatOption.anthropic' },
+  { value: 'openai_chat', label: 'providerForm.apiFormatOption.openaiChat' },
+  { value: 'openai_responses', label: 'providerForm.apiFormatOption.openaiResponses' },
+  { value: 'gemini_native', label: 'providerForm.apiFormatOption.geminiNative' },
 ]
 
 // ── Component ──────────────────────────────────────────────────────────
@@ -90,6 +91,7 @@ export function ClaudeFields({
   localProxyBodyOverride = '',
   onLocalProxyBodyOverrideChange,
 }: ProviderFieldsProps) {
+  const { t } = useTranslation()
   const { models: fetchedModels, fetching: fetchingModels, error: fetchError, fetch: handleFetchModels } = useFetchedModels(values.baseUrl, values.authValue, values.isFullUrl)
   const set = (patch: Partial<ProviderFormValues>) => onChange({ ...values, ...patch })
 
@@ -151,17 +153,17 @@ export function ClaudeFields({
     <div className="space-y-4">
       {/* ── Auth ───────────────────────────────────────────────────── */}
       <ApiKeySection
-        label={values.useApiKey ? 'API Key (ANTHROPIC_API_KEY)' : 'Auth Token (ANTHROPIC_AUTH_TOKEN)'}
+        label={values.useApiKey ? t('providerForm.authLabel.apiKey') : t('providerForm.authLabel.authToken')}
         value={values.authValue}
         onChange={(v) => set({ authValue: v })}
-        placeholder={values.useApiKey ? 'sk-ant-api03-...' : 'your-auth-token'}
+        placeholder={values.useApiKey ? t('providerForm.authPlaceholder.apiKey') : t('providerForm.authPlaceholder.authToken')}
         readOnly={readOnly}
       />
 
       {/* ── Endpoint ────────────────────────────────────────────────── */}
       <div>
         <div className="flex items-center justify-between mb-1">
-          <label className="text-xs text-muted-foreground">API Endpoint (ANTHROPIC_BASE_URL)</label>
+          <label className="text-xs text-muted-foreground">{t('providerForm.endpointLabel')} (ANTHROPIC_BASE_URL)</label>
           <label className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
             <input
               type="checkbox"
@@ -170,7 +172,7 @@ export function ClaudeFields({
               className="rounded"
               disabled={readOnly}
             />
-            Full URL
+            {t('providerForm.fullUrl')}
           </label>
         </div>
         <Input
@@ -181,7 +183,7 @@ export function ClaudeFields({
           disabled={readOnly}
         />
         {endpointCandidates && endpointCandidates.length > 1 && (
-          <p className="mt-1 text-xs text-muted-foreground">提供 {endpointCandidates.length} 个候选端点；上方按钮可触发速度测试。</p>
+          <p className="mt-1 text-xs text-muted-foreground">{t('providerForm.claude.endpointCandidatesHint', { count: endpointCandidates.length })}</p>
         )}
       </div>
 
@@ -193,11 +195,11 @@ export function ClaudeFields({
             onClick={() => setAdvancedOpen(!advancedOpen)}
             className="flex items-center gap-1.5 text-sm font-medium text-foreground hover:opacity-70"
           >
-            <span>{advancedOpen ? '▾' : '▸'}</span> Advanced Options
+            <span>{advancedOpen ? '▾' : '▸'}</span> {t('providerForm.advancedOptions')}
           </button>
           {!advancedOpen && (
             <p className="ml-1 mt-1 text-xs text-muted-foreground">
-              包含 API 格式 / 模型映射 / 思考能力 / 自定义 User-Agent 等。
+              {t('providerForm.claude.advancedCollapsedHint')}
             </p>
           )}
 
@@ -206,7 +208,7 @@ export function ClaudeFields({
               {/* API Format */}
               {showApiFormat && (
                 <div>
-                  <label className="text-xs text-muted-foreground block mb-1">API Format</label>
+                  <label className="text-xs text-muted-foreground block mb-1">{t('providerForm.apiFormat')}</label>
                   <select
                     value={values.apiFormat}
                     onChange={(e) => set({ apiFormat: e.target.value })}
@@ -214,16 +216,16 @@ export function ClaudeFields({
                     className="w-full h-9 rounded-md bg-input px-3 text-sm text-foreground border border-border focus:border-foreground/30 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {API_FORMAT_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      <option key={opt.value} value={opt.value}>{t(opt.label)}</option>
                     ))}
                   </select>
-                  <p className="mt-1 text-xs text-muted-foreground">选择供应商 API 的输入格式</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{t('providerForm.claude.apiFormatHint')}</p>
                 </div>
               )}
 
               {/* Auth field selector (replaces the old checkbox) */}
               <div>
-                <label className="text-xs text-muted-foreground block mb-1">认证字段</label>
+                <label className="text-xs text-muted-foreground block mb-1">{t('providerForm.claude.authField')}</label>
                 <select
                   value={authFieldValue}
                   onChange={handleAuthFieldChange}
@@ -231,23 +233,23 @@ export function ClaudeFields({
                   className="w-full h-9 rounded-md bg-input px-3 text-sm text-foreground border border-border focus:border-foreground/30 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {AUTH_FIELD_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    <option key={opt.value} value={opt.value}>{t(opt.label)}</option>
                   ))}
                 </select>
-                <p className="mt-1 text-xs text-muted-foreground">选择写入配置的认证环境变量名</p>
+                <p className="mt-1 text-xs text-muted-foreground">{t('providerForm.claude.authFieldHint')}</p>
               </div>
 
               {/* Model mapping grid */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs text-muted-foreground">Model Mapping（per-role）</label>
+                  <label className="text-xs text-muted-foreground">{t('providerForm.modelMapping')}</label>
                   <div className="flex items-center gap-1.5">
                     <button
                       type="button"
                       onClick={handleFetchModels}
                       disabled={readOnly || fetchingModels}
                       className="h-7 gap-1 text-xs inline-flex items-center rounded-md border border-border bg-muted px-2 text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                      title="从 API 拉取可用模型列表"
+                      title={t('providerForm.claude.fetchModelsTitle')}
                     >
                       {fetchingModels ? (
                         <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
@@ -259,19 +261,19 @@ export function ClaudeFields({
                           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
                         </svg>
                       )}
-                      拉取模型
+                      {t('providerForm.claude.fetchModels')}
                     </button>
                     <button
                       type="button"
                       onClick={handleQuickSet}
                       disabled={readOnly || (!values.fallbackModel && !Object.values(values.roleModels).some((r) => r.model))}
                       className="h-7 gap-1 text-xs inline-flex items-center rounded-md border border-border bg-muted px-2 text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                      title="将当前已有模型名一键应用到所有角色"
+                      title={t('providerForm.claude.quickSetTitle')}
                     >
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
                         <path d="M15 4V2" /><path d="M15 16v-2" /><path d="M8 9h2" /><path d="M20 9h2" /><path d="M17.8 11.8 19 13" /><path d="M15 9h.01" /><path d="M17.8 6.2 19 5" /><path d="m3 21 9-9" /><path d="M12.2 6.2 11 5" />
                       </svg>
-                      一键设置
+                      {t('providerForm.claude.quickSet')}
                     </button>
                   </div>
                 </div>
@@ -285,7 +287,7 @@ export function ClaudeFields({
                     return (
                       <div key={row.role} className="grid grid-cols-1 md:grid-cols-[100px_1fr_1fr_auto] gap-2 items-center">
                         <div className="flex h-9 items-center rounded-md bg-muted border border-border px-3 text-xs font-medium text-muted-foreground">
-                          {row.label}
+                          {t(row.labelKey)}
                         </div>
                         <Input
                           value={values.roleModels[row.role]?.name ?? ''}
@@ -297,7 +299,7 @@ export function ClaudeFields({
                               },
                             })
                           }
-                          placeholder="Display name"
+                          placeholder={t('providerForm.displayNamePlaceholder')}
                           className="text-sm font-mono"
                           disabled={readOnly}
                         />
@@ -341,13 +343,13 @@ export function ClaudeFields({
                   })}
                 </div>
                 <p className="mt-2 text-xs text-muted-foreground">
-                  选择模型角色后，CC Switch 会自动生成 Claude 兼容路由；菜单显示名可以填品牌模型名，实际请求模型按右侧填写内容发送。
+                  {t('providerForm.claude.modelMappingHint')}
                 </p>
               </div>
 
               {/* Default Model */}
               <div>
-                <label className="text-xs text-muted-foreground block mb-1">Default Model (ANTHROPIC_MODEL)</label>
+                <label className="text-xs text-muted-foreground block mb-1">{t('providerForm.defaultModelLabel')}</label>
                 <Input
                   value={values.fallbackModel}
                   onChange={(e) => set({ fallbackModel: e.target.value })}
@@ -356,14 +358,14 @@ export function ClaudeFields({
                   disabled={readOnly}
                 />
                 <p className="mt-1 text-xs text-muted-foreground">
-                  未明确落到 Sonnet/Opus/Fable/Haiku 角色的请求会使用此模型。使用第三方/中转端点时建议填写，否则这些请求会以原始 Claude 模型名透传给上游，可能因上游无此模型而报错。
+                  {t('providerForm.claude.defaultModelHint')}
                 </p>
               </div>
 
               {/* Effort + Timeout */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs text-muted-foreground block mb-1">Effort Level</label>
+                  <label className="text-xs text-muted-foreground block mb-1">{t('providerForm.effortLevel')}</label>
                   <Input
                     value={values.effortLevel}
                     onChange={(e) => set({ effortLevel: e.target.value })}
@@ -373,7 +375,7 @@ export function ClaudeFields({
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-muted-foreground block mb-1">API Timeout (ms)</label>
+                  <label className="text-xs text-muted-foreground block mb-1">{t('providerForm.apiTimeout')}</label>
                   <Input
                     value={values.timeoutMs}
                     onChange={(e) => set({ timeoutMs: e.target.value })}
@@ -394,7 +396,7 @@ export function ClaudeFields({
                     className="rounded"
                     disabled={readOnly}
                   />
-                  <span className="text-xs text-muted-foreground">Include co-authored-by attribution</span>
+                  <span className="text-xs text-muted-foreground">{t('providerForm.includeCoAuthoredBy')}</span>
                 </label>
                 <label className="flex items-center gap-2">
                   <input
@@ -404,7 +406,7 @@ export function ClaudeFields({
                     className="rounded"
                     disabled={readOnly}
                   />
-                  <span className="text-xs text-muted-foreground">Enable tool search (ENABLE_TOOL_SEARCH)</span>
+                  <span className="text-xs text-muted-foreground">{t('providerForm.enableToolSearch')}</span>
                 </label>
                 <label className="flex items-center gap-2">
                   <input
@@ -414,7 +416,7 @@ export function ClaudeFields({
                     className="rounded"
                     disabled={readOnly}
                   />
-                  <span className="text-xs text-muted-foreground">Skip WebFetch preflight check</span>
+                  <span className="text-xs text-muted-foreground">{t('providerForm.skipWebFetchPreflight')}</span>
                 </label>
                 <label className="flex items-center gap-2">
                   <input
@@ -424,22 +426,22 @@ export function ClaudeFields({
                     className="rounded"
                     disabled={readOnly}
                   />
-                  <span className="text-xs text-muted-foreground">Disable auto-updates</span>
+                  <span className="text-xs text-muted-foreground">{t('providerForm.disableAutoUpdates')}</span>
                 </label>
               </div>
 
               {/* Custom User-Agent */}
               <div>
-                <label className="text-xs text-muted-foreground block mb-1">Custom User-Agent</label>
+                <label className="text-xs text-muted-foreground block mb-1">{t('providerForm.customUserAgent')}</label>
                 <Input
                   value={values.customUserAgent}
                   onChange={(e) => set({ customUserAgent: e.target.value })}
-                  placeholder="Optional"
+                  placeholder={t('providerForm.customUserAgentPlaceholder')}
                   className="text-sm font-mono"
                   disabled={readOnly}
                 />
                 <p className="mt-1 text-xs text-muted-foreground">
-                  自定义 User-Agent。预设供应商已自动配置；自定义供应商会按名称/地址自动推断。仅当自动识别不准时才需手动覆盖。
+                  {t('providerForm.claude.customUserAgentHint')}
                 </p>
               </div>
 
@@ -476,6 +478,7 @@ function ModelDropdown({
   placeholder?: string
   disabled?: boolean
 }) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
 
   useEffect(() => {
@@ -491,7 +494,7 @@ function ModelDropdown({
   // Group by vendor
   const grouped: Record<string, typeof models> = {}
   for (const m of models) {
-    const vendor = m.owned_by || 'Other'
+    const vendor = m.owned_by || t('providerForm.modelDropdown.other')
     if (!grouped[vendor]) grouped[vendor] = []
     grouped[vendor].push(m)
   }

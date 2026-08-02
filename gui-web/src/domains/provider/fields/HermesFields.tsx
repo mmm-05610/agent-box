@@ -8,6 +8,7 @@
  * identity block now lives in the ProviderForm frame.
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { FetchedModel } from '@/api/models'
 import { Input, Textarea } from '@/components/ui'
 import type { ProviderFormValues } from '@/components/provider/ProviderFormFields'
@@ -26,10 +27,10 @@ export type HermesApiMode =
   | 'bedrock_converse'
 
 export const HERMES_API_MODE_OPTIONS: Array<{ value: HermesApiMode; label: string }> = [
-  { value: 'openai_compatible', label: 'OpenAI Compatible' },
-  { value: 'anthropic', label: 'Anthropic Messages' },
-  { value: 'codex_responses', label: 'Codex Responses' },
-  { value: 'bedrock_converse', label: 'Bedrock Converse' },
+  { value: 'openai_compatible', label: 'providerForm.hermes.apiModeOption.openaiCompatible' },
+  { value: 'anthropic', label: 'providerForm.hermes.apiModeOption.anthropic' },
+  { value: 'codex_responses', label: 'providerForm.hermes.apiModeOption.codexResponses' },
+  { value: 'bedrock_converse', label: 'providerForm.hermes.apiModeOption.bedrockConverse' },
 ]
 
 export interface HermesModel {
@@ -63,9 +64,6 @@ export function readHermesModels(settings: Record<string, unknown> | undefined):
 const selectClassName =
   'h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm outline-none focus:border-ring disabled:cursor-not-allowed disabled:opacity-50'
 
-const apiModeHint =
-  '选择与供应商匹配的请求协议；预设供应商已自动配置，自定义供应商可按名称/地址自动推断，也可手动覆盖。'
-
 function makeRow(seed?: HermesModel): ModelRow {
   return { rowId: crypto.randomUUID(), id: seed?.id ?? '', name: seed?.name ?? '', contextLength: seed?.contextLength }
 }
@@ -77,6 +75,7 @@ function sameModels(rows: ModelRow[], models: HermesModel[]) {
 }
 
 export function HermesFields(props: ProviderFieldsProps) {
+  const { t } = useTranslation()
   const {
     values, onChange, readOnly,
     apiMode = 'openai_compatible', onApiModeChange,
@@ -167,7 +166,7 @@ export function HermesFields(props: ProviderFieldsProps) {
       <ApiKeySection value={values.authValue} onChange={(value) => set({ authValue: value })} readOnly={readOnly} />
 
       {mode === 'library' && <>
-        <Field label="API Mode">
+        <Field label={t('providerForm.hermes.apiMode')}>
           <select
             value={effectiveMode}
             onChange={(event) => setMode(event.target.value as HermesApiMode)}
@@ -175,29 +174,29 @@ export function HermesFields(props: ProviderFieldsProps) {
             disabled={readOnly}
           >
             {HERMES_API_MODE_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
+              <option key={option.value} value={option.value}>{t(option.label)}</option>
             ))}
           </select>
-          <p className="mt-1 text-xs text-muted-foreground">{apiModeHint}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{t('providerForm.hermes.apiModeHint')}</p>
         </Field>
 
         <EndpointField
           value={values.baseUrl}
           onChange={(baseUrl) => { set({ baseUrl }); setBaseUrlTouched(true) }}
           candidates={endpointCandidates}
-          label="API 请求地址 (base_url)"
+          label={t('providerForm.hermes.endpointLabel')}
           readOnly={readOnly}
-          hint={<div className="mt-2 flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-700"><LinkIcon /><span>请使用 Hermes CLI 支持的 base_url（不包含 /v1 等路径）。</span></div>}
+          hint={<div className="mt-2 flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-700"><LinkIcon /><span>{t('providerForm.hermes.endpointHint')}</span></div>}
         />
         {baseUrlTouched && values.baseUrl.trim() === '' && (
-          <p className="mt-1 text-xs text-destructive">base_url 不能为空</p>
+          <p className="mt-1 text-xs text-destructive">{t('providerForm.hermes.baseUrlRequired')}</p>
         )}
         {baseUrlTouched && values.baseUrl.trim() !== '' && (() => {
           try {
             const u = new URL(values.baseUrl)
-            if (!['http:', 'https:'].includes(u.protocol)) return <p className="mt-1 text-xs text-destructive">仅支持 http/https 协议</p>
+            if (!['http:', 'https:'].includes(u.protocol)) return <p className="mt-1 text-xs text-destructive">{t('providerForm.hermes.httpOnly')}</p>
           } catch {
-            return <p className="mt-1 text-xs text-destructive">URL 格式无效</p>
+            return <p className="mt-1 text-xs text-destructive">{t('providerForm.hermes.invalidUrl')}</p>
           }
           return null
         })()}
@@ -216,7 +215,7 @@ export function HermesFields(props: ProviderFieldsProps) {
 
         <AdvancedCard
           icon={<ClockIcon />}
-          title="Provider Advanced"
+          title={t('providerForm.hermes.advancedTitle')}
           enabled={rateLimitEnabled}
           onEnabledChange={(enabled) => {
             setRateLimitEnabled(enabled)
@@ -227,8 +226,8 @@ export function HermesFields(props: ProviderFieldsProps) {
           }}
         >
           <SwitchRow
-            title="Rate limit delay"
-            hint="在两次请求之间插入固定等待时间（秒），适用于触发上游限流的供应商；留空则不延迟。"
+            title={t('providerForm.hermes.rateLimitDelay')}
+            hint={t('providerForm.hermes.rateLimitHint')}
             checked={rateLimitEnabled}
             onChange={(checked) => {
               setRateLimitEnabled(checked)
@@ -239,7 +238,7 @@ export function HermesFields(props: ProviderFieldsProps) {
             }}
             disabled={readOnly}
           />
-          <Field label="延迟（秒）">
+          <Field label={t('providerForm.hermes.delayLabel')}>
             <Input
               type="number"
               min="0"
@@ -250,7 +249,7 @@ export function HermesFields(props: ProviderFieldsProps) {
                 onRateLimitDelayChange?.(value)
                 if (!onRateLimitDelayChange) setLocalRateLimit(value)
               }}
-              placeholder="例如 1.5"
+              placeholder={t('providerForm.hermes.delayPlaceholder')}
               className="font-mono text-sm"
               disabled={!rateLimitEnabled || readOnly}
             />
@@ -259,8 +258,8 @@ export function HermesFields(props: ProviderFieldsProps) {
       </>}
 
       {mode === 'profile' && (
-        <Field label="默认模型">
-          <Input value={values.fallbackModel} onChange={(event) => set({ fallbackModel: event.target.value })} placeholder="例如 MiniMax-M2.7" className="font-mono text-sm" disabled={readOnly} />
+        <Field label={t('providerForm.modelBadge.default')}>
+          <Input value={values.fallbackModel} onChange={(event) => set({ fallbackModel: event.target.value })} placeholder={t('providerForm.hermes.defaultModelPlaceholder')} className="font-mono text-sm" disabled={readOnly} />
         </Field>
       )}
 
@@ -268,15 +267,15 @@ export function HermesFields(props: ProviderFieldsProps) {
         <div className="rounded-lg border border-border bg-card p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <h4 className="text-base font-medium">settings.json (JSON)</h4>
+              <h4 className="text-base font-medium">{t('providerForm.settingsEditor.title')}</h4>
               <p className="mt-0.5 text-xs text-muted-foreground">
                 {parentProvided
-                  ? '该供应商的完整 settings_config JSON（base_url / api_key / api_mode / models / rate_limit_delay 等）；修改后会被原样写入 Hermes 配置。普通编辑请使用上方结构化字段。'
-                  : '上方结构化字段对应的 settings_config JSON 预览（只读）；保存时由结构化字段自动生成。'}
+                  ? t('providerForm.hermes.settingsHintEditable')
+                  : t('providerForm.settingsEditor.hintPreview')}
               </p>
             </div>
             <span className="rounded-md bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-              {parentProvided ? '可编辑' : '实时预览（可编辑）'}
+              {parentProvided ? t('providerForm.settingsEditor.editable') : t('providerForm.settingsEditor.livePreviewEditable')}
             </span>
           </div>
           <Textarea
@@ -289,7 +288,7 @@ export function HermesFields(props: ProviderFieldsProps) {
         </div>
       )}
 
-      {mode === 'profile' && <p className="text-xs text-muted-foreground">Profile 模式保存到当前 Hermes 配置文件。</p>}
+      {mode === 'profile' && <p className="text-xs text-muted-foreground">{t('providerForm.profileModeHint', { agent: 'Hermes' })}</p>}
     </div>
   )
 }
@@ -309,19 +308,20 @@ function ModelsCard({
   onUpdate: (index: number, patch: Partial<HermesModel>) => void
   onRemove: (index: number) => void
 }) {
+  const { t } = useTranslation()
   return (
     <div className="rounded-lg border border-border bg-card p-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h4 className="text-base font-medium">Models</h4>
-          <p className="mt-1 max-w-3xl text-xs leading-relaxed text-muted-foreground">每个模型可配置显示名、上下文长度；首条作为默认模型。</p>
+          <h4 className="text-base font-medium">{t('providerForm.hermes.modelsTitle')}</h4>
+          <p className="mt-1 max-w-3xl text-xs leading-relaxed text-muted-foreground">{t('providerForm.hermes.modelsDesc')}</p>
         </div>
         <ModelFetchActions fetching={fetching} onFetch={onFetch} onAdd={onAdd} fetchDisabled={readOnly} addDisabled={readOnly} />
       </div>
       {fetchError && <p className="mt-2 text-xs text-red-500">{fetchError}</p>}
       {rows.length === 0 ? (
         <p className="mt-3 rounded-md border border-dashed p-4 text-center text-xs text-muted-foreground">
-          暂无模型，点击「获取模型列表」或「添加模型」。
+          {t('providerForm.emptyModels')}
         </p>
       ) : (
         <div className="mt-3 divide-y divide-border rounded-md border border-border bg-card">
@@ -352,13 +352,14 @@ function ModelRowView({
   onUpdate: (index: number, patch: Partial<HermesModel>) => void
   onRemove: (index: number) => void
 }) {
+  const { t } = useTranslation()
   const [contextOpen, setContextOpen] = useState(false)
   const isDefault = index === 0
   return (
     <div className="px-3 py-3">
       <div className="flex items-center gap-2">
         <span className={`inline-flex h-5 shrink-0 items-center rounded px-1.5 text-[10px] font-medium ${isDefault ? 'bg-blue-500/15 text-blue-600 dark:text-blue-300' : 'bg-muted text-muted-foreground'}`}>
-          {isDefault ? '默认模型' : '备选模型'}
+          {isDefault ? t('providerForm.modelBadge.default') : t('providerForm.modelBadge.fallback')}
         </span>
         <ModelIdInput
           value={row.id}
@@ -369,7 +370,7 @@ function ModelRowView({
         <Input
           value={row.name ?? ''}
           onChange={(event) => onUpdate(index, { name: event.target.value })}
-          placeholder="显示名称（可选）"
+          placeholder={t('providerForm.displayNameOptional')}
           className="text-sm"
           disabled={readOnly}
         />
@@ -377,17 +378,17 @@ function ModelRowView({
           type="button"
           onClick={() => setContextOpen((open) => !open)}
           className="flex h-9 shrink-0 items-center gap-1 rounded-md border border-border bg-muted px-2.5 text-xs text-muted-foreground hover:text-foreground"
-          title={contextOpen ? '收起高级' : '展开高级'}
+          title={contextOpen ? t('providerForm.advancedToggle.collapse') : t('providerForm.advancedToggle.expand')}
           disabled={readOnly}
         >
           <ChevronIcon open={contextOpen} />
-          <span>高级选项</span>
+          <span>{t('providerForm.advancedOptions')}</span>
         </button>
         <button
           type="button"
           onClick={() => onRemove(index)}
           className="flex h-9 w-8 shrink-0 items-center justify-center text-muted-foreground hover:text-destructive"
-          title="删除模型"
+          title={t('providerForm.deleteModel')}
           disabled={readOnly}
         >
           <TrashIcon />
@@ -395,17 +396,17 @@ function ModelRowView({
       </div>
       {contextOpen && (
         <div className="mt-3 max-w-md border-t border-border pt-3">
-          <Field label="上下文长度（tokens）">
+          <Field label={t('providerForm.contextLength')}>
             <Input
               type="number"
               min="1"
               value={row.contextLength ?? ''}
               onChange={(event) => onUpdate(index, { contextLength: event.target.value ? Number(event.target.value) : undefined })}
-              placeholder="例如 200000"
+              placeholder={t('providerForm.contextLengthPlaceholder')}
               className="font-mono text-sm"
               disabled={readOnly}
             />
-            <p className="mt-1 text-[11px] text-muted-foreground">覆盖自动推断的上下文窗口；留空使用模型默认值。</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">{t('providerForm.contextLengthHint')}</p>
           </Field>
         </div>
       )}

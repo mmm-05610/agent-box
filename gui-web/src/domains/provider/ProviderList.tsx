@@ -9,6 +9,8 @@
  */
 
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import i18n from '@/i18n'
 import { Button, Card, CardContent, CardHeader, CardTitle, Textarea } from '@/components/ui'
 import { useToast } from '@/components/feedback/toast'
 import {
@@ -56,6 +58,7 @@ function parseActiveProvider(yamlContent: string): string | null {
 // ── Component ─────────────────────────────────────────────────────────────
 
 export function ProviderList({ agentType, profileName }: ProviderListProps) {
+  const { t } = useTranslation()
   const isAdditive = AGENT_TYPE_CONFIGS[agentType].provider_apply_mode === 'additive'
   const { toast } = useToast()
 
@@ -132,9 +135,9 @@ export function ProviderList({ agentType, profileName }: ProviderListProps) {
       if (isAdditive) await refreshProfileProviders()
       await reloadConfigFiles()
       const provider = libraryProviders.find(p => p.id === providerId)
-      toast({ type: 'success', message: `${provider?.name ?? providerId} applied to ${profileName}` })
+      toast({ type: 'success', message: i18n.t('providerList.toast.appliedTo', { name: provider?.name ?? providerId, profile: profileName }) })
     } catch (error) {
-      toast({ type: 'error', message: error instanceof Error ? error.message : 'Failed to apply provider' })
+      toast({ type: 'error', message: error instanceof Error ? error.message : i18n.t('providerList.toast.applyFailed') })
     } finally {
       setApplyingId(null)
     }
@@ -147,9 +150,9 @@ export function ProviderList({ agentType, profileName }: ProviderListProps) {
       await refreshProfileProviders()
       await reloadConfigFiles()
       const provider = profileProviders.find(p => p.id === providerId)
-      toast({ type: 'success', message: `${provider?.name ?? providerId} removed` })
+      toast({ type: 'success', message: i18n.t('providerList.toast.removed', { name: provider?.name ?? providerId }) })
     } catch (error) {
-      toast({ type: 'error', message: error instanceof Error ? error.message : 'Failed to remove provider' })
+      toast({ type: 'error', message: error instanceof Error ? error.message : i18n.t('providerList.toast.removeFailed') })
     } finally {
       setRemovingId(null)
     }
@@ -161,11 +164,11 @@ export function ProviderList({ agentType, profileName }: ProviderListProps) {
     setSavingFile(path)
     try {
       const ok = await saveFile(path, editedContents[path] ?? '')
-      if (!ok) throw new Error('Save returned false')
+      if (!ok) throw new Error(i18n.t('providerList.toast.saveReturnedFalse'))
       await reloadConfigFiles()
-      toast({ type: 'success', message: 'File saved' })
+      toast({ type: 'success', message: i18n.t('providerList.toast.fileSaved') })
     } catch (error) {
-      toast({ type: 'error', message: error instanceof Error ? error.message : 'Failed to save file' })
+      toast({ type: 'error', message: error instanceof Error ? error.message : i18n.t('providerList.toast.saveFailed') })
     } finally {
       setSavingFile(null)
     }
@@ -185,7 +188,7 @@ export function ProviderList({ agentType, profileName }: ProviderListProps) {
         return (
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Profile Providers</CardTitle>
+              <CardTitle className="text-sm">{t('providerList.profileProviders')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               {profileProviders.map((pp) => {
@@ -208,14 +211,14 @@ export function ProviderList({ agentType, profileName }: ProviderListProps) {
                     </div>
                     {hasActive && (
                       active ? (
-                        <span className="inline-flex items-center rounded-full bg-accent/10 px-2.5 py-0.5 text-xs font-medium text-accent">Active</span>
+                        <span className="inline-flex items-center rounded-full bg-accent/10 px-2.5 py-0.5 text-xs font-medium text-accent">{t('providerList.active')}</span>
                       ) : (
-                        <Button size="sm" variant="ghost" onClick={() => handleApply(pp.id)} isLoading={applyingId === pp.id}>Activate</Button>
+                        <Button size="sm" variant="ghost" onClick={() => handleApply(pp.id)} isLoading={applyingId === pp.id}>{t('providerList.activate')}</Button>
                       )
                     )}
                     <Button size="sm" variant="ghost" onClick={() => handleRemove(pp.id)} isLoading={removingId === pp.id}
                       className="text-destructive hover:text-destructive">
-                      Remove
+                      {t('common.remove')}
                     </Button>
                   </div>
                 )
@@ -230,7 +233,7 @@ export function ProviderList({ agentType, profileName }: ProviderListProps) {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm">
-              {isAdditive ? 'Add from Library' : 'Apply from Library'}
+              {isAdditive ? t('providerList.addFromLibrary') : t('providerList.applyFromLibrary')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
@@ -256,10 +259,10 @@ export function ProviderList({ agentType, profileName }: ProviderListProps) {
                     )}
                   </div>
                   {isActive ? (
-                    <span className="inline-flex items-center rounded-full bg-accent/10 px-2.5 py-0.5 text-xs font-medium text-accent">Active</span>
+                    <span className="inline-flex items-center rounded-full bg-accent/10 px-2.5 py-0.5 text-xs font-medium text-accent">{t('providerList.active')}</span>
                   ) : (
                     <Button size="sm" isLoading={applyingId === p.id} onClick={() => handleApply(p.id)}>
-                      {isAdditive ? 'Add' : 'Apply'}
+                      {isAdditive ? t('common.add') : t('prompt.apply')}
                     </Button>
                   )}
                 </div>
@@ -277,7 +280,7 @@ export function ProviderList({ agentType, profileName }: ProviderListProps) {
               <CardTitle className="text-sm font-mono">{file.label}</CardTitle>
               <Button size="sm" variant="ghost" isLoading={savingFile === file.path}
                 onClick={() => handleSaveFile(file.path)}>
-                Save
+                {t('common.save')}
               </Button>
             </div>
           </CardHeader>

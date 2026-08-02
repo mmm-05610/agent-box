@@ -8,6 +8,7 @@
  * lives in the ProviderForm frame.
  */
 import { useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { FetchedModel } from '@/api/models'
 import { Button, Input, Textarea } from '@/components/ui'
 import type { ProviderFormValues } from '@/components/provider/ProviderFormFields'
@@ -27,11 +28,11 @@ export type OpenCodeNpmPackage =
   | '@ai-sdk/google'
 
 export const OPENCODE_NPM_PACKAGES: Array<{ value: OpenCodeNpmPackage; label: string }> = [
-  { value: '@ai-sdk/openai', label: '@ai-sdk/openai (OpenAI Responses)' },
-  { value: '@ai-sdk/openai-compatible', label: '@ai-sdk/openai-compatible (OpenAI Compatible)' },
-  { value: '@ai-sdk/anthropic', label: '@ai-sdk/anthropic (Anthropic)' },
-  { value: '@ai-sdk/amazon-bedrock', label: '@ai-sdk/amazon-bedrock (Bedrock)' },
-  { value: '@ai-sdk/google', label: '@ai-sdk/google (Gemini)' },
+  { value: '@ai-sdk/openai', label: 'providerForm.opencode.npmOption.openai' },
+  { value: '@ai-sdk/openai-compatible', label: 'providerForm.opencode.npmOption.openaiCompatible' },
+  { value: '@ai-sdk/anthropic', label: 'providerForm.opencode.npmOption.anthropic' },
+  { value: '@ai-sdk/amazon-bedrock', label: 'providerForm.opencode.npmOption.bedrock' },
+  { value: '@ai-sdk/google', label: 'providerForm.opencode.npmOption.google' },
 ]
 
 export interface OpenCodeModel {
@@ -46,6 +47,7 @@ const selectClassName =
 const MODEL_RESERVED_KEYS = new Set(['name', 'options'])
 
 export function OpenCodeFields(props: ProviderFieldsProps) {
+  const { t } = useTranslation()
   const {
     values, onChange, readOnly,
     modelsJson = '', onModelsJsonChange,
@@ -77,7 +79,7 @@ export function OpenCodeFields(props: ProviderFieldsProps) {
     } catch { return {} }
   }, [models, modelsJson])
 
-  const modelsError = !models && modelsJson.trim() && Object.keys(parsedModels).length === 0 ? 'JSON 无效或为空对象' : ''
+  const modelsError = !models && modelsJson.trim() && Object.keys(parsedModels).length === 0 ? t('providerForm.opencode.modelsJsonError') : ''
   const emitModels = (next: OpenCodeModels) => {
     onModelsChange?.(next)
     onModelsJsonChange?.(JSON.stringify(next, null, 2))
@@ -126,31 +128,31 @@ export function OpenCodeFields(props: ProviderFieldsProps) {
     <div className="space-y-4">
       <ApiKeySection value={values.authValue} onChange={(value) => set({ authValue: value })} readOnly={readOnly} />
 
-      <Field label="NPM Package">
+      <Field label={t('providerForm.opencode.npmPackage')}>
         <select value={npm} onChange={(event) => setNpm?.(event.target.value as OpenCodeNpmPackage)} className={selectClassName} disabled={readOnly}>
-          {OPENCODE_NPM_PACKAGES.map((pkg) => <option key={pkg.value} value={pkg.value}>{pkg.label}</option>)}
+          {OPENCODE_NPM_PACKAGES.map((pkg) => <option key={pkg.value} value={pkg.value}>{t(pkg.label)}</option>)}
         </select>
-        <p className="mt-1 text-xs text-muted-foreground">选择驱动该供应商的 AI SDK 包；预设供应商已自动配置，自定义供应商请按上游协议选择。</p>
+        <p className="mt-1 text-xs text-muted-foreground">{t('providerForm.opencode.npmHint')}</p>
       </Field>
 
       <EndpointField
         value={values.baseUrl}
         onChange={(baseUrl) => set({ baseUrl })}
         candidates={endpointCandidates}
-        label="API 请求地址 (options.baseURL)"
+        label={t('providerForm.opencode.endpointLabel')}
         readOnly={readOnly}
-        hint={<div className="mt-2 flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-700"><LinkIcon /><span>OpenCode 通过 options.baseURL 读取请求地址；不同 npm 包要求的路径格式可能不同。</span></div>}
+        hint={<div className="mt-2 flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-700"><LinkIcon /><span>{t('providerForm.opencode.endpointHint')}</span></div>}
       />
 
       {/* Headers */}
       <div className="rounded-lg border border-border bg-card p-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h4 className="text-base font-medium">Headers</h4>
-            <p className="mt-0.5 text-xs text-muted-foreground">发送到供应商的自定义 HTTP 头，例如 X-Title、HTTP-Referer。</p>
+            <h4 className="text-base font-medium">{t('providerForm.opencode.headersTitle')}</h4>
+            <p className="mt-0.5 text-xs text-muted-foreground">{t('providerForm.opencode.headersHint')}</p>
           </div>
           <Button type="button" variant="secondary" size="sm" onClick={() => onHeadersChange?.({ ...headers, [`header-${Date.now()}`]: '' })} disabled={readOnly || !onHeadersChange} className="h-7 gap-1">
-            <PlusIcon />添加
+            <PlusIcon />{t('common.add')}
           </Button>
         </div>
         <div className="mt-3">
@@ -158,7 +160,7 @@ export function OpenCodeFields(props: ProviderFieldsProps) {
             value={headers as Record<string, unknown>}
             onChange={(v) => onHeadersChange?.(v as Record<string, string>)}
             readOnly={readOnly}
-            emptyLabel="暂无自定义 Headers"
+            emptyLabel={t('providerForm.opencode.noHeaders')}
             keyPlaceholder="X-Title"
             valuePlaceholder="CC Switch"
           />
@@ -168,11 +170,11 @@ export function OpenCodeFields(props: ProviderFieldsProps) {
       <div className="rounded-lg border border-border bg-card p-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h4 className="text-base font-medium">Extra Options</h4>
-            <p className="mt-0.5 text-xs text-muted-foreground">除 baseURL/apiKey 外传给 SDK 的其他选项。</p>
+            <h4 className="text-base font-medium">{t('providerForm.opencode.extraOptionsTitle')}</h4>
+            <p className="mt-0.5 text-xs text-muted-foreground">{t('providerForm.opencode.extraOptionsHint')}</p>
           </div>
           <Button type="button" variant="secondary" size="sm" onClick={() => onExtraOptionsChange?.({ ...extraOptions, [`option-${Date.now()}`]: '' })} disabled={readOnly || !onExtraOptionsChange} className="h-7 gap-1">
-            <PlusIcon />添加
+            <PlusIcon />{t('common.add')}
           </Button>
         </div>
         <div className="mt-3">
@@ -180,22 +182,22 @@ export function OpenCodeFields(props: ProviderFieldsProps) {
             value={extraOptions}
             onChange={onExtraOptionsChange}
             readOnly={readOnly}
-            emptyLabel="暂无 extra 选项"
+            emptyLabel={t('providerForm.opencode.noExtraOptions')}
             showColumnHeader
             hideAddButton
-            addLabel="添加"
+            addLabel={t('common.add')}
             keyPlaceholder="timeout"
             valuePlaceholder="600000"
           />
         </div>
-        <p className="mt-2 text-xs text-muted-foreground">配置额外的 SDK 选项，如 timeout、setCacheKey 等；value 会自动尝试解析为 JSON，失败则按字符串处理。</p>
+        <p className="mt-2 text-xs text-muted-foreground">{t('providerForm.opencode.extraOptionsHint2')}</p>
       </div>
 
       <div className="rounded-lg border border-border bg-card p-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h4 className="text-base font-medium">Models</h4>
-            <p className="mt-1 max-w-3xl text-xs leading-relaxed text-muted-foreground">每个模型可配置显示名、SDK 选项（如 temperature / maxTokens）以及其他任意字段；首条作为默认模型写入 <span className="font-mono">model.default</span>。</p>
+            <h4 className="text-base font-medium">{t('providerForm.opencode.modelsTitle')}</h4>
+            <p className="mt-1 max-w-3xl text-xs leading-relaxed text-muted-foreground">{t('providerForm.opencode.modelsDesc')}</p>
           </div>
           <ModelFetchActions
             fetching={fetching}
@@ -214,7 +216,7 @@ export function OpenCodeFields(props: ProviderFieldsProps) {
         {(fetchError || modelsError) && <p className="mt-2 text-xs text-red-500">{fetchError || modelsError}</p>}
         {Object.keys(parsedModels).length === 0 ? (
           <p className="mt-3 rounded-md border border-dashed p-4 text-center text-xs text-muted-foreground">
-            暂无模型，点击「获取模型列表」或「添加模型」。
+            {t('providerForm.emptyModels')}
           </p>
         ) : (
           <div className="mt-3 divide-y divide-border rounded-md border border-border bg-card">
@@ -243,15 +245,15 @@ export function OpenCodeFields(props: ProviderFieldsProps) {
       <div className="rounded-lg border border-border bg-card p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h4 className="text-base font-medium">settings.json (JSON)</h4>
+            <h4 className="text-base font-medium">{t('providerForm.settingsEditor.title')}</h4>
             <p className="mt-0.5 text-xs text-muted-foreground">
               {parentProvided
-                ? '该供应商的完整 settings_config JSON；修改后会被原样写入 OpenCode 配置。普通编辑请使用上方结构化字段。'
-                : '上方结构化字段对应的 settings_config JSON 预览（只读）；保存时由结构化字段自动生成。'}
+                ? t('providerForm.opencode.settingsHintEditable')
+                : t('providerForm.settingsEditor.hintPreview')}
             </p>
           </div>
           {!parentProvided && (
-            <span className="rounded-md bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">实时预览</span>
+            <span className="rounded-md bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">{t('providerForm.settingsEditor.livePreview')}</span>
           )}
         </div>
         <Textarea
@@ -265,7 +267,7 @@ export function OpenCodeFields(props: ProviderFieldsProps) {
         />
       </div>
 
-      {mode === 'profile' && <p className="text-xs text-muted-foreground">Profile 模式保存到当前 OpenCode 配置文件。</p>}
+      {mode === 'profile' && <p className="text-xs text-muted-foreground">{t('providerForm.profileModeHint', { agent: 'OpenCode' })}</p>}
     </div>
   )
 }
@@ -289,13 +291,14 @@ function ModelRowView({
   onAttributesChange: (next: Record<string, unknown>) => void
   onOptionsChange: (next: Record<string, unknown>) => void
 }) {
+  const { t } = useTranslation()
   const attributes = Object.fromEntries(Object.entries(config).filter(([key]) => !MODEL_RESERVED_KEYS.has(key)))
   const options = config.options && typeof config.options === 'object' && !Array.isArray(config.options) ? config.options : {}
   return (
     <div className="px-3 py-3">
       <div className="flex items-center gap-2">
         <span className={`inline-flex h-5 shrink-0 items-center rounded px-1.5 text-[10px] font-medium ${isFirst ? 'bg-blue-500/15 text-blue-600 dark:text-blue-300' : 'bg-muted text-muted-foreground'}`}>
-          {isFirst ? '默认模型' : '备选模型'}
+          {isFirst ? t('providerForm.modelBadge.default') : t('providerForm.modelBadge.fallback')}
         </span>
         <ModelIdInput
           value={id}
@@ -307,7 +310,7 @@ function ModelRowView({
         <Input
           value={typeof config.name === 'string' ? config.name : ''}
           onChange={(event) => onNameChange(event.target.value)}
-          placeholder="显示名称（可选）"
+          placeholder={t('providerForm.displayNameOptional')}
           className="min-w-0 text-sm"
           disabled={readOnly || !canEdit}
         />
@@ -315,18 +318,18 @@ function ModelRowView({
           type="button"
           onClick={onToggle}
           className="flex h-9 shrink-0 items-center gap-1 rounded-md border border-border bg-muted px-2.5 text-xs text-muted-foreground hover:text-foreground"
-          title={expanded ? '收起高级' : '展开高级'}
+          title={expanded ? t('providerForm.advancedToggle.collapse') : t('providerForm.advancedToggle.expand')}
           disabled={readOnly}
         >
           <ChevronIcon open={expanded} />
-          <span>高级选项</span>
+          <span>{t('providerForm.advancedOptions')}</span>
         </button>
         <button
           type="button"
           onClick={onRemove}
           disabled={readOnly || !canEdit}
           className="flex h-9 w-8 shrink-0 items-center justify-center text-muted-foreground hover:text-destructive"
-          title="删除模型"
+          title={t('providerForm.deleteModel')}
         >
           <TrashIcon />
         </button>
@@ -335,7 +338,7 @@ function ModelRowView({
         <div className="mt-3 space-y-3 border-t border-border pt-3">
           {/* Token Limits */}
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Context Limit" hint="最大上下文 token 数">
+            <Field label={t('providerForm.opencode.contextLimit')} hint={t('providerForm.opencode.contextLimitHint')}>
               <Input
                 value={(config.limit as Record<string, unknown>)?.context as string ?? ''}
                 onChange={(e) => {
@@ -349,7 +352,7 @@ function ModelRowView({
                 disabled={readOnly}
               />
             </Field>
-            <Field label="Output Limit" hint="最大输出 token 数">
+            <Field label={t('providerForm.opencode.outputLimit')} hint={t('providerForm.opencode.outputLimitHint')}>
               <Input
                 value={(config.limit as Record<string, unknown>)?.output as string ?? ''}
                 onChange={(e) => {
@@ -366,17 +369,17 @@ function ModelRowView({
           </div>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <h5 className="text-xs font-medium">模型属性</h5>
+              <h5 className="text-xs font-medium">{t('providerForm.opencode.modelAttributes')}</h5>
               <KeyValueEditor
                 value={attributes}
                 onChange={(next) => onAttributesChange({ ...Object.fromEntries(Object.keys(attributes).map((key) => [key, undefined])), ...next })}
                 readOnly={readOnly}
-                emptyLabel="暂无模型属性"
+                emptyLabel={t('providerForm.opencode.noModelAttributes')}
               />
             </div>
             <div className="space-y-2">
-              <h5 className="text-xs font-medium">SDK 选项</h5>
-              <KeyValueEditor value={options as Record<string, unknown>} onChange={onOptionsChange} readOnly={readOnly} emptyLabel="暂无 SDK 选项" />
+              <h5 className="text-xs font-medium">{t('providerForm.opencode.sdkOptions')}</h5>
+              <KeyValueEditor value={options as Record<string, unknown>} onChange={onOptionsChange} readOnly={readOnly} emptyLabel={t('providerForm.opencode.noSdkOptions')} />
             </div>
           </div>
         </div>

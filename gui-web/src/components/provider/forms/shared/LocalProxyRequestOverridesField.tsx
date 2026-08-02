@@ -12,6 +12,7 @@
  * upstream so official providers never expose this.
  */
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Field } from './Field'
 
 export interface LocalProxyRequestOverridesFieldProps {
@@ -37,10 +38,10 @@ function parseJson(raw: string): { value?: unknown; error?: string } {
   if (!trimmed) return {}
   try {
     const parsed = JSON.parse(trimmed)
-    if (!isPlainObject(parsed)) return { error: 'JSON must be an object' }
+    if (!isPlainObject(parsed)) return { error: 'json-must-be-object' }
     return { value: parsed }
   } catch (err) {
-    return { error: err instanceof Error ? err.message : 'Invalid JSON' }
+    return { error: err instanceof Error ? err.message : 'invalid-json' }
   }
 }
 
@@ -50,7 +51,7 @@ function validateHeaders(raw: string): string | null {
     const headers = result.value as Record<string, unknown>
     for (const [name, value] of Object.entries(headers)) {
       if (typeof value !== 'string') {
-        return `Header "${name}" must be a string`
+        return `header-not-string|${name}`
       }
     }
   }
@@ -62,7 +63,7 @@ function validateBody(raw: string): string | null {
   if (!result.error && result.value !== undefined) {
     const body = result.value as Record<string, unknown>
     if ('stream' in body) {
-      return 'Body override must not include protocol field "stream"'
+      return 'body-has-stream'
     }
   }
   return result.error ?? null
@@ -75,24 +76,38 @@ export function LocalProxyRequestOverridesField({
   onBodyJsonChange,
   disabled,
 }: LocalProxyRequestOverridesFieldProps) {
+  const { t } = useTranslation()
   const headerError = useMemo(() => validateHeaders(headersJson), [headersJson])
   const bodyError = useMemo(() => validateBody(bodyJson), [bodyJson])
+
+  const translateError = (code: string): string => {
+    if (code === 'json-must-be-object') return t('providerForm.localProxy.errors.mustBeObject')
+    if (code === 'invalid-json') return t('providerForm.localProxy.errors.invalidJson')
+    if (code === 'body-has-stream') return t('providerForm.localProxy.errors.bodyNoStream')
+    if (code.startsWith('header-not-string|')) {
+      const name = code.slice('header-not-string|'.length)
+      return t('providerForm.localProxy.errors.headerMustBeString', { name })
+    }
+    return code
+  }
+  const translatedHeaderError = headerError ? translateError(headerError) : null
+  const translatedBodyError = bodyError ? translateError(bodyError) : null
 
   return (
     <div className="space-y-3 rounded-lg border border-border/60 bg-muted/20 p-3">
       <div className="space-y-1">
-        <p className="text-sm font-medium">本地代理请求覆盖</p>
+        <p className="text-sm font-medium">{t('providerForm.localProxy.title')}</p>
         <p className="text-xs text-muted-foreground">
-          仅在本地路由/代理接管后生效，应用于协议转换后的上游请求。
+          {t('providerForm.localProxy.desc')}
         </p>
       </div>
       <div className="grid gap-3 md:grid-cols-2">
         <Field
-          label="Header 覆盖 (JSON)"
+          label={t('providerForm.localProxy.header')}
           hint={
-            headerError
-              ? <span className="text-destructive">Header 覆盖格式错误：{headerError}</span>
-              : <span>键值对：<code className="font-mono">{`{"X-Provider": "agent-box"}`}</code></span>
+            translatedHeaderError
+              ? <span className="text-destructive">{t('providerForm.localProxy.headerErrorPrefix')}{translatedHeaderError}</span>
+              : <span>{t('providerForm.localProxy.kvExample')}<code className="font-mono">{`{"X-Provider": "agent-box"}`}</code></span>
           }
         >
           <textarea
@@ -105,11 +120,11 @@ export function LocalProxyRequestOverridesField({
           />
         </Field>
         <Field
-          label="Body 覆盖 (JSON)"
+          label={t('providerForm.localProxy.body')}
           hint={
-            bodyError
-              ? <span className="text-destructive">Body 覆盖格式错误：{bodyError}</span>
-              : <span>键值对：<code className="font-mono">{`{"temperature": 0.2}`}</code></span>
+            translatedBodyError
+              ? <span className="text-destructive">{t('providerForm.localProxy.bodyErrorPrefix')}{translatedBodyError}</span>
+              : <span>{t('providerForm.localProxy.kvExample')}<code className="font-mono">{`{"temperature": 0.2}`}</code></span>
           }
         >
           <textarea

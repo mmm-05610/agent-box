@@ -18,10 +18,10 @@ import { ProviderForm } from './ProviderForm'
 const values = () => defaultFormValues()
 
 const PER_AGENT_MARKERS: Record<string, string[]> = {
-  claude: ['API Endpoint (ANTHROPIC_BASE_URL)', 'Advanced Options', 'Model Mapping（per-role）'],
+  claude: ['API 请求地址 (ANTHROPIC_BASE_URL)', '高级选项', '模型映射（per-role）'],
   codex: ['API 请求地址', 'auth.json (JSON) *', 'config.toml (TOML)', '模型测试配置'],
-  hermes: ['API Mode', 'Models', 'Provider Advanced'],
-  opencode: ['NPM Package', 'Extra Options', 'Headers'],
+  hermes: ['API 模式', '模型', '供应商高级'],
+  opencode: ['NPM 包', '额外选项', '请求头'],
 }
 
 describe('ProviderForm shared frame', () => {
@@ -42,7 +42,7 @@ describe('ProviderForm shared frame', () => {
       }
 
       // Save action
-      screen.getByText('Save Provider Settings').click()
+      screen.getByText('保存供应商设置').click()
       expect(onSave).toHaveBeenCalledTimes(1)
     })
   }
