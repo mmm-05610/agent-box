@@ -20,7 +20,7 @@
  */
 import type { ProviderFormValues } from './ProviderFormFields'
 import { defaultFormValues } from './ProviderFormFields'
-import type { HermesApiMode, HermesModel } from './forms/HermesProviderForm'
+import type { HermesApiMode, HermesModel } from '@/domains/provider/fields/HermesFields'
 
 // ── Read: settings_config → form values ──────────────────────────────────
 

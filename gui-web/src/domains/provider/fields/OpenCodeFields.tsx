@@ -1,13 +1,23 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+/**
+ * OpenCodeFields — OpenCode-specific provider inputs.
+ *
+ * Extracted from the old OpenCodeProviderForm. Keeps the OpenCode-only
+ * pieces: npm package selector, baseURL endpoint (with speed test), custom
+ * headers, extra SDK options, the models editor (attributes + SDK options +
+ * token limits) and the settings.json editor. The shared identity block now
+ * lives in the ProviderForm frame.
+ */
+import { useMemo, useRef, useState } from 'react'
 import type { FetchedModel } from '@/api/models'
 import { Button, Input, Textarea } from '@/components/ui'
-import type { ProviderFormValues } from '../ProviderFormFields'
+import type { ProviderFormValues } from '@/components/provider/ProviderFormFields'
 import {
-  Field, ProviderIdentityFields, ApiKeySection, EndpointField, ModelFetchActions,
+  Field, ApiKeySection, EndpointField, ModelFetchActions,
   KeyValueEditor, ModelIdInput,
   LinkIcon, ChevronIcon, PlusIcon, TrashIcon,
-} from './shared'
-import { useFetchedModels } from './hooks/useFetchedModels'
+} from '@/components/provider/forms/shared'
+import { useFetchedModels } from '@/components/provider/forms/hooks/useFetchedModels'
+import type { ProviderFieldsProps } from './types'
 
 export type OpenCodeNpmPackage =
   | '@ai-sdk/openai'
@@ -31,42 +41,16 @@ export interface OpenCodeModel {
 }
 export type OpenCodeModels = Record<string, OpenCodeModel>
 
-export interface OpenCodeProviderFormProps {
-  values: ProviderFormValues
-  onChange: (next: ProviderFormValues) => void
-  readOnly?: boolean
-  modelsJson?: string
-  onModelsJsonChange?: (next: string) => void
-  npm?: OpenCodeNpmPackage
-  onNpmChange?: (next: OpenCodeNpmPackage) => void
-  models?: OpenCodeModels
-  onModelsChange?: (next: OpenCodeModels) => void
-  extraOptions?: Record<string, unknown>
-  onExtraOptionsChange?: (next: Record<string, unknown>) => void
-  category?: string
-  mode?: 'library' | 'profile'
-  endpointCandidates?: string[]
-  npmPackage?: OpenCodeNpmPackage
-  onNpmPackageChange?: (next: OpenCodeNpmPackage) => void
-  settingsJson?: string
-  onSettingsJsonChange?: (next: string) => void
-  // Headers + Token Limits
-  headers?: Record<string, string>
-  onHeadersChange?: (next: Record<string, string>) => void
-  modelsWithLimits?: Record<string, OpenCodeModel>  // models with limit.context / limit.output
-}
-
 const selectClassName =
   'h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm outline-none focus:border-ring disabled:cursor-not-allowed disabled:opacity-50'
 const MODEL_RESERVED_KEYS = new Set(['name', 'options'])
 
-
-export function OpenCodeProviderForm(props: OpenCodeProviderFormProps) {
+export function OpenCodeFields(props: ProviderFieldsProps) {
   const {
     values, onChange, readOnly,
     modelsJson = '', onModelsJsonChange,
     npm: npmProp, onNpmChange,
-    models, onModelsChange,
+    opencodeModels: models, onOpencodeModelsChange: onModelsChange,
     extraOptions = {}, onExtraOptionsChange,
     mode = 'library',
     endpointCandidates = [],
@@ -81,7 +65,6 @@ export function OpenCodeProviderForm(props: OpenCodeProviderFormProps) {
 
   const [expandedModels, setExpandedModels] = useState<Record<string, boolean>>({})
   const { models: fetchedModels, fetching, error: fetchError, fetch: handleFetchModels } = useFetchedModels(values.baseUrl, values.authValue)
-  const [settingsJsonLocal, setSettingsJsonLocal] = useState(settingsJson)
   const lastSentSettingsJsonRef = useRef(settingsJson)
   const set = (patch: Partial<ProviderFormValues>) => onChange({ ...values, ...patch })
 
@@ -128,10 +111,6 @@ export function OpenCodeProviderForm(props: OpenCodeProviderFormProps) {
     return JSON.stringify(settings, null, 2)
   }, [values.name, values.notes, values.websiteUrl, values.baseUrl, values.authValue, npm, extraOptions, parsedModels])
 
-  // settingsJson local fallback
-  useEffect(() => {
-    setSettingsJsonLocal((current) => settingsJson === current ? current : settingsJson)
-  }, [settingsJson])
   const parentProvided = Boolean(onSettingsJsonChange)
   const effectiveSettingsJson = parentProvided ? settingsJson : (settingsJson || previewSettingsJson)
   const setSettingsJson = (next: string) => {
@@ -139,14 +118,12 @@ export function OpenCodeProviderForm(props: OpenCodeProviderFormProps) {
       if (next === lastSentSettingsJsonRef.current) return
       lastSentSettingsJsonRef.current = next
       onSettingsJsonChange(next)
-    } else {
-      setSettingsJsonLocal(next)
     }
+    // No parent onChange: read-only preview only (matches the old behavior).
   }
 
   return (
     <div className="space-y-4">
-      <ProviderIdentityFields name={values.name} notes={values.notes} websiteUrl={values.websiteUrl} onChange={set} readOnly={readOnly} />
       <ApiKeySection value={values.authValue} onChange={(value) => set({ authValue: value })} readOnly={readOnly} />
 
       <Field label="NPM Package">
@@ -156,7 +133,14 @@ export function OpenCodeProviderForm(props: OpenCodeProviderFormProps) {
         <p className="mt-1 text-xs text-muted-foreground">选择驱动该供应商的 AI SDK 包；预设供应商已自动配置，自定义供应商请按上游协议选择。</p>
       </Field>
 
-      <EndpointField value={values.baseUrl} onChange={(baseUrl) => set({ baseUrl })} candidates={endpointCandidates} label="API 请求地址 (options.baseURL)" readOnly={readOnly} hint={<div className="mt-2 flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-700"><LinkIcon /><span>OpenCode 通过 options.baseURL 读取请求地址；不同 npm 包要求的路径格式可能不同。</span></div>} />
+      <EndpointField
+        value={values.baseUrl}
+        onChange={(baseUrl) => set({ baseUrl })}
+        candidates={endpointCandidates}
+        label="API 请求地址 (options.baseURL)"
+        readOnly={readOnly}
+        hint={<div className="mt-2 flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-700"><LinkIcon /><span>OpenCode 通过 options.baseURL 读取请求地址；不同 npm 包要求的路径格式可能不同。</span></div>}
+      />
 
       {/* Headers */}
       <div className="rounded-lg border border-border bg-card p-3">
@@ -165,7 +149,7 @@ export function OpenCodeProviderForm(props: OpenCodeProviderFormProps) {
             <h4 className="text-base font-medium">Headers</h4>
             <p className="mt-0.5 text-xs text-muted-foreground">发送到供应商的自定义 HTTP 头，例如 X-Title、HTTP-Referer。</p>
           </div>
-          <Button type="button" variant="outline" size="sm" onClick={() => onHeadersChange?.({ ...headers, [`header-${Date.now()}`]: '' })} disabled={readOnly || !onHeadersChange} className="h-7 gap-1">
+          <Button type="button" variant="secondary" size="sm" onClick={() => onHeadersChange?.({ ...headers, [`header-${Date.now()}`]: '' })} disabled={readOnly || !onHeadersChange} className="h-7 gap-1">
             <PlusIcon />添加
           </Button>
         </div>
@@ -177,8 +161,6 @@ export function OpenCodeProviderForm(props: OpenCodeProviderFormProps) {
             emptyLabel="暂无自定义 Headers"
             keyPlaceholder="X-Title"
             valuePlaceholder="CC Switch"
-            keyLabel="Header"
-            valueLabel="Value"
           />
         </div>
       </div>
@@ -189,7 +171,7 @@ export function OpenCodeProviderForm(props: OpenCodeProviderFormProps) {
             <h4 className="text-base font-medium">Extra Options</h4>
             <p className="mt-0.5 text-xs text-muted-foreground">除 baseURL/apiKey 外传给 SDK 的其他选项。</p>
           </div>
-          <Button type="button" variant="outline" size="sm" onClick={() => onExtraOptionsChange?.({ ...extraOptions, [`option-${Date.now()}`]: '' })} disabled={readOnly || !onExtraOptionsChange} className="h-7 gap-1">
+          <Button type="button" variant="secondary" size="sm" onClick={() => onExtraOptionsChange?.({ ...extraOptions, [`option-${Date.now()}`]: '' })} disabled={readOnly || !onExtraOptionsChange} className="h-7 gap-1">
             <PlusIcon />添加
           </Button>
         </div>
@@ -215,12 +197,19 @@ export function OpenCodeProviderForm(props: OpenCodeProviderFormProps) {
             <h4 className="text-base font-medium">Models</h4>
             <p className="mt-1 max-w-3xl text-xs leading-relaxed text-muted-foreground">每个模型可配置显示名、SDK 选项（如 temperature / maxTokens）以及其他任意字段；首条作为默认模型写入 <span className="font-mono">model.default</span>。</p>
           </div>
-          <ModelFetchActions fetching={fetching} onFetch={handleFetchModels} fetchDisabled={readOnly} addDisabled={readOnly || (!onModelsChange && !onModelsJsonChange)} onAdd={() => {
-              let id = 'new-model'; let suffix = 2
+          <ModelFetchActions
+            fetching={fetching}
+            onFetch={handleFetchModels}
+            fetchDisabled={readOnly}
+            addDisabled={readOnly || (!onModelsChange && !onModelsJsonChange)}
+            onAdd={() => {
+              let id = 'new-model'
+              let suffix = 2
               while (parsedModels[id]) id = `new-model-${suffix++}`
               emitModels({ ...parsedModels, [id]: { name: '' } })
               setExpandedModels((current) => ({ ...current, [id]: true }))
-            }} />
+            }}
+          />
         </div>
         {(fetchError || modelsError) && <p className="mt-2 text-xs text-red-500">{fetchError || modelsError}</p>}
         {Object.keys(parsedModels).length === 0 ? (
@@ -353,7 +342,7 @@ function ModelRowView({
                   const v = e.target.value.replace(/\D/g, '')
                   const limit = { ...(config.limit as Record<string, unknown> || {}) }
                   if (v) limit.context = parseInt(v, 10); else delete limit.context
-                  onAttributesChange({ ...attrs, limit: Object.keys(limit).length > 0 ? limit : undefined })
+                  onAttributesChange({ ...attributes, limit: Object.keys(limit).length > 0 ? limit : undefined })
                 }}
                 placeholder="1048576"
                 className="font-mono text-sm"
@@ -367,7 +356,7 @@ function ModelRowView({
                   const v = e.target.value.replace(/\D/g, '')
                   const limit = { ...(config.limit as Record<string, unknown> || {}) }
                   if (v) limit.output = parseInt(v, 10); else delete limit.output
-                  onAttributesChange({ ...attrs, limit: Object.keys(limit).length > 0 ? limit : undefined })
+                  onAttributesChange({ ...attributes, limit: Object.keys(limit).length > 0 ? limit : undefined })
                 }}
                 placeholder="131072"
                 className="font-mono text-sm"
@@ -376,15 +365,20 @@ function ModelRowView({
             </Field>
           </div>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div className="space-y-2">
-            <h5 className="text-xs font-medium">模型属性</h5>
-            <KeyValueEditor value={attributes} onChange={(next) => onAttributesChange({ ...Object.fromEntries(Object.keys(attributes).map((key) => [key, undefined])), ...next })} readOnly={readOnly} emptyLabel="暂无模型属性" />
+            <div className="space-y-2">
+              <h5 className="text-xs font-medium">模型属性</h5>
+              <KeyValueEditor
+                value={attributes}
+                onChange={(next) => onAttributesChange({ ...Object.fromEntries(Object.keys(attributes).map((key) => [key, undefined])), ...next })}
+                readOnly={readOnly}
+                emptyLabel="暂无模型属性"
+              />
+            </div>
+            <div className="space-y-2">
+              <h5 className="text-xs font-medium">SDK 选项</h5>
+              <KeyValueEditor value={options as Record<string, unknown>} onChange={onOptionsChange} readOnly={readOnly} emptyLabel="暂无 SDK 选项" />
+            </div>
           </div>
-          <div className="space-y-2">
-            <h5 className="text-xs font-medium">SDK 选项</h5>
-            <KeyValueEditor value={options as Record<string, unknown>} onChange={onOptionsChange} readOnly={readOnly} emptyLabel="暂无 SDK 选项" />
-          </div>
-        </div>
         </div>
       )}
     </div>

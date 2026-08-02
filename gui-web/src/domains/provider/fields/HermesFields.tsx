@@ -1,13 +1,23 @@
+/**
+ * HermesFields — Hermes-specific provider inputs.
+ *
+ * Extracted from the old HermesProviderForm. Keeps the Hermes-only pieces:
+ * API mode selector, base_url endpoint (with speed test + URL validation),
+ * the models list, rate-limit delay advanced card, and the settings.json
+ * editor (library mode) / default-model field (profile mode). The shared
+ * identity block now lives in the ProviderForm frame.
+ */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FetchedModel } from '@/api/models'
-import { Button, Input, Textarea } from '@/components/ui'
-import type { ProviderFormValues } from '../ProviderFormFields'
+import { Input, Textarea } from '@/components/ui'
+import type { ProviderFormValues } from '@/components/provider/ProviderFormFields'
 import {
-  Field, SwitchRow, AdvancedCard, ProviderIdentityFields, ApiKeySection, EndpointField, ModelFetchActions,
+  Field, SwitchRow, AdvancedCard, ApiKeySection, EndpointField, ModelFetchActions,
   ModelIdInput,
   LinkIcon, ChevronIcon, TrashIcon, ClockIcon,
-} from './shared'
-import { useFetchedModels } from './hooks/useFetchedModels'
+} from '@/components/provider/forms/shared'
+import { useFetchedModels } from '@/components/provider/forms/hooks/useFetchedModels'
+import type { ProviderFieldsProps } from './types'
 
 export type HermesApiMode =
   | 'openai_compatible'
@@ -50,23 +60,6 @@ export function readHermesModels(settings: Record<string, unknown> | undefined):
   })
 }
 
-export interface HermesProviderFormProps {
-  values: ProviderFormValues
-  onChange: (next: ProviderFormValues) => void
-  readOnly?: boolean
-  apiMode?: HermesApiMode
-  onApiModeChange?: (mode: HermesApiMode) => void
-  models?: HermesModel[]
-  onModelsChange?: (models: HermesModel[]) => void
-  rateLimitDelay?: number
-  onRateLimitDelayChange?: (delay: number | undefined) => void
-  category?: string
-  mode?: 'library' | 'profile'
-  endpointCandidates?: string[]
-  settingsJson?: string
-  onSettingsJsonChange?: (next: string) => void
-}
-
 const selectClassName =
   'h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm outline-none focus:border-ring disabled:cursor-not-allowed disabled:opacity-50'
 
@@ -79,12 +72,11 @@ function makeRow(seed?: HermesModel): ModelRow {
 function sameModels(rows: ModelRow[], models: HermesModel[]) {
   return rows.length === models.length && rows.every((row, index) => {
     const m = models[index]
-    return row.id === (m.id ?? '') && (row.name ?? '') === (m.name ?? '') && (row.contextLength ?? '') === (m.contextLength ?? '')
+    return row.id === (m?.id ?? '') && (row.name ?? '') === (m?.name ?? '') && (row.contextLength ?? '') === (m?.contextLength ?? '')
   })
 }
 
-
-export function HermesProviderForm(props: HermesProviderFormProps) {
+export function HermesFields(props: ProviderFieldsProps) {
   const {
     values, onChange, readOnly,
     apiMode = 'openai_compatible', onApiModeChange,
@@ -101,7 +93,6 @@ export function HermesProviderForm(props: HermesProviderFormProps) {
   const [localMode, setLocalMode] = useState<HermesApiMode>(apiMode)
   const [localModels, setLocalModels] = useState<HermesModel[]>(models)
   const [localRateLimit, setLocalRateLimit] = useState<number | undefined>(rateLimitDelay)
-  const [settingsJsonLocal, setSettingsJsonLocal] = useState(settingsJson)
   const lastSentSettingsJsonRef = useRef(settingsJson)
 
   const effectiveMode = onApiModeChange ? apiMode : localMode
@@ -125,10 +116,6 @@ export function HermesProviderForm(props: HermesProviderFormProps) {
     if (onModelsChange) onModelsChange(next)
     else setLocalModels(next)
   }, [rows, onModelsChange])
-
-  useEffect(() => {
-    setSettingsJsonLocal((current) => settingsJson === current ? current : settingsJson)
-  }, [settingsJson])
 
   // Live preview JSON — mirrors applyHermesEdits so the user can see exactly
   // what the saved config will look like.
@@ -163,118 +150,144 @@ export function HermesProviderForm(props: HermesProviderFormProps) {
       if (next === lastSentSettingsJsonRef.current) return
       lastSentSettingsJsonRef.current = next
       onSettingsJsonChange(next)
-    } else {
-      setSettingsJsonLocal(next)
     }
+    // No parent onChange: live preview only — edits are intentionally not
+    // persisted (matches the old standalone form behavior).
   }
 
-  const updateRow = (index: number, patch: Partial<HermesModel>) => setRows((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, ...patch } : row))
-  const setMode = (next: HermesApiMode) => { onApiModeChange?.(next); if (!onApiModeChange) setLocalMode(next) }
+  const updateRow = (index: number, patch: Partial<HermesModel>) =>
+    setRows((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, ...patch } : row))
+  const setMode = (next: HermesApiMode) => {
+    onApiModeChange?.(next)
+    if (!onApiModeChange) setLocalMode(next)
+  }
 
   return (
     <div className="space-y-4">
-      <ProviderIdentityFields name={values.name} notes={values.notes} websiteUrl={values.websiteUrl} onChange={set} readOnly={readOnly} namePlaceholder="例如：DeepSeek" />
       <ApiKeySection value={values.authValue} onChange={(value) => set({ authValue: value })} readOnly={readOnly} />
 
-      {mode === 'library' && <><Field label="API Mode">
-        <select
-          value={effectiveMode}
-          onChange={(event) => setMode(event.target.value as HermesApiMode)}
-          className={selectClassName}
-          disabled={readOnly}
-        >
-          {HERMES_API_MODE_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>{option.label}</option>
-          ))}
-        </select>
-        <p className="mt-1 text-xs text-muted-foreground">{apiModeHint}</p>
-      </Field>
+      {mode === 'library' && <>
+        <Field label="API Mode">
+          <select
+            value={effectiveMode}
+            onChange={(event) => setMode(event.target.value as HermesApiMode)}
+            className={selectClassName}
+            disabled={readOnly}
+          >
+            {HERMES_API_MODE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-muted-foreground">{apiModeHint}</p>
+        </Field>
 
-      <EndpointField value={values.baseUrl} onChange={(baseUrl) => { set({ baseUrl }); setBaseUrlTouched(true) }} candidates={endpointCandidates} label="API 请求地址 (base_url)" readOnly={readOnly} hint={<div className="mt-2 flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-700"><LinkIcon /><span>请使用 Hermes CLI 支持的 base_url（不包含 /v1 等路径）。</span></div>} />
-      {baseUrlTouched && values.baseUrl.trim() === '' && (
-        <p className="mt-1 text-xs text-destructive">base_url 不能为空</p>
-      )}
-      {baseUrlTouched && values.baseUrl.trim() !== '' && (() => { try { const u = new URL(values.baseUrl); if (!['http:', 'https:'].includes(u.protocol)) return <p className="mt-1 text-xs text-destructive">仅支持 http/https 协议</p> } catch { return <p className="mt-1 text-xs text-destructive">URL 格式无效</p> } return null })()}
-
-      <ModelsCard
-        rows={rows}
-        fetchedModels={fetchedModels}
-        fetching={fetching}
-        fetchError={fetchError}
-        readOnly={readOnly}
-        onFetch={handleFetch}
-        onAdd={() => setRows((current) => [...current, makeRow()])}
-        onUpdate={updateRow}
-        onRemove={(index) => setRows((current) => current.filter((_, rowIndex) => rowIndex !== index))}
-      />
-
-      <AdvancedCard
-        icon={<ClockIcon />}
-        title="Provider Advanced"
-        enabled={rateLimitEnabled}
-        onEnabledChange={(enabled) => {
-          setRateLimitEnabled(enabled)
-          if (!enabled) {
-            onRateLimitDelayChange?.(undefined)
-            if (!onRateLimitDelayChange) setLocalRateLimit(undefined)
+        <EndpointField
+          value={values.baseUrl}
+          onChange={(baseUrl) => { set({ baseUrl }); setBaseUrlTouched(true) }}
+          candidates={endpointCandidates}
+          label="API 请求地址 (base_url)"
+          readOnly={readOnly}
+          hint={<div className="mt-2 flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-700"><LinkIcon /><span>请使用 Hermes CLI 支持的 base_url（不包含 /v1 等路径）。</span></div>}
+        />
+        {baseUrlTouched && values.baseUrl.trim() === '' && (
+          <p className="mt-1 text-xs text-destructive">base_url 不能为空</p>
+        )}
+        {baseUrlTouched && values.baseUrl.trim() !== '' && (() => {
+          try {
+            const u = new URL(values.baseUrl)
+            if (!['http:', 'https:'].includes(u.protocol)) return <p className="mt-1 text-xs text-destructive">仅支持 http/https 协议</p>
+          } catch {
+            return <p className="mt-1 text-xs text-destructive">URL 格式无效</p>
           }
-        }}
-      >
-        <SwitchRow
-          title="Rate limit delay"
-          hint="在两次请求之间插入固定等待时间（秒），适用于触发上游限流的供应商；留空则不延迟。"
-          checked={rateLimitEnabled}
-          onChange={(checked) => {
-            setRateLimitEnabled(checked)
-            if (!checked) {
+          return null
+        })()}
+
+        <ModelsCard
+          rows={rows}
+          fetchedModels={fetchedModels}
+          fetching={fetching}
+          fetchError={fetchError}
+          readOnly={readOnly}
+          onFetch={handleFetch}
+          onAdd={() => setRows((current) => [...current, makeRow()])}
+          onUpdate={updateRow}
+          onRemove={(index) => setRows((current) => current.filter((_, rowIndex) => rowIndex !== index))}
+        />
+
+        <AdvancedCard
+          icon={<ClockIcon />}
+          title="Provider Advanced"
+          enabled={rateLimitEnabled}
+          onEnabledChange={(enabled) => {
+            setRateLimitEnabled(enabled)
+            if (!enabled) {
               onRateLimitDelayChange?.(undefined)
               if (!onRateLimitDelayChange) setLocalRateLimit(undefined)
             }
           }}
-          disabled={readOnly}
-        />
-        <Field label="延迟（秒）">
-          <Input
-            type="number"
-            min="0"
-            step="0.1"
-            value={effectiveRateLimit ?? ''}
-            onChange={(event) => {
-              const value = event.target.value ? Number(event.target.value) : undefined
-              onRateLimitDelayChange?.(value)
-              if (!onRateLimitDelayChange) setLocalRateLimit(value)
+        >
+          <SwitchRow
+            title="Rate limit delay"
+            hint="在两次请求之间插入固定等待时间（秒），适用于触发上游限流的供应商；留空则不延迟。"
+            checked={rateLimitEnabled}
+            onChange={(checked) => {
+              setRateLimitEnabled(checked)
+              if (!checked) {
+                onRateLimitDelayChange?.(undefined)
+                if (!onRateLimitDelayChange) setLocalRateLimit(undefined)
+              }
             }}
-            placeholder="例如 1.5"
-            className="font-mono text-sm"
-            disabled={!rateLimitEnabled || readOnly}
+            disabled={readOnly}
           />
+          <Field label="延迟（秒）">
+            <Input
+              type="number"
+              min="0"
+              step="0.1"
+              value={effectiveRateLimit ?? ''}
+              onChange={(event) => {
+                const value = event.target.value ? Number(event.target.value) : undefined
+                onRateLimitDelayChange?.(value)
+                if (!onRateLimitDelayChange) setLocalRateLimit(value)
+              }}
+              placeholder="例如 1.5"
+              className="font-mono text-sm"
+              disabled={!rateLimitEnabled || readOnly}
+            />
+          </Field>
+        </AdvancedCard>
+      </>}
+
+      {mode === 'profile' && (
+        <Field label="默认模型">
+          <Input value={values.fallbackModel} onChange={(event) => set({ fallbackModel: event.target.value })} placeholder="例如 MiniMax-M2.7" className="font-mono text-sm" disabled={readOnly} />
         </Field>
-      </AdvancedCard></>}
+      )}
 
-      {mode === 'profile' && <Field label="默认模型"><Input value={values.fallbackModel} onChange={(event) => set({ fallbackModel: event.target.value })} placeholder="例如 MiniMax-M2.7" className="font-mono text-sm" disabled={readOnly} /></Field>}
-
-      {mode === 'library' && <div className="rounded-lg border border-border bg-card p-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h4 className="text-base font-medium">settings.json (JSON)</h4>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              {parentProvided
-                ? '该供应商的完整 settings_config JSON（base_url / api_key / api_mode / models / rate_limit_delay 等）；修改后会被原样写入 Hermes 配置。普通编辑请使用上方结构化字段。'
-                : '上方结构化字段对应的 settings_config JSON 预览（只读）；保存时由结构化字段自动生成。'}
-            </p>
+      {mode === 'library' && (
+        <div className="rounded-lg border border-border bg-card p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h4 className="text-base font-medium">settings.json (JSON)</h4>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {parentProvided
+                  ? '该供应商的完整 settings_config JSON（base_url / api_key / api_mode / models / rate_limit_delay 等）；修改后会被原样写入 Hermes 配置。普通编辑请使用上方结构化字段。'
+                  : '上方结构化字段对应的 settings_config JSON 预览（只读）；保存时由结构化字段自动生成。'}
+              </p>
+            </div>
+            <span className="rounded-md bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+              {parentProvided ? '可编辑' : '实时预览（可编辑）'}
+            </span>
           </div>
-          <span className="rounded-md bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-            {parentProvided ? '可编辑' : '实时预览（可编辑）'}
-          </span>
+          <Textarea
+            value={effectiveSettingsJson}
+            onChange={(event) => setSettingsJson(event.target.value)}
+            rows={Math.min(16, Math.max(6, effectiveSettingsJson.split('\n').length + 1))}
+            className="mt-3 font-mono text-sm"
+            disabled={readOnly}
+          />
         </div>
-        <Textarea
-          value={effectiveSettingsJson}
-          onChange={(event) => setSettingsJson(event.target.value)}
-          rows={Math.min(16, Math.max(6, effectiveSettingsJson.split('\n').length + 1))}
-          className="mt-3 font-mono text-sm"
-          disabled={readOnly}
-        />
-      </div>}
+      )}
 
       {mode === 'profile' && <p className="text-xs text-muted-foreground">Profile 模式保存到当前 Hermes 配置文件。</p>}
     </div>
@@ -305,7 +318,7 @@ function ModelsCard({
         </div>
         <ModelFetchActions fetching={fetching} onFetch={onFetch} onAdd={onAdd} fetchDisabled={readOnly} addDisabled={readOnly} />
       </div>
-      {(fetchError) && <p className="mt-2 text-xs text-red-500">{fetchError}</p>}
+      {fetchError && <p className="mt-2 text-xs text-red-500">{fetchError}</p>}
       {rows.length === 0 ? (
         <p className="mt-3 rounded-md border border-dashed p-4 text-center text-xs text-muted-foreground">
           暂无模型，点击「获取模型列表」或「添加模型」。

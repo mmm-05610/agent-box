@@ -1,29 +1,22 @@
 /**
- * ClaudeProviderForm — agent-type specific form for Claude providers.
+ * ClaudeFields — Claude-specific provider inputs.
  *
- * Layout (top → bottom):
- *   Basic:  Name / Notes / Website URL / Get API Key link
- *   Auth:   Auth Token (or API Key selector)
- *   Endpoint: Base URL (+ full URL toggle + speed test)
- *   Advanced (collapsible, hidden when category === 'official'):
- *     - API Format (hidden when category === 'cloud_provider')
- *     - Auth Field Select (ANTHROPIC_AUTH_TOKEN / ANTHROPIC_API_KEY)
- *     - Model Mapping grid (Sonnet/Opus/Fable/Haiku + 1M toggle)
- *     - Default Model + Effort + Timeout + checkboxes
- *     - Custom User-Agent
- *     - Local Proxy Request Overrides (Headers + Body JSON)
+ * Extracted from the old ClaudeProviderForm. The shared frame renders the
+ * identity fields, warnings, and save actions; this component keeps the
+ * Claude-only pieces: auth label wiring, the ANTHROPIC_BASE_URL endpoint
+ * (with Full URL toggle) and the Advanced Options block (API format, auth
+ * field selector, per-role model mapping, fallback model, effort/timeout,
+ * checkboxes, custom User-Agent, local proxy request overrides).
  *
- * Note: the `settings.json` raw editor is intentionally NOT in this form.
- * cc-switch exposes it as a separate "Common Config" editor rendered by the
- * outer dialog. We follow the same separation.
+ * The `settings.json` raw editor stays outside the form (outer dialog /
+ * CommonConfigEditor), same separation as the old form.
  */
-
 import { useCallback, useEffect, useState, type ChangeEvent } from 'react'
 import { Input } from '@/components/ui'
-import type { ProviderFormValues } from '../ProviderFormFields'
-import { getSoftWarnings } from '../ProviderFormFields'
-import { ApiKeySection, ProviderIdentityFields, LocalProxyRequestOverridesField } from './shared'
-import { useFetchedModels } from './hooks/useFetchedModels'
+import type { ProviderFormValues } from '@/components/provider/ProviderFormFields'
+import { ApiKeySection, LocalProxyRequestOverridesField } from '@/components/provider/forms/shared'
+import { useFetchedModels } from '@/components/provider/forms/hooks/useFetchedModels'
+import type { ProviderFieldsProps } from './types'
 
 // ── 1M marker helpers ──────────────────────────────────────────────────
 
@@ -47,6 +40,8 @@ function setOneMMarker(model: string, enabled: boolean): string {
 
 // ── Model role row ─────────────────────────────────────────────────────
 
+interface RoleModel { model: string; name: string }
+
 interface ModelRoleRow {
   role: string
   label: string
@@ -58,8 +53,8 @@ const MODEL_ROLES: ModelRoleRow[] = [
   { role: 'sonnet', label: 'Sonnet', modelField: 'ANTHROPIC_DEFAULT_SONNET_MODEL', nameField: 'ANTHROPIC_DEFAULT_SONNET_MODEL_NAME', supportsOneM: true },
   { role: 'opus',   label: 'Opus',   modelField: 'ANTHROPIC_DEFAULT_OPUS_MODEL',   nameField: 'ANTHROPIC_DEFAULT_OPUS_MODEL_NAME',   supportsOneM: true },
   { role: 'fable',  label: 'Fable',  modelField: 'ANTHROPIC_DEFAULT_FABLE_MODEL',  nameField: 'ANTHROPIC_DEFAULT_FABLE_MODEL_NAME',  supportsOneM: true },
-  { role: 'haiku',    label: 'Haiku',    modelField: 'ANTHROPIC_DEFAULT_HAIKU_MODEL',    nameField: 'ANTHROPIC_DEFAULT_HAIKU_MODEL_NAME',    supportsOneM: false },
-  { role: 'subagent', label: 'Subagent', modelField: 'CLAUDE_CODE_SUBAGENT_MODEL',       nameField: 'CLAUDE_CODE_SUBAGENT_MODEL_NAME',       supportsOneM: true },
+  { role: 'haiku',  label: 'Haiku',  modelField: 'ANTHROPIC_DEFAULT_HAIKU_MODEL',  nameField: 'ANTHROPIC_DEFAULT_HAIKU_MODEL_NAME',  supportsOneM: false },
+  { role: 'subagent', label: 'Subagent', modelField: 'CLAUDE_CODE_SUBAGENT_MODEL', nameField: 'CLAUDE_CODE_SUBAGENT_MODEL_NAME',     supportsOneM: true },
 ]
 
 // ── Auth field options ─────────────────────────────────────────────────
@@ -82,38 +77,19 @@ const API_FORMAT_OPTIONS: ReadonlyArray<{ value: ApiFormatOption; label: string 
   { value: 'gemini_native', label: 'Gemini Native generateContent（需转换）' },
 ]
 
-// ── Props ──────────────────────────────────────────────────────────────
-
-export interface ClaudeProviderFormProps {
-  values: ProviderFormValues
-  onChange: (next: ProviderFormValues) => void
-  readOnly?: boolean
-  presetApiKeyUrl?: string
-  endpointCandidates?: string[]
-  mode?: 'library' | 'profile'
-  /** Provider category — controls Advanced/API Format visibility. */
-  category?: string
-  /** Local proxy headers override (advanced, JSON string). */
-  localProxyHeadersOverride?: string
-  onLocalProxyHeadersOverrideChange?: (next: string) => void
-  localProxyBodyOverride?: string
-  onLocalProxyBodyOverrideChange?: (next: string) => void
-}
-
 // ── Component ──────────────────────────────────────────────────────────
 
-export function ClaudeProviderForm({
+export function ClaudeFields({
   values,
   onChange,
   readOnly,
-  presetApiKeyUrl,
   endpointCandidates,
   category,
   localProxyHeadersOverride = '',
   onLocalProxyHeadersOverrideChange,
   localProxyBodyOverride = '',
   onLocalProxyBodyOverrideChange,
-}: ClaudeProviderFormProps) {
+}: ProviderFieldsProps) {
   const { models: fetchedModels, fetching: fetchingModels, error: fetchError, fetch: handleFetchModels } = useFetchedModels(values.baseUrl, values.authValue, values.isFullUrl)
   const set = (patch: Partial<ProviderFormValues>) => onChange({ ...values, ...patch })
 
@@ -143,15 +119,12 @@ export function ClaudeProviderForm({
   // Quick Set: pick first non-empty model and apply to all roles
   const handleQuickSet = () => {
     const source = values.fallbackModel
-      || MODEL_ROLES.reduce((acc, row) => acc || values.roleModels[row.role]?.model, '' as string)
+      || MODEL_ROLES.reduce<string>((acc, row) => acc || values.roleModels[row.role]?.model || '', '')
     if (!source) return
-    const next = { ...values.roleModels }
+    const next: Record<string, RoleModel> = {}
     for (const row of MODEL_ROLES) {
       const model = row.supportsOneM ? source : stripOneMMarker(source)
-      next[row.role] = {
-        name: stripOneMMarker(model),
-        model,
-      }
+      next[row.role] = { name: stripOneMMarker(model), model }
     }
     set({ roleModels: next })
   }
@@ -162,9 +135,10 @@ export function ClaudeProviderForm({
     const current = values.roleModels[row.role]?.model ?? ''
     const newModel = setOneMMarker(current, enabled)
     const oldBase = stripOneMMarker(current)
-    const newName = values.roleModels[row.role]?.name === oldBase || !values.roleModels[row.role]?.name
+    const currentRole = values.roleModels[row.role]
+    const newName = !currentRole?.name || currentRole.name === oldBase
       ? stripOneMMarker(newModel)
-      : values.roleModels[row.role]?.name
+      : currentRole.name
     set({
       roleModels: {
         ...values.roleModels,
@@ -173,31 +147,8 @@ export function ClaudeProviderForm({
     })
   }
 
-  const warnings = getSoftWarnings(values)
-
   return (
     <div className="space-y-4">
-      {warnings.length > 0 && (
-        <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2">
-          {warnings.map((w, i) => (
-            <p key={i} className="text-xs text-amber-700 dark:text-amber-300">
-              ⚠ {w}
-            </p>
-          ))}
-        </div>
-      )}
-
-      {/* ── Basic ──────────────────────────────────────────────────── */}
-      <ProviderIdentityFields
-        name={values.name}
-        notes={values.notes}
-        websiteUrl={values.websiteUrl}
-        onChange={set}
-        readOnly={readOnly}
-        apiKeyUrl={presetApiKeyUrl}
-        namePlaceholder="Provider name"
-      />
-
       {/* ── Auth ───────────────────────────────────────────────────── */}
       <ApiKeySection
         label={values.useApiKey ? 'API Key (ANTHROPIC_API_KEY)' : 'Auth Token (ANTHROPIC_AUTH_TOKEN)'}
@@ -342,7 +293,7 @@ export function ClaudeProviderForm({
                             set({
                               roleModels: {
                                 ...values.roleModels,
-                                [row.role]: { ...values.roleModels[row.role], name: e.target.value },
+                                [row.role]: { ...(values.roleModels[row.role] ?? { model: '', name: '' }), name: e.target.value },
                               },
                             })
                           }
@@ -360,7 +311,7 @@ export function ClaudeProviderForm({
                               roleModels: {
                                 ...values.roleModels,
                                 [row.role]: {
-                                  ...values.roleModels[row.role],
+                                  ...(values.roleModels[row.role] ?? { model: '', name: '' }),
                                   model: v,
                                   name: shouldSync ? stripOneMMarker(v) : oldName,
                                 },
@@ -576,7 +527,7 @@ function ModelDropdown({
               <div className="px-3 py-1.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wider bg-muted/50 sticky top-0">
                 {vendor}
               </div>
-              {grouped[vendor].map((m) => (
+              {(grouped[vendor] ?? []).map((m) => (
                 <button
                   key={m.id}
                   type="button"

@@ -1,15 +1,24 @@
+/**
+ * CodexFields — Codex-specific provider inputs.
+ *
+ * Extracted from the old CodexProviderForm. Keeps everything the form had
+ * except the shared identity block (now in the ProviderForm frame):
+ * auth.json / config.toml editors, upstream format + routing, Anthropic
+ * upstream settings, prompt-cache routing, thinking ability, default model,
+ * model_catalog.json mapping, custom User-Agent, local proxy overrides, and
+ * the per-provider model test config.
+ */
 import { useEffect, useRef, useState } from 'react'
 import type { FetchedModel } from '@/api/models'
-import { testEndpoint } from '@/api/files'
-import { useToast } from '@/components/feedback/toast'
 import { Button, Input, Textarea } from '@/components/ui'
-import { EndpointSpeedTest } from '../EndpointSpeedTest'
-import type { ProviderFormValues } from '../ProviderFormFields'
+import { EndpointSpeedTest } from '@/components/provider/EndpointSpeedTest'
+import type { ProviderFormValues } from '@/components/provider/ProviderFormFields'
 import {
-  Field, SwitchRow, AdvancedCard, Toggle, ProviderIdentityFields, ApiKeySection, ModelFetchActions, ModelIdInput,
+  Field, SwitchRow, AdvancedCard, Toggle, ApiKeySection, ModelFetchActions, ModelIdInput,
   LinkIcon, ZapIcon, BulbIcon, ChevronIcon, TrashIcon, FlaskIcon,
-} from './shared'
-import { useFetchedModels } from './hooks/useFetchedModels'
+} from '@/components/provider/forms/shared'
+import { useFetchedModels } from '@/components/provider/forms/hooks/useFetchedModels'
+import type { ProviderFieldsProps } from './types'
 
 export type CodexApiFormat = 'openai_responses' | 'openai_chat' | 'anthropic'
 export type ClaudeApiKeyField = 'ANTHROPIC_AUTH_TOKEN' | 'ANTHROPIC_API_KEY'
@@ -42,50 +51,38 @@ export function readCodexCatalogModels(settings: Record<string, unknown> | undef
   return configuredModel ? [{ model: configuredModel, displayName: configuredModel, contextWindow: '' }] : []
 }
 
-export interface CodexProviderFormProps {
-  values: ProviderFormValues; onChange: (next: ProviderFormValues) => void; readOnly?: boolean
-  codexConfig: string; onCodexConfigChange: (next: string) => void; model?: string; onModelChange?: (next: string) => void
-  apiFormat?: CodexApiFormat; onApiFormatChange?: (next: CodexApiFormat) => void
-  codexChatReasoning?: CodexChatReasoning; onCodexChatReasoningChange?: (next: CodexChatReasoning) => void
-  catalogModels?: CodexCatalogModel[]; onCatalogModelsChange?: (next: CodexCatalogModel[]) => void
-  customUserAgent?: string; onCustomUserAgentChange?: (next: string) => void
-  localProxyHeadersOverride?: string; onLocalProxyHeadersOverrideChange?: (next: string) => void
-  localProxyBodyOverride?: string; onLocalProxyBodyOverrideChange?: (next: string) => void
-  providerId?: string; category?: string; shouldShowSpeedTest?: boolean; isFullUrl?: boolean; onFullUrlChange?: (next: boolean) => void
-  isEndpointModalOpen?: boolean; onEndpointModalToggle?: (open?: boolean) => void; autoSelect?: boolean; onAutoSelectChange?: (next: boolean) => void
-  canEditReasoning?: boolean; mode?: 'library' | 'profile'
-  endpointCandidates?: string[]
-  // Default model (config.toml top-level `model`)
-  codexModel?: string; onCodexModelChange?: (next: string) => void
-  // Anthropic upstream (when apiFormat === 'anthropic')
-  anthropicAuthField?: ClaudeApiKeyField; onAnthropicAuthFieldChange?: (next: ClaudeApiKeyField) => void
-  impersonateClaudeCode?: boolean; onImpersonateClaudeCodeChange?: (next: boolean) => void
-  maxOutputTokens?: string; onMaxOutputTokensChange?: (next: string) => void
-  // Prompt Cache Routing (when apiFormat === 'openai_chat')
-  promptCacheRouting?: PromptCacheRoutingMode; onPromptCacheRoutingChange?: (next: PromptCacheRoutingMode) => void
-}
-
 const selectClassName = 'h-9 w-full rounded-md bg-muted px-3 text-sm text-foreground outline-none disabled:opacity-50'
-const localOnHint = 'Codex 目前仅原生支持 OpenAI Responses API 与 GPT 系列模型；如果您的供应商使用 Chat Completions 协议或非 GPT 模型（如 DeepSeek、Kimi），则需要打开本开关，并在使用过程中保持本地路由开启。'
-const localOffHint = '如果您的供应商不是原生 OpenAI Responses API，或者模型名不是 Codex 默认的 GPT 系列，请打开此开关。'
 const reasoningHint = '预设供应商已自动配置；自定义供应商会按名称/地址自动推断。仅当自动识别不准时才需展开手动覆盖。'
 const thinkingHint = '上游 Chat Completions 接口支持开启或关闭 thinking 时启用。Kimi、GLM、Qwen 等通常属于这一类。'
 const effortHint = '上游支持 low/high/max 等思考深度控制时启用。启用后会自动启用思考模式，并把 Codex 的 reasoning.effort 转成上游 Chat 参数。'
 
-function makeRow(seed?: CodexCatalogModel): CatalogRow { return { rowId: crypto.randomUUID(), model: seed?.model ?? '', displayName: seed?.displayName ?? '', contextWindow: seed?.contextWindow ?? '' } }
-function sameModels(rows: CatalogRow[], models: CodexCatalogModel[]) { return rows.length === models.length && rows.every((row, index) => row.model === (models[index].model ?? '') && row.displayName === (models[index].displayName ?? '') && String(row.contextWindow ?? '') === String(models[index].contextWindow ?? '')) }
+function makeRow(seed?: CodexCatalogModel): CatalogRow {
+  return { rowId: crypto.randomUUID(), model: seed?.model ?? '', displayName: seed?.displayName ?? '', contextWindow: seed?.contextWindow ?? '' }
+}
+function sameModels(rows: CatalogRow[], models: CodexCatalogModel[]) {
+  return rows.length === models.length && rows.every((row, index) => row.model === (models[index]?.model ?? '') && row.displayName === (models[index]?.displayName ?? '') && String(row.contextWindow ?? '') === String(models[index]?.contextWindow ?? ''))
+}
 
-export function CodexProviderForm(props: CodexProviderFormProps) {
-  const { values, onChange, readOnly, codexConfig, onCodexConfigChange, model = '', onModelChange, apiFormat = 'openai_responses', onApiFormatChange, codexChatReasoning = {}, onCodexChatReasoningChange, catalogModels = [], onCatalogModelsChange, customUserAgent, onCustomUserAgentChange, localProxyHeadersOverride = '', onLocalProxyHeadersOverrideChange, localProxyBodyOverride = '', onLocalProxyBodyOverrideChange, category, shouldShowSpeedTest = true, isFullUrl, onFullUrlChange, mode = 'library', endpointCandidates = [],
-    // New fields — Default Model + Anthropic upstream + Prompt Cache Routing
-    codexModel = '', onCodexModelChange, anthropicAuthField = 'ANTHROPIC_AUTH_TOKEN', onAnthropicAuthFieldChange, impersonateClaudeCode = false, onImpersonateClaudeCodeChange, maxOutputTokens = '', onMaxOutputTokensChange, promptCacheRouting = 'auto', onPromptCacheRoutingChange,
+export function CodexFields(props: ProviderFieldsProps) {
+  const {
+    values, onChange, readOnly, codexConfig = '', onCodexConfigChange,
+    model = '', onModelChange,
+    apiFormat = 'openai_responses', onApiFormatChange,
+    codexChatReasoning = {}, onCodexChatReasoningChange,
+    catalogModels = [], onCatalogModelsChange,
+    customUserAgent, onCustomUserAgentChange,
+    localProxyHeadersOverride = '', onLocalProxyHeadersOverrideChange,
+    localProxyBodyOverride = '', onLocalProxyBodyOverrideChange,
+    category, shouldShowSpeedTest = true, isFullUrl, onFullUrlChange,
+    mode = 'library', endpointCandidates = [],
+    codexModel = '', onCodexModelChange,
+    anthropicAuthField = 'ANTHROPIC_AUTH_TOKEN', onAnthropicAuthFieldChange,
+    impersonateClaudeCode = false, onImpersonateClaudeCodeChange,
+    maxOutputTokens = '', onMaxOutputTokensChange,
+    promptCacheRouting = 'auto', onPromptCacheRoutingChange,
   } = props
-  const { toast } = useToast()
   const [reasoningOpen, setReasoningOpen] = useState(false)
   const [testOpen, setTestOpen] = useState(Boolean(values.testConfigEnabled || values.testTimeout || values.testDegradedThreshold || values.testMaxRetries))
-  // 计费配置字段（costMultiplier / pricingModelSource / pricingConfigEnabled）保留在
-  // ProviderFormValues 里以兼容 settings_config 中已存的数据，但当前没有任何下游消费方
-  // 会读取它们，等使用统计/成本面板上线后再恢复卡片并接入 reader。
   const [endpointToolsOpen, setEndpointToolsOpen] = useState(false)
   const { models: fetchedModels, fetching, error: fetchError, fetch: fetchCatalog } = useFetchedModels(values.baseUrl, values.authValue)
   const [localReasoning, setLocalReasoning] = useState(codexChatReasoning)
@@ -94,33 +91,75 @@ export function CodexProviderForm(props: CodexProviderFormProps) {
   const effectiveModels = onCatalogModelsChange ? catalogModels : localModels
   const effectiveFormat = onApiFormatChange ? apiFormat : values.apiFormat === 'openai_chat' ? 'openai_chat' : 'openai_responses'
   const fullUrl = onFullUrlChange ? Boolean(isFullUrl) : values.isFullUrl
-  const needsLocalRouting = effectiveFormat === 'openai_chat'
   const supportsThinking = effectiveReasoning.supportsThinking === true || effectiveReasoning.supportsEffort === true
   const supportsEffort = effectiveReasoning.supportsEffort === true
-  const [rows, setRows] = useState<CatalogRow[]>(() => effectiveModels.map(makeRow))
-  const lastSentModelsRef = useRef<CodexCatalogModel[]>(effectiveModels)
   const set = (patch: Partial<ProviderFormValues>) => onChange({ ...values, ...patch })
 
-  useEffect(() => { setRows((current) => sameModels(current, effectiveModels) ? current : effectiveModels.map(makeRow)); lastSentModelsRef.current = effectiveModels }, [effectiveModels])
-  useEffect(() => { if (sameModels(rows, lastSentModelsRef.current)) return; const next = rows.map(({ rowId: _rowId, ...rest }) => rest); lastSentModelsRef.current = next; onCatalogModelsChange?.(next); if (!onCatalogModelsChange) setLocalModels(next) }, [rows, onCatalogModelsChange])
-  const setFormat = (next: CodexApiFormat) => { onApiFormatChange?.(next); if (!onApiFormatChange) set({ apiFormat: next }) }
-  const setReasoning = (next: CodexChatReasoning) => { onCodexChatReasoningChange?.(next); if (!onCodexChatReasoningChange) setLocalReasoning(next) }
-  const updateRow = (index: number, patch: Partial<CodexCatalogModel>) => setRows((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, ...patch } : row))
-  const testCurrentEndpoint = async () => { if (!values.baseUrl.trim()) return toast({ type: 'warning', message: '请先填写 API 请求地址' }); try { const result = await testEndpoint(values.baseUrl); if (!result) throw new Error('No response'); toast({ type: result.status === 'failed' ? 'error' : 'success', message: result.status === 'failed' ? result.message : `${result.response_time_ms} ms` }) } catch (error) { toast({ type: 'error', message: error instanceof Error ? error.message : '测试失败' }) } }
+  const [rows, setRows] = useState<CatalogRow[]>(() => effectiveModels.map(makeRow))
+  const lastSentModelsRef = useRef<CodexCatalogModel[]>(effectiveModels)
+
+  useEffect(() => {
+    setRows((current) => sameModels(current, effectiveModels) ? current : effectiveModels.map(makeRow))
+    lastSentModelsRef.current = effectiveModels
+  }, [effectiveModels])
+  useEffect(() => {
+    if (sameModels(rows, lastSentModelsRef.current)) return
+    const next = rows.map(({ rowId: _rowId, ...rest }) => rest)
+    lastSentModelsRef.current = next
+    onCatalogModelsChange?.(next)
+    if (!onCatalogModelsChange) setLocalModels(next)
+  }, [rows, onCatalogModelsChange])
+
+  const setFormat = (next: CodexApiFormat) => {
+    onApiFormatChange?.(next)
+    if (!onApiFormatChange) set({ apiFormat: next })
+  }
+  const setReasoning = (next: CodexChatReasoning) => {
+    onCodexChatReasoningChange?.(next)
+    if (!onCodexChatReasoningChange) setLocalReasoning(next)
+  }
+  const updateRow = (index: number, patch: Partial<CodexCatalogModel>) =>
+    setRows((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, ...patch } : row))
   const authJson = JSON.stringify({ OPENAI_API_KEY: values.authValue }, null, 2)
-  const updateAuthJson = (raw: string) => { try { const parsed = JSON.parse(raw) as Record<string, unknown>; if (typeof parsed.OPENAI_API_KEY === 'string') set({ authValue: parsed.OPENAI_API_KEY }) } catch { /* keep editor permissive */ } }
+  const updateAuthJson = (raw: string) => {
+    try {
+      const parsed = JSON.parse(raw) as Record<string, unknown>
+      if (typeof parsed.OPENAI_API_KEY === 'string') set({ authValue: parsed.OPENAI_API_KEY })
+    } catch { /* keep editor permissive */ }
+  }
 
   return <div className="space-y-4">
-    <ProviderIdentityFields name={values.name} notes={values.notes} websiteUrl={values.websiteUrl} onChange={set} readOnly={readOnly} namePlaceholder="例如：DeepSeek" />
     <ApiKeySection value={values.authValue} onChange={(value) => set({ authValue: value })} readOnly={readOnly} />
-    <div><div className="mb-1 flex flex-wrap items-center justify-between gap-2"><div className="flex items-center gap-3"><label className="text-xs text-muted-foreground">API 请求地址</label><div className="flex items-center gap-1.5 rounded-full border border-border bg-muted/30 px-2 py-0.5"><span className="flex items-center gap-1 text-[10px] text-muted-foreground"><LinkIcon />完整 URL</span><Toggle checked={fullUrl} onChange={(checked) => { onFullUrlChange?.(checked); if (!onFullUrlChange) set({ isFullUrl: checked }) }} disabled={readOnly} /></div></div><Button type="button" variant="ghost" size="sm" onClick={() => setEndpointToolsOpen((open) => !open)} disabled={readOnly} className="h-7 gap-1 text-xs"><ZapIcon />{endpointToolsOpen ? '收起测速' : '管理与测速'}</Button></div><Input value={values.baseUrl} onChange={(event) => set({ baseUrl: event.target.value })} placeholder="https://api.example.com" className="text-sm font-mono" disabled={readOnly} />{endpointToolsOpen && (() => {
-              const endpoints = Array.from(new Set([values.baseUrl, ...endpointCandidates].filter(Boolean)))
-              return <div className="mt-2">{endpoints.length > 0 ? <EndpointSpeedTest endpoints={endpoints} selected={values.baseUrl} onSelect={(url) => set({ baseUrl: url })} /> : <p className="rounded-md border border-dashed border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">请先填写 API 请求地址，再使用管理与测速功能。</p>}</div>
-            })()}<div className="mt-2 flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-700"><BulbIcon /><span>填写兼容 OpenAI Responses 格式的服务端点地址</span></div></div>
+    <div>
+      <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-3">
+          <label className="text-xs text-muted-foreground">API 请求地址</label>
+          <div className="flex items-center gap-1.5 rounded-full border border-border bg-muted/30 px-2 py-0.5">
+            <span className="flex items-center gap-1 text-[10px] text-muted-foreground"><LinkIcon />完整 URL</span>
+            <Toggle checked={fullUrl} onChange={(checked) => { onFullUrlChange?.(checked); if (!onFullUrlChange) set({ isFullUrl: checked }) }} disabled={readOnly} />
+          </div>
+        </div>
+        <Button type="button" variant="ghost" size="sm" onClick={() => setEndpointToolsOpen((open) => !open)} disabled={readOnly} className="h-7 gap-1 text-xs">
+          <ZapIcon />{endpointToolsOpen ? '收起测速' : '管理与测速'}
+        </Button>
+      </div>
+      <Input value={values.baseUrl} onChange={(event) => set({ baseUrl: event.target.value })} placeholder="https://api.example.com" className="text-sm font-mono" disabled={readOnly} />
+      {endpointToolsOpen && (() => {
+        const endpoints = Array.from(new Set([values.baseUrl, ...endpointCandidates].filter(Boolean)))
+        return <div className="mt-2">
+          {endpoints.length > 0
+            ? <EndpointSpeedTest endpoints={endpoints} selected={values.baseUrl} onSelect={(url) => set({ baseUrl: url })} />
+            : <p className="rounded-md border border-dashed border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">请先填写 API 请求地址，再使用管理与测速功能。</p>}
+        </div>
+      })()}
+      <div className="mt-2 flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+        <BulbIcon /><span>填写兼容 OpenAI Responses 格式的服务端点地址</span>
+      </div>
+    </div>
 
     {category !== 'official' && <>
       {/* Upstream Format */}
-      {category !== 'official' && shouldShowSpeedTest && (
+      {shouldShowSpeedTest && (
         <div className="rounded-lg border border-border bg-card p-3">
           <Field label="上游请求格式 (Upstream Format)">
             <select value={effectiveFormat} onChange={(e) => setFormat(e.target.value as CodexApiFormat)} className={selectClassName} disabled={readOnly}>
@@ -133,8 +172,8 @@ export function CodexProviderForm(props: CodexProviderFormProps) {
             {effectiveFormat === 'anthropic'
               ? '将 Codex 的请求转换为 Anthropic Messages 格式发送到供应商；需在下方配置 Anthropic 认证字段。'
               : effectiveFormat === 'openai_chat'
-              ? '将 Codex 的 Responses 请求转换为 Chat Completions 格式；需保持本地路由开启。'
-              : 'Codex 原生 Responses API，无需格式转换；GPT 系列模型默认使用此格式。'}
+                ? '将 Codex 的 Responses 请求转换为 Chat Completions 格式；需保持本地路由开启。'
+                : 'Codex 原生 Responses API，无需格式转换；GPT 系列模型默认使用此格式。'}
           </p>
         </div>
       )}
@@ -185,6 +224,7 @@ export function CodexProviderForm(props: CodexProviderFormProps) {
           )}
         </div>
       )}
+
       {/* Default Model */}
       <div className="rounded-lg border border-border bg-card p-3">
         <Field label="默认模型 (Default Model)" hint="config.toml 顶层 model 字段；当请求未指定模型时使用此值。">
@@ -199,21 +239,55 @@ export function CodexProviderForm(props: CodexProviderFormProps) {
         </Field>
       </div>
       <CatalogCard rows={rows} fetchedModels={fetchedModels} fetching={fetching} fetchError={fetchError} readOnly={readOnly} onFetch={fetchCatalog} onAdd={() => setRows((current) => [...current, makeRow()])} onUpdate={updateRow} onRemove={(index) => setRows((current) => current.filter((_, rowIndex) => rowIndex !== index))} />
-      <Field label="Custom User-Agent"><Input value={customUserAgent ?? values.customUserAgent} onChange={(event) => { onCustomUserAgentChange?.(event.target.value); if (!onCustomUserAgentChange) set({ customUserAgent: event.target.value }) }} placeholder="留空使用 Codex 默认 User-Agent" className="font-mono text-sm" disabled={readOnly} /></Field>
+      <Field label="Custom User-Agent">
+        <Input value={customUserAgent ?? values.customUserAgent} onChange={(event) => { onCustomUserAgentChange?.(event.target.value); if (!onCustomUserAgentChange) set({ customUserAgent: event.target.value }) }} placeholder="留空使用 Codex 默认 User-Agent" className="font-mono text-sm" disabled={readOnly} />
+      </Field>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <Field label="代理请求 Headers (JSON)"><Textarea value={localProxyHeadersOverride} onChange={(event) => onLocalProxyHeadersOverrideChange?.(event.target.value)} rows={5} className="font-mono text-sm" placeholder='{"X-Custom-Header":"value"}' disabled={readOnly || !onLocalProxyHeadersOverrideChange} /></Field>
-        <Field label="代理请求 Body (JSON)"><Textarea value={localProxyBodyOverride} onChange={(event) => onLocalProxyBodyOverrideChange?.(event.target.value)} rows={5} className="font-mono text-sm" placeholder='{"temperature":0.7}' disabled={readOnly || !onLocalProxyBodyOverrideChange} /></Field>
+        <Field label="代理请求 Headers (JSON)">
+          <Textarea value={localProxyHeadersOverride} onChange={(event) => onLocalProxyHeadersOverrideChange?.(event.target.value)} rows={5} className="font-mono text-sm" placeholder='{"X-Custom-Header":"value"}' disabled={readOnly || !onLocalProxyHeadersOverrideChange} />
+        </Field>
+        <Field label="代理请求 Body (JSON)">
+          <Textarea value={localProxyBodyOverride} onChange={(event) => onLocalProxyBodyOverrideChange?.(event.target.value)} rows={5} className="font-mono text-sm" placeholder='{"temperature":0.7}' disabled={readOnly || !onLocalProxyBodyOverrideChange} />
+        </Field>
       </div>
     </>}
 
-    <Field label="auth.json (JSON) *"><Textarea value={authJson} onChange={(event) => updateAuthJson(event.target.value)} rows={4} className="font-mono text-sm" disabled={readOnly} /><p className="mt-1 text-xs text-muted-foreground">Codex auth.json 配置内容</p></Field>
-    <Field label="config.toml (TOML)"><Textarea value={codexConfig} onChange={(event) => onCodexConfigChange(event.target.value)} rows={14} className="font-mono text-sm" disabled={readOnly} /><p className="mt-1 text-xs text-muted-foreground">Codex config.toml 配置内容</p></Field>
-    <AdvancedCard icon={<FlaskIcon />} title="模型测试配置" enabled={testOpen} onEnabledChange={(enabled) => { setTestOpen(enabled); set({ testConfigEnabled: enabled, ...(enabled ? {} : { testTimeout: '', testDegradedThreshold: '', testMaxRetries: '' }) }) }}><p className="text-sm text-muted-foreground">为此供应商配置单独的模型测试参数，不启用时使用全局配置。</p><div className="grid grid-cols-1 gap-4 md:grid-cols-2"><Field label="测试模型"><Input value={model} onChange={(event) => onModelChange?.(event.target.value)} placeholder="留空使用全局配置" disabled={!testOpen || readOnly} /></Field><Field label="超时时间（秒）"><Input type="number" value={values.testTimeout} onChange={(event) => set({ testTimeout: event.target.value })} placeholder="45" disabled={!testOpen || readOnly} /></Field><Field label="降级阈值（毫秒）"><Input type="number" value={values.testDegradedThreshold} onChange={(event) => set({ testDegradedThreshold: event.target.value })} placeholder="6000" disabled={!testOpen || readOnly} /></Field><Field label="最大重试次数"><Input type="number" value={values.testMaxRetries} onChange={(event) => set({ testMaxRetries: event.target.value })} placeholder="2" disabled={!testOpen || readOnly} /></Field></div></AdvancedCard>
+    <Field label="auth.json (JSON) *">
+      <Textarea value={authJson} onChange={(event) => updateAuthJson(event.target.value)} rows={4} className="font-mono text-sm" disabled={readOnly} />
+      <p className="mt-1 text-xs text-muted-foreground">Codex auth.json 配置内容</p>
+    </Field>
+    <Field label="config.toml (TOML)">
+      <Textarea value={codexConfig} onChange={(event) => onCodexConfigChange?.(event.target.value)} rows={14} className="font-mono text-sm" disabled={readOnly} />
+      <p className="mt-1 text-xs text-muted-foreground">Codex config.toml 配置内容</p>
+    </Field>
+    <AdvancedCard
+      icon={<FlaskIcon />}
+      title="模型测试配置"
+      enabled={testOpen}
+      onEnabledChange={(enabled) => {
+        setTestOpen(enabled)
+        set({ testConfigEnabled: enabled, ...(enabled ? {} : { testTimeout: '', testDegradedThreshold: '', testMaxRetries: '' }) })
+      }}
+    >
+      <p className="text-sm text-muted-foreground">为此供应商配置单独的模型测试参数，不启用时使用全局配置。</p>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <Field label="测试模型">
+          <Input value={model} onChange={(event) => onModelChange?.(event.target.value)} placeholder="留空使用全局配置" disabled={!testOpen || readOnly} />
+        </Field>
+        <Field label="超时时间（秒）">
+          <Input type="number" value={values.testTimeout} onChange={(event) => set({ testTimeout: event.target.value })} placeholder="45" disabled={!testOpen || readOnly} />
+        </Field>
+        <Field label="降级阈值（毫秒）">
+          <Input type="number" value={values.testDegradedThreshold} onChange={(event) => set({ testDegradedThreshold: event.target.value })} placeholder="6000" disabled={!testOpen || readOnly} />
+        </Field>
+        <Field label="最大重试次数">
+          <Input type="number" value={values.testMaxRetries} onChange={(event) => set({ testMaxRetries: event.target.value })} placeholder="2" disabled={!testOpen || readOnly} />
+        </Field>
+      </div>
+    </AdvancedCard>
     {mode === 'profile' && <p className="text-xs text-muted-foreground">Profile 模式保存到当前 Codex 配置文件。</p>}
   </div>
 }
-
-
 
 // ── CatalogCard + CatalogRowView (Codex-specific) ──────────────────────
 
@@ -237,7 +311,7 @@ function CatalogCard({ rows, fetchedModels, fetching, fetchError, readOnly, onFe
         </div>
         <ModelFetchActions fetching={fetching} onFetch={onFetch} onAdd={onAdd} fetchDisabled={readOnly} addDisabled={readOnly} />
       </div>
-      {(fetchError) && <p className="mt-2 text-xs text-red-500">{fetchError}</p>}
+      {fetchError && <p className="mt-2 text-xs text-red-500">{fetchError}</p>}
       {rows.length === 0 ? (
         <p className="mt-3 rounded-md border border-dashed p-4 text-center text-xs text-muted-foreground">暂无模型，点击「获取模型列表」或「添加模型」。</p>
       ) : (
@@ -290,7 +364,14 @@ function CatalogRowView({ index, row, fetchedModels, readOnly, onUpdate, onRemov
           <TrashIcon />
         </button>
       </div>
-      {contextOpen && <div className="mt-3 max-w-md border-t border-border pt-3"><Field label="上下文长度（tokens）"><Input type="number" min="1" value={row.contextWindow ?? ''} onChange={(event) => onUpdate(index, { contextWindow: event.target.value ? Number(event.target.value) : undefined })} placeholder="例如 200000" className="font-mono text-sm" disabled={readOnly} /><p className="mt-1 text-[11px] text-muted-foreground">覆盖自动推断的上下文窗口；留空使用模型默认值。</p></Field></div>}
+      {contextOpen && (
+        <div className="mt-3 max-w-md border-t border-border pt-3">
+          <Field label="上下文长度（tokens）">
+            <Input type="number" min="1" value={row.contextWindow ?? ''} onChange={(event) => onUpdate(index, { contextWindow: event.target.value ? Number(event.target.value) : undefined })} placeholder="例如 200000" className="font-mono text-sm" disabled={readOnly} />
+            <p className="mt-1 text-[11px] text-muted-foreground">覆盖自动推断的上下文窗口；留空使用模型默认值。</p>
+          </Field>
+        </div>
+      )}
     </div>
   )
 }
