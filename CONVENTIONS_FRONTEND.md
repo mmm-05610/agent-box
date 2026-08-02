@@ -18,16 +18,12 @@ Adding a new category member = adding one entry to the data structure,
 not creating a new file or inserting a new `else if`.
 
 ```tsx
-// ❌ Wrong — dedicated per-agent component files
-<ClaudeProviderForm />
-<CodexProviderForm />
-
 // ❌ Wrong — if/else chain on agent type
 {agentType === 'claude' ? <ClaudeView /> : agentType === 'codex' ? <CodexView /> : ...}
 
-// ✅ Correct — lookup from a shared map
-const Form = PROVIDER_FORMS[agentType]
-<Form config={providerConfig} />
+// ✅ Correct — shared frame + registry lookup (Stage 4: domains/provider/)
+const Fields = FIELD_REGISTRY[agentType]
+<ProviderForm agentType={agentType} values={values} onChange={setValues} />
 ```
 
 ---

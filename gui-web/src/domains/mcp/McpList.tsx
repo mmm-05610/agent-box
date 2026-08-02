@@ -1,14 +1,14 @@
 /**
  * MCP List — Available (ACS library) + Installed (from profile config).
- * Library data via useMcpServers; profile data via the api layer.
+ * Library data via useLibrary; profile data via useProfileResources.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Textarea } from '@/components/ui'
 import { useToast } from '@/components/feedback/toast'
-import { useMcpServers } from '@/hooks'
+import { useLibrary, useProfileResources } from '@/hooks'
 import {
-  applyMcpToProfile, fetchProfileMcp, removeMcpFromProfile,
+  applyMcpToProfile, removeMcpFromProfile,
   type ProfileMcp,
 } from '@/api'
 import type { AgentType, McpServer } from '@/api'
@@ -21,10 +21,8 @@ interface McpListProps {
 export function McpList({ profileName, agentType }: McpListProps) {
   const at = agentType ?? 'claude'
   const { toast } = useToast()
-  const { mcpServers: library } = useMcpServers(at)
-
-  const [installed, setInstalled] = useState<ProfileMcp[]>([])
-  const [loading, setLoading] = useState(true)
+  const { mcpServers: library } = useLibrary(at, ['mcpServers'])
+  const { mcp: installed, loading, refresh: reloadInstalled } = useProfileResources(profileName)
 
   const [search, setSearch] = useState('')
   const [searchInput, setSearchInput] = useState('')
@@ -35,19 +33,6 @@ export function McpList({ profileName, agentType }: McpListProps) {
   const [removingId, setRemovingId] = useState<string | null>(null)
   const [detailMcp, setDetailMcp] = useState<ProfileMcp | null>(null)
   const [tick, setTick] = useState(0)
-
-  const reloadInstalled = useCallback(async () => {
-    setLoading(true)
-    try {
-      setInstalled(await fetchProfileMcp(profileName))
-    } catch {
-      setInstalled([])
-    } finally {
-      setLoading(false)
-    }
-  }, [profileName])
-
-  useEffect(() => { void reloadInstalled() }, [reloadInstalled])
 
   const installedIds = useMemo(() => new Set(installed.map(s => s.id)), [installed])
 
@@ -75,7 +60,7 @@ export function McpList({ profileName, agentType }: McpListProps) {
     } catch (e) {
       toast({ type: 'error', message: e instanceof Error ? e.message : 'Apply failed' })
     } finally { setApplyingId(null) }
-  }, [profileName, reloadInstalled, toast])
+  }, [reloadInstalled, toast])
 
   const handleRemove = useCallback(async (mcpId: string) => {
     setRemovingId(mcpId)
@@ -87,7 +72,7 @@ export function McpList({ profileName, agentType }: McpListProps) {
     } catch (e) {
       toast({ type: 'error', message: e instanceof Error ? e.message : 'Remove failed' })
     } finally { setRemovingId(null) }
-  }, [profileName, reloadInstalled, toast])
+  }, [reloadInstalled, toast])
 
   return (
     <div className="space-y-6">

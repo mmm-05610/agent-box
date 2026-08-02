@@ -7,9 +7,9 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Card, CardContent, CardHeader, CardTitle, Textarea } from '@/components/ui'
 import { useToast } from '@/components/feedback/toast'
 import { readFile, saveFile } from '@/api/files'
-import { fetchClaudeMds } from '@/api/providers'
 import { AGENT_TYPE_CONFIGS } from '@/api'
-import type { AgentType, ClaudeMd } from '@/api'
+import type { AgentType } from '@/api'
+import { useLibrary } from '@/hooks'
 import { useProfileConfigDir } from '../useProfileConfigDir'
 
 interface PromptListProps {
@@ -23,18 +23,10 @@ export function PromptList({ profileName, agentType }: PromptListProps) {
   const promptFile = AGENT_TYPE_CONFIGS[agentType].prompt_file
   const promptPath = configDir === null ? null : `${configDir}/${promptFile}`
 
-  const [library, setLibrary] = useState<ClaudeMd[]>([])
+  const { prompts: library } = useLibrary(agentType, ['prompts'])
   const [editedContent, setEditedContent] = useState('')
   const [applyingId, setApplyingId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-
-  useEffect(() => {
-    let cancelled = false
-    fetchClaudeMds(agentType)
-      .then((mds) => { if (!cancelled) setLibrary(mds) })
-      .catch(() => {})
-    return () => { cancelled = true }
-  }, [agentType])
 
   useEffect(() => {
     if (!promptPath) return
