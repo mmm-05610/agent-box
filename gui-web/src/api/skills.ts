@@ -19,6 +19,7 @@ function toSkill(raw: Record<string, unknown>): Skill {
     repoName: (raw.repo_name as string | null | undefined) ?? undefined,
     repoBranch: (raw.repo_branch as string | null | undefined) ?? 'main',
     readmeUrl: (raw.readme_url as string | null | undefined) ?? undefined,
+    sourceAvailable: (raw.source_available as boolean | undefined) ?? undefined,
     agentTypes: (raw.agent_types as AgentType[] | undefined) ?? [],
     installedAt: (raw.installed_at as number | undefined) ?? undefined,
   }
@@ -56,4 +57,14 @@ export async function setSkillAgent(
     (api) => api.set_skill_agent(skillId, agentType, enabled ? 'true' : 'false'),
     undefined,
   )
+}
+
+// ── Profile skills (apply / remove) ─────────────────────────────────────
+
+export async function applySkillToProfile(profileName: string, skillId: string): Promise<void> {
+  await call<void>((api) => api.apply_skill_to_profile!(profileName, skillId), undefined)
+}
+
+export async function removeSkillFromProfile(profileName: string, skillId: string): Promise<void> {
+  await call<void>((api) => api.remove_skill_from_profile!(profileName, skillId), undefined)
 }

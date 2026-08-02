@@ -84,6 +84,8 @@ export interface Skill {
   repoName?: string
   repoBranch?: string
   readmeUrl?: string
+  /** Whether the skill's source directory exists locally (available to apply). */
+  sourceAvailable?: boolean
   /** Agent types this skill is enabled for (resolved from join table). */
   agentTypes: AgentType[]
   installedAt?: number

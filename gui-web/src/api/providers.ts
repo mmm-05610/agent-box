@@ -98,3 +98,7 @@ export async function fetchProfileProviders(profileName: string): Promise<Profil
 export async function removeProfileProvider(profileName: string, providerId: string): Promise<boolean> {
   return call<boolean>((api) => api.remove_profile_provider(profileName, providerId), false)
 }
+
+export async function applyProvider(profileName: string, providerId: string): Promise<void> {
+  await call<void>((api) => api.apply_provider!(profileName, providerId), undefined)
+}

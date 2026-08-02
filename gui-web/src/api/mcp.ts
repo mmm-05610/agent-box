@@ -68,3 +68,28 @@ export async function setMcpAgent(
     undefined,
   )
 }
+
+// ── Profile MCP (installed) ─────────────────────────────────────────────
+
+export interface ProfileMcp {
+  id: string
+  name: string
+  type?: string
+  command?: string
+  args?: string[]
+  url?: string
+  raw: Record<string, unknown>
+}
+
+export async function fetchProfileMcp(profileName: string): Promise<ProfileMcp[]> {
+  const raw = await call<ProfileMcp[] | null>((api) => api.get_profile_mcp!(profileName), null)
+  return raw ?? []
+}
+
+export async function applyMcpToProfile(profileName: string, mcpId: string): Promise<void> {
+  await call<void>((api) => api.apply_mcp_to_profile!(profileName, mcpId), undefined)
+}
+
+export async function removeMcpFromProfile(profileName: string, mcpId: string): Promise<void> {
+  await call<void>((api) => api.remove_mcp_from_profile!(profileName, mcpId), undefined)
+}
