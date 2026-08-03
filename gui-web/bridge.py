@@ -35,7 +35,8 @@ def _to_wsl_path(win_path: str) -> str:
     try:
         out = subprocess.run(
             ["wsl.exe", "wslpath", "-u", win_path],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True, text=True,
+            encoding="utf-8", errors="replace", timeout=10,
         )
         if out.returncode == 0 and out.stdout.strip():
             return out.stdout.strip()
@@ -361,7 +362,8 @@ class Api:
                  "%{http_code}|%{time_total}|%{time_connect}|%{time_starttransfer}",
                  "--connect-timeout", str(timeout_sec),
                  "--max-time", str(timeout_sec), url],
-                capture_output=True, text=True, timeout=timeout_sec + 3,
+                capture_output=True, text=True,
+                encoding="utf-8", errors="replace", timeout=timeout_sec + 3,
             )
             elapsed_ms = int((time.monotonic() - start) * 1000)
             parts = result.stdout.strip().split("|")
