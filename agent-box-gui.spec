@@ -1,4 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
+import os
 from PyInstaller.utils.hooks import collect_all
 
 datas = [
@@ -8,6 +9,13 @@ datas = [
 ]
 binaries = []
 hiddenimports = []
+
+# Bundle the ACS (cc-switch) submodule release binary when it has been built
+# (cargo build --release in acs/) — config.acs_binary() resolves it under
+# _MEIPASS at runtime.
+_acs_bin = 'acs/src-tauri/target/release/cc-switch'
+if os.path.isfile(_acs_bin):
+    datas.append((_acs_bin, 'acs/src-tauri/target/release'))
 
 # PyWebView
 tmp_ret = collect_all('webview')

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
 AGENT_BOX_HOME_ENV = "AGENT_BOX_HOME"
@@ -72,13 +73,18 @@ def acs_db() -> Path:
 def acs_binary() -> Path:
     """Path to the ACS (cc-switch) native GUI binary.
 
-    Override with the ``AGENT_BOX_ACS_BINARY`` env var; defaults to the
-    cc-switch repo's release build.
+    The ACS repo is vendored as a git submodule (``acs/``) that ships with
+    the app — the default points at its release build inside the repo, NOT
+    a per-machine checkout.  Override with ``AGENT_BOX_ACS_BINARY``.
     """
     override = os.environ.get("AGENT_BOX_ACS_BINARY")
     if override:
         return Path(override).expanduser()
-    return Path.home() / "projects" / "agent-config-store" / "src-tauri" / "target" / "release" / "cc-switch"
+    # Frozen (PyInstaller): the submodule binary is bundled into _MEIPASS.
+    if getattr(sys, "frozen", False):
+        return Path(sys._MEIPASS) / "acs" / "src-tauri" / "target" / "release" / "cc-switch"
+    # Source checkout: acs/ sits next to the package at the repo root.
+    return package_dir().parent.parent / "acs" / "src-tauri" / "target" / "release" / "cc-switch"
 
 
 def default_projects_dir() -> str:
