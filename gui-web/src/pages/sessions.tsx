@@ -11,11 +11,10 @@ import { Button, Badge, Tabs } from '@/components/ui'
 import { EmptyState, Loading, StatusDot } from '@/components/feedback'
 import { useToast } from '@/components/feedback/toast'
 import { PageHeader } from '@/components/layout'
-import { useSessions } from '@/hooks'
+import { useSessions, useAgentTypeColor } from '@/hooks'
 import { cn, formatRelativeTime } from '@/lib/utils'
 import { cleanupSessions } from '@/api'
 import type { Session, SessionStatus } from '@/api'
-import { agentTypeColor } from '@/config'
 import claudeLogo from '@/icons/extracted/claude.svg'
 import codexLogo from '@/icons/extracted/openai.svg'
 import hermesLogo from '@/icons/extracted/hermes.png'
@@ -190,6 +189,7 @@ const FILTER_TABS: { key: FilterTab; labelKey: string }[] = [
 
 function SessionCard({ session }: { session: Session }) {
   const { t } = useTranslation()
+  const agentTypeColor = useAgentTypeColor()
   const { profile, agentType, cwd, mode, pid, launchedAt, exitedAt, exitCode } =
     session
 

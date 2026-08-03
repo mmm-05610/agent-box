@@ -11,11 +11,10 @@ import { Button, Badge, Input, Tabs } from '@/components/ui'
 import { EmptyState, Loading } from '@/components/feedback'
 import { useToast } from '@/components/feedback/toast'
 import { PageHeader } from '@/components/layout'
-import { useAgentConfigs, useProfiles, useSessions } from '@/hooks'
+import { useAgentConfigs, useAgentTypeColor, useProfiles, useSessions } from '@/hooks'
 import { cn } from '@/lib/utils'
 import type { AgentType, Profile } from '@/api'
 import { createProfile, deleteProfile, launchProfile, getLastCwdMap, browseDir } from '@/api'
-import { agentTypeColor } from '@/config'
 import { readSettings } from '@/lib/settings'
 import { ProviderIcon } from '@/components/ProviderIcon'
 import { hasIcon, getIconMetadata } from '@/icons/extracted'
@@ -496,6 +495,7 @@ function ProfileCard({
   onView: (name: string) => void
 }) {
   const { t } = useTranslation()
+  const agentTypeColor = useAgentTypeColor()
   const { name, agentType, displayName, description, providerRef } = profile
 
   const displayLabel = displayName || name

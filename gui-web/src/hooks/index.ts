@@ -4,6 +4,7 @@
 
 export { useLibrary } from './useLibrary'
 export { useAgentConfigs, resetAgentConfigsCache } from './useAgentConfigs'
+export { useAgentTypeColor } from './useAgentTypeColor'
 export { useProfileResources } from './useProfileResources'
 export { useProfileContext } from './useProfileContext'
 export { useProfiles } from './use-profiles'

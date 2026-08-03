@@ -20,7 +20,6 @@ import { useMemo, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui'
 import type { AgentType } from '@/api'
-import { AGENT_CONFIG } from '@/config'
 import { getSoftWarnings } from '@/components/provider/ProviderFormFields'
 import { ProviderIdentityFields } from '@/components/provider/forms/shared'
 import { DEFAULT_PROVIDER_FIELDS, FIELD_REGISTRY, type ProviderFieldsProps } from './fields'
@@ -63,8 +62,6 @@ export function ProviderForm({
 }: ProviderFormProps) {
   const { t } = useTranslation()
   const Fields = FIELD_REGISTRY[agentType] ?? DEFAULT_PROVIDER_FIELDS
-  // Fact source (stage 1) — agent identity drives per-agent defaults/display.
-  const agentConfig = AGENT_CONFIG[agentType]
 
   const warnings = useMemo(() => getSoftWarnings(values), [values])
 
@@ -77,7 +74,7 @@ export function ProviderForm({
     onChange({ ...values, ...patch })
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4" data-agent-type={agentConfig?.id ?? agentType}>
+    <form onSubmit={handleSubmit} className="space-y-4" data-agent-type={agentType}>
       {warnings.length > 0 && (
         <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2">
           {warnings.map((w, i) => (

@@ -12,7 +12,6 @@
  */
 import { z } from 'zod'
 import type { AgentType } from '@/api'
-import { PROVIDER_PRESETS } from '@/config'
 import { defaultFormValues, type ProviderFormValues } from '@/components/provider/ProviderFormFields'
 import type { HermesApiMode } from './fields/HermesFields'
 import type { OpenCodeNpmPackage } from './fields/OpenCodeFields'
@@ -117,20 +116,20 @@ export interface ProviderDraftDefaults {
   opencodeNpm: OpenCodeNpmPackage
 }
 
-/** Default state for opening a brand-new provider form, seeded from
- *  `PROVIDER_PRESETS` (config/agentPresets.ts). */
+/** Default state for opening a brand-new provider form. Kept as a
+ *  fallback for the (future) edit-existing-provider flow; not reachable
+ *  from the current apply-from-library + config-file-editing path. */
 export function providerPresetDefaults(agentType: AgentType): ProviderDraftDefaults {
   switch (agentType) {
     case 'claude':
       return {
-        values: defaultFormValues(PROVIDER_PRESETS.claude.env),
+        values: defaultFormValues({ ANTHROPIC_BASE_URL: '', ANTHROPIC_AUTH_TOKEN: '', ANTHROPIC_MODEL: '' }),
         codexConfig: '',
         hermesApiMode: 'openai_compatible',
         opencodeNpm: '@ai-sdk/openai-compatible',
       }
     case 'codex': {
-      const preset = PROVIDER_PRESETS.codex
-      const modelProvider = preset.modelProvider ?? 'custom'
+      const modelProvider = 'custom'
       const codexConfig = `model_provider = "${modelProvider}"\n\n[model_providers.${modelProvider}]\nbase_url = ""\n`
       return {
         values: defaultFormValues(
@@ -148,7 +147,7 @@ export function providerPresetDefaults(agentType: AgentType): ProviderDraftDefau
       return {
         values: defaultFormValues({ ANTHROPIC_BASE_URL: '', ANTHROPIC_AUTH_TOKEN: '' }),
         codexConfig: '',
-        hermesApiMode: PROVIDER_PRESETS.hermes.apiMode as HermesApiMode,
+        hermesApiMode: 'openai_compatible',
         opencodeNpm: '@ai-sdk/openai-compatible',
       }
     case 'opencode':

@@ -18,8 +18,7 @@ import type { AgentType } from '@/api'
 import { fetchProfileDetail } from '@/api'
 import { findFiles } from '@/api/files'
 import { RESOURCES, type ResourceDef } from '@/domains'
-import { useAgentConfigs } from '@/hooks'
-import { agentTypeColor } from '@/config'
+import { useAgentConfigs, useAgentTypeColor } from '@/hooks'
 import { MetaEditor } from './detail/MetaEditor'
 import { StorageExplorer } from './detail/StorageExplorer'
 
@@ -171,6 +170,7 @@ export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProp
   const { meta } = detail
   const agentType = meta.agent_type as AgentType
   const { agentConfigs } = useAgentConfigs()
+  const agentTypeColor = useAgentTypeColor()
   // Loading-order fallback: no resource tabs until the registry arrives.
   const resourceConfig = agentConfigs?.[agentType]?.resources
   const resourceKeys = resourceConfig ? Object.keys(resourceConfig) : []
