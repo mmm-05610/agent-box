@@ -1,5 +1,5 @@
 /**
- * Help Page — CLI reference, links, about
+ * Help Page — documentation links, about
  */
 
 import { useTranslation } from 'react-i18next'
@@ -7,19 +7,10 @@ import { Card } from '@/components/ui'
 import { PageHeader } from '@/components/layout'
 import { useVersion } from '@/hooks'
 
-const CLI_COMMANDS = [
-  { command: 'agent-box create <name> --type claude', descriptionKey: 'help.cmd.create' },
-  { command: 'agent-box launch <name>', descriptionKey: 'help.cmd.launch' },
-  { command: 'agent-box list', descriptionKey: 'help.cmd.list' },
-  { command: 'agent-box delete <name>', descriptionKey: 'help.cmd.delete' },
-  { command: 'agent-box provider list --type claude', descriptionKey: 'help.cmd.providers' },
-  { command: 'agent-box claude-md list --type claude', descriptionKey: 'help.cmd.claudeMd' },
-]
-
 const LINKS = [
-  { labelKey: 'help.link.github', href: 'https://github.com/anthropics/agent-box' },
-  { labelKey: 'help.link.documentation', href: 'https://github.com/anthropics/agent-box#readme' },
-  { labelKey: 'help.link.issue', href: 'https://github.com/anthropics/agent-box/issues' },
+  { labelKey: 'help.link.github', href: 'https://github.com/mmm-05610/agent-box' },
+  { labelKey: 'help.link.documentation', href: 'https://github.com/mmm-05610/agent-box#readme' },
+  { labelKey: 'help.link.issue', href: 'https://github.com/mmm-05610/agent-box/issues' },
 ]
 
 export function HelpPage() {
@@ -32,8 +23,6 @@ export function HelpPage() {
         title={t('help.title')}
         stats={
           <>
-            <span>{t('help.stats.commands')}</span>
-            <span className="mx-2 text-border">·</span>
             <span>{t('help.stats.links')}</span>
             {version && (
               <>
@@ -49,33 +38,6 @@ export function HelpPage() {
       />
 
       <div className="flex flex-col gap-6">
-        {/* Quick Reference */}
-        <Card>
-          <div className="p-5">
-            <h2 className="text-sm font-semibold text-foreground mb-1">
-              {t('help.quickReference')}
-            </h2>
-            <p className="text-xs text-muted-foreground mb-4">
-              {t('help.cliCommands')}
-            </p>
-            <div className="space-y-2.5">
-              {CLI_COMMANDS.map(({ command, descriptionKey }) => (
-                <div
-                  key={command}
-                  className="flex items-center justify-between gap-4 py-2.5 first:pt-0 last:pb-0"
-                >
-                  <code className="font-mono text-xs text-foreground whitespace-nowrap">
-                    {command}
-                  </code>
-                  <span className="text-xs text-muted-foreground shrink-0">
-                    {t(descriptionKey)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </Card>
-
         {/* Links */}
         <Card>
           <div className="p-5">

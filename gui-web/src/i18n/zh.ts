@@ -212,23 +212,12 @@ export const zh: TranslationSchema = {
   help: {
     title: '帮助',
     stats: {
-      commands: '6 条 CLI 命令',
       links: '3 个链接',
     },
-    quickReference: '快速参考',
-    cliCommands: '常用 CLI 命令',
     links: '链接',
     linksDesc: '实用资源',
     about: '关于',
     aboutTagline: 'AI 代理配置隔离管理器。',
-    cmd: {
-      create: '创建新配置',
-      launch: '启动配置',
-      list: '列出所有配置',
-      delete: '删除配置',
-      providers: '列出提供商',
-      claudeMd: '列出 Claude.md 模板',
-    },
     link: {
       github: 'GitHub 仓库',
       documentation: '文档',

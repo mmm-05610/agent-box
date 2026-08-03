@@ -213,23 +213,12 @@ export const en = {
   help: {
     title: 'Help',
     stats: {
-      commands: '6 CLI commands',
       links: '3 links',
     },
-    quickReference: 'Quick reference',
-    cliCommands: 'Common CLI commands',
     links: 'Links',
     linksDesc: 'Useful resources',
     about: 'About',
     aboutTagline: 'AI agent configuration isolation manager.',
-    cmd: {
-      create: 'Create a new profile',
-      launch: 'Launch a profile',
-      list: 'List all profiles',
-      delete: 'Delete a profile',
-      providers: 'List providers',
-      claudeMd: 'List Claude.md templates',
-    },
     link: {
       github: 'GitHub repository',
       documentation: 'Documentation',
