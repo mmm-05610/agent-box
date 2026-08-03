@@ -385,8 +385,10 @@ export const zh: TranslationSchema = {
   memories: {
     title: '记忆',
     subtitle: '<code>{{dir}}</code> 中的文件。保存时会自动创建文件（如果不存在）。',
-    memoryDesc: '代理侧记忆——代理跨会话持久化的笔记。',
-    userDesc: '用户档案——关于你的、应跨会话保留的事实。',
+    desc: {
+      memory: '代理侧记忆——代理跨会话持久化的笔记。',
+      user: '用户档案——关于你的、应跨会话保留的事实。',
+    },
     placeholder: '# {{name}}\n\n跨会话保存的笔记...',
     toast: {
       saved: '{{file}} 已保存',

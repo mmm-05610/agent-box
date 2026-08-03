@@ -386,8 +386,10 @@ export const en = {
   memories: {
     title: 'Memories',
     subtitle: 'Files in <code>{{dir}}</code>. Save creates the file if it doesn\u2019t exist.',
-    memoryDesc: 'Agent-side memory — notes the agent persists across sessions.',
-    userDesc: 'User profile — facts about you that should persist across sessions.',
+    desc: {
+      memory: 'Agent-side memory — notes the agent persists across sessions.',
+      user: 'User profile — facts about you that should persist across sessions.',
+    },
     placeholder: '# {{name}}\n\nNotes stored across sessions...',
     toast: {
       saved: '{{file}} saved',

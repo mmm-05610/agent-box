@@ -19,18 +19,10 @@ interface MemoryFile {
   descriptionKey: string
 }
 
-const FILES: MemoryFile[] = [
-  {
-    path: '', // resolved at runtime
-    label: 'MEMORY.md',
-    descriptionKey: 'memories.memoryDesc',
-  },
-  {
-    path: '',
-    label: 'USER.md',
-    descriptionKey: 'memories.userDesc',
-  },
-]
+interface MemoryFileSpec {
+  file: string
+  kind: string
+}
 
 export function MemoriesList({ profileName, agentType }: { profileName: string; agentType?: AgentType }) {
   const { t } = useTranslation()
@@ -38,8 +30,15 @@ export function MemoriesList({ profileName, agentType }: { profileName: string; 
   // File name from the backend registry (resources.memories.dir).
   const { agentConfigs } = useAgentConfigs()
   const memoriesDirName = agentType ? (agentConfigs?.[agentType]?.resources?.memories?.dir as string | undefined) : undefined
+  // Memory file list (MEMORY.md / USER.md …) also comes from the backend
+  // registry (resources.memories.files) — not hardcoded.
+  const memoryFiles = agentType ? (agentConfigs?.[agentType]?.resources?.memories?.files as unknown as MemoryFileSpec[] | undefined) : undefined
   const memoriesDir = configDir === null || !memoriesDirName ? null : `${configDir.replace(/\/+$/, '')}/${memoriesDirName}`
-  const fileEntries: MemoryFile[] = memoriesDir === null ? [] : FILES.map((f) => ({ ...f, path: `${memoriesDir}/${f.label}` }))
+  const fileEntries: MemoryFile[] = memoriesDir === null || !memoryFiles ? [] : memoryFiles.map((f) => ({
+    path: `${memoriesDir}/${f.file}`,
+    label: f.file,
+    descriptionKey: `memories.desc.${f.kind}`,
+  }))
 
   const [texts, setTexts] = useState<Record<string, string>>({})
   const [original, setOriginal] = useState<Record<string, string>>({})

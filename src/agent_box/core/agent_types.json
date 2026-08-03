@@ -292,7 +292,17 @@
       },
       "skills": {},
       "memories": {
-        "dir": "memories"
+        "dir": "memories",
+        "files": [
+          {
+            "file": "MEMORY.md",
+            "kind": "memory"
+          },
+          {
+            "file": "USER.md",
+            "kind": "user"
+          }
+        ]
       }
     },
     "sandbox": {
