@@ -1,5 +1,5 @@
 import type { ResourceDef } from '..'
-import { HookList } from './HookList'
+import { HookList } from './List'
 
 export const hookResource: ResourceDef = {
   key: 'hooks',

@@ -1,5 +1,5 @@
 import type { ResourceDef } from '..'
-import { SkillList } from './SkillList'
+import { SkillList } from './List'
 
 export const skillResource: ResourceDef = {
   key: 'skills',

@@ -1,5 +1,5 @@
 import type { ResourceDef } from '..'
-import { PromptList } from './PromptList'
+import { PromptList } from './List'
 
 export const promptResource: ResourceDef = {
   key: 'prompt',

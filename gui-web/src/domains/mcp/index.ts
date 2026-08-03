@@ -1,5 +1,5 @@
 import type { ResourceDef } from '..'
-import { McpList } from './McpList'
+import { McpList } from './List'
 
 export const mcpResource: ResourceDef = {
   key: 'mcp',
