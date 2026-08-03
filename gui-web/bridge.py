@@ -36,6 +36,22 @@ class Api:
     def __init__(self, data):
         self._data = data  # LinuxDataAccess | WslDataAccess
 
+    # ── Agent types ──────────────────────────────────────────────────
+
+    def get_agent_configs(self) -> str:
+        """Return the full agent-type registry (identity/runtime/resources).
+
+        No frontend-specific filtering — consumers read what they need.
+        """
+        try:
+            from agent_box.core.library import get_agent_config, get_agent_types
+            registry = {
+                at: get_agent_config(at) for at in get_agent_types()
+            }
+            return json.dumps({"ok": True, "data": registry})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
     # ── Profiles ─────────────────────────────────────────────────────
 
     def list_profiles(self) -> str:
