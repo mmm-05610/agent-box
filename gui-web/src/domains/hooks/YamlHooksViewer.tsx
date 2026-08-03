@@ -9,12 +9,76 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
+import { parse as parseYaml, stringify as stringifyYaml } from 'yaml'
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, CodeEditor } from '@/components/ui'
 import { useToast } from '@/components/feedback/toast'
 import { readFile, saveFile } from '@/api/files'
 import type { AgentType } from '@/api'
 import { useAgentConfigs, useProfileConfigDir } from '@/hooks'
-import { extractHooksFragment, mergeHooksIntoConfig, parseHooksSection } from './yamlHooks'
+
+
+interface HookEntry { command: string }
+type HookPhases = Record<string, HookEntry[]>
+
+// ── yaml hooks parsing (yaml library) ────────────────────────────────
+
+function parseHooksSection(fragment: string): HookPhases {
+  if (!fragment.trim()) return {}
+  let parsed: unknown
+  try {
+    parsed = parseYaml(fragment)
+  } catch {
+    return {}
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+
+  const hooks = (parsed as Record<string, unknown>).hooks
+  if (!hooks || typeof hooks !== 'object' || Array.isArray(hooks)) return {}
+
+  const phases: HookPhases = {}
+  for (const [phase, entries] of Object.entries(hooks as Record<string, unknown>)) {
+    if (!Array.isArray(entries)) continue
+    const commands = entries
+      .filter((entry): entry is Record<string, unknown> => typeof entry === 'object' && entry !== null)
+      .map((entry) => entry.command)
+      .filter((command): command is string => typeof command === 'string')
+    if (commands.length > 0) phases[phase] = commands.map((command) => ({ command }))
+  }
+  return phases
+}
+
+
+function extractHooksFragment(configYaml: string): string {
+  if (!configYaml.trim()) return ''
+  let doc: unknown
+  try {
+    doc = parseYaml(configYaml)
+  } catch {
+    return ''
+  }
+  if (!doc || typeof doc !== 'object' || Array.isArray(doc)) return ''
+  const hooks = (doc as Record<string, unknown>).hooks
+  if (hooks === undefined) return ''
+  return stringifyYaml({ hooks })
+}
+
+
+function mergeHooksIntoConfig(configYaml: string, hooksFragment: string): string {
+  const doc = (parseYaml(configYaml) ?? {}) as Record<string, unknown>
+  if (!hooksFragment.trim()) {
+    delete doc.hooks
+  } else {
+    const fragment = parseYaml(hooksFragment)
+    // The Monaco fragment is the whole `hooks:` block; unwrap it so we
+    // don't nest hooks inside hooks. A fragment without the wrapper key
+    // is used as-is.
+    doc.hooks = fragment && typeof fragment === 'object' && !Array.isArray(fragment)
+      ? ((fragment as Record<string, unknown>).hooks ?? fragment)
+      : fragment
+  }
+  return stringifyYaml(doc)
+}
+
 
 export function YamlHooksViewer({ profileName, agentType }: { profileName: string; agentType?: AgentType }) {
   const { t } = useTranslation()
