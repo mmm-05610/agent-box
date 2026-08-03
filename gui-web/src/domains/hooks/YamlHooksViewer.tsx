@@ -8,8 +8,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from '@/components/ui'
-import { readFile } from '@/api/files'
+import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Textarea } from '@/components/ui'
+import { useToast } from '@/components/feedback/toast'
+import { readFile, saveFile } from '@/api/files'
 import type { AgentType } from '@/api'
 import { useAgentConfigs, useProfileConfigDir } from '@/hooks'
 
@@ -56,6 +57,37 @@ function extractHooks(yaml: string): HookPhases {
   return phases
 }
 
+/**
+ * Extract the literal `hooks:` block (from `hooks:` to the next top-level
+ * key) so the user can edit just that fragment, not the whole config.yaml.
+ */
+function extractHooksBlock(yaml: string): string | null {
+  const lines = yaml.split(/\r?\n/)
+  const start = lines.findIndex((l) => /^hooks\s*:/.test(l.replace(/\s+#.*$/, '')))
+  if (start === -1) return null
+  let end = lines.length
+  for (let i = start + 1; i < lines.length; i++) {
+    if (lines[i]!.trim() === '') continue
+    if (!/^\s/.test(lines[i]!)) { end = i; break }
+  }
+  return lines.slice(start, end).join('\n')
+}
+
+/** Replace the hooks block in config.yaml with the edited fragment. */
+function replaceHooksBlock(yaml: string, newBlock: string): string {
+  const lines = yaml.split(/\r?\n/)
+  const start = lines.findIndex((l) => /^hooks\s*:/.test(l.replace(/\s+#.*$/, '')))
+  if (start === -1) {
+    return yaml.trimEnd() + '\n\n' + newBlock + '\n'
+  }
+  let end = lines.length
+  for (let i = start + 1; i < lines.length; i++) {
+    if (lines[i]!.trim() === '') continue
+    if (!/^\s/.test(lines[i]!)) { end = i; break }
+  }
+  return [...lines.slice(0, start), newBlock, ...lines.slice(end)].join('\n')
+}
+
 const PHASE_ORDER = ['pre_llm_call', 'post_llm_call', 'pre_tool_use', 'post_tool_use']
 
 function phaseOrder(a: string, b: string): number {
@@ -75,16 +107,40 @@ export function YamlHooksViewer({ profileName, agentType }: { profileName: strin
   const configFile = agentType ? agentConfigs?.[agentType]?.resources?.hooks?.config_file : undefined
   const configPath = configDir === null || !configFile ? null : `${configDir}/${configFile}`
   const [configYaml, setConfigYaml] = useState('')
+  const [hooksBlock, setHooksBlock] = useState('')
+  const [saving, setSaving] = useState(false)
+  const { toast } = useToast()
 
-  // Self-fetch the profile's config.yaml.
+  // Self-fetch the profile's config.yaml; keep the hooks fragment editable.
   useEffect(() => {
     if (!configPath) return
     let cancelled = false
     readFile(configPath)
-      .then((raw) => { if (!cancelled) setConfigYaml(raw) })
-      .catch(() => { if (!cancelled) setConfigYaml('') })
+      .then((raw) => {
+        if (cancelled) return
+        setConfigYaml(raw)
+        setHooksBlock(extractHooksBlock(raw) ?? '')
+      })
+      .catch(() => { if (!cancelled) { setConfigYaml(''); setHooksBlock('') } })
     return () => { cancelled = true }
   }, [configPath])
+
+  const handleSaveHooks = useCallback(async () => {
+    if (!configPath) return
+    setSaving(true)
+    try {
+      const ok = await saveFile(configPath, replaceHooksBlock(configYaml, hooksBlock))
+      if (!ok) throw new Error(t('hooksViewer.saveReturnedFalse'))
+      const fresh = await readFile(configPath).catch(() => '')
+      setConfigYaml(fresh)
+      setHooksBlock(extractHooksBlock(fresh) ?? '')
+      toast({ type: 'success', message: t('hooksViewer.toast.saved') })
+    } catch (error) {
+      toast({ type: 'error', message: error instanceof Error ? error.message : t('hooksViewer.toast.failed') })
+    } finally {
+      setSaving(false)
+    }
+  }, [configPath, configYaml, hooksBlock, toast])
 
   // Resolve hook command paths. config.yaml hook commands are written as the
   // bwrap-mounted config dir (e.g. /home/<user>/.hermes/hooks/foo.sh); on the
@@ -98,7 +154,7 @@ export function YamlHooksViewer({ profileName, agentType }: { profileName: strin
     }
     return command
   }, [configDir, agentType, agentConfigs])
-  const phases = useMemo(() => extractHooks(configYaml), [configYaml])
+  const phases = useMemo(() => extractHooks(hooksBlock), [hooksBlock])
   const totalHooks = useMemo(
     () => Object.values(phases).reduce((sum, entries) => sum + entries.length, 0),
     [phases],
@@ -219,6 +275,22 @@ export function YamlHooksViewer({ profileName, agentType }: { profileName: strin
             )
           })
         )}
+        {/* Raw hooks fragment editor — only the hooks block, not the whole config */}
+        <div className="space-y-2 border-t border-border/40 pt-3">
+          <h4 className="text-sm font-medium text-foreground">{t('hooksViewer.editBlock')}</h4>
+          <Textarea
+            value={hooksBlock}
+            onChange={(e) => setHooksBlock(e.target.value)}
+            rows={10}
+            className="text-sm font-mono"
+            placeholder="hooks:"
+          />
+          <div className="flex justify-end">
+            <Button onClick={handleSaveHooks} disabled={saving || !configPath}>
+              {saving ? t('common.saving') : t('common.save')}
+            </Button>
+          </div>
+        </div>
       </CardContent>
     </Card>
   )

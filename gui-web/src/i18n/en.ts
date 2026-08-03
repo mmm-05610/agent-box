@@ -400,13 +400,19 @@ export const en = {
     count: '({{count}} across {{phases}} {{phaseWord}})',
     phase: 'phase',
     phases: 'phases',
-    subtitle: 'Read-only summary of the <code>hooks:</code> block in <code>config.yaml</code>. Expand a command to view the script.',
-    empty: 'No hooks configured. Add a <code>hooks:</code> block in config.yaml via the Storage tab.',
+    subtitle: 'View and edit the <code>hooks:</code> block in <code>config.yaml</code>. Expand a command to view the script.',
+    empty: 'No hooks configured. Add a <code>hooks:</code> block in the editor below.',
     commands: '{{count}} commands',
     commandsOne: '{{count}} command',
     hooksBadge: 'hooks',
     scriptContent: 'Script content',
     failedToRead: '(failed to read script)',
+    editBlock: 'Edit hooks block',
+    saveReturnedFalse: 'Save returned false',
+    toast: {
+      saved: 'Hooks saved',
+      failed: 'Failed to save',
+    },
   },
 
   opencode: {

@@ -399,13 +399,19 @@ export const zh: TranslationSchema = {
     count: '（{{count}} 个钩子，分布于 {{phases}} 个{{phaseWord}}）',
     phase: '阶段',
     phases: '阶段',
-    subtitle: '只读展示 <code>config.yaml</code> 中 <code>hooks:</code> 块的内容。展开命令即可查看脚本。',
-    empty: '未配置钩子。可通过存储标签页在 config.yaml 中添加 <code>hooks:</code> 块。',
+    subtitle: '展示并编辑 <code>config.yaml</code> 中的 <code>hooks:</code> 块。展开命令即可查看脚本。',
+    empty: '未配置钩子。可在下方编辑器中添加 <code>hooks:</code> 块。',
     commands: '{{count}} 条命令',
     commandsOne: '{{count}} 条命令',
     hooksBadge: '钩子',
     scriptContent: '脚本内容',
     failedToRead: '（读取脚本失败）',
+    editBlock: '编辑 hooks 块',
+    saveReturnedFalse: '保存返回失败',
+    toast: {
+      saved: 'hooks 已保存',
+      failed: '保存失败',
+    },
   },
 
   opencode: {
