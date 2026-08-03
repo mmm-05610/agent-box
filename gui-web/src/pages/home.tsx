@@ -188,7 +188,7 @@ export function HomePage({ onNav }: HomePageProps) {
           </>
         }
         action={
-          <Button variant="default" size="lg" onClick={() => onNav('profiles')}>
+          <Button size="lg" onClick={() => onNav('profiles')}>
             {t('home.launchProfile')}
           </Button>
         }

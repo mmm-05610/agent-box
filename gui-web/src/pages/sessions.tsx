@@ -92,7 +92,7 @@ export function SessionsPage() {
       <div className="mx-auto w-full max-w-6xl px-8 py-10">
         <PageHeader
           title={t('sessions.title')}
-          description={t('sessions.description')}
+          subtitle={t('sessions.description')}
           className="mb-6"
         />
         <Loading variant="skeleton" rows={6} />
@@ -105,7 +105,7 @@ export function SessionsPage() {
       <div className="mx-auto w-full max-w-6xl px-8 py-10">
         <PageHeader
           title={t('sessions.title')}
-          description={t('sessions.description')}
+          subtitle={t('sessions.description')}
           className="mb-6"
         />
         <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-10 text-center">

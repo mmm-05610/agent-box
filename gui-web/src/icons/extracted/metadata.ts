@@ -174,12 +174,14 @@ export const iconMetadata: Record<string, IconMetadata> = {
     displayName: "ClaudeAPI",
     category: "ai-provider",
     keywords: ["claudeapi", "claude", "anthropic", "bedrock"],
+    defaultColor: "#D97757",
   },
   claudecn: {
     name: "claudecn",
     displayName: "ClaudeCN",
     category: "ai-provider",
     keywords: ["claudecn", "claude", "enterprise"],
+    defaultColor: "#D97757",
   },
   cloudflare: {
     name: "cloudflare",
@@ -396,6 +398,7 @@ export const iconMetadata: Record<string, IconMetadata> = {
     displayName: "PatewayAI",
     category: "ai-provider",
     keywords: ["pateway", "patewayai", "claude", "codex"],
+    defaultColor: "currentColor",
   },
   palm: {
     name: "palm",
@@ -500,12 +503,14 @@ export const iconMetadata: Record<string, IconMetadata> = {
     displayName: "RunAPI",
     category: "ai-provider",
     keywords: ["runapi", "run", "aggregator", "gateway"],
+    defaultColor: "currentColor",
   },
   relaxcode: {
     name: "relaxcode",
     displayName: "RelaxyCode",
     category: "ai-provider",
     keywords: ["relaxycode", "relaxcode", "relax"],
+    defaultColor: "currentColor",
   },
   eflowcode: {
     name: "eflowcode",

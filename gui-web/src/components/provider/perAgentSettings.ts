@@ -319,9 +319,7 @@ function applyHermesEdits(
       context_length:
         typeof model.contextLength === 'number'
           ? model.contextLength
-          : typeof model.context_length === 'number'
-            ? model.context_length
-            : undefined,
+          : undefined,
     }))
     .filter((model) => model.id)
     .map((model) => {

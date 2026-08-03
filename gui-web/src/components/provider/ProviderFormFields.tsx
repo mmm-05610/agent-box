@@ -15,7 +15,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import i18n from '@/i18n'
-import { Input, Button, Card, CardHeader, CardTitle, CardContent } from '@/components/ui'
+import { Input } from '@/components/ui'
 
 // ── Model role row ─────────────────────────────────────────────────────
 

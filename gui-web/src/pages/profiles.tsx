@@ -7,13 +7,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Button, Card, Badge, Input, Tabs } from '@/components/ui'
+import { Button, Badge, Input, Tabs } from '@/components/ui'
 import { EmptyState, Loading } from '@/components/feedback'
 import { useToast } from '@/components/feedback/toast'
 import { PageHeader } from '@/components/layout'
 import { useAgentConfigs, useProfiles, useSessions } from '@/hooks'
 import { cn } from '@/lib/utils'
-import { formatRelativeTime } from '@/lib/utils'
 import type { AgentType, Profile } from '@/api'
 import { createProfile, deleteProfile, launchProfile, getLastCwdMap, browseDir } from '@/api'
 import { agentTypeColor } from '@/config'
@@ -214,7 +213,7 @@ export function ProfilesPage({ onOpenDetail, autoOpenCreate, onAutoOpenCreateHan
       <div className="mx-auto w-full max-w-6xl px-8 py-10">
         <PageHeader
           title={t('profiles.title')}
-          description={t('profiles.description')}
+          subtitle={t('profiles.description')}
           className="mb-6"
         />
         <Loading variant="skeleton" rows={4} />
@@ -227,7 +226,7 @@ export function ProfilesPage({ onOpenDetail, autoOpenCreate, onAutoOpenCreateHan
       <div className="mx-auto w-full max-w-6xl px-8 py-10">
         <PageHeader
           title={t('profiles.title')}
-          description={t('profiles.description')}
+          subtitle={t('profiles.description')}
           className="mb-6"
         />
         <div className="flex flex-col items-center gap-3 py-16 text-destructive">
@@ -497,8 +496,7 @@ function ProfileCard({
   onView: (name: string) => void
 }) {
   const { t } = useTranslation()
-  const { name, agentType, displayName, description, providerRef, createdAt } =
-    profile
+  const { name, agentType, displayName, description, providerRef } = profile
 
   const displayLabel = displayName || name
   const accentColor = AGENT_TYPE_HEX[agentType] ?? '#888'
