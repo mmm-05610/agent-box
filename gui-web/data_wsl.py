@@ -118,10 +118,12 @@ class WslDataAccess:
         if mode == "resume" and resume_args:
             launch_cmd += " " + " ".join(resume_args)
 
+        # cwd is resolved by the backend launch (expanduser) — pass it as a
+        # flag, not a `cd` in the shell (which chokes on `~` and quoting).
+        if cwd:
+            launch_cmd += f" --cwd {shlex.quote(cwd)}"
         setup = 'export PATH="$HOME/.npm-global/bin:$HOME/.local/bin:$PATH"'
         script = f'{setup} && agent-box exec "{launch_cmd}"'
-        if cwd:
-            script = f'cd "{cwd}" && {script}'
         script += (
             ' || { ec=$?; echo; echo agent-box failed code $ec; '
             'read -p "Press Enter to close..." ; }'

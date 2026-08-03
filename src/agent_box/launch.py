@@ -17,13 +17,17 @@ from .resources import sessions
 
 
 
-def launch(name: str, extra_args: list | None = None) -> None:
+def launch(name: str, extra_args: list | None = None, cwd: str | None = None) -> None:
     """Bind-mount the profile's config dir and exec the agent binary.
 
     Reads ``meta.yaml`` to determine agent_type. ``extra_args`` are
     passed through to the agent binary (e.g. ``-c`` for hermes,
-    ``--continue`` for claude). Never returns on success.
+    ``--continue`` for claude). ``cwd`` is the working directory for the
+    agent — resolved here (``~`` etc.) so callers don't shell-quote it.
+    Never returns on success.
     """
+    if cwd:
+        os.chdir(os.path.expanduser(cwd))
     meta = profile.load_meta(name)
     agent_type = meta.get("agent_type") or config.DEFAULT_AGENT_TYPE
     agent_config = get_agent_config(agent_type)

@@ -389,7 +389,7 @@ def test_launch_double_dash_extra_args_in_context(tmp_agent_box_home, monkeypatc
     """`launch -- -c do thing` in context passes `-c do thing` to the agent."""
     captured = {}
 
-    def fake_launch(name, extra_args=None):
+    def fake_launch(name, extra_args=None, cwd=None):
         captured["name"] = name
         captured["extra"] = extra_args
 
@@ -405,7 +405,7 @@ def test_launch_double_dash_with_explicit_name(tmp_agent_box_home, monkeypatch):
     """`launch mycc -- -c do thing` keeps name and passes extra args."""
     captured = {}
 
-    def fake_launch(name, extra_args=None):
+    def fake_launch(name, extra_args=None, cwd=None):
         captured["name"] = name
         captured["extra"] = extra_args
 

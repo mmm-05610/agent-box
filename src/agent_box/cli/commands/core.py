@@ -456,9 +456,26 @@ def do_launch(self, args: argparse.Namespace, unknown_args: list) -> None:
     # Parse from the raw token list, not argparse's name/extra split:
     # the first non-`-` token is the profile name, everything else is
     # extra args for the agent (including option-like ones).  A literal
-    # `--` is the standard separator and is dropped.
+    # `--` is the standard separator and is dropped.  `--cwd <path>` sets
+    # the agent's working directory (resolved by the backend).
     statement = getattr(args, "cmd2_statement", None)
     tokens = list(statement.arg_list) if statement is not None else []
+
+    cwd: str | None = None
+    filtered: list[str] = []
+    i = 0
+    while i < len(tokens):
+        tok = tokens[i]
+        if tok == "--cwd" and i + 1 < len(tokens):
+            cwd = tokens[i + 1]
+            i += 2
+        elif tok.startswith("--cwd="):
+            cwd = tok.split("=", 1)[1]
+            i += 1
+        else:
+            filtered.append(tok)
+            i += 1
+    tokens = filtered
 
     if tokens and not tokens[0].startswith("-"):
         profile_name = tokens[0]
@@ -476,7 +493,7 @@ def do_launch(self, args: argparse.Namespace, unknown_args: list) -> None:
             return
 
     try:
-        launch.launch(profile_name, extra_args=extra_args)
+        launch.launch(profile_name, extra_args=extra_args, cwd=cwd)
     except (ValueError, profile.ProfileError) as exc:
         self._cmd.perror(f"{config.DISPLAY_NAME}: {exc}")
 
