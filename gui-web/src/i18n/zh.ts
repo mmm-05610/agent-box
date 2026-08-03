@@ -41,14 +41,6 @@ export const zh: TranslationSchema = {
     newProfile: '新建配置',
   },
 
-  agent: {
-    claude: 'Claude',
-    codex: 'Codex',
-    hermes: 'Hermes',
-    opencode: 'OpenCode',
-    claudeCode: 'Claude Code',
-  },
-
   tab: {
     meta: '元信息',
     provider: '提供商',
@@ -61,12 +53,6 @@ export const zh: TranslationSchema = {
     rules: '规则',
     memories: '记忆',
     instructions: '说明',
-    prompt: {
-      claude: 'CLAUDE.md',
-      codex: 'AGENTS.md',
-      hermes: 'SOUL.md',
-      opencode: 'AGENTS.md',
-    },
   },
 
   home: {

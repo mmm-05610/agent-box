@@ -14,7 +14,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button, Badge, Tabs } from '@/components/ui'
 import { Loading } from '@/components/feedback'
-import type { AgentType } from '@/api'
+import type { AgentType, ResourceConfig } from '@/api'
 import { fetchProfileDetail } from '@/api'
 import { findFiles } from '@/api/files'
 import { RESOURCES, type ResourceDef } from '@/domains'
@@ -54,26 +54,21 @@ const RESOURCE_LABELS: Record<string, string> = {
   hooks: 'tab.hook',
 }
 
-/** The prompt resource edits the per-agent prompt file, which the old
- *  detail page exposed under per-agent tab labels. Keep those labels
- *  (filenames — identical in both language packs). */
-const PROMPT_TAB_LABELS: Record<string, string> = {
-  claude: 'tab.prompt.claude',
-  codex: 'tab.prompt.codex',
-  hermes: 'tab.prompt.hermes',
-  opencode: 'tab.prompt.opencode',
-}
-
 /**
  * Pure tab resolution: backend registry `resources` keys → RESOURCES
  * lookup. Presence in the backend dict IS the support declaration, so
  * there is no frontend feature gate. Kept outside the component so the
  * per-agent tab sets are directly testable.
+ *
+ * The prompt tab label is the prompt *file* name from the backend registry
+ * (`resources.prompt.file` — e.g. CLAUDE.md / AGENTS.md / SOUL.md), not a
+ * hardcoded per-agent map. `t()` renders it verbatim via missing-key
+ * passthrough, same as before.
  */
 export function resolveResourceTabs(
-  agentType: AgentType,
   resourceKeys: string[],
   registry: Record<string, ResourceDef>,
+  agentResources?: Record<string, ResourceConfig>,
 ): Array<{ key: string; label: string }> {
   const out: Array<{ key: string; label: string }> = []
   for (const key of resourceKeys) {
@@ -82,7 +77,7 @@ export function resolveResourceTabs(
     out.push({
       key,
       label: key === 'prompt'
-        ? (PROMPT_TAB_LABELS[agentType] ?? res.labelKey)
+        ? ((agentResources?.prompt as ResourceConfig | undefined)?.file as string | undefined) ?? res.labelKey
         : (RESOURCE_LABELS[key] ?? res.labelKey),
     })
   }
@@ -182,7 +177,7 @@ export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProp
     { key: 'meta', label: t('tab.meta'), render: () => <MetaEditor key={refreshKey} detail={detail} onRefresh={triggerRefresh} /> },
   ]
 
-  for (const { key, label } of resolveResourceTabs(agentType, resourceKeys, resourceRegistry)) {
+  for (const { key, label } of resolveResourceTabs(resourceKeys, resourceRegistry, resourceConfig)) {
     const res = resourceRegistry[key]
     if (res) {
       tabs.push({

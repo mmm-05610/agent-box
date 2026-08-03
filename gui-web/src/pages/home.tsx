@@ -19,7 +19,7 @@ import { fetchProviders } from '@/api/providers'
 import { fetchSessions } from '@/api/sessions'
 import { cn, formatRelativeTime } from '@/lib/utils'
 import type { AgentType } from '@/api'
-import { useAgentConfigs, resolveAgentIdentity } from '@/hooks'
+import { useAgentConfigs, useDefaultAgent, resolveAgentIdentity } from '@/hooks'
 
 interface HomePageProps {
   onNav: (key: NavKey) => void
@@ -37,6 +37,8 @@ interface StatTile {
 export function HomePage({ onNav }: HomePageProps) {
   const { t, i18n } = useTranslation()
   const { agentConfigs } = useAgentConfigs()
+  // Provider stat counts the backend's default agent — never a hardcoded type.
+  const defaultAgent = useDefaultAgent()
   const [profileCount, setProfileCount] = useState(0)
   const [providerCount, setProviderCount] = useState(0)
   const [sessionCount, setSessionCount] = useState(0)
@@ -51,7 +53,7 @@ export function HomePage({ onNav }: HomePageProps) {
       try {
         const [profiles, providers, sessions] = await Promise.all([
           fetchProfiles(),
-          fetchProviders('claude'),
+          fetchProviders(defaultAgent),
           fetchSessions(),
         ])
         setProfileCount(profiles.length)
@@ -76,7 +78,7 @@ export function HomePage({ onNav }: HomePageProps) {
       }
     }
     void load()
-  }, [])
+  }, [defaultAgent])
 
   const greeting = useMemo(() => {
     const h = new Date().getHours()

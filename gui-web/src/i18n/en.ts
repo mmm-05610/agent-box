@@ -42,14 +42,6 @@ export const en = {
     newProfile: 'New profile',
   },
 
-  agent: {
-    claude: 'Claude',
-    codex: 'Codex',
-    hermes: 'Hermes',
-    opencode: 'OpenCode',
-    claudeCode: 'Claude Code',
-  },
-
   tab: {
     meta: 'Meta',
     provider: 'Provider',
@@ -62,12 +54,6 @@ export const en = {
     rules: 'Rules',
     memories: 'Memories',
     instructions: 'Instructions',
-    prompt: {
-      claude: 'CLAUDE.md',
-      codex: 'AGENTS.md',
-      hermes: 'SOUL.md',
-      opencode: 'AGENTS.md',
-    },
   },
 
   home: {

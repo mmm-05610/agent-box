@@ -13,7 +13,7 @@ import { useToast } from '@/components/feedback/toast'
 import { PageHeader } from '@/components/layout'
 import { useAgentConfigs, useAgentIdentity, useAgentTypeColor, useDefaultAgent, useLibrary, useProfiles, useSessions, resolveAgentIdentity } from '@/hooks'
 import { cn } from '@/lib/utils'
-import type { AgentType, Profile } from '@/api'
+import type { AgentType, AgentTypeConfig, Profile } from '@/api'
 import { createProfile, deleteProfile, launchProfile, getLastCwdMap, browseDir } from '@/api'
 import { readSettings } from '@/lib/settings'
 import { ProviderIcon } from '@/components/ProviderIcon'
@@ -45,20 +45,14 @@ const LAUNCH_MODES = [
 
 type FilterTab = AgentType | 'all'
 
-const FILTER_TABS: { key: FilterTab; labelKey: string }[] = [
-  { key: 'all', labelKey: 'profiles.filter.all' },
-  { key: 'claude', labelKey: 'agent.claude' },
-  { key: 'codex', labelKey: 'agent.codex' },
-  { key: 'hermes', labelKey: 'agent.hermes' },
-  { key: 'opencode', labelKey: 'agent.opencode' },
-]
-
-/** Create-modal agent display names (brand names, identical in both packs). */
-const CREATE_AGENT_KEYS: Record<string, string> = {
-  claude: 'agent.claudeCode',
-  codex: 'agent.codex',
-  hermes: 'agent.hermes',
-  opencode: 'agent.opencode',
+/** Agent display name from the backend registry (identity.display_name).
+ *  Brand names are proper nouns, served by the registry — the frontend
+ *  never hardcodes which agents exist or what they're called. */
+function agentDisplayName(
+  agentConfigs: Record<string, AgentTypeConfig> | null,
+  at: string,
+): string {
+  return agentConfigs?.[at]?.identity?.display_name ?? at
 }
 
 // ── Component ───────────────────────────────────────────────────────────
@@ -76,6 +70,12 @@ export function ProfilesPage({ onOpenDetail, autoOpenCreate, onAutoOpenCreateHan
   const { agentConfigs } = useAgentConfigs()
   // Registry-driven agent types (loading fallback: empty list).
   const agentTypes = useMemo(() => (agentConfigs ? Object.keys(agentConfigs) : []), [agentConfigs])
+  // Filter tabs — 'all' + one per registry agent type, no hardcoded list.
+  const filterTabs = useMemo(() => {
+    const tabs: Array<{ key: FilterTab; label: string }> = [{ key: 'all', label: t('profiles.filter.all') }]
+    for (const at of agentTypes) tabs.push({ key: at, label: agentDisplayName(agentConfigs, at) })
+    return tabs
+  }, [agentTypes, agentConfigs, t])
   const { toast } = useToast()
 
   const [activeFilter, setActiveFilter] = useState<FilterTab>('all')
@@ -226,9 +226,9 @@ export function ProfilesPage({ onOpenDetail, autoOpenCreate, onAutoOpenCreateHan
 
       {/* Filter tabs */}
       <Tabs<FilterTab>
-        tabs={FILTER_TABS.map(({ key, labelKey }) => ({
+        tabs={filterTabs.map(({ key, label }) => ({
           key,
-          label: t(labelKey),
+          label,
           count: countByType[key] ?? 0,
         }))}
         active={activeFilter}
@@ -388,7 +388,7 @@ function CreateProfileModal({
                     alt={at}
                     className="h-5 w-5 object-contain"
                   />
-                  {t(CREATE_AGENT_KEYS[at] ?? at)}
+                  {agentDisplayName(agentConfigs, at)}
                 </button>
               ))}
             </div>
