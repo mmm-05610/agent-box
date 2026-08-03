@@ -3,90 +3,18 @@
  * `config.yaml`. Each command can be expanded to read and display the
  * referenced script file content.
  *
- * Self-fetches the profile's config.yaml; edits happen in the Storage tab.
+ * Self-fetches the profile's config.yaml; the hooks section is edited in a
+ * Monaco editor (yaml syntax) and merged back with the yaml library.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Textarea } from '@/components/ui'
+import { Badge, Button, Card, CardContent, CardHeader, CardTitle, CodeEditor } from '@/components/ui'
 import { useToast } from '@/components/feedback/toast'
 import { readFile, saveFile } from '@/api/files'
 import type { AgentType } from '@/api'
 import { useAgentConfigs, useProfileConfigDir } from '@/hooks'
-
-interface HookEntry {
-  command: string
-}
-
-type HookPhases = Record<string, HookEntry[]>
-
-/**
- * Extract phases + commands from `hooks:` block.
- *   hooks:
- *     pre_llm_call:
- *     - command: /path/to/script.sh
- */
-function extractHooks(yaml: string): HookPhases {
-  const lines = yaml.split(/\r?\n/)
-  const phases: HookPhases = {}
-
-  let inHooks = false
-  let currentPhase: string | null = null
-  const phaseRe = /^  ([A-Za-z_][A-Za-z0-9_]*)\s*:\s*$/
-  const commandRe = /^    -?\s*command\s*:\s*(.+?)\s*$/
-
-  for (const raw of lines) {
-    const stripped = raw.replace(/\s+#.*$/, '')
-    if (/^hooks\s*:\s*$/.test(stripped)) { inHooks = true; continue }
-    if (!inHooks) continue
-    if (/^[A-Za-z_]/.test(raw)) break
-
-    const phaseMatch = stripped.match(phaseRe)
-    if (phaseMatch) {
-      currentPhase = phaseMatch[1] ?? null
-      if (currentPhase) phases[currentPhase] = phases[currentPhase] ?? []
-      continue
-    }
-
-    const cmdMatch = stripped.match(commandRe)
-    if (cmdMatch && currentPhase) {
-      const value = cmdMatch[1]!.trim().replace(/^(['"])(.*)\1$/, '$2')
-      phases[currentPhase]!.push({ command: value })
-    }
-  }
-  return phases
-}
-
-/**
- * Extract the literal `hooks:` block (from `hooks:` to the next top-level
- * key) so the user can edit just that fragment, not the whole config.yaml.
- */
-function extractHooksBlock(yaml: string): string | null {
-  const lines = yaml.split(/\r?\n/)
-  const start = lines.findIndex((l) => /^hooks\s*:/.test(l.replace(/\s+#.*$/, '')))
-  if (start === -1) return null
-  let end = lines.length
-  for (let i = start + 1; i < lines.length; i++) {
-    if (lines[i]!.trim() === '') continue
-    if (!/^\s/.test(lines[i]!)) { end = i; break }
-  }
-  return lines.slice(start, end).join('\n')
-}
-
-/** Replace the hooks block in config.yaml with the edited fragment. */
-function replaceHooksBlock(yaml: string, newBlock: string): string {
-  const lines = yaml.split(/\r?\n/)
-  const start = lines.findIndex((l) => /^hooks\s*:/.test(l.replace(/\s+#.*$/, '')))
-  if (start === -1) {
-    return yaml.trimEnd() + '\n\n' + newBlock + '\n'
-  }
-  let end = lines.length
-  for (let i = start + 1; i < lines.length; i++) {
-    if (lines[i]!.trim() === '') continue
-    if (!/^\s/.test(lines[i]!)) { end = i; break }
-  }
-  return [...lines.slice(0, start), newBlock, ...lines.slice(end)].join('\n')
-}
+import { extractHooksFragment, mergeHooksIntoConfig, parseHooksSection } from './yamlHooks'
 
 export function YamlHooksViewer({ profileName, agentType }: { profileName: string; agentType?: AgentType }) {
   const { t } = useTranslation()
@@ -108,7 +36,7 @@ export function YamlHooksViewer({ profileName, agentType }: { profileName: strin
       .then((raw) => {
         if (cancelled) return
         setConfigYaml(raw)
-        setHooksBlock(extractHooksBlock(raw) ?? '')
+        setHooksBlock(extractHooksFragment(raw))
       })
       .catch(() => { if (!cancelled) { setConfigYaml(''); setHooksBlock('') } })
     return () => { cancelled = true }
@@ -118,11 +46,20 @@ export function YamlHooksViewer({ profileName, agentType }: { profileName: strin
     if (!configPath) return
     setSaving(true)
     try {
-      const ok = await saveFile(configPath, replaceHooksBlock(configYaml, hooksBlock))
+      // Parse the full config, replace the hooks field, serialize with yaml.
+      let next: string
+      try {
+        next = mergeHooksIntoConfig(configYaml, hooksBlock)
+      } catch {
+        // Invalid YAML in the fragment — keep the editor content as-is.
+        toast({ type: 'error', message: t('hooksViewer.toast.invalidYaml') })
+        return
+      }
+      const ok = await saveFile(configPath, next)
       if (!ok) throw new Error(t('hooksViewer.saveReturnedFalse'))
       const fresh = await readFile(configPath).catch(() => '')
       setConfigYaml(fresh)
-      setHooksBlock(extractHooksBlock(fresh) ?? '')
+      setHooksBlock(extractHooksFragment(fresh))
       toast({ type: 'success', message: t('hooksViewer.toast.saved') })
     } catch (error) {
       toast({ type: 'error', message: error instanceof Error ? error.message : t('hooksViewer.toast.failed') })
@@ -143,7 +80,8 @@ export function YamlHooksViewer({ profileName, agentType }: { profileName: strin
     }
     return command
   }, [configDir, agentType, agentConfigs])
-  const phases = useMemo(() => extractHooks(hooksBlock), [hooksBlock])
+
+  const phases = useMemo(() => parseHooksSection(hooksBlock), [hooksBlock])
   const totalHooks = useMemo(
     () => Object.values(phases).reduce((sum, entries) => sum + entries.length, 0),
     [phases],
@@ -264,16 +202,18 @@ export function YamlHooksViewer({ profileName, agentType }: { profileName: strin
             )
           })
         )}
-        {/* Raw hooks fragment editor — only the hooks block, not the whole config */}
+        {/* Hooks fragment editor — Monaco with yaml syntax */}
         <div className="space-y-2 border-t border-border/40 pt-3">
           <h4 className="text-sm font-medium text-foreground">{t('hooksViewer.editBlock')}</h4>
-          <Textarea
-            value={hooksBlock}
-            onChange={(e) => setHooksBlock(e.target.value)}
-            rows={10}
-            className="text-sm font-mono"
-            placeholder="hooks:"
-          />
+          <div className="overflow-hidden rounded-md ring-1 ring-border/60">
+            <CodeEditor
+              language="yaml"
+              value={hooksBlock}
+              onChange={setHooksBlock}
+              height={240}
+              ariaLabel={t('hooksViewer.editBlock')}
+            />
+          </div>
           <div className="flex justify-end">
             <Button onClick={handleSaveHooks} disabled={saving || !configPath}>
               {saving ? t('common.saving') : t('common.save')}
