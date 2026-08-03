@@ -17,6 +17,6 @@ interface HookListProps {
 export function HookList({ profileName, agentType }: HookListProps) {
   const { agentConfigs } = useAgentConfigs()
   const hooksFormat = agentType ? agentConfigs?.[agentType]?.resources?.hooks?.format : undefined
-  if (hooksFormat === 'yaml') return <YamlHooksViewer profileName={profileName} />
-  return <JsonHooksEditor profileName={profileName} />
+  if (hooksFormat === 'yaml') return <YamlHooksViewer profileName={profileName} agentType={agentType} />
+  return <JsonHooksEditor profileName={profileName} agentType={agentType} />
 }

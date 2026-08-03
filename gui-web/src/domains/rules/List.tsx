@@ -21,7 +21,8 @@ import {
 } from '@/components/ui'
 import { useToast } from '@/components/feedback/toast'
 import { deletePath, findFiles, readFile, saveFile } from '@/api/files'
-import { useProfileConfigDir } from '@/hooks'
+import type { AgentType } from '@/api'
+import { useAgentConfigs, useProfileConfigDir } from '@/hooks'
 
 interface RuleFile {
   /** Filename without `.rules` extension. */
@@ -57,9 +58,12 @@ async function loadRules(rulesDir: string): Promise<RuleFile[]> {
   return loaded.sort((left, right) => left.id.localeCompare(right.id))
 }
 
-export function RulesList({ profileName }: { profileName: string }) {
+export function RulesList({ profileName, agentType }: { profileName: string; agentType?: AgentType }) {
   const { t } = useTranslation()
   const configDir = useProfileConfigDir(profileName)
+  // File name from the backend registry (resources.rules.dir).
+  const { agentConfigs } = useAgentConfigs()
+  const rulesDirName = agentType ? (agentConfigs?.[agentType]?.resources?.rules?.dir as string | undefined) : undefined
   const [refreshKey, setRefreshKey] = useState(0)
   const [rules, setRules] = useState<RuleFile[]>([])
   const [loading, setLoading] = useState(true)
@@ -70,7 +74,7 @@ export function RulesList({ profileName }: { profileName: string }) {
   const [pendingDelete, setPendingDelete] = useState<RuleFile | null>(null)
   const [deleting, setDeleting] = useState(false)
   const { toast } = useToast()
-  const rulesDir = configDir === null ? null : `${configDir.replace(/\/+$/, '')}/rules`
+  const rulesDir = configDir === null ? null : `${configDir.replace(/\/+$/, '')}/${rulesDirName ?? 'rules'}`
 
   const refresh = useCallback(async () => {
     if (!rulesDir) {

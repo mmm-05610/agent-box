@@ -21,7 +21,8 @@ import {
 } from '@/components/ui'
 import { useToast } from '@/components/feedback/toast'
 import { patchJsonFile, readFile } from '@/api/files'
-import { useProfileConfigDir } from '@/hooks'
+import type { AgentType } from '@/api'
+import { useAgentConfigs, useProfileConfigDir } from '@/hooks'
 
 interface InstalledPluginMeta {
   version?: string
@@ -57,10 +58,13 @@ function formatInstalledAt(value?: string): string {
   return date.toLocaleString()
 }
 
-export function PluginsList({ profileName }: { profileName: string }) {
+export function PluginsList({ profileName, agentType }: { profileName: string; agentType?: AgentType }) {
   const { t } = useTranslation()
   const configDir = useProfileConfigDir(profileName)
-  const path = configDir === null ? null : `${configDir}/settings.json`
+  // File name from the backend registry (resources.plugins.config_file).
+  const { agentConfigs } = useAgentConfigs()
+  const configFile = agentType ? agentConfigs?.[agentType]?.resources?.plugins?.config_file : undefined
+  const path = configDir === null ? null : `${configDir}/${configFile ?? 'settings.json'}`
   const [content, setContent] = useState('{}')
   const [refreshKey, setRefreshKey] = useState(0)
   const enabledMap = useMemo(() => parseEnabledPlugins(content), [content])

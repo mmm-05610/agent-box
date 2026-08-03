@@ -10,7 +10,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from '@/components/ui'
 import { readFile } from '@/api/files'
-import { useProfileConfigDir } from '@/hooks'
+import type { AgentType } from '@/api'
+import { useAgentConfigs, useProfileConfigDir } from '@/hooks'
 
 interface HookEntry {
   command: string
@@ -66,10 +67,13 @@ function phaseOrder(a: string, b: string): number {
   return ai - bi
 }
 
-export function YamlHooksViewer({ profileName }: { profileName: string }) {
+export function YamlHooksViewer({ profileName, agentType }: { profileName: string; agentType?: AgentType }) {
   const { t } = useTranslation()
   const configDir = useProfileConfigDir(profileName)
-  const configPath = configDir === null ? null : `${configDir}/config.yaml`
+  // File name comes from the backend registry (resources.hooks.config_file).
+  const { agentConfigs } = useAgentConfigs()
+  const configFile = agentType ? agentConfigs?.[agentType]?.resources?.hooks?.config_file : undefined
+  const configPath = configDir === null ? null : `${configDir}/${configFile ?? 'config.yaml'}`
   const [configYaml, setConfigYaml] = useState('')
 
   // Self-fetch the profile's config.yaml.

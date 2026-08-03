@@ -16,7 +16,8 @@ import { useToast } from '@/components/feedback/toast'
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from '@/components/ui'
 import { Textarea } from '@/components/ui'
 import { patchJsonFile, readFile } from '@/api/files'
-import { useProfileConfigDir } from '@/hooks'
+import type { AgentType } from '@/api'
+import { useAgentConfigs, useProfileConfigDir } from '@/hooks'
 
 interface HookEntry {
   type?: string
@@ -82,10 +83,14 @@ function summarize(parsed: unknown): { events: EventSummary[]; total: number } {
   return { events, total }
 }
 
-export function JsonHooksEditor({ profileName }: { profileName: string }) {
+export function JsonHooksEditor({ profileName, agentType }: { profileName: string; agentType?: AgentType }) {
   const { t } = useTranslation()
   const configDir = useProfileConfigDir(profileName)
-  const path = configDir === null ? null : `${configDir}/settings.json`
+  // File name comes from the backend registry (resources.hooks.config_file),
+  // not hardcoded — the frontend doesn't own agent file knowledge.
+  const { agentConfigs } = useAgentConfigs()
+  const configFile = agentType ? agentConfigs?.[agentType]?.resources?.hooks?.config_file : undefined
+  const path = configDir === null ? null : `${configDir}/${configFile ?? 'settings.json'}`
 
   const [content, setContent] = useState('{}')
   const parsed = useMemo(() => {

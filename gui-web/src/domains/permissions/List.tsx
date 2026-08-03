@@ -24,7 +24,8 @@ import {
 } from '@/components/ui'
 import { useToast } from '@/components/feedback/toast'
 import { patchJsonFile, readFile } from '@/api/files'
-import { useProfileConfigDir } from '@/hooks'
+import type { AgentType } from '@/api'
+import { useAgentConfigs, useProfileConfigDir } from '@/hooks'
 
 type RuleGroup = 'allow' | 'deny' | 'ask'
 
@@ -141,10 +142,13 @@ function GroupIcon({ group }: { group: RuleGroup }) {
 
 // ── Main component ─────────────────────────────────────────────────────
 
-export function PermissionsList({ profileName }: { profileName: string }) {
+export function PermissionsList({ profileName, agentType }: { profileName: string; agentType?: AgentType }) {
   const { t } = useTranslation()
   const configDir = useProfileConfigDir(profileName)
-  const path = configDir === null ? null : `${configDir}/settings.json`
+  // File name from the backend registry (resources.permissions.config_file).
+  const { agentConfigs } = useAgentConfigs()
+  const configFile = agentType ? agentConfigs?.[agentType]?.resources?.permissions?.config_file : undefined
+  const path = configDir === null ? null : `${configDir}/${configFile ?? 'settings.json'}`
   const [content, setContent] = useState('{}')
   const [refreshKey, setRefreshKey] = useState(0)
   const initial = useMemo(() => parse(content), [content])

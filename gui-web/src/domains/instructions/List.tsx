@@ -18,7 +18,8 @@ import {
   CardTitle,
 } from '@/components/ui'
 import { findFiles, readFile } from '@/api/files'
-import { useProfileConfigDir, useProfilePath } from '@/hooks'
+import type { AgentType } from '@/api'
+import { useAgentConfigs, useProfileConfigDir, useProfilePath } from '@/hooks'
 
 interface InstructionRow {
   raw: string
@@ -71,12 +72,15 @@ function parseInstructions(raw: string): string[] {
   }
 }
 
-export function InstructionsList({ profileName }: { profileName: string }) {
+export function InstructionsList({ profileName, agentType }: { profileName: string; agentType?: AgentType }) {
   const { t } = useTranslation()
   const configDir = useProfileConfigDir(profileName)
+  // File name from the backend registry (resources.instructions.config_file).
+  const { agentConfigs } = useAgentConfigs()
+  const configFile = agentType ? agentConfigs?.[agentType]?.resources?.instructions?.config_file : undefined
   const profilePath = useProfilePath(profileName)
   const [configJsonc, setConfigJsonc] = useState('')
-  const configPath = configDir === null ? null : `${configDir}/opencode.jsonc`
+  const configPath = configDir === null ? null : `${configDir}/${configFile ?? 'opencode.jsonc'}`
 
   // Self-fetch opencode.jsonc → instructions for the profile.
   useEffect(() => {

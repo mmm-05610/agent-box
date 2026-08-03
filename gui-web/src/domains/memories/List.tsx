@@ -10,7 +10,8 @@ import { Trans, useTranslation } from 'react-i18next'
 import { Button, Card, CardContent, CardHeader, CardTitle, Textarea } from '@/components/ui'
 import { useToast } from '@/components/feedback/toast'
 import { readFile, saveFile } from '@/api/files'
-import { useProfileConfigDir } from '@/hooks'
+import type { AgentType } from '@/api'
+import { useAgentConfigs, useProfileConfigDir } from '@/hooks'
 
 interface MemoryFile {
   path: string
@@ -31,10 +32,13 @@ const FILES: MemoryFile[] = [
   },
 ]
 
-export function MemoriesList({ profileName }: { profileName: string }) {
+export function MemoriesList({ profileName, agentType }: { profileName: string; agentType?: AgentType }) {
   const { t } = useTranslation()
   const configDir = useProfileConfigDir(profileName)
-  const memoriesDir = configDir === null ? null : `${configDir.replace(/\/+$/, '')}/memories`
+  // File name from the backend registry (resources.memories.dir).
+  const { agentConfigs } = useAgentConfigs()
+  const memoriesDirName = agentType ? (agentConfigs?.[agentType]?.resources?.memories?.dir as string | undefined) : undefined
+  const memoriesDir = configDir === null ? null : `${configDir.replace(/\/+$/, '')}/${memoriesDirName ?? 'memories'}`
   const fileEntries: MemoryFile[] = memoriesDir === null ? [] : FILES.map((f) => ({ ...f, path: `${memoriesDir}/${f.label}` }))
 
   const [texts, setTexts] = useState<Record<string, string>>({})
