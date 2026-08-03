@@ -66,7 +66,7 @@ function phaseOrder(a: string, b: string): number {
   return ai - bi
 }
 
-export function HermesHooksViewer({ profileName }: { profileName: string }) {
+export function YamlHooksViewer({ profileName }: { profileName: string }) {
   const { t } = useTranslation()
   const configDir = useProfileConfigDir(profileName)
   const configPath = configDir === null ? null : `${configDir}/config.yaml`

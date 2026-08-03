@@ -1,5 +1,5 @@
 /**
- * SettingsHooksEditor — JSON hooks editor for agents that store hooks in
+ * JsonHooksEditor — JSON hooks editor for agents that store hooks in
  * settings.json → hooks (Claude / Codex / OpenCode). Selected by HookList
  * when the registry's resources.hooks.format is 'json'.
  *
@@ -82,7 +82,7 @@ function summarize(parsed: unknown): { events: EventSummary[]; total: number } {
   return { events, total }
 }
 
-export function SettingsHooksEditor({ profileName }: { profileName: string }) {
+export function JsonHooksEditor({ profileName }: { profileName: string }) {
   const { t } = useTranslation()
   const configDir = useProfileConfigDir(profileName)
   const path = configDir === null ? null : `${configDir}/settings.json`
