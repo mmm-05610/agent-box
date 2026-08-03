@@ -29,6 +29,7 @@ import type { AgentType } from '@/api'
 import { useAgentConfigs, useProfileConfigDir } from '@/hooks'
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml'
 import { parse as parseToml, stringify as stringifyToml } from 'smol-toml'
+import { RuleFilesBlock } from './RuleFilesBlock'
 
 // ── Block editors ──────────────────────────────────────────────────────
 
@@ -510,7 +511,7 @@ function RawEditorBlock({
 type ConfigFormat = 'json' | 'jsonc' | 'yaml' | 'toml'
 
 interface PermissionBlock {
-  type: 'rule_groups' | 'select' | 'toggle_list' | 'tool_matrix' | 'raw_editor'
+  type: 'rule_groups' | 'select' | 'toggle_list' | 'tool_matrix' | 'raw_editor' | 'rule_files'
   field?: string
   groups?: string[]
   rule_format?: string
@@ -520,6 +521,7 @@ interface PermissionBlock {
   tools?: string[]
   values?: string[]
   label?: string
+  dir?: string
 }
 
 interface PermissionsResource {
@@ -874,6 +876,15 @@ export function PermissionsList({ profileName, agentType }: { profileName: strin
                   values={block.values ?? []}
                   value={getFieldAt(doc, configKey)}
                   onChange={(value) => updateField(configKey, value)}
+                />
+              )
+            }
+            if (block.type === 'rule_files') {
+              return (
+                <RuleFilesBlock
+                  key={index}
+                  profileName={profileName}
+                  dir={block.dir ?? ''}
                 />
               )
             }

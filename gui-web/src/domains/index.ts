@@ -7,7 +7,6 @@ import { hookResource } from './hooks'
 import { promptResource } from './prompt'
 import { permissionsResource } from './permissions'
 import { pluginsResource } from './plugins'
-import { rulesResource } from './rules'
 import { memoriesResource } from './memories'
 import { instructionsResource } from './instructions'
 
@@ -26,7 +25,6 @@ export const RESOURCES = {
   prompt: promptResource,
   permissions: permissionsResource,
   plugins: pluginsResource,
-  rules: rulesResource,
   memories: memoriesResource,
   instructions: instructionsResource,
 } satisfies Record<string, ResourceDef>

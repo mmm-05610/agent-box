@@ -1,5 +1,5 @@
 /**
- * Rules — Codex rules directory.
+ * RuleFilesBlock — Codex rules directory (a permissions block type).
  *
  * Reads `*.rules` files from `${configDir}/rules`, shows rule count, an
  * expandable preview, an inline textarea editor and a delete confirm.
@@ -21,8 +21,7 @@ import {
 } from '@/components/ui'
 import { useToast } from '@/components/feedback/toast'
 import { deletePath, findFiles, readFile, saveFile } from '@/api/files'
-import type { AgentType } from '@/api'
-import { useAgentConfigs, useProfileConfigDir } from '@/hooks'
+import { useProfileConfigDir } from '@/hooks'
 
 interface RuleFile {
   /** Filename without `.rules` extension. */
@@ -58,12 +57,9 @@ async function loadRules(rulesDir: string): Promise<RuleFile[]> {
   return loaded.sort((left, right) => left.id.localeCompare(right.id))
 }
 
-export function RulesList({ profileName, agentType }: { profileName: string; agentType?: AgentType }) {
+export function RuleFilesBlock({ profileName, dir }: { profileName: string; dir: string }) {
   const { t } = useTranslation()
   const configDir = useProfileConfigDir(profileName)
-  // File name from the backend registry (resources.rules.dir).
-  const { agentConfigs } = useAgentConfigs()
-  const rulesDirName = agentType ? (agentConfigs?.[agentType]?.resources?.rules?.dir as string | undefined) : undefined
   const [refreshKey, setRefreshKey] = useState(0)
   const [rules, setRules] = useState<RuleFile[]>([])
   const [loading, setLoading] = useState(true)
@@ -74,7 +70,7 @@ export function RulesList({ profileName, agentType }: { profileName: string; age
   const [pendingDelete, setPendingDelete] = useState<RuleFile | null>(null)
   const [deleting, setDeleting] = useState(false)
   const { toast } = useToast()
-  const rulesDir = configDir === null || !rulesDirName ? null : `${configDir.replace(/\/+$/, '')}/${rulesDirName}`
+  const rulesDir = configDir === null || !dir ? null : `${configDir.replace(/\/+$/, '')}/${dir}`
 
   const refresh = useCallback(async () => {
     if (!rulesDir) {

@@ -15,14 +15,14 @@ const registry = RESOURCES as Record<string, import('@/domains').ResourceDef>
 type AgentKey = 'claude' | 'codex' | 'hermes' | 'opencode'
 const BACKEND_RESOURCES: Record<AgentKey, string[]> = {
   claude: ['provider', 'mcp', 'hooks', 'prompt', 'skills', 'permissions', 'plugins'],
-  codex: ['provider', 'mcp', 'prompt', 'skills', 'rules', 'permissions'],
+  codex: ['provider', 'mcp', 'prompt', 'skills', 'permissions'],
   hermes: ['provider', 'mcp', 'hooks', 'prompt', 'skills', 'memories', 'permissions'],
   opencode: ['provider', 'mcp', 'prompt', 'skills', 'instructions', 'permissions'],
 }
 
 const EXPECTED_RESOURCE_TABS: Record<string, string[]> = {
   claude: ['provider', 'mcp', 'hooks', 'prompt', 'skills', 'permissions', 'plugins'],
-  codex: ['provider', 'mcp', 'prompt', 'skills', 'rules', 'permissions'],
+  codex: ['provider', 'mcp', 'prompt', 'skills', 'permissions'],
   hermes: ['provider', 'mcp', 'hooks', 'prompt', 'skills', 'memories', 'permissions'],
   opencode: ['provider', 'mcp', 'prompt', 'skills', 'instructions', 'permissions'],
 }
@@ -58,7 +58,8 @@ describe('resolveResourceTabs', () => {
     const tabs = resolveResourceTabs('codex', BACKEND_RESOURCES.codex, registry)
     const keys = tabs.map((t) => t.key)
     expect(keys).not.toContain('hooks')
-    expect(keys).toContain('rules')
+    expect(keys).not.toContain('rules')   // rules merged into permissions
+    expect(keys).toContain('permissions')
     expect(keys).toContain('skills')
   })
 

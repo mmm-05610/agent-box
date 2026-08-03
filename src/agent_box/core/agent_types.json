@@ -194,9 +194,6 @@
         "file": "AGENTS.md"
       },
       "skills": {},
-      "rules": {
-        "dir": "rules"
-      },
       "permissions": {
         "config_file": "config.toml",
         "config_key": "approval_policy",
@@ -222,6 +219,11 @@
           {
             "type": "raw_editor",
             "label": "shell_environment_policy"
+          },
+          {
+            "type": "rule_files",
+            "dir": "rules",
+            "rule_format": "prefix_rule(pattern=[...], decision=...)"
           }
         ]
       }
