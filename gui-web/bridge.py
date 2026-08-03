@@ -6,8 +6,6 @@ Environment-agnostic shell. Picks the right DataAccess at startup:
 """
 
 import json
-import os
-import re
 import shutil
 import subprocess
 import sys
@@ -385,102 +383,18 @@ class Api:
         self, base_url: str, api_key: str, models_url: str = "",
         is_full_url: bool = False, timeout_sec: int = 10,
     ) -> str:
-        """Fetch available models from an API endpoint."""
-        curl = shutil.which("curl")
-        if not curl:
-            return json.dumps({"ok": False, "data": [], "error": "curl not found"})
+        """Fetch available models — delegates to the backend models adapter.
 
-        KNOWN_COMPAT_SUFFIXES = [
-            "/api/claudecode", "/api/anthropic", "/apps/anthropic",
-            "/api/coding", "/claudecode", "/anthropic",
-            "/step_plan", "/coding", "/claude",
-        ]
-
-        def _strip_compat_suffix(url: str):
-            lower = url.lower()
-            for suffix in sorted(KNOWN_COMPAT_SUFFIXES, key=len, reverse=True):
-                if lower.endswith(suffix):
-                    return url[: -len(suffix)]
-            return None
-
-        def _build_candidates(base: str, full_url: bool, override: str):
-            if override and override.strip():
-                return [override.strip()]
-            base = base.strip().rstrip("/")
-            if not base:
-                return []
-            candidates = []
-            if full_url:
-                idx = base.find("/v1/")
-                if idx != -1:
-                    candidates.append(f"{base[:idx]}/v1/models")
-                else:
-                    idx = base.rfind("/")
-                    if idx > 0:
-                        root = base[:idx]
-                        if "://" in root and len(root) > root.index("://") + 3:
-                            candidates.append(f"{root}/v1/models")
-                return candidates
-            last = base.rsplit("/", 1)[-1]
-            if re.match(r"^v\d+$", last):
-                candidates.append(f"{base}/models")
-                if not base.endswith("/v1"):
-                    candidates.append(f"{base}/v1/models")
-            else:
-                candidates.append(f"{base}/v1/models")
-            stripped = _strip_compat_suffix(base)
-            if stripped and "://" in stripped:
-                root = stripped.rstrip("/")
-                candidates.append(f"{root}/v1/models")
-                candidates.append(f"{root}/models")
-            seen = set()
-            return [c for c in candidates if not (c in seen or seen.add(c))]
-
-        candidates = _build_candidates(base_url, is_full_url, models_url)
-        if not candidates:
-            return json.dumps({"ok": False, "data": [], "error": "No candidate URLs"})
-
-        last_err = ""
-        for url in candidates:
-            try:
-                auth = ["-H", f"Authorization: Bearer {api_key}"] if api_key else []
-                result = subprocess.run(
-                    [curl, "-s", "-w", "\n%{http_code}",
-                     "--connect-timeout", str(timeout_sec),
-                     "--max-time", str(timeout_sec), *auth, url],
-                    capture_output=True, text=True, timeout=timeout_sec + 3,
-                )
-                out = result.stdout.strip()
-                lines = out.rsplit("\n", 1)
-                body = lines[0] if len(lines) > 1 else out
-                code_str = lines[-1] if len(lines) > 1 else ""
-                code = int(code_str) if code_str.isdigit() else 0
-                if code == 0:
-                    last_err = f"HTTP 0: {body[:200] if body else 'no response'}"
-                    continue
-                if 200 <= code < 300:
-                    data = json.loads(body)
-                    models_raw = data.get("data", data) if isinstance(data, dict) else data
-                    if isinstance(models_raw, list):
-                        models = [
-                            {"id": m["id"], "owned_by": m.get("owned_by")}
-                            if isinstance(m, dict) and "id" in m
-                            else {"id": m, "owned_by": None}
-                            if isinstance(m, str) else None
-                            for m in models_raw
-                        ]
-                        models = [m for m in models if m is not None]
-                        models.sort(key=lambda x: x["id"])
-                        return json.dumps({"ok": True, "data": models})
-                    return json.dumps({"ok": True, "data": []})
-                if code in (404, 405):
-                    last_err = f"HTTP {code}"
-                    continue
-                return json.dumps({"ok": False, "data": [], "error": f"HTTP {code}: {body[:200]}"})
-            except Exception as e:
-                last_err = str(e)
-                continue
-        return json.dumps({"ok": False, "data": [], "error": f"All candidates failed: {last_err}"})
+        The models-endpoint knowledge lives in agent_box (adapters/models.py
+        + core/provider_endpoints.json), not the GUI shell.
+        """
+        try:
+            models = self._data.fetch_models(
+                base_url, api_key, models_url, is_full_url, timeout_sec,
+            )
+            return json.dumps({"ok": True, "data": models})
+        except Exception as e:
+            return json.dumps({"ok": False, "data": [], "error": str(e)})
 
     def browse_dir(self, initial: str = "") -> str:
         """Open a native folder picker."""
@@ -497,16 +411,13 @@ class Api:
             return json.dumps({"ok": False, "error": str(e)})
 
     def launch_acs(self) -> str:
-        """Launch ACS GUI (native binary)."""
-        acs_binary = os.path.expanduser(
-            "~/projects/agent-config-store/src-tauri/target/release/cc-switch"
-        )
+        """Launch ACS GUI (native binary) — platform-specific via data layer.
+
+        The binary path comes from agent_box config (config.acs_binary),
+        resolved by the data layer (Linux direct / WSL python3 -c).
+        """
         try:
-            subprocess.Popen(
-                [acs_binary],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                start_new_session=True,
-            )
+            self._data.launch_acs()
             return json.dumps({"ok": True})
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})

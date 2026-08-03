@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Optional
 
 from agent_box import config
-from agent_box.adapters import acs
+from agent_box.adapters import acs, models as models_adapter
 from agent_box.core.library import get_agent_config
 from agent_box.resources import mcp, profile, providers, sessions, skills
 from agent_box.resources.prompts import apply_prompt
@@ -182,6 +182,14 @@ class LinuxDataAccess:
     def list_skills(self, agent_type: str) -> list:
         return acs.list_skills(agent_type)
 
+    def fetch_models(
+        self, base_url: str, api_key: str,
+        models_url: str = "", is_full_url: bool = False, timeout_sec: int = 10,
+    ) -> list:
+        return models_adapter.fetch_models(
+            base_url, api_key, models_url, is_full_url, timeout_sec,
+        )
+
     # ── File I/O (WSL/Linux filesystem) ─────────────────────────────
 
     def read_file(self, path: str) -> str:
@@ -253,3 +261,11 @@ class LinuxDataAccess:
             if name and cwd and name not in result:
                 result[name] = cwd
         return result
+
+    def launch_acs(self) -> None:
+        """Launch the ACS GUI binary (detached). Path from config.acs_binary()."""
+        subprocess.Popen(
+            [str(config.acs_binary())],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )

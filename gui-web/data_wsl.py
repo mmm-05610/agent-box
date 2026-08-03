@@ -114,7 +114,8 @@ class WslDataAccess:
         """Launch a profile in a new Windows console via wsl.exe."""
         resume_args = _resume_args(agent_type)
         launch_cmd = f"launch {name}"
-        if mode == "继续上次" and resume_args:
+        # Symbolic mode protocol — matches config.MODE_RESUME ("resume").
+        if mode == "resume" and resume_args:
             launch_cmd += " " + " ".join(resume_args)
 
         setup = 'export PATH="$HOME/.npm-global/bin:$HOME/.local/bin:$PATH"'
@@ -224,6 +225,19 @@ class WslDataAccess:
         out = _wsl_run(
             "python3 -c 'from agent_box.adapters.acs import list_skills; "
             f"import json; print(json.dumps(list_skills(\"{agent_type}\")))'"
+        )
+        return json.loads(out)
+
+    def fetch_models(
+        self, base_url: str, api_key: str,
+        models_url: str = "", is_full_url: bool = False, timeout_sec: int = 10,
+    ) -> list:
+        out = _wsl_run(
+            "python3 -c 'import json; "
+            "from agent_box.adapters.models import fetch_models; "
+            f"print(json.dumps(fetch_models(\"{base_url}\", \"{api_key}\", "
+            f"\"{models_url}\", {bool(is_full_url)}, {timeout_sec})))'",
+            timeout=timeout_sec + 15,
         )
         return json.loads(out)
 
@@ -338,3 +352,17 @@ class WslDataAccess:
             if name and cwd and name not in result:
                 result[name] = cwd
         return result
+
+    def launch_acs(self) -> None:
+        """Launch the ACS GUI binary inside WSL (detached).
+
+        The binary path comes from agent_box config (config.acs_binary()),
+        resolved through WSL — no hardcoded path in the GUI shell.
+        """
+        _wsl_run(
+            "python3 -c 'from agent_box.config import acs_binary; "
+            "import subprocess; "
+            "subprocess.Popen([str(acs_binary())], stdout=subprocess.DEVNULL, "
+            "stderr=subprocess.DEVNULL, start_new_session=True)'",
+            timeout=15,
+        )

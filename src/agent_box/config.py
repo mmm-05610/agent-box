@@ -9,9 +9,11 @@ DISPLAY_NAME = "agent-box"
 DEFAULT_AGENT_TYPE = "claude"
 BWRAP = "bwrap"
 
-# Session mode labels — written to sessions.db, read by GUI launch dialog.
-MODE_NEW = "新会话"
-MODE_RESUME = "继续上次"
+# Session mode — symbolic protocol values shared with the GUI launch dialog
+# (profiles LAUNCH_MODES values) and written to sessions.db.  The display
+# strings live in the frontend i18n (profiles.launchMode.*), not here.
+MODE_NEW = "new"
+MODE_RESUME = "resume"
 
 
 # --- package resolution ─────────────────────────────────────────────────
@@ -60,6 +62,18 @@ def skills_source_dir() -> Path:
 def acs_db() -> Path:
     """Path to the ACS (agent-config-store) SQLite database."""
     return agent_box_home() / "config" / "cc-switch.db"
+
+
+def acs_binary() -> Path:
+    """Path to the ACS (cc-switch) native GUI binary.
+
+    Override with the ``AGENT_BOX_ACS_BINARY`` env var; defaults to the
+    cc-switch repo's release build.
+    """
+    override = os.environ.get("AGENT_BOX_ACS_BINARY")
+    if override:
+        return Path(override).expanduser()
+    return Path.home() / "projects" / "agent-config-store" / "src-tauri" / "target" / "release" / "cc-switch"
 
 
 def library_db() -> Path:

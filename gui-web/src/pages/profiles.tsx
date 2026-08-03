@@ -36,9 +36,11 @@ function resolveIconKey(name: string, icon?: string | null): string | undefined 
 
 // ── Launch modes ────────────────────────────────────────────────────────
 
+// Symbolic mode values — shared protocol with the backend (config.MODE_NEW /
+// MODE_RESUME).  The display labels come from i18n, not the value.
 const LAUNCH_MODES = [
-  { value: '新会话', labelKey: 'profiles.launchMode.newSession' },
-  { value: '继续上次', labelKey: 'profiles.launchMode.resumeLast' },
+  { value: 'new', labelKey: 'profiles.launchMode.newSession' },
+  { value: 'resume', labelKey: 'profiles.launchMode.resumeLast' },
 ] as const
 
 // ── Filter tab type ─────────────────────────────────────────────────────
@@ -139,12 +141,14 @@ export function ProfilesPage({ onOpenDetail, autoOpenCreate, onAutoOpenCreateHan
           mode,
           cwd,
         })
-        toast({ type: 'success', message: t('profiles.toast.launched', { name, mode }) })
+        // Toast shows the translated mode label, not the symbolic value.
+        const modeLabel = LAUNCH_MODES.find((m) => m.value === mode)?.labelKey
+        toast({ type: 'success', message: t('profiles.toast.launched', { name, mode: modeLabel ? t(modeLabel) : mode }) })
       } catch {
         toast({ type: 'error', message: t('profiles.toast.launchFailed', { name }) })
       }
     },
-    [profiles, toast],
+    [profiles, toast, t],
   )
 
   const handleDelete = useCallback(
@@ -485,7 +489,7 @@ function ProfileCard({
   const providerIconKey = provider ? resolveIconKey(provider.name, provider.icon) : undefined
   const providerIconColor = providerIconKey ? getIconMetadata(providerIconKey)?.defaultColor : undefined
 
-  const [mode, setMode] = useState<string>('继续上次')
+  const [mode, setMode] = useState<string>('resume')
   const [cwd, setCwd] = useState<string>(lastCwd || '~')
 
   useEffect(() => {
