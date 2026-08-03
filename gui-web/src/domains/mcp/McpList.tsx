@@ -19,6 +19,26 @@ interface McpListProps {
   agentType?: AgentType
 }
 
+/**
+ * Resolve the MCP transport type for the badge. The ACS query layer already
+ * JSON-parses server_config, so the type is read from the object; a raw JSON
+ * string (older bridge responses) is tolerated via try/catch JSON.parse.
+ */
+function mcpServerType(server: McpServer): string {
+  const cfg = server.server_config
+  if (cfg == null) return 'stdio'
+  if (typeof cfg === 'string') {
+    try {
+      const parsed = JSON.parse(cfg) as { type?: unknown }
+      return typeof parsed.type === 'string' && parsed.type ? parsed.type : 'stdio'
+    } catch {
+      return 'stdio'
+    }
+  }
+  const type = cfg.type
+  return typeof type === 'string' && type ? type : 'stdio'
+}
+
 export function McpList({ profileName, agentType }: McpListProps) {
   const { t } = useTranslation()
   const at = agentType ?? 'claude'
@@ -99,7 +119,7 @@ export function McpList({ profileName, agentType }: McpListProps) {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium">{s.name}</span>
-                        <Badge variant="neutral" className="text-[10px] px-1.5 py-0">{s.serverConfigParsed?.type ?? 'stdio'}</Badge>
+                        <Badge variant="neutral" className="text-[10px] px-1.5 py-0">{mcpServerType(s)}</Badge>
                       </div>
                       {s.description && <div className="text-[11px] text-muted-foreground truncate">{s.description}</div>}
                     </div>

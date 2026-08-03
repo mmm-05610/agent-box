@@ -170,7 +170,7 @@ export function SkillList({ profileName, agentType }: SkillListProps) {
   // Filter + Paginate (filter first)
   const installedIds = useMemo(() => new Set(installed.map(s => s.id)), [installed])
   const effective = (search.trim() ? searchResults : library)
-    .filter(s => !installedIds.has(s.id) && s.sourceAvailable !== false)
+    .filter(s => !installedIds.has(s.id) && s.source_available !== false)
   const totalPages = Math.max(1, Math.ceil(effective.length / PER_PAGE))
   const pageItems = effective.slice(page * PER_PAGE, (page + 1) * PER_PAGE)
 
@@ -178,7 +178,7 @@ export function SkillList({ profileName, agentType }: SkillListProps) {
     setSearch(q); setPage(0)
     if (!q.trim()) { setSearchResults([]); return }
     const needle = q.toLowerCase()
-    setSearchResults(library.filter(s => (s.name.toLowerCase().includes(needle) || (s.description ?? '').toLowerCase().includes(needle)) && !installedIds.has(s.id) && s.sourceAvailable !== false))
+    setSearchResults(library.filter(s => (s.name.toLowerCase().includes(needle) || (s.description ?? '').toLowerCase().includes(needle)) && !installedIds.has(s.id) && s.source_available !== false))
   }, [library, installedIds])
 
   const handleApply = useCallback(async (skillId: string) => {

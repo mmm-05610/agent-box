@@ -14,14 +14,14 @@ const mocks = vi.hoisted(() => ({
   fetchProviders: vi.fn(),
   fetchMcpServers: vi.fn(),
   fetchSkills: vi.fn(),
-  fetchClaudeMds: vi.fn(),
+  fetchPrompts: vi.fn(),
 }))
 
 vi.mock('@/api', () => ({
   fetchProviders: mocks.fetchProviders,
   fetchMcpServers: mocks.fetchMcpServers,
   fetchSkills: mocks.fetchSkills,
-  fetchClaudeMds: mocks.fetchClaudeMds,
+  fetchPrompts: mocks.fetchPrompts,
 }))
 
 afterEach(() => {
@@ -31,16 +31,16 @@ afterEach(() => {
 })
 
 const PROVIDERS = [{ id: 'p1', name: 'P1', settings: { env: {} } }]
-const SKILLS = [{ id: 's1', name: 'S1', agentTypes: ['claude'] }]
-const MCP = [{ id: 'm1', name: 'M1', tags: [], agentTypes: ['claude'] }]
-const PROMPTS = [{ id: 'c1', name: 'C1', content: 'hi' }]
+const SKILLS = [{ id: 's1', name: 'S1' }]
+const MCP = [{ id: 'm1', name: 'M1', tags: [] }]
+const PROMPTS = [{ id: 'c1', name: 'C1', content: 'hi', description: '' }]
 
 describe('useLibrary', () => {
   it('loads each requested slice once and caches it across remounts', async () => {
     mocks.fetchProviders.mockResolvedValue(PROVIDERS)
     mocks.fetchSkills.mockResolvedValue(SKILLS)
     mocks.fetchMcpServers.mockResolvedValue(MCP)
-    mocks.fetchClaudeMds.mockResolvedValue(PROMPTS)
+    mocks.fetchPrompts.mockResolvedValue(PROMPTS)
 
     const first = renderHook(() => useLibrary('claude', ['providers', 'skills']))
     await waitFor(() => expect(first.result.current.providers).toEqual(PROVIDERS))
@@ -49,7 +49,7 @@ describe('useLibrary', () => {
     expect(mocks.fetchSkills).toHaveBeenCalledTimes(1)
     // Unrequested slices are never fetched (lazy per-slice loading).
     expect(mocks.fetchMcpServers).not.toHaveBeenCalled()
-    expect(mocks.fetchClaudeMds).not.toHaveBeenCalled()
+    expect(mocks.fetchPrompts).not.toHaveBeenCalled()
 
     first.unmount()
 

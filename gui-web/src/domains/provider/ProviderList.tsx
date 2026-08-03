@@ -256,10 +256,10 @@ export function ProviderList({ agentType, profileName }: ProviderListProps) {
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-medium truncate">{p.name}</div>
-                    {p.websiteUrl && (
-                      <a href={p.websiteUrl} target="_blank" rel="noopener noreferrer"
+                    {p.website_url && (
+                      <a href={p.website_url} target="_blank" rel="noopener noreferrer"
                         className="text-[10px] text-blue-500 hover:underline dark:text-blue-400 truncate block">
-                        {p.websiteUrl.replace(/^https?:\/\//, '')}
+                        {p.website_url.replace(/^https?:\/\//, '')}
                       </a>
                     )}
                   </div>

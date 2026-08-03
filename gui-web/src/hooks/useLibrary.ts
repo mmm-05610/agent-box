@@ -9,8 +9,8 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { AgentType, ClaudeMd, McpServer, Provider, Skill } from '@/api'
-import { fetchClaudeMds, fetchMcpServers, fetchProviders, fetchSkills } from '@/api'
+import type { AgentType, McpServer, Prompt, Provider, Skill } from '@/api'
+import { fetchMcpServers, fetchPrompts, fetchProviders, fetchSkills } from '@/api'
 import i18n from '@/i18n'
 
 export type LibraryKey = 'providers' | 'mcpServers' | 'skills' | 'prompts'
@@ -19,7 +19,7 @@ interface LibrarySlices {
   providers: Provider[]
   mcpServers: McpServer[]
   skills: Skill[]
-  prompts: ClaudeMd[]
+  prompts: Prompt[]
 }
 
 const ALL_KEYS: LibraryKey[] = ['providers', 'mcpServers', 'skills', 'prompts']
@@ -28,7 +28,7 @@ const FETCHERS: Record<LibraryKey, (agentType: AgentType) => Promise<unknown>> =
   providers: fetchProviders,
   mcpServers: fetchMcpServers,
   skills: fetchSkills,
-  prompts: fetchClaudeMds,
+  prompts: fetchPrompts,
 }
 
 // ── Global cache ──────────────────────────────────────────────────────
@@ -84,7 +84,7 @@ export interface UseLibraryReturn {
   providers: Provider[]
   mcpServers: McpServer[]
   skills: Skill[]
-  prompts: ClaudeMd[]
+  prompts: Prompt[]
   loading: boolean
   error: string | null
   /** Refetch the given slices (defaults to the slices this hook requested). */
