@@ -1,23 +1,30 @@
 /**
- * Tab-set tests for the registry-driven detail page (Stage 5).
+ * Tab-set tests for the registry-driven detail page.
  *
- * Verifies each agent's resource-tab set from AGENT_CONFIG.tabs + RESOURCES
- * + the agent-specific fallback map — the behavior the old hardcoded tab
- * lists provided. Meta/Storage are added by the page around these.
+ * Tabs are derived from the backend registry's `resources` keys (the
+ * support declaration), cross-referenced with the frontend RESOURCES
+ * registry. Meta/Storage are added by the page around these.
  */
 import { describe, expect, it } from 'vitest'
-import { AGENT_TYPE_CONFIGS } from '@/api'
 import { RESOURCES } from '@/domains'
-import { AGENT_CONFIG } from '@/config'
 import { resolveResourceTabs } from './detail'
 
 const registry = RESOURCES as Record<string, import('@/domains').ResourceDef>
 
+/** Mock of the backend registry resources — matches core/agent_types.json. */
+type AgentKey = 'claude' | 'codex' | 'hermes' | 'opencode'
+const BACKEND_RESOURCES: Record<AgentKey, string[]> = {
+  claude: ['provider', 'mcp', 'hooks', 'prompt', 'skills', 'permissions', 'plugins'],
+  codex: ['provider', 'mcp', 'prompt', 'skills', 'rules'],
+  hermes: ['provider', 'mcp', 'hooks', 'prompt', 'skills', 'memories'],
+  opencode: ['provider', 'mcp', 'prompt', 'skills', 'instructions'],
+}
+
 const EXPECTED_RESOURCE_TABS: Record<string, string[]> = {
-  claude: ['provider', 'mcp', 'skill', 'hook', 'prompt', 'permissions', 'plugins'],
-  codex: ['provider', 'mcp', 'skill', 'hook', 'prompt', 'rules'],
-  hermes: ['provider', 'mcp', 'skill', 'hook', 'prompt', 'memories'],
-  opencode: ['provider', 'mcp', 'skill', 'hook', 'prompt', 'instructions'],
+  claude: ['provider', 'mcp', 'hooks', 'prompt', 'skills', 'permissions', 'plugins'],
+  codex: ['provider', 'mcp', 'prompt', 'skills', 'rules'],
+  hermes: ['provider', 'mcp', 'hooks', 'prompt', 'skills', 'memories'],
+  opencode: ['provider', 'mcp', 'prompt', 'skills', 'instructions'],
 }
 
 const EXPECTED_PROMPT_LABELS: Record<string, string> = {
@@ -29,25 +36,39 @@ const EXPECTED_PROMPT_LABELS: Record<string, string> = {
 
 describe('resolveResourceTabs', () => {
   for (const agentType of ['claude', 'codex', 'hermes', 'opencode'] as const) {
-    it(`resolves ${agentType} tabs from AGENT_CONFIG + RESOURCES`, () => {
-      const tabs = resolveResourceTabs(agentType, AGENT_CONFIG[agentType].tabs, registry, AGENT_TYPE_CONFIGS[agentType].features)
+    it(`derives ${agentType} tabs from backend resources + RESOURCES`, () => {
+      const tabs = resolveResourceTabs(agentType, BACKEND_RESOURCES[agentType], registry)
       expect(tabs.map((t) => t.key)).toEqual(EXPECTED_RESOURCE_TABS[agentType])
       // Prompt tab keeps the per-agent prompt-file label key
       const prompt = tabs.find((t) => t.key === 'prompt')
       expect(prompt?.label).toBe(EXPECTED_PROMPT_LABELS[agentType])
-      // Shared resource tabs keep their label keys
+      // Shared resource tabs keep their label keys (only when present
+      // in the backend resources — e.g. codex/opencode have no hooks).
       expect(tabs.find((t) => t.key === 'provider')?.label).toBe('tab.provider')
       expect(tabs.find((t) => t.key === 'mcp')?.label).toBe('tab.mcp')
-      expect(tabs.find((t) => t.key === 'skill')?.label).toBe('tab.skill')
-      expect(tabs.find((t) => t.key === 'hook')?.label).toBe('tab.hook')
+      expect(tabs.find((t) => t.key === 'skills')?.label).toBe('tab.skill')
+      if (tabs.some((t) => t.key === 'hooks')) {
+        expect(tabs.find((t) => t.key === 'hooks')?.label).toBe('tab.hook')
+      }
     })
   }
 
-  it('hides agent-specific tabs when the agent feature is missing', () => {
-    const tabs = resolveResourceTabs('claude', AGENT_CONFIG.claude.tabs, registry, [])
+  it('only renders resources present in the backend dict', () => {
+    // codex has no hooks resource in the backend registry
+    const tabs = resolveResourceTabs('codex', BACKEND_RESOURCES.codex, registry)
     const keys = tabs.map((t) => t.key)
-    expect(keys).toContain('provider')
-    expect(keys).not.toContain('permissions')
-    expect(keys).not.toContain('plugins')
+    expect(keys).not.toContain('hooks')
+    expect(keys).toContain('rules')
+    expect(keys).toContain('skills')
+  })
+
+  it('skips backend resource keys without a frontend RESOURCES entry', () => {
+    const tabs = resolveResourceTabs('claude', [...BACKEND_RESOURCES.claude, 'unknown-resource'], registry)
+    expect(tabs.some((t) => t.key === 'unknown-resource')).toBe(false)
+  })
+
+  it('an empty backend dict yields no resource tabs', () => {
+    const tabs = resolveResourceTabs('claude', [], registry)
+    expect(tabs).toEqual([])
   })
 })

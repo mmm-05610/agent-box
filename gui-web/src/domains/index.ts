@@ -24,8 +24,8 @@ export interface ResourceDef {
 export const RESOURCES = {
   provider: providerResource,
   mcp: mcpResource,
-  skill: skillResource,
-  hook: hookResource,
+  skills: skillResource,
+  hooks: hookResource,
   prompt: promptResource,
   permissions: permissionsResource,
   plugins: pluginsResource,

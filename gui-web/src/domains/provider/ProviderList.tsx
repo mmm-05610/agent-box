@@ -19,8 +19,7 @@ import {
 import { readFile, saveFile } from '@/api/files'
 import { ProviderIcon } from '@/components/ProviderIcon'
 import { hasIcon } from '@/icons/extracted'
-import { AGENT_TYPE_CONFIGS } from '@/api'
-import { useLibrary, useProfileResources } from '@/hooks'
+import { useAgentConfigs, useLibrary, useProfileResources } from '@/hooks'
 import type { AgentType } from '@/api'
 
 // ── Icon helpers ──────────────────────────────────────────────────────────
@@ -59,7 +58,12 @@ function parseActiveProvider(yamlContent: string): string | null {
 
 export function ProviderList({ agentType, profileName }: ProviderListProps) {
   const { t } = useTranslation()
-  const isAdditive = AGENT_TYPE_CONFIGS[agentType].provider_apply_mode === 'additive'
+  const { agentConfigs } = useAgentConfigs()
+  // Registry-driven (resources.provider); defaults to overwrite mode while
+  // the registry is loading / for agents without a provider block.
+  const providerResource = agentConfigs?.[agentType]?.resources?.provider
+  const isAdditive = providerResource?.apply_mode === 'additive'
+  const configFilesList = agentConfigs?.[agentType]?.runtime?.config_files
   const { toast } = useToast()
 
   // Library providers (from ACS)
@@ -82,14 +86,15 @@ export function ProviderList({ agentType, profileName }: ProviderListProps) {
 
   const reloadConfigFiles = useCallback(async () => {
     if (!configDir) return
+    const list = configFilesList ?? []
     const contents = await Promise.all(
-      AGENT_TYPE_CONFIGS[agentType].config_files.map(async (filename) => {
+      list.map(async (filename) => {
         const content = await readFile(`${configDir}/${filename}`).catch(() => filename === 'settings.json' ? '{}' : '')
         return { label: filename, path: `${configDir}/${filename}`, content }
       })
     )
     setConfigFiles(contents)
-  }, [configDir, agentType])
+  }, [configDir, configFilesList])
 
   useEffect(() => { void reloadConfigFiles() }, [reloadConfigFiles])
 

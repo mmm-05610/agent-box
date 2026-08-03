@@ -25,8 +25,16 @@ afterEach(() => {
 })
 
 const REGISTRY = {
-  claude: { prompt_file: 'CLAUDE.md', features: [], config_files: [], provider_apply_mode: 'overwrite' as const },
-  codex: { prompt_file: 'AGENTS.md', features: [], config_files: [], provider_apply_mode: 'overwrite' as const },
+  claude: {
+    identity: { display_name: 'Claude Code', binary: 'claude' },
+    runtime: { config_dir: '~/.claude', profile_dir_suffix: 'dot-claude', acs_column: 'enabled_claude' },
+    resources: { provider: { apply_mode: 'overwrite' as const } },
+  },
+  codex: {
+    identity: { display_name: 'Codex', binary: 'codex' },
+    runtime: { config_dir: '~/.codex', profile_dir_suffix: 'dot-codex', acs_column: 'enabled_codex' },
+    resources: { provider: { apply_mode: 'overwrite' as const } },
+  },
 }
 
 describe('useAgentConfigs', () => {
@@ -62,7 +70,11 @@ describe('useAgentConfigs', () => {
     expect(mocks.fetchAgentConfigs).toHaveBeenCalledTimes(1)
 
     const REGISTRY2 = {
-      hermes: { prompt_file: 'SOUL.md', features: [], config_files: [], provider_apply_mode: 'additive' as const },
+      hermes: {
+        identity: { display_name: 'Hermes', binary: 'hermes' },
+        runtime: { config_dir: '~/.hermes', profile_dir_suffix: 'dot-hermes', acs_column: 'enabled_hermes' },
+        resources: { provider: { apply_mode: 'additive' as const } },
+      },
     }
     mocks.fetchAgentConfigs.mockResolvedValue(REGISTRY2)
     act(() => result.current.refresh())

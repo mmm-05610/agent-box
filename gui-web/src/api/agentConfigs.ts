@@ -9,5 +9,5 @@ import { call } from '@/lib/bridge'
 import type { AgentTypeConfig } from './types'
 
 export async function fetchAgentConfigs(): Promise<Record<string, AgentTypeConfig>> {
-  return call<Record<string, AgentTypeConfig>>((api) => api.get_agent_configs(), {})
+  return call<Record<string, AgentTypeConfig>>((api) => api.get_agent_configs!(), {})
 }

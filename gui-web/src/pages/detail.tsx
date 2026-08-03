@@ -1,9 +1,9 @@
 /**
  * Profile Detail Page — registry-driven tab host.
  *
- * Resource tabs are built from AGENT_CONFIG[agentType].tabs → RESOURCES
- * lookup, so adding a resource = registering in domains/ + one line in
- * config/agentConfig.ts — the page shell knows no concrete resource.
+ * Resource tabs are derived from the backend registry's `resources`
+ * keys (the support declaration) cross-referenced with the frontend
+ * RESOURCES registry — the page shell knows no concrete resource.
  *
  * Non-resource tabs (Meta / Storage) and the profile header stay here.
  * Every resource (including agent-specific ones) is a self-fetching
@@ -14,11 +14,12 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button, Badge, Tabs } from '@/components/ui'
 import { Loading } from '@/components/feedback'
-import type { AgentFeature, AgentType } from '@/api'
-import { AGENT_TYPE_COLORS, AGENT_TYPE_CONFIGS, fetchProfileDetail } from '@/api'
+import type { AgentType } from '@/api'
+import { fetchProfileDetail } from '@/api'
 import { findFiles } from '@/api/files'
 import { RESOURCES, type ResourceDef } from '@/domains'
-import { AGENT_CONFIG } from '@/config'
+import { useAgentConfigs } from '@/hooks'
+import { agentTypeColor } from '@/config'
 import { MetaEditor } from './detail/MetaEditor'
 import { StorageExplorer } from './detail/StorageExplorer'
 
@@ -50,8 +51,8 @@ interface DetailTab {
 const RESOURCE_LABELS: Record<string, string> = {
   provider: 'tab.provider',
   mcp: 'tab.mcp',
-  skill: 'tab.skill',
-  hook: 'tab.hook',
+  skills: 'tab.skill',
+  hooks: 'tab.hook',
 }
 
 /** The prompt resource edits the per-agent prompt file, which the old
@@ -65,23 +66,20 @@ const PROMPT_TAB_LABELS: Record<AgentType, string> = {
 }
 
 /**
- * Pure tab resolution: AGENT_CONFIG[agentType].tabs → registry resources
- * (RESOURCES), gated by the agent's feature set for agent-specific
- * resources. Kept outside the component so the per-agent tab sets are
- * directly testable.
+ * Pure tab resolution: backend registry `resources` keys → RESOURCES
+ * lookup. Presence in the backend dict IS the support declaration, so
+ * there is no frontend feature gate. Kept outside the component so the
+ * per-agent tab sets are directly testable.
  */
 export function resolveResourceTabs(
   agentType: AgentType,
-  tabKeys: string[],
+  resourceKeys: string[],
   registry: Record<string, ResourceDef>,
-  features: AgentFeature[],
 ): Array<{ key: string; label: string }> {
   const out: Array<{ key: string; label: string }> = []
-  for (const key of tabKeys) {
+  for (const key of resourceKeys) {
     const res = registry[key]
     if (!res) continue
-    // Agent-specific resources only render when the agent's features include them.
-    if (res.feature && !features.includes(res.feature)) continue
     out.push({
       key,
       label: key === 'prompt'
@@ -172,9 +170,11 @@ export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProp
 
   const { meta } = detail
   const agentType = meta.agent_type as AgentType
-  const agentConfig = AGENT_TYPE_CONFIGS[agentType] ?? AGENT_TYPE_CONFIGS.claude
-  const agentTabs = AGENT_CONFIG[agentType] ?? AGENT_CONFIG.claude
-  const badgeVariant = AGENT_TYPE_COLORS[agentType] ?? 'neutral'
+  const { agentConfigs } = useAgentConfigs()
+  // Loading-order fallback: no resource tabs until the registry arrives.
+  const resourceConfig = agentConfigs?.[agentType]?.resources
+  const resourceKeys = resourceConfig ? Object.keys(resourceConfig) : []
+  const badgeVariant = agentTypeColor(agentType)
 
   // ── Tab build: meta + registry/agent-specific resources + storage ──
   const resourceRegistry = RESOURCES as Record<string, ResourceDef>
@@ -182,7 +182,7 @@ export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProp
     { key: 'meta', label: t('tab.meta'), render: () => <MetaEditor key={refreshKey} detail={detail} onRefresh={triggerRefresh} /> },
   ]
 
-  for (const { key, label } of resolveResourceTabs(agentType, agentTabs.tabs, resourceRegistry, agentConfig.features)) {
+  for (const { key, label } of resolveResourceTabs(agentType, resourceKeys, resourceRegistry)) {
     const res = resourceRegistry[key]
     if (res) {
       tabs.push({
