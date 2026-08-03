@@ -1,11 +1,12 @@
 /**
- * RuleFilesBlock — Codex rules directory (a permissions block type).
+ * RuleFilesBlock — rule files directory (a permissions block type).
  *
- * Reads `*.rules` files from `${configDir}/rules`, shows rule count, an
- * expandable preview, an inline textarea editor and a delete confirm.
+ * Reads `*<extension>` files from `${configDir}/<dir>`, shows rule count,
+ * an expandable preview, an inline textarea editor and a delete confirm.
  *
- * Each `.rules` file is a list of `prefix_rule(pattern=[...], decision="...")`
- * lines; the rule count is the number of `prefix_rule(` occurrences.
+ * The file extension (e.g. `.rules`) and the rule-line format prefix (e.g.
+ * `prefix_rule(`) come from the backend registry block — no Codex-specific
+ * hardcoding here.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -24,7 +25,7 @@ import { deletePath, findFiles, readFile, saveFile } from '@/api/files'
 import { useProfileConfigDir } from '@/hooks'
 
 interface RuleFile {
-  /** Filename without `.rules` extension. */
+  /** Filename without the rules extension. */
   id: string
   /** Absolute path on disk. */
   path: string
@@ -32,32 +33,43 @@ interface RuleFile {
   ruleCount: number
 }
 
-function countRules(content: string): number {
-  // count occurrences of `prefix_rule(` on non-comment lines
+/** The rule-line format prefix from the registry (e.g. "prefix_rule("). */
+function formatPrefix(ruleFormat: string): string {
+  const name = ruleFormat.split('(')[0]?.trim()
+  return name ? `${name}(` : ''
+}
+
+function countRules(content: string, prefix: string): number {
+  if (!prefix) return 0
   let count = 0
   for (const line of content.split(/\r?\n/)) {
     const trimmed = line.split('#')[0]!.trim()
-    if (trimmed.startsWith('prefix_rule(')) count += 1
+    if (trimmed.startsWith(prefix)) count += 1
   }
   return count
 }
 
-async function loadRules(rulesDir: string): Promise<RuleFile[]> {
+async function loadRules(rulesDir: string, extension: string): Promise<RuleFile[]> {
   const paths = await findFiles(rulesDir)
   const pathList = Array.isArray(paths) ? paths : []
-  const ruleFiles = pathList.filter((p) => p.split('/').pop()?.endsWith('.rules'))
+  const ruleFiles = pathList.filter((p) => p.split('/').pop()?.endsWith(extension))
 
   const loaded = await Promise.all(ruleFiles.map(async (filePath) => {
     const fileName = filePath.split('/').pop() ?? ''
-    const id = fileName.replace(/\.rules$/, '')
+    const id = fileName.endsWith(extension) ? fileName.slice(0, -extension.length) : fileName
     const content = await readFile(filePath).catch(() => '')
-    return { id, path: filePath, content, ruleCount: countRules(content) }
+    return { id, path: filePath, content, ruleCount: 0 }
   }))
 
   return loaded.sort((left, right) => left.id.localeCompare(right.id))
 }
 
-export function RuleFilesBlock({ profileName, dir }: { profileName: string; dir: string }) {
+export function RuleFilesBlock({
+  profileName,
+  dir,
+  extension,
+  ruleFormat,
+}: { profileName: string; dir: string; extension?: string; ruleFormat?: string }) {
   const { t } = useTranslation()
   const configDir = useProfileConfigDir(profileName)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -71,6 +83,9 @@ export function RuleFilesBlock({ profileName, dir }: { profileName: string; dir:
   const [deleting, setDeleting] = useState(false)
   const { toast } = useToast()
   const rulesDir = configDir === null || !dir ? null : `${configDir.replace(/\/+$/, '')}/${dir}`
+  // Extension + rule-line format prefix from the registry block.
+  const ext = extension ?? ''
+  const prefix = formatPrefix(ruleFormat ?? '')
 
   const refresh = useCallback(async () => {
     if (!rulesDir) {
@@ -82,15 +97,16 @@ export function RuleFilesBlock({ profileName, dir }: { profileName: string; dir:
     setLoading(true)
     setLoadError('')
     try {
-      const loaded = await loadRules(rulesDir)
-      setRules(loaded)
+      const loaded = await loadRules(rulesDir, ext)
+      // Recompute counts with the registry format prefix.
+      setRules(loaded.map((r) => ({ ...r, ruleCount: countRules(r.content, prefix) })))
     } catch (error) {
       setRules([])
       setLoadError(error instanceof Error ? error.message : t('rules.loadFailed', { error: '' }))
     } finally {
       setLoading(false)
     }
-  }, [rulesDir])
+  }, [rulesDir, ext, prefix])
 
   useEffect(() => {
     let cancelled = false
@@ -127,7 +143,7 @@ export function RuleFilesBlock({ profileName, dir }: { profileName: string; dir:
     try {
       await saveFile(rule.path, draft)
       setRules((current) => current.map((r) => r.id === rule.id
-        ? { ...r, content: draft, ruleCount: countRules(draft) }
+        ? { ...r, content: draft, ruleCount: countRules(draft, prefix) }
         : r))
       cancelEditing(rule.id)
       toast({ type: 'success', message: t('rules.toast.saved', { name: rule.id }) })
@@ -212,7 +228,7 @@ export function RuleFilesBlock({ profileName, dir }: { profileName: string; dir:
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <h4 className="font-mono font-medium text-foreground">{rule.id}</h4>
-                      <span className="text-xs text-muted-foreground">.rules</span>
+                      <span className="text-xs text-muted-foreground">{ext}</span>
                       <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold tabular-nums text-muted-foreground ring-1 ring-inset ring-border">
                         {t(rule.ruleCount === 1 ? 'rules.countBadgeOne' : 'rules.countBadge', { count: rule.ruleCount })}
                       </span>
@@ -243,7 +259,7 @@ export function RuleFilesBlock({ profileName, dir }: { profileName: string; dir:
                         <p className="font-medium text-foreground">{t('rules.content')}</p>
                         {!isEditing ? (
                           <Button size="sm" variant="ghost" onClick={() => startEditing(rule)}>
-                            Edit
+                            {t('common.edit')}
                           </Button>
                         ) : (
                           <div className="flex items-center gap-1">

@@ -165,11 +165,14 @@ def get_mcp_server(server_id: str) -> Dict[str, Any] | None:
     conn = _conn()
     if conn is None:
         return None
+    # enabled_* columns are derived from the registry agent types (plus ACS
+    # extras) — never a hardcoded list that drifts when an agent is added.
+    agent_types = (*get_agent_types(), *ACS_EXTRA_TYPES)
+    enabled_cols = ", ".join(f"enabled_{at}" for at in agent_types)
     row = conn.execute(
-        "SELECT id, name, server_config, description, homepage, docs, tags, "
-        "enabled_claude, enabled_codex, enabled_gemini, "
-        "enabled_hermes, enabled_opencode, enabled_grokbuild "
-        "FROM mcp_servers WHERE id = ?", (server_id,)
+        f"SELECT id, name, server_config, description, homepage, docs, tags, "
+        f"{enabled_cols} "
+        f"FROM mcp_servers WHERE id = ?", (server_id,)
     ).fetchone()
     if row is None:
         conn.close()
@@ -188,7 +191,7 @@ def get_mcp_server(server_id: str) -> Dict[str, Any] | None:
     # The ACS schema uses wide booleans (enabled_claude, …) rather than a
     # join table — scan every known column and pick the ones that are true.
     enabled_agents = [
-        at for at in (*get_agent_types(), *ACS_EXTRA_TYPES)
+        at for at in agent_types
         if row[f"enabled_{at}"]
     ]
     conn.close()

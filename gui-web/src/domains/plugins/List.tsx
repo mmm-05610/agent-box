@@ -42,10 +42,10 @@ interface InstalledPluginsFile {
   plugins?: Record<string, InstalledPluginMeta[]>
 }
 
-function parseEnabledPlugins(content: string): Record<string, boolean> {
+function parseEnabledPlugins(content: string, key: string): Record<string, boolean> {
   try {
     const parsed = JSON.parse(content)
-    return parsed?.enabledPlugins ?? {}
+    return parsed?.[key] ?? {}
   } catch {
     return {}
   }
@@ -64,10 +64,13 @@ export function PluginsList({ profileName, agentType }: { profileName: string; a
   // File name from the backend registry (resources.plugins.config_file).
   const { agentConfigs } = useAgentConfigs()
   const configFile = agentType ? agentConfigs?.[agentType]?.resources?.plugins?.config_file : undefined
+  // The enabled-plugins key in settings.json (e.g. "enabledPlugins") comes
+  // from the backend registry — no hardcoded key name.
+  const configKey = agentType ? (agentConfigs?.[agentType]?.resources?.plugins?.config_key as string | undefined) : undefined
   const path = configDir === null || !configFile ? null : `${configDir}/${configFile}`
   const [content, setContent] = useState('{}')
   const [refreshKey, setRefreshKey] = useState(0)
-  const enabledMap = useMemo(() => parseEnabledPlugins(content), [content])
+  const enabledMap = useMemo(() => parseEnabledPlugins(content, configKey ?? ''), [content, configKey])
 
   const [installedMap, setInstalledMap] = useState<Record<string, InstalledPluginMeta[]>>({})
   const [metaLoading, setMetaLoading] = useState(true)
@@ -129,18 +132,18 @@ export function PluginsList({ profileName, agentType }: { profileName: string; a
   }, [enabledMap, installedMap])
 
   const toggle = useCallback(async (name: string, enabled: boolean) => {
-    if (!path) return
+    if (!path || !configKey) return
     setSaving(name)
     try {
       const next = { ...enabledMap, [name]: enabled }
-      await patchJsonFile(path, 'enabledPlugins', next)
+      await patchJsonFile(path, configKey, next)
       setRefreshKey((k) => k + 1)
     } catch (error) {
       toast({ type: 'error', message: error instanceof Error ? error.message : t('plugins.toast.failed') })
     } finally {
       setSaving(null)
     }
-  }, [path, enabledMap, toast])
+  }, [path, configKey, enabledMap, toast])
 
   const toggleExpanded = (id: string) => {
     setExpanded((current) => {
@@ -170,7 +173,10 @@ export function PluginsList({ profileName, agentType }: { profileName: string; a
         ) : null}
         {rows.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            {t('plugins.empty', { cmd: '/plugin install' })}
+            {t('plugins.empty', {
+              cmd: '/plugin install',
+              agent: agentType ? (agentConfigs?.[agentType]?.identity?.display_name ?? agentType) : '',
+            })}
           </p>
         ) : (
           rows.map((row) => {
@@ -209,7 +215,7 @@ export function PluginsList({ profileName, agentType }: { profileName: string; a
                       disabled={isSaving}
                       onClick={() => toggle(name, !enabled)}
                     >
-                      {isSaving ? '...' : enabled ? t('plugins.disable') : t('plugins.enable')}
+                      {isSaving ? t('common.saving') : enabled ? t('plugins.disable') : t('plugins.enable')}
                     </Button>
                   </div>
                 </div>
@@ -247,7 +253,7 @@ export function PluginsList({ profileName, agentType }: { profileName: string; a
                         <code className="break-all text-xs text-muted-foreground">{meta.installPath}</code>
                       ) : (
                         <p className="text-xs text-muted-foreground">
-                          {t('plugins.noInstallPath')}
+                          {t('plugins.noInstallPath', { file: configFile ?? '' })}
                         </p>
                       )}
                     </div>

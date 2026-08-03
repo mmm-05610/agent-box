@@ -101,7 +101,8 @@
       },
       "plugins": {
         "config_file": "settings.json",
-        "installed_file": "installed_plugins.json"
+        "installed_file": "installed_plugins.json",
+        "config_key": "enabledPlugins"
       }
     },
     "sandbox": {
@@ -227,6 +228,7 @@
           {
             "type": "rule_files",
             "dir": "rules",
+            "extension": ".rules",
             "rule_format": "prefix_rule(pattern=[...], decision=...)"
           }
         ]

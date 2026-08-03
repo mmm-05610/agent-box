@@ -123,15 +123,27 @@ export function InstructionsList({ profileName, agentType }: { profileName: stri
   }))
 
   const hasConfig = configJsonc.trim().length > 0
-  const hasParseError = hasConfig && rawEntries.length === 0 && /^\s*\{/.test(configJsonc)
+  // A parse error only when the JSON is genuinely broken — valid JSON that
+  // simply lacks the instructions array (e.g. `{}`) is "no instructions",
+  // not an error.  JSONC with comments falls through to the heuristic.
+  const hasParseError = useMemo(() => {
+    if (!hasConfig) return false
+    try {
+      JSON.parse(configJsonc)
+      return false
+    } catch {
+      return rawEntries.length === 0 && /^\s*\{/.test(configJsonc)
+    }
+  }, [configJsonc, hasConfig, rawEntries.length])
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{t('opencode.title')}</CardTitle>
+        <CardTitle>{t('instructions.title')}</CardTitle>
         <p className="text-sm text-muted-foreground">
           <Trans
-            i18nKey="opencode.subtitle"
+            i18nKey="instructions.subtitle"
+            values={{ key: configKey ?? '', file: configFile ?? '' }}
             components={{ code: <code className="font-mono" /> }}
           />
         </p>
@@ -140,7 +152,8 @@ export function InstructionsList({ profileName, agentType }: { profileName: stri
         {!hasConfig && (
           <p className="text-sm text-muted-foreground">
             <Trans
-              i18nKey="opencode.noConfig"
+              i18nKey="instructions.noConfig"
+              values={{ file: configFile ?? '' }}
               components={{ code: <code className="font-mono" /> }}
             />
           </p>
@@ -149,7 +162,8 @@ export function InstructionsList({ profileName, agentType }: { profileName: stri
         {hasParseError && (
           <p className="text-sm text-destructive">
             <Trans
-              i18nKey="opencode.parseError"
+              i18nKey="instructions.parseError"
+              values={{ file: configFile ?? '' }}
               components={{ code: <code className="font-mono" /> }}
             />
           </p>
@@ -158,7 +172,8 @@ export function InstructionsList({ profileName, agentType }: { profileName: stri
         {hasConfig && !hasParseError && rows.length === 0 && (
           <p className="text-sm text-muted-foreground">
             <Trans
-              i18nKey="opencode.noInstructions"
+              i18nKey="instructions.noInstructions"
+              values={{ key: configKey ?? '', file: configFile ?? '' }}
               components={{ code: <code className="font-mono" /> }}
             />
           </p>
@@ -186,15 +201,15 @@ function KindBadge({ kind }: { kind: InstructionRow['kind'] }) {
   const { t } = useTranslation()
   switch (kind) {
     case 'url':
-      return <Badge variant="info">{t('opencode.kind.url')}</Badge>
+      return <Badge variant="info">{t('instructions.kind.url')}</Badge>
     case 'glob':
-      return <Badge variant="neutral">{t('opencode.kind.glob')}</Badge>
+      return <Badge variant="neutral">{t('instructions.kind.glob')}</Badge>
     case 'absolute':
-      return <Badge variant="neutral">{t('opencode.kind.path')}</Badge>
+      return <Badge variant="neutral">{t('instructions.kind.path')}</Badge>
     case 'relative':
-      return <Badge variant="neutral">{t('opencode.kind.path')}</Badge>
+      return <Badge variant="neutral">{t('instructions.kind.path')}</Badge>
     default:
-      return <Badge variant="warning">{t('opencode.kind.unknown')}</Badge>
+      return <Badge variant="warning">{t('instructions.kind.unknown')}</Badge>
   }
 }
 
@@ -204,10 +219,10 @@ function ExistenceMark({ kind, exists }: { kind: InstructionRow['kind']; exists:
     return <span className="shrink-0 text-xs text-muted-foreground">—</span>
   }
   if (exists === null) {
-    return <span className="shrink-0 text-xs text-muted-foreground">{t('opencode.checking')}</span>
+    return <span className="shrink-0 text-xs text-muted-foreground">{t('instructions.checking')}</span>
   }
   if (exists) {
-    return <Badge variant="success">{t('opencode.exists')}</Badge>
+    return <Badge variant="success">{t('instructions.exists')}</Badge>
   }
-  return <Badge variant="warning">{t('opencode.missing')}</Badge>
+  return <Badge variant="warning">{t('instructions.missing')}</Badge>
 }

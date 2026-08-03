@@ -56,7 +56,7 @@ def _read_settings(path: Path, fmt: str) -> Dict[str, Any]:
         return {}
     try:
         data = _READERS[fmt](path)
-    except (json.JSONDecodeError, Exception) as exc:
+    except Exception as exc:
         raise ProfileError(
             f"{path.name} is not valid {fmt}: {exc}"
         ) from exc

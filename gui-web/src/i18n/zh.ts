@@ -315,7 +315,7 @@ export const zh: TranslationSchema = {
   plugins: {
     title: '插件（{{count}}）',
     metaError: '加载插件元数据失败：{{error}}',
-    empty: '未安装插件。请在 CC 中使用 {{cmd}}。',
+    empty: '未安装插件。请在 {{agent}} 中使用 {{cmd}}。',
     enabled: '已启用',
     disabled: '已禁用',
     enable: '启用',
@@ -328,7 +328,7 @@ export const zh: TranslationSchema = {
       installPath: '安装路径',
       installedAt: '安装时间',
     },
-    noInstallPath: '未记录安装路径（插件可能是在 settings.json 中手动启用的）。',
+    noInstallPath: '未记录安装路径（插件可能是在 {{file}} 中手动启用的）。',
     toast: {
       failed: '更新插件失败',
     },
@@ -393,12 +393,12 @@ export const zh: TranslationSchema = {
     },
   },
 
-  opencode: {
+  instructions: {
     title: '说明',
-    subtitle: '<code>opencode.jsonc</code> 中 <code>instructions</code> 数组引用的文件、通配符和 URL。只读——请在存储标签页编辑该数组。',
-    noConfig: '此配置未找到 <code>opencode.jsonc</code>。',
-    parseError: '无法将 <code>opencode.jsonc</code> 解析为 JSON。请检查存储标签页。',
-    noInstructions: '未配置自定义说明。可将路径/通配符/URL 添加到 opencode.jsonc 的 <code>instructions</code> 数组。',
+    subtitle: '<code>{{file}}</code> 中 <code>{{key}}</code> 数组引用的文件、通配符和 URL。只读——请在存储标签页编辑该数组。',
+    noConfig: '此配置未找到 <code>{{file}}</code>。',
+    parseError: '无法将 <code>{{file}}</code> 解析为 JSON。请检查存储标签页。',
+    noInstructions: '未配置自定义说明。可将路径/通配符/URL 添加到 <code>{{file}}</code> 的 <code>{{key}}</code> 数组。',
     kind: {
       url: 'URL',
       glob: 'glob',

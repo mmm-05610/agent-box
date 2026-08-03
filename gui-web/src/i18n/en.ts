@@ -316,7 +316,7 @@ export const en = {
   plugins: {
     title: 'Plugins ({{count}})',
     metaError: 'Failed to load plugin metadata: {{error}}',
-    empty: 'No plugins installed. Use {{cmd}} in CC.',
+    empty: 'No plugins installed. Use {{cmd}} in {{agent}}.',
     enabled: 'enabled',
     disabled: 'disabled',
     enable: 'Enable',
@@ -329,7 +329,7 @@ export const en = {
       installPath: 'Install path',
       installedAt: 'Installed at',
     },
-    noInstallPath: 'No install path recorded (plugin may be enabled manually in settings.json).',
+    noInstallPath: 'No install path recorded (plugin may be enabled manually in {{file}}).',
     toast: {
       failed: 'Failed to update plugin',
     },
@@ -394,12 +394,12 @@ export const en = {
     },
   },
 
-  opencode: {
+  instructions: {
     title: 'Instructions',
-    subtitle: 'Files, globs, and URLs referenced by the <code>instructions</code> array in <code>opencode.jsonc</code>. Read-only — edit the array in the Storage tab.',
-    noConfig: 'No <code>opencode.jsonc</code> found for this profile.',
-    parseError: 'Could not parse <code>opencode.jsonc</code> as JSON. Check the Storage tab.',
-    noInstructions: 'No custom instructions configured. Add paths/globs/URLs to the <code>instructions</code> array in opencode.jsonc.',
+    subtitle: 'Files, globs, and URLs referenced by the <code>{{key}}</code> array in <code>{{file}}</code>. Read-only — edit the array in the Storage tab.',
+    noConfig: 'No <code>{{file}}</code> found for this profile.',
+    parseError: 'Could not parse <code>{{file}}</code> as JSON. Check the Storage tab.',
+    noInstructions: 'No custom instructions configured. Add paths/globs/URLs to the <code>{{key}}</code> array in <code>{{file}}</code>.',
     kind: {
       url: 'URL',
       glob: 'glob',

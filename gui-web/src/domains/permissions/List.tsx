@@ -522,6 +522,7 @@ interface PermissionBlock {
   values?: string[]
   label?: string
   dir?: string
+  extension?: string
 }
 
 interface PermissionsResource {
@@ -885,6 +886,8 @@ export function PermissionsList({ profileName, agentType }: { profileName: strin
                   key={index}
                   profileName={profileName}
                   dir={block.dir ?? ''}
+                  extension={block.extension}
+                  ruleFormat={block.rule_format}
                 />
               )
             }

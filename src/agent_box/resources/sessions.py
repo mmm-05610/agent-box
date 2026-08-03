@@ -130,18 +130,6 @@ class SessionRepo:
             out.append(rec)
         return out
 
-    def latest_cwd_for(self, profile: str) -> str | None:
-        """Return the most-recent non-empty cwd for *profile*."""
-        conn = _core_db.get_conn()
-        with _core_db.write_lock:
-            row = conn.execute(
-                "SELECT cwd FROM sessions WHERE profile = ? "
-                "AND cwd IS NOT NULL AND cwd != '' "
-                "ORDER BY launched_at DESC LIMIT 1",
-                (profile,),
-            ).fetchone()
-            return row["cwd"] if row else None
-
     def cleanup_stale(self) -> int:
         """Mark dead-PID sessions as exited. Returns count cleaned."""
         conn = _core_db.get_conn()
@@ -160,12 +148,10 @@ record_launch          = _repo.record_launch
 record_exit            = _repo.record_exit
 record_exit_by_pid     = _repo.record_exit_by_pid
 fetch_sessions         = _repo.fetch
-latest_cwd_for         = _repo.latest_cwd_for
 cleanup_stale_sessions = _repo.cleanup_stale
 __all__ = [
     "cleanup_stale_sessions",
     "fetch_sessions",
-    "latest_cwd_for",
     "record_exit",
     "record_exit_by_pid",
     "record_launch",

@@ -14,7 +14,7 @@ from cmd2 import Cmd2ArgumentParser, CommandSet, with_argparser, with_category
 from ... import config
 from ...resources import hooks, mcp, profile, providers, skills
 from ...resources.prompts import apply_prompt
-from .core import _PROFILE_DISPLAY_FIELDS, _list_entries
+from .core import _PROFILE_DISPLAY_FIELDS
 
 
 class ProfileCommands(CommandSet):

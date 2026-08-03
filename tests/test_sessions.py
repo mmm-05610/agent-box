@@ -102,49 +102,6 @@ def test_fetch_sessions_limit(tmp_agent_box_home):
     assert len(rows) == 3
 
 
-# --- latest_cwd_for -------------------------------------------------------
-
-def test_latest_cwd(tmp_agent_box_home, monkeypatch):
-    """latest_cwd_for returns the most recent non-empty cwd for a profile.
-
-    SQLite's ``datetime('now')`` is second-granular, so we monkeypatch
-    ``_get_conn`` to return a row whose ``launched_at`` is a fixed
-    string and grows monotonically with insertion order.
-    """
-    import sqlite3
-    from agent_box.core.db import get_conn, write_lock
-
-    # Use the live connection and INSERT with explicit timestamps instead
-    # of datetime('now').
-    conn = get_conn()
-    with write_lock:
-        conn.execute(
-            "INSERT INTO sessions (profile, agent_type, cwd, mode, pid, launched_at) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            ("p", "claude", "/old",  "新会话", 7000, "2026-01-01 00:00:00"),
-        )
-        conn.execute(
-            "INSERT INTO sessions (profile, agent_type, cwd, mode, pid, launched_at) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            ("p", "claude", "/newer", "新会话", 7001, "2026-01-01 00:00:01"),
-        )
-        conn.execute(
-            "INSERT INTO sessions (profile, agent_type, cwd, mode, pid, launched_at) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            ("p", "claude", "",      "新会话", 7002, "2026-01-01 00:00:02"),  # empty ignored
-        )
-        conn.execute(
-            "INSERT INTO sessions (profile, agent_type, cwd, mode, pid, launched_at) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            ("other", "claude", "/other", "新会话", 7003, "2026-01-01 00:00:03"),
-        )
-        conn.commit()
-
-    assert sessions.latest_cwd_for("p") == "/newer"
-    assert sessions.latest_cwd_for("other") == "/other"
-    assert sessions.latest_cwd_for("nope") is None
-
-
 # --- cleanup_stale_sessions -----------------------------------------------
 
 def test_cleanup_stale(tmp_agent_box_home):

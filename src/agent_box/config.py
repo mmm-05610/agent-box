@@ -170,8 +170,16 @@ def profile_agent_data_dir(name: str, agent_type: str) -> Path | None:
 
 
 def profile_skills_dir(name: str, agent_type: str) -> Path:
-    """Profile's per-agent skills directory (copy target for skill apply)."""
-    return profile_agent_dir(name, agent_type) / "skills"
+    """Profile's per-agent skills directory (copy target for skill apply).
+
+    Dir name comes from the registry (``resources.skills.dir``), not a
+    hardcoded "skills" — lazy import avoids a config ↔ library cycle.
+    """
+    from .core.library import get_agent_config
+    agent_config = get_agent_config(agent_type)
+    dir_name = ((agent_config.get("resources") or {})
+                .get("skills", {}).get("dir") or "skills")
+    return profile_agent_dir(name, agent_type) / dir_name
 
 
 def profile_providers_store(name: str, agent_type: str) -> Path:
