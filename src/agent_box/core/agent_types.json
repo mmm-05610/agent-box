@@ -55,7 +55,9 @@
       "prompt": {
         "file": "CLAUDE.md"
       },
-      "skills": {},
+      "skills": {
+        "dir": "skills"
+      },
       "permissions": {
         "config_file": "settings.json",
         "config_key": "permissions",
@@ -193,7 +195,9 @@
       "prompt": {
         "file": "AGENTS.md"
       },
-      "skills": {},
+      "skills": {
+        "dir": "skills"
+      },
       "permissions": {
         "config_file": "config.toml",
         "config_key": "approval_policy",
@@ -358,7 +362,9 @@
       "prompt": {
         "file": "SOUL.md"
       },
-      "skills": {},
+      "skills": {
+        "dir": "skills"
+      },
       "memories": {
         "dir": "memories",
         "files": [
@@ -478,7 +484,9 @@
       "prompt": {
         "file": "AGENTS.md"
       },
-      "skills": {},
+      "skills": {
+        "dir": "skills"
+      },
       "instructions": {
         "config_file": "opencode.jsonc",
         "config_key": "instructions"

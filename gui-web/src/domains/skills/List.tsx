@@ -12,7 +12,7 @@ import {
 } from '@/components/ui'
 import { useToast } from '@/components/feedback/toast'
 import { deletePath, readFile, saveFile } from '@/api/files'
-import { useLibrary, useProfileResources } from '@/hooks'
+import { useAgentConfigs, useLibrary, useProfileResources } from '@/hooks'
 import { parseFrontmatter, type InstalledSkill } from '@/hooks/useProfileResources'
 import { applySkillToProfile, removeSkillFromProfile } from '@/api'
 import type { AgentType, Skill } from '@/api'
@@ -153,7 +153,10 @@ export function SkillList({ profileName, agentType }: SkillListProps) {
     refresh: refreshInstalled,
     updateSkill,
   } = useProfileResources(profileName, { includeSkills: true })
-  const skillsDir = configDir === null ? null : `${configDir.replace(/\/+$/, '')}/skills`
+  // Skills dir name comes from the backend registry (resources.skills.dir).
+  const { agentConfigs } = useAgentConfigs()
+  const skillsDirName = agentType ? (agentConfigs?.[agentType]?.resources?.skills?.dir as string | undefined) : undefined
+  const skillsDir = configDir === null || !skillsDirName ? null : `${configDir.replace(/\/+$/, '')}/${skillsDirName}`
 
   const [removingId, setRemovingId] = useState<string | null>(null)
   const [detailSkill, setDetailSkill] = useState<InstalledSkill | null>(null)
