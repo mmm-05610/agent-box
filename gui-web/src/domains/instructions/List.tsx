@@ -55,13 +55,13 @@ async function checkLocalExists(raw: string, profilePath: string): Promise<boole
   }
 }
 
-function parseInstructions(raw: string): string[] {
+function parseInstructions(raw: string, key: string): string[] {
   const trimmed = raw.trim()
-  if (!trimmed) return []
+  if (!trimmed || !key) return []
   try {
     const parsed = JSON.parse(trimmed)
     if (!parsed || typeof parsed !== 'object') return []
-    const value = (parsed as Record<string, unknown>).instructions
+    const value = (parsed as Record<string, unknown>)[key]
     if (!Array.isArray(value)) return []
     return value.filter((entry): entry is string => typeof entry === 'string')
   } catch {
@@ -78,6 +78,8 @@ export function InstructionsList({ profileName, agentType }: { profileName: stri
   // File name from the backend registry (resources.instructions.config_file).
   const { agentConfigs } = useAgentConfigs()
   const configFile = agentType ? agentConfigs?.[agentType]?.resources?.instructions?.config_file : undefined
+  // Config key (e.g. "instructions") also comes from the backend registry.
+  const configKey = agentType ? (agentConfigs?.[agentType]?.resources?.instructions?.config_key as string | undefined) : undefined
   const profilePath = useProfilePath(profileName)
   const [configJsonc, setConfigJsonc] = useState('')
   const configPath = configDir === null || !configFile ? null : `${configDir}/${configFile}`
@@ -92,7 +94,7 @@ export function InstructionsList({ profileName, agentType }: { profileName: stri
     return () => { cancelled = true }
   }, [configPath])
 
-  const rawEntries = useMemo(() => parseInstructions(configJsonc), [configJsonc])
+  const rawEntries = useMemo(() => parseInstructions(configJsonc, configKey ?? ''), [configJsonc, configKey])
   const [existsMap, setExistsMap] = useState<Record<string, boolean | null>>({})
 
   useEffect(() => {
