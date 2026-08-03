@@ -6,6 +6,7 @@ Environment-agnostic shell. Picks the right DataAccess at startup:
 """
 
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -27,22 +28,23 @@ def _is_windows() -> bool:
 
 def _to_wsl_path(win_path: str) -> str:
     """Convert a Windows path (UNC ``\\\\wsl$\\\\…`` or ``C:\\\\…``) to its WSL
-    equivalent via ``wslpath -u``.
+    equivalent.
 
-    The native folder picker returns Windows paths; the launch cwd and the
-    projects_dir default need WSL paths because agent-box runs inside WSL.
+    Deterministic string conversion — no ``wslpath`` dependency (wsl.exe
+    does not reliably forward a ``\\\\wsl$\\\\`` UNC argument).  The native
+    folder picker returns Windows paths; the launch cwd and projects_dir
+    need WSL paths because agent-box runs inside WSL.
     """
-    try:
-        out = subprocess.run(
-            ["wsl.exe", "wslpath", "-u", win_path],
-            capture_output=True, text=True,
-            encoding="utf-8", errors="replace", timeout=10,
-        )
-        if out.returncode == 0 and out.stdout.strip():
-            return out.stdout.strip()
-    except Exception:
-        pass
-    return win_path
+    p = win_path.strip()
+    # \\wsl$\<distro>\<rest>  →  /<rest>
+    m = re.match(r"^\\\\wsl\$\\([^\\]+)\\(.+)$", p, re.IGNORECASE)
+    if m:
+        return "/" + m.group(2).replace("\\", "/")
+    # C:\...  →  /mnt/<lower-drive>/...
+    m = re.match(r"^([A-Za-z]):\\(.+)$", p)
+    if m:
+        return f"/mnt/{m.group(1).lower()}/" + m.group(2).replace("\\", "/")
+    return p
 
 
 # ── API ───────────────────────────────────────────────────────────────
