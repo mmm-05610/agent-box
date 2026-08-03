@@ -26,3 +26,13 @@ export async function fetchVersion(): Promise<string> {
 export async function fetchDefaultProjectsDir(): Promise<string> {
   return call<string>((api) => api.get_default_projects_dir!(), '')
 }
+
+/** The current projects dir — user-stored value or backend default. */
+export async function fetchProjectsDir(): Promise<string> {
+  return call<string>((api) => api.get_projects_dir!(), '')
+}
+
+/** Persist the projects dir in the backend (survives GUI restarts). */
+export async function saveProjectsDir(value: string): Promise<void> {
+  await call<void>((api) => api.save_projects_dir!(value), undefined)
+}

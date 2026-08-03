@@ -5,7 +5,7 @@
 export { useLibrary } from './useLibrary'
 export { useAgentConfigs, resetAgentConfigsCache } from './useAgentConfigs'
 export { useDefaultAgent } from './useDefaultAgent'
-export { useDefaultProjectsDir } from './useDefaultProjectsDir'
+export { useProjectsDir } from './useDefaultProjectsDir'
 export { useVersion } from './useVersion'
 export { useAgentTypeColor } from './useAgentTypeColor'
 export { useAgentIdentity, resolveAgentIdentity } from './useAgentIdentity'

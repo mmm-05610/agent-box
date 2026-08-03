@@ -11,7 +11,7 @@ import { Button, Badge, Input, Tabs } from '@/components/ui'
 import { EmptyState, Loading } from '@/components/feedback'
 import { useToast } from '@/components/feedback/toast'
 import { PageHeader } from '@/components/layout'
-import { useAgentConfigs, useAgentIdentity, useAgentTypeColor, useDefaultAgent, useDefaultProjectsDir, useLibrary, useProfiles, useSessions, resolveAgentIdentity } from '@/hooks'
+import { useAgentConfigs, useAgentIdentity, useAgentTypeColor, useDefaultAgent, useLibrary, useProfiles, useProjectsDir, useSessions, resolveAgentIdentity } from '@/hooks'
 import { cn } from '@/lib/utils'
 import type { AgentType, AgentTypeConfig, Profile } from '@/api'
 import { createProfile, deleteProfile, launchProfile, getLastCwdMap, browseDir } from '@/api'
@@ -491,7 +491,7 @@ function ProfileCard({
 
   const [mode, setMode] = useState<string>('resume')
   const [cwd, setCwd] = useState<string>(lastCwd || '~')
-  const defaultProjectsDir = useDefaultProjectsDir()
+  const { dir: defaultProjectsDir } = useProjectsDir()
 
   useEffect(() => {
     if (lastCwd) setCwd(lastCwd)

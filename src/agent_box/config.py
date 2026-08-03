@@ -1,6 +1,7 @@
 """Path resolution, constants, and validation for agent-box."""
 from __future__ import annotations
 
+import json
 import os
 import sys
 from pathlib import Path
@@ -94,6 +95,45 @@ def default_projects_dir() -> str:
     path — consumers resolve it against ``$HOME`` (WSL / Linux).
     """
     return os.environ.get("AGENT_BOX_PROJECTS_DIR") or "~/projects"
+
+
+def _gui_settings_path() -> Path:
+    """Per-machine GUI settings store (projects dir, …)."""
+    return agent_box_home() / "gui-settings.json"
+
+
+def projects_dir() -> str:
+    """The current projects dir — user-stored value, else the backend default.
+
+    Persisted in ``gui-settings.json`` so it survives GUI restarts
+    (browser localStorage for a ``file://`` origin is not reliable).
+    """
+    try:
+        data = json.loads(_gui_settings_path().read_text(encoding="utf-8"))
+        value = data.get("projects_dir")
+        if isinstance(value, str) and value:
+            return value
+    except (OSError, json.JSONDecodeError):
+        pass
+    return default_projects_dir()
+
+
+def set_projects_dir(value: str) -> None:
+    """Persist the projects dir for the GUI (survives restarts)."""
+    path = _gui_settings_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    data: dict = {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        pass
+    if not isinstance(data, dict):
+        data = {}
+    data["projects_dir"] = value
+    path.write_text(
+        json.dumps(data, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
 
 
 def library_db() -> Path:

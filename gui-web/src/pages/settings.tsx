@@ -14,7 +14,8 @@ import { cn } from '@/lib/utils'
 import { browseDir } from '@/api'
 import { readSettings, writeSettings, type Theme } from '@/lib/settings'
 import { LANG_KEY, readStoredLanguage, type UILanguage } from '@/i18n'
-import { useDefaultProjectsDir, useVersion } from '@/hooks'
+import { useProjectsDir, useVersion } from '@/hooks'
+import { saveProjectsDir } from '@/api/agentConfigs'
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
@@ -76,13 +77,15 @@ export function SettingsPage() {
   const { toast } = useToast()
   const [theme, setTheme] = useState<Theme>(() => readSettings().theme)
   const [language, setLanguage] = useState<UILanguage>(() => readStoredLanguage())
-  const [projectsDir, setProjectsDir] = useState(() => readSettings().projects_dir)
-  // Backend-served default (config.default_projects_dir) — fills in only
-  // when the user has no saved path.
-  const defaultProjectsDir = useDefaultProjectsDir()
+  // Projects dir is persisted backend-side (gui-settings.json) so it survives
+  // GUI restarts — localStorage on a file:// origin is not reliable. Local
+  // state is the immediate display; the backend value is authoritative once
+  // loaded.
+  const { dir: backendProjectsDir, refresh: refreshProjectsDir } = useProjectsDir()
+  const [projectsDir, setProjectsDir] = useState(() => readSettings().projects_dir || '')
   useEffect(() => {
-    if (!projectsDir && defaultProjectsDir) setProjectsDir(defaultProjectsDir)
-  }, [projectsDir, defaultProjectsDir])
+    if (backendProjectsDir) setProjectsDir(backendProjectsDir)
+  }, [backendProjectsDir])
 
   useEffect(() => {
     applyTheme(theme)
@@ -113,6 +116,12 @@ export function SettingsPage() {
       const dir = await browseDir(projectsDir)
       if (dir) {
         setProjectsDir(dir)
+        try {
+          await saveProjectsDir(dir)
+          refreshProjectsDir()
+        } catch {
+          // backend unavailable — localStorage still carries this session
+        }
         writeSettings({ projects_dir: dir })
         toast({ type: 'success', message: t('settings.toast.dirUpdated') })
       }

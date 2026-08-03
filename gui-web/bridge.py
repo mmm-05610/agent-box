@@ -94,6 +94,23 @@ class Api:
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
 
+    def get_projects_dir(self) -> str:
+        """The current projects dir — user-stored value or backend default."""
+        try:
+            from agent_box import config
+            return json.dumps({"ok": True, "data": config.projects_dir()})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    def save_projects_dir(self, value: str) -> str:
+        """Persist the projects dir so it survives GUI restarts."""
+        try:
+            from agent_box import config
+            config.set_projects_dir(value)
+            return json.dumps({"ok": True})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
     # ── Profiles ─────────────────────────────────────────────────────
 
     def list_profiles(self) -> str:

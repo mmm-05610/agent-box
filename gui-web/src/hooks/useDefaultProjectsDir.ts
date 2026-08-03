@@ -1,13 +1,14 @@
 /**
- * useDefaultProjectsDir — the backend's default projects directory
- * (config.default_projects_dir(), env-overridable).
+ * useProjectsDir — the current projects directory (user-stored value from the
+ * backend's gui-settings.json, else the backend default).
  *
- * Served by the backend so the frontend never hardcodes a default path
- * that drifts. Module-level cache: fetched once, shared app-wide.
+ * Persisted backend-side so it survives GUI restarts — browser localStorage
+ * for a file:// origin is not reliable. Module-level cache shared app-wide;
+ * callers call `refresh()` after saving a new value.
  */
 
 import { useSyncExternalStore } from 'react'
-import { fetchDefaultProjectsDir } from '@/api/agentConfigs'
+import { fetchProjectsDir } from '@/api/agentConfigs'
 
 let cache: string | null = null
 let inflight: Promise<void> | null = null
@@ -28,7 +29,7 @@ function notify() {
 
 function ensureLoaded(): void {
   if (cache !== null || inflight) return
-  inflight = fetchDefaultProjectsDir()
+  inflight = fetchProjectsDir()
     .then((value) => {
       cache = value
       notify()
@@ -40,7 +41,15 @@ function ensureLoaded(): void {
     .finally(() => { inflight = null })
 }
 
-export function useDefaultProjectsDir(): string {
+export function useProjectsDir(): { dir: string; refresh: () => void } {
   ensureLoaded()
-  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot) ?? ''
+  const dir = useSyncExternalStore(subscribe, getSnapshot, getSnapshot) ?? ''
+  return {
+    dir,
+    refresh: () => {
+      cache = null
+      inflight = null
+      ensureLoaded()
+    },
+  }
 }
