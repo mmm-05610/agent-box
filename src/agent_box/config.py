@@ -34,6 +34,11 @@ def migrations_dir() -> Path:
     return package_dir() / "migrations"
 
 
+def agent_types_file() -> Path:
+    """Absolute path to the agent-type registry (``core/agent_types.json``)."""
+    return package_dir() / "core" / "agent_types.json"
+
+
 # --- root resolution -------------------------------------------------------
 
 def agent_box_home() -> Path:

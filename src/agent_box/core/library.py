@@ -26,7 +26,7 @@ from .. import config
 # data_dir   — optional second config directory (e.g. OpenCode auth).
 # ---------------------------------------------------------------------------
 
-_AGENT_TYPES_FILE = config.package_dir() / "core" / "agent_types.json"
+_AGENT_TYPES_FILE = config.agent_types_file()
 
 # Standard resource types declared in the format spec (agent-type-format.md
 # §2). Resource keys outside this set are a registry typo — warn on load.
