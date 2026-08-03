@@ -112,6 +112,12 @@ def _load_agent_types() -> Dict[str, Dict[str, Any]]:
                     f"{', '.join(unknown)}",
                     stacklevel=2,
                 )
+
+        # Expand ~ in config_dir so callers (and the frontend, for bwrap
+        # path translation) get an absolute path instead of "~/.hermes".
+        cfg_dir = entry.get("runtime", {}).get("config_dir")
+        if isinstance(cfg_dir, str) and cfg_dir.startswith("~"):
+            entry["runtime"]["config_dir"] = str(Path(cfg_dir).expanduser())
     return data
 
 

@@ -86,15 +86,18 @@ export function YamlHooksViewer({ profileName, agentType }: { profileName: strin
     return () => { cancelled = true }
   }, [configPath])
 
-  // Resolve hook command paths. Paths like /home/maoqh/.hermes/hooks/foo.sh
-  // refer to the bwrap mount — on the real filesystem they live under
-  // configDir/hooks/. Translate the prefix.
+  // Resolve hook command paths. config.yaml hook commands are written as the
+  // bwrap-mounted config dir (e.g. /home/<user>/.hermes/hooks/foo.sh); on the
+  // real filesystem they live under the profile's configDir. The mount
+  // prefix comes from the backend registry (runtime.config_dir, expanded at
+  // load) — the frontend doesn't hardcode any agent path.
   const resolvePath = useCallback((command: string) => {
-    if (command.startsWith('/home/maoqh/.hermes/')) {
-      return (configDir ?? '').replace(/\/+$/, '') + '/' + command.slice('/home/maoqh/.hermes/'.length)
+    const mountPrefix = agentType ? agentConfigs?.[agentType]?.runtime?.config_dir : undefined
+    if (mountPrefix && command.startsWith(mountPrefix + '/')) {
+      return (configDir ?? '').replace(/\/+$/, '') + '/' + command.slice(mountPrefix.length + 1)
     }
     return command
-  }, [configDir])
+  }, [configDir, agentType, agentConfigs])
   const phases = useMemo(() => extractHooks(configYaml), [configYaml])
   const totalHooks = useMemo(
     () => Object.values(phases).reduce((sum, entries) => sum + entries.length, 0),

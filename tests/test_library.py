@@ -1,6 +1,8 @@
 """Tests for the agent/preset registry in agent_box.library."""
 from __future__ import annotations
 
+from pathlib import Path
+
 from agent_box.core import library
 
 
@@ -13,7 +15,9 @@ def test_get_agent_types():
 def test_get_agent_config_known():
     info = library.get_agent_config("claude")
     assert info is not None
-    assert info["runtime"]["config_dir"] == "~/.claude"
+    # config_dir is expanded at load so bwrap/path translation gets an
+    # absolute path (the frontend uses it as the mount prefix).
+    assert info["runtime"]["config_dir"] == str(Path("~/.claude").expanduser())
     assert info["identity"]["binary"] == "claude"
 
 
