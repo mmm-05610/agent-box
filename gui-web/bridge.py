@@ -25,6 +25,25 @@ def _is_windows() -> bool:
     return sys.platform == "win32"
 
 
+def _to_wsl_path(win_path: str) -> str:
+    """Convert a Windows path (UNC ``\\\\wsl$\\\\…`` or ``C:\\\\…``) to its WSL
+    equivalent via ``wslpath -u``.
+
+    The native folder picker returns Windows paths; the launch cwd and the
+    projects_dir default need WSL paths because agent-box runs inside WSL.
+    """
+    try:
+        out = subprocess.run(
+            ["wsl.exe", "wslpath", "-u", win_path],
+            capture_output=True, text=True, timeout=10,
+        )
+        if out.returncode == 0 and out.stdout.strip():
+            return out.stdout.strip()
+    except Exception:
+        pass
+    return win_path
+
+
 # ── API ───────────────────────────────────────────────────────────────
 
 
@@ -405,7 +424,7 @@ class Api:
             return json.dumps({"ok": False, "data": [], "error": str(e)})
 
     def browse_dir(self, initial: str = "") -> str:
-        """Open a native folder picker."""
+        """Open a native folder picker; returns a WSL path."""
         try:
             initial = str(Path(initial).expanduser())
             result = webview.windows[0].create_file_dialog(
@@ -414,6 +433,10 @@ class Api:
             if not result:
                 return json.dumps({"ok": True, "data": ""})
             path = result[0] if isinstance(result, (list, tuple)) else str(result)
+            # Windows host mode: the picker returns Windows/UNC paths, but the
+            # launch cwd + projects_dir need WSL paths (agent-box runs in WSL).
+            if _is_windows():
+                path = _to_wsl_path(path)
             return json.dumps({"ok": True, "data": path})
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
