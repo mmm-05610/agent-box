@@ -139,6 +139,11 @@ export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProp
     setRefreshKey((k) => k + 1)
   }, [])
 
+  // Registry-driven hooks — MUST run before the loading/error early returns,
+  // or React #310 fires (hook count changes between renders).
+  const { agentConfigs } = useAgentConfigs()
+  const agentTypeColor = useAgentTypeColor()
+
   // ── Render ─────────────────────────────────────────────────────────
 
   if (loading) {
@@ -164,8 +169,6 @@ export function ProfileDetailPage({ profileName, onBack }: ProfileDetailPageProp
 
   const { meta } = detail
   const agentType = meta.agent_type as AgentType
-  const { agentConfigs } = useAgentConfigs()
-  const agentTypeColor = useAgentTypeColor()
   // Loading-order fallback: no resource tabs until the registry arrives.
   const resourceConfig = agentConfigs?.[agentType]?.resources
   const resourceKeys = resourceConfig ? Object.keys(resourceConfig) : []
