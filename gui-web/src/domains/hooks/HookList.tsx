@@ -19,8 +19,7 @@ import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from '@/compo
 import { Textarea } from '@/components/ui'
 import { patchJsonFile, readFile } from '@/api/files'
 import type { AgentType } from '@/api'
-import { useAgentConfigs } from '@/hooks'
-import { useProfileConfigDir } from '../useProfileConfigDir'
+import { useAgentConfigs, useProfileConfigDir } from '@/hooks'
 import { HermesHooksViewer } from './HermesHooksViewer'
 
 interface HookEntry {

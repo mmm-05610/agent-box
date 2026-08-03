@@ -10,7 +10,7 @@ import { Trans, useTranslation } from 'react-i18next'
 import { Button, Card, CardContent, CardHeader, CardTitle, Textarea } from '@/components/ui'
 import { useToast } from '@/components/feedback/toast'
 import { readFile, saveFile } from '@/api/files'
-import { useProfileConfigDir } from '../useProfileConfigDir'
+import { useProfileConfigDir } from '@/hooks'
 
 interface MemoryFile {
   path: string

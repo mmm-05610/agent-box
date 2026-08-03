@@ -10,7 +10,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from '@/components/ui'
 import { readFile } from '@/api/files'
-import { useProfileConfigDir } from '../useProfileConfigDir'
+import { useProfileConfigDir } from '@/hooks'
 
 interface HookEntry {
   command: string

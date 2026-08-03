@@ -24,7 +24,7 @@ import {
 } from '@/components/ui'
 import { useToast } from '@/components/feedback/toast'
 import { patchJsonFile, readFile } from '@/api/files'
-import { useProfileConfigDir } from '../useProfileConfigDir'
+import { useProfileConfigDir } from '@/hooks'
 
 type RuleGroup = 'allow' | 'deny' | 'ask'
 

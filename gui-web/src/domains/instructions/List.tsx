@@ -18,8 +18,7 @@ import {
   CardTitle,
 } from '@/components/ui'
 import { findFiles, readFile } from '@/api/files'
-import { useProfileConfigDir } from '../useProfileConfigDir'
-import { useProfilePath } from '../useProfilePath'
+import { useProfileConfigDir, useProfilePath } from '@/hooks'
 
 interface InstructionRow {
   raw: string

@@ -21,7 +21,7 @@ import {
 } from '@/components/ui'
 import { useToast } from '@/components/feedback/toast'
 import { deletePath, findFiles, readFile, saveFile } from '@/api/files'
-import { useProfileConfigDir } from '../useProfileConfigDir'
+import { useProfileConfigDir } from '@/hooks'
 
 interface RuleFile {
   /** Filename without `.rules` extension. */

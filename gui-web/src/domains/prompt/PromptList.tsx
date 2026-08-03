@@ -10,7 +10,7 @@ import { useToast } from '@/components/feedback/toast'
 import { readFile, saveFile } from '@/api/files'
 import type { AgentType } from '@/api'
 import { useAgentConfigs, useLibrary } from '@/hooks'
-import { useProfileConfigDir } from '../useProfileConfigDir'
+import { useProfileConfigDir } from '@/hooks'
 
 interface PromptListProps {
   profileName: string
