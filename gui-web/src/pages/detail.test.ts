@@ -15,16 +15,16 @@ const registry = RESOURCES as Record<string, import('@/domains').ResourceDef>
 type AgentKey = 'claude' | 'codex' | 'hermes' | 'opencode'
 const BACKEND_RESOURCES: Record<AgentKey, string[]> = {
   claude: ['provider', 'mcp', 'hooks', 'prompt', 'skills', 'permissions', 'plugins'],
-  codex: ['provider', 'mcp', 'prompt', 'skills', 'rules'],
-  hermes: ['provider', 'mcp', 'hooks', 'prompt', 'skills', 'memories'],
-  opencode: ['provider', 'mcp', 'prompt', 'skills', 'instructions'],
+  codex: ['provider', 'mcp', 'prompt', 'skills', 'rules', 'permissions'],
+  hermes: ['provider', 'mcp', 'hooks', 'prompt', 'skills', 'memories', 'permissions'],
+  opencode: ['provider', 'mcp', 'prompt', 'skills', 'instructions', 'permissions'],
 }
 
 const EXPECTED_RESOURCE_TABS: Record<string, string[]> = {
   claude: ['provider', 'mcp', 'hooks', 'prompt', 'skills', 'permissions', 'plugins'],
-  codex: ['provider', 'mcp', 'prompt', 'skills', 'rules'],
-  hermes: ['provider', 'mcp', 'hooks', 'prompt', 'skills', 'memories'],
-  opencode: ['provider', 'mcp', 'prompt', 'skills', 'instructions'],
+  codex: ['provider', 'mcp', 'prompt', 'skills', 'rules', 'permissions'],
+  hermes: ['provider', 'mcp', 'hooks', 'prompt', 'skills', 'memories', 'permissions'],
+  opencode: ['provider', 'mcp', 'prompt', 'skills', 'instructions', 'permissions'],
 }
 
 const EXPECTED_PROMPT_LABELS: Record<string, string> = {

@@ -1,14 +1,14 @@
 /**
- * Permissions — structured allow/deny/ask rule editor (Claude).
+ * Permissions — block-driven config editor.
  *
- * Reads/writes settings.json → permissions key for the given profile.
+ * Reads/writes the agent's permission config for the given profile. The
+ * editing surface is driven entirely by the backend registry's
+ * `resources.permissions.blocks` (rule_groups / select / toggle_list /
+ * tool_matrix / raw_editor) and `config_key` — nothing about any specific
+ * agent's permission schema is hardcoded here.
  *
- * Two modes:
- *   - Visual (default): three rule groups (allow/deny/ask) with per-group cards,
- *     a defaultMode selector, and an inline add-rule form per group.
- *   - Raw (collapsed): line-based textarea accepting `allow: Bash(npm run *)`.
- *
- * Both modes stay in sync — raw edits are parsed back into visual cards on close.
+ * Parsing/serialization use open-source libraries: yaml for .yaml/.yml,
+ * smol-toml for .toml, JSON (with a JSONC-tolerant read) for .json/.jsonc.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -20,299 +20,113 @@ import {
   CardHeader,
   CardTitle,
   ConfirmDialog,
+  CodeEditor,
   Input,
 } from '@/components/ui'
 import { useToast } from '@/components/feedback/toast'
-import { patchJsonFile, readFile } from '@/api/files'
+import { readFile, saveFile } from '@/api/files'
 import type { AgentType } from '@/api'
 import { useAgentConfigs, useProfileConfigDir } from '@/hooks'
+import {
+  blockFieldPath,
+  editorLanguage,
+  getFieldAt,
+  inferFormat,
+  joinRule,
+  parseConfig,
+  setFieldAt,
+  splitRule,
+  stringifyConfig,
+  type PermissionBlock,
+  type PermissionsResource,
+} from './codec'
 
-type RuleGroup = 'allow' | 'deny' | 'ask'
+// ── Block editors ──────────────────────────────────────────────────────
 
-interface Permissions {
-  allow?: string[]
-  deny?: string[]
-  ask?: string[]
-  defaultMode?: string
-}
-
-const RULE_GROUPS: { key: RuleGroup; labelKey: string; descriptionKey: string; accent: string }[] = [
-  {
-    key: 'allow',
-    labelKey: 'permissions.group.allow',
-    descriptionKey: 'permissions.group.allowDesc',
-    accent: 'text-success bg-success-subtle ring-success/20',
-  },
-  {
-    key: 'deny',
-    labelKey: 'permissions.group.deny',
-    descriptionKey: 'permissions.group.denyDesc',
-    accent: 'text-destructive bg-destructive-subtle ring-destructive/20',
-  },
-  {
-    key: 'ask',
-    labelKey: 'permissions.group.ask',
-    descriptionKey: 'permissions.group.askDesc',
-    accent: 'text-warning bg-warning-subtle ring-warning/20',
-  },
-]
-
-const DEFAULT_MODES = ['default', 'accept-edits', 'bypass-permissions', 'plan'] as const
-const COMMON_TOOLS = [
-  'Bash', 'Read', 'Edit', 'Write', 'Glob', 'Grep',
-  'WebFetch', 'WebSearch', 'Task', 'Skill', 'Agent', 'NotebookEdit',
-] as const
-
-const RULE_REGEX = /^(\w+)\((.+)\)$/
-
-function parse(content: string): Permissions {
-  try { return JSON.parse(content)?.permissions ?? {} } catch { return {} }
-}
-
-function splitRule(rule: string): { tool: string | null; pattern: string } {
-  const match = rule.match(RULE_REGEX)
-  if (match) return { tool: match[1] ?? null, pattern: match[2] ?? '' }
-  return { tool: null, pattern: rule }
-}
-
-function joinRule(tool: string, pattern: string): string {
-  if (!tool) return pattern
-  return `${tool}(${pattern})`
-}
-
-function parseRawRules(text: string): Pick<Permissions, 'allow' | 'deny' | 'ask'> {
-  const out: Record<RuleGroup, string[]> = { allow: [], deny: [], ask: [] }
-  for (const line of text.split('\n')) {
-    const trimmed = line.trim()
-    if (!trimmed) continue
-    const match = trimmed.match(/^(allow|deny|ask):\s*(.+)$/i)
-    if (!match) continue
-    const group = (match[1] ?? '').toLowerCase() as RuleGroup
-    const rule = (match[2] ?? '').trim()
-    if (rule) out[group].push(rule)
-  }
-  return out
-}
-
-function rulesToRawText(rules: Record<RuleGroup, string[]>): string {
-  return RULE_GROUPS
-    .flatMap(({ key }) => rules[key].map((r) => `${key}: ${r}`))
-    .join('\n')
-}
-
-// ── Visual primitives ──────────────────────────────────────────────────
-
-function CountChip({ count, accent }: { count: number; accent: string }) {
+function CountChip({ count }: { count: number }) {
   return (
-    <span
-      className={`inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold tabular-nums ring-1 ring-inset ${accent}`}
-    >
+    <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-muted px-1.5 text-[10px] font-semibold tabular-nums text-muted-foreground ring-1 ring-inset ring-border">
       {count}
     </span>
   )
 }
 
-function GroupIcon({ group }: { group: RuleGroup }) {
-  const stroke = group === 'allow'
-    ? 'text-success'
-    : group === 'deny'
-      ? 'text-destructive'
-      : 'text-warning'
-  return (
-    <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 ${stroke}`} aria-hidden="true">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
-        {group === 'allow' && <path d="M5 12l5 5L20 7" strokeLinecap="round" strokeLinejoin="round" />}
-        {group === 'deny' && (
-          <>
-            <circle cx="12" cy="12" r="9" />
-            <path d="M5.5 5.5l13 13" strokeLinecap="round" />
-          </>
-        )}
-        {group === 'ask' && (
-          <>
-            <circle cx="12" cy="12" r="9" />
-            <path d="M9.5 9.5a2.5 2.5 0 015 0c0 1.5-2.5 2-2.5 3.5" strokeLinecap="round" />
-            <circle cx="12" cy="17" r="0.5" fill="currentColor" />
-          </>
-        )}
-      </svg>
-    </div>
-  )
-}
-
-// ── Main component ─────────────────────────────────────────────────────
-
-export function PermissionsList({ profileName, agentType }: { profileName: string; agentType?: AgentType }) {
+function RuleGroupsBlock({
+  block,
+  doc,
+  configKey,
+  configKeyIsField,
+  onFieldChange,
+}: {
+  block: PermissionBlock
+  doc: Record<string, unknown>
+  configKey: string
+  configKeyIsField: boolean
+  onFieldChange: (path: string, value: unknown) => void
+}) {
   const { t } = useTranslation()
-  const configDir = useProfileConfigDir(profileName)
-  // File name from the backend registry (resources.permissions.config_file).
-  const { agentConfigs } = useAgentConfigs()
-  const configFile = agentType ? agentConfigs?.[agentType]?.resources?.permissions?.config_file : undefined
-  const path = configDir === null || !configFile ? null : `${configDir}/${configFile}`
-  const [content, setContent] = useState('{}')
-  const [refreshKey, setRefreshKey] = useState(0)
-  const initial = useMemo(() => parse(content), [content])
-
-  const [allow, setAllow] = useState<string[]>(initial.allow ?? [])
-  const [deny, setDeny] = useState<string[]>(initial.deny ?? [])
-  const [ask, setAsk] = useState<string[]>(initial.ask ?? [])
-  const [defaultMode, setDefaultMode] = useState<string>(initial.defaultMode ?? 'default')
-
-  const [rawOpen, setRawOpen] = useState(false)
-  const [rawText, setRawText] = useState(() => rulesToRawText({ allow, deny, ask }))
-
-  const [saving, setSaving] = useState(false)
-  const [pendingRemove, setPendingRemove] = useState<{ group: RuleGroup; rule: string } | null>(null)
-  const { toast } = useToast()
-
-  // Self-fetch settings.json → permissions for the profile.
-  useEffect(() => {
-    if (!path) return
-    let cancelled = false
-    readFile(path)
-      .then((raw) => { if (!cancelled) setContent(raw) })
-      .catch(() => { if (!cancelled) setContent('{}') })
-    return () => { cancelled = true }
-  }, [path, refreshKey])
-
-  // Re-sync from content when it changes externally (e.g. onRefresh invalidation).
-  useEffect(() => {
-    setAllow(initial.allow ?? [])
-    setDeny(initial.deny ?? [])
-    setAsk(initial.ask ?? [])
-    setDefaultMode(initial.defaultMode ?? 'default')
-  }, [initial.allow, initial.deny, initial.ask, initial.defaultMode])
-
-  // Keep raw text mirrored with structured state on initial load and structural changes.
-  useEffect(() => {
-    setRawText(rulesToRawText({ allow, deny, ask }))
-  }, [allow, deny, ask])
-
-  const ruleGroups = useMemo<Record<RuleGroup, string[]>>(
-    () => ({ allow, deny, ask }),
-    [allow, deny, ask],
-  )
-
-  const setRuleGroup = useCallback((group: RuleGroup, next: string[]) => {
-    if (group === 'allow') setAllow(next)
-    else if (group === 'deny') setDeny(next)
-    else setAsk(next)
-  }, [])
+  const [pendingRemove, setPendingRemove] = useState<{ group: string; rule: string } | null>(null)
+  const ruleFormat = block.rule_format ?? ''
+  const suggestedTools = block.suggested_tools ?? []
 
   const confirmRemove = useCallback(() => {
     if (!pendingRemove) return
-    const { group, rule } = pendingRemove
-    setRuleGroup(group, ruleGroups[group].filter((r) => r !== rule))
-    setPendingRemove(null)
-  }, [pendingRemove, ruleGroups, setRuleGroup])
-
-  const closeRawPanel = useCallback(() => {
-    const parsed = parseRawRules(rawText)
-    setAllow(parsed.allow ?? [])
-    setDeny(parsed.deny ?? [])
-    setAsk(parsed.ask ?? [])
-    setRawOpen(false)
-  }, [rawText])
-
-  const toggleRaw = useCallback(() => {
-    if (rawOpen) closeRawPanel()
-    else setRawOpen(true)
-  }, [rawOpen, closeRawPanel])
-
-  const handleSave = useCallback(async () => {
-    if (!path) return
-    setSaving(true)
-    try {
-      await patchJsonFile(path, 'permissions', { allow, deny, ask, defaultMode })
-      setRefreshKey((k) => k + 1)
-      toast({ type: 'success', message: t('permissions.toast.saved') })
-    } catch (error) {
-      toast({ type: 'error', message: error instanceof Error ? error.message : t('permissions.toast.failed') })
-    } finally {
-      setSaving(false)
+    const path = blockFieldPath(doc, configKey, pendingRemove.group, configKeyIsField)
+    const rules = getFieldAt(doc, path)
+    if (Array.isArray(rules)) {
+      onFieldChange(path, rules.filter((rule) => rule !== pendingRemove.rule))
     }
-  }, [path, allow, deny, ask, defaultMode, toast])
-
-  const totalRules = allow.length + deny.length + ask.length
+    setPendingRemove(null)
+  }, [pendingRemove, doc, configKey, configKeyIsField, onFieldChange])
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>
-          {t('permissions.title')}{' '}
-          <span className="text-muted-foreground font-normal">{t('permissions.rulesCount', { count: totalRules })}</span>
-        </CardTitle>
-        <p className="text-sm text-muted-foreground">
-          {t('permissions.subtitle')}
-        </p>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {totalRules === 0 && (
-          <p className="text-sm text-muted-foreground">
-            {t('permissions.noRules')}
-          </p>
-        )}
-
-        {RULE_GROUPS.map(({ key, labelKey, descriptionKey, accent }) => (
-          <RuleGroupCard
-            key={key}
-            group={key}
-            label={t(labelKey)}
-            description={t(descriptionKey)}
-            accent={accent}
-            rules={ruleGroups[key]}
-            onAdd={(tool, pattern) => {
-              const next = [...ruleGroups[key], joinRule(tool, pattern)]
-              setRuleGroup(key, next)
-            }}
-            onRemove={(rule) => setPendingRemove({ group: key, rule })}
-          />
-        ))}
-
-        <DefaultModeCard value={defaultMode} onChange={setDefaultMode} />
-
-        <RawEditorPanel
-          open={rawOpen}
-          text={rawText}
-          onTextChange={setRawText}
-          onToggle={toggleRaw}
-        />
-
-        <div className="flex items-center justify-end gap-2 pt-2">
-          <Button onClick={handleSave} disabled={saving}>
-            {saving ? t('common.saving') : t('permissions.save')}
-          </Button>
-        </div>
-      </CardContent>
-
+    <>
+      <div className="space-y-4">
+        {(block.groups ?? []).map((group) => {
+          const path = blockFieldPath(doc, configKey, group, configKeyIsField)
+          const rules = Array.isArray(getFieldAt(doc, path)) ? (getFieldAt(doc, path) as string[]) : []
+          return (
+            <RuleGroupCard
+              key={group}
+              group={group}
+              ruleFormat={ruleFormat}
+              suggestedTools={suggestedTools}
+              rules={rules}
+              onAdd={(tool, pattern) => onFieldChange(path, [...rules, joinRule(tool, pattern, ruleFormat)])}
+              onRemove={(rule) => setPendingRemove({ group, rule })}
+            />
+          )
+        })}
+      </div>
       <ConfirmDialog
         open={pendingRemove != null}
         title={t('permissions.confirmRemoveTitle')}
-        description={pendingRemove ? t('permissions.confirmRemoveDesc', {
-          rule: pendingRemove.rule,
-          group: t(RULE_GROUPS.find((g) => g.key === pendingRemove.group)?.labelKey ?? 'permissions.group.allow'),
-        }) : undefined}
+        description={pendingRemove
+          ? t('permissions.confirmRemoveDesc', { rule: pendingRemove.rule, group: pendingRemove.group })
+          : undefined}
         confirmLabel={t('common.remove')}
         onConfirm={confirmRemove}
         onCancel={() => setPendingRemove(null)}
       />
-    </Card>
+    </>
   )
 }
 
-// ── Sub-components ─────────────────────────────────────────────────────
-
-interface RuleGroupCardProps {
-  group: RuleGroup
-  label: string
-  description: string
-  accent: string
+function RuleGroupCard({
+  group,
+  ruleFormat,
+  suggestedTools,
+  rules,
+  onAdd,
+  onRemove,
+}: {
+  group: string
+  ruleFormat: string
+  suggestedTools: string[]
   rules: string[]
   onAdd: (tool: string, pattern: string) => void
   onRemove: (rule: string) => void
-}
-
-function RuleGroupCard({ group, label, description, accent, rules, onAdd, onRemove }: RuleGroupCardProps) {
+}) {
   const { t } = useTranslation()
   const [adding, setAdding] = useState(false)
   const [tool, setTool] = useState('')
@@ -329,13 +143,20 @@ function RuleGroupCard({ group, label, description, accent, rules, onAdd, onRemo
   return (
     <Card elevation="flat" className="ring-1 ring-border/60">
       <div className="flex items-start gap-3 p-4">
-        <GroupIcon group={group} />
+        <div
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 font-mono text-sm font-semibold uppercase text-primary"
+          aria-hidden="true"
+        >
+          {group.slice(0, 1)}
+        </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h4 className="font-medium text-foreground">{label}</h4>
-            <CountChip count={rules.length} accent={accent} />
+            <h4 className="font-mono font-medium text-foreground">{group}</h4>
+            <CountChip count={rules.length} />
           </div>
-          <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {t('permissions.groupRulesHint')}
+          </p>
         </div>
         {!adding && (
           <Button variant="ghost" size="sm" onClick={() => setAdding(true)}>
@@ -347,14 +168,14 @@ function RuleGroupCard({ group, label, description, accent, rules, onAdd, onRemo
       {rules.length > 0 && (
         <ul className="divide-y divide-border/40 border-t border-border/60">
           {rules.map((rule) => (
-            <RuleRow key={rule} rule={rule} onRemove={() => onRemove(rule)} />
+            <RuleRow key={rule} rule={rule} ruleFormat={ruleFormat} onRemove={() => onRemove(rule)} />
           ))}
         </ul>
       )}
 
       {rules.length === 0 && !adding && (
         <p className="border-t border-border/60 px-4 py-3 text-xs text-muted-foreground">
-          {t('permissions.noGroupRules', { group: label })}
+          {t('permissions.noGroupRules', { group })}
         </p>
       )}
 
@@ -371,7 +192,7 @@ function RuleGroupCard({ group, label, description, accent, rules, onAdd, onRemo
               className="w-40 font-mono"
             />
             <datalist id={`${group}-tools`}>
-              {COMMON_TOOLS.map((t) => <option key={t} value={t} />)}
+              {suggestedTools.map((suggested) => <option key={suggested} value={suggested} />)}
             </datalist>
             <span className="font-mono text-sm text-muted-foreground">(</span>
             <Input
@@ -402,9 +223,9 @@ function RuleGroupCard({ group, label, description, accent, rules, onAdd, onRemo
   )
 }
 
-function RuleRow({ rule, onRemove }: { rule: string; onRemove: () => void }) {
+function RuleRow({ rule, ruleFormat, onRemove }: { rule: string; ruleFormat: string; onRemove: () => void }) {
   const { t } = useTranslation()
-  const { tool, pattern } = splitRule(rule)
+  const { tool, pattern } = splitRule(rule, ruleFormat)
   return (
     <li className="group flex items-center gap-3 px-4 py-2 transition-colors hover:bg-muted/40">
       <div className="min-w-0 flex-1">
@@ -437,50 +258,210 @@ function RuleRow({ rule, onRemove }: { rule: string; onRemove: () => void }) {
   )
 }
 
-function DefaultModeCard({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function SelectBlock({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string
+  options: string[]
+  value: unknown
+  onChange: (value: string) => void
+}) {
   const { t } = useTranslation()
-  const isKnown = DEFAULT_MODES.includes(value as typeof DEFAULT_MODES[number])
+  const current = typeof value === 'string' ? value : ''
+  const isKnown = options.includes(current)
   return (
     <Card elevation="flat" className="ring-1 ring-border/60">
       <div className="flex items-start gap-3 p-4">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
-            <circle cx="12" cy="12" r="3" />
-            <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z" />
+            <path d="M4 6h16M4 12h16M4 18h16" strokeLinecap="round" />
           </svg>
         </div>
         <div className="min-w-0 flex-1">
-          <h4 className="font-medium text-foreground">defaultMode</h4>
+          <h4 className="font-mono font-medium text-foreground">{label}</h4>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            {t('permissions.defaultModeDesc')}
+            {t('permissions.selectFieldDesc')}
           </p>
         </div>
         <select
-          aria-label="defaultMode"
-          value={value}
+          aria-label={label}
+          value={current}
           onChange={(e) => onChange(e.target.value)}
           className="h-9 rounded-md border border-border bg-input px-3 text-sm text-foreground focus:outline-none focus:border-foreground/30 hover:border-foreground/20"
         >
-          {DEFAULT_MODES.map((mode) => (
-            <option key={mode} value={mode}>{mode}</option>
+          {options.map((option) => (
+            <option key={option} value={option}>{option}</option>
           ))}
-          {!isKnown && <option value={value}>{t('permissions.customMode', { value })}</option>}
+          {!isKnown && current !== '' && (
+            <option value={current}>{t('permissions.customValue', { value: current })}</option>
+          )}
         </select>
       </div>
     </Card>
   )
 }
 
-function RawEditorPanel({
+function ToggleListBlock({
+  label,
+  items,
+  value,
+  onChange,
+}: {
+  label: string
+  items: string[]
+  value: unknown
+  onChange: (value: string[]) => void
+}) {
+  const { t } = useTranslation()
+  const enabled = Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : []
+  const toggle = (item: string) => {
+    onChange(enabled.includes(item) ? enabled.filter((entry) => entry !== item) : [...enabled, item])
+  }
+  return (
+    <Card elevation="flat" className="ring-1 ring-border/60">
+      <div className="flex items-start gap-3 p-4 pb-2">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
+            <rect x="2" y="6" width="14" height="12" rx="6" />
+            <circle cx="16" cy="12" r="6" />
+          </svg>
+        </div>
+        <div className="min-w-0 flex-1">
+          <h4 className="font-mono font-medium text-foreground">{label}</h4>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {t('permissions.toggleListDesc')}
+          </p>
+        </div>
+      </div>
+      <ul className="divide-y divide-border/40 border-t border-border/60">
+        {items.map((item) => {
+          const checked = enabled.includes(item)
+          return (
+            <li key={item}>
+              <label className="flex cursor-pointer items-center gap-3 px-4 py-2.5 transition-colors hover:bg-muted/40">
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => toggle(item)}
+                  className="h-4 w-4 rounded border-border accent-primary"
+                />
+                <code className="min-w-0 flex-1 break-all font-mono text-xs text-foreground/90">{item}</code>
+                <span
+                  className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset ${
+                    checked
+                      ? 'bg-success-subtle text-success ring-success/20'
+                      : 'bg-muted text-muted-foreground ring-border'
+                  }`}
+                >
+                  {checked ? t('common.enabled') : t('common.disabled')}
+                </span>
+              </label>
+            </li>
+          )
+        })}
+      </ul>
+    </Card>
+  )
+}
+
+function ToolMatrixBlock({
+  label,
+  tools,
+  values,
+  value,
+  onChange,
+}: {
+  label: string
+  tools: string[]
+  values: string[]
+  value: unknown
+  onChange: (value: Record<string, string>) => void
+}) {
+  const { t } = useTranslation()
+  const matrix = value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, string>)
+    : {}
+  return (
+    <Card elevation="flat" className="ring-1 ring-border/60">
+      <div className="flex items-start gap-3 p-4 pb-2">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
+            <rect x="3" y="3" width="7" height="7" rx="1" />
+            <rect x="14" y="3" width="7" height="7" rx="1" />
+            <rect x="3" y="14" width="7" height="7" rx="1" />
+            <rect x="14" y="14" width="7" height="7" rx="1" />
+          </svg>
+        </div>
+        <div className="min-w-0 flex-1">
+          <h4 className="font-mono font-medium text-foreground">{label}</h4>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {t('permissions.toolMatrixDesc')}
+          </p>
+        </div>
+      </div>
+      <div className="overflow-x-auto border-t border-border/60">
+        <table className="w-full text-left text-sm">
+          <thead>
+            <tr className="border-b border-border/40 bg-muted/30 text-xs uppercase tracking-wider text-muted-foreground">
+              <th className="px-4 py-2 font-semibold">{t('permissions.toolColumn')}</th>
+              {values.map((entry) => (
+                <th key={entry} className="px-4 py-2 text-center font-semibold">{entry}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border/40">
+            {tools.map((tool) => {
+              const current = matrix[tool]
+              return (
+                <tr key={tool} className="transition-colors hover:bg-muted/30">
+                  <td className="px-4 py-2 font-mono text-xs text-foreground/90">{tool}</td>
+                  {values.map((entry) => {
+                    const active = current === entry
+                    return (
+                      <td key={entry} className="px-4 py-2 text-center">
+                        <button
+                          type="button"
+                          aria-label={`${tool}: ${entry}`}
+                          aria-pressed={active}
+                          onClick={() => onChange({ ...matrix, [tool]: entry })}
+                          className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs transition-colors ${
+                            active
+                              ? 'bg-primary text-primary-foreground'
+                              : 'text-muted-foreground hover:bg-muted'
+                          }`}
+                        >
+                          {active ? '✓' : ''}
+                        </button>
+                      </td>
+                    )
+                  })}
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  )
+}
+
+function RawEditorBlock({
+  label,
+  language,
   open,
   text,
-  onTextChange,
   onToggle,
+  onTextChange,
 }: {
+  label: string
+  language: 'json' | 'yaml' | 'toml'
   open: boolean
   text: string
-  onTextChange: (next: string) => void
   onToggle: () => void
+  onTextChange: (value: string) => void
 }) {
   const { t } = useTranslation()
   return (
@@ -498,11 +479,9 @@ function RawEditorPanel({
             </svg>
           </div>
           <div>
-            <h4 className="text-sm font-medium text-foreground">{t('permissions.editRaw')}</h4>
+            <h4 className="text-sm font-medium text-foreground">{label}</h4>
             <p className="text-xs text-muted-foreground">
-              {t('permissions.editRawDescPrefix')}{' '}
-              <code className="font-mono">group: tool(pattern)</code>{' '}
-              {t('permissions.editRawDescSuffix')}
+              {t('permissions.editRawDescFull')}
             </p>
           </div>
         </div>
@@ -518,19 +497,246 @@ function RawEditorPanel({
         </svg>
       </button>
       {open && (
-        <div className="space-y-2 border-t border-border/60 px-4 py-3">
-          <p className="text-xs text-muted-foreground">
-            {t('permissions.editRawHint')}
-          </p>
-          <textarea
-            value={text}
-            onChange={(e) => onTextChange(e.target.value)}
-            rows={10}
-            className="w-full rounded-md border border-border bg-input p-3 text-sm font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/30"
-            placeholder={t('permissions.rawPlaceholder')}
-          />
+        <div className="border-t border-border/60 px-4 py-3">
+          <div className="overflow-hidden rounded-md ring-1 ring-border/60">
+            <CodeEditor
+              language={language}
+              value={text}
+              onChange={onTextChange}
+              height={320}
+              ariaLabel={label}
+            />
+          </div>
         </div>
       )}
+    </Card>
+  )
+}
+
+// ── Main component ─────────────────────────────────────────────────────
+
+export function PermissionsList({ profileName, agentType }: { profileName: string; agentType?: AgentType }) {
+  const { t } = useTranslation()
+  const configDir = useProfileConfigDir(profileName)
+  // Resource metadata (config_file / config_key / blocks) from the backend
+  // registry — the frontend hardcodes no agent permission schema.
+  const { agentConfigs } = useAgentConfigs()
+  const permRes = agentType
+    ? (agentConfigs?.[agentType]?.resources?.permissions as PermissionsResource | undefined)
+    : undefined
+  const configFile = permRes?.config_file
+  const configKey = permRes?.config_key ?? ''
+  const blocks = permRes?.blocks ?? []
+  const format = inferFormat(configFile)
+  const language = editorLanguage(format)
+  const configKeyIsField = blocks.some((block) => block.field !== undefined && block.field === configKey)
+  const hasRawEditor = blocks.some((block) => block.type === 'raw_editor')
+  const path = configDir === null || !configFile ? null : `${configDir}/${configFile}`
+
+  const [rawText, setRawText] = useState('')
+  const [doc, setDoc] = useState<Record<string, unknown>>({})
+  const [parseFailed, setParseFailed] = useState(false)
+  const [rawDirty, setRawDirty] = useState(false)
+  const [rawOpen, setRawOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
+  const { toast } = useToast()
+
+  // Self-fetch the permission config for the profile.
+  useEffect(() => {
+    if (!path) return
+    let cancelled = false
+    readFile(path)
+      .then((raw) => {
+        if (cancelled) return
+        const parsed = parseConfig(raw, format)
+        setRawText(raw)
+        setRawDirty(false)
+        setRawOpen(false)
+        setParseFailed(parsed === null)
+        setDoc(parsed ?? {})
+      })
+      .catch(() => {
+        if (cancelled) return
+        setRawText('')
+        setRawDirty(false)
+        setRawOpen(false)
+        setParseFailed(false)
+        setDoc({})
+      })
+    return () => { cancelled = true }
+  }, [path, format, refreshKey])
+
+  const updateField = useCallback((fieldPath: string, value: unknown) => {
+    setDoc((current) => {
+      const next = structuredClone(current)
+      setFieldAt(next, fieldPath, value)
+      return next
+    })
+  }, [])
+
+  const toggleRaw = useCallback(() => {
+    if (rawOpen) {
+      // Commit raw text back into the structured doc; invalid text stays
+      // in the editor so nothing is lost.
+      const parsed = parseConfig(rawText, format)
+      if (parsed === null) {
+        toast({ type: 'error', message: t('permissions.toast.invalidRaw') })
+        return
+      }
+      setDoc(parsed)
+      setParseFailed(false)
+      setRawDirty(false)
+      setRawOpen(false)
+    } else {
+      // Keep the original text when parsing failed — never overwrite it
+      // with an empty structured draft.
+      if (!rawDirty && !parseFailed) setRawText(stringifyConfig(doc, format))
+      setRawOpen(true)
+    }
+  }, [rawOpen, rawText, format, doc, rawDirty, parseFailed, toast])
+
+  const handleSave = useCallback(async () => {
+    if (!path) return
+    setSaving(true)
+    try {
+      const next = rawDirty ? rawText : stringifyConfig(doc, format)
+      const ok = await saveFile(path, next)
+      if (!ok) throw new Error(t('permissions.toast.failed'))
+      setRefreshKey((k) => k + 1)
+      toast({ type: 'success', message: t('permissions.toast.saved') })
+    } catch (error) {
+      toast({ type: 'error', message: error instanceof Error ? error.message : t('permissions.toast.failed') })
+    } finally {
+      setSaving(false)
+    }
+  }, [path, rawDirty, rawText, doc, format, toast])
+
+  // Rule count for the header — only meaningful when a rule_groups block exists.
+  const ruleCount = useMemo(() => {
+    let total = 0
+    for (const block of blocks) {
+      if (block.type !== 'rule_groups') continue
+      for (const group of block.groups ?? []) {
+        const rules = getFieldAt(doc, blockFieldPath(doc, configKey, group, configKeyIsField))
+        if (Array.isArray(rules)) total += rules.length
+      }
+    }
+    return total
+  }, [blocks, doc, configKey, configKeyIsField])
+  const showRulesCount = blocks.some((block) => block.type === 'rule_groups')
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>
+          {t('permissions.title')}
+          {showRulesCount && (
+            <span className="text-muted-foreground font-normal">
+              {' '}{t('permissions.rulesCount', { count: ruleCount })}
+            </span>
+          )}
+        </CardTitle>
+        <p className="text-sm text-muted-foreground">
+          {t('permissions.subtitle')}
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {!path ? (
+          <p className="text-sm text-muted-foreground">
+            {t('permissions.noConfig')}
+          </p>
+        ) : parseFailed ? (
+          <>
+            <div className="rounded-lg bg-warning-subtle p-4 text-sm text-foreground ring-1 ring-warning/20">
+              {t('permissions.parseError', { file: configFile ?? '', format })}
+            </div>
+            {hasRawEditor && (
+              <RawEditorBlock
+                label={blocks.find((block) => block.type === 'raw_editor')?.label ?? t('permissions.editRaw')}
+                language={language}
+                open={rawOpen}
+                text={rawText}
+                onToggle={toggleRaw}
+                onTextChange={(value) => { setRawText(value); setRawDirty(true) }}
+              />
+            )}
+          </>
+        ) : blocks.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            {t('permissions.noBlocks')}
+          </p>
+        ) : (
+          blocks.map((block, index) => {
+            if (block.type === 'rule_groups') {
+              return (
+                <RuleGroupsBlock
+                  key={index}
+                  block={block}
+                  doc={doc}
+                  configKey={configKey}
+                  configKeyIsField={configKeyIsField}
+                  onFieldChange={updateField}
+                />
+              )
+            }
+            if (block.type === 'select') {
+              const fieldPath = blockFieldPath(doc, configKey, block.field, configKeyIsField)
+              return (
+                <SelectBlock
+                  key={index}
+                  label={block.field ?? configKey}
+                  options={block.options ?? []}
+                  value={getFieldAt(doc, fieldPath)}
+                  onChange={(value) => updateField(fieldPath, value)}
+                />
+              )
+            }
+            if (block.type === 'toggle_list') {
+              const fieldPath = blockFieldPath(doc, configKey, block.field, configKeyIsField)
+              return (
+                <ToggleListBlock
+                  key={index}
+                  label={block.field ?? configKey}
+                  items={block.items ?? []}
+                  value={getFieldAt(doc, fieldPath)}
+                  onChange={(value) => updateField(fieldPath, value)}
+                />
+              )
+            }
+            if (block.type === 'tool_matrix') {
+              return (
+                <ToolMatrixBlock
+                  key={index}
+                  label={configKey}
+                  tools={block.tools ?? []}
+                  values={block.values ?? []}
+                  value={getFieldAt(doc, configKey)}
+                  onChange={(value) => updateField(configKey, value)}
+                />
+              )
+            }
+            // raw_editor — whole-file Monaco editor
+            return (
+              <RawEditorBlock
+                key={index}
+                label={block.label ?? t('permissions.editRaw')}
+                language={language}
+                open={rawOpen}
+                text={rawText}
+                onToggle={toggleRaw}
+                onTextChange={(value) => { setRawText(value); setRawDirty(true) }}
+              />
+            )
+          })
+        )}
+
+        <div className="flex items-center justify-end gap-2 pt-2">
+          <Button onClick={handleSave} disabled={saving || !path || (parseFailed && !rawDirty)}>
+            {saving ? t('common.saving') : t('permissions.save')}
+          </Button>
+        </div>
+      </CardContent>
     </Card>
   )
 }
