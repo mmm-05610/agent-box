@@ -58,7 +58,7 @@ const RESOURCE_LABELS: Record<string, string> = {
 /** The prompt resource edits the per-agent prompt file, which the old
  *  detail page exposed under per-agent tab labels. Keep those labels
  *  (filenames — identical in both language packs). */
-const PROMPT_TAB_LABELS: Record<AgentType, string> = {
+const PROMPT_TAB_LABELS: Record<string, string> = {
   claude: 'tab.prompt.claude',
   codex: 'tab.prompt.codex',
   hermes: 'tab.prompt.hermes',

@@ -35,8 +35,8 @@ const FETCHERS: Record<LibraryKey, (agentType: AgentType) => Promise<unknown>> =
 // Keyed by (agentType, slice). A slice is fetched at most once per agent
 // type until invalidated — every List on every page shares this store.
 
-const cache: Partial<Record<AgentType, Partial<Record<LibraryKey, unknown>>>> = {}
-const inflight: Partial<Record<AgentType, Partial<Record<LibraryKey, Promise<unknown>>>>> = {}
+const cache: Partial<Record<string, Partial<Record<LibraryKey, unknown>>>> = {}
+const inflight: Partial<Record<string, Partial<Record<LibraryKey, Promise<unknown>>>>> = {}
 
 function loadSlice(agentType: AgentType, key: LibraryKey): Promise<unknown> {
   const cached = cache[agentType]?.[key]
@@ -74,8 +74,8 @@ function invalidate(agentType: AgentType, key: LibraryKey): void {
 
 /** Clear the global library cache (tests, or after the user edits the ACS). */
 export function resetLibraryCache(): void {
-  for (const agentType of Object.keys(cache) as AgentType[]) delete cache[agentType]
-  for (const agentType of Object.keys(inflight) as AgentType[]) delete inflight[agentType]
+  for (const agentType of Object.keys(cache) as string[]) delete cache[agentType]
+  for (const agentType of Object.keys(inflight) as string[]) delete inflight[agentType]
 }
 
 // ── Hook ──────────────────────────────────────────────────────────────

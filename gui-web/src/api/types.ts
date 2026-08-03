@@ -103,11 +103,9 @@ export interface Profile {
   createdAt?: number
 }
 
-export type AgentType = 'claude' | 'codex' | 'hermes' | 'opencode'
+/** Agent type id — fully dynamic; the backend registry is the source of truth. */
+export type AgentType = string
 
-export const AGENT_TYPES: AgentType[] = ['claude', 'codex', 'hermes', 'opencode']
-
-export type AgentFeature = 'permissions' | 'plugins' | 'rules' | 'memories' | 'instructions'
 export type ProviderApplyMode = 'overwrite' | 'additive'
 
 /** Resource capability block — key = supported resource type. */
@@ -162,13 +160,6 @@ export interface AgentTypeConfig {
   }
   presets?: Record<string, unknown>
   [key: string]: unknown
-}
-
-export const AGENT_TYPE_COLORS: Record<AgentType, string> = {
-  claude: 'warning',    // orange
-  codex: 'success',     // green
-  hermes: 'info',       // blue
-  opencode: 'primary',  // neutral
 }
 
 // ── Session ────────────────────────────────────────────────────────────

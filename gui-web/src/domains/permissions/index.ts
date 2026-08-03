@@ -4,6 +4,5 @@ import { PermissionsList } from './List'
 export const permissionsResource: ResourceDef = {
   key: 'permissions',
   labelKey: 'tab.permissions',
-  feature: 'permissions',
   List: PermissionsList,
 }

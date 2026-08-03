@@ -1,5 +1,4 @@
 import type { ComponentType } from 'react'
-import type { AgentFeature } from '@/api'
 
 import { providerResource } from './provider'
 import { mcpResource } from './mcp'
@@ -17,8 +16,6 @@ export interface ResourceDef {
   labelKey: string          // i18n key (literal for now)
   List: ComponentType<any>      // list component (tab body)
   Editor?: ComponentType<any>   // edit component
-  /** Agent-specific resource — only shown when the agent's features include it. */
-  feature?: AgentFeature
 }
 
 export const RESOURCES = {

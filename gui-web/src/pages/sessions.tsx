@@ -14,8 +14,8 @@ import { PageHeader } from '@/components/layout'
 import { useSessions } from '@/hooks'
 import { cn, formatRelativeTime } from '@/lib/utils'
 import { cleanupSessions } from '@/api'
-import type { Session, SessionStatus, AgentType } from '@/api'
-import { AGENT_TYPE_COLORS } from '@/api'
+import type { Session, SessionStatus } from '@/api'
+import { agentTypeColor } from '@/config'
 import claudeLogo from '@/icons/extracted/claude.svg'
 import codexLogo from '@/icons/extracted/openai.svg'
 import hermesLogo from '@/icons/extracted/hermes.png'
@@ -27,7 +27,7 @@ type FilterTab = 'all' | SessionStatus
 
 // ── Agent type constants ────────────────────────────────────────────────
 
-const AGENT_TYPE_LOGOS: Record<AgentType, string> = {
+const AGENT_TYPE_LOGOS: Record<string, string> = {
   claude: claudeLogo,
   codex: codexLogo,
   hermes: hermesLogo,
@@ -243,15 +243,7 @@ function SessionCard({ session }: { session: Session }) {
               {profile}
             </h3>
             <Badge
-              variant={
-                AGENT_TYPE_COLORS[agentType] as
-                  | 'neutral'
-                  | 'primary'
-                  | 'success'
-                  | 'warning'
-                  | 'destructive'
-                  | 'info'
-              }
+              variant={agentTypeColor(agentType)}
             >
               {agentType}
             </Badge>

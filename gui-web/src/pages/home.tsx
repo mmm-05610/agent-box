@@ -37,7 +37,7 @@ interface StatTile {
   accent: 'accent' | 'success' | 'info' | 'warning'
 }
 
-const AGENT_TYPE_LOGOS: Record<AgentType, string> = {
+const AGENT_TYPE_LOGOS: Record<string, string> = {
   claude: claudeLogo,
   codex: codexLogo,
   hermes: hermesLogo,
