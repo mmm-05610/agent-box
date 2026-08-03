@@ -18,6 +18,7 @@ import {
   applyProvider, removeProfileProvider,
 } from '@/api/providers'
 import { readFile, saveFile } from '@/api/files'
+import { fetchProfileDetail } from '@/api'
 import { ProviderIcon } from '@/components/ProviderIcon'
 import { hasIcon } from '@/icons/extracted'
 import { useAgentConfigs, useLibrary, useProfileResources } from '@/hooks'
@@ -81,6 +82,21 @@ export function ProviderList({ agentType, profileName }: ProviderListProps) {
   const { providers: libraryProviders } = useLibrary(agentType, ['providers'])
   const [applyingId, setApplyingId] = useState<string | null>(null)
   const [activeProviderId, setActiveProviderId] = useState<string | null>(null)
+  // Last-applied provider ref (backend profile meta) — the "active" signal
+  // for additive strategies that have no in-config marker (e.g. opencode's
+  // jsonc_provider), mirroring hermes' model.provider.
+  const [profileProviderRef, setProfileProviderRef] = useState<string | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    void fetchProfileDetail(profileName)
+      .then((d) => {
+        if (cancelled) return
+        const ref = (d as Record<string, unknown> | null)?.provider
+        setProfileProviderRef(typeof ref === 'string' && ref ? ref : null)
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [profileName])
 
 
   // Profile-local providers (additive mode) + config dir (from the object hook)
@@ -205,10 +221,16 @@ export function ProviderList({ agentType, profileName }: ProviderListProps) {
       {/* ── Added Providers (additive only) ────────────────────────── */}
       {isAdditive && profileProviders.length > 0 && (() => {
         const configYaml = configFiles.find(f => f.label === (providerResource?.config_file as string))?.content ?? ''
+        // Active provider: yaml_custom_providers reads the in-config marker
+        // (model.provider); jsonc_provider (opencode) has no marker — use the
+        // last-applied provider ref from the backend profile meta.
         const activeProvider = providerResource?.strategy === 'yaml_custom_providers'
           ? parseActiveProvider(configYaml, providerResource?.model_section as string | undefined, providerResource?.active_key as string | undefined)
-          : null
+          : providerResource?.strategy === 'jsonc_provider'
+            ? profileProviderRef
+            : null
         const hasActive = providerResource?.strategy === 'yaml_custom_providers'
+          || providerResource?.strategy === 'jsonc_provider'
         const isActive = (id: string) => activeProvider === id
 
         return (
