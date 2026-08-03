@@ -17,6 +17,22 @@ export interface AgentConfig {
   tabs: string[]
 }
 
+/** Badge accent used to display an agent type (unknown → neutral). */
+export type AgentColor = 'neutral' | 'primary' | 'success' | 'warning' | 'destructive' | 'info'
+
+/** Agent badge colors — pure presentation, with unknown-agent fallback. */
+export const AGENT_TYPE_COLORS: Record<string, AgentColor> = {
+  claude: 'warning',    // orange
+  codex: 'success',     // green
+  hermes: 'info',       // blue
+  opencode: 'primary',  // neutral
+}
+
+/** Badge color for an agent type; unknown types fall back to neutral. */
+export function agentTypeColor(agentType: string): AgentColor {
+  return AGENT_TYPE_COLORS[agentType] ?? 'neutral'
+}
+
 export const AGENT_CONFIG: Record<AgentType, AgentConfig> = {
   claude: {
     id: 'claude',

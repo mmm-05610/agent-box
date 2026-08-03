@@ -3,6 +3,7 @@
  */
 
 export { useLibrary } from './useLibrary'
+export { useAgentConfigs, resetAgentConfigsCache } from './useAgentConfigs'
 export { useProfileResources } from './useProfileResources'
 export { useProfileContext } from './useProfileContext'
 export { useProfiles } from './use-profiles'
