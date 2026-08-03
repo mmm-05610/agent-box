@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils'
 import { browseDir } from '@/api'
 import { readSettings, writeSettings, type Theme } from '@/lib/settings'
 import { LANG_KEY, readStoredLanguage, type UILanguage } from '@/i18n'
+import { useVersion } from '@/hooks'
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
@@ -71,6 +72,7 @@ const themeOptions: {
 
 export function SettingsPage() {
   const { t, i18n } = useTranslation()
+  const version = useVersion()
   const { toast } = useToast()
   const [theme, setTheme] = useState<Theme>(() => readSettings().theme)
   const [language, setLanguage] = useState<UILanguage>(() => readStoredLanguage())
@@ -120,8 +122,12 @@ export function SettingsPage() {
         title={t('settings.title')}
         stats={
           <>
-            <span className="font-mono">v0.5.0</span>
-            <span className="mx-2 text-border">·</span>
+            {version && (
+              <>
+                <span className="font-mono">{`v${version}`}</span>
+                <span className="mx-2 text-border">·</span>
+              </>
+            )}
             <span>{t('settings.stats.pathSaved')}</span>
             <span className="mx-2 text-border">·</span>
             <span>{t('settings.stats.lastBuild')}</span>
@@ -274,7 +280,7 @@ export function SettingsPage() {
               <h3 className="text-base font-semibold text-foreground">
                 Agent Box
               </h3>
-              <p className="text-xs text-muted-foreground">v0.5.0</p>
+              <p className="text-xs text-muted-foreground">{version ? `v${version}` : ''}</p>
               <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
                 {t('settings.aboutDesc')}
               </p>

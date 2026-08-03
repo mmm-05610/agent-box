@@ -16,6 +16,7 @@ import { type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import { StatusDot } from '@/components/feedback'
+import { useVersion } from '@/hooks'
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -119,6 +120,7 @@ const NAV_ITEMS: NavItem[] = [
 
 export function Sidebar({ active, onNav, runningCount = 0, onNewProfile }: SidebarProps) {
   const { t } = useTranslation()
+  const version = useVersion()
   return (
     <aside
       className={cn(
@@ -145,9 +147,11 @@ export function Sidebar({ active, onNav, runningCount = 0, onNewProfile }: Sideb
           <div className="text-[13px] font-semibold text-foreground tracking-tight leading-tight">
             Agent Box
           </div>
-          <div className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground mt-0.5">
-            v0.5.0
-          </div>
+          {version && (
+            <div className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground mt-0.5">
+              {`v${version}`}
+            </div>
+          )}
         </div>
       </div>
 

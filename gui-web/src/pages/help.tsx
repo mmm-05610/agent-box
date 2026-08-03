@@ -5,6 +5,7 @@
 import { useTranslation } from 'react-i18next'
 import { Card } from '@/components/ui'
 import { PageHeader } from '@/components/layout'
+import { useVersion } from '@/hooks'
 
 const CLI_COMMANDS = [
   { command: 'agent-box create <name> --type claude', descriptionKey: 'help.cmd.create' },
@@ -23,6 +24,7 @@ const LINKS = [
 
 export function HelpPage() {
   const { t } = useTranslation()
+  const version = useVersion()
   return (
     <div className="mx-auto w-full max-w-3xl px-8 py-10">
       {/* Header */}
@@ -33,9 +35,13 @@ export function HelpPage() {
             <span>{t('help.stats.commands')}</span>
             <span className="mx-2 text-border">·</span>
             <span>{t('help.stats.links')}</span>
-            <span className="mx-2 text-border">·</span>
-            <span className="font-mono">agent-box v0.5.0</span>
-            <span className="mx-2 text-border">·</span>
+            {version && (
+              <>
+                <span className="mx-2 text-border">·</span>
+                <span className="font-mono">{`agent-box v${version}`}</span>
+                <span className="mx-2 text-border">·</span>
+              </>
+            )}
             <span>MIT</span>
           </>
         }
@@ -106,7 +112,7 @@ export function HelpPage() {
             <h2 className="text-sm font-semibold text-foreground mb-1">
               {t('help.about')}
             </h2>
-            <p className="text-xs text-muted-foreground">Agent Box · v0.5.0</p>
+            <p className="text-xs text-muted-foreground">{version ? `Agent Box · v${version}` : 'Agent Box'}</p>
             <p className="mt-2 text-sm text-muted-foreground">
               {t('help.aboutTagline')}
             </p>

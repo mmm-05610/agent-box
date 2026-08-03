@@ -60,6 +60,14 @@ class Api:
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
 
+    def get_version(self) -> str:
+        """The agent-box backend version (agent_box.__version__)."""
+        try:
+            from agent_box import __version__
+            return json.dumps({"ok": True, "data": __version__})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
     # ── Profiles ─────────────────────────────────────────────────────
 
     def list_profiles(self) -> str:

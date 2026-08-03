@@ -16,3 +16,8 @@ export async function fetchAgentConfigs(): Promise<Record<string, AgentTypeConfi
 export async function fetchDefaultAgent(): Promise<string> {
   return call<string>((api) => api.get_default_agent!(), '')
 }
+
+/** The agent-box backend version (agent_box.__version__). */
+export async function fetchVersion(): Promise<string> {
+  return call<string>((api) => api.get_version!(), '')
+}

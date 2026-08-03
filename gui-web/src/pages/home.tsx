@@ -19,7 +19,7 @@ import { fetchProviders } from '@/api/providers'
 import { fetchSessions } from '@/api/sessions'
 import { cn, formatRelativeTime } from '@/lib/utils'
 import type { AgentType } from '@/api'
-import { useAgentConfigs, useDefaultAgent, resolveAgentIdentity } from '@/hooks'
+import { useAgentConfigs, useDefaultAgent, useVersion, resolveAgentIdentity } from '@/hooks'
 
 interface HomePageProps {
   onNav: (key: NavKey) => void
@@ -37,6 +37,7 @@ interface StatTile {
 export function HomePage({ onNav }: HomePageProps) {
   const { t, i18n } = useTranslation()
   const { agentConfigs } = useAgentConfigs()
+  const version = useVersion()
   // Provider stat counts the backend's default agent — never a hardcoded type.
   const defaultAgent = useDefaultAgent()
   const [profileCount, setProfileCount] = useState(0)
@@ -169,8 +170,12 @@ export function HomePage({ onNav }: HomePageProps) {
             <span>{t('home.stats.profiles', { count: profileCount })}</span>
             <span className="mx-2 text-border">·</span>
             <span>{t('home.stats.providers', { count: providerCount })}</span>
-            <span className="mx-2 text-border">·</span>
-            <span className="font-mono">v0.5.0</span>
+            {version && (
+              <>
+                <span className="mx-2 text-border">·</span>
+                <span className="font-mono">{`v${version}`}</span>
+              </>
+            )}
           </>
         }
         action={
