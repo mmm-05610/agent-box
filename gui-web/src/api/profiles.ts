@@ -22,12 +22,12 @@ function toProfile(raw: Record<string, unknown>): Profile {
 }
 
 export async function fetchProfiles(): Promise<Profile[]> {
-  const raw = await call<Record<string, unknown>[]>((api) => api.list_profiles(), [])
+  const raw = await call<Record<string, unknown>[]>((api) => api.list_profiles!(), [])
   return raw.map(toProfile)
 }
 
 export async function fetchProfileDetail(name: string): Promise<Record<string, unknown> | null> {
-  return call<Record<string, unknown> | null>((api) => api.get_profile(name), null)
+  return call<Record<string, unknown> | null>((api) => api.get_profile!(name), null)
 }
 
 export async function createProfile(
@@ -36,7 +36,7 @@ export async function createProfile(
   options?: { displayName?: string; description?: string; preset?: string },
 ): Promise<Profile> {
   const raw = await call<Record<string, unknown>>(
-    (api) => api.create_profile(
+    (api) => api.create_profile!(
       name,
       agentType,
       options?.displayName ?? '',
@@ -49,7 +49,7 @@ export async function createProfile(
 }
 
 export async function deleteProfile(name: string): Promise<void> {
-  await call<void>((api) => api.delete_profile(name), undefined)
+  await call<void>((api) => api.delete_profile!(name), undefined)
 }
 
 export async function launchProfile(
@@ -57,7 +57,7 @@ export async function launchProfile(
   options?: { agentType?: string; mode?: string; cwd?: string },
 ): Promise<void> {
   await call<void>(
-    (api) => api.launch_profile(
+    (api) => api.launch_profile!(
       name,
       options?.agentType ?? 'claude',
       options?.mode ?? 'interactive',
@@ -72,7 +72,7 @@ export async function launchProfile(
  * Returns {profile_name: last_cwd_path}.
  */
 export async function getLastCwdMap(): Promise<Record<string, string>> {
-  return call<Record<string, string>>((api) => api.last_cwd_map(), {})
+  return call<Record<string, string>>((api) => api.last_cwd_map!(), {})
 }
 
 /**
@@ -84,7 +84,7 @@ export async function editProfile(
   fields: { displayName?: string; description?: string; provider?: string; claudeMd?: string },
 ): Promise<Record<string, unknown> | null> {
   return call<Record<string, unknown> | null>(
-    (api) => api.edit_profile(
+    (api) => api.edit_profile!(
       name,
       fields.displayName ?? '',
       fields.description ?? '',
@@ -101,5 +101,5 @@ export async function editProfile(
  * @param initial - WSL path to start in (e.g. ~/projects)
  */
 export async function browseDir(initial?: string): Promise<string> {
-  return call<string>((api) => api.browse_dir(initial ?? ''), '')
+  return call<string>((api) => api.browse_dir!(initial ?? ''), '')
 }

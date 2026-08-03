@@ -11,7 +11,7 @@ interface ApiResponse<T> {
   error?: string
 }
 
-type ApiMethod = (...args: string[]) => Promise<string>
+type ApiMethod = (...args: unknown[]) => Promise<string>
 
 // Cache the API reference once it's available
 let cachedApi: Record<string, ApiMethod> | null = null
