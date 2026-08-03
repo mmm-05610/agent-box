@@ -76,7 +76,10 @@ export function PluginsList({ profileName, agentType }: { profileName: string; a
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const { toast } = useToast()
 
-  const installedPluginsPath = configDir === null ? null : `${configDir.replace(/\/+$/, '')}/installed_plugins.json`
+  // Installed-plugin metadata file also comes from the backend registry
+  // (resources.plugins.installed_file) — not hardcoded.
+  const installedFile = agentType ? (agentConfigs?.[agentType]?.resources?.plugins?.installed_file as string | undefined) : undefined
+  const installedPluginsPath = configDir === null || !installedFile ? null : `${configDir.replace(/\/+$/, '')}/${installedFile}`
 
   // Self-fetch settings.json → enabledPlugins for the profile.
   useEffect(() => {

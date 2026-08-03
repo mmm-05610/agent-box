@@ -98,7 +98,8 @@
         ]
       },
       "plugins": {
-        "config_file": "settings.json"
+        "config_file": "settings.json",
+        "installed_file": "installed_plugins.json"
       }
     },
     "sandbox": {
