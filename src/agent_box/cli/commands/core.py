@@ -458,8 +458,10 @@ def do_launch(self, args: argparse.Namespace, unknown_args: list) -> None:
     # extra args for the agent (including option-like ones).  A literal
     # `--` is the standard separator and is dropped.  `--cwd <path>` sets
     # the agent's working directory (resolved by the backend).
+    # Use `argv` (minus the leading command) not `arg_list` — argv strips
+    # quotes, so `'~'` arrives as `~` instead of `"'~'"`.
     statement = getattr(args, "cmd2_statement", None)
-    tokens = list(statement.arg_list) if statement is not None else []
+    tokens = list(statement.argv[1:]) if statement is not None else []
 
     cwd: str | None = None
     filtered: list[str] = []
