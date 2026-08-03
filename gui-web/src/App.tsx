@@ -2,7 +2,7 @@
  * App — Root component with routing
  */
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Shell, type NavKey } from '@/components/layout'
 import { ErrorBoundary, ToastProvider } from '@/components/feedback'
 import { useSessions } from '@/hooks'
@@ -19,8 +19,13 @@ export default function App() {
   const [page, setPage] = useState<NavKey>('home')
   const [detailProfile, setDetailProfile] = useState<string | null>(null)
   const [autoOpenCreate, setAutoOpenCreate] = useState(false)
-  // Live running count for the Sidebar status pill — not a hardcoded 0.
-  const { running } = useSessions()
+  // Live running count for the Sidebar status pill. useSessions fetches once
+  // on mount, so poll to reflect launches that happen after app start.
+  const { running, refresh: refreshSessions } = useSessions()
+  useEffect(() => {
+    const id = setInterval(() => void refreshSessions(), 5000)
+    return () => clearInterval(id)
+  }, [refreshSessions])
 
   // Navigate to a page and close any open detail
   const handleNav = (key: NavKey) => {

@@ -159,6 +159,29 @@ def _convert_entry(server_config: Dict[str, Any],
 
 
 
+def _mcp_summary(server_id: str, entry: Dict[str, Any]) -> Dict[str, Any]:
+    """Build the frontend-facing ProfileMcp summary for an installed server.
+
+    ``entry`` is the converted per-server config block; the summary flattens
+    the command list (``command`` + ``args``) and keeps the raw block for the
+    detail viewer.
+    """
+    name = entry.get("name") or server_id
+    summary: Dict[str, Any] = {"id": server_id, "name": name, "raw": entry}
+    typ = entry.get("type")
+    if typ:
+        summary["type"] = typ
+    command = entry.get("command")
+    if isinstance(command, str):
+        summary["command"] = command
+    elif isinstance(command, list) and command:
+        summary["command"] = str(command[0])
+        summary["args"] = [str(a) for a in command[1:]]
+    if entry.get("url"):
+        summary["url"] = entry["url"]
+    return summary
+
+
 def list_profile_mcp_servers(profile_name: str) -> List[Dict[str, Any]]:
     """Read installed MCP servers from a profile's config file."""
     meta, agent_config = resolve_profile(profile_name)
