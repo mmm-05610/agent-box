@@ -58,7 +58,44 @@
       "skills": {},
       "permissions": {
         "config_file": "settings.json",
-        "config_key": "permissions"
+        "config_key": "permissions",
+        "blocks": [
+          {
+            "type": "rule_groups",
+            "groups": [
+              "allow",
+              "deny",
+              "ask"
+            ],
+            "rule_format": "tool(pattern)",
+            "suggested_tools": [
+              "Bash",
+              "Read",
+              "Edit",
+              "Write",
+              "Glob",
+              "Grep",
+              "WebFetch",
+              "WebSearch",
+              "Task",
+              "Skill",
+              "Agent",
+              "NotebookEdit"
+            ]
+          },
+          {
+            "type": "select",
+            "field": "defaultMode",
+            "options": [
+              "default",
+              "acceptEdits",
+              "plan",
+              "auto",
+              "dontAsk",
+              "bypassPermissions"
+            ]
+          }
+        ]
       },
       "plugins": {
         "config_file": "settings.json"
@@ -158,6 +195,34 @@
       "skills": {},
       "rules": {
         "dir": "rules"
+      },
+      "permissions": {
+        "config_file": "config.toml",
+        "config_key": "approval_policy",
+        "blocks": [
+          {
+            "type": "select",
+            "field": "approval_policy",
+            "options": [
+              "untrusted",
+              "on-failure",
+              "on-request",
+              "never"
+            ]
+          },
+          {
+            "type": "toggle_list",
+            "field": "tools",
+            "items": [
+              "web_search",
+              "view_image"
+            ]
+          },
+          {
+            "type": "raw_editor",
+            "label": "shell_environment_policy"
+          }
+        ]
       }
     },
     "sandbox": {
@@ -303,6 +368,38 @@
             "kind": "user"
           }
         ]
+      },
+      "permissions": {
+        "config_file": "config.yaml",
+        "config_key": "approvals",
+        "blocks": [
+          {
+            "type": "select",
+            "field": "mode",
+            "options": [
+              "smart",
+              "manual",
+              "off"
+            ]
+          },
+          {
+            "type": "toggle_list",
+            "field": "agent.disabled_toolsets",
+            "items": [
+              "browser",
+              "web",
+              "file",
+              "terminal",
+              "code",
+              "vision",
+              "memory",
+              "delegation",
+              "cron",
+              "skills",
+              "plugins"
+            ]
+          }
+        ]
       }
     },
     "sandbox": {
@@ -382,6 +479,37 @@
       "instructions": {
         "config_file": "opencode.jsonc",
         "config_key": "instructions"
+      },
+      "permissions": {
+        "config_file": "opencode.jsonc",
+        "config_key": "permission",
+        "blocks": [
+          {
+            "type": "tool_matrix",
+            "tools": [
+              "read",
+              "edit",
+              "bash",
+              "glob",
+              "grep",
+              "list",
+              "task",
+              "webfetch",
+              "websearch",
+              "lsp",
+              "skill",
+              "external_directory",
+              "todowrite",
+              "question",
+              "doom_loop"
+            ],
+            "values": [
+              "allow",
+              "ask",
+              "deny"
+            ]
+          }
+        ]
       }
     },
     "sandbox": {
