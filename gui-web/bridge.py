@@ -260,31 +260,6 @@ class Api:
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
 
-    def list_library_skills(self, agent_type: str) -> str:
-        """Alias for list_skills — used by Profile detail SkillsTab."""
-        try:
-            return json.dumps({"ok": True, "data": self._data.list_skills(agent_type)})
-        except Exception as e:
-            return json.dumps({"ok": False, "error": str(e)})
-
-    def list_library_prompts(self, agent_type: str) -> str:
-        """Alias for list_prompts — used by Profile detail PromptTab."""
-        try:
-            return json.dumps({
-                "ok": True, "data": self._data.list_prompts(agent_type),
-            })
-        except Exception as e:
-            return json.dumps({"ok": False, "error": str(e)})
-
-    def list_library_mcp(self, agent_type: str) -> str:
-        """Alias for list_mcp_servers — used by Profile detail McpTab."""
-        try:
-            return json.dumps({
-                "ok": True, "data": self._data.list_mcp_servers(agent_type),
-            })
-        except Exception as e:
-            return json.dumps({"ok": False, "error": str(e)})
-
     # ── File I/O ─────────────────────────────────────────────────────
 
     def read_file(self, path: str) -> str:

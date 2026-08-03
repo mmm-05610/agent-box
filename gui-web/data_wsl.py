@@ -36,18 +36,30 @@ def _wsl_run(cmd: str, timeout: float = 30) -> str:
     return result.stdout.decode("utf-8", errors="replace").strip()
 
 
-# Resume args per agent type — mirrors `runtime.launch.resume` (minus the
-# binary name) in the agent-type registry (src/agent_box/core/agent_types.json).
-# Windows Python cannot import agent_box (it lives in WSL), so this table is
-# duplicated by necessity.
-# ⚠ SYNC: if a registry entry's `runtime.launch.resume` changes, update this
-# table too.
-_RESUME_ARGS = {
-    "claude": ("-c",),
-    "codex": ("resume", "--last"),
-    "hermes": ("-c",),
-    "opencode": None,
-}
+def _resume_args(agent_type: str) -> tuple:
+    """Fetch ``runtime.launch.resume`` (minus the binary name) from the
+    agent-type registry inside WSL.
+
+    Windows Python cannot import agent_box, so read the registry through
+    ``python3 -c`` — the same pattern as the ACS library methods below.
+    Mirrors ``data_linux.launch_profile``'s direct ``get_agent_config``
+    read, so there is no per-agent table to keep in sync.
+    """
+    out = _wsl_run(
+        "python3 -c 'import json; "
+        "from agent_box.core.library import get_agent_config; "
+        f"cfg = get_agent_config(\"{agent_type}\") or {{}}; "
+        "resume = ((cfg.get(\"runtime\") or {}).get(\"launch\") or {}).get(\"resume\") or []; "
+        "print(json.dumps(resume))'",
+        timeout=15,
+    )
+    try:
+        args = json.loads(out)
+        # The registry array includes the binary name (["claude", "-c"]);
+        # launch passes everything after the profile name through, so skip it.
+        return tuple(args[1:]) if isinstance(args, list) and len(args) > 1 else ()
+    except (json.JSONDecodeError, TypeError):
+        return ()
 
 
 class WslDataAccess:
@@ -100,7 +112,7 @@ class WslDataAccess:
 
     def launch_profile(self, name: str, agent_type: str, mode: str, cwd: str = "") -> dict:
         """Launch a profile in a new Windows console via wsl.exe."""
-        resume_args = _RESUME_ARGS.get(agent_type)
+        resume_args = _resume_args(agent_type)
         launch_cmd = f"launch {name}"
         if mode == "继续上次" and resume_args:
             launch_cmd += " " + " ".join(resume_args)
