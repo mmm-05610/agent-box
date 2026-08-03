@@ -34,6 +34,9 @@ export const zh: TranslationSchema = {
     minutesAgo: '{{count}} 分钟前',
     hoursAgo: '{{count}} 小时前',
     daysAgo: '{{count}} 天前',
+    launched: '上次启动 {{time}}',
+    closed: '上次关闭 {{time}}',
+    running: '运行中',
   },
 
   nav: {

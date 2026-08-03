@@ -35,6 +35,9 @@ export const en = {
     minutesAgo: '{{count}}m ago',
     hoursAgo: '{{count}}h ago',
     daysAgo: '{{count}}d ago',
+    launched: 'Launched {{time}}',
+    closed: 'Closed {{time}}',
+    running: 'Running',
   },
 
   nav: {

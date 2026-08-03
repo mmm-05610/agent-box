@@ -271,9 +271,20 @@ export function HomePage({ onNav }: HomePageProps) {
                       </div>
                     </div>
 
-                    {/* Time */}
-                    <span className="shrink-0 text-[11px] text-muted-foreground/60 font-mono">
-                      {formatRelativeTime(s.launchedAt, t)}
+                    {/* Time — last launched + last closed */}
+                    <span className="shrink-0 text-right">
+                      <span className="block text-[11px] text-muted-foreground/60 font-mono">
+                        {t('time.launched', { time: formatRelativeTime(s.launchedAt, t) })}
+                      </span>
+                      <span className="block text-[11px] font-mono">
+                        {isRunning ? (
+                          <span className="text-success">{t('time.running')}</span>
+                        ) : (
+                          <span className="text-muted-foreground/40">
+                            {t('time.closed', { time: formatRelativeTime(s.exitedAt ?? 0, t) })}
+                          </span>
+                        )}
+                      </span>
                     </span>
                   </div>
                 )
