@@ -88,17 +88,6 @@ function replaceHooksBlock(yaml: string, newBlock: string): string {
   return [...lines.slice(0, start), newBlock, ...lines.slice(end)].join('\n')
 }
 
-const PHASE_ORDER = ['pre_llm_call', 'post_llm_call', 'pre_tool_use', 'post_tool_use']
-
-function phaseOrder(a: string, b: string): number {
-  const ai = PHASE_ORDER.indexOf(a)
-  const bi = PHASE_ORDER.indexOf(b)
-  if (ai === -1 && bi === -1) return a.localeCompare(b)
-  if (ai === -1) return 1
-  if (bi === -1) return -1
-  return ai - bi
-}
-
 export function YamlHooksViewer({ profileName, agentType }: { profileName: string; agentType?: AgentType }) {
   const { t } = useTranslation()
   const configDir = useProfileConfigDir(profileName)
@@ -219,7 +208,7 @@ export function YamlHooksViewer({ profileName, agentType }: { profileName: strin
             />
           </p>
         ) : (
-          Object.keys(phases).sort(phaseOrder).map((phase) => {
+          Object.keys(phases).map((phase) => {
             const entries = phases[phase] ?? []
             return (
               <div key={phase} className="rounded-lg bg-card ring-1 ring-border/60">
