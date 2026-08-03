@@ -174,7 +174,9 @@ def test_cli_sessions_json(tmp_agent_box_home):
 def test_cli_sessions_active_flag(tmp_agent_box_home):
     """list sessions --active --json returns only rows that haven't exited."""
     a = sessions.record_launch("a", "claude", "/x", "新会话", 1)
-    sessions.record_launch("b", "claude", "/x", "新会话", 2)
+    # Use the test process's own PID for the running session — a fixed low
+    # PID (1/2) is flaky: _cleanup_zombies may misjudge it as dead (EPERM).
+    sessions.record_launch("b", "claude", "/x", "新会话", os.getpid())
     sessions.record_exit(a, 0)
 
     out = _exec("list sessions --active --json")
