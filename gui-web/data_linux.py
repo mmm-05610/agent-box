@@ -167,10 +167,10 @@ class LinuxDataAccess:
     def get_provider(self, agent_type: str, provider_id: str) -> dict | None:
         return acs.get_provider(agent_type, provider_id)
 
-    def list_claude_mds(self, agent_type: str) -> list:
+    def list_prompts(self, agent_type: str) -> list:
         return acs.list_prompts(agent_type)
 
-    def get_claude_md(self, agent_type: str, md_id: str) -> dict | None:
+    def get_prompt(self, agent_type: str, md_id: str) -> dict | None:
         return acs.get_prompt(agent_type, md_id)
 
     def list_mcp_servers(self, agent_type: str) -> list:

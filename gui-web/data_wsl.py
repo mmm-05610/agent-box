@@ -180,14 +180,14 @@ class WslDataAccess:
         )
         return json.loads(out)
 
-    def list_claude_mds(self, agent_type: str) -> list:
+    def list_prompts(self, agent_type: str) -> list:
         out = _wsl_run(
             "python3 -c 'from agent_box.adapters.acs import list_prompts; "
             f"import json; print(json.dumps(list_prompts(\"{agent_type}\")))'"
         )
         return json.loads(out)
 
-    def get_claude_md(self, agent_type: str, md_id: str) -> dict | None:
+    def get_prompt(self, agent_type: str, md_id: str) -> dict | None:
         out = _wsl_run(
             "python3 -c 'from agent_box.adapters.acs import get_prompt; "
             f"import json; print(json.dumps(get_prompt(\"{agent_type}\", \"{md_id}\")))'"

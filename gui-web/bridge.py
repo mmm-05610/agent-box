@@ -212,16 +212,16 @@ class Api:
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
 
-    def list_claude_mds(self, agent_type: str) -> str:
+    def list_prompts(self, agent_type: str) -> str:
         try:
-            return json.dumps({"ok": True, "data": self._data.list_claude_mds(agent_type)})
+            return json.dumps({"ok": True, "data": self._data.list_prompts(agent_type)})
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
 
-    def get_claude_md(self, agent_type: str, md_id: str) -> str:
+    def get_prompt(self, agent_type: str, md_id: str) -> str:
         try:
             return json.dumps({
-                "ok": True, "data": self._data.get_claude_md(agent_type, md_id),
+                "ok": True, "data": self._data.get_prompt(agent_type, md_id),
             })
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
@@ -252,10 +252,10 @@ class Api:
             return json.dumps({"ok": False, "error": str(e)})
 
     def list_library_prompts(self, agent_type: str) -> str:
-        """Alias for list_claude_mds — used by Profile detail PromptTab."""
+        """Alias for list_prompts — used by Profile detail PromptTab."""
         try:
             return json.dumps({
-                "ok": True, "data": self._data.list_claude_mds(agent_type),
+                "ok": True, "data": self._data.list_prompts(agent_type),
             })
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
