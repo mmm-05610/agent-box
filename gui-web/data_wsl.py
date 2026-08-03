@@ -96,7 +96,7 @@ class WslDataAccess:
     def edit_profile(
         self, name: str,
         display_name: str = "", description: str = "",
-        provider: str = "", claude_md: str = "",
+        provider: str = "", prompt: str = "",
     ) -> dict:
         flags = "configure " + name
         if display_name:
@@ -105,8 +105,8 @@ class WslDataAccess:
             flags += f" --description \"{description}\""
         if provider:
             flags += f" --provider \"{provider}\""
-        if claude_md:
-            flags += f" --prompt \"{claude_md}\""
+        if prompt:
+            flags += f" --prompt \"{prompt}\""
         _wsl_run(f"agent-box exec {shlex.quote(flags)}")
         return json.loads(_wsl_run(f"agent-box exec {shlex.quote(f'show {name} --json')}"))
 

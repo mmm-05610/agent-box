@@ -71,16 +71,16 @@ class LinuxDataAccess:
     def edit_profile(
         self, name: str,
         display_name: str = "", description: str = "",
-        provider: str = "", claude_md: str = "",
+        provider: str = "", prompt: str = "",
     ) -> dict:
-        if not any([display_name, description, provider, claude_md]):
+        if not any([display_name, description, provider, prompt]):
             raise ValueError("no fields to update")
         profile.update_meta(
             name,
             display_name=display_name or None,
             description=description or None,
             provider=provider or None,
-            prompt=claude_md or None,
+            prompt=prompt or None,
         )
         return profile.show(name)
 

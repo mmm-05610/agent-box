@@ -1,6 +1,6 @@
 """Test-only helper: replace ``edit.open_editor`` with a no-op.
 
-Used by tests for the add/edit flows of providers and claude_mds that
+Used by tests for the add/edit flows of providers and prompts that
 normally open ``$EDITOR``. We can't drive a real editor in CI, so the
 patched function just returns without touching the file.
 

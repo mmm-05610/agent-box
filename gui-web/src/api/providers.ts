@@ -33,31 +33,11 @@ export async function fetchPromptDetail(
   return call<Prompt | null>((api) => api.get_prompt!(agentType, mdId), null)
 }
 
-export async function savePrompt(
-  agentType: AgentType,
-  mdId: string,
-  content: string,
-  name?: string,
-  description?: string,
-): Promise<Prompt> {
-  return call<Prompt>(
-    (api) => api.save_claude_md!(agentType, mdId, content, name ?? '', description ?? ''),
-    {} as Prompt,
-  )
-}
-
-export async function deletePrompt(
-  agentType: AgentType,
-  mdId: string,
-): Promise<void> {
-  await call<void>((api) => api.delete_claude_md!(agentType, mdId), undefined)
-}
-
 export async function applyPromptToProfile(
   profileName: string,
   mdId: string,
 ): Promise<void> {
-  await call<void>((api) => api.apply_claude_md!(profileName, mdId), undefined)
+  await call<void>((api) => api.apply_prompt!(profileName, mdId), undefined)
 }
 
 // ── Profile Provider Store (Hermes / OpenCode) ──────────────────────────

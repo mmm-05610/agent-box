@@ -25,14 +25,14 @@ def _settings_json(profile_name: str) -> dict:
 
 # --- WS5: preset copies its files into the profile ------------------------
 
-def test_preset_applies_claude_md(tmp_agent_box_home):
+def test_preset_applies_prompt(tmp_agent_box_home):
     profile.create("p1", "claude", preset="python-dev")
-    claude_md = (config.profile_agent_dir("p1", "claude") / "CLAUDE.md")
-    assert claude_md.is_file()
-    assert claude_md.stat().st_size > 0
+    prompt_file = (config.profile_agent_dir("p1", "claude") / "CLAUDE.md")
+    assert prompt_file.is_file()
+    assert prompt_file.stat().st_size > 0
     # Matches the preset's CLAUDE.md
     preset_md = (library.get_preset_dir("claude", "python-dev") / "CLAUDE.md")
-    assert claude_md.read_text(encoding="utf-8") == \
+    assert prompt_file.read_text(encoding="utf-8") == \
         preset_md.read_text(encoding="utf-8")
 
 

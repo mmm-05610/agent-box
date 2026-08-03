@@ -106,7 +106,7 @@ class Api:
     def edit_profile(
         self, name: str,
         display_name: str = "", description: str = "",
-        provider: str = "", claude_md: str = "",
+        provider: str = "", prompt: str = "",
     ) -> str:
         try:
             return json.dumps({
@@ -114,7 +114,7 @@ class Api:
                 "data": self._data.edit_profile(
                     name,
                     display_name=display_name, description=description,
-                    provider=provider, claude_md=claude_md,
+                    provider=provider, prompt=prompt,
                 ),
             })
         except Exception as e:
