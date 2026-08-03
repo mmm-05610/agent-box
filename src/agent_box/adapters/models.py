@@ -16,15 +16,15 @@ import json
 import re
 import shutil
 import subprocess
-from pathlib import Path
 from typing import Any, Dict, List
+
+from .. import config
 
 # Provider base URL → known models-endpoint candidates.  Exact match on the
 # normalized base URL (stripped, no trailing slash).  A single string is
 # accepted as a one-element list.  Curated from the ACS provider presets
 # (claudeProviderPresets.ts etc.) — the authoritative source for these paths.
-_ENDPOINT_TABLE_PATH = Path(__file__).resolve().parent.parent / "core" / "provider_endpoints.json"
-
+# Resolved via config (package-relative), like agent_types.json.
 _endpoint_table_cache: Dict[str, List[str]] | None = None
 
 
@@ -39,7 +39,7 @@ def _endpoint_table() -> Dict[str, List[str]]:
         return _endpoint_table_cache
     table: Dict[str, List[str]] = {}
     try:
-        raw = json.loads(_ENDPOINT_TABLE_PATH.read_text(encoding="utf-8"))
+        raw = json.loads(config.provider_endpoints_file().read_text(encoding="utf-8"))
         for key, value in raw.items():
             if isinstance(value, str):
                 table[str(key)] = [value]

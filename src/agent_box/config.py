@@ -41,6 +41,11 @@ def agent_types_file() -> Path:
     return package_dir() / "core" / "agent_types.json"
 
 
+def provider_endpoints_file() -> Path:
+    """Absolute path to the models-endpoint table (``core/provider_endpoints.json``)."""
+    return package_dir() / "core" / "provider_endpoints.json"
+
+
 # --- root resolution -------------------------------------------------------
 
 def agent_box_home() -> Path:
