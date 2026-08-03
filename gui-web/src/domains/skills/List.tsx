@@ -141,7 +141,8 @@ interface SkillListProps {
 
 export function SkillList({ profileName, agentType }: SkillListProps) {
   const { t } = useTranslation()
-  const at = agentType ?? 'claude'
+  // detail always passes agentType — empty fallback, never a hardcoded name.
+  const at = agentType ?? ''
   const { toast } = useToast()
   const { skills: library } = useLibrary(at, ['skills'])
   const {

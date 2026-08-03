@@ -59,7 +59,7 @@ export async function launchProfile(
   await call<void>(
     (api) => api.launch_profile!(
       name,
-      options?.agentType ?? 'claude',
+      options?.agentType ?? '',
       options?.mode ?? 'interactive',
       options?.cwd ?? '',
     ),

@@ -11,7 +11,7 @@ import { Button, Badge, Input, Tabs } from '@/components/ui'
 import { EmptyState, Loading } from '@/components/feedback'
 import { useToast } from '@/components/feedback/toast'
 import { PageHeader } from '@/components/layout'
-import { useAgentConfigs, useAgentIdentity, useAgentTypeColor, useProfiles, useSessions, resolveAgentIdentity } from '@/hooks'
+import { useAgentConfigs, useAgentIdentity, useAgentTypeColor, useDefaultAgent, useProfiles, useSessions, resolveAgentIdentity } from '@/hooks'
 import { cn } from '@/lib/utils'
 import type { AgentType, Profile } from '@/api'
 import { createProfile, deleteProfile, launchProfile, getLastCwdMap, browseDir } from '@/api'
@@ -144,7 +144,7 @@ export function ProfilesPage({ onOpenDetail, autoOpenCreate, onAutoOpenCreateHan
       try {
         const profile = profiles.find((p) => p.name === name)
         await launchProfile(name, {
-          agentType: profile?.agentType ?? 'claude',
+          agentType: profile?.agentType ?? '',
           mode,
           cwd,
         })
@@ -332,10 +332,17 @@ function CreateProfileModal({
   const { agentConfigs } = useAgentConfigs()
 
   const [name, setName] = useState('')
-  const [agentType, setAgentType] = useState<AgentType>('claude')
+  // Default agent type comes from the backend (config.DEFAULT_AGENT_TYPE).
+  const defaultAgent = useDefaultAgent()
+  const [agentType, setAgentType] = useState<AgentType>(defaultAgent as AgentType)
   const [displayName, setDisplayName] = useState('')
   const [description, setDescription] = useState('')
   const [creating, setCreating] = useState(false)
+
+  // The backend default loads async — adopt it until the user picks explicitly.
+  useEffect(() => {
+    setAgentType((prev) => prev || (defaultAgent as AgentType))
+  }, [defaultAgent])
 
   const handleCreate = async () => {
     if (!name.trim()) return

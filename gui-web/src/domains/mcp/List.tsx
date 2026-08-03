@@ -41,7 +41,9 @@ function mcpServerType(server: McpServer): string {
 
 export function McpList({ profileName, agentType }: McpListProps) {
   const { t } = useTranslation()
-  const at = agentType ?? 'claude'
+  // detail always passes agentType; an empty fallback only guards the TS
+  // optional prop — it must not hardcode an agent name.
+  const at = agentType ?? ''
   const { toast } = useToast()
   const { mcpServers: library } = useLibrary(at, ['mcpServers'])
   const { mcp: installed, loading, refresh: reloadInstalled } = useProfileResources(profileName)

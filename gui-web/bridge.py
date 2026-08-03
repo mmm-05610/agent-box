@@ -52,6 +52,14 @@ class Api:
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
 
+    def get_default_agent(self) -> str:
+        """The backend's default agent type (config.DEFAULT_AGENT_TYPE)."""
+        try:
+            from agent_box import config
+            return json.dumps({"ok": True, "data": config.DEFAULT_AGENT_TYPE})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
     # ── Profiles ─────────────────────────────────────────────────────
 
     def list_profiles(self) -> str:
