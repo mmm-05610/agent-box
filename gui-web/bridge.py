@@ -66,6 +66,14 @@ class Api:
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
 
+    def get_default_projects_dir(self) -> str:
+        """The backend's default projects directory (config.default_projects_dir())."""
+        try:
+            from agent_box import config
+            return json.dumps({"ok": True, "data": config.default_projects_dir()})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
     # ── Profiles ─────────────────────────────────────────────────────
 
     def list_profiles(self) -> str:

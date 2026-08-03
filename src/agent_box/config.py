@@ -81,6 +81,15 @@ def acs_binary() -> Path:
     return Path.home() / "projects" / "agent-config-store" / "src-tauri" / "target" / "release" / "cc-switch"
 
 
+def default_projects_dir() -> str:
+    """Default projects directory for the GUI launch dialog / settings.
+
+    Override with the ``AGENT_BOX_PROJECTS_DIR`` env var.  Kept as a tilde
+    path — consumers resolve it against ``$HOME`` (WSL / Linux).
+    """
+    return os.environ.get("AGENT_BOX_PROJECTS_DIR") or "~/projects"
+
+
 def library_db() -> Path:
     """Path to the agent-box SQLite database (``agent-box.db``)."""
     return agent_box_home() / "agent-box.db"

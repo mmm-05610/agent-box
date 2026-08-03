@@ -5,6 +5,7 @@
 import { useState } from 'react'
 import { Shell, type NavKey } from '@/components/layout'
 import { ErrorBoundary, ToastProvider } from '@/components/feedback'
+import { useSessions } from '@/hooks'
 import {
   HelpPage,
   HomePage,
@@ -18,6 +19,8 @@ export default function App() {
   const [page, setPage] = useState<NavKey>('home')
   const [detailProfile, setDetailProfile] = useState<string | null>(null)
   const [autoOpenCreate, setAutoOpenCreate] = useState(false)
+  // Live running count for the Sidebar status pill — not a hardcoded 0.
+  const { running } = useSessions()
 
   // Navigate to a page and close any open detail
   const handleNav = (key: NavKey) => {
@@ -34,7 +37,7 @@ export default function App() {
 
   return (
     <ToastProvider>
-      <Shell active={page} onNav={handleNav} onNewProfile={handleNewProfile} runningCount={0}>
+      <Shell active={page} onNav={handleNav} onNewProfile={handleNewProfile} runningCount={running.length}>
         <ErrorBoundary name="App">
           <PageRouter
             page={page}

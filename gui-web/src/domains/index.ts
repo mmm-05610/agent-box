@@ -28,5 +28,3 @@ export const RESOURCES = {
   memories: memoriesResource,
   instructions: instructionsResource,
 } satisfies Record<string, ResourceDef>
-
-export type ResourceKey = keyof typeof RESOURCES

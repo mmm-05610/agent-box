@@ -21,3 +21,8 @@ export async function fetchDefaultAgent(): Promise<string> {
 export async function fetchVersion(): Promise<string> {
   return call<string>((api) => api.get_version!(), '')
 }
+
+/** The backend's default projects directory (config.default_projects_dir()). */
+export async function fetchDefaultProjectsDir(): Promise<string> {
+  return call<string>((api) => api.get_default_projects_dir!(), '')
+}

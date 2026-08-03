@@ -11,7 +11,7 @@ import { Button, Badge, Input, Tabs } from '@/components/ui'
 import { EmptyState, Loading } from '@/components/feedback'
 import { useToast } from '@/components/feedback/toast'
 import { PageHeader } from '@/components/layout'
-import { useAgentConfigs, useAgentIdentity, useAgentTypeColor, useDefaultAgent, useLibrary, useProfiles, useSessions, resolveAgentIdentity } from '@/hooks'
+import { useAgentConfigs, useAgentIdentity, useAgentTypeColor, useDefaultAgent, useDefaultProjectsDir, useLibrary, useProfiles, useSessions, resolveAgentIdentity } from '@/hooks'
 import { cn } from '@/lib/utils'
 import type { AgentType, AgentTypeConfig, Profile } from '@/api'
 import { createProfile, deleteProfile, launchProfile, getLastCwdMap, browseDir } from '@/api'
@@ -491,6 +491,7 @@ function ProfileCard({
 
   const [mode, setMode] = useState<string>('resume')
   const [cwd, setCwd] = useState<string>(lastCwd || '~')
+  const defaultProjectsDir = useDefaultProjectsDir()
 
   useEffect(() => {
     if (lastCwd) setCwd(lastCwd)
@@ -498,7 +499,7 @@ function ProfileCard({
 
   const handleBrowse = async () => {
     try {
-      const path = await browseDir(readSettings().projects_dir)
+      const path = await browseDir(readSettings().projects_dir || defaultProjectsDir)
       if (path) setCwd(path)
     } catch {
       // silently ignore

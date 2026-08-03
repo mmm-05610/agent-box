@@ -273,7 +273,7 @@ export function HomePage({ onNav }: HomePageProps) {
 
                     {/* Time */}
                     <span className="shrink-0 text-[11px] text-muted-foreground/60 font-mono">
-                      {formatRelativeTime(s.launchedAt)}
+                      {formatRelativeTime(s.launchedAt, t)}
                     </span>
                   </div>
                 )

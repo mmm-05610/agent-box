@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils'
 import { browseDir } from '@/api'
 import { readSettings, writeSettings, type Theme } from '@/lib/settings'
 import { LANG_KEY, readStoredLanguage, type UILanguage } from '@/i18n'
-import { useVersion } from '@/hooks'
+import { useDefaultProjectsDir, useVersion } from '@/hooks'
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
@@ -77,6 +77,12 @@ export function SettingsPage() {
   const [theme, setTheme] = useState<Theme>(() => readSettings().theme)
   const [language, setLanguage] = useState<UILanguage>(() => readStoredLanguage())
   const [projectsDir, setProjectsDir] = useState(() => readSettings().projects_dir)
+  // Backend-served default (config.default_projects_dir) — fills in only
+  // when the user has no saved path.
+  const defaultProjectsDir = useDefaultProjectsDir()
+  useEffect(() => {
+    if (!projectsDir && defaultProjectsDir) setProjectsDir(defaultProjectsDir)
+  }, [projectsDir, defaultProjectsDir])
 
   useEffect(() => {
     applyTheme(theme)

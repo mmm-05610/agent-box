@@ -262,7 +262,7 @@ function SessionCard({ session }: { session: Session }) {
             )}
             <span className="flex items-center gap-1">
               <span className="text-muted-foreground/40">·</span>
-              {formatRelativeTime(launchedAt)}
+              {formatRelativeTime(launchedAt, t)}
             </span>
           </div>
         </div>

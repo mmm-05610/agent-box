@@ -30,6 +30,13 @@ export const en = {
     clearFilter: 'Clear filter',
   },
 
+  time: {
+    justNow: 'just now',
+    minutesAgo: '{{count}}m ago',
+    hoursAgo: '{{count}}h ago',
+    daysAgo: '{{count}}d ago',
+  },
+
   nav: {
     home: 'Home',
     profiles: 'Profiles',

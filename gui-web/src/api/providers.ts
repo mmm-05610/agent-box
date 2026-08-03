@@ -1,5 +1,5 @@
 /**
- * Providers API — CRUD operations for providers and Claude.md
+ * Providers API — CRUD operations for providers and prompts
  *
  * Calls PyWebView bridge functions via window.pywebview.api (async).
  * ACS rows are already snake_case — no conversion layer needed.
