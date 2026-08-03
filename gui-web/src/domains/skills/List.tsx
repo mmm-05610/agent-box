@@ -145,6 +145,10 @@ export function SkillList({ profileName, agentType }: SkillListProps) {
   const at = agentType ?? ''
   const { toast } = useToast()
   const { skills: library } = useLibrary(at, ['skills'])
+  // Skills dir name comes from the backend registry (resources.skills.dir),
+  // and drives both the installed-skill scan and the apply/remove paths.
+  const { agentConfigs } = useAgentConfigs()
+  const skillsDirName = agentType ? (agentConfigs?.[agentType]?.resources?.skills?.dir as string | undefined) : undefined
   const {
     skills: installed,
     configDir,
@@ -152,10 +156,7 @@ export function SkillList({ profileName, agentType }: SkillListProps) {
     error: loadError,
     refresh: refreshInstalled,
     updateSkill,
-  } = useProfileResources(profileName, { includeSkills: true })
-  // Skills dir name comes from the backend registry (resources.skills.dir).
-  const { agentConfigs } = useAgentConfigs()
-  const skillsDirName = agentType ? (agentConfigs?.[agentType]?.resources?.skills?.dir as string | undefined) : undefined
+  } = useProfileResources(profileName, { includeSkills: true, skillsDirName })
   const skillsDir = configDir === null || !skillsDirName ? null : `${configDir.replace(/\/+$/, '')}/${skillsDirName}`
 
   const [removingId, setRemovingId] = useState<string | null>(null)

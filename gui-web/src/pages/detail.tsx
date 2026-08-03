@@ -32,7 +32,7 @@ export interface ProfileDetail {
     display_name: string
     description: string
     provider: string
-    claude_md: string
+    prompt: string
     preset: string
   }
   config_dir: string

@@ -82,6 +82,8 @@ async function loadInstalledSkills(dir: string, root: string): Promise<Installed
 export interface UseProfileResourcesOptions {
   /** Also scan the profile's local skills dir (default false). */
   includeSkills?: boolean
+  /** Skills dir name from the backend registry (resources.skills.dir). */
+  skillsDirName?: string
 }
 
 export interface UseProfileResourcesReturn {
@@ -104,7 +106,11 @@ export function useProfileResources(
   options: UseProfileResourcesOptions = {},
 ): UseProfileResourcesReturn {
   const configDir = useProfileConfigDir(profileName)
-  const skillsDir = configDir === null ? null : `${configDir.replace(/\/+$/, '')}/skills`
+  // Skills dir name comes from the backend registry — never a hardcoded
+  // "skills". Consumers (skills List) pass resources.skills.dir.
+  const skillsDir = configDir === null || !options.skillsDirName
+    ? null
+    : `${configDir.replace(/\/+$/, '')}/${options.skillsDirName}`
 
   const [providers, setProviders] = useState<ProfileProvider[]>([])
   const [mcp, setMcp] = useState<ProfileMcp[]>([])

@@ -84,7 +84,8 @@ export interface Profile {
   displayName?: string
   description?: string
   providerRef?: string
-  claudeMdRef?: string
+  /** Prompt template ref (backend column prompt_ref). */
+  promptRef?: string
   createdAt?: number
 }
 

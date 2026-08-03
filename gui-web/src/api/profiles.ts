@@ -16,7 +16,7 @@ function toProfile(raw: Record<string, unknown>): Profile {
     displayName: raw.display_name as string | undefined,
     description: raw.description as string | undefined,
     providerRef: raw.provider_ref as string | undefined,
-    claudeMdRef: raw.claude_md_ref as string | undefined,
+    promptRef: raw.prompt_ref as string | undefined,
     createdAt: raw.created_at as number | undefined,
   }
 }
@@ -81,7 +81,7 @@ export async function getLastCwdMap(): Promise<Record<string, string>> {
  */
 export async function editProfile(
   name: string,
-  fields: { displayName?: string; description?: string; provider?: string; claudeMd?: string },
+  fields: { displayName?: string; description?: string; provider?: string; prompt?: string },
 ): Promise<Record<string, unknown> | null> {
   return call<Record<string, unknown> | null>(
     (api) => api.edit_profile!(
@@ -89,7 +89,7 @@ export async function editProfile(
       fields.displayName ?? '',
       fields.description ?? '',
       fields.provider ?? '',
-      fields.claudeMd ?? '',
+      fields.prompt ?? '',
     ),
     null,
   )

@@ -85,7 +85,7 @@ describe('useProfileResources', () => {
     mocks.findFiles.mockResolvedValue(['/profiles/a/skills/myskill/SKILL.md'])
     mocks.readFile.mockResolvedValue('---\nname: My Skill\ndescription: Does things\n---\n\nBody')
 
-    const { result } = renderHook(() => useProfileResources('prof-a', { includeSkills: true }))
+    const { result } = renderHook(() => useProfileResources('prof-a', { includeSkills: true, skillsDirName: 'skills' }))
 
     await waitFor(() => expect(result.current.skills.length).toBe(1))
     expect(result.current.skills[0]?.id).toBe('myskill')
