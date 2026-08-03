@@ -19,10 +19,7 @@ import { fetchProviders } from '@/api/providers'
 import { fetchSessions } from '@/api/sessions'
 import { cn, formatRelativeTime } from '@/lib/utils'
 import type { AgentType } from '@/api'
-import claudeLogo from '@/icons/extracted/claude.svg'
-import codexLogo from '@/icons/extracted/openai.svg'
-import hermesLogo from '@/icons/extracted/hermes.png'
-import opencodeLogo from '@/icons/extracted/opencode-logo-light.svg'
+import { useAgentConfigs, resolveAgentIdentity } from '@/hooks'
 
 interface HomePageProps {
   onNav: (key: NavKey) => void
@@ -37,22 +34,9 @@ interface StatTile {
   accent: 'accent' | 'success' | 'info' | 'warning'
 }
 
-const AGENT_TYPE_LOGOS: Record<string, string> = {
-  claude: claudeLogo,
-  codex: codexLogo,
-  hermes: hermesLogo,
-  opencode: opencodeLogo,
-}
-
-const AGENT_TYPE_HEX: Record<string, string> = {
-  claude: '#D97757',
-  codex: '#10A37F',
-  hermes: '#8B5CF6',
-  opencode: '#3B82F6',
-}
-
 export function HomePage({ onNav }: HomePageProps) {
   const { t, i18n } = useTranslation()
+  const { agentConfigs } = useAgentConfigs()
   const [profileCount, setProfileCount] = useState(0)
   const [providerCount, setProviderCount] = useState(0)
   const [sessionCount, setSessionCount] = useState(0)
@@ -240,8 +224,7 @@ export function HomePage({ onNav }: HomePageProps) {
             <div className="flex flex-col gap-2">
               {recentSessions.map((s, i) => {
                 const isRunning = !s.exitedAt
-                const accentColor = AGENT_TYPE_HEX[s.agentType] ?? '#888'
-                const logo = AGENT_TYPE_LOGOS[s.agentType]
+                const { color: accentColor, logo } = resolveAgentIdentity(agentConfigs, s.agentType)
                 return (
                   <div
                     key={i}

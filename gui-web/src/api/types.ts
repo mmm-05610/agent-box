@@ -111,6 +111,10 @@ export interface AgentTypeConfig {
   identity: {
     display_name: string
     binary: string
+    /** Brand accent color (hex) — pure presentation, served by the registry. */
+    color?: string
+    /** Logo asset path (relative to the frontend build root). */
+    logo?: string
     [key: string]: unknown
   }
   runtime: {

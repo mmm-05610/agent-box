@@ -11,34 +11,14 @@ import { Button, Badge, Tabs } from '@/components/ui'
 import { EmptyState, Loading, StatusDot } from '@/components/feedback'
 import { useToast } from '@/components/feedback/toast'
 import { PageHeader } from '@/components/layout'
-import { useSessions, useAgentTypeColor } from '@/hooks'
+import { useSessions, useAgentTypeColor, useAgentIdentity } from '@/hooks'
 import { cn, formatRelativeTime } from '@/lib/utils'
 import { cleanupSessions } from '@/api'
 import type { Session, SessionStatus } from '@/api'
-import claudeLogo from '@/icons/extracted/claude.svg'
-import codexLogo from '@/icons/extracted/openai.svg'
-import hermesLogo from '@/icons/extracted/hermes.png'
-import opencodeLogo from '@/icons/extracted/opencode-logo-light.svg'
 
 // ── Filter tab type ─────────────────────────────────────────────────────
 
 type FilterTab = 'all' | SessionStatus
-
-// ── Agent type constants ────────────────────────────────────────────────
-
-const AGENT_TYPE_LOGOS: Record<string, string> = {
-  claude: claudeLogo,
-  codex: codexLogo,
-  hermes: hermesLogo,
-  opencode: opencodeLogo,
-}
-
-const AGENT_TYPE_HEX: Record<string, string> = {
-  claude: '#D97757',
-  codex: '#10A37F',
-  hermes: '#8B5CF6',
-  opencode: '#3B82F6',
-}
 
 // ── Component ───────────────────────────────────────────────────────────
 
@@ -190,12 +170,11 @@ const FILTER_TABS: { key: FilterTab; labelKey: string }[] = [
 function SessionCard({ session }: { session: Session }) {
   const { t } = useTranslation()
   const agentTypeColor = useAgentTypeColor()
+  const { color: accentColor, logo } = useAgentIdentity(session.agentType)
   const { profile, agentType, cwd, mode, pid, launchedAt, exitedAt, exitCode } =
     session
 
   const isRunning = !exitedAt
-  const accentColor = AGENT_TYPE_HEX[agentType] ?? '#888'
-  const logo = AGENT_TYPE_LOGOS[agentType]
 
   return (
     <div

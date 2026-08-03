@@ -11,35 +11,13 @@ import { Button, Badge, Input, Tabs } from '@/components/ui'
 import { EmptyState, Loading } from '@/components/feedback'
 import { useToast } from '@/components/feedback/toast'
 import { PageHeader } from '@/components/layout'
-import { useAgentConfigs, useAgentTypeColor, useProfiles, useSessions } from '@/hooks'
+import { useAgentConfigs, useAgentIdentity, useAgentTypeColor, useProfiles, useSessions, resolveAgentIdentity } from '@/hooks'
 import { cn } from '@/lib/utils'
 import type { AgentType, Profile } from '@/api'
 import { createProfile, deleteProfile, launchProfile, getLastCwdMap, browseDir } from '@/api'
 import { readSettings } from '@/lib/settings'
 import { ProviderIcon } from '@/components/ProviderIcon'
 import { hasIcon, getIconMetadata } from '@/icons/extracted'
-
-// Agent type logos
-import claudeLogo from '@/icons/extracted/claude.svg'
-import codexLogo from '@/icons/extracted/openai.svg'
-import hermesLogo from '@/icons/extracted/hermes.png'
-import opencodeLogo from '@/icons/extracted/opencode-logo-light.svg'
-
-// ── Agent type icons ────────────────────────────────────────────────────
-
-const AGENT_TYPE_LOGOS: Record<string, string> = {
-  claude: claudeLogo,
-  codex: codexLogo,
-  hermes: hermesLogo,
-  opencode: opencodeLogo,
-}
-
-const AGENT_TYPE_HEX: Record<string, string> = {
-  claude: '#D97757',
-  codex: '#10A37F',
-  hermes: '#8B5CF6',
-  opencode: '#3B82F6',
-}
 
 // ── Provider icon resolution ────────────────────────────────────────────
 
@@ -351,6 +329,7 @@ function CreateProfileModal({
 }) {
   const { t } = useTranslation()
   const { toast } = useToast()
+  const { agentConfigs } = useAgentConfigs()
 
   const [name, setName] = useState('')
   const [agentType, setAgentType] = useState<AgentType>('claude')
@@ -407,7 +386,7 @@ function CreateProfileModal({
                   )}
                 >
                   <img
-                    src={AGENT_TYPE_LOGOS[at] ?? claudeLogo}
+                    src={resolveAgentIdentity(agentConfigs, at).logo || undefined}
                     alt={at}
                     className="h-5 w-5 object-contain"
                   />
@@ -496,11 +475,10 @@ function ProfileCard({
 }) {
   const { t } = useTranslation()
   const agentTypeColor = useAgentTypeColor()
+  const { color: accentColor, logo } = useAgentIdentity(profile.agentType)
   const { name, agentType, displayName, description, providerRef } = profile
 
   const displayLabel = displayName || name
-  const accentColor = AGENT_TYPE_HEX[agentType] ?? '#888'
-  const logo = AGENT_TYPE_LOGOS[agentType] ?? claudeLogo
   const providerIconKey = providerRef ? resolveIconKey(providerRef) : undefined
   const providerIconColor = providerIconKey ? getIconMetadata(providerIconKey)?.defaultColor : undefined
 
