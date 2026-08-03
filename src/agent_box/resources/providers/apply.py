@@ -1,6 +1,6 @@
 """Provider apply — write provider settings to profile config files.
 
-Strategy dispatch is driven by ``provider_config.strategy`` in the
+Strategy dispatch is driven by ``resources.provider.strategy`` in the
 agent-type registry.  Zero agent-type references in the apply logic —
 adding a new agent type that uses an existing strategy requires no
 code changes, only a registry entry.
@@ -19,9 +19,9 @@ from ..profile import ProfileError, _repo, load_meta
 
 
 # ── Strategy dispatch ──────────────────────────────────────────────────────
-# Maps provider_config.strategy → writer function.  Strategies are
+# Maps resources.provider.strategy → writer function.  Strategies are
 # agent-type-agnostic — any agent type can use any strategy by setting
-# the right provider_config in its registry entry.
+# the right provider block in its registry entry.
 
 def _strategy_json_merge(
     profile_name: str,
@@ -261,7 +261,7 @@ _STRATEGIES: Dict[str, Any] = {
 def apply_provider(profile_name: str, provider_id: str) -> None:
     """Write a provider's settings to the profile's config file.
 
-    Strategy selection is driven by ``provider_config.strategy`` in the
+    Strategy selection is driven by ``resources.provider.strategy`` in the
     agent-type registry — zero per-agent branching.
     """
     meta = load_meta(profile_name)
@@ -270,7 +270,7 @@ def apply_provider(profile_name: str, provider_id: str) -> None:
     if agent_config is None:
         raise ProfileError(f"unknown agent_type {agent_type!r}")
 
-    provider_cfg = agent_config.get("provider_config")
+    provider_cfg = (agent_config.get("resources") or {}).get("provider")
     if not isinstance(provider_cfg, dict):
         raise ProfileError(f"provider apply is not supported for {agent_type!r}")
 
@@ -290,7 +290,7 @@ def apply_provider(profile_name: str, provider_id: str) -> None:
 
     # Additive agents track applied providers in a JSON store so
     # list / remove can enumerate them.
-    if agent_config.get("provider_apply_mode") == "additive":
+    if (agent_config.get("resources") or {}).get("provider", {}).get("apply_mode") == "additive":
         _add_to_providers_store(profile_name, agent_type, provider, provider_cfg)
 
     writer(profile_name, agent_type, provider, settings, provider_cfg)
@@ -352,7 +352,7 @@ def remove_profile_provider(
 
     # 1. Remove from _providers.json store
     store_removed = False
-    if agent_config.get("provider_apply_mode") == "additive":
+    if (agent_config.get("resources") or {}).get("provider", {}).get("apply_mode") == "additive":
         store_path = _providers_store_path(profile_name, agent_type)
         if store_path.is_file():
             entries = read_json(store_path)
@@ -362,7 +362,7 @@ def remove_profile_provider(
                 store_removed = True
 
     # 2. Remove from native config file (strategy-driven)
-    provider_cfg = agent_config.get("provider_config")
+    provider_cfg = (agent_config.get("resources") or {}).get("provider")
     if isinstance(provider_cfg, dict):
         handler = _REMOVE_HANDLERS.get(provider_cfg.get("strategy"))
         if handler is not None:
@@ -455,7 +455,7 @@ def _build_yaml_custom_entry(
     """Build a ``custom_providers`` YAML entry from provider settings.
 
     All field names — settings keys, YAML output keys, model sub-keys —
-    are declared in ``provider_config.entry_yaml_spec``.  The YAML
+    are declared in ``resources.provider.entry_yaml_spec``.  The YAML
     *structure* (indentation, quoting, nesting) is still format-level,
     but every named thing comes from the registry.
     """

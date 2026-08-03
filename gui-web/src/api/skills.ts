@@ -27,7 +27,7 @@ function toSkill(raw: Record<string, unknown>): Skill {
 
 export async function fetchSkills(agentType: AgentType): Promise<Skill[]> {
   const raw = await call<Record<string, unknown>[]>(
-    (api) => api.list_skills(agentType),
+    (api) => api.list_skills!(agentType),
     [],
   )
   return raw.map(toSkill)
@@ -38,14 +38,14 @@ export async function saveSkill(
   dataJson: string,
 ): Promise<Skill> {
   const raw = await call<Record<string, unknown>>(
-    (api) => api.save_skill(skillId, dataJson),
+    (api) => api.save_skill!(skillId, dataJson),
     {} as Record<string, unknown>,
   )
   return toSkill(raw)
 }
 
 export async function deleteSkill(skillId: string): Promise<void> {
-  await call<void>((api) => api.delete_skill(skillId), undefined)
+  await call<void>((api) => api.delete_skill!(skillId), undefined)
 }
 
 export async function setSkillAgent(
@@ -54,7 +54,7 @@ export async function setSkillAgent(
   enabled: boolean,
 ): Promise<void> {
   await call<void>(
-    (api) => api.set_skill_agent(skillId, agentType, enabled ? 'true' : 'false'),
+    (api) => api.set_skill_agent!(skillId, agentType, enabled ? 'true' : 'false'),
     undefined,
   )
 }

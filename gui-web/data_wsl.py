@@ -36,12 +36,14 @@ def _wsl_run(cmd: str, timeout: float = 30) -> str:
     return result.stdout.decode("utf-8", errors="replace").strip()
 
 
-# Resume args per agent type — mirrors `resume_args` in the agent-type
-# registry (src/agent_box/core/library.py). Windows Python cannot import
-# agent_box (it lives in WSL), so this table is duplicated by necessity.
-# ⚠ SYNC: if a registry entry's `resume_args` changes, update this table too.
+# Resume args per agent type — mirrors `runtime.launch.resume` (minus the
+# binary name) in the agent-type registry (src/agent_box/core/agent_types.json).
+# Windows Python cannot import agent_box (it lives in WSL), so this table is
+# duplicated by necessity.
+# ⚠ SYNC: if a registry entry's `runtime.launch.resume` changes, update this
+# table too.
 _RESUME_ARGS = {
-    "claude": ("--continue",),
+    "claude": ("-c",),
     "codex": ("resume", "--last"),
     "hermes": ("-c",),
     "opencode": None,

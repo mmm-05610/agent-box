@@ -1,5 +1,5 @@
 /**
- * Plugins Editor — toggle list of enabledPlugins, with metadata panel.
+ * Plugins — toggle list of enabledPlugins, with metadata panel (Claude).
  *
  * Two data sources:
  *   1. settings.json → enabledPlugins : { "plugin-name": true|false }
@@ -21,6 +21,7 @@ import {
 } from '@/components/ui'
 import { useToast } from '@/components/feedback/toast'
 import { patchJsonFile, readFile } from '@/api/files'
+import { useProfileConfigDir } from '../useProfileConfigDir'
 
 interface InstalledPluginMeta {
   version?: string
@@ -49,10 +50,6 @@ function parseEnabledPlugins(content: string): Record<string, boolean> {
   }
 }
 
-function settingsDir(settingsPath: string): string {
-  return settingsPath.replace(/\/settings\.json$/, '')
-}
-
 function formatInstalledAt(value?: string): string {
   if (!value) return ''
   const date = new Date(value)
@@ -60,10 +57,12 @@ function formatInstalledAt(value?: string): string {
   return date.toLocaleString()
 }
 
-export function PluginsEditor({ path, content, onRefresh }: {
-  path: string; content: string; onRefresh: () => void
-}) {
+export function PluginsList({ profileName }: { profileName: string }) {
   const { t } = useTranslation()
+  const configDir = useProfileConfigDir(profileName)
+  const path = configDir === null ? null : `${configDir}/settings.json`
+  const [content, setContent] = useState('{}')
+  const [refreshKey, setRefreshKey] = useState(0)
   const enabledMap = useMemo(() => parseEnabledPlugins(content), [content])
 
   const [installedMap, setInstalledMap] = useState<Record<string, InstalledPluginMeta[]>>({})
@@ -73,9 +72,20 @@ export function PluginsEditor({ path, content, onRefresh }: {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const { toast } = useToast()
 
-  const installedPluginsPath = `${settingsDir(path)}/installed_plugins.json`
+  const installedPluginsPath = configDir === null ? null : `${configDir.replace(/\/+$/, '')}/installed_plugins.json`
+
+  // Self-fetch settings.json → enabledPlugins for the profile.
+  useEffect(() => {
+    if (!path) return
+    let cancelled = false
+    readFile(path)
+      .then((raw) => { if (!cancelled) setContent(raw) })
+      .catch(() => { if (!cancelled) setContent('{}') })
+    return () => { cancelled = true }
+  }, [path, refreshKey])
 
   useEffect(() => {
+    if (!installedPluginsPath) return
     let cancelled = false
     setMetaLoading(true)
     setMetaError('')
@@ -112,17 +122,18 @@ export function PluginsEditor({ path, content, onRefresh }: {
   }, [enabledMap, installedMap])
 
   const toggle = useCallback(async (name: string, enabled: boolean) => {
+    if (!path) return
     setSaving(name)
     try {
       const next = { ...enabledMap, [name]: enabled }
       await patchJsonFile(path, 'enabledPlugins', next)
-      onRefresh()
+      setRefreshKey((k) => k + 1)
     } catch (error) {
       toast({ type: 'error', message: error instanceof Error ? error.message : t('plugins.toast.failed') })
     } finally {
       setSaving(null)
     }
-  }, [path, enabledMap, onRefresh, toast])
+  }, [path, enabledMap, toast])
 
   const toggleExpanded = (id: string) => {
     setExpanded((current) => {

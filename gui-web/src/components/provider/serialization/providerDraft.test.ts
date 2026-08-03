@@ -6,7 +6,7 @@ describe('provider editor draft round trips', () => {
     const original = { auth: { OPENAI_API_KEY: 'key' }, config: 'model = "MiniMax-M3"\nmodel_provider = "custom"\n\n[model_providers.custom]\nbase_url = "https://api.minimax.io/v1"' }
     const draft = readProviderEditorDraft('codex', original)
     expect(draft.codex.catalogModels[0]?.model).toBe('MiniMax-M3')
-    draft.codex.catalogModels[0].model = 'MiniMax-M4'
+    draft.codex.catalogModels[0]!.model = 'MiniMax-M4'
     const saved = writeProviderEditorDraft('codex', original, draft)
     expect(saved.config).toContain('model = "MiniMax-M4"')
     expect(saved.modelCatalog).toEqual({ models: [{ model: 'MiniMax-M4', displayName: 'MiniMax-M3', contextWindow: '' }] })

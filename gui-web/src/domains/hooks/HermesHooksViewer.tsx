@@ -3,13 +3,14 @@
  * `config.yaml`. Each command can be expanded to read and display the
  * referenced script file content.
  *
- * Edits happen in the Storage tab.
+ * Self-fetches the profile's config.yaml; edits happen in the Storage tab.
  */
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from '@/components/ui'
 import { readFile } from '@/api/files'
+import { useProfileConfigDir } from '../useProfileConfigDir'
 
 interface HookEntry {
   command: string
@@ -40,15 +41,15 @@ function extractHooks(yaml: string): HookPhases {
 
     const phaseMatch = stripped.match(phaseRe)
     if (phaseMatch) {
-      currentPhase = phaseMatch[1]
-      phases[currentPhase] = phases[currentPhase] ?? []
+      currentPhase = phaseMatch[1] ?? null
+      if (currentPhase) phases[currentPhase] = phases[currentPhase] ?? []
       continue
     }
 
     const cmdMatch = stripped.match(commandRe)
     if (cmdMatch && currentPhase) {
-      const value = cmdMatch[1].trim().replace(/^(['"])(.*)\1$/, '$2')
-      phases[currentPhase].push({ command: value })
+      const value = cmdMatch[1]!.trim().replace(/^(['"])(.*)\1$/, '$2')
+      phases[currentPhase]!.push({ command: value })
     }
   }
   return phases
@@ -65,25 +66,28 @@ function phaseOrder(a: string, b: string): number {
   return ai - bi
 }
 
-export function HermesHooksViewer({
-  configYaml,
-  configDir,
-  onRefresh: _onRefresh,
-}: {
-  configYaml: string
-  configDir: string
-  /** Future hook for the parent to re-fetch config.yaml after external edits.
-   *  The component currently re-renders when its parent bumps `key`, so this
-   *  prop is declared but not yet consumed inside. */
-  onRefresh?: () => void
-}) {
+export function HermesHooksViewer({ profileName }: { profileName: string }) {
   const { t } = useTranslation()
+  const configDir = useProfileConfigDir(profileName)
+  const configPath = configDir === null ? null : `${configDir}/config.yaml`
+  const [configYaml, setConfigYaml] = useState('')
+
+  // Self-fetch the profile's config.yaml.
+  useEffect(() => {
+    if (!configPath) return
+    let cancelled = false
+    readFile(configPath)
+      .then((raw) => { if (!cancelled) setConfigYaml(raw) })
+      .catch(() => { if (!cancelled) setConfigYaml('') })
+    return () => { cancelled = true }
+  }, [configPath])
+
   // Resolve hook command paths. Paths like /home/maoqh/.hermes/hooks/foo.sh
   // refer to the bwrap mount — on the real filesystem they live under
   // configDir/hooks/. Translate the prefix.
   const resolvePath = useCallback((command: string) => {
     if (command.startsWith('/home/maoqh/.hermes/')) {
-      return configDir.replace(/\/+$/, '') + '/' + command.slice('/home/maoqh/.hermes/'.length)
+      return (configDir ?? '').replace(/\/+$/, '') + '/' + command.slice('/home/maoqh/.hermes/'.length)
     }
     return command
   }, [configDir])
@@ -153,7 +157,7 @@ export function HermesHooksViewer({
           </p>
         ) : (
           Object.keys(phases).sort(phaseOrder).map((phase) => {
-            const entries = phases[phase]
+            const entries = phases[phase] ?? []
             return (
               <div key={phase} className="rounded-lg bg-card ring-1 ring-border/60">
                 <div className="flex items-center justify-between gap-3 border-b border-border/40 px-4 py-3">

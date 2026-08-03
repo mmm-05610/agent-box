@@ -24,10 +24,10 @@ function toSession(raw: Record<string, unknown>): Session {
 }
 
 export async function fetchSessions(): Promise<Session[]> {
-  const raw = await call<Record<string, unknown>[]>((api) => api.list_sessions(), [])
+  const raw = await call<Record<string, unknown>[]>((api) => api.list_sessions!(), [])
   return raw.map(toSession)
 }
 
 export async function cleanupSessions(): Promise<number> {
-  return call<number>((api) => api.cleanup_sessions(), 0)
+  return call<number>((api) => api.cleanup_sessions!(), 0)
 }

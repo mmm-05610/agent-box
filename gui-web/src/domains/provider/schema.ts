@@ -93,16 +93,16 @@ export const opencodeSchema = baseProviderSchema.extend({
   settingsJson: z.string().optional(),
 })
 
-export const agentSchemaMap = {
+export const agentSchemaMap: Record<string, z.ZodType> = {
   claude: claudeSchema,
   codex: codexSchema,
   hermes: hermesSchema,
   opencode: opencodeSchema,
-} satisfies Record<AgentType, z.ZodType>
+}
 
-/** Look up the merged schema for an agent type. */
+/** Look up the merged schema for an agent type (base schema as fallback). */
 export function getAgentProviderSchema(agentType: AgentType): z.ZodType {
-  return agentSchemaMap[agentType]
+  return agentSchemaMap[agentType] ?? baseProviderSchema
 }
 
 // ── Defaults from the stage-1 fact source ──────────────────────────────
@@ -158,5 +158,8 @@ export function providerPresetDefaults(agentType: AgentType): ProviderDraftDefau
         hermesApiMode: 'openai_compatible',
         opencodeNpm: '@ai-sdk/openai-compatible',
       }
+    default:
+      // Unknown agent types seed from the Claude defaults.
+      return providerPresetDefaults('claude')
   }
 }

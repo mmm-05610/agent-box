@@ -51,10 +51,9 @@ export function ConfirmDialog({
 
   // Autofocus the destructive button so Enter confirms.
   useEffect(() => {
-    if (open) {
-      const t = setTimeout(() => confirmRef.current?.focus(), 0)
-      return () => clearTimeout(t)
-    }
+    if (!open) return
+    const t = setTimeout(() => confirmRef.current?.focus(), 0)
+    return () => clearTimeout(t)
   }, [open])
 
   // Esc closes (unless busy).

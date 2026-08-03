@@ -27,7 +27,7 @@ function toMcpServer(raw: Record<string, unknown>): McpServer {
 
 export async function fetchMcpServers(agentType: AgentType): Promise<McpServer[]> {
   const raw = await call<Record<string, unknown>[]>(
-    (api) => api.list_mcp_servers(agentType),
+    (api) => api.list_mcp_servers!(agentType),
     [],
   )
   return raw.map(toMcpServer)
@@ -37,7 +37,7 @@ export async function fetchMcpServerDetail(
   serverId: string,
 ): Promise<McpServer | null> {
   const raw = await call<Record<string, unknown> | null>(
-    (api) => api.get_mcp_server(serverId),
+    (api) => api.get_mcp_server!(serverId),
     null,
   )
   return raw ? toMcpServer(raw) : null
@@ -48,14 +48,14 @@ export async function saveMcpServer(
   dataJson: string,
 ): Promise<McpServer> {
   const raw = await call<Record<string, unknown>>(
-    (api) => api.save_mcp_server(serverId, dataJson),
+    (api) => api.save_mcp_server!(serverId, dataJson),
     {} as Record<string, unknown>,
   )
   return toMcpServer(raw)
 }
 
 export async function deleteMcpServer(serverId: string): Promise<void> {
-  await call<void>((api) => api.delete_mcp_server(serverId), undefined)
+  await call<void>((api) => api.delete_mcp_server!(serverId), undefined)
 }
 
 export async function setMcpAgent(
@@ -64,7 +64,7 @@ export async function setMcpAgent(
   enabled: boolean,
 ): Promise<void> {
   await call<void>(
-    (api) => api.set_mcp_agent(serverId, agentType, enabled ? 'true' : 'false'),
+    (api) => api.set_mcp_agent!(serverId, agentType, enabled ? 'true' : 'false'),
     undefined,
   )
 }

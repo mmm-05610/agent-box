@@ -26,7 +26,7 @@ def _acs_column(agent_type: str) -> str:
     agent_config = get_agent_config(agent_type)
     if agent_config is None:
         raise ValueError(f"Unknown agent type: {agent_type!r}")
-    return agent_config["acs_column"]
+    return agent_config["runtime"]["acs_column"]
 
 
 def _conn() -> sqlite3.Connection | None:

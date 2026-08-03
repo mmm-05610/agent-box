@@ -6,19 +6,21 @@
  * `fields/<Agent>Fields.tsx` + one registry line; the frame doesn't change.
  */
 import type { ComponentType } from 'react'
-import type { AgentType } from '@/api'
 import type { ProviderFieldsProps } from './types'
 import { ClaudeFields } from './ClaudeFields'
 import { CodexFields } from './CodexFields'
 import { HermesFields } from './HermesFields'
 import { OpenCodeFields } from './OpenCodeFields'
 
-export const FIELD_REGISTRY: Record<AgentType, ComponentType<ProviderFieldsProps>> = {
+export const FIELD_REGISTRY: Record<string, ComponentType<ProviderFieldsProps>> = {
   claude: ClaudeFields,
   codex: CodexFields,
   hermes: HermesFields,
   opencode: OpenCodeFields,
 }
+
+/** Fallback fields component for unknown agent types. */
+export const DEFAULT_PROVIDER_FIELDS: ComponentType<ProviderFieldsProps> = ClaudeFields
 
 export type { ProviderFieldsProps } from './types'
 export type { ClaudeApiKeyField, CodexApiFormat, CodexCatalogModel, CodexChatReasoning, PromptCacheRoutingMode } from './CodexFields'

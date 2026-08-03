@@ -1,7 +1,9 @@
 /**
- * Hooks List — JSON editor with expandable per-event summary.
+ * Hooks — JSON editor with expandable per-event summary.
  *
- * Reads/writes settings.json → hooks key for the given profile.
+ * Claude / Codex / OpenCode store hooks in settings.json → hooks key.
+ * Hermes stores hooks in config.yaml (read-only viewer). The registry picks
+ * the right implementation via `agentType`.
  *
  * The JSON shape is too nested to form-edit, so we keep a single textarea
  * as the single source of truth. Above it, each configured event is a
@@ -16,7 +18,9 @@ import { useToast } from '@/components/feedback/toast'
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from '@/components/ui'
 import { Textarea } from '@/components/ui'
 import { patchJsonFile, readFile } from '@/api/files'
+import type { AgentType } from '@/api'
 import { useProfileConfigDir } from '../useProfileConfigDir'
+import { HermesHooksViewer } from './HermesHooksViewer'
 
 interface HookEntry {
   type?: string
@@ -84,9 +88,15 @@ function summarize(parsed: unknown): { events: EventSummary[]; total: number } {
 
 interface HookListProps {
   profileName: string
+  agentType?: AgentType
 }
 
-export function HookList({ profileName }: HookListProps) {
+export function HookList({ profileName, agentType }: HookListProps) {
+  if (agentType === 'hermes') return <HermesHooksViewer profileName={profileName} />
+  return <SettingsHooksEditor profileName={profileName} />
+}
+
+function SettingsHooksEditor({ profileName }: { profileName: string }) {
   const { t } = useTranslation()
   const configDir = useProfileConfigDir(profileName)
   const path = configDir === null ? null : `${configDir}/settings.json`

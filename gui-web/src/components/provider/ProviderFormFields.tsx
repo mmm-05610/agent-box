@@ -15,7 +15,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import i18n from '@/i18n'
-import { Input, Button, Card, CardHeader, CardTitle, CardContent } from '@/components/ui'
+import { Input } from '@/components/ui'
 
 // ── Model role row ─────────────────────────────────────────────────────
 
@@ -96,7 +96,7 @@ export function defaultFormValues(
     testTimeout: (extra?.testTimeout as string) ?? '',
     testDegradedThreshold: (extra?.testDegradedThreshold as string) ?? '',
     testMaxRetries: (extra?.testMaxRetries as string) ?? '',
-    pricingConfigEnabled: Boolean(extra?.pricingConfigEnabled) || Boolean(extra?.costMultiplier) || ((extra?.pricingModelSource as string) && (extra?.pricingModelSource as string) !== 'inherit'),
+    pricingConfigEnabled: Boolean(extra?.pricingConfigEnabled) || Boolean(extra?.costMultiplier) || Boolean((extra?.pricingModelSource as string) && (extra?.pricingModelSource as string) !== 'inherit'),
     costMultiplier: (extra?.costMultiplier as string) ?? '',
     pricingModelSource: (extra?.pricingModelSource as string) ?? 'inherit',
   }
@@ -109,8 +109,8 @@ export function formValuesToEnv(v: ProviderFormValues): Record<string, string> {
   if (v.fallbackModel) e.ANTHROPIC_MODEL = v.fallbackModel
   for (const r of MODEL_ROLES) {
     const rm = v.roleModels[r.role]
-    if (rm.model) e[r.modelField] = rm.model
-    if (rm.name) e[r.nameField] = rm.name
+    if (rm?.model) e[r.modelField] = rm.model
+    if (rm?.name) e[r.nameField] = rm.name
   }
   if (v.timeoutMs) e.API_TIMEOUT_MS = v.timeoutMs
   if (v.disableAutoUpdates) e.DISABLE_AUTOUPDATER = '1'
@@ -257,8 +257,8 @@ export function ProviderFormFields({
                 {MODEL_ROLES.map((row) => (
                   <div key={row.role} className="grid grid-cols-1 md:grid-cols-[80px_1fr_1fr] gap-2">
                     <div className="flex h-9 items-center rounded-md bg-muted px-3 text-xs font-medium text-muted-foreground">{t(row.labelKey)}</div>
-                    <Input value={values.roleModels[row.role]?.name ?? ''} onChange={(e) => set({ roleModels: { ...values.roleModels, [row.role]: { ...values.roleModels[row.role], name: e.target.value } } })} placeholder={t('providerForm.displayNamePlaceholder')} className="text-sm font-mono" disabled={readOnly} />
-                    <Input value={values.roleModels[row.role]?.model ?? ''} onChange={(e) => set({ roleModels: { ...values.roleModels, [row.role]: { ...values.roleModels[row.role], model: e.target.value } } })} placeholder={row.modelField} className="text-sm font-mono" disabled={readOnly} />
+                    <Input value={values.roleModels[row.role]?.name ?? ''} onChange={(e) => set({ roleModels: { ...values.roleModels, [row.role]: { ...values.roleModels[row.role]!, name: e.target.value } } })} placeholder={t('providerForm.displayNamePlaceholder')} className="text-sm font-mono" disabled={readOnly} />
+                    <Input value={values.roleModels[row.role]?.model ?? ''} onChange={(e) => set({ roleModels: { ...values.roleModels, [row.role]: { ...values.roleModels[row.role]!, model: e.target.value } } })} placeholder={row.modelField} className="text-sm font-mono" disabled={readOnly} />
                   </div>
                 ))}
               </div>

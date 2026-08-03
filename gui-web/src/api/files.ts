@@ -7,11 +7,11 @@ import { call } from '@/lib/bridge'
 export type { FetchedModel } from './models'
 
 export async function readFile(path: string): Promise<string> {
-  return call<string>((api) => api.read_file(path), '')
+  return call<string>((api) => api.read_file!(path), '')
 }
 
 export async function saveFile(path: string, content: string): Promise<boolean> {
-  return call<boolean>((api) => api.save_file(path, content), false)
+  return call<boolean>((api) => api.save_file!(path, content), false)
 }
 
 /**
@@ -22,13 +22,13 @@ export async function patchJsonFile(
   path: string, key: string, value: unknown,
 ): Promise<boolean> {
   return call<boolean>(
-    (api) => api.patch_json_file(path, key, JSON.stringify(value)),
+    (api) => api.patch_json_file!(path, key, JSON.stringify(value)),
     false,
   )
 }
 
 export async function listDir(path: string): Promise<string> {
-  return call<string>((api) => api.list_dir(path), '')
+  return call<string>((api) => api.list_dir!(path), '')
 }
 
 export interface EndpointTestResult {
@@ -41,7 +41,7 @@ export interface EndpointTestResult {
 /** Connectivity check like cc-switch. Returns structured result with operational/degraded/failed. */
 export async function testEndpoint(url: string): Promise<EndpointTestResult | null> {
   return call<EndpointTestResult | null>(
-    (api) => api.test_endpoint(url, 5),
+    (api) => api.test_endpoint!(url, 5),
     null,
   )
 }
@@ -51,13 +51,13 @@ export async function testEndpoint(url: string): Promise<EndpointTestResult | nu
  */
 export async function findFiles(path: string): Promise<string[]> {
   // Normalize — backend can return null/non-array when the directory is missing.
-  const result = await call<string[] | null>((api) => api.find_files(path), null)
+  const result = await call<string[] | null>((api) => api.find_files!(path), null)
   return Array.isArray(result) ? result : []
 }
 
 /** Delete a file or directory recursively. */
 export async function deletePath(path: string): Promise<boolean> {
-  return call<boolean>((api) => api.delete_path(path), false)
+  return call<boolean>((api) => api.delete_path!(path), false)
 }
 
 export interface LegacyFetchedModel {
@@ -67,7 +67,7 @@ export interface LegacyFetchedModel {
 
 export async function fetchModels(baseUrl: string, apiKey: string, modelsUrl?: string, isFullUrl?: boolean): Promise<LegacyFetchedModel[]> {
   return call<LegacyFetchedModel[]>(
-    (api) => api.fetch_models(baseUrl, apiKey, modelsUrl || '', isFullUrl || false),
+    (api) => api.fetch_models!(baseUrl, apiKey, modelsUrl || '', isFullUrl || false),
     [],
   )
 }
@@ -85,5 +85,5 @@ export interface DirTreeNode {
  * for "one level" then refetch with deeper values on expansion.
  */
 export async function listDirTree(path: string, maxDepth = 4): Promise<DirTreeNode | null> {
-  return call<DirTreeNode | null>((api) => api.list_dir_tree(path, maxDepth), null)
+  return call<DirTreeNode | null>((api) => api.list_dir_tree!(path, maxDepth), null)
 }

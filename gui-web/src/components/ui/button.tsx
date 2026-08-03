@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils'
 // ── Types ──────────────────────────────────────────────────────────────
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'ghost' | 'destructive'
+  variant?: 'primary' | 'secondary' | 'ghost' | 'outline' | 'destructive'
   size?: 'sm' | 'md' | 'lg'
   children: ReactNode
   isLoading?: boolean
@@ -92,6 +92,8 @@ const variantStyles = {
     'bg-secondary text-secondary-foreground hover:bg-secondary-hover',
   ghost:
     'bg-transparent text-muted-foreground hover:bg-card-hover hover:text-foreground',
+  outline:
+    'bg-transparent border border-border text-foreground hover:bg-card-hover hover:text-foreground',
   destructive:
     'bg-destructive text-destructive-foreground hover:bg-destructive-hover hover:shadow-md hover:-translate-y-px',
 } as const

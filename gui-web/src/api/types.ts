@@ -103,52 +103,63 @@ export interface Profile {
   createdAt?: number
 }
 
-export type AgentType = 'claude' | 'codex' | 'hermes' | 'opencode'
+/** Agent type id — fully dynamic; the backend registry is the source of truth. */
+export type AgentType = string
 
-export const AGENT_TYPES: AgentType[] = ['claude', 'codex', 'hermes', 'opencode']
-
-export type AgentFeature = 'permissions' | 'plugins' | 'rules' | 'memories' | 'instructions'
 export type ProviderApplyMode = 'overwrite' | 'additive'
 
+/** Resource capability block — key = supported resource type. */
+export interface ResourceConfig {
+  apply_mode?: ProviderApplyMode
+  config_file?: string
+  file?: string
+  format?: string
+  key?: string
+  [key: string]: unknown
+}
+
+/**
+ * Agent-type registry contract (mirrors core/agent_types.json).
+ *
+ * The backend registry is the single source of truth; the frontend only
+ * annotates the fields it consumes, with `[key: string]: unknown` as the
+ * catch-all for everything else.
+ */
 export interface AgentTypeConfig {
-  prompt_file: string
-  features: AgentFeature[]
-  config_files: string[]
-  provider_apply_mode: ProviderApplyMode
-}
-
-export const AGENT_TYPE_CONFIGS: Record<AgentType, AgentTypeConfig> = {
-  claude: {
-    prompt_file: 'CLAUDE.md',
-    features: ['permissions', 'plugins'],
-    config_files: ['settings.json'],
-    provider_apply_mode: 'overwrite',
-  },
-  codex: {
-    prompt_file: 'AGENTS.md',
-    features: ['rules'],
-    config_files: ['config.toml', 'auth.json'],
-    provider_apply_mode: 'overwrite',
-  },
-  hermes: {
-    prompt_file: 'SOUL.md',
-    features: ['memories'],
-    config_files: ['config.yaml', '.env'],
-    provider_apply_mode: 'additive',
-  },
-  opencode: {
-    prompt_file: 'AGENTS.md',
-    features: ['instructions'],
-    config_files: ['opencode.jsonc'],
-    provider_apply_mode: 'additive',
-  },
-}
-
-export const AGENT_TYPE_COLORS: Record<AgentType, string> = {
-  claude: 'warning',    // orange
-  codex: 'success',     // green
-  hermes: 'info',       // blue
-  opencode: 'primary',  // neutral
+  identity: {
+    display_name: string
+    binary: string
+    [key: string]: unknown
+  }
+  runtime: {
+    config_dir: string
+    profile_dir_suffix: string
+    config_files?: string[]
+    data_dir?: string
+    venv_preserve?: string
+    extra_profile_files?: string[]
+    launch?: {
+      interactive?: string[]
+      exec?: string[]
+      resume?: string[]
+      resume_by_id?: string[]
+      [key: string]: unknown
+    }
+    acs_column: string
+    [key: string]: unknown
+  }
+  resources: Record<string, ResourceConfig>
+  sandbox?: {
+    bind_mounts?: string[]
+    dev_mounts?: string[]
+    proc_mounts?: string[]
+    tmpfs?: string[]
+    unshare?: string[]
+    share?: string[]
+    [key: string]: unknown
+  }
+  presets?: Record<string, unknown>
+  [key: string]: unknown
 }
 
 // ── Session ────────────────────────────────────────────────────────────

@@ -3,7 +3,9 @@
  */
 
 export { useLibrary } from './useLibrary'
+export { useAgentConfigs, resetAgentConfigsCache } from './useAgentConfigs'
 export { useProfileResources } from './useProfileResources'
 export { useProfileContext } from './useProfileContext'
 export { useProfiles } from './use-profiles'
 export { useSessions } from './use-sessions'
+export { useProfilePath } from './useProfilePath'

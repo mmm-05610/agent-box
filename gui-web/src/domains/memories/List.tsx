@@ -1,5 +1,5 @@
 /**
- * Hermes Memories Tab — MEMORY.md + USER.md editors.
+ * Memories — MEMORY.md + USER.md editors (Hermes).
  *
  * Two independently-saved textareas. Files live under
  * `${configDir}/memories/` and are created on save if missing.
@@ -10,6 +10,7 @@ import { Trans, useTranslation } from 'react-i18next'
 import { Button, Card, CardContent, CardHeader, CardTitle, Textarea } from '@/components/ui'
 import { useToast } from '@/components/feedback/toast'
 import { readFile, saveFile } from '@/api/files'
+import { useProfileConfigDir } from '../useProfileConfigDir'
 
 interface MemoryFile {
   path: string
@@ -30,10 +31,11 @@ const FILES: MemoryFile[] = [
   },
 ]
 
-export function HermesMemoriesTab({ configDir }: { configDir: string }) {
+export function MemoriesList({ profileName }: { profileName: string }) {
   const { t } = useTranslation()
-  const memoriesDir = `${configDir.replace(/\/+$/, '')}/memories`
-  const fileEntries: MemoryFile[] = FILES.map((f) => ({ ...f, path: `${memoriesDir}/${f.label}` }))
+  const configDir = useProfileConfigDir(profileName)
+  const memoriesDir = configDir === null ? null : `${configDir.replace(/\/+$/, '')}/memories`
+  const fileEntries: MemoryFile[] = memoriesDir === null ? [] : FILES.map((f) => ({ ...f, path: `${memoriesDir}/${f.label}` }))
 
   const [texts, setTexts] = useState<Record<string, string>>({})
   const [original, setOriginal] = useState<Record<string, string>>({})
@@ -42,6 +44,12 @@ export function HermesMemoriesTab({ configDir }: { configDir: string }) {
   const { toast } = useToast()
 
   useEffect(() => {
+    if (memoriesDir === null) {
+      setLoading(false)
+      setTexts({})
+      setOriginal({})
+      return
+    }
     let cancelled = false
     setLoading(true)
     void Promise.all(fileEntries.map(async (f) => {
@@ -87,7 +95,7 @@ export function HermesMemoriesTab({ configDir }: { configDir: string }) {
         <p className="text-sm text-muted-foreground">
           <Trans
             i18nKey="memories.subtitle"
-            values={{ dir: memoriesDir }}
+            values={{ dir: memoriesDir ?? '' }}
             components={{ code: <code className="font-mono" /> }}
           />
         </p>

@@ -11,7 +11,15 @@ interface ApiResponse<T> {
   error?: string
 }
 
-type ApiMethod = (...args: string[]) => Promise<string>
+type ApiMethod = (...args: unknown[]) => Promise<string>
+
+declare global {
+  interface Window {
+    pywebview?: {
+      api?: Record<string, ApiMethod>
+    }
+  }
+}
 
 // Cache the API reference once it's available
 let cachedApi: Record<string, ApiMethod> | null = null
@@ -26,7 +34,6 @@ async function getApi(): Promise<Record<string, ApiMethod> | null> {
 
   // Poll every 100ms for up to 5 seconds
   for (let i = 0; i < 50; i++) {
-    // @ts-expect-error
     const api = window.pywebview?.api
     if (api) {
       cachedApi = api as Record<string, ApiMethod>

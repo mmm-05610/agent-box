@@ -8,9 +8,8 @@ import { useTranslation } from 'react-i18next'
 import { Button, Card, CardContent, CardHeader, CardTitle, Textarea } from '@/components/ui'
 import { useToast } from '@/components/feedback/toast'
 import { readFile, saveFile } from '@/api/files'
-import { AGENT_TYPE_CONFIGS } from '@/api'
 import type { AgentType } from '@/api'
-import { useLibrary } from '@/hooks'
+import { useAgentConfigs, useLibrary } from '@/hooks'
 import { useProfileConfigDir } from '../useProfileConfigDir'
 
 interface PromptListProps {
@@ -22,7 +21,9 @@ export function PromptList({ profileName, agentType }: PromptListProps) {
   const { t } = useTranslation()
   const { toast } = useToast()
   const configDir = useProfileConfigDir(profileName)
-  const promptFile = AGENT_TYPE_CONFIGS[agentType].prompt_file
+  // Registry-driven (resources.prompt.file); CLAUDE.md while loading.
+  const { agentConfigs } = useAgentConfigs()
+  const promptFile = agentConfigs?.[agentType]?.resources?.prompt?.file ?? 'CLAUDE.md'
   const promptPath = configDir === null ? null : `${configDir}/${promptFile}`
 
   const { prompts: library } = useLibrary(agentType, ['prompts'])

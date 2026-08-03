@@ -5,6 +5,11 @@ import { mcpResource } from './mcp'
 import { skillResource } from './skills'
 import { hookResource } from './hooks'
 import { promptResource } from './prompt'
+import { permissionsResource } from './permissions'
+import { pluginsResource } from './plugins'
+import { rulesResource } from './rules'
+import { memoriesResource } from './memories'
+import { instructionsResource } from './instructions'
 
 export interface ResourceDef {
   key: string
@@ -16,9 +21,14 @@ export interface ResourceDef {
 export const RESOURCES = {
   provider: providerResource,
   mcp: mcpResource,
-  skill: skillResource,
-  hook: hookResource,
+  skills: skillResource,
+  hooks: hookResource,
   prompt: promptResource,
+  permissions: permissionsResource,
+  plugins: pluginsResource,
+  rules: rulesResource,
+  memories: memoriesResource,
+  instructions: instructionsResource,
 } satisfies Record<string, ResourceDef>
 
 export type ResourceKey = keyof typeof RESOURCES

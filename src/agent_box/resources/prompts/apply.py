@@ -17,13 +17,13 @@ def apply_prompt(profile_name: str, prompt_id: str) -> None:
     agent_config = get_agent_config(meta["agent_type"])
     if agent_config is None:
         raise ProfileError(f"unknown agent_type {meta['agent_type']!r}")
-    if not agent_config.get("supports_prompt_apply"):
+    if not (agent_config.get("resources") or {}).get("prompt"):
         raise ProfileError(
             f"prompt apply is not supported for {meta['agent_type']!r}"
         )
     target = (
         config.profile_agent_dir(profile_name, meta["agent_type"])
-        / agent_config["prompt_file"]
+        / agent_config["resources"]["prompt"]["file"]
     )
     write_text(target, prompt.get("content") or "")
     _repo.set_prompt_ref(profile_name, prompt_id)

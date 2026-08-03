@@ -14,8 +14,8 @@ import { PageHeader } from '@/components/layout'
 import { useSessions } from '@/hooks'
 import { cn, formatRelativeTime } from '@/lib/utils'
 import { cleanupSessions } from '@/api'
-import type { Session, SessionStatus, AgentType } from '@/api'
-import { AGENT_TYPE_COLORS } from '@/api'
+import type { Session, SessionStatus } from '@/api'
+import { agentTypeColor } from '@/config'
 import claudeLogo from '@/icons/extracted/claude.svg'
 import codexLogo from '@/icons/extracted/openai.svg'
 import hermesLogo from '@/icons/extracted/hermes.png'
@@ -27,7 +27,7 @@ type FilterTab = 'all' | SessionStatus
 
 // ── Agent type constants ────────────────────────────────────────────────
 
-const AGENT_TYPE_LOGOS: Record<AgentType, string> = {
+const AGENT_TYPE_LOGOS: Record<string, string> = {
   claude: claudeLogo,
   codex: codexLogo,
   hermes: hermesLogo,
@@ -92,7 +92,7 @@ export function SessionsPage() {
       <div className="mx-auto w-full max-w-6xl px-8 py-10">
         <PageHeader
           title={t('sessions.title')}
-          description={t('sessions.description')}
+          subtitle={t('sessions.description')}
           className="mb-6"
         />
         <Loading variant="skeleton" rows={6} />
@@ -105,7 +105,7 @@ export function SessionsPage() {
       <div className="mx-auto w-full max-w-6xl px-8 py-10">
         <PageHeader
           title={t('sessions.title')}
-          description={t('sessions.description')}
+          subtitle={t('sessions.description')}
           className="mb-6"
         />
         <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-10 text-center">
@@ -231,7 +231,7 @@ function SessionCard({ session }: { session: Session }) {
             <img src={logo} alt={agentType} className="h-6 w-6 object-contain" />
           ) : (
             <span className="text-sm font-bold" style={{ color: accentColor }}>
-              {agentType[0].toUpperCase()}
+              {agentType[0]!.toUpperCase()}
             </span>
           )}
         </div>
@@ -243,15 +243,7 @@ function SessionCard({ session }: { session: Session }) {
               {profile}
             </h3>
             <Badge
-              variant={
-                AGENT_TYPE_COLORS[agentType] as
-                  | 'neutral'
-                  | 'primary'
-                  | 'success'
-                  | 'warning'
-                  | 'destructive'
-                  | 'info'
-              }
+              variant={agentTypeColor(agentType)}
             >
               {agentType}
             </Badge>

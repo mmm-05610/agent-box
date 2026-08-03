@@ -7,16 +7,15 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Button, Card, Badge, Input, Tabs } from '@/components/ui'
+import { Button, Badge, Input, Tabs } from '@/components/ui'
 import { EmptyState, Loading } from '@/components/feedback'
 import { useToast } from '@/components/feedback/toast'
 import { PageHeader } from '@/components/layout'
-import { useProfiles } from '@/hooks'
-import { useSessions } from '@/hooks'
+import { useAgentConfigs, useProfiles, useSessions } from '@/hooks'
 import { cn } from '@/lib/utils'
-import { formatRelativeTime } from '@/lib/utils'
 import type { AgentType, Profile } from '@/api'
-import { AGENT_TYPES, AGENT_TYPE_COLORS, createProfile, deleteProfile, launchProfile, getLastCwdMap, browseDir } from '@/api'
+import { createProfile, deleteProfile, launchProfile, getLastCwdMap, browseDir } from '@/api'
+import { agentTypeColor } from '@/config'
 import { readSettings } from '@/lib/settings'
 import { ProviderIcon } from '@/components/ProviderIcon'
 import { hasIcon, getIconMetadata } from '@/icons/extracted'
@@ -29,14 +28,14 @@ import opencodeLogo from '@/icons/extracted/opencode-logo-light.svg'
 
 // ── Agent type icons ────────────────────────────────────────────────────
 
-const AGENT_TYPE_LOGOS: Record<AgentType, string> = {
+const AGENT_TYPE_LOGOS: Record<string, string> = {
   claude: claudeLogo,
   codex: codexLogo,
   hermes: hermesLogo,
   opencode: opencodeLogo,
 }
 
-const AGENT_TYPE_HEX: Record<AgentType, string> = {
+const AGENT_TYPE_HEX: Record<string, string> = {
   claude: '#D97757',
   codex: '#10A37F',
   hermes: '#8B5CF6',
@@ -87,7 +86,7 @@ const FILTER_TABS: { key: FilterTab; labelKey: string }[] = [
 ]
 
 /** Create-modal agent display names (brand names, identical in both packs). */
-const CREATE_AGENT_KEYS: Record<AgentType, string> = {
+const CREATE_AGENT_KEYS: Record<string, string> = {
   claude: 'agent.claudeCode',
   codex: 'agent.codex',
   hermes: 'agent.hermes',
@@ -106,6 +105,9 @@ export function ProfilesPage({ onOpenDetail, autoOpenCreate, onAutoOpenCreateHan
   const { t } = useTranslation()
   const { profiles, loading, error, refresh, filterByType } = useProfiles()
   const { sessions } = useSessions()
+  const { agentConfigs } = useAgentConfigs()
+  // Registry-driven agent types (loading fallback: empty list).
+  const agentTypes = useMemo(() => (agentConfigs ? Object.keys(agentConfigs) : []), [agentConfigs])
   const { toast } = useToast()
 
   const [activeFilter, setActiveFilter] = useState<FilterTab>('all')
@@ -151,12 +153,12 @@ export function ProfilesPage({ onOpenDetail, autoOpenCreate, onAutoOpenCreateHan
   // ── Count per type (for tab labels) ─────────────────────────────────
 
   const countByType = useMemo(() => {
-    const counts: Record<FilterTab, number> = { all: profiles.length }
-    for (const t of AGENT_TYPES) {
+    const counts: Record<string, number> = { all: profiles.length }
+    for (const t of agentTypes) {
       counts[t] = profiles.filter((p) => p.agentType === t).length
     }
     return counts
-  }, [profiles])
+  }, [profiles, agentTypes])
 
   // ── Handlers ────────────────────────────────────────────────────────
 
@@ -211,7 +213,7 @@ export function ProfilesPage({ onOpenDetail, autoOpenCreate, onAutoOpenCreateHan
       <div className="mx-auto w-full max-w-6xl px-8 py-10">
         <PageHeader
           title={t('profiles.title')}
-          description={t('profiles.description')}
+          subtitle={t('profiles.description')}
           className="mb-6"
         />
         <Loading variant="skeleton" rows={4} />
@@ -224,7 +226,7 @@ export function ProfilesPage({ onOpenDetail, autoOpenCreate, onAutoOpenCreateHan
       <div className="mx-auto w-full max-w-6xl px-8 py-10">
         <PageHeader
           title={t('profiles.title')}
-          description={t('profiles.description')}
+          subtitle={t('profiles.description')}
           className="mb-6"
         />
         <div className="flex flex-col items-center gap-3 py-16 text-destructive">
@@ -305,6 +307,7 @@ export function ProfilesPage({ onOpenDetail, autoOpenCreate, onAutoOpenCreateHan
       {/* Create Profile Modal */}
       {showCreate && (
         <CreateProfileModal
+          agentTypes={agentTypes}
           onClose={() => setShowCreate(false)}
           onCreated={() => { setShowCreate(false); refresh() }}
         />
@@ -339,9 +342,11 @@ export function ProfilesPage({ onOpenDetail, autoOpenCreate, onAutoOpenCreateHan
 // ── Create Profile Modal ─────────────────────────────────────────────────
 
 function CreateProfileModal({
+  agentTypes,
   onClose,
   onCreated,
 }: {
+  agentTypes: string[]
   onClose: () => void
   onCreated: () => void
 }) {
@@ -391,7 +396,7 @@ function CreateProfileModal({
           <div>
             <label className="text-sm font-medium text-foreground mb-2 block">{t('profiles.create.agentType')}</label>
             <div className="grid grid-cols-2 gap-2">
-              {AGENT_TYPES.map((at) => (
+              {agentTypes.map((at) => (
                 <button
                   key={at}
                   onClick={() => setAgentType(at)}
@@ -403,11 +408,11 @@ function CreateProfileModal({
                   )}
                 >
                   <img
-                    src={AGENT_TYPE_LOGOS[at]}
+                    src={AGENT_TYPE_LOGOS[at] ?? claudeLogo}
                     alt={at}
                     className="h-5 w-5 object-contain"
                   />
-                  {t(CREATE_AGENT_KEYS[at])}
+                  {t(CREATE_AGENT_KEYS[at] ?? at)}
                 </button>
               ))}
             </div>
@@ -491,12 +496,11 @@ function ProfileCard({
   onView: (name: string) => void
 }) {
   const { t } = useTranslation()
-  const { name, agentType, displayName, description, providerRef, createdAt } =
-    profile
+  const { name, agentType, displayName, description, providerRef } = profile
 
   const displayLabel = displayName || name
-  const accentColor = AGENT_TYPE_HEX[agentType]
-  const logo = AGENT_TYPE_LOGOS[agentType]
+  const accentColor = AGENT_TYPE_HEX[agentType] ?? '#888'
+  const logo = AGENT_TYPE_LOGOS[agentType] ?? claudeLogo
   const providerIconKey = providerRef ? resolveIconKey(providerRef) : undefined
   const providerIconColor = providerIconKey ? getIconMetadata(providerIconKey)?.defaultColor : undefined
 
@@ -561,7 +565,7 @@ function ProfileCard({
             >
               {displayLabel}
             </h3>
-            <Badge variant={AGENT_TYPE_COLORS[agentType] as 'neutral' | 'primary' | 'success' | 'warning' | 'destructive' | 'info'}>
+            <Badge variant={agentTypeColor(agentType)}>
               {agentType}
             </Badge>
             <span
