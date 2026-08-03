@@ -55,7 +55,7 @@ def launch(name: str, extra_args: list | None = None) -> None:
         rdir.mkdir(parents=True, exist_ok=True)
 
     # ── sandbox policy (registry-driven) ─────────────────────────────
-    sandbox = agent_config.get("sandbox_config") or {}
+    sandbox = agent_config.get("sandbox") or {}
 
     # Build bwrap argv
     argv = [bwrap]
@@ -86,7 +86,7 @@ def launch(name: str, extra_args: list | None = None) -> None:
     for flag in sandbox.get("share") or []:
         argv.append(f"--share-{flag}")
 
-    for relative_path in agent_config.get("extra_profile_files", []):
+    for relative_path in agent_config.get("runtime", {}).get("extra_profile_files", []):
         extra_name = relative_path.rstrip("/")
         profile_extra = config.profile_dir(name) / extra_name
         real_name = f".{profile_extra.name.removeprefix('dot-')}"
@@ -113,12 +113,12 @@ def launch(name: str, extra_args: list | None = None) -> None:
         argv.insert(4, str(pdata))
         argv.insert(4, "--bind")
 
-    venv_preserve = agent_config.get("venv_preserve")
+    venv_preserve = agent_config.get("runtime", {}).get("venv_preserve")
     if venv_preserve:
         host_venv = rdir / venv_preserve
         profile_venv = pdir / venv_preserve
         agent_dir = host_venv.parent
-        venv_binary = profile_venv / "bin" / agent_config["binary"]
+        venv_binary = profile_venv / "bin" / agent_config["identity"]["binary"]
         if agent_dir.is_dir() and not venv_binary.is_file():
             argv.append("--bind")
             argv.append(str(agent_dir))

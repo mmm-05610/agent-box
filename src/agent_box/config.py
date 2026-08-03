@@ -83,7 +83,7 @@ def agent_config_dir(agent_type: str) -> str:
     info = library.get_agent_config(agent_type)
     if info is None:
         raise ValueError(f"Unknown agent type: {agent_type!r}")
-    return info["config_dir"]
+    return info["runtime"]["config_dir"]
 
 
 def real_agent_dir(agent_type: str) -> Path:
@@ -102,7 +102,7 @@ def profile_agent_dir(name: str, agent_type: str) -> Path:
     info = library.get_agent_config(agent_type)
     if info is None:
         raise ValueError(f"Unknown agent type: {agent_type!r}")
-    return profile_dir(name) / info["profile_dir_suffix"]
+    return profile_dir(name) / info["runtime"]["profile_dir_suffix"]
 
 
 def agent_binary(agent_type: str) -> str:
@@ -111,7 +111,7 @@ def agent_binary(agent_type: str) -> str:
     info = library.get_agent_config(agent_type)
     if info is None:
         raise ValueError(f"Unknown agent type: {agent_type!r}")
-    return info["binary"]
+    return info["identity"]["binary"]
 
 
 def agent_data_dir(agent_type: str) -> str | None:
@@ -120,7 +120,7 @@ def agent_data_dir(agent_type: str) -> str | None:
     info = library.get_agent_config(agent_type)
     if info is None:
         raise ValueError(f"Unknown agent type: {agent_type!r}")
-    return info.get("data_dir")
+    return info.get("runtime", {}).get("data_dir")
 
 
 def real_agent_data_dir(agent_type: str) -> Path | None:

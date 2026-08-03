@@ -53,14 +53,14 @@ def _mcp_target(profile_name: str, agent_type: str) -> tuple[Path, str]:
     agent_config = get_agent_config(agent_type)
     if agent_config is None:
         raise ProfileError(f"unknown agent_type {agent_type!r}")
-    mcp_config = agent_config.get("mcp_config")
+    mcp_config = (agent_config.get("resources") or {}).get("mcp")
     if not isinstance(mcp_config, dict):
         raise ProfileError(f"mcp config is not supported for {agent_type!r}")
     if mcp_config.get("at_profile_root"):
         base = config.profile_dir(profile_name)
     else:
         base = config.profile_agent_dir(profile_name, agent_type)
-    return base / mcp_config["filename"], mcp_config["root_key"]
+    return base / mcp_config["config_file"], mcp_config["root_key"]
 
 
 def _mcp_servers_dict(existing: Dict[str, Any], agent_type: str,
@@ -95,7 +95,7 @@ def _write_mcp(profile_name: str, agent_type: str,
         )
     target, root_key = _mcp_target(profile_name, agent_type)
     existing = read_config(target)
-    mcp_config = get_agent_config(agent_type).get("mcp_config") or {}
+    mcp_config = get_agent_config(agent_type).get("resources", {}).get("mcp") or {}
 
     servers, _ = _mcp_servers_dict(existing, agent_type, mcp_config)
     fmt = mcp_config.get("entry_format", "default")
@@ -162,7 +162,7 @@ def _convert_entry(server_config: Dict[str, Any],
 def list_profile_mcp_servers(profile_name: str) -> List[Dict[str, Any]]:
     """Read installed MCP servers from a profile's config file."""
     meta, agent_config = resolve_profile(profile_name)
-    mcp_config = agent_config.get("mcp_config") or {}
+    mcp_config = (agent_config.get("resources") or {}).get("mcp") or {}
     target, _ = _mcp_target(profile_name, meta["agent_type"])
     existing = read_config(target)
     servers, _ = _mcp_servers_dict(existing, meta["agent_type"], mcp_config)
@@ -172,7 +172,7 @@ def list_profile_mcp_servers(profile_name: str) -> List[Dict[str, Any]]:
 def remove_mcp_from_profile(profile_name: str, mcp_id: str) -> None:
     """Remove an MCP server from a profile's config file."""
     meta, agent_config = resolve_profile(profile_name)
-    mcp_config = agent_config.get("mcp_config") or {}
+    mcp_config = (agent_config.get("resources") or {}).get("mcp") or {}
     target, root_key = _mcp_target(profile_name, meta["agent_type"])
     existing = read_config(target) if target.is_file() else {}
     servers, sub_key = _mcp_servers_dict(existing, meta["agent_type"], mcp_config)

@@ -87,12 +87,17 @@ class LinuxDataAccess:
     def launch_profile(self, name: str, agent_type: str, mode: str, cwd: str = "") -> dict:
         """Launch a profile in a new terminal window via xterm/WSLg."""
         agent_config = get_agent_config(agent_type)
-        resume_args = (
-            agent_config.get("resume_args") if agent_config is not None else None
+        launch_block = (
+            (agent_config.get("runtime") or {}).get("launch")
+            if agent_config is not None else None
         )
+        resume_args = (launch_block or {}).get("resume") or []
         launch_cmd = f"launch {name}"
-        if mode == config.MODE_RESUME and resume_args:
-            launch_cmd += " " + " ".join(resume_args)
+        # runtime.launch.resume is a full command array (["claude", "-c"]);
+        # the CLI launch passes everything after the profile name through
+        # to the agent binary, so the binary name is skipped here.
+        if mode == config.MODE_RESUME and len(resume_args) > 1:
+            launch_cmd += " " + " ".join(resume_args[1:])
 
         setup = 'export PATH="$HOME/.npm-global/bin:$HOME/.local/bin:$PATH"'
         script = f'{setup} && agent-box exec "{launch_cmd}"'

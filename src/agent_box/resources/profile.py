@@ -214,7 +214,7 @@ def _copy_template(name: str, agent_type: str) -> None:
     if agent_config is None:
         raise ProfileError(f"unknown agent_type {agent_type!r}")
     root = config.profile_dir(name)
-    for relative_path in agent_config.get("extra_profile_files", []):
+    for relative_path in agent_config.get("runtime", {}).get("extra_profile_files", []):
         extra_path = root / relative_path.rstrip("/")
         if relative_path.endswith("/"):
             extra_path.mkdir(parents=True, exist_ok=True)
@@ -232,15 +232,15 @@ def _copy_template(name: str, agent_type: str) -> None:
 def _merge_preset_dir(src: Path, dest: Path, agent_type: str) -> None:
     """Apply every file from *src* into *dest*.
 
-    The source→destination mapping lives in :data:`library._AGENT_TYPES`
-    under ``preset_files``.  Files not listed there are skipped.
+    The source→destination mapping lives in the agent-type registry
+    (``core/agent_types.json``) under ``presets``.  Files not listed there are skipped.
     """
     import json as _json
 
     agent_config = library.get_agent_config(agent_type)
     if agent_config is None:
         raise ProfileError(f"unknown agent_type {agent_type!r}")
-    file_map = agent_config.get("preset_files")
+    file_map = agent_config.get("presets")
     if not isinstance(file_map, dict):
         return
 
@@ -283,13 +283,13 @@ def _apply_preset(
     """Apply preset files to a profile.
 
     The file list and merge rules come from
-    :data:`library._AGENT_TYPES` ``preset_files``.
+    the agent-type registry (``core/agent_types.json``) ``presets``.
     """
     target = config.profile_agent_dir(name, agent_type)
     agent_config = library.get_agent_config(agent_type)
     if agent_config is None:
         raise ProfileError(f"unknown agent_type {agent_type!r}")
-    if not agent_config.get("preset_files"):
+    if not agent_config.get("presets"):
         raise ProfileError(
             f"presets are not supported for {agent_type!r}"
         )
@@ -348,10 +348,12 @@ def create(
         _apply_preset(name, agent_type, preset)
     elif prompt_body is not None:
         agent_config = library.get_agent_config(agent_type)
-        if agent_config and agent_config.get("prompt_file"):
+        prompt_file = (
+            (agent_config or {}).get("resources", {}).get("prompt", {}).get("file")
+        )
+        if agent_config and prompt_file:
             write_text(
-                config.profile_agent_dir(name, agent_type)
-                / agent_config["prompt_file"],
+                config.profile_agent_dir(name, agent_type) / prompt_file,
                 prompt_body,
             )
     _repo.insert(name, agent_type,

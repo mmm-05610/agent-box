@@ -2,8 +2,8 @@
 
 Hooks live inside the main config file (``settings.json`` for Claude,
 ``config.yaml`` for Hermes) under a top-level key named in the registry
-(``hooks_key``).  The on-disk format (JSON / YAML) is dispatched from
-the registry's ``hooks_format`` field.
+(``resources.hooks.key``).  The on-disk format (JSON / YAML) is
+dispatched from the registry's ``resources.hooks.format`` field.
 
 The public API follows a uniform CRUD convention:
   get_hooks(name)        — read all hooks
@@ -28,23 +28,24 @@ _WRITERS = {"json": write_json, "yaml": write_yaml}
 
 
 def _hooks_config(profile_name: str) -> tuple[Path, str, str, str]:
-    """Return (path, format, hooks_key, agent_type) from registry."""
+    """Return (path, format, key, agent_type) from resources.hooks."""
     meta = load_meta(profile_name)
     agent_type = meta["agent_type"]
     agent_config = get_agent_config(agent_type)
     if agent_config is None:
         raise ProfileError(f"unknown agent_type {agent_type!r}")
-    if not agent_config.get("supports_hooks"):
+    hooks_res = (agent_config.get("resources") or {}).get("hooks")
+    if not isinstance(hooks_res, dict):
         raise ProfileError(
             f"hooks are not supported for {agent_type!r} profiles"
         )
-    filename = agent_config.get("hooks_config_file")
+    filename = hooks_res.get("config_file")
     if not filename:
-        raise ProfileError(f"hooks_config_file not configured for {agent_type!r}")
-    fmt = agent_config.get("hooks_format")
+        raise ProfileError(f"hooks config_file not configured for {agent_type!r}")
+    fmt = hooks_res.get("format")
     if fmt is None:
-        raise ProfileError(f"hooks_format not configured for {agent_type!r}")
-    key = agent_config.get("hooks_key", "hooks")
+        raise ProfileError(f"hooks format not configured for {agent_type!r}")
+    key = hooks_res.get("key", "hooks")
     path = config.profile_agent_dir(profile_name, agent_type) / filename
     return path, fmt, key, agent_type
 
