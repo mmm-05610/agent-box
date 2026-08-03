@@ -19,6 +19,7 @@ import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from '@/compo
 import { Textarea } from '@/components/ui'
 import { patchJsonFile, readFile } from '@/api/files'
 import type { AgentType } from '@/api'
+import { useAgentConfigs } from '@/hooks'
 import { useProfileConfigDir } from '../useProfileConfigDir'
 import { HermesHooksViewer } from './HermesHooksViewer'
 
@@ -92,7 +93,11 @@ interface HookListProps {
 }
 
 export function HookList({ profileName, agentType }: HookListProps) {
-  if (agentType === 'hermes') return <HermesHooksViewer profileName={profileName} />
+  // Backend-driven dispatch: hooks format (json/yaml) decides the editor,
+  // not a hardcoded agent-type branch.
+  const { agentConfigs } = useAgentConfigs()
+  const hooksFormat = agentType ? agentConfigs?.[agentType]?.resources?.hooks?.format : undefined
+  if (hooksFormat === 'yaml') return <HermesHooksViewer profileName={profileName} />
   return <SettingsHooksEditor profileName={profileName} />
 }
 

@@ -98,18 +98,21 @@ export function ProviderList({ agentType, profileName }: ProviderListProps) {
 
   useEffect(() => { void reloadConfigFiles() }, [reloadConfigFiles])
 
-  // Detect active provider from config files (Claude / Codex)
+  // Detect active provider from config files — driven by the backend
+  // provider strategy (json_merge reads config_file's metadata_key;
+  // multi_file matches auth.json), not a hardcoded agent-type branch.
   useEffect(() => {
     if (isAdditive) return
-    if (agentType === 'claude') {
-      const settingsFile = configFiles.find(f => f.label === 'settings.json')
-      if (settingsFile) {
+    const strategy = providerResource?.strategy
+    if (strategy === 'json_merge') {
+      const file = configFiles.find(f => f.label === (providerResource?.config_file ?? 'settings.json'))
+      if (file) {
         try {
-          const d = JSON.parse(settingsFile.content)
-          setActiveProviderId(d._provider?.id ?? null)
+          const d = JSON.parse(file.content)
+          setActiveProviderId(d?.[String(providerResource?.metadata_key ?? '_provider')]?.id ?? null)
         } catch { setActiveProviderId(null) }
       }
-    } else if (agentType === 'codex') {
+    } else if (strategy === 'multi_file') {
       const authFile = configFiles.find(f => f.label === 'auth.json')
       if (authFile && authFile.content.trim()) {
         // Find matching provider by comparing apiKey in auth
@@ -120,7 +123,7 @@ export function ProviderList({ agentType, profileName }: ProviderListProps) {
         setActiveProviderId(libProv?.id ?? null)
       }
     }
-  }, [configFiles, agentType, isAdditive, libraryProviders])
+  }, [configFiles, isAdditive, libraryProviders, providerResource])
 
   useEffect(() => {
     const init: Record<string, string> = {}
@@ -185,9 +188,9 @@ export function ProviderList({ agentType, profileName }: ProviderListProps) {
     <div className="space-y-6">
       {/* ── Added Providers (additive only) ────────────────────────── */}
       {isAdditive && profileProviders.length > 0 && (() => {
-        const hermesYaml = configFiles.find(f => f.label === 'config.yaml')?.content ?? ''
-        const activeProvider = agentType === 'hermes' ? parseActiveProvider(hermesYaml) : null
-        const hasActive = agentType === 'hermes'
+        const configYaml = configFiles.find(f => f.label === (providerResource?.config_file ?? 'config.yaml'))?.content ?? ''
+        const activeProvider = providerResource?.strategy === 'yaml_custom_providers' ? parseActiveProvider(configYaml) : null
+        const hasActive = providerResource?.strategy === 'yaml_custom_providers'
         const isActive = (id: string) => activeProvider === id
 
         return (
