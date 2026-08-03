@@ -1,0 +1,173 @@
+{
+  "claude": {
+    "identity": {
+      "display_name": "Claude Code",
+      "binary": "claude"
+    },
+    "runtime": {
+      "config_dir": "~/.claude",
+      "profile_dir_suffix": "dot-claude",
+      "extra_profile_files": ["dot-claude.json", "dot-agents/"],
+      "launch": {
+        "interactive": ["claude"],
+        "exec": ["claude", "-p"],
+        "resume": ["claude", "-c"],
+        "resume_by_id": ["claude", "-r", "{session}"]
+      },
+      "acs_column": "enabled_claude"
+    },
+    "resources": {
+      "provider": {
+        "apply_mode": "overwrite",
+        "strategy": "json_merge",
+        "config_file": "settings.json",
+        "env_source_key": "env",
+        "metadata_key": "_provider"
+      },
+      "mcp": {
+        "config_file": "dot-claude.json",
+        "root_key": "mcpServers",
+        "at_profile_root": true,
+        "entry_format": "passthrough"
+      },
+      "hooks": {
+        "format": "json",
+        "config_file": "settings.json",
+        "key": "hooks"
+      },
+      "prompt": { "file": "CLAUDE.md" },
+      "skills": {},
+      "permissions": { "config_file": "settings.json", "config_key": "permissions" },
+      "plugins": { "config_file": "settings.json" }
+    },
+    "sandbox": {
+      "bind_mounts": ["/"],
+      "dev_mounts": ["/dev"],
+      "proc_mounts": ["/proc"],
+      "tmpfs": ["/tmp"],
+      "unshare": ["ipc", "pid", "uts"],
+      "share": ["net"]
+    },
+    "presets": {
+      "CLAUDE.md":             { "dest": "CLAUDE.md",        "merge": "copy" },
+      "hooks.json":            { "dest": "hooks/hooks.json", "merge": "copy" },
+      "settings.overlay.json": { "dest": "settings.json",    "merge": "deep_merge" }
+    }
+  },
+  "codex": {
+    "identity": { "display_name": "Codex", "binary": "codex" },
+    "runtime": {
+      "config_dir": "~/.codex",
+      "profile_dir_suffix": "dot-codex",
+      "config_files": ["config.toml", "auth.json"],
+      "launch": {
+        "interactive": ["codex"],
+        "exec": ["codex", "exec"],
+        "resume": ["codex", "resume", "--last"]
+      },
+      "acs_column": "enabled_codex"
+    },
+    "resources": {
+      "provider": {
+        "apply_mode": "overwrite",
+        "strategy": "multi_file",
+        "files": [
+          { "dest": "config.toml", "source_key": "config", "format": "text" },
+          { "dest": "auth.json", "source_key": "auth", "format": "json" }
+        ]
+      },
+      "mcp": { "config_file": "config.toml", "root_key": "mcp_servers" },
+      "prompt": { "file": "AGENTS.md" },
+      "skills": {},
+      "rules": { "dir": "rules" }
+    },
+    "sandbox": {
+      "bind_mounts": ["/"], "dev_mounts": ["/dev"], "proc_mounts": ["/proc"],
+      "tmpfs": ["/tmp"], "unshare": ["ipc", "pid", "uts"], "share": ["net"]
+    }
+  },
+  "hermes": {
+    "identity": { "display_name": "Hermes", "binary": "hermes" },
+    "runtime": {
+      "config_dir": "~/.hermes",
+      "profile_dir_suffix": "dot-hermes",
+      "config_files": ["config.yaml", ".env"],
+      "venv_preserve": "hermes-agent/venv/",
+      "launch": {
+        "interactive": ["hermes"],
+        "exec": ["hermes", "-p"],
+        "resume": ["hermes", "-c"]
+      },
+      "acs_column": "enabled_hermes"
+    },
+    "resources": {
+      "provider": {
+        "apply_mode": "additive",
+        "strategy": "yaml_custom_providers",
+        "config_file": "config.yaml",
+        "model_section": "model",
+        "custom_providers_section": "custom_providers",
+        "metadata_fields": ["id", "name", "notes", "website_url", "icon", "icon_color", "category"],
+        "managed_yaml_keys": ["base_url", "api_key", "api_mode", "default", "models", "model", "providers", "custom_providers"],
+        "api_mode_mapping": {
+          "chat_completions": "openai_compatible",
+          "openai_compatible": "openai_compatible",
+          "anthropic": "anthropic",
+          "codex_responses": "codex_responses"
+        },
+        "entry_yaml_spec": {
+          "fields": [
+            { "yaml_key": "base_url", "settings_key": "base_url" },
+            { "yaml_key": "api_key", "settings_key": "api_key", "env_fallback": true },
+            { "yaml_key": "api_mode", "settings_key": "api_mode", "mapped": true }
+          ],
+          "model_list": {
+            "settings_key": "models", "id_key": "id", "name_key": "name", "context_key": "context_length",
+            "yaml_model_key": "model", "yaml_section_key": "models", "yaml_name_key": "name", "yaml_context_key": "context_length"
+          },
+          "default_model": { "settings_key": "default_model", "yaml_key": "model" }
+        }
+      },
+      "mcp": { "config_file": "config.yaml", "root_key": "mcp_servers" },
+      "hooks": { "format": "yaml", "config_file": "config.yaml", "key": "hooks" },
+      "prompt": { "file": "SOUL.md" },
+      "skills": {},
+      "memories": { "dir": "memories" }
+    },
+    "sandbox": {
+      "bind_mounts": ["/"], "dev_mounts": ["/dev"], "proc_mounts": ["/proc"],
+      "tmpfs": ["/tmp"], "unshare": ["ipc", "pid", "uts"], "share": ["net"]
+    }
+  },
+  "opencode": {
+    "identity": { "display_name": "OpenCode", "binary": "opencode" },
+    "runtime": {
+      "config_dir": "~/.config/opencode",
+      "profile_dir_suffix": "dot-opencode",
+      "data_dir": "~/.local/share/opencode",
+      "config_files": ["opencode.jsonc"],
+      "launch": {
+        "interactive": ["opencode"],
+        "exec": ["opencode", "run"]
+      },
+      "acs_column": "enabled_opencode"
+    },
+    "resources": {
+      "provider": {
+        "apply_mode": "additive",
+        "strategy": "jsonc_provider",
+        "config_file": "opencode.jsonc",
+        "provider_key": "provider",
+        "metadata_fields": ["id", "name", "notes", "website_url", "icon", "icon_color", "category"]
+      },
+      "mcp": { "config_file": "opencode.jsonc", "root_key": "mcp", "servers_key": "servers", "entry_format": "structured" },
+      "prompt": { "file": "AGENTS.md" },
+      "skills": {},
+      "instructions": { "config_file": "opencode.jsonc", "config_key": "instructions" }
+    },
+    "sandbox": {
+      "bind_mounts": ["/"], "dev_mounts": ["/dev"], "proc_mounts": ["/proc"],
+      "tmpfs": ["/tmp"], "unshare": ["ipc", "pid", "uts"], "share": ["net"]
+    }
+  }
+}

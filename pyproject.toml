@@ -43,4 +43,4 @@ testpaths = ["tests"]
 where = ["src"]
 
 [tool.setuptools.package-data]
-agent_box = ["templates/**", "presets/**"]
+agent_box = ["templates/**", "presets/**", "core/agent_types.json"]
