@@ -10,6 +10,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { parse as parseYaml } from 'yaml'
 import i18n from '@/i18n'
 import { Button, Card, CardContent, CardHeader, CardTitle, Textarea } from '@/components/ui'
 import { useToast } from '@/components/feedback/toast'
@@ -24,14 +25,11 @@ import type { AgentType } from '@/api'
 
 // ── Icon helpers ──────────────────────────────────────────────────────────
 
-const PROVIDER_ICON_ALIASES: Record<string, string> = {
-  'claude official': 'claude', 'openai official': 'openai',
-  'xiaomi mimo': 'xiaomimimo', 'zhipu glm': 'zhipu', 'anthropic claude': 'claude',
-}
-
-function resolveIconKey(name: string): string | undefined {
+/** Resolve a provider's icon key — backend icon wins, name heuristics fallback.
+ *  No hardcoded provider names here: the ACS providers table serves the icon. */
+function resolveIconKey(name: string, icon?: string | null): string | undefined {
+  if (icon && hasIcon(icon)) return icon
   const lower = name.toLowerCase()
-  if (PROVIDER_ICON_ALIASES[lower] && hasIcon(PROVIDER_ICON_ALIASES[lower])) return PROVIDER_ICON_ALIASES[lower]
   if (hasIcon(lower)) return lower
   for (const word of lower.split(/[\s\-_]+/)) {
     if (word.length >= 3 && hasIcon(word)) return word
@@ -48,10 +46,23 @@ interface ProviderListProps {
   profileName: string
 }
 
-/** Extract model.provider from a Hermes config.yaml to find the active provider. */
-function parseActiveProvider(yamlContent: string): string | null {
-  const m = yamlContent.match(/^\s+provider:\s*["']?([^"'\s]+)/m)
-  return m?.[1] ?? null
+/** Read the active provider id from a YAML config.
+ *  The section + key come from the backend registry (model_section +
+ *  active_key), never a hardcoded key name. */
+function parseActiveProvider(
+  yamlContent: string,
+  modelSection: string | undefined,
+  activeKey: string | undefined,
+): string | null {
+  if (!modelSection || !activeKey) return null
+  try {
+    const doc = parseYaml(yamlContent) as Record<string, unknown> | null
+    const section = doc?.[modelSection]
+    const val = (section as Record<string, unknown> | undefined)?.[activeKey]
+    return typeof val === 'string' && val ? val : null
+  } catch {
+    return null
+  }
 }
 
 // ── Component ─────────────────────────────────────────────────────────────
@@ -71,6 +82,7 @@ export function ProviderList({ agentType, profileName }: ProviderListProps) {
   const [applyingId, setApplyingId] = useState<string | null>(null)
   const [activeProviderId, setActiveProviderId] = useState<string | null>(null)
 
+
   // Profile-local providers (additive mode) + config dir (from the object hook)
   const {
     providers: profileProviders,
@@ -89,7 +101,7 @@ export function ProviderList({ agentType, profileName }: ProviderListProps) {
     const list = configFilesList ?? []
     const contents = await Promise.all(
       list.map(async (filename) => {
-        const content = await readFile(`${configDir}/${filename}`).catch(() => filename === 'settings.json' ? '{}' : '')
+        const content = await readFile(`${configDir}/${filename}`).catch(() => filename.endsWith('.json') ? '{}' : '')
         return { label: filename, path: `${configDir}/${filename}`, content }
       })
     )
@@ -113,12 +125,16 @@ export function ProviderList({ agentType, profileName }: ProviderListProps) {
         } catch { setActiveProviderId(null) }
       }
     } else if (strategy === 'multi_file') {
-      const authFile = configFiles.find(f => f.label === 'auth.json')
+      // Auth file dest comes from the backend multi_file files (format json).
+      const files = (providerResource?.files as Array<{ dest?: string; format?: string }> | undefined) ?? []
+      const authDest = files.find(f => f.format === 'json')?.dest
+      const authFile = authDest ? configFiles.find(f => f.label === authDest) : undefined
       if (authFile && authFile.content.trim()) {
-        // Find matching provider by comparing apiKey in auth
+        // Match the whole auth object — no hardcoded provider-specific key
+        // (e.g. codex's OPENAI_API_KEY).
         const libProv = libraryProviders.find(p => {
           const auth = (p.settings as Record<string, unknown>)?.auth as Record<string, unknown> | undefined
-          try { return JSON.parse(authFile.content).OPENAI_API_KEY === auth?.OPENAI_API_KEY } catch { return false }
+          try { return JSON.stringify(JSON.parse(authFile.content)) === JSON.stringify(auth) } catch { return false }
         })
         setActiveProviderId(libProv?.id ?? null)
       }
@@ -189,7 +205,9 @@ export function ProviderList({ agentType, profileName }: ProviderListProps) {
       {/* ── Added Providers (additive only) ────────────────────────── */}
       {isAdditive && profileProviders.length > 0 && (() => {
         const configYaml = configFiles.find(f => f.label === (providerResource?.config_file as string))?.content ?? ''
-        const activeProvider = providerResource?.strategy === 'yaml_custom_providers' ? parseActiveProvider(configYaml) : null
+        const activeProvider = providerResource?.strategy === 'yaml_custom_providers'
+          ? parseActiveProvider(configYaml, providerResource?.model_section as string | undefined, providerResource?.active_key as string | undefined)
+          : null
         const hasActive = providerResource?.strategy === 'yaml_custom_providers'
         const isActive = (id: string) => activeProvider === id
 
@@ -200,7 +218,7 @@ export function ProviderList({ agentType, profileName }: ProviderListProps) {
             </CardHeader>
             <CardContent className="space-y-2">
               {profileProviders.map((pp) => {
-                const icon = resolveIconKey(pp.name)
+                const icon = resolveIconKey(pp.name, pp.icon)
                 const active = hasActive && isActive(pp.id)
                 return (
                   <div key={pp.id}
@@ -248,7 +266,7 @@ export function ProviderList({ agentType, profileName }: ProviderListProps) {
             {libraryProviders
               .filter(p => !isAdditive || !profileProviders.some(pp => pp.id === p.id))
               .map((p) => {
-              const icon = resolveIconKey(p.name)
+              const icon = resolveIconKey(p.name, p.icon)
               const isActive = !isAdditive && activeProviderId === p.id
               return (
                 <div key={p.id}

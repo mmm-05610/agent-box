@@ -62,6 +62,7 @@ def list_providers(agent_type: str) -> List[Dict[str, Any]]:
             "id": r["id"], "name": r["name"], "category": r["category"],
             "website_url": r["website_url"], "is_current": bool(r["is_current"]),
             "in_failover_queue": bool(r["in_failover_queue"]),
+            "icon": r["icon"], "icon_color": r["icon_color"],
             "settings": settings, "meta": json.loads(r["meta"] or "{}"),
         })
     conn.close()

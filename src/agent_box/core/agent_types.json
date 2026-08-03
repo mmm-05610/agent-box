@@ -291,6 +291,7 @@
         "strategy": "yaml_custom_providers",
         "config_file": "config.yaml",
         "model_section": "model",
+        "active_key": "provider",
         "custom_providers_section": "custom_providers",
         "metadata_fields": [
           "id",

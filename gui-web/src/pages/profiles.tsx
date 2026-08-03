@@ -11,7 +11,7 @@ import { Button, Badge, Input, Tabs } from '@/components/ui'
 import { EmptyState, Loading } from '@/components/feedback'
 import { useToast } from '@/components/feedback/toast'
 import { PageHeader } from '@/components/layout'
-import { useAgentConfigs, useAgentIdentity, useAgentTypeColor, useDefaultAgent, useProfiles, useSessions, resolveAgentIdentity } from '@/hooks'
+import { useAgentConfigs, useAgentIdentity, useAgentTypeColor, useDefaultAgent, useLibrary, useProfiles, useSessions, resolveAgentIdentity } from '@/hooks'
 import { cn } from '@/lib/utils'
 import type { AgentType, Profile } from '@/api'
 import { createProfile, deleteProfile, launchProfile, getLastCwdMap, browseDir } from '@/api'
@@ -21,21 +21,12 @@ import { hasIcon, getIconMetadata } from '@/icons/extracted'
 
 // ── Provider icon resolution ────────────────────────────────────────────
 
-const PROVIDER_ICON_ALIASES: Record<string, string> = {
-  'claude official': 'claude',
-  'openai official': 'openai',
-  'xiaomi mimo': 'xiaomimimo',
-  'xiaomi mimo token plan (china)': 'xiaomimimo',
-  'zhipu glm': 'zhipu',
-  'google gemini': 'gemini',
-  'anthropic claude': 'claude',
-  'byteplus volcengine': 'byteplus',
-}
-
-function resolveIconKey(name: string): string | undefined {
+/** Resolve a provider's icon key — backend icon wins, name heuristics
+ *  fallback.  No hardcoded provider names: the icon comes from the ACS
+ *  providers table via the backend. */
+function resolveIconKey(name: string, icon?: string | null): string | undefined {
+  if (icon && hasIcon(icon)) return icon
   const lower = name.toLowerCase()
-  if (PROVIDER_ICON_ALIASES[lower] && hasIcon(PROVIDER_ICON_ALIASES[lower]))
-    return PROVIDER_ICON_ALIASES[lower]
   if (hasIcon(lower)) return lower
   for (const word of lower.split(/[\s\-_]+/)) {
     if (word.length >= 3 && hasIcon(word)) return word
@@ -486,7 +477,12 @@ function ProfileCard({
   const { name, agentType, displayName, description, providerRef } = profile
 
   const displayLabel = displayName || name
-  const providerIconKey = providerRef ? resolveIconKey(providerRef) : undefined
+  // Resolve the provider badge icon from backend library data (provider id
+  // → ACS row → icon field), not a hardcoded name→icon map.  Shared cache:
+  // the providers slice loads once per agent type.
+  const { providers } = useLibrary(agentType, ['providers'])
+  const provider = providerRef ? providers.find(p => p.id === providerRef) : undefined
+  const providerIconKey = provider ? resolveIconKey(provider.name, provider.icon) : undefined
   const providerIconColor = providerIconKey ? getIconMetadata(providerIconKey)?.defaultColor : undefined
 
   const [mode, setMode] = useState<string>('继续上次')

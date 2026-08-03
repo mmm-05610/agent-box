@@ -17,6 +17,9 @@ export interface Provider {
   category: string | null
   website_url: string | null
   is_current: boolean
+  /** Brand icon key (e.g. "deepseek") served by the ACS providers table. */
+  icon?: string | null
+  icon_color?: string | null
   /** Parsed settings object — the frontend reads provider settings config. */
   settings: Record<string, unknown>
   meta: Record<string, unknown>
