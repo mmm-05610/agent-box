@@ -184,8 +184,8 @@ function applyClaudeEdits(
   if (fv.fallbackModel) env.ANTHROPIC_MODEL = fv.fallbackModel
   for (const r of MODEL_ROLES) {
     const rm = fv.roleModels[r.role]
-    if (rm.model) env[r.modelField] = rm.model
-    if (rm.name) env[r.nameField] = rm.name
+    if (rm?.model) env[r.modelField] = rm.model
+    if (rm?.name) env[r.nameField] = rm.name
   }
   if (fv.timeoutMs) env.API_TIMEOUT_MS = fv.timeoutMs
   if (fv.disableAutoUpdates) env.DISABLE_AUTOUPDATER = '1'
@@ -406,7 +406,7 @@ export function extractCodexBaseUrl(configText: string): string | undefined {
   const active = (() => {
     const m = _CODEX_MODEL_PROVIDER_RE.exec(configText)
     if (!m) return undefined
-    const n = m[2].trim()
+    const n = (m[2] ?? '').trim()
     return n || undefined
   })()
   let inActive = false
@@ -414,7 +414,7 @@ export function extractCodexBaseUrl(configText: string): string | undefined {
   for (const rawLine of configText.split(/\r?\n/)) {
     const sec = _CODEX_SECTION_HEADER_RE.exec(rawLine)
     if (sec) {
-      const header = sec[1].trim()
+      const header = (sec[1] ?? '').trim()
       inActive = !!active && header === `model_providers.${active}`
       inTop = false
       continue
@@ -437,7 +437,7 @@ export function patchCodexBaseUrl(configText: string, newBaseUrl: string): strin
   const lines = configText ? configText.split(/\r?\n/) : []
   const active = (() => {
     const m = _CODEX_MODEL_PROVIDER_RE.exec(configText)
-    return m ? m[2].trim() : undefined
+    return m ? (m[2] ?? '').trim() : undefined
   })()
   let inActive = false
   let inTop = true
@@ -447,7 +447,7 @@ export function patchCodexBaseUrl(configText: string, newBaseUrl: string): strin
   for (const line of lines) {
     const sec = _CODEX_SECTION_HEADER_RE.exec(line)
     if (sec) {
-      const header = sec[1].trim()
+      const header = (sec[1] ?? '').trim()
       inActive = !!active && header === `model_providers.${active}`
       inTop = false
       out.push(line)

@@ -41,15 +41,15 @@ function extractHooks(yaml: string): HookPhases {
 
     const phaseMatch = stripped.match(phaseRe)
     if (phaseMatch) {
-      currentPhase = phaseMatch[1]
-      phases[currentPhase] = phases[currentPhase] ?? []
+      currentPhase = phaseMatch[1] ?? null
+      if (currentPhase) phases[currentPhase] = phases[currentPhase] ?? []
       continue
     }
 
     const cmdMatch = stripped.match(commandRe)
     if (cmdMatch && currentPhase) {
-      const value = cmdMatch[1].trim().replace(/^(['"])(.*)\1$/, '$2')
-      phases[currentPhase].push({ command: value })
+      const value = cmdMatch[1]!.trim().replace(/^(['"])(.*)\1$/, '$2')
+      phases[currentPhase]!.push({ command: value })
     }
   }
   return phases
@@ -157,7 +157,7 @@ export function HermesHooksViewer({ profileName }: { profileName: string }) {
           </p>
         ) : (
           Object.keys(phases).sort(phaseOrder).map((phase) => {
-            const entries = phases[phase]
+            const entries = phases[phase] ?? []
             return (
               <div key={phase} className="rounded-lg bg-card ring-1 ring-border/60">
                 <div className="flex items-center justify-between gap-3 border-b border-border/40 px-4 py-3">

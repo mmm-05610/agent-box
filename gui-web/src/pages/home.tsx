@@ -81,7 +81,7 @@ export function HomePage({ onNav }: HomePageProps) {
             agentType: s.agentType,
             mode: s.mode ?? 'interactive',
             cwd: s.cwd,
-            exitedAt: s.exitedAt,
+            exitedAt: s.exitedAt ?? null,
             launchedAt: s.launchedAt,
           })),
         )
@@ -261,7 +261,7 @@ export function HomePage({ onNav }: HomePageProps) {
                         <img src={logo} alt={s.agentType} className="h-5 w-5 object-contain" />
                       ) : (
                         <span className="text-xs font-bold" style={{ color: accentColor }}>
-                          {s.agentType[0].toUpperCase()}
+                          {s.agentType[0]!.toUpperCase()}
                         </span>
                       )}
                     </div>

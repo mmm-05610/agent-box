@@ -231,7 +231,7 @@ function SessionCard({ session }: { session: Session }) {
             <img src={logo} alt={agentType} className="h-6 w-6 object-contain" />
           ) : (
             <span className="text-sm font-bold" style={{ color: accentColor }}>
-              {agentType[0].toUpperCase()}
+              {agentType[0]!.toUpperCase()}
             </span>
           )}
         </div>

@@ -70,7 +70,7 @@ function parse(content: string): Permissions {
 
 function splitRule(rule: string): { tool: string | null; pattern: string } {
   const match = rule.match(RULE_REGEX)
-  if (match) return { tool: match[1], pattern: match[2] }
+  if (match) return { tool: match[1] ?? null, pattern: match[2] ?? '' }
   return { tool: null, pattern: rule }
 }
 
@@ -86,8 +86,8 @@ function parseRawRules(text: string): Pick<Permissions, 'allow' | 'deny' | 'ask'
     if (!trimmed) continue
     const match = trimmed.match(/^(allow|deny|ask):\s*(.+)$/i)
     if (!match) continue
-    const group = match[1].toLowerCase() as RuleGroup
-    const rule = match[2].trim()
+    const group = (match[1] ?? '').toLowerCase() as RuleGroup
+    const rule = (match[2] ?? '').trim()
     if (rule) out[group].push(rule)
   }
   return out

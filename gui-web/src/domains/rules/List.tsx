@@ -36,7 +36,7 @@ function countRules(content: string): number {
   // count occurrences of `prefix_rule(` on non-comment lines
   let count = 0
   for (const line of content.split(/\r?\n/)) {
-    const trimmed = line.split('#')[0].trim()
+    const trimmed = line.split('#')[0]!.trim()
     if (trimmed.startsWith('prefix_rule(')) count += 1
   }
   return count

@@ -226,7 +226,7 @@ export function Sidebar({ active, onNav, runningCount = 0, onNewProfile }: Sideb
           type="button"
           onClick={() => {
             try {
-              window.pywebview?.api?.launch_acs()
+              window.pywebview?.api?.launch_acs?.()
             } catch {
               // silently fail — ACS is optional
             }

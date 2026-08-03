@@ -15,10 +15,21 @@ function toProvider(raw: Record<string, unknown>): Provider {
     name: raw.name as string,
     category: raw.category as string | undefined,
     websiteUrl: raw.website_url as string | undefined,
-    settings: raw.settings as Provider['settings'] | undefined,
+    settings: raw.settings as Provider['settings'],
     meta: raw.meta as Provider['meta'] | undefined,
     createdAt: raw.created_at as number | undefined,
     isCurrent: raw.is_current as boolean | undefined,
+  }
+}
+
+/** Convert snake_case claude_md from CLI to camelCase */
+function toClaudeMd(raw: Record<string, unknown>): ClaudeMd {
+  return {
+    id: raw.id as string,
+    name: raw.name as string,
+    description: raw.description as string | undefined,
+    content: (raw.content as string | undefined) ?? '',
+    createdAt: raw.created_at as number | undefined,
   }
 }
 
