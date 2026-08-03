@@ -23,8 +23,8 @@ export function PromptList({ profileName, agentType }: PromptListProps) {
   const configDir = useProfileConfigDir(profileName)
   // Registry-driven (resources.prompt.file); CLAUDE.md while loading.
   const { agentConfigs } = useAgentConfigs()
-  const promptFile = agentConfigs?.[agentType]?.resources?.prompt?.file ?? 'CLAUDE.md'
-  const promptPath = configDir === null ? null : `${configDir}/${promptFile}`
+  const promptFile = agentConfigs?.[agentType]?.resources?.prompt?.file
+  const promptPath = configDir === null || !promptFile ? null : `${configDir}/${promptFile}`
 
   const { prompts: library } = useLibrary(agentType, ['prompts'])
   const [editedContent, setEditedContent] = useState('')

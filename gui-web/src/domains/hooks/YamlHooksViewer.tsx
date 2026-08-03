@@ -73,7 +73,7 @@ export function YamlHooksViewer({ profileName, agentType }: { profileName: strin
   // File name comes from the backend registry (resources.hooks.config_file).
   const { agentConfigs } = useAgentConfigs()
   const configFile = agentType ? agentConfigs?.[agentType]?.resources?.hooks?.config_file : undefined
-  const configPath = configDir === null ? null : `${configDir}/${configFile ?? 'config.yaml'}`
+  const configPath = configDir === null || !configFile ? null : `${configDir}/${configFile}`
   const [configYaml, setConfigYaml] = useState('')
 
   // Self-fetch the profile's config.yaml.

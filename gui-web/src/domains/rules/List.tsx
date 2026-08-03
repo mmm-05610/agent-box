@@ -74,7 +74,7 @@ export function RulesList({ profileName, agentType }: { profileName: string; age
   const [pendingDelete, setPendingDelete] = useState<RuleFile | null>(null)
   const [deleting, setDeleting] = useState(false)
   const { toast } = useToast()
-  const rulesDir = configDir === null ? null : `${configDir.replace(/\/+$/, '')}/${rulesDirName ?? 'rules'}`
+  const rulesDir = configDir === null || !rulesDirName ? null : `${configDir.replace(/\/+$/, '')}/${rulesDirName}`
 
   const refresh = useCallback(async () => {
     if (!rulesDir) {

@@ -90,7 +90,7 @@ export function JsonHooksEditor({ profileName, agentType }: { profileName: strin
   // not hardcoded — the frontend doesn't own agent file knowledge.
   const { agentConfigs } = useAgentConfigs()
   const configFile = agentType ? agentConfigs?.[agentType]?.resources?.hooks?.config_file : undefined
-  const path = configDir === null ? null : `${configDir}/${configFile ?? 'settings.json'}`
+  const path = configDir === null || !configFile ? null : `${configDir}/${configFile}`
 
   const [content, setContent] = useState('{}')
   const parsed = useMemo(() => {

@@ -64,7 +64,7 @@ export function PluginsList({ profileName, agentType }: { profileName: string; a
   // File name from the backend registry (resources.plugins.config_file).
   const { agentConfigs } = useAgentConfigs()
   const configFile = agentType ? agentConfigs?.[agentType]?.resources?.plugins?.config_file : undefined
-  const path = configDir === null ? null : `${configDir}/${configFile ?? 'settings.json'}`
+  const path = configDir === null || !configFile ? null : `${configDir}/${configFile}`
   const [content, setContent] = useState('{}')
   const [refreshKey, setRefreshKey] = useState(0)
   const enabledMap = useMemo(() => parseEnabledPlugins(content), [content])

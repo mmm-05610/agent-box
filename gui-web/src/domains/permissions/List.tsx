@@ -148,7 +148,7 @@ export function PermissionsList({ profileName, agentType }: { profileName: strin
   // File name from the backend registry (resources.permissions.config_file).
   const { agentConfigs } = useAgentConfigs()
   const configFile = agentType ? agentConfigs?.[agentType]?.resources?.permissions?.config_file : undefined
-  const path = configDir === null ? null : `${configDir}/${configFile ?? 'settings.json'}`
+  const path = configDir === null || !configFile ? null : `${configDir}/${configFile}`
   const [content, setContent] = useState('{}')
   const [refreshKey, setRefreshKey] = useState(0)
   const initial = useMemo(() => parse(content), [content])

@@ -38,7 +38,7 @@ export function MemoriesList({ profileName, agentType }: { profileName: string; 
   // File name from the backend registry (resources.memories.dir).
   const { agentConfigs } = useAgentConfigs()
   const memoriesDirName = agentType ? (agentConfigs?.[agentType]?.resources?.memories?.dir as string | undefined) : undefined
-  const memoriesDir = configDir === null ? null : `${configDir.replace(/\/+$/, '')}/${memoriesDirName ?? 'memories'}`
+  const memoriesDir = configDir === null || !memoriesDirName ? null : `${configDir.replace(/\/+$/, '')}/${memoriesDirName}`
   const fileEntries: MemoryFile[] = memoriesDir === null ? [] : FILES.map((f) => ({ ...f, path: `${memoriesDir}/${f.label}` }))
 
   const [texts, setTexts] = useState<Record<string, string>>({})

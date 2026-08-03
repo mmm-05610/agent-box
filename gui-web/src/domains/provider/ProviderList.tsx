@@ -105,7 +105,7 @@ export function ProviderList({ agentType, profileName }: ProviderListProps) {
     if (isAdditive) return
     const strategy = providerResource?.strategy
     if (strategy === 'json_merge') {
-      const file = configFiles.find(f => f.label === (providerResource?.config_file ?? 'settings.json'))
+      const file = configFiles.find(f => f.label === (providerResource?.config_file as string))
       if (file) {
         try {
           const d = JSON.parse(file.content)
@@ -188,7 +188,7 @@ export function ProviderList({ agentType, profileName }: ProviderListProps) {
     <div className="space-y-6">
       {/* ── Added Providers (additive only) ────────────────────────── */}
       {isAdditive && profileProviders.length > 0 && (() => {
-        const configYaml = configFiles.find(f => f.label === (providerResource?.config_file ?? 'config.yaml'))?.content ?? ''
+        const configYaml = configFiles.find(f => f.label === (providerResource?.config_file as string))?.content ?? ''
         const activeProvider = providerResource?.strategy === 'yaml_custom_providers' ? parseActiveProvider(configYaml) : null
         const hasActive = providerResource?.strategy === 'yaml_custom_providers'
         const isActive = (id: string) => activeProvider === id

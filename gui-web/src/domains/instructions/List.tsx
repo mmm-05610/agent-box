@@ -80,7 +80,7 @@ export function InstructionsList({ profileName, agentType }: { profileName: stri
   const configFile = agentType ? agentConfigs?.[agentType]?.resources?.instructions?.config_file : undefined
   const profilePath = useProfilePath(profileName)
   const [configJsonc, setConfigJsonc] = useState('')
-  const configPath = configDir === null ? null : `${configDir}/${configFile ?? 'opencode.jsonc'}`
+  const configPath = configDir === null || !configFile ? null : `${configDir}/${configFile}`
 
   // Self-fetch opencode.jsonc → instructions for the profile.
   useEffect(() => {
