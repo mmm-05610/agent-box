@@ -24,6 +24,9 @@ env/
 Thumbs.db
 *.log
 
+# --- Frontend deps / caches ---
+node_modules/
+
 # --- Agent workspace (AI-generated artifacts, never commit) ---
 workspace/
 
