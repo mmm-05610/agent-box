@@ -81,11 +81,13 @@ def acs_binary() -> Path:
     override = os.environ.get("AGENT_BOX_ACS_BINARY")
     if override:
         return Path(override).expanduser()
+    # cc-switch carries a platform extension (cc-switch.exe on Windows).
+    _name = "cc-switch.exe" if os.name == "nt" else "cc-switch"
     # Frozen (PyInstaller): the submodule binary is bundled into _MEIPASS.
     if getattr(sys, "frozen", False):
-        return Path(sys._MEIPASS) / "acs" / "src-tauri" / "target" / "release" / "cc-switch"
+        return Path(sys._MEIPASS) / "acs" / "src-tauri" / "target" / "release" / _name
     # Source checkout: acs/ sits next to the package at the repo root.
-    return package_dir().parent.parent / "acs" / "src-tauri" / "target" / "release" / "cc-switch"
+    return package_dir().parent.parent / "acs" / "src-tauri" / "target" / "release" / _name
 
 
 def default_projects_dir() -> str:

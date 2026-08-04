@@ -378,4 +378,16 @@ class WslDataAccess:
         return _wsl_rpc("last_cwd_map")
 
     def launch_acs(self) -> None:
-        _wsl_rpc("launch_acs")
+        """Launch the ACS (cc-switch) GUI binary on the Windows host directly.
+
+        The binary is a native Windows exe resolved by ``config.acs_binary()``
+        (bundled under ``_MEIPASS/acs/...`` when packaged).  It must launch on
+        the Windows host — not through the WSL RPC, whose runtime has no
+        notion of the bundled binary path.
+        """
+        from agent_box import config
+        subprocess.Popen(
+            [str(config.acs_binary())],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
