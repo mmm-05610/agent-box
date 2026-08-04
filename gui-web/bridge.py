@@ -88,19 +88,18 @@ class Api:
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
 
-    def get_default_projects_dir(self) -> str:
-        """The backend's default projects directory (config.default_projects_dir())."""
-        try:
-            from agent_box import config
-            return json.dumps({"ok": True, "data": config.default_projects_dir()})
-        except Exception as e:
-            return json.dumps({"ok": False, "error": str(e)})
-
     def get_projects_dir(self) -> str:
         """The current projects dir — user-stored value or backend default."""
         try:
             from agent_box import config
             return json.dumps({"ok": True, "data": config.projects_dir()})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    def get_home_dir(self) -> str:
+        """The OS home directory (data-layer resolved; WSL home on Windows)."""
+        try:
+            return json.dumps({"ok": True, "data": self._data.home_dir()})
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
 

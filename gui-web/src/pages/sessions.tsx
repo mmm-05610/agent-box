@@ -11,8 +11,9 @@ import { Button, Badge, Tabs } from '@/components/ui'
 import { EmptyState, Loading, StatusDot } from '@/components/feedback'
 import { useToast } from '@/components/feedback/toast'
 import { PageHeader } from '@/components/layout'
-import { useSessions, useAgentTypeColor, useAgentIdentity } from '@/hooks'
+import { useSessions, useAgentTypeColor, useAgentIdentity, useHomeDir } from '@/hooks'
 import { cn, formatRelativeTime } from '@/lib/utils'
+import { toHomeRelative } from '@/lib/path'
 import { cleanupSessions } from '@/api'
 import type { Session, SessionStatus } from '@/api'
 
@@ -171,6 +172,7 @@ function SessionCard({ session }: { session: Session }) {
   const { t } = useTranslation()
   const agentTypeColor = useAgentTypeColor()
   const { color: accentColor, logo } = useAgentIdentity(session.agentType)
+  const home = useHomeDir()
   const { profile, agentType, cwd, mode, pid, launchedAt, exitedAt, exitCode } =
     session
 
@@ -245,8 +247,8 @@ function SessionCard({ session }: { session: Session }) {
           </div>
           <div className="mt-1 flex items-center gap-3 flex-wrap text-[11px] text-muted-foreground">
             {cwd && (
-              <span className="font-mono truncate max-w-[200px]" title={cwd}>
-                {cwd}
+              <span className="font-mono truncate max-w-[200px]" title={toHomeRelative(cwd, home)}>
+                {toHomeRelative(cwd, home)}
               </span>
             )}
             {mode && (

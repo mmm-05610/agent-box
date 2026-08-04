@@ -13,8 +13,9 @@ import { PageHeader } from '@/components/layout'
 import { cn } from '@/lib/utils'
 import { browseDir } from '@/api'
 import { readSettings, writeSettings, type Theme } from '@/lib/settings'
+import { toHomeRelative } from '@/lib/path'
 import { LANG_KEY, readStoredLanguage, type UILanguage } from '@/i18n'
-import { useProjectsDir, useVersion } from '@/hooks'
+import { useHomeDir, useProjectsDir, useVersion } from '@/hooks'
 import { saveProjectsDir } from '@/api/agentConfigs'
 
 // ── Helpers ────────────────────────────────────────────────────────────
@@ -74,6 +75,7 @@ const themeOptions: {
 export function SettingsPage() {
   const { t, i18n } = useTranslation()
   const version = useVersion()
+  const home = useHomeDir()
   const { toast } = useToast()
   const [theme, setTheme] = useState<Theme>(() => readSettings().theme)
   const [language, setLanguage] = useState<UILanguage>(() => readStoredLanguage())
@@ -164,7 +166,7 @@ export function SettingsPage() {
                   <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" />
                 </svg>
                 <span className="text-sm font-mono text-foreground truncate">
-                  {projectsDir || t('settings.noDir')}
+                  {toHomeRelative(projectsDir, home) || t('settings.noDir')}
                 </span>
               </div>
               <Button

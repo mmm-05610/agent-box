@@ -18,8 +18,9 @@ import { fetchProfiles } from '@/api/profiles'
 import { fetchProviders } from '@/api/providers'
 import { fetchSessions } from '@/api/sessions'
 import { cn, formatRelativeTime } from '@/lib/utils'
+import { toHomeRelative } from '@/lib/path'
 import type { AgentType } from '@/api'
-import { useAgentConfigs, useDefaultAgent, useVersion, resolveAgentIdentity } from '@/hooks'
+import { useAgentConfigs, useDefaultAgent, useHomeDir, useVersion, resolveAgentIdentity } from '@/hooks'
 
 interface HomePageProps {
   onNav: (key: NavKey) => void
@@ -40,6 +41,7 @@ export function HomePage({ onNav }: HomePageProps) {
   const version = useVersion()
   // Provider stat counts the backend's default agent — never a hardcoded type.
   const defaultAgent = useDefaultAgent()
+  const home = useHomeDir()
   const [profileCount, setProfileCount] = useState(0)
   const [providerCount, setProviderCount] = useState(0)
   const [sessionCount, setSessionCount] = useState(0)
@@ -267,7 +269,7 @@ export function HomePage({ onNav }: HomePageProps) {
                         )}
                       </div>
                       <div className="text-[11px] text-muted-foreground font-mono truncate">
-                        {s.cwd}
+                        {toHomeRelative(s.cwd, home)}
                       </div>
                     </div>
 

@@ -22,14 +22,14 @@ export async function fetchVersion(): Promise<string> {
   return call<string>((api) => api.get_version!(), '')
 }
 
-/** The backend's default projects directory (config.default_projects_dir()). */
-export async function fetchDefaultProjectsDir(): Promise<string> {
-  return call<string>((api) => api.get_default_projects_dir!(), '')
-}
-
 /** The current projects dir — user-stored value or backend default. */
 export async function fetchProjectsDir(): Promise<string> {
   return call<string>((api) => api.get_projects_dir!(), '')
+}
+
+/** The OS home directory (data-layer resolved; WSL home on Windows host). */
+export async function fetchHomeDir(): Promise<string> {
+  return call<string>((api) => api.get_home_dir!(), '')
 }
 
 /** Persist the projects dir in the backend (survives GUI restarts). */

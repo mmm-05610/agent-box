@@ -123,6 +123,12 @@ class LinuxDataAccess:
         )
         return {"pid": 0}
 
+    # ── Config ──────────────────────────────────────────────────────
+
+    def home_dir(self) -> str:
+        """The OS home directory (config.home_dir)."""
+        return config.home_dir()
+
     # ── Sessions ────────────────────────────────────────────────────
 
     def list_sessions(self) -> list:

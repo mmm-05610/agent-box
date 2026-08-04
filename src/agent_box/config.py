@@ -94,7 +94,17 @@ def default_projects_dir() -> str:
     Override with the ``AGENT_BOX_PROJECTS_DIR`` env var.  Kept as a tilde
     path — consumers resolve it against ``$HOME`` (WSL / Linux).
     """
-    return os.environ.get("AGENT_BOX_PROJECTS_DIR") or "~/projects"
+    return os.environ.get("AGENT_BOX_PROJECTS_DIR") or "~/"
+
+
+def home_dir() -> str:
+    """The OS home directory (str(Path.home())).
+
+    Used by the GUI to render paths home-relatively (``~/…``) instead of the
+    absolute ``/home/<user>/…``.  Platform-correct at the point of use: the
+    data layer resolves it WSL-side for Windows-host mode.
+    """
+    return str(Path.home())
 
 
 def _gui_settings_path() -> Path:

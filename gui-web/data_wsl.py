@@ -148,6 +148,12 @@ class WslDataAccess:
     def cleanup_sessions(self) -> int:
         return int(_wsl_run("agent-box exec 'sessions --cleanup'"))
 
+    # ── Config ──────────────────────────────────────────────────────
+
+    def home_dir(self) -> str:
+        """The WSL home directory (echo $HOME)."""
+        return _wsl_run("echo \"$HOME\"").strip()
+
     # ── Apply / Remove ──────────────────────────────────────────────
 
     def apply_provider(self, profile_name: str, provider_id: str) -> None:

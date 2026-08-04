@@ -1,11 +1,11 @@
 /**
  * GUI settings — persisted in browser localStorage.
  *
- * Pure frontend preferences (theme, projects_dir); the backend has no
- * settings storage. Survives restarts because PyWebView keeps the
- * browser profile. The projects_dir *default* is served by the backend
- * (config.default_projects_dir() via useDefaultProjectsDir), so the
- * constant below is an empty fallback, not a hardcoded path.
+ * Pure frontend preferences (theme, projects_dir mirror). The *source of
+ * truth* for projects_dir is the backend (gui-settings.json via
+ * useProjectsDir — localStorage on a file:// origin is not reliable); this
+ * mirror keeps the value for the immediate session. The constant below is
+ * an empty fallback, not a hardcoded path.
  */
 
 export type Theme = 'system' | 'light' | 'dark'

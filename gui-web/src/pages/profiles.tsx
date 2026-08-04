@@ -11,8 +11,9 @@ import { Button, Badge, Input, Tabs } from '@/components/ui'
 import { EmptyState, Loading } from '@/components/feedback'
 import { useToast } from '@/components/feedback/toast'
 import { PageHeader } from '@/components/layout'
-import { useAgentConfigs, useAgentIdentity, useAgentTypeColor, useDefaultAgent, useLibrary, useProfiles, useProjectsDir, useSessions, resolveAgentIdentity } from '@/hooks'
+import { useAgentConfigs, useAgentIdentity, useAgentTypeColor, useDefaultAgent, useHomeDir, useLibrary, useProfiles, useProjectsDir, useSessions, resolveAgentIdentity } from '@/hooks'
 import { cn } from '@/lib/utils'
+import { toHomeRelative } from '@/lib/path'
 import type { AgentType, AgentTypeConfig, Profile } from '@/api'
 import { createProfile, deleteProfile, launchProfile, getLastCwdMap, browseDir } from '@/api'
 import { readSettings } from '@/lib/settings'
@@ -492,6 +493,7 @@ function ProfileCard({
   const [mode, setMode] = useState<string>('resume')
   const [cwd, setCwd] = useState<string>(lastCwd || '~')
   const { dir: defaultProjectsDir } = useProjectsDir()
+  const home = useHomeDir()
 
   useEffect(() => {
     if (lastCwd) setCwd(lastCwd)
@@ -591,7 +593,7 @@ function ProfileCard({
             </p>
           )}
           <p className="mt-0.5 font-mono text-xs text-muted-foreground truncate">
-            {cwd || '~'}
+            {toHomeRelative(cwd, home) || '~'}
           </p>
         </div>
 
