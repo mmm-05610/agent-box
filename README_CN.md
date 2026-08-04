@@ -11,7 +11,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/)
-[![v0.5.0](https://img.shields.io/badge/version-0.5.0-orange.svg)](https://github.com/mmm-05610/agent-box/releases)
+[![v1.0.0](https://img.shields.io/badge/version-1.0.0-orange.svg)](https://github.com/mmm-05610/agent-box/releases)
 
 ---
 

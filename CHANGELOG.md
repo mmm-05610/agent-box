@@ -2,6 +2,50 @@
 
 All notable changes to agent-box will be documented in this file.
 
+## [1.0.0] — 2026-08-04
+
+### Added
+
+- **cmd2 上下文栈 REPL** — 替代 flat argparse。双入口：交互 `repl` + 脚本
+  `exec "use x; apply provider y; launch"`（`;` 分隔、`#` 注释、piped
+  stdin）。`use <profile>` 进入 `[name:type]>` profile 上下文；tab 补全、
+  历史、自动建议。
+- **分层架构** — `core/`（注册表/DB/io）+ `adapters/`（acs/models）+
+  `resources/`（apply/CRUD）+ `cli/`。
+- **声明式注册表 `core/agent_types.json`** — 前端/CLI 零 agent 知识：
+  页面结构、tab、图标、默认值全部由后端注册表驱动。
+- **Provider 系统** — strategy dispatch（json_merge / multi_file /
+  yaml_custom / jsonc_provider）+ ACS 库集成（providers / mcp / skills /
+  prompts 只读查询 + apply 写入）。
+- **声明式数据表 `core/provider_endpoints.json`** — provider base_url →
+  /models endpoint 映射；`adapters/models.py` `fetch_models`。
+- **GUI 前端重构** — registry 动态 tab、库浏览（搜索/详情/apply）、
+  provider 表单（models fetch、endpoint 测速）、permissions 结构化块、
+  hooks / memories / instructions 编辑器、中/英 i18n、运行状态看板
+  （footer 5s 轮询）。
+- **后端化** — 版本号（`__version__`）、projects_dir（gui-settings.json
+  持久化）、launch `--cwd` 后端解析、acs_binary（env → PyInstaller →
+  submodule）、home_dir（`~/...` 显示）。
+
+### Changed
+
+- **CLI 重写** — argparse 平铺子命令 → cmd2 REPL；`cc/codex/hermes/
+opencode` 快捷命令合并为 `launch`。
+- **默认 projects_dir `~/projects` → `~/`**；路径显示 home-relative
+  （`/home/<user>/...` → `~/...`）。
+- **Session 时间按 UTC 存储/解析**（`datetime('now')` = UTC）。
+- **bridge 双模式** — Windows 宿主经 `wsl.exe`（确定性路径转换），
+  Linux/WSL 直接 import。
+- **死测试清理** — `tests/test_wsl_io.py`（指向已删除的 `gui.wsl`，破坏
+  pytest collection）移除；根 `.gitignore` 补 `node_modules/`。
+
+### Fixed
+
+- 冒烟测试（2026-08）~15 个 bug：会话时间 8h 偏移（UTC 解析）、detail 页
+  React #310（条件 hook）、Windows GBK 解码、UNC 路径转换、MCP summary
+  NameError、sidebar 运行计数陈旧、launch cwd 引号处理、MCP installed
+  skills "expecting value" 等。
+
 ## [0.5.0] — 2026-06-27
 
 ### Added
