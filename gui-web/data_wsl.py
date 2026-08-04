@@ -1,28 +1,48 @@
-"""WSL-bridged data access for Windows host mode."""
+"""agent_box access from the Windows host via ``wsl.exe`` + an RPC shim.
+
+The Windows GUI runs on Windows Python and cannot import agent_box, but it
+must not depend on the ``agent-box`` CLI binary being installed in WSL —
+the GUI and the CLI are independent tools.  So every agent_box operation
+goes through ``rpc_server.py``: a tiny stdin/stdout JSON dispatcher that
+imports ``LinuxDataAccess`` directly (the same code path ``data_linux.py``
+uses in-process).  The GUI depends on the agent_box *library*, which is
+bundled in the packaged runtime.
+
+``launch_profile`` is the exception — it must appear in a fresh Windows
+console — so it spawns ``wsl.exe`` with a small python3 snippet that calls
+``agent_box.launch.launch`` (again the library, not the CLI binary).
+
+File I/O methods use plain WSL shell commands (cat / find / rm / base64) and
+touch no agent_box code, so they carry no CLI dependency either.
+"""
 
 import base64
 import json
+import re
 import shlex
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 
-def _wsl_run(cmd: str, timeout: float = 30) -> str:
-    """Run a command via ``wsl.exe bash -lc`` and return stdout.
-
-    Only used in Windows host mode, where agent-box lives inside WSL
-    and this bridge process runs on Windows Python.
-    """
+def _wsl_run(cmd: str, timeout: float = 30, input: bytes | None = None) -> str:
+    """Run a command via ``wsl.exe bash -lc`` and return stdout."""
     wsl = shutil.which("wsl.exe")
     if wsl is None:
         raise RuntimeError("wsl.exe not found in PATH (install WSL).")
+    kwargs: dict = {}
+    if sys.platform == "win32":
+        # Windows host: avoid console flashes + a startup-dir dependency.
+        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+        kwargs["cwd"] = "C:\\"
     try:
         result = subprocess.run(
             [wsl, "bash", "-lc", cmd],
             capture_output=True,
+            input=input,
             timeout=timeout,
-            cwd="C:\\",
+            **kwargs,
         )
     except subprocess.TimeoutExpired as exc:
         raise RuntimeError(f"wsl.exe command timed out: {exc}") from exc
@@ -36,94 +56,132 @@ def _wsl_run(cmd: str, timeout: float = 30) -> str:
     return result.stdout.decode("utf-8", errors="replace").strip()
 
 
+def _to_wsl_path(win_path: str) -> str:
+    """Deterministic Windows path → WSL path (UNC ``\\\\wsl$`` or drive)."""
+    p = win_path.strip()
+    m = re.match(r"^\\\\wsl\$\\([^\\]+)\\(.+)$", p, re.IGNORECASE)
+    if m:
+        return "/" + m.group(2).replace("\\", "/")
+    m = re.match(r"^([A-Za-z]):\\(.+)$", p)
+    if m:
+        return f"/mnt/{m.group(1).lower()}/" + m.group(2).replace("\\", "/")
+    return p
+
+
+def _runtime_dir() -> str:
+    """WSL path to the GUI runtime (``rpc_server.py`` + the agent_box library).
+
+    Frozen: the runtime is bundled under ``sys._MEIPASS/runtime`` (a Windows
+    temp dir WSL reads via /mnt/<drive>/...).  Dev: the repo's ``gui-web/``
+    directory, where agent_box is importable from the WSL install.
+    """
+    if getattr(sys, "frozen", False):
+        return _to_wsl_path(str(Path(sys._MEIPASS) / "runtime"))
+    return str(Path(__file__).parent.resolve())
+
+
+def _wsl_rpc(method: str, *args, **kwargs):
+    """Call an agent_box operation as a *library* over the wsl.exe pipe.
+
+    Sends ``{method, args, kwargs}`` JSON on stdin to ``rpc_server.py`` and
+    returns the parsed ``data``.  Raises RuntimeError on a library error.
+    """
+    payload = json.dumps(
+        {"method": method, "args": list(args), "kwargs": kwargs},
+        ensure_ascii=False,
+    )
+    runtime = _runtime_dir()
+    cmd = (
+        f"cd {shlex.quote(runtime)} && "
+        f"PYTHONPATH={shlex.quote(runtime)} python3 rpc_server.py"
+    )
+    out = _wsl_run(cmd, timeout=60, input=payload.encode("utf-8"))
+    try:
+        resp = json.loads(out)
+    except json.JSONDecodeError as e:
+        raise RuntimeError(f"rpc_server.py returned invalid JSON: {out!r}") from e
+    if not resp.get("ok"):
+        raise RuntimeError(resp.get("error", "RPC failed"))
+    return resp.get("data")
+
+
 def _resume_args(agent_type: str) -> tuple:
     """Fetch ``runtime.launch.resume`` (minus the binary name) from the
-    agent-type registry inside WSL.
-
-    Windows Python cannot import agent_box, so read the registry through
-    ``python3 -c`` — the same pattern as the ACS library methods below.
-    Mirrors ``data_linux.launch_profile``'s direct ``get_agent_config``
-    read, so there is no per-agent table to keep in sync.
-    """
-    out = _wsl_run(
-        "python3 -c 'import json; "
+    agent-type registry inside WSL, through the bundled runtime."""
+    runtime = _runtime_dir()
+    snippet = (
+        "import json; "
         "from agent_box.core.library import get_agent_config; "
-        f"cfg = get_agent_config(\"{agent_type}\") or {{}}; "
-        "resume = ((cfg.get(\"runtime\") or {}).get(\"launch\") or {}).get(\"resume\") or []; "
-        "print(json.dumps(resume))'",
+        f"cfg = get_agent_config({shlex.quote(agent_type)}) or {{}}; "
+        "resume = ((cfg.get('runtime') or {}).get('launch') or {}).get('resume') or []; "
+        "print(json.dumps(resume))"
+    )
+    out = _wsl_run(
+        f"cd {shlex.quote(runtime)} && PYTHONPATH={shlex.quote(runtime)} "
+        f"python3 -c {shlex.quote(snippet)}",
         timeout=15,
     )
     try:
         args = json.loads(out)
-        # The registry array includes the binary name (["claude", "-c"]);
-        # launch passes everything after the profile name through, so skip it.
         return tuple(args[1:]) if isinstance(args, list) and len(args) > 1 else ()
     except (json.JSONDecodeError, TypeError):
         return ()
 
 
 class WslDataAccess:
-    """agent_box access via wsl.exe + ``agent-box exec``. Launch in a
-    fresh Windows console (CREATE_NEW_CONSOLE)."""
+    """agent_box access from Windows via ``wsl.exe`` + the RPC library shim.
+
+    Every agent_box operation goes through ``rpc_server.py`` (a direct
+    ``LinuxDataAccess`` import) — the GUI never needs the ``agent-box`` CLI
+    installed in WSL.  ``launch_profile`` spawns a fresh Windows console with
+    a python3 snippet that calls ``agent_box.launch.launch`` directly.
+    """
 
     # ── Profiles ────────────────────────────────────────────────────
 
     def list_profiles(self) -> list:
-        out = _wsl_run("agent-box exec 'list profiles --json'")
-        return json.loads(out)
+        return _wsl_rpc("list_profiles")
 
     def get_profile(self, name: str) -> dict:
-        out = _wsl_run(f"agent-box exec 'show {name} --json'")
-        return json.loads(out)
+        return _wsl_rpc("get_profile", name)
 
     def create_profile(
         self, name: str, agent_type: str,
         display_name: str = "", description: str = "", preset: str = "",
     ) -> dict:
-        flags = f" --type {agent_type}"
-        if display_name:
-            flags += f" --display-name \"{display_name}\""
-        if description:
-            flags += f" --description \"{description}\""
-        if preset:
-            flags += f" --preset \"{preset}\""
-        _wsl_run(f"agent-box exec {shlex.quote(f'create {name}{flags}')}")
-        return {"name": name, "agent_type": agent_type}
+        return _wsl_rpc(
+            "create_profile", name, agent_type,
+            display_name, description, preset,
+        )
 
     def delete_profile(self, name: str) -> None:
-        _wsl_run(f"agent-box exec {shlex.quote(f'delete {name} --force')}")
+        _wsl_rpc("delete_profile", name)
 
     def edit_profile(
         self, name: str,
         display_name: str = "", description: str = "",
         provider: str = "", prompt: str = "",
     ) -> dict:
-        flags = "configure " + name
-        if display_name:
-            flags += f" --display-name \"{display_name}\""
-        if description:
-            flags += f" --description \"{description}\""
-        if provider:
-            flags += f" --provider \"{provider}\""
-        if prompt:
-            flags += f" --prompt \"{prompt}\""
-        _wsl_run(f"agent-box exec {shlex.quote(flags)}")
-        return json.loads(_wsl_run(f"agent-box exec {shlex.quote(f'show {name} --json')}"))
+        return _wsl_rpc(
+            "edit_profile", name, display_name, description, provider, prompt,
+        )
 
     def launch_profile(self, name: str, agent_type: str, mode: str, cwd: str = "") -> dict:
-        """Launch a profile in a new Windows console via wsl.exe."""
+        """Launch a profile in a new Windows console, calling
+        ``agent_box.launch.launch`` (library) instead of ``agent-box exec``."""
         resume_args = _resume_args(agent_type)
-        launch_cmd = f"launch {name}"
-        # Symbolic mode protocol — matches config.MODE_RESUME ("resume").
-        if mode == "resume" and resume_args:
-            launch_cmd += " " + " ".join(resume_args)
-
-        # cwd is resolved by the backend launch (expanduser) — pass it as a
-        # flag, not a `cd` in the shell (which chokes on `~` and quoting).
-        if cwd:
-            launch_cmd += f" --cwd {shlex.quote(cwd)}"
+        extra_args = list(resume_args) if mode == "resume" else []
+        cwd_py = shlex.quote(cwd) if cwd else "None"
+        snippet = (
+            "from agent_box.launch import launch; "
+            f"launch({shlex.quote(name)}, {json.dumps(extra_args)}, cwd={cwd_py})"
+        )
         setup = 'export PATH="$HOME/.npm-global/bin:$HOME/.local/bin:$PATH"'
-        script = f'{setup} && agent-box exec "{launch_cmd}"'
+        cmd = (
+            f"cd {shlex.quote(_runtime_dir())} && "
+            f"PYTHONPATH={shlex.quote(_runtime_dir())} python3 -c {shlex.quote(snippet)}"
+        )
+        script = f"{setup} && {cmd}"
         script += (
             ' || { ec=$?; echo; echo agent-box failed code $ec; '
             'read -p "Press Enter to close..." ; }'
@@ -142,11 +200,10 @@ class WslDataAccess:
     # ── Sessions ────────────────────────────────────────────────────
 
     def list_sessions(self) -> list:
-        out = _wsl_run("agent-box exec 'list sessions --json'")
-        return json.loads(out)
+        return _wsl_rpc("list_sessions")
 
     def cleanup_sessions(self) -> int:
-        return int(_wsl_run("agent-box exec 'sessions --cleanup'"))
+        return _wsl_rpc("cleanup_sessions")
 
     # ── Config ──────────────────────────────────────────────────────
 
@@ -157,99 +214,65 @@ class WslDataAccess:
     # ── Apply / Remove ──────────────────────────────────────────────
 
     def apply_provider(self, profile_name: str, provider_id: str) -> None:
-        _wsl_run(f"agent-box exec 'use {profile_name}; apply provider {provider_id}'")
+        _wsl_rpc("apply_provider", profile_name, provider_id)
 
     def apply_prompt(self, profile_name: str, md_id: str) -> None:
-        _wsl_run(f"agent-box exec 'use {profile_name}; apply prompt {md_id}'")
+        _wsl_rpc("apply_prompt", profile_name, md_id)
 
     def list_profile_providers(self, profile_name: str) -> list:
-        out = _wsl_run(f"agent-box exec 'use {profile_name}; list providers --json'")
-        return json.loads(out)
+        return _wsl_rpc("list_profile_providers", profile_name)
 
     def remove_profile_provider(self, profile_name: str, provider_id: str) -> None:
-        _wsl_run(f"agent-box exec 'use {profile_name}; remove provider {provider_id}'")
+        _wsl_rpc("remove_profile_provider", profile_name, provider_id)
 
     def apply_mcp_to_profile(self, profile_name: str, mcp_id: str) -> None:
-        _wsl_run(f"agent-box exec 'use {profile_name}; apply mcp {mcp_id}'")
+        _wsl_rpc("apply_mcp_to_profile", profile_name, mcp_id)
 
     def get_profile_mcp(self, profile_name: str) -> list:
-        out = _wsl_run(f"agent-box exec 'use {profile_name}; list mcp --json'")
-        return json.loads(out)
+        return _wsl_rpc("get_profile_mcp", profile_name)
 
     def remove_mcp_from_profile(self, profile_name: str, mcp_id: str) -> None:
-        _wsl_run(f"agent-box exec 'use {profile_name}; remove mcp {mcp_id}'")
+        _wsl_rpc("remove_mcp_from_profile", profile_name, mcp_id)
 
     def apply_skill_to_profile(self, profile_name: str, skill_id: str) -> None:
-        _wsl_run(f"agent-box exec 'use {profile_name}; apply skill {skill_id}'")
+        _wsl_rpc("apply_skill_to_profile", profile_name, skill_id)
 
     def remove_skill_from_profile(self, profile_name: str, skill_id: str) -> None:
-        _wsl_run(f"agent-box exec 'use {profile_name}; remove skill {skill_id}'")
+        _wsl_rpc("remove_skill_from_profile", profile_name, skill_id)
 
-    # ── ACS Library (no CLI command exists → python3 -c) ────────────
+    # ── ACS Library ─────────────────────────────────────────────────
 
     def list_providers(self, agent_type: str) -> list:
-        out = _wsl_run(
-            "python3 -c 'from agent_box.adapters.acs import list_providers; "
-            f"import json; print(json.dumps(list_providers(\"{agent_type}\")))'"
-        )
-        return json.loads(out)
+        return _wsl_rpc("list_providers", agent_type)
 
     def get_provider(self, agent_type: str, provider_id: str) -> dict | None:
-        out = _wsl_run(
-            "python3 -c 'from agent_box.adapters.acs import get_provider; "
-            f"import json; print(json.dumps(get_provider(\"{agent_type}\", \"{provider_id}\")))'"
-        )
-        return json.loads(out)
+        return _wsl_rpc("get_provider", agent_type, provider_id)
 
     def list_prompts(self, agent_type: str) -> list:
-        out = _wsl_run(
-            "python3 -c 'from agent_box.adapters.acs import list_prompts; "
-            f"import json; print(json.dumps(list_prompts(\"{agent_type}\")))'"
-        )
-        return json.loads(out)
+        return _wsl_rpc("list_prompts", agent_type)
 
     def get_prompt(self, agent_type: str, md_id: str) -> dict | None:
-        out = _wsl_run(
-            "python3 -c 'from agent_box.adapters.acs import get_prompt; "
-            f"import json; print(json.dumps(get_prompt(\"{agent_type}\", \"{md_id}\")))'"
-        )
-        return json.loads(out)
+        return _wsl_rpc("get_prompt", agent_type, md_id)
 
     def list_mcp_servers(self, agent_type: str) -> list:
-        out = _wsl_run(
-            "python3 -c 'from agent_box.adapters.acs import list_mcp_servers; "
-            f"import json; print(json.dumps(list_mcp_servers(\"{agent_type}\")))'"
-        )
-        return json.loads(out)
+        return _wsl_rpc("list_mcp_servers", agent_type)
 
     def get_mcp_server(self, server_id: str) -> dict | None:
-        out = _wsl_run(
-            "python3 -c 'from agent_box.adapters.acs import get_mcp_server; "
-            f"import json; print(json.dumps(get_mcp_server(\"{server_id}\")))'"
-        )
-        return json.loads(out)
+        return _wsl_rpc("get_mcp_server", server_id)
 
     def list_skills(self, agent_type: str) -> list:
-        out = _wsl_run(
-            "python3 -c 'from agent_box.adapters.acs import list_skills; "
-            f"import json; print(json.dumps(list_skills(\"{agent_type}\")))'"
-        )
-        return json.loads(out)
+        return _wsl_rpc("list_skills", agent_type)
 
     def fetch_models(
         self, base_url: str, api_key: str,
         models_url: str = "", is_full_url: bool = False, timeout_sec: int = 10,
     ) -> list:
-        out = _wsl_run(
-            "python3 -c 'import json; "
-            "from agent_box.adapters.models import fetch_models; "
-            f"print(json.dumps(fetch_models(\"{base_url}\", \"{api_key}\", "
-            f"\"{models_url}\", {bool(is_full_url)}, {timeout_sec})))'",
-            timeout=timeout_sec + 15,
+        return _wsl_rpc(
+            "fetch_models", base_url, api_key,
+            models_url, is_full_url, timeout_sec,
         )
-        return json.loads(out)
 
-    # ── File I/O (WSL filesystem) ───────────────────────────────────
+    # ── File I/O (WSL filesystem — pure shell, no agent_box) ────────
 
     def read_file(self, path: str) -> str:
         quoted = f"'{path}'" if " " in path else path
@@ -352,25 +375,7 @@ class WslDataAccess:
     # ── Misc ────────────────────────────────────────────────────────
 
     def last_cwd_map(self) -> dict:
-        rows = json.loads(_wsl_run("agent-box exec 'list sessions --json'"))
-        result: dict[str, str] = {}
-        for s in rows:
-            name = s.get("profile", "")
-            cwd = s.get("cwd") or ""
-            if name and cwd and name not in result:
-                result[name] = cwd
-        return result
+        return _wsl_rpc("last_cwd_map")
 
     def launch_acs(self) -> None:
-        """Launch the ACS GUI binary inside WSL (detached).
-
-        The binary path comes from agent_box config (config.acs_binary()),
-        resolved through WSL — no hardcoded path in the GUI shell.
-        """
-        _wsl_run(
-            "python3 -c 'from agent_box.config import acs_binary; "
-            "import subprocess; "
-            "subprocess.Popen([str(acs_binary())], stdout=subprocess.DEVNULL, "
-            "stderr=subprocess.DEVNULL, start_new_session=True)'",
-            timeout=15,
-        )
+        _wsl_rpc("launch_acs")
