@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Input } from '@/components/ui'
 import { ChevronIcon } from './icons'
 import type { FetchedModel } from '@/api/models'
@@ -21,11 +22,13 @@ export function ModelIdInput({
   models,
   onChange,
   disabled,
-  placeholder = 'model-id',
+  placeholder,
   renameOnBlur = false,
 }: ModelIdInputProps) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [localValue, setLocalValue] = useState(value)
+  const resolvedPlaceholder = placeholder ?? 'model-id'
 
   useEffect(() => {
     setLocalValue(value)
@@ -54,7 +57,7 @@ export function ModelIdInput({
         onBlur={() => {
           if (renameOnBlur) commit(localValue)
         }}
-        placeholder={placeholder}
+        placeholder={resolvedPlaceholder}
         className="min-w-0 flex-1 font-mono text-sm"
         disabled={disabled}
       />
@@ -63,7 +66,7 @@ export function ModelIdInput({
         onClick={() => setOpen((v) => !v)}
         disabled={disabled || models.length === 0}
         className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border bg-muted text-muted-foreground"
-        title={models.length === 0 ? '请先获取模型列表' : '选择已获取的模型'}
+        title={models.length === 0 ? t('providerForm.modelIdInput.fetchFirst') : t('providerForm.modelIdInput.selectFetched')}
       >
         <ChevronIcon open={open} />
       </button>

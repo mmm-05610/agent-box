@@ -10,24 +10,29 @@ import shutil
 import sys
 
 from . import config
-from . import profile
-from . import sessions
+from .core.library import get_agent_config
+from .resources import profile
+from .resources import sessions
 
 
-# Mode labels stored in sessions.db. The GUI uses the same strings.
-MODE_NEW = "新会话"
-MODE_RESUME = "继续上次"
 
 
-def launch(name: str, extra_args: list | None = None) -> None:
+def launch(name: str, extra_args: list | None = None, cwd: str | None = None) -> None:
     """Bind-mount the profile's config dir and exec the agent binary.
 
     Reads ``meta.yaml`` to determine agent_type. ``extra_args`` are
     passed through to the agent binary (e.g. ``-c`` for hermes,
-    ``--continue`` for claude). Never returns on success.
+    ``--continue`` for claude). ``cwd`` is the working directory for the
+    agent — resolved here (``~`` etc.) so callers don't shell-quote it.
+    Never returns on success.
     """
+    if cwd:
+        os.chdir(os.path.expanduser(cwd))
     meta = profile.load_meta(name)
-    agent_type = meta.get("agent_type") or config.AGENT_TYPE_CC
+    agent_type = meta.get("agent_type") or config.DEFAULT_AGENT_TYPE
+    agent_config = get_agent_config(agent_type)
+    if agent_config is None:
+        raise profile.ProfileError(f"unknown agent_type {agent_type!r}")
 
     # --- resolve paths ---
     pdir = config.profile_agent_dir(name, agent_type)
@@ -53,41 +58,53 @@ def launch(name: str, extra_args: list | None = None) -> None:
     if not rdir.exists():
         rdir.mkdir(parents=True, exist_ok=True)
 
+    # ── sandbox policy (registry-driven) ─────────────────────────────
+    sandbox = agent_config.get("sandbox") or {}
+
     # Build bwrap argv
-    argv = [
-        bwrap,
-        "--bind", "/", "/",
-        "--bind", str(pdir), str(rdir),
-        "--dev", "/dev",
-        "--proc", "/proc",
-        "--tmpfs", "/tmp",
-        "--unshare-ipc",
-        "--unshare-pid",
-        "--unshare-uts",
-        "--share-net",
-    ]
+    argv = [bwrap]
 
-    # CC: also bind-mount dot-claude.json → ~/.claude.json
-    if agent_type == "claude":
-        pjson = config.profile_dir(name) / "dot-claude.json"
-        rjson = config.real_agent_dir("claude").with_name(".claude.json")
-        if pjson.is_file():
-            if not rjson.exists():
-                rjson.touch()
-            argv.insert(4, str(rjson))
-            argv.insert(4, str(pjson))
-            argv.insert(4, "--bind")
+    # Root filesystem + additional bind-mounts
+    for mount in sandbox.get("bind_mounts") or []:
+        argv.extend(["--bind", mount, mount])
 
-        # Bind-mount dot-agents/ → ~/.agents/ so skills installed
-        # via agent-box-skill-apply are isolated per profile.
-        pagents = config.profile_dir(name) / "dot-agents"
-        ragents = config.real_agent_dir("claude").with_name(".agents")
-        if not pagents.is_dir():
-            pagents.mkdir(parents=True, exist_ok=True)
-        if not ragents.exists():
-            ragents.mkdir(parents=True, exist_ok=True)
-        argv.insert(4, str(ragents))
-        argv.insert(4, str(pagents))
+    # Fresh virtual filesystems: bwrap's --dev/--proc create new
+    # filesystems tied to the child namespaces.  Binding the host's
+    # /dev or /proc instead breaks PID mapping (host procfs under a new
+    # --unshare-pid namespace) and leaves device nodes unusable.
+    for mount in sandbox.get("dev_mounts") or []:
+        argv.extend(["--dev", mount])
+    for mount in sandbox.get("proc_mounts") or []:
+        argv.extend(["--proc", mount])
+
+    # Profile config bind-mount (always done — core of agent-box)
+    argv.extend(["--bind", str(pdir), str(rdir)])
+
+    # tmpfs mounts
+    for tmp in sandbox.get("tmpfs") or []:
+        argv.extend(["--tmpfs", tmp])
+
+    # Namespace isolation
+    for flag in sandbox.get("unshare") or []:
+        argv.append(f"--unshare-{flag}")
+    for flag in sandbox.get("share") or []:
+        argv.append(f"--share-{flag}")
+
+    for relative_path in agent_config.get("runtime", {}).get("extra_profile_files", []):
+        extra_name = relative_path.rstrip("/")
+        profile_extra = config.profile_dir(name) / extra_name
+        real_name = f".{profile_extra.name.removeprefix('dot-')}"
+        real_extra = rdir.with_name(real_name)
+        if relative_path.endswith("/"):
+            profile_extra.mkdir(parents=True, exist_ok=True)
+            real_extra.mkdir(parents=True, exist_ok=True)
+        elif profile_extra.is_file():
+            if not real_extra.exists():
+                real_extra.touch()
+        else:
+            continue
+        argv.insert(4, str(real_extra))
+        argv.insert(4, str(profile_extra))
         argv.insert(4, "--bind")
 
     # Secondary data dir mount (e.g. OpenCode auth)
@@ -100,13 +117,12 @@ def launch(name: str, extra_args: list | None = None) -> None:
         argv.insert(4, str(pdata))
         argv.insert(4, "--bind")
 
-    # Hermes: preserve hermes-agent/ (venv) from host — profile config
-    # dirs don't ship a Python virtualenv. Append mount AFTER the main
-    # config-dir mount so it overrides the hermes-agent/ subdirectory.
-    if agent_type == "hermes":
-        agent_dir = rdir / "hermes-agent"
-        profile_agent_dir = pdir / "hermes-agent"
-        venv_binary = profile_agent_dir / "venv" / "bin" / "hermes"
+    venv_preserve = agent_config.get("runtime", {}).get("venv_preserve")
+    if venv_preserve:
+        host_venv = rdir / venv_preserve
+        profile_venv = pdir / venv_preserve
+        agent_dir = host_venv.parent
+        venv_binary = profile_venv / "bin" / agent_config["identity"]["binary"]
         if agent_dir.is_dir() and not venv_binary.is_file():
             argv.append("--bind")
             argv.append(str(agent_dir))
@@ -118,14 +134,14 @@ def launch(name: str, extra_args: list | None = None) -> None:
 
     env = dict(os.environ)
     print(
-        f"agent-box: launching {agent_type} as profile {name!r} "
+        f"{config.DISPLAY_NAME}: launching {agent_type} as profile {name!r} "
         f"(mount: {pdir} → {rdir})",
         file=sys.stderr,
     )
 
     import subprocess as _sp
 
-    mode = MODE_RESUME if extra_args else MODE_NEW
+    mode = config.MODE_RESUME if extra_args else config.MODE_NEW
     pid = os.getpid()
     sid = sessions.record_launch(name, agent_type, os.getcwd(), mode, pid)
 

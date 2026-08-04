@@ -10,6 +10,7 @@
  */
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui'
 import { Loading, StatusDot } from '@/components/feedback'
 import { PageHeader, type NavKey } from '@/components/layout'
@@ -17,11 +18,9 @@ import { fetchProfiles } from '@/api/profiles'
 import { fetchProviders } from '@/api/providers'
 import { fetchSessions } from '@/api/sessions'
 import { cn, formatRelativeTime } from '@/lib/utils'
+import { toHomeRelative } from '@/lib/path'
 import type { AgentType } from '@/api'
-import claudeLogo from '@/icons/extracted/claude.svg'
-import codexLogo from '@/icons/extracted/openai.svg'
-import hermesLogo from '@/icons/extracted/hermes.png'
-import opencodeLogo from '@/icons/extracted/opencode-logo-light.svg'
+import { useAgentConfigs, useDefaultAgent, useHomeDir, useVersion, resolveAgentIdentity } from '@/hooks'
 
 interface HomePageProps {
   onNav: (key: NavKey) => void
@@ -36,21 +35,13 @@ interface StatTile {
   accent: 'accent' | 'success' | 'info' | 'warning'
 }
 
-const AGENT_TYPE_LOGOS: Record<AgentType, string> = {
-  claude: claudeLogo,
-  codex: codexLogo,
-  hermes: hermesLogo,
-  opencode: opencodeLogo,
-}
-
-const AGENT_TYPE_HEX: Record<string, string> = {
-  claude: '#D97757',
-  codex: '#10A37F',
-  hermes: '#8B5CF6',
-  opencode: '#3B82F6',
-}
-
 export function HomePage({ onNav }: HomePageProps) {
+  const { t, i18n } = useTranslation()
+  const { agentConfigs } = useAgentConfigs()
+  const version = useVersion()
+  // Provider stat counts the backend's default agent — never a hardcoded type.
+  const defaultAgent = useDefaultAgent()
+  const home = useHomeDir()
   const [profileCount, setProfileCount] = useState(0)
   const [providerCount, setProviderCount] = useState(0)
   const [sessionCount, setSessionCount] = useState(0)
@@ -65,7 +56,7 @@ export function HomePage({ onNav }: HomePageProps) {
       try {
         const [profiles, providers, sessions] = await Promise.all([
           fetchProfiles(),
-          fetchProviders('claude'),
+          fetchProviders(defaultAgent),
           fetchSessions(),
         ])
         setProfileCount(profiles.length)
@@ -79,7 +70,7 @@ export function HomePage({ onNav }: HomePageProps) {
             agentType: s.agentType,
             mode: s.mode ?? 'interactive',
             cwd: s.cwd,
-            exitedAt: s.exitedAt,
+            exitedAt: s.exitedAt ?? null,
             launchedAt: s.launchedAt,
           })),
         )
@@ -90,25 +81,24 @@ export function HomePage({ onNav }: HomePageProps) {
       }
     }
     void load()
-  }, [])
+  }, [defaultAgent])
 
   const greeting = useMemo(() => {
     const h = new Date().getHours()
-    if (h < 5) return 'Working late'
-    if (h < 12) return 'Good morning'
-    if (h < 18) return 'Good afternoon'
-    return 'Good evening'
-  }, [])
+    if (h < 5) return t('home.greeting.late')
+    if (h < 12) return t('home.greeting.morning')
+    if (h < 18) return t('home.greeting.afternoon')
+    return t('home.greeting.evening')
+  }, [t])
 
   const currentDate = useMemo(() => {
-    const d = new Date()
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-    const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-    ]
-    return `${days[d.getDay()]} ${d.getDate()} ${months[d.getMonth()]}`
-  }, [])
+    const locale = i18n.resolvedLanguage === 'zh' ? 'zh-CN' : 'en-US'
+    return new Date().toLocaleDateString(locale, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+    })
+  }, [i18n.resolvedLanguage])
 
   if (loading) {
     return <Loading className="py-16" />
@@ -117,9 +107,9 @@ export function HomePage({ onNav }: HomePageProps) {
   const tiles: StatTile[] = [
     {
       key: 'sessions',
-      label: 'Running',
+      label: t('home.stat.running'),
       value: runningCount,
-      hint: runningCount > 0 ? 'active now' : 'all idle',
+      hint: runningCount > 0 ? t('home.stat.runningHintActive') : t('home.stat.runningHintIdle'),
       accent: 'success',
       icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -130,9 +120,9 @@ export function HomePage({ onNav }: HomePageProps) {
     },
     {
       key: 'profiles',
-      label: 'Profiles',
+      label: t('home.stat.profiles'),
       value: profileCount,
-      hint: 'across 4 types',
+      hint: t('home.stat.profilesHint'),
       accent: 'accent',
       icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -145,9 +135,9 @@ export function HomePage({ onNav }: HomePageProps) {
     },
     {
       key: 'sessions',
-      label: 'Sessions',
+      label: t('home.stat.sessions'),
       value: sessionCount,
-      hint: 'all time',
+      hint: t('home.stat.sessionsHint'),
       accent: 'warning',
       icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -176,19 +166,23 @@ export function HomePage({ onNav }: HomePageProps) {
               className="inline-block align-[-1px] mr-1.5"
             />
             <span className="text-foreground font-medium">
-              {runningCount > 0 ? `${runningCount} running now` : 'All idle'}
+              {runningCount > 0 ? t('home.stats.runningNow', { count: runningCount }) : t('home.stats.allIdle')}
             </span>
             <span className="mx-2 text-border">·</span>
-            <span>{profileCount} profiles</span>
+            <span>{t('home.stats.profiles', { count: profileCount })}</span>
             <span className="mx-2 text-border">·</span>
-            <span>{providerCount} providers</span>
-            <span className="mx-2 text-border">·</span>
-            <span className="font-mono">v0.5.0</span>
+            <span>{t('home.stats.providers', { count: providerCount })}</span>
+            {version && (
+              <>
+                <span className="mx-2 text-border">·</span>
+                <span className="font-mono">{`v${version}`}</span>
+              </>
+            )}
           </>
         }
         action={
-          <Button variant="default" size="lg" onClick={() => onNav('profiles')}>
-            Launch a profile →
+          <Button size="lg" onClick={() => onNav('profiles')}>
+            {t('home.launchProfile')}
           </Button>
         }
         className="mb-10"
@@ -208,10 +202,10 @@ export function HomePage({ onNav }: HomePageProps) {
           <div className="mb-5 flex items-center justify-between">
             <div>
               <h2 className="text-base font-semibold tracking-tight text-foreground">
-                Recent sessions
+                {t('home.recentSessions')}
               </h2>
               <p className="text-xs text-muted-foreground">
-                Last {recentSessions.length} launches
+                {t('home.lastLaunches', { count: recentSessions.length })}
               </p>
             </div>
             <Button
@@ -220,27 +214,26 @@ export function HomePage({ onNav }: HomePageProps) {
               onClick={() => onNav('sessions')}
               className="text-muted-foreground"
             >
-              View all →
+              {t('home.viewAll')}
             </Button>
           </div>
 
           {recentSessions.length === 0 ? (
             <div className="rounded-lg bg-muted/30 p-10 text-center">
-              <p className="text-sm text-muted-foreground">No sessions yet</p>
+              <p className="text-sm text-muted-foreground">{t('home.noSessions')}</p>
               <Button
                 size="sm"
                 className="mt-3"
                 onClick={() => onNav('profiles')}
               >
-                Launch your first profile
+                {t('home.launchFirstProfile')}
               </Button>
             </div>
           ) : (
             <div className="flex flex-col gap-2">
               {recentSessions.map((s, i) => {
                 const isRunning = !s.exitedAt
-                const accentColor = AGENT_TYPE_HEX[s.agentType] ?? '#888'
-                const logo = AGENT_TYPE_LOGOS[s.agentType]
+                const { color: accentColor, logo } = resolveAgentIdentity(agentConfigs, s.agentType)
                 return (
                   <div
                     key={i}
@@ -260,7 +253,7 @@ export function HomePage({ onNav }: HomePageProps) {
                         <img src={logo} alt={s.agentType} className="h-5 w-5 object-contain" />
                       ) : (
                         <span className="text-xs font-bold" style={{ color: accentColor }}>
-                          {s.agentType[0].toUpperCase()}
+                          {s.agentType[0]!.toUpperCase()}
                         </span>
                       )}
                     </div>
@@ -276,13 +269,24 @@ export function HomePage({ onNav }: HomePageProps) {
                         )}
                       </div>
                       <div className="text-[11px] text-muted-foreground font-mono truncate">
-                        {s.cwd}
+                        {toHomeRelative(s.cwd, home)}
                       </div>
                     </div>
 
-                    {/* Time */}
-                    <span className="shrink-0 text-[11px] text-muted-foreground/60 font-mono">
-                      {formatRelativeTime(s.launchedAt)}
+                    {/* Time — last launched + last closed */}
+                    <span className="shrink-0 text-right">
+                      <span className="block text-[11px] text-muted-foreground/60 font-mono">
+                        {t('time.launched', { time: formatRelativeTime(s.launchedAt, t) })}
+                      </span>
+                      <span className="block text-[11px] font-mono">
+                        {isRunning ? (
+                          <span className="text-success">{t('time.running')}</span>
+                        ) : (
+                          <span className="text-muted-foreground/40">
+                            {t('time.closed', { time: formatRelativeTime(s.exitedAt ?? 0, t) })}
+                          </span>
+                        )}
+                      </span>
                     </span>
                   </div>
                 )
@@ -294,8 +298,8 @@ export function HomePage({ onNav }: HomePageProps) {
         {/* Side rail — links to other pages */}
         <section className="space-y-3">
           <RailCard
-            title="Manage profiles"
-            description="Create, edit, switch between agent profiles."
+            title={t('home.rail.manageProfiles')}
+            description={t('home.rail.manageProfilesDesc')}
             onClick={() => onNav('profiles')}
             icon={
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -307,8 +311,8 @@ export function HomePage({ onNav }: HomePageProps) {
             }
           />
           <RailCard
-            title="Settings"
-            description="Theme, projects directory, about."
+            title={t('home.rail.settings')}
+            description={t('home.rail.settingsDesc')}
             onClick={() => onNav('settings')}
             icon={
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">

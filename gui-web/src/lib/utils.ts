@@ -15,35 +15,23 @@ export function cn(...inputs: (string | false | null | undefined)[]): string {
 }
 
 /**
- * Format a timestamp to a human-readable relative time.
+ * Format a timestamp to a human-readable relative time (i18n'd via `t`).
  *
  * @example
- *   formatRelativeTime(Date.now() - 60000) // → "1m ago"
+ *   formatRelativeTime(Date.now() - 60000, t) // → "1m ago" / "1 分钟前"
  */
-export function formatRelativeTime(timestamp: number): string {
+export function formatRelativeTime(
+  timestamp: number,
+  t: (key: string, opts?: Record<string, unknown>) => string,
+): string {
   const diff = Date.now() - timestamp
   const seconds = Math.floor(diff / 1000)
   const minutes = Math.floor(seconds / 60)
   const hours = Math.floor(minutes / 60)
   const days = Math.floor(hours / 24)
 
-  if (days > 0) return `${days}d ago`
-  if (hours > 0) return `${hours}h ago`
-  if (minutes > 0) return `${minutes}m ago`
-  return 'just now'
-}
-
-/**
- * Extract the first letter of a string, uppercased.
- */
-export function getInitial(name: string): string {
-  return (name[0] ?? '?').toUpperCase()
-}
-
-/**
- * Truncate a string to a maximum length.
- */
-export function truncate(str: string, maxLength: number): string {
-  if (str.length <= maxLength) return str
-  return str.slice(0, maxLength - 1) + '…'
+  if (days > 0) return t('time.daysAgo', { count: days })
+  if (hours > 0) return t('time.hoursAgo', { count: hours })
+  if (minutes > 0) return t('time.minutesAgo', { count: minutes })
+  return t('time.justNow')
 }

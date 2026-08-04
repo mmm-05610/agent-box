@@ -3,6 +3,10 @@
 This file is read by Claude Code when working in this repo. It points to
 the canonical docs and flags known landmines.
 
+**[CONVENTIONS.md](CONVENTIONS.md)** — project-wide rules for both humans
+and AI. All code and AI-assisted changes must follow the conventions
+listed there.
+
 ## Documentation index
 
 ### Architecture & design

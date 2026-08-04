@@ -10,11 +10,13 @@ from __future__ import annotations
 
 import os
 import shutil
+import subprocess as _sp
 from pathlib import Path
 
 import pytest
 
-from agent_box import config, launch, profile
+from agent_box import config, launch
+from agent_box.resources import profile
 
 
 class _ExecStop(Exception):
@@ -31,11 +33,11 @@ def fake_exec(monkeypatch, tmp_path):
 
     captured: dict = {}
 
-    def _fake_execvpe(file, args, env):
-        captured["file"] = file
-        captured["args"] = args
+    def _fake_popen(argv, env=None, **kwargs):
+        captured["file"] = argv[0]
+        captured["args"] = argv
         captured["env"] = env
-        raise _ExecStop("captured execvpe")
+        raise _ExecStop("captured Popen")
 
     # Resolve bwrap + agent binary to fake paths
     monkeypatch.setattr(
@@ -43,8 +45,8 @@ def fake_exec(monkeypatch, tmp_path):
         lambda name: f"/usr/bin/{name}" if name in ("bwrap", "claude", "codex",
                                                    "hermes", "opencode") else None,
     )
-    # Stop just before the real exec
-    monkeypatch.setattr(os, "execvpe", _fake_execvpe)
+    # Stop just before the real subprocess spawn
+    monkeypatch.setattr(_sp, "Popen", _fake_popen)
 
     # Redirect real_agent_dir/real_agent_data_dir into tmp_path
     real_root = tmp_path / "real"
@@ -84,15 +86,14 @@ def test_launch_cc_argv(tmp_agent_box_home, fake_exec):
     pdir = str(config.profile_agent_dir("cc1", "claude"))
     rdir = str(config.real_agent_dir("claude"))
     assert pdir in args and rdir in args
-    # CC also bind-mounts dot-claude.json → ~/.claude.json
+    # CC bind-mounts dot-agents/ → ~/.agents/ first (inserted at pos 4)
+    pagents = str(config.profile_dir("cc1") / "dot-agents")
+    ragents = str(config.real_agent_dir("claude").with_name(".agents"))
+    assert args[4:7] == ["--bind", pagents, ragents]
+    # dot-claude.json → ~/.claude.json inserted second (now at pos 7)
     pjson = str(config.profile_dir("cc1") / "dot-claude.json")
     rjson = str(config.real_agent_dir("claude").with_name(".claude.json"))
-    assert pjson in args
-    assert rjson in args
-    # The CC .claude.json --bind block was inserted at position 4
-    # (after the main --bind / / pair, so bwrap sees the CC override
-    # before the parent --bind / /).
-    assert args[4:7] == ["--bind", pjson, rjson]
+    assert args[7:10] == ["--bind", pjson, rjson]
 
 
 def test_launch_opencode_binds_data_dir(tmp_agent_box_home, fake_exec):

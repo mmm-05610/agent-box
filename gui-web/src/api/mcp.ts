@@ -2,60 +2,34 @@
  * MCP Servers API — CRUD operations for the MCP server library
  *
  * Calls PyWebView bridge functions via window.pywebview.api (async).
- * Converts snake_case fields from CLI to camelCase.
+ * ACS rows are already snake_case — no conversion layer needed.
  */
 
 import { call } from '@/lib/bridge'
-import type { AgentType, McpServer, McpServerConfig } from './types'
-
-/** Convert snake_case mcp_server row from CLI to camelCase. */
-function toMcpServer(raw: Record<string, unknown>): McpServer {
-  return {
-    id: raw.id as string,
-    name: raw.name as string,
-    description: (raw.description as string | null | undefined) ?? undefined,
-    homepage: (raw.homepage as string | null | undefined) ?? undefined,
-    docs: (raw.docs as string | null | undefined) ?? undefined,
-    tags: (raw.tags as string[] | undefined) ?? [],
-    agentTypes: (raw.agent_types as AgentType[] | undefined) ?? [],
-    serverConfig: (raw.server_config as string | null | undefined) ?? undefined,
-    serverConfigParsed:
-      (raw.server_config_parsed as McpServerConfig | null | undefined) ??
-      undefined,
-  }
-}
+import type { AgentType, McpServer } from './types'
 
 export async function fetchMcpServers(agentType: AgentType): Promise<McpServer[]> {
-  const raw = await call<Record<string, unknown>[]>(
-    (api) => api.list_mcp_servers(agentType),
-    [],
-  )
-  return raw.map(toMcpServer)
+  return call<McpServer[]>((api) => api.list_mcp_servers!(agentType), [])
 }
 
 export async function fetchMcpServerDetail(
   serverId: string,
 ): Promise<McpServer | null> {
-  const raw = await call<Record<string, unknown> | null>(
-    (api) => api.get_mcp_server(serverId),
-    null,
-  )
-  return raw ? toMcpServer(raw) : null
+  return call<McpServer | null>((api) => api.get_mcp_server!(serverId), null)
 }
 
 export async function saveMcpServer(
   serverId: string,
   dataJson: string,
 ): Promise<McpServer> {
-  const raw = await call<Record<string, unknown>>(
-    (api) => api.save_mcp_server(serverId, dataJson),
-    {} as Record<string, unknown>,
+  return call<McpServer>(
+    (api) => api.save_mcp_server!(serverId, dataJson),
+    {} as McpServer,
   )
-  return toMcpServer(raw)
 }
 
 export async function deleteMcpServer(serverId: string): Promise<void> {
-  await call<void>((api) => api.delete_mcp_server(serverId), undefined)
+  await call<void>((api) => api.delete_mcp_server!(serverId), undefined)
 }
 
 export async function setMcpAgent(
@@ -64,7 +38,32 @@ export async function setMcpAgent(
   enabled: boolean,
 ): Promise<void> {
   await call<void>(
-    (api) => api.set_mcp_agent(serverId, agentType, enabled ? 'true' : 'false'),
+    (api) => api.set_mcp_agent!(serverId, agentType, enabled ? 'true' : 'false'),
     undefined,
   )
+}
+
+// ── Profile MCP (installed) ─────────────────────────────────────────────
+
+export interface ProfileMcp {
+  id: string
+  name: string
+  type?: string
+  command?: string
+  args?: string[]
+  url?: string
+  raw: Record<string, unknown>
+}
+
+export async function fetchProfileMcp(profileName: string): Promise<ProfileMcp[]> {
+  const raw = await call<ProfileMcp[] | null>((api) => api.get_profile_mcp!(profileName), null)
+  return raw ?? []
+}
+
+export async function applyMcpToProfile(profileName: string, mcpId: string): Promise<void> {
+  await call<void>((api) => api.apply_mcp_to_profile!(profileName, mcpId), undefined)
+}
+
+export async function removeMcpFromProfile(profileName: string, mcpId: string): Promise<void> {
+  await call<void>((api) => api.remove_mcp_from_profile!(profileName, mcpId), undefined)
 }

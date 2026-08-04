@@ -3,6 +3,7 @@
  */
 
 import { Component, type ReactNode } from 'react'
+import i18n from '@/i18n'
 
 interface Props {
   children: ReactNode
@@ -41,7 +42,7 @@ export class ErrorBoundary extends Component<Props, State> {
           }}
         >
           <h2 style={{ color: '#c00', marginTop: 0 }}>
-            {this.props.name} crashed
+            {i18n.t('error.crashed', { name: this.props.name })}
           </h2>
           <pre style={{ background: '#fff', padding: 12, overflow: 'auto' }}>
             {String(this.state.error.message)}

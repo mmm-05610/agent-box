@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ChevronIcon } from './icons'
 import { Toggle } from './Toggle'
 
@@ -14,7 +15,8 @@ export interface AdvancedCardProps {
 
 /** Collapsible card with a "use custom config" toggle on the right.
  *  Default-closed; auto-opens when `enabled` flips to true. */
-export function AdvancedCard({ icon, title, enabled, onEnabledChange, enabledLabel = '使用单独配置', children }: AdvancedCardProps) {
+export function AdvancedCard({ icon, title, enabled, onEnabledChange, enabledLabel, children }: AdvancedCardProps) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(enabled)
   useEffect(() => {
     if (enabled) setOpen(true)
@@ -32,9 +34,9 @@ export function AdvancedCard({ icon, title, enabled, onEnabledChange, enabledLab
           {title}
         </span>
         <span className="flex items-center gap-3">
-          <span className="text-sm text-muted-foreground">{enabledLabel}</span>
+          <span className="text-sm text-muted-foreground">{enabledLabel ?? t('providerForm.advancedCard.enabledLabel')}</span>
           <span onClick={(event) => event.stopPropagation()}>
-            <Toggle checked={enabled} onChange={onEnabledChange} ariaLabel={enabledLabel} />
+            <Toggle checked={enabled} onChange={onEnabledChange} ariaLabel={enabledLabel ?? t('providerForm.advancedCard.enabledLabel')} />
           </span>
           <ChevronIcon open={open} />
         </span>

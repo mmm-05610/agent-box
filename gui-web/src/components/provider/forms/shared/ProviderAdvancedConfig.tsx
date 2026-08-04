@@ -12,6 +12,7 @@
  * and are parsed at save time in `perAgentSettings.ts`.
  */
 import type { ChangeEvent } from 'react'
+import { useTranslation } from 'react-i18next'
 import { AdvancedCard } from './AdvancedCard'
 import { Field } from './Field'
 import { FlaskIcon, CoinsIcon } from './icons'
@@ -67,21 +68,22 @@ export function ProviderAdvancedConfig({
   onPricingModelSourceChange,
   disabled,
 }: ProviderAdvancedConfigProps) {
+  const { t } = useTranslation()
   return (
     <div className="space-y-4">
       {/* ── Test config ───────────────────────────────────────────── */}
       <AdvancedCard
         icon={<FlaskIcon />}
-        title="连通检测配置"
+        title={t('providerForm.advancedConfig.testTitle')}
         enabled={testConfigEnabled}
         onEnabledChange={onTestConfigEnabledChange}
-        enabledLabel="使用单独配置"
+        enabledLabel={t('providerForm.advancedCard.enabledLabel')}
       >
         <p className="text-xs text-muted-foreground">
-          为此供应商配置单独的连通检测参数（超时 / 阈值 / 重试），不启用时使用全局配置。
+          {t('providerForm.advancedConfig.testDesc')}
         </p>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          <Field label="超时时间（秒）">
+          <Field label={t('providerForm.testTimeoutSec')}>
             <input
               type="number"
               min={1}
@@ -90,7 +92,7 @@ export function ProviderAdvancedConfig({
               {...numberInputProps(testTimeout, onTestTimeoutChange, disabled || !testConfigEnabled)}
             />
           </Field>
-          <Field label="降级阈值（毫秒）">
+          <Field label={t('providerForm.testDegradedThresholdMs')}>
             <input
               type="number"
               min={1}
@@ -98,7 +100,7 @@ export function ProviderAdvancedConfig({
               {...numberInputProps(testDegradedThreshold, onTestDegradedThresholdChange, disabled || !testConfigEnabled)}
             />
           </Field>
-          <Field label="最大重试次数">
+          <Field label={t('providerForm.testMaxRetries')}>
             <input
               type="number"
               min={0}
@@ -112,18 +114,18 @@ export function ProviderAdvancedConfig({
       {/* ── Billing config ────────────────────────────────────────── */}
       <AdvancedCard
         icon={<CoinsIcon />}
-        title="计费配置"
+        title={t('providerForm.advancedConfig.billingTitle')}
         enabled={pricingConfigEnabled}
         onEnabledChange={onPricingConfigEnabledChange}
-        enabledLabel="使用单独配置"
+        enabledLabel={t('providerForm.advancedCard.enabledLabel')}
       >
         <p className="text-xs text-muted-foreground">
-          为此供应商配置单独的计费参数，不启用时使用全局默认配置。
+          {t('providerForm.advancedConfig.billingDesc')}
         </p>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <Field
-            label="成本倍率"
-            hint="实际成本 = 基础成本 × 倍率，支持小数如 1.5。留空使用全局默认（1）。"
+            label={t('providerForm.costMultiplier')}
+            hint={t('providerForm.advancedConfig.costMultiplierHint')}
           >
             <input
               type="number"
@@ -138,8 +140,8 @@ export function ProviderAdvancedConfig({
             />
           </Field>
           <Field
-            label="计费模式"
-            hint="选择按请求模型还是返回模型进行定价匹配。"
+            label={t('providerForm.pricingModelSource')}
+            hint={t('providerForm.advancedConfig.pricingHint')}
           >
             <select
               value={pricingModelSource}
@@ -147,9 +149,9 @@ export function ProviderAdvancedConfig({
               disabled={disabled || !pricingConfigEnabled}
               className="h-9 w-full rounded-md border border-border bg-input px-3 text-sm text-foreground focus:border-foreground/30 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <option value="inherit">继承全局默认</option>
-              <option value="request">请求模型</option>
-              <option value="response">返回模型</option>
+              <option value="inherit">{t('providerForm.pricing.inherit')}</option>
+              <option value="request">{t('providerForm.pricing.request')}</option>
+              <option value="response">{t('providerForm.pricing.response')}</option>
             </select>
           </Field>
         </div>

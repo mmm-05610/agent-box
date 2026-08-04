@@ -6,32 +6,24 @@
  */
 
 import { useEffect, useState, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button, Card } from '@/components/ui'
 import { useToast } from '@/components/feedback/toast'
 import { PageHeader } from '@/components/layout'
 import { cn } from '@/lib/utils'
-import { getSettings, saveSettings, browseDir } from '@/api'
-
-// ── Types ──────────────────────────────────────────────────────────────
-
-type Theme = 'system' | 'light' | 'dark'
+import { browseDir } from '@/api'
+import { readSettings, writeSettings, type Theme } from '@/lib/settings'
+import { toHomeRelative } from '@/lib/path'
+import { LANG_KEY, readStoredLanguage, type UILanguage } from '@/i18n'
+import { useHomeDir, useProjectsDir, useVersion } from '@/hooks'
+import { saveProjectsDir } from '@/api/agentConfigs'
 
 // ── Helpers ────────────────────────────────────────────────────────────
-
-const STORAGE_KEY = 'agent-box-theme'
 
 function getSystemTheme(): 'light' | 'dark' {
   return window.matchMedia('(prefers-color-scheme: dark)').matches
     ? 'dark'
     : 'light'
-}
-
-function readStoredTheme(): Theme {
-  const stored = localStorage.getItem(STORAGE_KEY)
-  if (stored === 'light' || stored === 'dark' || stored === 'system') {
-    return stored
-  }
-  return 'system'
 }
 
 function applyTheme(theme: Theme) {
@@ -43,12 +35,12 @@ function applyTheme(theme: Theme) {
 
 const themeOptions: {
   value: Theme
-  label: string
+  labelKey: string
   swatch: { bg: string; fg: string; accent: string; card: string }
 }[] = [
   {
     value: 'system',
-    label: 'System',
+    labelKey: 'settings.theme.system',
     swatch: {
       bg: 'bg-gradient-to-br from-white to-stone-100',
       fg: 'bg-stone-900',
@@ -58,7 +50,7 @@ const themeOptions: {
   },
   {
     value: 'light',
-    label: 'Light',
+    labelKey: 'settings.theme.light',
     swatch: {
       bg: 'bg-stone-50',
       fg: 'bg-stone-900',
@@ -68,7 +60,7 @@ const themeOptions: {
   },
   {
     value: 'dark',
-    label: 'Dark',
+    labelKey: 'settings.theme.dark',
     swatch: {
       bg: 'bg-stone-900',
       fg: 'bg-stone-200',
@@ -81,21 +73,25 @@ const themeOptions: {
 // ── Component ──────────────────────────────────────────────────────────
 
 export function SettingsPage() {
+  const { t, i18n } = useTranslation()
+  const version = useVersion()
+  const home = useHomeDir()
   const { toast } = useToast()
-  const [theme, setTheme] = useState<Theme>(readStoredTheme)
-  const [projectsDir, setProjectsDir] = useState('~/projects')
-
+  const [theme, setTheme] = useState<Theme>(() => readSettings().theme)
+  const [language, setLanguage] = useState<UILanguage>(() => readStoredLanguage())
+  // Projects dir is persisted backend-side (gui-settings.json) so it survives
+  // GUI restarts — localStorage on a file:// origin is not reliable. Local
+  // state is the immediate display; the backend value is authoritative once
+  // loaded.
+  const { dir: backendProjectsDir, refresh: refreshProjectsDir } = useProjectsDir()
+  const [projectsDir, setProjectsDir] = useState(() => readSettings().projects_dir || '')
   useEffect(() => {
-    getSettings()
-      .then((s) => {
-        if (s.projects_dir) setProjectsDir(s.projects_dir)
-      })
-      .catch(() => {})
-  }, [])
+    if (backendProjectsDir) setProjectsDir(backendProjectsDir)
+  }, [backendProjectsDir])
 
   useEffect(() => {
     applyTheme(theme)
-    localStorage.setItem(STORAGE_KEY, theme)
+    writeSettings({ theme })
   }, [theme])
 
   useEffect(() => {
@@ -106,16 +102,33 @@ export function SettingsPage() {
     return () => mq.removeEventListener('change', handler)
   }, [theme])
 
+  const handleLanguageChange = (next: UILanguage) => {
+    setLanguage(next)
+    try {
+      localStorage.setItem(LANG_KEY, next)
+    } catch {
+      // localStorage unavailable — the change still applies for this session.
+    }
+    if (next === 'en') void i18n.changeLanguage('en')
+    else void i18n.changeLanguage('zh')
+  }
+
   const handleBrowse = async () => {
     try {
       const dir = await browseDir(projectsDir)
       if (dir) {
         setProjectsDir(dir)
-        await saveSettings({ projects_dir: dir })
-        toast({ type: 'success', message: 'Projects directory updated' })
+        try {
+          await saveProjectsDir(dir)
+          refreshProjectsDir()
+        } catch {
+          // backend unavailable — localStorage still carries this session
+        }
+        writeSettings({ projects_dir: dir })
+        toast({ type: 'success', message: t('settings.toast.dirUpdated') })
       }
     } catch {
-      toast({ type: 'error', message: 'Failed to browse directory' })
+      toast({ type: 'error', message: t('settings.toast.dirFailed') })
     }
   }
 
@@ -123,26 +136,29 @@ export function SettingsPage() {
     <div className="mx-auto w-full max-w-3xl px-8 py-10">
       {/* Header */}
       <PageHeader
-        title="Settings"
+        title={t('settings.title')}
         stats={
           <>
-            <span className="font-mono">v0.5.0</span>
+            {version && (
+              <>
+                <span className="font-mono">{`v${version}`}</span>
+                <span className="mx-2 text-border">·</span>
+              </>
+            )}
+            <span>{t('settings.stats.pathSaved')}</span>
             <span className="mx-2 text-border">·</span>
-            <span>1 profile path saved</span>
-            <span className="mx-2 text-border">·</span>
-            <span>last build 2 days ago</span>
+            <span>{t('settings.stats.lastBuild')}</span>
           </>
         }
         className="mb-8"
       />
 
       {/* ── Projects Directory ─────────────────────────────────────── */}
-      <Section title="Projects Directory">
+      <Section title={t('settings.section.projects')}>
         <Card>
           <div className="p-5">
             <p className="mb-3 text-sm text-muted-foreground">
-              Default directory for browsing and launching projects. Used as
-              the starting point for the folder picker.
+              {t('settings.projectsDesc')}
             </p>
             <div className="flex items-center gap-3">
               <div className="flex-1 flex items-center gap-2 rounded-lg bg-muted/40 px-3.5 py-2.5">
@@ -150,7 +166,7 @@ export function SettingsPage() {
                   <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" />
                 </svg>
                 <span className="text-sm font-mono text-foreground truncate">
-                  {projectsDir || 'No directory set'}
+                  {toHomeRelative(projectsDir, home) || t('settings.noDir')}
                 </span>
               </div>
               <Button
@@ -158,7 +174,7 @@ export function SettingsPage() {
                 size="md"
                 onClick={handleBrowse}
               >
-                Change folder
+                {t('settings.changeFolder')}
               </Button>
             </div>
           </div>
@@ -166,9 +182,9 @@ export function SettingsPage() {
       </Section>
 
       {/* ── Appearance ──────────────────────────────────────────────── */}
-      <Section title="Appearance" description="Choose how Agent Box looks.">
+      <Section title={t('settings.section.appearance')} description={t('settings.appearanceDesc')}>
         <div className="grid grid-cols-3 gap-3">
-          {themeOptions.map(({ value, label, swatch }) => {
+          {themeOptions.map(({ value, labelKey, swatch }) => {
             const isActive = theme === value
             return (
               <button
@@ -210,7 +226,7 @@ export function SettingsPage() {
                       isActive ? 'text-foreground' : 'text-muted-foreground',
                     )}
                   >
-                    {label}
+                    {t(labelKey)}
                   </span>
                   {isActive && (
                     <span className="flex h-5 w-5 items-center justify-center rounded-full bg-foreground text-background">
@@ -226,8 +242,48 @@ export function SettingsPage() {
         </div>
       </Section>
 
+      {/* ── Language ────────────────────────────────────────────────── */}
+      <Section title={t('settings.section.language')} description={t('settings.languageDesc')}>
+        <Card>
+          <div className="p-5">
+            <div className="grid grid-cols-3 gap-2">
+              {([
+                { value: 'zh', labelKey: 'settings.language.zh' },
+                { value: 'en', labelKey: 'settings.language.en' },
+                { value: 'system', labelKey: 'settings.language.system' },
+              ] as { value: UILanguage; labelKey: string }[]).map(({ value, labelKey }) => {
+                const isActive = language === value
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => handleLanguageChange(value)}
+                    aria-pressed={isActive}
+                    className={cn(
+                      'flex items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-sm transition-all',
+                      isActive
+                        ? 'border-primary bg-primary/10 text-primary font-medium'
+                        : 'border-border hover:border-muted-foreground/30 text-muted-foreground',
+                    )}
+                  >
+                    {t(labelKey)}
+                    {isActive && (
+                      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-2.5 w-2.5">
+                          <path d="M5 12l5 5L20 7" />
+                        </svg>
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </Card>
+      </Section>
+
       {/* ── About ────────────────────────────────────────────────────── */}
-      <Section title="About">
+      <Section title={t('settings.section.about')}>
         <Card>
           <div className="flex items-start gap-4 p-5">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-foreground text-background shadow-sm">
@@ -241,10 +297,9 @@ export function SettingsPage() {
               <h3 className="text-base font-semibold text-foreground">
                 Agent Box
               </h3>
-              <p className="text-xs text-muted-foreground">v0.5.0</p>
+              <p className="text-xs text-muted-foreground">{version ? `v${version}` : ''}</p>
               <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
-                Multi-agent configuration and session management. Isolate,
-                launch, and switch between agent profiles with ease.
+                {t('settings.aboutDesc')}
               </p>
             </div>
           </div>

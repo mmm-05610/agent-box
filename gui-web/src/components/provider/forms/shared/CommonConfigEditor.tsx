@@ -14,6 +14,7 @@
  *     preview of the parent-supplied value.
  */
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 export interface CommonConfigEditorProps {
   /** Current settings_config JSON string. */
@@ -33,13 +34,15 @@ export interface CommonConfigEditorProps {
 export function CommonConfigEditor({
   value,
   onChange,
-  title = 'settings.json (JSON)',
+  title,
   hint,
   readOnly,
   disabled,
 }: CommonConfigEditorProps) {
+  const { t } = useTranslation()
   const [localValue, setLocalValue] = useState(value)
   const lastSentRef = useLocalRef(value)
+  const resolvedTitle = title ?? t('providerForm.settingsEditor.title')
 
   // Sync parent → local when value changes from above.
   useEffect(() => {
@@ -53,15 +56,15 @@ export function CommonConfigEditor({
     <div className="rounded-lg border border-border bg-card p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h4 className="text-base font-medium">{title}</h4>
+          <h4 className="text-base font-medium">{resolvedTitle}</h4>
           <p className="mt-0.5 text-xs text-muted-foreground">
             {hint ?? (editable
-              ? '该供应商的完整 settings_config JSON；修改后会被原样写入配置文件。普通编辑请使用上方结构化字段。'
-              : '上方结构化字段对应的 settings_config JSON 预览（只读）；保存时由结构化字段自动生成。')}
+              ? t('providerForm.settingsEditor.hintEditable')
+              : t('providerForm.settingsEditor.hintPreview'))}
           </p>
         </div>
         {!editable && (
-          <span className="rounded-md bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">实时预览</span>
+          <span className="rounded-md bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">{t('providerForm.settingsEditor.livePreview')}</span>
         )}
       </div>
       <textarea
@@ -77,7 +80,7 @@ export function CommonConfigEditor({
         rows={Math.min(16, Math.max(6, effective.split('\n').length + 1))}
         readOnly={!editable}
         disabled={disabled}
-        aria-label={title}
+        aria-label={resolvedTitle}
         className="mt-3 w-full resize-y rounded-md border border-border bg-input px-3 py-2 font-mono text-sm text-foreground placeholder:text-muted-foreground focus:border-foreground/30 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
       />
     </div>

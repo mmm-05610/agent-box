@@ -8,6 +8,7 @@
  */
 
 import { useState, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui'
 import { testEndpoint } from '@/api'
 
@@ -25,6 +26,7 @@ export interface EndpointSpeedTestProps {
 }
 
 export function EndpointSpeedTest({ endpoints, selected, onSelect }: EndpointSpeedTestProps) {
+  const { t } = useTranslation()
   const [results, setResults] = useState<EndpointResult[]>([])
   const [testing, setTesting] = useState(false)
   const [autoSelect, setAutoSelect] = useState(true)
@@ -46,7 +48,7 @@ export function EndpointSpeedTest({ endpoints, selected, onSelect }: EndpointSpe
         }
         return { i, entry }
       } catch {
-        return { i, entry: { url, latency: null, status: 'failed' as const, error: 'Request failed' } }
+        return { i, entry: { url, latency: null, status: 'failed' as const, error: t('providerForm.endpointSpeedTest.requestFailed') } }
       }
     })
 
@@ -76,7 +78,7 @@ export function EndpointSpeedTest({ endpoints, selected, onSelect }: EndpointSpe
   return (
     <div className="rounded-lg border border-border/50 bg-muted/20 p-3 space-y-3">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-medium text-muted-foreground">Endpoint 测速</span>
+        <span className="text-xs font-medium text-muted-foreground">{t('providerForm.endpointSpeedTest.title')}</span>
         <div className="flex items-center gap-2">
           <label className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
             <input
@@ -85,7 +87,7 @@ export function EndpointSpeedTest({ endpoints, selected, onSelect }: EndpointSpe
               onChange={(e) => setAutoSelect(e.target.checked)}
               className="rounded"
             />
-            自动选最快
+            {t('providerForm.endpointSpeedTest.autoSelect')}
           </label>
           <Button
             type="button"
@@ -105,7 +107,7 @@ export function EndpointSpeedTest({ endpoints, selected, onSelect }: EndpointSpe
                 <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
               </svg>
             )}
-            测速
+            {t('providerForm.endpointSpeedTest.run')}
           </Button>
         </div>
       </div>
@@ -152,7 +154,7 @@ export function EndpointSpeedTest({ endpoints, selected, onSelect }: EndpointSpe
                   ) : r.latency !== null ? (
                     `${r.latency}ms`
                   ) : (
-                    'failed'
+                    t('providerForm.endpointSpeedTest.failed')
                   )}
                 </span>
               </button>

@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui'
 import { Input } from '@/components/ui'
+import { useTranslation } from 'react-i18next'
 import { KeyInput } from './KeyInput'
 import { PlusIcon, TrashIcon } from './icons'
 
@@ -32,13 +33,17 @@ export interface KeyValueEditorProps {
  *  reusable by any future form that needs structured dict editing. */
 export function KeyValueEditor({
   value, onChange, readOnly, emptyLabel,
-  addLabel = '添加键值对',
+  addLabel,
   showColumnHeader = false,
   hideAddButton = false,
-  keyPlaceholder = 'Key',
-  valuePlaceholder = 'JSON value or text',
+  keyPlaceholder,
+  valuePlaceholder,
 }: KeyValueEditorProps) {
+  const { t } = useTranslation()
   const entries = Object.entries(value)
+  const resolvedAddLabel = addLabel ?? t('providerForm.keyValue.add')
+  const resolvedKeyPlaceholder = keyPlaceholder ?? t('providerForm.keyValue.keyPlaceholder')
+  const resolvedValuePlaceholder = valuePlaceholder ?? t('providerForm.keyValue.valuePlaceholder')
   const replaceEntry = (index: number, key: string, nextValue: unknown) => {
     const next = Object.fromEntries(
       entries.map(([entryKey, entryValue], entryIndex) =>
@@ -52,8 +57,8 @@ export function KeyValueEditor({
     <div className="space-y-2">
       {entries.length > 0 && showColumnHeader && (
         <div className="flex items-center gap-2 px-1 text-xs text-muted-foreground">
-          <span className="flex-1">键名</span>
-          <span className="flex-1">值</span>
+          <span className="flex-1">{t('providerForm.keyValue.keyColumn')}</span>
+          <span className="flex-1">{t('providerForm.keyValue.valueColumn')}</span>
           <span className="w-9" />
         </div>
       )}
@@ -63,12 +68,12 @@ export function KeyValueEditor({
             value={key}
             onChange={(newKey) => replaceEntry(index, newKey, entryValue)}
             disabled={readOnly || !onChange}
-            placeholder={keyPlaceholder}
+            placeholder={resolvedKeyPlaceholder}
           />
           <Input
             value={stringifyValue(entryValue)}
             onChange={(event) => replaceEntry(index, key, parseValue(event.target.value))}
-            placeholder={valuePlaceholder}
+            placeholder={resolvedValuePlaceholder}
             className="flex-1 font-mono text-sm"
             disabled={readOnly || !onChange}
           />
@@ -77,7 +82,7 @@ export function KeyValueEditor({
             onClick={() => onChange?.(Object.fromEntries(entries.filter((_, i) => i !== index)))}
             disabled={readOnly || !onChange}
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-            title="删除"
+            title={t('providerForm.keyValue.delete')}
           >
             <TrashIcon />
           </button>
@@ -93,7 +98,7 @@ export function KeyValueEditor({
           disabled={readOnly || !onChange}
           className="h-7 gap-1"
         >
-          <PlusIcon />{addLabel}
+          <PlusIcon />{resolvedAddLabel}
         </Button>
       )}
     </div>

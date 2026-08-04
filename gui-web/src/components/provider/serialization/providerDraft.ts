@@ -1,9 +1,9 @@
 import type { ProviderFormValues } from '../ProviderFormFields'
 import { getInitialFormValues, patchCodexBaseUrl, settingsFromFormValues } from '../perAgentSettings'
-import { readCodexCatalogModels, type CodexCatalogModel } from '../forms/CodexProviderForm'
-import { readHermesModels, type HermesApiMode, type HermesModel } from '../forms/HermesProviderForm'
-import type { CodexChatReasoning } from '../forms/CodexProviderForm'
-import type { OpenCodeNpmPackage } from '../forms/OpenCodeProviderForm'
+import { readCodexCatalogModels, type CodexCatalogModel } from '@/domains/provider/fields/CodexFields'
+import { readHermesModels, type HermesApiMode, type HermesModel } from '@/domains/provider/fields/HermesFields'
+import type { CodexChatReasoning } from '@/domains/provider/fields/CodexFields'
+import type { OpenCodeNpmPackage } from '@/domains/provider/fields/OpenCodeFields'
 
 export interface ProviderEditorDraft {
   values: ProviderFormValues

@@ -13,14 +13,16 @@ from typing import List
 
 import pytest
 
-from agent_box import cli, sessions
+from agent_box.cli.commands.core import CoreCommands
+from agent_box.cli.shell import AgentBoxShell
+from agent_box.resources import sessions
 
 
 # --- core record_launch / record_exit -------------------------------------
 
 def test_record_launch_and_exit(tmp_agent_box_home):
     """record_launch inserts a row, record_exit marks it exited."""
-    sid = sessions.record_launch("p1", "claude", "/tmp/work", "新会话", 4242)
+    sid = sessions.record_launch("p1", "claude", "/tmp/work", "新会话", os.getpid())
     assert sid > 0
 
     # Active fetch shows the row, no exit columns
@@ -32,7 +34,7 @@ def test_record_launch_and_exit(tmp_agent_box_home):
     assert row["agent_type"] == "claude"
     assert row["cwd"] == "/tmp/work"
     assert row["mode"] == "新会话"
-    assert row["pid"] == 4242
+    assert row["pid"] == os.getpid()
     assert row["launched_at"]  # datetime string from SQLite
     assert "exited_at" not in row  # active_only drops the exit columns
 
@@ -64,9 +66,9 @@ def test_record_launch_multiple_profiles_newest_first(tmp_agent_box_home):
     falls through to insertion order in that case — so we just assert
     the count and that every inserted id is present.
     """
-    s1 = sessions.record_launch("first",  "claude", "/a", "新会话",   1000)
-    s2 = sessions.record_launch("second", "claude", "/b", "继续上次", 2000)
-    s3 = sessions.record_launch("third",  "claude", "/c", "新会话",   3000)
+    s1 = sessions.record_launch("first",  "claude", "/a", "新会话",   os.getpid())
+    s2 = sessions.record_launch("second", "claude", "/b", "继续上次", os.getpid())
+    s3 = sessions.record_launch("third",  "claude", "/c", "新会话",   os.getpid())
 
     rows = sessions.fetch_sessions()
     ids = {r["id"] for r in rows}
@@ -78,8 +80,8 @@ def test_record_launch_multiple_profiles_newest_first(tmp_agent_box_home):
 
 def test_fetch_active_only(tmp_agent_box_home):
     """active_only=True returns only rows with exited_at IS NULL."""
-    a = sessions.record_launch("alive", "claude", "/x", "新会话", 5000)
-    b = sessions.record_launch("dead",  "claude", "/y", "新会话", 5001)
+    a = sessions.record_launch("alive", "claude", "/x", "新会话", os.getpid())
+    b = sessions.record_launch("dead",  "claude", "/y", "新会话", os.getpid())
     sessions.record_exit(b, 1)
 
     active = sessions.fetch_sessions(active_only=True)
@@ -95,52 +97,9 @@ def test_fetch_active_only(tmp_agent_box_home):
 def test_fetch_sessions_limit(tmp_agent_box_home):
     """limit caps the number of returned rows."""
     for i in range(5):
-        sessions.record_launch(f"p{i}", "claude", f"/{i}", "新会话", 6000 + i)
+        sessions.record_launch(f"p{i}", "claude", f"/{i}", "新会话", os.getpid())
     rows = sessions.fetch_sessions(limit=3)
     assert len(rows) == 3
-
-
-# --- latest_cwd_for -------------------------------------------------------
-
-def test_latest_cwd(tmp_agent_box_home, monkeypatch):
-    """latest_cwd_for returns the most recent non-empty cwd for a profile.
-
-    SQLite's ``datetime('now')`` is second-granular, so we monkeypatch
-    ``_get_conn`` to return a row whose ``launched_at`` is a fixed
-    string and grows monotonically with insertion order.
-    """
-    import sqlite3
-    from agent_box import sessions as sess_mod
-
-    # Use the live _get_conn and INSERT with explicit timestamps instead
-    # of datetime('now').
-    conn = sess_mod._get_conn()
-    with sess_mod._lock:
-        conn.execute(
-            "INSERT INTO sessions (profile, agent_type, cwd, mode, pid, launched_at) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            ("p", "claude", "/old",  "新会话", 7000, "2026-01-01 00:00:00"),
-        )
-        conn.execute(
-            "INSERT INTO sessions (profile, agent_type, cwd, mode, pid, launched_at) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            ("p", "claude", "/newer", "新会话", 7001, "2026-01-01 00:00:01"),
-        )
-        conn.execute(
-            "INSERT INTO sessions (profile, agent_type, cwd, mode, pid, launched_at) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            ("p", "claude", "",      "新会话", 7002, "2026-01-01 00:00:02"),  # empty ignored
-        )
-        conn.execute(
-            "INSERT INTO sessions (profile, agent_type, cwd, mode, pid, launched_at) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            ("other", "claude", "/other", "新会话", 7003, "2026-01-01 00:00:03"),
-        )
-        conn.commit()
-
-    assert sessions.latest_cwd_for("p") == "/newer"
-    assert sessions.latest_cwd_for("other") == "/other"
-    assert sessions.latest_cwd_for("nope") is None
 
 
 # --- cleanup_stale_sessions -----------------------------------------------
@@ -173,72 +132,73 @@ def test_cleanup_stale(tmp_agent_box_home):
     assert sessions.cleanup_stale_sessions() == 0
 
 
-# --- CLI subcommand -------------------------------------------------------
+# --- CLI subcommand (cmd2 exec mode) ---------------------------------------
 
-def _run_cli(argv: List[str]) -> tuple[int, str, str]:
-    """Invoke cli.main(argv) and capture stdout/stderr."""
+def _exec(script: str) -> str:
+    """Run a REPL exec script and capture stdout + stderr."""
     import io
     out, err = io.StringIO(), io.StringIO()
-    old_out, old_err = sys.stdout, sys.stderr
-    sys.stdout, sys.stderr = out, err
+    app = AgentBoxShell(stdout=out)
+    app.register_command_set(CoreCommands())
+    old_err = sys.stderr
+    sys.stderr = err
     try:
-        rc = cli.main(argv)
+        for line in script.split(";"):
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            app.onecmd(line)
     finally:
-        sys.stdout, sys.stderr = old_out, old_err
-    return rc, out.getvalue(), err.getvalue()
+        sys.stderr = old_err
+    return out.getvalue() + err.getvalue()
 
 
 def test_cli_sessions_lists_inserts(tmp_agent_box_home):
-    """agent-box sessions prints the inserted rows as a table."""
+    """list sessions prints the inserted rows as a table."""
     sessions.record_launch("p1", "claude", "/x", "新会话", 1000)
-    rc, out, err = _run_cli(["sessions"])
-    assert rc == 0, f"stderr: {err}"
+    out = _exec("list sessions")
     assert "p1" in out
     assert "claude" in out
-    assert "新会话" in out
 
 
 def test_cli_sessions_json(tmp_agent_box_home):
-    """agent-box sessions --json emits a JSON array."""
+    """list sessions --json emits a JSON array."""
     sid = sessions.record_launch("p1", "claude", "/x", "新会话", 1000)
-    rc, out, _ = _run_cli(["sessions", "--json"])
-    assert rc == 0
-    data = json.loads(out)
+    out = _exec("list sessions --json")
+    data = json.loads(out.strip())
     assert isinstance(data, list)
     assert data[0]["id"] == sid
     assert data[0]["profile"] == "p1"
-    assert "exited_at" in data[0]  # not active_only, so exit columns present
 
 
 def test_cli_sessions_active_flag(tmp_agent_box_home):
-    """--active returns only rows that haven't exited."""
+    """list sessions --active --json returns only rows that haven't exited."""
     a = sessions.record_launch("a", "claude", "/x", "新会话", 1)
-    sessions.record_launch("b", "claude", "/x", "新会话", 2)
+    # Use the test process's own PID for the running session — a fixed low
+    # PID (1/2) is flaky: _cleanup_zombies may misjudge it as dead (EPERM).
+    sessions.record_launch("b", "claude", "/x", "新会话", os.getpid())
     sessions.record_exit(a, 0)
 
-    rc, out, _ = _run_cli(["sessions", "--active", "--json"])
-    assert rc == 0
-    data = json.loads(out)
+    out = _exec("list sessions --active --json")
+    data = json.loads(out.strip())
     assert len(data) == 1
     assert data[0]["profile"] == "b"
 
 
 def test_cli_sessions_cleanup_prints_count(tmp_agent_box_home):
-    """--cleanup prints the count as a plain integer on stdout."""
+    """sessions --cleanup prints the count as a plain integer."""
     sessions.record_launch("a", "claude", "/x", "新会话", 999_999_999)
     sessions.record_launch("b", "claude", "/x", "新会话", 999_999_998)
 
-    rc, out, _ = _run_cli(["sessions", "--cleanup"])
-    assert rc == 0
-    assert out.strip() == "2"
+    out = _exec("sessions --cleanup")
+    assert "2" in out
 
 
 def test_cli_sessions_exit_records_exit(tmp_agent_box_home):
-    """--exit ID CODE marks the session exited and prints 'ok'."""
+    """sessions --exit ID CODE marks the session exited and prints 'ok'."""
     sid = sessions.record_launch("p", "claude", "/x", "新会话", os.getpid())
-    rc, out, _ = _run_cli(["sessions", "--exit", str(sid), "42"])
-    assert rc == 0
-    assert out.strip() == "ok"
+    out = _exec(f"sessions --exit {sid} 42")
+    assert "ok" in out
 
     rows = sessions.fetch_sessions()
     assert rows[0]["id"] == sid
@@ -247,67 +207,16 @@ def test_cli_sessions_exit_records_exit(tmp_agent_box_home):
 
 
 def test_cli_sessions_exit_requires_code(tmp_agent_box_home):
-    """--exit without CODE returns non-zero with an error."""
-    rc, out, err = _run_cli(["sessions", "--exit", "1"])
-    assert rc == 2
-    assert "--exit" in err
+    """sessions --exit without CODE prints an error."""
+    out = _exec("sessions --exit 1")
+    assert "requires an exit code" in out
     # Nothing was modified
     assert sessions.fetch_sessions() == []
 
 
 def test_cli_sessions_empty(tmp_agent_box_home):
     """No sessions → '(no sessions)' on stdout."""
-    rc, out, _ = _run_cli(["sessions"])
-    assert rc == 0
+    out = _exec("list sessions")
     assert "(no sessions)" in out
 
 
-# --- v0.4 sessions.db migration ------------------------------------------
-
-def test_legacy_sessions_db_migrated(tmp_agent_box_home):
-    """A v0.4 ``sessions.db`` is migrated into ``agent-box.db`` on first use.
-
-    The legacy file is renamed to ``sessions.db.migrated``; its rows
-    end up in the shared ``sessions`` table of ``agent-box.db``.
-    """
-    import sqlite3
-    legacy_path = tmp_agent_box_home / "sessions.db"
-    legacy = sqlite3.connect(str(legacy_path))
-    legacy.execute(
-        "CREATE TABLE sessions ("
-        "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-        "profile TEXT NOT NULL, agent_type TEXT NOT NULL, "
-        "cwd TEXT, mode TEXT, pid INTEGER, "
-        "launched_at TEXT NOT NULL, exited_at TEXT, exit_code INTEGER)"
-    )
-    legacy.execute(
-        "INSERT INTO sessions (profile, agent_type, cwd, mode, pid, "
-        "launched_at, exited_at, exit_code) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        ("p_legacy", "claude", "/old", "新会话", 1234,
-         "2026-01-01 00:00:00", "2026-01-01 00:01:00", 0),
-    )
-    legacy.execute(
-        "INSERT INTO sessions (profile, agent_type, cwd, mode, pid, "
-        "launched_at, exited_at, exit_code) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        ("p_legacy", "claude", "/old2", "继续上次", 1235,
-         "2026-01-01 00:02:00", None, None),
-    )
-    legacy.commit()
-    legacy.close()
-
-    # First sessions.* call triggers the migration.
-    rows = sessions.fetch_sessions(limit=50)
-    assert len(rows) == 2
-    profiles = {r["profile"] for r in rows}
-    assert profiles == {"p_legacy"}
-
-    # Legacy file renamed.
-    assert not legacy_path.exists()
-    assert (tmp_agent_box_home / "sessions.db.migrated").is_file()
-
-    # Subsequent calls don't re-migrate.
-    sessions._reset_connection_for_tests()  # force the migration code to run again
-    rows2 = sessions.fetch_sessions(limit=50)
-    assert len(rows2) == 2

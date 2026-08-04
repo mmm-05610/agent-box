@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils'
 
 // ── Types ──────────────────────────────────────────────────────────────
 
-export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
+export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size'> {
   size?: 'sm' | 'md' | 'lg'
   error?: string
   label?: ReactNode

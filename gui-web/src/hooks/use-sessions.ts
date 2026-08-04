@@ -4,6 +4,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import type { Session } from '@/api'
+import i18n from '@/i18n'
 import { fetchSessions } from '@/api'
 
 interface UseSessionsReturn {
@@ -27,7 +28,7 @@ export function useSessions(): UseSessionsReturn {
       const data = await fetchSessions()
       setSessions(data)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load')
+      setError(e instanceof Error ? e.message : i18n.t('error.load'))
     } finally {
       setLoading(false)
     }

@@ -13,17 +13,19 @@
  */
 
 import { useState } from 'react'
-import { Input, Button, Card, CardHeader, CardTitle, CardContent } from '@/components/ui'
+import { useTranslation } from 'react-i18next'
+import i18n from '@/i18n'
+import { Input } from '@/components/ui'
 
 // ── Model role row ─────────────────────────────────────────────────────
 
-interface ModelRoleRow { role: string; label: string; modelField: string; nameField: string }
+interface ModelRoleRow { role: string; labelKey: string; modelField: string; nameField: string }
 const MODEL_ROLES: ModelRoleRow[] = [
-  { role: 'sonnet', label: 'Sonnet', modelField: 'ANTHROPIC_DEFAULT_SONNET_MODEL', nameField: 'ANTHROPIC_DEFAULT_SONNET_MODEL_NAME' },
-  { role: 'opus',   label: 'Opus',   modelField: 'ANTHROPIC_DEFAULT_OPUS_MODEL',   nameField: 'ANTHROPIC_DEFAULT_OPUS_MODEL_NAME' },
-  { role: 'fable',  label: 'Fable',  modelField: 'ANTHROPIC_DEFAULT_FABLE_MODEL',  nameField: 'ANTHROPIC_DEFAULT_FABLE_MODEL_NAME' },
-  { role: 'haiku',    label: 'Haiku',    modelField: 'ANTHROPIC_DEFAULT_HAIKU_MODEL',  nameField: 'ANTHROPIC_DEFAULT_HAIKU_MODEL_NAME' },
-  { role: 'subagent', label: 'Subagent', modelField: 'CLAUDE_CODE_SUBAGENT_MODEL',     nameField: 'CLAUDE_CODE_SUBAGENT_MODEL_NAME' },
+  { role: 'sonnet', labelKey: 'providerForm.role.sonnet', modelField: 'ANTHROPIC_DEFAULT_SONNET_MODEL', nameField: 'ANTHROPIC_DEFAULT_SONNET_MODEL_NAME' },
+  { role: 'opus',   labelKey: 'providerForm.role.opus',   modelField: 'ANTHROPIC_DEFAULT_OPUS_MODEL',   nameField: 'ANTHROPIC_DEFAULT_OPUS_MODEL_NAME' },
+  { role: 'fable',  labelKey: 'providerForm.role.fable',  modelField: 'ANTHROPIC_DEFAULT_FABLE_MODEL',  nameField: 'ANTHROPIC_DEFAULT_FABLE_MODEL_NAME' },
+  { role: 'haiku',    labelKey: 'providerForm.role.haiku',    modelField: 'ANTHROPIC_DEFAULT_HAIKU_MODEL',  nameField: 'ANTHROPIC_DEFAULT_HAIKU_MODEL_NAME' },
+  { role: 'subagent', labelKey: 'providerForm.role.subagent', modelField: 'CLAUDE_CODE_SUBAGENT_MODEL',     nameField: 'CLAUDE_CODE_SUBAGENT_MODEL_NAME' },
 ]
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -94,7 +96,7 @@ export function defaultFormValues(
     testTimeout: (extra?.testTimeout as string) ?? '',
     testDegradedThreshold: (extra?.testDegradedThreshold as string) ?? '',
     testMaxRetries: (extra?.testMaxRetries as string) ?? '',
-    pricingConfigEnabled: Boolean(extra?.pricingConfigEnabled) || Boolean(extra?.costMultiplier) || ((extra?.pricingModelSource as string) && (extra?.pricingModelSource as string) !== 'inherit'),
+    pricingConfigEnabled: Boolean(extra?.pricingConfigEnabled) || Boolean(extra?.costMultiplier) || Boolean((extra?.pricingModelSource as string) && (extra?.pricingModelSource as string) !== 'inherit'),
     costMultiplier: (extra?.costMultiplier as string) ?? '',
     pricingModelSource: (extra?.pricingModelSource as string) ?? 'inherit',
   }
@@ -107,8 +109,8 @@ export function formValuesToEnv(v: ProviderFormValues): Record<string, string> {
   if (v.fallbackModel) e.ANTHROPIC_MODEL = v.fallbackModel
   for (const r of MODEL_ROLES) {
     const rm = v.roleModels[r.role]
-    if (rm.model) e[r.modelField] = rm.model
-    if (rm.name) e[r.nameField] = rm.name
+    if (rm?.model) e[r.modelField] = rm.model
+    if (rm?.name) e[r.nameField] = rm.name
   }
   if (v.timeoutMs) e.API_TIMEOUT_MS = v.timeoutMs
   if (v.disableAutoUpdates) e.DISABLE_AUTOUPDATER = '1'
@@ -132,10 +134,10 @@ export function formValuesToSettings(v: ProviderFormValues): Record<string, unkn
 /** Soft validation: returns warning messages, does not block save. */
 export function getSoftWarnings(v: ProviderFormValues): string[] {
   const w: string[] = []
-  if (!v.name.trim()) w.push('Provider name is empty')
-  if (!v.baseUrl.trim() && !v.authValue.trim()) w.push('No endpoint or API key configured — provider may not work')
-  else if (!v.baseUrl.trim()) w.push('API endpoint is empty — provider may not work')
-  else if (!v.authValue.trim()) w.push('API key / auth token is empty — provider may not work')
+  if (!v.name.trim()) w.push(i18n.t('providerForm.warning.nameEmpty'))
+  if (!v.baseUrl.trim() && !v.authValue.trim()) w.push(i18n.t('providerForm.warning.noEndpointOrKey'))
+  else if (!v.baseUrl.trim()) w.push(i18n.t('providerForm.warning.endpointEmpty'))
+  else if (!v.authValue.trim()) w.push(i18n.t('providerForm.warning.authEmpty'))
   return w
 }
 
@@ -152,6 +154,7 @@ export function ProviderFormFields({
   showBasicFields?: boolean
   mode?: 'library' | 'profile'
 }) {
+  const { t } = useTranslation()
   const [advancedOpen, setAdvancedOpen] = useState(
     Object.values(values.roleModels).some((r) => r.model || r.name) ||
     !!values.fallbackModel || !!values.apiFormat || values.enableToolSearch || values.includeCoAuthoredBy,
@@ -180,46 +183,46 @@ export function ProviderFormFields({
         <>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-xs text-muted-foreground block mb-1">Name</label>
-              <Input value={values.name} onChange={(e) => set({ name: e.target.value })} placeholder="Provider name" className="text-sm" disabled={readOnly} />
+              <label className="text-xs text-muted-foreground block mb-1">{t('providerForm.name')}</label>
+              <Input value={values.name} onChange={(e) => set({ name: e.target.value })} placeholder={t('providerForm.namePlaceholderBasic')} className="text-sm" disabled={readOnly} />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground block mb-1">Notes</label>
-              <Input value={values.notes} onChange={(e) => set({ notes: e.target.value })} placeholder="Optional notes" className="text-sm" disabled={readOnly} />
+              <label className="text-xs text-muted-foreground block mb-1">{t('providerForm.notes')}</label>
+              <Input value={values.notes} onChange={(e) => set({ notes: e.target.value })} placeholder={t('providerForm.notesPlaceholderOpt')} className="text-sm" disabled={readOnly} />
             </div>
           </div>
           <div>
-            <label className="text-xs text-muted-foreground block mb-1">Website URL</label>
-            <Input value={values.websiteUrl} onChange={(e) => set({ websiteUrl: e.target.value })} placeholder="https://..." className="text-sm font-mono" disabled={readOnly} />
+            <label className="text-xs text-muted-foreground block mb-1">{t('providerForm.websiteUrl')}</label>
+            <Input value={values.websiteUrl} onChange={(e) => set({ websiteUrl: e.target.value })} placeholder={t('providerForm.websiteUrlPlaceholderShort')} className="text-sm font-mono" disabled={readOnly} />
           </div>
         </>
       )}
 
       {/* ── Auth ────────────────────────────────────────────────────── */}
       <AuthInput
-        label={values.useApiKey ? 'API Key (ANTHROPIC_API_KEY)' : 'Auth Token (ANTHROPIC_AUTH_TOKEN)'}
+        label={values.useApiKey ? t('providerForm.authLabel.apiKey') : t('providerForm.authLabel.authToken')}
         value={values.authValue}
         onChange={(v) => set({ authValue: v })}
-        placeholder={values.useApiKey ? 'sk-ant-api03-...' : 'your-auth-token'}
+        placeholder={values.useApiKey ? t('providerForm.authPlaceholder.apiKey') : t('providerForm.authPlaceholder.authToken')}
         readOnly={readOnly}
       />
 
       {/* ── Endpoint ────────────────────────────────────────────────── */}
       <div>
         <div className="flex items-center justify-between mb-1">
-          <label className="text-xs text-muted-foreground">API Endpoint (ANTHROPIC_BASE_URL)</label>
+          <label className="text-xs text-muted-foreground">{t('providerForm.endpointLabel')} (ANTHROPIC_BASE_URL)</label>
           <label className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
             <input type="checkbox" checked={values.isFullUrl} onChange={(e) => set({ isFullUrl: e.target.checked })} className="rounded" disabled={readOnly} />
-            Full URL
+            {t('providerForm.fullUrl')}
           </label>
         </div>
-        <Input value={values.baseUrl} onChange={(e) => set({ baseUrl: e.target.value })} placeholder="https://api.anthropic.com" className="text-sm font-mono" disabled={readOnly} />
+        <Input value={values.baseUrl} onChange={(e) => set({ baseUrl: e.target.value })} placeholder={t('providerForm.endpointPlaceholder')} className="text-sm font-mono" disabled={readOnly} />
       </div>
 
       {/* ── Advanced ────────────────────────────────────────────────── */}
       <div>
         <button type="button" onClick={() => setAdvancedOpen(!advancedOpen)} className="flex items-center gap-1.5 text-sm font-medium text-foreground hover:opacity-70">
-          <span>{advancedOpen ? '▾' : '▸'}</span> Advanced Options
+          <span>{advancedOpen ? '▾' : '▸'}</span> {t('providerForm.advancedOptions')}
         </button>
 
         {advancedOpen && (
@@ -227,35 +230,35 @@ export function ProviderFormFields({
 
             {/* API Format */}
             <div>
-              <label className="text-xs text-muted-foreground block mb-1">API Format</label>
+              <label className="text-xs text-muted-foreground block mb-1">{t('providerForm.apiFormat')}</label>
               <select
                 value={values.apiFormat}
                 onChange={(e) => set({ apiFormat: e.target.value })}
                 className="w-full h-9 rounded-md bg-muted px-3 text-sm text-foreground"
                 disabled={readOnly}
               >
-                <option value="anthropic">Anthropic Messages (原生)</option>
-                <option value="openai_chat">OpenAI Chat Completions (需转换)</option>
-                <option value="openai_responses">OpenAI Responses API (需转换)</option>
-                <option value="gemini_native">Gemini Native generateContent (需转换)</option>
+                <option value="anthropic">{t('providerForm.apiFormatOption.anthropic')}</option>
+                <option value="openai_chat">{t('providerForm.apiFormatOption.openaiChat')}</option>
+                <option value="openai_responses">{t('providerForm.apiFormatOption.openaiResponses')}</option>
+                <option value="gemini_native">{t('providerForm.apiFormatOption.geminiNative')}</option>
               </select>
             </div>
 
             {/* Auth field selector */}
             <label className="flex items-center gap-2">
               <input type="checkbox" checked={values.useApiKey} onChange={(e) => set({ useApiKey: e.target.checked })} className="rounded" disabled={readOnly} />
-              <span className="text-xs text-muted-foreground">Use ANTHROPIC_API_KEY instead of ANTHROPIC_AUTH_TOKEN</span>
+              <span className="text-xs text-muted-foreground">{t('providerForm.useApiKeyInstead')}</span>
             </label>
 
             {/* Model mapping grid */}
             <div>
-              <label className="text-xs text-muted-foreground block mb-2">Model Mapping (per-role)</label>
+              <label className="text-xs text-muted-foreground block mb-2">{t('providerForm.modelMapping')}</label>
               <div className="space-y-2">
                 {MODEL_ROLES.map((row) => (
                   <div key={row.role} className="grid grid-cols-1 md:grid-cols-[80px_1fr_1fr] gap-2">
-                    <div className="flex h-9 items-center rounded-md bg-muted px-3 text-xs font-medium text-muted-foreground">{row.label}</div>
-                    <Input value={values.roleModels[row.role]?.name ?? ''} onChange={(e) => set({ roleModels: { ...values.roleModels, [row.role]: { ...values.roleModels[row.role], name: e.target.value } } })} placeholder="Display name" className="text-sm font-mono" disabled={readOnly} />
-                    <Input value={values.roleModels[row.role]?.model ?? ''} onChange={(e) => set({ roleModels: { ...values.roleModels, [row.role]: { ...values.roleModels[row.role], model: e.target.value } } })} placeholder={row.modelField} className="text-sm font-mono" disabled={readOnly} />
+                    <div className="flex h-9 items-center rounded-md bg-muted px-3 text-xs font-medium text-muted-foreground">{t(row.labelKey)}</div>
+                    <Input value={values.roleModels[row.role]?.name ?? ''} onChange={(e) => set({ roleModels: { ...values.roleModels, [row.role]: { ...values.roleModels[row.role]!, name: e.target.value } } })} placeholder={t('providerForm.displayNamePlaceholder')} className="text-sm font-mono" disabled={readOnly} />
+                    <Input value={values.roleModels[row.role]?.model ?? ''} onChange={(e) => set({ roleModels: { ...values.roleModels, [row.role]: { ...values.roleModels[row.role]!, model: e.target.value } } })} placeholder={row.modelField} className="text-sm font-mono" disabled={readOnly} />
                   </div>
                 ))}
               </div>
@@ -263,18 +266,18 @@ export function ProviderFormFields({
 
             {/* Fallback model */}
             <div>
-              <label className="text-xs text-muted-foreground block mb-1">Default Model (ANTHROPIC_MODEL)</label>
-              <Input value={values.fallbackModel} onChange={(e) => set({ fallbackModel: e.target.value })} placeholder="claude-opus-4-8" className="text-sm font-mono" disabled={readOnly} />
+              <label className="text-xs text-muted-foreground block mb-1">{t('providerForm.defaultModelLabel')}</label>
+              <Input value={values.fallbackModel} onChange={(e) => set({ fallbackModel: e.target.value })} placeholder={t('providerForm.defaultModelPlaceholder')} className="text-sm font-mono" disabled={readOnly} />
             </div>
 
             {/* Effort + Timeout */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-xs text-muted-foreground block mb-1">Effort Level</label>
+                <label className="text-xs text-muted-foreground block mb-1">{t('providerForm.effortLevel')}</label>
                 <Input value={values.effortLevel} onChange={(e) => set({ effortLevel: e.target.value })} placeholder="medium" className="text-sm font-mono" disabled={readOnly} />
               </div>
               <div>
-                <label className="text-xs text-muted-foreground block mb-1">API Timeout (ms)</label>
+                <label className="text-xs text-muted-foreground block mb-1">{t('providerForm.apiTimeout')}</label>
                 <Input value={values.timeoutMs} onChange={(e) => set({ timeoutMs: e.target.value })} placeholder="60000" className="text-sm font-mono" disabled={readOnly} />
               </div>
             </div>
@@ -283,27 +286,27 @@ export function ProviderFormFields({
             <div className="space-y-2">
               <label className="flex items-center gap-2">
                 <input type="checkbox" checked={values.includeCoAuthoredBy} onChange={(e) => set({ includeCoAuthoredBy: e.target.checked })} className="rounded" disabled={readOnly} />
-                <span className="text-xs text-muted-foreground">Include co-authored-by attribution</span>
+                <span className="text-xs text-muted-foreground">{t('providerForm.includeCoAuthoredBy')}</span>
               </label>
               <label className="flex items-center gap-2">
                 <input type="checkbox" checked={values.enableToolSearch} onChange={(e) => set({ enableToolSearch: e.target.checked })} className="rounded" disabled={readOnly} />
-                <span className="text-xs text-muted-foreground">Enable tool search (ENABLE_TOOL_SEARCH)</span>
+                <span className="text-xs text-muted-foreground">{t('providerForm.enableToolSearch')}</span>
               </label>
               <label className="flex items-center gap-2">
                 <input type="checkbox" checked={values.skipWebFetchPreflight} onChange={(e) => set({ skipWebFetchPreflight: e.target.checked })} className="rounded" disabled={readOnly} />
-                <span className="text-xs text-muted-foreground">Skip WebFetch preflight check</span>
+                <span className="text-xs text-muted-foreground">{t('providerForm.skipWebFetchPreflight')}</span>
               </label>
               <label className="flex items-center gap-2">
                 <input type="checkbox" checked={values.disableAutoUpdates} onChange={(e) => set({ disableAutoUpdates: e.target.checked })} className="rounded" disabled={readOnly} />
-                <span className="text-xs text-muted-foreground">Disable auto-updates</span>
+                <span className="text-xs text-muted-foreground">{t('providerForm.disableAutoUpdates')}</span>
               </label>
             </div>
 
             {/* Custom User-Agent — hidden in profile mode (not serialized). */}
             {mode === 'library' && (
               <div>
-                <label className="text-xs text-muted-foreground block mb-1">Custom User-Agent</label>
-                <Input value={values.customUserAgent} onChange={(e) => set({ customUserAgent: e.target.value })} placeholder="Optional" className="text-sm font-mono" disabled={readOnly} />
+                <label className="text-xs text-muted-foreground block mb-1">{t('providerForm.customUserAgent')}</label>
+                <Input value={values.customUserAgent} onChange={(e) => set({ customUserAgent: e.target.value })} placeholder={t('providerForm.customUserAgentPlaceholder')} className="text-sm font-mono" disabled={readOnly} />
               </div>
             )}
           </div>
@@ -312,18 +315,18 @@ export function ProviderFormFields({
 
       {/* ── Model Test Config (hidden in profile mode — not serialized) ── */}
       {mode === 'library' && (
-      <CollapsibleSection title="Model Test Config" open={testOpen} onToggle={setTestOpen}>
+      <CollapsibleSection title={t('providerForm.modelTestConfig')} open={testOpen} onToggle={setTestOpen}>
         <div className="grid grid-cols-3 gap-4">
           <div>
-            <label className="text-xs text-muted-foreground block mb-1">Timeout (s)</label>
+            <label className="text-xs text-muted-foreground block mb-1">{t('providerForm.testTimeoutSec')}</label>
             <Input value={values.testTimeout} onChange={(e) => set({ testTimeout: e.target.value })} placeholder="8" className="text-sm" disabled={readOnly} />
           </div>
           <div>
-            <label className="text-xs text-muted-foreground block mb-1">Degraded Threshold (ms)</label>
+            <label className="text-xs text-muted-foreground block mb-1">{t('providerForm.testDegradedThresholdMs')}</label>
             <Input value={values.testDegradedThreshold} onChange={(e) => set({ testDegradedThreshold: e.target.value })} placeholder="6000" className="text-sm" disabled={readOnly} />
           </div>
           <div>
-            <label className="text-xs text-muted-foreground block mb-1">Max Retries</label>
+            <label className="text-xs text-muted-foreground block mb-1">{t('providerForm.testMaxRetries')}</label>
             <Input value={values.testMaxRetries} onChange={(e) => set({ testMaxRetries: e.target.value })} placeholder="1" className="text-sm" disabled={readOnly} />
           </div>
         </div>
@@ -332,23 +335,23 @@ export function ProviderFormFields({
       )}
       {/* ── Billing Config (hidden in profile mode — not serialized) ──── */}
       {mode === 'library' && (
-      <CollapsibleSection title="Billing Config" open={billingOpen} onToggle={setBillingOpen}>
+      <CollapsibleSection title={t('providerForm.billingConfig')} open={billingOpen} onToggle={setBillingOpen}>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="text-xs text-muted-foreground block mb-1">Cost Multiplier</label>
+            <label className="text-xs text-muted-foreground block mb-1">{t('providerForm.costMultiplier')}</label>
             <Input value={values.costMultiplier} onChange={(e) => set({ costMultiplier: e.target.value })} placeholder="1.0" className="text-sm" disabled={readOnly} />
           </div>
           <div>
-            <label className="text-xs text-muted-foreground block mb-1">Pricing Model Source</label>
+            <label className="text-xs text-muted-foreground block mb-1">{t('providerForm.pricingModelSource')}</label>
             <select
               value={values.pricingModelSource}
               onChange={(e) => set({ pricingModelSource: e.target.value })}
               className="w-full h-9 rounded-md bg-muted px-3 text-sm text-foreground"
               disabled={readOnly}
             >
-              <option value="inherit">Inherit global default</option>
-              <option value="request">Request model</option>
-              <option value="response">Response model</option>
+              <option value="inherit">{t('providerForm.pricing.inherit')}</option>
+              <option value="request">{t('providerForm.pricing.request')}</option>
+              <option value="response">{t('providerForm.pricing.response')}</option>
             </select>
           </div>
         </div>

@@ -6,87 +6,74 @@
 
 // ── Provider ───────────────────────────────────────────────────────────
 
-export interface ProviderMeta {
-  usage_script?: {
-    enabled: boolean
-    code: string
-    timeout: number
-    autoQueryInterval: number
-    [key: string]: unknown
-  }
-  [key: string]: unknown
-}
-
+/**
+ * Provider row from the ACS query layer (src/agent_box/adapters/acs.py).
+ * Backend returns snake_case and filters by agent type itself, so no
+ * agentTypes / createdAt fields are needed here.
+ */
 export interface Provider {
   id: string
   name: string
-  category?: string
-  websiteUrl?: string
-  settings: ProviderSettings
-  meta?: ProviderMeta
-  createdAt?: number
-  isCurrent?: boolean
-}
-
-export interface ProviderSettings {
-  name?: string
-  description?: string
-  env: Record<string, string>
+  category: string | null
+  website_url: string | null
+  is_current: boolean
+  /** Brand icon key (e.g. "deepseek") served by the ACS providers table. */
+  icon?: string | null
+  icon_color?: string | null
+  /** Parsed settings object — the frontend reads provider settings config. */
+  settings: Record<string, unknown>
+  meta: Record<string, unknown>
   [key: string]: unknown
 }
 
-// ── Claude.md ──────────────────────────────────────────────────────────
+// ── Prompt ─────────────────────────────────────────────────────────────
 
-export interface ClaudeMd {
+/**
+ * Prompt row from the ACS query layer (acs.list_prompts).
+ */
+export interface Prompt {
   id: string
   name: string
-  description?: string
   content: string
-  createdAt?: number
+  description: string
+  [key: string]: unknown
 }
 
 // ── MCP Server ─────────────────────────────────────────────────────────
 
-/** Unified MCP server_config shape (matches Python backend). */
-export interface McpServerConfig {
-  type: 'stdio' | 'sse' | 'http'
-  command?: string
-  args?: string[]
-  env?: Record<string, string>
-  url?: string
-  headers?: Record<string, string>
-  [key: string]: unknown
-}
-
+/**
+ * MCP server row from the ACS query layer (acs.list_mcp_servers).
+ * server_config is already JSON-parsed by the backend query layer.
+ */
 export interface McpServer {
   id: string
   name: string
-  description?: string
-  homepage?: string
-  docs?: string
+  description: string
+  homepage: string
+  docs: string
   tags: string[]
-  /** Agent types this server is enabled for (resolved from join table). */
-  agentTypes: AgentType[]
-  /** Raw server_config JSON string from the DB. */
-  serverConfig?: string
-  /** Parsed server_config object (only on detail / show response). */
-  serverConfigParsed?: McpServerConfig
+  server_config: Record<string, unknown> | null
+  [key: string]: unknown
 }
 
 // ── Skill ──────────────────────────────────────────────────────────────
 
+/**
+ * Skill row from the ACS query layer (acs.list_skills).
+ */
 export interface Skill {
   id: string
   name: string
-  description?: string
-  directory?: string
-  repoOwner?: string
-  repoName?: string
-  repoBranch?: string
-  readmeUrl?: string
-  /** Agent types this skill is enabled for (resolved from join table). */
-  agentTypes: AgentType[]
-  installedAt?: number
+  description: string
+  directory: string
+  repo_owner: string
+  repo_name: string
+  repo_branch: string
+  readme_url: string
+  /** Whether the skill's source directory exists locally (available to apply). */
+  source_available: boolean | null
+  source_path: string | null
+  [key: string]: unknown
 }
 
 // ── Profile ────────────────────────────────────────────────────────────
@@ -97,19 +84,72 @@ export interface Profile {
   displayName?: string
   description?: string
   providerRef?: string
-  claudeMdRef?: string
+  /** Prompt template ref (backend column prompt_ref). */
+  promptRef?: string
   createdAt?: number
 }
 
-export type AgentType = 'claude' | 'codex' | 'hermes' | 'opencode'
+/** Agent type id — fully dynamic; the backend registry is the source of truth. */
+export type AgentType = string
 
-export const AGENT_TYPES: AgentType[] = ['claude', 'codex', 'hermes', 'opencode']
+export type ProviderApplyMode = 'overwrite' | 'additive'
 
-export const AGENT_TYPE_COLORS: Record<AgentType, string> = {
-  claude: 'warning',    // orange
-  codex: 'success',     // green
-  hermes: 'info',       // blue
-  opencode: 'primary',  // neutral
+/** Resource capability block — key = supported resource type. */
+export interface ResourceConfig {
+  apply_mode?: ProviderApplyMode
+  config_file?: string
+  file?: string
+  format?: string
+  key?: string
+  [key: string]: unknown
+}
+
+/**
+ * Agent-type registry contract (mirrors core/agent_types.json).
+ *
+ * The backend registry is the single source of truth; the frontend only
+ * annotates the fields it consumes, with `[key: string]: unknown` as the
+ * catch-all for everything else.
+ */
+export interface AgentTypeConfig {
+  identity: {
+    display_name: string
+    binary: string
+    /** Brand accent color (hex) — pure presentation, served by the registry. */
+    color?: string
+    /** Logo asset path (relative to the frontend build root). */
+    logo?: string
+    [key: string]: unknown
+  }
+  runtime: {
+    config_dir: string
+    profile_dir_suffix: string
+    config_files?: string[]
+    data_dir?: string
+    venv_preserve?: string
+    extra_profile_files?: string[]
+    launch?: {
+      interactive?: string[]
+      exec?: string[]
+      resume?: string[]
+      resume_by_id?: string[]
+      [key: string]: unknown
+    }
+    acs_column: string
+    [key: string]: unknown
+  }
+  resources: Record<string, ResourceConfig>
+  sandbox?: {
+    bind_mounts?: string[]
+    dev_mounts?: string[]
+    proc_mounts?: string[]
+    tmpfs?: string[]
+    unshare?: string[]
+    share?: string[]
+    [key: string]: unknown
+  }
+  presets?: Record<string, unknown>
+  [key: string]: unknown
 }
 
 // ── Session ────────────────────────────────────────────────────────────

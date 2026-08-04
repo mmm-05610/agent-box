@@ -7,8 +7,9 @@ from pathlib import Path
 
 import pytest
 
-from agent_box import config, hooks, profile
-from agent_box.profile import ProfileError
+from agent_box import config
+from agent_box.resources import hooks, profile
+from agent_box.resources.profile import ProfileError
 
 
 _HOOKS_BODY = {
@@ -42,11 +43,11 @@ def _settings_path(name: str) -> Path:
 
 # --- upsert ---------------------------------------------------------------
 
-def test_upsert_hooks_new(tmp_agent_box_home):
+def test_set_hooks_new(tmp_agent_box_home):
     """Hooks are written into settings.json → hooks key, preserving the
     other keys already present in the template."""
     profile.create("mycc", "claude")
-    result = hooks.upsert_hooks("mycc", _hooks_json())
+    result = hooks.set_hooks("mycc", json.loads(_hooks_json()))
     assert result == _HOOKS_BODY
 
     target = _settings_path("mycc")
@@ -58,17 +59,17 @@ def test_upsert_hooks_new(tmp_agent_box_home):
     assert "env" in data
 
 
-def test_upsert_hooks_update(tmp_agent_box_home):
+def test_set_hooks_update(tmp_agent_box_home):
     """Hooks overwrite inside settings.json — other keys untouched."""
     profile.create("mycc", "claude")
-    hooks.upsert_hooks("mycc", _hooks_json())
+    hooks.set_hooks("mycc", json.loads(_hooks_json()))
 
     new_body = {
         "Notification": [
             {"hooks": [{"type": "command", "command": "echo notify"}]},
         ],
     }
-    result = hooks.upsert_hooks("mycc", json.dumps(new_body))
+    result = hooks.set_hooks("mycc", new_body)
     assert result == new_body
 
     data = json.loads(_settings_path("mycc").read_text(encoding="utf-8"))
@@ -79,7 +80,7 @@ def test_upsert_hooks_update(tmp_agent_box_home):
     assert "env" in data
 
 
-def test_upsert_hooks_preserves_other_keys(tmp_agent_box_home):
+def test_set_hooks_preserves_other_keys(tmp_agent_box_home):
     """Non-hooks keys in settings.json survive a hooks upsert."""
     profile.create("mycc", "claude")
     # Pre-populate settings with a custom key.
@@ -88,7 +89,7 @@ def test_upsert_hooks_preserves_other_keys(tmp_agent_box_home):
     s["theme"] = "light"
     _settings_path("mycc").write_text(json.dumps(s, indent=2) + "\n")
 
-    hooks.upsert_hooks("mycc", _hooks_json())
+    hooks.set_hooks("mycc", json.loads(_hooks_json()))
 
     data = json.loads(_settings_path("mycc").read_text(encoding="utf-8"))
     assert data["hooks"] == _HOOKS_BODY
@@ -96,29 +97,29 @@ def test_upsert_hooks_preserves_other_keys(tmp_agent_box_home):
     assert data["theme"] == "light"
 
 
-def test_upsert_hooks_invalid_json(tmp_agent_box_home):
+def test_set_hooks_not_dict(tmp_agent_box_home):
     profile.create("mycc", "claude")
-    with pytest.raises(ProfileError, match="not valid JSON"):
-        hooks.upsert_hooks("mycc", "not-json")
+    with pytest.raises(ProfileError, match="must be an object"):
+        hooks.set_hooks("mycc", "not-a-dict")
 
 
-def test_upsert_hooks_not_object(tmp_agent_box_home):
+def test_set_hooks_not_object(tmp_agent_box_home):
     profile.create("mycc", "claude")
-    with pytest.raises(ProfileError, match="must be a JSON object"):
-        hooks.upsert_hooks("mycc", "[]")
+    with pytest.raises(ProfileError, match="must be an object"):
+        hooks.set_hooks("mycc", [])
 
 
-def test_upsert_hooks_non_claude_profile(tmp_agent_box_home):
+def test_set_hooks_non_claude_profile(tmp_agent_box_home):
     profile.create("mycodex", "codex")
-    with pytest.raises(ProfileError, match="only supported for claude profiles"):
-        hooks.upsert_hooks("mycodex", _hooks_json())
+    with pytest.raises(ProfileError, match="not supported"):
+        hooks.set_hooks("mycodex", json.loads(_hooks_json()))
 
 
 # --- show -----------------------------------------------------------------
 
 def test_show_hooks(tmp_agent_box_home):
     profile.create("mycc", "claude")
-    hooks.upsert_hooks("mycc", _hooks_json())
+    hooks.set_hooks("mycc", json.loads(_hooks_json()))
     data = hooks.get_hooks("mycc")
     assert data == _HOOKS_BODY
 
@@ -133,7 +134,7 @@ def test_show_hooks_corrupt_file(tmp_agent_box_home):
     """Corrupt settings.json → ProfileError."""
     profile.create("mycc", "claude")
     _settings_path("mycc").write_text("{ not valid json")
-    with pytest.raises(ProfileError, match="not valid JSON"):
+    with pytest.raises(ProfileError, match="not valid"):
         hooks.get_hooks("mycc")
 
 
@@ -141,13 +142,13 @@ def test_show_hooks_non_object(tmp_agent_box_home):
     """settings.json → hooks is a list → ProfileError."""
     profile.create("mycc", "claude")
     _settings_path("mycc").write_text('{"hooks": []}\n')
-    with pytest.raises(ProfileError, match="'hooks' must be a JSON object"):
+    with pytest.raises(ProfileError, match="must be an object"):
         hooks.get_hooks("mycc")
 
 
 def test_show_hooks_non_claude_profile(tmp_agent_box_home):
     profile.create("mycodex", "codex")
-    with pytest.raises(ProfileError, match="only supported for claude profiles"):
+    with pytest.raises(ProfileError, match="not supported"):
         hooks.get_hooks("mycodex")
 
 

@@ -12,7 +12,7 @@ interface BridgeFetchedModel {
 
 export async function fetchModels(baseUrl: string, apiKey: string): Promise<FetchedModel[]> {
   const models = await call<BridgeFetchedModel[]>(
-    (api) => api.fetch_models(baseUrl, apiKey, '', false),
+    (api) => api.fetch_models!(baseUrl, apiKey, '', false),
     [],
   )
 
