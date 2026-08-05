@@ -85,8 +85,12 @@ share to a drive letter with `pushd`:
 pushd \\wsl.localhost\Ubuntu\home\maoqh\projects\agent-box
 cd gui-web; npm run build; cd ..    # Vite build BEFORE PyInstaller
 # build/runtime is prepared in WSL (bash scripts/build-gui-runtime.sh) —
-# on a shared repo it is already there
+# on a shared repo it is already there.  Re-run it right before pyinstaller:
+# the Windows-side walk of the 9P-mounted build/ dir can see a STALE view
+# and silently drop runtime files (see Landmines below).
 pyinstaller agent-box-gui.spec      # → dist\agent-box-gui.exe
+python scripts/verify-exe-runtime.py dist\agent-box-gui.exe
+#   ^ MUST print PASS before shipping — aborts on a broken exe
 iscc setup.iss                      # → dist\agent-box-setup-<v>.exe
 popd
 ```
@@ -114,6 +118,12 @@ pyinstaller agent-box-gui.spec      # → dist/agent-box-gui (ELF)
 - **Vite build order** — `npm run build` before every PyInstaller run.
 - **Stale agent_box on the Windows Python** — reinstall the wheel or the exe
   ships the old library.
+- **Stale `build/runtime` over 9P** — the Windows pyinstaller walk of the
+  shared `build/` dir can see a stale directory snapshot and silently drop
+  runtime files (2026-08: only ~6% of the runtime was bundled, breaking every
+  RPC call with "can't open file .../runtime/rpc_server.py"). Re-run
+  `bash scripts/build-gui-runtime.sh` right before pyinstaller, and always
+  run `scripts/verify-exe-runtime.py` on the exe before shipping.
 - **UNC paths** — build from a Windows-native path, not `\\wsl$\...`.
 - **`setup.iss` paths are relative to CWD** when running `iscc`.
 - **acs `.exe` suffix** — `config.acs_binary()` appends it on Windows; the
