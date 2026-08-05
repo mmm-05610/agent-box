@@ -162,10 +162,18 @@ agent binary（claude / codex / hermes / opencode）
 - 路径：`gui-web/`（PyWebView + React + Vite + Tailwind），不是
   `agent-box` 包的子模块。
 - **双模式 bridge**（`bridge.py`，策略模式）：
-  - Windows 宿主 → `WslDataAccess`：经 `wsl.exe bash -lc agent-box exec ...`
-    调 CLI；路径转换用确定性字符串转换（`_to_wsl_path`），不经 `wslpath`。
-  - Linux/WSL → `LinuxDataAccess`：直接 `import agent_box`。
-  - `main()` 按 `sys.platform == "win32"` 选择。
+  - Windows 宿主 → `WslDataAccess`：经 `wsl.exe python3 rpc_server.py`
+    （stdin/stdout JSON **RPC**）调 agent_box **库**，不是 `agent-box`
+    CLI 二进制 —— **Windows 宿主零 agent-box 依赖**（bridge.py +
+    data_wsl.py 只有 stdlib）。路径转换用确定性字符串转换
+    （`_to_wsl_path`），不经 `wslpath`。
+  - Linux/WSL → `LinuxDataAccess`：直接 `import agent_box`（懒加载，
+    Windows 不导入）。
+  - `main()` 按 `sys.platform == "win32"` 选择；`data_linux` 仅在
+    Linux 分支懒导入。
+- **RPC 运行时**：exe 内置 `build/runtime/`（rpc_server.py +
+  data_linux.py + agent_box 库 + 纯 Python 依赖），WSL 的 python3 经
+  `/mnt/<drive>/...` 读取 —— 无 pip / venv / CLI 安装。
 - 页面：home（仪表盘）/ profiles（列表+launch）/ detail（profile 详情，
   tab 由 registry `resources` 动态生成）/ sessions / settings / help。
 - **前端零 agent 知识**：页面结构、tab、图标、默认值全部来自后端
