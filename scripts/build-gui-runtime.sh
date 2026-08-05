@@ -20,7 +20,11 @@ fi
 # 2. Extract the package + deps into a flat importable runtime dir.
 rm -rf build/runtime
 WHEEL=$(ls dist/agent_box_cli-*.whl | sort -V | tail -1)
-python3 -m pip install --quiet --target build/runtime "$WHEEL"
+# tomli is the <3.11 fallback for core/io.py's `import tomllib`.  The build
+# env is usually 3.12+ where stdlib tomllib wins, so a `; python_version
+# < '3.11'` marker would NOT install it here — pin it explicitly so the
+# runtime stays self-contained on ANY WSL python (no host pip setup).
+python3 -m pip install --quiet --target build/runtime "$WHEEL" tomli
 
 # 3. Drop the RPC shim + LinuxDataAccess next to it (same dir as the GUI
 #    dev layout, so `from data_linux import LinuxDataAccess` resolves).

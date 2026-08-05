@@ -24,6 +24,7 @@ REQUIRED = (
     'runtime/data_linux.py',
     'runtime/agent_box/__init__.py',
     'runtime/agent_box/core/agent_types.json',
+    'runtime/tomli/__init__.py',  # <3.11 fallback for core/io.py
 )
 
 
