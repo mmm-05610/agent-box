@@ -33,6 +33,17 @@ datas += collect_data_files('agent_box')
 if os.path.isdir('build/runtime'):
     datas.append(('build/runtime', 'runtime'))
 
+# The RPC shim + LinuxDataAccess are copied into build/runtime by
+# scripts/build-gui-runtime.sh, but the Windows-side pyinstaller walk of the
+# 9P-mounted build/ dir can see a stale view and silently miss them (the
+# whole runtime is the pip-installed library; only these two live at the
+# top level).  Add them as explicit datas from gui-web/ so they are ALWAYS
+# bundled regardless of the directory walk.
+for _f in ('rpc_server.py', 'data_linux.py'):
+    _src = os.path.join('gui-web', _f)
+    if os.path.isfile(_src):
+        datas.append((_src, 'runtime'))
+
 # PyWebView
 tmp_ret = collect_all('webview')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
