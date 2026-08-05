@@ -73,11 +73,15 @@ def _runtime_dir() -> str:
 
     Frozen: the runtime is bundled under ``sys._MEIPASS/runtime`` (a Windows
     temp dir WSL reads via /mnt/<drive>/...).  Dev: the repo's ``gui-web/``
-    directory, where agent_box is importable from the WSL install.
+    directory.  Always run through ``_to_wsl_path`` — in dev the Windows GUI
+    may load this module via a ``\\\\wsl$\\`` UNC path, which WSL bash's
+    ``cd`` cannot handle.
     """
     if getattr(sys, "frozen", False):
-        return _to_wsl_path(str(Path(sys._MEIPASS) / "runtime"))
-    return str(Path(__file__).parent.resolve())
+        base = str(Path(sys._MEIPASS) / "runtime")
+    else:
+        base = str(Path(__file__).parent.resolve())
+    return _to_wsl_path(base)
 
 
 def _wsl_rpc(method: str, *args, **kwargs):
@@ -109,10 +113,12 @@ def _resume_args(agent_type: str) -> tuple:
     """Fetch ``runtime.launch.resume`` (minus the binary name) from the
     agent-type registry inside WSL, through the bundled runtime."""
     runtime = _runtime_dir()
+    # json.dumps gives a valid Python string literal (shlex.quote would emit
+    # a bare token like `claude` that Python reads as a variable → NameError).
     snippet = (
         "import json; "
         "from agent_box.core.library import get_agent_config; "
-        f"cfg = get_agent_config({shlex.quote(agent_type)}) or {{}}; "
+        f"cfg = get_agent_config({json.dumps(agent_type)}) or {{}}; "
         "resume = ((cfg.get('runtime') or {}).get('launch') or {}).get('resume') or []; "
         "print(json.dumps(resume))"
     )
@@ -171,10 +177,12 @@ class WslDataAccess:
         ``agent_box.launch.launch`` (library) instead of ``agent-box exec``."""
         resume_args = _resume_args(agent_type)
         extra_args = list(resume_args) if mode == "resume" else []
-        cwd_py = shlex.quote(cwd) if cwd else "None"
+        # json.dumps → valid Python string literal; shlex.quote would emit a
+        # bare token (NameError/SyntaxError) inside the python -c snippet.
+        cwd_py = json.dumps(cwd) if cwd else "None"
         snippet = (
             "from agent_box.launch import launch; "
-            f"launch({shlex.quote(name)}, {json.dumps(extra_args)}, cwd={cwd_py})"
+            f"launch({json.dumps(name)}, {json.dumps(extra_args)}, cwd={cwd_py})"
         )
         setup = 'export PATH="$HOME/.npm-global/bin:$HOME/.local/bin:$PATH"'
         cmd = (

@@ -142,11 +142,14 @@ def launch(name: str, extra_args: list | None = None, cwd: str | None = None) ->
     import subprocess as _sp
 
     mode = config.MODE_RESUME if extra_args else config.MODE_NEW
-    pid = os.getpid()
-    sid = sessions.record_launch(name, agent_type, os.getcwd(), mode, pid)
 
     # Use subprocess instead of execvpe so we can record exit
     proc = _sp.Popen(argv, env=env)
+    # Track the AGENT's pid (the bwrap process), not the launcher's
+    # os.getpid(): if the launcher (console / wsl.exe / python -c) dies
+    # while the bwrap agent keeps running, the session must still show as
+    # running — fetch_sessions decides by os.kill(recorded_pid, 0).
+    sid = sessions.record_launch(name, agent_type, os.getcwd(), mode, proc.pid)
     exit_code = proc.wait()
     sessions.record_exit(sid, exit_code)
     # Exit with the same code so the shell script can report failures
