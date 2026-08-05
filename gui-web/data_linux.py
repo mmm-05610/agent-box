@@ -47,6 +47,10 @@ def _dir_tree_node(p: Path, max_depth: int = 4) -> Optional[dict]:
 class LinuxDataAccess:
     """agent_box access via direct import. Launch via xterm/WSLg."""
 
+    def check_environment(self) -> dict:
+        """The Linux host always satisfies the runtime gate (no WSL needed)."""
+        return {"ready": True, "wsl": True, "distro": True, "detail": ""}
+
     # ── Profiles ────────────────────────────────────────────────────
 
     def list_profiles(self) -> list:

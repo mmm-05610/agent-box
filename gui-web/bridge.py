@@ -55,6 +55,18 @@ class Api:
     def __init__(self, data):
         self._data = data  # LinuxDataAccess | WslDataAccess
 
+    # ── Environment ─────────────────────────────────────────────────
+
+    def check_environment(self) -> str:
+        """Runtime health: is the WSL backend the GUI depends on usable?
+
+        Structured (never throws) — the frontend gates the whole app on it.
+        """
+        try:
+            return json.dumps({"ok": True, "data": self._data.check_environment()})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
     # ── Agent types ──────────────────────────────────────────────────
 
     def get_agent_configs(self) -> str:

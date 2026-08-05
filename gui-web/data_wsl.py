@@ -143,6 +143,33 @@ class WslDataAccess:
     a python3 snippet that calls ``agent_box.launch.launch`` directly.
     """
 
+    # ── Environment ─────────────────────────────────────────────────
+
+    def check_environment(self) -> dict:
+        """Detect whether the WSL runtime the whole GUI depends on works.
+
+        Structured status, never raises — the Windows host calls this on
+        startup to decide between the WSL install guide (setup screen) and
+        the app itself.  The probe exercises the exact code path every other
+        call uses (``wsl.exe bash -lc``), so a bootable default distro is
+        confirmed — not just a ``wsl.exe`` sitting on PATH.
+        """
+        wsl = shutil.which("wsl.exe")
+        if wsl is None:
+            return {
+                "ready": False, "wsl": False, "distro": False,
+                "detail": "wsl.exe not found in PATH. "
+                          "Install WSL2 from an admin PowerShell: wsl --install -d Ubuntu",
+            }
+        try:
+            _wsl_run("echo ready", timeout=60)
+        except RuntimeError as e:
+            return {
+                "ready": False, "wsl": True, "distro": False,
+                "detail": str(e),
+            }
+        return {"ready": True, "wsl": True, "distro": True, "detail": ""}
+
     # ── Profiles ────────────────────────────────────────────────────
 
     def list_profiles(self) -> list:

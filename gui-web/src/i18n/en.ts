@@ -798,6 +798,20 @@ export const en = {
     },
   },
 
+  setup: {
+    title: 'agent-box requires WSL2',
+    desc: 'agent-box runs inside WSL. Install WSL2 + Ubuntu, then click "Re-check" here.',
+    'status.noWsl': 'WSL2 (wsl.exe) not detected',
+    'status.noDistro': 'WSL2 detected, but no Linux distribution is installed',
+    'step.install': 'Open PowerShell as Administrator and run:',
+    'step.restart': 'Restart your computer',
+    'step.init': 'Open the Ubuntu app from Start and finish first-run setup (choose a username and password)',
+    'step.retryCheck': 'Come back to this window and click "Re-check"',
+    retry: 'Re-check',
+    retryHint: 'Click this once installed to enter the app',
+    detail: 'Technical details',
+  },
+
   error: {
     crashed: '{{name}} crashed',
     load: 'Failed to load',

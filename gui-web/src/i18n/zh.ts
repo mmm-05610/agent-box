@@ -797,6 +797,20 @@ export const zh: TranslationSchema = {
     },
   },
 
+  setup: {
+    title: 'agent-box 需要 WSL2',
+    desc: 'agent-box 在 WSL 中运行。安装 WSL2 和 Ubuntu 后，回到这里点击"重新检测"。',
+    'status.noWsl': '未检测到 WSL2（wsl.exe）',
+    'status.noDistro': '已检测到 WSL2，但没有安装任何 Linux 发行版',
+    'step.install': '以管理员身份打开 PowerShell，运行：',
+    'step.restart': '重启电脑',
+    'step.init': '打开开始菜单里的 Ubuntu，完成首次初始化（设置用户名和密码）',
+    'step.retryCheck': '回到这个窗口，点击"重新检测"',
+    retry: '重新检测',
+    retryHint: '装好后回来点这个，立即进入应用',
+    detail: '技术细节',
+  },
+
   error: {
     crashed: '{{name}} 崩溃了',
     load: '加载失败',

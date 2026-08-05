@@ -1,11 +1,16 @@
 /**
  * App — Root component with routing
+ *
+ * The whole app is gated on the WSL backend being usable: a bare Windows
+ * machine (no WSL) gets the SetupScreen install guide instead of pages that
+ * would all surface RPC errors. Only when `status.ready` does the real Shell
+ * (and its RPC polls) mount.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Shell, type NavKey } from '@/components/layout'
-import { ErrorBoundary, ToastProvider } from '@/components/feedback'
-import { useSessions } from '@/hooks'
+import { ErrorBoundary, Loading, ToastProvider } from '@/components/feedback'
+import { useEnvironment, useSessions } from '@/hooks'
 import {
   HelpPage,
   HomePage,
@@ -13,9 +18,32 @@ import {
   ProfilesPage,
   SessionsPage,
   SettingsPage,
+  SetupScreen,
 } from '@/pages'
 
 export default function App() {
+  return (
+    <ToastProvider>
+      <EnvironmentGate>
+        <ShellApp />
+      </EnvironmentGate>
+    </ToastProvider>
+  )
+}
+
+/** Blocks the app until the WSL backend is usable; shows the install guide otherwise. */
+function EnvironmentGate({ children }: { children: ReactNode }) {
+  const { status, checking, refresh } = useEnvironment()
+  if (checking || !status) {
+    return <Loading className="h-screen" />
+  }
+  if (!status.ready) {
+    return <SetupScreen status={status} onRetry={refresh} />
+  }
+  return <>{children}</>
+}
+
+function ShellApp() {
   const [page, setPage] = useState<NavKey>('home')
   const [detailProfile, setDetailProfile] = useState<string | null>(null)
   const [autoOpenCreate, setAutoOpenCreate] = useState(false)
@@ -41,21 +69,19 @@ export default function App() {
   }
 
   return (
-    <ToastProvider>
-      <Shell active={page} onNav={handleNav} onNewProfile={handleNewProfile} runningCount={running.length}>
-        <ErrorBoundary name="App">
-          <PageRouter
-            page={page}
-            detailProfile={detailProfile}
-            autoOpenCreate={autoOpenCreate}
-            onAutoOpenCreateHandled={() => setAutoOpenCreate(false)}
-            onNav={handleNav}
-            onOpenDetail={setDetailProfile}
-            onCloseDetail={() => setDetailProfile(null)}
-          />
-        </ErrorBoundary>
-      </Shell>
-    </ToastProvider>
+    <Shell active={page} onNav={handleNav} onNewProfile={handleNewProfile} runningCount={running.length}>
+      <ErrorBoundary name="App">
+        <PageRouter
+          page={page}
+          detailProfile={detailProfile}
+          autoOpenCreate={autoOpenCreate}
+          onAutoOpenCreateHandled={() => setAutoOpenCreate(false)}
+          onNav={handleNav}
+          onOpenDetail={setDetailProfile}
+          onCloseDetail={() => setDetailProfile(null)}
+        />
+      </ErrorBoundary>
+    </Shell>
   )
 }
 
