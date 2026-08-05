@@ -48,33 +48,47 @@ over `/mnt/<drive>/...` — no pip, venv, or CLI install on the WSL side.
 
 ## 3. cc-switch (ACS) binary
 
-The GUI's Config button launches the cc-switch (ACS) app. `config.acs_binary()`
-resolves it (env override → bundled `_MEIPASS/acs/...` → repo `acs/`). The
-spec conditionally bundles it when it has been compiled.
+The GUI's **Config** button launches the cc-switch (ACS) app. It always runs
+**inside WSL** — the Windows GUI routes `launch_acs` through the RPC, so the
+**Windows package does not need a Windows cc-switch.exe**. The WSL/Linux
+cc-switch is what gets launched (and the Linux GUI bundles it via the spec).
+
+**Frontend embedding** — plain `cargo build` does NOT embed the Tauri
+frontend (needs the `tauri build` CLI to enable `custom-protocol`). Build
+with the tauri CLI, with `cargo` on PATH:
 
 ```bash
-# per platform — the binary name carries the extension (cc-switch.exe / cc-switch)
-cd acs/src-tauri
-cargo build --release        # requires Rust ≥ 1.85 + Tauri system deps
-# Linux deps: libwebkit2gtk-4.1-dev libgtk-3-dev libsoup-3.0-dev
+export PATH="$HOME/.cargo/bin:$PATH"     # tauri CLI shells out to cargo
+cd acs
+pnpm install && pnpm run build:renderer  # → acs/dist
+pnpm tauri build --no-bundle             # → acs/src-tauri/target/release/cc-switch
+# requires Rust ≥ 1.85 + Tauri system deps:
+#   libwebkit2gtk-4.1-dev libgtk-3-dev libsoup-3.0-dev
 #   libjavascriptcoregtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev
 ```
 
-Build it once per platform; the spec picks it up automatically.
+Build it in WSL once; the Linux GUI spec bundles it (checks
+`acs/src-tauri/target/release/cc-switch`).
 
 ## 4. Windows GUI installer
 
-Runs on Windows (PyInstaller does not cross-compile). From a Windows-native
-checkout (not a `\\wsl$\...` UNC path — PyInstaller breaks on UNC):
+Runs on Windows (PyInstaller does not cross-compile). The package is
+**self-contained** — zero dependency on `agent-box` on the Windows Python
+(everything goes through the WSL RPC + bundled runtime). No `pip install
+agent-box-cli` needed.
+
+**UNC caveat** — building from a `\\wsl.localhost\...` UNC path breaks both
+`npm` (spawns cmd, which can't use UNC as CWD) and PyInstaller. Map the
+share to a drive letter with `pushd`:
 
 ```powershell
-pip install agent-box-cli==<v>   # IMPORTANT: the exe bundles whichever
-                                 # agent_box the Windows Python imports;
-                                 # a stale install ships a stale library.
-cd gui-web; npm install; npm run build; cd ..   # Vite build BEFORE PyInstaller
-bash scripts/build-gui-runtime.sh               # (Git Bash / WSL bash)
-pyinstaller agent-box-gui.spec                  # → dist\agent-box-gui.exe
-iscc setup.iss                                  # → dist\agent-box-setup-<v>.exe
+pushd \\wsl.localhost\Ubuntu\home\maoqh\projects\agent-box
+cd gui-web; npm run build; cd ..    # Vite build BEFORE PyInstaller
+# build/runtime is prepared in WSL (bash scripts/build-gui-runtime.sh) —
+# on a shared repo it is already there
+pyinstaller agent-box-gui.spec      # → dist\agent-box-gui.exe
+iscc setup.iss                      # → dist\agent-box-setup-<v>.exe
+popd
 ```
 
 Upload the installer to GitHub Releases under the version tag.

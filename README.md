@@ -67,13 +67,13 @@ configuration is visible. The agent cannot see or affect anything outside.
 - **Parallel** — run multiple profiles simultaneously on the same machine
 
 ```
-agent-box create decision --type cc --preset decision-maker
-agent-box create research --type cc --preset spec-writer
-agent-box create reviewer  --type cc --preset blank
+agent-box create decision --type claude --preset decision-maker
+agent-box create research --type claude --preset spec-writer
+agent-box create reviewer  --type claude --preset blank
 
-agent-box cc decision    # architecture + design decisions
-agent-box cc research    # deep investigation
-agent-box cc reviewer    # code review
+agent-box launch decision    # architecture + design decisions
+agent-box launch research    # deep investigation
+agent-box launch reviewer    # code review
 ```
 
 Three combinations, three config stacks, three isolated histories. Same machine.
@@ -135,14 +135,14 @@ npm install -g @anthropic-ai/claude-code   # Claude Code
 
 ```bash
 # Create a profile
-agent-box create dev --type cc --preset python-dev
+agent-box create dev --type claude --preset python-dev
 
 # Set your API key (opens profile config in $EDITOR)
-agent-box edit dev
+agent-box configure dev
 #  → edit settings.json and replace the placeholder API key
 
 # Launch
-agent-box cc dev
+agent-box launch dev
 ```
 
 That's it. The agent runs in a bwrap namespace where `~/.claude/` IS your
@@ -159,7 +159,7 @@ profile's config. Ctrl-C, terminal colors, and signals all work normally.
 | 📦 **Presets**                | `python-dev`, `decision-maker`, `spec-writer` — one command to create a fully-configured profile with custom CLAUDE.md, hooks, and settings. |
 | 📜 **Session tracking**       | `agent-box sessions` logs every launch. Know what ran, when, how long, and whether it exited clean.                                          |
 | 🪟 **Windows GUI**            | Manage profiles, edit raw config, track sessions — all from a desktop app. Dark/light themes.                                                |
-| ⚡ **Zero Python deps**       | CLI: stdlib only. `bwrap` and agent CLIs are system deps, not Python deps.                                                                   |
+| ⚡ **Minimal Python deps**    | CLI: `cmd2` + `json5` + `tomli-w`. `bwrap` and agent CLIs are system deps, not Python deps.                                                  |
 | 📂 **Filesystem-native**      | Every profile is plain JSON/YAML/Markdown on disk. Edit with anything. No database for profile storage.                                      |
 
 ---
@@ -181,12 +181,12 @@ without reconfiguring everything from scratch.
 
 ## Supported Agents
 
-| Agent       | CLI command                 | Config directory |
-| ----------- | --------------------------- | ---------------- |
-| Claude Code | `agent-box cc <name>`       | `dot-claude/`    |
-| Codex       | `agent-box codex <name>`    | `dot-codex/`     |
-| Hermes      | `agent-box hermes <name>`   | `dot-hermes/`    |
-| OpenCode    | `agent-box opencode <name>` | `dot-opencode/`  |
+| Agent       | CLI command           | Config directory |
+| ----------- | ---------------------- | ---------------- |
+| Claude Code | `agent-box launch <name>` | `dot-claude/`    |
+| Codex       | `agent-box launch <name>` | `dot-codex/`     |
+| Hermes      | `agent-box launch <name>` | `dot-hermes/`    |
+| OpenCode    | `agent-box launch <name>` | `dot-opencode/`  |
 
 ---
 
@@ -216,15 +216,16 @@ Host (real filesystem)          bwrap namespace (what the agent sees)
 
 ## CLI Commands
 
-| Command                                                            | What it does                     |
-| ------------------------------------------------------------------ | -------------------------------- |
-| `agent-box create <name> --type cc \| codex \| hermes \| opencode` | Create a new profile             |
-| `agent-box list`                                                   | List all profiles                |
-| `agent-box edit <name>`                                            | Open profile config in `$EDITOR` |
-| `agent-box cc \| codex \| hermes \| opencode <name>`               | Launch a profile                 |
-| `agent-box presets`                                                | List available presets           |
-| `agent-box sessions`                                               | View launch history              |
-| `agent-box --version`                                              | Print version                    |
+| Command                                                                      | What it does                       |
+| ---------------------------------------------------------------------------- | ---------------------------------- |
+| `agent-box create <name> --type claude \| codex \| hermes \| opencode`       | Create a new profile               |
+| `agent-box list profiles`                                                    | List all profiles                  |
+| `agent-box configure <name>`                                                 | Open profile config in `$EDITOR`   |
+| `agent-box launch <name> [--cwd <path>]`                                     | Launch a profile                   |
+| `agent-box list presets --type claude`                                        | List available presets             |
+| `agent-box sessions`                                                         | View launch history                |
+| `agent-box exec "use <name>; list providers --json"`                         | Scriptable (AI-friendly) mode      |
+| `agent-box --version`                                                        | Print version                      |
 
 `agent-box --help` for the full reference.
 
@@ -242,8 +243,8 @@ Shipped presets jump-start a profile with a purpose-built CLAUDE.md:
 | `spec-writer`    | Spec-first workflow; writes before coding        |
 
 ```bash
-agent-box create planner --type cc --preset decision-maker
-agent-box presets --type cc          # list all CC presets
+agent-box create planner --type claude --preset decision-maker
+agent-box list presets --type claude      # list all claude presets
 ```
 
 ---

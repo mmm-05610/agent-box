@@ -59,13 +59,13 @@ agent-box 将每个组合封装为**隔离的 Profile**。每个 Profile 是磁�
 - **可并行** — 同一台机器同时运行多个 Profile
 
 ```bash
-agent-box create decision --type cc --preset decision-maker
-agent-box create research --type cc --preset spec-writer
-agent-box create reviewer  --type cc --preset blank
+agent-box create decision --type claude --preset decision-maker
+agent-box create research --type claude --preset spec-writer
+agent-box create reviewer  --type claude --preset blank
 
-agent-box cc decision    # 架构与设计决策
-agent-box cc research    # 深度调研
-agent-box cc reviewer    # 代码审查
+agent-box launch decision    # 架构与设计决策
+agent-box launch research    # 深度调研
+agent-box launch reviewer    # 代码审查
 ```
 
 三种组合，三套配置栈，三段独立历史。同一台机器，零手动切换。
@@ -124,14 +124,14 @@ npm install -g @anthropic-ai/claude-code   # Claude Code
 
 ```bash
 # 创建一个 profile
-agent-box create dev --type cc --preset python-dev
+agent-box create dev --type claude --preset python-dev
 
 # 填入 API Key（在编辑器中打开 profile 配置目录）
-agent-box edit dev
+agent-box configure dev
 #  → 编辑 settings.json，替换占位 API Key
 
 # 启动
-agent-box cc dev
+agent-box launch dev
 ```
 
 搞定。Agent 在 bwrap 命名空间中运行，`~/.claude/` 就是你的 profile 配置。
@@ -170,10 +170,10 @@ Claude Code 的权限模型；调研任务可能适合 OpenCode 的工作流。a
 
 | Agent       | CLI 命令                    | 配置目录        |
 | ----------- | --------------------------- | --------------- |
-| Claude Code | `agent-box cc <name>`       | `dot-claude/`   |
-| Codex       | `agent-box codex <name>`    | `dot-codex/`    |
-| Hermes      | `agent-box hermes <name>`   | `dot-hermes/`   |
-| OpenCode    | `agent-box opencode <name>` | `dot-opencode/` |
+| Claude Code | `agent-box launch <name>`   | `dot-claude/`   |
+| Codex       | `agent-box launch <name>`   | `dot-codex/`    |
+| Hermes      | `agent-box launch <name>`   | `dot-hermes/`   |
+| OpenCode    | `agent-box launch <name>`   | `dot-opencode/` |
 
 ---
 
@@ -205,13 +205,14 @@ Claude Code 的权限模型；调研任务可能适合 OpenCode 的工作流。a
 
 | 命令                                                               | 说明                             |
 | ------------------------------------------------------------------ | -------------------------------- |
-| `agent-box create <name> --type cc \| codex \| hermes \| opencode` | 创建新 profile                   |
-| `agent-box list`                                                   | 列出所有 profile                 |
-| `agent-box edit <name>`                                            | 在 `$EDITOR` 中打开 profile 配置 |
-| `agent-box cc \| codex \| hermes \| opencode <name>`               | 启动 profile                     |
-| `agent-box presets`                                                | 列出可用预设                     |
-| `agent-box sessions`                                               | 查看启动历史                     |
-| `agent-box --version`                                              | 输出版本号                       |
+| `agent-box create <name> --type claude \| codex \| hermes \| opencode` | 创建新 profile                     |
+| `agent-box list profiles`                                              | 列出所有 profile                   |
+| `agent-box configure <name>`                                           | 在 `$EDITOR` 中打开 profile 配置   |
+| `agent-box launch <name> [--cwd <path>]`                               | 启动 profile                       |
+| `agent-box list presets --type claude`                                 | 列出可用预设                       |
+| `agent-box sessions`                                                   | 查看启动历史                       |
+| `agent-box exec "use <name>; list providers --json"`                   | 脚本模式（AI 友好）                |
+| `agent-box --version`                                                  | 输出版本号                         |
 
 `agent-box --help` 查看完整命令参考。
 
