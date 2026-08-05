@@ -18,7 +18,6 @@ touch no agent_box code, so they carry no CLI dependency either.
 
 import base64
 import json
-import os
 import re
 import shlex
 import shutil
@@ -402,29 +401,10 @@ class WslDataAccess:
         return _wsl_rpc("last_cwd_map")
 
     def launch_acs(self) -> None:
-        """Launch the ACS (cc-switch) GUI binary on the Windows host directly.
+        """Launch the ACS (cc-switch) GUI binary inside WSL via the RPC.
 
-        The binary path is computed here (no agent_box import) — the exe
-        bundles it under ``_MEIPASS/acs/...`` when packaged.  It must launch
-        on the Windows host, not through the WSL RPC (whose runtime has no
-        notion of the bundled binary path).
+        The binary is the WSL/Linux cc-switch (config.acs_binary() inside
+        WSL) — the Windows GUI never bundles or launches a Windows
+        cc-switch.exe, so the Windows package does not need one built.
         """
-        override = os.environ.get("AGENT_BOX_ACS_BINARY")
-        if override:
-            binary = Path(override).expanduser()
-        elif getattr(sys, "frozen", False):
-            binary = (
-                Path(sys._MEIPASS) / "acs" / "src-tauri" / "target"
-                / "release" / "cc-switch.exe"
-            )
-        else:
-            # Dev: the repo's acs submodule release build.
-            binary = (
-                Path(__file__).resolve().parent.parent / "acs" / "src-tauri"
-                / "target" / "release" / "cc-switch.exe"
-            )
-        subprocess.Popen(
-            [str(binary)],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            start_new_session=True,
-        )
+        _wsl_rpc("launch_acs")
