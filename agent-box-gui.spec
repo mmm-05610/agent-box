@@ -11,14 +11,13 @@ datas = [
 binaries = []
 hiddenimports = []
 
-# Bundle the ACS (cc-switch) submodule release binary when it has been built
-# (cargo build --release in acs/) — config.acs_binary() resolves it under
-# _MEIPASS at runtime.  Binary name carries the platform extension
-# (cc-switch.exe on Windows, cc-switch on Linux/WSL).
-_acs_name = 'cc-switch.exe' if sys.platform == 'win32' else 'cc-switch'
-_acs_bin = f'acs/src-tauri/target/release/{_acs_name}'
-if os.path.isfile(_acs_bin):
-    datas.append((_acs_bin, 'acs/src-tauri/target/release'))
+# Bundle the LINUX cc-switch (ACS) binary into the runtime.  The Windows GUI
+# always launches cc-switch inside WSL (never a native .exe), so the Linux
+# ELF is what ships; _resolve_acs() copies it to ~/.agent-box/bin on first
+# use (drvfs cannot exec ELF directly, so it must land on the WSL fs).
+_linux_acs = 'acs/src-tauri/target/release/cc-switch'
+if os.path.isfile(_linux_acs):
+    datas.append((_linux_acs, 'runtime/bin'))
 
 # agent_box package data (agent_types.json, provider_endpoints.json,
 # templates/, presets/, migrations/).  PyInstaller does NOT auto-collect

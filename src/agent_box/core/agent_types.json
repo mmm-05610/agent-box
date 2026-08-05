@@ -31,7 +31,8 @@
           "{session}"
         ]
       },
-      "acs_column": "enabled_claude"
+      "acs_column": "enabled_claude",
+      "install": "npm install -g @anthropic-ai/claude-code"
     },
     "resources": {
       "provider": {
@@ -170,7 +171,8 @@
           "--last"
         ]
       },
-      "acs_column": "enabled_codex"
+      "acs_column": "enabled_codex",
+      "install": "npm install -g @openai/codex"
     },
     "resources": {
       "provider": {
@@ -285,7 +287,8 @@
           "-c"
         ]
       },
-      "acs_column": "enabled_hermes"
+      "acs_column": "enabled_hermes",
+      "install": "pip install hermes-agent"
     },
     "resources": {
       "provider": {
@@ -460,7 +463,8 @@
           "run"
         ]
       },
-      "acs_column": "enabled_opencode"
+      "acs_column": "enabled_opencode",
+      "install": "npm i -g @opencode-ai/opencode"
     },
     "resources": {
       "provider": {

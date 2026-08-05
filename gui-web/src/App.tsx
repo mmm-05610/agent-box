@@ -12,6 +12,7 @@ import { Shell, type NavKey } from '@/components/layout'
 import { ErrorBoundary, Loading, ToastProvider } from '@/components/feedback'
 import { useEnvironment, useSessions } from '@/hooks'
 import {
+  EnvironmentPage,
   HelpPage,
   HomePage,
   ProfileDetailPage,
@@ -117,6 +118,8 @@ function PageRouter({
       return <SettingsPage />
     case 'help':
       return <HelpPage />
+    case 'environment':
+      return <EnvironmentPage />
     default:
       return <HomePage onNav={onNav} />
   }

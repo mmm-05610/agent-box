@@ -2,6 +2,7 @@
  * Pages — Top-level route components
  */
 
+export { EnvironmentPage } from './environment'
 export { HelpPage } from './help'
 export { HomePage } from './home'
 export { ProfileDetailPage } from './detail'

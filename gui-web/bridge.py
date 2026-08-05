@@ -67,6 +67,44 @@ class Api:
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
 
+    def check_binaries(self) -> str:
+        """Detect agent binaries + cc-switch inside WSL."""
+        try:
+            return json.dumps({"ok": True, "data": self._data.check_binaries()})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    def install_binary(self, agent_type: str) -> str:
+        """One-click install an agent binary (opens a visible console)."""
+        try:
+            self._data.install_binary(agent_type)
+            return json.dumps({"ok": True})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    def get_latest_version(self) -> str:
+        """Latest agent-box release version (for the update badge)."""
+        try:
+            return json.dumps({"ok": True, "data": self._data.get_latest_version()})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    def download_update(self) -> str:
+        """Download the new installer and run it."""
+        try:
+            return json.dumps({"ok": True, "data": self._data.download_update()})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    def open_external(self, url: str) -> str:
+        """Open a URL in the OS default browser (uses the system proxy)."""
+        try:
+            import webbrowser
+            webbrowser.open(url)
+            return json.dumps({"ok": True})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
     # ── Agent types ──────────────────────────────────────────────────
 
     def get_agent_configs(self) -> str:

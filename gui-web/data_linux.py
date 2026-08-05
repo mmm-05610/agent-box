@@ -1,6 +1,7 @@
 """Direct-import data access for Linux/WSL environments."""
 
 import json
+import os
 import shlex
 import shutil
 import subprocess
@@ -9,7 +10,7 @@ from typing import Optional
 
 from agent_box import config
 from agent_box.adapters import acs, models as models_adapter
-from agent_box.core.library import get_agent_config
+from agent_box.core.library import get_agent_config, get_agent_types
 from agent_box.resources import mcp, profile, providers, sessions, skills
 from agent_box.resources.prompts import apply_prompt
 
@@ -42,6 +43,80 @@ def _dir_tree_node(p: Path, max_depth: int = 4) -> Optional[dict]:
         except OSError:
             continue
     return {"path": str(p), "type": "dir", "children": entries}
+
+
+def _binary_version(binary: str) -> str | None:
+    """Best-effort `<binary> --version` capture (capped, never raises)."""
+    if not binary:
+        return None
+    try:
+        out = subprocess.run(
+            [binary, "--version"], capture_output=True, text=True, timeout=5,
+            encoding="utf-8", errors="replace",
+        )
+        line = (out.stdout or out.stderr).strip().splitlines()
+        return line[0][:60] if line else None
+    except Exception:
+        return None
+
+
+def _resolve_acs(exists_only: bool = False) -> Optional[Path]:
+    """Find a runnable cc-switch, provisioning from the bundle if needed.
+
+    Order: env override → installed copy (~/.agent-box/bin) → bundled in the
+    packaged runtime (``_MEIPASS/runtime/bin/cc-switch``, copied + chmod'ed
+    because ELF cannot exec from the /mnt/c drvfs) → repo submodule (dev).
+    """
+    override = os.environ.get("AGENT_BOX_ACS_BINARY")
+    if override:
+        p = Path(override).expanduser()
+        if p.is_file():
+            return p
+    installed = config.agent_box_home() / "bin" / "cc-switch"
+    if installed.is_file():
+        return installed
+    bundled = Path(__file__).parent / "bin" / "cc-switch"
+    if bundled.is_file():
+        if exists_only:
+            return bundled
+        try:
+            installed.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(bundled, installed)
+            installed.chmod(installed.stat().st_mode | 0o111)
+            return installed
+        except OSError:
+            return bundled
+    repo = config.package_dir().parent.parent / "acs" / "src-tauri" / "target" / "release" / "cc-switch"
+    if repo.is_file():
+        return repo
+    return None
+
+
+def _github_latest() -> dict:
+    """Fetch the latest agent-box release from GitHub (never raises)."""
+    import urllib.request
+    try:
+        req = urllib.request.Request(
+            "https://api.github.com/repos/mmm-05610/agent-box/releases/latest",
+            headers={"User-Agent": "agent-box-gui", "Accept": "application/vnd.github+json"},
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            release = json.loads(resp.read().decode("utf-8"))
+        tag = (release.get("tag_name") or "").lstrip("v")
+        asset_url = next(
+            (a.get("browser_download_url", "") for a in release.get("assets", [])
+             if a.get("name", "").startswith("agent-box-setup-")),
+            "",
+        )
+        return {
+            "current": "",
+            "latest": tag,
+            "asset_url": asset_url,
+            "release_url": release.get("html_url", ""),
+            "notes": (release.get("body") or "")[:500],
+        }
+    except Exception:
+        return {"current": "", "latest": "", "asset_url": "", "release_url": "", "notes": ""}
 
 
 class LinuxDataAccess:
@@ -298,9 +373,79 @@ class LinuxDataAccess:
         return result
 
     def launch_acs(self) -> None:
-        """Launch the ACS GUI binary (detached). Path from config.acs_binary()."""
+        """Launch the ACS GUI binary (detached).
+
+        Resolves through ``_resolve_acs`` — on a bare machine this
+        auto-provisions the bundled cc-switch into ``~/.agent-box/bin``
+        (drvfs cannot exec ELF, so it must land on the WSL filesystem first).
+        """
+        binary = _resolve_acs()
+        if binary is None:
+            raise RuntimeError(
+                "cc-switch not found — install it from the Environment page"
+            )
         subprocess.Popen(
-            [str(config.acs_binary())],
+            [str(binary)],
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
             start_new_session=True,
         )
+
+    # ── Environment / provisioning ───────────────────────────────────
+
+    def check_binaries(self) -> list:
+        """Detect agent binaries + cc-switch inside WSL.  Registry-driven."""
+        out = []
+        for agent_type in get_agent_types():
+            cfg = get_agent_config(agent_type) or {}
+            binary = ((cfg.get("identity") or {}).get("binary")) or ""
+            path = shutil.which(binary) if binary else None
+            out.append({
+                "kind": "agent",
+                "agent_type": agent_type,
+                "name": binary,
+                "installed": bool(path),
+                "path": path,
+                "version": _binary_version(binary) if path else None,
+            })
+        acs = _resolve_acs(exists_only=True)
+        out.append({
+            "kind": "acs",
+            "agent_type": "acs",
+            "name": "cc-switch",
+            "installed": acs is not None,
+            "path": str(acs) if acs else None,
+            "version": _binary_version("cc-switch") if acs else None,
+        })
+        return out
+
+    def get_install_command(self, agent_type: str) -> str:
+        """The one-line install command declared for *agent_type*."""
+        cfg = get_agent_config(agent_type)
+        if cfg is None:
+            raise ValueError(f"unknown agent_type {agent_type!r}")
+        cmd = ((cfg.get("runtime") or {}).get("install")) or ""
+        if not cmd:
+            raise ValueError(f"no install command declared for {agent_type!r}")
+        return cmd
+
+    def install_binary(self, agent_type: str) -> None:
+        """Run the agent's install command in a visible terminal (WSL)."""
+        cmd = self.get_install_command(agent_type)
+        term = shutil.which("xterm") or shutil.which("gnome-terminal") or shutil.which("konsole")
+        if not term:
+            raise RuntimeError("no terminal emulator found. Install: sudo apt install xterm")
+        script = f'bash -lc \'{cmd}; echo; read -p "Press Enter to close..."\''
+        subprocess.Popen(
+            [term, "-e", script],
+            start_new_session=True,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+
+    def get_latest_version(self) -> dict:
+        """Latest agent-box version from GitHub (best-effort in WSL)."""
+        from agent_box import __version__
+        info = _github_latest()
+        info["current"] = __version__
+        if not info["latest"]:
+            info["latest"] = __version__
+        return info

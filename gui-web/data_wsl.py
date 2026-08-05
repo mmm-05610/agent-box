@@ -430,8 +430,91 @@ class WslDataAccess:
     def launch_acs(self) -> None:
         """Launch the ACS (cc-switch) GUI binary inside WSL via the RPC.
 
-        The binary is the WSL/Linux cc-switch (config.acs_binary() inside
-        WSL) — the Windows GUI never bundles or launches a Windows
-        cc-switch.exe, so the Windows package does not need one built.
+        The binary is the WSL/Linux cc-switch — the Windows GUI never bundles
+        or launches a Windows cc-switch.exe.  The WSL side auto-provisions the
+        bundled Linux binary on first use.
         """
         _wsl_rpc("launch_acs")
+
+    # ── Environment / provisioning ──────────────────────────────────
+
+    def check_binaries(self) -> list:
+        return _wsl_rpc("check_binaries")
+
+    def get_install_command(self, agent_type: str) -> str:
+        return _wsl_rpc("get_install_command", agent_type)
+
+    def install_binary(self, agent_type: str) -> None:
+        """Run the agent's one-line install in a fresh Windows console.
+
+        The install runs inside WSL (`wsl.exe bash -lc`) with output visible,
+        mirroring how launch_profile opens an agent terminal.
+        """
+        cmd = _wsl_rpc("get_install_command", agent_type)
+        setup = 'export PATH="$HOME/.npm-global/bin:$HOME/.local/bin:$PATH"'
+        script = f"{setup} && {cmd}"
+        script += (
+            ' || { ec=$?; echo; echo "安装失败 code $ec"; '
+            'read -p "Press Enter to close..." ; }'
+        )
+        wsl = shutil.which("wsl.exe")
+        if wsl is None:
+            raise RuntimeError("wsl.exe not found in PATH (install WSL).")
+        subprocess.Popen(
+            [wsl, "bash", "-lc", script],
+            cwd="C:\\",
+            creationflags=subprocess.CREATE_NEW_CONSOLE,
+        )
+
+    def get_latest_version(self) -> dict:
+        """Latest agent-box version from GitHub Releases (Windows side).
+
+        urllib picks up the system proxy (registry) automatically, so the
+        check works where direct WSL→GitHub is blocked.  Never raises —
+        returns current on failure so the UI shows no badge.
+        """
+        current = self.get_version()
+        import urllib.request
+        try:
+            req = urllib.request.Request(
+                "https://api.github.com/repos/mmm-05610/agent-box/releases/latest",
+                headers={"User-Agent": "agent-box-gui", "Accept": "application/vnd.github+json"},
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                release = json.loads(resp.read().decode("utf-8"))
+            tag = (release.get("tag_name") or "").lstrip("v")
+            asset_url = next(
+                (a.get("browser_download_url", "") for a in release.get("assets", [])
+                 if a.get("name", "").startswith("agent-box-setup-")),
+                "",
+            )
+            return {
+                "current": current,
+                "latest": tag,
+                "asset_url": asset_url,
+                "release_url": release.get("html_url", ""),
+                "notes": (release.get("body") or "")[:500],
+            }
+        except Exception:
+            return {
+                "current": current, "latest": current,
+                "asset_url": "", "release_url": "", "notes": "",
+            }
+
+    def download_update(self) -> dict:
+        """Download the latest installer and launch it (Inno upgrades in place)."""
+        info = self.get_latest_version()
+        if not info.get("asset_url") or info.get("latest") == info.get("current"):
+            raise RuntimeError("no update available")
+        import urllib.request
+        dest = Path.home() / "Downloads" / f"agent-box-setup-{info['latest']}.exe"
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        req = urllib.request.Request(info["asset_url"], headers={"User-Agent": "agent-box-gui"})
+        with urllib.request.urlopen(req, timeout=120) as resp, open(dest, "wb") as f:
+            shutil.copyfileobj(resp, f)
+        if sys.platform == "win32":
+            subprocess.Popen([str(dest)], cwd=str(dest.parent))
+        else:
+            import webbrowser
+            webbrowser.open(str(dest))
+        return {"downloaded": str(dest)}

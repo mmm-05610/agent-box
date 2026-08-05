@@ -16,7 +16,9 @@ import { type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import { StatusDot } from '@/components/feedback'
-import { useVersion } from '@/hooks'
+import { useToast } from '@/components/feedback/toast'
+import { useBinaries, useAgentBoxUpdate, useVersion } from '@/hooks'
+import { launchAcs, openExternal } from '@/api/environment'
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -26,6 +28,7 @@ export type NavKey =
   | 'sessions'
   | 'settings'
   | 'help'
+  | 'environment'
 
 interface NavItem {
   key: NavKey
@@ -98,6 +101,17 @@ function HelpIcon() {
   )
 }
 
+function EnvironmentIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+      <path d="M3 9l9-6 9 6v9a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+      <path d="M3 9l9 6 9-6" />
+      <path d="M9 22V12" />
+      <path d="M15 22V12" />
+    </svg>
+  )
+}
+
 function PlusIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
@@ -114,6 +128,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'sessions', labelKey: 'nav.sessions', icon: <SessionsIcon /> },
   { key: 'settings', labelKey: 'nav.settings', icon: <SettingsIcon /> },
   { key: 'help', labelKey: 'nav.help', icon: <HelpIcon /> },
+  { key: 'environment', labelKey: 'nav.environment', icon: <EnvironmentIcon /> },
 ]
 
 // ── Component ──────────────────────────────────────────────────────────
@@ -121,6 +136,23 @@ const NAV_ITEMS: NavItem[] = [
 export function Sidebar({ active, onNav, runningCount = 0, onNewProfile }: SidebarProps) {
   const { t } = useTranslation()
   const version = useVersion()
+  const { toast } = useToast()
+  const { binaries } = useBinaries()
+  const { hasUpdate, info } = useAgentBoxUpdate()
+  const acsInstalled = binaries.find((b) => b.kind === 'acs')?.installed ?? false
+
+  const handleAcs = async () => {
+    if (acsInstalled) {
+      try {
+        await launchAcs()
+      } catch {
+        toast({ type: 'error', message: t('environment.acsFailed') })
+      }
+    } else {
+      toast({ type: 'info', message: t('environment.acsMissing') })
+      onNav('environment')
+    }
+  }
   return (
     <aside
       className={cn(
@@ -228,13 +260,7 @@ export function Sidebar({ active, onNav, runningCount = 0, onNewProfile }: Sideb
       <div className="relative px-3 pb-2">
         <button
           type="button"
-          onClick={() => {
-            try {
-              window.pywebview?.api?.launch_acs?.()
-            } catch {
-              // silently fail — ACS is optional
-            }
-          }}
+          onClick={() => void handleAcs()}
           className={cn(
             'flex w-full items-center gap-2 rounded-md px-3 py-2 text-xs',
             'text-muted-foreground hover:bg-muted hover:text-foreground',
@@ -260,6 +286,23 @@ export function Sidebar({ active, onNav, runningCount = 0, onNewProfile }: Sideb
           <span className="tabular-nums">
             {runningCount > 0 ? t('nav.running', { count: runningCount }) : t('nav.allIdle')}
           </span>
+          {hasUpdate && info?.latest && (
+            <button
+              type="button"
+              onClick={() => info.release_url && void openExternal(info.release_url)}
+              title={t('environment.updateAvailable', { version: info.latest })}
+              className={cn(
+                'ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium',
+                'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20',
+                'dark:text-emerald-400 transition-colors duration-fast',
+              )}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
+                <path d="M12 19V5M5 12l7-7 7 7" />
+              </svg>
+              v{info.latest}
+            </button>
+          )}
         </div>
       </div>
     </aside>
