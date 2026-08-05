@@ -15,7 +15,6 @@ from pathlib import Path
 
 import webview
 
-from data_linux import LinuxDataAccess
 from data_wsl import WslDataAccess
 
 
@@ -64,35 +63,28 @@ class Api:
         No frontend-specific filtering — consumers read what they need.
         """
         try:
-            from agent_box.core.library import get_agent_config, get_agent_types
-            registry = {
-                at: get_agent_config(at) for at in get_agent_types()
-            }
-            return json.dumps({"ok": True, "data": registry})
+            return json.dumps({"ok": True, "data": self._data.get_agent_configs()})
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
 
     def get_default_agent(self) -> str:
-        """The backend's default agent type (config.DEFAULT_AGENT_TYPE)."""
+        """The backend's default agent type (data-layer resolved)."""
         try:
-            from agent_box import config
-            return json.dumps({"ok": True, "data": config.DEFAULT_AGENT_TYPE})
+            return json.dumps({"ok": True, "data": self._data.get_default_agent()})
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
 
     def get_version(self) -> str:
-        """The agent-box backend version (agent_box.__version__)."""
+        """The agent-box backend version (data-layer resolved)."""
         try:
-            from agent_box import __version__
-            return json.dumps({"ok": True, "data": __version__})
+            return json.dumps({"ok": True, "data": self._data.get_version()})
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
 
     def get_projects_dir(self) -> str:
         """The current projects dir — user-stored value or backend default."""
         try:
-            from agent_box import config
-            return json.dumps({"ok": True, "data": config.projects_dir()})
+            return json.dumps({"ok": True, "data": self._data.get_projects_dir()})
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
 
@@ -106,8 +98,7 @@ class Api:
     def save_projects_dir(self, value: str) -> str:
         """Persist the projects dir so it survives GUI restarts."""
         try:
-            from agent_box import config
-            config.set_projects_dir(value)
+            self._data.save_projects_dir(value)
             return json.dumps({"ok": True})
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
@@ -478,7 +469,13 @@ class Api:
 
 
 def main():
-    data = WslDataAccess() if _is_windows() else LinuxDataAccess()
+    if _is_windows():
+        # data_linux is imported lazily so Windows never needs agent_box
+        # importable — it is only loaded when running the GUI in WSL/Linux.
+        data = WslDataAccess()
+    else:
+        from data_linux import LinuxDataAccess
+        data = LinuxDataAccess()
     api = Api(data)
     url = "http://localhost:5173"
 

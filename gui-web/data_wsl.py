@@ -18,6 +18,7 @@ touch no agent_box code, so they carry no CLI dependency either.
 
 import base64
 import json
+import os
 import re
 import shlex
 import shutil
@@ -219,6 +220,21 @@ class WslDataAccess:
         """The WSL home directory (echo $HOME)."""
         return _wsl_run("echo \"$HOME\"").strip()
 
+    def get_version(self) -> str:
+        return _wsl_rpc("get_version")
+
+    def get_default_agent(self) -> str:
+        return _wsl_rpc("get_default_agent")
+
+    def get_agent_configs(self) -> dict:
+        return _wsl_rpc("get_agent_configs")
+
+    def get_projects_dir(self) -> str:
+        return _wsl_rpc("get_projects_dir")
+
+    def save_projects_dir(self, value: str) -> None:
+        _wsl_rpc("save_projects_dir", value)
+
     # ── Apply / Remove ──────────────────────────────────────────────
 
     def apply_provider(self, profile_name: str, provider_id: str) -> None:
@@ -388,14 +404,27 @@ class WslDataAccess:
     def launch_acs(self) -> None:
         """Launch the ACS (cc-switch) GUI binary on the Windows host directly.
 
-        The binary is a native Windows exe resolved by ``config.acs_binary()``
-        (bundled under ``_MEIPASS/acs/...`` when packaged).  It must launch on
-        the Windows host — not through the WSL RPC, whose runtime has no
-        notion of the bundled binary path.
+        The binary path is computed here (no agent_box import) — the exe
+        bundles it under ``_MEIPASS/acs/...`` when packaged.  It must launch
+        on the Windows host, not through the WSL RPC (whose runtime has no
+        notion of the bundled binary path).
         """
-        from agent_box import config
+        override = os.environ.get("AGENT_BOX_ACS_BINARY")
+        if override:
+            binary = Path(override).expanduser()
+        elif getattr(sys, "frozen", False):
+            binary = (
+                Path(sys._MEIPASS) / "acs" / "src-tauri" / "target"
+                / "release" / "cc-switch.exe"
+            )
+        else:
+            # Dev: the repo's acs submodule release build.
+            binary = (
+                Path(__file__).resolve().parent.parent / "acs" / "src-tauri"
+                / "target" / "release" / "cc-switch.exe"
+            )
         subprocess.Popen(
-            [str(config.acs_binary())],
+            [str(binary)],
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
             start_new_session=True,
         )

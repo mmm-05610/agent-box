@@ -129,6 +129,28 @@ class LinuxDataAccess:
         """The OS home directory (config.home_dir)."""
         return config.home_dir()
 
+    def get_version(self) -> str:
+        """The agent-box backend version (agent_box.__version__)."""
+        from agent_box import __version__
+        return __version__
+
+    def get_default_agent(self) -> str:
+        """The backend's default agent type (config.DEFAULT_AGENT_TYPE)."""
+        return config.DEFAULT_AGENT_TYPE
+
+    def get_agent_configs(self) -> dict:
+        """The full agent-type registry (identity/runtime/resources)."""
+        from agent_box.core.library import get_agent_config, get_agent_types
+        return {at: get_agent_config(at) for at in get_agent_types()}
+
+    def get_projects_dir(self) -> str:
+        """The current projects dir (config.projects_dir)."""
+        return config.projects_dir()
+
+    def save_projects_dir(self, value: str) -> None:
+        """Persist the projects dir (config.set_projects_dir)."""
+        config.set_projects_dir(value)
+
     # ── Sessions ────────────────────────────────────────────────────
 
     def list_sessions(self) -> list:
