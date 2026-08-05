@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from ... import config
 from ...adapters import acs as _acs
@@ -328,14 +328,96 @@ def _add_to_providers_store(
     write_json(store_path, entries)
 
 
+def _config_provider_names(
+    profile_name: str, agent_type: str,
+    provider_cfg: Dict[str, Any], strategy: str,
+) -> Optional[List[str]]:
+    """Provider names that are ACTUALLY in the profile's config file.
+
+    The config file is the single source of truth for "which providers are
+    applied".  Strategy-aware — each agent type stores providers differently:
+      - yaml_custom_providers (hermes): custom_providers list in config.yaml
+      - jsonc_provider (opencode): provider dict in opencode.jsonc
+      - json_merge / multi_file (claude/codex): overwrite — no provider list
+
+    Returns a list of names, or None when the config exists but is
+    unreadable/malformed (caller degrades to the store snapshot rather than
+    hiding providers the user configured).
+    """
+    config_dir = config.profile_agent_dir(profile_name, agent_type)
+    try:
+        if strategy == "yaml_custom_providers":
+            path = config_dir / provider_cfg["config_file"]
+            text = read_text(path)
+            if text is None or not text.strip():
+                return []
+            import yaml
+            doc = yaml.safe_load(text)
+            if not isinstance(doc, dict):
+                return None
+            section = provider_cfg.get("custom_providers_section", "custom_providers")
+            entries = doc.get(section) or []
+            return [
+                str(e["name"]) for e in entries
+                if isinstance(e, dict) and e.get("name")
+            ]
+        if strategy == "jsonc_provider":
+            path = config_dir / provider_cfg["config_file"]
+            text = read_text(path)
+            if text is None or not text.strip():
+                return []
+            doc = read_jsonc(path)
+            if not isinstance(doc, dict):
+                return None
+            key = provider_cfg.get("provider_key", "provider")
+            providers = doc.get(key) or {}
+            if not isinstance(providers, dict):
+                return []
+            return [
+                str(k) for k, v in providers.items()
+                if isinstance(v, dict) and v
+            ]
+    except Exception:
+        return None
+    return []
+
+
 def list_profile_providers(profile_name: str, agent_type: str) -> List[Dict[str, Any]]:
+    """Providers actually present in the profile's config file.
+
+    The config file is the source of truth (edits to it are reflected, and
+    stale store records stop showing); the ``_providers.json`` store supplies
+    metadata (icon / website / notes) and ACS refreshes it.  If the config is
+    unreadable the function degrades to the store snapshot.
+    """
+    agent_config = get_agent_config(agent_type)
+    provider_cfg = (agent_config or {}).get("resources", {}).get("provider", {})
+    strategy = provider_cfg.get("strategy")
+
+    store: Dict[str, Any] = {}
     store_path = _providers_store_path(profile_name, agent_type)
-    if not store_path.is_file():
-        return []
-    entries = read_json(store_path)
-    if not isinstance(entries, dict):
-        return []
-    return sorted(entries.values(), key=lambda e: e.get("name", ""))
+    if store_path.is_file():
+        store = read_json(store_path)
+        if not isinstance(store, dict):
+            store = {}
+
+    names = _config_provider_names(profile_name, agent_type, provider_cfg, strategy)
+    if names is None:
+        names = list(store.keys())
+
+    result: List[Dict[str, Any]] = []
+    for name in names:
+        entry = dict(store.get(name) or {})
+        acs = _acs.get_provider(agent_type, name)
+        if acs:
+            for k in ("name", "website_url", "category", "icon",
+                      "icon_color", "notes", "settings"):
+                if k not in entry and acs.get(k) not in (None, ""):
+                    entry[k] = acs[k]
+        entry.setdefault("id", name)
+        entry.setdefault("name", name)
+        result.append(entry)
+    return sorted(result, key=lambda e: str(e.get("name", "")))
 
 
 def remove_profile_provider(
