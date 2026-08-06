@@ -516,31 +516,85 @@ class WslDataAccess:
             }
 
     def download_update(self) -> dict:
-        """Download the latest installer and launch it (Inno upgrades in place).
+        """Start an async BITS download of the installer (Windows) or open the
+        browser (non-Windows).  Caller polls :meth:`get_download_progress`.
 
-        On Windows the download goes through PowerShell ``Invoke-WebRequest``,
-        which honors the WinINET system proxy automatically — bare machines go
-        direct, Clash machines use the proxy, identical behaviour everywhere
-        with no proxy-detection code of our own.  (Python urllib ignores the
-        system proxy, which is why a plain urlopen download failed.)
+        ``Start-BitsTransfer`` is the Windows-native downloader: it honors the
+        WinINET system proxy automatically, resumes interrupted transfers, and
+        runs headless — no console window, no progress flashes.  Progress is
+        read back from the BITS job via ``BytesTransferred/BytesTotal``.
         """
         info = self.get_latest_version()
         if not info.get("asset_url") or info.get("latest") == info.get("current"):
             raise RuntimeError("no update available")
         dest = Path.home() / "Downloads" / f"agent-box-setup-{info['latest']}.exe"
         dest.parent.mkdir(parents=True, exist_ok=True)
-        if sys.platform == "win32":
-            ps = (
-                f'Invoke-WebRequest -Uri "{info["asset_url"]}" '
-                f'-OutFile "{dest}" -UseBasicParsing '
-                f'-UserAgent "agent-box-gui"'
-            )
-            subprocess.run(
-                ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
-                check=True, timeout=600,
-            )
-            subprocess.Popen([str(dest)], cwd=str(dest.parent))
-        else:
+        if sys.platform != "win32":
             import webbrowser
             webbrowser.open(info["asset_url"])
-        return {"downloaded": str(dest)}
+            return {"started": True, "dest": "", "mode": "browser"}
+        # Drop any stale BITS job, then start a fresh async transfer.
+        subprocess.run(
+            ["powershell", "-NoProfile", "-NonInteractive", "-Command",
+             "Remove-BitsTransfer -Name agent-box-update -ErrorAction SilentlyContinue"],
+            capture_output=True, timeout=20,
+        )
+        ps = (
+            'Start-BitsTransfer -Source "{url}" -Destination "{dest}" '
+            '-Asynchronous -DisplayName agent-box-update'
+        ).format(url=info["asset_url"], dest=dest)
+        subprocess.run(
+            ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
+            capture_output=True, timeout=30,
+        )
+        self._dl_state = {
+            "status": "downloading",
+            "bytes_written": 0,
+            "bytes_total": 0,
+            "dest": str(dest),
+        }
+        return {"started": True, "dest": str(dest), "mode": "bits"}
+
+    def get_download_progress(self) -> dict:
+        """Poll the running BITS download; returns ``{status, bytes_written,
+        bytes_total, dest}``.  Status: idle | downloading | done | error.
+
+        When the transfer completes it is finalized with ``Complete-BitsTransfer``
+        and the installer is launched (headless via CREATE_NO_WINDOW).
+        """
+        state = getattr(self, "_dl_state", None)
+        if not state:
+            return {"status": "idle", "bytes_written": 0, "bytes_total": 0, "dest": ""}
+        if state.get("status") in ("done", "error"):
+            return state
+        ps = (
+            '$j = Get-BitsTransfer -Name agent-box-update -ErrorAction SilentlyContinue; '
+            'if ($j) { "{0}|{1}|{2}" -f $j.JobState, $j.BytesTransferred, $j.BytesTotal } '
+            'else { "MISSING" }'
+        )
+        out = subprocess.run(
+            ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
+            capture_output=True, text=True, timeout=20,
+        ).stdout.strip()
+        try:
+            bits_state, written, total = out.split("|")
+        except ValueError:
+            return state
+        state["bytes_written"] = int(written or 0)
+        state["bytes_total"] = int(total or 0)
+        if bits_state == "Transferred":
+            subprocess.run(
+                ["powershell", "-NoProfile", "-NonInteractive", "-Command",
+                 "Get-BitsTransfer -Name agent-box-update | Complete-BitsTransfer"],
+                capture_output=True, timeout=30,
+            )
+            state["status"] = "done"
+            subprocess.Popen(
+                [state["dest"]], cwd=str(Path(state["dest"]).parent),
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+        elif bits_state in ("Error", "TransientError"):
+            state["status"] = "error"
+        else:
+            state["status"] = "downloading"
+        return state

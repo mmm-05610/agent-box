@@ -836,6 +836,7 @@ export const zh: TranslationSchema = {
     updateNow: '下载更新',
     openBrowser: '在浏览器打开',
     updateStarted: '已开始下载新版本安装包',
+    downloading: '正在下载更新包…',
     updateBrowser: '下载失败，已在浏览器打开 Release 页',
     updateAvailable: '有新版本 v{{version}}',
   },
