@@ -28,6 +28,9 @@ WizardStyle=modern
 ; Ask for admin rights — needed for WSL interaction
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
+; Force-close a running agent-box when the silent updater installs
+CloseApplications=yes
+RestartApplications=no
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"

@@ -102,6 +102,13 @@ class Api:
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
 
+    def launch_update_installer(self) -> str:
+        """Launch the downloaded installer (silent, closes the running app)."""
+        try:
+            return json.dumps({"ok": True, "data": self._data.launch_update_installer()})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
     def open_external(self, url: str) -> str:
         """Open a URL in the OS default browser (uses the system proxy)."""
         try:
