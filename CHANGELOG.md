@@ -2,6 +2,28 @@
 
 All notable changes to agent-box will be documented in this file.
 
+## [1.1.0](https://github.com/mmm-05610/agent-box/compare/v1.0.0...v1.1.0) (2026-08-06)
+
+
+### Features
+
+* **gui:** Environment page — binary detection, one-click install, ACS auto-provision, update badge ([c320d6b](https://github.com/mmm-05610/agent-box/commit/c320d6b3435ea302ab8709d33ed52e9dfe4e620e))
+
+
+### Bug Fixes
+
+* **ci:** use googleapis action + drop package-name for v-prefixed tags ([#5](https://github.com/mmm-05610/agent-box/issues/5)) ([a49651b](https://github.com/mmm-05610/agent-box/commit/a49651b37bb57f64645a9b9f61bf0a5c4fedcc08))
+* **gui:** _to_wsl_path handles wsl.localhost UNC — dev-mode runtime broke over 9P share ([583bf9f](https://github.com/mmm-05610/agent-box/commit/583bf9f94707b37ed968d77d011296f4901966da))
+* **gui:** bundle RPC shim deterministically + verify exe runtime before ship ([8f6198f](https://github.com/mmm-05610/agent-box/commit/8f6198f129810150c3dced1be3f940f2516484db))
+* **gui:** handle wsl.localhost UNC in _to_wsl_path ([6bf6749](https://github.com/mmm-05610/agent-box/commit/6bf6749c85af0e05509622bce7185be632c5c9f2))
+* **runtime:** bundle tomli — self-contained on any WSL python (&lt;3.11 fallback) ([66ca99a](https://github.com/mmm-05610/agent-box/commit/66ca99af196dc2e099e921e9fd4cb7a8b82a0fce))
+
+
+### Documentation
+
+* agent-box v2 vision (constitution) — project workbench platform ([3d6cc41](https://github.com/mmm-05610/agent-box/commit/3d6cc41e7b06de44424253be76e8f442d17750d0))
+* verify exe runtime before shipping + 9P stale-build landmine ([1149242](https://github.com/mmm-05610/agent-box/commit/114924244d598ec988ae2a1c71934ecd9d1f30fd))
+
 ## [1.0.0] — 2026-08-04
 
 ### Added
