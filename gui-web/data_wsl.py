@@ -56,6 +56,31 @@ def _wsl_run(cmd: str, timeout: float = 30, input: bytes | None = None) -> str:
     return result.stdout.decode("utf-8", errors="replace").strip()
 
 
+def _windows_proxy() -> dict:
+    """Read the Windows system proxy (HKCU Internet Settings) into a
+    urllib-friendly ``{'http': ..., 'https': ...}`` dict.
+
+    The packaged GUI runs on the Windows host where GitHub may only be
+    reachable through the user's proxy (Clash etc.).  urllib does NOT honor
+    the WinINET system proxy on its own, so we read it from the registry.
+    Returns ``{}`` (direct) when no proxy is configured.
+    """
+    try:
+        import winreg
+        key = winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER,
+            r"Software\Microsoft\Windows\CurrentVersion\Internet Settings",
+        )
+        if not winreg.QueryValueEx(key, "ProxyEnable")[0]:
+            return {}
+        server = winreg.QueryValueEx(key, "ProxyServer")[0]
+        if not server:
+            return {}
+        return {"http": server, "https": server}
+    except Exception:
+        return {}
+
+
 def _to_wsl_path(win_path: str) -> str:
     """Deterministic Windows path → WSL path (UNC ``\\\\wsl$``/``\\\\wsl.localhost`` or drive)."""
     p = win_path.strip()
@@ -491,19 +516,31 @@ class WslDataAccess:
             }
 
     def download_update(self) -> dict:
-        """Download the latest installer and launch it (Inno upgrades in place)."""
+        """Download the latest installer and launch it (Inno upgrades in place).
+
+        On Windows the download goes through PowerShell ``Invoke-WebRequest``,
+        which honors the WinINET system proxy automatically — bare machines go
+        direct, Clash machines use the proxy, identical behaviour everywhere
+        with no proxy-detection code of our own.  (Python urllib ignores the
+        system proxy, which is why a plain urlopen download failed.)
+        """
         info = self.get_latest_version()
         if not info.get("asset_url") or info.get("latest") == info.get("current"):
             raise RuntimeError("no update available")
-        import urllib.request
         dest = Path.home() / "Downloads" / f"agent-box-setup-{info['latest']}.exe"
         dest.parent.mkdir(parents=True, exist_ok=True)
-        req = urllib.request.Request(info["asset_url"], headers={"User-Agent": "agent-box-gui"})
-        with urllib.request.urlopen(req, timeout=120) as resp, open(dest, "wb") as f:
-            shutil.copyfileobj(resp, f)
         if sys.platform == "win32":
+            ps = (
+                f'Invoke-WebRequest -Uri "{info["asset_url"]}" '
+                f'-OutFile "{dest}" -UseBasicParsing '
+                f'-UserAgent "agent-box-gui"'
+            )
+            subprocess.run(
+                ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
+                check=True, timeout=600,
+            )
             subprocess.Popen([str(dest)], cwd=str(dest.parent))
         else:
             import webbrowser
-            webbrowser.open(str(dest))
+            webbrowser.open(info["asset_url"])
         return {"downloaded": str(dest)}

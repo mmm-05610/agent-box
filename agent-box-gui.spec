@@ -11,13 +11,10 @@ datas = [
 binaries = []
 hiddenimports = []
 
-# Bundle the LINUX cc-switch (ACS) binary into the runtime.  The Windows GUI
-# always launches cc-switch inside WSL (never a native .exe), so the Linux
-# ELF is what ships; _resolve_acs() copies it to ~/.agent-box/bin on first
-# use (drvfs cannot exec ELF directly, so it must land on the WSL fs).
-_linux_acs = 'acs/src-tauri/target/release/cc-switch'
-if os.path.isfile(_linux_acs):
-    datas.append((_linux_acs, 'runtime/bin'))
+# LINUX cc-switch (ACS) binary ships inside build/runtime/bin/ (staged by
+# scripts/build-gui-runtime.sh), so it rides along with the 'build/runtime'
+# datas below.  _resolve_acs() copies it to ~/.agent-box/bin on first use
+# (drvfs cannot exec ELF directly, so it must land on the WSL fs).
 
 # agent_box package data (agent_types.json, provider_endpoints.json,
 # templates/, presets/, migrations/).  PyInstaller does NOT auto-collect

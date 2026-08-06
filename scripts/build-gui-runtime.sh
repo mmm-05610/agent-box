@@ -30,4 +30,14 @@ python3 -m pip install --quiet --target build/runtime "$WHEEL" tomli
 #    dev layout, so `from data_linux import LinuxDataAccess` resolves).
 cp gui-web/rpc_server.py gui-web/data_linux.py build/runtime/
 
+# 4. Stage the LINUX cc-switch (ACS) binary into the runtime.  It ships via
+#    the whole build/runtime dir (bundled as 'runtime'), NOT a separate spec
+#    os.path.isfile() check — the 9P stale-view bug silently dropped it.
+LINUX_ACS=acs/src-tauri/target/release/cc-switch
+if [ -x "$LINUX_ACS" ]; then
+  mkdir -p build/runtime/bin
+  cp "$LINUX_ACS" build/runtime/bin/cc-switch
+  echo "staged cc-switch -> build/runtime/bin/"
+fi
+
 echo "GUI runtime ready at build/runtime/ ($(du -sh build/runtime | cut -f1))"
