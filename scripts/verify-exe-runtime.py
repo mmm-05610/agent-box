@@ -72,12 +72,12 @@ def _extract(entries: list[dict], exe_path: str, target: str) -> bytes | None:
         data = open(exe_path, 'rb').read()
         start = len(data) - _COOKIE.unpack(data[data.rfind(_MAGIC):data.rfind(_MAGIC) + _COOKIE_LEN])[1]
         raw = data[start + e['data_pos']:start + e['data_pos'] + e['data_len']]
-        if e['typecode'] == ord('z'):
-            try:
-                return zlib.decompress(raw)
-            except Exception:
-                return None
-        return raw
+        # PyInstaller 6 marks entries with a compression typecode (\x01 = zlib)
+        # rather than 'z' — just attempt zlib and fall back to raw.
+        try:
+            return zlib.decompress(raw)
+        except Exception:
+            return raw
     return None
 
 
