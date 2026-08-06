@@ -2,6 +2,13 @@
 
 All notable changes to agent-box will be documented in this file.
 
+## [1.5.0](https://github.com/mmm-05610/agent-box/compare/v1.4.0...v1.5.0) (2026-08-06)
+
+
+### Features
+
+* **gui:** update install confirm dialog — no console flashes, silent installer closes running app ([#19](https://github.com/mmm-05610/agent-box/issues/19)) ([860ef21](https://github.com/mmm-05610/agent-box/commit/860ef21ba89344b57eefadb0351bda1a9729c136))
+
 ## [1.4.0](https://github.com/mmm-05610/agent-box/compare/v1.3.0...v1.4.0) (2026-08-06)
 
 
