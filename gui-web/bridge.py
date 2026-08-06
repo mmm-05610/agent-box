@@ -75,10 +75,9 @@ class Api:
             return json.dumps({"ok": False, "error": str(e)})
 
     def install_binary(self, agent_type: str) -> str:
-        """One-click install an agent binary (opens a visible console)."""
+        """One-click install/update an agent binary (silent background)."""
         try:
-            self._data.install_binary(agent_type)
-            return json.dumps({"ok": True})
+            return json.dumps({"ok": True, "data": self._data.install_binary(agent_type)})
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
 
@@ -529,14 +528,20 @@ def main():
     api = Api(data)
     url = "http://localhost:5173"
 
+    # Cache-bust the frontend entry: PyWebView/WebView2 aggressively caches
+    # index.html, so a rebuilt dist can serve stale JS. A unique query param
+    # on every launch forces a fresh load.
+    def _frontend_url(frontend_dir: Path) -> str:
+        return f"{frontend_dir / 'index.html'}?v={int(time.time())}"
+
     if getattr(sys, "frozen", False):
         frontend_dir = Path(sys._MEIPASS) / "gui-web" / "dist"
         if frontend_dir.exists():
-            url = str(frontend_dir / "index.html")
+            url = _frontend_url(frontend_dir)
     elif "--prod" in sys.argv:
         frontend_dir = Path(__file__).parent / "dist"
         if frontend_dir.exists():
-            url = str(frontend_dir / "index.html")
+            url = _frontend_url(frontend_dir)
     if "--url" in sys.argv:
         idx = sys.argv.index("--url")
         if idx + 1 < len(sys.argv):

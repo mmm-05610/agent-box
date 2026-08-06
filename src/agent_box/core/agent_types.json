@@ -32,7 +32,8 @@
         ]
       },
       "acs_column": "enabled_claude",
-      "install": "npm install -g @anthropic-ai/claude-code"
+      "install": "npm install -g @anthropic-ai/claude-code",
+      "latest": { "type": "npm", "package": "@anthropic-ai/claude-code" }
     },
     "resources": {
       "provider": {
@@ -172,7 +173,8 @@
         ]
       },
       "acs_column": "enabled_codex",
-      "install": "npm install -g @openai/codex"
+      "install": "npm install -g @openai/codex",
+      "latest": { "type": "npm", "package": "@openai/codex" }
     },
     "resources": {
       "provider": {
@@ -288,7 +290,8 @@
         ]
       },
       "acs_column": "enabled_hermes",
-      "install": "pip install hermes-agent"
+      "install": "hermes update || bash -c 'tmp=$(mktemp) && curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh -o $tmp && bash $tmp; status=$?; rm -f $tmp; exit $status'",
+      "latest": { "type": "pip", "package": "hermes-agent" }
     },
     "resources": {
       "provider": {
@@ -464,7 +467,8 @@
         ]
       },
       "acs_column": "enabled_opencode",
-      "install": "npm i -g @opencode-ai/opencode"
+      "install": "npm i -g opencode-ai",
+      "latest": { "type": "npm", "package": "opencode-ai" }
     },
     "resources": {
       "provider": {

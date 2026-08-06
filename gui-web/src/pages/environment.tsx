@@ -7,6 +7,7 @@
  * renders; it never hardcodes an agent name or install recipe.
  */
 
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button, Card } from '@/components/ui'
 import { Loading, StatusDot, useToast } from '@/components/feedback'
@@ -30,23 +31,71 @@ export function EnvironmentPage() {
   const { agentConfigs } = useAgentConfigs()
   const { status } = useEnvironment()
   const { binaries, loading, refresh } = useBinaries()
-  const { hasUpdate, info, refresh: refreshUpdate } = useAgentBoxUpdate()
+  const { hasUpdate, info, loading: updateChecking, refresh: refreshUpdate } = useAgentBoxUpdate()
 
   const agents = binaries.filter((b) => b.kind === 'agent')
   const acs = binaries.find((b) => b.kind === 'acs')
 
-  const recheck = () => {
-    void refresh()
-    void refreshUpdate()
+  // Version-check in progress (manual re-check) — drives the recheck button
+  // spinner + per-row "checking version" indicators.
+  const [checking, setChecking] = useState(false)
+  const recheck = async () => {
+    setChecking(true)
+    try {
+      await refresh()
+      await refreshUpdate()
+    } finally {
+      setChecking(false)
+    }
   }
 
-  const handleInstall = async (b: BinaryInfo) => {
+  const [updating, setUpdating] = useState<Set<string>>(new Set())
+  const isUpdating = (agentType: string) => updating.has(agentType)
+
+  /** Silent background install/update for one agent; button shows loading.
+
+  The install RPC blocks until npm/pip actually finishes, so one refresh right
+  after confirms the new version.  The button stays in loading through that
+  refresh (no flash back to the stale "有更新" state), then clears.  If the
+  version never moved (install went somewhere PATH doesn't pick up), we say so
+  instead of claiming success.  Re-entrant clicks are ignored.
+  */
+  const installOne = async (b: BinaryInfo) => {
+    if (isUpdating(b.agentType)) return
+    setUpdating((p) => new Set(p).add(b.agentType))
+    let failed: string | null = null
     try {
       await installBinary(b.agentType)
-      toast({ type: 'success', message: t('environment.installStarted', { name: b.name }) })
     } catch (e) {
-      toast({ type: 'error', message: t('environment.installFailed', { name: b.name }) })
+      failed = e instanceof Error ? e.message : t('environment.installFailed', { name: b.name })
     }
+    const data = await refresh()
+    const cur = data.find((r) => r.agentType === b.agentType)
+    const caughtUp = !!(cur && cur.installed && (!cur.latestVersion || !hasBinaryUpdate(cur)))
+    setUpdating((p) => {
+      const n = new Set(p)
+      n.delete(b.agentType)
+      return n
+    })
+    if (failed) {
+      toast({ type: 'error', message: `${b.name}: ${failed}` })
+    } else if (!caughtUp) {
+      toast({ type: 'info', message: t('environment.installCheck', { name: b.name }) })
+    }
+  }
+
+  /** One click, updates every out-of-date agent silently (no console). */
+  const updateAll = async () => {
+    const targets = agents.filter((b) => b.installed && !b.broken && hasBinaryUpdate(b))
+    if (targets.length === 0) return
+    toast({ type: 'info', message: t('environment.updatingAll', { count: targets.length }) })
+    // Sequential, not parallel: concurrent `npm install -g` into the same
+    // global prefix races on node_modules writes.
+    for (const b of targets) {
+      await installOne(b)
+    }
+    toast({ type: 'success', message: t('environment.updateAllDone') })
+    await refresh()
   }
 
   const handleAcsOpen = async () => {
@@ -85,7 +134,7 @@ export function EnvironmentPage() {
           </>
         }
         action={
-          <Button variant="outline" onClick={recheck}>{t('environment.recheck')}</Button>
+          <Button variant="outline" onClick={() => void recheck()} isLoading={checking}>{t('environment.recheck')}</Button>
         }
         className="mb-8"
       />
@@ -96,7 +145,8 @@ export function EnvironmentPage() {
           <div className="flex items-start justify-between gap-4 p-5">
             <div className="min-w-0">
               <h3 className="text-sm font-semibold text-foreground">Agent Box</h3>
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                {updateChecking && <TinySpinner />}
                 {info
                   ? t('environment.versionInfo', { current: info.current, latest: info.latest })
                   : t('environment.versionChecking')}
@@ -120,7 +170,15 @@ export function EnvironmentPage() {
       </Section>
 
       {/* ── Agent binaries ───────────────────────────────────────── */}
-      <Section title={t('environment.section.agents')} description={t('environment.agentsDesc')}>
+      <Section
+        title={t('environment.section.agents')}
+        description={t('environment.agentsDesc')}
+        action={
+          <Button size="sm" variant="outline" onClick={() => void updateAll()} isLoading={updating.size > 0} disabled={!agents.some((a) => a.installed && !a.broken && hasBinaryUpdate(a))}>
+            {t('environment.updateAll')}
+          </Button>
+        }
+      >
         <Card>
           {loading ? (
             <Loading className="py-10" />
@@ -145,16 +203,34 @@ export function EnvironmentPage() {
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-medium text-foreground">{b.name}</div>
                       <div className="truncate text-[11px] text-muted-foreground font-mono">
-                        {b.installed ? (b.version || b.path) : t('environment.notInstalled')}
+                        {checking && <TinySpinner className="mr-1.5 inline-block align-[-2px]" />}
+                        {b.installed && b.broken
+                          ? t('environment.broken')
+                          : b.installed
+                            ? (b.version ? `v${b.version}` : (b.path || '')) + (b.latestVersion ? ` · ${t('environment.latest', { version: b.latestVersion })}` : b.latestError ? ` · ${t('environment.latestError')}: ${b.latestError}` : '')
+                            : t('environment.notInstalled')}
                       </div>
                     </div>
-                    {b.installed ? (
+                    {b.installed && b.broken ? (
+                      <span className="flex shrink-0 items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+                        <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                        {t('environment.installed')}
+                      </span>
+                    ) : b.installed && hasBinaryUpdate(b) ? (
+                      <>
+                        <span className="flex shrink-0 items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+                          <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                          {t('environment.updateAvailable', { version: b.latestVersion! })}
+                        </span>
+                        <Button size="sm" variant="outline" onClick={() => void installOne(b)} isLoading={isUpdating(b.agentType)}>{t('environment.update')}</Button>
+                      </>
+                    ) : b.installed ? (
                       <span className="flex shrink-0 items-center gap-1.5 text-xs text-success">
                         <span className="h-1.5 w-1.5 rounded-full bg-success" />
                         {t('environment.installed')}
                       </span>
                     ) : (
-                      <Button size="sm" onClick={() => void handleInstall(b)}>{t('environment.install')}</Button>
+                      <Button size="sm" onClick={() => void installOne(b)} isLoading={isUpdating(b.agentType)}>{t('environment.install')}</Button>
                     )}
                   </div>
                 )
@@ -181,13 +257,18 @@ export function EnvironmentPage() {
             <div className="min-w-0 flex-1">
               <div className="text-sm font-medium text-foreground">cc-switch (ACS)</div>
               <div className="truncate text-[11px] text-muted-foreground font-mono">
-                {acs?.installed ? (acs.path || t('environment.installed')) : t('environment.notInstalled')}
+                {checking && <TinySpinner className="mr-1.5 inline-block align-[-2px]" />}
+                {acs?.installed && acs.broken
+                  ? t('environment.broken')
+                  : acs?.installed
+                    ? (acs.version ? `v${acs.version}` : (acs.path || t('environment.installed')))
+                    : t('environment.notInstalled')}
               </div>
             </div>
             {acs?.installed ? (
               <Button size="sm" onClick={() => void handleAcsOpen()}>{t('environment.openAcs')}</Button>
             ) : (
-              <Button size="sm" onClick={() => void handleInstall(acs!)}>{t('environment.installAcs')}</Button>
+              <Button size="sm" onClick={() => void installOne(acs!)} isLoading={isUpdating('acs')}>{t('environment.installAcs')}</Button>
             )}
           </div>
         </Card>
@@ -196,20 +277,52 @@ export function EnvironmentPage() {
   )
 }
 
+function TinySpinner({ className = '' }: { className?: string }) {
+  return (
+    <span className={cn('relative inline-block h-3 w-3 shrink-0', className)}>
+      <span className="absolute inset-0 rounded-full border-2 border-muted" />
+      <span className="absolute inset-0 animate-spin rounded-full border-2 border-transparent border-t-accent" />
+    </span>
+  )
+}
+
+function parseVersion(v: string): number[] {
+  return v.split('.').map((n) => parseInt(n, 10) || 0)
+}
+
+/** Is a newer version available? (latest > local, semver-ish) */
+function hasBinaryUpdate(b: { version: string | null; latestVersion: string | null }): boolean {
+  if (!b.version || !b.latestVersion) return false
+  const cur = parseVersion(b.version)
+  const latest = parseVersion(b.latestVersion)
+  for (let i = 0; i < Math.max(cur.length, latest.length); i++) {
+    const a = latest[i] ?? 0
+    const c = cur[i] ?? 0
+    if (a > c) return true
+    if (a < c) return false
+  }
+  return false
+}
+
 function Section({
   title,
   description,
+  action,
   children,
 }: {
   title: string
   description?: string
+  action?: React.ReactNode
   children: React.ReactNode
 }) {
   return (
     <section className="mb-8">
-      <div className="mb-3">
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{title}</h2>
-        {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
+      <div className="mb-3 flex items-end justify-between gap-3">
+        <div>
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{title}</h2>
+          {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
+        </div>
+        {action}
       </div>
       {children}
     </section>
