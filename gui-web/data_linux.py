@@ -49,6 +49,28 @@ def _dir_tree_node(p: Path, max_depth: int = 4) -> Optional[dict]:
 
 
 _VERSION_RE = re.compile(r"\d+(?:\.\d+)+[a-zA-Z0-9.\-]*")
+
+# When an install command fails because a prerequisite tool is missing, map
+# the shell error to a targeted hint the UI can show verbatim.  We remind,
+# we never auto-install — runtimes (Node/Python) are system-level choices.
+_PRE_REQ_HINTS = (
+    (re.compile(r"(?:npm|node).*?(?:not found|command not found|no such file)", re.I),
+     "缺 Node.js / npm — 先安装 Node.js (https://nodejs.org)，装完重开 agent-box 再装"),
+    (re.compile(r"(?:python3?|pip).*?(?:not found|command not found|no such file)", re.I),
+     "缺 Python — 先安装 Python3 + pip（Ubuntu: sudo apt install python3-pip）"),
+    (re.compile(r"E: Unable to locate package", re.I),
+     "apt 源里没有该包 — 先运行 sudo apt update"),
+    (re.compile(r"permission denied", re.I),
+     "权限不足 — 在 WSL 里手动跑 sudo 命令安装"),
+)
+
+
+def _install_error_hint(output: str) -> str | None:
+    """Return a targeted prereq hint for a failed install, else None."""
+    for pattern, hint in _PRE_REQ_HINTS:
+        if pattern.search(output):
+            return hint
+    return None
 # Fallback search dirs when the RPC shell's PATH misses the user's installs
 # (mirrors cc-switch's scan_cli_version: npm-global / user bin / cargo bin).
 _COMMON_BIN_DIRS = ("~/.npm-global/bin", "~/.local/bin", "~/.cargo/bin")
@@ -616,8 +638,11 @@ class LinuxDataAccess:
             return {"ok": False, "error": str(e)}
         if out.returncode == 0:
             return {"ok": True, "error": None}
-        tail = "\n".join((out.stdout or out.stderr).strip().splitlines()[-5:])
-        return {"ok": False, "error": f"exit {out.returncode}: {tail}"}
+        combined = "\n".join(x for x in (out.stdout, out.stderr) if x)
+        hint = _install_error_hint(combined)
+        tail = "\n".join(combined.strip().splitlines()[-3:])
+        error = f"{hint}\n原始输出: {tail}" if hint else f"exit {out.returncode}: {tail}"
+        return {"ok": False, "error": error}
 
     def get_latest_version(self) -> dict:
         """Latest agent-box version from GitHub (best-effort in WSL)."""
