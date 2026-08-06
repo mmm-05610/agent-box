@@ -25,6 +25,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+# Hide console windows for PowerShell/installer child processes — the GUI is a
+# windowed app, every spawned powershell.exe would otherwise flash a console.
+_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
 
 def _wsl_run(cmd: str, timeout: float = 30, input: bytes | None = None) -> str:
     """Run a command via ``wsl.exe bash -lc`` and return stdout."""
@@ -537,7 +541,7 @@ class WslDataAccess:
         subprocess.run(
             ["powershell", "-NoProfile", "-NonInteractive", "-Command",
              "Remove-BitsTransfer -Name agent-box-update -ErrorAction SilentlyContinue"],
-            capture_output=True, timeout=20,
+            capture_output=True, timeout=20, creationflags=_NO_WINDOW,
         )
         ps = (
             'Start-BitsTransfer -Source "{url}" -Destination "{dest}" '
@@ -545,7 +549,7 @@ class WslDataAccess:
         ).format(url=info["asset_url"], dest=dest)
         subprocess.run(
             ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
-            capture_output=True, timeout=30,
+            capture_output=True, timeout=30, creationflags=_NO_WINDOW,
         )
         self._dl_state = {
             "status": "downloading",
@@ -559,8 +563,10 @@ class WslDataAccess:
         """Poll the running BITS download; returns ``{status, bytes_written,
         bytes_total, dest}``.  Status: idle | downloading | done | error.
 
-        When the transfer completes it is finalized with ``Complete-BitsTransfer``
-        and the installer is launched (headless via CREATE_NO_WINDOW).
+        On completion the transfer is finalized with ``Complete-BitsTransfer``
+        but the installer is NOT launched — the UI shows a confirm first and
+        calls :meth:`launch_update_installer`.  All powershell spawns are
+        headless (``_NO_WINDOW``) so no consoles flash on the 1s poll.
         """
         state = getattr(self, "_dl_state", None)
         if not state:
@@ -574,7 +580,7 @@ class WslDataAccess:
         )
         out = subprocess.run(
             ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
-            capture_output=True, text=True, timeout=20,
+            capture_output=True, text=True, timeout=20, creationflags=_NO_WINDOW,
         ).stdout.strip()
         try:
             bits_state, written, total = out.split("|")
@@ -586,15 +592,29 @@ class WslDataAccess:
             subprocess.run(
                 ["powershell", "-NoProfile", "-NonInteractive", "-Command",
                  "Get-BitsTransfer -Name agent-box-update | Complete-BitsTransfer"],
-                capture_output=True, timeout=30,
+                capture_output=True, timeout=30, creationflags=_NO_WINDOW,
             )
             state["status"] = "done"
-            subprocess.Popen(
-                [state["dest"]], cwd=str(Path(state["dest"]).parent),
-                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-            )
         elif bits_state in ("Error", "TransientError"):
             state["status"] = "error"
         else:
             state["status"] = "downloading"
         return state
+
+    def launch_update_installer(self) -> dict:
+        """Launch the downloaded Inno installer silently.
+
+        ``/VERYSILENT /SUPPRESSMSGBOXES`` installs without a wizard window;
+        ``CloseApplications`` in setup.iss force-closes the running app first.
+        Returns the installer path.
+        """
+        state = getattr(self, "_dl_state", None)
+        dest = (state or {}).get("dest") or ""
+        if not dest or not Path(dest).exists():
+            raise RuntimeError("installer not downloaded yet")
+        subprocess.Popen(
+            [dest, "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"],
+            cwd=str(Path(dest).parent),
+            creationflags=_NO_WINDOW,
+        )
+        return {"launched": str(dest)}

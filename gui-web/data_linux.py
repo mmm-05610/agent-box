@@ -708,3 +708,7 @@ class LinuxDataAccess:
     def get_download_progress(self) -> dict:
         """No async download on Linux — always in browser mode."""
         return {"status": "browser", "bytes_written": 0, "bytes_total": 0, "dest": ""}
+
+    def launch_update_installer(self) -> dict:
+        """Linux GUI has no installer — nothing to launch."""
+        raise RuntimeError("no installer on Linux (open the browser instead)")

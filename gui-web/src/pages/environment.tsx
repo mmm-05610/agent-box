@@ -25,6 +25,7 @@ import {
   getDownloadProgress,
   installBinary,
   launchAcs,
+  launchUpdateInstaller,
   openExternal,
   type DownloadProgress,
 } from '@/api/environment'
@@ -118,6 +119,7 @@ export function EnvironmentPage() {
   }
 
   const [dlProgress, setDlProgress] = useState<DownloadProgress | null>(null)
+  const [dlReady, setDlReady] = useState(false)
   const dlTimerRef = useRef<number | null>(null)
   const stopDlPoll = () => {
     if (dlTimerRef.current != null) {
@@ -129,6 +131,7 @@ export function EnvironmentPage() {
 
   const handleUpdate = async () => {
     if (!info?.asset_url) return
+    setDlReady(false)
     try {
       const start = await downloadUpdate()
       if (start.mode === 'browser') {
@@ -137,13 +140,14 @@ export function EnvironmentPage() {
       }
       setDlProgress({ status: 'downloading', bytesWritten: 0, bytesTotal: 0, dest: start.dest })
       // Poll BITS progress; on done/error stop. BITS resumes a dropped
-      // transfer automatically, so no manual retry needed.
+      // transfer automatically, so no manual retry needed. On done we show a
+      // confirm (close the running app?) instead of launching blindly.
       dlTimerRef.current = window.setInterval(async () => {
         const p = await getDownloadProgress()
         setDlProgress(p)
         if (p.status === 'done') {
           stopDlPoll()
-          toast({ type: 'success', message: t('environment.updateStarted') })
+          setDlReady(true)
         } else if (p.status === 'error') {
           stopDlPoll()
           setDlProgress(null)
@@ -155,6 +159,22 @@ export function EnvironmentPage() {
       if (info.release_url) await openExternal(info.release_url)
       toast({ type: 'info', message: t('environment.updateBrowser') })
     }
+  }
+
+  const handleStartInstall = async () => {
+    try {
+      await launchUpdateInstaller()
+      // The silent installer closes the running app (CloseApplications in
+      // setup.iss) and installs — nothing more to do here.
+      toast({ type: 'success', message: t('environment.installingNow') })
+    } catch {
+      toast({ type: 'error', message: t('environment.installFailed', { name: 'agent-box' }) })
+    }
+  }
+
+  const handleInstallLater = () => {
+    setDlReady(false)
+    setDlProgress(null)
   }
 
   return (
@@ -221,6 +241,15 @@ export function EnvironmentPage() {
                   className="h-full rounded-full bg-primary transition-all"
                   style={{ width: `${Math.min(100, (dlProgress.bytesWritten / dlProgress.bytesTotal) * 100)}%` }}
                 />
+              </div>
+            </div>
+          )}
+          {dlReady && (
+            <div className="flex items-center justify-between gap-3 border-t border-border px-5 py-3">
+              <div className="text-sm text-foreground">{t('environment.updateReady')}</div>
+              <div className="flex shrink-0 gap-2">
+                <Button size="sm" onClick={() => void handleStartInstall()}>{t('environment.startInstall')}</Button>
+                <Button size="sm" variant="ghost" onClick={handleInstallLater}>{t('environment.installLater')}</Button>
               </div>
             </div>
           )}

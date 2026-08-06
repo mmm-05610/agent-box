@@ -98,6 +98,10 @@ export async function getDownloadProgress(): Promise<DownloadProgress> {
   )
 }
 
+export async function launchUpdateInstaller(): Promise<void> {
+  await call<void>((api) => api.launch_update_installer!(), undefined)
+}
+
 export async function openExternal(url: string): Promise<void> {
   await call<void>((api) => api.open_external!(url), undefined)
 }
