@@ -14,8 +14,14 @@ export interface BinaryInfo {
   agentType: string
   name: string
   installed: boolean
+  /** Found the executable but `--version` fails — installed but can't run. */
+  broken: boolean
   path: string | null
   version: string | null
+  /** Latest version on npm/pypi — null when the check failed/offline. */
+  latestVersion: string | null
+  /** Why the latest-version fetch failed, when it did — echoed to the UI. */
+  latestError: string | null
 }
 
 export interface VersionInfo {
@@ -26,12 +32,32 @@ export interface VersionInfo {
   notes: string
 }
 
+/** Map snake_case backend fields to the camelCase BinaryInfo shape. */
+function toBinary(raw: Record<string, unknown>): BinaryInfo {
+  return {
+    kind: (raw.kind as BinaryInfo['kind']) ?? 'agent',
+    agentType: raw.agent_type as string,
+    name: raw.name as string,
+    installed: Boolean(raw.installed),
+    broken: Boolean(raw.broken),
+    path: (raw.path as string | null) ?? null,
+    version: (raw.version as string | null) ?? null,
+    latestVersion: (raw.latest_version as string | null) ?? null,
+    latestError: (raw.latest_error as string | null) ?? null,
+  }
+}
+
 export async function fetchBinaries(): Promise<BinaryInfo[]> {
-  return call<BinaryInfo[]>((api) => api.check_binaries!(), [])
+  const raw = await call<Record<string, unknown>[]>((api) => api.check_binaries!(), [])
+  return raw.map(toBinary)
 }
 
 export async function installBinary(agentType: string): Promise<void> {
-  await call<void>((api) => api.install_binary!(agentType), undefined)
+  const result = await call<{ ok: boolean; error?: string | null }>(
+    (api) => api.install_binary!(agentType),
+    { ok: true },
+  )
+  if (!result.ok) throw new Error(result.error ?? 'install failed')
 }
 
 export async function launchAcs(): Promise<void> {

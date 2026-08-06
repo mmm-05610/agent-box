@@ -2,9 +2,12 @@
 
 import json
 import os
+import re
 import shlex
 import shutil
 import subprocess
+import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Optional
 
@@ -45,19 +48,156 @@ def _dir_tree_node(p: Path, max_depth: int = 4) -> Optional[dict]:
     return {"path": str(p), "type": "dir", "children": entries}
 
 
-def _binary_version(binary: str) -> str | None:
-    """Best-effort `<binary> --version` capture (capped, never raises)."""
+_VERSION_RE = re.compile(r"\d+(?:\.\d+)+[a-zA-Z0-9.\-]*")
+# Fallback search dirs when the RPC shell's PATH misses the user's installs
+# (mirrors cc-switch's scan_cli_version: npm-global / user bin / cargo bin).
+_COMMON_BIN_DIRS = ("~/.npm-global/bin", "~/.local/bin", "~/.cargo/bin")
+
+# cc-switch-style latest-version cache: one fetch per package per TTL.
+# Cache value: (timestamp, version, error).  Errors are surfaced to the UI so
+# a failed fetch is visible instead of silently missing.
+_latest_cache: dict[str, tuple[float, str | None, str | None]] = {}
+
+
+def _fetch_latest_version(source: dict, ttl: float = 600) -> tuple[str | None, str | None]:
+    """Best-effort latest version from npm/pypi (never raises, cached).
+
+    Returns ``(version, error)`` — version on success, or None plus a
+    human-readable error so the UI can echo the failure back to the user.
+    """
+    if not isinstance(source, dict):
+        return None, "bad latest source"
+    kind, pkg = source.get("type"), source.get("package")
+    if not kind or not pkg:
+        return None, "no latest source declared"
+    key = f"{kind}:{pkg}"
+    now = time.monotonic()
+    if key in _latest_cache and now - _latest_cache[key][0] < ttl:
+        return _latest_cache[key][1], _latest_cache[key][2]
+
+    # npm primary + China-friendly mirror fallback; pypi single endpoint.
+    urls = {
+        "npm": (
+            f"https://registry.npmjs.org/{pkg}/latest",
+            f"https://registry.npmmirror.com/{pkg}/latest",
+        ),
+        "pip": (f"https://pypi.org/pypi/{pkg}/json",),
+    }.get(kind)
+    if not urls:
+        return None, f"unsupported latest source type {kind!r}"
+
+    import urllib.request
+    result: str | None = None
+    error: str | None = None
+    for url in urls:
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "agent-box-gui"})
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            if kind == "npm":
+                result = data.get("version")
+            elif kind == "pip":
+                result = (data.get("info") or {}).get("version")
+            if result:
+                error = None
+                break
+            error = f"no version in response from {url}"
+        except Exception as e:
+            error = f"{type(e).__name__}: {e}"
+            continue
+    _latest_cache[key] = (now, result, error)
+    return result, error
+
+
+_acs_version_cache: dict[str, str | None] = {}
+
+
+def _acs_version(path: str) -> str | None:
+    """Extract cc-switch's version from the binary without launching it.
+
+    cc-switch is a Tauri GUI app — running it with any arg LAUNCHES the window
+    (it has no CLI ``--version``), so we read the version out of the embedded
+    startup banner (``CC Switch vX.Y.Z started``) instead.  Cached per path.
+    """
+    if path in _acs_version_cache:
+        return _acs_version_cache[path]
+    result: str | None = None
+    try:
+        with open(path, "rb") as f:
+            head = f.read(64 * 1024 * 1024)  # binary is ~30MB, cap generously
+        m = re.search(rb"CC Switch v(\d+\.\d+\.\d+)", head)
+        if m:
+            result = m.group(1).decode("utf-8", "replace")
+    except Exception:
+        pass
+    _acs_version_cache[path] = result
+    return result
+
+
+def _which_wsl(binary: str) -> str | None:
+    """``shutil.which`` that skips Windows-mounted (``/mnt/...``) candidates.
+
+    ``wsl.exe bash -lc`` injects the Windows PATH, so the first match for e.g.
+    ``claude`` can be a Windows npm shim at ``/mnt/c/Users/.../Roaming/npm``
+    that reports "claude binary not installed" — wrong for the WSL runtime.
+    On WSL a real agent binary never lives under /mnt, so skipping those is
+    safe and keeps the probe honest.
+    """
+    for d in os.environ.get("PATH", "").split(os.pathsep):
+        if not d or d.startswith("/mnt/"):
+            continue
+        p = os.path.join(d, binary)
+        if os.path.isfile(p) and os.access(p, os.X_OK):
+            return p
+    return None
+
+
+def _probe_binary(binary: str, path: str | None = None) -> dict:
+    """Detect a binary the way cc-switch does.
+
+    PATH first (``shutil.which``), then scan common install dirs.  ``installed``
+    means a runnable file was located; ``broken`` means it exists but
+    ``--version`` fails (installed-but-can't-run, e.g. a Windows PE on Linux or
+    an npm shim whose real binary is missing).  The version is pulled out of
+    ``--version`` output with a semver regex — never the raw first line.
+    """
+    result = {"installed": False, "broken": False, "version": None, "path": None}
     if not binary:
-        return None
+        return result
+
+    if path is None:
+        path = _which_wsl(binary)
+        if path is None:
+            for d in _COMMON_BIN_DIRS:
+                p = Path(d).expanduser() / binary
+                if p.is_file() and os.access(p, os.X_OK):
+                    path = str(p)
+                    break
+    if not path:
+        return result
+
+    result["installed"] = True
+    result["path"] = path
     try:
         out = subprocess.run(
-            [binary, "--version"], capture_output=True, text=True, timeout=5,
+            [path, "--version"], capture_output=True, text=True, timeout=15,
             encoding="utf-8", errors="replace",
         )
-        line = (out.stdout or out.stderr).strip().splitlines()
-        return line[0][:60] if line else None
-    except Exception:
-        return None
+    except subprocess.TimeoutExpired:
+        # installed but --version is just slow (e.g. hermes) — not broken.
+        return result
+    except OSError:
+        # located but can't exec — broken symlink / Windows PE on Linux.
+        result["broken"] = True
+        return result
+    if out.returncode != 0:
+        # located but --version failed — installed-but-can't-run.
+        result["broken"] = True
+        return result
+    raw = (out.stdout or out.stderr).strip()
+    m = _VERSION_RE.search(raw)
+    result["version"] = m.group(0) if m else (raw[:60] or None)
+    return result
 
 
 def _resolve_acs(exists_only: bool = False) -> Optional[Path]:
@@ -393,28 +533,56 @@ class LinuxDataAccess:
     # ── Environment / provisioning ───────────────────────────────────
 
     def check_binaries(self) -> list:
-        """Detect agent binaries + cc-switch inside WSL.  Registry-driven."""
+        """Detect agent binaries + cc-switch inside WSL.  Registry-driven.
+
+        Mirrors cc-switch's probe model: PATH first, then common install dirs,
+        distinguishing installed-but-broken (``broken``) from not installed.
+        Also fetches each agent's latest npm/pypi version in parallel (cached,
+        best-effort) so the UI can show "update available".
+        """
         out = []
+        latest_sources: dict[str, dict] = {}
         for agent_type in get_agent_types():
             cfg = get_agent_config(agent_type) or {}
             binary = ((cfg.get("identity") or {}).get("binary")) or ""
-            path = shutil.which(binary) if binary else None
+            info = _probe_binary(binary)
             out.append({
                 "kind": "agent",
                 "agent_type": agent_type,
                 "name": binary,
-                "installed": bool(path),
-                "path": path,
-                "version": _binary_version(binary) if path else None,
+                "installed": info["installed"],
+                "broken": info["broken"],
+                "path": info["path"],
+                "version": info["version"],
+                "latest_version": None,
+                "latest_error": None,
             })
+            src = ((cfg.get("runtime") or {}).get("latest")) or {}
+            if src:
+                latest_sources[agent_type] = src
+        with ThreadPoolExecutor(max_workers=4) as ex:
+            futures = {at: ex.submit(_fetch_latest_version, src)
+                       for at, src in latest_sources.items()}
+            for row in out:
+                fut = futures.get(row["agent_type"])
+                if fut:
+                    version, error = fut.result()
+                    row["latest_version"] = version
+                    row["latest_error"] = error
         acs = _resolve_acs(exists_only=True)
+        # NOTE: never run `cc-switch --version` here — cc-switch is a Tauri GUI
+        # app that does not answer a --version probe and instead LAUNCHES its
+        # window, which the probe then kills on timeout.  Report presence only.
         out.append({
             "kind": "acs",
             "agent_type": "acs",
             "name": "cc-switch",
             "installed": acs is not None,
+            "broken": False,
             "path": str(acs) if acs else None,
-            "version": _binary_version("cc-switch") if acs else None,
+            "version": _acs_version(str(acs)) if acs else None,
+            "latest_version": None,
+            "latest_error": None,
         })
         return out
 
@@ -428,18 +596,28 @@ class LinuxDataAccess:
             raise ValueError(f"no install command declared for {agent_type!r}")
         return cmd
 
-    def install_binary(self, agent_type: str) -> None:
-        """Run the agent's install command in a visible terminal (WSL)."""
+    def install_binary(self, agent_type: str) -> dict:
+        """Run the agent's install command silently in the background.
+
+        No console window — the RPC call blocks until the install finishes and
+        returns ``{ok, error}`` so the UI can show a loading state and echo a
+        real error message instead of silently spawning a terminal.
+        """
         cmd = self.get_install_command(agent_type)
-        term = shutil.which("xterm") or shutil.which("gnome-terminal") or shutil.which("konsole")
-        if not term:
-            raise RuntimeError("no terminal emulator found. Install: sudo apt install xterm")
-        script = f'bash -lc \'{cmd}; echo; read -p "Press Enter to close..."\''
-        subprocess.Popen(
-            [term, "-e", script],
-            start_new_session=True,
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-        )
+        setup = 'export PATH="$HOME/.npm-global/bin:$HOME/.local/bin:$PATH"; '
+        try:
+            out = subprocess.run(
+                f"{setup}{cmd}", shell=True, capture_output=True, text=True,
+                timeout=600, encoding="utf-8", errors="replace",
+            )
+        except subprocess.TimeoutExpired:
+            return {"ok": False, "error": "install timed out after 10 minutes"}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+        if out.returncode == 0:
+            return {"ok": True, "error": None}
+        tail = "\n".join((out.stdout or out.stderr).strip().splitlines()[-5:])
+        return {"ok": False, "error": f"exit {out.returncode}: {tail}"}
 
     def get_latest_version(self) -> dict:
         """Latest agent-box version from GitHub (best-effort in WSL)."""

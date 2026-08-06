@@ -13,12 +13,16 @@ export function useBinaries() {
   const [binaries, setBinaries] = useState<BinaryInfo[]>([])
   const [loading, setLoading] = useState(true)
 
-  const refresh = useCallback(async () => {
-    setLoading(true)
+  const refresh = useCallback(async (): Promise<BinaryInfo[]> => {
+    // Refresh silently — never blank the whole list with a spinner.  The
+    // `loading` state only reflects the FIRST load (initial value true).
     try {
-      setBinaries(await fetchBinaries())
+      const data = await fetchBinaries()
+      setBinaries(data)
+      return data
     } catch {
       setBinaries([])
+      return []
     } finally {
       setLoading(false)
     }

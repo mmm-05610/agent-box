@@ -87,7 +87,7 @@ def _runtime_dir() -> str:
     return _to_wsl_path(base)
 
 
-def _wsl_rpc(method: str, *args, **kwargs):
+def _wsl_rpc(method: str, *args, timeout: float = 60, **kwargs):
     """Call an agent_box operation as a *library* over the wsl.exe pipe.
 
     Sends ``{method, args, kwargs}`` JSON on stdin to ``rpc_server.py`` and
@@ -102,7 +102,7 @@ def _wsl_rpc(method: str, *args, **kwargs):
         f"cd {shlex.quote(runtime)} && "
         f"PYTHONPATH={shlex.quote(runtime)} python3 rpc_server.py"
     )
-    out = _wsl_run(cmd, timeout=60, input=payload.encode("utf-8"))
+    out = _wsl_run(cmd, timeout=timeout, input=payload.encode("utf-8"))
     try:
         resp = json.loads(out)
     except json.JSONDecodeError as e:
@@ -447,27 +447,13 @@ class WslDataAccess:
     def get_install_command(self, agent_type: str) -> str:
         return _wsl_rpc("get_install_command", agent_type)
 
-    def install_binary(self, agent_type: str) -> None:
-        """Run the agent's one-line install in a fresh Windows console.
+    def install_binary(self, agent_type: str) -> dict:
+        """Silent background install via RPC — no console window.
 
-        The install runs inside WSL (`wsl.exe bash -lc`) with output visible,
-        mirroring how launch_profile opens an agent terminal.
+        The install runs inside WSL and the RPC blocks until it finishes
+        (``_wsl_rpc`` default 60s is too short for npm installs, hence 600s).
         """
-        cmd = _wsl_rpc("get_install_command", agent_type)
-        setup = 'export PATH="$HOME/.npm-global/bin:$HOME/.local/bin:$PATH"'
-        script = f"{setup} && {cmd}"
-        script += (
-            ' || { ec=$?; echo; echo "安装失败 code $ec"; '
-            'read -p "Press Enter to close..." ; }'
-        )
-        wsl = shutil.which("wsl.exe")
-        if wsl is None:
-            raise RuntimeError("wsl.exe not found in PATH (install WSL).")
-        subprocess.Popen(
-            [wsl, "bash", "-lc", script],
-            cwd="C:\\",
-            creationflags=subprocess.CREATE_NEW_CONSOLE,
-        )
+        return _wsl_rpc("install_binary", agent_type, timeout=600)
 
     def get_latest_version(self) -> dict:
         """Latest agent-box version from GitHub Releases (Windows side).
