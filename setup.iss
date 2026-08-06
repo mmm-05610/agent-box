@@ -2,7 +2,7 @@
 ; Inno Setup 6+ required: https://jrsoftware.org/isinfo.php
 
 #define MyAppName "Agent Box"
-#define MyAppVersion "1.3.0"  ; x-release-please-version
+#define MyAppVersion "1.4.0"  ; x-release-please-version
 #define MyAppPublisher "mmm-05610"
 #define MyAppURL "https://github.com/mmm-05610/agent-box"
 #define MyAppExeName "agent-box-gui.exe"
