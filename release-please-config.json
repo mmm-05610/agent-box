@@ -2,7 +2,6 @@
   "packages": {
     ".": {
       "release-type": "python",
-      "package-name": "agent-box-cli",
       "extra-files": [
         {
           "type": "generic",
