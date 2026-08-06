@@ -71,6 +71,35 @@ def _install_error_hint(output: str) -> str | None:
         if pattern.search(output):
             return hint
     return None
+
+
+def _npm_enotempty_path(output: str) -> str | None:
+    """If npm failed with ENOTEMPTY, return the exact blocked dir to remove.
+
+    Self-heal for an interrupted earlier install: npm leaves a partial package
+    dir and the next ``npm install`` dies renaming into it.  Scoped for
+    safety — the path must come from npm's own ``npm error path:`` line and
+    resolve under the npm global node_modules root, so we never remove
+    anything npm didn't flag.
+    """
+    if "ENOTEMPTY" not in output:
+        return None
+    m = re.search(r"(?:npm error\s+)?path:\s*(\S+)", output)
+    if not m:
+        return None
+    target = Path(m.group(1)).expanduser()
+    try:
+        root = Path(
+            subprocess.run(["npm", "root", "-g"], capture_output=True, text=True,
+                           timeout=15).stdout.strip()
+        )
+    except Exception:
+        return None
+    if not root.is_absolute() or not target.is_relative_to(root):
+        return None
+    if not target.is_dir():
+        return None
+    return str(target)
 # Fallback search dirs when the RPC shell's PATH misses the user's installs
 # (mirrors cc-switch's scan_cli_version: npm-global / user bin / cargo bin).
 _COMMON_BIN_DIRS = ("~/.npm-global/bin", "~/.local/bin", "~/.cargo/bin")
@@ -627,22 +656,32 @@ class LinuxDataAccess:
         """
         cmd = self.get_install_command(agent_type)
         setup = 'export PATH="$HOME/.npm-global/bin:$HOME/.local/bin:$PATH"; '
-        try:
-            out = subprocess.run(
-                f"{setup}{cmd}", shell=True, capture_output=True, text=True,
-                timeout=600, encoding="utf-8", errors="replace",
-            )
-        except subprocess.TimeoutExpired:
-            return {"ok": False, "error": "install timed out after 10 minutes"}
-        except Exception as e:
-            return {"ok": False, "error": str(e)}
-        if out.returncode == 0:
-            return {"ok": True, "error": None}
-        combined = "\n".join(x for x in (out.stdout, out.stderr) if x)
-        hint = _install_error_hint(combined)
-        tail = "\n".join(combined.strip().splitlines()[-3:])
-        error = f"{hint}\n原始输出: {tail}" if hint else f"exit {out.returncode}: {tail}"
-        return {"ok": False, "error": error}
+        for attempt in (1, 2):
+            try:
+                out = subprocess.run(
+                    f"{setup}{cmd}", shell=True, capture_output=True, text=True,
+                    timeout=600, encoding="utf-8", errors="replace",
+                )
+            except subprocess.TimeoutExpired:
+                return {"ok": False, "error": "install timed out after 10 minutes"}
+            except Exception as e:
+                return {"ok": False, "error": str(e)}
+            if out.returncode == 0:
+                return {"ok": True, "error": None}
+            combined = "\n".join(x for x in (out.stdout, out.stderr) if x)
+            # Self-heal an interrupted earlier install: npm ENOTEMPTY means a
+            # partial package dir blocks the rename.  Remove exactly the dir
+            # npm flagged (scoped to its own node_modules) and retry once.
+            if attempt == 1:
+                target = _npm_enotempty_path(combined)
+                if target:
+                    shutil.rmtree(target, ignore_errors=True)
+                    continue
+            hint = _install_error_hint(combined)
+            tail = "\n".join(combined.strip().splitlines()[-3:])
+            error = f"{hint}\n原始输出: {tail}" if hint else f"exit {out.returncode}: {tail}"
+            return {"ok": False, "error": error}
+        return {"ok": False, "error": "install failed after cleanup"}
 
     def get_latest_version(self) -> dict:
         """Latest agent-box version from GitHub (best-effort in WSL)."""
