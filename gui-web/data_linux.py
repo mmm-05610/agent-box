@@ -691,3 +691,15 @@ class LinuxDataAccess:
         if not info["latest"]:
             info["latest"] = __version__
         return info
+
+    def download_update(self) -> dict:
+        """Linux GUI has no installer — open the release page in the browser."""
+        import webbrowser
+        info = self.get_latest_version()
+        if info.get("release_url"):
+            webbrowser.open(info["release_url"])
+        return {"started": True, "dest": "", "mode": "browser"}
+
+    def get_download_progress(self) -> dict:
+        """No async download on Linux — always in browser mode."""
+        return {"status": "browser", "bytes_written": 0, "bytes_total": 0, "dest": ""}

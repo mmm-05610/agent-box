@@ -837,6 +837,7 @@ export const en = {
     updateNow: 'Download update',
     openBrowser: 'Open in browser',
     updateStarted: 'Downloading the new installer',
+    downloading: 'Downloading update package…',
     updateBrowser: 'Download failed — opened the Release page in your browser',
     updateAvailable: 'Update available: v{{version}}',
   },

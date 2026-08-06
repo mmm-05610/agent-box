@@ -89,9 +89,16 @@ class Api:
             return json.dumps({"ok": False, "error": str(e)})
 
     def download_update(self) -> str:
-        """Download the new installer and run it."""
+        """Start the installer download (async BITS on Windows / browser)."""
         try:
             return json.dumps({"ok": True, "data": self._data.download_update()})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    def get_download_progress(self) -> str:
+        """Poll the async installer download (BITS bytes, or browser mode)."""
+        try:
+            return json.dumps({"ok": True, "data": self._data.get_download_progress()})
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
 

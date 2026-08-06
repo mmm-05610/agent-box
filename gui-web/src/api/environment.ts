@@ -71,8 +71,31 @@ export async function fetchLatestVersion(): Promise<VersionInfo> {
   )
 }
 
-export async function downloadUpdate(): Promise<{ downloaded: string }> {
-  return call<{ downloaded: string }>((api) => api.download_update!(), { downloaded: '' })
+export interface DownloadStart {
+  started: boolean
+  dest: string
+  mode: 'bits' | 'browser'
+}
+
+export interface DownloadProgress {
+  status: 'idle' | 'downloading' | 'done' | 'error' | 'browser'
+  bytesWritten: number
+  bytesTotal: number
+  dest: string
+}
+
+export async function downloadUpdate(): Promise<DownloadStart> {
+  return call<DownloadStart>(
+    (api) => api.download_update!(),
+    { started: false, dest: '', mode: 'browser' },
+  )
+}
+
+export async function getDownloadProgress(): Promise<DownloadProgress> {
+  return call<DownloadProgress>(
+    (api) => api.get_download_progress!(),
+    { status: 'idle', bytesWritten: 0, bytesTotal: 0, dest: '' },
+  )
 }
 
 export async function openExternal(url: string): Promise<void> {

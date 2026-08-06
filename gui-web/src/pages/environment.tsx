@@ -7,7 +7,7 @@
  * renders; it never hardcodes an agent name or install recipe.
  */
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button, Card } from '@/components/ui'
 import { Loading, StatusDot, useToast } from '@/components/feedback'
@@ -20,7 +20,14 @@ import {
   useVersion,
   resolveAgentIdentity,
 } from '@/hooks'
-import { downloadUpdate, installBinary, launchAcs, openExternal } from '@/api/environment'
+import {
+  downloadUpdate,
+  getDownloadProgress,
+  installBinary,
+  launchAcs,
+  openExternal,
+  type DownloadProgress,
+} from '@/api/environment'
 import type { BinaryInfo } from '@/api/environment'
 import { cn } from '@/lib/utils'
 
@@ -110,11 +117,40 @@ export function EnvironmentPage() {
     }
   }
 
+  const [dlProgress, setDlProgress] = useState<DownloadProgress | null>(null)
+  const dlTimerRef = useRef<number | null>(null)
+  const stopDlPoll = () => {
+    if (dlTimerRef.current != null) {
+      window.clearInterval(dlTimerRef.current)
+      dlTimerRef.current = null
+    }
+  }
+  useEffect(() => stopDlPoll, [])
+
   const handleUpdate = async () => {
     if (!info?.asset_url) return
     try {
-      await downloadUpdate()
-      toast({ type: 'success', message: t('environment.updateStarted') })
+      const start = await downloadUpdate()
+      if (start.mode === 'browser') {
+        toast({ type: 'info', message: t('environment.updateBrowser') })
+        return
+      }
+      setDlProgress({ status: 'downloading', bytesWritten: 0, bytesTotal: 0, dest: start.dest })
+      // Poll BITS progress; on done/error stop. BITS resumes a dropped
+      // transfer automatically, so no manual retry needed.
+      dlTimerRef.current = window.setInterval(async () => {
+        const p = await getDownloadProgress()
+        setDlProgress(p)
+        if (p.status === 'done') {
+          stopDlPoll()
+          toast({ type: 'success', message: t('environment.updateStarted') })
+        } else if (p.status === 'error') {
+          stopDlPoll()
+          setDlProgress(null)
+          if (info.release_url) await openExternal(info.release_url)
+          toast({ type: 'info', message: t('environment.updateBrowser') })
+        }
+      }, 1000)
     } catch {
       if (info.release_url) await openExternal(info.release_url)
       toast({ type: 'info', message: t('environment.updateBrowser') })
@@ -161,7 +197,9 @@ export function EnvironmentPage() {
             </div>
             {hasUpdate && (
               <div className="flex shrink-0 gap-2">
-                <Button size="sm" onClick={() => void handleUpdate()}>{t('environment.updateNow')}</Button>
+                <Button size="sm" onClick={() => void handleUpdate()} disabled={dlProgress?.status === 'downloading'}>
+                  {t('environment.updateNow')}
+                </Button>
                 {info?.release_url && (
                   <Button variant="ghost" size="sm" onClick={() => void openExternal(info.release_url!)}>
                     {t('environment.openBrowser')}
@@ -170,6 +208,22 @@ export function EnvironmentPage() {
               </div>
             )}
           </div>
+          {dlProgress?.status === 'downloading' && dlProgress.bytesTotal > 0 && (
+            <div className="border-t border-border px-5 py-3">
+              <div className="mb-1 flex justify-between text-[11px] text-muted-foreground">
+                <span>{t('environment.downloading')}</span>
+                <span className="font-mono">
+                  {Math.min(100, Math.round((dlProgress.bytesWritten / dlProgress.bytesTotal) * 100))}%
+                </span>
+              </div>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full bg-primary transition-all"
+                  style={{ width: `${Math.min(100, (dlProgress.bytesWritten / dlProgress.bytesTotal) * 100)}%` }}
+                />
+              </div>
+            </div>
+          )}
         </Card>
       </Section>
 
