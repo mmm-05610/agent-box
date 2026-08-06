@@ -174,7 +174,12 @@ export function EnvironmentPage() {
         title={t('environment.section.agents')}
         description={t('environment.agentsDesc')}
         action={
-          <Button size="sm" variant="outline" onClick={() => void updateAll()} isLoading={updating.size > 0} disabled={!agents.some((a) => a.installed && !a.broken && hasBinaryUpdate(a))}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => void updateAll()}
+            disabled={updating.size > 0 || !agents.some((a) => a.installed && !a.broken && hasBinaryUpdate(a))}
+          >
             {t('environment.updateAll')}
           </Button>
         }
