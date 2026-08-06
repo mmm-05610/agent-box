@@ -124,6 +124,15 @@ pyinstaller agent-box-gui.spec      # → dist/agent-box-gui (ELF)
   RPC call with "can't open file .../runtime/rpc_server.py"). Re-run
   `bash scripts/build-gui-runtime.sh` right before pyinstaller, and always
   run `scripts/verify-exe-runtime.py` on the exe before shipping.
+- **Stale SOURCE files over 9P** — 9P (WSL's drvfs file sharing) caches
+  directory listings + file metadata and can serve stale content to Windows
+  processes. This bites not just `build/runtime` but any source file PyInstaller
+  compiles (2026-08: `data_wsl.py` compiled into the exe was a full release
+  behind). The WSL side always looks correct (`ls`/`cat` show new content) and
+  pyinstaller never errors — it just silently uses old bytes. **Fix: run
+  `wsl --shutdown` (restart WSL, fresh 9P mount) before pyinstaller**, and for
+  compiled modules trust `verify-exe-runtime.py`'s runtime check + a manual
+  `pyi-archive_viewer` PYZ extraction when in doubt.
 - **UNC paths** — build from a Windows-native path, not `\\wsl$\...`.
 - **`setup.iss` paths are relative to CWD** when running `iscc`.
 - **acs `.exe` suffix** — `config.acs_binary()` appends it on Windows; the
