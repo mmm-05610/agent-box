@@ -2,6 +2,19 @@
 
 All notable changes to agent-box will be documented in this file.
 
+## [1.3.0](https://github.com/mmm-05610/agent-box/compare/v1.2.0...v1.3.0) (2026-08-06)
+
+
+### Features
+
+* **gui:** targeted prereq hints on failed agent install ([#14](https://github.com/mmm-05610/agent-box/issues/14)) ([9dd4abc](https://github.com/mmm-05610/agent-box/commit/9dd4abc0151e379e43c19d06d168618b49bde546))
+
+
+### Bug Fixes
+
+* **build:** OutputBaseFilename derives from MyAppVersion (Inno has no inline ; comment); verify extract handles PyInstaller 6 typecode ([#13](https://github.com/mmm-05610/agent-box/issues/13)) ([c86b3e7](https://github.com/mmm-05610/agent-box/commit/c86b3e738c7677430b855c77663fb91bb8001c0c))
+* **build:** stage cc-switch into build/runtime + verify install field ([#11](https://github.com/mmm-05610/agent-box/issues/11)) ([3971806](https://github.com/mmm-05610/agent-box/commit/3971806361a5aa362785b159b5554d0b4a55f661))
+
 ## [1.2.0](https://github.com/mmm-05610/agent-box/compare/v1.1.0...v1.2.0) (2026-08-06)
 
 
