@@ -2,6 +2,19 @@
 
 All notable changes to agent-box will be documented in this file.
 
+## [1.2.0](https://github.com/mmm-05610/agent-box/compare/v1.1.0...v1.2.0) (2026-08-06)
+
+
+### Features
+
+* **gui:** Environment page — binary detection, version check, silent batch install/update ([#9](https://github.com/mmm-05610/agent-box/issues/9)) ([5fd497b](https://github.com/mmm-05610/agent-box/commit/5fd497b69df4be691a1f0bf1784bb392bff78568))
+
+
+### Bug Fixes
+
+* **ci:** restore package-name + include-component-in-tag=false for v-prefixed tags ([#7](https://github.com/mmm-05610/agent-box/issues/7)) ([2de4579](https://github.com/mmm-05610/agent-box/commit/2de457907768d079467259790b8c173b65f92064))
+* **ci:** setup.iss version sync via release-please markers; auto README badges ([#10](https://github.com/mmm-05610/agent-box/issues/10)) ([f0e2f58](https://github.com/mmm-05610/agent-box/commit/f0e2f582790390497bb85e9e62995816e17ea93d))
+
 ## [1.1.0](https://github.com/mmm-05610/agent-box/compare/agent-box-cli-v1.0.0...agent-box-cli-v1.1.0) (2026-08-06)
 
 
