@@ -2,6 +2,18 @@
 
 All notable changes to agent-box will be documented in this file.
 
+## [1.4.0](https://github.com/mmm-05610/agent-box/compare/v1.3.0...v1.4.0) (2026-08-06)
+
+
+### Features
+
+* **gui:** BITS async update download — proxy-aware, resumable, progress bar, no window ([#15](https://github.com/mmm-05610/agent-box/issues/15)) ([864445a](https://github.com/mmm-05610/agent-box/commit/864445aa8398197deb861e70083a3bec873b2732))
+
+
+### Bug Fixes
+
+* **gui:** ENOTEMPTY self-heal parses npm 10 rename output ([#18](https://github.com/mmm-05610/agent-box/issues/18)) ([e524c5e](https://github.com/mmm-05610/agent-box/commit/e524c5e02b6f65d408acbaabfc93d19d117acbaa))
+
 ## [1.3.0](https://github.com/mmm-05610/agent-box/compare/v1.2.0...v1.3.0) (2026-08-06)
 
 
