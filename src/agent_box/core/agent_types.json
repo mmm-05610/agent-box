@@ -32,7 +32,7 @@
         ]
       },
       "acs_column": "enabled_claude",
-      "install": "npm install -g @anthropic-ai/claude-code",
+      "install": "npm install -g @anthropic-ai/claude-code@latest",
       "latest": { "type": "npm", "package": "@anthropic-ai/claude-code" }
     },
     "resources": {
@@ -173,7 +173,7 @@
         ]
       },
       "acs_column": "enabled_codex",
-      "install": "npm install -g @openai/codex",
+      "install": "npm install -g @openai/codex@latest",
       "latest": { "type": "npm", "package": "@openai/codex" }
     },
     "resources": {
@@ -467,7 +467,7 @@
         ]
       },
       "acs_column": "enabled_opencode",
-      "install": "npm i -g opencode-ai",
+      "install": "npm i -g opencode-ai@latest",
       "latest": { "type": "npm", "package": "opencode-ai" }
     },
     "resources": {

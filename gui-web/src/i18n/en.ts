@@ -826,6 +826,7 @@ export const en = {
     install: 'Install',
     installStarted: 'Install terminal opened for {{name}} — click Re-check when done',
     installCheck: '{{name}} installed but version unchanged — check manually',
+    installingNote: 'Installing {{name}} — first install can take a few minutes, please wait',
     installFailed: 'Failed to start {{name}} install',
     openAcs: 'Open',
     installAcs: 'Install',
