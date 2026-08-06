@@ -825,6 +825,7 @@ export const zh: TranslationSchema = {
     install: '一键安装',
     installStarted: '已在终端打开 {{name}} 的安装，完成后点「重新检测」',
     installCheck: '{{name}} 安装完成但版本未变化，请手动检查',
+    installingNote: '正在安装 {{name}}，首次可能需要几分钟，请耐心等待',
     installFailed: '{{name}} 安装启动失败',
     openAcs: '打开',
     installAcs: '一键安装',

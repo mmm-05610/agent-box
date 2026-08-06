@@ -63,6 +63,10 @@ export function EnvironmentPage() {
   const installOne = async (b: BinaryInfo) => {
     if (isUpdating(b.agentType)) return
     setUpdating((p) => new Set(p).add(b.agentType))
+    // npm installs (esp. codex, which fetches its native binary from GitHub
+    // in postinstall) can take minutes on a slow/clean machine — say so up
+    // front so the loading state reads as "working" not "frozen".
+    toast({ type: 'info', message: t('environment.installingNote', { name: b.name }) })
     let failed: string | null = null
     try {
       await installBinary(b.agentType)
