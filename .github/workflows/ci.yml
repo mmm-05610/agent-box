@@ -1,0 +1,40 @@
+# CI — backend (pytest) + frontend (vitest + build)
+#
+# Status checks that gate PR merges on main (required by the "main" ruleset).
+# Job names ARE the status-check context IDs the ruleset references:
+#   backend, frontend.
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e '.[dev]'
+      - name: Test
+        run: pytest -q
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install
+        run: cd gui-web && npm ci
+      - name: Unit tests
+        run: cd gui-web && npx vitest run
+      - name: Build
+        run: cd gui-web && npm run build
