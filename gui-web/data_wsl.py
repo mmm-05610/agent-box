@@ -57,9 +57,12 @@ def _wsl_run(cmd: str, timeout: float = 30, input: bytes | None = None) -> str:
 
 
 def _to_wsl_path(win_path: str) -> str:
-    """Deterministic Windows path → WSL path (UNC ``\\\\wsl$`` or drive)."""
+    """Deterministic Windows path → WSL path (UNC ``\\\\wsl$``/``\\\\wsl.localhost`` or drive)."""
     p = win_path.strip()
-    m = re.match(r"^\\\\wsl\$\\([^\\]+)\\(.+)$", p, re.IGNORECASE)
+    # Both WSL share spellings: legacy \\wsl$\<distro>\… and modern
+    # \\wsl.localhost\<distro>\… — the latter is what Windows shows when
+    # the repo is accessed over the 9P share.
+    m = re.match(r"^\\\\wsl(?:\$|\.localhost)\\([^\\]+)\\(.+)$", p, re.IGNORECASE)
     if m:
         return "/" + m.group(2).replace("\\", "/")
     m = re.match(r"^([A-Za-z]):\\(.+)$", p)
