@@ -7,39 +7,7 @@
       "extra-files": [
         {
           "type": "generic",
-          "path": "setup.iss",
-          "startWith": "MyAppVersion \"",
-          "endWith": "\""
-        },
-        {
-          "type": "generic",
-          "path": "setup.iss",
-          "startWith": "OutputBaseFilename=agent-box-setup-",
-          "endWith": "\n"
-        },
-        {
-          "type": "generic",
-          "path": "README.md",
-          "startWith": "![v",
-          "endWith": "]"
-        },
-        {
-          "type": "generic",
-          "path": "README.md",
-          "startWith": "version-",
-          "endWith": "-orange"
-        },
-        {
-          "type": "generic",
-          "path": "README_CN.md",
-          "startWith": "![v",
-          "endWith": "]"
-        },
-        {
-          "type": "generic",
-          "path": "README_CN.md",
-          "startWith": "version-",
-          "endWith": "-orange"
+          "path": "setup.iss"
         }
       ]
     }

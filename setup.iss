@@ -2,7 +2,7 @@
 ; Inno Setup 6+ required: https://jrsoftware.org/isinfo.php
 
 #define MyAppName "Agent Box"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.0.0"  ; x-release-please-version
 #define MyAppPublisher "mmm-05610"
 #define MyAppURL "https://github.com/mmm-05610/agent-box"
 #define MyAppExeName "agent-box-gui.exe"
@@ -20,7 +20,7 @@ DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
 ; LicenseFile=LICENSE
 OutputDir=dist
-OutputBaseFilename=agent-box-setup-1.0.0
+OutputBaseFilename=agent-box-setup-1.0.0  ; x-release-please-version
 SetupIconFile=assets/logo.ico
 Compression=lzma2/max
 SolidCompression=yes
