@@ -73,33 +73,37 @@ def _install_error_hint(output: str) -> str | None:
     return None
 
 
-def _npm_enotempty_path(output: str) -> str | None:
-    """If npm failed with ENOTEMPTY, return the exact blocked dir to remove.
+def _npm_enotempty_paths(output: str) -> list[str]:
+    """If npm failed with ENOTEMPTY, return the blocked dirs to remove.
 
     Self-heal for an interrupted earlier install: npm leaves a partial package
-    dir and the next ``npm install`` dies renaming into it.  Scoped for
-    safety — the path must come from npm's own ``npm error path:`` line and
-    resolve under the npm global node_modules root, so we never remove
-    anything npm didn't flag.
+    dir and the next ``npm install`` dies renaming into it.  Handles both npm
+    9's ``npm error path: <dir>`` and npm 10's ``rename '<a>' -> '<b>'``
+    output, returning every path that resolves under the npm global
+    node_modules root — scoped to what npm itself flagged, never anything else.
     """
     if "ENOTEMPTY" not in output:
-        return None
-    m = re.search(r"(?:npm error\s+)?path:\s*(\S+)", output)
-    if not m:
-        return None
-    target = Path(m.group(1)).expanduser()
+        return []
+    candidates: set[str] = set()
+    for m in re.finditer(r"(?:npm error\s+)?path:\s*(\S+)", output):
+        candidates.add(m.group(1))
+    for m in re.finditer(r"rename\s+'([^']+)'\s*->\s*'([^']+)'", output):
+        candidates.add(m.group(1))
+        candidates.add(m.group(2))
+    if not candidates:
+        return []
     try:
         root = Path(
             subprocess.run(["npm", "root", "-g"], capture_output=True, text=True,
                            timeout=15).stdout.strip()
         )
     except Exception:
-        return None
-    if not root.is_absolute() or not target.is_relative_to(root):
-        return None
-    if not target.is_dir():
-        return None
-    return str(target)
+        return []
+    if not root.is_absolute():
+        return []
+    return [str(c) for c in candidates
+            if Path(c).expanduser().is_relative_to(root)
+            and Path(c).expanduser().is_dir()]
 # Fallback search dirs when the RPC shell's PATH misses the user's installs
 # (mirrors cc-switch's scan_cli_version: npm-global / user bin / cargo bin).
 _COMMON_BIN_DIRS = ("~/.npm-global/bin", "~/.local/bin", "~/.cargo/bin")
@@ -670,12 +674,13 @@ class LinuxDataAccess:
                 return {"ok": True, "error": None}
             combined = "\n".join(x for x in (out.stdout, out.stderr) if x)
             # Self-heal an interrupted earlier install: npm ENOTEMPTY means a
-            # partial package dir blocks the rename.  Remove exactly the dir
+            # partial package dir blocks the rename.  Remove exactly the dirs
             # npm flagged (scoped to its own node_modules) and retry once.
             if attempt == 1:
-                target = _npm_enotempty_path(combined)
-                if target:
-                    shutil.rmtree(target, ignore_errors=True)
+                targets = _npm_enotempty_paths(combined)
+                if targets:
+                    for target in targets:
+                        shutil.rmtree(target, ignore_errors=True)
                     continue
             hint = _install_error_hint(combined)
             tail = "\n".join(combined.strip().splitlines()[-3:])
