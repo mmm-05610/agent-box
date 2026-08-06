@@ -23,7 +23,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Topic :: Software Development :: Testing",
 ]
-dependencies = ["json5>=0.9", "tomli-w>=1.0", "cmd2>=4.1.0", "tomli>=2.0; python_version < '3.11'"]
+dependencies = ["json5>=0.9", "tomli-w>=1.0", "cmd2>=4.1.0", "PyYAML>=6.0", "tomli>=2.0; python_version < '3.11'"]
 
 [project.urls]
 Homepage = "https://github.com/mmm-05610/agent-box"
