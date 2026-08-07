@@ -2,6 +2,13 @@
 
 All notable changes to agent-box will be documented in this file.
 
+## [1.5.3](https://github.com/mmm-05610/agent-box/compare/v1.5.2...v1.5.3) (2026-08-07)
+
+
+### Bug Fixes
+
+* **gui:** version check via releases.atom feed (no GitHub API rate limit) + 10min cache ([#25](https://github.com/mmm-05610/agent-box/issues/25)) ([f3a9cd0](https://github.com/mmm-05610/agent-box/commit/f3a9cd05b8a59ff2828e2f303575fdefc28d9514))
+
 ## [1.5.2](https://github.com/mmm-05610/agent-box/compare/v1.5.1...v1.5.2) (2026-08-07)
 
 
