@@ -24,6 +24,7 @@ import {
   downloadUpdate,
   getDownloadProgress,
   getInstallProgress,
+  installAcsDeps,
   installBinary,
   launchAcs,
   launchUpdateInstaller,
@@ -144,8 +145,25 @@ export function EnvironmentPage() {
   const handleAcsOpen = async () => {
     try {
       await launchAcs()
-    } catch {
-      toast({ type: 'error', message: t('environment.acsFailed') })
+    } catch (e) {
+      // launch_acs now raises a readable message when the GUI libs are missing.
+      const msg = e instanceof Error ? e.message : ''
+      toast({ type: 'error', message: msg || t('environment.acsFailed') })
+    }
+  }
+
+  const [acsDepsBusy, setAcsDepsBusy] = useState(false)
+  const handleInstallAcsDeps = async () => {
+    setAcsDepsBusy(true)
+    try {
+      await installAcsDeps()
+      toast({ type: 'success', message: t('environment.acsDepsInstalled') })
+      await refresh()
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : ''
+      toast({ type: 'error', message: msg || t('environment.acsDepsFailed') })
+    } finally {
+      setAcsDepsBusy(false)
     }
   }
 
@@ -182,13 +200,23 @@ export function EnvironmentPage() {
         } else if (p.status === 'error') {
           stopDlPoll()
           setDlProgress(null)
-          if (info.release_url) await openExternal(info.release_url)
-          toast({ type: 'info', message: t('environment.updateBrowser') })
+          if (p.error) {
+            // Readable error (proxy/BITS failure) — don't silently fall back.
+            toast({ type: 'error', message: p.error })
+          } else if (info.release_url) {
+            await openExternal(info.release_url)
+            toast({ type: 'info', message: t('environment.updateBrowser') })
+          }
         }
       }, 1000)
-    } catch {
-      if (info.release_url) await openExternal(info.release_url)
-      toast({ type: 'info', message: t('environment.updateBrowser') })
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : ''
+      if (msg && !/Unknown error|Bridge/i.test(msg)) {
+        toast({ type: 'error', message: msg })
+      } else if (info.release_url) {
+        await openExternal(info.release_url)
+        toast({ type: 'info', message: t('environment.updateBrowser') })
+      }
     }
   }
 
@@ -397,7 +425,11 @@ export function EnvironmentPage() {
           <div className="flex items-center gap-3 p-5">
             <div className={cn(
               'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg',
-              acs?.installed ? 'bg-emerald-500/10 text-emerald-600' : 'bg-muted text-muted-foreground',
+              acs?.installed && acs.broken
+                ? 'bg-amber-500/10 text-amber-600'
+                : acs?.installed
+                  ? 'bg-emerald-500/10 text-emerald-600'
+                  : 'bg-muted text-muted-foreground',
             )}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
                 <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z" />
@@ -410,13 +442,15 @@ export function EnvironmentPage() {
               <div className="truncate text-[11px] text-muted-foreground font-mono">
                 {checking && <TinySpinner className="mr-1.5 inline-block align-[-2px]" />}
                 {acs?.installed && acs.broken
-                  ? t('environment.broken')
+                  ? (acs.latestError || t('environment.broken'))
                   : acs?.installed
                     ? (acs.version ? `v${acs.version}` : (acs.path || t('environment.installed')))
                     : t('environment.notInstalled')}
               </div>
             </div>
-            {acs?.installed ? (
+            {acs?.installed && acs.broken ? (
+              <Button size="sm" onClick={() => void handleInstallAcsDeps()} isLoading={acsDepsBusy}>{t('environment.installAcsDeps')}</Button>
+            ) : acs?.installed ? (
               <Button size="sm" onClick={() => void handleAcsOpen()}>{t('environment.openAcs')}</Button>
             ) : (
               <Button size="sm" onClick={() => void installOne(acs!)} isLoading={isUpdating('acs')}>{t('environment.installAcs')}</Button>

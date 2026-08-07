@@ -86,6 +86,20 @@ export async function launchAcs(): Promise<void> {
   await call<void>((api) => api.launch_acs!(), undefined)
 }
 
+export interface AcsDepsResult {
+  ok: boolean
+  output: string
+  manual: string
+}
+
+/** Install the Tauri GUI libs cc-switch needs (headless apt inside WSL). */
+export async function installAcsDeps(): Promise<AcsDepsResult> {
+  return call<AcsDepsResult>(
+    (api) => api.install_acs_deps!(),
+    { ok: false, output: '', manual: '' },
+  )
+}
+
 export async function fetchLatestVersion(): Promise<VersionInfo> {
   return call<VersionInfo>(
     (api) => api.get_latest_version!(),
@@ -96,7 +110,7 @@ export async function fetchLatestVersion(): Promise<VersionInfo> {
 export interface DownloadStart {
   started: boolean
   dest: string
-  mode: 'bits' | 'browser'
+  mode: 'urllib' | 'bits' | 'browser'
 }
 
 export interface DownloadProgress {
@@ -104,6 +118,7 @@ export interface DownloadProgress {
   bytesWritten: number
   bytesTotal: number
   dest: string
+  error?: string
 }
 
 export async function downloadUpdate(): Promise<DownloadStart> {
@@ -123,6 +138,7 @@ export async function getDownloadProgress(): Promise<DownloadProgress> {
     bytesWritten: Number(raw.bytes_written) || 0,
     bytesTotal: Number(raw.bytes_total) || 0,
     dest: (raw.dest as string) ?? '',
+    error: (raw.error as string | undefined) ?? undefined,
   }
 }
 
