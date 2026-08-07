@@ -2,6 +2,13 @@
 
 All notable changes to agent-box will be documented in this file.
 
+## [1.6.0](https://github.com/mmm-05610/agent-box/compare/v1.5.5...v1.6.0) (2026-08-07)
+
+
+### Features
+
+* **gui:** async agent install with live progress — detached process, elapsed + output, readable errors ([#31](https://github.com/mmm-05610/agent-box/issues/31)) ([d0b207b](https://github.com/mmm-05610/agent-box/commit/d0b207bab47d56513414cfb66d15bbf6e05c5c15))
+
 ## [1.5.5](https://github.com/mmm-05610/agent-box/compare/v1.5.4...v1.5.5) (2026-08-07)
 
 
