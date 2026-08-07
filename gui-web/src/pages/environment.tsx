@@ -74,7 +74,12 @@ export function EnvironmentPage() {
     // npm installs (esp. codex, which fetches its native binary from GitHub
     // in postinstall) can take minutes on a slow/clean machine — say so up
     // front so the loading state reads as "working" not "frozen".
-    toast({ type: 'info', message: t('environment.installingNote', { name: b.name }) })
+    toast({
+      type: 'info',
+      message: b.installed
+        ? t('environment.updatingNote', { name: b.name })
+        : t('environment.installingNote', { name: b.name }),
+    })
     let failed: string | null = null
     try {
       await installBinary(b.agentType)
