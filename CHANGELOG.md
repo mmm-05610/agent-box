@@ -2,6 +2,13 @@
 
 All notable changes to agent-box will be documented in this file.
 
+## [1.5.4](https://github.com/mmm-05610/agent-box/compare/v1.5.3...v1.5.4) (2026-08-07)
+
+
+### Bug Fixes
+
+* **gui:** map download progress snake_case fields — progress bar was never rendering ([#27](https://github.com/mmm-05610/agent-box/issues/27)) ([2f91476](https://github.com/mmm-05610/agent-box/commit/2f91476a538dc340778d7ff59d0aa3c29f0f32ce))
+
 ## [1.5.3](https://github.com/mmm-05610/agent-box/compare/v1.5.2...v1.5.3) (2026-08-07)
 
 
