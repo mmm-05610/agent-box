@@ -827,6 +827,8 @@ export const zh: TranslationSchema = {
     installCheck: '{{name}} 安装完成但版本未变化，请手动检查',
     installingNote: '正在安装 {{name}}，首次可能需要几分钟，请耐心等待',
     updatingNote: '正在更新 {{name}}，可能需要几分钟，请耐心等待',
+    installingRuntime: '已运行 {{elapsed}} 秒…',
+    installTimeout: '安装超时（30 分钟），请检查网络后重试',
     installFailed: '{{name}} 安装启动失败',
     openAcs: '打开',
     installAcs: '一键安装',

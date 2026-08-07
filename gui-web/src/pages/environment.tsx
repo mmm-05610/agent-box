@@ -23,11 +23,13 @@ import {
 import {
   downloadUpdate,
   getDownloadProgress,
+  getInstallProgress,
   installBinary,
   launchAcs,
   launchUpdateInstaller,
   openExternal,
   type DownloadProgress,
+  type InstallProgress,
 } from '@/api/environment'
 import type { BinaryInfo } from '@/api/environment'
 import { cn } from '@/lib/utils'
@@ -58,22 +60,17 @@ export function EnvironmentPage() {
   }
 
   const [updating, setUpdating] = useState<Set<string>>(new Set())
+  const [installProg, setInstallProg] = useState<Record<string, InstallProgress>>({})
   const isUpdating = (agentType: string) => updating.has(agentType)
 
-  /** Silent background install/update for one agent; button shows loading.
-
-  The install RPC blocks until npm/pip actually finishes, so one refresh right
-  after confirms the new version.  The button stays in loading through that
-  refresh (no flash back to the stale "有更新" state), then clears.  If the
-  version never moved (install went somewhere PATH doesn't pick up), we say so
-  instead of claiming success.  Re-entrant clicks are ignored.
-  */
+  /** Async background install/update for one agent.  The install is a detached
+  WSL process; we poll getInstallProgress every 2s and show elapsed time + live
+  output in the row so a 10-minute npm/pip run reads as "working", never
+  "frozen".  Errors are surfaced as a readable hint + output tail.  ENOTEMPTY
+  is auto-healed (backend cleans the leftover dirs, we retry once). */
   const installOne = async (b: BinaryInfo) => {
     if (isUpdating(b.agentType)) return
     setUpdating((p) => new Set(p).add(b.agentType))
-    // npm installs (esp. codex, which fetches its native binary from GitHub
-    // in postinstall) can take minutes on a slow/clean machine — say so up
-    // front so the loading state reads as "working" not "frozen".
     toast({
       type: 'info',
       message: b.installed
@@ -81,11 +78,40 @@ export function EnvironmentPage() {
         : t('environment.installingNote', { name: b.name }),
     })
     let failed: string | null = null
+    let retried = false
     try {
       await installBinary(b.agentType)
+      await new Promise<void>((resolve) => {
+        let tries = 0
+        const tick = async () => {
+          const p = await getInstallProgress()
+          setInstallProg((m) => ({ ...m, [b.agentType]: p }))
+          if (p.status === 'done') return resolve()
+          if (p.status === 'error') {
+            if (!retried && p.error && p.error.includes('ENOTEMPTY')) {
+              retried = true
+              await installBinary(b.agentType)  // backend cleans, restarts
+            } else {
+              failed = p.hint ? `${p.hint}\n${p.error ?? ''}` : (p.error ?? t('environment.installFailed', { name: b.name }))
+              return resolve()
+            }
+          }
+          if (tries++ > 900) {  // 30 min ceiling; hermes install.sh can take 15
+            failed = t('environment.installTimeout')
+            return resolve()
+          }
+          setTimeout(tick, 2000)
+        }
+        void tick()
+      })
     } catch (e) {
       failed = e instanceof Error ? e.message : t('environment.installFailed', { name: b.name })
     }
+    setInstallProg((m) => {
+      const n = { ...m }
+      delete n[b.agentType]
+      return n
+    })
     const data = await refresh()
     const cur = data.find((r) => r.agentType === b.agentType)
     const caughtUp = !!(cur && cur.installed && (!cur.latestVersion || !hasBinaryUpdate(cur)))
@@ -284,7 +310,8 @@ export function EnvironmentPage() {
               {agents.map((b) => {
                 const identity = resolveAgentIdentity(agentConfigs, b.agentType)
                 return (
-                  <div key={b.agentType} className="flex items-center gap-3 px-5 py-3.5">
+                  <div key={b.agentType}>
+                    <div className="flex items-center gap-3 px-5 py-3.5">
                     <div
                       className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg overflow-hidden"
                       style={{ backgroundColor: `${identity.color}14` }}
@@ -328,6 +355,33 @@ export function EnvironmentPage() {
                       </span>
                     ) : (
                       <Button size="sm" onClick={() => void installOne(b)} isLoading={isUpdating(b.agentType)}>{t('environment.install')}</Button>
+                    )}
+                  </div>
+                    {installProg[b.agentType] && (
+                      <div className="border-t border-border px-5 py-2 font-mono text-[11px]">
+                        {installProg[b.agentType].status === 'error' ? (
+                          <div className="text-red-600 dark:text-red-400">
+                            {installProg[b.agentType].hint && (
+                              <div className="font-sans">{installProg[b.agentType].hint}</div>
+                            )}
+                            <div className="mt-1 whitespace-pre-wrap break-all text-muted-foreground">
+                              {installProg[b.agentType].error}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-start gap-2 text-muted-foreground">
+                            <TinySpinner className="mt-0.5" />
+                            <div className="min-w-0 flex-1">
+                              <div>{t('environment.installingRuntime', { elapsed: installProg[b.agentType].elapsed })}</div>
+                              {installProg[b.agentType].output.length > 0 && (
+                                <div className="mt-0.5 whitespace-pre-wrap break-all text-muted-foreground/70">
+                                  {installProg[b.agentType].output.slice(-2).join('\n')}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 )

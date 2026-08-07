@@ -517,12 +517,12 @@ class WslDataAccess:
         return _wsl_rpc("get_install_command", agent_type)
 
     def install_binary(self, agent_type: str) -> dict:
-        """Silent background install via RPC — no console window.
+        """Start a detached install inside WSL; poll get_install_progress()."""
+        return _wsl_rpc("install_binary", agent_type)
 
-        The install runs inside WSL and the RPC blocks until it finishes
-        (``_wsl_rpc`` default 60s is too short for npm installs, hence 600s).
-        """
-        return _wsl_rpc("install_binary", agent_type, timeout=600)
+    def get_install_progress(self) -> dict:
+        """Poll the detached WSL install (status/elapsed/output/error)."""
+        return _wsl_rpc("get_install_progress")
 
     def get_latest_version(self) -> dict:
         """Latest agent-box version via the public releases.atom feed.

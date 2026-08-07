@@ -828,6 +828,8 @@ export const en = {
     installCheck: '{{name}} installed but version unchanged — check manually',
     installingNote: 'Installing {{name}} — first install can take a few minutes, please wait',
     updatingNote: 'Updating {{name}} — this can take a few minutes, please wait',
+    installingRuntime: 'Running for {{elapsed}}s…',
+    installTimeout: 'Install timed out (30 min) — check the network and retry',
     installFailed: 'Failed to start {{name}} install',
     openAcs: 'Open',
     installAcs: 'Install',
