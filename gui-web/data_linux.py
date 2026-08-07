@@ -662,41 +662,74 @@ class LinuxDataAccess:
         return cmd
 
     def install_binary(self, agent_type: str) -> dict:
-        """Run the agent's install command silently in the background.
+        """Start the agent's install command as a DETACHED process.
 
-        No console window — the RPC call blocks until the install finishes and
-        returns ``{ok, error}`` so the UI can show a loading state and echo a
-        real error message instead of silently spawning a terminal.
+        The RPC process exits right after spawning, so the install must outlive
+        it — hence ``start_new_session`` + a state file + log that
+        :meth:`get_install_progress` reads back across RPC calls.  The UI polls
+        progress instead of blocking a 10-minute npm/pip run.
         """
         cmd = self.get_install_command(agent_type)
         setup = 'export PATH="$HOME/.npm-global/bin:$HOME/.local/bin:$PATH"; '
-        for attempt in (1, 2):
-            try:
-                out = subprocess.run(
-                    f"{setup}{cmd}", shell=True, capture_output=True, text=True,
-                    timeout=600, encoding="utf-8", errors="replace",
-                )
-            except subprocess.TimeoutExpired:
-                return {"ok": False, "error": "install timed out after 10 minutes"}
-            except Exception as e:
-                return {"ok": False, "error": str(e)}
-            if out.returncode == 0:
-                return {"ok": True, "error": None}
-            combined = "\n".join(x for x in (out.stdout, out.stderr) if x)
-            # Self-heal an interrupted earlier install: npm ENOTEMPTY means a
-            # partial package dir blocks the rename.  Remove exactly the dirs
-            # npm flagged (scoped to its own node_modules) and retry once.
-            if attempt == 1:
-                targets = _npm_enotempty_paths(combined)
-                if targets:
-                    for target in targets:
-                        shutil.rmtree(target, ignore_errors=True)
-                    continue
-            hint = _install_error_hint(combined)
-            tail = "\n".join(combined.strip().splitlines()[-3:])
-            error = f"{hint}\n原始输出: {tail}" if hint else f"exit {out.returncode}: {tail}"
-            return {"ok": False, "error": error}
-        return {"ok": False, "error": "install failed after cleanup"}
+        home = config.agent_box_home()
+        home.mkdir(parents=True, exist_ok=True)
+        log = home / f"install-{agent_type}.log"
+        state_path = home / "install-state.json"
+        # Self-heal an interrupted earlier install: clean ENOTEMPTY leftovers
+        # flagged by the previous failed run before starting fresh.
+        if log.exists() and "ENOTEMPTY" in log.read_text(errors="replace"):
+            for t in _npm_enotempty_paths(log.read_text(errors="replace")):
+                shutil.rmtree(t, ignore_errors=True)
+        with open(log, "w") as f:
+            f.write(f"▶ 开始安装 {agent_type}\n")
+        shell = f'{{ {setup}{cmd}; echo "__AGENT_BOX_EXIT__=$?"; }} >> "{log}" 2>&1'
+        try:
+            proc = subprocess.Popen(shell, shell=True, start_new_session=True)
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+        state_path.write_text(json.dumps({
+            "agent_type": agent_type, "pid": proc.pid,
+            "status": "running", "started": time.monotonic(),
+        }))
+        return {"ok": True, "started": True, "agent_type": agent_type}
+
+    def get_install_progress(self) -> dict:
+        """Poll the detached install: ``{status, elapsed, output, error, hint}``.
+
+        status: idle | running | done | error.  ``output`` is the last log
+        lines (so the UI shows it's alive, not frozen); ``error`` + ``hint``
+        give a readable failure instead of a bare exit code.
+        """
+        home = config.agent_box_home()
+        state_path = home / "install-state.json"
+        if not state_path.exists():
+            return {"status": "idle", "elapsed": 0, "output": [], "error": None, "hint": None}
+        try:
+            state = json.loads(state_path.read_text())
+        except Exception:
+            return {"status": "idle", "elapsed": 0, "output": [], "error": None, "hint": None}
+        agent_type = state.get("agent_type", "")
+        log = home / f"install-{agent_type}.log"
+        log_text = log.read_text(errors="replace") if log.exists() else ""
+        lines = [l for l in log_text.strip().splitlines() if l.strip()]
+        elapsed = int(time.monotonic() - state.get("started", time.monotonic()))
+        tail = lines[-30:] if lines else []
+        marker = next((l for l in lines if "__AGENT_BOX_EXIT__=" in l), None)
+        if marker:
+            code = marker.split("__AGENT_BOX_EXIT__=")[1].strip()
+            done = code == "0"
+            error = None
+            hint = None
+            if not done:
+                combined = "\n".join(lines)
+                hint = _install_error_hint(combined)
+                error = marker + "\n" + "\n".join(tail[-5:])
+            state["status"] = "done" if done else "error"
+            state_path.write_text(json.dumps(state))
+            return {"status": state["status"], "elapsed": elapsed,
+                    "output": tail, "error": error, "hint": hint}
+        return {"status": "running", "elapsed": elapsed,
+                "output": tail, "error": None, "hint": None}
 
     def get_latest_version(self) -> dict:
         """Latest agent-box version via the releases.atom feed (cached 10min)."""

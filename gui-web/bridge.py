@@ -75,9 +75,16 @@ class Api:
             return json.dumps({"ok": False, "error": str(e)})
 
     def install_binary(self, agent_type: str) -> str:
-        """One-click install/update an agent binary (silent background)."""
+        """One-click install/update an agent binary (detached, async)."""
         try:
             return json.dumps({"ok": True, "data": self._data.install_binary(agent_type)})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    def get_install_progress(self) -> str:
+        """Poll the detached agent install (status/elapsed/output/error)."""
+        try:
+            return json.dumps({"ok": True, "data": self._data.get_install_progress()})
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
 

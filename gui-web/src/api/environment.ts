@@ -52,12 +52,34 @@ export async function fetchBinaries(): Promise<BinaryInfo[]> {
   return raw.map(toBinary)
 }
 
+export interface InstallProgress {
+  status: 'idle' | 'running' | 'done' | 'error'
+  elapsed: number
+  output: string[]
+  error: string | null
+  hint: string | null
+}
+
 export async function installBinary(agentType: string): Promise<void> {
   const result = await call<{ ok: boolean; error?: string | null }>(
     (api) => api.install_binary!(agentType),
     { ok: true },
   )
   if (!result.ok) throw new Error(result.error ?? 'install failed')
+}
+
+export async function getInstallProgress(): Promise<InstallProgress> {
+  const raw = await call<Record<string, unknown>>(
+    (api) => api.get_install_progress!(),
+    {},
+  )
+  return {
+    status: (raw.status as InstallProgress['status']) ?? 'idle',
+    elapsed: Number(raw.elapsed) || 0,
+    output: Array.isArray(raw.output) ? (raw.output as string[]) : [],
+    error: (raw.error as string | null) ?? null,
+    hint: (raw.hint as string | null) ?? null,
+  }
 }
 
 export async function launchAcs(): Promise<void> {
