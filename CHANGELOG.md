@@ -2,6 +2,13 @@
 
 All notable changes to agent-box will be documented in this file.
 
+## [1.5.5](https://github.com/mmm-05610/agent-box/compare/v1.5.4...v1.5.5) (2026-08-07)
+
+
+### Bug Fixes
+
+* **gui:** hermes install via install.sh (cc-switch) — self-contained, no pip/env dependency ([#29](https://github.com/mmm-05610/agent-box/issues/29)) ([a779c4b](https://github.com/mmm-05610/agent-box/commit/a779c4b39b88c0893bc471bbd46461afcf7faefc))
+
 ## [1.5.4](https://github.com/mmm-05610/agent-box/compare/v1.5.3...v1.5.4) (2026-08-07)
 
 
