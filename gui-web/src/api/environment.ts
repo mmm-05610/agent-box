@@ -58,6 +58,8 @@ export interface InstallProgress {
   output: string[]
   error: string | null
   hint: string | null
+  /** Frontend-computed: output hasn't changed for a while (npm --silent grind). */
+  stalled?: boolean
 }
 
 export async function installBinary(agentType: string): Promise<void> {
@@ -97,6 +99,19 @@ export async function installAcsDeps(): Promise<AcsDepsResult> {
   return call<AcsDepsResult>(
     (api) => api.install_acs_deps!(),
     { ok: false, output: '', manual: '' },
+  )
+}
+
+export interface AcsDepsManualResult {
+  launched: boolean
+  cmd: string
+}
+
+/** Pop a real WSL terminal running the apt install (user types sudo password). */
+export async function installAcsDepsManual(): Promise<AcsDepsManualResult> {
+  return call<AcsDepsManualResult>(
+    (api) => api.install_acs_deps_manual!(),
+    { launched: false, cmd: '' },
   )
 }
 

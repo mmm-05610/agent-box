@@ -514,6 +514,27 @@ class WslDataAccess:
         """Install the Tauri GUI libs cc-switch needs, inside WSL (sudo -n)."""
         return _wsl_rpc("install_acs_deps")
 
+    def install_acs_deps_manual(self) -> dict:
+        """Pop a real WSL terminal that runs the apt install interactively.
+
+        The headless ``sudo -n`` path fails when sudo needs a password.  This
+        launches a NEW Windows console running ``wsl.exe bash -lc '<apt cmd>'``
+        so the user only has to type their sudo password in the terminal (no
+        command to remember — it's already there).  Fire-and-forget.
+        """
+        info = _wsl_rpc("install_acs_deps_manual_cmd")
+        cmd = (info or {}).get("cmd") or ""
+        if not cmd:
+            raise RuntimeError("cc-switch 运行库齐全，无需安装")
+        wsl = shutil.which("wsl.exe")
+        if wsl is None:
+            raise RuntimeError("wsl.exe not found in PATH (install WSL).")
+        subprocess.Popen(
+            [wsl, "bash", "-lc", cmd],
+            creationflags=subprocess.CREATE_NEW_CONSOLE,
+        )
+        return {"launched": True, "cmd": (info or {}).get("manual") or cmd}
+
     # ── Environment / provisioning ──────────────────────────────────
 
     def check_binaries(self) -> list:

@@ -691,6 +691,27 @@ class LinuxDataAccess:
             raise RuntimeError("自动安装需要 sudo 密码。请在 WSL 里手动执行：" + manual)
         return {"ok": True, "output": (proc.stdout or proc.stderr or "").strip(), "manual": ""}
 
+    def install_acs_deps_manual_cmd(self) -> dict:
+        """The exact apt command that installs cc-switch's missing libs.
+
+        For the pop-a-terminal flow: the WINDOWS host launches a real WSL
+        console running this command, where ``sudo`` prompts interactively for
+        the password (the headless ``sudo -n`` path can't).  Returns
+        ``{cmd, manual, missing}``; ``cmd`` is empty when nothing is missing.
+        """
+        binary = _resolve_acs()
+        if binary is None:
+            raise RuntimeError(
+                "cc-switch not found — install it from the Environment page"
+            )
+        missing = _acs_missing_libs(binary)
+        if not missing:
+            return {"cmd": "", "manual": "", "missing": []}
+        pkgs = _acs_missing_lib_packages(missing)
+        manual = "sudo apt-get install -y " + " ".join(pkgs)
+        return {"cmd": "sudo apt-get update -qq && " + manual,
+                "manual": manual, "missing": missing}
+
     # ── Environment / provisioning ───────────────────────────────────
 
     def check_binaries(self) -> list:
