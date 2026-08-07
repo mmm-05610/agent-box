@@ -2,6 +2,13 @@
 
 All notable changes to agent-box will be documented in this file.
 
+## [1.6.2](https://github.com/mmm-05610/agent-box/compare/v1.6.1...v1.6.2) (2026-08-07)
+
+
+### Bug Fixes
+
+* **gui:** install stall hint + ACS terminal sudo install ([#35](https://github.com/mmm-05610/agent-box/issues/35)) ([3a5fc86](https://github.com/mmm-05610/agent-box/commit/3a5fc867c4e16473c323cf1ba885618cc1e5d92b))
+
 ## [1.6.1](https://github.com/mmm-05610/agent-box/compare/v1.6.0...v1.6.1) (2026-08-07)
 
 
