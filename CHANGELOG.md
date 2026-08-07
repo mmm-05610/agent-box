@@ -2,6 +2,13 @@
 
 All notable changes to agent-box will be documented in this file.
 
+## [1.6.1](https://github.com/mmm-05610/agent-box/compare/v1.6.0...v1.6.1) (2026-08-07)
+
+
+### Bug Fixes
+
+* **gui:** reliable self-update + ACS runtime-lib detection ([#33](https://github.com/mmm-05610/agent-box/issues/33)) ([ad502c7](https://github.com/mmm-05610/agent-box/commit/ad502c739e43c8010180d65a3f4ccc35eb695eeb))
+
 ## [1.6.0](https://github.com/mmm-05610/agent-box/compare/v1.5.5...v1.6.0) (2026-08-07)
 
 
