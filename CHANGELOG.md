@@ -2,6 +2,13 @@
 
 All notable changes to agent-box will be documented in this file.
 
+## [1.5.2](https://github.com/mmm-05610/agent-box/compare/v1.5.1...v1.5.2) (2026-08-07)
+
+
+### Bug Fixes
+
+* **gui:** bound hermes install — pip --timeout 30, curl --max-time 120 (no more 600s hang) ([#23](https://github.com/mmm-05610/agent-box/issues/23)) ([e11a790](https://github.com/mmm-05610/agent-box/commit/e11a790ec997fd622b3555d6367807d2e810f738))
+
 ## [1.5.1](https://github.com/mmm-05610/agent-box/compare/v1.5.0...v1.5.1) (2026-08-07)
 
 
