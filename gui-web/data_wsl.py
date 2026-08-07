@@ -23,6 +23,8 @@ import shlex
 import shutil
 import subprocess
 import sys
+import time
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 # Hide console windows for PowerShell/installer child processes — the GUI is a
@@ -83,6 +85,44 @@ def _windows_proxy() -> dict:
         return {"http": server, "https": server}
     except Exception:
         return {}
+
+
+def _latest_via_atom() -> dict:
+    """Latest agent-box release via the public releases.atom feed.
+
+    The atom feed lives on ``github.com`` (the same host the installer
+    downloads from), which stays reachable where ``api.github.com`` is
+    rate-limited (shared NAT/proxy IPs hit the 60/hr unauthenticated cap) or
+    blocked outright.  Returns ``{latest, asset_url, release_url, notes}``,
+    never raises.
+    """
+    import urllib.request
+    empty = {"latest": "", "asset_url": "", "release_url": "", "notes": ""}
+    try:
+        req = urllib.request.Request(
+            "https://github.com/mmm-05610/agent-box/releases.atom",
+            headers={"User-Agent": "agent-box-gui"},
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            root = ET.fromstring(resp.read())
+        ns = {"a": "http://www.w3.org/2005/Atom"}
+        entry = root.find("a:entry", ns)
+        if entry is None:
+            return empty
+        tag = (entry.findtext("a:title", "", ns) or "").strip().lstrip("v")
+        release_url = ""
+        for link in entry.findall("a:link", ns):
+            if link.get("rel") in (None, "alternate"):
+                release_url = link.get("href", "")
+                break
+        asset_url = (
+            f"https://github.com/mmm-05610/agent-box/releases/download/"
+            f"v{tag}/agent-box-setup-{tag}.exe"
+        )
+        return {"latest": tag, "asset_url": asset_url,
+                "release_url": release_url, "notes": ""}
+    except Exception:
+        return empty
 
 
 def _to_wsl_path(win_path: str) -> str:
@@ -485,39 +525,24 @@ class WslDataAccess:
         return _wsl_rpc("install_binary", agent_type, timeout=600)
 
     def get_latest_version(self) -> dict:
-        """Latest agent-box version from GitHub Releases (Windows side).
+        """Latest agent-box version via the public releases.atom feed.
 
-        urllib picks up the system proxy (registry) automatically, so the
-        check works where direct WSL→GitHub is blocked.  Never raises —
-        returns current on failure so the UI shows no badge.
+        The API endpoint (``api.github.com/releases/latest``) is rate-limited
+        per-IP (60/hr unauthenticated) and exhausted on shared NAT/proxy IPs,
+        so we read the ``releases.atom`` feed on ``github.com`` instead — no
+        rate cap, same host as the installer download.  Cached ~10min so the
+        per-page-load badge check doesn't re-fetch.
         """
         current = self.get_version()
-        import urllib.request
-        try:
-            req = urllib.request.Request(
-                "https://api.github.com/repos/mmm-05610/agent-box/releases/latest",
-                headers={"User-Agent": "agent-box-gui", "Accept": "application/vnd.github+json"},
-            )
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                release = json.loads(resp.read().decode("utf-8"))
-            tag = (release.get("tag_name") or "").lstrip("v")
-            asset_url = next(
-                (a.get("browser_download_url", "") for a in release.get("assets", [])
-                 if a.get("name", "").startswith("agent-box-setup-")),
-                "",
-            )
-            return {
-                "current": current,
-                "latest": tag,
-                "asset_url": asset_url,
-                "release_url": release.get("html_url", ""),
-                "notes": (release.get("body") or "")[:500],
-            }
-        except Exception:
-            return {
-                "current": current, "latest": current,
-                "asset_url": "", "release_url": "", "notes": "",
-            }
+        cached = getattr(self, "_latest_cache", None)
+        if cached and cached[0] > time.monotonic() - 600:
+            info = dict(cached[1])
+            info["current"] = current
+            return info
+        info = _latest_via_atom()
+        self._latest_cache = (time.monotonic(), info)
+        info["current"] = current
+        return info
 
     def download_update(self) -> dict:
         """Start an async BITS download of the installer (Windows) or open the
