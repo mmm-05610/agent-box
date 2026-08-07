@@ -290,7 +290,7 @@
         ]
       },
       "acs_column": "enabled_hermes",
-      "install": "pip3 install --user --break-system-packages -U --timeout 30 --retries 2 hermes-agent 2>/dev/null || bash -c 'tmp=$(mktemp) && curl -fsSL --max-time 120 https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh -o $tmp && bash $tmp; status=$?; rm -f $tmp; exit $status'",
+      "install": "timeout 120 hermes update 2>/dev/null || bash -c 'tmp=$(mktemp) && curl -fsSL --max-time 120 https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh -o $tmp && bash $tmp; status=$?; rm -f $tmp; exit $status'",
       "latest": { "type": "pip", "package": "hermes-agent" }
     },
     "resources": {
