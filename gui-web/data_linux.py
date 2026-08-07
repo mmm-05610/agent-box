@@ -288,30 +288,40 @@ def _resolve_acs(exists_only: bool = False) -> Optional[Path]:
 
 
 def _github_latest() -> dict:
-    """Fetch the latest agent-box release from GitHub (never raises)."""
+    """Latest agent-box release via the public releases.atom feed.
+
+    ``api.github.com`` is rate-limited per-IP (60/hr unauthenticated) and
+    exhausted on shared NAT/proxy IPs; the ``github.com`` atom feed has no
+    such cap and shares the host with the installer download.  Never raises.
+    """
     import urllib.request
+    import xml.etree.ElementTree as ET
+    empty = {"current": "", "latest": "", "asset_url": "", "release_url": "", "notes": ""}
     try:
         req = urllib.request.Request(
-            "https://api.github.com/repos/mmm-05610/agent-box/releases/latest",
-            headers={"User-Agent": "agent-box-gui", "Accept": "application/vnd.github+json"},
+            "https://github.com/mmm-05610/agent-box/releases.atom",
+            headers={"User-Agent": "agent-box-gui"},
         )
         with urllib.request.urlopen(req, timeout=10) as resp:
-            release = json.loads(resp.read().decode("utf-8"))
-        tag = (release.get("tag_name") or "").lstrip("v")
-        asset_url = next(
-            (a.get("browser_download_url", "") for a in release.get("assets", [])
-             if a.get("name", "").startswith("agent-box-setup-")),
-            "",
+            root = ET.fromstring(resp.read())
+        ns = {"a": "http://www.w3.org/2005/Atom"}
+        entry = root.find("a:entry", ns)
+        if entry is None:
+            return empty
+        tag = (entry.findtext("a:title", "", ns) or "").strip().lstrip("v")
+        release_url = ""
+        for link in entry.findall("a:link", ns):
+            if link.get("rel") in (None, "alternate"):
+                release_url = link.get("href", "")
+                break
+        asset_url = (
+            f"https://github.com/mmm-05610/agent-box/releases/download/"
+            f"v{tag}/agent-box-setup-{tag}.exe"
         )
-        return {
-            "current": "",
-            "latest": tag,
-            "asset_url": asset_url,
-            "release_url": release.get("html_url", ""),
-            "notes": (release.get("body") or "")[:500],
-        }
+        return {"current": "", "latest": tag, "asset_url": asset_url,
+                "release_url": release_url, "notes": ""}
     except Exception:
-        return {"current": "", "latest": "", "asset_url": "", "release_url": "", "notes": ""}
+        return empty
 
 
 class LinuxDataAccess:
@@ -689,9 +699,15 @@ class LinuxDataAccess:
         return {"ok": False, "error": "install failed after cleanup"}
 
     def get_latest_version(self) -> dict:
-        """Latest agent-box version from GitHub (best-effort in WSL)."""
+        """Latest agent-box version via the releases.atom feed (cached 10min)."""
         from agent_box import __version__
+        cached = getattr(self, "_box_latest_cache", None)
+        if cached and cached[0] > time.monotonic() - 600:
+            info = dict(cached[1])
+            info["current"] = __version__
+            return info
         info = _github_latest()
+        self._box_latest_cache = (time.monotonic(), info)
         info["current"] = __version__
         if not info["latest"]:
             info["latest"] = __version__
