@@ -2,6 +2,13 @@
 
 All notable changes to agent-box will be documented in this file.
 
+## [1.5.1](https://github.com/mmm-05610/agent-box/compare/v1.5.0...v1.5.1) (2026-08-07)
+
+
+### Bug Fixes
+
+* **gui:** hermes install prefers pip (no hang); install vs update note wording ([#21](https://github.com/mmm-05610/agent-box/issues/21)) ([1ef9c2d](https://github.com/mmm-05610/agent-box/commit/1ef9c2dce5cd6cbb6bdcb8e7159be25d80f1feb3))
+
 ## [1.5.0](https://github.com/mmm-05610/agent-box/compare/v1.4.0...v1.5.0) (2026-08-06)
 
 
