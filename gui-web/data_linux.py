@@ -287,6 +287,52 @@ def _resolve_acs(exists_only: bool = False) -> Optional[Path]:
     return None
 
 
+def _acs_missing_libs(binary) -> list:
+    """Shared libs cc-switch needs but that are absent on this box.
+
+    cc-switch is a Tauri GUI: it links webkit2gtk-4.1 / gtk3 / libsoup3 etc.
+    A bare WSL ships none of these, so the process dies on launch with
+    ``error while loading shared libraries`` — which the old stderr-swallowing
+    launch used to hide.  ``ldd`` is the cheapest probe.  Returns [] if the
+    binary is self-contained or ldd is unavailable.
+    """
+    try:
+        out = subprocess.run(
+            ["ldd", str(binary)],
+            capture_output=True, text=True, timeout=15,
+        ).stdout
+    except Exception:
+        return []
+    return [line.split("=>")[0].strip()
+            for line in out.splitlines()
+            if "=> not found" in line]
+
+
+_ACS_LIB_PACKAGES = {
+    "libwebkit2gtk-4.1.so.0": "libwebkit2gtk-4.1-0",
+    "libjavascriptcoregtk-4.1.so.0": "libjavascriptcoregtk-4.1-0",
+    "libsoup-3.0.so.0": "libsoup-3.0-0",
+    "libgtk-3.so.0": "libgtk-3-0",
+    "libgdk-3.so.0": "libgtk-3-0",
+    "libgdk_pixbuf-2.0.so.0": "libgdk-pixbuf-2.0-0",
+    "libatk-bridge-2.0.so.0": "libatk-bridge2.0-0",
+    "libatk-1.0.so.0": "libatk1.0-0",
+    "libharfbuzz.so.0": "libharfbuzz0b",
+    "libharfbuzz-icu.so.0": "libharfbuzz-icu0",
+    "libglib-2.0.so.0": "libglib2.0-0",
+    "libdbus-1.so.3": "libdbus-1-3",
+}
+
+
+def _acs_missing_lib_packages(missing: list) -> list:
+    """Map missing sonames to Ubuntu packages, with a sane catch-all."""
+    pkgs = {_ACS_LIB_PACKAGES.get(soname) for soname in missing}
+    pkgs.discard(None)
+    if missing:
+        pkgs.add("libwebkit2gtk-4.1-0")  # pulls gtk3/libsoup3/javascriptcore
+    return sorted(p for p in pkgs if p)
+
+
 def _github_latest() -> dict:
     """Latest agent-box release via the public releases.atom feed.
 
@@ -589,11 +635,61 @@ class LinuxDataAccess:
             raise RuntimeError(
                 "cc-switch not found — install it from the Environment page"
             )
-        subprocess.Popen(
-            [str(binary)],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            start_new_session=True,
-        )
+        missing = _acs_missing_libs(binary)
+        if missing:
+            pkgs = " ".join(_acs_missing_lib_packages(missing))
+            raise RuntimeError(
+                "cc-switch 缺少运行库：" + ", ".join(missing)
+                + "。请在 WSL 里执行：sudo apt-get install -y " + pkgs
+            )
+        # Keep launch stderr so a non-lib failure (display, config) is
+        # diagnosable instead of silently swallowed.
+        log_dir = config.agent_box_home() / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        with open(log_dir / "acs-launch.log", "a") as fh:
+            subprocess.Popen(
+                [str(binary)],
+                stdout=fh, stderr=subprocess.STDOUT,
+                start_new_session=True,
+            )
+
+    def install_acs_deps(self) -> dict:
+        """Install the Tauri GUI libs cc-switch needs (headless apt).
+
+        A bare WSL has no webkit2gtk-4.1, so the bundled cc-switch dies on
+        launch with ``error while loading shared libraries``.  This runs the
+        apt install via ``sudo -n`` (non-interactive); if sudo needs a
+        password, it fails fast and the caller shows the manual command.
+        """
+        binary = _resolve_acs()
+        if binary is None:
+            raise RuntimeError(
+                "cc-switch not found — install it from the Environment page"
+            )
+        missing = _acs_missing_libs(binary)
+        if not missing:
+            return {"ok": True, "output": "no missing libs", "manual": ""}
+        pkgs = _acs_missing_lib_packages(missing)
+        manual = "sudo apt-get install -y " + " ".join(pkgs)
+        # Refresh the index first — a fresh WSL may have an empty package list.
+        try:
+            subprocess.run(
+                ["sudo", "-n", "apt-get", "update", "-qq"],
+                capture_output=True, text=True, timeout=300,
+            )
+        except subprocess.TimeoutExpired:
+            pass
+        try:
+            proc = subprocess.run(
+                ["sudo", "-n", "apt-get", "install", "-y"] + pkgs,
+                capture_output=True, text=True, timeout=600,
+            )
+        except subprocess.TimeoutExpired:
+            raise RuntimeError("安装运行库超时。请手动执行：" + manual)
+        if proc.returncode != 0:
+            # sudo -n fails with "a password is required" — surface the command.
+            raise RuntimeError("自动安装需要 sudo 密码。请在 WSL 里手动执行：" + manual)
+        return {"ok": True, "output": (proc.stdout or proc.stderr or "").strip(), "manual": ""}
 
     # ── Environment / provisioning ───────────────────────────────────
 
@@ -638,16 +734,24 @@ class LinuxDataAccess:
         # NOTE: never run `cc-switch --version` here — cc-switch is a Tauri GUI
         # app that does not answer a --version probe and instead LAUNCHES its
         # window, which the probe then kills on timeout.  Report presence only.
+        acs_missing = _acs_missing_libs(acs) if acs else []
+        acs_broken_reason = (
+            "缺少运行库: " + ", ".join(acs_missing)
+            + " — 运行 sudo apt-get install -y "
+            + " ".join(_acs_missing_lib_packages(acs_missing))
+            if acs_missing
+            else None
+        )
         out.append({
             "kind": "acs",
             "agent_type": "acs",
             "name": "cc-switch",
             "installed": acs is not None,
-            "broken": False,
+            "broken": bool(acs_missing),
             "path": str(acs) if acs else None,
             "version": _acs_version(str(acs)) if acs else None,
             "latest_version": None,
-            "latest_error": None,
+            "latest_error": acs_broken_reason,
         })
         return out
 

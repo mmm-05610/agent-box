@@ -534,6 +534,13 @@ class Api:
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
 
+    def install_acs_deps(self) -> str:
+        """Install the Tauri GUI libs cc-switch needs (headless apt in WSL)."""
+        try:
+            return json.dumps({"ok": True, "data": self._data.install_acs_deps()})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
 
 # ── Entry point ───────────────────────────────────────────────────────
 

@@ -23,7 +23,9 @@ import shlex
 import shutil
 import subprocess
 import sys
+import threading
 import time
+import urllib.request
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -508,6 +510,10 @@ class WslDataAccess:
         """
         _wsl_rpc("launch_acs")
 
+    def install_acs_deps(self) -> dict:
+        """Install the Tauri GUI libs cc-switch needs, inside WSL (sudo -n)."""
+        return _wsl_rpc("install_acs_deps")
+
     # ── Environment / provisioning ──────────────────────────────────
 
     def check_binaries(self) -> list:
@@ -545,13 +551,13 @@ class WslDataAccess:
         return info
 
     def download_update(self) -> dict:
-        """Start an async BITS download of the installer (Windows) or open the
-        browser (non-Windows).  Caller polls :meth:`get_download_progress`.
+        """Start a background Python download of the installer.
 
-        ``Start-BitsTransfer`` is the Windows-native downloader: it honors the
-        WinINET system proxy automatically, resumes interrupted transfers, and
-        runs headless — no console window, no progress flashes.  Progress is
-        read back from the BITS job via ``BytesTransferred/BytesTotal``.
+        Zero PowerShell/BITS: ``urllib`` streams the asset through the WinINET
+        system proxy (read from the registry), reporting progress as it goes.
+        Returns immediately — callers poll :meth:`get_download_progress`.
+        (BITS was version-fragile and overkill: the installer downloads in
+        seconds, so resume/retry machinery buys nothing on every Windows.)
         """
         info = self.get_latest_version()
         if not info.get("asset_url") or info.get("latest") == info.get("current"):
@@ -562,83 +568,120 @@ class WslDataAccess:
             import webbrowser
             webbrowser.open(info["asset_url"])
             return {"started": True, "dest": "", "mode": "browser"}
-        # Drop any stale BITS job, then start a fresh async transfer.
-        subprocess.run(
-            ["powershell", "-NoProfile", "-NonInteractive", "-Command",
-             "Remove-BitsTransfer -Name agent-box-update -ErrorAction SilentlyContinue"],
-            capture_output=True, timeout=20, creationflags=_NO_WINDOW,
-        )
-        ps = (
-            'Start-BitsTransfer -Source "{url}" -Destination "{dest}" '
-            '-Asynchronous -DisplayName agent-box-update'
-        ).format(url=info["asset_url"], dest=dest)
-        subprocess.run(
-            ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
-            capture_output=True, timeout=30, creationflags=_NO_WINDOW,
-        )
+        state = getattr(self, "_dl_state", None)
+        if state and state.get("status") == "downloading":
+            return {"started": True, "dest": str(dest), "mode": "urllib"}
         self._dl_state = {
             "status": "downloading",
             "bytes_written": 0,
             "bytes_total": 0,
             "dest": str(dest),
         }
-        return {"started": True, "dest": str(dest), "mode": "bits"}
+        threading.Thread(
+            target=self._download_worker, args=(info["asset_url"], dest),
+            daemon=True,
+        ).start()
+        return {"started": True, "dest": str(dest), "mode": "urllib"}
+
+    @staticmethod
+    def _wininet_proxy():
+        """System HTTP/HTTPS proxy from the WinINET registry — the same
+        settings browsers and BITS use (``ProxyEnable`` + ``ProxyServer``)."""
+        try:
+            import winreg
+            key = winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER,
+                r"Software\Microsoft\Windows\CurrentVersion\Internet Settings",
+            )
+            try:
+                enabled, _ = winreg.QueryValueEx(key, "ProxyEnable")
+            except OSError:
+                enabled = 0
+            if enabled:
+                try:
+                    server, _ = winreg.QueryValueEx(key, "ProxyServer")
+                    return server or None
+                except OSError:
+                    return None
+            return None
+        except Exception:
+            return None
+
+    @staticmethod
+    def _proxy_handler(server):
+        """Map a WinINET ProxyServer string to a urllib ProxyHandler.
+
+        Handles both ``host:port`` and ``http=h;https=h;...`` forms.  Returns
+        an env-fallback handler when *server* is empty (rare on Windows)."""
+        if not server:
+            return urllib.request.ProxyHandler()
+        if "=" in server:
+            proxies = {}
+            for part in server.split(";"):
+                if "=" in part:
+                    scheme, value = part.split("=", 1)
+                    if scheme in ("http", "https"):
+                        proxies[scheme] = value
+            return urllib.request.ProxyHandler(proxies)
+        return urllib.request.ProxyHandler({"http": server, "https": server})
+
+    def _download_worker(self, url: str, dest: Path) -> None:
+        """Stream *url* to *dest* in 64 KiB chunks, updating ``_dl_state``."""
+        state = self._dl_state
+        try:
+            proxy = self._wininet_proxy()
+            if proxy:
+                opener = urllib.request.build_opener(self._proxy_handler(proxy))
+            else:
+                opener = urllib.request.build_opener()
+            req = urllib.request.Request(url, headers={"User-Agent": "agent-box-updater"})
+            with opener.open(req, timeout=30) as resp, open(dest, "wb") as fh:
+                total = int(resp.headers.get("Content-Length") or 0)
+                state["bytes_total"] = total
+                done = 0
+                while True:
+                    chunk = resp.read(64 * 1024)
+                    if not chunk:
+                        break
+                    fh.write(chunk)
+                    done += len(chunk)
+                    state["bytes_written"] = done
+            state["status"] = "done"
+        except Exception as e:
+            state["status"] = "error"
+            state["error"] = f"下载失败：{e}"
 
     def get_download_progress(self) -> dict:
-        """Poll the running BITS download; returns ``{status, bytes_written,
-        bytes_total, dest}``.  Status: idle | downloading | done | error.
-
-        On completion the transfer is finalized with ``Complete-BitsTransfer``
-        but the installer is NOT launched — the UI shows a confirm first and
-        calls :meth:`launch_update_installer`.  All powershell spawns are
-        headless (``_NO_WINDOW``) so no consoles flash on the 1s poll.
-        """
+        """Read the background download's live state.  ``{status, bytes_written,
+        bytes_total, dest}``; status: idle | downloading | done | error.  The
+        worker thread mutates the dict in place, so this is a plain read."""
         state = getattr(self, "_dl_state", None)
         if not state:
             return {"status": "idle", "bytes_written": 0, "bytes_total": 0, "dest": ""}
-        if state.get("status") in ("done", "error"):
-            return state
-        ps = (
-            '$j = Get-BitsTransfer -Name agent-box-update -ErrorAction SilentlyContinue; '
-            'if ($j) { "{0}|{1}|{2}" -f $j.JobState, $j.BytesTransferred, $j.BytesTotal } '
-            'else { "MISSING" }'
-        )
-        out = subprocess.run(
-            ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
-            capture_output=True, text=True, timeout=20, creationflags=_NO_WINDOW,
-        ).stdout.strip()
-        try:
-            bits_state, written, total = out.split("|")
-        except ValueError:
-            return state
-        state["bytes_written"] = int(written or 0)
-        state["bytes_total"] = int(total or 0)
-        if bits_state == "Transferred":
-            subprocess.run(
-                ["powershell", "-NoProfile", "-NonInteractive", "-Command",
-                 "Get-BitsTransfer -Name agent-box-update | Complete-BitsTransfer"],
-                capture_output=True, timeout=30, creationflags=_NO_WINDOW,
-            )
-            state["status"] = "done"
-        elif bits_state in ("Error", "TransientError"):
-            state["status"] = "error"
-        else:
-            state["status"] = "downloading"
         return state
 
     def launch_update_installer(self) -> dict:
-        """Launch the downloaded Inno installer silently.
+        """Launch the downloaded Inno installer silently, elevated.
 
         ``/VERYSILENT /SUPPRESSMSGBOXES`` installs without a wizard window;
         ``CloseApplications`` in setup.iss force-closes the running app first.
-        Returns the installer path.
+        setup.iss targets ``{autopf}`` (Program Files) with
+        ``PrivilegesRequired=lowest`` — an UNELEVATED silent run cannot write
+        there, so we elevate via ``Start-Process -Verb RunAs`` (the standard
+        UAC prompt).  No ``-Wait``: the silent installer force-closes the
+        running app mid-RPC, so we fire-and-forget.  Returns the installer path.
         """
         state = getattr(self, "_dl_state", None)
         dest = (state or {}).get("dest") or ""
         if not dest or not Path(dest).exists():
             raise RuntimeError("installer not downloaded yet")
+        ps = (
+            f'Start-Process -FilePath "{dest}" '
+            '-ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART" '
+            '-Verb RunAs'
+        )
         subprocess.Popen(
-            [dest, "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"],
+            ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
             cwd=str(Path(dest).parent),
             creationflags=_NO_WINDOW,
         )
