@@ -541,6 +541,13 @@ class Api:
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
 
+    def install_acs_deps_manual(self) -> str:
+        """Pop a WSL terminal that runs the apt install (interactive sudo)."""
+        try:
+            return json.dumps({"ok": True, "data": self._data.install_acs_deps_manual()})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
 
 # ── Entry point ───────────────────────────────────────────────────────
 

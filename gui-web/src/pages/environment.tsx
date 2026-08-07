@@ -25,6 +25,7 @@ import {
   getDownloadProgress,
   getInstallProgress,
   installAcsDeps,
+  installAcsDepsManual,
   installBinary,
   launchAcs,
   launchUpdateInstaller,
@@ -84,9 +85,24 @@ export function EnvironmentPage() {
       await installBinary(b.agentType)
       await new Promise<void>((resolve) => {
         let tries = 0
+        // Stall detection: a silent npm/pip step (npm --silent, big download)
+        // emits no new log lines for minutes, which reads as "frozen".  After
+        // 45s of unchanged output, flag it so the UI says "still working, be
+        // patient" instead of looking dead.
+        let lastSig = ''
+        let stallStart: number | null = null
         const tick = async () => {
           const p = await getInstallProgress()
-          setInstallProg((m) => ({ ...m, [b.agentType]: p }))
+          const now = Date.now()
+          const sig = (p.output || []).join('\n')
+          if (sig === lastSig) {
+            if (stallStart === null) stallStart = now
+          } else {
+            lastSig = sig
+            stallStart = null
+          }
+          const stalled = stallStart !== null && now - stallStart > 45000
+          setInstallProg((m) => ({ ...m, [b.agentType]: stalled ? { ...p, stalled } : p }))
           if (p.status === 'done') return resolve()
           if (p.status === 'error') {
             if (!retried && p.error && p.error.includes('ENOTEMPTY')) {
@@ -153,17 +169,36 @@ export function EnvironmentPage() {
   }
 
   const [acsDepsBusy, setAcsDepsBusy] = useState(false)
+  // Set when the headless apt needs a sudo password — offer the terminal flow.
+  const [acsDepsNeedsTerminal, setAcsDepsNeedsTerminal] = useState(false)
   const handleInstallAcsDeps = async () => {
     setAcsDepsBusy(true)
     try {
       await installAcsDeps()
+      setAcsDepsNeedsTerminal(false)
       toast({ type: 'success', message: t('environment.acsDepsInstalled') })
       await refresh()
     } catch (e) {
       const msg = e instanceof Error ? e.message : ''
+      setAcsDepsNeedsTerminal(/sudo|密码/.test(msg))
       toast({ type: 'error', message: msg || t('environment.acsDepsFailed') })
     } finally {
       setAcsDepsBusy(false)
+    }
+  }
+
+  const [acsDepsTermBusy, setAcsDepsTermBusy] = useState(false)
+  const handleInstallAcsDepsTerminal = async () => {
+    setAcsDepsTermBusy(true)
+    try {
+      await installAcsDepsManual()
+      setAcsDepsNeedsTerminal(false)
+      toast({ type: 'info', message: t('environment.acsDepsTerminalOpened') })
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : ''
+      toast({ type: 'error', message: msg || t('environment.acsDepsFailed') })
+    } finally {
+      setAcsDepsTermBusy(false)
     }
   }
 
@@ -401,6 +436,11 @@ export function EnvironmentPage() {
                             <TinySpinner className="mt-0.5" />
                             <div className="min-w-0 flex-1">
                               <div>{t('environment.installingRuntime', { elapsed: installProg[b.agentType].elapsed })}</div>
+                              {installProg[b.agentType].stalled && (
+                                <div className="mt-1 text-amber-600 dark:text-amber-400">
+                                  {t('environment.installStalled')}
+                                </div>
+                              )}
                               {installProg[b.agentType].output.length > 0 && (
                                 <div className="mt-0.5 whitespace-pre-wrap break-all text-muted-foreground/70">
                                   {installProg[b.agentType].output.slice(-2).join('\n')}
@@ -449,7 +489,12 @@ export function EnvironmentPage() {
               </div>
             </div>
             {acs?.installed && acs.broken ? (
-              <Button size="sm" onClick={() => void handleInstallAcsDeps()} isLoading={acsDepsBusy}>{t('environment.installAcsDeps')}</Button>
+              <div className="flex shrink-0 items-center gap-2">
+                {acsDepsNeedsTerminal && (
+                  <Button size="sm" variant="outline" onClick={() => void handleInstallAcsDepsTerminal()} isLoading={acsDepsTermBusy}>{t('environment.acsDepsTerminal')}</Button>
+                )}
+                <Button size="sm" onClick={() => void handleInstallAcsDeps()} isLoading={acsDepsBusy}>{t('environment.installAcsDeps')}</Button>
+              </div>
             ) : acs?.installed ? (
               <Button size="sm" onClick={() => void handleAcsOpen()}>{t('environment.openAcs')}</Button>
             ) : (
