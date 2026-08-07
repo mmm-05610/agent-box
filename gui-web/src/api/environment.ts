@@ -92,10 +92,16 @@ export async function downloadUpdate(): Promise<DownloadStart> {
 }
 
 export async function getDownloadProgress(): Promise<DownloadProgress> {
-  return call<DownloadProgress>(
+  const raw = await call<Record<string, unknown>>(
     (api) => api.get_download_progress!(),
-    { status: 'idle', bytesWritten: 0, bytesTotal: 0, dest: '' },
+    {},
   )
+  return {
+    status: (raw.status as DownloadProgress['status']) ?? 'idle',
+    bytesWritten: Number(raw.bytes_written) || 0,
+    bytesTotal: Number(raw.bytes_total) || 0,
+    dest: (raw.dest as string) ?? '',
+  }
 }
 
 export async function launchUpdateInstaller(): Promise<void> {
