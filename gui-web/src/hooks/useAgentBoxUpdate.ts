@@ -30,10 +30,10 @@ export function useAgentBoxUpdate() {
   const [info, setInfo] = useState<VersionInfo | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (force = false) => {
     setLoading(true)
     try {
-      setInfo(await fetchLatestVersion())
+      setInfo(await fetchLatestVersion(force))
     } catch {
       setInfo(null)
     } finally {

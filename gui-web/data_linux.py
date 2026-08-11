@@ -856,11 +856,16 @@ class LinuxDataAccess:
         return {"status": "running", "elapsed": elapsed,
                 "output": tail, "error": None, "hint": None}
 
-    def get_latest_version(self) -> dict:
-        """Latest agent-box version via the releases.atom feed (cached 10min)."""
+    def get_latest_version(self, force: bool = False) -> dict:
+        """Latest agent-box version via the releases.atom feed (cached 10min).
+
+        ``force=True`` bypasses the cache — the Environment page's explicit
+        "re-check" uses it so a freshly-published release shows up without an
+        app restart.
+        """
         from agent_box import __version__
         cached = getattr(self, "_box_latest_cache", None)
-        if cached and cached[0] > time.monotonic() - 600:
+        if not force and cached and cached[0] > time.monotonic() - 600:
             info = dict(cached[1])
             info["current"] = __version__
             return info

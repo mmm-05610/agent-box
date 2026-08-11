@@ -55,7 +55,7 @@ export function EnvironmentPage() {
     setChecking(true)
     try {
       await refresh()
-      await refreshUpdate()
+      await refreshUpdate(true)  // force: bypass the 10-min latest-version cache
     } finally {
       setChecking(false)
     }
