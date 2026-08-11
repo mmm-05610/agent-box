@@ -551,18 +551,20 @@ class WslDataAccess:
         """Poll the detached WSL install (status/elapsed/output/error)."""
         return _wsl_rpc("get_install_progress")
 
-    def get_latest_version(self) -> dict:
+    def get_latest_version(self, force: bool = False) -> dict:
         """Latest agent-box version via the public releases.atom feed.
 
         The API endpoint (``api.github.com/releases/latest``) is rate-limited
         per-IP (60/hr unauthenticated) and exhausted on shared NAT/proxy IPs,
         so we read the ``releases.atom`` feed on ``github.com`` instead — no
         rate cap, same host as the installer download.  Cached ~10min so the
-        per-page-load badge check doesn't re-fetch.
+        per-page-load badge check doesn't re-fetch; the Environment page's
+        explicit "re-check" passes ``force=True`` to bypass the cache (else a
+        stale cached version hides a freshly-published release until restart).
         """
         current = self.get_version()
         cached = getattr(self, "_latest_cache", None)
-        if cached and cached[0] > time.monotonic() - 600:
+        if not force and cached and cached[0] > time.monotonic() - 600:
             info = dict(cached[1])
             info["current"] = current
             return info
@@ -647,30 +649,50 @@ class WslDataAccess:
         return urllib.request.ProxyHandler({"http": server, "https": server})
 
     def _download_worker(self, url: str, dest: Path) -> None:
-        """Stream *url* to *dest* in 64 KiB chunks, updating ``_dl_state``."""
+        """Stream *url* to *dest* in 64 KiB chunks, updating ``_dl_state``.
+
+        Verifies before reporting done: a proxy drop can close the connection
+        early, urllib's read() then returns EOF WITHOUT raising, and the result
+        is a truncated installer that fails to install (observed: 2.75MB of a
+        48MB file marked "done").  Checks bytes-vs-Content-Length + the PE
+        ``MZ`` magic, and retries a truncated fetch up to twice.
+        """
         state = self._dl_state
-        try:
-            proxy = self._wininet_proxy()
-            if proxy:
-                opener = urllib.request.build_opener(self._proxy_handler(proxy))
-            else:
-                opener = urllib.request.build_opener()
-            req = urllib.request.Request(url, headers={"User-Agent": "agent-box-updater"})
-            with opener.open(req, timeout=30) as resp, open(dest, "wb") as fh:
-                total = int(resp.headers.get("Content-Length") or 0)
-                state["bytes_total"] = total
-                done = 0
-                while True:
-                    chunk = resp.read(64 * 1024)
-                    if not chunk:
-                        break
-                    fh.write(chunk)
-                    done += len(chunk)
-                    state["bytes_written"] = done
-            state["status"] = "done"
-        except Exception as e:
-            state["status"] = "error"
-            state["error"] = f"下载失败：{e}"
+        for attempt in range(3):
+            state["status"] = "downloading"
+            try:
+                proxy = self._wininet_proxy()
+                if proxy:
+                    opener = urllib.request.build_opener(self._proxy_handler(proxy))
+                else:
+                    opener = urllib.request.build_opener()
+                req = urllib.request.Request(url, headers={"User-Agent": "agent-box-updater"})
+                with opener.open(req, timeout=30) as resp, open(dest, "wb") as fh:
+                    total = int(resp.headers.get("Content-Length") or 0)
+                    state["bytes_total"] = total
+                    done = 0
+                    while True:
+                        chunk = resp.read(64 * 1024)
+                        if not chunk:
+                            break
+                        fh.write(chunk)
+                        done += len(chunk)
+                        state["bytes_written"] = done
+                # Truncation check: content-length promised N, we got less.
+                if total and done != total:
+                    raise OSError(f"下载不完整（{done}/{total} 字节）")
+                # A valid Windows installer starts with the PE "MZ" magic.
+                with open(dest, "rb") as fh:
+                    if fh.read(2) != b"MZ":
+                        raise OSError("下载的文件不是有效的安装程序")
+                state["status"] = "done"
+                return
+            except Exception as e:
+                if attempt < 2:
+                    state["error"] = f"下载中断，重试中（第 {attempt + 1}/2 次）：{e}"
+                    continue
+                state["status"] = "error"
+                state["error"] = f"下载失败：{e}"
 
     def get_download_progress(self) -> dict:
         """Read the background download's live state.  ``{status, bytes_written,
@@ -682,27 +704,31 @@ class WslDataAccess:
         return state
 
     def launch_update_installer(self) -> dict:
-        """Launch the downloaded Inno installer silently, elevated.
+        """Launch the downloaded Inno installer silently — UNELEVATED.
 
-        ``/VERYSILENT /SUPPRESSMSGBOXES`` installs without a wizard window;
-        ``CloseApplications`` in setup.iss force-closes the running app first.
-        setup.iss targets ``{autopf}`` (Program Files) with
-        ``PrivilegesRequired=lowest`` — an UNELEVATED silent run cannot write
-        there, so we elevate via ``Start-Process -Verb RunAs`` (the standard
-        UAC prompt).  No ``-Wait``: the silent installer force-closes the
-        running app mid-RPC, so we fire-and-forget.  Returns the installer path.
+        setup.iss uses ``PrivilegesRequired=lowest``, so an unelevated run
+        installs PER-USER to ``{localappdata}\\Programs\\AgentBox`` — exactly
+        where the app lives.  Elevating (``-Verb RunAs``) would make ``{autopf}``
+        resolve to the machine-wide ``Program Files``, installing a SECOND copy
+        the user's shortcut never points at — the update appeared to "not
+        take".  No elevation, no UAC, same directory.  ``CloseApplications``
+        force-closes the running app mid-RPC, so we fire-and-forget.
         """
         state = getattr(self, "_dl_state", None)
         dest = (state or {}).get("dest") or ""
         if not dest or not Path(dest).exists():
             raise RuntimeError("installer not downloaded yet")
-        ps = (
-            f'Start-Process -FilePath "{dest}" '
-            '-ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART" '
-            '-Verb RunAs'
-        )
+        # Sanity-check the file BEFORE launching: a truncated/partial installer
+        # (from an interrupted or pre-fix download) would fail silently.  The
+        # worker now verifies, but refuse a bad file here too (belt + braces).
+        size = Path(dest).stat().st_size
+        total = (state or {}).get("bytes_total") or 0
+        if total and size < total:
+            raise RuntimeError(f"安装包不完整（{size}/{total} 字节）— 请重新下载")
+        if size < 1_000_000 or open(dest, "rb").read(2) != b"MZ":
+            raise RuntimeError("安装包无效 — 请重新下载")
         subprocess.Popen(
-            ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
+            [str(dest), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"],
             cwd=str(Path(dest).parent),
             creationflags=_NO_WINDOW,
         )

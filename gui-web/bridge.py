@@ -95,6 +95,13 @@ class Api:
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
 
+    def refresh_latest_version(self) -> str:
+        """Bypass the 10-min cache — explicit "re-check" from the Environment page."""
+        try:
+            return json.dumps({"ok": True, "data": self._data.get_latest_version(force=True)})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
     def download_update(self) -> str:
         """Start the installer download (async BITS on Windows / browser)."""
         try:

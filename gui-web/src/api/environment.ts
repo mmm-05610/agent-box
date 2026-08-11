@@ -115,9 +115,9 @@ export async function installAcsDepsManual(): Promise<AcsDepsManualResult> {
   )
 }
 
-export async function fetchLatestVersion(): Promise<VersionInfo> {
+export async function fetchLatestVersion(force = false): Promise<VersionInfo> {
   return call<VersionInfo>(
-    (api) => api.get_latest_version!(),
+    (api) => (force ? api.refresh_latest_version!() : api.get_latest_version!()),
     { current: '', latest: '', asset_url: '', release_url: '', notes: '' },
   )
 }
