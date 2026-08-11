@@ -2,6 +2,13 @@
 
 All notable changes to agent-box will be documented in this file.
 
+## [1.6.3](https://github.com/mmm-05610/agent-box/compare/v1.6.2...v1.6.3) (2026-08-11)
+
+
+### Bug Fixes
+
+* **gui:** update-install reliability + force re-check + no-shutdown Windows build ([#37](https://github.com/mmm-05610/agent-box/issues/37)) ([d38f8b5](https://github.com/mmm-05610/agent-box/commit/d38f8b5e719ea70a0c3f7c21b47e881aa1018d15))
+
 ## [1.6.2](https://github.com/mmm-05610/agent-box/compare/v1.6.1...v1.6.2) (2026-08-07)
 
 
