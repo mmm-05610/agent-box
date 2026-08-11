@@ -114,12 +114,17 @@ def main() -> int:
         if not ok:
             missing.append(f'{AGENT_TYPES} lacks install/latest — stale runtime (9P view)')
 
-    # Windows-side modules bridge.py imports (bundled into the PYZ).
+    # Windows-side modules bridge.py imports.  Pure Python modules are stored
+    # INSIDE the PYZ blob, not the main TOC — so search the decompressed PYZ
+    # bytes for the module name (a false alarm in the main-TOC check would
+    # wrongly FAIL a valid exe).
+    pyz_name = next((e['name'] for e in entries if e['name'].lower().endswith('.pyz')), None)
+    pyz_raw = _extract(entries, exe, pyz_name) if pyz_name else None
     for mod in WINDOWS_MODULES:
-        ok = mod in names
-        print(f'  {"OK " if ok else "MISSING"} {mod} (Windows bridge module)')
+        ok = pyz_raw is not None and mod.encode() in pyz_raw
+        print(f'  {"OK " if ok else "MISSING"} {mod} (Windows bridge module, in PYZ)')
         if not ok:
-            missing.append(f'{mod} not bundled — bridge.py import will crash on launch')
+            missing.append(f'{mod} not bundled in PYZ — bridge.py import will crash on launch')
 
     if missing:
         print(f'FAIL: runtime incomplete — missing {len(missing)} required item(s)')
