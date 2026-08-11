@@ -732,4 +732,15 @@ class WslDataAccess:
             cwd=str(Path(dest).parent),
             creationflags=_NO_WINDOW,
         )
+        # setup.iss's CloseApplications can FAIL to terminate the running
+        # onefile app (bootloader + extracted child + lingering WebView2 procs
+        # hold the exe lock), and /VERYSILENT suppresses the "files in use"
+        # dialog — the install hangs.  Force-kill our own process image; the
+        # installer (setup.exe, a different image) survives as an orphan and
+        # finds nothing to close.  Deliberately NO /T: /T would kill the
+        # installer too.  Fire-and-forget — this process is about to die anyway.
+        subprocess.Popen(
+            ["taskkill", "/F", "/IM", "agent-box-gui.exe"],
+            creationflags=_NO_WINDOW,
+        )
         return {"launched": str(dest)}
