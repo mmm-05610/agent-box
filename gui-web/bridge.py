@@ -6,6 +6,7 @@ Environment-agnostic shell. Picks the right DataAccess at startup:
 """
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -559,7 +560,34 @@ class Api:
 # ── Entry point ───────────────────────────────────────────────────────
 
 
+def _cleanup_stale_mei() -> None:
+    """删除之前被 taskkill 强杀后残留的 PyInstaller 解压目录（_MEI）。
+
+    bootloader 正常退出会清理自己的 _MEI；被 taskkill /F 强杀时来不及，
+    就残留在 %TEMP% 里——既是磁盘垃圾，又可能通过环境变量把旧 runtime 路径
+    带进新进程。清理时跳过当前进程自己的 _MEI（sys._MEIPASS）。
+    """
+    import tempfile
+    current = getattr(sys, "_MEIPASS", None)
+    tempdir = tempfile.gettempdir()
+    try:
+        names = os.listdir(tempdir)
+    except OSError:
+        return
+    for name in names:
+        if not name.startswith("_MEI"):
+            continue
+        path = os.path.join(tempdir, name)
+        if not os.path.isdir(path):
+            continue
+        if current and os.path.normcase(path) == os.path.normcase(current):
+            continue
+        shutil.rmtree(path, ignore_errors=True)
+
+
 def main():
+    if getattr(sys, "frozen", False):
+        _cleanup_stale_mei()
     if _is_windows():
         # data_linux is imported lazily so Windows never needs agent_box
         # importable — it is only loaded when running the GUI in WSL/Linux.
