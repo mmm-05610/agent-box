@@ -2,6 +2,13 @@
 
 All notable changes to agent-box will be documented in this file.
 
+## [1.8.0](https://github.com/mmm-05610/agent-box/compare/v1.7.8...v1.8.0) (2026-08-15)
+
+
+### Features
+
+* **gui:** config-file editor in settings page (generic get/set resource) ([#59](https://github.com/mmm-05610/agent-box/issues/59)) ([1e92dc7](https://github.com/mmm-05610/agent-box/commit/1e92dc78a1c1e32aa473d5d8bf9072f36c4c092e))
+
 ## [1.7.8](https://github.com/mmm-05610/agent-box/compare/v1.7.7...v1.7.8) (2026-08-15)
 
 
