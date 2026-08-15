@@ -2,6 +2,13 @@
 
 All notable changes to agent-box will be documented in this file.
 
+## [1.7.1](https://github.com/mmm-05610/agent-box/compare/v1.7.0...v1.7.1) (2026-08-15)
+
+
+### Bug Fixes
+
+* **build:** stage data_wsl.py + verify Windows bridge module ([#39](https://github.com/mmm-05610/agent-box/issues/39)) ([7574802](https://github.com/mmm-05610/agent-box/commit/7574802bba1684e7c0873179c09d3777bf4dd0cc))
+
 ## [1.7.0](https://github.com/mmm-05610/agent-box/compare/v1.6.4...v1.7.0) (2026-08-11)
 
 
