@@ -2,6 +2,13 @@
 
 All notable changes to agent-box will be documented in this file.
 
+## [1.7.7](https://github.com/mmm-05610/agent-box/compare/v1.7.6...v1.7.7) (2026-08-15)
+
+
+### Bug Fixes
+
+* **gui:** silent update + manual reopen (drop auto-relaunch) ([#55](https://github.com/mmm-05610/agent-box/issues/55)) ([f00e847](https://github.com/mmm-05610/agent-box/commit/f00e8471945f6eb34e9f4d7948b5eb066bb96dd7))
+
 ## [1.7.6](https://github.com/mmm-05610/agent-box/compare/v1.7.5...v1.7.6) (2026-08-15)
 
 
