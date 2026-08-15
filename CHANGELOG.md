@@ -2,6 +2,13 @@
 
 All notable changes to agent-box will be documented in this file.
 
+## [1.7.4](https://github.com/mmm-05610/agent-box/compare/v1.7.3...v1.7.4) (2026-08-15)
+
+
+### Bug Fixes
+
+* **build:** scrub PyInstaller env vars in installer's [Run] postinstall ([#49](https://github.com/mmm-05610/agent-box/issues/49)) ([b48824b](https://github.com/mmm-05610/agent-box/commit/b48824bb0ec33eb034b0e2c584561c82e00a3fb5))
+
 ## [1.7.3](https://github.com/mmm-05610/agent-box/compare/v1.7.2...v1.7.3) (2026-08-15)
 
 
