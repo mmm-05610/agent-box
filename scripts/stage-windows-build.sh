@@ -23,8 +23,12 @@ mkdir -p "$DEST/gui-web" "$DEST/build" "$DEST/assets"
 cp agent-box-gui.spec setup.iss "$DEST/"
 
 # Frontend bundle + Windows entry/RPC shims.
+# NOTE: data_wsl.py is the WINDOWS-side bridge backend (bridge.py imports it);
+# omitting it makes both the source run AND the PyInstaller Analysis miss the
+# module → built exe crashes on launch with ModuleNotFoundError.  data_linux.py
+# is the lazy Linux path (also needed); rpc_server.py is copied into build/runtime.
 cp -r gui-web/dist "$DEST/gui-web/dist"
-cp gui-web/bridge.py gui-web/rpc_server.py gui-web/data_linux.py "$DEST/gui-web/"
+cp gui-web/bridge.py gui-web/rpc_server.py gui-web/data_linux.py gui-web/data_wsl.py "$DEST/gui-web/"
 
 # WSL self-contained runtime (built by scripts/build-gui-runtime.sh).
 cp -r build/runtime "$DEST/build/runtime"

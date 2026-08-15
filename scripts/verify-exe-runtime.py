@@ -34,6 +34,15 @@ REQUIRED = (
 )
 AGENT_TYPES = 'runtime/agent_box/core/agent_types.json'
 
+# Windows-side module bridge.py imports at the TOP level.  PyInstaller bundles
+# it into the PYZ (name carries no path).  If the build source dir (e.g. the
+# staged C:\\agentbox-build) is missing it, Analysis silently skips the import
+# and the exe crashes on launch with ModuleNotFoundError — which the runtime/
+# checks can't see.  (data_linux / rpc_server live in the WSL runtime and are
+# covered by the runtime/ entries above; they are not top-level Windows PYZ
+# imports.)
+WINDOWS_MODULES = ('data_wsl',)
+
 
 def _entries(exe_path: str) -> list[dict]:
     data = open(exe_path, 'rb').read()
@@ -104,6 +113,18 @@ def main() -> int:
         print(f'  {"OK " if ok else "STALE"} {AGENT_TYPES} has install/latest fields')
         if not ok:
             missing.append(f'{AGENT_TYPES} lacks install/latest — stale runtime (9P view)')
+
+    # Windows-side modules bridge.py imports.  Pure Python modules are stored
+    # INSIDE the PYZ blob, not the main TOC — so search the decompressed PYZ
+    # bytes for the module name (a false alarm in the main-TOC check would
+    # wrongly FAIL a valid exe).
+    pyz_name = next((e['name'] for e in entries if e['name'].lower().endswith('.pyz')), None)
+    pyz_raw = _extract(entries, exe, pyz_name) if pyz_name else None
+    for mod in WINDOWS_MODULES:
+        ok = pyz_raw is not None and mod.encode() in pyz_raw
+        print(f'  {"OK " if ok else "MISSING"} {mod} (Windows bridge module, in PYZ)')
+        if not ok:
+            missing.append(f'{mod} not bundled in PYZ — bridge.py import will crash on launch')
 
     if missing:
         print(f'FAIL: runtime incomplete — missing {len(missing)} required item(s)')
