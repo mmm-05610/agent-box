@@ -133,6 +133,16 @@ def launch(name: str, extra_args: list | None = None, cwd: str | None = None) ->
         argv.extend(extra_args)
 
     env = dict(os.environ)
+    # 清掉 PyInstaller 解压目录（_MEI）相关的环境污染。launch_profile 用
+    # PYTHONPATH={_MEI/runtime} 拉起本进程，会把 _MEI 路径带进 PYTHONPATH /
+    # PATH / _MEIPASS；这些对 WSL 侧的 agent 无用，且会让 agent 里跑 python
+    # 读版本号时读到旧 runtime。逐一剥掉，避免污染 agent 会话。
+    for _key in ("PATH", "PYTHONPATH"):
+        env[_key] = os.pathsep.join(
+            p for p in env.get(_key, "").split(os.pathsep) if "_MEI" not in p
+        )
+    env.pop("_MEIPASS", None)
+    env.pop("_MEIPASS2", None)
     print(
         f"{config.DISPLAY_NAME}: launching {agent_type} as profile {name!r} "
         f"(mount: {pdir} → {rdir})",
