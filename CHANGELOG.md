@@ -2,6 +2,13 @@
 
 All notable changes to agent-box will be documented in this file.
 
+## [1.7.8](https://github.com/mmm-05610/agent-box/compare/v1.7.7...v1.7.8) (2026-08-15)
+
+
+### Bug Fixes
+
+* **registry:** claude provider missing metadata_fields — active provider not detected ([#57](https://github.com/mmm-05610/agent-box/issues/57)) ([6ec3415](https://github.com/mmm-05610/agent-box/commit/6ec3415db24f782f2f194bfe197627d7c9ec2340))
+
 ## [1.7.7](https://github.com/mmm-05610/agent-box/compare/v1.7.6...v1.7.7) (2026-08-15)
 
 
