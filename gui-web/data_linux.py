@@ -481,6 +481,21 @@ class LinuxDataAccess:
         """Persist the projects dir (config.set_projects_dir)."""
         config.set_projects_dir(value)
 
+    def list_config_files(self) -> list:
+        """Registry of user-editable config files (metadata only, no content)."""
+        from agent_box.resources import config_files
+        return config_files.list_config_files()
+
+    def get_config_file(self, key: str) -> dict:
+        """Read a config file's raw content + metadata for the editor."""
+        from agent_box.resources import config_files
+        return config_files.read_config_file(key)
+
+    def save_config_file(self, key: str, content: str) -> None:
+        """Validate + atomically write a config file."""
+        from agent_box.resources import config_files
+        config_files.write_config_file(key, content)
+
     # ── Sessions ────────────────────────────────────────────────────
 
     def list_sessions(self) -> list:
