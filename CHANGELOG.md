@@ -2,6 +2,13 @@
 
 All notable changes to agent-box will be documented in this file.
 
+## [1.7.5](https://github.com/mmm-05610/agent-box/compare/v1.7.4...v1.7.5) (2026-08-15)
+
+
+### Bug Fixes
+
+* clear _PYI_APPLICATION_HOME_DIR (the real _MEI leak) + revert broken cmd fix ([#51](https://github.com/mmm-05610/agent-box/issues/51)) ([c91f893](https://github.com/mmm-05610/agent-box/commit/c91f893e483d7be03ba920705832c0648074c08d))
+
 ## [1.7.4](https://github.com/mmm-05610/agent-box/compare/v1.7.3...v1.7.4) (2026-08-15)
 
 
