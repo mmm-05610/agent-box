@@ -742,6 +742,7 @@ class WslDataAccess:
         env = dict(os.environ)
         env.pop("_MEIPASS", None)
         env.pop("_MEIPASS2", None)
+        env.pop("_PYI_APPLICATION_HOME_DIR", None)
         subprocess.Popen(
             [str(dest), "/NORESTART"],
             cwd=str(Path(dest).parent),
