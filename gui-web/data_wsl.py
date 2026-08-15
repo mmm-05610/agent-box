@@ -727,9 +727,25 @@ class WslDataAccess:
             raise RuntimeError(f"安装包不完整（{size}/{total} 字节）— 请重新下载")
         if size < 1_000_000 or open(dest, "rb").read(2) != b"MZ":
             raise RuntimeError("安装包无效 — 请重新下载")
+        # Run the installer with its WIZARD VISIBLE (no /VERYSILENT): the user
+        # gets live status ("正在安装..."), sees errors instead of silent
+        # failure, and the finish page's "运行 Agent Box" checkbox (postinstall
+        # in setup.iss) auto-launches the new version.  We previously ran
+        # /VERYSILENT — the app vanished with zero feedback and skipifsilent
+        # meant nothing relaunched it.
         subprocess.Popen(
-            [str(dest), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"],
+            [str(dest), "/NORESTART"],
             cwd=str(Path(dest).parent),
+        )
+        # setup.iss's CloseApplications can FAIL to terminate the running
+        # onefile app (bootloader + extracted child + lingering WebView2 procs
+        # hold the exe lock), and /VERYSILENT suppresses the "files in use"
+        # dialog — the install hangs.  Force-kill our own process image; the
+        # installer (setup.exe, a different image) survives as an orphan and
+        # finds nothing to close.  Deliberately NO /T: /T would kill the
+        # installer too.  Fire-and-forget — this process is about to die anyway.
+        subprocess.Popen(
+            ["taskkill", "/F", "/IM", "agent-box-gui.exe"],
             creationflags=_NO_WINDOW,
         )
         return {"launched": str(dest)}

@@ -2,6 +2,20 @@
 
 All notable changes to agent-box will be documented in this file.
 
+## [1.7.0](https://github.com/mmm-05610/agent-box/compare/v1.6.4...v1.7.0) (2026-08-11)
+
+
+### Features
+
+* **gui:** run the update installer with its wizard visible + auto-relaunch ([#42](https://github.com/mmm-05610/agent-box/issues/42)) ([3297f3a](https://github.com/mmm-05610/agent-box/commit/3297f3ac84e7b55a7566a6d82db36c643b0363d6))
+
+## [1.6.4](https://github.com/mmm-05610/agent-box/compare/v1.6.3...v1.6.4) (2026-08-11)
+
+
+### Bug Fixes
+
+* **gui:** force-kill the running app before the silent update install ([#40](https://github.com/mmm-05610/agent-box/issues/40)) ([1b8eadf](https://github.com/mmm-05610/agent-box/commit/1b8eadf7ef5b632b034138a62d5548883f69f59d))
+
 ## [1.6.3](https://github.com/mmm-05610/agent-box/compare/v1.6.2...v1.6.3) (2026-08-11)
 
 
