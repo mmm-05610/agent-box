@@ -47,4 +47,14 @@ Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFile
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\assets/logo.ico"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
+; 不再自动拉起新版本。沿「旧GUI → 安装器 → 新GUI」进程链泄漏的
+; _PYI_APPLICATION_HOME_DIR（PyInstaller onefile 解压目录指针）会让新 GUI
+; 复用旧解压目录、读到旧版本号（或 bootloader 报变量未定义）。改为安装完成
+; 后由安装器弹框提醒用户手动重开 —— 从桌面双击 = 干净进程树，版本号一定正确。
+
+[Code]
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep = ssPostInstall then
+    MsgBox('Agent Box 安装完成，请打开 Agent Box。', mbInformation, MB_OK);
+end;

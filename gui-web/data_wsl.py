@@ -728,23 +728,19 @@ class WslDataAccess:
             raise RuntimeError(f"安装包不完整（{size}/{total} 字节）— 请重新下载")
         if size < 1_000_000 or open(dest, "rb").read(2) != b"MZ":
             raise RuntimeError("安装包无效 — 请重新下载")
-        # Run the installer with its WIZARD VISIBLE (no /VERYSILENT): the user
-        # gets live status ("正在安装..."), sees errors instead of silent
-        # failure, and the finish page's "运行 Agent Box" checkbox (postinstall
-        # in setup.iss) auto-launches the new version.  We previously ran
-        # /VERYSILENT — the app vanished with zero feedback and skipifsilent
-        # meant nothing relaunched it.
-        # 启动安装器前，清除 PyInstaller 的 _MEIPASS 环境变量。否则它会沿
-        # 「旧GUI → 安装器 → 新GUI」的进程链泄漏：新 GUI 的 bootloader 检测到
-        # 已设置的 _MEIPASS 就复用它（而非生成新的 _MEI 解压目录），读到旧
-        # runtime 的版本号（症状：更新后版本号还是旧版）。手动重启则是干净
-        # 环境、生成新 _MEI，所以版本号才对。
+        # 后台静默安装（/VERYSILENT）：不弹向导、不自动拉起新版本。setup.iss
+        # 已删掉 [Run] 自动拉起，安装完成后由安装器自己弹框「安装完成，请重新
+        # 打开」—— 用户手动双击启动 = 干净进程树，绕开 _PYI_APPLICATION_HOME_DIR
+        # 沿「旧GUI → 安装器 → 新GUI」进程链泄漏的问题（症状：更新后版本号还是
+        # 旧版，或 bootloader 报 _PYI_APPLICATION_HOME_DIR 未定义）。
+        # 启动前仍清除 _MEIPASS/_PYI_APPLICATION_HOME_DIR，双保险：即使以后
+        # 再加自动拉起，也不让安装器继承旧解压目录。
         env = dict(os.environ)
         env.pop("_MEIPASS", None)
         env.pop("_MEIPASS2", None)
         env.pop("_PYI_APPLICATION_HOME_DIR", None)
         subprocess.Popen(
-            [str(dest), "/NORESTART"],
+            [str(dest), "/VERYSILENT", "/NORESTART"],
             cwd=str(Path(dest).parent),
             env=env,
         )
