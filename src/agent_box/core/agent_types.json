@@ -33,7 +33,8 @@
       },
       "acs_column": "enabled_claude",
       "install": "npm install -g @anthropic-ai/claude-code@latest",
-      "latest": { "type": "npm", "package": "@anthropic-ai/claude-code" }
+      "latest": { "type": "npm", "package": "@anthropic-ai/claude-code" },
+      "config_files": ["settings.json"]
     },
     "resources": {
       "provider": {
