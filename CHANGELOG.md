@@ -2,6 +2,13 @@
 
 All notable changes to agent-box will be documented in this file.
 
+## [1.7.2](https://github.com/mmm-05610/agent-box/compare/v1.7.1...v1.7.2) (2026-08-15)
+
+
+### Bug Fixes
+
+* **gui:** clear _MEIPASS before launching the update installer ([#45](https://github.com/mmm-05610/agent-box/issues/45)) ([51ae9e6](https://github.com/mmm-05610/agent-box/commit/51ae9e603de9cdd7ac986ef043b8de986f434195))
+
 ## [1.7.1](https://github.com/mmm-05610/agent-box/compare/v1.7.0...v1.7.1) (2026-08-15)
 
 
