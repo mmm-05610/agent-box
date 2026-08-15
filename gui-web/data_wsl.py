@@ -336,6 +336,15 @@ class WslDataAccess:
     def save_projects_dir(self, value: str) -> None:
         _wsl_rpc("save_projects_dir", value)
 
+    def list_config_files(self) -> list:
+        return _wsl_rpc("list_config_files")
+
+    def get_config_file(self, key: str) -> dict:
+        return _wsl_rpc("get_config_file", key)
+
+    def save_config_file(self, key: str, content: str) -> None:
+        _wsl_rpc("save_config_file", key, content)
+
     # ── Apply / Remove ──────────────────────────────────────────────
 
     def apply_provider(self, profile_name: str, provider_id: str) -> None:

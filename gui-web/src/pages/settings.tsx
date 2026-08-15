@@ -5,9 +5,9 @@
  * preview swatches instead of just glyphs.
  */
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Button, Card } from '@/components/ui'
+import { Button, Card, Textarea } from '@/components/ui'
 import { useToast } from '@/components/feedback/toast'
 import { PageHeader } from '@/components/layout'
 import { cn } from '@/lib/utils'
@@ -17,6 +17,7 @@ import { toHomeRelative } from '@/lib/path'
 import { LANG_KEY, readStoredLanguage, type UILanguage } from '@/i18n'
 import { useHomeDir, useProjectsDir, useVersion } from '@/hooks'
 import { saveProjectsDir } from '@/api/agentConfigs'
+import { getConfigFile, listConfigFiles, saveConfigFile, type ConfigFileMeta } from '@/api/config'
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
@@ -282,6 +283,11 @@ export function SettingsPage() {
         </Card>
       </Section>
 
+      {/* ── Config Files ───────────────────────────────────────────── */}
+      <Section title={t('settings.section.config')} description={t('settings.config.desc')}>
+        <ConfigFilesSection />
+      </Section>
+
       {/* ── About ────────────────────────────────────────────────────── */}
       <Section title={t('settings.section.about')}>
         <Card>
@@ -306,6 +312,114 @@ export function SettingsPage() {
         </Card>
       </Section>
     </div>
+  )
+}
+
+// ── Config Files ────────────────────────────────────────────────────────
+
+function ConfigFilesSection() {
+  const { t } = useTranslation()
+  const { toast } = useToast()
+  const [files, setFiles] = useState<ConfigFileMeta[]>([])
+  const [openKey, setOpenKey] = useState<string | null>(null)
+  const [edited, setEdited] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  const reload = useCallback(async () => {
+    setFiles(await listConfigFiles())
+  }, [])
+
+  useEffect(() => { void reload() }, [reload])
+
+  const toggle = async (key: string) => {
+    if (openKey === key) {
+      setOpenKey(null)
+      return
+    }
+    setOpenKey(key)
+    setLoading(true)
+    try {
+      const f = await getConfigFile(key)
+      setEdited(f.content)
+    } catch (e) {
+      setOpenKey(null)
+      toast({ type: 'error', message: e instanceof Error ? e.message : t('settings.config.saveFailed') })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const save = async () => {
+    if (!openKey) return
+    setSaving(true)
+    try {
+      await saveConfigFile(openKey, edited)
+      await reload()
+      toast({ type: 'success', message: t('settings.config.saved') })
+    } catch (e) {
+      toast({ type: 'error', message: e instanceof Error ? e.message : t('settings.config.saveFailed') })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Card>
+      <div className="divide-y divide-border">
+        {files.map((f) => {
+          const isOpen = openKey === f.key
+          return (
+            <div key={f.key}>
+              <button
+                type="button"
+                onClick={() => void toggle(f.key)}
+                className="flex w-full items-center gap-3 px-5 py-3.5 text-left transition-colors hover:bg-muted/40"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium font-mono">{f.path}</span>
+                    <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono uppercase text-muted-foreground">
+                      {f.format}
+                    </span>
+                    {!f.exists && (
+                      <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-600 dark:text-amber-400">
+                        {t('settings.config.notExists')}
+                      </span>
+                    )}
+                  </div>
+                  <div className="truncate text-[11px] text-muted-foreground">{f.description}</div>
+                </div>
+                <span className="shrink-0 text-xs text-muted-foreground">
+                  {isOpen ? t('settings.config.close') : t('settings.config.open')}
+                </span>
+              </button>
+              {isOpen && (
+                <div className="border-t border-border px-5 py-3">
+                  {loading ? (
+                    <div className="py-4 text-center text-sm text-muted-foreground">…</div>
+                  ) : (
+                    <>
+                      <Textarea
+                        value={edited}
+                        onChange={(e) => setEdited(e.target.value)}
+                        rows={Math.min(20, Math.max(6, edited.split('\n').length + 2))}
+                        className="font-mono text-xs"
+                      />
+                      <div className="mt-2 flex items-center justify-end">
+                        <Button size="sm" onClick={() => void save()} isLoading={saving}>
+                          {t('settings.config.save')}
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </Card>
   )
 }
 

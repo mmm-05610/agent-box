@@ -181,6 +181,28 @@ class Api:
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
 
+    def list_config_files(self) -> str:
+        """Registry of user-editable config files (metadata only)."""
+        try:
+            return json.dumps({"ok": True, "data": self._data.list_config_files()})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    def get_config_file(self, key: str) -> str:
+        """Read a config file's raw content + metadata for the editor."""
+        try:
+            return json.dumps({"ok": True, "data": self._data.get_config_file(key)})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    def save_config_file(self, key: str, content: str) -> str:
+        """Validate + atomically write a config file."""
+        try:
+            self._data.save_config_file(key, content)
+            return json.dumps({"ok": True})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
     # ── Profiles ─────────────────────────────────────────────────────
 
     def list_profiles(self) -> str:
