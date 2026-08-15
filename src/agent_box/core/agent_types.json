@@ -42,7 +42,16 @@
         "strategy": "json_merge",
         "config_file": "settings.json",
         "env_source_key": "env",
-        "metadata_key": "_provider"
+        "metadata_key": "_provider",
+        "metadata_fields": [
+          "id",
+          "name",
+          "notes",
+          "website_url",
+          "icon",
+          "icon_color",
+          "category"
+        ]
       },
       "mcp": {
         "config_file": "dot-claude.json",
