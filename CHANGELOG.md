@@ -2,6 +2,13 @@
 
 All notable changes to agent-box will be documented in this file.
 
+## [1.7.3](https://github.com/mmm-05610/agent-box/compare/v1.7.2...v1.7.3) (2026-08-15)
+
+
+### Bug Fixes
+
+* scrub _MEI pollution from agent env + cleanup stale extraction dirs ([#47](https://github.com/mmm-05610/agent-box/issues/47)) ([e12cc0a](https://github.com/mmm-05610/agent-box/commit/e12cc0a6cd959d51dd1d4100e4725d0de4979a55))
+
 ## [1.7.2](https://github.com/mmm-05610/agent-box/compare/v1.7.1...v1.7.2) (2026-08-15)
 
 
