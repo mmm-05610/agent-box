@@ -18,6 +18,7 @@ touch no agent_box code, so they carry no CLI dependency either.
 
 import base64
 import json
+import os
 import re
 import shlex
 import shutil
@@ -733,9 +734,18 @@ class WslDataAccess:
         # in setup.iss) auto-launches the new version.  We previously ran
         # /VERYSILENT — the app vanished with zero feedback and skipifsilent
         # meant nothing relaunched it.
+        # 启动安装器前，清除 PyInstaller 的 _MEIPASS 环境变量。否则它会沿
+        # 「旧GUI → 安装器 → 新GUI」的进程链泄漏：新 GUI 的 bootloader 检测到
+        # 已设置的 _MEIPASS 就复用它（而非生成新的 _MEI 解压目录），读到旧
+        # runtime 的版本号（症状：更新后版本号还是旧版）。手动重启则是干净
+        # 环境、生成新 _MEI，所以版本号才对。
+        env = dict(os.environ)
+        env.pop("_MEIPASS", None)
+        env.pop("_MEIPASS2", None)
         subprocess.Popen(
             [str(dest), "/NORESTART"],
             cwd=str(Path(dest).parent),
+            env=env,
         )
         # setup.iss's CloseApplications can FAIL to terminate the running
         # onefile app (bootloader + extracted child + lingering WebView2 procs
