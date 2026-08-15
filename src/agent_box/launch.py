@@ -143,6 +143,7 @@ def launch(name: str, extra_args: list | None = None, cwd: str | None = None) ->
         )
     env.pop("_MEIPASS", None)
     env.pop("_MEIPASS2", None)
+    env.pop("_PYI_APPLICATION_HOME_DIR", None)
     print(
         f"{config.DISPLAY_NAME}: launching {agent_type} as profile {name!r} "
         f"(mount: {pdir} → {rdir})",
