@@ -2,6 +2,13 @@
 
 All notable changes to agent-box will be documented in this file.
 
+## [1.7.6](https://github.com/mmm-05610/agent-box/compare/v1.7.5...v1.7.6) (2026-08-15)
+
+
+### Bug Fixes
+
+* **registry:** claude runtime missing config_files — provider tab blank ([#53](https://github.com/mmm-05610/agent-box/issues/53)) ([a5aca2e](https://github.com/mmm-05610/agent-box/commit/a5aca2ecb379fee1652230d933b6e44e93144ec0))
+
 ## [1.7.5](https://github.com/mmm-05610/agent-box/compare/v1.7.4...v1.7.5) (2026-08-15)
 
 
