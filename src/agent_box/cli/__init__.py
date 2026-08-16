@@ -1,8 +1,10 @@
 """Command-line entry point for agent-box.
 
-Three modes:
+Modes:
 
-- ``agent-box`` (no args) → interactive REPL
+- ``agent-box`` (no args) → terminal dashboard (TUI)
+- ``agent-box tui`` → same dashboard, explicit
+- ``agent-box repl`` → interactive cmd2 REPL
 - ``agent-box exec "<script>"`` → run commands and exit
 - ``agent-box --version`` → print version
 """
@@ -28,7 +30,10 @@ def _build_parser() -> argparse.ArgumentParser:
         version=f"%(prog)s {__version__}",
     )
     sub = parser.add_subparsers(dest="command")
-    parser.set_defaults(func=cmd_repl)
+    parser.set_defaults(func=cmd_tui)  # no args → terminal dashboard
+
+    p_tui = sub.add_parser("tui", help="Start the terminal dashboard (TUI)")
+    p_tui.set_defaults(func=cmd_tui)
 
     p_repl = sub.add_parser("repl", help="Start the interactive agent-box REPL")
     p_repl.set_defaults(func=cmd_repl)
@@ -38,6 +43,19 @@ def _build_parser() -> argparse.ArgumentParser:
     p_exec.set_defaults(func=cmd_exec)
 
     return parser
+
+
+def cmd_tui(_args: argparse.Namespace) -> int:
+    if not sys.stdin.isatty():
+        print(
+            f"{PROG}: the dashboard needs an interactive terminal "
+            "(use `agent-box repl` or `agent-box exec` for non-interactive use)",
+            file=sys.stderr,
+        )
+        return 2
+    from ..tui.app import AgentBoxTui
+    AgentBoxTui().run()
+    return 0
 
 
 def cmd_repl(_args: argparse.Namespace) -> int:
