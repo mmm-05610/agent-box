@@ -24,17 +24,29 @@ class SessionRepo:
     def _is_pid_alive(pid: int | None) -> bool:
         if pid is None:
             return False
+        # Check the whole process GROUP (negative pid), not the single process.
+        # launch() runs bwrap with start_new_session=True, so its pid == pgid:
+        # a forking agent that outlives its immediate bwrap parent still keeps
+        # the group (and thus the session) alive.
         try:
-            os.kill(pid, 0)
+            os.kill(-pid, 0)
             return True
         except (OSError, ProcessLookupError):
             return False
 
     @staticmethod
-    def _cleanup_zombies(conn: sqlite3.Connection) -> int:
-        rows = conn.execute(
-            "SELECT id, pid FROM sessions WHERE exited_at IS NULL"
-        ).fetchall()
+    def _cleanup_zombies(conn: sqlite3.Connection, grace_seconds: int = 5) -> int:
+        # Grace period: skip sessions launched in the last `grace_seconds` —
+        # the recorded bwrap pid may not be observable yet, and we'd wrongly
+        # mark a just-launched agent as exited (the "started 1s ago, already
+        # -1" bug).  grace_seconds <= 0 disables the grace entirely, so the
+        # explicit cleanup runs immediately on every running session.
+        query = "SELECT id, pid FROM sessions WHERE exited_at IS NULL"
+        params: tuple = ()
+        if grace_seconds > 0:
+            query += " AND launched_at < datetime('now', ?)"
+            params = (f"-{int(grace_seconds)} seconds",)
+        rows = conn.execute(query, params).fetchall()
         cleaned = 0
         for r in rows:
             if not SessionRepo._is_pid_alive(r["pid"]):
@@ -131,10 +143,13 @@ class SessionRepo:
         return out
 
     def cleanup_stale(self) -> int:
-        """Mark dead-PID sessions as exited. Returns count cleaned."""
+        """Mark dead-PID sessions as exited. Returns count cleaned.
+
+        Explicit cleanup — no grace period (the user asked for it now).
+        """
         conn = _core_db.get_conn()
         with _core_db.write_lock:
-            cleaned = self._cleanup_zombies(conn)
+            cleaned = self._cleanup_zombies(conn, grace_seconds=0)
             conn.commit()
             return cleaned
 

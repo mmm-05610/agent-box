@@ -154,8 +154,12 @@ def launch(name: str, extra_args: list | None = None, cwd: str | None = None) ->
 
     mode = config.MODE_RESUME if extra_args else config.MODE_NEW
 
-    # Use subprocess instead of execvpe so we can record exit
-    proc = _sp.Popen(argv, env=env)
+    # Use subprocess instead of execvpe so we can record exit.
+    # start_new_session=True detaches bwrap (and thus the agent) into its own
+    # session/process group: closing the terminal kills this launcher but NOT
+    # the agent, so the recorded PID stays a reliable liveness signal —
+    # fetch_sessions checks os.kill(-pid, 0) against that whole group.
+    proc = _sp.Popen(argv, env=env, start_new_session=True)
     # Track the AGENT's pid (the bwrap process), not the launcher's
     # os.getpid(): if the launcher (console / wsl.exe / python -c) dies
     # while the bwrap agent keeps running, the session must still show as
