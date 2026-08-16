@@ -2,6 +2,13 @@
 
 All notable changes to agent-box will be documented in this file.
 
+## [1.9.0](https://github.com/mmm-05610/agent-box/compare/v1.8.0...v1.9.0) (2026-08-16)
+
+
+### Features
+
+* TUI 仪表盘 + session 追踪修复 + bwrap 检测 ([#61](https://github.com/mmm-05610/agent-box/issues/61)) ([b73c9dd](https://github.com/mmm-05610/agent-box/commit/b73c9dd9f7e553a3dd11a3463cf4073ffe72c402))
+
 ## [1.8.0](https://github.com/mmm-05610/agent-box/compare/v1.7.8...v1.8.0) (2026-08-15)
 
 
