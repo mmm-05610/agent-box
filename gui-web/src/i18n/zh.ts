@@ -817,6 +817,7 @@ export const zh: TranslationSchema = {
       agentBox: 'agent-box 更新',
       agents: 'Agent 二进制',
       acs: 'ACS（cc-switch）',
+      runtime: '运行时依赖',
     },
     agentsDesc: '检测 WSL 内已安装的 agent 框架，缺失可一键安装',
     acsDesc: 'cc-switch 配置库，缺失时首次打开会自动安装',

@@ -10,7 +10,7 @@
 import { call } from '@/lib/bridge'
 
 export interface BinaryInfo {
-  kind: 'agent' | 'acs'
+  kind: 'agent' | 'acs' | 'bwrap'
   agentType: string
   name: string
   installed: boolean
