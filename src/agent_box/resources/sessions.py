@@ -24,15 +24,18 @@ class SessionRepo:
     def _is_pid_alive(pid: int | None) -> bool:
         if pid is None:
             return False
-        # Check the whole process GROUP (negative pid), not the single process.
-        # launch() runs bwrap with start_new_session=True, so its pid == pgid:
-        # a forking agent that outlives its immediate bwrap parent still keeps
-        # the group (and thus the session) alive.
-        try:
-            os.kill(-pid, 0)
-            return True
-        except (OSError, ProcessLookupError):
-            return False
+        # Prefer the process GROUP (negative pid): launch() runs bwrap with
+        # start_new_session=True so pid == pgid, and a forking agent that
+        # outlives its immediate bwrap parent still keeps the group alive.
+        # Fall back to the single-process check for PIDs that aren't group
+        # leaders (e.g. a test passing os.getpid()).
+        for target in (-pid, pid):
+            try:
+                os.kill(target, 0)
+                return True
+            except (OSError, ProcessLookupError):
+                continue
+        return False
 
     @staticmethod
     def _cleanup_zombies(conn: sqlite3.Connection, grace_seconds: int = 5) -> int:
