@@ -818,6 +818,7 @@ export const en = {
       agentBox: 'agent-box update',
       agents: 'Agent binaries',
       acs: 'ACS (cc-switch)',
+      runtime: 'Runtime dependencies',
     },
     agentsDesc: 'Detect agent frameworks inside WSL; one-click install if missing',
     acsDesc: 'cc-switch config store; auto-installs on first open if missing',

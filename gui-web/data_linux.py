@@ -417,6 +417,10 @@ class LinuxDataAccess:
 
     def launch_profile(self, name: str, agent_type: str, mode: str, cwd: str = "") -> dict:
         """Launch a profile in a new terminal window via xterm/WSLg."""
+        if not shutil.which(config.BWRAP):
+            raise RuntimeError(
+                "bwrap 未安装，无法启动 profile。请先运行：sudo apt-get install -y bubblewrap"
+            )
         agent_config = get_agent_config(agent_type)
         launch_block = (
             (agent_config.get("runtime") or {}).get("launch")
@@ -788,6 +792,25 @@ class LinuxDataAccess:
             "version": _acs_version(str(acs)) if acs else None,
             "latest_version": None,
             "latest_error": acs_broken_reason,
+        })
+
+        # bwrap — sandbox runtime dependency for launching any profile.  Not an
+        # "agent" but surfaced here so the Environment page can warn + hint the
+        # one-line install when it's missing.
+        bwrap_path = shutil.which(config.BWRAP)
+        out.append({
+            "kind": "bwrap",
+            "agent_type": "bwrap",
+            "name": "bwrap",
+            "installed": bwrap_path is not None,
+            "broken": bwrap_path is None,
+            "path": bwrap_path,
+            "version": None,
+            "latest_version": None,
+            "latest_error": (
+                None if bwrap_path
+                else "启动 profile 需要 bwrap 沙箱。安装：sudo apt-get install -y bubblewrap"
+            ),
         })
         return out
 

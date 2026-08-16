@@ -47,6 +47,7 @@ export function EnvironmentPage() {
 
   const agents = binaries.filter((b) => b.kind === 'agent')
   const acs = binaries.find((b) => b.kind === 'acs')
+  const bwrap = binaries.find((b) => b.kind === 'bwrap')
 
   // Version-check in progress (manual re-check) — drives the recheck button
   // spinner + per-row "checking version" indicators.
@@ -500,6 +501,33 @@ export function EnvironmentPage() {
             ) : (
               <Button size="sm" onClick={() => void installOne(acs!)} isLoading={isUpdating('acs')}>{t('environment.installAcs')}</Button>
             )}
+          </div>
+        </Card>
+      </Section>
+
+      {/* ── bwrap (sandbox runtime) ─────────────────────────────── */}
+      <Section title={t('environment.section.runtime')}>
+        <Card>
+          <div className="flex items-center gap-3 p-5">
+            <div className={cn(
+              'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg',
+              bwrap?.installed ? 'bg-emerald-500/10 text-emerald-600' : 'bg-red-500/10 text-red-600',
+            )}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                <rect x="3" y="11" width="18" height="11" rx="2" />
+                <path d="M7 11V7a5 5 0 0110 0v4" />
+              </svg>
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-medium text-foreground">bwrap (sandbox)</div>
+              <div className="truncate text-[11px] text-muted-foreground font-mono">
+                {checking && <TinySpinner className="mr-1.5 inline-block align-[-2px]" />}
+                {bwrap?.installed ? (bwrap.path || t('environment.installed')) : t('environment.notInstalled')}
+              </div>
+              {!bwrap?.installed && bwrap?.latestError && (
+                <div className="mt-1 text-[11px] text-red-600 dark:text-red-400 font-mono">{bwrap.latestError}</div>
+              )}
+            </div>
           </div>
         </Card>
       </Section>
