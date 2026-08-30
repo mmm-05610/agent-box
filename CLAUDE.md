@@ -1,62 +1,18 @@
-# agent-box — Project Notes for Claude
+# Agent-Box contributor notes
 
-This file is read by Claude Code when working in this repo. It points to
-the canonical docs and flags known landmines.
+Read [CONVENTIONS.md](CONVENTIONS.md), [docs/README.md](docs/README.md),
+[docs/architecture/ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md), and the relevant official plugin
+README before changing code.
 
-**[CONVENTIONS.md](CONVENTIONS.md)** — project-wide rules for both humans
-and AI. All code and AI-assisted changes must follow the conventions
-listed there.
+The repository is organized as a provider-neutral Root Core plus independent
+plugins. Core owns Work, Execution, Binding, Dispatch, Ref, Evidence, and
+atomic finalization. Web, Harness, Git, tmux, and Artifacts behavior belongs
+to the corresponding plugin.
 
-## Documentation index
+Use `pip install -e .` for Root-only work. For Preview contributor work,
+install the Root and official plugins editable. Frontend commands run from
+`plugins/agent-box-web/frontend/`; its build output is owned by the Web
+plugin's `_static/` package-data tree.
 
-### Architecture & design
-
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — design principles + data
-  flow (bwrap launcher, library.db, providers, profile settings).
-- [docs/ROADMAP.md](docs/ROADMAP.md) — feature roadmap and status.
-
-### Specs (planning + design intent)
-
-- [docs/specs/gui-redesign-p1.md](docs/specs/gui-redesign-p1.md) — GUI
-  feature spec.
-- [docs/specs/gui-redesign-p2.md](docs/specs/gui-redesign-p2.md) — GUI
-  visual spec.
-- [docs/specs/cc-switch-style-guide.md](docs/specs/cc-switch-style-guide.md)
-  — design system reference.
-- [docs/specs/frontend-overhaul.md](docs/specs/frontend-overhaul.md) —
-  Phase 1–4 modular refactor plan.
-
-### Troubleshooting (READ THESE BEFORE DEBUGGING)
-
-- [docs/troubleshooting/desktop-launch.md](docs/troubleshooting/desktop-launch.md)
-  — Windows + WSL desktop GUI launcher quirks. Covers the UNC + importlib
-  bug, WSL 9P cold start, bat encoding, Tk font weights, `start` + pushd
-  interactions, and the diagnostic workflow. **Read this first** when the
-  user reports "GUI won't launch".
-
-## Agent workspace convention
-
-**All AI-generated work products MUST go in `workspace/`** (gitignored).
-Never create new top-level directories or files for agent output — use
-`workspace/<descriptive-slug>/` instead. Examples:
-
-- `workspace/planning/` — DW / Codex planning artifacts
-- `workspace/frontend-overhaul/` — DW workflow run records
-
-## Entry points
-
-- **GUI (Windows desktop)**: `gui-web/bridge.py --prod` (PyWebView + React).
-  Build frontend first: `cd gui-web && npm run build`.
-- **CLI (WSL)**: `src/agent_box/cli.py`.
-- **Desktop launcher**: `C:\Users\maoqh\Desktop\AgentBox.bat`
-
-## Known landmines
-
-- **Bat file encoding**: keep ASCII only. Em-dash (—) corrupts to `€?`
-  on Chinese Windows GBK.
-- **PyWebView + PyInstaller**: bridge.py must detect `sys.frozen` to find
-  bundled frontend at `sys._MEIPASS/gui-web/dist/`.
-- **Vite build before PyInstaller**: always run `cd gui-web && npm run build`
-  before packaging, otherwise the exe will be missing the frontend.
-- **Inno Setup paths**: `setup.iss` paths are relative to CWD when running
-  `iscc`, not relative to the script location.
+Runtime homes, logs, worktrees, and generated evidence are local-only and
+must not be committed. Never inspect or print credential values.

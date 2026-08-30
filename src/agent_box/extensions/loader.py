@@ -6,7 +6,7 @@ from importlib import metadata
 from typing import Iterable
 
 from .. import __version__
-from .. import config
+from ..work_core.runtime import agent_box_home
 from ..work_core.registry import ExtensionRegistry
 from .api import (
     PLUGIN_API_VERSION,
@@ -53,7 +53,7 @@ def _entry_points() -> tuple[metadata.EntryPoint, ...]:
 
 
 def _context(descriptor: PluginDescriptor) -> PluginContext:
-    root = config.agent_box_home()
+    root = agent_box_home()
     return PluginContext(
         agent_box_version=__version__,
         agent_box_home=root,

@@ -21,7 +21,7 @@ ExecutionProvider may then project participant commands into those panes. The
 plugin does not add tmux concepts to Work Core.
 
 The package also exports a small tmux-specific `TmuxConsoleController` used by
-explicit consumers such as `agent-box-codex`. It supports race-free pane
+explicit consumers such as the Codex integration in `agent-box-harnesses`. It supports race-free pane
 launch, pane observation, scrollback capture, and cleanup. This is not a
 generic Agent-Box console protocol; a shared protocol should only be extracted
 after another real console product demonstrates the same contract.
@@ -33,3 +33,10 @@ tmux identity and pane state are projected runtime facts, not proof of consumpti
 ## What this plugin cannot prove
 
 This plugin cannot prove all resources were used or claim fully isolated, secure, or attested execution.
+# Agent-Box tmux
+
+The tmux plugin owns exact pane and execution-scoped managed-console Refs.
+Quick Launch can prepare either a managed `tmux-console` Ref or an explicitly
+selected observed `tmux-pane` Ref. Materialization and identity validation
+happen during Dispatch; browser attach only returns a validated provider-owned
+command for copying.

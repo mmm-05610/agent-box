@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from agent_box.extensions.api import FinalizationContribution
-from agent_box import config
+from agent_box.work_core.runtime import agent_box_home
 from agent_box.resource_contracts import WorkspaceV1
 from agent_box.work_core.models import Ref
 from agent_box.work_core.resource_observations import ResourceObservation, ResourceObservationCoverage, ResourceObservationKind, ResourceObservationResult, ResourceObserverRole
@@ -21,7 +21,7 @@ class GitFinalizationContributor:
         if self.provider is None:
             import json
             from pathlib import Path
-            path = config.agent_box_home() / "plugins" / "git" / "config.json"
+            path = agent_box_home() / "plugins" / "git" / "config.json"
             values = json.loads(path.read_text()) if path.exists() else {}
             if not values.get("repo"):
                 raise ValueError(f"configure Git repository in {path}")

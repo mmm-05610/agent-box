@@ -17,7 +17,7 @@ from agent_box_git.contributor import GitFinalizationContributor
 
 @pytest.fixture
 def tmp_agent_box_home(tmp_path, monkeypatch):
-    from agent_box.core.db import _reset_connection_for_tests
+    from agent_box.work_core.db import _reset_connection_for_tests
     home = tmp_path / "ab-home"
     home.mkdir()
     monkeypatch.setenv("AGENT_BOX_HOME", str(home))
@@ -92,15 +92,13 @@ def test_detached_capture_and_e2_materialization(repo, tmp_path):
     assert (w1.path / "added.txt").read_text() == "new\n"
 
 
-def test_empty_capture_reuses_base_and_cleanup_keeps_output(repo, tmp_path):
+def test_empty_capture_is_rejected_and_cleanup_keeps_workspace_safe(repo, tmp_path):
     provider = GitWorkspaceResourceProvider(repo, tmp_path / "managed")
     ref = provider.make_ref("HEAD")
     w1 = provider.resolve(WorkspaceV1.contract_id, ref, context=ResourceResolutionContext("E1"))
-    output, _ = provider.capture(execution_id="E1", workspace=w1, frozen_ref=ref)
-    assert output.native_id == ref.native_id
-    assert git(repo, "show-ref", "--verify", "refs/agent-box/executions/E1/output")
+    with pytest.raises(ValueError, match="NO_WORKSPACE_CHANGES"):
+        provider.capture(execution_id="E1", workspace=w1, frozen_ref=ref)
     provider.cleanup("E1")
-    assert git(repo, "cat-file", "-t", output.native_id) == "commit"
     with pytest.raises(ValueError):
         provider.cleanup("../outside")
 

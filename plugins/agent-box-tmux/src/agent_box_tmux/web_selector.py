@@ -2,7 +2,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Mapping
 from agent_box.extensions import ResourceSelection, SelectorField
-from .contract import TmuxPaneV1
+from .contract import TmuxPaneV1, TmuxConsoleV1
 from .provider import TmuxConsoleResourceProvider
 
 class TmuxPaneSelector:
@@ -20,3 +20,20 @@ class TmuxPaneSelector:
         del execution_id
         ref = self.provider.make_existing_pane_ref(parameters["pane"].strip(), socket_path=Path(parameters["socket"]).expanduser() if parameters.get("socket") else None, replace_policy=parameters.get("replace_policy", "idle-shell-only"))
         return ResourceSelection(self.contract_id, ref, ref.metadata["pane_id"], f'{ref.metadata["session_name"]} · {ref.metadata["window_id"]} · {ref.metadata["pane_id"]}')
+
+
+class TmuxConsoleSelector:
+    """Prepare an execution-scoped managed console without materializing it."""
+    id = "tmux-console"
+    contract_id = TmuxConsoleV1.contract_id
+    title = "Managed tmux console"
+    fields = (SelectorField("layout", "Layout", kind="select", default="tiled", required=False),)
+    def __init__(self): self.provider = None
+    def bind(self, registry): self.provider = registry.get_resource_provider("tmux-console")
+    def choices(self, parameters):
+        return tuple({"value": value, "label": value} for value in ("tiled", "even-horizontal", "even-vertical"))
+    def prepare(self, parameters: Mapping[str, str], *, execution_id: str) -> ResourceSelection:
+        if self.provider is None: raise ValueError("tmux console provider unavailable")
+        layout = parameters.get("layout", "tiled")
+        ref = self.provider.make_ref(execution_id, layout=layout)
+        return ResourceSelection(self.contract_id, ref, "managed tmux", f'{layout} · {ref.native_id}')

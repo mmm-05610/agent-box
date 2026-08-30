@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from agent_box.core import db
+from agent_box.work_core import db
 from agent_box.work_core import (
     ExecutionFinalizationRequest,
     ExecutionProjection,

@@ -1,12 +1,4 @@
-"""Command-line entry point for agent-box.
-
-Modes:
-
-- ``agent-box`` (no args) → help
-- ``agent-box repl`` → interactive cmd2 REPL
-- ``agent-box exec "<script>"`` → run commands and exit
-- ``agent-box --version`` → print version
-"""
+"""Thin command-line entry point for Core diagnostics and installed Hosts."""
 from __future__ import annotations
 
 import argparse
@@ -14,16 +6,17 @@ import json
 import sys
 from typing import List
 
-from .. import __version__, config
+from .. import __version__
+from ..work_core.runtime import DISPLAY_NAME, agent_box_home
 
 
-PROG = config.DISPLAY_NAME
+PROG = DISPLAY_NAME
 
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog=PROG,
-        description="Isolated config launcher for coding agents (bwrap bind mount).",
+        description="Agent-Box Work Core and plugin host launcher.",
     )
     parser.add_argument(
         "--version", action="version",
@@ -32,18 +25,16 @@ def _build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command")
     parser.set_defaults(func=cmd_help)
 
-    p_repl = sub.add_parser("repl", help="Start the interactive agent-box REPL")
-    p_repl.set_defaults(func=cmd_repl)
-
-    p_exec = sub.add_parser("exec", help="Execute a ;-separated command script")
-    p_exec.add_argument("script", nargs="?", help="Commands separated by ;")
-    p_exec.set_defaults(func=cmd_exec)
-
     p_web = sub.add_parser("web", help="Start the local Web Workbench Host")
     p_web.add_argument("--host", default="127.0.0.1")
     p_web.add_argument("--port", type=int, default=4173)
     p_web.add_argument("--no-browser", action="store_true")
     p_web.set_defaults(func=cmd_web)
+
+    p_launch = sub.add_parser("launch", help="Open the Web Workbench Quick Launch")
+    p_launch.add_argument("--host", default="127.0.0.1")
+    p_launch.add_argument("--port", type=int, default=4173)
+    p_launch.set_defaults(func=cmd_launch)
 
     p_doctor = sub.add_parser("doctor", help="Check local Web Host readiness")
     p_doctor.add_argument("--json", action="store_true", dest="as_json")
@@ -75,37 +66,36 @@ def cmd_help(_args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_repl(_args: argparse.Namespace) -> int:
-    from .shell import run_repl
-    return run_repl()
-
-
-def cmd_exec(args: argparse.Namespace) -> int:
-    from .shell import run_exec
-    script = args.script
-    if script is None and not sys.stdin.isatty():
-        script = sys.stdin.read()
-    if not script:
-        print("agent-box exec: no script given (argument or stdin)", file=sys.stderr)
-        return 2
-    return run_exec(script)
-
-
 def cmd_web(args: argparse.Namespace) -> int:
-    from ..server.host import run_server
-    if not args.no_browser:
-        import threading, webbrowser
-        threading.Timer(0.6, lambda: webbrowser.open(f"http://{args.host}:{args.port}")).start()
-    run_server(args.host, args.port)
-    return 0
+    try:
+        from agent_box_web.cli import run
+    except ModuleNotFoundError as exc:
+        if exc.name == "agent_box_web" or (exc.name and exc.name.startswith("agent_box_web.")):
+            print(
+                "agent-box web: Web Host is not installed; install with "
+                "`pip install 'agent-box-cli[web]'` or `pip install agent-box-web`.",
+                file=sys.stderr,
+            )
+            return 1
+        raise
+    return run(host=args.host, port=args.port, open_browser=not args.no_browser)
+
+
+def cmd_launch(args: argparse.Namespace) -> int:
+    try:
+        from agent_box_web.cli import run
+    except ModuleNotFoundError as exc:
+        if exc.name == "agent_box_web" or (exc.name and exc.name.startswith("agent_box_web.")):
+            print("agent-box launch: Web Host is not installed; install with `pip install 'agent-box-cli[web]'` or `pip install agent-box-web`.", file=sys.stderr)
+            return 1
+        raise
+    return run(host=args.host, port=args.port, open_browser=True, initial_route="/quick-launch")
 
 
 def cmd_doctor(args: argparse.Namespace) -> int:
     from shutil import which
     from ..extensions.bootstrap import build_extension_registry
-    from ..server.static import locate_web_static
-    static_dir = locate_web_static()
-    checks = {"AGENT_BOX_HOME": str(config.agent_box_home()), "git": bool(which("git")), "codex": bool(which("codex")), "frontend_static_build": static_dir is not None, "frontend_static_dir": str(static_dir) if static_dir else None}
+    checks = {"AGENT_BOX_HOME": str(agent_box_home()), "git": bool(which("git"))}
     try:
         registry, report = build_extension_registry(strict=False)
         checks["plugin_registry"] = not bool(report.failed)
@@ -113,19 +103,26 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     except Exception:
         checks["plugin_registry"] = False
         checks["execution_providers"] = False
-    from ..application.ownership import MutationOwner
-    owner = MutationOwner(config.agent_box_home())
     try:
-        owner.acquire(); checks["mutation_lock"] = True
-    except (RuntimeError, OSError):
-        checks["mutation_lock"] = False
-    finally:
-        owner.release()
+        from agent_box_web.cli import web_readiness
+    except ModuleNotFoundError as exc:
+        if exc.name == "agent_box_web" or (exc.name and exc.name.startswith("agent_box_web.")):
+            checks.update({"web_plugin": False, "frontend_static_build": False, "frontend_static_dir": None})
+        else:
+            raise
+    else:
+        checks.update(web_readiness())
     if args.as_json:
         print(json.dumps(checks, ensure_ascii=False, sort_keys=True))
     else:
         for key, value in checks.items(): print(f"{key}: {'ok' if value else 'missing'}")
-    return 0 if all(checks.values()) else 1
+    # Providers and the Web Host are optional distributions.  They are
+    # reported for diagnostics, but only an installed Web Host with missing
+    # static data is unhealthy; a root-only installation remains valid.
+    healthy = checks.get("plugin_registry", False)
+    if checks.get("web_plugin"):
+        healthy = healthy and checks.get("frontend_static_build", False)
+    return 0 if healthy else 1
 
 
 def cmd_plugins_list(args: argparse.Namespace) -> int:

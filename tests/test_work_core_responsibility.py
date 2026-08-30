@@ -1,6 +1,6 @@
 import pytest
 
-from agent_box.core import db
+from agent_box.work_core import db
 from agent_box.work_core.events import EventType
 from agent_box.work_core.repository import CoreRepository
 from agent_box.work_core.services import ExecutionService, WorkService

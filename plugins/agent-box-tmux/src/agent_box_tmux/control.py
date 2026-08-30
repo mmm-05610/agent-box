@@ -10,7 +10,7 @@ import shlex
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Sequence
+from typing import Mapping, Sequence
 
 from .contract import TmuxConsoleV1, TmuxPaneV1
 
@@ -111,6 +111,7 @@ class TmuxConsoleController:
         argv: Sequence[str],
         *,
         cwd: str | Path,
+        env: Mapping[str, str] | None = None,
     ) -> None:
         """Replace a pane shell with an exact argv without a send-keys race."""
         self._validate_pane(console, pane_id)
@@ -125,7 +126,19 @@ class TmuxConsoleController:
                 raise ValueError("frozen tmux pane is no longer available")
             if console.replace_policy == "idle-shell-only":
                 self._assert_idle_shell(console, row)
-        command = "exec " + shlex.join(tuple(argv))
+        bounded_env = env or {}
+        if any(not isinstance(key, str) or not isinstance(value, str)
+               for key, value in bounded_env.items()):
+            raise ValueError("tmux launch environment must contain strings")
+        # ``exec KEY=value command`` is not portable when a lower-case
+        # environment name is present; use env only when an environment is
+        # supplied, while preserving the simple command path for panes whose
+        # current-path observation is needed after exit.
+        command = ("exec env " if bounded_env else "exec ") + " ".join(
+            f"{shlex.quote(key)}={shlex.quote(value)}"
+            for key, value in bounded_env.items()
+        )
+        command += (" " if bounded_env else "") + shlex.join(tuple(argv))
         self._run(
             console,
             "set-option",

@@ -74,12 +74,13 @@ class GitWorkspaceResourceProvider:
         _git(workspace.path, "add", "-A")
         tree = _git(workspace.path, "write-tree")
         existing = _git(self.repo, "show-ref", "--hash", f"refs/agent-box/executions/{execution_id}/output") if self._has_ref(execution_id) else ""
+        base_tree = _git(self.repo, "rev-parse", f"{frozen_ref.native_id}^{{tree}}")
+        if tree == base_tree:
+            raise ValueError("NO_WORKSPACE_CHANGES")
         if existing:
             if _git(self.repo, "rev-parse", f"{existing}^{{tree}}") != tree:
                 raise ValueError("internal output ref conflicts with current captured tree")
             commit = existing
-        elif tree == _git(self.repo, "rev-parse", f"{frozen_ref.native_id}^{{tree}}"):
-            commit = frozen_ref.native_id
         else:
             commit = subprocess.run(["git", "-C", str(self.repo), "commit-tree", tree, "-p", frozen_ref.native_id], input=f"Agent-Box execution output {execution_id}\n", text=True, check=True, stdout=subprocess.PIPE).stdout.strip()
         if not existing:

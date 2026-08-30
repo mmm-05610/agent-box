@@ -3,6 +3,7 @@ import hashlib, json, os, re
 from pathlib import Path
 from typing import Any
 from .models import ProfileRef
+from .schema import normalize_profile, validate_public_value
 
 _ID = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$")
 _SECRET = re.compile(r"(secret|token|api[_-]?key|private[_-]?key|password|authorization|credential_value)", re.I)
@@ -57,10 +58,20 @@ class ProfileRepository:
         current=int(versions[-1].stem[1:]) if versions else 0
         if expected_revision is not None and current != expected_revision: raise ValueError("REVISION_CONFLICT")
         revision=current+1
+        # Keep the legacy v1 digest byte-for-byte compatible when callers use
+        # the established ``config`` input. New importer/UI fields are
+        # normalized into config only when no explicit config was supplied.
+        if isinstance(data.get("config"), dict):
+            validate_public_value(data["config"])
+            config = data["config"]
+        else:
+            config = normalize_profile(data)
         payload={"schema_version":1,"harness_id":"codex","profile_id":pid,"name":str(data.get("name") or pid)[:128],
                  "provider":str(data.get("provider") or "codex-profile"),"revision":revision,"disabled":bool(data.get("disabled",False)),
-                 "config":data.get("config") or {},"capability_refs":data.get("capability_refs") or [],"credential_source_ref":data.get("credential_source_ref"),
+                 "config":config,"capability_refs":data.get("capability_refs") or [],"credential_source_ref":data.get("credential_source_ref"),
                  "session_overlay_policy":data.get("session_overlay_policy") or {"mode":"execution-local"}}
+        if "import_provenance" in data:
+            payload["import_provenance"] = data["import_provenance"]
         _check(payload["config"]); _check(payload["capability_refs"]); _check(payload["credential_source_ref"])
         payload["digest"]="sha256:"+hashlib.sha256(_canonical({k:v for k,v in payload.items() if k not in {"digest","revision"}})).hexdigest()
         d.mkdir(mode=0o700, parents=True, exist_ok=True); target=d/f"r{revision}.json"; tmp=target.with_suffix(".tmp")

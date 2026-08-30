@@ -1,8 +1,8 @@
-# CI — backend (pytest) + frontend (vitest + build)
+# CI — Core, official plugins, and plugin-owned frontend
 #
 # Status checks that gate PR merges on main (required by the "main" ruleset).
 # Job names ARE the status-check context IDs the ruleset references:
-#   backend, frontend.
+#   backend, plugins, frontend, wheels.
 name: CI
 on:
   pull_request:
@@ -26,6 +26,33 @@ jobs:
       - name: Test
         run: pytest -q
 
+  plugins:
+    name: ${{ matrix.name }} tests
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {name: web, path: plugins/agent-box-web}
+          - {name: harnesses, path: plugins/agent-box-harnesses}
+          - {name: git, path: plugins/agent-box-git}
+          - {name: tmux, path: plugins/agent-box-tmux}
+          - {name: artifacts, path: plugins/agent-box-artifacts}
+          - {name: pi-third-party, path: plugins/agent-box-pi}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install root and official plugin dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e . -e plugins/agent-box-tmux -e plugins/agent-box-artifacts \
+            -e plugins/agent-box-git -e plugins/agent-box-harnesses -e plugins/agent-box-web
+          if [ "${{ matrix.name }}" = pi-third-party ]; then pip install -e plugins/agent-box-pi; fi
+      - name: Test plugin
+        run: pytest -q "${{ matrix.path }}/tests"
+
   frontend:
     runs-on: ubuntu-latest
     steps:
@@ -34,8 +61,31 @@ jobs:
         with:
           node-version: "22"
       - name: Install
-        run: cd gui-web && npm ci
+        run: cd plugins/agent-box-web/frontend && npm ci
       - name: Unit tests
-        run: cd gui-web && npx vitest run
+        run: cd plugins/agent-box-web/frontend && npm run test:run
+      - name: Lint
+        run: cd plugins/agent-box-web/frontend && npm run lint
       - name: Build
-        run: cd gui-web && npm run build
+        run: cd plugins/agent-box-web/frontend && npm run build
+
+  wheels:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build root and plugin wheels
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build --wheel --outdir /tmp/agent-box-wheels .
+          for package in plugins/agent-box-web plugins/agent-box-harnesses plugins/agent-box-git plugins/agent-box-tmux plugins/agent-box-artifacts; do
+            python -m build --wheel --outdir /tmp/agent-box-wheels "$package"
+          done
+      - name: Verify plugin discovery and doctor
+        run: |
+          python -m venv /tmp/agent-box-ci-venv
+          /tmp/agent-box-ci-venv/bin/pip install /tmp/agent-box-wheels/*.whl
+          /tmp/agent-box-ci-venv/bin/agent-box plugins list --json
+          /tmp/agent-box-ci-venv/bin/agent-box doctor --json

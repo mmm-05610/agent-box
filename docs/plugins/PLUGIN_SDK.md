@@ -92,7 +92,7 @@ missing provider fail with `ProviderUnavailable`.
 Host-neutral Preview registrations may also contribute `resource_selectors`
 and `host_controls`. A selector declares bounded fields and prepares an exact
 `ResourceSelection`; a control exposes attach/observe/finish for its provider.
-These are capability objects, not WorkBoard APIs. The browser receives only
+These are capability objects, not Web Host APIs. The browser receives only
 descriptors and bounded summaries; the selector remains the authority for
 parameter validation and Ref preparation.
 
@@ -108,6 +108,6 @@ Plugins may register execution-provider descriptors, resource selectors,
 resource providers, finalization contributors, and Host control/attach
 capabilities through `PluginRegistration`. Selectors expose only bounded
 fields, choices, requested summaries, exact prepared selections, and
-assurance. The Web Workbench renders these declarations generically; plugin
-code owns authority and provider-specific validation. Plugins must not depend
-on WorkBoard or the legacy UI.
+assurance. The Web Host renders these declarations generically; plugin code
+owns authority and provider-specific validation. Plugins must not depend on a
+particular Host UI or retired UI implementation.

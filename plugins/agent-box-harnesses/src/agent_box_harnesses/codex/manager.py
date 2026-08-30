@@ -1,10 +1,9 @@
 from __future__ import annotations
 from agent_box.extensions import ResourceSelection, SelectorField
 from agent_box.resource_contracts import AgentBoxProfileV1
-from agent_box.work_core import RefType
-from agent_box.work_core.providers.resources import profile_contract_digest
 from .runtime import CodexProfileProvider
 from ..profiles.repository import _check
+from ..importers import legacy_candidates, legacy_preview, cc_switch_candidates, cc_switch_preview
 
 class CodexHarnessManager:
     harness_id="codex"
@@ -28,6 +27,31 @@ class CodexHarnessManager:
         except Exception as e: errors.append(str(e))
         return {"valid":not errors,"errors":errors}
     def projection_preview(self,pid,revision=None): return self.provider.projection.preview(self.repo.ref(pid,revision))
+    def import_sources(self): return ("legacy-agent-box", "cc-switch")
+    def import_candidates(self, source_type, root):
+        if source_type == "legacy-agent-box": return [x.__dict__ for x in legacy_candidates(root)]
+        if source_type == "cc-switch": return [x.__dict__ for x in cc_switch_candidates(root)]
+        raise ValueError("IMPORT_SOURCE_UNSUPPORTED")
+    def import_preview(self, source_type, root, source_id):
+        candidates = legacy_candidates(root) if source_type == "legacy-agent-box" else cc_switch_candidates(root) if source_type == "cc-switch" else ()
+        candidate = next((x for x in candidates if x.source_id == source_id), None)
+        if candidate is None: raise ValueError("IMPORT_CANDIDATE_NOT_FOUND")
+        return (legacy_preview if source_type == "legacy-agent-box" else cc_switch_preview)(candidate).public()
+    def confirm_import(self, preview, expected_revision=None):
+        data = dict(preview.get("profile") or {})
+        provenance = data.get("import_provenance") or {}
+        for existing in self.repo.list():
+            if existing["name"] == data.get("name"):
+                current = self.repo.get(existing["profile_id"])
+                if current.get("import_provenance") == provenance:
+                    return current
+        pid = data.get("profile_id") or data.get("name", "").strip().lower().replace(" ", "-")
+        data["profile_id"] = pid
+        if not any(x["profile_id"] == pid for x in self.repo.list()):
+            return self.create(data)
+        if expected_revision is None:
+            raise ValueError("IMPORT_EXPECTED_REVISION_REQUIRED")
+        return self.update(pid, data, int(expected_revision))
     def diagnostics(self):
         credential=self.credentials.diagnostics(); binary=self.credentials.binary; version="unavailable"
         if binary:

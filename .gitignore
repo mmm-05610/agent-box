@@ -29,6 +29,9 @@ node_modules/
 
 # --- Agent workspace (AI-generated artifacts, never commit) ---
 workspace/
+.superpowers/
+home/
+report-source.md
 .agent-box/
 .agent-box*/
 .workboard-preview-home/
@@ -56,10 +59,6 @@ spikes/**/runtime/
 spikes/preview_provider_validation/langgraph_app/.env
 .agent-box/runtime/
 src/agent_box/templates/hermes/.env
-
-# --- Nested dependency/build output ---
-acs/node_modules/
-acs/src-tauri/target/
 
 # --- Local agent config dirs (per-host, never commit) ---
 # These are agent runtimes that store identity/credentials on the host.

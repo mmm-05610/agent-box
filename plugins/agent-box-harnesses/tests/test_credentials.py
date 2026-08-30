@@ -1,3 +1,4 @@
+from pathlib import Path
 from agent_box_harnesses.codex.credentials import CodexCredentialSource
 from agent_box_harnesses.codex.launch import CodexLaunchAdapter
 from agent_box_harnesses.profiles.projection import Projection
@@ -40,3 +41,8 @@ def test_launch_environment_is_bounded_and_sandbox_mode_is_not_external(tmp_path
     assert plan.env["no_proxy"] == "127.0.0.1,localhost"
     assert "UNRELATED_RUNTIME_VALUE" not in plan.env
     assert plan.env["CODEX_HOME"].endswith("/E1")
+    assert plan.profile_revision == 1
+    assert plan.profile_digest == value["digest"]
+    assert plan.projection_directory == Path(plan.env["CODEX_HOME"])
+    assert plan.cleanup_directory == plan.projection_directory
+    assert plan.projected_config_paths == (plan.projection_directory / "config.toml",)

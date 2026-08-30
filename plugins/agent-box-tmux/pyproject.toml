@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agent-box-tmux"
-version = "0.1.0"
+version = "2.0.0a1"
 description = "Tmux console resource plugin for Agent-Box"
 requires-python = ">=3.10"
-dependencies = ["agent-box-cli>=1.9.0"]
+dependencies = ["agent-box-cli==2.0.0a1"]
 
 [project.entry-points."agent_box.plugins"]
 tmux = "agent_box_tmux.plugin:create_plugin"

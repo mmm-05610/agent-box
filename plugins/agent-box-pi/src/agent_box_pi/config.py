@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
-from agent_box import config as agent_box_config
+from agent_box.work_core.runtime import agent_box_home
 
 PACKAGE = "pi"
 CONFIG_FILE_NAME = "config.json"
@@ -47,7 +47,7 @@ _CONFIG_KEYS = frozenset(
 
 def plugin_config_dir() -> Path:
     """``$AGENT_BOX_HOME/plugins/pi`` — the plugin's configuration directory."""
-    return agent_box_config.agent_box_home() / "plugins" / PACKAGE
+    return agent_box_home() / "plugins" / PACKAGE
 
 
 def plugin_config_file() -> Path:

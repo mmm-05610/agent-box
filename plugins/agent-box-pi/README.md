@@ -10,7 +10,8 @@ Third-party Agent-Box plugin that registers one accountable Pi
 - supports up to four independent Executions concurrently — one Pi process
   per pane, one Core Execution per Dispatch, one native Pi SessionRef each;
 - supports fresh SessionRefs and continuations; observe / recover / explicit
-  finish are provider-owned controls surfaced through WorkBoard.
+  finish are provider-owned controls surfaced through the Web Host or another
+  SDK host.
 
 Install into the same Python environment as Agent-Box:
 
@@ -21,7 +22,7 @@ agent-box plugins list --json
 ```
 
 The plugin registers the `agent-box-pi.continuation@1` Contract and the
-`pi-session` resource provider.  WorkBoard discovers the `pi` execution
+`pi-session` resource provider. An SDK host discovers the `pi` execution
 control adapter (`attach`/`observe`/`recover`/`finish`) and the optional
 `pi-session` continuation input adapter through entry points.
 
@@ -66,7 +67,7 @@ and an optional Pi continuation.  `start()`:
 6. returns the native session id as the provider correlation.
 
 A completed turn, an idle TUI, or even a dead pane never closes the Core
-Execution — only the explicit WorkBoard **Finish** submits it.  `finish()`
+Execution — only an explicit host **Finish** submits it. `finish()`
 collects the native SessionRef, the session JSONL event range/transcript
 digest, tmux scrollback, and runtime facts.  A continuation always creates a
 **new Core Execution** that resumes the old native Pi session; its frozen

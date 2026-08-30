@@ -4,7 +4,7 @@ from agent_box.extensions import PluginContext, PluginDescriptor, PluginRegistra
 
 from .contract import TmuxConsoleV1, TmuxPaneV1
 from .provider import TmuxConsoleResourceProvider
-from .web_selector import TmuxPaneSelector
+from .web_selector import TmuxPaneSelector, TmuxConsoleSelector
 
 
 class TmuxPlugin:
@@ -25,7 +25,7 @@ class TmuxPlugin:
         return PluginRegistration(
             contracts=(TmuxConsoleV1, TmuxPaneV1),
             resource_providers=(TmuxConsoleResourceProvider(),),
-            resource_selectors=(TmuxPaneSelector(),),
+            resource_selectors=(TmuxPaneSelector(), TmuxConsoleSelector()),
         )
 
 

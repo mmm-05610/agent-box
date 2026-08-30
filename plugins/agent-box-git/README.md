@@ -15,3 +15,11 @@ The `agent_box.plugins` entry point is the canonical registration source. It
 registers the `git-workspace` ResourceProvider, Web-neutral selector, and
 FinalizationContributor together; no independent component entry points are
 needed.
+# Agent-Box Git
+
+The Git plugin owns the local repository library, exact commit/tree workspace
+Refs, detached execution worktrees, and output capture. Repository records are
+plugin data (`repositories.json`); the legacy single `config.json` repository
+is read as a compatibility fallback. Paths must be explicitly registered and
+validated as Git repositories. The Web Quick Launch flow never scans the home
+directory or stores credentials.

@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61,<77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-box-artifacts"
+version = "2.0.0a1"
+description = "Agent-Box immutable local text artifact provider"
+requires-python = ">=3.10"
+dependencies = ["agent-box-cli==2.0.0a1"]
+
+[project.entry-points."agent_box.plugins"]
+artifacts = "agent_box_artifacts.plugin:create_plugin"
+
+[tool.setuptools.packages.find]
+where = ["src"]

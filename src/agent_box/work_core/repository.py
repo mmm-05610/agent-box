@@ -8,7 +8,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Iterable, Mapping, Optional, Sequence
 
-from ..core import db
+from . import db
 from .errors import DispatchRejected, FinalizationConflict, InputFrozen, WorkCoreError, WorkNotOpen
 from .events import (
     RESPONSIBILITY_INTENT_KEY,

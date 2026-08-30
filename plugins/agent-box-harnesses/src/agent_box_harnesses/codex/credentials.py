@@ -19,7 +19,9 @@ class CodexCredentialSource:
     def validate(self, value: Any) -> None:
         if value is None:
             return
-        if not isinstance(value, dict) or value.get("provider") != self.provider or value.get("native_locator") != self.locator:
+        if not isinstance(value, dict) or value.get("provider") not in {self.provider, "cc-switch"}:
+            raise ValueError("UNSUPPORTED_CODEX_CREDENTIAL_SOURCE")
+        if not isinstance(value.get("native_locator"), str) or not value.get("native_locator"):
             raise ValueError("UNSUPPORTED_CODEX_CREDENTIAL_SOURCE")
         if set(value) - {"provider", "native_locator", "revision", "digest"}:
             raise ValueError("UNSUPPORTED_CODEX_CREDENTIAL_SOURCE")

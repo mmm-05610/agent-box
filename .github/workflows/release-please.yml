@@ -1,12 +1,11 @@
 # release-please — automatic versioning, CHANGELOG, tag + GitHub Release.
 #
 # On every push to main it maintains a "release-please" Release PR. Merging it
-# bumps the version (pyproject / setup.iss / README badges via extra-files),
+# bumps the root package metadata and changelog,
 # generates CHANGELOG.md, tags v<version> and creates the GitHub Release.
 # The publish job then builds the wheel + sdist and attaches them.
 #
-# Artifacts NOT automated here (Phase 2): Windows installer + Linux GUI
-# binary — still uploaded manually to the release.
+# Preview artifacts are the root wheel plus the five official plugin wheels.
 name: release-please
 on:
   push:
@@ -38,10 +37,16 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Build wheel + sdist
+      - name: Build frontend and all Preview wheels
         run: |
           python -m pip install build
-          python -m build
+          npm ci --prefix plugins/agent-box-web/frontend
+          npm run build --prefix plugins/agent-box-web/frontend
+          mkdir -p dist
+          python -m build --wheel --sdist --outdir dist .
+          for package in plugins/agent-box-web plugins/agent-box-harnesses plugins/agent-box-git plugins/agent-box-tmux plugins/agent-box-artifacts; do
+            python -m build --wheel --outdir dist "$package"
+          done
       - name: Attach to release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
