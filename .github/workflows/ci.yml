@@ -47,7 +47,7 @@ jobs:
       - name: Install root and official plugin dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e . -e plugins/agent-box-tmux -e plugins/agent-box-artifacts \
+          pip install pytest -e . -e plugins/agent-box-tmux -e plugins/agent-box-artifacts \
             -e plugins/agent-box-git -e plugins/agent-box-harnesses -e plugins/agent-box-web
           if [ "${{ matrix.name }}" = pi-third-party ]; then pip install -e plugins/agent-box-pi; fi
       - name: Test plugin
