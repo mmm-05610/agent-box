@@ -16,6 +16,7 @@ from .. import __version__, config
 from ..core import library
 from .commands.core import CoreCommands
 from .commands.profile import ProfileCommands
+from .commands.work import WorkCommands
 
 # ── prompts ───────────────────────────────────────────────────────────────
 
@@ -148,6 +149,7 @@ def run_repl() -> int:
     """Launch the interactive REPL."""
     app = AgentBoxShell()
     app.register_command_set(CoreCommands())
+    app.register_command_set(WorkCommands())
     sys.exit(app.cmdloop())
 
 
@@ -165,6 +167,7 @@ def run_exec(script: str) -> int:
     """
     app = AgentBoxShell()
     app.register_command_set(CoreCommands())
+    app.register_command_set(WorkCommands())
 
     failures = 0
     for line in _split_script(script):

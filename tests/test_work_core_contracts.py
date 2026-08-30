@@ -4,6 +4,7 @@ import pytest
 
 from agent_box.work_core import (
     Execution,
+    ExecutionStartReceipt,
     ExecutionProjection,
     ExtensionRegistry,
     Freshness,
@@ -44,12 +45,12 @@ def test_projection_requires_terminal_outcome_and_rejects_outcome_elsewhere():
 
 
 def test_ref_is_a_bounded_flat_value_not_provider_payload():
-    ref = Ref(RefType.SESSION, "codex-cli", "thread-1", metadata={"profile": "codex-main"})
-    assert ref.metadata == {"profile": "codex-main"}
+    ref = Ref(RefType.SESSION, "external-runtime", "session-1", metadata={"profile": "main"})
+    assert ref.metadata == {"profile": "main"}
     with pytest.raises(InvalidRef):
-        Ref(RefType.SESSION, "codex-cli", "thread-1", metadata={"payload": {"native": "state"}})
+        Ref(RefType.SESSION, "external-runtime", "session-1", metadata={"payload": {"native": "state"}})
     with pytest.raises(InvalidRef):
-        Ref(RefType.SESSION, "codex-cli", "thread-1", metadata={str(i): "x" for i in range(17)})
+        Ref(RefType.SESSION, "external-runtime", "session-1", metadata={str(i): "x" for i in range(17)})
 
 
 class FakeProvider:
@@ -60,7 +61,9 @@ class FakeProvider:
         return {"start": "supported", "resume": "unsupported"}
 
     def start(self, request):
-        return request
+        return ExecutionStartReceipt(
+            request.execution_id, request.dispatch_id, request.inputs_digest
+        )
 
     def observe(self, native_ref):
         return native_ref

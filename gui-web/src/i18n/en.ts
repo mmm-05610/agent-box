@@ -156,6 +156,10 @@ export const en = {
     },
   },
 
+  harnesses: {
+    eyebrow: 'Integrations / harnesses', title: 'Harnesses', hint: 'Harness plugins own configuration and runtime projection.', codexHint: 'Profile configuration belongs to the official Harness plugin. It is not a Work Core entity.', profiles: 'Profiles', loading: 'Loading profiles…', loadingHarnesses: 'Loading harnesses…', empty: 'No Codex profiles yet. Create a revision-owned profile.', create: 'Create Profile', profile: 'Codex Profile', revision: 'Revision {{revision}}', immutable: 'ProfileRef is a Binding resource. Saving always creates a new immutable revision.', credential: 'CredentialSourceRef is a locator only; credential values are never stored or returned.', frozen: 'Frozen revision {{revision}} remains unchanged when you save a new revision.', edit: 'Edit', projection: 'Projection Preview', bind: 'Use for new Execution Binding', projectionTitle: 'Execution-scoped projection', environment: 'Environment names: {{value}} (values hidden)', noProfile: 'Unable to load profile.', createName: 'Profile name', model: 'Model/provider configuration', modelPlaceholder: 'model identifier', credentialSource: 'Credential source', credentialNone: 'None', credentialChatGPT: 'Current Codex ChatGPT login', credentialHint: 'Locator: codex-login/default. The secret is never copied; projection uses a controlled link. Agent-Box can prove the link, not how the model consumes it.', formHint: 'Non-secret values only. Add capability references and a CredentialSourceRef locator; never enter a key or token.', cancel: 'Cancel', saveRevision: 'Save new revision', createAction: 'Create Profile', error: 'Unable to load harnesses: {{message}}'
+  },
+
   sessions: {
     title: 'Active sessions',
     description: 'Watch agents as they run, manage their lifecycle.',

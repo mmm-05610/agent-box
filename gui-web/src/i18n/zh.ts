@@ -155,6 +155,10 @@ export const zh: TranslationSchema = {
     },
   },
 
+  harnesses: {
+    eyebrow: '集成 / Harness', title: 'Harness', hint: 'Harness 插件拥有配置与运行时投影。', codexHint: '配置属于官方 Harness 插件，不是 Work Core 实体。', profiles: '配置档案', loading: '正在加载配置…', loadingHarnesses: '正在加载 Harness…', empty: '还没有 Codex 配置。创建一个由 revision 所有的配置。', create: '创建配置', profile: 'Codex 配置', revision: 'Revision {{revision}}', immutable: 'ProfileRef 是 Binding 资源。保存始终产生新的不可变 revision。', credential: 'CredentialSourceRef 只是定位符；不会保存或返回凭证值。', frozen: '保存新 revision 后，已冻结的 revision {{revision}} 仍保持不变。', edit: '编辑', projection: '投影预览', bind: '用于新的 Execution Binding', projectionTitle: 'Execution-scoped 投影', environment: '环境变量名：{{value}}（值已隐藏）', noProfile: '无法加载配置。', createName: '配置名称', model: '模型/提供商配置', modelPlaceholder: '模型标识', credentialSource: '凭证来源', credentialNone: '无', credentialChatGPT: '当前 Codex ChatGPT 登录', credentialHint: '定位符：codex-login/default。不会复制 secret；投影使用受控链接。Agent-Box 只能证明链接，不证明模型如何消费凭证。', formHint: '仅允许非敏感值。请添加 capability 引用和 CredentialSourceRef 定位符，不要输入 key 或 token。', cancel: '取消', saveRevision: '保存为新 revision', createAction: '创建配置', error: '无法加载 Harness：{{message}}'
+  },
+
   sessions: {
     title: '活跃会话',
     description: '查看代理运行状态，管理其生命周期。',

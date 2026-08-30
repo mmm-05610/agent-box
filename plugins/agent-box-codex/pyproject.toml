@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=61,<77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-box-codex"
+version = "0.1.0"
+description = "Codex ExecutionProvider plugin for Agent-Box"
+requires-python = ">=3.10"
+dependencies = ["agent-box-cli>=1.9.0", "agent-box-tmux>=0.1.0"]
+
+# The compatibility implementation is imported by the official
+# agent-box-harnesses distribution. It is intentionally not discovered as a
+# second plugin, so Codex ownership and provider IDs remain unique.
+
+[tool.setuptools.packages.find]
+where = ["src"]

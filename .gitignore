@@ -29,9 +29,37 @@ node_modules/
 
 # --- Agent workspace (AI-generated artifacts, never commit) ---
 workspace/
+.agent-box/
+.agent-box*/
+.workboard-preview-home/
+.workboard-showcase-home/
+.workboard-*/
+.worktrees/
+.mcp.json
+CLAUDE.local.md
 
 # --- Dev logs ---
 logs/
+coverage/
+screenshots/
+*.whl
+
+# --- Runtime, databases, generated and local credentials ---
+*.db
+*.sqlite
+*.sqlite3
+*.egg-info/
+build/
+dist/
+spikes/**/.venv/
+spikes/**/runtime/
+spikes/preview_provider_validation/langgraph_app/.env
+.agent-box/runtime/
+src/agent_box/templates/hermes/.env
+
+# --- Nested dependency/build output ---
+acs/node_modules/
+acs/src-tauri/target/
 
 # --- Local agent config dirs (per-host, never commit) ---
 # These are agent runtimes that store identity/credentials on the host.
@@ -45,5 +73,11 @@ logs/
 
 # --- Secrets / credentials (defense in depth) ---
 *.auth
-*credentials*
+*.credential
+*.credentials
+credentials/
+credentials.json
 nul
+
+# --- Preview demo scratch homes (npm installs + Pi auth live here) ---
+.workboard-preview-pi-home/

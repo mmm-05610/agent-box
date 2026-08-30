@@ -10,6 +10,17 @@
 
 [English](README.md) | [简体中文](README_CN.md)
 
+## Local Web Workbench
+
+The supported management interface is the local loopback Web Workbench:
+
+```bash
+agent-box web
+```
+
+It owns mutations and serves the production frontend; Harness CLIs continue in
+the user's native terminal. There is no browser terminal or remote access.
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/)
 [![Release](https://img.shields.io/github/v/release/mmm-05610/agent-box)](https://github.com/mmm-05610/agent-box/releases)
@@ -83,14 +94,11 @@ Zero manual switching.
 
 ## Installation
 
-### Windows (GUI + one-click installer)
+### Local Web Host
 
-Download the installer from [GitHub Releases](https://github.com/mmm-05610/agent-box/releases),
-run it, and you'll have a desktop shortcut, start menu entry, and uninstaller.
-**Requires WSL2** (Ubuntu recommended).
-
-The GUI does everything: manage profiles, edit configs, launch agents, check
-health — no terminal needed.
+Install the core wheel and the plugins needed by your Preview composition. The
+Web Workbench is served from the installed wheel; plugin discovery is automatic.
+Harness CLIs remain in the native terminal.
 
 ### Linux / WSL (CLI)
 
@@ -124,14 +132,7 @@ npm install -g @anthropic-ai/claude-code   # Claude Code
   <img src="截图/v0.5.0/Library.png" alt="Library" width="48%">
 </p>
 
-### GUI (Windows)
-
-1. Install from the [latest release](https://github.com/mmm-05610/agent-box/releases)
-2. Click a profile → **Launch** — a terminal opens with your agent inside its
-   isolated environment
-3. Use the tabs to edit settings, hooks, auth, and CLAUDE.md directly
-
-### CLI (Linux / WSL)
+### Preview (Linux / WSL)
 
 ```bash
 # Create a profile
@@ -254,17 +255,30 @@ agent-box list presets --type claude      # list all claude presets
 ```bash
 git clone https://github.com/mmm-05610/agent-box.git
 cd agent-box
-pip install -e .[dev,gui]
+pip install -e .[dev]
 pytest -q                           # 53 tests, hermetic
 cd gui-web && npm run build && cd ..  # build frontend
-python gui-web/bridge.py --prod       # launch GUI from source
+agent-box web --no-browser           # launch the local Web Workbench
 ```
 
 → [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 → [docs/ROADMAP.md](docs/ROADMAP.md)
+→ [Complete documentation index](docs/README.md)
 
 ---
 
 ## License
 
 MIT — see [LICENSE](LICENSE).
+# Web Preview
+
+The primary Preview interface is local Web Workbench:
+
+```bash
+agent-box web
+```
+
+It binds `127.0.0.1`, serves the built UI, and owns mutations for the current
+`AGENT_BOX_HOME`. Use `--no-browser` in automation. Native Codex interaction
+continues in the external terminal; the browser provides binding, observe,
+finish, output, and continuation views.

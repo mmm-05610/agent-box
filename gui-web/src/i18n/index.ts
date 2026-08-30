@@ -11,6 +11,7 @@ import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
 import { en } from './en'
 import { zh } from './zh'
+import { workbench } from './workbench'
 
 export const LANG_KEY = 'agent-box-language'
 export type UILanguage = 'zh' | 'en' | 'system'
@@ -32,8 +33,8 @@ function initialLng(): string {
 
 i18n.use(initReactI18next).init({
   resources: {
-    zh: { translation: zh },
-    en: { translation: en },
+    zh: { translation: zh, workbench },
+    en: { translation: en, workbench },
   },
   lng: initialLng(),
   fallbackLng: 'zh',
@@ -43,4 +44,3 @@ i18n.use(initReactI18next).init({
 })
 
 export default i18n
-

@@ -9,6 +9,17 @@
 
 [English](README.md) | 简体中文
 
+## 本地 Web Workbench
+
+正式管理界面是本地 loopback Web Workbench：
+
+```bash
+agent-box web
+```
+
+它负责 mutation 并提供生产前端；Harness CLI 继续在用户自己的终端中运行。
+不提供浏览器终端或远程访问。
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/)
 [![Release](https://img.shields.io/github/v/release/mmm-05610/agent-box)](https://github.com/mmm-05610/agent-box/releases)
@@ -74,13 +85,10 @@ agent-box launch reviewer    # 代码审查
 
 ## 安装
 
-### Windows（GUI 一键安装）
+### 本地 Web Host
 
-从 [GitHub Releases](https://github.com/mmm-05610/agent-box/releases) 下载安装包，
-双击运行即可。自动创建桌面快捷方式、开始菜单和卸载入口。
-**需要 WSL2**（推荐 Ubuntu）。
-
-GUI 覆盖全部操作：管理 profile、编辑配置、启动 Agent、环境检查——不需要打开终端。
+安装 Core wheel 与 Preview 所需插件即可。Web Workbench 从已安装 wheel 提供静态资源，
+插件会自动发现；Harness CLI 继续在原生终端运行。
 
 ### Linux / WSL（命令行）
 
@@ -114,13 +122,7 @@ npm install -g @anthropic-ai/claude-code   # Claude Code
   <img src="截图/v0.5.0/Library.png" alt="Library" width="48%">
 </p>
 
-### GUI（Windows）
-
-1. 从 [最新 Release](https://github.com/mmm-05610/agent-box/releases) 下载安装
-2. 点击 profile → **启动** — 终端自动打开，Agent 在隔离环境中运行
-3. 使用标签页直接编辑 settings、hooks、auth、CLAUDE.md
-
-### 命令行（Linux / WSL）
+### Preview（Linux / WSL）
 
 ```bash
 # 创建一个 profile
@@ -241,17 +243,29 @@ agent-box presets --type cc          # 列出所有 CC 预设
 ```bash
 git clone https://github.com/mmm-05610/agent-box.git
 cd agent-box
-pip install -e .[dev,gui]
+pip install -e .[dev]
 pytest -q                           # 53 tests, hermetic
 cd gui-web && npm run build && cd ..  # 构建前端
-python gui-web/bridge.py --prod       # 从源码启动 GUI
+agent-box web --no-browser           # 启动本地 Web Workbench
 ```
 
 → [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 → [docs/ROADMAP.md](docs/ROADMAP.md)
+→ [完整文档目录](docs/README.md)
 
 ---
 
 ## License
 
 MIT — 详见 [LICENSE](LICENSE)。
+# Web Preview
+
+Preview 的主要界面是本地 Web Workbench：
+
+```bash
+agent-box web
+```
+
+默认只监听 `127.0.0.1`，由 Web Host 持有当前 `AGENT_BOX_HOME` 的 mutation
+lock 并服务已构建的前端。自动化可使用 `--no-browser`。Codex 仍在外部终端
+运行，浏览器负责 Binding、观察、Finish、输出和继续执行。

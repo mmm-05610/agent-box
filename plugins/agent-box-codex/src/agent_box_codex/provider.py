@@ -1,0 +1,496 @@
+"""Interactive Codex App Server ExecutionProvider for the Preview path."""
+from __future__ import annotations
+
+import hashlib
+import json
+import queue
+import subprocess
+import threading
+import time
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Mapping
+
+from agent_box.launch import LaunchPlan, build_launch_plan
+from agent_box.resource_contracts import (
+    AgentBoxProfileV1,
+    PromptFragmentV1,
+    WorkspaceV1,
+)
+from agent_box.work_core import (
+    ExecutionProjection,
+    ExecutionStartReceipt,
+    ExecutionStartRequest,
+    Freshness,
+    Outcome,
+    Phase,
+    ProviderDescriptor,
+    Ref,
+    RefType,
+)
+
+from .contract import CodexContinuationV1
+
+
+def _now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+class CodexAppServerClient:
+    """Small JSON-RPC client over the App Server stdio transport."""
+
+    def __init__(self, plan: LaunchPlan, events_path: Path) -> None:
+        self.events_path = events_path.resolve()
+        self.events_path.parent.mkdir(parents=True, exist_ok=True)
+        self.events_path.write_text("", encoding="utf-8")
+        self.process = subprocess.Popen(
+            plan.argv,
+            env=plan.env,
+            cwd=plan.cwd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            bufsize=1,
+            start_new_session=True,
+        )
+        if not self.process.stdin or not self.process.stdout or not self.process.stderr:
+            raise RuntimeError("Codex App Server stdio pipes were not created")
+        self._pending: dict[int, queue.Queue[dict[str, Any]]] = {}
+        self._pending_lock = threading.Lock()
+        self._write_lock = threading.Lock()
+        self._condition = threading.Condition()
+        self._next_id = 1
+        self.events: list[dict[str, Any]] = []
+        self.stderr: list[str] = []
+        threading.Thread(target=self._read_stdout, daemon=True).start()
+        threading.Thread(target=self._read_stderr, daemon=True).start()
+
+    def _send(self, message: Mapping[str, Any]) -> None:
+        encoded = json.dumps(message, separators=(",", ":")) + "\n"
+        with self._write_lock:
+            if not self.process.stdin:
+                raise RuntimeError("Codex App Server stdin is unavailable")
+            self.process.stdin.write(encoded)
+            self.process.stdin.flush()
+
+    def notify(self, method: str, params: Mapping[str, Any]) -> None:
+        self._send({"jsonrpc": "2.0", "method": method, "params": dict(params)})
+
+    def request(
+        self, method: str, params: Mapping[str, Any], *, timeout: float = 60
+    ) -> Any:
+        response_queue: queue.Queue[dict[str, Any]] = queue.Queue(maxsize=1)
+        with self._pending_lock:
+            request_id = self._next_id
+            self._next_id += 1
+            self._pending[request_id] = response_queue
+        self._send(
+            {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "method": method,
+                "params": dict(params),
+            }
+        )
+        try:
+            response = response_queue.get(timeout=timeout)
+        except queue.Empty as exc:
+            raise TimeoutError(f"timed out waiting for {method}") from exc
+        finally:
+            with self._pending_lock:
+                self._pending.pop(request_id, None)
+        if "error" in response:
+            raise RuntimeError(f"{method} failed: {response['error']}")
+        return response.get("result")
+
+    def _read_stdout(self) -> None:
+        assert self.process.stdout
+        for line in self.process.stdout:
+            try:
+                message = json.loads(line)
+            except json.JSONDecodeError:
+                self.stderr.append(f"non-json stdout: {line.rstrip()}")
+                continue
+            with self.events_path.open("a", encoding="utf-8") as stream:
+                stream.write(json.dumps(message, separators=(",", ":")) + "\n")
+            request_id = message.get("id")
+            if request_id is not None and "method" not in message:
+                with self._pending_lock:
+                    target = self._pending.get(request_id)
+                if target is not None:
+                    target.put(message)
+                    continue
+            if request_id is not None and "method" in message:
+                self._answer_server_request(message)
+                continue
+            with self._condition:
+                self.events.append(message)
+                self._condition.notify_all()
+
+    def _read_stderr(self) -> None:
+        assert self.process.stderr
+        for line in self.process.stderr:
+            self.stderr.append(line.rstrip())
+
+    def _answer_server_request(self, message: Mapping[str, Any]) -> None:
+        method = str(message.get("method") or "")
+        if "requestApproval" in method or "requestUserInput" in method:
+            self._send(
+                {
+                    "jsonrpc": "2.0",
+                    "id": message["id"],
+                    "result": {"decision": "decline"},
+                }
+            )
+        else:
+            self._send(
+                {
+                    "jsonrpc": "2.0",
+                    "id": message["id"],
+                    "error": {
+                        "code": -32601,
+                        "message": f"unsupported by Agent-Box Preview: {method}",
+                    },
+                }
+            )
+
+    def wait_turn_completed(self, turn_id: str, *, timeout: float = 300) -> dict[str, Any]:
+        deadline = time.monotonic() + timeout
+        with self._condition:
+            while True:
+                for event in self.events:
+                    if event.get("method") != "turn/completed":
+                        continue
+                    params = event.get("params") or {}
+                    turn = params.get("turn") or {}
+                    if turn.get("id") == turn_id:
+                        return params
+                if self.process.poll() is not None:
+                    raise RuntimeError(
+                        f"Codex App Server exited {self.process.returncode}: "
+                        + " | ".join(self.stderr[-10:])
+                    )
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise TimeoutError(f"timed out waiting for turn {turn_id}")
+                self._condition.wait(timeout=min(remaining, 1.0))
+
+    def close(self) -> None:
+        if self.process.poll() is None:
+            self.process.terminate()
+            try:
+                self.process.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                self.process.kill()
+                self.process.wait(timeout=10)
+
+
+@dataclass
+class CodexInteractiveHandle:
+    execution_id: str
+    dispatch_id: str
+    inputs_digest: str
+    workspace: WorkspaceV1
+    profile: AgentBoxProfileV1
+    client: CodexAppServerClient
+    thread_id: str
+    turn_ids: list[str]
+    projected_contracts: tuple[str, ...]
+    submitted: bool = False
+    turn_results: dict[str, dict[str, Any]] = field(default_factory=dict)
+
+    @property
+    def provider_correlation_ref(self) -> str:
+        return self.thread_id
+
+
+@dataclass(frozen=True)
+class CodexInteractiveObservation:
+    projection: ExecutionProjection
+    native_refs: tuple[Ref, ...]
+    output_refs: tuple[Ref, ...]
+    projected_contracts: tuple[str, ...]
+
+
+class CodexInteractiveExecutionProvider:
+    """One accountable interactive responsibility window over Codex App Server.
+
+    Turn completion and process idleness do not terminate the Core Execution.
+    Only :meth:`finish` changes the provider-owned submitted signal.
+    """
+
+    provider_id = "codex-app-server"
+
+    def __init__(
+        self,
+        evidence_root: Path,
+        *,
+        plan_builder=build_launch_plan,
+        launch_adapter=None,
+    ) -> None:
+        self.evidence_root = evidence_root.resolve()
+        self._plan_builder = plan_builder
+        self._launch_adapter = launch_adapter
+        self._handles: dict[str, CodexInteractiveHandle] = {}
+
+    def descriptor(self) -> ProviderDescriptor:
+        return ProviderDescriptor(self.provider_id, "Codex App Server", "v2")
+
+    def capabilities(self) -> Mapping[str, str]:
+        return {
+            "start": "supported",
+            "observe": "supported",
+            "continuation-input": "supported",
+            "steer": "supported",
+            "finish": "supported",
+            "stream": "supported",
+        }
+
+    def input_limits(self) -> Mapping[str, tuple[int, int | None]]:
+        return {
+            WorkspaceV1.contract_id: (1, 1),
+            PromptFragmentV1.contract_id: (1, None),
+            AgentBoxProfileV1.contract_id: (1, 1),
+            CodexContinuationV1.contract_id: (0, 1),
+        }
+
+    @staticmethod
+    def _one(request: ExecutionStartRequest, contract_id: str) -> object:
+        values = request.inputs.get(contract_id, ())
+        if len(values) != 1:
+            raise ValueError(f"expected one {contract_id}, got {len(values)}")
+        return values[0]
+
+    def start(self, request: ExecutionStartRequest) -> ExecutionStartReceipt:
+        if not isinstance(request, ExecutionStartRequest):
+            raise TypeError("Codex interactive provider requires ExecutionStartRequest")
+        workspace = self._one(request, WorkspaceV1.contract_id)
+        profile = self._one(request, AgentBoxProfileV1.contract_id)
+        if not isinstance(workspace, WorkspaceV1) or not isinstance(profile, AgentBoxProfileV1):
+            raise TypeError("resolved workspace/profile contract type mismatch")
+        if profile.agent_type != "codex":
+            raise ValueError("Codex App Server requires an Agent-Box Codex profile")
+        fragments = request.inputs.get(PromptFragmentV1.contract_id, ())
+        prompt = "\n\n".join(
+            f"# {fragment.title}\n\n{fragment.content}"
+            for fragment in fragments
+            if isinstance(fragment, PromptFragmentV1)
+        )
+        if not prompt:
+            raise ValueError("Codex interactive provider requires prompt content")
+
+        profile_ref = next(item.ref for item in request.resolved_inputs if item.contract_id == AgentBoxProfileV1.contract_id)
+        if self._launch_adapter is not None:
+            plan = self._launch_adapter.plan(execution_id=request.execution_id, profile_ref=profile_ref, profile=profile, workspace=workspace)
+        else:
+            plan = self._plan_builder(profile.name, extra_args=["app-server", "--stdio"], cwd=workspace.path)
+        client = CodexAppServerClient(
+            plan, self.evidence_root / f"{request.dispatch_id}.jsonl"
+        )
+        try:
+            client.request(
+                "initialize",
+                {
+                    "clientInfo": {"name": "agent-box", "version": "preview"},
+                    "capabilities": {"experimentalApi": True},
+                },
+            )
+            client.notify("initialized", {})
+            continuation_values = request.inputs.get(CodexContinuationV1.contract_id, ())
+            if continuation_values:
+                continuation = continuation_values[0]
+                if not isinstance(continuation, CodexContinuationV1):
+                    raise TypeError("continuation contract type mismatch")
+                started = client.request(
+                    "thread/resume",
+                    {
+                        "threadId": continuation.thread_id,
+                        "cwd": str(workspace.path),
+                        "sandbox": "workspace-write",
+                        "approvalPolicy": "on-request",
+                    },
+                )
+            else:
+                started = client.request(
+                    "thread/start",
+                    {
+                        "cwd": str(workspace.path),
+                        "sandbox": "workspace-write",
+                        "approvalPolicy": "on-request",
+                        "ephemeral": False,
+                        "developerInstructions": (
+                            "You are operating inside one Agent-Box Execution. "
+                            "Treat the supplied context as the fixed responsibility "
+                            "for this Execution and work only in the supplied workspace."
+                        ),
+                    },
+                )
+            thread_id = started["thread"]["id"]
+            turn = client.request(
+                "turn/start",
+                {
+                    "threadId": thread_id,
+                    "input": [{"type": "text", "text": prompt}],
+                    "cwd": str(workspace.path),
+                    "effort": "low",
+                    "sandboxPolicy": {"type": "workspaceWrite"},
+                },
+            )
+            handle = CodexInteractiveHandle(
+                request.execution_id,
+                request.dispatch_id,
+                request.inputs_digest,
+                workspace,
+                profile,
+                client,
+                thread_id,
+                [turn["turn"]["id"]],
+                tuple(sorted(request.inputs)),
+            )
+            self._handles[request.dispatch_id] = handle
+            return ExecutionStartReceipt(
+                request.execution_id,
+                request.dispatch_id,
+                request.inputs_digest,
+                correlation_ref=Ref(
+                    RefType.SESSION,
+                    self.descriptor().id,
+                    thread_id,
+                    uri=f"codex://thread/{thread_id}",
+                ),
+                runtime_handle=handle,
+            )
+        except Exception:
+            client.close()
+            raise
+
+    def get_handle(self, dispatch_id: str) -> CodexInteractiveHandle:
+        try:
+            return self._handles[dispatch_id]
+        except KeyError as exc:
+            raise KeyError(f"unknown Codex Dispatch: {dispatch_id}") from exc
+
+    def wait_current_turn(
+        self, handle: CodexInteractiveHandle, *, timeout: float = 300
+    ) -> dict[str, Any]:
+        turn_id = handle.turn_ids[-1]
+        result = handle.client.wait_turn_completed(turn_id, timeout=timeout)
+        handle.turn_results[turn_id] = result
+        return result
+
+    def send_turn(
+        self, handle: CodexInteractiveHandle, text: str, *, wait_timeout: float = 300
+    ) -> str:
+        if handle.submitted:
+            raise RuntimeError("Execution has already been submitted")
+        self.wait_current_turn(handle, timeout=wait_timeout)
+        started = handle.client.request(
+            "turn/start",
+            {
+                "threadId": handle.thread_id,
+                "input": [{"type": "text", "text": text}],
+                "cwd": str(handle.workspace.path),
+            },
+        )
+        turn_id = started["turn"]["id"]
+        handle.turn_ids.append(turn_id)
+        return turn_id
+
+    def steer(self, handle: CodexInteractiveHandle, text: str) -> None:
+        if handle.submitted:
+            raise RuntimeError("Execution has already been submitted")
+        handle.client.request(
+            "turn/steer",
+            {
+                "threadId": handle.thread_id,
+                "expectedTurnId": handle.turn_ids[-1],
+                "input": [{"type": "text", "text": text}],
+            },
+        )
+
+    def finish(
+        self, handle: CodexInteractiveHandle, *, timeout: float = 300
+    ) -> CodexInteractiveObservation:
+        """Provider-owned explicit responsibility completion signal."""
+        if isinstance(handle, ExecutionStartReceipt):
+            handle = handle.runtime_handle
+        self.wait_current_turn(handle, timeout=timeout)
+        handle.submitted = True
+        handle.client.close()
+        observation=self.observe(handle)
+        if self._launch_adapter is not None:
+            self._launch_adapter.cleanup(handle.execution_id)
+        return observation
+
+    @staticmethod
+    def _turn_succeeded(handle: CodexInteractiveHandle) -> bool:
+        if not handle.turn_ids:
+            return False
+        params = handle.turn_results.get(handle.turn_ids[-1]) or {}
+        status = str((params.get("turn") or {}).get("status") or "").lower()
+        return status in {"completed", "complete", "succeeded", "success"}
+
+    def observe(self, native_ref: Any) -> CodexInteractiveObservation:
+        if isinstance(native_ref, ExecutionStartReceipt):
+            native_ref = native_ref.runtime_handle
+        handle = (
+            self.get_handle(native_ref)
+            if isinstance(native_ref, str)
+            else native_ref
+        )
+        if not isinstance(handle, CodexInteractiveHandle):
+            raise TypeError("observe requires dispatch id or CodexInteractiveHandle")
+        session_ref = Ref(RefType.SESSION, self.provider_id, handle.thread_id)
+        run_refs = tuple(
+            Ref(
+                RefType.RUN,
+                self.provider_id,
+                turn_id,
+                metadata={"thread_id": handle.thread_id},
+            )
+            for turn_id in handle.turn_ids
+        )
+        output_refs: tuple[Ref, ...] = ()
+        if handle.submitted:
+            event_bytes = handle.client.events_path.read_bytes()
+            digest = "sha256:" + hashlib.sha256(event_bytes).hexdigest()
+            output_refs = (
+                Ref(
+                    RefType.ARTIFACT,
+                    self.provider_id,
+                    digest,
+                    uri=handle.client.events_path.as_uri(),
+                    metadata={"kind": "app-server-events"},
+                ),
+            )
+            outcome = Outcome.SUCCEEDED if self._turn_succeeded(handle) else Outcome.FAILED
+            # The thread was started (and confirmed by the app server) with
+            # ``ephemeral: False``, so its native identity remains available
+            # as a continuation source for a NEW Execution via thread/resume.
+            projection = ExecutionProjection(
+                Phase.TERMINAL, outcome, True, Freshness.OBSERVED, _now()
+            )
+        elif handle.client.process.poll() is None:
+            projection = ExecutionProjection(
+                Phase.ACTIVE, None, True, Freshness.OBSERVED, _now()
+            )
+        else:
+            projection = ExecutionProjection(
+                Phase.UNKNOWN, None, None, Freshness.UNREACHABLE, _now()
+            )
+        return CodexInteractiveObservation(
+            projection,
+            (session_ref, *run_refs),
+            output_refs,
+            handle.projected_contracts,
+        )
+
+
+__all__ = [
+    "CodexAppServerClient",
+    "CodexInteractiveExecutionProvider",
+    "CodexInteractiveHandle",
+    "CodexInteractiveObservation",
+]

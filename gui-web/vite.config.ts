@@ -14,7 +14,7 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
-  // PyWebView serves static files from here
+  // The Local Web Host serves the production bundle from here.
   base: './',
   // Vitest config — `test` is not part of Vite's UserConfig type.
   test: {
