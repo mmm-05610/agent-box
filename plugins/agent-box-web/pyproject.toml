@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=61,<77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-box-web"
+version = "2.0.0a1"
+description = "Installable Agent-Box local Web Workbench Host"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = ["agent-box-cli==2.0.0a1"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+agent_box_web = ["_static/**"]

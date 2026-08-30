@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61,<77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-box-git"
+version = "2.0.0a1"
+description = "Agent-Box detached Git workspace and output capture plugin"
+requires-python = ">=3.10"
+dependencies = ["agent-box-cli==2.0.0a1"]
+
+[project.entry-points."agent_box.plugins"]
+git = "agent_box_git.plugin:create_plugin"
+
+[tool.setuptools.packages.find]
+where = ["src"]

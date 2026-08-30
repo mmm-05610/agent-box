@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agent-box-cli"
-version = "1.9.0"
-description = "Isolated config launcher for coding agents (Claude Code / Codex / Hermes / OpenCode)"
+version = "2.0.0a1"
+description = "Execution governance kernel and plugin SDK for coding agents"
 readme = "README.md"
 requires-python = ">=3.9"
 license = {text = "MIT"}
@@ -23,15 +23,22 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Topic :: Software Development :: Testing",
 ]
-dependencies = ["json5>=0.9", "tomli-w>=1.0", "cmd2>=4.1.0", "PyYAML>=6.0", "tomli>=2.0; python_version < '3.11'", "textual>=8.0.0"]
+dependencies = []
 
 [project.urls]
 Homepage = "https://github.com/mmm-05610/agent-box"
 Repository = "https://github.com/mmm-05610/agent-box"
 
 [project.optional-dependencies]
-gui = ["customtkinter>=5.2"]
 dev = ["pytest>=7"]
+preview = [
+  "agent-box-web==2.0.0a1",
+  "agent-box-harnesses==2.0.0a1",
+  "agent-box-git==2.0.0a1",
+  "agent-box-tmux==2.0.0a1",
+  "agent-box-artifacts==2.0.0a1",
+]
+web = ["agent-box-web==2.0.0a1"]
 
 [project.scripts]
 agent-box = "agent_box.cli:main"
@@ -43,10 +50,4 @@ testpaths = ["tests"]
 where = ["src"]
 
 [tool.setuptools.package-data]
-agent_box = [
-    "templates/**",
-    "presets/**",
-    "core/agent_types.json",
-    "core/provider_endpoints.json",
-    "migrations/*.sql",
-]
+agent_box = ["migrations/*.sql"]

@@ -1,0 +1,184 @@
+@import "tailwindcss";
+@config "../tailwind.config.ts";
+
+/*
+ * Design System — agent-box (Stone warm palette)
+ *
+ * Light mode is primary (project runs as a Windows desktop tool in daytime
+ * office environments). Dark mode is supported and uses warm Zinc-stone blends.
+ *
+ * Brand accent: a refined Claude orange (#D97757) used sparingly for
+ * primary actions and active states. Saturation chosen so it reads as
+ * "warm tool" not "playful".
+ *
+ * Palette choice: Stone (warm gray) over Zinc (cool gray) — feels like a
+ * crafted developer instrument, not a hospital UI.
+ */
+
+@layer base {
+  /* ── Light mode (default) ──────────────────────────────────────────── */
+  :root {
+    /* Cool zinc-tinted canvas — not warm, not beige. Reads as "screen"
+       not "paper". Shadows do the depth work, not borders. */
+    --background: 220 14% 95%;
+    --foreground: 220 13% 12%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 13% 12%;
+    /* Border is reserved for true dividers; cards use ring-1 ring-black/5
+       so the visible edge is barely-there, like a sheet of paper resting
+       on a desk. */
+    --card-border: 220 13% 88%;
+    --card-hover: 220 14% 92%;
+
+    --primary: 220 13% 12%;             /* near-black CTA */
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 220 13% 8%;       /* darker on hover */
+
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 220 13% 12%;
+    --secondary-hover: 220 14% 92%;
+
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 46%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+    --destructive-hover: 0 72% 44%;
+    --destructive-subtle: 0 86% 97%;
+
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 98%;
+    --success-subtle: 138 76% 96%;
+
+    --warning: 32 95% 44%;
+    --warning-foreground: 0 0% 98%;
+    --warning-subtle: 48 100% 95%;
+
+    --info: 221 83% 53%;
+    --info-foreground: 0 0% 98%;
+    --info-subtle: 214 95% 93%;
+
+    --border: 220 13% 88%;
+    --input: 220 13% 88%;
+    --ring: 220 13% 12%;
+
+    /* Brand accent — same Claude orange. The cool bg + warm accent
+       combination is the visual signature: "professional tool with a
+       warm personality". */
+    --accent: 16 70% 52%;
+    --accent-foreground: 0 0% 100%;
+    --accent-subtle: 16 70% 96%;
+
+    /* Sidebar gets a very slight tint so the "two surfaces" relationship
+       is felt without a visible line between them. */
+    --sidebar: 220 14% 92%;
+    --sidebar-foreground: 220 13% 12%;
+    --sidebar-accent: 220 14% 88%;
+
+    --shadow-color: 220 30% 12%;
+  }
+
+  /* ── Dark mode (cool, near-black) ─────────────────────────────────── */
+  .dark {
+    --background: 220 14% 6%;
+    --foreground: 220 14% 96%;
+
+    --card: 220 14% 16%;
+    --card-foreground: 220 14% 96%;
+    --card-border: 220 14% 22%;
+    --card-hover: 220 14% 20%;
+
+    --primary: 220 14% 96%;
+    --primary-foreground: 220 14% 6%;
+    --primary-hover: 220 14% 88%;
+
+    --secondary: 220 14% 15%;
+    --secondary-foreground: 220 14% 96%;
+    --secondary-hover: 220 14% 20%;
+
+    --muted: 220 14% 15%;
+    --muted-foreground: 220 10% 70%;
+
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 98%;
+    --destructive-hover: 0 62% 42%;
+    --destructive-subtle: 0 50% 16%;
+
+    --success: 142 50% 52%;
+    --success-foreground: 0 0% 98%;
+    --success-subtle: 142 30% 16%;
+
+    --warning: 32 70% 52%;
+    --warning-foreground: 0 0% 98%;
+    --warning-subtle: 32 30% 16%;
+
+    --info: 217 60% 58%;
+    --info-foreground: 0 0% 98%;
+    --info-subtle: 217 30% 16%;
+
+    --border: 220 14% 26%;
+    --input: 220 14% 22%;
+    --ring: 220 14% 80%;
+
+    --accent: 16 70% 58%;
+    --accent-foreground: 220 14% 10%;
+    --accent-subtle: 16 50% 20%;
+
+    --sidebar: 220 14% 5%;
+    --sidebar-foreground: 220 14% 96%;
+    --sidebar-accent: 220 14% 15%;
+
+    --shadow-color: 0 0% 0%;
+  }
+}
+
+main{min-height:100vh;display:flex;background:#eef0f3;color:#17191d}aside{width:280px;padding:28px 18px;background:#e2e5e9;border-right:1px solid #d1d5da}.brand{display:flex;gap:12px;align-items:center;margin:0 12px 36px}.brand strong{display:block;font-size:18px}.brand small,.eyebrow,.navlabel{display:block;font-size:10px;letter-spacing:.14em;color:#737a83;font-weight:700}.mark{color:#d66b4d;font-size:24px}.new,.workitem{width:100%;border:0;text-align:left;background:transparent;padding:11px 12px;border-radius:8px;font:inherit;cursor:pointer}.new{background:#17191d;color:white;margin-bottom:28px}.navlabel{margin:0 12px 8px}.workitem{display:flex;gap:9px;color:#4d545d}.workitem span:last-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.workitem.active,.workitem:hover{background:#f6f7f8;color:#17191d}.content{max-width:980px;flex:1;padding:70px 8vw}.empty{max-width:600px;padding-top:10vh}.empty h1,.detail-head h1,.panel h1{font-size:42px;line-height:1.05;margin:15px 0}.empty p{color:#646b74;line-height:1.7;font-size:17px}.primary{border:0;border-radius:7px;padding:11px 16px;background:#d66b4d;color:white;font-weight:700;cursor:pointer}.primary:disabled{opacity:.4;cursor:not-allowed}.detail-head{display:flex;justify-content:space-between;gap:32px;align-items:end}.history{margin-top:60px}.section-title{font-size:12px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:#737a83;margin-bottom:14px}.section-title span{background:#d9dde1;border-radius:20px;padding:3px 7px;margin-left:4px}.empty-card,.execution{background:#fafbfc;border:1px solid #dce0e4;border-radius:10px;padding:22px}.execution{margin:12px 0}.exec-top{display:flex;justify-content:space-between;align-items:center}.exec-top strong{margin-left:12px}.phase{font-size:10px;letter-spacing:.13em;color:#d66b4d;font-weight:800}.mono{font-family:monospace;color:#8b929b}.responsibility{color:#737a83}.composer{border-top:1px solid #e2e5e9;margin-top:20px;padding-top:18px}.stepbar{display:flex;gap:24px;font-size:12px;color:#a0a6ad;margin-bottom:16px}.stepbar .current{color:#17191d;font-weight:700}.resource-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}.resource-row button{border:1px solid #d5d9de;background:#fff;border-radius:7px;padding:11px;text-align:left;min-width:190px;cursor:pointer}.resource-row small{display:block;color:#79818a;margin-top:4px}.panel{background:#fafbfc;border:1px solid #dce0e4;border-radius:12px;padding:30px;max-width:560px}.narrow{margin-top:8vh}.panel textarea,.panel select{display:block;width:100%;box-sizing:border-box;border:1px solid #ccd1d6;border-radius:7px;padding:12px;margin:10px 0 18px;font:inherit;background:#fff}.panel textarea{min-height:110px;resize:vertical}.panel label{font-size:12px;font-weight:700;color:#535a63}.actions{display:flex;justify-content:flex-end;gap:10px}.actions button:not(.primary),.error button{border:0;background:transparent;padding:10px;cursor:pointer}.modal{position:fixed;inset:0;background:#17191d55;display:grid;place-items:center;padding:20px}.error,.notice{padding:12px 14px;background:#fff0ed;color:#9e452e;border-radius:7px;margin-bottom:18px}.notice{background:#eef7f0;color:#347046}
+@media(max-width:700px){aside{width:210px;padding:20px 10px}.content{padding:40px 24px}.detail-head{display:block}.detail-head .primary{margin-top:20px}.empty h1,.detail-head h1,.panel h1{font-size:34px}}
+
+@layer base {
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI Variable", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    margin: 0;
+    letter-spacing: -0.005em;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Headings get tighter tracking by default — feels more crafted */
+  h1, h2, h3, h4, h5, h6 {
+    letter-spacing: -0.02em;
+  }
+}
+
+@keyframes active-glow {
+  0%, 100% {
+    box-shadow: 0 0 8px 0 var(--glow-color, rgba(34, 197, 94, 0.3));
+  }
+  50% {
+    box-shadow: 0 0 16px 2px var(--glow-color, rgba(34, 197, 94, 0.5));
+  }
+}
+
+.animate-active-glow {
+  animation: active-glow 2s ease-in-out infinite;
+}
+
+@keyframes active-text {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.animate-active-text {
+  animation: active-text 2s ease-in-out infinite;
+}
