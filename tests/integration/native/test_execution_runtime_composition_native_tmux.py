@@ -21,7 +21,7 @@ def test_real_tmux_respawn_creates_one_real_bwrap_target(tmp_path, monkeypatch):
     if BwrapSandboxProvider(tmp_path / "probe").probe()["status"] != "available":
         pytest.skip("real bwrap probe unavailable")
     bridge = tmp_path / "bin" / "agent-box-terminal-session-bridge"; bridge.parent.mkdir()
-    source_bridge = Path(__file__).parents[1] / "plugins" / "agent-box-terminal-session" / "src" / "agent_box_terminal_session" / "bridge.py"
+    source_bridge = Path(__file__).parents[3] / "plugins" / "agent-box-terminal-session" / "src" / "agent_box_terminal_session" / "bridge.py"
     bridge.write_text(f"#!/bin/sh\nexec /usr/bin/python3 {source_bridge}\n", encoding="utf-8"); bridge.chmod(0o755)
     monkeypatch.setenv("PATH", str(bridge.parent) + os.pathsep + os.environ["PATH"])
     workspace = tmp_path / "workspace"; workspace.mkdir()

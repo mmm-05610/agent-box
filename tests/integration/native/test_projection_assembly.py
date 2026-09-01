@@ -31,7 +31,7 @@ from agent_box.extensions.runtime_composition import (
     declare_source,
 )
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[3]
 ASSEMBLER_PATH = REPO_ROOT / "src" / "agent_box" / "extensions" / "runtime_composition" / "assembler.py"
 
 

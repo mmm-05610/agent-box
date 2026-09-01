@@ -33,7 +33,7 @@ from agent_box.resource_contracts import CredentialRefV1
 from agent_box.work_core import ExtensionRegistry, ProviderDescriptor
 from agent_box.extensions.loader import load_installed_plugins
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 class _FakeEntryPoint:

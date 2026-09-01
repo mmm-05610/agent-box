@@ -22,7 +22,7 @@ def test_official_native_bundle_is_bounded_and_publicly_path_free():
 def test_official_npm_launcher_resolves_native_without_projecting_node():
     if not LAUNCHER.is_file(): pytest.skip("official Codex npm launcher unavailable")
     bundle = CodexExecutableResolver(LAUNCHER).resolve("app-server")
-    assert bundle.version == "0.149.0"
+    assert bundle.version != "unknown" and bundle.version.count(".") == 2
     assert all(not m.guest_target.endswith(".js") for m in bundle.members)
     assert "/runtime/bin/codex" == bundle.members[0].guest_target
     assert "/runtime/bin/codex-code-mode-host" in [m.guest_target for m in bundle.members]

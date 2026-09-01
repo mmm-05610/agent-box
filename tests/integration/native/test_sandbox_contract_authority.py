@@ -57,7 +57,7 @@ from agent_box.work_core.repository import CoreRepository
 from agent_box.work_core.services import ExecutionService, WorkService
 from agent_box_sandbox_bwrap.provider import BwrapSandboxProvider, _CAPS
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[3]
 
 SHARED_IDS = {
     "agent-box.runtime-host@1",

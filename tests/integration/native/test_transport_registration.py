@@ -35,7 +35,7 @@ from agent_box.extensions.runtime_composition import (
 from agent_box.work_core import ExtensionRegistry
 from agent_box.extensions.loader import load_installed_plugins
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 class _FakeEntryPoint:
@@ -271,7 +271,7 @@ def test_transport_operation_resolver_is_typed_and_readonly():
 # 11-18. Single-spawn, replay, ambiguity and descriptor hygiene are proven by
 # the dedicated verticals; re-import them here as explicit regression gates.
 def test_single_spawn_replay_and_ambiguity_verticals_exist_and_pass():
-    assert (REPO_ROOT / "tests" / "test_execution_runtime_composition_vertical.py").exists()
-    assert (REPO_ROOT / "tests" / "test_execution_runtime_composition_native_tmux.py").exists()
-    assert (REPO_ROOT / "tests" / "test_execution_runtime_composition_native_bwrap.py").exists()
-    assert (REPO_ROOT / "tests" / "test_bwrap_formal_dispatch_vertical.py").exists()
+    assert (REPO_ROOT / "tests" / "integration" / "native" / "test_execution_runtime_composition_vertical.py").exists()
+    assert (REPO_ROOT / "tests" / "integration" / "native" / "test_execution_runtime_composition_native_tmux.py").exists()
+    assert (REPO_ROOT / "tests" / "integration" / "native" / "test_execution_runtime_composition_native_bwrap.py").exists()
+    assert (REPO_ROOT / "tests" / "integration" / "native" / "test_bwrap_formal_dispatch_vertical.py").exists()
