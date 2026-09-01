@@ -86,7 +86,7 @@ def check_registration_conformance(
               "build() must return PluginRegistration", plugin_id)
         return PluginDiagnosticReport(tuple(items))
     fields_are_tuples = True
-    for name in ("contracts", "resource_providers", "execution_providers", "finalization_contributors", "resource_selectors", "host_controls"):
+    for name in ("contracts", "resource_providers", "execution_providers", "finalization_contributors", "resource_selectors", "host_controls", "harness_managers", "continuation_routes", "credential_materializers"):
         if not isinstance(getattr(registration, name), tuple):
             fields_are_tuples = False
             _diag(items, "registration.tuple", DiagnosticSeverity.ERROR,

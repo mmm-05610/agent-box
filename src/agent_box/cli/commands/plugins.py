@@ -36,7 +36,18 @@ def _record_report(record, context, registry=None) -> PluginDiagnosticReport:
         descriptor=record.descriptor,
         available_contract_types=registry.contract_types() if registry else None,
     )
-    return PluginDiagnosticReport(tuple(items) + report.diagnostics)
+    diagnostics = list(items) + list(report.diagnostics)
+    for control in (record.registration.host_controls if record.registration else ()):
+        doctor = getattr(control, "doctor", None)
+        if callable(doctor):
+            result = doctor()
+            if result.get("status") == "SandboxUnavailable":
+                diagnostics.append(PluginDiagnostic(
+                    "sandbox.unavailable", DiagnosticSeverity.WARNING,
+                    result.get("error", "SandboxUnavailable"), record.descriptor.id,
+                    remediation="use the fake/formal vertical or enable the host namespace capability",
+                ))
+    return PluginDiagnosticReport(tuple(diagnostics))
 
 
 def _context_for(record):

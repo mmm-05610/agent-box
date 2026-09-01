@@ -17,6 +17,7 @@ export function Shell({ children }: { children: ReactNode }) {
             Works
           </a>
           <a href="#/harnesses">Harnesses</a>
+          <a href="#/skills">Skills</a>
           <a href="#/integrations">Integrations</a>
           <a href="#/settings">Settings</a>
         </nav>

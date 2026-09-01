@@ -5,22 +5,26 @@ from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 from agent_box.work_core.runtime import agent_box_home
 from agent_box_web.application.facade import HostApplication
-from agent_box.extensions.bootstrap import build_extension_registry
+from agent_box.extensions.bootstrap import build_extension_environment
+from agent_box.extensions.catalog import ExtensionCatalog
 from agent_box_web.application.ownership import MutationOwner
 from .static import locate_web_static
 
 MAX_BODY=128*1024
-def create_server(host="127.0.0.1",port=0,static_dir=None, *, registry=None, report=None):
+def create_server(host="127.0.0.1",port=0,static_dir=None, *, registry=None, report=None, catalog: ExtensionCatalog | None = None):
     if host not in {"127.0.0.1","localhost"}: raise ValueError("Web Host must bind exact loopback")
     owner=MutationOwner(agent_box_home()); owner.acquire()
     try:
         if registry is None or report is None:
-            registry,report=build_extension_registry(strict=False)
+            # Canonical environment path: Registry + Catalog + report from one
+            # loader run; Web never aggregates extensions itself.
+            environment=build_extension_environment(strict=False)
+            registry, report, catalog = environment.registry, environment.report, environment.catalog
     except Exception:
         owner.release()
         raise
     # The first database access/migrations happens only after ownership admission.
-    app=HostApplication(registry,report)
+    app=HostApplication(registry,report,catalog=catalog)
     static_dir = Path(static_dir).resolve() if static_dir else locate_web_static()
     if static_dir is None:
         owner.release()
@@ -38,11 +42,15 @@ def create_server(host="127.0.0.1",port=0,static_dir=None, *, registry=None, rep
             parsed=urlparse(self.path); path=parsed.path; query=parse_qs(parsed.query); route=path[len("/api/v1"):] if path.startswith("/api/v1") else path; bits=[x for x in route.split("/") if x]; body=self._json() if method in {"POST","PUT"} else {}
             if path=="/api/v1/health": return 200,{"status":"ok","owner":"local-web-host"}
             if path=="/api/v1/quick-launch" and method=="POST": return 201,app.quick_launch(body.get("command_id",""),body)
-            if path=="/api/v1/continuations" and method=="GET": return 200,app.continuation_candidates(query.get("work_id",[None])[0])
+            if path=="/api/v1/continuations" and method=="GET": return 200,app.continuation_candidates(query.get("work_id",[None])[0], query.get("target_provider_id",[None])[0])
             if path=="/api/v1/repositories" and method=="GET": return 200,app.repositories()
             if path=="/api/v1/repositories" and method=="POST": return 201,app.add_repository(body)
+            if path=="/api/v1/skills" and method=="GET": return 200,app.skills()
+            if path=="/api/v1/skills/import/preview" and method=="POST": return 200,app.skill_import_preview(body.get("path", ""))
+            if path=="/api/v1/skills/import/confirm" and method=="POST": return 201,app.skill_import_confirm(body.get("preview_id", ""), body.get("expected_revision"))
             if path=="/api/v1/plugins": return 200,{"plugins":[{"id":r.descriptor.id if r.descriptor else r.entry_point,"status":r.status,"display_name":r.descriptor.display_name if r.descriptor else r.entry_point,"error":r.error} for r in report.records]}
             if path=="/api/v1/providers/execution": return 200,{"providers":[{"id":p.id,"display_name":p.display_name,"version":p.version,"requirements":[{"contract_id":cid,"min":lo,"max":hi,"required":lo>0} for cid,(lo,hi) in sorted(registry.get(p.id).input_limits().items())],"capabilities":registry.get(p.id).capabilities()} for p in registry.descriptors()]}
+            if path=="/api/v1/quick-launch/discovery" and method=="GET": return 200,app.quick_launch_discovery()
             if path=="/api/v1/harnesses" and method=="GET": return 200,{"harnesses":app.harness_list()}
             if len(bits)>=2 and bits[0]=="harnesses":
                 hid=bits[1]

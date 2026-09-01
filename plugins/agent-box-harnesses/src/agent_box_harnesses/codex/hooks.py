@@ -1,4 +1,4 @@
-"""Bounded Codex lifecycle hook used by the tmux interactive provider."""
+"""Bounded Codex lifecycle hook used by the interactive provider."""
 from __future__ import annotations
 
 import json

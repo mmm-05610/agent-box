@@ -1,0 +1,10 @@
+from agent_box.extensions import PluginContext
+from agent_box_harnesses.plugin import create_codex
+
+
+def test_quick_launch_uses_generic_harness_registry_contracts(tmp_path):
+    registration = create_codex().build(PluginContext("1", tmp_path, tmp_path / "plugins" / "harnesses"))
+    provider = registration.execution_providers[0]
+    assert provider.descriptor().id == "codex-execution"
+    assert provider.input_limits() == {"agent-box.skill@1": (0, 32)}
+    assert [selector.id for selector in registration.resource_selectors] == ["codex-profile-selector"]

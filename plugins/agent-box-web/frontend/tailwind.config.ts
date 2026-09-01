@@ -1,5 +1,5 @@
 import type { Config } from 'tailwindcss'
-import { fontFamily, fontSize, radius, shadow, transition } from './src/tokens'
+import { fontFamily, fontSize, radius } from './src/tokens'
 
 const config: Config = {
   darkMode: 'class',

@@ -139,10 +139,6 @@ class CoreRepository:
         rows = db.get_conn().execute("SELECT * FROM core_works ORDER BY updated_at DESC, id DESC").fetchall()
         return tuple(Work(r["id"], r["objective"], WorkLifecycle(r["lifecycle"]), _parse_time(r["created_at"]), _parse_time(r["updated_at"]), r["closure_reason"], _load(r["metadata_json"]), r["version"]) for r in rows)
 
-    def list_works(self) -> tuple[Work, ...]:
-        rows = db.get_conn().execute("SELECT * FROM core_works ORDER BY updated_at DESC, id DESC").fetchall()
-        return tuple(Work(r["id"], r["objective"], WorkLifecycle(r["lifecycle"]), _parse_time(r["created_at"]), _parse_time(r["updated_at"]), r["closure_reason"], _load(r["metadata_json"]), r["version"]) for r in rows)
-
     def get_work(self, work_id: str) -> Work:
         row = db.get_conn().execute("SELECT * FROM core_works WHERE id = ?", (work_id,)).fetchone()
         if row is None:

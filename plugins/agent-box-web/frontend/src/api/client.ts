@@ -132,6 +132,7 @@ export const api = {
       }),
     }),
   providers: () => request<{ providers: Provider[] }>("/providers/execution"),
+  quickLaunchDiscovery: () => request<{ providers: (Provider & { selectors: Selector[] })[] }>("/quick-launch/discovery"),
   plugins: () => request<{ plugins: Plugin[] }>("/plugins"),
   harnesses: () => request<{ harnesses: Harness[] }>("/harnesses"),
   harness: (id: string) => request<Harness>(`/harnesses/${id}`),
@@ -151,7 +152,13 @@ export const api = {
       body: JSON.stringify({ command_id: command(), reason }),
     }),
   quickLaunch: (body: Record<string, unknown>) => request<ExecutionCreate & {work_id:string}>("/quick-launch", {method:"POST", body:JSON.stringify({...body,command_id:command()})}),
-  continuations: (workId?: string) => request<{candidates:any[]}>(`/continuations${workId ? `?work_id=${encodeURIComponent(workId)}` : ""}`),
+  continuations: (workId?: string, targetProviderId?: string) => request<{candidates:any[]}>(`/continuations?${workId ? `work_id=${encodeURIComponent(workId)}&` : ""}${targetProviderId ? `target_provider_id=${encodeURIComponent(targetProviderId)}` : ""}`),
   repositories: () => request<{repositories:any[]}>("/repositories"),
+  skills: () => request<{skills: Skill[]; status: string}>("/skills"),
+  skillPreview: (path: string) => request<SkillPreview>("/skills/import/preview", {method:"POST", body:JSON.stringify({path})}),
+  skillConfirm: (preview_id: string, expected_revision?: number) => request<{skill: Skill}>("/skills/import/confirm", {method:"POST", body:JSON.stringify({preview_id,expected_revision})}),
   addRepository: (value: Record<string, unknown>) => request<{repository:any}>("/repositories", {method:"POST", body:JSON.stringify({...value,command_id:command()})}),
 };
+
+export type Skill = { skill_id:string; name:string; description:string; revision:number; digest:string; format:string };
+export type SkillPreview = { preview_id:string; skill_id:string; name:string; description:string; file_count:number; digest:string; confirmation_required:boolean };

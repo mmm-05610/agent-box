@@ -3,3 +3,8 @@
 These reports record validation of the current Core + official plugin tree.
 They are evidence, not user instructions. Historical phase reports and
 spike-only validation are under `../archive/`.
+
+Current closure: `ROOT_EXTENSION_REPAIR_PHASE_5_ROUTING_CLOSURE.md`.
+
+Five-Harness consolidation closure:
+`FIVE_HARNESS_REGISTRY_CONSOLIDATION_CLOSURE.md`.

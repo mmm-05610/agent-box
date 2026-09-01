@@ -1,0 +1,240 @@
+schema_version = 1
+
+[[harness]]
+schema_version = 1
+driver = "codex"
+capabilities = ["start", "observe", "finish", "attach", "stream", "permissions", "native_continuation"]
+[harness.identity]
+harness_type = "codex"
+display_name = "Codex"
+description = "OpenAI Codex Harness"
+version = "2.0"
+[harness.executable]
+identity = "codex"
+resolver_kind = "PATH_OR_BUNDLE"
+bundle_members = ["codex", "codex-app-server"]
+version_probe = ["--version"]
+[harness.profile]
+native_home = ".codex"
+guest_home = "/runtime/home"
+config_format = "json-or-toml"
+payload_schema = "codex-profile-v1"
+codec = "codex"
+overlay_policy = "execution-local"
+slots = ["provider", "permission", "instruction", "mcp", "skill"]
+skill_target = "/runtime/home/skills/{skill_id}"
+skill_env = "CODEX_HOME"
+[[harness.inputs]]
+contract_id = "agent-box.skill@1"
+minimum = 0
+maximum = 32
+required = false
+selectors = ["agent-skill"]
+target = "skill-tree"
+transformer = "agent-skills"
+[[harness.launch_modes]]
+name = "interactive"
+argv = ["codex"]
+io = "pty"
+[[harness.launch_modes]]
+name = "exec"
+argv = ["codex", "exec"]
+io = "stdio"
+[[harness.launch_modes]]
+name = "app-server"
+argv = ["codex", "app-server"]
+io = "stdio"
+[harness.runtime]
+io = "stdio"
+host_capabilities = ["runtime-composition"]
+sandbox_capabilities = ["projection"]
+network = "required"
+terminal = "stdio-or-pty"
+[harness.continuation]
+kind = "native_session"
+contract_id = "agent-box.codex-continuation@1"
+target_provider = "codex-continuation"
+[harness.credential]
+contract = "agent-box.credential@1"
+locator_provider = "codex-login"
+guest_target_class = "secret-mount"
+materializer = "codex-login"
+
+[[harness]]
+schema_version = 1
+driver = "claude"
+capabilities = ["start", "observe", "finish", "attach", "native_continuation"]
+[harness.identity]
+harness_type = "claude-code"
+display_name = "Claude Code"
+description = "Anthropic Claude Code Harness"
+version = "2.0"
+[harness.executable]
+identity = "claude"
+resolver_kind = "PATH"
+version_probe = ["--version"]
+[harness.profile]
+native_home = ".claude"
+guest_home = "/runtime/home"
+config_format = "json"
+payload_schema = "claude-code-profile-v1"
+codec = "claude"
+overlay_policy = "execution-local"
+slots = ["instruction", "mcp", "skill", "permission"]
+skill_target = "/runtime/home/skills/{skill_id}"
+skill_env = "CLAUDE_CONFIG_DIR"
+[[harness.inputs]]
+contract_id = "agent-box.skill@1"
+minimum = 0
+maximum = 32
+required = false
+selectors = ["agent-skill"]
+target = "skill-tree"
+transformer = "agent-skills"
+[[harness.launch_modes]]
+name = "interactive"
+argv = ["claude"]
+io = "pty"
+[[harness.launch_modes]]
+name = "exec"
+argv = ["claude", "--print"]
+io = "stdio"
+[harness.runtime]
+io = "stdio"
+network = "required"
+terminal = "stdio-or-pty"
+[harness.continuation]
+kind = "native_session"
+contract_id = "agent-box.claude-continuation@1"
+target_provider = "claude-code-continuation"
+
+[[harness]]
+schema_version = 1
+driver = "opencode"
+capabilities = ["start", "observe", "finish", "stream"]
+[harness.identity]
+harness_type = "opencode"
+display_name = "OpenCode"
+description = "OpenCode Harness"
+version = "2.0"
+[harness.executable]
+identity = "opencode"
+resolver_kind = "PATH"
+version_probe = ["--version"]
+[harness.profile]
+native_home = ".config/opencode"
+guest_home = "/runtime/home"
+config_format = "json"
+payload_schema = "opencode-profile-v1"
+codec = "opencode"
+overlay_policy = "execution-local"
+slots = ["provider", "instruction", "mcp", "skill"]
+skill_target = "/runtime/home/skills/{skill_id}"
+skill_env = "OPENCODE_CONFIG_DIR"
+[[harness.inputs]]
+contract_id = "agent-box.skill@1"
+minimum = 0
+maximum = 32
+required = false
+selectors = ["agent-skill"]
+target = "skill-tree"
+transformer = "agent-skills"
+[[harness.launch_modes]]
+name = "exec"
+argv = ["opencode", "run"]
+io = "stdio"
+[harness.runtime]
+io = "stdio"
+network = "required"
+terminal = "stdio"
+[harness.continuation]
+kind = "transcript_handoff"
+contract_id = "agent-box.opencode-continuation@1"
+target_provider = "opencode-continuation"
+
+[[harness]]
+schema_version = 1
+driver = "hermes"
+capabilities = ["start", "observe", "finish", "stream"]
+[harness.identity]
+harness_type = "hermes"
+display_name = "Hermes"
+description = "Hermes Harness"
+version = "2.0"
+[harness.executable]
+identity = "hermes"
+resolver_kind = "PATH"
+version_probe = ["--version"]
+[harness.profile]
+native_home = ".hermes"
+guest_home = "/runtime/home"
+config_format = "json"
+payload_schema = "hermes-profile-v1"
+codec = "hermes"
+overlay_policy = "execution-local"
+slots = ["instruction", "mcp", "skill"]
+skill_target = "/runtime/home/skills/{skill_id}"
+skill_env = "HERMES_HOME"
+[[harness.inputs]]
+contract_id = "agent-box.skill@1"
+minimum = 0
+maximum = 32
+required = false
+selectors = ["agent-skill"]
+target = "skill-tree"
+transformer = "agent-skills"
+[[harness.launch_modes]]
+name = "exec"
+argv = ["hermes", "--print"]
+io = "stdio"
+[harness.runtime]
+io = "stdio"
+network = "required"
+terminal = "stdio"
+[harness.continuation]
+kind = "transcript_handoff"
+contract_id = "agent-box.hermes-continuation@1"
+target_provider = "hermes-continuation"
+
+[[harness]]
+schema_version = 1
+driver = "pi"
+capabilities = ["start", "observe", "finish", "attach", "stream", "native_continuation"]
+[harness.identity]
+harness_type = "pi"
+display_name = "Pi"
+description = "Pi Harness"
+version = "2.0"
+[harness.executable]
+identity = "pi"
+resolver_kind = "PATH"
+version_probe = ["--version"]
+[harness.profile]
+native_home = ".pi"
+guest_home = "/runtime/home"
+config_format = "json"
+payload_schema = "pi-profile-v1"
+codec = "pi"
+overlay_policy = "execution-local"
+slots = ["instruction", "mcp", "skill"]
+skill_target = "/runtime/home/skills/{skill_id}"
+[[harness.inputs]]
+contract_id = "agent-box.skill@1"
+minimum = 0
+maximum = 32
+required = false
+selectors = ["agent-skill"]
+target = "skill-tree"
+transformer = "agent-skills"
+[[harness.launch_modes]]
+name = "exec"
+argv = ["pi", "--agent-dir", "/runtime/home", "--print"]
+io = "stdio"
+[harness.runtime]
+io = "stdio"
+network = "required"
+terminal = "stdio-or-pty"
+[harness.continuation]
+kind = "native_session"
+contract_id = "agent-box-pi.continuation@1"
+target_provider = "pi-session"

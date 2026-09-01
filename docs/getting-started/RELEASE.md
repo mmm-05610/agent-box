@@ -1,9 +1,9 @@
 # Release Process
 
-Agent-Box Preview is distributed as one Root CLI wheel and five independent
-official plugin wheels. The Root wheel owns Core, the Plugin SDK, resource
-contracts, migrations, and the thin CLI. Web, Harnesses, Git, tmux, and
-Artifacts remain plugin-owned.
+Agent-Box Preview is distributed as one Root CLI wheel plus selected plugin
+wheels. The Root wheel owns Core, the Plugin SDK, resource contracts,
+migrations, and the thin CLI. Web, Harnesses, Git, Artifacts, runtime-local,
+bwrap, and terminal-session remain plugin-owned.
 
 ## 2.0.0a1 Preview build
 
@@ -13,7 +13,8 @@ npm ci --prefix plugins/agent-box-web/frontend
 npm run build --prefix plugins/agent-box-web/frontend
 python -m build --wheel --sdist --outdir dist .
 for package in plugins/agent-box-web plugins/agent-box-harnesses \
-  plugins/agent-box-git plugins/agent-box-tmux plugins/agent-box-artifacts; do
+  plugins/agent-box-git plugins/agent-box-artifacts plugins/agent-box-runtime-local \
+  plugins/agent-box-sandbox-bwrap plugins/agent-box-terminal-session; do
   python -m build --wheel --outdir dist "$package"
 done
 ```
@@ -36,5 +37,4 @@ uses user credentials or a real model. Release automation attaches the Root
 artifact and all five official plugin wheels; it does not build a Windows
 installer, PyInstaller GUI, or ACS binary.
 
-`agent-box-pi` is an optional third-party/example plugin and is not part of the
-Preview extra.
+Pi remains an adapter inside the consolidated Harness distribution.

@@ -24,7 +24,45 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e '.[dev]'
       - name: Test
-        run: pytest -q
+        run: pytest -q tests --ignore=tests/integration
+
+  integration-native:
+    name: native integration tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install explicit integration dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends bubblewrap tmux
+          python -m pip install --upgrade pip
+          pip install pytest -e . -e plugins/agent-box-harnesses \
+            -e plugins/agent-box-runtime-local \
+            -e plugins/agent-box-sandbox-bwrap -e plugins/agent-box-terminal-session \
+            -e plugins/agent-box-skills
+      - name: Probe native capabilities
+        run: |
+          set +e
+          bwrap_status=0
+          tmux_status=0
+          command -v bwrap >/dev/null || bwrap_status=1
+          command -v tmux >/dev/null || tmux_status=1
+          if [ "$bwrap_status" -eq 0 ]; then
+            bwrap --ro-bind / / --unshare-user --unshare-pid --proc /proc true >/tmp/agent-box-bwrap-probe.log 2>&1 || bwrap_status=$?
+          fi
+          if [ "$tmux_status" -eq 0 ]; then
+            tmux -L agent-box-ci-probe -f /dev/null start-server >/tmp/agent-box-tmux-probe.log 2>&1 || tmux_status=$?
+            tmux -L agent-box-ci-probe kill-server >/dev/null 2>&1
+          fi
+          echo "bwrap_status=$bwrap_status tmux_status=$tmux_status"
+          if [ "$bwrap_status" -ne 0 ]; then echo "native bwrap unavailable: binary missing or namespace capability denied"; fi
+          if [ "$tmux_status" -ne 0 ]; then echo "native tmux unavailable: binary missing or server capability denied"; fi
+          exit 0
+      - name: Test native integration suite
+        run: pytest -q tests/integration/native
 
   plugins:
     name: ${{ matrix.name }} tests
@@ -33,12 +71,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {name: web, path: plugins/agent-box-web}
-          - {name: harnesses, path: plugins/agent-box-harnesses}
-          - {name: git, path: plugins/agent-box-git}
-          - {name: tmux, path: plugins/agent-box-tmux}
-          - {name: artifacts, path: plugins/agent-box-artifacts}
-          - {name: pi-third-party, path: plugins/agent-box-pi}
+          - {name: web, path: plugins/agent-box-web, deps: "-e plugins/agent-box-web -e plugins/agent-box-harnesses -e plugins/agent-box-git -e plugins/agent-box-terminal-session"}
+          - {name: harnesses, path: plugins/agent-box-harnesses, deps: "-e plugins/agent-box-harnesses -e plugins/agent-box-runtime-local -e plugins/agent-box-sandbox-bwrap -e plugins/agent-box-terminal-session -e plugins/agent-box-skills"}
+          - {name: skills, path: plugins/agent-box-skills, deps: "-e plugins/agent-box-skills"}
+          - {name: git, path: plugins/agent-box-git, deps: "-e plugins/agent-box-git"}
+          - {name: runtime-local, path: plugins/agent-box-runtime-local, deps: "-e plugins/agent-box-runtime-local"}
+          - {name: sandbox-bwrap, path: plugins/agent-box-sandbox-bwrap, deps: "-e plugins/agent-box-sandbox-bwrap"}
+          - {name: terminal-session, path: plugins/agent-box-terminal-session, deps: "-e plugins/agent-box-terminal-session"}
+          - {name: artifacts, path: plugins/agent-box-artifacts, deps: "-e plugins/agent-box-artifacts"}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -47,9 +87,7 @@ jobs:
       - name: Install root and official plugin dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest -e . -e plugins/agent-box-tmux -e plugins/agent-box-artifacts \
-            -e plugins/agent-box-git -e plugins/agent-box-harnesses -e plugins/agent-box-web
-          if [ "${{ matrix.name }}" = pi-third-party ]; then pip install -e plugins/agent-box-pi; fi
+          pip install pytest -e . ${{ matrix.deps }}
       - name: Test plugin
         run: pytest -q "${{ matrix.path }}/tests"
 
@@ -80,7 +118,8 @@ jobs:
         run: |
           python -m pip install --upgrade pip build
           python -m build --wheel --outdir /tmp/agent-box-wheels .
-          for package in plugins/agent-box-web plugins/agent-box-harnesses plugins/agent-box-git plugins/agent-box-tmux plugins/agent-box-artifacts; do
+          for package in plugins/agent-box-web plugins/agent-box-harnesses plugins/agent-box-skills plugins/agent-box-git plugins/agent-box-artifacts \
+            plugins/agent-box-runtime-local plugins/agent-box-sandbox-bwrap plugins/agent-box-terminal-session; do
             python -m build --wheel --outdir /tmp/agent-box-wheels "$package"
           done
       - name: Verify plugin discovery and doctor

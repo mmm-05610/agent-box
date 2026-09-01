@@ -4,7 +4,6 @@ from __future__ import annotations
 import hashlib
 import json
 import queue
-import subprocess
 import threading
 import time
 from dataclasses import dataclass, field
@@ -14,6 +13,7 @@ from typing import Any, Mapping
 
 from agent_box.resource_contracts import (
     AgentBoxProfileV1,
+    CredentialRefV1,
     PromptFragmentV1,
     WorkspaceV1,
 )
@@ -30,7 +30,9 @@ from agent_box.work_core import (
 )
 
 from ..contracts import CodexContinuationV1
-from ..launch import CodexLaunchAdapter, CodexLaunchSpec
+from ..launch import CodexLaunchAdapter
+from ..composition import command_from_plan, compose, composition_from_resolved_inputs
+from agent_box.extensions.runtime_composition import RuntimeBinding, TerminalRunHandle, RuntimeHostV1, SandboxV1, TerminalSessionV1, RuntimeCompositionCoordinator
 
 
 def _now() -> datetime:
@@ -40,23 +42,14 @@ def _now() -> datetime:
 class CodexAppServerClient:
     """Small JSON-RPC client over the App Server stdio transport."""
 
-    def __init__(self, plan: CodexLaunchSpec, events_path: Path) -> None:
+    def __init__(self, transport: Any, events_path: Path) -> None:
         self.events_path = events_path.resolve()
         self.events_path.parent.mkdir(parents=True, exist_ok=True)
         self.events_path.write_text("", encoding="utf-8")
-        self.process = subprocess.Popen(
-            plan.argv,
-            env=plan.env,
-            cwd=plan.cwd,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            bufsize=1,
-            start_new_session=True,
-        )
-        if not self.process.stdin or not self.process.stdout or not self.process.stderr:
-            raise RuntimeError("Codex App Server stdio pipes were not created")
+        # The transport is supplied by the selected RuntimeComposition.  The
+        # Harness never creates a process or opens a carrier.
+        self.transport = transport
+        self.process = getattr(transport, "process", transport)
         self._pending: dict[int, queue.Queue[dict[str, Any]]] = {}
         self._pending_lock = threading.Lock()
         self._write_lock = threading.Lock()
@@ -76,7 +69,7 @@ class CodexAppServerClient:
     def _send(self, message: Mapping[str, Any]) -> None:
         encoded = json.dumps(message, separators=(",", ":")) + "\n"
         with self._write_lock:
-            if not self.process.stdin:
+            if not getattr(self.process, "stdin", None):
                 raise RuntimeError("Codex App Server stdin is unavailable")
             self.process.stdin.write(encoded)
             self.process.stdin.flush()
@@ -218,7 +211,7 @@ class CodexAppServerClient:
             self.process.terminate()
             try:
                 self.process.wait(timeout=10)
-            except subprocess.TimeoutExpired:
+            except TimeoutError:
                 self.process.kill()
                 self.process.wait(timeout=10)
         self.process_exit = self.process.returncode
@@ -231,7 +224,7 @@ class CodexAppServerClient:
             turn = ((event.get("params") or {}).get("turn") or {})
             if turn.get("id") in turn_ids:
                 statuses.append(str(turn.get("status") or "unknown"))
-        return {
+        limits = {
             "event_methods": tuple(self.event_methods[-64:]),
             "error_codes": tuple(self.error_codes[-16:]),
             "file_change_statuses": tuple(self.file_change_statuses[-16:]),
@@ -240,6 +233,7 @@ class CodexAppServerClient:
             "turn_terminal_statuses": tuple(statuses[-16:]),
             "process_exit": self.process_exit,
         }
+        return limits
 
 
 @dataclass
@@ -248,13 +242,17 @@ class CodexInteractiveHandle:
     dispatch_id: str
     inputs_digest: str
     workspace: WorkspaceV1
+    guest_cwd: str
     profile: AgentBoxProfileV1
     client: CodexAppServerClient
     thread_id: str
     turn_ids: list[str]
     projected_contracts: tuple[str, ...]
+    composition_handle: TerminalRunHandle | None = None
     submitted: bool = False
     turn_results: dict[str, dict[str, Any]] = field(default_factory=dict)
+    # Honest PROJECTED-level receipt captured from the composition attempt.
+    projection: Mapping[str, Any] | None = None
 
     @property
     def provider_correlation_ref(self) -> str:
@@ -284,10 +282,18 @@ class CodexInteractiveExecutionProvider:
         evidence_root: Path,
         *,
         launch_adapter: CodexLaunchAdapter,
+        credential_materializer=None,
+        coordinator: Any | None = None,
+        runtime_binding: RuntimeBinding | None = None,
+        client_factory: Any | None = None,
     ) -> None:
         self.evidence_root = evidence_root.resolve()
         self._launch_adapter = launch_adapter
+        self._coordinator = coordinator
+        self._runtime_binding = runtime_binding
+        self._client_factory = client_factory or CodexAppServerClient
         self._handles: dict[str, CodexInteractiveHandle] = {}
+        self._credential_materializer = credential_materializer
 
     def descriptor(self) -> ProviderDescriptor:
         return ProviderDescriptor(self.provider_id, "Codex App Server", "v2")
@@ -303,12 +309,16 @@ class CodexInteractiveExecutionProvider:
         }
 
     def input_limits(self) -> Mapping[str, tuple[int, int | None]]:
-        return {
+        limits = {
             WorkspaceV1.contract_id: (1, 1),
             PromptFragmentV1.contract_id: (1, None),
             AgentBoxProfileV1.contract_id: (1, 1),
             CodexContinuationV1.contract_id: (0, 1),
+            CredentialRefV1.contract_id: (0, 1),
         }
+        if self._coordinator is None:
+            limits.update({RuntimeHostV1.contract_id: (1, 1), SandboxV1.contract_id: (1, 1), TerminalSessionV1.contract_id: (1, 1)})
+        return limits
 
     @staticmethod
     def _one(request: ExecutionStartRequest, contract_id: str) -> object:
@@ -342,15 +352,29 @@ class CodexInteractiveExecutionProvider:
             profile=profile,
             workspace=workspace,
         )
-        client = CodexAppServerClient(
-            plan, self.evidence_root / f"{request.dispatch_id}.jsonl"
+        command = command_from_plan(
+            plan, execution_id=request.execution_id,
+            io_mode="stdio",
+            requires_control_plane_network=True,
+        )
+        # This is the only Harness-to-runtime launch edge.  In particular,
+        # constructing the command above has no process or terminal effect.
+        binding, coordinator = ((self._runtime_binding, self._coordinator)
+                                if self._coordinator is not None else composition_from_resolved_inputs(request, command, credential_materializer=self._credential_materializer))
+        run_handle = compose(
+            coordinator, binding, command,
+            execution_id=request.execution_id, dispatch_id=request.dispatch_id,
+        )
+        transport = getattr(run_handle, "transport", run_handle)
+        client = self._client_factory(
+            transport, self.evidence_root / f"{request.dispatch_id}.jsonl"
         )
         try:
             client.request(
                 "initialize",
                 {
                     "clientInfo": {"name": "agent-box", "version": "preview"},
-                    "capabilities": {"experimentalApi": True},
+                    "capabilities": {},
                 },
             )
             client.notify("initialized", {})
@@ -363,20 +387,31 @@ class CodexInteractiveExecutionProvider:
                     "thread/resume",
                     {
                         "threadId": continuation.thread_id,
-                        "cwd": str(workspace.path),
-                        "sandbox": "workspace-write",
+                        "cwd": command.cwd_token,
+                        # Agent-Box already owns the filesystem sandbox via
+                        # the exact frozen SandboxRef.  This legacy thread
+                        # field must permit the turn-level externalSandbox
+                        # override below; it does not weaken the outer bwrap
+                        # policy.
+                        "sandbox": "danger-full-access",
                         "approvalPolicy": "never",
-                        "runtimeWorkspaceRoots": [str(workspace.path)],
                     },
                 )
             else:
                 started = client.request(
                     "thread/start",
                     {
-                        "cwd": str(workspace.path),
-                        "sandbox": "workspace-write",
+                        # The App Server runs inside the selected Sandbox.
+                        # Never pass the host worktree path across that
+                        # boundary: the RuntimeBundle mounts it at this
+                        # command's canonical guest path.
+                        "cwd": command.cwd_token,
+                        # Codex's legacy sandbox must not create a second,
+                        # unaware bwrap around the guest workspace.  The
+                        # actual restriction comes from Agent-Box's selected
+                        # external Sandbox provider at process creation.
+                        "sandbox": "danger-full-access",
                         "approvalPolicy": "never",
-                        "runtimeWorkspaceRoots": [str(workspace.path)],
                         "ephemeral": False,
                         "developerInstructions": (
                             "You are operating inside one Agent-Box Execution. "
@@ -391,26 +426,33 @@ class CodexInteractiveExecutionProvider:
                 {
                     "threadId": thread_id,
                     "input": [{"type": "text", "text": prompt}],
-                    "cwd": str(workspace.path),
+                    "cwd": command.cwd_token,
                     "effort": "low",
                     "approvalPolicy": "never",
-                    "runtimeWorkspaceRoots": [str(workspace.path)],
                     "sandboxPolicy": {
-                        "type": "workspaceWrite",
-                        "writableRoots": [str(workspace.path)],
+                        "type": "externalSandbox",
+                        # The selected bwrap cloud template inherits network
+                        # for Codex control-plane traffic.  Agent-Box does
+                        # not claim separate workload-network enforcement.
+                        "networkAccess": "enabled",
                     },
                 },
             )
+            projection = (coordinator.projection_receipt(run_handle.attempt_key)
+                          if isinstance(coordinator, RuntimeCompositionCoordinator) else None)
             handle = CodexInteractiveHandle(
                 request.execution_id,
                 request.dispatch_id,
                 request.inputs_digest,
                 workspace,
+                command.cwd_token,
                 profile,
                 client,
                 thread_id,
                 [turn["turn"]["id"]],
                 tuple(sorted(request.inputs)),
+                composition_handle=run_handle,
+                projection=projection,
             )
             self._handles[request.dispatch_id] = handle
             return ExecutionStartReceipt(
@@ -454,12 +496,11 @@ class CodexInteractiveExecutionProvider:
             {
                 "threadId": handle.thread_id,
                 "input": [{"type": "text", "text": text}],
-                "cwd": str(handle.workspace.path),
+                "cwd": handle.guest_cwd,
                 "approvalPolicy": "never",
-                "runtimeWorkspaceRoots": [str(handle.workspace.path)],
                 "sandboxPolicy": {
-                    "type": "workspaceWrite",
-                    "writableRoots": [str(handle.workspace.path)],
+                    "type": "externalSandbox",
+                    "networkAccess": "enabled",
                 },
             },
         )
@@ -561,8 +602,9 @@ class CodexInteractiveExecutionProvider:
             {
                 "thread_id_present": bool(handle.thread_id),
                 "turn_ids_present": bool(handle.turn_ids),
-                "cwd": str(handle.workspace.path),
+                "cwd_token": handle.guest_cwd,
                 "turn_completed_before_finish": bool(handle.turn_results),
+                "projection": handle.projection,
                 "lifecycle": (
                     handle.client.diagnostics(tuple(handle.turn_ids))
                     if hasattr(handle.client, "diagnostics")

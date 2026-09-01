@@ -59,7 +59,7 @@ class FakeSelector:
     title = "Workspace input"
     fields = (SelectorField("selector", "Revision", default="HEAD"),)
 
-    def bind(self, registry):
+    def bind_registry(self, registry):
         self.registry = registry
 
     def prepare(self, parameters, *, execution_id):
@@ -106,7 +106,7 @@ class FakeControl:
     def __init__(self, provider):
         self.provider = provider
 
-    def bind(self, registry):
+    def bind_registry(self, registry):
         del registry
 
     def attach_command(self, facts):

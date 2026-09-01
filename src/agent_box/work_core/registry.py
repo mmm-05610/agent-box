@@ -139,8 +139,12 @@ class ExtensionRegistry:
         self._resource_descriptors: dict[str, ProviderDescriptor] = {}
         # Built-ins use the same runtime registry as third-party Contracts.
         # CONTRACT_TYPES remains an immutable compatibility catalog, not the
-        # dispatch-time source of truth.
+        # dispatch-time source of truth.  Shared runtime contracts
+        # (runtime-host/sandbox/terminal-session) are Root-owned and are
+        # registered exactly once by the Root Extension bootstrap; this
+        # module never imports the extension layer.
         self._contract_types: dict[str, type] = dict(CONTRACT_TYPES)
+        self._root_shared_contract_ids: frozenset[str] = frozenset()
 
     @staticmethod
     def _validate_contract_type(contract: type) -> tuple[str, type]:
@@ -156,8 +160,35 @@ class ExtensionRegistry:
             raise ValueError("resource contract must be a frozen dataclass")
         return contract_id, contract
 
+    def register_root_shared_contract(self, contract: type) -> None:
+        """Register one Root-owned shared runtime contract (bootstrap only).
+
+        A Root-owned id accepts only the exact canonical Python type.  Plugin
+        bundles re-declaring that identical canonical type are tolerated, so
+        several providers of one kind can coexist; every other duplicate
+        stays fail closed.
+        """
+        contract_id, contract_type = self._validate_contract_type(contract)
+        existing = self._contract_types.get(contract_id)
+        if existing is not None and existing is not contract_type:
+            raise ValueError(f"Root shared contract id collision: {contract_id}")
+        self._contract_types[contract_id] = contract_type
+        self._root_shared_contract_ids = frozenset(
+            {*self._root_shared_contract_ids, contract_id}
+        )
+
+    def root_shared_contract_ids(self) -> frozenset[str]:
+        return self._root_shared_contract_ids
+
     def register_contract(self, contract: type) -> None:
         contract_id, contract_type = self._validate_contract_type(contract)
+        if contract_id in self._root_shared_contract_ids:
+            if self._contract_types[contract_id] is not contract_type:
+                raise ValueError(
+                    "contract id is Root-owned shared runtime authority: "
+                    f"{contract_id}"
+                )
+            return
         if contract_id in self._contract_types:
             raise ValueError(f"resource contract already registered: {contract_id}")
         self._contract_types[contract_id] = contract_type
@@ -184,6 +215,7 @@ class ExtensionRegistry:
         staged._resource_providers = dict(self._resource_providers)
         staged._resource_descriptors = dict(self._resource_descriptors)
         staged._contract_types = dict(self._contract_types)
+        staged._root_shared_contract_ids = self._root_shared_contract_ids
         for contract in contracts:
             staged.register_contract(contract)
         for provider in resource_providers:
@@ -270,6 +302,14 @@ class ExtensionRegistry:
 
     def resource_descriptors(self) -> tuple[ProviderDescriptor, ...]:
         return tuple(self._resource_descriptors[key] for key in sorted(self._resource_descriptors))
+
+    def resource_providers(self) -> tuple[ResourceProvider, ...]:
+        """Read-only snapshot of the registered ResourceProviders."""
+        return tuple(self._resource_providers[key] for key in sorted(self._resource_providers))
+
+    def execution_providers(self) -> tuple[ExecutionProvider, ...]:
+        """Read-only snapshot of the registered ExecutionProviders."""
+        return tuple(self._providers[key] for key in sorted(self._providers))
 
     def require_capability(self, provider_id: str, operation: str) -> ExecutionProvider:
         """Return a provider only when it declares the requested operation."""

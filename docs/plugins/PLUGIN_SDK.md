@@ -8,6 +8,30 @@ Contracts, ResourceProviders, ExecutionProviders, Host-neutral selectors, and
 Host control capabilities. Product-specific UI adapters are not part of this
 SDK.
 
+## Host discovery and routing
+
+ExecutionProvider descriptors declare input requirements and capabilities only.
+Host-facing selector compatibility is contributed through the Extension
+Catalog (`SelectorCompatibility`); product ordering and defaults stay in the
+Host. Profile envelopes carry cross-Harness identity and locators only;
+Harness plugins own native payload validation and projection.
+
+## Root sandbox contract
+
+The Root SDK owns the provider-neutral sandbox protocol at
+`agent_box.extensions.sandbox`. It contains frozen DTOs, capability
+negotiation, protocol types, and sandbox errors only. Backend plugins import
+these values from Root and register only their ResourceProvider; they must not
+ship a second protocol authority. A sandbox `Ref.provider` is the exact
+ResourceProvider descriptor ID (`bwrap-sandbox` for the bwrap plugin).
+Resolve is side-effect free and returns an execution-scoped `ResolvedSandbox`.
+The only runtime call is `start(mounts: MountPlan, entrypoint:
+SandboxEntrypoint) -> SandboxedProcess`. Host/Harness code prepares resources,
+configuration, and digests before this call. The Sandbox validates and mounts
+prepared sources, starts one main process, and only observes/terminates/cleans
+that process; it does not understand Work, Execution, Harness, Profile, Skill,
+or MCP semantics.
+
 ## Minimal package
 
 ```text
@@ -111,3 +135,12 @@ fields, choices, requested summaries, exact prepared selections, and
 assurance. The Web Host renders these declarations generically; plugin code
 owns authority and provider-specific validation. Plugins must not depend on a
 particular Host UI or retired UI implementation.
+
+## Credential bindings
+
+`CredentialRefV1` (`agent-box.credential@1`) is a locator-only binding value.
+An installed credential ResourceProvider may resolve it to a provider-private,
+execution-scoped `PreparedSecretMount`; secret bytes, source paths, content
+digests and environment values are never part of Core inputs, manifests,
+events, API responses or Evidence. Secret materialization is not a
+`RuntimeSourceDeclaration` and cleanup is idempotent.
