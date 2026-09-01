@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import Any
 from pathlib import Path
 
-from agent_box.extensions.runtime_composition import (
+from agent_box.protocols.runtime import (
     CompositionCoordinator,
     HarnessCommandSpec,
     RuntimeBinding,

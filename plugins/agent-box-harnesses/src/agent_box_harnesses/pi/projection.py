@@ -1,7 +1,7 @@
 """Pi-native projection and the only Pi-to-runtime composition seam."""
 from __future__ import annotations
 from typing import Any
-from agent_box.extensions.runtime_composition import HarnessCommandSpec, assemble_runtime_composition, declare_source
+from agent_box.protocols.runtime import HarnessCommandSpec, assemble_runtime_composition, declare_source
 from agent_box.resource_contracts import PromptFragmentV1, WorkspaceV1, AgentBoxProfileV1
 from .config import PiProfile
 from .contract import PiContinuationV1

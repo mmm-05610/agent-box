@@ -31,7 +31,7 @@
 
 # Canonical sandbox contract
 
-- 唯一类型：`agent_box.extensions.runtime_composition.protocol.SandboxV1`（frozen dataclass，`ref: SandboxRef` + `port: object (compare=False)`，`__getattr__` 委托 port——与 `RuntimeHostV1`/`TerminalSessionV1` 同一形态）。
+- 唯一类型：`agent_box.protocols.runtime.protocol.SandboxV1`（frozen dataclass，`ref: SandboxRef` + `port: object (compare=False)`，`__getattr__` 委托 port——与 `RuntimeHostV1`/`TerminalSessionV1` 同一形态）。
 - 语义：exact `SandboxRef` + 已解析的 Sandbox port；不表示 runtime instance、不拥有进程、不提供 `start()`；真实执行仍只有 `Sandbox.wrap()`；RuntimeHost/TerminalSession 启动路径未动。
 - `SandboxRef(provider, native_id, policy_digest, affinity, schema_version, network_mode)` 未改动；bwrap 的 Core Ref identity（`RefType.ARTIFACT, "bwrap-sandbox", template_id, metadata{revision,digest,schema_version,affinity,network_mode}`）未改动。
 - 旧 `SandboxTemplateV1` 的 template 元数据（template_id/revision/template_digest/capabilities 字符串集）保留为 port 对象上的普通属性，Registry 值不再继承任何 template 字段。
@@ -62,7 +62,7 @@
 
 # Removed legacy sandbox API
 
-- `extensions/sandbox/protocol.py` 文件删除；`agent_box.extensions.sandbox` 保留为 shim（再导出支持类型与 `CONTRACT_ID`）。
+- `extensions/sandbox/protocol.py` 文件删除；Sandbox 协议 canonical 路径为 `agent_box.protocols.runtime`，不保留 shim。
 - `class SandboxTemplateV1`、`SandboxTemplate =` 别名、`class ResolvedSandbox`、`SandboxedProcess`、`ResolvedSandbox.start()`：正式源码（`src/agent_box/**` 与 `plugins/*/src/**`）零命中，由两个源码扫描测试锁死（`test_formal_source_defines_no_second_sandbox_contract_type`、`test_formal_source_has_no_legacy_resolved_sandbox_start_protocol`）。
 - shim 有测试（`test_legacy_sandbox_shim_points_at_canonical_types`）：`CONTRACT_ID == SandboxV1.contract_id`、各支持类型与 canonical 模块同一对象、且 `SandboxTemplateV1/SandboxTemplate/ResolvedSandbox/SandboxedProcess` 不可再导入。
 - 正式代码已全部改用 canonical import 路径（bwrap provider/plugin、formal vertical 测试）；shim 仅为一个周期的第三方兼容面。
@@ -145,7 +145,7 @@ Clean venv（`python3 -m venv /tmp/abx-phase1-venv`）验证：
 # Compatibility
 
 - 公共 contract id 全部保持：`agent-box.sandbox@1` / `agent-box.runtime-host@1` / `agent-box.terminal-session@1` / 四个 envelope id；SandboxRef/TerminalSessionRef/RuntimeHostRef schema 不变；Ref identity（Core Ref 与 composition Ref）不变；frozen Binding 数据、数据库、持久化格式零改动；插件 entry point 不变。
-- `agent_box.extensions.sandbox` 保留一个周期的再导出 shim（支持类型 + CONTRACT_ID）；旧契约类型名 `SandboxTemplateV1` 刻意**不**提供别名（避免诱导对 frozen dataclass 的子类化，符合"不增加兼容性第二契约类型"）。
+- 不提供旧路径 forwarding shim；旧契约类型名 `SandboxTemplateV1` 刻意**不**提供别名。
 - 行为差异（有意、已记录）：① 裸 `ExtensionRegistry()` 不再含 shared runtime 契约——必须经 `build_extension_registry()`/`register_shared_runtime_contracts()`（官方代码与测试已全部收敛）；② provider 插件的 `contracts=()` 变化不影响其对外能力（supported_contract_ids 经 bootstrap 注册后校验通过）；③ 第三方 sandbox provider 若曾子类化 SandboxTemplateV1 需改返回 `SandboxV1`（当前无已知第三方）。
 
 ---

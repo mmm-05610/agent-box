@@ -5,13 +5,13 @@ import hashlib, json, re, shutil, subprocess, tempfile
 from pathlib import Path, PurePosixPath
 from typing import Any, Mapping
 
-from agent_box.extensions.runtime_composition import (
+from agent_box.protocols.runtime import (
     SANDBOX_CONTRACT_ID, HarnessCommandSpec, IsolatedProcessSpec, MountPlan,
     PreparedMountSource, SandboxRef, SandboxRequirements, SandboxUnavailable,
     SandboxUnsupported, SandboxV1, ProjectionRejected, digest, digest_json,
     guest_path,
 )
-from agent_box.extensions.credentials import PreparedSecretMount
+from agent_box.protocols.credentials import PreparedSecretMount
 from agent_box.work_core.models import Ref, RefType
 from agent_box.work_core.registry import ProviderDescriptor, ResourceResolutionContext
 

@@ -8,8 +8,7 @@ Covers:
 - Root-owned shared runtime contracts registered exactly once by the Root
   Extension bootstrap (never by work_core, never re-declared by providers);
 - plugin-owned duplicate contracts still failing closed;
-- the retired ``agent_box.extensions.sandbox`` shim pointing at the canonical
-  module with no runnable legacy ``start()`` protocol;
+- the canonical ``agent_box.protocols.runtime`` sandbox protocol;
 - the repository defining ``list_works`` exactly once.
 """
 from __future__ import annotations
@@ -31,7 +30,7 @@ from agent_box.extensions.bootstrap import (
     register_shared_runtime_contracts,
 )
 from agent_box.extensions.loader import load_installed_plugins
-from agent_box.extensions.runtime_composition import (
+from agent_box.protocols.runtime import (
     SANDBOX_CONTRACT_ID,
     HarnessCommandSpec,
     RuntimeHostRef,
@@ -43,7 +42,7 @@ from agent_box.extensions.runtime_composition import (
     assemble_runtime_composition,
     declare_source,
 )
-from agent_box.extensions.runtime_composition import protocol as runtime_protocol
+from agent_box.protocols.runtime import protocol as runtime_protocol
 from agent_box.extensions import PluginContext, PluginDescriptor, PluginRegistration
 from agent_box.work_core import (
     ExecutionStartReceipt,
@@ -400,23 +399,11 @@ def test_assembler_unwraps_exactly_the_canonical_ports(tmp_path):
     assert resolved.sandbox is sandbox_value.port
 
 
-# 9. The legacy import shim points at the canonical module.
-def test_legacy_sandbox_shim_points_at_canonical_types():
-    import agent_box.extensions.sandbox as shim
-
-    assert shim.CONTRACT_ID == SANDBOX_CONTRACT_ID == SandboxV1.contract_id
-    assert shim.SandboxRequirements is runtime_protocol.SandboxRequirements
-    assert shim.SandboxError is runtime_protocol.SandboxError
-    assert shim.SandboxUnavailable is runtime_protocol.SandboxUnavailable
-    assert shim.SandboxUnsupported is runtime_protocol.SandboxUnsupported
-    assert shim.SandboxAmbiguous is runtime_protocol.SandboxAmbiguous
-    assert shim.ProjectionRejected is runtime_protocol.ProjectionRejected
-    assert shim.guest_path is runtime_protocol.guest_path
-    assert shim.digest_json is runtime_protocol.digest_json
-    assert not hasattr(shim, "SandboxTemplateV1")
-    assert not hasattr(shim, "SandboxTemplate")
-    assert not hasattr(shim, "ResolvedSandbox")
-    assert not hasattr(shim, "SandboxedProcess")
+# 9. Runtime sandbox types have one canonical authority.
+def test_runtime_sandbox_types_are_canonical():
+    from agent_box.protocols.runtime import SandboxRequirements
+    assert SANDBOX_CONTRACT_ID == SandboxV1.contract_id
+    assert SandboxRequirements is runtime_protocol.SandboxRequirements
 
 
 # 12. The repository defines list_works exactly once.

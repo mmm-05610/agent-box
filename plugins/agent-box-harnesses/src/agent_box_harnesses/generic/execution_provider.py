@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from agent_box.work_core import ExecutionStartReceipt, ExecutionStartRequest, ProviderDescriptor, Ref, RefType
-from agent_box.extensions.runtime_composition import assemble_runtime_composition
+from agent_box.protocols.runtime import assemble_runtime_composition
 @dataclass
 class GenericHandle:
     request: object; runtime: object; command: object; submitted: bool=False

@@ -16,8 +16,9 @@ from agent_box.work_core.runtime import agent_box_home
 from agent_box.work_core import db
 from agent_box.extensions import (
     PluginContext, PluginDescriptor, PluginLoadRecord, PluginLoadReport,
-    PluginRegistration, ResourceSelection, SelectorField,
+    PluginRegistration,
 )
+from agent_box.protocols.host import ResourceSelection, SelectorField, resource_selector, host_control
 from agent_box_web.server.host import create_server
 from agent_box_web.application.terminal import TerminalOpenResult
 from agent_box.work_core import (
@@ -134,7 +135,7 @@ class FakePlugin:
 
     def build(self, context):
         del context
-        return PluginRegistration(execution_providers=(self.provider,), resource_selectors=(self.selector,), host_controls=(FakeControl(self.provider),))
+        return PluginRegistration(execution_providers=(self.provider,), contributions=(resource_selector(self.selector), host_control(FakeControl(self.provider))))
 
 
 def git(cwd: Path, *args: str) -> str:

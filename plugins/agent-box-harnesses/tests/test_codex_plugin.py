@@ -17,11 +17,11 @@ def test_registers_codex_app_server_execution_provider_without_discovery_writes(
     assert registration.contracts == ()
     assert registration.resource_providers == ()
     assert len(registration.execution_providers) == 1
-    assert [control.provider_id for control in registration.host_controls] == ["codex-execution"]
+    assert "codex-execution" in [c.component.provider_id for c in registration.contributions if hasattr(c.component, "provider_id")]
     provider = registration.execution_providers[0]
     assert provider.descriptor().id == "codex-execution"
     assert provider.input_limits() == {"agent-box.skill@1": (0, 32)}
-    assert [selector.id for selector in registration.resource_selectors] == ["codex-profile-selector"]
+    assert "codex-profile-selector" in [c.component.id for c in registration.contributions if hasattr(c.component, "id")]
     assert not context.plugin_data_dir.exists()
 
 

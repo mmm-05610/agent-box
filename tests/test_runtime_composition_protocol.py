@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from agent_box.extensions.runtime_composition import (
+from agent_box.protocols.runtime import (
     FakeCompositionCoordinator, FakeHost, FakeSandbox, FakeTerminal,
     HarnessCommandSpec, RuntimeBinding, RuntimeHostRef, SandboxRef,
     TargetCreationSentinel, TerminalSessionRef, StartAmbiguous,

@@ -86,7 +86,7 @@ def check_registration_conformance(
               "build() must return PluginRegistration", plugin_id)
         return PluginDiagnosticReport(tuple(items))
     fields_are_tuples = True
-    for name in ("contracts", "resource_providers", "execution_providers", "finalization_contributors", "resource_selectors", "host_controls", "harness_managers", "continuation_routes", "credential_materializers"):
+    for name in ("contracts", "resource_providers", "execution_providers", "contributions"):
         if not isinstance(getattr(registration, name), tuple):
             fields_are_tuples = False
             _diag(items, "registration.tuple", DiagnosticSeverity.ERROR,
@@ -175,22 +175,10 @@ def check_registration_conformance(
         except Exception as exc:
             _diag(items, "execution.capabilities", DiagnosticSeverity.ERROR, str(exc), plugin_id, pid)
 
-    for kind, items_to_check, attr in (
-        ("selector", registration.resource_selectors, "id"),
-        ("contributor", registration.finalization_contributors, "id"),
-        ("control", registration.host_controls, "provider_id"),
-    ):
-        component_ids: set[str] = set()
-        for component in items_to_check:
-            component_id = getattr(component, attr, None)
-            if not isinstance(component_id, str) or not component_id:
-                _diag(items, f"{kind}.id", DiagnosticSeverity.ERROR,
-                      f"{kind} must declare a non-empty {attr}", plugin_id)
-                continue
-            if component_id in component_ids:
-                _diag(items, "duplicate.component", DiagnosticSeverity.ERROR,
-                      f"duplicate {kind} id: {component_id}", plugin_id, component_id)
-            component_ids.add(component_id)
+    for contribution in registration.contributions:
+        contribution_descriptor = getattr(contribution, "descriptor", None)
+        if contribution_descriptor is None or not getattr(contribution_descriptor, "kind", None) or not getattr(contribution_descriptor, "component_id", None):
+            _diag(items, "contribution.descriptor", DiagnosticSeverity.ERROR, "contribution descriptor is invalid", plugin_id)
 
     if descriptor is not None:
         if descriptor.api_version != PLUGIN_API_VERSION:

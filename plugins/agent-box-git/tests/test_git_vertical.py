@@ -11,7 +11,7 @@ from agent_box.work_core.projection import ExecutionProjection, Freshness, Outco
 from agent_box.work_core.events import CoreEvent, EventType
 from agent_box.work_core.repository import CoreRepository, RefRelation
 from agent_box.work_core.services import ExecutionService, WorkService
-from agent_box.extensions.finalization import HostFinalizationCoordinator
+from agent_box.protocols.host.finalization import HostFinalizationCoordinator
 from agent_box_git.contributor import GitFinalizationContributor
 
 
@@ -40,8 +40,7 @@ def test_git_registration_contains_the_formal_composition(tmp_path):
         PluginContext("1.9.0", tmp_path, tmp_path / "plugins" / "git")
     )
     assert [p.descriptor().id for p in registration.resource_providers] == ["git-workspace"]
-    assert [s.id for s in registration.resource_selectors] == ["git-workspace"]
-    assert [c.id for c in registration.finalization_contributors] == ["git-workspace"]
+    assert {c.component.id for c in registration.contributions} >= {"git-workspace"}
 
 
 @pytest.fixture

@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from agent_box.resource_contracts import AgentBoxProfileV1, PromptFragmentV1, WorkspaceV1
 from agent_box.work_core import ExecutionStartRequest, ExecutionStartReceipt, ExecutionProjection, Freshness, Outcome, Phase, ProviderDescriptor, Ref, RefType
-from agent_box.extensions.runtime_composition import RuntimeHostV1, SandboxV1, TerminalSessionV1
+from agent_box.protocols.runtime import RuntimeHostV1, SandboxV1, TerminalSessionV1
 from .contracts import HermesContinuationV1
 from .launch import HermesLaunchAdapter
 from .composition import command_from_plan, composition_from_resolved_inputs

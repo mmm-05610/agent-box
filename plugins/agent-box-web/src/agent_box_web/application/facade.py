@@ -6,10 +6,10 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from agent_box.work_core.runtime import agent_box_home
-from agent_box.extensions.finalization import HostFinalizationCoordinator
+from agent_box.protocols.host.finalization import HostFinalizationCoordinator
 from agent_box.extensions.bootstrap import build_extension_environment_from_parts
 from agent_box.extensions.catalog import ExtensionCatalog
-from agent_box.extensions import ProfileEnvelope
+from agent_box.protocols.host import HOST_CONTROL_KIND, RESOURCE_SELECTOR_KIND, RESOURCE_LIBRARY_KIND, FINALIZATION_CONTRIBUTOR_KIND, CONTINUATION_ROUTE_KIND
 from agent_box.work_core import Ref, RefType
 from agent_box.work_core.repository import CoreRepository, RefRelation
 from agent_box.work_core.services import WorkService, ExecutionService
@@ -19,7 +19,7 @@ from .terminal import UnavailableTerminalPresenter, WslTerminalPresenter
 def _ref(r): return {"type":r.type.value,"provider":r.provider,"native_id":r.native_id,"uri":r.uri,"metadata":dict(r.metadata)}
 def _execution(e): return {"id":e.id,"work_id":e.work_id,"provider_id":e.provider_id,"phase":e.projection.phase.value,"outcome":e.projection.outcome.value if e.projection.outcome else None,"freshness":e.projection.freshness.value,"created_at":e.created_at.isoformat()}
 def _profile(value):
-    if not isinstance(value, ProfileEnvelope): return value
+    if not hasattr(value, "native_payload"): return value
     result=asdict(value); result["config"]=result["native_payload"]; return result
 
 def _requirements(provider):
@@ -39,10 +39,10 @@ class HostApplication:
         self._skill_previews: dict[str, Path] = {}
         # Host extension lookup comes exclusively from the canonical Catalog
         # (uniqueness, binding activation and ownership live in the SDK).
-        self.controls={c.provider_id:c for c in catalog.host_controls()}; self.selectors={s.id:s for s in catalog.selectors()}; self.harnesses={h.harness_id:h for h in catalog.harness_managers()}
-        self.routes={route.descriptor().id: route for route in catalog.continuation_routes()}
+        self.controls={c.provider_id:c for c in catalog.query(HOST_CONTROL_KIND)}; self.selectors={s.id:s for s in catalog.query(RESOURCE_SELECTOR_KIND)}; self.harnesses={h.descriptor().id:h for h in catalog.query(RESOURCE_LIBRARY_KIND)}
+        self.routes={route.descriptor().id: route for route in catalog.query(CONTINUATION_ROUTE_KIND)}
         self.terminal_presenter = terminal_presenter or (WslTerminalPresenter() if os.environ.get("WSL_DISTRO_NAME") else UnavailableTerminalPresenter())
-        self.finalization=HostFinalizationCoordinator(self.execution,registry,catalog.finalization_contributors())
+        self.finalization=HostFinalizationCoordinator(self.execution,registry,catalog.query(FINALIZATION_CONTRIBUTOR_KIND))
     def _path(self,e): return self.draft_root/f"{e}.json"
     def _draft(self,e):
         try: draft = json.loads(self._path(e).read_text())
@@ -89,12 +89,12 @@ class HostApplication:
             if "provider_id" in changes and changes["provider_id"] != self.repo.get_execution(e).provider_id: raise ValueError("PROVIDER_IMMUTABLE_AFTER_CREATE")
             d["revision"]+=1;d["reviewed"]=False;d["errors"]=[];self._save(d);return self._draft(e)
     def selectors_json(self, provider_id=None):
-        selectors = self.catalog.selectors_for_provider(provider_id) if provider_id else self.catalog.selectors()
+        selectors = self.catalog.query(RESOURCE_SELECTOR_KIND)
         if provider_id:
             provider = self.registry.get(provider_id)
             limits = provider.input_limits()
-            selectors = tuple(s for s in selectors if s.contract_id in limits)
-        return [{"id":s.id,"contract_id":s.contract_id,"title":s.title,"fields":[asdict(f) for f in getattr(s,"fields",())],"plugin_id":(self.catalog.owner_of("resource_selector", s.id).plugin_id if self.catalog.owner_of("resource_selector", s.id) else None),"status":"available","compatibility":asdict(getattr(s,"compatibility",None)) if getattr(s,"compatibility",None) else {}} for s in selectors]
+            selectors = tuple(s for s in selectors if s.contract_id in limits and (not getattr(s, "compatibility", None) or not s.compatibility.execution_provider_ids or provider_id in s.compatibility.execution_provider_ids))
+        return [{"id":s.id,"contract_id":s.contract_id,"title":s.title,"fields":[asdict(f) for f in getattr(s,"fields",())],"plugin_id":(self.catalog.owner_of(RESOURCE_SELECTOR_KIND, s.id).plugin_id if self.catalog.owner_of(RESOURCE_SELECTOR_KIND, s.id) else None),"status":"available","compatibility":asdict(getattr(s,"compatibility",None)) if getattr(s,"compatibility",None) else {}} for s in selectors]
     def quick_launch_discovery(self):
         return {"providers":[{"id":p.descriptor().id,"display_name":p.descriptor().display_name,"version":p.descriptor().version,"requirements":_requirements(p),"capabilities":dict(p.capabilities()),"selectors":self.selectors_json(p.descriptor().id)} for p in self.registry.execution_providers()]}
     def skills(self):
@@ -116,7 +116,8 @@ class HostApplication:
         source = self._skill_previews.pop(preview_id, None)
         if source is None: raise ValueError("SKILL_PREVIEW_NOT_FOUND")
         return {"skill": provider.import_directory(source, expected_revision=expected_revision).public_dict()}
-    def harness_list(self): return [dict(h.descriptor()) for h in self.harnesses.values()]
+    def harness_list(self):
+        return [{"id": d.id, "contract_id": d.contract_id, "display_name": d.title, "version": "1", "status": "ready", "capabilities": sorted(d.capabilities)} for d in (h.descriptor() for h in self.harnesses.values())]
     def harness_detail(self,hid):
         h=self.harnesses.get(hid)
         if not h: raise KeyError("HARNESS_NOT_FOUND")

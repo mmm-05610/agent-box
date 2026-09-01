@@ -1,8 +1,8 @@
 from pathlib import Path
 import pytest
 
-from agent_box.extensions.runtime_composition import HarnessCommandSpec, MountPlan, PreparedMountSource
-from agent_box.extensions.sandbox import ProjectionRejected, SandboxRequirements, SandboxUnavailable, SandboxUnsupported
+from agent_box.protocols.runtime import HarnessCommandSpec, MountPlan, PreparedMountSource
+from agent_box.protocols.runtime import ProjectionRejected, SandboxRequirements, SandboxUnavailable, SandboxUnsupported
 from agent_box_sandbox_bwrap.provider import BwrapSandboxProvider, _tree_digest
 
 
@@ -89,7 +89,7 @@ def test_network_templates_compile_distinct_immutable_modes(tmp_path):
 
 
 def test_resolve_returns_the_canonical_sandbox_v1_registry_value(tmp_path):
-    from agent_box.extensions.runtime_composition import SandboxRef, SandboxV1
+    from agent_box.protocols.runtime import SandboxRef, SandboxV1
     provider = BwrapSandboxProvider(tmp_path / "data", binary=tmp_path / "missing")
     resolved = provider.resolve("agent-box.sandbox@1", provider.make_ref())
     assert isinstance(resolved, SandboxV1)

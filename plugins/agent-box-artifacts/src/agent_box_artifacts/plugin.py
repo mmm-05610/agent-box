@@ -1,4 +1,5 @@
 from agent_box.extensions import PluginContext, PluginDescriptor, PluginRegistration
+from agent_box.protocols.host import resource_selector
 
 from .provider import ArtifactPromptResourceProvider
 from .selector import ResponsibilitySelector
@@ -16,7 +17,7 @@ class ArtifactsPlugin:
         del context
         return PluginRegistration(
             resource_providers=(ArtifactPromptResourceProvider(),),
-            resource_selectors=(ResponsibilitySelector(),),
+            contributions=(resource_selector(ResponsibilitySelector()),),
         )
 
 

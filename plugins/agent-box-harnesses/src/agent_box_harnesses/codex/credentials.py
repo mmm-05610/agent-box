@@ -5,11 +5,11 @@ import subprocess
 import secrets
 from pathlib import Path
 from typing import Any
-from agent_box.extensions.credentials import CONTRACT_ID, PreparedSecretMount, ResolvedCredential
+from agent_box.protocols.credentials.protocol import CONTRACT_ID, PreparedSecretMount, ResolvedCredential
 from agent_box.resource_contracts import CredentialRefV1
 from agent_box.work_core import Ref, RefType
 from agent_box.work_core.registry import ProviderDescriptor
-from agent_box.extensions import ResourceSelection, SelectorField
+from agent_box.protocols.host import ResourceSelection, SelectorField
 
 
 class CodexCredentialSource:

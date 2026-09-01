@@ -13,7 +13,7 @@ import json
 import re
 from pathlib import Path, PurePosixPath
 from typing import Mapping, Protocol, Sequence, runtime_checkable
-from ..credentials import PreparedSecretMount
+from ..credentials.protocol import PreparedSecretMount
 
 CONTRACT_ID = "agent-box.runtime-composition@1"
 RUNTIME_HOST_CONTRACT_ID = "agent-box.runtime-host@1"

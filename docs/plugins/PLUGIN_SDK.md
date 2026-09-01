@@ -4,9 +4,10 @@ Agent-Box plugins are trusted Python distributions discovered through the single
 `agent_box.plugins` entry-point group. This is the canonical registration
 source for every component; independent component entry-point groups are not
 consumed. A plugin may contribute frozen Resource
-Contracts, ResourceProviders, ExecutionProviders, Host-neutral selectors, and
-Host control capabilities. Product-specific UI adapters are not part of this
-SDK.
+Contracts, ResourceProviders, ExecutionProviders and namespaced typed
+`CatalogContribution` values. Product-specific UI adapters are not part of
+this SDK. The current Plugin API is v2; `PluginRegistration` has only
+`contracts`, providers and `contributions`.
 
 ## Host discovery and routing
 
@@ -19,7 +20,7 @@ Harness plugins own native payload validation and projection.
 ## Root sandbox contract
 
 The Root SDK owns the provider-neutral sandbox protocol at
-`agent_box.extensions.sandbox`. It contains frozen DTOs, capability
+`agent_box.protocols.runtime`. It contains frozen DTOs, capability
 negotiation, protocol types, and sandbox errors only. Backend plugins import
 these values from Root and register only their ResourceProvider; they must not
 ship a second protocol authority. A sandbox `Ref.provider` is the exact
@@ -121,7 +122,7 @@ descriptors and bounded summaries; the selector remains the authority for
 parameter validation and Ref preparation.
 
 Host-facing plugins expose a bounded `FinalizationContributor` in the
-`PluginRegistration.finalization_contributors` tuple. A contributor
+namespaced `CatalogContribution` tuple. A contributor
 receives a frozen input Ref and resolved resource, and returns only
 `FinalizationContribution(output_refs, resource_observations)`. It never calls
 Core terminal APIs. The Host aggregates contributions into the existing atomic

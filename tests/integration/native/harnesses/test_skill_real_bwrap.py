@@ -7,7 +7,7 @@ import time
 
 import pytest
 
-from agent_box.extensions.runtime_composition.protocol import content_digest
+from agent_box.protocols.runtime.protocol import content_digest
 from agent_box_harnesses.adapters.skill_observation import observe_loaded_marker
 from agent_box_skills.store import SkillStore
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
-from agent_box.extensions import PluginDescriptor, PluginRegistration, ProviderHostControl, ProfileEnvelopeManager
+from agent_box.extensions import PluginDescriptor, PluginRegistration
+from agent_box.protocols.host import resource_selector, resource_library, host_control
+from ..controls import ProviderHostControl
 from agent_box.resource_contracts import AgentBoxProfileV1
 from ..registry import load_builtin_registry
 from ..adapters import ADAPTERS
@@ -16,7 +18,7 @@ def build_registration(context, harness_type: str | None = None):
     adapter=ADAPTERS.get(definition.driver)
     if adapter is None: raise ValueError("untrusted adapter key")
     provider=GenericExecutionProvider(definition,adapter); manager=GenericProfileManager(store,definition)
-    return PluginRegistration(execution_providers=(provider,),resource_selectors=(GenericProfileSelector(store,definition),),host_controls=(ProviderHostControl(provider.provider_id,provider),),harness_managers=(ProfileEnvelopeManager(manager,harness_type=definition.harness_type,provider_id=store.provider_id),))
+    return PluginRegistration(execution_providers=(provider,), contributions=(resource_selector(GenericProfileSelector(store,definition)), host_control(ProviderHostControl(provider.provider_id,provider)), resource_library(manager)))
 
 def descriptor(harness_type=None):
     d=load_builtin_registry().get(harness_type) if harness_type else None

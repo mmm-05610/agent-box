@@ -6,14 +6,16 @@
 Binding inputs, Dispatch, Ref, Evidence, durable persistence, resource
 observations, and atomic finalization. `resource_contracts` contains only
 provider-neutral versioned contracts. `extensions` discovers and validates
-installed plugins through `agent_box.plugins`.
+installed plugins through `agent_box.plugins`. Its canonical surface is the
+pure Extension Kernel: descriptors, generic contributions, ownership and
+transactional loading.
 
 Core has no concrete Codex, Git, tmux, Web, Profile, MCP, workflow, or sandbox
 implementation. Historical SQL migrations remain packaged for upgrade
 compatibility; they are not a legacy runtime authority.
 
-The Root Extension SDK owns the provider-neutral sandbox protocol in
-`agent_box.extensions.sandbox`: DTOs, capability negotiation, errors and
+Protocol packs own provider-neutral Host, Runtime and Credential protocols in
+`agent_box.protocols`: DTOs, capability negotiation, errors and
 lease/observation protocols only. Concrete bwrap behavior belongs to the
 optional `agent-box-sandbox-bwrap` plugin. The frozen sandbox Ref uses the
 exact ResourceProvider ID `bwrap-sandbox`; its correlation Ref is owned by the
@@ -27,6 +29,10 @@ Profile revisions, capability projection, credential locators and native Codex
 drivers. Git, tmux and Artifacts own their exact resource identities and
 evidence. Other external Hosts or workflow systems may drive the same Core
 contracts; Web is not the only product entry point.
+
+Dependency direction: `Work Core → Extension Kernel → Protocol Packs →
+Concrete Plugins → Optional Hosts`. The Kernel does not interpret Profile,
+Harness, Runtime, Credential or Web semantics.
 
 Quick Launch discovers Codex, Claude Code, OpenCode, Hermes and Pi from the
 versioned declarative registry in `agent-box-harnesses`. One generic factory

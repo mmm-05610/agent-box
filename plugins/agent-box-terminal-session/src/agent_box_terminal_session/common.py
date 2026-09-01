@@ -9,7 +9,7 @@ import os
 import secrets
 import tempfile
 
-from agent_box.extensions.runtime_composition import (
+from agent_box.protocols.runtime import (
     AttachDescriptor, CapabilitySet, CapabilityStatus, HostTransport,
     HostTransportOperation, IsolatedProcessSpec, TerminalAllocation,
     TerminalRunHandle, TerminalSessionRef, CompositionErrorCode,

@@ -14,6 +14,7 @@ from typing import Any, Mapping, Protocol
 
 from agent_box.resource_contracts import AgentSkillV1
 from agent_box.work_core import ProviderDescriptor, Ref, RefType, ResourceResolutionContext
+from agent_box.protocols.host import ResourceLibraryDescriptor
 
 PROVIDER_ID = "agent-skills"
 _ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$")
@@ -112,6 +113,12 @@ class SkillStore:
 
     def descriptor(self):
         return ProviderDescriptor(self.provider_id, "Agent Skills", "1")
+
+    def library_descriptor(self):
+        return ResourceLibraryDescriptor(self.provider_id, AgentSkillV1.contract_id, "Agent Skills", frozenset({"list", "get", "create_revision", "disable"}))
+    def list_resources(self): return self.list()
+    def get_resource(self, ref): return self.get(ref.native_id, int(ref.metadata.get("revision", "0")))
+    def create_revision(self, source, **kwargs): return self.import_directory(source, **kwargs)
 
     @staticmethod
     def tree_digest(files, blobs):
@@ -262,3 +269,12 @@ class SkillStore:
         if value.get("disabled") or value.get("digest") != ref.metadata.get("digest") or ref.metadata.get("format") != "agent-skills":
             raise ValueError("SKILL_EXACT_RESOLVE_FAILED")
         return self._resolved(value)
+
+class SkillLibrary:
+    """Management view over the single SkillStore authority."""
+    def __init__(self, store: SkillStore): self.store = store
+    def descriptor(self): return self.store.library_descriptor()
+    def list_resources(self): return self.store.list()
+    def get_resource(self, ref): return self.store.get(ref.native_id, int(ref.metadata.get("revision", "0")))
+    def create_revision(self, source, **kwargs): return self.store.import_directory(source, **kwargs)
+    def disable(self, skill_id, revision): return self.store.disable(skill_id, revision)

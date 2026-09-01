@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 
-from agent_box.extensions.runtime_composition import HarnessCommandSpec
-from agent_box.extensions.runtime_composition import (
+from agent_box.protocols.runtime import HarnessCommandSpec
+from agent_box.protocols.runtime import (
     FakeCompositionCoordinator, FakeHost, FakeSandbox, FakeTerminal,
     RuntimeBinding, RuntimeHostRef, SandboxRef, TargetCreationSentinel,
     TerminalSessionRef,

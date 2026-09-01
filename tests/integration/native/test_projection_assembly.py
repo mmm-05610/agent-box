@@ -14,7 +14,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from agent_box.extensions.runtime_composition import (
+from agent_box.protocols.runtime import (
     HarnessCommandSpec,
     IsolatedProcessSpec,
     RuntimeHostRef,
@@ -32,7 +32,7 @@ from agent_box.extensions.runtime_composition import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-ASSEMBLER_PATH = REPO_ROOT / "src" / "agent_box" / "extensions" / "runtime_composition" / "assembler.py"
+ASSEMBLER_PATH = REPO_ROOT / "src" / "agent_box" / "protocols" / "runtime" / "assembler.py"
 
 
 class _FakeSandboxPort:

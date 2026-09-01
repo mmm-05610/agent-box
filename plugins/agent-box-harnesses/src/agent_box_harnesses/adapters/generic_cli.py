@@ -1,6 +1,6 @@
 from __future__ import annotations
 import re
-from agent_box.extensions.runtime_composition import HarnessCommandSpec, declare_source
+from agent_box.protocols.runtime import HarnessCommandSpec, declare_source
 class GenericCliAdapter:
     def __init__(self,key): self.key=key
     def validate_native_payload(self,payload):

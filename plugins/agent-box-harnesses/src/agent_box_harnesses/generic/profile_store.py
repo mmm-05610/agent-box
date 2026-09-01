@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib, json, os, re
 from pathlib import Path
 from typing import Any, Callable
-from agent_box.extensions import ProfileEnvelope
+from agent_box.protocols.host import ResourceLibraryDescriptor
 from agent_box.work_core import Ref, RefType, ProviderDescriptor, ResourceResolutionContext
 from agent_box.resource_contracts import AgentBoxProfileV1
 
@@ -32,7 +32,12 @@ class ProfileStore:
     def __init__(self, root: Path, *, validator: Callable[[str, Any], None] | None=None):
         self.root=Path(root).resolve(); self.validator=validator
         self.root.mkdir(mode=0o700, parents=True, exist_ok=True)
-    def descriptor(self): return ProviderDescriptor(self.provider_id,"Harness Profile Store","2.0")
+    def descriptor(self): return ProviderDescriptor(self.provider_id, "Harness Profile Store", "2.0")
+    def library_descriptor(self): return ResourceLibraryDescriptor(self.provider_id, AgentBoxProfileV1.contract_id, "Harness Profiles", frozenset({"list", "get", "create_revision", "disable"}))
+    def list_resources(self): return self.list()
+    def get_resource(self, ref): return self.get(ref.metadata.get("harness_type", ""), ref.native_id, int(ref.metadata.get("revision", "0")))
+    def create_revision(self, harness_type, data, expected_revision=None): return self.put(harness_type, data, expected_revision)
+    def disable(self, harness_type, profile_id, revision): return self.put(harness_type, {"profile_id": profile_id, "disabled": True}, revision)
     def _dir(self,h,p):
         if not _ID.fullmatch(str(h)) or not _ID.fullmatch(str(p)): raise ValueError("INVALID_PROFILE_ID")
         d=(self.root/str(h)/str(p)).resolve()

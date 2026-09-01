@@ -3,8 +3,9 @@ from __future__ import annotations
 import json
 import pytest
 
-from agent_box.extensions import HostTransportOperation, PluginContext
-from agent_box.extensions.runtime_composition import CompositionErrorCode, CompositionRejected
+from agent_box.extensions import PluginContext
+from agent_box.protocols.runtime import HostTransportOperation
+from agent_box.protocols.runtime import CompositionErrorCode, CompositionRejected
 from agent_box.work_core import RefType
 from agent_box_runtime_local.plugin import LocalRuntimeHostPlugin, LocalRuntimeHostSelector
 from agent_box_runtime_local.provider import CONTRACT_ID, LocalHostTransport, LocalRuntimeHostProvider
@@ -68,5 +69,5 @@ def test_plugin_discovery_registration_is_clean(tmp_path):
     plugin = LocalRuntimeHostPlugin()
     registration = plugin.build(PluginContext("2.0.0a1", tmp_path, tmp_path / "data"))
     assert registration.resource_providers[0].provider_id == "runtime-host-local"
-    assert registration.resource_selectors[0].contract_id == CONTRACT_ID
-    assert registration.host_controls[0].doctor()
+    assert next(c.component for c in registration.contributions if c.descriptor.kind == "agent-box.host.resource-selector@1").contract_id == CONTRACT_ID
+    assert next(c.component for c in registration.contributions if c.descriptor.kind == "agent-box.host.control@1").doctor()

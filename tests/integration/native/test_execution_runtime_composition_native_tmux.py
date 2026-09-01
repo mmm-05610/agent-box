@@ -8,8 +8,9 @@ import shutil
 import time
 
 import pytest
+from agent_box.extensions import ContributionDescriptor
 
-from agent_box.extensions.runtime_composition import (
+from agent_box.protocols.runtime import (
     HarnessCommandSpec, MountPlan, PreparedMountSource, ResolvedComposition,
     RuntimeBinding, RuntimeBundle, RuntimeCompositionCoordinator,
 )
@@ -35,11 +36,11 @@ def test_real_tmux_respawn_creates_one_real_bwrap_target(tmp_path, monkeypatch):
     # The catalog component shape matches the plugin registration exactly:
     # a TransportOperationContribution(descriptor, handler) pair.
     from agent_box.extensions.catalog import ExtensionCatalog, ExtensionContribution
-    from agent_box.extensions.runtime_composition import TransportOperationContribution
+    from agent_box.protocols.runtime import TransportOperationContribution
     from agent_box_terminal_session.tmux import TmuxRespawnOperationHandler
     handler = TmuxRespawnOperationHandler()
     host_provider.bind_catalog(ExtensionCatalog.from_contributions([
-        ExtensionContribution("transport_operation", "tmux-respawn@1", "native-tmux-vertical",
+        ExtensionContribution(ContributionDescriptor("agent-box.runtime.transport-operation@1", "tmux-respawn@1"), "native-tmux-vertical",
                               component=TransportOperationContribution(handler.descriptor(), handler)),
     ]))
     host_ref = host_provider.make_ref(); host = host_provider.resolve("agent-box.runtime-host@1", host_ref).port

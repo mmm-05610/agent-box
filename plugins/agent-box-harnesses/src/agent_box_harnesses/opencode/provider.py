@@ -9,7 +9,7 @@ from typing import Any, Mapping
 
 from agent_box.resource_contracts import AgentBoxProfileV1, PromptFragmentV1, WorkspaceV1
 from agent_box.work_core import ExecutionProjection, ExecutionStartReceipt, ExecutionStartRequest, Freshness, Outcome, Phase, ProviderDescriptor, Ref, RefType
-from agent_box.extensions.runtime_composition import (
+from agent_box.protocols.runtime import (
     HarnessCommandSpec, RuntimeBinding,
     RuntimeHostV1, SandboxV1, TerminalSessionV1, declare_source,
 )
@@ -114,7 +114,7 @@ class OpenCodeExecutionProvider:
         return ref
 
     def _compose(self, request, command, workspace: WorkspaceV1):
-        from agent_box.extensions.runtime_composition import assemble_runtime_composition
+        from agent_box.protocols.runtime import assemble_runtime_composition
         if self.coordinator is not None and self.runtime_binding is not None:
             return self.coordinator.start(self.runtime_binding, command, execution_id=request.execution_id, dispatch_id=request.dispatch_id)
         binding, coordinator = assemble_runtime_composition(request, command)

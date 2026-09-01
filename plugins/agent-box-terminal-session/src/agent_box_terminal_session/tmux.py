@@ -9,7 +9,7 @@ from typing import Callable, Mapping
 import json
 
 from agent_box.work_core import ProviderDescriptor
-from agent_box.extensions.runtime_composition import (
+from agent_box.protocols.runtime import (
     CapabilitySet, CapabilityStatus, HostTransport, IsolatedProcessSpec,
     TerminalAllocation, TerminalRunHandle, TerminalSessionRef,
     CompositionErrorCode, CompositionRejected, HostTransportOperation,
@@ -236,7 +236,7 @@ _TMUX_RESPAWN_OPERATION_TYPE = "tmux-respawn@1"
 class TmuxRespawnOperationHandler:
     """Explicit transport operation handler for the sealed tmux carrier.
 
-    Registered through ``PluginRegistration.transport_operations`` — never at
+    Registered through the generic runtime transport ``CatalogContribution`` — never at
     module import time.  Its payload is bounded JSON, and its bridge is a
     fixed executable rather than a shell string.  The enclosing HostTransport
     owns single-use token consumption; a lost response escalates to

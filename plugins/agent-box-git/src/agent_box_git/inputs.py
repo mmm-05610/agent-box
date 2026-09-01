@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Any, Mapping
 from agent_box.resource_contracts import WorkspaceV1
-from agent_box.extensions.api import ResourceSelection, SelectorField, SelectorCompatibility
+from agent_box.protocols.host import ResourceSelection, SelectorField, SelectorCompatibility
 
 class GitWorkspaceSelector:
     id = "git-workspace"

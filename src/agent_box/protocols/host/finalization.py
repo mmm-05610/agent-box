@@ -3,9 +3,9 @@ from __future__ import annotations
 
 from typing import Any, Iterable
 
-from ..work_core.finalization import ExecutionFinalizationRequest
-from ..work_core.registry import ResourceResolutionContext
-from .api import FinalizationContributor
+from ...work_core.finalization import ExecutionFinalizationRequest
+from ...work_core.registry import ResourceResolutionContext
+from . import FinalizationContributor
 
 
 class HostFinalizationCoordinator:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from agent_box.work_core import ProviderDescriptor
-from agent_box.extensions.runtime_composition import (
+from agent_box.protocols.runtime import (
     CapabilitySet, CapabilityStatus, HostTransport, IsolatedProcessSpec,
     TerminalAllocation, TerminalRunHandle, TerminalSessionRef,
     TerminalSessionV1,

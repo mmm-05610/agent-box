@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Callable, Mapping
 from agent_box.work_core import ExecutionProjection, ExecutionStartReceipt, ExecutionStartRequest, Freshness, Outcome, Phase, ProviderDescriptor, Ref, RefType
-from agent_box.extensions.runtime_composition import RuntimeCompositionCoordinator, RuntimeBinding, TerminalRunHandle
+from agent_box.protocols.runtime import RuntimeCompositionCoordinator, RuntimeBinding, TerminalRunHandle
 from .config import PiPluginConfig, PiProfile
 from .contract import PiContinuationV1
 from .projection import command_from_request, composition_from_resolved_inputs

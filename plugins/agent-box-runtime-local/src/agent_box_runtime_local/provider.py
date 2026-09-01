@@ -16,8 +16,8 @@ import subprocess
 import uuid
 from typing import Callable, Mapping
 
-from agent_box.extensions import HostTransportOperation, RuntimeBundle, RuntimeHostRef
-from agent_box.extensions.runtime_composition.protocol import (
+from agent_box.protocols.runtime import HostTransportOperation, RuntimeBundle, RuntimeHostRef
+from agent_box.protocols.runtime.protocol import (
     CapabilitySet, CapabilityStatus, CompositionErrorCode, CompositionRejected,
     RuntimeHostV1, digest,
 )
@@ -244,7 +244,7 @@ class LocalRuntimeHostProvider:
 
     def bind_catalog(self, catalog) -> None:
         """CatalogBindable: receive the activated transport operation resolver."""
-        from agent_box.extensions.catalog import TransportOperationResolver
+        from agent_box.protocols.runtime.transport import TransportOperationResolver
 
         self.transport_operations = TransportOperationResolver.from_catalog(catalog)
 
