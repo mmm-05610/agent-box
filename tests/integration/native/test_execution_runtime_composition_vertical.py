@@ -11,8 +11,10 @@ from agent_box.extensions.runtime_composition import (
     HarnessCommandSpec, MountPlan, PreparedMountSource, ResolvedComposition,
     RuntimeBinding, RuntimeCompositionCoordinator, RuntimeHostRef, SandboxRef,
     StartAmbiguous,
+    IsolatedProcessSpec,
+    digest,
 )
-from agent_box_sandbox_bwrap.provider import BwrapSandboxProvider, _tree_digest
+from agent_box.extensions.runtime_composition.fake import FakeSandbox
 from agent_box_terminal_session import DirectStdioSession, TmuxSession
 
 
@@ -51,11 +53,14 @@ def _sandbox(tmp_path: Path):
     source = tmp_path / "workspace"
     source.mkdir(parents=True)
     (source / "README").write_text("fake Codex fixture")
-    provider = BwrapSandboxProvider(tmp_path / "bwrap")
-    prepared = PreparedMountSource("workspace-source", _tree_digest(source), "fixture", "execution")
-    provider.register_prepared_source(prepared.source_token, source, authorized_scope="execution")
-    core_ref = provider.make_ref(host_affinity=AFFINITY)
-    sandbox = provider.resolve("agent-box.sandbox@1", core_ref)
+    prepared = PreparedMountSource("workspace-source", "sha256:fixture", "fixture", "execution")
+    from agent_box.extensions.runtime_composition.protocol import SandboxRef
+    core_ref = SandboxRef("fake-sandbox", "fake", "sandbox-digest", AFFINITY)
+    sandbox = FakeSandbox(core_ref)
+    def fake_wrap(mount_plan, command, *, attempt_key):
+        return IsolatedProcessSpec("spawn:" + attempt_key, attempt_key, digest((mount_plan.digest, command.digest)), local_argv=command.argv)
+    sandbox.wrap = fake_wrap
+    sandbox.cleanup = lambda isolated: {"status": "cleaned"}
     return sandbox, MountPlan(((prepared, "/workspace", "ro"),))
 
 
@@ -65,7 +70,7 @@ def _coordinator(tmp_path, terminal, transport, *, lose_wrap=False):
     if lose_wrap:
         def fail_wrap(*args, **kwargs):
             raise RuntimeError("simulated wrap failure")
-        object.__setattr__(sandbox, "wrap", fail_wrap)
+        sandbox.wrap = fail_wrap
     binding = RuntimeBinding(host.ref, sandbox.ref, terminal.ref)
     return RuntimeCompositionCoordinator(
         lambda requested: ResolvedComposition(host, sandbox, terminal),

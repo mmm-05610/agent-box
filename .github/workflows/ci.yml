@@ -36,10 +36,30 @@ jobs:
           python-version: "3.12"
       - name: Install explicit integration dependencies
         run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends bubblewrap tmux
           python -m pip install --upgrade pip
           pip install pytest -e . -e plugins/agent-box-harnesses \
             -e plugins/agent-box-runtime-local \
             -e plugins/agent-box-sandbox-bwrap -e plugins/agent-box-terminal-session
+      - name: Probe native capabilities
+        run: |
+          set +e
+          bwrap_status=0
+          tmux_status=0
+          command -v bwrap >/dev/null || bwrap_status=1
+          command -v tmux >/dev/null || tmux_status=1
+          if [ "$bwrap_status" -eq 0 ]; then
+            bwrap --ro-bind / / --unshare-user --unshare-pid --proc /proc true >/tmp/agent-box-bwrap-probe.log 2>&1 || bwrap_status=$?
+          fi
+          if [ "$tmux_status" -eq 0 ]; then
+            tmux -L agent-box-ci-probe -f /dev/null start-server >/tmp/agent-box-tmux-probe.log 2>&1 || tmux_status=$?
+            tmux -L agent-box-ci-probe kill-server >/dev/null 2>&1
+          fi
+          echo "bwrap_status=$bwrap_status tmux_status=$tmux_status"
+          if [ "$bwrap_status" -ne 0 ]; then echo "native bwrap unavailable: binary missing or namespace capability denied"; fi
+          if [ "$tmux_status" -ne 0 ]; then echo "native tmux unavailable: binary missing or server capability denied"; fi
+          exit 0
       - name: Test native integration suite
         run: pytest -q tests/integration/native
 

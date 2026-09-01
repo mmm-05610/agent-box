@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { toHomeRelative } from './path'
 
-const HOME = '/home/maoqh'
+const HOME = '/home/tester'
 
 describe('toHomeRelative', () => {
   it('maps paths under home to ~-relative', () => {
-    expect(toHomeRelative('/home/maoqh/projects/x', HOME)).toBe('~/projects/x')
+    expect(toHomeRelative('/home/tester/projects/x', HOME)).toBe('~/projects/x')
     expect(toHomeRelative(`${HOME}`, HOME)).toBe('~')
   })
 
@@ -29,6 +29,6 @@ describe('toHomeRelative', () => {
   })
 
   it('is a no-op without a home value', () => {
-    expect(toHomeRelative('/home/maoqh/x', '')).toBe('/home/maoqh/x')
+    expect(toHomeRelative('/home/tester/x', '')).toBe('/home/tester/x')
   })
 })

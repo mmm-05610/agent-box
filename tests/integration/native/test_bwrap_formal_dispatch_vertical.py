@@ -4,6 +4,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
+import pytest
+
 from agent_box.extensions.bootstrap import register_shared_runtime_contracts
 from agent_box.extensions.runtime_composition import (
     SANDBOX_CONTRACT_ID as CONTRACT_ID,
@@ -58,6 +60,8 @@ def test_formal_dispatch_wrap_allocate_run_replay_cleanup_and_finish(tmp_path, t
     native_calls = []
     host_provider = LocalRuntimeHostProvider(executor=lambda argv, **kw: native_calls.append((argv, kw)) or "native")
     sandbox_provider = BwrapSandboxProvider(tmp_path / "sandbox")
+    if sandbox_provider.probe()["status"] != "available":
+        pytest.skip("real bwrap unavailable: binary missing or namespace capability denied")
     terminal_provider = DirectStdioResourceProvider()
     harness = FormalHarness(source)
     registry = ExtensionRegistry()

@@ -6,8 +6,9 @@ import pytest
 from agent_box_harnesses.codex.executable import CodexExecutableResolutionError, CodexExecutableResolver, classify_login_status_failure
 
 
-NATIVE = Path("/home/maoqh/.npm-global/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/vendor/x86_64-unknown-linux-musl/bin/codex")
-LAUNCHER = Path("/home/maoqh/.npm-global/lib/node_modules/@openai/codex/bin/codex.js")
+NATIVE = Path("/nonexistent/codex-native")
+LAUNCHER = Path("/nonexistent/codex.js")
+BIN_LINK = Path("/nonexistent/bin/codex")
 
 
 def test_official_native_bundle_is_bounded_and_publicly_path_free():
@@ -34,14 +35,18 @@ def test_official_npm_launcher_resolves_native_without_projecting_node():
 
 
 def test_official_npm_bin_symlink_resolves_the_official_launcher():
-    bin_link = Path("/home/maoqh/.npm-global/bin/codex")
+    bin_link = BIN_LINK
     if not bin_link.is_symlink(): pytest.skip("official Codex npm bin link unavailable")
     bundle = CodexExecutableResolver(bin_link).resolve("login-status")
     assert bundle.members[0].guest_target == "/runtime/bin/codex"
 
 
 def test_unrecognized_symlink_layout_and_drift_fail_closed(tmp_path):
-    native = tmp_path / "codex"; shutil.copy2(NATIVE, native); native.chmod(0o755)
+    native = tmp_path / "codex"
+    # Minimal synthetic x86_64 ELF header: enough to exercise the resolver's
+    # native-binary branch without depending on a developer installation.
+    native.write_bytes(b"\x7fELF" + bytes((2, 1)) + bytes(12) + b"\x3e\x00" + bytes(64))
+    native.chmod(0o755)
     arbitrary = tmp_path / "launcher"; arbitrary.symlink_to(native)
     with pytest.raises(CodexExecutableResolutionError, match="SYMLINK"):
         CodexExecutableResolver(arbitrary).resolve("login-status")
