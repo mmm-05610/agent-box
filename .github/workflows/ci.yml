@@ -41,7 +41,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install pytest -e . -e plugins/agent-box-harnesses \
             -e plugins/agent-box-runtime-local \
-            -e plugins/agent-box-sandbox-bwrap -e plugins/agent-box-terminal-session
+            -e plugins/agent-box-sandbox-bwrap -e plugins/agent-box-terminal-session \
+            -e plugins/agent-box-skills
       - name: Probe native capabilities
         run: |
           set +e
