@@ -28,7 +28,12 @@ drivers. Git, tmux and Artifacts own their exact resource identities and
 evidence. Other external Hosts or workflow systems may drive the same Core
 contracts; Web is not the only product entry point.
 
-Quick Launch composes selectors into a normal Core Binding draft, but Freeze,
+Quick Launch discovers Codex, Claude Code, OpenCode, Hermes and Pi from the
+versioned declarative registry in `agent-box-harnesses`. One generic factory
+generates their provider, selector and manager contributions; narrow adapters
+own only native protocol and projection differences. Profile persistence has
+one authority, provider `harness-profile`, with immutable revisions and exact
+digests. Quick Launch composes selectors into a normal Core Binding draft, but Freeze,
 Dispatch and Finish retain Core semantics. Workflow progression, routing,
 retry, scheduling, and future LangGraph/GitHub/Sandbox integrations remain
 outside the current implementation.

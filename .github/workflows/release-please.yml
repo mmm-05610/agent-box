@@ -44,7 +44,8 @@ jobs:
           npm run build --prefix plugins/agent-box-web/frontend
           mkdir -p dist
           python -m build --wheel --sdist --outdir dist .
-          for package in plugins/agent-box-web plugins/agent-box-harnesses plugins/agent-box-git plugins/agent-box-tmux plugins/agent-box-artifacts; do
+          for package in plugins/agent-box-web plugins/agent-box-harnesses plugins/agent-box-git plugins/agent-box-artifacts \
+            plugins/agent-box-runtime-local plugins/agent-box-sandbox-bwrap plugins/agent-box-terminal-session; do
             python -m build --wheel --outdir dist "$package"
           done
       - name: Attach to release

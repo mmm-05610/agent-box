@@ -8,6 +8,14 @@ description = "Official Agent-Box Harness integrations"
 requires-python = ">=3.10"
 dependencies = ["agent-box-cli==2.0.0a1", "agent-box-terminal-session==2.0.0a1"]
 [project.entry-points."agent_box.plugins"]
-harnesses = "agent_box_harnesses.plugin:create_plugin"
+harness-profile-store = "agent_box_harnesses.entrypoints:create_profile_store"
+codex = "agent_box_harnesses.entrypoints:create_codex"
+claude = "agent_box_harnesses.entrypoints:create_claude"
+opencode = "agent_box_harnesses.entrypoints:create_opencode"
+hermes = "agent_box_harnesses.entrypoints:create_hermes"
+pi = "agent_box_harnesses.entrypoints:create_pi"
+
+[tool.setuptools.package-data]
+agent_box_harnesses = ["harnesses.toml"]
 [tool.setuptools.packages.find]
 where = ["src"]

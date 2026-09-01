@@ -36,6 +36,6 @@ Profile revision、Fresh/Continue 输入和 managed/existing tmux。用户显式
 Freeze、Dispatch、打开或复制 provider 生成的 terminal attach 命令，并显式 Finish。
 终端输出成为新 Execution 的 WorkspaceRef。
 
-旧 1.x fixed workflow、Profile/session 数据库、TUI、PyWebView 和浏览器 shell 均已
+官方 Harness 统一由一个 registry wheel 提供，包含 Codex、Claude Code、OpenCode、Hermes 与 Pi；Profile provider 统一为 `harness-profile`。旧 1.x fixed workflow、Profile/session 数据库、TUI、PyWebView 和浏览器 shell 均已
 退休。详见 [docs/README.md](docs/README.md) 与
-[当前 Phase 6 RC 证据](docs/validation/current/REPOSITORY_RESTRUCTURE_PHASE_6_RELEASE_CANDIDATE.md)。
+[当前 Phase 6 RC 证据](docs/validation/current/REPOSITORY_RESTRUCTURE_PHASE_6_RELEASE_CANDIDATE.md)，以及[五 Harness 合并报告](docs/validation/current/FIVE_HARNESS_REGISTRY_CONSOLIDATION.md)。
