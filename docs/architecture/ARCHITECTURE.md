@@ -12,6 +12,13 @@ Core has no concrete Codex, Git, tmux, Web, Profile, MCP, workflow, or sandbox
 implementation. Historical SQL migrations remain packaged for upgrade
 compatibility; they are not a legacy runtime authority.
 
+The Root Extension SDK owns the provider-neutral sandbox protocol in
+`agent_box.extensions.sandbox`: DTOs, capability negotiation, errors and
+lease/observation protocols only. Concrete bwrap behavior belongs to the
+optional `agent-box-sandbox-bwrap` plugin. The frozen sandbox Ref uses the
+exact ResourceProvider ID `bwrap-sandbox`; its correlation Ref is owned by the
+Harness ExecutionProvider and is a separate identity.
+
 ## Plugins and Hosts
 
 Web is an optional Local Host. It owns HTTP, Quick Launch, Profile/integration
@@ -29,6 +36,12 @@ outside the current implementation.
 The browser sends operation identifiers and structured form values only. It
 never supplies arbitrary argv, shell text, executable paths, or credentials.
 Terminal presentation consumes a provider-generated attach descriptor.
+
+Credential bindings are provider-neutral locator references. Codex's official
+login provider is the first materializer: bwrap receives only an
+execution-scoped opaque SecretMount for the exact read-only auth child under
+the writable profile-home parent. Other Harness credential materialization is
+explicitly deferred.
 
 ## Installation boundary
 

@@ -12,6 +12,7 @@ from playwright.sync_api import expect
 from agent_box.work_core.runtime import agent_box_home
 from agent_box.work_core import db
 from agent_box.extensions import PluginContext, PluginLoadRecord, PluginLoadReport
+from agent_box.extensions.bootstrap import register_shared_runtime_contracts
 from agent_box_web.server.host import create_server
 from agent_box.resource_contracts import AgentBoxProfileV1
 from agent_box.work_core import ExecutionStartReceipt, ExecutionStartRequest, ProviderDescriptor
@@ -43,7 +44,7 @@ def test_browser_harness_profile_binding_vertical(tmp_path, monkeypatch):
     home=agent_box_home(); plugin=HarnessesPlugin(); original=plugin.build(PluginContext("1",home,home/"plugins/harnesses"))
     registration=replace(original, execution_providers=(FakeCodexProvider(),))
     from agent_box.work_core.registry import ExtensionRegistry
-    registry=ExtensionRegistry(); registry.register_components(contracts=registration.contracts,resource_providers=registration.resource_providers,execution_providers=registration.execution_providers)
+    registry=ExtensionRegistry(); register_shared_runtime_contracts(registry); registry.register_components(contracts=registration.contracts,resource_providers=registration.resource_providers,execution_providers=registration.execution_providers)
     report=PluginLoadReport((PluginLoadRecord("harnesses","READY",plugin.descriptor(),registration),))
     server=create_server(port=0,static_dir=Path(__file__).resolve().parents[1]/"src"/"agent_box_web"/"_static",registry=registry,report=report)
     threading.Thread(target=server.serve_forever,daemon=True).start(); url=f"http://127.0.0.1:{server.server_port}"

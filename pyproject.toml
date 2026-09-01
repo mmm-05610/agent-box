@@ -34,8 +34,10 @@ dev = ["pytest>=7"]
 preview = [
   "agent-box-web==2.0.0a1",
   "agent-box-harnesses==2.0.0a1",
+  "agent-box-runtime-local==2.0.0a1",
+  "agent-box-sandbox-bwrap==2.0.0a1",
+  "agent-box-terminal-session==2.0.0a1",
   "agent-box-git==2.0.0a1",
-  "agent-box-tmux==2.0.0a1",
   "agent-box-artifacts==2.0.0a1",
 ]
 web = ["agent-box-web==2.0.0a1"]

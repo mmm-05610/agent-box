@@ -6,7 +6,7 @@ name = "agent-box-harnesses"
 version = "2.0.0a1"
 description = "Official Agent-Box Harness integrations"
 requires-python = ">=3.10"
-dependencies = ["agent-box-cli==2.0.0a1", "agent-box-tmux==2.0.0a1"]
+dependencies = ["agent-box-cli==2.0.0a1", "agent-box-terminal-session==2.0.0a1"]
 [project.entry-points."agent_box.plugins"]
 harnesses = "agent_box_harnesses.plugin:create_plugin"
 [tool.setuptools.packages.find]

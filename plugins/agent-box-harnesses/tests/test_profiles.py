@@ -22,7 +22,7 @@ def test_projection_is_execution_scoped_and_redacted(tmp_path: Path):
     assert a["directory"] != b["directory"]
     assert a["manifest"]["shared_capability_refs"] == b["manifest"]["shared_capability_refs"]
     assert "value" not in (Path(a["directory"])/"manifest.json").read_text()
-    assert a["manifest"]["credential_projection"]["method"] == "none"
+    assert a["manifest"]["credential_projection"]["method"] == "locator-only"
 
 def test_secret_fields_and_digest_drift_rejected(tmp_path: Path):
     repo=ProfileRepository(tmp_path/"profiles")

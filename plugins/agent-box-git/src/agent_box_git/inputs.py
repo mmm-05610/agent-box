@@ -1,13 +1,14 @@
 from __future__ import annotations
 from typing import Any, Mapping
 from agent_box.resource_contracts import WorkspaceV1
-from agent_box.extensions.api import ResourceSelection, SelectorField
+from agent_box.extensions.api import ResourceSelection, SelectorField, SelectorCompatibility
 
 class GitWorkspaceSelector:
     id = "git-workspace"
     contract_id = WorkspaceV1.contract_id
     title = "Git workspace"
     fields = (SelectorField("selector", "Revision", default="HEAD", help="HEAD, a branch, or an exact commit"),)
+    compatibility = SelectorCompatibility(supports_exact_revision=True, requires_external_config=True, recommended=True)
 
     def __init__(self, provider):
         self.provider = provider

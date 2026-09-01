@@ -1,31 +1,12 @@
-"""Public values supplied by the agent-box-pi plugin.
-
-The package deliberately exposes a small surface: the native Pi continuity
-contract, the accountable Pi ExecutionProvider, and provider-owned resource
-resolution.  Host control and selector adapters live in extension modules.
-"""
-
-from .config import PiConfigError, PiPluginConfig
+"""Third-party Pi adapter; runtime ownership remains with composition ports."""
+from .config import PiConfigError, PiPluginConfig, PiProfile
 from .contract import PiContinuationV1
-from .provider import (
-    PiObservation,
-    PiTmuxHandle,
-    PiTmuxInteractiveExecutionProvider,
-    build_launch_command,
-)
+from .projection import PiProjection, command_from_request, composition_from_resolved_inputs
+from .provider import PiExecutionProvider, PiHandle, PiObservation
 from .resources import PiSessionResourceProvider
 from .sessions import PiSessionInfo, PiSessionScanner, read_session_info
 
-__all__ = [
-    "PiConfigError",
-    "PiContinuationV1",
-    "PiObservation",
-    "PiPluginConfig",
-    "PiSessionInfo",
-    "PiSessionResourceProvider",
-    "PiSessionScanner",
-    "PiTmuxHandle",
-    "PiTmuxInteractiveExecutionProvider",
-    "build_launch_command",
-    "read_session_info",
-]
+__all__ = ["PiConfigError", "PiPluginConfig", "PiProfile", "PiContinuationV1",
+           "PiProjection", "PiExecutionProvider", "PiHandle", "PiObservation",
+           "PiSessionResourceProvider", "PiSessionInfo", "PiSessionScanner",
+           "read_session_info", "command_from_request", "composition_from_resolved_inputs"]

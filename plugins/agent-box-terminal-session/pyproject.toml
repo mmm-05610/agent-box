@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61,<77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-box-terminal-session"
+version = "2.0.0a1"
+description = "Agent-Box TerminalSession direct-stdio and tmux adapters"
+requires-python = ">=3.10"
+dependencies = ["agent-box-cli==2.0.0a1"]
+
+[project.entry-points."agent_box.plugins"]
+terminal_session = "agent_box_terminal_session.plugin:create_plugin"
+
+[project.scripts]
+agent-box-terminal-session-bridge = "agent_box_terminal_session.bridge:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

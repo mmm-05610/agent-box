@@ -18,7 +18,7 @@ class ResponsibilitySelector:
     def __init__(self):
         self.registry = None
 
-    def bind(self, registry):
+    def bind_registry(self, registry):
         self.registry = registry
 
     def prepare(self, parameters: Mapping[str, str], *, execution_id: str) -> ResourceSelection:

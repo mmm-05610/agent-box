@@ -7,23 +7,23 @@ from agent_box.resource_contracts import AgentBoxProfileV1, WorkspaceV1
 import pytest
 
 
-def test_codex_login_is_a_controlled_link_and_cleanup_preserves_source(tmp_path):
+def test_codex_login_is_locator_only_and_preserves_source(tmp_path):
     source=tmp_path/"home/.codex/auth.json"; source.parent.mkdir(parents=True); source.write_text("TOP_SECRET")
     root=tmp_path/"projection"; root.mkdir()
     adapter=CodexCredentialSource(home=tmp_path/"home")
     result=adapter.project(root,{"provider":"codex","native_locator":"codex-login/default"})
-    assert result=={"identity":"codex-login/default","method":"controlled-symlink","materialized":True}
-    assert (root/"auth.json").is_symlink() and (root/"auth.json").resolve()==source.resolve()
+    assert result=={"provider":"codex","native_locator":"codex-login/default","method":"locator-only","materialized":False}
+    assert not (root/"auth.json").exists()
     assert "TOP_SECRET" not in str(result)
-    adapter.cleanup(root); assert not (root/"auth.json").exists(); assert source.read_text()=="TOP_SECRET"
+    adapter.cleanup(root); assert source.read_text()=="TOP_SECRET"
 
 
 def test_unsupported_or_missing_codex_login_fails_closed(tmp_path):
     adapter=CodexCredentialSource(home=tmp_path/"home")
     with pytest.raises(ValueError,match="UNSUPPORTED"):
         adapter.validate({"provider":"file","native_locator":"/tmp/auth.json"})
-    with pytest.raises(ValueError,match="UNAVAILABLE"):
-        adapter.project(tmp_path/"projection",{"provider":"codex","native_locator":"codex-login/default"})
+    result = adapter.project(tmp_path/"projection",{"provider":"codex","native_locator":"codex-login/default"})
+    assert result["materialized"] is False
 
 
 def test_launch_environment_is_bounded_and_sandbox_mode_is_not_external(tmp_path, monkeypatch):
@@ -35,7 +35,7 @@ def test_launch_environment_is_bounded_and_sandbox_mode_is_not_external(tmp_path
     value=repo.save({"profile_id":"safe","name":"Safe","config":{"model":"gpt-5","environment":{"SAFE_RUNTIME":"yes"}}})
     projection=Projection(tmp_path/"projections",repo)
     ref=repo.ref("safe",1).as_ref()
-    plan=CodexLaunchAdapter(projection,binary="/bin/true").plan(execution_id="E1",profile_ref=ref,profile=AgentBoxProfileV1("safe","codex",value["digest"],1,"codex-profile"),workspace=WorkspaceV1(tmp_path,"test"))
+    plan=CodexLaunchAdapter(projection,binary="/bin/true",allow_non_native_for_tests=True).plan(execution_id="E1",profile_ref=ref,profile=AgentBoxProfileV1("safe","codex",value["digest"],1,"codex-profile"),workspace=WorkspaceV1(tmp_path,"test"))
     assert "OPENAI_API_KEY" not in plan.env and "SECRET_ENV" not in str(plan.env)
     assert plan.env["HTTPS_PROXY"] == "http://127.0.0.1:7890"
     assert plan.env["no_proxy"] == "127.0.0.1,localhost"

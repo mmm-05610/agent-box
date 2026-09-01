@@ -55,6 +55,9 @@ export type Selector = {
   contract_id: string;
   title: string;
   fields: SelectorField[];
+  compatibility?: Record<string, unknown>;
+  plugin_id?: string | null;
+  status?: string;
 };
 export type Choice = { value: string; label?: string; detail?: string };
 export type Slot = {

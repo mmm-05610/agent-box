@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61,<77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-box-sandbox-bwrap"
+version = "2.0.0a1"
+description = "Agent-Box provider-neutral bubblewrap sandbox plugin"
+requires-python = ">=3.10"
+dependencies = ["agent-box-cli==2.0.0a1"]
+
+[project.entry-points."agent_box.plugins"]
+sandbox_bwrap = "agent_box_sandbox_bwrap.plugin:create_plugin"
+
+[tool.setuptools.packages.find]
+where = ["src"]

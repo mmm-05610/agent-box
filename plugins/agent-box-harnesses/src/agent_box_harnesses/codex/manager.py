@@ -8,7 +8,7 @@ from ..importers import legacy_candidates, legacy_preview, cc_switch_candidates,
 class CodexHarnessManager:
     harness_id="codex"
     def __init__(self, root): self.provider=CodexProfileProvider(root); self.repo=self.provider.repo; self.credentials=self.provider.projection.credential_source
-    def descriptor(self): return {"id":"codex","display_name":"Codex","version":"1","status":"ready","supported":True,"extension_points":["pi","opencode","claude"]}
+    def descriptor(self): return {"id":"codex","display_name":"Codex","version":"1","status":"ready","supported":True,"extension_points":["pi","opencode","claude"],"execution_provider_ids":["codex-app-server","codex-interactive"],"credential_selector_id":"codex-login","credential_mode":"official"}
     def list_profiles(self): return self.repo.list()
     def get_profile(self,pid,revision=None): return self.repo.get(pid,revision)
     def _validate_config(self, data):
@@ -63,7 +63,7 @@ class CodexHarnessManager:
 class CodexProfileSelector:
     id="agent-box-profile"; contract_id=AgentBoxProfileV1.contract_id; title="Codex profile"; fields=(SelectorField("profile_id","Profile",kind="select"),)
     def __init__(self, manager): self.manager=manager; self.registry=None
-    def bind(self,registry): self.registry=registry
+    def bind_registry(self,registry): self.registry=registry
     def choices(self,parameters): return tuple({"value":x["profile_id"],"label":f'{x["name"]} · r{x["revision"]}',"detail":x["digest"]} for x in self.manager.list_profiles() if not x["disabled"])
     def prepare(self,parameters,*,execution_id):
         ref=self.manager.repo.ref(parameters.get("profile_id","").strip()); return ResourceSelection(self.contract_id,ref.as_ref(),f'{ref.profile_id} · revision {ref.revision}',f'{ref.profile_id} · {ref.digest}')

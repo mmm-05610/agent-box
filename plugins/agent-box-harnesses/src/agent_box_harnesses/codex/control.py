@@ -5,7 +5,7 @@ from agent_box.resource_contracts import AgentBoxProfileV1, WorkspaceV1
 class CodexAppServerHostControl:
     provider_id="codex-app-server"
     def __init__(self, provider): self.provider=provider; self.registry=None
-    def bind(self,registry): self.registry=registry
+    def bind_registry(self,registry): self.registry=registry
     def attach_command(self,facts): return None
     def _handle(self,facts):
         return self.provider.get_handle(facts.dispatch["id"])

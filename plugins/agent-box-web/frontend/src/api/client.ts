@@ -132,6 +132,7 @@ export const api = {
       }),
     }),
   providers: () => request<{ providers: Provider[] }>("/providers/execution"),
+  quickLaunchDiscovery: () => request<{ providers: (Provider & { selectors: Selector[] })[] }>("/quick-launch/discovery"),
   plugins: () => request<{ plugins: Plugin[] }>("/plugins"),
   harnesses: () => request<{ harnesses: Harness[] }>("/harnesses"),
   harness: (id: string) => request<Harness>(`/harnesses/${id}`),
@@ -151,7 +152,7 @@ export const api = {
       body: JSON.stringify({ command_id: command(), reason }),
     }),
   quickLaunch: (body: Record<string, unknown>) => request<ExecutionCreate & {work_id:string}>("/quick-launch", {method:"POST", body:JSON.stringify({...body,command_id:command()})}),
-  continuations: (workId?: string) => request<{candidates:any[]}>(`/continuations${workId ? `?work_id=${encodeURIComponent(workId)}` : ""}`),
+  continuations: (workId?: string, targetProviderId?: string) => request<{candidates:any[]}>(`/continuations?${workId ? `work_id=${encodeURIComponent(workId)}&` : ""}${targetProviderId ? `target_provider_id=${encodeURIComponent(targetProviderId)}` : ""}`),
   repositories: () => request<{repositories:any[]}>("/repositories"),
   addRepository: (value: Record<string, unknown>) => request<{repository:any}>("/repositories", {method:"POST", body:JSON.stringify({...value,command_id:command()})}),
 };
