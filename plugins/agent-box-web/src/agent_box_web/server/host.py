@@ -45,6 +45,9 @@ def create_server(host="127.0.0.1",port=0,static_dir=None, *, registry=None, rep
             if path=="/api/v1/continuations" and method=="GET": return 200,app.continuation_candidates(query.get("work_id",[None])[0], query.get("target_provider_id",[None])[0])
             if path=="/api/v1/repositories" and method=="GET": return 200,app.repositories()
             if path=="/api/v1/repositories" and method=="POST": return 201,app.add_repository(body)
+            if path=="/api/v1/skills" and method=="GET": return 200,app.skills()
+            if path=="/api/v1/skills/import/preview" and method=="POST": return 200,app.skill_import_preview(body.get("path", ""))
+            if path=="/api/v1/skills/import/confirm" and method=="POST": return 201,app.skill_import_confirm(body.get("preview_id", ""), body.get("expected_revision"))
             if path=="/api/v1/plugins": return 200,{"plugins":[{"id":r.descriptor.id if r.descriptor else r.entry_point,"status":r.status,"display_name":r.descriptor.display_name if r.descriptor else r.entry_point,"error":r.error} for r in report.records]}
             if path=="/api/v1/providers/execution": return 200,{"providers":[{"id":p.id,"display_name":p.display_name,"version":p.version,"requirements":[{"contract_id":cid,"min":lo,"max":hi,"required":lo>0} for cid,(lo,hi) in sorted(registry.get(p.id).input_limits().items())],"capabilities":registry.get(p.id).capabilities()} for p in registry.descriptors()]}
             if path=="/api/v1/quick-launch/discovery" and method=="GET": return 200,app.quick_launch_discovery()

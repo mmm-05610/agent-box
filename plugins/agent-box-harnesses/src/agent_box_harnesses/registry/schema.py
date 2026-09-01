@@ -22,7 +22,7 @@ class ExecutableSpec:
     identity: str; resolver_kind: str; bundle_members: tuple[str, ...] = (); version_probe: tuple[str, ...] = (); metadata: Mapping[str, str] = field(default_factory=dict)
 @dataclass(frozen=True)
 class ProfileSpec:
-    native_home: str; guest_home: str; config_format: str; payload_schema: str; codec: str; overlay_policy: str; slots: tuple[str, ...] = ()
+    native_home: str; guest_home: str; config_format: str; payload_schema: str; codec: str; overlay_policy: str; slots: tuple[str, ...] = (); skill_target: str | None = None; skill_env: str | None = None
 @dataclass(frozen=True)
 class LaunchMode:
     name: str; argv: tuple[str, ...]; io: str = "stdio"; resume_contract: str | None = None
@@ -55,11 +55,19 @@ def definition_from_dict(raw: Mapping) -> HarnessDefinition:
     identity=Identity(_s(ident["harness_type"],"harness_type"),_s(ident["display_name"],"display_name"),_s(ident.get("description",""),"description",512),_s(ident["version"],"version"),MappingProxyType(dict(ident.get("visual",{}))))
     exe=raw["executable"]; executable=ExecutableSpec(_s(exe["identity"],"executable identity"),_s(exe["resolver_kind"],"resolver kind"),_tuple(exe.get("bundle_members",()),"bundle_members"),_tuple(exe.get("version_probe",()),"version_probe"),MappingProxyType(dict(exe.get("metadata",{}))))
     prof=raw["profile"]
+    if set(prof)-{"native_home","guest_home","config_format","payload_schema","codec","overlay_policy","slots","skill_target","skill_env"}: raise ValueError("unknown profile field")
     guest=_s(prof["guest_home"],"guest_home")
     if not guest.startswith("/") or ".." in guest.split("/"): raise ValueError("guest_home must be canonical")
     slots=_tuple(prof.get("slots",()),"profile slots")
     if len(set(slots)) != len(slots): raise ValueError("duplicate resource slot")
-    profile=ProfileSpec(_s(prof["native_home"],"native_home"),guest,_s(prof["config_format"],"config_format"),_s(prof["payload_schema"],"payload_schema"),_s(prof["codec"],"codec"),_s(prof["overlay_policy"],"overlay_policy"),slots)
+    skill_target=prof.get("skill_target")
+    if skill_target is not None:
+        skill_target=_s(skill_target,"skill_target",256)
+        if not skill_target.startswith("/") or "{skill_id}" not in skill_target or ".." in skill_target.split("/"):
+            raise ValueError("skill_target must be a canonical bounded template")
+    skill_env=prof.get("skill_env")
+    if skill_env is not None and (not isinstance(skill_env, str) or not skill_env.isupper() or len(skill_env) > 64): raise ValueError("invalid skill_env")
+    profile=ProfileSpec(_s(prof["native_home"],"native_home"),guest,_s(prof["config_format"],"config_format"),_s(prof["payload_schema"],"payload_schema"),_s(prof["codec"],"codec"),_s(prof["overlay_policy"],"overlay_policy"),slots,skill_target,skill_env)
     modes=[]; mode_names=set()
     for item in raw["launch_modes"]:
         if set(item)-{"name","argv","io","resume_contract"}: raise ValueError("unknown launch mode field")
@@ -80,6 +88,12 @@ def definition_from_dict(raw: Mapping) -> HarnessDefinition:
         maximum=item.get("maximum")
         if not isinstance(item.get("minimum"),int) or item["minimum"]<0 or (maximum is not None and (not isinstance(maximum,int) or maximum<item["minimum"])): raise ValueError("invalid input cardinality")
         inputs.append(InputSpec(_s(item["contract_id"],"contract id"),item["minimum"],maximum,bool(item.get("required",item["minimum"]>0)),_tuple(item.get("selectors",()),"selectors"),_s(item.get("target",""),"projection target"),_s(item.get("transformer","generic"),"transformer")))
+    input_ids = [item.contract_id for item in inputs]
+    if len(input_ids) != len(set(input_ids)):
+        raise ValueError("duplicate input contract")
+    for item in inputs:
+        if item.contract_id == "agent-box.skill@1" and (item.minimum != 0 or item.maximum is None or item.maximum > 32 or item.target != "skill-tree"):
+            raise ValueError("invalid Skill input declaration")
     cont=raw.get("continuation",{})
     if set(cont)-{"kind","contract_id","target_provider"}: raise ValueError("unknown continuation field")
     continuation=ContinuationSpec(_s(cont.get("kind","none"),"continuation kind"),cont.get("contract_id"),cont.get("target_provider"))

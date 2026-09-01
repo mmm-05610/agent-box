@@ -831,7 +831,6 @@ export const en = {
     broken: 'Installed but broken (--version fails)',
     latest: 'latest {{version}}',
     latestError: 'latest-version check failed',
-    updateAvailable: 'update v{{version}}',
     update: 'Update',
     agentUpdating: 'Updating {{name}} — will auto-refresh when done',
     agentUpdated: '{{name}} updated to v{{version}}',

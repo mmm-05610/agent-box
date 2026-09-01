@@ -15,6 +15,9 @@ sandbox。
 
 ```bash
 pip install --pre --find-links . "agent-box-cli[preview]==2.0.0a1"
+
+Preview bundle 包含官方 `agent-box-skills` immutable 本地 Agent Skills provider；
+只支持显式本地导入，不扫描 HOME，也不远程下载。
 agent-box doctor --json
 agent-box plugins list --json
 agent-box launch

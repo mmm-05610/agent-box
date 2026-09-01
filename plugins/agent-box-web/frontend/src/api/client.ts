@@ -154,5 +154,11 @@ export const api = {
   quickLaunch: (body: Record<string, unknown>) => request<ExecutionCreate & {work_id:string}>("/quick-launch", {method:"POST", body:JSON.stringify({...body,command_id:command()})}),
   continuations: (workId?: string, targetProviderId?: string) => request<{candidates:any[]}>(`/continuations?${workId ? `work_id=${encodeURIComponent(workId)}&` : ""}${targetProviderId ? `target_provider_id=${encodeURIComponent(targetProviderId)}` : ""}`),
   repositories: () => request<{repositories:any[]}>("/repositories"),
+  skills: () => request<{skills: Skill[]; status: string}>("/skills"),
+  skillPreview: (path: string) => request<SkillPreview>("/skills/import/preview", {method:"POST", body:JSON.stringify({path})}),
+  skillConfirm: (preview_id: string, expected_revision?: number) => request<{skill: Skill}>("/skills/import/confirm", {method:"POST", body:JSON.stringify({preview_id,expected_revision})}),
   addRepository: (value: Record<string, unknown>) => request<{repository:any}>("/repositories", {method:"POST", body:JSON.stringify({...value,command_id:command()})}),
 };
+
+export type Skill = { skill_id:string; name:string; description:string; revision:number; digest:string; format:string };
+export type SkillPreview = { preview_id:string; skill_id:string; name:string; description:string; file_count:number; digest:string; confirmation_required:boolean };

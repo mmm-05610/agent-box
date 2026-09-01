@@ -16,6 +16,10 @@ Download all release assets into one directory, then run:
 
 ```bash
 pip install --pre --find-links . "agent-box-cli[preview]==2.0.0a1"
+
+The preview bundle includes the official `agent-box-skills` immutable local
+Agent Skills provider. Import is explicit and local; no HOME scan or remote
+fetch is performed.
 agent-box doctor --json
 agent-box plugins list --json
 agent-box launch

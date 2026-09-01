@@ -15,6 +15,7 @@ def test_initial_contract_registry_is_versioned_and_immutable():
         "agent-box.prompt-fragment@1",
         "agent-box.profile@1",
         "agent-box.credential@1",
+        "agent-box.skill@1",
     }
     assert WorkspaceV1(Path("/tmp/workspace"), "sha256:workspace").contract_id == "agent-box.workspace@1"
     assert PromptFragmentV1("requirements", "do the work", "sha256:prompt").digest

@@ -830,7 +830,6 @@ export const zh: TranslationSchema = {
     broken: '已安装但损坏（--version 报错）',
     latest: '最新 {{version}}',
     latestError: '最新版本获取失败',
-    updateAvailable: '有更新 v{{version}}',
     update: '更新',
     agentUpdating: '{{name}} 更新中，完成后自动刷新',
     agentUpdated: '{{name}} 已更新到 v{{version}}',

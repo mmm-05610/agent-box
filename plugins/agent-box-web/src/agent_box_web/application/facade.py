@@ -36,6 +36,7 @@ class HostApplication:
             environment=build_extension_environment_from_parts(registry, report)
             registry, report, catalog = environment.registry, environment.report, environment.catalog
         self.registry,self.report,self.catalog,self.repo=registry,report,catalog,CoreRepository(); self.work,self.execution=WorkService(self.repo),ExecutionService(self.repo); self.lock=threading.RLock(); self._finish_locks: dict[str, threading.Lock] = {}; self._submitted_operations: set[str] = set(); self.root=(home or agent_box_home())/"host"; self.root.mkdir(parents=True,exist_ok=True); self.draft_root=self.root/"binding-drafts"; self.draft_root.mkdir(exist_ok=True); self.commands={}; self.operation_store=OperationStore(self.root); self.finish_pool=ThreadPoolExecutor(max_workers=2, thread_name_prefix="agent-box-finish")
+        self._skill_previews: dict[str, Path] = {}
         # Host extension lookup comes exclusively from the canonical Catalog
         # (uniqueness, binding activation and ownership live in the SDK).
         self.controls={c.provider_id:c for c in catalog.host_controls()}; self.selectors={s.id:s for s in catalog.selectors()}; self.harnesses={h.harness_id:h for h in catalog.harness_managers()}
@@ -89,9 +90,32 @@ class HostApplication:
             d["revision"]+=1;d["reviewed"]=False;d["errors"]=[];self._save(d);return self._draft(e)
     def selectors_json(self, provider_id=None):
         selectors = self.catalog.selectors_for_provider(provider_id) if provider_id else self.catalog.selectors()
+        if provider_id:
+            provider = self.registry.get(provider_id)
+            limits = provider.input_limits()
+            selectors = tuple(s for s in selectors if s.contract_id in limits)
         return [{"id":s.id,"contract_id":s.contract_id,"title":s.title,"fields":[asdict(f) for f in getattr(s,"fields",())],"plugin_id":(self.catalog.owner_of("resource_selector", s.id).plugin_id if self.catalog.owner_of("resource_selector", s.id) else None),"status":"available","compatibility":asdict(getattr(s,"compatibility",None)) if getattr(s,"compatibility",None) else {}} for s in selectors]
     def quick_launch_discovery(self):
         return {"providers":[{"id":p.descriptor().id,"display_name":p.descriptor().display_name,"version":p.descriptor().version,"requirements":_requirements(p),"capabilities":dict(p.capabilities()),"selectors":self.selectors_json(p.descriptor().id)} for p in self.registry.execution_providers()]}
+    def skills(self):
+        provider = next((p for p in self.registry.resource_providers() if p.descriptor().id == "agent-skills"), None)
+        if provider is None: return {"skills": [], "status": "unavailable"}
+        return {"skills": [item.public_dict() for item in provider.list()], "status": "ready"}
+    def skill_import_preview(self, source: str):
+        provider = next(p for p in self.registry.resource_providers() if p.descriptor().id == "agent-skills")
+        candidate = Path(source).expanduser()
+        if not candidate.is_absolute(): raise ValueError("LOCAL_SKILL_PATH_MUST_BE_ABSOLUTE")
+        if candidate.is_symlink(): raise ValueError("LOCAL_SKILL_SYMLINK_FORBIDDEN")
+        candidate = candidate.resolve(strict=True)
+        if not candidate.is_dir() or candidate.is_symlink(): raise ValueError("LOCAL_SKILL_DIRECTORY_REQUIRED")
+        skill_id, name, description, files, blobs = provider._snapshot(candidate)
+        token = os.urandom(16).hex(); self._skill_previews[token] = candidate
+        return {"preview_id": token, "skill_id": skill_id, "name": name, "description": description, "file_count": len(files), "digest": provider.tree_digest(files, blobs), "confirmation_required": True}
+    def skill_import_confirm(self, preview_id: str, expected_revision: int | None = None):
+        provider = next(p for p in self.registry.resource_providers() if p.descriptor().id == "agent-skills")
+        source = self._skill_previews.pop(preview_id, None)
+        if source is None: raise ValueError("SKILL_PREVIEW_NOT_FOUND")
+        return {"skill": provider.import_directory(source, expected_revision=expected_revision).public_dict()}
     def harness_list(self): return [dict(h.descriptor()) for h in self.harnesses.values()]
     def harness_detail(self,hid):
         h=self.harnesses.get(hid)

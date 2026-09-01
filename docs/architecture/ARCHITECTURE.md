@@ -30,6 +30,9 @@ contracts; Web is not the only product entry point.
 
 Quick Launch discovers Codex, Claude Code, OpenCode, Hermes and Pi from the
 versioned declarative registry in `agent-box-harnesses`. One generic factory
+The official `agent-box-skills` plugin provides the provider-neutral
+`agent-box.skill@1` resource; Harness adapters project exact immutable SkillRefs
+through the existing Runtime Composition boundary.
 generates their provider, selector and manager contributions; narrow adapters
 own only native protocol and projection differences. Profile persistence has
 one authority, provider `harness-profile`, with immutable revisions and exact

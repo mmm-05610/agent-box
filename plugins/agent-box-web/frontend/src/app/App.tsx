@@ -8,6 +8,7 @@ import { WorkDetail } from "../features/works/WorkDetail";
 import { WorkList } from "../features/works/WorkList";
 import { HarnessStudio } from "../features/harnesses/HarnessStudio";
 import { QuickLaunch } from "../features/quick-launch/QuickLaunch";
+import { SkillLibrary } from "../features/skills/SkillLibrary";
 function Utility({ kind }: { kind: string }) {
   const plugins = useQuery(api.plugins, []);
   const providers = useQuery(api.providers, []);
@@ -78,6 +79,7 @@ export default function App() {
     content = <ExecutionPage id={parts[1]} />;
   else if (parts[0] === "harnesses") content = <HarnessStudio harnessId={parts[1]} profileId={parts[3]} />;
   else if (parts[0] === "harness") { navigate("/harnesses"); content = <HarnessStudio />; }
+  else if (parts[0] === "skills") content = <SkillLibrary />;
   else if (["integrations", "settings"].includes(parts[0]))
     content = <Utility kind={parts[0]} />;
   return <Shell>{content}</Shell>;

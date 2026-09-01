@@ -22,6 +22,16 @@ payload_schema = "codex-profile-v1"
 codec = "codex"
 overlay_policy = "execution-local"
 slots = ["provider", "permission", "instruction", "mcp", "skill"]
+skill_target = "/runtime/home/skills/{skill_id}"
+skill_env = "CODEX_HOME"
+[[harness.inputs]]
+contract_id = "agent-box.skill@1"
+minimum = 0
+maximum = 32
+required = false
+selectors = ["agent-skill"]
+target = "skill-tree"
+transformer = "agent-skills"
 [[harness.launch_modes]]
 name = "interactive"
 argv = ["codex"]
@@ -71,6 +81,16 @@ payload_schema = "claude-code-profile-v1"
 codec = "claude"
 overlay_policy = "execution-local"
 slots = ["instruction", "mcp", "skill", "permission"]
+skill_target = "/runtime/home/skills/{skill_id}"
+skill_env = "CLAUDE_CONFIG_DIR"
+[[harness.inputs]]
+contract_id = "agent-box.skill@1"
+minimum = 0
+maximum = 32
+required = false
+selectors = ["agent-skill"]
+target = "skill-tree"
+transformer = "agent-skills"
 [[harness.launch_modes]]
 name = "interactive"
 argv = ["claude"]
@@ -109,6 +129,16 @@ payload_schema = "opencode-profile-v1"
 codec = "opencode"
 overlay_policy = "execution-local"
 slots = ["provider", "instruction", "mcp", "skill"]
+skill_target = "/runtime/home/skills/{skill_id}"
+skill_env = "OPENCODE_CONFIG_DIR"
+[[harness.inputs]]
+contract_id = "agent-box.skill@1"
+minimum = 0
+maximum = 32
+required = false
+selectors = ["agent-skill"]
+target = "skill-tree"
+transformer = "agent-skills"
 [[harness.launch_modes]]
 name = "exec"
 argv = ["opencode", "run"]
@@ -143,6 +173,16 @@ payload_schema = "hermes-profile-v1"
 codec = "hermes"
 overlay_policy = "execution-local"
 slots = ["instruction", "mcp", "skill"]
+skill_target = "/runtime/home/skills/{skill_id}"
+skill_env = "HERMES_HOME"
+[[harness.inputs]]
+contract_id = "agent-box.skill@1"
+minimum = 0
+maximum = 32
+required = false
+selectors = ["agent-skill"]
+target = "skill-tree"
+transformer = "agent-skills"
 [[harness.launch_modes]]
 name = "exec"
 argv = ["hermes", "--print"]
@@ -177,9 +217,18 @@ payload_schema = "pi-profile-v1"
 codec = "pi"
 overlay_policy = "execution-local"
 slots = ["instruction", "mcp", "skill"]
+skill_target = "/runtime/home/skills/{skill_id}"
+[[harness.inputs]]
+contract_id = "agent-box.skill@1"
+minimum = 0
+maximum = 32
+required = false
+selectors = ["agent-skill"]
+target = "skill-tree"
+transformer = "agent-skills"
 [[harness.launch_modes]]
 name = "exec"
-argv = ["pi", "--print"]
+argv = ["pi", "--agent-dir", "/runtime/home", "--print"]
 io = "stdio"
 [harness.runtime]
 io = "stdio"
