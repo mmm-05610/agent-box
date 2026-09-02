@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from agent_box.extensions.bootstrap import register_shared_runtime_contracts
-from agent_box.extensions.runtime_composition import (
+from agent_box.protocols.runtime import (
     SANDBOX_CONTRACT_ID as CONTRACT_ID,
     HarnessCommandSpec, RuntimeHostV1, TerminalSessionV1,
     assemble_runtime_composition, declare_source,

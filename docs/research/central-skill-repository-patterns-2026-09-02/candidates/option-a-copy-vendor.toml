@@ -1,0 +1,6 @@
+name = "option-a-copy-vendor"
+architecture = "copy-vendor"
+authority = "central-store-for-shared-project-git-for-local"
+projection = "copy"
+reversible = true
+requires_human_decision = true

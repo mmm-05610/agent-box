@@ -6,7 +6,7 @@ import subprocess
 
 import pytest
 
-from agent_box.extensions.runtime_composition import (
+from agent_box.protocols.runtime import (
     AttachDescriptor, CapabilitySet, CapabilityStatus, CompositionRejected,
     HarnessCommandSpec, MountPlan, PreparedMountSource, ResolvedComposition,
     RuntimeBinding, RuntimeCompositionCoordinator, RuntimeHostRef, SandboxRef,
@@ -14,7 +14,7 @@ from agent_box.extensions.runtime_composition import (
     IsolatedProcessSpec,
     digest,
 )
-from agent_box.extensions.runtime_composition.fake import FakeSandbox
+from agent_box.protocols.runtime.testing import FakeSandbox
 from agent_box_terminal_session import DirectStdioSession, TmuxSession
 
 
@@ -54,7 +54,7 @@ def _sandbox(tmp_path: Path):
     source.mkdir(parents=True)
     (source / "README").write_text("fake Codex fixture")
     prepared = PreparedMountSource("workspace-source", "sha256:fixture", "fixture", "execution")
-    from agent_box.extensions.runtime_composition.protocol import SandboxRef
+    from agent_box.protocols.runtime.protocol import SandboxRef
     core_ref = SandboxRef("fake-sandbox", "fake", "sandbox-digest", AFFINITY)
     sandbox = FakeSandbox(core_ref)
     def fake_wrap(mount_plan, command, *, attempt_key):
@@ -74,7 +74,7 @@ def _coordinator(tmp_path, terminal, transport, *, lose_wrap=False):
     binding = RuntimeBinding(host.ref, sandbox.ref, terminal.ref)
     return RuntimeCompositionCoordinator(
         lambda requested: ResolvedComposition(host, sandbox, terminal),
-        bundle_factory=lambda resolved_host, command, execution_id, dispatch_id: __import__("agent_box.extensions.runtime_composition", fromlist=["RuntimeBundle"]).RuntimeBundle(host.ref, mounts, "bundle:" + execution_id),
+        bundle_factory=lambda resolved_host, command, execution_id, dispatch_id: __import__("agent_box.protocols.runtime", fromlist=["RuntimeBundle"]).RuntimeBundle(host.ref, mounts, "bundle:" + execution_id),
     ), binding, sandbox
 
 

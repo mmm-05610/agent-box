@@ -1,0 +1,296 @@
+# candidate.toml — OpenAI Codex CLI (harness id: codex)
+# Built 2026-09-01 against codex-cli 0.152.0 + openai/codex tag rust-v0.152.0.
+# Unknown values are the string "unknown"; unsupported facts are recorded as
+# tri-state strings, never as false. Sanitized: <user-home>, <temp-home>, <workspace>, <binary>.
+
+[meta]
+tier = "A"
+evidence_dates = ["2026-09-01"]
+sources = [
+  "CLI probes on codex-cli 0.152.0 (version/help/features list/temp-HOME diffs)",
+  "openai/codex tag rust-v0.152.0 (commit 316795b) shallow clone in temp dir",
+  "learn.chatgpt.com official docs (config-basic, config-reference, exec, agents-md, auth, app-server, build-skills)",
+]
+verified_version = "0.152.0"
+knowledge_files = ["FACTS.md", "evidence.md", "../experiments/codex.md"]
+
+[identity]
+harness_id = "codex"
+display_name = "Codex CLI"
+org = "OpenAI"
+repo = "https://github.com/openai/codex"
+docs = "https://learn.chatgpt.com/docs (developers.openai.com/codex 308-redirects here)"
+license = "Apache-2.0"
+npm_package = "@openai/codex"
+binary_name = "codex"
+version_string_format = "codex-cli <semver>"
+aliases = ["e -> exec", "a -> apply"]
+maintenance_status = "active (tag 2026-08-31, HEAD 2026-09-01; many [experimental] surfaces)"
+in_repo_docs_are_pointers = true
+
+[distribution]
+npm = "@openai/codex (bin/codex.js Node wrapper, engines.node >=16)"
+homebrew = "unknown (not re-verified this round)"
+dotslash = "codex DotSlash file on GitHub releases (docs/install.md)"
+build_from_source = "cargo, codex-rs workspace"
+standalone_layout = "managed dirs under CODEX_HOME (install-context crate: bin/, codex-path/, releases/)"
+windows_story = "documented support: Windows 11 via WSL2; native Windows sandbox code in-tree but experimental"
+
+[platform]
+linux = "supported (Landlock+seccomp via codex-linux-sandbox arg0 helper)"
+macos = "supported (Seatbelt; CODEX_SANDBOX=seatbelt)"
+windows = "WSL2 documented; native Windows sandbox present but experimental (windows-sandbox-rs, windowsSandbox/readiness)"
+wsl_notes = "repo runs under WSL2 here; no WSL-specific failures observed in non-model probes"
+
+[executable]
+discovery = "PATH lookup; npm global bin in this environment (<binary>)"
+version_probe = "codex --version -> 'codex-cli 0.152.0' (exit 0)"
+arg0_helpers = "single binary dispatches helper CLIs by argv[0] (codex-linux-sandbox); PATH alias helper binaries created under CODEX_HOME at startup, warn-only on failure, refused under temp dirs"
+companions = "codex-code-mode-host, codex-linux-sandbox, zsh helpers (aliases, not separate installs)"
+doctor = "codex doctor [--json redacted] diagnoses install/config/auth/runtime"
+daemon_version_probe = "codex app-server daemon version -> CLI and running app-server versions as JSON"
+
+[launch_modes.tui]
+argv = "codex [OPTIONS] [PROMPT]"
+prompt_transport = "argv (PROMPT); images via -i/--image"
+cwd_behavior = "process cwd; -C/--cd sets agent root; --add-dir adds writable dirs"
+stdio = "requires TTY; alt-screen default, --no-alt-screen inline"
+remote = "--remote ws://|wss://|unix://PATH + --remote-auth-token-env <ENV> attaches TUI to remote app-server"
+exit_semantics = "user-quit; process exit does not equal task completion"
+network = "required by default; --oss / --local-provider lmstudio|ollama for local models"
+resume = "codex resume [SESSION_ID|--last] [PROMPT]; codex fork [SESSION_ID|--last]; archive/delete/unarchive/migrate-rollouts"
+
+[launch_modes.exec]
+argv = "codex exec [OPTIONS] [PROMPT] (alias: codex e)"
+prompt_transport = "argv PROMPT or stdin ('-'); piped stdin appended as <stdin> block"
+cwd_behavior = "process cwd; -C/--cd; outside git repo requires --skip-git-repo-check"
+required_env = "none beyond auth (CODEX_HOME optional override; must pre-exist)"
+stream_split = "stdout carries --json JSONL events (or human output); banner and diagnostics go to stderr"
+json_events = "--json: thread.started/turn.started/turn.completed/turn.failed/item.started/item.updated/item.completed/error"
+output_last_message = "-o/--output-last-message <FILE> (file + still printed to stdout)"
+output_schema = "--output-schema <FILE> (JSON Schema for final response)"
+sandbox_flags = "-s read-only|workspace-write|danger-full-access (default read-only)"
+approval_flags = "-a on-request|never (exec default approval: never); --approve-for-me; --dangerously-bypass-approvals-and-sandbox"
+full_auto = "deprecated compatibility flag (docs)"
+isolation_flags = "--ephemeral (no session persistence); --ignore-user-config (auth still from CODEX_HOME); --ignore-rules"
+structured_other = "--thread-source <SOURCE>; --color always|never|auto"
+exit_semantics = "process exit == task finished; 0 on success; observed 101 on connection failure after 5 retries (401 handshake); turn failure exit code unknown"
+network = "required; OpenAI transport observed as WebSocket wss://api.openai.com/v1/responses"
+default_model_observed = "gpt-5.6-sol (provider openai)"
+
+[launch_modes.exec_resume]
+argv = "codex exec resume [SESSION_ID|--last] [PROMPT]; codex exec fork <SESSION_ID> [PROMPT]"
+prompt_transport = "argv or stdin ('-')"
+json_events = "same flag set as exec (--json, -o, --output-schema, --ephemeral)"
+resume_handle = "thread.started.thread_id (UUID) or session name"
+
+[launch_modes.app_server]
+argv = "codex app-server [--listen stdio://|unix://|unix://PATH|ws://IP:PORT|off] [daemon|proxy|generate-ts|generate-json-schema]"
+protocol = "JSON-RPC 2.0, jsonrpc header omitted; newline-delimited JSON on stdio (default)"
+handshake = "initialize (clientInfo) then initialized notification"
+auth_ws = "--ws-auth capability-token|signed-bearer-token; --ws-token-file; --ws-shared-secret-file; --ws-issuer; --ws-audience"
+daemon = "per-user singleton daemon: start|stop|restart|version|bootstrap; proxy attaches via control socket; codex agents browses shared daemon sessions"
+schema_tools = "codex app-server generate-ts / generate-json-schema (version-locked artifacts)"
+methods = "thread/start|resume|fork|read|list|archive|delete|rollback; turn/start|steer|interrupt; item/* lifecycle + deltas; approval requests as server-initiated RPCs; config/read|batchWrite; skills/list; hooks/list; plugin/*; process/* (experimentalApi-gated); windowsSandbox/readiness"
+experimental_status = "[experimental] marker; websocket transport not for production (docs)"
+
+[launch_modes.mcp_server]
+argv = "codex mcp-server [--listen n/a] over stdio"
+status = "supported; docs page deprecated in favor of app-server"
+
+[launch_modes.review]
+argv = "codex review [PROMPT] --uncommitted|--base <BRANCH>|--commit <SHA>"
+
+[launch_modes.sandbox_utility]
+argv = "codex sandbox [COMMAND]... [-P --permission-profile <NAME>] [--sandbox-state-json <JSON>]"
+
+[profile]
+home = "<user-home>/.codex (default); CODEX_HOME env override, must pre-exist, canonicalized"
+config_file = "CODEX_HOME/config.toml (TOML)"
+profile_files = "$CODEX_HOME/<name>.config.toml layered on top of base user config via -p/--profile"
+legacy_profiles_table = "unknown (old [profiles.*] scheme absent from help; acceptance unverified)"
+scope_project = "<repo>/.codex/config.toml, trusted projects only, root->cwd, closest wins"
+precedence_low_to_high = "packaged defaults(-10) < MDM(0) < system /etc/codex/config.toml(10) < enterprise(15) < user(20) < user+profile(21) < project(25) < session flags -c/--enable/--disable(30) < managed_config.toml file(40) < MDM(50)"
+override_flags = "-c key=value (dotted, TOML-parsed); --enable/--disable <FEATURE>; --strict-config"
+model_provider_fields = "model_providers.<id>.{name, base_url, env_key, wire_api='responses', http_headers, env_http_headers, request_max_retries=4, stream_max_retries=5, auth.command|args|timeout_ms}"
+write_behavior = "features enable/disable and plugin add/remove rewrite config.toml; no observed locking (last-writer-wins)"
+concurrent_writers = "unknown (whole-file rewrite observed in code paths; SQLite WAL + thread-writer-locks used for session state)"
+startup_dotenv = "loads $CODEX_HOME/.env at startup (arg0)"
+safe_to_persist = "config.toml, profile files, AGENTS.md, skills/, rules/, skills config"
+opaque_or_forbidden = "auth.json, .env, keyring entries, installation_id"
+
+[credentials]
+oauth = "ChatGPT sign-in browser flow; local callback localhost:1455; auto token refresh"
+api_key_env = "OPENAI_API_KEY (primary), CODEX_API_KEY (recognized); provider keys via model_providers.<id>.env_key"
+access_token_env = "CODEX_ACCESS_TOKEN via `codex login --with-access-token` (enterprise; 'at-' personal tokens or agent-identity JWTs)"
+login_commands = "codex login [--with-api-key stdin | --with-access-token stdin | --device-auth beta]; codex login status; codex logout"
+file_names = "auth.json (contents never read); MCP OAuth tokens per mcp_oauth_credentials_store"
+keyring = "OS keychain via codex-keyring-store; cli_auth_credentials_store = file|keyring|auto; keyring-first with file fallback"
+forced_login_method = "config key chatgpt|api (enterprise enforcement)"
+precedence = "keyring/file auth vs env-key flows resolved per provider config; exact runtime precedence undocumented"
+isolation_feasibility = "copy CODEX_HOME to copy credentials; credential-free isolation via empty CODEX_HOME + env keys works (unauthenticated exec fails 401 after retries)"
+forbidden_from_profile = "credential material never lives in config.toml/profile files (auth.json/keyring/env only)"
+
+[isolation]
+account_state = "auth.json, keyring, .env, installation_id — never share or project"
+normal_state = "config.toml, profile files, AGENTS.md, skills/, rules/, memories content"
+session_state = "sessions/YYYY/MM/DD/rollout-<ts>-<thread_id>.jsonl, archived_sessions/, session_index.jsonl, history.jsonl, state_5/thread_history_1/queue_1/goals_1/logs_2 sqlite (WAL), shell_snapshots/"
+cache_state = "models_cache.json, skills/.system (marker-fingerprinted, self-healing), plugins/cache, cache/, log/, tmp/, .tmp/"
+unsafe_state = "auth.json, .env, keyring, installation_id"
+read_only_share_ok = "config layers, AGENTS.md, skills, rules, plugins cache (read)"
+copy_on_write_ok = "whole CODEX_HOME copy (includes credentials — scrub first); sessions/ + sqlite for session continuity"
+writable_overlay_needed = "sessions/, history.jsonl, sqlite stores, thread-writer-locks/, log/, tmp/"
+never_project = "auth.json, .env, keyring"
+concurrency = "multi-session (WAL + per-thread lock dir); app-server daemon is a per-user singleton"
+ephemeral_mode = "--ephemeral skips session persistence entirely"
+empty_home_behavior = "CODEX_HOME must pre-exist; read-only commands create nothing; runtime creates sessions etc."
+
+[resource_surfaces.instructions]
+state = "supported"
+discovery = "global: $CODEX_HOME/AGENTS.override.md then AGENTS.md (first non-empty); project: per-dir AGENTS.override.md > AGENTS.md > project_doc_fallback_filenames from project root (project_root_markers configurable) down to cwd"
+format = "markdown"
+recursion = "hierarchical chain, one file per directory, concatenated root->cwd"
+precedence = "nearer-cwd files appear later in prompt; global < project chain"
+env_var = "none (CODEX_HOME changes global location)"
+limits = "project_doc_max_bytes default 32 KiB"
+read_only_ok = "true"
+writable_needed = "no"
+version_sensitivity = "STABLE"
+
+[resource_surfaces.skills]
+state = "supported"
+discovery = "project .codex/skills (Repo); $CODEX_HOME/skills (user, DEPRECATED); $HOME/.agents/skills (user); /etc/codex/skills (admin); $CODEX_HOME/skills/.system (bundled system cache); plugin skill roots; repo .agents/skills per dir root->cwd"
+format = "SKILL.md with YAML frontmatter (name, description required)"
+recursion = "Recursive default; DirectChildren mode exists (SkillDiscoveryMode)"
+naming = "name collision: no merge, both appear in selectors"
+scope = "Repo | User | Admin | System | Plugin"
+precedence = "config-layer order then plugin roots then extra roots then repo roots; dedupe by path"
+env_var = "none"
+read_only_ok = "true"
+writable_needed = "system skills cache ($CODEX_HOME/skills/.system) is written by the CLI itself"
+disable = "[[skills.config]] path=... enabled=false in config.toml"
+invocation = "$skill-name mentions; app-server turn/start accepts skill input item"
+feature_flags = "skill_search stable+on; skill_mcp_dependency_install stable+on"
+version_sensitivity = "VERSION_SENSITIVE ($CODEX_HOME/skills deprecation path; .agents/skills is current)"
+
+[resource_surfaces.mcp]
+state = "supported"
+discovery = "[mcp_servers.<id>] in any config layer (user/project; project needs trust)"
+format = "TOML: command+args+env (stdio) or url (streamable HTTP); bearer_token_env_var; enabled; required; startup_timeout_sec=10; tool_timeout_sec=60; enabled_tools/disabled_tools; scopes; oauth"
+cli = "codex mcp add|list|get|remove|login|logout"
+oauth = "per-server OAuth (codex mcp login), mcp_oauth_credentials_store, elicitation in app-server"
+required_semantics = "required=true makes codex exec exit with error on init failure"
+read_only_ok = "true (config); OAuth token store needs write"
+version_sensitivity = "STABLE"
+
+[resource_surfaces.prompts]
+state = "unsupported_as_standalone_dir_in_0.152.0"
+detail = "no ~/.codex/prompts loader in source; plugin commands/ dirs migrate to skills at install (migrated-command-skills, <=4000 bytes)"
+legacy_support = "unknown"
+version_sensitivity = "VERSION_SENSITIVE"
+
+[resource_surfaces.rules]
+state = "supported"
+discovery = "user CODEX_HOME/rules/*.rules (default.rules); project .rules files; --ignore-rules skips both"
+purpose = "execpolicy command allow/deny prefixes; interacts with approvals (Never + rule-required => rejected)"
+format = "*.rules policy files (see execpolicy)"
+version_sensitivity = "VERSION_SENSITIVE"
+
+[resource_surfaces.hooks]
+state = "supported"
+feature_flag = "hooks (stable, default on)"
+config = "'hooks' key in config files; hook trust persisted per handler; --dangerously-bypass-hook-trust; requirements.toml allow_managed_hooks_only"
+events = "PreToolUse, PermissionRequest, PostToolUse, PreCompact, PostCompact, SessionStart, SessionEnd, UserPromptSubmit, SubagentStart, SubagentStop, Stop, Interrupt"
+app_server_surface = "hooks/list, hook/started, hook/completed"
+version_sensitivity = "VERSION_SENSITIVE"
+
+[resource_surfaces.plugins]
+state = "supported"
+feature_flag = "plugins, plugin_sharing (stable, on)"
+manifest = "plugin.json at plugin root; .codex-plugin metadata dir; universal ChatGPT+Codex format"
+marketplaces = "codex plugin marketplace add|list|upgrade|remove; cache under CODEX_HOME/plugins and cache/remote_plugin_catalog"
+content = "bundles skills + MCP connectors; commands/ migrated to skills"
+app_server_surface = "plugin/install|list|uninstall|read|search"
+version_sensitivity = "VERSION_SENSITIVE"
+
+[resource_surfaces.subagents]
+state = "supported_feature_not_file_surface"
+feature_flag = "multi_agent (stable, on); multi_agent_v2 (stable, off)"
+detail = "collab_tool_call thread items; SubagentStart/SubagentStop hook events; no user subagents directory"
+
+[resource_surfaces.memory]
+state = "supported_flag_off_by_default"
+feature_flag = "memories (stable, default false)"
+storage = "CODEX_HOME/memories/ + memories_1.sqlite (WAL)"
+app_server_surface = "memory/reset"
+enable = "--enable memories or [features] memories=true"
+
+[resource_surfaces.notify]
+state = "supported"
+config = "notify = [cmd, args...] ; JSON appended as last argv arg"
+payload = "{\"type\":\"agent-turn-complete\",\"thread-id\":..,\"turn-id\":..,\"cwd\":..,\"input-messages\":[..],\"last-assistant-message\":..}"
+exec_mode_scope = "unknown (not verified whether notify fires in exec mode)"
+
+[resource_surfaces.history]
+state = "supported"
+file = "CODEX_HOME/history.jsonl (one JSON object per line)"
+config = "[history] section; --ephemeral disables persistence"
+
+[resource_surfaces.web_search]
+state = "supported_flag"
+flag = "--search (native Responses web_search tool)"
+feature_flags = "web_search_request deprecated; standalone_web_search under development"
+
+[resource_surfaces.commands]
+state = "migrated_to_skills"
+detail = "plugin commands/ -> skills at install time; no standalone commands dir"
+
+[events]
+json_flag = "--json (JSONL on stdout)"
+envelope = "serde tag 'type' on every event"
+thread_events = "thread.started{thread_id} | turn.started | turn.completed{usage} | turn.failed{error} | item.started|updated|completed{item} | error{message}"
+usage_fields = "input_tokens, cached_input_tokens, cache_write_input_tokens, output_tokens, reasoning_output_tokens"
+item_types = "agent_message{text} | reasoning | command_execution | file_change | mcp_tool_call | collab_tool_call | web_search | todo_list | error"
+final_message = "-o/--output-last-message FILE; agent_message item; --output-schema shapes text as JSON string"
+stderr = "banner (OpenAI Codex v0.152.0, workdir/model/approval/sandbox/session id) + diagnostics; JSON stream stays clean on stdout"
+completion_marker = "turn.completed last for a turn; exit 0 ends run; no separate session-ended event"
+cancellation = "not available for exec from outside; app-server turn/interrupt ends turn status='interrupted'"
+unknown_event_tolerance = "unknown (closed serde enum in source; SDK contract unverified)"
+session_log = "sessions/YYYY/MM/DD/rollout-<timestamp>-<thread_id>.jsonl (+ archived_sessions/); thread_id = resume handle"
+exit_codes = "0 success; 1 config/usage errors; 101 observed on connection failure after 5 retries; full table unknown"
+
+[control]
+steer = "app-server turn/steer (expectedTurnId required); codex queue --thread <ID> --message <TEXT> for live sessions"
+interrupt = "app-server turn/interrupt"
+attach = "codex app-server proxy (daemon control socket); TUI --remote ws://|wss://|unix://PATH; resume/fork from rollouts"
+approval_responses = "accept | acceptForSession | decline | cancel | acceptWithExecpolicyAmendment; permissions grants accept subset + scope session|turn"
+model_switch = "-m per invocation; thread/start params; step_model_switching feature under development (mid-turn unknown)"
+effort = "model_reasoning_effort config key"
+model_catalog = "codex debug models (raw model catalog as JSON)"
+
+[continuation]
+resume_interactive = "codex resume [SESSION_ID|--last]; picker; --all; --include-non-interactive"
+resume_headless = "codex exec resume [SESSION_ID|--last] [PROMPT]"
+fork = "codex fork [SESSION_ID|--last]; codex exec fork <SESSION_ID>"
+archive = "codex archive|unarchive|delete <id|name>; migrate-rollouts --apply for legacy sessions"
+storage = "sessions/YYYY/MM/DD/rollout-<ts>-<thread_id>.jsonl + thread_history_1.sqlite paginated history"
+session_identity = "UUID from thread.started; session names supported in interactive pickers"
+
+[runtime]
+default_model_observed = "gpt-5.6-sol"
+provider = "openai (built-in ids: openai, ollama, lmstudio reserved)"
+transport_observed = "WebSocket wss://api.openai.com/v1/responses"
+sandbox_stack = "Linux Landlock+seccomp (arg0 helper), macOS Seatbelt, Windows experimental"
+git_requirement = "exec requires git repo unless --skip-git-repo-check"
+daemon_singleton = "per-user app-server daemon (start-if-not-running), proxy attach, remote-control pair"
+
+[unresolved]
+exec_exit_code_table = "unknown (beyond 0/1/observed-101)"
+json_unknown_event_tolerance = "unknown"
+legacy_profiles_table_acceptance = "unknown"
+native_windows_sandbox_status = "unknown (WSL2 documented; native code experimental)"
+notify_in_exec_mode = "unknown"
+memories_sqlite_schema = "unknown (not inspected; contents never read)"
+macos_system_config_path = "unknown (/etc/codex/config.toml documented for Unix)"
+homebrew_distribution = "unknown (not re-verified)"
+concurrent_config_writers = "unknown (no locking observed in read code paths)"

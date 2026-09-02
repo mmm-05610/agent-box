@@ -394,10 +394,10 @@ agent_box
 
 **第 1 步 · sandbox 契约 authority 收敛（含 F7）**
 - 移动/变更：`SandboxV1` 与 `SandboxTemplateV1` 收敛为一个类型（建议：`extensions/runtime/protocol.py` 持有唯一 Sandbox 契约类型，包含 template 元数据 + port 语义；旧 `ResolvedSandbox.start` Protocol 退役）；`registry.py:144-148` 的延迟注册移入 `extensions/bootstrap.py`。
-- import 迁移：`agent_box.extensions.sandbox` 保留 shim 再导出（bwrap/plugin 与测试改新路径）；assembler/codex composition 删除 `getattr(sandbox,"port",sandbox)` 桥接。
+- import 迁移：bwrap/plugin 与测试统一使用 `agent_box.protocols.runtime`；assembler/codex composition 删除 `getattr(sandbox,"port",sandbox)` 桥接。
 - 兼容：shim 一个 minor 周期；`extensions.sandbox.CONTRACT_ID` 常量不变。
 - 测试门槛：`services.py:345-355` isinstance 校验全绿；bwrap resolve/wrap、composition vertical、codex app_server/interactive 离线测试全绿；新增"注册 SandboxV1 形状契约成功"反测。
-- clean-wheel 验证：`pip install dist/*.whl` 后 import `agent_box.extensions.sandbox` shim + 新路径双通。
+- clean-wheel 验证：`pip install dist/*.whl` 后只验证 `agent_box.protocols.runtime` canonical 路径。
 - 回退：单 commit revert。
 
 **第 2 步 · assembler 去特判 + 唯一装配权威（F2、F13，协议签名顺带 F8）**

@@ -1,5 +1,5 @@
 from __future__ import annotations
-from agent_box.extensions.runtime_composition import (
+from agent_box.protocols.runtime import (
     HarnessCommandSpec, assemble_runtime_composition, declare_source,
 )
 

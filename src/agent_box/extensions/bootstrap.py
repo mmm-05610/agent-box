@@ -10,11 +10,6 @@ from .catalog import (
     activate_registry_bindings,
 )
 from .loader import PluginLoadReport, load_installed_plugins
-from .runtime_composition.protocol import (
-    RuntimeHostV1,
-    SandboxV1,
-    TerminalSessionV1,
-)
 from ..work_core.registry import ExtensionRegistry
 
 # Root-owned canonical shared runtime contracts.  They describe the execution
@@ -22,16 +17,15 @@ from ..work_core.registry import ExtensionRegistry
 # belong to the Root Runtime SDK -- never to a concrete provider plugin.
 # Provider plugins resolve and provide these contracts but never re-declare
 # a different type under the same id.
-SHARED_RUNTIME_CONTRACTS: tuple[type, ...] = (
-    RuntimeHostV1,
-    SandboxV1,
-    TerminalSessionV1,
-)
+SHARED_RUNTIME_CONTRACTS: tuple[type, ...] = ()
 
 
 def register_shared_runtime_contracts(registry: ExtensionRegistry) -> None:
     """Register the Root-owned shared runtime contracts exactly once."""
+    from ..protocols.runtime.protocol import RuntimeHostV1, SandboxV1, TerminalSessionV1
     for contract in SHARED_RUNTIME_CONTRACTS:
+        registry.register_root_shared_contract(contract)
+    for contract in (RuntimeHostV1, SandboxV1, TerminalSessionV1):
         registry.register_root_shared_contract(contract)
 
 

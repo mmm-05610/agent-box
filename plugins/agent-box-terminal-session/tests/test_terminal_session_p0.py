@@ -5,7 +5,7 @@ import subprocess
 
 import pytest
 
-from agent_box.extensions.runtime_composition import HostTransportOperation, IsolatedProcessSpec
+from agent_box.protocols.runtime import HostTransportOperation, IsolatedProcessSpec
 from agent_box_terminal_session import DirectStdioSession, TmuxSession
 
 

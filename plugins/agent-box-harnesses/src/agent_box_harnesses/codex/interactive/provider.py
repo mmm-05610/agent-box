@@ -10,7 +10,7 @@ from agent_box.work_core import ExecutionProjection, ExecutionStartReceipt, Exec
 from ..contracts import CodexContinuationV1
 from ..launch import CodexLaunchAdapter
 from ..composition import command_from_plan, compose, composition_from_resolved_inputs
-from agent_box.extensions.runtime_composition import RuntimeBinding, TerminalRunHandle, RuntimeHostV1, SandboxV1, TerminalSessionV1, RuntimeCompositionCoordinator
+from agent_box.protocols.runtime import RuntimeBinding, TerminalRunHandle, RuntimeHostV1, SandboxV1, TerminalSessionV1, RuntimeCompositionCoordinator
 
 def _now(): return datetime.now(timezone.utc)
 

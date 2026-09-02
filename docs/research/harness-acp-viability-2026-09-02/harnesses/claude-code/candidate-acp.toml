@@ -1,0 +1,131 @@
+# candidate-acp.toml — Claude Code ACP viability candidate profile
+# Research date: 2026-09-02. Read-only round: no model requests, no credentials read, no installs.
+# Sanitized: <user-home> <temp-home> <workspace> <agent-box-studio> <binary> <npm-global>.
+# Evidence ids resolve to harnesses/claude-code/EVIDENCE.md (same directory).
+# All 21 required fields are top-level (SOURCE_POLICY §1 formats); the nested
+# [detail.*] tables below carry the same facts with full annotation.
+
+schema_version = 1
+harness_type = "claude-code"
+decision = "NATIVE_PRIMARY"
+implementation_name = "@agentclientprotocol/claude-agent-acp"
+implementation_source = "https://github.com/agentclientprotocol/claude-agent-acp (formerly zed-industries/claude-code-acp; GitHub + npm redirect, E-7/E-4)"
+implementation_owner = "agentclientprotocol org (protocol body); actual maintainer Zed Industries per package.json author (E-6); registry manifest authors claim 'Anthropic, Zed Industries, JetBrains' without Anthropic-maintenance evidence (E-22, CONTRADICTED attribution)"
+officiality = "third_party_wrapper=true; acp_org_adapter=true; vendor_native=false; registry_manifest=adapter_only ('claude-acp' lists the wrapper, no 'claude-code' vendor entry, E-22); host_installability=zed_yes/codeg_yes"
+version = "0.73.0 (published 2026-09-01; legacy @zed-industries/claude-code-acp ended 0.16.2 on 2026-02-17 with npm rename notice, E-4/E-5)"
+protocol_version = 1
+launch_kind = "subprocess_acp_server (host spawns node wrapper; wrapper/SDK spawn native claude binary; E-35)"
+command = "npx @agentclientprotocol/claude-agent-acp@0.73.0"
+bundle_members = [
+  "node package @agentclientprotocol/claude-agent-acp (dist JS)",
+  "@agentclientprotocol/sdk 1.4.0",
+  "@anthropic-ai/claude-agent-sdk 0.3.257 (bundles native claude binary via optional platform deps)",
+  "zod ^4",
+]
+process_topology = "REQUIRES_RUNTIME_CHANGE — agent-box host -> node claude-agent-acp (ACP stdio server) -> native claude binary (SDK-spawned, stream-json + control internally) -> /bin/bash grandchildren (E-35); graceful teardown chain verified (E-31), hard-kill orphan UNKNOWN (U-1)"
+sandbox_status = "FEASIBLE_UNVERIFIED_IN_SANDBOX — static audit supports temp HOME + temp CLAUDE_CONFIG_DIR; no runtime sandbox test this round (U-5)"
+credential_boundary = "wrapper never reads credential files; auth entirely inside CLI child (OAuth/keychain/.credentials.json under shared config dir); host-injected ANTHROPIC_API_KEY/CLAUDE_CODE_OAUTH_TOKEN pass through full process.env (E-11); shared ~/.claude means single login shared with native CLI (E-26)"
+profile_boundary = "CLAUDE_CONFIG_DIR honored by wrapper AND CLI child; settings user/project/local/managed resolved by SDK with fs.watch hot reload; native skills/commands/agents/plugins/CLAUDE.md unchanged; machine cache still follows HOME (native FACTS F4 conflict persists)"
+capabilities = [
+  "initialize=SUPPORTED (E-12)",
+  "authenticate=PARTIAL (terminal + gateway methods only, E-12/E-38)",
+  "session_new=SUPPORTED (ACP sessionId == native claude session id, E-18)",
+  "session_load=SUPPORTED (E-18)",
+  "session_resume=SUPPORTED",
+  "session_list=SUPPORTED (E-18)",
+  "session_fork=SUPPORTED (message-level fork point via _meta, E-18)",
+  "session_close_delete=SUPPORTED (E-18/E-31)",
+  "prompt=SUPPORTED (multi-turn promptQueueing, E-37)",
+  "streaming_text=SUPPORTED (agent_message_chunk, E-13)",
+  "thinking=SUPPORTED (agent_thought_chunk, E-13)",
+  "tool_call=SUPPORTED (full kind mapping, E-14)",
+  "tool_update_diff=SUPPORTED (structuredPatch, E-14)",
+  "usage_cost=SUPPORTED (usage_update{used,size,cost}; per-model quota meta, E-15)",
+  "permission_request=SUPPORTED (canUseTool -> session/request_permission; editable options + _meta.permission effects, E-20/E-27)",
+  "question_elicitation=SUPPORTED (AskUserQuestion + MCP elicitation + OAuth, E-20)",
+  "plan_approval=PARTIAL (ExitPlanMode -> switch_mode; no dedicated approval method, E-13/E-27)",
+  "cancel=SUPPORTED (E-31)",
+  "steer=SUPPORTED (steer method + _meta.steering; promptRequired contract since 0.65.0, E-37)",
+  "mode_config_options=SUPPORTED (default/acceptEdits/plan/dontAsk/bypass(gated)/auto, E-17)",
+  "terminal=NOT_SUPPORTED (no terminal capability; Bash via tool cards + _meta.terminal_output, E-36)",
+  "filesystem=PARTIAL (agent->client fs when advertised; no ACP-level workspace boundary, E-12/E-11)",
+  "mcp_servers=SUPPORTED (client mcpServers merged; http/sse; OAuth bridges, E-11/E-12/E-20)",
+  "images=SUPPORTED (in/out base64, E-12/E-13)",
+  "subagents=SUPPORTED (subagent_spawned/state_update + flattened fallback, E-13/E-27)",
+  "session_locator=SUPPORTED (list/load/fork chain; hidden from native --resume picker #84421, E-18/E-34)",
+  "native_errors=PARTIAL (AIR sessionFailure opt-in, E-27/E-16)",
+  "process_exit=SUPPORTED (exit -> error mapping + SDK cleanup chain, E-31)",
+]
+missing_capabilities = [
+  "result_fields_lost: num_turns, duration_ms, duration_api_ms, stop_reason, terminal_reason, permission_denials, structured_output, api_error_status, is_error (E-16)",
+  "system_init_fields_lost: tools[], mcp_servers[], apiKeySource, initial permissionMode, model first-frame declaration (E-16)",
+  "observability_lost: stream_event raw Anthropic deltas (re-encoded), hook_started/hook_response frames (hooks still execute), tool_use_result raw structure (E-16)",
+  "control_lost: rewind_files (no ACP mapping, UNKNOWN), mcp_reconnect/mcp_toggle (E-16)",
+  "launch_flags_lost: --bare --safe-mode --no-session-persistence --setting-sources --append-system-prompt --max-turns --max-budget-usd --fallback-model --json-schema (E-11/ACP_FACTS §5)",
+]
+native_fallback = "native stream-json remains the primary and only Agent-Box routing (<workspace>/plugins/agent-box-harnesses/src/agent_box_harnesses/adapters/claude.py, claude-stream-json@1); revisit when Anthropic implements ACP (issue #24411/#6686) or external-client interop is required"
+known_risks = [
+  "VERSION_SKEW: bundled CLI from claude-agent-sdk 0.3.257 differs from host claude 2.1.247; upstream bug #87577 (missing result frame) is bundled-build-specific (E-32, U-4)",
+  "SUPPLY_CHAIN: npx pull of wrapper + ~100MB native binary per version bump; registry manifest license/authors fields contradict repo facts (E-22)",
+  "ORPHAN_ON_HARD_KILL: kill -9 of wrapper may orphan CLI child; untested (U-1)",
+  "FIDELITY: result aggregation/observability fields and strong-isolation launch flags have no ACP exit (E-16)",
+  "SESSION_VISIBILITY: ACP-created sessions hidden from native --resume picker (#84421, E-34)",
+  "UX_DEFECT_CLASS: AskUserQuestion via adapter closes panel in Zed (#82850, E-33)",
+]
+evidence_refs = [
+  "E-1..E-38 in harnesses/claude-code/EVIDENCE.md",
+  "U-1..U-6 open questions in same EVIDENCE.md",
+]
+
+# ---- detailed annotation (same facts, full context) -------------------------
+
+[detail.identity]
+implementation_license = "Apache-2.0 (repo LICENSE + package.json); registry manifest says 'proprietary' (E-22 discrepancy)"
+version_history = "first org-scope publish 0.24.0 on 2026-03-26 (E-5)"
+repo_activity = "2446 stars, 152 open issues, pushed 2026-09-01, releases 0.68-0.73 all after 2026-08-14 (E-7/E-8)"
+runtime_requirement = "node >=22; deps @agentclientprotocol/sdk 1.4.0 (=npm latest) + @anthropic-ai/claude-agent-sdk 0.3.257 + zod ^4 (E-6)"
+
+[detail.officiality]
+acp_official_sdk_exists = true
+harness_in_acp_registry = "adapter_only"
+third_party_wrapper_exists = true
+acp_org_adapter_exists = true
+vendor_native_acp_support = false
+host_installability = "zed_registry_yes__codeg_builtin_yes"
+
+[detail.launch]
+command_alt = "claude-agent-acp (<npm-global> bin); '--cli <args>' passthrough spawns bundled native claude with inherited stdio (E-9)"
+does_not_require_preinstalled_claude = true
+internal_cli_version_source = "@anthropic-ai/claude-agent-sdk dependency (0.3.257 in 0.73.0); independent of host claude 2.1.247 (U-4 version skew)"
+
+[detail.protocol]
+acp_sdk_version = "1.4.0"
+transport = "stdio JSON-RPC 2.0"
+capabilities_negotiated = [
+  "promptCapabilities.image",
+  "promptCapabilities.embeddedContext",
+  "mcpCapabilities.http",
+  "mcpCapabilities.sse",
+  "auth.logout",
+  "providers (unstable list/set/disable; client-managed LLM routing, E-38)",
+  "loadSession",
+  "sessionCapabilities.additionalDirectories",
+  "sessionCapabilities.close",
+  "sessionCapabilities.delete",
+  "sessionCapabilities.fork",
+  "sessionCapabilities.list",
+  "sessionCapabilities.resume",
+  "sessionCapabilities.subagents",
+  "_meta.claudeCode.promptQueueing",
+  "_meta.steering",
+  "_meta.goal (v1, actions set/clear)",
+  "_meta.jetbrains.air sessionFailure/agentFileChangeReport (client-gated)",
+  "authMethods: terminal (--cli auth login remote/local) + gateway/bedrock (client-gated)",
+]
+
+[detail.meta]
+facts_doc = "docs/research/harness-acp-viability-2026-09-02/harnesses/claude-code/ACP_FACTS.md"
+evidence_doc = "docs/research/harness-acp-viability-2026-09-02/harnesses/claude-code/EVIDENCE.md"
+notes_doc = "docs/research/harness-acp-viability-2026-09-02/research-notes/claude-code.md"
+source_policy = "docs/research/harness-acp-viability-2026-09-02/SOURCE_POLICY.md"
+confidence = "HIGH on identity/officiality/launch/topology; MEDIUM on isolation-without-runtime-test and ISSUE_DISCUSSION limits"

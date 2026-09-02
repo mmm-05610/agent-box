@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from agent_box.extensions.runtime_composition.protocol import content_digest
+from agent_box.protocols.runtime.protocol import content_digest
 
 
 @dataclass(frozen=True)

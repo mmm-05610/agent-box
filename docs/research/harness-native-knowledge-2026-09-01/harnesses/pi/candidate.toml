@@ -1,0 +1,208 @@
+# candidate.toml — Pi Coding Agent (harness id: pi)
+# Built 2026-09-02 against pi 0.84.4 + earendil-works/pi (ex badlogic/pi-mono) commit b8b873b.
+# Unknown values are the string "unknown"; unsupported facts are tri-state strings, never false.
+# Sanitized: <user-home>, <temp-home>, <workspace>, <binary>.
+# IDENTITY TRAP CORRECTED: npm @mariozechner/pi is an unrelated pi-pods tool.
+
+[meta]
+harness_id = "pi"
+tier = "A"
+tier_rationale = "first-class actively maintained coding harness; strong headless surface (print/json/rpc), env-relocatable config root, documented session format — full adapter feasibility with 3 argv-contract corrections"
+verified_version = "0.84.4"
+verified_on = "2026-09-02"
+research_files = ["FACTS.md", "evidence.md", "../experiments/pi.md"]
+sources = [
+  "npm registry @earendil-works/pi-coding-agent + @mariozechner/pi (GET 2026-09-02)",
+  "earendil-works/pi monorepo clone commit b8b873b9872db04a938fb4357b5e8e824ddc051c (2026-09-01) at <temp-home>/pi-mono",
+  "in-repo docs: README, settings.md, session-format.md, json.md, rpc.md, models.md, skills.md, packages.md, windows.md",
+  "CLI probes: --version/--help/--list-models(PI_OFFLINE)/--mode rpc get_state under isolated HOME",
+]
+
+[identity]
+canonical_id = "pi"
+display_name = "Pi Coding Agent"
+org = "Earendil Works (Mario Zechner/badlogic, Armin Ronacher/mitsuhiko, rwachtler)"
+repository = "https://github.com/earendil-works/pi"
+repository_alias_redirect = "https://github.com/badlogic/pi-mono (rename redirect, observed 2026-09-02)"
+docs = "in-repo packages/coding-agent/docs/ + pi.dev"
+license = "MIT"
+npm_package = "@earendil-works/pi-coding-agent"
+npm_name_trap = "npm @mariozechner/pi is NOT this product (pi-pods vLLM pods CLI, 0.70.6)"
+binary_name = "pi"
+version_string_format = "bare semver (0.84.4)"
+maintenance_status = "active (latest 2026-08-28, repo HEAD 2026-09-01, ~weekly minors since 2026-07)"
+sibling_packages = ["@earendil-works/pi-ai", "pi-agent-core", "pi-tui", "pi-protocol", "pi-client", "pi-server", "pi-telemetry", "pi-evals"]
+
+[distribution]
+npm = "@earendil-works/pi-coding-agent (bin pi -> dist/bundle/cli.js; engines node >=22.19.0; dist-tag legacy-node20 = 0.74.2 for Node 20)"
+install_script = "curl -fsSL https://pi.dev/install.sh | sh (documented)"
+bun_binary = "GitHub releases (documented; not probed)"
+build_from_source = "monorepo (documented)"
+self_update = "pi update --self / pi update [--all|--extensions|--models]; per-package-manager detection incl. --ignore-scripts and PI_PACKAGE_DIR for Nix/Guix"
+pip = "none"
+
+[platform]
+linux = "supported"
+macos = "supported"
+windows = "supported (Git Bash default shell; optional powershell tool since 0.84.3; docs/windows.md)"
+wsl = "usable (this research ran under WSL2; no WSL-specific failures in non-model probes)"
+termux = "documented (docs/termux.md)"
+
+[executable]
+discovery = "PATH lookup; npm bin symlink dist/bundle/cli.js (observed)"
+version_probe = "pi --version -> '0.84.4' exit 0 (observed)"
+node_requirement = ">=22.19.0 for latest line; Node 20 only via legacy-node20 dist-tag (0.74.2)"
+unknown_flag_behavior = "silently captured as extension flags and ignored (args.ts unknownFlags; observed with --agent-dir)"
+side_effects_on_probe = "declared: --version creates nothing; --help bootstraps <home>/.pi/agent/{auth.json,models-store.json} empty (observed)"
+package_dir_override = "PI_PACKAGE_DIR (Nix/Guix stores)"
+
+[launch_modes.interactive_tui]
+argv = "pi [options] [messages...] (@file args; --tui-mode regular|fullscreen)"
+io = "tty"
+network = "required for model calls; startup phones pi.dev unless PI_OFFLINE=1/PI_SKIP_VERSION_CHECK=1"
+
+[launch_modes.print]
+argv = "pi -p \"prompt\" (or --print)"
+prompt_transport = "argv text + @file args + piped stdin merged into initial prompt"
+output = "final assistant text on stdout; errors on stderr"
+exit_semantics = "declared+source: 0 ok; 1 if last assistant stopReason error|aborted or exception; SIGTERM->143, SIGHUP->129"
+session_flags = "-c/--continue, -r/--resume (interactive picker), --session <path|partial-uuid>, --session-id <uuid> (create-if-missing), --fork <path|id>, --session-dir, --no-session, --name"
+trust = "no prompt headless; defaultProjectTrust ask|never IGNORE project .pi resources; --approve/-a trusts for one run (observed-in-docs, load-bearing)"
+
+[launch_modes.json_stream]
+argv = "pi --mode json \"prompt\""
+output = "JSONL: first line session header {type:session,version:3,id,timestamp,cwd}; then agent/turn/message/tool_execution/queue_update/compaction events; message_update is delta-only with usage"
+exit_semantics = "same as print mode"
+observation_fit = "best observation envelope candidate for adapters"
+
+[launch_modes.rpc]
+argv = "pi --mode rpc [options]"
+io = "stdio full-duplex LF-delimited JSONL; commands + {type:response} + events; optional id correlation"
+commands = "prompt, steer, follow_up, abort, clear_queue, new_session, get_state, get_messages, set_model, cycle_model, get_available_models, set_thinking_level, cycle_thinking_level, get_available_thinking_levels, set_steering_mode, set_follow_up_mode, compact, set_auto_compaction, set_auto_retry, abort_retry, bash, abort_bash, get_session_stats, export_html, switch_session, fork, clone, get_fork_messages, get_entries, get_tree, get_last_assistant_text, set_session_name, get_commands"
+framing_gotcha = "documented: split on \\n only; Node readline non-compliant (U+2028/U+2029)"
+probed = "get_state + get_available_thinking_levels answered offline with --no-session (CLI_OBSERVED 2026-09-02)"
+
+[launch_modes.sdk]
+surface = "createAgentSession/AgentSession/SessionManager from @earendil-works/pi-coding-agent (Node embedding)"
+probed = false
+
+[profile]
+native_home_name = ".pi"
+native_config_root = "<home>/.pi/agent (settings.json, auth.json, models.json, models-store.json, trust.json, keybindings.json, skills/, extensions/, prompts/, themes/, tools/, bin/, npm/, git/, sessions/, AGENTS.md, SYSTEM.md)"
+env_overrides = "PI_CODING_AGENT_DIR (config root), PI_CODING_AGENT_SESSION_DIR (sessions)"
+agent_dir_cli_flag = "unsupported (no --agent-dir flag in 0.84.4; silently swallowed as unknown flag — observed)"
+settings_scopes = "global <agent-dir>/settings.json + project .pi/settings.json (project overrides, deep merge; project resources need trust)"
+custom_providers = "<agent-dir>/models.json: providers.<name>{baseUrl, api(openai-completions|openai-responses|anthropic-messages|google-generative-ai), apiKey, models[], compat{}}; project .pi/ mirrors resource dirs"
+session_dir_precedence = "--session-dir > PI_CODING_AGENT_SESSION_DIR > settings sessionDir > <agent-dir>/sessions"
+safe_to_persist = "settings.json, models.json (if apiKey uses $VAR/${VAR}/!command indirection), skills/extensions/prompts/themes payloads, keybindings.json"
+opaque_unsafe = "auth.json (tokens), trust.json (host decisions), models-store.json (cache), sessions/ (conversation), pi-debug.log"
+rebrand_risk = "package.json piConfig.name/configDir can rename APP_NAME and CONFIG_DIR (e.g. TAU_CODING_AGENT_DIR) — VERSION_SENSITIVE/UNKNOWN"
+payload_schema_feasibility = "pi-profile-v1 JSON codec feasible: settings+models are JSON; declare_ keys map to settings.json/model keys"
+
+[credentials]
+file_store = "<agent-dir>/auth.json (opaque tokens; scaffold {} observed)"
+oauth = "/login per provider: Anthropic Claude Pro/Max, OpenAI ChatGPT (Codex), GitHub Copilot subscription auth; /logout"
+env_vars = "documented: ANTHROPIC_API_KEY, ANTHROPIC_AUTH_TOKEN, ANTHROPIC_OAUTH_TOKEN, OPENAI_API_KEY, AZURE_OPENAI_*, DEEPSEEK_API_KEY, GEMINI_API_KEY, GROQ_API_KEY, CEREBRAS_API_KEY, XAI_API_KEY, OPENROUTER_API_KEY, MISTRAL_API_KEY, MINIMAX_API_KEY, MOONSHOT_API_KEY, ZAI_API_KEY, ZAI_CODING_CN_API_KEY, QWEN_TOKEN_PLAN_*, XIAOMI_*, CLOUDFLARE_API_KEY(+ACCOUNT_ID/GATEWAY_ID), AWS_* (Bedrock), AI_GATEWAY_API_KEY, KIMI_API_KEY, TOGETHER_API_KEY, FIREWORKS_API_KEY, BASETEN_API_KEY, NVIDIA_API_KEY, OPENCODE_API_KEY, ANT_LING_API_KEY"
+cli_flag = "--api-key (argv-visible; avoid in adapters)"
+stdout_retrieval = "pi auth print-api-key --provider X; pi auth print-bearer-token --provider X (refreshes OAuth)"
+models_json_indirection = "apiKey/headers accept literal | $VAR | ${VAR} | !command (macOS security, 1Password op) — keychain-safe forms for persisted payloads"
+resolution_order = "declared: --api-key > env var > auth.json > models.json provider keys"
+
+[isolation]
+home_relocation = "full: PI_CODING_AGENT_DIR=<guest> moves settings/auth/models/skills/extensions/sessions/npm/git wholesale (observed-in-source config.ts getAgentDir)"
+session_relocation = "PI_CODING_AGENT_SESSION_DIR / --session-dir / --no-session (ephemeral; observed RPC run wrote no session file)"
+offline_mode = "PI_OFFLINE=1 or --offline disables update check + package checks + install telemetry (documented)"
+partial_offline = "PI_SKIP_VERSION_CHECK=1 (update check only); PI_TELEMETRY=0 (telemetry only)"
+session_layout = "<sessions-dir>/--<cwd-with---/>--/<timestamp>_<uuid>.jsonl (documented)"
+session_format = "JSONL v3: header {type:session,version:3,id,timestamp,cwd,parentSession?}; tree entries id/parentId 8-hex; types: message, model_change, thinking_level_change, compaction, branch_summary, custom, custom_message, label, session_info; auto-migrate v1/v2->v3 (documented)"
+filename_glob = "*_<uuid>.jsonl valid lookup shape; --session <partial-uuid> resolves natively"
+delete = "remove .jsonl file (or /resume Ctrl+D with trash CLI)"
+
+[resource_surfaces.instructions]
+status = "supported"
+detail = "AGENTS.md/CLAUDE.md from <agent-dir>/AGENTS.md + ancestor dirs + cwd (concatenated); AGENTS.override.md per-dir override; --no-context-files/-nc; system prompt override .pi/SYSTEM.md or <agent-dir>/SYSTEM.md; APPEND_SYSTEM.md appends"
+flags = "--system-prompt <text>, --append-system-prompt <text-or-file> (repeatable)"
+
+[resource_surfaces.skills]
+status = "supported"
+detail = "Agent Skills standard SKILL.md; roots: <agent-dir>/skills/, ~/.agents/skills/, .pi/skills/, .agents/skills/ (cwd..git root, trust-gated), packages, settings skills[], --skill <path> repeatable; /skill:name via enableSkillCommands"
+note = "projecting into <agent-dir>/skills is natively discovered — no flag needed"
+
+[resource_surfaces.mcp]
+status = "unsupported_by_design"
+detail = "README: 'No MCP. Build CLI tools with READMEs, or build an extension that adds MCP support.' No flag/config; --mcp-config would be swallowed"
+
+[resource_surfaces.prompts]
+status = "supported"
+detail = "prompt templates: <agent-dir>/prompts/, .pi/prompts/, packages, settings prompts[], --prompt-template; /name expansion with {{var}}"
+
+[resource_surfaces.rules]
+status = "unsupported_as_named_surface"
+detail = "no rules/ concept; instructions live in AGENTS.md/CLAUDE.md/SYSTEM.md"
+
+[resource_surfaces.subagents]
+status = "unsupported_by_design"
+detail = "README: 'No sub-agents. Spawn pi instances via tmux, or build your own with extensions, or install a package.'"
+
+[resource_surfaces.commands]
+status = "supported"
+detail = "slash commands: built-ins + extension-registered + /skill:name + template expansion; RPC get_commands lists them"
+
+[resource_surfaces.hooks]
+status = "supported_as_extensions"
+detail = "TypeScript extensions (ExtensionAPI: registerTool/registerCommand/registerProvider/on('tool_call')/custom UI/renderers); locations <agent-dir>/extensions/, .pi/extensions/, -e, packages, settings; --no-extensions; no separate hooks subsystem"
+
+[resource_surfaces.plugins]
+status = "supported_as_pi_packages"
+detail = "npm/git packages: pi install|remove|list|update|config; package.json 'pi' manifest or conventional dirs; installs <agent-dir>/npm|git (project -l .pi/npm|git); settings packages[]; full system access warning"
+
+[resource_surfaces.themes]
+status = "supported"
+detail = "built-in dark/light; custom files <agent-dir>/themes/, .pi/themes/, packages, --theme, --use-theme; hot-reload"
+
+[resource_surfaces.memory]
+status = "unsupported"
+detail = "no native memory feature found in README/docs/source (would be extension-provided); unknown whether any planned"
+
+[events]
+json_mode = "documented: session header first; agent_start/agent_end, turn_start/turn_end, message_start/update/end, tool_execution_start/update/end, queue_update, compaction_start/end; message_update delta-only {usage, assistantMessageEvent{text_delta,contentIndex,...}}; message_end authoritative"
+rpc_extra = "agent_settled, bash_execution_update, session_before_switch, ui_prompt_start/ui_prompt_end (0.84.x)"
+usage_cost = "assistant usage{input,output,cacheRead,cacheWrite,totalTokens,cost{...,total}}; may stay zero until provider reports"
+session_id_observability = "json header, RPC get_state.data.sessionId, PI_SESSION_ID env in bash-tool children (also PI_SESSION_FILE, PI_PROVIDER, PI_MODEL, PI_REASONING_LEVEL)"
+malformed_handling = "unknown (undocumented)"
+stability = "VERSION_SENSITIVE (weekly releases)"
+
+[control]
+interrupt = "RPC abort (+clear_queue first to drop queues); TUI Escape; print-mode SIGTERM->143 SIGHUP->129 handled, SIGINT default"
+steer_follow_up = "RPC steer/follow_up or prompt{streamingBehavior:steer|followUp}; settings steeringMode/followUpMode one-at-a-time|all"
+attach = "@file args (text+images), RPC prompt images (base64), piped stdin merge in -p"
+permission_prompting = "none built in (philosophy: run in container / extensions gate tool_call); tool gating --tools/--exclude-tools/--no-tools/--no-builtin-tools/defaultTools; headless trust via defaultProjectTrust/-a"
+model_thinking_switch_mid_session = "TUI /model /thinking; RPC set_model/cycle_model/set_thinking_level/cycle_thinking_level; persisted as model_change/thinking_level_change entries and replayed on resume"
+compaction = "/compact, RPC compact/set_auto_compaction; settings compaction.*"
+bash_control = "RPC bash/abort_bash with bash_execution_update events"
+resize = "unknown detail (pi-tui differential rendering; not documented)"
+
+[continuation]
+native_contract = "--continue (most recent), --resume (picker), --session <path|partial-uuid>, --session-id <uuid> create-if-missing, --fork <path|id>, switch_session RPC, /fork /clone /tree"
+agent_box_contract = "agent-box-pi.continuation@1 (session_id + optional session_file) maps natively onto --session"
+resume_replay = "tree walk from leaf; model/thinking restored from entries (documented)"
+probed_locally = "no (requires model call) — documented+source-verified only"
+
+[runtime]
+network = "required for model calls; pi.dev startup calls optional and disableable (PI_OFFLINE)"
+io = "print/json = one-shot stdio; rpc = long-lived stdio; interactive = tty/pty"
+node = ">=22.19.0 (latest line)"
+process_env_exports = "AI_AGENT=pi, PI_CODING_AGENT=true set for CLI/RPC entry; bash-tool children get PI_SESSION_ID/PI_SESSION_FILE/PI_PROVIDER/PI_MODEL/PI_REASONING_LEVEL"
+tools_builtin = "read, bash, powershell(Windows), edit, write; off-by-default: grep, find, ls"
+providers_builtin_example = "deepseek catalog contains deepseek-v4-flash (baseUrl https://api.deepseek.com, openai-completions, reasoning true, 1M ctx) — CLI_OBSERVED via get_state; catalog contents VERSION_SENSITIVE"
+
+[unresolved]
+unresolved_1 = "on-disk session creation/--continue/--mode json live stream over a real prompt: NOT_LOCALLY_OBSERVED (policy: no model calls); documented+source-verified only"
+unresolved_2 = "exit code on headless auth failure before any provider request"
+unresolved_3 = "--session-id new-id file creation timing (immediately vs first persist)"
+unresolved_4 = "malformed JSON line handling in --mode json/rpc streams"
+unresolved_5 = "Windows/WSL runtime specifics beyond docs/windows.md (not probed on Linux)"
+unresolved_6 = "src/cli/experimental/ contents unaudited"
+unresolved_7 = "Bun compiled binary distribution layout on disk"
+unresolved_8 = "headless interplay of saved trust.json parent-folder decisions with defaultProjectTrust (inferred from interactive docs)"
+unresolved_9 = "whether thinkingLevel default 'high' for deepseek-v4-flash generalizes across reasoning models (single-model observation)"

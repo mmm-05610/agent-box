@@ -71,8 +71,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {name: web, path: plugins/agent-box-web, deps: "-e plugins/agent-box-web -e plugins/agent-box-harnesses -e plugins/agent-box-git -e plugins/agent-box-terminal-session"}
-          - {name: harnesses, path: plugins/agent-box-harnesses, deps: "-e plugins/agent-box-harnesses -e plugins/agent-box-runtime-local -e plugins/agent-box-sandbox-bwrap -e plugins/agent-box-terminal-session -e plugins/agent-box-skills"}
+          - {name: web, path: plugins/agent-box-web, deps: "-e plugins/agent-box-web -e plugins/agent-box-harnesses -e plugins/agent-box-git -e plugins/agent-box-terminal-session -e plugins/agent-box-skills"}
+          - {name: harnesses, path: plugins/agent-box-harnesses, deps: "-e plugins/agent-box-harnesses -e plugins/agent-box-acp -e plugins/agent-box-runtime-local -e plugins/agent-box-sandbox-bwrap -e plugins/agent-box-terminal-session -e plugins/agent-box-skills"}
           - {name: skills, path: plugins/agent-box-skills, deps: "-e plugins/agent-box-skills"}
           - {name: git, path: plugins/agent-box-git, deps: "-e plugins/agent-box-git"}
           - {name: runtime-local, path: plugins/agent-box-runtime-local, deps: "-e plugins/agent-box-runtime-local"}

@@ -8,7 +8,7 @@ from agent_box.resource_contracts import (
 )
 from agent_box.work_core import ExecutionStartRequest, Ref, RefType, ResolvedExecutionInput
 from agent_box.work_core.projection import Outcome, Phase
-from agent_box.extensions.runtime_composition import RuntimeBinding, RuntimeHostRef, SandboxRef, TerminalRunHandle, TerminalSessionRef
+from agent_box.protocols.runtime import RuntimeBinding, RuntimeHostRef, SandboxRef, TerminalRunHandle, TerminalSessionRef
 from agent_box_harnesses.codex.app_server import provider as module
 
 

@@ -20,7 +20,7 @@ def check_plugin_conformance(
         return PluginDiagnosticReport((PluginDiagnostic("descriptor.error", DiagnosticSeverity.ERROR, f"descriptor() failed: {type(exc).__name__}: {exc}"),))
     if not isinstance(descriptor, PluginDescriptor):
         return PluginDiagnosticReport((PluginDiagnostic("descriptor.type", DiagnosticSeverity.ERROR, "descriptor() must return PluginDescriptor"),))
-    if descriptor.api_version != 1:
+    if descriptor.api_version != 2:
         items.append(PluginDiagnostic("descriptor.api_version", DiagnosticSeverity.ERROR, f"unsupported plugin API: {descriptor.api_version}", descriptor.id))
     try:
         registration = plugin.build(context)

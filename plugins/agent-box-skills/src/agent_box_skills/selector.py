@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import Mapping
-from agent_box.extensions import ResourceSelection, SelectorCompatibility, SelectorField
+from agent_box.protocols.host import ResourceSelection, SelectorCompatibility, SelectorField
 from agent_box.resource_contracts import AgentSkillV1
 
 

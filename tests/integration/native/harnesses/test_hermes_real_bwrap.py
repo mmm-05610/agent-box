@@ -1,7 +1,7 @@
 from pathlib import Path
 from agent_box.resource_contracts import AgentBoxProfileV1, PromptFragmentV1, WorkspaceV1
 from agent_box.work_core import ExecutionStartRequest, Ref, RefType, ResolvedExecutionInput
-from agent_box.extensions.runtime_composition import RuntimeHostV1, SandboxV1, TerminalSessionV1
+from agent_box.protocols.runtime import RuntimeHostV1, SandboxV1, TerminalSessionV1
 from agent_box_harnesses.hermes.profile import HermesProfileProvider
 from agent_box_harnesses.hermes.projection import HermesProjection
 from agent_box_harnesses.hermes.launch import HermesLaunchAdapter

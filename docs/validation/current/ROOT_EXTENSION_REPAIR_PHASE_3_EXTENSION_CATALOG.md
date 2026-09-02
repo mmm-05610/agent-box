@@ -108,7 +108,7 @@ loader 重构为每插件三段式（`loader.py`）：
 - `HostApplication.__init__(registry, report, home=None, *, terminal_presenter=None, catalog=None)`：
   - `catalog` 给定（canonical 路径，`create_server` 经 `build_extension_environment` 获取）→ 直接消费；
   - `catalog` 缺省（旧 `(registry, report)` 调用方）→ **薄 shim**：调 `build_extension_environment_from_parts`（SDK canonical 构建 + 绑定激活），Web 自身零聚合逻辑。
-  - controls/selectors/harnesses/routes 字典改由 `catalog.host_controls()/selectors()/harness_managers()/continuation_routes()` 构建；facade 自做的 duplicate route 检查删除（Catalog 已保证唯一）；`hasattr(x,"bind")` 循环删除；`HostFinalizationCoordinator` 的 contributors 改从 `catalog.finalization_contributors()` 获取。
+  - controls/selectors/libraries/routes 字典改由 namespaced `catalog.query(kind)` 构建；facade 自做的 duplicate route 检查删除（Catalog 已保证唯一）；`hasattr(x,"bind")` 循环删除；`HostFinalizationCoordinator` 的 contributors 改从 generic query 获取。
 - `server/host.py create_server`：registry/report 缺省时走 `build_extension_environment(strict=False)`（canonical），并新增 `catalog` 透传参数。
 - 保持不变：Web API 路由、Quick Launch 行为、Profile 管理、continuation、Finish、terminal presenter、浏览器可见 payload、旧构造签名（薄 shim）。
 - `report` 在 Web 中仅剩 diagnostics 用途（/api/v1/plugins 列表 + 存储字段）——边界扫描确认 web src 无任何 `for … in report.ready` 聚合（测试 17）。
@@ -179,7 +179,7 @@ Clean venv（`/tmp/abx-phase3-venv`）：
 
 # Compatibility
 
-- 公开 SDK 路径：`agent_box.extensions` 再导出 ExtensionCatalog/Contribution/Builder、RegistryBindable、ExtensionEnvironment、build_extension_environment(-from-parts)、build_catalog_from_report、CONTRIBUTION_KINDS；`agent_box.extensions.sandbox` shim、bootstrap、credentials 等 Phase 1/2 兼容面全部保留。
+- 公开 SDK 路径：`agent_box.extensions` 提供 ExtensionCatalog/Contribution/Builder、RegistryBindable、ExtensionEnvironment、build_extension_environment(-from-parts)、build_catalog_from_report；Host/Runtime/Credential 协议 canonical 路径为 `agent_box.protocols`，不提供旧 shim。
 - 旧 import 无需一次性迁移：插件现有 `from agent_box.extensions import …` 与 `from agent_box.work_core import ExtensionRegistry` 继续有效。
 - 行为差异（有意、已记录）：① Host 贡献若需 Registry 必须实现 `bind_registry`（旧 `bind` 不再被触发）；② facade 的 duplicate-route 异常由 Catalog 构建期等价保证取代；③ `build_extension_registry` 现在会激活绑定（幂等，行为外延无害）。
 - 未拆发行包；未改 PLUGIN_API_VERSION；未修改数据库/持久化。

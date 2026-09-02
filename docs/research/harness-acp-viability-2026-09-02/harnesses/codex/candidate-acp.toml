@@ -1,0 +1,112 @@
+# candidate-acp.toml — OpenAI Codex CLI (harness id: codex) — PRIMARY round
+# Built 2026-09-02. Local codex-cli 0.152.0; adapter @agentclientprotocol/codex-acp 1.8.0
+# (npm latest, 2026-09-01); vendored @openai/codex ^0.152.0. Sanitized per SOURCE_POLICY:
+# <user-home> / <temp-home> / <workspace> / <agent-box-studio> / <binary> / <npm-global>.
+# Every fact carries an evidence ref -> harnesses/codex/EVIDENCE.md.
+
+schema_version = "1"
+harness_type = "codex"
+decision = "NATIVE_PRIMARY"
+implementation_name = "codex-acp (ACP adapter around Codex App Server; Codex itself has no ACP mode)"
+implementation_source = "https://github.com/agentclientprotocol/codex-acp (commit 87997e2, 2026-09-01); npm @agentclientprotocol/codex-acp 1.8.0; vendored dep @openai/codex ^0.152.0"
+implementation_owner = "agentclientprotocol org (pooled maintenance; registry manifest authors: OpenAI, JetBrains s.r.o, Zed Industries; recent commits by JetBrains employees)"
+officiality = "acp_org_adapter_co_maintained_not_vendor_native"
+version = "adapter 1.8.0 (npm latest, 32 releases) driving codex-cli 0.152.0; legacy zed-industries/codex-acp 0.16.0 deprecated 2026-07"
+protocol_version = "1 (negotiated in initialize; observed protocolVersion=1 in local probe; schema artifacts v1/v2)"
+launch_kind = "subprocess_stdio_ndjson_jsonrpc_wrapper"
+command = "npx -y @agentclientprotocol/codex-acp  (or pre-installed: codex-acp; recommend CODEX_PATH=<pinned codex binary>; registry launch: npx @agentclientprotocol/codex-acp@1.8.0)"
+bundle_members = [
+  "@agentclientprotocol/codex-acp 1.8.0 (npm, bin codex-acp, dist/index.js, Apache-2.0)",
+  "@agentclientprotocol/sdk 1.4.0 (bundled dep, protocol types)",
+  "@openai/codex 0.152.0 (bundled dep via ^0.152.0 semver; bin codex.js node shim -> platform native codex)",
+  "node runtime >= 20 (no engines field; upstream CI 24, Codeg floor 20.0.0, local probe v22.23.2)",
+]
+process_topology = "double_spawn_single_tree: ACP client -> node codex-acp wrapper (one per client) -> codex app-server child (exactly one per wrapper, spawned at startup, no daemon) -> transient git child observed at startup; graceful stdin-close ends codex stdin then kill-after-2s fallback, adapter exit 0 observed; SIGKILL-of-wrapper orphan behavior UNKNOWN (no pdeathsig); same process tree, bwrap-wrappable"
+sandbox_status = "partial: sandbox/approval carried per ACP session mode (read-only/standard/full_access/plan/auto_review -> approvalPolicy+sandboxPolicy mapping) plus additionalDirectories and session/setConfigOption; INITIAL_AGENT_MODE env default; native -s/-a free-form combination, --dangerously-bypass, codex sandbox utility and codex-linux-sandbox helper NOT exposed via ACP"
+credential_boundary = "adapter never reads/writes credential files and does not touch CODEX_HOME; spawns codex with process.env passed through, so CODEX_API_KEY/OPENAI_API_KEY/DEFAULT_AUTH_REQUEST env and CODEX_HOME (auth.json/keyring per native facts) are the caller-controlled boundaries; authMethods negotiated in initialize (api-key observed; ChatGPT login hidden under NO_BROWSER=1); CODEX_HOME isolation verified: temp home populated, host <user-home>/.codex mtime-untouched; credential contents never read this round"
+profile_boundary = "config.toml/profiles/AGENTS.md/skills/rules/hooks/plugins/mcp_servers loaded by codex itself from CODEX_HOME exactly as native (adapter adds CODEX_CONFIG JSON merge into thread config, MODEL_PROVIDER, INITIAL_AGENT_MODE); native CLI-only surfaces not reachable via ACP: -p profile layering, -c dotted overrides, --ephemeral, --output-schema, --skip-git-repo-check, --ignore-user-config"
+capabilities = [
+  "initialize=SUPPORTED (locally observed, protocolVersion 1)",
+  "authenticate=SUPPORTED (api-key observed; chatgpt login; custom gateway capability)",
+  "session_new=SUPPORTED (locally observed clean -32000 auth gate, no model request)",
+  "session_load=SUPPORTED (loadSession capability; child-tree rebuild from Codex history)",
+  "session_resume=SUPPORTED",
+  "session_fork=SUPPORTED (thread/fork with lastTurnId)",
+  "session_list=SUPPORTED",
+  "session_delete=SUPPORTED",
+  "session_close=SUPPORTED",
+  "prompt=SUPPORTED",
+  "streaming_text=SUPPORTED (agent_message_chunk)",
+  "thinking=SUPPORTED (agent_thought_chunk from app-server reasoning deltas)",
+  "tool_call=SUPPORTED (command execution, mcp tool call, web search, image generation)",
+  "tool_update=SUPPORTED (tool_call_update incl. output deltas)",
+  "file_edits_diff=PARTIAL (tool_call rawInput + opt-in agent file-change report extension; no standard unified-diff payload)",
+  "usage_tokens=SUPPORTED (totalTokens/inputTokens/cachedReadTokens/outputTokens/thoughtTokens; lossy: no cache_write_input_tokens)",
+  "usage_cost=NOT_SUPPORTED (no cost fields on either side)",
+  "permission=SUPPORTED (session/request_permission + _meta.permission presentation ext)",
+  "question_elicitation=SUPPORTED (elicitation.create/complete; MCP OAuth + form)",
+  "plan=PARTIAL (plan_update/delta display + plan mode via setMode; explicit plan-approval gate UNKNOWN)",
+  "cancel=SUPPORTED (session/cancel notification)",
+  "steer=SUPPORTED (extension _session/steering, _meta.steering; not core ACP v1)",
+  "terminal=PARTIAL (command output via tool_call updates, TerminalOutputMode; ACP client terminal capability unused)",
+  "filesystem_client_proxy=NOT_SUPPORTED (no fs/read_text_file|write_text_file calls; codex does its own IO)",
+  "set_session_mode=SUPPORTED (read-only/standard/full_access/plan/auto_review -> approval+sandbox)",
+  "set_config_option=SUPPORTED (+ env CODEX_CONFIG/MODEL_PROVIDER defaults)",
+  "mcp_client_servers=SUPPORTED (stdio command + http; acp:false sse:false observed)",
+  "images=SUPPORTED (promptCapabilities.image; text-only-model guard)",
+  "subagents=SUPPORTED (draft RFD, bilateral negotiation; no targeted child cancel/close)",
+  "session_locator=SUPPORTED (ACP sessionId == codex threadId; compatible with native codex exec resume)",
+  "native_errors=PARTIAL (error/warning mapping, quota_exhausted, sessionFailure via _meta.jetbrains.air)",
+  "process_exit=PARTIAL (codex exit -> connection dispose; wrapper orphan on SIGKILL UNKNOWN)",
+]
+missing_capabilities = [
+  "usage_cost",
+  "filesystem_client_proxy (ACP fs/read_text_file, fs/write_text_file unused)",
+  "cache_write_input_tokens in usage mapping",
+  "native exec conveniences: --output-schema, -o, --ephemeral, -p profiles, -c overrides, --skip-git-repo-check, --thread-source",
+  "app-server-only surfaces: thread/rollback|revert|search|archive, review/start, skills/list, plugin/*, project/*, hooks/list, account/usage/read, fs/*, command/exec persistent terminal, windowsSandbox/*, experimentalApi-gated methods",
+  "codex queue-based TUI steering equivalent (ACP path uses _session/steering extension instead)",
+  "explicit plan-approval interaction (display only; UNKNOWN gate)",
+]
+native_fallback = "Agent-Box native adapter already primary: codex app-server JSON-RPC (thread/turn methods, approvals, steer/interrupt, usage incl. cache_write) and codex exec --json JSONL (codex exec resume <thread_id> continuation); both documented in <workspace>/docs/research/harness-native-knowledge-2026-09-01/harnesses/codex/FACTS.md; ACP sessionId == threadId keeps the two paths interoperable"
+known_risks = [
+  "double-spawn supply chain: npx -y resolves/downloads at spawn time unless pre-installed and pinned (Codeg pins @agentclientprotocol/codex-acp@1.7.0 tarball + node>=20 floor as mitigation)",
+  "version coupling: adapter pins @openai/codex via floating ^0.152.0 semver; both components release daily; pin both exactly",
+  "no engines.node declaration -> node contract enforced only by downstream (20 floor; CI 24; probe ok on 22)",
+  "adapter SIGKILL may orphan codex app-server (no pdeathsig; EPIPE-exit assumed unverified); rely on process-group/bwrap kill",
+  "APP_SERVER_LOGS env makes adapter write full wire traffic (prompts, auth request JSON) to app-server.log -> treat guest log dir as sensitive artifact",
+  "pre-prompt network activity observed: codex app-server spawns git/git-remote-http during startup even before any prompt (purpose UNKNOWN); network policy must cover startup",
+  "registry conformance matrix runs codex-acp 1.7.0 (snapshot 2026-09-01); 1.8.0 session/fork + subagents face is newer than that verification",
+  "Codeg still pins 1.7.0 while npm latest is 1.8.0 -> cross-host behavior drift between Codeg and registry installs",
+]
+evidence_refs = [
+  "harnesses/codex/EVIDENCE.md#E-1 (no ACP flags in codex 0.152.0 help)",
+  "harnesses/codex/EVIDENCE.md#E-2 (no acp strings in @openai/codex package/binaries)",
+  "harnesses/codex/EVIDENCE.md#E-3 (ACP spec v1 + official SDKs)",
+  "harnesses/codex/EVIDENCE.md#E-4 (ACP registry codex-acp manifest, authors OpenAI/JetBrains/Zed)",
+  "harnesses/codex/EVIDENCE.md#E-5 (registry protocol-matrix codex-acp row)",
+  "harnesses/codex/EVIDENCE.md#E-6 (adapter identity/package/deps/env options)",
+  "harnesses/codex/EVIDENCE.md#E-7 (adapter spawn topology, method table, cleanup, no CODEX_HOME handling)",
+  "harnesses/codex/EVIDENCE.md#E-8 (local initialize response observed)",
+  "harnesses/codex/EVIDENCE.md#E-9 (local session/new auth gate + clean exit)",
+  "harnesses/codex/EVIDENCE.md#E-10 (local process tree incl. startup git child)",
+  "harnesses/codex/EVIDENCE.md#E-11 (temp CODEX_HOME isolation verified, host home untouched)",
+  "harnesses/codex/EVIDENCE.md#E-12 (usage mapping, cache_write loss, no cost)",
+  "harnesses/codex/EVIDENCE.md#E-13 (AgentMode -> approval+sandbox mapping)",
+  "harnesses/codex/EVIDENCE.md#E-14 (permission/subagent/goal/file-change extension docs)",
+  "harnesses/codex/EVIDENCE.md#E-15 (NDJSON framing both sides)",
+  "harnesses/codex/EVIDENCE.md#E-16 (zed-industries/codex-acp deprecated -> moved)",
+  "harnesses/codex/EVIDENCE.md#E-17 (Zed external agents lists Codex via registry)",
+  "harnesses/codex/EVIDENCE.md#E-18 (openai/codex issue 30052 open, no native ACP plans stated)",
+  "harnesses/codex/EVIDENCE.md#E-19 (no acp code hits in openai/codex search)",
+  "harnesses/codex/EVIDENCE.md#E-20 (Codeg adapter relation, pin 1.7.0, node floor, shared ~/.codex)",
+  "harnesses/codex/EVIDENCE.md#E-21 (Codeg uses nested bundled codex, not PATH codex)",
+  "harnesses/codex/EVIDENCE.md#E-22 (npm metadata adapter + sdk)",
+  "harnesses/codex/EVIDENCE.md#E-23 (APP_SERVER_LOGS wire logging)",
+  "harnesses/codex/EVIDENCE.md#E-24 (node version surface)",
+  "harnesses/codex/EVIDENCE.md#E-25 (app-server protocol surface larger than ACP exposure)",
+  "harnesses/codex/EVIDENCE.md#E-26 (observed capability advertisement)",
+  "harnesses/codex/EVIDENCE.md#E-27 (sessionId == threadId)",
+  "harnesses/codex/EVIDENCE.md#E-28 (community wrapper ecosystem snapshot)",
+  "harnesses/codex/EVIDENCE.md#E-29 (native dossier cross-reference)",
+]

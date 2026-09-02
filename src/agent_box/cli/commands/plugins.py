@@ -37,7 +37,9 @@ def _record_report(record, context, registry=None) -> PluginDiagnosticReport:
         available_contract_types=registry.contract_types() if registry else None,
     )
     diagnostics = list(items) + list(report.diagnostics)
-    for control in (record.registration.host_controls if record.registration else ()):
+    for contribution in (record.registration.contributions if record.registration else ()):
+        control = contribution.component if getattr(contribution, "descriptor", None) and contribution.descriptor.kind == "agent-box.host.control@1" else None
+        if control is None: continue
         doctor = getattr(control, "doctor", None)
         if callable(doctor):
             result = doctor()

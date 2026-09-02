@@ -1,0 +1,330 @@
+# candidate.toml — Anthropic Claude Code harness candidate profile
+# Research date: 2026-09-02. CLI observed: 2.1.247. Sanitized: <user-home>/<temp-home>/<binary>/<workspace>.
+# Unknown values are the literal string "unknown" (never false).
+
+[meta]
+harness_id = "claude-code"
+display_name = "Anthropic Claude Code"
+research_date = "2026-09-02"
+cli_version_observed = "2.1.247"
+knowledge_tier = 1
+tier_justification = "First-party binary probed locally end-to-end (help surface, temp-HOME isolation, plugin/MCP state, mcp serve handshake, binary strings) plus official docs and Agent SDK source; no headless session observed (policy)."
+facts_doc = "docs/research/harness-native-knowledge-2026-09-01/harnesses/claude-code/FACTS.md"
+evidence_doc = "docs/research/harness-native-knowledge-2026-09-01/harnesses/claude-code/evidence.md"
+experiments_doc = "docs/research/harness-native-knowledge-2026-09-01/experiments/claude-code.md"
+
+[identity]
+product = "Claude Code"
+vendor = "Anthropic"
+version_string_format = "<semver> (Claude Code)"
+version_probe = ["--version"]
+version_probe_writes_state = false
+build_commit = "89c726188daf"
+upstream_repo = "https://github.com/anthropics/claude-code"
+official_docs = "https://code.claude.com/docs"
+agent_sdk = ["@anthropic-ai/claude-agent-sdk", "claude-agent-sdk (python)"]
+legacy_config_subcommand_removed = true
+
+[distribution]
+channels = ["npm", "native-installer"]
+npm_package = "@anthropic-ai/claude-code"
+npm_engines_node = ">=22.0.0"
+npm_layout = "bin/claude.exe is the postinstall-copied native ELF; cli-wrapper.cjs is the Node fallback for --ignore-scripts; sdk-tools.d.ts ships tool schemas"
+platform_packages = [
+  "@anthropic-ai/claude-code-darwin-arm64",
+  "@anthropic-ai/claude-code-darwin-x64",
+  "@anthropic-ai/claude-code-linux-x64",
+  "@anthropic-ai/claude-code-linux-arm64",
+  "@anthropic-ai/claude-code-linux-x64-musl",
+  "@anthropic-ai/claude-code-linux-arm64-musl",
+  "@anthropic-ai/claude-code-win32-x64",
+  "@anthropic-ai/claude-code-win32-arm64",
+]
+native_installer_path = "~/.local/bin/claude -> ~/.local/share/claude/versions/"
+self_update_commands = ["claude install [stable|latest|<version>]", "claude update"]
+auto_update = true
+auto_update_channel = "latest"
+binary_size_bytes = 250162696
+binary_format = "ELF x86-64 (not stripped), not a JS bundle"
+third_party_shims = ["claude-agent-acp (not official; ignore for discovery)"]
+
+[platform]
+macos_min = "13.0"
+windows_min = "10 1809+ / Server 2019+"
+linux_min = "Ubuntu 20.04+, Debian 10+, Alpine 3.19+"
+ram_min_gb = 4
+wsl = "supported; sandboxing requires WSL2 (bubblewrap), not WSL1"
+native_windows_sandboxing = "unsupported"
+sandbox_engines = { macos = "Seatbelt", linux = "bubblewrap", wsl2 = "bubblewrap" }
+sandbox_deps_linux = ["bubblewrap", "socat"]
+ripgrep = "bundled with native binary (USE_BUILTIN_RIPGREP=0 for musl)"
+alpine_extra_deps = ["bash", "curl", "libgcc", "libstdc++", "ripgrep"]
+
+[executable]
+discovery_targets = [
+  "<npm-global>/bin/claude -> ../lib/node_modules/@anthropic-ai/claude-code/bin/claude.exe",
+  "~/.local/bin/claude (native install)",
+]
+version_output = "2.1.247 (Claude Code)"
+doctor_command = "claude doctor"
+doctor_outputs = ["install method", "commit", "platform", "binary path", "bundled ripgrep status", "auto-update channel"]
+doctor_calls_model = false
+
+[launch_modes.interactive_tui]
+argv = "claude [options] [prompt]"
+needs_tty = true
+prompt_transport = "argv or stdin; TUI otherwise errors: Input must be provided either through stdin or as a prompt argument when using --print (exit 1)"
+workspace_trust_dialog = "first use per project; state hasTrustDialogAccepted in .claude.json; skipped under -p or non-TTY stdout"
+output = "terminal UI (ink-based)"
+approval = "--permission-mode acceptEdits|auto|bypassPermissions|manual|dontAsk|plan; --dangerously-skip-permissions"
+resume = "--resume [id|name], --continue, --fork-session, --session-id <uuid>"
+network = "required; proxy env honored"
+slash_commands = "/model /effort /mcp /plugins /hooks /resume /rewind /sandbox /memory /status /doctor /cost /usage (cost/usage presence unverified in 2.1.247)"
+in_session_commands = "unsupported-as-automation-surface (TUI only)"
+
+[launch_modes.headless_text]
+argv = "claude -p \"<prompt>\" [--output-format text]"
+prompt_transport = "argv arg or stdin"
+output = "final text to stdout"
+trust_dialog = "skipped"
+settings_validation = "invalid settings silently ignored in -p mode"
+print_only_flags = ["--fallback-model", "--max-budget-usd", "--no-session-persistence", "--max-turns (SDK)", "--include-partial-messages", "--include-hook-events", "--forward-subagent-text", "--replay-user-messages (needs stream-json)", "--json-schema"]
+
+[launch_modes.headless_json]
+argv = "claude -p \"<prompt>\" --output-format json"
+output = "single result JSON object"
+result_fields = ["subtype", "duration_ms", "duration_api_ms", "is_error", "num_turns", "session_id", "stop_reason", "total_cost_usd", "usage", "result", "structured_output", "model_usage", "permission_denials", "deferred_tool_use", "errors", "api_error_status", "uuid", "terminal_reason", "origin"]
+structured_output_flag = "--json-schema <schema>"
+api_error_status_since = "2.1.110"
+
+[launch_modes.headless_stream_json]
+argv = "claude -p \"<prompt>\" --output-format stream-json --verbose"
+event_types = ["system/init", "assistant", "user", "stream_event (with --include-partial-messages)", "result", "system hook_started|hook_response (with --include-hook-events)", "system task_started|task_progress|task_notification|task_updated", "rate_limit_event", "prompt_suggestion (with --prompt-suggestions)"]
+completion_marker = "result event (terminal per turn)"
+partial_deltas = "stream_event {uuid, session_id, event, parent_tool_use_id}"
+
+[launch_modes.stream_json_input]
+argv = "claude -p --input-format stream-json --output-format stream-json --verbose"
+prompt_transport = "user turns as JSON on stdin; long-lived multi-turn"
+ack = "--replay-user-messages re-emits input on stdout"
+client_tool_calls = "client-injected assistant tool calls supported (merge fix 2.1.251)"
+control_plane = "control_request/control_response frames on stdout/stdin"
+
+[launch_modes.sdk]
+wrapper = "Agent SDK spawns the same CLI binary headless"
+canonical_argv_prefix = ["--output-format", "stream-json", "--verbose"]
+notable_argv = ["--system-prompt-file", "--tools \"\"", "--allowedTools", "--max-turns", "--task-budget", "--resume=<id> (equals-form, flag-injection guard)", "--session-id=<id>", "--setting-sources=user,project (SDK default)", "--permission-prompt-tool <mcp-tool>"]
+skills_projection = "allowedTools gains Skill(name) entries"
+
+[profile]
+config_dir_env = "CLAUDE_CONFIG_DIR"
+default_config_dir = "~/.claude"
+relocates = ["settings.json", ".claude.json", ".claude.json.lock", "backups/", "plugins/", "skills/", "commands/", "agents/", ".credentials.json", "CLAUDE.md"]
+does_not_relocate = ["$HOME/.cache/claude-cli-nodejs/ (MCP logs, machine cache)"]
+settings_files = [
+  "managed: /etc/claude-code/managed-settings.json (linux); /Library/Application Support/ClaudeCode/ (macos); C:/ProgramData/ClaudeCode/ (windows)",
+  "user: <config>/settings.json",
+  "project: .claude/settings.json",
+  "project local: .claude/settings.local.json",
+]
+settings_precedence = "managed > --settings > project local > project shared > user; list keys (permissions.allow) merge; managed sources do not merge"
+settings_format = "strict JSON; comments/trailing commas are syntax errors; invalid silently ignored under -p"
+settings_keys_verified_written = ["model", "env", "permissions.allow", "permissions.deny", "hooks", "statusLine", "extraKnownMarketplaces", "enabledPlugins"]
+settings_keys_documented = ["effortLevel", "modelSettings", "fallbackModel", "availableModels", "enforceAvailableModels", "outputStyle", "apiKeyHelper", "forceLoginMethod", "forceLoginOrgUUID", "autoMemoryEnabled", "autoMemoryDirectory", "claudeMdExcludes", "alwaysThinkingEnabled", "autoCompactWindow", "cleanupPeriodDays", "enableAllProjectMcpServers", "enabledMcpjsonServers", "disabledMcpjsonServers", "disableBypassPermissionsMode", "defaultMode", "includeCoAuthoredBy", "autoUpdates", "requiredMinimumVersion", "allowManagedPermissionRulesOnly", "disableAllHooks", "sandbox.* (top-level namespace)"]
+state_file = "<config>/.claude.json"
+state_file_lock = "<config>/.claude.json.lock"
+state_file_backups = "<config>/backups/.claude.json.backup.<epoch-ms>"
+state_file_keys_observed = ["firstStartTime", "firstStartVersion", "machineID", "userID", "migrationVersion", "mcpServers", "projects", "seenNotifications", "hasResetAutoModeOptInForDefaultOffer", "opusProMigrationComplete", "sonnet1m45MigrationComplete"]
+state_project_keys = "enclosing git repo root when in a repo; non-git rule unknown (observed ancestor collapse)"
+opaque_fields = ["machineID", "userID"]
+session_flags = "--settings <file-or-json>, --setting-sources user,project,local"
+safe_persist = "settings.json templates, CLAUDE.md, skills, commands, agents, plugin manifests"
+copy_on_write = ".claude.json, plugins/installed_plugins.json, known_marketplaces.json"
+model_env = ["ANTHROPIC_MODEL", "ANTHROPIC_DEFAULT_MODEL", "ANTHROPIC_DEFAULT_OPUS_MODEL", "ANTHROPIC_DEFAULT_SONNET_MODEL", "ANTHROPIC_DEFAULT_HAIKU_MODEL", "ANTHROPIC_DEFAULT_FABLE_MODEL", "CLAUDE_CODE_SUBAGENT_MODEL", "MAX_THINKING_TOKENS", "CLAUDE_CODE_MAX_OUTPUT_TOKENS", "CLAUDE_CODE_EFFORT_LEVEL"]
+model_aliases = ["default", "best", "fable", "opus", "sonnet", "haiku", "sonnet[1m]", "opus[1m]", "opusplan"]
+model_precedence = "in-session /model > --model > ANTHROPIC_MODEL > settings model > ANTHROPIC_DEFAULT_MODEL"
+effort_levels = ["low", "medium", "high", "xhigh", "max"]
+
+[credentials]
+methods = [
+  "CLAUDE_CODE_USE_BEDROCK / CLAUDE_CODE_USE_VERTEX / CLAUDE_CODE_USE_FOUNDRY (cloud provider creds, highest)",
+  "ANTHROPIC_AUTH_TOKEN (Authorization: Bearer)",
+  "ANTHROPIC_API_KEY (X-Api-Key; interactive approve-once, -p silent)",
+  "apiKeyHelper (settings script; refresh 5 min; CLAUDE_CODE_API_KEY_HELPER_TTL_MS)",
+  "CLAUDE_CODE_OAUTH_TOKEN (claude setup-token, 1-year, printed not saved)",
+  "Anthropic profile / federation credentials",
+  "subscription OAuth (claude auth login / /login)",
+]
+file_linux = "<config>/.credentials.json (mode 0600)"
+file_macos = "Keychain primary; <config>/.credentials.json 0600 fallback"
+file_windows = "%USERPROFILE%/.claude/.credentials.json"
+config_dir_effects = "relocates .credentials.json and re-keys the macOS Keychain entry"
+login_commands = ["claude auth login (NOT executed)", "claude auth logout (NOT executed)", "claude auth status (safe; --json|--text)"]
+logout_side_effects = "/logout also resets first-launch setup state"
+bare_mode = "--bare: only ANTHROPIC_API_KEY or apiKeyHelper via --settings; OAuth and keychain never read"
+enterprise = "forceLoginMethod (claudeai|console|gateway); forceLoginOrgUUID blocks env keys/apiKeyHelper at startup"
+isolation = "temp HOME + temp CLAUDE_CONFIG_DIR gives a fully isolated credential surface (verified no real-home reads)"
+forbidden = ["reading .credentials.json contents", "reading keychain", "printing tokens/cookies", "reading real ~/.claude.json contents (account state)"]
+
+[isolation]
+recipes = [
+  "fresh HOME + fresh CLAUDE_CONFIG_DIR => brand-new profile (verified)",
+  "--bare (CLAUDE_CODE_SIMPLE=1): skips hooks, LSP, plugin sync, auto-memory, keychain reads, CLAUDE.md discovery",
+  "--safe-mode (CLAUDE_CODE_SAFE_MODE=1): disables all customizations, keeps auth + managed policy",
+  "--no-session-persistence (print only): no transcript writes",
+  "--strict-mcp-config + --mcp-config: ignore ambient MCP config",
+  "claude project purge: deletes all state for a project",
+]
+state_classes = { account = "never-project (.credentials.json) + copy-on-write (.claude.json)", normal = "read-only-share templates / copy-on-write when harness writes", session = "per-session files under projects/<proj>/, sessions/, file-history, shell-snapshots", cache = "$HOME/.cache/claude-cli-nodejs + stats-cache.json (local-overlay)", unsafe = ".claude.json (multi-writer risk), daemon.lock/daemon.status.json (machine-global)" }
+transcript_path = "<config>/projects/<dash-sanitized-cwd>/<session-id>.jsonl (format internal; do not parse)"
+transcript_name_cap = "200 chars then hash suffix"
+cleanup = "cleanupPeriodDays (default 30); .last-cleanup marker"
+concurrency = ".claude.json.lock present; marketplace refresh races documented; serialize or copy-on-write"
+
+[resource_surfaces.instructions]
+status = "supported"
+targets = ["managed <managed-dir>/CLAUDE.md (/etc/claude-code/CLAUDE.md on linux)", "user <config>/CLAUDE.md", "project ./CLAUDE.md or ./.claude/CLAUDE.md", "local ./CLAUDE.local.md"]
+recursion = "cwd + all ancestors, ordered root->cwd; subdirectory files lazy-load; @imports expanded at launch, max depth 4 hops"
+auto_memory = "<config>/projects/<project>/memory/MEMORY.md (200 lines / 25KB preload) + topic files; types user|feedback|project|reference"
+env_vars = ["CLAUDE_CODE_DISABLE_AUTO_MEMORY", "CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD", "CLAUDE_CODE_PROJECT_DIR_NAME"]
+settings_keys = ["autoMemoryEnabled", "autoMemoryDirectory", "claudeMdExcludes", "claudeMd (managed inline)"]
+read_only_ok = true
+writable_needed = "only for auto memory writes"
+bare_behavior = "CLAUDE.md auto-discovery skipped"
+
+[resource_surfaces.skills]
+status = "supported"
+targets = ["<config>/skills/<name>/SKILL.md (auto-loads as <name>@skills-dir)", ".claude/skills/<name>/SKILL.md", "managed dir", "plugin <plugin>/skills/<name>/SKILL.md", "nested .claude/skills below cwd (lazy)"]
+format = "markdown + frontmatter (name, description, when_to_use, argument-hint, arguments, disable-model-invocation, user-invocable, allowed-tools, disallowed-tools, model, effort, context:fork, agent, background, hooks, paths, shell)"
+precedence = "enterprise > personal > project > bundled; skill beats command on name collision"
+naming = "dir name is the id; plugin skills namespaced /plugin:skill; 'synced' dir reserved; nested clashes qualified"
+env_vars = ["CLAUDE_SKILL_DIR (in skill scope)"]
+permission_rules = "Skill(name), Skill(name *), deny Skill disables all"
+disable_flag = "--disable-slash-commands"
+read_only_ok = true
+writable_needed = false
+version_sensitivity = "high (frontmatter surface grew through 2.1.x)"
+
+[resource_surfaces.mcp]
+status = "supported"
+scopes = { local = "<config>/.claude.json projects[<key>].mcpServers (default)", project = ".mcp.json at project root (approval gate)", user = "<config>/.claude.json top-level mcpServers" }
+precedence = "local > project > user > plugin-provided > claude.ai connectors (whole entries, no merge)"
+cli = ["claude mcp add [-s scope] [-t stdio|sse|http]", "add-json", "get", "list (health-check)", "login/logout (MCP OAuth)", "remove", "reset-project-choices", "serve (Claude Code as MCP server; serverInfo claude/tengu)"]
+flags = ["--mcp-config <files-or-json>", "--strict-mcp-config"]
+approval_controls = ["enableAllProjectMcpServers", "enabledMcpjsonServers", "disabledMcpjsonServers", "enabledMcpServers/disabledMcpServers (per-project toggles)"]
+permission_naming = "mcp__<server>__<tool>; plugin form mcp__plugin_<plugin>_<server>__<tool>"
+output_limits = "warn >10k tokens; default cap 25k; MAX_MCP_OUTPUT_TOKENS raises; maxResultSizeChars meta ceiling 500000 chars"
+env_expansion = "${VAR} and ${VAR:-default} in command/args/env/url/headers"
+headless_approval = "no approval prompt in -p/SDK/cloud sessions"
+
+[resource_surfaces.prompts_slash_commands]
+status = "supported"
+targets = [".claude/commands/*.md (project)", "<config>/commands/ (user)", "plugin commands/", "managed dir"]
+naming = "file name without extension; subdirectory namespacing; plugin namespacing"
+collision = "skill takes precedence over command with same name"
+frontmatter = "description, argument-hint, allowed-tools, model, context, agent, hooks (MEDIUM confidence; official page not fetched this run)"
+placeholders = "$ARGUMENTS, $1.., @file, backtick-shell dynamic context"
+read_only_ok = true
+writable_needed = false
+
+[resource_surfaces.rules]
+status = "unsupported"
+note = "no dedicated rules directory; project rules onto settings permissions (Tool(specifier) allow/deny/ask), hooks, outputStyle, and CLAUDE.md"
+
+[resource_surfaces.agents_subagents]
+status = "supported"
+targets = ["managed", "--agents <json> (session-only)", ".claude/agents/*.md (project)", "<config>/agents/ (user)", "plugin agents/"]
+precedence = "managed > --agents > project > user > plugin; recursive scan; identity = frontmatter name only; nested closest-to-cwd wins (>=2.1.178)"
+frontmatter = "name+description required; tools, disallowedTools, model, permissionMode, maxTurns, skills, mcpServers, hooks, memory (user|project|local), background, effort, isolation, color, initialPrompt, experimental"
+body = "becomes the subagent system prompt (no base Claude Code system prompt)"
+runtime_limits = "depth <=3 (CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH); <=20 concurrent (CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS)"
+hot_reload = "edits detected within seconds; brand-new agents/ dir needs restart"
+launch_flag = "--agent <name> (session-wide)"
+
+[resource_surfaces.hooks]
+status = "supported"
+placements = ["settings hooks key (user/project/local/managed)", "plugin hooks/hooks.json", "skill frontmatter", "subagent frontmatter"]
+events = ["SessionStart", "Setup", "UserPromptSubmit", "UserPromptExpansion", "PreToolUse", "PermissionRequest", "PermissionDenied", "PostToolUse", "PostToolUseFailure", "PostToolBatch", "Notification", "MessageDisplay", "SubagentStart", "SubagentStop", "TaskCreated", "TaskCompleted", "Stop", "StopFailure", "TeammateIdle", "InstructionsLoaded", "ConfigChange", "CwdChanged", "DirectoryAdded", "FileChanged", "WorktreeCreate", "WorktreeRemove", "PreCompact", "PostCompact", "PreModelSwitch", "PostModelSwitch", "Elicitation", "ElicitationResult", "SessionEnd"]
+handler_types = ["command", "http", "mcp_tool", "prompt", "agent"]
+handler_fields = ["type", "if (permission-rule syntax)", "timeout (600 command/http/mcp_tool, 30 prompt, 60 agent)", "statusMessage", "once"]
+input_fields = ["session_id", "prompt_id", "transcript_path", "cwd", "permission_mode", "effort.level", "hook_event_name", "tool_name", "tool_input", "tool_use_id", "agent_id", "agent_type"]
+exit_semantics = "0 = success (JSON stdout parsed when it starts { and ends }); 2 = blocking (stderr to Claude; PreToolUse blocks tool; UserPromptSubmit erases prompt; Stop prevents stop)"
+output_control = ["continue", "stopReason", "suppressOutput", "decision", "systemMessage", "additionalContext", "updatedInput", "hookSpecificOutput.permissionDecision (allow|deny|ask)", "terminalSequence"]
+path_vars = ["${CLAUDE_PROJECT_DIR}", "${CLAUDE_PLUGIN_ROOT}", "${CLAUDE_PLUGIN_DATA}"]
+disable = "disableAllHooks setting (managed hooks survive)"
+
+[resource_surfaces.plugins]
+status = "supported"
+manifests = { plugin = ".claude-plugin/plugin.json", marketplace = ".claude-plugin/marketplace.json" }
+components = ["skills/", "commands/", "agents/", "hooks/hooks.json", "MCP servers", "LSP", "output styles"]
+state_files = ["<config>/plugins/installed_plugins.json (schema version 2)", "<config>/plugins/known_marketplaces.json", "<config>/plugins/cache/<marketplace>/<plugin>/<version>/", "settings.json extraKnownMarketplaces + enabledPlugins"]
+cli = ["marketplace add|list|update|remove", "install|uninstall", "enable|disable", "update (restart to apply)", "list", "details", "validate", "init (scaffolds <config>/skills/<name> under CLAUDE_CONFIG_DIR)", "prune", "tag", "eval"]
+session_flags = ["--plugin-dir <path|.zip> (repeatable)", "--plugin-url <url> (repeatable)"]
+reload = "/reload-plugins"
+version_sensitivity = "high (2.1.247-252 hardening: path traversal, BOM, marketplace refresh races)"
+
+[resource_surfaces.memory]
+status = "supported"
+static_memory = "CLAUDE.md family (see instructions) + /memory command + @imports"
+auto_memory = "<config>/projects/<project>/memory/ with MEMORY.md index + topic files"
+subagent_memory_scopes = ["user", "project", "local"]
+
+[events]
+wire = "newline-delimited JSON on stdout; one object per event with type field"
+types = ["system (subtype init + task_*/hook_*/rate-limit variants)", "assistant", "user", "stream_event", "result", "control_request (outbound from CLI in input mode)", "control_response (host -> CLI)"]
+init_event = "system/init carries session_id, model, cwd, tools, slash_commands, mcp_servers, permissionMode (full key list unverified for 2.1.247)"
+result_fields = ["subtype", "duration_ms", "duration_api_ms", "is_error", "num_turns", "session_id", "stop_reason", "total_cost_usd", "usage", "result", "structured_output", "model_usage", "permission_denials", "deferred_tool_use", "errors", "api_error_status", "uuid", "terminal_reason", "origin"]
+model_usage_fields = ["inputTokens", "outputTokens", "cacheReadInputTokens", "cacheCreationInputTokens", "webSearchRequests", "costUSD", "contextWindow", "maxOutputTokens", "canonicalModel", "provider"]
+cost_caution = "do not accumulate total_cost_usd across long-lived connections (SDK guidance)"
+completion_marker = "result event"
+malformed_behavior = "unknown beyond lenient system passthrough (generic SystemMessage)"
+stderr = "not observed in this run (claude -p not executed)"
+transcript_consistency = "internal format, changes between versions; use hooks transcript_path instead of parsing"
+
+[control]
+permission_request = "control_request {request_id, request: {subtype: can_use_tool, tool_name, input}}; host answers control_response success {behavior allow|deny, updatedInput, updatedPermissions (PermissionUpdate)}"
+interrupt = "control_request interrupt; terminal_reason aborted_streaming|aborted_tools"
+set_permission_mode = "control_request set_permission_mode"
+mcp_runtime = ["mcp_reconnect", "mcp_toggle", "mcp_message"]
+file_checkpoint = "rewind_files (user_message_id); /rewind in TUI"
+stop_task = "control_request stop_task"
+hook_callback = "control_request hook_callback"
+initialize = "control_request initialize"
+permission_prompt_tool_flag = "--permission-prompt-tool <mcp-tool-name>"
+steer = "stream-json input mode: send further user turns; --replay-user-messages acks"
+model_switch = "TUI /model only; no stream-json control subtype (inference from SDK source); cross-session via --model/settings"
+effort_switch = "--effort at launch; /effort in TUI; CLAUDE_CODE_EFFORT_LEVEL"
+background_agents = "--bg returns immediately; claude agents view; claude agents --json (no TTY needed)"
+
+[continuation]
+resume = "--resume <session-id|name> (picker when bare; cross-directory id lookup since 2.1.223)"
+continue_flag = "--continue (most recent session in current directory)"
+fork = "--fork-session (new session id; session-scoped permission grants do not carry)"
+session_id_pin = "--session-id <uuid>"
+headless_visibility = "-p and SDK sessions excluded from picker and --continue but resumable by id"
+missing_id_error = "No conversation found with session ID: <id> (exit 1)"
+project_purge = "claude project purge [path]"
+
+[runtime]
+exit_codes_observed = { success = 0, startup_or_validation_error = 1 }
+hook_blocking_exit = 2
+other_exit_codes = "unknown"
+non_tty_behavior = "claude without -p and without prompt/stdin errors with --print guidance (exit 1)"
+network = "internet required; proxy env honored (observed Proxy line in auth status)"
+env_conflicts = "AUTHORITY_CONFLICT: CLAUDE_CONFIG_DIR relocates config but machine cache stays at $HOME/.cache/claude-cli-nodejs"
+single_writer = ".claude.json mutated by many subcommands; lock file present; serialize or copy-on-write"
+serve_mode = "claude mcp serve exposes the agent as an MCP server (serverInfo claude/tengu; 22 tools observed)"
+
+[unresolved]
+unresolved = [
+  "exact 2.1.247 system/init key list (apiKeySource/version/workspace presence unverified; headless docs fetch timed out)",
+  "--permission-mode literal 'default' acceptance at CLI (help lists manual as alias; untested)",
+  "non-git project-key derivation algorithm in .claude.json",
+  "official slash-command frontmatter field list (docs page fetch timed out; fields carried at MEDIUM confidence)",
+  "/cost and /usage presence and behavior in 2.1.247 TUI",
+  "todos/ and statsig/ storage locations in 2.1.247 (not at user config root in observed listing)",
+  "network-config domain allowlist and NO_PROXY semantics",
+  "exit-code table beyond 0/1/hook-2 (SIGINT semantics, error_max_turns exit code)",
+  "full --include-hook-events payload field list",
+  "malformed stream-json event handling beyond lenient system passthrough",
+]

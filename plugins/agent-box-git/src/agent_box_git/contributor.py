@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from agent_box.extensions.api import FinalizationContribution
+from agent_box.protocols.host import FinalizationContribution
 from agent_box.work_core.runtime import agent_box_home
 from agent_box.resource_contracts import WorkspaceV1
 from agent_box.work_core.models import Ref

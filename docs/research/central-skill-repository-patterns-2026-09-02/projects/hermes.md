@@ -1,0 +1,3 @@
+# Hermes Agent
+
+Official repo/docs: https://github.com/NousResearch/hermes-agent and https://hermes-agent.nousresearch.com/docs/guides/work-with-skills/. MIT, active. Primary global store is `~/.hermes/skills`; bundled skills are copied there, optional Hub skills install there, and external directories can be scanned. Identity is slug; plugin skills use `plugin:skill`. Install is copy; `hermes update` sync respects local edits/deletions; reset restores. Optional skills are not active by default; plugin skills are opt-in and not in the normal list. Version/digest/lock/rollback, project precedence, symlink, signatures, dependency and file bounds are UNKNOWN. Skills may declare Hermes config and request secrets; activation can execute/access files. Tier B; see S5.

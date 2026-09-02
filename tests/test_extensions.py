@@ -10,6 +10,7 @@ from agent_box.extensions import (
     check_plugin_conformance,
     load_installed_plugins,
 )
+from agent_box.protocols.host import resource_selector
 from agent_box.work_core import (
     ExtensionRegistry,
     ExecutionStartReceipt,
@@ -62,7 +63,7 @@ class ExampleExecutionProvider:
 
 
 class ExamplePlugin:
-    def __init__(self, *, api_version=1):
+    def __init__(self, *, api_version=2):
         self.api_version = api_version
 
     def descriptor(self):
@@ -181,6 +182,10 @@ def test_plugin_registers_contract_and_providers_without_core_source_branch(
 def test_loader_rejects_duplicate_host_extension_ids():
     class Selector:
         id = "same-selector"
+        contract_id = "example.resource@1"
+        title = "same"
+        fields = ()
+        def prepare(self, parameters, *, execution_id): raise AssertionError
 
     class Plugin:
         def __init__(self, plugin_id):
@@ -188,7 +193,7 @@ def test_loader_rejects_duplicate_host_extension_ids():
         def descriptor(self):
             return PluginDescriptor(self.plugin_id, self.plugin_id, "1")
         def build(self, context):
-            return PluginRegistration(resource_selectors=(Selector(),))
+            return PluginRegistration(contributions=(resource_selector(Selector()),))
 
     class EP(FakeEntryPoint):
         def __init__(self, plugin):
@@ -201,7 +206,21 @@ def test_loader_rejects_duplicate_host_extension_ids():
         ExtensionRegistry(), entry_points=(EP(Plugin("one")), EP(Plugin("two")))
     )
     assert [record.status for record in report.records] == ["READY", "FAILED"]
-    assert "duplicate selector id" in (report.records[1].error or "")
+    assert "duplicate contribution" in (report.records[1].error or "")
+
+
+def test_api_v1_is_incompatible_without_build_or_partial_registration():
+    built = []
+    class V1:
+        def descriptor(self): return PluginDescriptor("legacy", "Legacy", "1", api_version=1)
+        def build(self, context):
+            built.append(True)
+            return PluginRegistration()
+    registry = ExtensionRegistry()
+    report = load_installed_plugins(registry, entry_points=(FakeEntryPoint(lambda: V1()),))
+    assert report.records[0].status == "INCOMPATIBLE"
+    assert built == []
+    assert registry.resource_providers() == ()
 
 
 def test_dynamic_contract_participates_in_real_dispatch_and_type_check(

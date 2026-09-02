@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from agent_box.extensions import PluginContext, PluginDescriptor, PluginRegistration, ResourceSelection, SelectorField, TransportOperationContribution, SelectorCompatibility
+from agent_box.extensions import PluginContext, PluginDescriptor, PluginRegistration
+from agent_box.protocols.runtime import TransportOperationContribution
+from agent_box.protocols.runtime.transport import transport_operation
+from agent_box.protocols.host import ResourceSelection, SelectorField, SelectorCompatibility, resource_selector
 from agent_box.work_core import Ref, RefType
 from .contract import TerminalSessionV1
 from .direct_stdio import DirectStdioResourceProvider, DirectStdioSession
@@ -19,11 +22,11 @@ class TerminalSessionPlugin:
         # tmux-respawn@1 is an explicit, catalog-registered transport
         # operation; there is no import-time handler registration.
         return PluginRegistration(
-            transport_operations=(TransportOperationContribution(respawn.descriptor(), respawn),),
+            contributions=(transport_operation(TransportOperationContribution(respawn.descriptor(), respawn)), resource_selector(DirectStdioSelector()), resource_selector(ManagedTmuxSelector())),
             contracts=(), resource_providers=(
             DirectStdioResourceProvider(),
             TmuxResourceProvider(),
-        ), resource_selectors=(DirectStdioSelector(), ManagedTmuxSelector()))
+        ))
 
 
 class DirectStdioSelector:

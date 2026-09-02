@@ -8,7 +8,7 @@ def test_web_boundary_uses_catalog_credential_materializer_and_terminal_contract
     context = PluginContext("1", tmp_path / "home", tmp_path / "plugins" / "harnesses")
     registration = HarnessesPlugin().build(context)
     assert registration.execution_providers
-    assert registration.credential_materializers
-    manager = registration.harness_managers[0]
+    assert any(c.descriptor.kind == "agent-box.credentials.materializer@1" for c in registration.contributions)
+    manager = next(c.component for c in registration.contributions if c.descriptor.kind == "agent-box.host.resource-library@1")
     assert not hasattr(manager, "credentials")
     assert all("tmux" not in provider.provider_id for provider in registration.resource_providers)

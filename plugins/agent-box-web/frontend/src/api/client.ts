@@ -157,8 +157,21 @@ export const api = {
   skills: () => request<{skills: Skill[]; status: string}>("/skills"),
   skillPreview: (path: string) => request<SkillPreview>("/skills/import/preview", {method:"POST", body:JSON.stringify({path})}),
   skillConfirm: (preview_id: string, expected_revision?: number) => request<{skill: Skill}>("/skills/import/confirm", {method:"POST", body:JSON.stringify({preview_id,expected_revision})}),
+  skillInstallPreview: (harnessType: string, profileId: string, skill: SkillRef) => request<SkillInstallPreview>("/skills/install/preview", {method:"POST", body:JSON.stringify({harness_type:harnessType,profile_id:profileId,skill})}),
+  skillInstallConfirm: (preview_id: string, expected_revision: number) => request<{installation: SkillInstallation}>("/skills/install/confirm", {method:"POST", body:JSON.stringify({preview_id,expected_revision})}),
+  skillInstallUpdate: (harnessType: string, profileId: string, skill: SkillRef, expected_revision: number) => request<{installation: SkillInstallation}>("/skills/install/update", {method:"POST", body:JSON.stringify({harness_type:harnessType,profile_id:profileId,skill,expected_revision})}),
+  skillInstallRollback: (harnessType: string, profileId: string, skill: SkillRef, expected_revision: number) => request<{installation: SkillInstallation}>("/skills/install/rollback", {method:"POST", body:JSON.stringify({harness_type:harnessType,profile_id:profileId,skill_id:skill.skill_id,skill,expected_revision})}),
+  skillInstallRemove: (harnessType: string, profileId: string, skillId: string, expected_revision: number) => request<{status:string}>("/skills/install/remove", {method:"POST", body:JSON.stringify({harness_type:harnessType,profile_id:profileId,skill_id:skillId,expected_revision})}),
+  skillInstallations: (harnessType: string, profileId: string) => request<{installations: SkillInstallation[]}>("/skills/installations", {method:"GET"}).then((v) => v, () => ({installations: []})),
+  skillInventory: (harnessType: string, profileId: string, workspace?: string) => request<SkillInventory>(`/skills/inventory?harness_type=${encodeURIComponent(harnessType)}&profile_id=${encodeURIComponent(profileId)}${workspace ? `&workspace=${encodeURIComponent(workspace)}` : ""}`),
+  profileNativeHome: (h: string, p: string) => request<NativeHomeSummary>(`/harnesses/${h}/profiles/${p}/native-home`),
   addRepository: (value: Record<string, unknown>) => request<{repository:any}>("/repositories", {method:"POST", body:JSON.stringify({...value,command_id:command()})}),
 };
 
+export type SkillRef = { skill_id:string; revision?:number; digest?:string };
 export type Skill = { skill_id:string; name:string; description:string; revision:number; digest:string; format:string };
 export type SkillPreview = { preview_id:string; skill_id:string; name:string; description:string; file_count:number; digest:string; confirmation_required:boolean };
+export type SkillInstallPreview = SkillPreview & { native_target:string; conflicts:string[]; unmanaged:string[]; already_installed:boolean; harness_compatible:boolean; compatibility_notes:string[] };
+export type SkillInstallation = { profile_id:string; harness_type:string; profile_revision:number; skill:{skill_id:string;revision:number;digest:string}; installed_tree_digest:string; native_target:string; managed_files:string[]; state:string; installed_at:string };
+export type SkillInventory = { harness_type:string; profile_id:string; entries:Array<{identity:string;source_kind:string;claim:string;revision:number;digest:string;native_target:string;project_path:string;state:string;trust:string;detail:string}>; project_skills:Array<{repository_identity:string;relative_path:string;skill_id:string;git_commit:string;tree_digest:string;dirty:boolean;ignored:boolean;trust_state:string}>; warnings:string[]; summary:{total:number;by_source:Record<string,number>;by_claim:Record<string,number>} };
+export type NativeHomeSummary = { harness_type:string; profile_id:string; present:boolean; file_count:number; skipped:string[]; native_state_generation:number; native_tree_digest:string; revision:number; recovery_generation:number; installations:SkillInstallation[]; skill_inventory:SkillInventory };

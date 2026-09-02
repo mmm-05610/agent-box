@@ -1,0 +1,3 @@
+# Anthropic Agent Skills and `anthropics/skills`
+
+Format authority is https://github.com/agentskills/agentskills; examples/official content are at https://github.com/anthropics/skills. The standard is a folder with required `SKILL.md`, optional supporting files, progressive disclosure, and optional metadata such as license/compatibility. The specification deliberately does not define registry, installation, global/project scope, precedence, versioning, lock, rollback, activation, symlink, dependencies or trust. Consumers therefore copy or plugin-install repository content. Tier A/B. This distinction prevents treating the examples repository as a central manager.

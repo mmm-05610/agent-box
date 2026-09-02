@@ -1,0 +1,75 @@
+# ZCode (Z.ai) — candidate registration card
+# Researched 2026-09-01. Unknowns are recorded as "unknown" (never false).
+
+[meta]
+id = "zcode"
+tier = "C"
+requested_alias = "Zcode CLI"
+assessed_date = "2026-09-01"
+recommended_for_registry = false
+
+[identity]
+official_name = "ZCode"
+product_type = "desktop Agentic Development Environment (ADE) with embedded agent runtime"
+maintainer = "Z.ai (Zhipu AI)"
+maintainer_evidence = "https://zcode.z.ai/en/docs/welcome; https://docs.z.ai/devpack/tool/zcode"
+official_repo = "unknown"
+license = "unknown"
+cli_standalone_exists = "unknown"      # no standalone CLI documented; internal runtime observed under <user-home>/.zcode/cli
+identity_confirmed = true              # product identity confirmed; standalone CLI identity NOT confirmed
+
+[distribution]
+channel = "desktop installers (Electron) from cdn-zcode.z.ai; no npm/pip package found"
+npm_package = "unknown"                # npm 'zcode-app-cli' exists but is UNOFFICIAL (libraries.io)
+version = "3.10.2"
+version_source = "https://zcode.z.ai/en/docs/install (labeled Latest, 2026-09-01)"
+release_cadence = "unknown"
+platforms = ["macOS arm64", "macOS x64", "Windows x64", "Windows arm64", "Linux x64 (AppImage)", "Linux deb/rpm (claimed, no URLs shown)"]
+
+[platform]
+os = ["macos", "windows", "linux"]
+runtime = "Electron/Node bundled"
+arch = ["arm64", "x64"]
+
+[executable]
+binary_name = "zcode"                  # per third-party references; NOT on PATH in observation environment
+binary_path = "unknown"
+on_path_observed = false
+local_probe = "NOT_LOCALLY_OBSERVED (binary probing unavailable; config layout observed instead)"
+
+[launch_modes]
+interactive_tui = "unknown"
+headless_one_shot = "unknown"          # no documented headless mode
+headless_server = "unknown"
+flags = "unknown"
+
+[profile]
+config_home = "<user-home>/.zcode"
+user_config = "<user-home>/.zcode/cli/config.json"
+project_config = "<workspace>/.zcode/config.json or <workspace>/zcode.json (project-level HOOK configs ignored by design)"
+env_overrides = "unknown"
+commands_dir = "<user-home>/.zcode/commands (user scope); project dir (workspace scope)"
+plugin_cache = "<user-home>/.zcode/cli/plugins/cache/zcode-plugins-official/<plugin>/<version>/"
+sessions_dir = "<user-home>/.zcode/cli/agents/sess_<uuid>/ (layout observed)"
+event_stream = "<user-home>/.zcode/cli/rollout/model-io-sess_<uuid>.jsonl (layout observed)"
+hooks_events = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PermissionRequest", "PostToolUse", "PostToolUseFailure", "Stop"]
+
+[credentials]
+mechanism = "GUI account binding (BigModel/Z.ai) + API key entry in Settings; storage location unknown"
+env_vars = "unknown"
+endpoints = ["https://api.z.ai/api/coding/paas/v4", "https://api.z.ai/api/anthropic"]
+contents_read = false
+
+[events]
+structured_output = "unknown"          # no documented JSON/streaming output mode
+streaming_events = "unknown"
+
+[unresolved]
+items = [
+  "existence and contract of an official standalone zcode CLI (flags, npm channel)",
+  "credential storage location/format for CLI-side runtime",
+  "desktop app license",
+  "Linux deb/rpm and Linux ARM64 installer URLs",
+  "semantics of cli/rollout jsonl and v2/tasks-index.sqlite (names observed only)",
+  "release cadence / changelog for desktop app",
+]

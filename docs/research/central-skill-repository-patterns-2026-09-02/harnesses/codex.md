@@ -1,0 +1,3 @@
+# Codex harness
+
+Evidence: adjacent local dossier `../harness-native-knowledge-2026-09-01/harnesses/codex/FACTS.md`, official repo https://github.com/openai/codex. User/project skill paths center on `.agents/skills` convention and Codex native/plugin surfaces; exact precedence is version-sensitive. Standard SKILL.md is the portable format. Profiles and isolated native homes are suitable projection targets; do not copy `auth.json` or real HOME. Project trust and model activation are distinct. Symlink behavior, automatic recursive details and full skill conflict semantics require a version fixture. Tier A/B.

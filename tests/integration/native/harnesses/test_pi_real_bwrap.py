@@ -1,5 +1,5 @@
 """P0 vertical: the executable is an independent temporary fixture, never a workspace asset."""
-from agent_box.extensions.runtime_composition import RuntimeHostV1, SandboxV1, TerminalSessionV1
+from agent_box.protocols.runtime import RuntimeHostV1, SandboxV1, TerminalSessionV1
 from agent_box.resource_contracts import PromptFragmentV1, WorkspaceV1
 from agent_box.work_core import ExecutionStartRequest, ResolvedExecutionInput, Ref, RefType
 from agent_box_harnesses.pi import PiExecutionProvider, PiPluginConfig, PiProfile, PiContinuationV1

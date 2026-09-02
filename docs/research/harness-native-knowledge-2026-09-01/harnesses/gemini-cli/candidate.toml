@@ -1,0 +1,198 @@
+# candidate.toml — Gemini CLI (harness id: gemini-cli)
+# Built 2026-09-02 against npm @google/gemini-cli 0.58.0 (bin probe) + google-gemini/gemini-cli main (4963a4456, 2026-09-01).
+# Unknown values are the string "unknown"; unsupported facts are tri-state strings, never false.
+# Sanitized: <user-home>, <temp-home>, <workspace>, <binary>.
+
+[meta]
+tier = "A"
+evidence_dates = ["2026-09-02"]
+sources = [
+  "CLI probes on @google/gemini-cli 0.58.0 installed into <temp-home> npm prefix (version/help/list-sessions/invalid-flag) with fresh temp HOME",
+  "google-gemini/gemini-cli main @ 4963a4456 (2026-09-01) shallow clone in <temp-home>",
+  "Official docs in repo: docs/cli/headless.md, settings.md, session-management.md, custom-commands.md, checkpointing.md, system-prompt.md, extensions/reference.md, get-started/authentication.mdx, cli/cli-reference.md",
+]
+verified_version = "0.58.0"
+knowledge_files = ["FACTS.md", "evidence.md", "../experiments/candidates-2.md"]
+
+[identity]
+harness_id = "gemini-cli"
+display_name = "Gemini CLI"
+org = "Google (google-gemini)"
+repo = "https://github.com/google-gemini/gemini-cli"
+docs = "https://geminicli.com (docs/ tree in repo is the source)"
+license = "Apache-2.0"
+npm_package = "@google/gemini-cli"
+binary_name = "gemini"
+version_string_format = "<semver>"
+aliases = []
+maintenance_status = "active (stable 0.58.0 + nightly channel; changelogs in docs/changelogs/)"
+channels = ["stable (npm latest)", "nightly (main: 0.59.0-nightly.20260825.g812f7a2bc)"]
+
+[distribution]
+npm = "@google/gemini-cli bin gemini -> bundle/gemini.js, engines.node >=20"
+homebrew = "unknown (not verified this round)"
+build_from_source = "npm workspace monorepo (packages/cli, packages/core, a2a-server, sdk)"
+publisher = "npm maintainers google-wombot / ofrobots / mrdoob"
+windows_story = "docs exist; not re-verified this round"
+
+[platform]
+linux = "supported"
+macos = "supported"
+windows = "documented (not re-verified)"
+wsl = "runs here (WSL2 x64); probes healthy"
+
+[executable]
+identity = "gemini"
+version_probe = "gemini --version -> '0.58.0' (exit 0, unauthenticated)"
+layout = "npm wrapper bundle/gemini.js on Node >=20"
+subcommands = "mcp | extensions | skills | hooks | gemma | [query..]"
+
+[launch_modes.tui]
+argv = "gemini [query..] (positional query now defaults to INTERACTIVE; notice printed when no -p)"
+stdio = "ink TUI; alt-screen; screen-reader mode flag available"
+slash_commands = "/mcp, /memory reload, /commands, /stats (statsCommand.ts), /settings, /rewind, /hooks, /extensions"
+exit_semantics = "user-quit; process exit != task completion"
+
+[launch_modes.headless]
+argv = "gemini -p|--prompt <PROMPT> (also auto-triggered in non-TTY)"
+prompt_transport = "argv -p or stdin (appended); -p + positional mutually exclusive; --prompt-interactive/-i runs prompt then stays interactive"
+output = "-o|--output-format text|json|stream-json"
+approval_flags = "--approval-mode default|auto_edit|yolo|plan (plan = read-only); -y/--yolo (mutually exclusive with --approval-mode)"
+model_flag = "-m|--model"
+sandbox_flag = "-s|--sandbox"
+extra = "--include-directories, --allowed-mcp-server-names, --allowed-tools (deprecated -> policy engine), --policy/--admin-policy, --raw-output, --screen-reader, --debug/-d"
+cwd_behavior = "process cwd is workspace root; folder trust applies (GEMINI_CLI_TRUST_WORKSPACE / --skip-trust)"
+exit_codes = "documented 0 success | 1 general/API error | 42 input error | 53 turn limit exceeded"
+network = "required for model; unauthenticated run fails fast BEFORE any model call (observed: auth validation error, exit 41 on --list-sessions without auth)"
+
+[launch_modes.acp]
+argv = "gemini --acp (experimental-acp deprecated alias)"
+protocol = "Agent Client Protocol over stdio (Zed-style editor integration)"
+
+[profile]
+native_home = "<user-home>/.gemini"
+home_override_env = "GEMINI_CLI_HOME (replaces home root for .gemini resolution)"
+config_files = ["settings.json"]
+config_format = "JSON with comments tolerated (strip-json-comments); writer preserves comments"
+scopes = ["system defaults", "system (/etc/gemini-cli/settings.json; GEMINI_CLI_SYSTEM_SETTINGS_PATH override)", "user", "workspace (<project>/.gemini/settings.json)"]
+precedence_low_to_high = "system-defaults.json < system < user < workspace (merge order settings.ts:393-395); CLI flags and -c style overrides on top"
+trusted_folders = "<user-home>/.gemini/trustedFolders.json (GEMINI_CLI_TRUSTED_FOLDERS_PATH override); untrusted workspace settings restrictions apply"
+system_policies_dir = "/etc/gemini-cli/policies; workspace .gemini/policies/ + user policies/ (policy engine TOML; auto-saved.toml)"
+safe_to_persist = "settings.json layers, GEMINI.md, commands/, skills/, policies/"
+opaque_or_forbidden = "oauth_creds.json, google_accounts.json, installation_id, mcp-oauth-tokens.json, a2a-oauth-tokens.json"
+
+[credentials]
+oauth = "Login with Google (interactive browser flow); oauth_creds.json under <user-home>/.gemini (OAUTH_FILE constant); google_accounts.json account record; headless NOT supported with Google login per docs"
+api_key_env = ["GEMINI_API_KEY (Gemini API / AI Studio)", "GOOGLE_CLOUD_PROJECT + GOOGLE_CLOUD_LOCATION (Vertex AI)", "GOOGLE_GENAI_USE_VERTEXAI=true (select Vertex auth)", "GOOGLE_GENAI_USE_GCA", "GOOGLE_API_KEY (auth env whitelist in settings.ts)"]
+auth_types = "LOGIN_WITH_GOOGLE | USE_GEMINI ('gemini-api-key') | USE_VERTEX_AI ('vertex-ai') | GATEWAY (contentGenerator.ts)"
+auth_env_resolution = "env checked before settings: LOGIN_WITH_GOOGLE (GCA) > GOOGLE_GENAI_USE_VERTEXAI > GATEWAY > GEMINI_API_KEY (contentGenerator.ts:77-91)"
+credential_files = ["oauth_creds.json", "google_accounts.json", "mcp-oauth-tokens.json", "a2a-oauth-tokens.json", "installation_id"]
+forbidden_fields = "all credential file contents and tokens (names/paths only, never read)"
+credential_free_isolation = "fresh HOME + GEMINI_API_KEY env (unverified against real API by policy; unauthenticated startup observed to fail fast without network)"
+
+[isolation]
+account_state = "oauth_creds.json, google_accounts.json, installation_id, mcp/a2a oauth token stores"
+normal_state = "settings.json layers, GEMINI.md, commands/, skills/, policies/"
+session_state = "<user-home>/.gemini/tmp/<project_hash>/chats/ (session JSON), checkpoints at tmp/<project_hash>/checkpoints/, project registry <user-home>/.gemini/projects.json, history/"
+cache_state = "tmp/bin (managed binaries), debug logs"
+unsafe_state = "credential files above"
+writable_overlay_needed = "tmp/<project_hash>/ (sessions+checkpoints), projects.json, history/"
+startup_writes_observed = "fresh temp HOME gained .gemini/{projects.json, projects.json.*.tmp, history/, tmp/} on --list-sessions (project registry self-heals; no workspace writes)"
+concurrency = "unknown"
+
+[resource_surfaces.instructions]
+state = "supported"
+discovery = "global <user-home>/.gemini/GEMINI.md; project: cwd + ancestor chain up to trusted root; subdirectory GEMINI.md scanned for nested context; name configurable via settings.context.fileName"
+format = "markdown"
+env_var = "GEMINI_SYSTEM_MD (system prompt override: =1 -> ~/.gemini/system.md, or absolute path)"
+read_only_ok = "true"
+version_sensitivity = "STABLE"
+
+[resource_surfaces.commands]
+state = "supported"
+discovery = "user <user-home>/.gemini/commands/ then project <project>/.gemini/commands/ (project overrides); subdirectories namespace (git/commit.toml -> /git:commit); extensions can provide commands"
+format = "TOML v1 prompt files"
+read_only_ok = "true"
+version_sensitivity = "STABLE"
+
+[resource_surfaces.skills]
+state = "supported"
+discovery = "user <user-home>/.gemini/skills/ + agent skills <user-home>/.agents/skills/; workspace skills; extensions; `gemini skills` CLI manages"
+format = "SKILL.md (agent-skills convention)"
+version_sensitivity = "VERSION_SENSITIVE"
+
+[resource_surfaces.mcp]
+state = "supported"
+discovery = "settings mcpServers (any scope); `gemini mcp` CLI subcommand; /mcp slash command (reload); --allowed-mcp-server-names filter; MCP prompts surface as commands"
+format = "JSON settings: stdio/http servers"
+oauth = "mcp-oauth-tokens.json token store present"
+version_sensitivity = "STABLE"
+
+[resource_surfaces.hooks]
+state = "supported"
+config = "settings hooks section + project hooks passed to config; `gemini hooks` CLI + /hooks"
+version_sensitivity = "VERSION_SENSITIVE"
+
+[resource_surfaces.extensions]
+state = "supported"
+discovery = "user + workspace scopes; enable/disable --scope user|workspace; install via `gemini extensions` CLI; registry URI via GEMINI_CLI_EXTENSION_REGISTRY_URI / settings"
+content = "bundle commands (.toml), agents/*.md, skills, MCP servers"
+version_sensitivity = "VERSION_SENSITIVE"
+
+[resource_surfaces.subagents]
+state = "supported"
+discovery = "user <user-home>/.gemini/agents/*.md + extension agents/*.md (markdown agent definitions)"
+version_sensitivity = "VERSION_SENSITIVE"
+
+[resource_surfaces.checkpointing]
+state = "supported"
+config = "settings checkpointing key (--checkpointing CLI flag REMOVED per docs); automatic git snapshot on file edits; restore via /rewind; data under tmp/<project_hash>/checkpoints/"
+
+[resource_surfaces.policy_engine]
+state = "supported"
+flags = "--policy, --admin-policy (files/dirs, repeatable/comma-separated); --allowed-tools deprecated in favor of policy engine"
+storage = "user policies/, workspace .gemini/policies/ (auto-saved.toml), system policies"
+
+[resource_surfaces.ignore_files]
+state = "supported"
+files = ".geminiignore (respectGeminiIgnore); custom ignore file paths configurable"
+
+[resource_surfaces.worktrees]
+state = "experimental"
+flag = "-w/--worktree (requires settings experimental.worktrees)"
+
+[events]
+json_flag = "--output-format json (single object)"
+json_envelope = "{session_id?, response, stats{tokens, latency}, error?, warnings?} (types.ts JsonOutput; docs list response/stats/error)"
+stream_flag = "--output-format stream-json (NDJSON, one event per line)"
+stream_events = "init{session_id, model} | message{role, content, delta?} | tool_use{tool_name, tool_id, parameters} | tool_result{tool_id, status, output?, error?} | error{severity, message} | result{status, error?, stats{total_tokens, input_tokens, output_tokens, cached, duration_ms, tool_calls, models{...}}}"
+common_fields = "type + timestamp on every event"
+ansi = "JSON/stream-json output sanitized (ANSI stripped); --raw-output disables (with --accept-raw-output-risk)"
+stderr = "diagnostics kept out of the JSON stream (createWorkingStdio / debugLogger)"
+completion_marker = "result event (status success|error) then process exit; exit codes 0/1/42/53 documented"
+session_log = "tmp/<project_hash>/chats/ session JSON; --session-file can load a session from a JSON file"
+
+[control]
+interrupt = "unknown (headless); ACP/stream-json interactive paths exist but unverified this round"
+steer = "unknown (model-steering docs exist for interactive)"
+resume = "--resume latest|index|uuid, --session-file, --list-sessions, --delete-session; headless resume documented"
+approval_responses = "plan|default|auto_edit|yolo modes; per-tool confirmation prompts in TTY only (headless cannot prompt: unauthenticated/limited tools auto-reject per docs/tutorials/automation)"
+
+[continuation]
+native_resume = "supported (interactive + headless --resume)"
+contract_candidate = "agent-box.gemini-cli-continuation@1"
+
+[runtime]
+default_model = "gemini-* via Gemini API (model configurable -m; generation settings in docs/cli/generation-settings.md)"
+provider = "Google (Gemini API | Vertex AI | Cloud Gateway GATEWAY auth type)"
+transport = "unknown (HTTPS to Google endpoints; not inspected)"
+sandbox_native = "-s/--sandbox (seatbelt/docker per docs/cli/sandbox.md; not exercised)"
+tty_requirement = "none for -p headless (docs: triggered in non-TTY)"
+
+[unresolved]
+stats_field_list = "unknown (SessionMetrics serialization not enumerated)"
+json_in_tty = "unknown whether --output-format json applies outside headless"
+full_exit_code_table = "unknown (beyond documented 0/1/42/53; observed 41 once without auth)"
+session_file_schema = "unknown (--session-file JSON format not inspected)"
+windows_status = "unknown (not re-verified this round)"
+homebrew_distribution = "unknown (not verified)"

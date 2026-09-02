@@ -5,6 +5,7 @@ from .provider import GitWorkspaceResourceProvider
 from .contributor import GitFinalizationContributor
 from .inputs import GitWorkspaceSelector
 from .repositories import RepositoryLibrary
+from agent_box.protocols.host import resource_selector, finalization_contributor
 
 class GitPlugin:
     def descriptor(self):
@@ -43,8 +44,7 @@ class GitPlugin:
         provider = LazyGit()
         return PluginRegistration(
             resource_providers=(provider,),
-            resource_selectors=(GitWorkspaceSelector(provider),),
-            finalization_contributors=(GitFinalizationContributor(provider),),
+            contributions=(resource_selector(GitWorkspaceSelector(provider)), finalization_contributor(GitFinalizationContributor(provider))),
         )
 
 def create_plugin(): return GitPlugin()

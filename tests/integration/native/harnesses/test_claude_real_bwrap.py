@@ -7,7 +7,7 @@ import pytest
 from agent_box_harnesses.claude.profile import ClaudeProfileProvider, ClaudeProjection
 from agent_box_harnesses.claude.launch import ClaudeLaunchAdapter
 from agent_box_harnesses.claude.composition import command_from_plan
-from agent_box.extensions.runtime_composition import HarnessCommandSpec, MountPlan, PreparedMountSource, ResolvedComposition, RuntimeBinding, RuntimeBundle, RuntimeCompositionCoordinator
+from agent_box.protocols.runtime import HarnessCommandSpec, MountPlan, PreparedMountSource, ResolvedComposition, RuntimeBinding, RuntimeBundle, RuntimeCompositionCoordinator
 
 def test_native_projection_separates_profile_and_dynamic_sources(tmp_path):
     repo=ClaudeProfileProvider(tmp_path / "repo")
@@ -37,7 +37,7 @@ def test_real_bwrap_direct_stdio_fake_claude_is_independently_staged(tmp_path):
     from agent_box_sandbox_bwrap.provider import BwrapSandboxProvider
     from agent_box_terminal_session import DirectStdioSession
     from agent_box.work_core import Ref, RefType, ResolvedExecutionInput
-    from agent_box.extensions.runtime_composition import RuntimeHostV1, SandboxV1, TerminalSessionV1
+    from agent_box.protocols.runtime import RuntimeHostV1, SandboxV1, TerminalSessionV1
     from agent_box_harnesses.claude.composition import composition_from_resolved_inputs
     sandbox_provider=BwrapSandboxProvider(tmp_path / "sandbox")
     if sandbox_provider.probe()["status"] != "available": pytest.skip("bwrap unavailable")

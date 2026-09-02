@@ -1,0 +1,3 @@
+# obra/superpowers
+
+Official repo: https://github.com/obra/superpowers; active, license must be read from repository before redistribution. It is a skill/workflow package with per-harness install instructions: Claude/Copilot/Gemini/Hermes plugins, OpenCode instructions, Pi package and Codex marketplace path. Each harness is installed separately; there is no shared central local store, CAS, universal lock, or one activation state. Identity is repository/package and skill name; plugin/package versioning is harness-specific. Supporting files and bootstrap hooks are significant, so unchanged SKILL.md does not imply equal runtime behavior. Tier B; see S11.

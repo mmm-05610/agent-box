@@ -17,15 +17,10 @@ from agent_box.extensions.bootstrap import (
     build_extension_environment,
     register_shared_runtime_contracts,
 )
-from agent_box.extensions.catalog import (
-    TRANSPORT_OPERATION,
-    ExtensionCatalog,
-    ExtensionCatalogBuilder,
-    ExtensionContribution,
-    TransportOperationResolver,
-)
-from agent_box.extensions import PluginDescriptor, PluginRegistration
-from agent_box.extensions.runtime_composition import (
+from agent_box.extensions.catalog import ExtensionCatalog, ExtensionCatalogBuilder, ExtensionContribution
+from agent_box.extensions import PluginDescriptor, PluginRegistration, CatalogContribution, ContributionDescriptor
+from agent_box.protocols.runtime.transport import TransportOperationResolver
+from agent_box.protocols.runtime import (
     CompositionErrorCode,
     HostTransportOperation,
     IsolatedProcessSpec,
@@ -82,9 +77,7 @@ def _transport_plugin(plugin_id: str, operation_type: str = "tmux-respawn@1"):
             return PluginDescriptor(plugin_id, plugin_id, "1")
 
         def build(self, context):
-            return PluginRegistration(transport_operations=(
-                TransportOperationContribution(handler.descriptor(), handler),
-            ))
+            return PluginRegistration(contributions=(CatalogContribution(ContributionDescriptor("agent-box.runtime.transport-operation@1", handler.descriptor().operation_type), TransportOperationContribution(handler.descriptor(), handler)),))
 
     return _Plugin()
 
@@ -107,14 +100,14 @@ def test_tmux_respawn_discoverable_via_catalog_with_ownership(tmp_agent_box_home
     environment = build_extension_environment(entry_points=(
         _FakeEntryPoint("terminal_session", TerminalSessionPlugin(), dist=_Dist()),
     ))
-    contribution = environment.catalog.get_transport_operation("tmux-respawn@1")
+    contribution = environment.catalog.query("agent-box.runtime.transport-operation@1", "tmux-respawn@1")
     assert contribution.descriptor.operation_type == "tmux-respawn@1"
     assert contribution.descriptor.replay_policy == "single_use_token"
     assert contribution.descriptor.response_loss_policy == "start_ambiguous"
-    owner = environment.catalog.owner_of(TRANSPORT_OPERATION, "tmux-respawn@1")
+    owner = environment.catalog.owner_of("agent-box.runtime.transport-operation@1", "tmux-respawn@1")
     assert owner.plugin_id == "terminal-session"
     assert owner.distribution_name == "agent-box-terminal-session"
-    assert environment.catalog.transport_operations() == (contribution,)
+    assert environment.catalog.query("agent-box.runtime.transport-operation@1")[0] is contribution
 
 
 # 3b. A fresh interpreter can build the environment and query the operation
@@ -129,7 +122,7 @@ def test_no_import_side_effect_required(tmp_path):
         "        from agent_box_terminal_session.plugin import TerminalSessionPlugin",
         "        return lambda: TerminalSessionPlugin()",
         "environment = build_extension_environment(entry_points=(EP(),))",
-        "contribution = environment.catalog.get_transport_operation('tmux-respawn@1')",
+        "contribution = environment.catalog.query('agent-box.runtime.transport-operation@1', 'tmux-respawn@1')",
         "assert contribution.descriptor.operation_type == 'tmux-respawn@1'",
         "print('ok')",
     ])
@@ -145,12 +138,10 @@ def test_no_import_side_effect_required(tmp_path):
 def test_two_environments_do_not_share_transport_state(tmp_agent_box_home):
     first = _environment(tmp_agent_box_home, _transport_plugin("alpha"))
     second = _environment(tmp_agent_box_home, _transport_plugin("beta", operation_type="other.op@1"))
-    assert first.catalog.get_transport_operation("tmux-respawn@1") is not None
-    with pytest.raises(KeyError):
-        second.catalog.get_transport_operation("tmux-respawn@1")
-    assert second.catalog.get_transport_operation("other.op@1") is not None
-    with pytest.raises(KeyError):
-        first.catalog.get_transport_operation("other.op@1")
+    assert first.catalog.query("agent-box.runtime.transport-operation@1", "tmux-respawn@1") is not None
+    assert second.catalog.query("agent-box.runtime.transport-operation@1", "tmux-respawn@1") is None
+    assert second.catalog.query("agent-box.runtime.transport-operation@1", "other.op@1") is not None
+    assert first.catalog.query("agent-box.runtime.transport-operation@1", "other.op@1") is None
 
 
 # 5. A failed plugin leaves no transport handler behind.
@@ -184,8 +175,7 @@ def test_failed_plugin_leaves_no_transport_handler(tmp_agent_box_home):
     report = load_installed_plugins(registry, entry_points=(_FakeEntryPoint("bad", _BadPlugin()),), catalog=builder)
     assert [r.status for r in report.records] == ["FAILED"]
     catalog = builder.build()
-    with pytest.raises(KeyError):
-        catalog.get_transport_operation("tmux-respawn@1")
+    assert catalog.query("agent-box.runtime.transport-operation@1", "tmux-respawn@1") is None
 
 
 # 6. Duplicate operation_type across plugins fails closed.
@@ -200,7 +190,7 @@ def test_duplicate_operation_type_fails_closed(tmp_agent_box_home):
         ), catalog=builder,
     )
     assert [r.status for r in report.records] == ["READY", "FAILED"]
-    assert "duplicate transport operation id" in (report.records[1].error or "")
+    assert "duplicate contribution" in (report.records[1].error or "")
 
 
 # 7. Invalid payloads fail closed before the single-use token is consumed.
@@ -257,7 +247,7 @@ def test_transport_operation_resolver_is_typed_and_readonly():
     handler = TmuxRespawnOperationHandler()
     contribution = TransportOperationContribution(handler.descriptor(), handler)
     catalog = ExtensionCatalog.from_contributions([
-        ExtensionContribution(TRANSPORT_OPERATION, "tmux-respawn@1", "p", component=contribution),
+        ExtensionContribution(ContributionDescriptor("agent-box.runtime.transport-operation@1", "tmux-respawn@1"), "p", component=contribution),
     ])
     resolver = TransportOperationResolver.from_catalog(catalog)
     assert resolver.operation_types() == ("tmux-respawn@1",)

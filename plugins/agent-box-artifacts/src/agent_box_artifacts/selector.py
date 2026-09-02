@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Mapping
 
 from agent_box.work_core.runtime import agent_box_home
-from agent_box.extensions import ResourceSelection, SelectorField
+from agent_box.protocols.host import ResourceSelection, SelectorField
 
 
 class ResponsibilitySelector:

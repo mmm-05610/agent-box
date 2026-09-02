@@ -1,0 +1,272 @@
+# Agent-Box harness candidate declaration — Hermes Agent
+# Researched 2026-09-02 against local hermes v0.19.0 (2026.7.20, upstream f15a38ee).
+# unknown = "unknown" wherever not verified; nothing here is asserted false without evidence.
+
+[meta]
+schema = "agent-box.harness-candidate"
+schema_version = 1
+research_date = "2026-09-02"
+knowledge_base = "docs/research/harness-native-knowledge-2026-09-01/harnesses/hermes/FACTS.md"
+tier = 1
+tier_rationale = "Full-featured standalone agent; rich native home (config.yaml/.env/state.db/skills/plugins/hooks/profiles); locally verified via installed official distribution"
+
+[identity]
+harness_id = "hermes"
+display_name = "Hermes Agent"
+official_repo = "https://github.com/NousResearch/hermes-agent"
+maintainer = "Nous Research"
+license = "MIT"
+docs = "https://hermes-agent.nousresearch.com/docs/"
+summary = "Self-improving AI agent (skills-from-experience, persistent memory, 40+ tools, messaging gateway) by Nous Research; model-agnostic via OpenAI-compatible providers"
+related_but_distinct = ["Nous Hermes model family (LLMs)", "HermesJS", "other 'hermes' packages"]
+
+[distribution]
+package_name = "hermes-agent"
+package_version_local = "0.19.0"
+package_version_upstream_latest = "0.21.0"
+release_tag_upstream_latest = "v2026.8.31"
+version_scheme = "v0.X.Y display (YYYY.M.D) with release tag vYYYY.M.D"
+install_methods = ["official install.sh (Linux/macOS/WSL2/Termux)", "install.ps1 (Windows)", "git checkout + uv/pip -e", "local machine: git method into user site-packages"]
+pypi_published = "unknown"
+npm_published = false
+requires_python = ">=3.11,<3.14"
+entry_points = ["hermes = hermes_cli.main:main", "hermes-acp = acp_adapter.entry:main", "hermes-agent = run_agent:main"]
+data_files = ["locales/*.yaml (17 languages)", "optional-mcps/{linear,n8n}/manifest.yaml", "bundled skills + optional-skills dirs"]
+
+[platform]
+linux = true
+macos = true
+windows_native = true
+wsl2 = true
+termux = true
+notes = "win32 uses %LOCALAPPDATA%\\hermes home, pywinpty, concurrent-log-handler; source-read only, not locally exercised"
+
+[executable]
+primary = "hermes"
+path_resolution = "PATH"
+version_probe = ["--version"]
+version_probe_output = "multi-line: version+date, upstream/local commits, install dir, install method, python, openai sdk"
+version_probe_safe = true
+secondary = ["hermes-acp", "hermes-agent"]
+launcher_shape = "python console script requiring its site-packages tree importable (PYTHONPATH/venv must accompany any staged copy)"
+
+[launch_modes.interactive_chat]
+argv_template = ["hermes", "chat"]
+argv_default_bare = ["hermes"]
+prompt_transport = "tty"
+cwd = "user cwd; project context files resolve from cwd"
+env = ["HERMES_HOME", "HERMES_YOLO_MODE", "HERMES_ACCEPT_HOOKS", "HERMES_IGNORE_RULES", "HERMES_INFERENCE_MODEL", "HERMES_INFERENCE_PROVIDER", "HERMES_EPHEMERAL_SYSTEM_PROMPT"]
+stdio_or_pty = "pty"
+output_format = "streamed terminal UI (REPL or TUI); -Q quiet = final response + session info"
+approval_flags = ["--yolo", "--accept-hooks", "--checkpoints", "--max-turns"]
+resume = "--resume SESSION_ID | --continue [NAME] (--no-restore-cwd to skip cwd restore)"
+attach = "gateway/dashboard/TUI can attach to persisted sessions"
+exit_semantics = "interactive loop; session ID shown on exit"
+network = "required"
+non_tty_no_config_behavior = "prints not-configured notice + non-interactive setup instructions; exits without running a turn"
+supported = true
+
+[launch_modes.oneshot]
+argv_template = ["hermes", "-z", "<PROMPT>"]
+prompt_transport = "argv"
+cwd = "invoking cwd (AGENTS.md/memory/rules load from there as normal)"
+env = ["HERMES_HOME", "HERMES_INFERENCE_MODEL (model fallback)", "HERMES_YOLO_MODE (set internally)"]
+stdio_or_pty = "stdio"
+output_format = "final response text only on stdout; errors on stderr; no banner/spinner/session_id line"
+approval_flags = ["approvals auto-bypassed (yolo); --accept-hooks implied via HERMES_ACCEPT_HOOKS=1; clarify callback auto-answers"]
+resume = "--resume SESSION (pre-resume supported)"
+attach = false
+exit_semantics = "observed failure: exit 1, empty stdout, stderr 'No inference provider configured'; success exit code unknown (needs credentials)"
+network = "required"
+usage_file = "--usage-file PATH writes JSON run report (written even on failure)"
+supported = true
+
+[launch_modes.acp_server]
+argv_template = ["hermes", "acp"]
+alt_binary = "hermes-acp"
+purpose = "Agent Client Protocol server for VS Code/Zed/JetBrains"
+transport = "stdio"
+output_format = "ACP JSON-RPC events"
+approval_flags = ["--accept-hooks", "--yes"]
+setup_flags = ["--check", "--setup", "--setup-browser"]
+resume = "unknown"
+attach = "editor client attaches"
+exit_semantics = "server lifetime"
+network = "required"
+supported = true
+
+[launch_modes.backend_server]
+argv_template = ["hermes", "serve"]
+transport = "http"
+protocol = "JSON-RPC/WebSocket"
+default_port = 9119
+default_host = "127.0.0.1"
+flags = ["--port", "--host", "--skip-build", "--isolated", "--stop", "--status"]
+auth = "public bind always requires auth provider (June 2026 hardening); --insecure deprecated no-op"
+supported = true
+
+[launch_modes.other_surfaces]
+mcp_server = "hermes mcp serve (Hermes as MCP server)"
+dashboard = "hermes dashboard (web UI, port 9119, --stop/--status)"
+gateway = "hermes gateway (messaging platforms; installable service; HERMES_GATEWAY env)"
+send = "hermes send (platform message from scripts/cron/CI)"
+cron = "hermes cron"
+kanban = "hermes kanban (multi-profile board)"
+desktop = "hermes desktop|gui"
+console = "hermes console (safe command console)"
+programmatic = "hermes-agent binary / run_agent.main(query=..., fire-based kwargs)"
+
+[profile]
+native_home = "~/.hermes"
+native_home_windows = "%LOCALAPPDATA%\\hermes"
+home_override_env = "HERMES_HOME"
+home_resolution = "in-process context override > HERMES_HOME env > platform default"
+config_path = "$HERMES_HOME/config.yaml"
+config_format = "yaml"
+config_format_note = "native YAML; JSON bytes also parse (JSON is valid YAML 1.2) — Agent-Box relies on this"
+env_file = "$HERMES_HOME/.env"
+first_run_bootstrap = "auto-creates audio_cache/ pairing/ memories/ logs/ cron/ skills/ sessions/ hooks/ image_cache/ SOUL.md .update_check"
+config_scopes = ["per-profile config.yaml", "machine-level server assets (get_process_hermes_home)", "argv flags > env vars > config.yaml > defaults"]
+key_config_keys = ["model", "providers", "fallback_providers", "credential_pool_strategies", "toolsets", "max_concurrent_sessions", "max_live_sessions", "agent", "approvals", "command_allowlist", "mcp_servers", "skills", "hooks", "hooks_auto_accept", "write_approval", "security", "personalities", "platform_hints", "provider_routing", "checkpoints", "quick_commands"]
+model_fields = "model.provider persistent; model.base_url (OpenAI-compatible, precedence); model.api_key (falls back to OPENAI_API_KEY); user-defined providers: map with base_url+api_key"
+model_env = ["HERMES_INFERENCE_MODEL", "HERMES_INFERENCE_PROVIDER"]
+profile_concept = "hermes profile {list,use,create,delete,...}: multiple isolated instances"
+profile_layout = "HERMES_HOME=<root>/profiles/<name>; sticky selection via <root>/active_profile; spawners must pass HERMES_HOME explicitly (issue #18594)"
+profile_scoped_areas = ["skills", "plugins", "cron", "memories"]
+profile_export = "hermes profile export/import/install (git URL or local dir) /update"
+
+[credentials]
+primary_store = "$HERMES_HOME/.env (KEY=VALUE)"
+oauth_store = "$HERMES_HOME/auth.json (per-provider credential state, cross-process file lock)"
+credential_pool = "hermes auth (pooled provider credentials; strategies, exhaustion reset)"
+secret_managers = ["Bitwarden", "1Password (hermes secrets)"]
+login_logout = "hermes login | hermes logout (per inference provider); hermes mcp login/reauth (OAuth MCP)"
+notable_key_env_vars = ["OPENROUTER_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "ANTHROPIC_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN", "GOOGLE_API_KEY", "GEMINI_API_KEY", "DEEPSEEK_API_KEY", "XAI_API_KEY", "KIMI_API_KEY", "MINIMAX_API_KEY", "DASHSCOPE_API_KEY", "GLM_API_KEY", "ZAI_API_KEY", "FIREWORKS_API_KEY", "NVIDIA_API_KEY", "LM_API_KEY", "OPENCODE_ZEN_API_KEY", "UPSTAGE_API_KEY", "STEPFUN_API_KEY"]
+env_suffix_sanitization = "env_loader treats *_API_KEY/*_TOKEN/*_SECRET/*_KEY as credentials (ASCII sanitize, source labeling)"
+os_keychain = "unknown"
+nous_portal = "hermes portal (Nous Portal login/OAuth/Tool Gateway); nous_account/nous_billing modules"
+redaction = "security.redact_secrets default true; HERMES_REDACT_SECRETS env"
+
+[isolation]
+state_db = "$HERMES_HOME/state.db (SQLite, WAL, FTS5, self-repair)"
+sessions_dir = "$HERMES_HOME/sessions/ (legacy sessions.json; exports to JSONL/Markdown/QMD)"
+session_concurrency = "cross-process active-session leases; max_concurrent_sessions (0/None unbounded); max_live_sessions 16 LRU"
+parallel_runs = "--worktree (isolated git worktree); native profiles; single state.db per profile (WAL contention on shared home)"
+clean_room_flags = ["--safe-mode (disables config+injections+plugins+MCP)", "--ignore-user-config (config.yaml skipped, .env still loaded)", "--ignore-rules (AGENTS.md/SOUL.md/.cursorrules/memory/skills skipped)"]
+checkpoints = "$HERMES_HOME/checkpoints/ (--checkpoints, /rollback; max_snapshots 20, 500 MB cap)"
+host_isolation_recommendation = "give each execution its own HERMES_HOME (native mechanism mirrors this); keep HOME untouched (console script resolves user site-packages from HOME)"
+terminal_backends = ["local", "Docker", "SSH", "Singularity", "Modal", "Daytona", "Vercel Sandbox"]
+backup = "hermes backup (home zip) / hermes import"
+multi_instance_safe = "yes with per-profile homes; shared home possible but lock-contention guarded"
+
+[resource_surfaces.instructions]
+status = "supported"
+targets = ["cwd: AGENTS.md, SOUL.md, .hermes.md, CLAUDE.md, .cursorrules", "$HERMES_HOME/SOUL.md (primary identity, auto-created)"]
+format = "markdown, auto-injected into system prompt"
+skip_flag = "--ignore-rules / HERMES_IGNORE_RULES=1"
+hermes_md = false
+agents_md = true
+
+[resource_surfaces.skills]
+status = "supported"
+primary_dir = "$HERMES_HOME/skills/"
+external_dirs = "config skills.external_dirs (expand ~ and ${VAR}; relative resolved against HERMES_HOME; cached by config mtime)"
+bundled_dirs = ["package data skills", "$HERMES_HOME/optional-skills/"]
+format = "agent-skill directories (SKILL.md) from skills.sh / well-known endpoints / GitHub / ClawHub registries"
+naming = "directory name; bundles = aliases in $HERMES_HOME/skill-bundles/"
+disable_config = "skills.disabled + skills.platform_disabled.<platform>"
+preload_flag = "-s/--skills"
+hub_tooling = "hermes skills {search,install,update,audit,publish,snapshot,tap,...} (agentskills.io)"
+read_only_ok = true
+writable_needed = "for install; discovery works read-only"
+
+[resource_surfaces.mcp]
+status = "supported"
+config = "mcp_servers map in $HERMES_HOME/config.yaml (command/args or url; env; enabled; per-tool toggles)"
+cli = "hermes mcp add/remove/list/test/configure/login/reauth/catalog/install"
+server_mode = "hermes mcp serve"
+bundled = ["optional-mcps/linear/manifest.yaml", "optional-mcps/n8n/manifest.yaml"]
+oauth = "mcp login/reauth; bearer tokens via per-server env naming"
+installs_dir = "$HERMES_HOME/mcp-installs/"
+read_only_ok = true
+
+[resource_surfaces.prompts]
+status = "unknown"
+notes = "built-in slash commands (/resume /title /history /branch /model /yolo /reload-mcp /rollback /compress...); custom prompt library directories not found"
+quick_commands = "config quick_commands (type: exec) bypass agent loop"
+
+[resource_surfaces.subagents]
+status = "supported"
+tool = "spawn/delegate_task (isolated context; shared IterationBudget across parent+children)"
+approval = "agent.subagent_auto_approve default false"
+steering = "live subagent steering arrives in v0.21.0 (not in local v0.19.0)"
+
+[resource_surfaces.hooks]
+status = "supported"
+config = "hooks map in config.yaml: event -> [{matcher, command, timeout}]"
+events = ["pre_tool_call", "post_tool_call", "pre_llm_call", "subagent_stop"]
+allowlist = "$HERMES_HOME/shell-hooks-allowlist.json (first-use consent)"
+non_tty = "--accept-hooks / HERMES_ACCEPT_HOOKS=1 / hooks_auto_accept: true"
+cli = "hermes hooks {list,test,revoke,doctor}"
+
+[resource_surfaces.plugins]
+status = "supported"
+discovery_order = ["bundled (package manifests)", "user $HERMES_HOME/plugins/<name>/", "project ./.hermes/plugins/ (opt-in HERMES_ENABLE_PROJECT_PLUGINS=1)", "pip entry-points"]
+precedence = "project > user > bundled (later overrides earlier on key collision)"
+install = "hermes plugins {install,update,remove,list} from git URLs"
+gating = "plugins.enabled config for user plugins; HERMES_PLUGINS_DEBUG"
+
+[resource_surfaces.memory]
+status = "supported"
+dir = "$HERMES_HOME/memories/ (MEMORY.md + USER.md)"
+injection = "loaded unless --ignore-rules; memory toolset; query-rewrite sub-LLM; external memory provider via hermes memory"
+skills_relation = "learned skills + memories timeline via hermes journey/learning"
+
+[resource_surfaces.rules]
+status = "supported"
+form = "config approvals.deny (fnmatch globs, fire BEFORE yolo bypass), command_allowlist (permanent 'always' approvals), code-shipped hardline blocklist"
+tirith = "pre-exec security scanning (security.tirith_enabled default true)"
+
+[events]
+usage_report = "hermes -z --usage-file PATH -> JSON: estimated_cost_usd, cost_status, cost_source, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, reasoning_tokens, total_tokens, api_calls, model, provider, session_id, completed, failed, service_tier; written even on failure"
+session_id = "in usage report; shown on chat exit; --pass-session-id injects into system prompt; HERMES_SESSION_ID env"
+streaming = "interactive surfaces stream deltas; oneshot suppresses all streaming callbacks"
+tool_events = "shell hooks on pre/post_tool_call etc.; ACP/serve protocols for structured event streams"
+trajectories = "run_agent save_trajectories/save_sample -> JSONL trajectory files"
+persistence = "every run (incl. oneshot) recorded in state.db sessions"
+insights = "hermes insights (usage analytics); billing/credits modules"
+structured_output_beyond_usage_file = "unknown (none found in CLI survey; ACP/serve are the structured channels)"
+
+[control]
+interrupt = "signals (SIGINT/SIGTERM; HERMES_SIGTERM_GRACE); gateway drain (agent.restart_drain_timeout 0 = interrupt immediately)"
+steer = "interactive REPL only (v0.19.0); subagent steering v0.21.0"
+attach = "dashboard/TUI/gateway attach + resume persisted sessions (HERMES_TUI_RESUME)"
+approval_modes = "approvals.mode manual|smart|off; --yolo flag; HERMES_YOLO_MODE; /yolo session toggle; deny globs outrank yolo; command_allowlist; write_approval staged writes; subagent_auto_approve"
+tool_permissions = "toolsets (-t), hermes tools per-platform toggles, mcp per-tool configure, tirith scan, website blocklist, private-URL guard"
+resume = "--resume SESSION (ID or title) | --continue [NAME] | --no-restore-cwd; /branch /retry /undo /compress rewrites"
+hard_exit_note = "oneshot exits via os._exit (skips finalizers) — no post-run control channel"
+
+[continuation]
+native_resume = "supported (--resume/--continue, SQLite state.db, session export JSONL/Markdown/QMD)"
+agent_box_stance = "Agent-Box P0 treats continuation as transcript handoff (agent-box.hermes-continuation@1); this is a scoping choice, not a native limitation (authority conflict)"
+session_store_format = "SQLite state.db (authoritative) + JSONL-shaped transcripts + legacy sessions.json"
+cross_harness_resume = "unknown"
+
+[runtime]
+io_default = "pty for interactive; stdio for -z and acp"
+network = "required (model APIs, MCP, registries, update checks)"
+terminal = "stdio/pty; 7 selectable terminal backends incl. container ones"
+concurrency = "session leases + caps; worktrees; credential pools with exhaustion tracking"
+first_run_without_config = "interactive wizard or non-TTY setup notice; -z fails fast exit 1"
+update_check = "$HERMES_HOME/.update_check; hermes update"
+
+[unresolved]
+pypi_publication = "unknown"
+success_exit_code_of_oneshot = "unknown (requires credentials to observe)"
+docs_site_cross_check = "unreachable from sandbox (timeouts); facts sourced from installed official distribution instead"
+native_json_output_mode = "unknown (none found beyond --usage-file; ACP/serve structured)"
+custom_prompt_dirs = "unknown"
+per_session_file_layout = "unknown (SQLite authoritative; JSONL-shaped rows)"
+windows_behavior = "source-read only (LOCALAPPDATA\\hermes)"
+os_keychain_support = "unknown"
+memory_scope_fine_grain = "unknown"

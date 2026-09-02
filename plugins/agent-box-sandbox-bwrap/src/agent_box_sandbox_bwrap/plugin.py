@@ -1,5 +1,6 @@
-from agent_box.extensions import PluginContext, PluginDescriptor, PluginRegistration, SelectorField, SelectorCompatibility
-from agent_box.extensions.runtime_composition import SandboxUnavailable
+from agent_box.extensions import PluginContext, PluginDescriptor, PluginRegistration
+from agent_box.protocols.host import SelectorField, SelectorCompatibility, ResourceSelection, resource_selector, host_control
+from agent_box.protocols.runtime import SandboxUnavailable
 
 from .provider import BwrapSandboxProvider
 
@@ -18,8 +19,7 @@ class BwrapSandboxPlugin:
         return PluginRegistration(
             contracts=(),
             resource_providers=(provider,),
-            resource_selectors=(BwrapSandboxSelector(provider),),
-            host_controls=(BwrapSandboxDiagnostics(provider),),
+            contributions=(resource_selector(BwrapSandboxSelector(provider)), host_control(BwrapSandboxDiagnostics(provider))),
         )
 
 
@@ -48,7 +48,6 @@ class BwrapSandboxSelector:
             raise ValueError("sandbox selector accepts no arbitrary policy parameters")
         # Selector construction is intentionally bounded; provider resolves and
         # verifies the same manifest before dispatch.
-        from agent_box.extensions import ResourceSelection
         template_id = parameters.get("template_id", "bwrap-offline")
         return ResourceSelection(self.contract_id, self.provider.make_ref(template_id, host_affinity=parameters.get("host_affinity", "local:bwrap")), exact_summary=f"{template_id}@1")
 

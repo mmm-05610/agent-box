@@ -6,7 +6,7 @@ import subprocess
 
 import pytest
 
-from agent_box.extensions.runtime_composition import (
+from agent_box.protocols.runtime import (
     HarnessCommandSpec, MountPlan, PreparedMountSource, ResolvedComposition,
     RuntimeBinding, RuntimeBundle, RuntimeCompositionCoordinator,
 )

@@ -1,6 +1,6 @@
 """Hermes native codec backed by the unified ProfileStore."""
 from pathlib import Path
-from agent_box.extensions import ResourceSelection, SelectorField, SelectorCompatibility
+from agent_box.protocols.host import ResourceSelection, SelectorField, SelectorCompatibility
 from agent_box.resource_contracts import AgentBoxProfileV1
 from agent_box.work_core import ProviderDescriptor, Ref, RefType
 from agent_box_harnesses.generic.profile_store import ProfileStore, PROVIDER_ID
@@ -20,7 +20,7 @@ class HermesProfileProvider:
         x=self.store.resolve(contract_id,ref); return x
 class HermesProfileSelector:
     id="hermes-profile-selector"; contract_id=AgentBoxProfileV1.contract_id; title="Hermes profile"; fields=(SelectorField("profile_id","Profile",kind="select"),)
-    compatibility=SelectorCompatibility(execution_provider_ids=frozenset({"hermes-execution"}),harness_types=frozenset({"hermes"}),supports_exact_revision=True,recommended=True)
+    compatibility=SelectorCompatibility(execution_provider_ids=frozenset({"hermes-execution"}),supports_exact_revision=True,recommended=True)
     def __init__(self,provider): self.provider=provider
     def prepare(self,parameters,*,execution_id):
         del execution_id; ref=self.provider.ref(str(parameters.get("profile_id",""))); return ResourceSelection(self.contract_id,ref,ref.native_id,ref.metadata["digest"])

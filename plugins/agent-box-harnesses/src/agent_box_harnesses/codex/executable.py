@@ -14,7 +14,7 @@ import stat
 import struct
 from typing import Mapping
 
-from agent_box.extensions.runtime_composition import RuntimeSourceDeclaration
+from agent_box.protocols.runtime import RuntimeSourceDeclaration
 
 
 class CodexExecutableResolutionError(ValueError):

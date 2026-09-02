@@ -14,8 +14,11 @@ def test_unified_profile_store_revisions_are_exact_and_execution_local(tmp_path:
     assert store.get("codex", "main", 1)["native_payload"]["model"] == "offline"
     ref = store.ref("codex", "main", 1)
     assert store.resolve("agent-box.profile@1", ref).name == "Main"
-    with pytest.raises(ValueError, match="REVISION_CONFLICT"):
+    from agent_box_harnesses.native_home.failures import ProfileNativeHomeError, PROFILE_REVISION_CONFLICT
+
+    with pytest.raises(ProfileNativeHomeError) as exc:
         store.put("codex", {"profile_id": "main", "native_payload": {}}, expected_revision=1)
+    assert exc.value.code == PROFILE_REVISION_CONFLICT
 
 
 def test_unified_profile_store_rejects_secret_shaped_native_fields(tmp_path: Path):

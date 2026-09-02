@@ -1,10 +1,10 @@
 from pathlib import Path
 import pytest
 
-from agent_box.extensions.credentials import PreparedSecretMount
+from agent_box.protocols.credentials import PreparedSecretMount
 from agent_box.resource_contracts import CredentialRefV1
-from agent_box.extensions.runtime_composition import HarnessCommandSpec, MountPlan, PreparedMountSource
-from agent_box.extensions.sandbox import ProjectionRejected
+from agent_box.protocols.runtime import HarnessCommandSpec, MountPlan, PreparedMountSource
+from agent_box.protocols.runtime import ProjectionRejected
 from agent_box_sandbox_bwrap.provider import BwrapSandboxProvider, _tree_digest
 
 

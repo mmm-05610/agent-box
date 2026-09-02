@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from agent_box.extensions import PluginContext, PluginDescriptor, PluginRegistration, ResourceSelection, SelectorField, SelectorCompatibility
+from agent_box.extensions import PluginContext, PluginDescriptor, PluginRegistration
+from agent_box.protocols.host import ResourceSelection, SelectorField, SelectorCompatibility
 from .provider import CONTRACT_ID, LocalRuntimeHostProvider
+from agent_box.protocols.host import resource_selector, host_control
 
 
 class LocalRuntimeHostSelector:
@@ -59,8 +61,7 @@ class LocalRuntimeHostPlugin:
             # it is registered once by the Root Extension bootstrap.
             contracts=(),
             resource_providers=(provider,),
-            resource_selectors=(LocalRuntimeHostSelector(provider),),
-            host_controls=(LocalRuntimeHostDiagnostics(provider),),
+            contributions=(resource_selector(LocalRuntimeHostSelector(provider)), host_control(LocalRuntimeHostDiagnostics(provider))),
         )
 
 

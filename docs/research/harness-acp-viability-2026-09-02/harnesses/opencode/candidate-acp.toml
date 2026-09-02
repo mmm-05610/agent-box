@@ -1,0 +1,94 @@
+# candidate-acp.toml — OpenCode ACP candidate card
+# Research round: harness-acp-viability-2026-09-02 (observed 2026-09-02)
+# Companion docs: ACP_FACTS.md / EVIDENCE.md in this directory.
+# Sanitization per SOURCE_POLICY.md section 5.
+
+schema_version = 1
+harness_type = "opencode"
+
+decision = "NATIVE_PRIMARY"                # ACP viable + strong; native run-json adapter already owns the slot
+implementation_name = "opencode-acp"       # vendor-native `opencode acp` subcommand
+implementation_source = "github.com/anomalyco/opencode"   # sst/opencode 301-redirects here (observed 2026-09-02)
+implementation_owner = "Anomaly (anomalyco org)"
+officiality = "VENDOR_NATIVE"              # fact class 5: implemented by the vendor in its own product (PR #2947, merged 2025-10-20)
+
+version = "1.18.21"                        # locally verified binary; registry lists 1.18.26; npm latest 1.18.26
+protocol_version = 1                       # ACP wire protocolVersion: 1 (integer, MAJOR); ACP v2 draft NOT implemented (PR #44524 open)
+launch_kind = "stdio_subprocess"           # JSON-RPC over ndjson on inherited stdin/stdout (ACP stdio transport)
+
+command = ['<binary>', 'acp']              # e.g. <npm-global>/bin/opencode acp ; optional: --cwd <project>
+bundle_members = []                        # single standalone Bun-compiled binary; no runtime npx, no JS bundle needed
+
+process_topology = "single_process_internal_http"
+# host spawns `opencode acp` (stdio ACP); the process internally boots an HTTP server on
+# 127.0.0.1:<ephemeral> (in-process, zero child processes observed) used only as an internal
+# bridge to the opencode core; exits 0 on stdin EOF; sessions persisted in opencode.db under
+# XDG_DATA_HOME (ACP session ids == native session ids).
+sandbox_status = "SAFE_WITHIN_EXISTING_RUNTIME"
+# conditions encoded below: loopback listen must be allowed inside the sandbox; keep --mdns off;
+# prefer OPENCODE_SERVER_PASSWORD (internal API is unauthenticated by default); client should
+# implement session/request_permission and fs/write_text_file. If the host has no ACP client
+# layer, integration is a host runtime change (REQUIRES_RUNTIME_CHANGE at host layer), not a
+# harness defect.
+
+credential_boundary = "XDG_DATA_HOME/opencode/auth.json (0600); or OPENCODE_AUTH_CONTENT env; no new ACP-specific credential store; auth.json never created in credential-free probe"
+profile_boundary = "XDG_CONFIG_HOME/opencode (opencode.json c/jsonc, agent/, command/, skill/, plugin/); OPENCODE_CONFIG / OPENCODE_CONFIG_DIR / OPENCODE_CONFIG_CONTENT honored (same core as serve/run); auto-seeds config dir if missing (pre-render opencode.json to keep control); temp-home probe confirmed seeding + SQLite DB creation"
+
+capabilities = [
+  "initialize",                # protocolVersion 1; agentInfo; authMethods [opencode-login] (+ terminal-auth meta)
+  "authenticate",              # no-op for opencode-login; real creds from auth.json/OPENCODE_AUTH_CONTENT
+  "session/new",               # + client mcpServers registration + available_commands_update + configOptions
+  "session/load",              # full-history replay (messages + tool calls)
+  "session/list",              # cursor pagination (100/page), DB + live merge
+  "session/resume",            # metadata restore from last 20 messages
+  "session/close",             # aborts backing native session
+  "unstable_forkSession",      # maps to native session.fork (ACP fork = RFD stage)
+  "session/prompt",            # text/image/resource_link/resource; slash commands; /compact -> summarize
+  "session/update streaming",  # agent_message_chunk, agent_thought_chunk, tool_call, tool_call_update
+  "tool_calls",                # kinds read/search/edit/execute/fetch/think/other; locations; rawInput; rawOutput
+  "file_edit_diffs",           # ACP diff content (oldText/newText) for edit tool + edit permissions
+  "request_permission",        # allow_once / allow_always / reject_once; auto-reject if client cannot answer
+  "usage",                     # PromptResponse usage (incl. thought/cached tokens) + usage_update (context used/size, cost USD)
+  "cancel",                    # native abort; stopReason cancelled
+  "session_modes",             # build/plan agents surfaced as modes; setSessionMode + configOptions
+  "setSessionModel",           # + effort variants (unstable_setSessionModel / configOptions model|effort)
+  "slash_commands",            # commands + skills advertised as available_commands_update
+  "mcp_servers",               # client-declared local stdio + remote http/sse registered into native MCP
+  "images_in_prompt",          # promptCapabilities.image = true (data:, data-uri, http(s))
+  "embedded_context",          # resource/resource_link blocks (file://, zed://)
+  "session_locator",           # sessionId == native opencode session id (exportable via `opencode export`)
+  "process_exit",              # clean exit 0 on stdin EOF
+]
+
+missing_capabilities = [
+  "elicitation_or_question_bridge",   # native question.asked has NO ACP mapping -> AskUser-style tools stall the turn (highest gap)
+  "agent_plan_updates",               # native todo events not forwarded as ACP agent_plan
+  "step_boundaries",                  # native step-start/step-finish parts unmapped
+  "session_revert_undo",              # revert/unrevert + /undo /redo unsupported over ACP (vendor doc)
+  "subagent_streaming",               # task inner activity collapsed into one tool_call (PR #40654 open)
+  "steer_mid_turn",                   # no ACP mapping of native prompt_async/message-on-busy
+  "setSessionConfigOption_generic",   # only model | effort | mode ids accepted
+  "acp_v2",                           # protocolVersion 1 only; v2 draft PR unmerged
+  "multi_client_server",              # one stdio client per process (no serve-style fan-out over ACP)
+]
+
+native_fallback = "agent-box native adapter (opencode run --format json) remains primary: preserves question.asked, todo/plan, step parts, revert/undo, subagent streams, and adds opencode db/export observation channels; native adapter file: plugins/agent-box-harnesses/src/agent_box_harnesses/adapters/opencode.py"
+
+known_risks = [
+  "RISK question.asked stalls ACP turns until answered natively (no host surface) - gate usage to agents that do not ask questions, or keep native path for those",
+  "RISK internal HTTP API unauthenticated by default on 127.0.0.1:<ephemeral> - set OPENCODE_SERVER_PASSWORD or isolate netns",
+  "RISK client fs/write_text_file required for the ACP edit fast path; without it approved edits fall back to reject of that path (fail-closed)",
+  "RISK config-default model/variant ignored in some ACP paths (issues #46311, #34743, #41628; fix #41634 open) - pin model via configOptions per session",
+  "RISK version churn: near-daily releases, SDK pinned 0.21.0 vs latest 1.4.0, ACP v2 PR pending - pin exact version per deployment",
+  "RISK --mdns would advertise the internal server (default off - keep off)",
+  "RISK ACP clients can inject MCP servers (sdk.mcp.add) incl. local command execution - only expose acp endpoint to trusted clients",
+]
+
+evidence_refs = [
+  "EVIDENCE.md#E02-E07  local CLI + live initialize/port/topology probes (1.18.21, 2026-09-02)",
+  "EVIDENCE.md#E08-E20  vendor source audit packages/opencode/src/acp/* + cli/cmd/acp.ts (dev@69c172e)",
+  "EVIDENCE.md#E21-E24  repo identity anomalyco/opencode (sst 301), PR #2947 merged 2025-10-20, open v2 PRs, npm release dates",
+  "EVIDENCE.md#E25-E29  vendor docs opencode.ai/docs/acp/, ACP spec v1(+v2 draft), agentclientprotocol org repos, SDK versions",
+  "EVIDENCE.md#E30-E32  ACP Registry entry (1.18.26, binary+sha256, cmd acp), registry docs, Zed external-agents docs",
+  "EVIDENCE.md#E33-E36  limitation issues, absence of third-party wrapper, native dossier + agent-box native adapter cross-refs",
+]

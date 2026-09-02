@@ -7,7 +7,7 @@ from typing import Any
 from agent_box.resource_contracts import AgentBoxProfileV1, PromptFragmentV1, WorkspaceV1
 from agent_box.work_core import (ExecutionProjection, ExecutionStartReceipt, ExecutionStartRequest, Freshness, Outcome,
     Phase, ProviderDescriptor, Ref, RefType)
-from agent_box.extensions.runtime_composition import RuntimeBinding, RuntimeHostV1, SandboxV1, TerminalSessionV1, TerminalRunHandle
+from agent_box.protocols.runtime import RuntimeBinding, RuntimeHostV1, SandboxV1, TerminalSessionV1, TerminalRunHandle
 from .contracts import ClaudeContinuationV1
 from .composition import command_from_plan, compose, composition_from_resolved_inputs
 
