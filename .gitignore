@@ -75,6 +75,9 @@ src/agent_box/templates/hermes/.env
 *.credential
 *.credentials
 credentials/
+# The provider-neutral protocol pack is source, not credential material.
+!src/agent_box/protocols/credentials/
+!src/agent_box/protocols/credentials/**
 credentials.json
 nul
 
