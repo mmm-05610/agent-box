@@ -1,0 +1,6 @@
+name = "option-d-hybrid"
+architecture = "native-profile-home-central-store-project-local-overlay"
+authority = "central-shared-plus-project-git-plus-profile-activation"
+projection = "runtime-overlay"
+reversible = true
+requires_human_decision = true

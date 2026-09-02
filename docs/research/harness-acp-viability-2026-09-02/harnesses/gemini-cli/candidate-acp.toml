@@ -1,0 +1,25 @@
+# candidate-acp.toml — Gemini CLI (harness id: gemini-cli) — AUXILIARY round
+# Built 2026-09-02 from google-gemini/gemini-cli main @ 4963a4456 + npm latest 0.58.0.
+# Sanitized: <temp-home> = shallow clone + npm pack area. Values "unknown" per SOURCE_POLICY.
+
+schema_version = "agent-box.candidate-acp@1"
+harness_type = "gemini-cli"
+decision = "ACP_PRIMARY"
+implementation_name = "gemini-cli native ACP mode (packages/cli/src/acp/, GeminiAgent + AgentSideConnection)"
+implementation_source = "https://github.com/google-gemini/gemini-cli (main @ 4963a4456, 2026-09-01); npm @google/gemini-cli 0.58.0"
+implementation_owner = "Google (google-gemini org)"
+officiality = "vendor_native_official"
+version = "0.58.0 (npm stable latest; nightly 0.59.0-nightly.20260902.g4963a4456)"
+protocol_version = "1 (acp.PROTOCOL_VERSION from @agentclientprotocol/sdk 0.16.1, pinned)"
+launch_kind = "subprocess_stdio_jsonrpc_agent"
+command = "gemini --acp  (legacy alias: gemini --experimental-acp; registry launch: npx @google/gemini-cli@0.58.0 --acp)"
+bundle_members = ["@google/gemini-cli (npm, bin gemini, node >=20)", "@agentclientprotocol/sdk 0.16.1 (bundled dep)"]
+process_topology = "in_process: runAcpClient wraps process.stdin/stdout in ndJsonStream and serves AgentSideConnection inside the gemini process; no adapter child, no daemon; diagnostics to stderr/debug logger (acpStdioTransport.ts:12-33)"
+sandbox_status = "unknown: no ACP-specific sandbox code in packages/cli/src/acp/; shared config path calls loadSandboxConfig (config.ts:857); --sandbox + --acp combination undocumented and untested this round"
+credential_boundary = "same as CLI: auth via authenticate RPC (AuthType enum: LOGIN_WITH_GOOGLE | USE_GEMINI api-key in _meta | USE_VERTEX_AI | GATEWAY baseUrl/customHeaders); AuthDetails{apiKey,baseUrl,customHeaders} held in AcpSessionManager; switching auth clears cached credential file; .env project loading observed in integration test; credential files under <user-home>/.gemini (oauth_creds.json etc., names only, contents never read)"
+profile_boundary = "loads settings via loadSettings(cwd) per newSession (workspace <project>/.gemini/settings.json + user <user-home>/.gemini/settings.json scopes; GEMINI_CLI_HOME override); folder-trust applies; per-session cwd taken from ACP newSession request"
+capabilities = { initialize = "SUPPORTED", authenticate = "SUPPORTED", newSession = "SUPPORTED", loadSession = "SUPPORTED (agentCapabilities.loadSession=true)", prompt = "SUPPORTED", cancel = "SUPPORTED", setSessionMode = "SUPPORTED", unstable_setSessionModel = "SUPPORTED", fs_read_write_proxy = "SUPPORTED (acpFileSystemService, workspace-restricted)", session_update_stream = "SUPPORTED (AgentMessageChunk/ToolCall etc. via SDK types)", mcp_client_servers_from_client = "SUPPORTED (http+sse declared)", prompt_capabilities_image = "declared true (unverified at runtime)", prompt_capabilities_audio = "declared true (unverified at runtime)", prompt_capabilities_embeddedContext = "declared true (unverified at runtime)", slash_command_interception = "SUPPORTED (acpCommandHandler: /memory, /init)" }
+missing_capabilities = ["stable (non-unstable) setSessionModel", "runtime-verified promptCapabilities", "documented sandbox x ACP interaction", "unknown whether --experimental-zed-integration legacy path still exists (flag absent from config.ts but cli-reference.md row remains)"]
+native_fallback = "headless non-ACP: gemini -p <PROMPT> --output-format json|stream-json (documented); used when ACP unnecessary"
+known_risks = ["pinned @agentclientprotocol/sdk 0.16.1 lags npm latest 1.4.0 (protocol drift risk on unstable methods)", "cli-reference.md still documents --experimental-acp as 'Agent Code Pilot mode. Experimental feature.' (stale naming; docs lag behind renamed --acp)", "exact introduction version unresolved (ACP code existed by 2025-08-13, PR #5536)", "unstable_ prefixed methods VERSION_SENSITIVE", "process stdout shared with protocol frames"]
+evidence_refs = ["harnesses/gemini-cli/EVIDENCE.md#E-1..E-16", "../research-notes/auxiliary-gemini-qwen-grok.md"]

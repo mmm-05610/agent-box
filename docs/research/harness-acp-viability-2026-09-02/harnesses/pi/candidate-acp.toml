@@ -1,0 +1,92 @@
+# candidate-acp.toml — Pi Coding Agent ACP admission candidate
+# Round: harness-acp-viability-2026-09-02 (read-only research; observed 2026-09-02)
+# Policy: <workspace>/docs/research/harness-acp-viability-2026-09-02/SOURCE_POLICY.md
+# Companion: ACP_FACTS.md (facts), EVIDENCE.md (evidence ledger). All ACP behavior is via the
+# third-party pi-acp adapter — pi has NO native ACP mode (vendor declined, earendil-works/pi#175).
+
+schema_version = 1
+harness_type = "pi"
+
+decision = "NATIVE_PRIMARY"
+
+implementation_name = "pi-acp"
+implementation_source = "https://github.com/svkozak/pi-acp (npm: pi-acp)"
+implementation_owner = "Sergii Kozak (svkozak) — community; NOT pi vendor (Earendil Works / badlogic), NOT ACP org, NOT Zed"
+officiality = "THIRD_PARTY_ADAPTER"
+
+version = "pi-acp 0.0.33 (npm 2026-07-30); pi 0.84.4 (@earendil-works/pi-coding-agent, npm 2026-08-28); pi-mono HEAD b8b873b (2026-09-01)"
+protocol_version = 1
+
+launch_kind = "npx_wrapper_spawning_harness"
+command = ["npx", "pi-acp@0.0.33"]
+bundle_members = []  # no vendored bundle; npx downloads pi-acp@0.0.33 at install time; pi binary must be pre-installed on PATH (or host-managed via global npm install)
+
+# The adapter spawns, per ACP session: pi --mode rpc --no-themes [--session <path>]
+# with cwd = session cwd and env = process.env (PI_ACP_PI_COMMAND overrides the pi executable).
+process_topology = "acp_client -> pi-acp (node, one process) -> pi --mode rpc (node, one child per ACP session) -> bash/tool children"
+sandbox_status = "FEASIBLE_NOT_VERIFIED"  # plain Node CLI, no daemon (pi docs/containerization.md); ACP path adds npx layer needing writable npm cache inside sandbox; not exercised this round
+credential_boundary = "pi reads <user-home>/.pi/agent/auth.json and 35+ per-provider env vars; pi-acp passes process.env verbatim to the pi child; ACP authenticate method + Zed terminal-auth meta gate auth-required flows; auth.json contents never read this round (existence only)"
+profile_boundary = "config root <home>/.pi/agent/ (settings.json, models.json, skills/, extensions/, prompts/, themes/, sessions/); relocation env-only via PI_CODING_AGENT_DIR / PI_CODING_AGENT_SESSION_DIR (no CLI flag); adapter inherits host env so guest isolation must be injected before spawning the adapter; trust.json is host-state (Codeg manages it via acp_pi_set_project_trust)"
+
+capabilities = [
+  "initialize",
+  "session/new",
+  "session/load",
+  "session/list",
+  "session/delete",
+  "resume via session/load (--session <path>)",
+  "prompt (text + images)",
+  "streaming text (agent_message_chunk)",
+  "thinking stream (agent_thought_chunk)",
+  "tool_call + tool_call_update",
+  "file-edit diff surfaced in tool call (unified diff from pi details.diff)",
+  "cancel -> RPC abort",
+  "session modes = pi thinking levels (off/minimal/low/medium/high/xhigh)",
+  "config options = model + thinking level only",
+  "slash commands (available_commands_update; /compact, /autocompact, model/thinking switching)",
+  "permission prompts for pi extension-UI events only",
+]
+
+missing_capabilities = [
+  "usage/cost reporting (pi per-message usage{tokens,cost} is dropped entirely)",
+  "fork/clone and session tree (pi get_tree/get_entries/fork RPC not exposed)",
+  "compaction lifecycle events (compaction_start/end not mapped; only slash /compact)",
+  "thinking level 'max' rejected by adapter (pi CLI accepts it)",
+  "fs/* delegation (no ACP filesystem)",
+  "terminal/* delegation (no ACP terminals)",
+  "MCP servers accepted but not wired through to pi (pi has no MCP by design)",
+  "elicitation/question (no elicitation/* handling)",
+  "agent plan (no plan sessionUpdate)",
+  "subagents (pi has none natively)",
+  "steer is a client-side one-at-a-time queue reimplementation, not pi steer/follow_up RPC passthrough",
+  "extension-UI permissions are lossy (synthetic tool call per prompt)",
+]
+
+native_fallback = "ALREADY_INTEGRATED: Agent-Box runs pi natively via harnesses.toml launch mode exec argv [pi, --mode, json] + adapters/pi.py (env PI_CODING_AGENT_DIR relocation, PI_OFFLINE=1, --session continuation, PiJsonDecoder for the event stream); --mode rpc is the vendor-endorsed richer substrate (vendor quote in earendil-works/pi#175)"
+
+known_risks = [
+  "THIRD_PARTY_SINGLE_MAINTAINER: pi-acp is community MVP software 'centered around Zed'; other clients 'varying levels of compatibility' (README)",
+  "UNPINNED_UPSTREAM: adapter works with pi >= 0.80.4 without upper bound; pi ships weekly minors -> silent breakage risk in the wrapper layer",
+  "FRAMING_BUG_RISK: adapter parses pi stdout with Node readline while pi rpc.md documents LF-only framing and warns readline splits U+2028/U+2029",
+  "NO_PERMISSION_SYSTEM: pi deliberately has no permission popups; bash/edit tool calls run unconfined through ACP (sandboxing mandatory)",
+  "SUPPLY_CHAIN: npx dynamic download of pi-acp + global npm install of pi binary (Codeg acpInstallPiBinary) = two extra npm trust roots vs native path; pi-acp itself has npm provenance and a small dep tree (@agentclientprotocol/sdk + zod)",
+  "STARTUP_EGRESS: pi phones pi.dev (update check + telemetry) unless host sets PI_OFFLINE=1; pi-acp sets no such env",
+  "ORPHAN_RISK_UNKNOWN: no supervisor/reaper visible for pi children if the adapter dies (not exercised)",
+  "FIDELITY: usage/cost, fork, tree, compaction events, thinking 'max', fs/terminal delegation lost vs native --mode rpc/json",
+]
+
+evidence_refs = [
+  "EVIDENCE.md E7-E12 (vendor source + published-artifact probes: zero ACP in pi-mono b8b873b and pi 0.84.4 dist; Mode enum text|json|rpc)",
+  "EVIDENCE.md E13-E18 (ACP spec v1 schema/methods, official SDK @agentclientprotocol/sdk 1.4.0 v1-stable/v2-draft, agents page 'Pi (via pi-acp adapter)', registry pi-acp/agent.json npx pi-acp@0.0.33, org has no pi adapter)",
+  "EVIDENCE.md E19-E26 (pi-acp 0.0.33 source audit: initialize v1, per-session pi --mode rpc spawn, streaming translation, extension-UI permissions, diff surfacing, README limitations, contributor census)",
+  "EVIDENCE.md E27-E28 (vendor stance: earendil-works/pi#175 closed 'no need for ACP support… trivial to build an ACP adapter on top of RPC mode'; unmerged ACP-mode PRs #241/#836/#6660)",
+  "EVIDENCE.md E29 (Zed docs: Pi Coding Agent as Common External Agent via ACP Registry)",
+  "EVIDENCE.md E30-E31 (Codeg: acpInstallPiBinary / acpPrepareNpxAgent / acp_pi_* trust APIs; types.ts pi-acp channel note)",
+  "EVIDENCE.md E3-E4 (Agent-Box native pi adapter + registry block)",
+  "EVIDENCE.md E5-E6, E33 (npm metadata + local tooling baseline)",
+]
+
+# Unresolved (UNKNOWN, not false): wire-level adapter behavior under a synthetic ACP client
+# (not executed: no-real-model-request policy); orphan severity on adapter SIGKILL; ACP v2
+# migration; losslessness of pi session 'custom' entries through loadSession; tool-call kind
+# mapping completeness beyond the diff path.

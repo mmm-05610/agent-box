@@ -13,12 +13,19 @@ from agent_box.protocols.host import HOST_CONTROL_KIND, RESOURCE_SELECTOR_KIND, 
 from agent_box.work_core import Ref, RefType
 from agent_box.work_core.repository import CoreRepository, RefRelation
 from agent_box.work_core.services import WorkService, ExecutionService
+from agent_box_harnesses.native_home.kinds import SKILL_INSTALLER_KIND
+from agent_box_harnesses.native_home.contribution import as_skill_source
 from .operations import OperationStore
 from .terminal import UnavailableTerminalPresenter, WslTerminalPresenter
 
 def _ref(r): return {"type":r.type.value,"provider":r.provider,"native_id":r.native_id,"uri":r.uri,"metadata":dict(r.metadata)}
 def _execution(e): return {"id":e.id,"work_id":e.work_id,"provider_id":e.provider_id,"phase":e.projection.phase.value,"outcome":e.projection.outcome.value if e.projection.outcome else None,"freshness":e.projection.freshness.value,"created_at":e.created_at.isoformat()}
 def _profile(value):
+    if isinstance(value, dict):
+        result = dict(value)
+        if "native_payload" in result and "config" not in result:
+            result["config"] = result["native_payload"]
+        return result
     if not hasattr(value, "native_payload"): return value
     result=asdict(value); result["config"]=result["native_payload"]; return result
 
@@ -37,9 +44,11 @@ class HostApplication:
             registry, report, catalog = environment.registry, environment.report, environment.catalog
         self.registry,self.report,self.catalog,self.repo=registry,report,catalog,CoreRepository(); self.work,self.execution=WorkService(self.repo),ExecutionService(self.repo); self.lock=threading.RLock(); self._finish_locks: dict[str, threading.Lock] = {}; self._submitted_operations: set[str] = set(); self.root=(home or agent_box_home())/"host"; self.root.mkdir(parents=True,exist_ok=True); self.draft_root=self.root/"binding-drafts"; self.draft_root.mkdir(exist_ok=True); self.commands={}; self.operation_store=OperationStore(self.root); self.finish_pool=ThreadPoolExecutor(max_workers=2, thread_name_prefix="agent-box-finish")
         self._skill_previews: dict[str, Path] = {}
+        self._install_previews: dict[str, dict[str, object]] = {}
         # Host extension lookup comes exclusively from the canonical Catalog
         # (uniqueness, binding activation and ownership live in the SDK).
         self.controls={c.provider_id:c for c in catalog.query(HOST_CONTROL_KIND)}; self.selectors={s.id:s for s in catalog.query(RESOURCE_SELECTOR_KIND)}; self.harnesses={h.descriptor().id:h for h in catalog.query(RESOURCE_LIBRARY_KIND)}
+        self.installers={c.harness_type:c for c in catalog.query(SKILL_INSTALLER_KIND)}
         self.routes={route.descriptor().id: route for route in catalog.query(CONTINUATION_ROUTE_KIND)}
         self.terminal_presenter = terminal_presenter or (WslTerminalPresenter() if os.environ.get("WSL_DISTRO_NAME") else UnavailableTerminalPresenter())
         self.finalization=HostFinalizationCoordinator(self.execution,registry,catalog.query(FINALIZATION_CONTRIBUTOR_KIND))
@@ -116,6 +125,89 @@ class HostApplication:
         source = self._skill_previews.pop(preview_id, None)
         if source is None: raise ValueError("SKILL_PREVIEW_NOT_FOUND")
         return {"skill": provider.import_directory(source, expected_revision=expected_revision).public_dict()}
+
+    # ------------------------------------------------------------------ #
+    # central Skill -> Profile installation (management only; never a launch input)
+    # ------------------------------------------------------------------ #
+    def _skills_provider(self):
+        provider = next((p for p in self.registry.resource_providers() if p.descriptor().id == "agent-skills"), None)
+        if provider is None:
+            raise ValueError("SKILL_LIBRARY_UNAVAILABLE")
+        return provider
+
+    def _resolve_skill_source(self, skill: dict):
+        provider = self._skills_provider()
+        skill_id = str(skill.get("skill_id", ""))
+        revision = int(skill["revision"]) if skill.get("revision") else None
+        digest = str(skill.get("digest") or "")
+        metadata = {"digest": digest, "format": "agent-skills"}
+        if revision is not None:
+            metadata["revision"] = str(revision)
+        ref = Ref(RefType.ARTIFACT, "agent-skills", skill_id, metadata=metadata)
+        resolved = provider.resolve("agent-box.skill@1", ref)
+        return as_skill_source(resolved.contract, resolved.source.projection_source())
+
+    def _installer_for(self, harness_type: str):
+        installer = self.installers.get(harness_type)
+        if installer is None:
+            raise KeyError("SKILL_INSTALLER_NOT_FOUND")
+        return installer
+
+    def skill_install_preview(self, harness_type: str, profile_id: str, skill: dict):
+        source = self._resolve_skill_source(skill)
+        preview = self._installer_for(harness_type).preview(profile_id, source)
+        token = __import__("os").urandom(16).hex()
+        self._install_previews[token] = {
+            "harness_type": harness_type, "profile_id": profile_id,
+            "skill_id": source.skill_id, "revision": source.revision,
+            "digest": source.digest, "source_path": str(source.source_path),
+        }
+        return {"preview_id": token, **preview}
+
+    def skill_install_confirm(self, preview_id: str, expected_revision: int):
+        stashed = self._install_previews.pop(preview_id, None)
+        if stashed is None:
+            raise ValueError("SKILL_INSTALL_PREVIEW_NOT_FOUND")
+        source = self._resolve_skill_source(stashed)
+        receipt = self._installer_for(stashed["harness_type"]).install(
+            stashed["profile_id"], source, expected_revision=int(expected_revision),
+        )
+        return {"installation": receipt}
+
+    def skill_install_update(self, harness_type: str, profile_id: str, skill: dict, expected_revision: int):
+        source = self._resolve_skill_source(skill)
+        receipt = self._installer_for(harness_type).update(profile_id, source, expected_revision=int(expected_revision))
+        return {"installation": receipt}
+
+    def skill_install_rollback(self, harness_type: str, profile_id: str, skill_id: str, skill: dict, expected_revision: int):
+        source = self._resolve_skill_source(skill)
+        receipt = self._installer_for(harness_type).rollback(skill_id, profile_id, source, expected_revision=int(expected_revision))
+        return {"installation": receipt}
+
+    def skill_install_remove(self, harness_type: str, profile_id: str, skill_id: str, expected_revision: int):
+        result = self._installer_for(harness_type).remove(profile_id, skill_id, expected_revision=int(expected_revision))
+        return result
+
+    def skill_installations(self, harness_type: str, profile_id: str):
+        return self._installer_for(harness_type).list_installed(profile_id)
+
+    def skill_installer_recover(self, harness_type: str, profile_id: str):
+        return self._installer_for(harness_type).recover(profile_id)
+
+    def skill_inventory(self, harness_type: str, profile_id: str | None = None, workspace: str | None = None):
+        manager = self.harnesses.get(harness_type)
+        if manager is None:
+            raise KeyError("HARNESS_NOT_FOUND")
+        return manager.effective_skill_inventory(profile_id, workspace)
+
+    def profile_native_home(self, harness_type: str, profile_id: str):
+        manager = self.harnesses.get(harness_type)
+        if manager is None:
+            raise KeyError("HARNESS_NOT_FOUND")
+        summary = manager.native_home_summary(profile_id)
+        summary["installations"] = manager.installations(profile_id)["installations"]
+        summary["skill_inventory"] = manager.profile_skill_inventory(profile_id)
+        return summary
     def harness_list(self):
         return [{"id": d.id, "contract_id": d.contract_id, "display_name": d.title, "version": "1", "status": "ready", "capabilities": sorted(d.capabilities)} for d in (h.descriptor() for h in self.harnesses.values())]
     def harness_detail(self,hid):

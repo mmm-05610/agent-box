@@ -1,0 +1,152 @@
+# candidate.toml — Aider (harness id: aider)
+# Built 2026-09-02 against PyPI aider-chat 0.86.2 (venv probe) + Aider-AI/aider main (5dc9490bb, 2026-05-22).
+# Unknown values are the string "unknown"; unsupported facts are tri-state strings, never false.
+# Sanitized: <user-home>, <temp-home>, <workspace>, <binary>.
+
+[meta]
+tier = "B"
+evidence_dates = ["2026-09-02"]
+sources = [
+  "CLI probes on aider-chat 0.86.2 installed into <temp-home> venv (version/help) with fresh temp HOME",
+  "Aider-AI/aider main @ 5dc9490bb (last commit 2026-05-22) shallow clone in <temp-home>",
+  "Official docs via aider.chat: docs/scripting.html, docs/config.html (WebFetch)",
+]
+verified_version = "0.86.2"
+knowledge_files = ["../experiments/candidates-2.md"]
+
+[identity]
+harness_id = "aider"
+display_name = "Aider"
+org = "Aider-AI (Paul Gauthier)"
+repo = "https://github.com/Aider-AI/aider"
+docs = "https://aider.chat/docs (website separate from app repo)"
+license = "Apache-2.0 (PyPI classifier; LICENSE.txt)"
+pypi_package = "aider-chat"
+binary_name = "aider"
+version_string_format = "aider <semver>"
+aliases = []
+maintenance_status = "identity stable; main quiet since 2026-05-22 (last release 0.86.2); current cadence unknown"
+tagline = "AI pair programming in your terminal"
+
+[distribution]
+pypi = "aider-chat (requires_python >=3.10,<3.13; extras: dev, help, browser, playwright); PyPI owner role: paul-gauthier"
+aider_install = "unknown (not verified this round)"
+docker = "docker/ dir in repo (not verified)"
+homebrew = "unknown"
+
+[platform]
+linux = "supported"
+macos = "supported"
+windows = "unknown"
+wsl = "probe binary ran healthy under WSL2 x64"
+
+[executable]
+identity = "aider"
+version_probe = "aider --version -> 'aider 0.86.2' (exit 0)"
+layout = "Python package entrypoint (venv/pipx/pip)"
+python_requirement = ">=3.10,<3.13"
+
+[launch_modes.repl]
+argv = "aider [FILE...] (interactive REPL; files to edit passed as positionals; --read for read-only context)"
+stdio = "prompt_toolkit TUI; --no-fancy-input, --multiline, --vim, --dark-mode/--light-mode, --pretty/--no-pretty, --stream/--no-stream"
+exit_semantics = "user-quit"
+
+[launch_modes.one_shot]
+argv = "aider --message/-m \"<msg>\" [FILE...]"
+prompt_transport = "argv -m or --message-file/-f; stdin piping not documented (use --message-file)"
+output = "text/markdown only — NO --json/--output-format/--output-style machine-readable mode exists (verified against full argparse surface)"
+behavior = "send one message, process reply, then exit ('disables chat mode')"
+confirmation = "--yes-always (scripting doc references '--yes'; help shows '--yes-always' — drift noted)"
+side_effects = "git auto-commits default ON (--auto-commits default True) unless --no-auto-commits/--dry-run"
+related = "--load <cmd-file> (execute /commands from file on launch), --exit (startup then exit), --commit (commit pending changes then exit), --apply <file> (apply LLM-edited file)"
+
+[profile]
+native_home = "<user-home>/.aider.conf.yml (+ dotfiles); no .aider directory"
+config_files = [".aider.conf.yml", ".aider.model.settings.yml", ".aider.model.metadata.json"]
+config_search_order = "cwd/.aider.conf.yml -> <git-root>/.aider.conf.yml -> ~/.aider.conf.yml (main.py:464-477); -c/--config overrides"
+config_format = "yaml"
+env_twins = "every option has AIDER_<OPTION> env var (argparse env binding)"
+env_file = "--env-file (docs: .env config page)"
+ignore_files = ".aiderignore (git root by default)"
+scopes = ["cwd", "git-root", "user"]
+
+[credentials]
+oauth = "unsupported (no OAuth anywhere in the product)"
+api_key_env = ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "generic <PROVIDER>_API_KEY via --api-key PROVIDER=KEY"]
+cli_key_options = "--openai-api-key, --anthropic-api-key, --set-env NAME=value, --api-key provider=key; legacy --openai-api-base/-type/-version/-deployment-id (deprecated -> --set-env)"
+credential_files = "none managed by aider (keys live in user .env / shell env)"
+forbidden_fields = "any .env contents (never read)"
+credential_free_isolation = "fresh HOME + provider env keys is the entire credential surface (simplest of all candidates)"
+
+[isolation]
+account_state = "none (no OAuth/accounts)"
+normal_state = ".aider.conf.yml, .aider.model.settings.yml, .aiderignore"
+session_state = ".aider.chat.history.md (markdown transcript) + .aider.input.history (readline) at git root or cwd; --restore-chat-history; --llm-history-file; --input-history-file/--chat-history-file overrides"
+cache_state = "unknown"
+unsafe_state = "git repo mutations (auto-commits ON by default; --dirty-commits)"
+writable_overlay_needed = "chat/input history files, git index/worktree, .aider.tags.jsonl (ctags cache, name from source)"
+concurrency = "unknown"
+
+[resource_surfaces.instructions]
+state = "unsupported"
+detail = "no AGENTS.md/CONVENTIONS.md-style loader; conventions are passed via --message or config (docs suggest shell wrappers)"
+read_only_ok = "true"
+
+[resource_surfaces.repo_map]
+state = "supported"
+config = "--map-tokens, --map-refresh auto|always|files|manual, --map-multiplier-no-files, --show-repo-map"
+
+[resource_surfaces.git]
+state = "supported_core"
+config = "--git/--no-git (default true), --auto-commits (default True), --dirty-commits, --attribute-author/-committer/-commit-message, --attribute-co-authored-by, --git-commit-verify, --commit-prompt, --skip-sanity-check-repo"
+
+[resource_surfaces.lint_test_hooks]
+state = "supported"
+config = "--lint-cmd, --auto-lint, --test-cmd, --auto-test, --test, /lint /test slash commands"
+
+[resource_surfaces.watch_files]
+state = "supported_flag"
+config = "--watch-files (default False; AI coding comments in editors)"
+
+[resource_surfaces.mcp]
+state = "unsupported"
+detail = "no MCP support in 0.86.2 (no mcp flags/code in args.py or repo)"
+
+[resource_surfaces.subagents]
+state = "unsupported"
+detail = "single-agent; architect/editor model split (--architect, --editor-model) is the closest analog"
+
+[resource_surfaces.hooks]
+state = "unsupported"
+detail = "only lint/test command hooks exist"
+
+[events]
+structured_output = "unsupported (no JSON/stream/machine-readable mode; human markdown on stdout only)"
+stream_flag = "--stream (default True) = markdown streaming, not an event protocol"
+final_message = "assistant reply printed to stdout (no envelope, no separator contract)"
+session_log = ".aider.chat.history.md (human-readable markdown)"
+
+[control]
+interrupt = "interactive Ctrl-C only; unknown for one-shot"
+steer = "interactive only"
+resume = "--restore-chat-history replays context; --load re-executes /commands from a file; no session-id/handle"
+
+[continuation]
+native_resume = "unsupported (history replay only)"
+contract_candidate = "none (Tier B)"
+
+[runtime]
+default_model = "unknown (model required; aider defaults changed per release)"
+provider = "LiteLLM-backed: OpenAI/Anthropic/local/others via env + --openai-api-base/--alias"
+transport = "unknown"
+sandbox_native = "unsupported"
+tty_requirement = "none strictly required for -m one-shot, but output is human text; REPL requires TTY"
+git_requirement = "soft: works without git (--no-git) but loses checkpoints/auto-commits"
+
+[unresolved]
+one_shot_exit_codes = "unknown (undocumented; not probed against real model by policy)"
+stdout_automation_contract = "unknown (no machine-readable surface; scraping human text is VERSION_SENSITIVE and unsupported by design)"
+maintenance_status = "unknown (main quiet since 2026-05-22)"
+yes_alias = "unknown (--yes vs --yes-always doc/help drift)"
+distribution_channels = "unknown (aider-install/docker/brew not verified)"
+concurrency = "unknown"

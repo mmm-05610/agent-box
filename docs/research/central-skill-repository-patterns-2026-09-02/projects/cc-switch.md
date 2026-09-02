@@ -1,0 +1,3 @@
+# cc-switch
+
+Official docs: https://cc-switch.dev/docs/extensions/skills/; repository identity is linked from the docs and must be license-checked at adoption. Central content is `~/.cc-switch/skills/` (SSOT), with app directories for Claude, Codex, Gemini and OpenCode and a database. Identity is skill record/name plus source. Deployment is symlink/copy depending on app/filesystem; install/update/lock/digest/dependency semantics are not fully public. Enables are per-app, so central install is distinct from activation. Uninstall removes targets and SSOT after an automatic backup; restore is supported. Existing sessions and project-local ownership are not specified; same-name, traversal, script execution, signature and Windows details are UNKNOWN. Tier B; see S8.

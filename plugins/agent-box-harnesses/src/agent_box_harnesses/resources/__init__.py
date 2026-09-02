@@ -1,2 +1,14 @@
-from .executable import resolve_executable
-from .profile_codec import canonical_json
+"""Harnesses-owned host resource concerns (executable resolution/probing)."""
+from .executable import (
+    ExecutableMember,
+    ExecutableResolutionError,
+    ResolvedExecutable,
+    resolve_executable,
+)
+
+__all__ = [
+    "ExecutableMember",
+    "ExecutableResolutionError",
+    "ResolvedExecutable",
+    "resolve_executable",
+]

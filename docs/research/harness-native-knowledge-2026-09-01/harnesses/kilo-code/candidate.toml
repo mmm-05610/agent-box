@@ -1,0 +1,78 @@
+# Kilo Code CLI (Kilo / Kilo-Org) — candidate registration card
+# Researched 2026-09-01 from official docs, npm registry, GitHub repo. Unknowns are "unknown", never false.
+
+[meta]
+id = "kilo-code"
+tier = "B"
+requested_alias = "Kilo Code CLI"
+assessed_date = "2026-09-01"
+recommended_for_registry = false      # Tier B: close remaining gaps (events, session/auth paths, license) first
+
+[identity]
+official_name = "Kilo Code CLI"
+binary_branding = "kilo"
+maintainer = "Kilo (Kilo Code) / GitHub org Kilo-Org"
+maintainer_evidence = "https://kilo.ai/docs/code-with-ai/platforms/cli; https://kilo.ai/cli; registry.npmjs.org/@kilocode/cli maintainers"
+official_repo = "https://github.com/Kilo-Org/kilocode"
+lineage = "fork of OpenCode (sst), per repo FAQ; legacy opencode.json[c] configs still read"
+license = "Apache-2.0 (npm package metadata) vs MIT (repo README) — UNRESOLVED"
+
+[distribution]
+channel = "npm install -g @kilocode/cli; curl -fsSL https://kilo.ai/cli/install | bash; brew install Kilo-Org/tap/kilo; AUR kilo-bin; GitHub-release baseline (no-AVX) builds"
+npm_package = "@kilocode/cli"
+npm_dist_tags = { latest = "7.5.6", rc = "7.5.3", next = "1.0.8", alpha = "0.0.5" }
+version = "7.5.6"
+version_source = "registry.npmjs.org/@kilocode/cli dist-tags (2026-09-01)"
+release_cadence = "rapid (multiple prerelease channels); exact cadence unknown"
+runtime_requirement = "Node.js v20+ (Kilo-Org/kilocode issue 5780)"
+platforms = ["macOS", "Linux", "Windows"]   # per product page "installs on macOS, Linux or Windows" claim set for CLI not individually re-verified
+
+[platform]
+os = ["macos", "linux", "windows"]
+runtime = "Node.js v20+"
+arch = ["x64", "arm64"]               # baseline no-AVX builds provided for old CPUs
+
+[executable]
+binary_name = "kilo"
+binary_path = "unknown"
+on_path_observed = false
+local_probe = "NOT_LOCALLY_OBSERVED (binary absent in environment; no global installs performed)"
+update_command = "kilo upgrade | npm update -g @kilocode/cli"
+
+[launch_modes]
+interactive_tui = "kilo (TUI in project directory; /connect first-time setup)"
+headless_one_shot = "kilo run [message..]; kilo run --auto \"<msg>\" (auto-exit on completion/timeout)"
+headless_server = "kilo serve (headless server); kilo acp (Agent Client Protocol server); kilo attach <url>; kilo daemon"
+exit_codes = { success = 0, timeout = 124, error = 1 }
+fail_closed_note = "non-interactive run WITHOUT --auto auto-rejects any permission request and exits 1 if it did"
+flags = ["run", "--auto", "--continue/-c (resume last workspace session; incompatible with --auto)", "serve", "acp", "attach", "session", "export [sessionID]", "import <file>", "auth", "models [provider]", "stats", "roll-call <filter>", "mcp", "github", "pr", "cloud", "debug", "upgrade"]
+
+[profile]
+config_home = "~/.config/kilo/"
+user_config = "~/.config/kilo/kilo.json[c] (legacy opencode.json[c] still read)"
+project_config = "./kilo.json[c] or ./.kilo/ (legacy ./.kilocode/ also read); project overrides global"
+tui_config = "~/.config/kilo/tui.jsonc (global) or .kilo/tui.json (project)"
+config_schema = "https://app.kilo.ai/config.json"
+env_overrides = ["KILO_CONFIG", "KILO_CONFIG_CONTENT", "KILO_PROVIDER", "KILO_ORG_ID", "KILO_<FIELD_NAME>", "KILOCODE_<FIELD_NAME>"]
+permissions = "config keys: allow | ask | deny, wildcard patterns (e.g. \"git *\": \"allow\")"
+sessions_dir = "unknown"              # own session storage path undocumented
+cross_tool_sessions = "/resume-claude <uuid> reads ~/.claude/projects/; /resume-codex <uuid> reads ~/.codex/sessions/"
+
+[credentials]
+mechanism = "kilo auth (manage AI providers and credentials); /connect in TUI; selected org stored in CLI auth file (path undocumented)"
+env_vars = ["KILO_ORG_ID (org routing in CI)"]
+contents_read = false
+
+[events]
+structured_output = "partial: no --json stdout flag documented for kilo run; structured via kilo export [sessionID] (JSON), kilo import, kilo acp (JSON-RPC), kilo serve/attach"
+streaming_events = "unknown"
+
+[unresolved]
+items = [
+  "per-run streaming/JSON stdout event schema (if any)",
+  "auth file path and format (kilo auth)",
+  "own session storage directory",
+  "license conflict: npm Apache-2.0 vs repo README MIT",
+  "exact CLI source path in monorepo (npm says directory cli; repo listing shows packages/)",
+  "release cadence and next/rc channel semantics",
+]

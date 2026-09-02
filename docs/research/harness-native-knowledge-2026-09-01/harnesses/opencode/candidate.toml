@@ -1,0 +1,295 @@
+# candidate.toml — OpenCode harness profile candidate
+# Research date 2026-09-02. Verified binary opencode 1.18.21; official repo
+# github.com/sst/opencode @ 5341a5e (packages/opencode 1.18.25). TS/Bun core+TUI.
+# Policy: unknown = "unknown"; never asserted false for unverified items.
+# Path placeholders: <user-home>, <temp-home>, <workspace>, <binary>.
+
+[meta]
+harness_id = "opencode"
+research_date = "2026-09-02"
+binary_version_observed = "1.18.21"
+repo_head_version_observed = "1.18.25"
+repo_head_commit = "5341a5e442679f96fe152aac91c31509f4dd5430"
+repo_head_date = "2026-09-01"
+knowledge_tier = "T2_source_verified_plus_cli_observed"   # layered: CLI observed + source-verified + docs
+release_cadence = "very-fast"
+evidence_files = ["evidence.md", "../experiments/opencode.md"]
+
+[identity]
+display_name = "OpenCode"
+official_repo = "https://github.com/sst/opencode"
+official_repo_org = "sst"
+archived_namesake_repo = "https://github.com/opencode-ai/opencode"  # archived; became Charmbracelet Crush (Go)
+language_core = "typescript (Bun runtime)"
+language_tui = "typescript (packages/tui, opentui)"
+license = "MIT"
+docs_site = "https://opencode.ai/docs"
+config_schema_url = "https://opencode.ai/config.json"
+stale_lead_warning = "the 'Go core + TS TUI' lead referred to the archived opencode-ai/opencode; current opencode is TS core + TS TUI"
+npm_package = "opencode-ai"
+desktop_apps = ["macOS arm64", "macOS x64", "Windows x64", "Linux deb/rpm/AppImage"]
+
+[distribution]
+install_methods = ["npm", "curl-script", "brew", "scoop", "choco", "pacman", "aur", "deb", "rpm", "appimage", "desktop"]
+observed_install_method = "npm-global"
+observed_binary_layout = "<user-home>/.npm-global/bin/opencode -> ../lib/node_modules/opencode-ai/bin/opencode.exe (standalone ELF, Bun-compiled)"
+self_upgrade_path = "<xdg-cache>/opencode/bin"
+upgrade_command = "opencode upgrade [target] [--method curl|npm|pnpm|bun|brew|choco|scoop]"
+uninstall_command = "opencode uninstall"
+
+[platform]
+linux = "supported"
+macos = "supported"
+windows = "supported (native; also desktop app; WSL story: unknown)"
+wsl = "unknown"
+observed_os = "linux (WSL2 kernel)"
+
+[executable]
+discovery = "PATH lookup; name opencode"
+observed_path = "<user-home>/.npm-global/bin/opencode"
+binary_type = "ELF x86-64 standalone (Bun)"
+offline_help = true
+
+[launch_modes.tui]
+argv = "opencode [project-path]"
+is_default_command = true
+key_flags = ["-m/--model provider/model", "-c/--continue", "-s/--session <id>", "--fork", "--prompt <text>", "--agent <name>", "--auto", "--mini", "--no-replay", "--replay-limit N", "--port", "--hostname", "--mdns", "--mdns-domain", "--cors"]
+boots_local_server = true
+prompt_transport = "argv / interactive TUI"
+output = "TUI"
+
+[launch_modes.run]
+argv = "opencode run [message..]"
+key_flags = ["--command <slash-cmd> (message = args)", "-f/--file <attachment> (<=10MiB)", "--format default|json", "-m/--model", "--variant", "--thinking", "--agent", "--title", "-c/--continue", "-s/--session", "--fork", "--share", "--attach <url>", "--dir", "-u/--username", "-p/--password", "--port", "-i/--interactive", "--auto"]
+prompt_transport = "argv positional words; stdin interactive in -i mode"
+output_formats = ["default (human, streamed stdout)", "json (raw JSON events, stdout)"]
+permission_flag = "--auto (aliases --yolo, --dangerously-skip-permissions); default headless = auto-REJECT permissions with warning"
+exit_semantics = "streams until session.status idle, then exits; exitCode 1 on prompt/command/session errors; fast-fail WITHOUT credentials: no (observed hang >=25s with banner 'build · big-pickle')"
+env_overrides = ["OPENCODE_SERVER_USERNAME", "OPENCODE_SERVER_PASSWORD"]
+
+[launch_modes.serve]
+argv = "opencode serve"
+key_flags = ["--port (default 0 = random)", "--hostname (default 127.0.0.1)", "--mdns", "--mdns-domain", "--cors", "--print-logs", "--log-level"]
+api_doc = "GET /doc (OpenAPI)"
+sse = ["GET /event (instance)", "/global/event (global)"]
+auth = "basic auth via OPENCODE_SERVER_PASSWORD / OPENCODE_SERVER_USERNAME (username default 'opencode'); live behavior not observed"
+
+[launch_modes.attach]
+argv = "opencode attach <url>"
+key_flags = ["--dir", "-c/--continue", "-s/--session", "--fork", "-u", "-p", "--mini", "--no-replay", "--replay-limit"]
+purpose = "TUI client for a running opencode server"
+
+[launch_modes.acp]
+argv = "opencode acp"
+purpose = "Agent Client Protocol server (editor integration)"
+wire_protocol = "unknown"
+
+[launch_modes.web]
+argv = "opencode web"
+purpose = "start server and open web interface"
+
+[launch_modes.providers]
+argv = "opencode providers list|login [url]|logout [provider]"
+alias = "auth"
+note = "login is interactive (OAuth/API key); avoid inside sandboxes"
+
+[launch_modes.models]
+argv = "opencode models [provider]"
+registry = "models.dev (cached; --refresh refetches)"
+flags = ["--verbose (costs)", "--refresh"]
+
+[profile]
+homes_table = """
+data   = $XDG_DATA_HOME/opencode  (fallback ~/.local/share/opencode)  : opencode.db(+wal/shm), auth.json, log/, repos/, legacy storage/
+cache  = $XDG_CACHE_HOME/opencode (fallback ~/.cache/opencode)        : bin/ (upgrades), models.dev cache
+config = $XDG_CONFIG_HOME/opencode (fallback ~/.config/opencode)      : opencode.json(c), config.json, AGENTS.md, agent/, command/, skill/, plugin/ (+ npm root for installed plugins)
+state  = $XDG_STATE_HOME/opencode (fallback ~/.local/state/opencode)  : locks/<sha1>.lock/{heartbeat,meta.json}
+tmp    = os.tmpdir()/opencode (hardcoded, NOT XDG-overridable; /tmp/opencode on linux)
+bin    = cache/opencode/bin
+log    = data/opencode/log/opencode.log
+repos  = data/opencode/repos
+"""
+xdg_overrides_honored = true
+auto_mkdir_on_startup = true
+auto_init_behavior = "seeds global config {'$schema': 'https://opencode.ai/config.json'} if missing (also wrote opencode.jsonc + .gitignore in probe); creates sqlite db, log dir, locks"
+config_formats = ["json", "jsonc", "legacy toml (auto-migrated)"]
+global_load_order = "config.json -> opencode.json -> opencode.jsonc (later wins)"
+project_discovery = "opencode.json(c) walked UP cwd->worktree, deepest-first merge (deepest wins); .opencode/opencode.json(c) in each .opencode dir up the tree; ~/.opencode also scanned"
+merge_order_full = "remote .well-known/opencode -> global -> OPENCODE_CONFIG file -> project opencode.json -> .opencode dirs -> OPENCODE_CONFIG_CONTENT inline (last local) -> managed (/etc/opencode | /Library/Application Support/opencode | %ProgramData%\\opencode) -> MDM .mobileconfig (highest)"
+schema_strictness = "unknown top-level keys rejected (ConfigInvalidError); hard-fails startup on invalid config"
+hot_reload = false
+username_default = "os user name"
+safe_to_persist = ["opencode.json(c)", "config JSON", "agent/*.md", "command/*.md", "skill dirs", "plugin files (as read-only discovery)"]
+opaque_runtime = ["opencode.db(+wal/shm)", "auth.json", "state/locks/*", "log/opencode.log", "repos/", "cache bin/"]
+concurrent_writers = "yes (multiple TUI/run instances coexist; flock heartbeats in state/locks); observed no lock failure in probe"
+
+[profile.env_flags]
+OPENCODE_CONFIG = "extra explicit config file"
+OPENCODE_CONFIG_CONTENT = "inline JSON config merged last (local scope)"
+OPENCODE_CONFIG_DIR = "reroute global config dir"
+OPENCODE_DISABLE_PROJECT_CONFIG = "skip project config + project instruction walk-up"
+OPENCODE_DISABLE_DEFAULT_PLUGINS = "skip default plugins"
+OPENCODE_PURE = "skip external plugins entirely (== --pure)"
+OPENCODE_DISABLE_EXTERNAL_SKILLS = "skip ~/.claude + ~/.agents skill scan"
+OPENCODE_DISABLE_CLAUDE_CODE_SKILLS = "skip ~/.claude skill scan only"
+OPENCODE_AUTH_CONTENT = "replace auth.json content with inline JSON"
+OPENCODE_DB = "sqlite db path (absolute, data-relative, or :memory:)"
+OPENCODE_TEST_HOME = "override homedir used by Global.Path.home"
+OPENCODE_DISABLE_CHANNEL_DB = "force unsuffixed opencode.db"
+OPENCODE_SERVER_PASSWORD = "server basic-auth password"
+OPENCODE_SERVER_USERNAME = "server basic-auth username (default 'opencode')"
+
+[credentials]
+primary_store = "<xdg-data>/opencode/auth.json (mode 0600; NEVER read contents)"
+auth_shapes = ["{type:'api', key, metadata?} | {type:'oauth', refresh, access, expires, accountId?, enterpriseUrl?} | {type:'wellknown', key, token}"]
+env_injection = "OPENCODE_AUTH_CONTENT=<json> replaces file reads"
+provider_env_keys = "provider-specific env (e.g. ANTHROPIC_API_KEY) per provider docs; config provider.<id>.options.apiKey also possible"
+config_interpolation = "{env:VAR} and {file:path} supported in config string values"
+login_logout = "opencode providers login/logout (alias auth); mcp auth/logout for MCP OAuth"
+mcp_oauth_store = "unknown"
+existence_observed = "auth.json present in real <xdg-data>/opencode (name-listed only)"
+isolation_recipe = "per-sandbox XDG_DATA_HOME redirect OR write minimal auth.json OR OPENCODE_AUTH_CONTENT; never run interactive login in sandbox"
+
+[isolation]
+account_state = "auth.json (data dir) - copy or inject per sandbox"
+normal_state = "opencode.db(+wal/shm) SQLite sessions/messages/parts/usage - per-sandbox, never shared live"
+legacy_state = "data/opencode/storage/** JSON (legacy layout, still migrated-from; absent in fresh 1.18 installs)"
+cache_state = "cache/opencode (models.dev cache, bin/ upgrades) - shareable read-only or per-sandbox"
+unsafe_state = "/tmp/opencode fixed shared scratch; sqlite wal files must not be shared across concurrent hosts"
+read_only_share = "config/, agent/, command/, skill/, plugin/ files OK read-only ONLY IF auto-seed is avoided (use OPENCODE_CONFIG_DIR or OPENCODE_CONFIG_CONTENT, or pre-seed the dir)"
+copy_on_write = "whole-HOME CoW works (XDG fallbacks all under HOME)"
+local_overlay = "config merge supports layered files; agents/commands/skills merge across scopes (project over global)"
+never_project = "auth.json contents; opencode.db live"
+server_client_concurrency = "supported (one server, many clients incl. attach + run --attach)"
+
+[resource_surfaces.instructions]
+supported = "supported"
+discovery = "AGENTS.md|CLAUDE.md|CONTEXT.md walk-up cwd->worktree, FIRST matching file-type wins (not stacked); global <config>/AGENTS.md then ~/.claude/CLAUDE.md; config.instructions[] globs (~/ ok, http(s) fetched with 5s timeout); nested parent-dir instruction files attached once per message on file read"
+format = "markdown"
+recursion = "yes (nested dirs via walk-up + globs)"
+scope = "project + global + config list"
+env_override = "OPENCODE_DISABLE_PROJECT_CONFIG"
+read_only_ok = true
+writable_needed = false
+version_sensitivity = "medium"
+
+[resource_surfaces.skills]
+supported = "supported (new in 1.x; built-in skill exists)"
+discovery = ".opencode/skill|skills/<name>/SKILL.md (project, recursive **/SKILL.md); <config>/skill(s)/<name>/SKILL.md (global); EXTERNAL ~/.claude/skills/**/SKILL.md + ~/.agents/skills/**/SKILL.md auto-loaded; config.skills.paths[] + config.skills.urls[] (remote index)"
+format = "SKILL.md frontmatter: name (required, lowercase-hyphen, <=64 chars, must match folder), description (required to surface), optional license/compatibility/metadata"
+naming = "folder name = skill name"
+scope = "project + global + external + config paths/urls"
+env_override = ["OPENCODE_DISABLE_EXTERNAL_SKILLS", "OPENCODE_DISABLE_CLAUDE_CODE_SKILLS"]
+read_only_ok = true
+builtin = "customize-opencode (ships in binary)"
+version_sensitivity = "high (recent feature)"
+
+[resource_surfaces.mcp]
+supported = "supported"
+discovery = "config mcp.<name>: {type:'local', command:[...], environment{}, enabled} | {type:'remote', url, headers{}, enabled}; {env:VAR}/{file:path} interpolation; enabled:false disables inherited"
+cli = "opencode mcp add/list/auth/logout/debug"
+transport = "local = stdio child process; remote = HTTP"
+read_only_ok = true
+version_sensitivity = "medium"
+
+[resource_surfaces.commands]
+supported = "supported"
+discovery = ".opencode/command|commands/<name>.md (project), <config>/command(s)/<name>.md (global), config.command{} inline"
+format = "md frontmatter (description, agent, model, variant, subtask) + template body; $ARGUMENTS, $1.. substitution"
+invocation = "TUI slash command; headless: opencode run --command <name> [args..]"
+read_only_ok = true
+version_sensitivity = "medium"
+
+[resource_surfaces.rules]
+supported = "supported (as permission config, no separate rules dir)"
+discovery = "config.permission + agent frontmatter permission; keys: read, edit, glob, grep, list, bash, task, external_directory, todowrite, question, webfetch, websearch, lsp, doom_loop, skill; actions allow|ask|deny; pattern objects: LAST matching rule wins; external_directory uses path globs"
+scope = "top-level config, per-agent override"
+version_sensitivity = "medium"
+
+[resource_surfaces.agents]
+supported = "supported"
+discovery = ".opencode/agent|agents/<name>.md + config.agent{}; global <config>/agent(s)/"
+frontmatter_fields = ["name", "model", "variant", "description", "mode primary|subagent|all", "hidden", "color", "steps", "options", "permission", "disable", "temperature", "top_p"]
+body_role = "agent prompt (do not also set prompt: in frontmatter)"
+builtins = ["build", "plan", "general", "explore"]
+builtin_hidden = ["compaction", "title", "summary"]
+cli = "opencode agent create|list; opencode debug agent <name>"
+read_only_ok = true
+version_sensitivity = "medium"
+
+[resource_surfaces.hooks_plugins]
+supported = "supported"
+discovery = "auto: .opencode/plugin(s)/*.{ts,js}; config plugin[]: npm spec | relative file | file:// URL | [name, options]; opencode plugin <npm> [-g] [-f] installs into global config npm root"
+hook_list = ["event", "config", "chat.message", "chat.params", "chat.headers", "tool.execute.before", "tool.execute.after", "tool.definition", "command.execute.before", "shell.env", "permission.ask", "experimental.*", "tool{}", "auth{}", "provider{}"]
+disable_switches = ["--pure", "OPENCODE_PURE", "OPENCODE_DISABLE_DEFAULT_PLUGINS"]
+writable_needed = "only for installing plugins"
+version_sensitivity = "high"
+
+[resource_surfaces.memory]
+supported = "unknown"
+note = "no dedicated memory surface found; compaction + instructions cover the role"
+
+[resource_surfaces.references]
+supported = "supported (new in 1.x)"
+discovery = "config.references.<alias>: {path} local dir | {repository, branch} git; optional description/hidden; @ autocomplete; external-directory boundary auto-allowed for references"
+version_sensitivity = "high"
+
+[resource_surfaces.formatters_lsp]
+supported = "supported"
+discovery = "config.formatter (false|per-language), config.lsp (false|per-server); opencode debug lsp/rg/file/snapshot"
+version_sensitivity = "medium"
+
+[resource_surfaces.modes_themes]
+supported = "supported"
+discovery = "config.mode{}, config.theme, modes/ + themes/ subdirs, global tui.json"
+keybinds = "unknown (packages/tui internals not enumerated)"
+version_sensitivity = "medium"
+
+[events]
+run_json_stream = "opencode run --format json streams raw JSON events to stdout (schema = SDK v2 event payloads; not captured live)"
+headless_loop_events = ["session.status (status.type idle|busy; idle ends run)", "session.error (name + data.message; exitCode 1)", "permission.asked (id, sessionID, permission, patterns)"]
+bus_event_names = ["session.created", "session.updated", "session.deleted", "session.diff", "session.error", "message.updated", "message.removed", "message.part.updated", "message.part.delta", "message.part.removed", "session.todo", "session.compaction", "model-switched", "agent-switched", "permission.*", "question.*"]
+sse_endpoints = ["GET /event (instance)", "GET /global/event (global)"]
+sse_live_observed = false
+part_types = ["text", "reasoning", "file", "tool (state pending|running|completed, metadata, time)", "step-start", "step-finish", "snapshot", "patch", "agent", "subtask", "retry", "compaction"]
+usage_cost = "tracked per message/model (session.getUsage); opencode stats [--days --models --tools --project]"
+log_file = "<xdg-data>/opencode/log/opencode.log; --print-logs to stderr; --log-level DEBUG|INFO|WARN|ERROR"
+db_observation = "opencode db path | opencode db <sql> --format json|tsv; opencode session list --format json; opencode export <sessionID> [--sanitize]"
+
+[control]
+interrupt = "POST /session/:sessionID/abort (server API); headless CLI abort flag: none observed; TUI keybind: unknown"
+steer = "POST /session/:sessionID/message and /session/:sessionID/prompt_async (queued); semantics inferred, not live-observed"
+permission_respond = "POST /permission/:requestID/reply {reply: once|always|reject, message?}; GET /permission lists pending"
+question_respond = "POST /question/:requestID/reply (answers = arrays of selected labels); GET /question"
+resume = "-c/--continue (last), -s <sessionID>, --fork (fork before continuing) across tui/run/attach"
+model_switch_mid_session = "supported (model-switched/agent-switched events; per-prompt model/agent/variant args)"
+session_surgery = "revert/unrevert, summarize, share/unshare, delete message/part, update part (HTTP API)"
+ephemeral_port_pin = "run --port"
+tui_keybinds = "unknown"
+
+[continuation]
+session_id_format = "internal ids (ses_*/msg_*/part_* family per SDK; exact prefix not asserted)"
+fork_support = "--fork creates a new session from existing history"
+export_import = "opencode export <sessionID> [--sanitize]; opencode import <file|share-url>"
+share_links = "POST /session/:id/share; DELETE unshare; config share manual|auto|disabled; run --share"
+
+[runtime]
+process_model = "CLI bootstraps an in-process server (run without --attach) or talks to external server (attach); TUI similar"
+exit_code_success = "0 (inferred from source: no exitCode set on clean idle)"
+exit_code_error = "1"
+exit_code_no_creds = "observed hang (no fast exit) — needs bound timeout in host"
+log_level_flag = "--log-level DEBUG|INFO|WARN|ERROR"
+pure_flag = "--pure disables external plugins"
+version_drift_risk = "high (near-daily releases; argv/flags VERSION_SENSITIVE)"
+
+[unresolved]
+unresolved_1 = "exit code of run on user abort/SIGINT mid-run"
+unresolved_2 = "exact wire schema of run --format json events (SDK gen types exist; not captured live)"
+unresolved_3 = "MCP OAuth credential store location"
+unresolved_4 = "live SSE /event frame envelope format"
+unresolved_5 = "TUI keybind table (packages/tui)"
+unresolved_6 = "concurrent access contention behavior on same sandbox DB (locks exist; untested)"
+unresolved_7 = "what backs the no-credential default model 'big-pickle' and whether a request left the box before the observed hang"
+unresolved_8 = "opencode acp wire protocol details"
+unresolved_9 = "managed-config paths (/etc/opencode, MDM) presence on this Linux install (docs-only evidence)"
+unresolved_10 = "share:auto upload reachability from sandbox (policy decision, untested)"

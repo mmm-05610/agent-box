@@ -1,0 +1,74 @@
+# Grok Build (xAI) — candidate registration card
+# Researched 2026-09-01 from official docs + official source clone. Unknowns are "unknown", never false.
+
+[meta]
+id = "grok-build"
+tier = "A"
+requested_alias = "Grok Build"
+assessed_date = "2026-09-01"
+recommended_for_registry = true
+
+[identity]
+official_name = "Grok Build"
+binary_branding = "grok (README: \"Grok Build (grok)\", vendor branding 'SpaceXAI')"
+maintainer = "xAI"
+maintainer_evidence = "https://docs.x.ai/build/overview; https://x.ai/cli; https://github.com/xai-org/grok-build"
+official_repo = "https://github.com/xai-org/grok-build"
+license = "Apache-2.0 (first-party; vendored ports of openai/codex and sst/opencode tools keep original licenses)"
+status = "beta (per docs.x.ai/developers/release-notes)"
+source_rev_observed = "d761e8ba538084df023de79d26892eaf73ed7411"
+
+[distribution]
+channel = "install scripts: curl -fsSL https://x.ai/cli/install.sh | bash (macOS/Linux); irm https://x.ai/cli/install.ps1 | iex (Windows); cargo build from source"
+npm_package = "unknown"               # none mentioned in docs or README
+version = "0.2.97 (official changelog index, ~2026-08; third parties claim 1.0.x; exact latest unresolved)"
+version_source = "https://x.ai/build/changelog; grok --version; crates/codegen/xai-grok-version"
+release_cadence = "high-frequency (100+ changelog entries reported; exact cadence unknown)"
+platforms = ["macOS", "Linux", "Windows"]
+
+[platform]
+os = ["macos", "linux", "windows"]
+runtime = "native Rust binary"
+arch = ["x64", "arm64"]               # installer targets; per-arch list not individually verified
+
+[executable]
+binary_name = "grok"
+binary_path = "unknown"               # not installed in observation environment; source artifact name xai-grok-pager shipped as grok
+on_path_observed = false
+local_probe = "NOT_LOCALLY_OBSERVED (binary absent; facts from OFFICIAL_DOC + OFFICIAL_SOURCE)"
+
+[launch_modes]
+interactive_tui = "grok (fullscreen TUI in project directory)"
+headless_one_shot = "grok -p/--single <PROMPT> --output-format <plain|json|streaming-json|streaming-messages-json>"
+headless_server = "ACP agent mode (Agent Client Protocol; session/prompt + session/update JSON-RPC)"
+flags = ["-p/--single", "--prompt-json", "--prompt-file", "--json-schema", "-m/--model", "--output-format", "--cwd", "--always-approve", "--permission-mode", "--max-turns", "--allow", "--deny", "--trust", "-s/--session-id", "-r/--resume", "-c/--continue", "--fork-session", "--no-alt-screen", "--no-auto-update", "--oauth", "--device-auth", "--reauth"]
+
+[profile]
+config_home = "~/.grok"
+user_config = "~/.grok/config.toml"
+appearance_config = "~/.grok/pager.toml (hot-reloadable)"
+env_overrides = ["XAI_API_KEY"]
+custom_models = "[model.<name>] table: model/base_url/name/env_key + [models] default"
+sessions_dir = "~/.grok/sessions"
+session_flags = ["-s/--session-id <ID>", "-r/--resume <ID>", "-c/--continue", "--fork-session"]
+permissions = "--permission-mode, --allow/--deny, --always-approve, --trust"
+
+[credentials]
+mechanism = "grok login browser OAuth (or --device-auth); XAI_API_KEY env for headless/non-browser"
+env_vars = ["XAI_API_KEY"]
+api_endpoint_observed = "https://cli-chat-proxy.grok.com/v1/responses (bearer auth; from source error strings)"
+contents_read = false
+
+[events]
+structured_output = "yes: --output-format json (single) and streaming-json (NDJSON, one ACP session update per line); plus undocumented-in-docs streaming-messages-json (Anthropic wire NDJSON, source only)"
+streaming_events = ["AgentMessage", "AgentThought", "ToolCall", "ToolCallUpdate", "Plan", "AvailableCommands{tools,commands,skills}", "Lifecycle{CompactStarted,CompactCompleted,CompactFailed,CompactCancelled,AutoContinue,...}", "ResponseStarted{message_id,model,input_tokens,cache_read_input_tokens,cache_creation_input_tokens}", "ReasoningCompleted{signature}", "ResponseCompleted{message_id,stop_reason,usage,signature,stop_sequence}"]
+event_source = "crates/codegen/xai-grok-pager/src/headless/reducer/mod.rs:41-110 (VERSION_SENSITIVE; wire casing unverified live)"
+
+[unresolved]
+items = [
+  "exact latest version / GA status (changelog page 403s automated fetch)",
+  "wire-level field casing of streaming events (source enum read, live capture pending)",
+  "session file format under ~/.grok/sessions",
+  "credential token store path/format",
+  "per-OS flag parity (Windows)",
+]

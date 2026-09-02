@@ -48,6 +48,14 @@ def create_server(host="127.0.0.1",port=0,static_dir=None, *, registry=None, rep
             if path=="/api/v1/skills" and method=="GET": return 200,app.skills()
             if path=="/api/v1/skills/import/preview" and method=="POST": return 200,app.skill_import_preview(body.get("path", ""))
             if path=="/api/v1/skills/import/confirm" and method=="POST": return 201,app.skill_import_confirm(body.get("preview_id", ""), body.get("expected_revision"))
+            if path=="/api/v1/skills/install/preview" and method=="POST": return 200,app.skill_install_preview(body.get("harness_type",""), body.get("profile_id",""), body.get("skill",{}))
+            if path=="/api/v1/skills/install/confirm" and method=="POST": return 201,app.skill_install_confirm(body.get("preview_id", ""), body.get("expected_revision", -1))
+            if path=="/api/v1/skills/install/update" and method=="POST": return 200,app.skill_install_update(body.get("harness_type",""), body.get("profile_id",""), body.get("skill",{}), body.get("expected_revision", -1))
+            if path=="/api/v1/skills/install/rollback" and method=="POST": return 200,app.skill_install_rollback(body.get("harness_type",""), body.get("profile_id",""), body.get("skill_id",""), body.get("skill",{}), body.get("expected_revision", -1))
+            if path=="/api/v1/skills/install/remove" and method=="POST": return 200,app.skill_install_remove(body.get("harness_type",""), body.get("profile_id",""), body.get("skill_id",""), body.get("expected_revision", -1))
+            if path=="/api/v1/skills/install/recover" and method=="POST": return 200,app.skill_installer_recover(body.get("harness_type",""), body.get("profile_id",""))
+            if path=="/api/v1/skills/installations" and method=="GET": return 200,app.skill_installations(query.get("harness_type",[None])[0] or "", query.get("profile_id",[None])[0] or "")
+            if path=="/api/v1/skills/inventory" and method=="GET": return 200,app.skill_inventory(query.get("harness_type",[None])[0] or "", query.get("profile_id",[None])[0], query.get("workspace",[None])[0])
             if path=="/api/v1/plugins": return 200,{"plugins":[{"id":r.descriptor.id if r.descriptor else r.entry_point,"status":r.status,"display_name":r.descriptor.display_name if r.descriptor else r.entry_point,"error":r.error} for r in report.records]}
             if path=="/api/v1/providers/execution": return 200,{"providers":[{"id":p.id,"display_name":p.display_name,"version":p.version,"requirements":[{"contract_id":cid,"min":lo,"max":hi,"required":lo>0} for cid,(lo,hi) in sorted(registry.get(p.id).input_limits().items())],"capabilities":registry.get(p.id).capabilities()} for p in registry.descriptors()]}
             if path=="/api/v1/quick-launch/discovery" and method=="GET": return 200,app.quick_launch_discovery()
@@ -62,6 +70,7 @@ def create_server(host="127.0.0.1",port=0,static_dir=None, *, registry=None, rep
                     if len(bits)>=4:
                         pid=bits[3]
                         if len(bits)==4 and method=="GET": return 200,app.profile(hid,pid,int(query["revision"][0]) if query.get("revision") else None)
+                        if len(bits)==5 and bits[4]=="native-home" and method=="GET": return 200,app.profile_native_home(hid,pid)
                         if len(bits)==5 and bits[4]=="revisions" and method=="POST": return 201,app.profile_mutation(body.get("command_id",""),hid,"update",pid,body)
                         if len(bits)==5 and bits[4]=="validate" and method=="POST": return 200,app.profile_mutation(body.get("command_id",""),hid,"validate",pid,body)
                         if len(bits)==5 and bits[4]=="projection-preview" and method=="POST": return 200,app.profile_mutation(body.get("command_id",""),hid,"projection",pid,body)

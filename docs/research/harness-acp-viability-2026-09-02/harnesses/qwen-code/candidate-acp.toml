@@ -1,0 +1,25 @@
+# candidate-acp.toml — Qwen Code (harness id: qwen-code) — AUXILIARY round
+# Built 2026-09-02 from QwenLM/qwen-code main @ 7df5ac689 + npm 0.22.3.
+# Sanitized: <temp-home> = shallow clone + npm pack area. Values "unknown" per SOURCE_POLICY.
+
+schema_version = "agent-box.candidate-acp@1"
+harness_type = "qwen-code"
+decision = "ACP_PRIMARY"
+implementation_name = "qwen-code native ACP mode (packages/cli/src/acp-integration/acpAgent.ts runAcpAgent + packages/acp-bridge)"
+implementation_source = "https://github.com/QwenLM/qwen-code (main @ 7df5ac689, 2026-09-02); npm @qwen-code/qwen-code 0.22.3"
+implementation_owner = "Alibaba Qwen Team (QwenLM org)"
+officiality = "vendor_native_official"
+version = "0.22.3 (npm latest; same-day main commit)"
+protocol_version = "1 (PROTOCOL_VERSION from @agentclientprotocol/sdk ^0.14.1, dist/schema/index.js:27)"
+launch_kind = "subprocess_stdio_jsonrpc_agent"
+command = "qwen --acp  (deprecated alias retained: qwen --experimental-acp, prints warning then maps to --acp; registry launch: npx @qwen-code/qwen-code@0.22.3 --acp --experimental-skills)"
+bundle_members = ["@qwen-code/qwen-code (npm, bin qwen, node >=22)", "@agentclientprotocol/sdk ^0.14.1 (bundled dep)", "@qwen-code/acp-bridge (own workspace package, also used by daemon)"]
+process_topology = "dual: (1) standard in-process stdio AgentSideConnection inside the qwen process (acpAgent.ts:2688,2781; console redirected to stderr); (2) qwen-official daemon superset: qwen serve spawns/attaches one 'qwen --acp' child per WorkspaceRuntime via packages/acp-bridge and multiplexes N sessions (max 32), plus experimental ACP-over-HTTP/WebSocket listener (serve/acp-http); upstream gemini-cli has neither"
+sandbox_status = "partial: CLI has -s/--sandbox flag; ACP side has explicit restrictive-sandbox guard (acpAgent.ts:10266-10271 throws RequestError -32003 restrictive_sandbox on protected fs ops when config.isRestrictiveSandbox()); full trigger surface untested"
+credential_boundary = "ACP authenticate advertises ONLY USE_OPENAI ('Use OpenAI API key', OPENAI_API_KEY env, terminal _meta) per authMethods.ts:10-24; interactive CLI's wider auth (qwen-oauth, DASHSCOPE_API_KEY, anthropic, gemini, vertex-ai) not exposed via ACP authMethods; credential files under <user-home>/.qwen (oauth_creds.json etc., names only, contents never read)"
+profile_boundary = "loadSettings per newSession with ACP-provided cwd (<project>/.qwen/settings.json + user <user-home>/.qwen/settings.json; QWEN_HOME override); untrusted-folder workspace settings ignored; daemon mode adds per-runtime workspace registry isolation (bridges never shared across runtimes)"
+capabilities = { initialize = "SUPPORTED", authenticate = "SUPPORTED (single method advertised)", newSession = "SUPPORTED", loadSession = "SUPPORTED", prompt = "SUPPORTED", cancel = "SUPPORTED", setSessionMode = "SUPPORTED", unstable_setSessionModel = "SUPPORTED", unstable_resumeSession = "SUPPORTED (qwen extension)", unstable_listSessions = "SUPPORTED (qwen extension)", fs_read_write_proxy = "SUPPORTED (AcpFileSystemService/BridgeFileSystem; same-host daemon advertises readTextFile:false shortcut)", daemon_multiplexing = "SUPPORTED (own superset)", acp_over_http_ws = "SUPPORTED experimental (serve Stage 1)", restrictive_sandbox_guard = "SUPPORTED (-32003 errorKind restrictive_sandbox)" }
+missing_capabilities = ["ACP authMethods for non-OpenAI providers (qwen-oauth/DASHSCOPE/anthropic/gemini/vertex-ai not advertised)", "--worktree unusable with --acp (hard error)", "stable setSessionModel (unstable_ only)", "runtime conformance verification this round"]
+native_fallback = "headless non-ACP: qwen -p <PROMPT> -o json|stream-json; also --input-format stream-json bidirectional control channel (control_request/control_response) which is NOT ACP"
+known_risks = ["SDK ^0.14.1 older than upstream gemini pin 0.16.1 and npm latest 1.4.0; heavy reliance on unstable_ extension methods (incl. qwen-own unstable_resumeSession/unstable_listSessions) = protocol drift risk", "registry launch args include --experimental-skills (ACP behavior may depend on experimental flag)", "ACP auth surface narrower than CLI auth surface (client may fail to authenticate without OPENAI_API_KEY or pre-existing login state)", "console.log redirection in ACP mode means child stdout is protocol-only (fine) but external tool output capture paths must respect it"]
+evidence_refs = ["harnesses/qwen-code/EVIDENCE.md#E-1..E-12", "../research-notes/auxiliary-gemini-qwen-grok.md"]

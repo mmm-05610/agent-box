@@ -1,0 +1,3 @@
+# Codeg
+
+Official docs: https://docs.codeg.app/guide/skills. Central store is `~/.codeg/skills`; packs and custom skills share it. Identity is folder/pack skill name. Enable creates a symlink, Windows junction, or copy fallback in an agent native directory; a blocked real folder or link elsewhere is not overwritten. Central install and per-agent activation are separate. Pack updates are documented; exact revision/digest/lock/rollback, dependency, signature, traversal limits, script execution and project scope are UNKNOWN. Import can pull global agent skills into the store; custom native edits are possible. Copy fallback stops live updates. Tier B; see S9.

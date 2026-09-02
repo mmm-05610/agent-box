@@ -1,0 +1,194 @@
+# candidate.toml — Qwen Code (harness id: qwen-code)
+# Built 2026-09-02 against npm @qwen-code/qwen-code 0.22.3 (bin probe) + QwenLM/qwen-code main (165a03596, 2026-09-02 == same version).
+# Unknown values are the string "unknown"; unsupported facts are tri-state strings, never false.
+# Sanitized: <user-home>, <temp-home>, <workspace>, <binary>.
+
+[meta]
+tier = "A"
+evidence_dates = ["2026-09-02"]
+sources = [
+  "CLI probes on @qwen-code/qwen-code 0.22.3 installed into <temp-home> npm prefix (version/help/approval-mode validation) with fresh temp HOME",
+  "QwenLM/qwen-code main @ 165a03596 (2026-09-02) shallow clone in <temp-home>",
+  "Official docs in repo: docs/users/features/{headless,sub-agents,approval-mode,structured-output}.md, docs/users/configuration/auth.md, docs/users/common-workflow.md",
+  "Official README via github.com/QwenLM/qwen-code (WebFetch)",
+]
+verified_version = "0.22.3"
+knowledge_files = ["FACTS.md", "evidence.md", "../experiments/candidates-2.md"]
+
+[identity]
+harness_id = "qwen-code"
+display_name = "Qwen Code"
+org = "QwenLM (Alibaba Qwen team)"
+repo = "https://github.com/QwenLM/qwen-code"
+docs = "https://github.com/QwenLM/qwen-code/tree/main/docs"
+license = "Apache-2.0 (repo headers 'Copyright 2025 Google LLC, Copyright 2026 Qwen Team'; npm metadata has no license field)"
+npm_package = "@qwen-code/qwen-code"
+binary_name = "qwen"
+version_string_format = "<semver>"
+aliases = []
+maintenance_status = "active, extremely fast-moving (main commit same-day as verification; ~9.2k commits)"
+origin = "originally based on Google Gemini CLI v0.8.2; upstream sync stopped from v0.1 (README acknowledgments) — NOT a live fork"
+
+[distribution]
+npm = "@qwen-code/qwen-code bin qwen -> cli-entry.js, engines.node >=22, optional deps incl. platform pty packages; SLSA provenance (GitHub Actions trusted publisher)"
+homebrew = "brew install qwen-code (README)"
+build_from_source = "npm workspace monorepo (packages/cli, packages/core)"
+windows_story = "unknown (not verified this round)"
+
+[platform]
+linux = "supported"
+macos = "supported"
+windows = "unknown"
+wsl = "runs here (WSL2 x64); probes healthy"
+
+[executable]
+identity = "qwen"
+version_probe = "qwen --version -> '0.22.3' (exit 0, unauthenticated)"
+layout = "npm wrapper cli-entry.js on Node >=22"
+help_note = "top-level --help is CONDENSED: many real options (-y/--approval-mode/--system-prompt/--json-schema/...) are hidden or attached to the default command (verified via source + parse probes)"
+subcommands = "serve | review | sessions | channel | extensions | hooks | mcp | update | [query..] (auth REMOVED)"
+
+[launch_modes.tui]
+argv = "qwen [query..]"
+stdio = "ink TUI"
+slash_commands = "/auth (provider+key), /hooks, /review, /agents, /settings (docs; TUI surface)"
+exit_semantics = "user-quit"
+
+[launch_modes.headless]
+argv = "qwen -p|--prompt <PROMPT> (stdin appended)"
+prompt_transport = "argv -p or stdin; -i/--prompt-interactive runs prompt then stays interactive"
+output = "-o|--output-format text|json|stream-json"
+input = "--input-format stream-json (requires --output-format stream-json; long-lived bidirectional protocol; incompatible with --json-schema)"
+approval_flags = "--approval-mode default|auto-edit|auto|yolo|plan (choices observed via validation error; source normalizes auto_edit/autoedit aliases); hidden -y/--yolo"
+model_flags = "-m|--model; --fallback-model (repeatable/comma, max 3)"
+structured_output = "--json-schema <schema|@file> ('first structured_output call ends the session' contract)"
+budget_flags = "--max-session-turns, --max-wall-time, --max-tool-calls (docs/users/features/headless.md; budget breaches pause Goal work with budget-specific errors)"
+prompt_shaping = "--system-prompt (override), --append-system-prompt, --output-style (repeatable)"
+safe_modes = "--safe-mode (disables context files, hooks, extensions, skills, MCP servers); --bare"
+session_flags = "-c|--continue (most recent for project); -r|--resume <id|empty for picker>"
+cwd_behavior = "process cwd is workspace"
+exit_codes = "parse errors exit 1 (observed); full table unknown; budget-specific error exits documented in headless.md"
+network = "required for model; parse-level validation fails before any network"
+
+[launch_modes.serve]
+argv = "qwen serve"
+status = "experimental (Stage 1: --http-bridge)"
+protocol = "local HTTP daemon"
+
+[launch_modes.acp]
+argv = "--acp (experimental-acp hidden deprecated alias)"
+protocol = "Agent Client Protocol over stdio"
+
+[profile]
+native_home = "<user-home>/.qwen"
+home_override_env = "QWEN_HOME (overrides the .qwen dir root; storage.ts:194)"
+config_files = ["settings.json"]
+config_format = "JSON with comments (gemini-cli heritage)"
+scopes = ["system defaults", "system", "user (<user-home>/.qwen/settings.json)", "workspace (<project>/.qwen/settings.json)"]
+precedence_low_to_high = "System Defaults -> User -> Workspace -> System (settings.ts:827 comment); untrusted folders ignore workspace settings"
+context_file = "QWEN.md (project + parent-directory chain via @ refs; memory feature)"
+safe_to_persist = "settings.json layers, QWEN.md, .qwen/agents/, .qwen/fork-profiles/"
+opaque_or_forbidden = "oauth_creds.json, token caches"
+
+[credentials]
+oauth = "Qwen OAuth device-code flow against https://chat.qwen.ai (/api/v1/oauth2/device/code; grant urn:ietf:params:oauth:grant-type:device_code); token files under .qwen (oauth_creds.json, OAUTH_FILE constant); contents never read"
+api_key_env = ["OPENAI_API_KEY (authType openai)", "OPENAI_MODEL (model env)", "ANTHROPIC_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY (vertex-ai)", "DASHSCOPE_API_KEY (Qwen openai-compatible provider, auth.md)", "QWEN_API_KEY (referenced in qwenOAuth2.ts/qwenContentGenerator.ts; exact role unresolved)"]
+auth_types = "openai | qwen-oauth | gemini | vertex-ai | anthropic (AuthType enum, utils/auth-type.ts)"
+auth_config = "settings.json can carry auth envKey/env blocks (auth.md:61-110); `qwen auth` CLI removed — auth via /auth, env, or settings.json"
+forbidden_fields = "all credential file contents, tokens, key values"
+credential_free_isolation = "fresh HOME + provider env keys (design; real-API verification out of scope by policy)"
+
+[isolation]
+account_state = "oauth_creds.json + token caches under .qwen"
+normal_state = "settings.json layers, QWEN.md, agents/, fork-profiles/"
+session_state = "runtime <projectDir>/chats/<sessionId>.runtime.json (live-session discovery); global runtime base dir under qwen home (tmp/); debug logs per session id"
+cache_state = "unknown"
+unsafe_state = "credential files"
+writable_overlay_needed = "chats/, qwen-home tmp/, settings if /auth used"
+concurrency = "concurrent sessions supported (runtime output isolation per storage.ts:134)"
+
+[resource_surfaces.instructions]
+state = "supported"
+discovery = "QWEN.md: project root + parent directories; @ file references pull QWEN.md of file dirs; memory feature (global memory.md at qwen home, Storage.getGlobalMemoryFilePath)"
+format = "markdown"
+read_only_ok = "true"
+version_sensitivity = "STABLE"
+
+[resource_surfaces.subagents]
+state = "supported"
+discovery = "project .qwen/agents/ (highest precedence) and user <user-home>/.qwen/agents/ (fallback) markdown agents with frontmatter; extension agents/ dirs; fork subagents via subagent_type:'fork' (inherit parent context, run_in_background, fork_turns, fork_tools, fork_profile via .qwen/fork-profiles/<name>.md <=64KiB frontmatter-only)"
+teams = "agent teams / teammates (multi-agent-coordination.md); teammate tool calls gated by approval mode in headless"
+version_sensitivity = "VERSION_SENSITIVE"
+
+[resource_surfaces.mcp]
+state = "supported"
+config = "settings mcpServers + `qwen mcp` subcommand; --allowed-mcp-server-names"
+
+[resource_surfaces.hooks]
+state = "supported"
+config = "`qwen hooks` subcommand + /hooks; disabled by --safe-mode"
+version_sensitivity = "VERSION_SENSITIVE"
+
+[resource_surfaces.skills]
+state = "supported"
+config = "auto-skills feature (README); disabled by --safe-mode"
+version_sensitivity = "VERSION_SENSITIVE"
+
+[resource_surfaces.extensions]
+state = "supported"
+config = "`qwen extensions` subcommand; extension-provided agents/skills/commands"
+
+[resource_surfaces.lsp]
+state = "supported"
+config = "LSP integration docs (features/lsp.md); --experimental-lsp flag present in source"
+version_sensitivity = "VERSION_SENSITIVE"
+
+[resource_surfaces.channels]
+state = "supported"
+config = "`qwen channel` subcommand: Telegram, Discord, DingTalk, WeChat, Feishu IM bots"
+version_sensitivity = "VERSION_SENSITIVE"
+
+[resource_surfaces.goals]
+state = "supported"
+config = "persistent Goal workers; stream_event event.type=goal_state on --output-format stream-json (canonical; active_goal legacy projection behind --include-partial-messages)"
+version_sensitivity = "VERSION_SENSITIVE"
+
+[resource_surfaces.sandbox]
+state = "supported_flag"
+config = "-s/--sandbox, --sandbox-image"
+
+[events]
+json_flag = "-o json"
+json_envelope = "ONE JSON array frame on stdout: full messages array (main agent + subagent messages), objects typed assistant|user|system|result; result carries is_error, result, error{type,message,code?}, usage, stats, summary, numTurns-style fields (JsonOutputAdapter.emitResult; differs from gemini-cli {response,stats})"
+stream_flag = "-o stream-json (NDJSON)"
+stream_events = "Anthropic-CLI-style: assistant{content blocks text|thinking|tool_use}, user{tool_result}, system{subtype}, result{is_error/result/usage/stats/summary}; control_request/control_response (subtype can_use_tool) over --input-format stream-json; goal_state stream_event for Goal status"
+partials = "--include-partial-messages (legacy active_goal projection)"
+ansi = "stripAnsi applied in formatters"
+stderr = "diagnostics separated; text mode writes result or error to stdout/stderr respectively"
+completion_marker = "result message (status success|error|cancelled observed in code paths)"
+session_log = "chats/<sessionId>.runtime.json + chat-recording; --input-format stream-json supports reusable sessions (protocol interrupt does not tear down session)"
+
+[control]
+interrupt = "protocol interrupt via stream-json control_request/control_response (reusable sessions survive interrupts)"
+steer = "unknown"
+resume = "-c continue-latest; -r <id>; qwen sessions subcommand; background agent resume exists (background-agent-resume.ts)"
+approval_responses = "headless cannot prompt: teammate tool calls auto-cancelled unless --yolo or stream-json control channel (nonInteractiveCli.ts:991-992)"
+
+[continuation]
+native_resume = "supported (-c/-r/sessions subcommand)"
+contract_candidate = "agent-box.qwen-code-continuation@1"
+
+[runtime]
+default_model = "qwen models via qwen-oauth or DASHSCOPE_API_KEY openai-compatible provider"
+provider = "multi-protocol: OpenAI | Anthropic | Gemini | Qwen APIs + Ollama/vLLM (README); runtime switchable"
+transport = "unknown"
+sandbox_native = "-s flag (sandbox docs exist; not exercised)"
+tty_requirement = "none for -p headless (docs: 'Scripts, CI/CD, batch processing — no UI')"
+
+[unresolved]
+qwen_api_key_role = "unknown (referenced in source; exact auth path not traced)"
+serve_protocol = "unknown (Stage 1 experimental; not mapped)"
+full_exit_code_table = "unknown (parse-error exit 1 observed; budget exits documented qualitatively)"
+arena_internals = "unknown (features/arena.md not verified in depth)"
+json_frame_stability = "unknown (messages-array frame verified only on 0.22.3)"
+windows_status = "unknown"

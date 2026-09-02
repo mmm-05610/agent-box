@@ -1,0 +1,3 @@
+# Pi
+
+Official repo: https://github.com/badlogic/pi-mono. Pi uses native user/project skill directories plus package/extension loading (`pi install`, `pi -e`). A package can add skills and startup extension behavior; this is Package/Plugin Model D, not a central registry. Identity is package Git/npm reference plus skill name; exact commit pin, lock, rollback, project/global collision and symlink policy are version-sensitive/UNKNOWN. Supporting files are package content; extension code is executable runtime. Offline works for installed packages. Cross-Harness compatibility is content-level only. Tier B; see S15 and S11.

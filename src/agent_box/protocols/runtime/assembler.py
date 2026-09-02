@@ -1,12 +1,11 @@
 """Generic assembly of one frozen runtime composition.
 
 This module is the only shared place that turns the Core Dispatch handoff and
-a Harness projector's declared runtime sources into a RuntimeBundle.  It has
-no knowledge of any resource contract (workspace/profile/credential), any
-provider, or any guest path convention: the Harness projector owns the guest
-layout and declares it verbatim; the assembler validates, registers and
-assembles — fail closed, before any attempt starts — and only the Sandbox
-sees the final MountPlan.
+a projector's declared runtime sources into a RuntimeBundle.  It has no
+knowledge of any resource contract, any provider, or any guest path
+convention: the declaring projector owns the guest layout and declares it
+verbatim; the assembler validates, registers and assembles — fail closed,
+before any attempt starts — and only the Sandbox sees the final MountPlan.
 """
 from __future__ import annotations
 

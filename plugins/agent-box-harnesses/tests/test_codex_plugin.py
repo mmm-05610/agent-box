@@ -20,7 +20,9 @@ def test_registers_codex_app_server_execution_provider_without_discovery_writes(
     assert "codex-execution" in [c.component.provider_id for c in registration.contributions if hasattr(c.component, "provider_id")]
     provider = registration.execution_providers[0]
     assert provider.descriptor().id == "codex-execution"
-    assert provider.input_limits() == {"agent-box.skill@1": (0, 32)}
+    # ordinary Executions no longer carry SkillRef inputs; the provider
+    # declares no skill slot
+    assert provider.input_limits() == {}
     assert "codex-profile-selector" in [c.component.id for c in registration.contributions if hasattr(c.component, "id")]
     assert not context.plugin_data_dir.exists()
 

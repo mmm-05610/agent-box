@@ -1,0 +1,25 @@
+# candidate-acp.toml — Grok Build (harness id: grok-build) — AUXILIARY round
+# Built 2026-09-02 from xai-org/grok-build main @ 72a61251 (SOURCE_REV a549186d).
+# Sanitized: <temp-home> = shallow clone area. Values "unknown" per SOURCE_POLICY.
+
+schema_version = "agent-box.candidate-acp@1"
+harness_type = "grok-build"
+decision = "ACP_PRIMARY"
+implementation_name = "grok-build native ACP mode (impl acp::Agent for MvpAgent + AgentSideConnection; crates/codegen/xai-acp-lib)"
+implementation_source = "https://github.com/xai-org/grok-build (main @ 72a61251, 2026-09-01); official docs https://docs.x.ai/build/overview"
+implementation_owner = "xAI"
+officiality = "vendor_native_official"
+version = "unknown (contradicted signals: registry manifest 1.0.17 vs prior-phase changelog 0.2.97 vs npm mirror wrapper 0.1.4; VERSION const is build-time injected via GROK_VERSION)"
+protocol_version = "1 (InitializeResponse::new(acp::ProtocolVersion::V1), acp_agent.rs:493)"
+launch_kind = "subprocess_stdio_jsonrpc_agent"
+command = "grok agent stdio  (registry launch: npx @xai-official/grok@1.0.17 agent stdio)"
+bundle_members = ["grok native Rust binary (install script curl -fsSL https://x.ai/cli/install.sh | bash, or cargo build)", "@xai-official/grok npm wrapper (bin grok)", "agent-client-protocol Rust crate 0.10.4 features=[unstable] (bundled dep)"]
+process_topology = "in_process: 'grok agent stdio' runs the agent embedded in the grok binary (main.rs:1285 Entrypoint::Embedded) with acp::AgentSideConnection::new over stdio (xai-grok-shell agent/app.rs:156, agent/server.rs:523); ACP types (SessionUpdate) also reused internally for streaming-json output and via own xai-acp-lib channels; no adapter child"
+sandbox_status = "unknown: no ACP-specific sandbox handling located this round; CLI has permission-mode/allow/deny/approve flags per prior-phase research; ACP requestPermission flow exists via SDK but not audited"
+credential_boundary = "ACP authenticate supports XAI_API_KEY_METHOD_ID and CACHED_TOKEN_AUTH_METHOD_ID (auth_method.rs:187-300); preferred_method config can forbid api-key or session-token auth (acp::Error::auth_required); XAI_API_KEY env for headless; token store path/format not read (names only)"
+profile_boundary = "config home <user-home>/.grok (config.toml, pager.toml); sessions under <user-home>/.grok/sessions; per-newSession cwd from ACP request (session_setup.rs new_session_inner); worktree pool cleanup runs at initialize"
+capabilities = { initialize = "SUPPORTED", authenticate = "SUPPORTED (api-key + cached-token methods)", newSession = "SUPPORTED", loadSession = "SUPPORTED", prompt = "SUPPORTED", cancel = "SUPPORTED", setSessionMode = "SUPPORTED", setSessionModel = "SUPPORTED (native trait method, model_state meta in initialize)", session_update_stream = "SUPPORTED (AgentMessageChunk/AgentThoughtChunk/ToolCall/ToolCallUpdate/Plan/AvailableCommandsUpdate)", fs_read_write_proxy = "unknown (not located; Agent trait completion unverified)", prompt_capabilities = "unknown" }
+missing_capabilities = ["fs read/write proxy declarations not located this round", "promptCapabilities declarations not located", "official ACP documentation page (docs.x.ai/build/acp is 404; ACP only mentioned in prose on overview)", "runtime handshake verification (binary not installed this round)"]
+native_fallback = "headless non-ACP: grok -p/--single <PROMPT> --output-format streaming-json (NDJSON of ACP-typed session updates); Anthropic-wire streaming-messages-json undocumented flag"
+known_risks = ["version signal contradiction (1.0.17 registry vs 0.2.97 changelog vs 0.1.4 npm mirror) complicates pinning", "npm wrapper @xai-official/grok latest on local mirror (0.1.4) may lag; registry pins 1.0.17", "unstable features of agent-client-protocol crate in use (features=[unstable])", "no dedicated ACP docs page; client onboarding is registry-manifest only", "license field conflict: registry manifest 'proprietary' vs repo Apache-2.0"]
+evidence_refs = ["harnesses/grok-build/EVIDENCE.md#E-1..E-13", "../research-notes/auxiliary-gemini-qwen-grok.md"]

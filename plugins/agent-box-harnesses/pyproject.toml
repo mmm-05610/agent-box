@@ -7,6 +7,12 @@ version = "2.0.0a1"
 description = "Official Agent-Box Harness integrations"
 requires-python = ">=3.10"
 dependencies = ["agent-box-cli==2.0.0a1", "agent-box-terminal-session==2.0.0a1"]
+
+[project.optional-dependencies]
+# Optional generic ACP client engine; OpenCode's ACP second mode reports
+# UNAVAILABLE (with reason) when this extra is absent — the plugin itself
+# stays READY.
+acp = ["agent-box-acp==2.0.0a1"]
 [project.entry-points."agent_box.plugins"]
 harness-profile-store = "agent_box_harnesses.entrypoints:create_profile_store"
 codex = "agent_box_harnesses.entrypoints:create_codex"

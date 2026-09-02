@@ -1,0 +1,6 @@
+name = "option-c-cas-projection"
+architecture = "immutable-cas-runtime-projection"
+authority = "content-addressed-store-and-exact-ref"
+projection = "execution-scoped-native-home"
+reversible = true
+requires_human_decision = true
