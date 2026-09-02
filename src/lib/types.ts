@@ -3608,18 +3608,6 @@ export interface GitDetectResult {
   path: string | null
 }
 
-export interface PackageManagerInfo {
-  name: string
-  installed: boolean
-  version: string | null
-}
-
-/** Per-agent install status of the HyperFrames agent skills. */
-export interface HyperframesSkillAgent {
-  agent: string
-  installed: boolean
-}
-
 export interface GitSettings {
   custom_path: string | null
 }

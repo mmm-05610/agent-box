@@ -15,7 +15,6 @@ const mocks = vi.hoisted(() => {
   return {
     connections,
     openImportSessionsWindow: vi.fn(),
-    openProjectBootWindow: vi.fn(() => Promise.resolve()),
     openPetWindow: vi.fn(() => Promise.resolve()),
     openRemoteWorkspace: vi.fn(() => Promise.resolve()),
     listRemoteWorkspaceConnections: vi.fn(() => Promise.resolve(connections)),
@@ -28,7 +27,6 @@ vi.mock("@/lib/platform", () => ({ isDesktop: () => desktop }))
 
 vi.mock("@/lib/api", () => ({
   openImportSessionsWindow: mocks.openImportSessionsWindow,
-  openProjectBootWindow: mocks.openProjectBootWindow,
 }))
 
 vi.mock("@/lib/pet/api", () => ({ openPetWindow: mocks.openPetWindow }))
@@ -117,7 +115,7 @@ beforeEach(() => {
 })
 
 describe("QuickActionsDropdown", () => {
-  it("groups all ten actions under their headings on desktop", async () => {
+  it("groups all nine actions under their headings on desktop", async () => {
     await mountAndOpen()
 
     for (const group of ["Workspace", "Sessions", "Navigation", "More"]) {
@@ -126,7 +124,6 @@ describe("QuickActionsDropdown", () => {
     for (const label of [
       "Open Folder",
       "Clone Repository",
-      "Project Boot",
       "Open remote workspace",
       "Manage conversations",
       "Import local sessions",
@@ -179,10 +176,6 @@ describe("QuickActionsDropdown", () => {
     expect(mocks.openImportSessionsWindow).toHaveBeenCalledWith({
       focusPath: "/tmp/repo",
     })
-
-    await reopen()
-    await clickItem("Project Boot")
-    expect(mocks.openProjectBootWindow).toHaveBeenCalled()
 
     await reopen()
     await clickItem("To-dos")

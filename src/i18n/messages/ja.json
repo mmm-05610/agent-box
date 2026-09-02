@@ -2125,7 +2125,6 @@
       "fallbackFolderName": "フォルダ",
       "openFolder": "フォルダを開く",
       "cloneRepository": "リポジトリをクローン",
-      "projectBoot": "プロジェクトブート",
       "opened": "開いているフォルダ",
       "recentOpen": "最近開いたフォルダ"
     },
@@ -3642,77 +3641,6 @@
     },
     "toasts": {
       "cloneFailed": "リポジトリのクローンに失敗しました"
-    }
-  },
-  "ProjectBoot": {
-    "title": "プロジェクトブート",
-    "tabs": {
-      "shadcn": "shadcn",
-      "hyperframes": "HyperFrames"
-    },
-    "hyperframes": {
-      "title": "HyperFrames 動画プロジェクト",
-      "subtitle": "HTML から動画を生成するプロジェクトを作成します。ワークスペースのエージェントがそれを記述・レンダリングできます。",
-      "resolution": "解像度",
-      "skillsTitle": "エージェントスキル",
-      "skillsDesc": "選択したエージェント向けに HyperFrames スキルをグローバル(シンボリックリンク)でインストールし、動画の作成・レンダリングを可能にします。",
-      "recheck": "再チェック",
-      "installedBadge": "インストール済み",
-      "skillsInstall": "スキルをインストール / 更新",
-      "skillsInstalling": "スキルをインストール中…",
-      "skillsInstalled": "HyperFrames スキルをインストールしました",
-      "skillsInstallFailed": "HyperFrames スキルのインストールに失敗しました"
-    },
-    "config": {
-      "base": "ベース",
-      "style": "スタイル",
-      "baseColor": "ベースカラー",
-      "theme": "テーマ",
-      "chartColor": "チャートカラー",
-      "iconLibrary": "アイコンライブラリ",
-      "font": "フォント",
-      "fontHeading": "見出しフォント",
-      "menuAccent": "メニューアクセント",
-      "menuColor": "メニューカラー",
-      "radius": "角丸",
-      "template": "テンプレート",
-      "createProject": "プロジェクトを作成",
-      "sectionStyle": "スタイル",
-      "sectionColors": "カラー",
-      "sectionTypography": "タイポグラフィ",
-      "sectionInterface": "インターフェース"
-    },
-    "preview": {
-      "loading": "プレビューを読み込み中..."
-    },
-    "createDialog": {
-      "title": "プロジェクトを作成",
-      "projectName": "プロジェクト名",
-      "projectNamePlaceholder": "my-app",
-      "frameworkTemplate": "フレームワークテンプレート",
-      "packageManager": "パッケージマネージャー",
-      "saveDirectory": "保存先ディレクトリ",
-      "saveDirectoryPlaceholder": "ディレクトリを選択...",
-      "browseDirectory": "参照",
-      "projectPath": "プロジェクトの作成先：{path}",
-      "advancedOptions": "詳細オプション",
-      "base": "基盤ライブラリ",
-      "enableRtl": "RTL サポートを有効にする",
-      "enableRtlDescription": "右から左に書く言語（アラビア語、ヘブライ語など）のレイアウトサポートを有効にする",
-      "pmChecking": "確認中...",
-      "pmNotInstalled": "未インストール",
-      "cancel": "キャンセル",
-      "create": "作成",
-      "creating": "プロジェクトを作成中..."
-    },
-    "toasts": {
-      "createFailed": "プロジェクトの作成に失敗しました",
-      "createSuccess": "プロジェクトが正常に作成されました",
-      "openWorkspaceFailed": "プロジェクトは作成されましたが、ワークスペースで開けませんでした"
-    },
-    "errors": {
-      "directoryExists": "対象ディレクトリは既に存在します",
-      "commandFailed": "プロジェクト作成コマンドが失敗しました。"
     }
   },
   "WebServiceSettings": {

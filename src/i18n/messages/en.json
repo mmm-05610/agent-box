@@ -2125,7 +2125,6 @@
       "fallbackFolderName": "Folder",
       "openFolder": "Open Folder",
       "cloneRepository": "Clone Repository",
-      "projectBoot": "Project Boot",
       "opened": "Opened",
       "recentOpen": "Recently Opened"
     },
@@ -3642,77 +3641,6 @@
     },
     "toasts": {
       "cloneFailed": "Failed to clone repository"
-    }
-  },
-  "ProjectBoot": {
-    "title": "Project Boot",
-    "tabs": {
-      "shadcn": "shadcn",
-      "hyperframes": "HyperFrames"
-    },
-    "hyperframes": {
-      "title": "HyperFrames Video Project",
-      "subtitle": "Scaffold an HTML-to-video project. Your workspace agent can then write and render it.",
-      "resolution": "Resolution",
-      "skillsTitle": "Agent Skills",
-      "skillsDesc": "Globally install the HyperFrames skills (symlinked) for the selected agents so they can author and render video.",
-      "recheck": "Re-check",
-      "installedBadge": "Installed",
-      "skillsInstall": "Install / update skills",
-      "skillsInstalling": "Installing skills…",
-      "skillsInstalled": "HyperFrames skills installed",
-      "skillsInstallFailed": "Couldn't install HyperFrames skills"
-    },
-    "config": {
-      "base": "Base",
-      "style": "Style",
-      "baseColor": "Base Color",
-      "theme": "Theme",
-      "chartColor": "Chart Color",
-      "iconLibrary": "Icon Library",
-      "font": "Font",
-      "fontHeading": "Heading Font",
-      "menuAccent": "Menu Accent",
-      "menuColor": "Menu Color",
-      "radius": "Radius",
-      "template": "Template",
-      "createProject": "Create Project",
-      "sectionStyle": "Style",
-      "sectionColors": "Colors",
-      "sectionTypography": "Typography",
-      "sectionInterface": "Interface"
-    },
-    "preview": {
-      "loading": "Loading preview..."
-    },
-    "createDialog": {
-      "title": "Create Project",
-      "projectName": "Project Name",
-      "projectNamePlaceholder": "my-app",
-      "frameworkTemplate": "Framework Template",
-      "packageManager": "Package Manager",
-      "saveDirectory": "Save Directory",
-      "saveDirectoryPlaceholder": "Select directory...",
-      "browseDirectory": "Browse",
-      "projectPath": "Project will be created at: {path}",
-      "advancedOptions": "Advanced Options",
-      "base": "Base Library",
-      "enableRtl": "Enable RTL Support",
-      "enableRtlDescription": "Enable layout support for right-to-left languages (e.g. Arabic, Hebrew)",
-      "pmChecking": "Checking...",
-      "pmNotInstalled": "Not installed",
-      "cancel": "Cancel",
-      "create": "Create",
-      "creating": "Creating project..."
-    },
-    "toasts": {
-      "createFailed": "Failed to create project",
-      "createSuccess": "Project created successfully",
-      "openWorkspaceFailed": "Project created, but couldn't open it in the workspace"
-    },
-    "errors": {
-      "directoryExists": "Target directory already exists",
-      "commandFailed": "Project creation command failed."
     }
   },
   "WebServiceSettings": {

@@ -2125,7 +2125,6 @@
       "fallbackFolderName": "Pasta",
       "openFolder": "Abrir pasta",
       "cloneRepository": "Clonar repositório",
-      "projectBoot": "Inicializador de projeto",
       "opened": "Aberto",
       "recentOpen": "Abertos recentemente"
     },
@@ -3642,77 +3641,6 @@
     },
     "toasts": {
       "cloneFailed": "Falha ao clonar o repositório"
-    }
-  },
-  "ProjectBoot": {
-    "title": "Inicializador de Projeto",
-    "tabs": {
-      "shadcn": "shadcn",
-      "hyperframes": "HyperFrames"
-    },
-    "hyperframes": {
-      "title": "Projeto de vídeo HyperFrames",
-      "subtitle": "Crie um projeto de HTML para vídeo. O agente do espaço de trabalho pode então escrevê-lo e renderizá-lo.",
-      "resolution": "Resolução",
-      "skillsTitle": "Skills dos agentes",
-      "skillsDesc": "Instala globalmente as skills do HyperFrames (link simbólico) para os agentes selecionados, para que possam criar e renderizar vídeo.",
-      "recheck": "Verificar novamente",
-      "installedBadge": "Instalado",
-      "skillsInstall": "Instalar / atualizar skills",
-      "skillsInstalling": "Instalando skills…",
-      "skillsInstalled": "Skills do HyperFrames instaladas",
-      "skillsInstallFailed": "Não foi possível instalar as skills do HyperFrames"
-    },
-    "config": {
-      "base": "Base",
-      "style": "Estilo",
-      "baseColor": "Cor base",
-      "theme": "Tema",
-      "chartColor": "Cor do gráfico",
-      "iconLibrary": "Biblioteca de ícones",
-      "font": "Fonte",
-      "fontHeading": "Fonte do título",
-      "menuAccent": "Destaque do menu",
-      "menuColor": "Cor do menu",
-      "radius": "Raio",
-      "template": "Modelo",
-      "createProject": "Criar projeto",
-      "sectionStyle": "Estilo",
-      "sectionColors": "Cores",
-      "sectionTypography": "Tipografia",
-      "sectionInterface": "Interface"
-    },
-    "preview": {
-      "loading": "Carregando visualização..."
-    },
-    "createDialog": {
-      "title": "Criar projeto",
-      "projectName": "Nome do projeto",
-      "projectNamePlaceholder": "my-app",
-      "frameworkTemplate": "Modelo de framework",
-      "packageManager": "Gerenciador de pacotes",
-      "saveDirectory": "Diretório de salvamento",
-      "saveDirectoryPlaceholder": "Selecionar diretório...",
-      "browseDirectory": "Procurar",
-      "projectPath": "O projeto será criado em: {path}",
-      "advancedOptions": "Opções Avançadas",
-      "base": "Biblioteca Base",
-      "enableRtl": "Ativar Suporte RTL",
-      "enableRtlDescription": "Ativar suporte de layout para idiomas da direita para a esquerda (ex.: árabe, hebraico)",
-      "pmChecking": "Verificando...",
-      "pmNotInstalled": "Não instalado",
-      "cancel": "Cancelar",
-      "create": "Criar",
-      "creating": "Criando projeto..."
-    },
-    "toasts": {
-      "createFailed": "Falha ao criar o projeto",
-      "createSuccess": "Projeto criado com sucesso",
-      "openWorkspaceFailed": "Projeto criado, mas não foi possível abri-lo no espaço de trabalho"
-    },
-    "errors": {
-      "directoryExists": "O diretório de destino já existe",
-      "commandFailed": "O comando de criação do projeto falhou."
     }
   },
   "WebServiceSettings": {

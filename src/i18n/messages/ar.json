@@ -2125,7 +2125,6 @@
       "fallbackFolderName": "مجلد",
       "openFolder": "فتح مجلد",
       "cloneRepository": "استنساخ المستودع",
-      "projectBoot": "مُنشئ المشروع",
       "opened": "مفتوح",
       "recentOpen": "المفتوح مؤخرًا"
     },
@@ -3642,77 +3641,6 @@
     },
     "toasts": {
       "cloneFailed": "فشل استنساخ المستودع"
-    }
-  },
-  "ProjectBoot": {
-    "title": "مُنشئ المشروع",
-    "tabs": {
-      "shadcn": "shadcn",
-      "hyperframes": "HyperFrames"
-    },
-    "hyperframes": {
-      "title": "مشروع فيديو HyperFrames",
-      "subtitle": "أنشئ مشروعًا لتحويل HTML إلى فيديو. يمكن لوكيل مساحة العمل بعد ذلك كتابته وعرضه.",
-      "resolution": "الدقة",
-      "skillsTitle": "مهارات الوكلاء",
-      "skillsDesc": "ثبّت مهارات HyperFrames عامًّا (رابط رمزي) للوكلاء المحددين حتى يتمكنوا من إنشاء الفيديو وعرضه.",
-      "recheck": "إعادة الفحص",
-      "installedBadge": "مثبّت",
-      "skillsInstall": "تثبيت / تحديث المهارات",
-      "skillsInstalling": "جارٍ تثبيت المهارات…",
-      "skillsInstalled": "تم تثبيت مهارات HyperFrames",
-      "skillsInstallFailed": "تعذّر تثبيت مهارات HyperFrames"
-    },
-    "config": {
-      "base": "الأساس",
-      "style": "النمط",
-      "baseColor": "اللون الأساسي",
-      "theme": "السمة",
-      "chartColor": "لون المخطط",
-      "iconLibrary": "مكتبة الأيقونات",
-      "font": "الخط",
-      "fontHeading": "خط العنوان",
-      "menuAccent": "تمييز القائمة",
-      "menuColor": "لون القائمة",
-      "radius": "نصف القطر",
-      "template": "القالب",
-      "createProject": "إنشاء مشروع",
-      "sectionStyle": "النمط",
-      "sectionColors": "الألوان",
-      "sectionTypography": "الخطوط",
-      "sectionInterface": "الواجهة"
-    },
-    "preview": {
-      "loading": "جاري تحميل المعاينة..."
-    },
-    "createDialog": {
-      "title": "إنشاء مشروع",
-      "projectName": "اسم المشروع",
-      "projectNamePlaceholder": "my-app",
-      "frameworkTemplate": "قالب الإطار",
-      "packageManager": "مدير الحزم",
-      "saveDirectory": "دليل الحفظ",
-      "saveDirectoryPlaceholder": "اختر الدليل...",
-      "browseDirectory": "تصفح",
-      "projectPath": "سيتم إنشاء المشروع في: {path}",
-      "advancedOptions": "خيارات متقدمة",
-      "base": "المكتبة الأساسية",
-      "enableRtl": "تفعيل دعم RTL",
-      "enableRtlDescription": "تفعيل دعم التخطيط للغات التي تُكتب من اليمين إلى اليسار (مثل العربية والعبرية)",
-      "pmChecking": "جارٍ التحقق...",
-      "pmNotInstalled": "غير مثبت",
-      "cancel": "إلغاء",
-      "create": "إنشاء",
-      "creating": "جاري إنشاء المشروع..."
-    },
-    "toasts": {
-      "createFailed": "فشل إنشاء المشروع",
-      "createSuccess": "تم إنشاء المشروع بنجاح",
-      "openWorkspaceFailed": "تم إنشاء المشروع، ولكن تعذّر فتحه في مساحة العمل"
-    },
-    "errors": {
-      "directoryExists": "الدليل الهدف موجود بالفعل",
-      "commandFailed": "فشل أمر إنشاء المشروع."
     }
   },
   "WebServiceSettings": {

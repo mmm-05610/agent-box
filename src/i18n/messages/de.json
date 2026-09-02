@@ -2125,7 +2125,6 @@
       "fallbackFolderName": "Ordner",
       "openFolder": "Ordner öffnen",
       "cloneRepository": "Repository klonen",
-      "projectBoot": "Projekt-Boot",
       "opened": "Geöffnet",
       "recentOpen": "Zuletzt geöffnet"
     },
@@ -3642,77 +3641,6 @@
     },
     "toasts": {
       "cloneFailed": "Repository konnte nicht geklont werden"
-    }
-  },
-  "ProjectBoot": {
-    "title": "Projekt-Starter",
-    "tabs": {
-      "shadcn": "shadcn",
-      "hyperframes": "HyperFrames"
-    },
-    "hyperframes": {
-      "title": "HyperFrames-Videoprojekt",
-      "subtitle": "Erstelle ein HTML-zu-Video-Projekt. Der Agent im Arbeitsbereich kann es dann schreiben und rendern.",
-      "resolution": "Auflösung",
-      "skillsTitle": "Agenten-Skills",
-      "skillsDesc": "Installiert die HyperFrames-Skills global (Symlink) für die ausgewählten Agenten, damit sie Videos erstellen und rendern können.",
-      "recheck": "Erneut prüfen",
-      "installedBadge": "Installiert",
-      "skillsInstall": "Skills installieren / aktualisieren",
-      "skillsInstalling": "Skills werden installiert…",
-      "skillsInstalled": "HyperFrames-Skills installiert",
-      "skillsInstallFailed": "HyperFrames-Skills konnten nicht installiert werden"
-    },
-    "config": {
-      "base": "Basis",
-      "style": "Stil",
-      "baseColor": "Basisfarbe",
-      "theme": "Thema",
-      "chartColor": "Diagrammfarbe",
-      "iconLibrary": "Icon-Bibliothek",
-      "font": "Schriftart",
-      "fontHeading": "Überschrift-Schriftart",
-      "menuAccent": "Menü-Akzent",
-      "menuColor": "Menü-Farbe",
-      "radius": "Radius",
-      "template": "Vorlage",
-      "createProject": "Projekt erstellen",
-      "sectionStyle": "Stil",
-      "sectionColors": "Farben",
-      "sectionTypography": "Typografie",
-      "sectionInterface": "Oberfläche"
-    },
-    "preview": {
-      "loading": "Vorschau wird geladen..."
-    },
-    "createDialog": {
-      "title": "Projekt erstellen",
-      "projectName": "Projektname",
-      "projectNamePlaceholder": "my-app",
-      "frameworkTemplate": "Framework-Vorlage",
-      "packageManager": "Paketmanager",
-      "saveDirectory": "Speicherverzeichnis",
-      "saveDirectoryPlaceholder": "Verzeichnis auswählen...",
-      "browseDirectory": "Durchsuchen",
-      "projectPath": "Projekt wird erstellt in: {path}",
-      "advancedOptions": "Erweiterte Optionen",
-      "base": "Basisbibliothek",
-      "enableRtl": "RTL-Unterstützung aktivieren",
-      "enableRtlDescription": "Layout-Unterstützung für Rechts-nach-links-Sprachen (z.B. Arabisch, Hebräisch) aktivieren",
-      "pmChecking": "Wird überprüft...",
-      "pmNotInstalled": "Nicht installiert",
-      "cancel": "Abbrechen",
-      "create": "Erstellen",
-      "creating": "Projekt wird erstellt..."
-    },
-    "toasts": {
-      "createFailed": "Projekt konnte nicht erstellt werden",
-      "createSuccess": "Projekt erfolgreich erstellt",
-      "openWorkspaceFailed": "Projekt erstellt, konnte aber nicht im Arbeitsbereich geöffnet werden"
-    },
-    "errors": {
-      "directoryExists": "Zielverzeichnis existiert bereits",
-      "commandFailed": "Projekterstellungsbefehl fehlgeschlagen."
     }
   },
   "WebServiceSettings": {

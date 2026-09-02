@@ -150,8 +150,6 @@ import type {
   LogFileInfo,
   GitCredentials,
   GitDetectResult,
-  PackageManagerInfo,
-  HyperframesSkillAgent,
   GitSettings,
   GitHubAccountsSettings,
   GitHubTokenValidation,
@@ -3041,26 +3039,13 @@ export async function openImportSessionsWindow(
   )
 }
 
-export async function openProjectBootWindow(source?: string): Promise<void> {
-  if (isDesktop()) {
-    return getShellTransport().call("open_project_boot_window", {
-      source,
-      locale: getCurrentEffectiveAppLocale(),
-      remoteConnectionId: getActiveRemoteConnectionId(),
-    })
-  }
-  if (typeof window !== "undefined") {
-    window.open("/project-boot", "project-boot")
-  }
-}
-
-// Cross-window handoff for the project launcher, which lives in its own
-// window/tab and can't reach the workspace's React state directly. The
-// backend upserts the folder and emits `folder://open-in-workspace` carrying
-// the FolderDetail through the shared EventEmitter; the transport layer routes
-// that to the right workspace window in every runtime (local Tauri bus, the
-// server's WebSocket broadcaster for web, and the remote server's broadcaster
-// for remote desktop), so only windows talking to this backend react. The
+// Cross-window handoff for surfaces that live in their own window/tab and
+// can't reach the workspace's React state directly. The backend upserts the
+// folder and emits `folder://open-in-workspace` carrying the FolderDetail
+// through the shared EventEmitter; the transport layer routes that to the
+// right workspace window in every runtime (local Tauri bus, the server's
+// WebSocket broadcaster for web, and the remote server's broadcaster for
+// remote desktop), so only windows talking to this backend react. The
 // workspace subscribes via WorkspaceOpenFolderListener.
 export const FOLDER_OPEN_IN_WORKSPACE_EVENT = "folder://open-in-workspace"
 
@@ -3068,77 +3053,6 @@ export async function openFolderInWorkspace(
   path: string
 ): Promise<FolderDetail> {
   return getTransport().call("open_folder_in_workspace", { path })
-}
-
-export async function detectPackageManager(
-  name: string
-): Promise<PackageManagerInfo> {
-  return getTransport().call("detect_package_manager", { name })
-}
-
-export async function createShadcnProject(params: {
-  projectName: string
-  template: string
-  presetCode: string
-  packageManager: string
-  targetDir: string
-}): Promise<string> {
-  return getTransport().call("create_shadcn_project", {
-    projectName: params.projectName,
-    template: params.template,
-    presetCode: params.presetCode,
-    packageManager: params.packageManager,
-    targetDir: params.targetDir,
-  })
-}
-
-/**
- * Detect, per codeg-supported agent, whether the HyperFrames skills are already
- * installed globally. Cheap filesystem check, so no long timeout is needed.
- */
-export async function detectHyperframesSkills(): Promise<
-  HyperframesSkillAgent[]
-> {
-  return getTransport().call(
-    "detect_hyperframes_skills",
-    {},
-    { timeoutMs: 30_000 }
-  )
-}
-
-/**
- * Install the HyperFrames agent skills globally (symlinked) for the given
- * agents. Clones from GitHub, so allow a few minutes. Re-running is idempotent
- * (acts as an update for agents that already have the skills).
- */
-export async function installHyperframesSkills(
-  agents: string[]
-): Promise<void> {
-  await getTransport().call(
-    "install_hyperframes_skills",
-    { agents },
-    { timeoutMs: 600_000 }
-  )
-}
-
-export async function createHyperframesProject(params: {
-  projectName: string
-  example: string
-  resolution: string
-  packageManager: string
-  targetDir: string
-}): Promise<string> {
-  return getTransport().call(
-    "create_hyperframes_project",
-    {
-      projectName: params.projectName,
-      example: params.example,
-      resolution: params.resolution,
-      packageManager: params.packageManager,
-      targetDir: params.targetDir,
-    },
-    { timeoutMs: 600_000 }
-  )
 }
 
 // Conversation CRUD commands

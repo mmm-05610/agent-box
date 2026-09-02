@@ -2125,7 +2125,6 @@
       "fallbackFolderName": "폴더",
       "openFolder": "폴더 열기",
       "cloneRepository": "리포지토리 클론",
-      "projectBoot": "프로젝트 부트",
       "opened": "열린 항목",
       "recentOpen": "최근 연 항목"
     },
@@ -3642,77 +3641,6 @@
     },
     "toasts": {
       "cloneFailed": "저장소 클론에 실패했습니다"
-    }
-  },
-  "ProjectBoot": {
-    "title": "프로젝트 부트",
-    "tabs": {
-      "shadcn": "shadcn",
-      "hyperframes": "HyperFrames"
-    },
-    "hyperframes": {
-      "title": "HyperFrames 비디오 프로젝트",
-      "subtitle": "HTML을 비디오로 만드는 프로젝트를 생성합니다. 이후 워크스페이스 에이전트가 작성하고 렌더링할 수 있습니다.",
-      "resolution": "해상도",
-      "skillsTitle": "에이전트 스킬",
-      "skillsDesc": "선택한 에이전트에 HyperFrames 스킬을 전역(심볼릭 링크)으로 설치하여 영상 작성·렌더링을 지원합니다.",
-      "recheck": "다시 확인",
-      "installedBadge": "설치됨",
-      "skillsInstall": "스킬 설치 / 업데이트",
-      "skillsInstalling": "스킬 설치 중…",
-      "skillsInstalled": "HyperFrames 스킬 설치 완료",
-      "skillsInstallFailed": "HyperFrames 스킬 설치 실패"
-    },
-    "config": {
-      "base": "베이스",
-      "style": "스타일",
-      "baseColor": "베이스 색상",
-      "theme": "테마",
-      "chartColor": "차트 색상",
-      "iconLibrary": "아이콘 라이브러리",
-      "font": "글꼴",
-      "fontHeading": "제목 글꼴",
-      "menuAccent": "메뉴 강조",
-      "menuColor": "메뉴 색상",
-      "radius": "둥글기",
-      "template": "템플릿",
-      "createProject": "프로젝트 만들기",
-      "sectionStyle": "스타일",
-      "sectionColors": "색상",
-      "sectionTypography": "타이포그래피",
-      "sectionInterface": "인터페이스"
-    },
-    "preview": {
-      "loading": "미리보기 로딩 중..."
-    },
-    "createDialog": {
-      "title": "프로젝트 만들기",
-      "projectName": "프로젝트 이름",
-      "projectNamePlaceholder": "my-app",
-      "frameworkTemplate": "프레임워크 템플릿",
-      "packageManager": "패키지 매니저",
-      "saveDirectory": "저장 디렉토리",
-      "saveDirectoryPlaceholder": "디렉토리 선택...",
-      "browseDirectory": "찾아보기",
-      "projectPath": "프로젝트 생성 위치: {path}",
-      "advancedOptions": "고급 옵션",
-      "base": "기본 라이브러리",
-      "enableRtl": "RTL 지원 활성화",
-      "enableRtlDescription": "오른쪽에서 왼쪽으로 쓰는 언어(예: 아랍어, 히브리어)의 레이아웃 지원 활성화",
-      "pmChecking": "확인 중...",
-      "pmNotInstalled": "설치되지 않음",
-      "cancel": "취소",
-      "create": "만들기",
-      "creating": "프로젝트 생성 중..."
-    },
-    "toasts": {
-      "createFailed": "프로젝트 생성에 실패했습니다",
-      "createSuccess": "프로젝트가 성공적으로 생성되었습니다",
-      "openWorkspaceFailed": "프로젝트가 생성되었지만 작업 공간에서 열지 못했습니다"
-    },
-    "errors": {
-      "directoryExists": "대상 디렉터리가 이미 존재합니다",
-      "commandFailed": "프로젝트 생성 명령이 실패했습니다."
     }
   },
   "WebServiceSettings": {

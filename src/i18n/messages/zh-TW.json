@@ -2125,7 +2125,6 @@
       "fallbackFolderName": "資料夾",
       "openFolder": "打開資料夾",
       "cloneRepository": "複製倉庫",
-      "projectBoot": "專案啟動器",
       "opened": "已打開",
       "recentOpen": "最近打開"
     },
@@ -3642,77 +3641,6 @@
     },
     "toasts": {
       "cloneFailed": "複製倉庫失敗"
-    }
-  },
-  "ProjectBoot": {
-    "title": "專案啟動器",
-    "tabs": {
-      "shadcn": "shadcn",
-      "hyperframes": "HyperFrames"
-    },
-    "hyperframes": {
-      "title": "HyperFrames 影片專案",
-      "subtitle": "建立一個 HTML 轉影片專案，接著工作區的智慧代理即可撰寫並算繪它。",
-      "resolution": "解析度",
-      "skillsTitle": "智慧代理技能",
-      "skillsDesc": "為所選代理全域安裝 HyperFrames 技能(符號連結),讓它們會編寫並算繪影片。",
-      "recheck": "重新檢查",
-      "installedBadge": "已安裝",
-      "skillsInstall": "安裝 / 更新技能",
-      "skillsInstalling": "正在安裝技能…",
-      "skillsInstalled": "HyperFrames 技能安裝成功",
-      "skillsInstallFailed": "HyperFrames 技能安裝失敗"
-    },
-    "config": {
-      "base": "基礎庫",
-      "style": "風格",
-      "baseColor": "基礎顏色",
-      "theme": "主題",
-      "chartColor": "圖表顏色",
-      "iconLibrary": "圖示庫",
-      "font": "字體",
-      "fontHeading": "標題字體",
-      "menuAccent": "選單強調",
-      "menuColor": "選單顏色",
-      "radius": "圓角",
-      "template": "模板",
-      "createProject": "建立專案",
-      "sectionStyle": "風格",
-      "sectionColors": "配色",
-      "sectionTypography": "排版",
-      "sectionInterface": "介面"
-    },
-    "preview": {
-      "loading": "載入預覽..."
-    },
-    "createDialog": {
-      "title": "建立專案",
-      "projectName": "專案名稱",
-      "projectNamePlaceholder": "my-app",
-      "frameworkTemplate": "框架模板",
-      "packageManager": "套件管理器",
-      "saveDirectory": "儲存目錄",
-      "saveDirectoryPlaceholder": "選擇目錄...",
-      "browseDirectory": "瀏覽",
-      "projectPath": "專案將建立在：{path}",
-      "advancedOptions": "進階選項",
-      "base": "基礎庫",
-      "enableRtl": "啟用 RTL 支援",
-      "enableRtlDescription": "為從右到左書寫的語言（如阿拉伯語、希伯來語）啟用佈局支援",
-      "pmChecking": "正在檢測...",
-      "pmNotInstalled": "未安裝",
-      "cancel": "取消",
-      "create": "建立",
-      "creating": "正在建立專案..."
-    },
-    "toasts": {
-      "createFailed": "建立專案失敗",
-      "createSuccess": "專案建立成功",
-      "openWorkspaceFailed": "專案已建立，但無法在工作區中開啟"
-    },
-    "errors": {
-      "directoryExists": "目標目錄已存在",
-      "commandFailed": "專案建立命令執行失敗。"
     }
   },
   "WebServiceSettings": {
