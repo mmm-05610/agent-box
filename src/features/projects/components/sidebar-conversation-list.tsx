@@ -456,21 +456,24 @@ export function SidebarConversationList({
   const rowsRef = useRef<ProjectListRow[]>(rows)
   rowsRef.current = rows
 
-  // The active project auto-expands: switching to a folder opens its project
-  // row so its sessions are visible without a manual click. Persisted like a
-  // manual toggle. `folderExpanded` is a dep on purpose: the persisted state
-  // hydrates after mount, so the post-hydration pass is what corrects a
-  // stored "collapsed" entry for the active project.
+  // The active project auto-expands ONCE per activation: switching to a folder
+  // opens its project row so its sessions are visible without a manual click.
+  // A manual collapse afterwards must stick — the effect is keyed on the
+  // activation change (not on `folderExpanded`), so re-runs caused by the
+  // user's own toggle cannot force the active project back open.
+  const autoExpandedForRef = useRef<number | null>(null)
   useEffect(() => {
     const id = activeFolder?.id
     if (id == null || !projectFolders.some((f) => f.id === id)) return
+    if (autoExpandedForRef.current === id) return
+    autoExpandedForRef.current = id
     setFolderExpanded((prev) => {
       if (prev[id] ?? true) return prev
       const next = { ...prev, [id]: true }
       saveFolderExpanded(next)
       return next
     })
-  }, [activeFolder?.id, projectFolders, folderExpanded])
+  }, [activeFolder?.id, projectFolders])
 
   useImperativeHandle(ref, () => ({
     scrollToActive() {
