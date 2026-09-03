@@ -9,11 +9,6 @@ const controllerSource = readFileSync(
   "utf8"
 )
 
-const tabBarSource = readFileSync(
-  resolve(process.cwd(), "src/components/tabs/tab-bar.tsx"),
-  "utf8"
-)
-
 const fileTabBarSource = readFileSync(
   resolve(process.cwd(), "src/components/files/file-workspace-tab-bar.tsx"),
   "utf8"
@@ -66,11 +61,9 @@ describe("tab close/navigation shortcuts live in the always-mounted controller",
     )
   })
 
-  it("removes the keydown shortcut listeners from both tab strips", () => {
+  it("removes the keydown shortcut listeners from the file tab strip", () => {
     // The strips are conditionally mounted (desktop only; the file strip only
     // when a file tab is open), so they must not own any global shortcut.
-    expect(tabBarSource).not.toContain('addEventListener("keydown"')
-    expect(tabBarSource).not.toContain("matchShortcutEvent")
     expect(fileTabBarSource).not.toContain('addEventListener("keydown"')
     expect(fileTabBarSource).not.toContain("matchShortcutEvent")
   })

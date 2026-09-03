@@ -6,21 +6,6 @@ import { getFolderConversation, listOpenedTabs } from "@/lib/api"
 import { resolveDefaultAgent } from "@/lib/resolve-default-agent"
 import { formatConversationTitle } from "@/lib/conversation-title"
 import {
-  firstLeafId,
-  isLayoutNode,
-  leafIds,
-  makeGroupId,
-  neighborGroupId,
-  normalizeTree,
-  removeGroup,
-  resizeSplitAt,
-  singleGroupLayout,
-  splitGroup,
-  toggleOrientation,
-  type LayoutNode,
-  type SplitDirection,
-} from "@/lib/tab-group-layout"
-import {
   loadLastActiveContext,
   saveLastActiveContext,
   clearLastActiveContext,
@@ -111,8 +96,8 @@ interface DraftRetargetRequest {
 
 /**
  * What a "new conversation" open resolved to: the draft tab that ended up
- * serving the request — the freshly created one, or the target group's existing
- * draft it reused — and the identity that tab will be carrying once the open has
+ * serving the request — the freshly created one, or the existing draft it
+ * reused — and the identity that tab will be carrying once the open has
  * fully settled.
  *
  * `agentType`/`folderId` are a PROMISE, not necessarily the tab's state right
@@ -144,32 +129,6 @@ export interface TabStoreState {
   previewReplacedTabIds: string[]
   draftRetargetRequests: DraftRetargetRequest[]
   tabsHydrated: boolean
-  /**
-   * IDEA-style split groups (device-local, like tile mode). `groupLayout` is
-   * the splitter tree (leaves = groups); `groupOf` maps tab id → group id
-   * (missing = first leaf); `groupSelection` is each group's selected tab
-   * (the visible one in non-tiled mode); `tileByGroup` is the per-group tile
-   * flag. Group state never enters the synced `opened_tabs` payload — it is
-   * persisted to localStorage by `persistGroupState` and re-keyed to
-   * canonical tab ids there so it survives restarts.
-   */
-  groupLayout: LayoutNode
-  groupOf: Record<string, string>
-  groupSelection: Record<string, string>
-  tileByGroup: Record<string, boolean>
-  /**
-   * Transient cross-group tab drag (never persisted): the dragged tab, the
-   * live pointer position, and the FOREIGN group currently under the pointer
-   * (null while over the tab's own strip / no valid target). Drives the
-   * drop-target highlight and the floating ghost chip; cleared on drag end.
-   */
-  tabDrag: {
-    tabId: string
-    title: string
-    x: number
-    y: number
-    overGroupId: string | null
-  } | null
   childSummaries: Map<number, DbConversationSummary>
   /**
    * Derived from `rawTabs` × `conversations` × `childSummaries`: tab titles and
@@ -201,44 +160,16 @@ export interface TabStoreState {
     conversationId: number,
     agentType: AgentType
   ) => void
-  closeOtherTabs: (tabId: string) => void
   closeAllTabs: () => void
   closeTabsByFolder: (folderId: number) => void
   switchTab: (tabId: string) => void
   pinTab: (tabId: string) => void
-  toggleGroupTile: (groupId: string) => void
-  splitTab: (
-    tabId: string,
-    direction: SplitDirection,
-    opts: { move: boolean }
-  ) => void
-  moveTabToGroup: (
-    tabId: string,
-    targetGroupId: string,
-    opts?: {
-      /** Position within the target group (clamped). Omitted = keep the tab's
-       *  global rawTabs slot (menu moves — no reorder, no synced save). */
-      index?: number
-    }
-  ) => void
-  updateTabDrag: (drag: NonNullable<TabStoreState["tabDrag"]>) => void
-  endTabDrag: () => void
-  toggleGroupOrientation: (groupId: string) => void
-  dissolveGroup: (groupId: string) => void
-  unsplitAll: () => void
-  reorderGroupTabs: (groupId: string, orderedTabs: TabItem[]) => void
-  resizeGroupSplit: (
-    splitId: string,
-    handleIndex: number,
-    boundaryFraction: number
-  ) => void
   openNewConversationTab: (
     folderId: number,
     workingDir: string,
     options?: {
       inheritFromActive?: boolean
       folderDefaultAgent?: AgentType | null
-      targetGroup?: string
       /** Pin the draft to this agent, outranking BOTH the folder default and
        *  the inherit/fallback chain. For callers that must reproduce a specific
        *  agent (e.g. "ask about this selection" continues the conversation the
@@ -247,7 +178,6 @@ export interface TabStoreState {
     }
   ) => OpenedDraftTarget
   openChatModeTab: (options?: {
-    targetGroup?: string
     /** See `openNewConversationTab`'s `forceAgent`. */
     forceAgent?: AgentType
   }) => OpenedDraftTarget
@@ -267,8 +197,6 @@ export interface TabStoreState {
     tabId: string,
     runtimeConversationId: number
   ) => void
-  reorderTabs: (reorderedTabs: TabItem[]) => void
-  consumeRemoteActivation: () => boolean
   onPreviewTabReplaced: (callback: (tabId: string) => void) => () => void
 
   // ── Orchestration (driven by TabProvider) ───────────────────────────────────
@@ -292,11 +220,12 @@ export interface TabStoreState {
   setAgentAvailability: (sortedTypes: AgentType[], fresh: boolean) => void
 }
 
-/** Legacy pre-groups tile flag — read once as the first group's default. */
-const TILE_MODE_STORAGE_KEY = "workspace:tile-mode"
-/** Device-local split-group state (layout tree, assignments, selection, tile
- *  flags), keyed by canonical tab ids. See `persistGroupState`. */
-const TAB_GROUPS_STORAGE_KEY = "workspace:tab-groups:v1"
+/**
+ * Device-local draft tabs, keyed by their (restart-stable) tab ids. Drafts
+ * never reach `opened_tabs` (no DB row before the first send), so this blob is
+ * the only way an unsent draft survives a restart. See `persistDraftState`.
+ */
+const TAB_DRAFTS_STORAGE_KEY = "workspace:tab-drafts:v1"
 
 // ── React-land dependencies, injected by TabProvider ─────────────────────────
 // Kept out of the reactive store state so updating them never notifies
@@ -330,11 +259,8 @@ let runtime: TabRuntime = defaultRuntime()
 // gone — `tabs://changed` is unsubscribed and nothing calls `save_opened_tabs`.
 // `hydrate` still reads the server's last snapshot, but only to restore the
 // previously active session; `recomputeTabs` collapses it to one tab.
-let remoteActivationPending = false
-// Last JSON written to TAB_GROUPS_STORAGE_KEY (no-op gate), plus the trailing
-// debounce used while a split divider is being dragged.
-let lastGroupBlob: string | null = null
-let groupPersistTimer: ReturnType<typeof setTimeout> | null = null
+// Last JSON written to TAB_DRAFTS_STORAGE_KEY (no-op gate).
+let lastDraftBlob: string | null = null
 // Device-local draft tabs read from the blob at store creation, consumed once by
 // `hydrate` (kept out of store state: they are an input to hydration, not
 // renderable state). Refreshed whenever `initialTabState()` runs.
@@ -344,10 +270,9 @@ let orphanDraftPruneRan = false
 // True once a tab snapshot has actually been read from the backend (hydration,
 // a refetch, or a remote change). Until then the open-tab set is UNKNOWN — a
 // failed `listOpenedTabs` leaves it empty — and treating that emptiness as truth
-// would prune every group assignment, collapse the layout, and write that ruin
-// over the good blob (destroying the user's remembered layout on a transient
-// backend hiccup). Both the invariant prune and the blob write wait for it; the
-// session self-heals the moment any snapshot lands.
+// would prune every restored draft and write that ruin over the good blob
+// (destroying the user's unsent draft on a transient backend hiccup). The blob
+// write waits for it; the session self-heals the moment any snapshot lands.
 let tabsSnapshotLoaded = false
 const childSummaryInFlight = new Set<number>()
 const childSeedBuffer = new Map<
@@ -413,84 +338,10 @@ function sameDerivedTab(a: TabItemInternal, b: TabItemInternal): boolean {
   )
 }
 
-/** Resolve a tab's group: its assignment when it points at a live leaf, else
- *  the first leaf. Exported for the strip / detail-panel render filters. */
-export function groupOfTab(
-  groupOf: Record<string, string>,
-  layout: LayoutNode,
-  tabId: string
-): string {
-  const assigned = groupOf[tabId]
-  if (assigned != null && leafIds(layout).includes(assigned)) return assigned
-  return firstLeafId(layout)
-}
-
-/** True when more than one group exists (the canonical tree keeps a split root
- *  only while it has ≥ 2 leaves). */
-export function selectIsSplit(s: TabStoreState): boolean {
-  return s.groupLayout.type !== "group"
-}
-
 /**
- * Unmount classifier for a conversation view: is it being REPARENTED (its tab
- * moved to another split group — remount, keep the ACP connection) or TORN
- * DOWN (disconnect)?
- *
- * Narrowly scoped on purpose. "The tab is still open" alone is NOT a reparent
- * marker: the whole conversation surface also unmounts with tabs left open
- * (mobile conversation→file pane switch, workbench route overlay), and those
- * must still disconnect — the idle sweep skips viewers, so a viewer left
- * attached leaks its subscription. Since group shells are flat siblings keyed
- * by group id, a surviving tab leaves its shell if and only if its group
- * assignment changed, which is exactly what this compares.
- */
-export function isReparentUnmount(
-  state: Pick<TabStoreState, "rawTabs" | "groupOf" | "groupLayout">,
-  tabId: string,
-  renderedGroupId: string
-): boolean {
-  if (!state.rawTabs.some((tab) => tab.id === tabId)) return false
-  return groupOfTab(state.groupOf, state.groupLayout, tabId) !== renderedGroupId
-}
-
-/** Where a new tab should land: the explicit target when it's a live group,
- *  else the focused (active tab's) group. */
-function resolveTargetGroup(
-  st: Pick<TabStoreState, "activeTabId" | "groupOf" | "groupLayout">,
-  explicit?: string
-): string {
-  if (explicit != null && leafIds(st.groupLayout).includes(explicit)) {
-    return explicit
-  }
-  return st.activeTabId != null
-    ? groupOfTab(st.groupOf, st.groupLayout, st.activeTabId)
-    : firstLeafId(st.groupLayout)
-}
-
-function sanitizeStringRecord(value: unknown): Record<string, string> {
-  const out: Record<string, string> = {}
-  if (typeof value !== "object" || value === null) return out
-  for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-    if (typeof v === "string") out[k] = v
-  }
-  return out
-}
-
-function sanitizeBoolRecord(value: unknown): Record<string, boolean> {
-  const out: Record<string, boolean> = {}
-  if (typeof value !== "object" || value === null) return out
-  for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-    if (typeof v === "boolean") out[k] = v
-  }
-  return out
-}
-
-/**
- * A device-local draft tab as stored in the group blob. Drafts never reach
+ * A device-local draft tab as stored in the drafts blob. Drafts never reach
  * `opened_tabs` (the lazy-conversation invariant: no DB row before the first
- * send), so without this a split group holding only a draft — the common
- * "conversation | new conversation" layout — lost its member on restart and
- * `normalizeTree` collapsed the whole group.
+ * send), so without this an unsent draft was lost on every restart.
  *
  * `index` is the draft's position in `rawTabs` at save time, so restoring
  * splices it back among the conversation tabs instead of appending. `agentType`
@@ -501,7 +352,6 @@ function sanitizeBoolRecord(value: unknown): Record<string, boolean> {
  */
 interface PersistedDraft {
   id: string
-  group: string
   index: number
   folderId: number
   isChat?: boolean
@@ -516,7 +366,6 @@ function sanitizeDrafts(value: unknown): PersistedDraft[] {
     if (typeof entry !== "object" || entry === null) continue
     const e = entry as Record<string, unknown>
     if (typeof e.id !== "string" || e.id.length === 0) continue
-    if (typeof e.group !== "string" || e.group.length === 0) continue
     if (typeof e.folderId !== "number" || !Number.isFinite(e.folderId)) continue
     const index =
       typeof e.index === "number" && Number.isFinite(e.index) && e.index >= 0
@@ -524,7 +373,6 @@ function sanitizeDrafts(value: unknown): PersistedDraft[] {
         : out.length
     out.push({
       id: e.id,
-      group: e.group,
       index,
       folderId: e.folderId,
       ...(e.isChat === true ? { isChat: true } : {}),
@@ -539,78 +387,43 @@ function sanitizeDrafts(value: unknown): PersistedDraft[] {
   return out
 }
 
-/** Seed group state from the device-local blob (canonical tab ids — they match
- *  nothing until `hydrate` restores canonical-id tabs; `applyGroupInvariants`
- *  defers pruning until then). Falls back to a single group, seeding its tile
- *  flag from the legacy pre-groups key. The blob's draft entries are parked in
- *  module scope (not store state) for `hydrate` to splice back in. */
-function readPersistedGroupState(): {
-  groupLayout: LayoutNode
-  groupOf: Record<string, string>
-  groupSelection: Record<string, string>
-  tileByGroup: Record<string, boolean>
-} {
+/** Load device-local draft tabs from the drafts blob, parking them in module
+ *  scope for `hydrate` to splice back in (canonical tab ids — a restored draft
+ *  matches nothing until then, and a restored conversation tab takes its
+ *  identity from `opened_tabs`). */
+function readPersistedDraftState() {
   pendingRestoreDrafts = []
   pendingRestoreActiveDraft = null
-  const fallback = () => ({
-    groupLayout: singleGroupLayout() as LayoutNode,
-    groupOf: {} as Record<string, string>,
-    groupSelection: {} as Record<string, string>,
-    tileByGroup: {} as Record<string, boolean>,
-  })
-  if (typeof window === "undefined") return fallback()
+  if (typeof window === "undefined") return
   try {
-    const raw = localStorage.getItem(TAB_GROUPS_STORAGE_KEY)
-    if (raw) {
-      const parsed = JSON.parse(raw) as Record<string, unknown>
-      if (parsed && isLayoutNode(parsed.layout)) {
-        // Older blobs predate `drafts`/`activeDraft` — both sanitize to empty.
-        pendingRestoreDrafts = sanitizeDrafts(parsed.drafts)
-        pendingRestoreActiveDraft =
-          typeof parsed.activeDraft === "string" ? parsed.activeDraft : null
-        return {
-          groupLayout: parsed.layout,
-          groupOf: sanitizeStringRecord(parsed.assignments),
-          groupSelection: sanitizeStringRecord(parsed.selection),
-          tileByGroup: sanitizeBoolRecord(parsed.tileByGroup),
-        }
-      }
-    }
-    const seeded = fallback()
-    if (localStorage.getItem(TILE_MODE_STORAGE_KEY) === "true") {
-      seeded.tileByGroup[firstLeafId(seeded.groupLayout)] = true
-    }
-    return seeded
+    const raw = localStorage.getItem(TAB_DRAFTS_STORAGE_KEY)
+    if (!raw) return
+    const parsed = JSON.parse(raw) as Record<string, unknown>
+    if (!parsed || typeof parsed !== "object") return
+    pendingRestoreDrafts = sanitizeDrafts(parsed.drafts)
+    pendingRestoreActiveDraft =
+      typeof parsed.activeDraft === "string" ? parsed.activeDraft : null
   } catch {
-    return fallback()
+    /* ignore */
   }
 }
 
-/** Write the group blob: conversation tabs re-keyed to canonical tab ids, draft
- *  tabs carried in `drafts` under their own (now restart-stable) ids so a
- *  draft-only group survives a restart. String-diffed no-op gate; never runs
- *  before hydration so a transient pre-hydration state can't clobber the good
- *  blob. */
-function persistGroupState() {
+/** Write the drafts blob: unsent draft tabs under their (restart-stable) ids,
+ *  plus the active DRAFT focus (conversation focus rides `opened_tabs.
+ *  is_active`). String-diffed no-op gate; never runs before hydration so a
+ *  transient pre-hydration state can't clobber the good blob. */
+function persistDraftState() {
   if (typeof window === "undefined") return
   const st = useTabStore.getState()
   // Both gates matter: pre-hydration the state is transient, and after a FAILED
-  // hydration it is missing every conversation tab — writing either would
-  // replace the good blob with a collapsed layout.
+  // hydration the draft set is incomplete — writing either would replace the
+  // good blob with an emptied one.
   if (!st.tabsHydrated || !tabsSnapshotLoaded) return
-  const assignments: Record<string, string> = {}
   const drafts: PersistedDraft[] = []
   st.rawTabs.forEach((tab, index) => {
-    const group = groupOfTab(st.groupOf, st.groupLayout, tab.id)
-    if (tab.conversationId != null) {
-      assignments[
-        makeConversationTabId(tab.folderId, tab.agentType, tab.conversationId)
-      ] = group
-      return
-    }
+    if (tab.conversationId != null) return
     drafts.push({
       id: tab.id,
-      group,
       index,
       folderId: tab.folderId,
       ...(tab.isChat === true ? { isChat: true } : {}),
@@ -622,31 +435,16 @@ function persistGroupState() {
       ...(tab.agentTypeProvisional ? {} : { agentType: tab.agentType }),
     })
   })
-  const selection: Record<string, string> = {}
-  for (const [groupId, tabId] of Object.entries(st.groupSelection)) {
-    const tab = st.rawTabs.find((t) => t.id === tabId)
-    if (!tab) continue
-    selection[groupId] =
-      tab.conversationId != null
-        ? makeConversationTabId(tab.folderId, tab.agentType, tab.conversationId)
-        : tab.id
-  }
   const activeTab = st.rawTabs.find((t) => t.id === st.activeTabId)
   const blob = JSON.stringify({
-    layout: st.groupLayout,
-    assignments,
-    selection,
-    tileByGroup: st.tileByGroup,
     drafts,
-    // Only a DRAFT focus needs restoring here; conversation focus rides the
-    // synced `opened_tabs.is_active`.
     activeDraft:
       activeTab && activeTab.conversationId == null ? activeTab.id : null,
   })
-  if (blob === lastGroupBlob) return
-  lastGroupBlob = blob
+  if (blob === lastDraftBlob) return
+  lastDraftBlob = blob
   try {
-    localStorage.setItem(TAB_GROUPS_STORAGE_KEY, blob)
+    localStorage.setItem(TAB_DRAFTS_STORAGE_KEY, blob)
   } catch {
     /* ignore */
   }
@@ -654,7 +452,7 @@ function persistGroupState() {
 
 /**
  * Splice the blob's draft tabs back among the freshly-hydrated conversation
- * tabs, returning the merged list plus the group assignments to seed. Consumed
+ * tabs, returning the merged list. Consumed
  * once (the pending list is cleared), so a later refetch/reconnect never
  * resurrects a draft the user closed.
  *
@@ -664,14 +462,12 @@ function persistGroupState() {
  */
 function mergeRestoredDrafts(restored: TabItemInternal[]): {
   tabs: TabItemInternal[]
-  groupOf: Record<string, string>
 } {
   const pending = pendingRestoreDrafts
   pendingRestoreDrafts = []
-  if (pending.length === 0) return { tabs: restored, groupOf: {} }
+  if (pending.length === 0) return { tabs: restored }
 
   const tabs = [...restored]
-  const groupOf: Record<string, string> = {}
   const seen = new Set(restored.map((tab) => tab.id))
   for (const draft of [...pending].sort((a, b) => a.index - b.index)) {
     if (seen.has(draft.id)) continue
@@ -692,150 +488,17 @@ function mergeRestoredDrafts(restored: TabItemInternal[]): {
       ...(draft.isChat === true ? { isChat: true } : {}),
     }
     tabs.splice(Math.min(draft.index, tabs.length), 0, tab)
-    groupOf[draft.id] = draft.group
   }
-  return { tabs, groupOf }
+  return { tabs }
 }
 
-/** Trailing-debounced persist for divider drags (per-frame ratio writes). */
-function schedulePersistGroupState() {
-  if (groupPersistTimer) clearTimeout(groupPersistTimer)
-  groupPersistTimer = setTimeout(() => {
-    groupPersistTimer = null
-    persistGroupState()
-  }, 300)
-}
-
-function shallowRecordEqual(
-  a: Record<string, string> | Record<string, boolean>,
-  b: Record<string, string> | Record<string, boolean>
-): boolean {
-  const ak = Object.keys(a)
-  const bk = Object.keys(b)
-  if (ak.length !== bk.length) return false
-  return ak.every((k) => a[k] === (b as Record<string, unknown>)[k])
-}
-
-/**
- * Re-establish the group invariants after any tab/group write:
- *   1. assignments only for open tabs, pointing at live leaves;
- *   2. every leaf has ≥ 1 tab (normalizeTree collapses the rest);
- *   3. each group's selection is one of its members, and the focused group's
- *      selection IS the active tab;
- *   4. per-group tile flags only for live groups.
- * Pruning/normalizing waits until the open-tab set is KNOWN — before hydration
- * the blob-seeded canonical-id state matches nothing yet, and after a failed
- * snapshot fetch the set is empty for want of data, not because the tabs closed
- * (selection repair still runs either way, for the live drafts). Never touches
- * rawTabs/tabs — no recursion with `recomputeTabs`.
- */
-function applyGroupInvariants() {
-  const st = useTabStore.getState()
-  const openIds = new Set(st.rawTabs.map((t) => t.id))
-  const tabSetKnown = st.tabsHydrated && tabsSnapshotLoaded
-
-  let groupOf = st.groupOf
-  let layout = st.groupLayout
-
-  if (tabSetKnown) {
-    let pruned: Record<string, string> | null = null
-    const layoutLeaves = new Set(leafIds(layout))
-    for (const [tabId, groupId] of Object.entries(groupOf)) {
-      if (!openIds.has(tabId) || !layoutLeaves.has(groupId)) {
-        pruned = pruned ?? { ...groupOf }
-        delete pruned[tabId]
-      }
-    }
-    if (pruned) groupOf = pruned
-
-    const firstLeaf = firstLeafId(layout)
-    const liveGroups = new Set<string>()
-    for (const tab of st.rawTabs) {
-      liveGroups.add(groupOf[tab.id] ?? firstLeaf)
-    }
-    layout = normalizeTree(layout, liveGroups)
-    if (layout !== st.groupLayout) {
-      // Leaves may have merged away — re-validate assignments against the
-      // normalized tree so every entry still points at a live leaf.
-      const nextLeaves = new Set(leafIds(layout))
-      let revalidated: Record<string, string> | null = null
-      for (const [tabId, groupId] of Object.entries(groupOf)) {
-        if (!nextLeaves.has(groupId)) {
-          revalidated = revalidated ?? { ...groupOf }
-          delete revalidated[tabId]
-        }
-      }
-      if (revalidated) groupOf = revalidated
-    }
-  }
-
-  const leaves = leafIds(layout)
-  const active =
-    st.activeTabId != null && openIds.has(st.activeTabId)
-      ? st.activeTabId
-      : null
-  const activeGroup = active ? groupOfTab(groupOf, layout, active) : null
-
-  const selection: Record<string, string> = {}
-  for (const groupId of leaves) {
-    const members = st.rawTabs.filter(
-      (t) => groupOfTab(groupOf, layout, t.id) === groupId
-    )
-    if (members.length === 0) {
-      // An empty leaf can only stand while the tab set is still unknown; keep
-      // its seeded selection for the repair that follows the real snapshot.
-      const kept = st.groupSelection[groupId]
-      if (!tabSetKnown && kept != null) selection[groupId] = kept
-      continue
-    }
-    if (activeGroup === groupId && active != null) {
-      selection[groupId] = active
-      continue
-    }
-    const current = st.groupSelection[groupId]
-    selection[groupId] =
-      current != null && members.some((t) => t.id === current)
-        ? current
-        : members[0].id
-  }
-
-  let tileByGroup = st.tileByGroup
-  if (tabSetKnown) {
-    const leafSet = new Set(leaves)
-    let prunedTile: Record<string, boolean> | null = null
-    for (const groupId of Object.keys(tileByGroup)) {
-      if (!leafSet.has(groupId)) {
-        prunedTile = prunedTile ?? { ...tileByGroup }
-        delete prunedTile[groupId]
-      }
-    }
-    if (prunedTile) tileByGroup = prunedTile
-  }
-
-  const changed =
-    groupOf !== st.groupOf ||
-    layout !== st.groupLayout ||
-    tileByGroup !== st.tileByGroup ||
-    !shallowRecordEqual(selection, st.groupSelection)
-  if (changed) {
-    useTabStore.setState({
-      groupOf,
-      groupLayout: layout,
-      groupSelection: selection,
-      tileByGroup,
-    })
-  }
-  persistGroupState()
-}
-
-/** Focus a tab and realign the per-group selection with it. The shared path
- *  for every activeTabId-only write (rawTabs writes get the same invariant
- *  pass via `recomputeTabs`). */
+/** Focus a tab. Single-session semantics: focus == `activeTabId`; the drafts
+ *  blob's `activeDraft` pointer must follow it. */
 function focusTab(tabId: string) {
   if (useTabStore.getState().activeTabId !== tabId) {
     useTabStore.setState({ activeTabId: tabId })
+    persistDraftState()
   }
-  applyGroupInvariants()
 }
 
 /**
@@ -904,13 +567,10 @@ function recomputeTabs() {
     prev.length === next.length &&
     next.every((item, i) => item === prev[i])
   ) {
-    // Membership may have changed even when the derived output didn't (it
-    // usually can't, but the invariant pass is cheap and self-no-ops).
-    applyGroupInvariants()
     return
   }
   useTabStore.setState({ tabs: next })
-  applyGroupInvariants()
+  persistDraftState()
 }
 
 /** Pick the agent + provisional flag for a new draft tab. Wraps the pure
@@ -978,14 +638,13 @@ function makeReplacementDraftTab(preferred?: TabItemInternal): TabItemInternal {
 }
 
 function initialTabState() {
+  readPersistedDraftState()
   return {
     rawTabs: [] as TabItemInternal[],
     activeTabId: null as string | null,
     previewReplacedTabIds: [] as string[],
     draftRetargetRequests: [] as DraftRetargetRequest[],
     tabsHydrated: false,
-    ...readPersistedGroupState(),
-    tabDrag: null as TabStoreState["tabDrag"],
     childSummaries: new Map<number, DbConversationSummary>(),
     tabs: [] as TabItemInternal[],
     reseedTick: 0,
@@ -1018,9 +677,6 @@ export const useTabStore = create<TabStoreState>()((set, get) => ({
       return
     }
 
-    // New tabs land in the focused group (the active tab's group).
-    const targetGroup = resolveTargetGroup(prevState)
-
     // Format the seed title so a draft/conversation title carrying an inline
     // reference link (`[README.md](file://…)`) shows its label, not raw
     // Markdown, before the `tabs` derivation re-derives it from the refreshed
@@ -1050,24 +706,15 @@ export const useTabStore = create<TabStoreState>()((set, get) => ({
     }
 
     if (pin) {
-      set({
-        rawTabs: [...prevState.rawTabs, newTab],
-        activeTabId: tabId,
-        groupOf: { ...prevState.groupOf, [tabId]: targetGroup },
-      })
+      set({ rawTabs: [...prevState.rawTabs, newTab], activeTabId: tabId })
       recomputeTabs()
       runtime.activateConversationPane()
       return
     }
 
-    // Preview replacement stays within the focused group — a preview parked in
-    // another group is left alone (the new tab appends instead).
-    const previewIndex = prevState.rawTabs.findIndex(
-      (t) =>
-        !t.isPinned &&
-        groupOfTab(prevState.groupOf, prevState.groupLayout, t.id) ===
-          targetGroup
-    )
+    // Preview replacement: the new tab takes over the unpinned preview slot
+    // (the sidebar's preview chain records the replaced tab id).
+    const previewIndex = prevState.rawTabs.findIndex((t) => !t.isPinned)
     if (previewIndex >= 0) {
       const updated = [...prevState.rawTabs]
       const replacedPreviewTabId = updated[previewIndex].id
@@ -1075,7 +722,6 @@ export const useTabStore = create<TabStoreState>()((set, get) => ({
       set({
         rawTabs: updated,
         activeTabId: tabId,
-        groupOf: { ...prevState.groupOf, [tabId]: targetGroup },
         previewReplacedTabIds: [
           ...prevState.previewReplacedTabIds,
           replacedPreviewTabId,
@@ -1086,11 +732,7 @@ export const useTabStore = create<TabStoreState>()((set, get) => ({
       return
     }
 
-    set({
-      rawTabs: [...prevState.rawTabs, newTab],
-      activeTabId: tabId,
-      groupOf: { ...prevState.groupOf, [tabId]: targetGroup },
-    })
+    set({ rawTabs: [...prevState.rawTabs, newTab], activeTabId: tabId })
     recomputeTabs()
     runtime.activateConversationPane()
   },
@@ -1136,32 +778,15 @@ export const useTabStore = create<TabStoreState>()((set, get) => ({
           }
         }
       } else if (tabId === prevState.activeTabId) {
-        // Pick the neighbor within the closed tab's group; when the group
-        // emptied, fall to the neighboring group's selected tab.
-        const { groupOf, groupLayout, groupSelection } = prevState
-        const closedGroup = groupOfTab(groupOf, groupLayout, tabId)
-        const inGroup = (t: TabItemInternal) =>
-          groupOfTab(groupOf, groupLayout, t.id) === closedGroup
-        const indexInGroup = prevState.rawTabs
-          .filter(inGroup)
-          .findIndex((t) => t.id === tabId)
-        const groupAfter = next.filter(inGroup)
-        let newActiveId: string
-        if (groupAfter.length > 0) {
-          newActiveId =
-            groupAfter[Math.min(indexInGroup, groupAfter.length - 1)].id
-        } else {
-          const neighbor = neighborGroupId(groupLayout, closedGroup)
-          const neighborSelection = neighbor
-            ? groupSelection[neighbor]
-            : undefined
-          newActiveId =
-            neighborSelection != null &&
-            next.some((t) => t.id === neighborSelection)
-              ? neighborSelection
-              : next[0].id
-        }
-        set({ rawTabs: next, activeTabId: newActiveId })
+        // Focus falls to the neighbor at the closed tab's index (standard
+        // tab-close semantics). recomputeTabs then collapses the open set to
+        // this keeper, so it must be the neighbor — NOT simply next[0] — or a
+        // still-open tab would be silently dropped and never recorded.
+        const indexInList = prevState.rawTabs.findIndex((t) => t.id === tabId)
+        set({
+          rawTabs: next,
+          activeTabId: next[Math.min(indexInList, next.length - 1)].id,
+        })
       } else {
         set({ rawTabs: next })
       }
@@ -1187,37 +812,6 @@ export const useTabStore = create<TabStoreState>()((set, get) => ({
     // Every caller reaches here right after `deleteConversation` — the row is
     // gone, so the tab must not be offered back by "reopen closed tab".
     get().closeTab(target.id, { recordForReopen: false })
-  },
-
-  closeOtherTabs: (tabId) => {
-    const prevState = get()
-    const target = prevState.rawTabs.find((tab) => tab.id === tabId)
-    if (!target) return
-    // Group-scoped while split: "others" are the target's group siblings only —
-    // the other groups keep their tabs (IDEA semantics).
-    const { groupOf, groupLayout } = prevState
-    const targetGroup = groupOfTab(groupOf, groupLayout, tabId)
-    const keep =
-      groupLayout.type === "group"
-        ? [target]
-        : prevState.rawTabs.filter(
-            (tab) =>
-              tab.id === tabId ||
-              groupOfTab(groupOf, groupLayout, tab.id) !== targetGroup
-          )
-    if (keep.length === prevState.rawTabs.length) {
-      // Nothing to close (already alone in its group) — just focus.
-      focusTab(tabId)
-      return
-    }
-    const keepIds = new Set(keep.map((tab) => tab.id))
-    for (const tab of prevState.rawTabs) {
-      if (!keepIds.has(tab.id)) {
-        pushClosedTab(snapshotConversationTab(tab))
-      }
-    }
-    set({ rawTabs: keep, activeTabId: tabId })
-    recomputeTabs()
   },
 
   closeAllTabs: () => {
@@ -1285,271 +879,6 @@ export const useTabStore = create<TabStoreState>()((set, get) => ({
     recomputeTabs()
   },
 
-  toggleGroupTile: (groupId) => {
-    const st = get()
-    set({
-      tileByGroup: { ...st.tileByGroup, [groupId]: !st.tileByGroup[groupId] },
-    })
-    persistGroupState()
-  },
-
-  splitTab: (tabId, direction, opts) => {
-    const st = get()
-    const tab = st.rawTabs.find((t) => t.id === tabId)
-    if (!tab) return
-    const sourceGroup = groupOfTab(st.groupOf, st.groupLayout, tabId)
-
-    if (opts.move) {
-      // A draft belongs to the group that spawned it (see `moveTabToGroup`);
-      // plain split still seeds the new group with its own draft.
-      if (tab.conversationId == null) return
-      // Moving the group's only tab would just shift the group — pointless.
-      const groupSize = st.rawTabs.filter(
-        (t) => groupOfTab(st.groupOf, st.groupLayout, t.id) === sourceGroup
-      ).length
-      if (groupSize < 2) return
-      const newGroupId = makeGroupId()
-      const nextLayout = splitGroup(
-        st.groupLayout,
-        sourceGroup,
-        direction,
-        newGroupId
-      )
-      if (nextLayout === st.groupLayout) return
-      set({
-        groupLayout: nextLayout,
-        groupOf: { ...st.groupOf, [tabId]: newGroupId },
-        activeTabId: tabId,
-      })
-      recomputeTabs()
-      runtime.activateConversationPane()
-      return
-    }
-
-    // Split without moving: the new group opens with a fresh draft seeded from
-    // the context tab (conversations can't be duplicated across groups).
-    const newGroupId = makeGroupId()
-    const nextLayout = splitGroup(
-      st.groupLayout,
-      sourceGroup,
-      direction,
-      newGroupId
-    )
-    if (nextLayout === st.groupLayout) return
-    const inherit =
-      tab.conversationId != null || !tab.agentTypeProvisional
-        ? tab.agentType
-        : null
-    const { allFolders, folders } = useAppWorkspaceStore.getState()
-    const contextIsChat =
-      tab.isChat === true ||
-      allFolders.find((f) => f.id === tab.folderId)?.kind === "chat"
-    let newTab: TabItemInternal
-    if (contextIsChat) {
-      const { agentType, provisional } = resolveAgentForFolder(0, inherit, null)
-      newTab = {
-        id: makeNewConversationTabId(),
-        kind: "conversation",
-        folderId: 0,
-        conversationId: null,
-        agentType,
-        title: runtime.labels.newConversation,
-        isPinned: true,
-        workingDir: undefined,
-        agentTypeProvisional: provisional,
-        isChat: true,
-      }
-    } else {
-      const { agentType, provisional } = resolveAgentForFolder(
-        tab.folderId,
-        inherit
-      )
-      newTab = {
-        id: makeNewConversationTabId(),
-        kind: "conversation",
-        folderId: tab.folderId,
-        conversationId: null,
-        agentType,
-        title: runtime.labels.newConversation,
-        isPinned: true,
-        workingDir:
-          tab.workingDir ?? folders.find((f) => f.id === tab.folderId)?.path,
-        agentTypeProvisional: provisional,
-      }
-    }
-    set({
-      rawTabs: [...st.rawTabs, newTab],
-      groupLayout: nextLayout,
-      groupOf: { ...st.groupOf, [newTab.id]: newGroupId },
-      activeTabId: newTab.id,
-    })
-    recomputeTabs()
-    runtime.activateConversationPane()
-  },
-
-  moveTabToGroup: (tabId, targetGroupId, opts) => {
-    const st = get()
-    const moving = st.rawTabs.find((t) => t.id === tabId)
-    if (!moving) return
-    if (!leafIds(st.groupLayout).includes(targetGroupId)) return
-    if (groupOfTab(st.groupOf, st.groupLayout, tabId) === targetGroupId) return
-    // Drafts are group-bound: each group owns its unsent scratch conversation
-    // (its own composer text, its own folder/agent context), and every group can
-    // spawn one on demand from its own strip. Moving one would leave a group
-    // without its slot and hand another a second. Reordering WITHIN the group is
-    // unaffected (that path never reaches here). The UI hides both move
-    // affordances for drafts; this backstops the programmatic path.
-    if (moving.conversationId == null) return
-
-    if (opts?.index == null) {
-      // Menu move: only the assignment changes — the tab keeps its global
-      // rawTabs slot (group order = filtered order), so the synced payload
-      // stays byte-identical and no save fires.
-      set({
-        groupOf: { ...st.groupOf, [tabId]: targetGroupId },
-        activeTabId: tabId,
-      })
-      recomputeTabs()
-      runtime.activateConversationPane()
-      return
-    }
-
-    // Drag drop: land at `index` within the target group. Splice the tab out,
-    // then insert it before the target group's k-th member (after its last
-    // member when k = member count) — a partition insert, so every OTHER
-    // group's relative order is untouched. rawTabs order changes, which
-    // syncs like any user reorder.
-    const without = st.rawTabs.filter((t) => t.id !== tabId)
-    const memberSlots: number[] = []
-    without.forEach((t, i) => {
-      if (groupOfTab(st.groupOf, st.groupLayout, t.id) === targetGroupId) {
-        memberSlots.push(i)
-      }
-    })
-    const k = Math.max(0, Math.min(opts.index, memberSlots.length))
-    const insertPos =
-      k < memberSlots.length
-        ? memberSlots[k]
-        : memberSlots.length > 0
-          ? memberSlots[memberSlots.length - 1] + 1
-          : without.length
-    const nextRaw = [
-      ...without.slice(0, insertPos),
-      moving,
-      ...without.slice(insertPos),
-    ]
-    set({
-      rawTabs: nextRaw,
-      groupOf: { ...st.groupOf, [tabId]: targetGroupId },
-      activeTabId: tabId,
-    })
-    recomputeTabs()
-    runtime.activateConversationPane()
-  },
-
-  updateTabDrag: (drag) => {
-    const prev = get().tabDrag
-    // Per-frame writes: skip the set when nothing observable changed.
-    if (
-      prev != null &&
-      prev.tabId === drag.tabId &&
-      prev.x === drag.x &&
-      prev.y === drag.y &&
-      prev.overGroupId === drag.overGroupId
-    ) {
-      return
-    }
-    set({ tabDrag: drag })
-  },
-
-  endTabDrag: () => {
-    if (get().tabDrag == null) return
-    set({ tabDrag: null })
-  },
-
-  toggleGroupOrientation: (groupId) => {
-    const st = get()
-    const next = toggleOrientation(st.groupLayout, groupId)
-    if (next === st.groupLayout) return
-    set({ groupLayout: next })
-    persistGroupState()
-  },
-
-  dissolveGroup: (groupId) => {
-    const st = get()
-    const target = neighborGroupId(st.groupLayout, groupId)
-    if (!target) return
-    const groupOf = { ...st.groupOf }
-    for (const tab of st.rawTabs) {
-      if (groupOfTab(st.groupOf, st.groupLayout, tab.id) === groupId) {
-        groupOf[tab.id] = target
-      }
-    }
-    set({ groupOf, groupLayout: removeGroup(st.groupLayout, groupId) })
-    recomputeTabs()
-  },
-
-  unsplitAll: () => {
-    const st = get()
-    if (st.groupLayout.type === "group") return
-    // Everyone falls back to the (kept) first leaf; rawTabs order is already
-    // the merged display order, so the synced payload doesn't change.
-    set({
-      groupLayout: singleGroupLayout(firstLeafId(st.groupLayout)),
-      groupOf: {},
-    })
-    recomputeTabs()
-  },
-
-  reorderGroupTabs: (groupId, orderedTabs) => {
-    const st = get()
-    const raw = st.rawTabs
-    const slots: number[] = []
-    raw.forEach((tab, i) => {
-      if (groupOfTab(st.groupOf, st.groupLayout, tab.id) === groupId) {
-        slots.push(i)
-      }
-    })
-    if (orderedTabs.length !== slots.length) return
-    const slotIds = new Set(slots.map((i) => raw[i].id))
-    const seen = new Set<string>()
-    const ordered: TabItemInternal[] = []
-    for (const tab of orderedTabs) {
-      if (!slotIds.has(tab.id) || seen.has(tab.id)) return
-      seen.add(tab.id)
-      const item = raw.find((t) => t.id === tab.id)
-      if (!item) return
-      ordered.push(item)
-    }
-    // Partition permutation: only this group's slots move, so the other
-    // groups' persisted positions stay byte-stable.
-    const next = [...raw]
-    slots.forEach((slot, k) => {
-      next[slot] = ordered[k]
-    })
-    if (next.every((tab, i) => tab === raw[i])) return
-    set({ rawTabs: next })
-    recomputeTabs()
-  },
-
-  resizeGroupSplit: (splitId, handleIndex, boundaryFraction) => {
-    const st = get()
-    const next = resizeSplitAt(
-      st.groupLayout,
-      splitId,
-      handleIndex,
-      boundaryFraction
-    )
-    if (next === st.groupLayout) return
-    set({ groupLayout: next })
-    schedulePersistGroupState()
-  },
-
-  reorderTabs: (reorderedTabs) => {
-    set({ rawTabs: reorderedTabs })
-    recomputeTabs()
-  },
-
   openNewConversationTab: (folderId, workingDir, options) => {
     // "New conversation" while a chat conversation is active resolves the active
     // (hidden) chat folder. Never pile a second conversation into a
@@ -1559,14 +888,7 @@ export const useTabStore = create<TabStoreState>()((set, get) => ({
       useAppWorkspaceStore.getState().allFolders.find((f) => f.id === folderId)
         ?.kind === "chat"
     ) {
-      return get().openChatModeTab({
-        ...(options?.targetGroup != null
-          ? { targetGroup: options.targetGroup }
-          : {}),
-        ...(options?.forceAgent != null
-          ? { forceAgent: options.forceAgent }
-          : {}),
-      })
+      return get().openChatModeTab({ forceAgent: options?.forceAgent })
     }
     const inheritFromActive = options?.inheritFromActive === true
     let inherit: AgentType | null = null
@@ -1591,15 +913,9 @@ export const useTabStore = create<TabStoreState>()((set, get) => ({
 
     const tabId = makeNewConversationTabId()
     const prevState = get()
-    // Per-group draft singleton: reuse the target group's existing draft tab
-    // (regardless of folder), so each group carries at most one draft.
-    const targetGroup = resolveTargetGroup(prevState, options?.targetGroup)
-    const existingTab = prevState.rawTabs.find(
-      (t) =>
-        t.conversationId == null &&
-        groupOfTab(prevState.groupOf, prevState.groupLayout, t.id) ===
-          targetGroup
-    )
+    // Draft singleton: reuse the existing draft tab (regardless of folder), so
+    // at most one draft exists at a time.
+    const existingTab = prevState.rawTabs.find((t) => t.conversationId == null)
 
     if (!existingTab) {
       const newTab: TabItemInternal = {
@@ -1613,11 +929,7 @@ export const useTabStore = create<TabStoreState>()((set, get) => ({
         workingDir,
         agentTypeProvisional: provisional,
       }
-      set({
-        rawTabs: [...prevState.rawTabs, newTab],
-        activeTabId: tabId,
-        groupOf: { ...prevState.groupOf, [tabId]: targetGroup },
-      })
+      set({ rawTabs: [...prevState.rawTabs, newTab], activeTabId: tabId })
       recomputeTabs()
       runtime.activateConversationPane()
       return { tabId, agentType: targetAgent, folderId }
@@ -1679,24 +991,17 @@ export const useTabStore = create<TabStoreState>()((set, get) => ({
         ? { agentType: options.forceAgent, provisional: false }
         : resolveAgentForFolder(0, inherit, null)
 
-    // Per-group draft singleton — all draft handling below is scoped to the
-    // target group. Capture its existing draft (if any) up front so a stale
-    // ACP session can be torn down after we flip it to chat mode.
-    const targetGroup = resolveTargetGroup(st, options?.targetGroup)
-    const inTargetGroup = (t: TabItemInternal) =>
-      groupOfTab(st.groupOf, st.groupLayout, t.id) === targetGroup
-    const existingDraft = st.rawTabs.find(
-      (t) => t.conversationId == null && inTargetGroup(t)
-    )
+    // Draft singleton — all draft handling below is scoped to the single
+    // draft. Capture it (if any) up front so a stale ACP session can be torn
+    // down after we flip it to chat mode.
+    const existingDraft = st.rawTabs.find((t) => t.conversationId == null)
     const needsDisconnect =
       existingDraft != null &&
       !(existingDraft.isChat && existingDraft.folderId === 0)
 
     const tabId = makeNewConversationTabId()
     const prevState = get()
-    const existingTab = prevState.rawTabs.find(
-      (t) => t.conversationId == null && inTargetGroup(t)
-    )
+    const existingTab = prevState.rawTabs.find((t) => t.conversationId == null)
 
     if (!existingTab) {
       const newTab: TabItemInternal = {
@@ -1711,11 +1016,7 @@ export const useTabStore = create<TabStoreState>()((set, get) => ({
         agentTypeProvisional: provisional,
         isChat: true,
       }
-      set({
-        rawTabs: [...prevState.rawTabs, newTab],
-        activeTabId: tabId,
-        groupOf: { ...prevState.groupOf, [tabId]: targetGroup },
-      })
+      set({ rawTabs: [...prevState.rawTabs, newTab], activeTabId: tabId })
       recomputeTabs()
     } else if (existingTab.isChat && existingTab.folderId === 0) {
       // Already a chat-mode draft. Normally there is nothing to do but focus it
@@ -1900,12 +1201,6 @@ export const useTabStore = create<TabStoreState>()((set, get) => ({
     recomputeTabs()
   },
 
-  consumeRemoteActivation: () => {
-    if (!remoteActivationPending) return false
-    remoteActivationPending = false
-    return true
-  },
-
   onPreviewTabReplaced: (callback) => {
     previewReplacedCallbacks.add(callback)
     return () => {
@@ -1952,10 +1247,8 @@ export const useTabStore = create<TabStoreState>()((set, get) => ({
             )
           : null
         // Splice the device-local drafts back in (same frame as the conversation
-        // tabs, so the first invariant pass sees complete groups and can't
-        // collapse a draft-only one).
-        const { tabs: withDrafts, groupOf: draftGroups } =
-          mergeRestoredDrafts(restored)
+        // tabs, so the first pass sees the complete tab set).
+        const { tabs: withDrafts } = mergeRestoredDrafts(restored)
         if (
           pendingRestoreActiveDraft != null &&
           withDrafts.some((tab) => tab.id === pendingRestoreActiveDraft)
@@ -1965,47 +1258,35 @@ export const useTabStore = create<TabStoreState>()((set, get) => ({
         if (!restoredActive && withDrafts.length > 0) {
           restoredActive = withDrafts[0].id
         }
-        set({
-          rawTabs: withDrafts,
-          activeTabId: restoredActive,
-          ...(Object.keys(draftGroups).length > 0
-            ? { groupOf: { ...get().groupOf, ...draftGroups } }
-            : {}),
-        })
+        set({ rawTabs: withDrafts, activeTabId: restoredActive })
         recomputeTabs()
       } catch (err) {
         console.error("[TabStore] listOpenedTabs failed:", err)
         if (!cancelled) {
           // The snapshot is the CONVERSATION half only; the drafts are
           // device-local and still valid, so restore them rather than starting
-          // blank. Everything that could destroy on-disk state — the invariant
-          // prune, the blob write, the composer-key sweep — stays parked behind
+          // blank. Everything that could destroy on-disk state — the drafts
+          // blob write, the composer-key sweep — stays parked behind
           // `tabsSnapshotLoaded` until a snapshot actually lands (single-session
           // mode has no subscription refetch anymore; a later cold start or a
           // store reset retries the read).
-          const { tabs: draftsOnly, groupOf: draftGroups } =
-            mergeRestoredDrafts(get().rawTabs)
+          const { tabs: draftsOnly } = mergeRestoredDrafts(get().rawTabs)
           if (draftsOnly.length > 0) {
             const focus =
               pendingRestoreActiveDraft != null &&
               draftsOnly.some((tab) => tab.id === pendingRestoreActiveDraft)
                 ? pendingRestoreActiveDraft
                 : draftsOnly[0].id
-            set({
-              rawTabs: draftsOnly,
-              activeTabId: focus,
-              groupOf: { ...get().groupOf, ...draftGroups },
-            })
+            set({ rawTabs: draftsOnly, activeTabId: focus })
             recomputeTabs()
           }
         }
       } finally {
         if (!cancelled) {
           set({ tabsHydrated: true })
-          // First full invariant pass: with hydration done, blob-seeded group
-          // entries that matched nothing (tabs closed on another client) prune
-          // and ghost empty groups collapse.
-          applyGroupInvariants()
+          // First drafts-blob pass: with hydration done, a restored focus that
+          // matched nothing is dropped and the blob re-syncs.
+          persistDraftState()
           // Retire composer drafts left behind by tabs that no longer exist
           // (crash / pre-per-tab-key builds). The live set is read when the
           // sweep runs, so a draft opened in the meantime is never swept. Only
@@ -2361,8 +1642,7 @@ export function runRecoveryOnce() {
  * Drop restored drafts whose folder no longer exists (deleted while the app was
  * closed, so no `closeTabsByFolder` ever ran). Folder-blind at hydrate time by
  * design — hydration must not wait on the folder list — so this runs once the
- * folders land, and `applyGroupInvariants` collapses any group it empties.
- * Chat drafts are folderless (`folderId` 0) and always survive.
+ * folders land. Chat drafts are folderless (`folderId` 0) and always survive.
  */
 export function pruneOrphanDraftsOnce() {
   if (orphanDraftPruneRan) return
@@ -2411,21 +1691,10 @@ export function useTabActions() {
       openTab: s.openTab,
       closeTab: s.closeTab,
       closeConversationTab: s.closeConversationTab,
-      closeOtherTabs: s.closeOtherTabs,
       closeAllTabs: s.closeAllTabs,
       closeTabsByFolder: s.closeTabsByFolder,
       switchTab: s.switchTab,
       pinTab: s.pinTab,
-      toggleGroupTile: s.toggleGroupTile,
-      splitTab: s.splitTab,
-      moveTabToGroup: s.moveTabToGroup,
-      toggleGroupOrientation: s.toggleGroupOrientation,
-      dissolveGroup: s.dissolveGroup,
-      unsplitAll: s.unsplitAll,
-      reorderGroupTabs: s.reorderGroupTabs,
-      resizeGroupSplit: s.resizeGroupSplit,
-      updateTabDrag: s.updateTabDrag,
-      endTabDrag: s.endTabDrag,
       openNewConversationTab: s.openNewConversationTab,
       openChatModeTab: s.openChatModeTab,
       setChatDraftWorkingDir: s.setChatDraftWorkingDir,
@@ -2433,8 +1702,6 @@ export function useTabActions() {
       setDraftAgentFromFallback: s.setDraftAgentFromFallback,
       bindConversationTab: s.bindConversationTab,
       setTabRuntimeConversationId: s.setTabRuntimeConversationId,
-      reorderTabs: s.reorderTabs,
-      consumeRemoteActivation: s.consumeRemoteActivation,
       onPreviewTabReplaced: s.onPreviewTabReplaced,
     }))
   )
@@ -2448,12 +1715,7 @@ export function useTabActions() {
  * the window's lifetime and is never reset.
  */
 export function resetTabStore() {
-  if (groupPersistTimer) {
-    clearTimeout(groupPersistTimer)
-    groupPersistTimer = null
-  }
-  remoteActivationPending = false
-  lastGroupBlob = null
+  lastDraftBlob = null
   childSummaryInFlight.clear()
   childSeedBuffer.clear()
   seedEpoch = 0

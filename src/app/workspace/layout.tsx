@@ -25,7 +25,7 @@ import {
 } from "@/contexts/acp-connections-context"
 import { DelegationProvider } from "@/contexts/delegation-context"
 import { ConversationRuntimeProvider } from "@/contexts/conversation-runtime-context"
-import { TabProvider, useTabStore, useTabActions } from "@/contexts/tab-context"
+import { TabProvider, useTabStore } from "@/contexts/tab-context"
 import { SidebarProvider, useSidebarContext } from "@/contexts/sidebar-context"
 import { SearchDialogProvider } from "@/contexts/search-dialog-context"
 import { AutomationsViewProvider } from "@/contexts/automations-view-context"
@@ -1117,20 +1117,13 @@ function FolderLayoutShell({ children }: { children: React.ReactNode }) {
 // search dialog, run history) also call openConversations() directly.
 function WorkbenchRouteConversationSync() {
   const activeTabId = useTabStore((s) => s.activeTabId)
-  const { consumeRemoteActivation } = useTabActions()
   const { openConversations } = useWorkbenchRoute()
   const prevRef = useRef(activeTabId)
   useEffect(() => {
     if (prevRef.current === activeTabId) return
     prevRef.current = activeTabId
-    // A remote tab snapshot that mirrors another client's focus also changes
-    // activeTabId. That's not a local conversation activation, so don't hijack
-    // this window into the conversations route — doing so would unmount whatever
-    // non-conversation view it's on (e.g. the Automations editor + unsaved
-    // edits). Local activations leave the flag false and switch as before.
-    if (consumeRemoteActivation()) return
     openConversations()
-  }, [activeTabId, openConversations, consumeRemoteActivation])
+  }, [activeTabId, openConversations])
   return null
 }
 

@@ -80,13 +80,21 @@ describe("web-mode app popup windows", () => {
     expect(popup.close).not.toHaveBeenCalled()
   })
 
-  it("rejects without calling the backend when the popup is blocked", async () => {
-    // No window features are passed, so unlike the `noreferrer` popups in
-    // ai-elements/link-safety.tsx a null return really does mean "blocked".
+  it("no longer opens a popup for settings — web mode navigates in place", async () => {
+    const assign = vi.fn()
     vi.spyOn(window, "open").mockReturnValue(null)
+    vi.spyOn(window, "location", "get").mockReturnValue({
+      ...window.location,
+      assign,
+    } as unknown as Location)
+    mocks.call.mockResolvedValue({ path: "/settings/appearance" })
 
-    await expect(openSettingsWindow("appearance")).rejects.toThrow(/Popup/)
-    expect(mocks.call).not.toHaveBeenCalled()
+    await openSettingsWindow("appearance")
+    expect(mocks.call).toHaveBeenCalledWith(
+      "open_settings_window",
+      expect.objectContaining({ section: "appearance" })
+    )
+    expect(assign).toHaveBeenCalledWith("/settings/appearance")
   })
 
   it("closes a window it just created when the round trip fails", async () => {

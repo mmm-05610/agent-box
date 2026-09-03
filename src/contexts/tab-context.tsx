@@ -176,7 +176,6 @@ export interface TabContextValue {
   tabs: TabItem[]
   activeTabId: string | null
   tabsHydrated: boolean
-  tileByGroup: Record<string, boolean>
   openTab: (
     folderId: number,
     conversationId: number,
@@ -191,25 +190,20 @@ export interface TabContextValue {
     conversationId: number,
     agentType: TabItem["agentType"]
   ) => void
-  closeOtherTabs: (tabId: string) => void
   closeAllTabs: () => void
   closeTabsByFolder: (folderId: number) => void
   switchTab: (tabId: string) => void
   pinTab: (tabId: string) => void
-  toggleGroupTile: (groupId: string) => void
-  consumeRemoteActivation: () => boolean
   openNewConversationTab: (
     folderId: number,
     workingDir: string,
     options?: {
       inheritFromActive?: boolean
       folderDefaultAgent?: TabItem["agentType"] | null
-      targetGroup?: string
       forceAgent?: TabItem["agentType"]
     }
   ) => OpenedDraftTarget
   openChatModeTab: (options?: {
-    targetGroup?: string
     forceAgent?: TabItem["agentType"]
   }) => OpenedDraftTarget
   setChatDraftWorkingDir: (tabId: string, workingDir: string) => void
@@ -231,7 +225,6 @@ export interface TabContextValue {
     tabId: string,
     runtimeConversationId: number
   ) => void
-  reorderTabs: (reorderedTabs: TabItem[]) => void
   onPreviewTabReplaced: (callback: (tabId: string) => void) => () => void
 }
 
@@ -241,7 +234,7 @@ export interface TabContextValue {
  * consumers should read `useTabStore(selector)` / `useTabActions()` directly to
  * subscribe to the narrowest slice they render. `useShallow` keeps the returned
  * object stable, so this re-renders only when a read field (tabs/activeTabId/
- * tabsHydrated/tileByGroup) changes — matching the former context's behavior.
+ * tabsHydrated) changes — matching the former context's behavior.
  */
 export function useTabContext(): TabContextValue {
   return useTabStore(
@@ -249,17 +242,13 @@ export function useTabContext(): TabContextValue {
       tabs: s.tabs,
       activeTabId: s.activeTabId,
       tabsHydrated: s.tabsHydrated,
-      tileByGroup: s.tileByGroup,
       openTab: s.openTab,
       closeTab: s.closeTab,
       closeConversationTab: s.closeConversationTab,
-      closeOtherTabs: s.closeOtherTabs,
       closeAllTabs: s.closeAllTabs,
       closeTabsByFolder: s.closeTabsByFolder,
       switchTab: s.switchTab,
       pinTab: s.pinTab,
-      toggleGroupTile: s.toggleGroupTile,
-      consumeRemoteActivation: s.consumeRemoteActivation,
       openNewConversationTab: s.openNewConversationTab,
       openChatModeTab: s.openChatModeTab,
       setChatDraftWorkingDir: s.setChatDraftWorkingDir,
@@ -267,7 +256,6 @@ export function useTabContext(): TabContextValue {
       setDraftAgentFromFallback: s.setDraftAgentFromFallback,
       bindConversationTab: s.bindConversationTab,
       setTabRuntimeConversationId: s.setTabRuntimeConversationId,
-      reorderTabs: s.reorderTabs,
       onPreviewTabReplaced: s.onPreviewTabReplaced,
     }))
   )

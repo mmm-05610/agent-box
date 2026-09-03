@@ -27,10 +27,8 @@ import { useAcpAgents } from "@/hooks/use-acp-agents"
 import { useActiveFolder } from "@/contexts/active-folder-context"
 import { useAppWorkspaceStore } from "@/stores/app-workspace-store"
 import { useTabActions, useTabStore } from "@/contexts/tab-context"
-import { groupOfTab, isReparentUnmount } from "@/stores/tab-store"
-import { computeRects, leafIds } from "@/lib/tab-group-layout"
 import { useTaskContext } from "@/contexts/task-context"
-import { cn, copyTextToClipboard, randomUUID } from "@/lib/utils"
+import { copyTextToClipboard, randomUUID } from "@/lib/utils"
 import { buildAskPrompt, buildQuotedMarkdown } from "@/lib/message-quote"
 import {
   ASK_SELECTION_PARKED_EVENT,
@@ -59,20 +57,7 @@ import { ChatInput } from "@/components/chat/chat-input"
 import { WelcomeHero, WelcomeTip } from "@/components/chat/welcome-hero"
 import { QuickActions } from "@/components/chat/quick-actions"
 import type { ComposerInjectContent } from "@/components/chat/message-input"
-import { TileScrollContainer } from "@/components/conversations/tile-scroll-container"
-import { GroupSplitHandle } from "@/components/conversations/group-split-handle"
-import { OverlayHostHiddenProvider } from "@/components/ui/overlay-host-hidden"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { TabBar } from "@/components/tabs/tab-bar"
-import { TabDragGhost } from "@/components/tabs/tab-drag-ghost"
-import { useSidebarContext } from "@/contexts/sidebar-context"
-import { useAuxPanelContext } from "@/contexts/aux-panel-context"
-import { useWorkspaceView } from "@/contexts/workspace-context"
-import { useIsMobile } from "@/hooks/use-mobile"
-import { usePlatform } from "@/hooks/use-platform"
-import { useZoomLevel } from "@/hooks/use-appearance"
-import { isDesktop } from "@/lib/platform"
-import { leftChromeReserve, rightChromeReserve } from "@/lib/window-chrome"
 import {
   acpFork,
   createChatConversation,
@@ -165,10 +150,6 @@ interface ConversationTabViewProps {
    *  auto-focus/connect and is true even for a lone session. */
   showActiveFlow: boolean
   reloadSignal: number
-  /** The split group this view is rendered under. Used ONLY to tell a
-   *  reparent (the tab moved to another group — remount, keep the connection)
-   *  apart from a real teardown (pane switch / route change — disconnect). */
-  groupId: string
 }
 
 function buildOptimisticUserTurnFromDraft(
@@ -239,7 +220,6 @@ const ConversationTabView = memo(function ConversationTabView({
   isActive,
   showActiveFlow,
   reloadSignal,
-  groupId,
 }: ConversationTabViewProps) {
   const t = useTranslations("Folder.conversation")
   const tWelcome = useTranslations("Folder.chat.welcomeInputPanel")
@@ -583,13 +563,6 @@ const ConversationTabView = memo(function ConversationTabView({
     // Drives cross-client viewer discovery: when another client is already
     // live on this conversation, attach to its connection instead of spawning.
     conversationId: dbConversationId ?? undefined,
-    // A cross-group move / unsplit reparents this view (React remounts it)
-    // while the tab stays open — that unmount must not tear the connection
-    // down. See `isReparentUnmount` for why "still open" alone is too broad.
-    isTransientUnmount: useCallback(
-      () => isReparentUnmount(useTabStore.getState(), tabId, groupId),
-      [tabId, groupId]
-    ),
   })
   const { status: connStatus, sessionId: connSessionId } = conn
   const messageQueue = useMessageQueue()
@@ -1599,7 +1572,7 @@ const ConversationTabView = memo(function ConversationTabView({
       const target = openNewConversationTab(
         askFolderId,
         workingDirForConnection,
-        { targetGroup: groupId, forceAgent: selectedAgent }
+        { forceAgent: selectedAgent }
       )
       // Park against the identity the store PROMISED that tab, not against what
       // it looks like right now — reusing a draft from another folder/agent
@@ -1613,7 +1586,6 @@ const ConversationTabView = memo(function ConversationTabView({
     },
     [
       askFolderId,
-      groupId,
       openNewConversationTab,
       selectedAgent,
       workingDirForConnection,
@@ -2212,48 +2184,6 @@ const ConversationTabView = memo(function ConversationTabView({
   )
 })
 
-// A group rect (percentages) counts as touching a container edge within this
-// tolerance — ratio math can land a hair off exact 0 / 100.
-const GROUP_EDGE_EPSILON = 0.1
-
-/**
- * Corner reserve for a TOP-EDGE split-group strip. While split there is no
- * dedicated title-bar row above the shells (the workspace layout drops it
- * entirely instead of leaving a blank drag strip), so the strips along the
- * window's top edge must reserve the fixed corner overlays' width themselves —
- * exactly what the unsplit strip row does: left for LeftEdgeChrome while the
- * sidebar is collapsed (the conversation column then owns the window's left
- * edge), right for RightEdgeChrome while the column owns the right edge (aux
- * panel closed + conversation mode). Mobile shows the full-width
- * FolderTitleBar instead of corner overlays — no reserve. Self-subscribed so
- * sidebar/aux/zoom toggles re-render these slivers, not the whole panel.
- */
-function SplitStripCornerReserve({ side }: { side: "left" | "right" }) {
-  const isMobile = useIsMobile()
-  const { isOpen: sidebarOpen } = useSidebarContext()
-  const { isOpen: auxOpen } = useAuxPanelContext()
-  const { mode } = useWorkspaceView()
-  const { isMac, isWindows, isLinux } = usePlatform()
-  const { zoomLevel } = useZoomLevel()
-  if (isMobile) return null
-  const width =
-    side === "left"
-      ? sidebarOpen
-        ? 0
-        : leftChromeReserve(isMac && isDesktop(), zoomLevel)
-      : !auxOpen && mode === "conversation"
-        ? rightChromeReserve(isDesktop() && (isWindows || isLinux), zoomLevel)
-        : 0
-  if (width <= 0) return null
-  return (
-    <div
-      data-tauri-drag-region
-      className="h-full shrink-0 ws-strip-line"
-      style={{ width }}
-    />
-  )
-}
-
 export function ConversationDetailPanel() {
   const t = useTranslations("Folder.conversation")
   const tDetails = useTranslations("Folder.sessionDetails")
@@ -2266,20 +2196,8 @@ export function ConversationDetailPanel() {
   const allFolders = useAppWorkspaceStore((s) => s.allFolders)
   const tabs = useTabStore((s) => s.tabs)
   const activeTabId = useTabStore((s) => s.activeTabId)
-  const groupLayout = useTabStore((s) => s.groupLayout)
-  const groupOf = useTabStore((s) => s.groupOf)
-  const groupSelection = useTabStore((s) => s.groupSelection)
-  const tileByGroup = useTabStore((s) => s.tileByGroup)
-  // Narrow: only the drop-TARGET group id (for the shell highlight ring) — the
-  // per-frame x/y writes during a drag never re-render the panel.
-  const dragOverGroupId = useTabStore((s) => s.tabDrag?.overGroupId ?? null)
-  const {
-    openNewConversationTab,
-    closeTab,
-    switchTab,
-    resizeGroupSplit,
-    onPreviewTabReplaced,
-  } = useTabActions()
+  const { openNewConversationTab, closeTab, onPreviewTabReplaced } =
+    useTabActions()
   const newConversation = useMemo(() => {
     const activeTab = tabs.find((tab) => tab.id === activeTabId)
     if (!activeTab || activeTab.conversationId != null) return null
@@ -2526,236 +2444,11 @@ export function ConversationDetailPanel() {
   // stable group id, so splits/merges/orientation flips/divider drags are pure
   // style changes and a tab that stays in its group is never reparented (a
   // reparent would remount the view and tear down a live streaming response).
-  const { groups: groupRects, handles: groupHandles } = useMemo(
-    () => computeRects(groupLayout),
-    [groupLayout]
-  )
-  const orderedGroupIds = useMemo(() => leafIds(groupLayout), [groupLayout])
-  const isSplit = orderedGroupIds.length > 1
-  const tabsByGroup = useMemo(() => {
-    const byGroup = new Map<string, typeof tabs>()
-    for (const groupId of orderedGroupIds) byGroup.set(groupId, [])
-    for (const tab of tabs) {
-      const groupId = groupOfTab(groupOf, groupLayout, tab.id)
-      const bucket = byGroup.get(groupId)
-      if (bucket) {
-        bucket.push(tab)
-      } else {
-        byGroup.set(groupId, [tab])
-      }
-    }
-    return byGroup
-  }, [tabs, groupOf, groupLayout, orderedGroupIds])
-
-  const tileTabRefs = useRef<Map<string, HTMLDivElement | null>>(new Map())
-  const groupContainerRef = useRef<HTMLDivElement | null>(null)
-
-  // Scroll each TILED group's selected tab into view when the selection (or
-  // the group's tiled-ness) changes — the signature string keeps the effect
-  // from refiring on unrelated tab updates.
-  const tiledSelectionKey = useMemo(
-    () =>
-      orderedGroupIds
-        .filter(
-          (groupId) =>
-            tileByGroup[groupId] &&
-            (tabsByGroup.get(groupId)?.length ?? 0) > 1 &&
-            groupSelection[groupId] != null
-        )
-        .map((groupId) => groupSelection[groupId])
-        .join("|"),
-    [orderedGroupIds, tileByGroup, tabsByGroup, groupSelection]
-  )
-  useEffect(() => {
-    if (!tiledSelectionKey) return
-    for (const selectedId of tiledSelectionKey.split("|")) {
-      tileTabRefs.current.get(selectedId)?.scrollIntoView({
-        behavior: "smooth",
-        inline: "center",
-        block: "nearest",
-      })
-    }
-  }, [tiledSelectionKey])
-
-  // Safety valve: if the dragged tab vanishes mid-drag (a remote snapshot
-  // closing it), the drag-end callback on its unmounted item never fires —
-  // clear the transient drag so the ghost/highlight can't linger.
-  useEffect(() => {
-    const st = useTabStore.getState()
-    if (st.tabDrag && !tabs.some((tab) => tab.id === st.tabDrag?.tabId)) {
-      st.endTabDrag()
-    }
-  }, [tabs])
-
   if (hasNoTabs) {
     return null
   }
 
-  const renderTabWrapper = (
-    tab: (typeof tabs)[number],
-    indexInGroup: number,
-    groupId: string,
-    canTileG: boolean
-  ) => {
-    const active = tab.id === activeTabId
-    // Visible = tiled (all group members shown) or the group's selected tab.
-    const visible = canTileG || tab.id === groupSelection[groupId]
-    const folderPath = allFolders.find((f) => f.id === tab.folderId)?.path
-    const view = (
-      <ConversationTabView
-        tabId={tab.id}
-        conversationId={tab.conversationId}
-        agentType={tab.agentType}
-        workingDir={tab.workingDir ?? folderPath}
-        isActive={active}
-        showActiveFlow={(isSplit || canTileG) && active}
-        reloadSignal={reloadByTabId[tab.id] ?? 0}
-        groupId={groupId}
-      />
-    )
-    return (
-      <div
-        key={tab.id}
-        ref={(el) => {
-          if (el) {
-            tileTabRefs.current.set(tab.id, el)
-          } else {
-            tileTabRefs.current.delete(tab.id)
-          }
-        }}
-        className={cn(
-          canTileG
-            ? cn(
-                "relative h-full min-w-[24rem] flex-1 overflow-hidden",
-                indexInGroup > 0 && "border-l border-border/50"
-              )
-            : visible
-              ? "h-full"
-              : "conversation-tab-hidden absolute inset-0 invisible pointer-events-none"
-        )}
-        onPointerDownCapture={
-          visible && !active ? () => switchTab(tab.id) : undefined
-        }
-      >
-        {/* The visible active cue is now the composer's flowing gradient border
-            (see message-input.tsx); keep a non-visual cue for assistive tech
-            when several sessions are visible (tiled and/or split). */}
-        {(isSplit || canTileG) && active && (
-          <span className="sr-only">{t("activeConversationIndicator")}</span>
-        )}
-        {/* A backgrounded tab is kept mounted and merely hidden (its session is
-            still live), but a "查看会话" drawer opened from it portals to the
-            body — so without this it went on painting over whichever tab the
-            user switched to. The flag is additive, so a visible tab inside a
-            covered workspace stays hidden. */}
-        <OverlayHostHiddenProvider hidden={!canTileG && !visible}>
-          {view}
-        </OverlayHostHiddenProvider>
-      </div>
-    )
-  }
-
-  // Plain function (NOT a component defined in render — that type identity
-  // would change every render and remount the whole shell subtree).
-  const renderGroupShell = (groupId: string) => {
-    const rect = groupRects.get(groupId)
-    if (!rect) return null
-    const groupTabs = tabsByGroup.get(groupId) ?? []
-    const canTileG = !!tileByGroup[groupId] && groupTabs.length > 1
-    // Only the TOP-edge strips sit under the fixed corner overlays (the split
-    // layout has no title-bar row above them) — the leftmost/rightmost of that
-    // row carry the corner reserves the unsplit strip row normally provides.
-    const touchesTop = rect.y <= GROUP_EDGE_EPSILON
-    const touchesLeft = touchesTop && rect.x <= GROUP_EDGE_EPSILON
-    const touchesRight =
-      touchesTop && rect.x + rect.w >= 100 - GROUP_EDGE_EPSILON
-    // The group's SELECTED tab drives its header — each split group keeps the
-    // full "tabs + conversation title bar" pairing of the unsplit layout.
-    const selTab =
-      groupTabs.find((tab) => tab.id === groupSelection[groupId]) ??
-      groupTabs[0] ??
-      null
-    const selTabFolder = selTab
-      ? allFolders.find((f) => f.id === selTab.folderId)
-      : undefined
-    // NOTE: the strip / header / content stay PLAIN SIBLING SLOTS (no fragment
-    // around any pair) — a `false` conditional is a reconciliation hole, so the
-    // content keeps its slot across split flips; wrapping would shift slots and
-    // remount every live view (see group-shell-reconciliation.test.tsx).
-    return (
-      <div
-        key={groupId}
-        data-conv-group-shell={groupId}
-        className="absolute flex min-h-0 flex-col overflow-hidden"
-        style={{
-          left: `${rect.x}%`,
-          top: `${rect.y}%`,
-          width: `${rect.w}%`,
-          height: `${rect.h}%`,
-        }}
-      >
-        {/* While split, each group owns its own strip (the workspace layout's
-            title-bar row is gone entirely), and the TOP-edge strips add the
-            corner reserves that row normally carries. */}
-        {isSplit && (
-          <div className="flex h-10 shrink-0 items-stretch bg-muted ws-transparent-bg">
-            {touchesLeft && <SplitStripCornerReserve side="left" />}
-            <TabBar groupId={groupId} />
-            {touchesRight && <SplitStripCornerReserve side="right" />}
-          </div>
-        )}
-        {isSplit && selTab && (
-          <div
-            className="shrink-0"
-            // Clicking a non-focused group's title bar focuses that group
-            // (same gesture as clicking its content) — capture phase so the
-            // header's own controls still receive the event afterwards.
-            onPointerDownCapture={() => {
-              const selected = groupSelection[groupId]
-              if (selected && selected !== useTabStore.getState().activeTabId) {
-                switchTab(selected)
-              }
-            }}
-          >
-            <ConversationDetailHeader
-              tabId={selTab.id}
-              conversationId={selTab.conversationId}
-              runtimeConversationId={selTab.runtimeConversationId ?? null}
-              folderId={selTab.folderId}
-              folderPath={selTabFolder?.path}
-              title={selTab.title}
-              status={selTab.status as ConversationStatus | undefined}
-            />
-          </div>
-        )}
-        <div className="relative min-h-0 flex-1 overflow-hidden">
-          <TileScrollContainer canTile={canTileG}>
-            <div
-              className={cn(
-                "relative h-full",
-                canTileG && "flex min-w-full flex-row"
-              )}
-            >
-              {groupTabs.map((tab, indexInGroup) =>
-                renderTabWrapper(tab, indexInGroup, groupId, canTileG)
-              )}
-            </div>
-          </TileScrollContainer>
-          {/* Drop-target cue while a tab from another group hovers here. */}
-          {dragOverGroupId === groupId && (
-            <div className="pointer-events-none absolute inset-0 z-30 bg-primary/5 ring-2 ring-inset ring-primary/30" />
-          )}
-        </div>
-      </div>
-    )
-  }
-
-  // While UNSPLIT, a single header sits fixed above the horizontally-scrolling
-  // tile row, so it never scrolls on the x-axis when conversations are tiled.
-  // It reflects the ACTIVE conversation (title + owning folder). On mobile
-  // there's no tile row — it's simply the sole conversation's header. While
-  // SPLIT, every group shell renders its own header under its strip (the
-  // "tabs + title bar" pairing per group), so the global one steps aside.
+  // The single session's header (title + owning folder) sits above the view.
   const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? null
   const activeTabFolder = activeTab
     ? allFolders.find((f) => f.id === activeTab.folderId)
@@ -2764,7 +2457,7 @@ export function ConversationDetailPanel() {
   return (
     <>
       <div className="flex h-full min-h-0 flex-col overflow-hidden">
-        {!isSplit && activeTab && (
+        {activeTab && (
           <ConversationDetailHeader
             tabId={activeTab.id}
             conversationId={activeTab.conversationId}
@@ -2777,24 +2470,20 @@ export function ConversationDetailPanel() {
         )}
         <ContextMenu>
           <ContextMenuTrigger asChild>
-            <div
-              ref={groupContainerRef}
-              className="relative min-h-0 flex-1 overflow-hidden"
-            >
-              {/* Flat sibling shells keyed by stable group id + divider
-                  overlays — stable across every split/tile flip, otherwise
-                  sibling tabs remount and a live streaming response is torn
-                  down. */}
-              {orderedGroupIds.map((groupId) => renderGroupShell(groupId))}
-              {isSplit &&
-                groupHandles.map((handle) => (
-                  <GroupSplitHandle
-                    key={`${handle.splitId}:${handle.index}`}
-                    handle={handle}
-                    containerRef={groupContainerRef}
-                    onResize={resizeGroupSplit}
-                  />
-                ))}
+            <div className="relative min-h-0 flex-1 overflow-hidden">
+              {/* Single-session direct render (D-005): one live view, no
+                  group shells to keep stable across split flips. */}
+              {activeTab && (
+                <ConversationTabView
+                  tabId={activeTab.id}
+                  conversationId={activeTab.conversationId}
+                  agentType={activeTab.agentType}
+                  workingDir={activeTab.workingDir ?? activeTabFolder?.path}
+                  isActive
+                  showActiveFlow={false}
+                  reloadSignal={reloadByTabId[activeTab.id] ?? 0}
+                />
+              )}
             </div>
           </ContextMenuTrigger>
           <ContextMenuContent>
@@ -2850,7 +2539,6 @@ export function ConversationDetailPanel() {
           </ContextMenuContent>
         </ContextMenu>
       </div>
-      <TabDragGhost />
       {activeSessionSummary && (
         <SessionDetailsDialog
           open={detailsOpen}

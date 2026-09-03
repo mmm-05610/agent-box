@@ -188,9 +188,9 @@ function seedWorkspaceStore() {
     foldersHydrated: true,
     setActiveFolderId: setActiveFolderIdMock,
   })
-  // Drop device-local group/tile blobs BEFORE the reset re-reads them —
-  // `persistGroupState` writes localStorage during hydrated tests and would
-  // otherwise leak split layouts across tests.
+  // Drop device-local drafts blobs BEFORE the reset re-reads them —
+  // `persistDraftState` writes localStorage during hydrated tests and would
+  // otherwise leak restored drafts across tests.
   localStorage.clear()
   // The tab store is a module-level singleton: reset it (state + coordination
   // vars + injected runtime + one-shot correction/recovery flags) after seeding
@@ -324,23 +324,6 @@ describe("TabProvider tab state transitions", () => {
 
     expect(screen.getByTestId("tabs")).toHaveTextContent("conv-2-codex-3")
     expect(screen.getByTestId("active")).toHaveTextContent("conv-2-codex-3")
-  })
-
-  it("ignores closeOtherTabs when its target was removed earlier in the same batch", () => {
-    renderTabs()
-
-    expect(latestContext).not.toBeNull()
-
-    openConversationTab(1, 1, "First")
-    openConversationTab(1, 2, "Second")
-
-    act(() => {
-      latestContext?.closeTab("conv-1-codex-1")
-      latestContext?.closeOtherTabs("conv-1-codex-1")
-    })
-
-    expect(screen.getByTestId("tabs")).toHaveTextContent("conv-1-codex-2")
-    expect(screen.getByTestId("active")).toHaveTextContent("conv-1-codex-2")
   })
 
   it("keeps an existing draft active when reopening a draft after closing it in the same batch", () => {
@@ -519,8 +502,8 @@ describe("TabProvider tab state transitions", () => {
     ).toBe(false)
   })
 
-  it("promises the retargeted identity when it reuses the group's draft", () => {
-    // Each group keeps a single draft, so the second open retargets the first
+  it("promises the retargeted identity when it reuses the existing draft", () => {
+    // A single draft slot is reused, so the second open retargets the first
     // tab rather than adding one — ASYNCHRONOUSLY. Callers that hand work to the
     // returned tab (the "ask about this selection" hand-off) must be told the
     // identity it is heading for, not the stale one it still has, or they would

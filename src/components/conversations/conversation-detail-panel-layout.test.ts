@@ -70,25 +70,6 @@ describe("ConversationDetailPanel new conversation layout", () => {
     expect(welcomeBranch).toContain("tall")
   })
 
-  it("snaps the hidden keep-alive tab so `transition-all` descendants don't ghost", () => {
-    // Inactive tabs stay mounted and hide with `visibility: hidden` (`invisible`).
-    // In Tailwind v4 `transition-all` transitions `visibility` too, so welcome
-    // controls (agent pills, quick-action tabs, composer buttons) would linger
-    // 150–300ms as ghosts over the newly-active conversation. The wrapper must
-    // carry `conversation-tab-hidden` next to `invisible`, and globals.css must
-    // drop transitions for that subtree so visibility snaps. Both halves are
-    // required — assert they stay coupled.
-    expect(source).toContain(
-      '"conversation-tab-hidden absolute inset-0 invisible pointer-events-none"'
-    )
-    expect(globalsCssSource).toContain(".conversation-tab-hidden *")
-    const rule = globalsCssSource.slice(
-      globalsCssSource.indexOf(".conversation-tab-hidden,"),
-      globalsCssSource.indexOf(".conversation-tab-hidden,") + 200
-    )
-    expect(rule).toContain("transition-property: none !important")
-  })
-
   // Regression: with a workspace background image on, every covering surface is
   // TRANSPARENT rather than opaque, so a hidden-but-mounted subtree that still
   // paints is visible straight through it. `visibility` inherits, but a
@@ -138,17 +119,14 @@ describe("ConversationDetailPanel new conversation layout", () => {
    * column is deliberately not one — no conversation lives there.
    */
   it("publishes the hidden flag from every conversation-hosting subtree", () => {
-    // Full-page workbench route, both shells.
+    // Full-page workbench route, both shells. (Single-session mode removed the
+    // per-tab flag — there are no backgrounded conversation tabs anymore.)
     expect(workspaceLayoutSource).toContain(
       "<OverlayHostHiddenProvider hidden={hidden}>"
     )
     // Conversation column under the files-maximized overlay.
     expect(workspaceLayoutSource).toContain(
       "<OverlayHostHiddenProvider hidden={filesMaximized}>"
-    )
-    // A backgrounded conversation tab behind the selected one.
-    expect(source).toContain(
-      "<OverlayHostHiddenProvider hidden={!canTileG && !visible}>"
     )
   })
 
