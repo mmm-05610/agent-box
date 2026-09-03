@@ -17,6 +17,12 @@ const spies = vi.hoisted(() => ({
   openChatModeTab: vi.fn(),
   setRoute: vi.fn(),
   openConversations: vi.fn(),
+  // Search dialog (ZCode layout moved the Search row back into the sidebar).
+  setSearchOpen: vi.fn(),
+  // Bottom account row's settings gear.
+  openSettingsWindow: vi.fn(),
+  // "Groups" pill placeholder toast.
+  toastInfo: vi.fn(),
   // The list's imperative handle, driven by the header buttons.
   scrollToActive: vi.fn(),
   expandAll: vi.fn(),
@@ -67,6 +73,7 @@ vi.mock(
 )
 vi.mock("@/features/shell", () => ({
   useSidebar: () => ({ isOpen: true, toggle: vi.fn() }),
+  useSearchDialog: () => ({ open: false, setOpen: spies.setSearchOpen }),
   useAutomationsView: () => ({
     automations: [],
     unseenFailures: 0,
@@ -84,6 +91,13 @@ vi.mock("@/features/shell", () => ({
     openConversations: spies.openConversations,
   }),
 }))
+// The settings gear calls the real api client's openSettingsWindow; keep every
+// other export intact (project-tree's dialogs import this module transitively).
+vi.mock("@/lib/api", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  openSettingsWindow: spies.openSettingsWindow,
+}))
+vi.mock("sonner", () => ({ toast: { info: spies.toastInfo } }))
 vi.mock("@/contexts/active-folder-context", () => ({
   useActiveFolder: () => ({ activeFolder: mockState.activeFolder }),
 }))
@@ -139,6 +153,9 @@ describe("Sidebar — fixed nav region", () => {
     spies.openChatModeTab.mockClear()
     spies.setRoute.mockClear()
     spies.openConversations.mockClear()
+    spies.setSearchOpen.mockClear()
+    spies.openSettingsWindow.mockClear()
+    spies.toastInfo.mockClear()
     mockState.activeFolder = { id: 7, path: "/x" }
   })
 
@@ -167,12 +184,23 @@ describe("Sidebar — fixed nav region", () => {
     expect(getByText("Ctrl+T")).toBeTruthy()
   })
 
-  it("no longer carries a Search row — it moved to the window chrome", () => {
-    const { queryByText } = renderSidebar()
-    // The sidebar unmounts when collapsed, which left ⌘K as the only path to
-    // search; the button now lives in LeftEdgeChrome / FolderTitleBar instead.
-    expect(queryByText("Search")).toBeNull()
-    expect(queryByText("Ctrl+K")).toBeNull()
+  it("carries a Search row (ZCode layout) that opens the search dialog", () => {
+    const { getByText } = renderSidebar()
+    fireEvent.click(getByText("Search"))
+    expect(spies.setSearchOpen).toHaveBeenCalledWith(true)
+    // The Ctrl+K hint badge renders beside the label (in the DOM even while
+    // hover-revealed opacity-0, same as the New chat badge).
+    expect(getByText("Ctrl+K")).toBeTruthy()
+  })
+
+  it("plugin marketplace is a disabled 'coming soon' placeholder", () => {
+    const { getByRole } = renderSidebar()
+    const btn = getByRole("button", {
+      name: "Plugin marketplace",
+    }) as HTMLButtonElement
+    expect(btn.disabled).toBe(true)
+    // The tooltip — not the label — carries the coming-soon message.
+    expect(btn.getAttribute("title")).toBe("Coming soon")
   })
 
   it("falls back to chat mode (never disabled) when no folder is active", () => {
@@ -352,7 +380,10 @@ describe("Sidebar — Navigation item visibility", () => {
   it("shows every route row by default", () => {
     renderSidebar()
     expect(navRow("Automations")).toBeTruthy()
-    expect(navRow("To-dos")).toBeTruthy()
+    // Tasks left the nav rows in the ZCode layout — it is now its own section
+    // (header + empty state) further down the sidebar.
+    expect(screen.getByText("To-dos")).toBeTruthy()
+    expect(screen.getByText("No tasks yet")).toBeTruthy()
   })
 
   it("hides a row when its menu toggle is switched off, and persists it", async () => {
@@ -373,9 +404,9 @@ describe("Sidebar — Navigation item visibility", () => {
     await userEvent.keyboard("{Escape}")
 
     expect(navRow("Automations")).toBeNull()
-    // Control: the other rows are still there, so the assertion above is about
+    // Control: the tasks section is still there, so the assertion above is about
     // this one row rather than a hidden subtree.
-    expect(navRow("To-dos")).toBeTruthy()
+    expect(screen.getByText("To-dos")).toBeTruthy()
     expect(
       JSON.parse(localStorage.getItem("workspace:sidebar-nav-items") ?? "{}")
     ).toEqual({ automations: false })
@@ -387,7 +418,9 @@ describe("Sidebar — Navigation item visibility", () => {
       JSON.stringify({ tasks: false })
     )
     renderSidebar()
-    expect(navRow("To-dos")).toBeNull()
+    // Hiding tasks now removes its SECTION (header + empty state), since the
+    // nav row no longer exists.
+    expect(screen.queryByText("To-dos")).toBeNull()
     expect(navRow("Automations")).toBeTruthy()
   })
 
@@ -397,7 +430,7 @@ describe("Sidebar — Navigation item visibility", () => {
       JSON.stringify({ retired: false, tasks: false })
     )
     renderSidebar()
-    expect(navRow("To-dos")).toBeNull()
+    expect(screen.queryByText("To-dos")).toBeNull()
     expect(navRow("Automations")).toBeTruthy()
   })
 })
@@ -570,5 +603,67 @@ describe("Sidebar — Section order control", () => {
       "chats",
     ])
     expect(spies.listProps?.showRecent).toBe(false)
+  })
+})
+
+describe("Sidebar — ZCode layout", () => {
+  beforeEach(() => {
+    localStorage.clear()
+    spies.setRoute.mockClear()
+    spies.setSearchOpen.mockClear()
+    spies.openSettingsWindow.mockClear()
+    spies.toastInfo.mockClear()
+    // The gear handler chains `.catch` on the returned promise; the spy must
+    // resolve or the click surfaces an unhandled TypeError.
+    spies.openSettingsWindow.mockResolvedValue(undefined)
+    mockState.activeFolder = { id: 7, path: "/x" }
+  })
+
+  // "Projects" is ambiguous in the sidebar: the bottom ProjectTreeAddButton's
+  // menu trigger carries the same accessible name. The view pills are the only
+  // toggle buttons here, so pick the `aria-pressed` one.
+  const viewPill = (name: string) => {
+    const pill = screen
+      .getAllByRole("button", { name })
+      .find((el) => el.getAttribute("aria-pressed") != null)
+    expect(pill).toBeTruthy()
+    return pill as HTMLElement
+  }
+
+  it("view switcher defaults to the Projects pill", () => {
+    renderSidebar()
+    expect(viewPill("Projects").getAttribute("aria-pressed")).toBe("true")
+    expect(viewPill("Groups").getAttribute("aria-pressed")).toBe("false")
+  })
+
+  it("Groups pill is a visual placeholder that toasts coming-soon", async () => {
+    const user = userEvent.setup()
+    renderSidebar()
+    await user.click(viewPill("Groups"))
+    // This release keeps the Groups view a visual placeholder: the click never
+    // switches the list — it just tells the user the view is on its way.
+    expect(spies.toastInfo).toHaveBeenCalledWith("Coming soon")
+    expect(viewPill("Projects").getAttribute("aria-pressed")).toBe("true")
+  })
+
+  it("tasks empty state navigates to the tasks route", async () => {
+    const user = userEvent.setup()
+    renderSidebar()
+    await user.click(screen.getByText("No tasks yet"))
+    expect(spies.setRoute).toHaveBeenCalledWith("tasks")
+  })
+
+  it("account row's settings gear opens the settings window", async () => {
+    const user = userEvent.setup()
+    renderSidebar()
+    await user.click(screen.getByRole("button", { name: "Settings" }))
+    expect(spies.openSettingsWindow).toHaveBeenCalledTimes(1)
+  })
+
+  it("account row shows the placeholder user with an initial avatar", () => {
+    renderSidebar()
+    expect(screen.getByText("Local user")).toBeTruthy()
+    // The circular avatar carries the label's initial.
+    expect(screen.getByText("L")).toBeTruthy()
   })
 })

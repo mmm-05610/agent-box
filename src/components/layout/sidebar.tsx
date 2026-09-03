@@ -3,24 +3,34 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import {
   Crosshair,
+  Eraser,
   Eye,
+  Hash,
   ListChevronsDownUp,
   ListChevronsUpDown,
+  ListFilter,
   ListTodo,
   Menu,
   MessagesSquare,
+  Puzzle,
+  RectangleHorizontal,
+  Search,
+  Settings,
   SquarePen,
   Zap,
   type LucideIcon,
 } from "lucide-react"
 import { useTranslations } from "next-intl"
+import { toast } from "sonner"
 import { useActiveFolder } from "@/contexts/active-folder-context"
 import {
   useSidebar,
+  useSearchDialog,
   useAutomationsView,
   useTasksView,
   useWorkbenchRoute,
 } from "@/features/shell"
+import { openSettingsWindow } from "@/lib/api"
 import { useTabActions } from "@/contexts/tab-context"
 import {
   SidebarConversationList,
@@ -119,30 +129,84 @@ function SidebarNavButton({
   onClick,
   active,
   trailing,
+  disabled = false,
+  tooltip,
 }: {
   icon: LucideIcon
   label: string
-  onClick: () => void
+  /** Omitted on disabled placeholder rows (plugin marketplace). */
+  onClick?: () => void
   active?: boolean
   trailing?: ReactNode
+  /** Placeholder rows (plugin marketplace): greyed, inert, tooltip explains. */
+  disabled?: boolean
+  /** Overrides the row's `title` when it should differ from the label (the
+   *  disabled marketplace row says "coming soon" instead). */
+  tooltip?: string
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      title={label}
+      disabled={disabled}
+      title={tooltip ?? label}
       aria-current={active ? "page" : undefined}
       className={cn(
         "group flex h-8 w-full items-center gap-[0.4375rem] rounded-full pl-[0.4375rem] pr-1.5",
         "text-[0.875rem] text-sidebar-foreground outline-none",
         "transition-colors duration-150 hover:bg-sidebar-accent",
         "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
-        active && "bg-sidebar-primary/8"
+        active && "bg-sidebar-primary/8",
+        disabled &&
+          "cursor-not-allowed text-muted-foreground/60 opacity-70 hover:bg-transparent"
       )}
     >
-      <Icon className="h-[0.875rem] w-[0.875rem] shrink-0 text-muted-foreground" />
+      <Icon
+        className={cn(
+          "h-[0.875rem] w-[0.875rem] shrink-0 text-muted-foreground",
+          disabled && "text-muted-foreground/60"
+        )}
+      />
       <span className="truncate">{label}</span>
       {trailing}
+    </button>
+  )
+}
+
+/**
+ * One half of the ZCode-style view switcher (`# 分组 | ▭ 项目`): a compact pill
+ * inside a shared track. `active` renders the `bg-accent` pressed state; the
+ * inactive pill stays muted until hovered. The track owns the visual grouping,
+ * so each pill only needs its own padding + radius.
+ */
+function SidebarViewPill({
+  icon: Icon,
+  label,
+  active,
+  onClick,
+}: {
+  icon: LucideIcon
+  label: string
+  active: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={label}
+      aria-pressed={active}
+      className={cn(
+        "flex h-6 cursor-pointer items-center gap-1 rounded-full px-2",
+        "text-[0.75rem] outline-none transition-colors duration-150",
+        "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
+        active
+          ? "bg-accent text-accent-foreground"
+          : "text-muted-foreground hover:text-sidebar-foreground"
+      )}
+    >
+      <Icon aria-hidden className="h-3 w-3 shrink-0" />
+      <span className="truncate">{label}</span>
     </button>
   )
 }
@@ -155,6 +219,7 @@ export function Sidebar() {
   const { unseenFailures } = useAutomationsView()
   const { attentionCount } = useTasksView()
   const { routeId, setRoute, openConversations } = useWorkbenchRoute()
+  const { setOpen: setSearchOpen } = useSearchDialog()
   const isMac = useIsMac()
   const { isMac: platformIsMac } = usePlatform()
   const { zoomLevel } = useZoomLevel()
@@ -186,10 +251,16 @@ export function Sidebar() {
     shortcuts.new_conversation,
     isMac
   )
+  const searchShortcutLabel = formatShortcutLabel(
+    shortcuts.toggle_search,
+    isMac
+  )
   // General umbrella name for the eye menu (list toggles + nav rows + sort +
   // section order). Kept generic so the accessible name / tooltip stays
   // accurate as the menu gains options.
   const viewOptionsLabel = t("viewOptions")
+  // 底部账户行：占位用户名（头像圆标取其首字母）。
+  const localUserLabel = t("localUser")
   const toggleExpandLabel = allExpanded
     ? t("collapseAllGroups")
     : t("expandAllGroups")
@@ -286,6 +357,32 @@ export function Sidebar() {
     isMobile,
     toggle,
   ])
+
+  // 搜索（Ctrl+K）：打开既有的会话搜索对话框（workspace-shell store 的
+  // searchDialog slice — 对话框本体由 workspace-chrome-controller 挂载，
+  // ⌘K 快捷键同走这里，所以收起侧栏也不影响）。
+  const handleOpenSearch = useCallback(() => {
+    setSearchOpen(true)
+  }, [setSearchOpen])
+
+  // “分组”视图本期限留视觉位：点击只提示“即将上线”，不切换（实现成本最低
+  // 的二选一；按状态分组的平铺列表留待后端聚合接口）。
+  const handleGroupViewClick = useCallback(() => {
+    toast.info(t("comingSoon"))
+  }, [t])
+
+  // 底部账户行的设置齿轮：打开既有设置窗口（openSettingsWindow）。
+  const handleOpenSettings = useCallback(() => {
+    openSettingsWindow().catch((err) => {
+      console.error("[Sidebar] failed to open settings:", err)
+    })
+  }, [])
+
+  // 任务空态 → tasks 路由（移动端先收起 Drawer，与其它入口一致）。
+  const handleOpenTasks = useCallback(() => {
+    if (isMobile) toggle()
+    setRoute("tasks")
+  }, [isMobile, setRoute, toggle])
 
   if (!isOpen) return null
 
@@ -507,10 +604,19 @@ export function Sidebar() {
             ) : null
           }
         />
-        {/* Search is deliberately NOT a row here: it moved to the fixed top-left
-            window chrome (`LeftEdgeChrome`, plus the mobile `FolderTitleBar`),
-            which — unlike this sidebar — never unmounts, so the button survives
-            a collapse. ⌘K still works from anywhere. */}
+        {/* 搜索（ZCode 布局回到固定导航区，Ctrl+K）：打开既有搜索对话框。
+            对话框本体与 ⌘K 全局快捷键仍由 workspace-chrome-controller 持有，
+            侧栏收起时搜索依然可达。 */}
+        <SidebarNavButton
+          icon={Search}
+          label={t("search")}
+          onClick={handleOpenSearch}
+          trailing={
+            searchShortcutLabel ? (
+              <kbd className={SHORTCUT_BADGE_CLASS}>{searchShortcutLabel}</kbd>
+            ) : null
+          }
+        />
         {/* Each route row can be switched off from the view-options menu's
             "Navigation items" group — for a workspace that never uses one of
             them, this block is pure noise above the list. The routes stay
@@ -536,26 +642,54 @@ export function Sidebar() {
             }
           />
         )}
-        {isNavItemVisible(navItems, "tasks") && (
-          <SidebarNavButton
-            icon={ListTodo}
-            label={t("tasks")}
-            active={routeId === "tasks"}
-            onClick={() => {
-              if (isMobile) toggle()
-              setRoute("tasks")
-            }}
-            trailing={
-              attentionCount > 0 ? (
-                // Attention (not failure): tasks waiting on the user — primary
-                // tint like the shortcut chips, not destructive.
-                <span className="ml-auto inline-flex h-[0.9375rem] min-w-[0.9375rem] shrink-0 items-center justify-center rounded-full bg-primary/10 px-1 font-mono text-[0.625rem] font-medium leading-none text-primary">
-                  {attentionCount}
-                </span>
-              ) : null
-            }
-          />
-        )}
+        {/* 插件市场（ZCode 布局占位）：置灰 + “即将上线” tooltip，无功能。 */}
+        <SidebarNavButton
+          icon={Puzzle}
+          label={t("pluginMarketplace")}
+          tooltip={t("comingSoon")}
+          disabled
+        />
+        {/* 视图切换排（ZCode 布局）：`# 分组 | ▭ 项目` 两个 pill + 右侧筛选/
+            清理图标占位。默认激活“项目”；“分组”本期限留视觉位（点击提示
+            即将上线）。 */}
+        <div className="mt-1.5 flex h-7 items-center justify-between gap-1">
+          <div className="flex items-center gap-0.5 rounded-full bg-sidebar-accent/50 p-0.5">
+            <SidebarViewPill
+              icon={Hash}
+              label={t("groupView")}
+              active={false}
+              onClick={handleGroupViewClick}
+            />
+            <SidebarViewPill
+              icon={RectangleHorizontal}
+              label={t("projectView")}
+              active
+              onClick={() => {}}
+            />
+          </div>
+          <div className="flex items-center gap-0.5">
+            <Button
+              variant="ghost"
+              size="icon"
+              disabled
+              className="h-6 w-6 shrink-0 text-muted-foreground"
+              title={t("comingSoon")}
+              aria-label={t("comingSoon")}
+            >
+              <ListFilter aria-hidden="true" className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              disabled
+              className="h-6 w-6 shrink-0 text-muted-foreground"
+              title={t("comingSoon")}
+              aria-label={t("comingSoon")}
+            >
+              <Eraser aria-hidden="true" className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </div>
       </div>
 
       {/* On mobile, clicking a conversation card auto-closes the Drawer */}
@@ -582,10 +716,62 @@ export function Sidebar() {
         />
       </div>
 
+      {/* 任务区（ZCode 布局）：小节标题 + “还没有任务”空态入口（tasks 路由）。
+          保留 view-options 菜单里既有的 nav visibility 开关控制整节显隐；
+          有待处理任务时标题旁沿用原 nav 行的 primary 关注徽标。不随列表滚动。 */}
+      {isNavItemVisible(navItems, "tasks") && (
+        <div className="shrink-0 px-1.5">
+          <div className="flex items-center gap-1 px-[0.4375rem] pb-1 pt-1.5">
+            <span className="text-xs text-muted-foreground">{t("tasks")}</span>
+            {attentionCount > 0 && (
+              <span className="inline-flex h-[0.9375rem] min-w-[0.9375rem] shrink-0 items-center justify-center rounded-full bg-primary/10 px-1 font-mono text-[0.625rem] font-medium leading-none text-primary">
+                {attentionCount}
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={handleOpenTasks}
+            className={cn(
+              "flex h-7 w-full cursor-pointer items-center rounded-full px-[0.4375rem]",
+              "text-xs text-muted-foreground outline-none",
+              "transition-colors duration-150 hover:bg-sidebar-accent",
+              "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+            )}
+          >
+            <span className="truncate">{t("noTasksYet")}</span>
+          </button>
+        </div>
+      )}
+
       {/* 项目树固定底栏（F5 / S2.3）："项目 +" 入口——打开本地文件夹（既有
           对话框）/ 远程连接…（向导骨架）。不随列表滚动。 */}
-      <div className="shrink-0 px-1.5 pb-1.5">
+      <div className="shrink-0 px-1.5 pb-1.5 pt-1.5">
         <ProjectTreeAddButton />
+      </div>
+
+      {/* 底部账户行（ZCode 布局，sticky 底部）：圆形头像占位（本地用户首字母）
+          + 用户名 + 设置齿轮（打开既有设置窗口）。 */}
+      <div className="flex h-10 shrink-0 items-center gap-2 border-t border-border/50 px-2.5 ws-chrome-border">
+        <span
+          aria-hidden
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[0.625rem] font-semibold uppercase leading-none text-primary"
+        >
+          {localUserLabel.trim().charAt(0).toUpperCase()}
+        </span>
+        <span className="min-w-0 flex-1 truncate text-[0.75rem] text-sidebar-foreground">
+          {localUserLabel}
+        </span>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6 shrink-0 text-muted-foreground"
+          onClick={handleOpenSettings}
+          title={t("settings")}
+          aria-label={t("settings")}
+        >
+          <Settings aria-hidden="true" className="h-3.5 w-3.5" />
+        </Button>
       </div>
     </aside>
   )
