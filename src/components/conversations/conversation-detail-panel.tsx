@@ -48,7 +48,7 @@ import { ConversationShell } from "@/components/chat/conversation-shell"
 import { SessionConfigStaleBanner } from "@/components/chat/session-config-stale-banner"
 import { PiProjectTrustBanner } from "@/components/chat/pi-project-trust-banner"
 import { AgentDiagnosticsDialog } from "@/components/settings/agent-diagnostics-dialog"
-import { AgentSelector } from "@/components/chat/agent-selector"
+import { AgentSelectorDropdown } from "@/components/chat/agent-selector"
 import { ChatInput } from "@/components/chat/chat-input"
 import { WelcomeHero, WelcomeTip } from "@/components/chat/welcome-hero"
 import type { ComposerInjectContent } from "@/components/chat/message-input"
@@ -1861,6 +1861,28 @@ const ConversationTabView = memo(function ConversationTabView({
   // and the action would silently do nothing.
   const composerAvailable = !isWelcomeMode && !acpLoadError
 
+  // The harness (agent) selector now lives IN the composer's control bar
+  // (right group, next to the model/reasoning pickers and send) instead of a
+  // standalone row above the composer / on the welcome page. Same draft-agent
+  // binding as before — the dropdown is a re-chrome of the same selection
+  // contract; the per-turn semantics live in its own title/aria ("choose who
+  // runs the next message").
+  const harnessSelector = (
+    <AgentSelectorDropdown
+      defaultAgentType={selectedAgent}
+      onSelect={handleAgentSelect}
+      onFallback={handleAgentFallback}
+      onAgentsLoaded={(agents) => {
+        setAgentsLoaded(true)
+        setUsableAgentCount(
+          agents.filter((agent) => agent.enabled && agent.available).length
+        )
+      }}
+      onOpenAgentsSettings={handleOpenAgentsSettings}
+      disabled={isConnecting || dbConversationId != null}
+    />
+  )
+
   const messageListNode = (
     <GoalControlProvider value={goalControlValue}>
       <MessageListView
@@ -1939,6 +1961,7 @@ const ConversationTabView = memo(function ConversationTabView({
       hideInput={isWelcomeMode || Boolean(acpLoadError)}
       injectContent={composerInject}
       onInjectConsumed={handleComposerInjectConsumed}
+      harnessSelector={harnessSelector}
       composerBanner={acpLoadErrorBanner}
       isActive={isActive}
       showActiveFlow={showActiveFlow}
@@ -1976,26 +1999,6 @@ const ConversationTabView = memo(function ConversationTabView({
             <div className="flex-1" />
             <div className="mx-auto flex w-full max-w-3xl shrink-0 flex-col gap-6 px-4 py-4">
               <WelcomeHero />
-              <div className="flex justify-center">
-                <AgentSelector
-                  // The selector spans the row it is given (it has to measure
-                  // how much room it has), so the centring lives inside it now
-                  // — the `justify-center` above only centres a full-width box.
-                  align="center"
-                  defaultAgentType={selectedAgent}
-                  onSelect={handleAgentSelect}
-                  onFallback={handleAgentFallback}
-                  onAgentsLoaded={(agents) => {
-                    setAgentsLoaded(true)
-                    setUsableAgentCount(
-                      agents.filter((agent) => agent.enabled && agent.available)
-                        .length
-                    )
-                  }}
-                  onOpenAgentsSettings={handleOpenAgentsSettings}
-                  disabled={isConnecting || dbConversationId != null}
-                />
-              </div>
               {composerBlockedMessage ? (
                 <div className="flex w-full items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
                   <button
@@ -2044,6 +2047,7 @@ const ConversationTabView = memo(function ConversationTabView({
                 showActiveFlow={showActiveFlow}
                 injectContent={composerInject}
                 onInjectConsumed={handleComposerInjectConsumed}
+                harnessSelector={harnessSelector}
                 flush
                 tall
               />
@@ -2057,22 +2061,8 @@ const ConversationTabView = memo(function ConversationTabView({
       ) : showDraftHeader ? (
         <div className="flex h-full min-h-0 flex-col">
           <div className="px-4 pt-3 pb-2">
-            <AgentSelector
-              defaultAgentType={selectedAgent}
-              onSelect={handleAgentSelect}
-              onFallback={handleAgentFallback}
-              onAgentsLoaded={(agents) => {
-                setAgentsLoaded(true)
-                setUsableAgentCount(
-                  agents.filter((agent) => agent.enabled && agent.available)
-                    .length
-                )
-              }}
-              onOpenAgentsSettings={handleOpenAgentsSettings}
-              disabled={isConnecting || dbConversationId != null}
-            />
             {composerBlockedMessage ? (
-              <div className="mt-2 flex w-full items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+              <div className="flex w-full items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
                 <button
                   type="button"
                   onClick={handleOpenAgentsSettings}

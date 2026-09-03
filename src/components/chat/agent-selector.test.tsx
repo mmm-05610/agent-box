@@ -1,4 +1,11 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react"
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 import { NextIntlClientProvider } from "next-intl"
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -7,7 +14,7 @@ vi.mock("@/hooks/use-acp-agents", () => ({
   useAcpAgents: vi.fn(),
 }))
 
-import { AgentSelector } from "./agent-selector"
+import { AgentSelector, AgentSelectorDropdown } from "./agent-selector"
 import { useAcpAgents } from "@/hooks/use-acp-agents"
 import enMessages from "@/i18n/messages/en.json"
 import { getAgentLabel } from "@/lib/custom-agents"
@@ -391,5 +398,99 @@ describe("AgentSelector", () => {
     const calls = onAgentsLoaded.mock.calls
     const lastCall = calls[calls.length - 1]?.[0]
     expect(lastCall).toEqual([codex])
+  })
+})
+
+// The composer's inline form of the same selector: a compact ghost dropdown in
+// the control bar. The data plane (registry options, fallback contract) is the
+// shared hook, so only the chrome is asserted here — plus the one thing that
+// makes this form distinctive: its title/aria semantics ("who runs the NEXT
+// message", the Session×Harness per-turn binding).
+describe("AgentSelectorDropdown", () => {
+  it("labels the trigger with the per-turn semantics and the current agent", () => {
+    mockUseAcpAgents.mockReturnValue({
+      agents: [agent("claude_code"), agent("codex")],
+      fresh: true,
+      refresh: async () => {},
+    })
+    renderWithIntl(
+      <AgentSelectorDropdown
+        defaultAgentType="claude_code"
+        onSelect={() => {}}
+      />
+    )
+    const trigger = screen.getByRole("button", {
+      name: "Choose who runs the next message: Claude Code",
+    })
+    expect(trigger).toHaveAttribute("aria-label")
+    expect(trigger.textContent).toContain(getAgentLabel("claude_code"))
+  })
+
+  it("opens the menu, lists the harnesses and fires onSelect on pick", async () => {
+    const user = userEvent.setup()
+    mockUseAcpAgents.mockReturnValue({
+      agents: [agent("claude_code"), agent("codex")],
+      fresh: true,
+      refresh: async () => {},
+    })
+    const onSelect = vi.fn()
+    renderWithIntl(
+      <AgentSelectorDropdown
+        defaultAgentType="claude_code"
+        onSelect={onSelect}
+      />
+    )
+    await user.click(
+      screen.getByRole("button", { name: /Choose who runs the next message/ })
+    )
+    const menu = await screen.findByRole("menu")
+    expect(
+      within(menu).getAllByText(getAgentLabel("codex")).length
+    ).toBeGreaterThan(0)
+    await user.click(
+      within(menu)
+        .getAllByRole("menuitemradio")
+        .find((el) => el.textContent?.includes(getAgentLabel("codex")))!
+    )
+    expect(onSelect).toHaveBeenCalledWith("codex")
+  })
+
+  it("fires onFallback (not onSelect) when the preferred agent is unavailable", async () => {
+    // Same contract as the pill row (shared hook) — guarded here so the
+    // dropdown can never drift into promoting a system pick to a user choice.
+    mockUseAcpAgents.mockReturnValue({
+      agents: [agent("claude_code", { available: false }), agent("codex")],
+      fresh: true,
+      refresh: async () => {},
+    })
+    const onSelect = vi.fn()
+    const onFallback = vi.fn()
+    renderWithIntl(
+      <AgentSelectorDropdown
+        defaultAgentType="claude_code"
+        onSelect={onSelect}
+        onFallback={onFallback}
+      />
+    )
+    await waitFor(() => expect(onFallback).toHaveBeenCalledWith("codex"))
+    expect(onSelect).not.toHaveBeenCalled()
+  })
+
+  it("renders the compact empty state with a settings entry when nothing is enabled", () => {
+    mockUseAcpAgents.mockReturnValue({
+      agents: [],
+      fresh: true,
+      refresh: async () => {},
+    })
+    const onOpenSettings = vi.fn()
+    renderWithIntl(
+      <AgentSelectorDropdown
+        onSelect={() => {}}
+        onOpenAgentsSettings={onOpenSettings}
+      />
+    )
+    expect(screen.getByText("No enabled agents")).toBeInTheDocument()
+    fireEvent.click(screen.getByText("Open Agents settings"))
+    expect(onOpenSettings).toHaveBeenCalledTimes(1)
   })
 })

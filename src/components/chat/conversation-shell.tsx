@@ -129,6 +129,8 @@ interface ConversationShellProps {
    *  once the composer has taken it. */
   injectContent?: ComposerInjectContent | null
   onInjectConsumed?: () => void
+  /** Pass-through: see `MessageInput`. */
+  harnessSelector?: ReactNode
 }
 
 export function ConversationShell({
@@ -189,6 +191,7 @@ export function ConversationShell({
   topBanner,
   injectContent,
   onInjectConsumed,
+  harnessSelector,
 }: ConversationShellProps) {
   const tAcp = useTranslations("Folder.chat.acpConnections")
   const retryLineText = useMemo(() => {
@@ -351,6 +354,7 @@ export function ConversationShell({
               feedbackAddDisabled={feedbackAddDisabled}
               injectContent={injectContent}
               onInjectConsumed={onInjectConsumed}
+              harnessSelector={harnessSelector}
             />
           </div>
         )}

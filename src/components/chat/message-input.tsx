@@ -1,6 +1,13 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react"
 import { useTranslations } from "next-intl"
 import { isImeCompositionKey } from "@/lib/ime-composition"
 import { Button } from "@/components/ui/button"
@@ -219,6 +226,15 @@ interface MessageInputProps {
   feedbackAddDisabled?: boolean
   injectContent?: ComposerInjectContent | null
   onInjectConsumed?: () => void
+  /**
+   * The harness (agent) selector, rendered inline in the control bar's right
+   * group — between the model/reasoning pickers and the send button. A slot
+   * rather than wired props: the panel owns the draft-agent state and passes
+   * its already-bound `AgentSelectorDropdown` (or nothing, e.g. read-only
+   * viewers). The Session×Harness per-turn semantics live in that dropdown's
+   * own title/aria; the binding itself is the existing draft-agent flow.
+   */
+  harnessSelector?: ReactNode
 }
 
 // Non-image files attach as inline file badges in the editor (like `@`-file
@@ -321,6 +337,7 @@ export function MessageInput({
   feedbackAddDisabled,
   injectContent,
   onInjectConsumed,
+  harnessSelector,
 }: MessageInputProps) {
   const t = useTranslations("Folder.chat.messageInput")
   const tQueue = useTranslations("Folder.chat.messageQueue")
@@ -1410,60 +1427,55 @@ export function MessageInput({
   const hasImageAttachments = imageAttachments.length > 0
   const showDragActive = attach.isDragActive && !disabled
 
-  const inlineSelectorItems = (
+  // Config options (model, reasoning effort, …) live in the control bar's
+  // RIGHT group, next to the harness selector and the send button. The
+  // permission-mode selector moved to the LEFT group (next to the "+" menu) —
+  // the ZCode-style control-bar layout.
+  const configSelectorItems = (
     <>
-      {hasConfigOptions &&
-        availableConfigOptions.map((option) => {
-          // On/off options flip in place — a dropdown for a binary choice is a
-          // wasted interaction.
-          if (option.kind.type === "boolean") {
-            return (
-              <InlineSessionConfigToggle
-                key={option.id}
-                option={option}
-                onLabel={t("toggleOn")}
-                offLabel={t("toggleOff")}
-                onSelect={(configId, value) =>
-                  onConfigOptionChange?.(configId, value)
-                }
-              />
-            )
-          }
-          // Long model lists get the searchable + virtualized popover (a Radix
-          // menu of hundreds of items is the scroll jank); every other option —
-          // and short model lists — keep the lightweight inline dropdown.
-          const listGroups = modelPickerGroups(option)
-          if (listGroups) {
-            return (
-              <ModelOptionPicker
-                key={option.id}
-                option={option}
-                groups={listGroups}
-                onSelect={(configId, valueId) =>
-                  onConfigOptionChange?.(configId, valueId)
-                }
-              />
-            )
-          }
+      {availableConfigOptions.map((option) => {
+        // On/off options flip in place — a dropdown for a binary choice is a
+        // wasted interaction.
+        if (option.kind.type === "boolean") {
           return (
-            <InlineSessionConfigSelector
+            <InlineSessionConfigToggle
               key={option.id}
               option={option}
-              derivedGroups={deriveModelGroups(option)}
+              onLabel={t("toggleOn")}
+              offLabel={t("toggleOff")}
+              onSelect={(configId, value) =>
+                onConfigOptionChange?.(configId, value)
+              }
+            />
+          )
+        }
+        // Long model lists get the searchable + virtualized popover (a Radix
+        // menu of hundreds of items is the scroll jank); every other option —
+        // and short model lists — keep the lightweight inline dropdown.
+        const listGroups = modelPickerGroups(option)
+        if (listGroups) {
+          return (
+            <ModelOptionPicker
+              key={option.id}
+              option={option}
+              groups={listGroups}
               onSelect={(configId, valueId) =>
                 onConfigOptionChange?.(configId, valueId)
               }
             />
           )
-        })}
-      {showModeSelector && (
-        <InlineModeSelector
-          modes={availableModes}
-          selectedModeId={effectiveModeId!}
-          onSelect={handleModeSelect}
-          label={t("modeLabel")}
-        />
-      )}
+        }
+        return (
+          <InlineSessionConfigSelector
+            key={option.id}
+            option={option}
+            derivedGroups={deriveModelGroups(option)}
+            onSelect={(configId, valueId) =>
+              onConfigOptionChange?.(configId, valueId)
+            }
+          />
+        )
+      })}
     </>
   )
 
@@ -1716,11 +1728,14 @@ export function MessageInput({
       </DropdownMenu>
     </div>
   ) : (
+    // The plain send affordance: a round primary button trailing the control
+    // bar. The running (stop) state is the `isPrompting` branch above — this
+    // one only renders when there is no live turn to stop.
     <Button
       onClick={handleSend}
       disabled={disabled || !hasSendableContent}
       size="icon"
-      className="h-8 w-8"
+      className="h-8 w-8 rounded-full"
       title={t("send")}
     >
       <Send className="size-4" />
@@ -1918,9 +1933,17 @@ export function MessageInput({
                     onAddFeedback={onAddFeedback}
                     feedbackAddDisabled={feedbackAddDisabled}
                   />
-                  {hasInlineSelectors && (
-                    <div className="hidden min-w-0 items-end gap-1 @[30rem]:flex">
-                      {inlineSelectorItems}
+                  {/* Permission-mode selector: first-class on the LEFT of the
+                      control bar (next to the "+"), wide viewports only — the
+                      collapsed cog below covers the narrow fallback. */}
+                  {showModeSelector && (
+                    <div className="hidden @[30rem]:flex">
+                      <InlineModeSelector
+                        modes={availableModes}
+                        selectedModeId={effectiveModeId!}
+                        onSelect={handleModeSelect}
+                        label={t("modeLabel")}
+                      />
                     </div>
                   )}
                   {hasAnySelector && (
@@ -1992,7 +2015,23 @@ export function MessageInput({
                     </div>
                   )}
                 </div>
-                <div className="shrink-0">{actionButtons}</div>
+                <div className="flex shrink-0 items-end gap-1">
+                  {/* Harness (agent) selector — the "who runs the next
+                      message" pick. A caller-supplied slot so the panel keeps
+                      owning the draft-agent state; nothing renders when the
+                      surface has no binding to offer (read-only viewers). */}
+                  {harnessSelector && (
+                    <div className="flex shrink-0 items-center">
+                      {harnessSelector}
+                    </div>
+                  )}
+                  {hasConfigOptions && (
+                    <div className="hidden min-w-0 items-end gap-1 @[30rem]:flex">
+                      {configSelectorItems}
+                    </div>
+                  )}
+                  <div className="shrink-0">{actionButtons}</div>
+                </div>
               </div>
               {showDragActive && (
                 <div className="pointer-events-none absolute inset-1 z-20 flex items-center justify-center rounded-md border border-dashed border-primary/50 bg-background/80 text-xs text-muted-foreground">

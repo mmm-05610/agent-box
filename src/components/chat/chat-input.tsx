@@ -76,6 +76,8 @@ interface ChatInputProps {
   allowOfflineCompose?: boolean
   injectContent?: ComposerInjectContent | null
   onInjectConsumed?: () => void
+  /** Pass-through: see `MessageInput`. */
+  harnessSelector?: React.ReactNode
   /** Drop the input's own horizontal padding when an ancestor already supplies
    *  the gutter (the welcome column wraps this in its own `px-4`). */
   flush?: boolean
@@ -126,6 +128,7 @@ export const ChatInput = memo(function ChatInput({
   allowOfflineCompose = false,
   injectContent,
   onInjectConsumed,
+  harnessSelector,
   flush = false,
   tall = false,
 }: ChatInputProps) {
@@ -221,6 +224,7 @@ export const ChatInput = memo(function ChatInput({
         feedbackAddDisabled={feedbackAddDisabled}
         injectContent={injectContent}
         onInjectConsumed={onInjectConsumed}
+        harnessSelector={harnessSelector}
         placeholder={
           isConnecting
             ? t("connecting")

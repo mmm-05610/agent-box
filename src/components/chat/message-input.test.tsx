@@ -198,6 +198,47 @@ describe("MessageInput (RichComposer integration)", () => {
     expect(card.className).toContain("codeg-composer-chrome")
     expect(fireEvent.mouseDown(card)).toBe(false)
   })
+
+  it("keeps the send control a round trailing button of the control bar", async () => {
+    const { container } = renderInput({})
+    await waitFor(() =>
+      expect(container.querySelector('[role="textbox"]')).not.toBeNull()
+    )
+    const sendButton = container.querySelector<HTMLButtonElement>(
+      `button[title="${enMessages.Folder.chat.messageInput.send}"]`
+    )
+    expect(sendButton).not.toBeNull()
+    // ZCode-style control bar: the send affordance is the round trailing
+    // control (the running/stop state flips through the isPrompting branch).
+    expect(sendButton!.className).toContain("rounded-full")
+  })
+
+  it("renders the harness selector slot inline in the control bar", async () => {
+    const { container } = renderInput({
+      harnessSelector: (
+        <button type="button" data-testid="harness-slot">
+          Claude Code
+        </button>
+      ),
+    })
+    await waitFor(() =>
+      expect(container.querySelector('[role="textbox"]')).not.toBeNull()
+    )
+    // The slot (the panel's AgentSelectorDropdown) sits in the bottom control
+    // row, inside the composer chrome — not as a standalone block above it.
+    expect(screen.getByTestId("harness-slot")).toBeInTheDocument()
+    const chrome = container.querySelector('[class~="@container"]')
+    expect(chrome).not.toBeNull()
+    expect(chrome!.contains(screen.getByTestId("harness-slot"))).toBe(true)
+  })
+
+  it("renders nothing extra in the control bar when no harness slot is given", async () => {
+    const { container } = renderInput({})
+    await waitFor(() =>
+      expect(container.querySelector('[role="textbox"]')).not.toBeNull()
+    )
+    expect(screen.queryByTestId("harness-slot")).toBeNull()
+  })
 })
 
 describe("MessageInput attach-to-chat insertion position", () => {

@@ -15,11 +15,21 @@ import type { AgentType, AcpAgentInfo } from "@/lib/types"
 import { AgentIcon } from "@/components/agent-icon"
 import { harnessOptionsFromRegistry } from "@/components/chat/harness-registry"
 import { SelectorTooltip } from "@/components/chat/selector-tooltip"
+import { Button } from "@/components/ui/button"
+import { ChevronDown } from "lucide-react"
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { DropdownRadioItemContent } from "@/components/chat/dropdown-radio-item-content"
 import { cn } from "@/lib/utils"
 
 // Matches the local idiom in `use-reference-search.ts` / `suggestion-popup.tsx`:
@@ -37,7 +47,7 @@ const useIsomorphicLayoutEffect =
 // `px-3` / `px-2` pair below if either changes.
 const SELECTED_PADDING_EXTRA = 8
 
-interface AgentSelectorProps {
+interface HarnessSelectionProps {
   defaultAgentType?: AgentType
   /** Fires on user click. The caller should treat this as confirmation. */
   onSelect: (agentType: AgentType) => void
@@ -52,6 +62,9 @@ interface AgentSelectorProps {
   onAgentsLoaded?: (agents: AcpAgentInfo[]) => void
   onOpenAgentsSettings?: () => void
   disabled?: boolean
+}
+
+interface AgentSelectorProps extends HarnessSelectionProps {
   /**
    * Where the pill sits inside the row it is given. The selector now spans the
    * full available width (it has to, to know how much room it has — see the
@@ -62,11 +75,16 @@ interface AgentSelectorProps {
 }
 
 /**
- * One pill's data (F6: registry-driven). Projected from a `HarnessOption`
- * (core/registry/harnesses entry + optional ACP availability info) so the
- * rendering below never touches `AcpAgentInfo` directly — the harness
- * registry is the single source of truth for what the row shows.
+ * 语义标注（Session×Harness 逐轮绑定）：这个下拉选择的是“下一条消息由谁
+ * 执行”，不是会话的永久归属。i18n 消息文件由并行任务独占，新增 key 暂不可
+ * 行，故先用稳定英文原文承担 title/aria 语义；i18n key 落地后替换。
  */
+const HARNESS_PICKER_HINT = "Choose who runs the next message"
+
+/** One pill's data (F6: registry-driven). Projected from a `HarnessOption`
+ *  (core/registry/harnesses entry + optional ACP availability info) so the
+ *  rendering below never touches `AcpAgentInfo` directly — the harness
+ *  registry is the single source of truth for what the row shows. */
 interface SelectorAgent {
   agentType: AgentType
   /** harness displayName（注册表元数据，替代 getAgentLabel 现算） */
@@ -77,22 +95,22 @@ interface SelectorAgent {
   installedVersion: string | null
 }
 
-/** `parseFloat` for computed styles, with a 0 for `""` / `auto` / NaN. */
-function px(value: string): number {
-  const n = Number.parseFloat(value)
-  return Number.isFinite(n) ? n : 0
-}
-
-export function AgentSelector({
+/**
+ * Shared data plane for both selector forms (the pill row and the composer's
+ * inline dropdown): the F6 harness registry is the single source of truth, and
+ * the selection/fallback/notification contract is identical — only the UI
+ * differs. Keeping it in one hook means a behaviour fix (a stale-default
+ * correction, a registry ordering change) lands in both forms at once.
+ */
+function useHarnessSelection({
   defaultAgentType,
   onSelect,
   onFallback,
   onAgentsLoaded,
-  onOpenAgentsSettings,
-  disabled = false,
-  align = "start",
-}: AgentSelectorProps) {
-  const t = useTranslations("Folder.chat.agentSelector")
+}: Pick<
+  HarnessSelectionProps,
+  "defaultAgentType" | "onSelect" | "onFallback" | "onAgentsLoaded"
+>) {
   const { agents: rawAgents } = useAcpAgents()
   // F6 接线 1：数据源 = harnesses 注册表。ACP 列表先同步进注册表
   // （harnessOptionsFromRegistry 内完成），再从注册表投影出 pill 数据，
@@ -129,6 +147,77 @@ export function AgentSelector({
     const first = agents.find((a) => a.available)
     return first?.agentType ?? null
   }, [agents, defaultAgentType])
+
+  useEffect(() => {
+    onSelectRef.current = onSelect
+  }, [onSelect])
+
+  useEffect(() => {
+    onFallbackRef.current = onFallback
+  }, [onFallback])
+
+  useEffect(() => {
+    onAgentsLoadedRef.current = onAgentsLoaded
+  }, [onAgentsLoaded])
+
+  // Notify parent when the agent list changes, and emit a *fallback* event
+  // (not onSelect) when the requested preferred agent is unavailable and
+  // we had to pick a substitute. Splitting the channel matters: the caller
+  // treats `onSelect` as a confirmed user choice and clears any "this is a
+  // provisional default" flag upstream — if the auto-fallback came through
+  // the same path, a hydrated draft whose old agent is now disabled would
+  // be silently locked onto sortedTypes[0] before TabProvider's correction
+  // effect has a chance to apply the folder's saved default. Callers that
+  // don't supply `onFallback` get the legacy behavior (fallback as
+  // onSelect) so this prop stays optional.
+  useEffect(() => {
+    onAgentsLoadedRef.current?.(enabledRawAgents)
+    const found = defaultAgentType
+      ? agents.find((a) => a.agentType === defaultAgentType && a.available)
+      : null
+    if (found) return
+    const first = agents.find((a) => a.available)
+    if (!first) return
+    const fallback = onFallbackRef.current
+    if (fallback) {
+      fallback(first.agentType)
+    } else {
+      onSelectRef.current(first.agentType)
+    }
+  }, [agents, enabledRawAgents, defaultAgentType])
+
+  const handleSelect = useCallback(
+    (agentType: AgentType) => {
+      onSelect(agentType)
+    },
+    [onSelect]
+  )
+
+  return { agents, selected, handleSelect }
+}
+
+/** `parseFloat` for computed styles, with a 0 for `""` / `auto` / NaN. */
+function px(value: string): number {
+  const n = Number.parseFloat(value)
+  return Number.isFinite(n) ? n : 0
+}
+
+export function AgentSelector({
+  defaultAgentType,
+  onSelect,
+  onFallback,
+  onAgentsLoaded,
+  onOpenAgentsSettings,
+  disabled = false,
+  align = "start",
+}: AgentSelectorProps) {
+  const t = useTranslations("Folder.chat.agentSelector")
+  const { agents, selected, handleSelect } = useHarnessSelection({
+    defaultAgentType,
+    onSelect,
+    onFallback,
+    onAgentsLoaded,
+  })
 
   // Sliding indicator state
   const wrapperRef = useRef<HTMLDivElement>(null)
@@ -301,48 +390,6 @@ export function AgentSelector({
       window.removeEventListener("resize", onResize)
     }
   }, [measure, visible])
-
-  useEffect(() => {
-    onSelectRef.current = onSelect
-  }, [onSelect])
-
-  useEffect(() => {
-    onFallbackRef.current = onFallback
-  }, [onFallback])
-
-  useEffect(() => {
-    onAgentsLoadedRef.current = onAgentsLoaded
-  }, [onAgentsLoaded])
-
-  // Notify parent when the agent list changes, and emit a *fallback* event
-  // (not onSelect) when the requested preferred agent is unavailable and
-  // we had to pick a substitute. Splitting the channel matters: the caller
-  // treats `onSelect` as a confirmed user choice and clears any "this is a
-  // provisional default" flag upstream — if the auto-fallback came through
-  // the same path, a hydrated draft whose old agent is now disabled would
-  // be silently locked onto sortedTypes[0] before TabProvider's correction
-  // effect has a chance to apply the folder's saved default. Callers that
-  // don't supply `onFallback` get the legacy behavior (fallback as
-  // onSelect) so this prop stays optional.
-  useEffect(() => {
-    onAgentsLoadedRef.current?.(enabledRawAgents)
-    const found = defaultAgentType
-      ? agents.find((a) => a.agentType === defaultAgentType && a.available)
-      : null
-    if (found) return
-    const first = agents.find((a) => a.available)
-    if (!first) return
-    const fallback = onFallbackRef.current
-    if (fallback) {
-      fallback(first.agentType)
-    } else {
-      onSelectRef.current(first.agentType)
-    }
-  }, [agents, enabledRawAgents, defaultAgentType])
-
-  const handleSelect = (agentType: AgentType) => {
-    onSelect(agentType)
-  }
 
   const setItemRef = useCallback(
     (agentType: AgentType) => (el: HTMLButtonElement | null) => {
@@ -566,5 +613,135 @@ export function AgentSelector({
         ) : null}
       </div>
     </div>
+  )
+}
+
+/**
+ * The composer-row form of the harness selector: a compact ghost dropdown that
+ * sits in the control bar next to the model / reasoning-effort pickers and the
+ * send button. Same data plane as the pill row ({@link useHarnessSelection} —
+ * registry-driven options, the same fallback/notification contract, the same
+ * draft-agent binding semantics upstream); only the chrome differs.
+ *
+ * The trigger and menu carry {@link HARNESS_PICKER_HINT} so the control reads
+ * as "who runs the NEXT message" — the Session×Harness per-turn binding — not
+ * as a permanent session setting.
+ */
+export function AgentSelectorDropdown({
+  defaultAgentType,
+  onSelect,
+  onFallback,
+  onAgentsLoaded,
+  onOpenAgentsSettings,
+  disabled = false,
+}: HarnessSelectionProps) {
+  const t = useTranslations("Folder.chat.agentSelector")
+  const { agents, selected, handleSelect } = useHarnessSelection({
+    defaultAgentType,
+    onSelect,
+    onFallback,
+    onAgentsLoaded,
+  })
+
+  if (agents.length === 0) {
+    // Compact inline counterpart of the pill row's empty state: the composer
+    // row has no room for the wide dashed card, so the message and the
+    // settings entry collapse into one ghost chip.
+    return (
+      <button
+        type="button"
+        data-slot="agent-selector-empty"
+        onClick={onOpenAgentsSettings}
+        className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-dashed px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent"
+      >
+        {t("noEnabledAgents")}
+        {onOpenAgentsSettings ? (
+          <span className="text-foreground/70">{t("openAgentsSettings")}</span>
+        ) : null}
+      </button>
+    )
+  }
+
+  const current = agents.find((a) => a.agentType === selected) ?? null
+  const currentLabel = current?.label ?? selected ?? ""
+  const notInstalled =
+    current != null && current.available && !current.installedVersion
+
+  return (
+    <DropdownMenu>
+      <SelectorTooltip label={HARNESS_PICKER_HINT}>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="xs"
+            data-slot="agent-selector-dropdown-trigger"
+            aria-label={
+              currentLabel
+                ? `${HARNESS_PICKER_HINT}: ${currentLabel}`
+                : HARNESS_PICKER_HINT
+            }
+            disabled={disabled}
+            className="min-w-0 gap-1 px-1 text-muted-foreground"
+          >
+            {current ? (
+              <span className="relative inline-flex shrink-0 items-center">
+                <AgentIcon agentType={current.agentType} className="size-3.5" />
+                {notInstalled ? (
+                  <span
+                    aria-hidden
+                    className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-amber-500 ring-1 ring-background"
+                  />
+                ) : null}
+              </span>
+            ) : null}
+            <span className="max-w-[10rem] truncate">{currentLabel}</span>
+            <ChevronDown className="size-3 shrink-0 text-muted-foreground" />
+          </Button>
+        </DropdownMenuTrigger>
+      </SelectorTooltip>
+      <DropdownMenuContent
+        side="top"
+        align="end"
+        aria-label={HARNESS_PICKER_HINT}
+        className="min-w-56 overflow-y-auto"
+        style={{
+          maxWidth: "min(20rem, calc(100vw - 1rem))",
+          maxHeight:
+            "min(60vh, var(--radix-dropdown-menu-content-available-height))",
+        }}
+      >
+        <DropdownMenuRadioGroup
+          value={selected ?? ""}
+          onValueChange={handleSelect}
+        >
+          {agents.map((agent) => {
+            const agentNotInstalled = agent.available && !agent.installedVersion
+            return (
+              <DropdownMenuRadioItem
+                key={agent.agentType}
+                value={agent.agentType}
+                disabled={disabled || !agent.available}
+                title={
+                  agentNotInstalled
+                    ? `${agent.label} · ${t("notInstalled")}`
+                    : undefined
+                }
+              >
+                <DropdownRadioItemContent
+                  label={agent.label}
+                  description={agentNotInstalled ? t("notInstalled") : null}
+                  icon={
+                    <AgentIcon
+                      agentType={agent.agentType}
+                      className="h-4 w-4 shrink-0"
+                    />
+                  }
+                />
+              </DropdownMenuRadioItem>
+            )
+          })}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
