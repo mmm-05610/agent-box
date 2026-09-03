@@ -10,7 +10,9 @@ import {
   SquareTerminal,
 } from "lucide-react"
 import { useTranslations } from "next-intl"
+import { toast } from "sonner"
 import { openSettingsWindow } from "@/lib/api"
+import { toErrorMessage } from "@/lib/app-error"
 import { isDesktop } from "@/lib/platform"
 import { Button } from "@/components/ui/button"
 import { useActiveFolder } from "@/contexts/active-folder-context"
@@ -78,7 +80,7 @@ export function TopBar() {
 
   const handleOpenSettings = useCallback(() => {
     openSettingsWindow().catch((err) => {
-      console.error("[TopBar] failed to open settings:", err)
+      toast.error(toErrorMessage(err))
     })
   }, [])
 

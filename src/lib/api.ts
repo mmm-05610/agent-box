@@ -3005,14 +3005,19 @@ export async function openSettingsWindow(
       remoteConnectionId: getActiveRemoteConnectionId(),
     })
   }
-  // Web mode: open in new window
-  return openAppWindow(`settings-${section ?? "general"}`, () =>
-    getTransport().call<{ path: string }>("open_settings_window", {
+  // Web mode: same-tab navigation. A browser tab has no window manager, so the
+  // desktop habit of a separate settings window degenerates into a popup that
+  // blockers silently eat — navigate in place instead. The backend still
+  // computes the target path (section → route mapping lives there).
+  const { path } = await getTransport().call<{ path: string }>(
+    "open_settings_window",
+    {
       section: section ?? null,
       agentType: options?.agentType ?? null,
       locale,
-    })
+    }
   )
+  window.location.assign(path)
 }
 
 export interface OpenImportSessionsWindowOptions {
