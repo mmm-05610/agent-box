@@ -236,3 +236,59 @@ type MessagePart =
 - **F4**：shell 合并（6 context → 1 store）+ TopBar/StatusBar 挂接
 - **F5**：projects 模块（folder→project 改名 + S2.3 项目树侧栏，一次做完）
 - **F6**：注册表落位 + 扩展剧本 1-5 各写一个冒烟测试
+
+## 12. F2 设计：SessionRuntime 的 CodegRust 实现（抽取方案）
+
+### 12.1 范围与原则
+
+- **只加不改**：本片新增 `features/session/`，不改动 acp-connections-context（UI 重挂在 F3）。
+- 实现包住**现有命令面**（acp_connect/prompt/cancel/respond_permission/get_session_snapshot…）与**现有事件通道**（attach 协议 + legacy firehose），把它们翻译成 §5.3 的 9 种 SessionEvent。
+- runtime 是纯 TS 类（非 React），单测用 mock transport。
+
+### 12.2 文件与职责
+
+```text
+features/session/
+  runtime.ts          CodegRustSessionRuntime implements SessionRuntime
+                      - connect: preflight→connect→（web 模式）waitForReady→attach(带 sinceSeq)
+                      - events: 单一 Subscribable；内部处理 seq 去重/快照对齐/重连重放
+                      - send/cancel/respondPermission: 命令直通
+                      - restore: get_session_snapshot → snapshot-hydrated 事件
+  model/normalize.ts  纯函数：EventEnvelope → SessionEvent（下表）
+  model/normalize.test.ts
+  runtime.test.ts     mock transport 行为测试
+```
+
+### 12.3 归一化映射表（ACP/Codeg 事件 → SessionEvent）
+
+| 源事件（EventEnvelope.type） | SessionEvent | 载荷来源 |
+|---|---|---|
+| session_request/chat started（turn 开始类） | turn-started | conversation_id |
+| user_message 回显 | part-appended (text, role=user) | content |
+| assistant_message/content deltas | part-appended (text) / part-updated | content_block |
+| thinking/reasoning 块 | part-appended (reasoning) | content |
+| tool_call | part-appended (tool-call, state=running) | title/input |
+| tool_call_update (结果/失败) | part-updated (tool-call→result/error) | output/error |
+| plan/available_update 等 UI 级 | part-appended (custom, partType) | 原样 |
+| permission_request / plan_approval_request / question_request | permission-requested | 统一 PermissionRequest 形状 |
+| permission resolution 类 | permission-resolved | id/outcome |
+| conversation_status_changed | status-changed | status |
+| turn/end 类 | turn-completed | usage/duration |
+| snapshot 帧（attach 协议） | snapshot-hydrated | LiveSessionSnapshot |
+| error / process_exit | session-error | message |
+| 未知事件 | （丢弃 + 计数，绝不崩） | — |
+
+映射表是**唯一允许知道源事件方言的地方**；新 harness 只需再写一张表。
+
+### 12.4 测试策略
+
+- `normalize.test.ts`：每个源事件至少 1 正例 + 未知事件丢弃例；快照对齐（seq 回退保护）。
+- `runtime.test.ts`：connect 时序（preflight→connect→ready→attach）、send 直通、重连重放（lastAppliedSeq 作为 since_seq）、权限作答直通。
+- core 层：registry 四件套（注册/获取/列表/未注册回退）+ domain 形状守护（parts 判别联合穷尽性）。
+
+## 13. F3-F6 概要设计
+
+- **F3（session 模块搬家）**：ConversationTabView 改为消费 `useSessionRuntime()`（Provider 注入实例）；acp-connections-context 的归约器/权限/配置逻辑分文件迁入 `features/session/{model,components}`；`acp-connections-context.tsx` 最终删除。分 4 个可验收小步执行。
+- **F4（shell 合并）**：sidebar/aux/terminal/search-dialog/automations-view/tasks-view/workbench-route 7 个 context → `features/shell/store.ts` 单 zustand store（面板开合/路由/搜索框）；TopBar/StatusBar 改读 store。
+- **F5（projects 模块）**：app-workspace-store + sidebar-conversation-list → `features/projects/`（Folder→Project 改名、项目→会话两级树、S2.3 侧栏）。
+- **F6（注册表落位）**：agent 选择器改读 harnesses 注册表；工具卡渲染查 tool-renderers；右面板 tabs 查 panels；写 5 个扩展剧本冒烟测试。
