@@ -26,7 +26,6 @@ import {
 import { DelegationProvider } from "@/contexts/delegation-context"
 import { ConversationRuntimeProvider } from "@/contexts/conversation-runtime-context"
 import { TabProvider, useTabStore, useTabActions } from "@/contexts/tab-context"
-import { selectIsSplit } from "@/stores/tab-store"
 import { SidebarProvider, useSidebarContext } from "@/contexts/sidebar-context"
 import { SearchDialogProvider } from "@/contexts/search-dialog-context"
 import { AutomationsViewProvider } from "@/contexts/automations-view-context"
@@ -56,14 +55,12 @@ import {
 } from "@/contexts/workspace-context"
 import { RemoteConnectionGate } from "@/contexts/remote-connection-context"
 import { UpdateProvider } from "@/components/providers/update-provider"
-import { useWorkspaceBackground, useZoomLevel } from "@/hooks/use-appearance"
+import { useWorkspaceBackground } from "@/hooks/use-appearance"
 import { FILL_MODE_STYLE } from "@/lib/workspace-background"
 import { TerminalPanel } from "@/components/terminal/terminal-panel"
 import { AuxPanel } from "@/components/layout/aux-panel"
-import { LeftEdgeChrome } from "@/components/layout/left-edge-chrome"
-import { RightEdgeChrome } from "@/components/layout/right-edge-chrome"
+import { TopBar } from "@/components/layout/top-bar"
 import { WorkspaceChromeController } from "@/components/layout/workspace-chrome-controller"
-import { WindowControls } from "@/components/layout/window-controls"
 import { FileWorkspaceTabBar } from "@/components/files/file-workspace-tab-bar"
 import { FileWorkspaceHeader } from "@/components/files/file-workspace-header"
 import { FileWorkspacePanel } from "@/components/files/file-workspace-panel"
@@ -81,14 +78,7 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable"
 import { cn } from "@/lib/utils"
-import { isDesktop } from "@/lib/platform"
-import {
-  WINDOW_CAPTION_WIDTH,
-  leftChromeReserve,
-  rightChromeReserve,
-} from "@/lib/window-chrome"
 import { useIsMobile } from "@/hooks/use-mobile"
-import { usePlatform } from "@/hooks/use-platform"
 import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer"
 import { OverlayHostHiddenProvider } from "@/components/ui/overlay-host-hidden"
 
@@ -311,27 +301,6 @@ function WorkspaceContent({ children }: { children: React.ReactNode }) {
 
   const { isConversations } = useWorkbenchRoute()
   const hasRouteStrip = useHasWorkbenchRouteStrip()
-  const { isOpen: sidebarOpen } = useSidebarContext()
-  const { isOpen: auxOpen } = useAuxPanelContext()
-  const { isMac, isWindows, isLinux } = usePlatform()
-  const { zoomLevel } = useZoomLevel()
-  const isConvSplit = useTabStore(selectIsSplit)
-  const winLinuxControls = isDesktop() && (isWindows || isLinux)
-  // The window chrome (toggle/search left, terminal/aux/settings right) now
-  // lives in fixed corner overlays (see FolderLayoutShell) that never move on
-  // panel toggles. Each edge column just reserves the overlay's width so its
-  // tabs never render underneath. The reserve scales with the app zoom so it
-  // tracks the rem-sized overlay buttons (which grow with zoom).
-  const leftReserve = leftChromeReserve(isMac && isDesktop(), zoomLevel)
-  const rightReserve = rightChromeReserve(winLinuxControls, zoomLevel)
-  // A middle column reserves the right overlay only when it (not the aux panel)
-  // is the window's right edge: the file column in fusion, else conversation.
-  const convReservesRight = !auxOpen && mode === "conversation"
-  const fileReservesRight = !auxOpen && mode === "fusion"
-  // Maximizing files overlays the whole middle area, so the file column then
-  // also owns the window's LEFT edge when the sidebar is collapsed — reserve the
-  // left overlay too (normally that's the conversation column's job).
-  const fileReservesLeft = filesMaximized && !sidebarOpen
 
   return (
     <div className="relative h-full min-h-0 overflow-hidden">
@@ -368,42 +337,12 @@ function WorkspaceContent({ children }: { children: React.ReactNode }) {
                 )}
                 inert={filesMaximized || undefined}
               >
-                {/* Conversation column top strip (single-session, D-005): no
-                  tab bar — the main area shows one session at a time and
-                  switching happens from the sidebar. The strip survives only
-                  as the window's drag region plus the corner reserves (left:
-                  only when the sidebar is collapsed, so this column owns the
-                  window's left edge; right: only when it's the window's right
-                  edge) for the fixed chrome overlays. The session's own header
-                  (folder › title) renders inside {children}, directly below.
-                  Interim shape until the ZCode-style top bar (D-004) replaces
-                  the whole strip. */}
-                {!isConvSplit && (
-                  <div className="flex h-10 shrink-0 items-stretch bg-muted ws-transparent-bg">
-                    {!sidebarOpen && (
-                      <div
-                        data-tauri-drag-region
-                        className="h-full shrink-0 ws-strip-line"
-                        style={{ width: leftReserve }}
-                      />
-                    )}
-                    <div
-                      data-tauri-drag-region
-                      className="h-full min-w-0 flex-1 ws-strip-line"
-                    />
-                    {convReservesRight && (
-                      <div
-                        data-tauri-drag-region
-                        className="h-full shrink-0 ws-strip-line"
-                        style={{ width: rightReserve }}
-                      />
-                    )}
-                  </div>
-                )}
-                {/* Pane activation lives on the CONTENT, not the top bar: clicking
-                  edge chrome (terminal/settings/toggles) or grabbing a drag
-                  region stays pane-neutral so it never hijacks close-tab /
-                  next-tab routing. Tabs self-activate via switchTab. */}
+                {/* Single-session main area (D-005): no per-column strip — the
+                  ZCode-style TopBar (D-004) owns the window's top band, and the
+                  session's own header (folder › title) renders inside
+                  {children}. */}
+                {/* Pane activation lives on the CONTENT: clicking chrome or
+                  drag regions stays pane-neutral. */}
                 <div
                   className="relative flex-1 min-h-0 overflow-hidden"
                   onPointerDownCapture={markConversationActive}
@@ -468,35 +407,16 @@ function WorkspaceContent({ children }: { children: React.ReactNode }) {
               )}
               aria-hidden={mode === "conversation"}
             >
-              {/* File column top bar: the file tab strip + a right reserve for
-                  the fixed corner overlay (only when the aux panel is collapsed,
-                  so this column owns the window's right edge). Per-file actions
+              {/* File column top bar: the file tab strip. Per-file actions
                   live in FileWorkspaceHeader below, above every
                   FileWorkspacePanel render branch. `bg-muted` shades the strip
-                  like a browser tab bar (matches the conversation column and the
-                  bottom StatusBar). With a workspace background image on, the
-                  strip + every tab go transparent (reveal the image) and a
-                  hairline bottom border (ws-strip-line) sits under the reserves
-                  and inactive tabs, arching over the active tab (the active
-                  browser-tab-item's `::after`) — same as the conversation column. */}
+                  like a browser tab bar (matching the bottom StatusBar). With a
+                  workspace background image on, the strip + every tab go
+                  transparent (reveal the image). */}
               <div className="flex h-10 shrink-0 items-stretch bg-muted ws-transparent-bg">
-                {fileReservesLeft && (
-                  <div
-                    data-tauri-drag-region
-                    className="h-full shrink-0 ws-strip-line"
-                    style={{ width: leftReserve }}
-                  />
-                )}
                 <div className="flex min-w-0 flex-1 items-stretch">
                   <FileWorkspaceTabBar />
                 </div>
-                {fileReservesRight && (
-                  <div
-                    data-tauri-drag-region
-                    className="h-full shrink-0 ws-strip-line"
-                    style={{ width: rightReserve }}
-                  />
-                )}
               </div>
               {/* Pane activation on the file content + its detail header, not
                   the top bar (see the conversation section). */}
@@ -520,9 +440,8 @@ function WorkspaceContent({ children }: { children: React.ReactNode }) {
         // through, no frost) with a workspace background image on — the
         // conversation beneath is `invisible` so nothing else paints through.
         <div className="absolute inset-0 z-40 flex flex-col bg-background ws-transparent-bg">
-          {/* Window-chrome strip: reserves the fixed corner overlays' h-10
-              band, hosts the active route's title on the left, and keeps the
-              empty middle as a window-drag region. With a title present it
+          {/* Route strip: hosts the active route's title on the left, and the
+              empty middle is a window-drag region. With a title present it
               closes with the sidebar-header hairline (ws-chrome-border keeps
               it legible over a background image). */}
           <div
@@ -531,13 +450,6 @@ function WorkspaceContent({ children }: { children: React.ReactNode }) {
               hasRouteStrip && "border-b border-border/50 ws-chrome-border"
             )}
           >
-            {!sidebarOpen && (
-              <div
-                data-tauri-drag-region
-                className="h-full shrink-0"
-                style={{ width: leftReserve }}
-              />
-            )}
             <WorkbenchRouteStrip />
             <div data-tauri-drag-region className="h-full min-w-0 flex-1" />
           </div>
@@ -1132,8 +1044,6 @@ function FolderWorkspaceShell({ children }: { children: React.ReactNode }) {
 
 function FolderLayoutShell({ children }: { children: React.ReactNode }) {
   const isMobile = useIsMobile()
-  const { isWindows, isLinux } = usePlatform()
-  const winLinuxControls = isDesktop() && (isWindows || isLinux)
   const {
     workspaceBgEnabled,
     workspaceBgImageUrl,
@@ -1180,38 +1090,18 @@ function FolderLayoutShell({ children }: { children: React.ReactNode }) {
       <WorkspaceChromeController />
       {isMobile ? (
         <>
-          {/* Mobile keeps the visible full-width bar; desktop moved its buttons
-              into fixed corner overlays (LeftEdgeChrome / RightEdgeChrome). */}
+          {/* Mobile keeps the visible full-width bar; desktop uses the
+              ZCode-style TopBar (D-004), which owns the window's top band. */}
           <FolderTitleBar />
           <MobileFolderWorkspaceShell>{children}</MobileFolderWorkspaceShell>
         </>
       ) : (
-        <FolderWorkspaceShell>{children}</FolderWorkspaceShell>
-      )}
-      <StatusBar />
-      {/* Desktop window chrome, pinned to the window corners so it never moves —
-          or re-mounts — when the side panels open/close (that re-parenting is
-          what made the old in-header clusters flicker). Left = sidebar toggle +
-          search; right = terminal/aux/settings, sitting to the LEFT of the
-          Windows/Linux caption buttons; then the caption buttons themselves
-          (self-null on macOS/web). Each edge column reserves the matching width
-          beneath these (see leftChromeReserve / rightChromeReserve). */}
-      {!isMobile && (
         <>
-          <div className="absolute left-0 top-0 z-50 h-10">
-            <LeftEdgeChrome />
-          </div>
-          <div
-            className="absolute top-0 z-50 h-10"
-            style={{ right: winLinuxControls ? WINDOW_CAPTION_WIDTH : 0 }}
-          >
-            <RightEdgeChrome />
-          </div>
-          <div className="absolute right-0 top-0 z-50 h-10">
-            <WindowControls />
-          </div>
+          <TopBar />
+          <FolderWorkspaceShell>{children}</FolderWorkspaceShell>
         </>
       )}
+      <StatusBar />
       <AppToaster
         position="bottom-right"
         duration={TOAST_DURATION_MS}

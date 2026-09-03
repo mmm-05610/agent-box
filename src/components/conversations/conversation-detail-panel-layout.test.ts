@@ -32,10 +32,6 @@ const workspaceLayoutSource = readFileSync(
   resolve(process.cwd(), "src/app/workspace/layout.tsx"),
   "utf8"
 )
-const tabBarSource = readFileSync(
-  resolve(process.cwd(), "src/components/tabs/tab-bar.tsx"),
-  "utf8"
-)
 const messageListViewSource = readFileSync(
   resolve(process.cwd(), "src/components/message/message-list-view.tsx"),
   "utf8"
@@ -245,78 +241,6 @@ describe("ConversationDetailPanel new conversation layout", () => {
     expect(source).not.toContain("containerClassName")
     expect(conversationShellSource).not.toContain("containerClassName")
     expect(source).toContain("mx-auto flex w-full max-w-3xl")
-  })
-})
-
-describe("ConversationDetailPanel split-group render model", () => {
-  // The split feature's one structural invariant: group shells are FLAT
-  // SIBLINGS keyed by their stable group id, positioned purely by computed
-  // percentage rects. Nesting shells per layout-tree depth would reparent (and
-  // remount) every live conversation view on split/unsplit/orientation
-  // changes.
-  it("renders group shells as flat keyed siblings from computed rects", () => {
-    expect(source).toContain(
-      "{orderedGroupIds.map((groupId) => renderGroupShell(groupId))}"
-    )
-    expect(source).toContain("const renderGroupShell = (groupId: string)")
-    // A component defined inside render would change type identity every
-    // render and remount its subtree — keep these plain function calls.
-    expect(source).not.toContain("<RenderGroupShell")
-    expect(source).not.toContain("<RenderTabWrapper")
-    expect(source).toContain("key={groupId}")
-    expect(source).toContain("computeRects(groupLayout)")
-  })
-
-  it("marks the active session whenever several are visible (split or tiled)", () => {
-    expect(source).toContain("showActiveFlow={(isSplit || canTileG) && active}")
-  })
-
-  it("gives each split group its own strip and divider overlays only while split", () => {
-    expect(source).toContain("<TabBar groupId={groupId} />")
-    const handlesIdx = source.indexOf("groupHandles.map((handle) => (")
-    expect(handlesIdx).toBeGreaterThan(-1)
-    expect(source.slice(handlesIdx - 80, handlesIdx)).toContain("{isSplit &&")
-  })
-
-  // Each split group keeps the unsplit layout's "tabs + conversation title
-  // bar" pairing: its own header (driven by the GROUP's selected tab) sits
-  // under its strip, and the global single header steps aside while split.
-  it("pairs every split group with its own title bar and gates the global one", () => {
-    const shellStart = source.indexOf("const renderGroupShell = (groupId")
-    const shellBody = source.slice(shellStart, shellStart + 6000)
-    expect(shellBody).toContain("{isSplit && selTab && (")
-    expect(shellBody).toContain("<ConversationDetailHeader")
-    expect(shellBody).toContain("tabId={selTab.id}")
-    expect(source).toContain("{!isSplit && activeTab && (")
-  })
-
-  // While split the workspace layout drops its title-bar strip row ENTIRELY —
-  // no blank drag row above the shells. The window-drag surface moves into the
-  // group strips instead: every strip's tail spacer is a drag region, and the
-  // TOP-edge strips re-create the corner reserves (traffic lights / caption
-  // buttons / chrome clusters) the unsplit row normally provides.
-  it("replaces the unsplit title-bar row with in-strip drag surfaces while split", () => {
-    // Layout: the whole h-10 conversation top bar is gated on !isConvSplit;
-    // the old always-rendered row with a split drag-region branch is gone.
-    expect(workspaceLayoutSource).toContain("{!isConvSplit && (")
-    expect(workspaceLayoutSource).not.toContain("hasConvTabs && !isConvSplit")
-
-    // Panel: TOP-edge group strips carry the corner reserves themselves.
-    const shellStart = source.indexOf("const renderGroupShell = (groupId")
-    const shellBody = source.slice(shellStart, shellStart + 6000)
-    expect(shellBody).toContain(
-      '{touchesLeft && <SplitStripCornerReserve side="left" />}'
-    )
-    expect(shellBody).toContain(
-      '{touchesRight && <SplitStripCornerReserve side="right" />}'
-    )
-
-    // Tab bar: the tail spacer is a window-drag region on EVERY strip (group
-    // strips are the window's top edge while split), not just the unsplit one.
-    expect(tabBarSource).toContain(
-      '<div data-tauri-drag-region className="h-full min-w-10 flex-1" />'
-    )
-    expect(tabBarSource).not.toContain("data-tauri-drag-region={groupId")
   })
 })
 
