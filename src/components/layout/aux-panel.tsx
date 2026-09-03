@@ -1,13 +1,6 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import {
-  Folder,
-  FolderPen,
-  GitCommit,
-  ReceiptText,
-  type LucideIcon,
-} from "lucide-react"
 import { useTranslations } from "next-intl"
 import { useAuxPanel, type AuxPanelTab } from "@/features/shell"
 import { useActiveFolder } from "@/contexts/active-folder-context"
@@ -27,38 +20,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
-import { SessionDetailsTab } from "./aux-panel-session-details-tab"
-import { FileTreeTab } from "./aux-panel-file-tree-tab"
-import { GitChangesTab } from "./aux-panel-git-changes-tab"
-import { GitLogTab } from "./aux-panel-git-log-tab"
-
-const LAZY_TABS: AuxPanelTab[] = ["file_tree", "changes", "git_log"]
-
-// Visible order + icon for every aux tab. Both the desktop segmented control
-// and the collapsed picker map over this, so the two surfaces can never drift.
-const TAB_ORDER: AuxPanelTab[] = [
-  "session_details",
-  "file_tree",
-  "changes",
-  "git_log",
-]
-const TAB_ICONS: Record<AuxPanelTab, LucideIcon> = {
-  session_details: ReceiptText,
-  file_tree: Folder,
-  changes: FolderPen,
-  git_log: GitCommit,
-}
-// The three folder-scoped tabs share one label namespace (Folder.auxPanel.tabs);
-// session details resolves from its own (Folder.sessionDetails.menuLabel). The
-// value type is the literal key union so next-intl's typed `t()` accepts it.
-const FOLDER_TAB_LABEL_KEY: Record<
-  Exclude<AuxPanelTab, "session_details">,
-  "files" | "changes" | "commits"
-> = {
-  file_tree: "files",
-  changes: "changes",
-  git_log: "commits",
-}
+// F6 接线 4：标签头数据源 = panels 注册表（副作用导入同时完成内置标签注册）
+import {
+  isAuxTabVisible,
+  listAuxPanelTabs,
+  type AuxPanelTabDescriptor,
+} from "./aux-panel-registry"
 
 // The desktop segmented control needs ~130px (4 icon triggers + gaps + track
 // padding). It's pinned to the strip's LEFT while the fixed window-chrome
@@ -100,9 +67,10 @@ export function shouldCollapseAuxTabs(
  *
  * The folder-scoped tabs (files/changes/commits) only make sense with a real
  * folder workspace open, so chat sessions and the folderless state collapse to
- * just the Session Details tab. `effectiveTab` keeps the rendered selection
- * valid even when the stored `activeTab` is a now-hidden folder tab, avoiding a
- * one-frame flash before the reconciling effect corrects the stored value.
+ * just the always-visible tabs (Session Details, plus any registry-extension
+ * tabs — F6). `effectiveTab` keeps the rendered selection valid even when the
+ * stored `activeTab` is a now-hidden folder tab, avoiding a one-frame flash
+ * before the reconciling effect corrects the stored value.
  */
 export function resolveAuxTabView(
   activeTab: AuxPanelTab,
@@ -110,10 +78,16 @@ export function resolveAuxTabView(
   isChatMode: boolean
 ): { showFolderTabs: boolean; effectiveTab: AuxPanelTab } {
   const showFolderTabs = activeFolderId != null && !isChatMode
-  return {
-    showFolderTabs,
-    effectiveTab: showFolderTabs ? activeTab : "session_details",
-  }
+  const visible = listAuxPanelTabs().filter((tab) =>
+    isAuxTabVisible(tab, showFolderTabs)
+  )
+  // Keep the stored selection when it is still shown; otherwise fall back to
+  // the first visible tab (Session Details for the built-in set — it sorts
+  // first and is always visible).
+  const effectiveTab = visible.some((tab) => tab.panel.id === activeTab)
+    ? activeTab
+    : ((visible[0]?.panel.id ?? "session_details") as AuxPanelTab)
+  return { showFolderTabs, effectiveTab }
 }
 
 export function AuxPanel() {
@@ -125,8 +99,17 @@ export function AuxPanel() {
   const isMobile = useIsMobile()
   const { isWindows, isLinux } = usePlatform()
   const { zoomLevel } = useZoomLevel()
-  const [mountedTabs, setMountedTabs] = useState<Set<AuxPanelTab>>(
-    () => new Set(LAZY_TABS.filter((tab) => tab === activeTab))
+  // F6 接线 4：标签 = panels 注册表投影（每次渲染重读，扩展注册即时生效）。
+  // `activeTab` 在 store 侧是封闭的 AuxPanelTab 联合；注册表扩展标签的 id
+  // 在本组件边界上按 string 透传（store 只存字符串，不持久化该值）。
+  const tabs = listAuxPanelTabs()
+  const [mountedTabs, setMountedTabs] = useState<Set<string>>(
+    () =>
+      new Set(
+        tabs
+          .filter((tab) => tab.lazyMount && tab.panel.id === activeTab)
+          .map((tab) => tab.panel.id)
+      )
   )
 
   // Measure the panel's real rendered width. The context `width` is the user's
@@ -155,23 +138,27 @@ export function AuxPanel() {
     isChatMode
   )
 
+  const visibleTabs = tabs.filter((tab) => isAuxTabVisible(tab, showFolderTabs))
+
   // Ensure the shown tab is mounted (covers both user clicks and programmatic changes)
+  const effectiveDescriptor = tabs.find((tab) => tab.panel.id === effectiveTab)
   if (
     isOpen &&
-    LAZY_TABS.includes(effectiveTab) &&
+    effectiveDescriptor?.lazyMount &&
     !mountedTabs.has(effectiveTab)
   ) {
     setMountedTabs((prev) => new Set(prev).add(effectiveTab))
   }
 
-  // Reconcile the stored selection when folder tabs disappear (e.g. entering a
-  // chat session), so other consumers of `activeTab` stay in sync with what's
-  // shown. Done in an effect — never a render-time setState on the provider.
+  // Reconcile the stored selection when the shown tab is no longer visible
+  // (e.g. entering a chat session hides the folder tabs), so other consumers of
+  // `activeTab` stay in sync with what's shown. Done in an effect — never a
+  // render-time setState on the provider.
   useEffect(() => {
-    if (!showFolderTabs && activeTab !== "session_details") {
-      setActiveTab("session_details")
+    if (effectiveTab !== activeTab) {
+      setActiveTab(effectiveTab as AuxPanelTab)
     }
-  }, [showFolderTabs, activeTab, setActiveTab])
+  }, [activeTab, effectiveTab, setActiveTab])
 
   const handleTabValueChange = useCallback(
     (value: string) => {
@@ -197,10 +184,15 @@ export function AuxPanel() {
     )
 
   const tabLabel = useCallback(
-    (tab: AuxPanelTab) =>
-      tab === "session_details"
-        ? tDetails("menuLabel")
-        : t(FOLDER_TAB_LABEL_KEY[tab]),
+    (tab: AuxPanelTabDescriptor) => {
+      if (tab.label.source === "session-details-menu") {
+        return tDetails("menuLabel")
+      }
+      if (tab.label.source === "folder-tab") {
+        return t(tab.label.key)
+      }
+      return tab.panel.title
+    },
     [t, tDetails]
   )
 
@@ -211,15 +203,13 @@ export function AuxPanel() {
     const triggerClassName = compact
       ? "h-6 flex-none rounded-md px-2"
       : undefined
-    return TAB_ORDER.filter(
-      (tab) => tab === "session_details" || showFolderTabs
-    ).map((tab) => {
-      const Icon = TAB_ICONS[tab]
+    return visibleTabs.map((tab) => {
+      const Icon = tab.icon
       const label = tabLabel(tab)
       return (
         <TabsTrigger
-          key={tab}
-          value={tab}
+          key={tab.panel.id}
+          value={tab.panel.id}
           title={label}
           aria-label={label}
           className={triggerClassName}
@@ -236,8 +226,11 @@ export function AuxPanel() {
   // Pinned to the strip's LEFT, so it stays clear of the RIGHT window-chrome
   // overlay (incl. the Windows/Linux native caption) at any usable width.
   const renderCollapsedPicker = () => {
-    const ActiveIcon = TAB_ICONS[effectiveTab]
-    const activeLabel = tabLabel(effectiveTab)
+    const active =
+      tabs.find((tab) => tab.panel.id === effectiveTab) ?? visibleTabs[0]
+    if (!active) return null
+    const ActiveIcon = active.icon
+    const activeLabel = tabLabel(active)
     return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -255,10 +248,10 @@ export function AuxPanel() {
             value={effectiveTab}
             onValueChange={handleTabValueChange}
           >
-            {TAB_ORDER.map((tab) => {
-              const Icon = TAB_ICONS[tab]
+            {visibleTabs.map((tab) => {
+              const Icon = tab.icon
               return (
-                <DropdownMenuRadioItem key={tab} value={tab}>
+                <DropdownMenuRadioItem key={tab.panel.id} value={tab.panel.id}>
                   <Icon className="h-4 w-4" />
                   {tabLabel(tab)}
                 </DropdownMenuRadioItem>
@@ -335,12 +328,13 @@ export function AuxPanel() {
                 (display:none): its triggers stay in the DOM so each
                 TabsContent's aria-labelledby still resolves the panel name,
                 while dropping out of the tab order (unlike sr-only). The
-                dropdown above is the visible switcher. */}
+                dropdown above is the visible switcher. Same when only one tab
+                is visible (chat / folderless). */}
             <TabsList
               variant="default"
               className={cn(
                 "h-7 gap-0.5 rounded-lg bg-foreground/[0.06] p-0.5 group-data-horizontal/tabs:h-7",
-                (!showFolderTabs || collapsed) && "hidden"
+                (visibleTabs.length <= 1 || collapsed) && "hidden"
               )}
             >
               {renderTabTriggers(true)}
@@ -351,34 +345,24 @@ export function AuxPanel() {
           </div>
         )}
 
-        <TabsContent
-          value="session_details"
-          forceMount
-          className="mt-0 flex-1 min-h-0 overflow-hidden"
-        >
-          <SessionDetailsTab />
-        </TabsContent>
-        <TabsContent
-          value="file_tree"
-          forceMount
-          className="mt-0 flex-1 min-h-0 overflow-hidden"
-        >
-          {mountedTabs.has("file_tree") ? <FileTreeTab /> : null}
-        </TabsContent>
-        <TabsContent
-          value="changes"
-          forceMount
-          className="mt-0 flex-1 min-h-0 overflow-hidden"
-        >
-          {mountedTabs.has("changes") ? <GitChangesTab /> : null}
-        </TabsContent>
-        <TabsContent
-          value="git_log"
-          forceMount
-          className="mt-0 flex-1 min-h-0 overflow-hidden"
-        >
-          {mountedTabs.has("git_log") ? <GitLogTab /> : null}
-        </TabsContent>
+        {/* F6 接线 4：标签内容同样遍历注册表 —— 每个面板条目携带自己的
+            component（内置 4 个标签即原 TabsContent 的组件；扩展标签注册
+            即得内容区）。懒挂载标签首次激活后常驻（forceMount）。 */}
+        {tabs.map((tab) => {
+          const TabComponent = tab.panel.component
+          return (
+            <TabsContent
+              key={tab.panel.id}
+              value={tab.panel.id}
+              forceMount
+              className="mt-0 flex-1 min-h-0 overflow-hidden"
+            >
+              {tab.lazyMount && !mountedTabs.has(tab.panel.id) ? null : (
+                <TabComponent />
+              )}
+            </TabsContent>
+          )
+        })}
       </Tabs>
     </aside>
   )

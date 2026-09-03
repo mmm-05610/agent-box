@@ -12,8 +12,8 @@ import { useTranslations } from "next-intl"
 import { MoreHorizontal } from "lucide-react"
 import { useAcpAgents } from "@/hooks/use-acp-agents"
 import type { AgentType, AcpAgentInfo } from "@/lib/types"
-import { getAgentLabel } from "@/lib/custom-agents"
 import { AgentIcon } from "@/components/agent-icon"
+import { harnessOptionsFromRegistry } from "@/components/chat/harness-registry"
 import { SelectorTooltip } from "@/components/chat/selector-tooltip"
 import {
   Popover,
@@ -61,6 +61,22 @@ interface AgentSelectorProps {
   align?: "start" | "center"
 }
 
+/**
+ * One pill's data (F6: registry-driven). Projected from a `HarnessOption`
+ * (core/registry/harnesses entry + optional ACP availability info) so the
+ * rendering below never touches `AcpAgentInfo` directly — the harness
+ * registry is the single source of truth for what the row shows.
+ */
+interface SelectorAgent {
+  agentType: AgentType
+  /** harness displayName（注册表元数据，替代 getAgentLabel 现算） */
+  label: string
+  /** ACP 侧平台可用性；注册表扩展注册的 harness 视为可用 */
+  available: boolean
+  /** 已安装版本；`null` 标记 "needs install" 圆点 */
+  installedVersion: string | null
+}
+
 /** `parseFloat` for computed styles, with a 0 for `""` / `auto` / NaN. */
 function px(value: string): number {
   const n = Number.parseFloat(value)
@@ -78,7 +94,22 @@ export function AgentSelector({
 }: AgentSelectorProps) {
   const t = useTranslations("Folder.chat.agentSelector")
   const { agents: rawAgents } = useAcpAgents()
-  const agents = useMemo<AcpAgentInfo[]>(
+  // F6 接线 1：数据源 = harnesses 注册表。ACP 列表先同步进注册表
+  // （harnessOptionsFromRegistry 内完成），再从注册表投影出 pill 数据，
+  // 注册表独有的 harness（扩展注册）自动出现在末尾。顺序/过滤规则
+  // 与旧实现一致（enabled 过滤、保持 ACP sort_order 顺序）。
+  const agents = useMemo<SelectorAgent[]>(() => {
+    const options = harnessOptionsFromRegistry(rawAgents)
+    return options.map(({ harness, agent }) => ({
+      agentType: harness.id as AgentType,
+      label: harness.displayName,
+      available: agent ? agent.available : true,
+      installedVersion: agent?.installed_version ?? null,
+    }))
+  }, [rawAgents])
+  // onAgentsLoaded keeps its historical contract (enabled AcpAgentInfo[] with
+  // availability fields) — consumers count usable agents off it.
+  const enabledRawAgents = useMemo(
     () => rawAgents.filter((a) => a.enabled),
     [rawAgents]
   )
@@ -92,11 +123,11 @@ export function AgentSelector({
   // forwards via `onSelect`, which patches `defaultAgentType` upstream.
   const selected = useMemo<AgentType | null>(() => {
     const found = defaultAgentType
-      ? agents.find((a) => a.agent_type === defaultAgentType && a.available)
+      ? agents.find((a) => a.agentType === defaultAgentType && a.available)
       : null
-    if (found) return found.agent_type
+    if (found) return found.agentType
     const first = agents.find((a) => a.available)
-    return first?.agent_type ?? null
+    return first?.agentType ?? null
   }, [agents, defaultAgentType])
 
   // Sliding indicator state
@@ -129,13 +160,13 @@ export function AgentSelector({
   // it visible, named, and wearing the droplet.
   const { visible, hidden } = useMemo(() => {
     if (visibleOtherCount === null) {
-      return { visible: agents, hidden: [] as AcpAgentInfo[] }
+      return { visible: agents, hidden: [] as SelectorAgent[] }
     }
-    const visible: AcpAgentInfo[] = []
-    const hidden: AcpAgentInfo[] = []
+    const visible: SelectorAgent[] = []
+    const hidden: SelectorAgent[] = []
     let taken = 0
     for (const agent of agents) {
-      if (agent.agent_type === selected) {
+      if (agent.agentType === selected) {
         visible.push(agent)
       } else if (taken < visibleOtherCount) {
         visible.push(agent)
@@ -294,20 +325,20 @@ export function AgentSelector({
   // don't supply `onFallback` get the legacy behavior (fallback as
   // onSelect) so this prop stays optional.
   useEffect(() => {
-    onAgentsLoadedRef.current?.(agents)
+    onAgentsLoadedRef.current?.(enabledRawAgents)
     const found = defaultAgentType
-      ? agents.find((a) => a.agent_type === defaultAgentType && a.available)
+      ? agents.find((a) => a.agentType === defaultAgentType && a.available)
       : null
     if (found) return
     const first = agents.find((a) => a.available)
     if (!first) return
     const fallback = onFallbackRef.current
     if (fallback) {
-      fallback(first.agent_type)
+      fallback(first.agentType)
     } else {
-      onSelectRef.current(first.agent_type)
+      onSelectRef.current(first.agentType)
     }
-  }, [agents, defaultAgentType])
+  }, [agents, enabledRawAgents, defaultAgentType])
 
   const handleSelect = (agentType: AgentType) => {
     onSelect(agentType)
@@ -373,13 +404,13 @@ export function AgentSelector({
           />
         )}
         {visible.map((agent) => {
-          const isSelected = selected === agent.agent_type
+          const isSelected = selected === agent.agentType
           // Enabled + platform-available, but the CLI/SDK isn't installed. Kept
           // clickable (selecting it surfaces a persistent install prompt in the
           // composer) but flagged with a marker + tooltip so it reads as "needs
           // install" instead of looking identical to a ready agent.
-          const notInstalled = agent.available && !agent.installed_version
-          const label = getAgentLabel(agent.agent_type)
+          const notInstalled = agent.available && !agent.installedVersion
+          const label = agent.label
           return (
             // A collapsed pill is icon-only, so the hint names it; the selected
             // one already spells its name out and only gets a hint when there
@@ -388,17 +419,17 @@ export function AgentSelector({
             // icon-only ones that most need naming, and a disabled element
             // takes no pointer events.
             <SelectorTooltip
-              key={agent.agent_type}
+              key={agent.agentType}
               label={notInstalled || !isSelected ? label : null}
               description={notInstalled ? t("notInstalled") : null}
               disabled={disabled || !agent.available}
             >
               <button
-                ref={setItemRef(agent.agent_type)}
+                ref={setItemRef(agent.agentType)}
                 data-slot="agent-pill"
                 aria-pressed={isSelected}
                 disabled={disabled || !agent.available}
-                onClick={() => handleSelect(agent.agent_type)}
+                onClick={() => handleSelect(agent.agentType)}
                 className={cn(
                   // `shrink-0` keeps every pill at its natural width. Without it
                   // a row that briefly overflows (the frame before the first
@@ -428,7 +459,7 @@ export function AgentSelector({
                     the icon's, so icon and label share one centerline. Keep it a
                     flex box if this markup is ever touched. */}
                 <span className="relative inline-flex shrink-0 items-center">
-                  <AgentIcon agentType={agent.agent_type} className="h-4 w-4" />
+                  <AgentIcon agentType={agent.agentType} className="h-4 w-4" />
                   {notInstalled ? (
                     <span
                       aria-hidden
@@ -490,11 +521,11 @@ export function AgentSelector({
               aria-label={t("moreAgents", { count: hidden.length })}
             >
               {hidden.map((agent) => {
-                const notInstalled = agent.available && !agent.installed_version
-                const label = getAgentLabel(agent.agent_type)
+                const notInstalled = agent.available && !agent.installedVersion
+                const label = agent.label
                 return (
                   <button
-                    key={agent.agent_type}
+                    key={agent.agentType}
                     type="button"
                     data-slot="agent-option"
                     disabled={disabled || !agent.available}
@@ -505,7 +536,7 @@ export function AgentSelector({
                     }
                     onClick={() => {
                       setMoreOpen(false)
-                      handleSelect(agent.agent_type)
+                      handleSelect(agent.agentType)
                     }}
                     className={cn(
                       "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors",
@@ -516,7 +547,7 @@ export function AgentSelector({
                   >
                     <span className="relative flex shrink-0 items-center">
                       <AgentIcon
-                        agentType={agent.agent_type}
+                        agentType={agent.agentType}
                         className="h-4 w-4"
                       />
                       {notInstalled ? (

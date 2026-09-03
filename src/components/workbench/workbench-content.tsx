@@ -1,10 +1,7 @@
 "use client"
 
 import type { ComponentType } from "react"
-import {
-  useWorkbenchRoute,
-  type WorkbenchRouteId,
-} from "@/features/shell"
+import { useWorkbenchRoute, type WorkbenchRouteId } from "@/features/shell"
 import {
   AutomationsPage,
   AutomationsPageTitle,

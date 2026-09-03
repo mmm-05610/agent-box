@@ -1,5 +1,9 @@
 import { memo, useMemo, useState, type ReactNode } from "react"
 import type { AdaptedContentPart } from "@/features/session/model/adapters/ai-elements-adapter"
+import { dispatchToolRenderer } from "./tool-renderer-dispatch"
+import { dispatchPartRenderer } from "./part-renderer-dispatch"
+// 副作用导入：注册特化工具卡（question / check_user_feedback / 计划模式四件）
+import "./registered-tool-cards"
 import {
   classifyToolKind,
   TOOL_KIND_ORDER,
@@ -46,14 +50,12 @@ import {
   ReasoningContent,
 } from "@/components/ai-elements/reasoning"
 import { AgentToolCallPart } from "./agent-tool-call"
-import { AskQuestionResultCard } from "./ask-question-result-card"
 import { CodegMcpToolCard } from "./codeg-mcp-tool-card"
 import { CollabAgentCard } from "./collab-agent-card"
 import {
   ContextCompactionCard,
   isContextCompactionMeta,
 } from "./context-compaction-card"
-import { FeedbackCheckResultCard } from "./feedback-check-result-card"
 import { SearchResultsOutput } from "./search-results-output"
 import { parseCodexCommandEnvelope } from "@/lib/codex-command-action"
 import {
@@ -79,7 +81,6 @@ import { BackgroundTaskCard } from "./background-task-card"
 import { GeneratedImagesBlock } from "./generated-images-block"
 import { GoalRunPart, GoalToolCallPart } from "./goal-tool-call"
 import { PlanCard, PlanEntriesList } from "./plan-card"
-import { PlanModeCard } from "./plan-mode-card"
 import { PlainTextWithBadges } from "./plain-text-with-badges"
 import {
   FileTextIcon,
@@ -2603,6 +2604,15 @@ const ToolCallPart = memo(function ToolCallPart({
     return <ContextCompactionCard state={part.state} meta={part.meta} />
   }
 
+  // F6 接线 2（设计 §6.2）：tool-renderers 注册表优先于内置特化分派。
+  // 注册了特化卡（见 registered-tool-cards.tsx / 扩展注册）就命中；
+  // 未注册返回 null，落回下方内置分派 —— 内置未覆盖的工具最终走
+  // 通用卡（标题 + 状态 + JSON），永不崩。
+  const registeredToolCard = dispatchToolRenderer(part)
+  if (registeredToolCard !== null) {
+    return registeredToolCard
+  }
+
   // Agent/subagent tools get a dedicated container rendering
   if (toolNameLower === "agent") {
     return (
@@ -2685,34 +2695,9 @@ const ToolCallPart = memo(function ToolCallPart({
     )
   }
 
-  // codeg-mcp ask_user_question: render the asked question(s) and the user's
-  // selection as a dedicated read-only card instead of the generic tool shell.
-  // The live interactive answering is handled separately by the pinned
-  // AskQuestionCard; this is the in-stream record (historical + in-flight).
-  if (toolNameLower === "question") {
-    return (
-      <AskQuestionResultCard
-        input={part.input ?? null}
-        output={part.output ?? null}
-        errorText={part.errorText ?? null}
-        state={part.state}
-      />
-    )
-  }
-
-  // codeg-mcp check_user_feedback: render the received steering notes as a
-  // capsule. The no-op polls (count: 0) and in-flight checks are dropped upstream
-  // by `dropHiddenFeedbackChecks`, so reaching here means there is feedback to
-  // show (or, rarely, an error).
-  if (toolNameLower === "check_user_feedback") {
-    return (
-      <FeedbackCheckResultCard
-        output={part.output ?? null}
-        errorText={part.errorText ?? null}
-        state={part.state}
-      />
-    )
-  }
+  // codeg-mcp ask_user_question / check_user_feedback 与计划模式切换四件
+  // 已迁移为注册组件（registered-tool-cards.tsx），经上方
+  // dispatchToolRenderer 命中 —— 新工具卡同样“一个组件 + 一行注册”。
 
   // The remaining codeg-mcp workbench companions (session lookup, work-task
   // reporting, chat authoring). One compact line stating what the call was
@@ -2764,28 +2749,6 @@ const ToolCallPart = memo(function ToolCallPart({
           )}
         </ToolContent>
       </Tool>
-    )
-  }
-
-  // Plan-mode transition tools (EnterPlanMode/ExitPlanMode/switch_mode, and
-  // codex's plan_review gate): render the plan directly via a dedicated card
-  // instead of folding into a misleading "思考 N 次" tool-group. `toolNameLower`
-  // is the underscore-preserving `tool-call-normalization` form, so
-  // `switch_mode` / `plan_review` keep their underscore here.
-  if (
-    toolNameLower === "enterplanmode" ||
-    toolNameLower === "exitplanmode" ||
-    toolNameLower === "switch_mode" ||
-    toolNameLower === "plan_review"
-  ) {
-    return (
-      <PlanModeCard
-        toolName={toolNameLower}
-        input={part.input ?? null}
-        output={part.output ?? null}
-        errorText={part.errorText ?? null}
-        state={part.state}
-      />
     )
   }
 
@@ -3113,7 +3076,10 @@ export const ContentPartsRenderer = memo(function ContentPartsRenderer({
       )
     }
 
-    return null
+    // F6 接线 3（设计 §6.3 / §9-5）：内置分支未命中的 part（custom /
+    // 未知类型）查 part-renderers 注册表，注册了就渲染注册组件；
+    // 未注册返回 null —— 不渲染，也绝不崩。
+    return dispatchPartRenderer(part)
   }
 
   return (

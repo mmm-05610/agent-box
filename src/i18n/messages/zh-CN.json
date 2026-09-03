@@ -3643,6 +3643,45 @@
       "cloneFailed": "克隆仓库失败"
     }
   },
+  "ProjectTree": {
+            "addProject": "项目",
+            "openLocalFolder": "打开本地文件夹",
+            "remoteConnection": "远程连接…",
+            "branchBadge": "分支 {branch}",
+            "remoteOriginTitle": "{kind} · {host}",
+            "wizard": {
+            "title": "添加远程项目",
+            "description": "连接远程主机（SSH、WSL 或 Docker）上的项目。",
+            "steps": {
+            "method": "方式",
+            "config": "配置",
+            "connecting": "连接中",
+            "directory": "选择目录"
+            },
+            "methodSsh": "SSH",
+            "methodSshHint": "通过 SSH 连接的远程机器",
+            "methodWsl": "WSL",
+            "methodWslHint": "Windows 的 Linux 子系统发行版",
+            "methodDocker": "Docker",
+            "methodDockerHint": "一个正在运行的容器",
+            "hostLabel": "主机",
+            "hostPlaceholderSsh": "user@hostname",
+            "hostPlaceholderWsl": "发行版名称",
+            "hostPlaceholderDocker": "容器名称",
+            "displayLabel": "显示名（可选）",
+            "displayPlaceholder": "我的构建服务器",
+            "pathLabel": "项目路径",
+            "pathPlaceholder": "/home/user/project",
+            "next": "下一步",
+            "back": "上一步",
+            "cancel": "取消",
+            "connect": "连接",
+            "backendComingSoon": "后端支持即将接入",
+            "connectingTitle": "连接中…",
+            "directoryHint": "远程目录列表将随后端支持接入。",
+            "addProject": "添加项目"
+            }
+            },
   "WebServiceSettings": {
     "addressSwitchHint": "切换只改变这里显示和打开的地址；服务监听所有网卡，每个地址都可访问。",
     "sectionTitle": "Web 服务",

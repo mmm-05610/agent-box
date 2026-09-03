@@ -1,27 +1,7 @@
 "use client"
 
-import {
-  useCallback,
-  useEffect,
-  useState,
-  type ComponentType,
-  type ReactNode,
-} from "react"
-import {
-  Bot,
-  BookOpenText,
-  Boxes,
-  FileSpreadsheet,
-  GitBranch,
-  Globe,
-  Keyboard,
-  Menu,
-  Palette,
-  PlugZap,
-  Server,
-  Settings,
-  SlidersHorizontal,
-} from "lucide-react"
+import { useCallback, useEffect, useState, type ReactNode } from "react"
+import { Menu } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { usePathname } from "next/navigation"
 import { useRouter } from "next/navigation"
@@ -33,87 +13,8 @@ import { detectEnvironment } from "@/core/transport/detect"
 import { AppTitleBar } from "@/components/layout/app-title-bar"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer"
-
-interface SettingsNavItem {
-  href: string
-  labelKey:
-    | "general"
-    | "appearance"
-    | "agents"
-    | "model_providers"
-    | "mcp"
-    | "skills"
-    | "skill_packs"
-    | "shortcuts"
-    | "version_control"
-    | "system"
-    | "web_service"
-    | "logs"
-  icon: ComponentType<{ className?: string }>
-}
-
-const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
-  {
-    href: "/settings/appearance",
-    labelKey: "appearance",
-    icon: Palette,
-  },
-  {
-    href: "/settings/general",
-    labelKey: "general",
-    icon: SlidersHorizontal,
-  },
-  {
-    href: "/settings/mcp",
-    labelKey: "mcp",
-    icon: PlugZap,
-  },
-  {
-    href: "/settings/skills",
-    labelKey: "skills",
-    icon: BookOpenText,
-  },
-  {
-    href: "/settings/skill-packs",
-    labelKey: "skill_packs",
-    icon: Boxes,
-  },
-  {
-    href: "/settings/agents",
-    labelKey: "agents",
-    icon: Bot,
-  },
-  {
-    href: "/settings/model-providers",
-    labelKey: "model_providers",
-    icon: Server,
-  },
-  {
-    href: "/settings/shortcuts",
-    labelKey: "shortcuts",
-    icon: Keyboard,
-  },
-  {
-    href: "/settings/version-control",
-    labelKey: "version_control",
-    icon: GitBranch,
-  },
-  {
-    href: "/settings/web-service",
-    labelKey: "web_service",
-    icon: Globe,
-  },
-  {
-    href: "/settings/logs",
-    labelKey: "logs",
-    icon: FileSpreadsheet,
-  },
-  {
-    href: "/settings/system",
-    labelKey: "system",
-    icon: Settings,
-  },
-]
+// F6 接线 4：导航数据源 = panels 注册表（副作用导入同时完成内置分区注册）
+import { listSettingsSections } from "./settings-shell-panels"
 
 interface SettingsShellProps {
   children: ReactNode
@@ -173,9 +74,10 @@ export function SettingsShell({ children }: SettingsShellProps) {
     [router, setNavOpen]
   )
 
-  const filteredNavItems = SETTINGS_NAV_ITEMS.filter(
-    (item) =>
-      !(item.labelKey === "web_service" && detectEnvironment() === "web")
+  // F6 接线 4：导航项 = panels 注册表投影（每次渲染重读，扩展注册即时
+  // 生效）。web 环境隐藏 web_service 的规则与原实现一致。
+  const filteredNavItems = listSettingsSections().filter(
+    (item) => !(item.hideOnWeb && detectEnvironment() === "web")
   )
 
   const navContent = (
@@ -187,7 +89,10 @@ export function SettingsShell({ children }: SettingsShellProps) {
         <nav className="space-y-1">
           {filteredNavItems.map((item) => {
             const Icon = item.icon
-            const translationKey = `nav.${item.labelKey}` as const
+            // 内置分区走 i18n 键；扩展分区直出注册表 title
+            const label = item.labelKey
+              ? t(`nav.${item.labelKey}` as const)
+              : item.panel.title
             const active =
               normalizedPathname === item.href ||
               normalizedPathname.startsWith(`${item.href}/`)
@@ -203,7 +108,7 @@ export function SettingsShell({ children }: SettingsShellProps) {
               >
                 <span className="inline-flex items-center gap-1">
                   <Icon className="h-3.5 w-3.5" />
-                  {t(translationKey)}
+                  {label}
                 </span>
               </Button>
             )

@@ -3643,6 +3643,45 @@
       "cloneFailed": "Failed to clone repository"
     }
   },
+  "ProjectTree": {
+            "addProject": "Projects",
+            "openLocalFolder": "Open local folder",
+            "remoteConnection": "Remote connection…",
+            "branchBadge": "Branch {branch}",
+            "remoteOriginTitle": "{kind} · {host}",
+            "wizard": {
+            "title": "Add remote project",
+            "description": "Connect to a project on a remote host (SSH, WSL or Docker).",
+            "steps": {
+            "method": "Type",
+            "config": "Details",
+            "connecting": "Connecting",
+            "directory": "Directory"
+            },
+            "methodSsh": "SSH",
+            "methodSshHint": "A remote machine over SSH",
+            "methodWsl": "WSL",
+            "methodWslHint": "A Windows Subsystem for Linux distribution",
+            "methodDocker": "Docker",
+            "methodDockerHint": "A running container",
+            "hostLabel": "Host",
+            "hostPlaceholderSsh": "user@hostname",
+            "hostPlaceholderWsl": "Distribution name",
+            "hostPlaceholderDocker": "Container name",
+            "displayLabel": "Display name (optional)",
+            "displayPlaceholder": "My build server",
+            "pathLabel": "Project path",
+            "pathPlaceholder": "/home/user/project",
+            "next": "Next",
+            "back": "Back",
+            "cancel": "Cancel",
+            "connect": "Connect",
+            "backendComingSoon": "Backend support coming soon",
+            "connectingTitle": "Connecting…",
+            "directoryHint": "The remote directory list arrives with backend support.",
+            "addProject": "Add project"
+            }
+            },
   "WebServiceSettings": {
     "addressSwitchHint": "Switching only changes the address shown and opened here — the service listens on all interfaces and stays reachable at every address.",
     "sectionTitle": "Web Service",
