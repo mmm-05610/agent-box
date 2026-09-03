@@ -22,7 +22,7 @@ import {
   getCachedSelectors,
   useAcpActions,
   useAcpEvent,
-} from "@/contexts/acp-connections-context"
+} from "@/features/session/provider"
 import { useAcpAgents } from "@/hooks/use-acp-agents"
 import { useActiveFolder } from "@/contexts/active-folder-context"
 import { useAppWorkspaceStore } from "@/stores/app-workspace-store"
@@ -76,7 +76,7 @@ import {
   getTimelineTurns,
   useConversationRuntimeActions,
   useConversationRuntimeStore,
-} from "@/stores/conversation-runtime-store"
+} from "@/features/session/model/conversation-runtime-store"
 import { useShallow } from "zustand/react/shallow"
 import { useConversationDetail } from "@/hooks/use-conversation-detail"
 import {

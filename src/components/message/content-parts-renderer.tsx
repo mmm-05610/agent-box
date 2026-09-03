@@ -1,10 +1,10 @@
 import { memo, useMemo, useState, type ReactNode } from "react"
-import type { AdaptedContentPart } from "@/lib/adapters/ai-elements-adapter"
+import type { AdaptedContentPart } from "@/features/session/model/adapters/ai-elements-adapter"
 import {
   classifyToolKind,
   TOOL_KIND_ORDER,
   type ToolKindLabel,
-} from "@/lib/adapters/tool-kind-classifier"
+} from "@/features/session/model/adapters/tool-kind-classifier"
 import type { MessageRole, PlanEntryInfo } from "@/lib/types"
 import {
   aliasToolInputKeys,

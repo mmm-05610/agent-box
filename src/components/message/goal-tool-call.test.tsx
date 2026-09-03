@@ -8,7 +8,7 @@ import { GoalControlProvider } from "./goal-control-context"
 import type {
   AdaptedContentPart,
   AdaptedGoalRunPart,
-} from "@/lib/adapters/ai-elements-adapter"
+} from "@/features/session/model/adapters/ai-elements-adapter"
 import enMessages from "@/i18n/messages/en.json"
 import zhMessages from "@/i18n/messages/zh-CN.json"
 

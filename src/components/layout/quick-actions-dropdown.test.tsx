@@ -41,15 +41,9 @@ vi.mock("@/contexts/active-folder-context", () => ({
   }),
 }))
 
-vi.mock("@/contexts/automations-view-context", () => ({
+vi.mock("@/features/shell", () => ({
   useAutomationsView: () => ({ unseenFailures: 2 }),
-}))
-
-vi.mock("@/contexts/tasks-view-context", () => ({
   useTasksView: () => ({ attentionCount: 0 }),
-}))
-
-vi.mock("@/contexts/workbench-route-context", () => ({
   useWorkbenchRoute: () => ({
     routeId: "conversations",
     setRoute: mocks.setRoute,

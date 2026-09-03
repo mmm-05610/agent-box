@@ -36,7 +36,7 @@
  */
 
 import { isUnsettledToolCall } from "@/lib/tool-call-lifecycle"
-import type { AdaptedToolCallPart } from "@/lib/adapters/ai-elements-adapter"
+import type { AdaptedToolCallPart } from "@/features/session/model/adapters/ai-elements-adapter"
 
 export interface BackgroundTaskEnvelope {
   /** `poll` = a `TaskOutput` retrieval; `stop` = a `TaskStop` acknowledgement. */

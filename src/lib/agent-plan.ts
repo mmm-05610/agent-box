@@ -1,7 +1,7 @@
 import type {
   AdaptedContentPart,
   AdaptedMessage,
-} from "@/lib/adapters/ai-elements-adapter"
+} from "@/features/session/model/adapters/ai-elements-adapter"
 import {
   isPlanLikeToolName,
   normalizePriority,

@@ -27,7 +27,7 @@ import {
 import type {
   AdaptedToolCallPart,
   ToolCallState,
-} from "@/lib/adapters/ai-elements-adapter"
+} from "@/features/session/model/adapters/ai-elements-adapter"
 import { DelegationStatusRow } from "@/components/message/delegation-status-row"
 import { DelegationStatusGroupCard } from "@/components/message/delegation-status-group-card"
 

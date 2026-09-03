@@ -5,7 +5,7 @@ import type { DbConversationDetail } from "@/lib/types"
 import {
   resetConversationRuntimeStore,
   useConversationRuntimeStore,
-} from "@/stores/conversation-runtime-store"
+} from "@/features/session/model/conversation-runtime-store"
 import { useConversationDetail } from "./use-conversation-detail"
 
 const CID = 77

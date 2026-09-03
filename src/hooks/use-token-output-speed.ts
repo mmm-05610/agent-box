@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 
-import type { LiveMessage } from "@/contexts/acp-connections-context"
+import type { LiveMessage } from "@/features/session/provider"
 import { TokenCountAccumulator, TokenSpeedTracker } from "@/lib/token-speed"
 
 /**

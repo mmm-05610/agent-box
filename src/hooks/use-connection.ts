@@ -10,7 +10,7 @@ import {
   type PendingPermission,
   type PendingUserMessage,
   type PendingQuestion,
-} from "@/contexts/acp-connections-context"
+} from "@/features/session/provider"
 import type {
   AgentType,
   AvailableCommandInfo,

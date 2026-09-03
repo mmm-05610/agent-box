@@ -4,7 +4,7 @@ import { NextIntlClientProvider } from "next-intl"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import enMessages from "@/i18n/messages/en.json"
-import type { ConnectionState } from "@/contexts/acp-connections-context"
+import type { ConnectionState } from "@/features/session/provider"
 
 const fake = vi.hoisted(() => {
   const state = {
@@ -41,7 +41,7 @@ const fake = vi.hoisted(() => {
   }
 })
 
-vi.mock("@/contexts/acp-connections-context", () => ({
+vi.mock("@/features/session/provider", () => ({
   useConnectionStore: () => fake.store,
   useAcpActions: () => fake.actions,
 }))

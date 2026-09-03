@@ -18,7 +18,7 @@
 import { useMemo } from "react"
 
 import { cn } from "@/lib/utils"
-import type { AdaptedToolCallPart } from "@/lib/adapters/ai-elements-adapter"
+import type { AdaptedToolCallPart } from "@/features/session/model/adapters/ai-elements-adapter"
 import { buildDelegationTaskRows } from "@/lib/delegation-status"
 import { DelegationStatusRow } from "@/components/message/delegation-status-row"
 

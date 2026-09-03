@@ -8,7 +8,7 @@ import {
   parseBackgroundTaskEnvelopes,
   stripGrokSubagentScaffolding,
 } from "@/lib/background-task"
-import type { AdaptedToolCallPart } from "@/lib/adapters/ai-elements-adapter"
+import type { AdaptedToolCallPart } from "@/features/session/model/adapters/ai-elements-adapter"
 
 const COMPLETED = `<retrieval_status>success</retrieval_status>
 

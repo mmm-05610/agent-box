@@ -12,7 +12,7 @@ import type {
 import {
   isAgentLikeToolName,
   isDelegationStatusToolName,
-} from "@/lib/adapters/tool-kind-classifier"
+} from "@/features/session/model/adapters/tool-kind-classifier"
 import { normalizeToolName } from "@/lib/tool-call-normalization"
 import { isBackgroundTaskToolCall } from "@/lib/background-task"
 import { isContextCompactionMeta } from "@/lib/context-compaction"

@@ -38,7 +38,7 @@ import {
 } from "react"
 
 import type { AgentType, EventEnvelope } from "@/lib/types"
-import { useAcpActions, useAcpEvent } from "@/contexts/acp-connections-context"
+import { useAcpActions, useAcpEvent } from "@/features/session/provider"
 
 export type DelegationStatus = "running" | "ok" | "err"
 

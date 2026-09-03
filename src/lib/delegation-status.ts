@@ -30,7 +30,7 @@ import { isUnsettledToolCall } from "@/lib/tool-call-lifecycle"
 import type {
   AdaptedToolCallPart,
   ToolCallState,
-} from "@/lib/adapters/ai-elements-adapter"
+} from "@/features/session/model/adapters/ai-elements-adapter"
 
 /**
  * Visual badge states.

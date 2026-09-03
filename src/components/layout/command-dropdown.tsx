@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useActiveFolder } from "@/contexts/active-folder-context"
-import { useTerminalContext } from "@/contexts/terminal-context"
+import { useTerminal } from "@/features/shell"
 import {
   bootstrapFolderCommandsFromPackageJson,
   listFolderCommands,
@@ -50,7 +50,7 @@ export function CommandDropdown() {
     createTerminalWithCommand,
     exitedTerminals,
     tabs: terminalTabs,
-  } = useTerminalContext()
+  } = useTerminal()
   const [commands, setCommands] = useState<FolderCommand[]>([])
   const [manageOpen, setManageOpen] = useState(false)
   const [bootstrapping, setBootstrapping] = useState(false)

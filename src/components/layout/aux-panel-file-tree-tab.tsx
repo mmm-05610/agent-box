@@ -18,9 +18,8 @@ import { Check, ChevronRight, Link2 } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { toast } from "sonner"
 import { useActiveFolder } from "@/contexts/active-folder-context"
-import { useAuxPanelContext } from "@/contexts/aux-panel-context"
+import { useAuxPanel, useTerminal } from "@/features/shell"
 import { useTabStore } from "@/contexts/tab-context"
-import { useTerminalContext } from "@/contexts/terminal-context"
 import { useIsMobile } from "@/hooks/use-mobile"
 import {
   useWorkspaceActions,
@@ -1113,7 +1112,7 @@ export function FileTreeTab() {
     pendingRevealPath,
     consumePendingRevealPath,
     setOpen: setAuxOpen,
-  } = useAuxPanelContext()
+  } = useAuxPanel()
   const isMobile = useIsMobile()
   // Defer the folder so a cross-folder conversation-tab switch commits first and
   // this tab's heavy tree rebuild (remount, applyLazyTreeOverrides, per-row
@@ -1134,7 +1133,7 @@ export function FileTreeTab() {
   const folderStale = activeFolder?.id !== folder?.id
   const tabs = useTabStore((s) => s.tabs)
   const activeTabId = useTabStore((s) => s.activeTabId)
-  const { createTerminalInDirectory } = useTerminalContext()
+  const { createTerminalInDirectory } = useTerminal()
   const { activeFilePath } = useWorkspaceFileTabs()
   const { openBranchDiff, openFilePreview, openWorkingTreeDiff } =
     useWorkspaceActions()

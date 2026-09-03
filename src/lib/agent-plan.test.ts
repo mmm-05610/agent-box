@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 
 import { extractLatestPlanEntriesFromMessages } from "./agent-plan"
-import type { AdaptedMessage } from "@/lib/adapters/ai-elements-adapter"
+import type { AdaptedMessage } from "@/features/session/model/adapters/ai-elements-adapter"
 
 describe("extractLatestPlanEntriesFromMessages", () => {
   it("finds plan updates nested inside a goal run", () => {

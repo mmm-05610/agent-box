@@ -28,7 +28,7 @@
 
 import { extractEmbeddedJsonObject } from "@/lib/embedded-json"
 import { peelMcpResultEnvelope } from "@/lib/mcp-result-envelope"
-import type { ToolCallState } from "@/lib/adapters/ai-elements-adapter"
+import type { ToolCallState } from "@/features/session/model/adapters/ai-elements-adapter"
 
 /**
  * The canonical (post-`normalizeToolName`) names this module covers. Kept in

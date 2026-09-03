@@ -23,10 +23,10 @@ const mockAnswerQuestion = vi.fn()
 const mockSyncCancel = vi.fn()
 const mockSyncTurnMetadata = vi.fn(() => mockSyncCancel)
 
-vi.mock("@/stores/conversation-runtime-store", async () => {
+vi.mock("@/features/session/model/conversation-runtime-store", async () => {
   const actual = await vi.importActual<
-    typeof import("@/stores/conversation-runtime-store")
-  >("@/stores/conversation-runtime-store")
+    typeof import("@/features/session/model/conversation-runtime-store")
+  >("@/features/session/model/conversation-runtime-store")
   return {
     ...actual,
     // Bridge + body pull mutators from the stable actions bundle.
@@ -71,10 +71,10 @@ function notifyStore() {
   for (const cb of storeCallbacks) cb()
 }
 
-vi.mock("@/contexts/acp-connections-context", async () => {
+vi.mock("@/features/session/provider", async () => {
   const actual = await vi.importActual<
-    typeof import("@/contexts/acp-connections-context")
-  >("@/contexts/acp-connections-context")
+    typeof import("@/features/session/provider")
+  >("@/features/session/provider")
   return {
     ...actual,
     useConnectionStore: () => ({

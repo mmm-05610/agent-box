@@ -196,9 +196,21 @@ vi.mock("@/hooks/use-sorted-available-agents", () => ({
   }),
 }))
 
-vi.mock("@/contexts/terminal-context", () => ({
-  useTerminalContext: () => stableTerminal,
-}))
+vi.mock("@/features/shell", () => {
+  // Stable singleton — the real store slice keeps these references stable, so
+  // a fresh object per render would break the list's callback-identity
+  // memoization probes.
+  const routeValue = {
+    routeId: "conversations",
+    isConversations: true,
+    setRoute: () => {},
+    openConversations: () => {},
+  }
+  return {
+    useTerminal: () => stableTerminal,
+    useWorkbenchRoute: () => routeValue,
+  }
+})
 
 vi.mock("@/contexts/task-context", () => ({
   useTaskContext: () => stableTask,
@@ -224,19 +236,6 @@ vi.mock("@/contexts/tab-context", () => ({
       tabs: store.tabSpec.map((t) => ({ ...t })),
     }),
 }))
-vi.mock("@/contexts/workbench-route-context", () => {
-  // Stable singleton — the real provider memoizes these (useCallback([])), so a
-  // fresh object per render would break the list's callback-identity memoization
-  // probes.
-  const value = {
-    routeId: "conversations",
-    isConversations: true,
-    setRoute: () => {},
-    openConversations: () => {},
-  }
-  return { useWorkbenchRoute: () => value }
-})
-
 // These only mount when their state opens (never in these tests); stub to keep
 // the import graph light.
 vi.mock("./conversation-manage-dialog", () => ({

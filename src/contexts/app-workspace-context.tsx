@@ -5,7 +5,7 @@ import { getGitHead } from "@/lib/api"
 import { onTransportReconnect, subscribe } from "@/lib/platform"
 import { useAcpEvent } from "@/contexts/acp-connections-context"
 import { useAppWorkspaceStore } from "@/stores/app-workspace-store"
-import { useConversationRuntimeStore } from "@/stores/conversation-runtime-store"
+import { useConversationRuntimeStore } from "@/features/session/model/conversation-runtime-store"
 import { useTabStore } from "@/stores/tab-store"
 import {
   CONVERSATIONS_BULK_CHANGED_EVENT,

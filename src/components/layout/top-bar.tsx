@@ -17,12 +17,8 @@ import { isDesktop } from "@/lib/platform"
 import { Button } from "@/components/ui/button"
 import { useActiveFolder } from "@/contexts/active-folder-context"
 import { useAppWorkspaceStore } from "@/stores/app-workspace-store"
-import { useAuxPanelContext } from "@/contexts/aux-panel-context"
-import { useSearchDialog } from "@/contexts/search-dialog-context"
-import { useSidebarContext } from "@/contexts/sidebar-context"
+import { useWorkspaceShell } from "@/features/shell"
 import { useTabStore } from "@/stores/tab-store"
-import { useTerminalContext } from "@/contexts/terminal-context"
-import { useWorkbenchRoute } from "@/contexts/workbench-route-context"
 import { WorkbenchRouteChromeActions } from "@/components/workbench/workbench-content"
 import { WindowControls } from "@/components/layout/window-controls"
 import { useIsActiveChatMode } from "@/hooks/use-is-active-chat-mode"
@@ -53,13 +49,20 @@ const GHOST_BUTTON =
  */
 export function TopBar() {
   const t = useTranslations("Folder.folderTitleBar")
-  const { isOpen: sidebarOpen, toggle: toggleSidebar } = useSidebarContext()
-  const { setOpen: setSearchOpen } = useSearchDialog()
+  // Narrow selectors (F4): the bar only paints booleans, so it re-renders on
+  // none of the store's list churn (terminal tabs, automations, tasks).
+  const sidebarOpen = useWorkspaceShell((s) => s.sidebar.isOpen)
+  const toggleSidebar = useWorkspaceShell((s) => s.sidebar.toggle)
+  const setSearchOpen = useWorkspaceShell((s) => s.searchDialog.setOpen)
   const { activeFolder } = useActiveFolder()
   const isChatMode = useIsActiveChatMode()
-  const { isConversations } = useWorkbenchRoute()
-  const { isOpen: auxPanelOpen, toggle: toggleAuxPanel } = useAuxPanelContext()
-  const { isOpen: terminalOpen, toggle: toggleTerminal } = useTerminalContext()
+  const isConversations = useWorkspaceShell(
+    (s) => s.workbenchRoute.isConversations
+  )
+  const auxPanelOpen = useWorkspaceShell((s) => s.auxPanel.isOpen)
+  const toggleAuxPanel = useWorkspaceShell((s) => s.auxPanel.toggle)
+  const terminalOpen = useWorkspaceShell((s) => s.terminal.isOpen)
+  const toggleTerminal = useWorkspaceShell((s) => s.terminal.toggle)
   const isMac = useIsMac()
   const { isMac: platformIsMac } = usePlatform()
   const { shortcuts } = useShortcutSettings()

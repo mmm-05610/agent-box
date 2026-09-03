@@ -10,7 +10,7 @@ import {
   ImageActions,
   useImageActions,
 } from "@/components/message/image-actions"
-import type { UserImageDisplay } from "@/lib/adapters/ai-elements-adapter"
+import type { UserImageDisplay } from "@/features/session/model/adapters/ai-elements-adapter"
 import type { ImageInputAttachment } from "@/components/chat/message-input-attachments"
 
 /** The staged attachment reshaped for the shared transcript image actions. */

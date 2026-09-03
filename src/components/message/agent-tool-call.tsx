@@ -1,5 +1,5 @@
 import { memo, useMemo, useState, type ReactNode } from "react"
-import type { AdaptedContentPart } from "@/lib/adapters/ai-elements-adapter"
+import type { AdaptedContentPart } from "@/features/session/model/adapters/ai-elements-adapter"
 import type { AgentToolCall, AgentType } from "@/lib/types"
 import { tryParseJson, extractJsonField } from "./content-parts-renderer"
 import { SubagentSessionDialog } from "./subagent-session-dialog"

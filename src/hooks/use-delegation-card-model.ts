@@ -17,11 +17,11 @@
 import { useCallback, useMemo, useSyncExternalStore } from "react"
 
 import { type AgentType } from "@/lib/types"
-import type { ToolCallState } from "@/lib/adapters/ai-elements-adapter"
+import type { ToolCallState } from "@/features/session/model/adapters/ai-elements-adapter"
 import {
   useConnectionStore,
   type ConnectionState,
-} from "@/contexts/acp-connections-context"
+} from "@/features/session/provider"
 import { useDelegatedSubSession } from "@/hooks/use-delegated-sub-session"
 import {
   parseDelegateTaskId,

@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl"
 import { ChevronDown, ChevronUp } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-import type { AdaptedContentPart } from "@/lib/adapters/ai-elements-adapter"
+import type { AdaptedContentPart } from "@/features/session/model/adapters/ai-elements-adapter"
 import { useCollapsibleOverflow } from "@/hooks/use-collapsible-overflow"
 
 import { ContentPartsRenderer } from "./content-parts-renderer"

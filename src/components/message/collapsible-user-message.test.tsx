@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "vitest"
 
 import { CollapsibleUserMessage } from "./collapsible-user-message"
 import enMessages from "@/i18n/messages/en.json"
-import type { AdaptedContentPart } from "@/lib/adapters/ai-elements-adapter"
+import type { AdaptedContentPart } from "@/features/session/model/adapters/ai-elements-adapter"
 
 function renderWithIntl(ui: ReactElement) {
   return render(

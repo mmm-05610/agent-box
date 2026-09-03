@@ -13,7 +13,7 @@ import { Reorder, type PanInfo } from "motion/react"
 import { useTranslations } from "next-intl"
 import { toast } from "sonner"
 import { Funnel, Play, Plus, ListTodo, Tag } from "lucide-react"
-import { useTasksView } from "@/contexts/tasks-view-context"
+import { useTasksView } from "@/features/shell"
 import { useAppWorkspaceStore } from "@/stores/app-workspace-store"
 import {
   workTaskArchive,

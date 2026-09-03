@@ -1,6 +1,6 @@
 import { act, renderHook } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
-import type { ConnectionState } from "@/contexts/acp-connections-context"
+import type { ConnectionState } from "@/features/session/provider"
 
 // Minimal fake connection store: one mutable connection + a listener set the
 // hook subscribes to. `setConn` mutates and notifies (like a dispatch would).
@@ -28,7 +28,7 @@ const fake = vi.hoisted(() => {
   }
 })
 
-vi.mock("@/contexts/acp-connections-context", () => {
+vi.mock("@/features/session/provider", () => {
   // A STABLE actions object (same reference every call) so useConnection's
   // callback memos keep a stable identity across renders. Without this the final
   // useMemo would churn on every render regardless of the snapshot, and a

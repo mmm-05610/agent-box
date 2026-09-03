@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest"
 
 import { CollabAgentCard } from "./collab-agent-card"
 import { COLLAB_OP_KEY } from "@/lib/collab-tool"
-import type { ToolCallState } from "@/lib/adapters/ai-elements-adapter"
+import type { ToolCallState } from "@/features/session/model/adapters/ai-elements-adapter"
 import enMessages from "@/i18n/messages/en.json"
 
 function renderCard(props: {

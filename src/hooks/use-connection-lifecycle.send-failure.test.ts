@@ -37,7 +37,7 @@ vi.mock("next-intl", () => ({
 
 const sendPrompt = vi.fn()
 
-vi.mock("@/contexts/acp-connections-context", () => ({
+vi.mock("@/features/session/provider", () => ({
   useAcpActions: () => ({ setActiveKey: vi.fn(), touchActivity: vi.fn() }),
 }))
 

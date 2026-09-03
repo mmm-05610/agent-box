@@ -4,7 +4,7 @@ import { NextIntlClientProvider } from "next-intl"
 import { describe, expect, it } from "vitest"
 
 import enMessages from "@/i18n/messages/en.json"
-import type { AdaptedContentPart } from "@/lib/adapters/ai-elements-adapter"
+import type { AdaptedContentPart } from "@/features/session/model/adapters/ai-elements-adapter"
 import {
   CompletedTurnContent,
   splitAssistantTurnParts,

@@ -66,7 +66,7 @@ vi.mock("@/contexts/workspace-context", () => ({
   }),
 }))
 
-vi.mock("@/contexts/acp-connections-context", () => ({
+vi.mock("@/features/session/provider", () => ({
   useAcpActions: () => ({
     disconnect: disconnectMock,
   }),

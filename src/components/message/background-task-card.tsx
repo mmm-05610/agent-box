@@ -31,7 +31,7 @@ import {
 import { useTranslations } from "next-intl"
 
 import { cn } from "@/lib/utils"
-import type { AdaptedToolCallPart } from "@/lib/adapters/ai-elements-adapter"
+import type { AdaptedToolCallPart } from "@/features/session/model/adapters/ai-elements-adapter"
 import {
   buildBackgroundTaskRows,
   type BackgroundTaskRow,

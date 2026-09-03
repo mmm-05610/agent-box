@@ -2,7 +2,7 @@ import type {
   AdaptedContentPart,
   UserImageDisplay,
   UserResourceDisplay,
-} from "@/lib/adapters/ai-elements-adapter"
+} from "@/features/session/model/adapters/ai-elements-adapter"
 import type { PromptDraft, PromptInputBlock } from "@/lib/types"
 
 function isResourceLinkBlock(

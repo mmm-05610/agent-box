@@ -4,17 +4,13 @@ import { useCallback, useEffect, useState } from "react"
 import { openSettingsWindow } from "@/lib/api"
 import { useActiveFolder } from "@/contexts/active-folder-context"
 import { useIsActiveChatMode } from "@/hooks/use-is-active-chat-mode"
-import { useSidebarContext } from "@/contexts/sidebar-context"
-import { useAuxPanelContext } from "@/contexts/aux-panel-context"
-import { useTerminalContext } from "@/contexts/terminal-context"
+import { useWorkspaceShell } from "@/features/shell"
 import { useTabActions, useTabStore } from "@/contexts/tab-context"
 import {
   useWorkspaceActions,
   useWorkspaceFileTabs,
   useWorkspaceView,
 } from "@/contexts/workspace-context"
-import { useWorkbenchRoute } from "@/contexts/workbench-route-context"
-import { useSearchDialog } from "@/contexts/search-dialog-context"
 import { useShortcutSettings } from "@/hooks/use-shortcut-settings"
 import {
   isConversationDeleted,
@@ -40,9 +36,9 @@ import { WorkspaceFolderDialog } from "@/components/layout/workspace-folder-dial
 export function WorkspaceChromeController() {
   const { activeFolder } = useActiveFolder()
   const isChatMode = useIsActiveChatMode()
-  const { toggle } = useSidebarContext()
-  const { toggle: toggleAuxPanel } = useAuxPanelContext()
-  const { toggle: toggleTerminal } = useTerminalContext()
+  const toggleSidebar = useWorkspaceShell((s) => s.sidebar.toggle)
+  const toggleAuxPanel = useWorkspaceShell((s) => s.auxPanel.toggle)
+  const toggleTerminal = useWorkspaceShell((s) => s.terminal.toggle)
   const { openNewConversationTab, openTab, switchTab, closeTab } =
     useTabActions()
   const tabs = useTabStore((s) => s.tabs)
@@ -54,12 +50,15 @@ export function WorkspaceChromeController() {
   const { activeFileTabId, fileTabs } = useWorkspaceFileTabs()
   const { closeFileTab, closeAllFileTabs, switchFileTab, openFilePreview } =
     useWorkspaceActions()
-  const { openConversations } = useWorkbenchRoute()
+  const openConversations = useWorkspaceShell(
+    (s) => s.workbenchRoute.openConversations
+  )
   const { shortcuts } = useShortcutSettings()
-  // Search open-state is shared (see search-dialog-context): the trigger lives
+  // Search open-state is shared (workspace-shell store): the trigger lives
   // in the sidebar, but this always-mounted controller owns the dialog and the
   // ⌘K shortcut so search works even when the sidebar is collapsed.
-  const { open: searchOpen, setOpen: setSearchOpen } = useSearchDialog()
+  const searchOpen = useWorkspaceShell((s) => s.searchDialog.open)
+  const setSearchOpen = useWorkspaceShell((s) => s.searchDialog.setOpen)
   const [browserOpen, setBrowserOpen] = useState(false)
 
   // One dialog on every platform: it owns directory selection *and* the
@@ -82,7 +81,7 @@ export function WorkspaceChromeController() {
       }
       if (matchShortcutEvent(e, shortcuts.toggle_sidebar)) {
         e.preventDefault()
-        toggle()
+        toggleSidebar()
         return
       }
       if (matchShortcutEvent(e, shortcuts.toggle_terminal)) {
@@ -253,7 +252,7 @@ export function WorkspaceChromeController() {
     openFilePreview,
     setSearchOpen,
     shortcuts,
-    toggle,
+    toggleSidebar,
     toggleAuxPanel,
     toggleTerminal,
     isChatMode,

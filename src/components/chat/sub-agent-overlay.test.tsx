@@ -14,10 +14,10 @@ vi.mock("@/hooks/use-delegated-sub-session", () => ({
   useDelegatedSubSession: vi.fn(),
 }))
 
-vi.mock("@/contexts/acp-connections-context", async () => {
+vi.mock("@/features/session/provider", async () => {
   const actual = await vi.importActual<
-    typeof import("@/contexts/acp-connections-context")
-  >("@/contexts/acp-connections-context")
+    typeof import("@/features/session/provider")
+  >("@/features/session/provider")
   return {
     ...actual,
     useConnectionStore: () => ({

@@ -4,7 +4,7 @@ import { useState } from "react"
 import Image from "next/image"
 import { Download } from "lucide-react"
 import { useTranslations } from "next-intl"
-import type { UserImageDisplay } from "@/lib/adapters/ai-elements-adapter"
+import type { UserImageDisplay } from "@/features/session/model/adapters/ai-elements-adapter"
 import { ImagePreviewDialog } from "@/components/ui/image-preview-dialog"
 import { ImageActions, useImageActions } from "./image-actions"
 

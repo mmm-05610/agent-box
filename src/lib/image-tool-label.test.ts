@@ -5,8 +5,8 @@ import {
   isImageGenerationTitle,
   pathFromToolInput,
 } from "./image-tool-label"
-import { adaptMessageTurn } from "@/lib/adapters/ai-elements-adapter"
-import { buildStreamingTurnsFromLiveMessage } from "@/stores/conversation-runtime-store"
+import { adaptMessageTurn } from "@/features/session/model/adapters/ai-elements-adapter"
+import { buildStreamingTurnsFromLiveMessage } from "@/features/session/model/conversation-runtime-store"
 
 describe("isImageGenerationTitle", () => {
   it("matches the hardcoded codex-acp title only", () => {

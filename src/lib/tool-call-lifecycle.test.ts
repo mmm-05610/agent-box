@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 
 import { isUnsettledToolCall, toolStatusUnsettled } from "./tool-call-lifecycle"
-import type { AdaptedToolCallPart } from "@/lib/adapters/ai-elements-adapter"
+import type { AdaptedToolCallPart } from "@/features/session/model/adapters/ai-elements-adapter"
 
 function part(over: Partial<AdaptedToolCallPart> = {}): AdaptedToolCallPart {
   return {

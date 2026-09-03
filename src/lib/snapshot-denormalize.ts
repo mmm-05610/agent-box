@@ -22,7 +22,7 @@ import type {
   PendingPermission,
   PendingUserMessage,
   ToolCallInfo,
-} from "@/contexts/acp-connections-context"
+} from "@/features/session/provider"
 
 /**
  * Snapshot-derived subset of ConnectionState. Fields not present here

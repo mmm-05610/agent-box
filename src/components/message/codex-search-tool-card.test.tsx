@@ -42,7 +42,7 @@ vi.mock("@/components/ai-elements/message", () => ({
 
 import { ContentPartsRenderer } from "./content-parts-renderer"
 import enMessages from "@/i18n/messages/en.json"
-import type { AdaptedContentPart } from "@/lib/adapters/ai-elements-adapter"
+import type { AdaptedContentPart } from "@/features/session/model/adapters/ai-elements-adapter"
 
 /** Search cards are collapsed by default; expand so the body is asserted on. */
 function renderParts(parts: AdaptedContentPart[], expand = true) {

@@ -5,7 +5,7 @@ import { useShallow } from "zustand/react/shallow"
 import {
   useConversationRuntimeActions,
   useConversationRuntimeStore,
-} from "@/stores/conversation-runtime-store"
+} from "@/features/session/model/conversation-runtime-store"
 import type { DbConversationDetail } from "@/lib/types"
 
 function isVirtualConversationId(conversationId: number): boolean {

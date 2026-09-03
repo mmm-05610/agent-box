@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback } from "react"
-import { useWorkbenchRoute } from "@/contexts/workbench-route-context"
+import { useWorkbenchRoute } from "@/features/shell"
 import { useAppWorkspaceStore } from "@/stores/app-workspace-store"
 import { useTabStore } from "@/stores/tab-store"
 import { requestCreateTaskFromText } from "@/lib/task-compose-events"

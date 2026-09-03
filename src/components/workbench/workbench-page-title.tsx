@@ -3,7 +3,7 @@
 import { ChevronRight, MessagesSquare } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { Button } from "@/components/ui/button"
-import { useWorkbenchRoute } from "@/contexts/workbench-route-context"
+import { useWorkbenchRoute } from "@/features/shell"
 
 interface WorkbenchPageTitleProps {
   title: string

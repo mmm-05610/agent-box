@@ -71,7 +71,7 @@ vi.mock("@/contexts/tab-context", () => ({
   useTabActions: () => ({ openNewConversationTab: vi.fn() }),
 }))
 
-vi.mock("@/contexts/workbench-route-context", () => ({
+vi.mock("@/features/shell", () => ({
   useWorkbenchRoute: () => ({ openConversations: vi.fn() }),
 }))
 

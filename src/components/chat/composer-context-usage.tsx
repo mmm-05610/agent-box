@@ -5,7 +5,7 @@ import { Coins } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { useConnectionStore } from "@/contexts/acp-connections-context"
 import { useTabStore } from "@/contexts/tab-context"
-import { useConversationRuntimeStore } from "@/stores/conversation-runtime-store"
+import { useConversationRuntimeStore } from "@/features/session/model/conversation-runtime-store"
 import { formatTokenCount } from "@/lib/token-format"
 import { formatContextWindowPercent } from "@/lib/context-window"
 import {

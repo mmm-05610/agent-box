@@ -33,8 +33,7 @@ import {
   X,
   Zap,
 } from "lucide-react"
-import { useAutomationsView } from "@/contexts/automations-view-context"
-import { useWorkbenchRoute } from "@/contexts/workbench-route-context"
+import { useAutomationsView, useWorkbenchRoute } from "@/features/shell"
 import { useTabActions } from "@/contexts/tab-context"
 import { useAppWorkspaceStore } from "@/stores/app-workspace-store"
 import { AutomationEditor } from "./automation-editor"

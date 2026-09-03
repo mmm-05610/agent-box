@@ -21,9 +21,9 @@ vi.mock("@/components/agent-icon", () => ({ AgentIcon: () => null }))
 // the API so an accidental call is inert rather than a real transport hit.
 vi.mock("@/lib/api", () => ({ getFolderConversation: vi.fn() }))
 
-vi.mock("@/contexts/aux-panel-context", () => ({ useAuxPanelContext: vi.fn() }))
+vi.mock("@/features/shell", () => ({ useAuxPanel: vi.fn() }))
 vi.mock("@/contexts/tab-context", () => ({ useTabStore: vi.fn() }))
-vi.mock("@/stores/conversation-runtime-store", () => ({
+vi.mock("@/features/session/model/conversation-runtime-store", () => ({
   useConversationRuntimeStore: vi.fn(),
 }))
 vi.mock("@/stores/app-workspace-store", () => ({
@@ -31,12 +31,12 @@ vi.mock("@/stores/app-workspace-store", () => ({
 }))
 
 import { SessionDetailsTab } from "./aux-panel-session-details-tab"
-import { useAuxPanelContext } from "@/contexts/aux-panel-context"
+import { useAuxPanel } from "@/features/shell"
 import { useTabStore } from "@/contexts/tab-context"
-import { useConversationRuntimeStore } from "@/stores/conversation-runtime-store"
+import { useConversationRuntimeStore } from "@/features/session/model/conversation-runtime-store"
 import { useAppWorkspaceStore } from "@/stores/app-workspace-store"
 
-const mockAux = useAuxPanelContext as unknown as Mock
+const mockAux = useAuxPanel as unknown as Mock
 const mockTabs = useTabStore as unknown as Mock
 const mockRuntime = useConversationRuntimeStore as unknown as Mock
 const mockWorkspace = useAppWorkspaceStore as unknown as Mock

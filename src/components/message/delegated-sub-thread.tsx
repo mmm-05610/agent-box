@@ -24,7 +24,7 @@ import { Eye } from "lucide-react"
 import { useTranslations } from "next-intl"
 
 import { AgentIcon } from "@/components/agent-icon"
-import type { ToolCallState } from "@/lib/adapters/ai-elements-adapter"
+import type { ToolCallState } from "@/features/session/model/adapters/ai-elements-adapter"
 import { StatusBadge } from "@/components/message/delegation-status-badge"
 import { SubAgentSessionDialog } from "@/components/message/sub-agent-session-dialog"
 import { useSessionViewerHost } from "@/components/message/session-viewer-host"

@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl"
 import { Kanban, List, Settings2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { useTasksView } from "@/contexts/tasks-view-context"
+import { useTasksView } from "@/features/shell"
 import type { WorkbenchChromeActionsProps } from "@/components/workbench/workbench-content"
 
 /** Fired by the chrome cluster's settings button; TasksPage owns the dialog

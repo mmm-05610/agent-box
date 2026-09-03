@@ -33,7 +33,7 @@ import {
 } from "@/lib/collab-tool"
 import { MessageResponse } from "@/components/ai-elements/message"
 import { AgentCapsule } from "./agent-capsule"
-import type { ToolCallState } from "@/lib/adapters/ai-elements-adapter"
+import type { ToolCallState } from "@/features/session/model/adapters/ai-elements-adapter"
 
 interface Props {
   input?: string | null

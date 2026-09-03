@@ -3,7 +3,7 @@ import type {
   LiveContentBlock,
   LiveMessage,
   ToolCallInfo,
-} from "@/contexts/acp-connections-context"
+} from "@/features/session/model/connection-types"
 import { getFolderConversation, getFolderConversationTurns } from "@/lib/api"
 import { registerBackendScopedStoreReset } from "@/stores/backend-scoped-store-reset"
 import type {

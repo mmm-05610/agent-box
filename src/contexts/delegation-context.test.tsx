@@ -17,7 +17,7 @@ let capturedHandler: ((envelope: EventEnvelope) => void) | null = null
 const mockAttach = vi.fn()
 const mockDetach = vi.fn()
 
-vi.mock("@/contexts/acp-connections-context", () => ({
+vi.mock("@/features/session/provider", () => ({
   useAcpActions: () => ({
     attachDelegationChild: mockAttach,
     detachDelegationChild: mockDetach,

@@ -26,9 +26,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useActiveFolder } from "@/contexts/active-folder-context"
-import { useAutomationsView } from "@/contexts/automations-view-context"
-import { useTasksView } from "@/contexts/tasks-view-context"
-import { useWorkbenchRoute } from "@/contexts/workbench-route-context"
+import {
+  useAutomationsView,
+  useTasksView,
+  useWorkbenchRoute,
+} from "@/features/shell"
 import { useRemoteWorkspaceConnections } from "@/hooks/use-remote-workspace-connections"
 import { openImportSessionsWindow } from "@/lib/api"
 import { CloneDialog } from "./clone-dialog"

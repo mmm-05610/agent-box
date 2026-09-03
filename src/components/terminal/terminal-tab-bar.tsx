@@ -5,7 +5,7 @@ import { Minus, Plus, X } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { useActiveFolder } from "@/contexts/active-folder-context"
 import { useAppWorkspaceStore } from "@/stores/app-workspace-store"
-import { useTerminalContext } from "@/contexts/terminal-context"
+import { useTerminal } from "@/features/shell"
 import { useShortcutSettings } from "@/hooks/use-shortcut-settings"
 import { useIsMac } from "@/hooks/use-is-mac"
 import { useImeGuard } from "@/hooks/use-ime-guard"
@@ -41,7 +41,7 @@ export function TerminalTabBar() {
     renameTerminal,
     createTerminal,
     toggle,
-  } = useTerminalContext()
+  } = useTerminal()
   const { activeFolderId } = useActiveFolder()
   const folders = useAppWorkspaceStore((s) => s.folders)
 

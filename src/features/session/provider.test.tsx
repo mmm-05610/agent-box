@@ -6,7 +6,7 @@ import {
   AcpConnectionsProvider,
   useAcpActions,
   useConnectionStore,
-} from "@/contexts/acp-connections-context"
+} from "./provider"
 import {
   CONNECTION_IDLE_TIMEOUT_MS,
   IDLE_SWEEP_INTERVAL_MS,
@@ -1903,7 +1903,7 @@ describe("out-of-turn wire guard + background activity", () => {
 
   it("background_activity mirrors outstanding, applies overlay turns, and notifies settled tasks", async () => {
     const { useConversationRuntimeStore, resetConversationRuntimeStore } =
-      await import("@/stores/conversation-runtime-store")
+      await import("@/features/session/model/conversation-runtime-store")
     const { sendSystemNotification } = await import("@/lib/notification")
     const notify = vi.mocked(sendSystemNotification)
     notify.mockClear()

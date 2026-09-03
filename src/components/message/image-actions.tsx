@@ -17,7 +17,7 @@ import {
 } from "@/lib/copy-image"
 import { downloadImage } from "@/lib/image-download"
 import { toErrorMessage } from "@/lib/app-error"
-import type { UserImageDisplay } from "@/lib/adapters/ai-elements-adapter"
+import type { UserImageDisplay } from "@/features/session/model/adapters/ai-elements-adapter"
 
 /**
  * The copy/download pair behind every transcript image, shared by the

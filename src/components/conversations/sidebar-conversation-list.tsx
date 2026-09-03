@@ -43,8 +43,7 @@ import {
 import { useActiveFolder } from "@/contexts/active-folder-context"
 import { useAppWorkspaceStore } from "@/stores/app-workspace-store"
 import { useTabActions, useTabStore } from "@/contexts/tab-context"
-import { useWorkbenchRoute } from "@/contexts/workbench-route-context"
-import { useTerminalContext } from "@/contexts/terminal-context"
+import { useWorkbenchRoute, useTerminal } from "@/features/shell"
 import { useThemeColor, useZoomLevel } from "@/hooks/use-appearance"
 import { useSortedAvailableAgents } from "@/hooks/use-sorted-available-agents"
 import { useImeGuard } from "@/hooks/use-ime-guard"
@@ -872,7 +871,7 @@ export function SidebarConversationList({
   const tFileTree = useTranslations("Folder.fileTreeTab")
   const tRemote = useTranslations("RemoteWorkspace")
   const { themeColor: appThemeColor } = useThemeColor()
-  const { createTerminalInDirectory } = useTerminalContext()
+  const { createTerminalInDirectory } = useTerminal()
   const { zoomLevel } = useZoomLevel()
   const folders = useAppWorkspaceStore((s) => s.folders)
   const allFolders = useAppWorkspaceStore((s) => s.allFolders)

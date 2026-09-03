@@ -42,7 +42,7 @@ import {
 import {
   adaptMessageTurns,
   type AdaptedMessage,
-} from "@/lib/adapters/ai-elements-adapter"
+} from "@/features/session/model/adapters/ai-elements-adapter"
 import { getConversation } from "@/lib/api"
 import { toolStatusUnsettled } from "@/lib/tool-call-lifecycle"
 import type { AgentType, MessageTurn } from "@/lib/types"

@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest"
 
 import { GeneratedImagesBlock } from "./generated-images-block"
 import enMessages from "@/i18n/messages/en.json"
-import type { UserImageDisplay } from "@/lib/adapters/ai-elements-adapter"
+import type { UserImageDisplay } from "@/features/session/model/adapters/ai-elements-adapter"
 
 const image: UserImageDisplay = {
   name: "page-capture.png",

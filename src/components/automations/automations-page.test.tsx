@@ -24,10 +24,8 @@ import {
 const refetch = vi.fn().mockResolvedValue(undefined)
 let automations: Automation[] = []
 
-vi.mock("@/contexts/automations-view-context", () => ({
+vi.mock("@/features/shell", () => ({
   useAutomationsView: () => ({ automations, unseenFailures: 0, refetch }),
-}))
-vi.mock("@/contexts/workbench-route-context", () => ({
   useWorkbenchRoute: () => ({ openConversations: vi.fn() }),
 }))
 vi.mock("@/contexts/tab-context", () => ({

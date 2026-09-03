@@ -5,7 +5,7 @@ import {
   selectTimelineTurns,
   useConversationRuntimeActions,
   useConversationRuntimeStore,
-} from "@/stores/conversation-runtime-store"
+} from "@/features/session/model/conversation-runtime-store"
 import { isWindowedDetail } from "@/lib/turn-window"
 import { CompletedTurnContent } from "./completed-turn-content"
 import { ContextCompactionCard } from "./context-compaction-card"
@@ -23,7 +23,7 @@ import {
   type MessageTurnAdapter,
   type UserImageDisplay,
   type UserResourceDisplay,
-} from "@/lib/adapters/ai-elements-adapter"
+} from "@/features/session/model/adapters/ai-elements-adapter"
 import { TurnStats } from "./turn-stats"
 import { LiveTurnStats } from "./live-turn-stats"
 import { ReplyArtifacts } from "./reply-artifacts"

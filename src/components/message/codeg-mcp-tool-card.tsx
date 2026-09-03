@@ -34,7 +34,7 @@ import {
   parseCodegMcpToolCall,
   type CodegMcpWorkbenchTool,
 } from "@/lib/codeg-mcp-tool"
-import type { ToolCallState } from "@/lib/adapters/ai-elements-adapter"
+import type { ToolCallState } from "@/features/session/model/adapters/ai-elements-adapter"
 import { MessageResponse } from "@/components/ai-elements/message"
 import { Shimmer } from "@/components/ai-elements/shimmer"
 import { StatusBadge } from "@/components/message/delegation-status-badge"

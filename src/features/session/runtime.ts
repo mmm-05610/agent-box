@@ -150,6 +150,45 @@ export class CodegRustSessionRuntime implements SessionRuntime {
     return this.contextKey
   }
 
+  // ── F3 挂接：adopt 模式（provider 命令路由的过渡缝）──
+
+  /**
+   * 绑定一条「外部建立」的后端连接，只承接命令路由（sendPrompt /
+   * cancel / respondPermission 直达该 connectionId）。F3 把 provider
+   * （features/session/provider.tsx）的连接生命周期整体迁入
+   * features/session 时沿用其既有的 connect / viewer 发现 / delegation
+   * attach 接线——事件流仍由那条接线供养 UI store；事件消费迁入
+   * runtime 是绞杀者的后续切片。幂等：后一次 adopt 覆盖前一次
+   * （REKEY_CONNECTION 后 provider 会以新键重新 adopt）。
+   */
+  adopt(options: { connectionId: string; contextKey: string }): void {
+    this.connectionId = options.connectionId
+    this.contextKey = options.contextKey
+  }
+
+  /**
+   * F3 过渡命令面：composer 真实形状的 prompt——结构化 blocks 加
+   * DB 链接字段（folder/conversation/clientMessageId），§4.1 的
+   * `send(ComposerInput)` 归一化入口保持不变。
+   */
+  async sendPrompt(
+    blocks: PromptInputBlock[],
+    opts?: {
+      folderId?: number | null
+      conversationId?: number | null
+      clientMessageId?: string | null
+    }
+  ): Promise<void> {
+    const connectionId = this.requireConnection()
+    await this.transport.call("acp_prompt", {
+      connectionId,
+      blocks,
+      folderId: opts?.folderId ?? null,
+      conversationId: opts?.conversationId ?? null,
+      clientMessageId: opts?.clientMessageId ?? null,
+    })
+  }
+
   // ── 生命周期 ──
 
   async connect(spec: SessionSpec): Promise<void> {

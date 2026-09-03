@@ -45,7 +45,7 @@ vi.mock("@/stores/app-workspace-store", () => {
   useStore.getState = () => state
   return { useAppWorkspaceStore: useStore }
 })
-vi.mock("@/stores/conversation-runtime-store", () => ({
+vi.mock("@/features/session/model/conversation-runtime-store", () => ({
   getRuntimeSession: () => null,
 }))
 vi.mock("./session-details-dialog", () => ({

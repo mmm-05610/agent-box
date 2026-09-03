@@ -4,7 +4,7 @@ import { memo } from "react"
 import { useTranslations } from "next-intl"
 import { ChevronDownIcon, ChevronUpIcon, ListTodoIcon } from "lucide-react"
 
-import type { ToolCallState } from "@/lib/adapters/ai-elements-adapter"
+import type { ToolCallState } from "@/features/session/model/adapters/ai-elements-adapter"
 import { asRecord, extractPlanMarkdown } from "@/lib/plan-parse"
 import { MessageResponse } from "@/components/ai-elements/message"
 import { useCollapsibleOverflow } from "@/hooks/use-collapsible-overflow"

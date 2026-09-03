@@ -11,7 +11,7 @@ vi.mock("@/components/ai-elements/link-safety", () => ({
 
 import { PlanModeCard } from "./plan-mode-card"
 import enMessages from "@/i18n/messages/en.json"
-import type { ToolCallState } from "@/lib/adapters/ai-elements-adapter"
+import type { ToolCallState } from "@/features/session/model/adapters/ai-elements-adapter"
 
 function renderCard(props: {
   toolName: string

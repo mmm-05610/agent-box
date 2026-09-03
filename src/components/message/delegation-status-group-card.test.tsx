@@ -7,7 +7,7 @@ import { DelegationStatusGroupCard } from "./delegation-status-group-card"
 import type {
   AdaptedToolCallPart,
   ToolCallState,
-} from "@/lib/adapters/ai-elements-adapter"
+} from "@/features/session/model/adapters/ai-elements-adapter"
 import enMessages from "@/i18n/messages/en.json"
 
 // Same rationale as delegation-status-card.test.tsx: stub the heavy Markdown

@@ -25,7 +25,7 @@
 import { useTranslations } from "next-intl"
 import { Archive } from "lucide-react"
 
-import type { ToolCallState } from "@/lib/adapters/ai-elements-adapter"
+import type { ToolCallState } from "@/features/session/model/adapters/ai-elements-adapter"
 import { contextCompactionPayload } from "@/lib/context-compaction"
 
 // `isContextCompactionMeta` now lives in the dependency-free

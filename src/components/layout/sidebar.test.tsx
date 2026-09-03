@@ -62,8 +62,24 @@ vi.mock("@/components/conversations/sidebar-conversation-list", async () => {
     },
   }
 })
-vi.mock("@/contexts/sidebar-context", () => ({
-  useSidebarContext: () => ({ isOpen: true, toggle: vi.fn() }),
+vi.mock("@/features/shell", () => ({
+  useSidebar: () => ({ isOpen: true, toggle: vi.fn() }),
+  useAutomationsView: () => ({
+    automations: [],
+    unseenFailures: 0,
+    refetch: async () => {},
+  }),
+  useTasksView: () => ({
+    tasks: [],
+    attentionCount: 0,
+    refetch: async () => {},
+  }),
+  useWorkbenchRoute: () => ({
+    routeId: "conversations",
+    isConversations: true,
+    setRoute: spies.setRoute,
+    openConversations: spies.openConversations,
+  }),
 }))
 vi.mock("@/contexts/active-folder-context", () => ({
   useActiveFolder: () => ({ activeFolder: mockState.activeFolder }),
@@ -72,28 +88,6 @@ vi.mock("@/contexts/tab-context", () => ({
   useTabActions: () => ({
     openNewConversationTab: spies.openNewConversationTab,
     openChatModeTab: spies.openChatModeTab,
-  }),
-}))
-vi.mock("@/contexts/automations-view-context", () => ({
-  useAutomationsView: () => ({
-    automations: [],
-    unseenFailures: 0,
-    refetch: async () => {},
-  }),
-}))
-vi.mock("@/contexts/tasks-view-context", () => ({
-  useTasksView: () => ({
-    tasks: [],
-    attentionCount: 0,
-    refetch: async () => {},
-  }),
-}))
-vi.mock("@/contexts/workbench-route-context", () => ({
-  useWorkbenchRoute: () => ({
-    routeId: "conversations",
-    isConversations: true,
-    setRoute: spies.setRoute,
-    openConversations: spies.openConversations,
   }),
 }))
 vi.mock("@/hooks/use-is-mac", () => ({ useIsMac: () => false }))

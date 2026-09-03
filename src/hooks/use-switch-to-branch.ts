@@ -8,7 +8,7 @@ import { toErrorMessage } from "@/lib/app-error"
 import { planBranchSwitch } from "@/lib/branch-switch"
 import { useAppWorkspaceStore } from "@/stores/app-workspace-store"
 import { useTabActions } from "@/contexts/tab-context"
-import { useWorkbenchRoute } from "@/contexts/workbench-route-context"
+import { useWorkbenchRoute } from "@/features/shell"
 import { useTaskContext } from "@/contexts/task-context"
 import type { FolderDetail, WorktreeResolution } from "@/lib/types"
 

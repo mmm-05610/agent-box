@@ -19,7 +19,7 @@
  * through untouched, so non-codex agents are entirely unaffected.
  */
 
-import type { LiveContentBlock } from "@/contexts/acp-connections-context"
+import type { LiveContentBlock } from "@/features/session/provider"
 import {
   isCodexCollabInput,
   parseCollabToolInput,

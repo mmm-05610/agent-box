@@ -1,7 +1,7 @@
 "use client"
 
 import { FileSearch } from "lucide-react"
-import type { UserResourceDisplay } from "@/lib/adapters/ai-elements-adapter"
+import type { UserResourceDisplay } from "@/features/session/model/adapters/ai-elements-adapter"
 
 interface UserResourceLinksProps {
   resources: UserResourceDisplay[]

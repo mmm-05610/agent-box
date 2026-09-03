@@ -8,7 +8,7 @@
  * imports `background-task.ts`).
  */
 
-import type { AdaptedToolCallPart } from "@/lib/adapters/ai-elements-adapter"
+import type { AdaptedToolCallPart } from "@/features/session/model/adapters/ai-elements-adapter"
 
 /**
  * Whether a forwarded ACP tool status is present and not yet terminal. Absent

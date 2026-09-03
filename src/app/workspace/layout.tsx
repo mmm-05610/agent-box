@@ -25,27 +25,18 @@ import {
 import { DelegationProvider } from "@/contexts/delegation-context"
 import { ConversationRuntimeProvider } from "@/contexts/conversation-runtime-context"
 import { TabProvider, useTabStore } from "@/contexts/tab-context"
-import { SidebarProvider, useSidebarContext } from "@/contexts/sidebar-context"
-import { SearchDialogProvider } from "@/contexts/search-dialog-context"
-import { AutomationsViewProvider } from "@/contexts/automations-view-context"
-import { TasksViewProvider } from "@/contexts/tasks-view-context"
 import {
-  WorkbenchRouteProvider,
+  WorkspaceShellRuntime,
+  useSidebar,
+  useAuxPanel,
+  useTerminal,
   useWorkbenchRoute,
-} from "@/contexts/workbench-route-context"
+} from "@/features/shell"
 import {
   WorkbenchRoutePage,
   WorkbenchRouteStrip,
   useHasWorkbenchRouteStrip,
 } from "@/components/workbench/workbench-content"
-import {
-  AuxPanelProvider,
-  useAuxPanelContext,
-} from "@/contexts/aux-panel-context"
-import {
-  TerminalProvider,
-  useTerminalContext,
-} from "@/contexts/terminal-context"
 import { GitCredentialProvider } from "@/contexts/git-credential-context"
 import {
   WorkspaceProvider,
@@ -464,7 +455,7 @@ function FolderWorkspaceShell({ children }: { children: React.ReactNode }) {
     minWidth: sidebarMinWidth,
     maxWidth: sidebarMaxWidth,
     setWidth: setSidebarWidth,
-  } = useSidebarContext()
+  } = useSidebar()
   const {
     isOpen: auxOpenRequested,
     restored: auxRestored,
@@ -472,14 +463,14 @@ function FolderWorkspaceShell({ children }: { children: React.ReactNode }) {
     minWidth: auxMinWidth,
     maxWidth: auxMaxWidth,
     setWidth: setAuxWidth,
-  } = useAuxPanelContext()
+  } = useAuxPanel()
   const {
     isOpen: terminalOpenRequested,
     height: terminalHeight,
     minHeight: terminalMinHeight,
     maxHeight: terminalMaxHeight,
     setHeight: setTerminalHeight,
-  } = useTerminalContext()
+  } = useTerminal()
   // A full-page workbench route (tasks / automations) replaces only the CENTER
   // panel — the terminal sits below it and the aux panel beside it, both
   // outside the overlay. Their toggles are hidden on those routes
@@ -1005,28 +996,20 @@ function WorkspaceLayoutInner({ children }: { children: React.ReactNode }) {
                       {/* Always mounted: external-change conflicts must be
                             resolvable even with the aux file tree closed. */}
                       <ExternalConflictDialog />
-                      <SidebarProvider>
-                        <AuxPanelProvider>
-                          <TerminalProvider>
-                            <SearchDialogProvider>
-                              <AutomationsViewProvider>
-                                <TasksViewProvider>
-                                  <WorkbenchRouteProvider>
-                                    <WorkbenchRouteConversationSync />
-                                    {/* Inside WorkbenchRouteProvider: the
-                                          listener calls openConversations() to
-                                          surface a launcher-opened folder. */}
-                                    <WorkspaceOpenFolderListener />
-                                    <FolderLayoutShell>
-                                      {children}
-                                    </FolderLayoutShell>
-                                  </WorkbenchRouteProvider>
-                                </TasksViewProvider>
-                              </AutomationsViewProvider>
-                            </SearchDialogProvider>
-                          </TerminalProvider>
-                        </AuxPanelProvider>
-                      </SidebarProvider>
+                      {/* F4: the seven former shell providers (sidebar /
+                            aux / terminal / search-dialog / automations-view /
+                            tasks-view / workbench-route) collapsed into the
+                            single workspace-shell zustand store. This headless
+                            controller runs their mount-time wiring — persisted
+                            panel hydration, realtime badge sync, terminal
+                            hotkeys — so the badges and shortcuts stay alive no
+                            matter which route is showing. */}
+                      <WorkspaceShellRuntime />
+                      <WorkbenchRouteConversationSync />
+                      {/* Calls openConversations() to surface a
+                            launcher-opened folder. */}
+                      <WorkspaceOpenFolderListener />
+                      <FolderLayoutShell>{children}</FolderLayoutShell>
                     </TabProvider>
                   </WorkspaceProvider>
                 </ConversationRuntimeProvider>

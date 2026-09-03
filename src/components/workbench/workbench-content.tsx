@@ -4,7 +4,7 @@ import type { ComponentType } from "react"
 import {
   useWorkbenchRoute,
   type WorkbenchRouteId,
-} from "@/contexts/workbench-route-context"
+} from "@/features/shell"
 import {
   AutomationsPage,
   AutomationsPageTitle,

@@ -22,7 +22,7 @@ import type {
   PendingPermission,
   PendingQuestion,
   ClaudeApiRetryState,
-} from "@/contexts/acp-connections-context"
+} from "@/features/session/provider"
 import type { QueuedMessage } from "@/hooks/use-message-queue"
 import { Loader2 } from "lucide-react"
 import { ChatInput } from "@/components/chat/chat-input"

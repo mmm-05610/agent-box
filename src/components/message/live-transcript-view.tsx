@@ -29,7 +29,7 @@ import {
   type ResolvedMessageGroup,
 } from "@/components/message/message-list-view"
 import { useConversationDetail } from "@/hooks/use-conversation-detail"
-import { useConversationRuntimeActions } from "@/stores/conversation-runtime-store"
+import { useConversationRuntimeActions } from "@/features/session/model/conversation-runtime-store"
 import {
   useAcpActions,
   useConnectionStore,

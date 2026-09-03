@@ -5,7 +5,7 @@ import {
   getTimelineTurns,
   resetConversationRuntimeStore,
   useConversationRuntimeStore,
-} from "@/stores/conversation-runtime-store"
+} from "@/features/session/model/conversation-runtime-store"
 
 const CID = 42
 

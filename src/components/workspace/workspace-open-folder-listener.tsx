@@ -3,7 +3,7 @@
 import { useEffect } from "react"
 import { useAppWorkspaceStore } from "@/stores/app-workspace-store"
 import { useTabActions } from "@/contexts/tab-context"
-import { useWorkbenchRoute } from "@/contexts/workbench-route-context"
+import { useWorkbenchRoute } from "@/features/shell"
 import { subscribe } from "@/lib/platform"
 import { FOLDER_OPEN_IN_WORKSPACE_EVENT } from "@/lib/api"
 import type { FolderDetail } from "@/lib/types"

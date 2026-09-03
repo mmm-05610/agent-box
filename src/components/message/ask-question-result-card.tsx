@@ -32,7 +32,7 @@ import {
   parseAskQuestionOutcome,
 } from "@/lib/ask-question"
 import type { PendingQuestionState } from "@/lib/types"
-import type { ToolCallState } from "@/lib/adapters/ai-elements-adapter"
+import type { ToolCallState } from "@/features/session/model/adapters/ai-elements-adapter"
 
 // Separator for the composite "header + question" lookup key. A control char
 // (unit separator) that never appears in agent-authored text.

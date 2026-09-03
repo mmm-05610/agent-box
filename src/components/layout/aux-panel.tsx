@@ -9,10 +9,7 @@ import {
   type LucideIcon,
 } from "lucide-react"
 import { useTranslations } from "next-intl"
-import {
-  useAuxPanelContext,
-  type AuxPanelTab,
-} from "@/contexts/aux-panel-context"
+import { useAuxPanel, type AuxPanelTab } from "@/features/shell"
 import { useActiveFolder } from "@/contexts/active-folder-context"
 import { useIsActiveChatMode } from "@/hooks/use-is-active-chat-mode"
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -122,7 +119,7 @@ export function resolveAuxTabView(
 export function AuxPanel() {
   const t = useTranslations("Folder.auxPanel.tabs")
   const tDetails = useTranslations("Folder.sessionDetails")
-  const { isOpen, width, activeTab, setActiveTab } = useAuxPanelContext()
+  const { isOpen, width, activeTab, setActiveTab } = useAuxPanel()
   const { activeFolderId } = useActiveFolder()
   const isChatMode = useIsActiveChatMode()
   const isMobile = useIsMobile()

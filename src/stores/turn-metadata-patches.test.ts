@@ -3,7 +3,7 @@ import {
   computeTurnMetadataPatches,
   resetConversationRuntimeStore,
   useConversationRuntimeStore,
-} from "@/stores/conversation-runtime-store"
+} from "@/features/session/model/conversation-runtime-store"
 import type { DbConversationDetail, MessageTurn, TurnUsage } from "@/lib/types"
 
 // The post-turn reparse (`syncTurnMetadata`) backfills usage/duration/model

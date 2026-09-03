@@ -20,7 +20,7 @@ import {
   type AdaptedContentPart,
   type AdaptedToolCallPart,
   type AdapterMessageText,
-} from "@/lib/adapters/ai-elements-adapter"
+} from "@/features/session/model/adapters/ai-elements-adapter"
 import { deriveBadge, parseStatusReports } from "@/lib/delegation-status"
 import { parseToolOutput, resolveDelegationStatus } from "@/lib/delegation-card"
 import type { ContentBlock, MessageTurn } from "@/lib/types"

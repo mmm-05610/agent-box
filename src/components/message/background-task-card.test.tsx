@@ -4,7 +4,7 @@ import { NextIntlClientProvider } from "next-intl"
 import { describe, expect, it } from "vitest"
 
 import { BackgroundTaskCard } from "./background-task-card"
-import type { AdaptedToolCallPart } from "@/lib/adapters/ai-elements-adapter"
+import type { AdaptedToolCallPart } from "@/features/session/model/adapters/ai-elements-adapter"
 import enMessages from "@/i18n/messages/en.json"
 
 function renderCard(polls: AdaptedToolCallPart[]) {

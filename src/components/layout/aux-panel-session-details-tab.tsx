@@ -5,12 +5,12 @@ import { useTranslations } from "next-intl"
 import { useShallow } from "zustand/react/shallow"
 import type { MessageTurn } from "@/lib/types"
 import { useTabStore } from "@/contexts/tab-context"
-import { useConversationRuntimeStore } from "@/stores/conversation-runtime-store"
+import { useConversationRuntimeStore } from "@/features/session/model/conversation-runtime-store"
 import { useAppWorkspaceStore } from "@/stores/app-workspace-store"
 import { resolveActiveSessionDetails } from "@/components/conversations/active-session-details"
 import { SessionDetailsContent } from "@/components/conversations/session-details-content"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { useAuxPanelContext } from "@/contexts/aux-panel-context"
+import { useAuxPanel } from "@/features/shell"
 
 // Stable empty-turns reference so the `useShallow` slice below stays
 // reference-equal when there's no active session — otherwise a fresh `[]` each
@@ -30,7 +30,7 @@ const EMPTY_TURNS: MessageTurn[] = []
  */
 export function SessionDetailsTab() {
   const t = useTranslations("Folder.sessionDetails")
-  const { isOpen, activeTab } = useAuxPanelContext()
+  const { isOpen, activeTab } = useAuxPanel()
 
   const tabs = useTabStore((s) => s.tabs)
   const activeTabId = useTabStore((s) => s.activeTabId)

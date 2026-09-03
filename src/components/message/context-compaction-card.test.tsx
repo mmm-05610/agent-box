@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest"
 
 import { ContextCompactionCard } from "./context-compaction-card"
 import enMessages from "@/i18n/messages/en.json"
-import type { ToolCallState } from "@/lib/adapters/ai-elements-adapter"
+import type { ToolCallState } from "@/features/session/model/adapters/ai-elements-adapter"
 
 function renderCard(props: {
   state?: ToolCallState

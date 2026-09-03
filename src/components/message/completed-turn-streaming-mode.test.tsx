@@ -37,7 +37,7 @@ vi.mock("@/components/ai-elements/link-safety", () => ({
 }))
 
 import enMessages from "@/i18n/messages/en.json"
-import type { AdaptedContentPart } from "@/lib/adapters/ai-elements-adapter"
+import type { AdaptedContentPart } from "@/features/session/model/adapters/ai-elements-adapter"
 import { CompletedTurnContent } from "./completed-turn-content"
 
 function renderWithIntl(ui: ReactElement) {

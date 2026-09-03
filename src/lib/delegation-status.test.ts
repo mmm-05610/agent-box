@@ -9,7 +9,7 @@ import {
   parseTaskId,
   parseTaskIds,
 } from "./delegation-status"
-import type { AdaptedToolCallPart } from "@/lib/adapters/ai-elements-adapter"
+import type { AdaptedToolCallPart } from "@/features/session/model/adapters/ai-elements-adapter"
 
 // Mirrors the MCP CallToolResult envelope the companion emits.
 function envelope(report: Record<string, unknown>, isError = false): string {

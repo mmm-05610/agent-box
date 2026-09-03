@@ -49,7 +49,7 @@ vi.mock("./delegated-sub-thread", () => ({
 
 import { ContentPartsRenderer } from "./content-parts-renderer"
 import enMessages from "@/i18n/messages/en.json"
-import type { AdaptedContentPart } from "@/lib/adapters/ai-elements-adapter"
+import type { AdaptedContentPart } from "@/features/session/model/adapters/ai-elements-adapter"
 import { parseInput as parseDelegationInput } from "@/lib/delegation-card"
 import { normalizeToolName } from "@/lib/tool-call-normalization"
 

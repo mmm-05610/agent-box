@@ -7,7 +7,7 @@ import { useTranslations } from "next-intl"
 import {
   splitTrailingAnswerParts,
   type AdaptedContentPart,
-} from "@/lib/adapters/ai-elements-adapter"
+} from "@/features/session/model/adapters/ai-elements-adapter"
 import { formatElapsedLabel } from "@/lib/format-elapsed"
 import { cn } from "@/lib/utils"
 import { Shimmer } from "@/components/ai-elements/shimmer"

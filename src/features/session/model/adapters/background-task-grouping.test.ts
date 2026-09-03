@@ -6,7 +6,7 @@ import {
   mergeAdjacentBackgroundTaskGroups,
   type AdaptedContentPart,
   type AdaptedToolCallPart,
-} from "@/lib/adapters/ai-elements-adapter"
+} from "@/features/session/model/adapters/ai-elements-adapter"
 
 const POLL_OUTPUT = `<retrieval_status>success</retrieval_status>
 <task_id>bfb5xnq1t</task_id>

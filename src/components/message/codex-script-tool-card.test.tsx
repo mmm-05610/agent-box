@@ -41,7 +41,7 @@ vi.mock("@/components/ai-elements/message", () => ({
 
 import { ContentPartsRenderer } from "./content-parts-renderer"
 import enMessages from "@/i18n/messages/en.json"
-import type { AdaptedContentPart } from "@/lib/adapters/ai-elements-adapter"
+import type { AdaptedContentPart } from "@/features/session/model/adapters/ai-elements-adapter"
 import { CODEX_SCRIPT_TOOL_NAME } from "@/lib/codex-code-mode"
 
 function renderParts(parts: AdaptedContentPart[], expand = true) {

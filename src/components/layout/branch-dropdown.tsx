@@ -67,7 +67,7 @@ import type { FolderDetail, GitBranchList } from "@/lib/types"
 import { fsBaseName, siblingFsPath } from "@/lib/path-utils"
 import { useAppWorkspaceStore } from "@/stores/app-workspace-store"
 import { useTabActions } from "@/contexts/tab-context"
-import { useWorkbenchRoute } from "@/contexts/workbench-route-context"
+import { useWorkbenchRoute } from "@/features/shell"
 import { useGitCredential } from "@/contexts/git-credential-context"
 
 type ConfirmAction = {

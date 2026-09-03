@@ -24,7 +24,7 @@ import {
 
 import { cn } from "@/lib/utils"
 import { parseFeedbackCheckOutcome } from "@/lib/feedback-check"
-import type { ToolCallState } from "@/lib/adapters/ai-elements-adapter"
+import type { ToolCallState } from "@/features/session/model/adapters/ai-elements-adapter"
 
 interface Props {
   output?: string | null

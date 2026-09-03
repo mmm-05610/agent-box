@@ -5,7 +5,7 @@ import { formatDistanceToNow } from "date-fns"
 import { User, Bot, Terminal, Cpu } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ContentPartsRenderer } from "./content-parts-renderer"
-import type { AdaptedMessage } from "@/lib/adapters/ai-elements-adapter"
+import type { AdaptedMessage } from "@/features/session/model/adapters/ai-elements-adapter"
 
 interface MessageBubbleProps {
   message: AdaptedMessage

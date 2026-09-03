@@ -15,11 +15,13 @@ import {
 } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { useActiveFolder } from "@/contexts/active-folder-context"
-import { useSidebarContext } from "@/contexts/sidebar-context"
+import {
+  useSidebar,
+  useAutomationsView,
+  useTasksView,
+  useWorkbenchRoute,
+} from "@/features/shell"
 import { useTabActions } from "@/contexts/tab-context"
-import { useAutomationsView } from "@/contexts/automations-view-context"
-import { useTasksView } from "@/contexts/tasks-view-context"
-import { useWorkbenchRoute } from "@/contexts/workbench-route-context"
 import {
   SidebarConversationList,
   type SidebarConversationListHandle,
@@ -145,7 +147,7 @@ function SidebarNavButton({
 
 export function Sidebar() {
   const t = useTranslations("Folder.sidebar")
-  const { isOpen, toggle } = useSidebarContext()
+  const { isOpen, toggle } = useSidebar()
   const { activeFolder } = useActiveFolder()
   const { openNewConversationTab, openChatModeTab } = useTabActions()
   const { unseenFailures } = useAutomationsView()

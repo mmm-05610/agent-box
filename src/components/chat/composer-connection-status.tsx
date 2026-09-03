@@ -11,10 +11,7 @@ import {
   type LucideIcon,
 } from "lucide-react"
 import { useTranslations } from "next-intl"
-import {
-  useAcpActions,
-  useConnectionStore,
-} from "@/contexts/acp-connections-context"
+import { useAcpActions, useConnectionStore } from "@/features/session/provider"
 import { AgentIcon } from "@/components/agent-icon"
 import { Button } from "@/components/ui/button"
 import {

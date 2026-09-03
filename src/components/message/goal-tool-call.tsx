@@ -4,7 +4,7 @@ import { memo, useMemo, useState, type ReactNode } from "react"
 import type {
   AdaptedContentPart,
   AdaptedGoalRunPart,
-} from "@/lib/adapters/ai-elements-adapter"
+} from "@/features/session/model/adapters/ai-elements-adapter"
 import {
   Collapsible,
   CollapsibleContent,

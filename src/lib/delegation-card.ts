@@ -17,7 +17,7 @@ import {
   type DelegationBinding,
   type DelegationStatus,
 } from "@/contexts/delegation-context"
-import type { ToolCallState } from "@/lib/adapters/ai-elements-adapter"
+import type { ToolCallState } from "@/features/session/model/adapters/ai-elements-adapter"
 
 /**
  * The full status a delegation card can render. Extends the wire-level

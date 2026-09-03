@@ -20,7 +20,7 @@ import {
   resetConversationRuntimeStore,
   useConversationRuntimeStore,
   type ConversationRuntimeSession,
-} from "@/stores/conversation-runtime-store"
+} from "@/features/session/model/conversation-runtime-store"
 
 vi.mock("@/lib/api", () => ({
   getFolderConversation: vi.fn(),

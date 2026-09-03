@@ -6,7 +6,7 @@ import {
   useConversationRuntimeActions,
   useConversationRuntimeStore,
   type ConversationRuntimeContextValue,
-} from "@/stores/conversation-runtime-store"
+} from "@/features/session/model/conversation-runtime-store"
 
 // Re-export the store surface + pure builder + types so existing importers
 // (and the test) keep resolving through this module unchanged.
@@ -19,7 +19,7 @@ export {
   selectTimelineTurns,
   useConversationRuntimeActions,
   useConversationRuntimeStore,
-} from "@/stores/conversation-runtime-store"
+} from "@/features/session/model/conversation-runtime-store"
 export type {
   ConversationRuntimeContextValue,
   ConversationRuntimeSession,
@@ -27,11 +27,11 @@ export type {
   ConversationTimelinePhase,
   ConversationTimelineTurn,
   RuntimeActions,
-} from "@/stores/conversation-runtime-store"
+} from "@/features/session/model/conversation-runtime-store"
 
 /**
  * Compatibility shim. Conversation-runtime state now lives in
- * `@/stores/conversation-runtime-store`; this provider is a passthrough and
+ * `@/features/session/model/conversation-runtime-store`; this provider is a passthrough and
  * `useConversationRuntime()` reproduces the former merged-value semantics
  * (re-render whenever ANY session changes) so existing consumers work
  * unchanged. Perf-sensitive consumers should instead select their own slice via

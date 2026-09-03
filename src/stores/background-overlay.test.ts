@@ -23,7 +23,7 @@ import {
   resetConversationRuntimeStore,
   selectTimelineTurns,
   useConversationRuntimeStore,
-} from "@/stores/conversation-runtime-store"
+} from "@/features/session/model/conversation-runtime-store"
 import {
   BACKGROUND_TASK_MARKER,
   parseBackgroundTaskMarker,

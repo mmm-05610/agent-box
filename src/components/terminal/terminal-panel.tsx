@@ -1,11 +1,11 @@
 "use client"
 
-import { useTerminalContext } from "@/contexts/terminal-context"
+import { useTerminal } from "@/features/shell"
 import { TerminalTabBar } from "./terminal-tab-bar"
 import { TerminalView } from "./terminal-view"
 
 export function TerminalPanel() {
-  const { isOpen, tabs, activeTabId, markTerminalExited } = useTerminalContext()
+  const { isOpen, tabs, activeTabId, markTerminalExited } = useTerminal()
 
   return (
     <section
