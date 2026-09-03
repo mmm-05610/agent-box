@@ -2,8 +2,8 @@ import {
   getActiveRemoteConnectionId,
   isDesktop,
   getTransport,
-} from "./transport"
-import type { EventStream, UnsubscribeFn } from "./transport/types"
+} from "@/core/transport"
+import type { EventStream, UnsubscribeFn } from "@/core/transport/types"
 
 /**
  * Platform-aware API wrappers for features that differ between

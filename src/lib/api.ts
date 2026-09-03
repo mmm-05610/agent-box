@@ -5,9 +5,9 @@ import {
   isDesktop,
   isRemoteDesktopMode,
   notifyRemoteDesktopUnauthorized,
-} from "./transport"
-import { getCodegToken } from "./transport/web-auth"
-import { notifyWebUnauthorized } from "./transport/web-connection-store"
+} from "@/core/transport"
+import { getCodegToken } from "@/core/transport/web-auth"
+import { notifyWebUnauthorized } from "@/core/transport/web-connection-store"
 import { getCurrentEffectiveAppLocale } from "./i18n"
 import { TurnBusyError, isTurnInProgressRejection } from "./turn-busy"
 import type { FolderThemeColor } from "./theme-presets"

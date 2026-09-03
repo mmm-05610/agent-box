@@ -15,7 +15,7 @@ import { useTranslations } from "next-intl"
 import {
   clearRemoteDesktopTransport,
   configureRemoteDesktopTransport,
-} from "@/lib/transport"
+} from "@/core/transport"
 import { resetBackendScopedStores } from "@/stores/backend-scoped-store-reset"
 import { getRemoteWorkspaceConnection } from "@/lib/remote-workspace"
 import { toErrorMessage } from "@/lib/app-error"

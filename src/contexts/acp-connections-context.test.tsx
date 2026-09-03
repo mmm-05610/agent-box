@@ -14,7 +14,7 @@ import {
 import { parsePermissionToolCall } from "@/lib/permission-request"
 import { subscribe } from "@/lib/platform"
 import { saveConfigPreference } from "@/lib/selector-prefs-storage"
-import type { AttachHandlers } from "@/lib/transport/types"
+import type { AttachHandlers } from "@/core/transport/types"
 import type {
   EventEnvelope,
   LiveSessionSnapshot,

@@ -46,7 +46,7 @@ import {
   formatFileRangeLabel,
 } from "@/lib/reference-link"
 import { disposeTauriListener } from "@/lib/tauri-listener"
-import { getActiveRemoteConnectionId } from "@/lib/transport"
+import { getActiveRemoteConnectionId } from "@/core/transport"
 import { randomUUID } from "@/lib/utils"
 import type { PromptCapabilitiesInfo, PromptInputBlock } from "@/lib/types"
 import type { Editor } from "@tiptap/core"

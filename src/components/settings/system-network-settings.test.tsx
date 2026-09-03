@@ -13,7 +13,7 @@ const subscribe = vi.fn(
   }
 )
 
-vi.mock("@/lib/transport", () => ({
+vi.mock("@/core/transport", () => ({
   getTransport: () => ({ call, subscribe }),
   isDesktop: () => false,
   isRemoteDesktopMode: () => false,

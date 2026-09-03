@@ -15,7 +15,7 @@ import { subscribe, getEventStream } from "@/lib/platform"
 import type {
   AttachHandlers,
   EventStreamSubscription,
-} from "@/lib/transport/types"
+} from "@/core/transport/types"
 import { randomUUID } from "@/lib/utils"
 import { inferLiveToolName } from "@/lib/tool-call-normalization"
 import {

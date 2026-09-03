@@ -5,7 +5,7 @@ import { create } from "zustand"
 import { acpListAgents } from "@/lib/api"
 import { setCustomAgentDisplay } from "@/lib/custom-agents"
 import { onTransportReconnect, subscribe } from "@/lib/platform"
-import type { UnsubscribeFn } from "@/lib/transport/types"
+import type { UnsubscribeFn } from "@/core/transport/types"
 import type { AcpAgentInfo } from "@/lib/types"
 
 const ACP_AGENTS_UPDATED_EVENT = "app://acp-agents-updated"

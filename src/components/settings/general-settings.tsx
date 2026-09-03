@@ -36,7 +36,7 @@ import {
   updateSystemTerminalSettings,
 } from "@/lib/api"
 import { isDesktop } from "@/lib/platform"
-import { getActiveRemoteConnectionId } from "@/lib/transport"
+import { getActiveRemoteConnectionId } from "@/core/transport"
 import type { AvailableTerminalShells, TerminalShellOption } from "@/lib/types"
 import { usePlatform } from "@/hooks/use-platform"
 import { relaunchApp } from "@/lib/updater"

@@ -5,7 +5,7 @@ const call = vi.fn()
 // exercised alongside the server one.
 let desktop = false
 
-vi.mock("@/lib/transport", () => ({
+vi.mock("@/core/transport", () => ({
   getTransport: () => ({ call }),
   isDesktop: () => desktop,
   isRemoteDesktopMode: () => false,

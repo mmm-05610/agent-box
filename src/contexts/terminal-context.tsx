@@ -11,7 +11,7 @@ import {
   type ReactNode,
 } from "react"
 import { getSystemTerminalSettings, terminalKill } from "@/lib/api"
-import { getTransport } from "@/lib/transport"
+import { getTransport } from "@/core/transport"
 import { randomUUID } from "@/lib/utils"
 import { useActiveFolder } from "@/contexts/active-folder-context"
 import { useShortcutSettings } from "@/hooks/use-shortcut-settings"

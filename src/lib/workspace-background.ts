@@ -7,7 +7,7 @@
 // mask, blur, fill, panel opacity) lives in localStorage via the appearance
 // provider; only the image itself round-trips through here.
 
-import { getTransport } from "@/lib/transport"
+import { getTransport } from "@/core/transport"
 
 // ─── Types ───
 

@@ -54,7 +54,7 @@ import {
 import { useImeGuard } from "@/hooks/use-ime-guard"
 import { isDesktop, openFileDialog } from "@/lib/platform"
 import { parentFsPath } from "@/lib/path-utils"
-import { getActiveRemoteConnectionId } from "@/lib/transport"
+import { getActiveRemoteConnectionId } from "@/core/transport"
 import { toErrorMessage } from "@/lib/app-error"
 import {
   basenameOf,

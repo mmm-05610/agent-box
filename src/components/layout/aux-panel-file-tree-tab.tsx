@@ -50,7 +50,7 @@ import {
   renameFileTreeEntry,
   WORKSPACE_DOWNLOAD_CANCELLED,
 } from "@/lib/api"
-import { isDesktop, isRemoteDesktopMode } from "@/lib/transport"
+import { isDesktop, isRemoteDesktopMode } from "@/core/transport"
 import { emitAttachFileToSession } from "@/lib/session-attachment-events"
 import {
   resolveFileTreeDropZone,

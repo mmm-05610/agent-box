@@ -1,6 +1,6 @@
 "use client"
 
-import { getActiveRemoteConnectionId } from "@/lib/transport"
+import { getActiveRemoteConnectionId } from "@/core/transport"
 import type { AppUpdateInfo } from "@/lib/updater"
 
 /**

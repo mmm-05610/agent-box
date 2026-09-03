@@ -40,7 +40,7 @@ import {
   writeDismissedVersion,
   writeLastCheck,
 } from "@/lib/update-check-storage"
-import { getTransport } from "@/lib/transport"
+import { getTransport } from "@/core/transport"
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 

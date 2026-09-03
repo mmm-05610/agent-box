@@ -44,7 +44,7 @@ import {
 } from "@/lib/api"
 import { toErrorMessage } from "@/lib/app-error"
 import { joinFsPath } from "@/lib/path-utils"
-import { isRemoteDesktopMode } from "@/lib/transport"
+import { isRemoteDesktopMode } from "@/core/transport"
 
 type QueueStatus = "pending" | "uploading" | "success" | "error" | "cancelled"
 

@@ -50,7 +50,7 @@ vi.mock("@/lib/api", () => ({
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 vi.mock("@/lib/platform", () => ({ isDesktop: () => true }))
-vi.mock("@/lib/transport", () => ({ getActiveRemoteConnectionId: () => null }))
+vi.mock("@/core/transport", () => ({ getActiveRemoteConnectionId: () => null }))
 // Windows, so the rendering section (desktop + Windows only) is on screen.
 vi.mock("@/hooks/use-platform", () => ({
   usePlatform: () => ({

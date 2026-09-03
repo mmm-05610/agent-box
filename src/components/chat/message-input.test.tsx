@@ -80,7 +80,7 @@ vi.mock("@/lib/platform", () => ({
   isDesktop: () => false,
   openFileDialog: vi.fn(),
 }))
-vi.mock("@/lib/transport", () => ({
+vi.mock("@/core/transport", () => ({
   getActiveRemoteConnectionId: () => null,
 }))
 // Real classifier only recognizes actual backend NoActiveTurn payloads; the

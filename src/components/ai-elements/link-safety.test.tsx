@@ -31,7 +31,7 @@ vi.mock("@/lib/platform", () => ({
   openUrl: mocks.openUrl,
 }))
 
-vi.mock("@/lib/transport", () => ({
+vi.mock("@/core/transport", () => ({
   isDesktop: mocks.isDesktop,
   getActiveRemoteConnectionId: mocks.getActiveRemoteConnectionId,
 }))

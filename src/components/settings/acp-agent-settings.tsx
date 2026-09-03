@@ -37,7 +37,7 @@ import {
 } from "lucide-react"
 import { parse as parseTomlDocument } from "smol-toml"
 import { isDesktop, openUrl } from "@/lib/platform"
-import { getActiveRemoteConnectionId } from "@/lib/transport"
+import { getActiveRemoteConnectionId } from "@/core/transport"
 import { toast } from "sonner"
 import {
   customAgentId,

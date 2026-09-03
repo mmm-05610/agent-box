@@ -21,7 +21,7 @@ vi.mock("@/lib/platform", () => ({
   isDesktop: () => platform.desktop,
   openFileDialog: platform.openFileDialog,
 }))
-vi.mock("@/lib/transport", () => ({
+vi.mock("@/core/transport", () => ({
   getActiveRemoteConnectionId: () => null,
 }))
 

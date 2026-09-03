@@ -22,7 +22,7 @@ const mocks = vi.hoisted(() => ({
   call: vi.fn(),
 }))
 
-vi.mock("@/lib/transport", () => ({
+vi.mock("@/core/transport", () => ({
   getTransport: () => ({ call: mocks.call }),
   getShellTransport: () => ({ call: vi.fn() }),
   isDesktop: () => false,

@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/tooltip"
 import { DirectoryBrowserDialog } from "@/components/shared/directory-browser-dialog"
 import { isDesktop, openFileDialog } from "@/lib/platform"
-import { getActiveRemoteConnectionId } from "@/lib/transport"
+import { getActiveRemoteConnectionId } from "@/core/transport"
 
 interface DirectoryPathInputProps {
   value: string

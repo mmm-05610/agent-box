@@ -20,7 +20,7 @@ const mocks = vi.hoisted(() => ({
   tauriReveal: vi.fn(async () => {}),
 }))
 
-vi.mock("@/lib/transport", () => ({
+vi.mock("@/core/transport", () => ({
   getTransport: () => ({}),
   isDesktop: mocks.isDesktop,
   getActiveRemoteConnectionId: mocks.getActiveRemoteConnectionId,

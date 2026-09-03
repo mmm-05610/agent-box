@@ -1,5 +1,5 @@
-import { getTransport } from "./transport"
-import { isDesktop } from "./transport"
+import { getTransport } from "@/core/transport"
+import { isDesktop } from "@/core/transport"
 
 export async function sendSystemNotification(
   title: string,

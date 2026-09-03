@@ -1,5 +1,5 @@
 import { toErrorMessage } from "./app-error"
-import { getTransport, isDesktop, isRemoteDesktopMode } from "./transport"
+import { getTransport, isDesktop, isRemoteDesktopMode } from "@/core/transport"
 
 // Drive the LOCAL Tauri app updater only for a genuine local desktop window.
 // A remote-desktop window IS a Tauri app (`isDesktop()` is true) but its

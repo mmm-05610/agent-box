@@ -67,7 +67,7 @@ const onReconnect = vi.fn((cb: () => void) => {
   }
 })
 
-vi.mock("@/lib/transport", () => ({
+vi.mock("@/core/transport", () => ({
   getTransport: () => ({ call, subscribe, onReconnect }),
   isDesktop: () => false,
   isRemoteDesktopMode: () => false,

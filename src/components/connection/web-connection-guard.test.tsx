@@ -28,7 +28,7 @@ const store = vi.hoisted(() => {
   }
 })
 
-vi.mock("@/lib/transport/web-connection-store", () => ({
+vi.mock("@/core/transport/web-connection-store", () => ({
   subscribeWebConnection: store.subscribe,
   getWebConnectionSnapshot: store.getState,
   getWebConnectionServerSnapshot: () => "connected",
@@ -36,7 +36,7 @@ vi.mock("@/lib/transport/web-connection-store", () => ({
   notifyWebUnauthorized: vi.fn(),
 }))
 
-vi.mock("@/lib/transport/web-auth", () => ({
+vi.mock("@/core/transport/web-auth", () => ({
   redirectToCodegLogin: store.redirectToCodegLogin,
   getCodegToken: () => "tok",
 }))

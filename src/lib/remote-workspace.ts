@@ -1,4 +1,4 @@
-import { getShellTransport } from "@/lib/transport"
+import { getShellTransport } from "@/core/transport"
 import type {
   RemoteWorkspaceConnection,
   RemoteWorkspaceConnectionInput,
