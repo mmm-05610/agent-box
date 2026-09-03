@@ -10,6 +10,10 @@
 >   quick-actions/new-folder-dropdown、10 语言文件），eslint 0 错误、
 >   vitest 393 文件 5607 用例全过、next build 静态导出通过。
 >   后端路由/命令（router.rs 的 project_boot 段）成为死代码，留待后续切片清理。
+> - 构建注记：本机（WSL2，内核 6.18）默认 Turbopack 构建死锁
+>   （"Creating an optimized production build" 后零进展，与代码无关，非沙箱所致）；
+>   `next build --webpack` 正常（49s 编译 + 45s TS，31/31 静态页）。
+>   已把 package.json 的 build 脚本固定为 `--webpack`。
 
 审计日期基准：2026-09-02（会话内 "currentDate"）
 审计对象：`/home/maoqh/projects/agent-box-studio`（Codeg v0.29.0，HEAD `93c33861`）
