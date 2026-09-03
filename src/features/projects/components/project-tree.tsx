@@ -3,7 +3,6 @@
 import { memo, useCallback, useState } from "react"
 import { useTranslations } from "next-intl"
 import {
-  Bot,
   Check,
   ChevronRight,
   Download,
@@ -12,25 +11,31 @@ import {
   FolderGit2,
   FolderOpen,
   FolderOpenDot,
-  FolderPlus,
-  FolderRoot,
   GitBranch,
-  Layers,
-  LayersPlus,
   Link2,
   ListChecks,
   MonitorCloud,
   MoreHorizontal,
   Palette,
+  Pencil,
+  Pin,
+  PinOff,
   Plus,
   SquarePen,
   Tag,
+  Trash2,
   XCircle,
+  Bot,
 } from "lucide-react"
 import { useImeGuard } from "@/hooks/use-ime-guard"
 import { OpenInSubContent } from "@/components/layout/open-in-menu"
 import { isDesktop } from "@/lib/platform"
-import type { AgentType, FolderGroupDetail } from "@/lib/types"
+import type {
+  AgentType,
+  ConversationStatus,
+  DbConversationSummary,
+} from "@/lib/types"
+import { STATUS_ORDER } from "@/lib/types"
 import { getAgentLabel } from "@/lib/custom-agents"
 import {
   FOLDER_THEME_COLOR_INHERIT,
@@ -40,12 +45,9 @@ import {
   type FolderThemeColor,
   type ThemeColor,
 } from "@/lib/theme-presets"
-import {
-  SubsessionAncestorRails,
-  CONV_RAIL_DEPTH_STEP,
-} from "@/components/conversations/sidebar-conversation-card"
-import { worktreeHeaderAlias } from "@/components/conversations/sidebar-conversation-grouping"
+import { formatConversationTitle } from "@/lib/conversation-title"
 import { FolderAliasLabel } from "@/components/conversations/folder-alias-label"
+import { ConversationStatusDot } from "@/components/conversations/conversation-status-dot"
 import {
   ContextMenu,
   ContextMenuTrigger,
@@ -69,25 +71,40 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { WorkspaceFolderDialog } from "@/components/layout/workspace-folder-dialog"
+import { CloneDialog } from "@/components/layout/clone-dialog"
 import { cn } from "@/lib/utils"
 import type { Project, ProjectOrigin } from "@/core/domain"
 import { projectWireId } from "../wire"
 import { RemoteConnectionWizard } from "./remote-connection-wizard"
 
 /**
- * 项目树（F5 / S2.3，设计 §3 features/projects/components）。
+ * 项目树（studio-shell 重写，复刻 ZCode 左侧面板）。
  *
- * - `ProjectRow`：侧栏项目行——名称 + 分支徽标 + 远程 origin 云图标，可展开/
- *   折叠；展开后内嵌该项目下的会话列表（会话行由 sidebar-conversation-list
- *   复用 SidebarConversationCard 渲染）。由原 sidebar-conversation-list 内的
- *   FolderHeader 迁入改型：领域身份（`project: Project`）+ wire 显示补充
- *   （`directoryName` 等，后端长出对应列后移入 Project）。
- * - `ProjectTreeAddButton`：侧栏底部"项目 +"入口，菜单两项——打开本地文件
- *   夹（复用 WorkspaceFolderDialog）/ 远程连接…（RemoteConnectionWizard）。
+ * - `ProjectRow`：项目行——本地图标 / 远程云图标 + 项目名 + 右侧控制
+ *   （分支徽标、运行中徽标、需注意红点、悬停 ⋮ 菜单）。点击整行展开/折叠，
+ *   展开后其会话由 sidebar-conversation-list 嵌套缩进渲染。
+ * - `ProjectConversationRow`：项目下的会话行——状态点 + 标题 + 相对时间，
+ *   无任何 harness（agent）图标。
+ * - `ProjectTreeAddButton`：项目节头右侧的 "＋" 入口——打开本地文件夹 /
+ *   克隆仓库 / 远程连接（自带三个对话框）。
  */
+
+/** 会话行相对项目行的缩进步长：与会话行的图标轴一致（0.875rem 的轴 + 同
+ *  步长的内容内距），让状态点恰好落在父项目行标题起始的正下方。 */
+const SESSION_INDENT_STEP = "0.875rem"
 
 /** origin 的 tooltip 文案：本地就是路径；远程拼 `kind:host:path`。 */
 function originTitle(origin: ProjectOrigin): string {
@@ -107,13 +124,20 @@ export interface ProjectRowProps {
    */
   directoryName: string
   /** 分支徽标：git HEAD 解析结果（store `branches`）；null（非仓库/未解析）
-   *  不渲染。worktree 子组不消费它——分支在那儿是标签本身（worktreeBranch）。 */
+   *  不渲染。 */
   branch: string | null
   /**
    * How many of this project's sessions are currently RUNNING (`in_progress`) —
    * not how many it holds. Zero renders no badge at all.
    */
   runningCount: number
+  /**
+   * How many of this project's sessions need the user's attention
+   * (`pending_review`). Zero renders no dot; any positive count renders the
+   * red dot — same "someone is waiting on you" semantic as the tasks
+   * attention badge.
+   */
+  attentionCount: number
   expanded: boolean
   themeColor: FolderThemeColor
   appThemeColor: ThemeColor
@@ -134,39 +158,8 @@ export interface ProjectRowProps {
   onOpenInSystemExplorer: (folderId: number) => void
   onOpenInTerminal: (folderId: number) => void
   onOpenInCode: (folderId: number) => void
-  /**
-   * Every project group, for the "Move to group" submenu. Omitted on the header
-   * variants that can't move on their own (worktree sub-groups and the "root"
-   * sub-group follow their repo). Must be referentially stable to preserve the
-   * memo.
-   */
-  folderGroups?: readonly FolderGroupDetail[]
-  /** Which group this project is currently in (null = top level). */
-  currentGroupId?: number | null
-  onMoveToGroup?: (folderId: number, groupId: number | null) => void
-  /** Create a group and move this project into it in one step. */
-  onNewGroupWithFolder?: (folderId: number) => void
-  isDragging?: boolean
-  /** Starts a reorder gesture from the header's grip. Omitted on the drag
-   *  surface so headers there are pure drop-target visuals. */
-  onGripPointerDown?: (folderId: number, event: React.PointerEvent) => void
-  /** True for the in-list copy whose floating sticky overlay is showing (the
-   *  overlay is the accessible control for that row; see FolderHeader 历史). */
+  /** True for the in-list copy whose floating sticky overlay is showing. */
   suppressed?: boolean
-  /** Nesting depth of the row (0 top-level; 1 worktree/root sub-group; +1 in a
-   *  group). Drives indent and the connector-spine ancestor rails. */
-  depth?: number
-  /**
-   * Which glyph + label this row renders:
-   * - `repo` (default): a top-level project / repo container.
-   * - `worktree`: a git worktree sub-group (FolderGit2 glyph, branch as alias).
-   * - `root`: a repo container's own-sessions sub-group (FolderRoot glyph,
-   *   fixed "root" label).
-   */
-  variant?: "repo" | "worktree" | "root"
-  /** The worktree's branch name (its own `git_branch`), used as the alias when
-   *  none is set. Leaves the bare directory name when absent. */
-  worktreeBranch?: string | null
 }
 
 export const ProjectRow = memo(function ProjectRow({
@@ -174,6 +167,7 @@ export const ProjectRow = memo(function ProjectRow({
   directoryName,
   branch,
   runningCount,
+  attentionCount,
   expanded,
   themeColor,
   appThemeColor,
@@ -192,16 +186,7 @@ export const ProjectRow = memo(function ProjectRow({
   onOpenInSystemExplorer,
   onOpenInTerminal,
   onOpenInCode,
-  folderGroups,
-  currentGroupId,
-  onMoveToGroup,
-  onNewGroupWithFolder,
-  isDragging,
-  onGripPointerDown,
   suppressed = false,
-  depth = 0,
-  variant = "repo",
-  worktreeBranch = null,
 }: ProjectRowProps) {
   // Wire 接缝：领域 id 是字符串（core/domain），行交互回调仍以 wire 数字主键
   // 寻址（展开状态、tab、wire 命令）。后端替换日由 wire 层统一消化。
@@ -269,17 +254,14 @@ export const ProjectRow = memo(function ProjectRow({
           <div
             inert={suppressed || undefined}
             aria-hidden={suppressed || undefined}
-            className={cn("relative h-[2rem]", isDragging && "opacity-60")}
+            className="relative h-[2rem]"
           >
             <div
-              onPointerDown={(e) => onGripPointerDown?.(folderId, e)}
               className={cn(
                 "group flex h-[1.9375rem] w-full items-center",
                 "rounded-full",
                 "transition-colors duration-150",
-                isDragging
-                  ? "cursor-grabbing"
-                  : "cursor-grab hover:bg-[color-mix(in_oklab,var(--sidebar-accent),var(--sidebar-foreground)_2%)]"
+                "hover:bg-[color-mix(in_oklab,var(--sidebar-accent),var(--sidebar-foreground)_2%)]"
               )}
             >
               <button
@@ -290,36 +272,35 @@ export const ProjectRow = memo(function ProjectRow({
                 className={cn(
                   "relative flex h-full min-w-0 flex-1 items-center pr-[0.5rem] outline-none",
                   "rounded-full focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
-                  "text-sidebar-foreground",
-                  isDragging ? "cursor-grabbing" : "cursor-grab"
+                  "text-sidebar-foreground cursor-pointer"
                 )}
                 style={{
-                  paddingLeft: `calc(var(--conv-rail-axis) + 0.875rem + ${depth} * ${CONV_RAIL_DEPTH_STEP})`,
+                  paddingLeft: "calc(var(--conv-rail-axis) + 0.875rem)",
                 }}
               >
-                {/* Connector spine (Show worktrees): a depth-1 sub-group header
-                    draws its container's vertical rail at the depth-0 axis, so
-                    stacked across the container's children (root + worktree
-                    headers and their session cards) it forms one continuous line
-                    down from the container. Renders nothing at depth 0. */}
-                <SubsessionAncestorRails depth={depth} />
+                {/* 项目图标：远程项目用云图标标识来源主机，本地项目用文件夹
+                    图标（开/合随展开状态）。 */}
                 <span
                   aria-hidden
-                  className={cn(
-                    "pointer-events-none absolute flex items-center justify-center text-muted-foreground/75"
-                  )}
+                  className="pointer-events-none absolute flex items-center justify-center text-muted-foreground/75"
                   style={{
                     top: "50%",
-                    left: `calc(var(--conv-rail-axis) + ${depth} * ${CONV_RAIL_DEPTH_STEP})`,
+                    left: "var(--conv-rail-axis)",
                     width: "0.875rem",
                     height: "0.875rem",
                     transform: "translate(-50%, -50%)",
                   }}
                 >
-                  {variant === "worktree" ? (
-                    <FolderGit2 className="h-[0.875rem] w-[0.875rem]" />
-                  ) : variant === "root" ? (
-                    <FolderRoot className="h-[0.875rem] w-[0.875rem]" />
+                  {project.origin.kind !== "local" ? (
+                    <span
+                      title={tProject("remoteOriginTitle", {
+                        kind: project.origin.kind,
+                        host: project.origin.host.id,
+                      })}
+                      className="inline-flex h-full items-center"
+                    >
+                      <MonitorCloud className="h-[0.875rem] w-[0.875rem]" />
+                    </span>
                   ) : expanded ? (
                     <FolderOpen className="h-[0.875rem] w-[0.875rem]" />
                   ) : (
@@ -328,11 +309,7 @@ export const ProjectRow = memo(function ProjectRow({
                 </span>
                 <div className="flex min-w-0 flex-1 items-center gap-[0.5rem]">
                   {/* The project's chosen colour lands HERE and nowhere else: the
-                      row's hover pill, its badges and every conversation card
-                      under it stay on the app theme. `folderTitleTintVars`
-                      writes both themes' values as inline custom properties and
-                      `.folder-title-tint` (globals.css) picks one; `inherit`
-                      returns undefined and the default class carries the day. */}
+                      row's hover pill and its badges stay on the app theme. */}
                   <span
                     style={titleTint}
                     className={cn(
@@ -342,35 +319,15 @@ export const ProjectRow = memo(function ProjectRow({
                         : "text-sidebar-foreground/75"
                     )}
                   >
-                    {variant === "worktree" ? (
-                      // Branch as the alias, directory as the name — the same
-                      // two-part label a repo header renders.
-                      <FolderAliasLabel
-                        name={directoryName}
-                        alias={worktreeHeaderAlias(folderAlias, worktreeBranch)}
-                        bracketClassName={bracketClassName}
-                      />
-                    ) : variant === "root" ? (
-                      // The container repo's own-sessions sub-group is labeled
-                      // with a fixed, non-localized "root" (its glyph is
-                      // FolderRoot); it stands for the repo root regardless of
-                      // UI language.
-                      "root"
-                    ) : (
-                      <FolderAliasLabel
-                        name={directoryName}
-                        alias={folderAlias}
-                        bracketClassName={bracketClassName}
-                      />
-                    )}
+                    <FolderAliasLabel
+                      name={directoryName}
+                      alias={folderAlias}
+                      bracketClassName={bracketClassName}
+                    />
                   </span>
-                  {/* 分支徽标（F5）：项目当前分支（git HEAD 解析结果）。非仓库或
-                      未解析（null）不渲染；与下方的 amber 运行徽标区分，走中性
-                      元数据配色。仅 repo 变体消费——worktree 子组的分支就是其
-                      标签本身，root 子组是仓库自身会话的分组。 */}
-                  {variant === "repo" &&
-                  branch != null &&
-                  branch.trim() !== "" ? (
+                  {/* 分支徽标：项目当前分支（git HEAD 解析结果）。非仓库或
+                      未解析（null）不渲染；走中性元数据配色。 */}
+                  {branch != null && branch.trim() !== "" ? (
                     <span
                       title={tProject("branchBadge", { branch })}
                       className={cn(
@@ -387,31 +344,9 @@ export const ProjectRow = memo(function ProjectRow({
                       <span className="truncate font-mono">{branch}</span>
                     </span>
                   ) : null}
-                  {/* 远程 origin 云图标（F5）：origin 非 local 时标识来源主机。
-                      当前后端只产生本地 origin，此标记在远程项目命令接入后
-                      自然出现（向导见 RemoteConnectionWizard）。 */}
-                  {project.origin.kind !== "local" ? (
-                    <span
-                      title={tProject("remoteOriginTitle", {
-                        kind: project.origin.kind,
-                        host: project.origin.host.id,
-                      })}
-                      className="inline-flex shrink-0 items-center text-muted-foreground"
-                    >
-                      <MonitorCloud
-                        aria-hidden
-                        className="h-[0.75rem] w-[0.75rem]"
-                      />
-                    </span>
-                  ) : null}
                   {/* Live-activity badge: the number of RUNNING sessions in this
-                      group, and nothing at all when none are. Amber (not the
-                      primary tint the old total-count chip used) is the same
-                      "running" semantic the conversation cards spin in amber, so
-                      the two read as one signal. amber-700 (not the card's
-                      amber-600) carries the light-mode fill: at 0.625rem this is
-                      small text, and amber-600 on the tinted surface lands near
-                      3:1 — under the AA floor amber-700 (~4.7:1) clears. */}
+                      project, and nothing at all when none are. Amber — the same
+                      "running" semantic the conversation status dot spins in. */}
                   {runningCount > 0 && (
                     <span
                       title={t("runningCountBadge", { count: runningCount })}
@@ -429,18 +364,26 @@ export const ProjectRow = memo(function ProjectRow({
                       </span>
                     </span>
                   )}
-                  {/* Disclosure chevron mirrors the section headers: hover-revealed,
-                      rotates on expand. The persistent open/closed state still reads
-                      from the folder icon on the left, which is why the chevron can
-                      stay hidden at rest in BOTH states (collapsed included) — it is
-                      a redundant affordance, not the only one. Touch keeps it pinned
-                      on, since there is no hover to reveal it there.
-                      NOTE: `group-focus-within` (not `group-focus-visible` like the
-                      section header) is intentional — here the `group` is the outer
-                      row wrapper and focus lands on a child (the toggle button or the
-                      sibling ⋯ menu button), so the reveal must react to focus
-                      anywhere inside the row. The section header's `group` IS its
-                      button, so it uses `group-focus-visible`. Don't "normalize". */}
+                  {/* 需注意红点：项目下存在等待用户处理（pending_review）的
+                      会话时点亮——与任务节的 attention 徽标同一"有人在等你"
+                      语义，只是不需要计数，一眼可见即可。 */}
+                  {attentionCount > 0 && (
+                    <span
+                      title={t("attentionBadge", { count: attentionCount })}
+                      className="inline-flex h-[0.9375rem] min-w-[0.9375rem] shrink-0 items-center justify-center"
+                    >
+                      <span className="h-[0.5rem] w-[0.5rem] rounded-full bg-destructive" />
+                      <span className="sr-only">
+                        {t("attentionBadge", { count: attentionCount })}
+                      </span>
+                    </span>
+                  )}
+                  {/* Disclosure chevron: hover-revealed, rotates on expand. The
+                      open/closed state also reads from the folder icon on the
+                      left, so the chevron can stay hidden at rest. Touch keeps
+                      it pinned on, since there is no hover to reveal it there.
+                      NOTE: `group-focus-within` is intentional — the `group` is
+                      the outer row wrapper and focus lands on a child. */}
                   <ChevronRight
                     aria-hidden
                     className={cn(
@@ -458,10 +401,10 @@ export const ProjectRow = memo(function ProjectRow({
                 onClick={(e) => {
                   e.stopPropagation()
                   // Re-open the SAME context menu as right-click (single source of
-                  // truth — the menu has 3 submenus, duplicating it would drift).
-                  // Dispatch a synthetic contextmenu event from this button; it
-                  // bubbles to the enclosing <ContextMenuTrigger>, which Radix opens
-                  // at the given coords — anchored just under the button.
+                  // truth — duplicating it would drift). Dispatch a synthetic
+                  // contextmenu event from this button; it bubbles to the enclosing
+                  // <ContextMenuTrigger>, which Radix opens at the given coords —
+                  // anchored just under the button.
                   const rect = e.currentTarget.getBoundingClientRect()
                   e.currentTarget.dispatchEvent(
                     new MouseEvent("contextmenu", {
@@ -478,41 +421,14 @@ export const ProjectRow = memo(function ProjectRow({
                 aria-haspopup="menu"
                 className={cn(
                   "flex h-6 w-6 shrink-0 items-center justify-end",
-                  // Shares the card action-icon palette: default /90 is the lightest
-                  // muted shade clearing 3:1 non-text contrast (incl. on touch, where
-                  // this stays visible); hover deepens to full foreground.
-                  "rounded-[0.375rem] cursor-pointer outline-none text-muted-foreground/90",
+                  // Shares the card action-icon palette. Visible on hover /
+                  // keyboard focus / touch; hidden at rest on pointer devices.
+                  "mr-[0.375rem] rounded-[0.375rem] cursor-pointer outline-none text-muted-foreground/90",
                   "opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
                   "transition-[opacity,color] duration-150 hover:text-sidebar-foreground"
                 )}
               >
                 <MoreHorizontal className="h-[0.875rem] w-[0.875rem]" />
-              </button>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onNewConversation(folderId)
-                }}
-                title={t("newConversation")}
-                aria-label={t("newConversation")}
-                className={cn(
-                  // Mirrors the ⋯ button's action-icon palette and hover-reveal so
-                  // the two read as one trailing control cluster. As the rightmost
-                  // control it carries the right-edge margin that lines this cluster
-                  // up with the other sidebar affordances: 0.375rem + the list's
-                  // px-1.5 (0.375rem) = a uniform 0.75rem inset from the border,
-                  // matching the section-header actions and conversation-card badges.
-                  // h-6 (not h-7) keeps every action-icon centre on the same axis, and
-                  // justify-end flushes the glyph to that 0.75rem edge so the visible
-                  // icon — not the transparent button box — lines up with the badges.
-                  "mr-[0.375rem] flex h-6 w-6 shrink-0 items-center justify-end",
-                  "rounded-[0.375rem] cursor-pointer outline-none text-muted-foreground/90",
-                  "opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
-                  "transition-[opacity,color] duration-150 hover:text-sidebar-foreground"
-                )}
-              >
-                <SquarePen className="h-[0.875rem] w-[0.875rem]" />
               </button>
             </div>
           </div>
@@ -663,58 +579,6 @@ export const ProjectRow = memo(function ProjectRow({
             <Tag className="h-4 w-4" />
             {t("folderHeaderMenu.setAlias")}
           </ContextMenuItem>
-          {/* The keyboard/menu path into and out of a project group — the drag
-              gesture is the fast one, but it is pointer-only, and a project
-              inside a collapsed group has no drag target at all until you open
-              it. Hidden on worktree / root sub-groups (no handlers passed):
-              those follow their repo and can't be grouped on their own. */}
-          {folderGroups != null && onMoveToGroup != null && (
-            <ContextMenuSub>
-              <ContextMenuSubTrigger>
-                <Layers className="h-4 w-4" />
-                {t("folderGroup.moveToGroup")}
-              </ContextMenuSubTrigger>
-              <ContextMenuSubContent className="min-w-[12rem]">
-                <ContextMenuItem
-                  onSelect={() => onMoveToGroup(folderId, null)}
-                  className="gap-2"
-                >
-                  <span className="min-w-0 flex-1 truncate">
-                    {t("folderGroup.removeFromGroup")}
-                  </span>
-                  {currentGroupId == null ? (
-                    <Check className="h-3.5 w-3.5 shrink-0" />
-                  ) : null}
-                </ContextMenuItem>
-                {folderGroups.length > 0 && <ContextMenuSeparator />}
-                {folderGroups.map((group) => (
-                  <ContextMenuItem
-                    key={group.id}
-                    onSelect={() => onMoveToGroup(folderId, group.id)}
-                    className="gap-2"
-                  >
-                    <span className="min-w-0 flex-1 truncate">
-                      {group.name}
-                    </span>
-                    {currentGroupId === group.id ? (
-                      <Check className="h-3.5 w-3.5 shrink-0" />
-                    ) : null}
-                  </ContextMenuItem>
-                ))}
-                {onNewGroupWithFolder != null && (
-                  <>
-                    <ContextMenuSeparator />
-                    <ContextMenuItem
-                      onSelect={() => onNewGroupWithFolder(folderId)}
-                    >
-                      <LayersPlus className="h-4 w-4" />
-                      {t("folderGroup.newGroupAndMove")}
-                    </ContextMenuItem>
-                  </>
-                )}
-              </ContextMenuSubContent>
-            </ContextMenuSub>
-          )}
           <ContextMenuSeparator />
           <ContextMenuItem
             variant="destructive"
@@ -756,18 +620,283 @@ export const ProjectRow = memo(function ProjectRow({
   )
 })
 
+export interface ProjectConversationRowProps {
+  conversation: DbConversationSummary
+  isSelected: boolean
+  isOpenInTab?: boolean
+  timeLabel?: string
+  onSelect: (id: number, agentType: string, folderId: number) => void
+  onDoubleClick?: (id: number, agentType: string, folderId: number) => void
+  onRename: (id: number, newTitle: string) => Promise<void>
+  onDelete: (id: number, agentType: string, folderId: number) => Promise<void>
+  onStatusChange: (id: number, status: ConversationStatus) => Promise<void>
+  onTogglePin?: (id: number, nextPinned: boolean) => void
+}
+
 /**
- * 侧栏底部"项目 +"入口（F5 / S2.3）。菜单两项：
+ * 项目下的会话行：状态点 + 标题 + 相对时间，嵌套缩进显示在项目行下方。
+ * 刻意不渲染任何 harness（agent）专属元素——agent 图标、委托子会话展开、
+ * 连接轨道全部不出现；行只回答"哪个会话、什么状态、多久之前"。
+ */
+export const ProjectConversationRow = memo(function ProjectConversationRow({
+  conversation,
+  isSelected,
+  isOpenInTab = false,
+  timeLabel,
+  onSelect,
+  onDoubleClick,
+  onRename,
+  onDelete,
+  onStatusChange,
+  onTogglePin,
+}: ProjectConversationRowProps) {
+  const t = useTranslations("Folder.conversationCard")
+  const tStatus = useTranslations("Folder.statusLabels")
+  const ime = useImeGuard()
+  const [renameOpen, setRenameOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [renameValue, setRenameValue] = useState("")
+
+  const status = conversation.status as ConversationStatus
+  const isPinned = conversation.pinned_at != null
+
+  const handleClick = useCallback(() => {
+    onSelect(conversation.id, conversation.agent_type, conversation.folder_id)
+  }, [
+    onSelect,
+    conversation.id,
+    conversation.agent_type,
+    conversation.folder_id,
+  ])
+
+  const handleDblClick = useCallback(() => {
+    onDoubleClick?.(
+      conversation.id,
+      conversation.agent_type,
+      conversation.folder_id
+    )
+  }, [
+    onDoubleClick,
+    conversation.id,
+    conversation.agent_type,
+    conversation.folder_id,
+  ])
+
+  const handleRenameOpen = useCallback(() => {
+    setRenameValue(conversation.title || "")
+    setRenameOpen(true)
+  }, [conversation.title])
+
+  const handleRenameConfirm = useCallback(async () => {
+    const trimmed = renameValue.trim()
+    if (trimmed && trimmed !== conversation.title) {
+      await onRename(conversation.id, trimmed)
+    }
+    setRenameOpen(false)
+  }, [renameValue, conversation.id, conversation.title, onRename])
+
+  const handleDeleteConfirm = useCallback(async () => {
+    await onDelete(
+      conversation.id,
+      conversation.agent_type,
+      conversation.folder_id
+    )
+    setDeleteOpen(false)
+  }, [
+    conversation.id,
+    conversation.agent_type,
+    conversation.folder_id,
+    onDelete,
+  ])
+
+  return (
+    <>
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <div
+            className="relative h-[2rem]"
+            data-conv-key={`${conversation.agent_type}:${conversation.id}`}
+          >
+            <div
+              className={cn(
+                "group relative flex h-[1.9375rem] w-full items-center",
+                "rounded-full text-sidebar-foreground",
+                "transition-colors duration-[120ms]",
+                isSelected
+                  ? "bg-sidebar-primary/8"
+                  : "hover:bg-[color-mix(in_oklab,var(--sidebar-accent),var(--sidebar-foreground)_2%)]"
+              )}
+            >
+              <button
+                data-conversation-id={conversation.id}
+                onClick={handleClick}
+                onDoubleClick={handleDblClick}
+                className={cn(
+                  "relative flex h-full min-w-0 flex-1 items-center gap-[0.625rem] text-left outline-none",
+                  "rounded-full",
+                  "pr-[0.25rem]"
+                )}
+                // 项目行下方一级缩进：状态点的轴 = 项目行标题的起始位置
+                //（0.875rem 轴 + 一个 SESSION_INDENT_STEP），内容再让出
+                // 0.875rem 的点到文字间距。
+                style={{
+                  paddingLeft: `calc(var(--conv-rail-axis) + ${SESSION_INDENT_STEP} + 0.875rem)`,
+                }}
+              >
+                {/* 状态点：会话当前状态（进行中黄 / 待评审蓝 / 已完成绿 /
+                    已取消红）。这是行首唯一的图形元素。 */}
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute top-1/2 flex items-center justify-center"
+                  style={{
+                    left: `calc(var(--conv-rail-axis) + ${SESSION_INDENT_STEP})`,
+                    width: "0.875rem",
+                    height: "0.875rem",
+                    transform: "translate(-50%, -50%)",
+                  }}
+                >
+                  <ConversationStatusDot status={status} size="sm" />
+                </span>
+                <span
+                  className={cn(
+                    "relative min-w-0 flex-1 truncate text-[0.875rem] font-normal",
+                    isOpenInTab && "text-primary"
+                  )}
+                >
+                  {formatConversationTitle(conversation.title) ||
+                    t("untitledConversation")}
+                </span>
+              </button>
+              {/* Right slot: the relative time — the row reads "dot, title,
+                  when" exactly, with no further chrome. */}
+              <div className="flex h-full shrink-0 items-center pr-[0.375rem]">
+                {timeLabel ? (
+                  <span
+                    className={cn(
+                      "relative shrink-0 tabular-nums",
+                      "text-[0.71875rem]",
+                      isSelected
+                        ? "font-medium text-muted-foreground"
+                        : "font-normal text-muted-foreground/70"
+                    )}
+                  >
+                    {timeLabel}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        </ContextMenuTrigger>
+        <ContextMenuContent>
+          <ContextMenuItem onSelect={handleRenameOpen}>
+            <Pencil className="h-4 w-4" />
+            {t("rename")}
+          </ContextMenuItem>
+          {onTogglePin && (
+            <ContextMenuItem
+              onSelect={() => onTogglePin(conversation.id, !isPinned)}
+            >
+              {isPinned ? (
+                <PinOff className="h-4 w-4" />
+              ) : (
+                <Pin className="h-4 w-4" />
+              )}
+              {isPinned ? t("unpin") : t("pin")}
+            </ContextMenuItem>
+          )}
+          <ContextMenuSeparator />
+          <ContextMenuSub>
+            <ContextMenuSubTrigger>
+              <ConversationStatusDot status={status} />
+              {t("status")}
+            </ContextMenuSubTrigger>
+            <ContextMenuSubContent>
+              {STATUS_ORDER.filter((s) => s !== conversation.status).map(
+                (s) => (
+                  <ContextMenuItem
+                    key={s}
+                    onSelect={() => onStatusChange(conversation.id, s)}
+                  >
+                    <ConversationStatusDot status={s} />
+                    {tStatus(s)}
+                  </ContextMenuItem>
+                )
+              )}
+            </ContextMenuSubContent>
+          </ContextMenuSub>
+          <ContextMenuSeparator />
+          <ContextMenuItem
+            variant="destructive"
+            onSelect={() => setDeleteOpen(true)}
+          >
+            <Trash2 className="h-4 w-4" />
+            {t("delete")}
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
+
+      <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("renameConversation")}</DialogTitle>
+          </DialogHeader>
+          <Input
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            {...ime.props}
+            onKeyDown={(e) => {
+              if (ime.isComposing(e)) return
+              if (e.key === "Enter") handleRenameConfirm()
+            }}
+            autoFocus
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenameOpen(false)}>
+              {t("cancel")}
+            </Button>
+            <Button onClick={handleRenameConfirm}>{t("save")}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("deleteConversationTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("deleteConversationDescription", {
+                title:
+                  formatConversationTitle(conversation.title) ||
+                  t("untitledConversation"),
+              })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteConfirm}>
+              {t("delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  )
+})
+
+/**
+ * 项目节头右侧的 "＋" 入口。菜单三项：
  * - 打开本地文件夹 → 复用 WorkspaceFolderDialog（wire 层本地命令）；
- * - 远程连接… → RemoteConnectionWizard 四步向导骨架（提交 disabled，
- *   等后端远程项目命令接入）。
+ * - 克隆仓库 → CloneDialog；
+ * - 远程连接… → RemoteConnectionWizard 四步向导骨架。
  *
- * 自带两个对话框（选中菜单项时才挂载内容），挂载在 sidebar 底部固定区，
- * 不随会话列表滚动。
+ * 自带三个对话框（选中菜单项时才挂载内容），挂在项目节头，不随会话列表
+ * 滚动。
  */
 export function ProjectTreeAddButton() {
   const t = useTranslations("ProjectTree")
+  const tFolderDropdown = useTranslations("Folder.folderNameDropdown")
   const [localDialogOpen, setLocalDialogOpen] = useState(false)
+  const [cloneOpen, setCloneOpen] = useState(false)
   const [wizardOpen, setWizardOpen] = useState(false)
 
   return (
@@ -780,32 +909,24 @@ export function ProjectTreeAddButton() {
             aria-label={t("addProject")}
             aria-haspopup="menu"
             className={cn(
-              // 与侧栏固定操作行（New chat / Automations / Tasks）同一几何：
-              // h-8 圆角行 + 0.875rem 图标/文案 + 0.4375rem 左内距，图标中心
-              // 落在与列表行相同的 0.875rem 轴上。
-              "group flex h-8 w-full cursor-pointer items-center gap-[0.4375rem] rounded-full pl-[0.4375rem] pr-1.5",
-              "text-[0.875rem] text-sidebar-foreground outline-none",
-              "transition-colors duration-150 hover:bg-sidebar-accent",
+              // 与其它节头/行尾动作图标同一几何：h-6 w-6、glyph 靠右缘。
+              "flex h-6 w-6 shrink-0 cursor-pointer items-center justify-end",
+              "rounded-[0.375rem] outline-none text-muted-foreground/90",
+              "transition-colors duration-150 hover:text-sidebar-foreground",
               "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
             )}
           >
-            <FolderPlus
-              aria-hidden
-              className="h-[0.875rem] w-[0.875rem] shrink-0 text-muted-foreground"
-            />
-            <span className="truncate">{t("addProject")}</span>
-            {/* 尾缘 "+"：悬停/键盘聚焦才显现，与固定操作行的快捷键徽标同一
-                reveal 规则——按钮本体已足够克制，加号只作动作预告。 */}
-            <Plus
-              aria-hidden
-              className="ml-auto h-3 w-3 shrink-0 text-muted-foreground/70 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100"
-            />
+            <Plus aria-hidden className="h-[0.875rem] w-[0.875rem]" />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="min-w-56">
+        <DropdownMenuContent align="end" className="min-w-56">
           <DropdownMenuItem onSelect={() => setLocalDialogOpen(true)}>
             <FolderOpenDot className="h-3.5 w-3.5 shrink-0" />
             {t("openLocalFolder")}
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => setCloneOpen(true)}>
+            <FolderGit2 className="h-3.5 w-3.5 shrink-0" />
+            {tFolderDropdown("cloneRepository")}
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => setWizardOpen(true)}>
             <MonitorCloud className="h-3.5 w-3.5 shrink-0" />
@@ -817,6 +938,7 @@ export function ProjectTreeAddButton() {
         open={localDialogOpen}
         onOpenChange={setLocalDialogOpen}
       />
+      <CloneDialog open={cloneOpen} onOpenChange={setCloneOpen} />
       <RemoteConnectionWizard open={wizardOpen} onOpenChange={setWizardOpen} />
     </>
   )

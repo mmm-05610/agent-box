@@ -1,18 +1,21 @@
 "use client"
 
 /**
- * 侧栏会话列表（F5 迁入 features/projects，设计 §8）：Pinned / 项目区 /
- * Chat / Recent 四个分区的虚拟化列表。项目区的行渲染已改走领域组件
- * ProjectRow（./project-tree，Folder→Project 改型）：本组件负责行模型
- * （buildRows）、拖拽/粘性头/滚动等列表机制，行内视觉与交互（名称 + 分支
- * 徽标 + 远程 origin 云图标 + 右键菜单）由 ProjectRow 承担。
+ * 侧栏列表区（studio-shell 重写，复刻 ZCode 左侧面板）：单个"项目"节。
+ *
+ * - 节头：`项目 ⌄`（可折叠整节）+ 右侧 `⋮`（节菜单：新建会话 / 导入 /
+ *   远程工作区管理）+ `＋`（新建项目：本地文件夹 / 克隆 / 远程向导）。
+ * - 项目行：领域组件 ProjectRow（./project-tree）；活动项目自动展开，其
+ *   会话以 ProjectConversationRow 嵌套缩进渲染（状态点 + 标题 + 相对时间，
+ *   无 harness 图标）。有需注意（pending_review）会话的项目行显示红点。
+ * - 相比旧实现删除：Pinned / Chat / Recent 节、"文件夹"节头、拖拽重排、
+ *   粘性节头浮层、分组（folder group）渲染与会话委托子树展开。
  */
 
 import {
   useCallback,
   useEffect,
   useImperativeHandle,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -23,13 +26,12 @@ import { toast } from "sonner"
 import { Virtualizer, type VirtualizerHandle } from "virtua"
 import {
   ChevronDown,
-  ChevronsUp,
   Download,
   FolderGit2,
   FolderOpenDot,
-  LayersPlus,
   Loader2,
   MonitorCloud,
+  MoreHorizontal,
   Settings,
   SquarePen,
 } from "lucide-react"
@@ -37,9 +39,8 @@ import { useActiveFolder } from "@/contexts/active-folder-context"
 import { useAppWorkspaceStore } from "@/stores/app-workspace-store"
 import { useTabActions, useTabStore } from "@/contexts/tab-context"
 import { useWorkbenchRoute, useTerminal } from "@/features/shell"
-import { useThemeColor, useZoomLevel } from "@/hooks/use-appearance"
+import { useThemeColor } from "@/hooks/use-appearance"
 import { useSortedAvailableAgents } from "@/hooks/use-sorted-available-agents"
-import { useImeGuard } from "@/hooks/use-ime-guard"
 import {
   openImportSessionsWindow,
   openInCode,
@@ -47,7 +48,6 @@ import {
   updateConversationStatus,
   updateConversationPinned,
   deleteConversation,
-  listChildConversations,
 } from "@/lib/api"
 // Wire 层（F5）：folder 命令族经 features/projects/wire 取用（后端替换日只换
 // 该层）。会话命令族仍走 @/lib/api，待 session 域切片（F3）收口。
@@ -67,78 +67,39 @@ import type {
 import {
   loadFolderExpanded,
   saveFolderExpanded,
-  loadFolderGroupExpanded,
-  saveFolderGroupExpanded,
   loadSectionCollapsed,
   saveSectionCollapsed,
-  loadConversationExpanded,
-  saveConversationExpanded,
-  DEFAULT_SECTION_ORDER,
-  SIDEBAR_SECTION_KEYS,
   type SidebarSectionCollapsed,
-  type SidebarSectionKey,
   type SidebarSortMode,
-  type SidebarSectionOrder,
 } from "@/lib/sidebar-view-mode-storage"
 import {
   normalizeFolderThemeColor,
   type FolderThemeColor,
 } from "@/lib/theme-presets"
 import {
-  SidebarConversationCard,
-  SubsessionAncestorRails,
-  CONV_RAIL_DEPTH_STEP,
-} from "@/components/conversations/sidebar-conversation-card"
-import {
-  applyLayoutMove,
-  buildDragSlots,
-  buildOwnerHeaderIndex,
-  buildRows,
-  buildSidebarLayout,
-  EMPTY_SIDEBAR_LAYOUT,
-  layoutFolderIds,
-  layoutToEntries,
-  locateEntry,
-  reconcileLayout,
-  computeStickyState,
-  flatIndexOfConversation,
-  folderHeaderFlatIndices,
+  compareByCreatedAtDesc,
+  compareByPinnedAtDesc,
+  compareByUpdatedAtDesc,
   formatRelative,
-  groupByFolderWithReuse,
-  headerIndexForFolder,
-  mergeChildrenById,
-  nextHeaderAfter,
-  pointerYToTargetIndex,
-  RECENT_PAGE_SIZE,
-  reuseSelected,
-  reuseSet,
-  selectChatConversationsWithReuse,
-  selectPinnedWithReuse,
-  selectRecentConversationsWithReuse,
-  worktreeChildrenByParent,
-  type DragSlot,
-  type SidebarEntry,
-  type SidebarLayout,
-  type SidebarRow,
 } from "@/components/conversations/sidebar-conversation-grouping"
 import { useRemoteWorkspaceConnections } from "@/hooks/use-remote-workspace-connections"
-import { useSubsessionSync } from "@/hooks/use-subsession-sync"
-import { SidebarSectionHeader } from "@/components/conversations/sidebar-section-header"
-import { SidebarFolderGroupHeader } from "@/components/conversations/sidebar-folder-group-header"
 import { ConversationManageDialog } from "@/components/conversations/conversation-manage-dialog"
 import { CloneDialog } from "@/components/layout/clone-dialog"
 import { RemoteWorkspaceManageDialog } from "@/components/layout/remote-workspace-manage-dialog"
 import { WorkspaceFolderDialog } from "@/components/layout/workspace-folder-dialog"
-import { ProjectRow } from "./project-tree"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+  ProjectRow,
+  ProjectConversationRow,
+  ProjectTreeAddButton,
+} from "./project-tree"
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
@@ -164,63 +125,31 @@ import {
 import { cn } from "@/lib/utils"
 import { toErrorMessage } from "@/lib/app-error"
 
-// Layout effect on the client (so the sticky overlay is positioned before
-// paint) but a no-op-safe passive effect during the static-export prerender.
-const useIsomorphicLayoutEffect =
-  typeof window !== "undefined" ? useLayoutEffect : useEffect
-
-// Shared empty merge map used when "Show worktrees" is on: worktree children
-// then keep their own conversation bucket / count / theme instead of being
-// folded into the parent. A module constant so the reference is stable across
-// renders (the `byFolder` / `folderTotalCounts` memos depend on it).
-const EMPTY_CHILD_TO_PARENT: ReadonlyMap<number, number> = new Map()
-
-// Shared empty container map used when "Show worktrees" is off: no repo is a
-// worktree container, so every folder renders flat. Stable reference so the
-// `containerChildren` memo (and buildRows through it) doesn't churn.
-const EMPTY_CONTAINER_CHILDREN: ReadonlyMap<number, readonly number[]> =
-  new Map()
-
 export interface SidebarConversationListHandle {
   scrollToActive: () => void
-  /**
-   * Open / close every collapsible group in the list at once, driven by the
-   * sidebar header's toggle. "Every" is literal: the folder groups (plus each
-   * container's worktree children and its root sub-group) AND all four
-   * top-level section headers — Pinned, Folders, Chat, Recent. Any header left
-   * standing open is what makes the button read as broken, and the flat
-   * sections in particular own conversation rows directly, with no folder in
-   * between, so nothing else would have closed them.
-   *
-   * Collapsed therefore bottoms out at four header rows and nothing else. That
-   * is the intent, not an overshoot — `expandAll` restores the folder groups
-   * underneath, since section collapse and per-folder collapse are stored
-   * separately and neither erases the other.
-   */
+  /** Expand every project (and the section itself). */
   expandAll: () => void
+  /** Collapse every project down to the lone section header. */
   collapseAll: () => void
 }
 
 export interface SidebarConversationListProps {
   showCompleted?: boolean
   sortMode?: SidebarSortMode
-  sectionOrder?: SidebarSectionOrder
-  /** When on, each repo's worktree child folders render as indented sub-groups
-   *  instead of being merged flat into the parent group. Defaults to off. */
-  showWorktrees?: boolean
-  /** When on, the flat "Recent" section is rendered at its slot in
-   *  `sectionOrder`. Defaults to off here; the Sidebar passes the user's
-   *  preference, whose product default is ON. */
-  showRecent?: boolean
 }
+
+/** The flat row model fed to the windowed list. */
+type ProjectListRow =
+  | { kind: "section" }
+  | { kind: "no-projects" }
+  | { kind: "project"; folderId: number }
+  | { kind: "session"; conversation: DbConversationSummary }
+  | { kind: "empty"; folderId: number; total: number }
 
 export function SidebarConversationList({
   ref,
   showCompleted = true,
   sortMode = "created",
-  sectionOrder = DEFAULT_SECTION_ORDER,
-  showWorktrees = false,
-  showRecent = false,
 }: SidebarConversationListProps & {
   ref?: Ref<SidebarConversationListHandle>
 }) {
@@ -231,7 +160,6 @@ export function SidebarConversationList({
   const tRemote = useTranslations("RemoteWorkspace")
   const { themeColor: appThemeColor } = useThemeColor()
   const { createTerminalInDirectory } = useTerminal()
-  const { zoomLevel } = useZoomLevel()
   const folders = useAppWorkspaceStore((s) => s.folders)
   const allFolders = useAppWorkspaceStore((s) => s.allFolders)
   // 领域切片（F5，设计 §5.1）：store 从 wire 缓存（allFolders）派生的 Project
@@ -252,16 +180,7 @@ export function SidebarConversationList({
   const removeFolderFromWorkspace = useAppWorkspaceStore(
     (s) => s.removeFolderFromWorkspace
   )
-  const folderGroups = useAppWorkspaceStore((s) => s.folderGroups)
-  const applySidebarLayout = useAppWorkspaceStore((s) => s.applySidebarLayout)
-  const createFolderGroup = useAppWorkspaceStore((s) => s.createFolderGroup)
-  const updateFolderGroup = useAppWorkspaceStore((s) => s.updateFolderGroup)
-  const deleteFolderGroupAction = useAppWorkspaceStore(
-    (s) => s.deleteFolderGroup
-  )
-  const setFolderGroupAction = useAppWorkspaceStore((s) => s.setFolderGroup)
   const refreshFolder = useAppWorkspaceStore((s) => s.refreshFolder)
-  const refreshing = loading
   const { activeFolder } = useActiveFolder()
 
   const activeTabId = useTabStore((s) => s.activeTabId)
@@ -284,7 +203,6 @@ export function SidebarConversationList({
         path: string
         color: string
         defaultAgentType: AgentType | null
-        gitBranch: string | null
       }
     >()
     for (const f of allFolders)
@@ -294,7 +212,6 @@ export function SidebarConversationList({
         path: f.path,
         color: f.color,
         defaultAgentType: f.default_agent_type,
-        gitBranch: f.git_branch,
       })
     return map
   }, [allFolders])
@@ -307,33 +224,21 @@ export function SidebarConversationList({
     return map
   }, [projects])
 
-  // 分支徽标按需解析：每个顶层项目挂载时解析一次 git HEAD（store 内部按
-  // gitHeads 已知 + in-flight 去重，N 个项目行 = N 次请求，仅一次）。worktree
-  // 子组不解析——其分支标签来自 wire 行的 git_branch 列。
+  // 分支徽标按需解析：每个项目挂载时解析一次 git HEAD（store 内部按 gitHeads
+  // 已知 + in-flight 去重，N 个项目行 = N 次请求，仅一次）。
   useEffect(() => {
     for (const f of folders) {
       if (f.parent_id == null) ensureGitHead(f.id, f.path)
     }
   }, [folders, ensureGitHead])
 
-  // `tabs` gets a fresh array reference on every `conversations` change (the tab
-  // context re-derives titles/status), so these two derivations would otherwise
-  // hand a new object / Set to every FolderGroupItem on each status event and
-  // defeat its memo. Reuse the previous reference when the content is unchanged
-  // (render-phase ref cache; idempotent under StrictMode's double invoke).
-  const selectedConvRef = useRef<{ id: number; agentType: string } | null>(null)
   const selectedConversation = useMemo(() => {
     const activeTab = tabs.find((tab) => tab.id === activeTabId)
-    const next =
-      !activeTab || activeTab.conversationId == null
-        ? null
-        : { id: activeTab.conversationId, agentType: activeTab.agentType }
-    const reused = reuseSelected(selectedConvRef.current, next)
-    selectedConvRef.current = reused
-    return reused
+    return !activeTab || activeTab.conversationId == null
+      ? null
+      : { id: activeTab.conversationId, agentType: activeTab.agentType }
   }, [tabs, activeTabId])
 
-  const openTabKeysRef = useRef<Set<string>>(new Set())
   const openTabKeys = useMemo(() => {
     const next = new Set<string>()
     for (const tab of tabs) {
@@ -341,214 +246,323 @@ export function SidebarConversationList({
         next.add(`${tab.agentType}:${tab.conversationId}`)
       }
     }
-    const reused = reuseSet(openTabKeysRef.current, next)
-    openTabKeysRef.current = reused
-    return reused
+    return next
   }, [tabs])
 
   const { sortedTypes: availableAgents, fresh: availableAgentsFresh } =
     useSortedAvailableAgents()
+  // Expanded state of each project row (absent key = expanded). Hydrated from
+  // localStorage after mount.
   const [folderExpanded, setFolderExpanded] = useState<Record<number, boolean>>(
     {}
   )
-  // Collapsed state of each folder GROUP, keyed by group id. Absent key =
-  // expanded, mirroring `folderExpanded`. Hydrated from localStorage on mount.
-  const [folderGroupExpanded, setFolderGroupExpanded] = useState<
-    Record<number, boolean>
-  >({})
-  // Repo ids whose "root" sub-group (a container repo's own sessions, shown only
-  // under "Show worktrees") is collapsed. Session-only, not persisted: the
-  // container's own collapse — which hides the whole subtree — IS persisted via
-  // `folderExpanded`, so this indented sub-toggle is kept deliberately
-  // lightweight. Default (absent) = expanded.
-  const [rootGroupCollapsed, setRootGroupCollapsed] = useState<Set<number>>(
-    () => new Set()
-  )
-  // Collapsed state of the two top-level sections ("Pinned", "Folders"). Absent
-  // key = expanded (default). Hydrated from localStorage after mount.
+  // Collapsed state of the top-level "Projects" section. Absent = expanded.
+  // Reuses the historical "folders" key so an existing preference survives.
   const [sectionCollapsed, setSectionCollapsed] =
     useState<SidebarSectionCollapsed>({})
-  const pinnedExpanded = !sectionCollapsed.pinned
-  const foldersExpanded = !sectionCollapsed.folders
-  const chatsExpanded = !sectionCollapsed.chats
-  const recentExpanded = !sectionCollapsed.recent
-  // How many Recent rows are currently revealed. Session-only (not persisted):
-  // "show me more of this list right now" is a reading gesture, not a setting —
-  // and a fresh sidebar should open short again.
-  const [recentLimit, setRecentLimit] = useState(RECENT_PAGE_SIZE)
-  const revealMoreRecent = useCallback(
-    () => setRecentLimit((n) => n + RECENT_PAGE_SIZE),
-    []
-  )
-  // The Recent footer's own button, so the reset can hand focus to it.
-  const recentMoreButtonRef = useRef<HTMLButtonElement>(null)
-  // The way back out. `recentLimit` only ever grew before, so a list expanded a
-  // few pages deep stayed that way for the rest of the session, pushing the
-  // sections under Recent off the screen.
-  const resetRecentLimit = useCallback(() => {
-    // Move focus FIRST, while the right-edge icon variant is still mounted:
-    // dropping the limit unmounts it (its `canReset` goes false) and would
-    // otherwise leave keyboard focus on <body>, i.e. back at the top of the
-    // document. The footer button always survives a reset — the reset only
-    // exists when more than a page is on screen, so a remainder is guaranteed —
-    // and in the reset-only variant it IS the clicked button, making this a
-    // no-op. Programmatic focus after a mouse click does not raise
-    // `:focus-visible`, so pointer users see no ring.
-    recentMoreButtonRef.current?.focus()
-    setRecentLimit(RECENT_PAGE_SIZE)
-  }, [])
-  // ── Per-conversation delegation sub-session expansion ───────────────────
-  // Default COLLAPSED (unlike folders): only ids the user opened are tracked
-  // and persisted. Hydrated from localStorage after mount. `childrenByParent`
-  // is the lazily-fetched child cache (key absent = not fetched → renders a
-  // loading row; empty array = no live children → renders nothing, self-heals
-  // on the next refresh). The ref mirror lets the lazy-fetch dedupe read the
-  // latest cache without re-creating its callback.
-  const [conversationExpanded, setConversationExpanded] = useState<Set<number>>(
-    () => new Set()
-  )
-  const [childrenByParent, setChildrenByParent] = useState<
-    Map<number, DbConversationSummary[]>
-  >(() => new Map())
-  const childrenByParentRef = useRef(childrenByParent)
-  childrenByParentRef.current = childrenByParent
-  const childrenInFlightRef = useRef<Set<number>>(new Set())
-  // In-flight parent fetches → drives the loading spinner. A placeholder empty
-  // array is written into `childrenByParent` before the fetch so concurrent child
-  // upserts buffer into it (closing the lost-update race); `childrenLoading` then
-  // distinguishes "still fetching" from a settled-empty (stale-count) subtree.
-  const [childrenLoading, setChildrenLoading] = useState<Set<number>>(
-    () => new Set()
-  )
-  // Tombstones for soft-deleted child ids (FIFO-bounded in the sync hook) so a
-  // stale fetch snapshot or out-of-order upsert can't resurrect a deleted child —
-  // the child-cache analog of the context's root deletion guard.
-  const deletedChildIdsRef = useRef<Set<number>>(new Set())
+  const sectionExpanded = !sectionCollapsed.folders
 
-  // Keep the lazily-loaded sub-session cache live in real time: route child
-  // upsert/status/deleted events into `childrenByParent` (roots stay with the
-  // AppWorkspace context). child_count converges via backend parent re-emits.
-  useSubsessionSync({ setChildrenByParent, deletedChildIdsRef })
   const [removeConfirm, setRemoveConfirm] = useState<{
     folderId: number
     folderName: string
   } | null>(null)
-  // Folder the "manage conversations" dialog opens on — its initial scope; the
-  // dialog itself can then widen to the workspace or point at another folder.
+  // Project the "manage conversations" dialog opens on.
   const [manageFolderId, setManageFolderId] = useState<number | null>(null)
   const [cloneOpen, setCloneOpen] = useState(false)
   const [browserOpen, setBrowserOpen] = useState(false)
   const [remoteManageOpen, setRemoteManageOpen] = useState(false)
-  // Backs the list context menu's "Open remote workspace" submenu. Shared with
-  // the status bar's quick-actions menu, which renders the same list from the
-  // same loader; connections are fetched when that submenu opens, not on mount.
+  // Backs the list context menu's "Open remote workspace" submenu.
   const {
     desktop: remoteAvailable,
     connections: remoteConnections,
     refresh: refreshRemote,
     open: openRemote,
   } = useRemoteWorkspaceConnections()
-  // Folder whose links are being managed (context menu -> Linked folders).
+  // Project whose links are being managed (context menu -> Linked folders).
   // F5：只记 wire id，FolderDetail 经 allFolders 查找（UI 层不持有 wire 形状）。
   const [linksFolderId, setLinksFolderId] = useState<number | null>(null)
-  // What is being dragged: a folder or a whole group. `null` = no drag. Widened
-  // from a bare folder id when groups arrived, since a group reorders as one
-  // unit (its members travel with it and never appear on the drag surface).
-  const [dragging, setDragging] = useState<SidebarEntry | null>(null)
-  const [reordering, setReordering] = useState(false)
-  // Optimistic layout while a drag is in flight; `null` = use the store's.
-  const [dragLayout, setDragLayout] = useState<SidebarLayout | null>(null)
-  const pendingLayoutRef = useRef<SidebarLayout | null>(null)
 
-  // Floating sticky folder header. `stickyFolderId` is the ONLY new render
-  // state and changes solely when the scroll crosses into a different folder —
-  // never on a status event or the per-minute `now` tick — so the card/header
-  // memo budget is untouched. The per-frame handoff translateY is written
-  // straight to the overlay node (no re-render); see `recomputeSticky`.
-  const [stickyFolderId, setStickyFolderId] = useState<number | null>(null)
-  const overlayRef = useRef<HTMLDivElement>(null)
-  const stickyRafRef = useRef<number | null>(null)
-  // Read by the imperative scroll path without re-subscribing virtua's listener.
-  const draggingRef = useRef<SidebarEntry | null>(dragging)
-  draggingRef.current = dragging
+  // virtua binds to the real OverlayScrollbars viewport element (surfaced via
+  // the ScrollArea `onViewportRef` bridge once OS has initialized). We keep both
+  // a ref (for the Virtualizer `scrollRef` prop) and a state flag so the
+  // Virtualizer only mounts after the viewport exists.
+  const viewportRef = useRef<HTMLElement | null>(null)
+  const [viewportEl, setViewportEl] = useState<HTMLElement | null>(null)
+  const handleViewportRef = useCallback((element: HTMLElement | null) => {
+    viewportRef.current = element
+    setViewportEl(element)
+  }, [])
+  const virtualizerRef = useRef<VirtualizerHandle>(null)
+  const pendingScrollRef = useRef(false)
 
-  // Custom pointer-based folder reorder (replaces motion `Reorder`, which can't
-  // coexist with virtualization — see the perf plan). Refs are read by the
-  // window pointer listeners so the public callbacks stay referentially stable
-  // (the `FolderHeader` memo depends on a stable `onGripPointerDown`).
-  const dragSurfaceRef = useRef<HTMLDivElement>(null)
-  const dragPointerRef = useRef<{
-    entry: SidebarEntry
-    pointerId: number
-    startX: number
-    startY: number
-    lastY: number
-    started: boolean
-  } | null>(null)
-  const dragCleanupRef = useRef<(() => void) | null>(null)
-  const autoscrollRef = useRef<number | null>(null)
-  // Snapshots read by the imperative drag listeners without re-subscribing them.
-  const layoutRef = useRef<SidebarLayout>(EMPTY_SIDEBAR_LAYOUT)
-  // The authoritative (drag-free) layout, kept separately from `layoutRef` so
-  // the drop can reconcile against server truth rather than against its own
-  // optimistic view. See `handleDragEnd`.
-  const storeLayoutRef = useRef<SidebarLayout>(EMPTY_SIDEBAR_LAYOUT)
-  const dragSlotsRef = useRef<DragSlot[]>([])
-  const reorderingRef = useRef(false)
+  // Single "now" shared by every relative time label, refreshed once a minute.
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 60_000)
+    return () => clearInterval(interval)
+  }, [])
 
   useEffect(() => {
     // Hydrate from localStorage after mount to keep SSR/CSR markup consistent.
-
     setFolderExpanded(loadFolderExpanded())
-    setFolderGroupExpanded(loadFolderGroupExpanded())
     setSectionCollapsed(loadSectionCollapsed())
-    setConversationExpanded(new Set(loadConversationExpanded()))
   }, [])
 
-  const toggleSection = useCallback((section: SidebarSectionKey) => {
+  const toggleSection = useCallback(() => {
     setSectionCollapsed((prev) => {
-      const next = { ...prev, [section]: !prev[section] }
+      const next = { ...prev, folders: !prev.folders }
       saveSectionCollapsed(next)
       return next
     })
   }, [])
 
-  const toggleFolderGroup = useCallback((groupId: number) => {
-    setFolderGroupExpanded((prev) => {
-      // Absent key = expanded, so the first click has to write `false`.
-      const next = { ...prev, [groupId]: !(prev[groupId] ?? true) }
-      saveFolderGroupExpanded(next)
+  const toggleFolder = useCallback((folderId: number) => {
+    setFolderExpanded((prev) => {
+      const next = { ...prev, [folderId]: !(prev[folderId] ?? true) }
+      saveFolderExpanded(next)
       return next
     })
   }, [])
 
-  /** Drive every folder group at once, for expand/collapse-all. Reads the group
-   *  list imperatively so the callback stays stable across group changes. */
-  const setAllGroupsCollapsed = useCallback((collapsed: boolean) => {
-    setFolderGroupExpanded(() => {
-      const next: Record<number, boolean> = {}
-      for (const group of useAppWorkspaceStore.getState().folderGroups) {
-        next[group.id] = !collapsed
+  // ── Row data ─────────────────────────────────────────────────────────────
+  // Maps each open worktree child folder → its (open) root folder, so a
+  // worktree's sessions render under the parent project. Display-only merge:
+  // it never rewrites `conversation.folder_id`. A child whose parent was
+  // closed stands on its own (its sessions stay reachable).
+  const childToParent = useMemo(() => {
+    const map = new Map<number, number>()
+    for (const f of folders) {
+      if (f.parent_id != null && folders.some((p) => p.id === f.parent_id)) {
+        map.set(f.id, f.parent_id)
       }
-      saveFolderGroupExpanded(next)
+    }
+    return map
+  }, [folders])
+
+  // The projects rendered as rows: top-level open folders (worktree children
+  // whose parent is open follow that parent and never render their own row).
+  const projectFolders = useMemo(
+    () => folders.filter((f) => !childToParent.has(f.id)),
+    [folders, childToParent]
+  )
+
+  // Sessions listed under projects: chat-kind conversations are NOT listed in
+  // the sidebar any more (still creatable; reachable via search), and the
+  // completed filter applies per the view-options preference. Pinned sessions
+  // stay in their project (the old dedicated Pinned section is gone).
+  const visibleConversations = useMemo(() => {
+    const base = conversations.filter((c) => c.kind !== "chat")
+    if (showCompleted) return base
+    return base.filter((c) => c.status !== "completed")
+  }, [conversations, showCompleted])
+
+  // Per-project session buckets, pinned first then the chosen sort mode.
+  const byFolder = useMemo(() => {
+    const map = new Map<number, DbConversationSummary[]>()
+    for (const conv of visibleConversations) {
+      const groupId = childToParent.get(conv.folder_id) ?? conv.folder_id
+      const bucket = map.get(groupId)
+      if (bucket) bucket.push(conv)
+      else map.set(groupId, [conv])
+    }
+    const compareSessions =
+      sortMode === "updated" ? compareByUpdatedAtDesc : compareByCreatedAtDesc
+    for (const bucket of map.values()) {
+      bucket.sort((a, b) => {
+        const aPinned = a.pinned_at != null
+        const bPinned = b.pinned_at != null
+        // 置顶优先；同为置顶按置顶时间，同为未置顶走排序模式
+        //（compareByPinnedAtDesc 对双未置顶会退化为 id 倒序，不能整体套用）。
+        if (aPinned !== bPinned) return aPinned ? -1 : 1
+        if (aPinned && bPinned) return compareByPinnedAtDesc(a, b)
+        return compareSessions(a, b)
+      })
+    }
+    return map
+  }, [visibleConversations, sortMode, childToParent])
+
+  // Unfiltered (completed included) non-chat count per project, so the empty
+  // hint distinguishes a truly empty project from one whose rows are merely
+  // hidden by the completed filter.
+  const folderTotalCounts = useMemo(() => {
+    const map = new Map<number, number>()
+    for (const conv of conversations) {
+      if (conv.kind === "chat") continue
+      const groupId = childToParent.get(conv.folder_id) ?? conv.folder_id
+      map.set(groupId, (map.get(groupId) ?? 0) + 1)
+    }
+    return map
+  }, [conversations, childToParent])
+
+  // Running (`in_progress`) sessions per project — the amber badge.
+  const folderRunningCounts = useMemo(() => {
+    const map = new Map<number, number>()
+    for (const conv of conversations) {
+      if (conv.kind === "chat" || conv.status !== "in_progress") continue
+      const groupId = childToParent.get(conv.folder_id) ?? conv.folder_id
+      map.set(groupId, (map.get(groupId) ?? 0) + 1)
+    }
+    return map
+  }, [conversations, childToParent])
+
+  // Attention (pending_review) sessions per project — the red dot.
+  const folderAttentionCounts = useMemo(() => {
+    const map = new Map<number, number>()
+    for (const conv of conversations) {
+      if (conv.kind === "chat" || conv.status !== "pending_review") continue
+      const groupId = childToParent.get(conv.folder_id) ?? conv.folder_id
+      map.set(groupId, (map.get(groupId) ?? 0) + 1)
+    }
+    return map
+  }, [conversations, childToParent])
+
+  // Flat row model for windowing. Deliberately excludes `now` (the per-minute
+  // label tick must not rebuild rows).
+  const rows = useMemo<ProjectListRow[]>(() => {
+    const out: ProjectListRow[] = [{ kind: "section" }]
+    if (!sectionExpanded) return out
+    if (projectFolders.length === 0) {
+      out.push({ kind: "no-projects" })
+      return out
+    }
+    for (const folder of projectFolders) {
+      out.push({ kind: "project", folderId: folder.id })
+      if (folderExpanded[folder.id] ?? true) {
+        const bucket = byFolder.get(folder.id)
+        if (!bucket || bucket.length === 0) {
+          out.push({
+            kind: "empty",
+            folderId: folder.id,
+            total: folderTotalCounts.get(folder.id) ?? 0,
+          })
+        } else {
+          for (const conversation of bucket) {
+            out.push({ kind: "session", conversation })
+          }
+        }
+      }
+    }
+    return out
+  }, [
+    sectionExpanded,
+    projectFolders,
+    folderExpanded,
+    byFolder,
+    folderTotalCounts,
+  ])
+
+  // Latest snapshot for the imperative scrollToActive path, refreshed every
+  // render so the callback reads current rows without re-subscribing virtua.
+  const rowsRef = useRef<ProjectListRow[]>(rows)
+  rowsRef.current = rows
+
+  // The active project auto-expands: switching to a folder opens its project
+  // row so its sessions are visible without a manual click. Persisted like a
+  // manual toggle. `folderExpanded` is a dep on purpose: the persisted state
+  // hydrates after mount, so the post-hydration pass is what corrects a
+  // stored "collapsed" entry for the active project.
+  useEffect(() => {
+    const id = activeFolder?.id
+    if (id == null || !projectFolders.some((f) => f.id === id)) return
+    setFolderExpanded((prev) => {
+      if (prev[id] ?? true) return prev
+      const next = { ...prev, [id]: true }
+      saveFolderExpanded(next)
       return next
     })
-  }, [])
+  }, [activeFolder?.id, projectFolders, folderExpanded])
 
-  /** Drive every top-level section header at once, for expand/collapse-all.
-   *  Bails out (same object → no re-render, no write) when they already all
-   *  agree, so the header button is idempotent. */
-  const setAllSectionsCollapsed = useCallback((collapsed: boolean) => {
-    setSectionCollapsed((prev) => {
-      if (SIDEBAR_SECTION_KEYS.every((key) => Boolean(prev[key]) === collapsed))
-        return prev
-      const next: SidebarSectionCollapsed = { ...prev }
-      for (const key of SIDEBAR_SECTION_KEYS) next[key] = collapsed
-      saveSectionCollapsed(next)
-      return next
-    })
-  }, [])
+  useImperativeHandle(ref, () => ({
+    scrollToActive() {
+      scrollToActiveRef.current()
+    },
+    expandAll() {
+      setSectionCollapsed((prev) => {
+        if (!prev.folders) return prev
+        const next = { ...prev, folders: false }
+        saveSectionCollapsed(next)
+        return next
+      })
+      setFolderExpanded((prev) => {
+        const next: Record<number, boolean> = { ...prev }
+        for (const folder of projectFolders) next[folder.id] = true
+        saveFolderExpanded(next)
+        return next
+      })
+    },
+    collapseAll() {
+      setSectionCollapsed((prev) => {
+        if (prev.folders) return prev
+        const next = { ...prev, folders: true }
+        saveSectionCollapsed(next)
+        return next
+      })
+      setFolderExpanded((prev) => {
+        const next: Record<number, boolean> = { ...prev }
+        for (const folder of projectFolders) next[folder.id] = false
+        saveFolderExpanded(next)
+        return next
+      })
+    },
+  }))
 
+  const scrollToActiveRef = useRef<() => void>(() => {})
+
+  useEffect(() => {
+    scrollToActiveRef.current = () => {
+      const selected = selectedConversation
+      if (!selected) return
+      const conv = conversations.find(
+        (c) => c.id === selected.id && c.agent_type === selected.agentType
+      )
+      if (!conv || conv.kind === "chat") return
+      const displayFolderId =
+        childToParent.get(conv.folder_id) ?? conv.folder_id
+      // Each expansion step below defers the actual scroll to the next render
+      // (the row only exists in the flat model once visible); this effect
+      // re-runs on the expansion-state change with the rebuilt rows available
+      // via rowsRef, and chains via pendingScrollRef.
+      if (!sectionExpanded) {
+        toggleSection()
+        pendingScrollRef.current = true
+        return
+      }
+      if (!(folderExpanded[displayFolderId] ?? true)) {
+        setFolderExpanded((prev) => {
+          const next = { ...prev, [displayFolderId]: true }
+          saveFolderExpanded(next)
+          return next
+        })
+        pendingScrollRef.current = true
+        return
+      }
+      const index = rowsRef.current.findIndex(
+        (row) =>
+          row.kind === "session" &&
+          row.conversation.id === selected.id &&
+          row.conversation.agent_type === selected.agentType
+      )
+      if (index < 0) return
+      virtualizerRef.current?.scrollToIndex(index, {
+        align: "center",
+        smooth: true,
+      })
+    }
+
+    if (pendingScrollRef.current) {
+      pendingScrollRef.current = false
+      scrollToActiveRef.current()
+    }
+  }, [
+    selectedConversation,
+    conversations,
+    folderExpanded,
+    sectionExpanded,
+    childToParent,
+    toggleSection,
+  ])
+
+  // ── Handlers (project + session actions) ─────────────────────────────────
   const handleChangeFolderColor = useCallback(
     async (folderId: number, color: FolderThemeColor) => {
       try {
@@ -618,710 +632,13 @@ export function SidebarConversationList({
     (folderId: number) => {
       const folder = folderIndex.get(folderId)
       if (!folder) return
-      void openInCode(folder.path).catch((error) => {
+      void openInCode(folder.path).catch((err) => {
         toast.error(tFileTree("toasts.openInCodeFailed"), {
-          description: toErrorMessage(error),
+          description: toErrorMessage(err),
         })
       })
     },
     [folderIndex, tFileTree]
-  )
-
-  // virtua binds to the real OverlayScrollbars viewport element (surfaced via
-  // the ScrollArea `onViewportRef` bridge once OS has initialized). We keep both
-  // a ref (for the Virtualizer `scrollRef` prop) and a state flag so the
-  // Virtualizer only mounts after the viewport exists.
-  const viewportRef = useRef<HTMLElement | null>(null)
-  const [viewportEl, setViewportEl] = useState<HTMLElement | null>(null)
-  const handleViewportRef = useCallback((element: HTMLElement | null) => {
-    viewportRef.current = element
-    setViewportEl(element)
-  }, [])
-  const virtualizerRef = useRef<VirtualizerHandle>(null)
-  const scrollToActiveRef = useRef<() => void>(() => {})
-  const pendingScrollRef = useRef(false)
-
-  // Single "now" shared by every relative time label, refreshed once a minute.
-  // Threading one value through all rows (instead of each row calling
-  // `Date.now()` during render) keeps `timeLabel` referentially stable within a
-  // render tick, so a single status event re-renders only the affected card.
-  const [now, setNow] = useState(() => Date.now())
-  useEffect(() => {
-    const interval = setInterval(() => setNow(Date.now()), 60_000)
-    return () => clearInterval(interval)
-  }, [])
-
-  // Folder grouping source: pinned conversations are surfaced in the dedicated
-  // Pinned section, and folderless chat conversations in the dedicated Chat
-  // section, so exclude both here; then apply the completed filter as before.
-  const folderConversations = useMemo(() => {
-    const base = conversations.filter(
-      (c) => c.pinned_at == null && c.kind !== "chat"
-    )
-    if (showCompleted) return base
-    return base.filter((c) => c.status !== "completed")
-  }, [conversations, showCompleted])
-
-  // Flat "Chat" bucket: folderless chat-mode conversations, most-recently-updated
-  // first, with reference reuse (so an unrelated status event doesn't rebuild it
-  // and defeat the section's memo). Pinned chats live in the Pinned section.
-  const chatConvsRef = useRef<DbConversationSummary[]>([])
-  const chatConversations = useMemo(() => {
-    const next = selectChatConversationsWithReuse(
-      conversations,
-      showCompleted,
-      chatConvsRef.current
-    )
-    chatConvsRef.current = next
-    return next
-  }, [conversations, showCompleted])
-
-  // Pinned bucket: the FULL conversation list (ignores "Show completed" — a
-  // pinned conversation stays visible regardless), sorted most-recently-pinned
-  // first, with reference reuse so an unrelated status event doesn't rebuild it.
-  const pinnedRef = useRef<DbConversationSummary[]>([])
-  const pinned = useMemo(() => {
-    const next = selectPinnedWithReuse(conversations, pinnedRef.current)
-    pinnedRef.current = next
-    return next
-  }, [conversations])
-
-  // Every folder currently open in the workspace (repos and their worktree
-  // children alike). Depends only on `folders`, so status events never rebuild
-  // it — the Recent bucket below leans on that.
-  const openFolderIds = useMemo(
-    () => new Set(folders.map((f) => f.id)),
-    [folders]
-  )
-
-  // Flat "Recent" bucket: every reachable conversation — folder-bound and chat
-  // alike — newest first, gated on the folder still being open so closing a
-  // folder also removes its sessions here. Reference reuse keeps an unrelated
-  // status event from rebuilding it and defeating the section's card memos.
-  const recentConvsRef = useRef<DbConversationSummary[]>([])
-  const recentConversations = useMemo(() => {
-    const next = selectRecentConversationsWithReuse(
-      conversations,
-      showCompleted,
-      sortMode,
-      openFolderIds,
-      recentConvsRef.current
-    )
-    recentConvsRef.current = next
-    return next
-  }, [conversations, showCompleted, sortMode, openFolderIds])
-
-  // Maps each open worktree child folder → its (open) root folder. A child is
-  // only redirected when its parent is also open, so a worktree whose root was
-  // closed/removed falls back to standing on its own (its conversations stay
-  // reachable). The merge is display-only: it never rewrites `conversation.folder_id`.
-  const childToParent = useMemo(() => {
-    const map = new Map<number, number>()
-    for (const f of folders) {
-      if (f.parent_id != null && openFolderIds.has(f.parent_id)) {
-        map.set(f.id, f.parent_id)
-      }
-    }
-    return map
-  }, [folders, openFolderIds])
-
-  // The merge map used for DISPLAY (grouping, counts, theming). When "Show
-  // worktrees" is on it is empty, so each worktree child keeps its own bucket /
-  // count / theme and renders under its own header. The raw `childToParent`
-  // above is still used to know which folders ARE worktree children (nesting
-  // order, indent, grip gating). Off → identical to the historical behavior.
-  const displayChildToParent = useMemo(
-    () => (showWorktrees ? EMPTY_CHILD_TO_PARENT : childToParent),
-    [showWorktrees, childToParent]
-  )
-
-  // Hold the previous grouping so unchanged folders keep their bucket array
-  // reference across renders (lets memoized FolderGroupItems bail out). Updating
-  // the ref inside the memo factory is a deliberate cache, idempotent under
-  // StrictMode's double invoke.
-  const byFolderRef = useRef<Map<number, DbConversationSummary[]>>(new Map())
-  const byFolder = useMemo(() => {
-    const grouped = groupByFolderWithReuse(
-      folderConversations,
-      sortMode,
-      byFolderRef.current,
-      displayChildToParent
-    )
-    byFolderRef.current = grouped
-    return grouped
-  }, [folderConversations, sortMode, displayChildToParent])
-
-  // Counts the unfiltered-but-non-pinned conversations per display group, so the
-  // empty-hint renderer distinguishes a truly empty folder from one whose rows
-  // are merely hidden by the completed filter. Pinned conversations are excluded
-  // (they're not in this folder's bucket), matching `byFolder`.
-  const folderTotalCounts = useMemo(() => {
-    const map = new Map<number, number>()
-    for (const conv of conversations) {
-      if (conv.pinned_at != null) continue
-      const groupId = displayChildToParent.get(conv.folder_id) ?? conv.folder_id
-      map.set(groupId, (map.get(groupId) ?? 0) + 1)
-    }
-    return map
-  }, [conversations, displayChildToParent])
-
-  // Running (`in_progress`) sessions per display group — what the folder header
-  // badge shows. Counted off the FULL conversation list rather than `byFolder`
-  // on purpose: the badge answers "is there work running in here", so neither
-  // the "Show completed" filter nor a session being pinned into the Pinned
-  // section should be able to hide it. Deliberately NOT a `buildRows` input, so
-  // a status event never rebuilds the row model — it only changes one number on
-  // one memoized header.
-  const folderRunningCounts = useMemo(() => {
-    const map = new Map<number, number>()
-    for (const conv of conversations) {
-      if (conv.status !== "in_progress") continue
-      const groupId = displayChildToParent.get(conv.folder_id) ?? conv.folder_id
-      map.set(groupId, (map.get(groupId) ?? 0) + 1)
-    }
-    return map
-  }, [conversations, displayChildToParent])
-
-  // The REORDERABLE folders: worktree child folders are excluded (they follow
-  // their parent, never reorder on their own). Hidden chat folders never reach
-  // here — the backend already excludes them from the open-folder set
-  // (`folder_service::list_open_folder_details`).
-  const reorderableFolders = useMemo(
-    () => folders.filter((f) => !childToParent.has(f.id)),
-    [folders, childToParent]
-  )
-
-  // The mixed top-level shape of the Folders section: groups interleaved with
-  // ungrouped folders, plus each group's members. Source of truth for both the
-  // row model and the drag gesture.
-  //
-  // While a drag is in flight the optimistic `dragLayout` wins so siblings shift
-  // live as the pointer moves — but it is still reconciled against the real
-  // folder/group lists on every render, so a folder opened or closed mid-drag
-  // (an automation minting a worktree, say) neither disappears nor sticks
-  // around. Reconciling means re-deriving from the store and then re-applying
-  // the drag's single move, rather than trusting a stale snapshot.
-  const storeLayout = useMemo(
-    () =>
-      buildSidebarLayout({ folders: reorderableFolders, groups: folderGroups }),
-    [reorderableFolders, folderGroups]
-  )
-  const layout = useMemo(
-    () => (dragLayout ? reconcileLayout(dragLayout, storeLayout) : storeLayout),
-    [storeLayout, dragLayout]
-  )
-
-  // Flat id list in render order — what `worktreeChildrenByParent` and
-  // `buildRows`' folder count consume.
-  const reorderableFolderIds = useMemo(() => layoutFolderIds(layout), [layout])
-
-  // "Show worktrees" container map: repo id → its open worktree child folder ids
-  // (sorted). A repo present here renders as a CONTAINER — buildRows nests its
-  // own sessions (a "root" sub-group) plus each worktree beneath it, and the
-  // whole subtree is gated on the container's own `folderExpanded` entry. Empty
-  // when the toggle is off (every folder then renders flat). Depends only on
-  // `folders` (+ the toggle), never on `conversations`, so status events don't
-  // rebuild it — preserving the single-status-event re-render budget.
-  const containerChildren = useMemo(
-    () =>
-      showWorktrees
-        ? worktreeChildrenByParent(reorderableFolderIds, folders)
-        : EMPTY_CONTAINER_CHILDREN,
-    [showWorktrees, reorderableFolderIds, folders]
-  )
-  // The repo ids that are containers (have ≥1 open worktree child). Drives the
-  // header render's container/plain distinction (total count, subtree toggle).
-  const containerRepoIds = useMemo(
-    () => new Set(containerChildren.keys()),
-    [containerChildren]
-  )
-
-  // Flat row model for windowing — the pinned section, the folders section, and
-  // every conversation live in this ONE array fed to the single Virtualizer (no
-  // separate, un-virtualized pinned list). Deliberately excludes `now` (see
-  // buildRows): the per-minute label tick must not rebuild rows and break the
-  // card memo.
-  const rows = useMemo(
-    () =>
-      buildRows({
-        pinned,
-        pinnedExpanded,
-        // Top-level (reorderable) folders drive the outer order; buildRows nests
-        // each container's root sub-group + worktrees via `containerChildren`.
-        orderedFolderIds: reorderableFolderIds,
-        byFolder,
-        folderExpanded,
-        folderTotalCounts,
-        foldersExpanded,
-        chatConversations,
-        chatsExpanded,
-        recentConversations,
-        recentExpanded,
-        showRecent,
-        recentLimit,
-        sectionOrder,
-        conversationExpanded,
-        childrenByParent,
-        childrenLoading,
-        containerChildren,
-        rootGroupCollapsed,
-        layout,
-        groupExpanded: folderGroupExpanded,
-      }),
-    [
-      pinned,
-      pinnedExpanded,
-      reorderableFolderIds,
-      byFolder,
-      folderExpanded,
-      folderTotalCounts,
-      foldersExpanded,
-      chatConversations,
-      chatsExpanded,
-      recentConversations,
-      recentExpanded,
-      showRecent,
-      recentLimit,
-      sectionOrder,
-      conversationExpanded,
-      childrenByParent,
-      childrenLoading,
-      containerChildren,
-      rootGroupCollapsed,
-      layout,
-      folderGroupExpanded,
-    ]
-  )
-
-  // Latest snapshots for the imperative scroll/drag code paths, refreshed every
-  // render so the window listeners and scrollToActive read current values
-  // without being torn down and re-subscribed.
-  const rowsRef = useRef<SidebarRow[]>(rows)
-  rowsRef.current = rows
-  layoutRef.current = layout
-  storeLayoutRef.current = storeLayout
-  reorderingRef.current = reordering
-
-  // Drop-target rows for the in-flight drag, and the surface that renders them.
-  // Rebuilt from the (reconciled) layout on every render so a folder that
-  // appeared or vanished mid-drag is immediately a valid / invalid target — the
-  // slot array and what the user sees can never disagree, because they are the
-  // same array.
-  const dragSlots = useMemo<DragSlot[]>(
-    () => (dragging ? buildDragSlots(layout, dragging) : []),
-    [dragging, layout]
-  )
-  dragSlotsRef.current = dragSlots
-
-  // Sticky-overlay lookup tables, rebuilt only when the flat rows change
-  // (folder add/remove/expand, not status events). Consumed exclusively by the
-  // imperative scroll handler via refs — never passed to a memoized child — so
-  // they have zero effect on the card/header memo path.
-  const ownerHeaderIndex = useMemo(() => buildOwnerHeaderIndex(rows), [rows])
-  const headerFlatIndices = useMemo(() => folderHeaderFlatIndices(rows), [rows])
-  const ownerHeaderIndexRef = useRef(ownerHeaderIndex)
-  ownerHeaderIndexRef.current = ownerHeaderIndex
-  const headerFlatIndicesRef = useRef(headerFlatIndices)
-  headerFlatIndicesRef.current = headerFlatIndices
-
-  useImperativeHandle(ref, () => ({
-    scrollToActive() {
-      scrollToActiveRef.current()
-    },
-    expandAll() {
-      setFolderExpanded((prev) => {
-        const next: Record<number, boolean> = { ...prev }
-        for (const id of reorderableFolderIds) next[id] = true
-        // Worktree children (containers only) are separate folder ids.
-        for (const kids of containerChildren.values())
-          for (const id of kids) next[id] = true
-        saveFolderExpanded(next)
-        return next
-      })
-      // Folder GROUPS are collapsible headers too — leaving one closed is
-      // exactly the "the button did nothing" case this control exists to avoid.
-      setAllGroupsCollapsed(false)
-      // Expand every container's root sub-group too (session-only state).
-      setRootGroupCollapsed((prev) => (prev.size === 0 ? prev : new Set()))
-      setAllSectionsCollapsed(false)
-    },
-    collapseAll() {
-      setFolderExpanded((prev) => {
-        const next: Record<number, boolean> = { ...prev }
-        for (const id of reorderableFolderIds) next[id] = false
-        for (const kids of containerChildren.values())
-          for (const id of kids) next[id] = false
-        saveFolderExpanded(next)
-        return next
-      })
-      setAllGroupsCollapsed(true)
-      setAllSectionsCollapsed(true)
-    },
-  }))
-
-  useEffect(() => {
-    scrollToActiveRef.current = () => {
-      if (!selectedConversation) return
-      const targetId = selectedConversation.id
-      const targetAgent = selectedConversation.agentType
-      const conv = conversations.find(
-        (c) => c.id === targetId && c.agent_type === targetAgent
-      )
-      if (!conv) return
-      // Each expansion step below defers the actual scroll to the next render
-      // (the row only exists in the flat model once visible); this effect re-runs
-      // on the expansion-state change with the rebuilt rows available via
-      // rowsRef, and chains through multiple steps via pendingScrollRef.
-      if (conv.pinned_at != null) {
-        // Pinned conversations live in the Pinned section — gated only by that
-        // section's collapse, never by any folder.
-        if (!pinnedExpanded) {
-          setSectionCollapsed((prev) => {
-            const next = { ...prev, pinned: false }
-            saveSectionCollapsed(next)
-            return next
-          })
-          pendingScrollRef.current = true
-          return
-        }
-      } else if (conv.kind === "chat") {
-        // Chat conversations live in the flat Chat section — gated only by that
-        // section's collapse, never by any folder.
-        if (!chatsExpanded) {
-          setSectionCollapsed((prev) => {
-            const next = { ...prev, chats: false }
-            saveSectionCollapsed(next)
-            return next
-          })
-          pendingScrollRef.current = true
-          return
-        }
-      } else {
-        // A folder conversation appears only when the Folders section AND its
-        // (display) folder are expanded.
-        if (!foldersExpanded) {
-          setSectionCollapsed((prev) => {
-            const next = { ...prev, folders: false }
-            saveSectionCollapsed(next)
-            return next
-          })
-          pendingScrollRef.current = true
-          return
-        }
-        // Under "Show worktrees" the conversation may sit inside a container's
-        // subtree, which is gated top-down: the container (repo root) must be
-        // expanded first, then — for the repo's OWN sessions — its root
-        // sub-group. Each step defers the scroll one render (pendingScrollRef).
-        if (showWorktrees) {
-          const containerRepoId = childToParent.get(conv.folder_id) ?? null
-          if (
-            containerRepoId != null &&
-            !(folderExpanded[containerRepoId] ?? true)
-          ) {
-            setFolderExpanded((prev) => {
-              const next = { ...prev, [containerRepoId]: true }
-              saveFolderExpanded(next)
-              return next
-            })
-            pendingScrollRef.current = true
-            return
-          }
-          // The repo's own conversation lives in the indented root sub-group.
-          if (containerRepoIds.has(conv.folder_id)) {
-            if (!(folderExpanded[conv.folder_id] ?? true)) {
-              setFolderExpanded((prev) => {
-                const next = { ...prev, [conv.folder_id]: true }
-                saveFolderExpanded(next)
-                return next
-              })
-              pendingScrollRef.current = true
-              return
-            }
-            if (rootGroupCollapsed.has(conv.folder_id)) {
-              setRootGroupCollapsed((prev) => {
-                const next = new Set(prev)
-                next.delete(conv.folder_id)
-                return next
-              })
-              pendingScrollRef.current = true
-              return
-            }
-          }
-        }
-        // A worktree conversation is rendered under its display group's header,
-        // so the row's visibility is gated by that group's expansion. With
-        // "Show worktrees" off the display group is the parent repo; on, the
-        // worktree folder renders its own header, so expand the folder itself.
-        const displayFolderId =
-          displayChildToParent.get(conv.folder_id) ?? conv.folder_id
-        if (!(folderExpanded[displayFolderId] ?? true)) {
-          setFolderExpanded((prev) => {
-            const next = { ...prev, [displayFolderId]: true }
-            saveFolderExpanded(next)
-            return next
-          })
-          pendingScrollRef.current = true
-          return
-        }
-      }
-      // Off-screen virtualized rows are not in the DOM, so resolve the flat row
-      // index and let virtua scroll to it.
-      const index = flatIndexOfConversation(
-        rowsRef.current,
-        targetId,
-        targetAgent
-      )
-      if (index < 0) return
-      virtualizerRef.current?.scrollToIndex(index, {
-        align: "center",
-        smooth: true,
-      })
-    }
-
-    if (pendingScrollRef.current) {
-      pendingScrollRef.current = false
-      scrollToActiveRef.current()
-    }
-  }, [
-    selectedConversation,
-    conversations,
-    folderExpanded,
-    displayChildToParent,
-    showWorktrees,
-    childToParent,
-    containerRepoIds,
-    rootGroupCollapsed,
-    pinnedExpanded,
-    foldersExpanded,
-    chatsExpanded,
-  ])
-
-  const toggleFolder = useCallback((folderId: number) => {
-    setFolderExpanded((prev) => {
-      const next = { ...prev, [folderId]: !(prev[folderId] ?? true) }
-      saveFolderExpanded(next)
-      return next
-    })
-  }, [])
-
-  // Toggle a container repo's "root" sub-group (its own sessions). Session-only,
-  // so unlike `toggleFolder` there is no persistence write.
-  const toggleRootGroup = useCallback((repoId: number) => {
-    setRootGroupCollapsed((prev) => {
-      const next = new Set(prev)
-      if (next.has(repoId)) next.delete(repoId)
-      else next.add(repoId)
-      return next
-    })
-  }, [])
-
-  // Lazily fetch a conversation's direct delegation children into the cache.
-  // Deduped against both the cache and in-flight requests so a re-toggle or the
-  // restore-time guard below can call it freely (idempotent, StrictMode-safe).
-  const ensureChildrenLoaded = useCallback(async (id: number) => {
-    if (childrenByParentRef.current.has(id)) return
-    if (childrenInFlightRef.current.has(id)) return
-    childrenInFlightRef.current.add(id)
-    // Placeholder BEFORE the fetch: `childrenByParent` is the only routing
-    // surface for live child upserts, so a concurrent upsert buffers into this
-    // entry instead of being dropped, and the fetch merges them — closing the
-    // lost-update race. `childrenLoading` keeps the spinner up while empty.
-    setChildrenByParent((prev) => {
-      if (prev.has(id)) return prev
-      const next = new Map(prev)
-      next.set(id, [])
-      return next
-    })
-    setChildrenLoading((prev) => {
-      if (prev.has(id)) return prev
-      const next = new Set(prev)
-      next.add(id)
-      return next
-    })
-    try {
-      const fetched = await listChildConversations(id)
-      setChildrenByParent((prev) => {
-        // Drop any child tombstoned while the fetch was in flight — a stale
-        // snapshot can still contain a since-deleted child (list_children
-        // queried before the soft-delete committed) — then merge the snapshot
-        // with live events buffered mid-flight (events win by id) so a child
-        // created after the query isn't lost.
-        const tomb = deletedChildIdsRef.current
-        const liveFetched =
-          tomb.size > 0 ? fetched.filter((c) => !tomb.has(c.id)) : fetched
-        const buffered = prev.get(id)
-        const merged =
-          buffered && buffered.length > 0
-            ? mergeChildrenById(liveFetched, buffered)
-            : liveFetched
-        const next = new Map(prev)
-        next.set(id, merged)
-        return next
-      })
-    } catch {
-      // Roll back the placeholder so a later toggle retries — unless live events
-      // already populated it, in which case keep them.
-      setChildrenByParent((prev) => {
-        const cur = prev.get(id)
-        if (cur && cur.length > 0) return prev
-        const next = new Map(prev)
-        next.delete(id)
-        return next
-      })
-    } finally {
-      childrenInFlightRef.current.delete(id)
-      setChildrenLoading((prev) => {
-        if (!prev.has(id)) return prev
-        const next = new Set(prev)
-        next.delete(id)
-        return next
-      })
-    }
-  }, [])
-
-  // Toggle a conversation's sub-session subtree. Expanding kicks off a lazy
-  // fetch; the Set identity changes so `rows` rebuilds, but the per-card
-  // `expanded` boolean is computed per row at render (never the Set passed in),
-  // so only the toggled card's prop flips and every other card memo holds.
-  const toggleConversation = useCallback(
-    (id: number) => {
-      setConversationExpanded((prev) => {
-        const next = new Set(prev)
-        if (next.has(id)) {
-          next.delete(id)
-        } else {
-          next.add(id)
-          void ensureChildrenLoaded(id)
-        }
-        saveConversationExpanded([...next])
-        return next
-      })
-    },
-    [ensureChildrenLoaded]
-  )
-
-  // Restore-time lazy load, driven by the RENDERED rows (not the raw persisted
-  // set): fetch children for every expanded parent actually visible in `rows`
-  // but not yet cached. Iterating `rows` keeps this to the reachable next level —
-  // a deep restored expansion re-materializes one level per pass as each level's
-  // children arrive and `rows` rebuilds — instead of flooding startup with
-  // requests for every persisted (possibly stale/deleted/deep) id. An effect (not
-  // a render-time microtask) keeps the side effect out of render; the
-  // cache/in-flight dedupe makes the repeated passes cheap and StrictMode-safe.
-  useEffect(() => {
-    if (loading) return
-    for (const row of rows) {
-      if (row.kind !== "conversation") continue
-      const c = row.conversation
-      if (
-        c.child_count > 0 &&
-        conversationExpanded.has(c.id) &&
-        !childrenByParentRef.current.has(c.id) &&
-        !childrenInFlightRef.current.has(c.id)
-      ) {
-        void ensureChildrenLoaded(c.id)
-      }
-    }
-  }, [rows, conversationExpanded, loading, ensureChildrenLoaded])
-
-  // ── Sticky folder header overlay ──────────────────────────────────────────
-  // Resolve the folder currently scrolled through and the iOS handoff offset
-  // from the live virtua geometry. Imperative + ref-only so its identity stays
-  // stable (passing it to `<Virtualizer onScroll>` must not re-subscribe the
-  // listener) and so it never participates in the memoized render path.
-  const recomputeSticky = useCallback(() => {
-    const handle = virtualizerRef.current
-    const currentRows = rowsRef.current
-    const headers = headerFlatIndicesRef.current
-    if (
-      !handle ||
-      draggingRef.current !== null ||
-      currentRows.length === 0 ||
-      headers.length === 0
-    ) {
-      setStickyFolderId((prev) => (prev === null ? prev : null))
-      return
-    }
-    const scrollOffset = handle.scrollOffset
-    const topIndex = Math.max(
-      0,
-      Math.min(currentRows.length - 1, handle.findItemIndex(scrollOffset))
-    )
-    const activeHeaderIndex = ownerHeaderIndexRef.current[topIndex]
-    if (activeHeaderIndex < 0) {
-      setStickyFolderId((prev) => (prev === null ? prev : null))
-      return
-    }
-    const nextHeaderIndex = nextHeaderAfter(headers, activeHeaderIndex)
-    const { visible, translateY } = computeStickyState({
-      scrollOffset,
-      activeHeaderOffset: handle.getItemOffset(activeHeaderIndex),
-      nextHeaderOffset:
-        nextHeaderIndex == null ? null : handle.getItemOffset(nextHeaderIndex),
-      headerHeight: handle.getItemSize(activeHeaderIndex) || 32,
-    })
-    if (overlayRef.current) {
-      overlayRef.current.style.transform = `translateY(${translateY}px)`
-    }
-    const activeRow = currentRows[activeHeaderIndex]
-    const nextFolderId =
-      visible && activeRow.kind === "folder" ? activeRow.folderId : null
-    setStickyFolderId((prev) => (prev === nextFolderId ? prev : nextFolderId))
-  }, [])
-
-  // virtua fires onScroll synchronously per scroll event; coalesce to one
-  // recompute per frame and keep the DOM write frame-aligned.
-  const handleVirtuaScroll = useCallback(() => {
-    if (stickyRafRef.current != null) return
-    stickyRafRef.current = requestAnimationFrame(() => {
-      stickyRafRef.current = null
-      recomputeSticky()
-    })
-  }, [recomputeSticky])
-
-  // Collapse from the overlay, then bring the now-collapsed header to the top so
-  // the eye lands on the folder just folded (the in-list toggle leaves you mid
-  // next folder otherwise). Deferred so virtua re-measures the shorter list
-  // before scrolling. Header index is unchanged by its own collapse, but we
-  // re-resolve it to stay correct regardless.
-  const handleOverlayToggle = useCallback(
-    (folderId: number) => {
-      toggleFolder(folderId)
-      requestAnimationFrame(() => {
-        const idx = headerIndexForFolder(rowsRef.current, folderId)
-        if (idx >= 0) {
-          virtualizerRef.current?.scrollToIndex(idx, {
-            align: "start",
-            smooth: false,
-          })
-        }
-      })
-    },
-    [toggleFolder]
-  )
-
-  // Recompute on anything that shifts geometry without firing a scroll event:
-  // expand/collapse, reorder, data refresh, drag start/end, viewport ready, and
-  // the overlay flip itself (so the freshly-mounted overlay node gets its
-  // initial transform). `useLayoutEffect` avoids a one-frame stale overlay.
-  useIsomorphicLayoutEffect(() => {
-    recomputeSticky()
-  }, [
-    rows,
-    folderExpanded,
-    viewportEl,
-    dragging,
-    stickyFolderId,
-    recomputeSticky,
-  ])
-
-  useEffect(
-    () => () => {
-      if (stickyRafRef.current != null) {
-        cancelAnimationFrame(stickyRafRef.current)
-      }
-    },
-    []
   )
 
   const handleRemoveFolder = useCallback(
@@ -1355,10 +672,6 @@ export function SidebarConversationList({
     }
   }, [removeConfirm, closeTabsByFolder, removeFolderFromWorkspace, t])
 
-  // The card already holds the full summary, so it passes `folderId` back to
-  // these callbacks. That removes the `conversations` closure dependency, which
-  // is what keeps these references stable across status events — the linchpin
-  // for the card `memo` actually bailing out (see Phase 1 of the perf plan).
   const handleSelect = useCallback(
     (id: number, agentType: string, folderId: number) => {
       // Selecting a conversation returns to the conversation workspace if a
@@ -1409,11 +722,9 @@ export function SidebarConversationList({
 
   const handleTogglePin = useCallback(
     async (id: number, nextPinned: boolean) => {
-      // Optimistic: instantly move the row into / out of the Pinned section. The
-      // upsert echo (emit_conversation_upsert) reconciles the exact server
-      // `pinned_at`; on failure the next refresh / WS reconnect corrects it
-      // (mirrors handleStatusChange's lenient pattern). Stable callback — only
-      // `updateConversationLocal` as a dep — so the card memo keeps bailing out.
+      // Optimistic: instantly flip the row's pin state. The upsert echo
+      // reconciles the exact server `pinned_at`; on failure the next refresh
+      // corrects it (mirrors handleStatusChange's lenient pattern).
       updateConversationLocal(id, {
         pinned_at: nextPinned ? new Date().toISOString() : null,
       })
@@ -1426,10 +737,9 @@ export function SidebarConversationList({
     // Starting a conversation returns to the conversation workspace if a
     // workbench route (e.g. Automations) was taking over the content region.
     openConversations()
-    // With no active folder (all folders closed, or a cold start that recovered
-    // to nothing) fall back to folderless chat mode rather than no-op — the
-    // same defense the sidebar's own "New chat" row takes, so neither entry
-    // point is ever a dead end.
+    // With no active folder (all projects closed, or a cold start that
+    // recovered to nothing) fall back to folderless chat mode rather than
+    // no-op — this entry point is never a dead end.
     if (!activeFolder) {
       openChatModeTab()
       return
@@ -1441,19 +751,15 @@ export function SidebarConversationList({
     (folderId: number) => {
       const folder = folderIndex.get(folderId)
       if (!folder) return
-      // Starting a conversation returns to the conversation workspace if a
-      // workbench route (e.g. Automations) was taking over the content region.
       openConversations()
       openNewConversationTab(folderId, folder.path)
     },
     [folderIndex, openNewConversationTab, openConversations]
   )
 
-  // "Import local sessions" now lives in a dedicated picker window (scan →
-  // folder-grouped multi-select → batch import). The folder context-menu entry
-  // anchors the picker to its own folder; sidebar refresh arrives via the
-  // backend's `conversations://bulk-changed` / `folder://changed` broadcasts,
-  // so no local busy state or task tracking remains here.
+  // "Import local sessions" opens a dedicated picker window. The project
+  // context-menu entry anchors the picker to its own folder; sidebar refresh
+  // arrives via the backend broadcasts, so no local busy state remains here.
   const handleImportForFolder = useCallback(
     (folderId: number) => {
       const folder = folderIndex.get(folderId)
@@ -1466,557 +772,37 @@ export function SidebarConversationList({
     void openImportSessionsWindow()
   }, [])
 
-  // ── Folder groups ─────────────────────────────────────────────────────────
-  // Creating a group opens a small naming dialog rather than dropping an
-  // "Untitled" band into the list: a group's whole job is to be labelled, and an
-  // inline-rename-after-the-fact flow leaves a meaningless row behind whenever
-  // the user is interrupted. `pendingGroupFolderId` carries the folder to move
-  // in once created — that is the "New group…" entry inside a folder's "Move to
-  // group" submenu, where creating and moving are one intent.
-  const [newGroupOpen, setNewGroupOpen] = useState(false)
-  const [newGroupName, setNewGroupName] = useState("")
-  const [pendingGroupFolderId, setPendingGroupFolderId] = useState<
-    number | null
-  >(null)
-  const [deleteGroupConfirm, setDeleteGroupConfirm] = useState<{
-    groupId: number
-    name: string
-    count: number
-  } | null>(null)
-  const newGroupIme = useImeGuard()
-
-  const openNewGroupDialog = useCallback(() => {
-    setPendingGroupFolderId(null)
-    setNewGroupName("")
-    setNewGroupOpen(true)
-  }, [])
-
-  const handleNewGroupWithFolder = useCallback((folderId: number) => {
-    setPendingGroupFolderId(folderId)
-    setNewGroupName("")
-    setNewGroupOpen(true)
-  }, [])
-
-  const handleMoveToGroup = useCallback(
-    async (folderId: number, groupId: number | null) => {
-      try {
-        await setFolderGroupAction(folderId, groupId)
-      } catch (e) {
-        toast.error(
-          t("toasts.moveToGroupFailed", { message: toErrorMessage(e) })
-        )
-      }
-    },
-    [setFolderGroupAction, t]
-  )
-
-  const confirmNewGroup = useCallback(async () => {
-    const name = newGroupName.trim() || t("folderGroup.defaultName")
-    const folderId = pendingGroupFolderId
-    setNewGroupOpen(false)
-    setPendingGroupFolderId(null)
-    try {
-      const group = await createFolderGroup(name)
-      // Created-and-move is two calls, but only the second can fail on its own;
-      // an empty group left behind is visible and removable, so there is nothing
-      // to unwind.
-      if (folderId != null) await setFolderGroupAction(folderId, group.id)
-    } catch (e) {
-      toast.error(t("toasts.createGroupFailed", { message: toErrorMessage(e) }))
-    }
-  }, [
-    newGroupName,
-    pendingGroupFolderId,
-    createFolderGroup,
-    setFolderGroupAction,
-    t,
-  ])
-
-  const handleRenameGroup = useCallback(
-    async (groupId: number, name: string) => {
-      try {
-        await updateFolderGroup(groupId, { name })
-      } catch (e) {
-        toast.error(
-          t("toasts.updateGroupFailed", { message: toErrorMessage(e) })
-        )
-      }
-    },
-    [updateFolderGroup, t]
-  )
-
-  const handleChangeGroupColor = useCallback(
-    async (groupId: number, color: FolderThemeColor) => {
-      try {
-        await updateFolderGroup(groupId, { color })
-      } catch (e) {
-        toast.error(
-          t("toasts.updateGroupFailed", { message: toErrorMessage(e) })
-        )
-      }
-    },
-    [updateFolderGroup, t]
-  )
-
-  // Deleting an EMPTY group is unambiguous and instantly redoable, so it skips
-  // the dialog. A group holding folders gets one, because "delete" reads as
-  // "delete the folders too" — the copy is there to say it doesn't.
-  const handleDeleteGroup = useCallback(
-    (groupId: number) => {
-      const group = useAppWorkspaceStore
-        .getState()
-        .folderGroups.find((g) => g.id === groupId)
-      if (!group) return
-      const count = layoutRef.current.membersByGroup.get(groupId)?.length ?? 0
-      if (count === 0) {
-        void deleteFolderGroupAction(groupId).catch((e) => {
-          toast.error(
-            t("toasts.deleteGroupFailed", { message: toErrorMessage(e) })
-          )
-        })
-        return
-      }
-      setDeleteGroupConfirm({ groupId, name: group.name, count })
-    },
-    [deleteFolderGroupAction, t]
-  )
-
-  const confirmDeleteGroup = useCallback(async () => {
-    const pending = deleteGroupConfirm
-    setDeleteGroupConfirm(null)
-    if (!pending) return
-    try {
-      await deleteFolderGroupAction(pending.groupId)
-    } catch (e) {
-      toast.error(t("toasts.deleteGroupFailed", { message: toErrorMessage(e) }))
-    }
-  }, [deleteGroupConfirm, deleteFolderGroupAction, t])
-
-  const persistLayout = useCallback(
-    async (next: SidebarLayout) => {
-      const entries = layoutToEntries(next)
-      if (entries.length === 0) return
-      setReordering(true)
-      try {
-        await applySidebarLayout(entries)
-      } catch (e) {
-        const msg = toErrorMessage(e)
-        toast.error(t("toasts.applyLayoutFailed", { message: msg }))
-      } finally {
-        setReordering(false)
-      }
-    },
-    [applySidebarLayout, t]
-  )
-
-  const handleReorder = useCallback((next: SidebarLayout) => {
-    pendingLayoutRef.current = next
-    setDragLayout(next)
-  }, [])
-
-  const handleDragEnd = useCallback(async () => {
-    setDragging(null)
-    const next = pendingLayoutRef.current
-    pendingLayoutRef.current = null
-    if (!next) {
-      setDragLayout(null)
-      return
-    }
-    try {
-      // Reconcile ONE more time against the authoritative layout before
-      // writing. The rendered layout is reconciled every render, but this
-      // snapshot was taken at the last pointermove — and the workspace can move
-      // between that move and the release (another window regrouping a folder,
-      // a task closing one, an automation opening a worktree). Persisting the
-      // pre-mutation view would let a drop silently overwrite a change the user
-      // never saw, because `apply_sidebar_layout` is authoritative for every row
-      // it names. Reconciling here keeps "what is written" equal to "what was on
-      // screen" — while still carrying the user's last move, which a plain read
-      // of the rendered layout could lose if no render flushed after it.
-      await persistLayout(reconcileLayout(next, storeLayoutRef.current))
-    } finally {
-      // Clear the optimistic override once the store has absorbed the new
-      // layout (or, on failure, once its rollback has restored the old one).
-      setDragLayout(null)
-    }
-  }, [persistLayout])
-
-  // ── Custom folder-drag gesture ────────────────────────────────────────────
-  // Height of one folder header row (Tailwind `h-[2rem]`); the drag surface
-  // collapses every folder to just its header so the target slot is a simple
-  // `floor(pointerY / FOLDER_ROW_HEIGHT)`.
-  //
-  // Read off the zoom level rather than pinned at 32: the row is 2 *rem*, so it
-  // is 48px at 150%, and a fixed 32 would map the pointer to a slot a third too
-  // far down — a drop the gesture then persists as the new folder order.
-  const FOLDER_ROW_HEIGHT = 2 * ((16 * zoomLevel) / 100)
-  const DRAG_THRESHOLD_PX = 6
-  const AUTOSCROLL_EDGE_PX = 28
-  const AUTOSCROLL_STEP_PX = 12
-
-  const stopAutoscroll = useCallback(() => {
-    if (autoscrollRef.current != null) {
-      cancelAnimationFrame(autoscrollRef.current)
-      autoscrollRef.current = null
-    }
-  }, [])
-
-  // Suppress exactly one trailing click after a real drag so the gesture never
-  // also toggles a folder. The grip element that received `pointerdown` unmounts
-  // when the drag surface takes over, so a per-element guard would be unreliable;
-  // a one-shot capture listener is robust and self-cleans (the rAF drops it if
-  // the browser synthesizes no click, leaving later legitimate clicks intact).
-  const suppressNextClick = useCallback(() => {
-    const onClick = (event: MouseEvent) => {
-      event.preventDefault()
-      event.stopPropagation()
-    }
-    window.addEventListener("click", onClick, { capture: true, once: true })
-    requestAnimationFrame(() => {
-      window.removeEventListener("click", onClick, true)
-    })
-  }, [])
-
-  // Reorder the grabbed folder to the slot under the pointer (optimistically,
-  // via the same `dragOrder` machinery the persisted reorder uses). Targeting is
-  // intentionally gated on the collapsed drag surface existing: until it mounts,
-  // the only available geometry is the *expanded* virtualized list, whose
-  // scrollTop/row mix would map the pointer to a bogus far index (and clamp it
-  // to the last folder). Skipping until the surface is up means a too-quick
-  // release simply leaves the order untouched.
-  const updateDragTarget = useCallback(
-    (clientY: number) => {
-      const state = dragPointerRef.current
-      const surface = dragSurfaceRef.current
-      if (!state || !surface) return
-      const slots = dragSlotsRef.current
-      // The surface's live rect already reflects scroll, so no scrollTop term.
-      const slotIndex = pointerYToTargetIndex(
-        clientY,
-        surface.getBoundingClientRect().top,
-        0,
-        FOLDER_ROW_HEIGHT,
-        slots.length
-      )
-      const slot = slots[slotIndex]
-      if (!slot) return
-      const current = layoutRef.current
-      // Skip the no-op: without this every pointermove would allocate a fresh
-      // layout object and re-render the whole surface at pointer frequency.
-      const at = locateEntry(current, state.entry)
-      if (
-        at &&
-        at.groupId === slot.target.groupId &&
-        at.index === slot.target.index
-      ) {
-        return
-      }
-      handleReorder(
-        applyLayoutMove(
-          current,
-          state.entry,
-          slot.target.groupId,
-          slot.target.index
-        )
-      )
-    },
-    [handleReorder, FOLDER_ROW_HEIGHT]
-  )
-
-  // While the pointer rests near a viewport edge, scroll and keep retargeting so
-  // off-screen folders remain reachable as drop targets.
-  const maybeAutoscroll = useCallback(
-    (clientY: number) => {
-      const viewport = viewportRef.current
-      if (!viewport) return
-      const rect = viewport.getBoundingClientRect()
-      const atTop = clientY < rect.top + AUTOSCROLL_EDGE_PX
-      const atBottom = clientY > rect.bottom - AUTOSCROLL_EDGE_PX
-      if (!atTop && !atBottom) {
-        stopAutoscroll()
-        return
-      }
-      if (autoscrollRef.current != null) return
-      const step = () => {
-        const v = viewportRef.current
-        const state = dragPointerRef.current
-        if (!v || !state) {
-          stopAutoscroll()
-          return
-        }
-        const r = v.getBoundingClientRect()
-        const dir = state.lastY < r.top + AUTOSCROLL_EDGE_PX ? -1 : 1
-        v.scrollTop += dir * AUTOSCROLL_STEP_PX
-        updateDragTarget(state.lastY)
-        autoscrollRef.current = requestAnimationFrame(step)
-      }
-      autoscrollRef.current = requestAnimationFrame(step)
-    },
-    [stopAutoscroll, updateDragTarget]
-  )
-
-  const teardownDragListeners = useCallback(() => {
-    dragCleanupRef.current?.()
-    dragCleanupRef.current = null
-    stopAutoscroll()
-  }, [stopAutoscroll])
-
-  const cancelDrag = useCallback(() => {
-    teardownDragListeners()
-    dragPointerRef.current = null
-    pendingLayoutRef.current = null
-    setDragging(null)
-    setDragLayout(null)
-  }, [teardownDragListeners])
-
-  const finishDrag = useCallback(() => {
-    teardownDragListeners()
-    const state = dragPointerRef.current
-    dragPointerRef.current = null
-    if (state?.started) {
-      // A real drag occurred → commit the optimistic order and swallow the
-      // trailing click so it doesn't also toggle a folder. A pointerup that
-      // never crossed the threshold falls through to the normal toggle click.
-      suppressNextClick()
-      void handleDragEnd()
-    }
-  }, [teardownDragListeners, handleDragEnd, suppressNextClick])
-
-  const onDragPointerMove = useCallback(
-    (event: PointerEvent) => {
-      const state = dragPointerRef.current
-      if (!state || event.pointerId !== state.pointerId) return
-      state.lastY = event.clientY
-      if (!state.started) {
-        const moved = Math.hypot(
-          event.clientX - state.startX,
-          event.clientY - state.startY
-        )
-        if (moved < DRAG_THRESHOLD_PX) return
-        state.started = true
-        setDragging(state.entry)
-        // Seed the optimistic layout from the current one so the drag surface
-        // has something to render before the first target update lands.
-        setDragLayout(layoutRef.current)
-      }
-      updateDragTarget(event.clientY)
-      maybeAutoscroll(event.clientY)
-    },
-    [updateDragTarget, maybeAutoscroll]
-  )
-
-  const onDragPointerUp = useCallback(
-    (event: PointerEvent) => {
-      const state = dragPointerRef.current
-      if (state && event.pointerId !== state.pointerId) return
-      finishDrag()
-    },
-    [finishDrag]
-  )
-
-  // Pointer cancellation (touch interruption, browser takeover) aborts the drag
-  // rather than committing a possibly-incomplete reorder.
-  const onDragPointerCancel = useCallback(
-    (event: PointerEvent) => {
-      const state = dragPointerRef.current
-      if (state && event.pointerId !== state.pointerId) return
-      cancelDrag()
-    },
-    [cancelDrag]
-  )
-
-  const onDragKeyDown = useCallback(
-    (event: KeyboardEvent) => {
-      if (event.key === "Escape") cancelDrag()
-    },
-    [cancelDrag]
-  )
-
-  const beginEntryDrag = useCallback(
-    (entry: SidebarEntry, event: React.PointerEvent) => {
-      if (event.button !== 0) return
-      if (reorderingRef.current) return
-      if (dragPointerRef.current) return
-      dragPointerRef.current = {
-        entry,
-        pointerId: event.pointerId,
-        startX: event.clientX,
-        startY: event.clientY,
-        lastY: event.clientY,
-        started: false,
-      }
-      window.addEventListener("pointermove", onDragPointerMove)
-      window.addEventListener("pointerup", onDragPointerUp)
-      window.addEventListener("pointercancel", onDragPointerCancel)
-      window.addEventListener("keydown", onDragKeyDown)
-      dragCleanupRef.current = () => {
-        window.removeEventListener("pointermove", onDragPointerMove)
-        window.removeEventListener("pointerup", onDragPointerUp)
-        window.removeEventListener("pointercancel", onDragPointerCancel)
-        window.removeEventListener("keydown", onDragKeyDown)
-      }
-    },
-    [onDragPointerMove, onDragPointerUp, onDragPointerCancel, onDragKeyDown]
-  )
-
-  // Per-kind adapters so the memoized headers get an `(id, event)` callback with
-  // a stable identity — building `{ kind, id }` inline in the JSX would allocate
-  // a fresh function per render and defeat every header's memo.
-  const beginFolderDrag = useCallback(
-    (folderId: number, event: React.PointerEvent) => {
-      beginEntryDrag({ kind: "folder", id: folderId }, event)
-    },
-    [beginEntryDrag]
-  )
-  const beginGroupDrag = useCallback(
-    (groupId: number, event: React.PointerEvent) => {
-      beginEntryDrag({ kind: "group", id: groupId }, event)
-    },
-    [beginEntryDrag]
-  )
-
-  // Safety net: drop listeners / stop autoscroll if the list unmounts mid-drag.
-  useEffect(() => () => teardownDragListeners(), [teardownDragListeners])
-
-  // One dialog everywhere: it owns directory selection *and* the follow-up
-  // step that links other folders in, so the native picker can't be a separate
-  // path that skips half the flow (it is still offered inside the dialog on
-  // local desktop). Empty deps — `setBrowserOpen` is a stable setter — so the
-  // memoized section header doesn't re-render on every parent render.
   const handleOpenFolderAction = useCallback(() => setBrowserOpen(true), [])
-
-  // Stable trigger for the Clone Repository dialog, passed to the memoized
-  // Folders section header. Empty deps (setCloneOpen is a stable setter) so the
-  // header doesn't re-render on every parent render.
   const handleOpenCloneDialog = useCallback(() => setCloneOpen(true), [])
 
   const showEmptyWorkspaceActions =
     folders.length === 0 && conversations.length === 0
 
-  // A folder's chosen colour, for the header's colour picker and for the tint
-  // its TITLE takes. It used to also drive a per-row `data-theme` wrapper, which
-  // re-themed every conversation card under the folder (hover pill, selection,
-  // the whole token set) while barely showing on the title itself — the reverse
-  // of what picking a folder colour means. The tint now lands on the title text
-  // and nothing else; cards always render in the app theme.
+  // A project's chosen colour, for the tint its TITLE takes.
   const folderThemeColor = (folderId: number): FolderThemeColor =>
     normalizeFolderThemeColor(folderIndex.get(folderId)?.color)
 
-  // Which group each folder belongs to, straight off the resolved layout, so it
-  // agrees with what is actually rendered (including mid-drag) rather than with
-  // a possibly-stale `folder.group_id`.
-  const groupIdByFolder = useMemo(() => {
-    const map = new Map<number, number>()
-    for (const [groupId, members] of layout.membersByGroup) {
-      for (const memberId of members) map.set(memberId, groupId)
-    }
-    return map
-  }, [layout])
-
-  // A folder inside a group is indented one level, exactly like a worktree
-  // sub-group — the same `depth` machinery drives its glyph inset, connector
-  // rails and its conversations' indent, so the whole subtree shifts together. A
-  // worktree child inherits its repo's group, since the repo is what carries the
-  // family into the group.
-  const groupDepth = (folderId: number): number => {
-    const familyRoot = childToParent.get(folderId) ?? folderId
-    return groupIdByFolder.has(familyRoot) ? 1 : 0
-  }
-
-  // Running sessions across a container repo and all its worktrees — the count
-  // shown on the container header (its own sessions live in the root sub-group,
-  // so the bare per-folder number would understate the repo family).
-  const containerRunningCount = (repoId: number): number => {
-    let total = folderRunningCounts.get(repoId) ?? 0
-    const kids = containerChildren.get(repoId)
-    if (kids) {
-      for (const kid of kids) total += folderRunningCounts.get(kid) ?? 0
-    }
-    return total
-  }
-
-  // The same number one level up: a GROUP's badge is the running sessions across
-  // every folder in it. Members are always reorderable top-level folders, so
-  // `containerRunningCount` is the right per-member term in both worktree modes
-  // — with "Show worktrees" on it adds the worktree children (their own display
-  // groups), with it off `folderRunningCounts` has already folded them in.
-  //
-  // Computed here at render, deliberately NOT in `buildRows`: like the folder
-  // badge, a status event must move one number on one memoized header, never
-  // rebuild the row model.
-  const groupRunningCount = (groupId: number): number => {
-    let total = 0
-    for (const memberId of layout.membersByGroup.get(groupId) ?? []) {
-      total += containerRunningCount(memberId)
-    }
-    return total
-  }
-
-  const folderHeaderElement = (
-    folderId: number,
-    opts: {
-      dragging: boolean
-      collapsed?: boolean
-      grip: boolean
-      onToggle?: (folderId: number) => void
-      suppressed?: boolean
-      /** Render as the container repo's own-sessions "root" sub-group (FolderRoot
-       *  glyph, indented, session-only collapse) rather than the repo header. */
-      rootGroup?: boolean
-      /** Force depth 0. Used by the drag surface, where every row must be the
-       *  same fixed height AND the same indent for `pointerYToTargetIndex`; the
-       *  surface conveys nesting with its own explicit indent instead. */
-      flat?: boolean
-    }
-  ) => {
+  const projectRow = (folderId: number) => {
     const folderEntry = folderIndex.get(folderId)
     const project = projectsById.get(folderId)
     // F5：行渲染走领域 ProjectRow——wire 行（folderEntry）只补显示字段
-    // （目录原名/主题色/默认 agent/worktree 分支）。二者同源于 allFolders，
-    // 缺一即不渲染（防御性；正常数据流不会发生）。
+    // （目录原名/主题色/默认 agent）。二者同源于 allFolders，缺一即不渲染
+    // （防御性；正常数据流不会发生）。
     if (!folderEntry || !project) return null
-    const isRootGroup = opts.rootGroup ?? false
-    // A worktree child header (only under "Show worktrees"): indented, FolderGit2
-    // glyph, branch label. Keyed off `childToParent` so it matches exactly which
-    // folders buildRows nests — an orphan worktree (parent closed) is neither a
-    // worktree child nor a container here, so it renders as a plain top-level
-    // folder, consistent with its slot.
-    const isWorktree =
-      !isRootGroup && showWorktrees && childToParent.has(folderId)
-    // A container repo (has ≥1 open worktree): plain repo glyph but a count
-    // spanning the whole family. Its own sessions render in the root sub-group.
-    const isContainer =
-      !isRootGroup && showWorktrees && containerRepoIds.has(folderId)
-    const variant = isRootGroup ? "root" : isWorktree ? "worktree" : "repo"
-    // Sub-group indent (worktree / root) stacks ON TOP of the group indent, so a
-    // worktree of a grouped repo sits at depth 2. `opts.flat` zeroes both on the
-    // drag surface, whose fixed-height row math needs every row at one indent.
-    const depth = opts.flat
-      ? 0
-      : (isRootGroup || isWorktree ? 1 : 0) + groupDepth(folderId)
-    const runningCount = isContainer
-      ? containerRunningCount(folderId)
-      : (folderRunningCounts.get(folderId) ?? 0)
-    const expanded = isRootGroup
-      ? !rootGroupCollapsed.has(folderId)
-      : opts.collapsed
-        ? false
-        : (folderExpanded[folderId] ?? true)
     return (
       <ProjectRow
         project={project}
         directoryName={folderEntry.name}
         branch={branches.get(folderId) ?? null}
-        runningCount={runningCount}
-        expanded={expanded}
+        runningCount={folderRunningCounts.get(folderId) ?? 0}
+        attentionCount={folderAttentionCounts.get(folderId) ?? 0}
+        expanded={folderExpanded[folderId] ?? true}
         themeColor={folderThemeColor(folderId)}
         appThemeColor={appThemeColor}
         currentDefaultAgent={folderEntry.defaultAgentType ?? null}
         availableAgents={availableAgents}
         availableAgentsFresh={availableAgentsFresh}
-        onToggle={
-          opts.onToggle ?? (isRootGroup ? toggleRootGroup : toggleFolder)
-        }
+        onToggle={toggleFolder}
         onRemoveFromWorkspace={handleRemoveFolder}
         onNewConversation={handleNewConversationForFolder}
         onImport={handleImportForFolder}
@@ -2028,304 +814,118 @@ export function SidebarConversationList({
         onOpenInSystemExplorer={handleOpenFolderInSystemExplorer}
         onOpenInTerminal={handleOpenFolderInTerminal}
         onOpenInCode={handleOpenFolderInCode}
-        // "Move to group" only on real, reorderable project headers. A worktree
-        // sub-group and a container's "root" sub-group follow their repo and
-        // can't be grouped on their own, so they get no submenu at all rather
-        // than one that silently moves something else.
-        folderGroups={isRootGroup || isWorktree ? undefined : folderGroups}
-        currentGroupId={groupIdByFolder.get(folderId) ?? null}
-        onMoveToGroup={
-          isRootGroup || isWorktree ? undefined : handleMoveToGroup
-        }
-        onNewGroupWithFolder={
-          isRootGroup || isWorktree ? undefined : handleNewGroupWithFolder
-        }
-        isDragging={opts.dragging}
-        onGripPointerDown={opts.grip ? beginFolderDrag : undefined}
-        suppressed={opts.suppressed ?? false}
-        depth={depth}
-        variant={variant}
-        worktreeBranch={folderEntry.gitBranch ?? null}
       />
     )
   }
 
-  const renderRow = (row: SidebarRow) => {
+  const renderRow = (row: ProjectListRow) => {
     if (row.kind === "section") {
-      // Section headers are not folder-scoped, so they skip themeWrap.
+      // The single "Projects" section header: label toggles the whole
+      // section; the right cluster carries the section menu (⋮) and the
+      // add-project entry (＋).
       return (
-        <SidebarSectionHeader
-          section={row.section}
-          expanded={row.expanded}
-          onToggle={toggleSection}
-          // The chats section gets an always-visible New-chat button (its primary
-          // entry point, reachable even when empty). `openChatModeTab` is a stable
-          // context callback, so the memo holds. Recent gets the same
-          // affordance, but starting a conversation in the ACTIVE FOLDER — the
-          // section spans folders and chats alike, and the folder is where a
-          // "continue where I left off" list lands you.
-          onNewChat={
-            row.section === "chats"
-              ? openChatModeTab
-              : row.section === "recent"
-                ? handleNewConversation
-                : undefined
-          }
-          // The folders section gets two right-edge hover actions — Open Folder
-          // and Clone Repository (the sidebar-bottom ProjectTreeAddButton is the
-          // other entry into the same flows). Both handlers are stable, so the
-          // memo holds.
-          onOpenFolder={
-            row.section === "folders" ? handleOpenFolderAction : undefined
-          }
-          onCloneRepository={
-            row.section === "folders" ? handleOpenCloneDialog : undefined
-          }
-          // Global "Import local sessions" entry (no folder anchor) — opens
-          // the same picker window as the folder context-menu item. Stable
-          // callback, so the memo holds.
-          onImportSessions={
-            row.section === "folders" ? handleOpenImportWindow : undefined
-          }
-          // "New group" — the one action in this cluster that organises the
-          // list rather than adding to it. Stable callback, so the memo holds.
-          onNewFolderGroup={
-            row.section === "folders" ? openNewGroupDialog : undefined
-          }
-          // Every section header carries a top gap: it separates "Folders" from
-          // the "Pinned" section above it, and — now that a fixed New chat /
-          // Search region sits above the scrolled list — gives the first section
-          // (Pinned, or Folders when nothing is pinned) the same breathing room
-          // below that region instead of butting right up against it.
-          topGap
-        />
-      )
-    }
-    if (row.kind === "folder-group") {
-      const group = folderGroups.find((g) => g.id === row.groupId)
-      if (!group) return null
-      return (
-        <SidebarFolderGroupHeader
-          groupId={row.groupId}
-          name={group.name}
-          runningCount={groupRunningCount(row.groupId)}
-          expanded={row.expanded}
-          onToggle={toggleFolderGroup}
-          onRename={handleRenameGroup}
-          onChangeColor={handleChangeGroupColor}
-          onDelete={handleDeleteGroup}
-          themeColor={normalizeFolderThemeColor(group.color)}
-          appThemeColor={appThemeColor}
-          isDragging={dragging?.kind === "group" && dragging.id === row.groupId}
-          onGripPointerDown={beginGroupDrag}
-        />
-      )
-    }
-    if (row.kind === "group-empty") {
-      // Folderless hint at the member indent (depth 1), so it reads as being
-      // INSIDE the group rather than as another top-level row.
-      return (
-        <div
-          className="flex h-[2rem] items-center text-[0.75rem] text-muted-foreground/70"
-          style={{
-            paddingLeft: `calc(var(--conv-rail-axis) + 0.875rem + ${CONV_RAIL_DEPTH_STEP})`,
-          }}
-        >
-          <span className="truncate">{t("folderGroup.empty")}</span>
+        <div className="group flex h-[2rem] items-center pr-[0.375rem]">
+          <button
+            type="button"
+            onClick={toggleSection}
+            aria-expanded={sectionExpanded}
+            className={cn(
+              "flex h-full min-w-0 items-center gap-1 rounded-full pl-[0.25rem] pr-2 outline-none",
+              "text-xs font-medium text-muted-foreground",
+              "transition-colors duration-150 hover:text-sidebar-foreground",
+              "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+            )}
+          >
+            <ChevronDown
+              aria-hidden
+              className={cn(
+                "h-3 w-3 shrink-0 transition-transform duration-200 ease-out",
+                !sectionExpanded && "-rotate-90"
+              )}
+            />
+            <span className="truncate">{t("sectionProjects")}</span>
+          </button>
+          <div className="ml-auto flex items-center gap-0.5">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  title={t("moreOptions")}
+                  aria-label={t("moreOptions")}
+                  aria-haspopup="menu"
+                  className={cn(
+                    "flex h-6 w-6 cursor-pointer items-center justify-end rounded-[0.375rem] outline-none",
+                    "text-muted-foreground/90 transition-colors duration-150 hover:text-sidebar-foreground",
+                    "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                  )}
+                >
+                  <MoreHorizontal
+                    aria-hidden
+                    className="h-[0.875rem] w-[0.875rem]"
+                  />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-48">
+                <DropdownMenuItem
+                  onSelect={handleNewConversation}
+                  disabled={!activeFolder}
+                >
+                  <SquarePen className="h-3.5 w-3.5" />
+                  {t("newConversation")}
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={handleOpenImportWindow}>
+                  <Download className="h-3.5 w-3.5" />
+                  {t("importLocalSessions")}
+                </DropdownMenuItem>
+                {remoteAvailable && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onSelect={() => setRemoteManageOpen(true)}
+                    >
+                      <Settings className="h-3.5 w-3.5" />
+                      {tRemote("manage")}
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <ProjectTreeAddButton />
+          </div>
         </div>
       )
     }
-    if (row.kind === "folder") {
-      return folderHeaderElement(row.folderId, {
-        dragging: dragging?.kind === "folder" && dragging.id === row.folderId,
-        // Worktree child headers follow their parent and never reorder on
-        // their own, so they are not drag initiators (no grip). Only
-        // reorderable top-level repos keep the grip.
-        grip: !(showWorktrees && childToParent.has(row.folderId)),
-        // While this folder's sticky overlay is showing, the overlay is the
-        // accessible control; make the (occluded) in-list copy inert so it is
-        // not a duplicate tab stop / announcement.
-        suppressed: stickyFolderId === row.folderId,
-      })
-    }
-    if (row.kind === "root-group") {
-      // A container repo's own-sessions sub-group. Shares the repo id (for its
-      // bucket / count / theme) but is its own row kind with its own toggle, and
-      // is never draggable (it follows the container).
-      return folderHeaderElement(row.folderId, {
-        dragging: false,
-        grip: false,
-        rootGroup: true,
-      })
-    }
-    if (row.kind === "empty") {
-      // A worktree / root sub-group's empty hint is indented one level so its
-      // text lines up under the (depth-1) sub-group's sessions, matching the
-      // header. A plain folder's hint stays at depth 0. Group membership adds
-      // another level on top, exactly as it does for the header.
-      const nested =
-        showWorktrees &&
-        (childToParent.has(row.folderId) || containerRepoIds.has(row.folderId))
-      const depth = (nested ? 1 : 0) + groupDepth(row.folderId)
-      return (
-        // Full row height (h-[2rem], the fixed virtua item size) so the container
-        // connector spine stays continuous THROUGH an empty sub-group ("no
-        // conversations") instead of breaking at a shorter box. The ancestor rail
-        // spans this row; it renders nothing at depth 0 (a plain folder has no
-        // spine).
-        <div
-          className="relative flex h-[2rem] items-center text-[0.75rem] text-muted-foreground/70"
-          style={{
-            paddingLeft: `calc(var(--conv-rail-axis) + 0.875rem + ${depth} * ${CONV_RAIL_DEPTH_STEP})`,
-          }}
-        >
-          <SubsessionAncestorRails depth={depth} />
-          <span className="relative truncate">
-            {row.totalConversationCount === 0
-              ? t("emptyFolderHint")
-              : t("noUnfinishedConversations")}
-          </span>
-        </div>
-      )
-    }
-    if (row.kind === "chats-empty") {
-      // Folderless flat hint — no themeWrap, no conversation rail; align with the
-      // section header's text inset (px-[0.5rem]) rather than the folder rail.
-      return (
-        <div className="px-[0.5rem] py-[0.375rem] text-[0.75rem] text-muted-foreground/70">
-          {t("noChats")}
-        </div>
-      )
-    }
-    if (row.kind === "folders-empty") {
-      // Empty "Folders" section hint — mirrors chats-empty (folderless, no rail,
-      // aligned with the section header's text inset). The header's own hover
-      // actions (Open Folder / Clone / Import) are how you add the first folder.
+    if (row.kind === "no-projects") {
       return (
         <div className="px-[0.5rem] py-[0.375rem] text-[0.75rem] text-muted-foreground/70">
           {t("noFolders")}
         </div>
       )
     }
-    if (row.kind === "recent-empty") {
-      // Empty "Recent" section hint — same folderless, rail-less treatment as
-      // the other two. Only reachable in a workspace with no conversations at
-      // all, since Recent spans every section.
-      return (
-        <div className="px-[0.5rem] py-[0.375rem] text-[0.75rem] text-muted-foreground/70">
-          {t("noRecent")}
-        </div>
-      )
+    if (row.kind === "project") {
+      return projectRow(row.folderId)
     }
-    if (row.kind === "recent-more") {
-      // Footer of the paged Recent section — a row, not a hint: each click
-      // reveals another page. Its geometry is the conversation card's, so the
-      // section reads as one column — the chevron sits ON the rail axis exactly
-      // where a card's agent icon does (same 0.75rem glyph in the same 0.875rem
-      // box, centred on the var), and the label starts at the card's title
-      // inset (`axis + 0.875rem`). Same row height and full rounding too, so
-      // its hover pill is the one the rows above it use.
-      //
-      // Two directions live here. While pages remain, the row is "show more"
-      // and the reset hides at the right edge as an icon, on the same
-      // reveal-on-hover terms as the section headers' actions. Once the last
-      // page is out (`remaining === 0`) buildRows keeps the row alive for the
-      // reset alone, and it takes over the row: nothing is left to expand, so a
-      // hover-only affordance would be the section's only exit hiding itself.
-      const showMore = row.remaining > 0
-      const resetLabel = t("resetRecentLimit", { count: RECENT_PAGE_SIZE })
-      return (
-        <div className="group/recent-more relative h-[2rem]">
-          <button
-            ref={recentMoreButtonRef}
-            type="button"
-            onClick={showMore ? revealMoreRecent : resetRecentLimit}
-            className={cn(
-              // Lit from the ROW (`group-hover`), not from this button's own
-              // `:hover`. The reset icon is a sibling stacked on top, so with a
-              // plain `hover:` the pill went out the moment the pointer crossed
-              // onto it — the row read as un-hovered while the cursor was still
-              // inside it. Same reason the section headers put their group on
-              // the row container rather than the toggle button.
-              "relative flex h-[1.9375rem] w-full items-center rounded-full text-left text-[0.75rem] text-muted-foreground/80 outline-none transition-colors duration-[120ms] group-hover/recent-more:bg-[color-mix(in_oklab,var(--sidebar-accent),var(--sidebar-foreground)_2%)] group-hover/recent-more:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
-              // Reserved unconditionally (not just while hovered) so revealing
-              // the reset icon never reflows the label under the cursor.
-              showMore && row.canReset ? "pr-[1.75rem]" : "pr-[0.25rem]"
-            )}
-            style={{
-              paddingLeft: "calc(var(--conv-rail-axis, 0.875rem) + 0.875rem)",
-            }}
-          >
-            <span
-              aria-hidden
-              className="pointer-events-none absolute top-1/2 flex items-center justify-center"
-              style={{
-                left: "var(--conv-rail-axis, 0.875rem)",
-                width: "0.875rem",
-                height: "0.875rem",
-                transform: "translate(-50%, -50%)",
-              }}
-            >
-              {showMore ? (
-                <ChevronDown className="h-[0.75rem] w-[0.75rem]" />
-              ) : (
-                <ChevronsUp className="h-[0.75rem] w-[0.75rem]" />
-              )}
-            </span>
-            <span className="truncate">
-              {showMore
-                ? t("showMoreRecent", { count: row.remaining })
-                : resetLabel}
-            </span>
-          </button>
-          {showMore && row.canReset && (
-            // A SIBLING of the row button, never a child: buttons cannot nest.
-            // Being a sibling is also why the row's pill has to be driven from
-            // the group above — `:hover` only walks ancestors, and this button
-            // is not one, so the pill would blink off under the cursor.
-            // Geometry copied from the section headers' right-edge actions
-            // (`sidebar-section-header.tsx`) so every right-edge affordance in
-            // the sidebar lands on the same axis and reads as one family.
-            <button
-              type="button"
-              onClick={resetRecentLimit}
-              title={resetLabel}
-              aria-label={resetLabel}
-              className="absolute top-1/2 right-[0.375rem] flex h-6 w-6 -translate-y-1/2 cursor-pointer items-center justify-end rounded-[0.375rem] text-muted-foreground/90 opacity-0 outline-none transition-[color,opacity] duration-150 group-hover/recent-more:opacity-100 hover:text-sidebar-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset [@media(hover:none)]:opacity-100"
-            >
-              <ChevronsUp className="h-[0.875rem] w-[0.875rem]" />
-            </button>
-          )}
-        </div>
-      )
-    }
-    if (row.kind === "subsession-loading") {
-      // Transient spinner at the child indent while children are fetched. The
-      // left inset matches a depth-`row.depth` card's text start: rail axis
-      // (0.875rem + depth·CONV_RAIL_DEPTH_STEP) plus the button's extra 0.875rem.
-      // Ancestor guide rails keep each parent's vertical line continuous through
-      // this placeholder; the content is lifted (relative) above the z-0 rails.
+    if (row.kind === "empty") {
+      // A project's empty hint sits at the session indent so it reads as being
+      // INSIDE the project rather than as another top-level row.
       return (
         <div
-          className="relative py-[0.375rem] text-[0.75rem] text-muted-foreground/70"
+          className="flex h-[2rem] items-center text-[0.75rem] text-muted-foreground/70"
           style={{
-            paddingLeft: `calc(0.875rem + ${row.depth} * ${CONV_RAIL_DEPTH_STEP} + 0.875rem)`,
+            paddingLeft: "calc(var(--conv-rail-axis) + 0.875rem + 0.875rem)",
           }}
         >
-          <SubsessionAncestorRails depth={row.depth} />
-          <span className="relative flex items-center gap-1.5">
-            <Loader2 className="h-3 w-3 shrink-0 animate-spin" aria-hidden />
-            {t("loadingSubsessions")}
+          <span className="truncate">
+            {row.total === 0
+              ? t("emptyFolderHint")
+              : t("noUnfinishedConversations")}
           </span>
         </div>
       )
     }
     const conv = row.conversation
-    // No folder tint reaches this row: a card always renders in the app theme,
-    // whichever colour its folder carries. The colour is a label for the FOLDER,
-    // not a skin for the sessions inside it.
     return (
-      <SidebarConversationCard
+      <ProjectConversationRow
         conversation={conv}
         isSelected={
           selectedConversation?.agentType === conv.agent_type &&
@@ -2341,49 +941,28 @@ export function SidebarConversationList({
         onRename={handleRename}
         onDelete={handleDelete}
         onStatusChange={handleStatusChange}
-        onNewConversation={handleNewConversationForFolder}
         onTogglePin={handleTogglePin}
-        depth={row.depth}
-        hasChildren={conv.child_count > 0}
-        expanded={conversationExpanded.has(conv.id)}
-        onToggleExpand={toggleConversation}
       />
     )
   }
 
-  // Keys must be unique across the WHOLE flat array, and the Recent section
-  // deliberately re-lists conversations that also appear under their folder or
-  // in Chat — so every row a Recent parent can produce carries a `recent-`
-  // prefix to stay distinct from its canonical twin.
-  const rowKey = (row: SidebarRow): string => {
-    if (row.kind === "section") return `section-${row.section}`
-    if (row.kind === "folder-group") return `foldergroup-${row.groupId}`
-    if (row.kind === "group-empty") return `groupempty-${row.groupId}`
-    if (row.kind === "folder") return `folder-${row.folderId}`
-    if (row.kind === "root-group") return `rootgroup-${row.folderId}`
+  const rowKey = (row: ProjectListRow): string => {
+    if (row.kind === "section") return "section-projects"
+    if (row.kind === "no-projects") return "no-projects"
+    if (row.kind === "project") return `project-${row.folderId}`
     if (row.kind === "empty") return `empty-${row.folderId}`
-    if (row.kind === "chats-empty") return "chats-empty"
-    if (row.kind === "folders-empty") return "folders-empty"
-    if (row.kind === "recent-empty") return "recent-empty"
-    if (row.kind === "recent-more") return "recent-more"
-    const prefix = row.recent ? "recent-" : ""
-    if (row.kind === "subsession-loading") {
-      return `${prefix}subloading-${row.parentId}`
-    }
-    return `${prefix}conv-${row.conversation.agent_type}-${row.conversation.id}`
+    return `conv-${row.conversation.agent_type}-${row.conversation.id}`
   }
 
   return (
     <div className="relative flex flex-col flex-1 min-h-0">
-      {(loading || refreshing) && (
-        // z-20 keeps the refresh spinner above the sticky header overlay (z-10),
-        // which lives in a later sibling and would otherwise paint over it.
+      {loading && (
         <div className="absolute top-0 left-0 right-0 flex items-center justify-center py-1 z-20 pointer-events-none">
           <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
         </div>
       )}
 
-      {loading && !refreshing ? (
+      {loading ? (
         <div className="px-3 space-y-1.5 overflow-hidden">
           {Array.from({ length: 6 }).map((_, i) => (
             <Skeleton key={i} className="h-14 w-full rounded-md" />
@@ -2410,7 +989,7 @@ export function SidebarConversationList({
             variant="outline"
             size="sm"
             className="w-full max-w-[14rem] justify-start"
-            onClick={() => setCloneOpen(true)}
+            onClick={handleOpenCloneDialog}
           >
             <FolderGit2 className="h-3.5 w-3.5 mr-1.5" />
             {tFolderDropdown("cloneRepository")}
@@ -2437,103 +1016,15 @@ export function SidebarConversationList({
                   "[--conv-rail-axis:0.875rem]"
                 )}
               >
-                {dragging !== null ? (
-                  // Drag surface: one fixed-height row per DROP TARGET, so any
-                  // target (even one virtualized off-screen, or inside a group
-                  // that is collapsed in the real list) is reachable and the
-                  // `pointerYToTargetIndex` row math stays a plain divide.
-                  // Worktree children never appear — they aren't independently
-                  // reorderable, and an extra row would shift every slot below
-                  // it. Non-virtualized: folder counts are small.
-                  //
-                  // Every row is rendered at depth 0 (`flat`) and nesting is
-                  // shown with an explicit padding step instead, because the
-                  // depth machinery also drives connector rails that would
-                  // dangle off the collapsed surface.
-                  <div ref={dragSurfaceRef} className="flex flex-col">
-                    {dragSlots.map((slot, index) => {
-                      if (slot.render.kind === "ungroup") {
-                        return (
-                          <div
-                            key="ungroup"
-                            className={cn(
-                              "flex h-[2rem] items-center rounded-full",
-                              "border border-dashed border-sidebar-border",
-                              "px-[0.75rem] text-[0.75rem] text-muted-foreground/80"
-                            )}
-                          >
-                            <span className="truncate">
-                              {t("folderGroup.dropToUngroup")}
-                            </span>
-                          </div>
-                        )
-                      }
-                      if (slot.render.kind === "group") {
-                        const groupId = slot.render.id
-                        const group = folderGroups.find((g) => g.id === groupId)
-                        // The slot array and this surface must stay
-                        // row-for-row aligned — `pointerYToTargetIndex` is a
-                        // plain divide, so a slot that renders NOTHING would
-                        // silently shift every target below it by one row.
-                        // `layout` only ever names live groups, so this is
-                        // unreachable; it holds the row rather than vanishing
-                        // so the invariant is true by construction.
-                        if (!group)
-                          return (
-                            <div key={`g-${groupId}`} className="h-[2rem]" />
-                          )
-                        return (
-                          <div key={`g-${groupId}`}>
-                            <SidebarFolderGroupHeader
-                              presentation
-                              groupId={groupId}
-                              name={group.name}
-                              runningCount={groupRunningCount(groupId)}
-                              expanded={false}
-                              themeColor={normalizeFolderThemeColor(
-                                group.color
-                              )}
-                              appThemeColor={appThemeColor}
-                              isDragging={
-                                dragging.kind === "group" &&
-                                dragging.id === groupId
-                              }
-                            />
-                          </div>
-                        )
-                      }
-                      const { id: folderId, depth } = slot.render
-                      return (
-                        <div
-                          key={`f-${folderId}-${index}`}
-                          style={
-                            depth > 0
-                              ? { paddingLeft: CONV_RAIL_DEPTH_STEP }
-                              : undefined
-                          }
-                        >
-                          {folderHeaderElement(folderId, {
-                            dragging:
-                              dragging.kind === "folder" &&
-                              dragging.id === folderId,
-                            collapsed: true,
-                            grip: false,
-                            flat: true,
-                          })}
-                        </div>
-                      )
-                    })}
-                  </div>
-                ) : viewportEl ? (
+                {viewportEl ? (
                   <Virtualizer
                     ref={virtualizerRef}
                     scrollRef={viewportRef}
                     data={rows}
                     itemSize={32}
                     bufferSize={400}
-                    onScroll={handleVirtuaScroll}
                   >
-                    {(row: SidebarRow) => (
+                    {(row: ProjectListRow) => (
                       <div key={rowKey(row)}>{renderRow(row)}</div>
                     )}
                   </Virtualizer>
@@ -2548,36 +1039,6 @@ export function SidebarConversationList({
                   </div>
                 )}
               </ScrollArea>
-              {/*
-                Floating sticky folder header. Rendered AFTER ScrollArea so any
-                `[data-folder-id]` lookup still resolves the real in-list header
-                first (the real one stays mounted within virtua's buffer while
-                this overlay also shows). It is a real, accessible control: once
-                scrolled past, the in-list header is unmounted by virtua, so the
-                overlay is the keyboard/AT path to toggle/act on that folder.
-                `grip:false` — reordering is driven from the in-list header,
-                whose geometry the custom drag gesture relies on. `bg-sidebar`
-                is what occludes the rows scrolling beneath it — plain app-theme
-                sidebar, exactly the colour those rows are painted on.
-              */}
-              {stickyFolderId !== null && (
-                <div
-                  ref={overlayRef}
-                  className={cn(
-                    "pointer-events-none absolute left-0 right-0 top-0 z-10",
-                    "px-1.5 [--conv-rail-axis:0.875rem]"
-                  )}
-                  style={{ willChange: "transform" }}
-                >
-                  <div className="pointer-events-auto bg-sidebar">
-                    {folderHeaderElement(stickyFolderId, {
-                      dragging: false,
-                      grip: false,
-                      onToggle: handleOverlayToggle,
-                    })}
-                  </div>
-                </div>
-              )}
             </div>
           </ContextMenuTrigger>
           <ContextMenuContent>
@@ -2593,18 +1054,9 @@ export function SidebarConversationList({
               <FolderOpenDot className="h-4 w-4" />
               {tFolderDropdown("openFolder")}
             </ContextMenuItem>
-            <ContextMenuItem onSelect={() => setCloneOpen(true)}>
+            <ContextMenuItem onSelect={handleOpenCloneDialog}>
               <FolderGit2 className="h-4 w-4" />
               {tFolderDropdown("cloneRepository")}
-            </ContextMenuItem>
-            {/* The trigger wraps the whole scroll area, so this is also the menu
-                a right-click on the "Folders" heading (or on empty space below
-                the list) opens — the same entry point as the heading's
-                hover-revealed button, reachable without aiming at a 24px
-                target. */}
-            <ContextMenuItem onSelect={openNewGroupDialog}>
-              <LayersPlus className="h-4 w-4" />
-              {t("folderGroup.newGroup")}
             </ContextMenuItem>
             <ContextMenuItem onSelect={handleOpenImportWindow}>
               <Download className="h-4 w-4" />
@@ -2612,12 +1064,8 @@ export function SidebarConversationList({
             </ContextMenuItem>
             {/* Trailing entry, desktop-only: opening a remote workspace spawns
                 another window bound to a different server, which a web client
-                can't do. This is where the picker moved to when the fixed
-                top-left chrome handed its slot to Search — the status bar's
-                quick-actions menu carries the same submenu. Its own group: the
-                rows above all act on THIS machine's workspace, while this one
-                leaves for another host. The rule lives inside the guard so web
-                builds don't render a divider with nothing under it. */}
+                can't do. Its own group: the rows above all act on THIS
+                machine's workspace, while this one leaves for another host. */}
             {remoteAvailable && (
               <>
                 <ContextMenuSeparator />
@@ -2628,9 +1076,6 @@ export function SidebarConversationList({
                     <MonitorCloud className="h-4 w-4" />
                     {tRemote("openRemoteWorkspace")}
                   </ContextMenuSubTrigger>
-                  {/* The shared sub-content is `overflow-hidden` with no height
-                      cap, so a long connection list would strand its tail — the
-                      manage row included — offscreen. Bound and scroll it. */}
                   <ContextMenuSubContent className="max-h-(--radix-context-menu-content-available-height) w-72 overflow-x-hidden overflow-y-auto">
                     {remoteConnections.length === 0 ? (
                       <div className="px-3 py-2 text-sm text-muted-foreground">
@@ -2689,68 +1134,6 @@ export function SidebarConversationList({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Naming a group up front, rather than dropping an "Untitled" band into
-          the list and relying on a follow-up rename that an interrupted user
-          never performs. Doubles as the "New group…" step inside a folder's
-          "Move to group" submenu — `pendingGroupFolderId` is what makes the two
-          one gesture. */}
-      <Dialog open={newGroupOpen} onOpenChange={setNewGroupOpen}>
-        <DialogContent className="sm:max-w-[24rem]">
-          <DialogHeader>
-            <DialogTitle>{t("folderGroup.newGroupTitle")}</DialogTitle>
-          </DialogHeader>
-          <Input
-            value={newGroupName}
-            onChange={(e) => setNewGroupName(e.target.value)}
-            {...newGroupIme.props}
-            onKeyDown={(e) => {
-              // Never commit mid-composition: an IME's candidate-selection
-              // Enter would otherwise create a group named half a word.
-              if (newGroupIme.isComposing(e)) return
-              if (e.key === "Enter") void confirmNewGroup()
-            }}
-            placeholder={t("folderGroup.namePlaceholder")}
-            autoFocus
-          />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setNewGroupOpen(false)}>
-              {tCommon("cancel")}
-            </Button>
-            <Button onClick={() => void confirmNewGroup()}>
-              {tCommon("create")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Shown only for a NON-empty group (see `handleDeleteGroup`). The copy's
-          job is to say the folders survive — "delete group" otherwise reads as
-          "delete the folders in it". */}
-      <AlertDialog
-        open={deleteGroupConfirm !== null}
-        onOpenChange={(open) => !open && setDeleteGroupConfirm(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {t("folderGroup.deleteConfirmTitle")}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("folderGroup.deleteConfirmDescription", {
-                name: deleteGroupConfirm?.name ?? "",
-                count: deleteGroupConfirm?.count ?? 0,
-              })}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{tCommon("cancel")}</AlertDialogCancel>
-            <AlertDialogAction onClick={() => void confirmDeleteGroup()}>
-              {tCommon("confirm")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
       {manageFolderId != null && (
         <ConversationManageDialog
           open
@@ -2773,7 +1156,7 @@ export function SidebarConversationList({
         />
       )}
       {/* 链接管理模式复用同一对话框：只记 wire id，行数据在渲染时经
-          allFolders 解析（找不到即不挂载，与旧 linksFolder 语义一致）。 */}
+          allFolders 解析（找不到即不挂载）。 */}
       {linksFolderId != null &&
         (() => {
           const linksFolderDetail =

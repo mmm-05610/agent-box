@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react"
+import { fireEvent, render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { NextIntlClientProvider } from "next-intl"
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -28,12 +28,10 @@ const spies = vi.hoisted(() => ({
   expandAll: vi.fn(),
   collapseAll: vi.fn(),
   // Latest props the (stubbed) conversation list was rendered with, so tests can
-  // assert what the sidebar threads down (e.g. showWorktrees / showCompleted).
+  // assert what the sidebar threads down (e.g. showCompleted / sortMode).
   listProps: null as {
-    showWorktrees?: boolean
     showCompleted?: boolean
-    showRecent?: boolean
-    sectionOrder?: readonly string[]
+    sortMode?: string
   } | null,
 }))
 const mockState = vi.hoisted(() => ({
@@ -55,10 +53,8 @@ vi.mock(
         ...props
       }: {
         ref?: Ref<SidebarConversationListHandle>
-        showWorktrees?: boolean
         showCompleted?: boolean
-        showRecent?: boolean
-        sectionOrder?: readonly string[]
+        sortMode?: string
       }) => {
         spies.listProps = props
         useImperativeHandle(ref, () => ({
@@ -227,12 +223,11 @@ describe("Sidebar — View options grouping", () => {
     renderSidebar()
     await user.click(screen.getByRole("button", { name: "View options" }))
 
-    // Six checkboxes inline turned the root into a wall; they now sit one hop
-    // in, behind their group. Sort by / Section order stay inline — the
-    // control on the right is the proof this is about the two inventories and
-    // not the menu failing to render.
+    // The toggles sit one hop in, behind their group; Sort by stays inline.
     expect(
-      screen.queryByRole("menuitemcheckbox", { name: "Show worktree folders" })
+      screen.queryByRole("menuitemcheckbox", {
+        name: "Show completed conversations",
+      })
     ).toBeNull()
     expect(
       screen.queryByRole("menuitemcheckbox", { name: "Automations" })
@@ -273,43 +268,6 @@ describe("Sidebar — View options grouping", () => {
   })
 })
 
-describe("Sidebar — Show worktree folders toggle", () => {
-  beforeEach(() => {
-    localStorage.clear()
-    spies.listProps = null
-    mockState.activeFolder = { id: 7, path: "/x" }
-  })
-
-  it("defaults Show worktree folders on and threads it to the conversation list", () => {
-    renderSidebar()
-    expect(spies.listProps?.showWorktrees).toBe(true)
-  })
-
-  it("respects an explicitly-stored 'false' from localStorage", () => {
-    localStorage.setItem("workspace:sidebar-show-worktrees", "false")
-    renderSidebar()
-    // Hydration runs in a mount effect (flushed by render's act): a user who
-    // unchecked it keeps it off despite the default-on.
-    expect(spies.listProps?.showWorktrees).toBe(false)
-  })
-
-  it("toggling the view-options item off persists the choice and threads it down", async () => {
-    renderSidebar()
-    // Default on with a cleared store.
-    expect(spies.listProps?.showWorktrees).toBe(true)
-
-    await openViewOptionsGroup("Conversation list")
-    await userEvent.click(
-      screen.getByRole("menuitemcheckbox", { name: "Show worktree folders" })
-    )
-
-    expect(localStorage.getItem("workspace:sidebar-show-worktrees")).toBe(
-      "false"
-    )
-    expect(spies.listProps?.showWorktrees).toBe(false)
-  })
-})
-
 describe("Sidebar — Show completed default", () => {
   beforeEach(() => {
     localStorage.clear()
@@ -325,43 +283,33 @@ describe("Sidebar — Show completed default", () => {
   it("respects an explicitly-stored 'true' from localStorage", () => {
     localStorage.setItem("workspace:sidebar-show-completed", "true")
     renderSidebar()
+    // Hydration runs in a mount effect (flushed by render's act): a user who
+    // checked it keeps it on despite the default-off.
     expect(spies.listProps?.showCompleted).toBe(true)
   })
-})
 
-describe("Sidebar — Show Recent group toggle", () => {
-  beforeEach(() => {
-    localStorage.clear()
-    spies.listProps = null
-    mockState.activeFolder = { id: 7, path: "/x" }
-  })
-
-  it("defaults Show Recent on and threads it to the conversation list", () => {
+  it("toggling the view-options item persists the choice and threads it down", async () => {
     renderSidebar()
-    expect(spies.listProps?.showRecent).toBe(true)
-  })
-
-  it("respects an explicitly-stored 'false' from localStorage", () => {
-    localStorage.setItem("workspace:sidebar-show-recent", "false")
-    renderSidebar()
-    expect(spies.listProps?.showRecent).toBe(false)
-  })
-
-  it("toggling the view-options item off persists the choice and keeps the menu open", async () => {
-    renderSidebar()
+    // Default off with a cleared store.
+    expect(spies.listProps?.showCompleted).toBe(false)
 
     await openViewOptionsGroup("Conversation list")
     await userEvent.click(
-      screen.getByRole("menuitemcheckbox", { name: "Show Recent group" })
+      screen.getByRole("menuitemcheckbox", {
+        name: "Show completed conversations",
+      })
     )
 
-    expect(localStorage.getItem("workspace:sidebar-show-recent")).toBe("false")
-    expect(spies.listProps?.showRecent).toBe(false)
+    expect(localStorage.getItem("workspace:sidebar-show-completed")).toBe(
+      "true"
+    )
+    expect(spies.listProps?.showCompleted).toBe(true)
     // The view-options menu is a settings panel: flipping one option must not
-    // dismiss it — nor the submenu it lives in — or changing two costs two
-    // trips back through the trigger.
+    // dismiss it — nor the submenu it lives in.
     expect(
-      screen.getByRole("menuitemcheckbox", { name: "Show Recent group" })
+      screen.getByRole("menuitemcheckbox", {
+        name: "Show completed conversations",
+      })
     ).toBeTruthy()
   })
 })
@@ -382,7 +330,7 @@ describe("Sidebar — Navigation item visibility", () => {
     expect(navRow("Automations")).toBeTruthy()
     // Tasks left the nav rows in the ZCode layout — it is now its own section
     // (header + empty state) further down the sidebar.
-    expect(screen.getByText("To-dos")).toBeTruthy()
+    expect(screen.getByText("Tasks")).toBeTruthy()
     expect(screen.getByText("No tasks yet")).toBeTruthy()
   })
 
@@ -406,7 +354,7 @@ describe("Sidebar — Navigation item visibility", () => {
     expect(navRow("Automations")).toBeNull()
     // Control: the tasks section is still there, so the assertion above is about
     // this one row rather than a hidden subtree.
-    expect(screen.getByText("To-dos")).toBeTruthy()
+    expect(screen.getByText("Tasks")).toBeTruthy()
     expect(
       JSON.parse(localStorage.getItem("workspace:sidebar-nav-items") ?? "{}")
     ).toEqual({ automations: false })
@@ -420,7 +368,7 @@ describe("Sidebar — Navigation item visibility", () => {
     renderSidebar()
     // Hiding tasks now removes its SECTION (header + empty state), since the
     // nav row no longer exists.
-    expect(screen.queryByText("To-dos")).toBeNull()
+    expect(screen.queryByText("Tasks")).toBeNull()
     expect(navRow("Automations")).toBeTruthy()
   })
 
@@ -430,7 +378,7 @@ describe("Sidebar — Navigation item visibility", () => {
       JSON.stringify({ retired: false, tasks: false })
     )
     renderSidebar()
-    expect(screen.queryByText("To-dos")).toBeNull()
+    expect(screen.queryByText("Tasks")).toBeNull()
     expect(navRow("Automations")).toBeTruthy()
   })
 })
@@ -476,133 +424,6 @@ describe("Sidebar — Expand / collapse all groups", () => {
     expect(
       screen.getByRole("button", { name: "Collapse All Groups" })
     ).toBeTruthy()
-  })
-})
-
-describe("Sidebar — Section order control", () => {
-  beforeEach(() => {
-    localStorage.clear()
-    spies.listProps = null
-    mockState.activeFolder = { id: 7, path: "/x" }
-  })
-
-  // The order rows are `menuitem`s labelled "<name> — position N of 3"; the
-  // move buttons inside them are labelled "<name> — Move up/down".
-  const orderRowNames = () =>
-    screen
-      .getAllByRole("menuitem")
-      .map((el) => el.getAttribute("aria-label") ?? "")
-      .filter((label) => label.includes("position"))
-
-  it("defaults to Folders → Chat → Recent", async () => {
-    const user = userEvent.setup()
-    renderSidebar()
-    await user.click(screen.getByRole("button", { name: "View options" }))
-
-    expect(orderRowNames()).toEqual([
-      "Folders — position 1 of 3",
-      "Chat — position 2 of 3",
-      "Recent — position 3 of 3",
-    ])
-    expect(spies.listProps?.sectionOrder).toEqual([
-      "folders",
-      "chats",
-      "recent",
-    ])
-  })
-
-  it("moves a section up, persists the new order and threads it down", async () => {
-    const user = userEvent.setup()
-    renderSidebar()
-    await user.click(screen.getByRole("button", { name: "View options" }))
-    await user.click(screen.getByRole("button", { name: "Recent — Move up" }))
-
-    expect(orderRowNames()).toEqual([
-      "Folders — position 1 of 3",
-      "Recent — position 2 of 3",
-      "Chat — position 3 of 3",
-    ])
-    expect(spies.listProps?.sectionOrder).toEqual([
-      "folders",
-      "recent",
-      "chats",
-    ])
-    expect(
-      JSON.parse(localStorage.getItem("workspace:sidebar-section-order") ?? "")
-    ).toEqual(["folders", "recent", "chats"])
-  })
-
-  it("disables the move buttons that would fall off an end", async () => {
-    const user = userEvent.setup()
-    renderSidebar()
-    await user.click(screen.getByRole("button", { name: "View options" }))
-
-    expect(
-      screen.getByRole("button", { name: "Folders — Move up" })
-    ).toBeDisabled()
-    expect(
-      screen.getByRole("button", { name: "Recent — Move down" })
-    ).toBeDisabled()
-    expect(
-      screen.getByRole("button", { name: "Folders — Move down" })
-    ).not.toBeDisabled()
-  })
-
-  it("reorders from the keyboard with Alt+Arrow on the focused row", async () => {
-    const user = userEvent.setup()
-    renderSidebar()
-    await user.click(screen.getByRole("button", { name: "View options" }))
-
-    // The nested move buttons are unreachable by Tab (Radix's menu swallows it)
-    // and by the roving focus, so Alt+Arrow on the row is the ONLY keyboard
-    // path — if this regresses, the control becomes mouse-only.
-    const foldersRow = screen.getByRole("menuitem", {
-      name: "Folders — position 1 of 3",
-    })
-    // Focusing a menu item updates Radix's roving-focus state, so it has to run
-    // inside act().
-    act(() => foldersRow.focus())
-    await user.keyboard("{Alt>}{ArrowDown}{/Alt}")
-
-    expect(orderRowNames()).toEqual([
-      "Chat — position 1 of 3",
-      "Folders — position 2 of 3",
-      "Recent — position 3 of 3",
-    ])
-    // Focus follows the row it moved, so a second press keeps going.
-    expect(document.activeElement?.getAttribute("aria-label")).toBe(
-      "Folders — position 2 of 3"
-    )
-  })
-
-  it("restores a legacy 'chats-first' preference from an older build", async () => {
-    const user = userEvent.setup()
-    localStorage.setItem("workspace:sidebar-section-order", "chats-first")
-    renderSidebar()
-    await user.click(screen.getByRole("button", { name: "View options" }))
-
-    expect(orderRowNames()).toEqual([
-      "Chat — position 1 of 3",
-      "Folders — position 2 of 3",
-      "Recent — position 3 of 3",
-    ])
-  })
-
-  it("keeps a hidden Recent section listed and reorderable", async () => {
-    const user = userEvent.setup()
-    localStorage.setItem("workspace:sidebar-show-recent", "false")
-    renderSidebar()
-    await user.click(screen.getByRole("button", { name: "View options" }))
-
-    // Hiding is a separate preference from position: the row stays so the user
-    // can park it where it will reappear.
-    await user.click(screen.getByRole("button", { name: "Recent — Move up" }))
-    expect(spies.listProps?.sectionOrder).toEqual([
-      "folders",
-      "recent",
-      "chats",
-    ])
-    expect(spies.listProps?.showRecent).toBe(false)
   })
 })
 

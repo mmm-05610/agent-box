@@ -22,6 +22,12 @@ vi.mock("@/components/layout/workspace-folder-dialog", () => ({
   WorkspaceFolderDialog: () => null,
 }))
 
+// “克隆仓库”菜单项复用 CloneDialog（需 GitCredentialProvider）——桩掉，
+// 对话框本体有自己的测试。
+vi.mock("@/components/layout/clone-dialog", () => ({
+  CloneDialog: () => null,
+}))
+
 vi.mock("@/lib/platform", () => ({
   isDesktop: () => false,
   revealItemInDir: vi.fn(),
@@ -59,6 +65,7 @@ function rowProps(
     directoryName: "agent-box",
     branch: null,
     runningCount: 0,
+    attentionCount: 0,
     expanded: true,
     themeColor: "inherit",
     appThemeColor: "blue",

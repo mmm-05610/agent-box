@@ -118,7 +118,7 @@ describe("QuickActionsDropdown", () => {
       "Manage conversations",
       "Import local sessions",
       AUTOMATIONS_ROW,
-      "To-dos",
+      "Tasks",
     ]) {
       expect(await screen.findByRole("menuitem", { name: label })).toBeVisible()
     }
@@ -162,7 +162,7 @@ describe("QuickActionsDropdown", () => {
     })
 
     await reopen()
-    await clickItem("To-dos")
+    await clickItem("Tasks")
     expect(mocks.setRoute).toHaveBeenCalledWith("tasks")
 
     await reopen()

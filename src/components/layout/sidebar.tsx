@@ -36,8 +36,6 @@ import {
   SidebarConversationList,
   type SidebarConversationListHandle,
 } from "@/features/projects/components/sidebar-conversation-list"
-// F5 / S2.3：项目树底部"项目 +"入口（本地文件夹 / 远程连接向导）。
-import { ProjectTreeAddButton } from "@/features/projects/components/project-tree"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -64,26 +62,15 @@ import {
   isNavItemVisible,
   loadNavItemVisibility,
   loadShowCompleted,
-  loadShowRecent,
-  loadShowWorktrees,
   loadSortMode,
-  loadSectionOrder,
-  moveSectionInOrder,
   saveNavItemVisibility,
   saveShowCompleted,
-  saveShowRecent,
-  saveShowWorktrees,
   saveSortMode,
-  saveSectionOrder,
-  DEFAULT_SECTION_ORDER,
   SIDEBAR_NAV_ITEM_IDS,
   type SidebarNavItemId,
   type SidebarNavItemVisibility,
-  type SidebarSectionId,
   type SidebarSortMode,
-  type SidebarSectionOrder,
 } from "@/lib/sidebar-view-mode-storage"
-import { SidebarSectionOrderControl } from "./sidebar-section-order-control"
 import { cn } from "@/lib/utils"
 
 // Keyboard-shortcut hint at the trailing edge of the New chat row.
@@ -100,13 +87,6 @@ const SHORTCUT_BADGE_CLASS = cn(
   "opacity-0 transition-opacity duration-150",
   "group-hover:opacity-100 group-focus-visible:opacity-100"
 )
-
-// Which sections the order editor should render as switched-off. Module
-// constants rather than a per-render `new Set`, so the reference is stable and
-// the two states are spelled out once. "Recent" is the only section with a
-// visibility toggle today.
-const NO_HIDDEN_SECTIONS: ReadonlySet<SidebarSectionId> = new Set()
-const RECENT_HIDDEN: ReadonlySet<SidebarSectionId> = new Set(["recent"])
 
 // Icon per optional nav row. The visibility checkboxes in the view-options menu
 // carry the same glyph as the row they switch, so that group reads as a mirror
@@ -232,20 +212,13 @@ export function Sidebar() {
   // rem-sized overlay buttons. Mobile has no overlay (the sidebar is a Drawer).
   const leftReserve = leftChromeReserve(platformIsMac && isDesktop(), zoomLevel)
 
-  // `showCompleted` defaults OFF; `showWorktrees` and `showRecent` default ON
-  // (the mount effect below reconciles a persisted override). Each initial
-  // value matches its own default so the pre-hydration render doesn't flash as
-  // the stored preference is applied.
+  // `showCompleted` defaults OFF. The initial value matches the default so the
+  // pre-hydration render doesn't flash as the stored preference is applied.
   const [showCompleted, setShowCompleted] = useState(false)
-  const [showWorktrees, setShowWorktrees] = useState(true)
-  const [showRecent, setShowRecent] = useState(true)
   // Empty = every nav row shown, which is also the hydrated default — so the
   // pre-hydration render matches for a user who never hid one.
   const [navItems, setNavItems] = useState<SidebarNavItemVisibility>({})
   const [sortMode, setSortMode] = useState<SidebarSortMode>("created")
-  const [sectionOrder, setSectionOrder] = useState<SidebarSectionOrder>(
-    DEFAULT_SECTION_ORDER
-  )
   const [allExpanded, setAllExpanded] = useState(true)
   const newConversationShortcutLabel = formatShortcutLabel(
     shortcuts.new_conversation,
@@ -255,41 +228,27 @@ export function Sidebar() {
     shortcuts.toggle_search,
     isMac
   )
-  // General umbrella name for the eye menu (list toggles + nav rows + sort +
-  // section order). Kept generic so the accessible name / tooltip stays
-  // accurate as the menu gains options.
+  // General umbrella name for the eye menu (list toggles + nav rows + sort).
+  // Kept generic so the accessible name / tooltip stays accurate as the menu
+  // gains options.
   const viewOptionsLabel = t("viewOptions")
   // 底部账户行：占位用户名（头像圆标取其首字母）。
   const localUserLabel = t("localUser")
   const toggleExpandLabel = allExpanded
     ? t("collapseAllGroups")
     : t("expandAllGroups")
-  const hiddenSections = showRecent ? NO_HIDDEN_SECTIONS : RECENT_HIDDEN
 
   useEffect(() => {
     // Hydrate from localStorage after mount to keep SSR/CSR markup consistent.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setShowCompleted(loadShowCompleted())
-    setShowWorktrees(loadShowWorktrees())
-    setShowRecent(loadShowRecent())
     setNavItems(loadNavItemVisibility())
     setSortMode(loadSortMode())
-    setSectionOrder(loadSectionOrder())
   }, [])
 
   const handleSetShowCompleted = useCallback((value: boolean) => {
     setShowCompleted(value)
     saveShowCompleted(value)
-  }, [])
-
-  const handleSetShowWorktrees = useCallback((value: boolean) => {
-    setShowWorktrees(value)
-    saveShowWorktrees(value)
-  }, [])
-
-  const handleSetShowRecent = useCallback((value: boolean) => {
-    setShowRecent(value)
-    saveShowRecent(value)
   }, [])
 
   const handleSetNavItem = useCallback(
@@ -308,20 +267,6 @@ export function Sidebar() {
     setSortMode(mode)
     saveSortMode(mode)
   }, [])
-
-  // Nudge one section up/down a slot. `moveSectionInOrder` returns the SAME
-  // array when the move would fall off an end, so a clamped nudge neither
-  // re-renders the list nor rewrites localStorage.
-  const handleMoveSection = useCallback(
-    (id: SidebarSectionId, delta: number) => {
-      setSectionOrder((prev) => {
-        const next = moveSectionInOrder(prev, id, delta)
-        if (next !== prev) saveSectionOrder(next)
-        return next
-      })
-    },
-    []
-  )
 
   const handleToggleExpandAll = useCallback(() => {
     if (allExpanded) {
@@ -478,29 +423,17 @@ export function Sidebar() {
                 clips overflow-x — 48 would start truncating longer localized
                 section names. */}
             <DropdownMenuContent align="end" className="min-w-56">
-              {/* Four groups: what the list shows → which nav rows exist → how
-                  the list is sorted → how its sections are stacked. The first
-                  two are hover-opened submenus rather than inline blocks: they
-                  are set-and-forget on/off inventories, six checkboxes between
-                  them, and inlining all six left a fifteen-row menu with Sort
-                  by / Section order — the two settings people actually come
-                  back for — stranded at the bottom of it. Those two stay
-                  inline: a pair of radios and a ranked list read wrong behind
-                  another hop, and the order rows need this menu's width.
-                  Every option keeps the menu open on select (the default is to
-                  close): this menu is a settings panel, not a command list, and
-                  flipping two of them used to cost two round trips through the
-                  trigger. The one action it used to carry — expand/collapse
-                  all — is now a header button of its own. */}
+              {/* Two groups: what the list shows → which nav rows exist. Both
+                  are hover-opened submenus rather than inline blocks: they are
+                  set-and-forget on/off inventories. Sort by stays inline: a
+                  pair of radios reads wrong behind another hop. Every option
+                  keeps the menu open on select (the default is to close):
+                  this menu is a settings panel, not a command list. */}
               <DropdownMenuSub>
                 <DropdownMenuSubTrigger>
                   <MessagesSquare className="text-muted-foreground" />
                   {t("listOptions")}
                 </DropdownMenuSubTrigger>
-                {/* No width override: unlike the root content — held at exactly
-                    `min-w-56` and clipping overflow-x — the sub-content grows to
-                    fit its rows, which is the headroom these three (the longest
-                    labels in the menu) want. */}
                 <DropdownMenuSubContent>
                   <DropdownMenuCheckboxItem
                     checked={showCompleted}
@@ -508,20 +441,6 @@ export function Sidebar() {
                     onSelect={(event) => event.preventDefault()}
                   >
                     {t("showCompleted")}
-                  </DropdownMenuCheckboxItem>
-                  <DropdownMenuCheckboxItem
-                    checked={showWorktrees}
-                    onCheckedChange={handleSetShowWorktrees}
-                    onSelect={(event) => event.preventDefault()}
-                  >
-                    {t("showWorktrees")}
-                  </DropdownMenuCheckboxItem>
-                  <DropdownMenuCheckboxItem
-                    checked={showRecent}
-                    onCheckedChange={handleSetShowRecent}
-                    onSelect={(event) => event.preventDefault()}
-                  >
-                    {t("showRecent")}
                   </DropdownMenuCheckboxItem>
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
@@ -571,13 +490,6 @@ export function Sidebar() {
                   {t("sortByUpdatedAt")}
                 </DropdownMenuRadioItem>
               </DropdownMenuRadioGroup>
-              <DropdownMenuSeparator />
-              <DropdownMenuLabel>{t("sectionOrder")}</DropdownMenuLabel>
-              <SidebarSectionOrderControl
-                order={sectionOrder}
-                onMove={handleMoveSection}
-                hiddenSections={hiddenSections}
-              />
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -709,10 +621,7 @@ export function Sidebar() {
         <SidebarConversationList
           ref={listRef}
           showCompleted={showCompleted}
-          showWorktrees={showWorktrees}
-          showRecent={showRecent}
           sortMode={sortMode}
-          sectionOrder={sectionOrder}
         />
       </div>
 
@@ -743,12 +652,6 @@ export function Sidebar() {
           </button>
         </div>
       )}
-
-      {/* 项目树固定底栏（F5 / S2.3）："项目 +" 入口——打开本地文件夹（既有
-          对话框）/ 远程连接…（向导骨架）。不随列表滚动。 */}
-      <div className="shrink-0 px-1.5 pb-1.5 pt-1.5">
-        <ProjectTreeAddButton />
-      </div>
 
       {/* 底部账户行（ZCode 布局，sticky 底部）：圆形头像占位（本地用户首字母）
           + 用户名 + 设置齿轮（打开既有设置窗口）。 */}
