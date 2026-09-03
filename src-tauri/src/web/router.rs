@@ -1096,27 +1096,6 @@ pub fn build_router(
             "/stop_office_watch",
             post(handlers::office_tools::stop_office_watch),
         )
-        // ─── Project boot ───
-        .route(
-            "/detect_package_manager",
-            post(handlers::project_boot::detect_package_manager),
-        )
-        .route(
-            "/create_shadcn_project",
-            post(handlers::project_boot::create_shadcn_project),
-        )
-        .route(
-            "/detect_hyperframes_skills",
-            post(handlers::project_boot::detect_hyperframes_skills),
-        )
-        .route(
-            "/install_hyperframes_skills",
-            post(handlers::project_boot::install_hyperframes_skills),
-        )
-        .route(
-            "/create_hyperframes_project",
-            post(handlers::project_boot::create_hyperframes_project),
-        )
         // ─── Web Server ───
         .route(
             "/get_web_server_status",

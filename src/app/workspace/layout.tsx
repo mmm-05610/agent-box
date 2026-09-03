@@ -66,10 +66,7 @@ import { FileWorkspaceHeader } from "@/components/files/file-workspace-header"
 import { FileWorkspacePanel } from "@/components/files/file-workspace-panel"
 import { ExternalConflictDialog } from "@/components/files/external-conflict-dialog"
 import { AppToaster } from "@/components/ui/app-toaster"
-import {
-  DeepLinkBootstrap,
-  PetFocusBridge,
-} from "@/components/workspace/deep-link-bootstrap"
+import { DeepLinkBootstrap } from "@/components/workspace/deep-link-bootstrap"
 import { WorkspaceOpenFolderListener } from "@/components/workspace/workspace-open-folder-listener"
 import { HeavyPluginsWarmup } from "@/components/ai-elements/heavy-plugins-warmup"
 import {
@@ -1153,7 +1150,6 @@ function WorkspaceLayoutInner({ children }: { children: React.ReactNode }) {
                       <TabKeysSync />
                       <HeavyPluginsWarmup />
                       <DeepLinkBootstrap />
-                      <PetFocusBridge />
                       {/* Always mounted: external-change conflicts must be
                             resolvable even with the aux file tree closed. */}
                       <ExternalConflictDialog />

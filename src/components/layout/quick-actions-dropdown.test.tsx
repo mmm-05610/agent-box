@@ -15,7 +15,6 @@ const mocks = vi.hoisted(() => {
   return {
     connections,
     openImportSessionsWindow: vi.fn(),
-    openPetWindow: vi.fn(() => Promise.resolve()),
     openRemoteWorkspace: vi.fn(() => Promise.resolve()),
     listRemoteWorkspaceConnections: vi.fn(() => Promise.resolve(connections)),
     setRoute: vi.fn(),
@@ -28,8 +27,6 @@ vi.mock("@/lib/platform", () => ({ isDesktop: () => desktop }))
 vi.mock("@/lib/api", () => ({
   openImportSessionsWindow: mocks.openImportSessionsWindow,
 }))
-
-vi.mock("@/lib/pet/api", () => ({ openPetWindow: mocks.openPetWindow }))
 
 vi.mock("@/lib/remote-workspace", () => ({
   listRemoteWorkspaceConnections: mocks.listRemoteWorkspaceConnections,
@@ -115,10 +112,10 @@ beforeEach(() => {
 })
 
 describe("QuickActionsDropdown", () => {
-  it("groups all nine actions under their headings on desktop", async () => {
+  it("groups all eight actions under their headings on desktop", async () => {
     await mountAndOpen()
 
-    for (const group of ["Workspace", "Sessions", "Navigation", "More"]) {
+    for (const group of ["Workspace", "Sessions", "Navigation"]) {
       expect(await screen.findByText(group)).toBeVisible()
     }
     for (const label of [
@@ -130,7 +127,6 @@ describe("QuickActionsDropdown", () => {
       AUTOMATIONS_ROW,
       "To-dos",
       FORGE_ROW,
-      "Show pet",
     ]) {
       expect(await screen.findByRole("menuitem", { name: label })).toBeVisible()
     }
@@ -159,7 +155,6 @@ describe("QuickActionsDropdown", () => {
     expect(
       screen.queryByRole("menuitem", { name: "Open remote workspace" })
     ).toBeNull()
-    expect(screen.queryByRole("menuitem", { name: "Show pet" })).toBeNull()
     expect(screen.queryByText("More")).toBeNull()
   })
 
@@ -186,8 +181,6 @@ describe("QuickActionsDropdown", () => {
     expect(mocks.setRoute).toHaveBeenCalledWith("forge")
 
     await reopen()
-    await clickItem("Show pet")
-    expect(mocks.openPetWindow).toHaveBeenCalled()
   })
 
   it("loads the remote connections only when its submenu opens", async () => {

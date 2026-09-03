@@ -27,7 +27,6 @@ import {
   gitContinueOperation,
   gitStartPullMerge,
 } from "@/lib/api"
-import { petCelebrate } from "@/lib/pet/api"
 import { languageFromPath } from "@/lib/language-detect"
 import { toErrorMessage } from "@/lib/app-error"
 import type { GitConflictFileVersions } from "@/lib/types"
@@ -154,9 +153,6 @@ export function MergeWorkspace({
       await gitAbortOperation(folderPath, operation)
       toast.success(t("abortSuccess"))
       await emitEvent("folder://merge-aborted", { folder_id: folderId })
-      void petCelebrate("failed").catch((err) => {
-        console.warn("[Merge] pet celebrate (failed) failed:", err)
-      })
       onAborted()
     } catch (err) {
       toast.error(toErrorMessage(err))
@@ -171,9 +167,6 @@ export function MergeWorkspace({
       await gitContinueOperation(folderPath, operation)
       toast.success(t("allResolved"))
       await emitEvent("folder://merge-completed", { folder_id: folderId })
-      void petCelebrate("jumping").catch((err) => {
-        console.warn("[Merge] pet celebrate (jumping) failed:", err)
-      })
       onCompleted()
     } catch (err) {
       toast.error(toErrorMessage(err))
