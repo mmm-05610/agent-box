@@ -160,8 +160,8 @@ describe("RichComposer imperative inserts", () => {
   })
 
   it("hydrates serialized references in inserted text into badges", async () => {
-    // The quick-message fill path: stored wire-format text must show badges at
-    // insert time, and re-serialize to exactly what was inserted.
+    // The stored-text fill path: wire-format text must show badges at insert
+    // time, and re-serialize to exactly what was inserted.
     const { ref } = await mount()
     const content = "review [app.ts](file:///repo/app.ts) now"
     act(() => ref.current?.insertTextAtCursor(content))

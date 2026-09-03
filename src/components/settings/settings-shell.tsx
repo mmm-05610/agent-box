@@ -16,8 +16,6 @@ import {
   Globe,
   Keyboard,
   Menu,
-  MessageSquareText,
-  SendHorizontal,
   Palette,
   PlugZap,
   Server,
@@ -46,10 +44,8 @@ interface SettingsNavItem {
     | "mcp"
     | "skills"
     | "skill_packs"
-    | "quick_messages"
     | "shortcuts"
     | "version_control"
-    | "chat_channels"
     | "system"
     | "web_service"
     | "logs"
@@ -93,11 +89,6 @@ const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
     icon: Server,
   },
   {
-    href: "/settings/quick-messages",
-    labelKey: "quick_messages",
-    icon: MessageSquareText,
-  },
-  {
     href: "/settings/shortcuts",
     labelKey: "shortcuts",
     icon: Keyboard,
@@ -106,11 +97,6 @@ const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
     href: "/settings/version-control",
     labelKey: "version_control",
     icon: GitBranch,
-  },
-  {
-    href: "/settings/chat-channels",
-    labelKey: "chat_channels",
-    icon: SendHorizontal,
   },
   {
     href: "/settings/web-service",

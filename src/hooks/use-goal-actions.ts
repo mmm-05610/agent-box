@@ -3,8 +3,7 @@
 /**
  * The goal-control action vocabulary a connection's adapter ADVERTISED,
  * recovered from the session snapshot (`goal_actions` — launch-latched, same
- * snapshot-read pattern as the steering availability in
- * `use-session-feedback`).
+ * snapshot-read pattern as the other launch-time availability probes).
  *
  * Fail-closed contract: until the snapshot for EXACTLY this `connectionId`
  * reports a KNOWN vocabulary, the hook returns `NO_GOAL_ACTIONS` — the goal card

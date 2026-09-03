@@ -6,10 +6,8 @@ import {
   FolderGit2,
   FolderOpenDot,
   GamepadDirectional,
-  LayoutTemplate,
   ListChecks,
   ListTodo,
-  Map as MapIcon,
   MonitorCloud,
   Settings,
   Zap,
@@ -221,14 +219,6 @@ export function QuickActionsDropdown() {
                 {attentionCount}
               </span>
             )}
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => setRoute("forge")}>
-            <LayoutTemplate />
-            {tSidebar("forge")}
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => setRoute("canvas")}>
-            <MapIcon />
-            {tSidebar("canvas")}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

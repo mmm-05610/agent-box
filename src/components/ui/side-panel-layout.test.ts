@@ -21,7 +21,6 @@ const SIDE_PANELS = [
   "src/components/tasks/task-transcript-dialog.tsx",
   "src/components/message/sub-agent-session-dialog.tsx",
   "src/components/message/subagent-session-dialog.tsx",
-  "src/components/forge/forge-issue-detail-sheet.tsx",
 ]
 
 /** The `<DrawerContent …>` opening tag — where a width would be declared. */

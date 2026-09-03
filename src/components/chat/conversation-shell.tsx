@@ -92,9 +92,8 @@ interface ConversationShellProps {
    *  the agent failed to load this session) without hijacking the message
    *  area above. Renders nothing when omitted. */
   composerBanner?: ReactNode
-  /** Optional read-only live-feedback notes list rendered just above the
-   *  composer (see `FeedbackNotesDisplay`). Renders nothing when there are no
-   *  notes for the current turn. */
+  /** Optional read-only notes list rendered just above the composer. Renders
+   *  nothing when omitted. */
   feedbackList?: ReactNode
   /** Open the live-feedback dialog from the composer "+" menu (hidden when
    *  omitted / feature off). */

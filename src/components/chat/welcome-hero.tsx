@@ -20,13 +20,11 @@ type TipKey =
   | "draftAutoSave"
   | "forkSend"
   | "exportConversation"
-  | "chatChannels"
   | "shortcutsAuxPanel"
   | "shortcutsTerminalSidebar"
   | "customShortcuts"
   | "webService"
   | "fusionMode"
-  | "quickMessages"
   | "experts"
   | "taskBoard"
   | "automations"
@@ -67,7 +65,6 @@ const TIPS: TipDef[] = [
   { key: "draftAutoSave" },
   { key: "forkSend" },
   { key: "exportConversation" },
-  { key: "chatChannels" },
   {
     key: "shortcutsAuxPanel",
     buildValues: ({ shortcuts, isMac, kbd }) => ({
@@ -86,7 +83,6 @@ const TIPS: TipDef[] = [
   { key: "customShortcuts" },
   { key: "webService" },
   { key: "fusionMode" },
-  { key: "quickMessages" },
   { key: "experts" },
   { key: "taskBoard" },
   { key: "automations" },

@@ -103,7 +103,6 @@ async function clickItem(name: string | RegExp) {
 // "Automations" carries a failure-count badge inside the row (2, per the mock),
 // so its accessible name is the label plus that number — matched by prefix.
 const AUTOMATIONS_ROW = /^Automations/
-const FORGE_ROW = "Repository panel"
 
 beforeEach(() => {
   desktop = true
@@ -112,7 +111,7 @@ beforeEach(() => {
 })
 
 describe("QuickActionsDropdown", () => {
-  it("groups all eight actions under their headings on desktop", async () => {
+  it("groups all seven actions under their headings on desktop", async () => {
     await mountAndOpen()
 
     for (const group of ["Workspace", "Sessions", "Navigation"]) {
@@ -126,7 +125,6 @@ describe("QuickActionsDropdown", () => {
       "Import local sessions",
       AUTOMATIONS_ROW,
       "To-dos",
-      FORGE_ROW,
     ]) {
       expect(await screen.findByRole("menuitem", { name: label })).toBeVisible()
     }
@@ -143,14 +141,11 @@ describe("QuickActionsDropdown", () => {
     desktop = false
     await mountAndOpen()
 
-    // The remaining eight still render, so this is a targeted removal rather
+    // The remaining rows still render, so this is a targeted removal rather
     // than the menu failing to open. The navigation rows in particular are
     // platform-neutral route switches and must survive off the desktop.
     expect(
       await screen.findByRole("menuitem", { name: "Import local sessions" })
-    ).toBeVisible()
-    expect(
-      await screen.findByRole("menuitem", { name: FORGE_ROW })
     ).toBeVisible()
     expect(
       screen.queryByRole("menuitem", { name: "Open remote workspace" })
@@ -175,10 +170,6 @@ describe("QuickActionsDropdown", () => {
     await reopen()
     await clickItem("To-dos")
     expect(mocks.setRoute).toHaveBeenCalledWith("tasks")
-
-    await reopen()
-    await clickItem(FORGE_ROW)
-    expect(mocks.setRoute).toHaveBeenCalledWith("forge")
 
     await reopen()
   })

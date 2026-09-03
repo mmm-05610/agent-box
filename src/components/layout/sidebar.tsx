@@ -6,9 +6,7 @@ import {
   Eye,
   ListChevronsDownUp,
   ListChevronsUpDown,
-  LayoutTemplate,
   ListTodo,
-  Map as MapIcon,
   Menu,
   MessagesSquare,
   SquarePen,
@@ -102,8 +100,6 @@ const RECENT_HIDDEN: ReadonlySet<SidebarSectionId> = new Set(["recent"])
 const NAV_ITEM_ICONS: Record<SidebarNavItemId, LucideIcon> = {
   automations: Zap,
   tasks: ListTodo,
-  forge: LayoutTemplate,
-  canvas: MapIcon,
 }
 
 /**
@@ -554,28 +550,6 @@ export function Sidebar() {
                 </span>
               ) : null
             }
-          />
-        )}
-        {isNavItemVisible(navItems, "forge") && (
-          <SidebarNavButton
-            icon={LayoutTemplate}
-            label={t("forge")}
-            active={routeId === "forge"}
-            onClick={() => {
-              if (isMobile) toggle()
-              setRoute("forge")
-            }}
-          />
-        )}
-        {isNavItemVisible(navItems, "canvas") && (
-          <SidebarNavButton
-            icon={MapIcon}
-            label={t("canvas")}
-            active={routeId === "canvas"}
-            onClick={() => {
-              if (isMobile) toggle()
-              setRoute("canvas")
-            }}
           />
         )}
       </div>

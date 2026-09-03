@@ -12,7 +12,6 @@ import {
   Cog,
   Copy,
   GitFork,
-  MessageSquareText,
   Scissors,
   Send,
   Square,
@@ -35,10 +34,6 @@ import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuSub,
-  ContextMenuSubContent,
-  ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu"
 import { AgentIcon } from "@/components/agent-icon"
@@ -976,18 +971,13 @@ export function MessageInput({
   }, [disabled])
 
   // Opening the custom right-click menu: snapshot whether there's a selection
-  // (gates Cut/Copy) and refresh the quick-messages list. The editor keeps its
-  // selection while the menu is open, so Paste / a quick message lands back at
-  // the same caret.
-  const handleContextMenuOpenChange = useCallback(
-    (open: boolean) => {
-      if (!open) return
-      const editor = editorRef.current?.getEditor()
-      setContextSelectionActive(editor ? !editor.state.selection.empty : false)
-      menuShortcuts.refreshQuickMessages()
-    },
-    [menuShortcuts]
-  )
+  // (gates Cut/Copy). The editor keeps its selection while the menu is open, so
+  // Paste lands back at the same caret.
+  const handleContextMenuOpenChange = useCallback((open: boolean) => {
+    if (!open) return
+    const editor = editorRef.current?.getEditor()
+    setContextSelectionActive(editor ? !editor.state.selection.empty : false)
+  }, [])
 
   // Plain-text ("paste without formatting") paste, shared by the custom
   // right-click menu item and the Ctrl/⌘+Shift+V shortcut. Reads only the
@@ -2067,47 +2057,6 @@ export function MessageInput({
               <TextSelect className="size-4" />
               {t("selectAll")}
             </ContextMenuItem>
-            <ContextMenuSeparator />
-            <ContextMenuSub>
-              <ContextMenuSubTrigger disabled={disabled}>
-                <MessageSquareText className="size-4" />
-                {t("quickMessages")}
-              </ContextMenuSubTrigger>
-              <ContextMenuSubContent
-                className="min-w-40 overflow-y-auto"
-                style={{
-                  maxWidth: "min(20rem, calc(100vw - 1rem))",
-                  maxHeight:
-                    "min(32rem, var(--radix-context-menu-content-available-height))",
-                }}
-              >
-                {menuShortcuts.quickMessagesLoading &&
-                menuShortcuts.quickMessages.length === 0 ? (
-                  <div className="px-3 py-4 text-center text-xs text-muted-foreground">
-                    {t("quickMessagesLoading")}
-                  </div>
-                ) : menuShortcuts.quickMessages.length === 0 ? (
-                  <div className="px-3 py-4 text-center text-xs text-muted-foreground">
-                    {t("quickMessagesEmpty")}
-                  </div>
-                ) : (
-                  menuShortcuts.quickMessages.map((message) => (
-                    <ContextMenuItem
-                      key={message.id}
-                      onSelect={() => menuShortcuts.insertQuickMessage(message)}
-                    >
-                      <span className="truncate">
-                        {message.title || (
-                          <span className="italic text-muted-foreground">
-                            {t("quickMessageUntitled")}
-                          </span>
-                        )}
-                      </span>
-                    </ContextMenuItem>
-                  ))
-                )}
-              </ContextMenuSubContent>
-            </ContextMenuSub>
           </ContextMenuContent>
         </ContextMenu>
         {hasFolderBranchPicker && (

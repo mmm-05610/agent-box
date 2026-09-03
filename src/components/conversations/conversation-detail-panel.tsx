@@ -47,11 +47,7 @@ import { useAdvertisedGoalActions } from "@/hooks/use-goal-actions"
 import { ConversationShell } from "@/components/chat/conversation-shell"
 import { SessionConfigStaleBanner } from "@/components/chat/session-config-stale-banner"
 import { PiProjectTrustBanner } from "@/components/chat/pi-project-trust-banner"
-import { FeedbackNotesDisplay } from "@/components/chat/feedback-notes-display"
-import { FeedbackDialog } from "@/components/chat/feedback-dialog"
 import { AgentDiagnosticsDialog } from "@/components/settings/agent-diagnostics-dialog"
-import { useFeedbackEnabled } from "@/hooks/use-feedback-enabled"
-import { useSessionFeedback } from "@/hooks/use-session-feedback"
 import { AgentSelector } from "@/components/chat/agent-selector"
 import { ChatInput } from "@/components/chat/chat-input"
 import { WelcomeHero, WelcomeTip } from "@/components/chat/welcome-hero"
@@ -1895,40 +1891,6 @@ const ConversationTabView = memo(function ConversationTabView({
     </GoalControlProvider>
   )
 
-  // Live-feedback bar gating + the "agent never read your note" resend fallback.
-  // Enqueue rather than `handleSend`: this fallback fires on a turn-end race
-  // where the backend already reports no active turn but the frontend may still
-  // read `connStatus === "prompting"`, and `handleSend` no-ops unless
-  // "connected" — which would silently drop the note. The message queue holds it
-  // (visible above the composer) and auto-flushes when the turn completes, so
-  // the user's note is never lost.
-  const feedbackEnabled = useFeedbackEnabled()
-  const resendFeedbackAsPrompt = useCallback(
-    (text: string) => {
-      mqEnqueue(
-        { blocks: [{ type: "text", text }], displayText: text },
-        selectedModeId
-      )
-    },
-    [mqEnqueue, selectedModeId]
-  )
-  const feedback = useSessionFeedback({
-    connectionId: conn.connectionId,
-    connStatus,
-    enabled: feedbackEnabled,
-    onResendAsPrompt: resendFeedbackAsPrompt,
-  })
-  // Composer "insert into current turn" (native steering only). Rethrows —
-  // MessageInput owns the enqueue fallback and draft-preservation policy, so
-  // this wrapper must not swallow the turn-end race the way `submit` does.
-  const feedbackSteer = feedback.steer
-  const handleSteer = useCallback(
-    async (text: string) => {
-      await feedbackSteer(text)
-    },
-    [feedbackSteer]
-  )
-
   return (
     <ConversationShell
       topBanner={
@@ -1983,13 +1945,6 @@ const ConversationTabView = memo(function ConversationTabView({
       injectContent={composerInject}
       onInjectConsumed={handleComposerInjectConsumed}
       composerBanner={acpLoadErrorBanner}
-      feedbackList={
-        feedback.showList ? (
-          <FeedbackNotesDisplay notes={feedback.notes} />
-        ) : null
-      }
-      onAddFeedback={feedback.featureEnabled ? feedback.openDialog : undefined}
-      feedbackAddDisabled={!feedback.canSubmit}
       isActive={isActive}
       showActiveFlow={showActiveFlow}
       queue={msgQueue}
@@ -2009,14 +1964,6 @@ const ConversationTabView = memo(function ConversationTabView({
         conn.supportsFork &&
         !forkSendBlockedByQueue(msgQueue.length)
           ? handleForkSend
-          : undefined
-      }
-      onSteer={
-        // Native channel only: on pull sessions the prompting branch must
-        // stay pixel-identical (Stop button alone). The prompting scope
-        // itself is enforced where the button renders.
-        feedback.featureEnabled && feedback.channel === "native"
-          ? handleSteer
           : undefined
       }
     >
@@ -2104,10 +2051,6 @@ const ConversationTabView = memo(function ConversationTabView({
                 draftStorageKey={draftStorageKey}
                 isActive={isActive}
                 showActiveFlow={showActiveFlow}
-                onAddFeedback={
-                  feedback.featureEnabled ? feedback.openDialog : undefined
-                }
-                feedbackAddDisabled={!feedback.canSubmit}
                 injectContent={composerInject}
                 onInjectConsumed={handleComposerInjectConsumed}
                 flush
@@ -2164,17 +2107,6 @@ const ConversationTabView = memo(function ConversationTabView({
       ) : (
         messageListNode
       )}
-      <FeedbackDialog
-        open={feedback.dialogOpen}
-        onOpenChange={(open) => {
-          if (open) feedback.openDialog()
-          else feedback.closeDialog()
-        }}
-        onSubmit={feedback.submit}
-        submitting={feedback.submitting}
-        agentName={getAgentLabel(selectedAgent)}
-        channel={feedback.channel}
-      />
       <AgentDiagnosticsDialog
         open={composerDiagnosticsOpen}
         onOpenChange={setComposerDiagnosticsOpen}

@@ -351,13 +351,11 @@ describe("Sidebar — Navigation item visibility", () => {
   // the two never collide even while the menu is open.
   const navRow = (name: string | RegExp) =>
     screen.queryByRole("button", { name })
-  const FORGE_ROW = "Repository panel"
 
   it("shows every route row by default", () => {
     renderSidebar()
     expect(navRow("Automations")).toBeTruthy()
     expect(navRow("To-dos")).toBeTruthy()
-    expect(navRow(FORGE_ROW)).toBeTruthy()
   })
 
   it("hides a row when its menu toggle is switched off, and persists it", async () => {
@@ -389,10 +387,10 @@ describe("Sidebar — Navigation item visibility", () => {
   it("respects an explicitly-stored hidden row from localStorage", () => {
     localStorage.setItem(
       "workspace:sidebar-nav-items",
-      JSON.stringify({ forge: false })
+      JSON.stringify({ tasks: false })
     )
     renderSidebar()
-    expect(navRow(FORGE_ROW)).toBeNull()
+    expect(navRow("To-dos")).toBeNull()
     expect(navRow("Automations")).toBeTruthy()
   })
 

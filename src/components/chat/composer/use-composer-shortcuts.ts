@@ -1,17 +1,10 @@
 "use client"
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type RefObject,
-} from "react"
+import { useCallback, useEffect, useMemo, useRef, type RefObject } from "react"
 import { useLocale, useTranslations } from "next-intl"
 import { toast } from "sonner"
 
-import { openSettingsWindow, quickMessagesList } from "@/lib/api"
+import { openSettingsWindow } from "@/lib/api"
 import type { SettingsSection } from "@/lib/api"
 import { getAgentLabel } from "@/lib/custom-agents"
 import { getExpertIcon, pickLocalized } from "@/lib/expert-presentation"
@@ -24,7 +17,6 @@ import type {
   AgentType,
   AvailableCommandInfo,
   ExpertListItem,
-  QuickMessage,
   ScienceListItem,
 } from "@/lib/types"
 
@@ -38,9 +30,8 @@ import type { RichComposerHandle } from "@/components/chat/composer/rich-compose
 export type { OfficeAction }
 
 /**
- * Everything the composer's "+" menu can insert: saved quick messages, the
- * agent's own `/` commands, and the three bundled skill families (experts,
- * daily office, research).
+ * Everything the composer's "+" menu can insert: the agent's own `/` commands
+ * and the three bundled skill families (experts, daily office, research).
  *
  * Shared by the conversation composer and the to-do task composers so a task
  * brief is written with the same shortcuts as a chat message — the insertion
@@ -48,12 +39,6 @@ export type { OfficeAction }
  * hint instead of a dead badge) live here once.
  */
 export interface ComposerShortcuts {
-  quickMessages: QuickMessage[]
-  quickMessagesLoading: boolean
-  /** Call when the menu opens — refreshes the quick-message list. */
-  refreshQuickMessages: () => void
-  insertQuickMessage: (message: QuickMessage) => void
-
   /** Inserts a command badge at the caret (no trigger token to replace). */
   insertSlashCommand: (cmd: AvailableCommandInfo) => void
 
@@ -103,8 +88,6 @@ export function useComposerShortcuts({
   } = useEnabledSkillIds(agentType ?? null)
   const skillPrefix = agentType === "codex" ? "$" : "/"
 
-  const [quickMessages, setQuickMessages] = useState<QuickMessage[]>([])
-  const [quickMessagesLoading, setQuickMessagesLoading] = useState(false)
   // Held in a ref so `insertSkillShortcut` (and every handler built on it) stays
   // referentially stable across a host's re-renders — the callback fires a frame
   // later, so reading the latest value at call time is exactly right.
@@ -112,24 +95,6 @@ export function useComposerShortcuts({
   useEffect(() => {
     onAfterInsertRef.current = onAfterInsert
   }, [onAfterInsert])
-
-  const refreshQuickMessages = useCallback(() => {
-    setQuickMessagesLoading(true)
-    quickMessagesList()
-      .then((list) => setQuickMessages(list))
-      .catch((error) => {
-        console.error(`[${logLabel}] load quick messages failed:`, error)
-      })
-      .finally(() => setQuickMessagesLoading(false))
-  }, [logLabel])
-
-  const insertQuickMessage = useCallback(
-    (message: QuickMessage) => {
-      if (!message.content) return
-      editorRef.current?.insertTextAtCursor(message.content)
-    },
-    [editorRef]
-  )
 
   // The "+" → Slash commands picker inserts a command badge at the current caret
   // (no trigger token to replace), adding a leading space if the caret isn't at
@@ -296,10 +261,6 @@ export function useComposerShortcuts({
   )
 
   return {
-    quickMessages,
-    quickMessagesLoading,
-    refreshQuickMessages,
-    insertQuickMessage,
     insertSlashCommand,
     experts: expertsSorted,
     science: scienceSorted,

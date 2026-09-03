@@ -9,7 +9,6 @@ import {
   FolderSearch,
   Lock,
   MessageSquarePlus,
-  MessageSquareText,
   Paperclip,
   Plus,
   Search,
@@ -64,8 +63,8 @@ export interface ComposerAddMenuProps {
 }
 
 /**
- * The composer's "+" menu — attach files, insert a saved quick message, pick a
- * slash command, or drop in one of the bundled skill families.
+ * The composer's "+" menu — attach files, pick a slash command, or drop in one
+ * of the bundled skill families.
  *
  * One component for every composer in the app (conversation, and the to-do task
  * new/edit + follow-up + restart boxes) so the shortcuts a user learns in chat
@@ -110,18 +109,8 @@ export function ComposerAddMenu({
     return () => cancelAnimationFrame(raf)
   }, [slashOpen])
 
-  const handleOpenChange = useCallback(
-    (open: boolean) => {
-      if (!open) return
-      // The editor keeps its selection while the menu is open, so a quick
-      // message inserts back at the same caret without tracking an offset.
-      shortcuts.refreshQuickMessages()
-    },
-    [shortcuts]
-  )
-
   return (
-    <DropdownMenu onOpenChange={handleOpenChange}>
+    <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
           type="button"
@@ -175,42 +164,6 @@ export function ComposerAddMenu({
             </>
           )
         ) : null}
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger>
-            <MessageSquareText className="size-4" />
-            {t("quickMessages")}
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent
-            className="min-w-40 overflow-y-auto"
-            style={SUBMENU_STYLE}
-          >
-            {shortcuts.quickMessagesLoading &&
-            shortcuts.quickMessages.length === 0 ? (
-              <div className="px-3 py-4 text-center text-xs text-muted-foreground">
-                {t("quickMessagesLoading")}
-              </div>
-            ) : shortcuts.quickMessages.length === 0 ? (
-              <div className="px-3 py-4 text-center text-xs text-muted-foreground">
-                {t("quickMessagesEmpty")}
-              </div>
-            ) : (
-              shortcuts.quickMessages.map((message) => (
-                <DropdownMenuItem
-                  key={message.id}
-                  onClick={() => shortcuts.insertQuickMessage(message)}
-                >
-                  <span className="truncate">
-                    {message.title || (
-                      <span className="italic text-muted-foreground">
-                        {t("quickMessageUntitled")}
-                      </span>
-                    )}
-                  </span>
-                </DropdownMenuItem>
-              ))
-            )}
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
         {onAddFeedback && (
           <DropdownMenuItem
             disabled={feedbackAddDisabled}

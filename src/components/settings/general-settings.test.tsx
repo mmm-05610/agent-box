@@ -37,8 +37,6 @@ vi.mock("@/lib/api", () => ({
   })),
   setDelegationSettings: vi.fn(async (v: unknown) => v),
   acpListAgents: vi.fn(async () => []),
-  getFeedbackSettings: vi.fn(async () => ({ enabled: false })),
-  setFeedbackSettings: vi.fn(async (v: unknown) => v),
   getQuestionSettings: vi.fn(async () => ({ enabled: true })),
   setQuestionSettings: vi.fn(async (v: unknown) => v),
   getSessionInfoSettings: vi.fn(async () => ({ enabled: true })),
@@ -63,9 +61,6 @@ vi.mock("@/hooks/use-platform", () => ({
   }),
 }))
 vi.mock("@/lib/updater", () => ({ relaunchApp: vi.fn() }))
-vi.mock("@/hooks/use-feedback-enabled", () => ({
-  primeFeedbackEnabled: vi.fn(),
-}))
 
 import { GeneralSettings } from "./general-settings"
 import enMessages from "@/i18n/messages/en.json"
@@ -113,7 +108,6 @@ describe("GeneralSettings", () => {
 
     // Sibling toggles keep their label association through SettingRow.
     expect(screen.getByLabelText("Enable delegation")).toBeInTheDocument()
-    expect(screen.getByLabelText("Live Feedback")).toBeInTheDocument()
     expect(screen.getByLabelText("Ask user question")).toBeInTheDocument()
     expect(screen.getByLabelText("Get session info")).toBeInTheDocument()
     expect(screen.getByLabelText("Create automations")).toBeInTheDocument()
