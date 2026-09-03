@@ -10,15 +10,11 @@ import {
   useState,
 } from "react"
 import {
-  Archive,
-  ArchiveRestore,
   ChevronsDownUp,
   ChevronsUpDown,
   CloudDownload,
   CloudSync,
-  CloudUpload,
   GitBranch,
-  GitCommitHorizontal,
   Loader2,
   MoreHorizontal,
   PlusCircle,
@@ -73,7 +69,6 @@ import {
   gitCommit,
   gitRollbackFile,
   gitStatus,
-  openCommitWindow,
 } from "@/lib/api"
 import { joinFsPath } from "@/lib/path-utils"
 import { emitAttachFileToSession } from "@/lib/session-attachment-events"
@@ -755,19 +750,9 @@ export function GitChangesTab() {
     setExpandedUntrackedPaths(new Set())
   }, [allUntrackedDirectoryPaths, untrackedCanExpand])
 
-  const handleOpenCommitWindow = useCallback(() => {
-    if (!folder) return
-    openCommitWindow(folder.id).catch((error) => {
-      const message = toErrorMessage(error)
-      toast.error(t("toasts.openCommitWindowFailed"), {
-        description: message,
-      })
-    })
-  }, [folder, t])
-
-  // Pull / fetch / push / stash for the toolbar's "more" menu, sharing the
-  // branch selector's task tracking, credential retry and conflict dialog.
-  // A pull or stash rewrites the working tree, so resync the change list
+  // Pull / fetch for the toolbar's "more" menu, sharing the branch selector's
+  // task tracking, credential retry and conflict dialog.
+  // A pull rewrites the working tree, so resync the change list
   // directly instead of waiting on the file watcher (and, in server mode, on a
   // `folder://git-branch-changed` that is never delivered — it goes out over
   // the Tauri bridge only).
@@ -1130,13 +1115,6 @@ export function GitChangesTab() {
             <ContextMenuContent>
               <ContextMenuItem
                 onSelect={() => {
-                  handleOpenCommitWindow()
-                }}
-              >
-                {t("actions.commitCode")}
-              </ContextMenuItem>
-              <ContextMenuItem
-                onSelect={() => {
                   void openWorkingTreeDiff(node.path, { mode: "overview" })
                 }}
               >
@@ -1212,13 +1190,6 @@ export function GitChangesTab() {
           </ContextMenuTrigger>
           <ContextMenuContent>
             <ContextMenuItem
-              onSelect={() => {
-                handleOpenCommitWindow()
-              }}
-            >
-              {t("actions.commitCode")}
-            </ContextMenuItem>
-            <ContextMenuItem
               disabled={!canOpenCurrentFile}
               onSelect={() => {
                 if (!canOpenCurrentFile) return
@@ -1267,7 +1238,6 @@ export function GitChangesTab() {
       canAttachToSession,
       expandedTrackedPaths,
       handleAttachToSession,
-      handleOpenCommitWindow,
       handleRequestDelete,
       handleRequestRollback,
       openFilePreview,
@@ -1307,13 +1277,6 @@ export function GitChangesTab() {
               </FileTreeFolder>
             </ContextMenuTrigger>
             <ContextMenuContent>
-              <ContextMenuItem
-                onSelect={() => {
-                  handleOpenCommitWindow()
-                }}
-              >
-                {t("actions.commitCode")}
-              </ContextMenuItem>
               <ContextMenuItem
                 onSelect={() => {
                   void openWorkingTreeDiff(node.path, { mode: "overview" })
@@ -1388,13 +1351,6 @@ export function GitChangesTab() {
           <ContextMenuContent>
             <ContextMenuItem
               onSelect={() => {
-                handleOpenCommitWindow()
-              }}
-            >
-              {t("actions.commitCode")}
-            </ContextMenuItem>
-            <ContextMenuItem
-              onSelect={() => {
                 void openFilePreview(file.path)
               }}
             >
@@ -1446,7 +1402,6 @@ export function GitChangesTab() {
       canAttachToSession,
       expandedUntrackedPaths,
       handleAttachToSession,
-      handleOpenCommitWindow,
       handleAddToVcs,
       handleRequestDelete,
       handleRequestRollback,
@@ -1488,11 +1443,10 @@ export function GitChangesTab() {
       {/* Toolbar: type a message and commit right here with Enter, or reach the
           same git operations the branch selector offers. Just a text field and
           one round "more" circle — no commit button: Enter is the submit (the
-          placeholder says so) and the menu's "commit code" row opens the full
-          commit window, so a dedicated button would only repeat what both
-          already do. The circle matches the commits tab's header, so the two
-          tabs read as one panel. Hidden on a non-repo folder — there is nothing
-          to commit to (the body shows the "not a repo" hint). */}
+          placeholder says so), so a dedicated button would only repeat what the
+          field already does. The circle matches the commits tab's header, so the
+          two tabs read as one panel. Hidden on a non-repo folder — there is
+          nothing to commit to (the body shows the "not a repo" hint). */}
       {workspaceState.isGitRepo && (
         <div className="flex h-10 shrink-0 items-center gap-1 border-b border-border/50 px-2">
           <Input
@@ -1531,7 +1485,7 @@ export function GitChangesTab() {
               </Button>
             </DropdownMenuTrigger>
             {/* Blocked like the branch selector's operation list: incoming |
-                outgoing | stash | working tree | refresh. */}
+                working tree | refresh. */}
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuItem
                 disabled={gitActions.running}
@@ -1546,26 +1500,6 @@ export function GitChangesTab() {
               >
                 <CloudSync />
                 {tBranch("fetchRemoteBranches")}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={handleOpenCommitWindow}>
-                <GitCommitHorizontal />
-                {tBranch("openCommitWindow")}
-              </DropdownMenuItem>
-              {/* Wrapped, not passed bare: onSelect hands the handler an Event,
-                  which openPushWindow would read as the branch to push. */}
-              <DropdownMenuItem onSelect={() => gitActions.openPushWindow()}>
-                <CloudUpload />
-                {tBranch("pushCode")}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={gitActions.openStashDialog}>
-                <Archive />
-                {tBranch("stashChanges")}
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={gitActions.openUnstashWindow}>
-                <ArchiveRestore />
-                {tBranch("stashPop")}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               {/* Both fan out to the existing file-picker dialog, so neither is
@@ -1700,13 +1634,6 @@ export function GitChangesTab() {
                     <ContextMenuContent>
                       <ContextMenuItem
                         onSelect={() => {
-                          handleOpenCommitWindow()
-                        }}
-                      >
-                        {t("actions.commitCode")}
-                      </ContextMenuItem>
-                      <ContextMenuItem
-                        onSelect={() => {
                           void openWorkingTreeDiff(".", {
                             mode: "overview",
                           })
@@ -1816,13 +1743,6 @@ export function GitChangesTab() {
                       </FileTreeFolder>
                     </ContextMenuTrigger>
                     <ContextMenuContent>
-                      <ContextMenuItem
-                        onSelect={() => {
-                          handleOpenCommitWindow()
-                        }}
-                      >
-                        {t("actions.commitCode")}
-                      </ContextMenuItem>
                       <ContextMenuItem
                         onSelect={() => {
                           void openWorkingTreeDiff(".", {

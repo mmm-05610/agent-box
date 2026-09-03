@@ -177,12 +177,7 @@ export function TaskMessageComposer({
     defaultPath: folderPath,
     logLabel: "TaskComposer",
   })
-  const shortcuts = useComposerShortcuts({
-    editorRef,
-    agentType,
-    onAfterInsert: () => onChange(editorRef.current?.getText() ?? ""),
-    logLabel: "TaskComposer",
-  })
+  const shortcuts = useComposerShortcuts({ editorRef })
 
   // Keep already-inserted skill badges on the current agent's trigger (`$` is
   // Codex's; everyone else invokes skills as `/`).

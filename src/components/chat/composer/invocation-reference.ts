@@ -7,8 +7,7 @@ import type { ReferenceAttrs } from "./types"
  * badge the composer embeds (refType `skill`). They carry no `uri`, so on send
  * `referenceToMarkdown` serializes them to their literal invocation token
  * `${prefix}${id}` — `/command`, `$skill` — exactly the text the agent CLI
- * executes. `meta.invocationPrefix` drives that prefix; `meta.scope === "expert"`
- * (set elsewhere) is kept for the editor's leading-badge replace logic.
+ * executes. `meta.invocationPrefix` drives that prefix.
  */
 
 export type InvocationPrefix = "/" | "$"

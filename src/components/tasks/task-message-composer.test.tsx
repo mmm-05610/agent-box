@@ -41,15 +41,6 @@ const SKILL: AgentSkillItem = {
 }
 // The "+" menu's data sources all hit the transport; none of them is what
 // these tests exercise.
-vi.mock("@/hooks/use-built-in-experts", () => ({ useBuiltInExperts: () => [] }))
-vi.mock("@/hooks/use-built-in-science", () => ({ useBuiltInScience: () => [] }))
-vi.mock("@/hooks/use-enabled-skill-ids", () => ({
-  useEnabledSkillIds: () => ({
-    enabledIds: new Set<string>(),
-    ready: true,
-    supported: true,
-  }),
-}))
 vi.mock("@/lib/platform", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/platform")>()),
   isDesktop: () => false,

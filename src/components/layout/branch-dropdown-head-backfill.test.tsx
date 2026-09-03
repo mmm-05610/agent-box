@@ -91,10 +91,6 @@ vi.mock("@/hooks/use-git-quick-actions", () => ({
     fetchAll: vi.fn(),
     updateBranch: vi.fn(),
     reportConflict: vi.fn(),
-    openCommitWindow: vi.fn(),
-    openPushWindow: vi.fn(),
-    openStashDialog: vi.fn(),
-    openUnstashWindow: vi.fn(),
     dialogs: null,
   }),
 }))

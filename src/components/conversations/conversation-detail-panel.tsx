@@ -51,7 +51,6 @@ import { AgentDiagnosticsDialog } from "@/components/settings/agent-diagnostics-
 import { AgentSelector } from "@/components/chat/agent-selector"
 import { ChatInput } from "@/components/chat/chat-input"
 import { WelcomeHero, WelcomeTip } from "@/components/chat/welcome-hero"
-import { QuickActions } from "@/components/chat/quick-actions"
 import type { ComposerInjectContent } from "@/components/chat/message-input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
@@ -1527,10 +1526,6 @@ const ConversationTabView = memo(function ConversationTabView({
   const showDraftHeader = !hasPersistedConversation && !hasSentMessage
   const isWelcomeMode = showDraftHeader
 
-  const handleQuickAction = useCallback((payload: ComposerInjectContent) => {
-    setComposerInject(payload)
-  }, [])
-
   const handleComposerInjectConsumed = useCallback(() => {
     setComposerInject(null)
   }, [])
@@ -1981,10 +1976,6 @@ const ConversationTabView = memo(function ConversationTabView({
             <div className="flex-1" />
             <div className="mx-auto flex w-full max-w-3xl shrink-0 flex-col gap-6 px-4 py-4">
               <WelcomeHero />
-              <QuickActions
-                onSelect={handleQuickAction}
-                agentType={selectedAgent}
-              />
               <div className="flex justify-center">
                 <AgentSelector
                   // The selector spans the row it is given (it has to measure

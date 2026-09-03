@@ -22,7 +22,6 @@ import {
   CloudDownload,
   CloudOff,
   CloudSync,
-  CloudUpload,
   GitBranch,
   GitBranchPlus,
   GitCompare,
@@ -32,7 +31,6 @@ import {
   MoreHorizontal,
   RefreshCw,
   RotateCcw,
-  Upload,
   User,
   X,
 } from "lucide-react"
@@ -120,7 +118,6 @@ import {
   gitNewBranch,
   gitReset,
   gitSearchAuthors,
-  openPushWindow,
 } from "@/lib/api"
 import type {
   GitBranchList,
@@ -824,12 +821,10 @@ function BranchSelector({
 }
 
 // The header's git operations, worded exactly like the branch selector's — so
-// seeing a commit you're behind on is one click from updating, and a commit you
-// haven't shared is one click from pushing. Deliberately narrow: this is the
-// COMMITS tab, so it carries only the remote-facing operations (the working-tree
-// ones — commit, stash — belong to the changes tab's toolbar), the remote
-// bookkeeping the branch selector no longer offers, and — pinned at the top —
-// the plain reload of this very list.
+// seeing a commit you're behind on is one click from updating. Deliberately
+// narrow: this is the COMMITS tab, so it carries only the incoming operations,
+// the remote bookkeeping the branch selector no longer offers, and — pinned at
+// the top — the plain reload of this very list.
 function GitActionsMenu({
   actions,
   disabled,
@@ -865,8 +860,8 @@ function GitActionsMenu({
           <MoreHorizontal className="size-3.5" />
         </Button>
       </DropdownMenuTrigger>
-      {/* Blocked like the branch selector's operation list: refresh | incoming |
-          outgoing | remote bookkeeping. Refresh leads because it's the one row
+      {/* Blocked like the branch selector's operation list: refresh |
+          incoming | remote bookkeeping. Refresh leads because it's the one row
           that touches nothing but this list. */}
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuItem disabled={refreshing} onSelect={onRefresh}>
@@ -884,13 +879,6 @@ function GitActionsMenu({
         >
           <CloudSync />
           {tBranch("fetchRemoteBranches")}
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        {/* Wrapped, not passed bare: onSelect hands the handler an Event, which
-            openPushWindow would read as the branch to push. */}
-        <DropdownMenuItem onSelect={() => actions.openPushWindow()}>
-          <CloudUpload />
-          {tBranch("pushCode")}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={onManageRemotes}>
@@ -1995,8 +1983,8 @@ export function GitLogTab() {
   // walked (that zombie would keep firing stale-filter refetches on later events).
   const folderId = folder?.id ?? null
 
-  // Header actions (pull / fetch / push / commit / stash) share the branch
-  // selector's machinery. `onCompleted` runs the same handler as the git event
+  // Header actions (pull / fetch) share the branch selector's machinery.
+  // `onCompleted` runs the same handler as the git event
   // subscription below — branches AND log, since "fetch remote branches" exists
   // precisely to surface refs the branch selector doesn't know yet. It can't
   // rely on that subscription: `folder://git-branch-changed` is emitted through
@@ -2498,23 +2486,6 @@ export function GitLogTab() {
                               <RefreshCw className="size-3.5" />
                               {tCommon("refresh")}
                             </ContextMenuItem>
-                            <ContextMenuItem
-                              onSelect={() => {
-                                if (!folder) return
-                                openPushWindow(folder.id).catch((err) => {
-                                  const msg = toErrorMessage(err)
-                                  toast.error(
-                                    t("toasts.openPushWindowFailed"),
-                                    {
-                                      description: msg,
-                                    }
-                                  )
-                                })
-                              }}
-                            >
-                              <Upload className="size-3.5" />
-                              {tCommon("push")}
-                            </ContextMenuItem>
                           </ContextMenuContent>
                         </ContextMenu>
                       </div>
@@ -2540,20 +2511,6 @@ export function GitLogTab() {
             >
               <RefreshCw className="size-3.5" />
               {tCommon("refresh")}
-            </ContextMenuItem>
-            <ContextMenuItem
-              onSelect={() => {
-                if (!folder) return
-                openPushWindow(folder.id).catch((err) => {
-                  const msg = toErrorMessage(err)
-                  toast.error(t("toasts.openPushWindowFailed"), {
-                    description: msg,
-                  })
-                })
-              }}
-            >
-              <Upload className="size-3.5" />
-              {tCommon("push")}
             </ContextMenuItem>
           </ContextMenuContent>
         </ContextMenu>

@@ -2,7 +2,7 @@
  * Flat, virtualization-ready row model for the branch selector popup.
  *
  * The rich branch selector (`BranchDropdown`) renders operations (pull / fetch /
- * commit / push / new branch / worktree) AND the full local+remote branch tree
+ * new branch / worktree) AND the full local+remote branch tree
  * as ONE searchable, virtualized, flat list — mirroring
  * the model picker's `flattenModelGroups` + `ModelOptionList` split. This module
  * is the pure half: it flattens the prefix-grouped {@link BranchTreeNode} trees
@@ -38,8 +38,6 @@ export type BranchLeafAction =
   | "rebase"
   /** Update the branch in place, without checking it out. */
   | "pull"
-  /** Publish the branch, without checking it out. Local branches only. */
-  | "push"
   | "delete"
   | "deleteRemote"
   /**
@@ -482,10 +480,9 @@ export function isNavigableRow(row: BranchRow): boolean {
 }
 
 /**
- * The per-branch actions offered for a leaf, in three groups: what this branch
- * does to the CURRENT one (switch/merge/rebase), what it syncs with its remote
- * (pull/push — both in place, no checkout), and the destructive tail. "push" is
- * local-only: publishing `origin/x` is meaningless.
+ * The per-branch actions offered for a leaf, in two groups: what this branch
+ * does to the CURRENT one (switch/merge/rebase) and what it syncs with its
+ * remote (pull, in place, no checkout).
  *
  * The destructive tail depends on where the branch lives:
  * - remote → "deleteRemote", except for the remote branch the current local
@@ -515,7 +512,6 @@ export function branchLeafActions({
   isMainWorktree?: boolean
 }): BranchLeafAction[] {
   const actions: BranchLeafAction[] = ["switch", "merge", "rebase", "pull"]
-  if (!isRemote) actions.push("push")
   if (isTracking) return actions
   if (isRemote) actions.push("deleteRemote")
   else if (isMainWorktree) return actions

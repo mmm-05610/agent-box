@@ -537,7 +537,6 @@ describe("branchLeafActions", () => {
       "merge",
       "rebase",
       "pull",
-      "push",
       "delete",
     ])
   })
@@ -567,7 +566,7 @@ describe("branchLeafActions", () => {
   it("offers nothing destructive for the main working tree's branch", () => {
     expect(
       branchLeafActions(leaf({ isWorktree: true, isMainWorktree: true }))
-    ).toEqual(["switch", "merge", "rebase", "pull", "push"])
+    ).toEqual(["switch", "merge", "rebase", "pull"])
   })
 
   it("drops the destructive tail for the tracked remote branch", () => {

@@ -22,9 +22,9 @@ type WorkspaceHealth = "healthy" | "resyncing" | "degraded"
 //   "full"  — tree + git snapshots + changed_paths (aux file tree, git
 //             panels). The backend runs tree/git scans per watch batch
 //             while at least one full subscriber exists on the root.
-//   "paths" — changed_paths only (open-file-tab watching, office
-//             auto-preview). A root with only paths subscribers costs
-//             nothing per batch beyond the debounced FS events.
+//   "paths" — changed_paths only (open-file-tab watching). A root with
+//             only paths subscribers costs nothing per batch beyond the
+//             debounced FS events.
 export type WorkspaceWatchMode = "full" | "paths"
 
 // Opaque handle returned by acquire(). Release is BY TOKEN and idempotent:

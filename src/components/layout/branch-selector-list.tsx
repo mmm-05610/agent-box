@@ -13,14 +13,12 @@ import {
   ChevronRight,
   CloudDownload,
   CloudSync,
-  CloudUpload,
   Folder,
   FolderGit2,
   FolderOpen,
   FolderX,
   GitBranch,
   GitBranchPlus,
-  GitCommitHorizontal,
   GitMerge,
   GitPullRequestArrow,
   Loader2,
@@ -104,8 +102,6 @@ const BUBBLE_SEPARATOR_HAIRLINE_PX = 1
 const OP_ICONS: Record<string, LucideIcon> = {
   pull: CloudDownload,
   fetch: CloudSync,
-  commit: GitCommitHorizontal,
-  push: CloudUpload,
   newBranch: GitBranchPlus,
   newWorktree: FolderGit2,
   init: GitBranch,
@@ -136,7 +132,6 @@ const ACTION_ICONS: Record<BranchLeafAction, LucideIcon> = {
   merge: GitMerge,
   rebase: GitPullRequestArrow,
   pull: CloudDownload,
-  push: CloudUpload,
   delete: Trash2,
   deleteRemote: Trash2,
   deleteWorktree: FolderX,
@@ -153,8 +148,8 @@ const DESTRUCTIVE_ACTIONS: ReadonlySet<BranchLeafAction> = new Set([
 
 // First action of each group in `branchLeafActions`. A rule ("insert a divider
 // before any group starter that isn't the first row") rather than fixed indices,
-// so a group that drops out entirely — a remote leaf has no "push", a tracked
-// remote no "delete" — never leaves a dangling divider behind.
+// so a group that drops out entirely — a tracked remote has no "delete" — never
+// leaves a dangling divider behind.
 const BUBBLE_GROUP_STARTS: ReadonlySet<BranchLeafAction> = new Set([
   "pull",
   "delete",
@@ -429,11 +424,6 @@ export function BranchSelectorList({
         // the branch under the cursor instead of the checked-out one.
         case "pull":
           return t("pullCode")
-        // NOT `pushCode` ("Push…"): that ellipsis belongs to the top-of-list
-        // entry, which pushes whatever is checked out. This one names its target
-        // by the row it hangs off.
-        case "push":
-          return t("pushBranch")
         case "delete":
         case "deleteRemote":
           return t("deleteBranch")

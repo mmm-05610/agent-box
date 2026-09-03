@@ -10,22 +10,6 @@ async function loadMessages(locale: AppLocale): Promise<AbstractIntlMessages> {
   switch (locale) {
     case "zh_cn":
       return (await import("@/i18n/messages/zh-CN.json")).default
-    case "zh_tw":
-      return (await import("@/i18n/messages/zh-TW.json")).default
-    case "ja":
-      return (await import("@/i18n/messages/ja.json")).default
-    case "ko":
-      return (await import("@/i18n/messages/ko.json")).default
-    case "es":
-      return (await import("@/i18n/messages/es.json")).default
-    case "de":
-      return (await import("@/i18n/messages/de.json")).default
-    case "fr":
-      return (await import("@/i18n/messages/fr.json")).default
-    case "pt":
-      return (await import("@/i18n/messages/pt.json")).default
-    case "ar":
-      return (await import("@/i18n/messages/ar.json")).default
     case "en":
     default:
       return enMessages

@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 /**
- * The web-mode app popup windows (commit / push / settings / import-sessions /
- * merge / stash) learn their target path from a backend round trip. The window
- * therefore has to be RESERVED inside the click's own call stack — opening it
- * after the await is reliably swallowed by popup blockers, because an HTTP
- * round trip outlasts every browser's user-activation window. These tests pin
- * that ordering, which is the whole point of `openAppWindow` in api.ts.
+ * The web-mode app popup windows (merge / settings / import-sessions) learn
+ * their target path from a backend round trip. The window therefore has to be
+ * RESERVED inside the click's own call stack — opening it after the await is
+ * reliably swallowed by popup blockers, because an HTTP round trip outlasts
+ * every browser's user-activation window. These tests pin that ordering, which
+ * is the whole point of `openAppWindow` in api.ts.
  * (Issue #410 is the markdown-link variant of the same bug.)
  */
 
@@ -28,7 +28,7 @@ vi.mock("@/lib/transport", () => ({
   notifyRemoteDesktopUnauthorized: mocks.notifyRemoteDesktopUnauthorized,
 }))
 
-import { openCommitWindow, openSettingsWindow } from "@/lib/api"
+import { openMergeWindow, openSettingsWindow } from "@/lib/api"
 
 /** Stand-in for the reserved WindowProxy: only `location.href` and `close`. */
 function fakePopup(initialHref = "about:blank") {
@@ -65,18 +65,18 @@ describe("web-mode app popup windows", () => {
     const roundTrip = deferred<{ path: string }>()
     mocks.call.mockReturnValue(roundTrip.promise)
 
-    const pending = openCommitWindow(7)
+    const pending = openMergeWindow(7, "merge")
 
     // The window exists already — reserved in the caller's own task, with an
     // EMPTY url so a name that is already open is handed back un-navigated
     // (that is what preserves the reuse-by-name behaviour).
-    expect(open).toHaveBeenCalledWith("", "commit-7")
+    expect(open).toHaveBeenCalledWith("", "merge-7")
     expect(popup.location.href).toBe("about:blank")
 
-    roundTrip.resolve({ path: "/commit?folder=7" })
+    roundTrip.resolve({ path: "/merge?folderId=7" })
     await pending
 
-    expect(popup.location.href).toBe("/commit?folder=7")
+    expect(popup.location.href).toBe("/merge?folderId=7")
     expect(popup.close).not.toHaveBeenCalled()
   })
 
@@ -102,27 +102,27 @@ describe("web-mode app popup windows", () => {
     vi.spyOn(window, "open").mockReturnValue(popup as never)
     mocks.call.mockRejectedValue(new Error("backend down"))
 
-    await expect(openCommitWindow(7)).rejects.toThrow("backend down")
+    await expect(openMergeWindow(7, "merge")).rejects.toThrow("backend down")
     expect(popup.close).toHaveBeenCalledTimes(1)
   })
 
   it("leaves an already-open window alone when the round trip fails", async () => {
     // Reserving an existing name hands back the user's open window; a failed
     // call must not close it out from under them.
-    const popup = fakePopup("/commit?folder=7")
+    const popup = fakePopup("/merge?folderId=7")
     vi.spyOn(window, "open").mockReturnValue(popup as never)
     mocks.call.mockRejectedValue(new Error("backend down"))
 
-    await expect(openCommitWindow(7)).rejects.toThrow("backend down")
+    await expect(openMergeWindow(7, "merge")).rejects.toThrow("backend down")
     expect(popup.close).not.toHaveBeenCalled()
-    expect(popup.location.href).toBe("/commit?folder=7")
+    expect(popup.location.href).toBe("/merge?folderId=7")
   })
 
   // Two clicks on the same action reserve the SAME window (that is what an
   // empty url buys us), so a failing request must not close the window a
   // concurrent request is still going to navigate. The call sites have no
-  // in-flight guard — see handleOpenCommitWindow in aux-panel-git-changes-tab
-  // and aux-panel-file-tree-tab — so this races in practice on a double-click.
+  // in-flight guard — see the conflict dialog's openMergeWindow call — so this
+  // races in practice on a double-click.
   it.each([
     ["the failing request settles first", true],
     ["the succeeding request settles first", false],
@@ -137,17 +137,17 @@ describe("web-mode app popup windows", () => {
         .mockReturnValueOnce(failing.promise)
         .mockReturnValueOnce(succeeding.promise)
 
-      const first = openCommitWindow(7)
-      const second = openCommitWindow(7)
+      const first = openMergeWindow(7, "merge")
+      const second = openMergeWindow(7, "merge")
 
       if (failFirst) {
         failing.reject(new Error("backend down"))
         await expect(first).rejects.toThrow("backend down")
         expect(popup.close).not.toHaveBeenCalled()
-        succeeding.resolve({ path: "/commit?folder=7" })
+        succeeding.resolve({ path: "/merge?folderId=7" })
         await second
       } else {
-        succeeding.resolve({ path: "/commit?folder=7" })
+        succeeding.resolve({ path: "/merge?folderId=7" })
         await second
         failing.reject(new Error("backend down"))
         await expect(first).rejects.toThrow("backend down")
@@ -155,7 +155,7 @@ describe("web-mode app popup windows", () => {
 
       // The window survives and shows the page the successful request asked for.
       expect(popup.close).not.toHaveBeenCalled()
-      expect(popup.location.href).toBe("/commit?folder=7")
+      expect(popup.location.href).toBe("/merge?folderId=7")
     }
   )
 
@@ -168,8 +168,8 @@ describe("web-mode app popup windows", () => {
       .mockReturnValueOnce(first.promise)
       .mockReturnValueOnce(second.promise)
 
-    const firstCall = openCommitWindow(7)
-    const secondCall = openCommitWindow(7)
+    const firstCall = openMergeWindow(7, "merge")
+    const secondCall = openMergeWindow(7, "merge")
 
     first.reject(new Error("backend down"))
     await expect(firstCall).rejects.toThrow("backend down")
@@ -192,7 +192,7 @@ describe("web-mode app popup windows", () => {
     vi.spyOn(window, "open").mockReturnValue(popup as never)
     mocks.call.mockRejectedValue(new Error("backend down"))
 
-    await expect(openCommitWindow(7)).rejects.toThrow("backend down")
+    await expect(openMergeWindow(7, "merge")).rejects.toThrow("backend down")
     expect(popup.close).not.toHaveBeenCalled()
   })
 
@@ -201,10 +201,10 @@ describe("web-mode app popup windows", () => {
     mocks.isDesktop.mockReturnValue(true)
     mocks.shellCall.mockResolvedValue(undefined)
 
-    await openCommitWindow(7)
+    await openMergeWindow(7, "merge")
 
     expect(mocks.shellCall).toHaveBeenCalledWith(
-      "open_commit_window",
+      "open_merge_window",
       expect.objectContaining({ folderId: 7 })
     )
     expect(open).not.toHaveBeenCalled()

@@ -46,62 +46,19 @@ export function isComposerChromeClick(target: EventTarget | null): boolean {
 }
 
 /**
- * Insert an expert as the leading inline badge of the message — experts are
- * whole-turn directives the agent inspects first, so the badge goes at the very
- * front (and serializes to `${prefix}${id}` as the first token), never at the
- * caret. `attrs` is an expert reference (refType `skill`, `meta.scope === "expert"`).
+ * Re-stamp the invocation prefix of every scoped skill badge in the document to
+ * `prefix`. Codex triggers skills with `$`, every other agent with `/`, and a
+ * badge freezes its prefix in at insert time (see `skillToReference`). A badge
+ * inserted under one agent and then sent under another would carry the wrong
+ * trigger — most visibly a `/`-baked skill sent to Codex, which parses the
+ * leading `/skill` as a slash COMMAND and rejects the turn. Calling this
+ * whenever the effective agent changes keeps the leading invocation in sync
+ * with the selected agent.
  *
- * The badge must be the FIRST inline node of the FIRST block. The plain-text
- * schema has only paragraphs as blocks, so the first block is always a paragraph
- * and position 1 (the start of its content) is always the right spot. When it
- * already opens with an expert badge (from a prior pick), it is replaced rather
- * than stacked — the agent only honors the first directive.
- */
-export function applyExpertReference(
-  editor: Editor,
-  attrs: ReferenceAttrs
-): void {
-  const badge = [
-    { type: "reference", attrs },
-    { type: "text", text: " " },
-  ]
-
-  // Replace an existing leading expert badge (atom at pos 1) if any, taking one
-  // following space with it so the replacement doesn't stack spaces.
-  // `meta.scope === "expert"` is the unambiguous marker — only expert references
-  // carry it (commands/skills don't), so no extra id allow-list is needed (and
-  // an allow-list would false-negative on agent-linked experts → stacking).
-  const first = editor.state.doc.firstChild
-  const firstChild = first?.firstChild
-  const isExpertBadge =
-    firstChild?.type.name === "reference" &&
-    firstChild.attrs.refType === "skill" &&
-    firstChild.attrs.meta?.scope === "expert"
-
-  let chain = editor.chain().focus()
-  if (isExpertBadge) {
-    const afterBadge = first?.maybeChild(1)
-    const trailingSpace =
-      afterBadge?.isText && afterBadge.text?.startsWith(" ") ? 1 : 0
-    chain = chain.deleteRange({ from: 1, to: 2 + trailingSpace })
-  }
-  chain.insertContentAt(1, badge).setTextSelection(3).run()
-}
-
-/**
- * Re-stamp the invocation prefix of every agent-dependent skill / expert badge
- * in the document to `prefix`. Codex triggers skills with `$`, every other agent
- * with `/`, and a badge freezes its prefix in at insert time (see
- * {@link applyExpertReference} and `skillToReference`). A badge inserted under
- * one agent and then sent under another would carry the wrong trigger — most
- * visibly a `/`-baked skill sent to Codex, which parses the leading `/skill` as a
- * slash COMMAND and rejects the turn. Calling this whenever the effective agent
- * changes keeps the leading invocation in sync with the selected agent.
- *
- * Only skill references carrying a `meta.scope` (skills + experts) are
- * agent-dependent. Bare ACP slash commands (`commandToReference`, no scope) are
- * always `/` and are left untouched. The rewrite is a single attrs-only
- * transaction kept out of the undo history. Returns true if anything changed.
+ * Only skill references carrying a `meta.scope` are agent-dependent. Bare ACP
+ * slash commands (`commandToReference`, no scope) are always `/` and are left
+ * untouched. The rewrite is a single attrs-only transaction kept out of the
+ * undo history. Returns true if anything changed.
  */
 export function restampSkillPrefixes(
   editor: Editor,

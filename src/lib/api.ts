@@ -53,11 +53,9 @@ import type {
   AgentSkillItem,
   AgentSkillsListResult,
   AgentSkillContent,
-  ExpertListItem,
   ExpertInstallStatus,
   LinkOp,
   LinkOpResult,
-  ScienceListItem,
   CustomSkillItem,
   CustomDeleteResult,
   CustomImportResult,
@@ -84,15 +82,12 @@ import type {
   GitBranchList,
   GitHeadInfo,
   GitPullResult,
-  GitPushResult,
-  GitPushInfo,
   GitMergeResult,
   GitRebaseResult,
   GitResetMode,
   GitConflictFileVersions,
   GitCommitResult,
   GitRemote,
-  GitStashEntry,
   PreflightResult,
   FolderCommand,
   TerminalInfo,
@@ -132,9 +127,6 @@ import type {
   UpdateModelProviderResult,
   PluginCheckSummary,
   OpenCodeCatalogProvider,
-  OfficecliInfo,
-  OfficecliSkill,
-  SkillSyncReport,
   TokenUsageFacets,
   TokenUsageFilter,
   TokenUsageReport,
@@ -1351,114 +1343,14 @@ export async function acpDeleteAgentSkill(params: {
 
 // ─── Experts (built-in expert skills) ───────────────────────────────────
 
-export async function expertsList(): Promise<ExpertListItem[]> {
-  return getTransport().call("experts_list")
-}
-
-export async function expertsGetInstallStatus(
-  expertId: string
-): Promise<ExpertInstallStatus[]> {
-  return getTransport().call("experts_get_install_status", { expertId })
-}
-
 /** One round-trip snapshot of every (expert, agent) link state for the matrix. */
-export async function expertsListAllInstallStatuses(): Promise<
-  ExpertInstallStatus[]
-> {
-  return getTransport().call("experts_list_all_install_statuses")
-}
-
 /** Apply a batch of enable/disable ops; returns one result per op. */
-export async function expertsApplyLinks(
-  ops: LinkOp[]
-): Promise<LinkOpResult[]> {
-  return getTransport().call("experts_apply_links", { ops })
-}
-
-export async function expertsLinkToAgent(params: {
-  expertId: string
-  agentType: AgentType
-}): Promise<ExpertInstallStatus> {
-  return getTransport().call("experts_link_to_agent", {
-    expertId: params.expertId,
-    agentType: params.agentType,
-  })
-}
-
-export async function expertsUnlinkFromAgent(params: {
-  expertId: string
-  agentType: AgentType
-}): Promise<void> {
-  return getTransport().call("experts_unlink_from_agent", {
-    expertId: params.expertId,
-    agentType: params.agentType,
-  })
-}
-
-export async function expertsReadContent(expertId: string): Promise<string> {
-  return getTransport().call("experts_read_content", { expertId })
-}
-
-export async function expertsOpenCentralDir(): Promise<string> {
-  return getTransport().call("experts_open_central_dir")
-}
-
 // ─── Science (built-in scientific-research skills) ──────────────────────
 // Link statuses reuse the Expert* DTOs (like office tools do): the
 // `expertId` field carries the science skill id.
 
-export async function scienceList(): Promise<ScienceListItem[]> {
-  return getTransport().call("science_list")
-}
-
-export async function scienceGetInstallStatus(
-  skillId: string
-): Promise<ExpertInstallStatus[]> {
-  return getTransport().call("science_get_install_status", { skillId })
-}
-
 /** One round-trip snapshot of every (science skill, agent) link state. */
-export async function scienceListAllInstallStatuses(): Promise<
-  ExpertInstallStatus[]
-> {
-  return getTransport().call("science_list_all_install_statuses")
-}
-
 /** Apply a batch of enable/disable ops; returns one result per op. */
-export async function scienceApplyLinks(
-  ops: LinkOp[]
-): Promise<LinkOpResult[]> {
-  return getTransport().call("science_apply_links", { ops })
-}
-
-export async function scienceLinkToAgent(params: {
-  skillId: string
-  agentType: AgentType
-}): Promise<ExpertInstallStatus> {
-  return getTransport().call("science_link_to_agent", {
-    skillId: params.skillId,
-    agentType: params.agentType,
-  })
-}
-
-export async function scienceUnlinkFromAgent(params: {
-  skillId: string
-  agentType: AgentType
-}): Promise<void> {
-  return getTransport().call("science_unlink_from_agent", {
-    skillId: params.skillId,
-    agentType: params.agentType,
-  })
-}
-
-export async function scienceReadContent(skillId: string): Promise<string> {
-  return getTransport().call("science_read_content", { skillId })
-}
-
-export async function scienceOpenCentralDir(): Promise<string> {
-  return getTransport().call("science_open_central_dir")
-}
-
 // ─── Custom (user-authored) skills ──────────────────────────────────────
 // The fourth skill pack: user-created skills in the same central store, told
 // apart from the built-in packs by exclusion. Link statuses reuse the Expert*
@@ -1548,87 +1440,12 @@ export async function customDeleteSkills(
 
 // ─── Office tools ───
 
-export async function officecliDetect(): Promise<OfficecliInfo> {
-  return getTransport().call("officecli_detect")
-}
-
-export async function officecliInstall(taskId: string): Promise<OfficecliInfo> {
-  // The vendor installer downloads + extracts a multi-MB binary; allow well
-  // beyond the default 60s web-call timeout so slow networks don't surface a
-  // spurious timeout while progress is still streaming. Sits 30s ABOVE the
-  // backend's own 600s deadline so the backend's structured timeout error wins
-  // the race instead of a generic transport abort. `taskId` correlates the
-  // `app://officecli-install` stream the settings page subscribes to.
-  return getTransport().call(
-    "officecli_install",
-    { taskId },
-    { timeoutMs: 630_000 }
-  )
-}
-
-export async function officecliUninstall(): Promise<OfficecliInfo> {
-  return getTransport().call("officecli_uninstall")
-}
-
-export async function officecliListSkills(): Promise<OfficecliSkill[]> {
-  return getTransport().call("officecli_list_skills")
-}
-
-export async function officecliSyncSkills(): Promise<SkillSyncReport> {
-  return getTransport().call("officecli_sync_skills")
-}
-
-export async function officecliSkillLinkToAgent(params: {
-  skillId: string
-  agentType: AgentType
-}): Promise<ExpertInstallStatus> {
-  return getTransport().call("officecli_skill_link_to_agent", params)
-}
-
-export async function officecliSkillUnlinkFromAgent(params: {
-  skillId: string
-  agentType: AgentType
-}): Promise<void> {
-  return getTransport().call("officecli_skill_unlink_from_agent", params)
-}
-
-export async function officecliSkillGetInstallStatus(
-  skillId: string
-): Promise<ExpertInstallStatus[]> {
-  return getTransport().call("officecli_skill_get_install_status", { skillId })
-}
-
 /** One round-trip snapshot of every (skill, agent) link state for the matrix. */
-export async function officecliSkillListAllInstallStatuses(): Promise<
-  ExpertInstallStatus[]
-> {
-  return getTransport().call("officecli_skill_list_all_install_statuses")
-}
-
 /** Apply a batch of enable/disable ops; returns one result per op. */
-export async function officecliSkillApplyLinks(
-  ops: LinkOp[]
-): Promise<LinkOpResult[]> {
-  return getTransport().call("officecli_skill_apply_links", { ops })
-}
-
-export async function officecliSkillReadContent(
-  skillId: string
-): Promise<string> {
-  return getTransport().call("officecli_skill_read_content", { skillId })
-}
-
 /**
  * Render an office file (.docx/.xlsx/.pptx) to self-contained HTML via the
  * OfficeCLI backend, for the in-app preview. `path` is relative to `rootPath`.
  */
-export async function officecliRenderHtml(
-  rootPath: string,
-  path: string
-): Promise<string> {
-  return getTransport().call("officecli_render_html", { rootPath, path })
-}
-
 /**
  * Start (or share, by ref-count) a long-lived `officecli watch` preview server
  * for an office file and return its loopback `port` plus a per-watch `cap`
@@ -1640,21 +1457,7 @@ export async function officecliRenderHtml(
  * through the `/api/office-watch-proxy/{port}` reverse proxy and authenticates
  * with `?cap=` (the master token never enters the iframe). Desktop ignores it.
  */
-export async function startOfficeWatch(
-  rootPath: string,
-  path: string
-): Promise<{ port: number; cap: string }> {
-  return getTransport().call("start_office_watch", { rootPath, path })
-}
-
 /** Release one reference to an office file's watch preview server. */
-export async function stopOfficeWatch(
-  rootPath: string,
-  path: string
-): Promise<void> {
-  return getTransport().call("stop_office_watch", { rootPath, path })
-}
-
 export async function getSystemProxySettings(): Promise<SystemProxySettings> {
   return getTransport().call("get_system_proxy_settings")
 }
@@ -2190,37 +1993,6 @@ export async function gitUpdateBranch(
   })
 }
 
-/** `branch` omitted (or null) reports on the checked-out branch. */
-export async function gitPushInfo(
-  path: string,
-  branch?: string | null
-): Promise<GitPushInfo> {
-  return getTransport().call("git_push_info", {
-    path,
-    branch: branch ?? null,
-  })
-}
-
-/**
- * Push a branch. `branch` omitted (or null) pushes the checked-out one; naming
- * one pushes it without checking it out (`git push <remote> <branch>`).
- */
-export async function gitPush(
-  path: string,
-  remote?: string | null,
-  credentials?: GitCredentials | null,
-  folderId?: number | null,
-  branch?: string | null
-): Promise<GitPushResult> {
-  return getTransport().call("git_push", {
-    path,
-    remote: remote ?? null,
-    branch: branch ?? null,
-    credentials: credentials ?? null,
-    folderId: folderId ?? null,
-  })
-}
-
 export async function gitNewBranch(
   path: string,
   branchName: string,
@@ -2392,8 +2164,8 @@ function isBlankAppWindow(win: Window): boolean {
 }
 
 /**
- * Open a same-origin app window (commit / push / settings / …) whose target
- * path is only known after a backend round trip.
+ * Open a same-origin app window (merge / settings / …) whose target path is
+ * only known after a backend round trip.
  *
  * The window must be RESERVED inside the click's own call stack: in web mode
  * that round trip is a real HTTP request, far longer than any browser's
@@ -2404,7 +2176,7 @@ function isBlankAppWindow(win: Window): boolean {
  * Reserving with an EMPTY url is what makes this safe to retrofit: an empty
  * url never navigates, so a name that already maps to an open window is simply
  * handed back — preserving today's reuse-by-name behaviour, which
- * `openPushWindow` relies on to retarget an already-open push window. And
+ * `openMergeWindow` relies on to retarget an already-open merge window. And
  * because no window features are passed, a `null` return really does mean
  * "blocked" here, unlike the `noreferrer` popups in ai-elements/link-safety.tsx
  * (those return null even on success).
@@ -2460,100 +2232,6 @@ export async function openMergeWindow(
       locale,
     })
   )
-}
-
-export async function openStashWindow(folderId: number): Promise<void> {
-  const locale = getCurrentEffectiveAppLocale()
-  if (isDesktop()) {
-    return getShellTransport().call("open_stash_window", {
-      folderId,
-      locale,
-      remoteConnectionId: getActiveRemoteConnectionId(),
-    })
-  }
-  return openAppWindow(`stash-${folderId}`, () =>
-    getTransport().call<{ path: string }>("open_stash_window", {
-      folderId,
-      locale,
-    })
-  )
-}
-
-/** `branch` preselects the push target; omitted means the checked-out branch. */
-export async function openPushWindow(
-  folderId: number,
-  branch?: string | null
-): Promise<void> {
-  const locale = getCurrentEffectiveAppLocale()
-  if (isDesktop()) {
-    return getShellTransport().call("open_push_window", {
-      folderId,
-      locale,
-      remoteConnectionId: getActiveRemoteConnectionId(),
-      branch: branch ?? null,
-    })
-  }
-  // Reusing the window NAME navigates an already-open push window to the new
-  // URL, so the preselected branch applies there too (the desktop path gets the
-  // same effect from the `push://retarget-branch` event).
-  return openAppWindow(`push-${folderId}`, () =>
-    getTransport().call<{ path: string }>("open_push_window", {
-      folderId,
-      locale,
-      branch: branch ?? null,
-    })
-  )
-}
-
-export async function gitStashPush(
-  path: string,
-  message?: string,
-  keepIndex?: boolean
-): Promise<string> {
-  return getTransport().call("git_stash_push", {
-    path,
-    message: message ?? null,
-    keepIndex: keepIndex ?? false,
-  })
-}
-
-export async function gitStashPop(
-  path: string,
-  stashRef?: string
-): Promise<string> {
-  return getTransport().call("git_stash_pop", {
-    path,
-    stashRef: stashRef ?? null,
-  })
-}
-
-export async function gitStashList(path: string): Promise<GitStashEntry[]> {
-  return getTransport().call("git_stash_list", { path })
-}
-
-export async function gitStashApply(
-  path: string,
-  stashRef: string
-): Promise<string> {
-  return getTransport().call("git_stash_apply", { path, stashRef })
-}
-
-export async function gitStashDrop(
-  path: string,
-  stashRef: string
-): Promise<string> {
-  return getTransport().call("git_stash_drop", { path, stashRef })
-}
-
-export async function gitStashClear(path: string): Promise<string> {
-  return getTransport().call("git_stash_clear", { path })
-}
-
-export async function gitStashShow(
-  path: string,
-  stashRef: string
-): Promise<GitStatusEntry[]> {
-  return getTransport().call("git_stash_show", { path, stashRef })
 }
 
 export async function gitListRemotes(path: string): Promise<GitRemote[]> {
@@ -2779,23 +2457,6 @@ export async function resolveWorktreeFolder(
   branch: string
 ): Promise<WorktreeResolution> {
   return getTransport().call("resolve_worktree_folder", { repoPath, branch })
-}
-
-export async function openCommitWindow(folderId: number): Promise<void> {
-  const locale = getCurrentEffectiveAppLocale()
-  if (isDesktop()) {
-    return getShellTransport().call("open_commit_window", {
-      folderId,
-      locale,
-      remoteConnectionId: getActiveRemoteConnectionId(),
-    })
-  }
-  return openAppWindow(`commit-${folderId}`, () =>
-    getTransport().call<{ path: string }>("open_commit_window", {
-      folderId,
-      locale,
-    })
-  )
 }
 
 export type SettingsSection =

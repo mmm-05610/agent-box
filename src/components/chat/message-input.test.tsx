@@ -61,15 +61,6 @@ vi.mock("@/hooks/use-shortcut-settings", () => ({
 // scan mid-test; defaults to "no skills" for every other test in this file.
 const agentSkills = vi.hoisted(() => vi.fn(() => [] as unknown[]))
 vi.mock("@/hooks/use-agent-skills", () => ({ useAgentSkills: agentSkills }))
-vi.mock("@/hooks/use-built-in-experts", () => ({ useBuiltInExperts: () => [] }))
-vi.mock("@/hooks/use-built-in-science", () => ({ useBuiltInScience: () => [] }))
-vi.mock("@/hooks/use-enabled-skill-ids", () => ({
-  useEnabledSkillIds: () => ({
-    enabledIds: new Set(),
-    ready: false,
-    supported: true,
-  }),
-}))
 vi.mock("@/components/chat/composer/use-reference-search", () => ({
   useReferenceSearch: () => async () => [],
 }))

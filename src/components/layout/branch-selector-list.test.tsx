@@ -135,7 +135,6 @@ describe("BranchSelectorList — worktree section", () => {
       "Merge task/132 into main",
       "Rebase main onto task/132",
       "Pull code",
-      "Push",
       // Never plain "Delete branch": git refuses while a worktree holds the ref.
       "Delete worktree",
       "Delete worktree and branch",

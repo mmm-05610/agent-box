@@ -9,7 +9,6 @@ import {
   useState,
 } from "react"
 import type { ImperativePanelGroupHandle } from "react-resizable-panels"
-import { FolderTitleBar } from "@/components/layout/folder-title-bar"
 import { Sidebar } from "@/components/layout/sidebar"
 import { StatusBar } from "@/components/layout/status-bar"
 import {
@@ -75,8 +74,6 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable"
 import { cn } from "@/lib/utils"
-import { useIsMobile } from "@/hooks/use-mobile"
-import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer"
 import { OverlayHostHiddenProvider } from "@/components/ui/overlay-host-hidden"
 
 function WorkspaceDocumentTitle() {
@@ -455,132 +452,6 @@ function WorkspaceContent({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       ) : null}
-    </div>
-  )
-}
-
-function MobileWorkspaceContent({ children }: { children: React.ReactNode }) {
-  const { mode, activePane } = useWorkspaceView()
-  const { isConversations } = useWorkbenchRoute()
-  const hasRouteStrip = useHasWorkbenchRouteStrip()
-
-  const showConversation =
-    mode === "conversation" || activePane === "conversation"
-
-  return (
-    <div className="relative h-full min-h-0 overflow-hidden">
-      <KeptMountedSurface hidden={!isConversations}>
-        {showConversation ? (
-          // Mobile mirrors the desktop chrome: no tab strip — the conversation
-          // detail header (folder › title) renders inside {children}, and tabs
-          // are navigated from the sidebar (single active conversation at a time).
-          <section className="flex h-full min-h-0 flex-col overflow-hidden">
-            <div className="relative flex-1 min-h-0 overflow-hidden">
-              {children}
-            </div>
-          </section>
-        ) : (
-          // File view: the shared FileWorkspaceHeader (folder › file breadcrumb)
-          // replaces the file tab strip, matching the desktop file column.
-          <section className="flex h-full min-h-0 flex-col overflow-hidden">
-            <FileWorkspaceHeader />
-            <div className="flex-1 min-h-0 overflow-hidden">
-              <FileWorkspacePanel />
-            </div>
-          </section>
-        )}
-      </KeptMountedSurface>
-      {!isConversations ? (
-        // Same canvas as the desktop overlay: conversation-identical background
-        // (opaque normally, transparent under a workspace background image).
-        <div className="absolute inset-0 z-40 flex flex-col bg-background ws-transparent-bg">
-          {hasRouteStrip ? (
-            <div className="flex h-10 shrink-0 items-stretch border-b border-border/50 ws-chrome-border">
-              <WorkbenchRouteStrip />
-              <div className="min-w-0 flex-1" />
-            </div>
-          ) : null}
-          <div className="min-h-0 flex-1">
-            <WorkbenchRoutePage />
-          </div>
-        </div>
-      ) : null}
-    </div>
-  )
-}
-
-function MobileFolderWorkspaceShell({
-  children,
-}: {
-  children: React.ReactNode
-}) {
-  const {
-    isOpen: sidebarOpen,
-    restored: sidebarRestored,
-    toggle: toggleSidebar,
-  } = useSidebarContext()
-  const {
-    isOpen: auxOpen,
-    restored: auxRestored,
-    toggle: toggleAux,
-  } = useAuxPanelContext()
-  const { isOpen: terminalOpen, toggle: toggleTerminal } = useTerminalContext()
-
-  return (
-    <div className="flex flex-1 min-h-0 overflow-hidden">
-      {/* These three opt back into press-outside-to-close, against the app-wide
-          drawer default. They are mobile NAVIGATION: each covers most of the
-          screen and the strip of page left showing is the affordance for
-          getting back to it — tapping there to dismiss is the platform habit,
-          and there is nothing behind them a user would want to click *through*
-          to while they are open. */}
-      <Drawer
-        open={sidebarRestored && sidebarOpen}
-        onOpenChange={toggleSidebar}
-        swipeDirection="left"
-        disablePointerDismissal={false}
-      >
-        <DrawerContent
-          showCloseButton={false}
-          className="w-[85%] max-w-[22.5rem] p-0"
-        >
-          <DrawerTitle className="sr-only">Sidebar</DrawerTitle>
-          <Sidebar />
-        </DrawerContent>
-      </Drawer>
-
-      <main className="flex h-full min-h-0 w-full flex-col overflow-hidden">
-        <MobileWorkspaceContent>{children}</MobileWorkspaceContent>
-      </main>
-
-      <Drawer
-        open={auxRestored && auxOpen}
-        onOpenChange={toggleAux}
-        swipeDirection="right"
-        disablePointerDismissal={false}
-      >
-        <DrawerContent
-          showCloseButton={false}
-          className="w-[85%] max-w-[22.5rem] p-0"
-        >
-          <DrawerTitle className="sr-only">Panel</DrawerTitle>
-          <AuxPanel />
-        </DrawerContent>
-      </Drawer>
-
-      <Drawer
-        open={terminalOpen}
-        onOpenChange={toggleTerminal}
-        swipeDirection="down"
-        disablePointerDismissal={false}
-      >
-        <DrawerContent showCloseButton={false} className="h-[70vh] p-0">
-          <DrawerTitle className="sr-only">Terminal</DrawerTitle>
-          <div className="h-full min-h-0 overflow-hidden">
-            <TerminalPanel />
-          </div>
-        </DrawerContent>
-      </Drawer>
     </div>
   )
 }
@@ -1040,7 +911,6 @@ function FolderWorkspaceShell({ children }: { children: React.ReactNode }) {
 }
 
 function FolderLayoutShell({ children }: { children: React.ReactNode }) {
-  const isMobile = useIsMobile()
   const {
     workspaceBgEnabled,
     workspaceBgImageUrl,
@@ -1082,22 +952,11 @@ function FolderLayoutShell({ children }: { children: React.ReactNode }) {
           />
         </>
       )}
-      {/* Global shortcuts + the search / remote-directory dialogs (formerly
-          owned by the full-width FolderTitleBar). Mounted on both platforms. */}
+      {/* Global shortcuts + the search / remote-directory dialogs. Mounted on
+          both platforms. */}
       <WorkspaceChromeController />
-      {isMobile ? (
-        <>
-          {/* Mobile keeps the visible full-width bar; desktop uses the
-              ZCode-style TopBar (D-004), which owns the window's top band. */}
-          <FolderTitleBar />
-          <MobileFolderWorkspaceShell>{children}</MobileFolderWorkspaceShell>
-        </>
-      ) : (
-        <>
-          <TopBar />
-          <FolderWorkspaceShell>{children}</FolderWorkspaceShell>
-        </>
-      )}
+      <TopBar />
+      <FolderWorkspaceShell>{children}</FolderWorkspaceShell>
       <StatusBar />
       <AppToaster
         position="bottom-right"

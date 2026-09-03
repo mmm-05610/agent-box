@@ -32,15 +32,12 @@ import type {
   GitBranchList,
   GitHeadInfo,
   GitPullResult,
-  GitPushResult,
-  GitPushInfo,
   GitMergeResult,
   GitRebaseResult,
   GitResetMode,
   GitConflictFileVersions,
   GitCommitResult,
   GitRemote,
-  GitStashEntry,
   PreflightResult,
   FolderCommand,
   TerminalInfo,
@@ -701,22 +698,6 @@ export async function gitFetch(
   return invoke("git_fetch", { path, credentials: credentials ?? null })
 }
 
-export async function gitPushInfo(path: string): Promise<GitPushInfo> {
-  return invoke("git_push_info", { path })
-}
-
-export async function gitPush(
-  path: string,
-  remote?: string | null,
-  credentials?: GitCredentials | null
-): Promise<GitPushResult> {
-  return invoke("git_push", {
-    path,
-    remote: remote ?? null,
-    credentials: credentials ?? null,
-  })
-}
-
 export async function gitNewBranch(
   path: string,
   branchName: string,
@@ -810,68 +791,6 @@ export async function openMergeWindow(
     upstreamCommit: upstreamCommit ?? null,
     locale: getCurrentEffectiveAppLocale(),
   })
-}
-
-export async function openStashWindow(folderId: number): Promise<void> {
-  return invoke("open_stash_window", {
-    folderId,
-    locale: getCurrentEffectiveAppLocale(),
-  })
-}
-
-export async function openPushWindow(folderId: number): Promise<void> {
-  return invoke("open_push_window", {
-    folderId,
-    locale: getCurrentEffectiveAppLocale(),
-  })
-}
-
-export async function gitStashPush(
-  path: string,
-  message?: string,
-  keepIndex?: boolean
-): Promise<string> {
-  return invoke("git_stash_push", {
-    path,
-    message: message ?? null,
-    keepIndex: keepIndex ?? false,
-  })
-}
-
-export async function gitStashPop(
-  path: string,
-  stashRef?: string
-): Promise<string> {
-  return invoke("git_stash_pop", { path, stashRef: stashRef ?? null })
-}
-
-export async function gitStashList(path: string): Promise<GitStashEntry[]> {
-  return invoke("git_stash_list", { path })
-}
-
-export async function gitStashApply(
-  path: string,
-  stashRef: string
-): Promise<string> {
-  return invoke("git_stash_apply", { path, stashRef })
-}
-
-export async function gitStashDrop(
-  path: string,
-  stashRef: string
-): Promise<string> {
-  return invoke("git_stash_drop", { path, stashRef })
-}
-
-export async function gitStashClear(path: string): Promise<string> {
-  return invoke("git_stash_clear", { path })
-}
-
-export async function gitStashShow(
-  path: string,
-  stashRef: string
-): Promise<GitStatusEntry[]> {
-  return invoke("git_stash_show", { path, stashRef })
 }
 
 export async function gitListRemotes(path: string): Promise<GitRemote[]> {
@@ -1035,13 +954,6 @@ export async function removeFolderLink(
 
 export async function openFolder(path: string): Promise<FolderDetail> {
   return invoke("open_folder", { path })
-}
-
-export async function openCommitWindow(folderId: number): Promise<void> {
-  return invoke("open_commit_window", {
-    folderId,
-    locale: getCurrentEffectiveAppLocale(),
-  })
 }
 
 export type SettingsSection =

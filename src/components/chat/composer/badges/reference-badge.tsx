@@ -71,9 +71,8 @@ export function ReferenceIcon({
       icon = <GitCommit className={ICON_CLASS} />
       break
     case "skill":
-      // Commands, skills and experts all use the command glyph — they aren't
-      // visually distinguished (the `meta.scope` distinction is kept only for
-      // the editor's expert-replace logic, not the icon).
+      // Commands and skills share the command glyph — they aren't visually
+      // distinguished.
       icon = <Command className={ICON_CLASS} />
       break
     default:
@@ -94,7 +93,7 @@ export function ReferenceIcon({
  * Per-kind text color (light + dark) — no background or border, so the badge
  * reads as a colored inline token that sits cleanly on the user-message bubble
  * (`bg-secondary`). `text-*` colors the label and, since the icon strokes with
- * `currentColor`, the icon too. Commands/skills/experts share one color (they
+ * `currentColor`, the icon too. Commands/skills share one color (they
  * aren't distinguished). Light shades are `-700` so they clear WCAG AA contrast
  * on the near-white bubble; dark shades are `-400` for the near-black one.
  */

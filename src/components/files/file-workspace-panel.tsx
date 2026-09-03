@@ -34,8 +34,7 @@ import {
 import { BrowserLink } from "@/components/ui/browser-link"
 import { ImagePreview } from "@/components/files/image-preview"
 import { HtmlPreview } from "@/components/files/html-preview"
-import { OfficePreview } from "@/components/files/office-preview"
-import { isHtmlPreviewable, isOfficePreviewable } from "@/lib/language-detect"
+import { isHtmlPreviewable } from "@/lib/language-detect"
 import { DiffViewer } from "@/components/diff/diff-viewer"
 import { UnifiedDiffPreview } from "@/components/diff/unified-diff-preview"
 import {
@@ -2144,19 +2143,6 @@ export function FileWorkspacePanel() {
   // Image preview
   if (isFileTab && activeFileTab && activeFileTab.language === "image") {
     return <ImagePreview key={activeFileTab.id} tab={activeFileTab} />
-  }
-
-  // Office preview (.docx/.xlsx/.pptx → OfficeCLI HTML → sandboxed iframe).
-  // Preview-only: these are binary OpenXML files with no text editor view, so
-  // it renders unconditionally (not gated on the editor/preview toggle).
-  if (isFileTab && activeFileTab && isOfficePreviewable(activeFileTab.path)) {
-    return (
-      <OfficePreview
-        key={activeFileTab.id}
-        rootPath={activeIo?.rootPath ?? null}
-        relPath={activeIo?.ioPath ?? null}
-      />
-    )
   }
 
   // HTML preview (sandboxed iframe)

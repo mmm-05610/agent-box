@@ -116,12 +116,6 @@ interface GitCommitSucceededEventPayload {
   committed_files: number
 }
 
-interface GitPushSucceededEventPayload {
-  folder_id: number
-  pushed_commits: number
-  upstream_set: boolean
-}
-
 interface BranchDropdownProps {
   /** The row's OWN folder (each conversation tile passes its own), not the
    *  active one — so a tiled view keeps every tile's branch chip live. */
@@ -196,17 +190,15 @@ export function BranchDropdown({ folder, isChatMode }: BranchDropdownProps) {
   const [worktreeBranchName, setWorktreeBranchName] = useState("")
   const [worktreePath, setWorktreePath] = useState("")
 
-  // Task running, credential retry, pull/fetch/window openers and the
-  // conflict/stash dialogs all live in the shared hook, so the aux-panel git
-  // tabs drive the exact same machinery from their own toolbars.
+  // Task running, credential retry, pull/fetch and the conflict dialog all
+  // live in the shared hook, so the aux-panel git tabs drive the exact same
+  // machinery from their own toolbars.
   const {
     running: loading,
     runGitTask,
     pull: handlePull,
     fetchAll,
     updateBranch,
-    openCommitWindow: openCommit,
-    openPushWindow: openPush,
     reportConflict,
     dialogs: gitDialogs,
   } = useGitQuickActions({ folderId, folderPath })
@@ -238,18 +230,15 @@ export function BranchDropdown({ folder, isChatMode }: BranchDropdownProps) {
   // Operations shown as a searchable block at the top of the popup; the list
   // resolves each id to an icon and dispatches back through `runOperation`.
   // `groupEnd` inserts a separator after that op (non-search) to restore the old
-  // menu's pull/fetch | commit/push | new blocking. Deliberately short: this chip
-  // sits under the composer and is first of all a BRANCH picker, so the
-  // long-tail operations (stash, unstash, manage remotes) live in the aux
-  // panel's git tabs — the changes tab owns the working-tree ones, the commits
+  // menu's pull/fetch | new blocking. Deliberately short: this chip sits under
+  // the composer and is first of all a BRANCH picker, so the long-tail
+  // operations (manage remotes) live in the aux panel's git tabs — the commits
   // tab owns the remotes. The last entry carries no `groupEnd`: the row builder
   // already separates the operation block from the branch tree.
   const operations = useMemo<BranchOperationMeta[]>(
     () => [
       { id: "pull", label: t("pullCode") },
       { id: "fetch", label: t("fetchRemoteBranches"), groupEnd: true },
-      { id: "commit", label: t("openCommitWindow") },
-      { id: "push", label: t("pushCode"), groupEnd: true },
       { id: "newBranch", label: t("newBranch") },
       { id: "newWorktree", label: t("newWorktree") },
     ],
@@ -285,40 +274,6 @@ export function BranchDropdown({ folder, isChatMode }: BranchDropdownProps) {
       })
       .catch((err) => {
         console.error("[BranchDropdown] failed to listen commit event:", err)
-      })
-    return () => {
-      unlisten?.()
-    }
-  }, [folderId, refresh, t])
-
-  useEffect(() => {
-    if (!folderId) return
-    let unlisten: (() => void) | null = null
-    subscribe<GitPushSucceededEventPayload>(
-      "folder://git-push-succeeded",
-      (payload) => {
-        if (payload.folder_id !== folderId) return
-        const { pushed_commits, upstream_set } = payload
-        let description: string
-        if (upstream_set) {
-          description =
-            pushed_commits === 0
-              ? t("toasts.upstreamSet")
-              : t("toasts.upstreamSetAndPushed", { count: pushed_commits })
-        } else if (pushed_commits === 0) {
-          description = t("toasts.noCommitsToPush")
-        } else {
-          description = t("toasts.pushedCommits", { count: pushed_commits })
-        }
-        toast.success(t("toasts.pushCodeCompleted"), { description })
-        refresh()
-      }
-    )
-      .then((fn) => {
-        unlisten = fn
-      })
-      .catch((err) => {
-        console.error("[BranchDropdown] failed to listen push event:", err)
       })
     return () => {
       unlisten?.()
@@ -600,12 +555,6 @@ export function BranchDropdown({ folder, isChatMode }: BranchDropdownProps) {
       case "fetch":
         fetchAll()
         break
-      case "commit":
-        openCommit()
-        break
-      case "push":
-        openPush()
-        break
       case "newBranch":
         setNewBranchName("")
         setNewBranchOpen(true)
@@ -632,12 +581,6 @@ export function BranchDropdown({ folder, isChatMode }: BranchDropdownProps) {
     setDropdownOpen(false)
     if (action === "pull") {
       updateBranch(fullName, isRemote)
-      return
-    }
-    // Push opens the push window preselected for this branch, so the commits
-    // about to be published are reviewable before anything leaves the machine.
-    if (action === "push") {
-      openPush(fullName)
       return
     }
     setConfirmAction({ type: action, branchName: fullName })

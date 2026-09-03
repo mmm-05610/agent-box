@@ -109,7 +109,6 @@ import {
 } from "@/components/chat/composer/to-prompt-blocks"
 import { isEmbeddedReferenceUri } from "@/components/chat/composer/reference-uri"
 import {
-  applyExpertReference,
   isComposerChromeClick,
   isComposerEmpty,
   restampSkillPrefixes,
@@ -132,19 +131,15 @@ import { useComposerAttachments } from "@/components/chat/composer/use-composer-
 import { useComposerShortcuts } from "@/components/chat/composer/use-composer-shortcuts"
 
 /**
- * Payload pushed into the composer from outside (e.g. a welcome-page quick
- * action, or a quoted transcript selection). `skill`, when present, is prepended
- * as the leading invocation badge (serializes to `${prefix}${id}` as the first
- * token).
+ * Payload pushed into the composer from outside (e.g. a quoted transcript
+ * selection).
  */
 export interface ComposerInjectContent {
   text: string
-  skill?: { id: string; label: string }
   /**
    * How `text` lands in the composer.
    *
-   * - `"replace"` (default) swaps the whole document — the welcome quick-action
-   *   behaviour, where the card's prompt IS the message.
+   * - `"replace"` (default) swaps the whole document.
    * - `"append"` keeps whatever the user has already drafted and adds `text` as
    *   a trailing block, caret after it. Used for quoting a message selection,
    *   which is only ever the *start* of what the user is about to write.
@@ -382,12 +377,7 @@ export function MessageInput({
     hydrateFromBlocks,
     imagePromptBlocks,
   } = attach
-  const menuShortcuts = useComposerShortcuts({
-    editorRef,
-    agentType: agentType ?? null,
-    onAfterInsert: syncComposerEmpty,
-    logLabel: "MessageInput",
-  })
+  const menuShortcuts = useComposerShortcuts({ editorRef })
 
   // Collapsed (narrow) selectors live in a controlled Popover holding a
   // master–detail panel (`SessionSelectorsPanel`). It's controlled so a value
@@ -620,20 +610,6 @@ export function MessageInput({
           handle.insertTextAtCursor(`${gap}${payload.text}\n\n`)
         } else {
           handle.setText(payload.text)
-          // Prepend the skill as the leading invocation badge, so the sent
-          // message opens with `${prefix}${id}`.
-          if (payload.skill) {
-            const editor = handle.getEditor()
-            if (editor) {
-              applyExpertReference(editor, {
-                refType: "skill",
-                id: payload.skill.id,
-                label: payload.skill.label,
-                uri: null,
-                meta: { invocationPrefix: skillPrefix, scope: "expert" },
-              })
-            }
-          }
           handle.focus()
         }
         setComposerEmpty(false)
@@ -641,18 +617,17 @@ export function MessageInput({
       onInjectConsumed?.()
     })
     return () => cancelAnimationFrame(raf)
-  }, [injectContent, composerReady, skillPrefix, onInjectConsumed])
+  }, [injectContent, composerReady, onInjectConsumed])
 
-  // A skill / expert badge freezes its invocation prefix (`$` for Codex, `/`
-  // elsewhere) at insert time. On the welcome page users routinely click a
-  // quick-skill card while the default agent is selected and only then switch to
-  // Codex via the picker below — the badge would keep its `/` and Codex would
-  // parse the leading `/skill` as a slash command and reject the turn. Re-stamp
-  // the existing skill badges whenever the effective prefix changes so the
-  // leading invocation always matches the selected agent (ACP slash commands
-  // carry no scope and stay `/`). rAF-deferred like the sibling editor-mutation
-  // effects to stay off React's commit phase — the badge NodeView re-renders via
-  // a synchronous flushSync().
+  // A skill badge freezes its invocation prefix (`$` for Codex, `/` elsewhere)
+  // at insert time. If the effective agent changes while a draft is open, the
+  // badge would keep its old prefix — and Codex parses a leading `/skill` as a
+  // slash COMMAND and rejects the turn. Re-stamp the existing skill badges
+  // whenever the effective prefix changes so the leading invocation always
+  // matches the selected agent (ACP slash commands carry no scope and stay
+  // `/`). rAF-deferred like the sibling editor-mutation effects to stay off
+  // React's commit phase — the badge NodeView re-renders via a synchronous
+  // flushSync().
   useEffect(() => {
     if (!composerReady) return
     const raf = requestAnimationFrame(() => {

@@ -12,10 +12,10 @@
  *
  * Stored in localStorage rather than the backend because audio output is a
  * per-device concern — a phone browser attached to the same server should not
- * start beeping because the desktop was configured to. Same reactive shape as
- * `office-preview-prefs.ts`: a custom event for the current window plus the
- * native `storage` event for other windows/tabs, so flipping a switch in the
- * Settings window takes effect in the workspace immediately.
+ * start beeping because the desktop was configured to. Reactive shape: a
+ * custom event for the current window plus the native `storage` event for
+ * other windows/tabs, so flipping a switch in the Settings window takes
+ * effect in the workspace immediately.
  */
 
 import { useSyncExternalStore } from "react"

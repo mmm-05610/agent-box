@@ -218,29 +218,25 @@ describe("splitBilingualReleaseNotes", () => {
 })
 
 describe("prefersChineseReleaseNotes", () => {
-  it("covers both Chinese locales in both spellings", () => {
-    for (const locale of ["zh-CN", "zh-TW", "zh_cn", "zh_tw", "zh", "ZH-CN"]) {
+  it("covers Chinese in both spellings", () => {
+    for (const locale of ["zh-CN", "zh_cn", "zh", "ZH-CN"]) {
       expect(prefersChineseReleaseNotes(locale)).toBe(true)
     }
   })
 
-  it("leaves every other shipped locale on English", () => {
-    for (const locale of ["en", "ja", "ko", "es", "de", "fr", "pt", "ar"]) {
-      expect(prefersChineseReleaseNotes(locale)).toBe(false)
-    }
+  it("leaves English on the English half", () => {
+    expect(prefersChineseReleaseNotes("en")).toBe(false)
   })
 })
 
 describe("localizeReleaseNotes", () => {
   it("gives a Chinese interface the Chinese half", () => {
     expect(localizeReleaseNotes(BILINGUAL, "zh-CN")).toBe(CHINESE)
-    expect(localizeReleaseNotes(BILINGUAL, "zh-TW")).toBe(CHINESE)
+    expect(localizeReleaseNotes(BILINGUAL, "zh_cn")).toBe(CHINESE)
   })
 
   it("gives every other interface the English half", () => {
-    for (const locale of ["en", "ja", "de", "ar"]) {
-      expect(localizeReleaseNotes(BILINGUAL, locale)).toBe(ENGLISH)
-    }
+    expect(localizeReleaseNotes(BILINGUAL, "en")).toBe(ENGLISH)
   })
 
   it("falls back to the whole body when it isn't bilingual", () => {

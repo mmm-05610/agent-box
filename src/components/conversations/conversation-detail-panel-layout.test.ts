@@ -90,7 +90,7 @@ describe("ConversationDetailPanel new conversation layout", () => {
   })
 
   it("marks every hidden keep-alive subtree with the hardening class", () => {
-    // Under a full-page workbench route (desktop + mobile shells) — both go
+    // Under a full-page workbench route — the single (desktop) shell goes
     // through `KeptMountedSurface`, which is where the class now lives.
     expect(workspaceLayoutSource).toContain(
       'hidden && "conversation-tab-hidden invisible"'
@@ -99,7 +99,7 @@ describe("ConversationDetailPanel new conversation layout", () => {
       workspaceLayoutSource.match(
         /<KeptMountedSurface hidden=\{!isConversations\}>/g
       )
-    ).toHaveLength(2)
+    ).toHaveLength(1)
     // The FILE column under the conversation overlay — this is the one that
     // hosts git-diff tabs.
     expect(workspaceLayoutSource).toContain(

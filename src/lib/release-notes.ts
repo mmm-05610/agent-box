@@ -170,10 +170,10 @@ export function splitBilingualReleaseNotes(
 }
 
 /**
- * Whether `locale` reads the Chinese half. Both Chinese locales the app ships
- * (`zh-CN`, `zh-TW`) do; every other language falls back to English, the only
- * other half a release carries. Accepts the app's own `zh_cn` spelling as well
- * as the BCP-47 tag next-intl hands out.
+ * Whether `locale` reads the Chinese half. `zh-CN` does; English (and any other
+ * locale) reads the English half — the only other half a release carries.
+ * Accepts the app's own `zh_cn` spelling as well as the BCP-47 tag next-intl
+ * hands out.
  */
 export function prefersChineseReleaseNotes(locale: string): boolean {
   return locale.toLowerCase().split(/[-_]/)[0] === "zh"

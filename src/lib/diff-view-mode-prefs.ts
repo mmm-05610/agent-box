@@ -6,8 +6,7 @@
 // previews at once (one per Edit/Write tool call in a transcript, plus any
 // permission dialog stacked on top). Reading localStorage once per instance
 // would leave every already-mounted sibling on the old layout until it
-// remounted, so the toggle broadcasts and each preview subscribes — the same
-// shape `office-preview-prefs` uses for its cross-surface toggle.
+// remounted, so the toggle broadcasts and each preview subscribes.
 
 import { useEffect, useState } from "react"
 

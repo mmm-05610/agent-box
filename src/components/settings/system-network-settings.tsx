@@ -184,14 +184,6 @@ export function SystemNetworkSettings() {
     () => ({
       en: tLanguage("english"),
       zh_cn: tLanguage("simplifiedChinese"),
-      zh_tw: tLanguage("traditionalChinese"),
-      ja: tLanguage("japanese"),
-      ko: tLanguage("korean"),
-      es: tLanguage("spanish"),
-      de: tLanguage("german"),
-      fr: tLanguage("french"),
-      pt: tLanguage("portuguese"),
-      ar: tLanguage("arabic"),
     }),
     [tLanguage]
   )
@@ -766,14 +758,6 @@ export function SystemNetworkSettings() {
                 </SelectItem>
                 <SelectItem value="en">{languageLabels.en}</SelectItem>
                 <SelectItem value="zh_cn">{languageLabels.zh_cn}</SelectItem>
-                <SelectItem value="zh_tw">{languageLabels.zh_tw}</SelectItem>
-                <SelectItem value="ja">{languageLabels.ja}</SelectItem>
-                <SelectItem value="ko">{languageLabels.ko}</SelectItem>
-                <SelectItem value="es">{languageLabels.es}</SelectItem>
-                <SelectItem value="de">{languageLabels.de}</SelectItem>
-                <SelectItem value="fr">{languageLabels.fr}</SelectItem>
-                <SelectItem value="pt">{languageLabels.pt}</SelectItem>
-                <SelectItem value="ar">{languageLabels.ar}</SelectItem>
               </SelectContent>
             </Select>
           </div>

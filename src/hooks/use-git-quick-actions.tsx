@@ -4,18 +4,10 @@ import { useCallback, useMemo, useRef, useState, type ReactNode } from "react"
 import { useTranslations } from "next-intl"
 import { toast } from "sonner"
 import { ConflictDialog } from "@/components/layout/conflict-dialog"
-import { StashDialog } from "@/components/layout/stash-dialog"
 import { useAlertContext } from "@/contexts/alert-context"
 import { useGitCredential } from "@/contexts/git-credential-context"
 import { useTaskContext } from "@/contexts/task-context"
-import {
-  gitFetch,
-  gitPull,
-  gitUpdateBranch,
-  openCommitWindow,
-  openPushWindow,
-  openStashWindow,
-} from "@/lib/api"
+import { gitFetch, gitPull, gitUpdateBranch } from "@/lib/api"
 import { toErrorMessage } from "@/lib/app-error"
 import { useAppWorkspaceStore } from "@/stores/app-workspace-store"
 import type { GitConflictInfo } from "@/lib/types"
@@ -64,21 +56,14 @@ export interface GitQuickActions {
    * own (merge / rebase) call this from their own `runGitTask` success handler.
    */
   reportConflict: (conflict: GitConflictInfo) => void
-  openCommitWindow: () => void
-  /** `branch` preselects the push target; omitted means the checked-out one. */
-  openPushWindow: (branch?: string) => void
-  /** Open the in-place "stash changes" dialog. */
-  openStashDialog: () => void
-  /** Open the unstash workspace window. */
-  openUnstashWindow: () => void
-  /** Conflict + stash dialogs — render this once wherever the hook is used. */
+  /** The conflict dialog — render this once wherever the hook is used. */
   dialogs: ReactNode
 }
 
 interface UseGitQuickActionsOptions {
   folderId: number | null
   folderPath: string | null
-  /** Called after a task succeeds (and after a stash), to refresh the caller. */
+  /** Called after a task succeeds, to refresh the caller. */
   onCompleted?: () => void
 }
 
@@ -102,13 +87,12 @@ export function useGitQuickActions({
   const refreshFolder = useAppWorkspaceStore((s) => s.refreshFolder)
 
   const [running, setRunning] = useState(false)
-  // Both dialogs carry the repo they belong to rather than reading the hook's
-  // CURRENT folder. The aux-panel git tabs are force-mounted and follow the
-  // active folder, so a slow pull started on repo A can resolve after the panel
-  // has moved to repo B — binding the dialog to the folder captured when the
-  // operation started keeps the merge tool pointed at A's working tree instead
-  // of replaying A's upstream commit into B.
-  const [stashTarget, setStashTarget] = useState<GitDialogTarget | null>(null)
+  // The conflict dialog carries the repo it belongs to rather than reading the
+  // hook's CURRENT folder. The aux-panel git tabs are force-mounted and follow
+  // the active folder, so a slow pull started on repo A can resolve after the
+  // panel has moved to repo B — binding the dialog to the folder captured when
+  // the operation started keeps the merge tool pointed at A's working tree
+  // instead of replaying A's upstream commit into B.
   const [conflict, setConflict] = useState<{
     target: GitDialogTarget
     info: GitConflictInfo
@@ -242,66 +226,19 @@ export function useGitQuickActions({
     [describePullResult, folderPath, runGitTask, t, withCredentialRetry]
   )
 
-  // Window openers report their own failure — they don't touch the repo, so
-  // they're not worth a task entry.
-  const openWindow = useCallback(
-    (open: (id: number) => Promise<void>, failureTitle: string) => {
-      if (!folderId) return
-      open(folderId).catch((err) => {
-        const message = toErrorMessage(err)
-        pushAlert("error", failureTitle, message)
-        toast.error(failureTitle, { description: message })
-      })
-    },
-    [folderId, pushAlert]
-  )
-
-  const openCommit = useCallback(() => {
-    openWindow(openCommitWindow, t("toasts.openCommitWindowFailed"))
-  }, [openWindow, t])
-
-  const openPush = useCallback(
-    (branch?: string) => {
-      openWindow(
-        (id) => openPushWindow(id, branch),
-        t("toasts.openPushWindowFailed")
-      )
-    },
-    [openWindow, t]
-  )
-
-  const openUnstash = useCallback(() => {
-    openWindow(openStashWindow, t("toasts.openStashWindowFailed"))
-  }, [openWindow, t])
-
-  const openStashDialog = useCallback(() => {
-    if (!target) return
-    setStashTarget(target)
-  }, [target])
-
   const dialogs = useMemo(
     () => (
-      <>
-        <ConflictDialog
-          conflictInfo={conflict?.info ?? null}
-          folderId={conflict?.target.id ?? 0}
-          folderPath={conflict?.target.path ?? ""}
-          onClose={() => setConflict(null)}
-          onResolved={() => {
-            if (conflict) refreshTarget(conflict.target)
-          }}
-        />
-        <StashDialog
-          open={stashTarget !== null}
-          folderPath={stashTarget?.path ?? ""}
-          onClose={() => setStashTarget(null)}
-          onStashed={() => {
-            if (stashTarget) refreshTarget(stashTarget)
-          }}
-        />
-      </>
+      <ConflictDialog
+        conflictInfo={conflict?.info ?? null}
+        folderId={conflict?.target.id ?? 0}
+        folderPath={conflict?.target.path ?? ""}
+        onClose={() => setConflict(null)}
+        onResolved={() => {
+          if (conflict) refreshTarget(conflict.target)
+        }}
+      />
     ),
-    [conflict, refreshTarget, stashTarget]
+    [conflict, refreshTarget]
   )
 
   return {
@@ -311,10 +248,6 @@ export function useGitQuickActions({
     fetchAll,
     updateBranch,
     reportConflict,
-    openCommitWindow: openCommit,
-    openPushWindow: openPush,
-    openStashDialog,
-    openUnstashWindow: openUnstash,
     dialogs,
   }
 }

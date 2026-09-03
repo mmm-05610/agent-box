@@ -14,7 +14,7 @@ export const REFERENCE_KINDS: readonly ReferenceKind[] = [
 /**
  * Type-specific render hints carried alongside a reference. All fields are
  * optional — the badge reads only what its `refType` needs. Serialization is
- * `meta`-independent for every kind EXCEPT `skill` (commands / skills / experts),
+ * `meta`-independent for every kind EXCEPT `skill` (commands / skills),
  * which reads {@link ReferenceMeta.invocationPrefix} to emit `/id` vs `$id`.
  */
 export interface ReferenceMeta {
@@ -40,10 +40,7 @@ export interface ReferenceMeta {
   author?: string
   /** commit: whether the commit is pushed upstream. */
   pushed?: boolean | null
-  /**
-   * skill: "global" | "project" | "expert" scope. "expert" is read by the
-   * editor's expert-replace logic (not the badge — all skills share one icon).
-   */
+  /** skill: "global" | "project" scope (custom agent skills). */
   scope?: string
   /** skill: category grouping. */
   category?: string
@@ -51,7 +48,7 @@ export interface ReferenceMeta {
   icon?: string | null
   /**
    * skill: the invocation prefix the agent expects (`/` for commands and most
-   * skills, `$` for Codex skills/experts). Read by `referenceToMarkdown` to
+   * skills, `$` for Codex skills). Read by `referenceToMarkdown` to
    * serialize the badge back to its literal `${prefix}${id}` token; defaults to
    * `/` when absent.
    */

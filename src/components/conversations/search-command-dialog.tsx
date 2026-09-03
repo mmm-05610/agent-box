@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { formatDistanceToNow } from "date-fns"
-import { enUS, zhCN, zhTW } from "date-fns/locale"
+import { enUS, zhCN } from "date-fns/locale"
 import { File, Folder } from "lucide-react"
 import { useLocale, useTranslations } from "next-intl"
 import { useAuxPanelContext } from "@/contexts/aux-panel-context"
@@ -47,8 +47,7 @@ export function SearchCommandDialog({
 }: SearchCommandDialogProps) {
   const t = useTranslations("Folder.search")
   const locale = useLocale()
-  const dateFnsLocale =
-    locale === "zh-CN" ? zhCN : locale === "zh-TW" ? zhTW : enUS
+  const dateFnsLocale = locale === "zh-CN" ? zhCN : enUS
   const { activeFolder: folder, activeFolderId } = useActiveFolder()
   const allConversations = useAppWorkspaceStore((s) => s.conversations)
   const folderId = activeFolderId ?? 0

@@ -1,6 +1,6 @@
 "use client"
 
-import { LayoutGrid, Monitor, Moon, Sun, Type } from "lucide-react"
+import { Monitor, Moon, Sun, Type } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { useTheme } from "next-themes"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -11,12 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Switch } from "@/components/ui/switch"
-import {
-  useThemeColor,
-  useZoomLevel,
-  useWelcomeQuickActions,
-} from "@/hooks/use-appearance"
+import { useThemeColor, useZoomLevel } from "@/hooks/use-appearance"
 import { cn } from "@/lib/utils"
 import {
   DEFAULT_ZOOM_LEVEL,
@@ -37,8 +32,6 @@ export function AppearanceSettings() {
   const { theme, resolvedTheme, setTheme } = useTheme()
   const { themeColor, setThemeColor } = useThemeColor()
   const { zoomLevel, setZoomLevel } = useZoomLevel()
-  const { showWelcomeQuickActions, setShowWelcomeQuickActions } =
-    useWelcomeQuickActions()
 
   const resolvedThemeLabel =
     resolvedTheme === "dark"
@@ -212,30 +205,6 @@ export function AppearanceSettings() {
 
         {/* ===== Workspace background ===== */}
         <WorkspaceBackgroundSection />
-
-        {/* ===== New conversation — mode selection area ===== */}
-        <section className="rounded-xl border bg-card p-4 space-y-4">
-          <div className="flex items-center gap-2">
-            <LayoutGrid className="h-4 w-4 text-muted-foreground" />
-            <h2 className="text-sm font-semibold">
-              {t("welcomePanel.sectionTitle")}
-            </h2>
-          </div>
-
-          <p className="text-xs text-muted-foreground leading-5">
-            {t("welcomePanel.sectionDescription")}
-          </p>
-
-          <label className="flex items-center gap-2">
-            <Switch
-              checked={showWelcomeQuickActions}
-              onCheckedChange={setShowWelcomeQuickActions}
-            />
-            <span className="text-xs text-muted-foreground">
-              {t("welcomePanel.showQuickActions")}
-            </span>
-          </label>
-        </section>
       </div>
     </ScrollArea>
   )

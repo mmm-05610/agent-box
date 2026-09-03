@@ -4,7 +4,6 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import type { PromptInputBlock } from "@/lib/types"
 
 import {
-  applyExpertReference,
   isComposerChromeClick,
   isComposerEmpty,
   restampSkillPrefixes,
@@ -12,22 +11,10 @@ import {
 } from "./composer-commands"
 import { buildComposerExtensions } from "./editor-config"
 import { serializeDocToText } from "./to-prompt-blocks"
-import type { ReferenceAttrs } from "./types"
 
 /** The composer's plain-text send serialization (references → inline tokens). */
 function serialized(editor: Editor): string {
   return serializeDocToText(editor.state.doc)
-}
-
-/** An expert reference (refType `skill`, `meta.scope === "expert"`). */
-function expertAttrs(id: string, prefix: "/" | "$" = "/"): ReferenceAttrs {
-  return {
-    refType: "skill",
-    id,
-    label: id,
-    uri: null,
-    meta: { scope: "expert", invocationPrefix: prefix },
-  }
 }
 
 describe("isComposerEmpty", () => {
@@ -100,55 +87,6 @@ describe("isComposerChromeClick", () => {
   })
 })
 
-describe("applyExpertReference", () => {
-  let editor: Editor
-
-  beforeEach(() => {
-    editor = new Editor({ extensions: buildComposerExtensions() })
-  })
-  afterEach(() => editor?.destroy())
-
-  it("prepends an expert badge to an empty document", () => {
-    applyExpertReference(editor, expertAttrs("reviewer"))
-    // The badge is a real reference node (not plain text)…
-    expect(JSON.stringify(editor.getJSON())).toContain('"refType":"skill"')
-    // …that serializes to its `/reviewer` invocation token at the front.
-    expect(serialized(editor).trimStart()).toMatch(/^\/reviewer\b/)
-  })
-
-  it("prepends the badge in front of existing prose", () => {
-    editor.commands.setContent("look at this")
-    applyExpertReference(editor, expertAttrs("reviewer"))
-    expect(serialized(editor).trimStart()).toMatch(/^\/reviewer look at this/)
-  })
-
-  it("replaces an existing leading expert badge instead of stacking", () => {
-    applyExpertReference(editor, expertAttrs("old"))
-    applyExpertReference(editor, expertAttrs("reviewer"))
-    const md = serialized(editor)
-    expect(md.trimStart()).toMatch(/^\/reviewer\b/)
-    expect(md).not.toContain("/old")
-    // Exactly one expert badge remains.
-    expect(
-      JSON.stringify(editor.getJSON()).match(/"refType":"skill"/g)
-    ).toHaveLength(1)
-  })
-
-  it("does NOT replace a leading plain-text token (only a real expert badge)", () => {
-    editor.commands.setContent("/unknown keep")
-    applyExpertReference(editor, expertAttrs("reviewer"))
-    const md = serialized(editor)
-    expect(md.trimStart()).toMatch(/^\/reviewer /)
-    expect(md).toContain("/unknown")
-  })
-
-  it("supports the Codex `$` prefix", () => {
-    editor.commands.setContent("ship it")
-    applyExpertReference(editor, expertAttrs("deploy", "$"))
-    expect(serialized(editor).trimStart()).toMatch(/^\$deploy ship it/)
-  })
-})
-
 describe("restampSkillPrefixes", () => {
   let editor: Editor
 
@@ -179,11 +117,11 @@ describe("restampSkillPrefixes", () => {
     })
   }
 
-  it("rewrites an expert badge's prefix to `$` when switching to Codex", () => {
-    applyExpertReference(editor, expertAttrs("reviewer", "/"))
-    expect(serialized(editor).trimStart()).toMatch(/^\/reviewer\b/)
+  it("rewrites a scoped skill badge's prefix to `$` when switching to Codex", () => {
+    insertSkillBadge("reviewer")
+    expect(serialized(editor)).toContain("/reviewer")
     expect(restampSkillPrefixes(editor, "$")).toBe(true)
-    expect(serialized(editor).trimStart()).toMatch(/^\$reviewer\b/)
+    expect(serialized(editor)).toContain("$reviewer")
   })
 
   it("rewrites a scoped skill badge and preserves surrounding prose", () => {
@@ -198,10 +136,10 @@ describe("restampSkillPrefixes", () => {
   })
 
   it("switches back to `/` when leaving Codex for another agent", () => {
-    applyExpertReference(editor, expertAttrs("deploy", "$"))
-    expect(serialized(editor).trimStart()).toMatch(/^\$deploy\b/)
+    insertSkillBadge("deploy", "$")
+    expect(serialized(editor)).toContain("$deploy")
     expect(restampSkillPrefixes(editor, "/")).toBe(true)
-    expect(serialized(editor).trimStart()).toMatch(/^\/deploy\b/)
+    expect(serialized(editor)).toContain("/deploy")
   })
 
   it("leaves a bare ACP slash command (no scope) as `/` on Codex", () => {
@@ -211,11 +149,11 @@ describe("restampSkillPrefixes", () => {
     expect(serialized(editor)).not.toContain("$init")
   })
 
-  it("re-stamps skills/experts but not command badges in one pass", () => {
+  it("re-stamps every scoped skill badge but not command badges in one pass", () => {
     insertCommandBadge("init")
     editor.commands.insertContent(" ")
     insertSkillBadge("code-review")
-    applyExpertReference(editor, expertAttrs("reviewer", "/"))
+    insertSkillBadge("reviewer")
     expect(restampSkillPrefixes(editor, "$")).toBe(true)
     const md = serialized(editor)
     expect(md).toContain("$reviewer")
@@ -225,7 +163,7 @@ describe("restampSkillPrefixes", () => {
   })
 
   it("is a no-op (returns false) when every prefix already matches", () => {
-    applyExpertReference(editor, expertAttrs("reviewer", "$"))
+    insertSkillBadge("reviewer", "$")
     expect(restampSkillPrefixes(editor, "$")).toBe(false)
   })
 })

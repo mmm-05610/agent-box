@@ -2994,17 +2994,7 @@ export interface SystemProxySettings {
   proxy_url: string | null
 }
 
-export type AppLocale =
-  | "en"
-  | "zh_cn"
-  | "zh_tw"
-  | "ja"
-  | "ko"
-  | "es"
-  | "de"
-  | "fr"
-  | "pt"
-  | "ar"
+export type AppLocale = "en" | "zh_cn"
 export type LanguageMode = "system" | "manual"
 
 export interface SystemLanguageSettings {
