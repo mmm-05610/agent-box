@@ -1,8 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import {
-  resetAppWorkspaceStore,
-  useAppWorkspaceStore,
-} from "./app-workspace-store"
+import { resetAppWorkspaceStore, useAppWorkspaceStore } from "./store"
 import type { DbConversationSummary, FolderDetail } from "@/lib/types"
 
 vi.mock("@/lib/api", () => ({

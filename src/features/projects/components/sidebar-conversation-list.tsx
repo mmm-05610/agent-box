@@ -1,7 +1,14 @@
 "use client"
 
+/**
+ * 侧栏会话列表（F5 迁入 features/projects，设计 §8）：Pinned / 项目区 /
+ * Chat / Recent 四个分区的虚拟化列表。项目区的行渲染已改走领域组件
+ * ProjectRow（./project-tree，Folder→Project 改型）：本组件负责行模型
+ * （buildRows）、拖拽/粘性头/滚动等列表机制，行内视觉与交互（名称 + 分支
+ * 徽标 + 远程 origin 云图标 + 右键菜单）由 ProjectRow 承担。
+ */
+
 import {
-  memo,
   useCallback,
   useEffect,
   useImperativeHandle,
@@ -15,30 +22,16 @@ import { useTranslations } from "next-intl"
 import { toast } from "sonner"
 import { Virtualizer, type VirtualizerHandle } from "virtua"
 import {
-  Bot,
-  Check,
   ChevronDown,
-  ChevronRight,
   ChevronsUp,
   Download,
-  ExternalLink,
-  FolderClosed,
   FolderGit2,
-  FolderOpen,
   FolderOpenDot,
-  FolderRoot,
-  Layers,
   LayersPlus,
-  Link2,
-  ListChecks,
   Loader2,
   MonitorCloud,
-  MoreHorizontal,
-  Palette,
   Settings,
   SquarePen,
-  Tag,
-  XCircle,
 } from "lucide-react"
 import { useActiveFolder } from "@/contexts/active-folder-context"
 import { useAppWorkspaceStore } from "@/stores/app-workspace-store"
@@ -47,28 +40,30 @@ import { useWorkbenchRoute, useTerminal } from "@/features/shell"
 import { useThemeColor, useZoomLevel } from "@/hooks/use-appearance"
 import { useSortedAvailableAgents } from "@/hooks/use-sorted-available-agents"
 import { useImeGuard } from "@/hooks/use-ime-guard"
-import { OpenInSubContent } from "@/components/layout/open-in-menu"
 import {
   openImportSessionsWindow,
   openInCode,
   updateConversationTitle,
   updateConversationStatus,
   updateConversationPinned,
-  updateFolderColor,
-  updateFolderAlias,
-  updateFolderDefaultAgent,
   deleteConversation,
   listChildConversations,
 } from "@/lib/api"
-import { isDesktop, revealItemInDir } from "@/lib/platform"
+// Wire 层（F5）：folder 命令族经 features/projects/wire 取用（后端替换日只换
+// 该层）。会话命令族仍走 @/lib/api，待 session 域切片（F3）收口。
+import {
+  updateFolderAlias,
+  updateFolderColor,
+  updateFolderDefaultAgent,
+  projectWireId,
+} from "../wire"
+import type { Project } from "@/core/domain"
+import { revealItemInDir } from "@/lib/platform"
 import type {
   AgentType,
   ConversationStatus,
   DbConversationSummary,
-  FolderDetail,
-  FolderGroupDetail,
 } from "@/lib/types"
-import { getAgentLabel } from "@/lib/custom-agents"
 import {
   loadFolderExpanded,
   saveFolderExpanded,
@@ -86,19 +81,14 @@ import {
   type SidebarSectionOrder,
 } from "@/lib/sidebar-view-mode-storage"
 import {
-  FOLDER_THEME_COLOR_INHERIT,
-  THEME_COLOR_PREVIEW,
-  THEME_COLORS,
-  folderTitleTintVars,
   normalizeFolderThemeColor,
   type FolderThemeColor,
-  type ThemeColor,
 } from "@/lib/theme-presets"
 import {
   SidebarConversationCard,
   SubsessionAncestorRails,
   CONV_RAIL_DEPTH_STEP,
-} from "./sidebar-conversation-card"
+} from "@/components/conversations/sidebar-conversation-card"
 import {
   applyLayoutMove,
   buildDragSlots,
@@ -126,20 +116,20 @@ import {
   selectPinnedWithReuse,
   selectRecentConversationsWithReuse,
   worktreeChildrenByParent,
-  worktreeHeaderAlias,
   type DragSlot,
   type SidebarEntry,
   type SidebarLayout,
   type SidebarRow,
-} from "./sidebar-conversation-grouping"
+} from "@/components/conversations/sidebar-conversation-grouping"
 import { useRemoteWorkspaceConnections } from "@/hooks/use-remote-workspace-connections"
 import { useSubsessionSync } from "@/hooks/use-subsession-sync"
-import { SidebarSectionHeader } from "./sidebar-section-header"
-import { SidebarFolderGroupHeader } from "./sidebar-folder-group-header"
-import { ConversationManageDialog } from "./conversation-manage-dialog"
+import { SidebarSectionHeader } from "@/components/conversations/sidebar-section-header"
+import { SidebarFolderGroupHeader } from "@/components/conversations/sidebar-folder-group-header"
+import { ConversationManageDialog } from "@/components/conversations/conversation-manage-dialog"
 import { CloneDialog } from "@/components/layout/clone-dialog"
 import { RemoteWorkspaceManageDialog } from "@/components/layout/remote-workspace-manage-dialog"
 import { WorkspaceFolderDialog } from "@/components/layout/workspace-folder-dialog"
+import { ProjectRow } from "./project-tree"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -172,7 +162,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { cn } from "@/lib/utils"
-import { FolderAliasLabel } from "./folder-alias-label"
 import { toErrorMessage } from "@/lib/app-error"
 
 // Layout effect on the client (so the sticky overlay is positioned before
@@ -191,636 +180,6 @@ const EMPTY_CHILD_TO_PARENT: ReadonlyMap<number, number> = new Map()
 // `containerChildren` memo (and buildRows through it) doesn't churn.
 const EMPTY_CONTAINER_CHILDREN: ReadonlyMap<number, readonly number[]> =
   new Map()
-
-const FolderHeader = memo(function FolderHeader({
-  folderId,
-  folderName,
-  folderAlias,
-  folderPath,
-  runningCount,
-  expanded,
-  themeColor,
-  appThemeColor,
-  currentDefaultAgent,
-  availableAgents,
-  availableAgentsFresh,
-  onToggle,
-  onRemoveFromWorkspace,
-  onNewConversation,
-  onImport,
-  onManageConversations,
-  onManageLinks,
-  onChangeColor,
-  onSetAlias,
-  onSetDefaultAgent,
-  onOpenInSystemExplorer,
-  onOpenInTerminal,
-  onOpenInCode,
-  folderGroups,
-  currentGroupId,
-  onMoveToGroup,
-  onNewGroupWithFolder,
-  isDragging,
-  onGripPointerDown,
-  suppressed = false,
-  depth = 0,
-  variant = "repo",
-  worktreeBranch = null,
-}: {
-  folderId: number
-  folderName: string
-  /** User-set alias, or null. When present the header shows `alias [name]`. */
-  folderAlias: string | null
-  folderPath: string
-  /**
-   * How many of this group's sessions are currently RUNNING (`in_progress`) —
-   * not how many it holds. Zero renders no badge at all: the header's job is to
-   * flag live activity you'd otherwise have to expand the folder to notice, and
-   * a total-count chip on every row was noise (expanding shows the rows).
-   */
-  runningCount: number
-  expanded: boolean
-  themeColor: FolderThemeColor
-  appThemeColor: ThemeColor
-  currentDefaultAgent: AgentType | null
-  availableAgents: AgentType[]
-  /**
-   * False while `useSortedAvailableAgents` is still serving the
-   * localStorage seed (i.e. `acpListAgents()` has not yet succeeded this
-   * session). The "Set default agent" submenu disables agent selection
-   * while not fresh — otherwise the user could persist a folder default
-   * pointing at a stale/uninstalled agent. The "No default" option stays
-   * usable since clearing a default doesn't depend on the live list.
-   */
-  availableAgentsFresh: boolean
-  onToggle: (folderId: number) => void
-  onRemoveFromWorkspace: (folderId: number) => void
-  onNewConversation: (folderId: number) => void
-  onImport: (folderId: number) => void
-  onManageConversations: (folderId: number) => void
-  onManageLinks: (folderId: number) => void
-  onChangeColor: (folderId: number, color: FolderThemeColor) => void
-  onSetAlias: (folderId: number, alias: string | null) => void
-  onSetDefaultAgent: (folderId: number, agentType: AgentType | null) => void
-  onOpenInSystemExplorer: (folderId: number) => void
-  onOpenInTerminal: (folderId: number) => void
-  onOpenInCode: (folderId: number) => void
-  /**
-   * Every folder group, for the "Move to group" submenu. Omitted on the header
-   * variants that can't move on their own (worktree sub-groups and the "root"
-   * sub-group follow their repo), which is also what hides the submenu there.
-   * Must be referentially stable to preserve the memo.
-   */
-  folderGroups?: readonly FolderGroupDetail[]
-  /** Which group this folder is currently in (null = top level), for the check
-   *  mark in that submenu. */
-  currentGroupId?: number | null
-  onMoveToGroup?: (folderId: number, groupId: number | null) => void
-  /** Create a group and move this folder into it in one step — the path a user
-   *  takes when the group they want doesn't exist yet. */
-  onNewGroupWithFolder?: (folderId: number) => void
-  isDragging?: boolean
-  /**
-   * Starts a folder reorder gesture from the header's grip. Omitted on the drag
-   * surface (already dragging) so headers there are pure drop-target visuals.
-   */
-  onGripPointerDown?: (folderId: number, event: React.PointerEvent) => void
-  /**
-   * True for the in-list copy of the folder whose floating sticky overlay is
-   * currently showing: the overlay is the accessible control for that folder,
-   * so the (scrolled-past, occluded) in-list copy is made `inert` + aria-hidden
-   * to avoid a duplicate tab stop / double announcement during the window where
-   * virtua still keeps it mounted in the buffer.
-   */
-  suppressed?: boolean
-  /**
-   * Nesting depth of the header row. 0 for a top-level repo / plain folder / repo
-   * container; 1 for a worktree or "root" sub-group shown under its container
-   * when "Show worktrees" is on. Drives the left indent and the connector-spine
-   * ancestor rails (a pure function of this number), mirroring the conversation
-   * card's per-level rail step.
-   */
-  depth?: number
-  /**
-   * Which glyph + label this header renders:
-   * - `repo` (default): a top-level repo / plain folder / repo container — the
-   *   FolderOpen/FolderClosed glyph and the repo-name alias label.
-   * - `worktree`: a git worktree sub-group — the FolderGit2 glyph and the same
-   *   `alias [ name ]` label as a repo, with the branch standing in for the
-   *   alias (see {@link worktreeHeaderAlias}).
-   * - `root`: a repo container's own-sessions sub-group — the FolderRoot glyph
-   *   and a fixed, non-localized "root" label.
-   */
-  variant?: "repo" | "worktree" | "root"
-  /** The worktree's branch name (its own `git_branch`), used as the alias when
-   *  none is set. Leaves the bare folder name when absent. */
-  worktreeBranch?: string | null
-}) {
-  // Own the translations here rather than receiving `t` as a prop: next-intl
-  // returns a fresh `t` on every parent render, so passing it down would defeat
-  // this component's memo and re-render every header on each status event.
-  const t = useTranslations("Folder.sidebar")
-  const ime = useImeGuard()
-  // Only flag a stale default once the live list is known; before fresh,
-  // `availableAgents` is the localStorage seed and may legitimately omit a
-  // newly-enabled agent.
-  const showStaleDefault =
-    availableAgentsFresh &&
-    currentDefaultAgent !== null &&
-    !availableAgents.includes(currentDefaultAgent)
-  const tFileTree = useTranslations("Folder.fileTreeTab")
-  const systemExplorerLabel =
-    typeof navigator === "undefined"
-      ? tFileTree("openInFileManager")
-      : (() => {
-          const platform =
-            `${navigator.platform} ${navigator.userAgent}`.toLowerCase()
-          if (platform.includes("mac")) return tFileTree("openInFinder")
-          if (platform.includes("win")) return tFileTree("openInExplorer")
-          return tFileTree("openInFileManager")
-        })()
-  // `revealItemInDir` only works inside Tauri; in web mode it is a no-op,
-  // so disable the entry there to avoid silent failures.
-  const isDesktopMode = isDesktop()
-
-  // Alias dialog: controlled Dialog rendered as a sibling of the ContextMenu so
-  // it survives the menu closing on select (mirrors the conversation card's
-  // rename dialog). Seeded from the current alias on open.
-  const [aliasDialogOpen, setAliasDialogOpen] = useState(false)
-  const [aliasValue, setAliasValue] = useState("")
-  const openAliasDialog = useCallback(() => {
-    setAliasValue(folderAlias ?? "")
-    setAliasDialogOpen(true)
-  }, [folderAlias])
-  const confirmAlias = useCallback(() => {
-    // Empty / whitespace clears the alias (null); the backend re-normalizes too.
-    const trimmed = aliasValue.trim()
-    onSetAlias(folderId, trimmed ? trimmed : null)
-    setAliasDialogOpen(false)
-  }, [aliasValue, folderId, onSetAlias])
-
-  const titleTint = folderTitleTintVars(themeColor)
-  // The `[ name ]` half of an aliased label is normally a DEEPER shade than the
-  // alias beside it. A tinted title has no deeper shade to reach for (the tint
-  // is already pinned to the one lightness that clears AA on this surface), so
-  // it just inherits — the brackets alone carry the alias/name split there.
-  const bracketClassName = titleTint
-    ? "text-current"
-    : "text-sidebar-foreground"
-
-  return (
-    <>
-      <ContextMenu>
-        <ContextMenuTrigger asChild>
-          <div
-            inert={suppressed || undefined}
-            aria-hidden={suppressed || undefined}
-            className={cn("relative h-[2rem]", isDragging && "opacity-60")}
-          >
-            <div
-              onPointerDown={(e) => onGripPointerDown?.(folderId, e)}
-              className={cn(
-                "group flex h-[1.9375rem] w-full items-center",
-                "rounded-full",
-                "transition-colors duration-150",
-                isDragging
-                  ? "cursor-grabbing"
-                  : "cursor-grab hover:bg-[color-mix(in_oklab,var(--sidebar-accent),var(--sidebar-foreground)_2%)]"
-              )}
-            >
-              <button
-                data-folder-id={folderId}
-                onClick={() => onToggle(folderId)}
-                title={folderPath}
-                aria-expanded={expanded}
-                className={cn(
-                  "relative flex h-full min-w-0 flex-1 items-center pr-[0.5rem] outline-none",
-                  "rounded-full focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
-                  "text-sidebar-foreground",
-                  isDragging ? "cursor-grabbing" : "cursor-grab"
-                )}
-                style={{
-                  paddingLeft: `calc(var(--conv-rail-axis) + 0.875rem + ${depth} * ${CONV_RAIL_DEPTH_STEP})`,
-                }}
-              >
-                {/* Connector spine (Show worktrees): a depth-1 sub-group header
-                    draws its container's vertical rail at the depth-0 axis, so
-                    stacked across the container's children (root + worktree
-                    headers and their session cards) it forms one continuous line
-                    down from the container. Renders nothing at depth 0. */}
-                <SubsessionAncestorRails depth={depth} />
-                <span
-                  aria-hidden
-                  className={cn(
-                    "pointer-events-none absolute flex items-center justify-center text-muted-foreground/75"
-                  )}
-                  style={{
-                    top: "50%",
-                    left: `calc(var(--conv-rail-axis) + ${depth} * ${CONV_RAIL_DEPTH_STEP})`,
-                    width: "0.875rem",
-                    height: "0.875rem",
-                    transform: "translate(-50%, -50%)",
-                  }}
-                >
-                  {variant === "worktree" ? (
-                    <FolderGit2 className="h-[0.875rem] w-[0.875rem]" />
-                  ) : variant === "root" ? (
-                    <FolderRoot className="h-[0.875rem] w-[0.875rem]" />
-                  ) : expanded ? (
-                    <FolderOpen className="h-[0.875rem] w-[0.875rem]" />
-                  ) : (
-                    <FolderClosed className="h-[0.875rem] w-[0.875rem]" />
-                  )}
-                </span>
-                <div className="flex min-w-0 flex-1 items-center gap-[0.5rem]">
-                  {/* The folder's chosen colour lands HERE and nowhere else: the
-                      row's hover pill, its badges and every conversation card
-                      under it stay on the app theme. `folderTitleTintVars`
-                      writes both themes' values as inline custom properties and
-                      `.folder-title-tint` (globals.css) picks one; `inherit`
-                      returns undefined and the default class carries the day. */}
-                  <span
-                    style={titleTint}
-                    className={cn(
-                      "min-w-0 flex-shrink truncate text-left text-[0.875rem] font-normal",
-                      titleTint
-                        ? "folder-title-tint"
-                        : "text-sidebar-foreground/75"
-                    )}
-                  >
-                    {variant === "worktree" ? (
-                      // Branch as the alias, directory as the name — the same
-                      // two-part label a repo header renders.
-                      <FolderAliasLabel
-                        name={folderName}
-                        alias={worktreeHeaderAlias(folderAlias, worktreeBranch)}
-                        bracketClassName={bracketClassName}
-                      />
-                    ) : variant === "root" ? (
-                      // The container repo's own-sessions sub-group is labeled
-                      // with a fixed, non-localized "root" (its glyph is
-                      // FolderRoot); it stands for the repo root regardless of UI
-                      // language.
-                      "root"
-                    ) : (
-                      <FolderAliasLabel
-                        name={folderName}
-                        alias={folderAlias}
-                        bracketClassName={bracketClassName}
-                      />
-                    )}
-                  </span>
-                  {/* Live-activity badge: the number of RUNNING sessions in this
-                      group, and nothing at all when none are. Amber (not the
-                      primary tint the old total-count chip used) is the same
-                      "running" semantic the conversation cards spin in amber, so
-                      the two read as one signal. amber-700 (not the card's
-                      amber-600) carries the light-mode fill: at 0.625rem this is
-                      small text, and amber-600 on the tinted surface lands near
-                      3:1 — under the AA floor amber-700 (~4.7:1) clears. */}
-                  {runningCount > 0 && (
-                    <span
-                      title={t("runningCountBadge", { count: runningCount })}
-                      className={cn(
-                        "inline-flex shrink-0 items-center justify-center",
-                        "h-[0.9375rem] min-w-[1rem] rounded-[0.3125rem] px-[0.25rem]",
-                        "text-[0.625rem] font-semibold leading-none tabular-nums",
-                        "bg-amber-500/12 text-amber-700",
-                        "dark:bg-amber-400/15 dark:text-amber-300"
-                      )}
-                    >
-                      <span aria-hidden>{runningCount}</span>
-                      <span className="sr-only">
-                        {t("runningCountBadge", { count: runningCount })}
-                      </span>
-                    </span>
-                  )}
-                  {/* Disclosure chevron mirrors the section headers: hover-revealed,
-                    rotates on expand. The persistent open/closed state still reads
-                    from the folder icon on the left, which is why the chevron can
-                    stay hidden at rest in BOTH states (collapsed included) — it is
-                    a redundant affordance, not the only one. Touch keeps it pinned
-                    on, since there is no hover to reveal it there.
-                    NOTE: `group-focus-within` (not `group-focus-visible` like the
-                    section header) is intentional — here the `group` is the outer
-                    row wrapper and focus lands on a child (the toggle button or the
-                    sibling ⋯ menu button), so the reveal must react to focus
-                    anywhere inside the row. The section header's `group` IS its
-                    button, so it uses `group-focus-visible`. Don't "normalize". */}
-                  <ChevronRight
-                    aria-hidden
-                    className={cn(
-                      "h-3 w-3 shrink-0 text-muted-foreground/60",
-                      "transition-[transform,opacity] duration-200 ease-out",
-                      "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100",
-                      "[@media(hover:none)]:opacity-100",
-                      expanded && "rotate-90"
-                    )}
-                  />
-                </div>
-              </button>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  // Re-open the SAME context menu as right-click (single source of
-                  // truth — the menu has 3 submenus, duplicating it would drift).
-                  // Dispatch a synthetic contextmenu event from this button; it
-                  // bubbles to the enclosing <ContextMenuTrigger>, which Radix opens
-                  // at the given coords — anchored just under the button.
-                  const rect = e.currentTarget.getBoundingClientRect()
-                  e.currentTarget.dispatchEvent(
-                    new MouseEvent("contextmenu", {
-                      bubbles: true,
-                      cancelable: true,
-                      button: 2,
-                      clientX: rect.left,
-                      clientY: rect.bottom,
-                    })
-                  )
-                }}
-                title={t("moreOptions")}
-                aria-label={t("moreOptions")}
-                aria-haspopup="menu"
-                className={cn(
-                  "flex h-6 w-6 shrink-0 items-center justify-end",
-                  // Shares the card action-icon palette: default /90 is the lightest
-                  // muted shade clearing 3:1 non-text contrast (incl. on touch, where
-                  // this stays visible); hover deepens to full foreground.
-                  "rounded-[0.375rem] cursor-pointer outline-none text-muted-foreground/90",
-                  "opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
-                  "transition-[opacity,color] duration-150 hover:text-sidebar-foreground"
-                )}
-              >
-                <MoreHorizontal className="h-[0.875rem] w-[0.875rem]" />
-              </button>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onNewConversation(folderId)
-                }}
-                title={t("newConversation")}
-                aria-label={t("newConversation")}
-                className={cn(
-                  // Mirrors the ⋯ button's action-icon palette and hover-reveal so
-                  // the two read as one trailing control cluster. As the rightmost
-                  // control it carries the right-edge margin that lines this cluster
-                  // up with the other sidebar affordances: 0.375rem + the list's
-                  // px-1.5 (0.375rem) = a uniform 0.75rem inset from the border,
-                  // matching the section-header actions and conversation-card badges.
-                  // h-6 (not h-7) keeps every action-icon centre on the same axis, and
-                  // justify-end flushes the glyph to that 0.75rem edge so the visible
-                  // icon — not the transparent button box — lines up with the badges.
-                  "mr-[0.375rem] flex h-6 w-6 shrink-0 items-center justify-end",
-                  "rounded-[0.375rem] cursor-pointer outline-none text-muted-foreground/90",
-                  "opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
-                  "transition-[opacity,color] duration-150 hover:text-sidebar-foreground"
-                )}
-              >
-                <SquarePen className="h-[0.875rem] w-[0.875rem]" />
-              </button>
-            </div>
-          </div>
-        </ContextMenuTrigger>
-        <ContextMenuContent>
-          <ContextMenuItem onSelect={() => onNewConversation(folderId)}>
-            <SquarePen className="h-4 w-4" />
-            {t("newConversation")}
-          </ContextMenuItem>
-          <ContextMenuItem onSelect={() => onImport(folderId)}>
-            <Download className="h-4 w-4" />
-            {t("importLocalSessions")}
-          </ContextMenuItem>
-          <ContextMenuSub>
-            <ContextMenuSubTrigger>
-              <ExternalLink className="h-4 w-4" />
-              {tFileTree("openIn")}
-            </ContextMenuSubTrigger>
-            <OpenInSubContent
-              explorerLabel={systemExplorerLabel}
-              terminalLabel={tFileTree("openInTerminal")}
-              codeLabel={tFileTree("openInCode")}
-              explorerDisabled={!isDesktopMode}
-              onOpenExplorer={() => onOpenInSystemExplorer(folderId)}
-              onOpenTerminal={() => onOpenInTerminal(folderId)}
-              onOpenCode={() => onOpenInCode(folderId)}
-            />
-          </ContextMenuSub>
-          <ContextMenuSeparator />
-          <ContextMenuItem onSelect={() => onManageConversations(folderId)}>
-            <ListChecks className="h-4 w-4" />
-            {t("folderHeaderMenu.manageConversations")}
-          </ContextMenuItem>
-          <ContextMenuItem onSelect={() => onManageLinks(folderId)}>
-            <Link2 className="h-4 w-4" />
-            {t("folderHeaderMenu.manageLinks")}
-          </ContextMenuItem>
-          <ContextMenuSub>
-            <ContextMenuSubTrigger>
-              <Bot className="h-4 w-4" />
-              {t("folderHeaderMenu.setDefaultAgent")}
-            </ContextMenuSubTrigger>
-            <ContextMenuSubContent className="min-w-[12rem]">
-              <ContextMenuItem
-                onSelect={() => onSetDefaultAgent(folderId, null)}
-                className="gap-2"
-              >
-                <span className="min-w-0 flex-1 truncate">
-                  {t("folderHeaderMenu.defaultAgentNone")}
-                </span>
-                {currentDefaultAgent === null ? (
-                  <Check className="h-3.5 w-3.5 shrink-0" />
-                ) : null}
-              </ContextMenuItem>
-              <ContextMenuSeparator />
-              {availableAgentsFresh ? (
-                <>
-                  {availableAgents.map((agent) => {
-                    const active = currentDefaultAgent === agent
-                    return (
-                      <ContextMenuItem
-                        key={agent}
-                        onSelect={() => onSetDefaultAgent(folderId, agent)}
-                        className="gap-2"
-                      >
-                        <span className="min-w-0 flex-1 truncate">
-                          {getAgentLabel(agent)}
-                        </span>
-                        {active ? (
-                          <Check className="h-3.5 w-3.5 shrink-0" />
-                        ) : null}
-                      </ContextMenuItem>
-                    )
-                  })}
-                  {showStaleDefault && currentDefaultAgent !== null ? (
-                    <ContextMenuItem
-                      key={currentDefaultAgent}
-                      disabled
-                      className="gap-2 opacity-60"
-                    >
-                      <span className="min-w-0 flex-1 truncate">
-                        {`${getAgentLabel(currentDefaultAgent)} ${t("folderHeaderMenu.agentUnavailableSuffix")}`}
-                      </span>
-                      <Check className="h-3.5 w-3.5 shrink-0" />
-                    </ContextMenuItem>
-                  ) : null}
-                </>
-              ) : (
-                <ContextMenuItem disabled className="gap-2 opacity-60">
-                  <span className="min-w-0 flex-1 truncate">
-                    {t("folderHeaderMenu.loadingAgents")}
-                  </span>
-                </ContextMenuItem>
-              )}
-            </ContextMenuSubContent>
-          </ContextMenuSub>
-          <ContextMenuSub>
-            <ContextMenuSubTrigger>
-              <Palette className="h-4 w-4" />
-              {t("folderHeaderMenu.changeColor")}
-            </ContextMenuSubTrigger>
-            <ContextMenuSubContent className="min-w-[12rem] p-2">
-              <ContextMenuItem
-                onSelect={() =>
-                  onChangeColor(folderId, FOLDER_THEME_COLOR_INHERIT)
-                }
-                className="gap-2"
-              >
-                <span
-                  aria-hidden
-                  className="h-[1.125rem] w-[1.125rem] shrink-0 rounded-[0.25rem] border border-border"
-                  style={{
-                    backgroundColor: THEME_COLOR_PREVIEW[appThemeColor],
-                  }}
-                />
-                <span className="min-w-0 flex-1 truncate">
-                  {t("folderHeaderMenu.useThemeColor")}
-                </span>
-                {themeColor === FOLDER_THEME_COLOR_INHERIT ? (
-                  <Check className="h-3.5 w-3.5 shrink-0" />
-                ) : null}
-              </ContextMenuItem>
-              <ContextMenuSeparator />
-              <div className="grid grid-cols-6 gap-1">
-                {THEME_COLORS.map((color) => {
-                  const active = color === themeColor
-                  return (
-                    <button
-                      key={color}
-                      type="button"
-                      title={color}
-                      aria-label={color}
-                      onClick={() => onChangeColor(folderId, color)}
-                      className={cn(
-                        "h-[1.125rem] w-[1.125rem] cursor-pointer rounded-[0.25rem]",
-                        "outline-none ring-offset-1 ring-offset-popover",
-                        "transition-[box-shadow,transform] duration-100 hover:scale-110",
-                        active && "ring-2 ring-foreground/60"
-                      )}
-                      style={{ backgroundColor: THEME_COLOR_PREVIEW[color] }}
-                    />
-                  )
-                })}
-              </div>
-            </ContextMenuSubContent>
-          </ContextMenuSub>
-          <ContextMenuItem onSelect={openAliasDialog}>
-            <Tag className="h-4 w-4" />
-            {t("folderHeaderMenu.setAlias")}
-          </ContextMenuItem>
-          {/* The keyboard/menu path into and out of a folder group — the drag
-              gesture is the fast one, but it is pointer-only, and a folder
-              inside a collapsed group has no drag target at all until you open
-              it. Hidden on worktree / root sub-groups (no handlers passed):
-              those follow their repo and can't be grouped on their own. */}
-          {folderGroups != null && onMoveToGroup != null && (
-            <ContextMenuSub>
-              <ContextMenuSubTrigger>
-                <Layers className="h-4 w-4" />
-                {t("folderGroup.moveToGroup")}
-              </ContextMenuSubTrigger>
-              <ContextMenuSubContent className="min-w-[12rem]">
-                <ContextMenuItem
-                  onSelect={() => onMoveToGroup(folderId, null)}
-                  className="gap-2"
-                >
-                  <span className="min-w-0 flex-1 truncate">
-                    {t("folderGroup.removeFromGroup")}
-                  </span>
-                  {currentGroupId == null ? (
-                    <Check className="h-3.5 w-3.5 shrink-0" />
-                  ) : null}
-                </ContextMenuItem>
-                {folderGroups.length > 0 && <ContextMenuSeparator />}
-                {folderGroups.map((group) => (
-                  <ContextMenuItem
-                    key={group.id}
-                    onSelect={() => onMoveToGroup(folderId, group.id)}
-                    className="gap-2"
-                  >
-                    <span className="min-w-0 flex-1 truncate">
-                      {group.name}
-                    </span>
-                    {currentGroupId === group.id ? (
-                      <Check className="h-3.5 w-3.5 shrink-0" />
-                    ) : null}
-                  </ContextMenuItem>
-                ))}
-                {onNewGroupWithFolder != null && (
-                  <>
-                    <ContextMenuSeparator />
-                    <ContextMenuItem
-                      onSelect={() => onNewGroupWithFolder(folderId)}
-                    >
-                      <LayersPlus className="h-4 w-4" />
-                      {t("folderGroup.newGroupAndMove")}
-                    </ContextMenuItem>
-                  </>
-                )}
-              </ContextMenuSubContent>
-            </ContextMenuSub>
-          )}
-          <ContextMenuSeparator />
-          <ContextMenuItem
-            variant="destructive"
-            onSelect={() => onRemoveFromWorkspace(folderId)}
-          >
-            <XCircle className="h-4 w-4" />
-            {t("folderHeaderMenu.removeFromWorkspace")}
-          </ContextMenuItem>
-        </ContextMenuContent>
-      </ContextMenu>
-
-      <Dialog open={aliasDialogOpen} onOpenChange={setAliasDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t("folderHeaderMenu.setAliasTitle")}</DialogTitle>
-          </DialogHeader>
-          <Input
-            value={aliasValue}
-            onChange={(e) => setAliasValue(e.target.value)}
-            {...ime.props}
-            onKeyDown={(e) => {
-              if (ime.isComposing(e)) return
-              if (e.key === "Enter") confirmAlias()
-            }}
-            placeholder={t("folderHeaderMenu.setAliasPlaceholder")}
-            autoFocus
-          />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setAliasDialogOpen(false)}>
-              {t("folderHeaderMenu.setAliasCancel")}
-            </Button>
-            <Button onClick={confirmAlias}>
-              {t("folderHeaderMenu.setAliasSave")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
-  )
-})
 
 export interface SidebarConversationListHandle {
   scrollToActive: () => void
@@ -875,6 +234,12 @@ export function SidebarConversationList({
   const { zoomLevel } = useZoomLevel()
   const folders = useAppWorkspaceStore((s) => s.folders)
   const allFolders = useAppWorkspaceStore((s) => s.allFolders)
+  // 领域切片（F5，设计 §5.1）：store 从 wire 缓存（allFolders）派生的 Project
+  // 列表，引用只在 allFolders 变化时刷新——ProjectRow 的 memo 依赖它的稳定性。
+  const projects = useAppWorkspaceStore((s) => s.projects)
+  // 分支徽标数据源：git HEAD 解析结果（活动项目轮询 + 下方的按需 ensure）。
+  const branches = useAppWorkspaceStore((s) => s.branches)
+  const ensureGitHead = useAppWorkspaceStore((s) => s.ensureGitHead)
   const conversations = useAppWorkspaceStore((s) => s.conversations)
   const loading = useAppWorkspaceStore((s) => s.conversationsLoading)
   const error = useAppWorkspaceStore((s) => s.conversationsError)
@@ -933,6 +298,23 @@ export function SidebarConversationList({
       })
     return map
   }, [allFolders])
+
+  // 项目行领域索引（F5）：wire id → 领域 Project。ProjectRow 消费 Project 形状
+  // （名称/origin），此处只做 id 换算，引用随 `projects` 切片稳定。
+  const projectsById = useMemo(() => {
+    const map = new Map<number, Project>()
+    for (const p of projects) map.set(projectWireId(p.id), p)
+    return map
+  }, [projects])
+
+  // 分支徽标按需解析：每个顶层项目挂载时解析一次 git HEAD（store 内部按
+  // gitHeads 已知 + in-flight 去重，N 个项目行 = N 次请求，仅一次）。worktree
+  // 子组不解析——其分支标签来自 wire 行的 git_branch 列。
+  useEffect(() => {
+    for (const f of folders) {
+      if (f.parent_id == null) ensureGitHead(f.id, f.path)
+    }
+  }, [folders, ensureGitHead])
 
   // `tabs` gets a fresh array reference on every `conversations` change (the tab
   // context re-derives titles/status), so these two derivations would otherwise
@@ -1067,7 +449,8 @@ export function SidebarConversationList({
     open: openRemote,
   } = useRemoteWorkspaceConnections()
   // Folder whose links are being managed (context menu -> Linked folders).
-  const [linksFolder, setLinksFolder] = useState<FolderDetail | null>(null)
+  // F5：只记 wire id，FolderDetail 经 allFolders 查找（UI 层不持有 wire 形状）。
+  const [linksFolderId, setLinksFolderId] = useState<number | null>(null)
   // What is being dragged: a folder or a whole group. `null` = no drag. Widened
   // from a bare folder id when groups arrived, since a group reorders as one
   // unit (its members travel with it and never appear on the drag surface).
@@ -1953,13 +1336,9 @@ export function SidebarConversationList({
     setManageFolderId(folderId)
   }, [])
 
-  const handleManageFolderLinks = useCallback(
-    (folderId: number) => {
-      const folder = allFolders.find((f) => f.id === folderId)
-      if (folder) setLinksFolder(folder)
-    },
-    [allFolders]
-  )
+  const handleManageFolderLinks = useCallback((folderId: number) => {
+    setLinksFolderId(folderId)
+  }, [])
 
   const handleRemoveFolderConfirm = useCallback(async () => {
     if (!removeConfirm) return
@@ -2591,6 +1970,11 @@ export function SidebarConversationList({
     }
   ) => {
     const folderEntry = folderIndex.get(folderId)
+    const project = projectsById.get(folderId)
+    // F5：行渲染走领域 ProjectRow——wire 行（folderEntry）只补显示字段
+    // （目录原名/主题色/默认 agent/worktree 分支）。二者同源于 allFolders，
+    // 缺一即不渲染（防御性；正常数据流不会发生）。
+    if (!folderEntry || !project) return null
     const isRootGroup = opts.rootGroup ?? false
     // A worktree child header (only under "Show worktrees"): indented, FolderGit2
     // glyph, branch label. Keyed off `childToParent` so it matches exactly which
@@ -2619,16 +2003,15 @@ export function SidebarConversationList({
         ? false
         : (folderExpanded[folderId] ?? true)
     return (
-      <FolderHeader
-        folderId={folderId}
-        folderName={folderEntry?.name ?? String(folderId)}
-        folderAlias={folderEntry?.alias ?? null}
-        folderPath={folderEntry?.path ?? ""}
+      <ProjectRow
+        project={project}
+        directoryName={folderEntry.name}
+        branch={branches.get(folderId) ?? null}
         runningCount={runningCount}
         expanded={expanded}
         themeColor={folderThemeColor(folderId)}
         appThemeColor={appThemeColor}
-        currentDefaultAgent={folderEntry?.defaultAgentType ?? null}
+        currentDefaultAgent={folderEntry.defaultAgentType ?? null}
         availableAgents={availableAgents}
         availableAgentsFresh={availableAgentsFresh}
         onToggle={
@@ -2645,7 +2028,7 @@ export function SidebarConversationList({
         onOpenInSystemExplorer={handleOpenFolderInSystemExplorer}
         onOpenInTerminal={handleOpenFolderInTerminal}
         onOpenInCode={handleOpenFolderInCode}
-        // "Move to group" only on real, reorderable folder headers. A worktree
+        // "Move to group" only on real, reorderable project headers. A worktree
         // sub-group and a container's "root" sub-group follow their repo and
         // can't be grouped on their own, so they get no submenu at all rather
         // than one that silently moves something else.
@@ -2662,7 +2045,7 @@ export function SidebarConversationList({
         suppressed={opts.suppressed ?? false}
         depth={depth}
         variant={variant}
-        worktreeBranch={folderEntry?.gitBranch ?? null}
+        worktreeBranch={folderEntry.gitBranch ?? null}
       />
     )
   }
@@ -2688,9 +2071,10 @@ export function SidebarConversationList({
                 ? handleNewConversation
                 : undefined
           }
-          // The folders section gets two right-edge hover actions mirroring the
-          // top-of-page NewFolderDropdown: Open Folder and Clone Repository.
-          // Both handlers are stable, so the memo holds.
+          // The folders section gets two right-edge hover actions — Open Folder
+          // and Clone Repository (the sidebar-bottom ProjectTreeAddButton is the
+          // other entry into the same flows). Both handlers are stable, so the
+          // memo holds.
           onOpenFolder={
             row.section === "folders" ? handleOpenFolderAction : undefined
           }
@@ -3388,13 +2772,20 @@ export function SidebarConversationList({
           onChanged={refreshRemote}
         />
       )}
-      {linksFolder && (
-        <WorkspaceFolderDialog
-          open
-          onOpenChange={(o) => !o && setLinksFolder(null)}
-          folder={linksFolder}
-        />
-      )}
+      {/* 链接管理模式复用同一对话框：只记 wire id，行数据在渲染时经
+          allFolders 解析（找不到即不挂载，与旧 linksFolder 语义一致）。 */}
+      {linksFolderId != null &&
+        (() => {
+          const linksFolderDetail =
+            allFolders.find((f) => f.id === linksFolderId) ?? null
+          return linksFolderDetail ? (
+            <WorkspaceFolderDialog
+              open
+              onOpenChange={(o) => !o && setLinksFolderId(null)}
+              folder={linksFolderDetail}
+            />
+          ) : null
+        })()}
     </div>
   )
 }

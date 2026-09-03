@@ -7,7 +7,7 @@ import type { Ref } from "react"
 import { Sidebar } from "./sidebar"
 // Type-only (erased at runtime, so it does not defeat the mock below): pins the
 // stub's imperative handle to the real component's contract.
-import type { SidebarConversationListHandle } from "@/components/conversations/sidebar-conversation-list"
+import type { SidebarConversationListHandle } from "@/features/projects/components/sidebar-conversation-list"
 import enMessages from "@/i18n/messages/en.json"
 
 // Stable spies + mutable active-folder, referenced from the hoisted mock
@@ -39,29 +39,32 @@ const mockState = vi.hoisted(() => ({
 // handle (React 19 hands `ref` to a function component as a plain prop, which is
 // how the real component takes it), so the header buttons that drive the list
 // are asserted against real calls instead of clicking into a null ref.
-vi.mock("@/components/conversations/sidebar-conversation-list", async () => {
-  const { useImperativeHandle } = await import("react")
-  return {
-    SidebarConversationList: ({
-      ref,
-      ...props
-    }: {
-      ref?: Ref<SidebarConversationListHandle>
-      showWorktrees?: boolean
-      showCompleted?: boolean
-      showRecent?: boolean
-      sectionOrder?: readonly string[]
-    }) => {
-      spies.listProps = props
-      useImperativeHandle(ref, () => ({
-        scrollToActive: spies.scrollToActive,
-        expandAll: spies.expandAll,
-        collapseAll: spies.collapseAll,
-      }))
-      return null
-    },
+vi.mock(
+  "@/features/projects/components/sidebar-conversation-list",
+  async () => {
+    const { useImperativeHandle } = await import("react")
+    return {
+      SidebarConversationList: ({
+        ref,
+        ...props
+      }: {
+        ref?: Ref<SidebarConversationListHandle>
+        showWorktrees?: boolean
+        showCompleted?: boolean
+        showRecent?: boolean
+        sectionOrder?: readonly string[]
+      }) => {
+        spies.listProps = props
+        useImperativeHandle(ref, () => ({
+          scrollToActive: spies.scrollToActive,
+          expandAll: spies.expandAll,
+          collapseAll: spies.collapseAll,
+        }))
+        return null
+      },
+    }
   }
-})
+)
 vi.mock("@/features/shell", () => ({
   useSidebar: () => ({ isOpen: true, toggle: vi.fn() }),
   useAutomationsView: () => ({

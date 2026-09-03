@@ -1,28 +1,11 @@
 "use client"
 
-import { useShallow } from "zustand/react/shallow"
-import { useAppWorkspaceStore } from "@/stores/app-workspace-store"
-import type { FolderDetail } from "@/lib/types"
-
-interface ActiveFolderValue {
-  activeFolderId: number | null
-  activeFolder: FolderDetail | null
-}
-
 /**
- * Derived view over the app-workspace store: the active folder id (driven by
- * the active tab) plus its resolved `FolderDetail`. `useShallow` keeps the
- * returned pair stable, so consumers only re-render when the id or the folder
- * object itself changes — not on unrelated folder-list churn.
+ * F5 迁移壳：实现体已迁入 `@/features/projects/active-project`。
+ * `useActiveFolder` 的 wire 形状（FolderDetail）保留给既有消费点；新代码
+ * 读 `useActiveProject`（领域 Project 形状）。
  */
-export function useActiveFolder(): ActiveFolderValue {
-  return useAppWorkspaceStore(
-    useShallow((s) => ({
-      activeFolderId: s.activeFolderId,
-      activeFolder:
-        s.activeFolderId != null
-          ? (s.allFolders.find((f) => f.id === s.activeFolderId) ?? null)
-          : null,
-    }))
-  )
-}
+export {
+  useActiveFolder,
+  useActiveProject,
+} from "@/features/projects/active-project"

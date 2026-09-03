@@ -55,6 +55,8 @@ const stableWorkspaceFns = vi.hoisted(() => ({
   applySidebarLayout: vi.fn(() => Promise.resolve()),
   openFolder: async () => ({}) as FolderDetail,
   refreshFolder: async () => {},
+  // F5: 项目行分支徽标的按需 HEAD 解析——网络动作，测试里静音。
+  ensureGitHead: () => {},
 }))
 
 const stableTabFns = vi.hoisted(() => ({
@@ -238,7 +240,7 @@ vi.mock("@/contexts/tab-context", () => ({
 }))
 // These only mount when their state opens (never in these tests); stub to keep
 // the import graph light.
-vi.mock("./conversation-manage-dialog", () => ({
+vi.mock("@/components/conversations/conversation-manage-dialog", () => ({
   ConversationManageDialog: () => null,
 }))
 vi.mock("@/components/layout/clone-dialog", () => ({ CloneDialog: () => null }))

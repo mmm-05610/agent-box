@@ -63,6 +63,10 @@ import {
   validateLinkName,
   type LinkNameIssue,
 } from "@/lib/folder-links"
+// F5 wire 豁免：本对话框是"打开本地文件夹"的 wire 命令面（open_folder /
+// folder-link 族命令 + FolderDetail 行类型），由 ProjectTreeAddButton 复用。
+// 领域侧（features/projects）不穿透到此——后端替换日随 wire.ts 一起换成
+// agent-box-web 的调用与类型，组件结构不动。
 import type {
   FolderDetail,
   FolderLinkDetail,

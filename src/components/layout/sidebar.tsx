@@ -25,7 +25,9 @@ import { useTabActions } from "@/contexts/tab-context"
 import {
   SidebarConversationList,
   type SidebarConversationListHandle,
-} from "@/components/conversations/sidebar-conversation-list"
+} from "@/features/projects/components/sidebar-conversation-list"
+// F5 / S2.3：项目树底部"项目 +"入口（本地文件夹 / 远程连接向导）。
+import { ProjectTreeAddButton } from "@/features/projects/components/project-tree"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -578,6 +580,12 @@ export function Sidebar() {
           sortMode={sortMode}
           sectionOrder={sectionOrder}
         />
+      </div>
+
+      {/* 项目树固定底栏（F5 / S2.3）："项目 +" 入口——打开本地文件夹（既有
+          对话框）/ 远程连接…（向导骨架）。不随列表滚动。 */}
+      <div className="shrink-0 px-1.5 pb-1.5">
+        <ProjectTreeAddButton />
       </div>
     </aside>
   )

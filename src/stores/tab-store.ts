@@ -1582,12 +1582,14 @@ export const useTabStore = create<TabStoreState>()((set, get) => ({
     }
   },
 
+  // F5 接缝：函数名保留（tab-context 等消费点不在本切片所有权内），写入走
+  // 领域正名 setActiveProjectId（store 内部同帧镜像 activeFolderId 兼容旧读点）。
   syncActiveFolderId: () => {
     const st = get()
     const activeTab = st.rawTabs.find((t) => t.id === st.activeTabId) ?? null
     useAppWorkspaceStore
       .getState()
-      .setActiveFolderId(activeTab?.folderId ?? null)
+      .setActiveProjectId(activeTab?.folderId ?? null)
   },
 
   persistLastActiveContext: () => {
