@@ -126,9 +126,27 @@ describe("what a deletion retracts from the reopen stack", () => {
   })
 
   it("leaves other conversations and drafts alone", () => {
+    // Single-session mode: only one tab can be open at a time, but the reopen
+    // stack still accumulates across SEQUENTIAL closes, and a deletion must
+    // retract only its own entry — never its neighbours'.
+    useTabStore.getState().closeTab("conv-1") // records conversation 7
     useTabStore.setState({
       rawTabs: [
-        ...useTabStore.getState().rawTabs,
+        {
+          id: "conv-2",
+          kind: "conversation",
+          folderId: 1,
+          conversationId: 8,
+          agentType: "claude_code",
+          title: "next",
+          isPinned: false,
+        },
+      ],
+      activeTabId: "conv-2",
+    })
+    useTabStore.getState().closeTab("conv-2") // records conversation 8
+    useTabStore.setState({
+      rawTabs: [
         {
           id: "draft-1",
           kind: "conversation",
@@ -139,13 +157,13 @@ describe("what a deletion retracts from the reopen stack", () => {
           isPinned: false,
         },
       ],
+      activeTabId: "draft-1",
     })
-    useTabStore.getState().closeTab("draft-1")
-    useTabStore.getState().closeTab("conv-1")
+    useTabStore.getState().closeTab("draft-1") // records the draft
     useAppWorkspaceStore.getState().applyConversationRemove(8)
 
-    expect(popClosedTab()).toMatchObject({ conversationId: 7 })
     expect(popClosedTab()).toMatchObject({ conversationId: null })
+    expect(popClosedTab()).toMatchObject({ conversationId: 7 })
     expect(popClosedTab()).toBeNull()
   })
 

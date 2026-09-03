@@ -18,9 +18,7 @@ import {
 } from "@/stores/tab-store"
 import {
   CONVERSATION_CHANGED_EVENT,
-  TABS_CHANGED_EVENT,
   type ConversationChange,
-  type TabsChanged,
 } from "@/lib/types"
 
 export type { OpenedDraftTarget, TabItem }
@@ -33,11 +31,16 @@ interface TabProviderProps {
 /**
  * Thin lifecycle glue for `useTabStore`: injects the React-land dependencies
  * (i18n labels, `activateConversationPane`, `acpDisconnect`, agent availability)
- * and drives the effects that need a React lifecycle — the persisted-tab
- * hydration, the debounced CAS save, the cross-client `tabs://changed` and
- * sub-session `conversation://changed` subscriptions, the provisional-agent
- * correction gate, and post-hydration recovery. All state and logic live in the
- * store; this component renders nothing but `children`.
+ * and drives the effects that need a React lifecycle — the one-shot hydration
+ * (restore the last active session from `list_opened_tabs`), the sub-session
+ * `conversation://changed` subscription, the provisional-agent correction gate,
+ * and post-hydration recovery. All state and logic live in the store; this
+ * component renders nothing but `children`.
+ *
+ * Single-session mode (D-005): there is no tab-set persistence and no
+ * cross-client tab sync anymore — no debounced CAS save, no `tabs://changed`
+ * subscription. Hydration reads the server's last snapshot only to recover the
+ * previously active session, then the store collapses it to one tab.
  */
 export function TabProvider({ children }: TabProviderProps) {
   const t = useTranslations("Folder.tabContext")
@@ -69,7 +72,6 @@ export function TabProvider({ children }: TabProviderProps) {
   const previewReplacedTabIds = useTabStore((s) => s.previewReplacedTabIds)
   const draftRetargetRequests = useTabStore((s) => s.draftRetargetRequests)
   const tabsHydrated = useTabStore((s) => s.tabsHydrated)
-  const saveReconcileTick = useTabStore((s) => s.saveReconcileTick)
   const reseedTick = useTabStore((s) => s.reseedTick)
 
   // ── Runtime dependency injection ─────────────────────────────────────────────
@@ -111,16 +113,8 @@ export function TabProvider({ children }: TabProviderProps) {
     useTabStore.getState().consumeDraftRetargets()
   }, [draftRetargetRequests])
 
-  // Hydrate from persisted opened_tabs on mount.
+  // Hydrate from the persisted last-session snapshot on mount.
   useEffect(() => useTabStore.getState().hydrate(), [])
-
-  // Debounced compare-and-set save + broadcast.
-  useEffect(() => {
-    useTabStore.getState().runSaveEffect()
-  }, [rawTabs, activeTabId, tabsHydrated, saveReconcileTick])
-
-  // Clear a pending save only on unmount — NOT on every effect re-run.
-  useEffect(() => () => useTabStore.getState().clearSaveTimer(), [])
 
   // Reconcile the sub-session summary cache to the open child tabs.
   useEffect(() => {
@@ -141,35 +135,6 @@ export function TabProvider({ children }: TabProviderProps) {
     })()
     const offReconnect = onTransportReconnect(() =>
       useTabStore.getState().handleChildReconnect()
-    )
-    return () => {
-      disposed = true
-      unlisten?.()
-      offReconnect?.()
-    }
-  }, [])
-
-  // Subscribe to the global `tabs://changed` side-channel.
-  useEffect(() => {
-    let disposed = false
-    let unlisten: (() => void) | undefined
-    void (async () => {
-      const dispose = await subscribe<TabsChanged>(
-        TABS_CHANGED_EVENT,
-        (change) => useTabStore.getState().handleTabsChanged(change)
-      )
-      if (disposed) {
-        dispose()
-        return
-      }
-      unlisten = dispose
-      // Close the initial-connect window (a change committed between the hydrate
-      // snapshot read and the subscription going live is dropped by the
-      // broadcaster). One reconcile after subscribe is ready catches it.
-      void useTabStore.getState().refetchTabs()
-    })()
-    const offReconnect = onTransportReconnect(() =>
-      useTabStore.getState().refetchTabs()
     )
     return () => {
       disposed = true
