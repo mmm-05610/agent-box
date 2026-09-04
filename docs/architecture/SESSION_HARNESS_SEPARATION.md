@@ -176,65 +176,50 @@ send({input, harnessId})
      "history:compacted(N 轮)"。等价于一次显式 /compact，业界接受度成熟。
    - R3（原摘要链）仅作为 R2-F 裁剪后仍超预算的最后手段，默认不触发。
 
-### 9.2.1 存储与格式转换（v5：单一权威存储 + 双向转换器 + 沙箱覆写）
+### 9.2.1 存储布局：hub-and-spoke（转换器永在数据路径上，v6）
 
-**单一权威存储**：每个 session 一个 `session.unified.jsonl`（统一格式：
-Turn/parts 归一化记录，追加式）。这是会话的唯一权威——native 文件不再是
-平行存储，而是 execution 期的转换视图。
+```text
+~/.agent-box/studio/sessions/{session_id}/
+├── session.unified.jsonl       # ★ 唯一权威（统一格式：turn 语义 + x-native 原始封装）
+└── executions/{eid}/
+    └── native-view/            # 单次 execution 的临时 native 视图（用后即弃）
+        ├── codex: rollout JSONL（CODEX_HOME 投影）
+        └── claude: 会话 JSONL（CLAUDE_CONFIG_DIR 投影）
 
-**格式解剖结论**（2026-09-03 真实文件对比）：
-- codex rollout：`session_meta` / `response_item{message(role: developer|
-  user|assistant, content:[input_text|output_text]), reasoning(encrypted_content),
-  function_call}` / `event_msg` / `turn_context` / `world_state`
-- claude projects JSONL：`user|assistant{message.content:[text|tool_use|
-  tool_result], uuid, parentUuid 链表}` / `attachment` / `queue-operation` 等
-- 差异=中等：信封不同、消息模型同构（文本/工具/角色均可机械映射）。
-  不可迁移项：codex `encrypted_content`（加密 reasoning，诚实丢弃）、
-  claude parentUuid 链（重建而非原样）。
-- **先例**：codex rollout 中真实存在 `<model_switch>` developer 注入消息
-  （Codex 自身跨模型切换即用文本注入）——注入式接续有厂商原生先例。
-
-**执行期转换流水线**：
-```
-session.unified.jsonl（唯一权威）
-  │ EXPORT：unified → 目标 harness 格式
-  │   codex：session_meta(新id/cwd) + response_item 消息流
-  │   claude：user/assistant 行 + parentUuid 链重建
-  ▼
-沙箱覆写：declare_source("session", 会话文件, guest 会话路径, rw)
-  → harness 进程读写的就是这份经转换的原文件（mount，非副本）
-  │ execution 结束
-  ▼
-IMPORT：harness 新增行 → 解析 → 转回 unified 追加
-  （工具结果/reasoning 按 harness 语义归一；新 continuation 游标入 harnessState）
+studio.db                       # session/stage/profile 元数据 + 索引
 ```
 
-**转换器（中间件核心）**：双向四函数 `unified→codex / codex→unified /
-unified→claude / claude→unified`，各约 150-250 行；uuid 链重建、
-`encrypted_content` 丢弃、harness 专属行丢弃均有明确规则。
+**统一记录的双层结构**：
+```json
+{"seq":3, "execution_id":"e1", "harness_type":"codex",
+ "turn":{...归一化语义（role/parts/usage）——服务 UI 与跨 harness 渲染...},
+ "x-native":{"raw":{...该行的原始 native JSON——字节级原样...}}}
+```
 
-**治理收益**：转换前后均过 digest 校验；执行期 harness 对会话文件的修改
-经 IMPORT 对账（新增行/篡改检测）；绑定条/StageIndex 记录每阶段的
-格式转换方向与 harness 版本（cli_version 进 provenance）。
+**生命周期**：每次 execution 开始时从 unified 全量重建 native 视图（同 harness
+回吐 x-native.raw=字节无损；跨 harness 用 turn 语义渲染为该 harness 的会话
+格式）→ harness 进程读写视图（含它自己的 autocompact）→ 结束时解析视图增量
+合并回 unified → 视图作废。native 视图永不跨 execution 存活，永不成为权威。
 
-### 9.2.2 零损耗保证：三条结构性硬规则
+**为什么 resume 依然工作**：EXPORT 重建的 rollout/会话文件包含截至当前的
+完整历史（首行 session_meta 等 x-native 原样保留），thread/resume、--resume
+语义不变。
 
-同 harness 连续使用必须零损耗；损耗只允许出现在跨 harness 首次接手的
-注入副本上，且不随交替次数累积。保证是结构性的（路由规则，非实现纪律）：
+### 9.2.2 无损往返保证：同 harness 往返字节级无损（结构性）
 
-1. **R1 强制规则**：绑定解析第一步分流——请求 harness_type == continuation
-   游标的 harness_type ⇒ 走 native resume，转换器函数在代码层面不可达
-   （unreachable assert）。零损耗路径上没有损耗发生的代码。
-2. **投影目录持久规则**：codex-home/claude-home 等投影目录的清理只有两个
-   触发条件——会话删除、用户显式重置。切换 harness 绝不触发清理；切回时
-   native 文件原封未动，resume 完整恢复。
-3. **append-only 规则**：transcript.jsonl 只追加永不裁剪；任何压缩（R3 摘要、
-   预算裁剪）只作用于单次注入的脚本副本，发出去即弃。权威全量在存储中永远
-   完整——压缩是渲染策略，不是数据操作。
+转换器每次都在数据路径上（hub-and-spoke，无短路）；无损由结构保证：
 
-**交替无累积证明**：A→B→A→B 交替 N 次，每次回切都走 R1 native resume
-（无损），每个 harness 的上下文链 = 其接手时注入的快照 + 自己后续轮次，
-只增不减。全量损耗点仅存在于各线首次接手的注入副本，数目与交替次数无关。
+1. **x-native 原始封装**：同 harness 往返时，EXPORT 把每行的 `x-native.raw`
+   原样回吐——字节级无损，不经过任何语义压缩。语义映射（turn 字段）只服务
+   UI/审计/跨 harness，不参与同 harness 回写。
+2. **往返测试守护**：property-based 测试——任意 native 行序列 → IMPORT →
+   EXPORT → 与原始 diff 为空。转换器回归必跑。
+3. **跨 harness 的损耗被隔离且标注**：unified→异构格式只能走 turn 语义字段
+   （文本级无损），reasoning 加密等不可迁移项入 x-槽保留；StageIndex 记录
+   每阶段的转换方向。
+
+**交替无累积证明**：A→B→A→B 交替 N 次，A 线上下文 = A₁ 接手注入快照 +
+A 自身全部轮次的 x-native 原样回放（字节无损）；B 线同理。无累积损耗。
 
 ### 9.3 诚实边界
 
