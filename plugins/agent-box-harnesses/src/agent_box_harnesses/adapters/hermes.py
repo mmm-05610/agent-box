@@ -106,6 +106,18 @@ class HermesAdapter(GenericCliAdapter):
         unknown = sorted(set(str(key) for key in payload) - set(CONFIG_KEYS))
         return tuple(f"UNKNOWN_CONFIG_KEY:{key}" for key in unknown[:8])
 
+    def profile_model(self, payload: Mapping[str, Any]) -> str | None:
+        """Model identity declared by a Hermes profile payload (vendor fact).
+
+        Hermes config.yaml's documented top-level ``model`` key (FACTS D)
+        carries the default model selection; it is rendered into config.yaml
+        verbatim by the managed config render.
+        """
+        value = payload.get("model") if isinstance(payload, Mapping) else None
+        if not isinstance(value, str) or not value.strip():
+            return None
+        return value.strip()[:128]
+
     def _observation_contract(self) -> ObservationContract:
         return ObservationContract(decoder_id=self.decoder.id, stdout_events=False, artifacts=(USAGE_ARTIFACT,))
 

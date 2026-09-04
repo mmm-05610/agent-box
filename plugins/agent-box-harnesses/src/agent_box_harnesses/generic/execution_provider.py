@@ -100,6 +100,39 @@ class GenericExecutionProvider:
     def descriptor(self) -> ProviderDescriptor:
         return ProviderDescriptor(self.provider_id, self.definition.display_name + " execution", self.definition.identity.version)
 
+    @property
+    def harness_type(self) -> str:
+        """Generic, brand-free harness identity for exact provider selection."""
+        return self.definition.harness_type
+
+    def runtime_requirements(self) -> Mapping[str, str]:
+        """Registry-declared runtime facts of this harness (brand-free).
+
+        ``network`` is the launch chain's declared requirement; the upper
+        orchestrator uses it to select a compatible sandbox without ever
+        naming a harness.
+        """
+        return {"network": self.definition.runtime.network}
+
+    def cancel_truth(self) -> Mapping[str, str]:
+        """Per-launch-mode cancellation truth (honest, mechanism-agnostic).
+
+        Protocol session modes cancel through the SessionDriver; process
+        modes through the runtime transport termination.  In both cases the
+        outcome is only recorded after termination is PROVEN — the upper
+        orchestrator enforces that, so the truth here is about the ability
+        to request and eventually prove cancellation.
+        """
+        truth: dict[str, str] = {}
+        for mode in self.definition.launch_modes:
+            if mode.io == "pty":
+                # A pty session without a protocol driver cannot be proven
+                # terminated from here; honest limitation.
+                truth[mode.name] = "unsupported"
+            else:
+                truth[mode.name] = "supported"
+        return truth
+
     def input_limits(self) -> Mapping[str, tuple[int, int | None]]:
         return {item.contract_id: (item.minimum, item.maximum) for item in self.definition.inputs}
 
@@ -114,6 +147,18 @@ class GenericExecutionProvider:
             except Exception as exc:  # bounded diagnostic, no host details
                 self._executable_error = type(exc).__name__ + ":" + str(exc)[:120]
         return self._executable
+
+    def install_executable_for_tests(self, resolved: ResolvedExecutable | None) -> None:
+        """Test seam for synthetic-executable verticals.
+
+        Forces the resolved executable used by the REAL production launch
+        chain (staging -> lowering -> assembler -> coordinator -> spawn) so
+        offline tests can drive it with a synthetic binary or fake protocol
+        server.  Never called by production wiring.
+        """
+        self._executable = resolved
+        if resolved is not None:
+            self._executable_error = None
 
     def capability_truth(self) -> Mapping[str, tuple[CapabilityState, str]]:
         """Effective Capability = Registry declared ∩ Adapter implemented ∩ Runtime available."""
@@ -169,7 +214,29 @@ class GenericExecutionProvider:
     # ------------------------------------------------------------------ #
     def start(self, request: ExecutionStartRequest) -> ExecutionStartReceipt:
         default_mode = getattr(self.adapter, "default_session_mode", "exec")
-        return self.start_mode(request, launch_mode=default_mode)
+        return self.start_mode(request, launch_mode=self._requested_launch_mode(request) or default_mode)
+
+    def _requested_launch_mode(self, request: ExecutionStartRequest) -> str:
+        """Launch mode requested through a resolved launch-selection input.
+
+        Generic pass-through for the headless dispatch path: 0..1
+        ``agent-box.launch-selection@1`` inputs; more than one is a plan
+        rejection.  An empty string means "no explicit selection".
+        """
+        from agent_box.resource_contracts import LaunchSelectionV1
+
+        selections = [
+            item.value
+            for item in getattr(request, "resolved_inputs", ())
+            if getattr(item, "contract_id", "") == LaunchSelectionV1.contract_id
+        ]
+        if len(selections) > 1:
+            raise PlanRejected("LAUNCH_MODE_INVALID", "multiple launch selections")
+        for value in selections:
+            if not isinstance(value, LaunchSelectionV1):
+                raise PlanRejected("LAUNCH_SELECTION_TYPE_MISMATCH")
+            return value.mode
+        return ""
 
     def start_mode(self, request: ExecutionStartRequest, launch_mode: str) -> ExecutionStartReceipt:
         """Explicit launch-mode start; the mode must be registry-declared.
@@ -420,6 +487,108 @@ class GenericExecutionProvider:
 
     def session_modes(self) -> tuple[str, ...]:
         return tuple(mode.name for mode in self.definition.launch_modes)
+
+    # ------------------------------------------------------------------ #
+    # generic continuation / model / cancel surfaces (brand-free)
+    # ------------------------------------------------------------------ #
+    def continuation_ref(self, locator: str, *, extra_metadata: Mapping[str, str] | None = None) -> Ref:
+        """Build this harness's native continuation Ref from a session locator.
+
+        Uses only registry-declared continuation facts (contract id +
+        target provider); the locator is the harness-native session id the
+        provider itself reported on a previous execution.  ``extra_metadata``
+        carries bounded locator-adjacent facts the contract requires (for
+        example a context digest); it never carries credential values.
+        """
+        spec = self.definition.continuation
+        if spec is None or spec.kind == "none" or not spec.contract_id or not spec.target_provider:
+            raise PlanRejected("CONTINUATION_UNSUPPORTED", self.definition.harness_type)
+        if not isinstance(locator, str) or not locator.strip() or len(locator) > 256:
+            raise PlanRejected("CONTINUATION_LOCATOR_INVALID", self.definition.harness_type)
+        metadata = {
+            "harness_type": self.definition.harness_type,
+            "source_provider": self.definition.harness_type,
+        }
+        for key, value in (extra_metadata or {}).items():
+            if not isinstance(key, str) or not key or len(key) > 64 or not isinstance(value, str) or len(value) > 256:
+                raise PlanRejected("CONTINUATION_METADATA_INVALID", self.definition.harness_type)
+            metadata[key] = value
+        return Ref(RefType.SESSION, spec.target_provider, locator.strip(), metadata=metadata)
+
+    def continuation_contract_id(self) -> str | None:
+        spec = self.definition.continuation
+        return spec.contract_id if spec is not None and spec.kind != "none" else None
+
+    def profile_model_selection(self, profile: Any) -> str | None:
+        """Resolved model identity of a frozen profile envelope.
+
+        The payload vocabulary is vendor knowledge owned by the adapter;
+        this surface only exposes whether a model is declared.  ``None``
+        means the profile declares no model (honest absence).
+        """
+        payload = getattr(profile, "native_payload", None)
+        if not isinstance(payload, Mapping):
+            return None
+        model = self.adapter.profile_model(payload)
+        if model is None:
+            return None
+        return str(model)[:128]
+
+    def cancel_dispatch(self, dispatch_id: str) -> Mapping[str, object]:
+        """Request cancellation through the owning runtime authority.
+
+        Driver-bound dispatches cancel through the SessionDriver; native
+        process dispatches through the runtime transport.  This never
+        fabricates termination: the caller must confirm via
+        :meth:`dispatch_state` before recording a cancelled outcome.
+        """
+        handle = self._handles.get(dispatch_id)
+        if handle is None:
+            return {"state": "unknown", "reason": "no live runtime handle"}
+        driver = handle.session_driver
+        if driver is not None:
+            cancel = getattr(driver, "cancel", None)
+            if not callable(cancel):
+                return {"state": "unsupported", "reason": "bound session driver cannot cancel"}
+            try:
+                cancel()
+            except AttributeError:
+                return {"state": "unsupported", "reason": "bound session driver cannot cancel"}
+            return {"state": "terminate_sent", "via": "session-driver"}
+        transport = getattr(handle.runtime, "transport", None)
+        terminate = getattr(transport, "terminate", None)
+        if not callable(terminate):
+            return {"state": "unsupported", "reason": "runtime transport cannot terminate"}
+        terminate()
+        return {"state": "terminate_sent", "via": "runtime-transport"}
+
+    def kill_dispatch(self, dispatch_id: str) -> Mapping[str, object]:
+        """Last-resort SIGKILL-equivalent through the runtime transport."""
+        handle = self._handles.get(dispatch_id)
+        if handle is None:
+            return {"state": "unknown", "reason": "no live runtime handle"}
+        transport = getattr(handle.runtime, "transport", None)
+        kill = getattr(transport, "kill", None)
+        if not callable(kill):
+            return {"state": "unsupported", "reason": "runtime transport cannot kill"}
+        kill()
+        return {"state": "kill_sent", "via": "runtime-transport"}
+
+    def dispatch_state(self, dispatch_id: str) -> Mapping[str, object]:
+        """Bounded liveness facts of a live dispatch handle."""
+        handle = self._handles.get(dispatch_id)
+        if handle is None:
+            return {"state": "unknown"}
+        if handle.session_driver is not None:
+            hub = getattr(handle.session_driver, "hub", None)
+            terminal_seen = bool(getattr(hub, "terminal_seen", False))
+            return {"state": "terminal" if terminal_seen else "running", "via": "session-driver"}
+        transport = getattr(handle.runtime, "transport", None)
+        poll = getattr(transport, "poll", None)
+        if not callable(poll):
+            return {"state": "unknown"}
+        exit_code = poll()
+        return {"state": "terminal" if exit_code is not None else "running", "exit_code": exit_code}
 
     # ------------------------------------------------------------------ #
     # observation and finish boundary

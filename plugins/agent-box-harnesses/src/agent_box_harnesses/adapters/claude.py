@@ -137,6 +137,18 @@ class ClaudeAdapter(GenericCliAdapter):
     def _make_decoder(self) -> NativeObservationDecoder:
         return ClaudeStreamJsonDecoder()
 
+    def profile_model(self, payload: Mapping[str, Any]) -> str | None:
+        """Model identity declared by a Claude Code profile payload (vendor fact).
+
+        Claude Code's documented top-level ``model`` settings key (FACTS D2)
+        carries the model selection; it is rendered into settings.json
+        verbatim by the managed config render.
+        """
+        value = payload.get("model") if isinstance(payload, Mapping) else None
+        if not isinstance(value, str) or not value.strip():
+            return None
+        return value.strip()[:128]
+
     def _payload_diagnostics(self, payload: Mapping[str, Any]) -> tuple[str, ...]:
         unknown = sorted(set(str(key) for key in payload) - set(SETTINGS_KEYS))
         return tuple(f"UNKNOWN_SETTING_KEY:{key}" for key in unknown[:8])

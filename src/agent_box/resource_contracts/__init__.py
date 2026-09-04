@@ -11,6 +11,7 @@ from typing import Mapping
 from .agent_box_profile_v1 import AgentBoxProfileV1
 from .agent_skill_v1 import AgentSkillV1
 from .credential_v1 import CredentialRefV1
+from .launch_selection_v1 import LaunchSelectionV1
 from .prompt_fragment_v1 import PromptFragmentV1
 from .workspace_v1 import WorkspaceV1
 
@@ -22,6 +23,7 @@ CONTRACT_TYPES: Mapping[str, type] = MappingProxyType(
         AgentBoxProfileV1.contract_id: AgentBoxProfileV1,
         CredentialRefV1.contract_id: CredentialRefV1,
         AgentSkillV1.contract_id: AgentSkillV1,
+        LaunchSelectionV1.contract_id: LaunchSelectionV1,
     }
 )
 
@@ -39,6 +41,7 @@ __all__ = [
     "AgentSkillV1",
     "CredentialRefV1",
     "CONTRACT_TYPES",
+    "LaunchSelectionV1",
     "PromptFragmentV1",
     "WorkspaceV1",
     "contract_type",

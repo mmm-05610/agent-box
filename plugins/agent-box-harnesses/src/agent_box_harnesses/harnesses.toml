@@ -10,6 +10,51 @@ schema_version = 1
 schema_version = 1
 driver = "codex"
 capabilities = ["start", "observe", "finish", "stream", "native_continuation"]
+[[harness.inputs]]
+contract_id = "agent-box.workspace@1"
+target = "dispatch-input"
+minimum = 1
+maximum = 1
+[[harness.inputs]]
+contract_id = "agent-box.runtime-host@1"
+target = "dispatch-input"
+minimum = 1
+maximum = 1
+[[harness.inputs]]
+contract_id = "agent-box.sandbox@1"
+target = "dispatch-input"
+minimum = 1
+maximum = 1
+[[harness.inputs]]
+contract_id = "agent-box.terminal-session@1"
+target = "dispatch-input"
+minimum = 1
+maximum = 1
+[[harness.inputs]]
+contract_id = "agent-box.profile@1"
+target = "dispatch-input"
+minimum = 0
+maximum = 1
+[[harness.inputs]]
+contract_id = "agent-box.prompt-fragment@1"
+target = "dispatch-input"
+minimum = 1
+maximum = 32
+[[harness.inputs]]
+contract_id = "agent-box.launch-selection@1"
+target = "dispatch-input"
+minimum = 0
+maximum = 1
+[[harness.inputs]]
+contract_id = "agent-box.credential@1"
+target = "dispatch-input"
+minimum = 0
+maximum = 1
+[[harness.inputs]]
+contract_id = "agent-box.codex-continuation@1"
+target = "dispatch-input"
+minimum = 0
+maximum = 1
 [harness.identity]
 harness_type = "codex"
 display_name = "Codex"
@@ -53,6 +98,46 @@ materializer = "codex-login"
 schema_version = 1
 driver = "claude"
 capabilities = ["start", "observe", "finish", "stream", "native_continuation"]
+[[harness.inputs]]
+contract_id = "agent-box.workspace@1"
+target = "dispatch-input"
+minimum = 1
+maximum = 1
+[[harness.inputs]]
+contract_id = "agent-box.runtime-host@1"
+target = "dispatch-input"
+minimum = 1
+maximum = 1
+[[harness.inputs]]
+contract_id = "agent-box.sandbox@1"
+target = "dispatch-input"
+minimum = 1
+maximum = 1
+[[harness.inputs]]
+contract_id = "agent-box.terminal-session@1"
+target = "dispatch-input"
+minimum = 1
+maximum = 1
+[[harness.inputs]]
+contract_id = "agent-box.profile@1"
+target = "dispatch-input"
+minimum = 0
+maximum = 1
+[[harness.inputs]]
+contract_id = "agent-box.prompt-fragment@1"
+target = "dispatch-input"
+minimum = 1
+maximum = 32
+[[harness.inputs]]
+contract_id = "agent-box.launch-selection@1"
+target = "dispatch-input"
+minimum = 0
+maximum = 1
+[[harness.inputs]]
+contract_id = "agent-box.claude-continuation@1"
+target = "dispatch-input"
+minimum = 0
+maximum = 1
 [harness.identity]
 harness_type = "claude-code"
 display_name = "Claude Code"
@@ -86,6 +171,46 @@ target_provider = "claude-code-continuation"
 schema_version = 1
 driver = "opencode"
 capabilities = ["start", "observe", "finish", "stream", "native_continuation"]
+[[harness.inputs]]
+contract_id = "agent-box.workspace@1"
+target = "dispatch-input"
+minimum = 1
+maximum = 1
+[[harness.inputs]]
+contract_id = "agent-box.runtime-host@1"
+target = "dispatch-input"
+minimum = 1
+maximum = 1
+[[harness.inputs]]
+contract_id = "agent-box.sandbox@1"
+target = "dispatch-input"
+minimum = 1
+maximum = 1
+[[harness.inputs]]
+contract_id = "agent-box.terminal-session@1"
+target = "dispatch-input"
+minimum = 1
+maximum = 1
+[[harness.inputs]]
+contract_id = "agent-box.profile@1"
+target = "dispatch-input"
+minimum = 0
+maximum = 1
+[[harness.inputs]]
+contract_id = "agent-box.prompt-fragment@1"
+target = "dispatch-input"
+minimum = 1
+maximum = 32
+[[harness.inputs]]
+contract_id = "agent-box.launch-selection@1"
+target = "dispatch-input"
+minimum = 0
+maximum = 1
+[[harness.inputs]]
+contract_id = "agent-box.opencode-continuation@1"
+target = "dispatch-input"
+minimum = 0
+maximum = 1
 [harness.identity]
 harness_type = "opencode"
 display_name = "OpenCode"
@@ -122,6 +247,46 @@ target_provider = "opencode-continuation"
 schema_version = 1
 driver = "hermes"
 capabilities = ["start", "observe", "finish", "native_continuation"]
+[[harness.inputs]]
+contract_id = "agent-box.workspace@1"
+target = "dispatch-input"
+minimum = 1
+maximum = 1
+[[harness.inputs]]
+contract_id = "agent-box.runtime-host@1"
+target = "dispatch-input"
+minimum = 1
+maximum = 1
+[[harness.inputs]]
+contract_id = "agent-box.sandbox@1"
+target = "dispatch-input"
+minimum = 1
+maximum = 1
+[[harness.inputs]]
+contract_id = "agent-box.terminal-session@1"
+target = "dispatch-input"
+minimum = 1
+maximum = 1
+[[harness.inputs]]
+contract_id = "agent-box.profile@1"
+target = "dispatch-input"
+minimum = 0
+maximum = 1
+[[harness.inputs]]
+contract_id = "agent-box.prompt-fragment@1"
+target = "dispatch-input"
+minimum = 1
+maximum = 32
+[[harness.inputs]]
+contract_id = "agent-box.launch-selection@1"
+target = "dispatch-input"
+minimum = 0
+maximum = 1
+[[harness.inputs]]
+contract_id = "agent-box.hermes-continuation@1"
+target = "dispatch-input"
+minimum = 0
+maximum = 1
 [harness.identity]
 harness_type = "hermes"
 display_name = "Hermes"
@@ -151,6 +316,46 @@ target_provider = "hermes-continuation"
 schema_version = 1
 driver = "pi"
 capabilities = ["start", "observe", "finish", "stream", "native_continuation"]
+[[harness.inputs]]
+contract_id = "agent-box.workspace@1"
+target = "dispatch-input"
+minimum = 1
+maximum = 1
+[[harness.inputs]]
+contract_id = "agent-box.runtime-host@1"
+target = "dispatch-input"
+minimum = 1
+maximum = 1
+[[harness.inputs]]
+contract_id = "agent-box.sandbox@1"
+target = "dispatch-input"
+minimum = 1
+maximum = 1
+[[harness.inputs]]
+contract_id = "agent-box.terminal-session@1"
+target = "dispatch-input"
+minimum = 1
+maximum = 1
+[[harness.inputs]]
+contract_id = "agent-box.profile@1"
+target = "dispatch-input"
+minimum = 0
+maximum = 1
+[[harness.inputs]]
+contract_id = "agent-box.prompt-fragment@1"
+target = "dispatch-input"
+minimum = 1
+maximum = 32
+[[harness.inputs]]
+contract_id = "agent-box.launch-selection@1"
+target = "dispatch-input"
+minimum = 0
+maximum = 1
+[[harness.inputs]]
+contract_id = "agent-box-pi.continuation@1"
+target = "dispatch-input"
+minimum = 0
+maximum = 1
 [harness.identity]
 harness_type = "pi"
 display_name = "Pi"

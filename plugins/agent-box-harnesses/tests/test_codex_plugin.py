@@ -14,15 +14,23 @@ def test_registers_codex_app_server_execution_provider_without_discovery_writes(
 
     assert descriptor.id == "codex"
     assert descriptor.api_version == PLUGIN_API_VERSION
-    assert registration.contracts == ()
-    assert registration.resource_providers == ()
+    # the harness-owned native continuation contract ships with the plugin
+    assert registration.contracts == (CodexContinuationV1,)
+    # the continuation provider AND the locator-only credential source (the
+    # Registry resolver for the credential contract) ship with the plugin
+    assert [p.descriptor().id for p in registration.resource_providers] == [
+        "codex-continuation",
+        "codex-login",
+    ]
     assert len(registration.execution_providers) == 1
     assert "codex-execution" in [c.component.provider_id for c in registration.contributions if hasattr(c.component, "provider_id")]
     provider = registration.execution_providers[0]
     assert provider.descriptor().id == "codex-execution"
-    # ordinary Executions no longer carry SkillRef inputs; the provider
-    # declares no skill slot
-    assert provider.input_limits() == {}
+    # the formal dispatch input surface is registry-declared, not empty
+    limits = provider.input_limits()
+    assert limits["agent-box.workspace@1"] == (1, 1)
+    assert limits["agent-box.prompt-fragment@1"] == (1, 32)
+    assert limits["agent-box.codex-continuation@1"] == (0, 1)
     assert "codex-profile-selector" in [c.component.id for c in registration.contributions if hasattr(c.component, "id")]
     assert not context.plugin_data_dir.exists()
 

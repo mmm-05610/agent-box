@@ -119,6 +119,18 @@ class OpenCodeAdapter(GenericCliAdapter):
         unknown = sorted(set(str(key) for key in payload) - set(CONFIG_KEYS))
         return tuple(f"UNMAPPED_CONFIG_KEY:{key}" for key in unknown[:8])
 
+    def profile_model(self, payload: Mapping[str, Any]) -> str | None:
+        """Model identity declared by an OpenCode profile payload (vendor fact).
+
+        OpenCode's documented top-level ``model`` config key (FACTS D8) carries
+        the provider/model selection (``provider/model``); it is rendered into
+        opencode.json verbatim by the managed config render.
+        """
+        value = payload.get("model") if isinstance(payload, Mapping) else None
+        if not isinstance(value, str) or not value.strip():
+            return None
+        return value.strip()[:128]
+
     def _candidate_files(self, context, payload) -> tuple:
         """Render only the documented native keys into opencode.json.
 

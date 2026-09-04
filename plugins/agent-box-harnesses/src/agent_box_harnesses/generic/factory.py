@@ -38,6 +38,46 @@ def _config_renderers() -> dict[str, object]:
     return renderers
 
 
+def _continuation_wiring(harness_type: str):
+    """Per-harness continuation contract + resource provider (harness-owned)."""
+    if harness_type == "codex":
+        from ..codex.continuation import CodexContinuationResourceProvider
+        from ..codex.contracts import CodexContinuationV1
+        return CodexContinuationV1, CodexContinuationResourceProvider()
+    if harness_type == "claude-code":
+        from ..claude.continuation import ClaudeContinuationResourceProvider
+        from ..claude.contracts import ClaudeContinuationV1
+        return ClaudeContinuationV1, ClaudeContinuationResourceProvider()
+    if harness_type == "opencode":
+        from ..opencode.profiles import OpenCodeContinuationResourceProvider
+        from ..opencode.provider import OpenCodeContinuationV1
+        return OpenCodeContinuationV1, OpenCodeContinuationResourceProvider()
+    if harness_type == "hermes":
+        from ..hermes.continuation import HermesContinuationResourceProvider
+        from ..hermes.contracts import HermesContinuationV1
+        return HermesContinuationV1, HermesContinuationResourceProvider()
+    if harness_type == "pi":
+        from ..pi.continuation import PiContinuationResourceProvider
+        from ..pi.contract import PiContinuationV1
+        return PiContinuationV1, PiContinuationResourceProvider()
+    return None, None
+
+
+def _credential_materializer(harness_type: str, agent_box_home):
+    """Per-harness credential materializer (harness-owned, locator-only).
+
+    ``agent_box_home`` is reserved for explicit relocation in tests; the
+    production materializer resolves its native home itself and never
+    exposes the source location.
+    """
+    del agent_box_home
+    if harness_type == "codex":
+        from ..codex.credentials import CodexCredentialSource
+
+        return CodexCredentialSource()
+    return None
+
+
 def build_registration(context, harness_type: str | None = None):
     registry = load_builtin_registry()
     definition = registry.get(harness_type) if harness_type else None
@@ -49,19 +89,38 @@ def build_registration(context, harness_type: str | None = None):
         config_renderers=_config_renderers(),
     )
     if definition is None:
-        return PluginRegistration(resource_providers=(store,))
+        from .launch_selection import GenericLaunchSelectionProvider
+
+        return PluginRegistration(
+            resource_providers=(store, GenericLaunchSelectionProvider())
+        )
     adapter = ADAPTERS.get(definition.driver)
     if adapter is None:
         raise ValueError("untrusted adapter key")
+    continuation_contract, continuation_provider = _continuation_wiring(definition.harness_type)
     provider = GenericExecutionProvider(
         definition, adapter,
         staging_root=context.plugin_data_dir / "execution-staging",
+        executable_resolver=None,
+        credential_materializer=_credential_materializer(definition.harness_type, None),
         profile_store=store,
     )
+    resource_providers = []
+    contracts = []
+    materializer = _credential_materializer(definition.harness_type, None)
+    if continuation_provider is not None and continuation_contract is not None:
+        resource_providers.append(continuation_provider)
+        contracts.append(continuation_contract)
+    if materializer is not None:
+        # The locator-only credential source is also the Registry resolver
+        # for its credential contract during dispatch.
+        resource_providers.append(materializer)
     manager = GenericProfileManager(store, definition)
     installer = SkillInstallerContribution(store, definition.harness_type)
     return PluginRegistration(
+        contracts=tuple(contracts),
         execution_providers=(provider,),
+        resource_providers=tuple(resource_providers),
         contributions=(
             resource_selector(GenericProfileSelector(store, definition)),
             host_control(ProviderHostControl(provider.provider_id, provider)),

@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61,<77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-box-studio"
+version = "2.0.0a1"
+description = "Agent-Box Studio: upper-layer orchestration service over the Agent-Box core"
+requires-python = ">=3.10"
+dependencies = [
+    "agent-box-cli==2.0.0a1",
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+]
+
+[project.optional-dependencies]
+serve = ["uvicorn[standard]>=0.29"]
+test = ["httpx2>=2.0,<3"]
+
+[project.scripts]
+agent-box-studio = "agent_box_studio.cli:main"
+
+[project.entry-points."agent_box.plugins"]
+studio = "agent_box_studio.plugin:create_plugin"
+
+[tool.setuptools.packages.find]
+where = ["src"]

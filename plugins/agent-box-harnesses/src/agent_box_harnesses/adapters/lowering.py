@@ -38,6 +38,24 @@ class LoweredLaunch:
     plan_digest: str
 
 
+# Sanctioned live-workspace marker: a live Workspace Ref carries an
+# identity digest, not a content snapshot (the directory is externally
+# mutable and unfrozen by contract).  The launch-time content digest is
+# still computed and declared to the Runtime (assembler/sandbox verify
+# against THAT value); only the identity-marker equality check is waived,
+# and only for the workspace mount kind with this exact marker prefix.
+LIVE_WORKSPACE_DIGEST_PREFIX = "live-unfrozen:"
+
+
+def _is_live_workspace_mount(mount: MountIntent, actual: str) -> bool:
+    return (
+        mount.kind == "workspace"
+        and isinstance(mount.source_digest, str)
+        and mount.source_digest.startswith(LIVE_WORKSPACE_DIGEST_PREFIX)
+        and actual.startswith("sha256:")
+    )
+
+
 def lower(
     plan: LaunchPlan,
     *,
@@ -73,7 +91,8 @@ def lower(
         except (OSError, ValueError) as exc:
             raise MaterializationFailed("SOURCE_UNAVAILABLE", mount.source_key) from exc
         if not isinstance(resolved, (StagedHome, NativeHomeView)) and actual != mount.source_digest:
-            raise MaterializationFailed("SOURCE_DIGEST_DRIFT", mount.source_key)
+            if not _is_live_workspace_mount(mount, actual):
+                raise MaterializationFailed("SOURCE_DIGEST_DRIFT", mount.source_key)
         declared.append(declare_source(
             mount.kind, host_path, mount.guest_target, access=mount.access,
             provenance=mount.provenance or mount.kind,
