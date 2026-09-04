@@ -202,6 +202,18 @@ registerPanel({
   order: 120,
   component: RoutedSettingsSection,
 })
+// G6：AgentBox profiles 设置分区（agentbox 后端模式；内容在
+// /settings/agentbox-profiles，分区组件见 features/agentbox）。
+// 未进 BUILTIN_SECTION_META —— en/zh 标签同为 "Profiles"，导航直出
+// 注册表 title（扩展分区回退路径），不新增 i18n 键。
+registerPanel({
+  id: "agentbox-profiles",
+  title: "Profiles",
+  icon: "boxes",
+  placement: "settings",
+  order: 130,
+  component: RoutedSettingsSection,
+})
 
 /**
  * 设置导航数据源 = panels 注册表（placement="settings"，按 order 稳定

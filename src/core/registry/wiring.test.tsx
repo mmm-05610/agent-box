@@ -274,6 +274,8 @@ describe("扩展剧本 3：加面板（panels 注册表两处消费点）", () =
       "web-service",
       "logs",
       "system",
+      // G6：agentbox 后端模式的 profiles 分区（扩展分区回退：title 直出）
+      "agentbox-profiles",
     ])
   })
 
@@ -301,7 +303,7 @@ describe("扩展剧本 3：加面板（panels 注册表两处消费点）", () =
       id: "wiring-fake-section",
       title: "Wiring Fake Section",
       placement: "settings",
-      order: 125,
+      order: 135, // 末位（agentbox-profiles 占 130）
       component: () => null,
     })
     const sections = listSettingsSections()
