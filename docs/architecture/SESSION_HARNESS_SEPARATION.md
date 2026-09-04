@@ -152,15 +152,23 @@ send({input, harnessId})
    （Turn/parts 格式，与前端 core/domain/message.ts 同形；studio 侧 Python 镜像）。
    存于 SessionStore（transcript 表）。native 会话文件仍是 harness 侧事实源，
    但**面向 Studio 的权威视图是统一转写**。
-2. **接续的三档读取渲染**（按目标 harness 能力与历史长度自动选择）：
-   - **R1 native resume**（同 harness 回切）：无损，优先；
-   - **R2 脚本重放**（跨 harness）：统一转写渲染为对话脚本文本——
-     `[user] … / [assistant(Codex)] … / [tool: 读取 X → 结果摘要] / [文件变更] …`
-     ——作为新执行的首条前置上下文 + 用户输入。文本级无损（工具结果以
-     摘要/关键输出形式重放，工具本体不可跨产品重执行）；
-   - **R3 压缩尾部**（历史超过上限后）：旧轮折叠为摘要链（原 SessionMemory
-     的 digest 链降级为此用途）+ 保留近 N 轮全量。
-3. **原 SessionMemory 摘要方案降级为 R3 的压缩组件**，不再作为主接续手段。
+2. **接续渲染：全量保真优先，超窗才确定性裁剪**：
+
+   **R2 的默认形态是全量保真重放，不是简报**。transcript.jsonl 里有什么就
+   渲染什么——每条 user 消息全文、每条 assistant 消息全文、每次工具调用的
+   完整输入与完整输出（原文，仅超大输出做头尾截断并标注）、reasoning 原文、
+   文件变更全文。信息保真度：文本级 100%——渲染上下文与原生 resume 提供的
+   感知一致，唯二差异是(a)工具不再被真实重执行（改为记录）与(b)脚本包装的
+   少量格式开销。
+
+   **预算策略**（与 Claude Code autocompact 同构的窗口管理）：
+   - 历史 tokens ≤ 窗口预算（默认 context 的 60%）：全量重放，感知与原生
+     几乎一致；
+   - 超出：**确定性裁剪**（非 LLM 黑箱摘要）——最旧轮次降级为紧凑形式
+     （保留 user 全文 + assistant 最终文本 + 文件变更清单，裁去工具输出
+     细节与 reasoning），近端轮次保持全量；被裁内容在绑定条标注
+     "history:compacted(N 轮)"。等价于一次显式 /compact，业界接受度成熟。
+   - R3（原摘要链）仅作为"裁剪后仍超预算"的最后手段，默认不触发。
 
 ### 9.2.1 存储布局：双轨制（native 私有 + 统一权威）
 
