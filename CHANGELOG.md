@@ -2,6 +2,14 @@
 
 All notable changes to agent-box will be documented in this file.
 
+## [2.1.0](https://github.com/mmm-05610/agent-box/compare/v2.0.0...v2.1.0) (2026-09-04)
+
+
+### Features
+
+* consolidate Harness registry and add governed Agent Skills ([#65](https://github.com/mmm-05610/agent-box/issues/65)) ([80d2017](https://github.com/mmm-05610/agent-box/commit/80d2017e9a708421556914cd99d843573daf4c68))
+* Studio backend core with Official Session Store and five real harnesses ([#67](https://github.com/mmm-05610/agent-box/issues/67)) ([6c14ea8](https://github.com/mmm-05610/agent-box/commit/6c14ea8db8130f1e219328835840b4159fe8c9e7))
+
 ## [2.0.0a1] — Developer Preview / Experimental API
 
 - Introduced the execution governance Core and official plugin architecture.
