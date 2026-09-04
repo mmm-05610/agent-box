@@ -217,6 +217,25 @@ unified→claude / claude→unified`，各约 150-250 行；uuid 链重建、
 经 IMPORT 对账（新增行/篡改检测）；绑定条/StageIndex 记录每阶段的
 格式转换方向与 harness 版本（cli_version 进 provenance）。
 
+### 9.2.2 零损耗保证：三条结构性硬规则
+
+同 harness 连续使用必须零损耗；损耗只允许出现在跨 harness 首次接手的
+注入副本上，且不随交替次数累积。保证是结构性的（路由规则，非实现纪律）：
+
+1. **R1 强制规则**：绑定解析第一步分流——请求 harness_type == continuation
+   游标的 harness_type ⇒ 走 native resume，转换器函数在代码层面不可达
+   （unreachable assert）。零损耗路径上没有损耗发生的代码。
+2. **投影目录持久规则**：codex-home/claude-home 等投影目录的清理只有两个
+   触发条件——会话删除、用户显式重置。切换 harness 绝不触发清理；切回时
+   native 文件原封未动，resume 完整恢复。
+3. **append-only 规则**：transcript.jsonl 只追加永不裁剪；任何压缩（R3 摘要、
+   预算裁剪）只作用于单次注入的脚本副本，发出去即弃。权威全量在存储中永远
+   完整——压缩是渲染策略，不是数据操作。
+
+**交替无累积证明**：A→B→A→B 交替 N 次，每次回切都走 R1 native resume
+（无损），每个 harness 的上下文链 = 其接手时注入的快照 + 自己后续轮次，
+只增不减。全量损耗点仅存在于各线首次接手的注入副本，数目与交替次数无关。
+
 ### 9.3 诚实边界
 
 - 工具调用不可跨产品重**执行**，只能重放其**结果文本**——文件世界的实际产出
