@@ -37,6 +37,15 @@
    - **sandbox 是契约化绑定维度**（v3 修正）：解析期经 registry resolve(SANDBOX_CONTRACT_ID, ref) → SandboxV1 → `negotiate(harness.runtime.sandbox_capabilities)` → 谈判 digest 进绑定条/StageIndex；不满足 → preflight 拒绝。`none`(direct) 同样入账——每轮如实记录"跑在沙箱外"。执行双路径：negotiated → coordinator→wrap(mount_plan)；none → transport.submit 原样。
    StageIndex 是治理索引：每个阶段指向其 execution(s) 与该阶段的确切绑定（profile 版本、continuation 契约、sandbox、model overlay）。
 2. **SessionStore**（上层 SQLite：session/stage/profile_meta；Execution 归 work_core 库）。
+2.5 **权威统一转写格式（v3 定稿）与五 harness 损耗矩阵**：
+   以 pi 会话文件形态为基底（header + 顺序行，极简无链无加密）+ Turn/parts 内容
+   + `x-{harness}` 扩展槽（不可归一的原始字段降级保留，不丢弃）。接续策略按
+   `continuation.kind` 声明自动路由：native_session → R1 游标 resume（codex/
+   claude/pi）；transcript_handoff → R2 统一转写渲染注入（opencode/hermes，
+   官方定位即如此）。损耗矩阵（真实文件解剖 2026-09-03）：pi ≈0；codex 仅
+   encrypted reasoning；claude 仅 uuid 链重建；opencode/hermes 摘要级（官方
+   本不支持 native resume）。
+
 3. **BindingResolver 与静默化三层模型**（中间层的核心组件）：
    契约全集 9+1 维全部纳入绑定解析（治理完整），默认策略让用户只碰 2 个控件（使用简洁）：
 
