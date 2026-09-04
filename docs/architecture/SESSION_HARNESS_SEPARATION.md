@@ -162,6 +162,35 @@ send({input, harnessId})
      的 digest 链降级为此用途）+ 保留近 N 轮全量。
 3. **原 SessionMemory 摘要方案降级为 R3 的压缩组件**，不再作为主接续手段。
 
+### 9.2.1 存储布局：双轨制（native 私有 + 统一权威）
+
+```text
+~/.agent-box/studio/sessions/{session_id}/
+├── transcript.jsonl            # ★ 统一转写（Studio 权威视图）
+│     每行一条归一化记录：
+│     {seq, execution_id, harness_type, type, part/turn}
+├── codex-home/                 # codex native 会话（投影目录，rollout 存放）
+├── claude-home/                # claude native 会话（CLAUDE_CONFIG_DIR 投影）
+└── executions/{eid}/           # 每轮治理投影快照（config/manifest/credential）
+
+studio.db                       # session/stage/profile 元数据 + 索引
+```
+
+| 存储 | 写入者 | 读取者 | 用途 |
+|---|---|---|---|
+| native 会话目录 | harness 进程自己（Studio 只提供投影目录） | 同 harness resume（R1） | harness 私有执行状态 |
+| transcript.jsonl | orchestrator write-through（事件流经过时归一化追加，与 WS 推送同源） | UI 渲染 / R2·R3 脚本 / 审计 | Studio 权威视图 |
+| studio.db | orchestrator | 元数据查询 | 索引/阶段/profile |
+
+要点：
+- transcript.jsonl 不是 native 的拷贝，而是同一事件流的归一化投影——写入时刻
+  同时产生，无事后同步；
+- native 目录角色变更：从散落的 ~/.codex/~/.claude 变为 session 作用域下的托管
+  投影目录，唯一存在理由是支撑 R1 native 续接；生命周期归 Studio（会话删除一并清理）；
+- 互为灾难恢复：transcript 丢失 → native JSONL 经 parsers 重解析重建；native 丢失
+  → transcript 仍在，UI/R2/R3 可用，仅 R1 降级 fresh。双轨互不单点；
+- R2/R3 的数据源就是 transcript.jsonl（渲染策略，不产生第三份存储）。
+
 ### 9.3 诚实边界
 
 - 工具调用不可跨产品重**执行**，只能重放其**结果文本**——文件世界的实际产出
