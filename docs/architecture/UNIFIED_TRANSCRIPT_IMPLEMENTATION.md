@@ -1,10 +1,24 @@
-# 统一转写存储实施方案 v2（SH-PROFILE+TRANSCRIPT）
+# 统一转写存储实施方案 v3（SH-PROFILE+TRANSCRIPT）
 
 > 状态：待用户批准执行
-> 版本：v2——根据 ChatGPT 质疑裁决与 phase2 架构发现全面修订
+> 版本：v3——恢复读写转译器（v1 核心）+ 吸收 v2 审查中的合理约束
 > 铁律：agent-box core（src/agent_box/**）零改动；agent-box-web 零引用
 
 ---
+
+## 设计原则（用户模型，经裁决确认）
+
+每个 harness 配一套**读写转译器**（SessionCodec），直接读写该 harness 的
+native 会话文件。同一 harness 的 unified→native→unified 往返**字节级无损**
+（x-native 原始封装保证，非语义重建）。跨 harness 切换时上下文注入为
+**文本级**（可接受的损耗，绑定条标注）。
+
+**与 v2 的区别**：v2 因 ChatGPT 质疑"语义重建不可靠"而全面删除了
+import_events / x-native / 双向转换器——这是过度矫正。质疑攻击的是
+**语义重建路径**（用归一化字段重新合成 native 文件），不是 **x-native
+原始字节回放路径**（同 harness 往返时原样回吐，无信息经过语义变换）。
+v3 恢复后者并永久保留。
+
 
 ## 零、v2 修订要点（相对 v1 的六个修正）
 
@@ -16,6 +30,14 @@
 | 4 | native_resume / context_handoff 语义未区分 | **Leg 模型显式化**：Conversation → Legs → Executions → NativeSessionRef；每 Leg 声明 continuation_mode |
 | 5 | transcript.jsonl 缺生产约束 | **权威 = studio.db 的 append-only events 表**（seq 主键/幂等键/schema_version/watermark/脱敏/并发锁）；JSONL 降为导出/交换格式 |
 | 6 | 写入双路径（send 写一次+结束解析一次） | **单一写入路径**：实时 observation → transcript 表（唯一入口）；native 解码器仅用于启动导入/批式通道/故障补账（带 watermark 防重） |
+
+### v3 相对 v2 的三个恢复
+
+| # | v2 过度删除的 | v3 恢复 | 理由 |
+|---|---|---|---|
+| R1 | x-native 原始字节封装 | **恢复**——同 harness 往返时 EXPORT 直接回吐原始字节，不经过语义压缩，无损由封装结构性保证 | 质疑攻击的是语义重建路径，x-native 回放根本不经过那条路 |
+| R2 | 五家双向转换器（含 import_events 语义重建） | **部分恢复**——JSONL 三家（codex/claude/pi）的 export/import 保留但改名：export=decode（native→unified）、import=只读校验（不反向写入）；SQLite 两家（opencode/hermes）只读 | JSONL 是追加式纯文本，读回验证可靠；SQLite 有 FTS/WAL，只读安全 |
+| R3 | Leg 模型的 continuation_mode 显式选择 | **保留并强化**——native_resume / context_handoff / fresh 三种模式用户/默认策略可选，不再由 orchestrator 默默决定 | 用户裁决：这属于产品语义，应显式可配 |
 
 ---
 
