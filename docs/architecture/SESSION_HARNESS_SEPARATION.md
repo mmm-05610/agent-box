@@ -176,34 +176,46 @@ send({input, harnessId})
      "history:compacted(N 轮)"。等价于一次显式 /compact，业界接受度成熟。
    - R3（原摘要链）仅作为 R2-F 裁剪后仍超预算的最后手段，默认不触发。
 
-### 9.2.1 存储布局：双轨制（native 私有 + 统一权威）
+### 9.2.1 存储与格式转换（v5：单一权威存储 + 双向转换器 + 沙箱覆写）
 
-```text
-~/.agent-box/studio/sessions/{session_id}/
-├── transcript.jsonl            # ★ 统一转写（Studio 权威视图）
-│     每行一条归一化记录：
-│     {seq, execution_id, harness_type, type, part/turn}
-├── codex-home/                 # codex native 会话（投影目录，rollout 存放）
-├── claude-home/                # claude native 会话（CLAUDE_CONFIG_DIR 投影）
-└── executions/{eid}/           # 每轮治理投影快照（config/manifest/credential）
+**单一权威存储**：每个 session 一个 `session.unified.jsonl`（统一格式：
+Turn/parts 归一化记录，追加式）。这是会话的唯一权威——native 文件不再是
+平行存储，而是 execution 期的转换视图。
 
-studio.db                       # session/stage/profile 元数据 + 索引
+**格式解剖结论**（2026-09-03 真实文件对比）：
+- codex rollout：`session_meta` / `response_item{message(role: developer|
+  user|assistant, content:[input_text|output_text]), reasoning(encrypted_content),
+  function_call}` / `event_msg` / `turn_context` / `world_state`
+- claude projects JSONL：`user|assistant{message.content:[text|tool_use|
+  tool_result], uuid, parentUuid 链表}` / `attachment` / `queue-operation` 等
+- 差异=中等：信封不同、消息模型同构（文本/工具/角色均可机械映射）。
+  不可迁移项：codex `encrypted_content`（加密 reasoning，诚实丢弃）、
+  claude parentUuid 链（重建而非原样）。
+- **先例**：codex rollout 中真实存在 `<model_switch>` developer 注入消息
+  （Codex 自身跨模型切换即用文本注入）——注入式接续有厂商原生先例。
+
+**执行期转换流水线**：
+```
+session.unified.jsonl（唯一权威）
+  │ EXPORT：unified → 目标 harness 格式
+  │   codex：session_meta(新id/cwd) + response_item 消息流
+  │   claude：user/assistant 行 + parentUuid 链重建
+  ▼
+沙箱覆写：declare_source("session", 会话文件, guest 会话路径, rw)
+  → harness 进程读写的就是这份经转换的原文件（mount，非副本）
+  │ execution 结束
+  ▼
+IMPORT：harness 新增行 → 解析 → 转回 unified 追加
+  （工具结果/reasoning 按 harness 语义归一；新 continuation 游标入 harnessState）
 ```
 
-| 存储 | 写入者 | 读取者 | 用途 |
-|---|---|---|---|
-| native 会话目录 | harness 进程自己（Studio 只提供投影目录） | 同 harness resume（R1） | harness 私有执行状态 |
-| transcript.jsonl | orchestrator write-through（事件流经过时归一化追加，与 WS 推送同源） | UI 渲染 / R2·R3 脚本 / 审计 | Studio 权威视图 |
-| studio.db | orchestrator | 元数据查询 | 索引/阶段/profile |
+**转换器（中间件核心）**：双向四函数 `unified→codex / codex→unified /
+unified→claude / claude→unified`，各约 150-250 行；uuid 链重建、
+`encrypted_content` 丢弃、harness 专属行丢弃均有明确规则。
 
-要点：
-- transcript.jsonl 不是 native 的拷贝，而是同一事件流的归一化投影——写入时刻
-  同时产生，无事后同步；
-- native 目录角色变更：从散落的 ~/.codex/~/.claude 变为 session 作用域下的托管
-  投影目录，唯一存在理由是支撑 R1 native 续接；生命周期归 Studio（会话删除一并清理）；
-- 互为灾难恢复：transcript 丢失 → native JSONL 经 parsers 重解析重建；native 丢失
-  → transcript 仍在，UI/R2/R3 可用，仅 R1 降级 fresh。双轨互不单点；
-- R2/R3 的数据源就是 transcript.jsonl（渲染策略，不产生第三份存储）。
+**治理收益**：转换前后均过 digest 校验；执行期 harness 对会话文件的修改
+经 IMPORT 对账（新增行/篡改检测）；绑定条/StageIndex 记录每阶段的
+格式转换方向与 harness 版本（cli_version 进 provenance）。
 
 ### 9.3 诚实边界
 
