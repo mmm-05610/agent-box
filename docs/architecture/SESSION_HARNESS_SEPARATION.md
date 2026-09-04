@@ -152,9 +152,15 @@ send({input, harnessId})
    （Turn/parts 格式，与前端 core/domain/message.ts 同形；studio 侧 Python 镜像）。
    存于 SessionStore（transcript 表）。native 会话文件仍是 harness 侧事实源，
    但**面向 Studio 的权威视图是统一转写**。
-2. **接续渲染：全量保真优先，超窗才确定性裁剪**：
+2. **接续渲染：native 文件物化优先（R2-N），全量脚本重放为兜底（R2-F）**：
 
-   **R2 的默认形态是全量保真重放，不是简报**。transcript.jsonl 里有什么就
+   **首选 R2-N（native session 文件物化）**：把统一转写翻译成目标 harness 的
+   native 会话文件格式，写入其会话存储位置，然后走它自己的 resume——从那一刻起
+   该历史就是"它自己的 session 文件"，其 autocompact/resume/steer 等一切
+   native 会话机制原生无差别工作。写入经版本化 writer + 写入读回验证，失败自动
+   降级 R2-F。
+
+   **R2-F（全量保真脚本重放，兜底）**：transcript.jsonl 里有什么就
    渲染什么——每条 user 消息全文、每条 assistant 消息全文、每次工具调用的
    完整输入与完整输出（原文，仅超大输出做头尾截断并标注）、reasoning 原文、
    文件变更全文。信息保真度：文本级 100%——渲染上下文与原生 resume 提供的
@@ -168,7 +174,7 @@ send({input, harnessId})
      （保留 user 全文 + assistant 最终文本 + 文件变更清单，裁去工具输出
      细节与 reasoning），近端轮次保持全量；被裁内容在绑定条标注
      "history:compacted(N 轮)"。等价于一次显式 /compact，业界接受度成熟。
-   - R3（原摘要链）仅作为"裁剪后仍超预算"的最后手段，默认不触发。
+   - R3（原摘要链）仅作为 R2-F 裁剪后仍超预算的最后手段，默认不触发。
 
 ### 9.2.1 存储布局：双轨制（native 私有 + 统一权威）
 
