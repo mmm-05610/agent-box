@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>预览 3 · Execution Tree 与多 Harness 分支 — Agent-Box Studio</title>
+<link rel="stylesheet" href="./_kit.css">
+<style>
+  /* 预览 3 布局：树面板在 1024 仍可见；≤900 时上下堆叠 */
+  @media (max-width: 1100px) { .panel { display: flex; width: 20rem; } }
+  @media (max-width: 900px) {
+    .main { flex-direction: column; overflow-y: auto; }
+    .chat { flex: none; height: 26rem; }
+    .panel { width: auto; border-left: none; border-top: 1px solid var(--border); flex: 1; overflow: visible; }
+  }
+  .tree-section { padding: 0.25rem 0; }
+  .tree-section + .tree-section { border-top: 1px solid var(--border); margin-top: 0.5rem; padding-top: 0.5rem; }
+  /* 根节点：主会话 */
+  .tnode.root { height: 2.375rem; font-weight: 500; }
+  .tnode.root .tsum { color: var(--fg); }
+  /* 状态图标列 */
+  .tst { width: 1rem; text-align: center; flex: none; font-style: normal; font-size: 0.75rem; }
+  /* 等待输入的琥珀左缘节点 */
+  .tnode.waiting { box-shadow: inset 2px 0 0 var(--accent); }
+  .tnode.failed { box-shadow: inset 2px 0 0 var(--danger); }
+  /* 查看会话（Eye）——span[role=button]，避免 button 嵌套 button 拆开节点 */
+  .teye { margin-left: 0.375rem; color: var(--faint); cursor: pointer; flex: none; font-size: 0.75rem; }
+  .tnode:hover .teye { color: var(--muted); }
+  /* 绑定条（panel 底部） */
+  .binding { border-top: 1px solid var(--border); padding-top: 0.625rem; display: flex; flex-wrap: wrap; gap: 0.375rem; }
+  .binding .b-pill {
+    display: inline-flex; align-items: center; gap: 0.375rem;
+    border: 1px solid var(--border-strong); border-radius: var(--r-pill);
+    color: var(--muted); font-size: 0.71875rem; padding: 0.1875rem 0.625rem;
+    background: none; cursor: pointer; font-family: inherit;
+  }
+  .binding .b-pill.harness { background: var(--raise); color: var(--fg); font-weight: 500; }
+  .binding .b-pill:hover { color: var(--fg); }
+  /* 合流标记 */
+  .merge-row { display: flex; align-items: center; gap: 0.5rem; color: var(--faint); font-size: 0.71875rem; padding: 0.375rem 0.625rem; }
+  .merge-row::before { content: "⤷"; color: var(--faint); }
+</style>
+</head>
+<body>
+
+<div class="console">
+  <div class="name">预览 3 · <em>Execution Tree 与多 Harness 分支</em></div>
+  <div class="dials">harness 方槽 + 身份点 · 轨道缩进 · 状态语义</div>
+  <div class="spacer"></div>
+  <button class="cbtn" id="themeBtn" aria-pressed="false">☀ 亮色</button>
+  <button class="cbtn" id="zoomBtn" aria-pressed="false">A 150%</button>
+</div>
+
+<div class="app">
+  <div class="titlebar">
+    <div class="lights" aria-hidden="true"><i></i><i></i><i></i></div>
+    <div class="title">Agent-Box Studio</div>
+    <div class="winctl" aria-hidden="true">— ▢ ✕</div>
+  </div>
+
+  <div class="topbar">
+    <div class="logo" aria-hidden="true">A</div>
+    <div class="crumb"><span class="hide-sm">agent-box-studio</span> › <b>解析 Zed 会话 JSONL 的执行树投影</b></div>
+    <div class="chip"><span class="mono">⎇ studio-shell</span> ▾</div>
+    <div class="right">
+      <button class="sq on" aria-label="切换侧栏" aria-pressed="true">◧</button>
+      <button class="sq" aria-label="切换终端">▤</button>
+      <button class="sq on" aria-label="切换辅助面板" aria-pressed="true">◨</button>
+      <button class="sq" aria-label="设置">⚙</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <!-- 会话列（窄）：委派在消息流内的形态 -->
+    <section class="chat">
+      <div class="stream">
+        <div class="msg user">交叉验证交给 codex，矩阵复核给 gemini，旧的快照迁移让 opencode 试试。</div>
+
+        <div class="msg ai">
+          <div class="agent-line"><span class="hglyph" title="Claude Code">CC<span class="pid c1" aria-hidden="true"></span></span> Claude Code · 已委派 4 个子任务</div>
+          <p>已拆分为 4 个 Leg 并行推进，zinc 交叉验证委派给 <span class="code">CX</span>，矩阵复核委派给 <span class="code">GM</span>。执行树见侧栏，完成后自动合流回主会话。</p>
+
+          <button class="toolchip" aria-expanded="false">
+            <span class="hglyph" style="width:0.9375rem;height:0.9375rem;font-size:0.5rem" title="Codex CLI">CX<span class="pid c2" aria-hidden="true"></span></span>
+            <span class="sum">委派 · 交叉验证 zinc 快照差异 <span class="tid">#a3f9c2e1</span></span>
+            <span class="st spin" aria-hidden="true"></span>
+          </button>
+          <button class="toolchip" aria-expanded="false">
+            <span class="hglyph" style="width:0.9375rem;height:0.9375rem;font-size:0.5rem" title="OpenCode">OC<span class="pid c4" aria-hidden="true"></span></span>
+            <span class="sum">委派 · 迁移旧快照文件 <span class="tid">#d5c2b910</span></span>
+            <span class="st err" aria-hidden="true">✕</span>
+          </button>
+          <p class="dim" style="margin-top:0.5rem">OC 的迁移 Leg 失败了：旧快照路径含中文，需要先修 <span class="code">short-path</span>。已在执行树标红。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Execution Tree 面板 -->
+    <aside class="panel" aria-label="执行树面板">
+      <div class="panel-head">
+        <b>执行树</b>
+        <span class="count-chip">1 root · 4 legs</span>
+      </div>
+
+      <div class="legend">
+        <span class="it"><span class="hglyph">CC<span class="pid c1" aria-hidden="true"></span></span> Claude Code</span>
+        <span class="it"><span class="hglyph">CX<span class="pid c2" aria-hidden="true"></span></span> Codex</span>
+        <span class="it"><span class="hglyph">GM<span class="pid c3" aria-hidden="true"></span></span> Gemini</span>
+        <span class="it"><span class="hglyph">OC<span class="pid c4" aria-hidden="true"></span></span> OpenCode</span>
+      </div>
+
+      <div class="tree-section">
+        <div class="tree">
+          <button class="tnode root active" aria-current="true">
+            <span class="hglyph" title="Claude Code">CC<span class="pid c1" aria-hidden="true"></span></span>
+            <span class="tsum">解析 Zed 会话 JSONL 的执行树投影</span>
+            <span class="live-dot" aria-hidden="true"></span>
+            <span class="tdur">12 分 06 秒</span>
+          </button>
+
+          <div class="tkids">
+            <button class="tnode">
+              <span class="hglyph" title="Codex CLI">CX<span class="pid c2" aria-hidden="true"></span></span>
+              <span class="tid">#a3f9c2e1</span>
+              <span class="tsum">交叉验证 zinc 快照差异</span>
+              <span class="teye" role="button" tabindex="0" aria-label="查看 CX 会话 #a3f9c2e1">◉</span>
+              <span class="spin" aria-hidden="true"></span>
+              <span class="tdur">1 分 12 秒</span>
+            </button>
+
+            <div class="tkids">
+              <button class="tnode">
+                <span class="hglyph" title="Gemini CLI">GM<span class="pid c3" aria-hidden="true"></span></span>
+                <span class="tid">#b7e0d44c</span>
+                <span class="tsum">复核转换矩阵 zinc 行</span>
+                <span class="tst st-ok" aria-hidden="true">✓</span>
+                <span class="tdur">42 秒</span>
+              </button>
+            </div>
+
+            <button class="tnode waiting">
+              <span class="hglyph" title="Gemini CLI">GM<span class="pid c3" aria-hidden="true"></span></span>
+              <span class="tid">#c41a7b02</span>
+              <span class="tsum">补充 zinc fixture 样本</span>
+              <span class="tst st-wait" aria-hidden="true">盾</span>
+              <span class="tdur">等待输入</span>
+            </button>
+
+            <button class="tnode failed">
+              <span class="hglyph" title="OpenCode">OC<span class="pid c4" aria-hidden="true"></span></span>
+              <span class="tid">#d5c2b910</span>
+              <span class="tsum">迁移旧快照文件 · 路径含中文</span>
+              <span class="tst st-err" aria-hidden="true">✕</span>
+              <span class="tdur">重试 1/3</span>
+            </button>
+
+            <button class="tnode">
+              <span class="hglyph" title="Claude Code">CC<span class="pid c1" aria-hidden="true"></span></span>
+              <span class="tid">#e6f1a33b</span>
+              <span class="tsum">运行 parsers 回归</span>
+              <span class="tst st-ok" aria-hidden="true">✓</span>
+              <span class="tdur">48 秒</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="merge-row">3 个 Leg 完成后自动合流回主会话 · 冲突策略 = 主会话裁决</div>
+      </div>
+
+      <div class="tree-section">
+        <div class="treehead">上一个会话的执行树（已完成）</div>
+        <div class="tree">
+          <button class="tnode root">
+            <span class="hglyph" title="Codex CLI">CX<span class="pid c2" aria-hidden="true"></span></span>
+            <span class="tsum">会话导入的 JSONL 校验规则</span>
+            <span class="tst st-ok" aria-hidden="true">✓</span>
+            <span class="tdur">昨天</span>
+          </button>
+          <div class="tkids">
+            <button class="tnode">
+              <span class="hglyph" title="Claude Code">CC<span class="pid c1" aria-hidden="true"></span></span>
+              <span class="tid">#f0a4c771</span>
+              <span class="tsum">wire-shape 宽容解析评审</span>
+              <span class="tst st-ok" aria-hidden="true">✓</span>
+              <span class="tdur">3 分 20 秒</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="side-spacer"></div>
+
+      <!-- 绑定条：多 Harness 并行配置 -->
+      <div class="binding" aria-label="会话绑定">
+        <button class="b-pill harness"><span class="hglyph" style="width:0.9375rem;height:0.9375rem;font-size:0.5rem">CC<span class="pid c1" aria-hidden="true"></span></span> 主 Harness: Claude Code ▾</button>
+        <button class="b-pill"><span class="mono">profile</span> zinc-porting ▾</button>
+        <button class="b-pill"><span class="mono">sandbox</span> workspace-write ▾</button>
+        <button class="b-pill"><span class="mono">continue</span> 自动合流 ▾</button>
+        <button class="b-pill"><span class="mono">model</span> GLM-5.3-Flash ▾</button>
+      </div>
+    </aside>
+  </div>
+
+  <div class="statusbar">
+    <span class="mono">⎇ studio-shell</span>
+    <span class="ok">✓ 4800 tests</span>
+    <span class="hide-sm">4 legs · 1 running · 1 failed</span>
+    <div class="right"><span class="hide-sm">中文</span><span class="mono">100%</span></div>
+  </div>
+</div>
+
+<p class="note">
+  <b>检查要点：</b>harness 识别 = 中性 mono 方槽缩写 + 6px 身份点（色相取自 chart 队列，全局稳定），琥珀/绿/红只编码**状态**（运行/完成/失败），
+  身份与状态永不分家出现；树用 1px 轨道线缩进 + T 型接合，活跃根节点琥珀 live-dot；
+  waiting Leg 用琥珀左缘 + 盾图标（决策≠错误），failed Leg 红左缘 + 重试计数；
+  「查看会话」（◉）在行悬停时浮现，Keyboard 可达；底部绑定条沿用 BindingBar 五段 pill 的信息架构（harness·profile·model·sandbox·continue）。
+</p>
+
+<script>
+  const themeBtn = document.getElementById('themeBtn');
+  const zoomBtn = document.getElementById('zoomBtn');
+  themeBtn.addEventListener('click', () => {
+    const light = document.documentElement.dataset.pref === 'light';
+    document.documentElement.dataset.pref = light ? 'dark' : 'light';
+    themeBtn.setAttribute('aria-pressed', String(!light));
+    themeBtn.textContent = light ? '☀ 亮色' : '☾ 暗色';
+  });
+  zoomBtn.addEventListener('click', () => {
+    const on = document.documentElement.classList.toggle('zoom-150');
+    zoomBtn.setAttribute('aria-pressed', String(on));
+  });
+</script>
+</body>
+</html>

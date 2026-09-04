@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>预览 1 · 默认单 Harness 会话 — Agent-Box Studio</title>
+<link rel="stylesheet" href="./_kit.css">
+</head>
+<body>
+
+<svg style="display:none" aria-hidden="true">
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-panel-left" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></symbol>
+  <symbol id="i-panel-right" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/></symbol>
+  <symbol id="i-terminal" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="m8 9 3 3-3 3"/><path d="M13 15h4"/></symbol>
+  <symbol id="i-paperclip" viewBox="0 0 24 24"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></symbol>
+  <symbol id="i-arrow-up" viewBox="0 0 24 24"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+  <symbol id="i-chev-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-chev-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+</svg>
+
+<div class="console">
+  <div class="name">预览 1 · <em>默认单 Harness 会话</em></div>
+  <div class="dials">neutral · flat · Level 0 only</div>
+  <div class="spacer"></div>
+  <button class="cbtn" id="themeBtn" aria-pressed="false">亮色</button>
+  <button class="cbtn" id="zoomBtn" aria-pressed="false">150%</button>
+</div>
+
+<div class="app">
+  <div class="titlebar">
+    <div class="lights" aria-hidden="true"><i></i><i></i><i></i></div>
+    <div class="title">Agent-Box Studio</div>
+    <div class="winctl" aria-hidden="true">— ▢ ✕</div>
+  </div>
+
+  <div class="topbar">
+    <button class="tbtn" aria-label="切换侧栏" aria-pressed="true" aria-controls="sidebar"><svg class="ic" aria-hidden="true"><use href="#i-panel-left"/></svg></button>
+    <div class="crumb"><span class="hide-sm">agent-box-studio</span><span class="sep" aria-hidden="true">›</span><b>解析 Zed 会话 JSONL 的执行树投影</b></div>
+    <span class="branch mono">zinc-main</span>
+    <div class="right">
+      <button class="tbtn" aria-label="打开终端" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-terminal"/></svg></button>
+      <button class="tbtn" aria-label="打开辅助面板" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-panel-right"/></svg></button>
+      <span class="vsep" aria-hidden="true"></span>
+      <button class="tbtn" aria-label="设置"><svg class="ic" aria-hidden="true"><use href="#i-settings"/></svg></button>
+    </div>
+  </div>
+
+  <div class="main">
+    <aside class="sidebar" id="sidebar">
+      <button class="navrow"><svg class="ic sm" aria-hidden="true"><use href="#i-plus"/></svg> 新建会话 <span class="kbd">Ctrl N</span></button>
+      <button class="navrow"><svg class="ic sm" aria-hidden="true"><use href="#i-search"/></svg> 搜索 <span class="kbd">Ctrl K</span></button>
+
+      <div class="label">今天</div>
+      <button class="conv" aria-current="true"><span class="rundot" aria-hidden="true"></span><span class="t">解析 Zed 会话 JSONL 的执行树投影</span><span class="tm num">12 分</span></button>
+      <button class="conv"><span class="t">迁移三套会话格式到统一转写</span><span class="tm">2 小时</span></button>
+      <button class="conv"><span class="t">Codeg 分层架构解剖与整合方案</span><span class="tm">昨天</span></button>
+      <div class="label">项目 · agent-box</div>
+      <button class="conv"><span class="t">会话导入的 JSONL 校验规则</span><span class="tm">周二</span></button>
+
+      <div class="side-spacer"></div>
+      <div class="account">
+        <span class="avatar" aria-hidden="true">M</span>
+        <span class="nm">maoqh</span>
+        <button class="tbtn" style="margin-left:auto" aria-label="账户设置"><svg class="ic sm" aria-hidden="true"><use href="#i-settings"/></svg></button>
+      </div>
+    </aside>
+
+    <section class="chat">
+      <div class="stream">
+        <div class="turn">
+          <div class="msg-user">把 Zed 的会话格式和我们的五套 harness 对一遍，输出一张转换矩阵，重点看 tool call 的无损性。</div>
+
+          <div class="msg-ai">
+            <div class="agent-head"><span class="hglyph" title="Claude Code">CC</span><b>Claude Code</b></div>
+            <p>已读取 Zed 的 <span class="code">session_01J9.jsonl</span> 和本地 <span class="code">parsers/</span>。Zed 是单文件 JSONL、每行一个事件；tool call 内嵌在消息的 content 数组里，事件粒度和我们现有五套格式可以对齐。</p>
+
+            <div class="event done" style="margin-top:0.625rem">
+              <button class="event-row" aria-expanded="false" aria-controls="ev-read">
+                <span class="st ok" aria-hidden="true"><svg class="ic sm" viewBox="0 0 24 24" style="stroke:currentColor"><use href="#i-check"/></svg></span>
+                <span class="target">Read ~/.local/share/zed/conversations/session_01J9.jsonl</span>
+                <span class="meta num">214 行</span>
+                <span class="chev" aria-hidden="true"><svg class="ic sm"><use href="#i-chev-down"/></svg></span>
+              </button>
+              <div class="event-body" id="ev-read" hidden>{"version":1,"entries":[
+  {"kind":"user_message","content":"…"},
+  {"kind":"tool_call","name":"read_file","path":"src/…"}]}</div>
+            </div>
+
+            <div class="event done">
+              <button class="event-row" aria-expanded="false" aria-controls="ev-test">
+                <span class="st ok" aria-hidden="true"><svg class="ic sm" viewBox="0 0 24 24" style="stroke:currentColor"><use href="#i-check"/></svg></span>
+                <span class="target">Bash cargo test -p parsers --features test-utils</span>
+                <span class="meta num">48.3s</span>
+                <span class="chev" aria-hidden="true"><svg class="ic sm"><use href="#i-chev-down"/></svg></span>
+              </button>
+              <div class="event-body" id="ev-test" hidden>test result: ok. 214 passed; 0 failed; 3 ignored
+parsers::zinc::tests::roundtrip … ok
+parsers::codex::tests::wire_shape … ok</div>
+            </div>
+
+            <p class="dim" style="margin-top:0.625rem">矩阵初稿写在 <span class="code">docs/notes/zed-conversion-matrix.md</span>，建议先看 tool call 一列， reasoning 块的取舍我留了空。</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="composer-wrap">
+        <div class="composer-inner">
+          <div class="composer">
+            <div class="in" id="composerIn" aria-label="消息输入">输入消息，或者粘贴一段 JSONL…</div>
+            <div class="bar">
+              <button class="cctl" aria-label="添加附件"><svg class="ic sm" aria-hidden="true"><use href="#i-paperclip"/></svg></button>
+              <div class="pop-anchor">
+                <button class="cctl" id="bindingBtn" aria-expanded="false" aria-controls="bindingPop" aria-haspopup="dialog">
+                  <span class="hglyph" aria-hidden="true">CC</span> Claude Code <svg class="ic sm" aria-hidden="true" style="width:0.75rem;height:0.75rem"><use href="#i-chev-down"/></svg>
+                </button>
+                <div class="popover" id="bindingPop" role="group" aria-label="启动配置" hidden>
+                  <h4>启动配置</h4>
+                  <div class="frow"><label for="sel-harness">Harness</label>
+                    <select id="sel-harness"><option selected>Claude Code</option><option>Codex CLI</option><option>Gemini CLI</option><option>OpenCode</option></select></div>
+                  <div class="frow"><label for="sel-profile">Profile</label>
+                    <select id="sel-profile"><option selected>zinc-porting</option><option>default</option></select></div>
+                  <div class="frow"><label for="sel-model">模型</label>
+                    <select id="sel-model"><option selected>GLM-5.3-Flash</option><option>GLM-5.3</option></select></div>
+                  <div class="frow"><label for="sel-sandbox">沙箱</label>
+                    <select id="sel-sandbox"><option selected>workspace-write</option><option>read-only</option></select></div>
+                  <div class="cont"><b>继续方式</b>：原生继续 — 同 Harness 直接恢复上次存档，由系统根据父存档点决定，不可手选。</div>
+                </div>
+              </div>
+              <button class="send" aria-label="发送消息" disabled><svg class="ic sm" aria-hidden="true"><use href="#i-arrow-up"/></svg></button>
+            </div>
+          </div>
+          <div class="composer-meta">
+            <span class="right" style="margin-left:auto">
+              <span class="hide-sm">zinc-porting</span>
+              <span class="num">上下文 38%</span>
+            </span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="statusbar">
+    <span class="mono">zinc-main</span>
+    <span class="num">✓ 4821 tests</span>
+    <span class="hide-sm">MCP 3/3</span>
+    <div class="right"><span class="hide-sm">中文</span><span class="num">100%</span></div>
+  </div>
+</div>
+
+  <p class="note" style="color:var(--muted);font-weight:500">Concept preview — validates direction, not final layout or component specification.（概念预览：验证方向，非最终布局或组件规格）</p>
+<p class="note">
+  <b>第一眼检查：</b>画布上只有「Agent 正在做什么」（一条回答 + 两条已完成工具事件）与「下一步在哪输入」（composer）。
+  没有常驻的 Execution Tree / 委派面板 / 统计卡 / 绑定栏。Harness 身份只在消息头与 composer 左下入口出现；
+  用户消息轻微抬升，Agent 内容直接排在画布上；已完成工具事件降级为灰色一行，可点开。
+</p>
+
+<script>
+  // 主题 / 字号
+  const themeBtn = document.getElementById('themeBtn');
+  themeBtn.addEventListener('click', () => {
+    const light = document.documentElement.dataset.pref === 'light';
+    document.documentElement.dataset.pref = light ? 'dark' : 'light';
+    themeBtn.setAttribute('aria-pressed', String(!light));
+    themeBtn.textContent = light ? '亮色' : '暗色';
+  });
+  const zoomBtn = document.getElementById('zoomBtn');
+  zoomBtn.addEventListener('click', () => {
+    const on = document.documentElement.classList.toggle('zoom-150');
+    zoomBtn.setAttribute('aria-pressed', String(on));
+  });
+  // 工具事件展开
+  document.querySelectorAll('.event-row[aria-controls]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const body = document.getElementById(btn.getAttribute('aria-controls'));
+      const open = btn.getAttribute('aria-expanded') === 'true';
+      btn.setAttribute('aria-expanded', String(!open));
+      body.hidden = open;
+    });
+  });
+  // Binding popover
+  const bindingBtn = document.getElementById('bindingBtn');
+  const bindingPop = document.getElementById('bindingPop');
+  function closePop() { bindingPop.hidden = true; bindingBtn.setAttribute('aria-expanded', 'false'); }
+  bindingBtn.addEventListener('click', () => {
+    const open = bindingBtn.getAttribute('aria-expanded') === 'true';
+    bindingPop.hidden = open;
+    bindingBtn.setAttribute('aria-expanded', String(!open));
+    if (!open) document.getElementById('sel-harness').focus();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !bindingPop.hidden) { closePop(); bindingBtn.focus(); }
+  });
+  document.addEventListener('click', e => {
+    if (!bindingPop.hidden && !e.target.closest('.pop-anchor')) closePop();
+  });
+</script>
+</body>
+</html>

@@ -199,7 +199,7 @@ describe("MessageInput (RichComposer integration)", () => {
     expect(fireEvent.mouseDown(card)).toBe(false)
   })
 
-  it("keeps the send control a round trailing button of the control bar", async () => {
+  it("keeps the send control as a neutral trailing button of the control bar", async () => {
     const { container } = renderInput({})
     await waitFor(() =>
       expect(container.querySelector('[role="textbox"]')).not.toBeNull()
@@ -208,9 +208,10 @@ describe("MessageInput (RichComposer integration)", () => {
       `button[title="${enMessages.Folder.chat.messageInput.send}"]`
     )
     expect(sendButton).not.toBeNull()
-    // ZCode-style control bar: the send affordance is the round trailing
-    // control (the running/stop state flips through the isPrompting branch).
-    expect(sendButton!.className).toContain("rounded-full")
+    // The running/stop state still flips through the isPrompting branch; the
+    // idle send action is deliberately neutral and square-cornered.
+    expect(sendButton!.className).toContain("rounded-md")
+    expect(sendButton!.className).toContain("bg-secondary")
   })
 
   it("renders the harness selector slot inline in the control bar", async () => {

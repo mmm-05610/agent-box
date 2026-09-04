@@ -348,11 +348,11 @@ export const SidebarConversationCard = memo(function SidebarConversationCard({
                 <div
                   className={cn(
                     "group relative flex h-[1.9375rem] w-full items-center",
-                    "rounded-full text-sidebar-foreground",
+                    "rounded-md text-sidebar-foreground",
                     "transition-colors duration-[120ms]",
                     isSelected
-                      ? "bg-sidebar-primary/8"
-                      : "hover:bg-[color-mix(in_oklab,var(--sidebar-accent),var(--sidebar-foreground)_2%)]"
+                      ? "bg-[var(--surface-active)]"
+                      : "hover:bg-[var(--surface-hover)]"
                   )}
                 >
                   <button
@@ -361,7 +361,7 @@ export const SidebarConversationCard = memo(function SidebarConversationCard({
                     onDoubleClick={handleDblClick}
                     className={cn(
                       "relative flex h-full min-w-0 flex-1 items-center gap-[0.625rem] text-left outline-none",
-                      "rounded-full",
+                      "rounded-md",
                       "pr-[0.25rem]"
                     )}
                     // Rail-axis-relative left padding (was a fixed `pl-7`): at depth 0
@@ -424,7 +424,7 @@ export const SidebarConversationCard = memo(function SidebarConversationCard({
                     <span
                       className={cn(
                         "relative min-w-0 flex-1 truncate text-[0.875rem] font-normal",
-                        isOpenInTab && "text-primary"
+                        isOpenInTab && "text-foreground"
                       )}
                     >
                       {formatConversationTitle(conversation.title) ||

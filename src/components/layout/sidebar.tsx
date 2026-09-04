@@ -132,19 +132,19 @@ function SidebarNavButton({
       title={tooltip ?? label}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "group flex h-8 w-full items-center gap-[0.4375rem] rounded-full pl-[0.4375rem] pr-1.5",
+        "group flex h-8 w-full items-center gap-[0.4375rem] rounded-md pl-[0.4375rem] pr-1.5",
         "text-[0.875rem] text-sidebar-foreground outline-none",
-        "transition-colors duration-150 hover:bg-sidebar-accent",
+        "transition-colors duration-150 hover:bg-[var(--surface-hover)]",
         "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
-        active && "bg-sidebar-primary/8",
+        active && "bg-[var(--surface-active)]",
         disabled &&
-          "cursor-not-allowed text-muted-foreground/60 opacity-70 hover:bg-transparent"
+          "cursor-not-allowed text-muted-foreground opacity-100 hover:bg-transparent"
       )}
     >
       <Icon
         className={cn(
           "h-[0.875rem] w-[0.875rem] shrink-0 text-muted-foreground",
-          disabled && "text-muted-foreground/60"
+          disabled && "text-muted-foreground"
         )}
       />
       <span className="truncate">{label}</span>
@@ -177,11 +177,11 @@ function SidebarViewPill({
       title={label}
       aria-pressed={active}
       className={cn(
-        "flex h-6 cursor-pointer items-center gap-1 rounded-full px-2",
+        "flex h-6 cursor-pointer items-center gap-1 rounded-md px-2",
         "text-[0.75rem] outline-none transition-colors duration-150",
         "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
         active
-          ? "bg-accent text-accent-foreground"
+          ? "bg-[var(--surface-active)] text-foreground"
           : "text-muted-foreground hover:text-sidebar-foreground"
       )}
     >
@@ -565,7 +565,7 @@ export function Sidebar() {
             清理图标占位。默认激活“项目”；“分组”本期限留视觉位（点击提示
             即将上线）。 */}
         <div className="mt-1.5 flex h-7 items-center justify-between gap-1">
-          <div className="flex items-center gap-0.5 rounded-full bg-sidebar-accent/50 p-0.5">
+          <div className="flex items-center gap-0.5 rounded-md bg-[var(--surface-hover)] p-0.5">
             <SidebarViewPill
               icon={Hash}
               label={t("groupView")}
@@ -642,9 +642,9 @@ export function Sidebar() {
             type="button"
             onClick={handleOpenTasks}
             className={cn(
-              "flex h-7 w-full cursor-pointer items-center rounded-full px-[0.4375rem]",
+              "flex h-7 w-full cursor-pointer items-center rounded-md px-[0.4375rem]",
               "text-xs text-muted-foreground outline-none",
-              "transition-colors duration-150 hover:bg-sidebar-accent",
+              "transition-colors duration-150 hover:bg-[var(--surface-hover)]",
               "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
             )}
           >

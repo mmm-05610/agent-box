@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>预览 1 · App Shell — Agent-Box Studio</title>
+<link rel="stylesheet" href="./_kit.css">
+</head>
+<body>
+
+<div class="console">
+  <div class="name">预览 1 · <em>App Shell</em></div>
+  <div class="dials">warmcharcoal · VARIANCE 4 · MOTION 3 · DENSITY 6</div>
+  <div class="spacer"></div>
+  <button class="cbtn" id="themeBtn" aria-pressed="false">☀ 亮色</button>
+  <button class="cbtn" id="zoomBtn" aria-pressed="false">A 150%</button>
+</div>
+
+<div class="app">
+  <!-- 桌面标题栏 -->
+  <div class="titlebar">
+    <div class="lights" aria-hidden="true"><i></i><i></i><i></i></div>
+    <div class="title">Agent-Box Studio</div>
+    <div class="winctl" aria-hidden="true">— ▢ ✕</div>
+  </div>
+
+  <!-- 顶栏：面包屑 + ctx chip 全 pill -->
+  <div class="topbar">
+    <div class="logo" aria-hidden="true">A</div>
+    <div class="crumb"><span class="hide-sm">agent-box-studio</span> › <b>下载并解析 Zed 的会话格式</b></div>
+    <div class="chip hide-sm"><span class="mono">~/projects/agent-box-studio</span> <span class="dot">@</span> wsl:Ubuntu</div>
+    <div class="chip"><span class="mono">⎇ studio-shell</span> ▾</div>
+    <div class="right">
+      <button class="sq" aria-label="切换侧栏" aria-pressed="true">◧</button>
+      <button class="sq" aria-label="切换终端">▤</button>
+      <button class="sq on" aria-label="切换辅助面板" aria-pressed="true">◨</button>
+      <button class="sq" aria-label="设置">⚙</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <!-- 侧栏：与主区同底色 -->
+    <aside class="sidebar">
+      <button class="row"><span class="ic" aria-hidden="true">⊕</span> 新建会话 <span class="kbd">Ctrl+N</span></button>
+      <button class="row"><span class="ic" aria-hidden="true">⌕</span> 搜索 <span class="kbd">Ctrl+K</span></button>
+      <button class="row"><span class="ic" aria-hidden="true">◷</span> 自动化 <span class="tail"><span class="count-chip">2</span></span></button>
+
+      <div class="view-switch">
+        <div class="vs-pill" role="group" aria-label="列表视图">
+          <button aria-pressed="false">分组</button>
+          <button aria-pressed="true">项目</button>
+        </div>
+        <button class="mini" aria-label="排序方式">⇅</button>
+      </div>
+
+      <div class="label">项目 · agent-box-studio</div>
+      <button class="row active conv" aria-current="true">
+        <span class="live-dot" aria-hidden="true"></span>
+        <span class="title-text">解析 Zed 会话 JSONL 的执行树投影</span>
+        <span class="time">运行中</span>
+      </button>
+      <button class="row conv sub"><span class="title-text">迁移 agent-box 三套会话格式到统一转写</span><span class="time">2 小时</span></button>
+      <button class="row conv sub"><span class="title-text">Codeg 分层架构解剖与 AgentBox 后端整合</span><span class="time">昨天</span></button>
+
+      <div class="label">项目 · agent-box-resource-router</div>
+      <button class="row conv sub"><span class="title-text">路由表缓存与热更新策略</span><span class="time">3 天</span></button>
+      <button class="row conv sub"><span class="title-text">会话导入的 JSONL 校验规则</span><span class="time">上周</span></button>
+
+      <div class="label">任务</div>
+      <button class="row"><span class="ic" aria-hidden="true">✓</span> 审阅多 Harness 分支预览 <span class="tail"><span class="count-chip">3/5</span></span></button>
+      <button class="row"><span class="ic" aria-hidden="true">◔</span> 回归 parsers 快照 <span class="tail"><span class="count-chip">1</span></span></button>
+
+      <div class="side-spacer"></div>
+      <div class="account">
+        <span class="avatar" aria-hidden="true">M</span>
+        <span class="title-text">maoqh</span>
+        <span class="badge-lite">本地</span>
+        <span class="tail"><button class="sq" aria-label="账户菜单">▤</button><button class="sq" aria-label="账户设置">⚙</button></span>
+      </div>
+    </aside>
+
+    <!-- 会话列 -->
+    <section class="chat">
+      <div class="strip quiet" role="status">
+        <span class="spin" aria-hidden="true"></span>
+        <span class="txt">会话恢复中 · 已从 JSONL 回放 42 条消息…</span>
+        <span class="mono" style="margin-left:auto;flex:none">6 分 12 秒</span>
+      </div>
+
+      <div class="stream">
+        <div class="msg user">把 Zed 的会话格式和我们的五套 harness 对一遍，输出一张转换矩阵，重点看 tool call 的无损性。</div>
+
+        <div class="msg ai">
+          <div class="agent-line"><span class="hglyph" title="Claude Code">CC<span class="pid c1" aria-hidden="true"></span></span> Claude Code · studio-shell</div>
+          <p>已读取 Zed 的 <span class="code">session.jsonl</span> 与本地三套 parser。Zed 用单文件 JSONL、每行一个事件，tool call 内嵌在 <span class="code">Message.content</span> 数组里；这和我们 <span class="code">parsers/</code> 的分文件结构不同，但事件粒度可以对齐。</p>
+          <p class="dim">先跑一次无损往返验证，再给转换矩阵。</p>
+
+          <button class="toolchip" aria-expanded="false">
+            <span class="st ok" aria-hidden="true">✓</span>
+            <span class="sum">Read ~/.local/share/zed/conversations/session_01J9.jsonl · 214 lines</span>
+            <span class="st">↕</span>
+          </button>
+          <button class="toolchip running" aria-expanded="false">
+            <span class="spin" aria-hidden="true"></span>
+            <span class="sum shimmer">Bash cargo test -p parsers --features test-utils</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="queue-chip">
+        <span class="n" aria-hidden="true">≡ 1</span>
+        <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">再补一列「是否保留 reasoning 块」</span>
+        <span style="margin-left:auto" class="n tail-acts">编辑 · 上移 · 删除</span>
+      </div>
+
+      <div class="composer">
+        <div class="composer-input"><span class="typed">矩阵里加一列</span><span class="caret" aria-hidden="true"></span></div>
+        <div class="composer-controls">
+          <button class="ctl" aria-label="添加附件">＋ 附件</button>
+          <button class="ctl" aria-label="权限模式：普通">盾 普通 ▾</button>
+          <button class="ctl push" aria-label="模型选择"><span class="mono">GLM-5.3-Flash</span> ▾</button>
+          <button class="ctl hide-sm" aria-label="推理力度">权衡 ▾</button>
+          <button class="send" aria-label="发送消息">↑</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- 状态栏 -->
+  <div class="statusbar">
+    <span class="mono">⎇ studio-shell</span>
+    <span class="ok">✓ 4800 tests</span>
+    <span class="hide-sm">MCP 已连接</span>
+    <span class="hide-sm">2 个自动化</span>
+    <div class="right"><span>中文</span><span class="mono">100%</span></div>
+  </div>
+</div>
+
+<p class="note">
+  <b>检查要点：</b>侧栏与主区同底色，只靠 1px hairline 分区；琥珀只出现在 logo、当前会话、live-dot、发送按钮、focus ring 五处；
+  等宽字体只用于路径、快捷键、分支、时长与测试计数（<span class="mono">tabular-nums</span>）；
+  自动重试条（顶部细线）与致命错误条（左缘 2px 实底，见预览 2）在重量上分级。
+</p>
+
+<script>
+  const themeBtn = document.getElementById('themeBtn');
+  const zoomBtn = document.getElementById('zoomBtn');
+  themeBtn.addEventListener('click', () => {
+    const light = document.documentElement.dataset.pref === 'light';
+    document.documentElement.dataset.pref = light ? 'dark' : 'light';
+    themeBtn.setAttribute('aria-pressed', String(!light));
+    themeBtn.textContent = light ? '☀ 亮色' : '☾ 暗色';
+  });
+  zoomBtn.addEventListener('click', () => {
+    const on = document.documentElement.classList.toggle('zoom-150');
+    zoomBtn.setAttribute('aria-pressed', String(on));
+  });
+</script>
+</body>
+</html>

@@ -153,7 +153,7 @@ describe("AgentToolCallPart title", () => {
     // The settled card must not read as "the sub-agent finished": codex only
     // acknowledged the launch, and an async child may still be working.
     // Completed capsules mount collapsed; expand to see the body.
-    fireEvent.click(screen.getByRole("button", { name: "Completed" }))
+    fireEvent.click(screen.getByRole("button", { name: /Completed$/ }))
     expect(screen.getByText(/reports no further progress/)).toBeInTheDocument()
   })
 
@@ -167,7 +167,7 @@ describe("AgentToolCallPart title", () => {
       ),
       output: "Mapped 12 files.",
     })
-    fireEvent.click(screen.getByRole("button", { name: "Completed" }))
+    fireEvent.click(screen.getByRole("button", { name: /Completed$/ }))
     expect(screen.getByText("Mapped 12 files.")).toBeInTheDocument()
     expect(
       screen.queryByText(/reports no further progress/)
@@ -201,8 +201,9 @@ describe("AgentToolCallPart cursor task outcome envelope", () => {
     })
     expect(screen.getByText("39.9s")).toBeInTheDocument()
     // The folded duration has no body, so the capsule is a static "Completed"
-    // chip (not an expandable button) and the raw envelope never renders.
-    expect(screen.getByLabelText("Completed")).toBeInTheDocument()
+    // static event row (not an expandable button) and the raw envelope never
+    // renders. The accessible name retains both the visible title and status.
+    expect(screen.getByLabelText(/, Completed$/)).toBeInTheDocument()
     expect(screen.queryByText(/durationMs/)).not.toBeInTheDocument()
     expect(screen.queryByText(/isBackground/)).not.toBeInTheDocument()
   })
@@ -215,7 +216,7 @@ describe("AgentToolCallPart cursor task outcome envelope", () => {
     expect(screen.getByText(/Invalid arguments:/)).toBeInTheDocument()
     expect(screen.queryByText(/{"error"/)).not.toBeInTheDocument()
     // The capsule reports Error, not Completed.
-    expect(screen.getByLabelText("Error")).toBeInTheDocument()
+    expect(screen.getByLabelText(/, Error$/)).toBeInTheDocument()
   })
 
   it("shows a background launch as still running instead of Completed", () => {
@@ -225,7 +226,7 @@ describe("AgentToolCallPart cursor task outcome envelope", () => {
     })
     // The completion envelope only acknowledges the launch: the pill carries
     // the running label…
-    const trigger = screen.getByLabelText("Running in background")
+    const trigger = screen.getByLabelText(/, Running in background$/)
     // …and the body shows the visible running indicator, not raw JSON.
     fireEvent.click(trigger)
     expect(screen.getByText("Running in background")).toBeInTheDocument()
@@ -243,7 +244,7 @@ describe("AgentToolCallPart cursor task outcome envelope", () => {
       output: '{"error":"not an envelope"}',
     })
     expect(screen.queryByLabelText("Error")).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole("button", { name: "Completed" }))
+    fireEvent.click(screen.getByRole("button", { name: /Completed$/ }))
     expect(screen.getByText(/not an envelope/)).toBeInTheDocument()
   })
 
@@ -256,7 +257,7 @@ describe("AgentToolCallPart cursor task outcome envelope", () => {
       output: "All 3 checks passed.",
     })
     // Completed non-error capsules mount collapsed; expand to see the body.
-    fireEvent.click(screen.getByRole("button", { name: "Completed" }))
+    fireEvent.click(screen.getByRole("button", { name: /Completed$/ }))
     expect(screen.getByText("All 3 checks passed.")).toBeInTheDocument()
   })
 
@@ -292,7 +293,7 @@ describe("AgentToolCallPart live subagent transcript", () => {
   /** The capsule body is collapsed by default while running (matching the
    *  existing child-tool-call UX) — expand it via the pill trigger. */
   const expandRunningCapsule = () =>
-    fireEvent.click(screen.getByRole("button", { name: "Running" }))
+    fireEvent.click(screen.getByRole("button", { name: /Running$/ }))
 
   it("renders text and thinking entries while running", () => {
     renderCard(
@@ -321,7 +322,7 @@ describe("AgentToolCallPart live subagent transcript", () => {
       { type: "text", text: "stale transcript" },
     ])
     renderCard({ ...settled, output: "final result" })
-    fireEvent.click(screen.getByRole("button", { name: "Completed" }))
+    fireEvent.click(screen.getByRole("button", { name: /Completed$/ }))
     expect(screen.queryByText("stale transcript")).not.toBeInTheDocument()
     expect(screen.getByText("final result")).toBeInTheDocument()
   })
@@ -361,7 +362,7 @@ describe("AgentToolCallPart grok live progress", () => {
         },
       })
     )
-    fireEvent.click(screen.getByRole("button", { name: "Running" }))
+    fireEvent.click(screen.getByRole("button", { name: /Running$/ }))
     expect(
       screen.getByText("7 tool calls · 1 turns · 4.2s · context 12%")
     ).toBeInTheDocument()
@@ -373,7 +374,7 @@ describe("AgentToolCallPart grok live progress", () => {
         grokSubagentProgress: { toolCallCount: 3, contextUsagePct: "nope" },
       })
     )
-    fireEvent.click(screen.getByRole("button", { name: "Running" }))
+    fireEvent.click(screen.getByRole("button", { name: /Running$/ }))
     expect(screen.getByText("3 tool calls")).toBeInTheDocument()
   })
 
@@ -387,7 +388,7 @@ describe("AgentToolCallPart grok live progress", () => {
       meta: { grokSubagentProgress: { toolCallCount: 9 } },
     }
     renderCard(part)
-    fireEvent.click(screen.getByRole("button", { name: "Completed" }))
+    fireEvent.click(screen.getByRole("button", { name: /Completed$/ }))
     expect(screen.queryByText(/9 tool calls/)).not.toBeInTheDocument()
     expect(screen.getByText("final result")).toBeInTheDocument()
   })
@@ -431,7 +432,7 @@ describe("AgentToolCallPart child session action", () => {
         },
       },
     })
-    fireEvent.click(screen.getByRole("button", { name: "Running" }))
+    fireEvent.click(screen.getByRole("button", { name: /Running$/ }))
     expect(
       screen.getByRole("button", { name: "View sub-agent session" })
     ).toBeInTheDocument()
@@ -450,7 +451,7 @@ describe("AgentToolCallPart child session action", () => {
         child_session_id: "019fe6bf-0bcb-70c2-a02d-e5c006dfc32a",
       },
     })
-    fireEvent.click(screen.getByRole("button", { name: "Completed" }))
+    fireEvent.click(screen.getByRole("button", { name: /Completed$/ }))
     expect(
       screen.getByRole("button", { name: "View sub-agent session" })
     ).toBeInTheDocument()
@@ -466,7 +467,7 @@ describe("AgentToolCallPart child session action", () => {
       ),
       output: "final result",
     })
-    fireEvent.click(screen.getByRole("button", { name: "Completed" }))
+    fireEvent.click(screen.getByRole("button", { name: /Completed$/ }))
     expect(
       screen.queryByRole("button", { name: "View sub-agent session" })
     ).not.toBeInTheDocument()

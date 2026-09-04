@@ -259,9 +259,9 @@ export const ProjectRow = memo(function ProjectRow({
             <div
               className={cn(
                 "group flex h-[1.9375rem] w-full items-center",
-                "rounded-full",
+                "rounded-md",
                 "transition-colors duration-150",
-                "hover:bg-[color-mix(in_oklab,var(--sidebar-accent),var(--sidebar-foreground)_2%)]"
+                "hover:bg-[var(--surface-hover)]"
               )}
             >
               <button
@@ -271,7 +271,7 @@ export const ProjectRow = memo(function ProjectRow({
                 aria-expanded={expanded}
                 className={cn(
                   "relative flex h-full min-w-0 flex-1 items-center pr-[0.5rem] outline-none",
-                  "rounded-full focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
+                  "rounded-md focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-workbench)] focus-visible:ring-inset",
                   "text-sidebar-foreground cursor-pointer"
                 )}
                 style={{
@@ -354,8 +354,7 @@ export const ProjectRow = memo(function ProjectRow({
                         "inline-flex shrink-0 items-center justify-center",
                         "h-[0.9375rem] min-w-[1rem] rounded-[0.3125rem] px-[0.25rem]",
                         "text-[0.625rem] font-semibold leading-none tabular-nums",
-                        "bg-amber-500/12 text-amber-700",
-                        "dark:bg-amber-400/15 dark:text-amber-300"
+                        "bg-[var(--surface-hover)] text-[var(--text-faint)]"
                       )}
                     >
                       <span aria-hidden>{runningCount}</span>
@@ -720,11 +719,11 @@ export const ProjectConversationRow = memo(function ProjectConversationRow({
             <div
               className={cn(
                 "group relative flex h-[1.9375rem] w-full items-center",
-                "rounded-full text-sidebar-foreground",
+                "rounded-md text-sidebar-foreground",
                 "transition-colors duration-[120ms]",
                 isSelected
-                  ? "bg-sidebar-primary/8"
-                  : "hover:bg-[color-mix(in_oklab,var(--sidebar-accent),var(--sidebar-foreground)_2%)]"
+                  ? "bg-[var(--surface-active)]"
+                  : "hover:bg-[var(--surface-hover)]"
               )}
             >
               <button
@@ -733,7 +732,7 @@ export const ProjectConversationRow = memo(function ProjectConversationRow({
                 onDoubleClick={handleDblClick}
                 className={cn(
                   "relative flex h-full min-w-0 flex-1 items-center gap-[0.625rem] text-left outline-none",
-                  "rounded-full",
+                  "rounded-md",
                   "pr-[0.25rem]"
                 )}
                 // 项目行下方一级缩进：状态点的轴 = 项目行标题的起始位置
@@ -760,7 +759,7 @@ export const ProjectConversationRow = memo(function ProjectConversationRow({
                 <span
                   className={cn(
                     "relative min-w-0 flex-1 truncate text-[0.875rem] font-normal",
-                    isOpenInTab && "text-primary"
+                    isOpenInTab && "text-foreground"
                   )}
                 >
                   {formatConversationTitle(conversation.title) ||

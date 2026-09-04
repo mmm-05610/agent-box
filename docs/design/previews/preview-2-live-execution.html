@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>预览 2 · 真实执行过程 — Agent-Box Studio</title>
+<link rel="stylesheet" href="./_kit.css">
+</head>
+<body>
+
+<svg style="display:none" aria-hidden="true">
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+  <symbol id="i-chev-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1 1 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></symbol>
+  <symbol id="i-paperclip" viewBox="0 0 24 24"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></symbol>
+  <symbol id="i-arrow-up" viewBox="0 0 24 24"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></symbol>
+  <symbol id="i-panel-left" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></symbol>
+  <symbol id="i-terminal" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="m8 9 3 3-3 3"/><path d="M13 15h4"/></symbol>
+  <symbol id="i-panel-right" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></symbol>
+</svg>
+
+<div class="console">
+  <div class="name">预览 2 · <em>真实执行过程</em></div>
+  <div class="dials">Level 1 contextual · 完成即降级</div>
+  <div class="spacer"></div>
+  <button class="cbtn" id="themeBtn" aria-pressed="false">亮色</button>
+  <button class="cbtn" id="zoomBtn" aria-pressed="false">150%</button>
+</div>
+
+<div class="app">
+  <div class="titlebar">
+    <div class="lights" aria-hidden="true"><i></i><i></i><i></i></div>
+    <div class="title">Agent-Box Studio</div>
+    <div class="winctl" aria-hidden="true">— ▢ ✕</div>
+  </div>
+
+  <div class="topbar">
+    <button class="tbtn" aria-label="切换侧栏" aria-pressed="true"><svg class="ic" aria-hidden="true"><use href="#i-panel-left"/></svg></button>
+    <div class="crumb"><span class="hide-sm">agent-box-studio</span><span class="sep" aria-hidden="true">›</span><b>解析 Zed 会话 JSONL 的执行树投影</b></div>
+    <span class="branch mono">zinc-main</span>
+    <div class="right">
+      <button class="tbtn" aria-label="打开终端" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-terminal"/></svg></button>
+      <button class="tbtn" aria-label="打开辅助面板" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-panel-right"/></svg></button>
+      <span class="vsep" aria-hidden="true"></span>
+      <button class="tbtn" aria-label="设置"><svg class="ic" aria-hidden="true"><use href="#i-settings"/></svg></button>
+    </div>
+  </div>
+
+  <!-- 可恢复连接问题：中性通知条，处理后消失 -->
+  <div class="notice" id="connNotice" role="status">
+    <span class="spin" aria-hidden="true"></span>
+    <span class="txt">与 codex-sidecar 的连接中断 · 第 2 次自动重试（8 秒）</span>
+    <button class="linkbtn" id="reconnectBtn">手动重连</button>
+  </div>
+
+  <section class="chat" style="flex:1;min-height:0;display:flex;flex-direction:column">
+    <div class="stream">
+      <div class="turn">
+        <div class="msg-user">跑一下 parsers 的测试；如果 zinc 格式的快照挂了，把差异贴给我。注意别更新快照。</div>
+
+        <div class="msg-ai">
+          <div class="agent-head"><span class="hglyph" title="Claude Code">CC</span><b>Claude Code</b><span aria-hidden="true">·</span>执行中</div>
+
+          <!-- 已完成 → 已降级：灰色一行，可点开 -->
+          <div class="event done">
+            <button class="event-row" aria-expanded="false" aria-controls="ev-ok">
+              <span class="st ok" aria-hidden="true"><svg class="ic sm" viewBox="0 0 24 24" style="stroke:currentColor"><use href="#i-check"/></svg></span>
+              <span class="target">Bash cargo test -p parsers --features test-utils</span>
+              <span class="meta num">48.3s</span>
+              <span class="chev" aria-hidden="true"><svg class="ic sm"><use href="#i-chev-down"/></svg></span>
+            </button>
+            <div class="event-body" id="ev-ok" hidden>test result: ok. 213 passed; 1 failed; 3 ignored
+parsers::zinc::tests::roundtrip_118 … FAILED</div>
+          </div>
+
+          <!-- 失败：红叉在图标位，文本保持中性；展开看差异 -->
+          <div class="event">
+            <button class="event-row" aria-expanded="false" aria-controls="ev-err">
+              <span class="st err" aria-hidden="true"><svg class="ic sm" viewBox="0 0 24 24" style="stroke:currentColor"><use href="#i-x"/></svg></span>
+              <span class="target">Read parsers/zinc/fixtures/snapshot.snap · 断言失败</span>
+              <span class="chev" aria-hidden="true"><svg class="ic sm"><use href="#i-chev-down"/></svg></span>
+            </button>
+            <div class="event-body error" id="ev-err" hidden>assertion failed: snapshot line 118
+  left:  "role":"user","kind":"zinc","turn_id":"01J9ZK"
+ right:  "role":"assistant","kind":"zinc","turn_id":"01J9ZK"
+zinc 在 118 行把 turn 归属写反，与 wire-shape 宽容解析预期不符。</div>
+          </div>
+
+          <!-- 正在执行：spinner + shimmer -->
+          <div class="event">
+            <div class="event-row" role="status" aria-label="正在运行 cargo insta review">
+              <span class="spin" aria-hidden="true"></span>
+              <span class="target shimmer">Bash cargo insta review --snapshot zinc@118</span>
+            </div>
+          </div>
+
+          <p class="dim">差异确认后需要你决定是否更新快照（见下方请求）。</p>
+        </div>
+
+        <!-- 权限请求：等待时唯一的琥珀时刻；处理后降级为普通事件行 -->
+        <div class="perm" id="permCard" role="group" aria-label="权限请求">
+          <div class="head"><svg class="ic sm" aria-hidden="true" style="stroke:currentColor"><use href="#i-shield"/></svg> Claude Code 请求更新快照</div>
+          <div class="cmd">cargo insta accept --snapshot parsers::zinc@118
+# 1 个文件 · parsers/zinc/fixtures/snapshot.snap</div>
+          <div class="opts" role="radiogroup" aria-label="允许范围">
+            <label class="opt"><input type="radio" name="perm-scope" checked> 仅本次</label>
+            <label class="opt"><input type="radio" name="perm-scope"> 本会话内允许 cargo insta</label>
+            <label class="opt"><input type="radio" name="perm-scope"> 总是询问</label>
+          </div>
+          <div class="foot">
+            <button class="btn primary" id="permApprove">批准</button>
+            <button class="btn" id="permDeny">拒绝</button>
+            <span class="hint">Enter 批准 · Esc 拒绝</span>
+          </div>
+        </div>
+
+        <!-- 队列摘要：一行文字 -->
+        <div class="queue-line">
+          <span class="n num">排队 1 条</span>
+          <span class="q">把转换矩阵的 zinc 行标红</span>
+          <span class="acts">
+            <button class="linkbtn">编辑</button>
+            <button class="linkbtn">上移</button>
+            <button class="linkbtn">删除</button>
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div class="composer-wrap">
+      <div class="composer-inner">
+        <div class="composer">
+          <div class="in" aria-label="消息输入"><span class="typed">先别 accept，等 codex 侧交叉验证回来再</span><span class="caret" aria-hidden="true"></span></div>
+          <div class="bar">
+            <button class="cctl" aria-label="添加附件"><svg class="ic sm" aria-hidden="true"><use href="#i-paperclip"/></svg></button>
+            <button class="cctl"><span class="hglyph" aria-hidden="true">CC</span> Claude Code <svg class="ic sm" aria-hidden="true" style="width:0.75rem;height:0.75rem"><use href="#i-chev-down"/></svg></button>
+            <button class="send" aria-label="发送消息"><svg class="ic sm" aria-hidden="true"><use href="#i-arrow-up"/></svg></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="statusbar">
+    <span class="mono">zinc-main</span>
+    <span class="num">✓ 4821 tests</span>
+    <span class="hide-sm">MCP 3/3</span>
+    <div class="right"><span class="hide-sm">中文</span><span class="num">100%</span></div>
+  </div>
+</div>
+
+  <p class="note" style="color:var(--muted);font-weight:500">Concept preview — validates direction, not final layout or component specification.（概念预览：验证方向，非最终布局或组件规格）</p>
+<p class="note">
+  <b>检查要点：</b>正在执行、失败、等待三类状态都在消息流内自然出现，页面没有被做成工具仪表盘；
+  琥珀只出现在权限请求（左缘 2px + 批准按钮），其余状态靠图标 + 文本，不靠色块；
+  已完成工具事件已降级为灰色一行；权限处理后降级为一条普通历史行（点「批准 / 拒绝」可见）；
+  顶部连接问题是中性通知条，重连成功后自动消失。
+</p>
+
+<script>
+  const themeBtn = document.getElementById('themeBtn');
+  themeBtn.addEventListener('click', () => {
+    const light = document.documentElement.dataset.pref === 'light';
+    document.documentElement.dataset.pref = light ? 'dark' : 'light';
+    themeBtn.setAttribute('aria-pressed', String(!light));
+    themeBtn.textContent = light ? '亮色' : '暗色';
+  });
+  const zoomBtn = document.getElementById('zoomBtn');
+  zoomBtn.addEventListener('click', () => {
+    const on = document.documentElement.classList.toggle('zoom-150');
+    zoomBtn.setAttribute('aria-pressed', String(on));
+  });
+  document.querySelectorAll('.event-row[aria-controls]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const body = document.getElementById(btn.getAttribute('aria-controls'));
+      const open = btn.getAttribute('aria-expanded') === 'true';
+      btn.setAttribute('aria-expanded', String(!open));
+      body.hidden = open;
+    });
+  });
+  // 权限处理 → 降级
+  const permCard = document.getElementById('permCard');
+  function resolvePerm(label) {
+    const scope = document.querySelector('input[name="perm-scope"]:checked').parentElement.textContent.trim();
+    const when = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+    const row = document.createElement('div');
+    row.className = 'perm-resolved';
+    row.setAttribute('role', 'status');
+    row.innerHTML =
+      (label === '已批准'
+        ? '<svg class="ic sm" aria-hidden="true" style="stroke:currentColor;color:var(--faint)"><use href="#i-check"/></svg>'
+        : '<svg class="ic sm" aria-hidden="true" style="stroke:currentColor;color:var(--faint)"><use href="#i-x"/></svg>') +
+      '<span>' + label + ' · ' + scope + '</span>' +
+      '<span class="target">cargo insta accept parsers::zinc@118</span>' +
+      '<span class="meta num">' + when + '</span>';
+    permCard.replaceWith(row);
+  }
+  document.getElementById('permApprove').addEventListener('click', () => resolvePerm('已批准'));
+  document.getElementById('permDeny').addEventListener('click', () => resolvePerm('已拒绝'));
+  // 连接恢复 → 成功提示 → 自动消失
+  const connNotice = document.getElementById('connNotice');
+  document.getElementById('reconnectBtn').addEventListener('click', () => {
+    connNotice.innerHTML =
+      '<svg class="ic sm" aria-hidden="true" style="stroke:currentColor;color:var(--ok)"><use href="#i-check"/></svg>' +
+      '<span class="txt">已重新连接 · codex-sidecar 恢复正常</span>';
+    connNotice.setAttribute('role', 'status');
+    setTimeout(() => connNotice.remove(), 2400);
+  });
+</script>
+</body>
+</html>

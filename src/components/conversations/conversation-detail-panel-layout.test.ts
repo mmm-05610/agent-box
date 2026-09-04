@@ -160,7 +160,7 @@ describe("ConversationDetailPanel new conversation layout", () => {
 
     const pickerWrapper = messageInputSource.slice(pickerStart, pickerEnd)
     expect(messageInputSource).toContain(
-      '"overflow-hidden rounded-xl transition-colors"'
+      '"overflow-hidden rounded-lg transition-colors"'
     )
     expect(messageInputSource).not.toContain("bg-muted/60")
     expect(messageInputSource).toContain(': "contents"')
@@ -169,10 +169,10 @@ describe("ConversationDetailPanel new conversation layout", () => {
     // attached folder-branch-picker treatment still adds a solid surface
     // (`bg-background`, which goes transparent to reveal a workspace-bg image via
     // `ws-transparent-bg` instead of frosting) + the inset focus ring on top.
-    // The resting border is `border-foreground/20` (a touch darker than the
-    // near-invisible default `border-input`, and legible over a background image).
+    // The resting border uses the theme's low-contrast `border` token and stays
+    // legible over a background image.
     expect(messageInputSource).toContain(
-      "rounded-xl border border-foreground/20 bg-transparent transition-colors"
+      "rounded-lg border border-border bg-transparent transition-colors"
     )
     expect(messageInputSource).toContain(
       '"bg-background ws-transparent-bg focus-within:border-ring focus-within:ring-[3px] focus-within:ring-inset focus-within:ring-ring/50"'
@@ -181,7 +181,7 @@ describe("ConversationDetailPanel new conversation layout", () => {
     expect(pickerWrapper).not.toContain("bg-muted/30")
     expect(pickerWrapper).toContain("pt-1")
     expect(pickerWrapper).not.toContain("py-1")
-    expect(pickerWrapper).toContain("rounded-b-xl")
+    expect(pickerWrapper).toContain("rounded-b-lg")
     // The row only renders while attached below the composer, so the detached
     // `mt-1.5` else-branch is gone; it always takes the rounded-bottom box.
     expect(pickerWrapper).not.toContain("mt-1.5")

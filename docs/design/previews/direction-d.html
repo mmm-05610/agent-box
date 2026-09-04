@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>方向 D · ZCode 对照定稿</title>
+<style>
+  :root {
+    --page: #141414;
+    --bg: #1c1c1a;            /* 暖调炭黑，侧栏与主区同底色 */
+    --raise: #232322;         /* 悬浮面板 / composer */
+    --bubble: #2e2e2c;        /* 用户气泡 */
+    --border: rgba(255, 255, 255, 0.07);
+    --border-strong: rgba(255, 255, 255, 0.12);
+    --fg: #ececea;
+    --muted: #9c9c98;
+    --faint: #6e6e6a;
+    --accent: #eda23a;        /* 琥珀，唯一品牌 accent */
+    --accent-soft: rgba(237, 162, 58, 0.12);
+    --ok: #4cc38a;            /* 绿色仅表语义：通过/成功 */
+    --radius-pill: 999px;
+    --radius-panel: 14px;
+    --radius-row: 8px;
+    --font-sans: system-ui, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    --font-mono: ui-monospace, "JetBrains Mono", Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--page); color: var(--fg);
+    font-family: var(--font-sans); font-size: 14px; line-height: 1.5;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 32px 24px 64px; gap: 20px;
+  }
+  .spec { width: 1240px; max-width: 100%; display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
+  .spec-name { font-size: 18px; font-weight: 600; }
+  .spec-name em { font-style: normal; color: var(--accent); }
+  .spec-dials {
+    font-family: var(--font-mono); font-size: 11px; color: var(--muted);
+    border: 1px solid var(--border-strong); border-radius: 999px; padding: 4px 12px;
+  }
+  .swatches { display: flex; gap: 8px; margin-left: auto; }
+  .sw { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .sw i { width: 28px; height: 28px; border-radius: 8px; border: 1px solid var(--border-strong); display: block; }
+  .sw span { font-size: 10px; color: var(--faint); font-family: var(--font-mono); }
+  .specimen {
+    width: 1240px; max-width: 100%; font-size: 12px; color: var(--muted);
+    display: flex; gap: 24px; align-items: baseline; flex-wrap: wrap;
+    border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 10px 2px;
+  }
+  .specimen b { color: var(--fg); font-weight: 500; }
+  .specimen .mono { font-family: var(--font-mono); }
+
+  .app {
+    width: 1240px; max-width: 100%; height: 700px;
+    background: var(--bg);
+    border: 1px solid var(--border-strong);
+    border-radius: 12px; overflow: hidden;
+    display: flex; flex-direction: column;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+  }
+
+  /* ===== 顶栏 ===== */
+  .topbar {
+    height: 52px; flex: none; display: flex; align-items: center; gap: 10px;
+    padding: 0 14px; border-bottom: 1px solid var(--border);
+  }
+  .logo {
+    width: 26px; height: 26px; border-radius: 7px; background: var(--raise);
+    display: grid; place-items: center; font-weight: 700; font-size: 13px;
+  }
+  .nav-arrow { color: var(--muted); font-size: 14px; width: 22px; text-align: center; }
+  .pill-upd {
+    background: var(--accent-soft); color: var(--accent);
+    font-size: 12px; border-radius: 999px; padding: 3px 12px; font-weight: 500;
+  }
+  .topbar-title { font-weight: 600; font-size: 14.5px; margin-left: 6px; white-space: nowrap; }
+  .ctx-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    color: var(--muted); font-size: 12.5px;
+    background: var(--raise); border-radius: 999px; padding: 4px 12px;
+    white-space: nowrap;
+  }
+  .ctx-chip .dot { color: var(--faint); }
+  .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 8px; color: var(--muted); }
+  .sq {
+    width: 28px; height: 28px; border-radius: 8px;
+    display: grid; place-items: center; font-size: 13px;
+  }
+  .sq:hover { background: var(--raise); }
+
+  /* ===== 主体 ===== */
+  .main { flex: 1; display: flex; min-height: 0; }
+  .sidebar {
+    width: 296px; flex: none;
+    display: flex; flex-direction: column;
+    padding: 12px 10px 0;
+    border-right: 1px solid var(--border);
+  }
+  .nav-row {
+    height: 34px; display: flex; align-items: center; gap: 10px;
+    padding: 0 10px; border-radius: var(--radius-row);
+    color: var(--fg); font-size: 13.5px;
+  }
+  .nav-row .ic { color: var(--muted); width: 16px; text-align: center; }
+  .nav-row .kbd {
+    margin-left: auto; font-family: var(--font-mono); font-size: 10.5px; color: var(--faint);
+  }
+  .nav-row:hover { background: var(--raise); }
+  .view-switch {
+    margin: 10px 6px 8px; display: flex; align-items: center; gap: 4px;
+  }
+  .vs-pill {
+    display: flex; background: var(--raise); border-radius: 999px; padding: 3px;
+    font-size: 12.5px; flex: 1;
+  }
+  .vs-pill span { flex: 1; text-align: center; padding: 4px 0; border-radius: 999px; color: var(--muted); }
+  .vs-pill .on { background: #383836; color: var(--fg); }
+  .view-switch .mini { color: var(--faint); font-size: 13px; width: 22px; text-align: center; }
+  .side-label { font-size: 12px; color: var(--faint); padding: 10px 10px 6px; }
+  .proj {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px; border-radius: var(--radius-row);
+    color: var(--fg); font-size: 13.5px;
+  }
+  .proj .ic { color: var(--muted); }
+  .proj .sync { margin-left: auto; color: var(--faint); font-size: 12px; }
+  .proj:hover { background: var(--raise); }
+  .conv {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px 6px 26px; border-radius: var(--radius-row);
+    color: var(--muted); font-size: 13.5px;
+    white-space: nowrap; overflow: hidden;
+  }
+  .conv:hover { background: var(--raise); color: var(--fg); }
+  .conv .time { margin-left: auto; font-size: 11.5px; color: var(--faint); padding-left: 8px; }
+  .conv.active { color: var(--accent); background: var(--accent-soft); }
+  .conv.active .time { color: var(--accent); opacity: 0.7; }
+  .conv .live-dot {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex: none;
+  }
+  .divider-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px; border-radius: var(--radius-row);
+    color: var(--muted); font-size: 13.5px;
+  }
+  .divider-row .warn {
+    margin-left: auto; color: var(--faint);
+    width: 15px; height: 15px; border-radius: 50%; border: 1px solid var(--border-strong);
+    display: grid; place-items: center; font-size: 9px;
+  }
+  .divider-row:hover { background: var(--raise); }
+  .side-spacer { flex: 1; }
+  .account {
+    border-top: 1px solid var(--border);
+    margin: 8px -10px 0; padding: 12px 20px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .avatar {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: var(--accent); color: #2b1c05;
+    display: grid; place-items: center; font-size: 12px; font-weight: 700;
+  }
+  .account .name { font-size: 13.5px; }
+  .badge-lite {
+    font-size: 10px; color: var(--muted);
+    border: 1px solid var(--border-strong); border-radius: 999px; padding: 1px 7px;
+  }
+  .account .right { margin-left: auto; display: flex; gap: 12px; color: var(--muted); font-size: 14px; }
+
+  /* ===== 会话列 ===== */
+  .chat { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg); }
+  .stream { flex: 1; overflow: hidden; padding: 26px 30px; display: flex; flex-direction: column; gap: 20px; }
+  .msg { max-width: 76%; font-size: 14px; }
+  .msg.user {
+    align-self: flex-end; background: var(--bubble);
+    border-radius: var(--radius-panel); padding: 11px 16px;
+  }
+  .msg.ai { align-self: flex-start; }
+  .msg.ai p + p { margin-top: 10px; }
+  .msg.ai .dim { color: var(--muted); }
+  .msg.ai .code {
+    font-family: var(--font-mono); font-size: 12.5px;
+    background: var(--raise); border-radius: 6px; padding: 1px 6px;
+  }
+  .toolchip {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-family: var(--font-mono); font-size: 11.5px; color: var(--muted);
+    border: 1px solid var(--border-strong); border-radius: 999px;
+    padding: 4px 12px; margin-top: 10px;
+  }
+  .toolchip .ok { color: var(--ok); }
+
+  .composer {
+    margin: 0 22px 14px;
+    background: var(--raise);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-panel);
+  }
+  .composer-input { padding: 14px 16px 10px; color: var(--faint); font-size: 14px; }
+  .composer-controls { display: flex; align-items: center; gap: 4px; padding: 4px 8px 10px; }
+  .ctl {
+    height: 28px; display: inline-flex; align-items: center; gap: 6px;
+    padding: 0 10px; border-radius: 999px;
+    color: var(--muted); font-size: 12.5px;
+  }
+  .ctl:hover { background: rgba(255,255,255,0.06); color: var(--fg); }
+  .ctl.push { margin-left: auto; }
+  .send {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: var(--accent); color: #2b1c05;
+    display: grid; place-items: center; font-size: 14px; font-weight: 700;
+    margin-left: 6px;
+  }
+
+  .statusbar {
+    height: 34px; flex: none; border-top: 1px solid var(--border);
+    display: flex; align-items: center; gap: 20px; padding: 0 16px;
+    font-size: 12px; color: var(--muted);
+  }
+  .statusbar .right { margin-left: auto; display: flex; gap: 20px; }
+  .statusbar .ok { color: var(--ok); }
+  .note { width: 1240px; max-width: 100%; font-size: 12px; color: var(--faint); line-height: 1.7; }
+  .note b { color: var(--muted); font-weight: 500; }
+</style>
+</head>
+<body>
+
+<div class="spec">
+  <div class="spec-name">方向 D · <em>ZCode 对照定稿</em></div>
+  <div class="spec-dials">VARIANCE 4 · MOTION 3 · DENSITY 6</div>
+  <div class="swatches">
+    <div class="sw"><i style="background:#1c1c1a"></i><span>bg</span></div>
+    <div class="sw"><i style="background:#232322"></i><span>raise</span></div>
+    <div class="sw"><i style="background:#2e2e2c"></i><span>bubble</span></div>
+    <div class="sw"><i style="background:#eda23a"></i><span>accent</span></div>
+    <div class="sw"><i style="background:#4cc38a"></i><span>ok</span></div>
+    <div class="sw"><i style="background:#faf9f7"></i><span>light.bg</span></div>
+  </div>
+</div>
+<div class="specimen">
+  <span><b>系统无衬线</b> 工作台会话聚合 AaBbCc 0123456789</span>
+  <span class="mono"><b>ui-monospace</b> src/sidebar.tsx ⌘N {ok:true}</span>
+  <span>侧栏与主区同底色 · chip 全 pill · 琥珀单 accent · 绿色仅表语义成功</span>
+</div>
+
+<div class="app">
+  <div class="topbar">
+    <div class="logo">Z</div>
+    <div class="nav-arrow">←</div>
+    <div class="nav-arrow">→</div>
+    <div class="pill-upd">更新</div>
+    <div class="topbar-title">下载并检查taste-skill内容安全性</div>
+    <div class="ctx-chip">◌ agent-b… <span class="dot">@</span> wsl:Ubu…</div>
+    <div class="ctx-chip">⎇ studio-shell ▾</div>
+    <div class="ctx-chip">···</div>
+    <div class="topbar-right">
+      <div class="sq" style="color:#3b82f6">◤</div>
+      <div class="sq">▭</div>
+      <div class="sq">◫</div>
+      <div class="sq">⌄</div>
+    </div>
+  </div>
+  <div class="main">
+    <aside class="sidebar">
+      <div class="nav-row"><span class="ic">⊕</span> 新建任务 <span class="kbd">Ctrl+N</span></div>
+      <div class="nav-row"><span class="ic">⌕</span> 搜索 <span class="kbd">Ctrl+K</span></div>
+      <div class="nav-row"><span class="ic">◷</span> 自动化</div>
+      <div class="nav-row"><span class="ic">▦</span> 插件市场</div>
+      <div class="view-switch">
+        <div class="vs-pill"><span>分组</span><span class="on">项目</span></div>
+        <div class="mini">⇅</div>
+        <div class="mini">≡</div>
+      </div>
+      <div class="side-label">项目</div>
+      <div class="proj"><span class="ic">☁</span> litellm-router <span class="sync">⟳</span></div>
+      <div class="proj"><span class="ic">☁</span> agent-box-resource-rout… <span class="sync">⟳</span></div>
+      <div class="proj"><span class="ic">☁</span> agent-box-studio</div>
+      <div class="conv active">下载并检查taste-skill内容安… <span class="time">6分</span></div>
+      <div class="conv"><span class="live-dot"></span> Agent-Box Studio 前端能… <span class="time">2小时</span></div>
+      <div class="conv">Codeg 分层架构解剖与 Agen… <span class="time">2天</span></div>
+      <div class="proj" style="margin-top:6px"><span class="ic">☁</span> / <span class="sync">⚠</span></div>
+      <div class="proj"><span class="ic">☁</span> agent-box <span class="sync">⟳</span></div>
+      <div class="side-label">任务</div>
+      <div class="conv" style="color:var(--faint)">还没有任务</div>
+      <div class="side-spacer"></div>
+      <div class="account">
+        <span class="avatar">G</span>
+        <span class="name">gfwxjx18</span>
+        <span class="badge-lite">Lite</span>
+        <span class="right"><span>▤</span><span>⚙</span></span>
+      </div>
+    </aside>
+    <section class="chat">
+      <div class="stream">
+        <div class="msg user">三个都丑，你看这个 zcode 做的多好看</div>
+        <div class="msg ai">
+          <p>明白，以 ZCode 真实界面为基准来定型。我从截图里提取了它的设计语言，做一版忠实还原的预览（方向 D），你确认后再写规范。</p>
+          <p>从截图提取的关键特征：暖调炭黑底、琥珀作为唯一 accent、侧栏与主区同底色无缝、chip 全 pill、气泡和输入框大圆角。</p>
+          <span class="toolchip"><span class="ok">✓</span> Read ~/.zcode/cli/image-cache/…/image-f8d0…png</span>
+        </div>
+      </div>
+      <div class="composer">
+        <div class="composer-input">输入消息…</div>
+        <div class="composer-controls">
+          <div class="ctl">＋ 附件</div>
+          <div class="ctl">盾 权限: 普通 ▾</div>
+          <div class="ctl push">◌ GLM-5.3-Flash ▾</div>
+          <div class="ctl">权衡 ▾</div>
+          <div class="send">↑</div>
+        </div>
+      </div>
+    </section>
+  </div>
+  <div class="statusbar">
+    <span>⎇ studio-shell</span>
+    <span class="ok">✓ 4800 tests</span>
+    <span>MCP 已连接</span>
+    <div class="right"><span>中文</span><span>80%</span></div>
+  </div>
+</div>
+
+<p class="note">
+  <b>说明：</b>本页按你提供的 ZCode 截图逐项还原：暖调炭黑（zinc 系）打底，侧栏与主区同底色无缝；
+  琥珀是唯一品牌 accent，只出现在头像、发送按钮、当前会话、更新徽标四处；绿色仅表"通过/成功"语义。
+  chip / 标签 / 控件全 pill，气泡与输入框 14px 大圆角。等宽字体只用于路径、快捷键、代码。
+</p>
+
+</body>
+</html>

@@ -1624,6 +1624,7 @@ export function MessageInput({
       <Button
         onClick={handleSend}
         disabled={!hasSendableContent}
+        variant="secondary"
         size="icon"
         className="h-8 w-8"
         title={tQueue("saveEdit")}
@@ -1652,6 +1653,7 @@ export function MessageInput({
           <Button
             onClick={handleSend}
             disabled={steering}
+            variant="secondary"
             size="icon"
             className="h-8 w-8 rounded-r-none"
             title={t("queueMessage")}
@@ -1662,8 +1664,9 @@ export function MessageInput({
             <DropdownMenuTrigger asChild>
               <Button
                 disabled={steering}
+                variant="secondary"
                 size="icon"
-                className="h-8 w-5 rounded-l-none border-l border-primary-foreground/20"
+                className="h-8 w-5 rounded-l-none border-l border-border"
                 aria-label={t("steerIntoTurn")}
               >
                 <ChevronUp className="size-4" />
@@ -1702,6 +1705,7 @@ export function MessageInput({
       <Button
         onClick={handleSend}
         disabled={disabled || !hasSendableContent}
+        variant="secondary"
         size="icon"
         className="h-8 w-8 rounded-r-none"
         title={t("send")}
@@ -1712,8 +1716,9 @@ export function MessageInput({
         <DropdownMenuTrigger asChild>
           <Button
             disabled={disabled || !hasSendableContent}
+            variant="secondary"
             size="icon"
-            className="h-8 w-5 rounded-l-none border-l border-primary-foreground/20"
+            className="h-8 w-5 rounded-l-none border-l border-border"
             aria-label={t("forkAndSend")}
           >
             <ChevronUp className="size-4" />
@@ -1728,14 +1733,15 @@ export function MessageInput({
       </DropdownMenu>
     </div>
   ) : (
-    // The plain send affordance: a round primary button trailing the control
+    // The plain send affordance: a neutral button trailing the control
     // bar. The running (stop) state is the `isPrompting` branch above — this
     // one only renders when there is no live turn to stop.
     <Button
       onClick={handleSend}
       disabled={disabled || !hasSendableContent}
+      variant="secondary"
       size="icon"
-      className="h-8 w-8 rounded-full"
+      className="h-8 w-8 rounded-md"
       title={t("send")}
     >
       <Send className="size-4" />
@@ -1837,7 +1843,7 @@ export function MessageInput({
       <div
         className={cn(
           folderBranchPickerAttached
-            ? "overflow-hidden rounded-xl transition-colors"
+            ? "overflow-hidden rounded-lg transition-colors"
             : "contents",
           folderBranchPickerAttached &&
             showDragActive &&
@@ -1856,12 +1862,10 @@ export function MessageInput({
                 // blank areas (padding, the dead space below a short message, the
                 // action-bar gaps) so the whole input reads as clickable-to-type;
                 // interactive controls re-assert their own cursor (see globals.css).
-                // Resting border uses `border-foreground/20` (a touch darker than
-                // the default `border-input`, which is near-invisible at rest and
-                // vanishes over a workspace background image); it adapts per theme
-                // (dark ink in light mode, light ink in dark) and stays legible.
+                // Resting border uses the theme's low-contrast border token and
+                // stays legible over both plain and workspace-image surfaces.
                 // Focus still swaps to `border-ring` below.
-                "codeg-composer-chrome @container relative flex flex-col rounded-xl border border-foreground/20 bg-transparent transition-colors",
+                "codeg-composer-chrome @container relative flex flex-col rounded-lg border border-border bg-transparent transition-colors",
                 // Standard focus ring — always shown when the composer is
                 // focused (the plain default input style). `bg-background
                 // ws-transparent-bg`: opaque surface normally, but with a
@@ -2081,7 +2085,7 @@ export function MessageInput({
           // it always takes the rounded-bottom box treatment. Pickers sit at the
           // left edge; the context-usage circle + agent connection status
           // right-align at the trailing edge.
-          <div className="flex items-center justify-between gap-2 rounded-b-xl px-2 pt-1 text-xs text-muted-foreground">
+          <div className="flex items-center justify-between gap-2 rounded-b-lg px-2 pt-1 text-xs text-muted-foreground">
             <div className="flex min-w-0 items-center gap-1">
               <ConversationFolderBranchPicker
                 tabId={attachmentTabId}

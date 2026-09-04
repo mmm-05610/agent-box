@@ -68,13 +68,14 @@ export const MessageContent = ({
   <div
     className={cn(
       "is-user:dark flex min-w-0 flex-col gap-2 overflow-hidden text-sm",
-      // `ws-msg-secondary` pairs with the user bubble's `bg-secondary`: with
+      // `ws-msg-secondary` pairs with the user bubble's semantic message
+      // surface: with
       // a workspace background image on it turns the bubble translucent + frosted
       // with a hairline ring (fixed `--ws-msg-alpha` + backdrop blur — see
       // globals.css, scoped to `.is-user`) so it stays legible over a busy
       // background. Off / assistant messages: inert (no base rule, no `.is-user`
       // ancestor).
-      "group-[.is-user]:ml-auto group-[.is-user]:w-fit group-[.is-user]:max-w-full group-[.is-user]:rounded-lg group-[.is-user]:bg-secondary group-[.is-user]:px-4 group-[.is-user]:py-3 group-[.is-user]:text-foreground ws-msg-secondary",
+      "group-[.is-user]:ml-auto group-[.is-user]:w-fit group-[.is-user]:max-w-full group-[.is-user]:rounded-lg group-[.is-user]:bg-[var(--surface-message-user)] group-[.is-user]:px-4 group-[.is-user]:py-3 group-[.is-user]:text-foreground ws-msg-secondary",
       "group-[.is-assistant]:w-full group-[.is-assistant]:text-foreground",
       className
     )}

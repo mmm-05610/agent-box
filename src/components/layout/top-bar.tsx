@@ -30,7 +30,7 @@ import { formatShortcutLabel } from "@/lib/keyboard-shortcuts"
 import { MAC_TRAFFIC_LIGHT_INSET } from "@/lib/window-chrome"
 
 const GHOST_BUTTON =
-  "h-6 w-6 hover:bg-foreground/10 hover:text-foreground/80 dark:hover:bg-foreground/10"
+  "h-6 w-6 hover:bg-[var(--surface-hover)] hover:text-foreground/80 focus-visible:ring-[var(--focus-ring-workbench)]"
 
 /**
  * The window's single top strip (ZCode-style shell, D-004): everything that
@@ -107,6 +107,8 @@ export function TopBar() {
           size="icon"
           className={GHOST_BUTTON}
           onClick={toggleSidebar}
+          aria-label={t(sidebarOpen ? "hideSidebar" : "showSidebar")}
+          aria-pressed={sidebarOpen}
           title={t("withShortcut", {
             label: t(sidebarOpen ? "hideSidebar" : "showSidebar"),
             shortcut: formatShortcutLabel(shortcuts.toggle_sidebar, isMac),
@@ -154,7 +156,7 @@ export function TopBar() {
               </span>
             )}
             {branch && (
-              <span className="inline-flex shrink-0 items-center gap-1 rounded bg-accent px-1.5 py-0.5 text-xs text-muted-foreground">
+              <span className="inline-flex shrink-0 items-center gap-1 border-l border-border pl-2 font-mono text-2xs text-muted-foreground">
                 <GitBranch className="h-3 w-3" aria-hidden />
                 {branch}
               </span>
@@ -172,9 +174,11 @@ export function TopBar() {
             <Button
               variant="ghost"
               size="icon"
-              className={`${GHOST_BUTTON} ${terminalOpen ? "bg-accent" : ""}`}
+              className={`${GHOST_BUTTON} ${terminalOpen ? "bg-[var(--surface-active)]" : ""}`}
               onClick={() => toggleTerminal()}
               disabled={!activeFolder}
+              aria-label={t("toggleTerminal")}
+              aria-pressed={terminalOpen}
               title={t("withShortcut", {
                 label: t("toggleTerminal"),
                 shortcut: formatShortcutLabel(shortcuts.toggle_terminal, isMac),
@@ -185,9 +189,11 @@ export function TopBar() {
             <Button
               variant="ghost"
               size="icon"
-              className={`${GHOST_BUTTON} ${auxPanelOpen ? "bg-accent" : ""}`}
+              className={`${GHOST_BUTTON} ${auxPanelOpen ? "bg-[var(--surface-active)]" : ""}`}
               onClick={toggleAuxPanel}
               disabled={!activeFolder && !isChatMode}
+              aria-label={t("toggleAuxPanel")}
+              aria-pressed={auxPanelOpen}
               title={t("withShortcut", {
                 label: t("toggleAuxPanel"),
                 shortcut: formatShortcutLabel(
@@ -209,6 +215,7 @@ export function TopBar() {
           size="icon"
           className={GHOST_BUTTON}
           onClick={handleOpenSettings}
+          aria-label={t("openSettings")}
           title={t("withShortcut", {
             label: t("openSettings"),
             shortcut: formatShortcutLabel(shortcuts.open_settings, isMac),

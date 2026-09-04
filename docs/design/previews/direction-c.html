@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>方向 C · 灰阶保留 + 重定默认</title>
+<style>
+  :root {
+    --page: #0d0d0f;
+    --bg: #09090b;          /* 现有 neutral dark，保留 */
+    --panel: #131316;
+    --panel-2: #1b1b1f;
+    --border: rgba(255, 255, 255, 0.08);
+    --border-strong: rgba(255, 255, 255, 0.14);
+    --fg: #fafafa;
+    --muted: #a1a1aa;
+    --faint: #71717a;
+    --accent: #f59e0b;      /* 琥珀，重定默认 accent */
+    --accent-soft: rgba(245, 158, 11, 0.12);
+    --user-bubble: #26262b;
+    --radius: 10px;
+    --radius-sm: 6px;
+    --font-sans: "Inter", system-ui, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--page);
+    color: var(--fg);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 32px 24px 64px; gap: 20px;
+  }
+  .spec { width: 1180px; max-width: 100%; display: flex; align-items: center; gap: 28px; flex-wrap: wrap; }
+  .spec-name { font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+  .spec-name em { font-style: normal; color: var(--accent); }
+  .spec-dials {
+    font-family: var(--font-mono); font-size: 11px; color: var(--muted);
+    border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px;
+  }
+  .swatches { display: flex; gap: 8px; align-items: center; margin-left: auto; }
+  .sw { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .sw i { width: 28px; height: 28px; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); display: block; }
+  .sw span { font-size: 10px; color: var(--faint); font-family: var(--font-mono); }
+  .specimen {
+    width: 1180px; max-width: 100%;
+    font-size: 12px; color: var(--muted);
+    display: flex; gap: 24px; align-items: baseline;
+    border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+    padding: 10px 2px;
+  }
+  .specimen b { color: var(--fg); font-weight: 500; }
+  .specimen .mono { font-family: var(--font-mono); }
+
+  .app {
+    width: 1180px; max-width: 100%; height: 660px;
+    background: var(--bg);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    overflow: hidden; display: flex; flex-direction: column;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+  }
+  .topbar {
+    height: 40px; flex: none; display: flex; align-items: center; padding: 0 12px;
+    border-bottom: 1px solid var(--border); background: var(--panel);
+    font-size: 12px;
+  }
+  .win-dots { display: flex; gap: 7px; width: 120px; }
+  .win-dots i { width: 11px; height: 11px; border-radius: 50%; display: block; }
+  .win-dots i:nth-child(1) { background: #ff5f57; }
+  .win-dots i:nth-child(2) { background: #febc2e; }
+  .win-dots i:nth-child(3) { background: #28c840; }
+  .topbar-title {
+    flex: 1; text-align: center; color: var(--muted);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .topbar-title b { color: var(--fg); font-weight: 500; }
+  .topbar-actions { width: 120px; display: flex; gap: 4px; justify-content: flex-end; }
+  .icon-btn {
+    width: 24px; height: 24px; border-radius: var(--radius-sm);
+    display: grid; place-items: center; color: var(--muted); font-size: 12px;
+  }
+  .icon-btn:hover { background: rgba(255,255,255,0.08); color: var(--fg); }
+
+  .main { flex: 1; display: flex; min-height: 0; }
+  .sidebar {
+    width: 232px; flex: none; background: var(--panel);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; padding: 10px 8px; gap: 2px;
+  }
+  .side-row {
+    height: 30px; display: flex; align-items: center; gap: 8px;
+    padding: 0 8px; border-radius: var(--radius-sm);
+    color: var(--muted); font-size: 13px;
+  }
+  .side-row:hover { background: rgba(255,255,255,0.05); color: var(--fg); }
+  .side-row .kbd {
+    margin-left: auto; font-family: var(--font-mono); font-size: 10px;
+    color: var(--faint); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px;
+  }
+  .view-switch {
+    margin: 10px 4px 6px; display: flex; background: var(--panel-2);
+    border-radius: 999px; padding: 2px; font-size: 12px;
+  }
+  .view-switch span { flex: 1; text-align: center; padding: 4px 0; border-radius: 999px; color: var(--muted); }
+  .view-switch .on { background: var(--bg); color: var(--fg); box-shadow: 0 1px 4px rgba(0,0,0,0.4); }
+  .side-label { font-size: 11px; color: var(--faint); padding: 10px 8px 4px; }
+  .conv {
+    height: 32px; display: flex; align-items: center; gap: 8px;
+    padding: 0 8px; border-radius: var(--radius-sm);
+    color: var(--muted); font-size: 13px;
+  }
+  .conv:hover { background: rgba(255,255,255,0.05); color: var(--fg); }
+  .conv.active { background: var(--accent-soft); color: var(--fg); }
+  .conv .chip {
+    font-size: 10px; padding: 1px 6px; border-radius: 999px;
+    background: var(--accent-soft); color: var(--accent);
+  }
+  .side-spacer { flex: 1; }
+  .account {
+    border-top: 1px solid var(--border);
+    margin: 6px -8px -10px; padding: 10px 16px;
+    display: flex; align-items: center; gap: 8px;
+    color: var(--muted); font-size: 13px;
+  }
+  .avatar {
+    width: 20px; height: 20px; border-radius: 50%;
+    background: var(--accent); color: #27190a;
+    display: grid; place-items: center; font-size: 10px; font-weight: 700;
+  }
+  .account .gear { margin-left: auto; }
+
+  .chat { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .stream { flex: 1; overflow: hidden; padding: 24px 32px; display: flex; flex-direction: column; gap: 18px; }
+  .msg { max-width: 72%; font-size: 13.5px; }
+  .msg.user {
+    align-self: flex-end; background: var(--user-bubble);
+    border-radius: var(--radius); padding: 10px 14px;
+  }
+  .msg.ai { align-self: flex-start; color: var(--fg); }
+  .msg.ai p + p { margin-top: 8px; }
+  .msg.ai .dim { color: var(--muted); }
+  .toolchip {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: var(--font-mono); font-size: 11px; color: var(--muted);
+    border: 1px solid var(--border); border-radius: 999px;
+    padding: 3px 9px; margin-top: 8px;
+  }
+  .toolchip .ok { color: var(--accent); }
+
+  .composer {
+    margin: 0 24px 16px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    background: var(--panel);
+  }
+  .composer-input { padding: 12px 14px; color: var(--faint); font-size: 13.5px; }
+  .composer-controls { display: flex; align-items: center; gap: 6px; padding: 6px 8px 8px; }
+  .ctl {
+    height: 26px; display: inline-flex; align-items: center; gap: 5px;
+    padding: 0 9px; border-radius: 999px;
+    color: var(--muted); font-size: 12px;
+  }
+  .ctl:hover { background: rgba(255,255,255,0.06); color: var(--fg); }
+  .ctl.push { margin-left: auto; }
+  .send {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: var(--accent); color: #27190a;
+    display: grid; place-items: center; font-size: 13px; font-weight: 600;
+  }
+
+  .statusbar {
+    height: 32px; flex: none; border-top: 1px solid var(--border); background: var(--panel);
+    display: flex; align-items: center; gap: 18px; padding: 0 14px;
+    font-size: 11.5px; color: var(--muted);
+  }
+  .statusbar .right { margin-left: auto; display: flex; gap: 18px; }
+  .statusbar .accent { color: var(--accent); }
+  .note { width: 1180px; max-width: 100%; font-size: 12px; color: var(--faint); line-height: 1.7; }
+  .note b { color: var(--muted); font-weight: 500; }
+</style>
+</head>
+<body>
+
+<div class="spec">
+  <div class="spec-name">方向 C · <em>灰阶保留 + 重定默认</em></div>
+  <div class="spec-dials">VARIANCE 4 · MOTION 3 · DENSITY 6</div>
+  <div class="swatches">
+    <div class="sw"><i style="background:#09090b"></i><span>bg</span></div>
+    <div class="sw"><i style="background:#131316"></i><span>panel</span></div>
+    <div class="sw"><i style="background:#f59e0b"></i><span>accent</span></div>
+    <div class="sw"><i style="background:#fafafa"></i><span>fg</span></div>
+    <div class="sw"><i style="background:#ffffff"></i><span>light.bg</span></div>
+    <div class="sw"><i style="background:#d97706"></i><span>light.accent</span></div>
+  </div>
+</div>
+<div class="specimen">
+  <span><b>Inter</b>&nbsp; 工作台会话聚合 AaBbCc 0123456789</span>
+  <span class="mono"><b>JetBrains Mono</b>&nbsp; src/sidebar.tsx 0x1f {ok:true}</span>
+  <span>现有 neutral oklch 灰阶不动 · 默认 accent 换琥珀 · 12 主题预设体系保留</span>
+</div>
+
+<div class="app">
+  <div class="topbar">
+    <div class="win-dots"><i></i><i></i><i></i></div>
+    <div class="topbar-title"><b>agent-box-studio</b> › F6 registries 联调 &nbsp;⎇&nbsp;studio-shell</div>
+    <div class="topbar-actions">
+      <div class="icon-btn">◧</div><div class="icon-btn">◨</div><div class="icon-btn">▣</div>
+    </div>
+  </div>
+  <div class="main">
+    <aside class="sidebar">
+      <div class="side-row">＋ 新会话 <span class="kbd">⌘N</span></div>
+      <div class="side-row">⌕ 搜索 <span class="kbd">⌘K</span></div>
+      <div class="view-switch"><span class="on">会话</span><span>项目</span></div>
+      <div class="side-label">agent-box-studio</div>
+      <div class="conv active"><span>F6 registries 联调</span><span class="chip">运行中</span></div>
+      <div class="conv">session harness 分离重构</div>
+      <div class="conv">composer 单行控制条</div>
+      <div class="conv">侧栏树拖拽排序</div>
+      <div class="conv">ZCode 风格顶栏 D-004</div>
+      <div class="side-label">codeg-server</div>
+      <div class="conv">WS 广播去重</div>
+      <div class="side-spacer"></div>
+      <div class="account"><span class="avatar">M</span> maoqh <span class="gear">⚙</span></div>
+    </aside>
+    <section class="chat">
+      <div class="stream">
+        <div class="msg user">帮我看看 sidebar 分组切换的实现，会话/项目两个视图是怎么共存的？</div>
+        <div class="msg ai">
+          <p>分组切换在 <span class="dim">sidebar.tsx</span> 的 view-switcher 里完成，两个视图共享同一棵数据树，只在渲染层二选一。</p>
+          <span class="toolchip"><span class="ok">✓</span> Read src/components/layout/sidebar.tsx</span>
+        </div>
+        <div class="msg ai">
+          <p>关键状态只有一个 <span class="dim">viewMode: "grouped" | "projects"</span>，切换时用 CSS 折叠而不是卸载组件，所以滚动位置能保留。建议把排序逻辑抽到 project-tree 里，和视图解耦。</p>
+        </div>
+      </div>
+      <div class="composer">
+        <div class="composer-input">输入消息…</div>
+        <div class="composer-controls">
+          <div class="ctl">＋ 附件</div>
+          <div class="ctl">盾 权限: 普通 ▾</div>
+          <div class="ctl push">模型 GLM-4.7 ▾</div>
+          <div class="ctl">权衡 ▾</div>
+          <div class="send">➤</div>
+        </div>
+      </div>
+    </section>
+  </div>
+  <div class="statusbar">
+    <span>⎇ studio-shell</span>
+    <span class="accent">✓ 4800 tests</span>
+    <span>MCP 已连接</span>
+    <div class="right"><span>中文</span><span>80%</span></div>
+  </div>
+</div>
+
+<p class="note">
+  <b>特徵：</b>改动最小的重评估。neutral oklch 灰阶、圆角乘法刻度、12 主题预设全部保留；
+  只把「出厂默认」从无彩 accent 改为琥珀单色，主字体 Inter 保留（用户可选 Geist）。
+  琥珀只出现在语义位置（运行中、发送、测试通过、头像），保持中性灰的安静底色。
+</p>
+
+</body>
+</html>

@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>方向 B · Dark-tech 终端风</title>
+<style>
+  :root {
+    --page: #07080b;
+    --bg: #0a0c10;          /* 深墨蓝近黑 */
+    --panel: #10131a;
+    --panel-2: #151923;
+    --border: rgba(148, 163, 184, 0.14);
+    --border-strong: rgba(148, 163, 184, 0.22);
+    --fg: #d7dce3;
+    --muted: #8b94a3;
+    --faint: #5d6774;
+    --accent: #34d399;      /* 翡翠绿，唯一 accent */
+    --accent-soft: rgba(52, 211, 153, 0.10);
+    --user-bubble: #171c26;
+    --radius: 6px;
+    --radius-sm: 4px;
+    --font-sans: "Geist", "Inter", system-ui, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    --font-mono: "JetBrains Mono", "Geist Mono", ui-monospace, Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--page);
+    color: var(--fg);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 32px 24px 64px; gap: 20px;
+  }
+  .spec { width: 1180px; max-width: 100%; display: flex; align-items: center; gap: 28px; flex-wrap: wrap; }
+  .spec-name { font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+  .spec-name em { font-style: normal; color: var(--accent); }
+  .spec-dials {
+    font-family: var(--font-mono); font-size: 11px; color: var(--muted);
+    border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px;
+  }
+  .swatches { display: flex; gap: 8px; align-items: center; margin-left: auto; }
+  .sw { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .sw i { width: 28px; height: 28px; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); display: block; }
+  .sw span { font-size: 10px; color: var(--faint); font-family: var(--font-mono); }
+  .specimen {
+    width: 1180px; max-width: 100%;
+    font-size: 12px; color: var(--muted);
+    display: flex; gap: 24px; align-items: baseline;
+    border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+    padding: 10px 2px;
+  }
+  .specimen b { color: var(--fg); font-weight: 500; }
+  .specimen .mono { font-family: var(--font-mono); }
+
+  .app {
+    width: 1180px; max-width: 100%; height: 660px;
+    background: var(--bg);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    overflow: hidden; display: flex; flex-direction: column;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+  }
+  .topbar {
+    height: 40px; flex: none; display: flex; align-items: center; padding: 0 12px;
+    border-bottom: 1px solid var(--border); background: var(--panel);
+  }
+  .win-dots { display: flex; gap: 7px; width: 120px; }
+  .win-dots i { width: 11px; height: 11px; border-radius: 50%; display: block; }
+  .win-dots i:nth-child(1) { background: #ff5f57; }
+  .win-dots i:nth-child(2) { background: #febc2e; }
+  .win-dots i:nth-child(3) { background: #28c840; }
+  .topbar-title {
+    flex: 1; text-align: center; font-family: var(--font-mono); font-size: 11.5px; color: var(--muted);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .topbar-title b { color: var(--fg); font-weight: 500; }
+  .topbar-title .accent { color: var(--accent); }
+  .topbar-actions { width: 120px; display: flex; gap: 4px; justify-content: flex-end; }
+  .icon-btn {
+    width: 24px; height: 24px; border-radius: var(--radius-sm);
+    display: grid; place-items: center; color: var(--muted); font-size: 12px;
+    font-family: var(--font-mono);
+  }
+  .icon-btn:hover { background: rgba(148,163,184,0.12); color: var(--fg); }
+
+  .main { flex: 1; display: flex; min-height: 0; }
+  .sidebar {
+    width: 232px; flex: none; background: var(--panel);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; padding: 10px 8px; gap: 2px;
+  }
+  .side-row {
+    height: 30px; display: flex; align-items: center; gap: 8px;
+    padding: 0 8px; border-radius: var(--radius-sm);
+    color: var(--muted); font-size: 13px;
+  }
+  .side-row:hover { background: rgba(148,163,184,0.08); color: var(--fg); }
+  .side-row .kbd {
+    margin-left: auto; font-family: var(--font-mono); font-size: 10px;
+    color: var(--faint); border: 1px solid var(--border); border-radius: 3px; padding: 1px 5px;
+  }
+  .view-switch {
+    margin: 10px 4px 6px; display: flex;
+    border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 2px;
+    font-size: 12px;
+  }
+  .view-switch span { flex: 1; text-align: center; padding: 4px 0; color: var(--muted); }
+  .view-switch .on { background: var(--panel-2); color: var(--accent); font-family: var(--font-mono); font-size: 11.5px; }
+  .side-label {
+    font-family: var(--font-mono); font-size: 10.5px; color: var(--faint);
+    padding: 12px 8px 4px; letter-spacing: 0.04em;
+  }
+  .side-label::before { content: "~/ "; color: var(--accent); }
+  .conv {
+    height: 32px; display: flex; align-items: center; gap: 8px;
+    padding: 0 8px 0 10px; border-radius: var(--radius-sm);
+    color: var(--muted); font-size: 13px;
+    border-left: 2px solid transparent;
+  }
+  .conv:hover { background: rgba(148,163,184,0.08); color: var(--fg); }
+  .conv.active {
+    background: var(--accent-soft); color: var(--fg);
+    border-left-color: var(--accent);
+  }
+  .conv .state {
+    margin-left: auto; font-family: var(--font-mono); font-size: 10px; color: var(--accent);
+  }
+  .side-spacer { flex: 1; }
+  .account {
+    border-top: 1px solid var(--border);
+    margin: 6px -8px -10px; padding: 10px 16px;
+    display: flex; align-items: center; gap: 8px;
+    color: var(--muted); font-size: 13px;
+  }
+  .avatar {
+    width: 20px; height: 20px; border-radius: var(--radius-sm);
+    background: var(--panel-2); color: var(--accent);
+    display: grid; place-items: center; font-size: 10px; font-family: var(--font-mono);
+  }
+  .account .gear { margin-left: auto; font-family: var(--font-mono); }
+
+  .chat { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .stream { flex: 1; overflow: hidden; padding: 24px 32px; display: flex; flex-direction: column; gap: 18px; }
+  .msg { max-width: 74%; font-size: 13.5px; }
+  .msg.user {
+    align-self: flex-end; background: var(--user-bubble);
+    border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 10px 14px;
+  }
+  .msg.ai { align-self: flex-start; color: var(--fg); }
+  .msg.ai p + p { margin-top: 8px; }
+  .msg.ai .dim { color: var(--muted); }
+  .msg.ai .code { font-family: var(--font-mono); font-size: 12px; color: var(--accent); }
+  .toolchip {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: var(--font-mono); font-size: 11px; color: var(--muted);
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 3px 8px; margin-top: 8px; background: var(--panel);
+  }
+  .toolchip .ok { color: var(--accent); }
+
+  .composer {
+    margin: 0 24px 16px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    background: var(--panel);
+  }
+  .composer-input { padding: 12px 14px; color: var(--faint); font-size: 13.5px; }
+  .composer-input::before { content: "> "; color: var(--accent); font-family: var(--font-mono); }
+  .composer-controls { display: flex; align-items: center; gap: 6px; padding: 6px 8px 8px; }
+  .ctl {
+    height: 26px; display: inline-flex; align-items: center; gap: 5px;
+    padding: 0 9px; border-radius: var(--radius-sm);
+    color: var(--muted); font-size: 11.5px; font-family: var(--font-mono);
+  }
+  .ctl:hover { background: rgba(148,163,184,0.1); color: var(--fg); }
+  .ctl.push { margin-left: auto; }
+  .send {
+    width: 28px; height: 28px; border-radius: var(--radius-sm);
+    background: var(--accent); color: #05261a;
+    display: grid; place-items: center; font-size: 13px; font-family: var(--font-mono);
+  }
+
+  .statusbar {
+    height: 32px; flex: none; border-top: 1px solid var(--border); background: var(--panel);
+    display: flex; align-items: center; gap: 18px; padding: 0 14px;
+    font-size: 11px; color: var(--muted); font-family: var(--font-mono);
+  }
+  .statusbar .right { margin-left: auto; display: flex; gap: 18px; }
+  .statusbar .accent { color: var(--accent); }
+  .note { width: 1180px; max-width: 100%; font-size: 12px; color: var(--faint); line-height: 1.7; }
+  .note b { color: var(--muted); font-weight: 500; }
+</style>
+</head>
+<body>
+
+<div class="spec">
+  <div class="spec-name">方向 B · <em>Dark-tech 终端风</em></div>
+  <div class="spec-dials">VARIANCE 6 · MOTION 5 · DENSITY 7</div>
+  <div class="swatches">
+    <div class="sw"><i style="background:#0a0c10"></i><span>bg</span></div>
+    <div class="sw"><i style="background:#10131a"></i><span>panel</span></div>
+    <div class="sw"><i style="background:#34d399"></i><span>accent</span></div>
+    <div class="sw"><i style="background:#d7dce3"></i><span>fg</span></div>
+    <div class="sw"><i style="background:#f4f6f8"></i><span>light.bg</span></div>
+    <div class="sw"><i style="background:#0d9463"></i><span>light.accent</span></div>
+  </div>
+</div>
+<div class="specimen">
+  <span><b>Geist</b>&nbsp; 工作台会话聚合 AaBbCc 0123456789</span>
+  <span class="mono"><b>JetBrains Mono</b>&nbsp; ~/agent-box 0x1f {ok:true} 分支/路径/状态</span>
+  <span>圆角 6px 锐利刻度 · mono 承担元数据语言 · 深色优先</span>
+</div>
+
+<div class="app">
+  <div class="topbar">
+    <div class="win-dots"><i></i><i></i><i></i></div>
+    <div class="topbar-title"><b>agent-box-studio</b> / F6 registries 联调 <span class="accent">⎇ studio-shell</span></div>
+    <div class="topbar-actions">
+      <div class="icon-btn">◧</div><div class="icon-btn">◨</div><div class="icon-btn">▣</div>
+    </div>
+  </div>
+  <div class="main">
+    <aside class="sidebar">
+      <div class="side-row">＋ 新会话 <span class="kbd">⌘N</span></div>
+      <div class="side-row">⌕ 搜索 <span class="kbd">⌘K</span></div>
+      <div class="view-switch"><span class="on">[会话]</span><span>项目</span></div>
+      <div class="side-label">agent-box-studio</div>
+      <div class="conv active"><span>F6 registries 联调</span><span class="state">● run</span></div>
+      <div class="conv">session harness 分离重构</div>
+      <div class="conv">composer 单行控制条</div>
+      <div class="conv">侧栏树拖拽排序</div>
+      <div class="conv">ZCode 风格顶栏 D-004</div>
+      <div class="side-label">codeg-server</div>
+      <div class="conv">WS 广播去重</div>
+      <div class="side-spacer"></div>
+      <div class="account"><span class="avatar">M</span> maoqh <span class="gear">⚙</span></div>
+    </aside>
+    <section class="chat">
+      <div class="stream">
+        <div class="msg user">帮我看看 sidebar 分组切换的实现，会话/项目两个视图是怎么共存的？</div>
+        <div class="msg ai">
+          <p>分组切换在 <span class="code">sidebar.tsx</span> 的 view-switcher 里完成，两个视图共享同一棵数据树，只在渲染层二选一。</p>
+          <span class="toolchip"><span class="ok">✓</span> Read src/components/layout/sidebar.tsx</span>
+        </div>
+        <div class="msg ai">
+          <p>关键状态只有一个 <span class="code">viewMode</span>，切换时用 CSS 折叠而不是卸载组件，所以滚动位置能保留。建议把排序逻辑抽到 project-tree 里，和视图解耦。</p>
+        </div>
+      </div>
+      <div class="composer">
+        <div class="composer-input">输入消息…</div>
+        <div class="composer-controls">
+          <div class="ctl">+ 附件</div>
+          <div class="ctl">权限:normal ▾</div>
+          <div class="ctl push">glm-4.7 ▾</div>
+          <div class="ctl">权衡 ▾</div>
+          <div class="send">➤</div>
+        </div>
+      </div>
+    </section>
+  </div>
+  <div class="statusbar">
+    <span>⎇ studio-shell</span>
+    <span class="accent">✓ 4800 tests</span>
+    <span>mcp: connected</span>
+    <div class="right"><span>zh-CN</span><span>80%</span></div>
+  </div>
+</div>
+
+<p class="note">
+  <b>特徵：</b>深墨蓝底 + 翡翠绿单 accent，所有元数据（路径、分支、状态、权限、模型）改用等宽字体，让终端与 UI 同源。
+  当前会话用左侧 2px accent 竖线标记，输入框带终端提示符。圆角全局 6px，边界更锐。深色为第一公民，浅色模式作配套（右上 swatch）。
+</p>
+
+</body>
+</html>

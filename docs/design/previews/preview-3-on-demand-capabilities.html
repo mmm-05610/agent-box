@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>预览 3 · 按需打开复杂能力 — Agent-Box Studio</title>
+<link rel="stylesheet" href="./_kit.css">
+</head>
+<body>
+
+<svg style="display:none" aria-hidden="true">
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+  <symbol id="i-chev-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-panel-left" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></symbol>
+  <symbol id="i-panel-right" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/></symbol>
+  <symbol id="i-terminal" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="m8 9 3 3-3 3"/><path d="M13 15h4"/></symbol>
+  <symbol id="i-paperclip" viewBox="0 0 24 24"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></symbol>
+  <symbol id="i-arrow-up" viewBox="0 0 24 24"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></symbol>
+  <symbol id="i-git-branch" viewBox="0 0 24 24"><line x1="6" x2="6" y1="3" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></symbol>
+  <symbol id="i-bot" viewBox="0 0 24 24"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></symbol>
+  <symbol id="i-rotate" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></symbol>
+</svg>
+
+<div class="console">
+  <div class="name">预览 3 · <em>按需打开复杂能力</em></div>
+  <div class="dials">Execution History ≠ Delegation · Terminal 独立工作区</div>
+  <div class="spacer"></div>
+  <button class="cbtn" id="themeBtn" aria-pressed="false">亮色</button>
+  <button class="cbtn" id="zoomBtn" aria-pressed="false">150%</button>
+</div>
+
+<div class="app">
+  <div class="titlebar">
+    <div class="lights" aria-hidden="true"><i></i><i></i><i></i></div>
+    <div class="title">Agent-Box Studio</div>
+    <div class="winctl" aria-hidden="true">— ▢ ✕</div>
+  </div>
+
+  <div class="topbar">
+    <button class="tbtn" aria-label="切换侧栏" aria-pressed="true"><svg class="ic" aria-hidden="true"><use href="#i-panel-left"/></svg></button>
+    <div class="crumb"><span class="hide-sm">agent-box-studio</span><span class="sep" aria-hidden="true">›</span><b>解析 Zed 会话 JSONL 的执行树投影</b></div>
+    <span class="branch mono">zinc-main</span>
+    <div class="right">
+      <button class="tbtn" id="termBtn" aria-label="打开终端" aria-pressed="false" aria-controls="dock"><svg class="ic" aria-hidden="true"><use href="#i-terminal"/></svg></button>
+      <button class="tbtn" id="auxBtn" aria-label="打开辅助面板" aria-pressed="false" aria-controls="dock"><svg class="ic" aria-hidden="true"><use href="#i-panel-right"/></svg></button>
+      <span class="vsep" aria-hidden="true"></span>
+      <button class="tbtn" aria-label="设置"><svg class="ic" aria-hidden="true"><use href="#i-settings"/></svg></button>
+    </div>
+  </div>
+
+  <div class="main">
+    <aside class="sidebar">
+      <button class="navrow"><svg class="ic sm" aria-hidden="true"><use href="#i-plus"/></svg> 新建会话 <span class="kbd">Ctrl N</span></button>
+      <button class="navrow"><svg class="ic sm" aria-hidden="true"><use href="#i-search"/></svg> 搜索 <span class="kbd">Ctrl K</span></button>
+      <div class="label">今天</div>
+      <button class="conv" aria-current="true"><span class="rundot" aria-hidden="true"></span><span class="t">解析 Zed 会话 JSONL 的执行树投影</span><span class="tm num">12 分</span></button>
+      <button class="conv"><span class="t">迁移三套会话格式到统一转写</span><span class="tm">2 小时</span></button>
+      <div class="side-spacer"></div>
+      <div class="account">
+        <span class="avatar" aria-hidden="true">M</span><span class="nm">maoqh</span>
+        <button class="tbtn" style="margin-left:auto" aria-label="账户设置"><svg class="ic sm" aria-hidden="true"><use href="#i-settings"/></svg></button>
+      </div>
+    </aside>
+
+    <section class="chat">
+      <div class="stream">
+        <div class="turn">
+          <div class="msg-user">把 Zed 的会话格式和我们的五套 harness 对一遍，输出一张转换矩阵。</div>
+          <div class="msg-ai">
+            <div class="agent-head"><span class="hglyph" title="Claude Code">CC</span><b>Claude Code</b></div>
+            <p>矩阵已写入 <span class="code">docs/notes/zed-conversion-matrix.md</span>。zinc 的 turn 归属还有一处反写，我正在交叉验证。</p>
+            <div class="event" style="margin-top:0.5rem">
+              <div class="event-row" role="status" aria-label="正在运行交叉验证">
+                <span class="spin" aria-hidden="true"></span>
+                <span class="target shimmer">委派验证任务给 codex 侧 · 等待结果</span>
+              </div>
+            </div>
+            <p class="dim" style="margin-top:0.5rem">执行历史与委派任务在右侧辅助面板，按需打开。</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="composer-wrap">
+        <div class="composer-inner">
+          <!-- 纯信息状态条：选择历史节点后出现；发送按钮是唯一主动作 -->
+          <div class="fork-bar" id="forkBar" hidden>
+            <span class="t" id="forkText"></span>
+            <span class="acts">
+              <button class="btn" id="forkCancel">取消</button>
+            </span>
+          </div>
+          <div class="composer">
+            <div class="in" aria-label="消息输入"><span class="typed">从 E2 重新推一遍矩阵，这次用</span><span class="caret" aria-hidden="true"></span></div>
+            <div class="bar">
+              <button class="cctl" aria-label="添加附件"><svg class="ic sm" aria-hidden="true"><use href="#i-paperclip"/></svg></button>
+              <div class="pop-anchor">
+                <button class="cctl" id="bindingBtn" aria-expanded="false" aria-controls="bindingPop" aria-haspopup="dialog">
+                  <span class="hglyph" id="bindGlyph" aria-hidden="true">CC</span> <span id="bindName">Claude Code</span>
+                  <svg class="ic sm" aria-hidden="true" style="width:0.75rem;height:0.75rem"><use href="#i-chev-down"/></svg>
+                </button>
+                <div class="popover" id="bindingPop" role="group" aria-label="启动配置" hidden>
+                  <h4>启动配置</h4>
+                  <div class="frow"><label for="sel-harness">Harness</label>
+                    <select id="sel-harness">
+                      <option value="cc" selected>Claude Code</option>
+                      <option value="cx">Codex CLI</option>
+                      <option value="gm">Gemini CLI</option>
+                      <option value="oc">OpenCode</option>
+                    </select></div>
+                  <div class="frow"><label for="sel-profile">Profile</label>
+                    <select id="sel-profile"><option selected>zinc-porting</option><option>default</option></select></div>
+                  <div class="frow"><label for="sel-model">模型</label>
+                    <select id="sel-model"><option selected>GLM-5.3-Flash</option><option>GLM-5.3</option></select></div>
+                  <div class="frow"><label for="sel-sandbox">沙箱</label>
+                    <select id="sel-sandbox"><option selected>workspace-write</option><option>read-only</option></select></div>
+                  <div class="cont"><b>继续方式</b>由系统根据父存档点、目标 Harness 与 checkpoint 兼容性决定，不可手选。<span id="popCont">当前：原生继续（同 Harness）。</span></div>
+                </div>
+              </div>
+              <button class="send" aria-label="发送消息"><svg class="ic sm" aria-hidden="true"><use href="#i-arrow-up"/></svg></button>
+            </div>
+          </div>
+          <div class="composer-meta">
+            <span class="right" style="margin-left:auto"><span class="hide-sm">zinc-porting</span><span class="num">上下文 41%</span></span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 右侧工作坞：Aux（执行历史 / 委派任务）或 Terminal，互斥 -->
+    <div class="dock" id="dock" hidden>
+      <!-- Aux 面板 -->
+      <div class="aux dock-panel" id="auxPanel" role="group" aria-label="辅助面板">
+        <div class="aux-head">
+          <div class="tablist" role="tablist" aria-label="辅助面板视图" style="display:flex;gap:0.125rem">
+            <button class="tab" role="tab" id="tab-history" aria-selected="true" aria-controls="panel-history">
+              <svg class="ic sm" aria-hidden="true"><use href="#i-git-branch"/></svg> 执行历史
+            </button>
+            <button class="tab" role="tab" id="tab-tasks" aria-selected="false" aria-controls="panel-tasks" tabindex="-1">
+              <svg class="ic sm" aria-hidden="true"><use href="#i-bot"/></svg> 委派任务
+            </button>
+          </div>
+          <button class="tbtn" id="auxClose" aria-label="关闭辅助面板" style="margin-left:auto"><svg class="ic sm" aria-hidden="true"><use href="#i-x"/></svg></button>
+        </div>
+
+        <div class="aux-body" id="panel-history" role="tabpanel" aria-labelledby="tab-history" tabindex="0">
+          <p class="aux-note">会话由不可变的 Execution 存档点组成。选择任意已完成节点继续，将创建<b>新分支</b>；原分支与其后继永久保留。</p>
+
+          <label class="enode">
+            <input type="radio" name="exec-parent" value="e1" data-harness="cx" data-head="" data-ok="1">
+            <span class="hglyph" title="Codex CLI">CX</span>
+            <span class="eid">E1</span>
+            <span class="sum">导入 Zed 原生会话</span>
+            <span class="st ok" aria-label="已完成"><svg class="ic sm" viewBox="0 0 24 24" style="stroke:currentColor"><use href="#i-check"/></svg></span>
+            <span class="tm num">12:02</span>
+          </label>
+          <div class="efacts">codex · checkpoint cp-0a41 · 后继 2 支</div>
+
+          <div class="ekids">
+            <label class="enode">
+              <input type="radio" name="exec-parent" value="e2" data-harness="cc" data-head="" data-ok="1">
+              <span class="hglyph" title="Claude Code">CC</span>
+              <span class="eid">E2</span>
+              <span class="sum">跨 Harness 重写转换矩阵</span>
+              <span class="st ok" aria-label="已完成"><svg class="ic sm" viewBox="0 0 24 24" style="stroke:currentColor"><use href="#i-check"/></svg></span>
+              <span class="tm num">12:14</span>
+            </label>
+            <div class="efacts">claude-code · 从公共历史转换（Codex → Claude）</div>
+
+            <div class="ekids">
+              <label class="enode">
+                <input type="radio" name="exec-parent" value="e3" data-harness="cc" data-head="zinc-main" data-ok="1">
+                <span class="hglyph" title="Claude Code">CC</span>
+                <span class="eid">E3</span>
+                <span class="sum">修复 zinc 快照归属</span>
+                <span class="head-tag">head</span>
+                <span class="st ok" aria-label="已完成"><svg class="ic sm" viewBox="0 0 24 24" style="stroke:currentColor"><use href="#i-check"/></svg></span>
+                <span class="tm num">12:31</span>
+              </label>
+              <div class="efacts">claude-code · 原生继续（checkpoint cp-8f3a）</div>
+            </div>
+          </div>
+
+          <div class="ekids" style="margin-top:0.125rem">
+            <label class="enode">
+              <input type="radio" name="exec-parent" value="e4" data-harness="cc" data-head="zinc-retry" data-ok="">
+              <span class="hglyph" title="Claude Code">CC</span>
+              <span class="eid">E4</span>
+              <span class="sum">重试 zinc 校验规则</span>
+              <span class="head-tag">zinc-retry</span>
+              <span class="st err" aria-label="失败"><svg class="ic sm" viewBox="0 0 24 24" style="stroke:currentColor"><use href="#i-x"/></svg></span>
+              <span class="tm num">12:20</span>
+            </label>
+            <div class="efacts">claude-code · 失败 · 无已冻结的输出存档</div>
+          </div>
+        </div>
+
+        <div class="aux-body" id="panel-tasks" role="tabpanel" aria-labelledby="tab-tasks" tabindex="0" hidden>
+          <p class="aux-note">当前 Execution（E3）内部的子代理任务，属于一次执行的工作过程，<b>不是会话历史</b>。</p>
+          <div class="dtask">
+            <span class="spin" aria-hidden="true"></span>
+            <span class="tid">#a3f9c2e1</span>
+            <span class="sum">交叉验证 zinc 快照差异</span>
+            <span class="tm num">1 分 12 秒</span>
+          </div>
+          <div class="dtask">
+            <span class="st ok" aria-hidden="true" style="display:inline-flex;color:var(--ok)"><svg class="ic sm" viewBox="0 0 24 24" style="stroke:currentColor"><use href="#i-check"/></svg></span>
+            <span class="tid">#b7e0d44c</span>
+            <span class="sum">复核转换矩阵 zinc 行</span>
+            <span class="tm num">42 秒</span>
+          </div>
+          <div class="dtask">
+            <span class="st err" aria-hidden="true" style="display:inline-flex;color:var(--err)"><svg class="ic sm" viewBox="0 0 24 24" style="stroke:currentColor"><use href="#i-x"/></svg></span>
+            <span class="tid">#c41a7b02</span>
+            <span class="sum">迁移旧快照文件 · 路径含中文</span>
+            <button class="linkbtn retry">重试</button>
+            <span class="tm num">重试 1/3</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Terminal：真实工作区，宽度可调 -->
+      <div class="term dock-panel" id="termPanel" hidden>
+        <button class="resizer" id="termResizer" role="separator" aria-orientation="vertical" aria-label="调整终端宽度" aria-valuenow="440" aria-valuemin="280" aria-valuemax="640"></button>
+        <div class="term-body" id="termBody">
+          <div class="bar">
+            <svg class="ic sm" aria-hidden="true"><use href="#i-terminal"/></svg> zsh · agent-box-studio
+            <button class="tbtn" id="termClose" aria-label="关闭终端" style="margin-left:auto;width:1.5rem;height:1.5rem"><svg class="ic sm" aria-hidden="true"><use href="#i-x"/></svg></button>
+          </div>
+          <div class="scroller" id="termScroller"><span class="p">maoqh@wsl ~/projects/agent-box-studio</span>
+› cargo insta reject --snapshot zinc@118
+snapshot rejected, workspace clean
+› cargo test -p parsers zinc::roundtrip
+running 1 test
+test parsers::zinc::tests::roundtrip_118 ... FAILED
+
+failures:
+    turn ownership inverted at line 118</div>
+          <div class="inrow"><span class="p" aria-hidden="true">›</span>
+            <input type="text" aria-label="终端输入" placeholder=""></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="statusbar">
+    <span class="mono">zinc-main</span>
+    <span class="num">✓ 4821 tests</span>
+    <span class="hide-sm">MCP 3/3</span>
+    <div class="right"><span class="hide-sm">中文</span><span class="num">100%</span></div>
+  </div>
+</div>
+
+  <p class="note" style="color:var(--muted);font-weight:500">Concept preview — validates direction, not final layout or component specification.（概念预览：验证方向，非最终布局或组件规格）</p>
+<p class="note">
+  <b>操作路径：</b>顶栏 ◫ 打开辅助面板（执行历史 / 委派任务两个 tab，互斥命名，不混称）；「终端」按钮打开独立右侧工作区（拖边或用方向键调宽，与 Aux 互斥）。
+  执行历史里用方向键在存档点间移动：选 <span class="mono">E3</span>（head）＝原分支继续；选 <span class="mono">E2</span> ＝纯信息提示"下一条消息将从 E2 创建新分支，原分支保留"，只读展示系统决定的继续方式（在 composer 左下 popover 里把 Harness 改成 Codex 再看变化）；
+  选 <span class="mono">E4</span>（失败）＝不能作为父存档点。信息区只有弱化的「取消」，**发送按钮是唯一主动作**——发出下一条消息时才创建分支并启动新 Execution。
+  委派任务 tab 明确标注"属于当前 Execution，不是会话历史"。
+</p>
+
+<script>
+  const $ = id => document.getElementById(id);
+  // 主题 / 字号
+  $('themeBtn').addEventListener('click', () => {
+    const light = document.documentElement.dataset.pref === 'light';
+    document.documentElement.dataset.pref = light ? 'dark' : 'light';
+    $('themeBtn').setAttribute('aria-pressed', String(!light));
+    $('themeBtn').textContent = light ? '亮色' : '暗色';
+  });
+  $('zoomBtn').addEventListener('click', () => {
+    const on = document.documentElement.classList.toggle('zoom-150');
+    $('zoomBtn').setAttribute('aria-pressed', String(on));
+  });
+
+  // ===== 工作坞开合：Aux 与 Terminal 互斥（显式状态，避免 hidden 初始态歧义）=====
+  const dock = $('dock'), auxPanel = $('auxPanel'), termPanel = $('termPanel');
+  const auxBtn = $('auxBtn'), termBtn = $('termBtn');
+  let dockMode = null; // null | 'aux' | 'term'
+  function openAux() {
+    dockMode = 'aux';
+    dock.hidden = false; auxPanel.hidden = false; termPanel.hidden = true;
+    auxBtn.setAttribute('aria-pressed', 'true'); termBtn.setAttribute('aria-pressed', 'false');
+  }
+  function openTerm() {
+    dockMode = 'term';
+    dock.hidden = false; auxPanel.hidden = true; termPanel.hidden = false;
+    auxBtn.setAttribute('aria-pressed', 'false'); termBtn.setAttribute('aria-pressed', 'true');
+  }
+  function closeDock() {
+    dockMode = null;
+    dock.hidden = true;
+    auxBtn.setAttribute('aria-pressed', 'false'); termBtn.setAttribute('aria-pressed', 'false');
+  }
+  auxBtn.addEventListener('click', () => dockMode === 'aux' ? closeDock() : openAux());
+  termBtn.addEventListener('click', () => dockMode === 'term' ? closeDock() : openTerm());
+  $('auxClose').addEventListener('click', closeDock);
+  $('termClose').addEventListener('click', closeDock);
+  dock.addEventListener('click', e => { if (e.target === dock && getComputedStyle(dock).position === 'fixed') closeDock(); });
+
+  // ===== Tabs（键盘可达）=====
+  const tabs = [$('tab-history'), $('tab-tasks')];
+  const panels = { 'tab-history': $('panel-history'), 'tab-tasks': $('panel-tasks') };
+  function selectTab(tab) {
+    tabs.forEach(t => {
+      const on = t === tab;
+      t.setAttribute('aria-selected', String(on));
+      t.tabIndex = on ? 0 : -1;
+      panels[t.id].hidden = !on;
+    });
+    tab.focus();
+  }
+  tabs.forEach(t => t.addEventListener('click', () => selectTab(t)));
+  document.querySelector('.tablist').addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      const i = tabs.indexOf(document.activeElement);
+      selectTab(tabs[(i + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length]);
+    }
+  });
+
+  // ===== 分支待启动状态 =====
+  const forkBar = $('forkBar'), forkText = $('forkText');
+  const harnessNames = { cc: 'Claude Code', cx: 'Codex CLI', gm: 'Gemini CLI', oc: 'OpenCode' };
+  let harness = 'cc';
+  const CONT = {
+    same: '继续方式：原生继续（同 Harness，checkpoint 兼容）',
+    cross: '继续方式：从公共历史转换（跨 Harness，启动前出示 Loss Report）',
+  };
+  function contText(node) {
+    return node.dataset.harness === harness ? CONT.same : CONT.cross;
+  }
+  function updateFork() {
+    const sel = document.querySelector('input[name="exec-parent"]:checked');
+    if (!sel) { forkBar.hidden = true; forkBar.style.borderLeftColor = ''; return; }
+    const node = sel.closest('.enode');
+    const eid = sel.value.toUpperCase();
+    forkBar.hidden = false;
+    let main, cont = '';
+    if (!sel.dataset.ok) {
+      forkBar.style.borderLeftColor = 'var(--err)';
+      main = eid + ' 执行失败，没有已冻结的输出存档，不能作为父存档点继续';
+    } else if (sel.dataset.head) {
+      forkBar.style.borderLeftColor = '';
+      main = '下一条消息将从当前 head（' + eid + ' · 分支 ' + sel.dataset.head + '）继续';
+      cont = contText(node);
+    } else {
+      forkBar.style.borderLeftColor = 'var(--decision)';
+      main = '下一条消息将从 ' + eid + ' 创建新分支，原分支 zinc-main 保留不变';
+      cont = contText(node) + ' · 发送消息时生效';
+    }
+    forkText.textContent = main;
+    let line = forkText.querySelector('.cont-line');
+    if (!line) { line = document.createElement('span'); line.className = 'cont-line'; forkText.appendChild(line); }
+    line.textContent = cont;
+    $('popCont').textContent = '当前选择 ' + harnessNames[harness] + '：' + (sel ? contText(node) : CONT.same);
+  }
+  document.querySelectorAll('input[name="exec-parent"]').forEach(r => r.addEventListener('change', updateFork));
+  $('forkCancel').addEventListener('click', () => {
+    const sel = document.querySelector('input[name="exec-parent"]:checked');
+    if (sel) sel.checked = false;
+    updateFork();
+  });
+
+  // ===== Binding popover =====
+  const bindingBtn = $('bindingBtn'), bindingPop = $('bindingPop');
+  function closePop() { bindingPop.hidden = true; bindingBtn.setAttribute('aria-expanded', 'false'); }
+  bindingBtn.addEventListener('click', () => {
+    const open = bindingBtn.getAttribute('aria-expanded') === 'true';
+    bindingPop.hidden = open;
+    bindingBtn.setAttribute('aria-expanded', String(!open));
+    if (!open) $('sel-harness').focus();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !bindingPop.hidden) { closePop(); bindingBtn.focus(); }
+  });
+  document.addEventListener('click', e => {
+    if (!bindingPop.hidden && !e.target.closest('.pop-anchor')) closePop();
+  });
+  $('sel-harness').addEventListener('change', e => {
+    harness = e.target.value;
+    $('bindName').textContent = harnessNames[harness];
+    $('bindGlyph').textContent = harness.toUpperCase();
+    updateFork();
+  });
+
+  // ===== Terminal 宽度调整（指针 + 键盘）=====
+  const resizer = $('termResizer'), termBody = $('termBody');
+  let termW = 440;
+  function setTermW(px) {
+    termW = Math.min(640, Math.max(280, px));
+    termBody.style.width = termW + 'px';
+    resizer.setAttribute('aria-valuenow', String(termW));
+  }
+  resizer.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    resizer.setPointerCapture(e.pointerId);
+    const startX = e.clientX, startW = termW;
+    const move = ev => setTermW(startW - (ev.clientX - startX));
+    const up = () => { resizer.removeEventListener('pointermove', move); resizer.removeEventListener('pointerup', up); };
+    resizer.addEventListener('pointermove', move);
+    resizer.addEventListener('pointerup', up);
+  });
+  resizer.addEventListener('keydown', e => {
+    if (e.key === 'ArrowLeft') { e.preventDefault(); setTermW(termW + 32); }
+    if (e.key === 'ArrowRight') { e.preventDefault(); setTermW(termW - 32); }
+  });
+</script>
+</body>
+</html>

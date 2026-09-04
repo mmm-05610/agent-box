@@ -1,6 +1,15 @@
-# 统一转写存储实施方案 v3（SH-PROFILE+TRANSCRIPT）
+# 统一转写存储实施方案 v3（已废弃）
 
-> 状态：待用户批准执行
+> 状态：**SUPERSEDED / 禁止按本文实施**
+>
+> 当前 canonical 设计：
+> [`EXECUTION_TREE_AND_CROSS_HARNESS_SESSION.md`](./EXECUTION_TREE_AND_CROSS_HARNESS_SESSION.md)。
+> 中间阶段的对称 Codec 设计见已被取代的
+> [`SESSION_HARNESS_SEPARATION.md`](./SESSION_HARNESS_SEPARATION.md)。
+> 本文保留用于记录 Leg、context handoff 和 transcript-only 方案的演进历史；其中
+> “跨 Harness 使用摘要/脚本 handoff”“Studio 只保存 native locator”“不反向物化
+> native session”等结论已被后续用户裁决取代。
+>
 > 版本：v3——恢复读写转译器（v1 核心）+ 吸收 v2 审查中的合理约束
 > 铁律：agent-box core（src/agent_box/**）零改动；agent-box-web 零引用
 

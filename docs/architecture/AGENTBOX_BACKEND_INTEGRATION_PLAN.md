@@ -1,6 +1,17 @@
-# Agent-Box 后端接入评估与计划 v2（目标模式筹备稿）
+# Agent-Box 后端接入评估与计划 v2（已废弃）
 
-> 状态：v2——按用户纠偏调整：**充分利用 core 治理能力，Studio 是 harness 治理的会话级呈现层，不是"多 harness 并用"的简单拼接**。协作与 sandbox 作为一等设计维度预留。
+> 状态：**SUPERSEDED / 禁止按本文实施**
+>
+> 当前后端实施蓝图：
+> [`AGENTBOX_STUDIO_BACKEND_CORE_IMPLEMENTATION.md`](./AGENTBOX_STUDIO_BACKEND_CORE_IMPLEMENTATION.md)。
+> 当前统一 Session 设计：
+> [`EXECUTION_TREE_AND_CROSS_HARNESS_SESSION.md`](./EXECUTION_TREE_AND_CROSS_HARNESS_SESSION.md)。
+>
+> 本文保留为 G1–G7 原型的历史记录。其中 per-Harness continuation、Stage/Leg、
+> context handoff、内存 transcript、Codex/Claude 特判编排和 managed worktree 默认
+> 路径均已被后续裁决取代。
+>
+> 原状态：v2——按用户纠偏调整：**充分利用 core 治理能力，Studio 是 harness 治理的会话级呈现层，不是"多 harness 并用"的简单拼接**。协作与 sandbox 作为一等设计维度预留。
 > 前端：agent-box-studio `studio-shell`（ports/registry 架构）。后端：`~/projects/agent-box` v2.0.0a1。**不修改 core，不用 agent-box-web。**
 
 ---

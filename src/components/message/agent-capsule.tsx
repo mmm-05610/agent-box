@@ -4,14 +4,14 @@
  * Shared visual shell for sub-agent capsules. Both the history "Agent" capsule
  * (`agent-tool-call.tsx`, reconstructed from the on-disk rollout) and the live
  * codex collab capsule (`collab-agent-card.tsx`, streamed) render through this
- * same chrome so the two are visually consistent: a collapsible pill trigger
+ * same chrome so the two are visually consistent: a collapsible event-row trigger
  * (chevron + shimmering title while running + an optional right-aligned suffix)
  * over a bordered, scrollable body. Each caller supplies its own body for the
  * data it actually has.
  */
 
 import { Children, useState, type ReactNode } from "react"
-import { ChevronRightIcon } from "lucide-react"
+import { Check, ChevronRightIcon, Loader2, X } from "lucide-react"
 
 import { Shimmer } from "@/components/ai-elements/shimmer"
 import {
@@ -84,26 +84,44 @@ export function AgentCapsule({
     }
   }
 
-  const pillClass = cn(
-    "group inline-flex max-w-full items-center gap-1.5 rounded-full bg-primary/10 px-3.5 py-2 text-xs font-medium text-foreground transition-colors ws-msg-chip",
-    hasBody && "hover:bg-primary/15",
-    isError && "text-destructive"
+  const capsuleState = isRunning ? "running" : isError ? "error" : "ok"
+  const StatusIcon = isRunning ? Loader2 : isError ? X : Check
+  // Keep the visible title in the accessible name when callers provide a
+  // localized state label. `aria-label` otherwise replaces, rather than
+  // augments, the trigger's visible text.
+  const accessibleLabel = statusLabel ? `${title}, ${statusLabel}` : undefined
+  const rowClass = cn(
+    "group flex w-full min-w-0 items-center gap-2 rounded-md px-1 py-1 text-xs text-foreground outline-none transition-colors",
+    hasBody && "hover:bg-[var(--surface-hover)]",
+    "focus-visible:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-workbench)] focus-visible:ring-inset"
   )
 
-  const pillInner = (
+  const rowInner = (
     <>
+      <StatusIcon
+        aria-hidden="true"
+        className={cn(
+          "size-3.5 shrink-0",
+          isRunning && "animate-spin",
+          isError
+            ? "text-[var(--status-danger)]"
+            : isRunning
+              ? "text-[var(--text-faint)]"
+              : "text-[var(--status-success)]"
+        )}
+      />
       {hasBody && (
         <ChevronRightIcon
           aria-hidden="true"
           className={cn(
-            "size-3 shrink-0 opacity-60 transition-transform",
+            "order-last size-3 shrink-0 opacity-60 transition-transform",
             bodyOpen && "rotate-90"
           )}
         />
       )}
-      <span className="min-w-0 truncate">
+      <span className="min-w-0 flex-1 truncate font-mono font-normal">
         {isRunning ? (
-          <Shimmer as="span" duration={1} shineColor="var(--primary)">
+          <Shimmer as="span" duration={1} shineColor="var(--text-faint)">
             {title}
           </Shimmer>
         ) : (
@@ -111,36 +129,44 @@ export function AgentCapsule({
         )}
       </span>
       {idBadge != null && (
-        <span className="shrink-0 font-mono text-3xs font-normal text-muted-foreground/70">
+        <span className="shrink-0 font-mono text-3xs font-normal text-[var(--text-faint)]">
           {idBadge}
         </span>
       )}
       {rightSuffix != null && (
-        <span className="flex shrink-0 items-center text-muted-foreground/60">
+        <span className="flex shrink-0 items-center text-[var(--text-faint)]">
           {rightSuffix}
         </span>
       )}
     </>
   )
 
-  // Nothing to expand → a bare, non-interactive pill (no chevron, no bordered
+  // Nothing to expand → a bare, non-interactive event row (no chevron, no bordered
   // frame). This is the fix for the empty sub-agent "white box".
   if (!hasBody) {
     return (
-      <div className={pillClass} aria-label={statusLabel}>
-        {pillInner}
+      <div
+        className={rowClass}
+        data-state={capsuleState}
+        aria-label={accessibleLabel}
+      >
+        {rowInner}
       </div>
     )
   }
 
   return (
-    <Collapsible open={bodyOpen} onOpenChange={setBodyOpen} className="w-full">
-      {/* Pill trigger — matches ToolGroupPart structure with themed emphasis. */}
-      <CollapsibleTrigger className={pillClass} aria-label={statusLabel}>
-        {pillInner}
+    <Collapsible
+      open={bodyOpen}
+      onOpenChange={setBodyOpen}
+      className="w-full"
+      data-state={capsuleState}
+    >
+      <CollapsibleTrigger className={rowClass} aria-label={accessibleLabel}>
+        {rowInner}
       </CollapsibleTrigger>
 
-      {/* Body — sits below the pill. Internal sections retain their own affordances. */}
+      {/* Body — sits below the event row. Internal sections retain their own affordances. */}
       <CollapsibleContent
         className={cn(
           "w-full outline-none",
@@ -149,7 +175,7 @@ export function AgentCapsule({
           "data-[state=closed]:slide-out-to-top-1 data-[state=open]:slide-in-from-top-1"
         )}
       >
-        <div className="mt-3 w-full overflow-hidden rounded-md border border-border/60">
+        <div className="mt-1.5 ml-5 w-[calc(100%-1.25rem)] overflow-hidden border-l border-border pl-3">
           <ScrollArea className="max-h-72">
             <div className="space-y-3 px-3.5 py-2">{children}</div>
           </ScrollArea>

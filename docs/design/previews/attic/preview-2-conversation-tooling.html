@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>预览 2 · 活跃会话与工具调用 — Agent-Box Studio</title>
+<link rel="stylesheet" href="./_kit.css">
+<style>
+  /* 预览 2 专属：转写统计行 */
+  .turn-stats {
+    display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;
+    color: var(--faint); font-size: 0.71875rem; margin-top: 0.75rem;
+    font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  }
+  .turn-stats span { white-space: nowrap; }
+  .turn-stats .sep { color: var(--border-strong); }
+  /* 权限请求卡（waiting 原型的完整形态） */
+  .decision .cmd {
+    font-family: var(--font-mono); font-size: 0.78125rem; color: var(--fg);
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: var(--r-row); padding: 0.5rem 0.75rem; margin: 0.5rem 0 0;
+    white-space: pre-wrap;
+  }
+  .decision .modes { display: flex; gap: 0.5rem; margin-top: 0.75rem; flex-wrap: wrap; }
+  .mode-pill {
+    display: inline-flex; align-items: center; gap: 0.375rem;
+    border: 1px solid var(--border-strong); border-radius: var(--r-pill);
+    color: var(--muted); padding: 0.25rem 0.75rem; font-size: 0.78125rem;
+    background: none; cursor: pointer; font-family: inherit;
+  }
+  .mode-pill:hover { color: var(--fg); }
+  .mode-pill.on { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+  .composer-meta {
+    display: flex; gap: 1rem; padding: 0 0.75rem 0.625rem; align-items: center;
+    color: var(--faint); font-size: 0.71875rem; font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+  .ctxbar {
+    flex: 1; height: 0.1875rem; border-radius: var(--r-pill);
+    background: color-mix(in oklch, var(--fg) 10%, transparent); overflow: hidden;
+  }
+  .ctxbar i { display: block; height: 100%; width: 38%; background: var(--muted); border-radius: var(--r-pill); }
+</style>
+</head>
+<body>
+
+<div class="console">
+  <div class="name">预览 2 · <em>活跃会话与工具调用</em></div>
+  <div class="dials">tool pill 四态 · 横条三级 · 决策卡 · 队列</div>
+  <div class="spacer"></div>
+  <button class="cbtn" id="themeBtn" aria-pressed="false">☀ 亮色</button>
+  <button class="cbtn" id="zoomBtn" aria-pressed="false">A 150%</button>
+</div>
+
+<div class="app">
+  <div class="titlebar">
+    <div class="lights" aria-hidden="true"><i></i><i></i><i></i></div>
+    <div class="title">Agent-Box Studio</div>
+    <div class="winctl" aria-hidden="true">— ▢ ✕</div>
+  </div>
+
+  <div class="topbar">
+    <div class="logo" aria-hidden="true">A</div>
+    <div class="crumb"><span class="hide-sm">agent-box-studio</span> › <b>解析 Zed 会话 JSONL 的执行树投影</b></div>
+    <div class="chip"><span class="mono">⎇ studio-shell</span> ▾</div>
+    <div class="right">
+      <button class="sq on" aria-label="切换侧栏" aria-pressed="true">◧</button>
+      <button class="sq" aria-label="切换终端">▤</button>
+      <button class="sq" aria-label="切换辅助面板">◨</button>
+      <button class="sq" aria-label="设置">⚙</button>
+    </div>
+  </div>
+
+  <section class="chat">
+    <!-- 横条第 3 级：自动重试（提示，无 destructive 染色） -->
+    <div class="strip quiet" role="status">
+      <span class="spin" aria-hidden="true"></span>
+      <span class="txt">与 codex-sidecar 的连接中断，第 2 次自动重试…</span>
+      <button class="btn-ghost" style="margin-left:auto;padding:0.125rem 0.75rem">手动重连</button>
+    </div>
+
+    <div class="stream">
+      <div class="msg user">跑一下 parsers 的测试；如果 zinc 格式的快照挂了，把差异贴给我。注意别更新快照。</div>
+
+      <div class="msg ai">
+        <div class="agent-line"><span class="hglyph" title="Claude Code">CC<span class="pid c1" aria-hidden="true"></span></span> Claude Code · 正在执行</div>
+
+        <button class="toolchip" aria-expanded="false">
+          <span class="st ok" aria-hidden="true">✓</span>
+          <span class="sum">Bash cargo test --features test-utils · exit 0 · 48.3s</span>
+          <span class="st">↕</span>
+        </button>
+
+        <button class="toolchip" aria-expanded="true">
+          <span class="st err" aria-hidden="true">✕</span>
+          <span class="sum">Read parsers/zinc/fixtures/snapshot.snap · 断言失败</span>
+          <span class="st">↕</span>
+        </button>
+        <div class="tool-body error">assertion failed: actual line 118
+  left:  "role":"user","kind":"zinc","turn_id":"01J9ZK"
+ right:  "role":"assistant","kind":"zinc","turn_id":"01J9ZK"
+快照与 wire-shape 宽容解析的预期不符：zinc 在 118 行把 turn 归属写反了。</div>
+
+        <button class="toolchip running" aria-expanded="false">
+          <span class="spin" aria-hidden="true"></span>
+          <span class="sum shimmer">Bash cargo insta review --snapshot zinc@118</span>
+        </button>
+
+        <p style="margin-top:0.75rem" class="dim">已把差异摘要发给 codex 侧做交叉验证，等待结果：</p>
+
+        <button class="toolchip" aria-expanded="false">
+          <span class="hglyph" style="width:0.9375rem;height:0.9375rem;font-size:0.5rem" title="Codex CLI">CX<span class="pid c2" aria-hidden="true"></span></span>
+          <span class="sum">委派 · 交叉验证 zinc 快照差异 <span class="tid">#a3f9c2e1</span></span>
+          <span class="st spin" aria-hidden="true"></span>
+        </button>
+
+        <div class="turn-stats" aria-label="本轮统计">
+          <span>↑ 1,284 tok</span><span class="sep">·</span>
+          <span>↓ 3,907 tok</span><span class="sep">·</span>
+          <span>4 tools</span><span class="sep">·</span>
+          <span>2 分 41 秒</span>
+        </div>
+      </div>
+
+      <!-- 决策卡：waiting 原型（琥珀左缘，Approve 为主动作） -->
+      <div class="decision" role="alertdialog" aria-label="权限请求">
+        <div class="head"><span aria-hidden="true">盾</span> Claude Code 请求修改快照</div>
+        <div class="cmd">cargo insta accept --snapshot parsers::zinc@118
+# 涉及 1 个文件 · parsers/zinc/fixtures/snapshot.snap</div>
+        <div class="modes" role="radiogroup" aria-label="权限范围">
+          <button class="mode-pill on" role="radio" aria-checked="true">仅本次</button>
+          <button class="mode-pill" role="radio" aria-checked="false">本会话内允许 Bash</button>
+          <button class="mode-pill" role="radio" aria-checked="false">总是询问</button>
+        </div>
+        <div class="foot">
+          <button class="btn-approve">批准</button>
+          <button class="btn-ghost">拒绝</button>
+          <span style="align-self:center;color:var(--faint);font-size:0.71875rem;margin-left:0.25rem">Enter 批准 · Esc 拒绝</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="queue-chip">
+      <span class="n" aria-hidden="true">≡ 2</span>
+      <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">顺手把转换矩阵的 zinc 行标红</span>
+      <span class="n" aria-hidden="true">≡ 1</span>
+      <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--faint)">再补一列 reasoning 块</span>
+      <span style="margin-left:auto" class="n tail-acts">编辑 · 上移 · 删除</span>
+    </div>
+
+    <div class="composer">
+      <div class="composer-input"><span class="typed">先别 accept，等 codex 的结果回来再</span><span class="caret" aria-hidden="true"></span></div>
+      <div class="composer-controls">
+        <button class="ctl" aria-label="添加附件">＋ 附件</button>
+        <button class="ctl" aria-label="权限模式">盾 询问 ▾</button>
+        <button class="ctl hide-sm" aria-label="代理选择"><span class="hglyph" style="width:0.9375rem;height:0.9375rem;font-size:0.5rem">CC<span class="pid c1" aria-hidden="true"></span></span> Claude Code ▾</button>
+        <button class="ctl push" aria-label="模型选择"><span class="mono">GLM-5.3-Flash</span> ▾</button>
+        <button class="ctl hide-sm" aria-label="发送选项：转舵">⇄ 转舵 ▾</button>
+        <button class="send" aria-label="发送消息">↑</button>
+      </div>
+      <div class="composer-meta">
+        <span class="ctxbar" role="img" aria-label="上下文占用 38%"><i></i></span>
+        <span>38% · 46k / 128k</span>
+      </div>
+    </div>
+  </section>
+
+  <div class="statusbar">
+    <span class="mono">⎇ studio-shell</span>
+    <span class="ok">✓ 4800 tests</span>
+    <span class="hide-sm">MCP 已连接</span>
+    <div class="right"><span class="hide-sm">中文</span><span class="mono">100%</span></div>
+  </div>
+</div>
+
+<p class="note">
+  <b>检查要点：</b>工具调用是"事件不是文档"——默认一行 pill（状态图标 + mono 命令 + 摘要），错误体展开才出现；
+  自动重试（顶部细线）不染色，致命错误才用左缘 2px 实底（本页 tool-body.error 演示错误体形态）；
+  决策卡 = 琥珀左缘 + Approve 琥珀主按钮 + 键盘提示；委派 pill 内嵌 harness 方槽与身份点；
+  队列 chip 虚线框 + mono 序号；composer 底部上下文占用用 mono + tabular-nums。
+</p>
+
+<script>
+  const themeBtn = document.getElementById('themeBtn');
+  const zoomBtn = document.getElementById('zoomBtn');
+  themeBtn.addEventListener('click', () => {
+    const light = document.documentElement.dataset.pref === 'light';
+    document.documentElement.dataset.pref = light ? 'dark' : 'light';
+    themeBtn.setAttribute('aria-pressed', String(!light));
+    themeBtn.textContent = light ? '☀ 亮色' : '☾ 暗色';
+  });
+  zoomBtn.addEventListener('click', () => {
+    const on = document.documentElement.classList.toggle('zoom-150');
+    zoomBtn.setAttribute('aria-pressed', String(on));
+  });
+</script>
+</body>
+</html>

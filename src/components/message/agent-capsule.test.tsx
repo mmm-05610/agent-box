@@ -106,4 +106,46 @@ describe("AgentCapsule", () => {
     )
     expect(screen.queryByText("LIVE BODY")).not.toBeInTheDocument()
   })
+
+  it.each([
+    ["completed", false, false, "ok", "text-[var(--status-success)]"],
+    ["running", true, false, "running", "text-[var(--text-faint)]"],
+    ["error", false, true, "error", "text-[var(--status-danger)]"],
+  ])(
+    "uses a distinct semantic identity for %s state",
+    (_label, isRunning, isError, dataState, expectedClass) => {
+      const { container } = render(
+        <AgentCapsule
+          title="Stateful event"
+          isRunning={isRunning}
+          isError={isError}
+          statusLabel="state"
+        >
+          <div>STATE BODY</div>
+        </AgentCapsule>
+      )
+
+      const row = container.querySelector(`[data-state="${dataState}"]`)
+      const icon = row?.querySelector("svg")
+      expect(row).toBeInTheDocument()
+      expect(icon).toHaveClass(expectedClass)
+      expect(icon).not.toHaveClass(
+        isError
+          ? "text-[var(--status-success)]"
+          : isRunning
+            ? "text-[var(--status-danger)]"
+            : "text-[var(--status-danger)]"
+      )
+      if (isRunning) {
+        expect(icon).not.toHaveClass("text-[var(--status-success)]")
+      } else if (!isError) {
+        expect(icon).not.toHaveClass("text-[var(--text-faint)]")
+      } else {
+        expect(icon).not.toHaveClass("text-[var(--text-faint)]")
+      }
+      expect(screen.getByRole("button")).toHaveAccessibleName(
+        "Stateful event, state"
+      )
+    }
+  )
 })
