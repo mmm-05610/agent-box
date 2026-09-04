@@ -37,6 +37,16 @@
    - **sandbox 是契约化绑定维度**（v3 修正）：解析期经 registry resolve(SANDBOX_CONTRACT_ID, ref) → SandboxV1 → `negotiate(harness.runtime.sandbox_capabilities)` → 谈判 digest 进绑定条/StageIndex；不满足 → preflight 拒绝。`none`(direct) 同样入账——每轮如实记录"跑在沙箱外"。执行双路径：negotiated → coordinator→wrap(mount_plan)；none → transport.submit 原样。
    StageIndex 是治理索引：每个阶段指向其 execution(s) 与该阶段的确切绑定（profile 版本、continuation 契约、sandbox、model overlay）。
 2. **SessionStore**（上层 SQLite：session/stage/profile_meta；Execution 归 work_core 库）。
+2.4.5 **五家 native resume 官方支持确认（G0.5 复查结论，2026-09-04）**：
+   hermes 官方 `--resume SESSION`（by ID/title）+ SQLite 会话库（sessions export
+   可出 JSONL）；opencode 官方 `run --session <id>` + `opencode session` 管理 +
+   serve GET /session。**五家全部原生支持会话恢复**——R1 native resume 全通，
+   损耗矩阵中 opencode/hermes 的"摘要级"两行作废。R2 渲染仅用于跨 harness
+   首次启用（可选手 handoff）。
+   行动项：hermes provider 从 transcript_handoff 升级为 --resume 实现（toml
+   continuation.kind → native_session，转换器对接其 sessions export JSONL）；
+   opencode toml 标签修正（插件已在传 --session）。
+
 2.5 **权威统一转写格式（v3 定稿）与五 harness 损耗矩阵**：
    以 pi 会话文件形态为基底（header + 顺序行，极简无链无加密）+ Turn/parts 内容
    + `x-{harness}` 扩展槽（不可归一的原始字段降级保留，不丢弃）。接续策略按
