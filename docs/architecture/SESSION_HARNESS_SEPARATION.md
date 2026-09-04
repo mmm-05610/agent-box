@@ -127,57 +127,62 @@ send({input, harnessId})
 | SH-3 | UI：composer 逐轮选择器语义、turn 徽标、tab id 简化、侧栏行图标 | 一天 |
 | SH-4 | 迁移（旧会话导入）+ 交接动作 C（若批准） | 半天 |
 
-## 9. Session Orchestrator 插件（跨 harness 连续性引擎，v3 增补）
+## 9. Session Orchestrator 插件（统一转写存储 + 历史重放，v3 主方案）
 
-> 一个大 Session 包含多个小 Execution（不同 profile/harness/model/sandbox），
-> 每个 execution 都能"接着上面的任务继续"——如同在一个 harness 内部一样。
-> 这是 Session Orchestrator 的核心职责，也是本设计最复杂的部分。
+> 一个大 Session 包含多个小 Execution（不同 harness/profile/model/sandbox），
+> 每个 execution 都能"接着上面的任务继续"。核心机制不是记忆摘要，而是
+> **会话格式统一**：权威转写以统一格式持久化，接续 = 把统一历史渲染给执行者。
 
-### 9.1 诚实的边界声明
+### 9.1 业界依据（2026-09 调查）
 
-各 harness 的对话上下文是**私有格式**（codex rollout / claude 会话文件），
-跨 harness 的"无缝继续"在协议层不可能无损。工程上能做到的是三层连续性：
+- **同会话切模型的标准做法 = 全量重放**：ChatGPT/Claude.ai 切换模型时没有任何
+  隐藏状态迁移——平台把完整消息历史作为输入重放给新模型，由它从头重新解读
+  （参考：Chat History & Context 机制分析、MultiChats 模型切换说明）。
+- **会话格式统一是业界方向**：Agent Client Protocol 的 `session/update` 流即
+  统一会话事件 schema；Pydantic AI ACP harness 把每轮持久化为
+  "message history + client-visible transcript" 并在重开时恢复进 agent；
+  ecosystem 已有跨 harness 转换器（如 trajectory：任意 harness 会话 →
+  统一 trajectory 格式）。
+- **各 harness 的 native 会话本就是可解析的消息流**（JSONL），不是黑箱——
+  claude ~/.claude/projects、codex rollout 均可解析映射。
 
-| 层 | 连续性 | 机制 | 保真度 |
-|---|---|---|---|
-| L1 native | 同 harness 回切 | continuation 游标（thread/resume、--resume） | **无损** |
-| L2 文件世界 | 任意执行之间 | workspace 本身（代码/文档是共享事实） | **无损**（工作产物的主体） |
-| L3 Session Memory | 跨 harness 切换 | Orchestrator 维护的记忆层自动注入 | **有损、可控**（摘要级） |
+### 9.2 主方案：统一转写存储（Unified Transcript）+ 渲染适配
 
-大多数"继续干活"的实际依赖是 L2（文件世界）+ L3（目标与决策记忆），
-对话原文的逐 token 连续只在 L1 存在——这个边界对用户诚实呈现（绑定条标注 handoff 状态）。
+1. **权威转写**：每个 execution 的归一化事件追加写入统一转写
+   （Turn/parts 格式，与前端 core/domain/message.ts 同形；studio 侧 Python 镜像）。
+   存于 SessionStore（transcript 表）。native 会话文件仍是 harness 侧事实源，
+   但**面向 Studio 的权威视图是统一转写**。
+2. **接续的三档读取渲染**（按目标 harness 能力与历史长度自动选择）：
+   - **R1 native resume**（同 harness 回切）：无损，优先；
+   - **R2 脚本重放**（跨 harness）：统一转写渲染为对话脚本文本——
+     `[user] … / [assistant(Codex)] … / [tool: 读取 X → 结果摘要] / [文件变更] …`
+     ——作为新执行的首条前置上下文 + 用户输入。文本级无损（工具结果以
+     摘要/关键输出形式重放，工具本体不可跨产品重执行）；
+   - **R3 压缩尾部**（历史超过上限后）：旧轮折叠为摘要链（原 SessionMemory
+     的 digest 链降级为此用途）+ 保留近 N 轮全量。
+3. **原 SessionMemory 摘要方案降级为 R3 的压缩组件**，不再作为主接续手段。
 
-### 9.2 SessionMemory（Orchestrator 维护的记忆层）
+### 9.3 诚实边界
 
-```python
-class SessionMemory:
-    objective: str                    # 会话目标（创建时定，可改）
-    turn_digests: list[TurnDigest]    # 每轮摘要链（追加）
-    open_threads: list[str]           # 未完成事项（最近轮提取）
-    file_timeline: list[FileChange]   # 文件变更时间线（finalization capture）
-```
+- 工具调用不可跨产品重**执行**，只能重放其**结果文本**——文件世界的实际产出
+  仍在 workspace（无损），对话上下文的重放是文本级；
+- 跨 harness 的"风格/推理连续"依赖新模型对历史的重新解读（业界共性限制，
+  与 ChatGPT 切模型一致）；
+- token 成本线性于历史长度：R2 全量 → R3 压缩的分界可配置（默认
+  历史超过 context 窗口 1/3 时启用 R3）。
 
-- **TurnDigest 生成**（每轮完成时自动，规则式优先）：从事件流归约提取
-  `{harness, 用户意图, 结果摘要, 文件变更, profile/model}`，无 LLM 也可生成；
-  可选升级为小模型摘要（设置项，默认关）。
-- **注入策略**（跨 harness 切换时自动 + 绑定条标注 `handoff:auto`）：
-  前置上下文块 = Objective + 最近 3-5 轮 digest + open threads + 文件时间线近 N 项；
-  同 harness 回切不注入（L1 native 续接）。
-- **成本控制**：注入体上限（如 4KB）；摘要分级压缩（digest 链 > 总括）。
+### 9.4 Orchestrator 职责（更新）
 
-### 9.3 Orchestrator 职责汇总
+1. Session/StageIndex 聚合与持久化（G2）
+2. 统一转写写入（每 execution 事件归约追加）+ transcript API
+3. 接续渲染器：native resume / R2 脚本重放 / R3 压缩尾部的自动选择
+4. Turn 生命周期：BindingResolver 九维 → 谈判 → 冻结派发 → 执行 → 落账
+5. harnessState 游标（R1 用）；事件归一 → WS
 
-1. Session/StageIndex 聚合与持久化
-2. Turn 生命周期：绑定解析（BindingResolver 九维）→ 谈判 → 冻结派发 → 执行观测 → 落账
-3. SessionMemory 维护：digest 提取/注入/容量管理
-4. harnessState 游标：native 续接（同 harness 回切）
-5. 事件归一 → WS 广播；失败与中断处理
+### 9.5 落点
 
-### 9.4 落点
-
-实现为 `plugins/agent-box-studio` 的核心模块（orchestrator + memory），
-不是 core 插件（依赖 Studio 领域模型）；未来若 core 演进出统一 session 存储，
-memory 层可上移——接口已按此预留。
+`plugins/agent-box-studio`（orchestrator + transcript store + 渲染器）；
+native JSONL 解析器参考 codeg parsers/（claude/codex 会话文件解析已有实现可移植）。
 
 ## 10. 决策记录（v3 增补，2026-09-03）
 
