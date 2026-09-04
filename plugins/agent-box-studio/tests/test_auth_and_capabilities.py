@@ -45,18 +45,16 @@ def test_capabilities_report_honest_truth(client):
 def test_capabilities_without_fake_provider_report_unavailable(client_without_fake):
     body = client_without_fake.get("/api/v1/capabilities").json()
     # Without the fake provider no provider declares the session-turn
-    # capability; the five real harness providers still report their own
-    # honest capability truth (including an unavailable pi binary here).
+    # capability.  Whatever harness providers ARE installed in this
+    # environment (all five in a preview install, none in a lean studio
+    # install) must each report their own honest, well-formed truth.
     assert body["execution"]["session_turn_capability_providers"] == 0
     providers = {p["provider_id"]: p for p in body["execution"]["providers"]}
-    assert set(providers) >= {
-        "codex-execution",
-        "claude-code-execution",
-        "opencode-execution",
-        "hermes-execution",
-        "pi-execution",
-    }
-    assert providers["codex-execution"]["harness_type"] == "codex"
+    for provider_id, provider in providers.items():
+        assert provider["harness_type"]
+        assert provider["capabilities"]
+        assert provider["start_state"] in ("available", "unavailable", "not_implemented")
+        assert provider["session_modes"]
     # Without a harness the turn must fail closed, not fake success.
     session = client_without_fake.post(
         "/api/v1/sessions",

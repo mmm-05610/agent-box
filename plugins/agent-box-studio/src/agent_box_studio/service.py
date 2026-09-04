@@ -686,26 +686,39 @@ class StudioService:
         harness = getattr(provider, "harness_type", None) or ""
 
         # -- freeze runtime port selections (auditable defaults only) --------
+        # Only the ports the SELECTED provider actually declares as dispatch
+        # inputs are resolved: a provider that consumes no runtime/sandbox/
+        # terminal contract (fake/offline verticals) must not depend on
+        # those providers being installed.
+        provider_limits = provider.input_limits()
         requirements = getattr(provider, "runtime_requirements", None)
         network_required = (
             bool(callable(requirements) and requirements().get("network") == "required")
         )
-        host_ref, _host_provider = self._make_port_ref(
-            RUNTIME_HOST_CONTRACT_ID, runtime_host
-        )
-        affinity = str(host_ref.metadata.get("affinity", ""))
-        sandbox_ref, _sandbox_provider = self._sandbox_ref(
-            sandbox, affinity, network_required
-        )
-        terminal_native_ref, _terminal_provider = self._make_port_ref(
-            TERMINAL_SESSION_CONTRACT_ID,
-            terminal,
-            default_provider_id=DEFAULT_TERMINAL_PROVIDER_ID,
-            make_ref_kwargs={"host_affinity": affinity},
-        )
-        # Terminal refs cross the Work Core dispatch surface as work_core
-        # Refs carrying the exact session identity in metadata.
-        terminal_ref = _terminal_work_core_ref(terminal_native_ref)
+        host_ref: Optional[Ref] = None
+        sandbox_ref: Optional[Ref] = None
+        terminal_ref: Optional[Ref] = None
+        if RUNTIME_HOST_CONTRACT_ID in provider_limits:
+            host_ref, _host_provider = self._make_port_ref(
+                RUNTIME_HOST_CONTRACT_ID, runtime_host
+            )
+            affinity = str(host_ref.metadata.get("affinity", ""))
+        else:
+            affinity = ""
+        if SANDBOX_CONTRACT_ID in provider_limits:
+            sandbox_ref, _sandbox_provider = self._sandbox_ref(
+                sandbox, affinity, network_required
+            )
+        if TERMINAL_SESSION_CONTRACT_ID in provider_limits:
+            terminal_native_ref, _terminal_provider = self._make_port_ref(
+                TERMINAL_SESSION_CONTRACT_ID,
+                terminal,
+                default_provider_id=DEFAULT_TERMINAL_PROVIDER_ID,
+                make_ref_kwargs={"host_affinity": affinity},
+            )
+            # Terminal refs cross the Work Core dispatch surface as
+            # work_core Refs carrying the exact session identity in metadata.
+            terminal_ref = _terminal_work_core_ref(terminal_native_ref)
         profile_ref, profile_envelope = self._resolve_profile(
             provider, profile_id, profile_revision, profile_digest
         )
@@ -742,14 +755,26 @@ class StudioService:
             extra={
                 "harness_type": harness,
                 "launch_mode": launch_mode or "",
-                "sandbox_template": sandbox_ref.native_id,
-                "terminal_provider": terminal_ref.provider,
-                "terminal_native_id": terminal_ref.native_id,
-                "terminal_session_digest": str(
-                    (terminal_ref.metadata or {}).get("session_digest", "")
+                **(
+                    {
+                        "sandbox_template": sandbox_ref.native_id,
+                    }
+                    if sandbox_ref is not None
+                    else {}
                 ),
-                "terminal_affinity": str(
-                    (terminal_ref.metadata or {}).get("affinity", "")
+                **(
+                    {
+                        "terminal_provider": terminal_ref.provider,
+                        "terminal_native_id": terminal_ref.native_id,
+                        "terminal_session_digest": str(
+                            (terminal_ref.metadata or {}).get("session_digest", "")
+                        ),
+                        "terminal_affinity": str(
+                            (terminal_ref.metadata or {}).get("affinity", "")
+                        ),
+                    }
+                    if terminal_ref is not None
+                    else {}
                 ),
             },
         )
