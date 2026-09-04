@@ -251,3 +251,57 @@ native JSONL 解析器参考 codeg parsers/（claude/codex 会话文件解析已
   format 元数据扩展点；设置页管理启用/禁用/导入）。
 - Sandbox：**必选维度**——默认 direct（显式指定，非缺席）；指定 bwrap 而环境
   不可用 → turn 拒绝（不静默降级）。
+
+## 11. 五家 native 会话格式规格与转换矩阵（v5 终稿，2026-09-04 实机解剖）
+
+### 11.1 格式规格（真实文件/库实证）
+
+| harness | 存储 | 位置 | 结构 | 解析难度 |
+|---|---|---|---|---|
+| codex | JSONL rollout | `~/.codex/sessions/Y/M/D/rollout-*.jsonl` | 行类型：`session_meta`(id/cwd/instructions/cli_version) / `response_item`(message[developer\|user\|assistant, content=input_text\|output_text] / reasoning[**encrypted_content**] / function_call) / `event_msg` / `turn_context` / `world_state` | 中（payload 类型分派；event_msg 与 response_item 有重复需去重） |
+| claude | JSONL | `~/.claude/projects/{slug}/{uuid}.jsonl` | 行类型：`user\|assistant`(message.content=[text\|tool_use\|tool_result], **uuid/parentUuid 链表**) / `attachment` / `queue-operation` / `last-prompt` / `summary` | 中（链表→线性化；attachment 行过滤） |
+| pi | JSONL | `--session-dir` 下 `{_}_{session_id}.jsonl` | 行类型：`session`(header: id/cwd) / `message`(role/model/provider) | 易（与统一格式近同构，≈直读） |
+| opencode | **SQLite** | `~/.local/share/opencode/opencode.db` | `session`(tokens/cost/agent/model/permission/**time_compacting**) → `message`(data JSON) → `part`(data JSON：**类型化 parts**，与前端 Turn/parts 同构) + `session_context_epoch`（压缩纪元） | 易（关系模型≈统一模型；parts 直映射） |
+| hermes | **SQLite** | `~/.hermes/state.db` | `sessions`(model/**handoff_state/platform**/parent_session_id/**profile_name**/compression_* /tokens/cost) + `messages`(role/content/**tool_calls**/reasoning/compacted) | 易（OpenAI 风格消息行） |
+
+### 11.2 统一格式覆盖判定
+
+统一格式（Turn/parts + usage + 阶段索引）可承载五家全部**语义内容**；
+不可承载项（入 x-槽或丢弃并标注）：
+- codex `encrypted_content`（加密 reasoning——跨 harness 本不可读）
+- claude `parentUuid` 树结构（线性化为主分支）
+- 各家 harness 专属控制行（world_state/attachment/queue-operation 等——非会话语义）
+
+### 11.3 转换矩阵（难度/损耗终版）
+
+| 方向 | 难度 | 损耗 |
+|---|---|---|
+| codex ⇄ unified | 中 | reasoning 加密内容丢弃（标注）；其余无损 |
+| claude ⇄ unified | 中 | uuid 链→线性（主分支保留）；其余无损 |
+| pi ⇄ unified | 易 | ≈无损（同构） |
+| opencode ⇄ unified | 易 | ≈无损（parts 同构；time_compacting 纪元映射为 R3 压缩标记） |
+| hermes ⇄ unified | 易 | 无损（messages 行全字段可映射；handoff/profile 列映射为溯源） |
+
+### 11.4 设计范围（确定）
+
+**SH-1~4 覆盖（本次设计范围）**：
+- 统一转写权威存储（transcript.jsonl：Turn/parts + usage + 压缩纪元标记）
+- 五家双向转换器（codex/claude/pi/opencode/hermes ⇄ unified）
+- 执行期 EXPORT/IMPORT 流水线（unified→native 视图→沙箱覆写→harness 读写→收回合并）
+- R1/R2/R3 三档接续渲染（native resume / 全量脚本 / 压缩尾部）
+- 前端换联（转写渲染消费统一转写 + Profiles/绑定条）
+
+**范围外（明确不做，后续阶段）**：
+- 各 harness native 格式的**长期写权威**（native 文件每轮由 unified 重生成，非独立存储）
+- opencode/hermes 自有 storage 的接管（保留其原生机制，转换器只读）
+- hermes/opencode 插件的 continuation.kind 升级实施（文档已标行动项）
+- core 修改、agent-box-web 使用（铁律持续有效）
+
+### 11.5 收官判定
+
+五家 native resume 官方全支持；统一转写为唯一权威；跨 harness 接续=统一转写
+渲染（文本级全量保真，超窗确定性裁剪）；同 harness 永远 native resume（零损耗，
+结构性保证）。设计完备，可进入实施。
+__zcode_status=$?
+if [ "$__zcode_status" -eq 0 ]; then pwd -P > '/tmp/zcode-85d97b5e-80af-49d3-bfb8-5b6f52114be8-cwd'; fi
+exit "$__zcode_status"
