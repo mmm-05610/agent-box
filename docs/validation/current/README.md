@@ -26,3 +26,13 @@ no SkillRef):
   pointer intent/recovery truth table、exact freeze、reconcile verify、
   legacy staged snapshot、skill inventory delta、严格状态机)
 - `docs/architecture/NATIVE_PROFILE_HOME_AND_CENTRAL_SKILL_ARCHITECTURE.md`
+
+Studio 后端核心替换（Session/Harness separation 实施）：
+
+- `AGENT_BOX_STUDIO_BACKEND_CORE_PHASE1.md` — Phase 1（Session Protocol /
+  Store / Live Workspace / fake vertical）。
+- `AGENT_BOX_STUDIO_FIVE_HARNESS_BACKEND_PHASE2.md` — Phase 2（Gate A 审计
+  闭合 + 五真实 Harness 生产链 + 202 异步 Turn 事务 + 恢复/取消/权限面）。
+  该报告对 Phase 1 的 A10（httpx2 依赖）结论做了修正说明。
+- `SMOKE_REAL_HARNESS.md` — 人工真实凭据 smoke 指南（未执行，
+  REAL-CREDENTIAL SMOKE PENDING）。

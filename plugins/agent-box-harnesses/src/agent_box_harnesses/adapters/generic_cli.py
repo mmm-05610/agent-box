@@ -27,7 +27,7 @@ GUEST_HOME = "/runtime/home"
 GUEST_WORKSPACE = "/workspace"
 GUEST_PATH_ENV = "/usr/bin:/bin"
 _PROFILE_AUTHORITY = "agent-box.profile@1"
-_LOCATOR_ATTRS = ("session_locator", "session_id", "thread_id", "session_file", "native_id", "value")
+_LOCATOR_ATTRS = ("session_locator", "session_id", "thread_id", "transcript_ref", "session_file", "native_id", "value")
 
 
 class GenericCliAdapter:
@@ -160,7 +160,8 @@ class GenericCliAdapter:
             # never receive native argv tokens.
             continuation_argv = self._continuation_argv(locator, mode=context.launch_mode.name)
             if continuation_argv:
-                argv = argv[:2] + list(continuation_argv) + argv[2:]
+                index = self._continuation_insertion_index(context)
+                argv = argv[:index] + list(continuation_argv) + argv[index:]
         prompt = context.prompt
         if prompt and not self._prompt_is_protocol(context.launch_mode.name):
             argv.append(prompt)
@@ -226,11 +227,33 @@ class GenericCliAdapter:
             return continuation.strip()[:256]
         raise PlanRejected("CONTINUATION_LOCATOR_UNEXTRACTABLE", self.harness_type)
 
+    def profile_model(self, payload: Mapping[str, Any]) -> str | None:
+        """Model identity declared by a native profile payload (vendor fact).
+
+        The base is honest absence: ``None`` unless a per-Harness subclass
+        declares the payload key that carries the model selection.
+        """
+        del payload
+        return None
+
     def _continuation_argv(self, locator: str, *, mode: str | None = None) -> tuple[str, ...] | None:
         # Base native continuation; per-Harness subclasses own their argv
         # shape and may opt out per session mode (returning None).
         del mode
         return ("--resume", locator)
+
+    def _continuation_insertion_index(self, context: HarnessStartContext) -> int:
+        """Where continuation tokens enter the lowered argv.
+
+        The lowered argv is ``[binary] + launch_mode.argv[1:] + [prompt]``.
+        The default (index 2) inserts right after the subcommand token,
+        which is where the codex ``exec resume <id>`` and claude
+        ``--resume`` shapes belong.  Harnesses whose launch-mode head is
+        longer (e.g. pi's ``--mode json``) override this so continuation
+        tokens can never split the launch-mode flags.
+        """
+        del context
+        return 2
 
     def _continuation_kind(self, mode: str | None = None) -> str:
         del mode

@@ -115,6 +115,33 @@ class PiAdapter(GenericCliAdapter):
     def _make_decoder(self) -> NativeObservationDecoder:
         return PiJsonDecoder()
 
+    def _continuation_insertion_index(self, context) -> int:
+        # pi's exec head is `pi --mode json`: continuation tokens must enter
+        # AFTER the full launch-mode head, never between `--mode` and `json`.
+        return len(context.launch_mode.argv)
+
+    def profile_model(self, payload: Mapping[str, Any]) -> str | None:
+        """Model identity declared by a pi settings payload (FACTS D4/C.6).
+
+        ``defaultModel`` is the real settings.json vocabulary key.  pi's full
+        model identity is the ``<provider>/<model>`` form (the FACTS C.6 RPC
+        probe used ``--provider deepseek --model deepseek/deepseek-v4-flash``),
+        so a bare ``defaultModel`` value (no ``/``) is combined with the
+        declared ``defaultProvider``; an already-namespaced value is returned
+        as-is.  Absent or empty ``defaultModel`` is honest ``None`` — a
+        ``defaultProvider`` alone selects no model.
+        """
+        model = payload.get("defaultModel")
+        if not isinstance(model, str) or not model.strip():
+            return None
+        model = model.strip()
+        if "/" in model:
+            return model[:256]
+        provider = payload.get("defaultProvider")
+        if isinstance(provider, str) and provider.strip():
+            return f"{provider.strip()[:128]}/{model}"[:256]
+        return model[:256]
+
     def _payload_diagnostics(self, payload: Mapping[str, Any]) -> tuple[str, ...]:
         unknown = sorted(set(str(key) for key in payload) - set(SETTINGS_KEYS))
         return tuple(f"UNKNOWN_SETTING_KEY:{key}" for key in unknown[:8])
