@@ -37,6 +37,7 @@
 | [VISUAL_ACCEPTANCE_MATRIX.md](./VISUAL_ACCEPTANCE_MATRIX.md) | 截图、键盘、主题、缩放和无卡片断言 |
 | [IMPLEMENTATION_DECISIONS.md](./IMPLEMENTATION_DECISIONS.md) | 已确定项、开放项和推荐选项 |
 | [SOURCE_ADOPTION_PLAN.md](./SOURCE_ADOPTION_PLAN.md) | upstream→local 映射或本地重实现清单 |
+| [PRODUCT_UI_RECONSTRUCTION_PHASE2_IMPLEMENTATION.md](./PRODUCT_UI_RECONSTRUCTION_PHASE2_IMPLEMENTATION.md) | UI-1 foundation 后的真实产品 UI 重构 Goal authority |
 
 ## Evidence boundary
 
