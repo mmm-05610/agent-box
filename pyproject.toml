@@ -43,6 +43,7 @@ preview = [
   "agent-box-artifacts==2.0.0a1",
   "agent-box-session==2.0.0a1",
   "agent-box-workspace-local==2.0.0a1",
+  "agent-box-model-providers==2.0.0a1",
   "agent-box-studio==2.0.0a1",
 ]
 web = ["agent-box-web==2.0.0a1"]

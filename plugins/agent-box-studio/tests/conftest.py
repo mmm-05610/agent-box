@@ -79,3 +79,21 @@ def create_session(client, project_dir, key: str = "sess-key-1") -> dict:
     )
     assert response.status_code == 201, response.text
     return response.json()["session"]
+
+
+def production_entry_points(exclude: frozenset[str] = frozenset()):
+    """The installed production plugin set, minus excluded entry points.
+
+    Tests that must construct one provider themselves (with a controlled
+    registry path or host seam) exclude that plugin's entry point and then
+    register the SAME production class manually — never a test double.
+    """
+    from importlib import metadata
+
+    discovered = metadata.entry_points()
+    selected = (
+        discovered.select(group="agent_box.plugins")
+        if hasattr(discovered, "select")
+        else discovered.get("agent_box.plugins", ())
+    )
+    return tuple(ep for ep in selected if ep.name not in exclude)

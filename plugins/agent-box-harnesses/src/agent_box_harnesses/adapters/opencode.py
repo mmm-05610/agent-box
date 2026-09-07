@@ -85,6 +85,7 @@ class OpenCodeJsonDecoder(NativeObservationDecoder):
 
 
 class OpenCodeAdapter(GenericCliAdapter):
+    credential_env_var = "OPENCODE_API_KEY"
     harness_type = "opencode"
     native_home_env = "XDG_CONFIG_HOME"
     native_home_guest = "/runtime/home/.config"

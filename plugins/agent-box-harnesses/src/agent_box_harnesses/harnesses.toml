@@ -134,6 +134,11 @@ target = "dispatch-input"
 minimum = 0
 maximum = 1
 [[harness.inputs]]
+contract_id = "agent-box.credential@1"
+target = "dispatch-input"
+minimum = 0
+maximum = 1
+[[harness.inputs]]
 contract_id = "agent-box.claude-continuation@1"
 target = "dispatch-input"
 minimum = 0
@@ -166,6 +171,13 @@ network = "required"
 kind = "native_session"
 contract_id = "agent-box.claude-continuation@1"
 target_provider = "claude-code-continuation"
+
+[harness.credential]
+contract = "agent-box.credential@1"
+locator_provider = "gateway-provider"
+guest_target_class = "launch-env"
+materializer = "gateway-provider"
+env_var = "ANTHROPIC_AUTH_TOKEN"
 
 [[harness]]
 schema_version = 1
@@ -207,6 +219,11 @@ target = "dispatch-input"
 minimum = 0
 maximum = 1
 [[harness.inputs]]
+contract_id = "agent-box.credential@1"
+target = "dispatch-input"
+minimum = 0
+maximum = 1
+[[harness.inputs]]
 contract_id = "agent-box.opencode-continuation@1"
 target = "dispatch-input"
 minimum = 0
@@ -242,6 +259,13 @@ network = "required"
 kind = "native_session"
 contract_id = "agent-box.opencode-continuation@1"
 target_provider = "opencode-continuation"
+
+[harness.credential]
+contract = "agent-box.credential@1"
+locator_provider = "gateway-provider"
+guest_target_class = "launch-env"
+materializer = "gateway-provider"
+env_var = "OPENCODE_API_KEY"
 
 [[harness]]
 schema_version = 1
@@ -283,6 +307,11 @@ target = "dispatch-input"
 minimum = 0
 maximum = 1
 [[harness.inputs]]
+contract_id = "agent-box.credential@1"
+target = "dispatch-input"
+minimum = 0
+maximum = 1
+[[harness.inputs]]
 contract_id = "agent-box.hermes-continuation@1"
 target = "dispatch-input"
 minimum = 0
@@ -311,6 +340,13 @@ network = "required"
 kind = "native_session"
 contract_id = "agent-box.hermes-continuation@1"
 target_provider = "hermes-continuation"
+
+[harness.credential]
+contract = "agent-box.credential@1"
+locator_provider = "gateway-provider"
+guest_target_class = "launch-env"
+materializer = "gateway-provider"
+env_var = "OPENAI_API_KEY"
 
 [[harness]]
 schema_version = 1
@@ -352,6 +388,11 @@ target = "dispatch-input"
 minimum = 0
 maximum = 1
 [[harness.inputs]]
+contract_id = "agent-box.credential@1"
+target = "dispatch-input"
+minimum = 0
+maximum = 1
+[[harness.inputs]]
 contract_id = "agent-box-pi.continuation@1"
 target = "dispatch-input"
 minimum = 0
@@ -380,3 +421,9 @@ network = "required"
 kind = "native_session"
 contract_id = "agent-box-pi.continuation@1"
 target_provider = "pi-session"
+[harness.credential]
+contract = "agent-box.credential@1"
+locator_provider = "gateway-provider"
+guest_target_class = "launch-env"
+materializer = "gateway-provider"
+env_var = "MINIMAX_API_KEY"

@@ -62,6 +62,11 @@ class HarnessStartContext:
     continuation: Any | None = None
     credential_ref: CredentialRefV1 | None = None
     launch_selection: Mapping[str, str] = field(default_factory=dict)
+    # Bounded host-network environment (e.g. egress proxy variables) the
+    # provider inherited at start time.  The provider — never the pure
+    # adapter — reads the host environment and passes exactly these values
+    # in; the launch environment copies them verbatim.
+    ambient_environment: Mapping[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         for name in ("harness_type", "execution_id", "dispatch_id"):
@@ -111,6 +116,7 @@ def build_start_context(
     *,
     executable: Any,
     preferred_launch_mode: str = "exec",
+    ambient_environment: Mapping[str, str] | None = None,
 ) -> HarnessStartContext:
     """Freeze one typed start context from a resolved dispatch request."""
     harness_type = definition.harness_type
@@ -157,6 +163,7 @@ def build_start_context(
             "selection_policy": "explicit-preferred",
             "declared_modes": ",".join(item.name for item in definition.launch_modes),
         },
+        ambient_environment=dict(ambient_environment or {}),
     )
 
 

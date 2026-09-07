@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+
 from agent_box.extensions import PluginDescriptor, PluginRegistration
 from agent_box.extensions.contribution import CatalogContribution, ContributionDescriptor
 from agent_box.protocols.host import resource_selector, resource_library, host_control
@@ -68,7 +69,10 @@ def _credential_materializer(harness_type: str, agent_box_home):
 
     ``agent_box_home`` is reserved for explicit relocation in tests; the
     production materializer resolves its native home itself and never
-    exposes the source location.
+    exposes the source location.  Gateway launch-env credentials are
+    materialized through the credential-materializer SPI (the source is
+    registered by the model-providers plugin) — the harnesses plugin owns
+    no gateway source and never imports one.
     """
     del agent_box_home
     if harness_type == "codex":
@@ -102,12 +106,16 @@ def build_registration(context, harness_type: str | None = None):
         definition, adapter,
         staging_root=context.plugin_data_dir / "execution-staging",
         executable_resolver=None,
-        credential_materializer=_credential_materializer(definition.harness_type, None),
+        credential_materializer=_credential_materializer(
+            definition.harness_type, context.agent_box_home
+        ),
         profile_store=store,
     )
     resource_providers = []
     contracts = []
-    materializer = _credential_materializer(definition.harness_type, None)
+    materializer = _credential_materializer(
+        definition.harness_type, context.agent_box_home
+    )
     if continuation_provider is not None and continuation_contract is not None:
         resource_providers.append(continuation_provider)
         contracts.append(continuation_contract)

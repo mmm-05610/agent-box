@@ -112,6 +112,10 @@ class LocalHostTransport:
 
     @staticmethod
     def _default_executor(argv: list[str], *, cwd: str, env: dict[str, str]) -> object:
+        # stdin stays a PIPE: duplex consumers (session drivers) take it over
+        # after the spawn; one-shot consumers close it right after start so
+        # children that read piped stdin to EOF (the official Codex CLI)
+        # never wait forever.
         return subprocess.Popen(argv, cwd=cwd, env=env, shell=False, close_fds=True,
                                 stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE, text=True)

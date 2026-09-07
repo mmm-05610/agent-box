@@ -21,7 +21,7 @@ SHARED_RUNTIME_CONTRACTS: tuple[type, ...] = ()
 
 
 def register_shared_runtime_contracts(registry: ExtensionRegistry) -> None:
-    """Register the Root-owned shared runtime contracts exactly once."""
+    """Register the Root-owned shared contracts exactly once."""
     from ..protocols.runtime.protocol import RuntimeHostV1, SandboxV1, TerminalSessionV1
     for contract in SHARED_RUNTIME_CONTRACTS:
         registry.register_root_shared_contract(contract)
@@ -48,6 +48,7 @@ def build_extension_environment(
     *,
     strict: bool = False,
     entry_points=None,
+    host_operations: object | None = None,
 ) -> ExtensionEnvironment:
     """The single canonical loader path.
 
@@ -58,7 +59,13 @@ def build_extension_environment(
     registry = ExtensionRegistry()
     register_shared_runtime_contracts(registry)
     builder = ExtensionCatalogBuilder()
-    report = load_installed_plugins(registry, strict=strict, entry_points=entry_points, catalog=builder)
+    report = load_installed_plugins(
+        registry,
+        strict=strict,
+        entry_points=entry_points,
+        catalog=builder,
+        host_operations=host_operations,
+    )
     catalog = builder.build()
     activate_registry_bindings(catalog, registry)
     activate_catalog_bindings(catalog)

@@ -15,7 +15,7 @@ def test_codex_credential_is_exact_locator_only_and_materializes_without_reading
     value = provider.resolve("agent-box.credential@1", ref)
     assert isinstance(value, CredentialRefV1)
     assert "SECRET_MUST_NEVER_APPEAR" not in repr(value)
-    mount = provider.prepare_mount(value, "execution:E1", "/runtime/home/auth.json", "ro")
+    mount = provider.prepare_mount(value, "execution:E1", "/runtime/home/.codex/auth.json", "ro")
     assert mount.credential_ref == value and mount.access == "ro"
     assert "SECRET_MUST_NEVER_APPEAR" not in repr(mount)
     assert source.read_text() == "SECRET_MUST_NEVER_APPEAR"
@@ -35,6 +35,6 @@ def test_codex_source_rejects_directory_and_symlink(tmp_path):
     provider = CodexCredentialSource(home=home)
     source = home / ".codex/auth.json"; source.mkdir()
     value = CredentialRefV1("codex-login", "codex-login/default", "codex")
-    with pytest.raises(ValueError): provider.prepare_mount(value, "execution:E1", "/runtime/home/auth.json", "ro")
+    with pytest.raises(ValueError): provider.prepare_mount(value, "execution:E1", "/runtime/home/.codex/auth.json", "ro")
     source.rmdir(); source.symlink_to(tmp_path / "outside")
-    with pytest.raises(ValueError): provider.prepare_mount(value, "execution:E1", "/runtime/home/auth.json", "ro")
+    with pytest.raises(ValueError): provider.prepare_mount(value, "execution:E1", "/runtime/home/.codex/auth.json", "ro")

@@ -14,11 +14,12 @@ Native facts are evidence-backed by the 2026-09-01 knowledge base
 """
 from __future__ import annotations
 
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 from .generic_cli import GenericCliAdapter
 from .native_render import render_toml
 from .observation import (
+    MAX_EVENTS,
     NativeObservationDecoder, Observation, ObservationKind, TerminalCondition,
     bounded_native,
 )
@@ -101,6 +102,30 @@ class CodexExecJsonDecoder(NativeObservationDecoder):
         return (self.unknown_event(self.harness_type, event_type, payload),)
 
 
+class CodexLiveEventDecoder:
+    """Incremental Codex NDJSON decoder with a terminal-once budget."""
+
+    def __init__(self) -> None:
+        self._decoder = CodexExecJsonDecoder()
+        self._terminal_seen = False
+        self._emitted = 0
+
+    def feed_lines(self, lines: Sequence[str]) -> tuple[Observation, ...]:
+        if self._emitted >= MAX_EVENTS:
+            return ()
+        observations: list[Observation] = []
+        for item in self._decoder.decode_stream(tuple(lines)[:MAX_EVENTS]):
+            if self._emitted >= MAX_EVENTS:
+                break
+            if item.kind is ObservationKind.TERMINAL:
+                if self._terminal_seen:
+                    continue
+                self._terminal_seen = True
+            observations.append(item)
+            self._emitted += 1
+        return tuple(observations)
+
+
 class CodexAdapter(GenericCliAdapter):
     harness_type = "codex"
     native_home_env = "CODEX_HOME"
@@ -112,7 +137,10 @@ class CodexAdapter(GenericCliAdapter):
     # unknown payload keys surface as diagnostics instead of rejections.
     known_payload_keys = None
     implemented_capabilities = frozenset({"start", "observe", "finish", "stream", "native_continuation"})
-    credential_guest_target = "/runtime/home/auth.json"
+    # Codex reads its login state from $CODEX_HOME/auth.json; CODEX_HOME is
+    # the native home guest path, so the locator-only secret mount must land
+    # exactly there (ro, nested under the single writable profile home).
+    credential_guest_target = "/runtime/home/.codex/auth.json"
     credential_materializer_id = "codex-login"
     diagnostics_notes = (
         "CODEX_HOME_MUST_PRE_EXIST",
@@ -122,6 +150,10 @@ class CodexAdapter(GenericCliAdapter):
 
     def _make_decoder(self) -> NativeObservationDecoder:
         return CodexExecJsonDecoder()
+
+    @staticmethod
+    def new_live_decoder() -> CodexLiveEventDecoder:
+        return CodexLiveEventDecoder()
 
     def profile_model(self, payload: Mapping[str, Any]) -> str | None:
         """Model identity declared by a Codex profile payload (vendor fact).
@@ -168,4 +200,4 @@ class CodexAdapter(GenericCliAdapter):
         return tuple(warnings)
 
 
-__all__ = ["CodexAdapter", "CodexExecJsonDecoder"]
+__all__ = ["CodexAdapter", "CodexExecJsonDecoder", "CodexLiveEventDecoder"]

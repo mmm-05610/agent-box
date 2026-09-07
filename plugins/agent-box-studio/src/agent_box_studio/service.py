@@ -23,6 +23,7 @@ import hashlib
 import json
 import logging
 import queue
+import re
 import threading
 import time
 import uuid
@@ -72,6 +73,7 @@ from agent_box.work_core.finalization import ExecutionFinalizationRequest
 from agent_box.work_core.registry import ExtensionRegistry
 
 from .refs import live_workspace_provider_id
+from .host_bridge import HostBridgeHostAuthority
 
 logger = logging.getLogger("agent_box_studio.service")
 
@@ -81,6 +83,10 @@ TURN_OWNER_PREFIX = "studio-turn-"
 RUNTIME_HOST_CONTRACT_ID = "agent-box.runtime-host@1"
 SANDBOX_CONTRACT_ID = "agent-box.sandbox@1"
 TERMINAL_SESSION_CONTRACT_ID = "agent-box.terminal-session@1"
+
+# The auditable default runtime host of a LOCAL session: the provider id of
+# the registered local RuntimeHost (component id, never a harness name).
+LOCAL_RUNTIME_HOST_PROVIDER_ID = "runtime-host-local"
 
 # Auditable default rule for omitted selections: the terminal contract has
 # two registered providers, so an explicit auditable default is required
@@ -93,6 +99,82 @@ DEFAULT_TERMINAL_PROVIDER_ID = "direct-stdio"
 DEFAULT_SANDBOX_TEMPLATE = "bwrap-cloud-harness"
 
 _CANCEL_PROOF_TIMEOUT_SECONDS = 10.0
+
+# -- public disclosure boundary ----------------------------------------------------
+#
+# Public Ref projections are allowlisted per purpose: only explicitly
+# approved identity metadata may cross the Studio API.  Keys outside the
+# allowlist, absolute host paths, URIs, credential-shaped values and
+# oversized fields are dropped deterministically and never echoed in
+# errors, diagnostics or events.  The allowlist is the authority — a Ref's
+# size bounds say nothing about disclosure safety.
+
+_PUBLIC_REF_METADATA_ALLOWLIST: dict[str, frozenset[str]] = {
+    # Native Session continuation facts: harness identity only.
+    "session": frozenset({"harness_type", "source_provider"}),
+    # Frozen Profile binding summary: exact-revision identity facts.
+    "profile": frozenset({"harness_type", "revision", "digest"}),
+}
+
+# Upper bound for any single disclosed field; beyond it the field is
+# redacted rather than truncated.
+_PUBLIC_REF_MAX_VALUE_CHARS = 512
+
+_HOSTILE_VALUE_PATTERN = re.compile(
+    r"(^/"                          # absolute POSIX path
+    r"|\\\\"                        # UNC / backslash paths
+    r"|^[A-Za-z]:[\\/]"             # Windows drive path
+    r"|://"                         # any URI (incl. proxy userinfo)
+    r"|\bsk-"                       # OpenAI-style key
+    r"|\bBearer\s"                  # auth header value
+    r"|\bgh[pousr]_"                # GitHub tokens
+    r"|\bgithub_pat_"               # fine-grained GitHub tokens
+    r"|\bAKIA[0-9A-Z]"              # AWS access key ids
+    r"|\bxox[abps]-"                # Slack tokens
+    r"|^eyJ)"                       # JWT
+)
+
+# Host-side profile-home reconcile verdicts.  Only ``ok`` and the typed
+# no-view/``skipped`` shapes may proceed to finalization and commit;
+# everything else (exception, failed, ambiguous, malformed, unknown) is a
+# storage recovery, never a fabricated model outcome.
+_RECONCILE_PROCEED = "proceed"
+_RECONCILE_SKIP = "skip"
+_RECONCILE_RECOVERY_REQUIRED = "recovery_required"
+
+_RECONCILE_OK_STATUSES = frozenset({"ok"})
+_RECONCILE_SKIP_STATUSES = frozenset({"skipped"})
+_RECONCILE_NO_VIEW_REASONS = frozenset({"no-execution-view"})
+_RECONCILE_FAILED_REASON_CODE = "PROFILE_HOME_RECONCILE_FAILED"
+
+
+def _classify_reconcile_report(report: Any, *, errored: bool) -> str:
+    """Typed verdict of one provider reconcile report (shared classifier).
+
+    ``ok`` proceeds; the genuine no-execution-view shape and the typed
+    ``skipped`` status are honest skips; exceptions, ``failed``,
+    ``ambiguous``, malformed reports and unknown statuses are recovery.
+    """
+    if errored or not isinstance(report, Mapping):
+        return _RECONCILE_RECOVERY_REQUIRED
+    if report.get("reconciled") is False:
+        reason = str(report.get("reason", ""))
+        if reason in _RECONCILE_NO_VIEW_REASONS:
+            return _RECONCILE_SKIP
+        return _RECONCILE_RECOVERY_REQUIRED
+    status = str(report.get("status", ""))
+    if status in _RECONCILE_OK_STATUSES:
+        return _RECONCILE_PROCEED
+    if status in _RECONCILE_SKIP_STATUSES:
+        return _RECONCILE_SKIP
+    return _RECONCILE_RECOVERY_REQUIRED
+
+
+def _disclosable_ref_value(value: str) -> bool:
+    """Deterministic screen for one disclosed Ref field value."""
+    if not value or len(value) > _PUBLIC_REF_MAX_VALUE_CHARS:
+        return False
+    return _HOSTILE_VALUE_PATTERN.search(value) is None
 
 
 def _terminal_work_core_ref(native_ref: Any) -> Ref:
@@ -157,6 +239,25 @@ class CrossHarnessContinuationUnsupported(SessionError):
     phase and is never simulated (no handoff, no summary, no re-wrapping)."""
 
 
+class HarnessNotFound(SessionError):
+    """No registered execution provider serves the requested harness."""
+
+
+class ProfileNotFound(SessionError):
+    """The profile authority has no such profile (404 without existence
+    leakage beyond the harness/profile id itself)."""
+
+
+class ProfileAuthorityError(SessionError):
+    """A profile-authority typed failure (e.g. revision conflict, pointer
+    drift).  ``authority_code`` is the authority's own bounded code and
+    becomes the stable HTTP error code."""
+
+    def __init__(self, authority_code: str) -> None:
+        super().__init__("profile authority rejected the request")
+        self.authority_code = (authority_code or "PROFILE_AUTHORITY_ERROR")[:64]
+
+
 class _TurnRunControl:
     """In-process control facts of one live run (never the authority).
 
@@ -169,7 +270,7 @@ class _TurnRunControl:
         "session_id", "turn_id", "execution_id", "idempotency_key",
         "owner_id", "lease", "provider", "dispatch_id", "receipt",
         "cancel_requested", "cancel_reason", "terminal_seen", "done",
-        "driver_bound",
+        "driver_bound", "driver",
     )
 
     def __init__(self, session_id, turn_id, execution_id, idempotency_key, owner_id, lease, provider):
@@ -187,6 +288,7 @@ class _TurnRunControl:
         self.terminal_seen = False
         self.done = threading.Event()
         self.driver_bound = False
+        self.driver: Any = None
 
 
 class StudioService:
@@ -202,6 +304,7 @@ class StudioService:
         poll_interval: float = 0.1,
         turn_timeout_seconds: float = 600.0,
         permission_timeout_seconds: float = 300.0,
+        host_operations: object | None = None,
     ) -> None:
         if worker_mode not in ("thread", "inline"):
             raise ValueError("worker_mode must be 'thread' or 'inline'")
@@ -215,6 +318,9 @@ class StudioService:
         self._poll_interval = poll_interval
         self._turn_timeout_seconds = turn_timeout_seconds
         self._permission_timeout_seconds = permission_timeout_seconds
+        # The production host-control seam (CLI --sidecar wiring).  Readiness
+        # reports its TYPE only; it is never probed and never read.
+        self._host_operations = host_operations
         self._runs: dict[str, _TurnRunControl] = {}
         self._runs_lock = threading.Lock()
         self._queue: "queue.Queue[_TurnRunControl]" = queue.Queue()
@@ -424,6 +530,41 @@ class StudioService:
         envelope = store.resolve(AgentBoxProfileV1.contract_id, ref)
         return ref, envelope
 
+    def _committed_continuation_authority(
+        self, turn, run: Optional[TurnRunView] = None
+    ) -> tuple[Optional[str], str]:
+        """The ONLY continuation authority of a Turn: its committed Turn Run.
+
+        Shared invariant logic for continuation dispatch
+        (``_continuation_ref``) and the public GET-turn projection
+        (``_continuation_facts``): the run journal must prove a terminal
+        committed phase, a non-empty execution id, Turn membership.
+        Candidate scanning, ``execution_ids`` order, linked_at, "last
+        locator" or "only Ref holder" heuristics are forbidden: an
+        uncommitted/failed/stale/post-commit-injected attempt must never
+        become the authority, even when it is the unique output-Ref holder.
+
+        Returns ``(execution_id, unavailability_reason)``; the id is None
+        exactly when no valid committed run exists (continuation facts are
+        then explicitly unavailable).
+        """
+        if run is None:
+            run = self._safe_turn_run(turn.turn_id)
+        if run is None:
+            return (
+                None,
+                "the source turn has no run-transaction journal to prove its "
+                "committed execution",
+            )
+        if run.phase not in (TurnRunPhase.SESSION_COMMITTED, TurnRunPhase.COMPLETED):
+            return None, "the source turn's run is not in a committed final state"
+        committed_execution_id = run.execution_id
+        if not committed_execution_id:
+            return None, "the committed run does not name its execution"
+        if committed_execution_id not in turn.execution_ids:
+            return None, "the committed run's execution does not belong to the source turn"
+        return committed_execution_id, ""
+
     def _continuation_ref(
         self, provider: Any, session_id: str, continue_from_turn_id: Optional[str]
     ) -> tuple[Optional[Ref], Optional[str]]:
@@ -444,31 +585,13 @@ class StudioService:
             raise BindingVerificationError(
                 "continuation requires a committed source turn"
             )
-        # The ONLY parent authority is the source Turn's committed
-        # TurnRunView.execution_id.  Candidate scanning, execution_ids
-        # order, linked_at, "last locator" or "only Ref holder" heuristics
-        # are forbidden: an uncommitted/failed/stale/post-commit-injected
-        # attempt must never become the parent, even when it is the unique
-        # output-Ref holder.
-        run = self._safe_turn_run(continue_from_turn_id)
-        if run is None:
-            raise BindingVerificationError(
-                "the source turn has no run-transaction journal to prove its "
-                "committed execution"
-            )
-        if run.phase not in (TurnRunPhase.SESSION_COMMITTED, TurnRunPhase.COMPLETED):
-            raise BindingVerificationError(
-                "the source turn's run is not in a committed final state"
-            )
-        committed_execution_id = run.execution_id
-        if not committed_execution_id:
-            raise BindingVerificationError(
-                "the committed run does not name its execution"
-            )
-        if committed_execution_id not in source_turn.execution_ids:
-            raise BindingVerificationError(
-                "the committed run's execution does not belong to the source turn"
-            )
+        committed_execution_id, unavailable = self._committed_continuation_authority(
+            source_turn
+        )
+        if committed_execution_id is None:
+            # The ONLY parent authority is the source Turn's committed
+            # TurnRunView.execution_id; without it continuation fails closed.
+            raise BindingVerificationError(unavailable)
         link = self._store.execution_link(
             session_id, continue_from_turn_id, committed_execution_id
         )
@@ -527,6 +650,122 @@ class StudioService:
             )
         return resolvers[0].descriptor().id
 
+    def _freeze_model_provider_ref(
+        self,
+        selector: Optional[Mapping[str, Any]],
+        harness: str,
+        model: Optional[str],
+        profile_ref: Optional[Ref],
+    ) -> dict[str, Any]:
+        """Resolve the exact HarnessProviderConfig selector and freeze the
+        formal Binding facts (architecture override §一/§二/§三).
+
+        Returns ``{"_binding_ref": Ref, ...non-secret config facts}``; an
+        absent selector freezes nothing (no model, no route).  Validations,
+        all typed fail-closed: harness-type equality across profile ref /
+        config / execution provider; exact revision; digest when pinned;
+        model present in the config catalog; enabled.
+        """
+        if not selector:
+            if model:
+                raise BindingVerificationError(
+                    "a model selection requires an exact model provider "
+                    "configuration ref; a bare model cannot be routed"
+                )
+            return {}
+        if not isinstance(selector, Mapping) or isinstance(selector, str):
+            # A bare provider id string is not an accepted form: the caller
+            # pins the exact immutable revision (no current-revision shim).
+            raise BindingVerificationError(
+                "the model provider must be pinned as an exact "
+                "HarnessProviderConfigRef selector ({config_id, revision, "
+                "digest?}); bare provider ids are rejected"
+            )
+        from agent_box.resource_contracts import HarnessModelProviderV1
+
+        config_id = str(selector.get("config_id", ""))
+        revision = int(selector.get("revision", 0) or 0)
+        digest = str(selector.get("digest") or "")
+        if not config_id or revision < 1:
+            raise BindingVerificationError(
+                "the model provider selector must pin an exact config id "
+                "and revision"
+            )
+        resolvers = self._resource_providers_for(HarnessModelProviderV1.contract_id)
+        if len(resolvers) != 1:
+            raise BindingVerificationError(
+                "exactly one harness model provider authority must be "
+                "registered to route model providers"
+            )
+        ref = Ref(
+            RefType.ARTIFACT,
+            resolvers[0].descriptor().id,
+            f"{config_id}/revisions/{revision}",
+            metadata={
+                "revision": str(revision),
+                "harness_type": harness,
+                **({"digest": digest} if digest else {}),
+            },
+        )
+        try:
+            config = resolvers[0].resolve(HarnessModelProviderV1.contract_id, ref)
+        except Exception as exc:
+            code = str(getattr(exc, "code", "") or "")
+            if code:
+                raise BindingVerificationError(
+                    f"the pinned model provider configuration cannot be "
+                    f"resolved: {code}"
+                ) from None
+            raise
+        if not getattr(config, "enabled", False):
+            raise BindingVerificationError(
+                "the pinned model provider configuration is disabled"
+            )
+        config_harness = str(getattr(config, "harness_type", ""))
+        if config_harness != harness:
+            raise BindingVerificationError(
+                "the pinned model provider configuration targets harness "
+                f"{config_harness!s}, not the selected harness {harness!s}"
+            )
+        if profile_ref is not None:
+            profile_harness = str(
+                (getattr(profile_ref, "metadata", None) or {}).get("harness_type", "")
+            )
+            if profile_harness and profile_harness != config_harness:
+                raise BindingVerificationError(
+                    "the pinned model provider configuration targets harness "
+                    f"{config_harness!s}, not the pinned profile's harness "
+                    f"{profile_harness!s}"
+                )
+        expected_digest = str(getattr(config, "digest", ""))
+        if digest and digest != expected_digest:
+            raise BindingVerificationError(
+                "the pinned model provider configuration digest differs from "
+                "the resolved revision"
+            )
+        if not model:
+            raise BindingVerificationError(
+                "a pinned model provider configuration requires a model "
+                "selection from its catalog"
+            )
+        if not config.has_model(model):
+            raise BindingVerificationError(
+                f"model {model!s} is not in the pinned provider config's "
+                "catalog"
+            )
+        return {
+            "_binding_ref": Ref(
+                RefType.ARTIFACT,
+                resolvers[0].descriptor().id,
+                f"{config_id}/revisions/{revision}",
+                metadata={
+                    "revision": str(revision),
+                    "digest": expected_digest,
+                    "harness_type": config_harness,
+                },
+            ),
+        }
+
     def _capability_digest(self, provider: Any) -> str:
         payload = json.dumps(
             {
@@ -558,12 +797,24 @@ class StudioService:
             session_modes = getattr(provider, "session_mode_truth", None)
             cancel_truth = getattr(provider, "cancel_truth", None)
             runtime_requirements = getattr(provider, "runtime_requirements", None)
+            continuation_contract = (
+                provider.continuation_contract_id()
+                if callable(getattr(provider, "continuation_contract_id", None))
+                else None
+            )
             providers.append(
                 {
                     "provider_id": provider.descriptor().id,
                     "harness_type": getattr(provider, "harness_type", None),
                     "version": provider.descriptor().version,
                     "capabilities": dict(sorted(caps.items())),
+                    "input_limits": {
+                        contract: [minimum, maximum]
+                        for contract, (minimum, maximum) in sorted(
+                            provider.input_limits().items()
+                        )
+                    },
+                    "continuation_contract_id": continuation_contract,
                     "session_modes": dict(session_modes()) if callable(session_modes) else {},
                     "cancel_truth": dict(cancel_truth()) if callable(cancel_truth) else {},
                     "runtime_requirements": (
@@ -612,15 +863,381 @@ class StudioService:
             "compact": {"state": "NOT_IMPLEMENTED", "detail": "cross-harness codec phase"},
         }
 
+    # -- profiles (read/write through the single registered authority) --------
+
+    def _harness_provider(self, harness_type: str) -> Any:
+        for provider in self._providers():
+            if getattr(provider, "harness_type", None) == harness_type:
+                return provider
+        raise HarnessNotFound(f"no registered harness: {harness_type}")
+
+    def _profile_authority(self):
+        profile_providers = self._resource_providers_for(AgentBoxProfileV1.contract_id)
+        if len(profile_providers) != 1:
+            raise SessionCapabilityUnavailable(
+                "exactly one profile authority must be registered to manage profiles"
+            )
+        return profile_providers[0]
+
+    @staticmethod
+    def _profile_envelope_payload(envelope: Mapping[str, Any]) -> Mapping[str, Any]:
+        payload = envelope.get("native_payload")
+        if not isinstance(payload, Mapping):
+            payload = envelope.get("config")
+        return payload if isinstance(payload, Mapping) else {}
+
+    def _profile_projection(
+        self, provider: Any, envelope: Mapping[str, Any], *, native_home: Optional[Mapping[str, Any]] = None,
+        include_payload: bool = False,
+    ) -> dict[str, Any]:
+        from types import SimpleNamespace
+
+        model = None
+        try:
+            model = provider.profile_model_selection(
+                SimpleNamespace(native_payload=self._profile_envelope_payload(envelope))
+            )
+        except Exception:  # noqa: BLE001 - model absence is an honest fact
+            model = None
+        projection: dict[str, Any] = {
+            "harness_type": envelope.get("harness_type"),
+            "profile_id": envelope.get("profile_id"),
+            "revision": int(envelope.get("revision", 0)),
+            "digest": envelope.get("digest", ""),
+            "disabled": bool(envelope.get("disabled", False)),
+            "model": model,
+        }
+        if include_payload:
+            # The exact-revision payload itself (credential-scanned at
+            # resolve time): the edit-form readback source.  List rows stay
+            # payload-free; the payload is bounded by the profile authority.
+            projection["native_payload"] = dict(
+                self._profile_envelope_payload(envelope)
+            )
+        if native_home is not None:
+            projection["native_home"] = dict(native_home)
+        return projection
+
+    def list_profiles(self, harness_type: str) -> dict:
+        self._harness_provider(harness_type)
+        store = self._profile_authority()
+        envelopes = store.list(harness_type)
+        provider = self._harness_provider(harness_type)
+        return {
+            "harness_type": harness_type,
+            "profiles": [self._profile_projection(provider, envelope) for envelope in envelopes],
+            "problems": [dict(problem) for problem in store.pointer_problems(harness_type)],
+        }
+
+    def get_profile(self, harness_type: str, profile_id: str, *, revision: Optional[int] = None) -> dict:
+        provider = self._harness_provider(harness_type)
+        store = self._profile_authority()
+        try:
+            envelope = store.get(harness_type, profile_id, revision)
+        except KeyError as exc:
+            raise ProfileNotFound("profile not found") from exc
+        except Exception as exc:
+            raise self._profile_authority_error(exc) from exc
+        native_home = None
+        summary_getter = getattr(store, "native_home_summary", None)
+        if callable(summary_getter):
+            try:
+                native_home = dict(summary_getter(harness_type, profile_id))
+            except Exception:  # noqa: BLE001 - home absence is an honest fact
+                native_home = None
+        return {
+            "profile": self._profile_projection(
+                provider, envelope, native_home=native_home, include_payload=True
+            )
+        }
+
+    def create_or_update_profile(
+        self, harness_type: str, *, profile_id: str, payload: Mapping[str, Any],
+        expected_revision: Optional[int] = None,
+    ) -> dict:
+        self._harness_provider(harness_type)
+        store = self._profile_authority()
+        try:
+            envelope = store.put(
+                harness_type,
+                {"profile_id": profile_id, "native_payload": dict(payload)},
+                expected_revision,
+            )
+        except Exception as exc:
+            raise self._profile_authority_error(exc) from exc
+        provider = self._harness_provider(harness_type)
+        return {"profile": self._profile_projection(provider, envelope)}
+
+    @staticmethod
+    def _profile_authority_error(exc: Exception) -> SessionError:
+        """Map profile-authority failures to a typed, path-free error.
+
+        The authority's own bounded code (e.g. PROFILE_REVISION_CONFLICT)
+        becomes the stable error code; authority messages never carry host
+        paths.  A missing current pointer is an honest 404, not a conflict.
+        """
+        code = str(getattr(exc, "code", "") or "")
+        if code in {"PROFILE_POINTER_NOT_FOUND", "PROFILE_NOT_FOUND"}:
+            return ProfileNotFound("profile not found")
+        return ProfileAuthorityError(code)
+
+    # -- projects (standalone registration surface) ----------------------------
+
+    def register_project(self, path: str) -> dict:
+        if self._workspace is None:
+            raise SessionCapabilityUnavailable("live workspace provider unavailable")
+        project = self._workspace.register_project(path)
+        return self._project_payload(project)
+
+    def list_projects(self) -> dict:
+        if self._workspace is None:
+            raise SessionCapabilityUnavailable("live workspace provider unavailable")
+        return {
+            "projects": [self._project_payload(project) for project in self._workspace.list_projects()]
+        }
+
+    def get_project(self, project_id: str) -> dict:
+        if self._workspace is None:
+            raise SessionCapabilityUnavailable("live workspace provider unavailable")
+        project = self._workspace.get_project(project_id)
+        payload = self._project_payload(project)
+        workspace_ref = self._workspace.make_ref(project.project_id)
+        payload["workspace_ref"] = {
+            "provider": workspace_ref.provider,
+            "native_id": workspace_ref.native_id,
+            "metadata": dict(workspace_ref.metadata or {}),
+        }
+        return {"project": payload}
+
+    @staticmethod
+    def _project_payload(project: Any) -> dict[str, Any]:
+        return {
+            "project_id": project.project_id,
+            "workspace_mode": "live",
+            "registered_at": project.registered_at,
+        }
+
+    # -- readiness (component truth; never a single ready flag) ------------------
+
+    _READINESS_TERMINAL_BINARY = {"tmux": "tmux"}
+
+    def readiness(self, *, credential_preflight: bool = False) -> dict[str, Any]:
+        """Public readiness surface: per-component, per-launch-mode truth.
+
+        Every reported state is one of supported/available/unavailable/
+        not_implemented/unknown.  Credential facts are locator-availability
+        and (opt-in) a bounded login status class — never credential
+        content, never host paths.
+        """
+        providers = []
+        for provider in self._providers():
+            providers.append(
+                self._provider_readiness(provider, credential_preflight=credential_preflight)
+            )
+        return {
+            "session_store": {
+                "state": "available" if self._store is not None else "unavailable",
+                "component_id": getattr(self._store, "store_id", None),
+            },
+            "workspace": {
+                "state": "available" if self._workspace is not None else "unavailable",
+                "provider_id": live_workspace_provider_id,
+            },
+            "execution": {
+                "state": "available" if providers else "unavailable",
+                "providers": providers,
+            },
+            "sandbox": self._port_readiness(SANDBOX_CONTRACT_ID),
+            "runtime_host": self._port_readiness(RUNTIME_HOST_CONTRACT_ID),
+            "terminal": self._port_readiness(TERMINAL_SESSION_CONTRACT_ID),
+            "profiles": self._profiles_readiness(),
+            # Pure type facts about the host-control seam: whether the
+            # production HostBridge authority is wired.  No network probe,
+            # no endpoint/capability value, no host path ever crosses here.
+            "remote": {
+                "host_bridge": (
+                    "available"
+                    if isinstance(self._host_operations, HostBridgeHostAuthority)
+                    else "unavailable"
+                ),
+            },
+        }
+
+    def _port_readiness(self, contract_id: str) -> list[dict[str, Any]]:
+        entries = []
+        for provider in self._resource_providers_for(contract_id):
+            provider_id = provider.descriptor().id
+            state = "unknown"
+            detail: dict[str, Any] = {}
+            probe = getattr(provider, "probe", None)
+            availability = getattr(provider, "availability", None)
+            try:
+                if callable(probe):
+                    raw = dict(probe())
+                    # Allowlisted probe fields only: probe stderr may name
+                    # host-only locations and never crosses this boundary.
+                    detail = {
+                        key: raw[key]
+                        for key in ("status", "code", "failure_class")
+                        if key in raw
+                    }
+                    state = str(detail.get("status", "unknown"))
+                elif callable(availability):
+                    raw = dict(availability())
+                    state = str(raw.get("status", "unknown"))
+                    detail = {key: raw[key] for key in ("code", "realm") if key in raw}
+                else:
+                    state = "unknown"
+            except Exception as exc:  # noqa: BLE001 - unavailable is the honest answer
+                state = "unavailable"
+                detail = {"reason": type(exc).__name__}
+            entries.append({"provider_id": provider_id, "state": state, **detail})
+        return entries
+
+    def _profiles_readiness(self) -> dict[str, Any]:
+        authority = None
+        profile_providers = self._resource_providers_for(AgentBoxProfileV1.contract_id)
+        if len(profile_providers) == 1:
+            authority = profile_providers[0]
+        return {
+            "state": "available" if authority is not None else "unavailable",
+            "problems": (
+                [dict(problem) for problem in authority.pointer_problems()] if authority is not None else []
+            ),
+        }
+
+    def _provider_readiness(self, provider: Any, *, credential_preflight: bool) -> dict[str, Any]:
+        provider_id = provider.descriptor().id
+        truth = provider.capability_truth() if callable(getattr(provider, "capability_truth", None)) else {}
+        capabilities = {
+            key: {"state": state.value if hasattr(state, "value") else str(state), "detail": detail}
+            for key, (state, detail) in sorted(truth.items())
+        }
+        modes = dict(provider.session_mode_truth()) if callable(getattr(provider, "session_mode_truth", None)) else {}
+        diagnostics_getter = getattr(provider, "diagnostics", None)
+        executable = dict(diagnostics_getter().get("executable", {})) if callable(diagnostics_getter) else {}
+        executable_block = {
+            "status": str(executable.get("status", "unavailable")),
+            "version": executable.get("version"),
+        }
+        executable_error = executable.get("error")
+        if executable_error:
+            executable_block["error"] = str(executable_error)[:200]
+        continuation_contract = (
+            provider.continuation_contract_id()
+            if callable(getattr(provider, "continuation_contract_id", None))
+            else None
+        )
+        executable_resolved = executable_block["status"] == "resolved"
+        if continuation_contract:
+            native_resume = "available" if executable_resolved else "unavailable"
+        else:
+            native_resume = "not_implemented"
+        credential_block: dict[str, Any] = {}
+        definition = getattr(provider, "definition", None)
+        credential = getattr(definition, "credential", None) if definition else None
+        if credential is not None:
+            credential_block["locator"] = f"{credential.locator_provider}/default"
+            materializer = next(
+                (
+                    p for p in self._registry.resource_providers()
+                    if p.descriptor().id == credential.locator_provider
+                ),
+                None,
+            )
+            if materializer is not None and callable(getattr(materializer, "diagnostics", None)):
+                try:
+                    raw = dict(materializer.diagnostics())
+                    credential_block["available"] = bool(raw.get("available", False))
+                except Exception:  # noqa: BLE001
+                    credential_block["available"] = False
+            else:
+                credential_block["available"] = False
+            credential_block["login_status"] = "unknown"
+            if credential_preflight and callable(getattr(materializer, "login_preflight", None)):
+                try:
+                    preflight = dict(materializer.login_preflight())
+                    credential_block["login_status"] = str(preflight.get("status", "unknown"))
+                except Exception:  # noqa: BLE001
+                    credential_block["login_status"] = "unknown"
+        port_limits = provider.input_limits()
+        streaming_state = capabilities.get("stream", {}).get("state", "not_implemented")
+        cancel_states = (
+            sorted({str(value) for value in dict(provider.cancel_truth()).values()})
+            if callable(getattr(provider, "cancel_truth", None)) else []
+        )
+        permission_state = "not_implemented"
+        if modes:
+            bound_modes = [
+                mode for mode, entry in modes.items()
+                if isinstance(entry, Mapping) and entry.get("state") == "available"
+            ]
+            permission_state = (
+                "partial" if bound_modes else "unavailable"
+            ) if streaming_state in ("available", "implemented") else "unavailable"
+        readiness_block: dict[str, Any] = {
+            "provider_id": provider_id,
+            "harness_type": getattr(provider, "harness_type", None),
+            "version": provider.descriptor().version,
+            "start_state": capabilities.get("start", {}).get("state", "unknown"),
+            "executable": executable_block,
+            "capabilities": capabilities,
+            "session_modes": modes,
+            "input_limits": {
+                contract: [minimum, maximum]
+                for contract, (minimum, maximum) in sorted(port_limits.items())
+            },
+            "continuation": {
+                "contract_id": continuation_contract,
+                "native_resume": native_resume,
+            },
+            "credential": credential_block,
+            "runtime_requirements": (
+                dict(provider.runtime_requirements())
+                if callable(getattr(provider, "runtime_requirements", None)) else {}
+            ),
+            "streaming": {"state": streaming_state},
+            "permission": {"state": permission_state},
+            "cancel": {
+                "state": ("available" if "supported" in cancel_states else "unavailable")
+                if cancel_states else "not_implemented",
+                "per_launch_mode": dict(provider.cancel_truth()) if callable(getattr(provider, "cancel_truth", None)) else {},
+            },
+            "durable_replay": {"state": "available"},
+        }
+        # Runtime ports the provider actually consumes, with their own probe
+        # truth — the readiness of a port belongs next to the provider that
+        # cannot launch without it.
+        if SANDBOX_CONTRACT_ID in port_limits:
+            readiness_block["sandbox"] = self._port_readiness(SANDBOX_CONTRACT_ID)
+        if RUNTIME_HOST_CONTRACT_ID in port_limits:
+            readiness_block["runtime_host"] = self._port_readiness(RUNTIME_HOST_CONTRACT_ID)
+        if TERMINAL_SESSION_CONTRACT_ID in port_limits:
+            readiness_block["terminal"] = self._port_readiness(TERMINAL_SESSION_CONTRACT_ID)
+        return readiness_block
+
     # -- sessions -------------------------------------------------------------
 
-    def create_session(self, *, idempotency_key: str, title: str, project_path: str) -> dict:
+    def create_session(
+        self, *, idempotency_key: str, title: str,
+        project_path: Optional[str] = None, project_id: Optional[str] = None,
+    ) -> dict:
         if self._workspace is None:
             raise SessionCapabilityUnavailable("live workspace provider unavailable")
         if not idempotency_key:
             raise SessionError("session creation requires an idempotency key")
-        project = self._workspace.register_project(project_path)
-        workspace_ref = self._workspace.make_ref(project.project_id)
+        if (project_path is None) == (project_id is None):
+            raise SessionError(
+                "exactly one of project_path or project_id is required"
+            )
+        if project_id is not None:
+            # Session creation references an ALREADY registered project: the
+            # idempotent replay path depends only on durable registry state.
+            project = self._workspace.get_project(project_id)
+            workspace_ref = self._workspace.make_ref(project.project_id)
+        else:
+            project = self._workspace.register_project(project_path)
+            workspace_ref = self._workspace.make_ref(project.project_id)
         session = self._store.create_session(
             SessionCreationRequest(
                 idempotency_key=idempotency_key,
@@ -636,6 +1253,102 @@ class StudioService:
             "project_id": project.project_id,
             "workspace_mode": "live",
         }
+
+    def create_remote_session(
+        self,
+        *,
+        idempotency_key: str,
+        title: str,
+        connection_id: str,
+        connection_revision: int,
+        project_identity: str,
+        project_id: str,
+        remote_path: str,
+    ) -> dict:
+        """Create a Session from one exact Host-owned WSL Connection.
+
+        This is the backend-facing C2.2 seam used by the desktop integration:
+        the runtime provider resolves the durable Connection through Host
+        Authority, then the WSL workspace provider issues an opaque Project
+        Ref.  No local path is inspected or registered as a local Project.
+        """
+        if self._workspace is None:
+            raise SessionCapabilityUnavailable("live workspace provider unavailable")
+        if not all(
+            isinstance(value, str) and value.strip()
+            for value in (connection_id, project_identity, project_id, remote_path)
+        ):
+            raise SessionError("remote session identity fields are required")
+        if not isinstance(connection_revision, int) or connection_revision < 1:
+            raise SessionError("remote connection revision is invalid")
+
+        runtime_provider = next(
+            (
+                provider
+                for provider in self._registry.resource_providers()
+                if provider.descriptor().id == "runtime-host-wsl"
+            ),
+            None,
+        )
+        if runtime_provider is None:
+            raise SessionCapabilityUnavailable("WSL RuntimeHost provider unavailable")
+        resolve = getattr(runtime_provider, "resolve_connection", None)
+        if not callable(resolve):
+            raise SessionCapabilityUnavailable("WSL RuntimeHost cannot resolve Connections")
+        runtime = resolve(connection_id, connection_revision, project_identity)
+
+        if self._workspace.descriptor().id != live_workspace_provider_id.replace(
+            "local-live-workspace", "wsl-live-workspace"
+        ):
+            raise SessionCapabilityUnavailable("selected workspace is not the WSL live provider")
+        register = getattr(self._workspace, "register_project", None)
+        if not callable(register):
+            raise SessionCapabilityUnavailable("WSL workspace cannot register Projects")
+        project = register(
+            connection_id=connection_id,
+            project_id=project_id,
+            remote_path=remote_path,
+            runtime_host_ref=runtime,
+        )
+        workspace_ref = self._workspace.make_ref(project.project_id)
+        session = self._store.create_session(
+            SessionCreationRequest(
+                idempotency_key=idempotency_key,
+                title=title.strip()[:200],
+                objective=title.strip()[:200],
+                workspace_ref=workspace_ref,
+                workspace_mode="live",
+                project_identity=project.project_id,
+            )
+        )
+        return {
+            "session": session,
+            "project_id": project.project_id,
+            "workspace_mode": "live",
+            "connection_id": connection_id,
+            "connection_revision": connection_revision,
+        }
+
+    def list_remote_projects(self) -> dict[str, Any]:
+        """Saved WSL Project identities for the GUI's project selector.
+
+        Delegation only: the workspace provider owns the registration rows.
+        When the active workspace is not the WSL live provider there are no
+        remote projects to enumerate (an honest empty list, never a 500).
+        """
+        if self._workspace is None:
+            raise SessionCapabilityUnavailable("live workspace provider unavailable")
+        if (
+            getattr(self._workspace.descriptor(), "id", "")
+            != live_workspace_provider_id.replace(
+                "local-live-workspace", "wsl-live-workspace"
+            )
+        ):
+            return {"remote_projects": []}
+        listing = getattr(self._workspace, "list_remote_projects", None)
+        if not callable(listing):
+            return {"remote_projects": []}
+        return {"remote_projects": [dict(row) for row in listing()]}
 
     def list_sessions(self):
         return self._store.list_sessions()
@@ -660,6 +1373,7 @@ class StudioService:
         profile_revision: Optional[str] = None,
         profile_digest: Optional[str] = None,
         model: Optional[str] = None,
+        model_provider: Optional[Mapping[str, Any]] = None,
         launch_mode: Optional[str] = None,
         runtime_host: Optional[str] = None,
         sandbox: Optional[str] = None,
@@ -699,9 +1413,50 @@ class StudioService:
         sandbox_ref: Optional[Ref] = None
         terminal_ref: Optional[Ref] = None
         if RUNTIME_HOST_CONTRACT_ID in provider_limits:
-            host_ref, _host_provider = self._make_port_ref(
-                RUNTIME_HOST_CONTRACT_ID, runtime_host
-            )
+            if session.workspace_ref.provider == "wsl-live-workspace":
+                if runtime_host not in (None, "runtime-host-wsl"):
+                    raise LaunchSelectionError(
+                        "a WSL Session requires its frozen WSL RuntimeHost"
+                    )
+                runtime_ref_for = getattr(
+                    self._workspace, "runtime_host_input_ref", None
+                )
+                if not callable(runtime_ref_for):
+                    raise LaunchSelectionError(
+                        "WSL workspace cannot issue its frozen RuntimeHost Ref"
+                    )
+                host_ref = runtime_ref_for(session.project_identity)
+                try:
+                    _host_provider = self._registry.get_resource_provider(
+                        host_ref.provider
+                    )
+                except Exception as error:
+                    raise LaunchSelectionError(
+                        "the WSL Session RuntimeHost provider is unavailable"
+                    ) from error
+                if (
+                    _host_provider.descriptor().id != "runtime-host-wsl"
+                    or RUNTIME_HOST_CONTRACT_ID
+                    not in _host_provider.supported_contract_ids
+                ):
+                    raise LaunchSelectionError(
+                        "the WSL Session RuntimeHost Ref has invalid provider affinity"
+                    )
+            else:
+                host_ref, _host_provider = self._make_port_ref(
+                    RUNTIME_HOST_CONTRACT_ID,
+                    runtime_host,
+                    # Auditable default for an omitted selection (mirrors the
+                    # terminal/sandbox defaults): a LOCAL session resolves the
+                    # local runtime host when several runtime providers are
+                    # installed.  A WSL runtime host is never admitted for a
+                    # local Session — the Session freezes one execution kind.
+                    default_provider_id=(
+                        LOCAL_RUNTIME_HOST_PROVIDER_ID
+                        if runtime_host is None
+                        else None
+                    ),
+                )
             affinity = str(host_ref.metadata.get("affinity", ""))
         else:
             affinity = ""
@@ -723,19 +1478,27 @@ class StudioService:
             provider, profile_id, profile_revision, profile_digest
         )
 
-        # -- model truth: the profile owns the model vocabulary --------------
+        # -- model + route truth (architecture override §三) ------------------
+        # The Profile owns behavior (not the model); the exact
+        # HarnessProviderConfigRef owns endpoint/protocol/models/credential.
+        # The Binding freezes exact ProfileRef + exact provider Ref + model.
+        # Unselected/unknown model, harness mismatch, wrong revision/digest:
+        # typed fail closed.
         resolved_model: Optional[str] = None
-        if profile_envelope is not None:
-            resolved_model = provider.profile_model_selection(profile_envelope)
-        if model and resolved_model and model != resolved_model:
-            raise BindingVerificationError(
-                "the requested model differs from the model declared by the selected profile"
-            )
-        if model and not resolved_model:
-            raise BindingVerificationError(
-                "the selected profile declares no model; model selection must come "
-                "from the profile (honest absence, no silent passthrough)"
-            )
+        if model:
+            resolved_model = model
+        model_provider_facts = self._freeze_model_provider_ref(
+            model_provider, harness, model, profile_ref
+        )
+        model_provider_binding_ref = (
+            model_provider_facts.get("_binding_ref")  # type: ignore[union-attr]
+            if model_provider_facts
+            else None
+        )
+        if model_provider_facts:
+            model_provider_facts = {
+                k: v for k, v in model_provider_facts.items() if k != "_binding_ref"
+            }
 
         continuation_ref, parent_execution_id = self._continuation_ref(
             provider, session_id, continue_from_turn_id
@@ -746,6 +1509,7 @@ class StudioService:
             harness_provider_id=provider_id,
             harness_provider_version=provider_version,
             model_selection=resolved_model,
+            model_provider_ref=model_provider_binding_ref,
             profile_ref=profile_ref,
             workspace_ref=session.workspace_ref,
             workspace_mode=session.workspace_mode,
@@ -755,6 +1519,7 @@ class StudioService:
             extra={
                 "harness_type": harness,
                 "launch_mode": launch_mode or "",
+                **model_provider_facts,
                 **(
                     {
                         "sandbox_template": sandbox_ref.native_id,
@@ -995,6 +1760,36 @@ class StudioService:
                 self._notify(session_id)
                 return
 
+            # Host-side reconcile of the execution-scoped profile native
+            # home: the native thread/session state must survive the
+            # execution or no later native resume could ever find it.  The
+            # view owns the transaction (ok -> discard; ambiguous/failed ->
+            # preserve a recovery view, never write uncertain content); a
+            # staging-home attempt honestly reports nothing to reconcile.
+            # Reconcile correctness is PART of commit correctness: only the
+            # ``ok`` verdict and the typed no-view/skipped shapes reach
+            # finalization; every other outcome is an explicit recovery.
+            reconcile_verdict = self._reconcile_execution_home(run)
+            if reconcile_verdict == _RECONCILE_RECOVERY_REQUIRED:
+                self._store.mark_turn_recovery_required(
+                    turn_id,
+                    facts={
+                        "reason_code": _RECONCILE_FAILED_REASON_CODE,
+                        "lease_owner": run.owner_id,
+                    },
+                    lease=lease,
+                )
+                self._store.append_event(
+                    session_id,
+                    "execution.recovery_required",
+                    {"turn_id": turn_id, "reason_code": _RECONCILE_FAILED_REASON_CODE},
+                    lease,
+                    turn_id=turn_id,
+                    execution_id=run.execution_id,
+                )
+                self._notify(session_id)
+                return
+
             self._finalize_and_commit(run, baseline)
         except ExecutionFactConflict as exc:
             # Provenance violation: the run must never commit with missing
@@ -1062,11 +1857,53 @@ class StudioService:
             self._notify(session_id)
         finally:
             self._release_lease_quietly(run.session_id, run.owner_id)
+            self._release_dispatch_quietly(run)
             run.done.set()
             with self._runs_lock:
                 self._runs.pop(run.turn_id, None)
 
     # -- dispatch input assembly --------------------------------------------------
+
+    def _reconcile_execution_home(self, run: _TurnRunControl) -> str:
+        """One reconcile of the execution-scoped profile home per attempt.
+
+        Called by the Host after the execution terminal is proven and before
+        finalization/commit.  Returns the shared typed verdict:
+        ``ok`` proceeds; the typed no-view/``skipped`` shapes are honest
+        skips that also proceed; exception, ``failed``, ``ambiguous``,
+        malformed and unknown outcomes are ``recovery_required`` — the view
+        preserves itself as a recovery view (typed store-side, uncertain
+        content is never written back) and the caller must NOT finalize or
+        commit.  A reconcile failure never rewrites the proven process
+        terminal outcome: this is a storage recovery state, not an invented
+        model failure.
+        """
+        provider = run.provider
+        reconcile = getattr(provider, "reconcile_execution", None)
+        if not callable(reconcile):
+            return _RECONCILE_PROCEED
+        handle = run.receipt
+        errored = False
+        report: Any = None
+        try:
+            report = dict(reconcile(handle) or {})
+        except Exception as exc:  # noqa: BLE001 - the outcome stays proven
+            logger.error(
+                "profile home reconcile failed: turn_id=%s error_type=%s",
+                run.turn_id, type(exc).__name__,
+            )
+            errored = True
+        verdict = _classify_reconcile_report(report, errored=errored)
+        if verdict == _RECONCILE_RECOVERY_REQUIRED:
+            status = (
+                "exception" if errored else str(report.get("status", "malformed"))[:64]
+            )
+            logger.error(
+                "profile home reconcile moved the turn to recovery: "
+                "turn_id=%s status=%s",
+                run.turn_id, status,
+            )
+        return verdict
 
     def _build_dispatch_inputs(
         self, provider: Any, turn_id: str, execution_id: str, session
@@ -1137,7 +1974,11 @@ class StudioService:
         if callable(credential_contract):
             contract_id = credential_contract()
             if contract_id and contract_id in limits:
-                add(contract_id, self._credential_ref(provider), required=False)
+                add(
+                    contract_id,
+                    self._dispatch_credential_ref(provider, binding),
+                    required=False,
+                )
 
         if missing:
             raise LaunchSelectionError(
@@ -1145,6 +1986,51 @@ class StudioService:
                 + ",".join(sorted(missing))
             )
         return inputs
+
+    def _dispatch_credential_ref(self, provider: Any, binding: BindingSnapshot) -> Optional[Ref]:
+        """The credential Ref dispatched to this Execution.
+
+        Gateway route (formal authority): when the frozen binding carries a
+        ``model_provider_ref``, the dispatched credential is the pinned
+        configuration's credential locator (resolved from the EXACT frozen
+        revision — never Binding.extra).  Otherwise the harness's own
+        locator-only credential source (e.g. the native codex login).
+        """
+        definition = getattr(provider, "definition", None)
+        credential = getattr(definition, "credential", None) if definition else None
+        frozen_ref = binding.model_provider_ref
+        gateway_delivery = credential is not None and credential.guest_target_class in {
+            "launch-env", "fragment-mount"
+        }
+        if frozen_ref is None and gateway_delivery:
+            # launch-env credentials are meaningful ONLY with a pinned
+            # provider configuration; without one nothing is dispatched
+            # (the harness's own credential sources do not apply here).
+            return None
+        if frozen_ref is not None:
+            if credential is None or not gateway_delivery:
+                raise BindingVerificationError(
+                    "the pinned model provider configuration requires a "
+                    "gateway credential delivery (launch-env or "
+                    "fragment-mount) on the selected harness"
+                )
+            from agent_box.resource_contracts import HarnessModelProviderV1
+
+            resolvers = self._resource_providers_for(HarnessModelProviderV1.contract_id)
+            if len(resolvers) != 1:
+                raise BindingVerificationError(
+                    "exactly one harness model provider authority must be "
+                    "registered to resolve the pinned configuration"
+                )
+            config = resolvers[0].resolve(HarnessModelProviderV1.contract_id, frozen_ref)
+            locator = str(getattr(config, "credential_ref", "") or "")
+            if not locator:
+                raise BindingVerificationError(
+                    "the pinned model provider configuration carries no "
+                    "credential locator"
+                )
+            return Ref(RefType.ARTIFACT, credential.locator_provider, locator)
+        return self._credential_ref(provider)
 
     def _credential_ref(self, provider: Any) -> Optional[Ref]:
         definition = getattr(provider, "definition", None)
@@ -1173,6 +2059,7 @@ class StudioService:
             try:
                 driver = attach(run.dispatch_id)
                 run.driver_bound = driver is not None
+                run.driver = driver
             except Exception:  # noqa: BLE001 - legacy observe path remains
                 driver = None
         seen_hub_entries = 0
@@ -1260,6 +2147,7 @@ class StudioService:
                     # request stays what the provider reported.
                     if terminal_outcome is not TerminalOutcome.SUCCEEDED:
                         terminal_outcome = TerminalOutcome.CANCELLED
+                        evidence["outcome"] = terminal_outcome.value
                         evidence["cancel_reason"] = run.cancel_reason or "requested"
                 run.terminal_seen = True
                 self._store.record_execution_terminal(
@@ -1380,7 +2268,33 @@ class StudioService:
             payload["text"] = bounded(getattr(observation, "text", ""))
             return _EVENT_TOOL_RESULT, payload, None
         if kind == "permission_request":
-            payload["request_id"] = uuid.uuid4().hex
+            # The harness's own request identity and option vocabulary ride
+            # on the canonical observation (codec-owned native payload);
+            # when the codec did not inline them, the bound driver's
+            # canonical permission view is the authority.  Studio never
+            # invents a request id: without one the request is recorded
+            # honestly as not correlatable.
+            native_data = getattr(getattr(observation, "native", None), "data", None) or {}
+            request_id = bounded(native_data.get("request_id"))
+            options = native_data.get("options")
+            if not request_id and run.driver is not None:
+                view = self._pending_permission_view(run.driver)
+                if view is not None:
+                    request_id = bounded(view.request_id)
+                    options = [
+                        {"option_id": option.option_id, "kind": option.kind}
+                        for option in view.options
+                    ]
+            payload["request_id"] = request_id
+            if isinstance(options, list) and options:
+                rendered = []
+                for option in options[:8]:
+                    if isinstance(option, Mapping):
+                        rendered.append(
+                            f"{option.get('option_id', '')}:{option.get('kind', '')}"
+                        )
+                if rendered:
+                    payload["options"] = ",".join(rendered)[:512]
             payload["tool"] = bounded(getattr(observation, "tool_name", ""))
             payload["timeout_seconds"] = str(int(self._permission_timeout_seconds))
             payload["delivery"] = "session-driver" if run.driver_bound else "none-headless-auto-reject"
@@ -1641,23 +2555,18 @@ class StudioService:
                 "the turn that raised this request has no live writer in this process"
             )
         delivered = "false"
-        if run is not None and run.receipt is not None:
-            driver = self._bound_driver(run.provider, run.dispatch_id)
-            respond = None
-            if driver is not None:
-                respond = getattr(driver, "respond_permission", None) or getattr(
-                    driver, "respond", None
+        if run is not None and run.driver is not None:
+            view = self._pending_permission_view(run.driver)
+            if view is None or view.request_id != request_id:
+                # Unknown, expired or already-answered at the driver: the
+                # decision is recorded but never delivered (fail closed).
+                logger.warning(
+                    "permission not deliverable: request_id=%s reason=driver-view-mismatch",
+                    request_id[:12],
                 )
-            if callable(respond):
-                try:
-                    respond(request_id, decision)
-                    delivered = "true"
-                except Exception as exc:  # noqa: BLE001
-                    logger.error(
-                        "permission delivery failed: request_id=%s error=%s",
-                        request_id,
-                        type(exc).__name__,
-                    )
+            else:
+                option_id = self._decision_option_id(view, decision)
+                delivered = self._deliver_permission_decision(run.driver, option_id, decision)
         self._store.append_event(
             session_id,
             event_out,
@@ -1673,16 +2582,48 @@ class StudioService:
         self._notify(session_id)
         return {"request_id": request_id, "decision": decision, "delivered": delivered == "true"}
 
-    def _bound_driver(self, provider: Any, dispatch_id: Optional[str]):
-        if not dispatch_id:
-            return None
-        getter = getattr(provider, "session_driver", None)
+    @staticmethod
+    def _pending_permission_view(driver: Any):
+        getter = getattr(driver, "pending_permission", None)
         if not callable(getter):
             return None
         try:
-            return getter(dispatch_id)
-        except KeyError:
+            return getter()
+        except Exception:  # noqa: BLE001 - an unreachable driver never approves
             return None
+
+    @staticmethod
+    def _decision_option_id(view: Any, decision: str) -> Optional[str]:
+        """Map an approve/reject decision onto the harness's option ids.
+
+        Only the harness's own vocabulary is used; when it declares no
+        matching option the decision cannot be delivered (fail closed —
+        no auto-approval, no default escalation).
+        """
+        options = list(getattr(view, "options", ()) or ())
+        prefix = "allow" if decision == "approve" else "reject"
+        for option in options:
+            if str(getattr(option, "kind", "")).startswith(prefix):
+                return str(getattr(option, "option_id", ""))
+        return None
+
+    def _deliver_permission_decision(self, driver: Any, option_id: Optional[str], decision: str) -> str:
+        try:
+            if option_id:
+                respond = getattr(driver, "respond_permission", None)
+                if callable(respond) and respond(option_id):
+                    return "true"
+                return "false"
+            if decision == "reject":
+                reject = getattr(driver, "reject_permission", None)
+                if callable(reject) and reject():
+                    return "true"
+            return "false"
+        except Exception as exc:  # noqa: BLE001 - delivery failure is recorded, never faked
+            logger.error(
+                "permission delivery failed: error=%s", type(exc).__name__
+            )
+            return "false"
 
     # -- restart recovery -------------------------------------------------------------
 
@@ -1812,6 +2753,25 @@ class StudioService:
         except SessionError:
             pass
 
+    def _release_dispatch_quietly(self, run: _TurnRunControl) -> None:
+        """Release the attempt's execution-scoped runtime leftovers (best
+        effort, after the outcome is durable): the provider forgets the live
+        handle and removes the plain staged execution home.  A release
+        failure never rewrites the committed result."""
+        dispatch_id = run.dispatch_id
+        if not dispatch_id:
+            return
+        release = getattr(run.provider, "release_dispatch", None)
+        if not callable(release):
+            return
+        try:
+            release(dispatch_id)
+        except Exception:  # noqa: BLE001 - cleanup is best effort
+            logger.error(
+                "dispatch release failed: turn_id=%s dispatch=%s",
+                run.turn_id, dispatch_id[:12],
+            )
+
     def _safe_turn_run(self, turn_id: str) -> Optional[TurnRunView]:
         try:
             return self._store.turn_run(turn_id)
@@ -1841,7 +2801,8 @@ class StudioService:
 
     def _turn_payload(self, turn) -> dict:
         run = self._safe_turn_run(turn.turn_id)
-        return {
+        binding = turn.binding
+        payload = {
             "turn_id": turn.turn_id,
             "session_id": turn.session_id,
             "state": turn.state.value,
@@ -1851,7 +2812,96 @@ class StudioService:
             ),
             "committed_watermark": turn.committed_watermark,
             "run_phase": run.phase.value if run is not None else None,
+            # The frozen per-turn binding summary (identity facts only): the
+            # exact harness provider/version, profile/model selection, and
+            # launch mode this Turn was pinned to.
+            "binding": {
+                "harness_provider_id": binding.harness_provider_id,
+                "harness_provider_version": binding.harness_provider_version,
+                "harness_type": binding.extra.get("harness_type"),
+                "model_selection": binding.model_selection,
+                "launch_mode": binding.extra.get("launch_mode") or None,
+                "session_watermark": binding.session_watermark,
+                "capability_digest": binding.capability_digest,
+                "profile": self._public_ref(binding.profile_ref, purpose="profile"),
+            },
         }
+        payload["continuation"] = self._continuation_facts(turn, run)
+        return payload
+
+    def _continuation_facts(self, turn, run: Optional[TurnRunView]) -> dict:
+        """Public native-continuation facts of this Turn's executions.
+
+        The authority is EXACTLY the shared committed-Turn-Run authority
+        (``_committed_continuation_authority``) — the same one continuation
+        dispatch consumes.  There is no ``execution_ids[0]`` fallback, no
+        candidate-count, no insertion-time or locator-order heuristic: when
+        no valid committed run exists, every fact is explicitly unavailable.
+        Refs are projected through the public disclosure allowlist —
+        identity facts only, never host paths, never credential material.
+        """
+        execution_id, _unavailable = self._committed_continuation_authority(turn, run)
+        if execution_id is None:
+            return {
+                "execution_id": None,
+                "parent_execution_id": None,
+                "input_session_ref": None,
+                "output_native_session_ref": None,
+            }
+        try:
+            link = self._store.execution_link(turn.session_id, turn.turn_id, execution_id)
+        except SessionError:
+            return {
+                "execution_id": None,
+                "parent_execution_id": None,
+                "input_session_ref": None,
+                "output_native_session_ref": None,
+            }
+        return {
+            "execution_id": execution_id,
+            "parent_execution_id": link.parent_execution_id,
+            "input_session_ref": self._public_ref(link.input_session_ref),
+            "output_native_session_ref": self._public_ref(link.output_native_session_ref),
+        }
+
+    @staticmethod
+    def _public_ref(
+        ref: Optional[Ref], *, purpose: str = "session"
+    ) -> Optional[dict[str, Any]]:
+        """Project a Ref for the public API under its purpose allowlist.
+
+        Only allowlisted identity metadata crosses; every other key is
+        dropped deterministically (counted as a redaction, never echoed),
+        and each disclosed value passes the hostile-value screen (host
+        paths, URIs, credential-shaped blobs, oversized fields).  An
+        unknown purpose fails closed to no metadata at all.
+        """
+        if ref is None:
+            return None
+        allowlist = _PUBLIC_REF_METADATA_ALLOWLIST.get(purpose, frozenset())
+        metadata: dict[str, str] = {}
+        redacted = False
+        for key, raw in sorted(dict(ref.metadata or {}).items()):
+            value = str(raw)
+            if (
+                key not in allowlist
+                or not _disclosable_ref_value(key)
+                or not _disclosable_ref_value(value)
+            ):
+                redacted = True
+                continue
+            metadata[key] = value
+        provider = ref.provider if _disclosable_ref_value(ref.provider) else ""
+        native_id = ref.native_id if _disclosable_ref_value(ref.native_id) else ""
+        redacted = redacted or not provider or not native_id
+        public: dict[str, Any] = {
+            "provider": provider,
+            "native_id": native_id,
+            "metadata": metadata,
+        }
+        if redacted:
+            public["redacted"] = True
+        return public
 
     def get_turn(self, session_id: str, turn_id: str) -> dict:
         return self._turn_payload(self._store.get_turn(session_id, turn_id))

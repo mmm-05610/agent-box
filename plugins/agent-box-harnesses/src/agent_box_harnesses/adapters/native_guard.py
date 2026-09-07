@@ -24,8 +24,27 @@ SECRET_FIELD = re.compile(
 )
 
 
+# Credential-REFERENCE field names allowed in native payloads: their value
+# is an environment-variable NAME (never the secret).  This mirrors the
+# official DeepSeek Harness provider format ("settings retain only its
+# credential reference": apiKeyEnv).  The value shape is validated strictly
+# so a secret-shaped value can never ride in through the reference door.
+_CREDENTIAL_REFERENCE_FIELDS = frozenset({"apikeyenv", "api_key_env"})
+_ENV_NAME = re.compile(r"^[A-Z_][A-Z0-9_]{0,63}$")
+
+
 def secret_field_forbidden(key: str) -> bool:
     return bool(isinstance(key, str) and SECRET_FIELD.search(key))
+
+
+def credential_reference_allowed(key: str, value: Any) -> bool:
+    """True for an env-name reference field carrying a valid env NAME."""
+    return (
+        isinstance(key, str)
+        and key.lower() in _CREDENTIAL_REFERENCE_FIELDS
+        and isinstance(value, str)
+        and bool(_ENV_NAME.match(value))
+    )
 
 
 def bounded_native_payload(payload: Any) -> dict[str, Any]:
@@ -56,7 +75,7 @@ def _scan(value: Any, *, depth: int) -> None:
         for key, item in value.items():
             if not isinstance(key, str) or not key or len(key) > 96:
                 raise ValueError("NATIVE_PAYLOAD_KEY_INVALID")
-            if secret_field_forbidden(key):
+            if secret_field_forbidden(key) and not credential_reference_allowed(key, item):
                 raise ValueError("SECRET_FIELD_FORBIDDEN")
             _scan(item, depth=depth + 1)
     elif isinstance(value, list):

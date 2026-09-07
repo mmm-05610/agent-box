@@ -60,7 +60,18 @@ def _safe(value, size=65536):
         if len(value) > 128:
             raise ValueError("FIELD_LIMIT_EXCEEDED")
         for k, v in value.items():
-            if not isinstance(k, str) or len(k) > 96 or _SECRET.search(k):
+            # credential-REFERENCE fields (env-var NAME references, e.g. the
+            # official DeepSeek apiKeyEnv) are allowed with a strict env-name
+            # value shape — a secret can never ride the reference door; the
+            # guard module is the single source of truth for both rules.
+            from ..adapters.native_guard import (
+                credential_reference_allowed as _cred_ref_ok,
+                secret_field_forbidden as _secret_field,
+            )
+
+            if not isinstance(k, str) or len(k) > 96:
+                raise ValueError("SECRET_FIELD_FORBIDDEN")
+            if _secret_field(k) and not _cred_ref_ok(k, v):
                 raise ValueError("SECRET_FIELD_FORBIDDEN")
             _safe(v, size)
     elif isinstance(value, list):

@@ -57,12 +57,13 @@ def _entry_points() -> tuple[metadata.EntryPoint, ...]:
     return tuple(sorted(selected, key=lambda entry: (entry.name, entry.value)))
 
 
-def _context(descriptor: PluginDescriptor) -> PluginContext:
+def _context(descriptor: PluginDescriptor, host_operations: object | None = None) -> PluginContext:
     root = agent_box_home()
     return PluginContext(
         agent_box_version=__version__,
         agent_box_home=root,
         plugin_data_dir=root / "plugins" / descriptor.id,
+        host_operations=host_operations,
     )
 
 
@@ -83,6 +84,7 @@ def load_installed_plugins(
     strict: bool = False,
     entry_points: Iterable[metadata.EntryPoint] | None = None,
     catalog: ExtensionCatalogBuilder | None = None,
+    host_operations: object | None = None,
 ) -> PluginLoadReport:
     """Load installed plugins into ``registry`` and the staged ``catalog``.
 
@@ -118,7 +120,7 @@ def load_installed_plugins(
                 )
             if descriptor.id in seen_plugin_ids:
                 raise RuntimeError(f"duplicate plugin id: {descriptor.id}")
-            registration = plugin.build(_context(descriptor))
+            registration = plugin.build(_context(descriptor, host_operations))
             if not isinstance(registration, PluginRegistration):
                 raise TypeError("build() must return PluginRegistration")
 

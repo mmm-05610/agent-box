@@ -18,6 +18,9 @@ class CodexCredentialSource:
     locator = "codex-login/default"
     provider = "codex"
     provider_id = "codex-login"
+    # The only accepted guest target: exactly $CODEX_HOME/auth.json of the
+    # exec/app-server launch layout (adapter-declared native home guest).
+    auth_guest_target = "/runtime/home/.codex/auth.json"
     supported_contract_ids = frozenset({CONTRACT_ID})
 
     def __init__(self, *, home: Path | None = None, binary: str | None = None) -> None:
@@ -66,7 +69,11 @@ class CodexCredentialSource:
         if not isinstance(ref, CredentialRefV1):
             raise TypeError("credential mount requires CredentialRefV1")
         self.validate(ref)
-        if execution_scope.startswith("execution:") is False or guest_target != "/runtime/home/auth.json" or access != "ro":
+        if (
+            execution_scope.startswith("execution:") is False
+            or guest_target != self.auth_guest_target
+            or access != "ro"
+        ):
             raise ValueError("CODEX_SECRET_MOUNT_REJECTED")
         source = self._source()
         # Metadata-only checks: do not open, parse, copy, hash, or disclose it.
@@ -92,6 +99,54 @@ class CodexCredentialSource:
         except (OSError, ValueError):
             available = False
         return {"available": available, "login_status": "deferred-to-sandbox-preflight", "locator": self.locator}
+
+    def login_preflight(self, *, timeout_seconds: float = 15.0) -> dict[str, Any]:
+        """Bounded, content-free login readiness probe.
+
+        Runs the official binary's ``login status`` subcommand when it
+        exists and reports only the bounded status class (never stderr
+        text, never credential content, never the source path).  When the
+        binary cannot answer, the class is honest ``unknown``.
+        """
+        from .executable import classify_login_status_failure
+
+        locator_status: str | None = None
+        try:
+            source = self._source()
+            if source.is_symlink() or not source.exists():
+                locator_status = "credential-file-missing"
+        except (OSError, ValueError):
+            locator_status = "credential-file-missing"
+        if not self.binary:
+            return {
+                "status": "unavailable",
+                "reason": "executable unavailable",
+                "locator_available": locator_status is None,
+            }
+        try:
+            completed = subprocess.run(
+                [self.binary, "login", "status"],
+                capture_output=True,
+                text=True,
+                timeout=timeout_seconds,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return {
+                "status": "unknown",
+                "reason": "login status probe failed",
+                "locator_available": locator_status is None,
+            }
+        status = classify_login_status_failure(completed.stderr, completed.returncode)
+        if status == "process-error" and completed.returncode != 0:
+            status = "unknown"
+        if locator_status is not None and status == "logged-in":
+            status = locator_status
+        return {
+            "status": status,
+            "exit_code": completed.returncode,
+            "locator_available": locator_status is None,
+        }
 
 
 class CodexCredentialSelector:

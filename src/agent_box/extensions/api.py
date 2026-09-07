@@ -35,6 +35,10 @@ class PluginContext:
     agent_box_version: str
     agent_box_home: Path
     plugin_data_dir: Path
+    # Provider-neutral host-control port.  Its concrete operations are owned
+    # by the local host authority; the root SDK does not name WSL, workers or
+    # Harnesses.
+    host_operations: object | None = None
 
 @dataclass(frozen=True)
 class PluginRegistration:

@@ -1,0 +1,16 @@
+
+==================================== ERRORS ====================================
+_ ERROR collecting plugins/agent-box-workspace-wsl/tests/test_workspace_wsl.py _
+ImportError while importing test module '/home/maoqh/projects/agent-box-studio-codex-vertical/plugins/agent-box-workspace-wsl/tests/test_workspace_wsl.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/usr/lib/python3.12/importlib/__init__.py:90: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+plugins/agent-box-workspace-wsl/tests/test_workspace_wsl.py:11: in <module>
+    from agent_box_workspace_wsl import (
+E   ModuleNotFoundError: No module named 'agent_box_workspace_wsl'
+=========================== short test summary info ============================
+ERROR plugins/agent-box-workspace-wsl/tests/test_workspace_wsl.py
+!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+1 error in 0.11s

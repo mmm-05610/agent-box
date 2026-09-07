@@ -11,6 +11,9 @@ dependencies = [
     "agent-box-cli==2.0.0a1",
     "fastapi>=0.110",
     "uvicorn>=0.29",
+    # The authenticated event WebSocket is part of the served API surface;
+    # a uvicorn install without a WS library would answer 404 on upgrades.
+    "websockets>=12",
 ]
 
 [project.optional-dependencies]

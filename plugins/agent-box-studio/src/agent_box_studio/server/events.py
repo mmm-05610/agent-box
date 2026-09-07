@@ -74,12 +74,19 @@ class SessionEventStream:
         """Live-tail read from the ledger.
 
         Deliberately not gated by the committed watermark: a live consumer
-        may legitimately observe in-flight events of a running turn.  If the
-        turn never commits, the consumer's next *reconnect* hits the strict
-        replay gate and resyncs — the ledger stays the only authority.
+        may legitimately observe in-flight events of a running turn.  The
+        committed watermark rides on every batch so a consumer can tell
+        committed history from in-flight tail, and after a never-committed
+        run it knows the safe reset position for its next reconnect.  If
+        the turn never commits, the consumer's next *reconnect* hits the
+        strict replay gate and resyncs — the ledger stays the only
+        authority.
         """
         events = self._store.transcript(session_id, after_seq=after_seq)
-        return {"events": [_event_payload(event) for event in events]}
+        return {
+            "events": [_event_payload(event) for event in events],
+            "watermark": self._store.watermark(session_id),
+        }
 
 
 def _event_payload(event: Any) -> dict[str, Any]:

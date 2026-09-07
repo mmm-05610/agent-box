@@ -323,7 +323,6 @@ class HarnessCommandSpec:
     # Declaring projector identity (harness-owned); carried for honest
     # projection receipts, never used as a Root branch key.
     projector_id: str = ""
-
     def __post_init__(self) -> None:
         if not self.argv or len(self.argv) > 64 or any(not isinstance(x, str) or not x or "\0" in x for x in self.argv):
             raise ValueError("argv must be bounded and non-empty")

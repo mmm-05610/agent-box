@@ -26,6 +26,8 @@ def classify_login_status_failure(stderr: str, returncode: int) -> str:
     text = (stderr or "").lower()
     if returncode == 0:
         return "logged-in"
+    if "not logged in" in text:
+        return "not-logged-in"
     if "proc/self/exe" in text and "proc" in text:
         return "required-system-root-missing"
     if "auth.json" in text and any(word in text for word in ("permission", "read-only", "denied", "not readable")):

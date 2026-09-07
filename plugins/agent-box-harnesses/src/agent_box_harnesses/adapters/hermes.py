@@ -81,6 +81,7 @@ class HermesUsageReportDecoder(NativeObservationDecoder):
 
 
 class HermesAdapter(GenericCliAdapter):
+    credential_env_var = "OPENAI_API_KEY"
     harness_type = "hermes"
     native_home_env = "HERMES_HOME"
     native_home_guest = "/runtime/home/.hermes"

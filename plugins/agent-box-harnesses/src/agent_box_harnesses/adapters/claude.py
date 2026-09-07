@@ -121,6 +121,7 @@ class ClaudeStreamJsonDecoder(NativeObservationDecoder):
 
 
 class ClaudeAdapter(GenericCliAdapter):
+    credential_env_var = "ANTHROPIC_AUTH_TOKEN"
     harness_type = "claude-code"
     native_home_env = "CLAUDE_CONFIG_DIR"
     native_home_guest = "/runtime/home/.claude"

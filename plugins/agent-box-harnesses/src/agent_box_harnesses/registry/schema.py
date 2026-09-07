@@ -35,6 +35,10 @@ class InputSpec:
 @dataclass(frozen=True)
 class CredentialSpec:
     contract: str; locator_provider: str; guest_target_class: str; materializer: str; required: bool = False
+    # launch-env delivery only: the guest env var the credential value is
+    # injected under (never a file path; the value never enters a profile
+    # payload, event, binding fact or log line).
+    env_var: str = ""
 @dataclass(frozen=True)
 class ContinuationSpec:
     kind: str; contract_id: str | None = None; target_provider: str | None = None
@@ -89,8 +93,14 @@ def definition_from_dict(raw: Mapping) -> HarnessDefinition:
     if continuation.kind != "none" and "native_continuation" not in caps and continuation.kind == "native_session": raise ValueError("native continuation capability missing")
     cred=raw.get("credential"); credential=None
     if cred:
-        if set(cred)-{"contract","locator_provider","guest_target_class","materializer","required"}: raise ValueError("unknown credential field")
+        if set(cred)-{"contract","locator_provider","guest_target_class","materializer","required","env_var"}: raise ValueError("unknown credential field")
         target = str(cred.get("guest_target_class", "")).lower()
         if target in {"path", "value", "secret", "host-path"} or "raw" in target: raise ValueError("unsafe credential target")
-        credential=CredentialSpec(_s(cred["contract"],"credential contract"),_s(cred["locator_provider"],"credential locator"),_s(cred["guest_target_class"],"credential target"),_s(cred["materializer"],"credential materializer"),bool(cred.get("required",False)))
+        env_var = str(cred.get("env_var", "") or "")
+        if target == "launch-env":
+            # a launch-env credential MUST name the guest env var it is
+            # injected under; the name itself is a plain identifier
+            if not env_var or not env_var.replace("_","").isalnum(): raise ValueError("launch-env credential requires a safe env var name")
+        elif env_var: raise ValueError("env_var is only valid for launch-env credentials")
+        credential=CredentialSpec(_s(cred["contract"],"credential contract"),_s(cred["locator_provider"],"credential locator"),target,_s(cred["materializer"],"credential materializer"),bool(cred.get("required",False)),env_var)
     return HarnessDefinition(int(raw["schema_version"]),identity,executable,profile,tuple(modes),runtime_spec,tuple(inputs),credential,continuation,caps,_s(raw["driver"],"driver"))

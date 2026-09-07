@@ -1,9 +1,10 @@
 # Release Process
 
-Agent-Box Preview is distributed as one Root CLI wheel plus selected plugin
-wheels. The Root wheel owns Core, the Plugin SDK, resource contracts,
-migrations, and the thin CLI. Web, Harnesses, Git, Artifacts, runtime-local,
-bwrap, and terminal-session remain plugin-owned.
+Agent-Box Preview is distributed as one Root CLI wheel plus ALL official
+plugin wheels — exactly the set the root ``[preview]`` extra pins. The Root
+wheel owns Core, the Plugin SDK, resource contracts, migrations, and the thin
+CLI. Web, Harnesses, ACP, Skills, Git, Artifacts, runtime-local, bwrap,
+terminal-session, session, workspace-local, and studio remain plugin-owned.
 
 ## 2.0.0a1 Preview build
 
@@ -12,9 +13,11 @@ python -m pip install build
 npm ci --prefix plugins/agent-box-web/frontend
 npm run build --prefix plugins/agent-box-web/frontend
 python -m build --wheel --sdist --outdir dist .
-for package in plugins/agent-box-web plugins/agent-box-harnesses \
-  plugins/agent-box-git plugins/agent-box-artifacts plugins/agent-box-runtime-local \
-  plugins/agent-box-sandbox-bwrap plugins/agent-box-terminal-session; do
+for package in plugins/agent-box-web plugins/agent-box-harnesses plugins/agent-box-acp \
+  plugins/agent-box-skills plugins/agent-box-git plugins/agent-box-artifacts \
+  plugins/agent-box-runtime-local plugins/agent-box-sandbox-bwrap \
+  plugins/agent-box-terminal-session plugins/agent-box-session \
+  plugins/agent-box-workspace-local plugins/agent-box-studio; do
   python -m build --wheel --outdir dist "$package"
 done
 ```

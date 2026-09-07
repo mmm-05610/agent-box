@@ -112,7 +112,9 @@ def _prepare_credential_mount(request, materializer, sandbox=None):
     ref = values[0]
     if not isinstance(ref, CredentialRefV1):
         raise TypeError("credential input is not a typed CredentialRefV1")
-    prepared = materializer.prepare_mount(ref, "execution:" + request.execution_id, "/runtime/home/auth.json", "ro")
+    prepared = materializer.prepare_mount(
+        ref, "execution:" + request.execution_id, materializer.auth_guest_target, "ro"
+    )
     if sandbox is None:
         by_contract = {i.contract_id: i.value for i in request.resolved_inputs}
         sandbox = by_contract[SandboxV1.contract_id]

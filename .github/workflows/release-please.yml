@@ -5,7 +5,9 @@
 # generates CHANGELOG.md, tags v<version> and creates the GitHub Release.
 # The publish job then builds the wheel + sdist and attaches them.
 #
-# Preview artifacts are the root wheel plus the five official plugin wheels.
+# Preview artifacts are the root wheel plus ALL official plugin wheels —
+# exactly the set the root ``[preview]`` extra pins (a wheelhouse install
+# of ``agent-box-cli[preview]`` must resolve from these assets alone).
 name: release-please
 on:
   push:
@@ -44,8 +46,9 @@ jobs:
           npm run build --prefix plugins/agent-box-web/frontend
           mkdir -p dist
           python -m build --wheel --sdist --outdir dist .
-          for package in plugins/agent-box-web plugins/agent-box-harnesses plugins/agent-box-skills plugins/agent-box-git plugins/agent-box-artifacts \
-            plugins/agent-box-runtime-local plugins/agent-box-sandbox-bwrap plugins/agent-box-terminal-session; do
+          for package in plugins/agent-box-web plugins/agent-box-harnesses plugins/agent-box-acp plugins/agent-box-skills plugins/agent-box-git plugins/agent-box-artifacts \
+            plugins/agent-box-runtime-local plugins/agent-box-sandbox-bwrap plugins/agent-box-terminal-session \
+            plugins/agent-box-session plugins/agent-box-workspace-local plugins/agent-box-studio; do
             python -m build --wheel --outdir dist "$package"
           done
       - name: Attach to release

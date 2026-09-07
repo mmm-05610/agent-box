@@ -97,6 +97,7 @@ class PiJsonDecoder(NativeObservationDecoder):
 
 
 class PiAdapter(GenericCliAdapter):
+    credential_env_var = "MINIMAX_API_KEY"
     harness_type = "pi"
     native_home_env = "PI_CODING_AGENT_DIR"
     native_home_guest = "/runtime/home"

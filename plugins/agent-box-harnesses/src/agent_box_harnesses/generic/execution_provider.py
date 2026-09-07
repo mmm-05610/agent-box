@@ -14,6 +14,8 @@ unimplemented capabilities are ``not_implemented``, never silent no-ops.
 """
 from __future__ import annotations
 
+import os
+from pathlib import Path
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Mapping
@@ -47,6 +49,12 @@ from ..resources.executable import ResolvedExecutable, resolve_executable
 
 _MAX_OUTPUT_CHARS = 1_000_000
 
+# Network transport belongs to the native Harness process.  These proxy
+# variables are inherited at start time only (bounded, uppercase-only — the
+# LaunchPlan environment vocabulary) and are never copied into a Profile,
+# projection manifest, Binding, Evidence, or any public record.
+_AMBIENT_PROXY_ENV_KEYS = ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY")
+
 
 @dataclass
 class GenericHandle:
@@ -65,6 +73,9 @@ class GenericHandle:
     view: NativeHomeView | None = None
     expected_generation: int | None = None
     reconcile_report: ReconcileReport | None = None
+    launch_facts: object | None = None
+    secret_delivery: object | None = None
+    terminal_emitted: bool = False
 
 
 class CapabilityState(str, Enum):
@@ -81,7 +92,7 @@ _MAX_OUTPUT_CHARS = 1_000_000
 
 class GenericExecutionProvider:
     def __init__(self, definition, adapter, *, staging_root=None, executable_resolver=None,
-                 credential_materializer=None, profile_store=None) -> None:
+                 credential_materializer=None, profile_store=None, launch_authority=None) -> None:
         self.definition = definition
         self.adapter = adapter
         self.provider_id = f"{definition.harness_type}-execution"
@@ -90,6 +101,7 @@ class GenericExecutionProvider:
         self._executable_resolver = executable_resolver
         self._materializer = credential_materializer
         self._profile_store = profile_store
+        self._launch_authority = launch_authority
         self._executable: ResolvedExecutable | None = None
         self._executable_error: str | None = None
         self._acp_probe: tuple[bool, str] | None = None
@@ -267,12 +279,24 @@ class GenericExecutionProvider:
         executable = self._resolve_executable()
         if executable is None:
             raise PlanRejected("EXECUTABLE_UNAVAILABLE", self._executable_error or "")
+        launch_facts = None
+        secret_delivery = None
+        if self._launch_authority is not None:
+            launch_facts = self._launch_authority.freeze(request, executable)
+            make_delivery = getattr(self._launch_authority, "secret_delivery", None)
+            if (
+                callable(make_delivery)
+                and getattr(launch_facts, "credential_revision", None) is not None
+            ):
+                secret_delivery = make_delivery(request, launch_facts)
         try:
             context = build_start_context(
                 self.definition, request, executable=executable,
                 preferred_launch_mode=launch_mode,
+                ambient_environment=self._ambient_network_environment(),
             )
             plan = self.adapter.plan(context)
+            self._validate_secret_delivery(plan, secret_delivery)
         except LaunchStageError:
             raise
         except Exception as exc:
@@ -307,6 +331,12 @@ class GenericExecutionProvider:
             "profile-home": view if view is not None else staged,
             **{f"executable:{member.name}": member.path for member in executable.members},
         }
+        # launch-env delivery: stage the fixed secret-env launcher from the
+        # plugin asset into the execution staging area (ro source), so the
+        # in-guest launcher reads the projected secret and execs the harness.
+        if context.credential_ref is not None and self.adapter.credential_env_var:
+            launcher_host = self._stage_secret_launcher(request.execution_id)
+            sources["secret-launcher"] = launcher_host
         try:
             lowered = lower(plan, sources=sources, secret_mounts=secret_mounts)
         except LaunchStageError:
@@ -344,13 +374,98 @@ class GenericExecutionProvider:
             request=request, runtime=runtime_handle, command=lowered.command, plan=plan,
             staged_home=staged, execution_id=request.execution_id, dispatch_id=request.dispatch_id,
             view=view, expected_generation=expected_generation,
+            launch_facts=launch_facts,
+            secret_delivery=secret_delivery,
         )
+        self._close_one_shot_stdin(handle, launch_mode)
         self._handles[request.dispatch_id] = handle
         return ExecutionStartReceipt(
             request.execution_id, request.dispatch_id, request.inputs_digest,
             correlation_ref=Ref(RefType.SESSION, self.provider_id, request.execution_id),
             runtime_handle=handle,
         )
+
+    @staticmethod
+    def _validate_secret_delivery(plan: LaunchPlan, delivery: object | None) -> None:
+        """Require an exact designated binding before materialization.
+
+        The adapter-owned delivery object is intentionally opaque to the
+        generic provider; only the transport-neutral safety fields are
+        checked here.  No credential locator or value is inspected.
+        """
+        if delivery is None:
+            return
+        bindings = tuple(plan.secret_bindings)
+        if len(bindings) != 1:
+            raise PlanRejected("DESIGNATED_SECRET_BINDING_REQUIRED")
+        binding = bindings[0]
+        if (
+            getattr(delivery, "delivery_class", None) != "designated-secret-file"
+            or getattr(delivery, "replayable", None) is not False
+            or getattr(delivery, "cleanup_required", None) is not True
+            or getattr(delivery, "access", None) != "read-only"
+            or binding.guest_target != getattr(delivery, "guest_target", None)
+            or binding.access != "ro"
+        ):
+            raise PlanRejected("DESIGNATED_SECRET_BINDING_MISMATCH")
+
+    def _ambient_network_environment(self) -> Mapping[str, str]:
+        """Bounded egress-proxy passthrough for the native launch process.
+
+        The model control-plane connection must traverse the operator's
+        proxy on hosts whose egress policy forbids direct connections; a
+        launch environment without it can never reach the model backend.
+        Only the four canonical uppercase proxy variables are inherited,
+        with their start-time values, capped to the LaunchPlan's
+        512-character environment value limit.
+        """
+        if self.definition.runtime.network == "none":
+            return {}
+        values = {key: os.environ[key] for key in _AMBIENT_PROXY_ENV_KEYS if os.environ.get(key)}
+        return {key: value[:512] for key, value in sorted(values.items())}
+
+    def _close_one_shot_stdin(self, handle: GenericHandle, launch_mode: str) -> None:
+        """Close the spawned child's stdin when no driver will ever use it.
+
+        The spawn transport holds the child's stdin as a pipe.  A one-shot
+        native CLI that appends piped stdin to its prompt (the official
+        Codex CLI does) waits for EOF on that pipe forever, hanging the
+        launch.  The pipe is kept ONLY for launch modes whose registered
+        session driver declares a SUPPORTED streaming capability (a duplex
+        consumer that takes the pipe over); every other mode has no
+        in-process stdin consumer, so the provider closes the write end and
+        the child sees EOF immediately.
+        """
+        from ..session.registry import ensure_session_drivers
+
+        ensure_session_drivers()
+        from ..session import session_driver_factory
+
+        keeps_stdin = False
+        try:
+            factory = session_driver_factory(self.definition.harness_type, launch_mode)
+        except Exception:  # noqa: BLE001 - no driver for this mode
+            factory = None
+        if factory is not None:
+            try:
+                driver = factory(self.adapter, self.definition)
+                streaming = driver.capabilities().get("streaming")
+                keeps_stdin = (
+                    streaming is not None
+                    and str(getattr(streaming, "value", streaming)).lower() == "supported"
+                )
+            except Exception:  # noqa: BLE001 - an unusable driver keeps nothing
+                keeps_stdin = False
+        if keeps_stdin:
+            return
+        transport = getattr(handle.runtime, "transport", None)
+        stdin = getattr(transport, "stdin", None)
+        if stdin is None:
+            return
+        try:
+            stdin.close()
+        except Exception:  # noqa: BLE001 - closure is best-effort at the seam
+            pass
 
     def _materialize_home(self, plan: LaunchPlan, context, execution_id: str) -> tuple[StagedHome | None, NativeHomeView | None, int | None]:
         """One materialization path per launch.
@@ -379,18 +494,56 @@ class GenericExecutionProvider:
         staged = staging.materialize(plan.rendered_target())
         return staged, None, None
 
+    def _stage_secret_launcher(self, execution_id: str) -> Path:
+        """Copy the fixed launcher asset into the execution staging (0600 dir,
+        world-readable file) and return the host path for the ro source."""
+        import shutil
+
+        asset = getattr(self.adapter, "credential_launcher_asset", None)
+        if asset is None or not Path(asset).is_file():
+            raise MaterializationFailed("SECRET_LAUNCHER_ASSET_MISSING", self.definition.harness_type)
+        staging = Path(self._staging_root) / f"exec_{execution_id}" / "launcher"
+        staging.mkdir(parents=True, exist_ok=True)
+        target = staging / "secret-env-launcher.sh"
+        shutil.copyfile(asset, target)
+        return target
+
+    def _resolve_materializer(self):
+        """The credential materializer for this harness's delivery class.
+
+        codex uses its own harness-owned source; launch-env harnesses look
+        their declared materializer id up through the credential SPI
+        (registered by the authority that issued the locator).
+        """
+        if self._materializer is not None:
+            return self._materializer
+        credential = self.definition.credential
+        if credential is None or credential.guest_target_class not in {
+            "launch-env", "fragment-mount"
+        }:
+            return None
+        from agent_box.protocols.credentials import lookup_credential_materializer
+
+        source = lookup_credential_materializer(credential.materializer)
+        if source is None:
+            raise PlanRejected(
+                "CREDENTIAL_MATERIALIZER_UNREGISTERED", credential.materializer
+            )
+        return source
+
     def _prepare_secret_mounts(self, plan: LaunchPlan, context, request) -> tuple[Any, ...]:
         if not plan.secret_bindings:
             return ()
-        if self._materializer is None or context.credential_ref is None:
+        materializer = self._resolve_materializer()
+        if materializer is None or context.credential_ref is None:
             raise PlanRejected("CREDENTIAL_MATERIALIZER_UNAVAILABLE", self.definition.harness_type)
         binding = plan.secret_bindings[0]
         if context.credential_ref.native_locator != binding.locator:
             raise PlanRejected("CREDENTIAL_BINDING_MISMATCH", self.definition.harness_type)
-        prepared = self._materializer.prepare_mount(
+        prepared = materializer.prepare_mount(
             context.credential_ref, f"execution:{request.execution_id}", binding.guest_target, "ro",
         )
-        bind = getattr(self._materializer, "bind_to_sandbox", None)
+        bind = getattr(materializer, "bind_to_sandbox", None)
         if callable(bind):
             bind(prepared, context.sandbox.port)
         return (prepared,)
@@ -519,6 +672,16 @@ class GenericExecutionProvider:
         spec = self.definition.continuation
         return spec.contract_id if spec is not None and spec.kind != "none" else None
 
+    def credential_contract_id(self) -> str | None:
+        """The registry-declared credential contract of this harness.
+
+        The upper orchestrator dispatches the credential input through this
+        contract; the locator-only materialization and the secret mount stay
+        inside the harness-owned credential source.
+        """
+        credential = self.definition.credential
+        return credential.contract if credential is not None else None
+
     def profile_model_selection(self, profile: Any) -> str | None:
         """Resolved model identity of a frozen profile envelope.
 
@@ -598,16 +761,77 @@ class GenericExecutionProvider:
             handle.session_driver.poll(timeout=0.0)
             return tuple(item.observation for item in handle.session_driver.hub.all())
         lines, exit_code, exited = _collect_output(handle)
-        observations = list(self.adapter.decode_native_events(lines))
+        observations = []
+        terminal_seen = False
+        for item in self.adapter.decode_native_events(lines):
+            if item.kind is ObservationKind.TERMINAL:
+                if terminal_seen or handle.terminal_emitted:
+                    continue
+                terminal_seen = True
+                handle.terminal_emitted = True
+            observations.append(item)
         for artifact in handle.plan.observation.artifacts:
             document = _read_staged_document(handle, artifact)
             if document is not None:
                 observations.extend(self.adapter.decode_native_document(document))
         if exited:
-            observations.append(self.adapter.terminal_observation(tuple(observations), exit_code=exit_code))
+            if not handle.terminal_emitted:
+                observations.append(self.adapter.terminal_observation(tuple(observations), exit_code=exit_code))
+                handle.terminal_emitted = True
         else:
             observations.append(Observation(ObservationKind.LIFECYCLE, self.definition.harness_type, text="running"))
         return tuple(observations)
+
+    def release_dispatch(self, dispatch_id: str) -> Mapping[str, object]:
+        """Release a terminal dispatch's execution-scoped runtime leftovers.
+
+        The Host calls this once per attempt AFTER its outcome is committed:
+        the provider forgets the live handle and removes the plain staged
+        execution home.  A profile native-home view is NOT touched here —
+        reconcile already discarded the ok view and an ambiguous/failed view
+        was preserved under recovery/ for manual inspection.
+        """
+        handle = self._handles.pop(dispatch_id, None)
+        if handle is None:
+            return {"released": False, "reason": "unknown-dispatch"}
+        import shutil as _shutil
+
+        removed = False
+        for root in (
+            getattr(getattr(handle, "staged_home", None), "root", None),
+            getattr(getattr(handle, "view", None), "root", None),
+        ):
+            if root is None:
+                continue
+            _shutil.rmtree(root, ignore_errors=True)
+            container = root.parent
+            if container.name == handle.execution_id:
+                # A moved-away recovery view leaves the empty execution
+                # container behind; it carries no state and goes too.
+                _shutil.rmtree(container, ignore_errors=True)
+            removed = removed or not root.exists()
+        return {"released": True, "staging_removed": removed}
+
+    def reconcile_execution(self, handle: GenericHandle) -> Mapping[str, object]:
+        """Host-invoked reconcile of the execution-scoped profile home.
+
+        The upper orchestrator (Host) calls this ONCE per attempt after the
+        execution reached its terminal state: the profile native home
+        reconcile is a lease-held, generation-CAS'd transaction owned by the
+        view (ok -> discard the view; ambiguous/failed -> preserve a
+        recovery view and never write back uncertain content).  An attempt
+        without an execution-scoped view (plain staging home) has nothing to
+        reconcile and says so honestly.
+        """
+        if getattr(handle, "view", None) is None:
+            return {"reconciled": False, "reason": "no-execution-view"}
+        self._reconcile_view(handle)
+        report = handle.reconcile_report
+        if report is None:
+            return {"reconciled": True, "status": "skipped"}
+        public = report.public()
+        public["reconciled"] = True
+        return public
 
     def finish(self, handle: GenericHandle) -> Any:
         """Produce a terminal Observation and a FinishProposal.

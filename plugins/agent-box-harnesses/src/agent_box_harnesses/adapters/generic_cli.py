@@ -18,6 +18,8 @@ from .launch_plan import (
     SecretBinding,
 )
 from .native_guard import bounded_native_payload
+from pathlib import Path
+
 from .native_render import render_json, render_toml, render_yaml_via_json
 from .observation import FinishProposal, NativeObservationDecoder, Observation, ObservationKind, TerminalCondition
 from .staging import plan_home_logical_digest
@@ -56,6 +58,15 @@ class GenericCliAdapter:
     # credential materialization
     credential_guest_target: str | None = None
     credential_materializer_id: str | None = None
+    # launch-env credential delivery (gateway provider route): when set, the
+    # credential value is projected INTO the sandbox as a read-only secret
+    # source file, and a fixed in-guest launcher sets the env var and execs
+    # the harness.  The secret never enters the LaunchPlan, argv, environment
+    # digest, or any host-side carrier.
+    credential_env_var: str | None = None
+    credential_secret_guest_target = "/runtime/home/.credential/secret"
+    credential_launcher_guest_path = "/runtime/bin/secret-env-launcher"
+    credential_launcher_asset = Path(__file__).resolve().parent.parent / "assets" / "secret-env-launcher.sh"
     # bounded, non-secret diagnostics notes surfaced by the provider
     diagnostics_notes: tuple[str, ...] = ()
 
@@ -149,7 +160,7 @@ class GenericCliAdapter:
         ))
 
     def _plan_argv(self, context: HarnessStartContext) -> tuple[str, ...]:
-        argv = list(context.launch_mode.argv)
+        argv = list(self._credential_launcher_prefix(context)) + list(context.launch_mode.argv)
         if not argv:
             raise PlanRejected("LAUNCH_MODE_ARGV_EMPTY", self.harness_type)
         argv[0] = context.executable.guest_target()
@@ -185,6 +196,7 @@ class GenericCliAdapter:
         if self.native_home_env and self.native_home_guest:
             environment[self.native_home_env] = self.native_home_guest
         environment.update(self.extra_environment)
+        environment.update(dict(getattr(context, "ambient_environment", None) or {}))
         return environment
 
     def _mounts(self, context: HarnessStartContext, home_digest: str) -> tuple[MountIntent, ...]:
@@ -198,7 +210,24 @@ class GenericCliAdapter:
                 "executable", f"executable:{member.name}", member.digest,
                 executable.guest_target(member.name), "ro", "executable",
             ))
+        if context.credential_ref is not None and self.credential_env_var:
+            # launch-env delivery: the fixed launcher is projected read-only
+            # (its host path is staged by the provider; the declared digest
+            # is the asset content digest, verified fail-closed at lowering).
+            mounts.append(MountIntent(
+                "executable", "secret-launcher", self._launcher_asset_digest(),
+                self.credential_launcher_guest_path, "ro", "launcher",
+            ))
         return tuple(mounts)
+
+    _launcher_digest_cache: str | None = None
+
+    def _launcher_asset_digest(self) -> str:
+        if self._launcher_digest_cache is None:
+            from .lowering import content_digest
+
+            self._launcher_digest_cache = content_digest(self.credential_launcher_asset)
+        return self._launcher_digest_cache
 
     def _executable_plan(self, context: HarnessStartContext) -> ExecutablePlan:
         executable = context.executable
@@ -268,9 +297,52 @@ class GenericCliAdapter:
             self._continuation_argv(locator, mode=context.launch_mode.name) or (),
         )
 
+    def _credential_launcher_prefix(self, context: HarnessStartContext) -> tuple[str, ...]:
+        """The fixed in-guest launcher invocation for launch-env delivery.
+
+        argv carries ONLY the env name, the projected secret source path and
+        the harness argv behind ``--`` — never a secret value.  Active only
+        when a credential was dispatched AND this harness declares the
+        launch-env delivery class.
+        """
+        if context.credential_ref is None or not self.credential_env_var:
+            return ()
+        return (
+            self.credential_launcher_guest_path,
+            self.credential_env_var,
+            self.credential_secret_guest_target,
+            "--",
+        )
+
     def _secret_bindings(self, context: HarnessStartContext) -> tuple[SecretBinding, ...]:
         if context.credential_ref is None:
             return ()
+        definition = getattr(self, "definition", None)
+        materializer_id = (
+            definition.credential.materializer
+            if definition is not None and definition.credential is not None
+            else "gateway-provider"
+        )
+        if self.credential_env_var:
+            # launch-env delivery: the value is projected as a read-only
+            # secret source file and consumed by the in-guest launcher; the
+            # binding carries the locator only.
+            return (SecretBinding(
+                guest_target=self.credential_secret_guest_target,
+                locator=context.credential_ref.native_locator,
+                materializer_id=materializer_id,
+            ),)
+        fragment_target = getattr(self, "credential_fragment_guest_target", None)
+        if fragment_target:
+            # fragment-mount delivery (二次挂载): the ModelProvider renders
+            # the credential-bearing native fragment; it is layered OVER the
+            # writable native home read-only for exactly this execution and
+            # never reaches the host-side profile home.
+            return (SecretBinding(
+                guest_target=fragment_target,
+                locator=context.credential_ref.native_locator,
+                materializer_id=materializer_id,
+            ),)
         if not self.credential_guest_target or not self.credential_materializer_id:
             raise PlanRejected("CREDENTIAL_MATERIALIZER_UNDECLARED", self.harness_type)
         return (SecretBinding(

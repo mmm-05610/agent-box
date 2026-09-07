@@ -229,6 +229,11 @@ class BindingSnapshot:
     harness_provider_id: Optional[str] = None
     harness_provider_version: Optional[str] = None
     model_selection: Optional[str] = None
+    # The exact HarnessProviderConfig Ref this Turn froze (immutable
+    # revision; formal authority — never Binding.extra).  The execution
+    # invariant: profile_ref.harness_type == this ref's harness_type ==
+    # the ExecutionProvider's harness_type.
+    model_provider_ref: Optional[Ref] = None
     profile_ref: Optional[Ref] = None
     workspace_ref: Optional[Ref] = None
     workspace_mode: Optional[str] = None

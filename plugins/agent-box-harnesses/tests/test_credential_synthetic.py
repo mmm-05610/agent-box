@@ -11,6 +11,7 @@ import pytest
 
 from agent_box.protocols.credentials import PreparedSecretMount
 from agent_box.protocols.runtime import assemble_runtime_composition
+from agent_box.protocols.runtime import HarnessCommandSpec
 from agent_box.resource_contracts import CredentialRefV1
 from agent_box.work_core import Ref, RefType, ResolvedExecutionInput
 from agent_box_harnesses.adapters import ADAPTERS
@@ -31,7 +32,7 @@ class SyntheticCodexMaterializer:
         self._source = source
 
     def prepare_mount(self, ref: CredentialRefV1, execution_scope: str, guest_target: str, access: str) -> PreparedSecretMount:
-        assert access == "ro" and guest_target == "/runtime/home/auth.json"
+        assert access == "ro" and guest_target == "/runtime/home/.codex/auth.json"
         assert execution_scope.startswith("execution:")
         assert ref.native_locator == "codex-login/default"
         # the source is registered with the sandbox by bind_to_sandbox below
@@ -81,7 +82,7 @@ def test_credential_binding_is_locator_only_and_reaches_the_sandbox(tmp_path):
     # the plan carries only the opaque locator binding
     assert len(handle.plan.secret_bindings) == 1
     assert handle.plan.secret_bindings[0].locator == "codex-login/default"
-    assert handle.plan.secret_bindings[0].guest_target == "/runtime/home/auth.json"
+    assert handle.plan.secret_bindings[0].guest_target == "/runtime/home/.codex/auth.json"
     # the sandbox registered the synthetic source for the read-only bind
     registered = sandbox_port._secret_sources
     assert any(path == source for path, _ in registered.values())
@@ -114,6 +115,18 @@ def test_credential_without_materializer_is_plan_rejected(tmp_path):
     request, _ = _request_with_credential(tmp_path, definition, executable)
     with pytest.raises(PlanRejected, match="CREDENTIAL_MATERIALIZER"):
         provider.start(request)
+
+
+def test_credential_environment_escape_hatch_is_not_a_protocol_field():
+    """A forged declaration cannot turn ordinary env into a secret carrier."""
+    assert not hasattr(HarnessCommandSpec, "credential_environment")
+    with pytest.raises(TypeError):
+        HarnessCommandSpec(
+            ("/runtime/bin/codex",),
+            "/runtime/home",
+            environment={"API_TOKEN": "sentinel"},
+            credential_environment=("API_TOKEN",),
+        )
 
 
 def test_real_bwrap_binds_the_synthetic_secret_read_only(tmp_path):
@@ -149,7 +162,7 @@ def test_real_bwrap_binds_the_synthetic_secret_read_only(tmp_path):
     terminal_value = next(item.value for item in request.resolved_inputs if item.contract_id == "agent-box.terminal-session@1")
     assert terminal_value.specs, "the real sandbox must have wrapped the command"
     argv = terminal_value.specs[-1].local_argv
-    assert any(argv[i] == "--ro-bind" and argv[i + 1] == "<secret-source>" and argv[i + 2] == "/runtime/home/auth.json"
+    assert any(argv[i] == "--ro-bind" and argv[i + 1] == "<secret-source>" and argv[i + 2] == "/runtime/home/.codex/auth.json"
                for i in range(len(argv) - 2))
     # the public argv redacts the secret source path
     assert str(source) not in argv
