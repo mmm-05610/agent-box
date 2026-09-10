@@ -258,6 +258,22 @@ test('file bots into user sections by menu and drag; rename; delete returns them
   console.log('[diag] desktop.log tail:', fs.existsSync(desktopLog) ? fs.readFileSync(desktopLog, 'utf8').split('\n').slice(-25).join('\n') : 'MISSING')
   console.log('[diag] hermes-home:', fs.readdirSync(fixture!.sandbox.hermesHome))
 
+  // Probe: ask the runtime directly what it answers to the same call, with an
+  // EMPTY ui_meta so this cannot satisfy the assertion below by writing a value.
+  // `applied.ui_meta === true` means the RPC works for this profile and the app's
+  // own call is the problem; a typed error names the runtime's objection.
+  try {
+    const probe = await RealSessionBuilder.start(fixture!.sandbox.hermesHome)
+    try {
+      const res = await probe.requestRaw('profiles.configure', { name: 'alpha', ui_meta: {} })
+      console.log('[diag] profiles.configure ->', JSON.stringify(res))
+    } finally {
+      await probe.close()
+    }
+  } catch (error) {
+    console.log('[diag] profiles.configure threw:', String(error))
+  }
+
   await expect.poll(() => (fs.existsSync(alphaProfile) ? fs.readFileSync(alphaProfile, 'utf8') : '')).toMatch(/sectionId:\s*sec-/)
 
   // Delete both sections: the roster is the plain list again.
