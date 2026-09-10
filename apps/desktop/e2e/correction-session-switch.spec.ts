@@ -131,24 +131,37 @@ async function openFreshDraft(page: Page, priorSessionText: string): Promise<voi
   )
 }
 
-async function openSidebarSession(page: Page, sidebarText: string, expectedTranscriptText: string): Promise<void> {
-  const row = page.locator('[data-slot="sidebar"] button').filter({ hasText: sidebarText }).first()
+/**
+ * The substring to identify a sidebar row by.
+ *
+ * A sidebar row is labelled by the gateway's `preview`, which the runtime shapes
+ * to `_PREVIEW_MAX_CHARS = 60` plus an ellipsis (`hermes_state_common.py`), and
+ * `session.create` sends no title, so the preview is what the row shows. Filtering
+ * by the whole prompt therefore only matched while the client's own optimistic row
+ * was still on screen — the full text before the gateway's truncated label replaced
+ * it. That race is not the behaviour under test. A prefix is present in both forms,
+ * so matching it asks the question the spec means to ask; the transcript assertions
+ * below keep using the full prompt.
+ */
+const SIDEBAR_KEY_CHARS = 40
+
+function sidebarKey(prompt: string): string {
+  return prompt.slice(0, SIDEBAR_KEY_CHARS)
+}
+
+async function openSidebarSession(page: Page, prompt: string): Promise<void> {
+  const row = page.locator('[data-slot="sidebar"] button').filter({ hasText: sidebarKey(prompt) }).first()
   await row.waitFor({ state: 'visible', timeout: 30_000 })
   await row.click()
-  await waitForTranscriptText(page, expectedTranscriptText)
+  await waitForTranscriptText(page, prompt)
 }
 
 async function reopenOriginalSession(page: Page): Promise<void> {
-  // A still-running tool has not generated a final title yet, so the sidebar
-  // retains the source prompt as its provisional session title.
-  await openSidebarSession(page, ORIGINAL_PROMPT, ORIGINAL_PROMPT)
+  await openSidebarSession(page, ORIGINAL_PROMPT)
 }
 
 async function reopenInferenceSession(page: Page): Promise<void> {
-  const row = page.locator('[data-slot="sidebar"] button').filter({ hasText: INFERENCE_PROMPT }).first()
-  await row.waitFor({ state: 'visible', timeout: 30_000 })
-  await row.click()
-  await waitForTranscriptText(page, INFERENCE_PROMPT)
+  await openSidebarSession(page, INFERENCE_PROMPT)
 }
 
 function relevantOrder(messages: string[]): string[] {
@@ -213,7 +226,7 @@ test.describe('correction session switch', () => {
     // the foreground tool is live, then return before its redirect settles.
     // Sidebar rows title by the session's first user prompt (auto-title is
     // disabled in the e2e fixture config).
-    await openSidebarSession(page, OTHER_SESSION_PROMPT, OTHER_SESSION_PROMPT)
+    await openSidebarSession(page, OTHER_SESSION_PROMPT)
     await reopenOriginalSession(page)
     // The warm resume first paints the persisted history and then reconciles
     // the live turn (including a steer whose persistence may lag on a loaded
@@ -257,7 +270,7 @@ test.describe('correction session switch', () => {
     await send(page, INFERENCE_CORRECTION)
     await waitForTranscriptText(page, INFERENCE_CORRECTION)
 
-    await openSidebarSession(page, OTHER_SESSION_PROMPT, OTHER_SESSION_PROMPT)
+    await openSidebarSession(page, OTHER_SESSION_PROMPT)
     await reopenInferenceSession(page)
 
     expect(await textNodeOccurrences(page, INFERENCE_PROMPT)).toBe(1)
