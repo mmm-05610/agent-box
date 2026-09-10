@@ -262,11 +262,26 @@ test('file bots into user sections by menu and drag; rename; delete returns them
   // EMPTY ui_meta so this cannot satisfy the assertion below by writing a value.
   // `applied.ui_meta === true` means the RPC works for this profile and the app's
   // own call is the problem; a typed error names the runtime's objection.
+  //
+  // Measured: the runtime answers `applied.ui_meta: true` (so it DID write a
+  // profile.yaml) while this directory still has no such file — which can only
+  // mean the runtime resolved the profile to a DIFFERENT directory than the one
+  // the sandbox implies. `profiles.list` returns each profile's own `path`, so
+  // printing it names that directory instead of us inferring it.
   try {
     const probe = await RealSessionBuilder.start(fixture!.sandbox.hermesHome)
     try {
+      const list = await probe.requestRaw<{ profiles?: Array<{ name?: string; path?: string }> }>('profiles.list', {
+        include_sessions: false
+      })
+      console.log('[diag] profiles.list ->', JSON.stringify((list?.profiles || []).map(p => [p.name, p.path])))
       const res = await probe.requestRaw('profiles.configure', { name: 'alpha', ui_meta: {} })
       console.log('[diag] profiles.configure ->', JSON.stringify(res))
+      console.log('[diag] after configure, alpha dir:', fs.readdirSync(alphaDir))
+      console.log(
+        '[diag] after configure, profile.yaml:',
+        fs.existsSync(alphaProfile) ? `${fs.statSync(alphaProfile).size}B ${JSON.stringify(fs.readFileSync(alphaProfile, 'utf8'))}` : 'MISSING'
+      )
     } finally {
       await probe.close()
     }

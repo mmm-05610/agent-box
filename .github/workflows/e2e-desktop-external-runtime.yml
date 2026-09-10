@@ -183,6 +183,11 @@ jobs:
           CI: 'true'
           HERMES_DESKTOP_HERMES: /tmp/hermes-runtime/.venv/bin/hermes
           HERMES_E2E_PYTHON: /tmp/hermes-runtime/.venv/bin/python
+          # Each spec's HERMES_HOME is a fresh os.tmpdir() sandbox that the
+          # fixture deletes in afterAll. Keep it, so a red run still has the
+          # backend-side log to upload; without this the evidence is deleted
+          # before the artefact step below ever sees it.
+          HERMES_E2E_KEEP_SANDBOX: '1'
           # Ensure no real API keys leak into the test env.
           OPENROUTER_API_KEY: ''
           OPENAI_API_KEY: ''
@@ -218,7 +223,9 @@ jobs:
           if-no-files-found: ignore
 
       # The desktop log is where a backend-resolution or readiness failure is
-      # actually explained; keep it next to the Playwright artefacts.
+      # actually explained; keep it next to the Playwright artefacts. The
+      # per-spec sandboxes are retained (HERMES_E2E_KEEP_SANDBOX), so their
+      # logs are still on disk — glob only the logs, not the session DBs.
       - name: Upload desktop logs
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -226,6 +233,7 @@ jobs:
           name: external-runtime-desktop-logs-${{ github.run_id }}
           path: |
             ~/.hermes/logs
+            /tmp/hermes-e2e-*/hermes-home/logs
             /tmp/hermes-runtime/*.log
           retention-days: 14
           overwrite: true
