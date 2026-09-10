@@ -42,7 +42,12 @@ import {
   launchDesktop,
 } from './fixtures'
 import { startMockServer } from '../../../tests-js/scripts/mock-server'
+import { E2E_FIXTURE_MIGRATION_PENDING, hasHermesE2ERuntime } from './hermes-runtime'
 import { RealSessionBuilder } from './real-session-builder'
+
+// This spec drives a REAL gateway from an external Hermes install. Without one
+// it skips with a typed reason rather than passing without a session.
+test.skip(!hasHermesE2ERuntime(), E2E_FIXTURE_MIGRATION_PENDING)
 
 const SESSION_TITLE = 'E2E Warm Resume Jitter Test'
 

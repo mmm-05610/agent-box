@@ -1,13 +1,17 @@
 /**
  * Invariants for what is eager vs lazy in the root ``package.json``.
  *
+ * The rationale below cites files in the Hermes Agent runtime
+ * (``tools/browser_tool.py``, ``hermes_cli/tools_config.py``, ...). Those live
+ * in the upstream runtime, not in this desktop-client repository — they are
+ * quoted to explain WHY these pins exist, not as paths that resolve here.
+ *
  * The root ``package.json`` is installed by ``hermes update`` on every user,
  * including users who never opted into a given browser backend. Anything
  * listed in ``dependencies`` therefore runs its npm postinstall script for
  * everyone, and — per #43564 — is also part of the npm workspace install
- * graph, where a workspace-scoped ``npm ci`` (``--workspace ui-tui
- * --workspace web``) can silently prune it right back out on the next
- * ``hermes update``.
+ * graph, where a workspace-scoped ``npm ci`` can silently prune it right
+ * back out on the next ``hermes update``.
  *
  * The contract:
  *
@@ -15,7 +19,7 @@
  *   #27055, which reasoned its postinstall was small enough to keep eager
  *   unlike Camofox's) but #43564 found that keeping ANY dependency in root
  *   ``package.json`` — however small its postinstall — entangles it with
- *   the ui-tui/web workspace install and risks it being pruned. It now
+ *   the workspace install graph and risks it being pruned. It now
  *   resolves at runtime via ``npx agent-browser`` (see
  *   ``tools/browser_tool.py::_find_agent_browser``), which sidesteps the
  *   workspace graph entirely. ``hermes update`` and ``hermes doctor --fix``
@@ -78,8 +82,8 @@ test('agent-browser is not in root dependencies (resolves via npx, #43564)', () 
       'resolves lazily via `npx agent-browser` instead (see ' +
       'tools/browser_tool.py::_find_agent_browser and ' +
       'warm_agent_browser_npx_cache). Putting it back in root ' +
-      'dependencies re-entangles it with the ui-tui/web workspace ' +
-      'install graph and reintroduces #43564.'
+      'dependencies re-entangles it with the workspace install graph ' +
+      'and reintroduces #43564.'
   )
 })
 

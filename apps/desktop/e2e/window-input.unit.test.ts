@@ -3,7 +3,7 @@ import { createRequire } from 'node:module'
 import { expect, test } from 'vitest'
 
 const { prepareWindowForInput } = createRequire(import.meta.url)(
-  '../../../tests/install/e2e-assets/window-input.cjs',
+  './assets/window-input.cjs',
 )
 
 test('does not finish when IPC reports 100% before the window factor settles', async () => {

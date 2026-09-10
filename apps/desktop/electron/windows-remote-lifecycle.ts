@@ -720,7 +720,13 @@ async function connectWindowsRemote(deps) {
     localPort = await pickLocalPort()
     await forward(localPort, remotePort)
     const baseUrl = `http://127.0.0.1:${localPort}`
-    await waitForHermes(baseUrl, token)
+    // Probe with the token this backend was spawned with
+    // (HERMES_DASHBOARD_SESSION_TOKEN). A runtime that gates GET /api/health
+    // behind that token would otherwise 401 an anonymous probe forever: the
+    // anonymous 401 looks like a pre-/api/health backend, so the probe falls back
+    // to /api/status — which the same gate also rejects — and readiness times out
+    // against a backend that is actually healthy.
+    await waitForHermes(baseUrl, token, undefined, 'token')
     assertBootstrapNotSuperseded(signal)
     await helper(ssh, runtime, 'write-lock', [ownershipId], JSON.stringify({ ...owned, port: remotePort }))
 

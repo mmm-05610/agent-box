@@ -5,18 +5,20 @@ Root TypeScript style rules apply.
 
 ## The desktop is its own chat surface on a `hermes serve` backend
 
-Electron + React + nanostores (`@assistant-ui/react`) talking to a `tui_gateway` backend over
+Electron + React + nanostores (`@assistant-ui/react`) talking to a `hermes serve` backend over
 JSON-RPC (`requestGateway(method, params)`); transport lives in the framework-agnostic `apps/shared`
-(`@hermes/shared`: `JsonRpcGatewayClient` + WS URL helpers), which the web dashboard also consumes.
-The desktop has **no build/runtime dependency on the dashboard frontend**: it spawns a headless
-`hermes serve` (`headless_backend=True` → `cmd_dashboard` skips `_build_web_ui` and exports
-`HERMES_SERVE_HEADLESS=1` so `mount_spa()` disables the SPA even if a stray `web_dist/` exists).
-`dashboard` and `serve` share `cmd_dashboard`/`start_server` but neither launches the other. It does
-NOT embed `hermes --tui` — own composer, transcript, slash pipeline.
+(`@hermes/shared`: `JsonRpcGatewayClient` + WS URL helpers).
+
+That backend is an **external install** — this repository ships no Hermes runtime, no
+`tui_gateway` source and no CLI. The app resolves `hermes`, spawns `hermes serve --host 127.0.0.1
+--port 0`, and drives it over the wire; the server's internals are not visible from here. It does
+NOT embed a TUI and has no dashboard frontend — own composer, transcript, slash pipeline.
+Readiness is probed **with** the session token the app injects into the child, because a runtime
+that gates `GET /api/health` behind that token would otherwise 401 an anonymous probe forever.
 
 **One backward-compat fallback:** `serve` is newer, so the spawn (`electron/backend-command.ts` +
-`backendSupportsServe()` in `electron/main.ts`) checks whether the resolved runtime registers `serve`
-and ONLY when it does not (older managed install / PATH `hermes` not yet updated) rewrites argv to
+`backendSupportsServe()` in `electron/main.ts`) checks the resolved runtime for `serve` support and
+ONLY when it is absent (older managed install / PATH `hermes` not yet updated) rewrites argv to
 legacy `dashboard --no-open`. Without it a new app against an un-upgraded runtime crashes on an
 unknown subcommand and bricks every mid-upgrade user. Keep it narrow and tested.
 
@@ -79,5 +81,9 @@ by title); roster preview, activity signals, and the `/new`→`/compact` guard a
 identity and click identity are the same row by construction. Contract tests:
 in `src/plugins/hermes-bots/`: `canonical-chat-registry.test.ts` (tripwire: the open path never
 reads/writes a stored pointer), `canonical-chat-creation.test.ts`, `canonical-chat-adopt-on-conflict.test.ts`,
-`bot-row-opens-canonical-chat.test.ts`, `hide-bot-chats.test.ts`; plus repo-root
-`tests/tui_gateway/test_profiles_list_canonical_session.py`.
+`bot-row-opens-canonical-chat.test.ts`, `hide-bot-chats.test.ts`.
+
+The server side of that contract (`profiles.list` reporting `canonical_session`) lived in the
+Hermes runtime's Python test suite, which is no longer in this repository. Covering it here would
+require an integration test against an external runtime; until one exists, the Desktop-side
+tripwires above are the whole guard.

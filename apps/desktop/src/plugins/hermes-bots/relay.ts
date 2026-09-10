@@ -47,10 +47,11 @@ const RELAY_DRAIN_INTERVAL_MS = 30_000
 // reproduce #93911 at the upper boundary — the backend knowing a typed reason
 // while Desktop reports its generic timeout first.
 //
-// These three are mirrors of backend values, so a change there must not
-// silently invalidate this constant: relay-deliver-budget.test.ts reads
-// hermes_cli/config_defaults.py and tui_gateway/methods_bot_relay.py and fails
-// if the mirrors drift or the margin stops being positive.
+// These three mirror values owned by the Hermes runtime, which this repository
+// does not contain. The mirrors are asserted against the versioned fixture in
+// relay-protocol-budget.ts, so a runtime change cannot silently invalidate this
+// constant: relay-deliver-budget.test.ts fails when the mirrors drift or the
+// margin stops being positive.
 const RELAY_TURN_LOCK_WAIT_MS = 120_000 // bot_mode.turn_wait_seconds default
 const RELAY_TURN_ATTEMPT_MS = 600_000 // subprocess.run(..., timeout=600)
 const RELAY_TURN_MAX_ATTEMPTS = 2 // first attempt + the policy-gated re-run
@@ -61,6 +62,22 @@ const RELAY_DELIVER_BACKEND_CEILING_MS = RELAY_TURN_LOCK_WAIT_MS + RELAY_TURN_AT
 // answers at its own limit still wins the race against this timer.
 const RELAY_DELIVER_SETTLEMENT_MARGIN_MS = 180_000
 const RELAY_DELIVER_TIMEOUT_MS = RELAY_DELIVER_BACKEND_CEILING_MS + RELAY_DELIVER_SETTLEMENT_MARGIN_MS
+
+/**
+ * The composed relay-deliver budget, as a testable contract.
+ *
+ * Exported so relay-deliver-budget.test.ts can assert the composition against
+ * the runtime's recorded numbers by VALUE. Reading them back out of this file's
+ * text would pass while the wiring was wrong and break on any refactor.
+ */
+export const RELAY_DELIVER_BUDGET = {
+  backendCeilingMs: RELAY_DELIVER_BACKEND_CEILING_MS,
+  settlementMarginMs: RELAY_DELIVER_SETTLEMENT_MARGIN_MS,
+  timeoutMs: RELAY_DELIVER_TIMEOUT_MS,
+  turnAttemptMs: RELAY_TURN_ATTEMPT_MS,
+  turnLockWaitMs: RELAY_TURN_LOCK_WAIT_MS,
+  turnMaxAttempts: RELAY_TURN_MAX_ATTEMPTS
+} as const
 // Push path (#93091): the gateway broadcasts `bot_relay.outbox.pending` when
 // an envelope lands on disk; a burst of signals inside this window collapses
 // to ONE drain. The interval poll above stays as the backstop for older

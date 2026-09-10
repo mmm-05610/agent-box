@@ -3,7 +3,7 @@
 # Deliberately scoped to github-actions only.
 #
 # We do NOT enable Dependabot for pip / npm / any source-dependency ecosystem
-# because we pin source dependencies exactly (uv.lock, package-lock.json) as
+# because we pin source dependencies exactly (package-lock.json) as
 # part of our supply-chain posture. Automatic version-bump PRs against those
 # pins would undermine the strategy — pins are moved deliberately, after
 # review, not on a schedule.

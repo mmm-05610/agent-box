@@ -6,7 +6,7 @@ export default [
   {
     // Desktop is an Electron renderer — it legitimately uses browser globals
     // (window, document, etc). Re-add them here; the shared config omits
-    // globals.browser so terminal-only workspaces (ui-tui) don't get them.
+    // globals.browser is left off; only the renderer needs browser globals.
     files: ['**/*.{ts,tsx}'],
     languageOptions: {
       globals: {

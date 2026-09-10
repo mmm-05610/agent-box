@@ -1605,7 +1605,13 @@ async function connect(deps) {
     localPort = await openForward(deps, remotePort)
     assertBootstrapNotSuperseded(signal)
     const baseUrl = `http://127.0.0.1:${localPort}`
-    await waitForHermes(baseUrl, spawnToken)
+    // Probe with the token this backend was spawned with
+    // (HERMES_DASHBOARD_SESSION_TOKEN). A runtime that gates GET /api/health
+    // behind that token would otherwise 401 an anonymous probe forever: the
+    // anonymous 401 looks like a pre-/api/health backend, so the probe falls back
+    // to /api/status — which the same gate also rejects — and readiness times out
+    // against a backend that is actually healthy.
+    await waitForHermes(baseUrl, spawnToken, undefined, 'token')
     assertBootstrapNotSuperseded(signal)
 
     const token = await adoptOwnedServedToken(adoptServedToken, baseUrl, spawnToken, ssh, pid, 'remote dashboard')

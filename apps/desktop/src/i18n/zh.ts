@@ -139,6 +139,11 @@ export const zh: Translations = {
       cloudDownDescription:
         '此网关连接的 Nous 托管云代理正在返回服务器错误。无法在此处重启——请检查其状态、切换到本地网关或获取支持。',
       cloudDownHint: '使用下方按钮打开 Nous Portal（查看实例状态与操作）或加入 Discord 获取支持。',
+      notFoundTitle: '未找到 Hermes',
+      notFoundDescription:
+        '桌面端没有找到可启动的 Hermes 运行时。它会在 PATH 中查找 hermes 命令，或使用自身管理的安装。请先安装 Hermes 再重试——此处的操作不会删除你的对话或设置。',
+      notFoundHint:
+        '“修复安装”会运行 Hermes 安装程序；“重试”会在其可用后重新查找。',
       cloudDownCheckPortal: '查看 Portal 状态',
       cloudDownDiscord: '在 Discord 获取帮助',
       hideRecentLogs: '隐藏最近日志',
@@ -2692,7 +2697,6 @@ export const zh: Translations = {
       rename: '重命名…',
       archive: '归档',
       newWindow: '新窗口',
-      openInTerminal: '在终端中打开',
       hideTabBar: '隐藏标签栏',
       openInNewTab: '在新标签页中打开',
       openInSplit: '在分屏中打开',

@@ -184,6 +184,9 @@ export interface Translations {
       cloudDownTitle: string
       cloudDownDescription: string
       cloudDownHint: string
+      notFoundTitle: string
+      notFoundDescription: string
+      notFoundHint: string
       cloudDownCheckPortal: string
       cloudDownDiscord: string
       hideRecentLogs: string
@@ -2169,7 +2172,6 @@ export interface Translations {
       rename: string
       archive: string
       newWindow: string
-      openInTerminal: string
       hideTabBar: string
       openInNewTab: string
       openInSplit: string

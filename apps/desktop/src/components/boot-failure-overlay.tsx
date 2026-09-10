@@ -280,6 +280,12 @@ export function BootFailureOverlay() {
   // progress. When set, the recovery screen leads with the cloud-specific
   // guidance instead of the generic remote-failure copy (#85335).
   const cloudDown = Boolean(boot.isCloudBackendDown)
+  // The Desktop ships no Hermes runtime, so "nothing on the resolution ladder
+  // resolved" is a first-class outcome the main process names with a typed
+  // code. Lead with install guidance instead of the generic local-failure copy:
+  // the recovery actions are the same (Retry / Repair install / Gateway
+  // settings), only the explanation differs.
+  const notFound = boot.errorCode === 'HERMES_EXECUTABLE_NOT_FOUND'
 
   if (remoteReauth) {
     actions = [
@@ -337,7 +343,7 @@ export function BootFailureOverlay() {
       },
       { ...settingsAction, variant: 'ghost' }
     ]
-    hint = copy.repairHint
+    hint = notFound ? copy.notFoundHint : copy.repairHint
   }
 
   if (view === 'connect') {
@@ -381,10 +387,22 @@ export function BootFailureOverlay() {
           <ErrorIcon className="mt-0.5" size="1.25rem" />
           <div>
             <h2 className="text-[0.9375rem] font-semibold tracking-tight">
-              {remoteReauth ? copy.remoteTitle : cloudDown ? copy.cloudDownTitle : copy.title}
+              {remoteReauth
+                ? copy.remoteTitle
+                : cloudDown
+                  ? copy.cloudDownTitle
+                  : notFound
+                    ? copy.notFoundTitle
+                    : copy.title}
             </h2>
             <p className="mt-1 text-[0.8125rem] leading-5 text-(--ui-text-tertiary)">
-              {remoteReauth ? copy.remoteDescription : cloudDown ? copy.cloudDownDescription : copy.description}
+              {remoteReauth
+                ? copy.remoteDescription
+                : cloudDown
+                  ? copy.cloudDownDescription
+                  : notFound
+                    ? copy.notFoundDescription
+                    : copy.description}
             </p>
           </div>
         </div>

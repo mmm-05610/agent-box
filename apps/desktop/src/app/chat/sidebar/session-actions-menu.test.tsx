@@ -104,12 +104,10 @@ vi.mock('@/store/session-states', () => ({
   openSessionTile: vi.fn()
 }))
 vi.mock('@/store/windows', () => ({
-  canOpenSessionInTerminal: () => false,
   canOpenSessionWindow: () => false,
   isBrowserWindow: () => false,
   isSecondaryWindow: () => false,
   openSessionInNewWindow: vi.fn(),
-  openSessionInTerminal: vi.fn()
 }))
 
 function renderMenu() {

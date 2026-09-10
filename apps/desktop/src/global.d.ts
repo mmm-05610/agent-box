@@ -71,12 +71,6 @@ declare global {
         sessionId: string,
         opts?: { profile?: null | string; watch?: boolean }
       ) => Promise<{ ok: boolean; error?: string }>
-      // Resume this session in the user's own terminal emulator (`hermes --tui
-      // --resume <id>`) — the external terminal, not the in-app pane.
-      openSessionInTerminal: (
-        sessionId: string,
-        opts?: { cwd?: string; profile?: string }
-      ) => Promise<{ ok: boolean; error?: string }>
       // Open a new full-chrome app window — a peer instance of the primary that
       // renders the complete app against the shared backend, so the user can run
       // multiple GUI windows at once.
@@ -1126,6 +1120,14 @@ export interface DesktopCloudAgentSignInResult {
 
 export interface DesktopBootProgress {
   error: string | null
+  /**
+   * Typed cause of `error`, when the main process can name one (e.g.
+   * `HERMES_EXECUTABLE_NOT_FOUND` — the resolver found no Hermes to launch at
+   * all). Sticky for the failure: it survives later generic error updates and
+   * is cleared only by a successful boot, so the failure surface can offer the
+   * right recovery instead of guessing from message text.
+   */
+  errorCode?: string | null
   fakeMode: boolean
   /** True when the boot failure is a Nous Cloud agent that is down (HTTP 502/503/504). */
   isCloudBackendDown?: boolean

@@ -209,10 +209,23 @@ function verifyHermesCli(hermesCommand: string, opts?: { shell?: boolean }) {
   }
 }
 
+/**
+ * Typed reason the resolver could not find ANY Hermes to launch.
+ *
+ * The Desktop is a client of an external `hermes`: it no longer ships a
+ * runtime, so "nothing on the ladder resolved" is a first-class, expected
+ * outcome rather than an internal error. Carrying it as a code (not just a
+ * message) lets the renderer show a precise unavailable state and lets the
+ * boot surface distinguish "no Hermes installed" from "Hermes installed but
+ * broken". Serialized verbatim onto DesktopBootProgress.errorCode.
+ */
+const HERMES_EXECUTABLE_NOT_FOUND = 'HERMES_EXECUTABLE_NOT_FOUND'
+
 export {
   canImportHermesCli,
   DEFAULT_PROBE_TIMEOUT_MS,
   execProbeSync,
+  HERMES_EXECUTABLE_NOT_FOUND,
   hermesRuntimeImportProbe,
   PROBE_TIMEOUT_MS,
   resolveProbeTimeoutMs,

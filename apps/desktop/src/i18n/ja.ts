@@ -143,6 +143,11 @@ export const ja = defineLocale({
         'このゲートウェイが接続している Nous 管理のクラウドエージェントがサーバーエラーを返しています。ここから再起動することはできません。ステータスを確認するか、ローカルゲートウェイに切り替えるか、サポートに連絡してください。',
       cloudDownHint:
         '下のボタンから Nous Portal（インスタンスの状態と操作）を開くか、Discord でサポートを受けられます。',
+      notFoundTitle: 'Hermes が見つかりません',
+      notFoundDescription:
+        '起動できる Hermes ランタイムが見つかりませんでした。デスクトップは PATH 上の hermes コマンド、または自身が管理するインストールを探します。Hermes をインストールしてから再試行してください。ここでの操作でチャットや設定が削除されることはありません。',
+      notFoundHint:
+        '「インストールを修復」は Hermes インストーラーを実行します。「再試行」は利用可能になった後に再び探します。',
       cloudDownCheckPortal: 'Portal のステータスを確認',
       cloudDownDiscord: 'Discord でサポートを受ける',
       hideRecentLogs: '最近のログを非表示',
@@ -2174,7 +2179,6 @@ export const ja = defineLocale({
       rename: '名前を変更…',
       archive: 'アーカイブ',
       newWindow: '新しいウィンドウ',
-      openInTerminal: 'ターミナルで開く',
       copyIdFailed: 'セッション ID をコピーできませんでした',
 
       sessionActions: 'セッションアクション',

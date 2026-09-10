@@ -12,7 +12,7 @@
  * repo's Python venv (`.venv`) must exist for both backends.
  */
 
-import { type ChildProcess, spawn, spawnSync } from 'node:child_process'
+import { type ChildProcess, spawn } from 'node:child_process'
 import * as fs from 'node:fs'
 import * as net from 'node:net'
 import * as path from 'node:path'
@@ -28,10 +28,8 @@ import {
   writeMockProviderConfig,
 } from './fixtures'
 import { startMockServer } from '../../../tests-js/scripts/mock-server'
+import { E2E_FIXTURE_MIGRATION_PENDING, resolveHermesExecutable } from './hermes-runtime'
 import { type ElectronApplication, expect, type Page, test } from './test'
-
-const DESKTOP_ROOT = path.resolve(import.meta.dirname, '..')
-const REPO_ROOT = path.resolve(DESKTOP_ROOT, '..', '..')
 
 const REMOTE_LABEL = 'Homelab'
 const REMOTE_ID = 'homelab'
@@ -43,20 +41,23 @@ interface RemoteGateway {
   close: () => Promise<void>
 }
 
-function findHermesBinary(): string {
-  const venv = path.join(REPO_ROOT, '.venv', 'bin', 'hermes')
+/**
+ * The `hermes` this spec drives is an EXTERNAL install — this repository ships
+ * no runtime. See hermes-runtime.ts for the resolution order and the
+ * probe-before-trust rule; the spec skips with a typed reason when none exists.
+ */
+const E2E_HERMES = resolveHermesExecutable()
 
-  if (fs.existsSync(venv)) {
-    return venv
+test.skip(!E2E_HERMES, E2E_FIXTURE_MIGRATION_PENDING)
+
+/** `test.skip(!E2E_HERMES, ...)` guarantees this; TypeScript cannot see through
+ *  it, so fail loudly rather than hand a null command to spawn. */
+function hermesCommand(): string {
+  if (!E2E_HERMES) {
+    throw new Error(E2E_FIXTURE_MIGRATION_PENDING)
   }
 
-  const result = spawnSync('which', ['hermes'], { encoding: 'utf8' })
-
-  if (result.status === 0 && result.stdout.trim()) {
-    return result.stdout.trim()
-  }
-
-  throw new Error('hermes binary not found: create the repo venv (uv sync) or put hermes on PATH')
+  return E2E_HERMES.command
 }
 
 async function freePort(): Promise<number> {
@@ -96,10 +97,10 @@ async function startRemoteGateway(root: string, mockUrl: string, profiles: strin
   const url = `http://127.0.0.1:${port}`
 
   const child: ChildProcess = spawn(
-    findHermesBinary(),
+    hermesCommand(),
     ['serve', '--host', '127.0.0.1', '--port', String(port), '--skip-build'],
     {
-      cwd: REPO_ROOT,
+      cwd: home,
       detached: true,
       env: {
         ...process.env,

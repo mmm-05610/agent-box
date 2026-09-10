@@ -2,7 +2,7 @@
  * In-app update mutual-exclusion marker (#50238).
  *
  * The Tauri updater writes HERMES_HOME/.hermes-update-in-progress for the whole
- * duration of an `--update` run (see apps/bootstrap-installer/src-tauri/src/
+ * duration of an `--update` run (see the Hermes Setup installer, a separate app),
  * update.rs `UpdateMarkerGuard`). The marker body is two lines: the updater's
  * pid and the unix-seconds it started.
  *
@@ -172,7 +172,7 @@ export function writeUpdateMarker(
  * and mutating the checkout — is no longer recorded as the owner. A second
  * live updater can then run over the same tree unrecorded, the exact
  * two-updaters-at-once hazard `UpdateMarkerGuard` in the Rust updater
- * exists to prevent (apps/bootstrap-installer/src-tauri/src/update.rs).
+ * exists to prevent (the Hermes Setup installer's own update path).
  *
  * Returns the live foreign owner (with a ready-to-show message) when the
  * hand-off must be refused, or `null` when it's safe to spawn — no marker,

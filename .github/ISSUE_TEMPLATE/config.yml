@@ -9,3 +9,6 @@ contact_links:
   - name: 🤝 Contributing Guide
     url: https://github.com/NousResearch/hermes-agent/blob/main/CONTRIBUTING.md
     about: Read this before submitting a PR.
+  - name: 🔐 Security Policy
+    url: https://github.com/NousResearch/hermes-agent/blob/main/SECURITY.md
+    about: Report vulnerabilities privately — never in a public issue.

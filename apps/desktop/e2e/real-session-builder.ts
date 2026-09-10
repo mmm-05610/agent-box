@@ -1,9 +1,8 @@
 import { type ChildProcessWithoutNullStreams, spawn } from 'node:child_process'
-import * as path from 'node:path'
 import { createInterface } from 'node:readline'
 
-const DESKTOP_ROOT = path.resolve(import.meta.dirname, '..')
-const REPO_ROOT = path.resolve(DESKTOP_ROOT, '..', '..')
+import { E2E_FIXTURE_MIGRATION_PENDING, resolveHermesE2ERuntime } from './hermes-runtime'
+
 const DEFAULT_TIMEOUT_MS = 60_000
 
 interface JsonRpcError {
@@ -56,9 +55,14 @@ export interface RealSession {
  * This intentionally uses the shipped stdio JSON-RPC transport instead of
  * importing SessionDB or launching Electron. The desktop's WebSocket backend
  * dispatches the same `tui_gateway.server` methods.
+ *
+ * The gateway is an EXTERNAL Hermes install (see hermes-runtime.ts); when none
+ * is present the specs skip with E2E_FIXTURE_MIGRATION_PENDING rather than
+ * passing without having built a session.
  */
 export class RealSessionBuilder {
   private readonly child: ChildProcessWithoutNullStreams
+  private readonly hermesHome: string
   private nextRequestId = 0
   private readonly pending = new Map<number, { reject: (reason: Error) => void; resolve: (value: unknown) => void }>()
   private readonly events: JsonRpcFrame[] = []
@@ -70,13 +74,17 @@ export class RealSessionBuilder {
   private readonly stderr: string[] = []
   private closed = false
 
-  private constructor(hermesHome: string) {
-    this.child = spawn('uv', ['run', '--active', '--no-sync', 'python', '-m', 'tui_gateway.entry'], {
-      cwd: REPO_ROOT,
+  private constructor(hermesHome: string, runtime: { label: string; python: string }) {
+    this.hermesHome = hermesHome
+
+    // The gateway comes from an EXTERNAL Hermes install. This repository ships no
+    // runtime, and the workspace is the sandbox rather than the checkout: the
+    // agent must not see this repository as its working directory.
+    this.child = spawn(runtime.python, ['-m', 'tui_gateway.entry'], {
+      cwd: hermesHome,
       env: {
         ...process.env,
         HERMES_HOME: hermesHome,
-        PYTHONPATH: REPO_ROOT,
       },
       stdio: 'pipe',
     })
@@ -95,7 +103,13 @@ export class RealSessionBuilder {
   }
 
   static async start(hermesHome: string): Promise<RealSessionBuilder> {
-    const builder = new RealSessionBuilder(hermesHome)
+    const runtime = resolveHermesE2ERuntime()
+
+    if (!runtime) {
+      throw new Error(E2E_FIXTURE_MIGRATION_PENDING)
+    }
+
+    const builder = new RealSessionBuilder(hermesHome, runtime)
     await builder.waitForEvent(frame => frame.params?.type === 'gateway.ready')
     return builder
   }
@@ -107,7 +121,7 @@ export class RealSessionBuilder {
 
     const created = await this.request<CreatedSession>('session.create', {
       cols: 120,
-      cwd: REPO_ROOT,
+      cwd: this.hermesHome,
       source: 'desktop',
       title: spec.title,
     })

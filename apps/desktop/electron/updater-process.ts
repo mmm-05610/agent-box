@@ -247,7 +247,7 @@ function stagedFileMtimeMs(candidate: string): number | null {
  *
  * The Tauri installer self-copies into HERMES_HOME on *every* platform
  * (`hermes-setup.exe` on Windows, `hermes-setup` elsewhere — see
- * apps/bootstrap-installer `paths::installer_dest` and
+ * the Hermes Setup installer's `paths::installer_dest` and
  * `bootstrap::copy_self_to_hermes_home`), so finding that binary on macOS or
  * Linux is expected, not leftover junk.
  *
@@ -285,7 +285,7 @@ export function resolveStagedUpdaterBinary(
  * True when the staged installer is new enough to survive a pre-written marker.
  *
  * `copy_self_to_hermes_home` deliberately no-ops during `--update`
- * (apps/bootstrap-installer/src-tauri/src/paths.rs), so the binary staged by a
+ * (its `src-tauri/src/paths.rs`), so the binary staged by a
  * user's ORIGINAL install orchestrates every later update — forever. Installers
  * predating #74782 have no self-PID exclusion in `UpdateMarkerGuard::acquire`,
  * so when the desktop pre-writes the marker naming that very updater, the

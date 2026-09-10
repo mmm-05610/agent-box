@@ -6,7 +6,7 @@ import { buildAppEnv, createSandbox, launchDesktop, setupNoProvider } from './fi
 import { type ElectronApplication, expect, type Page, test } from './test'
 
 const { prepareWindowForInput } = createRequire(import.meta.url)(
-  '../../../tests/install/e2e-assets/window-input.cjs',
+  './assets/window-input.cjs',
 ) as { prepareWindowForInput: (app: ElectronApplication, page: Page) => Promise<void> }
 
 test('input setup survives a fresh-install zoom restore before onboarding', async () => {

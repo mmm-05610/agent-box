@@ -3713,14 +3713,6 @@ function Install-NodeDeps {
         }
     }
 
-    # TUI
-    $tuiDir = "$InstallDir\ui-tui"
-    if (Test-Path "$tuiDir\package.json") {
-        Write-Info "Installing TUI dependencies..."
-        $tuiLog = "$env:TEMP\hermes-npm-tui-$(Get-Random).log"
-        [void](_Run-NpmInstall "TUI" $tuiDir $tuiLog $npmExe)
-    }
-
     Install-BrowserUseCli
     Install-CuaDriver
 }

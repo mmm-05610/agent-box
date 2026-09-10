@@ -139,6 +139,11 @@ export const zhHant = defineLocale({
       cloudDownDescription:
         '此閘道連線的 Nous 託管雲端代理正在回傳伺服器錯誤。無法在此處重新啟動——請檢查其狀態、切換至本機閘道，或取得支援。',
       cloudDownHint: '使用下方按鈕開啟 Nous Portal（檢視執行個體狀態與操作）或加入 Discord 取得支援。',
+      notFoundTitle: '找不到 Hermes',
+      notFoundDescription:
+        '桌面端找不到可啟動的 Hermes 執行階段。它會在 PATH 中尋找 hermes 指令，或使用自身管理的安裝。請先安裝 Hermes 再重試——此處的操作不會刪除你的對話或設定。',
+      notFoundHint:
+        '「修復安裝」會執行 Hermes 安裝程式；「重試」會在其可用後重新尋找。',
       cloudDownCheckPortal: '查看 Portal 狀態',
       cloudDownDiscord: '在 Discord 取得協助',
       hideRecentLogs: '隱藏最近記錄',
@@ -2094,7 +2099,6 @@ export const zhHant = defineLocale({
       rename: '重新命名…',
       archive: '封存',
       newWindow: '新視窗',
-      openInTerminal: '在終端機中開啟',
       copyIdFailed: '無法複製工作階段 ID',
 
       sessionActions: '工作階段動作',

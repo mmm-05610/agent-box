@@ -99,19 +99,28 @@ The app has three boundaries:
 - **React** owns the Desktop routes, panes, interaction state, and
   `@assistant-ui/react` transcript.
 - **Hermes Agent** runs as a headless `hermes serve` process and exposes the
-  `tui_gateway` JSON-RPC/WebSocket API. The renderer connects through
-  [`apps/shared`](../shared/), which is also used by the browser dashboard.
+  JSON-RPC/WebSocket API. The renderer connects through
+  [`apps/shared`](../shared/).
 
-Backend resolution is an ordered ladder:
+This repository ships **no Hermes runtime**: the app is a client of an external
+`hermes`, and that separation is deliberate. There is no rung that launches
+Hermes from the checkout the app is running from.
 
-1. `HERMES_DESKTOP_HERMES_ROOT`
-2. the current source checkout during development
-3. a completed managed install
-4. `HERMES_DESKTOP_HERMES`, or `hermes` on `PATH`
-5. a system Python that can import the Hermes runtime
-6. the first-launch bootstrap installer
+Backend resolution is an ordered ladder over EXTERNAL sources only:
+
+1. `HERMES_DESKTOP_HERMES_ROOT` — an explicit Hermes checkout, for development
+2. a completed Desktop-managed install (`$HERMES_HOME/hermes-agent`)
+3. `HERMES_DESKTOP_HERMES`, or `hermes` on `PATH`
+4. a system Python that can import an installed Hermes runtime
+5. the first-launch bootstrap installer, for a machine with no Hermes at all
 
 Candidates are probed before use; an existing shim or interpreter is not enough.
+Falling off the bottom of the ladder is a first-class outcome, not an internal
+error: resolution returns the typed `HERMES_EXECUTABLE_NOT_FOUND`, the window
+still opens, and the UI says Hermes is not installed instead of pretending to
+connect. Readiness is probed with the same session token the app injects into
+the backend, so a runtime that gates `GET /api/health` behind its token (newer
+Hermes builds do) is not mistaken for a dead one.
 A runtime that predates `serve` falls back to headless
 `dashboard --no-open`. This is compatibility for the backend command only and
 does not launch or embed the dashboard UI.

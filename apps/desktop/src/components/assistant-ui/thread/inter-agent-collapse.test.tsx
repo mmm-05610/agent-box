@@ -8,7 +8,7 @@
 //    likely to break if the split is revisited.
 // 2. The streaming marker. `data-message-streaming` moved off the message root
 //    onto a permanently-mounted hidden leaf, and
-//    scripts/run-short-session-hang-repro.mjs derives its settled-row count by
+//    the settled-row count for this shape is derived by
 //    subtracting `[data-message-streaming="true"]` markers from message roots.
 //    Nothing in the app itself reads it, so without this test a delete would
 //    look free and would silently regress that repro's response gate.

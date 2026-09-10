@@ -79,6 +79,7 @@ export function resumeDesktopBootForRetry(message: string) {
   $desktopBoot.set({
     ...current,
     error: null,
+    errorCode: null,
     message,
     phase: 'renderer.boot.retry',
     running: true,
@@ -92,6 +93,7 @@ export function completeDesktopBoot(message = translateNow('boot.ready')) {
   $desktopBoot.set({
     ...current,
     error: null,
+    errorCode: null,
     message,
     phase: 'renderer.ready',
     progress: 100,

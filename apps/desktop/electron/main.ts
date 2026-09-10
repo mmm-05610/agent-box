@@ -58,6 +58,7 @@ import { backendCommandMatches, createBackendOwnership, createBackendShutdownCoo
 import {
   canImportHermesCli,
   execProbeSync,
+  HERMES_EXECUTABLE_NOT_FOUND,
   PROBE_TIMEOUT_MS,
   shouldTrustHermesOverride,
   verifyHermesCli
@@ -170,13 +171,6 @@ import {
 import { describeDevCdpDecision, resolveDevCdpPort } from './dev-cdp'
 import { installEmbedReferer } from './embed-referer'
 import { createEventDeduper } from './event-dedupe'
-import {
-  buildTerminalScript,
-  resolveTerminalLaunch,
-  terminalScriptEnv,
-  terminalScriptExtension,
-  tuiResumeArgs
-} from './external-terminal'
 import { type FaviconIo, resolveFavicon } from './favicon'
 import { findGitBash as _findGitBash } from './find-git-bash'
 import {
@@ -1666,6 +1660,7 @@ let nativeThemeListenerInstalled = false
 
 let bootProgressState = {
   error: null,
+  errorCode: null,
   fakeMode: BOOT_FAKE_MODE,
   isCloudBackendDown: false,
   message: 'Waiting to start Hermes backend',
@@ -2195,6 +2190,12 @@ async function waitForFirstRunSetupChoice(backend) {
 
   updateBootProgress(
     {
+      // Record the typed cause as soon as we know there is no executable, which
+      // is HERE — the gate is consulted before ensureRuntime() runs, so a boot
+      // that parks awaiting the install choice would otherwise never surface
+      // why it is not connecting. `error` stays null: this state is recoverable
+      // by design, not a failure.
+      errorCode: backend.errorCode ?? HERMES_EXECUTABLE_NOT_FOUND,
       error: null,
       message: 'Waiting for first-run setup choice',
       phase: 'bootstrap.choice',
@@ -2228,6 +2229,8 @@ function abandonFirstRunSetupChoiceForRemoteApply() {
 }
 
 function updateBootProgress(update, options: { allowDecrease?: boolean } = {}) {
+  const previousErrorCode = bootProgressState.errorCode
+
   const nextProgressRaw =
     typeof update.progress === 'number' ? clampBootProgress(update.progress) : bootProgressState.progress
 
@@ -2237,6 +2240,10 @@ function updateBootProgress(update, options: { allowDecrease?: boolean } = {}) {
     ...bootProgressState,
     ...update,
     error: update.error === undefined ? bootProgressState.error : update.error,
+    // Sticky by design: `errorCode` names the CAUSE of a failure, so a later
+    // generic error update (the boot catch sets only `error`) must not erase it.
+    // Success paths clear it explicitly by passing `errorCode: null`.
+    errorCode: update.errorCode === undefined ? bootProgressState.errorCode : update.errorCode,
     fakeMode: BOOT_FAKE_MODE || Boolean(update.fakeMode),
     progress: nextProgress,
     // `retryable` rides with `error`: it survives updates that preserve the
@@ -2250,6 +2257,13 @@ function updateBootProgress(update, options: { allowDecrease?: boolean } = {}) {
 
   if (update.message) {
     rememberLog(`[boot] ${update.message}`)
+  }
+
+  // Make a typed failure cause auditable: the code otherwise only travels to
+  // the renderer over IPC, leaving desktop.log unable to say WHY a boot failed.
+  // Log transitions only, so a sticky code is not repeated on every update.
+  if (bootProgressState.errorCode && bootProgressState.errorCode !== previousErrorCode) {
+    rememberLog(`[boot] errorCode=${bootProgressState.errorCode}`)
   }
 
   broadcastBootProgress()
@@ -4987,17 +5001,15 @@ function resolveHermesBackend(backendArgs) {
     }
   }
 
-  // 2. Development source -- when running `npm run dev` from a checkout, the
-  //    cloned repo at SOURCE_REPO_ROOT takes precedence over ACTIVE and any
-  //    installed `hermes` on PATH so local Python edits are actually exercised.
-  //    (In dev with no checkout, SOURCE_REPO_ROOT won't pass isHermesSourceRoot.)
-  if (!IS_PACKAGED && isHermesSourceRoot(SOURCE_REPO_ROOT)) {
-    const backend = createPythonBackend(SOURCE_REPO_ROOT, `Hermes source at ${SOURCE_REPO_ROOT}`, backendArgs)
-
-    if (backend) {
-      return backend
-    }
-  }
+  // 2. (removed) The app used to fall back to the checkout it was running from
+  //    (`SOURCE_REPO_ROOT`) whenever that looked like a Hermes source tree, so
+  //    in-repo Python edits were exercised during development. This repository
+  //    is now a pure Desktop client and ships no Hermes runtime, so there is
+  //    nothing to launch from here. Hermes must come from an external install:
+  //    rung 1 (explicit), rung 3 (Desktop-managed) or rung 4 (PATH / explicit
+  //    executable). A checkout can still be driven explicitly via
+  //    HERMES_DESKTOP_HERMES_ROOT, which is a deliberate deployment choice
+  //    rather than an implicit fallback.
 
   // 3. ACTIVE_HERMES_ROOT — the canonical install at
   //    %LOCALAPPDATA%\\hermes\\hermes-agent (Windows) or ~/.hermes/hermes-agent.
@@ -5125,16 +5137,16 @@ function resolveHermesBackend(backendArgs) {
     rememberLog(`Ignoring system Python ${python}: hermes_cli is not importable; falling through to bootstrap.`)
   }
 
-  // 6. Nothing usable yet -- signal the bootstrap runner that we need to
-  //    clone+install. Phase 1D's bootstrap-runner consumes this sentinel
-  //    and drives install.ps1 stages with a progress UI. Until 1D lands,
-  //    callers see the sentinel and surface it as a user-facing error
-  //    explaining what's missing.
+  // 6. Nothing usable anywhere -- no explicit executable, no Desktop-managed
+  //    install, no `hermes` on PATH, no importable hermes_cli. The result is
+  //    TYPED (see HERMES_EXECUTABLE_NOT_FOUND) so the UI can say precisely what
+  //    is missing instead of reporting an opaque boot failure.
   //
   //    We deliberately do NOT throw here -- throwing inside
-  //    resolveHermesBackend was the old "no payload" path and forced the
-  //    user into a dead end. With the bootstrap protocol, "no install yet"
-  //    is a recoverable state the GUI can drive through.
+  //    resolveHermesBackend was the old "no payload" path and forced the user
+  //    into a dead end. "No install yet" stays a recoverable state: the GUI
+  //    drives it through the first-run install, and the typed code rides along
+  //    so an unavailable app is still an honest, diagnosable one.
   return {
     kind: 'bootstrap-needed',
     label: 'Hermes Agent not installed yet; bootstrap required',
@@ -5143,6 +5155,7 @@ function resolveHermesBackend(backendArgs) {
     bootstrap: true,
     env: {},
     shell: false,
+    errorCode: HERMES_EXECUTABLE_NOT_FOUND,
     // Hints for the bootstrap runner / UI layer:
     activeRoot: ACTIVE_HERMES_ROOT,
     installStamp: INSTALL_STAMP, // may be null in dev
@@ -5169,6 +5182,13 @@ async function ensureRuntime(backend) {
   // to a renderer-side install overlay.
   if (backend.kind === 'bootstrap-needed') {
     rememberLog('[bootstrap] no Hermes install found; starting first-launch bootstrap')
+
+    // Record WHY the ladder exhausted before trying to fix it: if the install
+    // is declined or fails, the surface can say "no Hermes executable" instead
+    // of an opaque boot error. The code is sticky, and a successful install
+    // re-resolves and clears it via the explicit `errorCode: null` on the
+    // backend.ready update.
+    updateBootProgress({ errorCode: backend.errorCode ?? HERMES_EXECUTABLE_NOT_FOUND })
 
     if (await handOffWindowsBootstrapRecovery('bootstrap-needed')) {
       const handoffError: Error & { isBootstrapFailure?: boolean; bootstrapHandedOff?: boolean } = new Error(
@@ -12751,7 +12771,13 @@ async function spawnPoolBackend(profile, entry, opts: { forceLocal?: boolean; po
   entry.port = port
 
   const baseUrl = `http://127.0.0.1:${port}`
-  await Promise.race([waitForHermes(baseUrl, token), startFailed])
+  // Probe with the token this backend was spawned with
+  // (HERMES_DASHBOARD_SESSION_TOKEN). A runtime that gates GET /api/health
+  // behind that token would otherwise 401 an anonymous probe forever: the
+  // anonymous 401 looks like a pre-/api/health backend, so the probe falls back
+  // to /api/status — which the same gate also rejects — and readiness times out
+  // against a backend that is actually healthy.
+  await Promise.race([waitForHermes(baseUrl, token, undefined, 'token'), startFailed])
   ready = true
 
   const authToken = await adoptServedDashboardToken(baseUrl, token, {
@@ -13218,7 +13244,12 @@ async function startHermes() {
 
     const baseUrl = `http://127.0.0.1:${port}`
     await advanceBootProgress('backend.wait', 'Waiting for Hermes backend to become ready', 90)
-    await Promise.race([waitForHermes(baseUrl, token), backendStartFailed])
+    // Probe with the SAME token we injected into the child (HERMES_DASHBOARD_SESSION_TOKEN
+    // above). A runtime that gates /api/health behind its session token would otherwise
+    // 401 the credential-free probe forever: the anonymous 401 looks like a pre-/api/health
+    // backend, so the probe falls back to /api/status — which that same gate also rejects —
+    // and readiness times out against a backend that is actually healthy.
+    await Promise.race([waitForHermes(baseUrl, token, undefined, 'token'), backendStartFailed])
     backendReady = true
     backendStartFailure = null
 
@@ -13242,7 +13273,8 @@ async function startHermes() {
       message: 'Hermes backend is ready. Finalizing desktop startup',
       progress: 94,
       running: true,
-      error: null
+      error: null,
+      errorCode: null
     })
 
     // A successful boot (including a soft restart that the repair-guard
@@ -15076,69 +15108,6 @@ ipcMain.handle('hermes:window:openBrowser', async (_event, tabId) => {
   return { ok: true }
 })
 
-// Hand a session to the user's OWN terminal emulator, running the TUI against
-// it (`hermes --tui --resume <id>`). Not the in-app terminal pane: the point is
-// to continue the chat in the terminal they already live in.
-//
-// The desktop's runtime is usually a venv Python invoked as
-// `python -m hermes_cli.main`, so we resolve the SAME backend the app itself
-// launches and carry its argv + PYTHONPATH into a launcher script rather than
-// hoping a `hermes` exists on the user's interactive PATH. Resolution only —
-// never ensureRuntime(), which would kick off a first-run install from a menu
-// click; an unresolved runtime is reported instead.
-ipcMain.handle('hermes:window:openInTerminal', async (_event, sessionId, opts) => {
-  if (typeof sessionId !== 'string' || !sessionId.trim()) {
-    return { ok: false, error: 'invalid-session-id' }
-  }
-
-  try {
-    const profile = typeof opts?.profile === 'string' ? opts.profile.trim() : ''
-    const backend = resolveHermesBackend(tuiResumeArgs(sessionId.trim(), profile || undefined))
-
-    if (!backend.command) {
-      return { ok: false, error: 'Hermes is not installed yet' }
-    }
-
-    const { cwd } = sanitizeWorkspaceCwd(opts?.cwd)
-    const scriptDir = path.join(app.getPath('userData'), 'open-in-terminal')
-    fs.mkdirSync(scriptDir, { recursive: true })
-
-    const scriptPath = path.join(
-      scriptDir,
-      `hermes-${crypto.randomBytes(6).toString('hex')}${terminalScriptExtension()}`
-    )
-
-    fs.writeFileSync(
-      scriptPath,
-      buildTerminalScript({
-        args: backend.args,
-        command: backend.command,
-        cwd,
-        env: terminalScriptEnv(backend.env, HERMES_HOME)
-      }),
-      { mode: 0o700 }
-    )
-
-    const launch = resolveTerminalLaunch({ findOnPath, scriptPath })
-
-    if (!launch) {
-      return { ok: false, error: 'No terminal emulator found' }
-    }
-
-    rememberLog(`[terminal] opening session ${sessionId} via ${launch.command}`)
-
-    // Detached + unref'd: the terminal window outlives the desktop app, and
-    // never inherits our stdio (a closed pipe would kill the TUI).
-    const child = spawn(launch.command, launch.args, { detached: true, stdio: 'ignore' })
-    child.unref()
-
-    return { ok: true }
-  } catch (error) {
-    rememberLog(`[terminal] open in terminal failed: ${error.message}`)
-
-    return { ok: false, error: error.message }
-  }
-})
 ipcMain.handle('hermes:wake-indicator:get', () => wakeIndicatorController.getState())
 ipcMain.on('hermes:wake-indicator:set', (_event, state) => {
   wakeIndicatorController.setState(state)

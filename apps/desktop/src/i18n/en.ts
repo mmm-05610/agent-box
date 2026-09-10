@@ -143,6 +143,11 @@ export const en: Translations = {
         'The Nous-managed cloud agent this gateway connects to is returning a server error. It cannot be restarted from here — check its status, switch to the local gateway, or get support.',
       cloudDownHint:
         'The buttons below open the Nous Portal (instance status and controls) and our Discord for support.',
+      notFoundTitle: 'Hermes isn\'t installed',
+      notFoundDescription:
+        'The desktop couldn\'t find a Hermes runtime to launch. It looks for the hermes command on your PATH, or an install it manages itself. Install Hermes, then retry — nothing here deletes your chats or settings.',
+      notFoundHint:
+        'Repair install runs the Hermes installer; Retry looks for it again once it\'s available.',
       cloudDownCheckPortal: 'Check Portal status',
       cloudDownDiscord: 'Get help on Discord',
       hideRecentLogs: 'Hide recent logs',
@@ -2532,7 +2537,6 @@ export const en: Translations = {
       rename: 'Rename…',
       archive: 'Archive',
       newWindow: 'New window',
-      openInTerminal: 'Open in terminal',
       hideTabBar: 'Hide tab bar',
       openInNewTab: 'Open in new tab',
       openInSplit: 'Open in split',

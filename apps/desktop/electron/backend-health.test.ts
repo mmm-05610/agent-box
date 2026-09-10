@@ -181,6 +181,74 @@ test('anonymous gate-shaped 401 falls back to /api/status (backend predates /api
   ])
 })
 
+// The failure this pair pins is the one that made "Hermes on your PATH" false on
+// paper: a runtime that gates GET /api/health answers an ANONYMOUS probe with a
+// plain 401 — `{"detail":"Unauthorized"}`, with no `no_cookie` marker — so the
+// client cannot classify it as gate-shaped, does not fall back to /api/status,
+// and polls until readiness times out. The same endpoint answers 200 to the
+// session token the app injects into the child it just spawned.
+//
+// Hence: every locally/spawned-backend readiness probe must be CREDENTIALED.
+// These two tests pin both halves of that contract.
+test('a gated backend is reached when the readiness probe carries the session token', async () => {
+  const calls: string[][] = []
+
+  await waitForHermesReady('http://127.0.0.1:9000', {
+    token: 'session-token',
+    fetchPublicJson: async () => {
+      throw new Error('public probe must not be used when credentialed')
+    },
+    fetchJson: async url => {
+      calls.push(['json', url])
+
+      return { ok: true }
+    },
+    // The bearer lives in this closure (buildReadinessHealthProbe composes it),
+    // so the observable contract at this seam is WHICH leg ran.
+    probeHealth: async url => {
+      calls.push(['probe', url])
+
+      return { ok: true }
+    },
+    probeIsCredentialed: true,
+    sleep: async () => {},
+    timeoutMs: 100,
+    pollMs: 1
+  })
+
+  assert.deepEqual(calls, [['probe', 'http://127.0.0.1:9000/api/health']])
+})
+
+test('the same gated backend times out for an anonymous probe (why the call site must pass token)', async () => {
+  const calls: string[][] = []
+
+  await assert.rejects(
+    waitForHermesReady('http://127.0.0.1:9000', {
+      token: 'session-token',
+      // A plain 401 with no `no_cookie` is NOT gate-shaped, so there is no
+      // /api/status fallback to save an anonymous probe here.
+      fetchPublicJson: async url => {
+        calls.push(['public', url])
+        throw new Error('401: {"detail":"Unauthorized"}')
+      },
+      fetchJson: async url => {
+        calls.push(['json', url])
+
+        return { ok: true }
+      },
+      sleep: async () => {},
+      timeoutMs: 30,
+      pollMs: 1
+    }),
+    /did not become ready/
+  )
+
+  assert.ok(
+    calls.every(call => call[0] === 'public'),
+    `an anonymous probe must never reach the credentialed leg: ${JSON.stringify(calls)}`
+  )
+})
+
 test('a credentialed 401 fails fast for reauth instead of reporting a dead session ready', async () => {
   // The regression a blanket 401->fallback introduces: /api/status is public,
   // so an expired session would answer 200 and boot would report "ready",

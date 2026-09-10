@@ -12,9 +12,8 @@ name: Case Collision Check
 # enforcement point is CI, on Linux, against the index.
 #
 # Runs unconditionally (no change-classifier gate): a collision can ship in
-# any kind of PR — docs, JS, config, not just Python — so gating on a
-# language lane would be the same "passive rule that cannot enforce a
-# policy" trap the infographic check exists to close.
+# any kind of PR — docs, JS, config — so gating on a language lane would
+# be the same "passive rule that cannot enforce a policy" trap.
 
 on:
   workflow_call:

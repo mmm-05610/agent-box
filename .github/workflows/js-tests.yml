@@ -51,10 +51,7 @@ jobs:
           path: |
             node_modules
             apps/*/node_modules
-            ui-tui/node_modules
-            ui-tui/packages/*/node_modules
             tests-js/node_modules
-            web/node_modules
           key: node-modules-scripts-${{ runner.os }}-node26-npm12-${{ hashFiles('package-lock.json') }}
 
       - uses: ./.github/actions/retry

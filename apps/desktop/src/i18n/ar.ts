@@ -148,6 +148,11 @@ export const ar = defineLocale({
       cloudDownHint: 'تفتح الأزرار أدناه بوابة Nous (حالة المثيل وعناصر التحكم) أو Discord للحصول على الدعم.',
       cloudDownCheckPortal: 'التحقق من حالة البوابة',
       cloudDownDiscord: 'الحصول على مساعدة عبر Discord',
+      notFoundTitle: 'لم يتم العثور على Hermes',
+      notFoundDescription:
+        'تعذّر على التطبيق العثور على بيئة تشغيل Hermes لتشغيلها. يبحث التطبيق عن الأمر hermes في PATH أو عن تثبيت يديره بنفسه. ثبّت Hermes ثم أعد المحاولة — لن تؤدي هذه الإجراءات إلى حذف محادثاتك أو إعداداتك.',
+      notFoundHint:
+        'يشغّل «إصلاح التثبيت» مثبّت Hermes، ويعيد «إعادة المحاولة» البحث عنه بعد توفّره.',
       openLogs: 'فتح السجلات',
       repairHint: 'يعيد الإصلاح تشغيل المثبت وقد يستغرق بضع دقائق على جهاز جديد.',
       remoteSignInHint: signInLabel =>
@@ -1862,7 +1867,6 @@ export const ar = defineLocale({
       rename: 'إعادة تسمية…',
       archive: 'أرشفة',
       newWindow: 'فتح في نافذة جديدة',
-      openInTerminal: 'فتح في الطرفية',
       copyIdFailed: 'فشل نسخ المعرف',
 
       sessionActions: 'إجراءات الجلسة',

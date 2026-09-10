@@ -24,7 +24,12 @@ import {
   writeMockProviderConfig,
 } from './fixtures'
 import { type MockServer, startMockServer } from '../../../tests-js/scripts/mock-server'
+import { E2E_FIXTURE_MIGRATION_PENDING, hasHermesE2ERuntime } from './hermes-runtime'
 import { RealSessionBuilder } from './real-session-builder'
+
+// This spec drives a REAL gateway from an external Hermes install. Without one
+// it skips with a typed reason rather than passing without a session.
+test.skip(!hasHermesE2ERuntime(), E2E_FIXTURE_MIGRATION_PENDING)
 import { type ElectronApplication, expect, type Page, test } from './test'
 
 // The builder-provided title now labels the sidebar row directly (seeded
