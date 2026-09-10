@@ -125,6 +125,34 @@ run. What matters for this design is that it is a *third* example of the same th
 the client's own view of "which chat am I in / did my write land" is derived, not authoritative, and a
 test (or a user) can be looking at a truthful UI that answers a different question than the one asked.
 
+### 2.4 A session's visible name is derived twice, and the two derivations disagree (explained)
+
+`correction-session-switch` failed on both attempts in two of three full runs and passed on retry in the
+third. It is the same class of problem, and this one I did run to ground.
+
+`session.create` from the Desktop sends **no `title`**
+(`src/app/session/hooks/use-session-actions/index.ts:319-331`). A sidebar row is therefore labelled from
+the gateway's `preview`, which the runtime shapes to `_PREVIEW_MAX_CHARS = 60` plus an ellipsis
+(`hermes_state_common.py:23,102`). Meanwhile the client's own optimistic row is labelled from the text
+the user submitted — untruncated. So the label **changes under the user** when the gateway's roster row
+replaces the optimistic one, and a locator filtering on the full prompt matches only inside that window:
+
+| Prompt | Length | Row label from the gateway | Locator on the full prompt |
+|---|---|---|---|
+| `E2E persisted session used for a warm resume.` | 45 | renders in full | matches |
+| `E2E_CORRECTION_SWITCH_TRIGGER: original prompt must remain singular after a correction.` | 84 | first 60 chars + `...` | **never matches** |
+
+That is why the failing lookup was always the second one, and why the spec intermittently passed. The fix
+is a test fix — identify the row by a prefix present in both derivations — because the product never
+promised to render the full prompt. The stable specs already sidestep it by passing a short title to
+`session.create`.
+
+**Design consequence.** The same label means different things to the two sides of the wire, and neither
+is wrong. A client that wants to *find* something the backend named must consume the backend's identity
+(a stable id), never re-derive a display string and search for it. This is precisely why the Ports must
+carry identities rather than labels, and why "the client and the backend agree on what this thing is
+called" cannot be an assumption anywhere in the design.
+
 ## 3. Factual gaps (things I could not verify, and what would verify them)
 
 | # | Gap | Why it matters | How to close it |
