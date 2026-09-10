@@ -208,6 +208,16 @@ ${modelContextLength ? `  context_length: ${modelContextLength}\n` : ''}provider
     models:
       mock-model: {}
     context_length: 4096
+tools:
+  # The specs script tool calls BY NAME (the mock provider returns canned
+  # tool_calls), so every named tool must actually be advertised. tool_search
+  # defaults to "auto", which collapses the tool list behind the
+  # tool_search/tool_describe/tool_call bridge and drops the scripted tools
+  # (observed: todo_list disappears while write_file/terminal/clarify survive).
+  # The runtime then rejects the call as "Model generated invalid tool call"
+  # and, because the mock cannot self-correct, ends the turn as partial after
+  # three tries - a failure that looks nothing like its cause.
+  tool_search: off
 ${autoTitleDefault}${approvalsDefault}${displaySection}${extraConfig ? `\n${extraConfig.trim()}\n` : ''}`
 
   fs.writeFileSync(configPath, config, 'utf8')
