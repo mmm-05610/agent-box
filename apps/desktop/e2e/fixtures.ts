@@ -291,6 +291,18 @@ export function buildAppEnv(sandbox: Sandbox, extra: Record<string, string> = {}
     // mid-flight — otherwise the quit confirmation waits on a click that no
     // one is there to make, and the worker dies on a teardown timeout.
     HERMES_DESKTOP_SKIP_QUIT_CONFIRM: '1',
+    // The bot-backend pool defaults to 3 concurrent non-primary backends, and
+    // several specs seed more bot profiles than that. A profile whose backend is
+    // queued ("Profile backend "alpha" waiting for a free local slot (2/3 busy,
+    // 1 queued)" in desktop.log) cannot serve a bot-addressed save, so the spec
+    // measures pool contention instead of the behaviour it names. This is the
+    // documented scripted-setup knob for exactly this (main.ts
+    // readPersistedPoolLimits falls back to it when no userData file exists).
+    // NOTE: the product still degrades SILENTLY in that state — the save reports
+    // success and the profile write never happens. Raising the limit here keeps
+    // this lane about its own subject; it does not fix that.
+    HERMES_DESKTOP_POOL_MAX: '16',
+    HERMES_DESKTOP_POOL_IDLE_MS: '600000',
     // Clear dev-server override — we want the built dist/, not a vite server.
     // The dev-server check in main.ts looks for this env var; if it's set,
     // it loads from the vite URL instead of the local file.

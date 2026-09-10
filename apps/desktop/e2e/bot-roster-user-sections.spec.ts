@@ -247,16 +247,45 @@ test('file bots into user sections by menu and drag; rename; delete returns them
   // Membership rides the bot's profile ui_meta, so it follows profile sync.
   const alphaProfile = path.join(fixture!.sandbox.hermesHome, 'profiles', 'alpha', 'profile.yaml')
 
-  // Diagnostic: each of these three facts rules out a different cause when the
+  // Diagnostic: each of these facts rules out a different cause when the
   // assertion below fails. `readdir` says whether the runtime wrote the profile
   // at all; the log tail says what the app asked it to do; the hermes-home
   // listing says which root the app resolved.
+  //
+  // The walk is the decisive one. Measured: the app's save leaves NO
+  // profile.yaml under this profile while a direct `profiles.configure` from a
+  // plain gateway does — so the app's write lands somewhere else entirely, and
+  // guessing the path is what keeps costing runs. Walk the sandbox and print
+  // every profile.yaml the app actually produced.
   const alphaDir = path.join(fixture!.sandbox.hermesHome, 'profiles', 'alpha')
   console.log('[diag] profiles/alpha:', fs.existsSync(alphaDir) ? fs.readdirSync(alphaDir) : 'MISSING')
   console.log('[diag] profile.yaml:', fs.existsSync(alphaProfile) ? fs.readFileSync(alphaProfile, 'utf8') : 'MISSING')
   const desktopLog = path.join(fixture!.sandbox.hermesHome, 'logs', 'desktop.log')
   console.log('[diag] desktop.log tail:', fs.existsSync(desktopLog) ? fs.readFileSync(desktopLog, 'utf8').split('\n').slice(-25).join('\n') : 'MISSING')
-  console.log('[diag] hermes-home:', fs.readdirSync(fixture!.sandbox.hermesHome))
+
+  const written: string[] = []
+  const walk = (dir: string, depth = 0) => {
+    if (depth > 4) return
+    let entries: fs.Dirent[]
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true })
+    } catch {
+      return
+    }
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name)
+      if (entry.isDirectory()) {
+        // Skip the per-profile data trees; they are big and cannot hold the
+        // rosters' metadata.
+        if (!['cache', 'logs', 'sessions', 'skills', 'state', 'memories', 'projects.db'].includes(entry.name)) walk(full, depth + 1)
+      } else if (entry.name === 'profile.yaml') {
+        written.push(`${full} :: ${fs.readFileSync(full, 'utf8').replace(/\s+/g, ' ').slice(0, 300)}`)
+      }
+    }
+  }
+
+  walk(fixture!.sandbox.root)
+  console.log('[diag] every profile.yaml under the sandbox:', written)
 
   // Probe: ask the runtime directly what it answers to the same call, with an
   // EMPTY ui_meta so this cannot satisfy the assertion below by writing a value.
