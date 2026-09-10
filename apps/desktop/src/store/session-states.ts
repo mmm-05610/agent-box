@@ -9,6 +9,19 @@
 // - tile-operations       — open/focus/close/restore tiles in the tree
 
 export {
+  $botChatScopes,
+  $botChatSessionIds,
+  isBotChatSession,
+  setSessionTileWorkspaceScope
+} from './session-states/bot-chat-scope'
+export {
+  $sessionOwnerHoldRevision,
+  _resetSessionOwnerHoldsForTests,
+  foregroundSessionScopes,
+  holdSessionOwnerUntilForeground,
+  releaseSessionOwnerHold
+} from './session-states/owner-holds'
+export {
   $focusedRuntimeId,
   $focusedSessionIsTile,
   $focusedSessionState,
@@ -16,28 +29,28 @@ export {
   $openStoredSessionIds,
   $sessionStates,
   $sessionTiles,
+  $stalledSessionIds,
   clearAllSessionStates,
   dropSessionState,
   forgetProfileOnlyRuntimeOwners,
+  getRecentlySettledSessionIds,
   isSessionRemote,
   knownOwnerForSession,
   liveSessionScopes,
   openTileGatewayScopes,
   patchSessionTile,
   publishSessionState,
-  recordSessionEventScope,
   reconcileBusyStatesOnReconnect,
+  recordSessionEventScope,
   releaseSessionTranscript,
   requestForOwnedSession,
-  sessionTileOwnerRoute,
-  setSessionStalled,
-  $stalledSessionIds,
   SESSION_WATCHDOG_TIMEOUT_MS,
-  getRecentlySettledSessionIds,
-  storedSessionIdForRuntimeId,
   type SessionTile,
+  sessionTileOwnerRoute,
   type SessionTileWorkspaceScope,
+  setSessionStalled,
   type SplitDir,
+  storedSessionIdForRuntimeId,
   type TileDock
 } from './session-states/session-state-registry'
 export {
@@ -46,38 +59,19 @@ export {
   $workingSessionIds
 } from './session-states/state-projections'
 export {
-  $sessionOwnerHoldRevision,
-  foregroundSessionScopes,
-  holdSessionOwnerUntilForeground,
-  releaseSessionOwnerHold,
-  _resetSessionOwnerHoldsForTests
-} from './session-states/owner-holds'
-export {
-  $botChatScopes,
-  $botChatSessionIds,
-  isBotChatSession,
-  setSessionTileWorkspaceScope
-} from './session-states/bot-chat-scope'
-export {
   $sessionTileDelegateRevision,
   sessionTileDelegate,
-  setSessionTileDelegate,
-  type SessionTileDelegate
+  type SessionTileDelegate,
+  setSessionTileDelegate
 } from './session-states/tile-delegate'
-export {
-  resetTileRuntimeBindings,
-  unbindTileRuntime,
-  type RuntimeReconnectScope,
-  type UnknownRuntimeReconnectScope
-} from './session-states/tile-rebinding'
 export {
   blankDraftTile,
   closeAllOpenSessionTiles,
   closeSessionTile,
   discardSessionTile,
   dropTilesForProfile,
-  focusOpenSession,
   focusedSessionNeedsRoute,
+  focusOpenSession,
   focusWorkspaceOwnerSessionTile,
   markSelectionRestore,
   nextSessionTileForWorkspace,
@@ -87,3 +81,9 @@ export {
   reuseBlankDraftTile,
   selectionHomesToWorkspace
 } from './session-states/tile-operations'
+export {
+  resetTileRuntimeBindings,
+  type RuntimeReconnectScope,
+  unbindTileRuntime,
+  type UnknownRuntimeReconnectScope
+} from './session-states/tile-rebinding'

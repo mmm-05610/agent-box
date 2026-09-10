@@ -2,22 +2,26 @@ import { useCallback, useRef } from 'react'
 
 import { revealTreePane } from '@/components/pane-shell/tree/store'
 import { getAllSessionMessages } from '@/hermes'
+import { type Translations } from '@/i18n'
 import { type ChatMessage, toChatMessages } from '@/lib/chat-messages'
 import { requestGatewayForAgent } from '@/store/gateway'
 import { clearNotifications, notify, notifyError } from '@/store/notifications'
 import { ensureGatewayAgent, ensureGatewayProfile } from '@/store/profile'
 import { $currentCwd, $messages, $sessions, setSessionOwnerHint } from '@/store/session'
-import { holdSessionOwnerUntilForeground, openSessionTile, patchSessionTile } from '@/store/session-states'
 import { setFreshDraftReady } from '@/store/session'
-import { broadcastSessionsChanged } from '@/store/session-sync'
 import { type SessionOwnerRoute, sessionOwnerRouteFromRow } from '@/store/session-request-router'
-import { sessionRoute } from '../../../routes'
+import { holdSessionOwnerUntilForeground, openSessionTile, patchSessionTile } from '@/store/session-states'
+import { broadcastSessionsChanged } from '@/store/session-sync'
 import type { SessionCreateResponse } from '@/types/hermes'
-import { type Translations } from '@/i18n'
+
+import { sessionRoute } from '../../../routes'
 import { sessionContextDrift } from '../session-context-drift'
+
+import { type ResumeSessionAction } from './resume-session'
+import { type SessionActionsOptions } from './session-actions-options'
 import {
-  type BranchMessage,
   applyRuntimeInfo,
+  type BranchMessage,
   cachedSessionRow,
   patchSessionWorkspace,
   resolveSessionProfile,
@@ -27,9 +31,6 @@ import {
   toBranchMessages,
   upsertOptimisticSession
 } from './utils'
-
-import { type SessionActionsOptions } from './session-actions-options'
-import { type ResumeSessionAction } from './resume-session'
 
 const branchMessagesFingerprint = (messages: BranchMessage[]): string =>
   JSON.stringify(messages.map(({ content, role }) => [role, content]))
@@ -83,6 +84,7 @@ export function useBranchActions(
     selectedStoredSessionIdRef,
     updateSessionState
   } = options
+
   const { copy, resumeSession } = deps
   const branchCreateFlightsRef = useRef(new Map<string, Promise<SessionCreateResponse>>())
 

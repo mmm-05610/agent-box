@@ -1,3 +1,4 @@
+import { deleteProfile } from '@/hermes'
 import {
   activeGatewayConnectionId,
   openGatewayForAgent,
@@ -8,7 +9,6 @@ import {
   retainGatewayForRelay,
   retireLocalProfileGateways
 } from '@/store/gateway'
-import { deleteProfile } from '@/hermes'
 import {
   $activeGatewayProfile,
   $profiles,
@@ -19,6 +19,7 @@ import {
   setActiveProfile
 } from '@/store/profile'
 import { dropTilesForProfile } from '@/store/session-states'
+
 import { $activeConnectionId } from './host-state'
 
 export interface PluginProfileRoute {

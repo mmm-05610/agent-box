@@ -10,27 +10,18 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DisclosureCaret,
-  GlyphSpinner,
   host,
   Input,
-  queryClient,
   RowButton,
   SearchField,
-  SegmentedControl,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  Textarea,
   useI18n,
   useValue
 } from '@hermes/plugin-sdk'
-import { useEffect, useRef, useState } from 'react'
-import { avatarColor, blobatarSvg, botAppearance, BotFace } from './avatar'
+import { useEffect, useState } from 'react'
+
+import { avatarColor, botAppearance, BotFace } from './avatar'
 import { isBackfilledFacePng } from './avatar-image'
-import { $botMeta, botHandle, botRosterKey, filterBots, ROSTER_KEY, saveBotMeta } from './data'
+import { $botMeta, botHandle, botRosterKey, filterBots, saveBotMeta } from './data'
 import { GROUP_CHAT_MAX_MEMBERS, mintGroupRoomId, uniqueGroupChatName, updateGroupChat } from './group-chat'
 import type { GroupChatRoom } from './group-chat'
 import { GroupImageControls } from './group-chat-parts'
@@ -42,9 +33,9 @@ import {
   liveGroupChatNames
 } from './group-membership'
 import { useBots } from './i18n'
-import { displayName, slugify } from './labels'
+import { displayName } from './labels'
 import { botRosterMeta } from './routing'
-import type { BotMeta, ConnectionRow, RosterRow } from './types'
+import type { BotMeta, RosterRow } from './types'
 
 /** Group chat creation dialogs (rename a bot chat into a group). */
 

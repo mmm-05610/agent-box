@@ -3,8 +3,9 @@ import { atom } from 'nanostores'
 
 import { normalizeProfileKey } from '../profile'
 import { $activeSessionId } from '../session'
-import { $sessionTiles, sessionScopeByRuntimeId } from './session-state-registry'
 import type { SessionOwnerRoute, SessionOwnerScope } from '../session-request-router'
+
+import { $sessionTiles, sessionScopeByRuntimeId } from './session-state-registry'
 
 /** Create-to-foreground owner holds: pin the socket that minted a runtime
  *  until its surface publishes, and derive the foreground scope set. */

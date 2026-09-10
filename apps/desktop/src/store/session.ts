@@ -10,8 +10,8 @@
 export {
   $activeSessionId,
   $activeSessionStoredIdRotation,
-  $awaitingResponse,
   $availablePersonalities,
+  $awaitingResponse,
   $busy,
   $connection,
   $contextSuggestions,
@@ -48,17 +48,19 @@ export {
   $sessionProfilesTruncated,
   $sessionProfilesUsage,
   $sessionResumeRequest,
-  $sessionStartedAt,
   $sessions,
   $sessionsLoading,
+  $sessionStartedAt,
   $terminalBackend,
   $turnStartedAt,
   $unreadFinishedSessionIds,
   $workspaceCwdOwner,
   $yoloActive,
+  type ActiveSessionStoredIdRotation,
   clearComposerSelectionOwner,
   clearReadBaseline,
   commitWorkspaceCwdForSelectedSession,
+  type ComposerModelSource,
   CRON_SECTION_LIMIT,
   getComposerSelectionGeneration,
   getCurrentModelSource,
@@ -67,18 +69,21 @@ export {
   markComposerSelectionManual,
   markSessionRead,
   MESSAGING_SECTION_LIMIT,
+  type NewChatWorkspaceTarget,
   ownerLookupSessionRows,
+  type ProfileUsage,
   releaseWorkspaceCwdOwner,
   requestSessionResume,
+  type SessionResumeRequest,
   setActiveSessionId,
   setActiveSessionStoredIdRotation,
-  setAwaitingResponse,
   setAvailablePersonalities,
+  setAwaitingResponse,
   setBusy,
   setComposerSelectionOwner,
   setConnection,
-  setCronSessions,
   setContextSuggestions,
+  setCronSessions,
   setCurrentBranch,
   setCurrentCwd,
   setCurrentCwdTransient,
@@ -107,37 +112,21 @@ export {
   setSessionPickerOpen,
   setSessionProfilesTruncated,
   setSessionProfilesUsage,
-  setSessionStartedAt,
   setSessions,
   setSessionsLoading,
+  setSessionStartedAt,
   setTerminalBackend,
   setTurnStartedAt,
   setWorkspaceCwdOwner,
   setYoloActive,
-  workspaceCwdBelongsToSelectedSession,
-  type ActiveSessionStoredIdRotation,
-  type ComposerModelSource,
-  type NewChatWorkspaceTarget,
-  type ProfileUsage,
-  type SessionResumeRequest
+  workspaceCwdBelongsToSelectedSession
 } from './session/atoms'
-export {
-  _resetLegacyDiscardForTests,
-  getRememberedRoute,
-  getRememberedSessionId,
-  knownSessionOwner,
-  knownSessionProfile,
-  rememberedSessionProfile,
-  setRememberedRoute,
-  setRememberedSessionId,
-  sessionBelongsToProfile
-} from './session/navigation-memory'
 export {
   applyConfiguredDefaultProjectDir,
   ensureDefaultWorkspaceCwd,
   getConfiguredDefaultProjectDir,
-  workspaceCwdForNewSession,
-  syncConfiguredDefaultProjectDir
+  syncConfiguredDefaultProjectDir,
+  workspaceCwdForNewSession
 } from './session/default-workspace'
 export {
   idsShareLineage,
@@ -154,12 +143,23 @@ export {
   touchSessionActivity
 } from './session/list-merge'
 export {
+  _resetLegacyDiscardForTests,
+  getRememberedRoute,
+  getRememberedSessionId,
+  knownSessionOwner,
+  knownSessionProfile,
+  rememberedSessionProfile,
+  sessionBelongsToProfile,
+  setRememberedRoute,
+  setRememberedSessionId
+} from './session/navigation-memory'
+export {
   _resetSessionOwnerHintsForTests,
   forgetSessionOwnerHintsForConnection,
   forgetSessionOwnerHintsForSession,
   getSessionOwnerHint,
   getSessionOwnerHints,
   hydrateSessionOwnerHints,
-  setSessionOwnerHint,
-  sessionOwnerRouteFromRow
+  sessionOwnerRouteFromRow,
+  setSessionOwnerHint
 } from './session/owner-hints'

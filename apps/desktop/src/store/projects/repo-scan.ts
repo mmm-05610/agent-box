@@ -1,21 +1,17 @@
 import { getHermesConfig, type HermesGateway } from '@/hermes'
 import { desktopGit } from '@/lib/desktop-git'
-import {
-  $projectTree,
-  $projects,
-  markProjectsRpcFailure,
-  markProjectsRpcSuccess
-} from './scope'
+
 import {
   activeProjectsContext,
-  gatewayRequest,
+  type ActiveProjectsContext,
   gatewayRequestOn,
   projectParams,
-  projectProfile,
-  stillOnProjectsContext,
-  type ActiveProjectsContext
+  stillOnProjectsContext
 } from './gateway'
 import { refreshProjectTree, refreshProjectTreeOn } from './refresh'
+import {
+  markProjectsRpcFailure
+} from './scope'
 
 /** Discover repos under a project's folders and record them on the project
  *  rows. */
@@ -30,12 +26,12 @@ export const $reposScanning = atom(false)
 // chats land there, exactly as selecting a profile does.
 
 import { atom } from 'nanostores'
+
+import { isDesktopFsRemoteMode } from '@/lib/desktop-fs'
 import {
   $gateway,
-  activeGateway,
-  ensureActiveGatewayOpen
+  activeGateway
 } from '@/store/gateway'
-import { isDesktopFsRemoteMode } from '@/lib/desktop-fs'
 export interface RepoDiscoveryPolicy {
   enabled: boolean
   roots: string[]

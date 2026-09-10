@@ -1,9 +1,9 @@
 import { atom } from 'nanostores'
 
+import type { NewSessionPlacement } from '@/app/chat/new-session-drag'
 import { translateNow } from '@/i18n'
 import { notify } from '@/store/notifications'
 
-import type { NewSessionPlacement } from '@/app/chat/new-session-drag'
 import { $projectsRpcAvailable } from './scope'
 
 /** Project management dialog UI state. */

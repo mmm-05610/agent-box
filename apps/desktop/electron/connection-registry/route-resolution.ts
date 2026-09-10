@@ -1,4 +1,5 @@
-import { ConnectionRegistry, LOCAL_CONNECTION_ID, RegistryConnection, RegistryLocalRoute, ResolvedConnectionDescriptor, backendScopePrefix, resolvedConnectionId } from './identity'
+import type { ConnectionRegistry, RegistryConnection, RegistryLocalRoute, ResolvedConnectionDescriptor} from './identity';
+import { backendScopePrefix, LOCAL_CONNECTION_ID, resolvedConnectionId } from './identity'
 
 /** Route resolution: primary reuse, local routes, and enumeration gates. */
 

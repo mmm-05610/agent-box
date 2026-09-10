@@ -2,13 +2,14 @@ import { useCallback } from 'react'
 
 import { NO_PROJECT_ID } from '@/app/chat/sidebar/projects/workspace-groups'
 import { revealTreePane } from '@/components/pane-shell/tree/store'
+import { type Translations } from '@/i18n'
 import { setSessionYolo } from '@/lib/yolo-session'
 import { requestGatewayForAgent, retainGatewayForAgent } from '@/store/gateway'
 import { notify, notifyError } from '@/store/notifications'
 import {
-  type AgentProfileRoute,
   $activeGatewayProfile,
   $newChatProfile,
+  type AgentProfileRoute,
   ensureGatewayAgent,
   ensureGatewayProfile,
   normalizeProfileKey,
@@ -42,14 +43,14 @@ import {
 } from '@/store/session-states'
 import { releaseSessionOwnerHold } from '@/store/session-states'
 import { broadcastSessionsChanged } from '@/store/session-sync'
-import { sessionRoute } from '../../../routes'
 import type { SessionCreateResponse } from '@/types/hermes'
-import { type Translations } from '@/i18n'
-import { sessionContextDrift } from '../session-context-drift'
-import { applyRuntimeInfo, upsertOptimisticSession } from './utils'
 
-import { type SessionActionsOptions } from './session-actions-options'
+import { sessionRoute } from '../../../routes'
+import { sessionContextDrift } from '../session-context-drift'
+
 import { markSessionCreatedThisRun } from './created-this-run'
+import { type SessionActionsOptions } from './session-actions-options'
+import { applyRuntimeInfo, upsertOptimisticSession } from './utils'
 
 export // `session.create` params from the current profile + sticky-UI model/effort/fast,
 // ensuring the gateway is on that profile first. Shared by the primary send path
@@ -121,6 +122,7 @@ export function useSessionCreateActions(
     selectedStoredSessionIdRef,
     updateSessionState
   } = options
+
   const { copy } = deps
 
   const createBackendSessionForSend = useCallback(

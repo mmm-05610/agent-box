@@ -3,8 +3,10 @@ import { computed } from 'nanostores'
 import type { ClientSessionState } from '@/app/types'
 import { stableArray } from '@/lib/stable-array'
 import type { SessionInfo } from '@/types/hermes'
-import { $sessionStates } from './session-state-registry'
+
 import { $sessions, lineageAliases, sessionMatchesStoredId } from '../session'
+
+import { $sessionStates } from './session-state-registry'
 
 /** Derived per-session status sets (working / attention / draft) projected
  *  from the state mirror. */

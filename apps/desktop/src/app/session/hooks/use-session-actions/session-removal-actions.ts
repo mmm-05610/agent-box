@@ -1,6 +1,7 @@
 import { useCallback } from 'react'
 
 import { deleteSession, setSessionArchived } from '@/hermes'
+import { type Translations } from '@/i18n'
 import { clearQueuedPrompts } from '@/store/composer-queue'
 import { $pinnedSessionIds } from '@/store/layout'
 import { clearNotifications, notify, notifyError } from '@/store/notifications'
@@ -12,16 +13,20 @@ import {
   setMessages,
   setSelectedStoredSessionId
 } from '@/store/session'
+import { $messages } from '@/store/session'
 import { clearSessionControl } from '@/store/session-control'
 import { beginSessionMutation, endSessionMutation, tombstoneSessions, untombstoneSessions } from '@/store/session-removal'
 import { requestForSessionProfile, type SessionOwnerScope } from '@/store/session-request-router'
 import { closeSessionTile, dropSessionState } from '@/store/session-states'
 import { forgetSessionUnread } from '@/store/session-unread'
-import { $messages } from '@/store/session'
 import { $archivedSessions } from '@/store/sidebar-archive'
 import { dropTranscriptTailEverywhere } from '@/store/transcript-tail-cache'
+
 import { sessionRoute } from '../../../routes'
-import { type Translations } from '@/i18n'
+
+import { type FreshSessionDraftStarter } from './fresh-draft'
+import { type SessionActionsOptions } from './session-actions-options'
+import { applyStoredUsage } from './usage-mirror'
 import {
   dropListedSession,
   findListedSession,
@@ -29,10 +34,6 @@ import {
   restoreListedSession,
   sessionMatchesStoredId
 } from './utils'
-
-import { type SessionActionsOptions } from './session-actions-options'
-import { type FreshSessionDraftStarter } from './fresh-draft'
-import { applyStoredUsage } from './usage-mirror'
 
 /** Remove (delete) and archive flows for a stored session. */
 export function useSessionRemovalActions(
@@ -47,6 +48,7 @@ export function useSessionRemovalActions(
     selectedStoredSessionIdRef,
     sessionStateByRuntimeIdRef
   } = options
+
   const { copy, startFreshSessionDraft } = deps
 
   const removeSession = useCallback(

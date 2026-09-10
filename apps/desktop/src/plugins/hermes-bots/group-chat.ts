@@ -9,48 +9,35 @@
  * store, one writer.
  */
 
-import { atom, host } from '@hermes/plugin-sdk'
+import { host } from '@hermes/plugin-sdk'
 
-import { $botMeta, $lastRoster, botRosterKey } from './data'
-import { groupMemberReferencesConnection, markOrphanedGroupMemberDescriptor } from './hygiene'
-import { getPluginCtx } from './shared'
-import type {
-  Attachment,
-  GroupChat,
-  GroupHold,
-  GroupMember,
-  GroupMessage,
-  GroupMessageAuthor,
-  GroupPrompt,
-  RosterRow
-} from './types'
-
-/** Optional secondary navigation inside the Bots pane (group-chat rooms). */
-
+import { $botMeta, $lastRoster } from './data'
 /** Group-chat rooms: { [group]: { log: [{from:{kind,name},text,at}], watermarks:{[member]:idx}, epoch, running } }.
  *  Log + watermarks persist via plugin storage; epoch/running are runtime-only. */
 import {
-  $groupChatWorkspace,
   $groupChats,
-  $groupClarify,
   $groupNeedsYou,
-  type GroupChatSyncJob,
-  type GroupChatSyncRoom,
-  type GroupChatSyncSnapshot,
-  type GroupChatRoom,
   GROUP_CHAT_SYNC_META_KEY,
+  type GroupChatRoom,
+  type GroupChatSyncJob,
+  type GroupChatSyncSnapshot,
 } from './group-chat-state'
 import {
-  groupChatGatewayJsonSize,
-  groupChatRoomKey,
   groupChatSyncSnapshot,
   mergeGroupChatSyncSnapshots,
   mergeRemoteGroupChatSnapshotIntoRooms,
   trimGroupChatLog,
-  GROUP_CHAT_HISTORY_LIMIT,
-  GROUP_CHAT_MAX_MEMBERS,
-  assignLegacyThreads,
 } from './group-chat-sync-snapshot'
+import { groupMemberReferencesConnection, markOrphanedGroupMemberDescriptor } from './hygiene'
+/** Optional secondary navigation inside the Bots pane (group-chat rooms). */
+import { getPluginCtx } from './shared'
+import type {
+  Attachment,
+  GroupChat,
+  GroupMessage,
+  GroupMessageAuthor,
+  RosterRow
+} from './types'
 
 const groupChatSyncPendingByConnection = new Map<string, GroupChatSyncJob>()
 const groupChatSyncInFlightConnections = new Set<string>()

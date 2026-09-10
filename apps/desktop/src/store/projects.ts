@@ -10,60 +10,60 @@
 // - worktrees     — worktree/git doors and start-work requests
 
 export {
-  $activeProjectId,
-  $projectScope,
-  $projectTree,
-  $projectTreeLoading,
-  $projects,
-  $projectsRpcAvailable,
-  ALL_PROJECTS,
-  exitProjectScope,
-  projectRootCwd,
-  resolveNewSessionCwd
-} from './projects/scope'
-export {
-  projectIdForCwd,
-  projectNameForCwd
-} from './projects/cwd-identity'
-export { projectProfile } from './projects/gateway'
-export {
-  fetchProjectSessions,
-  moveSessionToProject,
-  refreshProjectTree,
-  refreshProjects
-} from './projects/refresh'
-export {
-  $reposScanning,
-  repoDiscoveryPolicyFromConfig,
-  repoDiscoveryPolicySignature,
-  scanAndRecordRepos,
-  type RepoDiscoveryPolicy
-} from './projects/repo-scan'
-export {
   addProjectFolder,
   createProject,
+  type CreateProjectInput,
   deleteProject,
   enterProject,
   followActiveSessionCwd,
   generateProjectIdea,
   renameProject,
   setActiveProject,
-  updateProject,
   setProjectAppearance,
-  type CreateProjectInput
+  updateProject
 } from './projects/crud'
 export {
+  projectIdForCwd,
+  projectNameForCwd
+} from './projects/cwd-identity'
+export {
+  $newProjectDropPlacement,
+  $newProjectSessionRequest,
   $projectDialog,
   clearNewProjectDropPlacement,
   closeProjectDialog,
+  type NewProjectSessionRequest,
   openProjectAddFolder,
   openProjectCreate,
   openProjectRename,
-  $newProjectDropPlacement,
-  $newProjectSessionRequest,
-  type NewProjectSessionRequest,
   type ProjectDialogState
 } from './projects/dialogs'
+export { projectProfile } from './projects/gateway'
+export {
+  fetchProjectSessions,
+  moveSessionToProject,
+  refreshProjects,
+  refreshProjectTree
+} from './projects/refresh'
+export {
+  $reposScanning,
+  type RepoDiscoveryPolicy,
+  repoDiscoveryPolicyFromConfig,
+  repoDiscoveryPolicySignature,
+  scanAndRecordRepos
+} from './projects/repo-scan'
+export {
+  $activeProjectId,
+  $projects,
+  $projectScope,
+  $projectsRpcAvailable,
+  $projectTree,
+  $projectTreeLoading,
+  ALL_PROJECTS,
+  exitProjectScope,
+  projectRootCwd,
+  resolveNewSessionCwd
+} from './projects/scope'
 export {
   $startWorkSessionRequest,
   $worktreeDialog,
@@ -80,7 +80,7 @@ export {
   requestStartWorkSession,
   revealPath,
   startWorkInRepo,
-  switchBranchInRepo,
   type StartWorkSessionRequest,
+  switchBranchInRepo,
   type WorktreeDialogState
 } from './projects/worktrees'

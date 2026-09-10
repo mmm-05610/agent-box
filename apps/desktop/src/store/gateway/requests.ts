@@ -1,6 +1,7 @@
 import { registryBackendScopeKey } from '@hermes/shared'
 
 import { g, isOpen, isPrimaryRegistryRoute, normKey } from './registry-state'
+import { isAttachedSharedRemote, requestOnPrimaryGateway } from './route-probes'
 import {
   createSecondary,
   disposeSecondary,
@@ -10,7 +11,6 @@ import {
   openSecondary,
   relayRetained
 } from './secondary-pool'
-import { isAttachedSharedRemote, requestOnPrimaryGateway } from './route-probes'
 
 /** One-shot RPC facades over profile- and agent-scoped routes. */
 /**

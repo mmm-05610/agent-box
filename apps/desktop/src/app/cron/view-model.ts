@@ -5,42 +5,18 @@ export interface ScheduleOption {
 }
 
 import {
-  type AutomationBlueprint,
-  createCronJob,
-  type CronDeliveryTarget,
-  type CronJob,
-  deleteCronJob,
-  getAutomationBlueprints,
-  getCronDeliveryTargets,
-  getCronJobRuns,
-  instantiateAutomationBlueprint,
-  pauseCronJob,
-  resumeCronJob,
-  type SessionInfo,
-  updateCronJob
+  type CronJob
 } from '@/hermes'
-import { type Translations, useI18n } from '@/i18n'
+import { type Translations } from '@/i18n'
 import { asText } from '@/lib/text'
-import { $profileScope, ALL_PROFILES } from '@/store/profile'
+import { ALL_PROFILES } from '@/store/profile'
+
 import {
-  Panel,
-  PanelAction,
-  PanelAddButton,
-  PanelBlock,
-  PanelBody,
-  PanelDetail,
-  PanelEmpty,
-  PanelHeader,
-  PanelList,
-  PanelListRow,
-  type PanelMenuItem,
-  PanelMeta,
-  PanelPill,
-  type PanelPillTone,
-  PanelSectionLabel
+  type PanelPillTone
 } from '../overlays/panel'
 import type { SetStatusbarItemGroup } from '../shell/statusbar-controls'
-import { jobState, jobTitle, STATE_DOT } from './job-state'
+
+import { jobTitle } from './job-state'
 
 /** Cron job view-model: labels, schedule display, payload formatting. */
 

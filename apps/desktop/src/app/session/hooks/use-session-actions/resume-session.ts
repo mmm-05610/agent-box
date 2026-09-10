@@ -63,8 +63,21 @@ import { restoreSessionTodosFromSnapshot } from '@/store/todos'
 import { dropTranscriptTail, loadTranscriptTail, saveTranscriptTail } from '@/store/transcript-tail-cache'
 import { isWatchWindow } from '@/store/windows'
 import type { SessionMessage, SessionResumeResponse, UsageStats } from '@/types/hermes'
+
 import type { ClientSessionState } from '../../../types'
 import { singleFlightSessionResume } from '../use-prompt-actions/single-flight-resume'
+
+import { wasSessionCreatedThisRun } from './created-this-run'
+import { type FreshSessionDraftStarter } from './fresh-draft'
+import { pendingClarifyToolPayload, restorePendingClarifyFromSnapshot } from './restore-pending-clarify'
+import { type SessionActionsOptions } from './session-actions-options'
+import {
+  createPersistedDisplayTranscriptProvenance,
+  hasPersistedDisplayTranscriptProvenance,
+  suppressTranscriptForView,
+  withoutTranscriptProvenance
+} from './transcript-provenance'
+import { applyStoredUsage } from './usage-mirror'
 import {
   appendLiveSessionProjection,
   applyRuntimeInfo,
@@ -83,19 +96,7 @@ import {
   sessionMatchesStoredId,
   sessionShouldHaveTranscript
 } from './utils'
-import {
-  createPersistedDisplayTranscriptProvenance,
-  hasPersistedDisplayTranscriptProvenance,
-  suppressTranscriptForView,
-  withoutTranscriptProvenance
-} from './transcript-provenance'
-import { pendingClarifyToolPayload, restorePendingClarifyFromSnapshot } from './restore-pending-clarify'
-import { applyStoredUsage } from './usage-mirror'
 import { patchSessionWorkspace } from './utils'
-import { wasSessionCreatedThisRun } from './created-this-run'
-
-import { type SessionActionsOptions } from './session-actions-options'
-import { type FreshSessionDraftStarter } from './fresh-draft'
 
 function reconcileAuthoritativeChatMessages(
   authoritativeMessages: ChatMessage[],
@@ -163,6 +164,7 @@ export function useResumeSession(
     syncSessionStateToView,
     updateSessionState
   } = options
+
   const { copy, startFreshSessionDraft } = deps
   const resumeRequestRef = useRef(0)
 

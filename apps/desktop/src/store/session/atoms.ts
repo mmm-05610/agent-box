@@ -6,19 +6,19 @@ import type { ContextSuggestion } from '@/app/types'
 import type { HermesConnection } from '@/global'
 import type { ChatMessage } from '@/lib/chat-messages'
 import {
-  activeConnectionScopeSuffix,
   connectionScopeSuffix,
   rescopeConnectionScopedStores
 } from '@/lib/connection-scoped'
-import { persistBoolean, persistString, readJson, storedBoolean, storedString, writeJson } from '@/lib/storage'
+import { persistBoolean, persistString, storedBoolean, storedString } from '@/lib/storage'
 import { syncCronModelImpactConnection } from '@/store/cron-model-impact-scope'
 import type { SessionInfo, UsageStats } from '@/types/hermes'
+
 import { isSessionRemovalPending } from '../session-removal'
+import type { SessionOwnerRoute } from '../session-request-router'
 import { clearUnreadOnOpen } from '../session-unread-remote'
-import { getConfiguredDefaultProjectDir } from './default-workspace'
+
 import { lineageAliases } from './identity'
 import { setSessionOwnerHint } from './owner-hints'
-import type { SessionOwnerRoute, SessionOwnerScope } from '../session-request-router'
 
 /** The session surface's reactive atom bank: the shared atoms, their
  *  scoped-persistence setters, and the composer model selection bound to

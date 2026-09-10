@@ -1,4 +1,5 @@
-import { ConnectionKind, RegistryConnection, agentHandle } from './identity'
+import type { ConnectionKind, RegistryConnection} from './identity';
+import { agentHandle } from './identity'
 import { pickCanonicalConnection } from './schema'
 
 /** Agent roster: ssh inventory memory, remote profile listings, roster build. */

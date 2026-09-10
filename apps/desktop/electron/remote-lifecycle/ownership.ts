@@ -1,6 +1,7 @@
 import crypto from 'node:crypto'
+
 import { READY_IN_MERGED_OUTPUT_RE } from '../backend-ready'
-import { connect } from './connect'
+
 
 /** Dashboard ownership: tokens, lockfiles, pid liveness, stale cleanup,
  *  and the managed-update termination commands. */

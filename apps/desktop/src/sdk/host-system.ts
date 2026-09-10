@@ -6,6 +6,7 @@ import { $gateway, requestGatewayForAgent } from '@/store/gateway'
 import { notify, notifyError } from '@/store/notifications'
 import { runGatewayRestart } from '@/store/system-actions'
 import type { PaginatedSessions } from '@/types/hermes'
+
 import type { PluginProfileRoute } from './host-routing'
 
 /** System doors: logs, MCP OAuth, navigation, events, gateway status and

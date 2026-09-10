@@ -1,6 +1,7 @@
 import { useStore } from '@nanostores/react'
 import { useEffect } from 'react'
 
+import { useI18n } from '@/i18n'
 import { migrateSessionDraft } from '@/store/composer'
 import { migrateQueuedPrompts } from '@/store/composer-queue'
 import {
@@ -10,16 +11,16 @@ import {
   setActiveSessionStoredIdRotation,
   setSelectedStoredSessionId
 } from '@/store/session'
-import { useI18n } from '@/i18n'
+
 import { sessionRoute } from '../../../routes'
 
 import { useBranchActions } from './branching'
 import { useFreshSessionDraft } from './fresh-draft'
 import { useResumeSession } from './resume-session'
+import { type SessionActionsOptions } from './session-actions-options'
 import { useSessionCreateActions } from './session-create'
 import { useSessionNavigationActions } from './session-navigation-actions'
 import { useSessionRemovalActions } from './session-removal-actions'
-import { type SessionActionsOptions } from './session-actions-options'
 
 /** Composition root for the session surface's actions: wires the
  *  responsibility modules below into the single hook callers consume. */
@@ -90,14 +91,18 @@ export function useSessionActions(options: SessionActionsOptions) {
 
   const startFreshSessionDraft = useFreshSessionDraft(options)
   const { createBackendSessionForSend, openNewSessionTile } = useSessionCreateActions(options, { copy })
+
   const { closeSettings, openSettings, selectSidebarItem } = useSessionNavigationActions(options, {
     startFreshSessionDraft
   })
+
   const resumeSession = useResumeSession(options, { copy, startFreshSessionDraft })
+
   const { branchCurrentSession, branchStoredSession, forkBranch } = useBranchActions(options, {
     copy,
     resumeSession
   })
+
   const { archiveSession, removeSession } = useSessionRemovalActions(options, {
     copy,
     startFreshSessionDraft

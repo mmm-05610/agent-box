@@ -1,4 +1,4 @@
-import { columnMeta, type KanbanBoard, type KanbanTask, type TaskEstimate } from './types'
+import { type KanbanBoard, type KanbanTask } from './types'
 
 /** Pure Kanban board transforms (card moves/removals). */
 

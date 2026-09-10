@@ -1,6 +1,7 @@
 import { textWithoutReferenceLines } from '@/components/assistant-ui/reference-kinds'
 import { type ChatMessage, chatMessageText } from '@/lib/chat-messages'
 import { embeddedImageUrls, textWithoutEmbeddedImages } from '@/lib/embedded-images'
+
 import {
   hasStructuralParts,
   isLiveTailRow,

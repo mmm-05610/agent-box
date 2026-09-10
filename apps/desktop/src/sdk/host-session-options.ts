@@ -1,5 +1,6 @@
 import type { OpenSessionIntent } from '@/app/open-session'
 import type { WorkspaceMode } from '@/contrib/types'
+
 import type { PluginProfileRoute } from './host-routing'
 
 /** Ordinary session opens fail fast when their gateway or socket is dead. */

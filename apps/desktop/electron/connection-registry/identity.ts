@@ -1,13 +1,10 @@
 import {
-  hostLabelFromBaseUrl,
-  modeIsRemoteLike,
   normalizeRemoteBaseUrl,
-  normalizeRemoteHeaders,
   normalizeSshConfig,
   normAuthMode
 } from '../connection-config'
 import { matchingConnectionId, type StoredRoute } from '../connection-route-identity'
-import { normalizeRegistry } from './schema'
+
 
 /** Registry identities: ids, labels, scope keys, and resolved descriptors. */
 

@@ -1,4 +1,4 @@
-import { $sessionTiles, toStored, type SessionTile } from './session-state-registry'
+import { $sessionTiles, type SessionTile, toStored } from './session-state-registry'
 import { sessionTileDelegate } from './tile-delegate'
 
 /** Drop or patch tiles' runtime bindings on gateway reconnect and backend

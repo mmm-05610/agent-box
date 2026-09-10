@@ -3,26 +3,24 @@ import { atom, computed, type ReadableAtom } from 'nanostores'
 import { PRIMARY_SESSION_VIEW } from '@/app/chat/session-view'
 import type { ClientSessionState } from '@/app/types'
 import { $narrowViewport } from '@/components/pane-shell/tree/store'
+import { $activeGatewayProfile, normalizeProfileKey } from '@/store/profile'
 import {
   $activeSessionId,
   $connection,
-  $selectedStoredSessionId,
-  $sessions,
   $currentCwd,
   $currentModel,
   $gatewayState,
-  $messages,
+  $selectedStoredSessionId,
+  $sessions,
   getSessionOwnerHints,
   rememberedSessionProfile,
   sessionMatchesStoredId
 } from '@/store/session'
-import { $activeGatewayProfile, normalizeProfileKey } from '@/store/profile'
 import {
   $focusedRuntimeId,
   $focusedSessionState,
   $focusedStoredSessionId,
-  $sessionStates,
-  $sessionTiles
+  $sessionStates
 } from '@/store/session-states'
 import type { UsageStats } from '@/types/hermes'
 

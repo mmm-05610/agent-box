@@ -58,7 +58,6 @@ import {
   Zap
 } from '@/lib/icons'
 import { getServers } from '@/lib/mcp-servers'
-import { normalize } from '@/lib/text'
 import { cn } from '@/lib/utils'
 import { resolveVersionStatus } from '@/lib/version-status'
 import { $repoWorktrees } from '@/store/coding-status'
@@ -110,17 +109,16 @@ import { useSettingsSearchCatalog } from '../settings/use-settings-search'
 import { usePaletteContributions } from './contrib'
 import { HighlightWatcher } from './highlight-watcher'
 import { MarketplaceThemePage } from './marketplace-theme-page'
-import { PetInlineToggle, PetPalettePage } from './pet-palette-page'
 import {
-  paletteValue,
-  rankGroups,
-  scoreItem,
+  PAGE_PARENTS,
   type PaletteGroup,
   type PaletteItem,
   type PalettePage,
+  paletteValue,
+  rankGroups,
   type SessionEntry,
-  PAGE_PARENTS,
 } from './palette-model'
+import { PetInlineToggle, PetPalettePage } from './pet-palette-page'
 
 
 

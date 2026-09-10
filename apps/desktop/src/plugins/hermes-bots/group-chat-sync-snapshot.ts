@@ -28,23 +28,20 @@ export function assignLegacyThreads(log: GroupMessage[]): GroupMessage[] {
 }
 
 import { botRosterKey } from './data'
-import type {
-  GroupChat,
-  GroupMember,
-  GroupMessage,
-  GroupPrompt,
-  RosterRow
-} from './types'
 import {
+  $groupChats,
   GROUP_CHAT_SYNC_IMAGE_CHARS,
   GROUP_CHAT_SYNC_MAX_BYTES,
   GROUP_CHAT_SYNC_MESSAGES,
   GROUP_CHAT_SYNC_TEXT_CHARS,
-  $groupChats,
-  type GroupChatSyncJob,
   type GroupChatSyncRoom,
   type GroupChatSyncSnapshot
 } from './group-chat-state'
+import type {
+  GroupChat,
+  GroupMember,
+  GroupMessage
+} from './types'
 
 /** Pure group-chat sync snapshot algebra: normalization, merge, envelopes. */
 

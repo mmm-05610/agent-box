@@ -173,6 +173,7 @@ import {
   useRepoWorktreeMap
 } from './projects'
 import { WorktreeDialog } from './projects/worktree-dialog'
+import { searchResultToSession } from './search-view-model'
 import {
   SidebarBlankState,
   SidebarLoadErrorState,
@@ -183,7 +184,6 @@ import { buildSessionByAnyId, resolvePinnedSessions } from './session-index'
 import { SidebarSessionsSection, VIRTUALIZE_THRESHOLD } from './sessions-section'
 import { CONTEXT_SPLIT_KIT, SplitSubmenu } from './split-submenu'
 import { useEnteredProjectSessions } from './use-entered-project-sessions'
-import { stripFtsMarkers, searchResultToSession } from './search-view-model'
 export { stripFtsMarkers } from './search-view-model'
 
 // Non-session groups (messaging platforms) stay compact: show a few rows up

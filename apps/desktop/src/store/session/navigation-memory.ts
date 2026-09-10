@@ -1,9 +1,11 @@
-import type { SessionInfo } from '@/types/hermes'
 import { activeConnectionScopeSuffix } from '@/lib/connection-scoped'
-import { persistString, readJson, storedString, writeJson } from '@/lib/storage'
+import { persistString, storedString } from '@/lib/storage'
+import type { SessionInfo } from '@/types/hermes'
+
 import type { SessionOwnerScope } from '../session-request-router'
-import { getSessionOwnerHint } from './owner-hints'
+
 import { sessionMatchesStoredId } from './identity'
+import { getSessionOwnerHint } from './owner-hints'
 
 /** Per-profile remembered navigation (last session/route) and the sync
  *  profile/owner knowledge derived from rows and hints. */

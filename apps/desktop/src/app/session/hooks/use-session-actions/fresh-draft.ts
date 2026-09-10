@@ -6,6 +6,7 @@ import {
   resolveNewSessionCwd
 } from '@/store/projects'
 import {
+  type NewChatWorkspaceTarget,
   setActiveSessionId,
   setAwaitingResponse,
   setBusy,
@@ -18,13 +19,13 @@ import {
   setIntroSeed,
   setMessages,
   setNewChatWorkspaceTarget,
+  setSelectedStoredSessionId,
   setSessionStartedAt,
   setTurnStartedAt,
   setWorkspaceCwdOwner,
-  setSelectedStoredSessionId,
-  setYoloActive,
-  type NewChatWorkspaceTarget
+  setYoloActive
 } from '@/store/session'
+
 import { NEW_CHAT_ROUTE } from '../../../routes'
 
 import { type SessionActionsOptions } from './session-actions-options'

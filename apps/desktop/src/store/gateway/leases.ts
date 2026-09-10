@@ -8,6 +8,7 @@ import {
   normKey,
   turnLeaseKey
 } from './registry-state'
+import { isAttachedSharedRemote } from './route-probes'
 import {
   createSecondary,
   disposeSecondary,
@@ -17,7 +18,6 @@ import {
   openSecondary,
   relayRetained
 } from './secondary-pool'
-import { isAttachedSharedRemote } from './route-probes'
 
 /** Hold pooled sockets open across multi-RPC sequences, relay drain ticks,
  *  and live turns. */

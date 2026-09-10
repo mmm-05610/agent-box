@@ -68,10 +68,8 @@ import {
   type PanelMenuItem,
   PanelMeta,
   PanelPill,
-  type PanelPillTone,
   PanelSectionLabel
 } from '../overlays/panel'
-import type { SetStatusbarItemGroup } from '../shell/statusbar-controls'
 
 import { BlueprintSlotControl, blueprintSlotHelp, cleanBlueprintFieldError, initialBlueprintValues } from './blueprints'
 import { mutateAndRefreshCronJobs, refreshCronJobs, triggerAndRefreshCronJobs } from './cron-actions'
@@ -83,26 +81,25 @@ import {
   validateCronEditor
 } from './cron-job-model'
 import { jobState, jobTitle, STATE_DOT } from './job-state'
+import type {
+  CronViewProps} from './view-model';
 import {
   cronProfileForScope,
-  truncate,
-  jobName,
-  jobPrompt,
-  jobScheduleDisplay,
-  jobScheduleExpr,
+  DEFAULT_DELIVER,
+  formatTime,
   jobDeliver,
   jobModel,
-  CronViewProps,
-  formatCronTime,
-  formatTime,
+  jobName,
+  jobPrompt,
   jobProvider,
+  jobScheduleDisplay,
+  jobScheduleExpr,
   matchesQuery,
+  SCHEDULE_OPTIONS,
   scheduleOptionForExpr,
   scheduleSummary,
-  DEFAULT_DELIVER,
-  type ScheduleOption,
   STATE_TONE,
-  SCHEDULE_OPTIONS,
+  truncate,
 } from './view-model'
 
 

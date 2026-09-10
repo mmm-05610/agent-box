@@ -1,6 +1,8 @@
-import { assertBootstrapNotSuperseded } from '../ssh-connection'
 import crypto from 'node:crypto'
-import { DEFAULT_READY_TIMEOUT_MS, LOCKFILE_SCHEMA_VERSION, PROTOCOL_VERSION, READY_POLL_INTERVAL_MS, READY_RE, REMOTE_NOFILE_SOFT_LIMIT, connectReservationPath, expandRemotePath, fingerprintToken, lockfilePath, readLockfile, remotePidAlive, shq, spawnLogPath, spawnTokenPath, validateSpawnNonce, withRemoteUpdateMutex } from './ownership'
+
+import { assertBootstrapNotSuperseded } from '../ssh-connection'
+
+import { connectReservationPath, DEFAULT_READY_TIMEOUT_MS, expandRemotePath, fingerprintToken, LOCKFILE_SCHEMA_VERSION, lockfilePath, PROTOCOL_VERSION, readLockfile, READY_POLL_INTERVAL_MS, READY_RE, REMOTE_NOFILE_SOFT_LIMIT, remotePidAlive, shq, spawnLogPath, spawnTokenPath, validateSpawnNonce, withRemoteUpdateMutex } from './ownership'
 import { remoteInstallRoot } from './resolve'
 
 /** Spawn the remote dashboard, scrape its readiness port, forward the

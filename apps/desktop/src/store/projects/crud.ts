@@ -1,50 +1,40 @@
+import type { NewSessionPlacement } from '@/app/chat/new-session-drag'
+import { liveSessionProjectId, type SidebarProjectTree } from '@/app/chat/sidebar/projects/workspace-groups'
 import {
-  desktopDefaultCwd,
-  isDesktopFsRemoteMode,
-  selectDesktopPaths,
   writeDesktopFileText
 } from '@/lib/desktop-fs'
-import { translateNow } from '@/i18n'
 import { isMissingRpcMethod } from '@/lib/gateway-rpc'
-import { isUnderPath } from '@/lib/path-compare'
 import { setSidebarAgentsGrouped } from '@/store/layout'
-import type { NewSessionPlacement } from '@/app/chat/new-session-drag'
-import { $newProjectDropPlacement, $newProjectSessionRequest } from './dialogs'
-import { projectIdForCwd } from './cwd-identity'
-import {
-  refreshProjectTree,
-  refreshProjects
-} from './refresh'
-import { notify } from '@/store/notifications'
 import {
   $activeGatewayProfile,
-  $profileScope,
-  ALL_PROFILES,
   normalizeProfileKey,
   requestFreshSession
 } from '@/store/profile'
 import { $selectedStoredSessionId, $sessions, sessionMatchesStoredId } from '@/store/session'
-import { liveSessionProjectId, type SidebarProjectTree } from '@/app/chat/sidebar/projects/workspace-groups'
 import type { ProjectInfo, ProjectsPayload } from '@/types/hermes'
-import {
-  $activeProjectId,
-  $projectScope,
-  $projectTree,
-  $projects,
-  $projectTreeLoading,
-  projectRootCwd,
-  $projectsRpcAvailable,
-  projectsStaleBackendError,
-  markProjectsRpcSuccess
-} from './scope'
+
+import { projectIdForCwd } from './cwd-identity'
+import { $newProjectSessionRequest } from './dialogs'
 import {
   activeProjectsContext,
   applyPayload,
   gatewayRequest,
   gatewayRequestOn,
-  projectParams,
-  projectProfile
+  projectParams
 } from './gateway'
+import {
+  refreshProjects,
+  refreshProjectTree
+} from './refresh'
+import {
+  $activeProjectId,
+  $projects,
+  $projectScope,
+  $projectsRpcAvailable,
+  $projectTree,
+  markProjectsRpcSuccess,
+  projectsStaleBackendError
+} from './scope'
 
 /** Create, rename, restyle, extend, and delete projects; the optimistic
  *  snapshot/rollback discipline for those writes. */

@@ -37,17 +37,17 @@ import { ConnectionsRegistrySection } from './connections-registry'
 import { CONTROL_TEXT } from './constants'
 import { ManagedUpdatesSection } from './managed-updates-section'
 import { EmptyState, ListRow, Pill, SettingsContent, SettingsSkeleton, ToggleRow } from './primitives'
-import { enrichSelectedSshHost, selectSshHost } from './ssh-host-selection'
 import {
-  type CloudDiscoverStatus,
   type AuthMode,
-  type GatewaySettingsState,
-  type ProbeStatus,
-  normalizeGatewaySettingsState,
-  savedCloudConnectionUrl,
+  type CloudDiscoverStatus,
   EMPTY_STATE,
+  type GatewaySettingsState,
+  normalizeGatewaySettingsState,
+  type ProbeStatus,
+  savedCloudConnectionUrl,
   SSH_HOST_CUSTOM
 } from './settings-state'
+import { enrichSelectedSshHost, selectSshHost } from './ssh-host-selection'
 
 // Hermes Cloud discovery lifecycle for the cloud-mode panel.
 

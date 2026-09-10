@@ -1,6 +1,7 @@
-import type { NewSessionPlacement } from '@/app/chat/new-session-drag'
+import { atom } from 'nanostores'
+
 import type { HermesGitBaseBranch, HermesGitBranch } from '@/global'
-import { hermesApi } from '@/hermes'
+import { translateNow } from '@/i18n'
 import {
   desktopDefaultCwd,
   isDesktopFsRemoteMode,
@@ -8,23 +9,16 @@ import {
 } from '@/lib/desktop-fs'
 import { desktopGit } from '@/lib/desktop-git'
 import { isMissingRestEndpoint } from '@/lib/gateway-rpc'
-import { translateNow } from '@/i18n'
-import { isUnderPath } from '@/lib/path-compare'
+import { setSidebarAgentsGrouped } from '@/store/layout'
 import { notify } from '@/store/notifications'
-import { atom } from 'nanostores'
 import {
-  $activeGatewayProfile,
-  normalizeProfileKey,
   requestFreshSession
 } from '@/store/profile'
-import { $sessions, setSessions } from '@/store/session'
-import { $projectScope, $projectTree, projectRootCwd } from './scope'
-import { setSidebarAgentsGrouped } from '@/store/layout'
+
+import { createProject, enterProject } from './crud'
 import { projectIdForCwd } from './cwd-identity'
 import { refreshProjectTree } from './refresh'
-import { createProject, enterProject } from './crud'
-import { $newProjectSessionRequest, type NewProjectSessionRequest } from './dialogs'
-import { $newProjectDropPlacement } from './dialogs'
+import { $projectTree, projectRootCwd } from './scope'
 
 /** Worktree/git doors: start work in a repo, branch listing and switching,
  *  worktree dialogs, and path reveal/copy. */

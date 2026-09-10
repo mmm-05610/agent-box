@@ -77,6 +77,7 @@ import {
   patchTask,
   PROFILES_KEY
 } from './api'
+import { moveCard, removeCard } from './board-state'
 import { BoardSwitcher } from './board-switcher'
 import { TaskDrawer } from './drawer'
 import { EMPTY_OVERRIDE, ModelOverrideField, overrideCreateFields, type TaskModelOverride } from './model-override'
@@ -100,7 +101,6 @@ import {
   useKanban,
   useOrchestration
 } from './ui'
-import { moveCard, removeCard } from './board-state'
 
 // ── optimistic board edits (reconciled by the follow-up refresh) ─────────────
 

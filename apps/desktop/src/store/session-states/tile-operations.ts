@@ -1,3 +1,4 @@
+import type { ClientSessionState } from '@/app/types'
 import type { LayoutNode } from '@/components/pane-shell/tree/model'
 import { findGroupOfPane } from '@/components/pane-shell/tree/model'
 import {
@@ -9,43 +10,40 @@ import {
   revealTreePane
 } from '@/components/pane-shell/tree/store'
 import { resolveRememberedActivePane, workspaceScopeKey } from '@/components/pane-shell/workspace-scope'
-import type { ClientSessionState } from '@/app/types'
 import type { SessionInfo } from '@/types/hermes'
+
+import { normalizeProfileKey } from '../profile'
 import {
-  $activeSessionId,
   $selectedStoredSessionId,
   $sessions,
   lineageAliases,
   markSessionRead,
   setSessions
 } from '../session'
-import { normalizeProfileKey } from '../profile'
 import type { SessionProfileRoute } from '../session-request-router'
 import { ackStoredSessionId } from '../session-unread'
+
+import { setSessionTileWorkspaceScope } from './bot-chat-scope'
 import {
-  $focusedRuntimeId,
   $focusedStoredSessionId,
   $sessionStates,
   $sessionTiles,
+  BOTS_TILE_BUCKET,
   dropSessionState,
+  evictable,
   patchSessionTile,
+  persistTiles,
   profileKey,
   publishSessionState,
-  sessionTileOwnerRoute,
-  storedSessionIdForRuntimeId,
-  TILE_PANE_PREFIX,
+  saveTiles,
   type SessionTile,
   type SessionTileWorkspaceScope,
+  TILE_PANE_PREFIX,
   type TileDock,
-  BOTS_TILE_BUCKET,
-  evictable,
-  persistTiles,
-  saveTiles,
-  toStored,
-  tilesByProfile
+  tilesByProfile,
+  toStored
 } from './session-state-registry'
 import { sessionTileDelegate } from './tile-delegate'
-import { setSessionTileWorkspaceScope } from './bot-chat-scope'
 
 /** Open, focus, order, close, discard, and restore session tiles in the
  *  layout tree, and home focus behind selection changes. */

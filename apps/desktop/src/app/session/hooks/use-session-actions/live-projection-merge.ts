@@ -1,7 +1,8 @@
 import { textWithoutReferenceLines } from '@/components/assistant-ui/reference-kinds'
-import { type ChatMessage, assistantTextPart, chatMessageText, textPart } from '@/lib/chat-messages'
+import { assistantTextPart, type ChatMessage, chatMessageText, textPart } from '@/lib/chat-messages'
 import { parseErrorSurface } from '@/lib/error-surface'
 import type { SessionResumeResponse } from '@/types/hermes'
+
 import { chatMessagesEquivalent, hasStructuralParts, isLiveTailRow } from './message-equivalence'
 
 /** Merge the gateway's live inflight/queued projection into a stored transcript. */

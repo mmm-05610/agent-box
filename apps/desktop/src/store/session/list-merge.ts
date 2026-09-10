@@ -1,4 +1,5 @@
 import type { SessionInfo } from '@/types/hermes'
+
 import { setSessions } from './atoms'
 import { sessionMatchesStoredId } from './identity'
 

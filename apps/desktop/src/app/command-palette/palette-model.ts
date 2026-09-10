@@ -1,46 +1,7 @@
+import type {
+  HUD_NOTE_VARIANT} from '@/app/floating-hud';
 import {
-  HUD_HEADING,
-  HUD_ITEM,
-  HUD_NOTE,
-  HUD_NOTE_VARIANT,
-  HUD_POSITION,
-  HUD_SURFACE,
-  HUD_TEXT
-} from '@/app/floating-hud'
-import {
-  Activity,
-  AppWindow,
-  Archive,
-  BarChart3,
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  Clock,
-  Cpu,
-  Download,
-  Egg,
-  GitBranch,
-  Globe,
-  type IconComponent,
-  Info,
-  KeyRound,
-  Layers3,
-  MessageCircle,
-  Monitor,
-  Moon,
-  Package,
-  Palette,
-  PawPrint,
-  Plus,
-  RefreshCw,
-  Settings,
-  Settings2,
-  SlidersHorizontal,
-  Starmap,
-  Sun,
-  Users,
-  Wrench,
-  Zap
+  type IconComponent
 } from '@/lib/icons'
 import { normalize } from '@/lib/text'
 

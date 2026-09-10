@@ -1,22 +1,13 @@
 import {
-  getActionStatus,
-  getLogs,
-  getMcpCatalog,
   getUsageAnalytics,
-  type HermesGateway,
-  installMcpCatalogEntry,
-  type McpCatalogEntry,
   type McpTestResult,
-  type ProfileScope,
-  profileScopeKey,
-  saveMcpServers,
-  testMcpServer
+  type ProfileScope
 } from '@/hermes'
-import { type Translations, useI18n } from '@/i18n'
+import { type Translations } from '@/i18n'
 import { compactNumber } from '@/lib/format'
-import { NEEDS_AUTH_RE, PROBE_TTL_MS, probeCache, probeKey, serverFingerprint } from '@/lib/mcp-probe-cache'
-import { getServers, isServerShape, type McpServers, normalizeEntry } from '@/lib/mcp-servers'
-import { countEnabledTools, isToolEnabled, toggleToolInServer } from '@/lib/mcp-tool-filter'
+import { NEEDS_AUTH_RE } from '@/lib/mcp-probe-cache'
+import { isServerShape, type McpServers, normalizeEntry } from '@/lib/mcp-servers'
+import { countEnabledTools } from '@/lib/mcp-tool-filter'
 
 /** MCP tab view-model: doc parsing, server status classification, usage cache. */
 

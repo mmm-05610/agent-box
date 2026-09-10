@@ -5,11 +5,7 @@
  */
 
 import fs from 'node:fs'
-import { pathToFileURL } from 'node:url'
 
-import { net as electronNet, protocol } from 'electron'
-
-import { createMediaProtocolHandler, MEDIA_PROTOCOL } from '../media-protocol'
 
 let bridgeEnsureNativeAccessToken: (baseUrl: string) => Promise<string | null> = async () => null
 

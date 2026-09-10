@@ -1,39 +1,34 @@
-import { liveSessionProjectId, NO_PROJECT_ID, type SidebarProjectTree } from '@/app/chat/sidebar/projects/workspace-groups'
-import { $sidebarShowAllSessions } from '@/store/layout'
-import { $gateway, activeGateway } from '@/store/gateway'
-import {
-  $activeGatewayProfile,
-  $profileScope,
-  ALL_PROFILES,
-  normalizeProfileKey
-} from '@/store/profile'
-import { $selectedStoredSessionId, $sessions, sessionMatchesStoredId, setSessions } from '@/store/session'
-import { $removedSessionIds, $sessionMutationsInFlight } from '@/store/session-removal'
+import { type SidebarProjectTree } from '@/app/chat/sidebar/projects/workspace-groups'
 import { hermesApi } from '@/hermes'
 import { translateNow } from '@/i18n'
-import { markProjectsRpcFailure, markProjectsRpcSuccess } from './scope'
-import type { ProjectInfo, ProjectsPayload } from '@/types/hermes'
+import { activeGateway } from '@/store/gateway'
+import { $sidebarShowAllSessions } from '@/store/layout'
 import {
-  $activeProjectId,
-  $projectTree,
-  $projectTreeLoading,
-  $projects,
-  projectRootCwd
-} from './scope'
+  $profileScope,
+  ALL_PROFILES
+} from '@/store/profile'
+import { sessionMatchesStoredId, setSessions } from '@/store/session'
+import { $removedSessionIds, $sessionMutationsInFlight } from '@/store/session-removal'
+import type { ProjectsPayload } from '@/types/hermes'
+
 import {
   activeProjectsContext,
+  type ActiveProjectsContext,
   applyPayload,
   gatewayRequest,
   gatewayRequestOn,
   isRetryableProjectTreeReadError,
   projectParams,
   projectProfile,
-  stillOnProjectsContext,
-  type ActiveProjectsContext
+  stillOnProjectsContext
 } from './gateway'
-import { projectIdForCwd } from './cwd-identity'
-import { setSidebarAgentsGrouped } from '@/store/layout'
-import { isUnderPath } from '@/lib/path-compare'
+import { markProjectsRpcFailure, markProjectsRpcSuccess } from './scope'
+import {
+  $activeProjectId,
+  $projectTree,
+  $projectTreeLoading,
+  projectRootCwd
+} from './scope'
 
 let projectsRefreshGeneration = 0
 

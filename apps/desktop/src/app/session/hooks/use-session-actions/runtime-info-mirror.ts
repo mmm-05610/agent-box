@@ -19,6 +19,7 @@ import {
 } from '@/store/session'
 import { reportBackendContract, reportInstallMethodWarning } from '@/store/updates'
 import type { SessionRuntimeInfo } from '@/types/hermes'
+
 import type { ClientSessionState } from '../../../types'
 
 /** Mirror a session's runtime info into the main-pane composer atoms and the

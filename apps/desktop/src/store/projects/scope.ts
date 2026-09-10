@@ -1,9 +1,9 @@
 import { atom } from 'nanostores'
 
 import { NO_PROJECT_ID, type SidebarProjectTree } from '@/app/chat/sidebar/projects/workspace-groups'
-import { persistentAtom } from '@/lib/persisted'
-import { isMissingRpcMethod } from '@/lib/gateway-rpc'
 import { translateNow } from '@/i18n'
+import { isMissingRpcMethod } from '@/lib/gateway-rpc'
+import { persistentAtom } from '@/lib/persisted'
 import { workspaceCwdForNewSession } from '@/store/session'
 import type { ProjectInfo, ProjectsPayload } from '@/types/hermes'
 

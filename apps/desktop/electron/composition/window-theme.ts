@@ -12,21 +12,21 @@ import path from 'node:path'
 
 import { app, nativeTheme } from 'electron'
 
+import { isWslEnvironment } from '../bootstrap-platform'
+import { macTitleBarOverlayHeight } from '../titlebar-overlay-width'
 import {
   backgroundMaterialFor,
   defaultTranslucencyState,
+  glassActive,
   glassSupportedOn,
   normalizeState as normalizeTranslucency,
   opacityNeedsSetting,
-  glassActive,
-  translucencySupportedOn,
   vibrancyFor as vibrancyForTranslucency,
   windowBackingOptions,
   windowOpacityFor,
   windowOpacityOptions
 } from '../translucency'
-import { macTitleBarOverlayHeight } from '../titlebar-overlay-width'
-import { isWslEnvironment } from '../bootstrap-platform'
+
 import { rememberLog } from './log-buffer'
 
 const TITLEBAR_HEIGHT = 34

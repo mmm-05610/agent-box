@@ -1,11 +1,12 @@
 import { atom } from 'nanostores'
 
 import { readJson, writeJson } from '@/lib/storage'
+
 import {
   $sessionTiles,
   patchSessionTile,
-  storedSessionIdForRuntimeId,
-  type SessionTileWorkspaceScope
+  type SessionTileWorkspaceScope,
+  storedSessionIdForRuntimeId
 } from './session-state-registry'
 
 /** The persisted bot-chat scope ledger for main-pane chats, and the writer

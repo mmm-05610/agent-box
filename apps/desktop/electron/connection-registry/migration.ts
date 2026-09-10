@@ -1,12 +1,13 @@
 import {
   hostLabelFromBaseUrl,
   modeIsRemoteLike,
-  normalizeRemoteBaseUrl,
   normalizeRemoteHeaders,
   normalizeSshConfig,
   normAuthMode
 } from '../connection-config'
-import { ConnectionRegistry, LOCAL_CONNECTION_ID, REGISTRY_VERSION, RegistryConnection, uniqueLabel } from './identity'
+
+import type { ConnectionRegistry, RegistryConnection} from './identity';
+import { LOCAL_CONNECTION_ID, REGISTRY_VERSION, uniqueLabel } from './identity'
 import { connectionIdForLabel, localEntry } from './schema'
 
 /** V1 connection-config to v2 registry migration. */

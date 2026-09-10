@@ -7,6 +7,11 @@
 // This file stays the stable import path with the unchanged public surface.
 
 export {
+  retainGatewayForAgent,
+  retainGatewayForRelay,
+  retainGatewayForSessionTurn
+} from './gateway/leases'
+export {
   $activeGatewayRoute,
   $gateway,
   activeGateway,
@@ -22,6 +27,7 @@ export {
   setPrimaryGatewayConnection,
   setPrimaryGatewayConnectionId
 } from './gateway/registry-state'
+export { requestGatewayForAgent, requestGatewayForProfile } from './gateway/requests'
 export {
   closeLegacySecondaryGateways,
   closeSecondaryGateways,
@@ -37,9 +43,3 @@ export {
   retireLocalProfileGateways,
   touchSecondaryGateways
 } from './gateway/secondary-pool'
-export { requestGatewayForAgent, requestGatewayForProfile } from './gateway/requests'
-export {
-  retainGatewayForAgent,
-  retainGatewayForRelay,
-  retainGatewayForSessionTurn
-} from './gateway/leases'

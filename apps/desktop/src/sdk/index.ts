@@ -18,94 +18,24 @@
  *  - `ui.*` — the design language, so plugin UI looks native by default.
  */
 
-import { atom, computed, type ReadableAtom } from 'nanostores'
-import type { ReactNode } from 'react'
-
-import { capabilityScoped } from '@/api/client'
-import { PRIMARY_SESSION_VIEW } from '@/app/chat/session-view'
-import { openSession, type OpenSessionIntent } from '@/app/open-session'
-import type { ClientSessionState } from '@/app/types'
-import {
-  $narrowViewport,
-  $newSessionTabAction,
-  $paneVisible,
-  registerPaneCloser,
-  removeTreePane,
-  revealTreePane
-} from '@/components/pane-shell/tree/store'
-import {
-  $workspaceMode,
-  $workspaceOwnerKey,
-  setWorkspaceScope as publishWorkspaceScope,
-  setWorkspaceOwnerLabel,
-  type WorkspaceNewSessionTarget
-} from '@/components/pane-shell/workspace-scope'
-import { onGatewayEvent } from '@/contrib/events'
-import { registry } from '@/contrib/registry'
-import type { WorkspaceMode } from '@/contrib/types'
-import { deleteProfile, getLogs, getStatus, hermesApi, type HermesGateway } from '@/hermes'
-import { completeMcpDesktopOAuth } from '@/lib/mcp-dashboard-oauth'
-import {
-  $gateway,
-  activeGatewayConnectionId,
-  openGatewayForAgent,
-  openGatewayForProfile,
-  requestGatewayForAgent,
-  requestGatewayForProfile,
-  retainGatewayForAgent,
-  retainGatewayForRelay,
-  retireLocalProfileGateways
-} from '@/store/gateway'
-import { notify, notifyError } from '@/store/notifications'
-import {
-  $activeGatewayProfile,
-  $gatewaySwapTarget,
-  $hydrationSyncProfile,
-  $profiles,
-  ensureGatewayAgent,
-  ensureGatewayProfile,
-  newSessionInAgent,
-  newSessionInProfile,
-  normalizeProfileKey,
-  refreshProfiles,
-  selectProfile,
-  setActiveProfile,
-  setShowAllProfiles
-} from '@/store/profile'
-import {
-  $activeSessionId,
-  $connection,
-  $currentCwd,
-  $currentModel,
-  $gatewayState,
-  $messages,
-  $selectedStoredSessionId,
-  $sessions,
-  getSessionOwnerHints,
-  rememberedSessionProfile,
-  requestSessionResume,
-  sessionMatchesStoredId,
-  setResumeExhaustedSessionId,
-  setSessionOwnerHint
-} from '@/store/session'
-import {
-  $focusedRuntimeId,
-  $focusedSessionState,
-  $focusedStoredSessionId,
-  $sessionStates,
-  $sessionTiles,
-  dropTilesForProfile,
-  focusWorkspaceOwnerSessionTile,
-  sessionTileDelegate
-} from '@/store/session-states'
-import { runGatewayRestart } from '@/store/system-actions'
-import type { PaginatedSessions, UsageStats } from '@/types/hermes'
 
 
-import { hostReadonlyState } from './host-state'
-import { hostSystem } from './host-system'
+
+
+
+
+
+
+
+
+
+
+
+
 import { hostProfileRouting } from './host-routing'
 import { hostSessionActions } from './host-session'
+import { hostReadonlyState } from './host-state'
+import { hostSystem } from './host-system'
 
 // -- the host object: composed from the responsibility modules below --------
 
@@ -119,16 +49,16 @@ export const host = {
   ...hostSessionActions
 }
 
-export type {
-  PluginFocusedSessionOwner,
-  ViewportRect
-} from './host-state'
 export type { PluginProfileRoute } from './host-routing'
 export type { PluginNewChatOptions, PluginOpenSessionOptions } from './host-session-options'
 export {
   BOT_CHAT_SESSION_HYDRATION_TIMEOUT_MS,
   DEFAULT_SESSION_HYDRATION_TIMEOUT_MS
 } from './host-session-options'
+export type {
+  PluginFocusedSessionOwner,
+  ViewportRect
+} from './host-state'
 
 // -- react bridge -------------------------------------------------------------
 

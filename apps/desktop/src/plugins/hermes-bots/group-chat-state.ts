@@ -6,20 +6,14 @@ export interface GroupChatRoom extends GroupChat {
   holds?: Record<string, GroupHoldStamp>
   turn?: null | string
 }
-import { atom, host } from '@hermes/plugin-sdk'
+import { atom } from '@hermes/plugin-sdk'
 
-import { $botMeta, $lastRoster, botRosterKey } from './data'
-import { groupMemberReferencesConnection, markOrphanedGroupMemberDescriptor } from './hygiene'
-import { getPluginCtx } from './shared'
 import type {
-  Attachment,
   GroupChat,
   GroupHold,
   GroupMember,
   GroupMessage,
-  GroupMessageAuthor,
-  GroupPrompt,
-  RosterRow
+  GroupPrompt
 } from './types'
 
 /** Group chat shared state: the room/workspace/clarify atoms and sync types. */

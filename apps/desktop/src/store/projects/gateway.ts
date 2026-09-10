@@ -1,24 +1,18 @@
-import { $gateway, activeGateway, ensureActiveGatewayOpen } from '@/store/gateway'
+import { type HermesGateway } from '@/hermes'
+import { activeGateway, ensureActiveGatewayOpen } from '@/store/gateway'
 import {
   $activeGatewayProfile,
   $profileScope,
   ALL_PROFILES,
   normalizeProfileKey
 } from '@/store/profile'
-import { isMissingRestEndpoint, isMissingRpcMethod } from '@/lib/gateway-rpc'
-import { hermesApi, type HermesGateway } from '@/hermes'
+
 import type {
-  ProjectInfo,
   ProjectsPayload
 } from './scope'
 import {
   $activeProjectId,
-  $projectTree,
-  $projects,
-  $projectsRpcAvailable,
-  markProjectsRpcFailure,
-  markProjectsRpcSuccess,
-  projectsStaleBackendError
+  $projects
 } from './scope'
 
 /** JSON-RPC plumbing for projects.*: profile scoping, typed requests, and

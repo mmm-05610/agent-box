@@ -1,11 +1,5 @@
-import { liveSessionProjectId, type SidebarProjectTree } from '@/app/chat/sidebar/projects/workspace-groups'
-import {
-  $activeGatewayProfile,
-  $profileScope,
-  ALL_PROFILES,
-  normalizeProfileKey
-} from '@/store/profile'
 import { isUnderPath } from '@/lib/path-compare'
+
 import { $projectTree } from './scope'
 
 /** The project (explicit or auto) that owns a cwd, and session-side

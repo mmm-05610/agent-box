@@ -4,6 +4,7 @@ import { HermesGateway } from '@/hermes'
 import { reconnectBackoffDelayMs } from '@/lib/reconnect-backoff'
 import { RECONNECT_ATTEMPT_TIMEOUT_MS, withTimeout } from '@/lib/with-timeout'
 import { stampSecondaryProfileOwner } from '@/store/session-event-provenance'
+
 import {
   applyActive,
   beginGatewayActivation,
@@ -19,8 +20,8 @@ import {
   releaseTerminalTurnLease,
   releaseTurnLeasesForScope,
   reportGatewayState,
-  setActive,
   type Secondary,
+  setActive,
   type SpawnPriority
 } from './registry-state'
 import { isAttachedSharedRemote, sharedPrimaryRoute } from './route-probes'

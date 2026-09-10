@@ -8,11 +8,8 @@
  */
 
 import {
-  Badge,
   Button,
   Checkbox,
-  cn,
-  Codicon,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -24,8 +21,6 @@ import {
   host,
   Input,
   queryClient,
-  RowButton,
-  SearchField,
   SegmentedControl,
   Select,
   SelectContent,
@@ -33,28 +28,16 @@ import {
   SelectTrigger,
   SelectValue,
   Textarea,
-  useI18n,
-  useValue
+  useI18n
 } from '@hermes/plugin-sdk'
 import { useEffect, useRef, useState } from 'react'
 
-import { avatarColor, blobatarSvg, botAppearance, BotFace } from './avatar'
-import { isBackfilledFacePng } from './avatar-image'
+import { avatarColor, blobatarSvg, BotFace } from './avatar'
 import { AvatarPicker } from './avatar-picker'
 import { $selectedBot } from './bot-state'
 import { createCanonicalChat } from './canonical-chat'
-import { $botMeta, botHandle, botRosterKey, filterBots, ROSTER_KEY, saveBotMeta } from './data'
+import { ROSTER_KEY, saveBotMeta } from './data'
 import { labeled, ResizableFrame } from './dialog-parts'
-import { GROUP_CHAT_MAX_MEMBERS, mintGroupRoomId, uniqueGroupChatName, updateGroupChat } from './group-chat'
-import type { GroupChatRoom } from './group-chat'
-import { GroupImageControls } from './group-chat-parts'
-import {
-  botGroups,
-  durableGroupChatMembers,
-  groupMembershipPatch,
-  knownGroups,
-  liveGroupChatNames
-} from './group-membership'
 import { useBots } from './i18n'
 import { displayName, slugify } from './labels'
 import { McpSetupButton } from './mcp-setup'
@@ -67,12 +50,10 @@ import type {
 } from './profile-config'
 import { CheckList, SkillsView, skillsViewRoutesConnections } from './profile-config'
 import { deleteBot } from './profile-ops'
-import { botRosterMeta } from './routing'
+import { singleFlight } from './single-flight'
 import { HubSkillsSection } from './skills-hub'
 import { composeSoul } from './soul'
-import type { BotMeta, ConnectionRow, RosterRow } from './types'
-import { singleFlight } from './single-flight'
-import { GroupDialog, CreateGroupChatDialog } from './group-dialogs'
+import type { ConnectionRow, RosterRow } from './types'
 
 const NAME_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/
 
@@ -996,5 +977,5 @@ export function CreateAgentDialog({ open, onClose, roster }: CreateAgentDialogPr
 }
 
 
-export { GroupDialog, CreateGroupChatDialog } from './group-dialogs'
+export { CreateGroupChatDialog, GroupDialog } from './group-dialogs'
 export { singleFlight } from './single-flight'

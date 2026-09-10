@@ -1,11 +1,12 @@
 import { useCallback } from 'react'
 
 import { setWorkspaceScope } from '@/components/pane-shell/workspace-scope'
-import { NEW_CHAT_ROUTE, SETTINGS_ROUTE, navigateToWorkspacePage, sessionRoute } from '../../../routes'
+
+import { navigateToWorkspacePage, NEW_CHAT_ROUTE, sessionRoute, SETTINGS_ROUTE } from '../../../routes'
 import type { SidebarNavItem } from '../../../types'
 
-import { type SessionActionsOptions } from './session-actions-options'
 import { type FreshSessionDraftStarter } from './fresh-draft'
+import { type SessionActionsOptions } from './session-actions-options'
 
 /** Sidebar selection and settings-page navigation owned by the session surface. */
 export function useSessionNavigationActions(

@@ -4,6 +4,7 @@ import { atom, computed } from 'nanostores'
 import type { ClientSessionState } from '@/app/types'
 import type { WorkspaceMode } from '@/contrib/types'
 import { readJson, writeJson } from '@/lib/storage'
+
 import { $activeGatewayProfile, normalizeProfileKey } from '../profile'
 import { clearAllProviderWaits, clearSessionProviderWait } from '../provider-wait'
 import {
@@ -29,6 +30,7 @@ import {
 } from '../session-request-router'
 import { markSessionUnreadFinished } from '../session-unread'
 import { isBrowserWindow, isSecondaryWindow } from '../windows'
+
 import { sessionTileDelegate } from './tile-delegate'
 
 /** The reactive per-session state machine: the per-runtime state mirror with

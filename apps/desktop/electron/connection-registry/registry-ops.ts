@@ -2,12 +2,11 @@ import {
   hostLabelFromBaseUrl,
   modeIsRemoteLike,
   normalizeRemoteBaseUrl,
-  normalizeRemoteHeaders,
-  normalizeSshConfig,
-  normAuthMode
+  normalizeSshConfig
 } from '../connection-config'
-import { ConnectionKind, ConnectionRegistry, LOCAL_CONNECTION_ID, RegistryConnection, normalizedSshTarget, resolvedConnectionId, uniqueLabel } from './identity'
-import { migrateV1ToRegistry } from './migration'
+
+import type { ConnectionKind, ConnectionRegistry, RegistryConnection} from './identity';
+import { LOCAL_CONNECTION_ID, normalizedSshTarget, uniqueLabel } from './identity'
 import { normalizeConnectionInput } from './schema'
 
 /** Registry CRUD, primary/last-used selection, and drift reconciliation. */

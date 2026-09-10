@@ -20,7 +20,6 @@ import {
   getActionStatus,
   getLogs,
   getMcpCatalog,
-  getUsageAnalytics,
   type HermesGateway,
   installMcpCatalogEntry,
   type McpCatalogEntry,
@@ -30,16 +29,15 @@ import {
   saveMcpServers,
   testMcpServer
 } from '@/hermes'
-import { type Translations, useI18n } from '@/i18n'
+import { useI18n } from '@/i18n'
 import { startCompletionPoll } from '@/lib/completion-poll'
-import { compactNumber } from '@/lib/format'
 import { brandFor } from '@/lib/mcp-brands'
 import { estimateServerTokens, serverUsageCount } from '@/lib/mcp-cost'
 import { completeMcpDesktopOAuth } from '@/lib/mcp-dashboard-oauth'
 import { type McpImportEntry, parseMcpImport } from '@/lib/mcp-import'
-import { NEEDS_AUTH_RE, PROBE_TTL_MS, probeCache, probeKey, serverFingerprint } from '@/lib/mcp-probe-cache'
-import { getServers, isServerShape, type McpServers, normalizeEntry } from '@/lib/mcp-servers'
-import { countEnabledTools, isToolEnabled, toggleToolInServer } from '@/lib/mcp-tool-filter'
+import { PROBE_TTL_MS, probeCache, probeKey, serverFingerprint } from '@/lib/mcp-probe-cache'
+import { getServers, type McpServers } from '@/lib/mcp-servers'
+import { isToolEnabled, toggleToolInServer } from '@/lib/mcp-tool-filter'
 import { cn } from '@/lib/utils'
 import { notify, notifyError } from '@/store/notifications'
 import { $activeGatewayProfile, normalizeProfileKey } from '@/store/profile'
@@ -51,23 +49,21 @@ import { DetailPane, ICON_BUTTON, MASTER_DETAIL_WIDE_COLS } from '../master-deta
 import { PanelAddButton, PanelEmpty } from '../overlays/panel'
 import { prettyName } from '../settings/helpers'
 import { useDeepLinkHighlight } from '../settings/use-deep-link-highlight'
+
 import {
-  pretty,
-  wrapDoc,
+  capabilitySummary,
+  loadMcpUsage,
+  MCP_CATALOG_KEY,
   parseServersDoc,
-  serverEnabled,
-  statusOf,
   type Probe,
   scanServerBlocks,
-  MCP_CATALOG_KEY,
-  loadMcpUsage,
-  mcpUsageCache,
-  MCP_USAGE_TTL_MS,
   type ServerCost,
+  serverEnabled,
   type ServerStatus,
-  statusLine,
-  capabilitySummary,
   STATUS_DOT,
+  statusLine,
+  statusOf,
+  wrapDoc,
 } from './view-model'
 
 

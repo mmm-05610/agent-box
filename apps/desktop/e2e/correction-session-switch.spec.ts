@@ -7,10 +7,10 @@
 
 import { type TestInfo } from '@playwright/test'
 
-import { expect, test, type Page } from './test'
+import { CORRECTION_SWITCH_TRIGGER, MOCK_REPLY } from '../../../tests-js/scripts/mock-server'
 
 import { type MockBackendFixture, setupMockBackend, waitForAppReady } from './fixtures'
-import { CORRECTION_SWITCH_TRIGGER, MOCK_REPLY } from '../../../tests-js/scripts/mock-server'
+import { expect, type Page, test } from './test'
 
 const OTHER_SESSION_PROMPT = 'E2E persisted session used for a warm resume.'
 const ORIGINAL_PROMPT = `${CORRECTION_SWITCH_TRIGGER}: original prompt must remain singular after a correction.`
@@ -69,15 +69,18 @@ async function textNodeOccurrences(page: Page, text: string): Promise<number> {
     ([expected, surfaceSelector]: [string, string]) => {
       const surfaces = document.querySelectorAll(surfaceSelector)
       const viewport = surfaces[surfaces.length - 1]?.querySelector('[data-slot="aui_thread-viewport"]')
-      if (!viewport) return 0
+
+      if (!viewport) {return 0}
 
       const walker = document.createTreeWalker(viewport, NodeFilter.SHOW_TEXT)
       let count = 0
+
       while (walker.nextNode()) {
         if (walker.currentNode.textContent?.includes(expected)) {
           count += 1
         }
       }
+
       return count
     },
     [text, SURFACE] as [string, string],
@@ -88,7 +91,8 @@ async function transcriptTextOrder(page: Page): Promise<string[]> {
   return page.evaluate((surfaceSelector: string) => {
     const surfaces = document.querySelectorAll(surfaceSelector)
     const viewport = surfaces[surfaces.length - 1]?.querySelector('[data-slot="aui_thread-viewport"]')
-    if (!viewport) return []
+
+    if (!viewport) {return []}
 
     return Array.from(viewport.querySelectorAll<HTMLElement>('[data-role="message"], [data-message-id]'))
       .map(message => message.textContent?.trim() ?? '')
@@ -100,7 +104,8 @@ async function transcriptMessageOrder(page: Page): Promise<string[]> {
   return page.evaluate((surfaceSelector: string) => {
     const surfaces = document.querySelectorAll(surfaceSelector)
     const viewport = surfaces[surfaces.length - 1]?.querySelector('[data-slot="aui_thread-viewport"]')
-    if (!viewport) return []
+
+    if (!viewport) {return []}
 
     return Array.from(
       viewport.querySelectorAll<HTMLElement>('[data-role="user"], [data-role="assistant"], [data-role="system"]'),
@@ -166,8 +171,9 @@ async function reopenInferenceSession(page: Page): Promise<void> {
 
 function relevantOrder(messages: string[]): string[] {
   return messages.flatMap(message => {
-    if (message.includes(ORIGINAL_PROMPT)) return [ORIGINAL_PROMPT]
-    if (message.includes(CORRECTION)) return [CORRECTION]
+    if (message.includes(ORIGINAL_PROMPT)) {return [ORIGINAL_PROMPT]}
+
+    if (message.includes(CORRECTION)) {return [CORRECTION]}
 
     return []
   })
@@ -175,9 +181,11 @@ function relevantOrder(messages: string[]): string[] {
 
 function steerTurnOrder(messages: string[]): string[] {
   return messages.flatMap(message => {
-    if (message.includes(ORIGINAL_PROMPT)) return [ORIGINAL_PROMPT]
-    if (message.includes(CORRECTION)) return [CORRECTION]
-    if (message.includes(CORRECTED_REPLY)) return [CORRECTED_REPLY]
+    if (message.includes(ORIGINAL_PROMPT)) {return [ORIGINAL_PROMPT]}
+
+    if (message.includes(CORRECTION)) {return [CORRECTION]}
+
+    if (message.includes(CORRECTED_REPLY)) {return [CORRECTED_REPLY]}
 
     return []
   })

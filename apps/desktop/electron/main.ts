@@ -90,6 +90,39 @@ import {
 } from './browser-windows'
 import { detectBundleSkew } from './bundle-skew'
 import { detectBundleSwap } from './bundle-swap'
+import {
+  cancelScheduledDesktopLogFlush,
+  flushDesktopLogBufferSync,
+  getRecentHermesLogLines,
+  initDesktopLogBuffer,
+  rememberLog
+} from './composition/log-buffer'
+import {
+  initMediaProtocolBridge,
+  LOCAL_PREVIEW_HOSTS,
+  looksBinary,
+  PREVIEW_HTML_EXTENSIONS,
+  PREVIEW_LANGUAGE_BY_EXT,
+  PREVIEW_PDF_EXTENSIONS,
+  PREVIEW_WATCH_DEBOUNCE_MS,
+  previewFileMetadata,
+  TEXT_PREVIEW_MAX_BYTES
+} from './composition/media-protocol'
+import {
+  applyTitleBarOverlay,
+  applyWindowTranslucency,
+  chatWindowSurfaceOptions,
+  getTitleBarOverlayOptions,
+  getTranslucencyState,
+  isHexColor,
+  setRendererTitleBarTheme,
+  setTranslucencyState,
+  THEME_SOURCES,
+  translucencyBackedWindows,
+  writePersistedThemeSource,
+  writePersistedTranslucency
+} from './composition/window-theme'
+import { ensureWslWindowsFonts } from './composition/wsl-fonts'
 import { applyConnectionChange, sshQuitShouldBlock, teardownSshState } from './connection-apply'
 import {
   apiRequestRegistryConnectionId,
@@ -154,52 +187,9 @@ import {
   upsertConnection
 } from './connection-registry'
 import type { RosterProfileMetadata } from './connection-registry'
-import { describeCrashReason, installCrashForensics } from './crash-forensics'
+import { describeCrashReason } from './crash-forensics'
 import { adoptServedDashboardToken } from './dashboard-token'
 import { loadOrCreateInstallationId, sshOwnershipId } from './desktop-installation'
-import { formatDesktopLogLine } from './desktop-log-line'
-import {
-  cancelScheduledDesktopLogFlush,
-  flushDesktopLogBufferAsync,
-  flushDesktopLogBufferSync,
-  getRecentHermesLogLines,
-  initDesktopLogBuffer,
-  planDesktopLogRotation,
-  rememberLog,
-  rotateDesktopLogIfNeededAsync,
-  rotateDesktopLogIfNeededSync,
-  scheduleDesktopLogFlush
-} from './composition/log-buffer'
-import {
-  LOCAL_PREVIEW_HOSTS,
-  PREVIEW_HTML_EXTENSIONS,
-  PREVIEW_LANGUAGE_BY_EXT,
-  PREVIEW_PDF_EXTENSIONS,
-  PREVIEW_WATCH_DEBOUNCE_MS,
-  TEXT_PREVIEW_MAX_BYTES,
-  initMediaProtocolBridge,
-  looksBinary,
-  previewFileMetadata
-} from './composition/media-protocol'
-import {
-  applyTitleBarOverlay,
-  applyWindowOpacity,
-  applyWindowTranslucency,
-  chatWindowSurfaceOptions,
-  getTranslucencyState,
-  getWindowBackgroundColor,
-  getTitleBarOverlayOptions,
-  readPersistedThemeSource,
-  readPersistedTranslucency,
-  setRendererTitleBarTheme,
-  setTranslucencyState,
-  isHexColor,
-  translucencyBackedWindows,
-  writePersistedThemeSource,
-  THEME_SOURCES,
-  writePersistedTranslucency
-} from './composition/window-theme'
-import { ensureWslWindowsFonts } from './composition/wsl-fonts'
 import { resolveDesktopRemoteRoute, v1SshTerminalPoolKey } from './desktop-remote-route'
 import {
   buildPosixCleanupScript,
@@ -405,19 +395,14 @@ import { collectSshConfigHosts, parseSshGOutput } from './ssh-config'
 import { createSshProbeConnection, pickLocalPort, redactSecrets, SshConnection } from './ssh-connection'
 import { createStreamThrottle } from './stream-throttle'
 import { registerTerminalIpc } from './terminal-ipc'
-import { nativeOverlayWidth as computeNativeOverlayWidth, macTitleBarOverlayHeight } from './titlebar-overlay-width'
+import { nativeOverlayWidth as computeNativeOverlayWidth } from './titlebar-overlay-width'
 import {
-  backgroundMaterialFor,
-  defaultTranslucencyState,
   glassActive,
   glassSupportedOn,
   normalizeState as normalizeTranslucency,
-  opacityNeedsSetting,
   translucencySupportedOn,
   vibrancyFor as vibrancyForTranslucency,
-  windowBackingOptions,
-  windowOpacityFor,
-  windowOpacityOptions
+  windowOpacityFor
 } from './translucency'
 import {
   compareApiUrl,

@@ -1,7 +1,7 @@
+import { type ReadableAtom } from 'nanostores'
 import type { ReactNode } from 'react'
-import { atom, type ReadableAtom } from 'nanostores'
-import { openSession, type OpenSessionIntent } from '@/app/open-session'
-import type { WorkspaceMode } from '@/contrib/types'
+
+import { openSession } from '@/app/open-session'
 import {
   $newSessionTabAction,
   $paneVisible,
@@ -17,12 +17,13 @@ import {
   type WorkspaceNewSessionTarget
 } from '@/components/pane-shell/workspace-scope'
 import { registry } from '@/contrib/registry'
+import type { WorkspaceMode } from '@/contrib/types'
 import {
   activeGatewayConnectionId,
   openGatewayForAgent,
   openGatewayForProfile
 } from '@/store/gateway'
-import { notify, notifyError } from '@/store/notifications'
+import { notify } from '@/store/notifications'
 import {
   $activeGatewayProfile,
   $gatewaySwapTarget,
@@ -31,7 +32,6 @@ import {
   newSessionInAgent,
   newSessionInProfile,
   normalizeProfileKey,
-  setActiveProfile,
   setShowAllProfiles
 } from '@/store/profile'
 import {
@@ -51,14 +51,14 @@ import {
   focusWorkspaceOwnerSessionTile,
   sessionTileDelegate
 } from '@/store/session-states'
+
+import { awaitProfileActivation, pluginRouteStillRegistered } from './host-routing'
 import {
-  BOT_CHAT_SESSION_HYDRATION_TIMEOUT_MS,
   DEFAULT_SESSION_HYDRATION_TIMEOUT_MS,
   type PluginNewChatOptions,
   type PluginOpenSessionOptions
 } from './host-session-options'
 import { $activeConnectionId, type PluginProfileRoute } from './host-state'
-import { awaitProfileActivation, pluginRouteStillRegistered } from './host-routing'
 import { planPluginOpenSession } from './plugin-open-session-plan'
 
 let openSessionGeneration = 0

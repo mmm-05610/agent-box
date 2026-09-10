@@ -1,22 +1,23 @@
 import {
   hostLabelFromBaseUrl,
-  modeIsRemoteLike,
   normalizeRemoteBaseUrl,
   normalizeRemoteHeaders,
   normalizeSshConfig,
   normAuthMode
 } from '../connection-config'
-import {
+
+import type {
   ConnectionKind,
   ConnectionRegistry,
-  LABEL_MAX,
-  LOCAL_CONNECTION_ID,
   QuarantinedRegistryEntry,
-  REGISTRY_QUARANTINE_CAP,
-  REGISTRY_VERSION,
-  RegistryConnection,
+  RegistryConnection} from './identity';
+import {
+  LABEL_MAX,
   labelKey,
   labelSlug,
+  LOCAL_CONNECTION_ID,
+  REGISTRY_QUARANTINE_CAP,
+  REGISTRY_VERSION,
   uniqueLabel
 } from './identity'
 
