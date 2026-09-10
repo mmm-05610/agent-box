@@ -5,6 +5,22 @@ import { E2E_FIXTURE_MIGRATION_PENDING, resolveHermesE2ERuntime } from './hermes
 
 const DEFAULT_TIMEOUT_MS = 60_000
 
+/**
+ * How long a request may keep retrying while the runtime reports the session as
+ * busy (JSON-RPC 4009).
+ *
+ * The runtime keeps a session `running` AFTER it emits `message.complete`: it
+ * still has post-turn work to do (a verify-on-stop continuation, a context
+ * compaction handoff — exactly what the specs that use this builder assert on).
+ * A client that submits the next turn the moment it sees `message.complete` is
+ * therefore rejected by `prompt.submit` with `4009 session busy`. The Desktop
+ * queues such a prompt rather than failing; this builder retries, which is the
+ * same contract. Confirmed against the runtime's `tui_gateway/server.py`, where
+ * `prompt.submit` returns 4009 while `session["running"]` is true.
+ */
+const BUSY_RETRY_BUDGET_MS = 60_000
+const BUSY_RETRY_INTERVAL_MS = 250
+
 interface JsonRpcError {
   code?: number
   message?: string
@@ -138,7 +154,7 @@ export class RealSessionBuilder {
       const completion = this.waitForEvent(
         frame => frame.params?.type === 'message.complete' && frame.params.session_id === runtimeId,
       )
-      await this.request('prompt.submit', { session_id: runtimeId, text })
+      await this.requestWhenIdle('prompt.submit', { session_id: runtimeId, text })
       const frame = await completion
       const status = readString(frame.params?.payload, 'status')
       if (status !== 'complete') {
@@ -146,7 +162,7 @@ export class RealSessionBuilder {
       }
     }
 
-    await this.request('session.close', { session_id: runtimeId })
+    await this.requestWhenIdle('session.close', { session_id: runtimeId })
     return { runtimeId, sessionId }
   }
 
@@ -164,6 +180,29 @@ export class RealSessionBuilder {
         resolve()
       })
     })
+  }
+
+  /**
+   * A request that survives the runtime still finishing the previous turn.
+   *
+   * Retries ONLY on `4009 session busy` — a genuine protocol error is surfaced
+   * immediately, and exhausting the budget reports what was being attempted
+   * rather than hanging.
+   */
+  private async requestWhenIdle<T = unknown>(method: string, params: Record<string, unknown>): Promise<T> {
+    const deadline = Date.now() + BUSY_RETRY_BUDGET_MS
+
+    for (;;) {
+      try {
+        return await this.request<T>(method, params)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        if (!message.includes('4009') || Date.now() >= deadline) {
+          throw error
+        }
+        await new Promise(resolve => setTimeout(resolve, BUSY_RETRY_INTERVAL_MS))
+      }
+    }
   }
 
   private request<T = unknown>(method: string, params: Record<string, unknown>): Promise<T> {

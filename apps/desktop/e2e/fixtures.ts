@@ -26,8 +26,10 @@ import * as path from 'node:path'
 
 import { _electron, type ElectronApplication, type Page } from '@playwright/test'
 
+import { type MockServerOptions, startMockServer } from '../../../tests-js/scripts/mock-server'
+
 import { resolveElectronBinary } from './electron-binary'
-import { startMockServer, type MockServerOptions } from '../../../tests-js/scripts/mock-server'
+import { resolveHermesExecutable } from './hermes-runtime'
 import { installErrorBannerGuard } from './test'
 
 const DESKTOP_ROOT = path.resolve(import.meta.dirname, '..')
@@ -237,11 +239,16 @@ function writeEmptyConfig(hermesHome: string): void {
  * Key env vars:
  *  - HERMES_HOME → sandbox hermes-home (isolated config/sessions)
  *  - HERMES_DESKTOP_USER_DATA_DIR → sandbox electron-user-data
- *  - HERMES_DESKTOP_IGNORE_EXISTING=1 → don't pick up `hermes` from PATH
- *    (we want the dev checkout at REPO_ROOT)
- *  - HERMES_DESKTOP_HERMES_ROOT → REPO_ROOT (dev checkout resolution)
+ *  - HERMES_DESKTOP_HERMES → the EXTERNAL `hermes` to drive (see below)
  *  - HERMES_DESKTOP_APP_NAME → unique-ish per test (avoids single-instance lock)
  *  - XDG_RUNTIME_DIR → ensure Electron has a writable runtime dir on Linux
+ *
+ * The app under test is a CLIENT: this repository ships no runtime, so the
+ * backend must come from outside it. `HERMES_DESKTOP_HERMES` is pinned to the
+ * external executable when one can be found, so the specs test the client
+ * against a known runtime instead of depending on whatever the runner's PATH
+ * happens to contain. With none installed the app takes its documented "no
+ * Hermes" path — which some specs (boot-failure) assert on purpose.
  */
 export function buildAppEnv(sandbox: Sandbox, extra: Record<string, string> = {}): Record<string, string> {
   const clean = stripCredentials(process.env)
@@ -257,12 +264,13 @@ export function buildAppEnv(sandbox: Sandbox, extra: Record<string, string> = {}
     clean.DISPLAY = process.env.DISPLAY
   }
 
+  const hermes = resolveHermesExecutable()
+
   return {
     ...clean,
     HERMES_HOME: sandbox.hermesHome,
     HERMES_DESKTOP_USER_DATA_DIR: sandbox.userDataDir,
-    HERMES_DESKTOP_IGNORE_EXISTING: '1',
-    HERMES_DESKTOP_HERMES_ROOT: REPO_ROOT,
+    ...(hermes ? { HERMES_DESKTOP_HERMES: hermes.command } : {}),
     HERMES_DESKTOP_APP_NAME: `HermesE2E-${Date.now()}`,
     // `app.close()` in teardown must exit even when a spec leaves a turn
     // mid-flight — otherwise the quit confirmation waits on a click that no
@@ -462,8 +470,9 @@ export interface DeadBackendOptions {
   /**
    * When true, inject a fake boot error via HERMES_DESKTOP_BOOT_FAKE_ERROR
    * so the backend resolution itself "fails" with a controlled error message.
-   * This is the only reliable way to trigger BootFailureOverlay in dev mode
-   * (the real backend always resolves via SOURCE_REPO_ROOT).
+   * This is the only reliable way to trigger BootFailureOverlay in dev mode:
+   * a real runtime resolves from the external install the fixture pins, so the
+   * overlay would never appear on its own.
    */
   fakeError?: boolean
 }
@@ -643,6 +652,7 @@ export async function waitForAppReady(fixture: MockBackendFixture | NoProviderFi
       // `position: fixed; inset: 0`. If the hit element or an ancestor
       // is a full-viewport fixed overlay, we're still covered.
       let node: Element | null = el
+
       while (node) {
         const cs = window.getComputedStyle(node)
 

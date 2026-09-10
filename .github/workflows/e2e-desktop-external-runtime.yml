@@ -1,0 +1,191 @@
+name: E2E Desktop (external runtime)
+
+# On-demand Playwright E2E against an EXTERNAL Hermes runtime.
+#
+# Why this exists as a separate, manually triggered workflow instead of the
+# `workflow_call` lane in e2e-desktop.yml:
+#
+#   1. That lane is hard-disabled in ci.yaml (`if: false`) because it was
+#      "incredibly flaky" (Sep 2026). Re-enabling it would put that flakiness
+#      back on every PR. This one runs only when a human asks.
+#   2. This repository is a CLIENT and ships no runtime, so the app under test
+#      needs a Hermes from somewhere else. Pinning that to an explicit
+#      `runtime_ref` input also makes it a real cross-product check: this
+#      desktop build against a named Hermes revision.
+#
+# Not part of PR CI. Run it from the Actions tab (or `gh workflow run`) when you
+# want E2E evidence, and treat a failure as evidence about the runtime version
+# you picked — not as a gate on unrelated changes.
+
+on:
+  workflow_dispatch:
+    inputs:
+      runtime_ref:
+        description: |
+          Hermes runtime ref to test against (branch, tag, or SHA of
+          NousResearch/hermes-agent). Pin a tag or SHA for a reproducible run.
+        required: true
+        default: main
+        type: string
+      specs:
+        description: 'Optional path filter, e.g. e2e/large-session-resume.spec.ts (empty = whole suite)'
+        required: false
+        default: ''
+        type: string
+      update_snapshots:
+        description: 'Regenerate visual baselines instead of comparing (expect diffs; CI baselines are Linux-generated)'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-desktop-external-${{ github.ref }}-${{ inputs.runtime_ref }}
+  cancel-in-progress: false
+
+jobs:
+  e2e:
+    name: Playwright E2E vs Hermes ${{ inputs.runtime_ref }}
+    # Standard runner on purpose: larger runners (`ubuntu-latest-32-core`) are a
+    # PAID GitHub feature and simply will not schedule on a personal account. The
+    # suite is single-worker (fullyParallel: false) and runs one Electron app at
+    # a time, so extra cores buy little here — the build is just slower.
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      # ── System deps for Electron under xvfb ───────────────────────────
+      - name: Install system dependencies for Electron
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            xvfb \
+            libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 \
+            xdg-utils libatspi2.0-0 libdrm2 libgbm1 libasound2t64
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 26
+          cache: npm
+
+      - name: grab npm 12
+        run: npm i -g npm@12
+
+      # Full npm ci (not --ignore-scripts): electron's postinstall downloads the
+      # binary under test, and node-pty's native build is needed for the
+      # terminal pane.
+      - uses: ./.github/actions/retry
+        with:
+          command: npm ci
+
+      # ── The external runtime under test ───────────────────────────────
+      # The app spawns `hermes serve`. This repository has none, so install one
+      # at an explicit ref and hand it to the app through the env vars the
+      # resolver already honours (see apps/desktop/e2e/hermes-runtime.ts).
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # 8.2.0
+        with:
+          version: '0.9.28'
+          enable-cache: true
+
+      - name: Clone the Hermes runtime at the requested ref
+        run: |
+          git clone --depth 1 --branch "${{ inputs.runtime_ref }}" \
+            https://github.com/NousResearch/hermes-agent.git /tmp/hermes-runtime \
+            || { echo "::error::could not clone NousResearch/hermes-agent at '${{ inputs.runtime_ref }}'"; exit 1; }
+          git -C /tmp/hermes-runtime log --oneline -1
+
+      # `--extra all` matches the closure the previous in-repo lane installed, so
+      # this differs only in coming from upstream. It is not required to boot:
+      # fastapi/uvicorn/python-multipart are core dependencies, so a plain
+      # `uv sync` already serves. The extras cover messaging/tool backends the
+      # specs here do not touch — trimmable once a run proves that.
+      - name: Install runtime dependencies
+        working-directory: /tmp/hermes-runtime
+        run: |
+          uv python install 3.11
+          uv sync --locked --python 3.11 --extra all
+
+      - name: Verify the runtime is usable
+        run: |
+          set -euo pipefail
+          test -x /tmp/hermes-runtime/.venv/bin/hermes || { echo "::error::no hermes entry point in the runtime venv"; exit 1; }
+          /tmp/hermes-runtime/.venv/bin/hermes --version
+          /tmp/hermes-runtime/.venv/bin/python -c "import tui_gateway.entry; print('gateway importable')"
+
+      # ── Run the suite against it ──────────────────────────────────────
+      # HERMES_DESKTOP_HERMES: the backend the APP spawns.
+      # HERMES_E2E_PYTHON:     the interpreter the session BUILDER spawns for
+      #                        its stdio gateway. Same runtime, so the spec's
+      #                        fixture and the app agree on the version.
+      - name: Build and run Playwright E2E
+        working-directory: apps/desktop
+        env:
+          CI: 'true'
+          HERMES_DESKTOP_HERMES: /tmp/hermes-runtime/.venv/bin/hermes
+          HERMES_E2E_PYTHON: /tmp/hermes-runtime/.venv/bin/python
+          # Ensure no real API keys leak into the test env.
+          OPENROUTER_API_KEY: ''
+          OPENAI_API_KEY: ''
+          NOUS_API_KEY: ''
+        run: |
+          set -uo pipefail
+          FLAGS=""
+          if [ "${{ inputs.update_snapshots }}" = "true" ]; then FLAGS="--update-snapshots"; fi
+          SPECS="${{ inputs.specs }}"
+          npm run build
+          xvfb-run -a --server-args="-screen 0 1280x1024x24" \
+            npx playwright test --reporter=list $FLAGS $SPECS
+
+      # ── Evidence ──────────────────────────────────────────────────────
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: external-runtime-report-${{ github.run_id }}
+          path: apps/desktop/playwright-report
+          retention-days: 14
+          overwrite: true
+          if-no-files-found: ignore
+
+      - name: Upload test results (screenshots, traces)
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: external-runtime-results-${{ github.run_id }}
+          path: apps/desktop/test-results
+          retention-days: 14
+          overwrite: true
+          if-no-files-found: ignore
+
+      # The desktop log is where a backend-resolution or readiness failure is
+      # actually explained; keep it next to the Playwright artefacts.
+      - name: Upload desktop logs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: external-runtime-desktop-logs-${{ github.run_id }}
+          path: |
+            ~/.hermes/logs
+            /tmp/hermes-runtime/*.log
+          retention-days: 14
+          overwrite: true
+          if-no-files-found: ignore
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Desktop E2E against external Hermes"
+            echo ""
+            echo "- runtime ref: \`${{ inputs.runtime_ref }}\`"
+            echo "- specs filter: \`${{ inputs.specs }}\` (empty = whole suite)"
+            echo "- update snapshots: \`${{ inputs.update_snapshots }}\`"
+            echo ""
+            echo "A spec that reports \`E2E_FIXTURE_MIGRATION_PENDING\` was SKIPPED because no usable"
+            echo "external runtime was found — that is not a pass. Everything else in the suite"
+            echo "ran against \`${{ inputs.runtime_ref }}\`."
+          } >> "$GITHUB_STEP_SUMMARY"
