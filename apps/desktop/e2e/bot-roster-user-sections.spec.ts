@@ -246,6 +246,18 @@ test('file bots into user sections by menu and drag; rename; delete returns them
 
   // Membership rides the bot's profile ui_meta, so it follows profile sync.
   const alphaProfile = path.join(fixture!.sandbox.hermesHome, 'profiles', 'alpha', 'profile.yaml')
+
+  // Diagnostic: each of these three facts rules out a different cause when the
+  // assertion below fails. `readdir` says whether the runtime wrote the profile
+  // at all; the log tail says what the app asked it to do; the hermes-home
+  // listing says which root the app resolved.
+  const alphaDir = path.join(fixture!.sandbox.hermesHome, 'profiles', 'alpha')
+  console.log('[diag] profiles/alpha:', fs.existsSync(alphaDir) ? fs.readdirSync(alphaDir) : 'MISSING')
+  console.log('[diag] profile.yaml:', fs.existsSync(alphaProfile) ? fs.readFileSync(alphaProfile, 'utf8') : 'MISSING')
+  const desktopLog = path.join(fixture!.sandbox.hermesHome, 'logs', 'desktop.log')
+  console.log('[diag] desktop.log tail:', fs.existsSync(desktopLog) ? fs.readFileSync(desktopLog, 'utf8').split('\n').slice(-25).join('\n') : 'MISSING')
+  console.log('[diag] hermes-home:', fs.readdirSync(fixture!.sandbox.hermesHome))
+
   await expect.poll(() => (fs.existsSync(alphaProfile) ? fs.readFileSync(alphaProfile, 'utf8') : '')).toMatch(/sectionId:\s*sec-/)
 
   // Delete both sections: the roster is the plain list again.
