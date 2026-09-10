@@ -100,40 +100,10 @@ import {
   useKanban,
   useOrchestration
 } from './ui'
+import { moveCard, removeCard } from './board-state'
 
 // ── optimistic board edits (reconciled by the follow-up refresh) ─────────────
 
-function moveCard(board: KanbanBoard, id: string, toStatus: string): KanbanBoard {
-  let moved: KanbanTask | undefined
-
-  const columns = board.columns.map(col => ({
-    ...col,
-    tasks: col.tasks.filter(task => {
-      if (task.id !== id) {
-        return true
-      }
-
-      moved = { ...task, status: toStatus }
-
-      return false
-    })
-  }))
-
-  if (!moved) {
-    return board
-  }
-
-  return {
-    ...board,
-    columns: columns.map(col => (col.name === toStatus ? { ...col, tasks: [moved!, ...col.tasks] } : col))
-  }
-}
-
-function removeCard(board: KanbanBoard, id: string): KanbanBoard {
-  return { ...board, columns: board.columns.map(col => ({ ...col, tasks: col.tasks.filter(t => t.id !== id) })) }
-}
-
-// ── card ─────────────────────────────────────────────────────────────────────
 
 function Meta({ children, icon }: { children: ReactNode; icon: string }) {
   return (
