@@ -158,6 +158,48 @@ import { describeCrashReason, installCrashForensics } from './crash-forensics'
 import { adoptServedDashboardToken } from './dashboard-token'
 import { loadOrCreateInstallationId, sshOwnershipId } from './desktop-installation'
 import { formatDesktopLogLine } from './desktop-log-line'
+import {
+  cancelScheduledDesktopLogFlush,
+  flushDesktopLogBufferAsync,
+  flushDesktopLogBufferSync,
+  getRecentHermesLogLines,
+  initDesktopLogBuffer,
+  planDesktopLogRotation,
+  rememberLog,
+  rotateDesktopLogIfNeededAsync,
+  rotateDesktopLogIfNeededSync,
+  scheduleDesktopLogFlush
+} from './composition/log-buffer'
+import {
+  LOCAL_PREVIEW_HOSTS,
+  PREVIEW_HTML_EXTENSIONS,
+  PREVIEW_LANGUAGE_BY_EXT,
+  PREVIEW_PDF_EXTENSIONS,
+  PREVIEW_WATCH_DEBOUNCE_MS,
+  TEXT_PREVIEW_MAX_BYTES,
+  initMediaProtocolBridge,
+  looksBinary,
+  previewFileMetadata
+} from './composition/media-protocol'
+import {
+  applyTitleBarOverlay,
+  applyWindowOpacity,
+  applyWindowTranslucency,
+  chatWindowSurfaceOptions,
+  getTranslucencyState,
+  getWindowBackgroundColor,
+  getTitleBarOverlayOptions,
+  readPersistedThemeSource,
+  readPersistedTranslucency,
+  setRendererTitleBarTheme,
+  setTranslucencyState,
+  isHexColor,
+  translucencyBackedWindows,
+  writePersistedThemeSource,
+  THEME_SOURCES,
+  writePersistedTranslucency
+} from './composition/window-theme'
+import { ensureWslWindowsFonts } from './composition/wsl-fonts'
 import { resolveDesktopRemoteRoute, v1SshTerminalPoolKey } from './desktop-remote-route'
 import {
   buildPosixCleanupScript,
@@ -814,6 +856,10 @@ function resolveHermesHome() {
 
 const HERMES_HOME = resolveHermesHome()
 
+const DESKTOP_LOG_PATH = path.join(HERMES_HOME, 'logs', 'desktop.log')
+initDesktopLogBuffer(DESKTOP_LOG_PATH)
+initMediaProtocolBridge({ ensureNativeAccessToken })
+
 function pathWithHermesManagedNode(...entries) {
   const managed = hermesManagedNodePathEntries(HERMES_HOME).filter(directoryExists)
 
@@ -865,31 +911,6 @@ const PROFILE_NAME_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/
 // tracks main. User can also override at runtime via
 // hermesDesktop.updates.setBranch().
 const DEFAULT_UPDATE_BRANCH = 'main'
-// desktop.log lives under HERMES_HOME/logs/ so it sits next to agent.log,
-// errors.log, gateway.log produced by hermes_logging.setup_logging — one log
-// directory per user, regardless of which UI surface produced the line.
-const DESKTOP_LOG_PATH = path.join(HERMES_HOME, 'logs', 'desktop.log')
-const DESKTOP_LOG_FLUSH_MS = 120
-const DESKTOP_LOG_BUFFER_MAX_CHARS = 64 * 1024
-// Bound desktop.log on disk. It is an append-only forensic log, so a boot loop
-// (version-skew crash -> backend exits instantly -> renderer keeps hitting
-// Retry) appends the full bootstrap transcript every attempt and grows without
-// bound — we have seen it reach ~326 GB and exhaust the disk, which then breaks
-// update/install (no room for git/venv/npm temp files).
-//
-// Mirror the Python logs (hermes_logging.py RotatingFileHandler, maxBytes x
-// backupCount): cascade live -> .1 -> .2 -> .3, drop the oldest. Steady-state
-// stays bounded at ~(backupCount + 1) x cap however hard the app loops.
-//
-// Bounding alone never RECLAIMS an already-huge file: a plain rotation just
-// renames the monster to .1 and strands it for a cycle a healthy app may never
-// reach. A multi-GB boot-loop transcript has no diagnostic value, so anything
-// past the discard ceiling is deleted outright — the updated app self-heals a
-// disk a stale build filled, on the next launch.
-const DESKTOP_LOG_MAX_BYTES = 10 * 1024 * 1024
-const DESKTOP_LOG_BACKUP_COUNT = 3
-const DESKTOP_LOG_DISCARD_BYTES = DESKTOP_LOG_MAX_BYTES * 4
-const desktopLogBackupPath = n => `${DESKTOP_LOG_PATH}.${n}`
 const BOOT_FAKE_MODE = process.env.HERMES_DESKTOP_BOOT_FAKE === '1'
 const BOOT_FAKE_ERROR = process.env.HERMES_DESKTOP_BOOT_FAKE_ERROR || ''
 // Automated teardown (Playwright's app.close(), harness scripts) quits with
@@ -936,265 +957,6 @@ const APP_ICON_PATHS = appIconCandidates({
   unpackedPathFor
 })
 
-let rendererTitleBarTheme = null
-
-// Force the NATIVE window appearance (vibrancy material, titlebar, the
-// pre-first-paint window background) to follow the APP theme instead of the
-// OS appearance. With `vibrancy` set, macOS paints an NSVisualEffectView that
-// tracks the window's effective appearance and ignores `backgroundColor` —
-// so a dark-themed app on a light-mode Mac flashes a white material on every
-// new window until the renderer covers it. The renderer reports its mode via
-// 'hermes:native-theme' ('dark' | 'light' | 'system'); we pin
-// nativeTheme.themeSource to it and persist the value so cold launches paint
-// correctly before the renderer has even loaded.
-const NATIVE_THEME_CONFIG_PATH = path.join(app.getPath('userData'), 'native-theme.json')
-const THEME_SOURCES = new Set(['dark', 'light', 'system'])
-
-function readPersistedThemeSource() {
-  try {
-    const parsed = JSON.parse(fs.readFileSync(NATIVE_THEME_CONFIG_PATH, 'utf8'))
-
-    if (parsed && THEME_SOURCES.has(parsed.themeSource)) {
-      return parsed.themeSource
-    }
-  } catch {
-    // Missing / malformed → follow the OS like a fresh install.
-  }
-
-  return 'system'
-}
-
-function writePersistedThemeSource(mode) {
-  try {
-    fs.mkdirSync(path.dirname(NATIVE_THEME_CONFIG_PATH), { recursive: true })
-    fs.writeFileSync(NATIVE_THEME_CONFIG_PATH, JSON.stringify({ themeSource: mode }, null, 2), 'utf8')
-  } catch (error) {
-    rememberLog(`[theme] write native theme failed: ${error.message}`)
-  }
-}
-
-nativeTheme.themeSource = readPersistedThemeSource()
-
-// Window translucency (see-through window). One lever, 0–100; 0 = off (the
-// default). Two modes share the lever (see electron/translucency.ts and
-// store/translucency): 'clear' maps it to the native window opacity so the
-// desktop shows through the whole window; 'glass' keeps the window opaque
-// and lets the renderer thin its surfaces over a platform material instead
-// — a matte blur with full-contrast text. macOS uses vibrancy; Windows 11
-// uses DWM acrylic/mica/tabbed. Persisted so a cold launch applies it at
-// window creation, before the renderer reports its value.
-// macOS + Windows only; `setOpacity` is a no-op on Linux.
-const TRANSLUCENCY_CONFIG_PATH = path.join(app.getPath('userData'), 'translucency.json')
-
-function readPersistedTranslucency() {
-  try {
-    return normalizeTranslucency(JSON.parse(fs.readFileSync(TRANSLUCENCY_CONFIG_PATH, 'utf8')), GLASS_SUPPORTED)
-  } catch {
-    // Nothing persisted yet — a first launch. Glass ships on, so the FIRST
-    // window has to be created with the glass backing already: a window born
-    // opaque cannot reliably be swapped to glass afterwards (see
-    // windowBackingOptions). nativeTheme is the only appearance signal main
-    // has this early; the renderer's first resolved send corrects it.
-    return defaultTranslucencyState(nativeTheme.shouldUseDarkColors ? 'dark' : 'light', GLASS_SUPPORTED, IS_WINDOWS)
-  }
-}
-
-function writePersistedTranslucency(state) {
-  try {
-    fs.mkdirSync(path.dirname(TRANSLUCENCY_CONFIG_PATH), { recursive: true })
-    fs.writeFileSync(TRANSLUCENCY_CONFIG_PATH, JSON.stringify(state, null, 2), 'utf8')
-  } catch (error) {
-    rememberLog(`[translucency] write failed: ${error.message}`)
-  }
-}
-
-let translucencyState = readPersistedTranslucency()
-
-// Chat windows whose webContents backing follows translucency (primary,
-// instance peers, session windows). The HUD / pet overlay / quick entry /
-// wake indicator are `transparent: true` windows that own their backgrounds —
-// painting a themed backing onto them would turn them into opaque rectangles.
-const translucencyBackedWindows = new WeakSet()
-
-// Set a live window's native opacity, but only when the state asks it to fade
-// — or when the window is already faded and is on its way back to opaque. The
-// window's own opacity is the record of whether that door was ever opened; see
-// opacityNeedsSetting for why it matters that it stays shut.
-function applyWindowOpacity(win) {
-  const opacity = windowOpacityFor(translucencyState)
-
-  if (typeof win.setOpacity === 'function' && opacityNeedsSetting(opacity, win.getOpacity?.() ?? 1)) {
-    win.setOpacity(opacity)
-  }
-}
-
-// Re-apply translucency to a live window (runtime toggle, no recreation).
-// Opacity goes through applyWindowOpacity, which knows when the call is worth
-// making at all. The backing swap is the glass half: Chromium composites the
-// page against the window backing BEFORE the OS composites the window, so
-// glass needs the backing dropped for the platform material to reach it, and
-// every other state needs the opaque themed backing (anti-flash, and it is
-// what makes clear mode fade to the desktop instead of to black).
-//
-// `changed` says which native properties actually need touching. Dragging the
-// intensity slider emits ~100 updates, and in glass mode NONE of them change
-// anything native — the tint is painted by the renderer and windowOpacityFor
-// answers off `fade`, not `intensity`, there. Re-issuing setVibrancy on every
-// tick restarts its 150ms animation before macOS can settle the material,
-// which reads as jank and flattens the frost levels into each other. Windows
-// setBackgroundMaterial is instantaneous but still skipped on tint-only ticks.
-// The glass Fade lever is the one glass drag that does reach main, and it
-// costs exactly what a Clear drag costs: one setOpacity.
-//
-// CAUTION (measured, macOS 26 / Electron 40): a runtime
-// setBackgroundColor('#00000000') is silently LOST on a window whose
-// compositor hasn't been up for a few seconds — including calls from
-// 'ready-to-show' and 'did-finish-load'. Cold launches therefore must not
-// rely on this path: windows are BORN with the right backing
-// (windowBackingOptions at each creation site). This path only has to cover
-// live toggles from Settings, where the window is long settled.
-function applyWindowTranslucency(win, changed = { backing: true, material: true, opacity: true }) {
-  if (!win || win.isDestroyed()) {
-    return
-  }
-
-  try {
-    // Backing swap + material are scoped to registered chat windows (see
-    // translucencyBackedWindows above).
-    if (translucencyBackedWindows.has(win)) {
-      if (changed.backing && typeof win.setBackgroundColor === 'function') {
-        win.setBackgroundColor(glassActive(translucencyState) ? '#00000000' : getWindowBackgroundColor())
-      }
-
-      if (changed.material) {
-        // Glass frost level = the platform material. Animate the macOS hop so
-        // a deliberate frost switch feels continuous — which only works if we
-        // don't re-issue it on unrelated updates. Windows has no equivalent
-        // animation option; setBackgroundMaterial is instantaneous.
-        if (IS_MAC && typeof win.setVibrancy === 'function') {
-          win.setVibrancy(vibrancyForTranslucency(translucencyState), { animationDuration: 150 })
-        }
-
-        if (IS_WINDOWS && GLASS_SUPPORTED && typeof win.setBackgroundMaterial === 'function') {
-          win.setBackgroundMaterial(backgroundMaterialFor(translucencyState))
-        }
-      }
-    }
-
-    if (changed.opacity) {
-      applyWindowOpacity(win)
-    }
-  } catch (error) {
-    rememberLog(`[translucency] apply failed: ${error.message}`)
-  }
-}
-
-// Constructor options every chat window shares for its translucency surface:
-// the platform material, the webContents backing, and a native opacity only if
-// the state actually fades — all under the CURRENT state. Glass omits
-// backgroundColor so the material shows from the first frame (Electron hands a
-// translucent window a transparent default backing, and runtime swaps are lost
-// early in a window's life — see applyWindowTranslucency); otherwise the opaque
-// themed anti-flash backing.
-//
-// Call sites also register the window in translucencyBackedWindows so a live
-// toggle can re-apply. The HUD, pet overlay, quick entry and wake indicator
-// are `transparent: true` windows that own their backgrounds and are
-// deliberately not chat windows.
-function chatWindowSurfaceOptions() {
-  return {
-    vibrancy: IS_MAC ? vibrancyForTranslucency(translucencyState) : undefined,
-    // Pin the material to its ACTIVE appearance: several NSVisualEffectView
-    // materials collapse to a shared inactive look when the window blurs
-    // (measured on macOS 26: sidebar, popover and under-window composited
-    // pixel-identically once unfocused), which would quietly erase the
-    // user's frost choice whenever they click elsewhere. Only observable
-    // under glass — everywhere else the page buries the material.
-    visualEffectState: IS_MAC ? ('active' as const) : undefined,
-    // NOT `transparent: true` on Windows. The backdrop material already makes
-    // the window translucent on its own: `IsTranslucent` answers yes off
-    // `background_material_` alone, which is what gives the page its transparent
-    // default backing, and `SetBackgroundMaterial` flips widget translucency
-    // live, so a Clear→Glass toggle needs no recreate either way. Its one gate
-    // is a frameless window, and `titleBarStyle: 'hidden'` already makes
-    // `has_frame()` false here.
-    //
-    // What `transparent` adds on top is permanent and unwanted: it pins the
-    // widget to kTranslucent for the window's whole life, so even glass-OFF
-    // windows pay a DirectComposition redraw per frame (electron#39895), and it
-    // opts into the documented transparent-window limits — including that a
-    // RESIZABLE transparent window is unsupported and breaks (electron#48421).
-    // Every chat window is resizable.
-    backgroundMaterial: IS_WINDOWS && GLASS_SUPPORTED ? backgroundMaterialFor(translucencyState) : undefined,
-    ...windowOpacityOptions(translucencyState),
-    ...windowBackingOptions(translucencyState, getWindowBackgroundColor())
-  }
-}
-
-function isHexColor(value) {
-  return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value)
-}
-
-// Background color to paint a window with BEFORE its renderer loads, so a new
-// (or reopened) window doesn't flash white/light in dark mode. Prefer the theme
-// the renderer last reported; fall back to the OS preference on first launch.
-function getWindowBackgroundColor() {
-  if (rendererTitleBarTheme && isHexColor(rendererTitleBarTheme.background)) {
-    return rendererTitleBarTheme.background
-  }
-
-  return nativeTheme.shouldUseDarkColors ? '#111111' : '#f7f7f7'
-}
-
-// Transparent WCO — renderer chrome shows through. rgba(0,0,0,0) can fall back
-// to GetFrameColor() on some Electron builds; rgba(1,0,0,0) is the escape hatch.
-const TITLEBAR_OVERLAY_COLOR = 'rgba(1, 0, 0, 0)'
-
-function getTitleBarOverlayOptions() {
-  if (IS_MAC) {
-    // Tahoe (Darwin 25+) misplaces the traffic lights when the overlay has a
-    // nonzero height (electron#49183); 0 there keeps them at the configured
-    // inset. See macTitleBarOverlayHeight.
-    return { height: macTitleBarOverlayHeight({ darwinMajor: DARWIN_MAJOR, titlebarHeight: TITLEBAR_HEIGHT }) }
-  }
-
-  // WSLg paints WCO via the RDP host's own min/max/close, so requesting
-  // an Electron overlay there just leaves a dead gap. Plain Linux (KDE,
-  // GNOME) can use the native overlay — let it through.
-  if (!IS_WINDOWS && IS_WSL) {
-    return false
-  }
-
-  return {
-    color: TITLEBAR_OVERLAY_COLOR,
-    height: TITLEBAR_HEIGHT,
-    symbolColor:
-      rendererTitleBarTheme && isHexColor(rendererTitleBarTheme.foreground)
-        ? rendererTitleBarTheme.foreground
-        : nativeTheme.shouldUseDarkColors
-          ? '#f7f7f7'
-          : '#242424'
-  }
-}
-
-// Push refreshed overlay options to a live window after a theme/appearance
-// change. No-op only on plain (non-WSL) Linux, where getTitleBarOverlayOptions()
-// returns false; the try/catch additionally guards builds where
-// setTitleBarOverlay isn't supported.
-function applyTitleBarOverlay(win) {
-  const options = getTitleBarOverlayOptions()
-
-  if (!options || typeof options !== 'object') {
-    return
-  }
-
-  try {
-    win?.setTitleBarOverlay?.(options)
-  } catch {
-    // Overlay not supported on this platform/build — leave the frameless
-    // titlebar as-is.
-  }
-}
 
 const MEDIA_MIME_TYPES = {
   '.avi': 'video/x-msvideo',
@@ -1218,184 +980,6 @@ const MEDIA_MIME_TYPES = {
   '.webp': 'image/webp'
 }
 
-const PREVIEW_HTML_EXTENSIONS = new Set(['.html', '.htm'])
-const PREVIEW_PDF_EXTENSIONS = new Set(['.pdf'])
-const PREVIEW_WATCH_DEBOUNCE_MS = 120
-const LOCAL_PREVIEW_HOSTS = new Set(['0.0.0.0', '127.0.0.1', '::1', '[::1]', 'localhost'])
-const TEXT_PREVIEW_MAX_BYTES = 512 * 1024
-
-const PREVIEW_LANGUAGE_BY_EXT = {
-  '.c': 'c',
-  '.conf': 'ini',
-  '.cpp': 'cpp',
-  '.css': 'css',
-  '.csv': 'csv',
-  '.go': 'go',
-  '.graphql': 'graphql',
-  '.h': 'c',
-  '.hpp': 'cpp',
-  '.html': 'html',
-  '.java': 'java',
-  '.js': 'javascript',
-  '.json': 'json',
-  '.jsx': 'jsx',
-  '.kt': 'kotlin',
-  '.lua': 'lua',
-  '.md': 'markdown',
-  '.mjs': 'javascript',
-  '.py': 'python',
-  '.rb': 'ruby',
-  '.rs': 'rust',
-  '.sh': 'shell',
-  '.sql': 'sql',
-  '.svg': 'xml',
-  '.toml': 'toml',
-  '.ts': 'typescript',
-  '.tsx': 'tsx',
-  '.txt': 'text',
-  '.xml': 'xml',
-  '.yaml': 'yaml',
-  '.yml': 'yaml',
-  '.zsh': 'shell'
-}
-
-function looksBinary(buffer) {
-  if (!buffer.length) {
-    return false
-  }
-
-  let suspicious = 0
-
-  for (const byte of buffer) {
-    if (byte === 0) {
-      return true
-    }
-
-    // Allow common whitespace controls: tab, LF, CR.
-    if (byte < 32 && byte !== 9 && byte !== 10 && byte !== 13) {
-      suspicious += 1
-    }
-  }
-
-  return suspicious / buffer.length > 0.12
-}
-
-function previewFileMetadata(filePath, mimeType) {
-  let byteSize = 0
-  let binary = false
-
-  try {
-    const stat = fs.statSync(filePath)
-    byteSize = stat.size
-
-    if (!mimeType.startsWith('image/')) {
-      const fd = fs.openSync(filePath, 'r')
-
-      try {
-        const sample = Buffer.alloc(Math.min(byteSize, 4096))
-        const bytesRead = fs.readSync(fd, sample, 0, sample.length, 0)
-        binary = looksBinary(sample.subarray(0, bytesRead))
-      } finally {
-        fs.closeSync(fd)
-      }
-    }
-  } catch {
-    // Metadata is best-effort; the read handlers surface hard errors later.
-  }
-
-  return {
-    binary,
-    byteSize,
-    large: byteSize > TEXT_PREVIEW_MAX_BYTES
-  }
-}
-
-app.setName(APP_NAME)
-
-// Windows toast notifications silently no-op unless an AppUserModelID is set:
-// `new Notification().show()` returns without error and nothing appears. The
-// AUMID must match the installed Start Menu shortcut's AUMID, which
-// electron-builder derives from the build `appId` (com.nousresearch.hermes) —
-// keep this string in sync with package.json `build.appId`. macOS/Linux don't
-// need this, so gate it on Windows. (Fixes: desktop approval/turn notifications
-// never firing on Windows.)
-if (IS_WINDOWS) {
-  app.setAppUserModelId('com.nousresearch.hermes')
-}
-
-// Seed the native About panel with the live Hermes version. This is refreshed
-// on every open via the explicit "About" menu handler (refreshAboutPanel), so
-// an in-place `hermes update` mid-session is reflected without an app restart;
-// the seed here just covers the first open and any non-menu invocation path.
-app.setAboutPanelOptions({
-  applicationName: APP_NAME,
-  applicationVersion: resolveHermesVersion(),
-  copyright: 'Copyright © 2026 Nous Research'
-})
-
-// Custom scheme for streaming audio/video into the renderer. Local paths read
-// from this machine; remote paths are proxied through the configured gateway
-// with main-process authentication. This avoids whole-file data URLs and keeps
-// playback seekable and Range-aware. Must be registered before app readiness.
-protocol.registerSchemesAsPrivileged([
-  {
-    scheme: MEDIA_PROTOCOL,
-    privileges: {
-      secure: true,
-      standard: true,
-      stream: true,
-      supportFetchAPI: true
-    }
-  }
-])
-
-function registerMediaProtocol() {
-  const handler = createMediaProtocolHandler({
-    ensureRemoteBearer: baseUrl => ensureNativeAccessToken(baseUrl).catch(() => null),
-    fetchLocal: (resolvedPath, headers, method) =>
-      electronNet.fetch(pathToFileURL(resolvedPath).toString(), {
-        bypassCustomProtocolHandlers: true,
-        credentials: 'omit',
-        headers,
-        method
-      }),
-    fetchRemote: (url, headers, method) =>
-      electronNet.fetch(url, {
-        bypassCustomProtocolHandlers: true,
-        credentials: 'omit',
-        headers,
-        method
-      }),
-    fetchRemoteWithCookies: (url, headers, method) => {
-      const oauthSession = getOauthSessionForUrl(url)
-
-      if (!oauthSession) {
-        throw new Error('OAuth session partition is unavailable.')
-      }
-
-      return oauthSession.fetch(url, {
-        bypassCustomProtocolHandlers: true,
-        credentials: 'include',
-        headers,
-        method
-      })
-    },
-    resolveLocalFile: async filePath => {
-      const { resolvedPath } = await resolveReadableFileForIpc(filePath, { purpose: 'Media stream' })
-
-      return resolvedPath
-    },
-    // Claim-guarded (#90812): a media stream load can race a renderer's own
-    // reconnect dial for the same (connectionId, profile) scope; coalescing
-    // here avoids bootstrapping a second SSH tunnel / remote dashboard.
-    resolveRemoteConnection: ({ connectionId, profile }) =>
-      backendDialClaims.run(backendScopeKey(connectionId, profile), () =>
-        connectionId ? ensureRegistryBackend(connectionId, profile) : ensureBackend(profile)
-      )
-  })
-
-  protocol.handle(MEDIA_PROTOCOL, handler)
-}
 
 let mainWindow = null
 const backendConnectionState = createBackendConnectionState<ReturnType<typeof spawn>, any>()
@@ -1475,10 +1059,6 @@ function persistPoolLimits(limits) {
 // readPersistedPoolLimits() call below, because that call logs during module
 // evaluation; declaring these later crashed launch with `undefined.push` in
 // the packaged build (esbuild lowers the TDZ to undefined instead of throwing).
-const hermesLog = []
-let desktopLogBuffer = ''
-let desktopLogFlushTimer = null
-let desktopLogFlushPromise = Promise.resolve()
 
 let poolLimits = readPersistedPoolLimits()
 // Hard cap on local backends that are starting OR running (the LRU eviction
@@ -1675,158 +1255,6 @@ let bootProgressState = {
 // Pure planner: ordered fs ops to bound a live log of `size`. [] = nothing.
 // Each step is ['rm', path] or ['mv', src, dst]; executed best-effort so a
 // missing chain link never aborts the rest.
-function planDesktopLogRotation(size) {
-  if (size < DESKTOP_LOG_MAX_BYTES) {
-    return []
-  }
-
-  const backups = n => Array.from({ length: n }, (_, i) => desktopLogBackupPath(i + 1))
-
-  // Pathological boot-loop log: reclaim live + every backup outright.
-  if (size > DESKTOP_LOG_DISCARD_BYTES) {
-    return [DESKTOP_LOG_PATH, ...backups(DESKTOP_LOG_BACKUP_COUNT)].map(p => ['rm', p])
-  }
-
-  // Cascade: drop oldest, shift each up, live -> .1.
-  const ops = [['rm', desktopLogBackupPath(DESKTOP_LOG_BACKUP_COUNT)]]
-
-  for (let i = DESKTOP_LOG_BACKUP_COUNT - 1; i >= 1; i--) {
-    ops.push(['mv', desktopLogBackupPath(i), desktopLogBackupPath(i + 1)])
-  }
-
-  ops.push(['mv', DESKTOP_LOG_PATH, desktopLogBackupPath(1)])
-
-  return ops
-}
-
-function rotateDesktopLogIfNeededSync() {
-  let size
-
-  try {
-    size = fs.statSync(DESKTOP_LOG_PATH).size
-  } catch {
-    return // No live file yet — the append (re)creates it.
-  }
-
-  for (const [op, src, dst] of planDesktopLogRotation(size)) {
-    try {
-      if (op === 'rm') {
-        fs.rmSync(src, { force: true })
-      } else {
-        fs.renameSync(src, dst)
-      }
-    } catch {
-      // Best-effort — logging must never block startup/shutdown.
-    }
-  }
-}
-
-async function rotateDesktopLogIfNeededAsync() {
-  let size
-
-  try {
-    size = (await fs.promises.stat(DESKTOP_LOG_PATH)).size
-  } catch {
-    return // No live file yet — the append (re)creates it.
-  }
-
-  for (const [op, src, dst] of planDesktopLogRotation(size)) {
-    try {
-      if (op === 'rm') {
-        await fs.promises.rm(src, { force: true })
-      } else {
-        await fs.promises.rename(src, dst)
-      }
-    } catch {
-      // Best-effort — logging must never crash the shell.
-    }
-  }
-}
-
-function flushDesktopLogBufferSync() {
-  if (!desktopLogBuffer) {
-    return
-  }
-
-  const chunk = desktopLogBuffer
-  desktopLogBuffer = ''
-
-  try {
-    fs.mkdirSync(path.dirname(DESKTOP_LOG_PATH), { recursive: true })
-    rotateDesktopLogIfNeededSync()
-    fs.appendFileSync(DESKTOP_LOG_PATH, chunk)
-  } catch {
-    // Logging must never block app startup/shutdown.
-  }
-}
-
-function flushDesktopLogBufferAsync() {
-  if (!desktopLogBuffer) {
-    return desktopLogFlushPromise
-  }
-
-  const chunk = desktopLogBuffer
-  desktopLogBuffer = ''
-
-  desktopLogFlushPromise = desktopLogFlushPromise
-    .then(async () => {
-      await fs.promises.mkdir(path.dirname(DESKTOP_LOG_PATH), { recursive: true })
-      await rotateDesktopLogIfNeededAsync()
-      await fs.promises.appendFile(DESKTOP_LOG_PATH, chunk)
-    })
-    .catch(() => {
-      // Logging must never crash the desktop shell.
-    })
-
-  return desktopLogFlushPromise
-}
-
-function scheduleDesktopLogFlush() {
-  if (desktopLogFlushTimer) {
-    return
-  }
-
-  desktopLogFlushTimer = setTimeout(() => {
-    desktopLogFlushTimer = null
-    void flushDesktopLogBufferAsync()
-  }, DESKTOP_LOG_FLUSH_MS)
-}
-
-function rememberLog(chunk) {
-  const text = String(chunk || '').trim()
-
-  if (!text) {
-    return
-  }
-
-  // One timestamp per chunk: lines arriving in the same event happened
-  // at the same moment.  ISO-8601 UTC, matching agent.log/gateway.log.
-  const stamp = new Date().toISOString()
-  const lines = text.split(/\r?\n/).map(line => formatDesktopLogLine(line, stamp))
-  hermesLog.push(...lines)
-
-  if (hermesLog.length > 300) {
-    hermesLog.splice(0, hermesLog.length - 300)
-  }
-
-  desktopLogBuffer += `${lines.join('\n')}\n`
-
-  if (desktopLogBuffer.length >= DESKTOP_LOG_BUFFER_MAX_CHARS) {
-    if (desktopLogFlushTimer) {
-      clearTimeout(desktopLogFlushTimer)
-      desktopLogFlushTimer = null
-    }
-
-    void flushDesktopLogBufferAsync()
-
-    return
-  }
-
-  scheduleDesktopLogFlush()
-}
-
-installCrashForensics({ flush: flushDesktopLogBufferSync, log: rememberLog })
-
 // A rejected loadURL leaves a blank window and, unhandled, no trace anywhere
 // the user can send us. `label` names the surface so the log says which one.
 function loadWindowUrl(win, url, label) {
@@ -1943,52 +1371,6 @@ async function openPreviewInBrowser(rawUrl) {
   return openExternalUrl(raw)
 }
 
-function ensureWslWindowsFonts() {
-  if (!IS_WSL) {
-    return
-  }
-
-  const fontsDir = ['/mnt/c/Windows/Fonts', '/mnt/c/windows/fonts'].find(candidate => {
-    try {
-      return fs.statSync(candidate).isDirectory()
-    } catch {
-      return false
-    }
-  })
-
-  if (!fontsDir) {
-    return
-  }
-
-  try {
-    const confDir = path.join(app.getPath('home'), '.config', 'fontconfig', 'conf.d')
-    const confPath = path.join(confDir, '99-hermes-wsl-windows-fonts.conf')
-    let existing = ''
-
-    try {
-      existing = fs.readFileSync(confPath, 'utf8')
-    } catch {
-      existing = ''
-    }
-
-    if (existing.includes(fontsDir)) {
-      return
-    }
-
-    fs.mkdirSync(confDir, { recursive: true })
-    fs.writeFileSync(
-      confPath,
-      `<?xml version="1.0"?>\n<!DOCTYPE fontconfig SYSTEM "fonts.dtd">\n<fontconfig>\n  <dir>${fontsDir}</dir>\n</fontconfig>\n`
-    )
-    rememberLog(`[fonts] wired WSL Windows fonts for renderer: ${fontsDir}`)
-
-    const cache = spawn('fc-cache', ['-f', fontsDir], { detached: true, stdio: 'ignore' })
-    cache.on('error', () => undefined)
-    cache.unref()
-  } catch (error) {
-    rememberLog(`[fonts] WSL font setup skipped: ${error.message}`)
-  }
-}
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms))
@@ -2974,8 +2356,57 @@ function resolveGhBinary() {
   return _ghBinaryCache
 }
 
+function registerMediaProtocol() {
+  const handler = createMediaProtocolHandler({
+    ensureRemoteBearer: baseUrl => ensureNativeAccessToken(baseUrl).catch(() => null),
+    fetchLocal: (resolvedPath, headers, method) =>
+      electronNet.fetch(pathToFileURL(resolvedPath).toString(), {
+        bypassCustomProtocolHandlers: true,
+        credentials: 'omit',
+        headers,
+        method
+      }),
+    fetchRemote: (url, headers, method) =>
+      electronNet.fetch(url, {
+        bypassCustomProtocolHandlers: true,
+        credentials: 'omit',
+        headers,
+        method
+      }),
+    fetchRemoteWithCookies: (url, headers, method) => {
+      const oauthSession = getOauthSessionForUrl(url)
+
+      if (!oauthSession) {
+        throw new Error('OAuth session partition is unavailable.')
+      }
+
+      return oauthSession.fetch(url, {
+        bypassCustomProtocolHandlers: true,
+        credentials: 'include',
+        headers,
+        method
+      })
+    },
+    resolveLocalFile: async filePath => {
+      const { resolvedPath } = await resolveReadableFileForIpc(filePath, { purpose: 'Media stream' })
+
+      return resolvedPath
+    },
+    // Claim-guarded (#90812): a media stream load can race a renderer's own
+    // reconnect dial for the same (connectionId, profile) scope; coalescing
+    // here avoids bootstrapping a second SSH tunnel / remote dashboard.
+    resolveRemoteConnection: ({ connectionId, profile }) =>
+      backendDialClaims.run(backendScopeKey(connectionId, profile), () =>
+        connectionId ? ensureRegistryBackend(connectionId, profile) : ensureBackend(profile)
+      )
+  })
+
+  protocol.handle(MEDIA_PROTOCOL, handler)
+}
+
+
 function recentHermesLog() {
-  return hermesLog.slice(-20).join('\n')
+  return getRecentHermesLogLines(20).join('\n')
 }
 
 // ─── Self-update (git-pull against the running backend's hermes root) ──────
@@ -11882,7 +11313,7 @@ async function connectRegistryBackend(
       // is only the routing label. hermes:api uses it to translate explicit
       // self-profile query filters into the backend's namespace.
       remoteProfile: sshConfig.remoteProfile || '',
-      logs: hermesLog.slice(-80),
+      logs: getRecentHermesLogLines(-80),
       ...getWindowState()
     }
   }
@@ -11913,7 +11344,7 @@ async function connectRegistryBackend(
     // One host, many profiles: REST paths must carry ?profile= (same contract
     // as the global-remote shared-primary route).
     sharedRemote: true,
-    logs: hermesLog.slice(-80),
+    logs: getRecentHermesLogLines(-80),
     ...getWindowState()
   }
 }
@@ -12579,7 +12010,7 @@ async function spawnPoolBackend(profile, entry, opts: { forceLocal?: boolean; po
     return {
       ...remote,
       profile,
-      logs: hermesLog.slice(-80),
+      logs: getRecentHermesLogLines(-80),
       ...getWindowState()
     }
   }
@@ -12807,7 +12238,7 @@ async function spawnPoolBackend(profile, entry, opts: { forceLocal?: boolean; po
     token: authToken,
     profile,
     wsUrl,
-    logs: hermesLog.slice(-80),
+    logs: getRecentHermesLogLines(-80),
     ...getWindowState()
   }
 }
@@ -13007,7 +12438,7 @@ async function startHermes() {
         error: null
       })
 
-      return createPrimaryRemoteConnection(remote, hermesLog.slice(-80), getWindowState())
+      return createPrimaryRemoteConnection(remote, getRecentHermesLogLines(-80), getWindowState())
     }
 
     await advanceBootProgress('backend.resolve', 'Resolving Hermes backend', 8)
@@ -13295,7 +12726,7 @@ async function startHermes() {
       authMode: 'token',
       token: authToken,
       wsUrl,
-      logs: hermesLog.slice(-80),
+      logs: getRecentHermesLogLines(-80),
       ...getWindowState()
     }
   })().catch(async error => {
@@ -15144,7 +14575,7 @@ registerPetOverlayIpc({
 // --- HUD mode (chrome-free floating chat) — see hud-ipc.ts. ---------------
 const hudIpc = registerHudIpc({
   isMac: IS_MAC,
-  getTranslucencyState: () => translucencyState,
+  getTranslucencyState: () => getTranslucencyState(),
   getHudWindow: () => hudWindow,
   openHudWindow,
   closeHudWindow,
@@ -17066,10 +16497,10 @@ ipcMain.on('hermes:titlebar-theme', (_event, payload) => {
     return
   }
 
-  rendererTitleBarTheme = {
+  setRendererTitleBarTheme({
     background: payload.background,
     foreground: payload.foreground
-  }
+  })
 
   // Repaint the native (Windows/Linux) titlebar overlay on every open chat
   // window, not just the primary — instance peers and session windows share the
@@ -17110,7 +16541,7 @@ function scheduleTranslucencyWrite() {
 
   translucencyWriteTimer = setTimeout(() => {
     translucencyWriteTimer = null
-    writePersistedTranslucency(translucencyState)
+    writePersistedTranslucency(getTranslucencyState())
   }, 250)
 }
 
@@ -17120,7 +16551,7 @@ app.on('before-quit', () => {
   if (translucencyWriteTimer) {
     clearTimeout(translucencyWriteTimer)
     translucencyWriteTimer = null
-    writePersistedTranslucency(translucencyState)
+    writePersistedTranslucency(getTranslucencyState())
   }
 })
 
@@ -17150,7 +16581,7 @@ ipcMain.on('hermes:launch-flags', event => {
 
 ipcMain.on('hermes:translucency', (_event, payload) => {
   const next = normalizeTranslucency(payload, GLASS_SUPPORTED)
-  const previous = translucencyState
+  const previous = getTranslucencyState()
 
   if (
     next.intensity === previous.intensity &&
@@ -17162,7 +16593,7 @@ ipcMain.on('hermes:translucency', (_event, payload) => {
     return
   }
 
-  translucencyState = next
+  setTranslucencyState(next)
 
   // Which native properties actually moved. `scope` is renderer-only (which
   // surfaces thin), so it never appears here.
@@ -17443,7 +16874,7 @@ ipcMain.handle('hermes:logs:reveal', async () => {
   }
 })
 
-ipcMain.handle('hermes:logs:recent', async () => ({ path: DESKTOP_LOG_PATH, lines: hermesLog.slice(-200) }))
+ipcMain.handle('hermes:logs:recent', async () => ({ path: DESKTOP_LOG_PATH, lines: getRecentHermesLogLines(-200) }))
 
 // Renderer error-boundary catches (#79428 defect B): the component stack only
 // exists in renderer memory, so the boundary posts it here and we persist it
@@ -18263,10 +17694,7 @@ app.on('before-quit', event => {
     }
   }
 
-  if (desktopLogFlushTimer) {
-    clearTimeout(desktopLogFlushTimer)
-    desktopLogFlushTimer = null
-  }
+  cancelScheduledDesktopLogFlush()
 
   flushDesktopLogBufferSync()
   closePreviewWatchers()
