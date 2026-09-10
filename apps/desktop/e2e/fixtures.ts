@@ -142,7 +142,10 @@ export function createSandbox(prefix: string): Sandbox {
       // log and the runtime's own log exist only inside it, and only for as long
       // as it lives. The CI lane sets this and uploads `<root>/hermes-home/logs`,
       // so a failure ships its backend-side evidence instead of a bare stack.
-      if (process.env.HERMES_E2E_KEEP_SANDBOX === '1') return
+      if (process.env.HERMES_E2E_KEEP_SANDBOX === '1') {
+        return
+      }
+
       try {
         fs.rmSync(root, { recursive: true, force: true })
       } catch {

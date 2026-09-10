@@ -1,6 +1,8 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
+import { startMockServer } from '../../../tests-js/scripts/mock-server'
+
 import {
   buildAppEnv,
   createSandbox,
@@ -10,7 +12,6 @@ import {
   writeEnvFile,
   writeMockProviderConfig
 } from './fixtures'
-import { startMockServer } from '../../../tests-js/scripts/mock-server'
 import { E2E_FIXTURE_MIGRATION_PENDING, hasHermesE2ERuntime } from './hermes-runtime'
 import { RealSessionBuilder } from './real-session-builder'
 
