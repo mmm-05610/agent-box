@@ -166,15 +166,6 @@ export class RealSessionBuilder {
     return { runtimeId, sessionId }
   }
 
-  /**
-   * Send a raw JSON-RPC request. Test-only diagnostic seam: lets a spec ask the
-   * runtime exactly what the app asks and print its answer, instead of inferring
-   * intent from UI state.
-   */
-  requestRaw<T = unknown>(method: string, params: Record<string, unknown>): Promise<T> {
-    return this.request<T>(method, params)
-  }
-
   async close(): Promise<void> {
     if (this.closed) return
     this.closed = true
