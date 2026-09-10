@@ -116,6 +116,53 @@ jobs:
           /tmp/hermes-runtime/.venv/bin/hermes --version
           /tmp/hermes-runtime/.venv/bin/python -c "import tui_gateway.entry; print('gateway importable')"
 
+      # ── Diagnose the advertised tool surface ──────────────────────────
+      # The specs' scripted tool calls must name tools THIS runtime actually
+      # advertises to the model: an unknown name is fed back to the model and,
+      # after 3 tries, ends the turn as `partial` with
+      # "Model generated invalid tool call: <name>". A scripted mock cannot
+      # self-correct, so a mismatch is a hard failure. Print the surface so a
+      # failure names its cause instead of needing a guess.
+      - name: Diagnose the runtime's advertised tool surface
+        working-directory: /tmp/hermes-runtime
+        run: |
+          set -uo pipefail
+          cat > /tmp/surface.py <<'PY'
+          def show(label, fn):
+              try:
+                  print(f"{label}: {fn()}")
+              except Exception as e:
+                  print(f"{label}: ERROR {type(e).__name__}: {e}")
+
+          import toolsets
+          from toolsets import resolve_toolset, TOOLSETS
+          from hermes_cli.tools_config import _get_platform_tools
+
+          show("version", lambda: __import__("hermes_cli").__version__)
+          show("TOOLSETS['todo'].tools", lambda: TOOLSETS["todo"]["tools"])
+          show("_HERMES_CORE_TOOLS has todo_list", lambda: "todo_list" in toolsets._HERMES_CORE_TOOLS)
+          show("_HERMES_CORE_TOOLS has todo", lambda: "todo" in toolsets._HERMES_CORE_TOOLS)
+          show("resolve_toolset('todo')", lambda: sorted(resolve_toolset("todo"))[:5])
+
+          cfg = {"model": {"default": "mock-model", "provider": "mock"},
+                 "approvals": {"mode": "off"},
+                 "auxiliary": {"title_generation": {"enabled": False}}}
+          for platform in ("cli", "local", "desktop"):
+              def surface(platform=platform):
+                  names = _get_platform_tools(cfg, platform)
+                  tools = set()
+                  for n in names:
+                      try:
+                          tools |= set(resolve_toolset(n))
+                      except Exception:
+                          pass
+                  return f"toolsets={sorted(names)} n={len(tools)} todo_list={'todo_list' in tools} todo={'todo' in tools}"
+              show(f"surface[{platform}]", surface)
+          PY
+          .venv/bin/python /tmp/surface.py
+          echo "--- registered names in the tool modules ---"
+          grep -rn 'name=' tools/todo_tool.py | head -5
+
       # ── Run the suite against it ──────────────────────────────────────
       # HERMES_DESKTOP_HERMES: the backend the APP spawns.
       # HERMES_E2E_PYTHON:     the interpreter the session BUILDER spawns for
