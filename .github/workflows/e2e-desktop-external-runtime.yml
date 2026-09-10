@@ -134,30 +134,39 @@ jobs:
               except Exception as e:
                   print(f"{label}: ERROR {type(e).__name__}: {e}")
 
-          import toolsets
           from toolsets import resolve_toolset, TOOLSETS
           from hermes_cli.tools_config import _get_platform_tools
+          from model_tools import get_tool_definitions
+
+          PROBE = ("write_file", "terminal", "clarify", "todo_list", "todo")
 
           show("version", lambda: __import__("hermes_cli").__version__)
           show("TOOLSETS['todo'].tools", lambda: TOOLSETS["todo"]["tools"])
-          show("_HERMES_CORE_TOOLS has todo_list", lambda: "todo_list" in toolsets._HERMES_CORE_TOOLS)
-          show("_HERMES_CORE_TOOLS has todo", lambda: "todo" in toolsets._HERMES_CORE_TOOLS)
-          show("resolve_toolset('todo')", lambda: sorted(resolve_toolset("todo"))[:5])
 
+          def surface(label, enabled):
+              def run():
+                  defs = get_tool_definitions(enabled_toolsets=enabled or None, quiet_mode=True)
+                  names = {t["function"]["name"] for t in defs}
+                  hits = {p: (p in names) for p in PROBE}
+                  return f"n_tools={len(names)} {hits}"
+              show(label, run)
+
+          # The E2E fixture's config: model/providers/approvals/auxiliary, and NO
+          # `toolsets` / `platform_toolsets` key.
           cfg = {"model": {"default": "mock-model", "provider": "mock"},
                  "approvals": {"mode": "off"},
                  "auxiliary": {"title_generation": {"enabled": False}}}
+
           for platform in ("cli", "local", "desktop"):
-              def surface(platform=platform):
+              def per_platform(platform=platform):
                   names = _get_platform_tools(cfg, platform)
-                  tools = set()
-                  for n in names:
-                      try:
-                          tools |= set(resolve_toolset(n))
-                      except Exception:
-                          pass
-                  return f"toolsets={sorted(names)} n={len(tools)} todo_list={'todo_list' in tools} todo={'todo' in tools}"
-              show(f"surface[{platform}]", surface)
+                  defs = get_tool_definitions(enabled_toolsets=sorted(names) or None, quiet_mode=True)
+                  got = {t["function"]["name"] for t in defs}
+                  hits = {p: (p in got) for p in PROBE}
+                  return f"toolsets={sorted(names)} n_tools={len(got)} {hits}"
+              show(f"[{platform}]", per_platform)
+
+          surface("[no restriction]", None)
           PY
           .venv/bin/python /tmp/surface.py
           echo "--- registered names in the tool modules ---"
