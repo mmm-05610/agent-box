@@ -1,7 +1,10 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
+import { MOCK_REPLY, startMockServer } from '../../../tests-js/scripts/mock-server'
+
 import {
+  activeComposer,
   buildAppEnv,
   createSandbox,
   launchDesktop,
@@ -10,7 +13,6 @@ import {
   writeEnvFile,
   writeMockProviderConfig
 } from './fixtures'
-import { MOCK_REPLY, startMockServer } from '../../../tests-js/scripts/mock-server'
 import { E2E_FIXTURE_MIGRATION_PENDING, hasHermesE2ERuntime } from './hermes-runtime'
 import { RealSessionBuilder } from './real-session-builder'
 
@@ -128,7 +130,7 @@ test("an open Bot Chat's tab reads the bot's name, not the canonical 'Bot Chat' 
   // A `+` side thread beside the Bot Chat gives the main zone a tab strip —
   // the surface where every bot chat used to read "Bot Chat".
   await page.keyboard.press('Control+t')
-  const composer = page.locator('[data-slot="composer-root"] [contenteditable="true"]').filter({ visible: true }).first()
+  const composer = activeComposer(page)
   await expect(composer).toBeVisible({ timeout: 15_000 })
   await composer.click()
   await composer.fill('hello alpha thread')

@@ -1,4 +1,4 @@
-import { type MockBackendFixture, setupMockBackend, waitForAppReady } from './fixtures'
+import { activeComposer, type MockBackendFixture, setupMockBackend, waitForAppReady } from './fixtures'
 import { expect, test } from './test'
 
 let fixture: MockBackendFixture | null = null
@@ -76,5 +76,5 @@ test('local bot replaces an open group main workspace', async () => {
   // around indefinitely (see bot-mode-row-click-mirrors-registry's settle()),
   // so its presence no longer distinguishes a stranded handoff. The splash
   // and composer above are the proof the bot's chat took the workspace.
-  await expect(page.locator('[data-slot="composer-root"] [contenteditable="true"]').filter({ visible: true }).first()).toBeVisible()
+  await expect(activeComposer(page)).toBeVisible()
 })

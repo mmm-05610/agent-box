@@ -784,3 +784,22 @@ export async function waitForBootFailure(page: Page, timeoutMs = 60_000): Promis
     { timeout: timeoutMs },
   )
 }
+
+/**
+ * The composer of the VISIBLE pane.
+ *
+ * An inactive tab stays mounted under a `data-pane-hidden` ancestor — the
+ * renderer's keep-alive policy, the same marker `correction-session-switch` and
+ * `image-attachment-resume` match on. A bare `.filter({ visible: true }).first()`
+ * still picks whichever mounted composer comes first in DOM order, so once a
+ * second pane is on screen (`Control+t` opens a side thread) it can resolve to
+ * the pane that was just hidden: observed as a click timing out on "element is
+ * not visible" against a composer that resolved a moment earlier. Written so
+ * that if the marker is ever absent this degrades to the old selector rather
+ * than matching nothing.
+ */
+export function activeComposer(page: MockBackendFixture['page']) {
+  return page
+    .locator('[data-slot="composer-root"]:not([data-pane-hidden] [data-slot="composer-root"]) [contenteditable="true"]')
+    .first()
+}
