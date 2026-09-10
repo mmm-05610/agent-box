@@ -121,16 +121,18 @@ An **on-demand** GitHub Actions lane (`.github/workflows/e2e-desktop-external-ru
 `HERMES_E2E_PYTHON` at it, prints the runtime's advertised tool surface, then runs the suite under
 `xvfb-run`. The PR lane (`e2e-desktop.yml`) stays disabled by upstream decision.
 
-Last measured runs against Hermes `v2026.9.7`. Best: **66 passed / 2 flaky / 11 skipped / 0 failed** —
-all 79 specs accounted for, every skip pre-existing (packaged-app, host secure storage, deliberate RED),
-both flakes green on retry. That run is not yet reproducible: the next full run failed those same two
-specs on both attempts, and they had already failed before any of this work. Treat the lane as
-**green-on-demand, not stably green**.
+Last measured runs against Hermes `v2026.9.7`. Latest full run: **67 passed / 1 flaky / 11 skipped /
+0 failed** — all 79 specs accounted for, every skip pre-existing (packaged-app, host secure storage,
+deliberate RED), the flake green on retry. Getting there closed three defects, all in
+`07-risks-gaps-decisions.md` §2: the runtime's `tool_search` collapse removed scripted tools from the
+advertised surface (five specs); a bot-addressed profile write silently vanished when the bot's backend
+was queued behind the pool limit (one spec, and a live reproducer for "the UI reports a write that never
+happened"); and a spec was identifying a sidebar row by a label the backend truncates at 60 characters,
+so it matched only while the client's own untruncated optimistic row was still mounted (one spec, three
+runs).
 
-Getting this far closed two real defects, both described in `07-risks-gaps-decisions.md` §2: the
-runtime's `tool_search` collapse removed scripted tools from the advertised surface (five specs), and a
-bot-addressed profile write silently vanished when the bot's backend was queued behind the pool limit
-(one spec). §2.3 records the third, unexplained instability rather than papering over it.
+The lane is not yet a gate: one flake remains, a different spec each run, always green on retry. Two
+consecutive green runs is the bar.
 
 The lane is also its own instrument now: `HERMES_E2E_KEEP_SANDBOX` keeps each spec's `os.tmpdir()`
 sandbox alive so the desktop and runtime logs reach the artifacts — without it the fixture deleted the
