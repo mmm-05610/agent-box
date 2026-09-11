@@ -1,5 +1,6 @@
 import { setApiRequestProfile } from '@/hermes'
 import { invalidateProfileScopedQueries } from '@/lib/query-client'
+import { markSlashCompletionsStale } from '@/lib/slash-completion-cache'
 import { invalidateCronModelImpactScopeState } from '@/store/cron-model-impact-scope'
 import { normalizeProfileKey } from '@/store/profile/identity'
 import { $activeGatewayProfile } from '@/store/profile/runtime-route-state'
@@ -41,6 +42,10 @@ export function startActiveProfileRouting(): void {
       // Narrowed so account/marketplace/onboarding caches don't refetch on
       // every profile switch.
       invalidateProfileScopedQueries()
+      // That drops the cached completions; this tells the composer its held answer
+      // is stale. The adapter de-dupes by query, so without the epoch bump an
+      // unchanged `/` would keep painting the previous profile's list.
+      markSlashCompletionsStale()
       resetStarmapGraph()
       // /api/profiles now routes to a different backend: strand any in-flight
       // profile-list fetch so the previous backend's late answer can't clobber

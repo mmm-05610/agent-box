@@ -2,6 +2,7 @@ import { atom } from 'nanostores'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { HermesConnection } from '@/global'
+import { $slashCompletionsEpoch } from '@/lib/slash-completion-cache'
 import type { ProfileInfo } from '@/types/hermes'
 
 // Keep the profile store's side-effecting imports inert: the gateway socket
@@ -153,6 +154,18 @@ describe('profile-scoped cache invalidation', () => {
 
     expect(invalidateProfileScopedQueries).toHaveBeenCalled()
     expect(resetStarmapGraph).toHaveBeenCalledTimes(1)
+  })
+
+  it('tells slash completions the answer they are holding is stale', () => {
+    // The completion adapter de-dupes by query, so dropping the cache is not
+    // enough — without this it would keep painting the previous profile's list
+    // for an unchanged `/`. The behaviour used to live in a subscription inside
+    // the cache module; it lives on this path now, so it is pinned here.
+    const before = $slashCompletionsEpoch.get()
+
+    $activeGatewayProfile.set('cache-scope-probe')
+
+    expect($slashCompletionsEpoch.get()).toBeGreaterThan(before)
   })
 })
 

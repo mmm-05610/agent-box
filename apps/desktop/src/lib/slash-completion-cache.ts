@@ -1,8 +1,6 @@
 import { atom } from 'nanostores'
 
 import { queryClient } from '@/lib/query-client'
-import { normalizeProfileKey } from '@/store/profile/identity'
-import { $activeGatewayProfile } from '@/store/profile/runtime-route-state'
 
 // Root for every cached `/` completion response — the bare-slash catalog and
 // each typed query. Not in PROFILE_INDEPENDENT_QUERY_ROOTS, so a profile or
@@ -86,23 +84,23 @@ export const $slashCompletionsEpoch = atom(0)
  * skills exist or are enabled — install/uninstall/update from the hub, a
  * skill toggle or delete in Capabilities — so the composer's list matches
  * the backend without waiting out the TTL.
+ *
+ * A profile move could not be one of those sites: this module is a leaf and may
+ * not watch the active profile. It has its own invalidation anyway — the cache
+ * root is not profile-independent, so `invalidateProfileScopedQueries` drops it —
+ * and what that does NOT do is signal the composer, which is why
+ * `application/profile/active-route-effects.ts` calls this on a real switch.
  */
 export function invalidateSlashCompletions(): void {
   void queryClient.invalidateQueries({ queryKey: [SLASH_COMPLETIONS_KEY] })
-  $slashCompletionsEpoch.set($slashCompletionsEpoch.get() + 1)
+  markSlashCompletionsStale()
 }
 
-// Each profile has its own skills directory, so a cached catalog is only valid
-// for the profile that produced it. Dropped at the source rather than in the
-// composer so it holds whether or not a chat is mounted at switch time.
-let cachedProfile: null | string = null
-
-$activeGatewayProfile.subscribe(value => {
-  const key = normalizeProfileKey(value)
-
-  if (cachedProfile !== null && cachedProfile !== key) {
-    invalidateSlashCompletions()
-  }
-
-  cachedProfile = key
-})
+/**
+ * Signal watchers without dropping anything. For the one caller that has already
+ * dropped it: a profile switch invalidates every profile-scoped root, and this is
+ * one of them, so all that is missing is the word to the composer.
+ */
+export function markSlashCompletionsStale(): void {
+  $slashCompletionsEpoch.set($slashCompletionsEpoch.get() + 1)
+}

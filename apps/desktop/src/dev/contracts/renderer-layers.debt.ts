@@ -64,7 +64,7 @@ export const DEBT_LEDGER: readonly string[] = [
   'extension/sdk/index.ts -> @/app/skills',
   'extension/sdk/index.ts -> @/app/skills/mcp-tab',
 
-  // lib/ — 23
+  // lib/ — 21
   'lib/external-link.tsx -> @/store/preview',
   'lib/guarded-model-switch.ts -> @/store/notifications',
   'lib/haptics.ts -> @/store/haptics',
@@ -78,8 +78,6 @@ export const DEBT_LEDGER: readonly string[] = [
   'lib/session-export.ts -> @/store/notifications',
   'lib/session-link-title.ts -> @/store/session',
   'lib/session-project-label.ts -> @/app/chat/sidebar/projects/workspace-groups',
-  'lib/slash-completion-cache.ts -> @/store/profile/identity',
-  'lib/slash-completion-cache.ts -> @/store/profile/runtime-route-state',
   'lib/sound/completion-sound.ts -> @/store/ambient',
   'lib/sound/completion-sound.ts -> @/store/haptics',
   'lib/sound/completion-sound.ts -> @/store/sound/completion-sound',
