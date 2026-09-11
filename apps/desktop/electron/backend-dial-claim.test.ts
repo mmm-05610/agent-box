@@ -6,9 +6,12 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { BackendDialClaims } from './backend-dial-claim'
 import { parseBackendScopeKey } from './connection-registry'
+import { mainProcessSources, sliceFromAnyModule } from './test-main-process-sources'
+
+
 
 const here = path.dirname(fileURLToPath(import.meta.url))
-const mainSource = fs.readFileSync(path.join(here, 'main.ts'), 'utf8').replace(/\r\n/g, '\n')
+const mainSource = mainProcessSources().replace(/\r\n/g, '\n')
 
 describe('BackendDialClaims (#90812)', () => {
   it('coalesces two concurrent dials for the same (connectionId, profile) onto ONE backend spawn', async () => {

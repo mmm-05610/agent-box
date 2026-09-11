@@ -12,18 +12,14 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { test } from 'vitest'
+import { mainProcessSources, sliceFromAnyModule } from './test-main-process-sources'
+
+
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const source = fs.readFileSync(path.join(__dirname, 'main.ts'), 'utf8')
+const source = mainProcessSources()
 
-function extract(startMarker: string, endMarker: string): string {
-  const start = source.indexOf(startMarker)
-  assert.notEqual(start, -1, `${startMarker} should exist`)
-  const end = source.indexOf(endMarker, start + startMarker.length)
-  assert.notEqual(end, -1, `boundary after ${startMarker} should exist`)
-
-  return source.slice(start, end)
-}
+const extract = sliceFromAnyModule
 
 test('token transport streams to disk instead of buffering the whole body', () => {
   const fn = extract('function downloadViaTokenToFile', '\nfunction ')

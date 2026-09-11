@@ -11,6 +11,9 @@ import {
   LocalBackendSpawnCoordinator,
   releaseLocalBackendSlotAfterExit
 } from './pool-spawn-coordinator'
+import { mainProcessSources, sliceFromAnyModule } from './test-main-process-sources'
+
+
 
 const deferred = () => {
   let resolve!: () => void
@@ -509,7 +512,7 @@ test('promoting a queued background waiter lets it take the reserved foreground 
 // fast with a reason.
 {
   const here = path.dirname(fileURLToPath(import.meta.url))
-  const mainSource = fs.readFileSync(path.join(here, 'main.ts'), 'utf8').replace(/\r\n/g, '\n')
+  const mainSource = mainProcessSources().replace(/\r\n/g, '\n')
 
   const withTimeoutSource = fs
     .readFileSync(path.join(here, '..', 'src', 'lib', 'with-timeout.ts'), 'utf8')

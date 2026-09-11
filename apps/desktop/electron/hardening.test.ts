@@ -26,6 +26,9 @@ import {
   tightenSecretFileMode,
   writeSecretFileAtomic
 } from './hardening'
+import { mainProcessSources, sliceFromAnyModule } from './test-main-process-sources'
+
+
 
 /**
  * Real temp dir per test: the property under test IS the on-disk mode after a
@@ -919,17 +922,19 @@ test('resolveDirectoryForIpc accepts directory symlinks or junctions', async () 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 function readMain() {
-  return fs.readFileSync(path.join(__dirname, 'main.ts'), 'utf8').replace(/\r\n/g, '\n')
+  return mainProcessSources().replace(/\r\n/g, '\n')
 }
 
 test('registry JSON helpers retain native OAuth bearer authentication', () => {
   const source = readMain()
-  const postStart = source.indexOf('async function postJsonForBackend(')
-  const fetchStart = source.indexOf('async function fetchJsonForBackend(', postStart)
-  const helpers = source.slice(postStart, fetchStart)
+  // The POST/GET twins and their shared fetch helper were split across modules;
+  // the contract under test is that BOTH twins delegate to fetchJsonForBackend
+  // and neither reaches for the OAuth cookie session.
+  const helpers = [
+    sliceFromAnyModule('async function postJsonForBackend(', '\nasync function '),
+    sliceFromAnyModule('async function getJsonForBackend(', '\nasync function ')
+  ].join('\n')
 
-  assert.notEqual(postStart, -1)
-  assert.notEqual(fetchStart, -1)
   assert.match(
     helpers,
     /return fetchJsonForBackend\(descriptor, path, \{ \.\.\.opts, body: body \?\? \{\}, method: 'POST' \}\)/

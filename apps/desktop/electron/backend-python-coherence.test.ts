@@ -4,6 +4,9 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { test } from 'vitest'
+import { mainProcessSources, sliceFromAnyModule } from './test-main-process-sources'
+
+
 
 // ── Regression guard: backend interpreter / site-packages coherence ─────────
 //
@@ -24,7 +27,7 @@ import { test } from 'vitest'
 // One resolver must own that decision (AGENTS.md "observable ladder" rule 6).
 
 const here = path.dirname(fileURLToPath(import.meta.url))
-const mainTsSource = fs.readFileSync(path.join(here, 'main.ts'), 'utf8')
+const mainTsSource = mainProcessSources()
 
 function extractFunction(source: string, name: string): string {
   const start = source.indexOf(`function ${name}(`)

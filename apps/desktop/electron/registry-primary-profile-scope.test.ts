@@ -5,9 +5,12 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 import { pathForRegistryBackendRequest } from './connection-config'
+import { mainProcessSources, sliceFromAnyModule } from './test-main-process-sources'
+
+
 
 const here = path.dirname(fileURLToPath(import.meta.url))
-const mainSource = fs.readFileSync(path.join(here, 'main.ts'), 'utf8').replace(/\r\n/g, '\n')
+const mainSource = mainProcessSources().replace(/\r\n/g, '\n')
 
 describe('primary-remote descriptor reuse keeps profile scope', () => {
   it('scopes a shared-remote request with ?profile=<profile>', () => {
