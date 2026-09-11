@@ -5,7 +5,6 @@ import { translateNow, type Translations } from '@/i18n'
 import type { ChatMessage } from '@/lib/chat-messages'
 import { type CommandsCatalogLike, filterDesktopCommandsCatalog } from '@/lib/desktop-slash-commands'
 import { isProviderSetupErrorMessage } from '@/lib/provider-setup-errors'
-import type { ComposerAttachment } from '@/types/composer'
 
 import { registerRecoveredRuntime, singleFlightSessionResume, takeRecoveredRuntime } from './single-flight-resume'
 
@@ -700,31 +699,4 @@ export function visibleUserIndexAtOrdinal(messages: readonly ChatMessage[], targ
   return targetOrdinal >= 0 && targetOrdinal < indices.length ? indices[targetOrdinal] : -1
 }
 
-export interface SubmitTextOptions {
-  attachments?: ComposerAttachment[]
-  /** The composer scope key that was actually loaded when this text was
-   *  submitted (see use-composer-draft's activeQueueSessionKeyRef). Compared
-   *  against the resolved submit target in sessionContextDrift — a mismatch
-   *  means the composer and the session-side refs disagreed about which
-   *  session this send belongs to (#59305). Omit for non-composer submits
-   *  (queue drain, steer, external submit requests): the check is a no-op
-   *  without it. */
-  composerScope?: string | null
-  /** What the transcript shows for this send, when it differs from the text
-   *  the agent receives. A `/skill` invocation expands into the whole skill
-   *  body — model-facing scaffolding the UI must never render — so the slash
-   *  dispatcher passes the invocation (`/work fix the leak`) here. */
-  displayText?: string
-  /** `hidden` types the persisted user row (display_kind) so no bubble
-   *  renders anywhere — the off-screen path for widget intents. The agent
-   *  still receives the text as a normal user turn. */
-  displayKind?: 'hidden'
-  fromQueue?: boolean
-  /** Runtime session id to submit into. Queue drains pass this so a
-   *  backgrounded/source session cannot be replaced by the current foreground
-   *  session between enqueue and drain. */
-  sessionId?: string | null
-  /** Stable stored session id for optimistic/cache updates and stale-runtime
-   *  recovery. Distinct from the runtime session id minted by the gateway. */
-  storedSessionId?: string | null
-}
+export type { SubmitTextOptions } from '@/types/composer'
