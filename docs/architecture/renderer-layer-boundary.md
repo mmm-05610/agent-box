@@ -114,48 +114,42 @@ importers) is a command bus (`requestComposerFocus/Insert/Submit`) that `store/`
 calls to make the UI do something. It should be a downward command channel, or
 the store should publish an intent the composer subscribes to.
 
-## 3. Batch C — mechanical, verified safe, ready to hand off
+## 3. The mechanical batches
 
-Every item below was checked for the trap that kills a naive "move it up": **does
+The verified-safe mechanical work is written up as **one implementation document
+per batch** in
+[`renderer-layer-batches/`](renderer-layer-batches/README.md) — 15 edges across
+four batches, each independently executable, each ending with a green suite and a
+regenerated ledger.
+
+They are listed here only so this document stays the whole picture:
+
+| batch | scope | edges |
+| --- | --- | --- |
+| [01](renderer-layer-batches/01-lib-services-to-store.md) | four small stateful `lib/` services → `store/` | 6 |
+| [02](renderer-layer-batches/02-tour-to-app.md) | `lib/tour/` → `app/tour/` | 2 |
+| [03](renderer-layer-batches/03-project-session-moves.md) | a misplaced shape and a sidebar label | 3 |
+| [04](renderer-layer-batches/04-workspace-groups-split.md) | split `workspace-groups.ts`, membership core → `store/` | 4 |
+
+They must run **in order, one at a time**. `01` and `03` both repoint
+`app/session/hooks/use-session-actions/session-create.ts`, `03` and `04` both edit
+`store/projects/crud.ts`, and every batch regenerates the same ledger file.
+Sequential execution is what makes them independent; two at once produce
+conflicts that read like bugs.
+
+Every item was checked for the trap that kills a naive "move it up": **does
 anything in a lower layer import it?** If yes, moving it turns one direction of
-violation into the other. Three candidates failed that check and are in Batch B
-instead — `lib/keybinds/` failed it badly (see §4).
+violation into the other. Three candidates failed that check and are in §4
+instead — `lib/keybinds/` failed it badly.
 
-Each item is a pure relocation with a determinate destination and no behaviour
-change. Expected total: **16 edges off the ledger.**
+`04` is the exception in kind: it is a split with a traced boundary, not a
+relocation. Its own document says so, and its stop conditions are the ones worth
+respecting.
 
-| # | move | importers to repoint | edges |
-| --- | --- | --- | --- |
-| C1 | `lib/oneshot.ts` → `store/oneshot.ts` | 1 (all `store/`) | 2 |
-| C2 | `lib/yolo-session.ts` → `store/yolo-session.ts` | 3 (all `app/`) | 2 |
-| C3 | `lib/guarded-model-switch.ts` → `store/guarded-model-switch.ts` | 2 (`app/`, `extension/`) | 1 |
-| C4 | `lib/session-export.ts` → `store/session-export.ts` | 2 (all `app/`) | 1 |
-| C5 | `lib/session-project-label.ts` → `app/chat/sidebar/projects/session-project-label.ts` | 1 (`app/`) | 1 |
-| C6 | `lib/tour/` (7 files, incl. `app-tour.css`) → `app/tour/` | 7 (`app/`, `dev/`) | 2 |
-| C7 | `NewSessionPlacement` (a lone interface at `app/chat/new-session-drag.ts:63`) → `types/` | 5 (`store/` ×2, `app/` ×3) | 2 |
-| C8 | Split `app/chat/sidebar/projects/workspace-groups.ts` (849 lines) | 5 in `store/` | 5 |
+Do not widen the ledger to make an item land. If a move needs an unlisted edge,
+stop and report: the batch is wrong, not the guard.
 
-Notes that matter for C6–C8:
-
-- **C6**: `lib/tour/index.ts:10` matches a search for `lib/tour` but is a doc
-  comment, not an import. `dev/` sits at rank 4, below `app/`, so it is fine.
-- **C7**: extract the interface only; `app/chat/new-session-drag.ts` keeps its
-  behaviour.
-- **C8** is the one item here that is a *split*, not a move. `store/` needs
-  exactly four symbols: `SidebarProjectTree` (line 48), `NO_PROJECT_ID`
-  (line 122), `liveSessionProjectId` (line 386) and `sessionProjectColor`
-  (line 469), together with whatever private helpers those four need. Everything
-  about building and overlaying the tree (`mergeRepoWorktreeGroups`,
-  `overlayRepoLanes`, `excludeProjectSessions`, `overlayLiveLanes`,
-  `reconcileEnteredProjectSessions`, `overlayLivePreviews`,
-  `sortWorktreeGroups`) stays in `app/`. The store-side symbols go to
-  `store/projects/`, and the existing `workspace-groups.test.ts` moves with the
-  symbols it covers. `tsc` plus that test file is the check.
-
-Do not widen the ledger to make an item land. If a move in this batch turns out
-to need an unlisted edge, stop and report: the batch is wrong, not the guard.
-
-## 4. Batch B — mechanical, but not safe yet
+## 4. Mechanical-looking, but not safe yet
 
 **Blocked by a lower-layer importer** (moving it would create a *new* violation
 in the opposite direction):

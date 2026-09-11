@@ -1,9 +1,10 @@
 // The renderer's upward-import debt, frozen.
 //
-// GENERATED — do not hand-edit. In a normal round you do NOT regenerate this at
-// all: `renderer-layers.test.ts` fails on an unlisted edge, you fix the
-// direction, and you delete the line it names. A full regeneration is only
-// needed when the ladder itself changes in `renderer-layers.ts`.
+// GENERATED — do not hand-edit. Regenerate with `npm run ledger:layers` from
+// `apps/desktop`. In a round that only fixes an edge you do not need to: delete
+// the line `renderer-layers.test.ts` names. Regenerate whenever files move,
+// because every entry is keyed by the importer's path and the specifier as
+// written.
 //
 // Each entry is `<src-relative importer> -> <specifier as written>`. It records
 // an import that points at a layer ranked ABOVE the one that wrote it. The list
