@@ -9,7 +9,11 @@ it fixes the order, says which batches may run at the same time, specifies the
 per-stage review, and lists what is not delegated. Live progress is
 [`../renderer-layer-status.md`](../renderer-layer-status.md).
 
-The analysis behind them — the layer rule, the four design knots, the full debt
+Handing the whole run to an executor? Use
+[`EXECUTOR-PROMPT.md`](EXECUTOR-PROMPT.md) — the canonical brief, which points at
+the work list instead of restating it.
+
+The analysis behind them — the layer rule, the design knots, the full debt
 table, and the candidates that look mechanical but are not — is
 [`../renderer-layer-boundary.md`](../renderer-layer-boundary.md). Read it if you
 are deciding *what* to do; read a batch document if you are doing it.

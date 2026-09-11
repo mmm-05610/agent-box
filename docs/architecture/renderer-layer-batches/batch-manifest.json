@@ -1,54 +1,90 @@
 {
-  "_comment": "Input to .agents/skills/architecture-tree-report/scripts/batch-collisions.mjs. A batch name mapped to ripgrep patterns finding the modules it moves or changes; its touched set is every production file importing one of them. Add a batch here when you add its work order, then re-run the check and update the waves table in renderer-layer-master-plan.md. A batch missing from this file has unknown collisions and must run alone.",
-  "01 lib-services": [
-    "lib/oneshot'",
-    "lib/yolo-session'",
-    "lib/guarded-model-switch'",
-    "lib/session-export'"
-  ],
-  "02 tour": [
-    "lib/tour'"
-  ],
-  "03 shape+label": [
-    "lib/session-project-label'",
-    "new-session-drag'"
-  ],
-  "04 workspace": [
-    "workspace-groups'"
-  ],
-  "06a1 statusbar": [
-    "lib/statusbar'"
-  ],
-  "06a2 link-title": [
-    "lib/session-link-title'"
-  ],
-  "06b1 haptics": [
-    "lib/haptics'"
-  ],
-  "06c1 sound": [
-    "lib/sound/completion-sound'"
-  ],
-  "06c2 image-dl": [
-    "hooks/use-image-download'"
-  ],
-  "07a keybinds": [
-    "lib/keybinds/use-keybind-hint'",
-    "lib/keybinds/composer-focus-keys'"
-  ],
-  "07b external-link": [
-    "lib/external-link'"
-  ],
-  "08 pane-shell": [
-    "pane-shell/tree/store'",
-    "pane-shell/tree/presets'",
-    "pane-shell/workspace-scope'",
-    "contrib/plugins-store'",
-    "strip-visibility'",
-    "track-model'",
-    "grid-model'",
-    "zones-engine'",
-    "grid-to-tree'",
-    "tab-selection'",
-    "floating-rect'"
-  ]
+  "_comment": "Input to .agents/skills/architecture-tree-report/scripts/batch-collisions.mjs. Per batch: `edges` = what its work order claims, `modules` = ripgrep patterns finding the modules it moves or changes (its touched set is every production file importing one of them). Add a batch here when you add its work order, then re-run the check and update the waves table in renderer-layer-master-plan.md. A batch missing from here has unknown collisions and must run alone. The script sums `edges` and prints the expected final ledger, so the aggregate numbers in the plan are DERIVED from this file and cannot drift from it.",
+  "01 lib-services": {
+    "edges": 6,
+    "modules": [
+      "lib/oneshot'",
+      "lib/yolo-session'",
+      "lib/guarded-model-switch'",
+      "lib/session-export'"
+    ]
+  },
+  "02 tour": {
+    "edges": 2,
+    "modules": [
+      "lib/tour'"
+    ]
+  },
+  "03 shape+label": {
+    "edges": 3,
+    "modules": [
+      "lib/session-project-label'",
+      "new-session-drag'"
+    ]
+  },
+  "04 workspace": {
+    "edges": 4,
+    "modules": [
+      "workspace-groups'"
+    ]
+  },
+  "06a1 statusbar": {
+    "edges": 1,
+    "modules": [
+      "lib/statusbar'"
+    ]
+  },
+  "06a2 link-title": {
+    "edges": 1,
+    "modules": [
+      "lib/session-link-title'"
+    ]
+  },
+  "06b1 haptics": {
+    "edges": 1,
+    "modules": [
+      "lib/haptics'"
+    ]
+  },
+  "06c1 sound": {
+    "edges": 3,
+    "modules": [
+      "lib/sound/completion-sound'"
+    ]
+  },
+  "06c2 image-dl": {
+    "edges": 1,
+    "modules": [
+      "hooks/use-image-download'"
+    ]
+  },
+  "07a keybinds": {
+    "edges": 4,
+    "modules": [
+      "lib/keybinds/use-keybind-hint'",
+      "lib/keybinds/composer-focus-keys'"
+    ]
+  },
+  "07b external-link": {
+    "edges": 1,
+    "modules": [
+      "lib/external-link'"
+    ]
+  },
+  "08 pane-shell": {
+    "edges": 9,
+    "modules": [
+      "pane-shell/tree/store'",
+      "pane-shell/tree/presets'",
+      "pane-shell/workspace-scope'",
+      "contrib/plugins-store'",
+      "strip-visibility'",
+      "track-model'",
+      "grid-model'",
+      "zones-engine'",
+      "grid-to-tree'",
+      "tab-selection'",
+      "floating-rect'"
+    ]
+  }
 }

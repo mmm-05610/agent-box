@@ -10,6 +10,55 @@ a judgement call.
 
 ---
 
+## 0 · Precedence — read this before trusting any number in this file
+
+This document is **the plan, not the state**. It is maintained, so parts of it are
+summaries, and summaries go stale — including while a batch is running. When two
+things disagree, this is the order:
+
+| source of truth | what it owns |
+| --- | --- |
+| `renderer-layers.debt.ts` | how much work is left. Generated, and the guard fails on a stale line |
+| `renderer-layer-batches/NN-*.md` | what each batch does, and how many edges it claims |
+| `renderer-layer-batches/batch-manifest.json` | each batch's claimed edges and the modules it touches |
+| `renderer-layer-status.md` | which items are merged |
+| **this file** | the order, the parallel groups, the rules, and what is not delegated |
+
+So the work list is **not** a list written into this file or into a prompt. It is
+the rows in the status file that are not `merged`, restricted to Stage A. And the
+target is **not** a number written in §1:
+
+```
+expected ledger = ledger now − Σ(edges of the items you are about to do)
+```
+
+Re-derive everything with one command:
+
+```bash
+cd apps/desktop/src
+node ../../../.agents/skills/architecture-tree-report/scripts/batch-collisions.mjs \
+  ../../../docs/architecture/renderer-layer-batches/batch-manifest.json
+```
+
+It prints each batch's claimed edges, its touched-file count, the current ledger,
+the ledger after every batch, and the waves. **If §1 or §3 below states a
+different number, this file is stale and the manifest wins.**
+
+Two consequences worth stating, because both have already happened:
+
+- **A prompt handed to an executor must not restate the batch list or the target
+  number.** It says where to read them. A prompt that froze "01–07, 27 edges,
+  85 → 58" was written from §3's state at that moment and was wrong within the
+  hour, when a knot was decided and became batch 08. The executor noticed and
+  stopped, which is correct behaviour — but the prompt was the defect. The brief
+  is therefore kept as
+  [`renderer-layer-batches/EXECUTOR-PROMPT.md`](renderer-layer-batches/EXECUTOR-PROMPT.md),
+  versioned with this plan, instead of being pasted from a chat.
+- **Re-read §3 and this section at the start of each item, not once at the
+  start of the run.** That is what §9 is for.
+
+---
+
 ## 1 · The objective, and the one honest measure of it
 
 Every import in the renderer points **down** the layer order:
@@ -32,8 +81,8 @@ red on purpose.
 
 | | |
 | --- | --- |
-| ledger today | **85** |
-| after every work order in §3 | **49** |
+| ledger today | **85** *(derived — see §0)* |
+| after every work order in §3 | **49** *(derived — see §0)* |
 | test baseline | **775 files / 7466 tests** |
 
 **An item is done when the ledger shrank by exactly the number its work order
@@ -69,8 +118,9 @@ orders are in
 
 ## 3 · Order
 
-**Stage A — the layer work orders. 36 edges.** All seven are written, all
-destinations verified, all collisions mapped (§4).
+**Stage A — the layer work orders.** All seven are written and their collisions are
+mapped (§4). The per-batch edge counts below are the ones in the manifest, which
+is what actually sums to the target — see §0.
 
 | work order | scope | edges |
 | --- | --- | --- |
@@ -277,9 +327,12 @@ being made:
 1. Write `renderer-layer-batches/NN-<name>.md`, self-contained, with verified
    destinations and stop conditions.
 2. Add its row to `renderer-layer-batches/README.md`.
-3. Add its modules to `renderer-layer-batches/batch-manifest.json`.
-4. **Re-run the collision check** (§4) and replace the waves table. Do not reason
-   about it — the graph changed.
+3. Add it to `renderer-layer-batches/batch-manifest.json` with **both** its
+   claimed edge count and the modules it touches. The count is what §1's target is
+   derived from, and the collision check now fails if the two disagree.
+4. **Re-run the collision check** (§4) and replace both the waves table and §1's
+   target. Do not reason about either — the graph and the arithmetic changed, and
+   the check will tell you if you got the target wrong.
 5. Add it to Stage A's table in §3, or open a new stage if it is a different kind
    of work (as 05 is).
 6. Add its row to the status file.

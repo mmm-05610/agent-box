@@ -11,14 +11,20 @@
 // The manifest is the one input a human maintains:
 //
 //   {
-//     "01 lib-services": ["lib/oneshot'", "lib/yolo-session'"],
-//     "06a1 statusbar":  ["lib/statusbar'"]
+//     "01 lib-services": { "edges": 6, "modules": ["lib/oneshot'", "lib/yolo-session'"] },
+//     "06a1 statusbar":  { "edges": 1, "modules": ["lib/statusbar'"] }
 //   }
 //
-// Each value is a list of ripgrep patterns that find the modules the batch moves
-// or changes. A batch's touched set is every production file that imports one of
+// `modules` is a list of ripgrep patterns that find the modules the batch moves or
+// changes. A batch's touched set is every production file that imports one of
 // those modules — which is exactly what "two batches touch the same file" means
 // in practice.
+//
+// `edges` is what the batch's work order claims. The script sums it and prints the
+// expected final ledger, which is the whole point: the aggregate numbers in the
+// master plan are DERIVED from this file, so a plan that says "36 edges" while the
+// manifest sums to something else is a detectable inconsistency rather than a
+// stale claim nobody notices.
 //
 // `dev/contracts/renderer-layers.debt.ts` is deliberately excluded. Every batch
 // regenerates it, so it would collide with everything and tell us nothing; the
@@ -27,6 +33,7 @@
 // No dependencies.
 
 import { execFileSync } from 'node:child_process'
+import { dirname, join, resolve } from 'node:path'
 import { readFileSync } from 'node:fs'
 
 const LEDGER = 'dev/contracts/renderer-layers.debt.ts'
@@ -44,6 +51,13 @@ const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
 // keys. Skipping them here is the whole convention — without it a `_comment`
 // entry becomes a phantom batch with no collisions and adds a wave.
 const batches = Object.entries(manifest).filter(([name]) => !name.startsWith('_'))
+
+for (const [name, spec] of batches) {
+  if (typeof spec?.edges !== 'number' || !Array.isArray(spec?.modules)) {
+    console.error(`manifest entry "${name}" needs { edges: number, modules: string[] }`)
+    process.exit(2)
+  }
+}
 
 /** Every production file that imports one of `patterns`. */
 function touched(patterns) {
@@ -64,11 +78,45 @@ function touched(patterns) {
   return found
 }
 
-const sets = Object.fromEntries(batches.map(([name, patterns]) => [name, touched(patterns)]))
+const sets = Object.fromEntries(batches.map(([name, spec]) => [name, touched(spec.modules)]))
+const claimed = batches.reduce((sum, [, spec]) => sum + spec.edges, 0)
 
-console.log('touched-file counts\n')
-for (const [name, files] of Object.entries(sets)) {
-  console.log(`  ${name.padEnd(20)} ${String(files.size).padStart(4)}`)
+console.log('batches\n')
+console.log('  batch                 edges   touched files')
+for (const [name, spec] of batches) {
+  console.log(`  ${name.padEnd(20)} ${String(spec.edges).padStart(5)}   ${String(sets[name].size).padStart(4)}`)
+}
+
+// The ledger is the objective measure of progress, so the arithmetic that matters
+// is read from it rather than restated anywhere. `ledgerNow` is the truth;
+// `ledgerAfterAll` is what the plan is allowed to claim.
+const ledgerSource = readFileSync(LEDGER, 'utf8')
+const ledgerNow = ledgerSource.split('\n').filter(line => /^\s*'/.test(line)).length
+
+console.log(`\n  claimed by every batch   ${String(claimed).padStart(3)} edges`)
+console.log(`  ledger right now         ${String(ledgerNow).padStart(3)}`)
+console.log(`  ledger after all of them ${String(ledgerNow - claimed).padStart(3)}`)
+// Detect the drift rather than merely declaring a winner. The plan labels its
+// aggregate as derived; if the label is there and the number disagrees with this
+// arithmetic, the plan was not updated when a batch was added. That is exactly the
+// failure this project already hit once, and it is cheap to catch.
+const planPath = join(dirname(resolve(manifestPath)), '..', 'renderer-layer-master-plan.md')
+
+try {
+  const plan = readFileSync(planPath, 'utf8')
+  const stated = /\|\s*after every work order in §3\s*\|\s*\*\*(\d+)\*\*/.exec(plan)
+
+  if (!stated) {
+    console.log('\n  (the plan states no §3 target — nothing to cross-check)')
+  } else if (Number(stated[1]) === ledgerNow - claimed) {
+    console.log('\n  ✓ the plan\'s §3 target agrees with this arithmetic')
+  } else {
+    console.log(`\n  ✗ THE PLAN IS STALE: it says ${stated[1]}, the manifest and ledger say ${ledgerNow - claimed}.`)
+    console.log('    The manifest and the ledger are the source; fix the plan.')
+    process.exitCode = 1
+  }
+} catch {
+  console.log(`\n  (could not read ${planPath} to cross-check the plan's target)`)
 }
 
 const names = Object.keys(sets)
