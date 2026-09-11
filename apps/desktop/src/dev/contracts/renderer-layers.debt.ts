@@ -16,30 +16,17 @@
 // work gets scheduled: a `lib/` batch, a `store/` batch, and so on.
 
 export const DEBT_LEDGER: readonly string[] = [
-  // components/ — 5
+  // components/ — 2
   'components/assistant-ui/thread/user-edit-composer.tsx -> @/app/session/hooks/use-prompt-actions',
   'components/boot-failure-overlay.tsx -> @/app/settings/gateway-settings',
-  'components/pet/floating-pet.tsx -> @/app/gateway/hooks/use-gateway-request',
-  'components/pet/floating-pet.tsx -> @/app/hooks/use-on-profile-switch',
-  'components/pet/floating-pet.tsx -> @/app/hooks/use-route-overlay-active',
 
   // extension/ — 3
   'extension/sdk/index.ts -> @/app/settings/toolset-config-panel',
   'extension/sdk/index.ts -> @/app/skills',
   'extension/sdk/index.ts -> @/app/skills/mcp-tab',
 
-  // lib/ — 11
-  'lib/guarded-model-switch.ts -> @/store/notifications',
-  'lib/keybinds/composer-focus-keys.ts -> @/app/routes',
-  'lib/keybinds/composer-focus-keys.ts -> @/store/pane-shell/tree',
-  'lib/keybinds/composer-focus-keys.ts -> @/store/session-switcher',
-  'lib/keybinds/use-keybind-hint.ts -> @/store/keybinds',
-  'lib/oneshot.ts -> @/store/gateway',
-  'lib/oneshot.ts -> @/store/session',
-  'lib/session-export.ts -> @/store/notifications',
+  // lib/ — 1
   'lib/session-project-label.ts -> @/app/chat/sidebar/projects/workspace-groups',
-  'lib/yolo-session.ts -> @/store/gateway',
-  'lib/yolo-session.ts -> @/store/session',
 
   // store/ — 4
   'store/gateway-switch.ts -> @/app/contrib/hooks/use-background-sync',
