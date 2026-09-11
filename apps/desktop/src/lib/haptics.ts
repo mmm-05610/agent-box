@@ -1,7 +1,5 @@
 import type { HapticInput, TriggerOptions } from 'web-haptics'
 
-import { $hapticsMuted } from '@/store/haptics'
-
 export type HapticIntent =
   | 'cancel'
   | 'close'
@@ -84,6 +82,18 @@ const HAPTIC_INTENTS: Record<HapticIntent, HapticConfig> = {
 
 export type HapticTrigger = (input?: HapticInput, options?: TriggerOptions) => Promise<void> | undefined
 
+// The mute preference is injected, not read: `lib/` is a leaf and may not import
+// `@/store/haptics`. The component that owns the platform trigger (see
+// `components/haptics-provider.tsx`) publishes the getter; reading it lazily —
+// a getter rather than a snapshot value — keeps the behaviour identical to
+// reading the atom directly. The unwired default (`false`) is the same answer
+// the unset preference gives: haptics are not muted until a provider says so.
+let readMuted: () => boolean = () => false
+
+export function setHapticsMutedSource(source: () => boolean): void {
+  readMuted = source
+}
+
 let registeredTrigger: HapticTrigger | null = null
 let lastSelectionAt = 0
 
@@ -101,7 +111,7 @@ export function registerHapticTrigger(trigger: HapticTrigger | null) {
 }
 
 export function triggerHaptic(intent: HapticIntent = 'selection') {
-  if ($hapticsMuted.get() || !registeredTrigger) {
+  if (readMuted() || !registeredTrigger) {
     return
   }
 
