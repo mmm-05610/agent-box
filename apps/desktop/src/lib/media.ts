@@ -1,6 +1,9 @@
-import { readDesktopFileDataUrl } from '@/lib/desktop-fs'
 import { capitalize } from '@/lib/text'
-import { $connection } from '@/store/session'
+
+// Path → kind / MIME / label. Pure: no connection, no DOM beyond the URL parser,
+// nothing else in the renderer. The half of media handling that needs the active
+// connection — resolving a path to a URL the shell or an <img> can use — is
+// `@/lib/desktop-fs`, next to the connection it needs.
 
 export type MediaKind = 'audio' | 'image' | 'video' | 'file'
 
@@ -81,82 +84,6 @@ export function isFileMediaPath(path: string): boolean {
   return /^(?:file:|\/|~\/|[a-z]:[\\/]|\\\\)/i.test(path)
 }
 
-export async function resolveMediaDisplaySrc(path: string): Promise<string> {
-  if (isInlineMediaSrc(path) || !isFileMediaPath(path)) {
-    return path
-  }
-
-  if (window.hermesDesktop && isRemoteGateway()) {
-    return gatewayMediaDataUrl(path)
-  }
-
-  if (!window.hermesDesktop?.readFileDataUrl) {
-    return mediaExternalUrl(path)
-  }
-
-  return window.hermesDesktop.readFileDataUrl(filePathFromMediaPath(path))
-}
-
-// Audio/video need a seekable source instead of a whole-file data URL. Keep
-// remote URLs untouched and route filesystem paths through the Electron media
-// protocol. Its main-process handler reads local files directly or proxies a
-// remote gateway with the connection's bearer/cookie/token authentication.
-export async function resolveMediaPlaybackSrc(path: string): Promise<string> {
-  if (isInlineMediaSrc(path)) {
-    return path
-  }
-
-  if (window.hermesDesktop && ['audio', 'video'].includes(mediaKind(path))) {
-    return isRemoteGateway() ? mediaGatewayStreamUrl(path) : mediaStreamUrl(path)
-  }
-
-  return resolveMediaDisplaySrc(path)
-}
-
-// Resolve a media path to a URL the shell can open. Remote mode rewrites
-// gateway-local paths to an authenticated /api/files/download URL (the file
-// lives on the gateway, not this disk); local mode keeps the file:// form.
-export function mediaExternalUrl(path: string): string {
-  if (/^https?:/i.test(path)) {
-    return path
-  }
-
-  if (isRemoteGateway()) {
-    const conn = $connection.get()
-
-    if (conn?.baseUrl && conn.token) {
-      const file = encodeURIComponent(filePathFromMediaPath(path))
-
-      return `${conn.baseUrl}/api/files/download?path=${file}&token=${encodeURIComponent(conn.token)}`
-    }
-  }
-
-  return /^file:/i.test(path) ? path : `file://${path}`
-}
-
-// Remote gateway audio/video is proxied by the Electron main process. OAuth
-// connections intentionally expose no static token to the renderer, so a bare
-// HTTPS source cannot authenticate reliably. The custom protocol keeps secrets
-// out of renderer URLs while forwarding Range requests to /api/files/stream.
-export function mediaGatewayStreamUrl(path: string): string {
-  const conn = $connection.get()
-
-  if (isRemoteGateway()) {
-    const file = encodeURIComponent(filePathFromMediaPath(path))
-
-    const scope = [
-      conn?.connectionId ? `connectionId=${encodeURIComponent(conn.connectionId)}` : '',
-      conn?.profile ? `profile=${encodeURIComponent(conn.profile)}` : ''
-    ]
-      .filter(Boolean)
-      .join('&')
-
-    return `hermes-media://remote/${file}${scope ? `?${scope}` : ''}`
-  }
-
-  return mediaExternalUrl(path)
-}
-
 // Custom Electron scheme (registered in electron/main.ts) that streams a local
 // file with Range support. Used for audio/video so playback bypasses the data
 // URL size cap and supports seeking. `path` may be a plain path or `file://…`.
@@ -186,52 +113,6 @@ export function filePathFromMediaPath(path: string): string {
   } catch {
     return path.replace(/^file:\/\//, '')
   }
-}
-
-// True when this desktop shell is wired to a remote gateway. Local media paths
-// then live on the gateway machine, not this disk, so we fetch them over the API.
-export function isRemoteGateway(): boolean {
-  return $connection.get()?.mode === 'remote'
-}
-
-// Fetch gateway-local media as a data URL via the authenticated desktop FS
-// bridge. Remote Desktop artifacts can live anywhere the gateway can read
-// (workspace, skills, ~/.hermes/cache, etc.); /api/media is intentionally
-// narrower and rejects non-images plus images outside its media roots.
-export async function gatewayMediaDataUrl(path: string): Promise<string> {
-  return readDesktopFileDataUrl(filePathFromMediaPath(path))
-}
-
-// Remote-mode replacement for opening gateway-local file paths with file://.
-// The file lives on the gateway, so ask the Electron main process to fetch the
-// bytes through the authenticated backend connection and save them locally. This
-// avoids browser/OS downloads losing OAuth cookies and avoids the data-URL cap
-// used by preview endpoints.
-export async function downloadGatewayMediaFile(
-  path: string,
-  origin?: { sessionId: string; profile?: string }
-): Promise<{ canceled?: boolean; path?: string; saved: boolean }> {
-  // URI conversion belongs to the gateway OS, not the renderer's URL parser.
-  const file = path
-  const conn = $connection.get()
-
-  if (!window.hermesDesktop?.saveGatewayFile) {
-    throw new Error('Desktop file download bridge is unavailable')
-  }
-
-  return window.hermesDesktop.saveGatewayFile({
-    connectionId: conn?.connectionId,
-    path: file,
-    profile: origin?.profile ?? conn?.profile,
-    ...(origin ? { sessionId: origin.sessionId } : {}),
-    suggestedName: mediaName(file).replace(/(?:%[0-9a-f]{2})+/gi, encoded => {
-      try {
-        return decodeURIComponent(encoded)
-      } catch {
-        return encoded
-      }
-    })
-  })
 }
 
 export function mediaDisplayLabel(path: string): string {

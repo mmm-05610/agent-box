@@ -1,5 +1,8 @@
 import { configure } from '@testing-library/react'
 
+import { setDesktopFsConnectionSource } from './src/lib/desktop-fs'
+import { $connection } from './src/store/session'
+
 // Node 26 defines its own `localStorage` accessor on the global object, which
 // returns `undefined` unless the process was started with --localstorage-file
 // (it warns: "localStorage is not available because --localstorage-file was
@@ -9,6 +12,7 @@ import { configure } from '@testing-library/react'
 // Storage when the global resolves to nothing, before any test module reads it.
 if (typeof (globalThis as any).localStorage === 'undefined') {
   const store = new Map<string, string>()
+
   const storage: Storage = {
     get length() {
       return store.size
@@ -19,6 +23,7 @@ if (typeof (globalThis as any).localStorage === 'undefined') {
     removeItem: (k: string) => void store.delete(String(k)),
     clear: () => store.clear(),
   }
+
   for (const target of [globalThis, (globalThis as any).window].filter(Boolean)) {
     Object.defineProperty(target, 'localStorage', {
       value: storage,
@@ -44,3 +49,15 @@ if (typeof (globalThis as any).localStorage === 'undefined') {
 // as the 15s testTimeout above it while still finishing below it, so a
 // genuinely hung await still surfaces as this assertion, not a test timeout.
 configure({ asyncUtilTimeout: 12_000 })
+
+// `lib/desktop-fs` is a leaf: it mirrors one filesystem/git/media operation onto
+// two backends and needs to know which is live, but it may not read the store to
+// find out. The app installs a getter over `$connection` at boot
+// (`app/contrib/hooks/use-desktop-fs-connection.ts`); tests install the same one
+// here so a test that sets `$connection` sees the branch it always did.
+//
+// Without this, every test that drives the adapter directly would silently take
+// the LOCAL branch — the connection would read as absent — and 20-odd remote-mode
+// assertions across the suite would fail on that, not on anything real. Wiring it
+// centrally is also the honest shape: the app never runs unwired either.
+setDesktopFsConnectionSource(() => $connection.get())

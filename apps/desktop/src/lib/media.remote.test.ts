@@ -4,15 +4,22 @@ import { $connection } from '@/store/session'
 
 import {
   downloadGatewayMediaFile,
-  filePathFromMediaPath,
   gatewayMediaDataUrl,
-  isInlineMediaSrc,
   isRemoteGateway,
   mediaExternalUrl,
   mediaGatewayStreamUrl,
   resolveMediaDisplaySrc,
-  resolveMediaPlaybackSrc
-} from './media'
+  resolveMediaPlaybackSrc,
+  setDesktopFsConnectionSource
+} from './desktop-fs'
+import { isInlineMediaSrc } from './media'
+
+// `lib/desktop-fs` takes its connection from an injected source now, so these
+// tests supply the store's atom — which is what the app wires at boot. Every
+// `$connection.set(...)` below drives the branch it always did.
+beforeEach(() => {
+  setDesktopFsConnectionSource(() => $connection.get())
+})
 
 describe('isRemoteGateway', () => {
   afterEach(() => {
@@ -32,16 +39,6 @@ describe('isRemoteGateway', () => {
   it('is true in remote mode', () => {
     $connection.set({ mode: 'remote' } as never)
     expect(isRemoteGateway()).toBe(true)
-  })
-})
-
-describe('filePathFromMediaPath', () => {
-  it('passes through a plain path', () => {
-    expect(filePathFromMediaPath('/home/u/.hermes/images/a.png')).toBe('/home/u/.hermes/images/a.png')
-  })
-
-  it('decodes a file:// URL with encoded characters', () => {
-    expect(filePathFromMediaPath('file:///tmp/a%20b.png')).toBe('/tmp/a b.png')
   })
 })
 

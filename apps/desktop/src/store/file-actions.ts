@@ -8,7 +8,7 @@ import {
   revealDesktopPath,
   trashDesktopPath
 } from '@/lib/desktop-fs'
-import { downloadGatewayMediaFile } from '@/lib/media'
+import {downloadGatewayMediaFile} from '@/lib/desktop-fs'
 import { notify, notifyError } from '@/store/notifications'
 import { notifyWorkspaceChanged } from '@/store/workspace-events'
 

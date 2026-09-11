@@ -1,4 +1,5 @@
-import { isArtifactFilePath, mediaExternalUrl, resolveMediaDisplaySrc } from '@/lib/media'
+import {mediaExternalUrl, resolveMediaDisplaySrc} from '@/lib/desktop-fs'
+import {isArtifactFilePath} from '@/lib/media'
 import type { SessionInfo, SessionMessage } from '@/types/hermes'
 
 export type ArtifactKind = 'image' | 'file' | 'link'

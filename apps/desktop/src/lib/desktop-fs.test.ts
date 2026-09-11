@@ -7,12 +7,15 @@ import {
   desktopDefaultCwd,
   desktopFileDiff,
   desktopFsCacheKey,
+  desktopFsProfile,
   desktopGitRoot,
+  isDesktopFsRemoteMode,
   readDesktopDir,
   readDesktopFileDataUrl,
   readDesktopFileDataUrlLocalFirst,
   readDesktopFileText,
   selectDesktopPaths,
+  setDesktopFsConnectionSource,
   setDesktopFsRemotePicker
 } from './desktop-fs'
 
@@ -317,5 +320,35 @@ describe('desktop filesystem facade', () => {
 
     expect(remoteSelect).toHaveBeenCalledWith({ directories: true, multiple: false })
     expect(selectPaths).not.toHaveBeenCalled()
+  })
+})
+
+// This is the seam that keeps the adapter on the leaf layer, so it gets its own
+// test rather than riding on ambient wiring: if someone reaches for
+// `$connection` in `lib/desktop-fs.ts` again, these two cases still pass, but
+// the store and the source can no longer disagree — which is exactly the state
+// this adapter is not allowed to be in.
+describe('the connection is injected, not read from the store', () => {
+  afterEach(() => {
+    // Restore the wiring the suite installs (see `vitest.setup.ts`), which is the
+    // same one the app installs at boot. Leaving a custom source behind would
+    // leak into whichever file runs next in this worker.
+    setDesktopFsConnectionSource(() => $connection.get())
+  })
+
+  it('follows the injected source even when the store disagrees', () => {
+    $connection.set({ mode: 'local' } as never)
+    setDesktopFsConnectionSource(() => ({ mode: 'remote', profile: 'gateway-b' } as never))
+
+    expect(isDesktopFsRemoteMode()).toBe(true)
+    expect(desktopFsProfile()).toBe('gateway-b')
+  })
+
+  it('answers local with no profile when nothing has been published', () => {
+    $connection.set({ mode: 'remote', profile: 'gateway-b' } as never)
+    setDesktopFsConnectionSource(() => null)
+
+    expect(isDesktopFsRemoteMode()).toBe(false)
+    expect(desktopFsProfile()).toBeUndefined()
   })
 })

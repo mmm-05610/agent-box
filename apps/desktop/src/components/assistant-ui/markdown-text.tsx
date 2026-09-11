@@ -16,23 +16,12 @@ import { chunkByLines, SyntaxHighlighter } from '@/components/chat/shiki-highlig
 import { ZoomableImage } from '@/components/chat/zoomable-image'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { detectArtifact } from '@/lib/artifact-detect'
+import {downloadGatewayMediaFile, isRemoteGateway, mediaExternalUrl, resolveMediaDisplaySrc, resolveMediaPlaybackSrc} from '@/lib/desktop-fs'
 import { normalizeExternalUrl, openExternalLink, PrettyLink } from '@/lib/external-link'
 import { createMemoizedMathPlugin } from '@/lib/katex-memo'
 import { parseMarkdownIntoBlocksCached } from '@/lib/markdown-blocks'
 import { preprocessMarkdown } from '@/lib/markdown-preprocess'
-import {
-  downloadGatewayMediaFile,
-  isFileMediaPath,
-  isInlineMediaSrc,
-  isMarkdownDocumentPath,
-  isRemoteGateway,
-  mediaExternalUrl,
-  mediaKind,
-  mediaName,
-  mediaPathFromMarkdownHref,
-  resolveMediaDisplaySrc,
-  resolveMediaPlaybackSrc
-} from '@/lib/media'
+import {isFileMediaPath, isInlineMediaSrc, isMarkdownDocumentPath, mediaKind, mediaName, mediaPathFromMarkdownHref} from '@/lib/media'
 import { previewTargetFromMarkdownHref } from '@/lib/preview-targets'
 import { sessionRefFromMarkdownHref } from '@/lib/session-refs'
 import { cn } from '@/lib/utils'

@@ -14,6 +14,7 @@ import { type CSSProperties, lazy, type ReactNode, Suspense, useCallback, useEff
 import { useLocation, useNavigate } from 'react-router'
 
 import { graftRefreshedTailOntoBackfill } from '@/app/chat/transcript-backfill'
+import { useDesktopFsConnection } from '@/app/contrib/hooks/use-desktop-fs-connection'
 import { refreshActiveProfile } from '@/application/profile/catalog'
 import { getLatestSessionMessages } from '@/application/session-transcripts'
 import { useSkinCommand } from '@/application/theme/use-skin-command'
@@ -680,6 +681,10 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     sessionStateByRuntimeIdRef,
     updateSessionState
   })
+
+  // The host-capability adapters learn which connection is live from here, so
+  // `lib/desktop-fs` never has to read the session store itself.
+  useDesktopFsConnection()
 
   // The popped-out pet overlay's bridge back into the app.
   usePetBridge({ requestGateway, resumeSession, submitText })

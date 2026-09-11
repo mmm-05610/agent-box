@@ -22,6 +22,7 @@ import { Tip } from '@/components/ui/tooltip'
 import { getAllSessionMessages } from '@/hermes'
 import { type Translations, useI18n } from '@/i18n'
 import { resolveBrandIcon } from '@/lib/brand-icon'
+import {downloadGatewayMediaFile, isRemoteGateway} from '@/lib/desktop-fs'
 import {
   ExternalLink,
   ExternalLinkIcon,
@@ -31,7 +32,7 @@ import {
   useLinkTitle
 } from '@/lib/external-link'
 import { FileImage, FileText, FolderOpen, Link2 } from '@/lib/icons'
-import { downloadGatewayMediaFile, isArtifactFilePath, isRemoteGateway } from '@/lib/media'
+import {isArtifactFilePath} from '@/lib/media'
 import { normalize } from '@/lib/text'
 import { fmtDayTime } from '@/lib/time'
 import { cn } from '@/lib/utils'

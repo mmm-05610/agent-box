@@ -1,4 +1,4 @@
-import { isRemoteGateway } from '@/lib/media'
+import {isRemoteGateway} from '@/lib/desktop-fs'
 
 /**
  * Make a URL loadable from THIS machine before the pane tries it.

@@ -64,8 +64,7 @@ export const DEBT_LEDGER: readonly string[] = [
   'extension/sdk/index.ts -> @/app/skills',
   'extension/sdk/index.ts -> @/app/skills/mcp-tab',
 
-  // lib/ — 25
-  'lib/desktop-fs.ts -> @/store/session',
+  // lib/ — 23
   'lib/external-link.tsx -> @/store/preview',
   'lib/guarded-model-switch.ts -> @/store/notifications',
   'lib/haptics.ts -> @/store/haptics',
@@ -74,7 +73,6 @@ export const DEBT_LEDGER: readonly string[] = [
   'lib/keybinds/composer-focus-keys.ts -> @/components/pane-shell/tree/store',
   'lib/keybinds/composer-focus-keys.ts -> @/store/session-switcher',
   'lib/keybinds/use-keybind-hint.ts -> @/store/keybinds',
-  'lib/media.ts -> @/store/session',
   'lib/oneshot.ts -> @/store/gateway',
   'lib/oneshot.ts -> @/store/session',
   'lib/session-export.ts -> @/store/notifications',

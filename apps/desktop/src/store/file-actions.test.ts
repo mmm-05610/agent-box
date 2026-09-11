@@ -2,12 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { $notifications, clearNotifications } from '@/store/notifications'
 
-vi.mock('@/lib/media', () => ({
+vi.mock('@/lib/desktop-fs', () => ({
   downloadGatewayMediaFile: vi.fn()
 }))
 
-const media = await import('@/lib/media')
-const downloadGatewayMediaFile = vi.mocked(media.downloadGatewayMediaFile)
+const desktopFs = await import('@/lib/desktop-fs')
+const downloadGatewayMediaFile = vi.mocked(desktopFs.downloadGatewayMediaFile)
 
 const { downloadRemoteFile, shouldOfferRemoteFileDownload } = await import('./file-actions')
 

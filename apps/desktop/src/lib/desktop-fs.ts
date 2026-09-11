@@ -5,7 +5,25 @@ import type {
   HermesReadFileTextResult,
   HermesSelectPathsOptions
 } from '@/global'
-import { $connection } from '@/store/session'
+import {
+  filePathFromMediaPath,
+  isFileMediaPath,
+  isInlineMediaSrc,
+  mediaKind,
+  mediaName,
+  mediaStreamUrl
+} from '@/lib/media'
+
+// The host-capability adapter: one operation, two backends. Local goes through
+// the Electron IPC bridge (`window.hermesDesktop`); a remote gateway has the
+// filesystem, so the same operation mirrors onto its REST surface (/api/fs/*,
+// /api/git/*, /api/files/*). The renderer's file and git surfaces never learn
+// which side answered.
+//
+// It is a LEAF, and it stays one. It used to read `$connection` out of the
+// session store, which is what made a filesystem primitive depend on app state;
+// the active connection now arrives through `setDesktopFsConnectionSource`,
+// the same shape this file already used for the remote picker below.
 
 export interface DesktopFsRemotePicker {
   selectPaths: (options?: HermesSelectPathsOptions) => Promise<string[]>
@@ -15,6 +33,23 @@ let remotePicker: DesktopFsRemotePicker | null = null
 
 export function setDesktopFsRemotePicker(next: DesktopFsRemotePicker | null) {
   remotePicker = next
+}
+
+/** The active connection, published by the composition root (see
+ *  `app/contrib/hooks/use-desktop-fs-connection.ts`).
+ *
+ *  Reading it lazily — a getter rather than a value — is what keeps the
+ *  behaviour identical to reading the atom directly: a connection that changes
+ *  mid-session is picked up by the next call, and no re-registration is needed.
+ *
+ *  The `() => null` default is the not-yet-connected state, which is exactly
+ *  what `$connection.get()` returns before a backend is chosen: local mode, no
+ *  profile. So an unwired source degrades to the same answer the store gave,
+ *  and never to a wrong remote one. */
+let readConnection: () => HermesConnection | null = () => null
+
+export function setDesktopFsConnectionSource(source: () => HermesConnection | null): void {
+  readConnection = source
 }
 
 function connectionCacheKey(connection: HermesConnection | null) {
@@ -37,18 +72,18 @@ function connectionCacheKey(connection: HermesConnection | null) {
   return `${connection.mode || 'local'}:${connection.remoteKind || ''}:${connection.profile || ''}:${target}`
 }
 
-export function desktopFsCacheKey(connection: HermesConnection | null = $connection.get()) {
+export function desktopFsCacheKey(connection: HermesConnection | null = readConnection()) {
   return connectionCacheKey(connection)
 }
 
 export function isDesktopFsRemoteMode() {
-  return $connection.get()?.mode === 'remote'
+  return readConnection()?.mode === 'remote'
 }
 
 // Active profile for FS/git REST calls. Without it the Electron api bridge
 // hits the primary (local) backend even when the user switched to a remote profile.
 export function desktopFsProfile(): string | undefined {
-  return $connection.get()?.profile || undefined
+  return readConnection()?.profile || undefined
 }
 
 function fsPath(endpoint: string, filePath: string) {
@@ -222,3 +257,139 @@ export async function selectDesktopPaths(options?: HermesSelectPathsOptions): Pr
 
   return remotePicker ? remotePicker.selectPaths({ ...options, multiple: false }) : []
 }
+
+// ── gateway media addresses ──────────────────────────────────────────────────
+//
+// The other half of "the same operation, two backends": a media path resolves to
+// a URL this shell can hand to the OS or to an <img>/<video>. Local paths live on
+// THIS disk; a remote gateway's live over there, so they need an authenticated
+// gateway URL instead.
+//
+// These live here rather than in `lib/media.ts` because they are the only part of
+// media handling that needs the connection — and the connection is injected into
+// this module. Keeping them together means one injection point, not two.
+// `lib/media.ts` keeps the pure half (path → kind / MIME / label), which needs no
+// connection at all.
+
+/** True when this desktop shell is wired to a remote gateway. Local media paths
+ *  then live on the gateway machine, not this disk, so we fetch them over the API. */
+export function isRemoteGateway(): boolean {
+  return readConnection()?.mode === 'remote'
+}
+
+// Resolve a media path to a URL the shell can open. Remote mode rewrites
+// gateway-local paths to an authenticated /api/files/download URL (the file
+// lives on the gateway, not this disk); local mode keeps the file:// form.
+export function mediaExternalUrl(path: string): string {
+  if (/^https?:/i.test(path)) {
+    return path
+  }
+
+  if (isRemoteGateway()) {
+    const conn = readConnection()
+
+    if (conn?.baseUrl && conn.token) {
+      const file = encodeURIComponent(filePathFromMediaPath(path))
+
+      return `${conn.baseUrl}/api/files/download?path=${file}&token=${encodeURIComponent(conn.token)}`
+    }
+  }
+
+  return /^file:/i.test(path) ? path : `file://${path}`
+}
+
+// Remote gateway audio/video is proxied by the Electron main process. OAuth
+// connections intentionally expose no static token to the renderer, so a bare
+// HTTPS source cannot authenticate reliably. The custom protocol keeps secrets
+// out of renderer URLs while forwarding Range requests to /api/files/stream.
+export function mediaGatewayStreamUrl(path: string): string {
+  const conn = readConnection()
+
+  if (isRemoteGateway()) {
+    const file = encodeURIComponent(filePathFromMediaPath(path))
+
+    const scope = [
+      conn?.connectionId ? `connectionId=${encodeURIComponent(conn.connectionId)}` : '',
+      conn?.profile ? `profile=${encodeURIComponent(conn.profile)}` : ''
+    ]
+      .filter(Boolean)
+      .join('&')
+
+    return `hermes-media://remote/${file}${scope ? `?${scope}` : ''}`
+  }
+
+  return mediaExternalUrl(path)
+}
+
+// Fetch gateway-local media as a data URL via the authenticated desktop FS
+// bridge. Remote Desktop artifacts can live anywhere the gateway can read
+// (workspace, skills, ~/.hermes/cache, etc.); /api/media is intentionally
+// narrower and rejects non-images plus images outside its media roots.
+export async function gatewayMediaDataUrl(path: string): Promise<string> {
+  return readDesktopFileDataUrl(filePathFromMediaPath(path))
+}
+
+// Remote-mode replacement for opening gateway-local file paths with file://.
+// The file lives on the gateway, so ask the Electron main process to fetch the
+// bytes through the authenticated backend connection and save them locally. This
+// avoids browser/OS downloads losing OAuth cookies and avoids the data-URL cap
+// used by preview endpoints.
+export async function downloadGatewayMediaFile(
+  path: string,
+  origin?: { sessionId: string; profile?: string }
+): Promise<{ canceled?: boolean; path?: string; saved: boolean }> {
+  // URI conversion belongs to the gateway OS, not the renderer's URL parser.
+  const file = path
+  const conn = readConnection()
+
+  if (!window.hermesDesktop?.saveGatewayFile) {
+    throw new Error('Desktop file download bridge is unavailable')
+  }
+
+  return window.hermesDesktop.saveGatewayFile({
+    connectionId: conn?.connectionId,
+    path: file,
+    profile: origin?.profile ?? conn?.profile,
+    ...(origin ? { sessionId: origin.sessionId } : {}),
+    suggestedName: mediaName(file).replace(/(?:%[0-9a-f]{2})+/gi, encoded => {
+      try {
+        return decodeURIComponent(encoded)
+      } catch {
+        return encoded
+      }
+    })
+  })
+}
+
+export async function resolveMediaDisplaySrc(path: string): Promise<string> {
+  if (isInlineMediaSrc(path) || !isFileMediaPath(path)) {
+    return path
+  }
+
+  if (window.hermesDesktop && isRemoteGateway()) {
+    return gatewayMediaDataUrl(path)
+  }
+
+  if (!window.hermesDesktop?.readFileDataUrl) {
+    return mediaExternalUrl(path)
+  }
+
+  return window.hermesDesktop.readFileDataUrl(filePathFromMediaPath(path))
+}
+
+// Audio/video need a seekable source instead of a whole-file data URL. Keep
+// remote URLs untouched and route filesystem paths through the Electron media
+// protocol. Its main-process handler reads local files directly or proxies a
+// remote gateway with the connection's bearer/cookie/token authentication.
+export async function resolveMediaPlaybackSrc(path: string): Promise<string> {
+  if (isInlineMediaSrc(path)) {
+    return path
+  }
+
+  if (window.hermesDesktop && ['audio', 'video'].includes(mediaKind(path))) {
+    return isRemoteGateway() ? mediaGatewayStreamUrl(path) : mediaStreamUrl(path)
+  }
+
+  return resolveMediaDisplaySrc(path)
+}
+
