@@ -36,6 +36,7 @@
 import http from 'node:http'
 import https from 'node:https'
 
+
 // JSON pool: many small concurrent calls (session lists, config, prompts).
 const HTTP_JSON_AGENT = new http.Agent({ keepAlive: true, maxSockets: 50 })
 const HTTPS_JSON_AGENT = new https.Agent({ keepAlive: true, maxSockets: 50 })
@@ -176,3 +177,4 @@ export {
   shouldRetryRequest,
   withRetry
 }
+

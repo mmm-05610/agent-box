@@ -636,3 +636,28 @@ export async function stopRegistryConnectionBackends(connectionId) {
 }
 
 export const connectionInstallIds = new Map<string, { id?: string; ts: number }>()
+
+export function sanitizeConnectionsRegistry(registry = readDesktopConnectionsRegistry()) {
+  // Same keyring signal the v1 sanitize exposes: lets the Connections panel
+  // offer the plain-text opt-in on keyring-less Linux instead of failing.
+  // Policy-aware: never touches safeStorage while encryption is opted out.
+  const secureTokenStorage = probeSecureTokenStorage()
+
+  return {
+    version: registry.version,
+    primary: registry.primary,
+    launchMode: registry.launchMode,
+    lastUsed: registry.lastUsed,
+    secureTokenStorage,
+    connections: registry.connections.map(sanitizeRegistryConnection),
+    // Surface quarantined-entry NOTICES only (reason + best-effort label) —
+    // the raw entries can carry token envelopes and stay in the file (#94246).
+    quarantined: (registry.quarantined || []).map(q => ({
+      reason: String(q?.reason || 'unknown'),
+      label:
+        q && q.entry && typeof q.entry === 'object' && typeof (q.entry as any).label === 'string'
+          ? (q.entry as any).label
+          : ''
+    }))
+  }
+}
