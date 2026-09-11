@@ -90,9 +90,10 @@ Three rules keep the seams real:
 
 ## Backend lifecycle, briefly
 
-`electron/main.ts` is the orchestration entry point; resolution, probing,
-readiness, and platform policy live in focused modules under
-`electron/legacy-hermes/` (`backend-probes.ts`, `backend-health.ts`,
+`electron/main.ts` is the orchestration entry point and nothing else: the startup
+statement sequence, the module wiring, and the IPC registrations — no function
+declarations at all. Resolution, probing, readiness, and platform policy live in
+focused modules under `electron/legacy-hermes/` (`backend-probes.ts`, `backend-health.ts`,
 `backend-command.ts`, `backend-env.ts`, `backend-start-failure.ts`,
 `active-runtime-state.ts`, `bootstrap-runner.ts`, `first-run-setup-gate.ts`).
 Keep it that way — new policy belongs in a module with a test, not inline in
