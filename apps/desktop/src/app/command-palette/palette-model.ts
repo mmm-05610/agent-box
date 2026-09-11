@@ -1,5 +1,5 @@
 import type {
-  HUD_NOTE_VARIANT} from '@/app/floating-hud';
+  HUD_NOTE_VARIANT} from '@/lib/floating-hud';
 import {
   type IconComponent
 } from '@/lib/icons'

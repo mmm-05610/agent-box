@@ -1,8 +1,8 @@
 import type { CSSProperties } from 'react'
 
 import { PanelEmpty } from '@/app/overlays/panel'
-import { TITLEBAR_HEIGHT } from '@/app/shell/titlebar'
 import { useI18n } from '@/i18n'
+import { TITLEBAR_HEIGHT } from '@/lib/titlebar'
 import { windowBrowserTabId } from '@/store/windows'
 
 import { PreviewTilePane } from './right-rail/preview'

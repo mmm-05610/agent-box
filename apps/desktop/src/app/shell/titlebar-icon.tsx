@@ -1,7 +1,6 @@
 import { Codicon } from '@/components/ui/codicon'
+import { titlebarIconSizeCss } from '@/lib/titlebar'
 import { cn } from '@/lib/utils'
-
-import { titlebarIconSizeCss } from './titlebar'
 
 /** Titlebar-cluster glyph — 13.9px inline (see titlebarIconSizeCss). */
 export function TitlebarIcon({

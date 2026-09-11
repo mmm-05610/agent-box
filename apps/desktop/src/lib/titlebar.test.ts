@@ -13,7 +13,7 @@ import {
   titlebarIconSizeCss,
   titlebarToolsRightCss,
   titlebarToolsWidthCss
-} from './titlebar'
+} from '@/lib/titlebar'
 
 describe('titlebar sizing', () => {
   it('uses 24×24 hit targets and 13.9px glyphs', () => {

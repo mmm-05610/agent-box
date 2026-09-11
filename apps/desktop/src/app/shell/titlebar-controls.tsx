@@ -12,6 +12,12 @@ import { useI18n } from '@/i18n'
 import { compactNumber } from '@/lib/format'
 import { triggerHaptic } from '@/lib/haptics'
 import { formatModifierToken } from '@/lib/keybinds/combo'
+import {
+  TITLEBAR_ICON_BADGE_SCALE,
+  titlebarButtonClass,
+  titlebarIconSizeCss,
+  titlebarToolClusterClass
+} from '@/lib/titlebar'
 import { cn } from '@/lib/utils'
 import { $hapticsMuted, toggleHapticsMuted } from '@/store/haptics'
 import { toggleHud } from '@/store/hud'
@@ -27,12 +33,6 @@ import { $unreadSessionCount } from '@/store/session-dot-state'
 
 import { appViewForPath, isOverlayView } from '../routes'
 
-import {
-  TITLEBAR_ICON_BADGE_SCALE,
-  titlebarButtonClass,
-  titlebarIconSizeCss,
-  titlebarToolClusterClass
-} from './titlebar'
 import { TitlebarIcon } from './titlebar-icon'
 
 export interface TitlebarTool {

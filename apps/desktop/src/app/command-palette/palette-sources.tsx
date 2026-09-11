@@ -2,16 +2,16 @@
 
 import { memo, useDeferredValue } from 'react'
 
+import { CommandGroup, CommandItem } from '@/components/ui/command'
+import { HighlightMatches } from '@/components/ui/highlight-matches'
+import { KbdCombo } from '@/components/ui/kbd'
 import {
   HUD_HEADING,
   HUD_ITEM,
   HUD_NOTE,
   HUD_NOTE_VARIANT,
   HUD_TEXT
-} from '@/app/floating-hud'
-import { CommandGroup, CommandItem } from '@/components/ui/command'
-import { HighlightMatches } from '@/components/ui/highlight-matches'
-import { KbdCombo } from '@/components/ui/kbd'
+} from '@/lib/floating-hud'
 import {
   Archive,
   Check,

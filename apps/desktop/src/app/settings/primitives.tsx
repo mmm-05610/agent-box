@@ -6,9 +6,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
 import { triggerHaptic } from '@/lib/haptics'
 import type { IconComponent } from '@/lib/icons'
+import { PAGE_INSET_X } from '@/lib/layout-constants'
 import { cn } from '@/lib/utils'
-
-import { PAGE_INSET_X } from '../layout-constants'
 
 // `bare` drops the page gutters + tall bottom pad for embedding in a tighter
 // surface (e.g. the boot-failure recovery card owns its own padding).

@@ -1,11 +1,11 @@
 import { type CSSProperties, type ReactNode, useEffect } from 'react'
 
-import { TITLEBAR_HEIGHT } from '@/app/shell/titlebar'
 import { TitlebarIcon } from '@/app/shell/titlebar-icon'
 import { Button } from '@/components/ui/button'
 import { translateNow } from '@/i18n'
 import { ESCAPE_PRIORITY, isTopEscapeLayer, pushEscapeLayer } from '@/lib/escape-layers'
 import { triggerHaptic } from '@/lib/haptics'
+import { TITLEBAR_HEIGHT } from '@/lib/titlebar'
 import { cn } from '@/lib/utils'
 
 // Shared top clearance for overlay content that sits *beside* the floating

@@ -6,11 +6,6 @@ import { Dialog as DialogPrimitive } from 'radix-ui'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 
-import {
-  HUD_POSITION,
-  HUD_SURFACE,
-  HUD_TEXT
-} from '@/app/floating-hud'
 import { SESSION_IMPORT_ROUTE } from '@/app/routes'
 import { listAllProfileSessions } from '@/application/session-lists'
 import { codiconIcon } from '@/components/ui/codicon'
@@ -18,6 +13,11 @@ import { Command, CommandInput, CommandList } from '@/components/ui/command'
 import { getHermesConfigRecord } from '@/hermes'
 import { useMediaQuery } from '@/hooks/use-media-query'
 import { useI18n } from '@/i18n'
+import {
+  HUD_POSITION,
+  HUD_SURFACE,
+  HUD_TEXT
+} from '@/lib/floating-hud'
 import {
   Activity,
   AppWindow,

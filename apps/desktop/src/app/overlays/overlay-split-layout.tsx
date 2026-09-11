@@ -2,9 +2,8 @@ import { Fragment, memo, type ReactNode } from 'react'
 
 import { TabDropdown } from '@/components/ui/tab-dropdown'
 import type { IconComponent } from '@/lib/icons'
+import { PAGE_MAX_W } from '@/lib/layout-constants'
 import { cn } from '@/lib/utils'
-
-import { PAGE_MAX_W } from '../layout-constants'
 
 import { OVERLAY_TOP_CLEARANCE } from './overlay-view'
 

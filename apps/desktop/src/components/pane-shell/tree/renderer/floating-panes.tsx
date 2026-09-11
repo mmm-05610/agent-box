@@ -11,13 +11,13 @@
 import { useStore } from '@nanostores/react'
 import { type PointerEvent as ReactPointerEvent, useCallback, useEffect, useRef, useState } from 'react'
 
-import { HUD_SURFACE } from '@/app/floating-hud'
-import { TITLEBAR_HEIGHT } from '@/app/shell/titlebar'
 import { Codicon } from '@/components/ui/codicon'
 import { ContribBoundary, ContribRender } from '@/contrib/react/boundary'
 import { useContributions } from '@/contrib/react/use-contributions'
 import type { Contribution } from '@/contrib/types'
+import { HUD_SURFACE } from '@/lib/floating-hud'
 import { readJson, writeJson } from '@/lib/storage'
+import { TITLEBAR_HEIGHT } from '@/lib/titlebar'
 import { cn } from '@/lib/utils'
 
 import { $hiddenTreePanes } from '../store'

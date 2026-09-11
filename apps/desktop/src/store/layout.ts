@@ -1,10 +1,10 @@
 import { atom, computed, type ReadableAtom, type WritableAtom } from 'nanostores'
 
-import { SIDEBAR_COLLAPSE_MEDIA_QUERY } from '@/app/layout-constants'
 import { PANE_TOGGLE_REVEAL_EVENT } from '@/components/pane-shell'
 import { isPaneVisible, revealTreePane } from '@/components/pane-shell/tree/store'
 import { matchesQuery } from '@/hooks/use-media-query'
 import { connectionScopedAtom } from '@/lib/connection-scoped'
+import { SIDEBAR_COLLAPSE_MEDIA_QUERY } from '@/lib/layout-constants'
 import { type Codec, Codecs, persistentAtom } from '@/lib/persisted'
 import { arraysEqual, insertUniqueId, readKey } from '@/lib/storage'
 import { $showAllProfiles, setShowAllProfiles } from '@/store/profile/sidebar-scope'

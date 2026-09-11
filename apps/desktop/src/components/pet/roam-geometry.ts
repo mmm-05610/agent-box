@@ -6,7 +6,7 @@
  * helpers (`overlapsX`, `resolveLedge`, `groundTop`) stay unit testable.
  */
 
-import { TITLEBAR_HEIGHT } from '@/app/shell/titlebar'
+import { TITLEBAR_HEIGHT } from '@/lib/titlebar'
 
 /**
  * A horizontal surface the pet can stand and walk on. `y` is the surface line
