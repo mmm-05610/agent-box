@@ -8,7 +8,7 @@ import { PluginsTab } from './plugins-tab'
 
 const requestGateway = vi.fn(async () => ({ plugins: [] }))
 
-vi.mock('@/app/gateway/hooks/use-gateway-request', () => ({
+vi.mock('@/components/hooks/use-gateway-request', () => ({
   useGatewayRequest: () => ({ requestGateway })
 }))
 

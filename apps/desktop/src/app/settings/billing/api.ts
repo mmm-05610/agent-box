@@ -1,6 +1,6 @@
 import { createContext, useContext, useMemo } from 'react'
 
-import { useGatewayRequest } from '@/app/gateway/hooks/use-gateway-request'
+import { useGatewayRequest } from '@/components/hooks/use-gateway-request'
 
 import type {
   BillingChargeResponse,

@@ -18,7 +18,7 @@ vi.mock('@/hermes', () => ({
   setApiRequestProfile: () => {}
 }))
 
-vi.mock('../hooks/use-on-profile-switch', () => ({
+vi.mock('@/components/hooks/use-on-profile-switch', () => ({
   useOnProfileSwitch: () => {}
 }))
 

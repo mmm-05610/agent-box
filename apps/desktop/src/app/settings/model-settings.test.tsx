@@ -49,7 +49,7 @@ vi.mock('@/store/onboarding', () => ({
   startManualProviderOAuth: (slug: string) => startManualProviderOAuth(slug)
 }))
 
-vi.mock('../hooks/use-on-profile-switch', () => ({
+vi.mock('@/components/hooks/use-on-profile-switch', () => ({
   useOnProfileSwitch: (handler: () => void) => {
     profileSwitchHandler = handler
   }

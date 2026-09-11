@@ -14,8 +14,8 @@
 
 import { useStore } from '@nanostores/react'
 
-import { useGatewayRequest } from '@/app/gateway/hooks/use-gateway-request'
-import { useRouteOverlayActive } from '@/app/hooks/use-route-overlay-active'
+import { useGatewayRequest } from '@/components/hooks/use-gateway-request'
+import { useRouteOverlayActive } from '@/components/hooks/use-route-overlay-active'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
