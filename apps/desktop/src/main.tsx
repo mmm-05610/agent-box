@@ -24,12 +24,13 @@ import App from './app'
 import { RootErrorBoundary } from './components/error-boundary'
 import { HapticsProvider } from './components/haptics-provider'
 import { RootTooltipProvider } from './components/ui/tooltip'
+import { hermesLocalePreference } from './hermes-locale-preference'
 import { I18nProvider } from './i18n'
 import { installClipboardShim } from './lib/clipboard'
 import { queryClient } from './lib/query-client'
 import { installRendererAnimationPauseState } from './lib/renderer-loop-pause'
 import { installSelectionCopyColorGuard } from './lib/selection-copy-colors'
-import { ThemeProvider } from './themes/context'
+import { ThemeProvider } from './theme-composition'
 
 installClipboardShim()
 // Chromium serializes selection copies (Cmd+C, right-click Copy) with the
@@ -67,7 +68,10 @@ if (winParam === 'overlay') {
     <StrictMode>
       <RootErrorBoundary>
         <QueryClientProvider client={queryClient}>
-          <I18nProvider>
+          {/* Language persistence is bound HERE, not inside i18n: the provider
+              knows only the `LocalePreferencePort` shape, and this is the one
+              place that gets to decide the choice lives in the Hermes config. */}
+          <I18nProvider localePreference={hermesLocalePreference}>
             <ThemeProvider>
               <HapticsProvider>
                 {/* ONE tooltip provider for the whole app. Every `Tip` used to

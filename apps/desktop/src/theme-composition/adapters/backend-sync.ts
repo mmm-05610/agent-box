@@ -20,10 +20,10 @@ import type { HermesSkin } from '@hermes/shared/skin'
 import { atom } from 'nanostores'
 
 import { readJson, writeJson } from '@/lib/storage'
+import { BUILTIN_THEMES } from '@/themes/presets'
+import { type DesktopTheme, isValidTheme } from '@/themes/types'
 
-import { BUILTIN_THEMES } from './presets'
 import { skinToDesktopTheme } from './skin'
-import { type DesktopTheme, isValidTheme } from './types'
 
 // Cached so the boot-time paint (which runs before the gateway connects) can
 // resolve a persisted skin pick synchronously, like a built-in or a user

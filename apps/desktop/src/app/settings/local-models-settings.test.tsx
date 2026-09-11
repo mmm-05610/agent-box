@@ -104,7 +104,7 @@ const REFUSED_MODEL: LocalCatalogModel = {
 function renderPane() {
   return render(
     <MemoryRouter>
-      <I18nProvider>
+      <I18nProvider localePreference={null}>
         <LocalModelsSettings />
       </I18nProvider>
     </MemoryRouter>
@@ -429,7 +429,7 @@ describe('BrowseSection', () => {
 
       render(
         <MemoryRouter>
-          <I18nProvider>
+          <I18nProvider localePreference={null}>
             <LocalModelsSettings />
           </I18nProvider>
         </MemoryRouter>
@@ -534,7 +534,7 @@ describe('quickstart completion navigation', () => {
 
     render(
       <MemoryRouter initialEntries={['/settings']}>
-        <I18nProvider>
+        <I18nProvider localePreference={null}>
           <LocalModelsSettings />
         </I18nProvider>
         <Probe />

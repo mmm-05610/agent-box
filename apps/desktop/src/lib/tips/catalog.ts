@@ -16,6 +16,8 @@
  * a tip at a positional selector or a translated aria-label.
  */
 
+import type { TipId } from '@/i18n/tip-ids'
+
 export type TipSide = 'bottom' | 'left' | 'right' | 'top'
 
 export interface TipDef {
@@ -29,16 +31,10 @@ export interface TipDef {
   targets: readonly string[]
 }
 
-export type TipId =
-  | 'artifacts'
-  | 'command-palette'
-  | 'composer-mentions'
-  | 'cron'
-  | 'messaging'
-  | 'new-session'
-  | 'profiles'
-  | 'right-pane'
-  | 'skills'
+// The id list itself is declared with the copy it keys, in i18n, and re-exported
+// here so every caller keeps importing `TipId` from the catalog. One list, so a
+// new tip cannot exist without a translation.
+export type { TipId }
 
 // Between them these introduce the app: the rail down the left, the composer,
 // and the pane on the right. Nothing here is a step in a sequence — any one has

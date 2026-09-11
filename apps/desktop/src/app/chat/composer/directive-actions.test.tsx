@@ -23,7 +23,7 @@ function mountEditor(chips: { kind: string; value: string }[]) {
   document.body.append(editor)
 
   render(
-    <I18nProvider configClient={null} initialLocale="en">
+    <I18nProvider initialLocale="en" localePreference={null}>
       <ComposerDirectiveActions editorRef={{ current: editor }} />
     </I18nProvider>
   )
@@ -190,7 +190,7 @@ describe('ComposerDirectiveActions', () => {
     editor.append(refChipElement('url', '`https://late.example`'))
 
     render(
-      <I18nProvider configClient={null} initialLocale="en">
+      <I18nProvider initialLocale="en" localePreference={null}>
         <ComposerDirectiveActions editorRef={{ current: editor }} />
       </I18nProvider>
     )

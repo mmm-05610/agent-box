@@ -1,6 +1,12 @@
-import { normalize } from '@/lib/text'
-
 import type { Locale } from './types'
+
+// Locale lookup folds the way every search key in the app folds —
+// `value.trim().toLowerCase()` — but written out here rather than imported
+// from `@/lib/text`, so the language table stays inside the i18n leaf instead
+// of depending on the shared helper barrel.
+function normalize(value: string): string {
+  return value.trim().toLowerCase()
+}
 
 export const DEFAULT_LOCALE: Locale = 'en'
 

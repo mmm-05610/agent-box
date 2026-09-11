@@ -12,7 +12,7 @@ it('reveals the complete slash description on hover without intercepting selecti
   const item = { id: '/proof', type: 'slash', label: 'proof', metadata: { display: '/proof', meta: description } }
   const onPick = vi.fn()
   render(
-    <I18nProvider configClient={null} initialLocale="en">
+    <I18nProvider initialLocale="en" localePreference={null}>
       <ComposerTriggerPopover
         activeIndex={0}
         items={[item]}

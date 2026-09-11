@@ -1,138 +1,182 @@
 import { act, cleanup, render } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { useState } from 'react'
+import { afterEach, describe, expect, it } from 'vitest'
 
-import { __resetBackendSkinSync, ingestBackendSkin } from './backend-sync'
-import { skinPref, ThemeProvider, useTheme } from './context'
-import { everforestTheme } from './presets'
+import { ThemePresenter, type ThemePresenterProps, useTheme } from './context'
+import type { ThemeAppearancePort, ThemePreferences } from './ports'
+import { everforestTheme, nousTheme } from './presets'
+import { listThemes } from './resolve'
+import type { ResolvedTheme, ThemeContribution } from './types'
 
-// The live-authoring loop: Hermes writes/edits one skin file and every surface
-// repaints. An in-place edit keeps the NAME — only the palette moves.
-const bloomberg = (foreground: string) => ({
-  name: 'bloomberg',
-  colors: { background: '#000000', ui_text: foreground, ui_accent: '#ff8000' }
-})
+// The presenter's contract: values in, a resolved palette out. Everything it
+// needs arrives as a prop, so these tests drive it with plain objects — no
+// store, no registry, no storage, no DOM. What the palette LOOKS like on screen
+// is `appearance.test.ts`; that it reaches the app's surfaces is
+// `@/theme-composition/index.test.tsx`.
 
-const cssVar = (name: string) => window.document.documentElement.style.getPropertyValue(name)
+const BUILT_INS: readonly ThemeContribution[] = listThemes({ user: [], backend: [], contributed: [] })
 
-describe('ThemeProvider ← backend skin sync', () => {
-  beforeEach(() => {
-    window.localStorage.clear()
-    __resetBackendSkinSync()
-  })
+const painted: ResolvedTheme[] = []
+const appearance: ThemeAppearancePort = { paint: resolved => void painted.push(resolved) }
 
-  afterEach(cleanup)
+const lastPaint = (): ResolvedTheme => {
+  const resolved = painted[painted.length - 1]
 
-  it('applies an activated backend skin', () => {
-    render(
-      <ThemeProvider>
-        <div />
-      </ThemeProvider>
-    )
-
-    act(() => ingestBackendSkin(bloomberg('#ff9f0a'), { apply: true }))
-
-    expect(cssVar('--theme-foreground')).toBe('#ff9f0a')
-    expect(cssVar('--theme-background-seed')).toBe('#000000')
-  })
-
-  it('repaints an in-place edit of the ACTIVE skin (same name, new palette)', () => {
-    render(
-      <ThemeProvider>
-        <div />
-      </ThemeProvider>
-    )
-
-    act(() => ingestBackendSkin(bloomberg('#ff9f0a'), { apply: true }))
-    expect(cssVar('--theme-foreground')).toBe('#ff9f0a')
-
-    // Recolor the same skin file. The same-name apply guard correctly no-ops
-    // (protects manual desktop picks), so the repaint must come from the
-    // registry update reaching the active theme derivation.
-    act(() => ingestBackendSkin(bloomberg('#ff2d95'), { apply: true }))
-    expect(cssVar('--theme-foreground')).toBe('#ff2d95')
-  })
-
-  it('does not repaint an edit to an INACTIVE skin', () => {
-    render(
-      <ThemeProvider>
-        <div />
-      </ThemeProvider>
-    )
-
-    act(() => ingestBackendSkin(bloomberg('#ff9f0a'), { apply: true }))
-
-    // A different skin registered without apply (e.g. seeded on reconnect)
-    // must not touch the painted theme.
-    act(() =>
-      ingestBackendSkin({ name: 'forest', colors: { background: '#001100', ui_text: '#66ff66' } }, { apply: false })
-    )
-    expect(cssVar('--theme-foreground')).toBe('#ff9f0a')
-  })
-
-  // The relaunch bug: the persisted pick was a backend skin, and the boot paint
-  // ran before the gateway seeded it. `normalizeSkin` could not resolve the
-  // name, flattened it to the default, and the connect-time seed (apply: false,
-  // by design) never repainted — so the theme "didn't stick" until `/skin`.
-  it('paints a persisted backend skin once the connect-time seed makes it resolvable', () => {
-    window.localStorage.setItem('hermes-desktop-theme-v2', 'bloomberg')
-
-    render(
-      <ThemeProvider>
-        <div />
-      </ThemeProvider>
-    )
-
-    // Boot: nothing resolves 'bloomberg' yet → default paint...
-    expect(cssVar('--theme-background-seed')).not.toBe('#000000')
-
-    // ...but the pick survives, so the seed alone repaints it.
-    act(() => ingestBackendSkin(bloomberg('#ff9f0a'), { apply: false }))
-
-    expect(cssVar('--theme-background-seed')).toBe('#000000')
-    expect(skinPref.resolve('default')).toBe('bloomberg')
-  })
-})
-
-describe('ThemeProvider highlight preview', () => {
-  beforeEach(() => {
-    window.localStorage.clear()
-    __resetBackendSkinSync()
-  })
-
-  afterEach(cleanup)
-
-  // Read the live context so the tests drive the real provider, not a mock.
-  let ctx: ReturnType<typeof useTheme>
-
-  function Probe() {
-    ctx = useTheme()
-
-    return null
+  if (!resolved) {
+    throw new Error('nothing was painted')
   }
 
-  const renderProbe = () =>
-    render(
-      <ThemeProvider>
-        <Probe />
-      </ThemeProvider>
-    )
+  return resolved
+}
 
-  it('paints the previewed theme without persisting it', () => {
-    renderProbe()
+let ctx: ReturnType<typeof useTheme>
+
+function Probe() {
+  ctx = useTheme()
+
+  return null
+}
+
+interface HarnessProps {
+  accentOverride?: ThemePresenterProps['accentOverride']
+  activeScope?: string
+  preferences?: ThemePreferences
+  systemDark?: boolean
+  themes?: readonly ThemeContribution[]
+}
+
+function Harness({
+  accentOverride = null,
+  activeScope = 'default',
+  preferences: injected = { theme: 'nous', mode: 'light' },
+  systemDark = false,
+  themes = BUILT_INS
+}: HarnessProps) {
+  // Props are the composition's read of the stored pick; a commit layers on top,
+  // exactly like the real `onPreferencesChange` re-reading after it assigns.
+  const [committed, setCommitted] = useState<Partial<ThemePreferences>>({})
+  const preferences: ThemePreferences = { ...injected, ...committed }
+
+  return (
+    <ThemePresenter
+      accentOverride={accentOverride}
+      activeScope={activeScope}
+      appearance={appearance}
+      availableThemes={themes}
+      onPendingApplyDrained={() => {}}
+      onPreferencesChange={next => setCommitted(current => ({ ...current, ...next }))}
+      pendingApply={null}
+      preferences={preferences}
+      systemDark={systemDark}
+    >
+      <Probe />
+    </ThemePresenter>
+  )
+}
+
+const cssVar = (name: string) => lastPaint().cssVariables[name]
+
+describe('ThemePresenter', () => {
+  afterEach(() => {
+    cleanup()
+    painted.length = 0
+  })
+
+  it('paints the committed theme and reports it', () => {
+    render(<Harness preferences={{ theme: 'everforest', mode: 'dark' }} />)
+
+    expect(cssVar('--theme-foreground')).toBe(everforestTheme.darkColors!.foreground)
+    expect(ctx.themeName).toBe('everforest')
+    expect(ctx.theme).toBe(lastPaint().theme)
+    expect(ctx.renderedMode).toBe('dark')
+  })
+
+  it('follows the OS for system mode, and the pick for light/dark', () => {
+    const { rerender } = render(<Harness preferences={{ theme: 'nous', mode: 'system' }} systemDark />)
+
+    expect(ctx.mode).toBe('system')
+    expect(ctx.resolvedMode).toBe('dark')
+
+    rerender(<Harness preferences={{ theme: 'nous', mode: 'system' }} systemDark={false} />)
+    expect(ctx.resolvedMode).toBe('light')
+
+    rerender(<Harness preferences={{ theme: 'nous', mode: 'light' }} systemDark />)
+    expect(ctx.resolvedMode).toBe('light')
+  })
+
+  it('re-seeds the palette from an accent override', () => {
+    render(<Harness preferences={{ theme: 'nous', mode: 'dark' }} />)
+    const authored = ctx.theme.colors.primary
+
+    cleanup()
+    painted.length = 0
+    render(<Harness accentOverride="#ff00aa" preferences={{ theme: 'nous', mode: 'dark' }} />)
+
+    expect(ctx.theme.colors.primary).not.toBe(authored)
+    expect(ctx.theme.colors.primary).not.toBe(nousTheme.colors.primary)
+  })
+
+  it('flattens a name the injected set does not resolve, and keeps the pick itself', () => {
+    render(<Harness preferences={{ theme: 'not-installed', mode: 'dark' }} />)
+
+    // The context reports what is painted; the committed pick is the
+    // composition's to keep (see the boot/seed case in the composition tests).
+    expect(ctx.themeName).toBe('nous')
+    expect(lastPaint().theme.name).toBe('nous-dark')
+  })
+
+  it('reports the available themes it was handed, in order', () => {
+    const themes: ThemeContribution[] = [
+      { ...everforestTheme, name: 'everforest' },
+      { ...everforestTheme, description: 'plugin', label: 'Plugin', name: 'plugin-theme' }
+    ]
+
+    render(<Harness themes={themes} />)
+
+    expect(ctx.availableThemes.map(theme => theme.name)).toEqual(['everforest', 'plugin-theme'])
+  })
+
+  it('commits a pick through the preference port it was given', () => {
+    render(<Harness />)
+
+    act(() => ctx.setTheme('everforest'))
+
+    expect(ctx.themeName).toBe('everforest')
+    expect(ctx.theme.name).toBe('everforest-light')
+  })
+
+  it('normalizes a commit that cannot resolve', () => {
+    render(<Harness />)
+
+    act(() => ctx.setTheme('nothing-installed'))
+
+    expect(ctx.themeName).toBe('nous')
+  })
+})
+
+describe('ThemePresenter highlight preview', () => {
+  afterEach(() => {
+    cleanup()
+    painted.length = 0
+  })
+
+  const renderHarness = (props: HarnessProps = {}) => render(<Harness {...props} />)
+
+  it('paints the previewed theme without committing it', () => {
+    renderHarness()
 
     const committed = ctx.themeName
 
     act(() => ctx.previewTheme('everforest', 'dark'))
 
     expect(cssVar('--theme-foreground')).toBe(everforestTheme.darkColors!.foreground)
-    // The commit surface does not change. The context name and the stored
-    // preference keep their values.
+    // The commit surface does not change: the context name is still the
+    // committed one, and the preference was never written.
     expect(ctx.themeName).toBe(committed)
-    expect(skinPref.resolve('default')).toBe(committed)
   })
 
   it('clearThemePreview repaints the committed appearance', () => {
-    renderProbe()
+    renderHarness()
 
     act(() => ctx.previewTheme('everforest', 'dark'))
     expect(cssVar('--theme-foreground')).toBe(everforestTheme.darkColors!.foreground)
@@ -141,23 +185,33 @@ describe('ThemeProvider highlight preview', () => {
     expect(cssVar('--theme-foreground')).not.toBe(everforestTheme.darkColors!.foreground)
   })
 
-  it('a commit replaces the preview and persists', () => {
-    renderProbe()
+  it('a commit replaces the preview', () => {
+    renderHarness()
 
     act(() => ctx.previewTheme('everforest', 'dark'))
     act(() => ctx.setTheme('mono'))
 
     expect(ctx.themeName).toBe('mono')
-    expect(skinPref.resolve('default')).toBe('mono')
     expect(cssVar('--theme-foreground')).not.toBe(everforestTheme.darkColors!.foreground)
   })
 
-  it('ignores a preview of an unknown theme', () => {
-    renderProbe()
+  it('ignores a preview of a theme the injected set does not have', () => {
+    renderHarness()
 
-    const painted = cssVar('--theme-foreground')
+    const before = cssVar('--theme-foreground')
 
     act(() => ctx.previewTheme('does-not-exist', 'dark'))
-    expect(cssVar('--theme-foreground')).toBe(painted)
+    expect(cssVar('--theme-foreground')).toBe(before)
+  })
+
+  it('drops a preview when the scope changes — the next context must not inherit it', () => {
+    const { rerender } = render(<Harness preferences={{ theme: 'everforest', mode: 'dark' }} />)
+
+    act(() => ctx.previewTheme('mono', 'light'))
+    expect(lastPaint().theme.name).toBe('mono-light')
+
+    rerender(<Harness activeScope="work" preferences={{ theme: 'everforest', mode: 'dark' }} />)
+
+    expect(lastPaint().theme.name).toBe('everforest-dark')
   })
 })

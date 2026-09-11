@@ -33,7 +33,7 @@ describe('toast titles', () => {
     notify({ kind: 'error', title: LONG_TITLE, message: DETAIL })
 
     render(
-      <I18nProvider configClient={null} initialLocale="en">
+      <I18nProvider initialLocale="en" localePreference={null}>
         <NotificationStack />
       </I18nProvider>
     )

@@ -28,7 +28,7 @@ const goal = (status: SessionGoal['status'], title = 'ship the feature', detail?
 function renderStack(sessionId: null | string = SID) {
   return render(
     <MemoryRouter>
-      <I18nProvider configClient={null} initialLocale="en">
+      <I18nProvider initialLocale="en" localePreference={null}>
         <ComposerStatusStack queue={null} sessionId={sessionId} />
       </I18nProvider>
     </MemoryRouter>

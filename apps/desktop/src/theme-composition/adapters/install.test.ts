@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
 import type { DesktopMarketplaceThemeResult } from '@/global'
+import { luminance } from '@/themes/color'
 
-import { luminance } from './color'
 import { buildThemeFromMarketplace } from './install'
 
 const themeJson = (type: 'light' | 'dark', background: string, foreground: string) =>

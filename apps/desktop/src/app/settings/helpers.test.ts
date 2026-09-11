@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
+import { defineFieldCopy, fieldCopyForSchemaKey, schemaKeyToFieldCopyKey } from '@/i18n/field-copy'
 import type { HermesConfigRecord } from '@/types/hermes'
 
 import { FIELD_DESCRIPTIONS, FIELD_LABELS, SECTIONS } from './constants'
-import { defineFieldCopy, fieldCopyForSchemaKey, schemaKeyToFieldCopyKey } from './field-copy'
 import {
   clearsEnabledToolsets,
   diffConfig,

@@ -68,7 +68,7 @@ describe('approval mode statusbar item', () => {
   it('renders the shared trigger and menu in the active locale', async () => {
     const response = new Promise<never>(() => undefined)
     render(
-      <I18nProvider configClient={null} initialLocale="ja">
+      <I18nProvider initialLocale="ja" localePreference={null}>
         <Harness requestGateway={vi.fn(() => response)} />
       </I18nProvider>
     )

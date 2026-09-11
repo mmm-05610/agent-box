@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { luminance, normalizeHex } from './color'
+import { luminance, normalizeHex } from '@/themes/color'
+
 import { skinToDesktopTheme } from './skin'
 
 const withColors = (name: string, colors: Record<string, string>) => skinToDesktopTheme({ name, colors })

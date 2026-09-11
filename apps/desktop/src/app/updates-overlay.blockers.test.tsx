@@ -17,7 +17,7 @@ import { BlockerView, formatBlockerCommandLine, UpdatesOverlay } from './updates
 async function renderWithI18n(ui: React.ReactNode) {
   await act(async () => {
     render(
-      <I18nProvider configClient={{ getConfig: async () => ({}), saveConfig: async () => ({ ok: true }) }}>
+      <I18nProvider localePreference={{ load: async () => undefined, save: async () => {} }}>
         <Dialog open>
           <DialogContent>{ui}</DialogContent>
         </Dialog>
@@ -29,7 +29,7 @@ async function renderWithI18n(ui: React.ReactNode) {
 async function renderUpdatesOverlay() {
   await act(async () => {
     render(
-      <I18nProvider configClient={{ getConfig: async () => ({}), saveConfig: async () => ({ ok: true }) }}>
+      <I18nProvider localePreference={{ load: async () => undefined, save: async () => {} }}>
         <UpdatesOverlay />
       </I18nProvider>
     )

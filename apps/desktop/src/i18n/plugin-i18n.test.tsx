@@ -90,7 +90,7 @@ describe('usePluginI18n', () => {
     })
 
     render(
-      <I18nProvider configClient={null}>
+      <I18nProvider localePreference={null}>
         <SwitchToJa />
         <Probe pluginId="hooked" />
       </I18nProvider>
@@ -107,7 +107,7 @@ describe('usePluginI18n', () => {
 
   it('picks up a bundle registered after mount', () => {
     render(
-      <I18nProvider configClient={null}>
+      <I18nProvider localePreference={null}>
         <Probe pluginId="late" />
       </I18nProvider>
     )

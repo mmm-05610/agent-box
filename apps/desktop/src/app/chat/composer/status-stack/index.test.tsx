@@ -28,7 +28,7 @@ describe('ComposerStatusStack scroll treatment', () => {
   it('dims only the status content while keeping the dock card opaque', () => {
     const view = render(
       <MemoryRouter>
-        <I18nProvider configClient={null} initialLocale="en">
+        <I18nProvider initialLocale="en" localePreference={null}>
           <ComposerStatusStack queue={<div>Queued task</div>} sessionId={null} />
         </I18nProvider>
       </MemoryRouter>

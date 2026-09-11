@@ -13,10 +13,18 @@
 import { atom, computed } from 'nanostores'
 
 import { registry } from '@/contrib/registry'
+import { baseColors } from '@/themes/appearance'
+import { BUILTIN_THEMES, nousTheme } from '@/themes/presets'
+import { listThemes, lookupTheme } from '@/themes/resolve'
+import {
+  type DesktopTheme,
+  type DesktopThemeColors,
+  isValidTheme,
+  type RenderedMode,
+  type ThemeSource
+} from '@/themes/types'
 
 import { $backendThemes } from './backend-sync'
-import { BUILTIN_THEMES } from './presets'
-import { type DesktopTheme, isValidTheme } from './types'
 
 const USER_THEMES_KEY = 'hermes-desktop-user-themes-v1'
 
@@ -147,26 +155,37 @@ export function contributedThemes(): DesktopTheme[] {
   return out
 }
 
-/** Resolve a theme by name across the merged set (built-in + user + backend + contributed). */
-export function resolveTheme(name: string): DesktopTheme | undefined {
-  return (
-    BUILTIN_THEMES[name] ??
-    $userThemes.get()[name] ??
-    $backendThemes.get()[name] ??
-    contributedThemes().find(theme => theme.name === name)
-  )
+/** The merged set: built-in + user + backend + contributed, in picker order. */
+export function listAllThemes(): DesktopTheme[] {
+  return listThemes(themeSource())
 }
 
-/** Built-ins first (stable order), then contributed, then backend skins, then user installs. */
-export function listAllThemes(): DesktopTheme[] {
-  const user = $userThemes.get()
-  const backend = $backendThemes.get()
-  const shadows = (theme: DesktopTheme) => user[theme.name] || backend[theme.name]
+/** Resolve a theme by name across the merged set (built-in + user + backend + contributed). */
+export function resolveTheme(name: string): DesktopTheme | undefined {
+  return lookupTheme(name, listAllThemes())
+}
 
-  return [
-    ...Object.values(BUILTIN_THEMES),
-    ...contributedThemes().filter(theme => !shadows(theme)),
-    ...Object.values(backend).filter(theme => !user[theme.name]),
-    ...Object.values(user)
-  ]
+/**
+ * The merged theme set this app currently has, as plain data.
+ *
+ * Handler-shaped for exactly one reason: `themeSource()` reads the stores, and
+ * reading them is what the pure core must never do. Everything downstream of it
+ * — the resolver, the palette math, the presenter — only ever sees the lists.
+ */
+export function themeSource(): ThemeSource {
+  return {
+    user: Object.values($userThemes.get()),
+    backend: Object.values($backendThemes.get()),
+    contributed: contributedThemes()
+  }
+}
+
+/**
+ * The seed palette for a named theme, resolved through the merged registry.
+ *
+ * The registry-aware sibling of the core's `baseColors`: settings previews and
+ * anything else with only a name in hand needs the lookup, not the math.
+ */
+export function getBaseColors(skinName: string, mode: RenderedMode): DesktopThemeColors {
+  return baseColors(resolveTheme(skinName) ?? nousTheme, mode)
 }

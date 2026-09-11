@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import { BUILTIN_THEMES, DEFAULT_SKIN_NAME } from './presets'
+import { BUILTIN_THEMES, DEFAULT_SKIN_NAME } from '@/themes/presets'
+import { convertVscodeColorTheme } from '@/themes/vscode'
+
 import {
   $marketplaceInstalls,
   $userThemes,
@@ -11,7 +13,6 @@ import {
   removeUserTheme,
   resolveTheme
 } from './user-themes'
-import { convertVscodeColorTheme } from './vscode'
 
 const makeTheme = (label: string, source?: string) =>
   convertVscodeColorTheme(

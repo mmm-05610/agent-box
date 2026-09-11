@@ -23,7 +23,7 @@ const SID = 'sess-dead-runtime'
 function renderStack() {
   return render(
     <MemoryRouter>
-      <I18nProvider configClient={null} initialLocale="en">
+      <I18nProvider initialLocale="en" localePreference={null}>
         <ComposerStatusStack queue={null} sessionId={SID} />
       </I18nProvider>
     </MemoryRouter>
@@ -93,7 +93,7 @@ describe('ComposerStatusStack hidden-pane poll', () => {
   function renderStackBg(visible: boolean) {
     return render(
       <MemoryRouter>
-        <I18nProvider configClient={null} initialLocale="en">
+        <I18nProvider initialLocale="en" localePreference={null}>
           <PaneVisibleContext.Provider value={visible}>
             <ComposerStatusStack queue={null} sessionId={SID_BG} />
           </PaneVisibleContext.Provider>
@@ -143,7 +143,7 @@ describe('ComposerStatusStack hidden-pane poll', () => {
 
     view.rerender(
       <MemoryRouter>
-        <I18nProvider configClient={null} initialLocale="en">
+        <I18nProvider initialLocale="en" localePreference={null}>
           <PaneVisibleContext.Provider value>
             <ComposerStatusStack queue={null} sessionId={SID_BG} />
           </PaneVisibleContext.Provider>

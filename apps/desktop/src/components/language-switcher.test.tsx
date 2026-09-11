@@ -1,8 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { HermesConfigRecord } from '@/hermes'
-import { type I18nConfigClient, I18nProvider } from '@/i18n'
+import { I18nProvider, type LocalePreferencePort } from '@/i18n'
 import { stubMenuDomApis, stubResizeObserver } from '@/test/jsdom'
 
 import { LanguageSwitcher } from './language-switcher'
@@ -15,17 +14,16 @@ describe('LanguageSwitcher', () => {
     vi.restoreAllMocks()
   })
 
-  it('persists language changes through display.language config', async () => {
-    const saveConfig = vi.fn().mockResolvedValue({ ok: true })
-    const latestConfig: HermesConfigRecord = { display: { language: 'en', skin: 'slate' } }
+  it('persists the picked language through the injected preference port', async () => {
+    const save = vi.fn().mockResolvedValue(undefined)
 
-    const configClient: I18nConfigClient = {
-      getConfig: vi.fn().mockResolvedValue(latestConfig),
-      saveConfig
+    const localePreference: LocalePreferencePort = {
+      load: vi.fn().mockResolvedValue('en'),
+      save
     }
 
     render(
-      <I18nProvider configClient={configClient}>
+      <I18nProvider localePreference={localePreference}>
         <LanguageSwitcher />
       </I18nProvider>
     )
@@ -37,7 +35,9 @@ describe('LanguageSwitcher', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Switch language' }))
     fireEvent.click(screen.getByRole('option', { name: /日本語/i }))
 
-    await waitFor(() => expect(saveConfig).toHaveBeenCalledTimes(1))
-    expect(saveConfig).toHaveBeenCalledWith({ display: { language: 'ja', skin: 'slate' } })
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1))
+    // Where it lands (display.language in the Hermes config) is the adapter's
+    // business; the switcher only reports WHICH locale the user picked.
+    expect(save).toHaveBeenCalledWith('ja')
   })
 })

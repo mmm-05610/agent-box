@@ -15,7 +15,7 @@
 
 import { atom } from 'nanostores'
 
-import { normalizeHex } from './color'
+import { normalizeHex } from '@/themes/color'
 
 export const $accentOverride = atom<null | string>(null)
 

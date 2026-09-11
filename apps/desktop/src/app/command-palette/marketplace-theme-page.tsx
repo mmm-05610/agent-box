@@ -20,8 +20,8 @@ import { useI18n } from '@/i18n'
 import { triggerHaptic } from '@/lib/haptics'
 import { Check, Download, Loader2, Palette } from '@/lib/icons'
 import { cn } from '@/lib/utils'
-import { installVscodeThemeFromMarketplace } from '@/themes/install'
-import { $marketplaceInstalls } from '@/themes/user-themes'
+import { installVscodeThemeFromMarketplace } from '@/theme-composition/adapters/install'
+import { $marketplaceInstalls } from '@/theme-composition/adapters/user-themes'
 
 const compactNumber = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 })
 

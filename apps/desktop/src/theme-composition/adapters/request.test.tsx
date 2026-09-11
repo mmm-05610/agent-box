@@ -2,13 +2,20 @@ import { act, cleanup, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { registry } from '@/contrib/registry'
+import { ThemeProvider } from '@/theme-composition'
+import { useTheme } from '@/themes/context'
+import { midnightTheme } from '@/themes/presets'
+import type { DesktopTheme } from '@/themes/types'
 
 import { __resetBackendSkinSync } from './backend-sync'
-import { skinPref, ThemeProvider, useTheme } from './context'
-import { midnightTheme } from './presets'
+import { skinPref } from './preferences'
 import { requestTheme } from './request'
-import type { DesktopTheme } from './types'
 import { THEMES_AREA } from './user-themes'
+
+// The imperative door is a theme-feature API, but its contract is about the
+// whole chain: write a name, and the app repaints and persists it exactly like a
+// manual pick. So this mounts the composed provider — the real path — rather
+// than the presenter with stand-in props.
 
 const cssVar = (name: string) => window.document.documentElement.style.getPropertyValue(name)
 

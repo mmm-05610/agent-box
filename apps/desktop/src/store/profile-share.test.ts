@@ -24,8 +24,8 @@ vi.mock('@/store/starmap', () => ({ resetStarmapGraph: vi.fn() }))
 
 const { applyDesktopOverlay, buildDesktopOverlay, exportProfileBundle } = await import('./profile-share')
 const { $profileColors, setProfileColor } = await import('./profile')
-const { modePref, skinPref } = await import('@/themes/context')
-const { $userThemes } = await import('@/themes/user-themes')
+const { modePref, skinPref } = await import('@/theme-composition/adapters/preferences')
+const { $userThemes } = await import('@/theme-composition/adapters/user-themes')
 const { $layoutTree } = await import('@/components/pane-shell/tree/store')
 const { exportProfileArchive } = await import('@/hermes')
 

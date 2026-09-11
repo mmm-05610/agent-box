@@ -1,10 +1,10 @@
+import { fieldCopyForSchemaKey } from '@/i18n/field-copy'
 import type { IconComponent } from '@/lib/icons'
 import { normalize } from '@/lib/text'
 import type { ConfigFieldSchema, EnvVarInfo, HermesConfigRecord } from '@/types/hermes'
 
 import { FIELD_LABELS, SECTIONS } from './constants'
 import { credentialRowLabel } from './credential-key-ui'
-import { fieldCopyForSchemaKey } from './field-copy'
 import { prettyName, sectionFieldEntries, voiceFieldVisible } from './helpers'
 import type { DesktopConfigSection, SettingsView } from './types'
 

@@ -1,6 +1,5 @@
-import { defineFieldCopy } from '@/app/settings/field-copy'
-
 import { defineLocale } from './define-locale'
+import { defineFieldCopy } from './field-copy'
 
 // RU_PLURAL: (count, one, few, many) — русские формы сущ. падежа
 // RU_NOUN: (count, one, few, many) — формы род. множественного

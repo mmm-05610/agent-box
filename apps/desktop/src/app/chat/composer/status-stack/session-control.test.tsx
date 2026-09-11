@@ -129,7 +129,7 @@ const mockEntry = (overrides?: Partial<SessionControlEntry>): SessionControlEntr
 function renderStack(sessionId: null | string = SID, props: Record<string, unknown> = {}) {
   return render(
     <MemoryRouter>
-      <I18nProvider configClient={null} initialLocale="en">
+      <I18nProvider initialLocale="en" localePreference={null}>
         <ComposerStatusStack queue={null} sessionId={sessionId} {...props} />
       </I18nProvider>
     </MemoryRouter>

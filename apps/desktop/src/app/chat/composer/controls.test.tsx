@@ -18,7 +18,7 @@ const state: ChatBarState = {
 
 function renderControls(overrides: Partial<React.ComponentProps<typeof ComposerControls>> = {}) {
   return render(
-    <I18nProvider configClient={null} initialLocale="en">
+    <I18nProvider initialLocale="en" localePreference={null}>
       <ComposerControls
         autoSpeak={false}
         busy={false}

@@ -51,10 +51,10 @@ import {
 import { $userBubbleTransparency, setUserBubbleTransparency } from '@/store/user-bubble-transparency'
 import { $vibeHeartsEnabled, setVibeHeartsEnabled } from '@/store/vibe-hearts-enabled'
 import { $zoomPercent, setZoomPercent } from '@/store/zoom'
-import { getBaseColors, useTheme } from '@/themes/context'
-import { installVscodeThemeFromMarketplace } from '@/themes/install'
+import { installVscodeThemeFromMarketplace } from '@/theme-composition/adapters/install'
+import { $marketplaceInstalls, getBaseColors, isUserTheme, removeUserTheme } from '@/theme-composition/adapters/user-themes'
+import { useTheme } from '@/themes/context'
 import type { DesktopTheme } from '@/themes/types'
-import { $marketplaceInstalls, isUserTheme, removeUserTheme } from '@/themes/user-themes'
 
 import { setHermesConfigCache, useHermesConfigRecord } from '../hooks/use-config-record'
 

@@ -19,7 +19,7 @@ describe('CopyButton i18n', () => {
     })
 
     render(
-      <I18nProvider configClient={null} initialLocale="zh">
+      <I18nProvider initialLocale="zh" localePreference={null}>
         <CopyButton text="hello" />
       </I18nProvider>
     )

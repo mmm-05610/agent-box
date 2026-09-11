@@ -593,7 +593,7 @@ function actStore(mutate: () => void) {
 function renderFindBar(initialPath = '/') {
   return render(
     <MemoryRouter initialEntries={[initialPath]}>
-      <I18nProvider configClient={null} initialLocale="en">
+      <I18nProvider initialLocale="en" localePreference={null}>
         <FindBar />
       </I18nProvider>
     </MemoryRouter>
@@ -612,7 +612,7 @@ function renderFindBarWithNavigation(initialPath = '/session/a') {
 
   const view = render(
     <MemoryRouter initialEntries={[initialPath]}>
-      <I18nProvider configClient={null} initialLocale="en">
+      <I18nProvider initialLocale="en" localePreference={null}>
         <CaptureNavigate />
         <FindBar />
       </I18nProvider>
@@ -957,7 +957,7 @@ describe('view.findInPage keybind gate', () => {
 
     render(
       <MemoryRouter initialEntries={[pathname]}>
-        <I18nProvider configClient={null} initialLocale="en">
+        <I18nProvider initialLocale="en" localePreference={null}>
           <KeybindHarness deps={deps} />
         </I18nProvider>
       </MemoryRouter>

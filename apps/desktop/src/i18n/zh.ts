@@ -1,5 +1,4 @@
-import { defineFieldCopy } from '@/app/settings/field-copy'
-
+import { defineFieldCopy } from './field-copy'
 import type { Translations } from './types'
 
 export const zh: Translations = {

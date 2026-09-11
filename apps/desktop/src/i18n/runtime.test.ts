@@ -1,8 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { fieldCopyForSchemaKey } from '@/app/settings/field-copy'
-
 import { TRANSLATIONS } from './catalog'
+import { fieldCopyForSchemaKey } from './field-copy'
 import { setRuntimeI18nLocale, translateNow } from './runtime'
 import { zh } from './zh'
 

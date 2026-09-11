@@ -1,55 +1,12 @@
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 
-import { getHermesConfigRecord, type HermesConfigRecord, saveHermesConfig } from '@/hermes'
-
 import { TRANSLATIONS } from './catalog'
-import { DEFAULT_LOCALE, localeConfigValue, normalizeLocale } from './languages'
+import { DEFAULT_LOCALE, normalizeLocale } from './languages'
+import type { LocalePreferencePort } from './locale-preference'
 import { setRuntimeI18nLocale } from './runtime'
 import type { Locale, Translations } from './types'
 
 export { LOCALE_META } from './languages'
-
-export interface I18nConfigClient {
-  getConfig: () => Promise<HermesConfigRecord>
-  saveConfig: (config: HermesConfigRecord) => Promise<{ ok: boolean }>
-}
-
-const defaultConfigClient: I18nConfigClient = {
-  getConfig: () => {
-    if (typeof window === 'undefined' || !window.hermesDesktop?.api) {
-      return Promise.resolve({})
-    }
-
-    return getHermesConfigRecord()
-  },
-  saveConfig: config => {
-    if (typeof window === 'undefined' || !window.hermesDesktop?.api) {
-      return Promise.resolve({ ok: true })
-    }
-
-    return saveHermesConfig(config)
-  }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-export function getConfigDisplayLanguage(config: HermesConfigRecord): unknown {
-  return isRecord(config.display) ? config.display.language : undefined
-}
-
-export function withConfigDisplayLanguage(config: HermesConfigRecord, locale: Locale): HermesConfigRecord {
-  const display = isRecord(config.display) ? config.display : {}
-
-  return {
-    ...config,
-    display: {
-      ...display,
-      language: localeConfigValue(locale)
-    }
-  }
-}
 
 function toError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error))
@@ -88,11 +45,16 @@ const I18nContext = createContext<I18nContextValue>({
 
 export interface I18nProviderProps {
   children: ReactNode
-  configClient?: I18nConfigClient | null
   initialLocale?: unknown
+  /**
+   * Where the language choice is persisted, injected by the composition root.
+   * Required, and `null` is a real answer: a surface with no persistence must
+   * say so here rather than let the provider guess a backend.
+   */
+  localePreference: LocalePreferencePort | null
 }
 
-export function I18nProvider({ children, configClient = defaultConfigClient, initialLocale }: I18nProviderProps) {
+export function I18nProvider({ children, initialLocale, localePreference }: I18nProviderProps) {
   const [locale, setLocaleState] = useState<Locale>(() => normalizeLocale(initialLocale))
   const [isLoadingConfig, setIsLoadingConfig] = useState(false)
   const [isSavingLocale, setIsSavingLocale] = useState(false)
@@ -111,7 +73,7 @@ export function I18nProvider({ children, configClient = defaultConfigClient, ini
   }, [locale])
 
   useEffect(() => {
-    if (!configClient) {
+    if (!localePreference) {
       return
     }
 
@@ -132,11 +94,11 @@ export function I18nProvider({ children, configClient = defaultConfigClient, ini
       setIsLoadingConfig(true)
       setConfigLoadError(null)
 
-      return configClient
-        .getConfig()
-        .then(config => {
+      return localePreference
+        .load()
+        .then(persisted => {
           if (!cancelled && !userLocaleRef.current) {
-            setLocaleState(normalizeLocale(getConfigDisplayLanguage(config)))
+            setLocaleState(normalizeLocale(persisted))
           }
         })
         .catch(error => {
@@ -170,7 +132,7 @@ export function I18nProvider({ children, configClient = defaultConfigClient, ini
         clearTimeout(retryTimer)
       }
     }
-  }, [configClient, initialLocale])
+  }, [localePreference, initialLocale])
 
   const setLocale = useCallback(
     async (next: Locale) => {
@@ -180,19 +142,14 @@ export function I18nProvider({ children, configClient = defaultConfigClient, ini
       setSaveError(null)
       setLocaleState(next)
 
-      if (!configClient) {
+      if (!localePreference) {
         return
       }
 
       setIsSavingLocale(true)
 
       try {
-        const latestConfig = await configClient.getConfig()
-        const result = await configClient.saveConfig(withConfigDisplayLanguage(latestConfig, next))
-
-        if (!result.ok) {
-          throw new Error('Failed to save language')
-        }
+        await localePreference.save(next)
       } catch (error) {
         const nextError = toError(error)
 
@@ -204,7 +161,7 @@ export function I18nProvider({ children, configClient = defaultConfigClient, ini
         setIsSavingLocale(false)
       }
     },
-    [configClient]
+    [localePreference]
   )
 
   const value = useMemo<I18nContextValue>(

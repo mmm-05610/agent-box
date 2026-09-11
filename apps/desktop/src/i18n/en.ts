@@ -1,5 +1,4 @@
-import { FIELD_DESCRIPTIONS, FIELD_LABELS } from '@/app/settings/constants'
-
+import { FIELD_DESCRIPTIONS, FIELD_LABELS } from './en-field-copy'
 import type { Translations } from './types'
 
 export const en: Translations = {

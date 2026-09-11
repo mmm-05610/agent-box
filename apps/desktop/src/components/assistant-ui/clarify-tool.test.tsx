@@ -49,7 +49,7 @@ afterEach(() => {
 
 function clarifyTree(ui: ReactNode) {
   return (
-    <I18nProvider configClient={null} initialLocale="en">
+    <I18nProvider initialLocale="en" localePreference={null}>
       {ui}
     </I18nProvider>
   )

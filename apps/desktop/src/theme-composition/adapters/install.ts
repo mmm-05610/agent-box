@@ -8,10 +8,10 @@
  */
 
 import type { DesktopMarketplaceThemeResult } from '@/global'
+import type { DesktopTheme } from '@/themes/types'
+import { convertVscodeColorTheme, parseVscodeTheme, vscodeThemeSlug } from '@/themes/vscode'
 
-import type { DesktopTheme } from './types'
 import { installUserTheme } from './user-themes'
-import { convertVscodeColorTheme, parseVscodeTheme, vscodeThemeSlug } from './vscode'
 
 /** A `publisher.extension` id, e.g. `dracula-theme.theme-dracula`. */
 export const MARKETPLACE_ID_RE = /^[\w-]+\.[\w-]+$/

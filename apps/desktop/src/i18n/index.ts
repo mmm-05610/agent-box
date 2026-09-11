@@ -1,13 +1,5 @@
 export { TRANSLATIONS } from './catalog'
-export {
-  getConfigDisplayLanguage,
-  type I18nConfigClient,
-  type I18nContextValue,
-  I18nProvider,
-  LOCALE_META,
-  useI18n,
-  withConfigDisplayLanguage
-} from './context'
+export { type I18nContextValue, I18nProvider, LOCALE_META, useI18n } from './context'
 export {
   DEFAULT_LOCALE,
   isLocale,
@@ -16,6 +8,7 @@ export {
   localeConfigValue,
   normalizeLocale
 } from './languages'
+export type { LocalePreferencePort } from './locale-preference'
 export {
   createPluginI18n,
   type PluginI18n,

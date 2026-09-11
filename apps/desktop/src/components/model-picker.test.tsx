@@ -63,7 +63,7 @@ function renderPicker(ui?: Partial<Parameters<typeof ModelPickerDialog>[0]>) {
 
   const element: ReactElement = (
     <QueryClientProvider client={client}>
-      <I18nProvider>
+      <I18nProvider localePreference={null}>
         <ModelPickerDialog
           currentModel="Qwen3.6-27B-UD-Q4_K_XL"
           currentProvider="llamacpp"

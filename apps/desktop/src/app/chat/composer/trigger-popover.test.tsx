@@ -10,7 +10,7 @@ function renderPopover(kind: '@' | '/', loading = false) {
   const onPick = vi.fn()
 
   const rendered = render(
-    <I18nProvider configClient={null} initialLocale="zh">
+    <I18nProvider initialLocale="zh" localePreference={null}>
       <ComposerTriggerPopover
         activeIndex={0}
         items={[]}
@@ -94,7 +94,7 @@ describe('ComposerTriggerPopover keyboard scrolling', () => {
 
   function popover(activeIndex: number, onHover = vi.fn(), nextItems = items) {
     return (
-      <I18nProvider configClient={null} initialLocale="en">
+      <I18nProvider initialLocale="en" localePreference={null}>
         <ComposerTriggerPopover
           activeIndex={activeIndex}
           items={nextItems}

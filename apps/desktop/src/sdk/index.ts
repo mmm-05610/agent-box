@@ -372,7 +372,13 @@ export { ackStoredSessionId, forgetSessionUnread, markSessionUnreadFinished } fr
  *  accent family re-seeded from it (see `retintTheme`); `null` restores the
  *  authored palette. Deliberately not persisted: it is an authoring knob, not
  *  a setting, so a plugin that sets it must clear it on dispose. */
-export { $accentOverride, setAccentOverride } from '@/themes/accent-override'
+export { $accentOverride, setAccentOverride } from '@/theme-composition/adapters/accent-override'
+/** Switch the theme from outside React (a gateway event, a connection coming
+ *  up, any callback with no component around it). Returns false and leaves the
+ *  appearance alone when the name doesn't resolve, so it doubles as the "is
+ *  this theme installed?" check. */
+export { requestTheme } from '@/theme-composition/adapters/request'
+export { THEMES_AREA } from '@/theme-composition/adapters/user-themes'
 /** OKLCH colour maths, for anything deriving a palette rather than hardcoding
  *  one: perceptual conversion, the sRGB gamut boundary, WCAG contrast, and
  *  hue-stable blending. */
@@ -391,14 +397,8 @@ export {
 /** The painted theme, its name, and the appearance it resolved to — plus
  *  `setTheme` / `setMode` to change it from a component. */
 export { useTheme } from '@/themes/context'
-/** Switch the theme from outside React (a gateway event, a connection coming
- *  up, any callback with no component around it). Returns false and leaves the
- *  appearance alone when the name doesn't resolve, so it doubles as the "is
- *  this theme installed?" check. */
-export { requestTheme } from '@/themes/request'
 export { retintTheme, themeHue } from '@/themes/retint'
 export type { DesktopTheme, DesktopThemeColors } from '@/themes/types'
-export { THEMES_AREA } from '@/themes/user-themes'
 export type { RpcEvent, StatusResponse } from '@/types/hermes'
 /** Subscribe a component to a `host.state` atom. */
 export { useStore as useValue } from '@nanostores/react'

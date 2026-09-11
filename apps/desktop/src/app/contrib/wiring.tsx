@@ -84,7 +84,7 @@ import {
 import { clearSessionTodos, setSessionTodos, todosForHydration } from '@/store/todos'
 import { armWakeWord, stopClientCapture } from '@/store/wake-word'
 import { isAuxiliaryWindow, isBrowserWindow, isHudWindow } from '@/store/windows'
-import { useSkinCommand } from '@/themes/use-skin-command'
+import { useSkinCommand } from '@/theme-composition/use-skin-command'
 
 import { closeWorkspaceTab } from '../chat/close-tab'
 import { requestComposerInsert } from '../chat/composer/focus'

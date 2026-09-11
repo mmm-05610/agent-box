@@ -13,7 +13,7 @@ import { markRuntimeGone } from '@/store/runtime-gone'
 import { dropSessionState, unbindTileRuntime } from '@/store/session-states'
 // Leaf import (not the `@/themes` barrel) to avoid pulling the ThemeProvider
 // module graph into the gateway event hot path.
-import { ingestBackendSkin } from '@/themes/backend-sync'
+import { ingestBackendSkin } from '@/theme-composition/adapters/backend-sync'
 
 import type { GatewayEventContext } from './types'
 

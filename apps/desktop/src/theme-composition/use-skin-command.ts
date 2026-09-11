@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 
-import { useTheme } from './context'
+import { useTheme } from '@/themes/context'
 
 // Retired skin names land on the canonical Nous skin so old muscle memory works.
 const ALIASES: Record<string, string> = {

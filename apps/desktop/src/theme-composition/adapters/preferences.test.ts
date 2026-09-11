@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import { modePref, skinPref } from './context'
-import { DEFAULT_SKIN_NAME } from './presets'
+import { DEFAULT_SKIN_NAME } from '@/themes/presets'
+
+import { modePref, skinPref } from './preferences'
 
 // Skin and mode share one per-profile contract, so assert it once over both.
 interface Pref {

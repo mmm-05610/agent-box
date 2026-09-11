@@ -26,8 +26,8 @@ import {
 } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 import { bindingsFor } from '@/store/keybinds'
+import { isUserTheme, resolveTheme } from '@/theme-composition/adapters/user-themes'
 import { luminance } from '@/themes/color'
-import { isUserTheme, resolveTheme } from '@/themes/user-themes'
 
 import {
   type PaletteGroup,

@@ -1,6 +1,5 @@
-import { defineFieldCopy } from '@/app/settings/field-copy'
-
 import { defineLocale } from './define-locale'
+import { defineFieldCopy } from './field-copy'
 
 export const ja = defineLocale({
   sessionImport: {
