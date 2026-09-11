@@ -3,8 +3,9 @@ import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
 
-import { pathForRegistryBackendRequest } from './connection-config'
 import { mainProcessSources } from '../test-main-process-sources'
+
+import { pathForRegistryBackendRequest } from './connection-config'
 
 
 

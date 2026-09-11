@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 
 import { test } from 'vitest'
 
+import type { EnumeratedWindow } from '../host-capabilities/platform/window-below'
+
 import {
   coversDisplay,
   detectFullscreenApp,
@@ -12,7 +14,6 @@ import {
   startHudGameOverlayWatch
 } from './hud-game-overlay'
 import type { GameOverlayState } from './hud-game-overlay'
-import type { EnumeratedWindow } from '../host-capabilities/platform/window-below'
 
 const DISPLAY = { x: 0, y: 0, width: 2560, height: 1440 }
 const SELF_PID = 4242

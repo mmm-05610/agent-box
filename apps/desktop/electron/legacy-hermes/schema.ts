@@ -5,7 +5,6 @@ import {
   normalizeSshConfig,
   normAuthMode
 } from './connection-config'
-
 import type {
   ConnectionKind,
   ConnectionRegistry,

@@ -10,13 +10,13 @@ import {
 } from 'electron'
 
 import {
+  rememberLog
+} from '../app/log-buffer'
+import {
   fileExists,
   POOL_LIMITS_PATH,
   resolveUpdateRoot,
 } from '../composition/bootstrap-env-composition'
-import {
-  rememberLog
-} from '../app/log-buffer'
 
 export function persistPoolLimits(limits) {
   try {

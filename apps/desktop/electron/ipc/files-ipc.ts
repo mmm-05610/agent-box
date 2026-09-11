@@ -12,11 +12,6 @@ import {
 } from 'electron'
 
 import {
-  looksBinary,
-  PREVIEW_LANGUAGE_BY_EXT,
-  TEXT_PREVIEW_MAX_BYTES
-} from '../host-capabilities/preview/media-bridge'
-import {
   ATTACHMENT_UPLOAD_DEFAULT_MAX_BYTES,
   dataUrlReadMaxBytesFromMb,
   readFileDataUrlForIpc,
@@ -24,9 +19,14 @@ import {
   resolveRequestedPathForIpc,
   TEXT_PREVIEW_SOURCE_MAX_BYTES
 } from '../host-capabilities/filesystem/hardening'
-import { capturePreviewContents } from '../host-capabilities/preview/preview-capture'
 import { readWslWindowsClipboardImage } from '../host-capabilities/platform/wsl-clipboard-image'
 import { resolvePickerDefaultPath } from '../host-capabilities/platform/wsl-path-bridge'
+import {
+  looksBinary,
+  PREVIEW_LANGUAGE_BY_EXT,
+  TEXT_PREVIEW_MAX_BYTES
+} from '../host-capabilities/preview/media-bridge'
+import { capturePreviewContents } from '../host-capabilities/preview/preview-capture'
 
 export interface RegisterFilesIpcDeps {
   mimeTypeForPath: any

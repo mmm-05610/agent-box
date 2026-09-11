@@ -3,6 +3,7 @@ import { pathToFileURL } from 'node:url'
 import { BrowserWindow, screen } from 'electron'
 
 import { attachRendererConsoleCapture } from '../app/renderer-log'
+
 import {
   normalizeWakeIndicatorState,
   selectWakeIndicatorDisplay,

@@ -5,11 +5,11 @@ import {
   ipcMain
 } from 'electron'
 
-import { recycleOwnedBackend } from '../legacy-hermes/backend-recycle'
-import { decideBootstrapRepair } from '../legacy-hermes/bootstrap-repair-guard'
 import {
   rememberLog
 } from '../app/log-buffer'
+import { recycleOwnedBackend } from '../legacy-hermes/backend-recycle'
+import { decideBootstrapRepair } from '../legacy-hermes/bootstrap-repair-guard'
 import {
   gatewayWsUrlIpcResult
 } from '../legacy-hermes/connection-config'

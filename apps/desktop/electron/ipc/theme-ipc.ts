@@ -8,6 +8,12 @@ import {
 } from 'electron'
 
 import {
+  glassActive,
+  normalizeState as normalizeTranslucency,
+  vibrancyFor as vibrancyForTranslucency,
+  windowOpacityFor
+} from '../windows/translucency'
+import {
   applyTitleBarOverlay,
   applyWindowTranslucency,
   getTranslucencyState,
@@ -17,12 +23,6 @@ import {
   THEME_SOURCES,
   writePersistedThemeSource
 } from '../windows/window-theme'
-import {
-  glassActive,
-  normalizeState as normalizeTranslucency,
-  vibrancyFor as vibrancyForTranslucency,
-  windowOpacityFor
-} from '../windows/translucency'
 
 export interface RegisterThemeIpcDeps {
   GLASS_SUPPORTED: any

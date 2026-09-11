@@ -17,48 +17,9 @@ import {
 } from 'electron'
 
 import {
-  BROWSER_WINDOW_HEIGHT,
-  BROWSER_WINDOW_MIN_HEIGHT,
-  BROWSER_WINDOW_MIN_WIDTH,
-  BROWSER_WINDOW_WIDTH,
-  buildBrowserWindowUrl
-} from './browser-windows'
-import { detectBundleSkew } from '../update/bundle-skew'
-import {
-  resolveRequestedPathForIpc
-} from '../host-capabilities/filesystem/hardening'
-import { cursorPointInWindow } from './hud-cursor'
-import { startHudGameOverlayWatch } from './hud-game-overlay'
-import { applyHudElectronOverlay, promoteHudOverlay } from './hud-overlay'
-import { snapHudBounds } from './hud-snap'
-import { createHudSnapShortcut } from './hud-snap-shortcut'
-import { buildHudWindowUrl } from './hud-url'
-import { resolveHudWindowing } from './hud-windowing'
-import {
-  hudBounds,
-  nextInstanceBounds,
-} from '../main'
-import { createQuickEntryShortcut, quickEntryWindowBounds } from './quick-entry'
+  rememberLog
+} from '../app/log-buffer'
 import { attachRendererConsoleCapture } from '../app/renderer-log'
-import {
-  buildInstanceWindowUrl,
-  chatWindowWebPreferences,
-  createSessionWindowRegistry
-} from './session-windows'
-import { enumerateWindowsFrontToBack, enumerationFailed } from '../host-capabilities/platform/window-below'
-import { installWindowRendererLifecycle } from './window-renderer-lifecycle'
-import {
-  bindGeometryPersistence,
-  debounce,
-  MIN_HEIGHT as WINDOW_MIN_HEIGHT,
-  MIN_WIDTH as WINDOW_MIN_WIDTH
-} from './window-state'
-import {
-  DEFAULT_ZOOM_LEVEL,
-  ZOOM_STEP,
-  zoomWiringForWindowKind
-} from './zoom'
-
 import {
   APP_NAME,
   DEV_SERVER,
@@ -90,16 +51,55 @@ import {
   writeFileAtomic,
 } from '../composition/bootstrap-env-composition'
 import {
-  rememberLog
-} from '../app/log-buffer'
+  resolveRequestedPathForIpc
+} from '../host-capabilities/filesystem/hardening'
+import { enumerateWindowsFrontToBack, enumerationFailed } from '../host-capabilities/platform/window-below'
 import {
   resolveHermesVersion,
 } from '../legacy-hermes/paths'
+import {
+  hudBounds,
+  nextInstanceBounds,
+} from '../main'
+import { detectBundleSkew } from '../update/bundle-skew'
+
+import {
+  BROWSER_WINDOW_HEIGHT,
+  BROWSER_WINDOW_MIN_HEIGHT,
+  BROWSER_WINDOW_MIN_WIDTH,
+  BROWSER_WINDOW_WIDTH,
+  buildBrowserWindowUrl
+} from './browser-windows'
+import { cursorPointInWindow } from './hud-cursor'
+import { startHudGameOverlayWatch } from './hud-game-overlay'
+import { applyHudElectronOverlay, promoteHudOverlay } from './hud-overlay'
+import { snapHudBounds } from './hud-snap'
+import { createHudSnapShortcut } from './hud-snap-shortcut'
+import { buildHudWindowUrl } from './hud-url'
+import { resolveHudWindowing } from './hud-windowing'
+import { createQuickEntryShortcut, quickEntryWindowBounds } from './quick-entry'
+import {
+  buildInstanceWindowUrl,
+  chatWindowWebPreferences,
+  createSessionWindowRegistry
+} from './session-windows'
+import { installWindowRendererLifecycle } from './window-renderer-lifecycle'
+import {
+  bindGeometryPersistence,
+  debounce,
+  MIN_HEIGHT as WINDOW_MIN_HEIGHT,
+  MIN_WIDTH as WINDOW_MIN_WIDTH
+} from './window-state'
 import {
   chatWindowSurfaceOptions,
   getTitleBarOverlayOptions,
   translucencyBackedWindows
 } from './window-theme'
+import {
+  DEFAULT_ZOOM_LEVEL,
+  ZOOM_STEP,
+  zoomWiringForWindowKind
+} from './zoom'
 
 export async function openPreviewInBrowser(rawUrl) {
   const raw = String(rawUrl || '').trim()

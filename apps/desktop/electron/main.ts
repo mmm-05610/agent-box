@@ -20,6 +20,24 @@ import {
 } from 'electron'
 
 import {
+  _extractDeepLink,
+  get_pendingDeepLink,
+  handleDeepLink,
+  HERMES_PROTOCOL,
+  registerDeepLinkProtocol,
+  set_pendingDeepLink,
+} from './app/deep-link-composition'
+import { describeDevCdpDecision } from './app/dev-cdp'
+import { createEventDeduper } from './app/event-dedupe'
+import {
+  cancelScheduledDesktopLogFlush,
+  flushDesktopLogBufferSync,
+  initDesktopLogBuffer,
+  rememberLog
+} from './app/log-buffer'
+import { createKeepAwake } from './app/power-save'
+import { type ActiveWork, mergeActiveWork, quitPromptFor } from './app/quit-guard'
+import {
   closePreviewWatchers,
   dispatchRegistryApiRequest,
   expandUserPath,
@@ -180,6 +198,69 @@ import {
   renewPortalAccessSilently,
   resolvePortalBaseUrl,
 } from './host-capabilities/credentials/cloud-oauth'
+import { registerMcpOauthCallbackIpc } from './host-capabilities/credentials/mcp-oauth-callback-ipc'
+import { registerFsIpc } from './host-capabilities/filesystem/fs-ipc'
+import {
+  enableBasicPasswordStoreEncryption,
+  resolveReadableFileForIpc,
+  resolveRequestedPathForIpc
+} from './host-capabilities/filesystem/hardening'
+import { registerGitIpc } from './host-capabilities/git/git-ipc'
+import { ensureLoginShellPath } from './host-capabilities/platform/shell-path'
+import { createSshProbeConnection, pickLocalPort } from './host-capabilities/platform/ssh-connection'
+import {
+  alreadyHasNoSandbox,
+  buildNoSandboxRelaunchArgs,
+  decideWindowsSandboxLaunch,
+  fallbackMarker,
+  grantAllApplicationPackagesAcl,
+  markerAfterSuccessfulBoot,
+  readSandboxMarker,
+  shouldAttemptAclRepair,
+  shouldRelaunchForGpuSandboxCrash,
+  writeSandboxMarker
+} from './host-capabilities/platform/windows-sandbox-fallback'
+import { installWindowsSystemCaTrust } from './host-capabilities/platform/windows-system-ca'
+import { ensureWslWindowsFonts } from './host-capabilities/platform/wsl-fonts'
+import { setActiveGatewayProfile, setWslBridgeProfileState } from './host-capabilities/platform/wsl-path-bridge'
+import { type FaviconIo, resolveFavicon } from './host-capabilities/preview/favicon'
+import {
+  initMediaProtocolBridge
+} from './host-capabilities/preview/media-bridge'
+import { createMediaProtocolHandler, MEDIA_PROTOCOL } from './host-capabilities/preview/media-protocol'
+import { PreviewReachRegistry } from './host-capabilities/preview/preview-reach'
+import { registerApiProxyIpc } from './ipc/api-proxy-ipc'
+import { registerBackendIpc } from './ipc/backend-ipc'
+import { registerConnectionIpc } from './ipc/connection-ipc'
+import { registerFilesIpc } from './ipc/files-ipc'
+import { registerHudIpc } from './ipc/hud-ipc'
+import { registerNativeNotifications } from './ipc/notification-ipc'
+import { registerPetOverlayIpc } from './ipc/pet-overlay-ipc'
+import { registerPreviewIpc } from './ipc/preview-ipc'
+import { registerSystemIpc } from './ipc/system-ipc'
+import { registerThemeIpc } from './ipc/theme-ipc'
+import { registerWindowIpc } from './ipc/window-ipc'
+import { destroyKeepaliveAgents } from './legacy-hermes/api-transport'
+import { sshQuitShouldBlock } from './legacy-hermes/connection-apply'
+import {
+  authModeFromStatus,
+  buildGatewayWsUrlWithTicket,
+  connectionScopeKey,
+  modeIsRemoteLike,
+  normalizeRemoteBaseUrl,
+  normalizeSshConfig,
+  normAuthMode,
+  resolveTestWsUrl
+} from './legacy-hermes/connection-config'
+import {
+  backendScopeKey,
+  parseBackendScopeKey,
+  rememberSshEnumeration,
+  resolveRegistryLocalRoute,
+  shouldDeferLocalEnumeration,
+  shouldRetrySshInventory
+} from './legacy-hermes/connection-registry'
+import type { RosterProfileMetadata } from './legacy-hermes/connection-registry'
 import {
   applySecretStorageEncryption,
   broadcastConnectionsChanged,
@@ -192,34 +273,25 @@ import {
   saveRegistryConnection,
   stopRegistryConnectionBackends,
 } from './legacy-hermes/connections-composition'
+import { probeGatewayWebSocket } from './legacy-hermes/gateway-ws-probe'
 import {
-  _extractDeepLink,
-  get_pendingDeepLink,
-  handleDeepLink,
-  HERMES_PROTOCOL,
-  registerDeepLinkProtocol,
-  set_pendingDeepLink,
-} from './app/deep-link-composition'
-import { registerApiProxyIpc } from './ipc/api-proxy-ipc'
-import { registerBackendIpc } from './ipc/backend-ipc'
-import { registerConnectionIpc } from './ipc/connection-ipc'
-import { registerFilesIpc } from './ipc/files-ipc'
-import { registerPreviewIpc } from './ipc/preview-ipc'
-import { registerSystemIpc } from './ipc/system-ipc'
-import { registerThemeIpc } from './ipc/theme-ipc'
-import { registerWindowIpc } from './ipc/window-ipc'
-import {
-  cancelScheduledDesktopLogFlush,
-  flushDesktopLogBufferSync,
-  initDesktopLogBuffer,
-  rememberLog
-} from './app/log-buffer'
-import {
-  initMediaProtocolBridge
-} from './host-capabilities/preview/media-bridge'
+  refusedManagedSshUpdate,
+  waitForManagedUpdateOperations
+} from './legacy-hermes/managed-ssh-update'
 import {
   resolveHermesVersion,
 } from './legacy-hermes/paths'
+import { poolTouchKeys } from './legacy-hermes/pool-touch-scope'
+import * as remoteLifecycle from './legacy-hermes/remote-lifecycle'
+import {
+  attachPowerResumeRemoteRevalidation,
+  revalidatePooledRemoteBackends,
+  revalidateSuspectPooledRemoteBackends
+} from './legacy-hermes/remote-liveness'
+import {
+  createRegistryGatewayWsUrlHandler
+} from './legacy-hermes/remote-ws-headers'
+import { fetchRosterSourceData } from './legacy-hermes/roster-source-fetch'
 import {
   applySpawnPriority,
   installRemoteHeaderRules,
@@ -234,10 +306,27 @@ import {
   updateManagedSshConnection,
 } from './legacy-hermes/runtime-composition'
 import {
+  detectRemotePlatform,
+  helper
+} from './legacy-hermes/windows-remote-lifecycle'
+import { installEmbedReferer } from './security/embed-referer'
+import {
   checkUpdates,
   getUninstallSummary,
   runDesktopUninstall,
 } from './update/updates-composition'
+import {
+  installFoundInPageForwarder
+} from './windows/find-in-page'
+import { applyHudResetBounds, defaultHudBounds } from './windows/hud-geometry'
+import { ensureMainWindow } from './windows/main-window-lifecycle'
+import { sanitizeQuickEntrySettings } from './windows/quick-entry'
+import {
+  instanceWindowBounds
+} from './windows/session-windows'
+import {
+  computeWindowOptions
+} from './windows/window-state'
 import {
   getTranslucencyState,
   writePersistedTranslucency
@@ -268,95 +357,6 @@ import {
   setQuickEntryWindow,
   spawnBrowserWindow,
 } from './windows/windows-composition'
-import { ensureWslWindowsFonts } from './host-capabilities/platform/wsl-fonts'
-import { describeDevCdpDecision } from './app/dev-cdp'
-import { installEmbedReferer } from './security/embed-referer'
-import { createEventDeduper } from './app/event-dedupe'
-import {
-  installFoundInPageForwarder
-} from './windows/find-in-page'
-import { registerMcpOauthCallbackIpc } from './host-capabilities/credentials/mcp-oauth-callback-ipc'
-import { registerFsIpc } from './host-capabilities/filesystem/fs-ipc'
-import {
-  enableBasicPasswordStoreEncryption,
-  resolveReadableFileForIpc,
-  resolveRequestedPathForIpc
-} from './host-capabilities/filesystem/hardening'
-import { registerGitIpc } from './host-capabilities/git/git-ipc'
-import { ensureLoginShellPath } from './host-capabilities/platform/shell-path'
-import { createSshProbeConnection, pickLocalPort } from './host-capabilities/platform/ssh-connection'
-import {
-  alreadyHasNoSandbox,
-  buildNoSandboxRelaunchArgs,
-  decideWindowsSandboxLaunch,
-  fallbackMarker,
-  grantAllApplicationPackagesAcl,
-  markerAfterSuccessfulBoot,
-  readSandboxMarker,
-  shouldAttemptAclRepair,
-  shouldRelaunchForGpuSandboxCrash,
-  writeSandboxMarker
-} from './host-capabilities/platform/windows-sandbox-fallback'
-import { installWindowsSystemCaTrust } from './host-capabilities/platform/windows-system-ca'
-import { setActiveGatewayProfile, setWslBridgeProfileState } from './host-capabilities/platform/wsl-path-bridge'
-import { type FaviconIo, resolveFavicon } from './host-capabilities/preview/favicon'
-import { createMediaProtocolHandler, MEDIA_PROTOCOL } from './host-capabilities/preview/media-protocol'
-import { PreviewReachRegistry } from './host-capabilities/preview/preview-reach'
-import { applyHudResetBounds, defaultHudBounds } from './windows/hud-geometry'
-import { registerHudIpc } from './ipc/hud-ipc'
-import { destroyKeepaliveAgents } from './legacy-hermes/api-transport'
-import { sshQuitShouldBlock } from './legacy-hermes/connection-apply'
-import {
-  authModeFromStatus,
-  buildGatewayWsUrlWithTicket,
-  connectionScopeKey,
-  modeIsRemoteLike,
-  normalizeRemoteBaseUrl,
-  normalizeSshConfig,
-  normAuthMode,
-  resolveTestWsUrl
-} from './legacy-hermes/connection-config'
-import {
-  backendScopeKey,
-  parseBackendScopeKey,
-  rememberSshEnumeration,
-  resolveRegistryLocalRoute,
-  shouldDeferLocalEnumeration,
-  shouldRetrySshInventory
-} from './legacy-hermes/connection-registry'
-import type { RosterProfileMetadata } from './legacy-hermes/connection-registry'
-import { probeGatewayWebSocket } from './legacy-hermes/gateway-ws-probe'
-import {
-  refusedManagedSshUpdate,
-  waitForManagedUpdateOperations
-} from './legacy-hermes/managed-ssh-update'
-import { poolTouchKeys } from './legacy-hermes/pool-touch-scope'
-import * as remoteLifecycle from './legacy-hermes/remote-lifecycle'
-import {
-  attachPowerResumeRemoteRevalidation,
-  revalidatePooledRemoteBackends,
-  revalidateSuspectPooledRemoteBackends
-} from './legacy-hermes/remote-liveness'
-import {
-  createRegistryGatewayWsUrlHandler
-} from './legacy-hermes/remote-ws-headers'
-import { fetchRosterSourceData } from './legacy-hermes/roster-source-fetch'
-import {
-  detectRemotePlatform,
-  helper
-} from './legacy-hermes/windows-remote-lifecycle'
-import { ensureMainWindow } from './windows/main-window-lifecycle'
-import { registerNativeNotifications } from './ipc/notification-ipc'
-import { registerPetOverlayIpc } from './ipc/pet-overlay-ipc'
-import { createKeepAwake } from './app/power-save'
-import { sanitizeQuickEntrySettings } from './windows/quick-entry'
-import { type ActiveWork, mergeActiveWork, quitPromptFor } from './app/quit-guard'
-import {
-  instanceWindowBounds
-} from './windows/session-windows'
-import {
-  computeWindowOptions
-} from './windows/window-state'
 
 
 

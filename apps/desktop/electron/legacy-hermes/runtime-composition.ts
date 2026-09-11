@@ -10,49 +10,6 @@ import {
 } from 'electron'
 
 import {
-  modeIsRemoteLike,
-  remoteRequestMatchesBaseUrl
-} from '../legacy-hermes/connection-config'
-import {
-  backendScopeKey,
-  backendScopePrefix
-} from '../legacy-hermes/connection-registry'
-import { resolveDesktopRemoteRoute } from '../legacy-hermes/desktop-remote-route'
-import {
-  writeSecretFileAtomic
-} from '../host-capabilities/filesystem/hardening'
-import {
-  assertManagedUpdatePreflightClear,
-  executeManagedRemoteUpdate,
-  managedSshRecoveryScopes,
-  managedSshScopeRole,
-  recoverManagedSshScopes,
-  type RemoteUpdateTarget,
-  runManagedSshUpdate,
-  validateCorrelationId,
-  waitForManagedRemoteClearance,
-  waitForManagedSshBootstrapFence
-} from '../legacy-hermes/managed-ssh-update'
-import { clampPoolLimits } from '../legacy-hermes/pool-limits'
-import {
-  type LocalBackendSpawnPriority
-} from '../legacy-hermes/pool-spawn-coordinator'
-import * as remoteLifecycle from '../legacy-hermes/remote-lifecycle'
-import {
-  RemoteLivenessTracker,
-  RemoteRevalidationCoordinator
-} from '../legacy-hermes/remote-liveness'
-import {
-  applyRemoteRequestHeaders
-} from '../legacy-hermes/remote-ws-headers'
-import { createSshProbeConnection } from '../host-capabilities/platform/ssh-connection'
-import {
-  detectRemotePlatform,
-  probeWindowsRemote,
-  terminateOwnedWindowsDashboardForUpdate
-} from '../legacy-hermes/windows-remote-lifecycle'
-
-import {
   backendConnectionState,
   backendPool,
   connectRegistryBackend,
@@ -86,6 +43,49 @@ import {
   updateBootProgress,
   waitForHermes,
 } from '../composition/bootstrap-env-composition'
+import {
+  writeSecretFileAtomic
+} from '../host-capabilities/filesystem/hardening'
+import { createSshProbeConnection } from '../host-capabilities/platform/ssh-connection'
+import {
+  modeIsRemoteLike,
+  remoteRequestMatchesBaseUrl
+} from '../legacy-hermes/connection-config'
+import {
+  backendScopeKey,
+  backendScopePrefix
+} from '../legacy-hermes/connection-registry'
+import { resolveDesktopRemoteRoute } from '../legacy-hermes/desktop-remote-route'
+import {
+  assertManagedUpdatePreflightClear,
+  executeManagedRemoteUpdate,
+  managedSshRecoveryScopes,
+  managedSshScopeRole,
+  recoverManagedSshScopes,
+  type RemoteUpdateTarget,
+  runManagedSshUpdate,
+  validateCorrelationId,
+  waitForManagedRemoteClearance,
+  waitForManagedSshBootstrapFence
+} from '../legacy-hermes/managed-ssh-update'
+import { clampPoolLimits } from '../legacy-hermes/pool-limits'
+import {
+  type LocalBackendSpawnPriority
+} from '../legacy-hermes/pool-spawn-coordinator'
+import * as remoteLifecycle from '../legacy-hermes/remote-lifecycle'
+import {
+  RemoteLivenessTracker,
+  RemoteRevalidationCoordinator
+} from '../legacy-hermes/remote-liveness'
+import {
+  applyRemoteRequestHeaders
+} from '../legacy-hermes/remote-ws-headers'
+import {
+  detectRemotePlatform,
+  probeWindowsRemote,
+  terminateOwnedWindowsDashboardForUpdate
+} from '../legacy-hermes/windows-remote-lifecycle'
+
 import {
   persistPoolLimits,
 } from './paths'

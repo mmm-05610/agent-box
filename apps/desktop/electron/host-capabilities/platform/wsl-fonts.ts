@@ -9,9 +9,9 @@ import path from 'node:path'
 
 import { app } from 'electron'
 
-import { isWslEnvironment } from './bootstrap-platform'
-
 import { rememberLog } from '../../app/log-buffer'
+
+import { isWslEnvironment } from './bootstrap-platform'
 
 export function ensureWslWindowsFonts() {
   if (!isWslEnvironment()) {

@@ -1,5 +1,4 @@
 import { parseRemoteProfileListing } from './connection-registry'
-
 import { expandRemotePath, shq, SUPPORTED_REMOTE_OS, validateRemotePath } from './ownership'
 
 /** Locate and validate the remote Hermes install: login-shell probe,

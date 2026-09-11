@@ -23,17 +23,71 @@ import {
   shell
 } from 'electron'
 
+import { describeCrashReason } from '../app/crash-forensics'
+import { loadOrCreateInstallationId, sshOwnershipId } from '../app/desktop-installation'
+import { resolveDevCdpPort } from '../app/dev-cdp'
+import {
+  getRecentHermesLogLines,
+  rememberLog
+} from '../app/log-buffer'
+import { missingRendererAssets } from '../app/renderer-bundle'
+import { attachRendererConsoleCapture } from '../app/renderer-log'
+import {
+  oauthGuardMayHardFail,
+  oauthSessionIsLive,
+  oauthTicketFailureAuthMessage,
+  resolveJsonBody,
+  resolveReadinessProbeAuth
+} from '../host-capabilities/credentials/native-auth-decisions'
+import {
+  nativeRefreshUrl,
+  type NativeTokenSet,
+  parseTokenResponse,
+  tokenNeedsRefresh
+} from '../host-capabilities/credentials/native-oauth'
+import { loadNativeTokenSet, type NativeTokenStoreIo, persistNativeTokenSet } from '../host-capabilities/credentials/native-token-store'
+import { serializeJsonBody, setJsonRequestHeaders } from '../host-capabilities/credentials/oauth-net-request'
+import { LEGACY_OAUTH_PARTITION, resolveOauthPartition } from '../host-capabilities/credentials/oauth-partition'
+import {
+  classifyStoredSecret,
+  readSecretStoragePolicy,
+  SECRET_STORAGE_POLICY_FILE,
+  type SecretStoragePolicy
+} from '../host-capabilities/credentials/secret-storage-policy'
+import {
+  DEFAULT_FETCH_TIMEOUT_MS,
+  encryptDesktopSecret as encryptDesktopSecretStrict,
+  resolveRequestedPathForIpc,
+  resolveTimeoutMs,
+  SAFE_STORAGE_ENCODING,
+  tightenSecretFileMode,
+  writeSecretFileAtomic
+} from '../host-capabilities/filesystem/hardening'
+import {
+  detectRemoteDisplay,
+  isWindowsBinaryPathInWsl,
+  isWslEnvironment,
+  resolveLinuxPasswordStore
+} from '../host-capabilities/platform/bootstrap-platform'
+import { findGitBash as _findGitBash } from '../host-capabilities/platform/find-git-bash'
+import { ensureLoginShellPath } from '../host-capabilities/platform/shell-path'
+import { pickLocalPort, redactSecrets, SshConnection } from '../host-capabilities/platform/ssh-connection'
+import { hiddenWindowsChildOptions } from '../host-capabilities/platform/windows-child-options'
+import {
+  alreadyHasNoSandbox,
+  buildNoSandboxRelaunchArgs,
+  fallbackMarker,
+  markerAfterSuccessfulBoot,
+  type SandboxFallbackReason,
+  shouldRelaunchForRendererSandboxCrashLoop,
+  writeSandboxMarker
+} from '../host-capabilities/platform/windows-sandbox-fallback'
+import { readWindowsUserEnvVar } from '../host-capabilities/platform/windows-user-env'
+import { setActiveGatewayProfile, setWslBridgeProfileState } from '../host-capabilities/platform/wsl-path-bridge'
+import { registerTerminalIpc } from '../host-capabilities/terminal/terminal-ipc'
 import { classifyActiveRuntime } from '../legacy-hermes/active-runtime-state'
 import { jsonAgentFor, withRetry } from '../legacy-hermes/api-transport'
-import { appIconCandidates, resolveAppIcon } from '../windows/app-icon'
 import { dashboardFallbackArgs, sourceDeclaresServe } from '../legacy-hermes/backend-command'
-import {
-  hermesBackendEnv,
-  hermesLocalWsUrl,
-  hermesPrimaryConnectionDescriptor,
-  hermesProfiledConnectionDescriptor,
-  hermesServeArgs
-} from '../legacy-hermes/lifecycle'
 import { buildDesktopBackendEnv, hermesManagedNodePathEntries, normalizeHermesHomeRoot } from '../legacy-hermes/backend-env'
 import {
   isReauthRequiredError,
@@ -59,14 +113,7 @@ import {
   shouldLatchHostKeyChangedFailure,
   shouldLatchRemoteReauthFailure
 } from '../legacy-hermes/backend-start-failure'
-import {
-  detectRemoteDisplay,
-  isWindowsBinaryPathInWsl,
-  isWslEnvironment,
-  resolveLinuxPasswordStore
-} from '../host-capabilities/platform/bootstrap-platform'
 import { runBootstrap } from '../legacy-hermes/bootstrap-runner'
-import { detectBundleSwap } from '../update/bundle-swap'
 import { teardownSshState } from '../legacy-hermes/connection-apply'
 import {
   buildGatewayWsUrl,
@@ -97,53 +144,24 @@ import {
   reuseMatchingPrimarySshBackend,
   upsertConnection
 } from '../legacy-hermes/connection-registry'
-import { describeCrashReason } from '../app/crash-forensics'
 import { adoptServedDashboardToken } from '../legacy-hermes/dashboard-token'
-import { loadOrCreateInstallationId, sshOwnershipId } from '../app/desktop-installation'
 import { resolveDesktopRemoteRoute, v1SshTerminalPoolKey } from '../legacy-hermes/desktop-remote-route'
-import {
-  resolveRemovableAppPath
-} from '../update/desktop-uninstall'
-import { resolveDevCdpPort } from '../app/dev-cdp'
-import { findGitBash as _findGitBash } from '../host-capabilities/platform/find-git-bash'
-import {
-  installFindShortcut
-} from '../windows/find-in-page'
 import { createFirstRunSetupGate } from '../legacy-hermes/first-run-setup-gate'
 import { startGatewaysAfterUpdateAbort, stopGatewayBeforeUpdate } from '../legacy-hermes/gateway-stop-before-update'
 import { probeGatewayWebSocket } from '../legacy-hermes/gateway-ws-probe'
-import { readAndConsumeHandoffResult } from '../update/handoff-result'
 import {
-  DEFAULT_FETCH_TIMEOUT_MS,
-  encryptDesktopSecret as encryptDesktopSecretStrict,
-  resolveRequestedPathForIpc,
-  resolveTimeoutMs,
-  SAFE_STORAGE_ENCODING,
-  tightenSecretFileMode,
-  writeSecretFileAtomic
-} from '../host-capabilities/filesystem/hardening'
+  hermesBackendEnv,
+  hermesLocalWsUrl,
+  hermesPrimaryConnectionDescriptor,
+  hermesProfiledConnectionDescriptor,
+  hermesServeArgs
+} from '../legacy-hermes/lifecycle'
 import {
   fenceManagedSshBootstrapPublication,
   ManagedConnectionUpdateGate,
   managedSshTokenPersistencePlan,
   validateCorrelationId
 } from '../legacy-hermes/managed-ssh-update'
-import {
-  oauthGuardMayHardFail,
-  oauthSessionIsLive,
-  oauthTicketFailureAuthMessage,
-  resolveJsonBody,
-  resolveReadinessProbeAuth
-} from '../host-capabilities/credentials/native-auth-decisions'
-import {
-  nativeRefreshUrl,
-  type NativeTokenSet,
-  parseTokenResponse,
-  tokenNeedsRefresh
-} from '../host-capabilities/credentials/native-oauth'
-import { loadNativeTokenSet, type NativeTokenStoreIo, persistNativeTokenSet } from '../host-capabilities/credentials/native-token-store'
-import { serializeJsonBody, setJsonRequestHeaders } from '../host-capabilities/credentials/oauth-net-request'
-import { LEGACY_OAUTH_PARTITION, resolveOauthPartition } from '../host-capabilities/credentials/oauth-partition'
 import { createParentStartMarkerResolver, electronProcessStartMarker, parentWatchdogEnv } from '../legacy-hermes/parent-process-identity'
 import {
   pendingNotice as pendingPluginCompatNotice,
@@ -164,6 +182,46 @@ import {
   FirstRunSetupResetError,
   runPrimaryBackendStartup
 } from '../legacy-hermes/primary-backend-startup'
+import {
+  assertLocalProfileCanStart,
+  ProfileDeletionGate
+} from '../legacy-hermes/profile-delete-routing'
+import { migrateActiveProfileIfMissing as migrateActiveProfileIfMissingPure } from '../legacy-hermes/profile-migration'
+import * as remoteLifecycle from '../legacy-hermes/remote-lifecycle'
+import {
+  ensureHealthyPooledRemoteBackendForDispatch,
+  RemoteRevalidationCoordinator
+} from '../legacy-hermes/remote-liveness'
+import {
+  createRemoteWsHeaderStore
+} from '../legacy-hermes/remote-ws-headers'
+import {
+  headersForRemoteRequest,
+} from '../legacy-hermes/runtime-composition'
+import { createBootstrapCoordinator, sshConfigFingerprint } from '../legacy-hermes/ssh-bootstrap-coordinator'
+import {
+  formatBlockerMessage,
+  formatProbeFailedMessage,
+  scanVenvBlockers,
+  stopSafeVenvBlockers
+} from '../legacy-hermes/venv-blocker-scan'
+import { isHermesOwnedVenvDaemon } from '../legacy-hermes/venv-holder-select'
+import {
+  registrySshPoolScopeByConnectionId,
+  registrySshScopeForWindowRoute,
+  WindowConnectionRouteRegistry
+} from '../legacy-hermes/window-connection-route'
+import {
+  buildPathExtCandidates,
+  chooseUpdaterArgs,
+  getVenvSitePackagesEntries,
+  resolveVenvHermesCommand
+} from '../legacy-hermes/windows-hermes-path'
+import {
+  connectWindowsRemote,
+  detectRemotePlatform,
+  terminateOwnedWindowsDashboardForUpdate
+} from '../legacy-hermes/windows-remote-lifecycle'
 import { stopChildProcess as stopBackendChildImpl, stopProcessTreesForUpdate } from '../process/child-stop'
 import { createConnectionState } from '../process/connection-state'
 import {
@@ -178,45 +236,13 @@ import {
 } from '../process/identity'
 import { InFlightClaims } from '../process/inflight-claim'
 import { createOutputTail, type ProcessOutputTail } from '../process/output-tail'
+import { createWindowOpenHandler } from '../security/window-open-policy'
+import { isPackagedInstallPath as isPackagedInstallPathUnderRoots } from '../security/workspace-cwd'
+import { detectBundleSwap } from '../update/bundle-swap'
 import {
-  assertLocalProfileCanStart,
-  ProfileDeletionGate
-} from '../legacy-hermes/profile-delete-routing'
-import { migrateActiveProfileIfMissing as migrateActiveProfileIfMissingPure } from '../legacy-hermes/profile-migration'
-import * as remoteLifecycle from '../legacy-hermes/remote-lifecycle'
-import {
-  ensureHealthyPooledRemoteBackendForDispatch,
-  RemoteRevalidationCoordinator
-} from '../legacy-hermes/remote-liveness'
-import {
-  createRemoteWsHeaderStore
-} from '../legacy-hermes/remote-ws-headers'
-import { missingRendererAssets } from '../app/renderer-bundle'
-import { loadRendererLoadErrorPage } from '../windows/renderer-load-error-page'
-import { attachRendererConsoleCapture } from '../app/renderer-log'
-import {
-  classifyStoredSecret,
-  readSecretStoragePolicy,
-  SECRET_STORAGE_POLICY_FILE,
-  type SecretStoragePolicy
-} from '../host-capabilities/credentials/secret-storage-policy'
-import {
-  buildSessionWindowUrl,
-  chatWindowWebPreferences,
-  createSessionWindowRegistry,
-  SESSION_WINDOW_MIN_HEIGHT,
-  SESSION_WINDOW_MIN_WIDTH
-} from '../windows/session-windows'
-import { ensureLoginShellPath } from '../host-capabilities/platform/shell-path'
-import { createBootstrapCoordinator, sshConfigFingerprint } from '../legacy-hermes/ssh-bootstrap-coordinator'
-import { pickLocalPort, redactSecrets, SshConnection } from '../host-capabilities/platform/ssh-connection'
-import { createStreamThrottle } from '../windows/stream-throttle'
-import { registerTerminalIpc } from '../host-capabilities/terminal/terminal-ipc'
-import { nativeOverlayWidth as computeNativeOverlayWidth } from '../windows/titlebar-overlay-width'
-import {
-  glassSupportedOn,
-  translucencySupportedOn
-} from '../windows/translucency'
+  resolveRemovableAppPath
+} from '../update/desktop-uninstall'
+import { readAndConsumeHandoffResult } from '../update/handoff-result'
 import { waitForUpdateClearance } from '../update/update-gate'
 import { readLiveUpdateMarker, updateHandoffConflict, writeUpdateMarker } from '../update/update-marker'
 import { isOfficialSshRemote, OFFICIAL_REPO_HTTPS_URL } from '../update/update-remote'
@@ -232,20 +258,25 @@ import {
   windowsUpdatePrerequisiteError,
   wrapHandoffForDetachedConsole
 } from '../update/updater-process'
+import { appIconCandidates, resolveAppIcon } from '../windows/app-icon'
 import {
-  formatBlockerMessage,
-  formatProbeFailedMessage,
-  scanVenvBlockers,
-  stopSafeVenvBlockers
-} from '../legacy-hermes/venv-blocker-scan'
-import { isHermesOwnedVenvDaemon } from '../legacy-hermes/venv-holder-select'
+  installFindShortcut
+} from '../windows/find-in-page'
+import { loadRendererLoadErrorPage } from '../windows/renderer-load-error-page'
+import {
+  buildSessionWindowUrl,
+  chatWindowWebPreferences,
+  createSessionWindowRegistry,
+  SESSION_WINDOW_MIN_HEIGHT,
+  SESSION_WINDOW_MIN_WIDTH
+} from '../windows/session-windows'
+import { createStreamThrottle } from '../windows/stream-throttle'
+import { nativeOverlayWidth as computeNativeOverlayWidth } from '../windows/titlebar-overlay-width'
+import {
+  glassSupportedOn,
+  translucencySupportedOn
+} from '../windows/translucency'
 import { createWakeIndicatorWindowController } from '../windows/wake-indicator-window'
-import {
-  registrySshPoolScopeByConnectionId,
-  registrySshScopeForWindowRoute,
-  WindowConnectionRouteRegistry
-} from '../legacy-hermes/window-connection-route'
-import { createWindowOpenHandler } from '../security/window-open-policy'
 import { installWindowRendererLifecycle } from '../windows/window-renderer-lifecycle'
 import { createWindowRevealController } from '../windows/window-reveal'
 import {
@@ -256,30 +287,12 @@ import {
   MIN_HEIGHT as WINDOW_MIN_HEIGHT,
   MIN_WIDTH as WINDOW_MIN_WIDTH
 } from '../windows/window-state'
-import { hiddenWindowsChildOptions } from '../host-capabilities/platform/windows-child-options'
 import {
-  buildPathExtCandidates,
-  chooseUpdaterArgs,
-  getVenvSitePackagesEntries,
-  resolveVenvHermesCommand
-} from '../legacy-hermes/windows-hermes-path'
-import {
-  connectWindowsRemote,
-  detectRemotePlatform,
-  terminateOwnedWindowsDashboardForUpdate
-} from '../legacy-hermes/windows-remote-lifecycle'
-import {
-  alreadyHasNoSandbox,
-  buildNoSandboxRelaunchArgs,
-  fallbackMarker,
-  markerAfterSuccessfulBoot,
-  type SandboxFallbackReason,
-  shouldRelaunchForRendererSandboxCrashLoop,
-  writeSandboxMarker
-} from '../host-capabilities/platform/windows-sandbox-fallback'
-import { readWindowsUserEnvVar } from '../host-capabilities/platform/windows-user-env'
-import { isPackagedInstallPath as isPackagedInstallPathUnderRoots } from '../security/workspace-cwd'
-import { setActiveGatewayProfile, setWslBridgeProfileState } from '../host-capabilities/platform/wsl-path-bridge'
+  applyTitleBarOverlay,
+  chatWindowSurfaceOptions,
+  getTitleBarOverlayOptions,
+  translucencyBackedWindows
+} from '../windows/window-theme'
 import {
   applyZoomLevel,
   DEFAULT_ZOOM_LEVEL,
@@ -289,20 +302,6 @@ import {
   ZOOM_STORAGE_KEY,
   zoomWiringForWindowKind
 } from '../windows/zoom'
-
-import {
-  getRecentHermesLogLines,
-  rememberLog
-} from '../app/log-buffer'
-import {
-  headersForRemoteRequest,
-} from '../legacy-hermes/runtime-composition'
-import {
-  applyTitleBarOverlay,
-  chatWindowSurfaceOptions,
-  getTitleBarOverlayOptions,
-  translucencyBackedWindows
-} from '../windows/window-theme'
 
 export const USER_DATA_OVERRIDE = process.env.HERMES_DESKTOP_USER_DATA_DIR
 

@@ -11,7 +11,6 @@ import {
   shell
 } from 'electron'
 
-import { detectBundleSwap } from '../update/bundle-swap'
 import {
   flushDesktopLogBufferSync,
   getRecentHermesLogLines,
@@ -21,6 +20,7 @@ import { formatRendererBoundaryReport } from '../app/renderer-log'
 import {
   buildNoSandboxRelaunchArgs
 } from '../host-capabilities/platform/windows-sandbox-fallback'
+import { detectBundleSwap } from '../update/bundle-swap'
 
 export interface RegisterSystemIpcDeps {
   REMOTE_DISPLAY_REASON: any

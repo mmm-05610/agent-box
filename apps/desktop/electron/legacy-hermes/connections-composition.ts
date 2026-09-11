@@ -8,38 +8,8 @@ import {
 } from 'electron'
 
 import {
-  connectionScopeKey,
-  localProfileEntry,
-  modeIsRemoteLike,
-  normalizeRemoteBaseUrl,
-  normalizeRemoteHeaders,
-  normalizeSshConfig,
-  normAuthMode,
-  resolveAuthMode,
-  savedProfileSsh,
-  tokenPreview
-} from '../legacy-hermes/connection-config'
-import {
-  backendScopePrefix,
-  connectionDialFieldsChanged,
-  mergeConnectionInput,
-  normalizeConnectionInput,
-  upsertConnection
-} from '../legacy-hermes/connection-registry'
-import {
-  encryptDesktopSecret as encryptDesktopSecretStrict,
-  resolvePersistedRemoteToken,
-  SAFE_STORAGE_ENCODING
-} from '../host-capabilities/filesystem/hardening'
-import {
-  oauthSessionIsLive
-} from '../host-capabilities/credentials/native-auth-decisions'
-import {
-  classifyStoredSecret,
-  type SecretStoragePolicy,
-  writeSecretStoragePolicy
-} from '../host-capabilities/credentials/secret-storage-policy'
-
+  rememberLog
+} from '../app/log-buffer'
 import {
   _nativeTokenStoreIo,
   _secretStoragePolicy,
@@ -62,8 +32,37 @@ import {
   writeDesktopConnectionsRegistry,
 } from '../composition/bootstrap-env-composition'
 import {
-  rememberLog
-} from '../app/log-buffer'
+  oauthSessionIsLive
+} from '../host-capabilities/credentials/native-auth-decisions'
+import {
+  classifyStoredSecret,
+  type SecretStoragePolicy,
+  writeSecretStoragePolicy
+} from '../host-capabilities/credentials/secret-storage-policy'
+import {
+  encryptDesktopSecret as encryptDesktopSecretStrict,
+  resolvePersistedRemoteToken,
+  SAFE_STORAGE_ENCODING
+} from '../host-capabilities/filesystem/hardening'
+import {
+  connectionScopeKey,
+  localProfileEntry,
+  modeIsRemoteLike,
+  normalizeRemoteBaseUrl,
+  normalizeRemoteHeaders,
+  normalizeSshConfig,
+  normAuthMode,
+  resolveAuthMode,
+  savedProfileSsh,
+  tokenPreview
+} from '../legacy-hermes/connection-config'
+import {
+  backendScopePrefix,
+  connectionDialFieldsChanged,
+  mergeConnectionInput,
+  normalizeConnectionInput,
+  upsertConnection
+} from '../legacy-hermes/connection-registry'
 
 export function setSecretStoragePolicy(next: SecretStoragePolicy) {
   set_secretStoragePolicy({ on: next.on === true, migrated: next.migrated === true })

@@ -14,13 +14,13 @@ import {
 import {
   rememberLog
 } from '../app/log-buffer'
+import { normalizeActiveWork } from '../app/quit-guard'
+import { readWindowBelow } from '../host-capabilities/platform/window-below'
 import {
   performFindAfterIndexingStarted,
   stopFind
 } from '../windows/find-in-page'
 import { sanitizeQuickEntrySettings } from '../windows/quick-entry'
-import { normalizeActiveWork } from '../app/quit-guard'
-import { readWindowBelow } from '../host-capabilities/platform/window-below'
 import {
   DEFAULT_ZOOM_LEVEL,
   percentToZoomLevel,

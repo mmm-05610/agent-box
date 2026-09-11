@@ -4,7 +4,6 @@ import {
   normalizeRemoteBaseUrl,
   normalizeSshConfig
 } from './connection-config'
-
 import type { ConnectionKind, ConnectionRegistry, RegistryConnection} from './identity';
 import { LOCAL_CONNECTION_ID, normalizedSshTarget, uniqueLabel } from './identity'
 import { normalizeConnectionInput } from './schema'

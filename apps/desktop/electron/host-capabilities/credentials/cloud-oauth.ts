@@ -12,6 +12,16 @@ import {
   net as electronNet
 } from 'electron'
 
+import {
+  rememberLog
+} from '../../app/log-buffer'
+import {
+  fetchJsonViaOauthSession,
+  getOauthSession,
+  getOauthSessionForUrl,
+  mainWindow,
+  warmOauthCookieStore,
+} from '../../composition/bootstrap-env-composition'
 import { downloadAgentFor } from '../../legacy-hermes/api-transport'
 import {
   cookiesHavePrivyAccessToken,
@@ -24,22 +34,11 @@ import {
   fsPumpDeps,
   pumpStreamToFile
 } from '../../legacy-hermes/gateway-file-download'
+import { installWindowRendererLifecycle } from '../../windows/window-renderer-lifecycle'
 import {
   DEFAULT_FETCH_TIMEOUT_MS,
   resolveTimeoutMs
 } from '../filesystem/hardening'
-import { installWindowRendererLifecycle } from '../../windows/window-renderer-lifecycle'
-
-import {
-  fetchJsonViaOauthSession,
-  getOauthSession,
-  getOauthSessionForUrl,
-  mainWindow,
-  warmOauthCookieStore,
-} from '../../composition/bootstrap-env-composition'
-import {
-  rememberLog
-} from '../../app/log-buffer'
 
 export function downloadViaTokenToFile(url, token, ctx, options: any = {}) {
   return new Promise((resolve, reject) => {

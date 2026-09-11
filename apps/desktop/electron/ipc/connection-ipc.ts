@@ -12,6 +12,12 @@ import {
 import {
   rememberLog
 } from '../app/log-buffer'
+import {
+  resolveLoginStrategy
+} from '../host-capabilities/credentials/native-oauth'
+import { runNativeLogin } from '../host-capabilities/credentials/native-oauth-login'
+import { collectSshConfigHosts, parseSshGOutput } from '../host-capabilities/platform/ssh-config'
+import { hiddenWindowsChildOptions } from '../host-capabilities/platform/windows-child-options'
 import { applyConnectionChange } from '../legacy-hermes/connection-apply'
 import {
   authModeFromStatus,
@@ -35,10 +41,6 @@ import {
 } from '../legacy-hermes/connection-registry'
 import { probeGatewayWebSocket } from '../legacy-hermes/gateway-ws-probe'
 import {
-  resolveLoginStrategy
-} from '../host-capabilities/credentials/native-oauth'
-import { runNativeLogin } from '../host-capabilities/credentials/native-oauth-login'
-import {
   buildRegistryProfileRoutes,
   isLocalEnumerationFailure,
   localRouteFallbackProfiles,
@@ -48,8 +50,6 @@ import { rehomePrimaryConnection } from '../legacy-hermes/primary-connection-reh
 import {
   revalidateRemoteConnection
 } from '../legacy-hermes/remote-liveness'
-import { collectSshConfigHosts, parseSshGOutput } from '../host-capabilities/platform/ssh-config'
-import { hiddenWindowsChildOptions } from '../host-capabilities/platform/windows-child-options'
 
 export interface RegisterConnectionIpcDeps {
   backendDialClaims: any

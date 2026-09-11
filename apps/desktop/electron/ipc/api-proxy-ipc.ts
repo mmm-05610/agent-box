@@ -6,12 +6,12 @@ import {
 } from 'electron'
 
 import {
-  apiRequestRegistryConnectionId
-} from '../legacy-hermes/connection-config'
-import {
   DATA_URL_READ_DEFAULT_MAX_MB,
   dataUrlReadMaxBytesFromMb
 } from '../host-capabilities/filesystem/hardening'
+import {
+  apiRequestRegistryConnectionId
+} from '../legacy-hermes/connection-config'
 import {
   dispatchConnectionScopedProfileDelete,
   profileNameFromDeleteRequest

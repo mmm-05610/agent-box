@@ -18,6 +18,34 @@ import {
 } from 'electron'
 
 import {
+  rememberLog
+} from '../app/log-buffer'
+import {
+  downloadViaOauthSessionToFile,
+  downloadViaTokenToFile,
+} from '../host-capabilities/credentials/cloud-oauth'
+import {
+  resolveGatedDownloadAuth,
+  resolveOauthRestAuth
+} from '../host-capabilities/credentials/native-auth-decisions'
+import {
+  clampDataUrlReadMaxMb,
+  DATA_URL_READ_DEFAULT_MAX_MB,
+  DEFAULT_FETCH_TIMEOUT_MS,
+  resolveReadableFileForIpc,
+  resolveRequestedPathForIpc,
+  resolveTimeoutMs
+} from '../host-capabilities/filesystem/hardening'
+import { hiddenWindowsChildOptions } from '../host-capabilities/platform/windows-child-options'
+import {
+  LOCAL_PREVIEW_HOSTS,
+  PREVIEW_HTML_EXTENSIONS,
+  PREVIEW_LANGUAGE_BY_EXT,
+  PREVIEW_PDF_EXTENSIONS,
+  PREVIEW_WATCH_DEBOUNCE_MS,
+  previewFileMetadata
+} from '../host-capabilities/preview/media-bridge'
+import {
   apiRequestRegistryConnectionId,
   pathForRegistryBackendRequest,
   pathWithGlobalRemoteProfile,
@@ -39,19 +67,6 @@ import {
   writeBufferToFile
 } from '../legacy-hermes/gateway-file-download'
 import {
-  clampDataUrlReadMaxMb,
-  DATA_URL_READ_DEFAULT_MAX_MB,
-  DEFAULT_FETCH_TIMEOUT_MS,
-  resolveReadableFileForIpc,
-  resolveRequestedPathForIpc,
-  resolveTimeoutMs
-} from '../host-capabilities/filesystem/hardening'
-import { createLinkTitleWindow, guardLinkTitleSession, readLinkTitleWindowTitle } from '../windows/link-title-window'
-import {
-  resolveGatedDownloadAuth,
-  resolveOauthRestAuth
-} from '../host-capabilities/credentials/native-auth-decisions'
-import {
   decideProfileDeleteAction,
   localProfilePoolKeys,
   profileNameFromDeleteRequest,
@@ -69,7 +84,10 @@ import {
   spliceRegistrySessionRows,
   tagRegistrySessionResponse
 } from '../legacy-hermes/profile-session-routing'
-import { hiddenWindowsChildOptions } from '../host-capabilities/platform/windows-child-options'
+import {
+  resetHermesConnection,
+} from '../legacy-hermes/runtime-composition'
+import { createLinkTitleWindow, guardLinkTitleSession, readLinkTitleWindowTitle } from '../windows/link-title-window'
 
 import {
   backendConnectionState,
@@ -102,24 +120,6 @@ import {
   waitForBackendExit,
   writeActiveDesktopProfile,
 } from './bootstrap-env-composition'
-import {
-  downloadViaOauthSessionToFile,
-  downloadViaTokenToFile,
-} from '../host-capabilities/credentials/cloud-oauth'
-import {
-  rememberLog
-} from '../app/log-buffer'
-import {
-  LOCAL_PREVIEW_HOSTS,
-  PREVIEW_HTML_EXTENSIONS,
-  PREVIEW_LANGUAGE_BY_EXT,
-  PREVIEW_PDF_EXTENSIONS,
-  PREVIEW_WATCH_DEBOUNCE_MS,
-  previewFileMetadata
-} from '../host-capabilities/preview/media-bridge'
-import {
-  resetHermesConnection,
-} from '../legacy-hermes/runtime-composition'
 
 export const previewWatchers = new Map()
 

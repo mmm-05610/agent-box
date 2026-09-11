@@ -12,25 +12,8 @@ import {
 } from 'electron'
 
 import {
-  buildPosixCleanupScript,
-  buildWindowsCleanupScript,
-  modeRemovesAgent,
-  modeRemovesUserData,
-  resolveRemovableAppPath,
-  shouldRemoveAppBundle,
-  uninstallArgsForMode
-} from './desktop-uninstall'
-import { clearStaleGitLocks } from '../host-capabilities/git/gitlock'
-import {
-  compareApiUrl,
-  parseCompareBehindCount,
-  resolveBehindCount,
-  resolveCommitLogSelection,
-  shouldCountCommits
-} from './update-count'
-import { isOfficialSshRemote, OFFICIAL_REPO_HTTPS_URL } from './update-remote'
-import { hiddenWindowsChildOptions } from '../host-capabilities/platform/windows-child-options'
-
+  rememberLog
+} from '../app/log-buffer'
 import {
   ACTIVE_HERMES_ROOT,
   directoryExists,
@@ -50,9 +33,26 @@ import {
   setIsQuittingForHandoff,
   VENV_ROOT,
 } from '../composition/bootstrap-env-composition'
+import { clearStaleGitLocks } from '../host-capabilities/git/gitlock'
+import { hiddenWindowsChildOptions } from '../host-capabilities/platform/windows-child-options'
+
 import {
-  rememberLog
-} from '../app/log-buffer'
+  buildPosixCleanupScript,
+  buildWindowsCleanupScript,
+  modeRemovesAgent,
+  modeRemovesUserData,
+  resolveRemovableAppPath,
+  shouldRemoveAppBundle,
+  uninstallArgsForMode
+} from './desktop-uninstall'
+import {
+  compareApiUrl,
+  parseCompareBehindCount,
+  resolveBehindCount,
+  resolveCommitLogSelection,
+  shouldCountCommits
+} from './update-count'
+import { isOfficialSshRemote, OFFICIAL_REPO_HTTPS_URL } from './update-remote'
 
 export const firstLine = text => (text || '').split('\n').find(Boolean) || ''
 

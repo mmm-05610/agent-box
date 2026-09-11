@@ -5,7 +5,6 @@ import {
   normalizeSshConfig,
   normAuthMode
 } from './connection-config'
-
 import type { ConnectionRegistry, RegistryConnection} from './identity';
 import { LOCAL_CONNECTION_ID, REGISTRY_VERSION, uniqueLabel } from './identity'
 import { connectionIdForLabel, localEntry } from './schema'

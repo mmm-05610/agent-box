@@ -20,6 +20,7 @@ import path from 'path'
 import { test } from 'vitest'
 
 import { isPidAlive } from '../process/pid'
+
 import {
   markerPath,
   readLiveUpdateMarker,
