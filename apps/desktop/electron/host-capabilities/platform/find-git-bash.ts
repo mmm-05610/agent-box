@@ -1,5 +1,10 @@
 import path from 'node:path'
 
+import { fileExists } from '../filesystem/fs-probe'
+
+import { findOnPath } from './executables'
+import { IS_WINDOWS } from './platform-facts'
+
 export interface GitBashOptions {
   isWindows: boolean
   env: Record<string, string | undefined>
@@ -64,4 +69,21 @@ export function findGitBash(opts: GitBashOptions): string | null {
   }
 
   return null
+}
+
+/**
+ * `findGitBash` wired to this host.
+ *
+ * The core above takes its deps so it can be tested without a host; this is the
+ * one-line binding the main process uses, kept here so a caller does not have to
+ * know which platform probes to inject. It replaces a wrapper that lived in the
+ * composition root only because that is where `IS_WINDOWS`/`findOnPath` were.
+ */
+export function findGitBashOnHost(): null | string {
+  return findGitBash({
+    isWindows: IS_WINDOWS,
+    env: process.env,
+    fileExists,
+    findOnPath
+  })
 }

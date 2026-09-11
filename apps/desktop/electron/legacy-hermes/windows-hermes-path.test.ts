@@ -17,8 +17,9 @@ import path from 'node:path'
 
 import { test } from 'vitest'
 
+import { buildPathExtCandidates } from '../host-capabilities/platform/pathext'
+
 import {
-  buildPathExtCandidates,
   chooseUpdaterArgs,
   getVenvSitePackagesEntries,
   resolveVenvHermesCommand

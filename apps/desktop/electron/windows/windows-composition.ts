@@ -20,39 +20,11 @@ import {
   rememberLog
 } from '../app/log-buffer'
 import { attachRendererConsoleCapture } from '../app/renderer-log'
-import {
-  APP_NAME,
-  DEV_SERVER,
-  getAppIconPath,
-  HUD_WINDOW_TITLE,
-  INSTALL_STAMP,
-  IS_MAC,
-  loadWindowUrl,
-  mainWindow,
-  openExternalUrl,
-  petOverlayWindow,
-  PRELOAD_PATH,
-  RENDERER_RELOAD_MAX,
-  RENDERER_RELOAD_WINDOW_MS,
-  rendererReloadTimesRef,
-  resolveRendererIndex,
-  resolveUpdateRoot,
-  runGit,
-  sendClosePreviewRequested,
-  sendPreviewNavCommand,
-  sendWindowStateChanged,
-  setAndPersistZoomLevel,
-  setPetOverlayWindow,
-  streamThrottle,
-  toggleDevTools,
-  WINDOW_BUTTON_POSITION,
-  wireCommonWindowHandlers,
-  wireWindowReveal,
-  writeFileAtomic,
-} from '../composition/bootstrap-env-composition'
+import { APP_NAME, DEV_SERVER, getAppIconPath, HUD_WINDOW_TITLE, INSTALL_STAMP, loadWindowUrl, mainWindow, openExternalUrl, petOverlayWindow, PRELOAD_PATH, RENDERER_RELOAD_MAX, RENDERER_RELOAD_WINDOW_MS, rendererReloadTimesRef, resolveRendererIndex, resolveUpdateRoot, runGit, sendClosePreviewRequested, sendPreviewNavCommand, sendWindowStateChanged, setAndPersistZoomLevel, setPetOverlayWindow, streamThrottle, toggleDevTools, WINDOW_BUTTON_POSITION, wireCommonWindowHandlers, wireWindowReveal, writeFileAtomic } from '../composition/bootstrap-env-composition'
 import {
   resolveRequestedPathForIpc
 } from '../host-capabilities/filesystem/hardening'
+import { IS_MAC } from '../host-capabilities/platform/platform-facts'
 import { enumerateWindowsFrontToBack, enumerationFailed } from '../host-capabilities/platform/window-below'
 import {
   resolveHermesVersion,

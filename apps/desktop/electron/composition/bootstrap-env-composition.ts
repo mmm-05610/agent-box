@@ -54,6 +54,7 @@ import {
   SECRET_STORAGE_POLICY_FILE,
   type SecretStoragePolicy
 } from '../host-capabilities/credentials/secret-storage-policy'
+import { directoryExists, fileExists } from '../host-capabilities/filesystem/fs-probe'
 import {
   DEFAULT_FETCH_TIMEOUT_MS,
   encryptDesktopSecret as encryptDesktopSecretStrict,
@@ -66,10 +67,11 @@ import {
 import {
   detectRemoteDisplay,
   isWindowsBinaryPathInWsl,
-  isWslEnvironment,
   resolveLinuxPasswordStore
 } from '../host-capabilities/platform/bootstrap-platform'
-import { findGitBash as _findGitBash } from '../host-capabilities/platform/find-git-bash'
+import { findOnPath } from '../host-capabilities/platform/executables'
+import { findGitBashOnHost } from '../host-capabilities/platform/find-git-bash'
+import { IS_MAC, IS_WINDOWS, IS_WSL } from '../host-capabilities/platform/platform-facts'
 import { ensureLoginShellPath } from '../host-capabilities/platform/shell-path'
 import { pickLocalPort, redactSecrets, SshConnection } from '../host-capabilities/platform/ssh-connection'
 import { hiddenWindowsChildOptions } from '../host-capabilities/platform/windows-child-options'
@@ -82,13 +84,11 @@ import {
   shouldRelaunchForRendererSandboxCrashLoop,
   writeSandboxMarker
 } from '../host-capabilities/platform/windows-sandbox-fallback'
-import { readWindowsUserEnvVar } from '../host-capabilities/platform/windows-user-env'
 import { setActiveGatewayProfile, setWslBridgeProfileState } from '../host-capabilities/platform/wsl-path-bridge'
 import { registerTerminalIpc } from '../host-capabilities/terminal/terminal-ipc'
 import { classifyActiveRuntime } from '../legacy-hermes/active-runtime-state'
 import { jsonAgentFor, withRetry } from '../legacy-hermes/api-transport'
-import { dashboardFallbackArgs, sourceDeclaresServe } from '../legacy-hermes/backend-command'
-import { buildDesktopBackendEnv, hermesManagedNodePathEntries, normalizeHermesHomeRoot } from '../legacy-hermes/backend-env'
+import { buildDesktopBackendEnv, hermesManagedNodePathEntries } from '../legacy-hermes/backend-env'
 import {
   isReauthRequiredError,
   makeNousCloudBackendDownError,
@@ -98,9 +98,7 @@ import {
 import { backendCommandMatches, createBackendOwnership, createBackendShutdownCoordinator } from '../legacy-hermes/backend-ownership'
 import {
   canImportHermesCli,
-  execProbeSync,
   HERMES_EXECUTABLE_NOT_FOUND,
-  PROBE_TIMEOUT_MS,
   shouldTrustHermesOverride,
   verifyHermesCli
 } from '../legacy-hermes/backend-probes'
@@ -150,6 +148,12 @@ import { createFirstRunSetupGate } from '../legacy-hermes/first-run-setup-gate'
 import { startGatewaysAfterUpdateAbort, stopGatewayBeforeUpdate } from '../legacy-hermes/gateway-stop-before-update'
 import { probeGatewayWebSocket } from '../legacy-hermes/gateway-ws-probe'
 import {
+  ACTIVE_HERMES_ROOT,
+  BOOTSTRAP_COMPLETE_MARKER,
+  HERMES_HOME,
+  VENV_ROOT
+} from '../legacy-hermes/home'
+import {
   hermesBackendEnv,
   hermesLocalWsUrl,
   hermesPrimaryConnectionDescriptor,
@@ -196,9 +200,22 @@ import {
   createRemoteWsHeaderStore
 } from '../legacy-hermes/remote-ws-headers'
 import {
+  getBackendArgsForRuntime,
+  isHermesSourceRoot,
+  looksLikeDesktopAppBinary
+} from '../legacy-hermes/resolution'
+import {
   headersForRemoteRequest,
 } from '../legacy-hermes/runtime-composition'
 import { createBootstrapCoordinator, sshConfigFingerprint } from '../legacy-hermes/ssh-bootstrap-coordinator'
+import {
+  findPythonForRoot,
+  findSystemPython,
+  getVenvPython,
+  isCommandScript,
+  unwrapWindowsVenvHermesCommand,
+  venvRootForPython
+} from '../legacy-hermes/venv'
 import {
   formatBlockerMessage,
   formatProbeFailedMessage,
@@ -211,12 +228,7 @@ import {
   registrySshScopeForWindowRoute,
   WindowConnectionRouteRegistry
 } from '../legacy-hermes/window-connection-route'
-import {
-  buildPathExtCandidates,
-  chooseUpdaterArgs,
-  getVenvSitePackagesEntries,
-  resolveVenvHermesCommand
-} from '../legacy-hermes/windows-hermes-path'
+import { chooseUpdaterArgs, getVenvSitePackagesEntries } from '../legacy-hermes/windows-hermes-path'
 import {
   connectWindowsRemote,
   detectRemotePlatform,
@@ -303,17 +315,13 @@ import {
   zoomWiringForWindowKind
 } from '../windows/zoom'
 
-export const USER_DATA_OVERRIDE = process.env.HERMES_DESKTOP_USER_DATA_DIR
 
 export const DEV_SERVER = process.env.HERMES_DESKTOP_DEV_SERVER
 
 export const IS_PACKAGED = app.isPackaged || Boolean(process.env.HERMES_DESKTOP_IS_PACKAGED)
 
-export const IS_MAC = process.platform === 'darwin'
 
-export const IS_WINDOWS = process.platform === 'win32'
 
-export const IS_WSL = isWslEnvironment()
 
 export const DARWIN_MAJOR = IS_MAC ? Number.parseInt(os.release(), 10) || 0 : 0
 
@@ -390,46 +398,7 @@ export function loadInstallStamp() {
 
 export const INSTALL_STAMP = loadInstallStamp()
 
-export function resolveHermesHome() {
-  if (process.env.HERMES_HOME) {
-    return normalizeHermesHomeRoot(process.env.HERMES_HOME)
-  }
 
-  if (USER_DATA_OVERRIDE) {
-    return path.join(path.resolve(USER_DATA_OVERRIDE), 'hermes-home')
-  }
-
-  if (IS_WINDOWS) {
-    // A GUI app launched from Explorer inherits the environment block captured
-    // at login, so a HERMES_HOME set via `setx` AFTER login is invisible in
-    // process.env even though the CLI (a fresh shell) sees it. Without this the
-    // backend silently falls back to %LOCALAPPDATA%\hermes and reports "No
-    // inference provider configured" despite a valid configured home (#45471).
-    // Consult the live User-scoped registry value before the default below.
-    const fromRegistry = readWindowsUserEnvVar('HERMES_HOME')
-
-    if (fromRegistry) {
-      return normalizeHermesHomeRoot(fromRegistry)
-    }
-  }
-
-  if (IS_WINDOWS && process.env.LOCALAPPDATA) {
-    const localappdata = path.join(process.env.LOCALAPPDATA, 'hermes')
-    const legacy = path.join(app.getPath('home'), '.hermes')
-
-    // Migrate transparently to LOCALAPPDATA, but honour an existing legacy
-    // ~/.hermes setup (no LOCALAPPDATA install yet) so users don't lose state.
-    if (!directoryExists(localappdata) && directoryExists(legacy)) {
-      return legacy
-    }
-
-    return localappdata
-  }
-
-  return path.join(app.getPath('home'), '.hermes')
-}
-
-export const HERMES_HOME = resolveHermesHome()
 
 export const DESKTOP_LOG_PATH = path.join(HERMES_HOME, 'logs', 'desktop.log')
 
@@ -439,11 +408,8 @@ export function pathWithHermesManagedNode(...entries) {
   return [...managed, ...entries, process.env.PATH].filter(Boolean).join(path.delimiter)
 }
 
-export const ACTIVE_HERMES_ROOT = path.join(HERMES_HOME, 'hermes-agent')
 
-export const VENV_ROOT = path.join(ACTIVE_HERMES_ROOT, 'venv')
 
-export const BOOTSTRAP_COMPLETE_MARKER = path.join(ACTIVE_HERMES_ROOT, '.hermes-bootstrap-complete')
 
 export const BOOTSTRAP_MARKER_SCHEMA_VERSION = 1
 
@@ -1002,21 +968,7 @@ export async function advanceBootProgress(phase, message, progress) {
   }
 }
 
-export function fileExists(filePath) {
-  try {
-    return fs.statSync(filePath).isFile()
-  } catch {
-    return false
-  }
-}
 
-export function directoryExists(filePath) {
-  try {
-    return fs.statSync(filePath).isDirectory()
-  } catch {
-    return false
-  }
-}
 
 export const UPDATE_WAIT_TIMEOUT_MS = 20 * 60 * 1000
 
@@ -1139,383 +1091,19 @@ export function unpackedPathFor(filePath) {
   return filePath.replace(/app\.asar(?=$|[\\/])/, 'app.asar.unpacked')
 }
 
-export function findOnPath(command) {
-  if (!command) {
-    return null
-  }
 
-  if (path.isAbsolute(command) || command.includes(path.sep) || (IS_WINDOWS && command.includes('/'))) {
-    if (!fileExists(command)) {
-      return null
-    }
 
-    if (isWindowsBinaryPathInWsl(command, { isWsl: IS_WSL })) {
-      return null
-    }
 
-    return command
-  }
 
-  const pathEntries = String(process.env.PATH || '')
-    .split(path.delimiter)
-    .filter(Boolean)
 
-  // On Windows, try PATHEXT extensions BEFORE the bare (empty-extension) name.
-  // A real command must resolve via its .exe/.cmd (Windows command-resolution
-  // semantics consult PATHEXT); an extensionless file — e.g. a Git-Bash
-  // shell-script shim named `hermes` — must not shadow `hermes.cmd`/`hermes.exe`.
-  // The empty entry is kept LAST so callers that already include the extension
-  // (py.exe, pwsh.exe, powershell.exe) still resolve.
-  const extensions = buildPathExtCandidates(process.env.PATHEXT, IS_WINDOWS)
 
-  for (const entry of pathEntries) {
-    for (const extension of extensions) {
-      const candidate = path.join(entry, `${command}${extension}`)
 
-      if (fileExists(candidate)) {
-        return candidate
-      }
-    }
-  }
 
-  return null
-}
 
-export function isCommandScript(command) {
-  return IS_WINDOWS && /\.(cmd|bat)$/i.test(command || '')
-}
 
-export function unwrapWindowsVenvHermesCommand(command, backendArgs) {
-  return resolveVenvHermesCommand(command, backendArgs, {
-    isWindows: IS_WINDOWS,
-    isCommandScript,
-    fileExists,
-    directoryExists,
-    canImportHermesCli,
-    getVenvPython,
-    getVenvSitePackagesEntries,
-    buildDesktopBackendEnv,
-    hermesHome: HERMES_HOME,
-    resolvePath: (...segments) => path.resolve(...segments),
-    dirname: p => path.dirname(p),
-    basename: p => path.basename(p),
-    rememberLog
-  })
-}
 
-export const _serveSupportCache = new Map()
 
-export function backendSupportsServe(backend) {
-  if (!backend || !backend.command) {
-    return true
-  }
 
-  const key = `${backend.command}::${backend.root || ''}`
-
-  if (_serveSupportCache.has(key)) {
-    return _serveSupportCache.get(key)
-  }
-
-  let supported = null
-
-  if (backend.root) {
-    try {
-      const src = fs.readFileSync(path.join(backend.root, 'hermes_cli', 'subcommands', 'dashboard.py'), 'utf8')
-      supported = sourceDeclaresServe(src)
-    } catch {
-      supported = null // source unreadable — fall through to the probe
-    }
-  }
-
-  if (supported === null) {
-    try {
-      const prefix = backend.args && backend.args[0] === '-m' ? backend.args.slice(0, 2) : []
-      // Same cold-Windows Python-startup class as the runtime probes
-      // (#61764/#72632/#72707): `serve --help` imports at least as much as
-      // `hermes --version` (~10.5s measured cold), and a false negative here
-      // is cached for the process lifetime, silently routing a modern
-      // runtime through the legacy `dashboard` form. Share the probe budget
-      // and its timeout-only retry instead of a thinner local bound.
-      execProbeSync(backend.command, [...prefix, 'serve', '--help'], {
-        cwd: backend.root || undefined,
-        env: { ...process.env, HERMES_HOME, ...(backend.env || {}) },
-        timeout: PROBE_TIMEOUT_MS,
-        stdio: 'ignore',
-        // `.cmd`/`.bat` shim backends carry shell: true in their descriptor
-        // (see resolveHermesBackend step 4); execFileSync of a .cmd without
-        // shell throws EINVAL on modern Node, which the catch below would
-        // mis-cache as "serve unsupported" for the process lifetime.
-        shell: Boolean(backend.shell),
-        windowsHide: true
-      })
-      supported = true
-    } catch {
-      supported = false
-    }
-  }
-
-  _serveSupportCache.set(key, supported)
-  rememberLog(
-    `[backend] \`serve\` ${supported ? 'supported' : 'unsupported → routing via legacy `dashboard`'} for ${backend.label || key}`
-  )
-
-  return supported
-}
-
-export function getBackendArgsForRuntime(backend) {
-  return backendSupportsServe(backend) ? backend.args : dashboardFallbackArgs(backend.args)
-}
-
-export function normalizeExecutablePathForCompare(commandPath) {
-  if (!commandPath) {
-    return null
-  }
-
-  let resolved = path.resolve(String(commandPath))
-
-  try {
-    resolved = fs.realpathSync.native ? fs.realpathSync.native(resolved) : fs.realpathSync(resolved)
-  } catch {
-    // Fallback to path.resolve() above.
-  }
-
-  return IS_WINDOWS ? resolved.toLowerCase() : resolved
-}
-
-export function looksLikeDesktopAppBinary(commandPath) {
-  if (!IS_WINDOWS || !commandPath) {
-    return false
-  }
-
-  const normalizedCandidate = normalizeExecutablePathForCompare(commandPath)
-  const normalizedCurrentExec = normalizeExecutablePathForCompare(process.execPath)
-
-  if (normalizedCandidate && normalizedCurrentExec && normalizedCandidate === normalizedCurrentExec) {
-    return true
-  }
-
-  let resolved = path.resolve(String(commandPath))
-
-  try {
-    resolved = fs.realpathSync.native ? fs.realpathSync.native(resolved) : fs.realpathSync(resolved)
-  } catch {
-    // Keep resolved path fallback.
-  }
-
-  const resourcesDir = path.join(path.dirname(resolved), 'resources')
-
-  return (
-    fileExists(path.join(resourcesDir, 'app.asar')) || directoryExists(path.join(resourcesDir, 'app.asar.unpacked'))
-  )
-}
-
-export function isHermesSourceRoot(root) {
-  return directoryExists(root) && fileExists(path.join(root, 'hermes_cli', 'main.py'))
-}
-
-export function findPythonForRoot(root) {
-  const override = process.env.HERMES_DESKTOP_PYTHON
-
-  if (override && fileExists(override)) {
-    return override
-  }
-
-  const relativePaths = IS_WINDOWS
-    ? [path.join('.venv', 'Scripts', 'python.exe'), path.join('venv', 'Scripts', 'python.exe')]
-    : [path.join('.venv', 'bin', 'python'), path.join('venv', 'bin', 'python')]
-
-  for (const relativePath of relativePaths) {
-    const candidate = path.join(root, relativePath)
-
-    if (fileExists(candidate)) {
-      return candidate
-    }
-  }
-
-  return findSystemPython()
-}
-
-export function findSystemPython() {
-  if (!IS_WINDOWS) {
-    // POSIX systems: PATH lookup is safe.
-    for (const command of ['python3', 'python']) {
-      const candidate = findOnPath(command)
-
-      if (candidate) {
-        return candidate
-      }
-    }
-
-    return null
-  }
-
-  // Windows: PATH-based detection has TWO landmines we have to dodge.
-  //
-  //  (1) The Microsoft Store "Python stub" lives at
-  //      %LOCALAPPDATA%\Microsoft\WindowsApps\python.exe and is on PATH
-  //      by default on modern Windows. It's a redirector that opens the
-  //      Store window if no Store Python is installed. Running it for
-  //      `-m venv` would either succeed (real Store install — fine) or
-  //      pop the Store dialog (bad UX during boot).
-  //  (2) `py.exe` (Python launcher) is missing from per-user installs
-  //      that didn't check the launcher option, so PATH-only checks
-  //      miss real Python 3.13 installs (user-reported case).
-  //
-  // We also restrict ourselves to Python 3.11–3.13. 3.14 is the latest
-  // CPython but several Hermes deps (notably pywinpty's Rust-built
-  // windows_x86_64_msvc crate) don't yet publish 3.14 wheels, and
-  // `pip install -e .` falls back to source-build, which fails without
-  // a Rust toolchain. install.ps1 sidesteps this by pinning to 3.11
-  // via uv; until we add the same uv-managed Python pathway here, the
-  // simplest fix is to refuse 3.14 detection and let the NSIS prereq
-  // page offer to install 3.11 alongside.
-  //
-  // Strategy: probe in three passes, in order from most-precise to
-  // least-precise, and ONLY use PATH lookup as a last resort after
-  // confirming the candidate isn't the WindowsApps redirector.
-  //
-  //  Pass 1: PEP 514 registry — every standards-compliant Python
-  //          installer registers itself at SOFTWARE\Python\PythonCore.
-  //          The MS Store stub does NOT register here, so a hit means
-  //          a real Python install. Versions are explicit so we
-  //          inherently filter 3.14 out.
-  //  Pass 2: Filesystem probe of standard install locations
-  //          (Program Files, LocalAppData\Programs\Python). Same
-  //          version filtering by directory name.
-  //  Pass 3: PATH lookup of `py.exe` (the launcher itself never
-  //          triggers the Store) — but call it with a version flag so
-  //          we resolve to a SPECIFIC supported version, not whatever
-  //          py.exe's default is (which on a 3.14-only box would be
-  //          3.14).
-
-  const SUPPORTED_VERSIONS = ['3.11', '3.12', '3.13']
-  const SUPPORTED_VERSIONS_NO_DOT = ['311', '312', '313']
-
-  // Pass 1: registry. Use `reg query` since main process doesn't have
-  // a reliable in-process registry API across all electron versions.
-  for (const hive of ['HKLM', 'HKCU']) {
-    for (const version of SUPPORTED_VERSIONS) {
-      try {
-        const out = execFileSync(
-          'reg',
-          ['query', `${hive}\\SOFTWARE\\Python\\PythonCore\\${version}\\InstallPath`, '/ve', '/reg:64'],
-          // Registry reads are near-instant; the bound only exists so a
-          // pathologically wedged reg.exe can't hang the synchronous boot
-          // resolver forever (this ran unbounded before).
-          hiddenWindowsChildOptions({ encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 5_000 })
-        )
-
-        // Output format: "    (Default)    REG_SZ    C:\Path\To\Python\"
-        const match = out.match(/REG_SZ\s+(.+?)\s*$/m)
-
-        if (match) {
-          const installPath = match[1].trim()
-          const pythonExe = path.join(installPath, 'python.exe')
-
-          if (fileExists(pythonExe)) {
-            return pythonExe
-          }
-        }
-      } catch {
-        // Key not present — try next.
-      }
-    }
-  }
-
-  // Pass 2: filesystem probe of standard locations.
-  const programFiles = process.env['ProgramFiles'] || 'C:\\Program Files'
-  const localAppData = process.env.LOCALAPPDATA || ''
-
-  for (const versionDir of SUPPORTED_VERSIONS_NO_DOT) {
-    const systemWide = path.join(programFiles, `Python${versionDir}`, 'python.exe')
-
-    if (fileExists(systemWide)) {
-      return systemWide
-    }
-
-    if (localAppData) {
-      const perUser = path.join(localAppData, 'Programs', 'Python', `Python${versionDir}`, 'python.exe')
-
-      if (fileExists(perUser)) {
-        return perUser
-      }
-    }
-  }
-
-  // Pass 3: py.exe with explicit version flag. The launcher itself is
-  // safe to invoke (no Store popup) and `py -3.13 -c "import sys;
-  // print(sys.executable)"` resolves to the actual python.exe path of
-  // the requested version. We try in version-priority order so the
-  // first hit wins.
-  const pyExe = findOnPath('py.exe')
-
-  if (pyExe) {
-    for (const version of SUPPORTED_VERSIONS) {
-      try {
-        const out = execFileSync(
-          pyExe,
-          [`-${version}`, '-c', 'import sys; print(sys.executable)'],
-          hiddenWindowsChildOptions({
-            encoding: 'utf8',
-            stdio: ['ignore', 'pipe', 'ignore'],
-            // Bare interpreter startup — much lighter than the hermes-import
-            // probes, but still python.exe under cold cache / AV scan, so
-            // share the probe budget rather than running unbounded (this
-            // synchronous exec previously had no timeout at all).
-            timeout: PROBE_TIMEOUT_MS
-          })
-        )
-
-        const candidate = out.trim()
-
-        if (candidate && fileExists(candidate)) {
-          return candidate
-        }
-      } catch {
-        // py couldn't find that version — try next.
-      }
-    }
-  }
-
-  // We deliberately do NOT fall back to plain `python.exe` on PATH.
-  // Without a way to verify the version safely (running `python -V`
-  // risks the Microsoft Store popup), accepting whatever's there
-  // could land us on 3.14 and trigger the Rust-build-from-source
-  // failure. Better to return null and let the NSIS prereq page
-  // offer to install a known-good 3.11 via winget.
-  return null
-}
-
-export function findGitBash() {
-  return _findGitBash({
-    isWindows: IS_WINDOWS,
-    env: process.env,
-    fileExists,
-    findOnPath
-  })
-}
-
-export function getVenvPython(venvRoot) {
-  return path.join(venvRoot, IS_WINDOWS ? path.join('Scripts', 'python.exe') : path.join('bin', 'python'))
-}
-
-export function venvRootForPython(python: string, root: string) {
-  const parent = path.dirname(python)
-  const binName = path.basename(parent).toLowerCase()
-
-  if (binName !== 'bin' && binName !== 'scripts') {
-    return null
-  }
-
-  const candidate = path.dirname(parent)
-  const relative = path.relative(root, candidate)
-
-  if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) {
-    return null
-  }
-
-  return candidate
-}
 
 export function makeDashboardReadyFile() {
   const dir = path.join(app.getPath('userData'), 'backend-ready')
@@ -3483,7 +3071,7 @@ export async function ensureRuntime(backend) {
   // %LOCALAPPDATA%\hermes\git\, which findGitBash() picks up, so for any
   // user who completed the bootstrap this is a no-op. For users who got
   // here via an external `hermes` on PATH, this check still helps.
-  if (IS_WINDOWS && !findGitBash()) {
+  if (IS_WINDOWS && !findGitBashOnHost()) {
     throw new Error(
       'Git for Windows is required for Hermes on Windows (provides Git Bash, ' +
         "which the agent's terminal tool uses). Install it from " +

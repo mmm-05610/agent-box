@@ -14,27 +14,14 @@ import {
 import {
   rememberLog
 } from '../app/log-buffer'
-import {
-  ACTIVE_HERMES_ROOT,
-  directoryExists,
-  fileExists,
-  findSystemPython,
-  getOriginUrl,
-  getVenvPython,
-  HERMES_HOME,
-  IS_PACKAGED,
-  IS_WINDOWS,
-  isHermesSourceRoot,
-  readDesktopUpdateConfig,
-  releaseBackendLock,
-  resolveHealedBranch,
-  resolveUpdateRoot,
-  runGit,
-  setIsQuittingForHandoff,
-  VENV_ROOT,
-} from '../composition/bootstrap-env-composition'
+import { getOriginUrl, IS_PACKAGED, readDesktopUpdateConfig, releaseBackendLock, resolveHealedBranch, resolveUpdateRoot, runGit, setIsQuittingForHandoff } from '../composition/bootstrap-env-composition'
+import { directoryExists, fileExists } from '../host-capabilities/filesystem/fs-probe'
 import { clearStaleGitLocks } from '../host-capabilities/git/gitlock'
+import { IS_WINDOWS } from '../host-capabilities/platform/platform-facts'
 import { hiddenWindowsChildOptions } from '../host-capabilities/platform/windows-child-options'
+import { ACTIVE_HERMES_ROOT, HERMES_HOME, VENV_ROOT } from '../legacy-hermes/home'
+import { isHermesSourceRoot } from '../legacy-hermes/resolution'
+import { findSystemPython, getVenvPython } from '../legacy-hermes/venv'
 
 import {
   buildPosixCleanupScript,

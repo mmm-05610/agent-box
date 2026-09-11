@@ -51,14 +51,6 @@ import path from 'node:path'
  * @param {boolean} isWindows
  * @returns {string[]} extensions to try, in order, always ending in ''.
  */
-export function buildPathExtCandidates(pathext: string | undefined, isWindows: boolean): string[] {
-  if (!isWindows) {
-    return ['']
-  }
-
-  return [...(pathext || '.COM;.EXE;.BAT;.CMD').split(';').filter(Boolean), '']
-}
-
 /**
  * Choose the Windows bootstrap-recovery invocation. The gentle in-place
  * updater can only start when both pieces of its runtime contract exist: the

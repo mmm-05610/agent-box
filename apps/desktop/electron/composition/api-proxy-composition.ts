@@ -28,6 +28,7 @@ import {
   resolveGatedDownloadAuth,
   resolveOauthRestAuth
 } from '../host-capabilities/credentials/native-auth-decisions'
+import { directoryExists, fileExists } from '../host-capabilities/filesystem/fs-probe'
 import {
   clampDataUrlReadMaxMb,
   DATA_URL_READ_DEFAULT_MAX_MB,
@@ -89,37 +90,7 @@ import {
 } from '../legacy-hermes/runtime-composition'
 import { createLinkTitleWindow, guardLinkTitleSession, readLinkTitleWindowTitle } from '../windows/link-title-window'
 
-import {
-  backendConnectionState,
-  backendDialClaims,
-  backendPool,
-  directoryExists,
-  ensureBackend,
-  ensureNativeAccessToken,
-  ensureRegistryBackend,
-  fetchJson,
-  fetchJsonForBackend,
-  fetchJsonViaOauthSession,
-  fileExists,
-  globalRemoteActive,
-  mainWindow,
-  MEDIA_MIME_TYPES,
-  poolStopper,
-  primaryProfileKey,
-  PROFILE_NAME_RE,
-  profileHasRemoteOverride,
-  profileRouteOptions,
-  readDesktopConnectionConfig,
-  readDesktopConnectionsRegistry,
-  resolveHermesCwd,
-  setSoftRehomeInProgress,
-  sshBootstrapCoordinator,
-  startHermes,
-  stopPoolBackend,
-  teardownSshConnection,
-  waitForBackendExit,
-  writeActiveDesktopProfile,
-} from './bootstrap-env-composition'
+import { backendConnectionState, backendDialClaims, backendPool, ensureBackend, ensureNativeAccessToken, ensureRegistryBackend, fetchJson, fetchJsonForBackend, fetchJsonViaOauthSession, globalRemoteActive, mainWindow, MEDIA_MIME_TYPES, poolStopper, primaryProfileKey, PROFILE_NAME_RE, profileHasRemoteOverride, profileRouteOptions, readDesktopConnectionConfig, readDesktopConnectionsRegistry, resolveHermesCwd, setSoftRehomeInProgress, sshBootstrapCoordinator, startHermes, stopPoolBackend, teardownSshConnection, waitForBackendExit, writeActiveDesktopProfile } from './bootstrap-env-composition'
 
 export const previewWatchers = new Map()
 

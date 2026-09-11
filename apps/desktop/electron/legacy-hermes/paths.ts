@@ -12,11 +12,8 @@ import {
 import {
   rememberLog
 } from '../app/log-buffer'
-import {
-  fileExists,
-  POOL_LIMITS_PATH,
-  resolveUpdateRoot,
-} from '../composition/bootstrap-env-composition'
+import { POOL_LIMITS_PATH, resolveUpdateRoot } from '../composition/bootstrap-env-composition'
+import { fileExists } from '../host-capabilities/filesystem/fs-probe'
 
 export function persistPoolLimits(limits) {
   try {
