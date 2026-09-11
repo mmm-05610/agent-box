@@ -2,8 +2,8 @@ import { readActivePreview } from '@/app/chat/right-rail/preview-reader'
 import { writeAgentTerminalChunk } from '@/app/right-sidebar/terminal/agent-terminal-stream'
 import { readActiveTerminal } from '@/app/right-sidebar/terminal/buffer'
 import { closeAgentTerminalByProc } from '@/app/right-sidebar/terminal/terminals'
+import type { TourAction, TourStep } from '@/app/tour'
 import type { PreviewActAction } from '@/lib/preview-act/act-in-page'
-import type { TourAction, TourStep } from '@/lib/tour'
 import { $gateway } from '@/store/gateway'
 import { applyDesktopLayoutPreset, revealDesktopPane } from '@/store/pane-focus'
 import { recordAgentReaction } from '@/store/reactions-local'
@@ -191,7 +191,7 @@ export function handleDesktopBridgeEvent(ctx: GatewayEventContext): boolean {
         // a spotlight the user can't see.
         void answer({ error: 'The user has turned guided tours off.', success: false })
       } else if (isActiveEvent) {
-        void import('@/lib/tour')
+        void import('@/app/tour')
           .then(({ runTour }) =>
             runTour(
               {

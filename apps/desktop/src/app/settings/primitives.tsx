@@ -138,7 +138,7 @@ export function ListRow({
   hint?: ReactNode
   action?: ReactNode
   below?: ReactNode
-  /** Durable handle for tours (see lib/tour) — usually the field's schema key. */
+  /** Durable handle for tours (see app/tour) — usually the field's schema key. */
   'data-tour'?: string
   id?: string
   wide?: boolean

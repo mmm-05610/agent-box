@@ -6,7 +6,7 @@
  * The guest page is out-of-process; nothing here can touch its DOM directly.
  * Instead the first action injects a self-contained bundle over
  * `executeJavaScript` — the vendored driver.js IIFE, its stylesheet, and the
- * same engine/collector SOURCE the app surface runs (see lib/tour/engine.ts's
+ * same engine/collector SOURCE the app surface runs (see app/tour/engine.ts's
  * self-containment contract) — parked on window globals so subsequent actions
  * reuse the live driver instance. Injection is idempotent and vanishes with
  * the page (a navigation resets the tour, which is the right behavior).
@@ -18,8 +18,8 @@
 import driverCss from 'driver.js/dist/driver.css?raw'
 import driverIife from 'driver.js/dist/driver.js.iife.js?raw'
 
-import { collectTourTargets } from '@/lib/tour/collect-targets'
-import { runTourEngine, type TourAction, type TourResult } from '@/lib/tour/engine'
+import { collectTourTargets } from '@/app/tour/collect-targets'
+import { runTourEngine, type TourAction, type TourResult } from '@/app/tour/engine'
 
 import { activePreviewScriptRunner } from './preview-script-runner'
 
