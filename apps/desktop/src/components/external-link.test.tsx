@@ -1,21 +1,18 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { IS_MAC } from '@/lib/keybinds/combo'
-import { $previewTabs, closeRightRail } from '@/store/preview'
-
 import {
   __resetLinkTitleCache,
-  ExternalLink,
   fetchLinkTitle,
   hostPathLabel,
   hudForcesNativeLinks,
   isTitleFetchable,
-  LinkifiedText,
-  MarkdownLinkText,
-  PrettyLink,
   urlSlugTitleLabel
-} from './external-link'
+} from '@/lib/external-link'
+import { IS_MAC } from '@/lib/keybinds/combo'
+import { $previewTabs, closeRightRail } from '@/store/preview'
+
+import { ExternalLink, LinkifiedText, MarkdownLinkText, PrettyLink } from './external-link'
 
 const desktopWindow = window as unknown as { hermesDesktop?: Window['hermesDesktop'] }
 const initialHermesDesktop = desktopWindow.hermesDesktop

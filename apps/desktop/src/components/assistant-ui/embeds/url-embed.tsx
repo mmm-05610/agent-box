@@ -3,7 +3,7 @@
 import { useStore } from '@nanostores/react'
 import { type CSSProperties, lazy, Suspense, useState } from 'react'
 
-import { PrettyLink } from '@/lib/external-link'
+import { PrettyLink } from '@/components/external-link'
 import { $embedAllowed, $embedMode } from '@/store/embed-consent'
 
 import { EmbedFacade } from './embed-consent'

@@ -1,7 +1,7 @@
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import type { ILinkHandler } from '@xterm/xterm'
 
-import { openLink } from '@/lib/external-link'
+import { openLink } from '@/components/external-link'
 
 import { isMacPlatform } from './selection'
 

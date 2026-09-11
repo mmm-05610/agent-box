@@ -4,11 +4,11 @@ import { useEffect, useState } from 'react'
 
 import { WIDGET_SHELL_CLASS } from '@/components/chat/widget-shell'
 import { ImageLightbox } from '@/components/chat/zoomable-image'
+import { ExternalLink } from '@/components/external-link'
 import { useImageDownload } from '@/components/hooks/use-image-download'
 import { Codicon } from '@/components/ui/codicon'
 import { Tip } from '@/components/ui/tooltip'
 import { useI18n } from '@/i18n'
-import { ExternalLink } from '@/lib/external-link'
 import { type Listing, parseListings, specLine } from '@/lib/listing-embed'
 import { cn } from '@/lib/utils'
 

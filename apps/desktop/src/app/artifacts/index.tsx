@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router'
 import { TitlebarIcon } from '@/app/shell/titlebar-icon'
 import { listAllProfileSessions } from '@/application/session-lists'
 import { ZoomableImage } from '@/components/chat/zoomable-image'
+import { ExternalLink, ExternalLinkIcon } from '@/components/external-link'
 import { PageLoader } from '@/components/page-loader'
 import { Button } from '@/components/ui/button'
 import { CopyButton } from '@/components/ui/copy-button'
@@ -24,8 +25,6 @@ import { type Translations, useI18n } from '@/i18n'
 import { resolveBrandIcon } from '@/lib/brand-icon'
 import {downloadGatewayMediaFile, isRemoteGateway} from '@/lib/desktop-fs'
 import {
-  ExternalLink,
-  ExternalLinkIcon,
   hostPathLabel,
   shortHostLabel,
   urlSlugTitleLabel,

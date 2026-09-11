@@ -10,6 +10,7 @@
 //               discussion: GitHub Issues · Nous Portal Support · Discord.
 import { useStore } from '@nanostores/react'
 
+import { ExternalLink as ExternalLinkAnchor } from '@/components/external-link'
 import { Button } from '@/components/ui/button'
 import { CopyButton } from '@/components/ui/copy-button'
 import {
@@ -21,7 +22,7 @@ import {
   DialogTitle
 } from '@/components/ui/dialog'
 import { useI18n } from '@/i18n'
-import { ExternalLink as ExternalLinkAnchor, openExternalLink } from '@/lib/external-link'
+import { openExternalLink } from '@/lib/external-link'
 import { ExternalLink, Loader2Icon, Lock } from '@/lib/icons'
 import { $sendDiagnostics, confirmSendDiagnostics, dismissSendDiagnostics } from '@/store/send-diagnostics'
 

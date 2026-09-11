@@ -1,11 +1,11 @@
 import { SCAFFOLD_META_CLASS, ScaffoldRow } from '@/components/chat/scaffold-row'
 import { WIDGET_SHELL_CLASS } from '@/components/chat/widget-shell'
+import { MarkdownLinkText } from '@/components/external-link'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
 import { ConnectorLogo, type ConnectorLogoSubject } from '@/components/ui/connector-logo'
 import { Input } from '@/components/ui/input'
 import { Tip } from '@/components/ui/tooltip'
-import { MarkdownLinkText } from '@/lib/external-link'
 import { Loader2 } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 
