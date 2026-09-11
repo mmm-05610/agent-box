@@ -1,0 +1,51 @@
+{
+  "skill_name": "architecture-tree-report",
+  "evals": [
+    {
+      "id": 0,
+      "name": "status-uses-the-tree",
+      "prompt": "现在架构什么情况",
+      "expected_output": "一张以 apps/desktop/src/ 为根的目录树，右侧带 ✓/⚠ 注解；后面跟剩余债务按方向的表、按杠杆排序的结、以及需要用户决定的事项。数字与 npm run arch:tree 一致。不用字母代号。",
+      "files": [],
+      "assertions": [
+        "输出里有围栏代码块，根节点是 apps/desktop/src/",
+        "树使用了 ✓ 与 ⚠ 记号，⚠ 后面带条数",
+        "给出了剩余债务按方向的表（components → app 等）",
+        "至少有一个结被标为『需要决定』而不是『需要搬运』",
+        "没有出现 K1/K2/K3 这类需要回翻上文才能理解的字母代号",
+        "账本总条数与 npm run arch:tree 的输出一致（当前 97）",
+        "没有把树用散文复述一遍"
+      ]
+    },
+    {
+      "id": 1,
+      "name": "move-proposal-checks-lower-layers",
+      "prompt": "我想把 lib/keybinds 整个挪到 app/keybinds 下面，这样 lib 就干净了吧？帮我看看行不行",
+      "expected_output": "先做上移安全性判断，指出 components/extension/lib/store 里共 9 个导入者会因为这次搬迁变成上行边（components 6 个是容易漏的那部分），给出层分布证据，结论是整体搬迁不行、正确形状是按需四分。不能只说『可以』。",
+      "files": [],
+      "assertions": [
+        "结论是『不行』或『要改形状』，不是简单的『可以』",
+        "指出了 components/ 下存在导入者（这是最容易漏的一层）",
+        "给出了导入者的层分布，带具体数量",
+        "说明了为什么整体上移会适得其反（方向反转）",
+        "给出了替代形状（按职责拆成多份），而不是停在『不行』",
+        "用了实测命令而不是凭记忆的数字"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "layer-inventory-ranked-by-leverage",
+      "prompt": "components 这层我觉得特别乱，帮我盘点一下，排个优先级我看看先动哪个",
+      "expected_output": "以树形式定位 components 的问题点，指出 user-edit-composer.tsx（17 条）是最大单点，并把它与 pane-shell（K1，17 条但分界线需要决定）区分开；优先级按『一个决定能消掉多少条』排，而不是按文件大小或行数排。",
+      "files": [],
+      "assertions": [
+        "输出以树为主要载体，而不是纯散文列表",
+        "识别出 components/assistant-ui/thread/user-edit-composer.tsx 是最大单点（17 条）",
+        "把『需要决定』的结与『需要搬运』的债区分开",
+        "优先级依据是影响条数，不是文件大小或行数",
+        "指出了 components 的问题有相当一部分根源在别处（如 pane-shell 的状态住在组件层）",
+        "没有对 components 下 248 个文件逐个罗列"
+      ]
+    }
+  ]
+}

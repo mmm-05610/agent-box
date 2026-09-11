@@ -167,11 +167,20 @@ in the opposite direction):
 - `lib/slash-completion-cache.ts` — imported by `lib/desktop-slash-commands.ts`
   (a clean leaf). Either that moves too, or the cache reads are parameterized.
 - `lib/keybinds/` (9 files, 1,386 lines, 27 production importers) — **the trap in
-  full**. `store/keybinds.ts` imports its `actions` and `combo`, and
-  `lib/external-link.tsx` imports `combo`; moving the directory to `app/keybinds/`
-  would add two `store → app` edges and one `lib → app`. The right shape is a
-  three-way split: pure combo/chord math stays in `lib/`, the action registry
-  goes down to `store/`, and the composer/hint bindings go up to `app/`.
+  full**, and the case that shows why "move it up" is not a decision you can make
+  from the offending file alone. Moving the directory to `app/keybinds/` would
+  turn **9** of its importers into upward edges — `components` 6,
+  `extension` 1, `lib` 1, `store` 1 — while clearing only the 4 edges it owns
+  today. (An earlier note here said 3; it had counted only the `lib/` and `store/`
+  importers and missed the components ones.)
+  Check any candidate with `npm run arch:tree -- --move lib/keybinds --to app/`.
+  The right shape is a four-way split by what each file actually needs:
+  pure combo/chord math (`combo.ts`, `chords.ts`) stays in `lib/`; the action
+  registry (`actions.ts`) goes down to `store/`, since the store is its lowest
+  consumer; the hint hook (`use-keybind-hint.ts`) has to sit at its lowest
+  consumer too, which is `components/`; and `composer-focus-keys.ts` cannot go
+  below `app/` at all while it imports `app/routes` — that dependency has to be
+  broken, not relocated.
 
 **Blocked by a decision**:
 
