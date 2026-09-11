@@ -2,16 +2,15 @@ import { act, cleanup, render, waitFor } from '@testing-library/react'
 import { useLayoutEffect } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import type { QueueEditState } from '@/components/composer/composer-utils'
+import { type ComposerTarget, getActiveComposer, markActiveComposer } from '@/components/composer/focus'
+import { composerPlainText } from '@/components/composer/rich-editor'
+import { type ComposerScope, ComposerScopeProvider, MAIN_COMPOSER_SCOPE } from '@/components/composer/scope'
+import { useComposerActions } from '@/components/composer/use-composer-actions'
 import { PaneVisibleContext } from '@/components/pane-shell/pane-visibility'
 import { clearSessionDraft, mainComposerScope, stashSessionDraft } from '@/store/composer'
 import { $connection } from '@/store/session'
 import type { ComposerAttachment } from '@/types/composer'
-
-import { useComposerActions } from '../../hooks/use-composer-actions'
-import type { QueueEditState } from '../composer-utils'
-import { type ComposerTarget, getActiveComposer, markActiveComposer } from '../focus'
-import { composerPlainText } from '../rich-editor'
-import { type ComposerScope, ComposerScopeProvider, MAIN_COMPOSER_SCOPE } from '../scope'
 
 import { useComposerDraft } from './use-composer-draft'
 

@@ -1,8 +1,7 @@
 import { type MutableRefObject, useCallback } from 'react'
 
+import { useComposerScope } from '@/components/composer/scope'
 import { listRepoBranches, requestStartWorkSession, startWorkInRepo, switchBranchInRepo } from '@/store/projects'
-
-import { useComposerScope } from '../scope'
 
 interface UseComposerBranchOptions {
   clearDraft: () => void

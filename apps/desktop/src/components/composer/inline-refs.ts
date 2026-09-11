@@ -1,5 +1,6 @@
 import { translateNow } from '@/i18n'
 import { contextPath } from '@/lib/chat-runtime'
+import type { DroppedFile } from '@/lib/composer/types'
 import { formatRefValue } from '@/lib/format-ref-value'
 
 import {
@@ -9,7 +10,6 @@ import {
   refChipElement,
   RICH_INPUT_SLOT
 } from './rich-editor'
-import type { DroppedFile } from './types'
 
 /** A chip to insert: a raw `@kind:value` string, or a typed value + display label. */
 export type InlineRefInput = string | { kind: string; label?: string; value: string }

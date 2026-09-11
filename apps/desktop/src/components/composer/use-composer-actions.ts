@@ -1,9 +1,9 @@
 import { useCallback } from 'react'
 
-import { requestComposerFocus, requestComposerInsert, requestComposerInsertRefs } from '@/app/chat/composer/focus'
-import { droppedFileInlineRef } from '@/app/chat/composer/inline-refs'
+import { droppedFileInlineRef } from '@/components/composer/inline-refs'
 import { useI18n } from '@/i18n'
 import { attachmentId, contextPath, pathLabel } from '@/lib/chat-runtime'
+import type { DroppedFile } from '@/lib/composer/types'
 import { readDesktopFileDataUrlLocalFirst, selectDesktopPaths } from '@/lib/desktop-fs'
 import { desktopGit } from '@/lib/desktop-git'
 import { formatRefValue } from '@/lib/format-ref-value'
@@ -14,7 +14,7 @@ import { notify, notifyError } from '@/store/notifications'
 import type { ImageDetachResponse } from '@/types/api-responses'
 import type { ComposerAttachment, ComposerAttachmentPatch } from '@/types/composer'
 
-import type { DroppedFile } from '../composer/types'
+import { requestComposerFocus, requestComposerInsert, requestComposerInsertRefs } from './focus'
 
 const IMAGE_EXTENSION_PATTERN = /\.(png|jpe?g|gif|webp|bmp|tiff?|svg|ico)$/i
 

@@ -1,7 +1,7 @@
 import { type RefObject, useEffect } from 'react'
 
-import { focusComposerInput } from '@/app/chat/composer/focus'
-import { RICH_INPUT_SLOT } from '@/app/chat/composer/rich-editor'
+import { focusComposerInput } from '@/components/composer/focus'
+import { RICH_INPUT_SLOT } from '@/components/composer/rich-editor'
 
 const THREAD_INTERACTIVE = 'a[href], button, input, textarea, select, [contenteditable], [role="button"], [role="link"]'
 

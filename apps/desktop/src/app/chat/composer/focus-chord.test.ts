@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { $workspaceIsPage } from '@/app/routes'
+import { onComposerFocusRequest } from '@/components/composer/focus'
 import { closeSwitcher } from '@/store/session-switcher'
 
-import { onComposerFocusRequest } from './focus'
 import { handleComposerFocusChord } from './focus-chord'
 
 // jsdom is not macOS, so the chord is Ctrl+L. isComposerChord reads

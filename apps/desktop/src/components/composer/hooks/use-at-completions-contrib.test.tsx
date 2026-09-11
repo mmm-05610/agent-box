@@ -7,9 +7,10 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { COMPOSER_AREAS, type ComposerAtCompletionSource } from '@/app/chat/composer/contrib'
 import { registry } from '@/lib/contributions'
 import { queryClient } from '@/lib/query-client'
+
+import { COMPOSER_AREAS, type ComposerAtCompletionSource } from '../contrib'
 
 import { useAtCompletions } from './use-at-completions'
 

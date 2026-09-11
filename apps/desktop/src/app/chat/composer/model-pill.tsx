@@ -4,20 +4,19 @@ import { useEffect, useState } from 'react'
 import { useTourMarker } from '@/app/chat/tour-marker'
 import { ModelMenuCloseContext } from '@/app/shell/model-menu-panel'
 import { useSessionView } from '@/components/chat/session-view'
+import { onComposerModelMenuRequest } from '@/components/composer/focus'
+import { useComposerScope } from '@/components/composer/scope'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { GlyphSpinner } from '@/components/ui/glyph-spinner'
 import { Tip } from '@/components/ui/tooltip'
 import { useI18n } from '@/i18n'
+import type { ChatBarState } from '@/lib/composer/types'
 import { ChevronDown } from '@/lib/icons'
 import { formatModelStatusLabel } from '@/lib/model-status-label'
 import { releaseTypingFocus } from '@/lib/typing-focus'
 import { cn } from '@/lib/utils'
 import { $currentModelSource, $defaultReasoningEffort, setModelPickerOpen } from '@/store/session'
-
-import { onComposerModelMenuRequest } from './focus'
-import { useComposerScope } from './scope'
-import type { ChatBarState } from './types'
 
 // `shrink` (not `shrink-0`) with a truncating label: the pill is the one
 // control in the row that can give width back continuously, so it absorbs the

@@ -1,8 +1,8 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { ChatBarState } from '@/app/chat/composer/types'
 import { I18nProvider } from '@/i18n'
+import type { ChatBarState } from '@/lib/composer/types'
 import { $hudMode } from '@/store/hud'
 
 import { ComposerControls } from './controls'

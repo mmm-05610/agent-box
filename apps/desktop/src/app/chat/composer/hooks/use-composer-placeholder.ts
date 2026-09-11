@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 
+import { pickPlaceholder } from '@/components/composer/composer-utils'
 import { useI18n } from '@/i18n'
 import { resetBrowseState } from '@/store/composer-input-history'
-
-import { pickPlaceholder } from '../composer-utils'
 
 interface UseComposerPlaceholderOptions {
   disabled: boolean

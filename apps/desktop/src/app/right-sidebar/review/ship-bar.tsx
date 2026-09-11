@@ -1,7 +1,7 @@
 import { useStore } from '@nanostores/react'
 import { useState } from 'react'
 
-import { requestComposerSubmit } from '@/app/chat/composer/focus'
+import { requestComposerSubmit } from '@/components/composer/focus'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
 import { GenerateButton } from '@/components/ui/generate-button'

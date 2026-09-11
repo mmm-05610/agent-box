@@ -12,6 +12,7 @@ import type { AppendMessage, ThreadMessage } from '@assistant-ui/react'
 import { useCallback, useMemo, useRef } from 'react'
 
 import { requestForSessionProfile } from '@/application/session/request-router'
+import type { ComposerScope } from '@/components/composer/scope'
 import { useI18n } from '@/i18n'
 import { textPart } from '@/lib/chat-messages'
 import { SLASH_COMMAND_RE } from '@/lib/chat-runtime'
@@ -62,8 +63,6 @@ import {
   withSessionNotFoundResume
 } from '../session/hooks/use-prompt-actions/utils'
 import { upsertOptimisticSession } from '../session/hooks/use-session-actions/utils'
-
-import type { ComposerScope } from './composer/scope'
 
 /**
  * List a tile's session in the sidebar/tab strip on its first send.

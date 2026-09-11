@@ -1,9 +1,8 @@
 import type { ReactNode } from 'react'
 
+import { COMPLETION_DRAWER_CLASS } from '@/components/composer/completion-drawer'
 import { KbdCombo } from '@/components/ui/kbd'
 import { useI18n } from '@/i18n'
-
-import { COMPLETION_DRAWER_CLASS } from './completion-drawer'
 
 const COMMON_COMMAND_KEYS = ['/help', '/clear', '/resume', '/details', '/copy', '/quit']
 

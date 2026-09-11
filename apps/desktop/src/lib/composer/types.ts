@@ -1,8 +1,7 @@
 import type { ReactNode } from 'react'
 
-import type { SubmitTextOptions } from '@/app/session/hooks/use-prompt-actions/utils'
 import type { HermesGateway } from '@/hermes'
-import type { QuickModelOption } from '@/types/composer'
+import type { QuickModelOption, SubmitTextOptions } from '@/types/composer'
 import type { ContextSuggestion } from '@/types/context-suggestion'
 
 /** One entry resolved from a drop event. Declared here rather than beside the

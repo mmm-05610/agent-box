@@ -10,10 +10,10 @@
  * steal focus from the composer effect.
  */
 
+import type { InlineRefInput } from '@/components/composer/inline-refs'
 import { isElementInHiddenPane, queryAllVisible, queryVisible } from '@/lib/pane-visibility'
 import { $hoveredTreeGroup } from '@/store/pane-shell/tree'
 
-import type { InlineRefInput } from './inline-refs'
 import { RICH_INPUT_SLOT } from './rich-editor'
 
 /** Composer routing key. The main chat is `'main'`, the edit composer

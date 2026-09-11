@@ -1,10 +1,9 @@
 import { type DragEvent as ReactDragEvent, useRef, useState } from 'react'
 
+import { dragHasAttachments, droppedFileInlineRefs, type InlineRefInput } from '@/components/composer/inline-refs'
+import { extractDroppedFiles, HERMES_PATHS_MIME, partitionDroppedFiles } from '@/components/composer/use-composer-actions'
+import type { ChatBarProps } from '@/lib/composer/types'
 import { triggerHaptic } from '@/lib/haptics'
-
-import { extractDroppedFiles, HERMES_PATHS_MIME, partitionDroppedFiles } from '../../hooks/use-composer-actions'
-import { dragHasAttachments, droppedFileInlineRefs, type InlineRefInput } from '../inline-refs'
-import type { ChatBarProps } from '../types'
 
 interface UseComposerDropArgs {
   cwd: ChatBarProps['cwd']

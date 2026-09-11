@@ -1,4 +1,4 @@
-import { requestComposerFocus, requestComposerInsert } from '@/app/chat/composer/focus'
+import { requestComposerFocus, requestComposerInsert } from '@/components/composer/focus'
 import { getSkills } from '@/hermes'
 import { translateNow } from '@/i18n'
 import type { ChatMessage } from '@/lib/chat-messages'

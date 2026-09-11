@@ -4,6 +4,8 @@ import { useCallback, useEffect } from 'react'
 
 import type { HermesGateway } from '@/hermes'
 import { sessionTitle } from '@/lib/chat-runtime'
+import type { CompletionEntry, CompletionPayload } from '@/lib/composer/hooks/use-live-completion-adapter'
+import { useLiveCompletionAdapter } from '@/lib/composer/hooks/use-live-completion-adapter'
 import {
   type CommandsCatalogLike,
   desktopSkinSlashCompletions,
@@ -18,9 +20,6 @@ import {
 import { $slashCompletionsEpoch, cachedSlashCompletion, hasCachedSlashCompletion } from '@/lib/slash-completion-cache'
 import { normalize } from '@/lib/text'
 import { $sessions } from '@/store/session'
-
-import type { CompletionEntry, CompletionPayload } from './use-live-completion-adapter'
-import { useLiveCompletionAdapter } from './use-live-completion-adapter'
 
 interface SlashItemMetadata extends Record<string, string> {
   command: string

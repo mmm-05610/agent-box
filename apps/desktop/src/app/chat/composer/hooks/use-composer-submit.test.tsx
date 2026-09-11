@@ -2,6 +2,8 @@ import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
 import { type Dispatch, type PropsWithChildren, type SetStateAction, useLayoutEffect, useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { type ComposerTarget, requestComposerSubmit } from '@/components/composer/focus'
+import { ComposerScopeProvider, ComposerSurfaceProvider, MAIN_COMPOSER_SCOPE } from '@/components/composer/scope'
 import { PaneVisibleContext } from '@/components/pane-shell/pane-visibility'
 import { $clarifyRequests } from '@/store/clarify'
 import { $gateway } from '@/store/gateway'
@@ -13,9 +15,6 @@ import {
   setSudoRequest
 } from '@/store/prompts'
 import type { ComposerAttachment } from '@/types/composer'
-
-import { type ComposerTarget, requestComposerSubmit } from '../focus'
-import { ComposerScopeProvider, ComposerSurfaceProvider, MAIN_COMPOSER_SCOPE } from '../scope'
 
 import { useComposerSubmit } from './use-composer-submit'
 

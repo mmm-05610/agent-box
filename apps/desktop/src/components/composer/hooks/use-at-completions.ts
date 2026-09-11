@@ -4,14 +4,13 @@ import { useCallback } from 'react'
 import { refChipLabel } from '@/components/assistant-ui/directive-text'
 import { useContributions } from '@/extension/contrib/react/use-contributions'
 import type { HermesGateway } from '@/hermes'
+import type { CompletionEntry, CompletionPayload } from '@/lib/composer/hooks/use-live-completion-adapter'
+import { useLiveCompletionAdapter } from '@/lib/composer/hooks/use-live-completion-adapter'
 import { cachedPathCompletion, hasCachedPathCompletion } from '@/lib/slash-completion-cache'
 import { normalize } from '@/lib/text'
 
 import type { ComposerAtCompletionSource } from '../contrib'
 import { COMPOSER_AREAS } from '../contrib'
-
-import type { CompletionEntry, CompletionPayload } from './use-live-completion-adapter'
-import { useLiveCompletionAdapter } from './use-live-completion-adapter'
 
 const KIND_RE = /^@(file|folder|url|image|tool|git):(.*)$/
 const REF_STARTERS = new Set(['file', 'folder', 'url', 'image', 'tool', 'git'])

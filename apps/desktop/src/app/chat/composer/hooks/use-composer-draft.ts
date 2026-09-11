@@ -1,28 +1,20 @@
 // Register the built-in draft providers with the suggestion bus (side-effect
 // import — the bus itself is provider-agnostic). The repair provider is
 // event-driven and registers through the gateway stream instead.
-import '@/store/suggestion-providers/cron'
-import '@/store/suggestion-providers/github'
-import '@/store/suggestion-providers/mcp'
-import '@/store/suggestion-providers/skill'
+import '@/components/composer/suggestion-providers/cron'
+import '@/components/composer/suggestion-providers/github'
+import '@/components/composer/suggestion-providers/mcp'
+import '@/components/composer/suggestion-providers/skill'
 
 import { useAui, useAuiState, useComposerRuntime } from '@assistant-ui/react'
 import { type RefObject, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-
-import { usePaneVisible } from '@/components/pane-shell/pane-visibility'
-import { SLASH_COMMAND_RE } from '@/lib/chat-runtime'
-import { sanitizeComposerInput } from '@/lib/composer-input-sanitize'
-import { type ComposerDraftSyncMode, onComposerDraftSyncRequest, reloadPersistedDrafts, stashSessionDraft, takeSessionDraft } from '@/store/composer'
-import { isBrowsingHistory } from '@/store/composer-input-history'
-import { clearDraftSuggestions, sampleComposerDraft } from '@/store/composer-suggestions'
-import type { ComposerAttachment } from '@/types/composer'
 
 import {
   cloneAttachments,
   DRAFT_PERSIST_DEBOUNCE_MS,
   isPendingDraftPersistCurrent,
   type QueueEditState
-} from '../composer-utils'
+} from '@/components/composer/composer-utils'
 import {
   type ComposerInsertMode,
   focusComposerInput,
@@ -31,17 +23,24 @@ import {
   onComposerInsertRefsRequest,
   onComposerInsertRequest,
   releaseActiveComposer
-} from '../focus'
-import { type InlineRefInput, insertInlineRefsIntoEditor } from '../inline-refs'
+} from '@/components/composer/focus'
+import { type InlineRefInput, insertInlineRefsIntoEditor } from '@/components/composer/inline-refs'
 import {
   composerPlainText,
   normalizeComposerEditorDom,
   placeCaretEnd,
   REF_RE,
   renderComposerContents
-} from '../rich-editor'
-import { useComposerScope } from '../scope'
-import type { ChatBarProps } from '../types'
+} from '@/components/composer/rich-editor'
+import { useComposerScope } from '@/components/composer/scope'
+import { usePaneVisible } from '@/components/pane-shell/pane-visibility'
+import { SLASH_COMMAND_RE } from '@/lib/chat-runtime'
+import { sanitizeComposerInput } from '@/lib/composer-input-sanitize'
+import type { ChatBarProps } from '@/lib/composer/types'
+import { type ComposerDraftSyncMode, onComposerDraftSyncRequest, reloadPersistedDrafts, stashSessionDraft, takeSessionDraft } from '@/store/composer'
+import { isBrowsingHistory } from '@/store/composer-input-history'
+import { clearDraftSuggestions, sampleComposerDraft } from '@/store/composer-suggestions'
+import type { ComposerAttachment } from '@/types/composer'
 
 interface UseComposerDraftArgs {
   activeQueueSessionKey: string | null

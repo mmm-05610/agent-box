@@ -16,10 +16,9 @@
  *     the session switcher.
  */
 
+import { requestComposerFocus } from '@/components/composer/focus'
 import { isComposerChord } from '@/lib/keybinds/chords'
 import { composerFocusBlockedBySurface } from '@/lib/keybinds/composer-focus-keys'
-
-import { requestComposerFocus } from './focus'
 
 /** The window-level keydown fallback. use-keybinds registers it beside the
  *  paste listener. When this handler claims the press, it prevents the

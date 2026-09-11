@@ -7,7 +7,8 @@ import {
   refChipElement,
   renderComposerContents,
   RICH_INPUT_SLOT
-} from './rich-editor'
+} from '@/components/composer/rich-editor'
+
 import { createComposerUndoHistory, isRedoShortcut, isUndoShortcut } from './undo-history'
 
 const key = (over: Partial<KeyboardEvent> = {}) =>

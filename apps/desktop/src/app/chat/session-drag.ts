@@ -27,6 +27,8 @@
 
 import type { PointerEvent as ReactPointerEvent } from 'react'
 
+import { requestComposerInsertRefs } from '@/components/composer/focus'
+import { type SessionDragPayload, sessionInlineRef, sessionLabel } from '@/components/composer/inline-refs'
 import {
   rectContains,
   slotBefore,
@@ -41,8 +43,6 @@ import { queryAllVisible } from '@/lib/pane-visibility'
 import { $treeDragging, type DropHint, revealTreePane, SESSION_TILE_DRAG } from '@/store/pane-shell/tree'
 import { openSessionTile, type TileDock } from '@/store/session-states'
 
-import { requestComposerInsertRefs } from './composer/focus'
-import { type SessionDragPayload, sessionInlineRef, sessionLabel } from './composer/inline-refs'
 import { tileZoneHost } from './tile-zone-host'
 
 /** A chat surface's drag-start geometry: the anchor pane id it advertises
