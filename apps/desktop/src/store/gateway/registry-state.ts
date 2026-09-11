@@ -1,8 +1,8 @@
 import { type ConnectionState, type GatewayEvent } from '@hermes/shared'
 import { atom } from 'nanostores'
 
+import type { HermesGateway } from '@/api/client';
 import type { HermesConnection } from '@/global'
-import type { HermesGateway} from '@/hermes';
 import { setApiRequestConnection } from '@/hermes'
 import { markNativeNotifyBaseline } from '@/store/notify-baseline'
 import { setConnection, setGatewayState } from '@/store/session'

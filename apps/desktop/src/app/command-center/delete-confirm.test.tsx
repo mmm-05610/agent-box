@@ -3,8 +3,8 @@ import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type * as HermesApi from '@/hermes'
-import type { SessionInfo } from '@/hermes'
 import { $sessions } from '@/store/session'
+import type { SessionInfo } from '@/types/hermes'
 
 import { CommandCenterView } from './index'
 

@@ -13,6 +13,7 @@ import {
   useState
 } from 'react'
 
+import type { HermesGateway } from '@/api/client'
 import { uploadComposerAttachment } from '@/app/session/hooks/use-prompt-actions'
 import { hermesDirectiveFormatter } from '@/components/assistant-ui/directive-text'
 import {
@@ -61,7 +62,6 @@ import {
   partitionDroppedFiles
 } from '@/components/composer/use-composer-actions'
 import { Codicon } from '@/components/ui/codicon'
-import type { HermesGateway } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { attachmentDisplayText, attachmentId, pathLabel } from '@/lib/chat-runtime'
 import { sanitizeComposerInput } from '@/lib/composer-input-sanitize'

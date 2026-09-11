@@ -2,7 +2,7 @@ import type { Unstable_TriggerAdapter, Unstable_TriggerItem } from '@assistant-u
 import { useStore } from '@nanostores/react'
 import { useCallback, useEffect } from 'react'
 
-import type { HermesGateway } from '@/hermes'
+import type { HermesGateway } from '@/api/client'
 import { sessionTitle } from '@/lib/chat-runtime'
 import type { CompletionEntry, CompletionPayload } from '@/lib/composer/hooks/use-live-completion-adapter'
 import { useLiveCompletionAdapter } from '@/lib/composer/hooks/use-live-completion-adapter'

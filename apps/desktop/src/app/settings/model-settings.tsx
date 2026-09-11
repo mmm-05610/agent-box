@@ -17,14 +17,6 @@ import {
   setEnvVar,
   setModelAssignment
 } from '@/hermes'
-import type {
-  AuxiliaryModelsResponse,
-  AuxiliaryTaskAssignment,
-  MoaConfigResponse,
-  MoaModelSlot,
-  ModelOptionProvider,
-  StaleAuxAssignment
-} from '@/hermes'
 import { useI18n } from '@/i18n'
 import { isCodeSkewRestartRequired } from '@/lib/code-skew-error'
 import { AlertTriangle, Cpu, Loader2 } from '@/lib/icons'
@@ -33,6 +25,7 @@ import { cn } from '@/lib/utils'
 import { setMainModelAssignment } from '@/store/cron-model-impact'
 import { notifyError, readableError } from '@/store/notifications'
 import { startManualLocalEndpoint, startManualOnboarding, startManualProviderOAuth } from '@/store/onboarding'
+import type { AuxiliaryModelsResponse, AuxiliaryTaskAssignment, MoaConfigResponse, MoaModelSlot, ModelOptionProvider, StaleAuxAssignment } from '@/types/hermes'
 
 import { hermesConfigCacheWriter, invalidateHermesConfig, useHermesConfigRecord } from '../hooks/use-config-record'
 

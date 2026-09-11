@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-import type { HermesGateway } from '@/hermes'
+import type { HermesGateway } from '@/api/client'
 import type { QuickModelOption, SubmitTextOptions } from '@/types/composer'
 import type { ContextSuggestion } from '@/types/context-suggestion'
 

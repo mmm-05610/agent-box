@@ -50,8 +50,8 @@ vi.mock('@/hermes', async importOriginal => {
   return { ...actual, HermesGateway: FakeHermesGateway }
 })
 
+import type { HermesGateway } from '@/api/client'
 import type * as HermesModule from '@/hermes'
-import type { HermesGateway } from '@/hermes'
 import {
   $gateway,
   closeSecondaryGateways,
