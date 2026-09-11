@@ -10,13 +10,14 @@ because it is trusted; see `renderer-layer-master-plan.md` §8.
 | last updated | 2026-09-12 |
 | last commit to change renderer source | `c6889f1` |
 | ledger | **85** |
-| target after Stage A | **49** |
+| target when the run completes | **49** |
 | tests | **775 files / 7466 tests** |
 | reviewed | nothing yet |
+| in scope | **every work order in `renderer-layer-batches/`** — Phase 1 and Phase 2 both; no phase is a permission gate |
 
 ---
 
-## Stage A — the layer work orders
+## Phase 1 — the layer work orders
 
 36 edges across seven work orders. Batches 06-08 are written as
 independently executable items, so the table is finer than the work orders. Wave
@@ -50,9 +51,9 @@ Expected on completion: the ledger drops to 58, and **`lib/` holds only the nine
 edges belonging to `01`–`03`**. `lib/keybinds/` and `lib/external-link` must be
 gone from the ledger entirely. If they are not, a split boundary was drawn wrong.
 
-## Stage B — the barrel
+## Phase 2 — the barrel
 
-Runs as its own stage, **never interleaved with Stage A**. It pays no layer debt,
+Runs in its own phase, **never interleaved with Phase 1**. It pays no layer debt,
 so it can never be how the migration is progressing.
 
 | item | scope | files | status | commit | reviewer |
@@ -62,12 +63,12 @@ so it can never be how the migration is progressing.
 Work order: [05](renderer-layer-batches/05-hermes-barrel-removal.md). Ledger
 impact: **none** — `@/hermes` and `@/api/*` are both rank 0.
 
-## Stage C — the knots (not delegated)
+## Not yet work orders — need a decision
 
 Each needs a decision before it can become a work order. An executor that
 attempts one unprompted will produce a plausible wrong answer. The fourth knot —
 layout state in the component layer — was decided on 2026-09-12 and became
-work order 08; it is in Stage A above.
+work order 08; it is in Phase 1 above.
 
 | knot | edges | the decision | status |
 | --- | --- | --- | --- |
@@ -77,8 +78,9 @@ work order 08; it is in Stage A above.
 
 ## Open items
 
-- Nothing is blocked. Every Stage A item has a verified destination and a
-  self-contained work order.
+- Nothing is blocked. Every work order has a verified destination, a self-contained
+  brief and a place in Phase 1 or 2. The rows under "not yet work orders" are the only
+  thing that can stop the run short, and stopping there is the correct outcome.
 
 ## How to update this file
 

@@ -25,8 +25,8 @@ things disagree, this is the order:
 | **this file** | the order, the parallel groups, the rules, and what is not delegated |
 
 So the work list is **not** a list written into this file or into a prompt. It is
-the rows in the status file that are not `merged`, restricted to Stage A. And the
-target is **not** a number written in §1:
+the rows in the status file that are not `merged` — every work order, with no
+  phase acting as a permission gate. And the target is **not** a number written in §1:
 
 ```
 expected ledger = ledger now − Σ(edges of the items you are about to do)
@@ -116,11 +116,18 @@ The read-first analysis is
 orders are in
 [`renderer-layer-batches/`](renderer-layer-batches/README.md).
 
-## 3 · Order
+## 3 · The run
 
-**Stage A — the layer work orders.** All seven are written and their collisions are
-mapped (§4). The per-batch edge counts below are the ones in the manifest, which
-is what actually sums to the target — see §0.
+**Everything in `renderer-layer-batches/` is in scope. There is no permission gate,
+and nothing waits for a later instruction.** The ordering below is about *when
+things may run relative to each other* — file collisions and review boundaries —
+not about what is allowed. A run that finishes Phase 1 and stops has not done the
+job; it has done a third of it.
+
+The per-batch edge counts are the ones in the manifest, which is what sums to the
+target — see §0.
+
+### Phase 1 — the layer work orders
 
 | work order | scope | edges |
 | --- | --- | --- |
@@ -132,17 +139,35 @@ is what actually sums to the target — see §0.
 | 07 | `lib/keybinds/` and `lib/external-link.tsx`, split by consumer | 5 |
 | 08 | the pane/layout domain sinks to `lib/` + `store/` | 9 |
 
-**Stage B — work order 05, the `@/hermes` barrel.** 0 edges, ~240 files, four
-phases. It runs as its own stage, **never interleaved with Stage A** — it is the
-largest single change and it overlaps most of Stage A's files.
+Parallel per §4. **Review gate** when the phase's last item merges (§5).
 
-Stage A first, deliberately: it banks verified progress, it is the stage that
-moves the ledger, and 05 is order-independent from it (its own document says
-entirely before or entirely after). 05 also pays no layer debt at all, so it can
-never be "how the migration is progressing" — it gets its own stage and its own
-review so its result is attributable.
+### Phase 2 — work order 05, the `@/hermes` barrel
 
-**Stage C — the four knots. Not delegated.** They need decisions, not moves. §7.
+0 edges, ~240 files, four internal phases. It is its own phase for one reason:
+**it must not run concurrently with Phase 1**, because it overlaps most of Phase 1's
+files. Before or after are both fine; after is better, because Phase 1's progress is
+already banked and reviewed by then.
+
+05 pays no layer debt, so it never moves the ledger. Do not read its completion as
+progress on the migration — read the ledger for that. **Review gate** after it, with
+its own reviewer, so its result is attributable rather than mixed into a layer
+round.
+
+### Phase 3 — whatever the open decisions produce
+
+Work order 09 (the plugin ABI) is decided and being written. Further orders appear
+as the remaining knots in §7 are decided. Each is a normal work order: same
+collision check, same review gate. §9 says how one enters this plan.
+
+### Done
+
+**Every work order in `renderer-layer-batches/` is merged and reviewed, and the
+ledger equals the target §0 derives from the manifest.** Not "Phase 1 is green".
+
+If the run reaches that state and the ledger is still above zero, the remainder is
+in §7 — undecided knots, which a decision has to unblock. Report what is left and
+stop there; that is the one legitimate stopping point. Do not improvise a fix for an
+undecided knot to reach zero.
 
 ## 4 · What may run at the same time
 
@@ -215,7 +240,7 @@ items fill the queue around them.
   source moves can conflict, and those are exactly what the collision check
   mapped.
 
-## 5 · Review: every stage, by someone who did not do the work
+## 5 · Review: every phase, by someone who did not do the work
 
 Each merged slot gets an **independent reviewer + test subagent**, briefed to
 distrust the worker's report. It must:
@@ -282,13 +307,16 @@ attention.
    `./registry` each exist in two or three places. A blanket rewrite across a
    search result will corrupt the unrelated ones.
 
-## 7 · Not delegated
+## 7 · Still needs a decision
 
-**The three remaining design knots.** Each needs a decision; an executor that
-"helpfully" attempts one produces a plausible wrong answer. (The fourth — the
-layout state in the component layer — was decided as "sink the whole domain",
-became work order [08](renderer-layer-batches/08-pane-shell-sink.md), and moved
-into Stage A.) They are described in
+These are **not yet work orders**, which is the only reason they are not being
+executed: nobody has decided what they should become. An executor that "helpfully"
+attempts one produces a plausible wrong answer — the decision is the work.
+
+Two are settled: layout state became work order
+[08](renderer-layer-batches/08-pane-shell-sink.md), and the plugin ABI is decided as
+09 — **a decision, not yet a file**, so its 16 edges stay in §1's target until
+`09-*.md` exists and enters the manifest. The rest are described in
 [`renderer-layer-boundary.md`](renderer-layer-boundary.md) §2.
 
 | knot | edges | the decision needed |
@@ -297,8 +325,9 @@ into Stage A.) They are described in
 | the plugin ABI (`extension/sdk/index.ts`, 96 re-exports) | 16 | invert it: SDK declares the contract, `app/` registers implementations |
 | components driving app behaviour by import (`app/chat/composer/focus.ts`, 420 lines) | 16 | a downward command channel, or an intent the composer subscribes to |
 
-A knot becomes a work order the moment its decision is made, and then it enters
-Stage A's machinery (§9).
+A knot becomes a work order the moment its decision is made, and then it enters the
+run like any other (§9). Until then it is not in the definition of done — so a run
+that stops here is finished with what exists, not with the migration.
 
 **Also not delegated:**
 - `apps/desktop/src/agentbox/`, `apps/desktop/src/plugins/agentbox-lab/`,
@@ -333,8 +362,8 @@ being made:
 4. **Re-run the collision check** (§4) and replace both the waves table and §1's
    target. Do not reason about either — the graph and the arithmetic changed, and
    the check will tell you if you got the target wrong.
-5. Add it to Stage A's table in §3, or open a new stage if it is a different kind
-   of work (as 05 is).
+5. Add it to the right phase table in §3 — which phase is a question about file
+   collisions and review boundaries, not about permission.
 6. Add its row to the status file.
 
 If it is not in the manifest, its collisions are unknown and it must run alone.
