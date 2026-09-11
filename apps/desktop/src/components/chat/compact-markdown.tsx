@@ -2,7 +2,7 @@ import type { ComponentProps, ElementType, FC } from 'react'
 import { memo } from 'react'
 import { Streamdown } from 'streamdown'
 
-import { ExternalLink } from '@/lib/external-link'
+import { ExternalLink } from '@/components/external-link'
 import { cn } from '@/lib/utils'
 
 // Compact markdown renderer for tool detail bodies. Same Streamdown pipeline

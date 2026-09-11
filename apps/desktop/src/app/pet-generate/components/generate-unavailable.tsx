@@ -1,5 +1,5 @@
+import { ExternalLink } from '@/components/external-link'
 import { Button } from '@/components/ui/button'
-import { ExternalLink } from '@/lib/external-link'
 import { PawPrint, Settings2 } from '@/lib/icons'
 
 interface GenerateUnavailableProps {
