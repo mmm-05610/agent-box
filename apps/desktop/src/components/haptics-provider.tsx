@@ -2,7 +2,7 @@ import { useStore } from '@nanostores/react'
 import { type ReactNode, useEffect } from 'react'
 import { useWebHaptics } from 'web-haptics/react'
 
-import { registerHapticTrigger } from '@/lib/haptics'
+import { registerHapticTrigger, setHapticsMutedSource } from '@/lib/haptics'
 import { $hapticsMuted } from '@/store/haptics'
 
 export function HapticsProvider({ children }: { children: ReactNode }) {
@@ -11,6 +11,12 @@ export function HapticsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     registerHapticTrigger(muted ? null : trigger)
+    // Publish the mute preference to `lib/haptics` as well: registration-time
+    // gating alone leaves a window where a haptic fires after the user muted,
+    // so the dispatch-time check must keep reading live state. No teardown —
+    // the getter is stateless, and this component owns both the trigger and
+    // the preference for the window's lifetime.
+    setHapticsMutedSource(() => $hapticsMuted.get())
 
     return () => registerHapticTrigger(null)
   }, [muted, trigger])
