@@ -11,7 +11,6 @@
 
 import type { AppendMessage, ThreadMessage } from '@assistant-ui/react'
 
-import type { ClientSessionState } from '@/app/types'
 import { PROMPT_SUBMIT_REQUEST_TIMEOUT_MS } from '@/hermes'
 import {
   branchGroupForUser,
@@ -20,6 +19,7 @@ import {
   completeOpenTimelineParts,
   textPart
 } from '@/lib/chat-messages'
+import type { ClientSessionState } from '@/types/session'
 
 import {
   appendText,

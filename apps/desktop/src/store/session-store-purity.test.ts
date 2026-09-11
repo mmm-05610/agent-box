@@ -297,7 +297,7 @@ describe('the session store reaches nothing above itself', () => {
     const cases = [
       "import { setSessionUnreadRemote } from '@/api/sessions'",
       "import { markSessionUnread } from '@/application/session-read-state'",
-      "import type { ContextSuggestion } from '@/app/types'",
+      "import type { ContextSuggestion } from '@/app/shell/statusbar-controls'",
       "import { Button } from '@/components/ui/button'",
       "import { getHermesConfigRecord } from '@/hermes'",
       "import { clearUnreadOnOpen } from '../session-unread-remote'",

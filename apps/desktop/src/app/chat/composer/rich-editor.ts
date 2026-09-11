@@ -9,13 +9,13 @@
 import {
   directiveIconElement,
   directiveIconSvg,
-  formatRefValue,
   refAttrsHtml,
   refChipLabel,
   type SlashChipKind,
   slashIconElement
 } from '@/components/assistant-ui/directive-text'
 import { referenceKind, referenceRe } from '@/components/assistant-ui/reference-kinds'
+import { formatRefValue } from '@/lib/format-ref-value'
 
 import { slashCommandMatches, type SlashCommandScanOptions } from './slash-refs'
 

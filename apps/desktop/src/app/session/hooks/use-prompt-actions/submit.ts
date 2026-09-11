@@ -22,8 +22,8 @@ import {
 } from '@/store/session'
 import { $sessionStates } from '@/store/session-states'
 import type { ComposerAttachment } from '@/types/composer'
+import type { ClientSessionState } from '@/types/session'
 
-import type { ClientSessionState } from '../../../types'
 import { sessionContextDrift } from '../session-context-drift'
 import { resolveSessionProfile } from '../use-session-actions/utils'
 

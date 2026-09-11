@@ -27,7 +27,6 @@
 
 import type { PointerEvent as ReactPointerEvent } from 'react'
 
-import { queryAllVisible } from '@/components/pane-shell/pane-visibility'
 import {
   rectContains,
   slotBefore,
@@ -39,6 +38,7 @@ import {
 } from '@/components/pane-shell/tree/renderer/drag-session'
 import { $treeDragging, type DropHint, revealTreePane, SESSION_TILE_DRAG } from '@/components/pane-shell/tree/store'
 import type { EngineZone, ZoneRect } from '@/components/pane-shell/tree/zones-engine'
+import { queryAllVisible } from '@/lib/pane-visibility'
 import { openSessionTile, type TileDock } from '@/store/session-states'
 
 import { requestComposerInsertRefs } from './composer/focus'

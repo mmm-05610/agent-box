@@ -1,8 +1,8 @@
 import { computed } from 'nanostores'
 
-import type { ClientSessionState } from '@/app/types'
 import { stableArray } from '@/lib/stable-array'
 import type { SessionInfo } from '@/types/hermes'
+import type { ClientSessionState } from '@/types/session'
 
 import { $sessions, lineageAliases, sessionMatchesStoredId } from '../session'
 

@@ -1,4 +1,4 @@
-import type { PluginInstallLegacyHint } from '@/store/plugin-install-request'
+import type { PluginInstallLegacyHint } from '@/types/plugin-install'
 
 export interface DeepLinkPayload {
   kind: string

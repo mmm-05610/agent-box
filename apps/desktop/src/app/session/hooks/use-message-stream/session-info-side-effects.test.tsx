@@ -3,10 +3,10 @@ import { act, cleanup } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { isTargetSessionBusy } from '@/app/session/hooks/use-prompt-actions/utils'
-import type { ClientSessionState } from '@/app/types'
 import { createClientSessionState } from '@/lib/chat-runtime'
 import { modelOptionsQueryKey } from '@/lib/model-options'
 import { setCurrentModel, setCurrentProvider } from '@/store/session'
+import type { ClientSessionState } from '@/types/session'
 
 import { type MessageStreamHarness, renderMessageStream } from './test-harness'
 import { PRE_TURN_LIVE_SETTLE_GRACE_MS } from './utils'

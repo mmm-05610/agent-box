@@ -55,8 +55,8 @@ import { restoreSessionTodosFromSnapshot } from '@/store/todos'
 import { dropTranscriptTail, loadTranscriptTail, saveTranscriptTail } from '@/store/transcript-tail-cache'
 import { isWatchWindow } from '@/store/windows'
 import type { SessionMessage, SessionResumeResponse, UsageStats } from '@/types/hermes'
+import type { ClientSessionState } from '@/types/session'
 
-import type { ClientSessionState } from '../../../types'
 import { singleFlightSessionResume } from '../use-prompt-actions/single-flight-resume'
 
 import { wasSessionCreatedThisRun } from './created-this-run'

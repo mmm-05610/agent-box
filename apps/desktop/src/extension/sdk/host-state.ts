@@ -1,6 +1,5 @@
 import { atom, computed, type ReadableAtom } from 'nanostores'
 
-import type { ClientSessionState } from '@/app/types'
 import { PRIMARY_SESSION_VIEW } from '@/components/chat/session-view'
 import { $narrowViewport } from '@/components/pane-shell/tree/store'
 import { $activeGatewayProfile, normalizeProfileKey } from '@/store/profile'
@@ -23,6 +22,7 @@ import {
   $sessionStates
 } from '@/store/session-states'
 import type { UsageStats } from '@/types/hermes'
+import type { ClientSessionState } from '@/types/session'
 
 // -- state: readonly views over the app's live atoms -------------------------
 

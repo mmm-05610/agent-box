@@ -2,9 +2,9 @@ import { useStore } from '@nanostores/react'
 import { atom } from 'nanostores'
 import { type CSSProperties, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
-import { isElementInHiddenPane, PANE_HIDDEN_ATTR } from '@/components/pane-shell/pane-visibility'
 import { $layoutTree } from '@/components/pane-shell/tree/store'
 import { markRightPanePerf } from '@/dev/debug/right-pane-events'
+import { isElementInHiddenPane, PANE_HIDDEN_ATTR } from '@/lib/pane-visibility'
 import { createRendererLoopPauseController } from '@/lib/renderer-loop-pause'
 import { $paneStates } from '@/store/panes'
 

@@ -53,7 +53,7 @@
  *   the renderer-side walker is the only path that satisfies the issue.
  */
 
-import { queryVisible } from '@/components/pane-shell/pane-visibility'
+import { isElementInHiddenPane, queryVisible } from '@/lib/pane-visibility'
 
 const SCOPE_SELECTOR = '[data-chat-surface]'
 const HIGHLIGHT_CLASS = 'find-hit'
@@ -180,12 +180,6 @@ function retargetFindScope(roots: NodeListOf<HTMLElement>): HTMLElement | null {
   foreground.setAttribute(ROOT_ATTR, '')
 
   return foreground
-}
-
-/** Same predicate pane-visibility exposes, kept local so this module is
- *  independently testable without an import cycle in the renderer. */
-function isElementInHiddenPane(element: Element): boolean {
-  return Boolean(element.closest('[data-pane-hidden]'))
 }
 
 /**

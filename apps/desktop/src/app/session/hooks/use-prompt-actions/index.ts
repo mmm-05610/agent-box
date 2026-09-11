@@ -32,17 +32,9 @@ import { $sessionStates, isSessionRemote } from '@/store/session-states'
 import { clearSessionSubagents } from '@/store/subagents'
 import { clearSessionTodos } from '@/store/todos'
 import { setSessionDraftingTool } from '@/store/tool-drafting'
+import type { FileAttachResponse, HandoffFailResponse, HandoffRequestResponse, HandoffStateResponse, ImageAttachResponse, SessionRedirectResponse } from '@/types/api-responses'
 import type { ComposerAttachment } from '@/types/composer'
-
-import type {
-  ClientSessionState,
-  FileAttachResponse,
-  HandoffFailResponse,
-  HandoffRequestResponse,
-  HandoffStateResponse,
-  ImageAttachResponse,
-  SessionRedirectResponse
-} from '../../../types'
+import type { ClientSessionState } from '@/types/session'
 
 import {
   appendMidTurnUserMessage,

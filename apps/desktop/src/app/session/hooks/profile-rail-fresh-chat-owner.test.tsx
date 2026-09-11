@@ -37,8 +37,7 @@ import {
 } from '@/store/session'
 import { foregroundSessionScopes } from '@/store/session-states'
 import type { SessionInfo } from '@/types/hermes'
-
-import type { ClientSessionState } from '../../types'
+import type { ClientSessionState } from '@/types/session'
 
 import { usePromptActions } from './use-prompt-actions'
 import { clearSingleFlightSessionResumeState } from './use-prompt-actions/single-flight-resume'

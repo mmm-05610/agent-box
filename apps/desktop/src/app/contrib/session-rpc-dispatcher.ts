@@ -34,13 +34,13 @@
 import type { MutableRefObject } from 'react'
 
 import { resolveSessionOwner } from '@/app/session/hooks/use-session-actions/utils'
-import type { ClientSessionState } from '@/app/types'
 import { requestForSessionProfile } from '@/application/session/request-router'
 import { isSessionGoneForBackgroundPolling } from '@/store/runtime-gone'
 import { getSessionOwnerHint, knownSessionOwner, ownerLookupSessionRows, requestSessionResume } from '@/store/session'
 import { assertSessionOwnerResolved } from '@/store/session-owner-resolution'
 import { $focusedStoredSessionId, sessionTileOwnerRoute, storedSessionIdForRuntimeId } from '@/store/session-states'
 import { type SessionOwnerScope } from '@/store/session/types'
+import type { ClientSessionState } from '@/types/session'
 
 import { findStoredIdForRuntimeId, resolveRoutingSessionId, resolveSessionRpcOwner } from './wiring-routing'
 

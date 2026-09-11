@@ -1,4 +1,4 @@
-import type { ClientSessionState } from '../types'
+import type { ClientSessionState } from '@/types/session'
 
 export const DEFAULT_WARM_SESSION_TRANSCRIPT_COUNT = 24
 export const DEFAULT_WARM_SESSION_TRANSCRIPT_BYTES = 32 * 1024 * 1024

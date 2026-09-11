@@ -21,7 +21,6 @@
 
 import type { PointerEvent as ReactPointerEvent } from 'react'
 
-import { queryAllVisible } from '@/components/pane-shell/pane-visibility'
 import {
   rectContains,
   slotBefore,
@@ -34,6 +33,7 @@ import {
 import { $treeDragging, type DropHint, NEW_SESSION_DRAG } from '@/components/pane-shell/tree/store'
 import type { EngineZone, ZoneRect } from '@/components/pane-shell/tree/zones-engine'
 import { translateNow } from '@/i18n'
+import { queryAllVisible } from '@/lib/pane-visibility'
 import type { AgentProfileRoute } from '@/store/profile'
 import type { TileDock } from '@/store/session-states'
 

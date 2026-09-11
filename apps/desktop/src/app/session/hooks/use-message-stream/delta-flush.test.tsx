@@ -3,9 +3,9 @@ import { act, cleanup, render } from '@testing-library/react'
 import { type MutableRefObject, useEffect, useRef } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { ClientSessionState } from '@/app/types'
 import type { ChatMessage } from '@/lib/chat-messages'
 import { createClientSessionState } from '@/lib/chat-runtime'
+import type { ClientSessionState } from '@/types/session'
 
 import { useSessionStateCache } from '../use-session-state-cache'
 

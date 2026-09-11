@@ -1,12 +1,13 @@
 import type { ThreadMessage } from '@assistant-ui/react'
 
-import type { ClientSessionState, CommandDispatchResponse } from '@/app/types'
-import { formatRefValue } from '@/components/assistant-ui/directive-text'
 import { type ChatMessage, type ChatMessagePart, chatMessageText, textPart } from '@/lib/chat-messages'
+import { formatRefValue } from '@/lib/format-ref-value'
 import { normalize } from '@/lib/text'
+import type { CommandDispatchResponse } from '@/types/api-responses'
 import type { ComposerAttachment } from '@/types/composer'
 import type { QuickModelOption } from '@/types/composer'
 import type { ModelOptionsResponse, SessionInfo } from '@/types/hermes'
+import type { ClientSessionState } from '@/types/session'
 
 export const SLASH_COMMAND_RE = /^\/[^\s/]*(?:\s|$)/
 export { BUILTIN_PERSONALITIES } from '@/lib/personalities'

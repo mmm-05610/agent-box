@@ -11,7 +11,6 @@
 import type { AppendMessage, ThreadMessage } from '@assistant-ui/react'
 import { useCallback, useMemo, useRef } from 'react'
 
-import type { ClientSessionState } from '@/app/types'
 import { requestForSessionProfile } from '@/application/session/request-router'
 import { useI18n } from '@/i18n'
 import { textPart } from '@/lib/chat-messages'
@@ -37,6 +36,7 @@ import { clearSessionTodos } from '@/store/todos'
 import { setSessionDraftingTool } from '@/store/tool-drafting'
 import type { ComposerAttachment } from '@/types/composer'
 import type { SessionInfo } from '@/types/hermes'
+import type { ClientSessionState } from '@/types/session'
 
 import type { GatewayRequester } from '../contrib/types'
 import { uploadComposerAttachment } from '../session/hooks/use-prompt-actions'

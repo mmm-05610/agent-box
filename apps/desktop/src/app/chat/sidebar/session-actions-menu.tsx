@@ -46,8 +46,7 @@ import { $sessionColorOverrides, setSessionColorOverride } from '@/store/session
 import { $sessionTiles, closeAllOpenSessionTiles } from '@/store/session-states'
 import { ackStoredSessionId } from '@/store/session-unread'
 import { canOpenSessionWindow } from '@/store/windows'
-
-import type { SessionTitleResponse } from '../../types'
+import type { SessionTitleResponse } from '@/types/api-responses'
 
 // Rename a session, preferring the gateway's session.title RPC over REST.
 //

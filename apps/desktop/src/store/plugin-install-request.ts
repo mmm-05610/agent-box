@@ -1,7 +1,8 @@
 import { atom } from 'nanostores'
 
-/** Which plugin component(s) a legacy deeplink pre-selects after probe. */
-export type PluginInstallLegacyHint = 'agent' | 'desktop' | null
+import type { PluginInstallLegacyHint } from '@/types/plugin-install'
+
+export type { PluginInstallLegacyHint }
 
 /** Future metrics (opt-in): install count + success/failure, per repo. */
 export interface PluginInstallRequest {

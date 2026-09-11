@@ -1,6 +1,6 @@
 import { atom } from 'nanostores'
 
-import type { ClientSessionState } from '@/app/types'
+import type { ClientSessionState } from '@/types/session'
 
 /** The inversion seam between tile UI and the wiring layer: the wiring owns
  *  the gateway + session cache and registers itself here. */

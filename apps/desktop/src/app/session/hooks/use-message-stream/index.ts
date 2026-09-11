@@ -29,8 +29,7 @@ import { isDiskFullErrorMessage, notifyError } from '@/store/notifications'
 import { broadcastSessionsChanged } from '@/store/session-sync'
 import { upsertSubagent } from '@/store/subagents'
 import { $todosBySession, setSessionTodos } from '@/store/todos'
-
-import type { ClientSessionState } from '../../../types'
+import type { ClientSessionState } from '@/types/session'
 
 import { useGatewayEventHandler } from './gateway-event'
 import { completionErrorText, delegateTaskPayloads, MAX_STREAM_FLUSH_GAP_MS, STREAM_DELTA_FLUSH_MS } from './utils'

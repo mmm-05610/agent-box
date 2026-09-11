@@ -37,14 +37,8 @@ import {
   setYoloActive
 } from '@/store/session'
 import { $sessionStates } from '@/store/session-states'
-
-import type {
-  BrowserManageResponse,
-  ClientSessionState,
-  SessionCompressResponse,
-  SessionTitleResponse,
-  SlashExecResponse
-} from '../../../types'
+import type { BrowserManageResponse, SessionCompressResponse, SessionTitleResponse, SlashExecResponse } from '@/types/api-responses'
+import type { ClientSessionState } from '@/types/session'
 
 import { queueKickoffIfSessionBusy } from './queue-if-busy'
 import { resolveTargetSessionId } from './resolve-target-session'

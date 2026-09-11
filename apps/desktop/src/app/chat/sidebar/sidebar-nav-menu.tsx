@@ -20,9 +20,9 @@ import type { Translations } from '@/i18n'
 import { cn } from '@/lib/utils'
 import { $newChatProfile } from '@/store/profile'
 import { openRouteTile } from '@/store/route-tiles'
+import { type SidebarNavItem } from '@/types/sidebar'
 
 import { type AppView } from '../../routes'
-import { type SidebarNavItem } from '../../types'
 import { startNewSessionDrag } from '../new-session-drag'
 
 import { type ChatSidebarProps, SIDEBAR_NAV } from './sidebar-constants'

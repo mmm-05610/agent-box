@@ -1,4 +1,4 @@
-import type { SessionOwnerRoute } from '@/store/session/types'
+import type { SessionOwnerRoute } from '@/types/session'
 
 interface ModelPickerOwnerInput {
   ambientConnectionId?: string

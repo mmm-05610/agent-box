@@ -2,18 +2,18 @@ import { useCallback } from 'react'
 
 import { requestComposerFocus, requestComposerInsert, requestComposerInsertRefs } from '@/app/chat/composer/focus'
 import { droppedFileInlineRef } from '@/app/chat/composer/inline-refs'
-import { formatRefValue } from '@/components/assistant-ui/directive-text'
 import { useI18n } from '@/i18n'
 import { attachmentId, contextPath, pathLabel } from '@/lib/chat-runtime'
 import { readDesktopFileDataUrlLocalFirst, selectDesktopPaths } from '@/lib/desktop-fs'
 import { desktopGit } from '@/lib/desktop-git'
+import { formatRefValue } from '@/lib/format-ref-value'
 import { downscaleDataUrlForPreview } from '@/lib/image-resize'
 import { normalize } from '@/lib/text'
 import { addComposerAttachment, createComposerAttachmentOccurrenceId, patchMainComposerAttachmentOccurrence, removeComposerAttachment, setComposerTerminalSelection, updateComposerAttachment } from '@/store/composer'
 import { notify, notifyError } from '@/store/notifications'
+import type { ImageDetachResponse } from '@/types/api-responses'
 import type { ComposerAttachment, ComposerAttachmentPatch } from '@/types/composer'
 
-import type { ImageDetachResponse } from '../../types'
 import type { DroppedFile } from '../composer/types'
 
 const IMAGE_EXTENSION_PATTERN = /\.(png|jpe?g|gif|webp|bmp|tiff?|svg|ico)$/i

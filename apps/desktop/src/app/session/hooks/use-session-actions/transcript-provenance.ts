@@ -1,4 +1,4 @@
-import type { ClientSessionState, PersistedDisplayTranscriptProvenance } from '../../../types'
+import type { ClientSessionState, PersistedDisplayTranscriptProvenance } from '@/types/session'
 
 export type TranscriptProvenanceScope =
   string | null | undefined | { connectionId?: string | null; profile?: string | null }

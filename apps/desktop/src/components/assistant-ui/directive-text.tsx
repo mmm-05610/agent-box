@@ -9,6 +9,7 @@ import { ZoomableImage } from '@/components/chat/zoomable-image'
 import type { I18nContextValue } from '@/i18n'
 import { extractEmbeddedImages } from '@/lib/embedded-images'
 import { openLink } from '@/lib/external-link'
+import { formatRefValue } from '@/lib/format-ref-value'
 import { triggerHaptic } from '@/lib/haptics'
 import { gatewayMediaDataUrl, isRemoteGateway } from '@/lib/media'
 import { useSessionLinkTitle } from '@/lib/session-link-title'
@@ -152,30 +153,6 @@ function unwrapRefValue(raw: string): string {
   }
 
   return raw.replace(TRAILING_PUNCTUATION_RE, '')
-}
-
-function needsQuoting(value: string): boolean {
-  return /[\s()[\]{}<>"'`]/.test(value)
-}
-
-export function formatRefValue(value: string): string {
-  if (!needsQuoting(value)) {
-    return value
-  }
-
-  if (!value.includes('`')) {
-    return `\`${value}\``
-  }
-
-  if (!value.includes('"')) {
-    return `"${value}"`
-  }
-
-  if (!value.includes("'")) {
-    return `'${value}'`
-  }
-
-  return value
 }
 
 export const hermesDirectiveFormatter: Unstable_DirectiveFormatter = {

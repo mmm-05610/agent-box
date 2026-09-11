@@ -71,10 +71,10 @@ import { $removedSessionIds, $sessionMutationsInFlight } from '@/store/session-r
 import { $sessionTiles, sessionTileOwnerRoute } from '@/store/session-states'
 import { $sessionSeenCounts, $unreadFinishedMarkers } from '@/store/session-unread'
 import { type SessionProfileRoute } from '@/store/session/types'
+import type { ClientSessionState } from '@/types/session'
 
 import { deferred } from '../../../dev/test/deferred'
 import { NEW_CHAT_ROUTE, sessionRoute } from '../../routes'
-import type { ClientSessionState } from '../../types'
 
 import sessionResumeActiveTurn from './__fixtures__/session-resume-active-turn.json'
 import { useSessionActions } from './use-session-actions'

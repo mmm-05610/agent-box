@@ -8,30 +8,14 @@
  * USES it — the routing use-case that hands it to `store/gateway` — made every
  * consumer of the type inherit that use-case's whole closure, transport
  * included, and closed the cycle that put the session store inside SCC-B. The
- * shape and the shape predicate therefore live here, on nothing, and the router
- * lives above in `application/session/**`.
+ * shape lives on the `@/types/session` leaf; the shape predicate therefore
+ * lives here, on nothing, and the router lives above in
+ * `application/session/**`.
  */
 
-/**
- * The ONE authoritative exact owner of a session: the registry connection whose
- * socket minted (or resumed) the runtime, plus the Desktop profile that selects
- * that route. `targetProfile` is the backend profile the route serves when it
- * differs from the Desktop-side name (remote overrides); `mode` is informative.
- *
- * Captured ONCE at the new-chat intent / send linearization point
- * (store/profile resolveNewChatOwnerRoute) and carried through session.create,
- * the owner hint, the optimistic row, the runtime binding, the foreground hold
- * and every later session-scoped RPC. Never re-derived from ambient state after
- * an asynchronous activation: connection/profile EQUALITY is not enough — the
- * runtime lives on one concrete WebSocket, and only this route names the
- * registry entry that holds it.
- */
-export interface SessionOwnerRoute {
-  connectionId: string
-  mode?: 'local' | 'remote'
-  profile: string
-  targetProfile?: string
-}
+import type { SessionOwnerRoute } from '@/types/session'
+
+export type { SessionOwnerRoute }
 
 /** @deprecated Alias kept for existing imports; new code names SessionOwnerRoute. */
 export type SessionProfileRoute = SessionOwnerRoute

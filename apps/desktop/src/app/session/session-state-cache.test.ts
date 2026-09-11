@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { ClientSessionState } from '@/app/types'
 import type { ChatMessage } from '@/lib/chat-messages'
 import { createClientSessionState } from '@/lib/chat-runtime'
 import { $sessionStates, $sessionTiles, releaseSessionTranscript } from '@/store/session-states'
+import type { ClientSessionState } from '@/types/session'
 
 import { SessionStateCache } from './session-state-cache'
 

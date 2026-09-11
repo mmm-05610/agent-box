@@ -21,8 +21,8 @@ import {
   setYoloActive
 } from '@/store/session'
 import { $sessionStates, $sessionTiles, publishSessionState, releaseSessionTranscript } from '@/store/session-states'
+import type { ClientSessionState } from '@/types/session'
 
-import type { ClientSessionState } from '../../types'
 import { SessionStateCache } from '../session-state-cache'
 
 import {

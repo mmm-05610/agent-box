@@ -3,8 +3,7 @@ import type { MutableRefObject } from 'react'
 
 import type { GatewayEventPayload } from '@/lib/chat-messages'
 import type { RpcEvent } from '@/types/hermes'
-
-import type { ClientSessionState } from '../../../../types'
+import type { ClientSessionState } from '@/types/session'
 
 export interface GatewayEventDeps {
   activeGatewayProfile: string

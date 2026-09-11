@@ -1,6 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { ClientSessionState } from '@/app/types'
+import type { ClientSessionState } from '@/types/session'
 
 import { $sessions } from './session'
 import { clearAllSessionStates, publishSessionState } from './session-states'

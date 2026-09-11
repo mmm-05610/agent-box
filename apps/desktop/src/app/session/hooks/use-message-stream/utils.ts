@@ -1,8 +1,7 @@
 import type { GatewayEventPayload } from '@/lib/chat-messages'
 import { normalizePersonalityValue } from '@/lib/chat-runtime'
 import { isTodoToolName } from '@/lib/todos'
-
-import type { ClientSessionState } from '../../../types'
+import type { ClientSessionState } from '@/types/session'
 
 type SessionRuntimeStatePatch = Partial<
   Pick<

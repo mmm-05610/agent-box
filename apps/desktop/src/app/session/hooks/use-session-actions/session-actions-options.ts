@@ -1,7 +1,7 @@
 import type { MutableRefObject } from 'react'
 import type { NavigateFunction } from 'react-router'
 
-import type { ClientSessionState } from '../../../types'
+import type { ClientSessionState } from '@/types/session'
 
 /** The session-surface state and callbacks the session action hooks operate on. */
 export interface SessionActionsOptions {

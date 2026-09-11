@@ -5,6 +5,7 @@ import type {
   Sidebar} from '@/components/ui/sidebar';
 import { type SessionInfo } from '@/hermes'
 import { cn } from '@/lib/utils'
+import type { SidebarNavItem } from '@/types/sidebar'
 
 import {
   type AppView,
@@ -13,7 +14,6 @@ import {
   MESSAGING_ROUTE,
   SKILLS_ROUTE
 } from '../../routes'
-import type { SidebarNavItem } from '../../types'
 import { type NewSessionSplitHandler } from '../new-session-drag'
 
 export const NON_SESSION_INITIAL_ROWS = 3

@@ -1,8 +1,8 @@
 import { act } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { hiddenPaneProps, PANE_HIDDEN_ATTR } from '@/components/pane-shell/pane-visibility'
 import { reactRoot } from '@/dev/test/react-root'
+import { hiddenPaneProps, PANE_HIDDEN_ATTR } from '@/lib/pane-visibility'
 import { $paneStates } from '@/store/panes'
 
 import { installWindowStateBridge, setDocumentHidden, type WindowStateBridge } from '../../../dev/test/window-state'

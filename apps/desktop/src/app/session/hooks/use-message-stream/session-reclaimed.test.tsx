@@ -2,12 +2,12 @@ import { QueryClient } from '@tanstack/react-query'
 import { act, cleanup } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { ClientSessionState } from '@/app/types'
 import { createClientSessionState } from '@/lib/chat-runtime'
 import { resetRuntimeGoneHealing } from '@/store/runtime-gone'
 import { $activeSessionId, $sessionResumeRequest } from '@/store/session'
 import { $sessionStates, $sessionTiles, publishSessionState } from '@/store/session-states'
 import type { RpcEvent } from '@/types/hermes'
+import type { ClientSessionState } from '@/types/session'
 
 import { type MessageStreamHarness, renderMessageStream } from './test-harness'
 

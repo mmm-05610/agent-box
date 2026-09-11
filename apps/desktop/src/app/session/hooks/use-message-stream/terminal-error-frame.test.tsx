@@ -1,8 +1,8 @@
 import { act, cleanup } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { ClientSessionState } from '@/app/types'
 import { chatMessageText } from '@/lib/chat-messages'
+import type { ClientSessionState } from '@/types/session'
 
 import { type MessageStreamHarness, renderMessageStream } from './test-harness'
 

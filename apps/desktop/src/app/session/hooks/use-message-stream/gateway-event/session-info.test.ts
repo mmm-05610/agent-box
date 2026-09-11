@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { ClientSessionState } from '@/app/types'
 import { createClientSessionState } from '@/lib/chat-runtime'
 import {
   $currentCwd,
@@ -9,6 +8,7 @@ import {
   releaseWorkspaceCwdOwner,
   setCurrentCwd
 } from '@/store/session'
+import type { ClientSessionState } from '@/types/session'
 
 import { handleSessionInfoEvent } from './session-info'
 import type { GatewayEventContext } from './types'

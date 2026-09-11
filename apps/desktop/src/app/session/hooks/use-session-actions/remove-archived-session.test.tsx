@@ -12,8 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { deleteSession, type SessionInfo } from '@/hermes'
 import { setSessions } from '@/store/session'
 import { $archivedSessions } from '@/store/sidebar-archive'
-
-import type { ClientSessionState } from '../../../types'
+import type { ClientSessionState } from '@/types/session'
 
 import { useSessionActions } from './index'
 

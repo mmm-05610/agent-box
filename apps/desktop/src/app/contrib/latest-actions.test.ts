@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import type { SidebarNavItem } from '../types'
+import type { SidebarNavItem } from '@/types/sidebar'
 
 import { latestChatActions, latestSidebarActions } from './latest-actions'
 import type { ChatActions, SidebarActions } from './types'

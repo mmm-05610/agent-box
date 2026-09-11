@@ -31,10 +31,10 @@ import { describe, expect, it } from 'vitest'
 // the zone in this module's public type surface) but excluded from the
 // TRANSITIVE walk: `import type` is erased, so it cannot create the runtime
 // initialization cycle this walk exists to prevent. `store/session-states/**
-// imports `@/app/types` for `ClientSessionState`, and `@/app/types` — which
-// imports nothing but types itself — is only the first link of a chain that
-// textually ends at `api/client.ts`; no runtime edge to the API exists, and the
-// direct rule is what keeps it that way.
+// imports `@/types/session` for `ClientSessionState`, and `@/types/session` —
+// which imports nothing but types itself — is only the first link of a chain
+// that textually ends at `api/client.ts`; no runtime edge to the API exists,
+// and the direct rule is what keeps it that way.
 
 const STORE_DIR = dirname(fileURLToPath(import.meta.url))
 const SRC_DIR = resolve(STORE_DIR, '..')
@@ -454,7 +454,7 @@ describe('the scanners can fail', () => {
     // What a state store legitimately stands on: its own submodules, the shape
     // leaf, protocol types, pure helpers and the UI primitives it renders into.
     const allowed = [
-      "import type { ClientSessionState } from '@/app/types'",
+      "import type { ClientSessionState } from '@/types/session'",
       "import { atom } from 'nanostores'",
       "import { normalizeProfileKey } from '@/store/profile/identity'",
       "import type { SessionOwnerRoute } from '../session/types'",

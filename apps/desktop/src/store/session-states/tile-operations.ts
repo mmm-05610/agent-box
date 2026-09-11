@@ -1,4 +1,3 @@
-import type { ClientSessionState } from '@/app/types'
 import type { LayoutNode } from '@/components/pane-shell/tree/model'
 import { findGroupOfPane } from '@/components/pane-shell/tree/model'
 import {
@@ -12,6 +11,7 @@ import {
 import { resolveRememberedActivePane, workspaceScopeKey } from '@/components/pane-shell/workspace-scope'
 import { normalizeProfileKey } from '@/store/profile/identity'
 import type { SessionInfo } from '@/types/hermes'
+import type { ClientSessionState } from '@/types/session'
 
 import {
   $selectedStoredSessionId,

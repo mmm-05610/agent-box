@@ -116,12 +116,12 @@ import { $focusedSessionIsTile, $focusedStoredSessionId, $workingSessionIds } fr
 import { ackAllSessionsRead } from '@/store/session-unread'
 import { $archivedSessions, loadArchivedSessions } from '@/store/sidebar-archive'
 import { $sidebarSessionRankIds } from '@/store/sidebar-sort'
+import type { SidebarNavItem } from '@/types/sidebar'
 
 import {
   SIDEBAR_NAV_AREA,
   type SidebarNavContribution
 } from '../../routes'
-import type { SidebarNavItem } from '../../types'
 
 import { SidebarSectionAddButton } from './chrome'
 import { SidebarCronJobsSection } from './cron-jobs-section'

@@ -3,9 +3,9 @@ import { render } from '@testing-library/react'
 import { useEffect, useRef } from 'react'
 import { vi } from 'vitest'
 
-import type { ClientSessionState } from '@/app/types'
 import { createClientSessionState } from '@/lib/chat-runtime'
 import type { RpcEvent } from '@/types/hermes'
+import type { ClientSessionState } from '@/types/session'
 
 import { useMessageStream } from './index'
 

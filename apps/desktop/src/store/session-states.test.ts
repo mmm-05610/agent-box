@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { ClientSessionState } from '@/app/types'
 import { requestForOwnedSession } from '@/application/session/request-owned-session'
 import { findGroupOfPane, group, split } from '@/components/pane-shell/tree/model'
 import { $layoutTree, noteActiveTreeGroup } from '@/components/pane-shell/tree/store'
@@ -43,6 +42,7 @@ import {
   setSessionTileWorkspaceScope
 } from '@/store/session-states'
 import type { SessionProfileRoute } from '@/store/session/types'
+import type { ClientSessionState } from '@/types/session'
 
 const tile = (storedSessionId: string): SessionTile => ({ storedSessionId })
 const tilePane = (id: string) => `session-tile:${id}`
