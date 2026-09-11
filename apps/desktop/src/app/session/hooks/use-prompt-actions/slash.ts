@@ -1,6 +1,8 @@
 import { skillInvocationText } from '@hermes/shared'
 import { type MutableRefObject, useCallback, useRef } from 'react'
 
+import { captureNewChatSource } from '@/application/profile/new-session'
+import { ensureGatewayProfile } from '@/application/profile/runtime-selection'
 import { getProfiles } from '@/hermes'
 import type { Translations } from '@/i18n'
 import { type ChatMessage, toChatMessages } from '@/lib/chat-messages'
@@ -22,13 +24,7 @@ import { applyGoalStatusText } from '@/store/goals'
 import { dismissNotification, notify, notifyError } from '@/store/notifications'
 import { setPetScale } from '@/store/pet-gallery'
 import { $petGenInput, openPetGenerate } from '@/store/pet-generate'
-import {
-  $activeGatewayProfile,
-  $newChatProfile,
-  captureNewChatSource,
-  ensureGatewayProfile,
-  normalizeProfileKey
-} from '@/store/profile'
+import { $activeGatewayProfile, $newChatProfile, normalizeProfileKey } from '@/store/profile'
 import {
   $connection,
   $sessions,

@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
+import { $showAllProfiles } from '@/store/profile/sidebar-scope'
+
 import {
   $sidebarGrouping,
   $sidebarOrdering,
@@ -13,7 +15,6 @@ import {
   toggleSidebarRowMeta,
   toggleSidebarStatusFilter
 } from './layout'
-import { $showAllProfiles } from './profile'
 
 beforeEach(() => {
   $showAllProfiles.set(false)

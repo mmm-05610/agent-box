@@ -445,7 +445,8 @@ export function drainPendingConnectionRedial(entry: Secondary): boolean {
 }
 
 // Open `profile`'s socket WITHOUT making it active — the hover-intent pre-warm
-// (store/profile). Runs the same spawn + connect chain as a real switch, so by
+// (application/profile/runtime-selection). Runs the same spawn + connect chain
+    // as a real switch, so by
 // click time ensureGatewayForProfile finds an open socket and just activates
 // it. No scheduleReconnect on failure: a hover is speculative, so a dead
 // backend must not start a background retry loop — the real switch owns retry

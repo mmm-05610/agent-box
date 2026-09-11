@@ -10,7 +10,8 @@ import {
 import { queryClient } from '@/lib/query-client'
 import { invalidateSlashCompletions } from '@/lib/slash-completion-cache'
 import { upsertDesktopActionTask } from '@/store/activity'
-import { $activeGatewayProfile, normalizeProfileKey } from '@/store/profile'
+import { normalizeProfileKey } from '@/store/profile/identity'
+import { $activeGatewayProfile } from '@/store/profile/runtime-route-state'
 
 const POLL_MS = 1200
 

@@ -2,8 +2,8 @@ import { cleanup, render, screen } from '@testing-library/react'
 import { atom } from 'nanostores'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-// Keep store/profile's side-effecting imports inert (gateway socket layer +
-// REST client) — same seam as store/profile.test.ts.
+// Keep the profile store's module graph inert (raw storage) — same seam as
+// store/profile.test.ts.
 vi.mock('@/store/gateway', () => ({
   $gateway: atom<unknown>(null),
   ensureGatewayForProfile: vi.fn(async () => undefined)

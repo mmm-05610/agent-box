@@ -20,7 +20,8 @@
  * (a turn finished in the background while this window wasn't looking at it,
  * $unreadFinishedSessionIds — transient) and the backend's derived read-state
  * watermark (row.unread — persists across restarts and is visible to every
- * surface). The write side of the persisted flag lives in session-unread.ts.
+ * surface). Both halves of the persisted flag live in session/unread.ts: the
+ * guard read below, and the local row mutations the write use case calls.
  */
 
 import { computed } from 'nanostores'
@@ -36,7 +37,7 @@ import {
   $stalledSessionIds,
   $workingSessionIds
 } from './session-states'
-import { $unreadWriteGuard, UNREAD_WRITE_GUARD_MS } from './session-unread-remote'
+import { $unreadWriteGuard, UNREAD_WRITE_GUARD_MS } from './session/unread'
 import { $subagentsBySession, activeSubagentCount } from './subagents'
 
 // Sessions parked in async delegation: the parent turn has ended (busy=false —

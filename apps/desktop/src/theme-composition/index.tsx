@@ -25,7 +25,8 @@ import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react
 
 import { $registryVersion } from '@/contrib/registry'
 import { useMediaQuery } from '@/hooks/use-media-query'
-import { $activeGatewayProfile, normalizeProfileKey } from '@/store/profile'
+import { normalizeProfileKey } from '@/store/profile/identity'
+import { $activeGatewayProfile } from '@/store/profile/runtime-route-state'
 import { ThemePresenter } from '@/themes/context'
 import type { ThemePreferences } from '@/themes/ports'
 

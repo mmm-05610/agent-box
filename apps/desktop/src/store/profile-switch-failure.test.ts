@@ -42,7 +42,7 @@ vi.mock('@/store/session', () => ({
 vi.mock('@/store/notify-baseline', () => ({ markNativeNotifyBaseline: vi.fn() }))
 vi.mock('@/lib/query-client', () => ({ invalidateProfileScopedQueries: vi.fn() }))
 
-const { ensureGatewayProfile } = await import('./profile')
+const { ensureGatewayProfile } = await import('@/application/profile/runtime-selection')
 
 function installDesktop(stub: Record<string, unknown>): void {
   ;(window as unknown as { hermesDesktop: unknown }).hermesDesktop = stub

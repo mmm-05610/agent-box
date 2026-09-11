@@ -1,24 +1,23 @@
 import type { ConnectionState } from '@hermes/shared'
 import { atom, computed } from 'nanostores'
 
-import { lastVisibleMessageIsUser } from '@/app/chat/thread-loading'
-import type { ContextSuggestion } from '@/app/types'
 import type { HermesConnection } from '@/global'
-import type { ChatMessage } from '@/lib/chat-messages'
+import type { ChatMessage } from '@/lib/chat-messages/types'
 import {
   connectionScopeSuffix,
   rescopeConnectionScopedStores
 } from '@/lib/connection-scoped'
+import { lastVisibleMessageIsUser } from '@/lib/message-tail'
 import { persistBoolean, persistString, storedBoolean, storedString } from '@/lib/storage'
 import { syncCronModelImpactConnection } from '@/store/cron-model-impact-scope'
+import type { ContextSuggestion } from '@/types/context-suggestion'
 import type { SessionInfo, UsageStats } from '@/types/hermes'
 
 import { isSessionRemovalPending } from '../session-removal'
-import type { SessionOwnerRoute } from '../session-request-router'
-import { clearUnreadOnOpen } from '../session-unread-remote'
 
 import { lineageAliases } from './identity'
 import { setSessionOwnerHint } from './owner-hints'
+import type { SessionOwnerRoute } from './types'
 
 /** The session surface's reactive atom bank: the shared atoms, their
  *  scoped-persistence setters, and the composer model selection bound to
@@ -338,8 +337,9 @@ export const setActiveSessionStoredIdRotation = (next: Updater<ActiveSessionStor
 // list refresh — so the green dot survives an app restart, and a session that
 // finished while the app was CLOSED still comes up unread. The explicit
 // Mark-as-unread toggle rides the BACKEND watermark instead
-// (SessionDB.set_session_read, session-unread-remote.ts). Written by
-// session-states.ts (live busy→idle edge), cleared here on session open.
+// (SessionDB.set_session_read; its use case is application/session-read-state.ts
+// over the store half in session/unread.ts). Written by session-states.ts (live
+// busy→idle edge), cleared here on session open.
 export const $unreadFinishedSessionIds = atom<string[]>([])
 
 /** Sidebar "mark all as read" — clears every finished-unread dot. Purely
@@ -367,6 +367,16 @@ export const clearReadBaseline = (storedSessionId: string) => {
   }
 }
 
+/** Select the session the UI is showing. Synchronous store work ONLY.
+ *
+ *  Two halves of "this session is read" are not this setter's job:
+ *  `markSessionRead` below owns the LOCAL invariant (the selected conversation
+ *  is not "finished — unread", and its read baseline is now), and the persisted
+ *  BACKEND watermark is cleared by the open/view use case in
+ *  `@/application/session-read-state` — which also runs for an open that does
+ *  not move the selection at all (a tile, a route that already holds it). So a
+ *  selection made here for its own sake (a reset, a background bind) never
+ *  fires a request, and never depends on one succeeding. */
 export const setSelectedStoredSessionId = (next: Updater<string | null>) => {
   updateAtom($selectedStoredSessionId, next)
   // Opening a session clears its unread state — the user is now looking at it.
@@ -377,11 +387,6 @@ export const setSelectedStoredSessionId = (next: Updater<string | null>) => {
 
   if (id) {
     markSessionRead(id)
-  }
-
-  // ...and the persisted watermark flag, when the row carried one.
-  if (id) {
-    void clearUnreadOnOpen(id)
   }
 }
 

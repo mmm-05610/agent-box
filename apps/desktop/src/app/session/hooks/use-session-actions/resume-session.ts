@@ -1,6 +1,9 @@
 import { useCallback, useRef } from 'react'
 
 import { graftRefreshedTailOntoBackfill } from '@/app/chat/transcript-backfill'
+import { ensureGatewayAgent } from '@/application/profile/gateway-routing'
+import { ensureGatewayProfile } from '@/application/profile/runtime-selection'
+import { selectStoredSessionForViewing } from '@/application/session-read-state'
 import { fetchStoredTranscriptAcrossBackends, getLatestSessionMessages } from '@/application/session-transcripts'
 import { type Translations } from '@/i18n'
 import {
@@ -17,14 +20,7 @@ import { $clarifyRequests } from '@/store/clarify'
 import { openGatewayForAgent, openGatewayForProfile } from '@/store/gateway'
 import { $gatewaySwitching } from '@/store/gateway-switch'
 import { clearNotifications, notify, notifyError } from '@/store/notifications'
-import {
-  $activeGatewayProfile,
-  $gatewaySwapTarget,
-  $showAllProfiles,
-  ensureGatewayAgent,
-  ensureGatewayProfile,
-  normalizeProfileKey
-} from '@/store/profile'
+import { $activeGatewayProfile, $gatewaySwapTarget, $showAllProfiles, normalizeProfileKey } from '@/store/profile'
 import { setApprovalRequest } from '@/store/prompts'
 import { clearStoredTranscriptReadOnly, markStoredTranscriptReadOnly } from '@/store/read-only-transcript'
 import {
@@ -42,7 +38,6 @@ import {
   setMessages,
   setResumeExhaustedSessionId,
   setResumeFailedSessionId,
-  setSelectedStoredSessionId,
   setSessionStartedAt,
   setWorkspaceCwdOwner
 } from '@/store/session'
@@ -198,7 +193,7 @@ export function useResumeSession(
       setFreshDraftReady(false)
       clearNotifications()
       resetViewSync()
-      setSelectedStoredSessionId(storedSessionId)
+      selectStoredSessionForViewing(storedSessionId)
       selectedStoredSessionIdRef.current = storedSessionId
 
       // A session is EITHER the main thread OR a tile — never both. openSessionTile
@@ -431,7 +426,7 @@ export function useResumeSession(
 
           setFreshDraftReady(false)
           clearNotifications()
-          setSelectedStoredSessionId(storedSessionId)
+          selectStoredSessionForViewing(storedSessionId)
           selectedStoredSessionIdRef.current = storedSessionId
           setActiveSessionId(cachedRuntimeId)
           activeSessionIdRef.current = cachedRuntimeId
@@ -814,7 +809,7 @@ export function useResumeSession(
       setBusy(false)
       setAwaitingResponse(false)
       clearNotifications()
-      setSelectedStoredSessionId(storedSessionId)
+      selectStoredSessionForViewing(storedSessionId)
       selectedStoredSessionIdRef.current = storedSessionId
       setSessionStartedAt(Date.now())
 

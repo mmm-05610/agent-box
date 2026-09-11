@@ -52,13 +52,7 @@ import {
   toggleSidebarRowMeta,
   toggleSidebarStatusFilter
 } from '@/store/layout'
-import {
-  $profiles,
-  $showAllProfiles,
-  normalizeProfileKey,
-  requestProfileCreate,
-  toggleShowAllProfiles
-} from '@/store/profile'
+import { $profiles, $showAllProfiles, normalizeProfileKey, requestProfileCreate, toggleShowAllProfiles } from '@/store/profile'
 import { runImportProfileFlow } from '@/store/profile-share'
 import { $projectTree } from '@/store/projects'
 import type { PullRequestBucket } from '@/store/pull-requests'

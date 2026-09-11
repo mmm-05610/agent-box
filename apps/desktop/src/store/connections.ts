@@ -1,5 +1,8 @@
 import { atom, computed } from 'nanostores'
 
+import { refreshActiveProfile } from '@/application/profile/catalog'
+import { ensureGatewayAgent, openGatewayAgent } from '@/application/profile/gateway-routing'
+import { captureNewChatSource } from '@/application/profile/new-session'
 import type { DesktopConnectionsRegistry } from '@/global'
 import { persistStringRecord, storedStringRecord } from '@/lib/storage'
 import { BACKEND_BOOT_WAIT_TIMEOUT_MS, isTimeoutError, withTimeout } from '@/lib/with-timeout'
@@ -10,17 +13,11 @@ import {
   type GatewaySwitchToken,
   recoverActiveSourceAfterFailedGatewaySwitch
 } from '@/store/gateway-switch'
-import {
-  $activeGatewayProfile,
-  $newChatProfile,
-  $showAllProfiles,
-  captureNewChatSource,
-  ensureGatewayAgent,
-  normalizeProfileKey,
-  openGatewayAgent,
-  refreshActiveProfile,
-  requestFreshSession
-} from '@/store/profile'
+import { normalizeProfileKey } from '@/store/profile/identity'
+import { $newChatProfile } from '@/store/profile/new-chat-state'
+import { requestFreshSession } from '@/store/profile/request-atoms'
+import { $activeGatewayProfile } from '@/store/profile/runtime-route-state'
+import { $showAllProfiles } from '@/store/profile/sidebar-scope'
 import { $connection } from '@/store/session'
 
 const LAST_PROFILE_STORAGE_KEY = 'hermes.desktop.lastProfileByConnection'

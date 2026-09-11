@@ -10,9 +10,9 @@ import {
   revealTreePane
 } from '@/components/pane-shell/tree/store'
 import { resolveRememberedActivePane, workspaceScopeKey } from '@/components/pane-shell/workspace-scope'
+import { normalizeProfileKey } from '@/store/profile/identity'
 import type { SessionInfo } from '@/types/hermes'
 
-import { normalizeProfileKey } from '../profile'
 import {
   $selectedStoredSessionId,
   $sessions,

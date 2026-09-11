@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createClientSessionState } from '@/lib/chat-runtime'
 import { $connectionsRegistry } from '@/store/connection-registry-state'
 import { setPrimaryGateway, setPrimaryGatewayConnection } from '@/store/gateway'
-import { $profiles } from '@/store/profile'
+import { $profiles } from '@/store/profile/catalog-state'
 import { _resetSessionOwnerHintsForTests, setSessionOwnerHint, setSessions } from '@/store/session'
 import { isSessionOwnerResolutionError } from '@/store/session-owner-resolution'
 import {

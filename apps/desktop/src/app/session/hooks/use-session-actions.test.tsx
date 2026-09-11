@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { NO_PROJECT_ID } from '@/app/chat/sidebar/projects/workspace-groups'
 import { resolveSessionRpcOwner } from '@/app/contrib/wiring-routing'
 import { $terminalTakeover, setTerminalTakeover } from '@/app/right-sidebar/store'
+import { ensureGatewayProfile } from '@/application/profile/runtime-selection'
 import { getLatestSessionMessages } from '@/application/session-transcripts'
 import { noteActiveTreeGroup, revealTreePane } from '@/components/pane-shell/tree/store'
 import {
@@ -24,7 +25,7 @@ import { $clarifyRequests, clearClarifyRequest, setClarifyRequest } from '@/stor
 import { clearSessionDraft, stashSessionDraft, takeSessionDraft } from '@/store/composer'
 import { requestGatewayForAgent, requestGatewayForProfile } from '@/store/gateway'
 import { $pinnedSessionIds } from '@/store/layout'
-import { $activeGatewayProfile, $newChatProfile, $newChatRoute, $profiles, ensureGatewayProfile } from '@/store/profile'
+import { $activeGatewayProfile, $newChatProfile, $newChatRoute, $profiles } from '@/store/profile'
 import { $projectScope, $projectTree, ALL_PROJECTS } from '@/store/projects'
 import {
   $activeSessionId,
@@ -97,9 +98,15 @@ vi.mock('@/application/session-transcripts', async importOriginal => ({
   getLatestSessionMessages: vi.fn()
 }))
 
-vi.mock('@/store/profile', async importOriginal => ({
+// Partial mocks: only the DIALS are stubbed. resolveNewChatOwnerRoute keeps
+// its real routing decision, and the shared switch slot/commit hook stays real
+// so the profile door the router composes is the one being exercised.
+vi.mock('@/application/profile/gateway-routing', async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  ensureGatewayAgent: vi.fn().mockResolvedValue(undefined),
+  ensureGatewayAgent: vi.fn().mockResolvedValue(undefined)
+}))
+vi.mock('@/application/profile/runtime-selection', async importOriginal => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   ensureGatewayProfile: vi.fn().mockResolvedValue(undefined)
 }))
 

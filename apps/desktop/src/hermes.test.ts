@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { fetchLatestSessionMessages } from './api/sessions'
+import { refreshActiveProfile } from './application/profile/catalog'
 import { listAllProfileSessions, listSessions, listSidebarSessions } from './application/session-lists'
 import {
   AUDIO_SPEAK_MAX_REQUEST_TIMEOUT_MS,
@@ -31,7 +32,6 @@ import {
   transcribeAudio,
   triggerCronJob
 } from './hermes'
-import { refreshActiveProfile } from './store/profile'
 
 const emptySessionsResponse = {
   limit: 0,

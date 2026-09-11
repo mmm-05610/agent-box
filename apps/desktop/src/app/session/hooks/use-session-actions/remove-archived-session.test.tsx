@@ -36,7 +36,7 @@ vi.mock('@/application/session-transcripts', async importOriginal => ({
   getLatestSessionMessages: vi.fn()
 }))
 
-vi.mock('@/store/profile', async importOriginal => ({
+vi.mock('@/application/profile/runtime-selection', async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
   ensureGatewayProfile: vi.fn().mockResolvedValue(undefined)
 }))

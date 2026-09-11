@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 
-import { refreshActiveProfile } from '@/store/profile'
+import { refreshActiveProfile } from '@/application/profile/catalog'
 
 /**
  * Re-pull the running profile + list on mount, and again whenever the window

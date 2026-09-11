@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { $activeGatewayProfile } from '@/store/profile'
+import { $activeGatewayProfile } from '@/store/profile/runtime-route-state'
 import { $sessions } from '@/store/session'
 import type { SessionInfo } from '@/types/hermes'
 

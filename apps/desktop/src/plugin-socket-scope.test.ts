@@ -35,7 +35,16 @@ vi.mock('@/store/starmap', () => ({ resetStarmapGraph: vi.fn() }))
 
 const { pluginSocket, setApiRequestConnection, setApiRequestProfile } = await import('@/hermes')
 const { closeSecondaryGateways, configureGatewayRegistry, setPrimaryGateway } = await import('@/store/gateway')
-const { $activeGatewayProfile, ensureGatewayAgent, ensureGatewayProfile } = await import('@/store/profile')
+const { $activeGatewayProfile } = await import('@/store/profile/runtime-route-state')
+const { startActiveProfileRouting } = await import('@/application/profile/active-route-effects')
+
+// What the renderer entry does for every window, done ONCE here: route the API
+// and plugin socket at the profile the live gateway moves to. It used to happen
+// implicitly when the profile store was imported, which is why this file only
+// had to import it.
+startActiveProfileRouting()
+const { ensureGatewayAgent } = await import('@/application/profile/gateway-routing')
+const { ensureGatewayProfile } = await import('@/application/profile/runtime-selection')
 
 // authMode 'oauth' makes pluginSocket stop after resolving the connection
 // (polling fallback), so the assertions cover resolution without a WS dial.

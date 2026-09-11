@@ -14,16 +14,14 @@ const startManualProviderOAuth = vi.fn()
 const startManualLocalEndpoint = vi.fn()
 const onboarding = atom({ manual: false })
 
-vi.mock('@/store/profile', () => ({
-  $activeGatewayProfile: atom('alpha'),
-  $profiles: atom([]),
-  refreshProfiles: async () => {},
-  normalizeProfileKey: (p: string | null) => p || 'default'
-}))
+vi.mock('@/store/profile/catalog-state', () => ({ $profiles: atom([]), setActiveProfile: vi.fn() }))
+vi.mock('@/store/profile/identity', () => ({ normalizeProfileKey: (p: string | null) => p || 'default' }))
+vi.mock('@/store/profile/runtime-route-state', () => ({ $activeGatewayProfile: atom('alpha') }))
+vi.mock('@/application/profile/catalog', () => ({ refreshProfiles: async () => {} }))
 
 vi.mock('@/hermes', () => ({
   setApiRequestProfile: vi.fn(),
-  getProfiles: async () => ({ profiles: (await import('@/store/profile')).$profiles.get() }),
+  getProfiles: async () => ({ profiles: (await import('@/store/profile/catalog-state')).$profiles.get() }),
   setEnvVar: (key: string, value: string, profile?: string) => setEnvVar(key, value, profile),
   disconnectOAuthProvider: (...args: unknown[]) => disconnectOAuthProvider(...args),
   getEnvVars: (...args: unknown[]) => getEnvVars(...args),
@@ -106,7 +104,8 @@ async function renderProvidersSettings() {
 describe('ProvidersSettings', () => {
   it('reads and saves API keys for the shared Settings target and reloads when it changes', async () => {
     const { $settingsScopeOverride } = await import('@/store/settings-scope')
-    const { $activeGatewayProfile, $profiles } = await import('@/store/profile')
+    const { $profiles } = await import('@/store/profile/catalog-state')
+    const { $activeGatewayProfile } = await import('@/store/profile/runtime-route-state')
     $activeGatewayProfile.set('profile-a')
     $settingsScopeOverride.set('profile-b')
     $profiles.set(

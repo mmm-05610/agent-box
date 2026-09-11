@@ -1,11 +1,8 @@
 import { type HermesGateway } from '@/hermes'
 import { activeGateway, ensureActiveGatewayOpen } from '@/store/gateway'
-import {
-  $activeGatewayProfile,
-  $profileScope,
-  ALL_PROFILES,
-  normalizeProfileKey
-} from '@/store/profile'
+import { normalizeProfileKey } from '@/store/profile/identity'
+import { $activeGatewayProfile } from '@/store/profile/runtime-route-state'
+import { $profileScope, ALL_PROFILES } from '@/store/profile/sidebar-scope'
 
 import type {
   ProjectsPayload

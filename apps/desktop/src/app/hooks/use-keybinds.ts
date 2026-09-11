@@ -6,6 +6,7 @@ import { hudTargetSessionId } from '@/app/hud/handoff'
 import { setTerminalTakeover } from '@/app/right-sidebar/store'
 import { closeActiveTerminal, createTerminal, cycleTerminal } from '@/app/right-sidebar/terminal/terminals'
 import { appViewForPath, isOverlayView } from '@/app/routes'
+import { cycleProfile, switchProfileToSlot, switchToDefaultProfile } from '@/application/profile/navigation'
 import {
   activateTreeTabSlot,
   cycleTreeTabInFocusedZone,
@@ -38,14 +39,7 @@ import {
   toggleSidebarOpen
 } from '@/store/layout'
 import { openBrowserTab } from '@/store/preview'
-import {
-  $newChatProfile,
-  cycleProfile,
-  requestProfileCreate,
-  switchProfileToSlot,
-  switchToDefaultProfile,
-  toggleShowAllProfiles
-} from '@/store/profile'
+import { $newChatProfile, requestProfileCreate, toggleShowAllProfiles } from '@/store/profile'
 import { openFolderAsProject } from '@/store/projects'
 import { toggleReview } from '@/store/review'
 import { $selectedStoredSessionId, setModelPickerOpen } from '@/store/session'

@@ -23,7 +23,7 @@ vi.mock('@/lib/query-client', () => ({ invalidateProfileScopedQueries: vi.fn() }
 vi.mock('@/store/starmap', () => ({ resetStarmapGraph: vi.fn() }))
 
 const { applyDesktopOverlay, buildDesktopOverlay, exportProfileBundle } = await import('./profile-share')
-const { $profileColors, setProfileColor } = await import('./profile')
+const { $profileColors, setProfileColor } = await import('@/store/profile/appearance-preferences')
 const { modePref, skinPref } = await import('@/theme-composition/adapters/preferences')
 const { $userThemes } = await import('@/theme-composition/adapters/user-themes')
 const { $layoutTree } = await import('@/components/pane-shell/tree/store')

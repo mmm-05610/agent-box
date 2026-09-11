@@ -1,32 +1,15 @@
 import { requestGatewayForAgent, requestGatewayForProfile, retainGatewayForSessionTurn } from '@/store/gateway'
 
 import { resetBackgroundPollingGuardAfterRebind } from './session-gone-latch'
+import type { SessionOwnerRoute, SessionOwnerScope, SessionProfileRoute } from './session/types'
 
 /**
- * The ONE authoritative exact owner of a session: the registry connection whose
- * socket minted (or resumed) the runtime, plus the Desktop profile that selects
- * that route. `targetProfile` is the backend profile the route serves when it
- * differs from the Desktop-side name (remote overrides); `mode` is informative.
- *
- * Captured ONCE at the new-chat intent / send linearization point
- * (store/profile resolveNewChatOwnerRoute) and carried through session.create,
- * the owner hint, the optimistic row, the runtime binding, the foreground hold
- * and every later session-scoped RPC. Never re-derived from ambient state after
- * an asynchronous activation: connection/profile EQUALITY is not enough — the
- * runtime lives on one concrete WebSocket, and only this route names the
- * registry entry that holds it.
+ * The owner route and its scope are DEFINED in `./session/types`, which stands
+ * on `@/types/**` alone: the session store carries the shape and may not reach
+ * this router (and, through it, `@/store/gateway` → `@/hermes`). Everything that
+ * routes an RPC to a session's owner keeps importing the types from here.
  */
-export interface SessionOwnerRoute {
-  connectionId: string
-  mode?: 'local' | 'remote'
-  profile: string
-  targetProfile?: string
-}
-
-/** @deprecated Alias kept for existing imports; new code names SessionOwnerRoute. */
-export type SessionProfileRoute = SessionOwnerRoute
-
-export type SessionOwnerScope = undefined | null | string | SessionOwnerRoute
+export type { SessionOwnerRoute, SessionOwnerScope, SessionProfileRoute } from './session/types'
 
 /** Exact owner reconstructed from a CONNECTION-TAGGED session row (the
  *  Electron unified-list splice tags foreign registry rows; an optimistic row

@@ -72,7 +72,7 @@ import {
 import { $currentCwd, $selectedStoredSessionId, $sessions, $yoloActive, sessionMatchesStoredId } from '@/store/session'
 import { watchSessionPins } from '@/store/session-pin-sync'
 import { $botChatScopes } from '@/store/session-states'
-import { watchUnreadWriteGuard } from '@/store/session-unread-remote'
+import { watchUnreadWriteGuard } from '@/store/session/unread'
 import { $statusbarVisible } from '@/store/statusbar-prefs'
 import { isBrowserWindow, isHudWindow } from '@/store/windows'
 

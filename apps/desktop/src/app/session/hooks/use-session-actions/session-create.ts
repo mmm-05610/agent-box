@@ -1,20 +1,16 @@
 import { useCallback } from 'react'
 
 import { NO_PROJECT_ID } from '@/app/chat/sidebar/projects/workspace-groups'
+import { ensureGatewayAgent } from '@/application/profile/gateway-routing'
+import { resolveNewChatOwnerRoute } from '@/application/profile/new-session'
+import { ensureGatewayProfile } from '@/application/profile/runtime-selection'
+import { selectStoredSessionForViewing } from '@/application/session-read-state'
 import { revealTreePane } from '@/components/pane-shell/tree/store'
 import { type Translations } from '@/i18n'
 import { setSessionYolo } from '@/lib/yolo-session'
 import { requestGatewayForAgent, retainGatewayForAgent } from '@/store/gateway'
 import { notify, notifyError } from '@/store/notifications'
-import {
-  $activeGatewayProfile,
-  $newChatProfile,
-  type AgentProfileRoute,
-  ensureGatewayAgent,
-  ensureGatewayProfile,
-  normalizeProfileKey,
-  resolveNewChatOwnerRoute
-} from '@/store/profile'
+import { $activeGatewayProfile, $newChatProfile, type AgentProfileRoute, normalizeProfileKey } from '@/store/profile'
 import { $projectScope, resolveNewSessionCwd } from '@/store/projects'
 import {
   $currentCwd,
@@ -263,7 +259,16 @@ export function useSessionCreateActions(
         setFreshDraftReady(false)
         setNewChatWorkspaceTarget(undefined)
         setActiveSessionId(created.session_id)
-        setSelectedStoredSessionId(stored)
+
+        // The new chat is what the user is now looking at (routed into main
+        // above), so its read state is the open/view use case. With no stored
+        // id there is no persisted session yet — just clear the selection.
+        if (stored) {
+          selectStoredSessionForViewing(stored)
+        } else {
+          setSelectedStoredSessionId(null)
+        }
+
         setSessionStartedAt(Date.now())
         const yoloArmed = $yoloActive.get()
         const runtimeInfo = applyRuntimeInfo(created.info)

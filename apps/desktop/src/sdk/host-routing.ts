@@ -1,3 +1,6 @@
+import { refreshProfiles } from '@/application/profile/catalog'
+import { ensureGatewayAgent } from '@/application/profile/gateway-routing'
+import { selectProfile } from '@/application/profile/navigation'
 import { deleteProfile } from '@/hermes'
 import {
   activeGatewayConnectionId,
@@ -9,15 +12,7 @@ import {
   retainGatewayForRelay,
   retireLocalProfileGateways
 } from '@/store/gateway'
-import {
-  $activeGatewayProfile,
-  $profiles,
-  ensureGatewayAgent,
-  normalizeProfileKey,
-  refreshProfiles,
-  selectProfile,
-  setActiveProfile
-} from '@/store/profile'
+import { $activeGatewayProfile, $profiles, normalizeProfileKey, setActiveProfile } from '@/store/profile'
 import { dropTilesForProfile } from '@/store/session-states'
 
 import { $activeConnectionId } from './host-state'

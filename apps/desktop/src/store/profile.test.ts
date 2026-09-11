@@ -4,8 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { HermesConnection } from '@/global'
 import type { ProfileInfo } from '@/types/hermes'
 
-// Keep profile.ts's side-effecting imports inert: the gateway socket layer and
-// the REST query client must not run for real in a unit test.
+// Keep the profile store's side-effecting imports inert: the gateway socket
+// layer and the REST query client must not run for real in a unit test.
 const ensureGatewayForProfile = vi.fn(async () => undefined)
 const ensureGatewayForAgent = vi.fn(async () => undefined)
 const openGatewayForProfile = vi.fn(async (_profile: string) => undefined)
@@ -20,7 +20,7 @@ vi.mock('@/store/gateway', () => ({
   openGatewayForProfile,
   openSecondaryCount
 }))
-// The pool-limits atom is profile.ts's live saturation signal — keep the real
+// The pool-limits atom is the pre-warm's live saturation signal — keep the real
 // one so tests can move the cap via the store, but stub its IPC bridge.
 vi.mock('@/store/pool-limits', async () => {
   const { atom } = await import('nanostores')
@@ -34,14 +34,11 @@ vi.mock('@/hermes', () => ({
 vi.mock('@/lib/query-client', () => ({ invalidateProfileScopedQueries: vi.fn() }))
 vi.mock('@/store/starmap', () => ({ resetStarmapGraph }))
 
-const {
-  $activeGatewayProfile,
-  $profiles,
-  ensureGatewayProfile,
-  invalidateProfileListFetches,
-  prewarmProfileBackend,
-  refreshProfiles
-} = await import('./profile')
+const { $profiles } = await import('@/store/profile/catalog-state')
+const { $activeGatewayProfile } = await import('@/store/profile/runtime-route-state')
+const { ensureGatewayProfile, prewarmProfileBackend } = await import('@/application/profile/runtime-selection')
+const { invalidateProfileListFetches, refreshProfiles } = await import('@/application/profile/catalog')
+const { startActiveProfileRouting, stopActiveProfileRouting } = await import('@/application/profile/active-route-effects')
 
 const { $poolLimits } = await import('@/store/pool-limits')
 
@@ -79,9 +76,14 @@ beforeEach(() => {
   vi.stubGlobal('window', { hermesDesktop: { getConnection } })
   vi.mocked(invalidateProfileScopedQueries).mockClear()
   resetStarmapGraph.mockClear()
+  // The routing effect has a lifecycle now (it used to be a module-load
+  // subscription inside the profile store): a test that drives
+  // $activeGatewayProfile through a switch starts it, and stops it after.
+  startActiveProfileRouting()
 })
 
 afterEach(() => {
+  stopActiveProfileRouting()
   vi.unstubAllGlobals()
   $connection.set(null)
 })

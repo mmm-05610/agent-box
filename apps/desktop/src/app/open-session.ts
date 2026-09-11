@@ -14,8 +14,9 @@
  *   - `window` (⇧⌘-click) — pop into its own window; falls back to `tab` when
  *     the bridge has no session-window support.
  */
+import { markStoredSessionViewed } from '@/application/session-read-state'
 import type { WorkspaceMode } from '@/contrib/types'
-import { $activeSessionId, $selectedStoredSessionId, markSessionRead } from '@/store/session'
+import { $activeSessionId, $selectedStoredSessionId } from '@/store/session'
 import type { SessionProfileRoute } from '@/store/session-request-router'
 import {
   focusedSessionNeedsRoute,
@@ -89,11 +90,12 @@ export function openSession(
     return
   }
 
-  // Any explicit open/focus means the user has seen the finished-turn marker.
+  // Any explicit open/focus means the user has seen the finished-turn marker:
+  // retire the local dot AND clear the persisted read-state watermark.
   // Must run BEFORE the focus short-circuits below: clicking a session that is
   // already on screen (open tile, or the main session) would otherwise return
   // at focusOpenSession and never clear its unread dot.
-  markSessionRead(storedSessionId)
+  markStoredSessionViewed(storedSessionId)
   setSessionTileWorkspaceScope(storedSessionId, workspaceScope)
   const botWorkspaceScope = workspaceScope.workspaceMode === 'bots' ? workspaceScope : undefined
 

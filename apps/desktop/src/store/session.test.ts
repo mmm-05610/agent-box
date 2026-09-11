@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import type * as sessionsApi from '@/api/sessions'
 import type { ClientSessionState } from '@/app/types'
 import { createClientSessionState } from '@/lib/chat-runtime'
 import type { SessionInfo } from '@/types/hermes'
@@ -9,9 +10,15 @@ const setUnreadRemote = vi.fn<(id: string, unread: boolean, profile?: null | str
 )
 
 vi.mock('@/hermes', () => ({
-  // Opening a session now PATCHes its persisted unread flag (clearUnreadOnOpen
-  // -> markSessionUnread); keep the REST mutation minimal for the suite.
-  setApiRequestProfile: () => {},
+  // The store only needs the request-scope seam; keep the barrel mock minimal.
+  setApiRequestProfile: () => {}
+}))
+
+// The persisted read-state PATCH is a use case (application/session-read-state
+// → api/sessions). This suite spies on it to prove the STORE never sends it:
+// the real module is kept, one export is replaced.
+vi.mock('@/api/sessions', async importOriginal => ({
+  ...(await importOriginal<typeof sessionsApi>()),
   setSessionUnreadRemote: (id: string, unread: boolean, profile?: null | string) => setUnreadRemote(id, unread, profile)
 }))
 
@@ -1209,25 +1216,17 @@ describe('unread finished sessions', () => {
     vi.useRealTimers()
   })
 
-  it('clears a persisted unread row when the session is opened', async () => {
+  it('leaves the persisted flag to the open/view use case — the setter never PATCHes', async () => {
     $sessions.set([session({ id: 's1', unread: true })])
 
     setSelectedStoredSessionId('s1')
 
-    // The optimistic flip is synchronous; the PATCH is fire-and-forget.
-    expect($sessions.get().find(s => s.id === 's1')?.unread).toBe(false)
-
-    await Promise.resolve()
-    expect(setUnreadRemote).toHaveBeenCalledWith('s1', false, undefined)
-  })
-
-  it('does not PATCH a read row when it is opened', async () => {
-    $sessions.set([session({ id: 's1', unread: false })])
-
-    setSelectedStoredSessionId('s1')
-
+    // Selecting is pure store work: the local invariant (no transient dot for
+    // the selected conversation) is kept, and the backend watermark is
+    // deliberately left alone — clearing it is application/session-read-state.
     await Promise.resolve()
     expect(setUnreadRemote).not.toHaveBeenCalled()
+    expect($sessions.get().find(s => s.id === 's1')?.unread).toBe(true)
   })
 })
 

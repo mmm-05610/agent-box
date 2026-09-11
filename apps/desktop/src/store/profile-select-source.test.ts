@@ -31,7 +31,9 @@ vi.mock('@/hermes', () => ({
 vi.mock('@/lib/query-client', () => ({ invalidateProfileScopedQueries: vi.fn() }))
 vi.mock('@/store/starmap', () => ({ resetStarmapGraph }))
 
-const { $activeGatewayProfile, newSessionInProfile, selectProfile } = await import('./profile')
+const { $activeGatewayProfile } = await import('@/store/profile/runtime-route-state')
+const { newSessionInProfile } = await import('@/application/profile/new-session')
+const { selectProfile } = await import('@/application/profile/navigation')
 
 beforeEach(() => {
   ensureGatewayForProfile.mockClear()

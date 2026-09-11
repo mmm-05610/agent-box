@@ -2,9 +2,11 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import type * as Nanostores from 'nanostores'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { refreshProfiles } from '@/application/profile/catalog'
+import { selectProfile } from '@/application/profile/navigation'
 import { deleteProfile } from '@/hermes'
 import { retireLocalProfileGateways } from '@/store/gateway'
-import { refreshProfiles, selectProfile, setActiveProfile } from '@/store/profile'
+import { setActiveProfile } from '@/store/profile/catalog-state'
 import type { ProfileInfo } from '@/types/hermes'
 
 import { ProfilesView } from './index'
@@ -53,16 +55,16 @@ const { $activeGatewayProfile: activeGateway, $profileColors } = vi.hoisted(() =
   }
 })
 
-vi.mock('@/store/profile', () => ({
-  $activeGatewayProfile: activeGateway,
-  $profileColors,
+vi.mock('@/store/profile/appearance-preferences', () => ({ $profileColors }))
+vi.mock('@/store/profile/catalog-state', () => ({ setActiveProfile: vi.fn() }))
+vi.mock('@/store/profile/identity', () => ({
   normalizeProfileKey: (name: null | string | undefined) => (name ?? '').trim() || 'default',
   profileLabel: (profile: { display_name?: string; name: string }) =>
-    (profile.display_name ?? '').trim() || profile.name,
-  refreshProfiles: vi.fn(async () => [] as ProfileInfo[]),
-  selectProfile: vi.fn(),
-  setActiveProfile: vi.fn()
+    (profile.display_name ?? '').trim() || profile.name
 }))
+vi.mock('@/store/profile/runtime-route-state', () => ({ $activeGatewayProfile: activeGateway }))
+vi.mock('@/application/profile/catalog', () => ({ refreshProfiles: vi.fn(async () => [] as ProfileInfo[]) }))
+vi.mock('@/application/profile/navigation', () => ({ selectProfile: vi.fn() }))
 
 // The one non-default profile these tests act on. Its name doubles as the row's
 // accessible name, so the delete helper queries by it rather than a literal.

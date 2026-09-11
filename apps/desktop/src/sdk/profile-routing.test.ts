@@ -62,38 +62,38 @@ vi.mock('@/store/session-states', async () => {
     sessionTileDelegate: vi.fn(() => null)
   }
 })
-vi.mock('@/store/profile', async () => {
+vi.mock('@/store/profile/catalog-state', async () => {
   const { atom } = await import('nanostores')
 
-  const profiles = atom([
-    {
-      has_env: false,
-      is_default: false,
-      model: null,
-      name: 'cached-only',
-      path: '/profiles/cached-only',
-      provider: null,
-      skill_count: 0
-    }
-  ])
+  return { $profiles: atom<ProfileInfo[]>([]), setActiveProfile: vi.fn() }
+})
+vi.mock('@/store/profile/identity', () => ({
+  normalizeProfileKey: (value: null | string | undefined) => (value ?? '').trim() || 'default'
+}))
+vi.mock('@/store/profile/new-chat-state', async () => {
+  const { atom } = await import('nanostores')
+
+  return { $newChatConnectionId: atom(null), $newChatProfile: atom(null), $newChatRoute: atom(null) }
+})
+vi.mock('@/store/profile/runtime-route-state', async () => {
+  const { atom } = await import('nanostores')
 
   return {
     $activeGatewayProfile: atom('remote-worker'),
     $gatewaySwapTarget: atom(null),
-    $hydrationSyncProfile: atom(null),
-    $profiles: profiles,
-    $showAllProfiles: atom(false),
-    ensureGatewayAgent: vi.fn(),
-    ensureGatewayProfile: vi.fn(),
-    newSessionInAgent: vi.fn(),
-    newSessionInProfile: vi.fn(),
-    normalizeProfileKey: (value: null | string | undefined) => (value ?? '').trim() || 'default',
-    refreshProfiles: vi.fn(async () => profiles.get()),
-    selectProfile: vi.fn(),
-    setActiveProfile: vi.fn(),
-    setShowAllProfiles: vi.fn()
+    $hydrationSyncProfile: atom(null)
   }
 })
+vi.mock('@/store/profile/sidebar-scope', async () => {
+  const { atom } = await import('nanostores')
+
+  return { $showAllProfiles: atom(false), setShowAllProfiles: vi.fn() }
+})
+vi.mock('@/application/profile/catalog', () => ({ refreshProfiles: vi.fn(async () => []) }))
+vi.mock('@/application/profile/gateway-routing', () => ({ ensureGatewayAgent: vi.fn() }))
+vi.mock('@/application/profile/navigation', () => ({ selectProfile: vi.fn() }))
+vi.mock('@/application/profile/new-session', () => ({ newSessionInAgent: vi.fn(), newSessionInProfile: vi.fn() }))
+vi.mock('@/application/profile/runtime-selection', () => ({ ensureGatewayProfile: vi.fn() }))
 vi.mock('@/store/gateway', async () => {
   const { atom } = await import('nanostores')
 
@@ -135,15 +135,15 @@ const {
   retireLocalProfileGateways
 } = await import('@/store/gateway')
 
-const {
-  $activeGatewayProfile,
-  $gatewaySwapTarget,
-  $hydrationSyncProfile,
-  $profiles,
-  ensureGatewayProfile,
-  refreshProfiles,
-  setShowAllProfiles
-} = await import('@/store/profile')
+const { $profiles } = await import('@/store/profile/catalog-state')
+
+const { $activeGatewayProfile, $gatewaySwapTarget, $hydrationSyncProfile } = await import(
+  '@/store/profile/runtime-route-state'
+)
+
+const { setShowAllProfiles } = await import('@/store/profile/sidebar-scope')
+const { refreshProfiles } = await import('@/application/profile/catalog')
+const { ensureGatewayProfile } = await import('@/application/profile/runtime-selection')
 
 const {
   $focusedRuntimeId,

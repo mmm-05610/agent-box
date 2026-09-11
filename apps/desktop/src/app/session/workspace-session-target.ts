@@ -1,6 +1,6 @@
 import type { MutableRefObject } from 'react'
 
-import { pinNewChatProfile } from '@/store/profile'
+import { pinNewChatProfile } from '@/application/profile/new-session'
 import { followActiveSessionCwd, projectProfile, resolveNewSessionCwd } from '@/store/projects'
 import {
   $newChatWorkspaceTargetGeneration,

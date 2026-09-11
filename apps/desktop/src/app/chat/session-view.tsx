@@ -3,6 +3,7 @@ import { createContext, useContext } from 'react'
 
 import type { ClientSessionState } from '@/app/types'
 import type { ChatMessage } from '@/lib/chat-messages'
+import { lastVisibleMessageIsUser } from '@/lib/message-tail'
 import {
   $activeSessionId,
   $awaitingResponse,
@@ -17,8 +18,6 @@ import {
   $turnStartedAt
 } from '@/store/session'
 import { $sessionStates } from '@/store/session-states'
-
-import { lastVisibleMessageIsUser } from './thread-loading'
 
 /**
  * SESSION VIEW — the store surface a ChatView renders from. Every session,

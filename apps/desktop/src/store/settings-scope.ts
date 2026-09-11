@@ -1,6 +1,7 @@
 import { atom, computed } from 'nanostores'
 
-import { $activeGatewayProfile, normalizeProfileKey } from '@/store/profile'
+import { normalizeProfileKey } from '@/store/profile/identity'
+import { $activeGatewayProfile } from '@/store/profile/runtime-route-state'
 
 // ── Shared settings "Applies to" scope ──────────────────────────────────────
 // One selection shared by every config-backed settings page (Model, Workspace,

@@ -12,7 +12,7 @@
  */
 
 import { matchesQuery } from '@/hooks/use-media-query'
-import { normalizeProfileKey } from '@/store/profile'
+import { normalizeProfileKey } from '@/store/profile/identity'
 import { resolveAppearance } from '@/themes/appearance'
 import { normalizeSkinName, pickTheme } from '@/themes/resolve'
 

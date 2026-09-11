@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { $profiles } from '@/store/profile/catalog-state'
+
 import { $connectionsRegistry } from './connections'
-import { $profiles } from './profile'
 import {
   ambientGatewayOwnsEverySession,
   assertSessionOwnerResolved,

@@ -1,7 +1,8 @@
 import { atom, computed } from 'nanostores'
 
 import { persistBoolean, storedBoolean } from '@/lib/storage'
-import { $activeGatewayProfile, normalizeProfileKey } from '@/store/profile'
+import { normalizeProfileKey } from '@/store/profile/identity'
+import { $activeGatewayProfile } from '@/store/profile/runtime-route-state'
 import { $busy } from '@/store/session'
 
 /**

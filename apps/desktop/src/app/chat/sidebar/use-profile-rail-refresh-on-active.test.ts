@@ -5,7 +5,7 @@ const { refreshActiveProfile } = vi.hoisted(() => ({
   refreshActiveProfile: vi.fn().mockResolvedValue(undefined)
 }))
 
-vi.mock('@/store/profile', () => ({ refreshActiveProfile }))
+vi.mock('@/application/profile/catalog', () => ({ refreshActiveProfile }))
 
 import { useProfileRailRefreshOnActive } from './use-profile-rail-refresh-on-active'
 

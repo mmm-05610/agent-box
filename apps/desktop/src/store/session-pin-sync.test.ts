@@ -14,7 +14,7 @@ vi.mock('@/hermes', () => ({
 }))
 
 import { $pinnedSessionIds } from '@/store/layout'
-import { $activeGatewayProfile } from '@/store/profile'
+import { $activeGatewayProfile } from '@/store/profile/runtime-route-state'
 import { $cronSessions, $messagingSessions, $sessions } from '@/store/session'
 
 import { $unconfirmedPinWrites, resetSessionPinMirror, watchSessionPins } from './session-pin-sync'

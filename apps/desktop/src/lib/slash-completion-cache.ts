@@ -1,7 +1,8 @@
 import { atom } from 'nanostores'
 
 import { queryClient } from '@/lib/query-client'
-import { $activeGatewayProfile, normalizeProfileKey } from '@/store/profile'
+import { normalizeProfileKey } from '@/store/profile/identity'
+import { $activeGatewayProfile } from '@/store/profile/runtime-route-state'
 
 // Root for every cached `/` completion response — the bare-slash catalog and
 // each typed query. Not in PROFILE_INDEPENDENT_QUERY_ROOTS, so a profile or

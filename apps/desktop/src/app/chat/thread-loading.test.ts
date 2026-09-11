@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
 import type { ChatMessage } from '@/lib/chat-messages'
+import { lastVisibleMessageIsUser } from '@/lib/message-tail'
 
-import { lastVisibleMessageIsUser, routedSessionIsLoading, threadLoadingState } from './thread-loading'
+import { routedSessionIsLoading, threadLoadingState } from './thread-loading'
 
 function message(id: string, role: ChatMessage['role'], hidden = false): ChatMessage {
   return {

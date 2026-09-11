@@ -1,6 +1,7 @@
 import { useStore } from '@nanostores/react'
 import { useEffect } from 'react'
 
+import { selectStoredSessionForViewing } from '@/application/session-read-state'
 import { useI18n } from '@/i18n'
 import { migrateSessionDraft } from '@/store/composer'
 import { migrateQueuedPrompts } from '@/store/composer-queue'
@@ -8,8 +9,7 @@ import {
   $activeSessionStoredIdRotation,
   $sessions,
   resolveComposerSessionKey,
-  setActiveSessionStoredIdRotation,
-  setSelectedStoredSessionId
+  setActiveSessionStoredIdRotation
 } from '@/store/session'
 
 import { sessionRoute } from '../../../routes'
@@ -78,7 +78,7 @@ export function useSessionActions(options: SessionActionsOptions) {
     migrateQueuedPrompts(previousId, durableKey)
     migrateQueuedPrompts(nextId, durableKey)
 
-    setSelectedStoredSessionId(nextId)
+    selectStoredSessionForViewing(nextId)
     selectedStoredSessionIdRef.current = nextId
 
     // A route overlay/page has no routed session id, but the underlying selected

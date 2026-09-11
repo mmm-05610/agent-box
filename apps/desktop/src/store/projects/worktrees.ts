@@ -11,9 +11,7 @@ import { desktopGit } from '@/lib/desktop-git'
 import { isMissingRestEndpoint } from '@/lib/gateway-rpc'
 import { setSidebarAgentsGrouped } from '@/store/layout'
 import { notify } from '@/store/notifications'
-import {
-  requestFreshSession
-} from '@/store/profile'
+import { requestFreshSession } from '@/store/profile/request-atoms'
 
 import { createProject, enterProject } from './crud'
 import { projectIdForCwd } from './cwd-identity'

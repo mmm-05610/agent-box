@@ -5,7 +5,8 @@ import { RECONNECT_ATTEMPT_TIMEOUT_MS, withTimeout } from '@/lib/with-timeout'
 import { getApiRequestConnection, getApiRequestProfile, hasHermesApiBridge, hermesApi, profileScoped } from './client'
 
 /** Resolve the ACTIVE backend's connection descriptor, (connectionId,
- *  profile)-scoped — mirroring how store/profile resolves $connection: a
+ *  profile)-scoped — mirroring how application/profile/runtime-selection resolves
+ *  $connection: a
  *  registry agent's descriptor comes from getConnectionFor (its SOURCE
  *  connection), everything else from the profile-keyed local pool. The
  *  getConnectionFor bridge is optional (older Desktop mains); without it the

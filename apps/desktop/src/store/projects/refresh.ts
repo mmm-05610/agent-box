@@ -3,10 +3,7 @@ import { hermesApi } from '@/hermes'
 import { translateNow } from '@/i18n'
 import { activeGateway } from '@/store/gateway'
 import { $sidebarShowAllSessions } from '@/store/layout'
-import {
-  $profileScope,
-  ALL_PROFILES
-} from '@/store/profile'
+import { $profileScope, ALL_PROFILES } from '@/store/profile/sidebar-scope'
 import { sessionMatchesStoredId, setSessions } from '@/store/session'
 import { $removedSessionIds, $sessionMutationsInFlight } from '@/store/session-removal'
 import type { ProjectsPayload } from '@/types/hermes'

@@ -1,6 +1,7 @@
 import { act, cleanup, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { ensureGatewayProfile } from '@/application/profile/runtime-selection'
 import type { DesktopConnectionsRegistry } from '@/global'
 import { createClientSessionState } from '@/lib/chat-runtime'
 import { $desktopBoot } from '@/store/boot'
@@ -28,7 +29,7 @@ import {
   recoverActiveSourceAfterFailedGatewaySwitch
 } from '@/store/gateway-switch'
 import { notifyError } from '@/store/notifications'
-import { $activeGatewayProfile, $profiles, ensureGatewayProfile } from '@/store/profile'
+import { $activeGatewayProfile, $profiles } from '@/store/profile'
 import {
   $activeSessionId,
   $awaitingResponse,

@@ -1,8 +1,7 @@
 import { type MutableRefObject, useCallback, useEffect } from 'react'
 
 import { $currentCwd, setContextSuggestions } from '@/store/session'
-
-import type { ContextSuggestion } from '../../types'
+import type { ContextSuggestion } from '@/types/context-suggestion'
 
 interface ContextSuggestionsOptions {
   activeSessionId: string | null

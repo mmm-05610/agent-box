@@ -3,7 +3,7 @@ import { act, render } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { rescopeConnectionScopedStores } from '@/lib/connection-scoped'
-import { setActiveProfile } from '@/store/profile'
+import { setActiveProfile } from '@/store/profile/catalog-state'
 import { saveThreadScrollPosition } from '@/store/thread-scroll'
 
 import { stubThreadEnvironment, stubThreadViewportSize } from '../test-utils'

@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
 
+import { selectStoredSessionForViewing } from '@/application/session-read-state'
 import { deleteSession, setSessionArchived } from '@/hermes'
 import { type Translations } from '@/i18n'
 import { clearQueuedPrompts } from '@/store/composer-queue'
@@ -10,8 +11,7 @@ import {
   sessionPinId,
   setActiveSessionId,
   setFreshDraftReady,
-  setMessages,
-  setSelectedStoredSessionId
+  setMessages
 } from '@/store/session'
 import { $messages } from '@/store/session'
 import { clearSessionControl } from '@/store/session-control'
@@ -166,7 +166,7 @@ export function useSessionRemovalActions(
 
         if (wasSelected) {
           setFreshDraftReady(false)
-          setSelectedStoredSessionId(storedSessionId)
+          selectStoredSessionForViewing(storedSessionId)
           selectedStoredSessionIdRef.current = storedSessionId
           const stored = findListedSession(storedSessionId)?.session
 

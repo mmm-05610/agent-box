@@ -6,7 +6,7 @@ import { isSessionGone, latchSessionGone, resetBackgroundPollingGuard } from './
 // routed to a backend that does not own the session's profile. Three layers:
 //   1. The registry publishes the ACTIVE route's profile ($activeGatewayRoute)
 //      from applyActive itself, so eviction fallbacks move it in lockstep.
-//   2. store/profile.ts mirrors that atom into $activeGatewayProfile, so the
+//   2. the profile store mirrors that atom into $activeGatewayProfile, so the
 //      "already active" fast path can never trust a stale profile.
 //   3. session-request-router pins session-scoped RPCs to the owning
 //      profile's socket at REQUEST time when the active route diverges.
@@ -241,7 +241,7 @@ describe('requestForSessionProfile', () => {
 
   it('keeps routing a bare profile owner through its legacy profile pool when a connection registry exists', async () => {
     // A profile pick on the primary or the explicit `local` source takes the
-    // legacy profile-only door (store/profile activateOnCurrentSource), so a
+    // legacy profile-only door (application/profile/gateway-routing activateOnCurrentSource), so a
     // session minted there is owned by that profile's pool socket in every
     // topology — a registry does not turn the bare profile into a guess.
     const primary = makePrimary()

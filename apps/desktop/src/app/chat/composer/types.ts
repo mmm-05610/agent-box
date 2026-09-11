@@ -2,14 +2,9 @@ import type { ReactNode } from 'react'
 
 import type { SubmitTextOptions } from '@/app/session/hooks/use-prompt-actions/utils'
 import type { HermesGateway } from '@/hermes'
+import type { ContextSuggestion } from '@/types/context-suggestion'
 
 import type { DroppedFile } from '../hooks/use-composer-actions'
-
-export interface ContextSuggestion {
-  text: string
-  display: string
-  meta?: string
-}
 
 export interface QuickModelOption {
   provider: string

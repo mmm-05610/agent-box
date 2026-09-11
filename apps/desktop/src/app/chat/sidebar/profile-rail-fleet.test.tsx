@@ -66,24 +66,44 @@ vi.mock('@/i18n', () => ({
   })
 }))
 
-vi.mock('@/store/profile', () => ({
-  $activeGatewayProfile: atom('default'),
-  $profileColors: atom({}),
-  $profileCreateRequest: atom(0),
-  $profileOrder: atom([]),
-  $profiles: atom([{ is_default: true, name: 'default' }]),
-  $profileScope: atom('default'),
-  ALL_PROFILES: '*',
+vi.mock('@/store/profile/appearance-preferences', async () => {
+  const { atom } = await import('nanostores')
+
+  return {
+    $profileColors: atom({}),
+    $profileOrder: atom([]),
+    setProfileColor: vi.fn(),
+    setProfileOrder: vi.fn(),
+    sortByProfileOrder: (profiles: unknown[]) => profiles
+  }
+})
+vi.mock('@/store/profile/catalog-state', async () => {
+  const { atom } = await import('nanostores')
+
+  return { $profiles: atom([{ is_default: true, name: 'default' }]) }
+})
+vi.mock('@/store/profile/identity', () => ({
   normalizeProfileKey: (name: string) => name,
   profileLabel: (profile: { display_name?: string; name: string }) =>
-    (profile.display_name ?? '').trim() || profile.name,
-  refreshActiveProfile: vi.fn().mockResolvedValue(undefined),
-  selectProfile: (name: string) => selectProfile(name),
-  setProfileColor: vi.fn(),
-  setProfileOrder: vi.fn(),
-  setShowAllProfiles: vi.fn(),
-  sortByProfileOrder: (profiles: unknown[]) => profiles
+    (profile.display_name ?? '').trim() || profile.name
 }))
+vi.mock('@/store/profile/request-atoms', async () => {
+  const { atom } = await import('nanostores')
+
+  return { $profileCreateRequest: atom(0) }
+})
+vi.mock('@/store/profile/runtime-route-state', async () => {
+  const { atom } = await import('nanostores')
+
+  return { $activeGatewayProfile: atom('default') }
+})
+vi.mock('@/store/profile/sidebar-scope', async () => {
+  const { atom } = await import('nanostores')
+
+  return { $profileScope: atom('default'), ALL_PROFILES: '*', setShowAllProfiles: vi.fn() }
+})
+vi.mock('@/application/profile/catalog', () => ({ refreshActiveProfile: vi.fn().mockResolvedValue(undefined) }))
+vi.mock('@/application/profile/navigation', () => ({ selectProfile: (name: string) => selectProfile(name) }))
 
 vi.mock('@/store/connections', () => ({
   $activeConnectionId: atom<null | string>(null),
@@ -123,7 +143,8 @@ const connectionsRegistry = connectionsStore.$connectionsRegistry as ReturnType<
   typeof atom<DesktopConnectionsRegistry | null>
 >
 
-const { $profiles, $profileScope } = await import('@/store/profile')
+const { $profiles } = await import('@/store/profile/catalog-state')
+const { $profileScope } = await import('@/store/profile/sidebar-scope')
 const profiles = $profiles as ReturnType<typeof atom<Array<{ is_default: boolean; name: string }>>>
 const profileScope = $profileScope as ReturnType<typeof atom<string>>
 const { _resetFleetRosterForTests } = await import('@/store/fleet-roster')

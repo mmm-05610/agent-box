@@ -1,3 +1,5 @@
+import { $profiles } from '@/store/profile/catalog-state'
+
 /**
  * Fail-closed owner resolution for session-scoped RPCs.
  *
@@ -19,7 +21,6 @@
  * their rows entirely; those users keep working unchanged.
  */
 import { hasRegistryTopology } from './connection-registry-state'
-import { $profiles } from './profile'
 import { isSessionOwnerRoute, type SessionOwnerScope } from './session-request-router'
 
 export class SessionOwnerResolutionError extends Error {
@@ -54,7 +55,8 @@ export function ambientGatewayOwnsEverySession(): boolean {
 /** True when `owner` names a backend: an exact connection route, or a bare
  *  profile. A bare profile stays an owner in registry topology too — a profile
  *  pick on the primary or the explicit `local` source takes the legacy
- *  profile-only door (store/profile activateOnCurrentSource, so a per-profile
+ *  profile-only door (application/profile/gateway-routing activateOnCurrentSource,
+ * so a per-profile
  *  remote override resolves), and a session minted there is owned by that
  *  profile's pool socket, which requestForSessionProfile dials by name. */
 export function sessionOwnerIsKnown(owner: SessionOwnerScope): boolean {

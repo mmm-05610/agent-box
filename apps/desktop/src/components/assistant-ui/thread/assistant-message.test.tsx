@@ -19,7 +19,7 @@ import { Thread } from '.'
 const requestFreshSession = vi.hoisted(() => vi.fn())
 const startManualProviderOAuth = vi.hoisted(() => vi.fn())
 
-vi.mock('@/store/profile', async importOriginal => ({
+vi.mock('@/store/profile/request-atoms', async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
   requestFreshSession: () => requestFreshSession()
 }))

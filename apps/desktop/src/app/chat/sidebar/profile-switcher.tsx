@@ -23,6 +23,8 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 
 import type { ProfileScope } from '@/api/client'
+import { refreshActiveProfile } from '@/application/profile/catalog'
+import { selectProfile } from '@/application/profile/navigation'
 import { CodeEditor } from '@/components/chat/code-editor'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
@@ -65,23 +67,7 @@ import {
 } from '@/store/connections'
 import { $fleetRoster, refreshFleetRoster } from '@/store/fleet-roster'
 import { notify, notifyError } from '@/store/notifications'
-import {
-  $activeGatewayProfile,
-  $profileColors,
-  $profileCreateRequest,
-  $profileOrder,
-  $profiles,
-  $profileScope,
-  ALL_PROFILES,
-  normalizeProfileKey,
-  profileLabel,
-  refreshActiveProfile,
-  selectProfile,
-  setProfileColor,
-  setProfileOrder,
-  setShowAllProfiles,
-  sortByProfileOrder
-} from '@/store/profile'
+import { $activeGatewayProfile, $profileColors, $profileCreateRequest, $profileOrder, $profiles, $profileScope, ALL_PROFILES, normalizeProfileKey, profileLabel, setProfileColor, setProfileOrder, setShowAllProfiles, sortByProfileOrder } from '@/store/profile'
 import {
   $profileRemoteOverrides,
   openRemoteOverrideDialog,

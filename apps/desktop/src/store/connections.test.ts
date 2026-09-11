@@ -66,17 +66,16 @@ vi.mock('@/store/gateway-switch', () => ({
   recoverActiveSourceAfterFailedGatewaySwitch,
   wipeSessionListsForGatewaySwitch
 }))
-vi.mock('@/store/profile', () => ({
-  $activeGatewayProfile,
-  $newChatProfile,
-  $showAllProfiles,
-  captureNewChatSource: vi.fn(),
-  ensureGatewayAgent,
-  normalizeProfileKey: (name: null | string | undefined) => (name ?? '').trim() || 'default',
-  openGatewayAgent,
-  refreshActiveProfile,
-  requestFreshSession
+vi.mock('@/store/profile/identity', () => ({
+  normalizeProfileKey: (name: null | string | undefined) => (name ?? '').trim() || 'default'
 }))
+vi.mock('@/store/profile/new-chat-state', () => ({ $newChatProfile, setNewChatSource: vi.fn() }))
+vi.mock('@/store/profile/request-atoms', () => ({ requestFreshSession }))
+vi.mock('@/store/profile/runtime-route-state', () => ({ $activeGatewayProfile }))
+vi.mock('@/store/profile/sidebar-scope', () => ({ $showAllProfiles }))
+vi.mock('@/application/profile/catalog', () => ({ refreshActiveProfile }))
+vi.mock('@/application/profile/gateway-routing', () => ({ ensureGatewayAgent, openGatewayAgent }))
+vi.mock('@/application/profile/new-session', () => ({ captureNewChatSource: vi.fn() }))
 
 const {
   $activeConnectionId,

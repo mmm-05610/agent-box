@@ -232,7 +232,7 @@ export const $gateway = g.$gateway
 // only writer is applyActive(), which sets it in the same synchronous step
 // that selects the socket — so a consumer that reads this and then calls
 // activeGateway() always gets a matching (profile, socket) pair. Renderer
-// surfaces (store/profile.ts's $activeGatewayProfile) mirror this atom
+// surfaces (store/profile/runtime-route-state.ts's $activeGatewayProfile) mirror this atom
 // instead of writing their own copy.
 export const $activeGatewayRoute = g.$activeProfile
 

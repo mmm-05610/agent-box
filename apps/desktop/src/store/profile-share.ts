@@ -13,10 +13,15 @@
  * dialogs and the backend share the filesystem for local and pooled backends.
  */
 
+import { refreshActiveProfile } from '@/application/profile/catalog'
+import { selectProfile } from '@/application/profile/navigation'
 import { isLayoutNode, normalize } from '@/components/pane-shell/tree/model'
 import { $layoutTree, markActivePreset, persistTree } from '@/components/pane-shell/tree/store'
 import { exportProfileArchive, importProfileArchive } from '@/hermes'
 import { translateNow } from '@/i18n'
+import { $profileColors, setProfileColor } from '@/store/profile/appearance-preferences'
+import { normalizeProfileKey } from '@/store/profile/identity'
+import { $activeGatewayProfile } from '@/store/profile/runtime-route-state'
 import { modePref, skinPref } from '@/theme-composition/adapters/preferences'
 import { $userThemes, installUserTheme, resolveTheme } from '@/theme-composition/adapters/user-themes'
 import { BUILTIN_THEMES } from '@/themes/presets'
@@ -24,14 +29,6 @@ import type { DesktopTheme, ThemeMode } from '@/themes/types'
 import type { ProfileDesktopOverlay } from '@/types/hermes'
 
 import { notify, notifyError } from './notifications'
-import {
-  $activeGatewayProfile,
-  $profileColors,
-  normalizeProfileKey,
-  refreshActiveProfile,
-  selectProfile,
-  setProfileColor
-} from './profile'
 
 /** Filename of the overlay inside the archive (profile root). */
 export const DESKTOP_OVERLAY_FILENAME = 'desktop.json'

@@ -192,10 +192,16 @@ export async function openSessionInNewWindow(sessionId: string, opts?: { watch?:
     return
   }
 
-  // Lazy imports: `./profile` subscribes to the API client on load, so a
-  // static import here would drag it into every page that opens windows.
-  const [{ $activeGatewayProfile, normalizeProfileKey }, { $sessions, rememberedSessionProfile }] = await Promise.all([
-    import('./profile'),
+  // Direct leaf imports: the profile state this reads is plain atoms, so unlike
+  // the old `./profile` aggregate there is no API-client subscription riding
+  // along with the import.
+  const [
+    { $activeGatewayProfile },
+    { normalizeProfileKey },
+    { $sessions, rememberedSessionProfile }
+  ] = await Promise.all([
+    import('./profile/runtime-route-state'),
+    import('./profile/identity'),
     import('./session')
   ])
 

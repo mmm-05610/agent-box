@@ -2,6 +2,8 @@ import { type ReadableAtom } from 'nanostores'
 import type { ReactNode } from 'react'
 
 import { openSession } from '@/app/open-session'
+import { newSessionInAgent, newSessionInProfile } from '@/application/profile/new-session'
+import { ensureGatewayProfile } from '@/application/profile/runtime-selection'
 import {
   $newSessionTabAction,
   $paneVisible,
@@ -24,16 +26,7 @@ import {
   openGatewayForProfile
 } from '@/store/gateway'
 import { notify } from '@/store/notifications'
-import {
-  $activeGatewayProfile,
-  $gatewaySwapTarget,
-  $hydrationSyncProfile,
-  ensureGatewayProfile,
-  newSessionInAgent,
-  newSessionInProfile,
-  normalizeProfileKey,
-  setShowAllProfiles
-} from '@/store/profile'
+import { $activeGatewayProfile, $gatewaySwapTarget, $hydrationSyncProfile, normalizeProfileKey, setShowAllProfiles } from '@/store/profile'
 import {
   $activeSessionId,
   $messages,

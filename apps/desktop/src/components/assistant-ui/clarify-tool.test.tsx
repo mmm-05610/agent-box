@@ -11,7 +11,7 @@ import { $activeTreeGroup, $hoveredTreeGroup } from '@/components/pane-shell/tre
 import { I18nProvider } from '@/i18n'
 import { clearClarifyRequest, setClarifyRequest } from '@/store/clarify'
 import { $gateway } from '@/store/gateway'
-import { $profiles } from '@/store/profile'
+import { $profiles } from '@/store/profile/catalog-state'
 import { $activeSessionId, _resetSessionOwnerHintsForTests, setSessionOwnerHint } from '@/store/session'
 
 import { ClarifyTool, readClarifyBatchResult, readClarifyResult } from './clarify-tool'

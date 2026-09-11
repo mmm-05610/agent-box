@@ -35,7 +35,9 @@ vi.mock('@/hermes', () => ({
 vi.mock('@/lib/query-client', () => ({ invalidateProfileScopedQueries: vi.fn() }))
 vi.mock('@/store/starmap', () => ({ resetStarmapGraph }))
 
-const { $activeGatewayProfile, ensureGatewayAgent, ensureGatewayProfile } = await import('./profile')
+const { $activeGatewayProfile } = await import('@/store/profile/runtime-route-state')
+const { ensureGatewayAgent } = await import('@/application/profile/gateway-routing')
+const { ensureGatewayProfile } = await import('@/application/profile/runtime-selection')
 
 const {
   $connection,

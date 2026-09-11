@@ -32,16 +32,9 @@ vi.mock('@/lib/query-client', () => ({
   invalidateProfileScopedQueries: vi.fn()
 }))
 
-vi.mock(import('@/store/profile'), async importOriginal => {
-  const actual = await importOriginal()
+vi.mock('@/application/profile/catalog', () => ({ invalidateProfileListFetches: vi.fn() }))
 
-  return {
-    ...actual,
-    invalidateProfileListFetches: vi.fn()
-  }
-})
-
-const { invalidateProfileListFetches } = await import('@/store/profile')
+const { invalidateProfileListFetches } = await import('@/application/profile/catalog')
 
 describe('wipeSessionListsForGatewaySwitch', () => {
   beforeEach(() => {

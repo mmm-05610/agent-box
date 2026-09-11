@@ -10,7 +10,7 @@ import {
   setWorkspaceScope,
   workspaceScopeKey
 } from '@/components/pane-shell/workspace-scope'
-import { $activeGatewayProfile } from '@/store/profile'
+import { $activeGatewayProfile } from '@/store/profile/runtime-route-state'
 import { $activeSessionId, $connection, $selectedStoredSessionId, setSessions } from '@/store/session'
 import type { SessionProfileRoute } from '@/store/session-request-router'
 import type { SessionTile } from '@/store/session-states'
@@ -618,7 +618,7 @@ describe('dropTilesForProfile', () => {
     // Re-import the module graph so the private tile buckets start empty; the
     // profile atom session-states subscribes to is the freshly loaded one too.
     mod = await import('@/store/session-states')
-    const profile = await import('@/store/profile')
+    const profile = await import('@/store/profile/runtime-route-state')
     activeGatewayProfile = profile.$activeGatewayProfile
     activeGatewayProfile.set('default')
     mod.$sessionTiles.set([])

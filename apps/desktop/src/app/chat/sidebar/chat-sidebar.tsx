@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'react-router'
 
 import { PlatformAvatar } from '@/app/messaging/platform-icon'
+import { markSessionUnread } from '@/application/session-read-state'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
 import { GlyphSpinner } from '@/components/ui/glyph-spinner'
@@ -67,14 +68,7 @@ import {
   unpinSession
 } from '@/store/layout'
 import { notifyError } from '@/store/notifications'
-import {
-  $profiles,
-  $profileScope,
-  ALL_PROFILES,
-  messagingTotalsKey,
-  normalizeProfileKey,
-  sidebarProfileForScope
-} from '@/store/profile'
+import { $profiles, $profileScope, ALL_PROFILES, messagingTotalsKey, normalizeProfileKey, sidebarProfileForScope } from '@/store/profile'
 import {
   $activeProjectId,
   $newProjectDropPlacement,
@@ -120,7 +114,6 @@ import { $unconfirmedPinWrites } from '@/store/session-pin-sync'
 import { $removedSessionIds } from '@/store/session-removal'
 import { $focusedSessionIsTile, $focusedStoredSessionId, $workingSessionIds } from '@/store/session-states'
 import { ackAllSessionsRead } from '@/store/session-unread'
-import { markSessionUnread } from '@/store/session-unread-remote'
 import { $archivedSessions, loadArchivedSessions } from '@/store/sidebar-archive'
 import { $sidebarSessionRankIds } from '@/store/sidebar-sort'
 

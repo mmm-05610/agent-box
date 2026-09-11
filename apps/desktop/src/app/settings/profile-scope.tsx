@@ -1,9 +1,10 @@
 import { useStore } from '@nanostores/react'
 import { useEffect } from 'react'
 
+import { refreshProfiles } from '@/application/profile/catalog'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
-import { $activeGatewayProfile, $profiles, normalizeProfileKey, refreshProfiles } from '@/store/profile'
+import { $activeGatewayProfile, $profiles, normalizeProfileKey } from '@/store/profile'
 import { $settingsScopeOverride, setSettingsScope } from '@/store/settings-scope'
 
 // The same chip affordance the Gateway page uses for its per-profile

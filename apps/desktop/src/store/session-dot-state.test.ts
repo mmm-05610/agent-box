@@ -22,7 +22,7 @@ import {
   unreadSessionCount
 } from './session-dot-state'
 import { clearAllSessionStates, publishSessionState } from './session-states'
-import { $unreadWriteGuard } from './session-unread-remote'
+import { $unreadWriteGuard } from './session/unread'
 import { $subagentsBySession, type SubagentProgress } from './subagents'
 
 describe('showsRunningArc', () => {

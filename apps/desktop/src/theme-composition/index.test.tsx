@@ -2,7 +2,7 @@ import { act, cleanup, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { registry } from '@/contrib/registry'
-import { $activeGatewayProfile } from '@/store/profile'
+import { $activeGatewayProfile } from '@/store/profile/runtime-route-state'
 import { $appearance } from '@/store/translucency'
 import { useTheme } from '@/themes/context'
 import { BUILTIN_THEMES, everforestTheme, midnightTheme } from '@/themes/presets'

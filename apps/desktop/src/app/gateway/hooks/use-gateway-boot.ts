@@ -6,6 +6,8 @@ import {
 } from '@hermes/shared'
 import { useEffect, useRef } from 'react'
 
+import { refreshActiveProfile } from '@/application/profile/catalog'
+import { touchActiveGatewayBackend } from '@/application/profile/runtime-selection'
 import { shouldApplyPostBootProgressError } from '@/components/boot-failure-reauth'
 import type { HermesConnection } from '@/global'
 import { HermesGateway } from '@/hermes'
@@ -54,12 +56,7 @@ import {
 import { checkLocalRuntimeUpdate, watchLocalRuntimeJobs } from '@/store/local-runtime-jobs'
 import { notify, notifyError } from '@/store/notifications'
 import { loadPoolLimits } from '@/store/pool-limits'
-import {
-  $activeGatewayProfile,
-  normalizeProfileKey,
-  refreshActiveProfile,
-  touchActiveGatewayBackend
-} from '@/store/profile'
+import { $activeGatewayProfile, normalizeProfileKey } from '@/store/profile'
 import {
   $activeSessionId,
   $connection,

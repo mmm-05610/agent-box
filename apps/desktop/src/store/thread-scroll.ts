@@ -2,7 +2,8 @@ import { atom, type WritableAtom } from 'nanostores'
 
 import { activeConnectionScopeSuffix } from '@/lib/connection-scoped'
 import { readKey, writeKey } from '@/lib/storage'
-import { $activeProfile, normalizeProfileKey } from '@/store/profile'
+import { $activeProfile } from '@/store/profile/catalog-state'
+import { normalizeProfileKey } from '@/store/profile/identity'
 
 // "Is the thread parked at the bottom" is owned by use-stick-to-bottom inside
 // ThreadMessageList (the scroll container). That state lives only in that

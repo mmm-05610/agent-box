@@ -4,8 +4,9 @@ import { atom, computed } from 'nanostores'
 import type { ClientSessionState } from '@/app/types'
 import type { WorkspaceMode } from '@/contrib/types'
 import { readJson, writeJson } from '@/lib/storage'
+import { normalizeProfileKey } from '@/store/profile/identity'
+import { $activeGatewayProfile } from '@/store/profile/runtime-route-state'
 
-import { $activeGatewayProfile, normalizeProfileKey } from '../profile'
 import { clearAllProviderWaits, clearSessionProviderWait } from '../provider-wait'
 import {
   $activeSessionId,

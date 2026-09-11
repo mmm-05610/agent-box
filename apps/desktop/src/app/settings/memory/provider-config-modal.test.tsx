@@ -9,7 +9,7 @@ vi.mock('@/hermes', () => ({
   saveMemoryProviderConfig: (provider: string, values: unknown) => saveMemoryProviderConfig(provider, values)
 }))
 
-vi.mock('@/store/profile', async () => {
+vi.mock('@/store/profile/runtime-route-state', async () => {
   const { atom } = await import('nanostores')
 
   return { $activeGatewayProfile: atom('default') }

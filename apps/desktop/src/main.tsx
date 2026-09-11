@@ -21,6 +21,7 @@ import { createRoot } from 'react-dom/client'
 import { HashRouter } from 'react-router'
 
 import App from './app'
+import { startActiveProfileRouting } from './application/profile/active-route-effects'
 import { RootErrorBoundary } from './components/error-boundary'
 import { HapticsProvider } from './components/haptics-provider'
 import { RootTooltipProvider } from './components/ui/tooltip'
@@ -31,6 +32,13 @@ import { queryClient } from './lib/query-client'
 import { installRendererAnimationPauseState } from './lib/renderer-loop-pause'
 import { installSelectionCopyColorGuard } from './lib/selection-copy-colors'
 import { ThemeProvider } from './theme-composition'
+
+// Route profile-scoped REST/WS calls at the profile the live gateway is on, and
+// drop the previous profile's caches when the route moves. Started HERE, once,
+// for every window shape (main, HUD, overlay, quick entry, wake indicator) —
+// this used to happen implicitly by importing the profile store, which meant no
+// window could opt out and nothing could stop it.
+startActiveProfileRouting()
 
 installClipboardShim()
 // Chromium serializes selection copies (Cmd+C, right-click Copy) with the

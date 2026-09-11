@@ -5,6 +5,9 @@ import { useEffect, useMemo, useRef } from 'react'
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest'
 
 import { createSessionRpcDispatcher } from '@/app/contrib/session-rpc-dispatcher'
+import { ensureGatewayAgent } from '@/application/profile/gateway-routing'
+import { selectProfile } from '@/application/profile/navigation'
+import { newSessionInProfile } from '@/application/profile/new-session'
 import { getSession } from '@/hermes'
 import {
   activeGateway,
@@ -14,15 +17,7 @@ import {
   configureGatewayRegistry,
   setPrimaryGateway
 } from '@/store/gateway'
-import {
-  $activeGatewayProfile,
-  $newChatConnectionId,
-  $newChatProfile,
-  $newChatRoute,
-  ensureGatewayAgent,
-  newSessionInProfile,
-  selectProfile
-} from '@/store/profile'
+import { $activeGatewayProfile, $newChatConnectionId, $newChatProfile, $newChatRoute } from '@/store/profile'
 import {
   $activeSessionId,
   $connection,
