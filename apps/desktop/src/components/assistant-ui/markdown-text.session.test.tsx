@@ -1,11 +1,11 @@
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { __resetSessionLinkTitleCache } from '@/lib/session-link-title'
 import { $sessions } from '@/store/session'
 import type { SessionInfo } from '@/types/hermes'
 
 import { MarkdownTextContent } from './markdown-text'
+import { __resetSessionLinkTitleCache } from './session-link-title'
 
 function makeSession(overrides: Partial<SessionInfo> = {}): SessionInfo {
   return {
