@@ -21,11 +21,12 @@ Companion documents:
 
 | Layer | Modules | Non-test lines |
 |---|---:|---:|
-| `apps/desktop/electron/` production | 184 | 50,925 |
-| of which `electron/composition/` | 21 | 16,183 |
+| `apps/desktop/electron/` production | 185 | 51,115 |
+| of which `electron/legacy-hermes/` (E2) | 60 | 14,868 |
+| of which `electron/composition/` | 21 | 16,151 |
 | of which `electron/process/` (E1) | 8 | 859 |
 | of which `electron/main.ts` | 1 | 2,488 |
-| `apps/desktop/electron/` tests | 151 files | 34,242 |
+| `apps/desktop/electron/` tests | 152 files | 34,429 |
 
 Module counts exclude a type shim (`get-windows.d.ts`) and a test fixture
 (`fixtures/windows-system-ca.ts`), which are not registered production modules.
@@ -126,7 +127,7 @@ truth — `indirect` means it routes or configures something that does, without 
 | `desktop-installation.ts` | 137 | `c/bootstrap-env-composition` | desktop-installation.json | Electron | no | `app/` | no |
 | `hud-windowing.ts` | 136 | `c/windows-composition`, `hud-ipc` | HUD windowing backend | pure | no | `windows/` | no |
 | `bundle-skew.ts` | 133 | `bundle-swap`, `c/windows-composition` | git checkout vs build stamp | git | partial | `update/` | no |
-| `test-main-process-sources.ts` | 122 | `backend-python-coherence`, `gateway-file-download-transport`, `hardening`, `pool-spawn-coordinator`, `process/inflight-claim` +1 | reads main-process sources for wiring assertions | none | no | `(test support)` | no |
+| `test-main-process-sources.ts` | 122 | `backend-python-coherence`, `gateway-file-download-transport`, `hardening`, `lh/pool-spawn-coordinator`, `process/inflight-claim` +1 | reads main-process sources for wiring assertions | none | no | `(test support)` | no |
 | `stream-throttle.ts` | 119 | `c/bootstrap-env-composition` | background throttling | renderer | no | `windows/` | no |
 | `composition/ipc/theme-ipc.ts` | 113 | `main` | theme channels | Electron | no | `ipc/` | no |
 | `translucency.ts` | 111 | `c/bootstrap-env-composition`, `c/ipc/theme-ipc`, `c/window-theme`, `hud-ipc` | window translucency | OS | no | `windows/` | no |
@@ -171,7 +172,7 @@ truth — `indirect` means it routes or configures something that does, without 
 
 | module | LOC | current callers | operates on | state authority | Hermes-only? | target | Session/Exec/Workspace |
 |---|---:|---|---|---|---|---|---|
-| `ssh-connection.ts` | 1148 | `c/bootstrap-env-composition`, `c/runtime-composition`, `main`, `remote-lifecycle/connect`, `remote-lifecycle/spawn` +2 | ssh exec / forward primitive | remote host | no | `host-capabilities/platform` | indirect |
+| `ssh-connection.ts` | 1148 | `c/bootstrap-env-composition`, `c/runtime-composition`, `lh/remote-lifecycle/connect`, `lh/remote-lifecycle/spawn`, `lh/windows-remote-lifecycle` +2 | ssh exec / forward primitive | remote host | no | `host-capabilities/platform` | indirect |
 | `git-review-ops.ts` | 903 | `git-ipc` | diff/commit/push/PR | git | no | `host-capabilities/git` | indirect |
 | `composition/cloud-oauth-composition.ts` | 839 | `c/api-proxy-composition`, `main` | Nous portal OAuth | portal | partial | `host-capabilities/credentials` | no |
 | `hardening.ts` | 554 | `c/api-proxy-composition`, `c/bootstrap-env-composition`, `c/cloud-oauth-composition`, `c/connections-composition`, `c/ipc/api-proxy-ipc` +8 | path safety, data-URL read, secret encryption | filesystem | partial | `host-capabilities/filesystem` | no |
@@ -212,94 +213,95 @@ truth — `indirect` means it routes or configures something that does, without 
 | `terminal-output-gate.ts` | 62 | `terminal-ipc` | terminal exit payload | pure | no | `host-capabilities/terminal` | no |
 | `composition/wsl-fonts.ts` | 61 | `main` | WSL font registration | filesystem | no | `host-capabilities/platform` | no |
 | `git-root.ts` | 50 | `fs-ipc` | git root discovery | filesystem | no | `host-capabilities/git` | indirect |
-| `windows-child-options.ts` | 37 | `bootstrap-runner`, `c/api-proxy-composition`, `c/bootstrap-env-composition`, `c/ipc/connection-ipc`, `c/updates-composition` +2 | Windows child spawn options | pure | no | `host-capabilities/platform` | no |
+| `windows-child-options.ts` | 37 | `c/api-proxy-composition`, `c/bootstrap-env-composition`, `c/ipc/connection-ipc`, `c/updates-composition`, `lh/bootstrap-runner` +2 | Windows child spawn options | pure | no | `host-capabilities/platform` | no |
 | `oauth-net-request.ts` | 17 | `c/bootstrap-env-composition` | OAuth request headers | pure | no | `host-capabilities/credentials` | no |
 
 ### PROCESS_PRIMITIVE — 9 modules, 1048 lines
 
 | module | LOC | current callers | operates on | state authority | Hermes-only? | target | Session/Exec/Workspace |
 |---|---:|---|---|---|---|---|---|
-| `process/readiness.ts` | 207 | `backend-ready` | stdout sentinel + polled-value readiness | OS | no | `process/ (new)` | no |
+| `process/readiness.ts` | 207 | `lh/backend-ready` | stdout sentinel + polled-value readiness | OS | no | `process/ (new)` | no |
 | `process/identity.ts` | 193 | `c/bootstrap-env-composition` | process start marker + claim policy | OS (PID identity) | no | `process/ (moved)` | no |
 | `update-marker.ts` | 189 | `c/bootstrap-env-composition` | PID liveness + update marker file | OS | partial | `process/pid` | no |
 | `process/connection-state.ts` | 103 | `c/bootstrap-env-composition` | generation + owned child | Electron | no | `process/ (moved)` | no |
-| `process/budget.ts` | 101 | `remote-liveness`, `window-renderer-lifecycle` | failure streak + attempt window | pure | no | `process/ (new)` | no |
+| `process/budget.ts` | 101 | `lh/remote-liveness`, `window-renderer-lifecycle` | failure streak + attempt window | pure | no | `process/ (new)` | no |
 | `process/child-stop.ts` | 94 | `c/bootstrap-env-composition` | child process + tree | OS | no | `process/ (moved)` | no |
 | `process/output-tail.ts` | 69 | `c/bootstrap-env-composition` | child stdout/stderr ring buffer | OS | no | `process/ (moved)` | no |
 | `process/inflight-claim.ts` | 58 | `c/bootstrap-env-composition` | keyed in-flight claim | Electron | no | `process/ (moved)` | no |
 | `process/pid.ts` | 34 | `process/identity`, `update-marker` | host-process liveness | OS | no | `process/ (moved)` | no |
 
-### LEGACY_HERMES — 63 modules, 24030 lines
+### LEGACY_HERMES — 64 modules, 24220 lines
 
 | module | LOC | current callers | operates on | state authority | Hermes-only? | target | Session/Exec/Workspace |
 |---|---:|---|---|---|---|---|---|
-| `composition/bootstrap-env-composition.ts` | 7971 | `c/api-proxy-composition`, `c/cloud-oauth-composition`, `c/connections-composition`, `c/deep-link-composition`, `c/paths-composition` +4 | env constants + local backend spawn + boot progress + updates | Electron | yes | `legacy-hermes (split)` | indirect |
-| `managed-ssh-update.ts` | 1084 | `c/bootstrap-env-composition`, `c/runtime-composition`, `main` | remote hermes install | filesystem + network | yes | `legacy-hermes/managed-ssh-update` | no |
-| `connection-config.ts` | 1056 | `c/api-proxy-composition`, `c/bootstrap-env-composition`, `c/cloud-oauth-composition`, `c/connections-composition`, `c/ipc/api-proxy-ipc` +10 | connection.json + baseUrl/wsUrl/auth mode | Electron | yes | `legacy-hermes/connections` | indirect |
-| `bootstrap-runner.ts` | 1037 | `bootstrap-runner`, `c/bootstrap-env-composition` | hermes checkout + install.sh | git / install script | yes | `legacy-hermes/bootstrap-runner` | no |
-| `windows-remote-lifecycle.ts` | 789 | `c/bootstrap-env-composition`, `c/runtime-composition`, `main`, `managed-ssh-update`, `terminal-ipc` | remote host process | remote host | yes | `legacy-hermes/windows-remote` | no |
-| `remote-lifecycle/ownership.ts` | 777 | `remote-lifecycle`, `remote-lifecycle/connect`, `remote-lifecycle/resolve`, `remote-lifecycle/spawn` | remote lockfile + tokens | remote host | yes | `legacy-hermes/remote-lifecycle` | no |
+| `composition/bootstrap-env-composition.ts` | 7939 | `c/api-proxy-composition`, `c/cloud-oauth-composition`, `c/connections-composition`, `c/deep-link-composition`, `c/paths-composition` +4 | env constants + local backend spawn + boot progress + updates | Electron | yes | `legacy-hermes (split)` | indirect |
+| `legacy-hermes/managed-ssh-update.ts` | 1084 | `c/bootstrap-env-composition`, `c/runtime-composition`, `main` | remote hermes install | filesystem + network | yes | `legacy-hermes/ (moved) managed-ssh-update` | no |
+| `legacy-hermes/connection-config.ts` | 1056 | `c/api-proxy-composition`, `c/bootstrap-env-composition`, `c/cloud-oauth-composition`, `c/connections-composition`, `c/ipc/api-proxy-ipc` +10 | connection.json + baseUrl/wsUrl/auth mode | Electron | yes | `legacy-hermes/ (moved) connections` | indirect |
+| `legacy-hermes/bootstrap-runner.ts` | 1037 | `c/bootstrap-env-composition`, `lh/bootstrap-runner` | hermes checkout + install.sh | git / install script | yes | `legacy-hermes/ (moved) bootstrap-runner` | no |
+| `legacy-hermes/windows-remote-lifecycle.ts` | 789 | `c/bootstrap-env-composition`, `c/runtime-composition`, `lh/managed-ssh-update`, `main`, `terminal-ipc` | remote host process | remote host | yes | `legacy-hermes/ (moved) windows-remote` | no |
+| `legacy-hermes/remote-lifecycle/ownership.ts` | 777 | `lh/remote-lifecycle`, `lh/remote-lifecycle/connect`, `lh/remote-lifecycle/resolve`, `lh/remote-lifecycle/spawn` | remote lockfile + tokens | remote host | yes | `legacy-hermes/ (moved) remote-lifecycle` | no |
 | `composition/runtime-composition.ts` | 721 | `c/api-proxy-composition`, `c/bootstrap-env-composition`, `main` | pool, liveness, managed ssh updates | Electron | yes | `legacy-hermes/runtime` | indirect |
 | `composition/connections-composition.ts` | 639 | `main` | registry secrets + broadcast | Electron | yes | `legacy-hermes/connections` | indirect |
-| `connection-registry/schema.ts` | 551 | `connection-registry`, `connection-registry/migration`, `connection-registry/registry-ops`, `connection-registry/roster` | registry normalisation | pure | yes | `legacy-hermes/connections` | indirect |
-| `profile-session-routing.ts` | 455 | `c/api-proxy-composition` | profile→session rows | backend | yes | `legacy-hermes/connections` | yes |
-| `remote-liveness.ts` | 440 | `c/bootstrap-env-composition`, `c/ipc/connection-ipc`, `c/runtime-composition`, `main` | cached remote descriptors | Electron | yes | `legacy-hermes/remote-liveness` | no |
-| `connection-registry/identity.ts` | 384 | `connection-registry`, `connection-registry/migration`, `connection-registry/registry-ops`, `connection-registry/roster`, `connection-registry/route-resolution` +1 | registry schema | pure | yes | `legacy-hermes/connections` | indirect |
-| `remote-lifecycle/spawn.ts` | 348 | `remote-lifecycle`, `remote-lifecycle/connect` | remote dashboard spawn + forward | remote host | yes | `legacy-hermes/remote-lifecycle` | no |
-| `gateway-file-download.ts` | 343 | `c/api-proxy-composition`, `c/cloud-oauth-composition` | gateway file/artifact download | gateway | yes | `legacy-hermes/download` | no |
-| `backend-ownership.ts` | 336 | `c/bootstrap-env-composition` | backend-ownership.json | Electron (process facts) | yes | `legacy-hermes/ownership` | no |
-| `venv-blocker-scan.ts` | 323 | `c/bootstrap-env-composition` | processes holding the hermes venv | OS process facts | yes | `legacy-hermes/venv-blockers` | no |
-| `backend-health.ts` | 317 | `c/bootstrap-env-composition` | /api/health + /api/status readiness | backend | yes | `legacy-hermes/health` | no |
-| `plugin-profile-routes.ts` | 312 | `c/ipc/connection-ipc`, `remote-ws-headers` | profile route table | pure | yes | `legacy-hermes/connections` | indirect |
-| `profile-migration.ts` | 311 | `c/bootstrap-env-composition` | legacy active-profile file | Electron | yes | `legacy-hermes/connections` | indirect |
-| `windows-hermes-path.ts` | 293 | `c/bootstrap-env-composition` | Windows venv hermes command | Electron | yes | `legacy-hermes/windows-path` | no |
-| `remote-lifecycle/connect.ts` | 286 | `remote-lifecycle` | SSH remote backend | remote host | yes | `legacy-hermes/remote-lifecycle` | no |
-| `connection-registry/registry-ops.ts` | 274 | `connection-registry` | registry mutations | Electron | yes | `legacy-hermes/connections` | indirect |
-| `pool-spawn-coordinator.ts` | 272 | `c/bootstrap-env-composition`, `c/runtime-composition` | local backend spawn slots | Electron | yes | `legacy-hermes/pool` | indirect |
-| `profile-delete-routing.ts` | 246 | `c/api-proxy-composition`, `c/bootstrap-env-composition`, `c/ipc/api-proxy-ipc`, `profile-rename-routing` | profile delete routing | pure | yes | `legacy-hermes/connections` | indirect |
-| `remote-lifecycle/resolve.ts` | 244 | `remote-lifecycle`, `remote-lifecycle/connect`, `remote-lifecycle/spawn` | remote hermes binary + profiles | remote host | yes | `legacy-hermes/remote-lifecycle` | no |
-| `gateway-ws-probe.ts` | 237 | `c/bootstrap-env-composition`, `c/ipc/connection-ipc`, `main` | /api/ws upgrade | backend | yes | `legacy-hermes/ws-probe` | no |
-| `backend-probes.ts` | 234 | `c/bootstrap-env-composition` | hermes executable resolution ladder | Electron | yes | `legacy-hermes/resolution` | no |
-| `desktop-remote-route.ts` | 228 | `c/bootstrap-env-composition`, `c/runtime-composition` | ssh terminal pool key | pure | yes | `legacy-hermes/remote-route` | no |
-| `connection-registry/roster.ts` | 219 | `connection-registry` | agent roster | pure | yes | `legacy-hermes/connections` | indirect |
-| `api-transport.ts` | 178 | `c/bootstrap-env-composition`, `c/cloud-oauth-composition`, `main` | gateway HTTP keepalive/retry | transport only | partial | `legacy-hermes/transport` | no |
-| `backend-env.ts` | 161 | `c/bootstrap-env-composition`, `shell-path` | child env, HERMES_HOME, PATH | Electron (env policy) | yes | `legacy-hermes/env` | no |
-| `connection-registry/migration.ts` | 153 | `connection-registry` | v1→v2 registry migration | pure | yes | `legacy-hermes/connections` | indirect |
-| `ssh-bootstrap-coordinator.ts` | 151 | `c/bootstrap-env-composition` | ssh bootstrap dial lifetime | Electron | partial | `legacy-hermes/ssh-bootstrap` | no |
-| `backend-ready.ts` | 149 | `c/bootstrap-env-composition`, `remote-lifecycle/ownership` | stdout READY line + ready file | backend (announces port) | yes | `legacy-hermes/readiness` | no |
-| `first-run-setup-gate.ts` | 146 | `c/bootstrap-env-composition`, `primary-backend-startup` | first-run choice gate | Electron | yes | `legacy-hermes/first-run-gate` | no |
-| `backend-start-failure.ts` | 140 | `c/bootstrap-env-composition` | latched boot failure | Electron | yes | `legacy-hermes/start-failure` | no |
-| `plugin-compat-notice.ts` | 138 | `c/bootstrap-env-composition` | HERMES_HOME plugin-compat report | Hermes runtime | yes | `legacy-hermes/plugin-compat` | no |
-| `profile-rename-routing.ts` | 138 | `c/api-proxy-composition`, `c/ipc/api-proxy-ipc` | profile rename lifecycle | Electron | yes | `legacy-hermes/connections` | indirect |
-| `connection-registry/route-resolution.ts` | 131 | `connection-registry` | primary route resolution | Electron | yes | `legacy-hermes/connections` | indirect |
-| `connection-route-identity.ts` | 131 | `connection-registry/identity`, `desktop-remote-route` | stored route identity | pure | yes | `legacy-hermes/connections` | indirect |
-| `backend-release-gate.ts` | 127 | `c/bootstrap-env-composition` | backend PID release | Electron | yes | `legacy-hermes/release-gate` | no |
-| `bootstrap-repair-guard.ts` | 121 | `c/ipc/backend-ipc` | bootstrap repair decision | pure | yes | `legacy-hermes/repair-guard` | no |
-| `primary-backend-startup.ts` | 113 | `c/bootstrap-env-composition` | primary boot sequence | Electron | yes | `legacy-hermes/primary-startup` | no |
-| `dashboard-token.ts` | 112 | `c/bootstrap-env-composition` | scraped dashboard session token | backend | yes | `legacy-hermes/token` | no |
-| `connection-apply.ts` | 111 | `c/bootstrap-env-composition`, `c/ipc/connection-ipc`, `main`, `terminal-ipc` | applied connection + ssh teardown | Electron | yes | `legacy-hermes/connections` | indirect |
-| `parent-process-identity.ts` | 108 | `c/bootstrap-env-composition` | HERMES_PARENT_* / HERMES_SPAWN env | Electron | yes | `legacy-hermes/parent-identity` | no |
-| `gateway-stop-before-update.ts` | 97 | `c/bootstrap-env-composition` | messaging gateway process | gateway | yes | `legacy-hermes/gateway-stop` | no |
-| `remote-ws-headers.ts` | 97 | `c/bootstrap-env-composition`, `c/runtime-composition`, `main` | WS request headers | Electron | yes | `legacy-hermes/remote-ws-headers` | no |
-| `window-connection-route.ts` | 91 | `c/bootstrap-env-composition` | per-window connection route | Electron | yes | `legacy-hermes/connections` | indirect |
-| `pool-stop.ts` | 86 | `c/bootstrap-env-composition` | pool teardown | Electron | yes | `legacy-hermes/pool` | indirect |
-| `pool-limits.ts` | 81 | `c/bootstrap-env-composition`, `c/runtime-composition` | pool limits | pure | yes | `legacy-hermes/pool` | indirect |
-| `connection-registry.ts` | 73 | `c/api-proxy-composition`, `c/bootstrap-env-composition`, `c/connections-composition`, `c/ipc/connection-ipc`, `c/runtime-composition` +5 | connections.json | Electron | yes | `legacy-hermes/connections` | indirect |
-| `active-runtime-state.ts` | 58 | `c/bootstrap-env-composition` | bootstrap marker + ACTIVE_HERMES_ROOT | Electron (install facts) | yes | `legacy-hermes/active-runtime` | no |
-| `pool-eviction.ts` | 58 | `c/bootstrap-env-composition` | profile backend pool | pure | yes | `legacy-hermes/pool` | indirect |
-| `remote-lifecycle.ts` | 55 | `c/bootstrap-env-composition`, `c/runtime-composition`, `main`, `managed-ssh-update` | remote backend + lockfile | remote host | yes | `legacy-hermes/remote-lifecycle` | no |
-| `connection-config-apply.ts` | 53 | `c/ipc/connection-ipc` | connection.json | Electron | yes | `legacy-hermes/connections` | indirect |
+| `legacy-hermes/connection-registry/schema.ts` | 551 | `lh/connection-registry`, `lh/connection-registry/migration`, `lh/connection-registry/registry-ops`, `lh/connection-registry/roster` | registry normalisation | pure | yes | `legacy-hermes/ (moved) connections` | indirect |
+| `legacy-hermes/profile-session-routing.ts` | 455 | `c/api-proxy-composition` | profile→session rows | backend | yes | `legacy-hermes/ (moved) connections` | yes |
+| `legacy-hermes/remote-liveness.ts` | 440 | `c/bootstrap-env-composition`, `c/ipc/connection-ipc`, `c/runtime-composition`, `main` | cached remote descriptors | Electron | yes | `legacy-hermes/ (moved) remote-liveness` | no |
+| `legacy-hermes/connection-registry/identity.ts` | 384 | `lh/connection-registry`, `lh/connection-registry/migration`, `lh/connection-registry/registry-ops`, `lh/connection-registry/roster`, `lh/connection-registry/route-resolution` +1 | registry schema | pure | yes | `legacy-hermes/ (moved) connections` | indirect |
+| `legacy-hermes/remote-lifecycle/spawn.ts` | 348 | `lh/remote-lifecycle`, `lh/remote-lifecycle/connect` | remote dashboard spawn + forward | remote host | yes | `legacy-hermes/ (moved) remote-lifecycle` | no |
+| `legacy-hermes/gateway-file-download.ts` | 343 | `c/api-proxy-composition`, `c/cloud-oauth-composition` | gateway file/artifact download | gateway | yes | `legacy-hermes/ (moved) download` | no |
+| `legacy-hermes/backend-ownership.ts` | 336 | `c/bootstrap-env-composition` | backend-ownership.json | Electron (process facts) | yes | `legacy-hermes/ (moved) ownership` | no |
+| `legacy-hermes/venv-blocker-scan.ts` | 323 | `c/bootstrap-env-composition` | processes holding the hermes venv | OS process facts | yes | `legacy-hermes/ (moved) venv-blockers` | no |
+| `legacy-hermes/backend-health.ts` | 317 | `c/bootstrap-env-composition` | /api/health + /api/status readiness | backend | yes | `legacy-hermes/ (moved) health` | no |
+| `legacy-hermes/plugin-profile-routes.ts` | 312 | `c/ipc/connection-ipc`, `lh/remote-ws-headers` | profile route table | pure | yes | `legacy-hermes/ (moved) connections` | indirect |
+| `legacy-hermes/profile-migration.ts` | 311 | `c/bootstrap-env-composition` | legacy active-profile file | Electron | yes | `legacy-hermes/ (moved) connections` | indirect |
+| `legacy-hermes/windows-hermes-path.ts` | 293 | `c/bootstrap-env-composition` | Windows venv hermes command | Electron | yes | `legacy-hermes/ (moved) windows-path` | no |
+| `legacy-hermes/remote-lifecycle/connect.ts` | 286 | `lh/remote-lifecycle` | SSH remote backend | remote host | yes | `legacy-hermes/ (moved) remote-lifecycle` | no |
+| `legacy-hermes/connection-registry/registry-ops.ts` | 274 | `lh/connection-registry` | registry mutations | Electron | yes | `legacy-hermes/ (moved) connections` | indirect |
+| `legacy-hermes/pool-spawn-coordinator.ts` | 272 | `c/bootstrap-env-composition`, `c/runtime-composition` | local backend spawn slots | Electron | yes | `legacy-hermes/ (moved) pool` | indirect |
+| `legacy-hermes/profile-delete-routing.ts` | 246 | `c/api-proxy-composition`, `c/bootstrap-env-composition`, `c/ipc/api-proxy-ipc`, `lh/profile-rename-routing` | profile delete routing | pure | yes | `legacy-hermes/ (moved) connections` | indirect |
+| `legacy-hermes/remote-lifecycle/resolve.ts` | 244 | `lh/remote-lifecycle`, `lh/remote-lifecycle/connect`, `lh/remote-lifecycle/spawn` | remote hermes binary + profiles | remote host | yes | `legacy-hermes/ (moved) remote-lifecycle` | no |
+| `legacy-hermes/gateway-ws-probe.ts` | 237 | `c/bootstrap-env-composition`, `c/ipc/connection-ipc`, `main` | /api/ws upgrade | backend | yes | `legacy-hermes/ (moved) ws-probe` | no |
+| `legacy-hermes/backend-probes.ts` | 234 | `c/bootstrap-env-composition` | hermes executable resolution ladder | Electron | yes | `legacy-hermes/ (moved) resolution` | no |
+| `legacy-hermes/desktop-remote-route.ts` | 228 | `c/bootstrap-env-composition`, `c/runtime-composition` | ssh terminal pool key | pure | yes | `legacy-hermes/ (moved) remote-route` | no |
+| `legacy-hermes/lifecycle.ts` | 222 | `c/bootstrap-env-composition` | Hermes argv/env/descriptor producers + six-verb seam | Electron (legacy adapter) | yes | `legacy-hermes/ (new)` | no |
+| `legacy-hermes/connection-registry/roster.ts` | 219 | `lh/connection-registry` | agent roster | pure | yes | `legacy-hermes/ (moved) connections` | indirect |
+| `legacy-hermes/api-transport.ts` | 178 | `c/bootstrap-env-composition`, `c/cloud-oauth-composition`, `main` | gateway HTTP keepalive/retry | transport only | partial | `legacy-hermes/ (moved) transport` | no |
+| `legacy-hermes/backend-env.ts` | 161 | `c/bootstrap-env-composition`, `shell-path` | child env, HERMES_HOME, PATH | Electron (env policy) | yes | `legacy-hermes/ (moved) env` | no |
+| `legacy-hermes/connection-registry/migration.ts` | 153 | `lh/connection-registry` | v1→v2 registry migration | pure | yes | `legacy-hermes/ (moved) connections` | indirect |
+| `legacy-hermes/ssh-bootstrap-coordinator.ts` | 151 | `c/bootstrap-env-composition` | ssh bootstrap dial lifetime | Electron | partial | `legacy-hermes/ (moved) ssh-bootstrap` | no |
+| `legacy-hermes/backend-ready.ts` | 149 | `c/bootstrap-env-composition`, `lh/remote-lifecycle/ownership` | stdout READY line + ready file | backend (announces port) | yes | `legacy-hermes/ (moved) readiness` | no |
+| `legacy-hermes/first-run-setup-gate.ts` | 146 | `c/bootstrap-env-composition`, `lh/primary-backend-startup` | first-run choice gate | Electron | yes | `legacy-hermes/ (moved) first-run-gate` | no |
+| `legacy-hermes/backend-start-failure.ts` | 140 | `c/bootstrap-env-composition` | latched boot failure | Electron | yes | `legacy-hermes/ (moved) start-failure` | no |
+| `legacy-hermes/plugin-compat-notice.ts` | 138 | `c/bootstrap-env-composition` | HERMES_HOME plugin-compat report | Hermes runtime | yes | `legacy-hermes/ (moved) plugin-compat` | no |
+| `legacy-hermes/profile-rename-routing.ts` | 138 | `c/api-proxy-composition`, `c/ipc/api-proxy-ipc` | profile rename lifecycle | Electron | yes | `legacy-hermes/ (moved) connections` | indirect |
+| `legacy-hermes/connection-registry/route-resolution.ts` | 131 | `lh/connection-registry` | primary route resolution | Electron | yes | `legacy-hermes/ (moved) connections` | indirect |
+| `legacy-hermes/connection-route-identity.ts` | 131 | `lh/connection-registry/identity`, `lh/desktop-remote-route` | stored route identity | pure | yes | `legacy-hermes/ (moved) connections` | indirect |
+| `legacy-hermes/backend-release-gate.ts` | 127 | `c/bootstrap-env-composition` | backend PID release | Electron | yes | `legacy-hermes/ (moved) release-gate` | no |
+| `legacy-hermes/bootstrap-repair-guard.ts` | 121 | `c/ipc/backend-ipc` | bootstrap repair decision | pure | yes | `legacy-hermes/ (moved) repair-guard` | no |
+| `legacy-hermes/primary-backend-startup.ts` | 113 | `c/bootstrap-env-composition` | primary boot sequence | Electron | yes | `legacy-hermes/ (moved) primary-startup` | no |
+| `legacy-hermes/dashboard-token.ts` | 112 | `c/bootstrap-env-composition` | scraped dashboard session token | backend | yes | `legacy-hermes/ (moved) token` | no |
+| `legacy-hermes/connection-apply.ts` | 111 | `c/bootstrap-env-composition`, `c/ipc/connection-ipc`, `main`, `terminal-ipc` | applied connection + ssh teardown | Electron | yes | `legacy-hermes/ (moved) connections` | indirect |
+| `legacy-hermes/parent-process-identity.ts` | 108 | `c/bootstrap-env-composition` | HERMES_PARENT_* / HERMES_SPAWN env | Electron | yes | `legacy-hermes/ (moved) parent-identity` | no |
+| `legacy-hermes/gateway-stop-before-update.ts` | 97 | `c/bootstrap-env-composition` | messaging gateway process | gateway | yes | `legacy-hermes/ (moved) gateway-stop` | no |
+| `legacy-hermes/remote-ws-headers.ts` | 97 | `c/bootstrap-env-composition`, `c/runtime-composition`, `main` | WS request headers | Electron | yes | `legacy-hermes/ (moved) remote-ws-headers` | no |
+| `legacy-hermes/window-connection-route.ts` | 91 | `c/bootstrap-env-composition` | per-window connection route | Electron | yes | `legacy-hermes/ (moved) connections` | indirect |
+| `legacy-hermes/pool-stop.ts` | 86 | `c/bootstrap-env-composition` | pool teardown | Electron | yes | `legacy-hermes/ (moved) pool` | indirect |
+| `legacy-hermes/pool-limits.ts` | 81 | `c/bootstrap-env-composition`, `c/runtime-composition` | pool limits | pure | yes | `legacy-hermes/ (moved) pool` | indirect |
+| `legacy-hermes/connection-registry.ts` | 73 | `c/api-proxy-composition`, `c/bootstrap-env-composition`, `c/connections-composition`, `c/ipc/connection-ipc`, `c/runtime-composition` +5 | connections.json | Electron | yes | `legacy-hermes/ (moved) connections` | indirect |
+| `legacy-hermes/active-runtime-state.ts` | 58 | `c/bootstrap-env-composition` | bootstrap marker + ACTIVE_HERMES_ROOT | Electron (install facts) | yes | `legacy-hermes/ (moved) active-runtime` | no |
+| `legacy-hermes/pool-eviction.ts` | 58 | `c/bootstrap-env-composition` | profile backend pool | pure | yes | `legacy-hermes/ (moved) pool` | indirect |
+| `legacy-hermes/remote-lifecycle.ts` | 55 | `c/bootstrap-env-composition`, `c/runtime-composition`, `lh/managed-ssh-update`, `main` | remote backend + lockfile | remote host | yes | `legacy-hermes/ (moved) remote-lifecycle` | no |
+| `legacy-hermes/connection-config-apply.ts` | 53 | `c/ipc/connection-ipc` | connection.json | Electron | yes | `legacy-hermes/ (moved) connections` | indirect |
 | `composition/paths-composition.ts` | 53 | `c/runtime-composition`, `c/windows-composition`, `main` | hermes version + pool limits | filesystem | yes | `legacy-hermes/paths` | no |
-| `backend-command.ts` | 48 | `c/bootstrap-env-composition` | Hermes argv (serve / dashboard) | pure | yes | `legacy-hermes/command` | no |
-| `backend-recycle.ts` | 47 | `c/ipc/backend-ipc` | owned backend child | Electron | yes | `legacy-hermes/recycle` | no |
-| `venv-holder-select.ts` | 36 | `c/bootstrap-env-composition` | hermes-owned venv daemon | pure | yes | `legacy-hermes/venv-blockers` | no |
-| `primary-connection-rehome.ts` | 35 | `c/ipc/connection-ipc` | connection re-home | Electron | yes | `legacy-hermes/rehome` | no |
-| `pool-touch-scope.ts` | 19 | `main` | pool touch keys | pure | yes | `legacy-hermes/pool` | indirect |
-| `roster-source-fetch.ts` | 8 | `main` | roster source JSON | remote host | yes | `legacy-hermes/connections` | indirect |
+| `legacy-hermes/backend-command.ts` | 48 | `c/bootstrap-env-composition`, `lh/lifecycle` | Hermes argv (serve / dashboard) | pure | yes | `legacy-hermes/ (moved) command` | no |
+| `legacy-hermes/backend-recycle.ts` | 47 | `c/ipc/backend-ipc` | owned backend child | Electron | yes | `legacy-hermes/ (moved) recycle` | no |
+| `legacy-hermes/venv-holder-select.ts` | 36 | `c/bootstrap-env-composition` | hermes-owned venv daemon | pure | yes | `legacy-hermes/ (moved) venv-blockers` | no |
+| `legacy-hermes/primary-connection-rehome.ts` | 35 | `c/ipc/connection-ipc` | connection re-home | Electron | yes | `legacy-hermes/ (moved) rehome` | no |
+| `legacy-hermes/pool-touch-scope.ts` | 19 | `main` | pool touch keys | pure | yes | `legacy-hermes/ (moved) pool` | indirect |
+| `legacy-hermes/roster-source-fetch.ts` | 8 | `main` | roster source JSON | remote host | yes | `legacy-hermes/ (moved) connections` | indirect |
 
 ## 4. Dependency direction
 
-Current direction, as it exists in the tree after this round:
+Current direction, as it exists in the tree after E1 and E2:
 
 ```
                      main.ts  (Electron boot order + top-level composition)
@@ -311,8 +313,9 @@ Current direction, as it exists in the tree after this round:
         │               │                │
         ▼               ▼                ▼
    legacy-hermes/ ◄── process/ ──────────┘
-   (Hermes policy)   (generic primitives)
-        │
+   (Hermes policy)   (generic primitives)      ← one-way: process/ and
+        │                                         host-capabilities/ never
+        │                                         import legacy-hermes/
         ▼
    external `hermes` runtime  (NOT in this repository)
 ```
@@ -340,14 +343,14 @@ Where Hermes vocabulary still lives, by density (non-test occurrences of `HERMES
 | Location | Density | Why it is still there | Class |
 |---|---|---|---|
 | `preload.ts` | 253 | **IPC channel names (`hermes:*`).** Deliberately not renamed this round: renaming a channel changes the public Renderer contract. Retirement is a separate, coordinated change. | `DESKTOP_HOST` |
-| `composition/bootstrap-env-composition.ts` | 199 | Local backend spawn env (`HERMES_HOME`, `HERMES_DASHBOARD_SESSION_TOKEN`, `HERMES_DESKTOP`), ready-file, update machinery. E2's split target. | `LEGACY_HERMES` |
-| `remote-lifecycle/*` (5 files) | 32 | Remote spawn argv (`--isolated`, `--ssh-owner-nonce`, token file), ownership lockfile. | `LEGACY_HERMES` |
-| `windows-remote-lifecycle.ts` | 19 | `-m hermes_cli.windows_ssh_runtime spawn`. | `LEGACY_HERMES` |
-| `windows-hermes-path.ts` | 12 | Venv `hermes` shim layout. | `LEGACY_HERMES` |
-| `managed-ssh-update.ts` | 13 | Remote install of the external runtime. | `LEGACY_HERMES` |
+| `composition/bootstrap-env-composition.ts` | ~150 | Local backend spawn env (`HERMES_HOME`, `HERMES_DASHBOARD_SESSION_TOKEN`, `HERMES_DESKTOP`), ready-file, update machinery. E2's split target. | `LEGACY_HERMES` |
+| `legacy-hermes/remote-lifecycle/*` (5 files) | 32 | Remote spawn argv (`--isolated`, `--ssh-owner-nonce`, token file), ownership lockfile. | `LEGACY_HERMES` |
+| `legacy-hermes/windows-remote-lifecycle.ts` | 19 | `-m hermes_cli.windows_ssh_runtime spawn`. | `LEGACY_HERMES` |
+| `legacy-hermes/windows-hermes-path.ts` | 12 | Venv `hermes` shim layout. | `LEGACY_HERMES` |
+| `legacy-hermes/managed-ssh-update.ts` | 13 | Remote install of the external runtime. | `LEGACY_HERMES` |
 | `composition/updates-composition.ts` | 9 | `uninstallVenvPython` — the Hermes venv, not the Desktop bundle. | `LEGACY_HERMES` (inside an update module) |
-| `parent-process-identity.ts` | 9 | `HERMES_PARENT_PID` / `HERMES_PARENT_START_MARKER` / `HERMES_PARENT_NONCE` / `HERMES_SPAWN`, mirrored by `hermes_cli/process_identity.py`. | `LEGACY_HERMES` |
-| `backend-ready.ts` | 8 | `HERMES_(BACKEND|DASHBOARD)_READY port=` sentinel. | `LEGACY_HERMES` |
+| `legacy-hermes/parent-process-identity.ts` | 9 | `HERMES_PARENT_PID` / `HERMES_PARENT_START_MARKER` / `HERMES_PARENT_NONCE` / `HERMES_SPAWN`, mirrored by `hermes_cli/process_identity.py`. | `LEGACY_HERMES` |
+| `legacy-hermes/backend-ready.ts` | 8 | `HERMES_(BACKEND|DASHBOARD)_READY port=` sentinel. | `LEGACY_HERMES` |
 | `main.ts` | 25 | Log prefixes, `HERMES_DESKTOP_*` env reads, deep-link scheme. | `DESKTOP_HOST` (branding, not protocol) |
 | `composition/ipc/*` (8 files) | 100 | Channel names + `HERMES_HOME` file roots. | `DESKTOP_HOST` |
 | `git-ipc.ts`, `fs-ipc.ts`, `terminal-ipc.ts` | 43 | Channel names (`hermes:git:*`, `hermes:fs:*`, `hermes:terminal:*`) — unchanged by design. | `HOST_CAPABILITY` |
@@ -388,7 +391,14 @@ without changing behaviour, keep the production path and record the cycle".
    precondition for *deleting* the helper. E1 widened its discovery to walk the main-process tree
    (with `main.ts` still scanned first, since those assertions read the first `indexOf` match), so a
    module moving behind a boundary stays visible instead of silently dropping out of the scan.
-5. **Renderer mass is out of scope.** The 293k lines under `apps/desktop/src/` — including the
+5. **The `serve`-support detection cluster stays in the composition root.** `backendSupportsServe()`,
+   `findPythonForRoot()`, `isHermesSourceRoot()`, `venvRootForPython()` and `unwrapWindowsVenvHermesCommand()`
+   are genuine Hermes resolution knowledge, but they are entangled with the module-level constant bag
+   (`HERMES_HOME`, `APP_ROOT`, `IS_WINDOWS`) that `composition/bootstrap-env-composition.ts` still
+   owns. E2 moved argv *assembly* out (`hermesRuntimeArgs`) while leaving the *detection* in place:
+   extracting it means first separating that constant bag, which is the deferred item above. This is
+   the recorded dependency knot, not an oversight.
+6. **Renderer mass is out of scope.** The 293k lines under `apps/desktop/src/` — including the
    Hermes product surfaces listed in `03-coupling-matrix.md` §4 (Bucket D) — are untouched. This
    round is Electron-main-process only.
 
@@ -425,22 +435,42 @@ without changing behaviour, keep the production path and record the cycle".
   error semantics differ. Unifying them changes behaviour at three live call sites, so it remains a
   registered future move rather than a forced abstraction.
 
-### Target-directory status after E1
+### The narrow lifecycle interface (E2)
+
+`legacy-hermes/lifecycle.ts` declares `HermesBackendLifecycle` — `resolve`, `launch`, `readiness`,
+`descriptor`, `restart`, `shutdown` — as a **description of an existing shape**, not a new object:
+each verb already has exactly one production implementation across `legacy-hermes/*`, and the
+interface's doc comment names it. No orchestrator was introduced, because a single object owning all
+six verbs is the god-object §6 and E5 forbid. `legacy-hermes/lifecycle.test.ts` pins the producers'
+contracts (argv order, env pins, descriptor key presence, ws URL encoding) and proves the interface is
+satisfiable from narrow functions.
+
+Two properties the interface deliberately asserts:
+
+- **`resolve` is still in the composition root.** Only argv/env/descriptor assembly left; the
+  executable ladder's *detection* half is deferred (§6.5). The interface records the verb so the
+  seam is complete, without pretending the move happened.
+- **`descriptor` distinguishes absent from null.** The primary descriptor carries no `profile` key
+  (the backend serves the active profile); a pooled descriptor always carries one, even when null.
+  Collapsing those two would let a caller scope a request to a profile the backend does not serve.
+
+### Target-directory status after E2
 
 | Target directory | Exists? | Populated? |
 |---|---|---|
 | `app/` | no | — |
 | `windows/` | no | — |
 | `host-capabilities/` | no | — |
-| `process/` | **yes** | **yes** — 8 modules, 859 production lines |
+| `process/` | yes | yes — 8 modules, 859 lines |
 | `workcore/` | no | — |
 | `host-bridge/` | no | — |
 | `ipc/` | no | — |
 | `update/` | no | — |
 | `security/` | no | — |
-| `legacy-hermes/` | no | — |
+| `legacy-hermes/` | **yes** | **yes** — 60 modules, 14,868 lines |
 
-Every row in §3 whose target is not `process/` is still a *registered future ownership*.
+Modules in §3 whose target is not `process/` or `legacy-hermes/` are still *registered future
+ownership*.
 
 ## 8. The next vertical chain (executed by E2)
 

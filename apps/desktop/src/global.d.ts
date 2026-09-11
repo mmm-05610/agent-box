@@ -2,7 +2,7 @@ import type { GatewayWsUrlResult } from '@hermes/shared'
 import type { TranslucencyState } from '@hermes/shared/translucency'
 
 import type { HermesNotification } from '../electron/notification-types'
-import type { PoolLimits } from '../electron/pool-limits'
+import type { PoolLimits } from '../electron/legacy-hermes/pool-limits'
 
 import type { WakeIndicatorState } from './lib/wake-indicator'
 import type {

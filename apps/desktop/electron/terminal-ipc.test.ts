@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 
 import { test } from 'vitest'
 
-import { resolveTerminalConnection, resolveTerminalConnectionForSender } from './connection-apply'
+import { resolveTerminalConnection, resolveTerminalConnectionForSender } from './legacy-hermes/connection-apply'
 
 const ssh = {
   host: 'registry-box.test',

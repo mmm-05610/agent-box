@@ -18,14 +18,14 @@ import {
   resolveAuthMode,
   savedProfileSsh,
   tokenPreview
-} from '../connection-config'
+} from '../legacy-hermes/connection-config'
 import {
   backendScopePrefix,
   connectionDialFieldsChanged,
   mergeConnectionInput,
   normalizeConnectionInput,
   upsertConnection
-} from '../connection-registry'
+} from '../legacy-hermes/connection-registry'
 import {
   encryptDesktopSecret as encryptDesktopSecretStrict,
   resolvePersistedRemoteToken,

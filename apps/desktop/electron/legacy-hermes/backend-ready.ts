@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 
-import { waitForLineAnnouncement, waitForPolledValue } from './process/readiness'
+import { waitForLineAnnouncement, waitForPolledValue } from '../process/readiness'
 
 // `hermes serve` announces HERMES_BACKEND_READY; the legacy `hermes dashboard`
 // backend announces HERMES_DASHBOARD_READY. Accept either so the desktop spawn

@@ -23,18 +23,25 @@ import {
   shell
 } from 'electron'
 
-import { classifyActiveRuntime } from '../active-runtime-state'
-import { jsonAgentFor, withRetry } from '../api-transport'
+import { classifyActiveRuntime } from '../legacy-hermes/active-runtime-state'
+import { jsonAgentFor, withRetry } from '../legacy-hermes/api-transport'
 import { appIconCandidates, resolveAppIcon } from '../app-icon'
-import { dashboardFallbackArgs, sourceDeclaresServe } from '../backend-command'
-import { buildDesktopBackendEnv, hermesManagedNodePathEntries, normalizeHermesHomeRoot } from '../backend-env'
+import { dashboardFallbackArgs, sourceDeclaresServe } from '../legacy-hermes/backend-command'
+import {
+  hermesBackendEnv,
+  hermesLocalWsUrl,
+  hermesPrimaryConnectionDescriptor,
+  hermesProfiledConnectionDescriptor,
+  hermesServeArgs
+} from '../legacy-hermes/lifecycle'
+import { buildDesktopBackendEnv, hermesManagedNodePathEntries, normalizeHermesHomeRoot } from '../legacy-hermes/backend-env'
 import {
   isReauthRequiredError,
   makeNousCloudBackendDownError,
   makeUnsignedOauthError,
   waitForHermesReady
-} from '../backend-health'
-import { backendCommandMatches, createBackendOwnership, createBackendShutdownCoordinator } from '../backend-ownership'
+} from '../legacy-hermes/backend-health'
+import { backendCommandMatches, createBackendOwnership, createBackendShutdownCoordinator } from '../legacy-hermes/backend-ownership'
 import {
   canImportHermesCli,
   execProbeSync,
@@ -42,25 +49,25 @@ import {
   PROBE_TIMEOUT_MS,
   shouldTrustHermesOverride,
   verifyHermesCli
-} from '../backend-probes'
-import { waitForDashboardPortAnnouncement } from '../backend-ready'
-import { isPidAliveWindows, waitForBackendRelease } from '../backend-release-gate'
+} from '../legacy-hermes/backend-probes'
+import { waitForDashboardPortAnnouncement } from '../legacy-hermes/backend-ready'
+import { isPidAliveWindows, waitForBackendRelease } from '../legacy-hermes/backend-release-gate'
 import {
   isHostKeyChangedBootFailure,
   isRetryableRemoteBootFailure,
   shouldLatchBackendStartFailure,
   shouldLatchHostKeyChangedFailure,
   shouldLatchRemoteReauthFailure
-} from '../backend-start-failure'
+} from '../legacy-hermes/backend-start-failure'
 import {
   detectRemoteDisplay,
   isWindowsBinaryPathInWsl,
   isWslEnvironment,
   resolveLinuxPasswordStore
 } from '../bootstrap-platform'
-import { runBootstrap } from '../bootstrap-runner'
+import { runBootstrap } from '../legacy-hermes/bootstrap-runner'
 import { detectBundleSwap } from '../bundle-swap'
-import { teardownSshState } from '../connection-apply'
+import { teardownSshState } from '../legacy-hermes/connection-apply'
 import {
   buildGatewayWsUrl,
   buildGatewayWsUrlWithTicket,
@@ -79,7 +86,7 @@ import {
   resolveProfileBackendRoute,
   resolveRemoteSshDashboardProfile,
   withTransientRetries
-} from '../connection-config'
+} from '../legacy-hermes/connection-config'
 import {
   backendScopeKey,
   migrateV1ToRegistry,
@@ -89,11 +96,11 @@ import {
   resolveRegistryLocalRoute,
   reuseMatchingPrimarySshBackend,
   upsertConnection
-} from '../connection-registry'
+} from '../legacy-hermes/connection-registry'
 import { describeCrashReason } from '../crash-forensics'
-import { adoptServedDashboardToken } from '../dashboard-token'
+import { adoptServedDashboardToken } from '../legacy-hermes/dashboard-token'
 import { loadOrCreateInstallationId, sshOwnershipId } from '../desktop-installation'
-import { resolveDesktopRemoteRoute, v1SshTerminalPoolKey } from '../desktop-remote-route'
+import { resolveDesktopRemoteRoute, v1SshTerminalPoolKey } from '../legacy-hermes/desktop-remote-route'
 import {
   resolveRemovableAppPath
 } from '../desktop-uninstall'
@@ -102,9 +109,9 @@ import { findGitBash as _findGitBash } from '../find-git-bash'
 import {
   installFindShortcut
 } from '../find-in-page'
-import { createFirstRunSetupGate } from '../first-run-setup-gate'
-import { startGatewaysAfterUpdateAbort, stopGatewayBeforeUpdate } from '../gateway-stop-before-update'
-import { probeGatewayWebSocket } from '../gateway-ws-probe'
+import { createFirstRunSetupGate } from '../legacy-hermes/first-run-setup-gate'
+import { startGatewaysAfterUpdateAbort, stopGatewayBeforeUpdate } from '../legacy-hermes/gateway-stop-before-update'
+import { probeGatewayWebSocket } from '../legacy-hermes/gateway-ws-probe'
 import { readAndConsumeHandoffResult } from '../handoff-result'
 import {
   DEFAULT_FETCH_TIMEOUT_MS,
@@ -120,7 +127,7 @@ import {
   ManagedConnectionUpdateGate,
   managedSshTokenPersistencePlan,
   validateCorrelationId
-} from '../managed-ssh-update'
+} from '../legacy-hermes/managed-ssh-update'
 import {
   oauthGuardMayHardFail,
   oauthSessionIsLive,
@@ -137,26 +144,26 @@ import {
 import { loadNativeTokenSet, type NativeTokenStoreIo, persistNativeTokenSet } from '../native-token-store'
 import { serializeJsonBody, setJsonRequestHeaders } from '../oauth-net-request'
 import { LEGACY_OAUTH_PARTITION, resolveOauthPartition } from '../oauth-partition'
-import { createParentStartMarkerResolver, electronProcessStartMarker, parentWatchdogEnv } from '../parent-process-identity'
+import { createParentStartMarkerResolver, electronProcessStartMarker, parentWatchdogEnv } from '../legacy-hermes/parent-process-identity'
 import {
   pendingNotice as pendingPluginCompatNotice,
   recordDismissed as recordPluginCompatDismissed
-} from '../plugin-compat-notice'
-import { selectPoolEvictions } from '../pool-eviction'
-import { clampPoolLimits, parsePoolLimits, POOL_LIMITS_DEFAULTS } from '../pool-limits'
+} from '../legacy-hermes/plugin-compat-notice'
+import { selectPoolEvictions } from '../legacy-hermes/pool-eviction'
+import { clampPoolLimits, parsePoolLimits, POOL_LIMITS_DEFAULTS } from '../legacy-hermes/pool-limits'
 import {
   isBackgroundSlotWaitTimeout,
   LocalBackendSpawnCoordinator,
   type LocalBackendSpawnPriority,
   type LocalBackendSpawnRequest,
   releaseLocalBackendSlotAfterExit
-} from '../pool-spawn-coordinator'
-import { createPoolStopper } from '../pool-stop'
+} from '../legacy-hermes/pool-spawn-coordinator'
+import { createPoolStopper } from '../legacy-hermes/pool-stop'
 import {
   createPrimaryRemoteConnection,
   FirstRunSetupResetError,
   runPrimaryBackendStartup
-} from '../primary-backend-startup'
+} from '../legacy-hermes/primary-backend-startup'
 import { stopChildProcess as stopBackendChildImpl, stopProcessTreesForUpdate } from '../process/child-stop'
 import { createConnectionState } from '../process/connection-state'
 import {
@@ -174,16 +181,16 @@ import { createOutputTail, type ProcessOutputTail } from '../process/output-tail
 import {
   assertLocalProfileCanStart,
   ProfileDeletionGate
-} from '../profile-delete-routing'
-import { migrateActiveProfileIfMissing as migrateActiveProfileIfMissingPure } from '../profile-migration'
-import * as remoteLifecycle from '../remote-lifecycle'
+} from '../legacy-hermes/profile-delete-routing'
+import { migrateActiveProfileIfMissing as migrateActiveProfileIfMissingPure } from '../legacy-hermes/profile-migration'
+import * as remoteLifecycle from '../legacy-hermes/remote-lifecycle'
 import {
   ensureHealthyPooledRemoteBackendForDispatch,
   RemoteRevalidationCoordinator
-} from '../remote-liveness'
+} from '../legacy-hermes/remote-liveness'
 import {
   createRemoteWsHeaderStore
-} from '../remote-ws-headers'
+} from '../legacy-hermes/remote-ws-headers'
 import { missingRendererAssets } from '../renderer-bundle'
 import { loadRendererLoadErrorPage } from '../renderer-load-error-page'
 import { attachRendererConsoleCapture } from '../renderer-log'
@@ -201,7 +208,7 @@ import {
   SESSION_WINDOW_MIN_WIDTH
 } from '../session-windows'
 import { ensureLoginShellPath } from '../shell-path'
-import { createBootstrapCoordinator, sshConfigFingerprint } from '../ssh-bootstrap-coordinator'
+import { createBootstrapCoordinator, sshConfigFingerprint } from '../legacy-hermes/ssh-bootstrap-coordinator'
 import { pickLocalPort, redactSecrets, SshConnection } from '../ssh-connection'
 import { createStreamThrottle } from '../stream-throttle'
 import { registerTerminalIpc } from '../terminal-ipc'
@@ -230,14 +237,14 @@ import {
   formatProbeFailedMessage,
   scanVenvBlockers,
   stopSafeVenvBlockers
-} from '../venv-blocker-scan'
-import { isHermesOwnedVenvDaemon } from '../venv-holder-select'
+} from '../legacy-hermes/venv-blocker-scan'
+import { isHermesOwnedVenvDaemon } from '../legacy-hermes/venv-holder-select'
 import { createWakeIndicatorWindowController } from '../wake-indicator-window'
 import {
   registrySshPoolScopeByConnectionId,
   registrySshScopeForWindowRoute,
   WindowConnectionRouteRegistry
-} from '../window-connection-route'
+} from '../legacy-hermes/window-connection-route'
 import { createWindowOpenHandler } from '../window-open-policy'
 import { installWindowRendererLifecycle } from '../window-renderer-lifecycle'
 import { createWindowRevealController } from '../window-reveal'
@@ -255,12 +262,12 @@ import {
   chooseUpdaterArgs,
   getVenvSitePackagesEntries,
   resolveVenvHermesCommand
-} from '../windows-hermes-path'
+} from '../legacy-hermes/windows-hermes-path'
 import {
   connectWindowsRemote,
   detectRemotePlatform,
   terminateOwnedWindowsDashboardForUpdate
-} from '../windows-remote-lifecycle'
+} from '../legacy-hermes/windows-remote-lifecycle'
 import {
   alreadyHasNoSandbox,
   buildNoSandboxRelaunchArgs,
@@ -6567,10 +6574,8 @@ export async function spawnPoolBackend(profile, entry, opts: { forceLocal?: bool
 
   profileDeletionGate.assertCanStart(profile)
 
-  // --profile wins over the inherited HERMES_HOME env (see _apply_profile_override
-  // step 3 in hermes_cli/main.py), so the child re-homes to this profile.
-  // --port 0: the OS assigns an ephemeral port; the child announces it on stdout.
-  const backendArgs = ['--profile', profile, 'serve', '--host', '127.0.0.1', '--port', '0']
+  // Argv assembly is the Hermes adapter's job (legacy-hermes/lifecycle.ts).
+  const backendArgs = hermesServeArgs(profile)
   const backend = await ensureRuntime(resolveHermesBackend(backendArgs))
   // Route old runtimes (no `serve`) through the legacy `dashboard --no-open`.
   backend.args = getBackendArgsForRuntime(backend)
@@ -6598,25 +6603,16 @@ export async function spawnPoolBackend(profile, entry, opts: { forceLocal?: bool
     backend.args,
     hiddenWindowsChildOptions({
       cwd: hermesCwd,
-      env: {
-        ...process.env,
-        HERMES_HOME,
-        ...backend.env,
-        // Pin the gateway's tool/terminal cwd to the same directory we chose for
-        // the child process. Inherited TERMINAL_CWD (or a stale config bridge)
-        // can still point at the install dir even when spawn cwd is home.
-        TERMINAL_CWD: hermesCwd,
-        HERMES_DASHBOARD_SESSION_TOKEN: token,
-        // Marks this dashboard backend as desktop-spawned so it runs the cron
-        // scheduler tick loop (the gateway isn't running under the app).
-        HERMES_DESKTOP: '1',
-        // Exact parent identity lets the backend self-exit after an unclean
-        // Desktop death without mistaking a reused PID for its owner. If the
-        // optional marker probe fails, retain legacy PID-only tracking.
-        ...parentIdentityEnv,
-        HERMES_WEB_DIST: webDist,
-        ...(readyFile ? { HERMES_DESKTOP_READY_FILE: readyFile } : {})
-      },
+      env: hermesBackendEnv({
+        backendEnv: backend.env,
+        cwd: hermesCwd,
+        hermesHome: HERMES_HOME,
+        inherited: process.env,
+        parentIdentityEnv,
+        readyFile,
+        sessionToken: token,
+        webDist
+      }),
       shell: backend.shell,
       stdio: ['ignore', 'pipe', 'pipe']
     })
@@ -6714,7 +6710,7 @@ export async function spawnPoolBackend(profile, entry, opts: { forceLocal?: bool
 
   // Verify the WebSocket session token before declaring backend ready.
   // HTTP /api/status can pass while WS auth fails (separate transport, separate guards).
-  const wsUrl = `ws://127.0.0.1:${port}/api/ws?token=${encodeURIComponent(authToken)}`
+  const wsUrl = hermesLocalWsUrl(port, authToken)
   const wsProbe = await probeGatewayWebSocket(wsUrl, { WebSocketImpl: globalThis.WebSocket })
 
   if (!wsProbe.ok) {
@@ -6723,17 +6719,14 @@ export async function spawnPoolBackend(profile, entry, opts: { forceLocal?: bool
     )
   }
 
-  return {
+  return hermesProfiledConnectionDescriptor({
     baseUrl,
-    mode: 'local',
-    source: 'local',
-    authMode: 'token',
-    token: authToken,
-    profile,
-    wsUrl,
     logs: getRecentHermesLogLines(-80),
-    ...getWindowState()
-  }
+    profile,
+    token: authToken,
+    windowState: getWindowState(),
+    wsUrl
+  })
 }
 
 export const poolStopper = createPoolStopper({
@@ -6892,18 +6885,10 @@ export async function startHermes() {
     }
 
     const token = crypto.randomBytes(32).toString('base64url')
-    // --port 0: the OS assigns an ephemeral port; the child announces it on stdout.
-    const backendArgs = ['serve', '--host', '127.0.0.1', '--port', '0']
-    // Pin the desktop's chosen profile via the global --profile flag. This is
-    // deterministic (it wins over the sticky ~/.hermes/active_profile file) and
-    // resolves HERMES_HOME the same way `hermes -p <name>` does on the CLI. An
-    // unset preference keeps the legacy launch so existing installs are
-    // unaffected.
-    const activeProfile = readActiveDesktopProfile()
-
-    if (activeProfile) {
-      backendArgs.unshift('--profile', activeProfile)
-    }
+    // Argv assembly is the Hermes adapter's job (legacy-hermes/lifecycle.ts).
+    // An unset profile preference keeps the legacy launch so existing installs
+    // are unaffected.
+    const backendArgs = hermesServeArgs(readActiveDesktopProfile())
 
     const setup = await runPrimaryBackendStartup({
       connectRemote,
@@ -6959,30 +6944,16 @@ export async function startHermes() {
       backend.args,
       hiddenWindowsChildOptions({
         cwd: hermesCwd,
-        env: {
-          ...process.env,
-          // Explicitly pin HERMES_HOME for the child so Python's get_hermes_home()
-          // resolves to the SAME location our resolveHermesHome() picked. Without
-          // this pin, Python falls back to ~/.hermes on every platform — fine on
-          // mac/linux (where our default matches), but on Windows our default is
-          // %LOCALAPPDATA%\hermes, which differs from C:\Users\<u>\.hermes.
-          // Mismatch would split config / sessions / .env / logs across two
-          // directories. install.ps1 sets HERMES_HOME via setx; the desktop
-          // can't reliably do that, so we set it inline for every spawn.
-          HERMES_HOME,
-          ...backend.env,
-          TERMINAL_CWD: hermesCwd,
-          HERMES_DASHBOARD_SESSION_TOKEN: token,
-          // Marks this dashboard backend as desktop-spawned so it runs the cron
-          // scheduler tick loop (the gateway isn't running under the app).
-          HERMES_DESKTOP: '1',
-          // Exact parent identity lets the backend self-exit after an unclean
-          // Desktop death without mistaking a reused PID for its owner. If the
-          // optional marker probe fails, retain legacy PID-only tracking.
-          ...parentIdentityEnv,
-          HERMES_WEB_DIST: webDist,
-          ...(readyFile ? { HERMES_DESKTOP_READY_FILE: readyFile } : {})
-        },
+        env: hermesBackendEnv({
+          backendEnv: backend.env,
+          cwd: hermesCwd,
+          hermesHome: HERMES_HOME,
+          inherited: process.env,
+          parentIdentityEnv,
+          readyFile,
+          sessionToken: token,
+          webDist
+        }),
         shell: backend.shell,
         stdio: ['ignore', 'pipe', 'pipe']
       })
@@ -7121,7 +7092,7 @@ export async function startHermes() {
     })
 
     // Verify the WebSocket session token before declaring backend ready.
-    const wsUrl = `ws://127.0.0.1:${port}/api/ws?token=${encodeURIComponent(authToken)}`
+    const wsUrl = hermesLocalWsUrl(port, authToken)
     const wsProbe = await probeGatewayWebSocket(wsUrl, { WebSocketImpl: globalThis.WebSocket })
 
     if (!wsProbe.ok) {
@@ -7150,16 +7121,13 @@ export async function startHermes() {
     // Surface it once (per distinct set of affected plugins) after the window is up; never block boot.
     setTimeout(() => void showPluginCompatNoticeOnce(), 1500)
 
-    return {
+    return hermesPrimaryConnectionDescriptor({
       baseUrl,
-      mode: 'local',
-      source: 'local',
-      authMode: 'token',
-      token: authToken,
-      wsUrl,
       logs: getRecentHermesLogLines(-80),
-      ...getWindowState()
-    }
+      token: authToken,
+      windowState: getWindowState(),
+      wsUrl
+    })
   })().catch(async error => {
     if (!backendConnectionState.clearPromiseForAttempt(connectionAttempt)) {
       throw error

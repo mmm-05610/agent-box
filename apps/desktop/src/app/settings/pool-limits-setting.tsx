@@ -7,7 +7,7 @@ import { $poolLimits, loadPoolLimits, savePoolLimits } from '@/store/pool-limits
 
 // Bounds imported from main's clamp module so the advertised input ranges
 // can never drift from what the pool actually enforces (review note on #92581).
-import { POOL_LIMITS_BOUNDS } from '../../../electron/pool-limits'
+import { POOL_LIMITS_BOUNDS } from '../../../electron/legacy-hermes/pool-limits'
 
 const MAX_BACKENDS_MAX = POOL_LIMITS_BOUNDS.maxBackendsMax
 const IDLE_MS_MAX = POOL_LIMITS_BOUNDS.idleMsMax

@@ -12,12 +12,12 @@ import {
 import {
   modeIsRemoteLike,
   remoteRequestMatchesBaseUrl
-} from '../connection-config'
+} from '../legacy-hermes/connection-config'
 import {
   backendScopeKey,
   backendScopePrefix
-} from '../connection-registry'
-import { resolveDesktopRemoteRoute } from '../desktop-remote-route'
+} from '../legacy-hermes/connection-registry'
+import { resolveDesktopRemoteRoute } from '../legacy-hermes/desktop-remote-route'
 import {
   writeSecretFileAtomic
 } from '../hardening'
@@ -32,25 +32,25 @@ import {
   validateCorrelationId,
   waitForManagedRemoteClearance,
   waitForManagedSshBootstrapFence
-} from '../managed-ssh-update'
-import { clampPoolLimits } from '../pool-limits'
+} from '../legacy-hermes/managed-ssh-update'
+import { clampPoolLimits } from '../legacy-hermes/pool-limits'
 import {
   type LocalBackendSpawnPriority
-} from '../pool-spawn-coordinator'
-import * as remoteLifecycle from '../remote-lifecycle'
+} from '../legacy-hermes/pool-spawn-coordinator'
+import * as remoteLifecycle from '../legacy-hermes/remote-lifecycle'
 import {
   RemoteLivenessTracker,
   RemoteRevalidationCoordinator
-} from '../remote-liveness'
+} from '../legacy-hermes/remote-liveness'
 import {
   applyRemoteRequestHeaders
-} from '../remote-ws-headers'
+} from '../legacy-hermes/remote-ws-headers'
 import { createSshProbeConnection } from '../ssh-connection'
 import {
   detectRemotePlatform,
   probeWindowsRemote,
   terminateOwnedWindowsDashboardForUpdate
-} from '../windows-remote-lifecycle'
+} from '../legacy-hermes/windows-remote-lifecycle'
 
 import {
   backendConnectionState,

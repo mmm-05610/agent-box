@@ -5,14 +5,14 @@ import {
   ipcMain
 } from 'electron'
 
-import { recycleOwnedBackend } from '../../backend-recycle'
-import { decideBootstrapRepair } from '../../bootstrap-repair-guard'
+import { recycleOwnedBackend } from '../../legacy-hermes/backend-recycle'
+import { decideBootstrapRepair } from '../../legacy-hermes/bootstrap-repair-guard'
 import {
   rememberLog
 } from '../../composition/log-buffer'
 import {
   gatewayWsUrlIpcResult
-} from '../../connection-config'
+} from '../../legacy-hermes/connection-config'
 
 export interface RegisterBackendIpcDeps {
   touchPoolBackend: any

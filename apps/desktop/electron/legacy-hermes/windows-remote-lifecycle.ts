@@ -1,6 +1,6 @@
 import crypto from 'node:crypto'
 
-import { assertBootstrapNotSuperseded, redactSecrets, SSH_ERROR } from './ssh-connection'
+import { assertBootstrapNotSuperseded, redactSecrets, SSH_ERROR } from '../ssh-connection'
 
 const LOCKFILE_SCHEMA_VERSION = 2
 const PROTOCOL_VERSION = 1

@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it, vi } from 'vitest'
 
-import { parseBackendScopeKey } from '../connection-registry'
+import { parseBackendScopeKey } from '../legacy-hermes/connection-registry'
 import { mainProcessSources } from '../test-main-process-sources'
 
 import { InFlightClaims } from './inflight-claim'

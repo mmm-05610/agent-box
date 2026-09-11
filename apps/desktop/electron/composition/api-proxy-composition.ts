@@ -24,11 +24,11 @@ import {
   profileHasRemoteConnection,
   type RegistryBackendRequestScope,
   resolveProfileApiRequest
-} from '../connection-config'
+} from '../legacy-hermes/connection-config'
 import {
   backendScopeKey,
   backendScopePrefix
-} from '../connection-registry'
+} from '../legacy-hermes/connection-registry'
 import {
   fsPumpDeps,
   gatewayFilePath,
@@ -37,7 +37,7 @@ import {
   parseDataUrlToBuffer,
   resolveGatewayFileBackend,
   writeBufferToFile
-} from '../gateway-file-download'
+} from '../legacy-hermes/gateway-file-download'
 import {
   clampDataUrlReadMaxMb,
   DATA_URL_READ_DEFAULT_MAX_MB,
@@ -56,8 +56,8 @@ import {
   localProfilePoolKeys,
   profileNameFromDeleteRequest,
   resolveRouteProfile
-} from '../profile-delete-routing'
-import { prepareProfileRenameLifecycle } from '../profile-rename-routing'
+} from '../legacy-hermes/profile-delete-routing'
+import { prepareProfileRenameLifecycle } from '../legacy-hermes/profile-rename-routing'
 import {
   buildSidebarSessionSliceParams,
   fetchPrimaryProfileSessions,
@@ -68,7 +68,7 @@ import {
   type RegistrySessionSource,
   spliceRegistrySessionRows,
   tagRegistrySessionResponse
-} from '../profile-session-routing'
+} from '../legacy-hermes/profile-session-routing'
 import { hiddenWindowsChildOptions } from '../windows-child-options'
 
 import {

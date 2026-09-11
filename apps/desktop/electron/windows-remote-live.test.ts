@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { test } from 'vitest'
 
 import { pickLocalPort, SshConnection } from './ssh-connection'
-import { connectWindowsRemote } from './windows-remote-lifecycle'
+import { connectWindowsRemote } from './legacy-hermes/windows-remote-lifecycle'
 
 // Live test against a real Windows host over SSH. Opt-in: set the env trio to
 // your test rig; skipped everywhere else (CI, other machines).

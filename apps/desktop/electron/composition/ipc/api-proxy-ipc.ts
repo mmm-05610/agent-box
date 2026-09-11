@@ -7,7 +7,7 @@ import {
 
 import {
   apiRequestRegistryConnectionId
-} from '../../connection-config'
+} from '../../legacy-hermes/connection-config'
 import {
   DATA_URL_READ_DEFAULT_MAX_MB,
   dataUrlReadMaxBytesFromMb
@@ -15,8 +15,8 @@ import {
 import {
   dispatchConnectionScopedProfileDelete,
   profileNameFromDeleteRequest
-} from '../../profile-delete-routing'
-import { profileRenameFromRequest } from '../../profile-rename-routing'
+} from '../../legacy-hermes/profile-delete-routing'
+import { profileRenameFromRequest } from '../../legacy-hermes/profile-rename-routing'
 
 export interface RegisterApiProxyIpcDeps {
   HERMES_HOME: any

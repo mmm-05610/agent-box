@@ -12,7 +12,7 @@ import {
 import {
   rememberLog
 } from '../../composition/log-buffer'
-import { applyConnectionChange } from '../../connection-apply'
+import { applyConnectionChange } from '../../legacy-hermes/connection-apply'
 import {
   authModeFromStatus,
   connectionScopeKey,
@@ -20,8 +20,8 @@ import {
   normalizeRemoteBaseUrl,
   normAuthMode,
   resolveTestWsUrl
-} from '../../connection-config'
-import { applyConnectionConfigAtomically } from '../../connection-config-apply'
+} from '../../legacy-hermes/connection-config'
+import { applyConnectionConfigAtomically } from '../../legacy-hermes/connection-config-apply'
 import {
   backendScopeKey,
   buildAgentRoster,
@@ -32,8 +32,8 @@ import {
   setLastUsedConnection,
   setPrimaryConnection,
   updateEligibility
-} from '../../connection-registry'
-import { probeGatewayWebSocket } from '../../gateway-ws-probe'
+} from '../../legacy-hermes/connection-registry'
+import { probeGatewayWebSocket } from '../../legacy-hermes/gateway-ws-probe'
 import {
   resolveLoginStrategy
 } from '../../native-oauth'
@@ -43,11 +43,11 @@ import {
   isLocalEnumerationFailure,
   localRouteFallbackProfiles,
   undialedSshRouteSeeds
-} from '../../plugin-profile-routes'
-import { rehomePrimaryConnection } from '../../primary-connection-rehome'
+} from '../../legacy-hermes/plugin-profile-routes'
+import { rehomePrimaryConnection } from '../../legacy-hermes/primary-connection-rehome'
 import {
   revalidateRemoteConnection
-} from '../../remote-liveness'
+} from '../../legacy-hermes/remote-liveness'
 import { collectSshConfigHosts, parseSshGOutput } from '../../ssh-config'
 import { hiddenWindowsChildOptions } from '../../windows-child-options'
 

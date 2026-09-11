@@ -1,4 +1,4 @@
-import { createFailureStreakBudget, type FailureStreakBudget } from './process/budget'
+import { createFailureStreakBudget, type FailureStreakBudget } from '../process/budget'
 
 export const REMOTE_LIVENESS_TIMEOUT_MS = 10_000
 // Dispatch is synchronous user intent: a cached descriptor must prove its

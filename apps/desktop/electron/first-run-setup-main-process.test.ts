@@ -2,10 +2,10 @@ import assert from 'node:assert/strict'
 
 import { test, vi } from 'vitest'
 
-import { applyConnectionChange } from './connection-apply'
-import { createFirstRunSetupGate } from './first-run-setup-gate'
-import { runPrimaryBackendStartup } from './primary-backend-startup'
-import { rehomePrimaryConnection } from './primary-connection-rehome'
+import { applyConnectionChange } from './legacy-hermes/connection-apply'
+import { createFirstRunSetupGate } from './legacy-hermes/first-run-setup-gate'
+import { runPrimaryBackendStartup } from './legacy-hermes/primary-backend-startup'
+import { rehomePrimaryConnection } from './legacy-hermes/primary-connection-rehome'
 
 test('a first-run bootstrap-needed remote apply connects without ensuring or bootstrapping locally', async () => {
   const gate = createFirstRunSetupGate({ stuckAfterMs: 0 })

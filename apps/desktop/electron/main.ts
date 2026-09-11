@@ -19,7 +19,7 @@ import {
   session
 } from 'electron'
 
-import { destroyKeepaliveAgents } from './api-transport'
+import { destroyKeepaliveAgents } from './legacy-hermes/api-transport'
 import {
   closePreviewWatchers,
   dispatchRegistryApiRequest,
@@ -269,7 +269,7 @@ import {
   spawnBrowserWindow,
 } from './composition/windows-composition'
 import { ensureWslWindowsFonts } from './composition/wsl-fonts'
-import { sshQuitShouldBlock } from './connection-apply'
+import { sshQuitShouldBlock } from './legacy-hermes/connection-apply'
 import {
   authModeFromStatus,
   buildGatewayWsUrlWithTicket,
@@ -279,7 +279,7 @@ import {
   normalizeSshConfig,
   normAuthMode,
   resolveTestWsUrl
-} from './connection-config'
+} from './legacy-hermes/connection-config'
 import {
   backendScopeKey,
   parseBackendScopeKey,
@@ -287,8 +287,8 @@ import {
   resolveRegistryLocalRoute,
   shouldDeferLocalEnumeration,
   shouldRetrySshInventory
-} from './connection-registry'
-import type { RosterProfileMetadata } from './connection-registry'
+} from './legacy-hermes/connection-registry'
+import type { RosterProfileMetadata } from './legacy-hermes/connection-registry'
 import { describeDevCdpDecision } from './dev-cdp'
 import { installEmbedReferer } from './embed-referer'
 import { createEventDeduper } from './event-dedupe'
@@ -297,7 +297,7 @@ import {
   installFoundInPageForwarder
 } from './find-in-page'
 import { registerFsIpc } from './fs-ipc'
-import { probeGatewayWebSocket } from './gateway-ws-probe'
+import { probeGatewayWebSocket } from './legacy-hermes/gateway-ws-probe'
 import { registerGitIpc } from './git-ipc'
 import {
   enableBasicPasswordStoreEncryption,
@@ -310,26 +310,26 @@ import { ensureMainWindow } from './main-window-lifecycle'
 import {
   refusedManagedSshUpdate,
   waitForManagedUpdateOperations
-} from './managed-ssh-update'
+} from './legacy-hermes/managed-ssh-update'
 import { registerMcpOauthCallbackIpc } from './mcp-oauth-callback-ipc'
 import { createMediaProtocolHandler, MEDIA_PROTOCOL } from './media-protocol'
 import { registerNativeNotifications } from './notification-ipc'
 import { registerPetOverlayIpc } from './pet-overlay-ipc'
-import { poolTouchKeys } from './pool-touch-scope'
+import { poolTouchKeys } from './legacy-hermes/pool-touch-scope'
 import { createKeepAwake } from './power-save'
 import { PreviewReachRegistry } from './preview-reach'
 import { sanitizeQuickEntrySettings } from './quick-entry'
 import { type ActiveWork, mergeActiveWork, quitPromptFor } from './quit-guard'
-import * as remoteLifecycle from './remote-lifecycle'
+import * as remoteLifecycle from './legacy-hermes/remote-lifecycle'
 import {
   attachPowerResumeRemoteRevalidation,
   revalidatePooledRemoteBackends,
   revalidateSuspectPooledRemoteBackends
-} from './remote-liveness'
+} from './legacy-hermes/remote-liveness'
 import {
   createRegistryGatewayWsUrlHandler
-} from './remote-ws-headers'
-import { fetchRosterSourceData } from './roster-source-fetch'
+} from './legacy-hermes/remote-ws-headers'
+import { fetchRosterSourceData } from './legacy-hermes/roster-source-fetch'
 import {
   instanceWindowBounds
 } from './session-windows'
@@ -341,7 +341,7 @@ import {
 import {
   detectRemotePlatform,
   helper
-} from './windows-remote-lifecycle'
+} from './legacy-hermes/windows-remote-lifecycle'
 import {
   alreadyHasNoSandbox,
   buildNoSandboxRelaunchArgs,

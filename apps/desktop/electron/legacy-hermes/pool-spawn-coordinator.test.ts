@@ -11,7 +11,7 @@ import {
   LocalBackendSpawnCoordinator,
   releaseLocalBackendSlotAfterExit
 } from './pool-spawn-coordinator'
-import { mainProcessSources } from './test-main-process-sources'
+import { mainProcessSources } from '../test-main-process-sources'
 
 
 
@@ -515,7 +515,7 @@ test('promoting a queued background waiter lets it take the reserved foreground 
   const mainSource = mainProcessSources().replace(/\r\n/g, '\n')
 
   const withTimeoutSource = fs
-    .readFileSync(path.join(here, '..', 'src', 'lib', 'with-timeout.ts'), 'utf8')
+    .readFileSync(path.join(here, '..', '..', 'src', 'lib', 'with-timeout.ts'), 'utf8')
     .replace(/\r\n/g, '\n')
 
   test('main.ts bounds the slot wait below the renderer backend-boot budget', () => {

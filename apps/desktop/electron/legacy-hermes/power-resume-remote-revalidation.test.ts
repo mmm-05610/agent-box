@@ -12,7 +12,7 @@ import {
 } from './remote-liveness'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
-const mainSource = fs.readFileSync(path.join(here, 'main.ts'), 'utf8').replace(/\r\n/g, '\n')
+const mainSource = fs.readFileSync(path.join(here, '..', 'main.ts'), 'utf8').replace(/\r\n/g, '\n')
 
 describe('revalidateSuspectPooledRemoteBackends (#93910)', () => {
   const descriptor = (baseUrl: string) => ({ baseUrl, mode: 'remote' })

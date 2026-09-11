@@ -12,18 +12,18 @@ import {
   net as electronNet
 } from 'electron'
 
-import { downloadAgentFor } from '../api-transport'
+import { downloadAgentFor } from '../legacy-hermes/api-transport'
 import {
   cookiesHavePrivyAccessToken,
   cookiesHavePrivySession,
   cookiesHaveSession,
   normalizeRemoteBaseUrl
-} from '../connection-config'
+} from '../legacy-hermes/connection-config'
 import {
   filenameFromContentDisposition,
   fsPumpDeps,
   pumpStreamToFile
-} from '../gateway-file-download'
+} from '../legacy-hermes/gateway-file-download'
 import {
   DEFAULT_FETCH_TIMEOUT_MS,
   resolveTimeoutMs
