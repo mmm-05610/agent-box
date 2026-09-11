@@ -82,7 +82,7 @@ red on purpose.
 | | |
 | --- | --- |
 | ledger today | **85** *(derived — see §0)* |
-| after every work order in §3 | **10** *(derived — see §0)* |
+| after every work order in §3 | **7** *(derived — see §0)* |
 | test baseline | **775 files / 7466 tests** |
 
 **An item is done when the ledger shrank by exactly the number its work order
@@ -117,7 +117,7 @@ Where the 85 lines go, so the batches can be read against the tree:
 lib/          21   all of it      01 · 02 · 03 · 06 · 07            → 0 left
 store/        20   18 of it       03 · 04 · 08 · 10                  → 2 left
 components/   28   23 of it       09 (1) · 10 (19) · 11 (3)          → 5 left
-extension/    16   13 of it       09                                 → 3 left
+extension/    16   all of it      09 (13) · 12 (3)                   → 0 left
 ```
 lib/          21   all of it      01 · 02 · 03 · 06 · 07        → 0 left
 store/        20   18 of it       03 · 04 · 08 · 10            → 2 left
@@ -155,8 +155,9 @@ target — see §0.
 | 09 | the plugin ABI stops reaching into the app | 14 |
 | 10 | the composer engine leaves `app/` for `lib/` + `components/` | 22 |
 | 11 | the route vocabulary sinks to `lib/` | 3 |
+| 12 | the host views ride the plugin context (ABI change) | 3 |
 
-75 edges. Parallel per §4. **Review gate** when the phase's last item merges (§5).
+78 edges. Parallel per §4. **Review gate** when the phase's last item merges (§5).
 
 ### Phase 2 — work order 05, the `@/hermes` barrel
 
@@ -173,9 +174,8 @@ round.
 ### Phase 3 — whatever the open decisions produce
 
 Empty today, and that is the honest state: every work order that exists is in
-Phase 1 or 2. Orders appear here as the knots in §7 are decided — the three
-host-view capability exports, the composer's last edge, and the six edges nobody has
-examined yet. Each becomes a normal work order: same collision check, same
+Phase 1 or 2. Orders appear here as the knots in §7 are decided — the composer's last
+edge and the six edges nobody has examined yet. Each becomes a normal work order: same collision check, same
 review gate. §9 says how one enters this plan.
 
 ### Done
@@ -360,19 +360,24 @@ attention.
    `./registry` each exist in two or three places. A blanket rewrite across a
    search result will corrupt the unrelated ones.
 
-## 7 · Still needs a decision
+## 7 · What is left — seven edges, no decisions
 
 These are **not yet work orders**, which is the only reason they are not being
-executed: nobody has decided what they should become — or, for the last group,
-nobody has traced them yet. An executor that "helpfully" attempts one produces a
-plausible wrong answer.
+executed. The composer edge's chain is traced and mechanical; the last two rows
+nobody has traced yet. An executor that "helpfully" attempts one of those produces a
+plausible wrong answer, so they get the same closure pass as 10 before anyone runs
+them.
 
-Four are settled and written up: layout state became work order
+Five are settled and written up: layout state became work order
 [08](renderer-layer-batches/08-pane-shell-sink.md); the plugin ABI became
 [09](renderer-layer-batches/09-plugin-abi.md) — fourteen of its seventeen edges;
 the composer engine became [10](renderer-layer-batches/10-composer-engine.md) —
-twenty-two of its twenty-three; and the route vocabulary became
-[11](renderer-layer-batches/11-route-vocabulary.md) — all three of its edges. 09 and
+twenty-two of its twenty-three; the route vocabulary became
+[11](renderer-layer-batches/11-route-vocabulary.md) — all three of its edges; and
+the three host-view capability exports became
+[12](renderer-layer-batches/12-host-views-through-context.md), which moves them onto
+the plugin context ([the decision page](renderer-layer-host-views-decision.md) has
+the reasoning and the ABI cost). 09 and
 10 each end with the finding that stopped them, and both are worth reading before
 anyone retries the remainder: 09's is a module-scope capability read that runs
 before any `app/` code, and 10's is a hook cluster that reaches into the
@@ -380,8 +385,7 @@ session-actions domain.
 
 | the remainder | edges | what has to happen |
 | --- | --- | --- |
-| the three host-view capability exports (`SkillsView`, `McpTab`, `ToolsetConfigPanel`) | 3 | **a decision — written up in full at [`renderer-layer-host-views-decision.md`](renderer-layer-host-views-decision.md).** How a plugin learns about a host-provided view: register the components from `app/` (recommended), a `ctx`-supplied component, a lazy plugin glob, loose typing, or leave it |
-| the composer's last edge (`user-edit-composer -> @/app/session/hooks/use-prompt-actions`) | 1 | **a decision.** Either unblock the chain (below), or give the edit composer a host-supplied "send" verb, the same shape as 09d |
+| the composer's last edge (`user-edit-composer -> @/app/session/hooks/use-prompt-actions`) | 1 | not a decision — the chain is traced and mechanical; it needs a work order, not a call |
 | `components/pet/floating-pet.tsx` → three `app/hooks` | 3 | not a decision — pet is a floating widget whose three hooks are app-domain. Sink what is pure, seam what is not |
 | three singletons: `boot-failure-overlay -> app/settings/gateway-settings`, `store/gateway-switch -> app/contrib/hooks/use-background-sync`, `store/pane-focus -> app/right-sidebar/store` | 3 | not a decision — three unrelated edges; each needs its own read |
 
@@ -394,7 +398,8 @@ mechanical. Whoever writes that batch pays the composer's last edge with it.
 
 The last two rows are an **unexamined remainder**, not a set of knots: every one is
 a single module reached from a single consumer, so the next pass is the same closure
-exercise as 10, not a design question. Expect one or two small batches.
+exercise as 10, not a design question. Expect one or two small batches. Nothing else
+in the migration needs a decision.
 
 **Also not delegated:**
 - `apps/desktop/src/agentbox/`, `apps/desktop/src/plugins/agentbox-lab/`,

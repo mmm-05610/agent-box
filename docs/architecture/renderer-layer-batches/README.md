@@ -30,9 +30,10 @@ are deciding *what* to do; read a batch document if you are doing it.
 | [09](09-plugin-abi.md) | the plugin ABI stops reaching into the app | 14 |
 | [10](10-composer-engine.md) | the composer engine leaves `app/` | 22 |
 | [11](11-route-vocabulary.md) | the route vocabulary sinks to `lib/` | 3 |
-| | | **75** |
+| [12](12-host-views-through-context.md) | the host views ride the plugin context | 3 |
+| | | **78** |
 
-Seventy-five of the outstanding edges. The rest are concentrated in the design knots
+Seventy-eight of the outstanding edges. The rest are concentrated in the design knots
 described in
 [`../renderer-layer-boundary.md`](../renderer-layer-boundary.md), not in more
 batches like these.

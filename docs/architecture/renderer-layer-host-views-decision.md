@@ -1,8 +1,10 @@
 # The host-view decision — the last thing in the renderer migration that needs a call
 
-**Status: awaiting a decision.** Everything else in the migration is either written
-as a work order or traced to a mechanical batch. This page is the whole of the open
-question: how a plugin learns about `SkillsView`, `McpTab` and `ToolsetConfigPanel`.
+**Status: decided — option C.** The host views ride the plugin context, written up
+as [batch 12](renderer-layer-batches/12-host-views-through-context.md). This page is
+kept as the record of the decision: the constraint, the five options and why the
+chosen one won. The two paragraphs below are how the question was posed, not an
+open question.
 
 Edges at stake: **3** (`extension → app`, the last three). Context:
 [`renderer-layer-boundary.md`](renderer-layer-boundary.md) §K3 and
@@ -158,6 +160,9 @@ never goes below 3. The migration has an explicit stopping point for undecided w
 so this is a legitimate answer — just the one that keeps the wart.
 
 ## Recommendation
+
+*Written before the decision. The answer taken was **C**, for the reason named at the
+end of this page: the API was worth fixing while the only consumers are in-tree.*
 
 **A.** It is the only option that pays the three edges, keeps the published ABI's
 names, types and failure semantics exactly as they are, needs no plugin change, and

@@ -144,5 +144,12 @@
       "\\.\\./routes'",
       "\\./routes'"
     ]
+  },
+  "12 host-views": {
+    "edges": 3,
+    "modules": [
+      "profile-config'",
+      "contrib/plugin'"
+    ]
   }
 }

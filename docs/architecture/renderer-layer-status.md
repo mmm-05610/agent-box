@@ -10,7 +10,7 @@ because it is trusted; see `renderer-layer-master-plan.md` §8.
 | last updated | 2026-09-12 |
 | last commit to change renderer source | `c6889f1` |
 | ledger | **85** |
-| target when the run completes | **10** |
+| target when the run completes | **7** |
 | tests | **775 files / 7466 tests** |
 | reviewed | nothing yet |
 | in scope | **every work order in `renderer-layer-batches/`** — Phase 1 and Phase 2 both; no phase is a permission gate |
@@ -19,7 +19,7 @@ because it is trusted; see `renderer-layer-master-plan.md` §8.
 
 ## Phase 1 — the layer work orders
 
-75 edges across ten work orders. Batches 06-11 are written as
+78 edges across eleven work orders. Batches 06-12 are written as
 independently executable items, so the table is finer than the work orders. Wave
 numbers come from the collision check
 (`renderer-layer-master-plan.md` §4) — items in the same wave share no file.
@@ -41,6 +41,7 @@ numbers come from the collision check
 | 09 | the plugin ABI stops reaching into the app | 14 | 1 | not started | — | — |
 | 10 | the composer engine leaves `app/` for `lib/` + `components/` | 22 | 6 | not started | — | — |
 | 11 | the route vocabulary sinks to `lib/` | 3 | 3 | not started | — | — |
+| 12 | the host views ride the plugin context (ABI change) | 3 | 7 | not started | — | — |
 
 Work orders: [01](renderer-layer-batches/01-lib-services-to-store.md) ·
 [02](renderer-layer-batches/02-tour-to-app.md) ·
@@ -51,12 +52,14 @@ Work orders: [01](renderer-layer-batches/01-lib-services-to-store.md) ·
 [08](renderer-layer-batches/08-pane-shell-sink.md) ·
 [09](renderer-layer-batches/09-plugin-abi.md) ·
 [10](renderer-layer-batches/10-composer-engine.md) ·
-[11](renderer-layer-batches/11-route-vocabulary.md)
+[11](renderer-layer-batches/11-route-vocabulary.md) ·
+[12](renderer-layer-batches/12-host-views-through-context.md)
 
-Expected on completion: the ledger drops to 10, and **no `lib/` line and no
+Expected on completion: the ledger drops to 7, and **no `lib/` line and no
 `extension/` line survives** — every one of `lib/`'s 21 lines is paid by 01–03,
-06–07, 10 and 11, and 09 pays 14 of the 16 `extension/` lines plus one of
-`components/`'s (the same seam, used by a component). `lib/keybinds/` and
+06–07, 10 and 11; 09 pays 14 of `extension/`'s 16 plus one of `components/`'s (the
+same seam, used by a component); and 12 pays the last three `extension/` lines by
+moving the capability onto the plugin context. `lib/keybinds/` and
 `lib/external-link` must be gone from the ledger entirely; if a `lib/` line
 survives, a split boundary was drawn wrong.
 
@@ -72,26 +75,27 @@ so it can never be how the migration is progressing.
 Work order: [05](renderer-layer-batches/05-hermes-barrel-removal.md). Ledger
 impact: **none** — `@/hermes` and `@/api/*` are both rank 0.
 
-## Not yet work orders — need a decision
+## Not yet work orders — seven edges, no decisions
 
-Three knots were decided on 2026-09-12 and are Phase 1 above: layout state in the
-component layer became 08, the plugin ABI became 09, and the composer engine became
-10. What follows is what those three left behind.
+Five knots were decided on 2026-09-12 and are Phase 1 above: layout state in the
+component layer became 08, the plugin ABI became 09, the composer engine became 10,
+the route vocabulary became 11, and the host views became 12. What follows is what
+they left behind, and it is all mechanical — the only open question in the migration
+was the host views, and that page is now a record rather than a request.
 
 | the remainder | edges | what has to happen | status |
 | --- | --- | --- | --- |
-| the three host-view capability exports (`SkillsView`, `McpTab`, `ToolsetConfigPanel`) | 3 | [the decision page](renderer-layer-host-views-decision.md) — five options, one recommended | awaiting decision |
-| the composer's last edge (`user-edit-composer -> use-prompt-actions`) | 1 | a decision: unblock the chain, or give the edit composer a host-supplied "send" verb | awaiting decision |
+| the composer's last edge (`user-edit-composer -> use-prompt-actions`) | 1 | the chain is traced: 11 shortened it by sinking the route vocabulary; the next link is the `use-session-actions/utils.ts` barrel, whose four helpers are app-free | traced, no work order yet |
 | `components/pet/floating-pet.tsx` → three `app/hooks` | 3 | sink what is pure, seam what is not | not analysed |
 | three singletons (`boot-failure-overlay`, `store/gateway-switch`, `store/pane-focus`) | 3 | three unrelated edges; each needs its own read | not analysed |
 
-The first row is what 09 deliberately left behind: `plugins/hermes-bots/profile-config.tsx`
-reads `sdk.SkillsView` **at module scope**, and the eager bundled-plugin glob means
-that runs before any `app/` module body — so an `app/`-side registration cannot fill
-the seam in time, and the failure would be a silent loss of connection routing rather
-than a crash. 09's last section has the full chain.
+The host-view row that used to head this table was decided on 2026-09-12: the three
+capabilities move onto the plugin context,
+[batch 12](renderer-layer-batches/12-host-views-through-context.md). The decision page
+records why — including that 09's original obstacle (a module-scope read of the SDK)
+disappears entirely once the value arrives as context data instead of a module export.
 
-The second row is what 10 left behind, and it is a chain rather than a wall:
+The composer row is what 10 left behind, and it is a chain rather than a wall:
 `use-prompt-actions/index.ts` reaches `app/session/hooks/session-context-drift.ts`,
 which imports `isNewChatRoute` and `routeSessionId` from `@/app/routes`. Work order
 [11](renderer-layer-batches/11-route-vocabulary.md) sinks that vocabulary, which
@@ -101,9 +105,9 @@ shortens the chain by one link — the next link is the
 ## Open items
 
 - Nothing is blocked. Every work order has a verified destination, a self-contained
-  brief and a place in Phase 1 or 2. The four rows under "not yet work orders" are
+  brief and a place in Phase 1 or 2. The three rows under "not yet work orders" are
   the only thing that can stop the run short, and stopping there is the correct
-  outcome — the run ends at ledger **10**, not at zero.
+  outcome — the run ends at ledger **7**, not at zero.
 
 ## How to update this file
 
