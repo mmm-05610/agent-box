@@ -1,7 +1,7 @@
 import { useStore } from '@nanostores/react'
 import { memo, useEffect, useMemo, useState } from 'react'
 
-import { useGatewayRequest } from '@/app/gateway/hooks/use-gateway-request'
+import { useGatewayRequest } from '@/components/hooks/use-gateway-request'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Tip } from '@/components/ui/tooltip'

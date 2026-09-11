@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { requestGateway } = vi.hoisted(() => ({ requestGateway: vi.fn() }))
-vi.mock('@/app/gateway/hooks/use-gateway-request', () => ({
+vi.mock('@/components/hooks/use-gateway-request', () => ({
   useGatewayRequest: () => ({ requestGateway })
 }))
 vi.mock('@/hermes', async importOriginal => ({

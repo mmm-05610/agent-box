@@ -1,7 +1,7 @@
 import { useStore } from '@nanostores/react'
 import { type ReactNode, useEffect, useState } from 'react'
 
-import { useGatewayRequest } from '@/app/gateway/hooks/use-gateway-request'
+import { useGatewayRequest } from '@/components/hooks/use-gateway-request'
 import { PetThumb } from '@/components/pet/pet-thumb'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'

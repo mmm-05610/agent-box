@@ -6,6 +6,7 @@ import {
   setTerminalFontFamilyFromConfig,
   TERMINAL_FONT_SUGGESTIONS
 } from '@/app/right-sidebar/terminal/terminal-font'
+import { useOnProfileSwitch } from '@/components/hooks/use-on-profile-switch'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { saveHermesConfig } from '@/hermes'
@@ -14,7 +15,6 @@ import { notifyError } from '@/store/notifications'
 import type { HermesConfigRecord } from '@/types/hermes'
 
 import { setHermesConfigCache, useHermesConfigRecord } from '../hooks/use-config-record'
-import { useOnProfileSwitch } from '../hooks/use-on-profile-switch'
 
 import { getNested, setNested } from './helpers'
 import { ListRow } from './primitives'

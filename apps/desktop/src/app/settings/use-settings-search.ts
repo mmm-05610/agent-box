@@ -2,7 +2,8 @@ import { useStore } from '@nanostores/react'
 import { useQuery } from '@tanstack/react-query'
 import { useCallback, useEffect } from 'react'
 
-import { useGatewayRequest } from '@/app/gateway/hooks/use-gateway-request'
+import { useGatewayRequest } from '@/components/hooks/use-gateway-request'
+import { useOnProfileSwitch } from '@/components/hooks/use-on-profile-switch'
 import { getEnvVars, getHermesConfigSchema } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { Package, Palette, Settings2, Wrench } from '@/lib/icons'
@@ -12,7 +13,6 @@ import { $gatewayState } from '@/store/session'
 import { TRANSLUCENCY_SUPPORTED } from '@/store/translucency'
 
 import { useHermesConfigRecord } from '../hooks/use-config-record'
-import { useOnProfileSwitch } from '../hooks/use-on-profile-switch'
 
 import {
   APPEARANCE_SETTING_IDS,

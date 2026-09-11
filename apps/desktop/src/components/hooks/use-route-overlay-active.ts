@@ -1,6 +1,6 @@
 import { useLocation } from 'react-router'
 
-import { appViewForPath, isOverlayView } from '@/app/routes'
+import { appViewForPath, isOverlayView } from '@/lib/routes'
 
 /**
  * True while a full-screen route overlay (settings, agents, command-center, …)

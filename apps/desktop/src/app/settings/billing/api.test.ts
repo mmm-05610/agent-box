@@ -5,7 +5,7 @@ import type { BillingChargeResponse, BillingStateResponse } from './types'
 
 const requestGatewayMock = vi.hoisted(() => vi.fn())
 
-vi.mock('@/app/gateway/hooks/use-gateway-request', () => ({
+vi.mock('@/components/hooks/use-gateway-request', () => ({
   useGatewayRequest: () => ({ requestGateway: requestGatewayMock })
 }))
 

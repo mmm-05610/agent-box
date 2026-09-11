@@ -44,7 +44,7 @@ vi.mock('../hooks/use-config-record', () => ({
   useHermesConfigRecord: () => ({ data: mocks.loadedConfig })
 }))
 
-vi.mock('../hooks/use-on-profile-switch', () => ({
+vi.mock('@/components/hooks/use-on-profile-switch', () => ({
   useOnProfileSwitch: (callback: () => void) => {
     mocks.profileSwitch = callback
   }

@@ -2,9 +2,9 @@ import { useStore } from '@nanostores/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 
-import { useGatewayRequest } from '@/app/gateway/hooks/use-gateway-request'
 import { NEW_CHAT_ROUTE, SETTINGS_ROUTE } from '@/app/routes'
 import { ExternalLink } from '@/components/external-link'
+import { useGatewayRequest } from '@/components/hooks/use-gateway-request'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
