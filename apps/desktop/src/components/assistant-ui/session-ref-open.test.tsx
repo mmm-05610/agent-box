@@ -1,11 +1,11 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { __resetSessionLinkTitleCache } from '@/lib/session-link-title'
 import { $previewTabs, closeRightRail } from '@/store/preview'
 
 import { DirectiveContent } from './directive-text'
 import { MarkdownTextContent } from './markdown-text'
+import { __resetSessionLinkTitleCache } from './session-link-title'
 
 const openSession = vi.fn()
 

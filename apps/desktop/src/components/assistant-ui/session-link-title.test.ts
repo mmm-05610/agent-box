@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { getSession } from '@/hermes'
+import { sessionRefCacheKey } from '@/lib/session-refs'
 import { $sessions } from '@/store/session'
 import type { SessionInfo } from '@/types/hermes'
 
 import { __resetSessionLinkTitleCache, fetchSessionLinkTitle, lookupLocalSessionTitle } from './session-link-title'
-import { sessionRefCacheKey } from './session-refs'
 
 vi.mock('@/hermes', () => ({
   getSession: vi.fn()
