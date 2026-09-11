@@ -43,4 +43,3 @@ export interface PluginNewChatOptions {
   workspaceMode?: WorkspaceMode
   workspaceOwnerKey?: string
 }
-

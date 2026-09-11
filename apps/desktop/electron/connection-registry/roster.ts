@@ -217,4 +217,3 @@ export function buildAgentRoster(
 
 /** Deterministic route priority for same-backend rows: local is definitionally
  * this box; ssh beats HTTP remotes; cloud last. */
-

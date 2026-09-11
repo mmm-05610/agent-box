@@ -22,4 +22,3 @@ export function singleFlight<T>(ref: { current: null | Promise<T> }, start: () =
 
   return flight
 }
-

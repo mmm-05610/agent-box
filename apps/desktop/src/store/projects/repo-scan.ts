@@ -204,4 +204,3 @@ export async function scanAndRecordRepos(force = false): Promise<void> {
     syncReposScanning()
   }
 }
-

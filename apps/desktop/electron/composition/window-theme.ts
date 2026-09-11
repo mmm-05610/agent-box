@@ -308,4 +308,3 @@ export function applyTitleBarOverlay(win) {
     // titlebar as-is.
   }
 }
-

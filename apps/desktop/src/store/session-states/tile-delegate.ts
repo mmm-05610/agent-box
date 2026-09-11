@@ -58,4 +58,3 @@ export function setSessionTileDelegate(next: SessionTileDelegate) {
 export function sessionTileDelegate(): SessionTileDelegate | null {
   return delegate
 }
-

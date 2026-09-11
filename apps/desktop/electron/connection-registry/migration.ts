@@ -151,4 +151,3 @@ export function migrateV1ToRegistry(v1: unknown): ConnectionRegistry {
 }
 
 /** Insert or replace by id. Input must already be normalized/validated. */
-

@@ -242,5 +242,3 @@ export function remoteInstallRoot(home) {
 
   return profile ? profile[1] : value
 }
-
-

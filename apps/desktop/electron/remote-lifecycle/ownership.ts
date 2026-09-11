@@ -775,4 +775,3 @@ export async function terminateOwnedDashboardForUpdate(ssh, expected) {
 
 // Detach so the backend survives the SSH channel closing: setsid (Linux)
 // starts a new session; macOS has no setsid, so fall back to nohup (HUP-immune;
-

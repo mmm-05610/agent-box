@@ -65,4 +65,3 @@ export function patchSessionWorkspace(sessionId: string, cwd: string | undefined
 
   setSessions(prev => prev.map(session => (session.id === sessionId ? { ...session, cwd } : session)))
 }
-

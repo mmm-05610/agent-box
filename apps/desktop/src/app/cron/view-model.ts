@@ -220,4 +220,3 @@ export interface CronViewProps extends React.ComponentProps<'section'> {
   onOpenSession?: (sessionId: string) => void
   setStatusbarItemGroup?: SetStatusbarItemGroup
 }
-

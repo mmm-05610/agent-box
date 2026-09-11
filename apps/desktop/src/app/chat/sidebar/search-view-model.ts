@@ -28,4 +28,3 @@ export function searchResultToSession(result: SessionSearchResult): SessionInfo 
     tool_call_count: 0
   }
 }
-

@@ -549,4 +549,3 @@ export function normalizeRegistry(raw: unknown): ConnectionRegistry {
  * URL/host against the global block), so a user who had `research` pinned to
  * a second gateway sees both sources registered on first launch.
  */
-

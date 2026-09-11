@@ -274,4 +274,3 @@ export async function moveSessionToProject(
   )
   void refreshProjectTree()
 }
-

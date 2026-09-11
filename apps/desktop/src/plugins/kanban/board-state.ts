@@ -33,4 +33,3 @@ export function removeCard(board: KanbanBoard, id: string): KanbanBoard {
 }
 
 // ── card ─────────────────────────────────────────────────────────────────────
-

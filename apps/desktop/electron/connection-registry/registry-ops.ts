@@ -272,4 +272,3 @@ export function setConnectionLaunchMode(registry: ConnectionRegistry, launchMode
 
   return { ...registry, launchMode }
 }
-

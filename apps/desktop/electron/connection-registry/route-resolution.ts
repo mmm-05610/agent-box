@@ -129,5 +129,3 @@ export function shouldDeferLocalEnumeration(
 }
 
 // ── Union agent roster ──────────────────────────────────────────────────────
-
-

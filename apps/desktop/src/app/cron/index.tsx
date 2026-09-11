@@ -1245,5 +1245,3 @@ interface EditorValues {
   provider: string
   schedule: string
 }
-
-

@@ -374,4 +374,3 @@ export function CreateGroupChatDialog({ open, roster, onClose, onCreated }: Crea
     </Dialog>
   )
 }
-

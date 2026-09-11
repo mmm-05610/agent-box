@@ -346,4 +346,3 @@ export async function waitForRemoteSpawnCompletion(ssh, ownershipId, timeoutMs) 
   error.kind = 'spawn-failed'
   throw error
 }
-

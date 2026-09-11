@@ -298,4 +298,3 @@ export function scanServerBlocks(text: string): ServerBlock[] {
 
   return blocks
 }
-

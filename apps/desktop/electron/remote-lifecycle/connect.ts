@@ -284,5 +284,3 @@ export async function connect(deps) {
     throw error
   }
 }
-
-

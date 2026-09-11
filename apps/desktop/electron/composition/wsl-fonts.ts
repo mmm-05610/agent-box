@@ -59,4 +59,3 @@ export function ensureWslWindowsFonts() {
     rememberLog(`[fonts] WSL font setup skipped: ${error.message}`)
   }
 }
-
