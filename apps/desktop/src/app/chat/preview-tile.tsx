@@ -12,7 +12,6 @@
 
 import { useStore } from '@nanostores/react'
 
-import { $activeTreeGroup, $layoutTree, revealTreePane, treePanesWithPrefix } from '@/components/pane-shell/tree/store'
 import { type MenuKit, renderActionItem } from '@/components/ui/actions-menu'
 import { FileTypeIcon } from '@/components/ui/file-type-icon'
 import { ToolIcon } from '@/components/ui/tool-icon'
@@ -20,6 +19,7 @@ import { translateNow } from '@/i18n'
 import { openExternalLink } from '@/lib/external-link'
 import { findGroup } from '@/lib/pane-tree'
 import { $rightRailActiveTabId, type RightRailTabId, selectRightRailTab } from '@/store/layout'
+import { $activeTreeGroup, $layoutTree, revealTreePane, treePanesWithPrefix } from '@/store/pane-shell/tree'
 import {
   $browserPages,
   $dockedPreviewTabs,

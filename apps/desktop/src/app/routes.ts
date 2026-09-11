@@ -1,7 +1,7 @@
 import { atom } from 'nanostores'
 
-import { noteActiveTreeGroup, revealTreePane } from '@/components/pane-shell/tree/store'
 import { isWorkspacePageRoute } from '@/lib/routes'
+import { noteActiveTreeGroup, revealTreePane } from '@/store/pane-shell/tree'
 
 export * from '@/lib/routes'
 

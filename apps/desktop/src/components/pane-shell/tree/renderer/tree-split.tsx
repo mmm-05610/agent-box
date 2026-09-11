@@ -32,9 +32,6 @@ import type { LayoutNode, SplitNode } from '@/lib/pane-tree'
 import { allPaneIds } from '@/lib/pane-tree'
 import { rafCoalesce } from '@/lib/raf-coalesce'
 import { cn } from '@/lib/utils'
-import { $paneStates, type PaneStateSnapshot, setPaneHeightOverride, setPaneWidthOverride } from '@/store/panes'
-
-import { $layoutEditMode } from '../../edit-mode'
 import {
   $collapsedTreeSides,
   $hiddenTreePanes,
@@ -44,7 +41,10 @@ import {
   presetSplitWeights,
   setTreeGroupMinimized,
   setTreeSplitWeights
-} from '../store'
+} from '@/store/pane-shell/tree'
+import { $paneStates, type PaneStateSnapshot, setPaneHeightOverride, setPaneWidthOverride } from '@/store/panes'
+
+import { $layoutEditMode } from '../../edit-mode'
 
 import type { LayoutNodeRenderer } from './renderer-types'
 

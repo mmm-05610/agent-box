@@ -13,9 +13,9 @@ import { useI18n } from '@/i18n'
 import { formatCombo } from '@/lib/keybinds/combo'
 import { startPointerDrag } from '@/lib/pointer-drag'
 import { $bindings, bindingsFor } from '@/store/keybinds'
+import { resetLayoutTree } from '@/store/pane-shell/tree'
 
 import { $layoutEditMode } from '../../edit-mode'
-import { resetLayoutTree } from '../store'
 
 import { LayoutPicker } from './layout-picker'
 

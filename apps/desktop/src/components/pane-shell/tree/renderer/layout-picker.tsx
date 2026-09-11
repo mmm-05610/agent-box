@@ -16,10 +16,10 @@ import { useI18n } from '@/i18n'
 import type { LayoutNode } from '@/lib/pane-tree'
 import { isLayoutNode } from '@/lib/pane-tree'
 import { cn } from '@/lib/utils'
+import { applyLayoutPreset, deleteUserPreset, isUserPreset, LAYOUTS_AREA, saveCurrentLayoutAs } from '@/store/pane-shell/presets'
+import { $activePresetId } from '@/store/pane-shell/tree'
 import type { Contribution } from '@/types/contributions'
 
-import { applyLayoutPreset, deleteUserPreset, isUserPreset, LAYOUTS_AREA, saveCurrentLayoutAs } from '../presets'
-import { $activePresetId } from '../store'
 import { $zoneEditorOpen } from '../zone-editor'
 
 /** Miniature render of a layout tree — the preset card thumbnail. */

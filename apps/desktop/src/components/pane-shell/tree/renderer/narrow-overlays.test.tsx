@@ -5,8 +5,7 @@ import { stubResizeObserver } from '@/dev/test/jsdom'
 import { registry } from '@/lib/contributions'
 import { PANE_TOGGLE_REVEAL_EVENT } from '@/lib/pane-events'
 import { group, split } from '@/lib/pane-tree'
-
-import { $hiddenTreePanes, $layoutTree, $narrowViewport, declareDefaultTree } from '../store'
+import { $hiddenTreePanes, $layoutTree, $narrowViewport, declareDefaultTree } from '@/store/pane-shell/tree'
 
 import { NarrowOverlays } from './narrow-overlays'
 

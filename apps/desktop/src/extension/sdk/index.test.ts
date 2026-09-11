@@ -61,7 +61,7 @@ describe('host.state turn flags', () => {
   })
 
   it('follows a focused session tile, not the primary', async () => {
-    const tree = await import('@/components/pane-shell/tree/store')
+    const tree = await import('@/store/pane-shell/tree')
     const model = await import('@/lib/pane-tree')
     const { registry } = await import('@/lib/contributions')
     const { $sessionTiles } = await import('@/store/session-states')
@@ -177,7 +177,7 @@ describe('host.connections', () => {
 describe('host workspace scope', () => {
   afterEach(async () => {
     host.setWorkspaceScope('sessions')
-    const tree = await import('@/components/pane-shell/tree/store')
+    const tree = await import('@/store/pane-shell/tree')
     tree.$newSessionTabAction.set(null)
     tree.removeTreePane('plugin-workspace:scope-test')
   })
@@ -205,7 +205,7 @@ describe('host workspace scope', () => {
   })
 
   it('publishes the active workspace scope through one host seam', async () => {
-    const { $workspaceMode, $workspaceOwnerKey } = await import('@/components/pane-shell/workspace-scope')
+    const { $workspaceMode, $workspaceOwnerKey } = await import('@/store/pane-shell/workspace-scope')
 
     expect(host.setWorkspaceScope('bots', 'connection-b::default')).toBe(true)
     expect($workspaceMode.get()).toBe('bots')
@@ -213,8 +213,8 @@ describe('host workspace scope', () => {
   })
 
   it('uses the shared tab action for an exact Bot owner without moving Sessions', async () => {
-    const tree = await import('@/components/pane-shell/tree/store')
-    const { $workspaceNewSessionTarget } = await import('@/components/pane-shell/workspace-scope')
+    const tree = await import('@/store/pane-shell/tree')
+    const { $workspaceNewSessionTarget } = await import('@/store/pane-shell/workspace-scope')
     const opened: string[] = []
 
     const route = {

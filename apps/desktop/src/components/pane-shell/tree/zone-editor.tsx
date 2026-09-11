@@ -46,9 +46,8 @@ import { gridIsTreeExpressible, gridToTree, type PanePlacementHint } from '@/lib
 import { allPaneIds } from '@/lib/pane-tree'
 import { startPointerDrag } from '@/lib/pointer-drag'
 import { cn } from '@/lib/utils'
-
-import { applyLayoutPreset, saveLayoutPresetTree } from './presets'
-import { $layoutTree } from './store'
+import { applyLayoutPreset, saveLayoutPresetTree } from '@/store/pane-shell/presets'
+import { $layoutTree } from '@/store/pane-shell/tree'
 
 export const $zoneEditorOpen = atom(false)
 

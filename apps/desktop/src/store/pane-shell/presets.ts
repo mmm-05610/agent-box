@@ -12,7 +12,7 @@ import { registry } from '@/lib/contributions'
 import { isLayoutNode, type LayoutNode } from '@/lib/pane-tree'
 import { readJson, writeJson, writeKey } from '@/lib/storage'
 
-import { $layoutTree, applyTree, markActivePreset } from './store'
+import { $layoutTree, applyTree, markActivePreset } from './tree'
 
 export const LAYOUTS_AREA = 'layouts'
 

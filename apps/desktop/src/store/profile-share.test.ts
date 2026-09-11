@@ -26,7 +26,7 @@ const { applyDesktopOverlay, buildDesktopOverlay, exportProfileBundle } = await 
 const { $profileColors, setProfileColor } = await import('@/store/profile/appearance-preferences')
 const { modePref, skinPref } = await import('@/application/theme/adapters/preferences')
 const { $userThemes } = await import('@/application/theme/adapters/user-themes')
-const { $layoutTree } = await import('@/components/pane-shell/tree/store')
+const { $layoutTree } = await import('@/store/pane-shell/tree')
 const { exportProfileArchive } = await import('@/hermes')
 
 // isValidTheme only requires background/foreground/primary at runtime; the

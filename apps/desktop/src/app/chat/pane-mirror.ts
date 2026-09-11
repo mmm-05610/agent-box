@@ -9,9 +9,9 @@
 import type { ReadableAtom } from 'nanostores'
 import type { ReactElement, ReactNode, PointerEvent as ReactPointerEvent } from 'react'
 
-import { registerPaneCloser, removeTreePane, treePanesWithPrefix } from '@/components/pane-shell/tree/store'
 import type { MenuKit } from '@/components/ui/actions-menu'
 import { registry } from '@/lib/contributions'
+import { registerPaneCloser, removeTreePane, treePanesWithPrefix } from '@/store/pane-shell/tree'
 import type { TileDock } from '@/store/session-states'
 
 export interface PaneMirror<T> {

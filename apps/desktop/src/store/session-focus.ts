@@ -1,8 +1,8 @@
 import { atom, computed } from 'nanostores'
 
-import { $activeTreeGroup, $layoutTree } from '@/components/pane-shell/tree/store'
-import { $workspaceMode } from '@/components/pane-shell/workspace-scope'
 import { findGroup, findGroupOfPane } from '@/lib/pane-tree'
+import { $activeTreeGroup, $layoutTree } from '@/store/pane-shell/tree'
+import { $workspaceMode } from '@/store/pane-shell/workspace-scope'
 
 // The sidebar still owns keyboard focus, but navigating its chrome must not
 // replace the chat being worked in with the route's (possibly hidden) primary.

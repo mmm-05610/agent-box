@@ -3,9 +3,8 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 
 import { registry } from '@/lib/contributions'
 import { group, split, type SplitNode } from '@/lib/pane-tree'
+import { $hiddenTreePanes, $layoutTree, markCollapsePane, setTreeGroupMinimized } from '@/store/pane-shell/tree'
 import { $paneStates } from '@/store/panes'
-
-import { $hiddenTreePanes, $layoutTree, markCollapsePane, setTreeGroupMinimized } from '../store'
 
 import { TreeNode } from './tree-node'
 import { TreeSplit } from './tree-split'

@@ -3,20 +3,6 @@ import type { ReactNode } from 'react'
 
 import { newSessionInAgent, newSessionInProfile } from '@/application/profile/new-session'
 import { ensureGatewayProfile } from '@/application/profile/runtime-selection'
-import {
-  $newSessionTabAction,
-  $paneVisible,
-  registerPaneCloser,
-  removeTreePane,
-  revealTreePane
-} from '@/components/pane-shell/tree/store'
-import {
-  $workspaceMode,
-  $workspaceOwnerKey,
-  setWorkspaceScope as publishWorkspaceScope,
-  setWorkspaceOwnerLabel,
-  type WorkspaceNewSessionTarget
-} from '@/components/pane-shell/workspace-scope'
 import { registry } from '@/lib/contributions'
 import { requestOpenSession } from '@/lib/open-session'
 import {
@@ -25,6 +11,20 @@ import {
   openGatewayForProfile
 } from '@/store/gateway'
 import { notify } from '@/store/notifications'
+import {
+  $newSessionTabAction,
+  $paneVisible,
+  registerPaneCloser,
+  removeTreePane,
+  revealTreePane
+} from '@/store/pane-shell/tree'
+import {
+  $workspaceMode,
+  $workspaceOwnerKey,
+  setWorkspaceScope as publishWorkspaceScope,
+  setWorkspaceOwnerLabel,
+  type WorkspaceNewSessionTarget
+} from '@/store/pane-shell/workspace-scope'
 import { $activeGatewayProfile, $gatewaySwapTarget, $hydrationSyncProfile, normalizeProfileKey, setShowAllProfiles } from '@/store/profile'
 import {
   $activeSessionId,

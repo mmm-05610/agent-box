@@ -10,30 +10,6 @@ import { SessionStatusDot } from '@/components/chat/session-status-dot'
 import { IdleMount } from '@/components/idle-mount'
 import { $layoutEditMode, toggleLayoutEditMode } from '@/components/pane-shell/edit-mode'
 import { LayoutTreeRoot } from '@/components/pane-shell/tree/renderer'
-import {
-  $layoutTree,
-  bindPaneVisibility,
-  bindToolPaneCollapse,
-  bindTreeSideVisibility,
-  declareDefaultTree,
-  dismissTreePane,
-  isPaneVisible,
-  markCollapsePane,
-  mirrorLayoutTree,
-  paneRootSide,
-  registerLayoutResetHandler,
-  registerPaneCloser,
-  registerPaneOpener,
-  removeTreePane,
-  resetLayoutTree,
-  revealTreePane,
-  setStripTabHidden,
-  targetZoneTabStripVisible,
-  togglePaneVisible,
-  toggleTargetZoneTabStrip,
-  watchContributedPanes
-} from '@/components/pane-shell/tree/store'
-import { $workspaceOwnerLabels, workspaceOwnerTitle } from '@/components/pane-shell/workspace-scope'
 import { SidebarProvider } from '@/components/ui/sidebar'
 import { discoverBundledPlugins } from '@/extension/contrib/plugins'
 import { Slot } from '@/extension/contrib/react/slot'
@@ -60,6 +36,30 @@ import {
   SIDEBAR_DEFAULT_WIDTH,
   SIDEBAR_MAX_WIDTH
 } from '@/store/layout'
+import {
+  $layoutTree,
+  bindPaneVisibility,
+  bindToolPaneCollapse,
+  bindTreeSideVisibility,
+  declareDefaultTree,
+  dismissTreePane,
+  isPaneVisible,
+  markCollapsePane,
+  mirrorLayoutTree,
+  paneRootSide,
+  registerLayoutResetHandler,
+  registerPaneCloser,
+  registerPaneOpener,
+  removeTreePane,
+  resetLayoutTree,
+  revealTreePane,
+  setStripTabHidden,
+  targetZoneTabStripVisible,
+  togglePaneVisible,
+  toggleTargetZoneTabStrip,
+  watchContributedPanes
+} from '@/store/pane-shell/tree'
+import { $workspaceOwnerLabels, workspaceOwnerTitle } from '@/store/pane-shell/workspace-scope'
 import { runExportProfileFlow, runImportProfileFlow } from '@/store/profile-share'
 import {
   $reviewOpen,

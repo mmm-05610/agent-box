@@ -13,7 +13,7 @@
 
 import { type RefObject, useLayoutEffect, useState, useSyncExternalStore } from 'react'
 
-import { $layoutTree } from '@/components/pane-shell/tree/store'
+import { $layoutTree } from '@/store/pane-shell/tree'
 import { $connection } from '@/store/session'
 
 // ---------------------------------------------------------------------------

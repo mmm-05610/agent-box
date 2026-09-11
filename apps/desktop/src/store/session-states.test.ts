@@ -1,15 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { requestForOwnedSession } from '@/application/session/request-owned-session'
-import { $layoutTree, noteActiveTreeGroup } from '@/components/pane-shell/tree/store'
+import { findGroupOfPane, group, split } from '@/lib/pane-tree'
+import { $layoutTree, noteActiveTreeGroup } from '@/store/pane-shell/tree'
 import {
   $workspaceMode,
   forgetActivePane,
   rememberActivePane,
   setWorkspaceScope,
   workspaceScopeKey
-} from '@/components/pane-shell/workspace-scope'
-import { findGroupOfPane, group, split } from '@/lib/pane-tree'
+} from '@/store/pane-shell/workspace-scope'
 import { $activeGatewayProfile } from '@/store/profile/runtime-route-state'
 import { $activeSessionId, $connection, $selectedStoredSessionId, setSessions } from '@/store/session'
 import type { SessionTile } from '@/store/session-states'
@@ -1122,7 +1122,7 @@ describe('reopenLastClosedTile focuses the restored tab', () => {
   })
 
   async function setup() {
-    const tree = await import('@/components/pane-shell/tree/store')
+    const tree = await import('@/store/pane-shell/tree')
     const model = await import('@/lib/pane-tree')
     const { registry } = await import('@/lib/contributions')
     const session = await import('@/store/session')

@@ -1,3 +1,6 @@
+import type { LayoutNode } from '@/lib/pane-tree'
+import { findGroupOfPane } from '@/lib/pane-tree'
+import { normalizeProfileKey } from '@/lib/profile-identity'
 import {
   $layoutTree,
   focusedSessionTabAnchor,
@@ -5,11 +8,8 @@ import {
   moveTreePane,
   noteActiveTreeGroup,
   revealTreePane
-} from '@/components/pane-shell/tree/store'
-import { resolveRememberedActivePane, workspaceScopeKey } from '@/components/pane-shell/workspace-scope'
-import type { LayoutNode } from '@/lib/pane-tree'
-import { findGroupOfPane } from '@/lib/pane-tree'
-import { normalizeProfileKey } from '@/lib/profile-identity'
+} from '@/store/pane-shell/tree'
+import { resolveRememberedActivePane, workspaceScopeKey } from '@/store/pane-shell/workspace-scope'
 import type { SessionInfo } from '@/types/hermes'
 import type { ClientSessionState } from '@/types/session'
 

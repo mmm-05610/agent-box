@@ -4,13 +4,6 @@ import { useEffect, useRef, useState } from 'react'
 
 import { openSession } from '@/app/open-session'
 import {
-  closeAllTreeTabs,
-  closeOtherTreeTabs,
-  closeTreeTabsToRight,
-  reloadTreePane,
-  treeTabCloseTargets
-} from '@/components/pane-shell/tree/store'
-import {
   type ActionItemSpec,
   ActionsContextMenu,
   ActionsMenu,
@@ -31,6 +24,13 @@ import { PROFILE_SWATCHES } from '@/lib/profile-color'
 import { exportSession } from '@/lib/session-export'
 import { activeGateway } from '@/store/gateway'
 import { notify, notifyError } from '@/store/notifications'
+import {
+  closeAllTreeTabs,
+  closeOtherTreeTabs,
+  closeTreeTabsToRight,
+  reloadTreePane,
+  treeTabCloseTargets
+} from '@/store/pane-shell/tree'
 import { $projectTree, moveSessionToProject, projectIdForCwd, projectRootCwd } from '@/store/projects'
 import {
   $activeSessionId,

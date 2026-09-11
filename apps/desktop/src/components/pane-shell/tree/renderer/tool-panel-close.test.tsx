@@ -4,7 +4,6 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { stubMenuDomApis, stubResizeObserver } from '@/dev/test/jsdom'
 import { registry } from '@/lib/contributions'
 import { group, split } from '@/lib/pane-tree'
-
 import {
   $layoutTree,
   declareDefaultTree,
@@ -12,7 +11,7 @@ import {
   noteActiveTreeGroup,
   registerPaneCloser,
   setTreeGroupMinimized
-} from '../store'
+} from '@/store/pane-shell/tree'
 
 import { TreeGroup } from './tree-group'
 
@@ -34,7 +33,7 @@ beforeEach(async () => {
 
   // Per-test isolation: earlier cases dismiss / hide panes, and both records
   // live in module state that survives into the next test.
-  const { $dismissedPanes, $hiddenTreePanes } = await import('../store')
+  const { $dismissedPanes, $hiddenTreePanes } = await import('@/store/pane-shell/tree')
   $dismissedPanes.set(new Set())
   $hiddenTreePanes.set(new Set())
 
@@ -123,7 +122,7 @@ describe('⌘W over a focused tool panel', () => {
   it('closes the logs tab and the toggle brings it back', async () => {
     const { closeActiveTab } = await import('@/app/chat/close-tab')
     const { allPaneIds } = await import('@/lib/pane-tree')
-    const { revealTreePane, setPaneCollapsed } = await import('../store')
+    const { revealTreePane, setPaneCollapsed } = await import('@/store/pane-shell/tree')
 
     declareDefaultTree(
       split('column', [
@@ -158,7 +157,7 @@ describe('⌘W over a focused tool panel', () => {
 
   it('leaves the uncloseable workspace zone to the chat rung', async () => {
     const { allPaneIds } = await import('@/lib/pane-tree')
-    const { closeFocusedToolTab } = await import('../store')
+    const { closeFocusedToolTab } = await import('@/store/pane-shell/tree')
 
     declareDefaultTree(
       split('column', [

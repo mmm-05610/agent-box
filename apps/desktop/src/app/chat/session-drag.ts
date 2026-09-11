@@ -36,9 +36,9 @@ import {
   type StripSnapshot,
   subZonePosition
 } from '@/components/pane-shell/tree/renderer/drag-session'
-import { $treeDragging, type DropHint, revealTreePane, SESSION_TILE_DRAG } from '@/components/pane-shell/tree/store'
 import type { EngineZone, ZoneRect } from '@/lib/pane-shell/zones-engine'
 import { queryAllVisible } from '@/lib/pane-visibility'
+import { $treeDragging, type DropHint, revealTreePane, SESSION_TILE_DRAG } from '@/store/pane-shell/tree'
 import { openSessionTile, type TileDock } from '@/store/session-states'
 
 import { requestComposerInsertRefs } from './composer/focus'

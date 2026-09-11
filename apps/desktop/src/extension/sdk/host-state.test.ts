@@ -71,7 +71,7 @@ describe('host.state focused-session atoms', () => {
 
   it('follows the interacted tile while the primary-only atom stays put', async () => {
     const { host, session, states } = await setup()
-    const tree = await import('@/components/pane-shell/tree/store')
+    const tree = await import('@/store/pane-shell/tree')
     const model = await import('@/lib/pane-tree')
     const { registry } = await import('@/lib/contributions')
 

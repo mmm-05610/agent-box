@@ -4,7 +4,6 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 
 import { registry } from '@/lib/contributions'
 import { group, type GroupNode, split } from '@/lib/pane-tree'
-
 import {
   $layoutTree,
   markCollapsePane,
@@ -12,7 +11,7 @@ import {
   setTreeGroupTabStrip,
   tabStripVisibleForGroup,
   toggleTargetZoneTabStrip
-} from '../store'
+} from '@/store/pane-shell/tree'
 
 import { TreeGroup } from './tree-group'
 
@@ -48,7 +47,7 @@ const disposers: (() => void)[] = []
 beforeEach(async () => {
   window.localStorage.clear()
 
-  const { $dismissedPanes, $hiddenTreePanes } = await import('../store')
+  const { $dismissedPanes, $hiddenTreePanes } = await import('@/store/pane-shell/tree')
   $dismissedPanes.set(new Set())
   $hiddenTreePanes.set(new Set())
 

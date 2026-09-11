@@ -4,7 +4,6 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 
 import { registry } from '@/lib/contributions'
 import { group, type GroupNode, split } from '@/lib/pane-tree'
-
 import {
   $dismissedPanes,
   $hiddenTreePanes,
@@ -15,7 +14,7 @@ import {
   setTreeGroupMinimized,
   setTreeGroupTabStrip,
   tabStripVisibleForGroup
-} from '../store'
+} from '@/store/pane-shell/tree'
 
 import { TreeGroup } from './tree-group'
 

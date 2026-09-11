@@ -41,18 +41,7 @@ import {
 import type { DropPosition, GroupNode } from '@/lib/pane-tree'
 import { hiddenPaneProps } from '@/lib/pane-visibility'
 import { cn } from '@/lib/utils'
-import { closeAllOpenSessionTiles } from '@/store/session-states'
-
-import { $layoutEditMode } from '../../edit-mode'
-import { useWindowControlsOverlap } from '../../geometry'
-import { PaneGroupContext, PaneLifecycleContext, PaneVisibleContext } from '../../pane-visibility'
-import {
-  $workspaceMode,
-  $workspaceOwnerKey,
-  rememberActivePane,
-  resolveRememberedActivePane,
-  workspaceScopeKey
-} from '../../workspace-scope'
+import { tabStripVisibleForZone } from '@/store/pane-shell/strip-visibility'
 import {
   $dropHint,
   $hiddenTreePanes,
@@ -80,11 +69,22 @@ import {
   setTreeGroupMinimized,
   setTreeGroupTabStrip,
   treeTabCloseTargets
-} from '../store'
+} from '@/store/pane-shell/tree'
+import {
+  $workspaceMode,
+  $workspaceOwnerKey,
+  rememberActivePane,
+  resolveRememberedActivePane,
+  workspaceScopeKey
+} from '@/store/pane-shell/workspace-scope'
+import { closeAllOpenSessionTiles } from '@/store/session-states'
+
+import { $layoutEditMode } from '../../edit-mode'
+import { useWindowControlsOverlap } from '../../geometry'
+import { PaneGroupContext, PaneLifecycleContext, PaneVisibleContext } from '../../pane-visibility'
 
 import { paneChromeRender } from './chrome-render'
 import { startPaneDrag } from './drag-session'
-import { tabStripVisibleForZone } from './strip-visibility'
 import { useActiveTabVisible } from './tab-strip-scroll'
 
 /** Right-click zone menu: the tab verbs (close this / others / to the right /

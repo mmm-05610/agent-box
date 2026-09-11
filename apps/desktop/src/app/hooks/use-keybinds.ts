@@ -7,15 +7,6 @@ import { setTerminalTakeover } from '@/app/right-sidebar/store'
 import { closeActiveTerminal, createTerminal, cycleTerminal } from '@/app/right-sidebar/terminal/terminals'
 import { appViewForPath, isOverlayView } from '@/app/routes'
 import { cycleProfile, switchProfileToSlot, switchToDefaultProfile } from '@/application/profile/navigation'
-import {
-  activateTreeTabSlot,
-  cycleTreeTabInFocusedZone,
-  isPaneVisible,
-  layoutHasRootSide,
-  togglePaneVisible,
-  toggleTargetZoneTabStrip
-} from '@/components/pane-shell/tree/store'
-import { setWorkspaceScope } from '@/components/pane-shell/workspace-scope'
 import { findBarClaimsCombo } from '@/lib/find-in-page'
 import { contributedKeybindHandler, PROFILE_SLOT_COUNT, SESSION_SLOT_COUNT } from '@/lib/keybinds/actions'
 import { actionAllowedInInput, comboFromEvent, isEditableTarget } from '@/lib/keybinds/combo'
@@ -38,6 +29,15 @@ import {
   togglePanesFlipped,
   toggleSidebarOpen
 } from '@/store/layout'
+import {
+  activateTreeTabSlot,
+  cycleTreeTabInFocusedZone,
+  isPaneVisible,
+  layoutHasRootSide,
+  togglePaneVisible,
+  toggleTargetZoneTabStrip
+} from '@/store/pane-shell/tree'
+import { setWorkspaceScope } from '@/store/pane-shell/workspace-scope'
 import { openBrowserTab } from '@/store/preview'
 import { $newChatProfile, requestProfileCreate, toggleShowAllProfiles } from '@/store/profile'
 import { openFolderAsProject } from '@/store/projects'

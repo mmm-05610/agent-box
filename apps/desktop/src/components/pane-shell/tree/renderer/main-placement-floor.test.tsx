@@ -5,8 +5,7 @@ import { stubResizeObserver } from '@/dev/test/jsdom'
 import { registry } from '@/lib/contributions'
 import { subtreeGone, type TrackContext } from '@/lib/pane-shell/track-model'
 import { group, split } from '@/lib/pane-tree'
-
-import { $hiddenTreePanes, $layoutTree } from '../store'
+import { $hiddenTreePanes, $layoutTree } from '@/store/pane-shell/tree'
 
 import { TreeNode } from './tree-node'
 import { TreeSplit } from './tree-split'

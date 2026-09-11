@@ -1,6 +1,5 @@
 import { atom, computed } from 'nanostores'
 
-import { isPaneVisible, revealTreePane } from '@/components/pane-shell/tree/store'
 import type { HermesReviewFile, HermesReviewShipInfo } from '@/global'
 import { desktopGit } from '@/lib/desktop-git'
 import { isExcludedPath } from '@/lib/excluded-paths'
@@ -9,6 +8,7 @@ import { SIDEBAR_COLLAPSE_MEDIA_QUERY } from '@/lib/layout-constants'
 import { requestOneShot } from '@/lib/oneshot'
 import { PANE_TOGGLE_REVEAL_EVENT } from '@/lib/pane-events'
 import { Codecs, persistentAtom } from '@/lib/persisted'
+import { isPaneVisible, revealTreePane } from '@/store/pane-shell/tree'
 
 import { refreshRepoStatus, repoStatusForCwd } from './coding-status'
 import { stampSessionPrBranch } from './pull-requests'

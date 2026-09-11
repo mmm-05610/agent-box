@@ -1,9 +1,9 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 import { paneMirror } from '@/app/chat/pane-mirror'
-import * as tree from '@/components/pane-shell/tree/store'
 import { registry } from '@/lib/contributions'
 import * as model from '@/lib/pane-tree'
+import * as tree from '@/store/pane-shell/tree'
 import { applyDesktopOverlay } from '@/store/profile-share'
 import * as session from '@/store/session'
 import * as states from '@/store/session-states'

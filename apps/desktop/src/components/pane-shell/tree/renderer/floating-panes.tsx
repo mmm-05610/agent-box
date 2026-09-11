@@ -28,9 +28,8 @@ import {
 import { readJson, writeJson } from '@/lib/storage'
 import { TITLEBAR_HEIGHT } from '@/lib/titlebar'
 import { cn } from '@/lib/utils'
+import { $hiddenTreePanes } from '@/store/pane-shell/tree'
 import type { Contribution } from '@/types/contributions'
-
-import { $hiddenTreePanes } from '../store'
 
 const POSITIONS_KEY = 'hermes.desktop.floatingPanes.v1'
 

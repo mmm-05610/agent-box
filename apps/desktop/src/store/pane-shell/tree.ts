@@ -43,7 +43,7 @@ import { clearAllPaneSizeOverrides } from '@/store/panes'
 import { setPluginEnabled } from '@/store/plugin-state'
 import { isBrowserWindow, isSecondaryWindow } from '@/store/windows'
 
-import { tabStripVisibleForZone } from './renderer/strip-visibility'
+import { tabStripVisibleForZone } from './strip-visibility'
 
 // v2: v1 trees were saved against placeholder panes with index-order zone
 // assignment (chat could land in a corner cell). Retire them wholesale.

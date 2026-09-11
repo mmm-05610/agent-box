@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { registry } from '@/lib/contributions'
 import { group, split } from '@/lib/pane-tree'
-
 import {
   $dismissedPanes,
   $hiddenTreePanes,
@@ -12,7 +11,7 @@ import {
   isPaneVisible,
   setTreeGroupMinimized,
   togglePaneVisible
-} from './store'
+} from '@/store/pane-shell/tree'
 
 // The bug class, across EVERY pane kind — not just the terminal she reported.
 //
