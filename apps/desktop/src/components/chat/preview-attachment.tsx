@@ -1,7 +1,7 @@
 import { useStore } from '@nanostores/react'
 import { useEffect, useRef, useState } from 'react'
 
-import { useSessionView } from '@/app/chat/session-view'
+import { useSessionView } from '@/components/chat/session-view'
 import { useI18n } from '@/i18n'
 import { Download, MonitorPlay } from '@/lib/icons'
 import { normalizeOrLocalPreviewTarget } from '@/lib/local-preview'

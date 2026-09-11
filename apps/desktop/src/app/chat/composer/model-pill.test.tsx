@@ -3,7 +3,7 @@ import { atom } from 'nanostores'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import type { ChatBarState } from '@/app/chat/composer/types'
-import { type SessionView, SessionViewProvider } from '@/app/chat/session-view'
+import { type SessionView, SessionViewProvider } from '@/components/chat/session-view'
 import { $activeSessionId, $currentModel, setCurrentModel, setCurrentModelSource } from '@/store/session'
 
 import { ModelPill } from './model-pill'

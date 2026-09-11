@@ -3,7 +3,7 @@ import { atom } from 'nanostores'
 import type { ComponentProps, ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { type SessionView, SessionViewProvider } from '@/app/chat/session-view'
+import { type SessionView, SessionViewProvider } from '@/components/chat/session-view'
 import { $previewStatusBySession } from '@/store/preview-status'
 import { $activeSessionId, $currentCwd } from '@/store/session'
 

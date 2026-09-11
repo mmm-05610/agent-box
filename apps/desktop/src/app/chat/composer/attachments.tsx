@@ -1,7 +1,7 @@
 import { useStore } from '@nanostores/react'
 import { useState } from 'react'
 
-import { useSessionView } from '@/app/chat/session-view'
+import { useSessionView } from '@/components/chat/session-view'
 import { ImageLightbox } from '@/components/chat/zoomable-image'
 import { Codicon } from '@/components/ui/codicon'
 import { Tip } from '@/components/ui/tooltip'

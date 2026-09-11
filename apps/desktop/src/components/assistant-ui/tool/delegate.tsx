@@ -3,10 +3,10 @@
 import { useStore } from '@nanostores/react'
 import { type FC, type ReactNode, useMemo } from 'react'
 
-import { useSessionView } from '@/app/chat/session-view'
 import { useElapsedSeconds } from '@/components/chat/activity-timer'
 import { ActivityTimerText } from '@/components/chat/activity-timer-text'
 import { SCAFFOLD_GLYPH_CLASS, SCAFFOLD_LABEL_CLASS, SCAFFOLD_META_CLASS } from '@/components/chat/scaffold-row'
+import { useSessionView } from '@/components/chat/session-view'
 import { FadeText } from '@/components/ui/fade-text'
 import { GlyphSpinner } from '@/components/ui/glyph-spinner'
 import { useI18n } from '@/i18n'

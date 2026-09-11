@@ -14,9 +14,9 @@ import {
 } from 'react'
 
 import { requestComposerFocus, requestComposerInsert } from '@/app/chat/composer/focus'
-import { useSessionView } from '@/app/chat/session-view'
 import { requestForOwnedSession } from '@/application/session/request-owned-session'
 import { ToolFallback } from '@/components/assistant-ui/tool/fallback'
+import { useSessionView } from '@/components/chat/session-view'
 import { WIDGET_SHELL_CLASS } from '@/components/chat/widget-shell'
 import { Button } from '@/components/ui/button'
 import { Kbd } from '@/components/ui/kbd'

@@ -15,7 +15,7 @@
  * anyone who wants a specific tile.
  */
 
-import { useSessionView } from '@/app/chat/session-view'
+import { useSessionView } from '@/components/chat/session-view'
 
 /** The handle if this is the primary chat, nothing if it is a tile. */
 export function useTourMarker(name: string): string | undefined {

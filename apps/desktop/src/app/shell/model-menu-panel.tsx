@@ -2,7 +2,7 @@ import { useStore } from '@nanostores/react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 
-import { useSessionView } from '@/app/chat/session-view'
+import { useSessionView } from '@/components/chat/session-view'
 import { Codicon } from '@/components/ui/codicon'
 import { DropdownMenuItem, dropdownMenuRow } from '@/components/ui/dropdown-menu'
 import type { HermesGateway } from '@/hermes'

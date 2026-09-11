@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { ProfileInfo } from '@/types/hermes'
 
-vi.mock('@/app/chat/session-view', async () => {
+vi.mock('@/components/chat/session-view', async () => {
   const { atom } = await import('nanostores')
 
   return { PRIMARY_SESSION_VIEW: { $awaitingResponse: atom(false), $busy: atom(false) } }

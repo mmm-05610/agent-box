@@ -1,7 +1,7 @@
 import { useStore } from '@nanostores/react'
 import { type MutableRefObject, useCallback, useEffect, useRef } from 'react'
 
-import { PRIMARY_SESSION_VIEW } from '@/app/chat/session-view'
+import { PRIMARY_SESSION_VIEW } from '@/components/chat/session-view'
 import type { ChatMessage } from '@/lib/chat-messages'
 import { preserveLocalAssistantErrors } from '@/lib/chat-messages'
 import { createClientSessionState } from '@/lib/chat-runtime'

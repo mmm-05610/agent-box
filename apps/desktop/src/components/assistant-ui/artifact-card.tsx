@@ -3,8 +3,8 @@
 import { useStore } from '@nanostores/react'
 import { useEffect, useMemo } from 'react'
 
-import { useSessionView } from '@/app/chat/session-view'
 import { CodeCardIcon } from '@/components/chat/code-card'
+import { useSessionView } from '@/components/chat/session-view'
 import { WIDGET_SHELL_CLASS } from '@/components/chat/widget-shell'
 import { useI18n } from '@/i18n'
 import type { ArtifactDetection } from '@/lib/artifact-detect'

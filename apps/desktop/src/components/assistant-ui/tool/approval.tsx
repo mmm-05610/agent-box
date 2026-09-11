@@ -3,8 +3,8 @@
 import { useStore } from '@nanostores/react'
 import { type FC, useCallback, useEffect, useMemo, useState } from 'react'
 
-import { useSessionView } from '@/app/chat/session-view'
 import { requestForOwnedSession } from '@/application/session/request-owned-session'
+import { useSessionView } from '@/components/chat/session-view'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
