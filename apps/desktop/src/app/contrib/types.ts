@@ -1,12 +1,13 @@
 import type { ComponentProps, ReactNode } from 'react'
 
+import type { GatewayRequester } from '@/types/gateway'
+
 import type { ChatView } from '../chat'
 import type { ChatSidebar } from '../chat/sidebar'
 import type { CommandCenterSection } from '../command-center'
-import type { useGatewayRequest } from '../gateway/hooks/use-gateway-request'
 import type { ModelMenuPanel } from '../shell/model-menu-panel'
 
-export type GatewayRequester = ReturnType<typeof useGatewayRequest>['requestGateway']
+export type { GatewayRequester }
 
 /** The ChatSidebar handlers the controller owns — forwarded verbatim. */
 export type SidebarActions = Pick<

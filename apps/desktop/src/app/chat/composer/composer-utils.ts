@@ -2,8 +2,8 @@ import type { Unstable_TriggerItem } from '@assistant-ui/core'
 import type { ConnectionState } from '@hermes/shared'
 
 import type { SlashChipKind } from '@/components/assistant-ui/directive-text'
-import type { ComposerAttachment } from '@/store/composer'
 import { setSessionPickerOpen } from '@/store/session'
+import type { ComposerAttachment } from '@/types/composer'
 
 import type { TriggerState } from './text-utils'
 

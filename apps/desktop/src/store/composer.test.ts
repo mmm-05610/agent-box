@@ -1,22 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import {
-  $composerAttachments,
-  $voiceConversationStartRequest,
-  addComposerAttachment,
-  clearSessionDraft,
-  type ComposerAttachment,
-  createComposerAttachmentOccurrenceId,
-  createComposerAttachmentScope,
-  migrateSessionDraft,
-  removeComposerAttachment,
-  requestVoiceConversationStart,
-  SESSION_DRAFTS_STORAGE_KEY,
-  stashSessionDraft,
-  takeSessionDraft,
-  takeVoiceConversationStart,
-  updateComposerAttachment
-} from './composer'
+import type { ComposerAttachment } from '@/types/composer'
+
+import { $composerAttachments, $voiceConversationStartRequest, addComposerAttachment, clearSessionDraft, createComposerAttachmentOccurrenceId, createComposerAttachmentScope, migrateSessionDraft, removeComposerAttachment, requestVoiceConversationStart, SESSION_DRAFTS_STORAGE_KEY, stashSessionDraft, takeSessionDraft, takeVoiceConversationStart, updateComposerAttachment } from './composer'
 
 describe('voice conversation start requests', () => {
   it('latches each request until the main composer consumes it once', () => {

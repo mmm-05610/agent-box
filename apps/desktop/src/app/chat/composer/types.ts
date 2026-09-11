@@ -2,14 +2,24 @@ import type { ReactNode } from 'react'
 
 import type { SubmitTextOptions } from '@/app/session/hooks/use-prompt-actions/utils'
 import type { HermesGateway } from '@/hermes'
+import type { QuickModelOption } from '@/types/composer'
 import type { ContextSuggestion } from '@/types/context-suggestion'
 
-import type { DroppedFile } from '../hooks/use-composer-actions'
-
-export interface QuickModelOption {
-  provider: string
-  providerName: string
-  model: string
+/** One entry resolved from a drop event. Declared here rather than beside the
+ *  runtime that resolves it (`hooks/use-composer-actions`), so a consumer that
+ *  only needs the shape does not drag that module's closure in with it. */
+export interface DroppedFile {
+  /** Browser-native File handle. Absent for in-app drags (e.g. project tree). */
+  file?: File
+  /** Absolute filesystem path. Empty when an OS drop didn't carry one. */
+  path: string
+  /** True if the entry is a directory. Set by in-app drags, and by OS drops via
+   * DataTransferItem.webkitGetAsEntry(). */
+  isDirectory?: boolean
+  /** First line number for in-app line-ref drags (source view gutter). */
+  line?: number
+  /** Last line number for line-range drags (`line..lineEnd` inclusive). */
+  lineEnd?: number
 }
 
 export interface ChatBarState {

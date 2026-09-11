@@ -1,7 +1,8 @@
 import { $gateway } from '@/store/gateway'
 import { $activeSessionId, setYoloActive } from '@/store/session'
+import type { GatewayRequester } from '@/types/gateway'
 
-export type GatewayRequester = <T = unknown>(method: string, params?: Record<string, unknown>) => Promise<T>
+export type { GatewayRequester }
 
 /**
  * Toggle per-session YOLO (approval bypass) via gateway `config.set` — the same

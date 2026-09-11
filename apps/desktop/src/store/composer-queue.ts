@@ -1,8 +1,7 @@
 import { atom } from 'nanostores'
 
 import { SLASH_COMMAND_RE } from '@/lib/chat-runtime'
-
-import type { ComposerAttachment } from './composer'
+import type { ComposerAttachment } from '@/types/composer'
 
 export interface QueuedPromptEntry {
   id: string

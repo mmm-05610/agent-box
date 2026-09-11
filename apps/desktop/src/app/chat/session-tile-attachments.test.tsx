@@ -5,13 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ComposerScope } from '@/app/chat/composer/scope'
 import { useSessionTileActions } from '@/app/chat/session-tile-actions'
 import { createClientSessionState } from '@/lib/chat-runtime'
-import {
-  type ComposerAttachment,
-  createComposerAttachmentOccurrenceId,
-  createComposerAttachmentScope
-} from '@/store/composer'
+import { createComposerAttachmentOccurrenceId, createComposerAttachmentScope } from '@/store/composer'
 import { $connection, $sessions } from '@/store/session'
 import { $sessionStates, type SessionTileDelegate, setSessionTileDelegate } from '@/store/session-states'
+import type { ComposerAttachment } from '@/types/composer'
 
 import { deferred } from '../../test/deferred'
 

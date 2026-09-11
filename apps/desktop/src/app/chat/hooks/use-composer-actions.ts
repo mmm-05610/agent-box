@@ -9,19 +9,12 @@ import { readDesktopFileDataUrlLocalFirst, selectDesktopPaths } from '@/lib/desk
 import { desktopGit } from '@/lib/desktop-git'
 import { downscaleDataUrlForPreview } from '@/lib/image-resize'
 import { normalize } from '@/lib/text'
-import {
-  addComposerAttachment,
-  type ComposerAttachment,
-  type ComposerAttachmentPatch,
-  createComposerAttachmentOccurrenceId,
-  patchMainComposerAttachmentOccurrence,
-  removeComposerAttachment,
-  setComposerTerminalSelection,
-  updateComposerAttachment
-} from '@/store/composer'
+import { addComposerAttachment, createComposerAttachmentOccurrenceId, patchMainComposerAttachmentOccurrence, removeComposerAttachment, setComposerTerminalSelection, updateComposerAttachment } from '@/store/composer'
 import { notify, notifyError } from '@/store/notifications'
+import type { ComposerAttachment, ComposerAttachmentPatch } from '@/types/composer'
 
 import type { ImageDetachResponse } from '../../types'
+import type { DroppedFile } from '../composer/types'
 
 const IMAGE_EXTENSION_PATTERN = /\.(png|jpe?g|gif|webp|bmp|tiff?|svg|ico)$/i
 
@@ -75,20 +68,6 @@ async function queuedAttachmentPreview(filePath: string): Promise<{ previewUrl: 
   )
 
   return task
-}
-
-export interface DroppedFile {
-  /** Browser-native File handle. Absent for in-app drags (e.g. project tree). */
-  file?: File
-  /** Absolute filesystem path. Empty when an OS drop didn't carry one. */
-  path: string
-  /** True if the entry is a directory. Set by in-app drags, and by OS drops via
-   * DataTransferItem.webkitGetAsEntry(). */
-  isDirectory?: boolean
-  /** First line number for in-app line-ref drags (source view gutter). */
-  line?: number
-  /** Last line number for line-range drags (`line..lineEnd` inclusive). */
-  lineEnd?: number
 }
 
 /** MIME emitted by in-app drag sources (project tree, gutter line numbers).

@@ -14,13 +14,7 @@ import { setMutableRef } from '@/lib/mutable-ref'
 import { normalize } from '@/lib/text'
 import { transcribeAudioClientDirect } from '@/lib/voice-client-direct'
 import { clearClarifyRequest } from '@/store/clarify'
-import {
-  $composerAttachments,
-  type ComposerAttachment,
-  patchMainComposerAttachmentOccurrence,
-  setComposerAttachmentUploadState,
-  updateComposerAttachment
-} from '@/store/composer'
+import { $composerAttachments, patchMainComposerAttachmentOccurrence, setComposerAttachmentUploadState, updateComposerAttachment } from '@/store/composer'
 import { resetSessionBackground } from '@/store/composer-status'
 import { clearNotifications, notify, notifyError } from '@/store/notifications'
 import { clearPreviewArtifacts } from '@/store/preview-status'
@@ -40,6 +34,7 @@ import { $sessionStates, isSessionRemote } from '@/store/session-states'
 import { clearSessionSubagents } from '@/store/subagents'
 import { clearSessionTodos } from '@/store/todos'
 import { setSessionDraftingTool } from '@/store/tool-drafting'
+import type { ComposerAttachment } from '@/types/composer'
 
 import type {
   ClientSessionState,

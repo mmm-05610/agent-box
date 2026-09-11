@@ -4,7 +4,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { PaneVisibleContext } from '@/components/pane-shell/pane-visibility'
 import { $clarifyRequests } from '@/store/clarify'
-import type { ComposerAttachment } from '@/store/composer'
 import { $gateway } from '@/store/gateway'
 import {
   clearAllPrompts,
@@ -13,6 +12,7 @@ import {
   setSecretRequest,
   setSudoRequest
 } from '@/store/prompts'
+import type { ComposerAttachment } from '@/types/composer'
 
 import { type ComposerTarget, requestComposerSubmit } from '../focus'
 import { ComposerScopeProvider, ComposerSurfaceProvider, MAIN_COMPOSER_SCOPE } from '../scope'

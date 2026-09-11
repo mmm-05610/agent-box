@@ -12,12 +12,7 @@ import {
   stopVoicePlayback,
   takeVoicePlaybackInterrupted
 } from '@/lib/voice-playback'
-import {
-  $composerAttachments,
-  type ComposerAttachment,
-  mainComposerScope,
-  terminalContextBlocksFromDraft
-} from '@/store/composer'
+import { $composerAttachments, mainComposerScope, terminalContextBlocksFromDraft } from '@/store/composer'
 import { $hudMode } from '@/store/hud'
 import { clearNotifications, notify, notifyError } from '@/store/notifications'
 import { consumePendingCredentialWarning, requestDesktopOnboarding } from '@/store/onboarding'
@@ -32,6 +27,7 @@ import {
   touchSessionActivity
 } from '@/store/session'
 import { $sessionStates } from '@/store/session-states'
+import type { ComposerAttachment } from '@/types/composer'
 
 import type { ClientSessionState } from '../../../types'
 import { sessionContextDrift } from '../session-context-drift'

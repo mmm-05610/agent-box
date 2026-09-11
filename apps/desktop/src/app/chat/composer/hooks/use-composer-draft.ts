@@ -12,16 +12,10 @@ import { type RefObject, useCallback, useEffect, useLayoutEffect, useRef, useSta
 import { usePaneVisible } from '@/components/pane-shell/pane-visibility'
 import { SLASH_COMMAND_RE } from '@/lib/chat-runtime'
 import { sanitizeComposerInput } from '@/lib/composer-input-sanitize'
-import {
-  type ComposerAttachment,
-  type ComposerDraftSyncMode,
-  onComposerDraftSyncRequest,
-  reloadPersistedDrafts,
-  stashSessionDraft,
-  takeSessionDraft
-} from '@/store/composer'
+import { type ComposerDraftSyncMode, onComposerDraftSyncRequest, reloadPersistedDrafts, stashSessionDraft, takeSessionDraft } from '@/store/composer'
 import { isBrowsingHistory } from '@/store/composer-input-history'
 import { clearDraftSuggestions, sampleComposerDraft } from '@/store/composer-suggestions'
+import type { ComposerAttachment } from '@/types/composer'
 
 import {
   cloneAttachments,

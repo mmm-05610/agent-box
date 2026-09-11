@@ -72,11 +72,11 @@ import { DATA_IMAGE_URL_RE } from '@/lib/embedded-images'
 import { triggerHaptic } from '@/lib/haptics'
 import { Loader2Icon } from '@/lib/icons'
 import { cn } from '@/lib/utils'
-import type { ComposerAttachment } from '@/store/composer'
 import { notifyError } from '@/store/notifications'
 import { $terminalBackend } from '@/store/session'
 import { isSessionRemote } from '@/store/session-states'
 import { notifyThreadEditClose } from '@/store/thread-scroll'
+import type { ComposerAttachment } from '@/types/composer'
 
 interface UserEditComposerProps {
   cwd: string | null

@@ -2,8 +2,8 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { I18nProvider } from '@/i18n/context'
-import type { ComposerAttachment } from '@/store/composer'
 import { $previewTabs } from '@/store/preview'
+import type { ComposerAttachment } from '@/types/composer'
 
 import { AttachmentList } from './attachments'
 

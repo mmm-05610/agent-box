@@ -29,9 +29,9 @@ import {
   setSessionStalled
 } from '@/store/session-states'
 import type { SessionProfileRoute } from '@/store/session/types'
+import type { GatewayRequester } from '@/types/gateway'
 
 import type { ClientSessionState } from '../../types'
-import type { GatewayRequester } from '../types'
 
 interface ActiveTranscriptSession {
   ownerRoute?: SessionProfileRoute

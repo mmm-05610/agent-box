@@ -2,14 +2,13 @@ import { useEffect, useState } from 'react'
 
 import { getStatus } from '@/hermes'
 import { evaluateRuntimeReadiness, type RuntimeReadinessResult } from '@/lib/runtime-readiness'
+import type { GatewayRequester } from '@/types/gateway'
 import type { StatusResponse } from '@/types/hermes'
 
 // Statusbar health is ambient chrome, not live data — nothing the user acts on
 // within seconds. 60s + an actively-viewed check keeps traffic low; focus and
 // visibility listeners refresh immediately on return.
 const REFRESH_MS = 60_000
-
-type GatewayRequester = <T = unknown>(method: string, params?: Record<string, unknown>) => Promise<T>
 
 export function useStatusSnapshot(
   gatewayState: string | undefined,

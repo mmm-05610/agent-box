@@ -11,9 +11,9 @@ import { readDesktopFileDataUrlLocalFirst } from '@/lib/desktop-fs'
 import { AlertCircle, FileText, FolderOpen, ImageIcon, Link, Loader2, MessageCode, Terminal } from '@/lib/icons'
 import { normalizeOrLocalPreviewTarget } from '@/lib/local-preview'
 import { cn } from '@/lib/utils'
-import type { ComposerAttachment } from '@/store/composer'
 import { notifyError } from '@/store/notifications'
 import { openPreview } from '@/store/preview'
+import type { ComposerAttachment } from '@/types/composer'
 
 export function AttachmentList({
   attachments,

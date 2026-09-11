@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import type { ComposerAttachment } from './composer'
+import type { ComposerAttachment } from '@/types/composer'
+
 import {
   $parkedQueueSessions,
   $queuedPromptsBySession,

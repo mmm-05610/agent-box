@@ -25,8 +25,8 @@ import { useMemo } from 'react'
 import { useContributions } from '@/contrib/react/use-contributions'
 import { registry } from '@/contrib/registry'
 import type { TodoItem } from '@/lib/todos'
-import type { ComposerAttachment } from '@/store/composer'
 import type { ComposerAction } from '@/store/composer-actions'
+import type { ComposerAttachment } from '@/types/composer'
 
 export const COMPOSER_AREAS = {
   top: 'composer.top',

@@ -3,8 +3,9 @@ import { useLayoutEffect } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { PaneVisibleContext } from '@/components/pane-shell/pane-visibility'
-import { clearSessionDraft, type ComposerAttachment, mainComposerScope, stashSessionDraft } from '@/store/composer'
+import { clearSessionDraft, mainComposerScope, stashSessionDraft } from '@/store/composer'
 import { $connection } from '@/store/session'
+import type { ComposerAttachment } from '@/types/composer'
 
 import { useComposerActions } from '../../hooks/use-composer-actions'
 import type { QueueEditState } from '../composer-utils'

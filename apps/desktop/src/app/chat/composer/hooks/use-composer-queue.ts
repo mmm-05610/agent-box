@@ -4,7 +4,6 @@ import { type RefObject, useCallback, useEffect, useRef, useState } from 'react'
 import { useI18n } from '@/i18n'
 import { triggerHaptic } from '@/lib/haptics'
 import { useSessionSlice } from '@/lib/use-session-slice'
-import { type ComposerAttachment } from '@/store/composer'
 import { resetBrowseState } from '@/store/composer-input-history'
 import {
   $parkedQueueSessions,
@@ -23,6 +22,7 @@ import {
 } from '@/store/composer-queue'
 import { notify } from '@/store/notifications'
 import { $sessionsLoading } from '@/store/session'
+import type { ComposerAttachment } from '@/types/composer'
 
 import { cloneAttachments, type QueueEditState } from '../composer-utils'
 import { useComposerScope } from '../scope'

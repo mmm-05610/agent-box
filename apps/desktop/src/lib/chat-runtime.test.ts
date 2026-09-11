@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { ChatMessage, ChatMessagePart } from '@/lib/chat-messages'
-import type { ComposerAttachment } from '@/store/composer'
+import type { ComposerAttachment } from '@/types/composer'
 
 import {
   attachmentDisplayText,
