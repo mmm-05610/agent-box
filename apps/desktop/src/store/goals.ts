@@ -1,11 +1,11 @@
 import { atom } from 'nanostores'
 
+import { requestForOwnedSession } from '@/application/session/request-owned-session'
 import { keyedTimeouts } from '@/lib/keyed-timeouts'
 
 import { $gateway } from './gateway'
 import { isSessionGone, isSessionGoneForBackgroundPolling, markSessionGone } from './runtime-gone'
 import { ambientRequestFor } from './session-gone-latch'
-import { requestForOwnedSession } from './session-states'
 
 export type GoalStatus = 'active' | 'done' | 'paused' | 'waiting'
 

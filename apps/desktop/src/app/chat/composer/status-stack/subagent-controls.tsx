@@ -1,9 +1,9 @@
 import { useState } from 'react'
 
+import { requestForOwnedSession } from '@/application/session/request-owned-session'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useI18n } from '@/i18n'
-import { requestForOwnedSession } from '@/store/session-states'
 
 interface SubagentControlsProps {
   sessionId: string

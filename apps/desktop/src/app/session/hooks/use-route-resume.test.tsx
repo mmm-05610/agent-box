@@ -3,8 +3,8 @@ import type { MutableRefObject } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { $resumeExhaustedSessionId, setResumeExhaustedSessionId } from '@/store/session'
-import type { SessionProfileRoute } from '@/store/session-request-router'
 import { markSelectionRestore } from '@/store/session-states'
+import type { SessionProfileRoute } from '@/store/session/types'
 
 import { useRouteResume } from './use-route-resume'
 

@@ -34,7 +34,7 @@ export async function requestGatewayForProfile<T>(
 
     const routedParams = route.scopeProfile ? { ...params, profile: route.key } : params
 
-    // Same arity contract as the ambient path in session-request-router: only
+    // Same arity contract as the ambient path in application/session/request-router:
     // pass the deadline args through when the caller set them, so a plain
     // profile-routed RPC keeps its two-argument call shape.
     return await (timeoutMs === undefined && signal === undefined

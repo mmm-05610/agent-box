@@ -7,6 +7,12 @@
 // - tile-delegate         — the wiring-layer inversion seam
 // - tile-rebinding        — reconnect/reclaim runtime unbinding
 // - tile-operations       — open/focus/close/restore tiles in the tree
+//
+// STATE ONLY. This store answers what a session's state is and who owns it;
+// REQUESTING something from that owner is the `application/session/**` routing
+// use-case, which reads these atoms and talks to `store/gateway`. Re-exporting
+// a use-case from here would hand every consumer of session state the whole
+// transport closure back.
 
 export {
   $botChatScopes,
@@ -43,7 +49,6 @@ export {
   reconcileBusyStatesOnReconnect,
   recordSessionEventScope,
   releaseSessionTranscript,
-  requestForOwnedSession,
   SESSION_WATCHDOG_TIMEOUT_MS,
   type SessionTile,
   sessionTileOwnerRoute,

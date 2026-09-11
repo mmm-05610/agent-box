@@ -4,6 +4,7 @@ import { useStore } from '@nanostores/react'
 import { type FC, useCallback, useEffect, useMemo, useState } from 'react'
 
 import { useSessionView } from '@/app/chat/session-view'
+import { requestForOwnedSession } from '@/application/session/request-owned-session'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -28,7 +29,6 @@ import {
   sessionApprovalInlineVisible,
   sessionApprovalRequest
 } from '@/store/prompts'
-import { requestForOwnedSession } from '@/store/session-states'
 
 import type { ToolPart } from './fallback-model'
 

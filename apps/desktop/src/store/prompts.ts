@@ -1,10 +1,11 @@
 import { atom, computed, type ReadableAtom } from 'nanostores'
 
+import { requestForOwnedSession } from '@/application/session/request-owned-session'
+
 import { $clarifyRequest, $clarifyRequests } from './clarify'
 import { isSessionGone, isSessionGoneForBackgroundPolling, markSessionGone } from './runtime-gone'
 import { $activeSessionId } from './session'
 import { ambientRequestFor } from './session-gone-latch'
-import { requestForOwnedSession } from './session-states'
 
 // Blocking interactive prompts the gateway raises mid-turn. Each maps to a
 // `*.request` event the Python side emits while it blocks the agent thread

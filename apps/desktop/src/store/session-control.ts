@@ -1,10 +1,11 @@
 import { atom } from 'nanostores'
 
+import { requestForOwnedSession } from '@/application/session/request-owned-session'
+
 import { $gateway } from './gateway'
 import { refreshSessionGoal } from './goals'
 import { isSessionGone, isSessionGoneForBackgroundPolling, markSessionGone } from './runtime-gone'
 import { ambientRequestFor } from './session-gone-latch'
-import { requestForOwnedSession } from './session-states'
 
 export type SessionControlGoalStatus = 'active' | 'done' | 'paused'
 export type SessionControlLoopMode = 'interval' | 'self_paced'

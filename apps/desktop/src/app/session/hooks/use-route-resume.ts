@@ -2,8 +2,8 @@ import { type MutableRefObject, useEffect, useRef } from 'react'
 
 import { isNewChatRoute } from '@/app/routes'
 import { type SessionResumeRequest, setResumeExhaustedSessionId } from '@/store/session'
-import type { SessionProfileRoute } from '@/store/session-request-router'
 import { markSelectionRestore } from '@/store/session-states'
+import type { SessionProfileRoute } from '@/store/session/types'
 
 interface RouteResumeOptions {
   activeSessionId: string | null

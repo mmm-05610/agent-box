@@ -3,7 +3,7 @@ import type { SessionInfo } from '@/types/hermes'
 /**
  * THE canonical write path for tagging backend-returned session rows with the
  * registry connection that owns them (the read counterpart is
- * `sessionOwnerRouteFromRow` in store/session-request-router).
+ * `sessionOwnerRouteFromRow` in application/session/request-router).
  *
  * Every other `connection_id` writer works from an EXACT captured owner route
  * (the optimistic row in upsertOptimisticSession, the cache patch in

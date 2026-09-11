@@ -4,6 +4,7 @@ import { useCallback } from 'react'
 
 import { useModelControls } from '@/app/session/hooks/use-model-controls'
 import type { ModelSelection } from '@/app/shell/model-menu-panel'
+import { requestForSessionProfile } from '@/application/session/request-router'
 import { ModelPickerDialog } from '@/components/model-picker'
 import type { HermesGateway } from '@/hermes'
 import { resolveModelPickerOwner } from '@/lib/model-picker-owner'
@@ -17,7 +18,6 @@ import {
   $selectedStoredSessionId,
   setModelPickerOpen
 } from '@/store/session'
-import { requestForSessionProfile } from '@/store/session-request-router'
 import { $focusedRuntimeId, $focusedSessionState, $focusedStoredSessionId, $sessionTiles } from '@/store/session-states'
 
 interface ModelPickerOverlayProps {

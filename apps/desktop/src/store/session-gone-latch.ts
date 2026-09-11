@@ -6,8 +6,8 @@ import { JsonRpcGatewayError } from '@hermes/shared'
  *
  *  Shared by every background poller (process.list, approval.pending, goal
  *  status) and by the owner-routed RPC seam that clears it. This module is a
- *  dependency-free leaf on purpose: `session-request-router` (which every
- *  store imports) must be able to clear the latch after a successful rebind
+ *  dependency-free leaf on purpose: the session-routing use-case
+ *  (application/session/request-router) must be able to clear the latch after a rebind
  *  without pulling the session/tile stores into its import graph. Stores that
  *  also need the heal levers import through `runtime-gone.ts` (which re-exports
  *  this module); cycle-sensitive callers (the router, the gateway event loop)

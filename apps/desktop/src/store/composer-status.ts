@@ -1,5 +1,6 @@
 import { atom, computed } from 'nanostores'
 
+import { requestForOwnedSession } from '@/application/session/request-owned-session'
 import { translateNow } from '@/i18n'
 import { stableArray } from '@/lib/stable-array'
 import { type TodoItem, type TodoStatus, todoTree } from '@/lib/todos'
@@ -11,7 +12,7 @@ import { notifyError } from './notifications'
 import { isSessionGone, isSessionGoneForBackgroundPolling, markSessionGone, noteRuntimeAlive } from './runtime-gone'
 import { $sessions, lineageAliases } from './session'
 import { ambientRequestFor } from './session-gone-latch'
-import { $sessionStates, requestForOwnedSession } from './session-states'
+import { $sessionStates } from './session-states'
 import { $subagentsBySession, type SubagentProgress } from './subagents'
 import { $todosBySession } from './todos'
 

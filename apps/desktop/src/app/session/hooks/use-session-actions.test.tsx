@@ -10,6 +10,7 @@ import { resolveSessionRpcOwner } from '@/app/contrib/wiring-routing'
 import { $terminalTakeover, setTerminalTakeover } from '@/app/right-sidebar/store'
 import { ensureGatewayProfile } from '@/application/profile/runtime-selection'
 import { getLatestSessionMessages } from '@/application/session-transcripts'
+import { requestForSessionProfile } from '@/application/session/request-router'
 import { noteActiveTreeGroup, revealTreePane } from '@/components/pane-shell/tree/store'
 import {
   deleteSession,
@@ -67,9 +68,9 @@ import {
   setTurnStartedAt
 } from '@/store/session'
 import { $removedSessionIds, $sessionMutationsInFlight } from '@/store/session-removal'
-import { requestForSessionProfile, type SessionProfileRoute } from '@/store/session-request-router'
 import { $sessionTiles, sessionTileOwnerRoute } from '@/store/session-states'
 import { $sessionSeenCounts, $unreadFinishedMarkers } from '@/store/session-unread'
+import { type SessionProfileRoute } from '@/store/session/types'
 
 import { deferred } from '../../../test/deferred'
 import { NEW_CHAT_ROUTE, sessionRoute } from '../../routes'

@@ -1,3 +1,4 @@
+import { sessionOwnerRouteFromRow } from '@/application/session/request-router'
 import { getSession } from '@/hermes'
 import { isMessagingSource, normalizeSessionSource } from '@/lib/session-source'
 import { $activeGatewayProfile, $profiles, normalizeProfileKey } from '@/store/profile'
@@ -11,11 +12,7 @@ import {
   setMessagingSessions,
   setSessions
 } from '@/store/session'
-import {
-  sessionOwnerRouteFromRow,
-  type SessionOwnerScope,
-  type SessionProfileRoute
-} from '@/store/session-request-router'
+import { type SessionOwnerScope, type SessionProfileRoute } from '@/store/session/types'
 import type { SessionInfo } from '@/types/hermes'
 
 /** Resolve a stored session row and its owner across every cached session

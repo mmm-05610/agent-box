@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 
 import { graftRefreshedTailOntoBackfill } from '@/app/chat/transcript-backfill'
 import { fetchStoredTranscriptAcrossBackends, getLatestSessionMessages } from '@/application/session-transcripts'
+import { requestForSessionProfile } from '@/application/session/request-router'
 import { PROMPT_SUBMIT_REQUEST_TIMEOUT_MS } from '@/hermes'
 import { translateNow } from '@/i18n/runtime'
 import { type ChatMessage, chatMessageText, toChatMessages } from '@/lib/chat-messages'
@@ -13,13 +14,13 @@ import {
 } from '@/store/read-only-transcript'
 import { knownSessionOwner, ownerLookupSessionRows } from '@/store/session'
 import { assertSessionOwnerResolved } from '@/store/session-owner-resolution'
-import { requestForSessionProfile, type SessionOwnerScope } from '@/store/session-request-router'
 import {
   $sessionTiles,
   publishSessionState,
   sessionTileOwnerRoute,
   setSessionTileDelegate
 } from '@/store/session-states'
+import { type SessionOwnerScope } from '@/store/session/types'
 import type { SessionResumeResponse } from '@/types/hermes'
 
 import type { usePromptActions } from '../../session/hooks/use-prompt-actions'

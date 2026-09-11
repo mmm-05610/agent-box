@@ -1,5 +1,5 @@
 import { requestGatewayForAgent } from '@/store/gateway'
-import type { SessionOwnerRoute } from '@/store/session-request-router'
+import type { SessionOwnerRoute } from '@/store/session/types'
 
 export interface ForeignSession {
   id: string

@@ -1,8 +1,9 @@
 import { useStore } from '@nanostores/react'
 import { useEffect } from 'react'
 
+import { requestForOwnedSession } from '@/application/session/request-owned-session'
 import { $gatewayState } from '@/store/session'
-import { knownOwnerForSession, requestForOwnedSession } from '@/store/session-states'
+import { knownOwnerForSession } from '@/store/session-states'
 import { $subagentsBySession, reconcileSubagentSnapshot, type SubagentPayload } from '@/store/subagents'
 
 export const rejectUnownedSubagentRequest = async <T>(): Promise<T> => {

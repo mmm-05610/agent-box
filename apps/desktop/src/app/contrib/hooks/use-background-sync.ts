@@ -21,7 +21,6 @@ import {
   sessionMatchesStoredId,
   setCurrentCwd
 } from '@/store/session'
-import type { SessionProfileRoute } from '@/store/session-request-router'
 import {
   $sessionStates,
   $sessionTiles,
@@ -29,6 +28,7 @@ import {
   SESSION_WATCHDOG_TIMEOUT_MS,
   setSessionStalled
 } from '@/store/session-states'
+import type { SessionProfileRoute } from '@/store/session/types'
 
 import type { ClientSessionState } from '../../types'
 import type { GatewayRequester } from '../types'

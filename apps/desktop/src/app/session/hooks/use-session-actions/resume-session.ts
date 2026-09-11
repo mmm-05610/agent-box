@@ -5,6 +5,7 @@ import { ensureGatewayAgent } from '@/application/profile/gateway-routing'
 import { ensureGatewayProfile } from '@/application/profile/runtime-selection'
 import { selectStoredSessionForViewing } from '@/application/session-read-state'
 import { fetchStoredTranscriptAcrossBackends, getLatestSessionMessages } from '@/application/session-transcripts'
+import { requestForSessionProfile } from '@/application/session/request-router'
 import { type Translations } from '@/i18n'
 import {
   type ChatMessage,
@@ -44,16 +45,12 @@ import {
 import { isSessionOwnerResolutionError } from '@/store/session-owner-resolution'
 import { isSessionRemovalPending } from '@/store/session-removal'
 import {
-  requestForSessionProfile,
-  type SessionOwnerScope,
-  type SessionProfileRoute
-} from '@/store/session-request-router'
-import {
   $sessionTiles,
   closeSessionTile,
   dropSessionState,
   publishSessionState
 } from '@/store/session-states'
+import { type SessionOwnerScope, type SessionProfileRoute } from '@/store/session/types'
 import { restoreSessionTodosFromSnapshot } from '@/store/todos'
 import { dropTranscriptTail, loadTranscriptTail, saveTranscriptTail } from '@/store/transcript-tail-cache'
 import { isWatchWindow } from '@/store/windows'

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 
+import { requestForOwnedSession } from '@/application/session/request-owned-session'
 import { useI18n } from '@/i18n'
-import { knownOwnerForSession, requestForOwnedSession } from '@/store/session-states'
+import { knownOwnerForSession } from '@/store/session-states'
 
 import { rejectUnownedSubagentRequest } from './use-subagent-snapshot'
 

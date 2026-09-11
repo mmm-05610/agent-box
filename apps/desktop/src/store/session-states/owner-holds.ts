@@ -4,7 +4,7 @@ import { atom } from 'nanostores'
 import { normalizeProfileKey } from '@/store/profile/identity'
 
 import { $activeSessionId } from '../session'
-import type { SessionOwnerRoute, SessionOwnerScope } from '../session-request-router'
+import type { SessionOwnerRoute, SessionOwnerScope } from '../session/types'
 
 import { $sessionTiles, sessionScopeByRuntimeId } from './session-state-registry'
 

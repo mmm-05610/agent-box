@@ -1,6 +1,6 @@
 import { knownSessionOwner } from '@/store/session'
-import type { SessionOwnerRoute, SessionOwnerScope } from '@/store/session-request-router'
 import type { SessionTile } from '@/store/session-states'
+import type { SessionOwnerRoute, SessionOwnerScope } from '@/store/session/types'
 import type { SessionInfo } from '@/types/hermes'
 
 /**

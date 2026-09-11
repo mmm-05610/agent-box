@@ -1,6 +1,6 @@
 import { $activeGatewayProfile, normalizeProfileKey } from '@/store/profile'
 import { $currentCwd, setSessionOwnerHint, setSessions } from '@/store/session'
-import type { SessionProfileRoute } from '@/store/session-request-router'
+import type { SessionProfileRoute } from '@/store/session/types'
 import type { SessionCreateResponse, SessionInfo } from '@/types/hermes'
 
 /** Publish optimistic sidebar session rows and patch their workspace fields. */

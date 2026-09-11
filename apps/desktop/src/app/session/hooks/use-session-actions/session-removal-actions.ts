@@ -1,6 +1,7 @@
 import { useCallback } from 'react'
 
 import { selectStoredSessionForViewing } from '@/application/session-read-state'
+import { requestForSessionProfile } from '@/application/session/request-router'
 import { deleteSession, setSessionArchived } from '@/hermes'
 import { type Translations } from '@/i18n'
 import { clearQueuedPrompts } from '@/store/composer-queue'
@@ -16,9 +17,9 @@ import {
 import { $messages } from '@/store/session'
 import { clearSessionControl } from '@/store/session-control'
 import { beginSessionMutation, endSessionMutation, tombstoneSessions, untombstoneSessions } from '@/store/session-removal'
-import { requestForSessionProfile, type SessionOwnerScope } from '@/store/session-request-router'
 import { closeSessionTile, dropSessionState } from '@/store/session-states'
 import { forgetSessionUnread } from '@/store/session-unread'
+import { type SessionOwnerScope } from '@/store/session/types'
 import { $archivedSessions } from '@/store/sidebar-archive'
 import { dropTranscriptTailEverywhere } from '@/store/transcript-tail-cache'
 

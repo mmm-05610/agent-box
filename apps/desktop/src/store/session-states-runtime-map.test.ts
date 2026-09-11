@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { requestForOwnedSession } from '@/application/session/request-owned-session'
 import { createClientSessionState } from '@/lib/chat-runtime'
 import { $connectionsRegistry } from '@/store/connection-registry-state'
 import { setPrimaryGateway, setPrimaryGatewayConnection } from '@/store/gateway'
@@ -13,7 +14,6 @@ import {
   knownOwnerForSession,
   publishSessionState,
   recordSessionEventScope,
-  requestForOwnedSession,
   storedSessionIdForRuntimeId
 } from '@/store/session-states'
 import { makeSessionInfo } from '@/test/session-info'

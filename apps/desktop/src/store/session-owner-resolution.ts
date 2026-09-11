@@ -21,7 +21,7 @@ import { $profiles } from '@/store/profile/catalog-state'
  * their rows entirely; those users keep working unchanged.
  */
 import { hasRegistryTopology } from './connection-registry-state'
-import { isSessionOwnerRoute, type SessionOwnerScope } from './session-request-router'
+import { isSessionOwnerRoute, type SessionOwnerScope } from './session/types'
 
 export class SessionOwnerResolutionError extends Error {
   constructor(

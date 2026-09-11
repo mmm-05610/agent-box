@@ -15,6 +15,7 @@ import {
 
 import { requestComposerFocus, requestComposerInsert } from '@/app/chat/composer/focus'
 import { useSessionView } from '@/app/chat/session-view'
+import { requestForOwnedSession } from '@/application/session/request-owned-session'
 import { ToolFallback } from '@/components/assistant-ui/tool/fallback'
 import { WIDGET_SHELL_CLASS } from '@/components/chat/widget-shell'
 import { Button } from '@/components/ui/button'
@@ -38,7 +39,6 @@ import {
 } from '@/store/clarify'
 import { $gateway } from '@/store/gateway'
 import { notifyError } from '@/store/notifications'
-import { requestForOwnedSession } from '@/store/session-states'
 
 import { handleClarifySubmitShortcut } from './clarify-submit-shortcut'
 import { selectMessageRunning } from './tool/fallback-model'

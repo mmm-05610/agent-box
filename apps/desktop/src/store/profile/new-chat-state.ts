@@ -8,7 +8,7 @@ import type { SessionOwnerRoute } from '@/store/session/types'
 // `application/profile/{new-session,gateway-routing}`.
 
 /** The draft's exact owner — the same shape every session-scoped surface
- *  routes by (store/session-request-router SessionOwnerRoute). */
+ *  routes by (store/session/types SessionOwnerRoute). */
 export type AgentProfileRoute = SessionOwnerRoute
 
 // Profile for the NEXT new chat (chosen via the new-chat picker). null = primary

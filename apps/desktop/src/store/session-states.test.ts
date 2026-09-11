@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { ClientSessionState } from '@/app/types'
+import { requestForOwnedSession } from '@/application/session/request-owned-session'
 import { findGroupOfPane, group, split } from '@/components/pane-shell/tree/model'
 import { $layoutTree, noteActiveTreeGroup } from '@/components/pane-shell/tree/store'
 import {
@@ -12,7 +13,6 @@ import {
 } from '@/components/pane-shell/workspace-scope'
 import { $activeGatewayProfile } from '@/store/profile/runtime-route-state'
 import { $activeSessionId, $connection, $selectedStoredSessionId, setSessions } from '@/store/session'
-import type { SessionProfileRoute } from '@/store/session-request-router'
 import type { SessionTile } from '@/store/session-states'
 import type * as SessionStatesModule from '@/store/session-states'
 import {
@@ -35,7 +35,6 @@ import {
   patchSessionTile,
   recordSessionEventScope,
   releaseSessionTranscript,
-  requestForOwnedSession,
   resetTileRuntimeBindings,
   selectionHomesToWorkspace,
   type SessionTileDelegate,
@@ -43,6 +42,7 @@ import {
   setSessionTileDelegate,
   setSessionTileWorkspaceScope
 } from '@/store/session-states'
+import type { SessionProfileRoute } from '@/store/session/types'
 
 const tile = (storedSessionId: string): SessionTile => ({ storedSessionId })
 const tilePane = (id: string) => `session-tile:${id}`

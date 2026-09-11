@@ -12,6 +12,7 @@ import type { AppendMessage, ThreadMessage } from '@assistant-ui/react'
 import { useCallback, useMemo, useRef } from 'react'
 
 import type { ClientSessionState } from '@/app/types'
+import { requestForSessionProfile } from '@/application/session/request-router'
 import { useI18n } from '@/i18n'
 import { textPart } from '@/lib/chat-messages'
 import { SLASH_COMMAND_RE } from '@/lib/chat-runtime'
@@ -24,11 +25,6 @@ import { clearPreviewArtifacts } from '@/store/preview-status'
 import { clearAllPrompts } from '@/store/prompts'
 import { $sessions, knownSessionOwner, ownerLookupSessionRows, sessionMatchesStoredId } from '@/store/session'
 import {
-  requestForSessionProfile,
-  type SessionOwnerScope,
-  type SessionProfileRoute
-} from '@/store/session-request-router'
-import {
   $sessionStates,
   isSessionRemote,
   patchSessionTile,
@@ -36,6 +32,7 @@ import {
   sessionTileOwnerRoute
 } from '@/store/session-states'
 import { broadcastSessionsChanged } from '@/store/session-sync'
+import { type SessionOwnerScope, type SessionProfileRoute } from '@/store/session/types'
 import { clearSessionSubagents } from '@/store/subagents'
 import { clearSessionTodos } from '@/store/todos'
 import { setSessionDraftingTool } from '@/store/tool-drafting'

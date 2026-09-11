@@ -1,5 +1,6 @@
 import { atom } from 'nanostores'
 
+import { requestForOwnedSession } from '@/application/session/request-owned-session'
 import { type HermesOpenTarget, resolveHermesOpenPath } from '@/lib/hermes-open-target'
 import { persistString, storedString } from '@/lib/storage'
 
@@ -8,7 +9,7 @@ import { withinNativeNotifyBaseline } from './notify-baseline'
 import { clearApprovalRequest } from './prompts'
 import { isSessionGone, isSessionGoneForBackgroundPolling, markSessionGone } from './runtime-gone'
 import { $activeSessionId } from './session'
-import { requestForOwnedSession, storedSessionIdForRuntimeId } from './session-states'
+import { storedSessionIdForRuntimeId } from './session-states'
 
 export type { HermesOpenTarget }
 

@@ -12,7 +12,7 @@ import { SegmentedControl } from '@/components/ui/segmented-control'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
 import { setSessionOwnerHint } from '@/store/session'
-import type { SessionOwnerRoute } from '@/store/session-request-router'
+import type { SessionOwnerRoute } from '@/store/session/types'
 
 import { OverlayView } from '../overlays/overlay-view'
 import { PanelEmpty } from '../overlays/panel'

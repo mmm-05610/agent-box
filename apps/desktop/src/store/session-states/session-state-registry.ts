@@ -23,13 +23,8 @@ import {
 } from '../session'
 import { secondaryProfileOwnerForEvent } from '../session-event-provenance'
 import { $focusedTreePaneId } from '../session-focus'
-import { assertSessionOwnerResolved } from '../session-owner-resolution'
-import {
-  requestForSessionProfile,
-  type SessionOwnerRoute,
-  type SessionOwnerScope
-} from '../session-request-router'
 import { markSessionUnreadFinished } from '../session-unread'
+import { type SessionOwnerRoute, type SessionOwnerScope } from '../session/types'
 import { isBrowserWindow, isSecondaryWindow } from '../windows'
 
 import { sessionTileDelegate } from './tile-delegate'
@@ -777,8 +772,8 @@ export function knownOwnerForSession(sessionId: null | string | undefined): Sess
  * Whether the connection that OWNS `sessionId` is remote — never the ambient
  * `$connection`. A session tied to a registered secondary connection (Bot
  * Mode, the unified Sessions list) can differ from whichever connection the
- * window currently shows; its RPCs already route to their own owner via
- * `requestForSessionProfile`, but a caller that instead reads ambient mode to
+ * window currently shows; its RPCs already route to their own owner through
+ * application/session, but a caller that instead reads ambient mode to
  * decide image.attach vs image.attach_bytes ships a client-local path to a
  * remote backend that can't resolve it (#94640). A bare profile name (no
  * connectionId) is a pool profile of the ambient connection, so ambient mode
@@ -792,39 +787,6 @@ export function isSessionRemote(sessionId: null | string | undefined): boolean {
   }
 
   return $connection.get()?.mode === 'remote'
-}
-
-/**
- * Dispatch a session-scoped RPC through the OWNER of `sessionId` (tile route →
- * hint → connection-tagged row / known profile). This is the client half of
- * #91684: approval.respond (and siblings) sent on the ambient socket land on
- * whatever backend is active, which for a cross-profile session is a backend
- * that never held the approval. An UNKNOWN owner fails closed with an
- * explicit SessionOwnerResolutionError unless the ambient gateway is provably
- * the only backend (legacy single-profile, no registry source).
- */
-export function requestForOwnedSession<T>(
-  sessionId: null | string | undefined,
-  ambientRequest: <R>(
-    method: string,
-    params?: Record<string, unknown>,
-    timeoutMs?: number,
-    signal?: AbortSignal
-  ) => Promise<R>,
-  method: string,
-  params: Record<string, unknown> = {},
-  timeoutMs?: number,
-  signal?: AbortSignal
-): Promise<T> {
-  const owner = knownOwnerForSession(sessionId)
-
-  try {
-    assertSessionOwnerResolved(owner, { method, sessionId })
-  } catch (error) {
-    return Promise.reject(error)
-  }
-
-  return requestForSessionProfile<T>(owner, ambientRequest, method, params, timeoutMs, signal)
 }
 
 /** Resolve a session id THAT MAY BE A RUNTIME ID to the stored id its tile

@@ -72,9 +72,10 @@ const {
   clearAllSessionStates,
   forgetProfileOnlyRuntimeOwners,
   knownOwnerForSession,
-  recordSessionEventScope,
-  requestForOwnedSession
+  recordSessionEventScope
 } = await import('./session-states')
+
+const { requestForOwnedSession } = await import('@/application/session/request-owned-session')
 
 const { isSessionOwnerResolutionError } = await import('./session-owner-resolution')
 

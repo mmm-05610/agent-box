@@ -1,15 +1,22 @@
 import { requestGatewayForAgent, requestGatewayForProfile, retainGatewayForSessionTurn } from '@/store/gateway'
-
-import { resetBackgroundPollingGuardAfterRebind } from './session-gone-latch'
-import type { SessionOwnerRoute, SessionOwnerScope, SessionProfileRoute } from './session/types'
+import { resetBackgroundPollingGuardAfterRebind } from '@/store/session-gone-latch'
+import { isSessionOwnerRoute, type SessionOwnerRoute, type SessionOwnerScope, type SessionProfileRoute } from '@/store/session/types'
 
 /**
- * The owner route and its scope are DEFINED in `./session/types`, which stands
- * on `@/types/**` alone: the session store carries the shape and may not reach
- * this router (and, through it, `@/store/gateway` → `@/hermes`). Everything that
- * routes an RPC to a session's owner keeps importing the types from here.
+ * The session-scoped RPC routing use-case: which socket a session RPC is sent
+ * on, and for how long that socket is held.
+ *
+ * It lives in `application/` because it is an orchestration over two things the
+ * store layer keeps apart — Gateway transport (which socket) and Session State
+ * (which owner a session has). `store/session-states/**` used to send these
+ * requests itself, which is what closed SCC-B; it now answers state and owner
+ * queries only, and callers that need to REQUEST something come here.
+ *
+ * The owner SHAPE is not re-exported here. It is defined in the shape leaf
+ * (`store/session/types`), which imports nothing, and every consumer of the
+ * type imports it from there — a type that arrives through this module drags the
+ * transport into the consumer's closure, which is the mistake being undone.
  */
-export type { SessionOwnerRoute, SessionOwnerScope, SessionProfileRoute } from './session/types'
 
 /** Exact owner reconstructed from a CONNECTION-TAGGED session row (the
  *  Electron unified-list splice tags foreign registry rows; an optimistic row
@@ -47,11 +54,6 @@ export function sessionOwnerRouteFromRow(
 // reach that case for a real session.
 
 const normKey = (profile: null | string | undefined): string => (profile ?? '').trim() || 'default'
-
-export const isSessionOwnerRoute = (owner: SessionOwnerScope): owner is SessionOwnerRoute =>
-  Boolean(owner && typeof owner === 'object' && 'connectionId' in owner)
-
-const isRoute = isSessionOwnerRoute
 
 function routeParams(route: SessionProfileRoute, params: Record<string, unknown>): Record<string, unknown> {
   if (!route.targetProfile || !Object.prototype.hasOwnProperty.call(params, 'profile')) {
@@ -135,7 +137,7 @@ async function requestWithRebindGuard<T>(
  * fresh draft with no session, or global chrome) routes ambient.
  */
 export function sessionRpcNeedsProfileRoute(ownerProfile: SessionOwnerScope | undefined): boolean {
-  if (isRoute(ownerProfile)) {
+  if (isSessionOwnerRoute(ownerProfile)) {
     // A descriptor is an immutable ownership claim. Even an explicitly local
     // route must not collapse to the ambient request: another connection can
     // expose the same profile name, and activation is UI state only.
@@ -164,7 +166,7 @@ export function requestForSessionProfile<T>(
   timeoutMs?: number,
   signal?: AbortSignal
 ): Promise<T> {
-  if (isRoute(ownerProfile)) {
+  if (isSessionOwnerRoute(ownerProfile)) {
     const connectionId = ownerProfile.connectionId.trim()
 
     if (!connectionId) {

@@ -17,7 +17,6 @@
 import { markStoredSessionViewed } from '@/application/session-read-state'
 import type { WorkspaceMode } from '@/contrib/types'
 import { $activeSessionId, $selectedStoredSessionId } from '@/store/session'
-import type { SessionProfileRoute } from '@/store/session-request-router'
 import {
   focusedSessionNeedsRoute,
   focusOpenSession,
@@ -25,6 +24,7 @@ import {
   reuseBlankDraftTile,
   setSessionTileWorkspaceScope
 } from '@/store/session-states'
+import type { SessionProfileRoute } from '@/store/session/types'
 import { canOpenSessionWindow, openSessionInNewWindow } from '@/store/windows'
 
 import { $workspaceIsPage, sessionRoute } from './routes'

@@ -24,6 +24,7 @@ import { useModelControls } from '@/app/session/hooks/use-model-controls'
 import { blobToDataUrl } from '@/app/session/hooks/use-prompt-actions/utils'
 import { resolveStoredSession } from '@/app/session/hooks/use-session-actions/utils'
 import { ModelMenuPanel } from '@/app/shell/model-menu-panel'
+import { requestForSessionProfile } from '@/application/session/request-router'
 import { formatRefValue } from '@/components/assistant-ui/directive-text'
 import { CenteredThreadSpinner } from '@/components/assistant-ui/thread/status'
 import { findGroupOfPane } from '@/components/pane-shell/tree/model'
@@ -52,7 +53,6 @@ import {
   sessionPinId
 } from '@/store/session'
 import { isSessionRemovalPending } from '@/store/session-removal'
-import { requestForSessionProfile } from '@/store/session-request-router'
 import {
   $sessionStates,
   $sessionTileDelegateRevision,

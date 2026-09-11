@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { isSessionGone, latchSessionGone, resetBackgroundPollingGuard } from './session-gone-latch'
+import { isSessionGone, latchSessionGone, resetBackgroundPollingGuard } from '@/store/session-gone-latch'
 
 // Regression coverage for the #89206 wake-failure class: session-scoped RPCs
 // routed to a backend that does not own the session's profile. Three layers:
@@ -8,7 +8,7 @@ import { isSessionGone, latchSessionGone, resetBackgroundPollingGuard } from './
 //      from applyActive itself, so eviction fallbacks move it in lockstep.
 //   2. the profile store mirrors that atom into $activeGatewayProfile, so the
 //      "already active" fast path can never trust a stale profile.
-//   3. session-request-router pins session-scoped RPCs to the owning
+//   3. application/session/request-router pins session-scoped RPCs to the owning
 //      profile's socket at REQUEST time when the active route diverges.
 
 const secondaryGateways: Array<{
@@ -77,10 +77,10 @@ const {
   pruneSecondaryGateways,
   retireLocalProfileGateways,
   setPrimaryGateway
-} = await import('./gateway')
+} = await import('@/store/gateway')
 
-const { requestForSessionProfile, sessionRpcNeedsProfileRoute } = await import('./session-request-router')
-const { $connectionsRegistry } = await import('./connection-registry-state')
+const { requestForSessionProfile, sessionRpcNeedsProfileRoute } = await import('./request-router')
+const { $connectionsRegistry } = await import('@/store/connection-registry-state')
 
 function installDesktop(): void {
   ;(window as unknown as { hermesDesktop: unknown }).hermesDesktop = {

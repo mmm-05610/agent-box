@@ -5,7 +5,7 @@
  * React/Electron controller module.
  */
 
-import type { SessionOwnerRoute } from '@/store/session-request-router'
+import type { SessionOwnerRoute } from '@/store/session/types'
 
 /**
  * Resolve a runtime session id back to its stored id by reverse-scanning the

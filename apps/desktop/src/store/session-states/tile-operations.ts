@@ -20,8 +20,8 @@ import {
   markSessionRead,
   setSessions
 } from '../session'
-import type { SessionProfileRoute } from '../session-request-router'
 import { ackStoredSessionId } from '../session-unread'
+import type { SessionProfileRoute } from '../session/types'
 
 import { setSessionTileWorkspaceScope } from './bot-chat-scope'
 import {
