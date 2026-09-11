@@ -1,11 +1,8 @@
 import { useEffect } from 'react'
 
 import { graftRefreshedTailOntoBackfill } from '@/app/chat/transcript-backfill'
-import {
-  fetchStoredTranscriptAcrossBackends,
-  getLatestSessionMessages,
-  PROMPT_SUBMIT_REQUEST_TIMEOUT_MS
-} from '@/hermes'
+import { fetchStoredTranscriptAcrossBackends, getLatestSessionMessages } from '@/application/session-transcripts'
+import { PROMPT_SUBMIT_REQUEST_TIMEOUT_MS } from '@/hermes'
 import { translateNow } from '@/i18n/runtime'
 import { type ChatMessage, chatMessageText, toChatMessages } from '@/lib/chat-messages'
 import { notify } from '@/store/notifications'

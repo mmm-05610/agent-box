@@ -1,6 +1,6 @@
 import type { McpCatalogResponse, McpServerSummary } from '@/types/hermes'
 
-import { capabilityScoped, hermesApi, type ProfileScope, profileScoped } from './client'
+import { capabilityScoped, hermesApi, type ProfileScope, profileScoped, requestHermesApi } from './client'
 
 export interface McpTestResult {
   ok: boolean
@@ -25,7 +25,7 @@ export interface McpOAuthFlow {
 /** Connect to the server, list its tools, disconnect. Slow (spawns/handshakes
  *  for real) — well past the 15s default fetch timeout. */
 export function testMcpServer(name: string, profile?: ProfileScope): Promise<McpTestResult> {
-  return window.hermesDesktop.api<McpTestResult>({
+  return requestHermesApi<McpTestResult>({
     ...capabilityScoped(profile),
     path: `/api/mcp/servers/${encodeURIComponent(name)}/test`,
     method: 'POST',
@@ -40,25 +40,12 @@ export function saveMcpServers(
   servers: Record<string, Record<string, unknown>>,
   profile?: ProfileScope
 ): Promise<{ ok: boolean }> {
-  return window.hermesDesktop.api<{ ok: boolean }>({
+  return requestHermesApi<{ ok: boolean }>({
     ...capabilityScoped(profile),
     path: '/api/mcp/servers',
     method: 'PUT',
     body: { servers }
   })
-}
-
-/** Capture the source before the first await. Every OAuth RPC, including
- *  cleanup after a foreground switch, belongs to this (connection, profile).
- *  Import the store lazily: it consumes the API barrel during initialization. */
-export function mcpOAuthRpc(scope?: ProfileScope) {
-  const { connectionId = null, profile = 'default' } = capabilityScoped(scope)
-
-  return async <T>(action: 'start' | 'poll' | 'callback' | 'cancel', params: Record<string, unknown>): Promise<T> => {
-    const { requestGatewayForAgent } = await import('@/store/gateway')
-
-    return requestGatewayForAgent<T>(connectionId, profile, `mcp.servers.oauth.${action}`, params, 60_000)
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -87,7 +74,7 @@ export function addMcpServer(
   },
   profile?: ProfileScope
 ): Promise<McpServerSummary> {
-  return window.hermesDesktop.api<McpServerSummary>({
+  return requestHermesApi<McpServerSummary>({
     ...capabilityScoped(profile),
     path: '/api/mcp/servers',
     method: 'POST',
@@ -98,7 +85,7 @@ export function addMcpServer(
 /** Remove one server from `mcp_servers` (the inline setup card's rollback
  *  when a directory install is cancelled after the config write). */
 export function removeMcpServer(name: string, profile?: ProfileScope): Promise<{ ok: boolean }> {
-  return window.hermesDesktop.api<{ ok: boolean }>({
+  return requestHermesApi<{ ok: boolean }>({
     ...capabilityScoped(profile),
     path: `/api/mcp/servers/${encodeURIComponent(name)}`,
     method: 'DELETE'
@@ -115,7 +102,7 @@ export function setMcpServerEnabled(name: string, enabled: boolean): Promise<{ o
 }
 
 export function getMcpCatalog(profile?: ProfileScope): Promise<McpCatalogResponse> {
-  return window.hermesDesktop.api<McpCatalogResponse>({
+  return requestHermesApi<McpCatalogResponse>({
     ...capabilityScoped(profile),
     path: '/api/mcp/catalog'
   })
@@ -126,7 +113,7 @@ export function installMcpCatalogEntry(
   env: Record<string, string> = {},
   profile?: ProfileScope
 ): Promise<{ ok: boolean; name?: string; pid?: number; action?: string; background?: boolean }> {
-  return window.hermesDesktop.api<{ ok: boolean; name?: string; pid?: number; action?: string; background?: boolean }>({
+  return requestHermesApi<{ ok: boolean; name?: string; pid?: number; action?: string; background?: boolean }>({
     ...capabilityScoped(profile),
     path: '/api/mcp/catalog/install',
     method: 'POST',

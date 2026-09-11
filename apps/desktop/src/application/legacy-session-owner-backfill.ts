@@ -22,6 +22,11 @@
  * repeat is harmless but pointless. A transport failure re-arms the scope so
  * the next refresh retries; a backend without the endpoint (version skew)
  * stays armed-off for this renderer lifetime.
+ *
+ * It reads the Connection Registry to decide where to point, so it is an
+ * APPLICATION module and not a `lib/` helper: `@/application/session-lists`
+ * calls it at enumeration time, and nothing under `src/api/` may reach it
+ * (see `api/import-boundary.test.ts`).
  */
 import { getApiRequestConnection, hermesApi } from '@/api/client'
 import { isMissingRestEndpoint } from '@/lib/gateway-rpc'

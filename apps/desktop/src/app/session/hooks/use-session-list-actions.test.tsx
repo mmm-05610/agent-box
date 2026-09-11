@@ -84,7 +84,11 @@ interface Deferred<T> {
 
 vi.mock('@/hermes', async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  getCronJobs: (...args: unknown[]) => getCronJobs(...args),
+  getCronJobs: (...args: unknown[]) => getCronJobs(...args)
+}))
+
+vi.mock('@/application/session-lists', async importOriginal => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   listAllProfileSessions: (...args: unknown[]) => listAllProfileSessions(...args),
   listSidebarSessions: (...args: unknown[]) => listSidebarSessions(...args)
 }))

@@ -86,6 +86,23 @@ export function connectionScoped(): { connectionId?: string } {
   return _apiConnectionId ? { connectionId: _apiConnectionId } : {}
 }
 
+/** The renderer's ONE door to the preload REST bridge.
+ *
+ *  Every REST request in the renderer arrives here — the rest of `api/` calls
+ *  this rather than the bridge, and the stores/application layer reach the
+ *  bridge only through `api/`. That keeps the platform seam at a single
+ *  address: swapping the transport, or tagging a new call shape, is a change
+ *  in one file instead of a search across `window.hermesDesktop.api`. */
+export function requestHermesApi<T>(request: HermesApiRequest): Promise<T> {
+  return window.hermesDesktop.api<T>(request)
+}
+
+/** Whether this Desktop main exposes the REST bridge at all — an older main
+ *  without it must fail with a sentence rather than a TypeError. */
+export function hasHermesApiBridge(): boolean {
+  return Boolean(window.hermesDesktop?.api)
+}
+
 /** Send a REST request to the renderer's active registry source. Request-level
  *  routing may override the active source for an explicitly-owned resource.
  *
@@ -96,7 +113,7 @@ export function connectionScoped(): { connectionId?: string } {
  *  underneath it. (It used to omit the key for 'local', which made the pin
  *  unable to beat the ambient tag; helpers then had to bypass this wrapper.) */
 export function hermesApi<T>(request: HermesApiRequest): Promise<T> {
-  return window.hermesDesktop.api<T>({ ...connectionScoped(), ...request })
+  return requestHermesApi<T>({ ...connectionScoped(), ...request })
 }
 
 // ── Capability scope: (connection, profile) routing for the Capabilities

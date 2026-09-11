@@ -14,7 +14,7 @@ import type {
   StatusResponse
 } from '@/types/hermes'
 
-import { capabilityScoped, hermesApi, type ProfileScope, profileScoped, STARTUP_REQUEST_TIMEOUT_MS } from './client'
+import { capabilityScoped, hermesApi, type ProfileScope, profileScoped, requestHermesApi, STARTUP_REQUEST_TIMEOUT_MS } from './client'
 
 export function getStatus(): Promise<StatusResponse> {
   return hermesApi<StatusResponse>({
@@ -69,7 +69,7 @@ export function getHermesConfig(profile?: string): Promise<HermesConfig> {
 }
 
 export function getHermesConfigRecord(profile?: ProfileScope): Promise<HermesConfigRecord> {
-  return window.hermesDesktop.api<HermesConfigRecord>({
+  return requestHermesApi<HermesConfigRecord>({
     ...capabilityScoped(profile),
     path: '/api/config'
   })
@@ -103,7 +103,7 @@ export function saveHermesConfig(config: HermesConfigRecord, profile?: null | st
  *  the profile/connection the Capabilities scope selector points at (possibly
  *  on another registered gateway), mirroring getHermesConfigRecord. */
 export function saveHermesConfigRecord(config: HermesConfigRecord, profile?: ProfileScope): Promise<{ ok: boolean }> {
-  return window.hermesDesktop.api<{ ok: boolean }>({
+  return requestHermesApi<{ ok: boolean }>({
     ...capabilityScoped(profile),
     path: '/api/config',
     method: 'PUT',
@@ -119,7 +119,7 @@ export function getEnvVars(profile?: null | string): Promise<Record<string, EnvV
 }
 
 export function setEnvVar(key: string, value: string, profile?: ProfileScope): Promise<{ ok: boolean }> {
-  return window.hermesDesktop.api<{ ok: boolean }>({
+  return requestHermesApi<{ ok: boolean }>({
     ...capabilityScoped(profile),
     path: '/api/env',
     method: 'PUT',
@@ -128,7 +128,7 @@ export function setEnvVar(key: string, value: string, profile?: ProfileScope): P
 }
 
 export function deleteEnvVar(key: string, profile?: ProfileScope): Promise<{ ok: boolean }> {
-  return window.hermesDesktop.api<{ ok: boolean }>({
+  return requestHermesApi<{ ok: boolean }>({
     ...capabilityScoped(profile),
     path: '/api/env',
     method: 'DELETE',
@@ -137,7 +137,7 @@ export function deleteEnvVar(key: string, profile?: ProfileScope): Promise<{ ok:
 }
 
 export function revealEnvVar(key: string, profile?: ProfileScope): Promise<{ key: string; value: string }> {
-  return window.hermesDesktop.api<{ key: string; value: string }>({
+  return requestHermesApi<{ key: string; value: string }>({
     ...capabilityScoped(profile),
     path: '/api/env/reveal',
     method: 'POST',
@@ -217,7 +217,7 @@ export function disconnectOAuthProvider(
 }
 
 export function startOAuthLogin(providerId: string, profile?: ProfileScope): Promise<OAuthStartResponse> {
-  return window.hermesDesktop.api<OAuthStartResponse>({
+  return requestHermesApi<OAuthStartResponse>({
     ...capabilityScoped(profile),
     path: `/api/providers/oauth/${encodeURIComponent(providerId)}/start`,
     method: 'POST',
@@ -244,7 +244,7 @@ export function pollOAuthSession(
   sessionId: string,
   profile?: ProfileScope
 ): Promise<OAuthPollResponse> {
-  return window.hermesDesktop.api<OAuthPollResponse>({
+  return requestHermesApi<OAuthPollResponse>({
     ...capabilityScoped(profile),
     path: `/api/providers/oauth/${encodeURIComponent(providerId)}/poll/${encodeURIComponent(sessionId)}`
   })

@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { setApiRequestConnection, setApiRequestProfile } from '@/api/client'
 import { requestGatewayForAgent } from '@/store/gateway'
 
-import { completeMcpDesktopOAuth, McpOAuthCancelled } from './mcp-dashboard-oauth'
+import { completeMcpDesktopOAuth, McpOAuthCancelled } from './mcp-oauth'
 
 vi.mock('@/store/gateway', () => ({ requestGatewayForAgent: vi.fn() }))
 

@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { setApiRequestConnection, setApiRequestProfile } from '@/hermes'
-
+import { setApiRequestConnection, setApiRequestProfile } from './client'
 import { activeConnection } from './plugins'
 
 // desktop.getConnection/getConnectionFor are IPC round-trips into the main

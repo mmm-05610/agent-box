@@ -36,7 +36,7 @@ import {
   windowIsActivelyViewed
 } from './use-background-sync'
 
-vi.mock('@/hermes', async importOriginal => ({
+vi.mock('@/application/session-transcripts', async importOriginal => ({
   ...(await importOriginal()),
   getLatestSessionMessages: vi.fn()
 }))
@@ -46,7 +46,7 @@ vi.mock('@/store/projects', async importOriginal => ({
   refreshProjectTree: vi.fn(async () => undefined)
 }))
 
-const { getLatestSessionMessages } = await import('@/hermes')
+const { getLatestSessionMessages } = await import('@/application/session-transcripts')
 const { refreshProjectTree } = await import('@/store/projects')
 
 const ACTIVE_RUNTIME_ID = 'runtime-active'

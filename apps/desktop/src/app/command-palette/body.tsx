@@ -12,9 +12,10 @@ import {
   HUD_TEXT
 } from '@/app/floating-hud'
 import { SESSION_IMPORT_ROUTE } from '@/app/routes'
+import { listAllProfileSessions } from '@/application/session-lists'
 import { codiconIcon } from '@/components/ui/codicon'
 import { Command, CommandInput, CommandList } from '@/components/ui/command'
-import { getHermesConfigRecord, listAllProfileSessions } from '@/hermes'
+import { getHermesConfigRecord } from '@/hermes'
 import { useMediaQuery } from '@/hooks/use-media-query'
 import { useI18n } from '@/i18n'
 import {

@@ -1,6 +1,31 @@
 import { describe, expect, it } from 'vitest'
 
-import { resolveLegacyOwnerBackfillScope } from './session-owner-stamp'
+import type { SessionInfo } from '@/types/hermes'
+
+import { resolveLegacyOwnerBackfillScope, stampRowsWithOwningConnection } from './session-owner-stamp'
+
+describe('stampRowsWithOwningConnection', () => {
+  const row = (over: Partial<SessionInfo> = {}): SessionInfo =>
+    ({ id: 'session-1', pinned: false, profile: 'default', source: 'desktop', title: 'Session', ...over }) as SessionInfo
+
+  it('stamps an untagged row with the serving non-local connection', () => {
+    expect(stampRowsWithOwningConnection([row()], 'gw-b')).toEqual([{ ...row(), connection_id: 'gw-b' }])
+  })
+
+  it('never clobbers an owner the row already names', () => {
+    // Every other connection_id writer works from an exact captured owner
+    // route; those are authoritative and this helper must not overwrite them.
+    const owned = row({ connection_id: 'gw-a' })
+
+    expect(stampRowsWithOwningConnection([owned], 'gw-b')[0].connection_id).toBe('gw-a')
+  })
+
+  it("leaves a bare local row bare — `local` is never a useful owner", () => {
+    for (const owner of [null, undefined, '', '   ', 'local']) {
+      expect(stampRowsWithOwningConnection([row()], owner)).toEqual([row()])
+    }
+  })
+})
 
 describe('resolveLegacyOwnerBackfillScope (#94724 single-match owner backfill)', () => {
   it('targets the serving registered connection (the backend that serves a page owns its rows)', () => {

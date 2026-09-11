@@ -22,10 +22,18 @@ vi.mock('@/hermes', async importOriginal => ({
   deleteSession: vi.fn(),
   getSession: vi.fn(),
   getAllSessionMessages: vi.fn(),
-  getLatestSessionMessages: vi.fn(),
-  listAllProfileSessions: vi.fn(),
   setApiRequestProfile: vi.fn(),
   setSessionArchived: vi.fn()
+}))
+
+vi.mock('@/application/session-lists', async importOriginal => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  listAllProfileSessions: vi.fn()
+}))
+
+vi.mock('@/application/session-transcripts', async importOriginal => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  getLatestSessionMessages: vi.fn()
 }))
 
 vi.mock('@/store/profile', async importOriginal => ({

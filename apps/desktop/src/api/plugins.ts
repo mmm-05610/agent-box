@@ -2,7 +2,7 @@ import type { HermesConnection } from '@/global'
 import { reconnectBackoffDelayMs } from '@/lib/reconnect-backoff'
 import { RECONNECT_ATTEMPT_TIMEOUT_MS, withTimeout } from '@/lib/with-timeout'
 
-import { getApiRequestConnection, getApiRequestProfile, hermesApi, profileScoped } from './client'
+import { getApiRequestConnection, getApiRequestProfile, hasHermesApiBridge, hermesApi, profileScoped } from './client'
 
 /** Resolve the ACTIVE backend's connection descriptor, (connectionId,
  *  profile)-scoped — mirroring how store/profile resolves $connection: a
@@ -69,7 +69,7 @@ function pluginPathSuffix(caller: string, path: string): string {
  *  REST call. Broader reach (core endpoints, another namespace) is the future
  *  declared-capability seam; today the namespace IS the boundary. */
 export async function pluginRest<T>(pluginId: string, path: string, opts: PluginRestOptions = {}): Promise<T> {
-  if (!window.hermesDesktop?.api) {
+  if (!hasHermesApiBridge()) {
     throw new Error('Hermes desktop bridge unavailable')
   }
 

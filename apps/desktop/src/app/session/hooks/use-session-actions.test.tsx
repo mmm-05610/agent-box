@@ -8,11 +8,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { NO_PROJECT_ID } from '@/app/chat/sidebar/projects/workspace-groups'
 import { resolveSessionRpcOwner } from '@/app/contrib/wiring-routing'
 import { $terminalTakeover, setTerminalTakeover } from '@/app/right-sidebar/store'
+import { getLatestSessionMessages } from '@/application/session-transcripts'
 import { noteActiveTreeGroup, revealTreePane } from '@/components/pane-shell/tree/store'
 import {
   deleteSession,
   getAllSessionMessages,
-  getLatestSessionMessages,
   getSession,
   type ProfileScope,
   type SessionInfo,
@@ -83,10 +83,18 @@ vi.mock('@/hermes', async importOriginal => ({
   deleteSession: vi.fn(),
   getSession: vi.fn(),
   getAllSessionMessages: vi.fn(),
-  getLatestSessionMessages: vi.fn(),
-  listAllProfileSessions: vi.fn(),
   setApiRequestProfile: vi.fn(),
   setSessionArchived: vi.fn()
+}))
+
+vi.mock('@/application/session-lists', async importOriginal => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  listAllProfileSessions: vi.fn()
+}))
+
+vi.mock('@/application/session-transcripts', async importOriginal => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  getLatestSessionMessages: vi.fn()
 }))
 
 vi.mock('@/store/profile', async importOriginal => ({

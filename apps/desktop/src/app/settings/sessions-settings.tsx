@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 
+import { listAllProfileSessions } from '@/application/session-lists'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Tip } from '@/components/ui/tooltip'
 import {
   deleteSession,
   getHermesConfigRecord,
-  listAllProfileSessions,
   saveHermesConfig,
   setSessionArchived
 } from '@/hermes'

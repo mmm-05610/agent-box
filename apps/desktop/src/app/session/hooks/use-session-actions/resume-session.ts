@@ -1,7 +1,7 @@
 import { useCallback, useRef } from 'react'
 
 import { graftRefreshedTailOntoBackfill } from '@/app/chat/transcript-backfill'
-import { fetchStoredTranscriptAcrossBackends, getLatestSessionMessages } from '@/hermes'
+import { fetchStoredTranscriptAcrossBackends, getLatestSessionMessages } from '@/application/session-transcripts'
 import { type Translations } from '@/i18n'
 import {
   type ChatMessage,

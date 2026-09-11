@@ -9,10 +9,10 @@ import type {
 } from '@/types/hermes'
 import type { ActionResponse } from '@/types/hermes'
 
-import { capabilityScoped, hermesApi, type ProfileScope, profileScoped } from './client'
+import { capabilityScoped, hermesApi, type ProfileScope, profileScoped, requestHermesApi } from './client'
 
 export function getSkills(profile?: ProfileScope): Promise<SkillInfo[]> {
-  return window.hermesDesktop.api<SkillInfo[]>({
+  return requestHermesApi<SkillInfo[]>({
     ...capabilityScoped(profile),
     path: '/api/skills'
   })
@@ -24,7 +24,7 @@ export function getSkillContent(
   name: string,
   profile?: ProfileScope
 ): Promise<{ content: string; name: string; path: string }> {
-  return window.hermesDesktop.api<{ content: string; name: string; path: string }>({
+  return requestHermesApi<{ content: string; name: string; path: string }>({
     ...capabilityScoped(profile),
     path: `/api/skills/content?name=${encodeURIComponent(name)}`
   })
@@ -35,7 +35,7 @@ export function setSkillEnabled(
   enabled: boolean,
   profile?: ProfileScope
 ): Promise<{ ok: boolean; name: string; enabled: boolean }> {
-  return window.hermesDesktop.api<{ ok: boolean; name: string; enabled: boolean }>({
+  return requestHermesApi<{ ok: boolean; name: string; enabled: boolean }>({
     ...capabilityScoped(profile),
     path: '/api/skills/toggle',
     method: 'PUT',
@@ -60,14 +60,14 @@ export interface LearningNodeDetail {
 }
 
 export function getLearningNode(id: string, profile?: ProfileScope): Promise<LearningNodeDetail> {
-  return window.hermesDesktop.api<LearningNodeDetail>({
+  return requestHermesApi<LearningNodeDetail>({
     ...capabilityScoped(profile),
     path: `/api/learning/node?id=${encodeURIComponent(id)}`
   })
 }
 
 export function deleteLearningNode(id: string, profile?: ProfileScope): Promise<{ message: string; ok: boolean }> {
-  return window.hermesDesktop.api<{ message: string; ok: boolean }>({
+  return requestHermesApi<{ message: string; ok: boolean }>({
     ...capabilityScoped(profile),
     path: '/api/learning/node',
     method: 'DELETE',
@@ -80,7 +80,7 @@ export function editLearningNode(
   content: string,
   profile?: ProfileScope
 ): Promise<{ message: string; ok: boolean }> {
-  return window.hermesDesktop.api<{ message: string; ok: boolean }>({
+  return requestHermesApi<{ message: string; ok: boolean }>({
     ...capabilityScoped(profile),
     path: '/api/learning/node',
     method: 'PUT',
@@ -100,7 +100,7 @@ const HUB_REQUEST_TIMEOUT_MS = 45_000
  *  with per-profile installed flags. Feeds the Capabilities Skills list's
  *  "available to install" rows. */
 export function getOfficialSkills(profile?: ProfileScope): Promise<{ skills: OfficialSkillInfo[] }> {
-  return window.hermesDesktop.api<{ skills: OfficialSkillInfo[] }>({
+  return requestHermesApi<{ skills: OfficialSkillInfo[] }>({
     ...capabilityScoped(profile),
     path: '/api/skills/hub/official'
   })
@@ -130,7 +130,7 @@ export function searchSkillsHub(
 }
 
 export function previewSkillHub(identifier: string, profile?: ProfileScope): Promise<SkillHubPreview> {
-  return window.hermesDesktop.api<SkillHubPreview>({
+  return requestHermesApi<SkillHubPreview>({
     ...capabilityScoped(profile),
     path: `/api/skills/hub/preview?identifier=${encodeURIComponent(identifier)}`,
     timeoutMs: HUB_REQUEST_TIMEOUT_MS
@@ -146,7 +146,7 @@ export function scanSkillHub(identifier: string, profile?: null | string): Promi
 }
 
 export function installSkillFromHub(identifier: string, profile?: ProfileScope): Promise<ActionResponse> {
-  return window.hermesDesktop.api<ActionResponse>({
+  return requestHermesApi<ActionResponse>({
     ...capabilityScoped(profile),
     path: '/api/skills/hub/install',
     method: 'POST',
@@ -155,7 +155,7 @@ export function installSkillFromHub(identifier: string, profile?: ProfileScope):
 }
 
 export function uninstallSkillFromHub(name: string, profile?: ProfileScope): Promise<ActionResponse> {
-  return window.hermesDesktop.api<ActionResponse>({
+  return requestHermesApi<ActionResponse>({
     ...capabilityScoped(profile),
     path: '/api/skills/hub/uninstall',
     method: 'POST',
@@ -164,7 +164,7 @@ export function uninstallSkillFromHub(name: string, profile?: ProfileScope): Pro
 }
 
 export function updateSkillsFromHub(profile?: ProfileScope): Promise<ActionResponse> {
-  return window.hermesDesktop.api<ActionResponse>({
+  return requestHermesApi<ActionResponse>({
     ...capabilityScoped(profile),
     path: '/api/skills/hub/update',
     method: 'POST',

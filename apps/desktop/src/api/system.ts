@@ -13,7 +13,7 @@ import type {
   MemoryStatusResponse
 } from '@/types/hermes'
 
-import { capabilityScoped, hermesApi, type ProfileScope, profileScoped } from './client'
+import { capabilityScoped, hermesApi, type ProfileScope, profileScoped, requestHermesApi } from './client'
 
 export const AUDIO_SPEAK_MIN_REQUEST_TIMEOUT_MS = 180_000
 export const AUDIO_SPEAK_MAX_REQUEST_TIMEOUT_MS = 600_000
@@ -162,7 +162,7 @@ export function checkHermesUpdate(force = false): Promise<BackendUpdateCheckResp
 }
 
 export function getActionStatus(name: string, lines = 200, profile?: ProfileScope): Promise<ActionStatusResponse> {
-  return window.hermesDesktop.api<ActionStatusResponse>({
+  return requestHermesApi<ActionStatusResponse>({
     ...capabilityScoped(profile),
     path: `/api/actions/${encodeURIComponent(name)}/status?lines=${Math.max(1, lines)}`
   })

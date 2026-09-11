@@ -8,7 +8,7 @@ import type {
   ModelOptionsResponse
 } from '@/types/hermes'
 
-import { capabilityScoped, hermesApi, type ProfileScope, profileScoped, STARTUP_REQUEST_TIMEOUT_MS } from './client'
+import { capabilityScoped, hermesApi, type ProfileScope, profileScoped, requestHermesApi, STARTUP_REQUEST_TIMEOUT_MS } from './client'
 
 export function getGlobalModelInfo(profile?: null | string): Promise<ModelInfoResponse> {
   return hermesApi<ModelInfoResponse>({
@@ -19,7 +19,7 @@ export function getGlobalModelInfo(profile?: null | string): Promise<ModelInfoRe
 }
 
 export function getUsageAnalytics(days = 30, profile?: ProfileScope): Promise<AnalyticsResponse> {
-  return window.hermesDesktop.api<AnalyticsResponse>({
+  return requestHermesApi<AnalyticsResponse>({
     ...capabilityScoped(profile),
     path: `/api/analytics/usage?days=${Math.max(1, Math.floor(days))}`
   })

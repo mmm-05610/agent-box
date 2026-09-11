@@ -1,7 +1,26 @@
+/**
+ * The MCP OAuth use-case: start a flow, relay the provider callback, poll until
+ * the backend approves it, and always release the flow.
+ *
+ * This is an APPLICATION-layer module, not an API one. It composes three things
+ * that `api/mcp.ts` may not know about:
+ *
+ *  - the Gateway JSON-RPC surface (`mcp.servers.oauth.*` through
+ *    `requestGatewayForAgent`), which lives in the gateway store;
+ *  - the native loopback listener in `window.hermesDesktop.mcpOauth`, the
+ *    Desktop callback bridge a remote gateway needs;
+ *  - the desktop's own cancellation/timeout policy.
+ *
+ * It used to live in `lib/mcp-dashboard-oauth.ts` and reach the gateway through
+ * a lazy `import()` hidden inside `api/mcp.ts`. That dynamic import was the only
+ * reason `api/mcp.ts` sat in an import cycle with the stores; a static import
+ * from this layer is acyclic (the gateway store never reaches back here) and
+ * says out loud where the dependency actually is.
+ */
 import { capabilityScoped, type ProfileScope } from '@/api/client'
-import { type McpOAuthFlow, mcpOAuthRpc } from '@/api/mcp'
-
-import { isMissingRpcMethod } from './gateway-rpc'
+import type { McpOAuthFlow } from '@/api/mcp'
+import { isMissingRpcMethod } from '@/lib/gateway-rpc'
+import { requestGatewayForAgent } from '@/store/gateway'
 
 interface CompleteOptions {
   serverName: string
@@ -31,6 +50,20 @@ export class McpOAuthCancelled extends Error {
 
 const defaultSleep = (milliseconds: number) => new Promise<void>(resolve => window.setTimeout(resolve, milliseconds))
 const UPDATE_BACKEND = 'Update the Hermes backend to support Desktop MCP OAuth callbacks.'
+
+/**
+ * Bind every OAuth RPC of one flow to the (connection, profile) that was active
+ * when the flow started. Capture the source before the first await so a
+ * foreground switch mid-flow cannot re-home a later poll or the cleanup onto a
+ * different gateway — every RPC, including cleanup after a switch, belongs to
+ * this (connection, profile).
+ */
+export function mcpOAuthRpc(scope?: ProfileScope) {
+  const { connectionId = null, profile = 'default' } = capabilityScoped(scope)
+
+  return async <T>(action: 'start' | 'poll' | 'callback' | 'cancel', params: Record<string, unknown>): Promise<T> =>
+    requestGatewayForAgent<T>(connectionId, profile, `mcp.servers.oauth.${action}`, params, 60_000)
+}
 
 /** Remote gateways require the Desktop callback bridge. An explicitly local
  *  gateway can host its own loopback listener when that capability is absent. */

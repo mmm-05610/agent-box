@@ -18,11 +18,15 @@ const paths = vi.hoisted(() => [
   '/srv/absolute.txt'
 ])
 
-vi.mock('@/hermes', async () => ({
-  ...(await vi.importActual('@/hermes')),
+vi.mock('@/application/session-lists', async () => ({
+  ...(await vi.importActual('@/application/session-lists')),
   listAllProfileSessions: async () => ({
     sessions: [{ id: 'artifact-session', title: 'Fixture', profile: 'origin-profile' }]
-  }),
+  })
+}))
+
+vi.mock('@/hermes', async () => ({
+  ...(await vi.importActual('@/hermes')),
   getAllSessionMessages: async () => ({
     messages: [
       {

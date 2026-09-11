@@ -1,7 +1,15 @@
+// The session REST surface: build the request, send it, parse the page, raise
+// the typed error. Nothing in this file touches a store, a route or a
+// component — a page comes back the way the backend served it.
+//
+// Everything that composes this surface with Desktop-local state lives one
+// level up in `@/application`:
+//   - `session-lists` adds the registry-ownership stamp, the pinned-row window
+//     and the one-shot legacy-owner backfill at enumeration time;
+//   - `session-transcripts` records the tail bookkeeping and probes the
+//     Connection Registry for a stored transcript.
+// `api/import-boundary.test.ts` enforces the seam, transitively.
 import { isMissingRestEndpoint } from '@/lib/gateway-rpc'
-import { maybeBackfillLegacySessionOwners } from '@/lib/legacy-session-owner-backfill'
-import { stampRowsWithOwningConnection } from '@/lib/session-owner-stamp'
-import { recordTranscriptTail } from '@/store/transcript-tail'
 import type {
   PaginatedSessions,
   SessionInfo,
@@ -10,7 +18,7 @@ import type {
   SessionSearchResponse
 } from '@/types/hermes'
 
-import { capabilityScoped, getApiRequestConnection, hermesApi, type ProfileScope, profileScoped } from './client'
+import { capabilityScoped, hermesApi, type ProfileScope, profileScoped } from './client'
 
 const SESSION_LIST_REQUEST_TIMEOUT_MS = 60_000
 
@@ -35,24 +43,6 @@ function sessionScopeQuery(scope?: ProfileScope): string {
 }
 
 /**
- * The active registered gateway owns every row it returns, but its HTTP APIs
- * correctly know nothing about this Desktop-local registry id. Preserve an
- * explicit owner from a multi-source response; otherwise stamp the active
- * non-local source so a later resume cannot fall back to a same-named local
- * profile. Delegates to the canonical row-stamp helper so this stays the ONE
- * write shape for connection_id on backend-returned rows.
- */
-function stampActiveConnectionOwner(sessions: SessionInfo[]): SessionInfo[] {
-  // Durable half of the same ownership contract (#94724): enumeration under
-  // registry topology triggers the one-shot server-side owner backfill for
-  // the serving store when its owner is a single match. Fire-and-forget;
-  // idempotent server-side; never blocks or fails the list that triggered it.
-  maybeBackfillLegacySessionOwners()
-
-  return stampRowsWithOwningConnection(sessions, getApiRequestConnection())
-}
-
-/**
  * Trim a page to its window WITHOUT discarding pinned rows.
  *
  * The list endpoints deliberately back-fill pinned conversations past their
@@ -62,7 +52,7 @@ function stampActiveConnectionOwner(sessions: SessionInfo[]): SessionInfo[] {
  * some count: the sidebar could only ever show the pins that happened to fall
  * inside the most-recent page.
  */
-function pageWindow(sessions: SessionInfo[], limit: number): SessionInfo[] {
+export function pageWindowSessions(sessions: SessionInfo[], limit: number): SessionInfo[] {
   if (sessions.length <= limit) {
     return sessions
   }
@@ -72,25 +62,22 @@ function pageWindow(sessions: SessionInfo[], limit: number): SessionInfo[] {
   return [...recent, ...sessions.slice(limit).filter(session => session.pinned)]
 }
 
-export async function listSessions(
+/** One page of the active profile's sessions, as the backend served it. The
+ *  caller (`listSessions` in `@/application/session-lists`) applies the
+ *  ownership stamp, the window and `offset: 0`. */
+export async function fetchSessionsPage(
   limit = 40,
   minMessages = 0,
   archived: 'exclude' | 'include' | 'only' = 'exclude',
   order: 'created' | 'recent' = 'recent'
 ): Promise<PaginatedSessions> {
-  const result = await hermesApi<PaginatedSessions>({
+  return hermesApi<PaginatedSessions>({
     ...profileScoped(),
     path:
       `/api/sessions?limit=${limit}&offset=0&min_messages=${Math.max(0, minMessages)}` +
       `&archived=${archived}&order=${order}`,
     timeoutMs: SESSION_LIST_REQUEST_TIMEOUT_MS
   })
-
-  return {
-    ...result,
-    sessions: pageWindow(stampActiveConnectionOwner(result.sessions), limit),
-    offset: 0
-  }
 }
 
 // Unified, read-only session list aggregated across ALL profiles. Served by the
@@ -106,7 +93,7 @@ export interface SessionSourceFilter {
   excludeSources?: string[]
 }
 
-export async function listAllProfileSessions(
+export async function fetchAllProfileSessionsPage(
   limit = 40,
   minMessages = 0,
   archived: 'exclude' | 'include' | 'only' = 'exclude',
@@ -120,19 +107,13 @@ export async function listAllProfileSessions(
     ? `&exclude_sources=${encodeURIComponent(filter.excludeSources.join(','))}`
     : ''
 
-  const result = await hermesApi<PaginatedSessions>({
+  return hermesApi<PaginatedSessions>({
     ...profileScoped(),
     path:
       `/api/profiles/sessions?limit=${limit}&offset=0&min_messages=${Math.max(0, minMessages)}` +
       `&archived=${archived}&order=${order}&profile=${encodeURIComponent(profile)}${sourceParam}${excludeParam}`,
     timeoutMs: SESSION_LIST_REQUEST_TIMEOUT_MS
   })
-
-  return {
-    ...result,
-    sessions: pageWindow(stampActiveConnectionOwner(result.sessions), limit),
-    offset: 0
-  }
 }
 
 // Batched sidebar slices in one request: recents (scoped to the active profile),
@@ -210,13 +191,13 @@ export function resetSidebarBatchCapability() {
 // archived excluded, recency order; every slice scoped to the caller's profile).
 // Rides the same Electron remote-splice
 // interception as the pre-batching desktop, so remote profiles stay correct.
-async function listSidebarSessionsLegacy(req: SidebarSessionsRequest): Promise<SidebarSessionsResponse> {
+async function fetchSidebarSessionsLegacy(req: SidebarSessionsRequest): Promise<SidebarSessionsResponse> {
   const [recents, cron, messaging] = await Promise.all([
-    listAllProfileSessions(req.recentsLimit, 1, 'exclude', 'recent', req.recentsProfile, {
+    fetchAllProfileSessionsPage(req.recentsLimit, 1, 'exclude', 'recent', req.recentsProfile, {
       excludeSources: req.recentsExclude
     }),
-    listAllProfileSessions(req.cronLimit, 1, 'exclude', 'recent', req.recentsProfile, { source: 'cron' }),
-    listAllProfileSessions(req.messagingLimit, 1, 'exclude', 'recent', req.recentsProfile, {
+    fetchAllProfileSessionsPage(req.cronLimit, 1, 'exclude', 'recent', req.recentsProfile, { source: 'cron' }),
+    fetchAllProfileSessionsPage(req.messagingLimit, 1, 'exclude', 'recent', req.recentsProfile, {
       excludeSources: req.messagingExclude
     })
   ])
@@ -225,18 +206,22 @@ async function listSidebarSessionsLegacy(req: SidebarSessionsRequest): Promise<S
   const cronErrors = cron.errors ?? []
   const messagingErrors = messaging.errors ?? []
 
+  // Windowed first, then counted: a back-filled pin must not be read as a full
+  // window (see pageWindowSessions / profilesTruncatedFrom).
+  const recentsWindow = pageWindowSessions(recents.sessions, req.recentsLimit)
+
   return {
     recents: {
-      profiles_truncated: profilesTruncatedFrom(recents.sessions, req.recentsLimit),
-      sessions: recents.sessions,
+      profiles_truncated: profilesTruncatedFrom(recentsWindow, req.recentsLimit),
+      sessions: recentsWindow,
       ...(recentsErrors.length ? { errors: recentsErrors } : {})
     },
     cron: {
-      sessions: cron.sessions,
+      sessions: pageWindowSessions(cron.sessions, req.cronLimit),
       ...(cronErrors.length ? { errors: cronErrors } : {})
     },
     messaging: {
-      sessions: messaging.sessions,
+      sessions: pageWindowSessions(messaging.sessions, req.messagingLimit),
       ...(messagingErrors.length ? { errors: messagingErrors } : {})
     }
   }
@@ -259,9 +244,13 @@ export function scanSessionPullRequests(
   })
 }
 
-export async function listSidebarSessions(req: SidebarSessionsRequest): Promise<SidebarSessionsResponse> {
+/** The batched sidebar read: recents, cron and messaging in one request, with
+ *  the per-slice fallback for a backend that predates the route. Raw rows — the
+ *  ownership stamp belongs to `listSidebarSessions` in
+ *  `@/application/session-lists`. */
+export async function fetchSidebarSessions(req: SidebarSessionsRequest): Promise<SidebarSessionsResponse> {
   if (sidebarBatchEndpointMissing) {
-    return listSidebarSessionsLegacy(req)
+    return fetchSidebarSessionsLegacy(req)
   }
 
   const params = new URLSearchParams({
@@ -279,10 +268,8 @@ export async function listSidebarSessions(req: SidebarSessionsRequest): Promise<
     params.set('messaging_exclude', req.messagingExclude.join(','))
   }
 
-  let result: SidebarSessionsResponse
-
   try {
-    result = await hermesApi<SidebarSessionsResponse>({
+    return await hermesApi<SidebarSessionsResponse>({
       ...profileScoped(),
       path: `/api/profiles/sessions/sidebar?${params.toString()}`,
       timeoutMs: SESSION_LIST_REQUEST_TIMEOUT_MS
@@ -297,26 +284,7 @@ export async function listSidebarSessions(req: SidebarSessionsRequest): Promise<
     // Older backend without the batched route (desktop/runtime version skew).
     sidebarBatchEndpointMissing = true
 
-    return listSidebarSessionsLegacy(req)
-  }
-
-  return {
-    recents: {
-      ...result.recents,
-      sessions: stampActiveConnectionOwner(result.recents?.sessions ?? []),
-      ...(result.errors?.length ? { errors: result.errors } : {})
-    },
-    cron: {
-      ...result.cron,
-      sessions: stampActiveConnectionOwner(result.cron?.sessions ?? []),
-      ...(result.errors?.length ? { errors: result.errors } : {})
-    },
-    messaging: {
-      ...result.messaging,
-      sessions: stampActiveConnectionOwner(result.messaging?.sessions ?? []),
-      ...(result.errors?.length ? { errors: result.errors } : {})
-    },
-    errors: result.errors
+    return fetchSidebarSessionsLegacy(req)
   }
 }
 
@@ -439,7 +407,10 @@ export function getSessionMessages(
  */
 export const LATEST_SESSION_MESSAGES_LIMIT = 120
 
-export function getLatestSessionMessages(id: string, profile?: ProfileScope): Promise<SessionMessagesResponse> {
+/** The tail PAGE. Recording what it implies for "Show earlier" is a store
+ *  write, so it lives in `getLatestSessionMessages` (`@/application/
+ *  session-transcripts`) — the entry point callers should use. */
+export function fetchLatestSessionMessages(id: string, profile?: ProfileScope): Promise<SessionMessagesResponse> {
   // includeCompacted: durable display history must include rows preserved by
   // in-place compaction (active=0, compacted=1); without them the transcript
   // silently ends at the compaction boundary and earlier turns are unreachable.
@@ -447,56 +418,7 @@ export function getLatestSessionMessages(id: string, profile?: ProfileScope): Pr
     limit: LATEST_SESSION_MESSAGES_LIMIT,
     order: 'latest',
     includeCompacted: true
-  }).then(page => {
-    // Record whether the tail was truncated (page came back full) and where
-    // the next older page starts, so "Show earlier" can backfill over REST
-    // (app/chat/transcript-backfill). Keyed under both the requested id and
-    // the resolved id — callers hold either.
-    recordTranscriptTail(id, page, profile)
-
-    if (page.session_id && page.session_id !== id) {
-      recordTranscriptTail(page.session_id, page, profile)
-    }
-
-    return page
   })
-}
-
-/**
- * READ-ONLY stored-transcript lookup that never routes a live session
- * (#94724 no-owner recovery). Tries the ambient/primary store first, then
- * probes every registered NON-local connection by id — a REST read of a
- * backend's own state.db is side-effect free (a miss is a plain 404, no
- * session is minted or resumed anywhere), so probing across backends is safe
- * where live routing would be a guess. Returns null when no reachable
- * backend holds the transcript.
- */
-export async function fetchStoredTranscriptAcrossBackends(id: string): Promise<SessionMessagesResponse | null> {
-  try {
-    return await getLatestSessionMessages(id)
-  } catch {
-    // Not on the ambient store — probe the registered backends below.
-  }
-
-  const { $connectionsRegistry } = await import('@/store/connection-registry-state')
-
-  const connections = ($connectionsRegistry.get()?.connections ?? []) as Array<{ id?: string }>
-
-  for (const connection of connections) {
-    const connectionId = connection.id?.trim()
-
-    if (!connectionId || connectionId === 'local' || connectionId === getApiRequestConnection()) {
-      continue
-    }
-
-    try {
-      return await getLatestSessionMessages(id, { connectionId, profile: 'default' })
-    } catch {
-      // Not on this backend (or it is unreachable); try the next.
-    }
-  }
-
-  return null
 }
 
 /**

@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { fetchLatestSessionMessages } from './api/sessions'
+import { listAllProfileSessions, listSessions, listSidebarSessions } from './application/session-lists'
 import {
   AUDIO_SPEAK_MAX_REQUEST_TIMEOUT_MS,
   AUDIO_SPEAK_MIN_REQUEST_TIMEOUT_MS,
@@ -15,16 +17,12 @@ import {
   getGlobalModelOptions,
   getHermesConfig,
   getHermesConfigDefaults,
-  getLatestSessionMessages,
   getOlderSessionMessages,
   getProfiles,
   getSession,
   getSessionMessages,
   getStatus,
   LATEST_SESSION_MESSAGES_LIMIT,
-  listAllProfileSessions,
-  listSessions,
-  listSidebarSessions,
   pluginSocket,
   resetSidebarBatchCapability,
   setApiRequestConnection,
@@ -34,7 +32,6 @@ import {
   triggerCronJob
 } from './hermes'
 import { refreshActiveProfile } from './store/profile'
-import { $transcriptTailBySessionId, transcriptTailState } from './store/transcript-tail'
 
 const emptySessionsResponse = {
   limit: 0,
@@ -544,33 +541,21 @@ describe('Hermes REST helpers', () => {
   })
 
   it('hydrates the latest transcript with a small tail page (120, latest, compacted rows included)', async () => {
+    // The tail PAGE is the API layer's business; what it implies for "Show
+    // earlier" is recorded one level up in @/application/session-transcripts.
     api.mockResolvedValue({
       messages: [],
       pagination: { limit: 120, offset: 0, order: 'latest', returned: 0 },
       session_id: 'session-1'
     })
 
-    await getLatestSessionMessages('session-1', 'xiaoxuxu')
+    await fetchLatestSessionMessages('session-1', 'xiaoxuxu')
 
     expect(LATEST_SESSION_MESSAGES_LIMIT).toBe(120)
     expect(api).toHaveBeenCalledWith({
       path: '/api/sessions/session-1/messages?profile=xiaoxuxu&limit=120&order=latest&include_compacted=true',
       profile: 'xiaoxuxu'
     })
-  })
-
-  it('records tail truncation state under the requested and resolved session ids', async () => {
-    $transcriptTailBySessionId.set({})
-    api.mockResolvedValue({
-      messages: Array.from({ length: 120 }, (_, index) => ({ content: `m${index}`, id: index, role: 'user' })),
-      pagination: { limit: 120, offset: 0, order: 'latest', returned: 120 },
-      session_id: 'resolved-1'
-    })
-
-    await getLatestSessionMessages('prefix-1')
-
-    expect(transcriptTailState('prefix-1')).toMatchObject({ nextOffset: 120, possiblyTruncated: true })
-    expect(transcriptTailState('resolved-1')).toMatchObject({ nextOffset: 120, possiblyTruncated: true })
   })
 
   it('requests older pages backwards from the newest message', async () => {

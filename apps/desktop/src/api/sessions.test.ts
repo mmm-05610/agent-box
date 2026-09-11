@@ -1,24 +1,40 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('@/lib/gateway-rpc', () => ({ isMissingRestEndpoint: () => false }))
-vi.mock('@/store/transcript-tail', () => ({ recordTranscriptTail: vi.fn() }))
+vi.mock('@/lib/gateway-rpc', () => ({ isMissingRestEndpoint: vi.fn(() => false) }))
 vi.mock('./client', () => ({
   capabilityScoped: vi.fn(),
-  getApiRequestConnection: vi.fn(() => 'prometheus'),
   hermesApi: vi.fn(),
   profileScoped: vi.fn(() => ({}))
 }))
 
+const gatewayRpc = await import('@/lib/gateway-rpc')
 const client = await import('./client')
 
-const { deleteSession, setSessionArchived, setSessionPinnedRemote, setSessionUnreadRemote, listSidebarSessions } =
-  await import('./sessions')
+const {
+  deleteSession,
+  fetchSessionsPage,
+  fetchSidebarSessions,
+  resetSidebarBatchCapability,
+  setSessionArchived,
+  setSessionPinnedRemote,
+  setSessionUnreadRemote
+} = await import('./sessions')
 
 const hermesApi = vi.mocked(client.hermesApi)
+const isMissingRestEndpoint = vi.mocked(gatewayRpc.isMissingRestEndpoint)
+
+const sidebarRequest = {
+  recentsProfile: 'default',
+  recentsLimit: 40,
+  recentsExclude: [],
+  cronLimit: 20,
+  messagingLimit: 40,
+  messagingExclude: []
+}
 
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.mocked(client.getApiRequestConnection).mockReturnValue('prometheus')
+  resetSidebarBatchCapability()
 })
 
 describe('deleteSession profile scoping', () => {
@@ -108,9 +124,9 @@ describe('setSessionArchived profile scoping', () => {
 
     await setSessionArchived('sess-b', false)
 
-    const req = hermesApi.mock.calls[0][0] as { body: Record<string, unknown> }
-    expect(req).toMatchObject({ method: 'PATCH', body: { archived: false } })
-    expect(req.body).not.toHaveProperty('profile')
+    const request = hermesApi.mock.calls[0][0] as { body: Record<string, unknown> }
+    expect(request).toMatchObject({ method: 'PATCH', body: { archived: false } })
+    expect(request.body).not.toHaveProperty('profile')
   })
 })
 
@@ -146,31 +162,91 @@ describe('setSessionPinnedRemote / setSessionUnreadRemote profile scoping', () =
 
     await setSessionPinnedRemote('sess-p2', false)
 
-    const req = hermesApi.mock.calls[0][0] as { body: Record<string, unknown> }
-    expect(req).toMatchObject({ method: 'PATCH', body: { pinned: false } })
-    expect(req.body).not.toHaveProperty('profile')
+    const request = hermesApi.mock.calls[0][0] as { body: Record<string, unknown> }
+    expect(request).toMatchObject({ method: 'PATCH', body: { pinned: false } })
+    expect(request.body).not.toHaveProperty('profile')
   })
 })
 
-describe('listSidebarSessions remote ownership', () => {
-  it('stamps active remote rows so a later resume stays on their gateway', async () => {
+describe('the session list surface returns the backend page untouched', () => {
+  it('neither stamps registry ownership nor trims the page to its window', async () => {
+    // Both of those are APPLICATION policy (see @/application/session-lists):
+    // the stamp needs the active registry connection, the window needs the
+    // caller's LIMIT. A raw page here is what keeps this module a leaf.
+    const rows = Array.from({ length: 45 }, (_, index) => ({
+      id: `row-${index}`,
+      pinned: index < 2,
+      profile: 'default',
+      source: 'desktop',
+      title: `Row ${index}`
+    }))
+
+    hermesApi.mockResolvedValue({ limit: 40, offset: 0, sessions: rows, total: 45 } as never)
+
+    const page = await fetchSessionsPage(40, 1)
+
+    expect(page.sessions).toHaveLength(45)
+    expect(page.sessions.every(row => row.connection_id === undefined)).toBe(true)
+    expect(hermesApi.mock.calls[0][0]).toMatchObject({
+      path: '/api/sessions?limit=40&offset=0&min_messages=1&archived=exclude&order=recent',
+      timeoutMs: 60_000
+    })
+  })
+
+  it('returns the batched sidebar slices untouched when the route exists', async () => {
     hermesApi.mockResolvedValue({
       cron: { sessions: [] },
       messaging: { sessions: [] },
-      recents: {
-        sessions: [{ id: 'remote-session', profile: 'default', source: 'desktop', title: 'Remote chat' }]
-      }
+      recents: { sessions: [{ id: 'remote-session', pinned: false, profile: 'default' }] }
     } as never)
 
-    const result = await listSidebarSessions({
-      recentsProfile: 'default',
-      recentsLimit: 40,
-      recentsExclude: [],
-      cronLimit: 20,
-      messagingLimit: 40,
-      messagingExclude: []
+    const result = await fetchSidebarSessions(sidebarRequest)
+
+    expect(result.recents.sessions[0]).toMatchObject({ id: 'remote-session' })
+    expect(result.recents.sessions[0].connection_id).toBeUndefined()
+    expect(hermesApi).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('batched sidebar route skew', () => {
+  it('falls back to the three per-slice reads and remembers the dead route', async () => {
+    // The batched route shipped later than the per-slice one, so a newer
+    // desktop can meet an older backend. Endpoint-missing is a capability
+    // verdict, not a transient failure: probe once, then serve every refresh
+    // from the proven calls.
+    isMissingRestEndpoint.mockReturnValue(true)
+    hermesApi.mockImplementation(async ({ path }: { path: string }) => {
+      if (path.includes('/sidebar')) {
+        throw new Error('404: {"detail":"No such API endpoint: /api/profiles/sessions/sidebar"}')
+      }
+
+      return {
+        limit: 0,
+        offset: 0,
+        sessions: Array.from({ length: 3 }, (_, index) => ({
+          id: `pinned-${index}`,
+          pinned: true,
+          profile: 'default'
+        })),
+        total: 3
+      } as never
     })
 
-    expect(result.recents.sessions[0]).toMatchObject({ connection_id: 'prometheus', id: 'remote-session' })
+    const result = await fetchSidebarSessions(sidebarRequest)
+
+    // One batched attempt + three per-slice reads.
+    expect(hermesApi).toHaveBeenCalledTimes(4)
+    const paths = hermesApi.mock.calls.map(call => (call[0] as { path: string }).path)
+    expect(paths[1]).toContain('/api/profiles/sessions?limit=40&offset=0&min_messages=1')
+    expect(paths[2]).toContain('source=cron')
+    expect(result.recents.sessions).toHaveLength(3)
+    // A back-filled pin is not a full window: counting them would leave a
+    // "Load more" that can never resolve.
+    expect(result.recents.profiles_truncated).toEqual({ default: false })
+
+    hermesApi.mockClear()
+    await fetchSidebarSessions(sidebarRequest)
+    expect(hermesApi).toHaveBeenCalledTimes(3)
+    expect(hermesApi.mock.calls.every(call => !(call[0] as { path: string }).path.includes('/sidebar'))).toBe(true)
   })
 })

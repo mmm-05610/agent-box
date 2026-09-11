@@ -1,6 +1,6 @@
 // Extracted verbatim from index.tsx (see docs/desktop-megafile-decomposition.md).
 
-import type { listAllProfileSessions } from '@/hermes';
+import type { listAllProfileSessions } from '@/application/session-lists';
 import { sessionTitle } from '@/lib/chat-runtime'
 import {
   type IconComponent,

@@ -1,6 +1,6 @@
+import { completeMcpDesktopOAuth, McpOAuthCancelled } from '@/application/mcp-oauth'
 import { listMcpServers } from '@/hermes'
 import { translateNow } from '@/i18n'
-import { completeMcpDesktopOAuth, McpOAuthCancelled } from '@/lib/mcp-dashboard-oauth'
 import { prettyName } from '@/lib/text'
 import { type ComposerSuggestion, offerSuggestions } from '@/store/composer-suggestions'
 import { $gateway } from '@/store/gateway'

@@ -3,6 +3,27 @@
 Applies on top of `apps/desktop/AGENTS.md` (the judgment guide) and the root `AGENTS.md`.
 Root TypeScript style rules apply.
 
+## `api/` is a leaf; `application/` composes it
+
+Two adjacent layers, one direction of dependency:
+
+- **`src/api/**`** builds a request, sends it, parses the response and raises typed errors. It is the
+  BOTTOM of the renderer's own dependency order, so it must not reach `@/store`, `@/app`,
+  `@/components`, `@/themes`, `@/theme-composition`, `@/i18n`, `@/contrib`, the `@/hermes` barrel, or
+  `@/application` — directly or through any chain of modules. `@/types/**`, `@hermes/shared`, React
+  and third-party packages are what it stands on. The platform bridge has exactly ONE address:
+  `api/client.ts` (`requestHermesApi` / `hermesApi`); no other file names `window.hermesDesktop.api`.
+- **`src/application/**`** holds the use-cases that need more than a request: MCP OAuth
+  (`mcp-oauth.ts`), session-list assembly and the one-shot legacy owner backfill
+  (`session-lists.ts`, `legacy-session-owner-backfill.ts`), transcript tail bookkeeping and the
+  cross-backend stored-transcript probe (`session-transcripts.ts`). It imports `api/` and the stores
+  freely, and is imported by `app/`/`store/` call sites — never re-exported from the `@/hermes`
+  barrel, which would route it back into `api/`'s cycle.
+
+`src/api/import-boundary.test.ts` enforces all of it (direct specifiers, `import()`/`require()`/
+`vi.mock()`, and the transitive closure), with reverse controls proving the scanner can fail. When a
+helper needs a store, a component or the active gateway, it belongs in `application/`, not `api/`.
+
 ## The desktop is its own chat surface on a `hermes serve` backend
 
 Electron + React + nanostores (`@assistant-ui/react`) talking to a `hermes serve` backend over
