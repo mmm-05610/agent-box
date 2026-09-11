@@ -136,5 +136,13 @@
       "hooks/use-emoji-completions'",
       "\\./use-live-completion-adapter'"
     ]
+  },
+  "11 route-vocab": {
+    "edges": 3,
+    "modules": [
+      "app/routes'",
+      "\\.\\./routes'",
+      "\\./routes'"
+    ]
   }
 }

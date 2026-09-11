@@ -10,7 +10,7 @@ because it is trusted; see `renderer-layer-master-plan.md` §8.
 | last updated | 2026-09-12 |
 | last commit to change renderer source | `c6889f1` |
 | ledger | **85** |
-| target when the run completes | **13** |
+| target when the run completes | **10** |
 | tests | **775 files / 7466 tests** |
 | reviewed | nothing yet |
 | in scope | **every work order in `renderer-layer-batches/`** — Phase 1 and Phase 2 both; no phase is a permission gate |
@@ -19,27 +19,28 @@ because it is trusted; see `renderer-layer-master-plan.md` §8.
 
 ## Phase 1 — the layer work orders
 
-72 edges across nine work orders. Batches 06-10 are written as
+75 edges across ten work orders. Batches 06-11 are written as
 independently executable items, so the table is finer than the work orders. Wave
 numbers come from the collision check
 (`renderer-layer-master-plan.md` §4) — items in the same wave share no file.
 
 | item | scope | edges | wave | status | commit | reviewer |
 | --- | --- | --- | --- | --- | --- | --- |
-| 01 | four stateful `lib/` services → `store/` | 6 | 4 | not started | — | — |
+| 01 | four stateful `lib/` services → `store/` | 6 | 5 | not started | — | — |
 | 02 | `lib/tour/` → `app/tour/` | 2 | 1 | not started | — | — |
-| 03 | a misplaced shape and a sidebar label | 3 | 3 | not started | — | — |
+| 03 | a misplaced shape and a sidebar label | 3 | 4 | not started | — | — |
 | 04 | split `workspace-groups.ts`, membership core → `store/` | 4 | 2 | not started | — | — |
 | 06a1 | `lib/statusbar.tsx` — the React half leaves | 1 | 2 | not started | — | — |
 | 06a2 | `lib/session-link-title.ts` → its only consumer | 1 | 3 | not started | — | — |
 | 06b1 | `lib/haptics.ts` — inject the mute preference | 1 | 2 | not started | — | — |
 | 06c1 | `lib/sound/completion-sound.ts` → `store/sound/player.ts` | 3 | 1 | not started | — | — |
 | 06c2 | `lib/hooks/use-image-download.ts` → `components/hooks/` | 1 | 1 | not started | — | — |
-| 07a | `lib/keybinds/` — split two of its five files | 4 | 4 | not started | — | — |
-| 07b | `lib/external-link.tsx` — split 7 exports out of 18 | 1 | 4 | not started | — | — |
-| 08 | the pane/layout domain sinks to `lib/` + `store/` | 9 | 3 | not started | — | — |
+| 07a | `lib/keybinds/` — split two of its five files | 4 | 5 | not started | — | — |
+| 07b | `lib/external-link.tsx` — split 7 exports out of 18 | 1 | 5 | not started | — | — |
+| 08 | the pane/layout domain sinks to `lib/` + `store/` | 9 | 4 | not started | — | — |
 | 09 | the plugin ABI stops reaching into the app | 14 | 1 | not started | — | — |
-| 10 | the composer engine leaves `app/` for `lib/` + `components/` | 22 | 5 | not started | — | — |
+| 10 | the composer engine leaves `app/` for `lib/` + `components/` | 22 | 6 | not started | — | — |
+| 11 | the route vocabulary sinks to `lib/` | 3 | 3 | not started | — | — |
 
 Work orders: [01](renderer-layer-batches/01-lib-services-to-store.md) ·
 [02](renderer-layer-batches/02-tour-to-app.md) ·
@@ -49,11 +50,12 @@ Work orders: [01](renderer-layer-batches/01-lib-services-to-store.md) ·
 [07](renderer-layer-batches/07-split-by-consumer.md) ·
 [08](renderer-layer-batches/08-pane-shell-sink.md) ·
 [09](renderer-layer-batches/09-plugin-abi.md) ·
-[10](renderer-layer-batches/10-composer-engine.md)
+[10](renderer-layer-batches/10-composer-engine.md) ·
+[11](renderer-layer-batches/11-route-vocabulary.md)
 
-Expected on completion: the ledger drops to 13, and **no `lib/` line and no
+Expected on completion: the ledger drops to 10, and **no `lib/` line and no
 `extension/` line survives** — every one of `lib/`'s 21 lines is paid by 01–03,
-06–07 and 10, and 09 pays 14 of the 16 `extension/` lines plus one of
+06–07, 10 and 11, and 09 pays 14 of the 16 `extension/` lines plus one of
 `components/`'s (the same seam, used by a component). `lib/keybinds/` and
 `lib/external-link` must be gone from the ledger entirely; if a `lib/` line
 survives, a split boundary was drawn wrong.
@@ -80,7 +82,6 @@ component layer became 08, the plugin ABI became 09, and the composer engine bec
 | --- | --- | --- | --- |
 | the three host-view capability exports (`SkillsView`, `McpTab`, `ToolsetConfigPanel`) | 3 | a decision: a lazy capability read, a `ctx`-supplied component, a lazy plugin glob, or a shared prop contract | awaiting decision |
 | the composer's last edge (`user-edit-composer -> use-prompt-actions`) | 1 | a decision: unblock the chain, or give the edit composer a host-supplied "send" verb | awaiting decision |
-| the route classifiers (`assistant-message`, `find-bar`, `tips/use-tip-rotation`) | 3 | the same closure pass as 10 | not analysed |
 | `components/pet/floating-pet.tsx` → three `app/hooks` | 3 | sink what is pure, seam what is not | not analysed |
 | three singletons (`boot-failure-overlay`, `store/gateway-switch`, `store/pane-focus`) | 3 | three unrelated edges; each needs its own read | not analysed |
 
@@ -92,16 +93,17 @@ than a crash. 09's last section has the full chain.
 
 The second row is what 10 left behind, and it is a chain rather than a wall:
 `use-prompt-actions/index.ts` reaches `app/session/hooks/session-context-drift.ts`,
-which imports `isNewChatRoute` and `routeSessionId` from `@/app/routes`. The route
-vocabulary is pure and the third row needs it sunk anyway — so the route work order
-comes first and shortens this chain by one link.
+which imports `isNewChatRoute` and `routeSessionId` from `@/app/routes`. Work order
+[11](renderer-layer-batches/11-route-vocabulary.md) sinks that vocabulary, which
+shortens the chain by one link — the next link is the
+`use-session-actions/utils.ts` barrel, whose four re-exported helpers are app-free.
 
 ## Open items
 
 - Nothing is blocked. Every work order has a verified destination, a self-contained
-  brief and a place in Phase 1 or 2. The five rows under "not yet work orders" are
+  brief and a place in Phase 1 or 2. The four rows under "not yet work orders" are
   the only thing that can stop the run short, and stopping there is the correct
-  outcome — the run ends at ledger **13**, not at zero.
+  outcome — the run ends at ledger **10**, not at zero.
 
 ## How to update this file
 

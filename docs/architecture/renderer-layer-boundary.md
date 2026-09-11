@@ -17,13 +17,19 @@ this document and that file disagree, the file is right.
 | importer → target | edges |
 | --- | --- |
 | `components` → `app` | 28 |
-| `lib` → `store` | 20 |
-| `store` → `components` | 17 |
 | `extension` → `app` | 16 |
+| `lib` → `store` | 16 |
 | `store` → `app` | 11 |
+| `store` → `components` | 9 |
 | `lib` → `app` | 3 |
 | `lib` → `components` | 2 |
-| **total** | **97** |
+| **total** | **85** |
+
+That table and the two below are a **snapshot of the day this analysis was
+written**. The ledger is the source: `npm run ledger:layers` regenerates it, the
+guard fails on a stale line, and the master plan §1 derives its target from the
+batch manifest. An earlier version of this table said 97 with a different split —
+it had drifted, which is exactly why nothing here is allowed to be the authority.
 
 The 16 `store → application` imports are **not** in that list: `src/AGENTS.md`
 sanctions them ("`application/` … is imported by `app/`/`store/` call sites"), so
@@ -44,8 +50,8 @@ and eight files own 48:
  3  components/pet/floating-pet.tsx
 ```
 
-So this is not 97 chores. It is a handful of knots plus a long tail that hangs off
-them.
+So this is not eighty-five chores. It is a handful of knots plus a long tail that
+hangs off them.
 
 ## 2. The knots — these need a decision, not a move
 
@@ -137,35 +143,30 @@ fourteen to `components/`, plus the five suggestion providers moving up out of
 The 23rd is `user-edit-composer -> @/app/session/hooks/use-prompt-actions`, and it
 is blocked by a chain rather than by a design: that hook cluster reaches
 `app/session/hooks/session-context-drift.ts`, which imports `isNewChatRoute` and
-`routeSessionId` from `@/app/routes`. Sink the route vocabulary (K5's first row)
-and the chain shortens.
+`routeSessionId` from `@/app/routes`. Batch
+[11](renderer-layer-batches/11-route-vocabulary.md) sinks that vocabulary, which
+shortens the chain by one link; the next link is the `use-session-actions/utils.ts`
+barrel, whose helpers import nothing above rank 1.
 
-### K5 · What is left after 09 and 10 (9 edges)
+### K5 · What is left after 09, 10 and 11 (6 edges)
 
-Everything still pointing up out of `components/` and `store/` once the three
-big items are paid off. Nine lines, and none of them is a design decision:
+Everything still pointing up out of `components/` and `store/` once the four big
+items are paid off. Six lines, and none of them is a design decision:
 
-- **the route classifiers** — `components/assistant-ui/thread/assistant-message.tsx`,
-  `components/find-bar.tsx` and `components/tips/use-tip-rotation.ts` import
-  `appViewForPath` / `SETTINGS_ROUTE` from `@/app/routes`. Pure, and the first two
-  have a below-app consumer;
 - **pet** — `components/pet/floating-pet.tsx` imports three `app/hooks`
   (`use-gateway-request`, `use-on-profile-switch`, `use-overlay-route-active`);
 - **three singletons** — `components/boot-failure-overlay.tsx -> app/settings/gateway-settings`,
   `store/gateway-switch.ts -> app/contrib/hooks/use-background-sync`, and
   `store/pane-focus.ts -> app/right-sidebar/store`.
 
-The route work order comes first: K4's last edge and this first row both need it.
+The route classifiers that used to head this list are
+[batch 11](renderer-layer-batches/11-route-vocabulary.md).
 
 ## 3. The mechanical batches
 
 The verified-safe mechanical work is written up as **one implementation document
-per batch** in
-[`renderer-layer-batches/`](renderer-layer-batches/README.md) — 15 edges across
-four batches, each independently executable, each ending with a green suite and a
-regenerated ledger.
-
-They are listed here only so this document stays the whole picture:
+per batch** in [`renderer-layer-batches/`](renderer-layer-batches/README.md), each
+independently executable, each ending with a green suite and a regenerated ledger.
 
 The inventory, the per-batch edge counts, the order and the parallel groups are
 **not restated here**. They are derived from
