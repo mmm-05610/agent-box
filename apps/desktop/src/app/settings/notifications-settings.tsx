@@ -6,7 +6,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useI18n } from '@/i18n'
 import { triggerHaptic } from '@/lib/haptics'
 import { Bell, Play } from '@/lib/icons'
-import { COMPLETION_SOUND_VARIANTS, previewCompletionSound } from '@/lib/sound/completion-sound'
 import { cn } from '@/lib/utils'
 import {
   $nativeNotifyPrefs,
@@ -17,6 +16,7 @@ import {
 } from '@/store/native-notifications'
 import { notify } from '@/store/notifications'
 import { $completionSoundVariantId, setCompletionSoundVariantId } from '@/store/sound/completion-sound'
+import { COMPLETION_SOUND_VARIANTS, previewCompletionSound } from '@/store/sound/player'
 
 import { CONTROL_TEXT } from './constants'
 import { ListRow, SectionHeading, SettingsContent, ToggleRow } from './primitives'
