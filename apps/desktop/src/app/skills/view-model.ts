@@ -11,6 +11,17 @@ import { countEnabledTools } from '@/lib/mcp-tool-filter'
 
 /** MCP tab view-model: doc parsing, server status classification, usage cache. */
 
+/**
+ * What "Add server" seeds into the draft — a server block the user then points
+ * at their own path. View-model data, so it sits with `wrapDoc` (the two are
+ * always used together) instead of on the tab's entry module, which would make
+ * the view import the module that re-exports it.
+ */
+export const STARTER_ENTRY = {
+  command: 'npx',
+  args: ['-y', '@modelcontextprotocol/server-filesystem', '/path/to/dir']
+}
+
 export const pretty = (value: unknown) => JSON.stringify(value, null, 2)
 export const wrapDoc = (entries: McpServers) => pretty({ mcpServers: entries })
 

@@ -30,6 +30,7 @@ import {
   setTreeSplitWeights
 } from '../store'
 
+import type { LayoutNodeRenderer } from './renderer-types'
 import {
   allFixedAbsorberIndex,
   COLLAPSED_ZONE_PX,
@@ -47,7 +48,6 @@ import {
   subtreeGone,
   type TrackContext
 } from './track-model'
-import { TreeNode } from './tree-node'
 
 /** The single group id a subtree resolves to, or null when it holds several
  *  zones — the sash can only collapse a boundary that IS exactly one zone. */
@@ -87,7 +87,24 @@ function useSubtreeOverrides(paneIds: readonly string[]): TrackContext['override
   return useSyncExternalStore(cb => $paneStates.listen(cb), snapshot, snapshot)
 }
 
-export function TreeSplit({ node, root, rootRow }: { node: SplitNode; root?: boolean; rootRow?: boolean }) {
+/**
+ * `renderNode` is the injected child renderer (the dispatch in tree-node.tsx
+ * hands itself down) — a split renders each of its children through it, which
+ * is how the recursion stays in one place without this module importing the
+ * dispatcher. It is never forwarded `root`: side collapse applies only at the
+ * top split, so children are always rendered as non-root.
+ */
+export function TreeSplit({
+  node,
+  renderNode: RenderNode,
+  root,
+  rootRow
+}: {
+  node: SplitNode
+  renderNode: LayoutNodeRenderer
+  root?: boolean
+  rootRow?: boolean
+}) {
   const containerRef = useRef<HTMLDivElement>(null)
   const panes = useContributions('panes')
   const hiddenPanes = useStore($hiddenTreePanes)
@@ -719,7 +736,7 @@ export function TreeSplit({ node, root, rootRow }: { node: SplitNode; root?: boo
               />
             )}
             {!narrowCollapsed && (
-              <TreeNode
+              <RenderNode
                 node={child}
                 parentAxis={axis}
                 railSide={horizontal ? railSideFor(i) : undefined}

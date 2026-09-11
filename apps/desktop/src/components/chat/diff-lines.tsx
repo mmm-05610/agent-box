@@ -4,13 +4,10 @@ import * as React from 'react'
 import type { BundledLanguage, ThemedToken } from 'shiki'
 
 import {
-  DIFF_KIND_TEXT,
   DIFF_KIND_TINT,
-  DIFF_LINE_BASE,
   DiffBody,
   type DiffKind,
-  type DiffLine,
-  diffLineTransformer
+  type DiffLine
 } from '@/components/chat/diff-body'
 import { chunkLines, type LineChunk, useFixedRowWindow } from '@/components/chat/fixed-row-window'
 import { exceedsHighlightBudget, SHIKI_THEME } from '@/components/chat/shiki-highlighter'
@@ -258,22 +255,6 @@ function parseFullFileDiff(diff: string, fullText: string): DiffLine[] {
   return out
 }
 
-/** Exported for the lazily-loaded SyntaxDiff (syntax-diff.tsx). */
-export function DiffBody({ lines, syntax }: { lines: DiffLine[]; syntax?: boolean }) {
-  return (
-    <>
-      {lines.map((line, index) => (
-        <span
-          className={cn(DIFF_LINE_BASE, DIFF_KIND_TINT[line.kind], !syntax && DIFF_KIND_TEXT[line.kind])}
-          key={`${index}-${line.text}`}
-        >
-          {line.text || ' '}
-        </span>
-      ))}
-    </>
-  )
-}
-
 // shiki FontStyle is a bitmask: Italic=1, Bold=2, Underline=4.
 function tokenStyle({ bgColor, color, fontStyle = 0 }: ThemedToken): React.CSSProperties | undefined {
   if (!color && !bgColor && !fontStyle) {
@@ -428,25 +409,6 @@ function TokenizedDiffBody({
       })}
     </>
   )
-}
-
-// Shiki transformer: tag each `.line` with the diff tint for its kind, so the
-// syntax-highlighted output keeps add/remove backgrounds + the gutter accent.
-// Exported for the lazily-loaded SyntaxDiff (syntax-diff.tsx).
-export function diffLineTransformer(kinds: DiffKind[]): ShikiTransformer {
-  return {
-    line(node, line) {
-      const kind = kinds[line - 1] ?? 'context'
-
-      const existing = Array.isArray(node.properties.className)
-        ? (node.properties.className as string[])
-        : node.properties.className
-          ? [String(node.properties.className)]
-          : []
-
-      node.properties.className = [...existing, DIFF_LINE_BASE, DIFF_KIND_TINT[kind]]
-    }
-  }
 }
 
 function SyntaxDiff({ language, lines }: { language: string; lines: DiffLine[] }) {

@@ -29,8 +29,6 @@ import { avatarColor, blobatarSvg, BotFace } from './avatar'
 import { AvatarPicker } from './avatar-picker'
 import { $selectedBot } from './bot-state'
 import { createCanonicalChat } from './canonical-chat'
-import type { CapabilityCatalog, CreateAgentDialogProps } from './create-dialog'
-import { NAME_RE } from './create-dialog'
 import { ROSTER_KEY, saveBotMeta } from './data'
 import { labeled, ResizableFrame } from './dialog-parts'
 import { useBots } from './i18n'
@@ -38,6 +36,7 @@ import { displayName, slugify } from './labels'
 import { McpSetupButton } from './mcp-setup'
 import { ModelPicker } from './model-picker'
 import type {
+  CapabilityEntry,
   McpCatalogResponse,
   ProfileConfigurePayload,
   ProfileDescribeResponse
@@ -47,7 +46,24 @@ import { deleteBot } from './profile-ops'
 import { singleFlight } from './single-flight'
 import { HubSkillsSection } from './skills-hub'
 import { composeSoul } from './soul'
-import type { ConnectionRow } from './types'
+import type { ConnectionRow, RosterRow } from './types'
+
+/** Bot names are slugs — the rule profile keys and the roster's avatar seeds
+ *  both assume. */
+export const NAME_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/
+
+export interface CapabilityCatalog {
+  mcp: CapabilityEntry[]
+  skills: CapabilityEntry[]
+  source: string
+  toolsets: CapabilityEntry[]
+}
+
+export interface CreateAgentDialogProps {
+  onClose: () => void
+  open: boolean
+  roster: RosterRow[]
+}
 
 export function CreateAgentDialog({ open, onClose, roster }: CreateAgentDialogProps) {
   const { t } = useI18n()

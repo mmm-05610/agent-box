@@ -7,6 +7,7 @@ import { $paneStates } from '@/store/panes'
 import { group, split, type SplitNode } from '../model'
 import { $hiddenTreePanes, $layoutTree, markCollapsePane, setTreeGroupMinimized } from '../store'
 
+import { TreeNode } from './tree-node'
 import { TreeSplit } from './tree-split'
 
 class TestResizeObserver {
@@ -108,7 +109,7 @@ describe('TreeSplit cascading expansion', () => {
 
     $layoutTree.set(tree)
 
-    render(<TreeSplit node={tree} root rootRow />)
+    render(<TreeSplit node={tree} renderNode={TreeNode} root rootRow />)
 
     const container = document.querySelector<HTMLElement>('[data-tree-split="root-row"]')!
     const [chat, cron, browser] = [...container.children] as HTMLElement[]
@@ -164,7 +165,7 @@ describe('TreeSplit cascading expansion', () => {
     $paneStates.set({ browser: { open: true, widthOverride: 200 } })
     setTreeGroupMinimized('terminal-zone', true)
 
-    render(<TreeSplit node={row()} root rootRow />)
+    render(<TreeSplit node={row()} renderNode={TreeNode} root rootRow />)
 
     const container = document.querySelector<HTMLElement>('[data-tree-split="root-row"]')!
     const [chat, cron, browser, terminal] = [...container.children] as HTMLElement[]
@@ -208,7 +209,7 @@ describe('TreeSplit cascading expansion', () => {
 
     $layoutTree.set(tree)
 
-    render(<TreeSplit node={tree} root />)
+    render(<TreeSplit node={tree} renderNode={TreeNode} root />)
 
     const container = document.querySelector<HTMLElement>('[data-tree-split="root-column"]')!
     const [chat, terminal] = [...container.children] as HTMLElement[]

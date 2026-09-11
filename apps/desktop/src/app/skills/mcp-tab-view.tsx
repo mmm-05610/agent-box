@@ -38,7 +38,6 @@ import { DetailPane, MASTER_DETAIL_WIDE_COLS } from '../master-detail'
 import { PanelAddButton, PanelEmpty } from '../overlays/panel'
 import { useDeepLinkHighlight } from '../settings/use-deep-link-highlight'
 
-import { STARTER_ENTRY } from './mcp-tab'
 import {
   McpCatalog,
   McpImportButton,
@@ -54,6 +53,7 @@ import {
   scanServerBlocks,
   type ServerCost,
   serverEnabled,
+  STARTER_ENTRY,
   statusLine,
   statusOf,
   wrapDoc,
@@ -248,7 +248,8 @@ export function McpTab({ gateway, profile }: { gateway: HermesGateway | null; pr
     [scopeProfileKey]
   )
 
-  // A profile switch invalidates the config query (see store/profile.ts), which
+  // A profile switch invalidates the config query (see
+  // application/profile/active-route-effects), which
   // refetches the new backend's mcp.json. Reset ALL per-profile view state — the
   // draft (incl. a dirty one, so profile A's edits can't be saved into B), its
   // seed latch, probes, and cursor — so everything reseeds for the new profile.

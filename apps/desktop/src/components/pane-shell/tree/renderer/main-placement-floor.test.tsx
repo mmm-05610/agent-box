@@ -8,6 +8,7 @@ import { group, split } from '../model'
 import { $hiddenTreePanes, $layoutTree } from '../store'
 
 import { subtreeGone, type TrackContext } from './track-model'
+import { TreeNode } from './tree-node'
 import { TreeSplit } from './tree-split'
 
 // Ground truth for "the main pane always shows, no matter what". Emptying the
@@ -86,7 +87,7 @@ describe('the main placement floor in the renderer', () => {
     $layoutTree.set(tree)
     $hiddenTreePanes.set(new Set(['workspace', 'session-tile:a', 'terminal']))
 
-    render(<TreeSplit node={tree} root rootRow />)
+    render(<TreeSplit node={tree} renderNode={TreeNode} root rootRow />)
 
     const main = zoneWrapper('grp-main')
 
