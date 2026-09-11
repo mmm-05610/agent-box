@@ -2,9 +2,9 @@ import { isValidElement } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { registry } from '@/lib/contributions'
+import { $pluginDecisions, $pluginRecords, setPluginEnabled } from '@/store/plugin-state'
 
 import { discoverBundledPlugins } from './plugins'
-import { $pluginDecisions, $pluginRecords, setPluginEnabled } from './plugins-store'
 
 vi.mock('./runtime-loader', () => ({ watchRuntimePlugins: vi.fn() }))
 

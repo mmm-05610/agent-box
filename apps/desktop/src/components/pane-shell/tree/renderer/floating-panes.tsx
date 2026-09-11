@@ -15,13 +15,7 @@ import { Codicon } from '@/components/ui/codicon'
 import { ContribBoundary, ContribRender } from '@/extension/contrib/react/boundary'
 import { useContributions } from '@/extension/contrib/react/use-contributions'
 import { HUD_SURFACE } from '@/lib/floating-hud'
-import { readJson, writeJson } from '@/lib/storage'
-import { TITLEBAR_HEIGHT } from '@/lib/titlebar'
-import { cn } from '@/lib/utils'
-import type { Contribution } from '@/types/contributions'
-
-import { $hiddenTreePanes } from '../store'
-
+import { paneChrome } from '@/lib/pane-shell/chrome'
 import {
   anchoredRect,
   clampFloatingRect,
@@ -30,8 +24,12 @@ import {
   type FloatingRect,
   type FloatingViewport,
   reflowRect
-} from './floating-rect'
-import { paneChrome } from './track-model'
+} from '@/lib/pane-shell/floating-rect'
+import { readJson, writeJson } from '@/lib/storage'
+import { TITLEBAR_HEIGHT } from '@/lib/titlebar'
+import { cn } from '@/lib/utils'
+import { $hiddenTreePanes } from '@/store/pane-shell/tree'
+import type { Contribution } from '@/types/contributions'
 
 const POSITIONS_KEY = 'hermes.desktop.floatingPanes.v1'
 

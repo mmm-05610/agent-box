@@ -9,11 +9,10 @@
  * a function of what it currently holds plus one deliberate choice.
  */
 
+import { paneChrome } from '@/lib/pane-shell/chrome'
 import type { TabStripMode } from '@/lib/pane-tree'
 import { effectiveTabStripMode } from '@/store/tabstrip-prefs'
 import type { Contribution } from '@/types/contributions'
-
-import { paneChrome } from './track-model'
 
 export interface StripPane {
   /** A tool panel (terminal / logs) that collapses rather than closes. */

@@ -1,7 +1,7 @@
 import { atom, computed, type ReadableAtom } from 'nanostores'
 
 import { PRIMARY_SESSION_VIEW } from '@/components/chat/session-view'
-import { $narrowViewport } from '@/components/pane-shell/tree/store'
+import { $narrowViewport } from '@/store/pane-shell/tree'
 import { $activeGatewayProfile, normalizeProfileKey } from '@/store/profile'
 import {
   $activeSessionId,

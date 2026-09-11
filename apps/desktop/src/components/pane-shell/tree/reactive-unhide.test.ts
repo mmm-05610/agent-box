@@ -24,7 +24,7 @@ describe('reactive pane unhide', () => {
   })
 
   async function setupWithFiles() {
-    const tree = await import('@/components/pane-shell/tree/store')
+    const tree = await import('@/store/pane-shell/tree')
     const layout = await import('@/store/layout')
     const model = await import('@/lib/pane-tree')
     const { registry } = await import('@/lib/contributions')

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { $hoveredTreeGroup } from '@/components/pane-shell/tree/store'
+import { $hoveredTreeGroup } from '@/store/pane-shell/tree'
 
 import {
   blurComposerInput,

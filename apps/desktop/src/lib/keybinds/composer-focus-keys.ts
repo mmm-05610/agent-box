@@ -7,8 +7,8 @@
  */
 
 import { $workspaceIsPage } from '@/app/routes'
-import { $activeTreeGroup, $hoveredTreeGroup } from '@/components/pane-shell/tree/store'
 import { queryAllVisible } from '@/lib/pane-visibility'
+import { $activeTreeGroup, $hoveredTreeGroup } from '@/store/pane-shell/tree'
 import { switcherActive } from '@/store/session-switcher'
 
 import { isEditableTarget, isFocusWithin } from './combo'

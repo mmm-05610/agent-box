@@ -29,22 +29,19 @@ import { ContribBoundary, ContribRender } from '@/extension/contrib/react/bounda
 import { useContributions } from '@/extension/contrib/react/use-contributions'
 import { useI18n } from '@/i18n'
 import { useKeybindHint } from '@/lib/keybinds/use-keybind-hint'
+import { emptyPaneLifecycleState, reconcilePaneLifecycle } from '@/lib/pane-shell/pane-lifecycle'
+import {
+  $tabSelection,
+  clearTabSelection,
+  isToggleSelectClick,
+  selectionFor,
+  selectTabRange,
+  toggleTabSelected
+} from '@/lib/pane-shell/tab-selection'
 import type { DropPosition, GroupNode } from '@/lib/pane-tree'
 import { hiddenPaneProps } from '@/lib/pane-visibility'
 import { cn } from '@/lib/utils'
-import { closeAllOpenSessionTiles } from '@/store/session-states'
-
-import { $layoutEditMode } from '../../edit-mode'
-import { useWindowControlsOverlap } from '../../geometry'
-import { emptyPaneLifecycleState, reconcilePaneLifecycle } from '../../pane-lifecycle'
-import { PaneGroupContext, PaneLifecycleContext, PaneVisibleContext } from '../../pane-visibility'
-import {
-  $workspaceMode,
-  $workspaceOwnerKey,
-  rememberActivePane,
-  resolveRememberedActivePane,
-  workspaceScopeKey
-} from '../../workspace-scope'
+import { tabStripVisibleForZone } from '@/store/pane-shell/strip-visibility'
 import {
   $dropHint,
   $hiddenTreePanes,
@@ -72,20 +69,23 @@ import {
   setTreeGroupMinimized,
   setTreeGroupTabStrip,
   treeTabCloseTargets
-} from '../store'
+} from '@/store/pane-shell/tree'
 import {
-  $tabSelection,
-  clearTabSelection,
-  isToggleSelectClick,
-  selectionFor,
-  selectTabRange,
-  toggleTabSelected
-} from '../tab-selection'
+  $workspaceMode,
+  $workspaceOwnerKey,
+  rememberActivePane,
+  resolveRememberedActivePane,
+  workspaceScopeKey
+} from '@/store/pane-shell/workspace-scope'
+import { closeAllOpenSessionTiles } from '@/store/session-states'
 
+import { $layoutEditMode } from '../../edit-mode'
+import { useWindowControlsOverlap } from '../../geometry'
+import { PaneGroupContext, PaneLifecycleContext, PaneVisibleContext } from '../../pane-visibility'
+
+import { paneChromeRender } from './chrome-render'
 import { startPaneDrag } from './drag-session'
-import { tabStripVisibleForZone } from './strip-visibility'
 import { useActiveTabVisible } from './tab-strip-scroll'
-import { paneChrome } from './track-model'
 
 /** Right-click zone menu: the tab verbs (close this / others / to the right /
  *  all) plus the strip's own chrome toggles. Same items and icons as a session
@@ -269,7 +269,7 @@ export function TreeGroup({
   // Edit mode forces toggle-hidden panes visible so they can be rearranged
   // (mirrors tree-split's paneGone) — restores itself on exit.
   const paneShown = (id: string) =>
-    Boolean(paneFor(id)) && (editMode || !hiddenPanes.has(id)) && !(narrow && paneChrome(paneFor(id)).collapsible)
+    Boolean(paneFor(id)) && (editMode || !hiddenPanes.has(id)) && !(narrow && paneChromeRender(paneFor(id)).collapsible)
 
   const shown = node.panes.filter(paneShown)
   const memoryKey = workspaceScopeKey(workspaceMode, workspaceOwnerKey)
@@ -287,7 +287,7 @@ export function TreeGroup({
   // can mint its own kind — that last rung is what keeps the button from
   // blinking out when you click a file tab sitting beside a Browser.
   const ownNewTab = (id: string) => {
-    const mint = paneChrome(paneFor(id)).newTab
+    const mint = paneChromeRender(paneFor(id)).newTab
 
     return mint ? { label: t.zones.newTab, onSelect: mint } : null
   }
@@ -317,7 +317,7 @@ export function TreeGroup({
   if (!node.minimized && !isEmpty) {
     lifecycleRef.current = reconcilePaneLifecycle(lifecycleRef.current, {
       activeId,
-      keepAlive: id => Boolean(paneChrome(paneFor(id)).lifecycleKeepAlive),
+      keepAlive: id => Boolean(paneChromeRender(paneFor(id)).lifecycleKeepAlive),
       paneIds: shown
     })
   }
@@ -375,14 +375,14 @@ export function TreeGroup({
   // (sessions / Bots — show/hide replaces Close) are exempt.
   const closable = () => {
     const paneId = targetPane()
-    const chrome = paneChrome(paneFor(paneId))
+    const chrome = paneChromeRender(paneFor(paneId))
 
     return chrome.uncloseable || chrome.hideOnly ? undefined : paneId
   }
 
   // The zone hosting the uncloseable workspace never minimizes — collapsing
   // MAIN strands the whole app behind a strip.
-  const minimizable = !shown.some(id => paneChrome(paneFor(id)).uncloseable)
+  const minimizable = !shown.some(id => paneChromeRender(paneFor(id)).uncloseable)
 
   // Middle-click / ⌘-click on a tab: one routing for every tab kind, the same
   // one the zone menu's Close and ⌘W use.
@@ -394,10 +394,10 @@ export function TreeGroup({
   // close gesture: its tabs are shown/hidden (zone menu, ⌘K), never closed —
   // an accidental ✕ on standing chrome removed Bot Mode until the next launch.
   const closeableTab = (paneId: string) =>
-    !paneChrome(paneFor(paneId)).hideOnly && (!paneChrome(paneFor(paneId)).uncloseable || panesWithCloser.has(paneId))
+    !paneChromeRender(paneFor(paneId)).hideOnly && (!paneChromeRender(paneFor(paneId)).uncloseable || panesWithCloser.has(paneId))
 
   // A pane's own live label when it has one, else its registered string.
-  const tabLabel = (paneId: string) => paneChrome(paneFor(paneId)).tabTitle?.() ?? paneFor(paneId)?.title ?? paneId
+  const tabLabel = (paneId: string) => paneChromeRender(paneFor(paneId)).tabTitle?.() ?? paneFor(paneId)?.title ?? paneId
 
   // Collapse/restore a tool panel (or plain minimize elsewhere) — the header
   // chevron, routed so ⌃`/the titlebar toggle stay truthful. The strip itself
@@ -412,7 +412,7 @@ export function TreeGroup({
     minimized: node.minimized,
     nodeId: node.id,
     stripVisible,
-    tabMenuPrefix: (kit: MenuKit) => paneChrome(paneFor(targetPane())).tabMenuPrefix?.(kit),
+    tabMenuPrefix: (kit: MenuKit) => paneChromeRender(paneFor(targetPane())).tabMenuPrefix?.(kit),
     targetPane
   }
 
@@ -531,7 +531,7 @@ export function TreeGroup({
           >
             {shown.map(paneId => {
               const isActive = paneId === activeId && !node.minimized
-              const chrome = paneChrome(paneFor(paneId))
+              const chrome = paneChromeRender(paneFor(paneId))
               const closeable = closeableTab(paneId)
               const title = paneFor(paneId)?.title ?? paneId
               const isSelected = tabSelection?.groupId === node.id && tabSelection.ids.has(paneId)

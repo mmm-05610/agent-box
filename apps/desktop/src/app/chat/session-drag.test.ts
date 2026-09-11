@@ -1,8 +1,8 @@
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { $layoutTree } from '@/components/pane-shell/tree/store'
 import { group } from '@/lib/pane-tree'
+import { $layoutTree } from '@/store/pane-shell/tree'
 import { openSessionTile } from '@/store/session-states'
 
 import { requestComposerInsertRefs } from './composer/focus'

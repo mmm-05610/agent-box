@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 
-import { setWorkspaceScope } from '@/components/pane-shell/workspace-scope'
+import { setWorkspaceScope } from '@/store/pane-shell/workspace-scope'
 import type { SidebarNavItem } from '@/types/sidebar'
 
 import { navigateToWorkspacePage, NEW_CHAT_ROUTE, sessionRoute, SETTINGS_ROUTE } from '../../../routes'

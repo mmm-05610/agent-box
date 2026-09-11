@@ -4,8 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { registry } from '@/lib/contributions'
 import type { GroupNode } from '@/lib/pane-tree'
-
-import { $treeDragging, NEW_SESSION_DRAG, SESSION_TILE_DRAG } from '../store'
+import { $treeDragging, NEW_SESSION_DRAG, SESSION_TILE_DRAG } from '@/store/pane-shell/tree'
 
 import { TreeGroup } from './tree-group'
 

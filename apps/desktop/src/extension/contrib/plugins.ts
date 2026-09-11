@@ -13,8 +13,9 @@
  *    — the agent's/user's doors, watched + hot-reloaded by the runtime loader.
  */
 
+import { pluginActive, publishPlugin } from '@/store/plugin-state'
+
 import { createPluginContext, type HermesPlugin } from './plugin'
-import { pluginActive, publishPlugin } from './plugins-store'
 import { watchRuntimePlugins } from './runtime-loader'
 
 const modules = import.meta.glob<{ default: HermesPlugin }>('../../plugins/*/plugin.{js,ts,tsx}', { eager: true })

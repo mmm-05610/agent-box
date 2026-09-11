@@ -31,13 +31,13 @@ import {
   syncWorkspaceRoute
 } from './routes'
 
-vi.mock('@/components/pane-shell/tree/store', async importOriginal => ({
+vi.mock('@/store/pane-shell/tree', async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
   noteActiveTreeGroup: vi.fn(),
   revealTreePane: vi.fn()
 }))
 
-const { noteActiveTreeGroup, revealTreePane } = await import('@/components/pane-shell/tree/store')
+const { noteActiveTreeGroup, revealTreePane } = await import('@/store/pane-shell/tree')
 
 const CONTRIBUTED_ROUTE = '/kanban'
 

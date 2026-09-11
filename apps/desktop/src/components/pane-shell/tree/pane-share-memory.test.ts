@@ -19,7 +19,7 @@ describe('tile split-share memory across close/reopen', () => {
   })
 
   async function setup() {
-    const tree = await import('@/components/pane-shell/tree/store')
+    const tree = await import('@/store/pane-shell/tree')
     const model = await import('@/lib/pane-tree')
     const { registry } = await import('@/lib/contributions')
 

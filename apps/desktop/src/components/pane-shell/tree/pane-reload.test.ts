@@ -11,7 +11,7 @@ describe('reloadTreePane', () => {
   })
 
   it('advances only the reloaded pane epoch and leaves the tree alone', async () => {
-    const tree = await import('@/components/pane-shell/tree/store')
+    const tree = await import('@/store/pane-shell/tree')
     const model = await import('@/lib/pane-tree')
 
     tree.declareDefaultTree(model.group(['workspace', 'files'], { active: 'workspace', id: 'grp-main' }))

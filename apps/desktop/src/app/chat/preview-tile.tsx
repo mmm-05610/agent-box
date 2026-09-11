@@ -12,7 +12,6 @@
 
 import { useStore } from '@nanostores/react'
 
-import { $activeTreeGroup, $layoutTree, revealTreePane, treePanesWithPrefix } from '@/components/pane-shell/tree/store'
 import { type MenuKit, renderActionItem } from '@/components/ui/actions-menu'
 import { FileTypeIcon } from '@/components/ui/file-type-icon'
 import { ToolIcon } from '@/components/ui/tool-icon'
@@ -20,6 +19,7 @@ import { translateNow } from '@/i18n'
 import { openExternalLink } from '@/lib/external-link'
 import { findGroup } from '@/lib/pane-tree'
 import { $rightRailActiveTabId, type RightRailTabId, selectRightRailTab } from '@/store/layout'
+import { $activeTreeGroup, $layoutTree, revealTreePane, treePanesWithPrefix } from '@/store/pane-shell/tree'
 import {
   $browserPages,
   $dockedPreviewTabs,
@@ -141,7 +141,7 @@ export function browserTabLabel(target: PreviewTarget, page?: BrowserPage): stri
 }
 
 /** Live tab label for a Browser: it renames itself as the page navigates,
- *  without the contribution re-registering (see PaneChrome.tabTitle). */
+ *  without the contribution re-registering (see PaneChromeRender.tabTitle). */
 function BrowserTabLabel({ tabId }: { tabId: string }) {
   const pages = useStore($browserPages)
   const target = targetFor(tabId)

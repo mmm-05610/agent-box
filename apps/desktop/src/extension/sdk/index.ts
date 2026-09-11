@@ -128,12 +128,6 @@ export {
   ModelMenuCloseContext,
   type ModelMenuController
 } from '@/components/model-catalog-menu'
-/** Pane placement roles. `'floating'` is the one NON-tiling value: the pane is
- *  excluded from the layout tree and rendered as a fixed, draggable card above
- *  it — it takes no width from any zone, has no tab, and can't be docked.
- *  Pair it with `anchor` (spawn corner, default `'top-right'`) plus
- *  `width`/`height`. */
-export type { FloatingAnchor } from '@/components/pane-shell/tree/renderer/floating-rect'
 export { StatusDot, type StatusTone } from '@/components/status-dot'
 export { Badge } from '@/components/ui/badge'
 export { Button } from '@/components/ui/button'
@@ -230,12 +224,12 @@ export type {
  *  `ctx.register` stays the door for permanent contributions. Namespace the
  *  id with your plugin slug (`kanban:board-switcher`). */
 export { Contribute, type ContributeProps } from '@/extension/contrib/react/contribute'
-
-// -- contracts ----------------------------------------------------------------
-
 /** The live gateway instance type — for typing the `gateway` prop `McpTab`
  *  takes; obtain the instance from `host.getGateway()`. */
 export type { HermesGateway } from '@/hermes'
+
+// -- contracts ----------------------------------------------------------------
+
 /** Localized copy. `useI18n` reuses the app's strings; `usePluginI18n(id)` +
  *  `ctx.i18n.register` let a plugin ship its OWN locale bundles, scoped like
  *  `ctx.storage` and resolved against the app's active locale — no core edit.
@@ -294,6 +288,12 @@ export { formatModifierToken } from '@/lib/keybinds/combo'
  *  a renderer that stays open for days. Only for values that can be
  *  regenerated — eviction costs a recompute or a refetch, never correctness. */
 export { LruCache } from '@/lib/lru-cache'
+/** Pane placement roles. `'floating'` is the one NON-tiling value: the pane is
+ *  excluded from the layout tree and rendered as a fixed, draggable card above
+ *  it — it takes no width from any zone, has no tab, and can't be docked.
+ *  Pair it with `anchor` (spawn corner, default `'top-right'`) plus
+ *  `width`/`height`. */
+export type { FloatingAnchor } from '@/lib/pane-shell/floating-rect'
 
 export const PANES_AREA = 'panes'
 /** The app's deterministic identity color for a name (profiles, assignees,

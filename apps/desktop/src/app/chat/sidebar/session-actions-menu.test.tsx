@@ -10,7 +10,7 @@ afterEach(cleanup)
 // a broken asChild composition on the kebab trigger fails here — the menu
 // must still open on click.
 
-vi.mock('@/components/pane-shell/tree/store', () => ({
+vi.mock('@/store/pane-shell/tree', () => ({
   closeAllTreeTabs: vi.fn(),
   closeOtherTreeTabs: vi.fn(),
   closeTreeTabsToRight: vi.fn(),

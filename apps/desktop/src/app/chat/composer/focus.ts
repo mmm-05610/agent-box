@@ -10,8 +10,8 @@
  * steal focus from the composer effect.
  */
 
-import { $hoveredTreeGroup } from '@/components/pane-shell/tree/store'
 import { isElementInHiddenPane, queryAllVisible, queryVisible } from '@/lib/pane-visibility'
+import { $hoveredTreeGroup } from '@/store/pane-shell/tree'
 
 import type { InlineRefInput } from './inline-refs'
 import { RICH_INPUT_SLOT } from './rich-editor'

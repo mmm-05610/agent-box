@@ -23,9 +23,10 @@
 import { useStore } from '@nanostores/react'
 import { type ReactNode, useEffect } from 'react'
 
+import { $layoutTree, trackActiveTreeGroup } from '@/store/pane-shell/tree'
+
 import { useLayoutEditHotkey } from '../../edit-mode'
 import { publishWorkspaceGeometry } from '../../geometry'
-import { $layoutTree, trackActiveTreeGroup } from '../store'
 import { ZoneEditor } from '../zone-editor'
 
 import { TreeEditBar } from './edit-bar'

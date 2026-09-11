@@ -14,13 +14,11 @@ import { ContribBoundary, ContribRender } from '@/extension/contrib/react/bounda
 import { useContributions } from '@/extension/contrib/react/use-contributions'
 import { ESCAPE_PRIORITY, isTopEscapeLayer, pushEscapeLayer } from '@/lib/escape-layers'
 import { PANE_TOGGLE_REVEAL_EVENT } from '@/lib/pane-events'
+import { paneChrome } from '@/lib/pane-shell/chrome'
 import { allPaneIds, findGroupOfPane } from '@/lib/pane-tree'
 import { cn } from '@/lib/utils'
+import { $hiddenTreePanes, $layoutTree, $narrowViewport } from '@/store/pane-shell/tree'
 import type { Contribution } from '@/types/contributions'
-
-import { $hiddenTreePanes, $layoutTree, $narrowViewport } from '../store'
-
-import { paneChrome } from './track-model'
 
 export function NarrowOverlays() {
   const narrow = useStore($narrowViewport)

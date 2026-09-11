@@ -30,9 +30,9 @@
 
 import { installPluginSdk, sdkImportMap } from '@/extension/sdk/runtime'
 import { notifyError } from '@/store/notifications'
+import { $pluginRecords, dropPlugin, pluginActive, type PluginKind, publishPlugin } from '@/store/plugin-state'
 
 import { createPluginContext, type HermesPlugin } from './plugin'
-import { $pluginRecords, dropPlugin, pluginActive, type PluginKind, publishPlugin } from './plugins-store'
 
 interface LoadOptions {
   /** Root-level default-enable CAP: `false` ships the plugin opt-in (inventory

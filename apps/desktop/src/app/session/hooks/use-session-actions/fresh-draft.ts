@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
 
-import { revealTreePane } from '@/components/pane-shell/tree/store'
 import { clearNotifications } from '@/store/notifications'
+import { revealTreePane } from '@/store/pane-shell/tree'
 import {
   resolveNewSessionCwd
 } from '@/store/projects'

@@ -6,7 +6,7 @@ const nextSessionTileForWorkspace = vi.fn<() => null | string>(() => null)
 const closeSessionTile = vi.fn()
 const requestFreshSession = vi.fn()
 
-vi.mock('@/components/pane-shell/tree/store', () => ({
+vi.mock('@/store/pane-shell/tree', () => ({
   closeFocusedSessionTab: () => closeFocusedSessionTab(),
   closeFocusedToolTab: () => closeFocusedToolTab()
 }))

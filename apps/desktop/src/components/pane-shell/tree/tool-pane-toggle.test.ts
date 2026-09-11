@@ -4,7 +4,6 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { $terminalTakeover, setTerminalTakeover } from '@/app/right-sidebar/store'
 import { registry } from '@/lib/contributions'
 import { allPaneIds, group, split } from '@/lib/pane-tree'
-
 import {
   $dismissedPanes,
   $hiddenTreePanes,
@@ -16,7 +15,7 @@ import {
   revealTreePane,
   setTreeGroupTabStrip,
   togglePaneVisible
-} from './store'
+} from '@/store/pane-shell/tree'
 
 // Ground truth for "toggle terminal broke — ⌘J/⌘B work fine, but once I move
 // the terminal around it just doesn't open/close anymore", and for "I have the

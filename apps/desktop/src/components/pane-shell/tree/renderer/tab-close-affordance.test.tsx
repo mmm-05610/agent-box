@@ -3,8 +3,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 
 import { registry } from '@/lib/contributions'
 import { allPaneIds, group, split } from '@/lib/pane-tree'
-
-import { $layoutTree } from '../store'
+import { $layoutTree } from '@/store/pane-shell/tree'
 
 import { TreeGroup } from './tree-group'
 
@@ -48,7 +47,7 @@ const PANES: readonly (readonly [string, Record<string, unknown>])[] = [
 beforeEach(async () => {
   window.localStorage.clear()
 
-  const { $dismissedPanes, $hiddenTreePanes } = await import('../store')
+  const { $dismissedPanes, $hiddenTreePanes } = await import('@/store/pane-shell/tree')
   $dismissedPanes.set(new Set())
   $hiddenTreePanes.set(new Set())
 

@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { registry } from '@/lib/contributions'
 import { allPaneIds, group, split } from '@/lib/pane-tree'
-
 import {
   $hiddenStripTabs,
   $hiddenTreePanes,
@@ -15,7 +14,7 @@ import {
   setTreeGroupTabStrip,
   tabStripVisibleForGroup,
   treeTabCloseTargets
-} from './store'
+} from '@/store/pane-shell/tree'
 
 vi.mock('@/store/notifications', () => ({ notify: vi.fn() }))
 

@@ -12,25 +12,7 @@ import { type PointerEvent as ReactPointerEvent, useCallback, useMemo, useRef, u
 import { beginSashDrag, endSashDrag } from '@/components/pane-shell/geometry'
 import { useContributions } from '@/extension/contrib/react/use-contributions'
 import { guardGuestPointers } from '@/lib/guest-pointer-guard'
-import type { LayoutNode, SplitNode } from '@/lib/pane-tree'
-import { allPaneIds } from '@/lib/pane-tree'
-import { rafCoalesce } from '@/lib/raf-coalesce'
-import { cn } from '@/lib/utils'
-import { $paneStates, type PaneStateSnapshot, setPaneHeightOverride, setPaneWidthOverride } from '@/store/panes'
-
-import { $layoutEditMode } from '../../edit-mode'
-import {
-  $collapsedTreeSides,
-  $hiddenTreePanes,
-  $narrowViewport,
-  isCollapsePane,
-  persistTree,
-  presetSplitWeights,
-  setTreeGroupMinimized,
-  setTreeSplitWeights
-} from '../store'
-
-import type { LayoutNodeRenderer } from './renderer-types'
+import { paneChrome, type PaneSizing } from '@/lib/pane-shell/chrome'
 import {
   allFixedAbsorberIndex,
   COLLAPSED_ZONE_PX,
@@ -40,14 +22,31 @@ import {
   fixedTrackSize,
   MIN_PANE_PX,
   MINIMIZED_TRACK,
-  paneChrome,
-  type PaneSizing,
   resolveCssPx,
   rootChildSide,
   shownPaneIds,
   subtreeGone,
   type TrackContext
-} from './track-model'
+} from '@/lib/pane-shell/track-model'
+import type { LayoutNode, SplitNode } from '@/lib/pane-tree'
+import { allPaneIds } from '@/lib/pane-tree'
+import { rafCoalesce } from '@/lib/raf-coalesce'
+import { cn } from '@/lib/utils'
+import {
+  $collapsedTreeSides,
+  $hiddenTreePanes,
+  $narrowViewport,
+  isCollapsePane,
+  persistTree,
+  presetSplitWeights,
+  setTreeGroupMinimized,
+  setTreeSplitWeights
+} from '@/store/pane-shell/tree'
+import { $paneStates, type PaneStateSnapshot, setPaneHeightOverride, setPaneWidthOverride } from '@/store/panes'
+
+import { $layoutEditMode } from '../../edit-mode'
+
+import type { LayoutNodeRenderer } from './renderer-types'
 
 /** The single group id a subtree resolves to, or null when it holds several
  *  zones — the sash can only collapse a boundary that IS exactly one zone. */

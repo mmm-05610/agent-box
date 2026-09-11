@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { $workspaceIsPage } from '@/app/routes'
-import { $activeTreeGroup, $hoveredTreeGroup } from '@/components/pane-shell/tree/store'
+import { $activeTreeGroup, $hoveredTreeGroup } from '@/store/pane-shell/tree'
 import { $switcherOpen, closeSwitcher } from '@/store/session-switcher'
 
 import {

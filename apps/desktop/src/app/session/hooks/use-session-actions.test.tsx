@@ -10,7 +10,6 @@ import { $terminalTakeover, setTerminalTakeover } from '@/app/right-sidebar/stor
 import { ensureGatewayProfile } from '@/application/profile/runtime-selection'
 import { getLatestSessionMessages } from '@/application/session-transcripts'
 import { requestForSessionProfile } from '@/application/session/request-router'
-import { noteActiveTreeGroup, revealTreePane } from '@/components/pane-shell/tree/store'
 import {
   deleteSession,
   getAllSessionMessages,
@@ -25,6 +24,7 @@ import { $clarifyRequests, clearClarifyRequest, setClarifyRequest } from '@/stor
 import { clearSessionDraft, stashSessionDraft, takeSessionDraft } from '@/store/composer'
 import { requestGatewayForAgent, requestGatewayForProfile } from '@/store/gateway'
 import { $pinnedSessionIds } from '@/store/layout'
+import { noteActiveTreeGroup, revealTreePane } from '@/store/pane-shell/tree'
 import { $activeGatewayProfile, $newChatProfile, $newChatRoute, $profiles } from '@/store/profile'
 import { $projectScope, $projectTree, ALL_PROJECTS } from '@/store/projects'
 import { NO_PROJECT_ID } from '@/store/projects/membership'
@@ -118,7 +118,7 @@ vi.mock('@/store/gateway', async importOriginal => ({
   retainGatewayForAgent: vi.fn(async () => () => undefined)
 }))
 
-vi.mock('@/components/pane-shell/tree/store', async importOriginal => ({
+vi.mock('@/store/pane-shell/tree', async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
   noteActiveTreeGroup: vi.fn(),
   revealTreePane: vi.fn()

@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 // localStorage) to simulate a ⌃R reload. `bind` mirrors the controller wiring.
 async function loadStores() {
   const layout = await import('./layout')
-  const tree = await import('@/components/pane-shell/tree/store')
+  const tree = await import('@/store/pane-shell/tree')
 
   return {
     layout,

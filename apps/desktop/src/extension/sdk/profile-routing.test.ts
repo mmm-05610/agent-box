@@ -8,7 +8,7 @@ vi.mock('@/components/chat/session-view', async () => {
   return { PRIMARY_SESSION_VIEW: { $awaitingResponse: atom(false), $busy: atom(false) } }
 })
 vi.mock('@/lib/open-session', () => ({ requestOpenSession: vi.fn(), setOpenSessionHandler: vi.fn() }))
-vi.mock('@/components/pane-shell/tree/store', async () => {
+vi.mock('@/store/pane-shell/tree', async () => {
   const { atom } = await import('nanostores')
 
   return { $narrowViewport: atom(false) }
@@ -156,7 +156,7 @@ const {
 
 const { dropTilesForProfile } = await import('@/store/session-states')
 
-const { setWorkspaceScope } = await import('@/components/pane-shell/workspace-scope')
+const { setWorkspaceScope } = await import('@/store/pane-shell/workspace-scope')
 
 const {
   $activeSessionId,

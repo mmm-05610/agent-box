@@ -1,8 +1,8 @@
 import { setTerminalTakeover } from '@/app/right-sidebar/store'
-import { applyLayoutPreset, LAYOUTS_AREA } from '@/components/pane-shell/tree/presets'
-import { revealTreePane } from '@/components/pane-shell/tree/store'
 import { registry } from '@/lib/contributions'
 import { isLayoutNode, type LayoutNode } from '@/lib/pane-tree'
+import { applyLayoutPreset, LAYOUTS_AREA } from '@/store/pane-shell/presets'
+import { revealTreePane } from '@/store/pane-shell/tree'
 
 import { setFileBrowserOpen, setSidebarOpen } from './layout'
 import { openReview } from './review'
