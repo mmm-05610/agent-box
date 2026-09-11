@@ -1,4 +1,4 @@
-import type { OpenSessionIntent } from '@/app/open-session'
+import type { OpenSessionIntent } from '@/lib/open-session'
 import type { WorkspaceMode } from '@/types/contributions'
 
 import type { PluginProfileRoute } from './host-routing'

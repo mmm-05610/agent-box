@@ -15,6 +15,7 @@
  *     the bridge has no session-window support.
  */
 import { markStoredSessionViewed } from '@/application/session-read-state'
+import { type OpenSessionIntent, type OpenSessionScope, setOpenSessionHandler } from '@/lib/open-session'
 import { $activeSessionId, $selectedStoredSessionId } from '@/store/session'
 import {
   focusedSessionNeedsRoute,
@@ -23,22 +24,13 @@ import {
   reuseBlankDraftTile,
   setSessionTileWorkspaceScope
 } from '@/store/session-states'
-import type { SessionProfileRoute } from '@/store/session/types'
 import { canOpenSessionWindow, openSessionInNewWindow } from '@/store/windows'
-import type { WorkspaceMode } from '@/types/contributions'
 
 import { $workspaceIsPage, sessionRoute } from './routes'
 
-export type OpenSessionIntent = 'in-place' | 'main' | 'stack' | 'tab' | 'window'
+export type { OpenSessionIntent, OpenSessionScope as OpenSessionWorkspaceScope } from '@/lib/open-session'
 
 export type OpenSessionNavigate = (to: string, options?: { replace?: boolean }) => void
-
-export interface OpenSessionWorkspaceScope {
-  ownerRoute?: SessionProfileRoute
-  workspaceMode: WorkspaceMode
-  workspaceOwnerKey?: string
-  workspaceTabTitle?: string
-}
 
 /**
  * Is the main tab holding a conversation worth preserving?
@@ -84,7 +76,7 @@ export function openSession(
   storedSessionId: string,
   navigate: OpenSessionNavigate,
   intent: OpenSessionIntent = 'in-place',
-  workspaceScope: OpenSessionWorkspaceScope = { workspaceMode: 'sessions' }
+  workspaceScope: OpenSessionScope = { workspaceMode: 'sessions' }
 ): void {
   if (!storedSessionId) {
     return
@@ -175,3 +167,10 @@ export function openSession(
     navigate(sessionRoute(storedSessionId))
   }
 }
+
+// `host.openSession` and the transcript's session refs ask for this verb from
+// BELOW `app/` — through the `@/lib/open-session` seam. Registering here, at
+// module scope (not in a hook or a mount effect), means the verb is answerable
+// the first time a plugin calls it: this module is in the app's eager graph, so
+// importing it IS installing the verb.
+setOpenSessionHandler(openSession)

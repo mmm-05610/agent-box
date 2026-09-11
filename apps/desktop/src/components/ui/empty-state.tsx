@@ -2,7 +2,7 @@ import { cn } from '@/lib/utils'
 
 // Canonical centered empty state (title + description). The default for "no
 // results / nothing here yet" page bodies. For richer master-detail lists that
-// want an icon + action, use PanelEmpty (overlays/panel); the file-tree's
+// want an icon + action, use PanelEmpty (ui/panel-empty); the file-tree's
 // inline uppercase error state is its own deliberately-distinct treatment.
 export function EmptyState({
   title,

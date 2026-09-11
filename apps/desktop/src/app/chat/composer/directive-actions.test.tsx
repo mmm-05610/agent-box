@@ -11,7 +11,10 @@ const desktopWindow = window as unknown as { hermesDesktop?: Window['hermesDeskt
 
 const openSession = vi.fn()
 
-vi.mock('@/app/open-session', () => ({ openSession: (...args: unknown[]) => openSession(...args) }))
+vi.mock('@/lib/open-session', () => ({
+  requestOpenSession: (...args: unknown[]) => openSession(...args),
+  setOpenSessionHandler: () => undefined
+}))
 
 /** A live contenteditable holding real chips, with the watcher bound to it —
  *  the same pair both composers mount. */

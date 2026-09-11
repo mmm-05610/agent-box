@@ -5,30 +5,9 @@
  */
 
 import { useContributions } from '@/extension/contrib/react/use-contributions'
-import type { IconComponent } from '@/lib/icons'
+import { PALETTE_AREA, type PaletteContribution } from '@/lib/contribution-areas'
 
-export const PALETTE_AREA = 'palette'
-
-/** Payload of a `palette` data contribution. */
-export interface PaletteContribution {
-  id: string
-  label: string
-  /** Keybind action id — its live combo renders as the hotkey hint. */
-  action?: string
-  icon?: IconComponent
-  keywords?: string[]
-  run: () => void
-  /**
-   * Short note after the label — the live state the row acts on. A function
-   * because contributions register once at boot while that state keeps moving;
-   * the palette re-reads it on open.
-   */
-  detail?: () => string
-  /** `state` when running the row CHANGES what `detail` says. */
-  detailVariant?: 'muted' | 'state'
-  /** Leave the palette open after running — for rows you may run repeatedly. */
-  keepOpen?: boolean
-}
+export { PALETTE_AREA, type PaletteContribution } from '@/lib/contribution-areas'
 
 /** Contributed palette rows, with stable render keys. */
 export function usePaletteContributions(): Array<PaletteContribution & { key: string }> {

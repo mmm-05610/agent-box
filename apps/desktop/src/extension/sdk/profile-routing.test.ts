@@ -7,7 +7,7 @@ vi.mock('@/components/chat/session-view', async () => {
 
   return { PRIMARY_SESSION_VIEW: { $awaitingResponse: atom(false), $busy: atom(false) } }
 })
-vi.mock('@/app/open-session', () => ({ openSession: vi.fn() }))
+vi.mock('@/lib/open-session', () => ({ requestOpenSession: vi.fn(), setOpenSessionHandler: vi.fn() }))
 vi.mock('@/components/pane-shell/tree/store', async () => {
   const { atom } = await import('nanostores')
 
@@ -123,7 +123,7 @@ vi.mock('@/store/gateway', async () => {
 
 const { BOT_CHAT_SESSION_HYDRATION_TIMEOUT_MS, DEFAULT_SESSION_HYDRATION_TIMEOUT_MS, host } = await import('./index')
 
-const { openSession: openSessionCore } = await import('@/app/open-session')
+const { requestOpenSession: openSessionCore } = await import('@/lib/open-session')
 const { deleteProfile, hermesApi } = await import('@/hermes')
 
 const {

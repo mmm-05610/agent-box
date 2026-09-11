@@ -9,8 +9,9 @@ import { MarkdownTextContent } from './markdown-text'
 
 const openSession = vi.fn()
 
-vi.mock('@/app/open-session', () => ({
-  openSession: (...args: unknown[]) => openSession(...args)
+vi.mock('@/lib/open-session', () => ({
+  requestOpenSession: (...args: unknown[]) => openSession(...args),
+  setOpenSessionHandler: () => undefined
 }))
 
 const desktopWindow = window as unknown as { hermesDesktop?: Window['hermesDesktop'] }

@@ -62,85 +62,14 @@ export type {
 
 // -- react bridge -------------------------------------------------------------
 
-// Every contribution surface, plugin-reachable: register keybinds, palette
-// commands, routes, themes, panes, composer extensions, and bar items with
-// the same area ids + payload types core uses.
-export {
-  COMPOSER_AREAS,
-  type ComposerAtCompletionItem,
-  type ComposerAtCompletionSource,
-  type ComposerAttachmentProvider,
-  type ComposerMiddleware
-} from '@/app/chat/composer/contrib'
-
-// -- ui: the design language --------------------------------------------------
-
-/** THE session status dot — the one primitive the sidebar row, the pane tabs
- *  and the session switcher render, so a session's status can never disagree
- *  between surfaces. Pass the STORED session id and it resolves the rest
- *  itself: the live state (needs-input / working / stalled / background /
- *  unread / draft / idle) and the project color. Never hand-roll a status
- *  circle beside it — a plugin's own dot inverts core's color vocabulary the
- *  moment either side moves. */
-export { SessionStatusDot, type SessionStatusDotProps } from '@/app/chat/session-status-dot'
-/** The sidebar row's leading cell — the fixed box a dot, icon or handle sits in.
- *  Reserve it and your label starts on the same left edge as every session row
- *  above you; spell the classes yourself and the row drifts. The session row is
- *  canonical; `row-geometry.ts` explains what each measurement belongs to. */
-export { SidebarRowLead } from '@/app/chat/sidebar/chrome'
-/** One glyph per gateway kind — device, cloud, terminal, network. The statusbar
- *  switcher, the fleet profile rail and any plugin rail listing gateways share
- *  it, so a connection looks the same wherever it is named. */
-export { ConnectionGlyph } from '@/app/chat/sidebar/connection-glyph'
-export { SIDEBAR_ROW_LEAD, SIDEBAR_TRUNCATED_LEADING } from '@/app/chat/sidebar/row-geometry'
-export { PALETTE_AREA, type PaletteContribution } from '@/app/command-palette/contrib'
-/** THE master-detail toolkit core uses for list+inspector surfaces (Scheduled
- *  jobs, Kanban, …): a dense left `PanelList` of `PanelListRow`s beside a
- *  scrolling `PanelDetail` of `PanelSectionLabel` / `PanelMeta` / `PanelBlock`.
- *  `PanelEmpty` is the icon+action empty state (plain `EmptyState` is title +
- *  description only, and silently drops an `icon`). A row takes a custom `lead`
- *  (avatar/swatch), trailing `meta`, and `menuItems` for kebab + right-click
- *  parity, so a roster needs no hand-rolled row. The overlay-bound `Panel` root
- *  is deliberately NOT exported — these compose inside a pane just as well. */
-export {
-  PanelAction,
-  PanelAddButton,
-  PanelBlock,
-  PanelBody,
-  PanelDetail,
-  PanelEmpty,
-  PanelHeader,
-  PanelList,
-  PanelListRow,
-  type PanelMenuItem,
-  PanelMeta,
-  type PanelMetaRow,
-  PanelPill,
-  type PanelPillTone,
-  PanelRowMenu,
-  PanelSectionLabel
-} from '@/app/overlays/panel'
-export { type RouteContribution, ROUTES_AREA, SIDEBAR_NAV_AREA, type SidebarNavContribution } from '@/app/routes'
-
 /** THE full per-toolset config panel core Settings renders — provider picker,
  *  env vars / API keys, model catalog picker, and post-setup runners. Route-
  *  decoupled (the "manage keys" deep link is a no-op outside the router); pass
  *  `toolset`, optional `onConfiguredChange`, and an optional `profile`. */
 export { ToolsetConfigPanel } from '@/app/settings/toolset-config-panel'
-/** THE model catalog menu — the same searchable, provider-grouped, family-
- *  collapsing picker the chat composer uses, including the per-row
- *  thinking/effort/fast submenu. Drive it with a `ModelMenuController`: the
- *  menu renders and navigates, your controller decides what a selection MEANS
- *  (write to a session, hold a per-task override, …). Never fork it — a copy
- *  drifts from the composer the first time either side changes. */
-export {
-  ModelCatalogMenu,
-  type ModelChoice,
-  ModelMenuCloseContext,
-  type ModelMenuController
-} from '@/app/shell/model-catalog-menu'
-export type { StatusbarItem } from '@/app/shell/statusbar-controls'
-export type { TitlebarTool } from '@/app/shell/titlebar-controls'
+
+// -- ui: the design language --------------------------------------------------
+
 /** THE whole Capabilities surface (Skills / Tools / MCP tabs, installed
  *  lists, full-skill detail pane, embedded hub picker with one-click
  *  installs). For plugin dialogs pass `embedded` (tab state stays local —
@@ -167,9 +96,38 @@ export { $accentOverride, setAccentOverride } from '@/application/theme/adapters
  *  this theme installed?" check. */
 export { requestTheme } from '@/application/theme/adapters/request'
 export { THEMES_AREA } from '@/application/theme/adapters/user-themes'
+/** THE session status dot — the one primitive the sidebar row, the pane tabs
+ *  and the session switcher render, so a session's status can never disagree
+ *  between surfaces. Pass the STORED session id and it resolves the rest
+ *  itself: the live state (needs-input / working / stalled / background /
+ *  unread / draft / idle) and the project color. Never hand-roll a status
+ *  circle beside it — a plugin's own dot inverts core's color vocabulary the
+ *  moment either side moves. */
+export { SessionStatusDot } from '@/components/chat/session-status-dot'
+
+/** One glyph per gateway kind — device, cloud, terminal, network. The statusbar
+ *  switcher, the fleet profile rail and any plugin rail listing gateways share
+ *  it, so a connection looks the same wherever it is named. */
+export { ConnectionGlyph } from '@/components/chat/sidebar/connection-glyph'
+/** The sidebar row's leading cell — the fixed box a dot, icon or handle sits in.
+ *  Reserve it and your label starts on the same left edge as every session row
+ *  above you; spell the classes yourself and the row drifts. The session row is
+ *  canonical; `row-geometry.ts` explains what each measurement belongs to. */
+export { SidebarRowLead } from '@/components/chat/sidebar/row-lead'
 /** The oversized Collapse lettering an empty chat is titled with — core writes
  *  "HERMES AGENT" with it, a `chat.empty` contribution writes its own name. */
 export { Wordmark } from '@/components/chat/wordmark'
+/** THE model catalog menu — the same searchable, provider-grouped, family-
+ *  collapsing picker the chat composer uses, including the per-row
+ *  thinking/effort/fast submenu. Drive it with a `ModelMenuController`: the
+ *  menu renders and navigates, your controller decides what a selection MEANS
+ *  (write to a session, hold a per-task override, …). Never fork it — a copy
+ *  drifts from the composer the first time either side changes. */
+export {
+  ModelCatalogMenu,
+  ModelMenuCloseContext,
+  type ModelMenuController
+} from '@/components/model-catalog-menu'
 /** Pane placement roles. `'floating'` is the one NON-tiling value: the pane is
  *  excluded from the layout tree and rendered as a fixed, draggable card above
  *  it — it takes no width from any zone, has no tab, and can't be docked.
@@ -231,6 +189,15 @@ export { Kbd, KbdGroup } from '@/components/ui/kbd'
  *  page loads) — the same one every core page uses. */
 export { Loader, type LoaderType } from '@/components/ui/loader'
 export { LogView } from '@/components/ui/log-view'
+/** THE master-detail toolkit core uses for list+inspector surfaces (Scheduled
+ *  jobs, Kanban, …): a dense left `PanelList` of `PanelListRow`s beside a
+ *  scrolling `PanelDetail` of `PanelSectionLabel` / `PanelMeta` / `PanelBlock`.
+ *  `PanelEmpty` is the icon+action empty state (plain `EmptyState` is title +
+ *  description only, and silently drops an `icon`). A row takes a custom `lead`
+ *  (avatar/swatch), trailing `meta`, and `menuItems` for kebab + right-click
+ *  parity, so a roster needs no hand-rolled row. The overlay-bound `Panel` root
+ *  is deliberately NOT exported — these compose inside a pane just as well. */
+export { PanelEmpty } from '@/components/ui/panel-empty'
 export { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 /** Full-row / region click target. Imposes NO styling — the caller keeps its own
  *  layout classes — it just bakes in `type="button"` and a stable `data-slot`.
@@ -246,9 +213,6 @@ export { Switch } from '@/components/ui/switch'
 export { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 export { Textarea } from '@/components/ui/textarea'
 export { Tip, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-
-// -- contracts ----------------------------------------------------------------
-
 export type { GatewayEventListener } from '@/extension/contrib/events'
 export type {
   HermesPlugin,
@@ -266,6 +230,9 @@ export type {
  *  `ctx.register` stays the door for permanent contributions. Namespace the
  *  id with your plugin slug (`kanban:board-switcher`). */
 export { Contribute, type ContributeProps } from '@/extension/contrib/react/contribute'
+
+// -- contracts ----------------------------------------------------------------
+
 /** The live gateway instance type — for typing the `gateway` prop `McpTab`
  *  takes; obtain the instance from `host.getGateway()`. */
 export type { HermesGateway } from '@/hermes'
@@ -295,6 +262,12 @@ export { type BudgetedLoop, type BudgetedLoopOptions, createBudgetedLoop } from 
 /** The blank transcript as a contribution area: claim the sessions you own and
  *  render what stands in the gap. Core's own splash keeps a fresh draft. */
 export { CHAT_EMPTY_AREA, type ChatEmptyContribution, type ChatEmptyProps } from '@/lib/chat-empty'
+// Every contribution surface, plugin-reachable: register keybinds, palette
+// commands, routes, themes, panes, composer extensions, and bar items with
+// the same area ids + payload types core uses.
+export { COMPOSER_AREAS } from '@/lib/contribution-areas'
+export { PALETTE_AREA, type PaletteContribution } from '@/lib/contribution-areas'
+export { type RouteContribution, ROUTES_AREA, SIDEBAR_NAV_AREA, type SidebarNavContribution } from '@/lib/contribution-areas'
 /** THE compact-number formatter — every user-facing count/token figure goes
  *  through here (1230 → "1.2k", 1_500_000 → "1.5M"). Don't hand-roll `/1000`. */
 export { compactNumber } from '@/lib/format'

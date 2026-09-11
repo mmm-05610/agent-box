@@ -1,7 +1,6 @@
 import { type ReadableAtom } from 'nanostores'
 import type { ReactNode } from 'react'
 
-import { openSession } from '@/app/open-session'
 import { newSessionInAgent, newSessionInProfile } from '@/application/profile/new-session'
 import { ensureGatewayProfile } from '@/application/profile/runtime-selection'
 import {
@@ -19,6 +18,7 @@ import {
   type WorkspaceNewSessionTarget
 } from '@/components/pane-shell/workspace-scope'
 import { registry } from '@/lib/contributions'
+import { requestOpenSession } from '@/lib/open-session'
 import {
   activeGatewayConnectionId,
   openGatewayForAgent,
@@ -379,14 +379,14 @@ export const hostSessionActions = {
           const intent = options.intent ?? 'in-place'
 
           if (options.workspaceMode === 'bots') {
-            openSession(storedSessionId, navigate, intent, {
+            requestOpenSession(storedSessionId, navigate, intent, {
               ownerRoute: ownerRoute ?? undefined,
               workspaceMode: 'bots',
               workspaceOwnerKey: options.workspaceOwnerKey,
               ...(options.tabTitle ? { workspaceTabTitle: options.tabTitle } : {})
             })
           } else {
-            openSession(storedSessionId, navigate, intent)
+            requestOpenSession(storedSessionId, navigate, intent)
           }
 
           // Judge the main surface AFTER the open: on a cold start the persisted

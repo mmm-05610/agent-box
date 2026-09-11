@@ -12,6 +12,7 @@ import { extractEmbeddedImages } from '@/lib/embedded-images'
 import { openLink } from '@/lib/external-link'
 import { formatRefValue } from '@/lib/format-ref-value'
 import { triggerHaptic } from '@/lib/haptics'
+import { requestOpenSession } from '@/lib/open-session'
 import { useSessionLinkTitle } from '@/lib/session-link-title'
 import { parseSessionRefValue, sessionRefFallbackLabel } from '@/lib/session-refs'
 import { cn } from '@/lib/utils'
@@ -428,8 +429,10 @@ const DirectiveImage: FC<{ id: string; label: string }> = ({ id, label }) => {
 
 /** Opens the referenced session the way a sidebar ⌘-click would: jump to it if
  *  it's already a tile/main, otherwise open a stacked tab (never steals main
- *  from under the chat you're reading). Lazy-imports so the composer's rich
- *  editor can pull this module in without booting the profile/REST stack. */
+ *  from under the chat you're reading). Goes through the `@/lib/open-session`
+ *  seam rather than naming `@/app/open-session` — the host registers the verb,
+ *  and the seam (a rank-0 leaf) stays cheap enough for the composer's rich
+ *  editor to import this module directly. */
 export function openSessionRef(value: string) {
   const { sessionId } = parseSessionRefValue(value)
 
@@ -439,7 +442,7 @@ export function openSessionRef(value: string) {
 
   triggerHaptic('selection')
   // navigate is unused for the `tab` intent (focus-or-tile only).
-  void import('@/app/open-session').then(({ openSession }) => openSession(sessionId, () => undefined, 'tab'))
+  requestOpenSession(sessionId, () => undefined, 'tab')
 }
 
 /** What activating a directive of a given kind does. The single source of truth

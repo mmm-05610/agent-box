@@ -23,22 +23,13 @@
 import { useMemo } from 'react'
 
 import { useContributions } from '@/extension/contrib/react/use-contributions'
+import { COMPOSER_AREAS } from '@/lib/contribution-areas'
 import { registry } from '@/lib/contributions'
 import type { TodoItem } from '@/lib/todos'
 import type { ComposerAction } from '@/store/composer-actions'
 import type { ComposerAttachment } from '@/types/composer'
 
-export const COMPOSER_AREAS = {
-  top: 'composer.top',
-  bottom: 'composer.bottom',
-  underside: 'composer.underside',
-  leading: 'composer.leading',
-  actions: 'composer.actions',
-  middleware: 'composer.middleware',
-  attachments: 'composer.attachments',
-  microActions: 'composer.microActions',
-  atCompletions: 'composer.atCompletions'
-} as const
+export { COMPOSER_AREAS } from '@/lib/contribution-areas'
 
 export interface ComposerDraft {
   text: string
