@@ -34,7 +34,7 @@ import { $openStoredSessionIds } from '@/store/session-states'
 import { sessionCostUsd } from '@/store/sidebar-archive'
 import { $todoProgressBySession } from '@/store/todos'
 
-import { SessionStatusDot } from '../session-status-dot'
+import { SessionStatusDot } from '@/components/chat/session-status-dot'
 
 import {
   SIDEBAR_ROW_CARD_MIN_H,

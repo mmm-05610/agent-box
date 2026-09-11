@@ -8,7 +8,7 @@ import { HUD_ITEM, HUD_POSITION, HUD_SURFACE, HUD_TEXT } from '@/lib/floating-hu
 import { cn } from '@/lib/utils'
 import { $switcherIndex, $switcherOpen, $switcherSessions, closeSwitcher } from '@/store/session-switcher'
 
-import { SessionStatusDot } from './chat/session-status-dot'
+import { SessionStatusDot } from '@/components/chat/session-status-dot'
 import { openSession } from './open-session'
 
 // Compact session-switcher HUD — keyboard-driven from `use-keybinds`, rows

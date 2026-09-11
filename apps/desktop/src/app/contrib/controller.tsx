@@ -3,7 +3,7 @@ import { atom, computed } from 'nanostores'
 import type { CSSProperties, ReactElement, PointerEvent as ReactPointerEvent } from 'react'
 
 import { SessionDraftTitle } from '@/app/chat/session-draft-title'
-import { SessionStatusDot } from '@/app/chat/session-status-dot'
+import { SessionStatusDot } from '@/components/chat/session-status-dot'
 import { PALETTE_AREA, type PaletteContribution, paletteToggle } from '@/app/command-palette/contrib'
 import { type StatusbarItem } from '@/app/shell/statusbar-controls'
 import { InlinePreviewDirective } from '@/components/assistant-ui/inline-preview-directive'

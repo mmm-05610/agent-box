@@ -76,16 +76,16 @@ export { COMPOSER_AREAS } from '@/lib/contribution-areas'
  *  unread / draft / idle) and the project color. Never hand-roll a status
  *  circle beside it — a plugin's own dot inverts core's color vocabulary the
  *  moment either side moves. */
-export { SessionStatusDot } from '@/app/chat/session-status-dot'
+export { SessionStatusDot } from '@/components/chat/session-status-dot'
 /** The sidebar row's leading cell — the fixed box a dot, icon or handle sits in.
  *  Reserve it and your label starts on the same left edge as every session row
  *  above you; spell the classes yourself and the row drifts. The session row is
  *  canonical; `row-geometry.ts` explains what each measurement belongs to. */
-export { SidebarRowLead } from '@/app/chat/sidebar/chrome'
+export { SidebarRowLead } from '@/components/chat/sidebar/row-lead'
 /** One glyph per gateway kind — device, cloud, terminal, network. The statusbar
  *  switcher, the fleet profile rail and any plugin rail listing gateways share
  *  it, so a connection looks the same wherever it is named. */
-export { ConnectionGlyph } from '@/app/chat/sidebar/connection-glyph'
+export { ConnectionGlyph } from '@/components/chat/sidebar/connection-glyph'
 export { PALETTE_AREA, type PaletteContribution } from '@/lib/contribution-areas'
 /** THE master-detail toolkit core uses for list+inspector surfaces (Scheduled
  *  jobs, Kanban, …): a dense left `PanelList` of `PanelListRow`s beside a
@@ -95,7 +95,7 @@ export { PALETTE_AREA, type PaletteContribution } from '@/lib/contribution-areas
  *  (avatar/swatch), trailing `meta`, and `menuItems` for kebab + right-click
  *  parity, so a roster needs no hand-rolled row. The overlay-bound `Panel` root
  *  is deliberately NOT exported — these compose inside a pane just as well. */
-export { PanelEmpty } from '@/app/overlays/panel'
+export { PanelEmpty } from '@/components/ui/panel-empty'
 export { type RouteContribution, ROUTES_AREA, SIDEBAR_NAV_AREA, type SidebarNavContribution } from '@/lib/contribution-areas'
 
 /** THE full per-toolset config panel core Settings renders — provider picker,
@@ -113,7 +113,7 @@ export {
   ModelCatalogMenu,
   ModelMenuCloseContext,
   type ModelMenuController
-} from '@/app/shell/model-catalog-menu'
+} from '@/components/model-catalog-menu'
 /** THE whole Capabilities surface (Skills / Tools / MCP tabs, installed
  *  lists, full-skill detail pane, embedded hub picker with one-click
  *  installs). For plugin dialogs pass `embedded` (tab state stays local —

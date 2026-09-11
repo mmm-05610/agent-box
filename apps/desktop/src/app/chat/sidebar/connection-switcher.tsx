@@ -38,7 +38,7 @@ import { closeFindBar } from '@/store/find-in-page'
 import { notifyError } from '@/store/notifications'
 import { isAuxiliaryWindow, isPeerInstanceWindow } from '@/store/windows'
 
-import { ConnectionGlyph } from './connection-glyph'
+import { ConnectionGlyph } from '@/components/chat/sidebar/connection-glyph'
 
 export function ConnectionSwitcher({ compact = false, onConnect }: { compact?: boolean; onConnect: () => void }) {
   const { t } = useI18n()

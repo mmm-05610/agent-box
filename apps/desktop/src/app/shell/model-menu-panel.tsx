@@ -23,9 +23,9 @@ import {
 import { sessionTileDelegate } from '@/store/session-states'
 import type { ModelOptionsResponse } from '@/types/hermes'
 
-import { ModelCatalogMenu, type ModelMenuController } from './model-catalog-menu'
+import { ModelCatalogMenu, type ModelMenuController } from '@/components/model-catalog-menu'
 
-export { ModelMenuCloseContext } from './model-catalog-menu'
+export { ModelMenuCloseContext } from '@/components/model-catalog-menu'
 
 export interface ModelSelection {
   model: string

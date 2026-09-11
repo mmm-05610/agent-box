@@ -12,13 +12,13 @@ import { cn } from '@/lib/utils'
 import { $sidebarRowMeta } from '@/store/layout'
 import type { TileDock } from '@/store/session-states'
 
+import { SidebarRowLead } from '@/components/chat/sidebar/row-lead'
 import {
   SIDEBAR_ROW_INSET,
   SIDEBAR_ROW_LABEL,
-  SIDEBAR_ROW_LEAD,
   SIDEBAR_ROW_MIN_H,
   SIDEBAR_ROW_PAD_TRAIL
-} from './row-geometry'
+} from '@/components/chat/sidebar/row-geometry'
 
 // Shared, content-agnostic sidebar chrome — used by both the flat session
 // sections and the project/workspace tree, so it lives outside either to keep
@@ -32,7 +32,8 @@ export function SidebarSectionMeta({ children }: { children: React.ReactNode }) 
 // Row geometry lives in `row-geometry.ts` — see that file for why each class
 // belongs to the box it belongs to. Re-exported here because this module is
 // where callers already look for row chrome.
-export { SIDEBAR_LEAD_ICON_SIZE, SIDEBAR_ROW_CARD_MIN_H, SIDEBAR_TRUNCATED_LEADING } from './row-geometry'
+export { SIDEBAR_LEAD_ICON_SIZE, SIDEBAR_ROW_CARD_MIN_H, SIDEBAR_TRUNCATED_LEADING } from '@/components/chat/sidebar/row-geometry'
+export { SidebarRowLead } from '@/components/chat/sidebar/row-lead'
 
 // The section header's "+" button, hover-revealed (group/section lives on
 // SidebarSectionHeader), mirroring the artifacts/file browser header
@@ -223,11 +224,6 @@ export function SidebarRowLink({
       <span className={cn(SIDEBAR_ROW_LABEL, labelClassName)}>{children}</span>
     </RowButton>
   )
-}
-
-/** Fixed leading column (dot, icon, drag handle). */
-export function SidebarRowLead({ className, ...props }: React.ComponentProps<'span'>) {
-  return <span className={cn(SIDEBAR_ROW_LEAD, className)} {...props} />
 }
 
 /** Standard row label typography. */

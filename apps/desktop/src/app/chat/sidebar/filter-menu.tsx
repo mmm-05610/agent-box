@@ -1,6 +1,6 @@
 import { useStore } from '@nanostores/react'
 
-import { sessionDotClassName } from '@/app/chat/session-status-dot'
+import { sessionDotClassName } from '@/components/chat/session-status-dot'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
 import {
