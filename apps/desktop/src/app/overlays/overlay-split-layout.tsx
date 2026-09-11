@@ -70,7 +70,7 @@ export function OverlaySidebar({ children, className }: OverlaySidebarProps) {
       )}
       // Every overlay's left nav (settings, cron, profiles, agents) answers to
       // one name, so a tour can point at "the nav" without knowing which
-      // overlay is open. See lib/tour.
+      // overlay is open. See app/tour.
       data-tour="overlay-nav"
     >
       {children}

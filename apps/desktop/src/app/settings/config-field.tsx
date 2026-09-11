@@ -76,7 +76,7 @@ export function ConfigField({
 
   // Every config row is addressable by its canonical schema key, so a tour can
   // point at one setting (`[data-tour="field-model"]`) without hunting through
-  // the section for an nth-child path. See lib/tour.
+  // the section for an nth-child path. See app/tour.
   const row = (action: ReactNode, wide = false) => (
     <ListRow action={action} data-tour={`field-${schemaKey}`} description={descriptionNode} title={label} wide={wide} />
   )
