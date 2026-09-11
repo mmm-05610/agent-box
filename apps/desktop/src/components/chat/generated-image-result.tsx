@@ -4,10 +4,10 @@ import { type FC, useEffect, useState } from 'react'
 
 import { DiffusionCanvas } from '@/components/chat/image-generation-placeholder'
 import { ImageActionButton, ImageLightbox } from '@/components/chat/zoomable-image'
+import { useImageDownload } from '@/components/hooks/use-image-download'
 import { useI18n } from '@/i18n'
 import {gatewayMediaDataUrl, isRemoteGateway, mediaExternalUrl} from '@/lib/desktop-fs'
 import { generatedImageFromResult } from '@/lib/generated-images'
-import { useImageDownload } from '@/lib/hooks/use-image-download'
 import {filePathFromMediaPath, mediaName} from '@/lib/media'
 import { cn } from '@/lib/utils'
 
