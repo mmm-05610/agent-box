@@ -3,18 +3,19 @@ import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it, vi } from 'vitest'
 
-import { BackendDialClaims } from './backend-dial-claim'
-import { parseBackendScopeKey } from './connection-registry'
-import { mainProcessSources } from './test-main-process-sources'
+import { parseBackendScopeKey } from '../connection-registry'
+import { mainProcessSources } from '../test-main-process-sources'
+
+import { InFlightClaims } from './inflight-claim'
 
 
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const mainSource = mainProcessSources().replace(/\r\n/g, '\n')
 
-describe('BackendDialClaims (#90812)', () => {
+describe('InFlightClaims (#90812)', () => {
   it('coalesces two concurrent dials for the same (connectionId, profile) onto ONE backend spawn', async () => {
-    const claims = new BackendDialClaims()
+    const claims = new InFlightClaims()
     let spawns = 0
     let resolveSpawn: ((value: { baseUrl: string }) => void) | undefined
 
@@ -44,7 +45,7 @@ describe('BackendDialClaims (#90812)', () => {
   })
 
   it('scopes claims by key: different (connectionId, profile) pairs dial independently', async () => {
-    const claims = new BackendDialClaims()
+    const claims = new InFlightClaims()
     const dialA = vi.fn(async () => 'a')
     const dialB = vi.fn(async () => 'b')
 
@@ -60,7 +61,7 @@ describe('BackendDialClaims (#90812)', () => {
   })
 
   it('releases the claim once the dial settles so a later reconnect can dial again (bounded, not latched)', async () => {
-    const claims = new BackendDialClaims()
+    const claims = new InFlightClaims()
     const dial = vi.fn(async () => 'fresh')
 
     await claims.run('default', dial)
@@ -71,7 +72,7 @@ describe('BackendDialClaims (#90812)', () => {
   })
 
   it('propagates a failed dial to every coalesced waiter and never caches the rejection', async () => {
-    const claims = new BackendDialClaims()
+    const claims = new InFlightClaims()
     let rejectSpawn: ((error: Error) => void) | undefined
 
     const failingDial = vi.fn(
@@ -97,7 +98,7 @@ describe('BackendDialClaims (#90812)', () => {
   })
 
   it('a synchronously-throwing dial rejects the claim instead of escaping the coalescing seam', async () => {
-    const claims = new BackendDialClaims()
+    const claims = new InFlightClaims()
 
     await expect(
       claims.run('default', () => {

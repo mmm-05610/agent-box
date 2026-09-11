@@ -23,6 +23,8 @@
 import fs from 'fs'
 import path from 'path'
 
+import { isPidAlive } from './process/pid'
+
 // Even with a live-looking PID, never treat a marker older than this as a live
 // update. A full update (git pull + pip + desktop rebuild) is minutes, not tens
 // of minutes; past this the marker is almost certainly stale (e.g. the OS
@@ -31,24 +33,6 @@ export const UPDATE_MARKER_MAX_AGE_MS = 20 * 60 * 1000
 
 export function markerPath(hermesHome) {
   return path.join(hermesHome, '.hermes-update-in-progress')
-}
-
-// True only if a host process with this pid is currently alive. Signal 0 does
-// not deliver a signal — it just probes existence/permission. ESRCH => dead;
-// EPERM => alive but owned by another user (still "alive" for our purposes).
-// Injectable `kill` keeps it unit-testable.
-export function isPidAlive(pid, kill: typeof process.kill = process.kill.bind(process)) {
-  if (!Number.isInteger(pid) || pid <= 0) {
-    return false
-  }
-
-  try {
-    kill(pid, 0)
-
-    return true
-  } catch (err) {
-    return Boolean(err && err.code === 'EPERM')
-  }
 }
 
 /**

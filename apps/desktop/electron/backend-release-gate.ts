@@ -22,7 +22,7 @@
  *
  * Extracted into its own dependency-free module (no electron import) so the
  * gate's decision logic can be asserted directly with fake clocks and fake
- * process tables, following the backend-child.ts pattern.
+ * process tables, following the process/child-stop.ts pattern.
  */
 
 export interface ReleaseGateDeps {

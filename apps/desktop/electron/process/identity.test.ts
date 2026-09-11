@@ -1,17 +1,8 @@
 import assert from 'node:assert/strict'
-import { EventEmitter } from 'node:events'
 
 import { test } from 'vitest'
 
-import {
-  claimDecision,
-  createBackendOutputTail,
-  DEFAULT_OUTPUT_TAIL_LIMIT,
-  isPidOnlyStartMarker,
-  pidOnlyStartMarker,
-  probeStartMarker,
-  processStartMarker
-} from './backend-claim'
+import { claimDecision, isPidOnlyStartMarker, pidOnlyStartMarker, probeStartMarker, processStartMarker } from './identity'
 
 // --- claimDecision: the #93608 policy ---------------------------------------
 
@@ -83,53 +74,4 @@ test('pidOnlyStartMarker round-trips through isPidOnlyStartMarker', () => {
   assert.equal(isPidOnlyStartMarker(marker), true)
   assert.equal(isPidOnlyStartMarker('linux:12345'), false)
   assert.equal(isPidOnlyStartMarker(undefined), false)
-})
-
-// --- output tail ring buffer ----------------------------------------------------
-
-test('output tail keeps only the most recent bytes once past the limit', () => {
-  const tail = createBackendOutputTail(16)
-
-  tail.append('0123456789')
-  tail.append('abcdefghij')
-
-  assert.equal(tail.text(), '456789abcdefghij')
-  assert.equal(tail.text().length, 16)
-})
-
-test('output tail default limit is ~8KB', () => {
-  const tail = createBackendOutputTail()
-
-  tail.append('x'.repeat(DEFAULT_OUTPUT_TAIL_LIMIT + 500))
-
-  assert.equal(tail.text().length, DEFAULT_OUTPUT_TAIL_LIMIT)
-  assert.equal(DEFAULT_OUTPUT_TAIL_LIMIT, 8192)
-})
-
-test('output tail interleaves stdout and stderr attached from spawn time', () => {
-  const child = { stderr: new EventEmitter(), stdout: new EventEmitter() }
-  const tail = createBackendOutputTail(64)
-
-  tail.attach(child)
-  child.stdout.emit('data', Buffer.from('booting\n'))
-  child.stderr.emit('data', Buffer.from("ModuleNotFoundError: No module named 'hermes_cli'\n"))
-
-  assert.match(tail.text(), /booting/)
-  assert.match(tail.text(), /ModuleNotFoundError/)
-})
-
-test('describe() is empty when nothing was captured, formatted when output exists', () => {
-  const tail = createBackendOutputTail(64)
-
-  assert.equal(tail.describe(), '')
-
-  tail.append('Traceback (most recent call last):\n')
-  assert.match(tail.describe(), /^\nRecent backend output:\nTraceback/)
-})
-
-test('attach tolerates a child with missing stdio streams', () => {
-  const tail = createBackendOutputTail(64)
-
-  tail.attach({ stderr: null, stdout: null })
-  assert.equal(tail.text(), '')
 })

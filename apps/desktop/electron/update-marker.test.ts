@@ -19,8 +19,8 @@ import path from 'path'
 
 import { test } from 'vitest'
 
+import { isPidAlive } from './process/pid'
 import {
-  isPidAlive,
   markerPath,
   readLiveUpdateMarker,
   UPDATE_MARKER_MAX_AGE_MS,

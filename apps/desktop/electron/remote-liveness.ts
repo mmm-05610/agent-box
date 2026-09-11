@@ -1,3 +1,5 @@
+import { createFailureStreakBudget, type FailureStreakBudget } from './process/budget'
+
 export const REMOTE_LIVENESS_TIMEOUT_MS = 10_000
 // Dispatch is synchronous user intent: a cached descriptor must prove its
 // forwarded endpoint is alive before it can be returned. Keep this probe much
@@ -123,52 +125,32 @@ export async function ensureHealthyPooledRemoteBackendForDispatch<TConnection ex
  * A successful probe clears the streak, and reaching the limit consumes it so
  * a rebuilt connection starts from a clean state.
  */
+/**
+ * Per-base-URL failure streak. The counting/eviction policy is the generic
+ * `process/budget.ts` concern; what lives here is the policy's *numbers* and the
+ * fact that the scope is a remote base URL rather than a process.
+ */
 export class RemoteLivenessTracker {
-  readonly #failureLimit: number
-  readonly #failureWindowMs: number
-  readonly #failuresByBaseUrl = new Map<string, { failures: number; lastFailureAt: number }>()
-  readonly #now: () => number
+  readonly #budget: FailureStreakBudget
 
   constructor(
     failureLimit = REMOTE_LIVENESS_FAILURE_LIMIT,
     failureWindowMs = REMOTE_LIVENESS_FAILURE_WINDOW_MS,
     now: () => number = Date.now
   ) {
-    if (!Number.isInteger(failureLimit) || failureLimit < 1) {
-      throw new Error('Remote liveness failure limit must be a positive integer.')
-    }
-
-    if (!Number.isFinite(failureWindowMs) || failureWindowMs < 1) {
-      throw new Error('Remote liveness failure window must be positive.')
-    }
-
-    this.#failureLimit = failureLimit
-    this.#failureWindowMs = failureWindowMs
-    this.#now = now
+    this.#budget = createFailureStreakBudget({ failureLimit, failureWindowMs, now })
   }
 
   recordSuccess(baseUrl: string): void {
-    this.#failuresByBaseUrl.delete(baseUrl)
+    this.#budget.recordSuccess(baseUrl)
   }
 
   recordFailure(baseUrl: string): RemoteLivenessFailure {
-    const now = this.#now()
-    const previous = this.#failuresByBaseUrl.get(baseUrl)
-    const withinFailureWindow = previous && now - previous.lastFailureAt <= this.#failureWindowMs
-    const failures = (withinFailureWindow ? previous.failures : 0) + 1
-    const shouldReset = failures >= this.#failureLimit
-
-    if (shouldReset) {
-      this.#failuresByBaseUrl.delete(baseUrl)
-    } else {
-      this.#failuresByBaseUrl.set(baseUrl, { failures, lastFailureAt: now })
-    }
-
-    return { failures, shouldReset }
+    return this.#budget.recordFailure(baseUrl)
   }
 
   clear(): void {
-    this.#failuresByBaseUrl.clear()
+    this.#budget.clear()
   }
 }
 

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 
 import { test } from 'vitest'
 
-import { createBackendConnectionState } from './backend-connection-state'
+import { createConnectionState } from './connection-state'
 
 type FakeProcess = { id: string }
 
@@ -17,7 +17,7 @@ function deferred<T>() {
 }
 
 test('an invalidated remote attempt cannot publish a late descriptor', async () => {
-  const state = createBackendConnectionState<FakeProcess, string>()
+  const state = createConnectionState<FakeProcess, string>()
   const oldProbe = deferred<string>()
   const oldAttempt = state.startAttempt()
 
@@ -44,7 +44,7 @@ test('an invalidated remote attempt cannot publish a late descriptor', async () 
 })
 
 test('a stale backend exit cannot clear a newer connection attempt', () => {
-  const state = createBackendConnectionState<FakeProcess, string>()
+  const state = createConnectionState<FakeProcess, string>()
   const oldAttempt = state.startAttempt()
   const oldPromise = Promise.resolve('old')
 
@@ -67,7 +67,7 @@ test('a stale backend exit cannot clear a newer connection attempt', () => {
 })
 
 test('the current backend exit clears its process and connection promise', () => {
-  const state = createBackendConnectionState<FakeProcess, string>()
+  const state = createConnectionState<FakeProcess, string>()
   const attempt = state.startAttempt()
 
   state.setPromise(attempt, Promise.resolve('current'))
@@ -81,7 +81,7 @@ test('the current backend exit clears its process and connection promise', () =>
 })
 
 test('a stale rejected attempt cannot clear a newer connection promise', () => {
-  const state = createBackendConnectionState<FakeProcess, string>()
+  const state = createConnectionState<FakeProcess, string>()
   const oldAttempt = state.startAttempt()
 
   state.setPromise(oldAttempt, Promise.resolve('old'))
@@ -97,7 +97,7 @@ test('a stale rejected attempt cannot clear a newer connection promise', () => {
 })
 
 test('an invalidated attempt cannot attach a late-spawned process', () => {
-  const state = createBackendConnectionState<FakeProcess, string>()
+  const state = createConnectionState<FakeProcess, string>()
   const staleAttempt = state.startAttempt()
 
   state.invalidate()

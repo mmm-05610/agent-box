@@ -21,10 +21,14 @@ Companion documents:
 
 | Layer | Modules | Non-test lines |
 |---|---:|---:|
-| `apps/desktop/electron/` production | 180 | 50,675 |
-| of which `electron/composition/` | 21 | 16,171 |
+| `apps/desktop/electron/` production | 184 | 50,925 |
+| of which `electron/composition/` | 21 | 16,183 |
+| of which `electron/process/` (E1) | 8 | 859 |
 | of which `electron/main.ts` | 1 | 2,488 |
-| `apps/desktop/electron/` tests | 149 files | 34,234 |
+| `apps/desktop/electron/` tests | 151 files | 34,242 |
+
+Module counts exclude a type shim (`get-windows.d.ts`) and a test fixture
+(`fixtures/windows-system-ca.ts`), which are not registered production modules.
 
 The single most important structural fact: `composition/bootstrap-env-composition.ts` is **7,959
 lines** — 47% of `composition/` and 16% of the whole main process. The megafile decomposition moved
@@ -89,7 +93,7 @@ allowed to be right about that resource. **Hermes-only?** is the string/import f
 **Session/Exec/Workspace** marks whether the module participates in Session, Execution or Workspace
 truth — `indirect` means it routes or configures something that does, without being authoritative.
 
-### DESKTOP_HOST — 69 modules, 15125 lines
+### DESKTOP_HOST — 69 modules, 15175 lines
 
 | module | LOC | current callers | operates on | state authority | Hermes-only? | target | Session/Exec/Workspace |
 |---|---:|---|---|---|---|---|---|
@@ -100,7 +104,7 @@ truth — `indirect` means it routes or configures something that does, without 
 | `preload.ts` | 540 | — | contextBridge surface | Electron | partial | `ipc/` | no |
 | `composition/updates-composition.ts` | 470 | `main` | update check + desktop uninstall | git | partial | `update/` | no |
 | `updater-process.ts` | 455 | `c/bootstrap-env-composition` | detached updater child | updater script | partial | `update/` | no |
-| `window-renderer-lifecycle.ts` | 427 | `c/bootstrap-env-composition`, `c/cloud-oauth-composition`, `c/windows-composition`, `wake-indicator-window` | renderer crash/reload policy | Electron | no | `windows/` | no |
+| `window-renderer-lifecycle.ts` | 426 | `c/bootstrap-env-composition`, `c/cloud-oauth-composition`, `c/windows-composition`, `wake-indicator-window` | renderer crash/reload policy | Electron | no | `windows/` | no |
 | `quick-entry.ts` | 421 | `c/ipc/window-ipc`, `c/windows-composition`, `hud-snap-shortcut`, `main` | global quick-entry composer | OS | yes | `windows/` | no |
 | `composition/ipc/window-ipc.ts` | 310 | `main` | window channels | Electron | yes | `ipc/` | no |
 | `composition/window-theme.ts` | 310 | `c/bootstrap-env-composition`, `c/ipc/theme-ipc`, `c/windows-composition`, `main` | theme + translucency persistence | Electron | no | `windows/` | no |
@@ -122,6 +126,7 @@ truth — `indirect` means it routes or configures something that does, without 
 | `desktop-installation.ts` | 137 | `c/bootstrap-env-composition` | desktop-installation.json | Electron | no | `app/` | no |
 | `hud-windowing.ts` | 136 | `c/windows-composition`, `hud-ipc` | HUD windowing backend | pure | no | `windows/` | no |
 | `bundle-skew.ts` | 133 | `bundle-swap`, `c/windows-composition` | git checkout vs build stamp | git | partial | `update/` | no |
+| `test-main-process-sources.ts` | 122 | `backend-python-coherence`, `gateway-file-download-transport`, `hardening`, `pool-spawn-coordinator`, `process/inflight-claim` +1 | reads main-process sources for wiring assertions | none | no | `(test support)` | no |
 | `stream-throttle.ts` | 119 | `c/bootstrap-env-composition` | background throttling | renderer | no | `windows/` | no |
 | `composition/ipc/theme-ipc.ts` | 113 | `main` | theme channels | Electron | no | `ipc/` | no |
 | `translucency.ts` | 111 | `c/bootstrap-env-composition`, `c/ipc/theme-ipc`, `c/window-theme`, `hud-ipc` | window translucency | OS | no | `windows/` | no |
@@ -138,7 +143,6 @@ truth — `indirect` means it routes or configures something that does, without 
 | `composition/ipc/api-proxy-ipc.ts` | 82 | `main` | hermes:api proxy channel | backend | yes | `ipc/` | indirect |
 | `link-title-window.ts` | 80 | `c/api-proxy-composition` | link title peek window | Electron | no | `windows/` | no |
 | `window-reveal.ts` | 78 | `c/bootstrap-env-composition` | window reveal | Electron | no | `windows/` | no |
-| `test-main-process-sources.ts` | 71 | `backend-dial-claim`, `backend-python-coherence`, `gateway-file-download-transport`, `hardening`, `pool-spawn-coordinator` +1 | reads main-process sources for wiring assertions | none | no | `(test support)` | no |
 | `hud-cursor.ts` | 65 | `c/windows-composition` | cursor position | pure | no | `windows/` | no |
 | `update-remote.ts` | 65 | `c/bootstrap-env-composition`, `c/updates-composition` | reviewed remote URL | git | no | `update/` | no |
 | `bundle-swap.ts` | 61 | `c/bootstrap-env-composition`, `c/ipc/system-ipc` | bundle swap stamp | updater script | partial | `update/` | no |
@@ -208,24 +212,28 @@ truth — `indirect` means it routes or configures something that does, without 
 | `terminal-output-gate.ts` | 62 | `terminal-ipc` | terminal exit payload | pure | no | `host-capabilities/terminal` | no |
 | `composition/wsl-fonts.ts` | 61 | `main` | WSL font registration | filesystem | no | `host-capabilities/platform` | no |
 | `git-root.ts` | 50 | `fs-ipc` | git root discovery | filesystem | no | `host-capabilities/git` | indirect |
-| `windows-child-options.ts` | 37 | `backend-claim`, `bootstrap-runner`, `c/api-proxy-composition`, `c/bootstrap-env-composition`, `c/ipc/connection-ipc` +2 | Windows child spawn options | pure | no | `host-capabilities/platform` | no |
+| `windows-child-options.ts` | 37 | `bootstrap-runner`, `c/api-proxy-composition`, `c/bootstrap-env-composition`, `c/ipc/connection-ipc`, `c/updates-composition` +2 | Windows child spawn options | pure | no | `host-capabilities/platform` | no |
 | `oauth-net-request.ts` | 17 | `c/bootstrap-env-composition` | OAuth request headers | pure | no | `host-capabilities/credentials` | no |
 
-### PROCESS_PRIMITIVE — 5 modules, 675 lines
+### PROCESS_PRIMITIVE — 9 modules, 1048 lines
 
 | module | LOC | current callers | operates on | state authority | Hermes-only? | target | Session/Exec/Workspace |
 |---|---:|---|---|---|---|---|---|
-| `backend-claim.ts` | 221 | `c/bootstrap-env-composition` | child stdout/stderr + start marker | OS (PID identity) | no | `process/{output-tail,identity}` | no |
-| `update-marker.ts` | 205 | `backend-claim`, `c/bootstrap-env-composition` | PID liveness + update marker file | OS | partial | `process/pid` | no |
-| `backend-child.ts` | 103 | `c/bootstrap-env-composition` | child process + tree | spawner | no | `process/child-stop` | no |
-| `backend-connection-state.ts` | 88 | `c/bootstrap-env-composition` | generation + owned child | Electron | no | `process/connection-state` | no |
-| `backend-dial-claim.ts` | 58 | `c/bootstrap-env-composition` | keyed in-flight dial | Electron | no | `process/inflight-claim` | no |
+| `process/readiness.ts` | 207 | `backend-ready` | stdout sentinel + polled-value readiness | OS | no | `process/ (new)` | no |
+| `process/identity.ts` | 193 | `c/bootstrap-env-composition` | process start marker + claim policy | OS (PID identity) | no | `process/ (moved)` | no |
+| `update-marker.ts` | 189 | `c/bootstrap-env-composition` | PID liveness + update marker file | OS | partial | `process/pid` | no |
+| `process/connection-state.ts` | 103 | `c/bootstrap-env-composition` | generation + owned child | Electron | no | `process/ (moved)` | no |
+| `process/budget.ts` | 101 | `remote-liveness`, `window-renderer-lifecycle` | failure streak + attempt window | pure | no | `process/ (new)` | no |
+| `process/child-stop.ts` | 94 | `c/bootstrap-env-composition` | child process + tree | OS | no | `process/ (moved)` | no |
+| `process/output-tail.ts` | 69 | `c/bootstrap-env-composition` | child stdout/stderr ring buffer | OS | no | `process/ (moved)` | no |
+| `process/inflight-claim.ts` | 58 | `c/bootstrap-env-composition` | keyed in-flight claim | Electron | no | `process/ (moved)` | no |
+| `process/pid.ts` | 34 | `process/identity`, `update-marker` | host-process liveness | OS | no | `process/ (moved)` | no |
 
-### LEGACY_HERMES — 63 modules, 24144 lines
+### LEGACY_HERMES — 63 modules, 24030 lines
 
 | module | LOC | current callers | operates on | state authority | Hermes-only? | target | Session/Exec/Workspace |
 |---|---:|---|---|---|---|---|---|
-| `composition/bootstrap-env-composition.ts` | 7959 | `c/api-proxy-composition`, `c/cloud-oauth-composition`, `c/connections-composition`, `c/deep-link-composition`, `c/paths-composition` +4 | env constants + local backend spawn + boot progress + updates | Electron | yes | `legacy-hermes (split)` | indirect |
+| `composition/bootstrap-env-composition.ts` | 7971 | `c/api-proxy-composition`, `c/cloud-oauth-composition`, `c/connections-composition`, `c/deep-link-composition`, `c/paths-composition` +4 | env constants + local backend spawn + boot progress + updates | Electron | yes | `legacy-hermes (split)` | indirect |
 | `managed-ssh-update.ts` | 1084 | `c/bootstrap-env-composition`, `c/runtime-composition`, `main` | remote hermes install | filesystem + network | yes | `legacy-hermes/managed-ssh-update` | no |
 | `connection-config.ts` | 1056 | `c/api-proxy-composition`, `c/bootstrap-env-composition`, `c/cloud-oauth-composition`, `c/connections-composition`, `c/ipc/api-proxy-ipc` +10 | connection.json + baseUrl/wsUrl/auth mode | Electron | yes | `legacy-hermes/connections` | indirect |
 | `bootstrap-runner.ts` | 1037 | `bootstrap-runner`, `c/bootstrap-env-composition` | hermes checkout + install.sh | git / install script | yes | `legacy-hermes/bootstrap-runner` | no |
@@ -234,8 +242,8 @@ truth — `indirect` means it routes or configures something that does, without 
 | `composition/runtime-composition.ts` | 721 | `c/api-proxy-composition`, `c/bootstrap-env-composition`, `main` | pool, liveness, managed ssh updates | Electron | yes | `legacy-hermes/runtime` | indirect |
 | `composition/connections-composition.ts` | 639 | `main` | registry secrets + broadcast | Electron | yes | `legacy-hermes/connections` | indirect |
 | `connection-registry/schema.ts` | 551 | `connection-registry`, `connection-registry/migration`, `connection-registry/registry-ops`, `connection-registry/roster` | registry normalisation | pure | yes | `legacy-hermes/connections` | indirect |
-| `remote-liveness.ts` | 458 | `c/bootstrap-env-composition`, `c/ipc/connection-ipc`, `c/runtime-composition`, `main` | cached remote descriptors | Electron | yes | `legacy-hermes/remote-liveness` | no |
 | `profile-session-routing.ts` | 455 | `c/api-proxy-composition` | profile→session rows | backend | yes | `legacy-hermes/connections` | yes |
+| `remote-liveness.ts` | 440 | `c/bootstrap-env-composition`, `c/ipc/connection-ipc`, `c/runtime-composition`, `main` | cached remote descriptors | Electron | yes | `legacy-hermes/remote-liveness` | no |
 | `connection-registry/identity.ts` | 384 | `connection-registry`, `connection-registry/migration`, `connection-registry/registry-ops`, `connection-registry/roster`, `connection-registry/route-resolution` +1 | registry schema | pure | yes | `legacy-hermes/connections` | indirect |
 | `remote-lifecycle/spawn.ts` | 348 | `remote-lifecycle`, `remote-lifecycle/connect` | remote dashboard spawn + forward | remote host | yes | `legacy-hermes/remote-lifecycle` | no |
 | `gateway-file-download.ts` | 343 | `c/api-proxy-composition`, `c/cloud-oauth-composition` | gateway file/artifact download | gateway | yes | `legacy-hermes/download` | no |
@@ -248,7 +256,6 @@ truth — `indirect` means it routes or configures something that does, without 
 | `remote-lifecycle/connect.ts` | 286 | `remote-lifecycle` | SSH remote backend | remote host | yes | `legacy-hermes/remote-lifecycle` | no |
 | `connection-registry/registry-ops.ts` | 274 | `connection-registry` | registry mutations | Electron | yes | `legacy-hermes/connections` | indirect |
 | `pool-spawn-coordinator.ts` | 272 | `c/bootstrap-env-composition`, `c/runtime-composition` | local backend spawn slots | Electron | yes | `legacy-hermes/pool` | indirect |
-| `backend-ready.ts` | 257 | `c/bootstrap-env-composition`, `remote-lifecycle/ownership` | stdout READY line + ready file | backend (announces port) | yes | `legacy-hermes/readiness` | no |
 | `profile-delete-routing.ts` | 246 | `c/api-proxy-composition`, `c/bootstrap-env-composition`, `c/ipc/api-proxy-ipc`, `profile-rename-routing` | profile delete routing | pure | yes | `legacy-hermes/connections` | indirect |
 | `remote-lifecycle/resolve.ts` | 244 | `remote-lifecycle`, `remote-lifecycle/connect`, `remote-lifecycle/spawn` | remote hermes binary + profiles | remote host | yes | `legacy-hermes/remote-lifecycle` | no |
 | `gateway-ws-probe.ts` | 237 | `c/bootstrap-env-composition`, `c/ipc/connection-ipc`, `main` | /api/ws upgrade | backend | yes | `legacy-hermes/ws-probe` | no |
@@ -259,6 +266,7 @@ truth — `indirect` means it routes or configures something that does, without 
 | `backend-env.ts` | 161 | `c/bootstrap-env-composition`, `shell-path` | child env, HERMES_HOME, PATH | Electron (env policy) | yes | `legacy-hermes/env` | no |
 | `connection-registry/migration.ts` | 153 | `connection-registry` | v1→v2 registry migration | pure | yes | `legacy-hermes/connections` | indirect |
 | `ssh-bootstrap-coordinator.ts` | 151 | `c/bootstrap-env-composition` | ssh bootstrap dial lifetime | Electron | partial | `legacy-hermes/ssh-bootstrap` | no |
+| `backend-ready.ts` | 149 | `c/bootstrap-env-composition`, `remote-lifecycle/ownership` | stdout READY line + ready file | backend (announces port) | yes | `legacy-hermes/readiness` | no |
 | `first-run-setup-gate.ts` | 146 | `c/bootstrap-env-composition`, `primary-backend-startup` | first-run choice gate | Electron | yes | `legacy-hermes/first-run-gate` | no |
 | `backend-start-failure.ts` | 140 | `c/bootstrap-env-composition` | latched boot failure | Electron | yes | `legacy-hermes/start-failure` | no |
 | `plugin-compat-notice.ts` | 138 | `c/bootstrap-env-composition` | HERMES_HOME plugin-compat report | Hermes runtime | yes | `legacy-hermes/plugin-compat` | no |
@@ -270,7 +278,7 @@ truth — `indirect` means it routes or configures something that does, without 
 | `primary-backend-startup.ts` | 113 | `c/bootstrap-env-composition` | primary boot sequence | Electron | yes | `legacy-hermes/primary-startup` | no |
 | `dashboard-token.ts` | 112 | `c/bootstrap-env-composition` | scraped dashboard session token | backend | yes | `legacy-hermes/token` | no |
 | `connection-apply.ts` | 111 | `c/bootstrap-env-composition`, `c/ipc/connection-ipc`, `main`, `terminal-ipc` | applied connection + ssh teardown | Electron | yes | `legacy-hermes/connections` | indirect |
-| `parent-process-identity.ts` | 108 | `backend-claim`, `c/bootstrap-env-composition` | HERMES_PARENT_* / HERMES_SPAWN env | Electron | yes | `legacy-hermes/parent-identity` | no |
+| `parent-process-identity.ts` | 108 | `c/bootstrap-env-composition` | HERMES_PARENT_* / HERMES_SPAWN env | Electron | yes | `legacy-hermes/parent-identity` | no |
 | `gateway-stop-before-update.ts` | 97 | `c/bootstrap-env-composition` | messaging gateway process | gateway | yes | `legacy-hermes/gateway-stop` | no |
 | `remote-ws-headers.ts` | 97 | `c/bootstrap-env-composition`, `c/runtime-composition`, `main` | WS request headers | Electron | yes | `legacy-hermes/remote-ws-headers` | no |
 | `window-connection-route.ts` | 91 | `c/bootstrap-env-composition` | per-window connection route | Electron | yes | `legacy-hermes/connections` | indirect |
@@ -376,9 +384,10 @@ without changing behaviour, keep the production path and record the cycle".
 4. **The source-reading test helper.** `test-main-process-sources.ts` reads `.ts` files as text to
    assert wiring. The root `AGENTS.md` forbids this ("Never read source code in a test"), and it is
    why six test files constrain where production code may live. It is registered as test support and
-   is **not** production ownership; converting those six tests to behavioural contracts is the
-   precondition for moving the code they scan. This round widens the helper's discovery so it
-   survives the moves rather than pretending the constraint does not exist.
+   is **not** production ownership; converting those six tests to behavioural contracts remains the
+   precondition for *deleting* the helper. E1 widened its discovery to walk the main-process tree
+   (with `main.ts` still scanned first, since those assertions read the first `indexOf` match), so a
+   module moving behind a boundary stays visible instead of silently dropping out of the scan.
 5. **Renderer mass is out of scope.** The 293k lines under `apps/desktop/src/` — including the
    Hermes product surfaces listed in `03-coupling-matrix.md` §4 (Bucket D) — are untouched. This
    round is Electron-main-process only.
@@ -387,20 +396,43 @@ without changing behaviour, keep the production path and record the cycle".
 
 **This is the only section that asserts physical change.** Everything in §3 is classification.
 
-An initial ledger. Each phase appends its own rows and its commit id when it lands.
+**This is the only section that asserts physical change.** Everything in §3 is classification.
 
 | Phase | Commit | Module | From | To | Physical? |
 |---|---|---|---|---|---|
-| E0 | *(this commit)* | all 180 production modules | — | — | **No.** Classification only — an audit, not a move. |
+| E0 | `1cc19c4` | all 180 production modules | — | — | **No.** Classification only — an audit, not a move. |
+| E1 | *(this commit)* | `backend-claim.ts` | `electron/` | split: `process/identity.ts` (start marker, probe, claim policy, `execText`) + `process/output-tail.ts` (stdout/stderr tail) | **Yes** — extracted, genericised, and the Hermes path re-pointed at it. The `winms:` self-marker format was *injected* (`ProcessIdentityDeps.selfMarker`) rather than moved, because `hermes_cli/process_identity.py` parses it. |
+| E1 | *(this commit)* | `backend-child.ts` | `electron/` | `process/child-stop.ts` (`stopChildProcess`, `stopProcessTreesForUpdate`) | **Yes** — renamed generically; tree-kill / group-kill policy unchanged. |
+| E1 | *(this commit)* | `backend-connection-state.ts` | `electron/` | `process/connection-state.ts` (`createConnectionState`) | **Yes** — renamed generically; generation semantics unchanged. |
+| E1 | *(this commit)* | `backend-dial-claim.ts` | `electron/` | `process/inflight-claim.ts` (`InFlightClaims`) | **Yes** — renamed generically; single-flight semantics unchanged. |
+| E1 | *(this commit)* | `update-marker.ts`'s `isPidAlive` | `electron/update-marker.ts` | `process/pid.ts` | **Yes** — a pure extraction that removes a real inversion: process identity no longer imports the Desktop-update module. |
+| E1 | *(this commit)* | `backend-ready.ts`'s deadline/listener engine | `electron/backend-ready.ts` | `process/readiness.ts` (`waitForLineAnnouncement`, `waitForPolledValue`) | **Yes** — the Hermes sentinel regex and failure wording stay in `backend-ready.ts`; the deadline, listener teardown and already-buffered-sentinel recovery are now generic. |
+| E1 | *(this commit)* | `RemoteLivenessTracker`, `pruneReloadTimes`/`pushReloadTime` | `electron/remote-liveness.ts`, `electron/window-renderer-lifecycle.ts` | `process/budget.ts` (`createFailureStreakBudget`, `pruneWindowTimestamps`, `recordWindowTimestamp`) | **Yes** — both supervising loops now share one bounded-budget implementation; their public classes/functions are unchanged wrappers. |
+| E1 | *(this commit)* | `test-main-process-sources.ts` | `electron/` | `electron/` (rewritten in place) | **Yes, in behaviour** — discovery now walks the main-process tree instead of naming `composition/`, so the six source-scanning tests survive a module moving behind a boundary. `main.ts` is still scanned first, because those assertions read the first `indexOf` match. |
 
-Status of the target tree after E0:
+### What E1 deliberately did not extract
+
+- **No pass-through spawn wrapper.** `bounded spawn` is realised by the primitives that actually
+  bound something (`output-tail` bounds bytes, `readiness` bounds time, `child-stop` bounds
+  lifetime). A `spawnChild()` that only forwards `child_process.spawn` would add a layer with no
+  policy in it.
+- **No standalone typed-process-result module.** The typed results are the option/result interfaces
+  of those primitives (`StartMarkerProbe`, `ClaimDecision`, `FailureStreak`, `ProcessOutputTail`).
+  A separate result type with no producer would be an empty abstraction.
+- **The one real run-to-completion shape is still deferred.** `desktop-plugin-install.runGit`,
+  `bootstrap-env-composition.runGit` and `composition/updates-composition`'s updater spawn all
+  "run a child, capture bounded output, enforce a deadline", but their timeout, stdio, abort and
+  error semantics differ. Unifying them changes behaviour at three live call sites, so it remains a
+  registered future move rather than a forced abstraction.
+
+### Target-directory status after E1
 
 | Target directory | Exists? | Populated? |
 |---|---|---|
 | `app/` | no | — |
 | `windows/` | no | — |
 | `host-capabilities/` | no | — |
-| `process/` | no | — |
+| `process/` | **yes** | **yes** — 8 modules, 859 production lines |
 | `workcore/` | no | — |
 | `host-bridge/` | no | — |
 | `ipc/` | no | — |
@@ -408,9 +440,9 @@ Status of the target tree after E0:
 | `security/` | no | — |
 | `legacy-hermes/` | no | — |
 
-Everything in §3 is therefore a *registered future ownership*. Nothing has moved.
+Every row in §3 whose target is not `process/` is still a *registered future ownership*.
 
-## 8. Next vertical chain (not started)
+## 8. The next vertical chain (executed by E2)
 
 The safest first vertical chain, named so a later round can begin without re-deriving it:
 

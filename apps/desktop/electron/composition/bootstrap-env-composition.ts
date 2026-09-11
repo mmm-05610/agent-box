@@ -26,21 +26,7 @@ import {
 import { classifyActiveRuntime } from '../active-runtime-state'
 import { jsonAgentFor, withRetry } from '../api-transport'
 import { appIconCandidates, resolveAppIcon } from '../app-icon'
-import { stopBackendChild as stopBackendChildImpl, stopBackendTreesForUpdate } from '../backend-child'
-import {
-  type BackendOutputTail,
-  claimDecision,
-  createBackendOutputTail,
-  execText,
-  isPidOnlyStartMarker,
-  pidOnlyStartMarker,
-  probeStartMarker,
-  processStartMarker,
-  REAP_PROBE_TIMEOUT_MS
-} from '../backend-claim'
 import { dashboardFallbackArgs, sourceDeclaresServe } from '../backend-command'
-import { createBackendConnectionState } from '../backend-connection-state'
-import { BackendDialClaims } from '../backend-dial-claim'
 import { buildDesktopBackendEnv, hermesManagedNodePathEntries, normalizeHermesHomeRoot } from '../backend-env'
 import {
   isReauthRequiredError,
@@ -151,7 +137,7 @@ import {
 import { loadNativeTokenSet, type NativeTokenStoreIo, persistNativeTokenSet } from '../native-token-store'
 import { serializeJsonBody, setJsonRequestHeaders } from '../oauth-net-request'
 import { LEGACY_OAUTH_PARTITION, resolveOauthPartition } from '../oauth-partition'
-import { createParentStartMarkerResolver, parentWatchdogEnv } from '../parent-process-identity'
+import { createParentStartMarkerResolver, electronProcessStartMarker, parentWatchdogEnv } from '../parent-process-identity'
 import {
   pendingNotice as pendingPluginCompatNotice,
   recordDismissed as recordPluginCompatDismissed
@@ -171,6 +157,20 @@ import {
   FirstRunSetupResetError,
   runPrimaryBackendStartup
 } from '../primary-backend-startup'
+import { stopChildProcess as stopBackendChildImpl, stopProcessTreesForUpdate } from '../process/child-stop'
+import { createConnectionState } from '../process/connection-state'
+import {
+  claimDecision,
+  execText,
+  isPidOnlyStartMarker,
+  pidOnlyStartMarker,
+  probeStartMarker,
+  type ProcessIdentityDeps,
+  processStartMarker,
+  REAP_PROBE_TIMEOUT_MS
+} from '../process/identity'
+import { InFlightClaims } from '../process/inflight-claim'
+import { createOutputTail, type ProcessOutputTail } from '../process/output-tail'
 import {
   assertLocalProfileCanStart,
   ProfileDeletionGate
@@ -521,11 +521,11 @@ export const MEDIA_MIME_TYPES = {
 
 export let mainWindow = null
 
-export const backendConnectionState = createBackendConnectionState<ReturnType<typeof spawn>, any>()
+export const backendConnectionState = createConnectionState<ReturnType<typeof spawn>, any>()
 
 export const registryDispatchRevalidation = new RemoteRevalidationCoordinator()
 
-export const backendDialClaims = new BackendDialClaims()
+export const backendDialClaims = new InFlightClaims()
 
 export let softRehomeInProgress = false
 
@@ -1881,7 +1881,7 @@ export async function processIdentityMatches(identity, timeoutMs: number = 30_00
   }
 
   try {
-    return (await processStartMarker(identity.pid, timeoutMs)) === identity.startMarker
+    return (await hermesProcessStartMarker(identity.pid, timeoutMs)) === identity.startMarker
   } catch (error) {
     return error?.code === 'ENOENT' || error?.code === 'ESRCH' ? false : undefined
   }
@@ -1905,7 +1905,7 @@ export async function backendParentMatches(entry) {
   }
 
   try {
-    return (await processStartMarker(entry.parentPid, REAP_PROBE_TIMEOUT_MS)) === entry.parentStartMarker
+    return (await hermesProcessStartMarker(entry.parentPid, REAP_PROBE_TIMEOUT_MS)) === entry.parentStartMarker
   } catch (error) {
     return error?.code === 'ENOENT' || error?.code === 'ESRCH' ? false : undefined
   }
@@ -1996,8 +1996,20 @@ export const backendOwnership = createBackendOwnership({
   }
 })
 
+// The marker format for the Desktop's OWN process (and for the parent-watchdog
+// env derived from it) is mirrored by `hermes_cli/process_identity.py`, so the
+// format lives with the Hermes adapter and is injected into the generic probe
+// rather than baked into it. Without this the probe would spawn a PowerShell /
+// `ps` helper to describe the process it already is.
+const hermesSelfMarker: ProcessIdentityDeps['selfMarker'] = pid =>
+  electronProcessStartMarker(pid, process.pid, process.getCreationTime?.())
+
+export function hermesProcessStartMarker(pid: number, timeoutMs: number = 30_000): Promise<string> {
+  return processStartMarker(pid, timeoutMs, { selfMarker: hermesSelfMarker })
+}
+
 export const desktopParentStartMarker = createParentStartMarkerResolver({
-  load: () => processStartMarker(process.pid),
+  load: () => hermesProcessStartMarker(process.pid),
   onError: error => {
     const detail = error instanceof Error ? error.message : String(error)
 
@@ -2007,13 +2019,13 @@ export const desktopParentStartMarker = createParentStartMarkerResolver({
   }
 })
 
-export async function claimBackendChild(child, command, profile, nonce, outputTail: BackendOutputTail | null = null) {
-  // Probe/claim policy lives in backend-claim.ts (#93608): a marker probe
+export async function claimBackendChild(child, command, profile, nonce, outputTail: ProcessOutputTail | null = null) {
+  // Probe/claim policy lives in process/identity.ts (#93608): a marker probe
   // that fails against a LIVE child degrades to PID-only identity — matching
   // createParentStartMarkerResolver — instead of killing a healthy backend
   // over a flaky Get-Process (PS 5.1 cold starts, #87169). Only a child that
   // actually died keeps the fail-closed throw, now carrying its stderr tail.
-  const probe = await probeStartMarker(child.pid)
+  const probe = await probeStartMarker(child.pid, pid => hermesProcessStartMarker(pid))
   const decision = claimDecision(child.exitCode === null && !child.killed, probe)
 
   if (decision.action === 'fail') {
@@ -2123,9 +2135,9 @@ export async function releaseBackendLock(updateRoot, tag) {
     }
   }
 
-  stopBackendTreesForUpdate(hermesProcess, {
+  stopProcessTreesForUpdate(hermesProcess, {
     forceKillProcessTree,
-    stopAllPoolBackends
+    stopAllPooledChildren: stopAllPoolBackends
   })
 
   // Stop separately-running messaging gateways (all profiles) BEFORE the
@@ -6616,7 +6628,7 @@ export async function spawnPoolBackend(profile, entry, opts: { forceLocal?: bool
   // traceback must survive into the claim error and the before-ready exit
   // message instead of a bare exit code. rememberLog attaches later, after
   // the claim, and would miss anything printed before it.
-  const outputTail = createBackendOutputTail()
+  const outputTail = createOutputTail(undefined, 'backend')
   outputTail.attach(child)
 
   // Start watching for the READY announcement BEFORE any await (#60323):
@@ -6980,7 +6992,7 @@ export async function startHermes() {
     // crash's traceback must survive into the claim error and the
     // before-ready exit message shown by the boot UI. rememberLog attaches
     // later, after the claim, and would miss anything printed before it.
-    const primaryOutputTail = createBackendOutputTail()
+    const primaryOutputTail = createOutputTail(undefined, 'backend')
     primaryOutputTail.attach(hermesProcess)
 
     // Start watching for the READY announcement BEFORE any await (#60323):

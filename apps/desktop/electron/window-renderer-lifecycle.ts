@@ -35,6 +35,8 @@
 // (OAuth/portal windows, which install this helper for process events) from
 // spilling their console output — potentially tokens/PII — into desktop.log.
 
+import { pruneWindowTimestamps, recordWindowTimestamp } from './process/budget'
+
 export interface RendererLifecycleDetails {
   reason?: string
   exitCode?: number | string | undefined
@@ -124,20 +126,17 @@ function safeNow(now: (() => number) | undefined): number {
   return typeof now === 'function' ? now() : Date.now()
 }
 
-function isWithin(timestamp: number, now: number, windowMs: number): boolean {
-  return now - timestamp < windowMs
-}
-
-/** Drop reload timestamps outside the rolling window. Mutates + returns. */
+/**
+ * Drop reload timestamps outside the rolling window. The windowing arithmetic is
+ * the generic `process/budget.ts` concern; this is the renderer-reload binding.
+ */
 export function pruneReloadTimes(times: number[], now: number, windowMs: number): number[] {
-  return times.filter(timestamp => isWithin(timestamp, now, windowMs))
+  return pruneWindowTimestamps(times, now, windowMs)
 }
 
 /** Record a reload attempt timestamp. Mutates + returns. */
 export function pushReloadTime(times: number[], now: number): number[] {
-  times.push(now)
-
-  return times
+  return recordWindowTimestamp(times, now)
 }
 
 /**

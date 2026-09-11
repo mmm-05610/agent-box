@@ -1,8 +1,16 @@
 // Test-only helper: the main process' source is spread over main.ts plus the
-// composition modules extracted from it (see
-// docs/desktop-megafile-decomposition.md). Wiring assertions that used to read
-// main.ts alone must look at the whole set — the call sites moved, the contract
-// did not.
+// modules extracted from it (see docs/desktop-megafile-decomposition.md and
+// docs/architecture/electron-host-boundary.md). Wiring assertions that used to
+// read main.ts alone must look at the whole set — the call sites moved, the
+// contract did not.
+//
+// Discovery walks the main-process tree rather than naming directories, so a
+// module that moves behind a boundary (process/, legacy-hermes/,
+// host-capabilities/) stays visible to the assertions instead of silently
+// dropping out of the scanned set. Two files are deliberately excluded:
+// `preload.ts` is the renderer bridge bundle, not main-process wiring, and this
+// helper itself is test support rather than production behaviour.
+
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -14,20 +22,63 @@ export interface MainProcessFile {
   text: string
 }
 
-export function mainProcessFiles(): MainProcessFile[] {
-  const rel = [
-    'main.ts',
-    ...fs
-      .readdirSync(path.join(here, 'composition'))
-      .filter(f => f.endsWith('.ts'))
-      .map(f => path.join('composition', f)),
-    ...fs
-      .readdirSync(path.join(here, 'composition', 'ipc'))
-      .filter(f => f.endsWith('.ts'))
-      .map(f => path.join('composition', 'ipc', f))
-  ]
+const EXCLUDED = new Set(['preload.ts', 'test-main-process-sources.ts'])
 
-  return rel.map(name => ({ name, text: fs.readFileSync(path.join(here, name), 'utf8').replace(/\r\n/g, '\n') }))
+function mainProcessModulePaths(dir = here): string[] {
+  const out: string[] = []
+
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+    const full = path.join(dir, entry.name)
+
+    if (entry.isDirectory()) {
+      if (entry.name === 'node_modules' || entry.name === 'fixtures') {
+        continue
+      }
+
+      out.push(...mainProcessModulePaths(full))
+
+      continue
+    }
+
+    if (!entry.name.endsWith('.ts')) {
+      continue
+    }
+
+    if (entry.name.endsWith('.test.ts') || entry.name.endsWith('.d.ts') || EXCLUDED.has(entry.name)) {
+      continue
+    }
+
+    out.push(path.relative(here, full))
+  }
+
+  return out
+}
+
+export function mainProcessFiles(): MainProcessFile[] {
+  // main.ts first, then the rest in a stable path order. These assertions use
+  // `indexOf` and read the FIRST match, so ordering is load-bearing: the
+  // composition root must be scanned before the modules it assembles, or a
+  // declaration would shadow the call site the assertion is about.
+  const names = mainProcessModulePaths().sort((a, b) => {
+    if (a === b) {
+      return 0
+    }
+
+    if (a === 'main.ts') {
+      return -1
+    }
+
+    if (b === 'main.ts') {
+      return 1
+    }
+
+    return a.localeCompare(b)
+  })
+
+  return names.map(name => ({
+    name,
+    text: fs.readFileSync(path.join(here, name), 'utf8').replace(/\r\n/g, '\n')
+  }))
 }
 
 export function mainProcessSources(): string {

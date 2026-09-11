@@ -1,5 +1,7 @@
 import fs from 'node:fs'
 
+import { waitForLineAnnouncement, waitForPolledValue } from './process/readiness'
+
 // `hermes serve` announces HERMES_BACKEND_READY; the legacy `hermes dashboard`
 // backend announces HERMES_DASHBOARD_READY. Accept either so the desktop spawn
 // works against both the headless backend and old/dashboard runtimes.
@@ -40,22 +42,27 @@ function resolvePortAnnounceTimeoutMs(env = process.env) {
   return DEFAULT_PORT_ANNOUNCE_TIMEOUT_MS
 }
 
+function exitedMessage(describeOutputTail: () => string) {
+  return (detail: string) =>
+    `Hermes backend: exited before port announcement (${detail})${describeOutputTail()}`
+}
+
+function timedOutMessage(timeoutMs: number) {
+  return `Timed out waiting for Hermes backend port announcement (${timeoutMs}ms)`
+}
+
 /**
  * Watch a child process's stdout for the `HERMES_(BACKEND|DASHBOARD)_READY
  * port=<N>` line that web_server.py prints after uvicorn binds its socket.
  *
- * Returns the parsed port. Rejects if:
- *   - the child exits before emitting the line
- *   - the child emits an `error` event
- *   - no line arrives within the timeout
+ * Returns the parsed port. Rejects if the child exits before emitting the line,
+ * emits an `error` event, or no line arrives within the timeout. The default
+ * timeout is cold-start tolerant (see DEFAULT_PORT_ANNOUNCE_TIMEOUT_MS) because
+ * the clock starts before the backend has even bound its port.
  *
- * The default timeout is cold-start tolerant (see
- * DEFAULT_PORT_ANNOUNCE_TIMEOUT_MS) because the clock starts before the
- * backend has even bound its port. Pass an explicit `timeoutMs` to override.
- *
- * A single `cleanup()` tears down every listener (data/exit/error/timeout)
- * on every terminal path — resolve, reject, or timeout — so repeated
- * backend spawns don't leak listener slots on the child.
+ * The deadline, the listener teardown and the already-buffered-sentinel recovery
+ * are the generic `process/readiness.ts` concern; this function supplies what is
+ * Hermes-specific: the sentinel pattern and the wording of a failure.
  */
 function waitForDashboardPort(
   child,
@@ -63,83 +70,15 @@ function waitForDashboardPort(
   describeOutputTail = () => '',
   bufferedOutput: () => string = () => ''
 ) {
-  return new Promise((resolve, reject) => {
-    // Seed the line buffer with any output the spawn-time tail already
-    // consumed (#60323): main.ts attaches its output tail at spawn, then
-    // awaits claimBackendChild + advanceBootProgress BEFORE this listener
-    // attaches. child.stdout is in flowing mode from the tail's listener, so
-    // a READY line flushed during that window is emitted once and never
-    // replayed to late listeners — the wait then times out at 90s and a
-    // healthy backend is killed. Scanning the tail's buffer (and seeding any
-    // trailing partial line) makes the listener-attach ordering irrelevant.
-    let buf = ''
-    let done = false
-
-    function cleanup() {
-      if (done) {
-        return
-      }
-
-      done = true
-      clearTimeout(timer)
-      child.stdout.off('data', onData)
-      child.off('exit', onExit)
-      child.off('error', onError)
-    }
-
-    function onData(chunk) {
-      buf += chunk.toString()
-      let nl
-
-      while ((nl = buf.indexOf('\n')) !== -1) {
-        const line = buf.slice(0, nl)
-        buf = buf.slice(nl + 1)
-        const m = line.match(_READY_RE)
-
-        if (m) {
-          cleanup()
-          resolve(parseInt(m[1], 10))
-
-          return
-        }
-      }
-    }
-
-    function onExit(code, signal) {
-      cleanup()
-      reject(new Error(`Hermes backend: exited before port announcement (${signal || code})${describeOutputTail()}`))
-    }
-
-    function onError(err) {
-      cleanup()
-      reject(err)
-    }
-
-    const timer = setTimeout(() => {
-      cleanup()
-      reject(new Error(`Timed out waiting for Hermes backend port announcement (${timeoutMs}ms)`))
-    }, timeoutMs)
-
-    child.stdout.on('data', onData)
-    child.on('exit', onExit)
-    child.on('error', onError)
-
-    // Listener is live — now recover a sentinel that was already flushed and
-    // consumed before this promise existed. The snapshot is taken AFTER the
-    // listener attaches, so no chunk can fall between snapshot and listener.
-    // Merged-buffer regex here (the tail interleaves both streams). Currently dormant: both
-    // main.ts callers attach the tail and build this wait in one synchronous block, so the
-    // snapshot is empty; any await reintroduced between them makes this the live path again.
-    if (!done) {
-      const alreadyBuffered = bufferedOutput()
-      const m = alreadyBuffered ? alreadyBuffered.match(READY_IN_MERGED_OUTPUT_RE) : null
-
-      if (m) {
-        cleanup()
-        resolve(parseInt(m[1], 10))
-      }
-    }
-  })
+  return waitForLineAnnouncement(child, {
+    bufferedOutput,
+    bufferedPattern: READY_IN_MERGED_OUTPUT_RE,
+    describeOutputTail,
+    linePattern: _READY_RE,
+    onExit: exitedMessage(describeOutputTail),
+    onTimeout: timedOutMessage,
+    timeoutMs
+  }).then(raw => parseInt(raw, 10))
 }
 
 function readDashboardReadyFile(readyFile: fs.PathOrFileDescriptor) {
@@ -163,59 +102,12 @@ function waitForDashboardReadyFile(
   timeoutMs = resolvePortAnnounceTimeoutMs(),
   describeOutputTail = () => ''
 ) {
-  return new Promise((resolve, reject) => {
-    let done = false
-    let interval = null
-
-    function cleanup() {
-      if (done) {
-        return
-      }
-
-      done = true
-      clearTimeout(timer)
-
-      if (interval) {
-        clearInterval(interval)
-      }
-
-      child.off('exit', onExit)
-      child.off('error', onError)
-    }
-
-    function check() {
-      const port = readDashboardReadyFile(readyFile)
-
-      if (port) {
-        cleanup()
-        resolve(port)
-      }
-    }
-
-    function onExit(code, signal) {
-      cleanup()
-      reject(new Error(`Hermes backend: exited before port announcement (${signal || code})${describeOutputTail()}`))
-    }
-
-    function onError(err) {
-      cleanup()
-      reject(err)
-    }
-
-    const timer = setTimeout(() => {
-      cleanup()
-      reject(new Error(`Timed out waiting for Hermes backend port announcement (${timeoutMs}ms)`))
-    }, timeoutMs)
-
-    child.on('exit', onExit)
-    child.on('error', onError)
-    interval = setInterval(check, 50)
-
-    if (typeof interval.unref === 'function') {
-      interval.unref()
-    }
-
-    check()
+  return waitForPolledValue(child, {
+    describeOutputTail,
+    onExit: exitedMessage(describeOutputTail),
+    onTimeout: timedOutMessage,
+    read: () => readDashboardReadyFile(readyFile),
+    timeoutMs
   })
 }
 
