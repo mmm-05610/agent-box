@@ -4,13 +4,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { reactRoot } from '@/dev/test/react-root'
 import { hiddenPaneProps, PANE_HIDDEN_ATTR } from '@/lib/pane-visibility'
 import { $paneStates } from '@/store/panes'
+import { $terminalTakeover } from '@/store/terminal-takeover'
 
 import { installWindowStateBridge, setDocumentHidden, type WindowStateBridge } from '../../../dev/test/window-state'
-import { $terminalTakeover } from '../store'
 
 import { PersistentTerminal, TerminalSlot } from './persistent'
 
-vi.mock('../store', async () => ({
+vi.mock('@/store/terminal-takeover', async () => ({
   $terminalTakeover: (await import('nanostores')).atom(false)
 }))
 

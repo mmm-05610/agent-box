@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { resetLiveRuntimeTracking } from '@/store/live-runtime-tracking'
 import { $selectedStoredSessionId, $unreadFinishedSessionIds } from '@/store/session'
 import { $workingSessionIds, clearAllSessionStates } from '@/store/session-states'
 
-import { rehydrateLiveSessionStatuses, resetLiveRuntimeTracking } from './use-background-sync'
+import { rehydrateLiveSessionStatuses } from './use-background-sync'
 
 /**
  * (C) The sidebar spinner is driven by `$workingSessionIds`, which is keyed by

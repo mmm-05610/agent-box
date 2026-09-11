@@ -14,8 +14,7 @@ import { formatCombo } from '@/lib/keybinds/combo'
 import { isMetaClose, middleClickHandlers } from '@/lib/middle-click'
 import { cn } from '@/lib/utils'
 import { $bindings } from '@/store/keybinds'
-
-import { setTerminalTakeover } from '../store'
+import { setTerminalTakeover } from '@/store/terminal-takeover'
 
 import {
   $activeTerminalId,

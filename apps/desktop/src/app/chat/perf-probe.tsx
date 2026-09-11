@@ -1,6 +1,5 @@
 import { Profiler, type ProfilerOnRenderCallback, type ReactNode } from 'react'
 
-import { $terminalTakeover, setTerminalTakeover } from '@/app/right-sidebar/store'
 import { writeAgentTerminalChunk } from '@/app/right-sidebar/terminal/agent-terminal-stream'
 import {
   $activeTerminalId,
@@ -13,6 +12,7 @@ import {
 import { $repoStatusByCwd } from '@/store/coding-status'
 import { $gateway } from '@/store/gateway'
 import { $currentCwd, $messages, setBusy, setCurrentCwdTransient, setMessages } from '@/store/session'
+import { $terminalTakeover, setTerminalTakeover } from '@/store/terminal-takeover'
 
 type Sample = {
   id: string

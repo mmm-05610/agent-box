@@ -1,5 +1,5 @@
 import { useStore } from '@nanostores/react'
-import { type ComponentProps, lazy, type ReactNode, Suspense, useEffect, useState } from 'react'
+import { type ComponentProps, type ComponentType, type ReactNode, Suspense, useEffect, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { ErrorIcon } from '@/components/ui/error-state'
@@ -22,12 +22,13 @@ import {
   sshFailureMessage
 } from './boot-failure-reauth'
 
-// The recovery "Gateway settings" view embeds the real Settings → Gateway panel
-// (identical URL/auth/test/save controls — no parallel form to drift). Lazy so
-// it stays out of the always-mounted overlay's bundle until opened.
-const GatewaySettings = lazy(() =>
-  import('@/app/settings/gateway-settings').then(module => ({ default: module.GatewaySettings }))
-)
+interface BootFailureOverlayProps {
+  /** The Settings → Gateway panel shown by the recovery surface. Injected by
+   *  the host (app/contrib/wiring, the only render site) as a lazy component so
+   *  the overlay never imports an app screen and the code-split stays put.
+   *  Absent — or not yet resolved — the slot renders nothing. */
+  GatewaySettingsView?: ComponentType<{ embedded?: boolean }>
+}
 
 type BusyAction = 'local' | 'repair' | 'retry' | 'signin' | null
 type RecoveryView = 'connect' | 'recovery'
@@ -43,7 +44,7 @@ type RecoveryView = 'connect' | 'recovery'
 // exited during startup, bootstrap latched, …). Without this the app shell
 // renders dead — "gateway offline", no composer, only a toast — with no way
 // to retry, repair the install, switch the gateway, or find the logs.
-export function BootFailureOverlay() {
+export function BootFailureOverlay({ GatewaySettingsView }: BootFailureOverlayProps) {
   const boot = useStore($desktopBoot)
   const onboarding = useStore($desktopOnboarding)
   const { t } = useI18n()
@@ -366,9 +367,11 @@ export function BootFailureOverlay() {
             {copy.back}
           </button>
           <div className="min-h-0 flex-1 pt-4">
-            <Suspense fallback={<Loader className="mx-auto my-16 size-6 text-(--ui-text-tertiary)" />}>
-              <GatewaySettings embedded />
-            </Suspense>
+            {GatewaySettingsView ? (
+              <Suspense fallback={<Loader className="mx-auto my-16 size-6 text-(--ui-text-tertiary)" />}>
+                <GatewaySettingsView embedded />
+              </Suspense>
+            ) : null}
           </div>
         </div>
       </div>

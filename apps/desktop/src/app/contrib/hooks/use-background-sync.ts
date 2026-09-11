@@ -8,6 +8,7 @@ import { type ProfileScope } from '@/hermes'
 import { preserveLocalAssistantErrors, sealOpenToolParts, toChatMessages } from '@/lib/chat-messages'
 import { createClientSessionState } from '@/lib/chat-runtime'
 import { sessionMessagesSignature } from '@/lib/session-signatures'
+import { liveRuntimeIds, setLiveRuntimeIds } from '@/store/live-runtime-tracking'
 import { $changeEventsAvailable, $cronChangeTick, $sessionsChangeTick } from '@/store/live-sync'
 import { $onBattery, batteryPollInterval } from '@/store/power'
 import { refreshProjectTree } from '@/store/projects'
@@ -330,16 +331,11 @@ interface LiveSessionStatusResponse {
   sessions?: LiveSessionStatusItem[]
 }
 
-// Runtime ids this poll has seen live, per gateway profile. A profile only
-// ever reaps what its OWN snapshot previously reported: background profiles are
-// served by different gateways and never appear in this profile's active_list,
-// so an unscoped reap would dark out every other profile's running rows.
-const liveRuntimeIdsByProfile = new Map<string, Set<string>>()
-
 // Renderer-wide keyboard warmth, tracked at module scope like the live-runtime
-// bookkeeping above: any keydown anywhere in the window marks activity, and a
-// burst stays warm for TYPING_BURST_QUIET_MS after the last key. IME
-// composition still emits keydown (keyCode 229), so one listener covers both.
+// bookkeeping (store/live-runtime-tracking): any keydown anywhere in the window
+// marks activity, and a burst stays warm for TYPING_BURST_QUIET_MS after the
+// last key. IME composition still emits keydown (keyCode 229), so one listener
+// covers both.
 let lastRendererInputAt = 0
 
 /** Record renderer-wide keyboard activity (wired to a capture-phase window
@@ -444,7 +440,7 @@ export function rehydrateLiveSessionStatuses(
   // path so the busy→idle transition fires — that edge is what clears the
   // spinner AND marks the row unread ("your turn"). Only ids this profile
   // previously saw are eligible, so another profile's live rows are untouched.
-  const previouslyLive = liveRuntimeIdsByProfile.get(profileKey)
+  const previouslyLive = liveRuntimeIds(profileKey)
 
   if (previouslyLive) {
     for (const runtimeSessionId of previouslyLive) {
@@ -473,14 +469,7 @@ export function rehydrateLiveSessionStatuses(
     }
   }
 
-  liveRuntimeIdsByProfile.set(profileKey, seen)
-}
-
-/** Forget every profile's live-runtime bookkeeping. A gateway wipe already
- *  drops the session states these ids point at, so a carried-over set would
- *  only reap runtimes that no longer exist. */
-export function resetLiveRuntimeTracking(): void {
-  liveRuntimeIdsByProfile.clear()
+  setLiveRuntimeIds(profileKey, seen)
 }
 
 interface BackgroundSyncParams {

@@ -156,6 +156,13 @@ const ProfilesView = lazy(async () => ({ default: (await import('../profiles')).
 const SettingsView = lazy(async () => ({ default: (await import('../settings')).SettingsView }))
 const StarmapView = lazy(async () => ({ default: (await import('../starmap')).StarmapView }))
 
+// The boot-failure overlay embeds the real Settings → Gateway panel in its
+// recovery surface; the host hands it over as a prop so the overlay never
+// imports an app screen and the code-split lives here with the other views.
+const GatewaySettingsView = lazy(async () => ({
+  default: (await import('../settings/gateway-settings')).GatewaySettings
+}))
+
 // Surfaces (the four wired panes), the render context + WiredPane, and the
 // WiringActions/WiringApi contracts all live in sibling modules — this file is
 // the controller that assembles them.
@@ -1159,7 +1166,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
       />
       <UpdatesOverlay />
       <GatewayConnectingOverlay />
-      <BootFailureOverlay />
+      <BootFailureOverlay GatewaySettingsView={GatewaySettingsView} />
       <CommandPalette />
       <PluginInstallModal />
       <PetGenerateOverlay />

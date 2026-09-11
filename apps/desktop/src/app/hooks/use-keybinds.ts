@@ -4,7 +4,6 @@ import { useLocation, useNavigate } from 'react-router'
 import { closeActiveTab } from '@/app/chat/close-tab'
 import { composerFocusKeysAllowed, isComposerFocusSoftCombo, typeToFocusChar } from '@/app/chat/composer/focus-keys'
 import { hudTargetSessionId } from '@/app/hud/handoff'
-import { setTerminalTakeover } from '@/app/right-sidebar/store'
 import { closeActiveTerminal, createTerminal, cycleTerminal } from '@/app/right-sidebar/terminal/terminals'
 import { appViewForPath, isOverlayView } from '@/app/routes'
 import { cycleProfile, switchProfileToSlot, switchToDefaultProfile } from '@/application/profile/navigation'
@@ -57,6 +56,7 @@ import {
   switcherJustClosed
 } from '@/store/session-switcher'
 import { toggleStatusbarVisible } from '@/store/statusbar-prefs'
+import { setTerminalTakeover } from '@/store/terminal-takeover'
 import { openNewWindow } from '@/store/windows'
 import { useTheme } from '@/themes/context'
 
