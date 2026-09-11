@@ -1,10 +1,10 @@
 import { atom } from 'nanostores'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { NO_PROJECT_ID, type SidebarProjectTree } from '@/app/chat/sidebar/projects/workspace-groups'
 import { $sidebarAgentsGrouped, setSidebarAgentsGrouped } from '@/store/layout'
 import { $activeGatewayProfile } from '@/store/profile/runtime-route-state'
 import { $profileScope, ALL_PROFILES, setShowAllProfiles } from '@/store/profile/sidebar-scope'
+import { NO_PROJECT_ID, type SidebarProjectTree } from '@/store/projects/membership'
 import { $currentCwd, $selectedStoredSessionId, $sessions, applyConfiguredDefaultProjectDir } from '@/store/session'
 
 import {

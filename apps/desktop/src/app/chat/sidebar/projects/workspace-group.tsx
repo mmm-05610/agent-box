@@ -14,6 +14,7 @@ import { useStoreSelector } from '@/lib/use-session-slice'
 import { setWorkspaceNodeOpen } from '@/store/layout'
 import { notifyError } from '@/store/notifications'
 import { switchBranchInRepo } from '@/store/projects'
+import type { SidebarSessionGroup } from '@/store/projects/membership'
 import { $sessionProfilesUsage } from '@/store/session'
 import { $sidebarSessionRankIds } from '@/store/sidebar-sort'
 
@@ -21,7 +22,6 @@ import { SidebarGroupRow, SidebarRowLead, SidebarRowLink, SidebarRowStack } from
 import { rankSessions } from '../order'
 
 import { PROJECT_PREVIEW_COUNT, SIDEBAR_GROUP_PAGE, useWorkspaceNodeOpen } from './model'
-import type { SidebarSessionGroup } from './workspace-groups'
 import {
   WorkspaceAddButton,
   WorkspaceContextMenu,

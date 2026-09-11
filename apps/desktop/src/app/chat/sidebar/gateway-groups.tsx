@@ -23,6 +23,7 @@ import type { SessionInfo } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { useStoreSelector } from '@/lib/use-session-slice'
 import { $connectionsRegistry } from '@/store/connection-registry-state'
+import type { SidebarSessionGroup } from '@/store/projects/membership'
 import { $sessionProfilesUsage } from '@/store/session'
 import { $sidebarSessionRankIds } from '@/store/sidebar-sort'
 
@@ -37,7 +38,6 @@ import {
 } from './gateway-group-preferences'
 import { rankSessions } from './order'
 import { SIDEBAR_GROUP_PAGE } from './projects/model'
-import type { SidebarSessionGroup } from './projects/workspace-groups'
 import { WorkspaceAddButton, WorkspaceShowMoreButton } from './projects/workspace-header'
 import { ReorderableList, useSortableBindings } from './reorderable-list'
 

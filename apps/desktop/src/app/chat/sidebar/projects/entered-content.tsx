@@ -12,18 +12,13 @@ import { displayPath } from '@/lib/display-path'
 import { $dismissedWorktreeIds, $removedWorktreeIds, dismissWorktree, setWorkspaceNodeOpen } from '@/store/layout'
 import { notifyError } from '@/store/notifications'
 import { removeWorktreePath } from '@/store/projects'
+import type { SidebarProjectTree, SidebarSessionGroup, SidebarWorkspaceTree } from '@/store/projects/membership'
 
 import { SidebarRowStack } from '../chrome'
 
 import { useWorkspaceNodeOpen } from './model'
 import { SidebarWorkspaceGroup } from './workspace-group'
-import {
-  mergeRepoWorktreeGroups,
-  overlayRepoLanes,
-  type SidebarProjectTree,
-  type SidebarSessionGroup,
-  type SidebarWorkspaceTree
-} from './workspace-groups'
+import { mergeRepoWorktreeGroups, overlayRepoLanes } from './workspace-groups'
 import { WorkspaceAddButton, WorkspaceHeader } from './workspace-header'
 
 // The entered project's body. Main-checkout sessions render directly — no

@@ -1,8 +1,9 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
+import type { SidebarProjectTree } from '@/store/projects/membership'
+
 import { ProjectMenu } from './project-menu'
-import type { SidebarProjectTree } from './workspace-groups'
 
 afterEach(cleanup)
 

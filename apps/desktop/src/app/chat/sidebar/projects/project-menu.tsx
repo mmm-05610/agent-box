@@ -31,9 +31,9 @@ import {
   setActiveProject,
   setProjectAppearance
 } from '@/store/projects'
+import type { SidebarProjectTree } from '@/store/projects/membership'
 
 import { ProjectAppearancePicker } from './project-appearance'
-import type { SidebarProjectTree } from './workspace-groups'
 
 // Shared per-project state + handlers, so the kebab dropdown and the row's
 // right-click menu drive the exact same actions. Modeled on git GUIs (GitHub

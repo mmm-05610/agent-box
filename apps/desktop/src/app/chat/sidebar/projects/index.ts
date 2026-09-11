@@ -12,14 +12,17 @@ export { ProjectMenu } from './project-menu'
 export { SidebarWorkspaceGroup } from './workspace-group'
 export {
   excludeProjectSessions,
-  liveSessionProjectId,
   overlayLiveLanes,
   overlayLivePreviews,
   reconcileEnteredProjectSessions,
   sessionMatchesProjectFilter,
-  sessionRecency,
+  sessionRecency
+} from './workspace-groups'
+export { StartWorkButton } from './workspace-header'
+// The membership core lives in `store/`; the tree-building half stays local.
+export {
+  liveSessionProjectId,
   type SidebarProjectTree,
   type SidebarSessionGroup,
   type SidebarWorkspaceTree
-} from './workspace-groups'
-export { StartWorkButton } from './workspace-header'
+} from '@/store/projects/membership'

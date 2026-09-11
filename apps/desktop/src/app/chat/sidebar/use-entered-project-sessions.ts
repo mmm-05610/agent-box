@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import { fetchProjectSessions } from '@/store/projects'
-
-import type { SidebarProjectTree } from './projects/workspace-groups'
+import type { SidebarProjectTree } from '@/store/projects/membership'
 
 // The mounted drill-in owns its outcome. A global error flag lets a departed
 // project's slow failure overwrite the next project's successful load.
