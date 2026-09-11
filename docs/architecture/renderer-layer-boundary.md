@@ -146,6 +146,14 @@ instead — `lib/keybinds/` failed it badly.
 relocation. Its own document says so, and its stop conditions are the ones worth
 respecting.
 
+A fifth document in that directory,
+[`05-hermes-barrel-removal.md`](renderer-layer-batches/05-hermes-barrel-removal.md),
+removes the `@/hermes` compatibility barrel. It is **not** layer debt and pays off
+none of the 97 edges — `@/hermes` is a rank-0 root module, so every import of it is
+already downward. It is recorded alongside these because it is mechanical work of
+the same character, and because it touches 240 files and therefore has to be
+sequenced against these four rather than interleaved.
+
 Do not widen the ledger to make an item land. If a move needs an unlisted edge,
 stop and report: the batch is wrong, not the guard.
 

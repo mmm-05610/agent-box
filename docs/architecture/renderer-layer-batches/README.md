@@ -21,6 +21,17 @@ knots described in
 [`../renderer-layer-boundary.md`](../renderer-layer-boundary.md), not in more
 batches like these.
 
+## Batch 05 is a different objective
+
+[`05-hermes-barrel-removal.md`](05-hermes-barrel-removal.md) removes the
+`@/hermes` compatibility barrel. It pays off **no** ledger entry and is not part
+of the 15 above — it is in this directory so the eventual policy document sees
+the whole mechanical stack in one place, and because it shares this file's rules.
+
+It has one ordering constraint that matters: it touches 240 files, so it must run
+**entirely before or entirely after** batches 01–04, never interleaved. Batch 05's
+own document argues for doing it first.
+
 ## Run them in order, one at a time
 
 Not a style preference — two batches edit the same files. `01` and `03` both
