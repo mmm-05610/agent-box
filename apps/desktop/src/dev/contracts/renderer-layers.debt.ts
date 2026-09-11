@@ -16,21 +16,13 @@
 // work gets scheduled: a `lib/` batch, a `store/` batch, and so on.
 
 export const DEBT_LEDGER: readonly string[] = [
-  // components/ — 2
+  // components/ — 1
   'components/assistant-ui/thread/user-edit-composer.tsx -> @/app/session/hooks/use-prompt-actions',
-  'components/boot-failure-overlay.tsx -> @/app/settings/gateway-settings',
-
-  // extension/ — 3
-  'extension/sdk/index.ts -> @/app/settings/toolset-config-panel',
-  'extension/sdk/index.ts -> @/app/skills',
-  'extension/sdk/index.ts -> @/app/skills/mcp-tab',
 
   // lib/ — 1
   'lib/session-project-label.ts -> @/app/chat/sidebar/projects/workspace-groups',
 
-  // store/ — 4
-  'store/gateway-switch.ts -> @/app/contrib/hooks/use-background-sync',
-  'store/pane-focus.ts -> @/app/right-sidebar/store',
+  // store/ — 2
   'store/projects/crud.ts -> @/app/chat/new-session-drag',
   'store/projects/dialogs.ts -> @/app/chat/new-session-drag',
 ]
