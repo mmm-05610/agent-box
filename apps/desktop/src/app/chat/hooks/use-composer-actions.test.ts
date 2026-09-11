@@ -1,11 +1,10 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import type { DroppedFile } from '@/lib/composer/types'
 import { $composerAttachments, updateComposerAttachment } from '@/store/composer'
 import { $connection } from '@/store/session'
 import type { ComposerAttachment } from '@/types/composer'
-
-import type { DroppedFile } from '../composer/types'
 
 import {
   attachmentPreviewDataUrl,

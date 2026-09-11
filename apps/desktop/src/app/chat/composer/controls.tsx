@@ -4,13 +4,13 @@ import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
 import { Tip, TipKeybindLabel } from '@/components/ui/tooltip'
 import { useI18n } from '@/i18n'
+import type { ChatBarState } from '@/lib/composer/types'
 import { iconSize, Layers3 } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 import { $hudMode, closeHud, resetHudLayout } from '@/store/hud'
 
 import { GHOST_ICON_BTN, PRIMARY_ICON_BTN } from './control-classes'
 import { ModelPill } from './model-pill'
-import type { ChatBarState } from './types'
 
 // Re-exported: `context-menu.tsx` and other row neighbours have always reached
 // for these here, and the row is where they read as belonging.

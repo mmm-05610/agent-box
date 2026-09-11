@@ -2,11 +2,12 @@ import type { Unstable_TriggerItem } from '@assistant-ui/core'
 import { act, renderHook } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
+import { pathifyRefs } from '@/components/composer/path-refs'
+import { linkifyUrls } from '@/components/composer/url-refs'
+
 import { useComposerTrigger } from './hooks/use-composer-trigger'
-import { pathifyRefs } from './path-refs'
 import { composerPlainText, insertComposerContentsAtCaret, RICH_INPUT_SLOT } from './rich-editor'
 import { detectTrigger, openDirectiveScope, textBeforeCaret } from './text-utils'
-import { linkifyUrls } from './url-refs'
 
 function folderItem(rel: string): Unstable_TriggerItem {
   const rawText = `@folder:${rel}/`

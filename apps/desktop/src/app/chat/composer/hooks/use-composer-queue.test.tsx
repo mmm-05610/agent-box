@@ -1,6 +1,7 @@
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import type { ChatBarProps } from '@/lib/composer/types'
 import {
   $parkedQueueSessions,
   $queuedPromptsBySession,
@@ -13,7 +14,6 @@ import {
 import { setSessionsLoading } from '@/store/session'
 
 import type { QueueEditState } from '../composer-utils'
-import type { ChatBarProps } from '../types'
 
 import { useComposerQueue } from './use-composer-queue'
 

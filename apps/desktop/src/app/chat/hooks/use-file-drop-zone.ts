@@ -1,9 +1,8 @@
 import { type DragEvent as ReactDragEvent, useCallback, useEffect, useRef, useState } from 'react'
 
-import { dragHasAttachments } from '@/app/chat/composer/inline-refs'
+import { dragHasAttachments } from '@/components/composer/inline-refs'
+import type { DroppedFile } from '@/lib/composer/types'
 import { ESCAPE_PRIORITY, pushEscapeLayer } from '@/lib/escape-layers'
-
-import type { DroppedFile } from '../composer/types'
 
 import { extractDroppedFiles, HERMES_PATHS_MIME } from './use-composer-actions'
 

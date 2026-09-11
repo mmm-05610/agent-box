@@ -14,7 +14,6 @@ import {
 } from 'react'
 
 import { ComposerDirectiveActions } from '@/app/chat/composer/directive-actions'
-import { COMPOSER_DROP_ACTIVE_CLASS, COMPOSER_DROP_FADE_CLASS } from '@/app/chat/composer/drop-affordance'
 import {
   type ComposerInsertMode,
   focusComposerInput,
@@ -25,16 +24,7 @@ import {
 } from '@/app/chat/composer/focus'
 import { useAtCompletions } from '@/app/chat/composer/hooks/use-at-completions'
 import { rebuildAroundCaret, triggerKeyUpHandler } from '@/app/chat/composer/hooks/use-composer-trigger'
-import { useComposerUndo } from '@/app/chat/composer/hooks/use-composer-undo'
-import { useEmojiCompletions } from '@/app/chat/composer/hooks/use-emoji-completions'
 import { useSlashCompletions } from '@/app/chat/composer/hooks/use-slash-completions'
-import {
-  dragHasAttachments,
-  droppedFileInlineRefs,
-  type InlineRefInput,
-  insertInlineRefsIntoEditor
-} from '@/app/chat/composer/inline-refs'
-import { chipTypedPathOnSpace, pathifyRefs } from '@/app/chat/composer/path-refs'
 import {
   composerPlainText,
   insertComposerContentsAtCaret,
@@ -46,8 +36,6 @@ import {
 } from '@/app/chat/composer/rich-editor'
 import { detectTrigger, openDirectiveScope, textBeforeCaret, type TriggerState } from '@/app/chat/composer/text-utils'
 import { ComposerTriggerPopover } from '@/app/chat/composer/trigger-popover'
-import { isRedoShortcut, isUndoShortcut } from '@/app/chat/composer/undo-history'
-import { chipTypedUrlOnSpace, linkifyUrls } from '@/app/chat/composer/url-refs'
 import {
   extractDroppedFiles,
   HERMES_PATHS_MIME,
@@ -63,11 +51,23 @@ import {
   USER_ACTION_ICON_SIZE,
   USER_BUBBLE_BASE_CLASS
 } from '@/components/assistant-ui/thread/user-message'
+import { useComposerUndo } from '@/components/composer/hooks/use-composer-undo'
+import {
+  dragHasAttachments,
+  droppedFileInlineRefs,
+  type InlineRefInput,
+  insertInlineRefsIntoEditor
+} from '@/components/composer/inline-refs'
+import { chipTypedPathOnSpace, pathifyRefs } from '@/components/composer/path-refs'
+import { chipTypedUrlOnSpace, linkifyUrls } from '@/components/composer/url-refs'
 import { Codicon } from '@/components/ui/codicon'
 import type { HermesGateway } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { attachmentDisplayText, attachmentId, pathLabel } from '@/lib/chat-runtime'
 import { sanitizeComposerInput } from '@/lib/composer-input-sanitize'
+import { COMPOSER_DROP_ACTIVE_CLASS, COMPOSER_DROP_FADE_CLASS } from '@/lib/composer/drop-affordance'
+import { useEmojiCompletions } from '@/lib/composer/hooks/use-emoji-completions'
+import { isRedoShortcut, isUndoShortcut } from '@/lib/composer/undo-history'
 import { DATA_IMAGE_URL_RE } from '@/lib/embedded-images'
 import { triggerHaptic } from '@/lib/haptics'
 import { Loader2Icon } from '@/lib/icons'

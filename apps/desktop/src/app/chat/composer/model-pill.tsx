@@ -9,6 +9,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/compon
 import { GlyphSpinner } from '@/components/ui/glyph-spinner'
 import { Tip } from '@/components/ui/tooltip'
 import { useI18n } from '@/i18n'
+import type { ChatBarState } from '@/lib/composer/types'
 import { ChevronDown } from '@/lib/icons'
 import { formatModelStatusLabel } from '@/lib/model-status-label'
 import { releaseTypingFocus } from '@/lib/typing-focus'
@@ -17,7 +18,6 @@ import { $currentModelSource, $defaultReasoningEffort, setModelPickerOpen } from
 
 import { onComposerModelMenuRequest } from './focus'
 import { useComposerScope } from './scope'
-import type { ChatBarState } from './types'
 
 // `shrink` (not `shrink-0`) with a truncating label: the pill is the one
 // control in the row that can give width back continuously, so it absorbs the

@@ -9,9 +9,11 @@ import '@/store/suggestion-providers/skill'
 import { useAui, useAuiState, useComposerRuntime } from '@assistant-ui/react'
 import { type RefObject, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
+import { type InlineRefInput, insertInlineRefsIntoEditor } from '@/components/composer/inline-refs'
 import { usePaneVisible } from '@/components/pane-shell/pane-visibility'
 import { SLASH_COMMAND_RE } from '@/lib/chat-runtime'
 import { sanitizeComposerInput } from '@/lib/composer-input-sanitize'
+import type { ChatBarProps } from '@/lib/composer/types'
 import { type ComposerDraftSyncMode, onComposerDraftSyncRequest, reloadPersistedDrafts, stashSessionDraft, takeSessionDraft } from '@/store/composer'
 import { isBrowsingHistory } from '@/store/composer-input-history'
 import { clearDraftSuggestions, sampleComposerDraft } from '@/store/composer-suggestions'
@@ -32,7 +34,6 @@ import {
   onComposerInsertRequest,
   releaseActiveComposer
 } from '../focus'
-import { type InlineRefInput, insertInlineRefsIntoEditor } from '../inline-refs'
 import {
   composerPlainText,
   normalizeComposerEditorDom,
@@ -41,7 +42,6 @@ import {
   renderComposerContents
 } from '../rich-editor'
 import { useComposerScope } from '../scope'
-import type { ChatBarProps } from '../types'
 
 interface UseComposerDraftArgs {
   activeQueueSessionKey: string | null
