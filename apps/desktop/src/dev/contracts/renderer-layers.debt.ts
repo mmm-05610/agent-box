@@ -47,8 +47,7 @@ export const DEBT_LEDGER: readonly string[] = [
   'extension/sdk/index.ts -> @/app/skills',
   'extension/sdk/index.ts -> @/app/skills/mcp-tab',
 
-  // lib/ — 12
-  'lib/external-link.tsx -> @/store/preview',
+  // lib/ — 11
   'lib/guarded-model-switch.ts -> @/store/notifications',
   'lib/keybinds/composer-focus-keys.ts -> @/app/routes',
   'lib/keybinds/composer-focus-keys.ts -> @/store/pane-shell/tree',
