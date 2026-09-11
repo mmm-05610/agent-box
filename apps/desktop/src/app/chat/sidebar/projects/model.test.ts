@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
+import { NO_PROJECT_ID, type SidebarProjectTree } from '@/store/projects/membership'
+
 import { orderProjectsByIds, sortProjectsForOverview } from './model'
-import { NO_PROJECT_ID, type SidebarProjectTree } from './workspace-groups'
 
 function makeProject(id: string, sessionCount: number): SidebarProjectTree {
   return {

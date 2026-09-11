@@ -1,8 +1,8 @@
 import { computed } from 'nanostores'
 
-import { sessionProjectColor } from '@/app/chat/sidebar/projects/workspace-groups'
 import { Codecs, persistentAtom } from '@/lib/persisted'
 import { $projects } from '@/store/projects'
+import { sessionProjectColor } from '@/store/projects/membership'
 import { $sessions, sessionPinId } from '@/store/session'
 import type { ProjectInfo, SessionInfo } from '@/types/hermes'
 

@@ -3,9 +3,9 @@ import type { ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { SessionInfo } from '@/hermes'
+import type { SidebarProjectTree } from '@/store/projects/membership'
 
 import { ProjectOverviewRow } from './overview-row'
-import type { SidebarProjectTree } from './workspace-groups'
 
 afterEach(cleanup)
 

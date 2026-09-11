@@ -5,7 +5,6 @@ import type { MutableRefObject } from 'react'
 import { useEffect, useRef } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { NO_PROJECT_ID } from '@/app/chat/sidebar/projects/workspace-groups'
 import { resolveSessionRpcOwner } from '@/app/contrib/wiring-routing'
 import { $terminalTakeover, setTerminalTakeover } from '@/app/right-sidebar/store'
 import { ensureGatewayProfile } from '@/application/profile/runtime-selection'
@@ -28,6 +27,7 @@ import { requestGatewayForAgent, requestGatewayForProfile } from '@/store/gatewa
 import { $pinnedSessionIds } from '@/store/layout'
 import { $activeGatewayProfile, $newChatProfile, $newChatRoute, $profiles } from '@/store/profile'
 import { $projectScope, $projectTree, ALL_PROJECTS } from '@/store/projects'
+import { NO_PROJECT_ID } from '@/store/projects/membership'
 import {
   $activeSessionId,
   $activeSessionStoredIdRotation,

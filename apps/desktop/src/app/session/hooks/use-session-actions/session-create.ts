@@ -1,6 +1,5 @@
 import { useCallback } from 'react'
 
-import { NO_PROJECT_ID } from '@/app/chat/sidebar/projects/workspace-groups'
 import { ensureGatewayAgent } from '@/application/profile/gateway-routing'
 import { resolveNewChatOwnerRoute } from '@/application/profile/new-session'
 import { ensureGatewayProfile } from '@/application/profile/runtime-selection'
@@ -12,6 +11,7 @@ import { requestGatewayForAgent, retainGatewayForAgent } from '@/store/gateway'
 import { notify, notifyError } from '@/store/notifications'
 import { $activeGatewayProfile, $newChatProfile, type AgentProfileRoute, normalizeProfileKey } from '@/store/profile'
 import { $projectScope, resolveNewSessionCwd } from '@/store/projects'
+import { NO_PROJECT_ID } from '@/store/projects/membership'
 import {
   $currentCwd,
   $currentFastMode,

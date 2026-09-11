@@ -5,8 +5,7 @@ import type { SessionInfo } from '@/hermes'
 import { resolveProfileColor } from '@/lib/profile-color'
 import { $connectionsRegistry } from '@/store/connection-registry-state'
 import { $profileColors, normalizeProfileKey } from '@/store/profile'
-
-import type { SidebarSessionGroup } from './projects/workspace-groups'
+import type { SidebarSessionGroup } from '@/store/projects/membership'
 
 /** Group identity never depends on a mutable label, URL, or the active gateway. */
 export function useGatewaySessionGroups(sessions: SessionInfo[], enabled: boolean) {

@@ -9,6 +9,7 @@ import type { SessionInfo } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
 import { $sidebarShowAllSessions } from '@/store/layout'
+import type { SidebarProjectTree } from '@/store/projects/membership'
 
 import {
   SIDEBAR_LEAD_ICON_SIZE,
@@ -25,7 +26,6 @@ import {
 
 import { latestProjectSessions, PROJECT_PREVIEW_COUNT, useWorkspaceNodeOpen } from './model'
 import { ProjectContextMenu, ProjectMenu } from './project-menu'
-import type { SidebarProjectTree } from './workspace-groups'
 import { WorkspaceAddButton } from './workspace-header'
 
 // A bare color dot (no icon) or an icon glyph — tinted by `color` when set, else

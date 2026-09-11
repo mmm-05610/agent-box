@@ -1,5 +1,4 @@
 import type { NewSessionPlacement } from '@/app/chat/new-session-drag'
-import { liveSessionProjectId, type SidebarProjectTree } from '@/app/chat/sidebar/projects/workspace-groups'
 import {
   writeDesktopFileText
 } from '@/lib/desktop-fs'
@@ -8,6 +7,7 @@ import { normalizeProfileKey } from '@/lib/profile-identity'
 import { setSidebarAgentsGrouped } from '@/store/layout'
 import { requestFreshSession } from '@/store/profile/request-atoms'
 import { $activeGatewayProfile } from '@/store/profile/runtime-route-state'
+import { liveSessionProjectId, type SidebarProjectTree } from '@/store/projects/membership'
 import { $selectedStoredSessionId, $sessions, sessionMatchesStoredId } from '@/store/session'
 import type { ProjectInfo, ProjectsPayload } from '@/types/hermes'
 

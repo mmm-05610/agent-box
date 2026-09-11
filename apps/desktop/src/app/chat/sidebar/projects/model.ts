@@ -7,8 +7,9 @@ import { desktopGit } from '@/lib/desktop-git'
 import { mapPool } from '@/lib/pool'
 import { $sidebarWorkspaceNodeOpen, toggleWorkspaceNodeCollapsed } from '@/store/layout'
 import { $worktreeRefreshToken } from '@/store/projects'
+import type { SidebarProjectTree } from '@/store/projects/membership'
 
-import { sessionRecency, type SidebarProjectTree } from './workspace-groups'
+import { sessionRecency } from './workspace-groups'
 
 // Page size when revealing more already-loaded rows within a workspace group.
 export const SIDEBAR_GROUP_PAGE = 5
