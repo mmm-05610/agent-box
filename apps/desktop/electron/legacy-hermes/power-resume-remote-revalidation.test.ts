@@ -1,8 +1,9 @@
-import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it, vi } from 'vitest'
+
+import { mainProcessSources } from '../test-main-process-sources'
 
 import {
   attachPowerResumeRemoteRevalidation,
@@ -12,7 +13,13 @@ import {
 } from './remote-liveness'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
-const mainSource = fs.readFileSync(path.join(here, '..', 'main.ts'), 'utf8').replace(/\r\n/g, '\n')
+/**
+ * The wiring these assertions describe now spans two modules (the host half in
+ * `app/power-state.ts`, the Hermes half in `main.ts`), so scan the whole
+ * main-process tree rather than main.ts alone. Reading only main.ts is exactly
+ * how a moved call site turns into a silently passing test.
+ */
+const mainSource = mainProcessSources()
 
 describe('revalidateSuspectPooledRemoteBackends (#93910)', () => {
   const descriptor = (baseUrl: string) => ({ baseUrl, mode: 'remote' })
@@ -261,12 +268,26 @@ describe('attachPowerResumeRemoteRevalidation (#93910)', () => {
 
 describe('main.ts wiring for #93910', () => {
   it('registers the suspect-pool revalidation on powerMonitor resume/unlock', () => {
-    const fnStart = mainSource.indexOf('function registerPowerResumeListeners()')
-    expect(fnStart).toBeGreaterThan(-1)
-    const body = mainSource.slice(fnStart, mainSource.indexOf('\nfunction ', fnStart + 1))
+    // Two halves, and both must hold. The host half lives in app/power-state.ts
+    // since E5b: it is the module that subscribes to powerMonitor. The Hermes
+    // half is injected from main.ts, because only the composition root knows
+    // which pooled backends need revalidating. Asserting either half alone would
+    // pass with the feature disconnected.
+    const hostStart = mainSource.indexOf("powerMonitor.on('resume', sendResume)")
+    expect(hostStart).toBeGreaterThan(-1)
 
-    expect(body).toContain('attachPowerResumeRemoteRevalidation(')
-    expect(body).toContain('revalidateSuspectPoolAfterResume()')
+    // Wide enough for the four subscriptions plus the comment that explains why
+    // the injected hook exists; the point is that all of them are in ONE block.
+    const hostBody = mainSource.slice(hostStart, hostStart + 1_200)
+    expect(hostBody).toContain("powerMonitor.on('unlock-screen', sendResume)")
+    expect(hostBody).toContain('attachRemoteRevalidation()')
+
+    const wiring = mainSource.indexOf('attachRemoteRevalidation: () =>')
+    expect(wiring).toBeGreaterThan(-1)
+
+    const wiringBody = mainSource.slice(wiring, wiring + 300)
+    expect(wiringBody).toContain('attachPowerResumeRemoteRevalidation(')
+    expect(wiringBody).toContain('revalidateSuspectPoolAfterResume()')
   })
 
   it('drives suspect revalidation through the shared coordinator, teardown and claimed re-dial primitives', () => {

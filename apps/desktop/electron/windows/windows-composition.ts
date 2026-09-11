@@ -20,7 +20,7 @@ import {
   rememberLog
 } from '../app/log-buffer'
 import { attachRendererConsoleCapture } from '../app/renderer-log'
-import { APP_NAME, DEV_SERVER, getAppIconPath, HUD_WINDOW_TITLE, INSTALL_STAMP, loadWindowUrl, mainWindow, openExternalUrl, petOverlayWindow, PRELOAD_PATH, RENDERER_RELOAD_MAX, RENDERER_RELOAD_WINDOW_MS, rendererReloadTimesRef, resolveRendererIndex, resolveUpdateRoot, runGit, sendClosePreviewRequested, sendPreviewNavCommand, sendWindowStateChanged, setAndPersistZoomLevel, setPetOverlayWindow, streamThrottle, toggleDevTools, WINDOW_BUTTON_POSITION, wireCommonWindowHandlers, wireWindowReveal, writeFileAtomic } from '../composition/bootstrap-env-composition'
+import { APP_NAME, DEV_SERVER, getAppIconPath, HUD_WINDOW_TITLE, INSTALL_STAMP, loadWindowUrl, mainWindow, openExternalUrl, petOverlayWindow, PRELOAD_PATH, readWindowState, RENDERER_RELOAD_MAX, RENDERER_RELOAD_WINDOW_MS, rendererReloadTimesRef, resolveRendererIndex, resolveUpdateRoot, runGit, sendClosePreviewRequested, sendPreviewNavCommand, sendWindowStateChanged, setAndPersistZoomLevel, setPetOverlayWindow, streamThrottle, toggleDevTools, WINDOW_BUTTON_POSITION, wireCommonWindowHandlers, wireWindowReveal, writeFileAtomic } from '../composition/bootstrap-env-composition'
 import {
   resolveRequestedPathForIpc
 } from '../host-capabilities/filesystem/hardening'
@@ -29,10 +29,6 @@ import { enumerateWindowsFrontToBack, enumerationFailed } from '../host-capabili
 import {
   resolveHermesVersion,
 } from '../legacy-hermes/paths'
-import {
-  hudBounds,
-  nextInstanceBounds,
-} from '../main'
 import { detectBundleSkew } from '../update/bundle-skew'
 
 import {
@@ -44,6 +40,7 @@ import {
 } from './browser-windows'
 import { cursorPointInWindow } from './hud-cursor'
 import { startHudGameOverlayWatch } from './hud-game-overlay'
+import { applyHudResetBounds, defaultHudBounds } from './hud-geometry'
 import { applyHudElectronOverlay, promoteHudOverlay } from './hud-overlay'
 import { snapHudBounds } from './hud-snap'
 import { createHudSnapShortcut } from './hud-snap-shortcut'
@@ -53,11 +50,13 @@ import { createQuickEntryShortcut, quickEntryWindowBounds } from './quick-entry'
 import {
   buildInstanceWindowUrl,
   chatWindowWebPreferences,
-  createSessionWindowRegistry
+  createSessionWindowRegistry,
+  instanceWindowBounds
 } from './session-windows'
 import { installWindowRendererLifecycle } from './window-renderer-lifecycle'
 import {
   bindGeometryPersistence,
+  computeWindowOptions,
   debounce,
   MIN_HEIGHT as WINDOW_MIN_HEIGHT,
   MIN_WIDTH as WINDOW_MIN_WIDTH
@@ -329,6 +328,16 @@ export function focusWindow(win) {
 }
 
 export const browserWindows = createSessionWindowRegistry()
+
+/**
+ * Open (or focus) the browser pop-out for a tab id.
+ *
+ * Moved here from `main.ts` (E5b): it is the registry's own open-through, so it
+ * belongs beside the registry and the spawner instead of in the composition root.
+ */
+export function createBrowserWindow(tabId: string) {
+  return browserWindows.openOrFocus(tabId, () => spawnBrowserWindow(tabId))
+}
 
 export function notifyBrowserPopoutClosed(tabId) {
   if (typeof tabId !== 'string' || !tabId) {
@@ -1217,3 +1226,115 @@ export function getQuickEntryLastState() {
 export function setQuickEntryLastState(value: any) {
   quickEntryLastState = value
 }
+
+interface InstancePlacementDeps {
+  /** The HUD window, if it exists. */
+  getHudWindow: () => any
+  /** The primary window, used when nothing is focused. */
+  getMainWindow: () => null | undefined | { getBounds: () => any; isDestroyed: () => boolean }
+  log: (line: string) => void
+  persistHudState: () => void
+  readHudState: () => null | undefined | { height: number; width: number; x: number; y: number }
+  /** Situate a new instance window relative to an existing one. */
+  instanceWindowBounds: (base: null | { height: number; width: number; x: number; y: number }, fallback: any) => any
+}
+
+interface InstancePlacement {
+  /** Bounds for a new instance window, offset from the focused window. */
+  nextInstanceBounds(): any
+  /** Bounds for the HUD: its remembered spot when still on-screen, else the default. */
+  hudBounds(): any
+  /** Snap the HUD back to the default position for its display. */
+  resetHudLayout(): boolean
+}
+
+/**
+ * Where a new instance window lands, where the HUD goes back to, and the reset
+ * that snaps it there.
+ *
+ * Extracted from `main.ts` (E5b) into this module rather than a new one because
+ * they are the HUD/instance registries' own placement policy: `windows-composition`
+ * already owns `readHudState`/`persistHudState`/`getHudWindow` and the instance
+ * bounds helper, and a separate module would have made the two import each other.
+ * A window parked on an unplugged monitor must come back on-screen rather than
+ * vanish, which is the check in `hudBounds`.
+ */
+export function createInstancePlacement(deps: InstancePlacementDeps): InstancePlacement {
+  return {
+    nextInstanceBounds() {
+      const source = BrowserWindow.getFocusedWindow() || deps.getMainWindow()
+      const fallback = computeWindowOptions(readWindowState(), screen.getAllDisplays())
+      const base = source && !source.isDestroyed() ? (source.getBounds() as any) : null
+
+      return deps.instanceWindowBounds(base, fallback)
+    },
+
+    hudBounds() {
+      // Remembered spot first — validated against the LIVE displays so a HUD
+      // parked on an unplugged monitor comes back on-screen instead of lost.
+      const saved = deps.readHudState()
+
+      if (saved) {
+        const onScreen = screen.getAllDisplays().some(d => {
+          const a = d.workArea
+
+          return (
+            saved.x < a.x + a.width - 40 &&
+            saved.x + saved.width > a.x + 40 &&
+            saved.y < a.y + a.height - 40 &&
+            saved.y + saved.height > a.y + 40
+          )
+        })
+
+        if (onScreen) {
+          return saved
+        }
+      }
+
+      const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint())
+
+      return defaultHudBounds(display?.workArea)
+    },
+
+    resetHudLayout(): boolean {
+      const hud = deps.getHudWindow()
+
+      if (!hud || hud.isDestroyed()) {
+        return false
+      }
+
+      const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint())
+      const bounds = defaultHudBounds(display?.workArea)
+
+      if (!applyHudResetBounds(hud, bounds)) {
+        deps.log('[hud-state] reset layout failed while applying native bounds')
+
+        return false
+      }
+
+      deps.persistHudState()
+
+      return true
+    }
+  }
+}
+
+/**
+ * The one placement instance this module's registries use, plus the three verbs
+ * `main.ts` and the IPC layer need. Exported as functions rather than as the
+ * object so callers keep the flat surface they had when these lived in `main.ts`.
+ */
+const instancePlacement = createInstancePlacement({
+  getHudWindow,
+  getMainWindow: () => mainWindow,
+  instanceWindowBounds,
+  log: rememberLog,
+  persistHudState,
+  readHudState
+})
+
+export const nextInstanceBounds = () => instancePlacement.nextInstanceBounds()
+
+export const hudBounds = () => instancePlacement.hudBounds()
+
+export const resetHudWindowLayout = () => instancePlacement.resetHudLayout()

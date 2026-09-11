@@ -153,13 +153,26 @@ describe('main.ts wiring for #90812', () => {
   // (connectionId, profile) scope.
 
   it('routes a media-stream connection resolve through the single-owner claim', () => {
+    // The media handler moved out of main.ts in E5b
+    // (host-capabilities/preview/media-registration.ts), so the resolve it calls
+    // is built from injected deps. The invariant is unchanged: the dial is
+    // coalesced on the scope key, and the two ensure* paths are the ones inside
+    // that coalesced callback rather than beside it.
     const handlerStart = mainSource.indexOf('resolveRemoteConnection: ({ connectionId, profile }) =>')
     expect(handlerStart).toBeGreaterThan(-1)
-    const body = mainSource.slice(handlerStart, handlerStart + 300)
+    const body = mainSource.slice(handlerStart, handlerStart + 400)
 
-    expect(body).toContain('backendDialClaims.run(backendScopeKey(connectionId, profile)')
+    expect(body).toContain('runDedupedBackendDial(')
+    expect(body).toContain('backendScopeKey(connectionId, profile)')
     expect(body).toContain('ensureRegistryBackend(connectionId, profile)')
     expect(body).toContain('ensureBackend(profile)')
+  })
+
+  it('hands the media handler a dial coalesced by the same single-owner claim instance', () => {
+    const wiring = mainSource.indexOf('runDedupedBackendDial: (scopeKey, dial) =>')
+    expect(wiring).toBeGreaterThan(-1)
+
+    expect(mainSource.slice(wiring, wiring + 120)).toContain('backendDialClaims.run(scopeKey, dial)')
   })
 
   it('routes a terminal-pane backend resolve through the single-owner claim on both the registry and local branches', () => {

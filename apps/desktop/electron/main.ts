@@ -3,20 +3,16 @@ import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import tls from 'node:tls'
-import { pathToFileURL } from 'node:url'
 
 import {
   app,
   BrowserWindow,
   dialog,
-  net as electronNet,
   Menu,
   powerMonitor,
   powerSaveBlocker,
-  protocol,
   safeStorage,
-  screen,
-  session
+  screen
 } from 'electron'
 
 import {
@@ -28,6 +24,7 @@ import {
   set_pendingDeepLink,
 } from './app/deep-link-composition'
 import { describeDevCdpDecision } from './app/dev-cdp'
+import { installDownloadHandling as installDownloadHandlingImpl } from './app/downloads'
 import { createEventDeduper } from './app/event-dedupe'
 import {
   cancelScheduledDesktopLogFlush,
@@ -35,8 +32,16 @@ import {
   initDesktopLogBuffer,
   rememberLog
 } from './app/log-buffer'
+import {
+  DISABLE_F12_CONFIG_PATH,
+  KEEP_AWAKE_CONFIG_PATH,
+  readPersistedDisableF12,
+  readPersistedKeepAwake
+} from './app/persisted-flags'
 import { createKeepAwake } from './app/power-save'
+import { createPowerState } from './app/power-state'
 import { type ActiveWork, mergeActiveWork, quitPromptFor } from './app/quit-guard'
+import { configureSpellChecker as configureSpellCheckerImpl } from './app/spellcheck'
 import { USER_DATA_OVERRIDE } from './app/user-data'
 import {
   closePreviewWatchers,
@@ -58,12 +63,10 @@ import {
   teardownConnectionScopedProfileBackend,
   teardownPoolBackendAndWait,
   teardownPrimaryBackendAndWait,
-  TITLE_BYTE_BUDGET,
-  TITLE_USER_AGENT,
   watchDirectory,
   watchPreviewFile,
 } from './composition/api-proxy-composition'
-import { _clearNativeTokens, _storeNativeTokens, activeSshTerminalTarget, applyUpdates, backendConnectionState, backendDialClaims, backendPool, backendShutdown, broadcastBootstrapEvent, closePetOverlay, createSessionWindow, createWindow, decryptDesktopSecret, decryptRemoteHeaders, DEFAULT_UPDATE_BRANCH, defaultProjectDirConfigPath, DESKTOP_LOG_PATH, DEV_CDP, ensureBackend, ensureNativeAccessToken, ensureRegistryBackend, ensureTerminalBackend, exitAfterBackendShutdown, fetchJson, fetchJsonForBackend, fetchJsonViaOauthSession, fetchPublicJson, gatewayAuthProviders, get_rendererReadyForDeepLink, getBackendStartFailure, getBootProgressState, getBootstrapAbortController, getBootstrapFailure, getBootstrapRepairAttempt, getBootstrapRepairRequested, getBootstrapState, getF12Blocked, getFirstRunSetupGate, getIsQuittingForHandoff, getMainWindow, getOauthSession, getOauthSessionForUrl, getPetOverlayWindow, getPoolLimits, getPreviewShortcutActive, getRemoteReauthFailure, getWindowsNoSandboxRelaunchAttempted, getWindowsSandboxFallbackActive, getWindowsSandboxFallbackSticky, GLASS_SUPPORTED, globalRemoteActive, hasLiveOauthSession, hasNativeSession, INSTALL_STAMP, IS_PACKAGED, isPackagedInstallPath, isPrimaryInstance, lastContextMenuPoint, loadInstallStamp, managedConnectionUpdateGate, managedPrimaryRestoreOwners, mintGatewayWsTicket, openExternalUrl, PASSWORD_STORE, postJsonNoAuth, primaryBackendIsRemote, primaryProfileKey, PROFILE_NAME_RE, profileDeletionGate, profileHasRemoteOverride, readActiveDesktopProfile, readDefaultProjectDir, readDesktopConnectionConfig, readDesktopConnectionsRegistry, readDesktopUpdateConfig, readManagedSshRecoveryRecords, readWindowState, rememberRemoteWsHeaders, REMOTE_DISPLAY_REASON, resetBootstrapSnapshot, resolveGitBinary, resolveHermesCwd, resolveRemoteBackend, resolveUpdateRoot, secretStoragePolicy, set_rendererReadyForDeepLink, setAndPersistZoomLevel, setBackendStartFailure, setBootstrapFailure, setBootstrapRepairAttempt, setBootstrapRepairRequested, setF12Blocked, setPreviewShortcutActive, setRemoteReauthFailure, setWindowsNoSandboxRelaunchAttempted, setWindowsSandboxFallbackActive, setWindowsSandboxFallbackReason, setWindowsSandboxFallbackSticky, SKIP_QUIT_CONFIRM, spawnPriorityFrom, sshBootstrapCoordinator, sshConnections, sshRememberLog, sshScopeKey, startHermes, stopPoolBackend, streamThrottle, teardownSshConnection, terminalIpc, TRANSLUCENCY_SUPPORTED, wakeIndicatorController, windowConnectionRoutes, writeActiveDesktopProfile, writeDesktopConnectionConfig, writeDesktopConnectionsRegistry, writeDesktopUpdateConfig } from './composition/bootstrap-env-composition'
+import { _clearNativeTokens, _storeNativeTokens, activeSshTerminalTarget, applyUpdates, backendConnectionState, backendDialClaims, backendPool, backendShutdown, broadcastBootstrapEvent, closePetOverlay, createSessionWindow, createWindow, decryptDesktopSecret, decryptRemoteHeaders, DEFAULT_UPDATE_BRANCH, defaultProjectDirConfigPath, DESKTOP_LOG_PATH, DEV_CDP, ensureBackend, ensureNativeAccessToken, ensureRegistryBackend, ensureTerminalBackend, exitAfterBackendShutdown, fetchJson, fetchJsonForBackend, fetchJsonViaOauthSession, fetchPublicJson, gatewayAuthProviders, get_rendererReadyForDeepLink, getBackendStartFailure, getBootProgressState, getBootstrapAbortController, getBootstrapFailure, getBootstrapRepairAttempt, getBootstrapRepairRequested, getBootstrapState, getF12Blocked, getFirstRunSetupGate, getIsQuittingForHandoff, getMainWindow, getOauthSession, getOauthSessionForUrl, getPetOverlayWindow, getPoolLimits, getPreviewShortcutActive, getRemoteReauthFailure, getWindowsNoSandboxRelaunchAttempted, getWindowsSandboxFallbackActive, getWindowsSandboxFallbackSticky, GLASS_SUPPORTED, globalRemoteActive, hasLiveOauthSession, hasNativeSession, INSTALL_STAMP, IS_PACKAGED, isPackagedInstallPath, isPrimaryInstance, lastContextMenuPoint, loadInstallStamp, managedConnectionUpdateGate, managedPrimaryRestoreOwners, mintGatewayWsTicket, openExternalUrl, PASSWORD_STORE, postJsonNoAuth, primaryBackendIsRemote, primaryProfileKey, PROFILE_NAME_RE, profileDeletionGate, profileHasRemoteOverride, readActiveDesktopProfile, readDefaultProjectDir, readDesktopConnectionConfig, readDesktopConnectionsRegistry, readDesktopUpdateConfig, readManagedSshRecoveryRecords, rememberRemoteWsHeaders, REMOTE_DISPLAY_REASON, resetBootstrapSnapshot, resolveGitBinary, resolveHermesCwd, resolveRemoteBackend, resolveUpdateRoot, secretStoragePolicy, set_rendererReadyForDeepLink, setAndPersistZoomLevel, setBackendStartFailure, setBootstrapFailure, setBootstrapRepairAttempt, setBootstrapRepairRequested, setF12Blocked, setPreviewShortcutActive, setRemoteReauthFailure, setWindowsNoSandboxRelaunchAttempted, setWindowsSandboxFallbackActive, setWindowsSandboxFallbackReason, setWindowsSandboxFallbackSticky, SKIP_QUIT_CONFIRM, spawnPriorityFrom, sshBootstrapCoordinator, sshConnections, sshRememberLog, sshScopeKey, startHermes, stopPoolBackend, streamThrottle, teardownSshConnection, terminalIpc, TRANSLUCENCY_SUPPORTED, wakeIndicatorController, windowConnectionRoutes, writeActiveDesktopProfile, writeDesktopConnectionConfig, writeDesktopConnectionsRegistry, writeDesktopUpdateConfig } from './composition/bootstrap-env-composition'
 import {
   discoverCloudAgents,
   hasLivePortalSession,
@@ -75,6 +78,7 @@ import {
   resolvePortalBaseUrl,
 } from './host-capabilities/credentials/cloud-oauth'
 import { registerMcpOauthCallbackIpc } from './host-capabilities/credentials/mcp-oauth-callback-ipc'
+import { writeComposerImage } from './host-capabilities/filesystem/composer-image'
 import { registerFsIpc } from './host-capabilities/filesystem/fs-ipc'
 import { directoryExists, fileExists } from './host-capabilities/filesystem/fs-probe'
 import {
@@ -82,8 +86,12 @@ import {
   resolveReadableFileForIpc,
   resolveRequestedPathForIpc
 } from './host-capabilities/filesystem/hardening'
+import {
+  sanitizeWorkspaceCwd as sanitizeWorkspaceCwdImpl,
+  writeDefaultProjectDir as writeDefaultProjectDirImpl
+} from './host-capabilities/filesystem/project-dir'
+import { resolveGhBinary } from './host-capabilities/git/gh-binary'
 import { registerGitIpc } from './host-capabilities/git/git-ipc'
-import { findOnPath } from './host-capabilities/platform/executables'
 import { IS_MAC, IS_WINDOWS, IS_WSL } from './host-capabilities/platform/platform-facts'
 import { ensureLoginShellPath } from './host-capabilities/platform/shell-path'
 import { createSshProbeConnection, pickLocalPort } from './host-capabilities/platform/ssh-connection'
@@ -102,11 +110,11 @@ import {
 import { installWindowsSystemCaTrust } from './host-capabilities/platform/windows-system-ca'
 import { ensureWslWindowsFonts } from './host-capabilities/platform/wsl-fonts'
 import { setActiveGatewayProfile, setWslBridgeProfileState } from './host-capabilities/platform/wsl-path-bridge'
-import { type FaviconIo, resolveFavicon } from './host-capabilities/preview/favicon'
+import { createFaviconCache } from './host-capabilities/preview/favicon-cache'
 import {
   initMediaProtocolBridge
 } from './host-capabilities/preview/media-bridge'
-import { createMediaProtocolHandler, MEDIA_PROTOCOL } from './host-capabilities/preview/media-protocol'
+import { registerMediaProtocol as registerMediaProtocolImpl } from './host-capabilities/preview/media-registration'
 import { PreviewReachRegistry } from './host-capabilities/preview/preview-reach'
 import { registerApiProxyIpc } from './ipc/api-proxy-ipc'
 import { registerBackendIpc } from './ipc/backend-ipc'
@@ -195,27 +203,23 @@ import {
   getUninstallSummary,
   runDesktopUninstall,
 } from './update/updates-composition'
+import { updateStreamThrottleFromActiveWork as updateStreamThrottleImpl } from './windows/active-work-throttle'
 import {
   installFoundInPageForwarder
 } from './windows/find-in-page'
-import { applyHudResetBounds, defaultHudBounds } from './windows/hud-geometry'
+import { createFoundInPageForwarders } from './windows/found-in-page'
 import { ensureMainWindow } from './windows/main-window-lifecycle'
-import { sanitizeQuickEntrySettings } from './windows/quick-entry'
-import {
-  instanceWindowBounds
-} from './windows/session-windows'
-import {
-  computeWindowOptions
-} from './windows/window-state'
+import { createQuickEntrySettings } from './windows/quick-entry-settings'
+import { createTranslucencyPersistence } from './windows/translucency-persistence'
 import {
   getTranslucencyState,
   writePersistedTranslucency
 } from './windows/window-theme'
 import {
-  browserWindows,
   buildApplicationMenu,
   closeHudWindow,
   closeQuickEntryWindow,
+  createBrowserWindow,
   createInstanceWindow,
   detectRendererSkew,
   focusWindow,
@@ -228,14 +232,12 @@ import {
   openHudWindow,
   openPetOverlay,
   openPreviewInBrowser,
-  persistHudState,
   quickEntryShortcut,
-  readHudState,
+  resetHudWindowLayout,
   setHudSessionId,
   setHudWindow,
   setQuickEntryLastState,
   setQuickEntryWindow,
-  spawnBrowserWindow,
 } from './windows/windows-composition'
 
 
@@ -388,6 +390,64 @@ initDesktopLogBuffer(DESKTOP_LOG_PATH)
 
 initMediaProtocolBridge({ ensureNativeAccessToken })
 
+// ── Composition: bind the extracted modules to this app's singletons ────────
+//
+// Everything below is wiring, not policy: the behaviour lives in its module, and
+// what remains here is which singleton each module is handed. This is the part of
+// `main.ts` that is allowed to know every corner of the app.
+const faviconCache = createFaviconCache()
+
+const projectDirDeps = {
+  configPath: defaultProjectDirConfigPath,
+  isPackagedInstallPath,
+  log: rememberLog,
+  resolveDefaultCwd: resolveHermesCwd
+}
+
+const sanitizeWorkspaceCwd = (cwd: unknown) => sanitizeWorkspaceCwdImpl(cwd, projectDirDeps)
+
+const writeDefaultProjectDir = (dir: unknown) => writeDefaultProjectDirImpl(dir as any, projectDirDeps)
+
+const foundInPageForwarders = createFoundInPageForwarders(installFoundInPageForwarder)
+
+const ensureFoundInPageForwarder = (sender: Electron.WebContents) => foundInPageForwarders.ensure(sender)
+
+const quickEntrySettings = createQuickEntrySettings(path.join(app.getPath('userData'), 'quick-entry.json'), {
+  applyShortcut: settings => quickEntryShortcut.apply(settings),
+  closeWindow: () => {
+    const win = getQuickEntryWindow()
+
+    if (win && !win.isDestroyed()) {
+      win.close()
+    }
+  },
+  getWindow: getQuickEntryWindow,
+  log: rememberLog,
+  setWindow: win => setQuickEntryWindow(win)
+})
+
+
+const updateStreamThrottleFromActiveWork = () =>
+  updateStreamThrottleImpl({ activeWorkByWebContents, streamThrottle })
+
+const translucencyPersistence = createTranslucencyPersistence({
+  getState: getTranslucencyState,
+  write: state => writePersistedTranslucency(state as any)
+})
+
+const keepAwake = createKeepAwake(powerSaveBlocker)
+
+const powerState = createPowerState({
+  attachRemoteRevalidation: () =>
+    attachPowerResumeRemoteRevalidation({
+      log: rememberLog,
+      powerMonitor,
+      revalidate: () => revalidateSuspectPoolAfterResume()
+    }),
+  getMainWindow,
+  log: rememberLog
+})
+
 function continueFirstRunLocalBootstrap() {
   getFirstRunSetupGate().continueLocal()
 }
@@ -408,384 +468,37 @@ function abandonFirstRunSetupChoiceForRemoteApply() {
   return resumedGatedConnection
 }
 
-let _ghBinaryCache = null
 
-function resolveGhBinary() {
-  if (_ghBinaryCache) {
-    return _ghBinaryCache
-  }
 
-  const candidates = []
-
-  if (IS_WINDOWS) {
-    candidates.push(path.join(process.env['ProgramFiles'] || 'C:\\Program Files', 'GitHub CLI', 'gh.exe'))
-
-    if (process.env.LOCALAPPDATA) {
-      candidates.push(path.join(process.env.LOCALAPPDATA, 'Microsoft', 'WinGet', 'Links', 'gh.exe'))
-    }
-  } else {
-    const home = app.getPath('home')
-    candidates.push('/opt/homebrew/bin/gh', '/usr/local/bin/gh', '/usr/bin/gh', path.join(home, '.local', 'bin', 'gh'))
-  }
-
-  _ghBinaryCache = candidates.find(fileExists) || findOnPath('gh') || 'gh'
-
-  return _ghBinaryCache
-}
-
-function registerMediaProtocol() {
-  const handler = createMediaProtocolHandler({
-    ensureRemoteBearer: baseUrl => ensureNativeAccessToken(baseUrl).catch(() => null),
-    fetchLocal: (resolvedPath, headers, method) =>
-      electronNet.fetch(pathToFileURL(resolvedPath).toString(), {
-        bypassCustomProtocolHandlers: true,
-        credentials: 'omit',
-        headers,
-        method
-      }),
-    fetchRemote: (url, headers, method) =>
-      electronNet.fetch(url, {
-        bypassCustomProtocolHandlers: true,
-        credentials: 'omit',
-        headers,
-        method
-      }),
-    fetchRemoteWithCookies: (url, headers, method) => {
-      const oauthSession = getOauthSessionForUrl(url)
-
-      if (!getOauthSession()) {
-        throw new Error('OAuth session partition is unavailable.')
-      }
-
-      return getOauthSession().fetch(url, {
-        bypassCustomProtocolHandlers: true,
-        credentials: 'include',
-        headers,
-        method
-      })
-    },
-    resolveLocalFile: async filePath => {
-      const { resolvedPath } = await resolveReadableFileForIpc(filePath, { purpose: 'Media stream' })
-
-      return resolvedPath
-    },
-    // Claim-guarded (#90812): a media stream load can race a renderer's own
-    // reconnect dial for the same (connectionId, profile) scope; coalescing
-    // here avoids bootstrapping a second SSH tunnel / remote dashboard.
-    resolveRemoteConnection: ({ connectionId, profile }) =>
-      backendDialClaims.run(backendScopeKey(connectionId, profile), () =>
-        connectionId ? ensureRegistryBackend(connectionId, profile) : ensureBackend(profile)
-      )
-  })
-
-  protocol.handle(MEDIA_PROTOCOL, handler)
-}
 
 let quitPromptOpen = false
 
 let quitConfirmedWithActiveWork = false
 
-function sanitizeWorkspaceCwd(cwd) {
-  const trimmed = typeof cwd === 'string' ? cwd.trim() : ''
 
-  if (!trimmed || isPackagedInstallPath(trimmed)) {
-    return { cwd: resolveHermesCwd(), sanitized: Boolean(trimmed) }
-  }
 
-  try {
-    const resolved = path.resolve(trimmed)
 
-    if (directoryExists(resolved)) {
-      return { cwd: resolved, sanitized: false }
-    }
-  } catch {
-    // Fall through to the resolved default.
-  }
 
-  return { cwd: resolveHermesCwd(), sanitized: Boolean(trimmed) }
-}
 
-function writeDefaultProjectDir(dir) {
-  const target = defaultProjectDirConfigPath()
-  const payload = dir ? JSON.stringify({ dir: path.resolve(dir) }, null, 2) : JSON.stringify({}, null, 2)
 
-  try {
-    fs.mkdirSync(path.dirname(target), { recursive: true })
-    fs.writeFileSync(target, payload, 'utf8')
-  } catch (error) {
-    rememberLog(`[settings] write default project dir failed: ${error.message}`)
-  }
-}
 
-const FAVICON_CACHE_PATH = path.join(app.getPath('userData'), 'favicon-cache.json')
 
-const FAVICON_CACHE_LIMIT = 400
 
-const FAVICON_TTL_MS = 30 * 24 * 60 * 60 * 1000
 
-const FAVICON_MISS_TTL_MS = 12 * 60 * 60 * 1000
 
-const FAVICON_TIMEOUT_MS = 6000
 
-const FAVICON_MAX_BYTES = 256 * 1024
 
-const FAVICON_WRITE_DEBOUNCE_MS = 3000
 
-let faviconCache: Map<string, { at: number; icon: string }> | null = null
 
-let faviconWriteTimer: null | ReturnType<typeof setTimeout> = null
 
-const faviconInflight = new Map<string, Promise<string>>()
 
-function faviconCacheKey(rawUrl: string): string {
-  try {
-    return new URL(rawUrl).hostname.replace(/^www\./i, '').toLowerCase()
-  } catch {
-    return ''
-  }
-}
 
-function loadFaviconCache(): Map<string, { at: number; icon: string }> {
-  if (faviconCache) {
-    return faviconCache
-  }
 
-  faviconCache = new Map()
 
-  try {
-    const raw = JSON.parse(fs.readFileSync(FAVICON_CACHE_PATH, 'utf8'))
 
-    for (const [host, entry] of Object.entries(raw?.icons ?? {})) {
-      const at = Number((entry as { at?: number })?.at)
-      const icon = String((entry as { icon?: string })?.icon ?? '')
 
-      if (Number.isFinite(at) && Date.now() - at < (icon ? FAVICON_TTL_MS : FAVICON_MISS_TTL_MS)) {
-        faviconCache.set(host, { at, icon })
-      }
-    }
-  } catch {
-    // No cache yet, or it's unreadable — resolving again is the whole cost.
-  }
 
-  return faviconCache
-}
 
-function saveFaviconCacheSoon() {
-  if (faviconWriteTimer) {
-    return
-  }
-
-  faviconWriteTimer = setTimeout(() => {
-    faviconWriteTimer = null
-
-    try {
-      const icons = Object.fromEntries(loadFaviconCache())
-
-      fs.writeFileSync(FAVICON_CACHE_PATH, JSON.stringify({ icons }), 'utf8')
-    } catch {
-      // Cache is an optimization; failing to persist it costs one refetch.
-    }
-  }, FAVICON_WRITE_DEBOUNCE_MS)
-
-  faviconWriteTimer.unref?.()
-}
-
-async function faviconFetch(url: string, accept: string) {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), FAVICON_TIMEOUT_MS)
-
-  try {
-    return await electronNet.fetch(url, {
-      // Same browser-shaped identity the title fetcher uses: a plain Electron
-      // UA gets a challenge page from anything behind a bot wall.
-      headers: { Accept: accept, 'Accept-Language': 'en-US,en;q=0.7', 'User-Agent': TITLE_USER_AGENT },
-      redirect: 'follow',
-      signal: controller.signal
-    })
-  } finally {
-    clearTimeout(timer)
-  }
-}
-
-const faviconIo: FaviconIo = {
-  fetchImage: async url => {
-    const response = await faviconFetch(url, 'image/avif,image/webp,image/svg+xml,image/*;q=0.8,*/*;q=0.5')
-
-    if (!response.ok) {
-      return null
-    }
-
-    const buffer = await response.arrayBuffer()
-
-    if (buffer.byteLength === 0 || buffer.byteLength > FAVICON_MAX_BYTES) {
-      return null
-    }
-
-    return { bytes: new Uint8Array(buffer), mime: response.headers.get('content-type') ?? '' }
-  },
-  fetchText: async url => {
-    const response = await faviconFetch(url, 'text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.5')
-
-    return response.ok ? (await response.text()).slice(0, TITLE_BYTE_BUDGET * 2) : ''
-  }
-}
-
-function resolveFaviconCached(rawUrl: string): Promise<string> {
-  const key = faviconCacheKey(String(rawUrl || '').trim())
-
-  if (!key) {
-    return Promise.resolve('')
-  }
-
-  const cache = loadFaviconCache()
-  const hit = cache.get(key)
-
-  if (hit && Date.now() - hit.at < (hit.icon ? FAVICON_TTL_MS : FAVICON_MISS_TTL_MS)) {
-    return Promise.resolve(hit.icon)
-  }
-
-  const inflight = faviconInflight.get(key)
-
-  if (inflight) {
-    return inflight
-  }
-
-  const pending = resolveFavicon(rawUrl, faviconIo)
-    .catch(() => '')
-    .then(icon => {
-      if (cache.size >= FAVICON_CACHE_LIMIT) {
-        cache.delete(cache.keys().next().value)
-      }
-
-      cache.set(key, { at: Date.now(), icon })
-      saveFaviconCacheSoon()
-      faviconInflight.delete(key)
-
-      return icon
-    })
-
-  faviconInflight.set(key, pending)
-
-  return pending
-}
-
-async function writeComposerImage(buffer, ext = '.png', name = '') {
-  const rawExt = String(ext || '.png')
-    .trim()
-    .toLowerCase()
-
-  const normalizedExt = rawExt.startsWith('.') ? rawExt : `.${rawExt}`
-  const safeExt = /^\.[a-z0-9]{1,5}$/.test(normalizedExt) ? normalizedExt : '.png'
-  const dir = path.join(app.getPath('userData'), 'composer-images')
-  await fs.promises.mkdir(dir, { recursive: true })
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').replace('Z', '')
-  const random = crypto.randomBytes(3).toString('hex')
-
-  const baseName = String(name || '')
-    .split(/[\\/]/)
-    .pop()
-    ?.replace(/\.[^.]+$/, '')
-
-  const safeName = (baseName || '')
-    .replace(/[^\p{L}\p{N}._-]+/gu, '_')
-    .replace(/^[._-]+|[._-]+$/g, '')
-    .slice(0, 80)
-
-  const fileName = safeName ? `${safeName}_${random}${safeExt}` : `composer_${stamp}_${random}${safeExt}`
-  const filePath = path.join(dir, fileName)
-  await fs.promises.writeFile(filePath, buffer)
-
-  return filePath
-}
-
-function sendPowerResume() {
-  if (!getMainWindow() || getMainWindow().isDestroyed()) {
-    return
-  }
-
-  const { webContents } = getMainWindow()
-
-  if (!webContents || webContents.isDestroyed()) {
-    return
-  }
-
-  webContents.send('hermes:power-resume')
-}
-
-let powerResumeRegistered = false
-
-let onBatteryPower: boolean | null = null
-
-function broadcastBatteryState(next: boolean) {
-  if (onBatteryPower === next) {
-    return
-  }
-
-  onBatteryPower = next
-
-  for (const win of BrowserWindow.getAllWindows()) {
-    const { webContents } = win
-
-    if (webContents && !webContents.isDestroyed()) {
-      webContents.send('hermes:power-battery', next)
-    }
-  }
-}
-
-function registerPowerResumeListeners() {
-  if (powerResumeRegistered) {
-    return
-  }
-
-  powerResumeRegistered = true
-
-  try {
-    // 'resume' covers sleep/wake; 'unlock-screen' covers lock/unlock without a
-    // full suspend. Either can drop an idle socket.
-    powerMonitor.on('resume', sendPowerResume)
-    powerMonitor.on('unlock-screen', sendPowerResume)
-    powerMonitor.on('on-battery', () => broadcastBatteryState(true))
-    powerMonitor.on('on-ac', () => broadcastBatteryState(false))
-    onBatteryPower = powerMonitor.isOnBatteryPower()
-    // Pooled remote/SSH backends are also suspect after a wake (#93910): the
-    // renderer nudge above only re-drives the PRIMARY socket, while pooled
-    // tunnels have no renderer loop of their own. Bounded + coalesced inside;
-    // never a hot loop.
-    attachPowerResumeRemoteRevalidation({
-      log: rememberLog,
-      powerMonitor,
-      revalidate: () => revalidateSuspectPoolAfterResume()
-    })
-  } catch {
-    // powerMonitor is unavailable before app 'ready' on some platforms; the
-    // caller registers after 'ready', so this should not normally throw.
-  }
-}
-
-function installDownloadHandling() {
-  session.defaultSession.on('will-download', (_event, item) => {
-    const suggested = item.getFilename() || 'download'
-    const hasExtension = Boolean(path.extname(suggested))
-    const extension = hasExtension ? '' : extensionForMimeType(item.getMimeType())
-    const filename = `${suggested}${extension}`
-
-    try {
-      item.setSaveDialogOptions({
-        title: 'Save File',
-        defaultPath: path.join(app.getPath('downloads'), filename),
-        filters:
-          extension || /^image\//i.test(item.getMimeType() || '')
-            ? [
-                { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'] },
-                { name: 'All Files', extensions: ['*'] }
-              ]
-            : undefined
-      })
-    } catch {
-      // No Downloads directory to offer — keep Chromium's default prompt.
-    }
-  })
-}
 
 async function clearOauthSession(baseUrl) {
   const sess = getOauthSessionForUrl(baseUrl)
@@ -1249,106 +962,13 @@ function touchPoolBackend(profile) {
   }
 }
 
-function createBrowserWindow(tabId) {
-  return browserWindows.openOrFocus(tabId, () => spawnBrowserWindow(tabId))
-}
 
-export function nextInstanceBounds() {
-  const source = BrowserWindow.getFocusedWindow() || getMainWindow()
-  const fallback = computeWindowOptions(readWindowState(), screen.getAllDisplays())
-  const base = source && !source.isDestroyed() ? source.getBounds() : null
 
-  return instanceWindowBounds(base, fallback)
-}
 
-function resetHudWindowLayout(): boolean {
-  if (!getHudWindow() || getHudWindow().isDestroyed()) {
-    return false
-  }
 
-  const win = getHudWindow()
-  const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint())
-  const bounds = defaultHudBounds(display?.workArea)
 
-  if (!applyHudResetBounds(win, bounds)) {
-    rememberLog('[hud-state] reset layout failed while applying native bounds')
 
-    return false
-  }
 
-  persistHudState()
-
-  return true
-}
-
-export function hudBounds() {
-  // Remembered spot first — validated against the LIVE displays so a HUD
-  // parked on an unplugged monitor comes back on-screen instead of lost.
-  const saved = readHudState()
-
-  if (saved) {
-    const onScreen = screen.getAllDisplays().some(d => {
-      const a = d.workArea
-
-      return (
-        saved.x < a.x + a.width - 40 &&
-        saved.x + saved.width > a.x + 40 &&
-        saved.y < a.y + a.height - 40 &&
-        saved.y + saved.height > a.y + 40
-      )
-    })
-
-    if (onScreen) {
-      return saved
-    }
-  }
-
-  const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint())
-  const area = display?.workArea
-
-  return defaultHudBounds(area)
-}
-
-const QUICK_ENTRY_CONFIG_PATH = path.join(app.getPath('userData'), 'quick-entry.json')
-
-function readQuickEntrySettings() {
-  try {
-    return sanitizeQuickEntrySettings(JSON.parse(fs.readFileSync(QUICK_ENTRY_CONFIG_PATH, 'utf8')))
-  } catch {
-    // Missing / unreadable / malformed → shipped defaults (enabled, default chord).
-    return sanitizeQuickEntrySettings(undefined)
-  }
-}
-
-function writeQuickEntrySettings(settings) {
-  try {
-    fs.mkdirSync(path.dirname(QUICK_ENTRY_CONFIG_PATH), { recursive: true })
-    fs.writeFileSync(QUICK_ENTRY_CONFIG_PATH, JSON.stringify(settings, null, 2), 'utf8')
-  } catch (error) {
-    rememberLog(`[quick-entry] write failed: ${error.message}`)
-  }
-}
-
-function applyQuickEntrySettings(settings) {
-  const state = quickEntryShortcut.apply(settings)
-
-  if (!settings.enabled) {
-    // Turning the feature off must not leave an orphan always-on-top window.
-    if (getQuickEntryWindow() && !getQuickEntryWindow().isDestroyed()) {
-      getQuickEntryWindow().close()
-    }
-
-    setQuickEntryWindow(null)
-  }
-
-  if (state.error === 'taken') {
-    rememberLog(`[quick-entry] shortcut ${state.shortcut} is already taken by another application`)
-  } else if (state.error === 'invalid') {
-    rememberLog(`[quick-entry] shortcut ${state.shortcut} is not a valid accelerator`)
-  }
-
-  return { ...state, enabled: settings.enabled }
-}
 
 const windowConnectionRouteOwners = new Set<number>()
 
@@ -1405,7 +1025,7 @@ const hudIpc = registerHudIpc({
   getHudWindow: () => getHudWindow(),
   openHudWindow,
   closeHudWindow,
-  resetHudLayout: resetHudWindowLayout,
+  resetHudLayout: () => resetHudWindowLayout(),
   setHudSessionId: value => {
     setHudSessionId(value)
   }
@@ -1722,27 +1342,11 @@ const PLUGIN_SOURCE_MAX_BYTES = 16 * 1024 * 1024
 
 const activeWorkByWebContents = new Map<number, ActiveWork>()
 
-function updateStreamThrottleFromActiveWork() {
-  streamThrottle.update(mergeActiveWork(activeWorkByWebContents.values()).count > 0)
-}
 
-let translucencyWriteTimer = null
 
-function scheduleTranslucencyWrite() {
-  if (translucencyWriteTimer) {
-    clearTimeout(translucencyWriteTimer)
-  }
-
-  translucencyWriteTimer = setTimeout(() => {
-    translucencyWriteTimer = null
-    writePersistedTranslucency(getTranslucencyState())
-  }, 250)
-}
 
 app.on('before-quit', () => {
-  if (translucencyWriteTimer) {
-    clearTimeout(translucencyWriteTimer)
-    translucencyWriteTimer = null
+  if (translucencyPersistence.cancelPending()) {
     writePersistedTranslucency(getTranslucencyState())
   }
 })
@@ -1751,43 +1355,12 @@ app.on('will-quit', () => {
   destroyKeepaliveAgents()
 })
 
-const KEEP_AWAKE_CONFIG_PATH = path.join(app.getPath('userData'), 'keep-awake.json')
 
-const keepAwake = createKeepAwake(powerSaveBlocker)
 
-function readPersistedKeepAwake() {
-  try {
-    return JSON.parse(fs.readFileSync(KEEP_AWAKE_CONFIG_PATH, 'utf8')).on === true
-  } catch {
-    return false
-  }
-}
 
-const DISABLE_F12_CONFIG_PATH = path.join(app.getPath('userData'), 'disable-f12.json')
 
-function readPersistedDisableF12() {
-  try {
-    return JSON.parse(fs.readFileSync(DISABLE_F12_CONFIG_PATH, 'utf8')).on === true
-  } catch {
-    return false
-  }
-}
 
-const foundInPageForwarders = new Map<number, () => void>()
 
-function ensureFoundInPageForwarder(sender: Electron.WebContents): void {
-  if (foundInPageForwarders.has(sender.id)) {
-    return
-  }
-
-  const uninstall = installFoundInPageForwarder(sender)
-  foundInPageForwarders.set(sender.id, uninstall)
-
-  sender.once('destroyed', () => {
-    foundInPageForwarders.get(sender.id)?.()
-    foundInPageForwarders.delete(sender.id)
-  })
-}
 
 registerFsIpc({
   hermesHome: HERMES_HOME,
@@ -1852,7 +1425,7 @@ registerSystemIpc({
   resolveHermesCwd,
   readDefaultProjectDir,
   writeDefaultProjectDir,
-  getOnBatteryPower: () => onBatteryPower,
+  getOnBatteryPower: () => powerState.isOnBattery(),
   exitAfterBackendShutdown,
   resolveHermesVersion,
   detectRendererSkew,
@@ -1995,11 +1568,11 @@ registerWindowIpc({
   getQuickEntryWindow: () => getQuickEntryWindow(),
   getQuickEntryLastState: () => getQuickEntryLastState(),
   setQuickEntryLastState: value => (setQuickEntryLastState(value)),
-  readQuickEntrySettings,
-  writeQuickEntrySettings,
+  readQuickEntrySettings: () => quickEntrySettings.read(),
+  writeQuickEntrySettings: (settings: any) => quickEntrySettings.write(settings),
   hideQuickEntryWindow,
   quickEntryShortcut,
-  applyQuickEntrySettings,
+  applyQuickEntrySettings: (settings: any) => quickEntrySettings.apply(settings),
   claimedAmbientCue,
   activeWorkByWebContents,
   updateStreamThrottleFromActiveWork,
@@ -2044,14 +1617,14 @@ registerThemeIpc({
   GLASS_SUPPORTED,
   TRANSLUCENCY_SUPPORTED,
   hudIpc,
-  scheduleTranslucencyWrite,
+  scheduleTranslucencyWrite: () => translucencyPersistence.schedule(),
 })
 
 registerPreviewIpc({
   openExternalUrl,
   openPreviewInBrowser,
   fetchLinkTitle,
-  resolveFaviconCached,
+  resolveFaviconCached: (url: string) => faviconCache.resolve(url),
   reachablePreviewUrl,
 })
 
@@ -2093,15 +1666,28 @@ app.whenReady().then(() => {
   }
 
   installMediaPermissions()
-  installDownloadHandling()
-  registerMediaProtocol()
+  installDownloadHandlingImpl({ extensionForMimeType })
+  registerMediaProtocolImpl({
+    backendScopeKey,
+    ensureBackend,
+    ensureRegistryBackend,
+    ensureRemoteBearer: baseUrl => ensureNativeAccessToken(baseUrl),
+    getOauthSession,
+    getOauthSessionForUrl,
+    resolveReadablePath: async filePath => {
+      const { resolvedPath } = await resolveReadableFileForIpc(filePath, { purpose: 'Media stream' })
+
+      return resolvedPath
+    },
+    runDedupedBackendDial: (scopeKey, dial) => backendDialClaims.run(scopeKey, dial)
+  })
   installEmbedReferer()
   installRemoteHeaderRules()
   registerDeepLinkProtocol()
 
   ensureWslWindowsFonts()
-  configureSpellChecker()
-  registerPowerResumeListeners()
+  configureSpellCheckerImpl({ log: rememberLog })
+  powerState.register()
   keepAwake.set(readPersistedKeepAwake())
   setF12Blocked(readPersistedDisableF12())
   // Seed this before the first window exists: a picker can open before
@@ -2113,7 +1699,7 @@ app.whenReady().then(() => {
   // Quick Entry's global chord — registered on ready so a cold launch restores
   // it without the renderer visiting Settings. A failed registration is logged
   // here and surfaced in Settings via the IPC state (never silent).
-  applyQuickEntrySettings(readQuickEntrySettings())
+  quickEntrySettings.apply(quickEntrySettings.read())
 
   if (IS_MAC) {
     const reposition = () => wakeIndicatorController.reposition()
@@ -2151,24 +1737,6 @@ app.whenReady().then(() => {
   })
 })
 
-function configureSpellChecker() {
-  try {
-    const defaultSession = session.defaultSession
-
-    if (!defaultSession || typeof defaultSession.setSpellCheckerLanguages !== 'function') {
-      return
-    }
-
-    const available = defaultSession.availableSpellCheckerLanguages || []
-    const locale = (app.getLocale && app.getLocale()) || 'en-US'
-    const candidates = [locale, locale.split('-')[0], 'en-US', 'en']
-    const chosen = candidates.find(lang => available.includes(lang)) || 'en-US'
-
-    defaultSession.setSpellCheckerLanguages([chosen])
-  } catch (error) {
-    rememberLog(`Spellchecker setup failed: ${error.message}`)
-  }
-}
 
 function heldQuitForActiveWork(event: Electron.Event): boolean {
   if (SKIP_QUIT_CONFIRM || quitConfirmedWithActiveWork || quitPromptOpen) {
