@@ -10,10 +10,9 @@
 import type * as React from 'react'
 
 import type { MenuKit } from '@/components/ui/actions-menu'
+import type { GroupNode, LayoutNode } from '@/lib/pane-tree'
+import { allPaneIds } from '@/lib/pane-tree'
 import type { Contribution } from '@/types/contributions'
-
-import type { GroupNode, LayoutNode } from '../model'
-import { allPaneIds } from '../model'
 
 import type { FloatingAnchor } from './floating-rect'
 

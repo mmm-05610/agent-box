@@ -3,8 +3,8 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 
 import { stubMenuDomApis, stubResizeObserver } from '@/dev/test/jsdom'
 import { registry } from '@/lib/contributions'
+import { group, split } from '@/lib/pane-tree'
 
-import { group, split } from '../model'
 import {
   $layoutTree,
   declareDefaultTree,
@@ -122,7 +122,7 @@ describe('right-clicking a tool panel tab', () => {
 describe('⌘W over a focused tool panel', () => {
   it('closes the logs tab and the toggle brings it back', async () => {
     const { closeActiveTab } = await import('@/app/chat/close-tab')
-    const { allPaneIds } = await import('../model')
+    const { allPaneIds } = await import('@/lib/pane-tree')
     const { revealTreePane, setPaneCollapsed } = await import('../store')
 
     declareDefaultTree(
@@ -157,7 +157,7 @@ describe('⌘W over a focused tool panel', () => {
   })
 
   it('leaves the uncloseable workspace zone to the chat rung', async () => {
-    const { allPaneIds } = await import('../model')
+    const { allPaneIds } = await import('@/lib/pane-tree')
     const { closeFocusedToolTab } = await import('../store')
 
     declareDefaultTree(

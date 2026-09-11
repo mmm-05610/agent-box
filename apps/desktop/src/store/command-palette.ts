@@ -1,6 +1,6 @@
 import { atom } from 'nanostores'
 
-import { releaseTypingFocus } from '@/components/ui/keyboard-first'
+import { releaseTypingFocus } from '@/lib/typing-focus'
 
 /** Whether the global command palette (Cmd/Ctrl+K) is currently open. */
 export const $commandPaletteOpen = atom(false)

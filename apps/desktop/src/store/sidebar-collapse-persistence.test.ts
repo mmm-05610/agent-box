@@ -41,7 +41,7 @@ describe('sidebar collapse persistence', () => {
   // next ⌘B into a SHOW, and the user's hide never persists.
   it('reset reopens a hidden sidebar, so a later hide persists across reload', async () => {
     const s1 = await loadStores()
-    const { group, split } = await import('@/components/pane-shell/tree/model')
+    const { group, split } = await import('@/lib/pane-tree')
     s1.tree.declareDefaultTree(split('row', [group(['sessions']), group(['workspace'])], [1, 3]))
     s1.bind()
 

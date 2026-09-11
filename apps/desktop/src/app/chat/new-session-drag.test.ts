@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type * as TreeModel from '@/components/pane-shell/tree/model'
 import type * as TreeStore from '@/components/pane-shell/tree/store'
 import { NEW_SESSION_DRAG } from '@/components/pane-shell/tree/store'
+import type * as TreeModel from '@/lib/pane-tree'
 
 import { type NewSessionPlacement, startNewProjectDrag, startNewSessionDrag } from './new-session-drag'
 
@@ -50,7 +50,7 @@ vi.mock('@/components/pane-shell/tree/store', async importOriginal => {
   }
 })
 
-vi.mock('@/components/pane-shell/tree/model', async importOriginal => {
+vi.mock('@/lib/pane-tree', async importOriginal => {
   const actual = await importOriginal<typeof TreeModel>()
 
   return {

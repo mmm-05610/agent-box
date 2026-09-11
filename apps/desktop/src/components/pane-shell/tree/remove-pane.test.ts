@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { findGroup, group, removePane, split } from './model'
+import { findGroup, group, removePane, split } from '@/lib/pane-tree'
 
 describe('removePane close-neighbor selection', () => {
   it('closing a middle active tab keeps you on the tab that slides into its slot', () => {

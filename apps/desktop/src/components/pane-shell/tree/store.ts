@@ -10,11 +10,6 @@ import { setPluginEnabled } from '@/extension/contrib/plugins-store'
 import { translateNow } from '@/i18n'
 import { registry } from '@/lib/contributions'
 import { SIDEBAR_COLLAPSE_MEDIA_QUERY } from '@/lib/layout-constants'
-import { readJson, readKey, writeJson, writeKey } from '@/lib/storage'
-import { notify } from '@/store/notifications'
-import { clearAllPaneSizeOverrides } from '@/store/panes'
-import { isBrowserWindow, isSecondaryWindow } from '@/store/windows'
-
 import {
   allPaneIds,
   type DropPosition,
@@ -40,7 +35,12 @@ import {
   setSplitWeights as setSplitWeightsOp,
   type SplitNode,
   type TabStripMode
-} from './model'
+} from '@/lib/pane-tree'
+import { readJson, readKey, writeJson, writeKey } from '@/lib/storage'
+import { notify } from '@/store/notifications'
+import { clearAllPaneSizeOverrides } from '@/store/panes'
+import { isBrowserWindow, isSecondaryWindow } from '@/store/windows'
+
 import { FLOATING_PLACEMENT } from './renderer/floating-rect'
 import { tabStripVisibleForZone } from './renderer/strip-visibility'
 import { rootChildSide } from './renderer/track-model'

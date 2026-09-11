@@ -7,9 +7,10 @@
  * editor disables Save with an explanation.
  */
 
+import { group, type LayoutNode, normalize, split } from '@/lib/pane-tree'
+
 import type { GridLayout, GridZone } from './grid-model'
 import { modelToZones } from './grid-model'
-import { group, type LayoutNode, normalize, split } from './model'
 
 function cutCandidates(zones: GridZone[], axis: 'x' | 'y'): number[] {
   const coords = new Set(zones.flatMap(z => (axis === 'x' ? [z.left, z.right] : [z.top, z.bottom])))

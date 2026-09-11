@@ -3,8 +3,8 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { registry } from '@/lib/contributions'
+import type { GroupNode } from '@/lib/pane-tree'
 
-import type { GroupNode } from '../model'
 import { $treeDragging, NEW_SESSION_DRAG, SESSION_TILE_DRAG } from '../store'
 
 import { TreeGroup } from './tree-group'

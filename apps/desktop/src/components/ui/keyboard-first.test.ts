@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { onReleaseTypingFocus, releaseTypingFocus, usePointerQuiet } from './keyboard-first'
+import { usePointerQuiet } from './keyboard-first'
 
 const move = () => act(() => void window.dispatchEvent(new MouseEvent('mousemove', { bubbles: true })))
 const scroll = () => act(() => void window.dispatchEvent(new WheelEvent('wheel', { bubbles: true })))
@@ -51,19 +51,5 @@ describe('usePointerQuiet', () => {
     renderHook(() => usePointerQuiet()).unmount()
 
     expect(remove.mock.calls.map(([type]) => type)).toEqual(expect.arrayContaining(['mousemove', 'wheel']))
-  })
-})
-
-describe('releaseTypingFocus', () => {
-  it('notifies subscribers, and stops once unsubscribed', () => {
-    const handler = vi.fn()
-    const off = onReleaseTypingFocus(handler)
-
-    releaseTypingFocus()
-    expect(handler).toHaveBeenCalledTimes(1)
-
-    off()
-    releaseTypingFocus()
-    expect(handler).toHaveBeenCalledTimes(1)
   })
 })

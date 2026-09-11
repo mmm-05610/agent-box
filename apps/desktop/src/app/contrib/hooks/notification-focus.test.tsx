@@ -3,9 +3,9 @@ import { afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
 
 import { paneMirror } from '@/app/chat/pane-mirror'
 import { sessionRoute, syncWorkspaceRoute } from '@/app/routes'
-import { group } from '@/components/pane-shell/tree/model'
 import * as tree from '@/components/pane-shell/tree/store'
 import { registry } from '@/lib/contributions'
+import { group } from '@/lib/pane-tree'
 import { $selectedStoredSessionId } from '@/store/session'
 import {
   $sessionTiles,

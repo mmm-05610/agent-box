@@ -2,8 +2,8 @@ import { atom } from 'nanostores'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { registry } from '@/lib/contributions'
+import { group, split } from '@/lib/pane-tree'
 
-import { group, split } from './model'
 import {
   $dismissedPanes,
   $hiddenTreePanes,

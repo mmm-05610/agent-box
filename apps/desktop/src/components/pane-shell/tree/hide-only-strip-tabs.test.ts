@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { registry } from '@/lib/contributions'
+import { allPaneIds, group, split } from '@/lib/pane-tree'
 
-import { allPaneIds, group, split } from './model'
 import {
   $hiddenStripTabs,
   $hiddenTreePanes,

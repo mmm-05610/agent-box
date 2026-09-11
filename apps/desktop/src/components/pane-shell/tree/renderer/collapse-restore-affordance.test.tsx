@@ -3,8 +3,8 @@ import { cleanup, fireEvent, render } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { registry } from '@/lib/contributions'
+import { group, type GroupNode, split } from '@/lib/pane-tree'
 
-import { group, type GroupNode, split } from '../model'
 import {
   $dismissedPanes,
   $hiddenTreePanes,

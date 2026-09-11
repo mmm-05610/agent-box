@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { group, split } from '@/components/pane-shell/tree/model'
 import {
   $activeTreeGroup,
   $layoutTree,
@@ -8,6 +7,7 @@ import {
   trackActiveTreeGroup
 } from '@/components/pane-shell/tree/store'
 import { setWorkspaceScope } from '@/components/pane-shell/workspace-scope'
+import { group, split } from '@/lib/pane-tree'
 import { $selectedStoredSessionId } from '@/store/session'
 import { $focusedStoredSessionId } from '@/store/session-states'
 

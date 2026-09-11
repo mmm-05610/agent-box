@@ -16,7 +16,7 @@ describe('focused chat zone drives the tab verbs', () => {
 
   async function setup() {
     const tree = await import('@/components/pane-shell/tree/store')
-    const model = await import('@/components/pane-shell/tree/model')
+    const model = await import('@/lib/pane-tree')
     const { registry } = await import('@/lib/contributions')
 
     for (const id of ['workspace', 'files', 'session-tile:a', 'session-tile:b']) {
@@ -86,7 +86,7 @@ describe('focused chat zone drives the tab verbs', () => {
   // lone Browser tile falls through and empties MAIN instead.
   it('⌘W and ⌃Tab serve a zone of preview/page tiles like any tab strip', async () => {
     const tree = await import('@/components/pane-shell/tree/store')
-    const model = await import('@/components/pane-shell/tree/model')
+    const model = await import('@/lib/pane-tree')
     const { registry } = await import('@/lib/contributions')
 
     for (const id of ['workspace', 'preview-tile:url:x', 'route-tile:/skills']) {

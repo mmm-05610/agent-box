@@ -48,7 +48,7 @@ describe('enforced dock (stacked Bots pane → sessions-zone tab, every boot)', 
     window.localStorage.setItem(TREE_KEY, JSON.stringify(initialTree))
 
     const tree = await import('@/components/pane-shell/tree/store')
-    const model = await import('@/components/pane-shell/tree/model')
+    const model = await import('@/lib/pane-tree')
     const { registry } = await import('@/lib/contributions')
 
     registry.register({

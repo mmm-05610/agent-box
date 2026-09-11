@@ -7,8 +7,8 @@
  * question with the same pane predicates.
  */
 
-import { findGroup } from '@/components/pane-shell/tree/model'
 import { $layoutTree, isMainStripPane, isSessionStripPane } from '@/components/pane-shell/tree/store'
+import { findGroup } from '@/lib/pane-tree'
 
 /** A session may land in any zone hosting a MAIN tile — another chat stack, a
  *  Browser tile, a page — never the sidebar/terminal zones. Returns the pane a

@@ -5,7 +5,7 @@
  */
 import type { ComponentType } from 'react'
 
-import type { LayoutNode } from '../model'
+import type { LayoutNode } from '@/lib/pane-tree'
 
 /**
  * `node` is any node in the layout tree. `parentAxis` is the containing split's

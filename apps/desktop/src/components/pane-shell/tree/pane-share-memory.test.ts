@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { LayoutNode } from '@/components/pane-shell/tree/model'
+import type { LayoutNode } from '@/lib/pane-tree'
 
 // Closing and re-opening a docked tile (the in-app browser) must respect the
 // size the user left it at. Adoption's edge insert used to split the anchor
@@ -20,7 +20,7 @@ describe('tile split-share memory across close/reopen', () => {
 
   async function setup() {
     const tree = await import('@/components/pane-shell/tree/store')
-    const model = await import('@/components/pane-shell/tree/model')
+    const model = await import('@/lib/pane-tree')
     const { registry } = await import('@/lib/contributions')
 
     registry.register({

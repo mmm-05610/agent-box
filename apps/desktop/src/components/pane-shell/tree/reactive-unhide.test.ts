@@ -26,7 +26,7 @@ describe('reactive pane unhide', () => {
   async function setupWithFiles() {
     const tree = await import('@/components/pane-shell/tree/store')
     const layout = await import('@/store/layout')
-    const model = await import('@/components/pane-shell/tree/model')
+    const model = await import('@/lib/pane-tree')
     const { registry } = await import('@/lib/contributions')
 
     // Register the right-column panes like controller.tsx does — placement

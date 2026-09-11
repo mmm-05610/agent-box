@@ -13,11 +13,11 @@ import { PaneTab, PaneTabLabel, PaneTabStrip } from '@/components/ui/pane-tab'
 import { ContribBoundary, ContribRender } from '@/extension/contrib/react/boundary'
 import { useContributions } from '@/extension/contrib/react/use-contributions'
 import { ESCAPE_PRIORITY, isTopEscapeLayer, pushEscapeLayer } from '@/lib/escape-layers'
+import { PANE_TOGGLE_REVEAL_EVENT } from '@/lib/pane-events'
+import { allPaneIds, findGroupOfPane } from '@/lib/pane-tree'
 import { cn } from '@/lib/utils'
 import type { Contribution } from '@/types/contributions'
 
-import { PANE_TOGGLE_REVEAL_EVENT } from '../..'
-import { allPaneIds, findGroupOfPane } from '../model'
 import { $hiddenTreePanes, $layoutTree, $narrowViewport } from '../store'
 
 import { paneChrome } from './track-model'

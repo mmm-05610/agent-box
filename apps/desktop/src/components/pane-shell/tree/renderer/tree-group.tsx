@@ -29,6 +29,7 @@ import { ContribBoundary, ContribRender } from '@/extension/contrib/react/bounda
 import { useContributions } from '@/extension/contrib/react/use-contributions'
 import { useI18n } from '@/i18n'
 import { useKeybindHint } from '@/lib/keybinds/use-keybind-hint'
+import type { DropPosition, GroupNode } from '@/lib/pane-tree'
 import { hiddenPaneProps } from '@/lib/pane-visibility'
 import { cn } from '@/lib/utils'
 import { closeAllOpenSessionTiles } from '@/store/session-states'
@@ -44,7 +45,6 @@ import {
   resolveRememberedActivePane,
   workspaceScopeKey
 } from '../../workspace-scope'
-import type { DropPosition, GroupNode } from '../model'
 import {
   $dropHint,
   $hiddenTreePanes,

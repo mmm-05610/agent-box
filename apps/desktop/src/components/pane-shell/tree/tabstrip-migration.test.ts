@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { type LayoutNode, migratePersistedTree } from './model'
+import { type LayoutNode, migratePersistedTree } from '@/lib/pane-tree'
 
 // A stored `headerHidden: true` is ambiguous — a deliberate "Hide header" and
 // an accidental double-tap wrote the same byte — and it is the state people got

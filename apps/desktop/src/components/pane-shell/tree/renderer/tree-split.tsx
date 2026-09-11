@@ -12,13 +12,13 @@ import { type PointerEvent as ReactPointerEvent, useCallback, useMemo, useRef, u
 import { beginSashDrag, endSashDrag } from '@/components/pane-shell/geometry'
 import { useContributions } from '@/extension/contrib/react/use-contributions'
 import { guardGuestPointers } from '@/lib/guest-pointer-guard'
+import type { LayoutNode, SplitNode } from '@/lib/pane-tree'
+import { allPaneIds } from '@/lib/pane-tree'
 import { rafCoalesce } from '@/lib/raf-coalesce'
 import { cn } from '@/lib/utils'
 import { $paneStates, type PaneStateSnapshot, setPaneHeightOverride, setPaneWidthOverride } from '@/store/panes'
 
 import { $layoutEditMode } from '../../edit-mode'
-import type { LayoutNode, SplitNode } from '../model'
-import { allPaneIds } from '../model'
 import {
   $collapsedTreeSides,
   $hiddenTreePanes,

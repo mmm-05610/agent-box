@@ -62,7 +62,7 @@ describe('host.state turn flags', () => {
 
   it('follows a focused session tile, not the primary', async () => {
     const tree = await import('@/components/pane-shell/tree/store')
-    const model = await import('@/components/pane-shell/tree/model')
+    const model = await import('@/lib/pane-tree')
     const { registry } = await import('@/lib/contributions')
     const { $sessionTiles } = await import('@/store/session-states')
 

@@ -2,9 +2,9 @@ import { cleanup, fireEvent, render } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { registry } from '@/lib/contributions'
+import { group, split, type SplitNode } from '@/lib/pane-tree'
 import { $paneStates } from '@/store/panes'
 
-import { group, split, type SplitNode } from '../model'
 import { $hiddenTreePanes, $layoutTree, markCollapsePane, setTreeGroupMinimized } from '../store'
 
 import { TreeNode } from './tree-node'

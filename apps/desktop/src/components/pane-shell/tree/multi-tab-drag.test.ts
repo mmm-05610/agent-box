@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { findGroup, findGroupOfPane, group, mergeZonesWithPane, movePanes, reorderPanesInGroup, split } from './model'
+import { findGroup, findGroupOfPane, group, mergeZonesWithPane, movePanes, reorderPanesInGroup, split } from '@/lib/pane-tree'
+
 import { $tabSelection, clearTabSelection, selectionFor, selectTabRange, toggleTabSelected } from './tab-selection'
 
 describe('movePanes (multi-tab drag)', () => {

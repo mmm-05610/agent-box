@@ -1,4 +1,4 @@
-import type { TabStripMode } from '@/components/pane-shell/tree/model'
+import type { TabStripMode } from '@/lib/pane-tree'
 import { type Codec, persistentAtom } from '@/lib/persisted'
 
 const TAB_STRIP_DEFAULT_STORAGE_KEY = 'hermes.desktop.tabStripDefault'

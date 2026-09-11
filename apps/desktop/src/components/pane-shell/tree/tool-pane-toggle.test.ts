@@ -3,8 +3,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { $terminalTakeover, setTerminalTakeover } from '@/app/right-sidebar/store'
 import { registry } from '@/lib/contributions'
+import { allPaneIds, group, split } from '@/lib/pane-tree'
 
-import { allPaneIds, group, split } from './model'
 import {
   $dismissedPanes,
   $hiddenTreePanes,
