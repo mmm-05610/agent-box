@@ -380,7 +380,7 @@ session-actions domain.
 
 | the remainder | edges | what has to happen |
 | --- | --- | --- |
-| the three host-view capability exports (`SkillsView`, `McpTab`, `ToolsetConfigPanel`) | 3 | **a decision.** How a plugin learns about a host-provided view: a lazy capability read, a `ctx`-supplied component, a lazy plugin glob, or a shared prop contract |
+| the three host-view capability exports (`SkillsView`, `McpTab`, `ToolsetConfigPanel`) | 3 | **a decision — written up in full at [`renderer-layer-host-views-decision.md`](renderer-layer-host-views-decision.md).** How a plugin learns about a host-provided view: register the components from `app/` (recommended), a `ctx`-supplied component, a lazy plugin glob, loose typing, or leave it |
 | the composer's last edge (`user-edit-composer -> @/app/session/hooks/use-prompt-actions`) | 1 | **a decision.** Either unblock the chain (below), or give the edit composer a host-supplied "send" verb, the same shape as 09d |
 | `components/pet/floating-pet.tsx` → three `app/hooks` | 3 | not a decision — pet is a floating widget whose three hooks are app-domain. Sink what is pure, seam what is not |
 | three singletons: `boot-failure-overlay -> app/settings/gateway-settings`, `store/gateway-switch -> app/contrib/hooks/use-background-sync`, `store/pane-focus -> app/right-sidebar/store` | 3 | not a decision — three unrelated edges; each needs its own read |

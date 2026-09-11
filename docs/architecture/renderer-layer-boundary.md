@@ -117,7 +117,9 @@ reads `sdk.SkillsView` at module scope (`plugins/hermes-bots/profile-config.tsx:
 and the eager bundled-plugin glob means that runs before any `app/` module body,
 so an app-side registration seam is always too late — silently, as a lost
 connection route rather than a crash. Batch 09's last section has the chain; the
-open knot is the master plan's §7.
+open knot is the master plan's §7, and the whole of it — the constraint, five
+options and a recommendation — is [the host-view decision
+page](renderer-layer-host-views-decision.md).
 
 ### K4 · The composer engine is filed under `app/` (23 edges) — decided, 22 paid by batch 10
 

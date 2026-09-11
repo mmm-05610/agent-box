@@ -80,7 +80,7 @@ component layer became 08, the plugin ABI became 09, and the composer engine bec
 
 | the remainder | edges | what has to happen | status |
 | --- | --- | --- | --- |
-| the three host-view capability exports (`SkillsView`, `McpTab`, `ToolsetConfigPanel`) | 3 | a decision: a lazy capability read, a `ctx`-supplied component, a lazy plugin glob, or a shared prop contract | awaiting decision |
+| the three host-view capability exports (`SkillsView`, `McpTab`, `ToolsetConfigPanel`) | 3 | [the decision page](renderer-layer-host-views-decision.md) — five options, one recommended | awaiting decision |
 | the composer's last edge (`user-edit-composer -> use-prompt-actions`) | 1 | a decision: unblock the chain, or give the edit composer a host-supplied "send" verb | awaiting decision |
 | `components/pet/floating-pet.tsx` → three `app/hooks` | 3 | sink what is pure, seam what is not | not analysed |
 | three singletons (`boot-failure-overlay`, `store/gateway-switch`, `store/pane-focus`) | 3 | three unrelated edges; each needs its own read | not analysed |
