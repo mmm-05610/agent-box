@@ -10,6 +10,19 @@ chat is a snapshot; this one is versioned with the plan it points at, and can be
 re-read when the plan changes. The first version of it was a message, and it froze
 "01–07, 27 edges, 85 → 58" — which was wrong within the hour.
 
+**This file is the only prompt. There is nothing else to hand over.** A run that is
+already going cannot be re-prompted, so if one was started before a plan change, it
+needs one *message* — not a second prompt:
+
+> 总方针变了。重新读 `renderer-layer-master-plan.md` §0/§3/§4 和
+> `renderer-layer-status.md`，重跑 `batch-collisions.mjs` 算你现在的工作列表和目标数字
+> （目标 = 当前账本 − 你要做的那些项的边数之和）。已经完成的项不用重做。
+
+That message exists because the run predates the fix, not because the system needs
+two briefs. Once a run is started from this file it re-reads the plan per item and
+needs no correction — the correction is a one-off, and the fact that one was needed
+is a symptom of the frozen prompt, not a step in the process.
+
 ---
 
 ```
