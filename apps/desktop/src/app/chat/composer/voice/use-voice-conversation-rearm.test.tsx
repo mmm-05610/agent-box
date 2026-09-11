@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { $voicePlayback } from '@/store/voice/voice-playback'
 
-import { useVoiceConversation } from '../voice/use-voice-conversation'
+import { useVoiceConversation } from './use-voice-conversation'
 
 const mocks = vi.hoisted(() => {
   let deferStreamStart = false
