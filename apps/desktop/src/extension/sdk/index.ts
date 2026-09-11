@@ -65,7 +65,7 @@ export type {
 // Every contribution surface, plugin-reachable: register keybinds, palette
 // commands, routes, themes, panes, composer extensions, and bar items with
 // the same area ids + payload types core uses.
-export { COMPOSER_AREAS } from '@/app/chat/composer/contrib'
+export { COMPOSER_AREAS } from '@/lib/contribution-areas'
 
 // -- ui: the design language --------------------------------------------------
 
@@ -86,7 +86,7 @@ export { SidebarRowLead } from '@/app/chat/sidebar/chrome'
  *  switcher, the fleet profile rail and any plugin rail listing gateways share
  *  it, so a connection looks the same wherever it is named. */
 export { ConnectionGlyph } from '@/app/chat/sidebar/connection-glyph'
-export { PALETTE_AREA, type PaletteContribution } from '@/app/command-palette/contrib'
+export { PALETTE_AREA, type PaletteContribution } from '@/lib/contribution-areas'
 /** THE master-detail toolkit core uses for list+inspector surfaces (Scheduled
  *  jobs, Kanban, …): a dense left `PanelList` of `PanelListRow`s beside a
  *  scrolling `PanelDetail` of `PanelSectionLabel` / `PanelMeta` / `PanelBlock`.
@@ -96,7 +96,7 @@ export { PALETTE_AREA, type PaletteContribution } from '@/app/command-palette/co
  *  parity, so a roster needs no hand-rolled row. The overlay-bound `Panel` root
  *  is deliberately NOT exported — these compose inside a pane just as well. */
 export { PanelEmpty } from '@/app/overlays/panel'
-export { type RouteContribution, ROUTES_AREA, SIDEBAR_NAV_AREA, type SidebarNavContribution } from '@/app/routes'
+export { type RouteContribution, ROUTES_AREA, SIDEBAR_NAV_AREA, type SidebarNavContribution } from '@/lib/contribution-areas'
 
 /** THE full per-toolset config panel core Settings renders — provider picker,
  *  env vars / API keys, model catalog picker, and post-setup runners. Route-

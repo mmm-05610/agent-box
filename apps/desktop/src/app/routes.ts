@@ -2,6 +2,7 @@ import { atom } from 'nanostores'
 import type { ReactNode } from 'react'
 
 import { noteActiveTreeGroup, revealTreePane } from '@/components/pane-shell/tree/store'
+import { ROUTES_AREA, type RouteContribution } from '@/lib/contribution-areas'
 import { registry } from '@/lib/contributions'
 
 type NavigateLike = (to: string, options?: { replace?: boolean }) => void
@@ -83,13 +84,7 @@ const RESERVED_PATHS: ReadonlySet<string> = new Set(APP_ROUTES.map(route => rout
 // paths are reserved exactly like APP_ROUTES so the session-id parser never
 // mistakes them for a session route. Navigate with `host.navigate(path)`.
 
-export const ROUTES_AREA = 'routes'
-
-/** Payload of a `routes` contribution's `data`. */
-export interface RouteContribution {
-  /** Absolute path, e.g. `/kanban`. One segment; no params. */
-  path: string
-}
+export { ROUTES_AREA, type RouteContribution, SIDEBAR_NAV_AREA, type SidebarNavContribution } from '@/lib/contribution-areas'
 
 export function contributedRoutes(): Array<{ key: string; path: string; title?: string; render: () => ReactNode }> {
   return registry
@@ -111,17 +106,6 @@ function isContributedPath(pathname: string): boolean {
 // A DATA contribution adds a row to the sidebar's top nav (below Artifacts).
 // Pair with a ROUTES_AREA page: the row navigates to `path` and lights up
 // while the app is there.
-
-export const SIDEBAR_NAV_AREA = 'sidebar.nav'
-
-/** Payload of a `sidebar.nav` data contribution. */
-export interface SidebarNavContribution {
-  /** Codicon name, e.g. `'project'`. */
-  codicon: string
-  label: string
-  /** Route to navigate to (usually a contributed page's path). */
-  path: string
-}
 
 // Views that render as a full-screen modal card (OverlayView) over the shell.
 // While one is open the app's titlebar control clusters must hide so they don't
