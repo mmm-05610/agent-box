@@ -49,7 +49,7 @@ export function execText(command: string, args: string[], { timeout = 3000 } = {
  * stopOwned). The claim path keeps the full 30s headroom — a freshly spawned
  * child's marker is load-bearing and a slow probe must not kill a healthy child
  * (#93608). Reap only needs to tell "same process" from "gone or reused" for OLD
- * records, and an ownership file can accumulate dozens of them (one per profile
+ * records, and an ownership file can accumulate dozens of them (one per scope
  * per launch), so a 30s budget per record would let a cold PowerShell 5.1 stall
  * boot for minutes (#87169). 5s is plenty for a warm probe; a timeout degrades
  * to "unknown" and the record is preserved for the next launch instead of
