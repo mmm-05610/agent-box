@@ -3,7 +3,6 @@ import { useQuery } from '@tanstack/react-query'
 import { Dialog as DialogPrimitive } from 'radix-ui'
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
-
 import {
   HUD_HEADING,
   HUD_ITEM,
@@ -87,7 +86,6 @@ import { canOpenNewWindow, openNewWindow } from '@/store/windows'
 import { luminance } from '@/themes/color'
 import { type ThemeMode, useTheme } from '@/themes/context'
 import { isUserTheme, resolveTheme } from '@/themes/user-themes'
-
 import { openSession, openSessionIntentFromModifiers } from '../open-session'
 import {
   AGENTS_ROUTE,
@@ -105,7 +103,6 @@ import {
 import { SECTIONS } from '../settings/constants'
 import { type SettingsSearchEntry, settingsSearchTargetQuery } from '../settings/settings-search'
 import { useSettingsSearchCatalog } from '../settings/use-settings-search'
-
 import { usePaletteContributions } from './contrib'
 import { HighlightWatcher } from './highlight-watcher'
 import { MarketplaceThemePage } from './marketplace-theme-page'
@@ -120,266 +117,29 @@ import {
 } from './palette-model'
 import { PetInlineToggle, PetPalettePage } from './pet-palette-page'
 
-
-
-const EMPTY_GROUPS: PaletteGroup[] = []
-
-// Backstop only. The palette normally retires on the content's real
-// `animationend`, so the CSS owns the close duration; this just guarantees the
-// body can't stay mounted forever somewhere animations never run (jsdom,
-// `animation: none`). Deliberately longer than any plausible exit so it never
-// races the real signal and truncates the fade.
+import {
+  EMPTY_GROUPS,
+  PaletteGroups,
+  PaletteRow,
+  NonConfigSettingsLabel,
+  NON_CONFIG_SETTINGS,
+  themeSupportsMode,
+} from './palette-sources'
 const EXIT_FALLBACK_MS = 1000
-
-/**
- * The palette's row list, split out so an OPENING palette paints before it
- * renders rows. This component mounts with the portal, so `useDeferredValue`'s
- * initial value applies per open: the first commit is the frame + input
- * (instant), and the several-hundred-row list arrives in an interruptible
- * follow-up render. Opening ⌘K must never wait on building the list.
- */
-const PaletteGroups = memo(function PaletteGroups({
-  bindings,
-  groups,
-  modHeld,
-  noResultsLabel,
-  onSelectItem,
-  onSelectMods,
-  search
-}: {
-  bindings: Record<string, string[]>
-  groups: PaletteGroup[]
-  modHeld: boolean
-  noResultsLabel: string
-  onSelectItem: (item: PaletteItem) => void
-  onSelectMods: (event: { ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }) => void
-  search: string
-}) {
-  const deferred = useDeferredValue(groups, EMPTY_GROUPS)
-  // While the rows are still catching up, an empty list means "not rendered
-  // yet", not "nothing matched" — don't flash the empty state on open.
-  const pending = deferred !== groups
-
-  return (
-    <>
-      {/* Filtering happens in rankGroups, so cmdk's own CommandEmpty
-          (keyed to its internal filter count) would never fire. */}
-      {deferred.length === 0 && !pending && (
-        <div className="py-6 text-center text-sm text-muted-foreground">{noResultsLabel}</div>
-      )}
-      {deferred.map((group, index) => (
-        <CommandGroup className={HUD_HEADING} heading={group.heading} key={group.heading ?? `palette-group-${index}`}>
-          {group.items.map(item => (
-            <PaletteRow
-              bindings={bindings}
-              item={item}
-              key={item.id}
-              modHeld={modHeld}
-              onSelectItem={onSelectItem}
-              onSelectMods={onSelectMods}
-              search={search}
-            />
-          ))}
-        </CommandGroup>
-      ))}
-    </>
-  )
-})
-
-const PaletteRow = memo(function PaletteRow({
-  bindings,
-  item,
-  modHeld,
-  onSelectMods,
-  onSelectItem,
-  search
-}: {
-  bindings: Record<string, string[]>
-  item: PaletteItem
-  modHeld: boolean
-  onSelectMods: (event: { ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }) => void
-  onSelectItem: (item: PaletteItem) => void
-  search: string
-}) {
-  const Icon = item.icon
-  // The row's live keybind, else a static modifier-variant hint (⌘↵). One slot,
-  // so every downstream `ml-auto` fallback below keeps working unchanged.
-  // `bindingsFor`, not a raw lookup: a plugin's action is contributed after
-  // $bindings was seeded, so its combo only resolves through the fallback chain.
-  const combo = (item.action ? bindingsFor(item.action, bindings)[0] : undefined) ?? item.comboHint
-  // While ⌘/⌃ is held, a row with a modifier variant previews it: the label
-  // swaps to the variant's copy so Enter reads as what it will actually do.
-  const modPreview = modHeld && Boolean(item.modLabel)
-
-  return (
-    <CommandItem
-      className={cn(HUD_ITEM, HUD_TEXT)}
-      keywords={item.keywords}
-      onMouseDown={onSelectMods}
-      onSelect={() => onSelectItem(item)}
-      value={paletteValue(item)}
-    >
-      <Icon className="size-3.5 shrink-0 text-muted-foreground" />
-      <span className={cn('truncate', modPreview && 'text-muted-foreground/80')}>
-        {modPreview ? (
-          item.modLabel
-        ) : (
-          /* Same per-term split as scoreItem's AND matcher, so the emphasis
-             shows exactly which words earned the row its rank. */
-          <HighlightMatches query={search.split(/\s+/)} text={item.label} />
-        )}
-      </span>
-      {item.detail && (
-        <span className={cn(HUD_NOTE, HUD_NOTE_VARIANT[item.detailVariant ?? 'muted'])}>{item.detail}</span>
-      )}
-      {combo && (
-        <KbdCombo className={cn('ml-auto', modPreview ? 'opacity-90' : 'opacity-55')} combo={combo} size="sm" />
-      )}
-      {item.to && <ChevronRight className={cn('size-3.5 shrink-0 text-muted-foreground/70', !combo && 'ml-auto')} />}
-      {item.active && <Check className={cn('size-3.5 shrink-0 text-primary', !combo && !item.to && 'ml-auto')} />}
-    </CommandItem>
-  )
-})
-
-// Hermes session ids: <YYYYMMDD>_<HHMMSS>_<6 hex>. Used to offer a direct
-// "Go to session ‹id›" jump for ids that aren't in the recent-200 list.
 const SESSION_ID_RE = /^\d{8}_\d{6}_[a-f0-9]{6}$/
-
-// A typed/pasted folder path: absolute (`/…`) or a Windows drive (`C:\…`).
-// Deliberately NOT `~/…`: the upsert's membership check (projectIdForCwd)
-// compares literal strings against the tree's absolute paths, so an unexpanded
-// home path would always miss and double-create.
 const FOLDER_PATH_RE = /^(\/|[A-Za-z]:[/\\]).+/
-
 type SessionRow = Awaited<ReturnType<typeof listAllProfileSessions>>['sessions'][number]
-
 const toSessionEntry = (session: SessionRow): SessionEntry => ({
   git_branch: session.git_branch ?? null,
   id: session.id,
   preview: session.preview ?? undefined,
   title: sessionTitle(session)
 })
-
-type NonConfigSettingsLabel =
-  | 'about'
-  | 'archivedChats'
-  | 'gateway'
-  | 'keysSettings'
-  | 'keysTools'
-  | 'mcp'
-  | 'plugins'
-  | 'providerAccounts'
-  | 'providerApiKeys'
-
-const NON_CONFIG_SETTINGS: ReadonlyArray<{
-  icon: IconComponent
-  keywords?: string[]
-  labelKey: NonConfigSettingsLabel
-  tab: string
-}> = [
-  {
-    icon: Zap,
-    keywords: ['accounts', 'sign in', 'oauth', 'login', 'subscription', 'models', 'anthropic', 'openai'],
-    labelKey: 'providerAccounts',
-    tab: 'providers&pview=accounts'
-  },
-  {
-    icon: KeyRound,
-    keywords: ['providers', 'api key', 'keys', 'secrets', 'tokens', 'egress', 'iron proxy', 'sandbox proxy'],
-    labelKey: 'providerApiKeys',
-    tab: 'providers&pview=keys'
-  },
-  {
-    icon: Globe,
-    // The Connections registry merged into the unified Gateways page.
-    keywords: [
-      'connection',
-      'connections',
-      'messaging',
-      'remote',
-      'multi',
-      'instances',
-      'ssh',
-      'cloud',
-      'add gateway',
-      'registry'
-    ],
-    labelKey: 'gateway',
-    tab: 'gateway'
-  },
-  {
-    icon: KeyRound,
-    keywords: ['api', 'secrets', 'tokens', 'credentials', 'browser', 'search'],
-    labelKey: 'keysTools',
-    tab: 'keys&kview=tools'
-  },
-  {
-    icon: Settings2,
-    keywords: ['gateway', 'proxy', 'server', 'webhook', 'env', 'egress proxy', 'iron proxy'],
-    labelKey: 'keysSettings',
-    tab: 'keys&kview=settings'
-  },
-  {
-    icon: Package,
-    keywords: ['plugins', 'extensions', 'desktop plugins', 'addon', 'add-on'],
-    labelKey: 'plugins',
-    tab: 'plugins'
-  },
-  { icon: Archive, keywords: ['history', 'archived'], labelKey: 'archivedChats', tab: 'sessions' },
-  { icon: Info, keywords: ['version', 'about'], labelKey: 'about', tab: 'about' }
-]
-
 const THEME_MODES: ReadonlyArray<{ icon: IconComponent; mode: ThemeMode }> = [
   { icon: Sun, mode: 'light' },
   { icon: Moon, mode: 'dark' },
   { icon: Monitor, mode: 'system' }
 ]
-
-// Which Light/Dark groups a theme belongs in. Built-ins render in both modes
-// (the engine synthesises the missing side). Imported VS Code themes only carry
-// the variant(s) the extension shipped — a single dark theme like Dracula lives
-// under Dark only, while a GitHub/Solarized family (light + dark) lives in both.
-function themeSupportsMode(name: string, target: 'light' | 'dark'): boolean {
-  if (!isUserTheme(name)) {
-    return true
-  }
-
-  const resolved = resolveTheme(name)
-
-  if (!resolved) {
-    return true
-  }
-
-  const background =
-    target === 'dark' ? (resolved.darkColors ?? resolved.colors).background : resolved.colors.background
-
-  return target === 'dark' ? luminance(background) <= 0.5 : luminance(background) > 0.5
-}
-
-/**
- * ⌘K is an overlay that is stateful to itself: pressing it must open a frame
- * immediately, and must not be held up by whatever else the shell is doing. So
- * the mounted cost of a CLOSED palette is one store subscription and nothing
- * else.
- *
- * Everything expensive — a dozen store subscriptions (connection, update
- * status/apply, keybinds, worktrees, projects, theme, i18n), three server
- * queries, and the group builders that assemble a few hundred rows — lives in
- * `CommandPaletteBody`, which only exists while the palette is on screen.
- * Before this split those hooks ran on every render of the always-mounted
- * component: an in-flight update rewrote `$updateApply` per progress line and
- * rebuilt the entire row set each time, for a surface nobody could see.
- *
- * `mounted` lags `open` by the close animation rather than tracking it exactly.
- * Unmounting the body the instant `open` flips false would rip the content out
- * of the tree before Radix could play `data-[state=closed]`, so the overlay
- * would vanish instead of closing. The body reports its own exit via
- * `onExited` (the content's real `animationend`), so nothing here has to know
- * how long that animation is — the CSS owns the duration.
- *
- * The `openCount` key remounts the body per open, which is what lets local
- * search/sub-page state reset without a close effect.
- */
 export function CommandPalette() {
   const open = useStore($commandPaletteOpen)
   const [mounted, setMounted] = useState(open)
@@ -415,7 +175,6 @@ export function CommandPalette() {
     </DialogPrimitive.Root>
   )
 }
-
 function CommandPaletteBody({ onExited }: { onExited: () => void }) {
   const { t } = useI18n()
   const pendingPage = useStore($commandPalettePage)
