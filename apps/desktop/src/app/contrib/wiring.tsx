@@ -15,8 +15,6 @@ import { useLocation, useNavigate } from 'react-router'
 
 import { graftRefreshedTailOntoBackfill } from '@/app/chat/transcript-backfill'
 import { refreshActiveProfile } from '@/application/profile/catalog'
-import { newSessionInProfile } from '@/application/profile/new-session'
-import { ensureGatewayProfile } from '@/application/profile/runtime-selection'
 import { getLatestSessionMessages } from '@/application/session-transcripts'
 import { formatRefValue } from '@/components/assistant-ui/directive-text'
 import { BootFailureOverlay } from '@/components/boot-failure-overlay'
@@ -47,15 +45,11 @@ import {
   titlebarToolsWidthCss
 } from '@/lib/titlebar'
 import { latestSessionTodos } from '@/lib/todos'
-import { activateWakeIndicator } from '@/lib/voice/wake-indicator'
-import { playWakeSound } from '@/lib/voice/wake-sound'
 import { $billingSettingsRequest } from '@/store/billing-block'
 import { $desktopBoot } from '@/store/boot'
-import { requestVoiceConversationStart } from '@/store/composer'
 import { $activeConnectionId } from '@/store/connections'
 import { $cronReviewRequest, setCronFocusJobId } from '@/store/cron'
 import { $pinnedSessionIds, pinSession, restoreWorktree, unpinSession } from '@/store/layout'
-import { notifyError } from '@/store/notifications'
 import { $previewTarget } from '@/store/preview'
 import { $activeGatewayProfile, $freshSessionRequest, $profileScope, ALL_PROFILES, normalizeProfileKey } from '@/store/profile'
 import { $newProjectSessionRequest, $startWorkSessionRequest, followActiveSessionCwd } from '@/store/projects'
@@ -82,7 +76,6 @@ import {
   setMessages
 } from '@/store/session'
 import { clearSessionTodos, setSessionTodos, todosForHydration } from '@/store/todos'
-import { armWakeWord, stopClientCapture } from '@/store/voice/wake-word'
 import { isAuxiliaryWindow, isBrowserWindow, isHudWindow } from '@/store/windows'
 import { useSkinCommand } from '@/theme-composition/use-skin-command'
 
@@ -334,7 +327,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     requestGateway
   })
 
-  const { refreshHermesConfig, sttEnabled, voiceMaxRecordingSeconds } = useHermesConfig({ activeSessionIdRef })
+  const { refreshHermesConfig } = useHermesConfig({ activeSessionIdRef })
 
   const { applySavedMainModel, refreshCurrentModel, selectModel } = useModelControls({
     cacheOwnerConnectionId: activeConnectionId || undefined,
@@ -645,8 +638,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     reloadFromMessage,
     restoreToMessage,
     steerPrompt,
-    submitText,
-    transcribeVoiceAudio
+    submitText
   } = usePromptActions({
     activeSessionId,
     activeSessionIdRef,
@@ -664,7 +656,6 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     runtimeIdByStoredSessionIdRef,
     selectedStoredSessionIdRef,
     startFreshSessionDraft,
-    sttEnabled,
     updateSessionState
   })
 
@@ -764,46 +755,9 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     (event: Parameters<typeof handleDesktopGatewayEvent>[0]) => {
       emitGatewayEvent(event)
 
-      if (event.type === 'wake.detected') {
-        const payload = event.payload as { profile?: null | string; start_new_session?: boolean } | undefined
-
-        // Free the Mac mic so voice conversation can open getUserMedia.
-        // Server already pauses the detector lease; this stops client PCM feed.
-        stopClientCapture()
-
-        // Audible confirmation that the wake registered, before voice capture
-        // starts. Gated by the shared sound-mute toggle.
-        playWakeSound()
-        activateWakeIndicator()
-
-        // Multi-profile routing: a wake phrase enrolled by another profile
-        // re-homes the gateway to that profile first (live swap — same path
-        // as clicking it in the profile rail), then opens the fresh session
-        // and starts voice there.
-        const targetProfile = payload?.profile?.trim()
-        const activeProfile = normalizeProfileKey($activeGatewayProfile.get())
-
-        if (targetProfile && normalizeProfileKey(targetProfile) !== activeProfile) {
-          if (payload?.start_new_session !== false) {
-            newSessionInProfile(targetProfile)
-          } else {
-            void ensureGatewayProfile(normalizeProfileKey(targetProfile)).catch((error: unknown) => {
-              // #81094: the voice-path switch must surface its failure too.
-              notifyError(error, `Failed to switch to profile "${normalizeProfileKey(targetProfile)}"`)
-            })
-          }
-        } else if (payload?.start_new_session !== false) {
-          startFreshSessionDraft()
-        }
-
-        requestVoiceConversationStart()
-
-        return
-      }
-
       handleDesktopGatewayEvent(event)
     },
-    [handleDesktopGatewayEvent, startFreshSessionDraft]
+    [handleDesktopGatewayEvent]
   )
 
   useGatewayBoot({
@@ -823,14 +777,6 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     refreshHermesConfig,
     refreshSessions
   })
-
-  useEffect(() => {
-    if (gatewayState === 'open') {
-      // Status-then-arm, syncing $wakeWord so the composer toggle reflects the
-      // same listener this auto-arm claims.
-      void armWakeWord(requestGateway)
-    }
-  }, [gatewayState, requestGateway])
 
   const activeIsMessaging =
     !!selectedStoredSessionId &&
@@ -1056,7 +1002,6 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     onSubmit: submitText,
     onThreadMessagesChange: handleThreadMessagesChange,
     onToggleSelectedPin: toggleSelectedPin,
-    onTranscribeAudio: transcribeVoiceAudio,
     onTriggerCronJob: jobId =>
       triggerAndRefreshCronJobs(jobId, profileScope === ALL_PROFILES ? 'all' : profileScope)
         .then(() => undefined)
@@ -1101,12 +1046,9 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     [actions, agentsOpen, chatOpen, commandCenterOpen]
   )
 
-  // The voice cap changes only on config load; the gateway instance + all
-  // chat reactivity are subscribed inside ChatRoutesSurface / ChatView.
-  const chatRoutesNode = useMemo(
-    () => <ChatRoutesSurface actions={actions} maxVoiceRecordingSeconds={voiceMaxRecordingSeconds} />,
-    [actions, voiceMaxRecordingSeconds]
-  )
+  // The gateway instance + all chat reactivity are subscribed inside
+  // ChatRoutesSurface / ChatView.
+  const chatRoutesNode = useMemo(() => <ChatRoutesSurface actions={actions} />, [actions])
 
   const api = useMemo<WiringApi>(
     () => ({

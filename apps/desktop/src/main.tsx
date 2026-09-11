@@ -35,7 +35,7 @@ import { ThemeProvider } from './theme-composition'
 
 // Route profile-scoped REST/WS calls at the profile the live gateway is on, and
 // drop the previous profile's caches when the route moves. Started HERE, once,
-// for every window shape (main, HUD, overlay, quick entry, wake indicator) —
+// for every window shape (main, HUD, overlay, quick entry) —
 // this used to happen implicitly by importing the profile store, which meant no
 // window could opt out and nothing could stop it.
 startActiveProfileRouting()
@@ -64,8 +64,6 @@ if (winParam === 'overlay') {
   void import('./app/pet-overlay/overlay-root').then(({ mountPetOverlay }) => mountPetOverlay())
 } else if (winParam === 'quick') {
   void import('./app/quick-entry/quick-entry-root').then(({ mountQuickEntry }) => mountQuickEntry())
-} else if (winParam === 'wake') {
-  void import('./app/wake-indicator/wake-indicator-root').then(({ mountWakeIndicator }) => mountWakeIndicator())
 } else {
   // CSS animations do not inherit Chromium's JS-loop pause policy. Mirror the
   // main window's visibility state to :root so decorative infinite

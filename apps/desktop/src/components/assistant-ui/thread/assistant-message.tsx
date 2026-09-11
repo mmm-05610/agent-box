@@ -26,28 +26,22 @@ import { AGENT_MESSAGE_RE } from '@/components/assistant-ui/thread/user-message'
 import { TooltipIconButton } from '@/components/assistant-ui/tooltip-icon-button'
 import { formatElapsed } from '@/components/chat/activity-timer'
 import { PreviewAttachment } from '@/components/chat/preview-attachment'
-import { useSessionView } from '@/components/chat/session-view'
 import { Codicon } from '@/components/ui/codicon'
 import { CopyButton } from '@/components/ui/copy-button'
 import { useI18n } from '@/i18n'
 import { type ErrorSurface, formatErrorDiagnostics, isOAuthReauthSurface } from '@/lib/error-surface'
 import { triggerHaptic } from '@/lib/haptics'
 import {
-  AudioLines,
   GitForkIcon,
   KeyRound,
-  Loader2Icon,
   RefreshCwIcon,
   SmilePlusIcon,
   Upload,
-  VolumeXIcon,
   XIcon
 } from '@/lib/icons'
 import { extractPreviewTargets } from '@/lib/preview-targets'
-import { markAssistantIdSpoken } from '@/lib/spoken-reply'
 import { useEnterAnimation } from '@/lib/use-enter-animation'
 import { cn } from '@/lib/utils'
-import { playSpeechText, stopVoicePlayback } from '@/lib/voice/voice-playback'
 import { notifyError } from '@/store/notifications'
 import { startManualProviderOAuth } from '@/store/onboarding'
 import { normalizeProfileKey } from '@/store/profile/identity'
@@ -55,7 +49,6 @@ import { requestFreshSession } from '@/store/profile/request-atoms'
 import { $activeGatewayProfile } from '@/store/profile/runtime-route-state'
 import { requestSendDiagnostics } from '@/store/send-diagnostics'
 import { $connection, $currentModel } from '@/store/session'
-import { $voicePlayback } from '@/store/voice/voice-playback'
 
 // Stable empty identity for the settled-parts selector — a fresh [] per render
 // would re-derive the changed-files card on every message re-render.
@@ -686,7 +679,6 @@ const AssistantActionBar: FC<MessageActionProps & { durationS?: number }> = ({
           </TooltipIconButton>
         )}
         <CopyButton appearance="icon" buttonSize="icon" label={copy.copy} text={getMessageText} />
-        <ReadAloudButton getText={getMessageText} messageId={messageId} />
         <ActionBarPrimitive.Reload asChild>
           <TooltipIconButton onClick={() => triggerHaptic('submit')} tooltip={copy.refresh}>
             <RefreshCwIcon className="size-3.5" />
@@ -730,51 +722,6 @@ const AssistantActionBar: FC<MessageActionProps & { durationS?: number }> = ({
         </ReactionPicker>
       )}
     </div>
-  )
-}
-
-const ReadAloudButton: FC<{ getText: () => string; messageId: string }> = ({ getText, messageId }) => {
-  const { t } = useI18n()
-  const copy = t.assistant.thread
-  const voicePlayback = useStore($voicePlayback)
-  const view = useSessionView()
-  const sessionId = useStore(view.$runtimeId)
-
-  const readAloudStatus =
-    voicePlayback.source === 'read-aloud' && voicePlayback.messageId === messageId ? voicePlayback.status : 'idle'
-
-  const isPreparing = readAloudStatus === 'preparing'
-  const isSpeaking = readAloudStatus === 'speaking'
-  const anyPlaybackActive = voicePlayback.status !== 'idle'
-  const Icon = isPreparing ? Loader2Icon : isSpeaking ? VolumeXIcon : AudioLines
-  const tooltip = isPreparing ? copy.preparingAudio : isSpeaking ? copy.stopReading : copy.readAloud
-
-  const read = useCallback(async () => {
-    const text = getText()
-
-    if (!text || $voicePlayback.get().status !== 'idle') {
-      return
-    }
-
-    try {
-      await playSpeechText(text, { messageId, source: 'read-aloud' })
-      markAssistantIdSpoken(sessionId, view.$messages.get(), messageId)
-    } catch (error) {
-      notifyError(error, copy.readAloudFailed)
-    }
-  }, [copy.readAloudFailed, getText, messageId, sessionId, view.$messages])
-
-  return (
-    <TooltipIconButton
-      disabled={isPreparing || (!isSpeaking && anyPlaybackActive)}
-      onClick={() => {
-        triggerHaptic('selection')
-        void (isSpeaking ? stopVoicePlayback() : read())
-      }}
-      tooltip={tooltip}
-    >
-      <Icon className={cn('size-3.5', isPreparing && 'animate-spin')} />
-    </TooltipIconButton>
   )
 }
 

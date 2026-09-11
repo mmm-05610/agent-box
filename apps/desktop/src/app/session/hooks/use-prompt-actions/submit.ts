@@ -6,12 +6,6 @@ import { type ChatMessage, textPart } from '@/lib/chat-messages'
 import { optimisticAttachmentRef } from '@/lib/chat-runtime'
 import { sanitizeComposerInput } from '@/lib/composer-input-sanitize'
 import { setMutableRef } from '@/lib/mutable-ref'
-import {
-  isVoicePlaybackActive,
-  markVoicePlaybackInterrupted,
-  stopVoicePlayback,
-  takeVoicePlaybackInterrupted
-} from '@/lib/voice/voice-playback'
 import { $composerAttachments, mainComposerScope, terminalContextBlocksFromDraft } from '@/store/composer'
 import { $hudMode } from '@/store/hud'
 import { clearNotifications, notify, notifyError } from '@/store/notifications'
@@ -175,12 +169,6 @@ export function useSubmitPrompt(deps: SubmitPromptDeps) {
         return false
       }
 
-      // Typing barge-in: a new send silences any in-flight spoken reply.
-      if (isVoicePlaybackActive()) {
-        markVoicePlaybackInterrupted()
-        stopVoicePlayback()
-      }
-
       // The gateway already told us this profile has no usable provider (a
       // credential warning arrived with the session's runtime info, deferred
       // instead of popping onboarding on the mere profile switch). The user
@@ -197,10 +185,6 @@ export function useSubmitPrompt(deps: SubmitPromptDeps) {
           return false
         }
       }
-
-      // Barged mid-speech (here or via the voice loop's VAD)? Flag the submit
-      // so the backend notes the interruption to the model.
-      const interrupted = takeVoicePlaybackInterrupted()
 
       // Queue drains carry their source session explicitly. A background drain
       // must never inherit the currently selected session after the user moves
@@ -753,7 +737,6 @@ export function useSubmitPrompt(deps: SubmitPromptDeps) {
         const submitParams = (targetId: string) => ({
           session_id: targetId,
           text,
-          ...(interrupted && { interrupted }),
           // Off-screen widget intent: the gateway types the persisted user
           // row display_kind=hidden so no client renders it as a bubble.
           ...(options?.displayKind === 'hidden' && { display_kind: 'hidden' }),

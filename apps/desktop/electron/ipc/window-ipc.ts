@@ -31,7 +31,6 @@ export interface RegisterWindowIpcDeps {
   createSessionWindow: any
   createInstanceWindow: any
   createBrowserWindow: any
-  wakeIndicatorController: any
   setAndPersistZoomLevel: any
   getPreviewShortcutActive: () => any
   setPreviewShortcutActive: (value: any) => void
@@ -57,7 +56,7 @@ export interface RegisterWindowIpcDeps {
   ensureFoundInPageForwarder: any
 }
 
-export function registerWindowIpc({ createSessionWindow, createInstanceWindow, createBrowserWindow, wakeIndicatorController, setAndPersistZoomLevel, getPreviewShortcutActive, setPreviewShortcutActive, IS_MAC, claimedAmbientCue, lastContextMenuPoint, activeWorkByWebContents, updateStreamThrottleFromActiveWork, KEEP_AWAKE_CONFIG_PATH, keepAwake, readQuickEntrySettings, quickEntryShortcut, writeQuickEntrySettings, applyQuickEntrySettings, getMainWindow, hideQuickEntryWindow, getQuickEntryWindow, getQuickEntryLastState, setQuickEntryLastState, getF12Blocked, setF12Blocked, DISABLE_F12_CONFIG_PATH, ensureFoundInPageForwarder }: RegisterWindowIpcDeps) {
+export function registerWindowIpc({ createSessionWindow, createInstanceWindow, createBrowserWindow, setAndPersistZoomLevel, getPreviewShortcutActive, setPreviewShortcutActive, IS_MAC, claimedAmbientCue, lastContextMenuPoint, activeWorkByWebContents, updateStreamThrottleFromActiveWork, KEEP_AWAKE_CONFIG_PATH, keepAwake, readQuickEntrySettings, quickEntryShortcut, writeQuickEntrySettings, applyQuickEntrySettings, getMainWindow, hideQuickEntryWindow, getQuickEntryWindow, getQuickEntryLastState, setQuickEntryLastState, getF12Blocked, setF12Blocked, DISABLE_F12_CONFIG_PATH, ensureFoundInPageForwarder }: RegisterWindowIpcDeps) {
 ipcMain.handle('hermes:window:openSession', async (_event, sessionId, opts) => {
   if (typeof sessionId !== 'string' || !sessionId.trim()) {
     return { ok: false, error: 'invalid-session-id' }
@@ -87,12 +86,6 @@ ipcMain.handle('hermes:window:openBrowser', async (_event, tabId) => {
   return { ok: true }
 })
 
-ipcMain.handle('hermes:wake-indicator:get', () => wakeIndicatorController.getState())
-
-ipcMain.on('hermes:wake-indicator:set', (_event, state) => {
-  wakeIndicatorController.setState(state)
-})
-
 ipcMain.handle('hermes:zoom:get', event => {
   const window = BrowserWindow.fromWebContents(event.sender)
 
@@ -113,14 +106,6 @@ ipcMain.on('hermes:zoom:set-percent', (event, percent) => {
 
 ipcMain.on('hermes:previewShortcutActive', (_event, active) => {
   setPreviewShortcutActive(Boolean(active))
-})
-
-ipcMain.handle('hermes:requestMicrophoneAccess', async () => {
-  if (!IS_MAC || typeof systemPreferences.askForMediaAccess !== 'function') {
-    return true
-  }
-
-  return systemPreferences.askForMediaAccess('microphone')
 })
 
 ipcMain.handle('hermes:window:readBelow', async event => {

@@ -124,9 +124,9 @@ export function writePersistedTranslucency(state) {
 let translucencyState = readPersistedTranslucency()
 
 // Chat windows whose webContents backing follows translucency (primary,
-// instance peers, session windows). The HUD / pet overlay / quick entry /
-// wake indicator are `transparent: true` windows that own their backgrounds —
-// painting a themed backing onto them would turn them into opaque rectangles.
+// instance peers, session windows). The HUD / pet overlay / quick entry
+// are `transparent: true` windows that own their backgrounds — painting a
+// themed backing onto them would turn them into opaque rectangles.
 export const translucencyBackedWindows = new WeakSet()
 
 // Set a live window's native opacity, but only when the state asks it to fade
@@ -211,8 +211,8 @@ export function applyWindowTranslucency(win, changed = { backing: true, material
 // themed anti-flash backing.
 //
 // Call sites also register the window in translucencyBackedWindows so a live
-// toggle can re-apply. The HUD, pet overlay, quick entry and wake indicator
-// are `transparent: true` windows that own their backgrounds and are
+// toggle can re-apply. The HUD, pet overlay and quick entry are
+// `transparent: true` windows that own their backgrounds and are
 // deliberately not chat windows.
 export function chatWindowSurfaceOptions() {
   return {

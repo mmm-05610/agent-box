@@ -8,8 +8,7 @@ import {
   Menu,
   powerMonitor,
   powerSaveBlocker,
-  safeStorage,
-  screen
+  safeStorage
 } from 'electron'
 
 import {
@@ -63,7 +62,7 @@ import {
   watchDirectory,
   watchPreviewFile,
 } from './composition/api-proxy-composition'
-import { _clearNativeTokens, _storeNativeTokens, applyUpdates, backendConnectionState, backendDialClaims, backendShutdown, closePetOverlay, createSessionWindow, createWindow, decryptDesktopSecret, decryptRemoteHeaders, DEFAULT_UPDATE_BRANCH, defaultProjectDirConfigPath, DESKTOP_LOG_PATH, DEV_CDP, ensureBackend, ensureNativeAccessToken, ensureRegistryBackend, exitAfterBackendShutdown, fetchJsonForBackend, fetchPublicJson, gatewayAuthProviders, get_rendererReadyForDeepLink, getBackendStartFailure, getBootProgressState, getBootstrapAbortController, getBootstrapFailure, getBootstrapRepairAttempt, getBootstrapRepairRequested, getBootstrapState, getF12Blocked, getFirstRunSetupGate, getIsQuittingForHandoff, getMainWindow, getOauthSession, getOauthSessionForUrl, getPetOverlayWindow, getPoolLimits, getPreviewShortcutActive, getRemoteReauthFailure, getWindowsNoSandboxRelaunchAttempted, getWindowsSandboxFallbackActive, getWindowsSandboxFallbackSticky, GLASS_SUPPORTED, hasLiveOauthSession, hasNativeSession, INSTALL_STAMP, IS_PACKAGED, isPackagedInstallPath, isPrimaryInstance, lastContextMenuPoint, loadInstallStamp, managedConnectionUpdateGate, mintGatewayWsTicket, openExternalUrl, PASSWORD_STORE, postJsonNoAuth, primaryBackendIsRemote, primaryProfileKey, PROFILE_NAME_RE, profileDeletionGate, readActiveDesktopProfile, readDefaultProjectDir, readDesktopConnectionConfig, readDesktopConnectionsRegistry, readDesktopUpdateConfig, rememberRemoteWsHeaders, REMOTE_DISPLAY_REASON, resetBootstrapSnapshot, resolveGitBinary, resolveHermesCwd, resolveUpdateRoot, secretStoragePolicy, set_rendererReadyForDeepLink, setAndPersistZoomLevel, setBackendStartFailure, setBootstrapFailure, setBootstrapRepairAttempt, setBootstrapRepairRequested, setF12Blocked, setPreviewShortcutActive, setRemoteReauthFailure, setWindowsNoSandboxRelaunchAttempted, setWindowsSandboxFallbackActive, setWindowsSandboxFallbackReason, setWindowsSandboxFallbackSticky, SKIP_QUIT_CONFIRM, spawnPriorityFrom, sshBootstrapCoordinator, sshConnections, sshScopeKey, startHermes, stopPoolBackend, streamThrottle, teardownSshConnection, terminalIpc, TRANSLUCENCY_SUPPORTED, wakeIndicatorController, windowConnectionRoutes, writeActiveDesktopProfile, writeDesktopConnectionConfig, writeDesktopConnectionsRegistry, writeDesktopUpdateConfig } from './composition/bootstrap-env-composition'
+import { _clearNativeTokens, _storeNativeTokens, applyUpdates, backendConnectionState, backendDialClaims, backendShutdown, closePetOverlay, createSessionWindow, createWindow, decryptDesktopSecret, decryptRemoteHeaders, DEFAULT_UPDATE_BRANCH, defaultProjectDirConfigPath, DESKTOP_LOG_PATH, DEV_CDP, ensureBackend, ensureNativeAccessToken, ensureRegistryBackend, exitAfterBackendShutdown, fetchJsonForBackend, fetchPublicJson, gatewayAuthProviders, get_rendererReadyForDeepLink, getBackendStartFailure, getBootProgressState, getBootstrapAbortController, getBootstrapFailure, getBootstrapRepairAttempt, getBootstrapRepairRequested, getBootstrapState, getF12Blocked, getFirstRunSetupGate, getIsQuittingForHandoff, getMainWindow, getOauthSession, getOauthSessionForUrl, getPetOverlayWindow, getPoolLimits, getPreviewShortcutActive, getRemoteReauthFailure, getWindowsNoSandboxRelaunchAttempted, getWindowsSandboxFallbackActive, getWindowsSandboxFallbackSticky, GLASS_SUPPORTED, hasLiveOauthSession, hasNativeSession, INSTALL_STAMP, IS_PACKAGED, isPackagedInstallPath, isPrimaryInstance, lastContextMenuPoint, loadInstallStamp, managedConnectionUpdateGate, mintGatewayWsTicket, openExternalUrl, PASSWORD_STORE, postJsonNoAuth, primaryBackendIsRemote, primaryProfileKey, PROFILE_NAME_RE, profileDeletionGate, readActiveDesktopProfile, readDefaultProjectDir, readDesktopConnectionConfig, readDesktopConnectionsRegistry, readDesktopUpdateConfig, rememberRemoteWsHeaders, REMOTE_DISPLAY_REASON, resetBootstrapSnapshot, resolveGitBinary, resolveHermesCwd, resolveUpdateRoot, secretStoragePolicy, set_rendererReadyForDeepLink, setAndPersistZoomLevel, setBackendStartFailure, setBootstrapFailure, setBootstrapRepairAttempt, setBootstrapRepairRequested, setF12Blocked, setPreviewShortcutActive, setRemoteReauthFailure, setWindowsNoSandboxRelaunchAttempted, setWindowsSandboxFallbackActive, setWindowsSandboxFallbackReason, setWindowsSandboxFallbackSticky, SKIP_QUIT_CONFIRM, spawnPriorityFrom, sshBootstrapCoordinator, sshConnections, sshScopeKey, startHermes, stopPoolBackend, streamThrottle, teardownSshConnection, terminalIpc, TRANSLUCENCY_SUPPORTED, windowConnectionRoutes, writeActiveDesktopProfile, writeDesktopConnectionConfig, writeDesktopConnectionsRegistry, writeDesktopUpdateConfig } from './composition/bootstrap-env-composition'
 import {
   discoverCloudAgents,
   hasLivePortalSession,
@@ -759,7 +758,6 @@ registerWindowIpc({
   createSessionWindow,
   createBrowserWindow,
   createInstanceWindow,
-  wakeIndicatorController,
   getQuickEntryWindow: () => getQuickEntryWindow(),
   getQuickEntryLastState: () => getQuickEntryLastState(),
   setQuickEntryLastState: value => (setQuickEntryLastState(value)),
@@ -896,16 +894,6 @@ app.whenReady().then(() => {
   // here and surfaced in Settings via the IPC state (never silent).
   quickEntrySettings.apply(quickEntrySettings.read())
 
-  if (IS_MAC) {
-    const reposition = () => wakeIndicatorController.reposition()
-
-    screen.on('display-added', reposition)
-
-    screen.on('display-metrics-changed', reposition)
-
-    screen.on('display-removed', reposition)
-  }
-
   // A hard crash can interrupt the in-memory restore loop after exact remote
   // serves were drained. The owner-only recovery journal survives that crash;
   // its worker waits for the install marker to clear, then reopens every scope
@@ -1034,7 +1022,6 @@ app.on('before-quit', event => {
   // The always-on-top overlay isn't a "real" app window; close it so a stray
   // pet can't keep the process alive or float over a quit app.
   closePetOverlay()
-  wakeIndicatorController.close()
 
   // Same for the HUD — an always-on-top panel outliving the app would leave a
   // floating composer with nothing behind it. Close it directly rather than via

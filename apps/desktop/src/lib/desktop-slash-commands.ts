@@ -67,14 +67,13 @@ export type DesktopActionId =
   | 'skin'
   | 'stop'
   | 'title'
-  | 'wake'
   | 'yolo'
 
 /** A command fulfilled by opening a desktop overlay picker. */
 export type DesktopPickerId = 'model' | 'session'
 
 /** Why a known Hermes command has no desktop UI surface. */
-export type DesktopUnavailableReason = 'advanced' | 'composer-voice' | 'messaging' | 'settings' | 'terminal'
+export type DesktopUnavailableReason = 'advanced' | 'messaging' | 'settings' | 'terminal'
 
 /**
  * How the desktop fulfils a command. This is the single discriminator the
@@ -186,12 +185,6 @@ const DESKTOP_COMMAND_SPECS: readonly DesktopCommandSpec[] = [
     surface: action('branch')
   },
   { name: '/yolo', description: 'Toggle YOLO — auto-approve dangerous commands', surface: action('yolo') },
-  {
-    name: '/wake',
-    description: 'Control the desktop wake-word listener [on|off|status]',
-    surface: action('wake'),
-    argumentMode: 'options'
-  },
   {
     name: '/handoff',
     description: 'Hand off this session to a messaging platform',
@@ -314,7 +307,11 @@ const NO_DESKTOP_SURFACE: Record<DesktopUnavailableReason, readonly string[]> = 
     '/statusbar',
     '/toolsets',
     '/update',
-    '/verbose'
+    '/verbose',
+    // /voice arms SERVER-side capture (voice.record → PortAudio on the backend
+    // host). The desktop has no voice surface of its own, so this is terminal
+    // interface only.
+    '/voice'
   ],
   messaging: ['/approve', '/deny'],
   settings: ['/skills', '/pets'],
@@ -328,12 +325,7 @@ const NO_DESKTOP_SURFACE: Record<DesktopUnavailableReason, readonly string[]> = 
     '/reload_mcp',
     '/reload-skills',
     '/reload_skills'
-  ],
-  // /voice arms SERVER-side capture (voice.record → PortAudio on the backend
-  // host) — meaningless on desktop, which has its own composer-native voice
-  // conversation (mic menu / Ctrl+B) with client-side capture and playback.
-  // Point the user at the button instead of a generic "advanced" shrug.
-  'composer-voice': ['/voice']
+  ]
 }
 
 const ALL_SPECS: readonly DesktopCommandSpec[] = [
@@ -387,7 +379,6 @@ function catalogCanonical(normalized: string): string | undefined {
 function asUnavailableReason(value: string | null | undefined): DesktopUnavailableReason | null {
   if (
     value === 'advanced' ||
-    value === 'composer-voice' ||
     value === 'messaging' ||
     value === 'settings' ||
     value === 'terminal'
@@ -443,8 +434,6 @@ function isAliasCommand(command: string): boolean {
 const UNAVAILABLE_MESSAGE: Record<DesktopUnavailableReason, (command: string) => string> = {
   advanced: command =>
     `${command} is not shown in the desktop slash palette. Use the relevant desktop control or terminal interface instead.`,
-  'composer-voice': () =>
-    'Voice chat lives in the composer here: click the microphone button and choose "Start voice chat" (or press Ctrl+B).',
   messaging: command => `${command} is only used from messaging platforms.`,
   settings: command => `${command} is managed from the desktop sidebar.`,
   terminal: command => `${command} is only available in the terminal interface.`

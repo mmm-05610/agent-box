@@ -42,16 +42,6 @@ contextBridge.exposeInMainWorld('hermesDesktop', {
     return () => ipcRenderer.removeListener('hermes:browser-popout:closed', listener)
   },
   claimAmbientCue: key => ipcRenderer.invoke('hermes:ambient:claim', key),
-  wakeIndicator: {
-    getState: () => ipcRenderer.invoke('hermes:wake-indicator:get'),
-    setState: state => ipcRenderer.send('hermes:wake-indicator:set', state),
-    onState: callback => {
-      const listener = (_event, state) => callback(state)
-      ipcRenderer.on('hermes:wake-indicator:state', listener)
-
-      return () => ipcRenderer.removeListener('hermes:wake-indicator:state', listener)
-    }
-  },
   petOverlay: {
     // Main renderer → main process: window lifecycle + drag. `request` is
     // `{ bounds, screen }`; resolves with the screen bounds it actually used.
@@ -228,7 +218,6 @@ contextBridge.exposeInMainWorld('hermesDesktop', {
   },
   api: request => ipcRenderer.invoke('hermes:api', request),
   notify: payload => ipcRenderer.invoke('hermes:notify', payload),
-  requestMicrophoneAccess: () => ipcRenderer.invoke('hermes:requestMicrophoneAccess'),
   readWindowBelow: () => ipcRenderer.invoke('hermes:window:readBelow'),
   readFileDataUrl: filePath => ipcRenderer.invoke('hermes:readFileDataUrl', filePath),
   readFileDataUrlForAttach: filePath => ipcRenderer.invoke('hermes:readFileDataUrlForAttach', filePath),

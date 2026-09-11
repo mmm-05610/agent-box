@@ -1,10 +1,10 @@
 // Completion sound bank for agent turn-end cues.
 // Fourteen curated presets for A/B in Settings → Appearance. Default is variant 1.
 
-import { getAudioContext } from '@/lib/voice/audio-context'
+import { getAudioContext } from '@/lib/sound/audio-context'
 import { ownsAmbientCue } from '@/store/ambient'
 import { $hapticsMuted } from '@/store/haptics'
-import { $completionSoundVariantId, resolveCompletionSoundVariantId } from '@/store/voice/completion-sound'
+import { $completionSoundVariantId, resolveCompletionSoundVariantId } from '@/store/sound/completion-sound'
 
 type OscType = OscillatorType
 

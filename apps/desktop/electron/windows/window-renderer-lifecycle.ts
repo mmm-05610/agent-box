@@ -80,7 +80,7 @@ export interface FailedLoadDetails {
 
 export interface WindowRendererLifecycleOptions {
   /** Stable label used in log lines: 'main' | 'secondary' | 'instance' |
-   *  'overlay' | 'quick' | 'wake'. */
+   *  'overlay' | 'quick'. */
   kind: string
   callbacks: {
     log: (message: string) => void

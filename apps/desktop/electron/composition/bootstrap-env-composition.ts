@@ -288,7 +288,6 @@ import {
   glassSupportedOn,
   translucencySupportedOn
 } from '../windows/translucency'
-import { createWakeIndicatorWindowController } from '../windows/wake-indicator-window'
 import { installWindowRendererLifecycle } from '../windows/window-renderer-lifecycle'
 import { createWindowRevealController } from '../windows/window-reveal'
 import {
@@ -6942,16 +6941,6 @@ export function createSessionWindow(sessionId, { profile = null, watch = false }
   return sessionWindows.openOrFocus(sessionId, () => spawnSecondaryWindow({ sessionId, profile, watch }))
 }
 
-export const wakeIndicatorController = createWakeIndicatorWindowController({
-  devServer: DEV_SERVER,
-  isMac: IS_MAC,
-  loadWindowUrl,
-  log: rememberLog,
-  preloadPath: PRELOAD_PATH,
-  rendererIndex: resolveRendererIndex,
-  wireWindow: window => wireCommonWindowHandlers(window, zoomWiringForWindowKind('wakeIndicator'))
-})
-
 export let petOverlayWindow = null
 
 export function closePetOverlay() {
@@ -7074,7 +7063,6 @@ export function createWindow() {
   // the closed wrapper remains truthy, so clear only the window this callback owns.
   mainWindow.on('closed', () => {
     closePetOverlay()
-    wakeIndicatorController.close()
 
     if (mainWindow === createdMainWindow) {
       mainWindow = null

@@ -129,16 +129,15 @@ describe('desktop slash command curation', () => {
     expect(isDesktopSlashSuggestion('/curator')).toBe(false)
   })
 
-  it('/voice points at the composer voice button instead of the generic advanced message', () => {
-    // /voice arms server-side capture — on the desktop the composer's own
-    // voice conversation (mic menu / Ctrl+B) is the surface. A user typing
-    // /voice must be told where the button IS, not shrugged at.
-    expect(resolveDesktopCommand('/voice')?.surface).toEqual({ kind: 'unavailable', reason: 'composer-voice' })
+  it('/voice is terminal-only, now that the desktop ships no voice surface', () => {
+    // /voice arms server-side capture (voice.record → PortAudio on the backend
+    // host). With no desktop voice feature there is no button to point at, so
+    // the honest answer is the terminal interface.
+    expect(resolveDesktopCommand('/voice')?.surface).toEqual({ kind: 'unavailable', reason: 'terminal' })
     expect(isDesktopSlashCommand('/voice')).toBe(false)
 
     const message = desktopSlashUnavailableMessage('/voice')
-    expect(message).toContain('microphone button')
-    expect(message).toContain('Ctrl+B')
+    expect(message).toContain('terminal interface')
   })
 
   it('routes /compact to /compress (context compression), not the TUI display toggle', () => {
@@ -169,14 +168,6 @@ describe('desktop slash command curation', () => {
     expect(resolveDesktopCommand('/pets')?.surface).toEqual({ kind: 'unavailable', reason: 'settings' })
     expect(isDesktopSlashSuggestion('/pets')).toBe(false)
     expect(isDesktopSlashCommand('/pets')).toBe(false)
-  })
-
-  it('routes /wake through the desktop wake action instead of the slash worker', () => {
-    expect(resolveDesktopCommand('/wake')?.surface).toEqual({ kind: 'action', action: 'wake' })
-    expect(desktopSlashCommandArgumentMode('/wake')).toBe('options')
-    expect(isDesktopSlashSuggestion('/wake')).toBe(true)
-    expect(isDesktopSlashCommand('/wake')).toBe(true)
-    expect(desktopSlashUnavailableMessage('/wake')).toBeNull()
   })
 
   it('routes /stop through the desktop action that cancels the active turn', () => {

@@ -35,7 +35,6 @@ import type {
 
 import { EnvVarActionsMenu, EnvVarActionsTrigger, EnvVarContextMenu } from './env-var-actions-menu'
 import { Pill } from './primitives'
-import { VoiceProviderFields } from './voice-provider-fields'
 
 interface ToolsetConfigPanelProps {
   toolset: string
@@ -885,12 +884,6 @@ export function ToolsetConfigPanel({ toolset, onConfiguredChange, profile }: Too
                     profile={profile}
                     toolset={toolset}
                   />
-                )}
-                {toolset === 'tts' && provider.tts_provider && (
-                  // Voice/model settings for this backend (tts.<key>.*) —
-                  // the same fields Settings → Voice renders, inline so the
-                  // Capabilities panel is a complete setup surface.
-                  <VoiceProviderFields providerKey={provider.tts_provider} section="tts" />
                 )}
                 {MODEL_CATALOG_TOOLSETS.has(toolset) && (
                   <ModelCatalogPicker

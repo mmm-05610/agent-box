@@ -243,14 +243,6 @@ export interface Translations {
     voice: {
       configureSpeechToText: string
       couldNotStartSession: string
-      microphoneAccessDenied: string
-      microphoneConstraintsUnsupported: string
-      microphoneFailed: string
-      microphoneInUse: string
-      microphonePermissionDenied: string
-      microphoneStartFailed: string
-      microphoneUnsupported: string
-      noMicrophone: string
       noSpeechDetected: string
       playbackFailed: string
       recordingFailed: string
@@ -2224,32 +2216,11 @@ export interface Translations {
     placeholderFollowUp: string
     newSessionPlaceholders: readonly string[]
     followUpPlaceholders: readonly string[]
-    startVoice: string
     openDirective: string
     queueMessage: string
     steer: string
     stop: string
     send: string
-    speaking: string
-    transcribing: string
-    thinking: string
-    muted: string
-    listening: string
-    muteMic: string
-    unmuteMic: string
-    stopListening: string
-    stopShort: string
-    endConversation: string
-    endShort: string
-    stopDictation: string
-    transcribingDictation: string
-    voiceControls: string
-    voiceDictation: string
-    speakReplies: string
-    stopSpeakingReplies: string
-    wakeWordListening: (phrase: string) => string
-    wakeWordOff: (phrase: string) => string
-    wakeWordPausedVoice: (phrase: string) => string
     lookupLoading: string
     lookupNoMatches: string
     lookupTry: string
@@ -2284,8 +2255,6 @@ export interface Translations {
     previewLabel: (label: string) => string
     couldNotPreview: (label: string) => string
     removeAttachment: (label: string) => string
-    dictating: string
-    preparingAudio: string
     speakingResponse: string
     readingAloud: string
     themeSuggestions: string
@@ -2833,7 +2802,6 @@ export interface Translations {
       }
       contextUsagePanel: {
         categories: {
-          conversation: string
           mcp: string
           memory: string
           rules: string
@@ -3128,10 +3096,7 @@ export interface Translations {
       errorSendDiagnostics: string
       filesChanged: (count: number) => string
       reviewChanges: string
-      readAloudFailed: string
-      preparingAudio: string
       stopReading: string
-      readAloud: string
       editMessage: string
       expandMessage: string
       scrollToBottom: string
@@ -3285,7 +3250,6 @@ export interface Translations {
     noProfileNamed: (target: string, available: string) => string
     newChatsProfile: (name: string) => string
     setProfileFailed: string
-    sttDisabled: string
     stopFailed: string
     regenerateFailed: string
     editFailed: string

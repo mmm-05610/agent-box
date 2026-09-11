@@ -335,7 +335,6 @@ function Harness({
     runtimeIdByStoredSessionIdRef: cache.runtimeIdByStoredSessionIdRef,
     selectedStoredSessionIdRef: cache.selectedStoredSessionIdRef,
     startFreshSessionDraft: sessionActions.startFreshSessionDraft,
-    sttEnabled: false,
     updateSessionState: cache.updateSessionState
   })
 

@@ -1,4 +1,4 @@
-import { type MutableRefObject, useCallback, useRef, useState } from 'react'
+import { type MutableRefObject, useCallback, useRef } from 'react'
 
 import { setTerminalFontFamilyFromConfig } from '@/app/right-sidebar/terminal/terminal-font'
 import { getHermesConfig, getHermesConfigDefaults } from '@/hermes'
@@ -16,18 +16,8 @@ import {
   setDefaultReasoningEffort,
   setIntroPersonality
 } from '@/store/session'
-import {
-  applyAutoSpeakFromConfig,
-  applyThinkingSoundFromConfig,
-  applyVoiceStopPhraseFromConfig
-} from '@/store/voice/voice-prefs'
 
-const DEFAULT_VOICE_SECONDS = 120
 const FAST_TIERS = new Set(['fast', 'priority', 'on'])
-
-function recordingLimit(value: unknown) {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : DEFAULT_VOICE_SECONDS
-}
 
 /** config.yaml hands back whatever the user wrote — `reasoning_effort: false`
  *  (or `off`/`no`, which YAML also parses to boolean false) means thinking
@@ -51,8 +41,6 @@ interface HermesConfigOptions {
 }
 
 export function useHermesConfig({ activeSessionIdRef }: HermesConfigOptions) {
-  const [voiceMaxRecordingSeconds, setVoiceMaxRecordingSeconds] = useState(DEFAULT_VOICE_SECONDS)
-  const [sttEnabled, setSttEnabled] = useState(true)
   const profileRefreshEpochRef = useRef(0)
 
   const refreshHermesConfig = useCallback(
@@ -130,23 +118,8 @@ export function useHermesConfig({ activeSessionIdRef }: HermesConfigOptions) {
           return
         }
 
-        setVoiceMaxRecordingSeconds(recordingLimit(config.voice?.max_recording_seconds))
-        setSttEnabled(config.stt?.enabled !== false)
-
-        if (!canPublish()) {
-          return
-        }
-
         setDisplayTimestampsFromConfig(config.display?.timestamps)
         setTerminalFontFamilyFromConfig(config.terminal?.font_family)
-
-        if (!canPublish()) {
-          return
-        }
-
-        applyAutoSpeakFromConfig(config)
-        applyVoiceStopPhraseFromConfig(config)
-        applyThinkingSoundFromConfig(config)
       } catch {
         // Config is nice-to-have; chat still works without it.
       }
@@ -154,5 +127,5 @@ export function useHermesConfig({ activeSessionIdRef }: HermesConfigOptions) {
     [activeSessionIdRef]
   )
 
-  return { refreshHermesConfig, sttEnabled, voiceMaxRecordingSeconds }
+  return { refreshHermesConfig }
 }

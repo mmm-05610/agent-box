@@ -60,12 +60,6 @@ export const KEYBIND_ACTIONS: readonly KeybindActionMeta[] = [
   // Open WebUI, and Cherry Studio all ship the same chord). Opens the pill's
   // live dropdown on the pane under the pointer, else the active composer.
   { id: 'composer.modelPicker', category: 'composer', defaults: ['mod+shift+m'] },
-  // Voice conversation toggle. Matches the documented `voice.record_key`
-  // (Ctrl+B). On macOS that's literally ⌃B — distinct from the ⌘B sidebar
-  // toggle. Off macOS `ctrl` folds to `mod`, which IS the ⌘B/Ctrl+B sidebar
-  // chord, so ship it unbound there (rebindable in the panel) rather than
-  // stealing the long-standing sidebar binding.
-  { id: 'composer.voice', category: 'composer', defaults: IS_MAC ? ['ctrl+b'] : [] },
 
   // ── Profiles ─────────────────────────────────────────────────────────────
   { id: 'profile.default', category: 'profiles', defaults: ['mod+d'] },
