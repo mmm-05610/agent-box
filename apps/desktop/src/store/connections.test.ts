@@ -66,7 +66,7 @@ vi.mock('@/store/gateway-switch', () => ({
   recoverActiveSourceAfterFailedGatewaySwitch,
   wipeSessionListsForGatewaySwitch
 }))
-vi.mock('@/store/profile/identity', () => ({
+vi.mock('@/lib/profile-identity', () => ({
   normalizeProfileKey: (name: null | string | undefined) => (name ?? '').trim() || 'default'
 }))
 vi.mock('@/store/profile/new-chat-state', () => ({ $newChatProfile, setNewChatSource: vi.fn() }))

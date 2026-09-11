@@ -345,7 +345,6 @@ describe('the profile store reaches nothing above itself', () => {
       'store/profile.ts',
       'store/profile/appearance-preferences.ts',
       'store/profile/catalog-state.ts',
-      'store/profile/identity.ts',
       'store/profile/new-chat-state.ts',
       'store/profile/request-atoms.ts',
       'store/profile/runtime-route-state.ts',
@@ -444,8 +443,8 @@ describe('the profile store reaches nothing above itself', () => {
     // A chain that stays on the leaf is exactly what the split is for.
     const clean = [
       { path: PINNED[0], source: "import { helper } from './session-states/helper'" },
-      { path: 'store/session-states/helper.ts', source: "import { normalizeProfileKey } from '@/store/profile/identity'" },
-      { path: 'store/profile/identity.ts', source: "import type { ProfileInfo } from '@/types/hermes'" },
+      { path: 'store/session-states/helper.ts', source: "import { normalizeProfileKey } from '@/lib/profile-identity'" },
+      { path: 'lib/profile-identity.ts', source: "import type { ProfileInfo } from '@/types/hermes'" },
       { path: 'types/hermes.ts', source: '' }
     ]
 

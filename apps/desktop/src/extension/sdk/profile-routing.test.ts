@@ -67,7 +67,7 @@ vi.mock('@/store/profile/catalog-state', async () => {
 
   return { $profiles: atom<ProfileInfo[]>([]), setActiveProfile: vi.fn() }
 })
-vi.mock('@/store/profile/identity', () => ({
+vi.mock('@/lib/profile-identity', () => ({
   normalizeProfileKey: (value: null | string | undefined) => (value ?? '').trim() || 'default'
 }))
 vi.mock('@/store/profile/new-chat-state', async () => {

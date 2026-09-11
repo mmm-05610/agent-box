@@ -15,8 +15,8 @@
 
 import { atom } from 'nanostores'
 
+import { normalizeProfileKey } from '@/lib/profile-identity'
 import { requestComposerDraftSync } from '@/store/composer'
-import { normalizeProfileKey } from '@/store/profile/identity'
 import { $activeGatewayProfile } from '@/store/profile/runtime-route-state'
 import { $sessions, rememberedSessionProfile } from '@/store/session'
 import { isHudWindow } from '@/store/windows'

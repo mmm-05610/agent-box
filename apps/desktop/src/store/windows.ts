@@ -201,7 +201,7 @@ export async function openSessionInNewWindow(sessionId: string, opts?: { watch?:
     { $sessions, rememberedSessionProfile }
   ] = await Promise.all([
     import('./profile/runtime-route-state'),
-    import('./profile/identity'),
+    import('@/lib/profile-identity'),
     import('./session')
   ])
 

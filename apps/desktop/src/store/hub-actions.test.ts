@@ -29,7 +29,7 @@ vi.mock('@/store/activity', () => ({
 
 // hub-actions subscribes to the active gateway profile at module scope (its
 // per-profile state wipe); a minimal stub keeps this test off the real store.
-vi.mock('@/store/profile/identity', () => ({
+vi.mock('@/lib/profile-identity', () => ({
   normalizeProfileKey: (value: unknown) => String(value ?? '') || 'default'
 }))
 vi.mock('@/store/profile/runtime-route-state', () => ({

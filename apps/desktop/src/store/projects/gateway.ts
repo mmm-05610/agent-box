@@ -1,6 +1,6 @@
 import { type HermesGateway } from '@/hermes'
+import { normalizeProfileKey } from '@/lib/profile-identity'
 import { activeGateway, ensureActiveGatewayOpen } from '@/store/gateway'
-import { normalizeProfileKey } from '@/store/profile/identity'
 import { $activeGatewayProfile } from '@/store/profile/runtime-route-state'
 import { $profileScope, ALL_PROFILES } from '@/store/profile/sidebar-scope'
 

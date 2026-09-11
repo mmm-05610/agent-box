@@ -1,7 +1,7 @@
 import { Codecs, persistentAtom } from '@/lib/persisted'
+import { normalizeProfileKey } from '@/lib/profile-identity'
 import { stableArray } from '@/lib/stable-array'
 import { readKey } from '@/lib/storage'
-import { normalizeProfileKey } from '@/store/profile/identity'
 import { $activeGatewayProfile } from '@/store/profile/runtime-route-state'
 import type { SessionInfo } from '@/types/hermes'
 

@@ -456,7 +456,7 @@ describe('the scanners can fail', () => {
     const allowed = [
       "import type { ClientSessionState } from '@/types/session'",
       "import { atom } from 'nanostores'",
-      "import { normalizeProfileKey } from '@/store/profile/identity'",
+      "import { normalizeProfileKey } from '@/lib/profile-identity'",
       "import type { SessionOwnerRoute } from '../session/types'",
       "import { readJson } from '@/lib/storage'",
       "import { sharedRemote } from '@hermes/shared'"

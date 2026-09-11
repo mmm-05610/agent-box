@@ -9,7 +9,7 @@ import {
 import { resolveRememberedActivePane, workspaceScopeKey } from '@/components/pane-shell/workspace-scope'
 import type { LayoutNode } from '@/lib/pane-tree'
 import { findGroupOfPane } from '@/lib/pane-tree'
-import { normalizeProfileKey } from '@/store/profile/identity'
+import { normalizeProfileKey } from '@/lib/profile-identity'
 import type { SessionInfo } from '@/types/hermes'
 import type { ClientSessionState } from '@/types/session'
 

@@ -7,10 +7,10 @@ import {
   uninstallSkillFromHub,
   updateSkillsFromHub
 } from '@/hermes'
+import { normalizeProfileKey } from '@/lib/profile-identity'
 import { queryClient } from '@/lib/query-client'
 import { invalidateSlashCompletions } from '@/lib/slash-completion-cache'
 import { upsertDesktopActionTask } from '@/store/activity'
-import { normalizeProfileKey } from '@/store/profile/identity'
 import { $activeGatewayProfile } from '@/store/profile/runtime-route-state'
 
 const POLL_MS = 1200

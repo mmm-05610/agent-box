@@ -1,7 +1,7 @@
+import { normalizeProfileKey } from '@/lib/profile-identity'
 import { activeGatewayConnectionId } from '@/store/gateway'
 import { notifyError } from '@/store/notifications'
 import { notifyRemoteOverrideAuthFailure } from '@/store/profile-remote-override'
-import { normalizeProfileKey } from '@/store/profile/identity'
 import type { AgentProfileRoute } from '@/store/profile/new-chat-state'
 import { $newChatConnectionId, $newChatProfile, $newChatRoute, setNewChatSource } from '@/store/profile/new-chat-state'
 import { requestFreshSession } from '@/store/profile/request-atoms'

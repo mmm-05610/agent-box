@@ -1,10 +1,10 @@
 import { batch } from 'nanostores'
 
 import type { HermesConnection } from '@/global'
+import { normalizeProfileKey } from '@/lib/profile-identity'
 import { withTimeout } from '@/lib/with-timeout'
 import { $gateway, ensureGatewayForProfile, openGatewayForProfile, openSecondaryCount } from '@/store/gateway'
 import { $poolLimits } from '@/store/pool-limits'
-import { normalizeProfileKey } from '@/store/profile/identity'
 import { $activeGatewayProfile, $gatewaySwapTarget } from '@/store/profile/runtime-route-state'
 import { clearComposerSelectionOwner, setConnection } from '@/store/session'
 

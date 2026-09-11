@@ -15,7 +15,7 @@ const startManualLocalEndpoint = vi.fn()
 const onboarding = atom({ manual: false })
 
 vi.mock('@/store/profile/catalog-state', () => ({ $profiles: atom([]), setActiveProfile: vi.fn() }))
-vi.mock('@/store/profile/identity', () => ({ normalizeProfileKey: (p: string | null) => p || 'default' }))
+vi.mock('@/lib/profile-identity', () => ({ normalizeProfileKey: (p: string | null) => p || 'default' }))
 vi.mock('@/store/profile/runtime-route-state', () => ({ $activeGatewayProfile: atom('alpha') }))
 vi.mock('@/application/profile/catalog', () => ({ refreshProfiles: async () => {} }))
 

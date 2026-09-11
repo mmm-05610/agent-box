@@ -40,11 +40,11 @@ import {
   XIcon
 } from '@/lib/icons'
 import { extractPreviewTargets } from '@/lib/preview-targets'
+import { normalizeProfileKey } from '@/lib/profile-identity'
 import { useEnterAnimation } from '@/lib/use-enter-animation'
 import { cn } from '@/lib/utils'
 import { notifyError } from '@/store/notifications'
 import { startManualProviderOAuth } from '@/store/onboarding'
-import { normalizeProfileKey } from '@/store/profile/identity'
 import { requestFreshSession } from '@/store/profile/request-atoms'
 import { $activeGatewayProfile } from '@/store/profile/runtime-route-state'
 import { requestSendDiagnostics } from '@/store/send-diagnostics'

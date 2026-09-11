@@ -48,7 +48,7 @@ vi.mock('@/store/notifications', () => ({
   notify: mocks.notify
 }))
 
-vi.mock('@/store/profile/identity', () => ({
+vi.mock('@/lib/profile-identity', () => ({
   normalizeProfileKey: (name: string | null | undefined) => (name ?? '').trim() || 'default'
 }))
 vi.mock('@/store/profile/runtime-route-state', () => ({ $activeGatewayProfile: mocks.activeProfile }))

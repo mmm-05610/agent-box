@@ -16,8 +16,8 @@ import { getHermesConfigRecord, type McpTestResult, testMcpServer } from '@/herm
 import { translateNow } from '@/i18n'
 import { classifyProbe, freshProbe, probeCache, probeKey } from '@/lib/mcp-probe-cache'
 import { getServers } from '@/lib/mcp-servers'
+import { normalizeProfileKey } from '@/lib/profile-identity'
 import { notify } from '@/store/notifications'
-import { normalizeProfileKey } from '@/store/profile/identity'
 import { $activeGatewayProfile } from '@/store/profile/runtime-route-state'
 import { $gatewayState } from '@/store/session'
 

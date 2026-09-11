@@ -1,8 +1,8 @@
 import { type GatewayEvent, LOCAL_CONNECTION_ID, registryBackendScopeKey } from '@hermes/shared'
 import { atom, computed } from 'nanostores'
 
+import { normalizeProfileKey } from '@/lib/profile-identity'
 import { readJson, writeJson } from '@/lib/storage'
-import { normalizeProfileKey } from '@/store/profile/identity'
 import { $activeGatewayProfile } from '@/store/profile/runtime-route-state'
 import type { WorkspaceMode } from '@/types/contributions'
 import type { ClientSessionState } from '@/types/session'

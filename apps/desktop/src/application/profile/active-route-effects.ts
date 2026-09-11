@@ -1,8 +1,8 @@
 import { setApiRequestProfile } from '@/hermes'
+import { normalizeProfileKey } from '@/lib/profile-identity'
 import { invalidateProfileScopedQueries } from '@/lib/query-client'
 import { markSlashCompletionsStale } from '@/lib/slash-completion-cache'
 import { invalidateCronModelImpactScopeState } from '@/store/cron-model-impact-scope'
-import { normalizeProfileKey } from '@/store/profile/identity'
 import { $activeGatewayProfile } from '@/store/profile/runtime-route-state'
 import { resetStarmapGraph } from '@/store/starmap'
 

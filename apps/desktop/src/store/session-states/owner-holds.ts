@@ -1,7 +1,7 @@
 import { registryBackendScopeKey } from '@hermes/shared'
 import { atom } from 'nanostores'
 
-import { normalizeProfileKey } from '@/store/profile/identity'
+import { normalizeProfileKey } from '@/lib/profile-identity'
 
 import { $activeSessionId } from '../session'
 import type { SessionOwnerRoute, SessionOwnerScope } from '../session/types'

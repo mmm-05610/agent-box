@@ -57,7 +57,7 @@ const { $activeGatewayProfile: activeGateway, $profileColors } = vi.hoisted(() =
 
 vi.mock('@/store/profile/appearance-preferences', () => ({ $profileColors }))
 vi.mock('@/store/profile/catalog-state', () => ({ setActiveProfile: vi.fn() }))
-vi.mock('@/store/profile/identity', () => ({
+vi.mock('@/lib/profile-identity', () => ({
   normalizeProfileKey: (name: null | string | undefined) => (name ?? '').trim() || 'default',
   profileLabel: (profile: { display_name?: string; name: string }) =>
     (profile.display_name ?? '').trim() || profile.name

@@ -1,8 +1,8 @@
 import { atom, computed } from 'nanostores'
 
+import { normalizeProfileKey } from '@/lib/profile-identity'
 import { persistBoolean, storedBoolean } from '@/lib/storage'
 
-import { normalizeProfileKey } from './identity'
 import { $activeGatewayProfile } from './runtime-route-state'
 
 // ── Sidebar profile scope (the "workspace switcher" model) ─────────────────

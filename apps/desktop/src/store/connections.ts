@@ -4,6 +4,7 @@ import { refreshActiveProfile } from '@/application/profile/catalog'
 import { ensureGatewayAgent, openGatewayAgent } from '@/application/profile/gateway-routing'
 import { captureNewChatSource } from '@/application/profile/new-session'
 import type { DesktopConnectionsRegistry } from '@/global'
+import { normalizeProfileKey } from '@/lib/profile-identity'
 import { persistStringRecord, storedStringRecord } from '@/lib/storage'
 import { BACKEND_BOOT_WAIT_TIMEOUT_MS, isTimeoutError, withTimeout } from '@/lib/with-timeout'
 import { $connectionsRegistry } from '@/store/connection-registry-state'
@@ -13,7 +14,6 @@ import {
   type GatewaySwitchToken,
   recoverActiveSourceAfterFailedGatewaySwitch
 } from '@/store/gateway-switch'
-import { normalizeProfileKey } from '@/store/profile/identity'
 import { $newChatProfile } from '@/store/profile/new-chat-state'
 import { requestFreshSession } from '@/store/profile/request-atoms'
 import { $activeGatewayProfile } from '@/store/profile/runtime-route-state'

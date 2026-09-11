@@ -1,5 +1,6 @@
 import { atom } from 'nanostores'
 
+import { normalizeProfileKey } from '@/lib/profile-identity'
 import {
   arraysEqual,
   persistStringArray,
@@ -7,8 +8,6 @@ import {
   storedStringArray,
   storedStringRecord
 } from '@/lib/storage'
-
-import { normalizeProfileKey } from './identity'
 
 // Local-only cosmetic preferences for the profile rail: the user's order for
 // the named squares and an optional per-profile colour. Presentation state

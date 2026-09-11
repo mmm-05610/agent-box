@@ -4,8 +4,8 @@ import {
   writeDesktopFileText
 } from '@/lib/desktop-fs'
 import { isMissingRpcMethod } from '@/lib/gateway-rpc'
+import { normalizeProfileKey } from '@/lib/profile-identity'
 import { setSidebarAgentsGrouped } from '@/store/layout'
-import { normalizeProfileKey } from '@/store/profile/identity'
 import { requestFreshSession } from '@/store/profile/request-atoms'
 import { $activeGatewayProfile } from '@/store/profile/runtime-route-state'
 import { $selectedStoredSessionId, $sessions, sessionMatchesStoredId } from '@/store/session'

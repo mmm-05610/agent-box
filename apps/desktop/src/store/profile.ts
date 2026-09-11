@@ -23,7 +23,6 @@
 
 export { $profileColors, $profileOrder, setProfileColor, setProfileOrder, sortByProfileOrder } from './profile/appearance-preferences'
 export { $activeProfile, $profiles, setActiveProfile } from './profile/catalog-state'
-export { normalizeProfileKey, profileLabel } from './profile/identity'
 export type { AgentProfileRoute } from './profile/new-chat-state'
 export { $newChatConnectionId, $newChatProfile, $newChatRoute, setNewChatSource } from './profile/new-chat-state'
 export { $freshSessionRequest, $profileCreateRequest, requestFreshSession, requestProfileCreate } from './profile/request-atoms'
@@ -37,3 +36,4 @@ export {
   sidebarProfileForScope,
   toggleShowAllProfiles
 } from './profile/sidebar-scope'
+export { normalizeProfileKey, profileLabel } from '@/lib/profile-identity'
