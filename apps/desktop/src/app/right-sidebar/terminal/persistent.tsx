@@ -7,8 +7,7 @@ import { isElementInHiddenPane, PANE_HIDDEN_ATTR } from '@/lib/pane-visibility'
 import { createRendererLoopPauseController } from '@/lib/renderer-loop-pause'
 import { $layoutTree } from '@/store/pane-shell/tree'
 import { $paneStates } from '@/store/panes'
-
-import { $terminalTakeover } from '../store'
+import { $terminalTakeover } from '@/store/terminal-takeover'
 
 import { ensureTerminal } from './terminals'
 import { TerminalWorkspace } from './workspace'

@@ -1,12 +1,12 @@
 import { atom } from 'nanostores'
 
-import { resetLiveRuntimeTracking } from '@/app/contrib/hooks/use-background-sync'
 import { invalidateProfileListFetches } from '@/application/profile/catalog'
 import { resetSidebarBatchCapability } from '@/hermes'
 import { invalidateProfileScopedQueries } from '@/lib/query-client'
 import { clearArtifactRegistry } from '@/store/artifacts'
 import { invalidateCronJobsRequests, setCronJobs } from '@/store/cron'
 import { resetSessionsLimit } from '@/store/layout'
+import { resetLiveRuntimeTracking } from '@/store/live-runtime-tracking'
 import { resetLiveSync } from '@/store/live-sync'
 import {
   $unreadFinishedSessionIds,

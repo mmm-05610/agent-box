@@ -2,8 +2,7 @@ import { atom, computed } from 'nanostores'
 
 import { readKey, writeKey } from '@/lib/storage'
 import { $currentCwd } from '@/store/session'
-
-import { setTerminalTakeover } from '../store'
+import { setTerminalTakeover } from '@/store/terminal-takeover'
 
 import { seedAgentTerminalCommand } from './agent-terminal-stream'
 

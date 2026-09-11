@@ -74,6 +74,7 @@ import { watchSessionPins } from '@/store/session-pin-sync'
 import { $botChatScopes } from '@/store/session-states'
 import { watchUnreadWriteGuard } from '@/store/session/unread'
 import { $statusbarVisible } from '@/store/statusbar-prefs'
+import { $terminalTakeover, setTerminalTakeover } from '@/store/terminal-takeover'
 import { isBrowserWindow, isHudWindow } from '@/store/windows'
 import { setYoloEnabled } from '@/store/yolo-session'
 
@@ -90,7 +91,6 @@ import {
 } from '../chat/session-tile'
 import { AppContextMenu } from '../context-menu/app-context-menu'
 import { HudShell } from '../hud/hud-shell'
-import { $terminalTakeover, setTerminalTakeover } from '../right-sidebar/store'
 import { $workspaceIsPage } from '../routes'
 
 import { FilesPane, LogsPane, ReviewPaneContent } from './panes'

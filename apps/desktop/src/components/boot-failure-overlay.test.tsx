@@ -25,6 +25,12 @@ function failBoot() {
   })
 }
 
+// The host (app/contrib/wiring) injects the Gateway settings view; a directly
+// constructed overlay takes a stub and renders it in the connect slot.
+const StubGatewaySettingsView = ({ embedded }: { embedded?: boolean }) => (
+  <div data-embedded={String(Boolean(embedded))} data-testid="stub-gateway-settings" />
+)
+
 function stubDesktop(config: Record<string, unknown>, overrides: Record<string, unknown> = {}) {
   const original = window.hermesDesktop
   Object.defineProperty(window, 'hermesDesktop', {
@@ -66,15 +72,17 @@ afterEach(cleanup)
 
 describe('BootFailureOverlay', () => {
   it('swaps to the in-place gateway settings view (no route nav) and back', async () => {
-    render(<BootFailureOverlay />)
+    render(<BootFailureOverlay GatewaySettingsView={StubGatewaySettingsView} />)
 
     fireEvent.click(screen.getByRole('button', { name: /gateway settings/i }))
-    // Recovery actions give way to the embedded panel (behind a Back control).
+    // Recovery actions give way to the injected panel (behind a Back control).
     expect(await screen.findByRole('button', { name: /back/i })).toBeTruthy()
+    expect(screen.getByTestId('stub-gateway-settings').getAttribute('data-embedded')).toBe('true')
     expect(screen.queryByRole('button', { name: /retry/i })).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: /back/i }))
     expect(screen.getByRole('button', { name: /retry/i })).toBeTruthy()
+    expect(screen.queryByTestId('stub-gateway-settings')).toBeNull()
     expect(screen.queryByRole('button', { name: /back/i })).toBeNull()
   })
 
@@ -103,10 +111,11 @@ describe('BootFailureOverlay', () => {
     const restore = stubDesktop({ mode: 'remote', remoteAuthMode: undefined, remoteUrl: undefined })
 
     try {
-      render(<BootFailureOverlay />)
+      render(<BootFailureOverlay GatewaySettingsView={StubGatewaySettingsView} />)
       fireEvent.click(screen.getByRole('button', { name: /gateway settings/i }))
 
       expect(await screen.findByRole('button', { name: /back/i })).toBeTruthy()
+      expect(screen.getByTestId('stub-gateway-settings')).toBeTruthy()
       expect(screen.queryByRole('button', { name: /retry/i })).toBeNull()
     } finally {
       restore()

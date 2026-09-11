@@ -6,7 +6,6 @@ import { useEffect, useRef } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { resolveSessionRpcOwner } from '@/app/contrib/wiring-routing'
-import { $terminalTakeover, setTerminalTakeover } from '@/app/right-sidebar/store'
 import { ensureGatewayProfile } from '@/application/profile/runtime-selection'
 import { getLatestSessionMessages } from '@/application/session-transcripts'
 import { requestForSessionProfile } from '@/application/session/request-router'
@@ -71,6 +70,7 @@ import { $removedSessionIds, $sessionMutationsInFlight } from '@/store/session-r
 import { $sessionTiles, sessionTileOwnerRoute } from '@/store/session-states'
 import { $sessionSeenCounts, $unreadFinishedMarkers } from '@/store/session-unread'
 import { type SessionProfileRoute } from '@/store/session/types'
+import { $terminalTakeover, setTerminalTakeover } from '@/store/terminal-takeover'
 import type { ClientSessionState } from '@/types/session'
 
 import { deferred } from '../../../dev/test/deferred'

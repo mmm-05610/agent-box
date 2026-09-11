@@ -11,9 +11,8 @@ import { markRightPanePerf } from '@/dev/debug/right-pane-events'
 import { triggerHaptic } from '@/lib/haptics'
 import { isComposerChord } from '@/lib/keybinds/chords'
 import { $previewTarget } from '@/store/preview'
+import { $terminalInjection } from '@/store/terminal-takeover'
 import { useTheme } from '@/themes/context'
-
-import { $terminalInjection } from '../store'
 
 import { observeActiveTerminalResize } from './active-resize'
 import { makeTerminalReader, registerTerminalReader } from './buffer'
