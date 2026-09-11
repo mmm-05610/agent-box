@@ -14,12 +14,19 @@ are deciding *what* to do; read a batch document if you are doing it.
 | [02](02-tour-to-app.md) | `lib/tour/` → `app/tour/` | 2 |
 | [03](03-project-session-moves.md) | a misplaced shape and a sidebar label | 3 |
 | [04](04-workspace-groups-split.md) | split `workspace-groups.ts`, membership core → `store/` | 4 |
-| | | **15** |
+| [06](06-lib-sink-and-move.md) | the rest of station 1: two splits, one injection, two moves | 7 |
+| | | **22** |
 
-Fifteen of the 97 outstanding edges. The other 82 are concentrated in the design
-knots described in
+Twenty-two of the outstanding edges. The rest are concentrated in the design knots
+described in
 [`../renderer-layer-boundary.md`](../renderer-layer-boundary.md), not in more
 batches like these.
+
+`06` shares no file with `01`–`04` (they take `oneshot`, `yolo-session`,
+`session-export`, `guarded-model-switch`, `tour/`, `session-project-label`; it
+takes `statusbar`, `session-link-title`, `haptics`, `sound/completion-sound`,
+`hooks/use-image-download`), so it can run before or after them. It has its own
+internal order — see its own document.
 
 ## Batch 05 is a different objective
 
