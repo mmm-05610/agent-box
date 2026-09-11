@@ -2,6 +2,13 @@ import { useStore } from '@nanostores/react'
 import type * as React from 'react'
 
 import { type NewSessionSplitHandler, startNewProjectDrag, startNewSessionDrag } from '@/app/chat/new-session-drag'
+import {
+  SIDEBAR_ROW_INSET,
+  SIDEBAR_ROW_LABEL,
+  SIDEBAR_ROW_MIN_H,
+  SIDEBAR_ROW_PAD_TRAIL
+} from '@/components/chat/sidebar/row-geometry'
+import { SidebarRowLead } from '@/components/chat/sidebar/row-lead'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
 import { DisclosureCaret } from '@/components/ui/disclosure-caret'
@@ -11,14 +18,6 @@ import { compactNumber } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { $sidebarRowMeta } from '@/store/layout'
 import type { TileDock } from '@/store/session-states'
-
-import { SidebarRowLead } from '@/components/chat/sidebar/row-lead'
-import {
-  SIDEBAR_ROW_INSET,
-  SIDEBAR_ROW_LABEL,
-  SIDEBAR_ROW_MIN_H,
-  SIDEBAR_ROW_PAD_TRAIL
-} from '@/components/chat/sidebar/row-geometry'
 
 // Shared, content-agnostic sidebar chrome — used by both the flat session
 // sections and the project/workspace tree, so it lives outside either to keep

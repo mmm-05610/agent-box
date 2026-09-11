@@ -2,7 +2,7 @@ import { atom } from 'nanostores'
 import type { ReactNode } from 'react'
 
 import { noteActiveTreeGroup, revealTreePane } from '@/components/pane-shell/tree/store'
-import { ROUTES_AREA, type RouteContribution } from '@/lib/contribution-areas'
+import { type RouteContribution, ROUTES_AREA } from '@/lib/contribution-areas'
 import { registry } from '@/lib/contributions'
 
 type NavigateLike = (to: string, options?: { replace?: boolean }) => void
@@ -84,7 +84,7 @@ const RESERVED_PATHS: ReadonlySet<string> = new Set(APP_ROUTES.map(route => rout
 // paths are reserved exactly like APP_ROUTES so the session-id parser never
 // mistakes them for a session route. Navigate with `host.navigate(path)`.
 
-export { ROUTES_AREA, type RouteContribution, SIDEBAR_NAV_AREA, type SidebarNavContribution } from '@/lib/contribution-areas'
+export { type RouteContribution, ROUTES_AREA, SIDEBAR_NAV_AREA, type SidebarNavContribution } from '@/lib/contribution-areas'
 
 export function contributedRoutes(): Array<{ key: string; path: string; title?: string; render: () => ReactNode }> {
   return registry

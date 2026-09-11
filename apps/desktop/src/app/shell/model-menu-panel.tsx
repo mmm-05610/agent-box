@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 
 import { useSessionView } from '@/components/chat/session-view'
+import { ModelCatalogMenu, type ModelMenuController } from '@/components/model-catalog-menu'
 import { Codicon } from '@/components/ui/codicon'
 import { DropdownMenuItem, dropdownMenuRow } from '@/components/ui/dropdown-menu'
 import type { HermesGateway } from '@/hermes'
@@ -22,8 +23,6 @@ import {
 } from '@/store/session'
 import { sessionTileDelegate } from '@/store/session-states'
 import type { ModelOptionsResponse } from '@/types/hermes'
-
-import { ModelCatalogMenu, type ModelMenuController } from '@/components/model-catalog-menu'
 
 export { ModelMenuCloseContext } from '@/components/model-catalog-menu'
 
