@@ -8,11 +8,11 @@ because it is trusted; see `renderer-layer-master-plan.md` §8.
 | | |
 | --- | --- |
 | last updated | 2026-09-12 |
-| last commit to change renderer source | `c6889f1` |
-| ledger | **85** |
+| last commit to change renderer source | `c2ff3b4` |
+| ledger | **76** |
 | target when the run completes | **0** |
-| tests | **775 files / 7466 tests** |
-| reviewed | nothing yet |
+| tests | **776 files / 7466 tests** |
+| reviewed | wave 1: 02 · 04 · 06a1 · 06b1 · 06c2 |
 | in scope | **every work order in `renderer-layer-batches/`** — Phase 1 and Phase 2 both; no phase is a permission gate |
 
 ---
@@ -24,17 +24,17 @@ independently executable items, so the table is finer than the work orders. Wave
 numbers come from the collision check
 (`renderer-layer-master-plan.md` §4) — items in the same wave share no file.
 
-| item | scope | edges | wave | status | commit | reviewer |
-| --- | --- | --- | --- | --- | --- | --- |
-| 01 | four stateful `lib/` services → `store/` | 6 | 6 | not started | — | — |
-| 02 | `lib/tour/` → `app/tour/` | 2 | 1 | not started | — | — |
-| 03 | a misplaced shape and a sidebar label | 3 | 4 | not started | — | — |
-| 04 | split `workspace-groups.ts`, membership core → `store/` | 4 | 2 | not started | — | — |
-| 06a1 | `lib/statusbar.tsx` — the React half leaves | 1 | 2 | not started | — | — |
-| 06a2 | `lib/session-link-title.ts` → its only consumer | 1 | 3 | not started | — | — |
-| 06b1 | `lib/haptics.ts` — inject the mute preference | 1 | 2 | not started | — | — |
-| 06c1 | `lib/sound/completion-sound.ts` → `store/sound/player.ts` | 3 | 1 | not started | — | — |
-| 06c2 | `lib/hooks/use-image-download.ts` → `components/hooks/` | 1 | 1 | not started | — | — |
+| item | scope | edges | wave | status | commit | reviewer | notes |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 01 | four stateful `lib/` services → `store/` | 6 | 6 | not started | — | — | |
+| 02 | `lib/tour/` → `app/tour/` | 2 | 1 | merged | `ca2b693` | wave-1 reviewer: ledger 85→76 exact, regen idempotent · 776 files/7466 tests · guard 16/16 · eslint 0 err | only 2 of the 5 named files had real imports; the other 3 held prose comments only. Stale prose left at `vite.config.ts:181` and `app/tour/index.ts:10` (cosmetic) |
+| 03 | a misplaced shape and a sidebar label | 3 | 4 | not started | — | — | |
+| 04 | split `workspace-groups.ts`, membership core → `store/` | 4 | 2 | merged | `7037d03` | wave-1 reviewer: 4 lines verified gone, no duplication, test split byte-identical | closure pulled `isWindowsPath`/`comparisonSegments` down with `isPathUnder` (app half imports them back); temporary re-export of `liveSessionProjectId` left in the app module — batch 03 consumes it |
+| 06a1 | `lib/statusbar.tsx` — the React half leaves | 1 | 2 | merged | `e6f67b0` | wave-1 reviewer: edge gone, moves verbatim | `formatDuration` turned out to be exported already; it traveled with `LiveDuration` |
+| 06a2 | `lib/session-link-title.ts` → its only consumer | 1 | 3 | not started | — | — | |
+| 06b1 | `lib/haptics.ts` — inject the mute preference | 1 | 2 | merged | `cd9746a` | wave-1 reviewer: injection matches the desktop-fs pattern exactly, no teardown, mute check live in the dispatch path | |
+| 06c1 | `lib/sound/completion-sound.ts` → `store/sound/player.ts` | 3 | 1 | not started | — | — | |
+| 06c2 | `lib/hooks/use-image-download.ts` → `components/hooks/` | 1 | 1 | merged | `55d40e9` | wave-1 reviewer: edge gone, 5 importers repointed, pure renames | |
 | 07a | `lib/keybinds/` — split two of its five files | 4 | 6 | not started | — | — |
 | 07b | `lib/external-link.tsx` — split 7 exports out of 18 | 1 | 5 | not started | — | — |
 | 08 | the pane/layout domain sinks to `lib/` + `store/` | 9 | 4 | not started | — | — |
