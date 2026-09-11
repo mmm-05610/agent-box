@@ -2,9 +2,9 @@
 
 import { type ComponentProps, useState } from 'react'
 
+import { useImageDownload } from '@/components/hooks/use-image-download'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { useI18n } from '@/i18n'
-import { useImageDownload } from '@/lib/hooks/use-image-download'
 import { Download } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 
