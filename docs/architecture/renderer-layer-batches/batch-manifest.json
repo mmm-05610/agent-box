@@ -1,0 +1,14 @@
+{
+  "_comment": "Input to .agents/skills/architecture-tree-report/scripts/batch-collisions.mjs. A batch name mapped to ripgrep patterns finding the modules it moves or changes; its touched set is every production file importing one of them. Add a batch here when you add its work order, then re-run the check and update the waves table in renderer-layer-master-plan.md. A batch missing from this file has unknown collisions and must run alone.",
+  "01 lib-services": ["lib/oneshot'", "lib/yolo-session'", "lib/guarded-model-switch'", "lib/session-export'"],
+  "02 tour": ["lib/tour'"],
+  "03 shape+label": ["lib/session-project-label'", "new-session-drag'"],
+  "04 workspace": ["workspace-groups'"],
+  "06a1 statusbar": ["lib/statusbar'"],
+  "06a2 link-title": ["lib/session-link-title'"],
+  "06b1 haptics": ["lib/haptics'"],
+  "06c1 sound": ["lib/sound/completion-sound'"],
+  "06c2 image-dl": ["hooks/use-image-download'"],
+  "07a keybinds": ["lib/keybinds/use-keybind-hint'", "lib/keybinds/composer-focus-keys'"],
+  "07b external-link": ["lib/external-link'"]
+}

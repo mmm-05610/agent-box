@@ -3,6 +3,12 @@
 One document per batch. Each is self-contained: an agent should be able to pick
 up a single file and execute it without reading the others.
 
+**Starting a construction run? Read
+[`../renderer-layer-master-plan.md`](../renderer-layer-master-plan.md) first** —
+it fixes the order, says which batches may run at the same time, specifies the
+per-stage review, and lists what is not delegated. Live progress is
+[`../renderer-layer-status.md`](../renderer-layer-status.md).
+
 The analysis behind them — the layer rule, the four design knots, the full debt
 table, and the candidates that look mechanical but are not — is
 [`../renderer-layer-boundary.md`](../renderer-layer-boundary.md). Read it if you
