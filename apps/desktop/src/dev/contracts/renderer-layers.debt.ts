@@ -16,26 +16,7 @@
 // work gets scheduled: a `lib/` batch, a `store/` batch, and so on.
 
 export const DEBT_LEDGER: readonly string[] = [
-  // components/ — 24
-  'components/assistant-ui/clarify-tool.tsx -> @/app/chat/composer/focus',
-  'components/assistant-ui/inline-preview-directive.tsx -> @/app/chat/composer/focus',
-  'components/assistant-ui/thread/changed-files-card.tsx -> @/app/chat/composer/scope',
-  'components/assistant-ui/thread/user-edit-composer.tsx -> @/app/chat/composer/directive-actions',
-  'components/assistant-ui/thread/user-edit-composer.tsx -> @/app/chat/composer/drop-affordance',
-  'components/assistant-ui/thread/user-edit-composer.tsx -> @/app/chat/composer/focus',
-  'components/assistant-ui/thread/user-edit-composer.tsx -> @/app/chat/composer/hooks/use-at-completions',
-  'components/assistant-ui/thread/user-edit-composer.tsx -> @/app/chat/composer/hooks/use-composer-trigger',
-  'components/assistant-ui/thread/user-edit-composer.tsx -> @/app/chat/composer/hooks/use-composer-undo',
-  'components/assistant-ui/thread/user-edit-composer.tsx -> @/app/chat/composer/hooks/use-emoji-completions',
-  'components/assistant-ui/thread/user-edit-composer.tsx -> @/app/chat/composer/hooks/use-slash-completions',
-  'components/assistant-ui/thread/user-edit-composer.tsx -> @/app/chat/composer/inline-refs',
-  'components/assistant-ui/thread/user-edit-composer.tsx -> @/app/chat/composer/path-refs',
-  'components/assistant-ui/thread/user-edit-composer.tsx -> @/app/chat/composer/rich-editor',
-  'components/assistant-ui/thread/user-edit-composer.tsx -> @/app/chat/composer/text-utils',
-  'components/assistant-ui/thread/user-edit-composer.tsx -> @/app/chat/composer/trigger-popover',
-  'components/assistant-ui/thread/user-edit-composer.tsx -> @/app/chat/composer/undo-history',
-  'components/assistant-ui/thread/user-edit-composer.tsx -> @/app/chat/composer/url-refs',
-  'components/assistant-ui/thread/user-edit-composer.tsx -> @/app/chat/hooks/use-composer-actions',
+  // components/ — 5
   'components/assistant-ui/thread/user-edit-composer.tsx -> @/app/session/hooks/use-prompt-actions',
   'components/boot-failure-overlay.tsx -> @/app/settings/gateway-settings',
   'components/pet/floating-pet.tsx -> @/app/gateway/hooks/use-gateway-request',
@@ -60,12 +41,9 @@ export const DEBT_LEDGER: readonly string[] = [
   'lib/yolo-session.ts -> @/store/gateway',
   'lib/yolo-session.ts -> @/store/session',
 
-  // store/ — 7
+  // store/ — 4
   'store/gateway-switch.ts -> @/app/contrib/hooks/use-background-sync',
   'store/pane-focus.ts -> @/app/right-sidebar/store',
   'store/projects/crud.ts -> @/app/chat/new-session-drag',
   'store/projects/dialogs.ts -> @/app/chat/new-session-drag',
-  'store/suggestion-providers/cron.ts -> @/app/chat/composer/focus',
-  'store/suggestion-providers/github.ts -> @/app/chat/composer/focus',
-  'store/suggestion-providers/skill.ts -> @/app/chat/composer/focus',
 ]
