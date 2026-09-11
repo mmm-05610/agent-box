@@ -174,13 +174,14 @@ in the opposite direction):
   today. (An earlier note here said 3; it had counted only the `lib/` and `store/`
   importers and missed the components ones.)
   Check any candidate with `npm run arch:tree -- --move lib/keybinds --to app/`.
-  The right shape is a four-way split by what each file actually needs:
-  pure combo/chord math (`combo.ts`, `chords.ts`) stays in `lib/`; the action
-  registry (`actions.ts`) goes down to `store/`, since the store is its lowest
-  consumer; the hint hook (`use-keybind-hint.ts`) has to sit at its lowest
-  consumer too, which is `components/`; and `composer-focus-keys.ts` cannot go
-  below `app/` at all while it imports `app/routes` — that dependency has to be
-  broken, not relocated.
+  Two notes here were written before later rounds and are now **wrong**:
+  `actions.ts` was said to belong in `store/`, but it is a clean leaf whose one
+  edge was fixed when the contribution registry moved to `lib/contributions.ts`;
+  and `composer-focus-keys.ts`'s dependency on `app/routes` was said to have to be
+  broken, but the file simply splits — the resolver goes to `components/` and the
+  rest to `app/`, where that import becomes same-layer.
+  The real shape is **written up as batch [07](renderer-layer-batches/07-split-by-consumer.md)**:
+  three of the five production files do not move at all.
 
 **Blocked by a decision**:
 

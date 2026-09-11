@@ -15,12 +15,16 @@ are deciding *what* to do; read a batch document if you are doing it.
 | [03](03-project-session-moves.md) | a misplaced shape and a sidebar label | 3 |
 | [04](04-workspace-groups-split.md) | split `workspace-groups.ts`, membership core → `store/` | 4 |
 | [06](06-lib-sink-and-move.md) | the rest of station 1: two splits, one injection, two moves | 7 |
-| | | **22** |
+| [07](07-split-by-consumer.md) | `lib/keybinds/` and `lib/external-link.tsx`, split by who needs what | 5 |
+| | | **27** |
 
-Twenty-two of the outstanding edges. The rest are concentrated in the design knots
-described in
+Twenty-seven of the outstanding edges. The rest are concentrated in the design
+knots described in
 [`../renderer-layer-boundary.md`](../renderer-layer-boundary.md), not in more
 batches like these.
+
+`06` and `07` complete station 1 (`lib/`): after both, the only `lib/` entries
+left in the ledger belong to `01`–`03`.
 
 `06` shares no file with `01`–`04` (they take `oneshot`, `yolo-session`,
 `session-export`, `guarded-model-switch`, `tour/`, `session-project-label`; it
