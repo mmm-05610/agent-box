@@ -2,7 +2,7 @@ import { useStore } from '@nanostores/react'
 import type { CSSProperties, MutableRefObject, PointerEvent as ReactPointerEvent, RefObject } from 'react'
 import { useEffect, useMemo, useRef } from 'react'
 
-import { requestComposerInsert } from '@/app/chat/composer/focus'
+import { requestComposerInsert } from '@/components/composer/focus'
 import { CopyButton } from '@/components/ui/copy-button'
 import { Tip } from '@/components/ui/tooltip'
 import { useI18n } from '@/i18n'

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 
 import { composerPanelCard } from '@/components/chat/composer-dock'
+import { useComposerAttachmentProviders } from '@/components/composer/contrib'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -19,7 +20,6 @@ import type { ChatBarState } from '@/lib/composer/types'
 import { Clipboard, FileText, FolderOpen, type IconComponent, ImageIcon, Link, MessageSquareText } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 
-import { useComposerAttachmentProviders } from './contrib'
 import { GHOST_ICON_BTN } from './controls'
 
 const SNIPPET_KEYS = ['codeReview', 'implementationPlan', 'explainThis']

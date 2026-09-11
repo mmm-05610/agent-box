@@ -7,8 +7,34 @@ import { type ClipboardEvent, type FormEvent, type KeyboardEvent, useCallback, u
 import { useTourMarker } from '@/app/chat/tour-marker'
 import { useHudComposerDrag } from '@/app/hud/composer-drag'
 import { composerFill, composerFloatingStrip, composerSurfaceGlass } from '@/components/chat/composer-dock'
+import {
+  acceptsTriggerCompletion,
+  COMPOSER_FADE_BACKGROUND,
+  implicitSlashAcceptIndex,
+  type QueueEditState,
+  shouldDisableComposerInput,
+  slashArgStage
+} from '@/components/composer/composer-utils'
+import { COMPOSER_AREAS, runComposerMiddleware } from '@/components/composer/contrib'
+import { ComposerDirectiveActions } from '@/components/composer/directive-actions'
+import { markActiveComposer, onComposerAttachImagesRequest } from '@/components/composer/focus'
+import { useAtCompletions } from '@/components/composer/hooks/use-at-completions'
+import { triggerKeyUpHandler, useComposerTrigger } from '@/components/composer/hooks/use-composer-trigger'
 import { useComposerUndo } from '@/components/composer/hooks/use-composer-undo'
+import { useSlashCompletions } from '@/components/composer/hooks/use-slash-completions'
 import { chipTypedPathOnSpace, pathifyRefs } from '@/components/composer/path-refs'
+import {
+  beginComposerComposition,
+  composerPlainText,
+  deleteChipBeforeCaret,
+  deleteSelectionInEditor,
+  insertComposerContentsAtCaret,
+  normalizeComposerEditorDom,
+  RICH_INPUT_SLOT
+} from '@/components/composer/rich-editor'
+import { useComposerScope } from '@/components/composer/scope'
+import { extractClipboardImageBlobs, openDirectiveScope } from '@/components/composer/text-utils'
+import { ComposerTriggerPopover } from '@/components/composer/trigger-popover'
 import { chipTypedUrlOnSpace, linkifyUrls } from '@/components/composer/url-refs'
 import { Button } from '@/components/ui/button'
 import { Slot as ContribSlot } from '@/extension/contrib/react/slot'
@@ -37,21 +63,9 @@ import { $threadScrolledUp } from '@/store/thread-scroll'
 import { useTheme } from '@/themes'
 
 import { AttachmentList } from './attachments'
-import {
-  acceptsTriggerCompletion,
-  COMPOSER_FADE_BACKGROUND,
-  implicitSlashAcceptIndex,
-  type QueueEditState,
-  shouldDisableComposerInput,
-  slashArgStage
-} from './composer-utils'
 import { ContextMenu } from './context-menu'
-import { COMPOSER_AREAS, runComposerMiddleware } from './contrib'
 import { ComposerControls } from './controls'
-import { ComposerDirectiveActions } from './directive-actions'
-import { markActiveComposer, onComposerAttachImagesRequest } from './focus'
 import { HelpHint } from './help-hint'
-import { useAtCompletions } from './hooks/use-at-completions'
 import { useComposerBranch } from './hooks/use-composer-branch'
 import { useComposerDraft } from './hooks/use-composer-draft'
 import { useComposerDrop } from './hooks/use-composer-drop'
@@ -61,28 +75,14 @@ import { useComposerPlaceholder } from './hooks/use-composer-placeholder'
 import { useComposerPopout } from './hooks/use-composer-popout'
 import { useComposerQueue } from './hooks/use-composer-queue'
 import { useComposerSubmit } from './hooks/use-composer-submit'
-import { triggerKeyUpHandler, useComposerTrigger } from './hooks/use-composer-trigger'
 import { useComposerUrlDialog } from './hooks/use-composer-url-dialog'
 import { useComposerMicroActions } from './hooks/use-micro-actions'
-import { useSlashCompletions } from './hooks/use-slash-completions'
 import { useSessionStatusPresence } from './hooks/use-status-presence'
 import { ActionBadges } from './micro-actions'
 import { QueuePanel } from './queue-panel'
-import {
-  beginComposerComposition,
-  composerPlainText,
-  deleteChipBeforeCaret,
-  deleteSelectionInEditor,
-  insertComposerContentsAtCaret,
-  normalizeComposerEditorDom,
-  RICH_INPUT_SLOT
-} from './rich-editor'
-import { useComposerScope } from './scope'
 import { ComposerStatusStack } from './status-stack'
 import { CodingStatusRow } from './status-stack/coding-row'
 import { SuggestionPills } from './suggestion-pills'
-import { extractClipboardImageBlobs, openDirectiveScope } from './text-utils'
-import { ComposerTriggerPopover } from './trigger-popover'
 import { UrlDialog } from './url-dialog'
 
 export function ChatBar({

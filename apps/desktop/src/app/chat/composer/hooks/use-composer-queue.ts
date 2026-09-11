@@ -1,6 +1,8 @@
 import { useStore } from '@nanostores/react'
 import { type RefObject, useCallback, useEffect, useRef, useState } from 'react'
 
+import { cloneAttachments, type QueueEditState } from '@/components/composer/composer-utils'
+import { useComposerScope } from '@/components/composer/scope'
 import { useI18n } from '@/i18n'
 import type { ChatBarProps } from '@/lib/composer/types'
 import { triggerHaptic } from '@/lib/haptics'
@@ -24,9 +26,6 @@ import {
 import { notify } from '@/store/notifications'
 import { $sessionsLoading } from '@/store/session'
 import type { ComposerAttachment } from '@/types/composer'
-
-import { cloneAttachments, type QueueEditState } from '../composer-utils'
-import { useComposerScope } from '../scope'
 
 interface UseComposerQueueArgs {
   activeQueueSessionKey: string | null

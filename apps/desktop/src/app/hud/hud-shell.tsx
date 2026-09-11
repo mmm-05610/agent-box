@@ -2,12 +2,12 @@ import { useStore } from '@nanostores/react'
 import { type CSSProperties, useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 
+import { RICH_INPUT_SLOT } from '@/components/composer/rich-editor'
 import { chatMessageText } from '@/lib/chat-messages'
 import { useViewedInterval } from '@/lib/hooks/use-viewed-interval'
 import { $activeSessionAwaitingInput } from '@/store/prompts'
 import { $busy, $messages } from '@/store/session'
 
-import { RICH_INPUT_SLOT } from '../chat/composer/rich-editor'
 import { WiredPane } from '../contrib/wiring'
 
 import { useHudClickThrough } from './click-through'

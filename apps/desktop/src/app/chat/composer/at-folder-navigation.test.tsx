@@ -3,8 +3,8 @@ import { act, renderHook } from '@testing-library/react'
 import { createRef } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
-import { useComposerTrigger } from './hooks/use-composer-trigger'
-import { composerPlainText, renderComposerContents, RICH_INPUT_SLOT } from './rich-editor'
+import { useComposerTrigger } from '@/components/composer/hooks/use-composer-trigger'
+import { composerPlainText, renderComposerContents, RICH_INPUT_SLOT } from '@/components/composer/rich-editor'
 
 /**
  * Folder navigation in the `@` popover, driven through the REAL hook against a

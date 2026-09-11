@@ -9,22 +9,12 @@ import '@/store/suggestion-providers/skill'
 import { useAui, useAuiState, useComposerRuntime } from '@assistant-ui/react'
 import { type RefObject, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
-import { type InlineRefInput, insertInlineRefsIntoEditor } from '@/components/composer/inline-refs'
-import { usePaneVisible } from '@/components/pane-shell/pane-visibility'
-import { SLASH_COMMAND_RE } from '@/lib/chat-runtime'
-import { sanitizeComposerInput } from '@/lib/composer-input-sanitize'
-import type { ChatBarProps } from '@/lib/composer/types'
-import { type ComposerDraftSyncMode, onComposerDraftSyncRequest, reloadPersistedDrafts, stashSessionDraft, takeSessionDraft } from '@/store/composer'
-import { isBrowsingHistory } from '@/store/composer-input-history'
-import { clearDraftSuggestions, sampleComposerDraft } from '@/store/composer-suggestions'
-import type { ComposerAttachment } from '@/types/composer'
-
 import {
   cloneAttachments,
   DRAFT_PERSIST_DEBOUNCE_MS,
   isPendingDraftPersistCurrent,
   type QueueEditState
-} from '../composer-utils'
+} from '@/components/composer/composer-utils'
 import {
   type ComposerInsertMode,
   focusComposerInput,
@@ -33,15 +23,24 @@ import {
   onComposerInsertRefsRequest,
   onComposerInsertRequest,
   releaseActiveComposer
-} from '../focus'
+} from '@/components/composer/focus'
+import { type InlineRefInput, insertInlineRefsIntoEditor } from '@/components/composer/inline-refs'
 import {
   composerPlainText,
   normalizeComposerEditorDom,
   placeCaretEnd,
   REF_RE,
   renderComposerContents
-} from '../rich-editor'
-import { useComposerScope } from '../scope'
+} from '@/components/composer/rich-editor'
+import { useComposerScope } from '@/components/composer/scope'
+import { usePaneVisible } from '@/components/pane-shell/pane-visibility'
+import { SLASH_COMMAND_RE } from '@/lib/chat-runtime'
+import { sanitizeComposerInput } from '@/lib/composer-input-sanitize'
+import type { ChatBarProps } from '@/lib/composer/types'
+import { type ComposerDraftSyncMode, onComposerDraftSyncRequest, reloadPersistedDrafts, stashSessionDraft, takeSessionDraft } from '@/store/composer'
+import { isBrowsingHistory } from '@/store/composer-input-history'
+import { clearDraftSuggestions, sampleComposerDraft } from '@/store/composer-suggestions'
+import type { ComposerAttachment } from '@/types/composer'
 
 interface UseComposerDraftArgs {
   activeQueueSessionKey: string | null

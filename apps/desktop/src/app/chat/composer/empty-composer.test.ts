@@ -7,7 +7,7 @@ import {
   normalizeComposerEditorDom,
   renderComposerContents,
   RICH_INPUT_SLOT
-} from './rich-editor'
+} from '@/components/composer/rich-editor'
 
 function editor(): HTMLDivElement {
   const el = document.createElement('div')

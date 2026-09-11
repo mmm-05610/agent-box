@@ -3,10 +3,9 @@ import { act, renderHook } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
 import { hermesDirectiveFormatter } from '@/components/assistant-ui/directive-text'
-
-import { classify } from './hooks/use-at-completions'
-import { useComposerTrigger } from './hooks/use-composer-trigger'
-import { composerPlainText, RICH_INPUT_SLOT } from './rich-editor'
+import { classify } from '@/components/composer/hooks/use-at-completions'
+import { useComposerTrigger } from '@/components/composer/hooks/use-composer-trigger'
+import { composerPlainText, RICH_INPUT_SLOT } from '@/components/composer/rich-editor'
 
 /** A row exactly as tui_gateway's complete.path emits it, run through the
  *  real classify() the popover uses. */

@@ -1,6 +1,10 @@
 import { type RefObject, useLayoutEffect, useRef } from 'react'
 
+import { cloneAttachments, type QueueEditState } from '@/components/composer/composer-utils'
+import { onComposerSubmitRequest } from '@/components/composer/focus'
 import { pathifyRefs } from '@/components/composer/path-refs'
+import { composerPlainText } from '@/components/composer/rich-editor'
+import { useComposerScope, useComposerSurfaceId } from '@/components/composer/scope'
 import { usePaneVisible } from '@/components/pane-shell/pane-visibility'
 import { SLASH_COMMAND_RE } from '@/lib/chat-runtime'
 import type { ChatBarProps } from '@/lib/composer/types'
@@ -12,11 +16,6 @@ import { enqueueQueuedPrompt, type QueuedPromptEntry } from '@/store/composer-qu
 import { hasMcpSetupRequest, skipMcpSetupRequest } from '@/store/mcp-setup'
 import { hasBlockingPromptRequest } from '@/store/prompts'
 import type { ComposerAttachment } from '@/types/composer'
-
-import { cloneAttachments, type QueueEditState } from '../composer-utils'
-import { onComposerSubmitRequest } from '../focus'
-import { composerPlainText } from '../rich-editor'
-import { useComposerScope, useComposerSurfaceId } from '../scope'
 
 interface UseComposerSubmitArgs {
   activeQueueSessionKey: string | null

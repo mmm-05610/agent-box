@@ -1,11 +1,11 @@
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { requestComposerInsertRefs } from '@/components/composer/focus'
 import { group } from '@/lib/pane-tree'
 import { $layoutTree } from '@/store/pane-shell/tree'
 import { openSessionTile } from '@/store/session-states'
 
-import { requestComposerInsertRefs } from './composer/focus'
 import { startSessionDrag } from './session-drag'
 
 /**
@@ -16,7 +16,7 @@ import { startSessionDrag } from './session-drag'
  */
 
 vi.mock('@/store/session-states', () => ({ openSessionTile: vi.fn() }))
-vi.mock('./composer/focus', () => ({ requestComposerInsertRefs: vi.fn() }))
+vi.mock('@/components/composer/focus', () => ({ requestComposerInsertRefs: vi.fn() }))
 
 const ZONE = { left: 0, top: 0, right: 1000, bottom: 800 }
 const COMPOSER = { left: 100, top: 700, right: 900, bottom: 780 }

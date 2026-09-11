@@ -8,15 +8,14 @@ import {
   COMPOSER_SURFACE_HEIGHT_VAR,
   setSurfaceVar
 } from '@/app/chat/surface-vars'
-import { useResizeObserver } from '@/lib/hooks/use-resize-observer'
-
 import {
   COMPOSER_COMPACT_PILL_PX,
   COMPOSER_FOLD_VOICE_PX,
   COMPOSER_MINIMAL_PX,
   COMPOSER_SINGLE_LINE_MAX_PX,
   COMPOSER_STACK_BREAKPOINT_PX
-} from '../composer-utils'
+} from '@/components/composer/composer-utils'
+import { useResizeObserver } from '@/lib/hooks/use-resize-observer'
 
 interface UseComposerMetricsArgs {
   composerDockRef: RefObject<HTMLDivElement | null>

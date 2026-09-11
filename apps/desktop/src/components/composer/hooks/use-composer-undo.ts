@@ -1,7 +1,8 @@
 import { type RefObject, useCallback, useEffect, useMemo } from 'react'
 
+import { type ComposerSnapshot, createComposerUndoHistory } from '@/lib/composer/undo-history'
+
 import { caretOffsetInEditor, composerPlainText, placeCaretAtOffset, renderComposerContents } from '../rich-editor'
-import { type ComposerSnapshot, createComposerUndoHistory } from '../undo-history'
 
 interface UseComposerUndoArgs {
   editorRef: RefObject<HTMLDivElement | null>

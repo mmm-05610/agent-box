@@ -3,9 +3,8 @@ import { act, fireEvent, render } from '@testing-library/react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
+import { detectTrigger, type TriggerState } from '@/components/composer/text-utils'
 import { useLiveCompletionAdapter } from '@/lib/composer/hooks/use-live-completion-adapter'
-
-import { detectTrigger, type TriggerState } from './text-utils'
 
 // Faithful mirror of index.tsx's trigger wiring, driven through REAL DOM
 // keydown+keyup events on a contentEditable. Exercises the parts a direct

@@ -13,7 +13,7 @@ import {
   replaceBeforeCaret,
   RICH_INPUT_SLOT
 } from './rich-editor'
-import { placeCaretAtEnd } from './test-utils'
+import { placeCaretAtEnd } from '@/app/chat/composer/test-utils'
 
 beforeEach(() => {
   rememberDesktopCommandsCatalog({

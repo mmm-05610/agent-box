@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 
-import { requestComposerFocus, requestComposerInsert, requestComposerInsertRefs } from '@/app/chat/composer/focus'
+import { requestComposerFocus, requestComposerInsert, requestComposerInsertRefs } from './focus'
 import { droppedFileInlineRef } from '@/components/composer/inline-refs'
 import { useI18n } from '@/i18n'
 import { attachmentId, contextPath, pathLabel } from '@/lib/chat-runtime'

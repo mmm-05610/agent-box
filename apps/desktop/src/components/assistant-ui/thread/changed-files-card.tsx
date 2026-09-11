@@ -1,10 +1,10 @@
 import { useStore } from '@nanostores/react'
 import { type FC, useMemo } from 'react'
 
-import { useComposerScope } from '@/app/chat/composer/scope'
 import { deriveChangedFiles } from '@/components/assistant-ui/thread/changed-files'
 import { useSessionView } from '@/components/chat/session-view'
 import { WIDGET_SHELL_CLASS } from '@/components/chat/widget-shell'
+import { useComposerScope } from '@/components/composer/scope'
 import { DiffCount } from '@/components/ui/diff-count'
 import { FadeScroll } from '@/components/ui/fade-scroll'
 import { FileTypeIcon } from '@/components/ui/file-type-icon'

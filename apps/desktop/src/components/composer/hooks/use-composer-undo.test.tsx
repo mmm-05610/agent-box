@@ -2,7 +2,7 @@ import { render } from '@testing-library/react'
 import { createRef, type RefObject } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
-import { placeCaretAtEnd } from '../test-utils'
+import { placeCaretAtEnd } from '@/app/chat/composer/test-utils'
 
 import { useComposerUndo } from './use-composer-undo'
 

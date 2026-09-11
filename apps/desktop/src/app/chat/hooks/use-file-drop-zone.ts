@@ -1,10 +1,9 @@
 import { type DragEvent as ReactDragEvent, useCallback, useEffect, useRef, useState } from 'react'
 
 import { dragHasAttachments } from '@/components/composer/inline-refs'
+import { extractDroppedFiles, HERMES_PATHS_MIME } from '@/components/composer/use-composer-actions'
 import type { DroppedFile } from '@/lib/composer/types'
 import { ESCAPE_PRIORITY, pushEscapeLayer } from '@/lib/escape-layers'
-
-import { extractDroppedFiles, HERMES_PATHS_MIME } from './use-composer-actions'
 
 /** `'session'` is set by callers from the pointer drag session's store —
  *  native drags only ever resolve to `'files'` here (sessions left native

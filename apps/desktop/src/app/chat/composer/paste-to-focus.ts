@@ -11,15 +11,14 @@
  * that block type-to-focus (dialogs, menus, terminal, full pages) block this.
  */
 
+import { requestComposerAttachImages, requestComposerFocus, requestComposerInsert } from '@/components/composer/focus'
 import { pathifyRefs } from '@/components/composer/path-refs'
+import { extractClipboardImageBlobs } from '@/components/composer/text-utils'
 import { linkifyUrls } from '@/components/composer/url-refs'
 import { sanitizeComposerInput } from '@/lib/composer-input-sanitize'
 import { DATA_IMAGE_URL_RE } from '@/lib/embedded-images'
 import { isEditableTarget } from '@/lib/keybinds/combo'
 import { composerFocusBlockedBySurface } from '@/lib/keybinds/composer-focus-keys'
-
-import { requestComposerAttachImages, requestComposerFocus, requestComposerInsert } from './focus'
-import { extractClipboardImageBlobs } from './text-utils'
 
 /** Route clipboard contents to the active composer. True when it carried
  *  something a composer can take (the caller should swallow the event). */

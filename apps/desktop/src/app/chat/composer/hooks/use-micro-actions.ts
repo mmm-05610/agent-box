@@ -1,10 +1,9 @@
 import { useEffect } from 'react'
 
+import { type ComposerMicroActionContext, useComposerMicroActionProviders } from '@/components/composer/contrib'
 import { useSessionSlice } from '@/lib/use-session-slice'
 import { setComposerActions } from '@/store/composer-actions'
 import { $todosBySession } from '@/store/todos'
-
-import { type ComposerMicroActionContext, useComposerMicroActionProviders } from '../contrib'
 
 /**
  * Resolve every registered micro-action provider for this session and publish

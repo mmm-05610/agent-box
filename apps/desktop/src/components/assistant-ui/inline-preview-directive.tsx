@@ -1,10 +1,10 @@
 import { useStore } from '@nanostores/react'
 import { useEffect, useMemo, useState } from 'react'
 
-import { requestComposerSubmit } from '@/app/chat/composer/focus'
 import { useIsDark } from '@/components/assistant-ui/embeds/use-is-dark'
 import { PreviewAttachment } from '@/components/chat/preview-attachment'
 import { useSessionView } from '@/components/chat/session-view'
+import { requestComposerSubmit } from '@/components/composer/focus'
 import { readDesktopFileText } from '@/lib/desktop-fs'
 import { localPreviewTarget } from '@/lib/local-preview'
 

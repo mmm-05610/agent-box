@@ -13,11 +13,11 @@ import {
   useState
 } from 'react'
 
-import { requestComposerFocus, requestComposerInsert } from '@/app/chat/composer/focus'
 import { requestForOwnedSession } from '@/application/session/request-owned-session'
 import { ToolFallback } from '@/components/assistant-ui/tool/fallback'
 import { useSessionView } from '@/components/chat/session-view'
 import { WIDGET_SHELL_CLASS } from '@/components/chat/widget-shell'
+import { requestComposerFocus, requestComposerInsert } from '@/components/composer/focus'
 import { Button } from '@/components/ui/button'
 import { Kbd } from '@/components/ui/kbd'
 import { Textarea } from '@/components/ui/textarea'
