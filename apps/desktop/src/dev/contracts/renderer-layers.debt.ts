@@ -64,11 +64,9 @@ export const DEBT_LEDGER: readonly string[] = [
   'extension/sdk/index.ts -> @/app/skills',
   'extension/sdk/index.ts -> @/app/skills/mcp-tab',
 
-  // lib/ — 21
+  // lib/ — 16
   'lib/external-link.tsx -> @/store/preview',
   'lib/guarded-model-switch.ts -> @/store/notifications',
-  'lib/haptics.ts -> @/store/haptics',
-  'lib/hooks/use-image-download.ts -> @/store/notifications',
   'lib/keybinds/composer-focus-keys.ts -> @/app/routes',
   'lib/keybinds/composer-focus-keys.ts -> @/components/pane-shell/tree/store',
   'lib/keybinds/composer-focus-keys.ts -> @/store/session-switcher',
@@ -81,13 +79,10 @@ export const DEBT_LEDGER: readonly string[] = [
   'lib/sound/completion-sound.ts -> @/store/ambient',
   'lib/sound/completion-sound.ts -> @/store/haptics',
   'lib/sound/completion-sound.ts -> @/store/sound/completion-sound',
-  'lib/statusbar.tsx -> @/components/chat/stable-text',
-  'lib/tour/run-tour.ts -> @/app/chat/right-rail/preview-tour',
-  'lib/tour/run-tour.ts -> @/store/pane-focus',
   'lib/yolo-session.ts -> @/store/gateway',
   'lib/yolo-session.ts -> @/store/session',
 
-  // store/ — 20
+  // store/ — 16
   'store/gateway-switch.ts -> @/app/contrib/hooks/use-background-sync',
   'store/layout.ts -> @/components/pane-shell/tree/store',
   'store/pane-focus.ts -> @/app/right-sidebar/store',
@@ -95,12 +90,8 @@ export const DEBT_LEDGER: readonly string[] = [
   'store/pane-focus.ts -> @/components/pane-shell/tree/store',
   'store/profile-share.ts -> @/components/pane-shell/tree/store',
   'store/projects/crud.ts -> @/app/chat/new-session-drag',
-  'store/projects/crud.ts -> @/app/chat/sidebar/projects/workspace-groups',
   'store/projects/dialogs.ts -> @/app/chat/new-session-drag',
-  'store/projects/refresh.ts -> @/app/chat/sidebar/projects/workspace-groups',
-  'store/projects/scope.ts -> @/app/chat/sidebar/projects/workspace-groups',
   'store/review.ts -> @/components/pane-shell/tree/store',
-  'store/session-color.ts -> @/app/chat/sidebar/projects/workspace-groups',
   'store/session-focus.ts -> @/components/pane-shell/tree/store',
   'store/session-focus.ts -> @/components/pane-shell/workspace-scope',
   'store/session-states/tile-operations.ts -> @/components/pane-shell/tree/store',
