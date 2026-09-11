@@ -22,8 +22,8 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router'
 
-import { SETTINGS_ROUTE } from '@/app/routes'
 import type { Translations } from '@/i18n/types'
+import { SETTINGS_ROUTE } from '@/lib/routes'
 import { resolveTipAnchor } from '@/lib/tips/anchor'
 import { TIP_CATALOG } from '@/lib/tips/catalog'
 import { nextTip } from '@/lib/tips/rotation'
