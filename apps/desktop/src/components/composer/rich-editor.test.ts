@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
+import { placeCaretAtEnd } from '@/app/chat/composer/test-utils'
 import { insertInlineRefsIntoEditor } from '@/components/composer/inline-refs'
 import { rememberDesktopCommandsCatalog } from '@/lib/desktop-slash-commands'
 
@@ -13,7 +14,6 @@ import {
   replaceBeforeCaret,
   RICH_INPUT_SLOT
 } from './rich-editor'
-import { placeCaretAtEnd } from '@/app/chat/composer/test-utils'
 
 beforeEach(() => {
   rememberDesktopCommandsCatalog({
