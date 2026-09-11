@@ -82,7 +82,7 @@ red on purpose.
 | | |
 | --- | --- |
 | ledger today | **85** *(derived — see §0)* |
-| after every work order in §3 | **49** *(derived — see §0)* |
+| after every work order in §3 | **36** *(derived — see §0)* |
 | test baseline | **775 files / 7466 tests** |
 
 **An item is done when the ledger shrank by exactly the number its work order
@@ -103,7 +103,7 @@ rank 0   hermes.ts                         ⚠ pending deletion (work order 05)
 rank 1   store/                            ⚠ 20   ← station 2
 rank 2   application/                      ✓ 0
 rank 4   components/                       ⚠ 28   ← station 4, the hardest
-rank 4   extension/                        ⚠ 16   ← the SDK barrel
+rank 4   extension/                        ⚠ 16   ← the plugin ABI (work order 09)
 rank 4   dev/  plugins/                    ✓ 0
 rank 5   app/                              ✓ 0
 ```
@@ -138,8 +138,9 @@ target — see §0.
 | 06 | the rest of station 1: two splits, one injection, two moves | 7 |
 | 07 | `lib/keybinds/` and `lib/external-link.tsx`, split by consumer | 5 |
 | 08 | the pane/layout domain sinks to `lib/` + `store/` | 9 |
+| 09 | the plugin ABI stops reaching into the app | 13 |
 
-Parallel per §4. **Review gate** when the phase's last item merges (§5).
+49 edges. Parallel per §4. **Review gate** when the phase's last item merges (§5).
 
 ### Phase 2 — work order 05, the `@/hermes` barrel
 
@@ -155,9 +156,11 @@ round.
 
 ### Phase 3 — whatever the open decisions produce
 
-Work order 09 (the plugin ABI) is decided and being written. Further orders appear
-as the remaining knots in §7 are decided. Each is a normal work order: same
-collision check, same review gate. §9 says how one enters this plan.
+Empty today, and that is the honest state: every work order that exists is in
+Phase 1 or 2. Orders appear here as the knots in §7 are decided — the second
+composer, the components that drive app behaviour, and the three host-view
+capability exports. Each becomes a normal work order: same collision check, same
+review gate. §9 says how one enters this plan.
 
 ### Done
 
@@ -183,39 +186,28 @@ node ../../../.agents/skills/architecture-tree-report/scripts/batch-collisions.m
   ../../../docs/architecture/renderer-layer-batches/batch-manifest.json
 ```
 
-Current output — **3 waves is the minimum sequential depth**:
+Current output — **4 waves is the minimum sequential depth**:
 
 ```
-wave 1: 02 tour · 04 workspace · 06a1 statusbar · 06b1 haptics · 06c2 image-dl
-wave 2: 03 shape+label · 06a2 link-title · 06c1 sound · 08 pane-shell
-wave 3: 01 lib-services · 07a keybinds · 07b external-link
+wave 1: 02 tour · 06c1 sound · 06c2 image-dl · 09 plugin-abi
+wave 2: 04 workspace · 06a1 statusbar · 06b1 haptics
+wave 3: 03 shape+label · 06a2 link-title · 08 pane-shell
+wave 4: 01 lib-services · 07a keybinds · 07b external-link
 ```
 
 The collisions that force this:
 
 | pair | shared file |
 | --- | --- |
-| 01 ∩ 04 | `app/session/hooks/use-session-actions/session-create.ts` |
-| 03 ∩ 04 | `store/projects/crud.ts`, `app/chat/sidebar/projects/workspace-group.tsx`, +3 |
-| 06a2 ∩ 07b | `components/assistant-ui/directive-text.tsx` |
-| 06b1 ∩ 07a | `components/assistant-ui/clarify-tool.tsx`, `app/settings/index.tsx`, +1 |
-| 06b1 ∩ 06c1 | `app/session/hooks/use-message-stream/gateway-event/message-stream.ts`, +1 |
-| 06b1 ∩ 07b | `components/assistant-ui/directive-text.tsx`, `app/settings/env-var-actions-menu.tsx` |
-| 06b1 ∩ 03 | `app/chat/sidebar/session-row.tsx` |
-| 06b1 ∩ 01 | `extension/sdk/index.ts`, `app/chat/sidebar/session-actions-menu.tsx` |
-| 06c2 ∩ 07b | `components/assistant-ui/embeds/listing-embed.tsx` |
-| 01 ∩ 08 | `store/review.ts`, `app/contrib/controller.tsx`, `app/session/hooks/use-session-actions/session-create.ts`, +2 |
-| 04 ∩ 08 | `app/session/hooks/use-session-actions/session-create.ts` |
-| 06a1 ∩ 08 | `app/shell/hooks/use-statusbar-items.tsx` |
-| 06b1 ∩ 08 | `extension/sdk/index.ts`, `app/settings/plugins-settings.tsx`, +2 |
-| 07a ∩ 08 | `components/pane-shell/tree/renderer/tree-group.tsx`, `app/hooks/use-keybinds.ts` |
-| 07b ∩ 08 | `app/chat/preview-tile.tsx`, `app/context-menu/app-context-menu.tsx` |
 
-Two items collide with six others, for opposite reasons and with the same
-consequence — treat either as its own slot: `06b1 haptics`, because it has 55
-importers, and `08 pane-shell`, because it touches ~100 files. Their width is not
-a reason to split them; it is a reason to start them early and let the small
-items fill the queue around them.
+
+Three items are wide, for different reasons and with the same
+consequence — treat each as its own slot: `09 plugin-abi` (nine collisions, 78
+touched files: it edits the ABI module every batch that ships a `lib/` helper
+re-exports through, plus `app/contrib/controller.tsx` and `app/routes.ts`),
+`06b1 haptics` (eight, 55 importers) and `08 pane-shell` (seven, 45). Their width
+is not a reason to split them; it is a reason to start them early and let the
+small items fill the queue around them.
 
 ### How to actually run it
 
@@ -313,16 +305,18 @@ These are **not yet work orders**, which is the only reason they are not being
 executed: nobody has decided what they should become. An executor that "helpfully"
 attempts one produces a plausible wrong answer — the decision is the work.
 
-Two are settled: layout state became work order
-[08](renderer-layer-batches/08-pane-shell-sink.md), and the plugin ABI is decided as
-09 — **a decision, not yet a file**, so its 16 edges stay in §1's target until
-`09-*.md` exists and enters the manifest. The rest are described in
+Three are settled and written up: layout state became work order
+[08](renderer-layer-batches/08-pane-shell-sink.md), the plugin ABI became
+[09](renderer-layer-batches/09-plugin-abi.md) — thirteen of its sixteen edges; the
+three it left behind are the host-view row above, and 09's own last section is the
+finding that stopped them (a module-scope capability read that runs before any
+`app/` code). The rest are described in
 [`renderer-layer-boundary.md`](renderer-layer-boundary.md) §2.
 
 | knot | edges | the decision needed |
 | --- | --- | --- |
 | the second composer (`components/assistant-ui/thread/user-edit-composer.tsx`, 928 lines) | 17 | collapse it into the app's composer, or extract a shared one |
-| the plugin ABI (`extension/sdk/index.ts`, 96 re-exports) | 16 | invert it: SDK declares the contract, `app/` registers implementations |
+| the three host-view capability exports (`SkillsView`, `McpTab`, `ToolsetConfigPanel`) | 3 | how a plugin learns about a host-provided view: a lazy capability read, a `ctx`-supplied component, a lazy plugin glob, or a shared prop contract |
 | components driving app behaviour by import (`app/chat/composer/focus.ts`, 420 lines) | 16 | a downward command channel, or an intent the composer subscribes to |
 
 A knot becomes a work order the moment its decision is made, and then it enters the

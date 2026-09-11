@@ -1,6 +1,6 @@
 # Batch 06 — `lib/` leftovers: two splits, one injection, two moves
 
-**Edges paid off: 7** (ledger 85 → 78). Shared rules and the verification recipe:
+**Edges paid off: 7.** Shared rules and the verification recipe:
 [README](README.md) — read it first; the rules there (never widen the ledger,
 regenerate don't hand-edit, no behaviour change, stay off the in-flight paths,
 explicit pathspecs) all apply here.
@@ -188,8 +188,10 @@ npm run ledger:layers
 npm run test:ui                                     # again: the ledger must not move
 ```
 
-Baseline before this batch: **775 files / 7466 tests**, ledger **85**. After it:
-ledger **78**. `apps/desktop/vitest.setup.ts`, `store/*-purity.test.ts` and
+Baseline: **775 files / 7466 tests**. **Take the ledger's number when you start
+and subtract 7** — this batch can run beside 09, so where it begins depends on
+what has already merged, and an absolute number written here would be wrong for
+someone. `apps/desktop/vitest.setup.ts`, `store/*-purity.test.ts` and
 `dev/contracts/*` all hard-code paths and layer expectations in places — when one
 of them fails after a move, it is telling you a modelled path changed, which is
 information, not noise. Update the model, never the assertion.

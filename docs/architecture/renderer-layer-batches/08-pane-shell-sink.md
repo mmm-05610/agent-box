@@ -1,6 +1,6 @@
 # Batch 08 — sink the pane/layout domain
 
-**Edges paid off: 9** (ledger 58 → 49). Shared rules and the verification recipe:
+**Edges paid off: 9.** Shared rules and the verification recipe:
 [README](README.md). This is knot 4 from
 [`../renderer-layer-boundary.md`](../renderer-layer-boundary.md) §2, decided.
 
@@ -179,7 +179,9 @@ npm run ledger:layers
 npm run test:ui                                     # again: the ledger must not move
 ```
 
-Before: ledger **58**, tests **775 files / 7466**. After: ledger **49**.
+Baseline: tests **775 files / 7466**. The ledger drops by **9** from whatever it
+reads when you start — subtract; do not expect an absolute number, because 09 shares
+a wave with nothing but runs over some of the same wiring.
 
 The nine lines that must be gone are all `store/` importers of
 `@/components/pane-shell/tree/{store,presets}` and

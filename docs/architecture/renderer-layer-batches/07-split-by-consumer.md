@@ -1,7 +1,8 @@
 # Batch 07 — split by consumer, not by moving
 
-**Edges paid off: 5** (ledger 78 → 73, assuming 06 has run; if it has not, the
-counts are 85 → 80). Shared rules and the verification recipe: [README](README.md).
+**Edges paid off: 5.** Take the ledger's number when you start and subtract 5 —
+which batches have merged first does not change the delta. Shared rules and the
+verification recipe: [README](README.md).
 
 These are the last two `lib/` items, and neither is a relocation. Both modules
 are **toolkits whose consumers span layers**, so "which layer does this file

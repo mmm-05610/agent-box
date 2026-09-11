@@ -80,17 +80,37 @@ Moved to **`lib/contributions.ts`** with the shapes at
 `extension/contrib/{plugin,plugins,plugins-store,runtime-loader,events,react/*}`
 stayed where they are — those are the parts that genuinely know about plugins.
 
-### K3 · The plugin ABI points the wrong way (16 edges)
+### K3 · The plugin ABI points the wrong way (16 edges) — decided, 13 paid by batch 09
 
-`extension/sdk/index.ts` has **96 re-exports**, and 14 of them are
-`export … from '@/app/shell/statusbar-controls'`, `@/app/chat/composer/contrib`,
-`@/app/routes`, `@/app/skills`, and so on. The host exposes its own internal
-module layout as the plugin ABI. `plugins/` never names `src/` by alias (that is
-guarded, and true today), so the ABI works — but every app refactor is now an ABI
-change.
+`extension/sdk/index.ts` is one 418-line module re-exporting **216 names from 90
+modules**, and 14 of its statements pull from `@/app/…` —
+`@/app/shell/statusbar-controls`, `@/app/chat/composer/contrib`, `@/app/routes`,
+`@/app/skills`, and so on. The host exposes its own internal module layout as the
+plugin ABI. `plugins/` never names `src/` by alias (that is guarded, and true
+today), so the ABI works — but every app refactor is now an ABI change.
 
-The fix inverts it: the SDK declares the contract, and `app/` registers
-implementations at boot. That is a real design task, not a relocation.
+Reading the list import by import split it into three kinds, which is why this
+knot did not need one big design:
+
+- **dead surface** — 25 of the names taken from `app/` are referenced by no
+  plugin and no test. Three of them are a module's whole ABI, so deleting them
+  deletes the import line;
+- **data** — the area ids and payload types (`ROUTES_AREA`, `PALETTE_AREA`,
+  `COMPOSER_AREAS`, …). Pure data filed by feature; they belong in `lib/` beside
+  `KEYBINDS_AREA` / `CHAT_EMPTY_AREA`, and the components they describe belong in
+  `components/`;
+- **the one verb** — `host.openSession`, which is app behaviour and becomes a
+  host-supplied seam (`lib/plugin-open-session.ts`), the same shape as
+  `setDesktopFsConnectionSource`.
+
+Those thirteen are [batch 09](renderer-layer-batches/09-plugin-abi.md). **The
+remaining three — `SkillsView`, `McpTab`, `ToolsetConfigPanel` — are not
+relocatable and not yet invertible**, and the reason is worth keeping: Bot Mode
+reads `sdk.SkillsView` at module scope (`plugins/hermes-bots/profile-config.tsx:37`),
+and the eager bundled-plugin glob means that runs before any `app/` module body,
+so an app-side registration seam is always too late — silently, as a lost
+connection route rather than a crash. Batch 09's last section has the chain; the
+open knot is the master plan's §7.
 
 ### K4 · There is a second composer (17 edges)
 

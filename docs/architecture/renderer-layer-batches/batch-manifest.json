@@ -86,5 +86,26 @@
       "tab-selection'",
       "floating-rect'"
     ]
+  },
+  "09 plugin-abi": {
+    "edges": 13,
+    "modules": [
+      "host-session-options'",
+      "host-session'",
+      "session-status-dot'",
+      "row-geometry'",
+      "connection-glyph'",
+      "sidebar/chrome'",
+      "\\./chrome'",
+      "overlays/panel'",
+      "model-catalog-menu'",
+      "model-edit-submenu'",
+      "app/routes'",
+      "\\./routes'",
+      "\\.\\./routes'",
+      "command-palette/contrib'",
+      "composer/contrib'",
+      "open-session'"
+    ]
   }
 }
