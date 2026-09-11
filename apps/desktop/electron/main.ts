@@ -1,511 +1,26 @@
-import { execFileSync, spawn } from 'node:child_process'
+import { execFileSync } from 'node:child_process'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
-import http from 'node:http'
-import https from 'node:https'
-import os from 'node:os'
 import path from 'node:path'
 import tls from 'node:tls'
 import { pathToFileURL } from 'node:url'
+
 import {
   app,
   BrowserWindow,
-  clipboard,
   dialog,
   net as electronNet,
-  webContents as electronWebContents,
-  globalShortcut,
-  ipcMain,
   Menu,
-  nativeTheme,
   powerMonitor,
   powerSaveBlocker,
   protocol,
   safeStorage,
   screen,
-  session,
-  shell,
-  systemPreferences
+  session
 } from 'electron'
-import { classifyActiveRuntime } from './active-runtime-state'
-import { destroyKeepaliveAgents, downloadAgentFor, jsonAgentFor, withRetry } from './api-transport'
-import { appIconCandidates, resolveAppIcon } from './app-icon'
-import { stopBackendChild as stopBackendChildImpl, stopBackendTreesForUpdate } from './backend-child'
-import {
-  type BackendOutputTail,
-  claimDecision,
-  createBackendOutputTail,
-  execText,
-  isPidOnlyStartMarker,
-  pidOnlyStartMarker,
-  probeStartMarker,
-  processStartMarker,
-  REAP_PROBE_TIMEOUT_MS
-} from './backend-claim'
-import { dashboardFallbackArgs, sourceDeclaresServe } from './backend-command'
-import { createBackendConnectionState } from './backend-connection-state'
-import { BackendDialClaims } from './backend-dial-claim'
-import { buildDesktopBackendEnv, hermesManagedNodePathEntries, normalizeHermesHomeRoot } from './backend-env'
-import {
-  isReauthRequiredError,
-  makeNousCloudBackendDownError,
-  makeUnsignedOauthError,
-  waitForHermesReady
-} from './backend-health'
-import { backendCommandMatches, createBackendOwnership, createBackendShutdownCoordinator } from './backend-ownership'
-import {
-  canImportHermesCli,
-  execProbeSync,
-  HERMES_EXECUTABLE_NOT_FOUND,
-  PROBE_TIMEOUT_MS,
-  shouldTrustHermesOverride,
-  verifyHermesCli
-} from './backend-probes'
-import { waitForDashboardPortAnnouncement } from './backend-ready'
-import { recycleOwnedBackend } from './backend-recycle'
-import { isPidAliveWindows, waitForBackendRelease } from './backend-release-gate'
-import {
-  isHostKeyChangedBootFailure,
-  isRetryableRemoteBootFailure,
-  shouldLatchBackendStartFailure,
-  shouldLatchHostKeyChangedFailure,
-  shouldLatchRemoteReauthFailure
-} from './backend-start-failure'
-import {
-  detectRemoteDisplay,
-  isWindowsBinaryPathInWsl,
-  isWslEnvironment,
-  resolveLinuxPasswordStore
-} from './bootstrap-platform'
-import { decideBootstrapRepair } from './bootstrap-repair-guard'
-import { runBootstrap } from './bootstrap-runner'
-import {
-  BROWSER_WINDOW_HEIGHT,
-  BROWSER_WINDOW_MIN_HEIGHT,
-  BROWSER_WINDOW_MIN_WIDTH,
-  BROWSER_WINDOW_WIDTH,
-  buildBrowserWindowUrl
-} from './browser-windows'
-import { detectBundleSkew } from './bundle-skew'
-import { detectBundleSwap } from './bundle-swap'
-import {
-  cancelScheduledDesktopLogFlush,
-  flushDesktopLogBufferSync,
-  getRecentHermesLogLines,
-  initDesktopLogBuffer,
-  rememberLog
-} from './composition/log-buffer'
-import {
-  initMediaProtocolBridge,
-  LOCAL_PREVIEW_HOSTS,
-  looksBinary,
-  PREVIEW_HTML_EXTENSIONS,
-  PREVIEW_LANGUAGE_BY_EXT,
-  PREVIEW_PDF_EXTENSIONS,
-  PREVIEW_WATCH_DEBOUNCE_MS,
-  previewFileMetadata,
-  TEXT_PREVIEW_MAX_BYTES
-} from './composition/media-protocol'
-import {
-  applyTitleBarOverlay,
-  applyWindowTranslucency,
-  chatWindowSurfaceOptions,
-  getTitleBarOverlayOptions,
-  getTranslucencyState,
-  isHexColor,
-  setRendererTitleBarTheme,
-  setTranslucencyState,
-  THEME_SOURCES,
-  translucencyBackedWindows,
-  writePersistedThemeSource,
-  writePersistedTranslucency
-} from './composition/window-theme'
-import { ensureWslWindowsFonts } from './composition/wsl-fonts'
-import { applyConnectionChange, sshQuitShouldBlock, teardownSshState } from './connection-apply'
-import {
-  apiRequestRegistryConnectionId,
-  authModeFromStatus,
-  buildGatewayWsUrl,
-  buildGatewayWsUrlWithTicket,
-  connectionScopeKey,
-  cookiesHaveLiveSession,
-  cookiesHavePrivyAccessToken,
-  cookiesHavePrivySession,
-  cookiesHaveSession,
-  gatewayTicketFailure,
-  gatewayWsUrlIpcResult,
-  hostLabelFromBaseUrl,
-  localProfileEntry,
-  modeIsRemoteLike,
-  normalizeRemoteBaseUrl,
-  normalizeRemoteHeaders,
-  normalizeSshConfig,
-  normAuthMode,
-  pathForRegistryBackendRequest,
-  pathWithGlobalRemoteProfile,
-  profileHasRemoteConnection,
-  profileRemoteOverride,
-  profileSshOverride,
-  type RegistryBackendRequestScope,
-  remoteRequestMatchesBaseUrl,
-  resolveAuthMode,
-  resolveProfileApiRequest,
-  resolveProfileBackendRoute,
-  resolveRemoteSshDashboardProfile,
-  resolveTestWsUrl,
-  savedProfileSsh,
-  tokenPreview,
-  withTransientRetries
-} from './connection-config'
-import { applyConnectionConfigAtomically } from './connection-config-apply'
-import {
-  backendScopeKey,
-  backendScopePrefix,
-  buildAgentRoster,
-  connectionDialFieldsChanged,
-  mergeConnectionInput,
-  migrateV1ToRegistry,
-  normalizeConnectionInput,
-  normalizeRegistry,
-  parseBackendScopeKey,
-  reconcileAppliedGlobalConnection,
-  reconcileRegistryDrift,
-  registrySourceOwnsPrimaryBackend,
-  rememberSshEnumeration,
-  removeConnection,
-  resolvedConnectionId,
-  resolveRegistryLocalRoute,
-  reuseMatchingPrimarySshBackend,
-  setConnectionLaunchMode,
-  setLastUsedConnection,
-  setPrimaryConnection,
-  shouldDeferLocalEnumeration,
-  shouldRetrySshInventory,
-  updateEligibility,
-  upsertConnection
-} from './connection-registry'
-import type { RosterProfileMetadata } from './connection-registry'
-import { describeCrashReason } from './crash-forensics'
-import { adoptServedDashboardToken } from './dashboard-token'
-import { loadOrCreateInstallationId, sshOwnershipId } from './desktop-installation'
-import { resolveDesktopRemoteRoute, v1SshTerminalPoolKey } from './desktop-remote-route'
-import {
-  buildPosixCleanupScript,
-  buildWindowsCleanupScript,
-  modeRemovesAgent,
-  modeRemovesUserData,
-  resolveRemovableAppPath,
-  shouldRemoveAppBundle,
-  uninstallArgsForMode
-} from './desktop-uninstall'
-import { describeDevCdpDecision, resolveDevCdpPort } from './dev-cdp'
-import { installEmbedReferer } from './embed-referer'
-import { createEventDeduper } from './event-dedupe'
-import { type FaviconIo, resolveFavicon } from './favicon'
-import { findGitBash as _findGitBash } from './find-git-bash'
-import {
-  installFindShortcut,
-  installFoundInPageForwarder,
-  performFindAfterIndexingStarted,
-  stopFind
-} from './find-in-page'
-import { createFirstRunSetupGate } from './first-run-setup-gate'
-import { registerFsIpc } from './fs-ipc'
-import {
-  filenameFromContentDisposition,
-  fsPumpDeps,
-  gatewayFilePath,
-  gatewayFileRequestPaths,
-  isNotFoundError,
-  parseDataUrlToBuffer,
-  pumpStreamToFile,
-  resolveGatewayFileBackend,
-  writeBufferToFile
-} from './gateway-file-download'
-import { startGatewaysAfterUpdateAbort, stopGatewayBeforeUpdate } from './gateway-stop-before-update'
-import { probeGatewayWebSocket } from './gateway-ws-probe'
-import { registerGitIpc } from './git-ipc'
-import { registerSystemIpc } from './composition/ipc/system-ipc'
-import { registerConnectionIpc } from './composition/ipc/connection-ipc'
-import { registerBackendIpc } from './composition/ipc/backend-ipc'
-import { registerWindowIpc } from './composition/ipc/window-ipc'
-import { registerApiProxyIpc } from './composition/ipc/api-proxy-ipc'
-import { registerFilesIpc } from './composition/ipc/files-ipc'
-import { registerThemeIpc } from './composition/ipc/theme-ipc'
-import { registerPreviewIpc } from './composition/ipc/preview-ipc'
-import { clearStaleGitLocks } from './gitlock'
-import { readAndConsumeHandoffResult } from './handoff-result'
-import {
-  ATTACHMENT_UPLOAD_DEFAULT_MAX_BYTES,
-  clampDataUrlReadMaxMb,
-  DATA_URL_READ_DEFAULT_MAX_MB,
-  dataUrlReadMaxBytesFromMb,
-  DEFAULT_FETCH_TIMEOUT_MS,
-  enableBasicPasswordStoreEncryption,
-  encryptDesktopSecret as encryptDesktopSecretStrict,
-  readFileDataUrlForIpc,
-  resolvePersistedRemoteToken,
-  resolveReadableFileForIpc,
-  resolveRequestedPathForIpc,
-  resolveTimeoutMs,
-  SAFE_STORAGE_ENCODING,
-  TEXT_PREVIEW_SOURCE_MAX_BYTES,
-  tightenSecretFileMode,
-  writeSecretFileAtomic
-} from './hardening'
-import { cursorPointInWindow } from './hud-cursor'
-import { startHudGameOverlayWatch } from './hud-game-overlay'
-import { applyHudResetBounds, defaultHudBounds } from './hud-geometry'
-import { registerHudIpc } from './hud-ipc'
-import { applyHudElectronOverlay, promoteHudOverlay } from './hud-overlay'
-import { snapHudBounds } from './hud-snap'
-import { createHudSnapShortcut } from './hud-snap-shortcut'
-import { buildHudWindowUrl } from './hud-url'
-import { resolveHudWindowing } from './hud-windowing'
-import { createLinkTitleWindow, guardLinkTitleSession, readLinkTitleWindowTitle } from './link-title-window'
-import { ensureMainWindow } from './main-window-lifecycle'
-import {
-  assertManagedUpdatePreflightClear,
-  executeManagedRemoteUpdate,
-  fenceManagedSshBootstrapPublication,
-  ManagedConnectionUpdateGate,
-  managedSshRecoveryScopes,
-  managedSshScopeRole,
-  managedSshTokenPersistencePlan,
-  recoverManagedSshScopes,
-  refusedManagedSshUpdate,
-  type RemoteUpdateTarget,
-  runManagedSshUpdate,
-  validateCorrelationId,
-  waitForManagedRemoteClearance,
-  waitForManagedSshBootstrapFence,
-  waitForManagedUpdateOperations
-} from './managed-ssh-update'
-import { registerMcpOauthCallbackIpc } from './mcp-oauth-callback-ipc'
-import { createMediaProtocolHandler, MEDIA_PROTOCOL } from './media-protocol'
-import {
-  oauthGuardMayHardFail,
-  oauthSessionIsLive,
-  oauthTicketFailureAuthMessage,
-  resolveGatedDownloadAuth,
-  resolveJsonBody,
-  resolveOauthRestAuth,
-  resolveReadinessProbeAuth
-} from './native-auth-decisions'
-import {
-  nativeRefreshUrl,
-  type NativeTokenSet,
-  parseTokenResponse,
-  resolveLoginStrategy,
-  tokenNeedsRefresh
-} from './native-oauth'
-import { runNativeLogin } from './native-oauth-login'
-import { loadNativeTokenSet, type NativeTokenStoreIo, persistNativeTokenSet } from './native-token-store'
-import { registerNativeNotifications } from './notification-ipc'
-import { serializeJsonBody, setJsonRequestHeaders } from './oauth-net-request'
-import { LEGACY_OAUTH_PARTITION, resolveOauthPartition } from './oauth-partition'
-import { createParentStartMarkerResolver, parentWatchdogEnv } from './parent-process-identity'
-import { registerPetOverlayIpc } from './pet-overlay-ipc'
-import {
-  pendingNotice as pendingPluginCompatNotice,
-  recordDismissed as recordPluginCompatDismissed
-} from './plugin-compat-notice'
-import {
-  buildRegistryProfileRoutes,
-  isLocalEnumerationFailure,
-  localRouteFallbackProfiles,
-  undialedSshRouteSeeds
-} from './plugin-profile-routes'
-import { selectPoolEvictions } from './pool-eviction'
-import { clampPoolLimits, parsePoolLimits, POOL_LIMITS_DEFAULTS } from './pool-limits'
-import {
-  isBackgroundSlotWaitTimeout,
-  LocalBackendSpawnCoordinator,
-  type LocalBackendSpawnPriority,
-  type LocalBackendSpawnRequest,
-  releaseLocalBackendSlotAfterExit
-} from './pool-spawn-coordinator'
-import { createPoolStopper } from './pool-stop'
-import { poolTouchKeys } from './pool-touch-scope'
-import { createKeepAwake } from './power-save'
-import { capturePreviewContents } from './preview-capture'
-import { PreviewReachRegistry } from './preview-reach'
-import {
-  createPrimaryRemoteConnection,
-  FirstRunSetupResetError,
-  runPrimaryBackendStartup
-} from './primary-backend-startup'
-import { rehomePrimaryConnection } from './primary-connection-rehome'
-import {
-  assertLocalProfileCanStart,
-  decideProfileDeleteAction,
-  dispatchConnectionScopedProfileDelete,
-  localProfilePoolKeys,
-  ProfileDeletionGate,
-  profileNameFromDeleteRequest,
-  resolveRouteProfile
-} from './profile-delete-routing'
-import { migrateActiveProfileIfMissing as migrateActiveProfileIfMissingPure } from './profile-migration'
-import { prepareProfileRenameLifecycle, profileRenameFromRequest } from './profile-rename-routing'
-import {
-  buildSidebarSessionSliceParams,
-  fetchPrimaryProfileSessions,
-  fetchRegistrySessionRows,
-  fetchRemoteProfileSessions,
-  findRemoteOwnerProfileForSession,
-  mergeProfileSessionWindow,
-  type RegistrySessionSource,
-  spliceRegistrySessionRows,
-  tagRegistrySessionResponse
-} from './profile-session-routing'
-import { createQuickEntryShortcut, quickEntryWindowBounds, sanitizeQuickEntrySettings } from './quick-entry'
-import { type ActiveWork, mergeActiveWork, normalizeActiveWork, quitPromptFor } from './quit-guard'
-import * as remoteLifecycle from './remote-lifecycle'
-import {
-  attachPowerResumeRemoteRevalidation,
-  ensureHealthyPooledRemoteBackendForDispatch,
-  RemoteLivenessTracker,
-  RemoteRevalidationCoordinator,
-  revalidatePooledRemoteBackends,
-  revalidateRemoteConnection,
-  revalidateSuspectPooledRemoteBackends
-} from './remote-liveness'
-import {
-  applyRemoteRequestHeaders,
-  createRegistryGatewayWsUrlHandler,
-  createRemoteWsHeaderStore
-} from './remote-ws-headers'
-import { missingRendererAssets } from './renderer-bundle'
-import { loadRendererLoadErrorPage } from './renderer-load-error-page'
-import { attachRendererConsoleCapture, formatRendererBoundaryReport } from './renderer-log'
-import { fetchRosterSourceData } from './roster-source-fetch'
-import {
-  classifyStoredSecret,
-  readSecretStoragePolicy,
-  SECRET_STORAGE_POLICY_FILE,
-  type SecretStoragePolicy,
-  writeSecretStoragePolicy
-} from './secret-storage-policy'
-import {
-  buildInstanceWindowUrl,
-  buildSessionWindowUrl,
-  chatWindowWebPreferences,
-  createSessionWindowRegistry,
-  instanceWindowBounds,
-  SESSION_WINDOW_MIN_HEIGHT,
-  SESSION_WINDOW_MIN_WIDTH
-} from './session-windows'
-import { ensureLoginShellPath } from './shell-path'
-import { createBootstrapCoordinator, sshConfigFingerprint } from './ssh-bootstrap-coordinator'
-import { collectSshConfigHosts, parseSshGOutput } from './ssh-config'
-import { createSshProbeConnection, pickLocalPort, redactSecrets, SshConnection } from './ssh-connection'
-import { createStreamThrottle } from './stream-throttle'
-import { registerTerminalIpc } from './terminal-ipc'
-import { nativeOverlayWidth as computeNativeOverlayWidth } from './titlebar-overlay-width'
-import {
-  glassActive,
-  glassSupportedOn,
-  normalizeState as normalizeTranslucency,
-  translucencySupportedOn,
-  vibrancyFor as vibrancyForTranslucency,
-  windowOpacityFor
-} from './translucency'
-import {
-  compareApiUrl,
-  parseCompareBehindCount,
-  resolveBehindCount,
-  resolveCommitLogSelection,
-  shouldCountCommits
-} from './update-count'
-import { waitForUpdateClearance } from './update-gate'
-import { readLiveUpdateMarker, updateHandoffConflict, writeUpdateMarker } from './update-marker'
-import { isOfficialSshRemote, OFFICIAL_REPO_HTTPS_URL } from './update-remote'
-import {
-  collectRelaunchArgs,
-  observeUpdaterHandoff,
-  resolvePosixScriptHandoff,
-  resolveStagedUpdaterBinary,
-  resolveUpdateScriptHandoff,
-  sandboxFallbackFromEnv,
-  spawnUpdaterProcess,
-  stagedUpdaterSupportsPrewrittenMarker,
-  windowsUpdatePrerequisiteError,
-  wrapHandoffForDetachedConsole
-} from './updater-process'
-import {
-  formatBlockerMessage,
-  formatProbeFailedMessage,
-  scanVenvBlockers,
-  stopSafeVenvBlockers
-} from './venv-blocker-scan'
-import { isHermesOwnedVenvDaemon } from './venv-holder-select'
-import { fetchMarketplaceThemes, searchMarketplaceThemes } from './vscode-marketplace'
-import { createWakeIndicatorWindowController } from './wake-indicator-window'
-import { enumerateWindowsFrontToBack, enumerationFailed, readWindowBelow } from './window-below'
-import {
-  registrySshPoolScopeByConnectionId,
-  registrySshScopeForWindowRoute,
-  WindowConnectionRouteRegistry
-} from './window-connection-route'
-import { createWindowOpenHandler } from './window-open-policy'
-import { installWindowRendererLifecycle } from './window-renderer-lifecycle'
-import { createWindowRevealController } from './window-reveal'
-import {
-  bindGeometryPersistence,
-  computeWindowOptions,
-  debounce,
-  sanitizeWindowState,
-  MIN_HEIGHT as WINDOW_MIN_HEIGHT,
-  MIN_WIDTH as WINDOW_MIN_WIDTH
-} from './window-state'
-import { hiddenWindowsChildOptions } from './windows-child-options'
-import {
-  buildPathExtCandidates,
-  chooseUpdaterArgs,
-  getVenvSitePackagesEntries,
-  resolveVenvHermesCommand
-} from './windows-hermes-path'
-import {
-  connectWindowsRemote,
-  detectRemotePlatform,
-  helper,
-  probeWindowsRemote,
-  terminateOwnedWindowsDashboardForUpdate
-} from './windows-remote-lifecycle'
-import {
-  alreadyHasNoSandbox,
-  buildNoSandboxRelaunchArgs,
-  decideWindowsSandboxLaunch,
-  fallbackMarker,
-  grantAllApplicationPackagesAcl,
-  markerAfterSuccessfulBoot,
-  readSandboxMarker,
-  type SandboxFallbackReason,
-  shouldAttemptAclRepair,
-  shouldRelaunchForGpuSandboxCrash,
-  shouldRelaunchForRendererSandboxCrashLoop,
-  writeSandboxMarker
-} from './windows-sandbox-fallback'
-import { installWindowsSystemCaTrust } from './windows-system-ca'
-import { readWindowsUserEnvVar } from './windows-user-env'
-import { isPackagedInstallPath as isPackagedInstallPathUnderRoots } from './workspace-cwd'
-import { readWslWindowsClipboardImage } from './wsl-clipboard-image'
-import { resolvePickerDefaultPath, setActiveGatewayProfile, setWslBridgeProfileState } from './wsl-path-bridge'
-import {
-  applyZoomLevel,
-  DEFAULT_ZOOM_LEVEL,
-  installZoomReassertOnNavigation,
-  installZoomReassertOnWindowEvents,
-  percentToZoomLevel,
-  ZOOM_STEP,
-  ZOOM_STORAGE_KEY,
-  zoomLevelToPercent,
-  zoomWiringForWindowKind
-} from './zoom'
 
+import { destroyKeepaliveAgents } from './api-transport'
 import {
-  TITLE_BYTE_BUDGET,
-  TITLE_USER_AGENT,
   closePreviewWatchers,
   dispatchRegistryApiRequest,
   expandUserPath,
@@ -525,26 +40,12 @@ import {
   teardownConnectionScopedProfileBackend,
   teardownPoolBackendAndWait,
   teardownPrimaryBackendAndWait,
+  TITLE_BYTE_BUDGET,
+  TITLE_USER_AGENT,
   watchDirectory,
   watchPreviewFile,
 } from './composition/api-proxy-composition'
 import {
-  DEFAULT_UPDATE_BRANCH,
-  DESKTOP_LOG_PATH,
-  DEV_CDP,
-  GLASS_SUPPORTED,
-  HERMES_HOME,
-  INSTALL_STAMP,
-  IS_MAC,
-  IS_PACKAGED,
-  IS_WINDOWS,
-  IS_WSL,
-  PASSWORD_STORE,
-  PROFILE_NAME_RE,
-  REMOTE_DISPLAY_REASON,
-  SKIP_QUIT_CONFIRM,
-  TRANSLUCENCY_SUPPORTED,
-  USER_DATA_OVERRIDE,
   _clearNativeTokens,
   _storeNativeTokens,
   activeSshTerminalTarget,
@@ -559,7 +60,10 @@ import {
   createWindow,
   decryptDesktopSecret,
   decryptRemoteHeaders,
+  DEFAULT_UPDATE_BRANCH,
   defaultProjectDirConfigPath,
+  DESKTOP_LOG_PATH,
+  DEV_CDP,
   directoryExists,
   ensureBackend,
   ensureNativeAccessToken,
@@ -573,6 +77,7 @@ import {
   fileExists,
   findOnPath,
   gatewayAuthProviders,
+  get_rendererReadyForDeepLink,
   getBackendStartFailure,
   getBootProgressState,
   getBootstrapAbortController,
@@ -591,12 +96,17 @@ import {
   getRemoteReauthFailure,
   getWindowsNoSandboxRelaunchAttempted,
   getWindowsSandboxFallbackActive,
-  getWindowsSandboxFallbackReason,
   getWindowsSandboxFallbackSticky,
-  get_rendererReadyForDeepLink,
+  GLASS_SUPPORTED,
   globalRemoteActive,
   hasLiveOauthSession,
   hasNativeSession,
+  HERMES_HOME,
+  INSTALL_STAMP,
+  IS_MAC,
+  IS_PACKAGED,
+  IS_WINDOWS,
+  IS_WSL,
   isPackagedInstallPath,
   isPrimaryInstance,
   lastContextMenuPoint,
@@ -605,9 +115,11 @@ import {
   managedPrimaryRestoreOwners,
   mintGatewayWsTicket,
   openExternalUrl,
+  PASSWORD_STORE,
   postJsonNoAuth,
   primaryBackendIsRemote,
   primaryProfileKey,
+  PROFILE_NAME_RE,
   profileDeletionGate,
   profileHasRemoteOverride,
   readActiveDesktopProfile,
@@ -618,12 +130,14 @@ import {
   readManagedSshRecoveryRecords,
   readWindowState,
   rememberRemoteWsHeaders,
+  REMOTE_DISPLAY_REASON,
   resetBootstrapSnapshot,
   resolveGitBinary,
   resolveHermesCwd,
   resolveRemoteBackend,
   resolveUpdateRoot,
   secretStoragePolicy,
+  set_rendererReadyForDeepLink,
   setAndPersistZoomLevel,
   setBackendStartFailure,
   setBootstrapFailure,
@@ -636,7 +150,7 @@ import {
   setWindowsSandboxFallbackActive,
   setWindowsSandboxFallbackReason,
   setWindowsSandboxFallbackSticky,
-  set_rendererReadyForDeepLink,
+  SKIP_QUIT_CONFIRM,
   spawnPriorityFrom,
   sshBootstrapCoordinator,
   sshConnections,
@@ -647,13 +161,14 @@ import {
   streamThrottle,
   teardownSshConnection,
   terminalIpc,
+  TRANSLUCENCY_SUPPORTED,
+  USER_DATA_OVERRIDE,
   wakeIndicatorController,
   windowConnectionRoutes,
   writeActiveDesktopProfile,
   writeDesktopConnectionConfig,
   writeDesktopConnectionsRegistry,
   writeDesktopUpdateConfig,
-  bootstrapRepairAttempt,
 } from './composition/bootstrap-env-composition'
 import {
   discoverCloudAgents,
@@ -678,22 +193,39 @@ import {
   stopRegistryConnectionBackends,
 } from './composition/connections-composition'
 import {
-  HERMES_PROTOCOL,
   _extractDeepLink,
   get_pendingDeepLink,
   handleDeepLink,
+  HERMES_PROTOCOL,
   registerDeepLinkProtocol,
   set_pendingDeepLink,
 } from './composition/deep-link-composition'
+import { registerApiProxyIpc } from './composition/ipc/api-proxy-ipc'
+import { registerBackendIpc } from './composition/ipc/backend-ipc'
+import { registerConnectionIpc } from './composition/ipc/connection-ipc'
+import { registerFilesIpc } from './composition/ipc/files-ipc'
+import { registerPreviewIpc } from './composition/ipc/preview-ipc'
+import { registerSystemIpc } from './composition/ipc/system-ipc'
+import { registerThemeIpc } from './composition/ipc/theme-ipc'
+import { registerWindowIpc } from './composition/ipc/window-ipc'
+import {
+  cancelScheduledDesktopLogFlush,
+  flushDesktopLogBufferSync,
+  initDesktopLogBuffer,
+  rememberLog
+} from './composition/log-buffer'
+import {
+  initMediaProtocolBridge
+} from './composition/media-protocol'
 import {
   resolveHermesVersion,
 } from './composition/paths-composition'
 import {
-  MAX_BOOTSTRAP_REPAIR_SOFT_ATTEMPTS,
   applySpawnPriority,
   installRemoteHeaderRules,
   managedConnectionRecoveries,
   managedConnectionUpdates,
+  MAX_BOOTSTRAP_REPAIR_SOFT_ATTEMPTS,
   recoverManagedSshUpdate,
   remoteLiveness,
   remoteRevalidation,
@@ -707,6 +239,10 @@ import {
   runDesktopUninstall,
 } from './composition/updates-composition'
 import {
+  getTranslucencyState,
+  writePersistedTranslucency
+} from './composition/window-theme'
+import {
   browserWindows,
   buildApplicationMenu,
   closeHudWindow,
@@ -714,7 +250,6 @@ import {
   createInstanceWindow,
   detectRendererSkew,
   focusWindow,
-  getHudSessionId,
   getHudWindow,
   getQuickEntryLastState,
   getQuickEntryWindow,
@@ -733,6 +268,96 @@ import {
   setQuickEntryWindow,
   spawnBrowserWindow,
 } from './composition/windows-composition'
+import { ensureWslWindowsFonts } from './composition/wsl-fonts'
+import { sshQuitShouldBlock } from './connection-apply'
+import {
+  authModeFromStatus,
+  buildGatewayWsUrlWithTicket,
+  connectionScopeKey,
+  modeIsRemoteLike,
+  normalizeRemoteBaseUrl,
+  normalizeSshConfig,
+  normAuthMode,
+  resolveTestWsUrl
+} from './connection-config'
+import {
+  backendScopeKey,
+  parseBackendScopeKey,
+  rememberSshEnumeration,
+  resolveRegistryLocalRoute,
+  shouldDeferLocalEnumeration,
+  shouldRetrySshInventory
+} from './connection-registry'
+import type { RosterProfileMetadata } from './connection-registry'
+import { describeDevCdpDecision } from './dev-cdp'
+import { installEmbedReferer } from './embed-referer'
+import { createEventDeduper } from './event-dedupe'
+import { type FaviconIo, resolveFavicon } from './favicon'
+import {
+  installFoundInPageForwarder
+} from './find-in-page'
+import { registerFsIpc } from './fs-ipc'
+import { probeGatewayWebSocket } from './gateway-ws-probe'
+import { registerGitIpc } from './git-ipc'
+import {
+  enableBasicPasswordStoreEncryption,
+  resolveReadableFileForIpc,
+  resolveRequestedPathForIpc
+} from './hardening'
+import { applyHudResetBounds, defaultHudBounds } from './hud-geometry'
+import { registerHudIpc } from './hud-ipc'
+import { ensureMainWindow } from './main-window-lifecycle'
+import {
+  refusedManagedSshUpdate,
+  waitForManagedUpdateOperations
+} from './managed-ssh-update'
+import { registerMcpOauthCallbackIpc } from './mcp-oauth-callback-ipc'
+import { createMediaProtocolHandler, MEDIA_PROTOCOL } from './media-protocol'
+import { registerNativeNotifications } from './notification-ipc'
+import { registerPetOverlayIpc } from './pet-overlay-ipc'
+import { poolTouchKeys } from './pool-touch-scope'
+import { createKeepAwake } from './power-save'
+import { PreviewReachRegistry } from './preview-reach'
+import { sanitizeQuickEntrySettings } from './quick-entry'
+import { type ActiveWork, mergeActiveWork, quitPromptFor } from './quit-guard'
+import * as remoteLifecycle from './remote-lifecycle'
+import {
+  attachPowerResumeRemoteRevalidation,
+  revalidatePooledRemoteBackends,
+  revalidateSuspectPooledRemoteBackends
+} from './remote-liveness'
+import {
+  createRegistryGatewayWsUrlHandler
+} from './remote-ws-headers'
+import { fetchRosterSourceData } from './roster-source-fetch'
+import {
+  instanceWindowBounds
+} from './session-windows'
+import { ensureLoginShellPath } from './shell-path'
+import { createSshProbeConnection, pickLocalPort } from './ssh-connection'
+import {
+  computeWindowOptions
+} from './window-state'
+import {
+  detectRemotePlatform,
+  helper
+} from './windows-remote-lifecycle'
+import {
+  alreadyHasNoSandbox,
+  buildNoSandboxRelaunchArgs,
+  decideWindowsSandboxLaunch,
+  fallbackMarker,
+  grantAllApplicationPackagesAcl,
+  markerAfterSuccessfulBoot,
+  readSandboxMarker,
+  shouldAttemptAclRepair,
+  shouldRelaunchForGpuSandboxCrash,
+  writeSandboxMarker
+} from './windows-sandbox-fallback'
+import { installWindowsSystemCaTrust } from './windows-system-ca'
+import { setActiveGatewayProfile, setWslBridgeProfileState } from './wsl-path-bridge'
+
+
 
 if (USER_DATA_OVERRIDE) {
   const resolvedUserData = path.resolve(USER_DATA_OVERRIDE)
@@ -2861,4 +2486,3 @@ app.on('window-all-closed', () => {
     app.quit()
   }
 })
-
