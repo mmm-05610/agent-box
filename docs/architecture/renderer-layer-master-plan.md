@@ -33,7 +33,7 @@ red on purpose.
 | | |
 | --- | --- |
 | ledger today | **85** |
-| after every work order in §3 | **58** |
+| after every work order in §3 | **49** |
 | test baseline | **775 files / 7466 tests** |
 
 **An item is done when the ledger shrank by exactly the number its work order
@@ -69,7 +69,7 @@ orders are in
 
 ## 3 · Order
 
-**Stage A — the layer work orders. 27 edges.** All six are written, all
+**Stage A — the layer work orders. 36 edges.** All seven are written, all
 destinations verified, all collisions mapped (§4).
 
 | work order | scope | edges |
@@ -80,6 +80,7 @@ destinations verified, all collisions mapped (§4).
 | 04 | split `workspace-groups.ts`, membership core → `store/` | 4 |
 | 06 | the rest of station 1: two splits, one injection, two moves | 7 |
 | 07 | `lib/keybinds/` and `lib/external-link.tsx`, split by consumer | 5 |
+| 08 | the pane/layout domain sinks to `lib/` + `store/` | 9 |
 
 **Stage B — work order 05, the `@/hermes` barrel.** 0 edges, ~240 files, four
 phases. It runs as its own stage, **never interleaved with Stage A** — it is the
@@ -111,8 +112,8 @@ Current output — **3 waves is the minimum sequential depth**:
 
 ```
 wave 1: 02 tour · 04 workspace · 06a1 statusbar · 06b1 haptics · 06c2 image-dl
-wave 2: 01 lib-services · 03 shape+label · 06c1 sound · 07a keybinds · 07b external-link
-wave 3: 06a2 link-title
+wave 2: 03 shape+label · 06a2 link-title · 06c1 sound · 08 pane-shell
+wave 3: 01 lib-services · 07a keybinds · 07b external-link
 ```
 
 The collisions that force this:
@@ -128,9 +129,18 @@ The collisions that force this:
 | 06b1 ∩ 03 | `app/chat/sidebar/session-row.tsx` |
 | 06b1 ∩ 01 | `extension/sdk/index.ts`, `app/chat/sidebar/session-actions-menu.tsx` |
 | 06c2 ∩ 07b | `components/assistant-ui/embeds/listing-embed.tsx` |
+| 01 ∩ 08 | `store/review.ts`, `app/contrib/controller.tsx`, `app/session/hooks/use-session-actions/session-create.ts`, +2 |
+| 04 ∩ 08 | `app/session/hooks/use-session-actions/session-create.ts` |
+| 06a1 ∩ 08 | `app/shell/hooks/use-statusbar-items.tsx` |
+| 06b1 ∩ 08 | `extension/sdk/index.ts`, `app/settings/plugins-settings.tsx`, +2 |
+| 07a ∩ 08 | `components/pane-shell/tree/renderer/tree-group.tsx`, `app/hooks/use-keybinds.ts` |
+| 07b ∩ 08 | `app/chat/preview-tile.tsx`, `app/context-menu/app-context-menu.tsx` |
 
-`06b1 haptics` collides with six others because it has 55 importers. Treat it as
-its own slot.
+Two items collide with six others, for opposite reasons and with the same
+consequence — treat either as its own slot: `06b1 haptics`, because it has 55
+importers, and `08 pane-shell`, because it touches ~100 files. Their width is not
+a reason to split them; it is a reason to start them early and let the small
+items fill the queue around them.
 
 ### How to actually run it
 
@@ -224,8 +234,11 @@ attention.
 
 ## 7 · Not delegated
 
-**The four design knots.** Each needs a decision; an executor that "helpfully"
-attempts one produces a plausible wrong answer. They are described in
+**The three remaining design knots.** Each needs a decision; an executor that
+"helpfully" attempts one produces a plausible wrong answer. (The fourth — the
+layout state in the component layer — was decided as "sink the whole domain",
+became work order [08](renderer-layer-batches/08-pane-shell-sink.md), and moved
+into Stage A.) They are described in
 [`renderer-layer-boundary.md`](renderer-layer-boundary.md) §2.
 
 | knot | edges | the decision needed |
@@ -233,7 +246,6 @@ attempts one produces a plausible wrong answer. They are described in
 | the second composer (`components/assistant-ui/thread/user-edit-composer.tsx`, 928 lines) | 17 | collapse it into the app's composer, or extract a shared one |
 | the plugin ABI (`extension/sdk/index.ts`, 96 re-exports) | 16 | invert it: SDK declares the contract, `app/` registers implementations |
 | components driving app behaviour by import (`app/chat/composer/focus.ts`, 420 lines) | 16 | a downward command channel, or an intent the composer subscribes to |
-| layout state in the component layer (`components/pane-shell/tree/store.ts`, 2029 lines) | 9 | how far the pane/layout split goes — the registry move already untied it from its blocker |
 
 A knot becomes a work order the moment its decision is made, and then it enters
 Stage A's machinery (§9).

@@ -8,9 +8,9 @@ because it is trusted; see `renderer-layer-master-plan.md` §8.
 | | |
 | --- | --- |
 | last updated | 2026-09-12 |
-| HEAD at last update | `cdb516e` |
+| HEAD at last update | `be1b0c7` |
 | ledger | **85** |
-| target after Stage A | **58** |
+| target after Stage A | **49** |
 | tests | **775 files / 7466 tests** |
 | reviewed | nothing yet |
 
@@ -18,7 +18,8 @@ because it is trusted; see `renderer-layer-master-plan.md` §8.
 
 ## Stage A — the layer work orders
 
-27 edges across six work orders, eleven independently executable items. Wave
+36 edges across seven work orders. Batches 06-08 are written as
+independently executable items, so the table is finer than the work orders. Wave
 numbers come from the collision check
 (`renderer-layer-master-plan.md` §4) — items in the same wave share no file.
 
@@ -35,13 +36,15 @@ numbers come from the collision check
 | 06c2 | `lib/hooks/use-image-download.ts` → `components/hooks/` | 1 | 1 | not started | — | — |
 | 07a | `lib/keybinds/` — split two of its five files | 4 | 2 | not started | — | — |
 | 07b | `lib/external-link.tsx` — split 7 exports out of 18 | 1 | 2 | not started | — | — |
+| 08 | the pane/layout domain sinks to `lib/` + `store/` | 9 | 2 | not started | — | — |
 
 Work orders: [01](renderer-layer-batches/01-lib-services-to-store.md) ·
 [02](renderer-layer-batches/02-tour-to-app.md) ·
 [03](renderer-layer-batches/03-project-session-moves.md) ·
 [04](renderer-layer-batches/04-workspace-groups-split.md) ·
 [06](renderer-layer-batches/06-lib-sink-and-move.md) ·
-[07](renderer-layer-batches/07-split-by-consumer.md)
+[07](renderer-layer-batches/07-split-by-consumer.md) ·
+[08](renderer-layer-batches/08-pane-shell-sink.md)
 
 Expected on completion: the ledger drops to 58, and **`lib/` holds only the nine
 edges belonging to `01`–`03`**. `lib/keybinds/` and `lib/external-link` must be
@@ -62,14 +65,15 @@ impact: **none** — `@/hermes` and `@/api/*` are both rank 0.
 ## Stage C — the knots (not delegated)
 
 Each needs a decision before it can become a work order. An executor that
-attempts one unprompted will produce a plausible wrong answer.
+attempts one unprompted will produce a plausible wrong answer. The fourth knot —
+layout state in the component layer — was decided on 2026-09-12 and became
+work order 08; it is in Stage A above.
 
 | knot | edges | the decision | status |
 | --- | --- | --- | --- |
 | the second composer (`user-edit-composer.tsx`, 928 lines) | 17 | collapse into the app's composer, or extract a shared one | awaiting decision |
 | the plugin ABI (`extension/sdk/index.ts`, 96 re-exports) | 16 | invert it: SDK declares, `app/` registers | awaiting decision |
 | components driving app behaviour (`app/chat/composer/focus.ts`) | 16 | a downward command channel, or an intent the composer subscribes to | awaiting decision |
-| layout state in the component layer (`pane-shell/tree/store.ts`, 2029 lines) | 9 | how far the pane/layout split goes | awaiting decision |
 
 ## Open items
 
