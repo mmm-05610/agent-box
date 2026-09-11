@@ -10,7 +10,7 @@ because it is trusted; see `renderer-layer-master-plan.md` §8.
 | last updated | 2026-09-12 |
 | last commit to change renderer source | `c6889f1` |
 | ledger | **85** |
-| target when the run completes | **7** |
+| target when the run completes | **0** |
 | tests | **775 files / 7466 tests** |
 | reviewed | nothing yet |
 | in scope | **every work order in `renderer-layer-batches/`** — Phase 1 and Phase 2 both; no phase is a permission gate |
@@ -19,14 +19,14 @@ because it is trusted; see `renderer-layer-master-plan.md` §8.
 
 ## Phase 1 — the layer work orders
 
-78 edges across eleven work orders. Batches 06-12 are written as
+85 edges across fourteen work orders. Batches 06-15 are written as
 independently executable items, so the table is finer than the work orders. Wave
 numbers come from the collision check
 (`renderer-layer-master-plan.md` §4) — items in the same wave share no file.
 
 | item | scope | edges | wave | status | commit | reviewer |
 | --- | --- | --- | --- | --- | --- | --- |
-| 01 | four stateful `lib/` services → `store/` | 6 | 5 | not started | — | — |
+| 01 | four stateful `lib/` services → `store/` | 6 | 6 | not started | — | — |
 | 02 | `lib/tour/` → `app/tour/` | 2 | 1 | not started | — | — |
 | 03 | a misplaced shape and a sidebar label | 3 | 4 | not started | — | — |
 | 04 | split `workspace-groups.ts`, membership core → `store/` | 4 | 2 | not started | — | — |
@@ -35,13 +35,16 @@ numbers come from the collision check
 | 06b1 | `lib/haptics.ts` — inject the mute preference | 1 | 2 | not started | — | — |
 | 06c1 | `lib/sound/completion-sound.ts` → `store/sound/player.ts` | 3 | 1 | not started | — | — |
 | 06c2 | `lib/hooks/use-image-download.ts` → `components/hooks/` | 1 | 1 | not started | — | — |
-| 07a | `lib/keybinds/` — split two of its five files | 4 | 5 | not started | — | — |
+| 07a | `lib/keybinds/` — split two of its five files | 4 | 6 | not started | — | — |
 | 07b | `lib/external-link.tsx` — split 7 exports out of 18 | 1 | 5 | not started | — | — |
 | 08 | the pane/layout domain sinks to `lib/` + `store/` | 9 | 4 | not started | — | — |
 | 09 | the plugin ABI stops reaching into the app | 14 | 1 | not started | — | — |
-| 10 | the composer engine leaves `app/` for `lib/` + `components/` | 22 | 6 | not started | — | — |
+| 10 | the composer engine leaves `app/` for `lib/` + `components/` | 22 | 5 | not started | — | — |
 | 11 | the route vocabulary sinks to `lib/` | 3 | 3 | not started | — | — |
 | 12 | the host views ride the plugin context (ABI change) | 3 | 7 | not started | — | — |
+| 13 | the last composer edge: the attachment upload moves out | 1 | 7 | not started | — | — |
+| 14 | three hooks sink, and the pet stops reaching up | 3 | 6 | not started | — | — |
+| 15 | the last three singletons | 3 | 7 | not started | — | — |
 
 Work orders: [01](renderer-layer-batches/01-lib-services-to-store.md) ·
 [02](renderer-layer-batches/02-tour-to-app.md) ·
@@ -53,13 +56,18 @@ Work orders: [01](renderer-layer-batches/01-lib-services-to-store.md) ·
 [09](renderer-layer-batches/09-plugin-abi.md) ·
 [10](renderer-layer-batches/10-composer-engine.md) ·
 [11](renderer-layer-batches/11-route-vocabulary.md) ·
-[12](renderer-layer-batches/12-host-views-through-context.md)
+[12](renderer-layer-batches/12-host-views-through-context.md) ·
+[13](renderer-layer-batches/13-composer-last-edge.md) ·
+[14](renderer-layer-batches/14-hooks-sink.md) ·
+[15](renderer-layer-batches/15-singletons.md)
 
-Expected on completion: the ledger drops to 7, and **no `lib/` line and no
-`extension/` line survives** — every one of `lib/`'s 21 lines is paid by 01–03,
-06–07, 10 and 11; 09 pays 14 of `extension/`'s 16 plus one of `components/`'s (the
-same seam, used by a component); and 12 pays the last three `extension/` lines by
-moving the capability onto the plugin context. `lib/keybinds/` and
+Expected on completion: **the ledger is 0.** Every one of `lib/`'s 21 lines is paid
+by 01–03 and 06–07; 09 pays 14 of `extension/`'s 16 plus one of `components/`'s (the
+same seam, used by a component) and 12 pays the last three `extension/` lines; 10 and
+11 pay the composer and the route vocabulary; 13–15 pay what those left. When the
+last work order merges, `renderer-layers.debt.ts` should be an empty list and the
+guard's "records no debt that has already been paid" test is what will tell you it is
+over. `lib/keybinds/` and
 `lib/external-link` must be gone from the ledger entirely; if a `lib/` line
 survives, a split boundary was drawn wrong.
 
@@ -75,19 +83,17 @@ so it can never be how the migration is progressing.
 Work order: [05](renderer-layer-batches/05-hermes-barrel-removal.md). Ledger
 impact: **none** — `@/hermes` and `@/api/*` are both rank 0.
 
-## Not yet work orders — seven edges, no decisions
+## Nothing is left unassigned
 
-Five knots were decided on 2026-09-12 and are Phase 1 above: layout state in the
-component layer became 08, the plugin ABI became 09, the composer engine became 10,
-the route vocabulary became 11, and the host views became 12. What follows is what
-they left behind, and it is all mechanical — the only open question in the migration
-was the host views, and that page is now a record rather than a request.
+Every line in the ledger is a work order now, and the target is **0**. The list below
+is kept only so a reader can see what the last three batches were, and why each of
+them was mechanical rather than a decision.
 
-| the remainder | edges | what has to happen | status |
-| --- | --- | --- | --- |
-| the composer's last edge (`user-edit-composer -> use-prompt-actions`) | 1 | the chain is traced: 11 shortened it by sinking the route vocabulary; the next link is the `use-session-actions/utils.ts` barrel, whose four helpers are app-free | traced, no work order yet |
-| `components/pet/floating-pet.tsx` → three `app/hooks` | 3 | sink what is pure, seam what is not | not analysed |
-| three singletons (`boot-failure-overlay`, `store/gateway-switch`, `store/pane-focus`) | 3 | three unrelated edges; each needs its own read | not analysed |
+| the last edges | edges | how it is paid |
+| --- | --- | --- |
+| the composer's last edge (`user-edit-composer -> use-prompt-actions`) | 1 | [13](renderer-layer-batches/13-composer-last-edge.md): what the edit composer wants is one *function* (`uploadComposerAttachment`), not the hook — so the use-case sinks to `application/session/`, and the 4,000-line hook cluster stays put |
+| `components/pet/floating-pet.tsx` → three `app/hooks` | 3 | [14](renderer-layer-batches/14-hooks-sink.md): none of the three hooks reads anything above `store/`, so all three sink to `components/hooks/` |
+| three singletons (`boot-failure-overlay`, `store/gateway-switch`, `store/pane-focus`) | 3 | [15](renderer-layer-batches/15-singletons.md): inject the settings view the overlay embeds; move the live-runtime bookkeeping into `store/`; move a 30-line terminal store out of `app/right-sidebar/` |
 
 The host-view row that used to head this table was decided on 2026-09-12: the three
 capabilities move onto the plugin context,
@@ -105,9 +111,9 @@ shortens the chain by one link — the next link is the
 ## Open items
 
 - Nothing is blocked. Every work order has a verified destination, a self-contained
-  brief and a place in Phase 1 or 2. The three rows under "not yet work orders" are
-  the only thing that can stop the run short, and stopping there is the correct
-  outcome — the run ends at ledger **7**, not at zero.
+  brief and a place in Phase 1 or 2. Nothing is undecided and nothing is unassigned:
+  the run's stopping point is the ledger reaching **0**, which is the first time in
+  this migration that "done" and "zero" are the same number.
 
 ## How to update this file
 

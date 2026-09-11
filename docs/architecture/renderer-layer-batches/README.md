@@ -31,12 +31,37 @@ are deciding *what* to do; read a batch document if you are doing it.
 | [10](10-composer-engine.md) | the composer engine leaves `app/` | 22 |
 | [11](11-route-vocabulary.md) | the route vocabulary sinks to `lib/` | 3 |
 | [12](12-host-views-through-context.md) | the host views ride the plugin context | 3 |
-| | | **78** |
+| [13](13-composer-last-edge.md) | the last composer edge: the attachment upload moves out | 1 |
+| [14](14-hooks-sink.md) | three hooks sink, and the pet stops reaching up | 3 |
+| [15](15-singletons.md) | the last three singletons | 3 |
+| | | **85** |
 
-Seventy-eight of the outstanding edges. The rest are concentrated in the design knots
-described in
-[`../renderer-layer-boundary.md`](../renderer-layer-boundary.md), not in more
-batches like these.
+**All eighty-five.** Every line in the ledger has a work order, and the target is
+**0**. Nothing here is waiting on a decision.
+
+## The complete set, and how to read it
+
+Fourteen work orders, written over one night, in the order they should be read:
+
+```
+station 1 — lib/           01  02  03  04  06  07        the mechanical moves
+station 2 — store/          08                             the pane/layout domain
+knots, decided              09  10  11  12               ABI · composer · routes · host views
+last edges                  13  14  15                   upload · hooks · singletons
+```
+
+Start at [`../renderer-layer-master-plan.md`](../renderer-layer-master-plan.md) —
+§3 has the phase order, §4 the waves and what may run together, §6 the silent
+failures to watch for. Then take a single work order and execute it: each is
+self-contained by design.
+
+Three documents are read-first rather than executable, and they are where the
+reasoning lives: [`../renderer-layer-boundary.md`](../renderer-layer-boundary.md)
+(what the debt is and the knots it clusters into),
+[`../renderer-layer-host-views-decision.md`](../renderer-layer-host-views-decision.md)
+(the one decision this migration needed, and why the chosen answer cost an ABI
+change), and [`../renderer-layer-status.md`](../renderer-layer-status.md) (live
+state — a row only says `merged` when it names a commit and a reviewer's numbers).
 
 `06` and `07` complete station 1 (`lib/`): after both, the only `lib/` entries
 left in the ledger belong to `01`–`03`. `08` is station 2's first big item and the

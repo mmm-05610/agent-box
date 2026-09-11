@@ -151,5 +151,28 @@
       "profile-config'",
       "contrib/plugin'"
     ]
+  },
+  "13 composer-last-edge": {
+    "edges": 1,
+    "modules": [
+      "use-prompt-actions'",
+      "uploadComposerAttachment"
+    ]
+  },
+  "14 hooks-sink": {
+    "edges": 3,
+    "modules": [
+      "use-gateway-request'",
+      "use-on-profile-switch'",
+      "use-route-overlay-active'"
+    ]
+  },
+  "15 singletons": {
+    "edges": 3,
+    "modules": [
+      "gateway-settings'",
+      "resetLiveRuntimeTracking",
+      "right-sidebar/store'"
+    ]
   }
 }

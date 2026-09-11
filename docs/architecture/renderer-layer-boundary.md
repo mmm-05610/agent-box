@@ -156,7 +156,7 @@ Everything still pointing up out of `components/` and `store/` once the four big
 items are paid off. Six lines, and none of them is a design decision:
 
 - **pet** — `components/pet/floating-pet.tsx` imports three `app/hooks`
-  (`use-gateway-request`, `use-on-profile-switch`, `use-overlay-route-active`);
+  (`use-gateway-request`, `use-on-profile-switch`, `use-route-overlay-active`);
 - **three singletons** — `components/boot-failure-overlay.tsx -> app/settings/gateway-settings`,
   `store/gateway-switch.ts -> app/contrib/hooks/use-background-sync`, and
   `store/pane-focus.ts -> app/right-sidebar/store`.

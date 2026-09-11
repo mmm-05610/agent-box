@@ -82,7 +82,7 @@ red on purpose.
 | | |
 | --- | --- |
 | ledger today | **85** *(derived — see §0)* |
-| after every work order in §3 | **7** *(derived — see §0)* |
+| after every work order in §3 | **0** *(derived — see §0)* |
 | test baseline | **775 files / 7466 tests** |
 
 **An item is done when the ledger shrank by exactly the number its work order
@@ -114,10 +114,10 @@ Directions: `components → app` 28, `lib → store` 16, `extension → app` 16,
 Where the 85 lines go, so the batches can be read against the tree:
 
 ```
-lib/          21   all of it      01 · 02 · 03 · 06 · 07            → 0 left
-store/        20   18 of it       03 · 04 · 08 · 10                  → 2 left
-components/   28   23 of it       09 (1) · 10 (19) · 11 (3)          → 5 left
-extension/    16   all of it      09 (13) · 12 (3)                   → 0 left
+lib/          21   all of it      01 · 02 · 03 · 06 · 07 · 14
+store/        20   all of it      03 · 04 · 08 · 10 · 15
+components/   28   all of it      09 (1) · 10 (19) · 11 (3) · 13 · 14 · 15
+extension/    16   all of it      09 (13) · 12 (3)
 ```
 lib/          21   all of it      01 · 02 · 03 · 06 · 07        → 0 left
 store/        20   18 of it       03 · 04 · 08 · 10            → 2 left
@@ -156,8 +156,11 @@ target — see §0.
 | 10 | the composer engine leaves `app/` for `lib/` + `components/` | 22 |
 | 11 | the route vocabulary sinks to `lib/` | 3 |
 | 12 | the host views ride the plugin context (ABI change) | 3 |
+| 13 | the last composer edge: the attachment upload moves out | 1 |
+| 14 | three hooks sink, and the pet stops reaching up | 3 |
+| 15 | the last three singletons | 3 |
 
-78 edges. Parallel per §4. **Review gate** when the phase's last item merges (§5).
+85 edges — **the whole ledger**. Parallel per §4. **Review gate** when the phase's last item merges (§5).
 
 ### Phase 2 — work order 05, the `@/hermes` barrel
 
@@ -202,15 +205,16 @@ node ../../../.agents/skills/architecture-tree-report/scripts/batch-collisions.m
   ../../../docs/architecture/renderer-layer-batches/batch-manifest.json
 ```
 
-Current output — **6 waves is the minimum sequential depth**:
+Current output — **7 waves is the minimum sequential depth**:
 
 ```
 wave 1: 02 tour, 06c1 sound, 06c2 image-dl, 09 plugin-abi
 wave 2: 04 workspace, 06a1 statusbar, 06b1 haptics
 wave 3: 06a2 link-title, 11 route-vocab
 wave 4: 03 shape+label, 08 pane-shell
-wave 5: 01 lib-services, 07a keybinds, 07b external-link
-wave 6: 10 composer-engine
+wave 5: 07b external-link, 10 composer-engine
+wave 6: 01 lib-services, 07a keybinds, 14 hooks-sink
+wave 7: 12 host-views, 13 composer-last-edge, 15 singletons
 ```
 
 The collisions that force this:
@@ -223,6 +227,8 @@ The collisions that force this:
 | 01 lib-services ∩ 09 plugin-abi | `app/chat/sidebar/session-actions-menu.tsx``, ``app/contrib/controller.tsx`, +2 |
 | 01 lib-services ∩ 10 composer-engine | `app/contrib/controller.tsx``, ``extension/sdk/index.ts` |
 | 01 lib-services ∩ 11 route-vocab | `app/contrib/controller.tsx``, ``app/session/hooks/use-session-actions/session-create.ts`, +1 |
+| 01 lib-services ∩ 12 host-views | `extension/sdk/index.ts` |
+| 01 lib-services ∩ 15 singletons | `app/contrib/controller.tsx` |
 | 03 shape+label ∩ 04 workspace | `app/chat/sidebar/gateway-groups.tsx``, ``app/chat/sidebar/projects/entered-content.tsx`, +3 |
 | 03 shape+label ∩ 06b1 haptics | `app/chat/sidebar/session-row.tsx` |
 | 03 shape+label ∩ 09 plugin-abi | `app/chat/sidebar/chrome.tsx``, ``app/chat/sidebar/gateway-groups.tsx`, +7 |
@@ -243,20 +249,44 @@ The collisions that force this:
 | 06b1 haptics ∩ 09 plugin-abi | `app/chat/sidebar/connection-switcher.tsx``, ``app/chat/sidebar/profile-switcher.tsx`, +9 |
 | 06b1 haptics ∩ 10 composer-engine | `app/chat/composer/chat-bar.tsx``, ``app/chat/composer/hooks/use-composer-drop.ts`, +7 |
 | 06b1 haptics ∩ 11 route-vocab | `app/chat/sidebar/profile-switcher.tsx``, ``app/pet-generate/pet-generate-content.tsx`, +4 |
+| 06b1 haptics ∩ 12 host-views | `extension/sdk/index.ts` |
+| 06b1 haptics ∩ 13 composer-last-edge | `app/chat/session-tile-actions.ts``, ``app/session/hooks/use-prompt-actions/index.ts`, +1 |
+| 06b1 haptics ∩ 14 hooks-sink | `app/command-palette/pet-palette-page.tsx``, ``app/pet-generate/pet-generate-content.tsx`, +3 |
+| 06b1 haptics ∩ 15 singletons | `app/settings/index.tsx` |
 | 06c2 image-dl ∩ 07b external-link | `components/assistant-ui/embeds/listing-embed.tsx` |
 | 07a keybinds ∩ 08 pane-shell | `app/hooks/use-keybinds.ts``, ``components/pane-shell/tree/renderer/tree-group.tsx` |
 | 07a keybinds ∩ 09 plugin-abi | `app/hooks/use-keybinds.ts``, ``app/settings/index.tsx` |
 | 07a keybinds ∩ 10 composer-engine | `app/chat/composer/focus-chord.ts``, ``app/chat/composer/hooks/use-composer-esc-cancel.ts`, +3 |
 | 07a keybinds ∩ 11 route-vocab | `app/hooks/use-keybinds.ts``, ``app/settings/index.tsx` |
+| 07a keybinds ∩ 15 singletons | `app/hooks/use-keybinds.ts``, ``app/settings/index.tsx` |
 | 07b external-link ∩ 08 pane-shell | `app/chat/preview-tile.tsx``, ``app/context-menu/app-context-menu.tsx` |
 | 07b external-link ∩ 09 plugin-abi | `app/artifacts/index.tsx``, ``app/context-menu/app-context-menu.tsx`, +2 |
 | 07b external-link ∩ 11 route-vocab | `app/context-menu/app-context-menu.tsx``, ``app/settings/plugin-install-modal.tsx` |
+| 07b external-link ∩ 14 hooks-sink | `app/settings/plugin-install-modal.tsx` |
+| 07b external-link ∩ 15 singletons | `components/boot-failure-overlay.tsx` |
 | 08 pane-shell ∩ 09 plugin-abi | `app/chat/close-tab.ts``, ``app/chat/index.tsx`, +15 |
 | 08 pane-shell ∩ 10 composer-engine | `app/chat/composer/focus.ts``, ``app/chat/index.tsx`, +5 |
 | 08 pane-shell ∩ 11 route-vocab | `app/chat/close-tab.ts``, ``app/chat/index.tsx`, +12 |
+| 08 pane-shell ∩ 12 host-views | `extension/sdk/index.ts` |
+| 08 pane-shell ∩ 13 composer-last-edge | `app/contrib/wiring.tsx` |
+| 08 pane-shell ∩ 14 hooks-sink | `app/chat/session-tile.tsx``, ``app/contrib/wiring.tsx`, +2 |
+| 08 pane-shell ∩ 15 singletons | `app/contrib/controller.tsx``, ``app/hooks/use-keybinds.ts`, +1 |
 | 09 plugin-abi ∩ 10 composer-engine | `app/chat/composer/status-stack/index.tsx``, ``app/chat/index.tsx`, +8 |
 | 09 plugin-abi ∩ 11 route-vocab | `app/chat/close-tab.ts``, ``app/chat/composer/status-stack/index.tsx`, +38 |
+| 09 plugin-abi ∩ 12 host-views | `extension/sdk/index.ts` |
+| 09 plugin-abi ∩ 13 composer-last-edge | `app/contrib/wiring.tsx` |
+| 09 plugin-abi ∩ 14 hooks-sink | `app/chat/session-tile.tsx``, ``app/contrib/wiring.tsx`, +6 |
+| 09 plugin-abi ∩ 15 singletons | `app/contrib/controller.tsx``, ``app/hooks/use-keybinds.ts`, +1 |
 | 10 composer-engine ∩ 11 route-vocab | `app/chat/composer/status-stack/index.tsx``, ``app/chat/index.tsx`, +6 |
+| 10 composer-engine ∩ 12 host-views | `extension/sdk/index.ts` |
+| 10 composer-engine ∩ 13 composer-last-edge | `app/contrib/wiring.tsx``, ``components/assistant-ui/thread/user-edit-composer.tsx` |
+| 10 composer-engine ∩ 14 hooks-sink | `app/chat/session-tile.tsx``, ``app/contrib/wiring.tsx` |
+| 10 composer-engine ∩ 15 singletons | `app/contrib/controller.tsx``, ``app/hooks/use-keybinds.ts` |
+| 11 route-vocab ∩ 12 host-views | `extension/sdk/index.ts` |
+| 11 route-vocab ∩ 13 composer-last-edge | `app/contrib/wiring.tsx` |
+| 11 route-vocab ∩ 14 hooks-sink | `app/contrib/wiring.tsx``, ``app/pet-generate/pet-generate-content.tsx`, +2 |
+| 11 route-vocab ∩ 15 singletons | `app/contrib/controller.tsx``, ``app/hooks/use-keybinds.ts`, +1 |
+| 13 composer-last-edge ∩ 14 hooks-sink | `app/contrib/wiring.tsx` |
 
 
 Four items are wide, for different reasons and with the same consequence —
@@ -360,52 +390,39 @@ attention.
    `./registry` each exist in two or three places. A blanket rewrite across a
    search result will corrupt the unrelated ones.
 
-## 7 · What is left — seven edges, no decisions
+## 7 · What is left
 
-These are **not yet work orders**, which is the only reason they are not being
-executed. The composer edge's chain is traced and mechanical; the last two rows
-nobody has traced yet. An executor that "helpfully" attempts one of those produces a
-plausible wrong answer, so they get the same closure pass as 10 before anyone runs
-them.
+**Nothing.** Every line in the ledger is a work order, and the target is 0 — the
+first time in this migration that "done" and "zero" are the same number.
 
-Five are settled and written up: layout state became work order
+Five knots were decided on 2026-09-12 and written up: layout state became
 [08](renderer-layer-batches/08-pane-shell-sink.md); the plugin ABI became
-[09](renderer-layer-batches/09-plugin-abi.md) — fourteen of its seventeen edges;
-the composer engine became [10](renderer-layer-batches/10-composer-engine.md) —
+[09](renderer-layer-batches/09-plugin-abi.md) — fourteen of its seventeen edges; the
+composer engine became [10](renderer-layer-batches/10-composer-engine.md) —
 twenty-two of its twenty-three; the route vocabulary became
-[11](renderer-layer-batches/11-route-vocabulary.md) — all three of its edges; and
-the three host-view capability exports became
-[12](renderer-layer-batches/12-host-views-through-context.md), which moves them onto
-the plugin context ([the decision page](renderer-layer-host-views-decision.md) has
-the reasoning and the ABI cost). 09 and
-10 each end with the finding that stopped them, and both are worth reading before
-anyone retries the remainder: 09's is a module-scope capability read that runs
-before any `app/` code, and 10's is a hook cluster that reaches into the
-session-actions domain.
+[11](renderer-layer-batches/11-route-vocabulary.md); and the three host-view
+capability exports became
+[12](renderer-layer-batches/12-host-views-through-context.md), which is the one ABI
+change in the set ([the decision page](renderer-layer-host-views-decision.md) has the
+reasoning). The last three batches —
+[13](renderer-layer-batches/13-composer-last-edge.md),
+[14](renderer-layer-batches/14-hooks-sink.md) and
+[15](renderer-layer-batches/15-singletons.md) — are the seven edges those left, and
+none of them needed a decision either.
 
-| the remainder | edges | what has to happen |
-| --- | --- | --- |
-| the composer's last edge (`user-edit-composer -> @/app/session/hooks/use-prompt-actions`) | 1 | not a decision — the chain is traced and mechanical; it needs a work order, not a call |
-| `components/pet/floating-pet.tsx` → three `app/hooks` | 3 | not a decision — pet is a floating widget whose three hooks are app-domain. Sink what is pure, seam what is not |
-| three singletons: `boot-failure-overlay -> app/settings/gateway-settings`, `store/gateway-switch -> app/contrib/hooks/use-background-sync`, `store/pane-focus -> app/right-sidebar/store` | 3 | not a decision — three unrelated edges; each needs its own read |
-
-11 unblocks one link of the composer's chain: `session-context-drift.ts` can now
-read the two classifiers from `lib/`. The next link is
-`app/session/hooks/use-session-actions/utils.ts` — a barrel whose four re-exported
-helpers (`branch-messages`, `gone-session-verdict`, `optimistic-session-rows`,
-`runtime-info-mirror`) import nothing above rank 1, so the chain is short and
-mechanical. Whoever writes that batch pays the composer's last edge with it.
-
-The last two rows are an **unexamined remainder**, not a set of knots: every one is
-a single module reached from a single consumer, so the next pass is the same closure
-exercise as 10, not a design question. Expect one or two small batches. Nothing else
-in the migration needs a decision.
+Two batches carry a documented "not here" of their own, and both are worth reading
+before anyone retries them: 09's last section is a module-scope capability read that
+runs before any `app/` code (12 solves it by changing what a plugin is handed), and
+10's is a hook cluster that reaches into the session-actions domain (13 needs one
+function out of it, not the cluster).
 
 **Also not delegated:**
 - `apps/desktop/src/agentbox/`, `apps/desktop/src/plugins/agentbox-lab/`,
   `docs/architecture/acp-desktop-phase1-design.md`, `docs/desktop-src-tree.md` —
   untracked work in progress. Never read, modify or stage them.
-- Anything that would change behaviour. Stages A and B are relocations.
+- Anything that would change behaviour. Every work order but 12 is a relocation or a
+  re-wiring; 12 changes the plugin API and says so.
+
 
 ## 8 · The status file
 
