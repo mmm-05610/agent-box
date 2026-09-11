@@ -80,7 +80,7 @@ Moved to **`lib/contributions.ts`** with the shapes at
 `extension/contrib/{plugin,plugins,plugins-store,runtime-loader,events,react/*}`
 stayed where they are — those are the parts that genuinely know about plugins.
 
-### K3 · The plugin ABI points the wrong way (16 edges) — decided, 13 paid by batch 09
+### K3 · The plugin ABI points the wrong way (16 edges) — decided, 14 paid by batch 09
 
 `extension/sdk/index.ts` is one 418-line module re-exporting **216 names from 90
 modules**, and 14 of its statements pull from `@/app/…` —
@@ -103,8 +103,9 @@ knot did not need one big design:
   host-supplied seam (`lib/plugin-open-session.ts`), the same shape as
   `setDesktopFsConnectionSource`.
 
-Those thirteen are [batch 09](renderer-layer-batches/09-plugin-abi.md). **The
-remaining three — `SkillsView`, `McpTab`, `ToolsetConfigPanel` — are not
+Those fourteen (thirteen from the ABI list, plus `directive-text`'s dynamic
+`import('@/app/open-session')`, which uses the same seam) are
+[batch 09](renderer-layer-batches/09-plugin-abi.md). **The remaining three — `SkillsView`, `McpTab`, `ToolsetConfigPanel` — are not
 relocatable and not yet invertible**, and the reason is worth keeping: Bot Mode
 reads `sdk.SkillsView` at module scope (`plugins/hermes-bots/profile-config.tsx:37`),
 and the eager bundled-plugin glob means that runs before any `app/` module body,
@@ -112,27 +113,49 @@ so an app-side registration seam is always too late — silently, as a lost
 connection route rather than a crash. Batch 09's last section has the chain; the
 open knot is the master plan's §7.
 
-### K4 · There is a second composer (17 edges)
+### K4 · The composer engine is filed under `app/` (23 edges) — decided, 22 paid by batch 10
 
-`components/assistant-ui/thread/user-edit-composer.tsx` is 928 lines and imports
-15 modules from `app/chat/composer/*` (62 files, 12,432 lines), plus
-`app/session/hooks/use-prompt-actions`. A component layer is not supposed to own
-a chat composer; this one does. Either it collapses into the app's composer, or
-the shared part is extracted so both sides use one implementation. All 17 of its
-edges disappear with that decision.
+The first reading of this knot was wrong, and the correction is the useful part.
+It said *"there is a second composer — either it collapses into the app's composer,
+or the shared part is extracted"*. There is no second composer.
+`components/assistant-ui/thread/user-edit-composer.tsx` (929 lines) has exactly one
+consumer, its own sibling `thread/index.tsx`; it is the transcript's edit-in-place
+box and it is fine where it is.
 
-### K5 · Components drive app behaviour by import (16 edges)
+What it cannot do is reach the engine. It imports **15 modules from
+`app/chat/composer/`** — focus, rich-editor, the completion hooks, the ref
+resolvers, undo — and two app actions on top. `app/chat/composer/` is 62 files and
+12,446 lines, and it is not one thing: a pure tier, a React/state tier, and the
+app's own composer chrome.
 
-Everything left in `components → app` outside K4, plus `store → app` outside the
-mechanical batch: `components/pet/floating-pet.tsx` importing three `app/hooks`,
-`components/find-bar.tsx` and `components/tips/use-tip-rotation.ts` importing
-`app/routes`, `components/assistant-ui/clarify-tool.tsx` importing
-`app/chat/composer/focus`, and `store/suggestion-providers/*` doing the same.
+So the fix is a **sink, not a merge**: the engine has a consumer below `app/`, so
+the engine moves. Batch 10 traces the transitive closure (nine files to `lib/`,
+fourteen to `components/`, plus the five suggestion providers moving up out of
+`store/`) and pays 22 of the 23 edges; nobody unifies two implementations and
+`user-edit-composer.tsx` does not change a line.
 
-One target explains five of them: `app/chat/composer/focus.ts` (420 lines, 20
-importers) is a command bus (`requestComposerFocus/Insert/Submit`) that `store/`
-calls to make the UI do something. It should be a downward command channel, or
-the store should publish an intent the composer subscribes to.
+The 23rd is `user-edit-composer -> @/app/session/hooks/use-prompt-actions`, and it
+is blocked by a chain rather than by a design: that hook cluster reaches
+`app/session/hooks/session-context-drift.ts`, which imports `isNewChatRoute` and
+`routeSessionId` from `@/app/routes`. Sink the route vocabulary (K5's first row)
+and the chain shortens.
+
+### K5 · What is left after 09 and 10 (9 edges)
+
+Everything still pointing up out of `components/` and `store/` once the three
+big items are paid off. Nine lines, and none of them is a design decision:
+
+- **the route classifiers** — `components/assistant-ui/thread/assistant-message.tsx`,
+  `components/find-bar.tsx` and `components/tips/use-tip-rotation.ts` import
+  `appViewForPath` / `SETTINGS_ROUTE` from `@/app/routes`. Pure, and the first two
+  have a below-app consumer;
+- **pet** — `components/pet/floating-pet.tsx` imports three `app/hooks`
+  (`use-gateway-request`, `use-on-profile-switch`, `use-overlay-route-active`);
+- **three singletons** — `components/boot-failure-overlay.tsx -> app/settings/gateway-settings`,
+  `store/gateway-switch.ts -> app/contrib/hooks/use-background-sync`, and
+  `store/pane-focus.ts -> app/right-sidebar/store`.
+
+The route work order comes first: K4's last edge and this first row both need it.
 
 ## 3. The mechanical batches
 
@@ -144,12 +167,13 @@ regenerated ledger.
 
 They are listed here only so this document stays the whole picture:
 
-| batch | scope | edges |
-| --- | --- | --- |
-| [01](renderer-layer-batches/01-lib-services-to-store.md) | four small stateful `lib/` services → `store/` | 6 |
-| [02](renderer-layer-batches/02-tour-to-app.md) | `lib/tour/` → `app/tour/` | 2 |
-| [03](renderer-layer-batches/03-project-session-moves.md) | a misplaced shape and a sidebar label | 3 |
-| [04](renderer-layer-batches/04-workspace-groups-split.md) | split `workspace-groups.ts`, membership core → `store/` | 4 |
+The inventory, the per-batch edge counts, the order and the parallel groups are
+**not restated here**. They are derived from
+[`renderer-layer-batches/batch-manifest.json`](renderer-layer-batches/batch-manifest.json)
+by the collision check, and printed in the master plan §1/§3/§4 and the batches
+[README](renderer-layer-batches/README.md). A copy in this document would drift the
+moment a knot was decided — which is what happened to the four-batch table that used
+to sit here.
 
 They must run **in order, one at a time**. `01` and `03` both repoint
 `app/session/hooks/use-session-actions/session-create.ts`, `03` and `04` both edit
@@ -169,7 +193,7 @@ respecting.
 A fifth document in that directory,
 [`05-hermes-barrel-removal.md`](renderer-layer-batches/05-hermes-barrel-removal.md),
 removes the `@/hermes` compatibility barrel. It is **not** layer debt and pays off
-none of the 97 edges — `@/hermes` is a rank-0 root module, so every import of it is
+none of the ledger's edges — `@/hermes` is a rank-0 root module, so every import of it is
 already downward. It is recorded alongside these because it is mechanical work of
 the same character, and because it touches 240 files and therefore has to be
 sequenced against these four rather than interleaved.
@@ -178,6 +202,13 @@ Do not widen the ledger to make an item land. If a move needs an unlisted edge,
 stop and report: the batch is wrong, not the guard.
 
 ## 4. Mechanical-looking, but not safe yet
+
+*Historical: every item below has since been decided and written up — the
+"needs a merge" group became batch 06, `lib/keybinds/` and `lib/external-link.tsx`
+became batch 07, and the pane model became batch 08. The counts in this section
+were written mid-migration and are kept only because the reasoning (especially the
+keybinds lesson about counting importers by resolution) still applies to the
+remainder in §7 of the master plan.*
 
 **Blocked by a lower-layer importer** (moving it would create a *new* violation
 in the opposite direction):

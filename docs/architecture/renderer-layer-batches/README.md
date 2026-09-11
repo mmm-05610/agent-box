@@ -27,10 +27,11 @@ are deciding *what* to do; read a batch document if you are doing it.
 | [06](06-lib-sink-and-move.md) | the rest of station 1: two splits, one injection, two moves | 7 |
 | [07](07-split-by-consumer.md) | `lib/keybinds/` and `lib/external-link.tsx`, split by who needs what | 5 |
 | [08](08-pane-shell-sink.md) | the pane/layout domain sinks to `lib/` + `store/` | 9 |
-| [09](09-plugin-abi.md) | the plugin ABI stops reaching into the app | 13 |
-| | | **49** |
+| [09](09-plugin-abi.md) | the plugin ABI stops reaching into the app | 14 |
+| [10](10-composer-engine.md) | the composer engine leaves `app/` | 22 |
+| | | **72** |
 
-Forty-nine of the outstanding edges. The rest are concentrated in the design knots
+Seventy-two of the outstanding edges. The rest are concentrated in the design knots
 described in
 [`../renderer-layer-boundary.md`](../renderer-layer-boundary.md), not in more
 batches like these.

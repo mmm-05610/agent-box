@@ -88,7 +88,7 @@
     ]
   },
   "09 plugin-abi": {
-    "edges": 13,
+    "edges": 14,
     "modules": [
       "host-session-options'",
       "host-session'",
@@ -106,6 +106,35 @@
       "command-palette/contrib'",
       "composer/contrib'",
       "open-session'"
+    ]
+  },
+  "10 composer-engine": {
+    "edges": 22,
+    "modules": [
+      "chat/composer/",
+      "composer/contrib'",
+      "composer/types'",
+      "use-composer-actions'",
+      "suggestion-providers/",
+      "\\./focus'",
+      "\\./rich-editor'",
+      "\\./text-utils'",
+      "\\./composer-utils'",
+      "\\./completion-drawer'",
+      "\\./trigger-popover'",
+      "\\./directive-actions'",
+      "\\./slash-refs'",
+      "\\./inline-refs'",
+      "\\./path-refs'",
+      "\\./url-refs'",
+      "\\./undo-history'",
+      "\\./drop-affordance'",
+      "hooks/use-at-completions'",
+      "hooks/use-composer-trigger'",
+      "hooks/use-slash-completions'",
+      "hooks/use-composer-undo'",
+      "hooks/use-emoji-completions'",
+      "\\./use-live-completion-adapter'"
     ]
   }
 }

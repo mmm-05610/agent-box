@@ -82,7 +82,7 @@ red on purpose.
 | | |
 | --- | --- |
 | ledger today | **85** *(derived — see §0)* |
-| after every work order in §3 | **36** *(derived — see §0)* |
+| after every work order in §3 | **13** *(derived — see §0)* |
 | test baseline | **775 files / 7466 tests** |
 
 **An item is done when the ledger shrank by exactly the number its work order
@@ -111,6 +111,15 @@ rank 5   app/                              ✓ 0
 Directions: `components → app` 28, `lib → store` 16, `extension → app` 16,
 `store → app` 11, `store → components` 9, `lib → app` 3, `lib → components` 2.
 
+Where the 85 lines go, so the batches can be read against the tree:
+
+```
+lib/          21   all of it      01 · 02 · 03 · 06 · 07        → 0 left
+store/        20   18 of it       03 · 04 · 08 · 10            → 2 left
+components/   28   20 of it       09 (1) · 10 (19)             → 8 left
+extension/    16   13 of it       09                            → 3 left
+```
+
 The read-first analysis is
 [`renderer-layer-boundary.md`](renderer-layer-boundary.md); the executable work
 orders are in
@@ -138,9 +147,10 @@ target — see §0.
 | 06 | the rest of station 1: two splits, one injection, two moves | 7 |
 | 07 | `lib/keybinds/` and `lib/external-link.tsx`, split by consumer | 5 |
 | 08 | the pane/layout domain sinks to `lib/` + `store/` | 9 |
-| 09 | the plugin ABI stops reaching into the app | 13 |
+| 09 | the plugin ABI stops reaching into the app | 14 |
+| 10 | the composer engine leaves `app/` for `lib/` + `components/` | 22 |
 
-49 edges. Parallel per §4. **Review gate** when the phase's last item merges (§5).
+72 edges. Parallel per §4. **Review gate** when the phase's last item merges (§5).
 
 ### Phase 2 — work order 05, the `@/hermes` barrel
 
@@ -157,9 +167,9 @@ round.
 ### Phase 3 — whatever the open decisions produce
 
 Empty today, and that is the honest state: every work order that exists is in
-Phase 1 or 2. Orders appear here as the knots in §7 are decided — the second
-composer, the components that drive app behaviour, and the three host-view
-capability exports. Each becomes a normal work order: same collision check, same
+Phase 1 or 2. Orders appear here as the knots in §7 are decided — the three
+host-view capability exports, the composer's last edge, and the nine edges nobody
+has examined yet. Each becomes a normal work order: same collision check, same
 review gate. §9 says how one enters this plan.
 
 ### Done
@@ -186,28 +196,62 @@ node ../../../.agents/skills/architecture-tree-report/scripts/batch-collisions.m
   ../../../docs/architecture/renderer-layer-batches/batch-manifest.json
 ```
 
-Current output — **4 waves is the minimum sequential depth**:
+Current output — **5 waves is the minimum sequential depth**:
 
 ```
 wave 1: 02 tour · 06c1 sound · 06c2 image-dl · 09 plugin-abi
 wave 2: 04 workspace · 06a1 statusbar · 06b1 haptics
 wave 3: 03 shape+label · 06a2 link-title · 08 pane-shell
 wave 4: 01 lib-services · 07a keybinds · 07b external-link
+wave 5: 10 composer-engine
 ```
 
 The collisions that force this:
 
 | pair | shared file |
 | --- | --- |
+| 01 lib-services ∩ 04 workspace | `app/session/hooks/use-session-actions/session-create.ts` |
+| 01 lib-services ∩ 06b1 haptics | `app/chat/sidebar/session-actions-menu.tsx``, ``extension/sdk/index.ts` |
+| 01 lib-services ∩ 08 pane-shell | `app/chat/sidebar/session-actions-menu.tsx``, ``app/contrib/controller.tsx`, +3 |
+| 01 lib-services ∩ 09 plugin-abi | `app/chat/sidebar/session-actions-menu.tsx``, ``app/contrib/controller.tsx`, +2 |
+| 01 lib-services ∩ 10 composer-engine | `app/contrib/controller.tsx``, ``extension/sdk/index.ts` |
+| 03 shape+label ∩ 04 workspace | `app/chat/sidebar/gateway-groups.tsx``, ``app/chat/sidebar/projects/entered-content.tsx`, +3 |
+| 03 shape+label ∩ 06b1 haptics | `app/chat/sidebar/session-row.tsx` |
+| 03 shape+label ∩ 09 plugin-abi | `app/chat/sidebar/chrome.tsx``, ``app/chat/sidebar/gateway-groups.tsx`, +7 |
+| 04 workspace ∩ 08 pane-shell | `app/session/hooks/use-session-actions/session-create.ts` |
+| 04 workspace ∩ 09 plugin-abi | `app/chat/sidebar/gateway-groups.tsx``, ``app/chat/sidebar/projects/entered-content.tsx`, +3 |
+| 06a1 statusbar ∩ 08 pane-shell | `app/shell/hooks/use-statusbar-items.tsx` |
+| 06a1 statusbar ∩ 09 plugin-abi | `app/shell/hooks/use-statusbar-items.tsx` |
+| 06a2 link-title ∩ 06b1 haptics | `components/assistant-ui/directive-text.tsx` |
+| 06a2 link-title ∩ 07b external-link | `components/assistant-ui/directive-text.tsx` |
+| 06a2 link-title ∩ 09 plugin-abi | `components/assistant-ui/directive-text.tsx` |
+| 06b1 haptics ∩ 06c1 sound | `app/session/hooks/use-message-stream/gateway-event/message-stream.ts``, ``app/settings/notifications-settings.tsx` |
+| 06b1 haptics ∩ 07a keybinds | `app/chat/composer/hooks/use-composer-esc-cancel.ts``, ``app/settings/index.tsx`, +1 |
+| 06b1 haptics ∩ 07b external-link | `app/settings/env-var-actions-menu.tsx``, ``components/assistant-ui/directive-text.tsx` |
+| 06b1 haptics ∩ 08 pane-shell | `app/chat/sidebar/session-actions-menu.tsx``, ``app/settings/plugins-settings.tsx`, +2 |
+| 06b1 haptics ∩ 09 plugin-abi | `app/chat/sidebar/connection-switcher.tsx``, ``app/chat/sidebar/profile-switcher.tsx`, +9 |
+| 06b1 haptics ∩ 10 composer-engine | `app/chat/composer/chat-bar.tsx``, ``app/chat/composer/hooks/use-composer-drop.ts`, +7 |
+| 06c2 image-dl ∩ 07b external-link | `components/assistant-ui/embeds/listing-embed.tsx` |
+| 07a keybinds ∩ 08 pane-shell | `app/hooks/use-keybinds.ts``, ``components/pane-shell/tree/renderer/tree-group.tsx` |
+| 07a keybinds ∩ 09 plugin-abi | `app/hooks/use-keybinds.ts``, ``app/settings/index.tsx` |
+| 07a keybinds ∩ 10 composer-engine | `app/chat/composer/focus-chord.ts``, ``app/chat/composer/hooks/use-composer-esc-cancel.ts`, +3 |
+| 07b external-link ∩ 08 pane-shell | `app/chat/preview-tile.tsx``, ``app/context-menu/app-context-menu.tsx` |
+| 07b external-link ∩ 09 plugin-abi | `app/artifacts/index.tsx``, ``app/context-menu/app-context-menu.tsx`, +2 |
+| 08 pane-shell ∩ 09 plugin-abi | `app/chat/close-tab.ts``, ``app/chat/index.tsx`, +15 |
+| 08 pane-shell ∩ 10 composer-engine | `app/chat/composer/focus.ts``, ``app/chat/index.tsx`, +5 |
+| 09 plugin-abi ∩ 10 composer-engine | `app/chat/composer/status-stack/index.tsx``, ``app/chat/index.tsx`, +8 |
 
 
-Three items are wide, for different reasons and with the same
-consequence — treat each as its own slot: `09 plugin-abi` (nine collisions, 78
-touched files: it edits the ABI module every batch that ships a `lib/` helper
-re-exports through, plus `app/contrib/controller.tsx` and `app/routes.ts`),
-`06b1 haptics` (eight, 55 importers) and `08 pane-shell` (seven, 45). Their width
-is not a reason to split them; it is a reason to start them early and let the
-small items fill the queue around them.
+Four items are wide, for different reasons and with the same consequence —
+treat each as its own slot: `09 plugin-abi` (ten collisions, 78 touched files: it
+edits the ABI module that every batch shipping a `lib/` helper re-exports
+through), `06b1 haptics` (nine, 55 importers), `08 pane-shell` (eight, 45), and
+`10 composer-engine` (five collisions but the widest real footprint in the
+migration: 40 production importers plus most of the 49 files inside
+`app/chat/composer/`, which the manifest's string patterns can only approximate).
+`10` lands alone in wave 5 for that reason, and it is also why it should be written
+last: by then 09 has already moved `COMPOSER_AREAS` out of the file the two batches
+share.
 
 ### How to actually run it
 
@@ -302,26 +346,35 @@ attention.
 ## 7 · Still needs a decision
 
 These are **not yet work orders**, which is the only reason they are not being
-executed: nobody has decided what they should become. An executor that "helpfully"
-attempts one produces a plausible wrong answer — the decision is the work.
+executed: nobody has decided what they should become — or, for the last group,
+nobody has traced them yet. An executor that "helpfully" attempts one produces a
+plausible wrong answer.
 
 Three are settled and written up: layout state became work order
-[08](renderer-layer-batches/08-pane-shell-sink.md), the plugin ABI became
-[09](renderer-layer-batches/09-plugin-abi.md) — thirteen of its sixteen edges; the
-three it left behind are the host-view row above, and 09's own last section is the
-finding that stopped them (a module-scope capability read that runs before any
-`app/` code). The rest are described in
-[`renderer-layer-boundary.md`](renderer-layer-boundary.md) §2.
+[08](renderer-layer-batches/08-pane-shell-sink.md); the plugin ABI became
+[09](renderer-layer-batches/09-plugin-abi.md) — fourteen of its seventeen edges;
+the composer engine became [10](renderer-layer-batches/10-composer-engine.md) —
+twenty-two of its twenty-three. Each of those two documents ends with the finding
+that stopped it, and both are worth reading before anyone retries the remainder:
+09's is a module-scope capability read that runs before any `app/` code, and 10's
+is a hook cluster that reaches into the session-actions domain.
 
-| knot | edges | the decision needed |
+| the remainder | edges | what has to happen |
 | --- | --- | --- |
-| the second composer (`components/assistant-ui/thread/user-edit-composer.tsx`, 928 lines) | 17 | collapse it into the app's composer, or extract a shared one |
-| the three host-view capability exports (`SkillsView`, `McpTab`, `ToolsetConfigPanel`) | 3 | how a plugin learns about a host-provided view: a lazy capability read, a `ctx`-supplied component, a lazy plugin glob, or a shared prop contract |
-| components driving app behaviour by import (`app/chat/composer/focus.ts`, 420 lines) | 16 | a downward command channel, or an intent the composer subscribes to |
+| the three host-view capability exports (`SkillsView`, `McpTab`, `ToolsetConfigPanel`) | 3 | **a decision.** How a plugin learns about a host-provided view: a lazy capability read, a `ctx`-supplied component, a lazy plugin glob, or a shared prop contract |
+| the composer's last edge (`user-edit-composer -> @/app/session/hooks/use-prompt-actions`) | 1 | **a decision.** Either unblock the chain (below), or give the edit composer a host-supplied "send" verb, the same shape as 09d |
+| the route classifiers (`assistant-message`, `find-bar`, `tips/use-tip-rotation` → `@/app/routes`) | 3 | not a decision — the same closure pass as 10. `appViewForPath`, `SETTINGS_ROUTE`, `isNewChatRoute` and `routeSessionId` are pure, and the first two have a below-app consumer |
+| `components/pet/floating-pet.tsx` → three `app/hooks` | 3 | not a decision — pet is a floating widget whose three hooks are app-domain. Sink what is pure, seam what is not |
+| three singletons: `boot-failure-overlay -> app/settings/gateway-settings`, `store/gateway-switch -> app/contrib/hooks/use-background-sync`, `store/pane-focus -> app/right-sidebar/store` | 3 | not a decision — three unrelated edges; each needs its own read |
 
-A knot becomes a work order the moment its decision is made, and then it enters the
-run like any other (§9). Until then it is not in the definition of done — so a run
-that stops here is finished with what exists, not with the migration.
+The route classifiers come first whatever else happens: the composer's last edge is
+blocked on `app/session/hooks/session-context-drift.ts`, which imports
+`isNewChatRoute` and `routeSessionId` from `@/app/routes`. Sink the route
+vocabulary and that chain shortens by one link.
+
+The last three rows are an **unexamined remainder**, not a set of knots: every one
+is a single module reached from a single consumer, so the next pass is the same
+closure exercise as 10, not a design question. Expect two or three small batches.
 
 **Also not delegated:**
 - `apps/desktop/src/agentbox/`, `apps/desktop/src/plugins/agentbox-lab/`,

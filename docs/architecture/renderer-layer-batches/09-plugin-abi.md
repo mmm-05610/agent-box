@@ -1,21 +1,24 @@
 # Batch 09 — the plugin ABI stops reaching into the app
 
-**Edges paid off: 13.** Shared rules and the verification recipe:
+**Edges paid off: 14.** Shared rules and the verification recipe:
 [README](README.md). This is knot 2 from
 [`../renderer-layer-boundary.md`](../renderer-layer-boundary.md) §2, decided: **delete
 the dead surface, sink the data and the components, invert the one verb.**
 
-Sixteen `extension → app` edges are waiting. Thirteen are mechanical once the
-ABI's shape is read correctly, which is what this document does. **Three are
-deliberately left behind** — the three optional host pages — and the last section
-says exactly why and what has to be decided first. If you find yourself editing
-`app/skills/index.tsx` to satisfy this batch, you have walked into that section:
-stop and report.
+Sixteen `extension → app` edges are in the ledger, plus a seventeenth that no
+specifier grep finds (09d, last row of the table below). Fourteen are mechanical
+once the ABI's shape is read correctly, which is what this document does. **Three
+are deliberately left behind** — the three optional host pages — and the last
+section says exactly why and what has to be decided first. If you find yourself
+editing `app/skills/index.tsx` to satisfy this batch, you have walked into that
+section: stop and report.
 
 ## The sixteen lines, and what happens to each
 
-All sixteen are in the ledger already. Every one comes from the SDK's re-export
-list — the plugin ABI is the only `extension/` code that names `app/`.
+All sixteen are in the ledger already. Fifteen come from the SDK's re-export list
+— the plugin ABI is the only `extension/` code that names `app/` — and the
+seventeenth is a component that reaches for the same behaviour by dynamic
+`import()`.
 
 | # | the ledger line | step |
 | --- | --- | --- |
@@ -35,6 +38,7 @@ list — the plugin ABI is the only `extension/` code that names `app/`.
 | 14 | `sdk/index.ts -> @/app/shell/titlebar-controls` | 09a |
 | 15 | `sdk/index.ts -> @/app/skills` | **left behind** — host page |
 | 16 | `sdk/index.ts -> @/app/skills/mcp-tab` | **left behind** — host page |
+| 17 | `components/assistant-ui/directive-text.tsx -> @/app/open-session` | 09d — the same seam, used by a component |
 
 Run 09a, 09b, 09c, 09d as one work order, in that order. Only 09a is
 observable on its own; the rest is one ledger drop at the end.
@@ -229,15 +233,26 @@ importer list *and* refuses a destination whose layer would make any of them
 inward. Relative spellings (`'./row-geometry'`, `'../chrome'`) are invisible to a
 specifier grep, which is how this repo has already missed importers five times.
 
-## 09d · `host.openSession` becomes a host-supplied verb — 2 edges
+## 09d · `host.openSession` becomes a host-supplied verb — 3 edges
 
-The last two lines are the only place the ABI reaches up for **behaviour**
-rather than data:
+These are the only places anything below `app/` reaches up for **behaviour**
+rather than data. Two are the ABI itself; the third is a component nobody's
+specifier grep finds, because it is spelled as a dynamic import:
 
 ```
 extension/sdk/host-session-options.ts:1  import type { OpenSessionIntent } from '@/app/open-session'
 extension/sdk/host-session.ts:4          import { openSession } from '@/app/open-session'
+
+components/assistant-ui/directive-text.tsx:442
+  void import('@/app/open-session').then(({ openSession }) => openSession(sessionId, () => undefined, 'tab'))
 ```
+
+`directive-text` wants exactly half of the verb — the `'tab'` open, with a
+`navigate` that does nothing, so an already-open tile is fronted and the router
+is left alone. That is `openSession`'s own `'tab'` branch, so it uses the same
+seam rather than a second contract. **This is why the seam is named for the host,
+not for plugins**: `lib/open-session.ts` is the host publishing one of its verbs
+downward, and `host.openSession` is one caller, not the definition.
 
 `app/open-session.ts` is 177 lines of "the user asked to open this session":
 mark it viewed, then pick between window / tab / main / in-place. That is a
@@ -247,7 +262,7 @@ did (`lib/desktop-fs.ts:51 setDesktopFsConnectionSource`, filled from
 `app/contrib/hooks/use-desktop-fs-connection.ts`). The module stays in `app/`
 where the routing vocabulary lives; the SDK stops naming it.
 
-**New file `lib/plugin-open-session.ts`** — the contract, and nothing else:
+**New file `lib/open-session.ts`** — the contract, and nothing else:
 
 ```ts
 import type { SessionOwnerRoute } from '@/types/session'
@@ -255,22 +270,22 @@ import type { WorkspaceMode } from '@/types/contributions'
 
 export type OpenSessionIntent = 'in-place' | 'main' | 'stack' | 'tab' | 'window'
 
-export interface PluginOpenSessionScope {
+export interface OpenSessionScope {
   ownerRoute?: SessionOwnerRoute
   workspaceMode: WorkspaceMode
   workspaceOwnerKey?: string
   workspaceTabTitle?: string
 }
 
-export type PluginOpenSessionHandler = (
+export type OpenSessionHandler = (
   storedSessionId: string,
   navigate: (to: string, options?: { replace?: boolean }) => void,
   intent: OpenSessionIntent,
-  scope?: PluginOpenSessionScope
+  scope?: OpenSessionScope
 ) => void
 
-export function setPluginOpenSession(handler: PluginOpenSessionHandler): void
-export function pluginOpenSession(...): void   // throws when unset
+export function setOpenSessionHandler(handler: OpenSessionHandler): void
+export function requestOpenSession(...): void   // throws when unset
 ```
 
 `SessionOwnerRoute` is already on the `@/types/session` leaf (see the header of
@@ -282,7 +297,7 @@ types, so its existing importers do not move.
 **Register at the bottom of `app/open-session.ts`**, at module scope:
 
 ```ts
-setPluginOpenSession(openSession)
+setOpenSessionHandler(openSession)
 ```
 
 Module scope, not a hook or a mount effect: the verb has to be answerable the
@@ -290,12 +305,18 @@ first time a plugin calls it, and a registration that waits for React to mount
 is a silent "not registered yet" window. `app/open-session.ts` is already in the
 app's eager graph (13 importers), so importing it is what installs the verb.
 
-**Unset means a clear failure, not a no-op.** `pluginOpenSession` throwing is
+**Unset means a clear failure, not a no-op.** `requestOpenSession` throwing is
 the honest outcome for a host that never registered; a silent no-op would look
 like "the click did nothing". Do not add a fallback that navigates on its own —
-that is the app's decision, which is the reason for the seam.
+that is the app's decision, which is the reason for the seam. `directive-text`
+registers nothing and only calls: it replaces its dynamic import with
+`requestOpenSession(sessionId, () => undefined, 'tab')`, which is the same call
+its `.then()` makes today. It cannot be reached unregistered — the app registers
+at module scope, and a directive renders long after that — so the throw is a
+programming-error tripwire, not a user-facing state.
 
-Then repoint the two SDK files and delete the now-unused `app/` imports.
+Then repoint the two SDK files and the component, and delete the now-unused
+`app/` imports.
 
 ## What is left behind — three edges, and why
 
@@ -358,12 +379,12 @@ npm run ledger:layers
 npm run test:ui                                     # again: the ledger must not move
 ```
 
-Baseline: tests **775 files / 7466**. The ledger drops by **13** from whatever it
+Baseline: tests **775 files / 7466**. The ledger drops by **14** from whatever it
 reads when you start — 09 shares wave 1 with 02, 06c1 and 06c2, so it is not
 necessarily the first batch to land.
 
-The thirteen lines that must be gone are the ones marked 09 in the table at the
-top. If the count falls by 13 but a different set of lines disappeared, a step was
+The fourteen lines that must be gone are the ones marked 09 in the table at the
+top. If the count falls by 14 but a different set of lines disappeared, a step was
 done by a route other than the one written here — say so.
 
 ## Stop conditions
@@ -377,7 +398,7 @@ done by a route other than the one written here — say so.
   that name and report. Do not read, edit or stage anything in that directory,
   `src/agentbox/`, `docs/architecture/acp-desktop-phase1-design.md` or
   `docs/desktop-src-tree.md`.
-- **`host.openSession` throws "not registered" in a real flow.** The seat is
+- **`host.openSession` throws "not registered" in a real flow.** The handler is
   registered at `app/open-session.ts` module scope; if that is not reached, the
   app graph lost the import — report rather than moving the registration into a
   hook or a try/catch.
