@@ -11,9 +11,9 @@
 // stopThinkingSound() — callers fire it the moment TTS starts, the mic re-arms,
 // or the conversation ends.
 
-import { getAudioContext } from '@/lib/audio-context'
+import { getAudioContext } from '@/lib/voice/audio-context'
 import { $hapticsMuted } from '@/store/haptics'
-import { $thinkingSoundEnabled } from '@/store/voice-prefs'
+import { $thinkingSoundEnabled } from '@/store/voice/voice-prefs'
 
 let timer: number | null = null
 let blipIndex = 0

@@ -4,15 +4,15 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { assistantTextPart, type ChatMessage, chatMessageText } from '@/lib/chat-messages'
 import { clearSpokenRepliesForTests, markAssistantIdSpoken, resolveSpokenReply } from '@/lib/spoken-reply'
-import { playSpeechText } from '@/lib/voice-playback'
-import { $voicePlayback, setVoicePlaybackState } from '@/store/voice-playback'
-import { $autoSpeakReplies } from '@/store/voice-prefs'
+import { playSpeechText } from '@/lib/voice/voice-playback'
+import { $voicePlayback, setVoicePlaybackState } from '@/store/voice/voice-playback'
+import { $autoSpeakReplies } from '@/store/voice/voice-prefs'
 
 import { ComposerScopeProvider, MAIN_COMPOSER_SCOPE } from '../scope'
 
 import { useAutoSpeakReplies } from './use-auto-speak-replies'
 
-vi.mock('@/lib/voice-playback', () => ({
+vi.mock('@/lib/voice/voice-playback', () => ({
   playSpeechText: vi.fn()
 }))
 

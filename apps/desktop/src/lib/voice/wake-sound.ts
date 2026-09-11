@@ -5,7 +5,7 @@
 // the completion cue settles (done). Reuses the same lightweight WebAudio
 // synthesis approach — no asset file to ship.
 
-import { getAudioContext } from '@/lib/audio-context'
+import { getAudioContext } from '@/lib/voice/audio-context'
 import { $hapticsMuted } from '@/store/haptics'
 
 // One enveloped sine voice → master. Linear-ish attack into an exponential

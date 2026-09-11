@@ -20,7 +20,7 @@ import {
   applyAutoSpeakFromConfig,
   applyThinkingSoundFromConfig,
   applyVoiceStopPhraseFromConfig
-} from '@/store/voice-prefs'
+} from '@/store/voice/voice-prefs'
 
 const DEFAULT_VOICE_SECONDS = 120
 const FAST_TIERS = new Set(['fast', 'priority', 'on'])

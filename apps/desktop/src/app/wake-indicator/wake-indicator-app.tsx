@@ -2,7 +2,7 @@ import './wake-indicator.css'
 
 import { useEffect, useState } from 'react'
 
-import type { WakeIndicatorState } from '@/lib/wake-indicator'
+import type { WakeIndicatorState } from '@/lib/voice/wake-indicator'
 
 export function WakeIndicatorApp() {
   const [state, setState] = useState<WakeIndicatorState>('hidden')

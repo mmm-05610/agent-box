@@ -1,6 +1,6 @@
 import { atom } from 'nanostores'
 
-import { type ClientWakeCaptureHandle, startClientWakeCapture } from '@/lib/wake-client-capture'
+import { type ClientWakeCaptureHandle, startClientWakeCapture } from '@/lib/voice/wake-client-capture'
 import { $gateway } from '@/store/gateway'
 
 // "Hey Hermes" wake-word listener state for the composer toggle. The gateway is

@@ -1,18 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { useI18n } from '@/i18n'
-import { startThinkingSound, stopThinkingSound } from '@/lib/thinking-sound'
-import { monitorSpeechDuringPlayback } from '@/lib/voice-barge-in'
+import { startThinkingSound, stopThinkingSound } from '@/lib/voice/thinking-sound'
+import { monitorSpeechDuringPlayback } from '@/lib/voice/voice-barge-in'
 import {
   markVoicePlaybackInterrupted,
   playSpeechText,
   type SpeechStreamSession,
   startSpeechStream,
   stopVoicePlayback
-} from '@/lib/voice-playback'
-import { isVoiceStopCommand } from '@/lib/voice-stop-word'
+} from '@/lib/voice/voice-playback'
+import { isVoiceStopCommand } from '@/lib/voice/voice-stop-word'
 import { notify, notifyError } from '@/store/notifications'
-import { $voicePlayback } from '@/store/voice-playback'
+import { $voicePlayback } from '@/store/voice/voice-playback'
 
 import { useMicRecorder } from './use-mic-recorder'
 

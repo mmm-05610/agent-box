@@ -11,7 +11,7 @@ import {
   markVoicePlaybackInterrupted,
   stopVoicePlayback,
   takeVoicePlaybackInterrupted
-} from '@/lib/voice-playback'
+} from '@/lib/voice/voice-playback'
 import { $composerAttachments, mainComposerScope, terminalContextBlocksFromDraft } from '@/store/composer'
 import { $hudMode } from '@/store/hud'
 import { clearNotifications, notify, notifyError } from '@/store/notifications'

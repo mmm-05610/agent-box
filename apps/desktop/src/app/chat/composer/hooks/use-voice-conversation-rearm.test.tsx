@@ -1,9 +1,9 @@
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { $voicePlayback } from '@/store/voice-playback'
+import { $voicePlayback } from '@/store/voice/voice-playback'
 
-import { useVoiceConversation } from './use-voice-conversation'
+import { useVoiceConversation } from '../voice/use-voice-conversation'
 
 const mocks = vi.hoisted(() => {
   let deferStreamStart = false
@@ -85,22 +85,22 @@ const mocks = vi.hoisted(() => {
   }
 })
 
-vi.mock('./use-mic-recorder', () => ({
+vi.mock('../voice/use-mic-recorder', () => ({
   useMicRecorder: () => ({ handle: mocks.handle, level: 0 })
 }))
 
-vi.mock('@/lib/voice-barge-in', () => ({
+vi.mock('@/lib/voice/voice-barge-in', () => ({
   monitorSpeechDuringPlayback: () => vi.fn()
 }))
 
-vi.mock('@/lib/voice-playback', () => ({
+vi.mock('@/lib/voice/voice-playback', () => ({
   markVoicePlaybackInterrupted: vi.fn(),
   playSpeechText: mocks.playSpeechText,
   startSpeechStream: mocks.startSpeechStream,
   stopVoicePlayback: mocks.stopVoicePlayback
 }))
 
-vi.mock('@/lib/thinking-sound', () => ({
+vi.mock('@/lib/voice/thinking-sound', () => ({
   startThinkingSound: vi.fn(),
   stopThinkingSound: vi.fn()
 }))

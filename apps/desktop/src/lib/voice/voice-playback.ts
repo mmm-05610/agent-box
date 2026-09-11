@@ -6,14 +6,14 @@ import {
   directTtsConfig,
   type DirectTtsConfig,
   synthesizeSpeechClientDirect
-} from '@/lib/voice-client-direct'
+} from '@/lib/voice/voice-client-direct'
 import { RECONNECT_ATTEMPT_TIMEOUT_MS, withTimeout } from '@/lib/with-timeout'
 import {
   $voicePlayback,
   setVoicePlaybackState,
   type VoicePlaybackSource,
   type VoicePlaybackState
-} from '@/store/voice-playback'
+} from '@/store/voice/voice-playback'
 
 import { sanitizeTextForSpeech } from './speech-text'
 

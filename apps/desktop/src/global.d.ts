@@ -1,10 +1,10 @@
 import type { GatewayWsUrlResult } from '@hermes/shared'
 import type { TranslucencyState } from '@hermes/shared/translucency'
 
-import type { HermesNotification } from '../electron/windows/notification-types'
 import type { PoolLimits } from '../electron/legacy-hermes/pool-limits'
+import type { HermesNotification } from '../electron/windows/notification-types'
 
-import type { WakeIndicatorState } from './lib/wake-indicator'
+import type { WakeIndicatorState } from './lib/voice/wake-indicator'
 import type {
   PetOverlayBounds,
   PetOverlayControl,

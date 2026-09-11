@@ -27,7 +27,7 @@ import {
   setSessions
 } from '@/store/session'
 import { dropSessionState, publishSessionState } from '@/store/session-states'
-import { $wakeWord, resetWakeWordState } from '@/store/wake-word'
+import { $wakeWord, resetWakeWordState } from '@/store/voice/wake-word'
 import type { ComposerAttachment } from '@/types/composer'
 import type { SessionInfo } from '@/types/hermes'
 
@@ -2053,7 +2053,7 @@ describe('usePromptActions submit / queue drain semantics', () => {
   })
 
   it('flags prompt.submit with interrupted:true after a voice-playback barge', async () => {
-    const { markVoicePlaybackInterrupted } = await import('@/lib/voice-playback')
+    const { markVoicePlaybackInterrupted } = await import('@/lib/voice/voice-playback')
     const requestGateway = vi.fn(async () => ({}) as never)
 
     let handle: HarnessHandle | null = null

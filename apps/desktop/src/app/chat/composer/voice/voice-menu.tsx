@@ -16,10 +16,10 @@ import { useI18n } from '@/i18n'
 import { triggerHaptic } from '@/lib/haptics'
 import { AudioLines, Ear, EarOff, iconSize, Loader2, Square, Volume2, VolumeX } from '@/lib/icons'
 import { cn } from '@/lib/utils'
-import { $wakeWord, toggleWakeWord } from '@/store/wake-word'
+import { $wakeWord, toggleWakeWord } from '@/store/voice/wake-word'
 
-import { ACTIVE_ICON_BTN, GHOST_ICON_BTN } from './control-classes'
-import type { ChatBarState, VoiceStatus } from './types'
+import { ACTIVE_ICON_BTN, GHOST_ICON_BTN } from '../control-classes'
+import type { ChatBarState, VoiceStatus } from '../types'
 
 export interface VoiceMenuProps {
   autoSpeak: boolean

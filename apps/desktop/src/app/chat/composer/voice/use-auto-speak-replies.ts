@@ -1,11 +1,11 @@
 import { useStore } from '@nanostores/react'
 import { useEffect, useRef } from 'react'
 
-import { playSpeechText } from '@/lib/voice-playback'
+import { playSpeechText } from '@/lib/voice/voice-playback'
 import { ownsAmbientCue } from '@/store/ambient'
 import { notifyError } from '@/store/notifications'
-import { $voicePlayback } from '@/store/voice-playback'
-import { $autoSpeakReplies } from '@/store/voice-prefs'
+import { $voicePlayback } from '@/store/voice/voice-playback'
+import { $autoSpeakReplies } from '@/store/voice/voice-prefs'
 
 import { useComposerScope } from '../scope'
 

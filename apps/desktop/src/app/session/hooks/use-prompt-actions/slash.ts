@@ -45,7 +45,7 @@ import {
   type WakeStartResponse,
   type WakeStatusResponse,
   type WakeStopResponse
-} from '@/store/wake-word'
+} from '@/store/voice/wake-word'
 
 import type {
   BrowserManageResponse,

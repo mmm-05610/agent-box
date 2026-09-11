@@ -8,13 +8,13 @@ import { triggerHaptic } from '@/lib/haptics'
 import { AudioLines, Ear, EarOff, iconSize, Layers3, Loader2, Square, Volume2, VolumeX } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 import { $hudMode, closeHud, resetHudLayout } from '@/store/hud'
-import { $wakeWord, toggleWakeWord } from '@/store/wake-word'
+import { $wakeWord, toggleWakeWord } from '@/store/voice/wake-word'
 
 import { ACTIVE_ICON_BTN, GHOST_ICON_BTN, PRIMARY_ICON_BTN } from './control-classes'
-import type { ConversationStatus } from './hooks/use-voice-conversation'
 import { ModelPill } from './model-pill'
 import type { ChatBarState, VoiceStatus } from './types'
-import { VoiceMenu } from './voice-menu'
+import type { ConversationStatus } from './voice/use-voice-conversation'
+import { VoiceMenu } from './voice/voice-menu'
 
 // Re-exported: `context-menu.tsx` and other row neighbours have always reached
 // for these here, and the row is where they read as belonging.

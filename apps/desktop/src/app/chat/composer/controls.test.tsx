@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ChatBarState } from '@/app/chat/composer/types'
 import { I18nProvider } from '@/i18n'
 import { $hudMode } from '@/store/hud'
-import { applyWakeStartResult, applyWakeStatus, resetWakeWordState } from '@/store/wake-word'
+import { applyWakeStartResult, applyWakeStatus, resetWakeWordState } from '@/store/voice/wake-word'
 
 import { ComposerControls } from './controls'
 

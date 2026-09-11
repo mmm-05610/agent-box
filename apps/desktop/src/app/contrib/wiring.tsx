@@ -47,8 +47,8 @@ import {
   titlebarToolsWidthCss
 } from '@/lib/titlebar'
 import { latestSessionTodos } from '@/lib/todos'
-import { activateWakeIndicator } from '@/lib/wake-indicator'
-import { playWakeSound } from '@/lib/wake-sound'
+import { activateWakeIndicator } from '@/lib/voice/wake-indicator'
+import { playWakeSound } from '@/lib/voice/wake-sound'
 import { $billingSettingsRequest } from '@/store/billing-block'
 import { $desktopBoot } from '@/store/boot'
 import { requestVoiceConversationStart } from '@/store/composer'
@@ -82,7 +82,7 @@ import {
   setMessages
 } from '@/store/session'
 import { clearSessionTodos, setSessionTodos, todosForHydration } from '@/store/todos'
-import { armWakeWord, stopClientCapture } from '@/store/wake-word'
+import { armWakeWord, stopClientCapture } from '@/store/voice/wake-word'
 import { isAuxiliaryWindow, isBrowserWindow, isHudWindow } from '@/store/windows'
 import { useSkinCommand } from '@/theme-composition/use-skin-command'
 

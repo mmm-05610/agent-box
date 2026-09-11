@@ -7,7 +7,7 @@ vi.mock('@/hermes', () => ({
 }))
 
 import { $hapticsMuted } from '@/store/haptics'
-import { $thinkingSoundEnabled } from '@/store/voice-prefs'
+import { $thinkingSoundEnabled } from '@/store/voice/voice-prefs'
 
 import { isThinkingSoundActive, startThinkingSound, stopThinkingSound } from './thinking-sound'
 

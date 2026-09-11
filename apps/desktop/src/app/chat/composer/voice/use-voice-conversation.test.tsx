@@ -1,7 +1,7 @@
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { BargeMonitorCallbacks } from '@/lib/voice-barge-in'
+import type { BargeMonitorCallbacks } from '@/lib/voice/voice-barge-in'
 
 import type { MicRecording } from './use-mic-recorder'
 import { useVoiceConversation } from './use-voice-conversation'
@@ -16,7 +16,7 @@ import { useVoiceConversation } from './use-voice-conversation'
 const monitorCalls: BargeMonitorCallbacks[] = []
 const stopMonitor = vi.fn()
 
-vi.mock('@/lib/voice-barge-in', () => ({
+vi.mock('@/lib/voice/voice-barge-in', () => ({
   monitorSpeechDuringPlayback: (callbacks: BargeMonitorCallbacks) => {
     monitorCalls.push(callbacks)
 
@@ -27,14 +27,14 @@ vi.mock('@/lib/voice-barge-in', () => ({
 const markVoicePlaybackInterrupted = vi.fn()
 const stopVoicePlayback = vi.fn()
 
-vi.mock('@/lib/voice-playback', () => ({
+vi.mock('@/lib/voice/voice-playback', () => ({
   markVoicePlaybackInterrupted: () => markVoicePlaybackInterrupted(),
   playSpeechText: vi.fn(async () => true),
   startSpeechStream: vi.fn(async () => null),
   stopVoicePlayback: () => stopVoicePlayback()
 }))
 
-vi.mock('@/lib/thinking-sound', () => ({
+vi.mock('@/lib/voice/thinking-sound', () => ({
   startThinkingSound: vi.fn(),
   stopThinkingSound: vi.fn()
 }))
