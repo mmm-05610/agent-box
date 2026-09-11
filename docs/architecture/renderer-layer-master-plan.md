@@ -160,7 +160,10 @@ target — see §0.
 | 14 | three hooks sink, and the pet stops reaching up | 3 |
 | 15 | the last three singletons | 3 |
 
-85 edges — **the whole ledger**. Parallel per §4. **Review gate** when the phase's last item merges (§5).
+85 edges — **the whole ledger**. Phase 1 and Phase 2 together are the complete set:
+every line in the ledger belongs to a work order listed here, and §1's target is 0.
+There is no remainder, no "later stage", and nothing waiting on a decision. Parallel
+per §4. **Review gate** when the phase's last item merges (§5).
 
 ### Phase 2 — work order 05, the `@/hermes` barrel
 
@@ -174,22 +177,30 @@ progress on the migration — read the ledger for that. **Review gate** after it
 its own reviewer, so its result is attributable rather than mixed into a layer
 round.
 
-### Phase 3 — whatever the open decisions produce
+### Phase 3 — no such phase
 
-Empty today, and that is the honest state: every work order that exists is in
-Phase 1 or 2. Orders appear here as the knots in §7 are decided — the composer's last
-edge and the six edges nobody has examined yet. Each becomes a normal work order: same collision check, same
-review gate. §9 says how one enters this plan.
+Kept as a heading so that anyone who read an earlier version of this plan knows where
+the knots went: there are none. Every one of them was decided and written up, and the
+eleven edges they left behind became batches 13, 14 and 15 in Phase 1. §9 still says
+how a new work order would enter this plan, and it would enter Phase 1, not here.
 
 ### Done
 
 **Every work order in `renderer-layer-batches/` is merged and reviewed, and the
-ledger equals the target §0 derives from the manifest.** Not "Phase 1 is green".
+ledger is empty.** Not "Phase 1 is green", not "the target shrank" — the ledger file
+holds an empty list and `renderer-layers.test.ts` is its witness.
 
-If the run reaches that state and the ledger is still above zero, the remainder is
-in §7 — undecided knots, which a decision has to unblock. Report what is left and
-stop there; that is the one legitimate stopping point. Do not improvise a fix for an
-undecided knot to reach zero.
+There is no longer a legitimate place to stop short. Every line belongs to a work
+order, so a ledger that is still above zero after all of them means one of two
+defects, and both are reportable rather than acceptable:
+
+- a batch under-counted what it pays off, or
+- a batch was skipped, or its edge came back.
+
+The old text here said to stop and report if the ledger was above zero, because
+undecided knots used to be the remainder. That is no longer true: §7 is empty and
+the target is 0. Report the number you see and which lines are left, but do not treat
+a non-zero ledger as the end of the run.
 
 ## 4 · What may run at the same time
 

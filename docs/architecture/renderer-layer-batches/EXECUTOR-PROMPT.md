@@ -30,7 +30,7 @@ is a symptom of the frozen prompt, not a step in the process.
 
 **工作范围不是这份提示词里的一份清单。** 开工时、以及每完成一项之后，都重新读：
   - docs/architecture/renderer-layer-master-plan.md
-      §0 谁说了算 · §3 阶段与顺序 · §4 并行 · §5 验收 · §6 静默失败清单 · §7 不派的活
+      §0 谁说了算 · §3 阶段与顺序 · §4 并行 · §5 验收 · §6 静默失败清单 · §7 还剩什么（现在是空的）
   - docs/architecture/renderer-layer-status.md
       工作列表 = 这份文件里状态不是 merged 的行（**所有批次**，没有阶段权限之分）
   - docs/architecture/renderer-layer-batches/
@@ -46,7 +46,7 @@ is a symptom of the frozen prompt, not a step in the process.
 要求：
 1. **做完 batches 目录里的所有派工单，不要停在某一阶段。**
    §3 的 Phase 只是**顺序约束**，不是权限：05 不能和 Phase 1 的项交错，是因为它们文件重叠。
-   做完 Phase 1 就交差，等于只做了三分之一。
+   做完 Phase 1 就交差，等于没做完——账本不会归零。
    §7 现在是空的：**账本里每一条边都有派工单**，目标 0。
    总方针是**会被更新的**：如果它在你跑的过程中变了，以新版本为准，并重新算目标数字。
    如果变化让你不确定某件事还做不做，停下来报告，不要自行扩大或缩小范围。
@@ -63,6 +63,7 @@ is a symptom of the frozen prompt, not a step in the process.
    总方针和派工单是权威的；发现覆盖不到的东西，报告，不要即兴发明做法。
 
 完成标准：batches 目录里**所有**派工单都 merged 且 review 通过，账本等于上面脚本算出的目标。
+那个目标现在是 **0**，所以不存在「停在未决策的结上」这种收尾方式；账本不为零就是缺陷，不是终点。
 若做到那一步账本仍不为零，剩下的就是 §7 里还没有决策的结——报告还剩什么然后停下，
 这是唯一正当的停止点；不要为了凑到零而自己发明某个结的解法。
 ```

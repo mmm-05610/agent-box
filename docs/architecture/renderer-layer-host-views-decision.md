@@ -156,8 +156,9 @@ plugin host, and this round is relocations only.
 
 Do nothing. The ABI keeps exposing three component modules of the app, which is the
 original sin (every `app/` refactor of those files is an ABI change), and the ledger
-never goes below 3. The migration has an explicit stopping point for undecided work,
-so this is a legitimate answer — just the one that keeps the wart.
+never goes below 3. It was a legitimate answer while the ledger still had undecided
+work behind it; now that every line has a work order and the target is 0, a non-zero
+ledger is a defect rather than an endpoint. Not taken.
 
 ## Recommendation
 
