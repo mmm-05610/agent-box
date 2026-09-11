@@ -8,7 +8,7 @@ vi.mock('./right-rail/preview-console-store', () => ({
   forgetPreviewConsole: () => undefined
 }))
 
-import { registry } from '@/extension/contrib/registry'
+import { registry } from '@/lib/contributions'
 import { $previewTabs, closeRightRail, noteBrowserPage, openPreview } from '@/store/preview'
 
 import { browserTabExternalUrl, browserTabLabel, watchPreviewTiles } from './preview-tile'

@@ -15,10 +15,6 @@
 // work gets scheduled: a `lib/` batch, a `store/` batch, and so on.
 
 export const DEBT_LEDGER: readonly string[] = [
-  // application/ — 2
-  'application/theme/adapters/user-themes.ts -> @/extension/contrib/registry',
-  'application/theme/index.tsx -> @/extension/contrib/registry',
-
   // components/ — 28
   'components/assistant-ui/clarify-tool.tsx -> @/app/chat/composer/focus',
   'components/assistant-ui/directive-text.tsx -> @/app/open-session',
@@ -67,17 +63,15 @@ export const DEBT_LEDGER: readonly string[] = [
   'extension/sdk/index.ts -> @/app/skills',
   'extension/sdk/index.ts -> @/app/skills/mcp-tab',
 
-  // lib/ — 27
+  // lib/ — 25
   'lib/desktop-fs.ts -> @/store/session',
   'lib/external-link.tsx -> @/store/preview',
   'lib/guarded-model-switch.ts -> @/store/notifications',
   'lib/haptics.ts -> @/store/haptics',
   'lib/hooks/use-image-download.ts -> @/store/notifications',
-  'lib/keybinds/actions.ts -> @/extension/contrib/registry',
   'lib/keybinds/composer-focus-keys.ts -> @/app/routes',
   'lib/keybinds/composer-focus-keys.ts -> @/components/pane-shell/tree/store',
   'lib/keybinds/composer-focus-keys.ts -> @/store/session-switcher',
-  'lib/keybinds/use-keybind-hint.ts -> @/extension/contrib/registry',
   'lib/keybinds/use-keybind-hint.ts -> @/store/keybinds',
   'lib/media.ts -> @/store/session',
   'lib/oneshot.ts -> @/store/gateway',
@@ -96,17 +90,15 @@ export const DEBT_LEDGER: readonly string[] = [
   'lib/yolo-session.ts -> @/store/gateway',
   'lib/yolo-session.ts -> @/store/session',
 
-  // store/ — 31
+  // store/ — 28
   'store/command-palette.ts -> @/components/ui/keyboard-first',
   'store/gateway-switch.ts -> @/app/contrib/hooks/use-background-sync',
-  'store/keybinds.ts -> @/extension/contrib/registry',
   'store/layout.ts -> @/components/pane-shell',
   'store/layout.ts -> @/components/pane-shell/tree/store',
   'store/pane-focus.ts -> @/app/right-sidebar/store',
   'store/pane-focus.ts -> @/components/pane-shell/tree/model',
   'store/pane-focus.ts -> @/components/pane-shell/tree/presets',
   'store/pane-focus.ts -> @/components/pane-shell/tree/store',
-  'store/pane-focus.ts -> @/extension/contrib/registry',
   'store/profile-share.ts -> @/components/pane-shell/tree/model',
   'store/profile-share.ts -> @/components/pane-shell/tree/store',
   'store/projects/crud.ts -> @/app/chat/new-session-drag',
@@ -120,7 +112,6 @@ export const DEBT_LEDGER: readonly string[] = [
   'store/session-focus.ts -> @/components/pane-shell/tree/model',
   'store/session-focus.ts -> @/components/pane-shell/tree/store',
   'store/session-focus.ts -> @/components/pane-shell/workspace-scope',
-  'store/session-states/session-state-registry.ts -> @/extension/contrib/types',
   'store/session-states/tile-operations.ts -> @/components/pane-shell/tree/model',
   'store/session-states/tile-operations.ts -> @/components/pane-shell/tree/store',
   'store/session-states/tile-operations.ts -> @/components/pane-shell/workspace-scope',

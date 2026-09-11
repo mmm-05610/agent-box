@@ -1124,7 +1124,7 @@ describe('reopenLastClosedTile focuses the restored tab', () => {
   async function setup() {
     const tree = await import('@/components/pane-shell/tree/store')
     const model = await import('@/components/pane-shell/tree/model')
-    const { registry } = await import('@/extension/contrib/registry')
+    const { registry } = await import('@/lib/contributions')
     const session = await import('@/store/session')
     const states = await import('@/store/session-states')
 

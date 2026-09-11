@@ -11,7 +11,7 @@
 import type { GatewayEvent } from '@hermes/shared'
 
 import { PALETTE_AREA, type PaletteContribution } from '@/app/command-palette/contrib'
-import { registry } from '@/extension/contrib/registry'
+import { registry } from '@/lib/contributions'
 import { CreditCard } from '@/lib/icons'
 import { emitLocalGatewayEvent } from '@/store/gateway'
 import { $activeSessionId } from '@/store/session'

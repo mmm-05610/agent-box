@@ -7,7 +7,7 @@ import { group, split } from '@/components/pane-shell/tree/model'
 import { $layoutTree, noteActiveTreeGroup } from '@/components/pane-shell/tree/store'
 import { SidebarProvider } from '@/components/ui/sidebar'
 import { makeSessionInfo } from '@/dev/test/session-info'
-import { registry } from '@/extension/contrib/registry'
+import { registry } from '@/lib/contributions'
 import { $selectedStoredSessionId, $sessions } from '@/store/session'
 import { $removedSessionIds } from '@/store/session-removal'
 

@@ -18,8 +18,7 @@ import {
   setWorkspaceOwnerLabel,
   type WorkspaceNewSessionTarget
 } from '@/components/pane-shell/workspace-scope'
-import { registry } from '@/extension/contrib/registry'
-import type { WorkspaceMode } from '@/extension/contrib/types'
+import { registry } from '@/lib/contributions'
 import {
   activeGatewayConnectionId,
   openGatewayForAgent,
@@ -44,6 +43,7 @@ import {
   focusWorkspaceOwnerSessionTile,
   sessionTileDelegate
 } from '@/store/session-states'
+import type { WorkspaceMode } from '@/types/contributions'
 
 import { awaitProfileActivation, pluginRouteStillRegistered } from './host-routing'
 import {

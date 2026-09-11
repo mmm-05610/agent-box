@@ -10,7 +10,7 @@
 import type * as React from 'react'
 
 import type { MenuKit } from '@/components/ui/actions-menu'
-import type { Contribution } from '@/extension/contrib/types'
+import type { Contribution } from '@/types/contributions'
 
 import type { GroupNode, LayoutNode } from '../model'
 import { allPaneIds } from '../model'

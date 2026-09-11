@@ -18,7 +18,7 @@ describe('floating panes stay out of the layout tree', () => {
   async function setup() {
     const tree = await import('@/components/pane-shell/tree/store')
     const model = await import('@/components/pane-shell/tree/model')
-    const { registry } = await import('@/extension/contrib/registry')
+    const { registry } = await import('@/lib/contributions')
 
     registry.register({
       id: 'workspace',

@@ -1,7 +1,7 @@
 import { useCallback, useSyncExternalStore } from 'react'
 
-import { registry } from '../registry'
-import type { Contribution } from '../types'
+import { registry } from '@/lib/contributions'
+import type { Contribution } from '@/types/contributions'
 
 /** Subscribe to the resolved contributions for an area. The subscription is
  *  scoped to `area`, so a slot re-renders only when ITS area mutates — a

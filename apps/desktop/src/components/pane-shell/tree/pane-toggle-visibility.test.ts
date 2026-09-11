@@ -1,7 +1,7 @@
 import { atom } from 'nanostores'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { registry } from '@/extension/contrib/registry'
+import { registry } from '@/lib/contributions'
 
 import { group, split } from './model'
 import {

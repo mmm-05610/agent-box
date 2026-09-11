@@ -17,7 +17,7 @@ import { useStore } from '@nanostores/react'
 import { atom, type WritableAtom } from 'nanostores'
 import { type ReactNode, useEffect, useRef } from 'react'
 
-import { registry } from '../registry'
+import { registry } from '@/lib/contributions'
 
 function ProjectedNode({ $node }: { $node: WritableAtom<ReactNode> }) {
   return <>{useStore($node)}</>

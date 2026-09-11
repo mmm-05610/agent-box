@@ -11,7 +11,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { registry } from '@/extension/contrib/registry'
+import { registry } from '@/lib/contributions'
 
 import {
   $workspaceIsPage,

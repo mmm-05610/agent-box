@@ -1,7 +1,7 @@
 import { act, cleanup, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { registry } from '@/extension/contrib/registry'
+import { registry } from '@/lib/contributions'
 import { $activeGatewayProfile } from '@/store/profile/runtime-route-state'
 import { $appearance } from '@/store/translucency'
 import { useTheme } from '@/themes/context'

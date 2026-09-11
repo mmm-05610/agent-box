@@ -15,7 +15,6 @@
  *     the bridge has no session-window support.
  */
 import { markStoredSessionViewed } from '@/application/session-read-state'
-import type { WorkspaceMode } from '@/extension/contrib/types'
 import { $activeSessionId, $selectedStoredSessionId } from '@/store/session'
 import {
   focusedSessionNeedsRoute,
@@ -26,6 +25,7 @@ import {
 } from '@/store/session-states'
 import type { SessionProfileRoute } from '@/store/session/types'
 import { canOpenSessionWindow, openSessionInNewWindow } from '@/store/windows'
+import type { WorkspaceMode } from '@/types/contributions'
 
 import { $workspaceIsPage, sessionRoute } from './routes'
 

@@ -73,7 +73,7 @@ describe('host.state focused-session atoms', () => {
     const { host, session, states } = await setup()
     const tree = await import('@/components/pane-shell/tree/store')
     const model = await import('@/components/pane-shell/tree/model')
-    const { registry } = await import('@/extension/contrib/registry')
+    const { registry } = await import('@/lib/contributions')
 
     // A second chat zone holding a session tile, next to the main workspace.
     for (const id of ['workspace', 'session-tile:tile-a']) {

@@ -17,7 +17,7 @@ describe('activateTreeTabSlot indexes shown panes only', () => {
   async function setup() {
     const tree = await import('@/components/pane-shell/tree/store')
     const model = await import('@/components/pane-shell/tree/model')
-    const { registry } = await import('@/extension/contrib/registry')
+    const { registry } = await import('@/lib/contributions')
 
     for (const id of ['workspace', 'files', 'session-tile:a', 'session-tile:b']) {
       registry.register({

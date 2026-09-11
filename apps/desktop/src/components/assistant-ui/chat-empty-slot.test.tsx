@@ -11,8 +11,8 @@
 import { render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { registry } from '@/extension/contrib'
 import { CHAT_EMPTY_AREA, type ChatEmptyContribution } from '@/lib/chat-empty'
+import { registry } from '@/lib/contributions'
 
 import { ChatEmptySlot } from './chat-empty-slot'
 

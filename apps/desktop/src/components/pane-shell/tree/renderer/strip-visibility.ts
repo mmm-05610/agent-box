@@ -9,8 +9,8 @@
  * a function of what it currently holds plus one deliberate choice.
  */
 
-import type { Contribution } from '@/extension/contrib/types'
 import { effectiveTabStripMode } from '@/store/tabstrip-prefs'
+import type { Contribution } from '@/types/contributions'
 
 import type { TabStripMode } from '../model'
 

@@ -266,7 +266,6 @@ export type {
  *  `ctx.register` stays the door for permanent contributions. Namespace the
  *  id with your plugin slug (`kanban:board-switcher`). */
 export { Contribute, type ContributeProps } from '@/extension/contrib/react/contribute'
-export type { Contribution } from '@/extension/contrib/types'
 /** The live gateway instance type — for typing the `gateway` prop `McpTab`
  *  takes; obtain the instance from `host.getGateway()`. */
 export type { HermesGateway } from '@/hermes'
@@ -318,15 +317,12 @@ export { type GrabScroll, useGrabScroll } from '@/lib/hooks/use-grab-scroll'
 export * as icons from '@/lib/icons'
 export { type KeybindContribution, KEYBINDS_AREA } from '@/lib/keybinds/actions'
 export { formatModifierToken } from '@/lib/keybinds/combo'
-
-export const PANES_AREA = 'panes'
 /** A `Map` with a ceiling, for the module-level caches a plugin keeps across
  *  a renderer that stays open for days. Only for values that can be
  *  regenerated — eviction costs a recompute or a refetch, never correctness. */
 export { LruCache } from '@/lib/lru-cache'
-export const STATUSBAR_AREAS = { left: 'statusBar.left', right: 'statusBar.right' } as const
-export const TITLEBAR_AREAS = { center: 'titleBar.center', left: 'titleBar.left', right: 'titleBar.right' } as const
 
+export const PANES_AREA = 'panes'
 /** The app's deterministic identity color for a name (profiles, assignees,
  *  authors), its translucent tag fill, and the curated picker swatches — so
  *  plugin-rendered identities read the same hue as everywhere else. The
@@ -334,6 +330,9 @@ export const TITLEBAR_AREAS = { center: 'titleBar.center', left: 'titleBar.left'
  *  hand-picked color still sits with the generated ones; reach for them
  *  instead of literal hex, which can't follow the theme. */
 export { PROFILE_SWATCHES, profileColor, profileColorSoft } from '@/lib/profile-color'
+export const STATUSBAR_AREAS = { left: 'statusBar.left', right: 'statusBar.right' } as const
+export const TITLEBAR_AREAS = { center: 'titleBar.center', left: 'titleBar.left', right: 'titleBar.right' } as const
+
 /** The shared client itself, for invalidation OUTSIDE React (e.g. a
  *  `ctx.socket` frame invalidating a query). Inside components keep using
  *  `useQueryClient`. */
@@ -399,6 +398,7 @@ export {
 export { useTheme } from '@/themes/context'
 export { retintTheme, themeHue } from '@/themes/retint'
 export type { DesktopTheme, DesktopThemeColors } from '@/themes/types'
+export type { Contribution } from '@/types/contributions'
 export type { RpcEvent, StatusResponse } from '@/types/hermes'
 /** Subscribe a component to a `host.state` atom. */
 export { useStore as useValue } from '@nanostores/react'

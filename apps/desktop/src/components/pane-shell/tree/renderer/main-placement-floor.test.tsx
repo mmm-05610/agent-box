@@ -2,7 +2,7 @@ import { cleanup, render } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { stubResizeObserver } from '@/dev/test/jsdom'
-import { registry } from '@/extension/contrib/registry'
+import { registry } from '@/lib/contributions'
 
 import { group, split } from '../model'
 import { $hiddenTreePanes, $layoutTree } from '../store'

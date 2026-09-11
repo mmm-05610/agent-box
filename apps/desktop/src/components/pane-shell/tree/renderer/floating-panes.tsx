@@ -14,11 +14,11 @@ import { type PointerEvent as ReactPointerEvent, useCallback, useEffect, useRef,
 import { Codicon } from '@/components/ui/codicon'
 import { ContribBoundary, ContribRender } from '@/extension/contrib/react/boundary'
 import { useContributions } from '@/extension/contrib/react/use-contributions'
-import type { Contribution } from '@/extension/contrib/types'
 import { HUD_SURFACE } from '@/lib/floating-hud'
 import { readJson, writeJson } from '@/lib/storage'
 import { TITLEBAR_HEIGHT } from '@/lib/titlebar'
 import { cn } from '@/lib/utils'
+import type { Contribution } from '@/types/contributions'
 
 import { $hiddenTreePanes } from '../store'
 

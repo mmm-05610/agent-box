@@ -17,7 +17,7 @@ describe('focused chat zone drives the tab verbs', () => {
   async function setup() {
     const tree = await import('@/components/pane-shell/tree/store')
     const model = await import('@/components/pane-shell/tree/model')
-    const { registry } = await import('@/extension/contrib/registry')
+    const { registry } = await import('@/lib/contributions')
 
     for (const id of ['workspace', 'files', 'session-tile:a', 'session-tile:b']) {
       registry.register({
@@ -87,7 +87,7 @@ describe('focused chat zone drives the tab verbs', () => {
   it('⌘W and ⌃Tab serve a zone of preview/page tiles like any tab strip', async () => {
     const tree = await import('@/components/pane-shell/tree/store')
     const model = await import('@/components/pane-shell/tree/model')
-    const { registry } = await import('@/extension/contrib/registry')
+    const { registry } = await import('@/lib/contributions')
 
     for (const id of ['workspace', 'preview-tile:url:x', 'route-tile:/skills']) {
       registry.register({

@@ -49,7 +49,7 @@ describe('enforced dock (stacked Bots pane → sessions-zone tab, every boot)', 
 
     const tree = await import('@/components/pane-shell/tree/store')
     const model = await import('@/components/pane-shell/tree/model')
-    const { registry } = await import('@/extension/contrib/registry')
+    const { registry } = await import('@/lib/contributions')
 
     registry.register({
       id: 'workspace',

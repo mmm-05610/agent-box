@@ -12,7 +12,7 @@
 
 import { atom, computed } from 'nanostores'
 
-import { registry } from '@/extension/contrib/registry'
+import { registry } from '@/lib/contributions'
 import { baseColors } from '@/themes/appearance'
 import { BUILTIN_THEMES, nousTheme } from '@/themes/presets'
 import { listThemes, lookupTheme } from '@/themes/resolve'

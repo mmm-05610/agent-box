@@ -2,7 +2,7 @@ import { atom } from 'nanostores'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { $terminalTakeover, setTerminalTakeover } from '@/app/right-sidebar/store'
-import { registry } from '@/extension/contrib/registry'
+import { registry } from '@/lib/contributions'
 
 import { allPaneIds, group, split } from './model'
 import {

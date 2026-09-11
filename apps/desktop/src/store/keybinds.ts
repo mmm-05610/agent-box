@@ -1,6 +1,6 @@
 import { atom, computed } from 'nanostores'
 
-import { $registryVersion } from '@/extension/contrib/registry'
+import { $registryVersion } from '@/lib/contributions'
 import { allKeybindActions, defaultBindings, keybindAction, type KeybindBindings } from '@/lib/keybinds/actions'
 import { canonicalizeCombo } from '@/lib/keybinds/combo'
 import { arraysEqual, persistString, storedString } from '@/lib/storage'

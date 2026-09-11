@@ -1,6 +1,6 @@
 import { atom } from 'nanostores'
 
-import type { Contribution } from './types'
+import type { Contribution } from '@/types/contributions'
 
 /** Bumped on every registry mutation — the reactive hook for non-React
  *  consumers (nanostores `computed`s, memo deps) that read `registry.getArea`

@@ -22,8 +22,8 @@ import { type PointerEvent as ReactPointerEvent, useCallback, useEffect, useRef,
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { registry } from '@/extension/contrib/registry'
 import { useI18n } from '@/i18n'
+import { registry } from '@/lib/contributions'
 import { ESCAPE_PRIORITY, isTopEscapeLayer, pushEscapeLayer } from '@/lib/escape-layers'
 import { startPointerDrag } from '@/lib/pointer-drag'
 import { cn } from '@/lib/utils'

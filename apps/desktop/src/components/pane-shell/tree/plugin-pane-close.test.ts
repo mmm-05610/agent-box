@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { setPluginEnabled } from '@/extension/contrib/plugins-store'
-import { registry } from '@/extension/contrib/registry'
+import { registry } from '@/lib/contributions'
 
 import { allPaneIds, group, split } from './model'
 import { $dismissedPanes, $layoutTree, closeTreePane } from './store'

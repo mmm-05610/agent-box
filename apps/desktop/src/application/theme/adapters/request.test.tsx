@@ -2,7 +2,7 @@ import { act, cleanup, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { ThemeProvider } from '@/application/theme'
-import { registry } from '@/extension/contrib/registry'
+import { registry } from '@/lib/contributions'
 import { useTheme } from '@/themes/context'
 import { midnightTheme } from '@/themes/presets'
 import type { DesktopTheme } from '@/themes/types'

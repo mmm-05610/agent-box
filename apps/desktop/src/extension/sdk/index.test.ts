@@ -63,7 +63,7 @@ describe('host.state turn flags', () => {
   it('follows a focused session tile, not the primary', async () => {
     const tree = await import('@/components/pane-shell/tree/store')
     const model = await import('@/components/pane-shell/tree/model')
-    const { registry } = await import('@/extension/contrib/registry')
+    const { registry } = await import('@/lib/contributions')
     const { $sessionTiles } = await import('@/store/session-states')
 
     // A second chat zone holding a session tile, next to the main workspace.
@@ -183,7 +183,7 @@ describe('host workspace scope', () => {
   })
 
   it('registers plugin workspace chrome options', async () => {
-    const { registry } = await import('@/extension/contrib/registry')
+    const { registry } = await import('@/lib/contributions')
 
     const close = host.openWorkspace('scope-test', {
       dock: { pane: 'workspace', pos: 'right' },

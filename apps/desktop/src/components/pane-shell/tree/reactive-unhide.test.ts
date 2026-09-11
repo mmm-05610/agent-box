@@ -27,7 +27,7 @@ describe('reactive pane unhide', () => {
     const tree = await import('@/components/pane-shell/tree/store')
     const layout = await import('@/store/layout')
     const model = await import('@/components/pane-shell/tree/model')
-    const { registry } = await import('@/extension/contrib/registry')
+    const { registry } = await import('@/lib/contributions')
 
     // Register the right-column panes like controller.tsx does — placement
     // 'right' is what makes `treeSideOfPane(id)` return 'right' (and therefore

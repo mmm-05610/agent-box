@@ -1,13 +1,14 @@
 import type { FC, ReactNode } from 'react'
 import { useMemo } from 'react'
 
-import { type Contribution, useContributions } from '@/extension/contrib'
+import { useContributions } from '@/extension/contrib'
 import { ContribBoundary, ContribRender } from '@/extension/contrib/react/boundary'
 import {
   parseTranscriptDirective,
   TRANSCRIPT_DIRECTIVE_AREA,
   type TranscriptDirectiveContribution
 } from '@/lib/transcript-directives'
+import type { Contribution } from '@/types/contributions'
 
 /**
  * The transcript's directive slot. Given a paragraph's raw text, renders the

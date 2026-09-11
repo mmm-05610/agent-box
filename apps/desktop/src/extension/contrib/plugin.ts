@@ -14,11 +14,10 @@
 
 import { pluginRest, type PluginRestOptions, pluginSocket } from '@/hermes'
 import { createPluginI18n, type PluginI18n } from '@/i18n'
+import { registry } from '@/lib/contributions'
 import { readKey, writeKey } from '@/lib/storage'
 import { dispatchPluginNativeNotification, type PluginNativeNotificationInput } from '@/store/native-notifications'
-
-import { registry } from './registry'
-import type { Contribution } from './types'
+import type { Contribution } from '@/types/contributions'
 
 export type { PluginRestOptions } from '@/hermes'
 export type { HermesOpenTarget } from '@/lib/hermes-open-target'

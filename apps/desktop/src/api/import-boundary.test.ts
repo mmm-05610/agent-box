@@ -304,7 +304,10 @@ describe('the api directory is a leaf', () => {
       "vi.doMock('@/store/gateway')",
       "import { useStore } from '@/store'",
       "import { translate } from '@/i18n'",
-      "import { registry } from '@/extension/contrib/registry'",
+      // The `extension/contrib` zone. `registry.ts` used to live here and now
+      // sits at `@/lib/contributions` — this case names a file that is still in
+      // the zone, so the fixture cannot rot into a claim about a deleted path.
+      "import { registry } from '@/extension/contrib/plugin'",
       "import { modePref } from '@/themes/context'",
       "import { ingestBackendSkin } from '@/application/theme/adapters/backend-sync'",
       "import { overlay } from '@/components/ui/dialog'",

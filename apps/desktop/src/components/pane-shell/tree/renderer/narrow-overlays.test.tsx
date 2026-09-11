@@ -3,7 +3,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 import { PANE_TOGGLE_REVEAL_EVENT } from '@/components/pane-shell'
 import { stubResizeObserver } from '@/dev/test/jsdom'
-import { registry } from '@/extension/contrib/registry'
+import { registry } from '@/lib/contributions'
 
 import { group, split } from '../model'
 import { $hiddenTreePanes, $layoutTree, $narrowViewport, declareDefaultTree } from '../store'

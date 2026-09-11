@@ -21,25 +21,22 @@ this document and that file disagree, the file is right.
 | `store` → `components` | 17 |
 | `extension` → `app` | 16 |
 | `store` → `app` | 11 |
-| `store` → `extension` | 3 |
 | `lib` → `app` | 3 |
-| `lib` → `extension` | 2 |
 | `lib` → `components` | 2 |
-| `application` → `extension` | 2 |
-| **total** | **104** |
+| **total** | **97** |
 
 The 16 `store → application` imports are **not** in that list: `src/AGENTS.md`
 sanctions them ("`application/` … is imported by `app/`/`store/` call sites"), so
 they live in `SANCTIONED`, not in the debt ledger. Sanctioned and unfixed must
 never look alike.
 
-The debt is far more concentrated than 104 suggests. Two files own 31 edges and
-eight files own 51:
+The debt is far more concentrated than the count suggests. Two files own 31 edges
+and eight files own 48:
 
 ```
 17  components/assistant-ui/thread/user-edit-composer.tsx
 14  extension/sdk/index.ts
- 5  store/pane-focus.ts
+ 4  store/pane-focus.ts
  3  store/session-states/tile-operations.ts
  3  store/session-focus.ts
  3  lib/sound/completion-sound.ts
@@ -47,8 +44,8 @@ eight files own 51:
  3  components/pet/floating-pet.tsx
 ```
 
-So this is not 104 chores. It is a handful of knots plus a long tail that hangs
-off them.
+So this is not 97 chores. It is a handful of knots plus a long tail that hangs off
+them.
 
 ## 2. The knots — these need a decision, not a move
 
@@ -60,23 +57,28 @@ state living in the component layer, and `store` reaching up for it.
 
 The split, by responsibility, is legible: `tree/model.ts` (650 lines, **zero
 imports**) is a pure model; `tree/store.ts` is state; `tree/renderer/*` is
-components. What makes it a decision rather than a move is that `tree/store.ts`
-imports `extension/contrib/{registry,plugins-store}` — the layout store has to
-know which pane plugins are enabled. So K1 and K2 are the same knot.
+components.
 
-### K2 · Is the contribution registry infrastructure? (7 edges)
+This used to be knotted to K2: `tree/store.ts` imported
+`extension/contrib/{registry,plugins-store}`, so moving it down would have
+traded a `store → components` edge for a `store → extension` one. With the
+registry now at `@/lib/contributions` (rank 0, see K2) that is no longer true,
+and the pane domain can move on its own. The remaining question is only how far
+the split goes.
 
-`extension/contrib/registry.ts` (162 lines) depends on `nanostores` and
-`extension/contrib/types.ts` (51 lines, react types only). Nothing else. It is
-imported by `lib` (2), `store` (3) and `application` (2).
+### K2 · The contribution registry — DECIDED, done
 
-Its dependencies say it belongs **below `store/`**; its directory says it belongs
-to the extension layer. Either move `registry.ts` + `types.ts` + `plugins-store.ts`
-+ `events.ts` down, or record `extension/contrib` as rank-0 infrastructure in the
-ladder. Moving them is the honest option — a rank that says "this module is
-infrastructure but lives in the top layer" is debt wearing a policy's clothes.
-This does touch the earlier non-goal about not splitting `sdk/` + `contrib/`, so
-it needs a call.
+It was `extension/contrib/registry.ts` (162 lines) plus its type module, living
+in the top layer while `lib` (2), `store` (3) and `application` (2) imported it.
+Its dependencies — `nanostores` and a 51-line type file — said it was a leaf; its
+directory said it belonged to the plugin feature. It is a generic keyed-slot
+primitive that the app's own core UI writes to as much as plugins do, so the
+directory was a grouping accident rather than a design intent.
+
+Moved to **`lib/contributions.ts`** with the shapes at
+**`types/contributions.ts`**. All 7 edges paid, and K1 unblocked with them.
+`extension/contrib/{plugin,plugins,plugins-store,runtime-loader,events,react/*}`
+stayed where they are — those are the parts that genuinely know about plugins.
 
 ### K3 · The plugin ABI points the wrong way (16 edges)
 
@@ -116,8 +118,8 @@ the store should publish an intent the composer subscribes to.
 
 Every item below was checked for the trap that kills a naive "move it up": **does
 anything in a lower layer import it?** If yes, moving it turns one direction of
-violation into the other. Two candidates failed that check and are in Batch B
-instead; `lib/keybinds/` failed it badly (see §4).
+violation into the other. Three candidates failed that check and are in Batch B
+instead — `lib/keybinds/` failed it badly (see §4).
 
 Each item is a pure relocation with a determinate destination and no behaviour
 change. Expected total: **16 edges off the ledger.**
@@ -167,7 +169,7 @@ in the opposite direction):
   `lib/external-link.tsx` imports `combo`; moving the directory to `app/keybinds/`
   would add two `store → app` edges and one `lib → app`. The right shape is a
   three-way split: pure combo/chord math stays in `lib/`, the action registry
-  goes down (or follows K2), and the composer/hint bindings go up to `app/`.
+  goes down to `store/`, and the composer/hint bindings go up to `app/`.
 
 **Blocked by a decision**:
 
@@ -201,10 +203,9 @@ npm run test:ui                            # renderer project — the baseline t
 npx vitest run --project ui src/dev/contracts/renderer-layers.test.ts
 ```
 
-`test:ui` is the renderer project (771 files / 7,446 tests as of `e583391`).
-Plain `npm test` runs **both** vitest projects (933 files) and will never match a
-renderer-only number; two electron loopback tests fail environmentally there and
-are unrelated.
+`test:ui` is the renderer project (772 files / 7,462 tests). Plain `npm test` runs
+**both** vitest projects (933 files) and will never match a renderer-only number;
+two electron loopback tests fail environmentally there and are unrelated.
 
 Every line a round pays off must be deleted from
 `renderer-layers.debt.ts`. The guard fails both ways: on an unlisted edge and on

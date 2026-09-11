@@ -1,9 +1,10 @@
 import { isValidElement } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { registry } from '@/lib/contributions'
+
 import { discoverBundledPlugins } from './plugins'
 import { $pluginDecisions, $pluginRecords, setPluginEnabled } from './plugins-store'
-import { registry } from './registry'
 
 vi.mock('./runtime-loader', () => ({ watchRuntimePlugins: vi.fn() }))
 

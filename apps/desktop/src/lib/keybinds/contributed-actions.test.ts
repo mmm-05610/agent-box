@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { createPluginContext } from '@/extension/contrib/plugin'
-import { registry } from '@/extension/contrib/registry'
+import { registry } from '@/lib/contributions'
 import { allKeybindActions, contributedKeybindHandler, KEYBINDS_AREA } from '@/lib/keybinds/actions'
 import { bindingsFor } from '@/store/keybinds'
 

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { registry } from '@/extension/contrib/registry'
+import { registry } from '@/lib/contributions'
 
 import { COMPOSER_AREAS, type ComposerMiddleware, runComposerMiddleware } from './contrib'
 

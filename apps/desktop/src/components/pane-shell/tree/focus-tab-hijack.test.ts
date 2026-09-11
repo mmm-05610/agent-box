@@ -20,7 +20,7 @@ describe('reactive unhide in a shared (Focus) group', () => {
   async function setupFocusGroup() {
     const tree = await import('@/components/pane-shell/tree/store')
     const model = await import('@/components/pane-shell/tree/model')
-    const { registry } = await import('@/extension/contrib/registry')
+    const { registry } = await import('@/lib/contributions')
 
     for (const id of ['workspace', 'files']) {
       registry.register({ id, area: 'panes', title: id, data: {}, render: () => null })

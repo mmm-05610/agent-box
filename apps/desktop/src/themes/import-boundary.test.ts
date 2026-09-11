@@ -130,7 +130,7 @@ describe('the theme directory is a leaf', () => {
     const cases = [
       "import { $activeGatewayProfile } from '@/store/profile'",
       "import { persistString } from '@/lib/storage'",
-      "import { registry } from '@/extension/contrib/registry'",
+      "import { registry } from '@/lib/contributions'",
       "import { requestGateway } from '@/api/gateway'",
       "import { getHermesConfigRecord } from '@/hermes'",
       "import { ingestBackendSkin } from '@/application/theme/adapters/backend-sync'",

@@ -21,7 +21,7 @@ describe('tile split-share memory across close/reopen', () => {
   async function setup() {
     const tree = await import('@/components/pane-shell/tree/store')
     const model = await import('@/components/pane-shell/tree/model')
-    const { registry } = await import('@/extension/contrib/registry')
+    const { registry } = await import('@/lib/contributions')
 
     registry.register({
       id: 'workspace',
@@ -95,7 +95,7 @@ describe('tile split-share memory across close/reopen', () => {
 
   it('a stacked tab records no share (its removal changes no geometry)', async () => {
     const { model, tree } = await setup()
-    const { registry } = await import('@/extension/contrib/registry')
+    const { registry } = await import('@/lib/contributions')
 
     // Stacks INTO the workspace zone instead of splitting beside it.
     const dispose = registry.register({
