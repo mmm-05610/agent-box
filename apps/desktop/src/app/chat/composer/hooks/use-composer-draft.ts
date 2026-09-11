@@ -1,10 +1,10 @@
 // Register the built-in draft providers with the suggestion bus (side-effect
 // import — the bus itself is provider-agnostic). The repair provider is
 // event-driven and registers through the gateway stream instead.
-import '@/store/suggestion-providers/cron'
-import '@/store/suggestion-providers/github'
-import '@/store/suggestion-providers/mcp'
-import '@/store/suggestion-providers/skill'
+import '@/components/composer/suggestion-providers/cron'
+import '@/components/composer/suggestion-providers/github'
+import '@/components/composer/suggestion-providers/mcp'
+import '@/components/composer/suggestion-providers/skill'
 
 import { useAui, useAuiState, useComposerRuntime } from '@assistant-ui/react'
 import { type RefObject, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
