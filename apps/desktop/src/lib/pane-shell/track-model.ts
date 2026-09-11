@@ -7,10 +7,11 @@
  * live pane contributions; the React split renderer reads it per render.
  */
 
-import { paneChrome, type PaneSizing } from '@/lib/pane-shell/chrome'
 import type { GroupNode, LayoutNode } from '@/lib/pane-tree'
 import { allPaneIds } from '@/lib/pane-tree'
 import type { Contribution } from '@/types/contributions'
+
+import { paneChrome, type PaneSizing } from './chrome'
 
 export const MIN_PANE_PX = 80
 

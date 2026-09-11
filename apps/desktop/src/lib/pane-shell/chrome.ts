@@ -5,8 +5,9 @@
  * `components/pane-shell/tree/renderer/chrome-render.ts`.
  */
 
-import type { FloatingAnchor } from '@/components/pane-shell/tree/renderer/floating-rect'
 import type { Contribution } from '@/types/contributions'
+
+import type { FloatingAnchor } from './floating-rect'
 
 /** Optional CSS sizing a pane contributes (`data.width` / `data.minWidth`…).
  *  Applied to the pane's GROUP along the axis of the split that contains it —

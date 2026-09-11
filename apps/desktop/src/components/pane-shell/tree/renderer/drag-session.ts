@@ -33,12 +33,12 @@ import type { PointerEvent as ReactPointerEvent } from 'react'
 import { createDragGhost, type DragGhost } from '@/lib/drag-ghost'
 import { ESCAPE_PRIORITY, pushEscapeLayer } from '@/lib/escape-layers'
 import { guardGuestPointers } from '@/lib/guest-pointer-guard'
+import { clearTabSelection } from '@/lib/pane-shell/tab-selection'
+import { type EngineZone, HighlightedZones, primaryZone, type ZoneRect } from '@/lib/pane-shell/zones-engine'
 import type { DropPosition } from '@/lib/pane-tree'
 import { reorderCommitHaptic, reorderStepHaptic } from '@/lib/reorder'
 
 import { $dropHint, $treeDragging, type DropHint, mergeTreeZones, moveTreePanes, reorderTreePanes } from '../store'
-import { clearTabSelection } from '../tab-selection'
-import { type EngineZone, HighlightedZones, primaryZone, type ZoneRect } from '../zones-engine'
 
 const DRAG_THRESHOLD_PX = 4
 

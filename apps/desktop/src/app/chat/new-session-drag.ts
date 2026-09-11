@@ -31,8 +31,8 @@ import {
   subZonePosition
 } from '@/components/pane-shell/tree/renderer/drag-session'
 import { $treeDragging, type DropHint, NEW_SESSION_DRAG } from '@/components/pane-shell/tree/store'
-import type { EngineZone, ZoneRect } from '@/components/pane-shell/tree/zones-engine'
 import { translateNow } from '@/i18n'
+import type { EngineZone, ZoneRect } from '@/lib/pane-shell/zones-engine'
 import { queryAllVisible } from '@/lib/pane-visibility'
 import type { AgentProfileRoute } from '@/store/profile'
 import type { TileDock } from '@/store/session-states'

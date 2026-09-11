@@ -29,6 +29,15 @@ import { ContribBoundary, ContribRender } from '@/extension/contrib/react/bounda
 import { useContributions } from '@/extension/contrib/react/use-contributions'
 import { useI18n } from '@/i18n'
 import { useKeybindHint } from '@/lib/keybinds/use-keybind-hint'
+import { emptyPaneLifecycleState, reconcilePaneLifecycle } from '@/lib/pane-shell/pane-lifecycle'
+import {
+  $tabSelection,
+  clearTabSelection,
+  isToggleSelectClick,
+  selectionFor,
+  selectTabRange,
+  toggleTabSelected
+} from '@/lib/pane-shell/tab-selection'
 import type { DropPosition, GroupNode } from '@/lib/pane-tree'
 import { hiddenPaneProps } from '@/lib/pane-visibility'
 import { cn } from '@/lib/utils'
@@ -36,7 +45,6 @@ import { closeAllOpenSessionTiles } from '@/store/session-states'
 
 import { $layoutEditMode } from '../../edit-mode'
 import { useWindowControlsOverlap } from '../../geometry'
-import { emptyPaneLifecycleState, reconcilePaneLifecycle } from '../../pane-lifecycle'
 import { PaneGroupContext, PaneLifecycleContext, PaneVisibleContext } from '../../pane-visibility'
 import {
   $workspaceMode,
@@ -73,14 +81,6 @@ import {
   setTreeGroupTabStrip,
   treeTabCloseTargets
 } from '../store'
-import {
-  $tabSelection,
-  clearTabSelection,
-  isToggleSelectClick,
-  selectionFor,
-  selectTabRange,
-  toggleTabSelected
-} from '../tab-selection'
 
 import { paneChromeRender } from './chrome-render'
 import { startPaneDrag } from './drag-session'

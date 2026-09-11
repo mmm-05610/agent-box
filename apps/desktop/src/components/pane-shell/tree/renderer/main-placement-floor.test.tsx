@@ -3,11 +3,11 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 
 import { stubResizeObserver } from '@/dev/test/jsdom'
 import { registry } from '@/lib/contributions'
+import { subtreeGone, type TrackContext } from '@/lib/pane-shell/track-model'
 import { group, split } from '@/lib/pane-tree'
 
 import { $hiddenTreePanes, $layoutTree } from '../store'
 
-import { subtreeGone, type TrackContext } from './track-model'
 import { TreeNode } from './tree-node'
 import { TreeSplit } from './tree-split'
 

@@ -25,10 +25,6 @@ import { Input } from '@/components/ui/input'
 import { useI18n } from '@/i18n'
 import { registry } from '@/lib/contributions'
 import { ESCAPE_PRIORITY, isTopEscapeLayer, pushEscapeLayer } from '@/lib/escape-layers'
-import { allPaneIds } from '@/lib/pane-tree'
-import { startPointerDrag } from '@/lib/pointer-drag'
-import { cn } from '@/lib/utils'
-
 import {
   canSplit,
   doMerge,
@@ -45,8 +41,12 @@ import {
   modelToZones,
   MULTIPLIER,
   splitZone
-} from './grid-model'
-import { gridIsTreeExpressible, gridToTree, type PanePlacementHint } from './grid-to-tree'
+} from '@/lib/pane-shell/grid-model'
+import { gridIsTreeExpressible, gridToTree, type PanePlacementHint } from '@/lib/pane-shell/grid-to-tree'
+import { allPaneIds } from '@/lib/pane-tree'
+import { startPointerDrag } from '@/lib/pointer-drag'
+import { cn } from '@/lib/utils'
+
 import { applyLayoutPreset, saveLayoutPresetTree } from './presets'
 import { $layoutTree } from './store'
 

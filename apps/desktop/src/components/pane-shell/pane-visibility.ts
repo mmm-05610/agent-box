@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react'
 
-import type { PaneLifecycle } from './pane-lifecycle'
+import type { PaneLifecycle } from '@/lib/pane-shell/pane-lifecycle'
 
 /** React face of the same policy: the pane layer provides its visibility so a
  *  kept-alive surface can gate hot subscriptions (streaming re-renders) off

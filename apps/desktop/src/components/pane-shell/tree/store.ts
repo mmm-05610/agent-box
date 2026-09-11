@@ -9,6 +9,8 @@ import { atom, computed, type ReadableAtom } from 'nanostores'
 import { translateNow } from '@/i18n'
 import { registry } from '@/lib/contributions'
 import { SIDEBAR_COLLAPSE_MEDIA_QUERY } from '@/lib/layout-constants'
+import { FLOATING_PLACEMENT } from '@/lib/pane-shell/floating-rect'
+import { rootChildSide } from '@/lib/pane-shell/track-model'
 import {
   allPaneIds,
   type DropPosition,
@@ -41,9 +43,7 @@ import { clearAllPaneSizeOverrides } from '@/store/panes'
 import { setPluginEnabled } from '@/store/plugin-state'
 import { isBrowserWindow, isSecondaryWindow } from '@/store/windows'
 
-import { FLOATING_PLACEMENT } from './renderer/floating-rect'
 import { tabStripVisibleForZone } from './renderer/strip-visibility'
-import { rootChildSide } from './renderer/track-model'
 
 // v2: v1 trees were saved against placeholder panes with index-order zone
 // assignment (chat could land in a corner cell). Retire them wholesale.
