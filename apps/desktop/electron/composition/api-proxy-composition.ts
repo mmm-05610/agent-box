@@ -2,161 +2,62 @@
 // main.ts keeps only the startup/lifecycle statement sequence; the accessors at the
 // bottom exist so main can read/write the few mutable bindings the sequence needs.
 
-import { execFileSync, spawn } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import http from 'node:http'
 import https from 'node:https'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
+
 import {
   app,
   BrowserWindow,
-  clipboard,
   dialog,
-  net as electronNet,
-  webContents as electronWebContents,
-  globalShortcut,
-  ipcMain,
-  Menu,
-  nativeTheme,
-  powerMonitor,
-  powerSaveBlocker,
-  protocol,
-  safeStorage,
-  screen,
-  session,
-  shell,
-  systemPreferences
+  session
 } from 'electron'
-import {
-  cancelScheduledDesktopLogFlush,
-  flushDesktopLogBufferSync,
-  getRecentHermesLogLines,
-  initDesktopLogBuffer,
-  rememberLog
-} from './log-buffer'
-import {
-  initMediaProtocolBridge,
-  LOCAL_PREVIEW_HOSTS,
-  looksBinary,
-  PREVIEW_HTML_EXTENSIONS,
-  PREVIEW_LANGUAGE_BY_EXT,
-  PREVIEW_PDF_EXTENSIONS,
-  PREVIEW_WATCH_DEBOUNCE_MS,
-  previewFileMetadata,
-  TEXT_PREVIEW_MAX_BYTES
-} from './media-protocol'
+
 import {
   apiRequestRegistryConnectionId,
-  authModeFromStatus,
-  buildGatewayWsUrl,
-  buildGatewayWsUrlWithTicket,
-  connectionScopeKey,
-  cookiesHaveLiveSession,
-  cookiesHavePrivyAccessToken,
-  cookiesHavePrivySession,
-  cookiesHaveSession,
-  gatewayTicketFailure,
-  gatewayWsUrlIpcResult,
-  hostLabelFromBaseUrl,
-  localProfileEntry,
-  modeIsRemoteLike,
-  normalizeRemoteBaseUrl,
-  normalizeRemoteHeaders,
-  normalizeSshConfig,
-  normAuthMode,
   pathForRegistryBackendRequest,
   pathWithGlobalRemoteProfile,
   profileHasRemoteConnection,
-  profileRemoteOverride,
-  profileSshOverride,
   type RegistryBackendRequestScope,
-  remoteRequestMatchesBaseUrl,
-  resolveAuthMode,
-  resolveProfileApiRequest,
-  resolveProfileBackendRoute,
-  resolveRemoteSshDashboardProfile,
-  resolveTestWsUrl,
-  savedProfileSsh,
-  tokenPreview,
-  withTransientRetries
+  resolveProfileApiRequest
 } from '../connection-config'
 import {
   backendScopeKey,
-  backendScopePrefix,
-  buildAgentRoster,
-  connectionDialFieldsChanged,
-  mergeConnectionInput,
-  migrateV1ToRegistry,
-  normalizeConnectionInput,
-  normalizeRegistry,
-  parseBackendScopeKey,
-  reconcileAppliedGlobalConnection,
-  reconcileRegistryDrift,
-  registrySourceOwnsPrimaryBackend,
-  rememberSshEnumeration,
-  removeConnection,
-  resolvedConnectionId,
-  resolveRegistryLocalRoute,
-  reuseMatchingPrimarySshBackend,
-  setConnectionLaunchMode,
-  setLastUsedConnection,
-  setPrimaryConnection,
-  shouldDeferLocalEnumeration,
-  shouldRetrySshInventory,
-  updateEligibility,
-  upsertConnection
+  backendScopePrefix
 } from '../connection-registry'
 import {
-  filenameFromContentDisposition,
   fsPumpDeps,
   gatewayFilePath,
   gatewayFileRequestPaths,
   isNotFoundError,
   parseDataUrlToBuffer,
-  pumpStreamToFile,
   resolveGatewayFileBackend,
   writeBufferToFile
 } from '../gateway-file-download'
 import {
-  ATTACHMENT_UPLOAD_DEFAULT_MAX_BYTES,
   clampDataUrlReadMaxMb,
   DATA_URL_READ_DEFAULT_MAX_MB,
-  dataUrlReadMaxBytesFromMb,
   DEFAULT_FETCH_TIMEOUT_MS,
-  enableBasicPasswordStoreEncryption,
-  encryptDesktopSecret as encryptDesktopSecretStrict,
-  readFileDataUrlForIpc,
-  resolvePersistedRemoteToken,
   resolveReadableFileForIpc,
   resolveRequestedPathForIpc,
-  resolveTimeoutMs,
-  SAFE_STORAGE_ENCODING,
-  TEXT_PREVIEW_SOURCE_MAX_BYTES,
-  tightenSecretFileMode,
-  writeSecretFileAtomic
+  resolveTimeoutMs
 } from '../hardening'
 import { createLinkTitleWindow, guardLinkTitleSession, readLinkTitleWindowTitle } from '../link-title-window'
 import {
-  oauthGuardMayHardFail,
-  oauthSessionIsLive,
-  oauthTicketFailureAuthMessage,
   resolveGatedDownloadAuth,
-  resolveJsonBody,
-  resolveOauthRestAuth,
-  resolveReadinessProbeAuth
+  resolveOauthRestAuth
 } from '../native-auth-decisions'
 import {
-  assertLocalProfileCanStart,
   decideProfileDeleteAction,
-  dispatchConnectionScopedProfileDelete,
   localProfilePoolKeys,
-  ProfileDeletionGate,
   profileNameFromDeleteRequest,
   resolveRouteProfile
 } from '../profile-delete-routing'
-import { prepareProfileRenameLifecycle, profileRenameFromRequest } from '../profile-rename-routing'
+import { prepareProfileRenameLifecycle } from '../profile-rename-routing'
 import {
   buildSidebarSessionSliceParams,
   fetchPrimaryProfileSessions,
@@ -169,11 +70,11 @@ import {
   tagRegistrySessionResponse
 } from '../profile-session-routing'
 import { hiddenWindowsChildOptions } from '../windows-child-options'
+
 import {
-  MEDIA_MIME_TYPES,
-  PROFILE_NAME_RE,
   backendConnectionState,
   backendDialClaims,
+  backendPool,
   directoryExists,
   ensureBackend,
   ensureNativeAccessToken,
@@ -184,32 +85,41 @@ import {
   fileExists,
   globalRemoteActive,
   mainWindow,
-  mintGatewayWsTicket,
+  MEDIA_MIME_TYPES,
   poolStopper,
   primaryProfileKey,
+  PROFILE_NAME_RE,
   profileHasRemoteOverride,
   profileRouteOptions,
   readDesktopConnectionConfig,
   readDesktopConnectionsRegistry,
   resolveHermesCwd,
-  softRehomeInProgress,
+  setSoftRehomeInProgress,
   sshBootstrapCoordinator,
   startHermes,
   stopPoolBackend,
   teardownSshConnection,
   waitForBackendExit,
   writeActiveDesktopProfile,
-  backendPool,
-  getSoftRehomeInProgress,
-  setSoftRehomeInProgress,
 } from './bootstrap-env-composition'
-import {
-  resetHermesConnection,
-} from './runtime-composition'
 import {
   downloadViaOauthSessionToFile,
   downloadViaTokenToFile,
 } from './cloud-oauth-composition'
+import {
+  rememberLog
+} from './log-buffer'
+import {
+  LOCAL_PREVIEW_HOSTS,
+  PREVIEW_HTML_EXTENSIONS,
+  PREVIEW_LANGUAGE_BY_EXT,
+  PREVIEW_PDF_EXTENSIONS,
+  PREVIEW_WATCH_DEBOUNCE_MS,
+  previewFileMetadata
+} from './media-protocol'
+import {
+  resetHermesConnection,
+} from './runtime-composition'
 
 export const previewWatchers = new Map()
 
@@ -1584,6 +1494,7 @@ export function persistDataUrlReadMaxMb(maxMb) {
 export function getRenderTitleInFlight() {
   return renderTitleInFlight
 }
+
 export function setRenderTitleInFlight(value: any) {
   renderTitleInFlight = value
 }
@@ -1591,6 +1502,7 @@ export function setRenderTitleInFlight(value: any) {
 export function getDataUrlReadMaxMb() {
   return dataUrlReadMaxMb
 }
+
 export function setDataUrlReadMaxMb(value: any) {
   dataUrlReadMaxMb = value
 }

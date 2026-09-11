@@ -3,58 +3,30 @@
 
 import fs from 'node:fs'
 import path from 'node:path'
+
 import {
-  app,
-  BrowserWindow,
   clipboard,
   dialog,
-  net as electronNet,
   webContents as electronWebContents,
-  globalShortcut,
-  ipcMain,
-  Menu,
-  nativeTheme,
-  powerMonitor,
-  powerSaveBlocker,
-  protocol,
-  safeStorage,
-  screen,
-  session,
-  shell,
-  systemPreferences
+  ipcMain
 } from 'electron'
+
 import {
-  initMediaProtocolBridge,
-  LOCAL_PREVIEW_HOSTS,
   looksBinary,
-  PREVIEW_HTML_EXTENSIONS,
   PREVIEW_LANGUAGE_BY_EXT,
-  PREVIEW_PDF_EXTENSIONS,
-  PREVIEW_WATCH_DEBOUNCE_MS,
-  previewFileMetadata,
   TEXT_PREVIEW_MAX_BYTES
 } from '../../composition/media-protocol'
 import {
   ATTACHMENT_UPLOAD_DEFAULT_MAX_BYTES,
-  clampDataUrlReadMaxMb,
-  DATA_URL_READ_DEFAULT_MAX_MB,
   dataUrlReadMaxBytesFromMb,
-  DEFAULT_FETCH_TIMEOUT_MS,
-  enableBasicPasswordStoreEncryption,
-  encryptDesktopSecret as encryptDesktopSecretStrict,
   readFileDataUrlForIpc,
-  resolvePersistedRemoteToken,
   resolveReadableFileForIpc,
   resolveRequestedPathForIpc,
-  resolveTimeoutMs,
-  SAFE_STORAGE_ENCODING,
-  TEXT_PREVIEW_SOURCE_MAX_BYTES,
-  tightenSecretFileMode,
-  writeSecretFileAtomic
+  TEXT_PREVIEW_SOURCE_MAX_BYTES
 } from '../../hardening'
 import { capturePreviewContents } from '../../preview-capture'
 import { readWslWindowsClipboardImage } from '../../wsl-clipboard-image'
-import { resolvePickerDefaultPath, setActiveGatewayProfile, setWslBridgeProfileState } from '../../wsl-path-bridge'
+import { resolvePickerDefaultPath } from '../../wsl-path-bridge'
 
 export interface RegisterFilesIpcDeps {
   mimeTypeForPath: any

@@ -1,18 +1,11 @@
 // Extracted verbatim from gateway-settings.tsx (see docs/desktop-megafile-decomposition.md).
 
 import { Tip } from '@/components/ui/tooltip'
+import type {
+  Monitor} from '@/lib/icons';
 import {
-  AlertCircle,
   Check,
-  Cloud,
-  FileText,
-  Globe,
-  HelpCircle,
-  Loader2,
-  LogIn,
-  Monitor,
-  RefreshCw,
-  Terminal
+  HelpCircle
 } from '@/lib/icons'
 import { selectableCardClass } from '@/lib/selectable-card'
 import { cn } from '@/lib/utils'

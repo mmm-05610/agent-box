@@ -3,118 +3,64 @@ import { useStore } from '@nanostores/react'
 import { useQuery } from '@tanstack/react-query'
 import type * as React from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+
 import { PageLoader } from '@/components/page-loader'
 import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Codicon } from '@/components/ui/codicon'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle
-} from '@/components/ui/dialog'
-import { Field, FieldHint } from '@/components/ui/field'
-import { Input } from '@/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue
-} from '@/components/ui/select'
-import { Textarea } from '@/components/ui/textarea'
 import {
   type AutomationBlueprint,
   createCronJob,
-  type CronDeliveryTarget,
   type CronJob,
   deleteCronJob,
   getAutomationBlueprints,
-  getCronDeliveryTargets,
-  getCronJobRuns,
   instantiateAutomationBlueprint,
   pauseCronJob,
   resumeCronJob,
-  type SessionInfo,
   updateCronJob
 } from '@/hermes'
-import { type Translations, useI18n } from '@/i18n'
-import { AlertTriangle } from '@/lib/icons'
-import { requestModelOptions } from '@/lib/model-options'
+import { useI18n } from '@/i18n'
 import { asText } from '@/lib/text'
 import { $cronFocusJobId, $cronJobs, invalidateCronJobsRequests, setCronFocusJobId } from '@/store/cron'
-import { $changeEventsAvailable, $cronChangeTick } from '@/store/live-sync'
 import { notify, notifyError } from '@/store/notifications'
 import { $profileScope, ALL_PROFILES } from '@/store/profile'
+
 import { useRefreshHotkey } from '../hooks/use-refresh-hotkey'
 import {
   Panel,
-  PanelAction,
   PanelAddButton,
-  PanelBlock,
   PanelBody,
-  PanelDetail,
   PanelEmpty,
   PanelHeader,
   PanelList,
   PanelListRow,
-  type PanelMenuItem,
-  PanelMeta,
-  PanelPill,
   PanelSectionLabel
 } from '../overlays/panel'
-import { BlueprintSlotControl, blueprintSlotHelp, cleanBlueprintFieldError, initialBlueprintValues } from './blueprints'
+
+import type {
+  EditorState,
+  EditorValues} from './components';
+import {
+  CronEditorDialog,
+  CronJobDetail,
+  CronJobListRow
+} from './components'
 import { mutateAndRefreshCronJobs, refreshCronJobs, triggerAndRefreshCronJobs } from './cron-actions'
 import {
   cronEditorUpdates,
-  jobIsScriptOnly,
-  parseCronDeliveryTargets,
-  toggleCronDeliveryTarget,
-  validateCronEditor
+  jobIsScriptOnly
 } from './cron-job-model'
-import { jobState, jobTitle, STATE_DOT } from './job-state'
+import { jobState, jobTitle } from './job-state'
 import type {
   CronViewProps} from './view-model';
 import {
   cronProfileForScope,
   DEFAULT_DELIVER,
-  formatTime,
-  jobDeliver,
-  jobModel,
   jobName,
-  jobPrompt,
-  jobProvider,
-  jobScheduleDisplay,
-  jobScheduleExpr,
   matchesQuery,
-  SCHEDULE_OPTIONS,
-  scheduleOptionForExpr,
-  scheduleSummary,
-  STATE_TONE,
   truncate,
 } from './view-model'
-
-import {
-  MODEL_DEFAULT_VALUE,
-  CUSTOM_TEMPLATE,
-  CronJobListRow,
-  CronJobDetail,
-  formatRunTime,
-  RUNS_POLL_INTERVAL_MS,
-  RUNS_BACKSTOP_INTERVAL_MS,
-  CronJobRuns,
-  deliverTargetLabel,
-  DeliverCheckboxes,
-  CronEditorDialog,
-  EditorState,
-  EditorValues,
-} from './components'
 export { DeliverCheckboxes } from './components'
+
 export function CronView({ onClose, onOpenSession, setStatusbarItemGroup: _setStatusbarItemGroup }: CronViewProps) {
   const { t } = useI18n()
   const c = t.cron

@@ -4,100 +4,32 @@
 
 import http from 'node:http'
 import https from 'node:https'
-import path from 'node:path'
+
 import {
   app,
   BrowserWindow,
-  clipboard,
   dialog,
-  net as electronNet,
-  webContents as electronWebContents,
-  globalShortcut,
-  ipcMain,
-  Menu,
-  nativeTheme,
-  powerMonitor,
-  powerSaveBlocker,
-  protocol,
-  safeStorage,
-  screen,
-  session,
-  shell,
-  systemPreferences
+  net as electronNet
 } from 'electron'
-import { destroyKeepaliveAgents, downloadAgentFor, jsonAgentFor, withRetry } from '../api-transport'
+
+import { downloadAgentFor } from '../api-transport'
 import {
-  cancelScheduledDesktopLogFlush,
-  flushDesktopLogBufferSync,
-  getRecentHermesLogLines,
-  initDesktopLogBuffer,
-  rememberLog
-} from './log-buffer'
-import {
-  apiRequestRegistryConnectionId,
-  authModeFromStatus,
-  buildGatewayWsUrl,
-  buildGatewayWsUrlWithTicket,
-  connectionScopeKey,
-  cookiesHaveLiveSession,
   cookiesHavePrivyAccessToken,
   cookiesHavePrivySession,
   cookiesHaveSession,
-  gatewayTicketFailure,
-  gatewayWsUrlIpcResult,
-  hostLabelFromBaseUrl,
-  localProfileEntry,
-  modeIsRemoteLike,
-  normalizeRemoteBaseUrl,
-  normalizeRemoteHeaders,
-  normalizeSshConfig,
-  normAuthMode,
-  pathForRegistryBackendRequest,
-  pathWithGlobalRemoteProfile,
-  profileHasRemoteConnection,
-  profileRemoteOverride,
-  profileSshOverride,
-  type RegistryBackendRequestScope,
-  remoteRequestMatchesBaseUrl,
-  resolveAuthMode,
-  resolveProfileApiRequest,
-  resolveProfileBackendRoute,
-  resolveRemoteSshDashboardProfile,
-  resolveTestWsUrl,
-  savedProfileSsh,
-  tokenPreview,
-  withTransientRetries
+  normalizeRemoteBaseUrl
 } from '../connection-config'
 import {
   filenameFromContentDisposition,
   fsPumpDeps,
-  gatewayFilePath,
-  gatewayFileRequestPaths,
-  isNotFoundError,
-  parseDataUrlToBuffer,
-  pumpStreamToFile,
-  resolveGatewayFileBackend,
-  writeBufferToFile
+  pumpStreamToFile
 } from '../gateway-file-download'
 import {
-  ATTACHMENT_UPLOAD_DEFAULT_MAX_BYTES,
-  clampDataUrlReadMaxMb,
-  DATA_URL_READ_DEFAULT_MAX_MB,
-  dataUrlReadMaxBytesFromMb,
   DEFAULT_FETCH_TIMEOUT_MS,
-  enableBasicPasswordStoreEncryption,
-  encryptDesktopSecret as encryptDesktopSecretStrict,
-  readFileDataUrlForIpc,
-  resolvePersistedRemoteToken,
-  resolveReadableFileForIpc,
-  resolveRequestedPathForIpc,
-  resolveTimeoutMs,
-  SAFE_STORAGE_ENCODING,
-  TEXT_PREVIEW_SOURCE_MAX_BYTES,
-  tightenSecretFileMode,
-  writeSecretFileAtomic
+  resolveTimeoutMs
 } from '../hardening'
 import { installWindowRendererLifecycle } from '../window-renderer-lifecycle'
+
 import {
   fetchJsonViaOauthSession,
   getOauthSession,
@@ -105,6 +37,9 @@ import {
   mainWindow,
   warmOauthCookieStore,
 } from './bootstrap-env-composition'
+import {
+  rememberLog
+} from './log-buffer'
 
 export function downloadViaTokenToFile(url, token, ctx, options: any = {}) {
   return new Promise((resolve, reject) => {
@@ -898,6 +833,7 @@ export function trimCloudAgents(body) {
 export function getPortalAccessRenewal() {
   return portalAccessRenewal
 }
+
 export function setPortalAccessRenewal(value: any) {
   portalAccessRenewal = value
 }

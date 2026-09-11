@@ -2,140 +2,49 @@
 // main.ts keeps only the startup/lifecycle statement sequence; the accessors at the
 // bottom exist so main can read/write the few mutable bindings the sequence needs.
 
-import path from 'node:path'
 import {
-  app,
   BrowserWindow,
-  clipboard,
-  dialog,
-  net as electronNet,
-  webContents as electronWebContents,
-  globalShortcut,
-  ipcMain,
-  Menu,
-  nativeTheme,
-  powerMonitor,
-  powerSaveBlocker,
-  protocol,
-  safeStorage,
-  screen,
-  session,
-  shell,
-  systemPreferences
+  safeStorage
 } from 'electron'
+
 import {
-  cancelScheduledDesktopLogFlush,
-  flushDesktopLogBufferSync,
-  getRecentHermesLogLines,
-  initDesktopLogBuffer,
-  rememberLog
-} from './log-buffer'
-import {
-  apiRequestRegistryConnectionId,
-  authModeFromStatus,
-  buildGatewayWsUrl,
-  buildGatewayWsUrlWithTicket,
   connectionScopeKey,
-  cookiesHaveLiveSession,
-  cookiesHavePrivyAccessToken,
-  cookiesHavePrivySession,
-  cookiesHaveSession,
-  gatewayTicketFailure,
-  gatewayWsUrlIpcResult,
-  hostLabelFromBaseUrl,
   localProfileEntry,
   modeIsRemoteLike,
   normalizeRemoteBaseUrl,
   normalizeRemoteHeaders,
   normalizeSshConfig,
   normAuthMode,
-  pathForRegistryBackendRequest,
-  pathWithGlobalRemoteProfile,
-  profileHasRemoteConnection,
-  profileRemoteOverride,
-  profileSshOverride,
-  type RegistryBackendRequestScope,
-  remoteRequestMatchesBaseUrl,
   resolveAuthMode,
-  resolveProfileApiRequest,
-  resolveProfileBackendRoute,
-  resolveRemoteSshDashboardProfile,
-  resolveTestWsUrl,
   savedProfileSsh,
-  tokenPreview,
-  withTransientRetries
+  tokenPreview
 } from '../connection-config'
 import {
-  backendScopeKey,
   backendScopePrefix,
-  buildAgentRoster,
   connectionDialFieldsChanged,
   mergeConnectionInput,
-  migrateV1ToRegistry,
   normalizeConnectionInput,
-  normalizeRegistry,
-  parseBackendScopeKey,
-  reconcileAppliedGlobalConnection,
-  reconcileRegistryDrift,
-  registrySourceOwnsPrimaryBackend,
-  rememberSshEnumeration,
-  removeConnection,
-  resolvedConnectionId,
-  resolveRegistryLocalRoute,
-  reuseMatchingPrimarySshBackend,
-  setConnectionLaunchMode,
-  setLastUsedConnection,
-  setPrimaryConnection,
-  shouldDeferLocalEnumeration,
-  shouldRetrySshInventory,
-  updateEligibility,
   upsertConnection
 } from '../connection-registry'
 import {
-  ATTACHMENT_UPLOAD_DEFAULT_MAX_BYTES,
-  clampDataUrlReadMaxMb,
-  DATA_URL_READ_DEFAULT_MAX_MB,
-  dataUrlReadMaxBytesFromMb,
-  DEFAULT_FETCH_TIMEOUT_MS,
-  enableBasicPasswordStoreEncryption,
   encryptDesktopSecret as encryptDesktopSecretStrict,
-  readFileDataUrlForIpc,
   resolvePersistedRemoteToken,
-  resolveReadableFileForIpc,
-  resolveRequestedPathForIpc,
-  resolveTimeoutMs,
-  SAFE_STORAGE_ENCODING,
-  TEXT_PREVIEW_SOURCE_MAX_BYTES,
-  tightenSecretFileMode,
-  writeSecretFileAtomic
+  SAFE_STORAGE_ENCODING
 } from '../hardening'
 import {
-  oauthGuardMayHardFail,
-  oauthSessionIsLive,
-  oauthTicketFailureAuthMessage,
-  resolveGatedDownloadAuth,
-  resolveJsonBody,
-  resolveOauthRestAuth,
-  resolveReadinessProbeAuth
+  oauthSessionIsLive
 } from '../native-auth-decisions'
 import {
   classifyStoredSecret,
-  readSecretStoragePolicy,
-  SECRET_STORAGE_POLICY_FILE,
   type SecretStoragePolicy,
   writeSecretStoragePolicy
 } from '../secret-storage-policy'
-import {
-  connectWindowsRemote,
-  detectRemotePlatform,
-  helper,
-  probeWindowsRemote,
-  terminateOwnedWindowsDashboardForUpdate
-} from '../windows-remote-lifecycle'
+
 import {
   _nativeTokenStoreIo,
   _secretStoragePolicy,
   _secretStoragePolicyIo,
+  backendPool,
   decryptDesktopSecret,
   encryptDesktopSecret,
   hasLiveOauthSession,
@@ -143,18 +52,18 @@ import {
   managedConnectionUpdateGate,
   readDesktopConnectionConfig,
   readDesktopConnectionsRegistry,
-  resolveRemoteBackend,
   secretStoragePolicy,
+  set_secretStoragePolicy,
   sshBootstrapCoordinator,
+  sshConnections,
   stopPoolBackend,
   teardownSshConnection,
   writeDesktopConnectionConfig,
   writeDesktopConnectionsRegistry,
-  backendPool,
-  sshConnections,
-  get_secretStoragePolicy,
-  set_secretStoragePolicy,
 } from './bootstrap-env-composition'
+import {
+  rememberLog
+} from './log-buffer'
 
 export function setSecretStoragePolicy(next: SecretStoragePolicy) {
   set_secretStoragePolicy({ on: next.on === true, migrated: next.migrated === true })

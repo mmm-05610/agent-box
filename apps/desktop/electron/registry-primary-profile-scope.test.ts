@@ -1,11 +1,10 @@
-import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
 
 import { pathForRegistryBackendRequest } from './connection-config'
-import { mainProcessSources, sliceFromAnyModule } from './test-main-process-sources'
+import { mainProcessSources } from './test-main-process-sources'
 
 
 

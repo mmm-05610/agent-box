@@ -3,20 +3,17 @@
 import { useStore } from '@nanostores/react'
 import { useQuery } from '@tanstack/react-query'
 import { Dialog as DialogPrimitive } from 'radix-ui'
-import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
+
 import {
-  HUD_HEADING,
-  HUD_ITEM,
-  HUD_NOTE,
-  HUD_NOTE_VARIANT,
   HUD_POSITION,
   HUD_SURFACE,
   HUD_TEXT
 } from '@/app/floating-hud'
 import { SESSION_IMPORT_ROUTE } from '@/app/routes'
 import { codiconIcon } from '@/components/ui/codicon'
-import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
+import { Command, CommandInput, CommandList } from '@/components/ui/command'
 import { getHermesConfigRecord, listAllProfileSessions } from '@/hermes'
 import { useMediaQuery } from '@/hooks/use-media-query'
 import { useI18n } from '@/i18n'
@@ -25,29 +22,20 @@ import {
   AppWindow,
   Archive,
   BarChart3,
-  Check,
   ChevronLeft,
-  ChevronRight,
   Clock,
   Cpu,
   Download,
   Egg,
   GitBranch,
-  Globe,
-  type IconComponent,
-  Info,
-  KeyRound,
   Layers3,
   MessageCircle,
-  Monitor,
-  Moon,
   Package,
   Palette,
   PawPrint,
   Plus,
   RefreshCw,
   Settings,
-  Settings2,
   SlidersHorizontal,
   Starmap,
   Sun,
@@ -63,10 +51,9 @@ import {
   $commandPaletteOpen,
   $commandPalettePage,
   $commandPaletteSeed,
-  closeCommandPalette,
-  setCommandPaletteOpen
+  closeCommandPalette
 } from '@/store/command-palette'
-import { $bindings, bindingsFor } from '@/store/keybinds'
+import { $bindings } from '@/store/keybinds'
 import { $dismissedAutoProjectIds, filterVisibleProjects } from '@/store/layout'
 import { openPetGenerate } from '@/store/pet-generate'
 import { openBrowserTab } from '@/store/preview'
@@ -83,6 +70,7 @@ import {
 } from '@/store/updates'
 import { canOpenNewWindow, openNewWindow } from '@/store/windows'
 import { type ThemeMode, useTheme } from '@/themes/context'
+
 import { openSession, openSessionIntentFromModifiers } from '../open-session'
 import {
   AGENTS_ROUTE,
@@ -100,9 +88,16 @@ import {
 import { SECTIONS } from '../settings/constants'
 import { type SettingsSearchEntry, settingsSearchTargetQuery } from '../settings/settings-search'
 import { useSettingsSearchCatalog } from '../settings/use-settings-search'
+
 import { usePaletteContributions } from './contrib'
 import { HighlightWatcher } from './highlight-watcher'
 import { MarketplaceThemePage } from './marketplace-theme-page'
+import {
+  FOLDER_PATH_RE,
+  SESSION_ID_RE,
+  THEME_MODES,
+  toSessionEntry,
+} from './palette-helpers'
 import {
   PAGE_PARENTS,
   type PaletteGroup,
@@ -110,26 +105,16 @@ import {
   type PalettePage,
   paletteValue,
   rankGroups,
-  type SessionEntry,
 } from './palette-model'
-import { PetInlineToggle, PetPalettePage } from './pet-palette-page'
 import {
-  EMPTY_GROUPS,
-  PaletteGroups,
-  PaletteRow,
-  NonConfigSettingsLabel,
   NON_CONFIG_SETTINGS,
+  PaletteGroups,
   themeSupportsMode,
 } from './palette-sources'
-import {
-  CommandPalette,
-} from './index'
-import {
-  SESSION_ID_RE,
-  FOLDER_PATH_RE,
-  toSessionEntry,
-  THEME_MODES,
-} from './palette-helpers'
+import { PetInlineToggle, PetPalettePage } from './pet-palette-page'
+
+
+
 
 
 export function CommandPaletteBody({ onExited }: { onExited: () => void }) {

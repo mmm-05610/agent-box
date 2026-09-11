@@ -1,65 +1,38 @@
 // Extracted verbatim from index.tsx (see docs/desktop-megafile-decomposition.md).
 
-import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useDeferredValue } from 'react'
+
 import {
   HUD_HEADING,
   HUD_ITEM,
   HUD_NOTE,
   HUD_NOTE_VARIANT,
-  HUD_POSITION,
-  HUD_SURFACE,
   HUD_TEXT
 } from '@/app/floating-hud'
-import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
+import { CommandGroup, CommandItem } from '@/components/ui/command'
 import { HighlightMatches } from '@/components/ui/highlight-matches'
 import { KbdCombo } from '@/components/ui/kbd'
 import {
-  Activity,
-  AppWindow,
   Archive,
-  BarChart3,
   Check,
-  ChevronLeft,
   ChevronRight,
-  Clock,
-  Cpu,
-  Download,
-  Egg,
-  GitBranch,
   Globe,
   type IconComponent,
   Info,
   KeyRound,
-  Layers3,
-  MessageCircle,
-  Monitor,
-  Moon,
   Package,
-  Palette,
-  PawPrint,
-  Plus,
-  RefreshCw,
-  Settings,
   Settings2,
-  SlidersHorizontal,
-  Starmap,
-  Sun,
-  Users,
-  Wrench,
   Zap
 } from '@/lib/icons'
 import { cn } from '@/lib/utils'
-import { $bindings, bindingsFor } from '@/store/keybinds'
+import { bindingsFor } from '@/store/keybinds'
 import { luminance } from '@/themes/color'
 import { isUserTheme, resolveTheme } from '@/themes/user-themes'
+
 import {
-  PAGE_PARENTS,
   type PaletteGroup,
   type PaletteItem,
-  type PalettePage,
   paletteValue,
-  rankGroups,
-  type SessionEntry,
 } from './palette-model'
 
 export const EMPTY_GROUPS: PaletteGroup[] = []

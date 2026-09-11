@@ -1,11 +1,7 @@
-import {
-  headersForRemoteRequest,
-} from './runtime-composition'
+import { execFileSync, spawn } from 'node:child_process'
 // Extracted verbatim from main.ts (see docs/desktop-megafile-decomposition.md).
 // main.ts keeps only the startup/lifecycle statement sequence; the accessors at the
 // bottom exist so main can read/write the few mutable bindings the sequence needs.
-
-import { execFileSync, spawn } from 'node:child_process'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import http from 'node:http'
@@ -13,28 +9,22 @@ import https from 'node:https'
 import os from 'node:os'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
+
 import {
   app,
   BrowserWindow,
-  clipboard,
   dialog,
   net as electronNet,
   webContents as electronWebContents,
-  globalShortcut,
-  ipcMain,
-  Menu,
   nativeTheme,
-  powerMonitor,
-  powerSaveBlocker,
-  protocol,
   safeStorage,
   screen,
   session,
-  shell,
-  systemPreferences
+  shell
 } from 'electron'
+
 import { classifyActiveRuntime } from '../active-runtime-state'
-import { destroyKeepaliveAgents, downloadAgentFor, jsonAgentFor, withRetry } from '../api-transport'
+import { jsonAgentFor, withRetry } from '../api-transport'
 import { appIconCandidates, resolveAppIcon } from '../app-icon'
 import { stopBackendChild as stopBackendChildImpl, stopBackendTreesForUpdate } from '../backend-child'
 import {
@@ -84,87 +74,34 @@ import {
 } from '../bootstrap-platform'
 import { runBootstrap } from '../bootstrap-runner'
 import { detectBundleSwap } from '../bundle-swap'
+import { teardownSshState } from '../connection-apply'
 import {
-  cancelScheduledDesktopLogFlush,
-  flushDesktopLogBufferSync,
-  getRecentHermesLogLines,
-  initDesktopLogBuffer,
-  rememberLog
-} from './log-buffer'
-import {
-  applyTitleBarOverlay,
-  applyWindowTranslucency,
-  chatWindowSurfaceOptions,
-  getTitleBarOverlayOptions,
-  getTranslucencyState,
-  isHexColor,
-  setRendererTitleBarTheme,
-  setTranslucencyState,
-  THEME_SOURCES,
-  translucencyBackedWindows,
-  writePersistedThemeSource,
-  writePersistedTranslucency
-} from './window-theme'
-import { applyConnectionChange, sshQuitShouldBlock, teardownSshState } from '../connection-apply'
-import {
-  apiRequestRegistryConnectionId,
-  authModeFromStatus,
   buildGatewayWsUrl,
   buildGatewayWsUrlWithTicket,
   connectionScopeKey,
   cookiesHaveLiveSession,
-  cookiesHavePrivyAccessToken,
-  cookiesHavePrivySession,
-  cookiesHaveSession,
   gatewayTicketFailure,
-  gatewayWsUrlIpcResult,
   hostLabelFromBaseUrl,
-  localProfileEntry,
   modeIsRemoteLike,
   normalizeRemoteBaseUrl,
   normalizeRemoteHeaders,
   normalizeSshConfig,
   normAuthMode,
-  pathForRegistryBackendRequest,
-  pathWithGlobalRemoteProfile,
   profileHasRemoteConnection,
   profileRemoteOverride,
   profileSshOverride,
-  type RegistryBackendRequestScope,
-  remoteRequestMatchesBaseUrl,
-  resolveAuthMode,
-  resolveProfileApiRequest,
   resolveProfileBackendRoute,
   resolveRemoteSshDashboardProfile,
-  resolveTestWsUrl,
-  savedProfileSsh,
-  tokenPreview,
   withTransientRetries
 } from '../connection-config'
 import {
   backendScopeKey,
-  backendScopePrefix,
-  buildAgentRoster,
-  connectionDialFieldsChanged,
-  mergeConnectionInput,
   migrateV1ToRegistry,
-  normalizeConnectionInput,
   normalizeRegistry,
-  parseBackendScopeKey,
-  reconcileAppliedGlobalConnection,
   reconcileRegistryDrift,
   registrySourceOwnsPrimaryBackend,
-  rememberSshEnumeration,
-  removeConnection,
-  resolvedConnectionId,
   resolveRegistryLocalRoute,
   reuseMatchingPrimarySshBackend,
-  setConnectionLaunchMode,
-  setLastUsedConnection,
-  setPrimaryConnection,
-  shouldDeferLocalEnumeration,
-  shouldRetrySshInventory,
-  updateEligibility,
   upsertConnection
 } from '../connection-registry'
 import { describeCrashReason } from '../crash-forensics'
@@ -172,75 +109,43 @@ import { adoptServedDashboardToken } from '../dashboard-token'
 import { loadOrCreateInstallationId, sshOwnershipId } from '../desktop-installation'
 import { resolveDesktopRemoteRoute, v1SshTerminalPoolKey } from '../desktop-remote-route'
 import {
-  buildPosixCleanupScript,
-  buildWindowsCleanupScript,
-  modeRemovesAgent,
-  modeRemovesUserData,
-  resolveRemovableAppPath,
-  shouldRemoveAppBundle,
-  uninstallArgsForMode
+  resolveRemovableAppPath
 } from '../desktop-uninstall'
-import { describeDevCdpDecision, resolveDevCdpPort } from '../dev-cdp'
+import { resolveDevCdpPort } from '../dev-cdp'
 import { findGitBash as _findGitBash } from '../find-git-bash'
 import {
-  installFindShortcut,
-  installFoundInPageForwarder,
-  performFindAfterIndexingStarted,
-  stopFind
+  installFindShortcut
 } from '../find-in-page'
 import { createFirstRunSetupGate } from '../first-run-setup-gate'
 import { startGatewaysAfterUpdateAbort, stopGatewayBeforeUpdate } from '../gateway-stop-before-update'
 import { probeGatewayWebSocket } from '../gateway-ws-probe'
 import { readAndConsumeHandoffResult } from '../handoff-result'
 import {
-  ATTACHMENT_UPLOAD_DEFAULT_MAX_BYTES,
-  clampDataUrlReadMaxMb,
-  DATA_URL_READ_DEFAULT_MAX_MB,
-  dataUrlReadMaxBytesFromMb,
   DEFAULT_FETCH_TIMEOUT_MS,
-  enableBasicPasswordStoreEncryption,
   encryptDesktopSecret as encryptDesktopSecretStrict,
-  readFileDataUrlForIpc,
-  resolvePersistedRemoteToken,
-  resolveReadableFileForIpc,
   resolveRequestedPathForIpc,
   resolveTimeoutMs,
   SAFE_STORAGE_ENCODING,
-  TEXT_PREVIEW_SOURCE_MAX_BYTES,
   tightenSecretFileMode,
   writeSecretFileAtomic
 } from '../hardening'
 import {
-  assertManagedUpdatePreflightClear,
-  executeManagedRemoteUpdate,
   fenceManagedSshBootstrapPublication,
   ManagedConnectionUpdateGate,
-  managedSshRecoveryScopes,
-  managedSshScopeRole,
   managedSshTokenPersistencePlan,
-  recoverManagedSshScopes,
-  refusedManagedSshUpdate,
-  type RemoteUpdateTarget,
-  runManagedSshUpdate,
-  validateCorrelationId,
-  waitForManagedRemoteClearance,
-  waitForManagedSshBootstrapFence,
-  waitForManagedUpdateOperations
+  validateCorrelationId
 } from '../managed-ssh-update'
 import {
   oauthGuardMayHardFail,
   oauthSessionIsLive,
   oauthTicketFailureAuthMessage,
-  resolveGatedDownloadAuth,
   resolveJsonBody,
-  resolveOauthRestAuth,
   resolveReadinessProbeAuth
 } from '../native-auth-decisions'
 import {
   nativeRefreshUrl,
   type NativeTokenSet,
   parseTokenResponse,
-  resolveLoginStrategy,
   tokenNeedsRefresh
 } from '../native-oauth'
 import { loadNativeTokenSet, type NativeTokenStoreIo, persistNativeTokenSet } from '../native-token-store'
@@ -268,60 +173,42 @@ import {
 } from '../primary-backend-startup'
 import {
   assertLocalProfileCanStart,
-  decideProfileDeleteAction,
-  dispatchConnectionScopedProfileDelete,
-  localProfilePoolKeys,
-  ProfileDeletionGate,
-  profileNameFromDeleteRequest,
-  resolveRouteProfile
+  ProfileDeletionGate
 } from '../profile-delete-routing'
 import { migrateActiveProfileIfMissing as migrateActiveProfileIfMissingPure } from '../profile-migration'
+import * as remoteLifecycle from '../remote-lifecycle'
 import {
-  attachPowerResumeRemoteRevalidation,
   ensureHealthyPooledRemoteBackendForDispatch,
-  RemoteLivenessTracker,
-  RemoteRevalidationCoordinator,
-  revalidatePooledRemoteBackends,
-  revalidateRemoteConnection,
-  revalidateSuspectPooledRemoteBackends
+  RemoteRevalidationCoordinator
 } from '../remote-liveness'
 import {
-  applyRemoteRequestHeaders,
-  createRegistryGatewayWsUrlHandler,
   createRemoteWsHeaderStore
 } from '../remote-ws-headers'
 import { missingRendererAssets } from '../renderer-bundle'
 import { loadRendererLoadErrorPage } from '../renderer-load-error-page'
-import { attachRendererConsoleCapture, formatRendererBoundaryReport } from '../renderer-log'
+import { attachRendererConsoleCapture } from '../renderer-log'
 import {
   classifyStoredSecret,
   readSecretStoragePolicy,
   SECRET_STORAGE_POLICY_FILE,
-  type SecretStoragePolicy,
-  writeSecretStoragePolicy
+  type SecretStoragePolicy
 } from '../secret-storage-policy'
 import {
-  buildInstanceWindowUrl,
   buildSessionWindowUrl,
   chatWindowWebPreferences,
   createSessionWindowRegistry,
-  instanceWindowBounds,
   SESSION_WINDOW_MIN_HEIGHT,
   SESSION_WINDOW_MIN_WIDTH
 } from '../session-windows'
 import { ensureLoginShellPath } from '../shell-path'
 import { createBootstrapCoordinator, sshConfigFingerprint } from '../ssh-bootstrap-coordinator'
-import { createSshProbeConnection, pickLocalPort, redactSecrets, SshConnection } from '../ssh-connection'
+import { pickLocalPort, redactSecrets, SshConnection } from '../ssh-connection'
 import { createStreamThrottle } from '../stream-throttle'
 import { registerTerminalIpc } from '../terminal-ipc'
 import { nativeOverlayWidth as computeNativeOverlayWidth } from '../titlebar-overlay-width'
 import {
-  glassActive,
   glassSupportedOn,
-  normalizeState as normalizeTranslucency,
-  translucencySupportedOn,
-  vibrancyFor as vibrancyForTranslucency,
-  windowOpacityFor
+  translucencySupportedOn
 } from '../translucency'
 import { waitForUpdateClearance } from '../update-gate'
 import { readLiveUpdateMarker, updateHandoffConflict, writeUpdateMarker } from '../update-marker'
@@ -372,39 +259,43 @@ import {
 import {
   connectWindowsRemote,
   detectRemotePlatform,
-  helper,
-  probeWindowsRemote,
   terminateOwnedWindowsDashboardForUpdate
 } from '../windows-remote-lifecycle'
 import {
   alreadyHasNoSandbox,
   buildNoSandboxRelaunchArgs,
-  decideWindowsSandboxLaunch,
   fallbackMarker,
-  grantAllApplicationPackagesAcl,
   markerAfterSuccessfulBoot,
-  readSandboxMarker,
   type SandboxFallbackReason,
-  shouldAttemptAclRepair,
-  shouldRelaunchForGpuSandboxCrash,
   shouldRelaunchForRendererSandboxCrashLoop,
   writeSandboxMarker
 } from '../windows-sandbox-fallback'
 import { readWindowsUserEnvVar } from '../windows-user-env'
 import { isPackagedInstallPath as isPackagedInstallPathUnderRoots } from '../workspace-cwd'
-import { resolvePickerDefaultPath, setActiveGatewayProfile, setWslBridgeProfileState } from '../wsl-path-bridge'
+import { setActiveGatewayProfile, setWslBridgeProfileState } from '../wsl-path-bridge'
 import {
   applyZoomLevel,
   DEFAULT_ZOOM_LEVEL,
   installZoomReassertOnNavigation,
   installZoomReassertOnWindowEvents,
-  percentToZoomLevel,
   ZOOM_STEP,
   ZOOM_STORAGE_KEY,
-  zoomLevelToPercent,
   zoomWiringForWindowKind
 } from '../zoom'
-import * as remoteLifecycle from '../remote-lifecycle'
+
+import {
+  getRecentHermesLogLines,
+  rememberLog
+} from './log-buffer'
+import {
+  headersForRemoteRequest,
+} from './runtime-composition'
+import {
+  applyTitleBarOverlay,
+  chatWindowSurfaceOptions,
+  getTitleBarOverlayOptions,
+  translucencyBackedWindows
+} from './window-theme'
 
 export const USER_DATA_OVERRIDE = process.env.HERMES_DESKTOP_USER_DATA_DIR
 
@@ -7822,6 +7713,7 @@ export const isPrimaryInstance = _gotSingleInstanceLock
 export function getF12Blocked() {
   return f12Blocked
 }
+
 export function setF12Blocked(value: any) {
   f12Blocked = value
 }
@@ -7829,6 +7721,7 @@ export function setF12Blocked(value: any) {
 export function getWindowsSandboxFallbackActive() {
   return windowsSandboxFallbackActive
 }
+
 export function setWindowsSandboxFallbackActive(value: any) {
   windowsSandboxFallbackActive = value
 }
@@ -7836,6 +7729,7 @@ export function setWindowsSandboxFallbackActive(value: any) {
 export function getWindowsSandboxFallbackSticky() {
   return windowsSandboxFallbackSticky
 }
+
 export function setWindowsSandboxFallbackSticky(value: any) {
   windowsSandboxFallbackSticky = value
 }
@@ -7843,6 +7737,7 @@ export function setWindowsSandboxFallbackSticky(value: any) {
 export function getWindowsSandboxFallbackReason() {
   return windowsSandboxFallbackReason
 }
+
 export function setWindowsSandboxFallbackReason(value: any) {
   windowsSandboxFallbackReason = value
 }
@@ -7850,6 +7745,7 @@ export function setWindowsSandboxFallbackReason(value: any) {
 export function getWindowsNoSandboxRelaunchAttempted() {
   return windowsNoSandboxRelaunchAttempted
 }
+
 export function setWindowsNoSandboxRelaunchAttempted(value: any) {
   windowsNoSandboxRelaunchAttempted = value
 }
@@ -7857,6 +7753,7 @@ export function setWindowsNoSandboxRelaunchAttempted(value: any) {
 export function getMainWindow() {
   return mainWindow
 }
+
 export function setMainWindow(value: any) {
   mainWindow = value
 }
@@ -7864,6 +7761,7 @@ export function setMainWindow(value: any) {
 export function getSoftRehomeInProgress() {
   return softRehomeInProgress
 }
+
 export function setSoftRehomeInProgress(value: any) {
   softRehomeInProgress = value
 }
@@ -7871,6 +7769,7 @@ export function setSoftRehomeInProgress(value: any) {
 export function getPoolLimits() {
   return poolLimits
 }
+
 export function setPoolLimits(value: any) {
   poolLimits = value
 }
@@ -7878,6 +7777,7 @@ export function setPoolLimits(value: any) {
 export function getPoolIdleReaper() {
   return poolIdleReaper
 }
+
 export function setPoolIdleReaper(value: any) {
   poolIdleReaper = value
 }
@@ -7885,6 +7785,7 @@ export function setPoolIdleReaper(value: any) {
 export function getBackendOrphanReapPromise() {
   return backendOrphanReapPromise
 }
+
 export function setBackendOrphanReapPromise(value: any) {
   backendOrphanReapPromise = value
 }
@@ -7892,6 +7793,7 @@ export function setBackendOrphanReapPromise(value: any) {
 export function getBootstrapFailure() {
   return bootstrapFailure
 }
+
 export function setBootstrapFailure(value: any) {
   bootstrapFailure = value
 }
@@ -7899,6 +7801,7 @@ export function setBootstrapFailure(value: any) {
 export function getBackendStartFailure() {
   return backendStartFailure
 }
+
 export function setBackendStartFailure(value: any) {
   backendStartFailure = value
 }
@@ -7906,6 +7809,7 @@ export function setBackendStartFailure(value: any) {
 export function getRemoteReauthFailure() {
   return remoteReauthFailure
 }
+
 export function setRemoteReauthFailure(value: any) {
   remoteReauthFailure = value
 }
@@ -7913,6 +7817,7 @@ export function setRemoteReauthFailure(value: any) {
 export function getBootstrapAbortController() {
   return bootstrapAbortController
 }
+
 export function setBootstrapAbortController(value: any) {
   bootstrapAbortController = value
 }
@@ -7920,6 +7825,7 @@ export function setBootstrapAbortController(value: any) {
 export function getBootstrapRepairRequested() {
   return bootstrapRepairRequested
 }
+
 export function setBootstrapRepairRequested(value: any) {
   bootstrapRepairRequested = value
 }
@@ -7927,6 +7833,7 @@ export function setBootstrapRepairRequested(value: any) {
 export function getBootstrapRepairAttempt() {
   return bootstrapRepairAttempt
 }
+
 export function setBootstrapRepairAttempt(value: any) {
   bootstrapRepairAttempt = value
 }
@@ -7934,6 +7841,7 @@ export function setBootstrapRepairAttempt(value: any) {
 export function getConnectionConfigCache() {
   return connectionConfigCache
 }
+
 export function setConnectionConfigCache(value: any) {
   connectionConfigCache = value
 }
@@ -7941,6 +7849,7 @@ export function setConnectionConfigCache(value: any) {
 export function getConnectionConfigCacheMtime() {
   return connectionConfigCacheMtime
 }
+
 export function setConnectionConfigCacheMtime(value: any) {
   connectionConfigCacheMtime = value
 }
@@ -7948,6 +7857,7 @@ export function setConnectionConfigCacheMtime(value: any) {
 export function getConnectionRegistryCache() {
   return connectionRegistryCache
 }
+
 export function setConnectionRegistryCache(value: any) {
   connectionRegistryCache = value
 }
@@ -7955,6 +7865,7 @@ export function setConnectionRegistryCache(value: any) {
 export function getConnectionRegistryCacheMtime() {
   return connectionRegistryCacheMtime
 }
+
 export function setConnectionRegistryCacheMtime(value: any) {
   connectionRegistryCacheMtime = value
 }
@@ -7962,6 +7873,7 @@ export function setConnectionRegistryCacheMtime(value: any) {
 export function getPreviewShortcutActive() {
   return previewShortcutActive
 }
+
 export function setPreviewShortcutActive(value: any) {
   previewShortcutActive = value
 }
@@ -7969,6 +7881,7 @@ export function setPreviewShortcutActive(value: any) {
 export function getNativeThemeListenerInstalled() {
   return nativeThemeListenerInstalled
 }
+
 export function setNativeThemeListenerInstalled(value: any) {
   nativeThemeListenerInstalled = value
 }
@@ -7976,6 +7889,7 @@ export function setNativeThemeListenerInstalled(value: any) {
 export function getBootProgressState() {
   return bootProgressState
 }
+
 export function setBootProgressState(value: any) {
   bootProgressState = value
 }
@@ -7983,6 +7897,7 @@ export function setBootProgressState(value: any) {
 export function getBootstrapState() {
   return bootstrapState
 }
+
 export function setBootstrapState(value: any) {
   bootstrapState = value
 }
@@ -7990,6 +7905,7 @@ export function setBootstrapState(value: any) {
 export function get_gitBinaryCache() {
   return _gitBinaryCache
 }
+
 export function set_gitBinaryCache(value: any) {
   _gitBinaryCache = value
 }
@@ -7997,6 +7913,7 @@ export function set_gitBinaryCache(value: any) {
 export function getUpdateInFlight() {
   return updateInFlight
 }
+
 export function setUpdateInFlight(value: any) {
   updateInFlight = value
 }
@@ -8004,6 +7921,7 @@ export function setUpdateInFlight(value: any) {
 export function getIsQuittingForHandoff() {
   return isQuittingForHandoff
 }
+
 export function setIsQuittingForHandoff(value: any) {
   isQuittingForHandoff = value
 }
@@ -8011,6 +7929,7 @@ export function setIsQuittingForHandoff(value: any) {
 export function getPluginCompatNoticeShown() {
   return pluginCompatNoticeShown
 }
+
 export function setPluginCompatNoticeShown(value: any) {
   pluginCompatNoticeShown = value
 }
@@ -8018,6 +7937,7 @@ export function setPluginCompatNoticeShown(value: any) {
 export function get_secretStoragePolicy() {
   return _secretStoragePolicy
 }
+
 export function set_secretStoragePolicy(value: any) {
   _secretStoragePolicy = value
 }
@@ -8025,6 +7945,7 @@ export function set_secretStoragePolicy(value: any) {
 export function getPetOverlayWindow() {
   return petOverlayWindow
 }
+
 export function setPetOverlayWindow(value: any) {
   petOverlayWindow = value
 }
@@ -8032,6 +7953,7 @@ export function setPetOverlayWindow(value: any) {
 export function get_rendererReadyForDeepLink() {
   return _rendererReadyForDeepLink
 }
+
 export function set_rendererReadyForDeepLink(value: any) {
   _rendererReadyForDeepLink = value
 }

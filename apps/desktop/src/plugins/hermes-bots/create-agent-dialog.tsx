@@ -24,10 +24,13 @@ import {
   useI18n
 } from '@hermes/plugin-sdk'
 import { useEffect, useRef, useState } from 'react'
+
 import { avatarColor, blobatarSvg, BotFace } from './avatar'
 import { AvatarPicker } from './avatar-picker'
 import { $selectedBot } from './bot-state'
 import { createCanonicalChat } from './canonical-chat'
+import type { CapabilityCatalog, CreateAgentDialogProps } from './create-dialog'
+import { NAME_RE } from './create-dialog'
 import { ROSTER_KEY, saveBotMeta } from './data'
 import { labeled, ResizableFrame } from './dialog-parts'
 import { useBots } from './i18n'
@@ -35,7 +38,6 @@ import { displayName, slugify } from './labels'
 import { McpSetupButton } from './mcp-setup'
 import { ModelPicker } from './model-picker'
 import type {
-  CapabilityEntry,
   McpCatalogResponse,
   ProfileConfigurePayload,
   ProfileDescribeResponse
@@ -45,9 +47,7 @@ import { deleteBot } from './profile-ops'
 import { singleFlight } from './single-flight'
 import { HubSkillsSection } from './skills-hub'
 import { composeSoul } from './soul'
-import type { ConnectionRow, RosterRow } from './types'
-import type { CapabilityCatalog, CreateAgentDialogProps } from './create-dialog'
-import { NAME_RE } from './create-dialog'
+import type { ConnectionRow } from './types'
 
 export function CreateAgentDialog({ open, onClose, roster }: CreateAgentDialogProps) {
   const { t } = useI18n()

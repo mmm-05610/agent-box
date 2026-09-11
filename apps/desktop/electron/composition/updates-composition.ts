@@ -2,37 +2,15 @@
 // main.ts keeps only the startup/lifecycle statement sequence; the accessors at the
 // bottom exist so main can read/write the few mutable bindings the sequence needs.
 
-import { execFileSync, spawn } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import https from 'node:https'
 import path from 'node:path'
+
 import {
-  app,
-  BrowserWindow,
-  clipboard,
-  dialog,
-  net as electronNet,
-  webContents as electronWebContents,
-  globalShortcut,
-  ipcMain,
-  Menu,
-  nativeTheme,
-  powerMonitor,
-  powerSaveBlocker,
-  protocol,
-  safeStorage,
-  screen,
-  session,
-  shell,
-  systemPreferences
+  app
 } from 'electron'
-import {
-  cancelScheduledDesktopLogFlush,
-  flushDesktopLogBufferSync,
-  getRecentHermesLogLines,
-  initDesktopLogBuffer,
-  rememberLog
-} from './log-buffer'
+
 import {
   buildPosixCleanupScript,
   buildWindowsCleanupScript,
@@ -52,27 +30,29 @@ import {
 } from '../update-count'
 import { isOfficialSshRemote, OFFICIAL_REPO_HTTPS_URL } from '../update-remote'
 import { hiddenWindowsChildOptions } from '../windows-child-options'
+
 import {
   ACTIVE_HERMES_ROOT,
-  HERMES_HOME,
-  IS_PACKAGED,
-  IS_WINDOWS,
-  VENV_ROOT,
   directoryExists,
   fileExists,
   findSystemPython,
   getOriginUrl,
   getVenvPython,
+  HERMES_HOME,
+  IS_PACKAGED,
+  IS_WINDOWS,
   isHermesSourceRoot,
-  isQuittingForHandoff,
   readDesktopUpdateConfig,
   releaseBackendLock,
   resolveHealedBranch,
   resolveUpdateRoot,
   runGit,
-  getIsQuittingForHandoff,
   setIsQuittingForHandoff,
+  VENV_ROOT,
 } from './bootstrap-env-composition'
+import {
+  rememberLog
+} from './log-buffer'
 
 export const firstLine = text => (text || '').split('\n').find(Boolean) || ''
 

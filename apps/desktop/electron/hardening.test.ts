@@ -927,6 +927,7 @@ function readMain() {
 
 test('registry JSON helpers retain native OAuth bearer authentication', () => {
   const source = readMain()
+
   // The POST/GET twins and their shared fetch helper were split across modules;
   // the contract under test is that BOTH twins delegate to fetchJsonForBackend
   // and neither reaches for the OAuth cookie session.

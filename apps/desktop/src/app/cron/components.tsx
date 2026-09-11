@@ -2,7 +2,8 @@
 
 import { useStore } from '@nanostores/react'
 import { useQuery } from '@tanstack/react-query'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
+
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Codicon } from '@/components/ui/codicon'
@@ -28,42 +29,31 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import {
   type AutomationBlueprint,
-  createCronJob,
   type CronDeliveryTarget,
   type CronJob,
-  deleteCronJob,
   getAutomationBlueprints,
   getCronDeliveryTargets,
   getCronJobRuns,
-  instantiateAutomationBlueprint,
-  pauseCronJob,
-  resumeCronJob,
-  type SessionInfo,
-  updateCronJob
+  type SessionInfo
 } from '@/hermes'
 import { type Translations, useI18n } from '@/i18n'
 import { AlertTriangle } from '@/lib/icons'
 import { requestModelOptions } from '@/lib/model-options'
 import { $changeEventsAvailable, $cronChangeTick } from '@/store/live-sync'
+
 import {
-  Panel,
   PanelAction,
-  PanelAddButton,
   PanelBlock,
-  PanelBody,
   PanelDetail,
-  PanelEmpty,
-  PanelHeader,
-  PanelList,
   PanelListRow,
   type PanelMenuItem,
   PanelMeta,
   PanelPill,
   PanelSectionLabel
 } from '../overlays/panel'
+
 import { BlueprintSlotControl, blueprintSlotHelp, cleanBlueprintFieldError, initialBlueprintValues } from './blueprints'
 import {
-  cronEditorUpdates,
   jobIsScriptOnly,
   parseCronDeliveryTargets,
   toggleCronDeliveryTarget,
@@ -71,7 +61,6 @@ import {
 } from './cron-job-model'
 import { jobState, jobTitle, STATE_DOT } from './job-state'
 import {
-  cronProfileForScope,
   DEFAULT_DELIVER,
   formatTime,
   jobDeliver,
@@ -81,12 +70,10 @@ import {
   jobProvider,
   jobScheduleDisplay,
   jobScheduleExpr,
-  matchesQuery,
   SCHEDULE_OPTIONS,
   scheduleOptionForExpr,
   scheduleSummary,
   STATE_TONE,
-  truncate,
 } from './view-model'
 
 export const MODEL_DEFAULT_VALUE = '__default__'

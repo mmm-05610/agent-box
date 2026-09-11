@@ -2,88 +2,21 @@
 // semantics unchanged; state authority stays with main.ts via this deps object.
 
 import {
-  app,
-  BrowserWindow,
-  clipboard,
-  dialog,
-  net as electronNet,
-  webContents as electronWebContents,
-  globalShortcut,
-  ipcMain,
-  Menu,
-  nativeTheme,
-  powerMonitor,
-  powerSaveBlocker,
-  protocol,
-  safeStorage,
-  screen,
-  session,
-  shell,
-  systemPreferences
+  ipcMain
 } from 'electron'
+
 import {
-  apiRequestRegistryConnectionId,
-  authModeFromStatus,
-  buildGatewayWsUrl,
-  buildGatewayWsUrlWithTicket,
-  connectionScopeKey,
-  cookiesHaveLiveSession,
-  cookiesHavePrivyAccessToken,
-  cookiesHavePrivySession,
-  cookiesHaveSession,
-  gatewayTicketFailure,
-  gatewayWsUrlIpcResult,
-  hostLabelFromBaseUrl,
-  localProfileEntry,
-  modeIsRemoteLike,
-  normalizeRemoteBaseUrl,
-  normalizeRemoteHeaders,
-  normalizeSshConfig,
-  normAuthMode,
-  pathForRegistryBackendRequest,
-  pathWithGlobalRemoteProfile,
-  profileHasRemoteConnection,
-  profileRemoteOverride,
-  profileSshOverride,
-  type RegistryBackendRequestScope,
-  remoteRequestMatchesBaseUrl,
-  resolveAuthMode,
-  resolveProfileApiRequest,
-  resolveProfileBackendRoute,
-  resolveRemoteSshDashboardProfile,
-  resolveTestWsUrl,
-  savedProfileSsh,
-  tokenPreview,
-  withTransientRetries
+  apiRequestRegistryConnectionId
 } from '../../connection-config'
 import {
-  ATTACHMENT_UPLOAD_DEFAULT_MAX_BYTES,
-  clampDataUrlReadMaxMb,
   DATA_URL_READ_DEFAULT_MAX_MB,
-  dataUrlReadMaxBytesFromMb,
-  DEFAULT_FETCH_TIMEOUT_MS,
-  enableBasicPasswordStoreEncryption,
-  encryptDesktopSecret as encryptDesktopSecretStrict,
-  readFileDataUrlForIpc,
-  resolvePersistedRemoteToken,
-  resolveReadableFileForIpc,
-  resolveRequestedPathForIpc,
-  resolveTimeoutMs,
-  SAFE_STORAGE_ENCODING,
-  TEXT_PREVIEW_SOURCE_MAX_BYTES,
-  tightenSecretFileMode,
-  writeSecretFileAtomic
+  dataUrlReadMaxBytesFromMb
 } from '../../hardening'
 import {
-  assertLocalProfileCanStart,
-  decideProfileDeleteAction,
   dispatchConnectionScopedProfileDelete,
-  localProfilePoolKeys,
-  ProfileDeletionGate,
-  profileNameFromDeleteRequest,
-  resolveRouteProfile
+  profileNameFromDeleteRequest
 } from '../../profile-delete-routing'
-import { prepareProfileRenameLifecycle, profileRenameFromRequest } from '../../profile-rename-routing'
+import { profileRenameFromRequest } from '../../profile-rename-routing'
 
 export interface RegisterApiProxyIpcDeps {
   HERMES_HOME: any

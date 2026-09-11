@@ -3,39 +3,20 @@
 // bottom exist so main can read/write the few mutable bindings the sequence needs.
 
 import path from 'node:path'
+
 import {
-  app,
-  BrowserWindow,
-  clipboard,
-  dialog,
-  net as electronNet,
-  webContents as electronWebContents,
-  globalShortcut,
-  ipcMain,
-  Menu,
-  nativeTheme,
-  powerMonitor,
-  powerSaveBlocker,
-  protocol,
-  safeStorage,
-  screen,
-  session,
-  shell,
-  systemPreferences
+  app
 } from 'electron'
+
 import {
-  cancelScheduledDesktopLogFlush,
-  flushDesktopLogBufferSync,
-  getRecentHermesLogLines,
-  initDesktopLogBuffer,
-  rememberLog
-} from './log-buffer'
-import {
+  _rendererReadyForDeepLink,
   DEEPLINK_SCHEMES,
   DEV_SERVER,
-  _rendererReadyForDeepLink,
   mainWindow,
 } from './bootstrap-env-composition'
+import {
+  rememberLog
+} from './log-buffer'
 
 export const HERMES_PROTOCOL = DEV_SERVER ? 'hermes-dev' : 'hermes'
 
@@ -121,6 +102,7 @@ export function registerDeepLinkProtocol() {
 export function get_pendingDeepLink() {
   return _pendingDeepLink
 }
+
 export function set_pendingDeepLink(value: any) {
   _pendingDeepLink = value
 }

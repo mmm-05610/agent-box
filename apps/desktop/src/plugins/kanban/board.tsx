@@ -2,36 +2,11 @@ import {
   Button,
   cn,
   Codicon,
-  compactNumber,
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuTrigger,
   Contribute,
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
   ErrorState,
-  formatModifierToken,
   host,
-  Input,
   Loader,
   SearchField,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  Switch,
-  Textarea,
   Tip,
   TITLEBAR_AREAS,
   useGrabScroll,
@@ -41,70 +16,40 @@ import {
   useValue
 } from '@hermes/plugin-sdk'
 import {
-  type CSSProperties,
-  type DragEvent as ReactDragEvent,
-  type ReactNode,
   useEffect,
   useMemo,
   useRef,
   useState
 } from 'react'
+
 import {
   $boardSlug,
   $collapsedLanes,
   $introDismissed,
-  $lanesByProfile,
   boardKey,
-  BOARDS_KEY,
-  bulkTasks,
-  createTask,
   deleteTask,
-  estimateNew,
   fetchBoard,
-  fetchBoards,
-  fetchProfiles,
-  patchTask,
-  PROFILES_KEY
+  patchTask
 } from './api'
+import {
+  Column,
+  FilterMenu,
+  NewTaskDialog,
+  SelectionBar,
+} from './board-parts'
 import { moveCard, removeCard } from './board-state'
 import { BoardSwitcher } from './board-switcher'
 import { TaskDrawer } from './drawer'
-import { EMPTY_OVERRIDE, ModelOverrideField, overrideCreateFields, type TaskModelOverride } from './model-override'
 import { OrchestrationPanel } from './orchestration'
-import { columnMeta, type KanbanBoard, type KanbanTask, type TaskEstimate } from './types'
+import { type KanbanBoard, type KanbanTask } from './types'
 import {
   $newTaskLane,
-  ago,
-  type ArcState,
-  arcState,
-  Avatar,
-  columnHelp,
-  columnLabel,
   errText,
-  FIELD_LABEL,
   isLockedTarget,
   lockedReason,
-  RunClock,
-  shortId,
-  useDefaultAssignee,
-  useKanban,
-  useOrchestration
+  useKanban
 } from './ui'
 
-import {
-  Meta,
-  CardFooter,
-  Card,
-  Column,
-  NO_PARENT,
-  PARKED,
-  WORKSPACE_KINDS,
-  Field,
-  NewTaskDialog,
-  UNASSIGNED_LANE,
-  FilterMenu,
-  SelectionBar,
-} from './board-parts'
 function Intro() {
   const k = useKanban()
   const dismissed = useValue($introDismissed)
@@ -125,6 +70,7 @@ function Intro() {
     </div>
   )
 }
+
 export function KanbanBoardPage() {
   const k = useKanban()
   const qc = useQueryClient()

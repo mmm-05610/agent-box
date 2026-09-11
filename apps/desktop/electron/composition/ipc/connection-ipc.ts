@@ -1,105 +1,41 @@
 // IPC surface extracted from main.ts. Channel names, payloads and error
 // semantics unchanged; state authority stays with main.ts via this deps object.
 
-import { execFileSync, spawn } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import path from 'node:path'
+
 import {
-  app,
-  BrowserWindow,
-  clipboard,
-  dialog,
-  net as electronNet,
-  webContents as electronWebContents,
-  globalShortcut,
   ipcMain,
-  Menu,
-  nativeTheme,
-  powerMonitor,
-  powerSaveBlocker,
-  protocol,
-  safeStorage,
-  screen,
-  session,
-  shell,
-  systemPreferences
+  shell
 } from 'electron'
+
 import {
-  cancelScheduledDesktopLogFlush,
-  flushDesktopLogBufferSync,
-  getRecentHermesLogLines,
-  initDesktopLogBuffer,
   rememberLog
 } from '../../composition/log-buffer'
-import { applyConnectionChange, sshQuitShouldBlock, teardownSshState } from '../../connection-apply'
+import { applyConnectionChange } from '../../connection-apply'
 import {
-  apiRequestRegistryConnectionId,
   authModeFromStatus,
-  buildGatewayWsUrl,
-  buildGatewayWsUrlWithTicket,
   connectionScopeKey,
-  cookiesHaveLiveSession,
-  cookiesHavePrivyAccessToken,
-  cookiesHavePrivySession,
-  cookiesHaveSession,
-  gatewayTicketFailure,
-  gatewayWsUrlIpcResult,
-  hostLabelFromBaseUrl,
-  localProfileEntry,
   modeIsRemoteLike,
   normalizeRemoteBaseUrl,
-  normalizeRemoteHeaders,
-  normalizeSshConfig,
   normAuthMode,
-  pathForRegistryBackendRequest,
-  pathWithGlobalRemoteProfile,
-  profileHasRemoteConnection,
-  profileRemoteOverride,
-  profileSshOverride,
-  type RegistryBackendRequestScope,
-  remoteRequestMatchesBaseUrl,
-  resolveAuthMode,
-  resolveProfileApiRequest,
-  resolveProfileBackendRoute,
-  resolveRemoteSshDashboardProfile,
-  resolveTestWsUrl,
-  savedProfileSsh,
-  tokenPreview,
-  withTransientRetries
+  resolveTestWsUrl
 } from '../../connection-config'
 import { applyConnectionConfigAtomically } from '../../connection-config-apply'
 import {
   backendScopeKey,
-  backendScopePrefix,
   buildAgentRoster,
-  connectionDialFieldsChanged,
-  mergeConnectionInput,
-  migrateV1ToRegistry,
-  normalizeConnectionInput,
-  normalizeRegistry,
-  parseBackendScopeKey,
   reconcileAppliedGlobalConnection,
-  reconcileRegistryDrift,
-  registrySourceOwnsPrimaryBackend,
-  rememberSshEnumeration,
   removeConnection,
   resolvedConnectionId,
-  resolveRegistryLocalRoute,
-  reuseMatchingPrimarySshBackend,
   setConnectionLaunchMode,
   setLastUsedConnection,
   setPrimaryConnection,
-  shouldDeferLocalEnumeration,
-  shouldRetrySshInventory,
-  updateEligibility,
-  upsertConnection
+  updateEligibility
 } from '../../connection-registry'
 import { probeGatewayWebSocket } from '../../gateway-ws-probe'
 import {
-  nativeRefreshUrl,
-  type NativeTokenSet,
-  parseTokenResponse,
-  resolveLoginStrategy,
-  tokenNeedsRefresh
+  resolveLoginStrategy
 } from '../../native-oauth'
 import { runNativeLogin } from '../../native-oauth-login'
 import {
@@ -110,13 +46,7 @@ import {
 } from '../../plugin-profile-routes'
 import { rehomePrimaryConnection } from '../../primary-connection-rehome'
 import {
-  attachPowerResumeRemoteRevalidation,
-  ensureHealthyPooledRemoteBackendForDispatch,
-  RemoteLivenessTracker,
-  RemoteRevalidationCoordinator,
-  revalidatePooledRemoteBackends,
-  revalidateRemoteConnection,
-  revalidateSuspectPooledRemoteBackends
+  revalidateRemoteConnection
 } from '../../remote-liveness'
 import { collectSshConfigHosts, parseSshGOutput } from '../../ssh-config'
 import { hiddenWindowsChildOptions } from '../../windows-child-options'

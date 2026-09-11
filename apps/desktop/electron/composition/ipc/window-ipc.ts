@@ -3,52 +3,28 @@
 
 import fs from 'node:fs'
 import path from 'node:path'
+
 import {
-  app,
   BrowserWindow,
-  clipboard,
-  dialog,
-  net as electronNet,
   webContents as electronWebContents,
-  globalShortcut,
   ipcMain,
-  Menu,
-  nativeTheme,
-  powerMonitor,
-  powerSaveBlocker,
-  protocol,
-  safeStorage,
-  screen,
-  session,
-  shell,
   systemPreferences
 } from 'electron'
+
 import {
-  cancelScheduledDesktopLogFlush,
-  flushDesktopLogBufferSync,
-  getRecentHermesLogLines,
-  initDesktopLogBuffer,
   rememberLog
 } from '../../composition/log-buffer'
 import {
-  installFindShortcut,
-  installFoundInPageForwarder,
   performFindAfterIndexingStarted,
   stopFind
 } from '../../find-in-page'
-import { createQuickEntryShortcut, quickEntryWindowBounds, sanitizeQuickEntrySettings } from '../../quick-entry'
-import { type ActiveWork, mergeActiveWork, normalizeActiveWork, quitPromptFor } from '../../quit-guard'
-import { enumerateWindowsFrontToBack, enumerationFailed, readWindowBelow } from '../../window-below'
+import { sanitizeQuickEntrySettings } from '../../quick-entry'
+import { normalizeActiveWork } from '../../quit-guard'
+import { readWindowBelow } from '../../window-below'
 import {
-  applyZoomLevel,
   DEFAULT_ZOOM_LEVEL,
-  installZoomReassertOnNavigation,
-  installZoomReassertOnWindowEvents,
   percentToZoomLevel,
-  ZOOM_STEP,
-  ZOOM_STORAGE_KEY,
-  zoomLevelToPercent,
-  zoomWiringForWindowKind
+  zoomLevelToPercent
 } from '../../zoom'
 
 export interface RegisterWindowIpcDeps {

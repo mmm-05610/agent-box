@@ -1,50 +1,28 @@
-import { host } from '@hermes/plugin-sdk'
 import { $botMeta, $lastRoster } from './data'
 import {
   $groupChats,
   $groupNeedsYou,
-  GROUP_CHAT_SYNC_META_KEY,
   type GroupChatRoom,
-  type GroupChatSyncJob,
-  type GroupChatSyncSnapshot,
 } from './group-chat-state'
 import {
-  groupChatSyncSnapshot,
-  mergeGroupChatSyncSnapshots,
+  groupChatRemoteSnapshot,
+  groupChatSyncConnectionId,
+  groupChatSyncPendingByConnection,
+  persistGroupChatRooms,
+  scheduleGroupChatServerSync,
+  updateGroupChat,
+} from './group-chat-sync'
+import {
   mergeRemoteGroupChatSnapshotIntoRooms,
-  trimGroupChatLog,
 } from './group-chat-sync-snapshot'
 import { groupMemberReferencesConnection, markOrphanedGroupMemberDescriptor } from './hygiene'
-import { getPluginCtx } from './shared'
 import type {
   Attachment,
   GroupChat,
   GroupMessage,
-  GroupMessageAuthor,
-  RosterRow
+  GroupMessageAuthor
 } from './types'
 
-import {
-  groupChatSyncPendingByConnection,
-  groupChatSyncInFlightConnections,
-  groupChatSyncRetryTimers,
-  groupChatSyncRetryCounts,
-  groupChatSyncTimer,
-  groupChatSyncDisposed,
-  durableGroupChatRooms,
-  persistGroupChatRooms,
-  groupChatSyncConnectionId,
-  groupChatSyncRequest,
-  groupChatRemoteSnapshot,
-  groupChatSyncBackoff,
-  mergeGroupChatSyncJobs,
-  groupChatSyncPayloadEqual,
-  groupChatSyncTargetConnections,
-  flushGroupChatServerSync,
-  scheduleGroupChatServerSync,
-  UpdateGroupChatOptions,
-  updateGroupChat,
-} from './group-chat-sync'
 export function sweepGroupChatMembersForRemovedConnection(connectionId: string) {
   const id = String(connectionId || '').trim()
 
@@ -72,6 +50,7 @@ export function sweepGroupChatMembersForRemovedConnection(connectionId: string) 
 
   return changed
 }
+
 export async function pullGroupChatServerState(connectionId: string = groupChatSyncConnectionId()) {
   const { snapshot: remote } = await groupChatRemoteSnapshot({
     connectionId
@@ -120,6 +99,7 @@ export function handleSessionsGatewayTransition() {
 export const GROUP_CHAT_MAX_ROUNDS = 3
 export const GROUP_CHAT_MAX_MESSAGES = 10
 export const GROUP_CHAT_MAX_CONTINUATIONS = 2
+
 export function groupSpeakerLabel(name?: null | string) {
   const trimmed = (name || '').trim()
 
@@ -151,6 +131,7 @@ export function groupSpeakerLabel(name?: null | string) {
 
   return trimmed.toLowerCase() === 'default' ? 'Hermes' : trimmed
 }
+
 export function setGroupChatImage(group: string, image: null | string | undefined) {
   updateGroupChat(group, (room: GroupChatRoom) => {
     room.image = image || null
@@ -158,6 +139,7 @@ export function setGroupChatImage(group: string, image: null | string | undefine
     return room
   })
 }
+
 function groupChatEntryId(): string {
   if (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function') {
     return globalThis.crypto.randomUUID()
@@ -165,15 +147,19 @@ function groupChatEntryId(): string {
 
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
 }
+
 const GROUP_EMPTY_SENTINEL = '(empty)'
+
 const GROUP_EMPTY_FRIENDLY =
   '⚠️ The model returned no response after processing tool results. ' +
   'This can happen with some models — try again or rephrase your question.'
+
 function normalizeGroupChatText(text: string): string {
   const trimmed = String(text || '').trim()
 
   return trimmed === GROUP_EMPTY_SENTINEL ? GROUP_EMPTY_FRIENDLY : trimmed
 }
+
 export function appendGroupChatEntry(
   group: string,
   from: GroupMessageAuthor,
@@ -222,9 +208,11 @@ export function appendGroupChatEntry(
 
   return entry
 }
+
 export function mintGroupRoomId(): string {
   return `r${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
 }
+
 export function uniqueGroupChatName(base: string, taken: Set<string>): string {
   if (!taken.has(base)) {
     return base
@@ -241,6 +229,7 @@ export function uniqueGroupChatName(base: string, taken: Set<string>): string {
 
   throw new Error('No free name for the group.')
 }
+
 export function shouldCommitMemberTurn(epochAtDispatch: number, currentEpoch: number, newerUserEntryInThread = true) {
   if (epochAtDispatch === currentEpoch) {
     return true
@@ -248,7 +237,9 @@ export function shouldCommitMemberTurn(epochAtDispatch: number, currentEpoch: nu
 
   return !newerUserEntryInThread
 }
+
 const GROUP_DUPLICATE_APPEND_WINDOW_MS = 10 * 60 * 1000
+
 function isDuplicateGroupAppend(
   lastEntry: GroupMessage | undefined,
   from: GroupMessageAuthor,
@@ -278,16 +269,16 @@ function isDuplicateGroupAppend(
 
   return String(lastEntry.text || '') === String(text || '').trim()
 }
+
 export function groupThreadOf(entry: GroupMessage): string {
   return entry?.thread || 'legacy'
 }
+
 export function mintGroupThreadId(): string {
   return `t${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
 }
-export * from './group-chat-state'
-export * from './group-chat-sync-snapshot'
-export { GROUP_CHAT_HISTORY_LIMIT, GROUP_CHAT_MAX_MEMBERS } from './group-chat-sync-snapshot'
 
+export * from './group-chat-state'
 export {
   durableGroupChatRooms,
   flushGroupChatServerSync,
@@ -313,3 +304,6 @@ export {
 export type {
   UpdateGroupChatOptions,
 } from './group-chat-sync'
+
+export * from './group-chat-sync-snapshot'
+export { GROUP_CHAT_HISTORY_LIMIT, GROUP_CHAT_MAX_MEMBERS } from './group-chat-sync-snapshot'

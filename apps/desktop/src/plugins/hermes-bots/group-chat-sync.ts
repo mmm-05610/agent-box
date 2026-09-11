@@ -1,11 +1,10 @@
 // Extracted verbatim from group-chat.ts (see docs/desktop-megafile-decomposition.md).
 
 import { host } from '@hermes/plugin-sdk'
+
 import {
   $groupChats,
-  $groupNeedsYou,
   GROUP_CHAT_SYNC_META_KEY,
-  type GroupChatRoom,
   type GroupChatSyncJob,
   type GroupChatSyncSnapshot,
 } from './group-chat-state'
@@ -17,10 +16,7 @@ import {
 } from './group-chat-sync-snapshot'
 import { getPluginCtx } from './shared'
 import type {
-  Attachment,
   GroupChat,
-  GroupMessage,
-  GroupMessageAuthor,
   RosterRow
 } from './types'
 

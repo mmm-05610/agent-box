@@ -4,38 +4,19 @@
 
 import fs from 'node:fs'
 import path from 'node:path'
+
 import {
-  app,
-  BrowserWindow,
-  clipboard,
-  dialog,
-  net as electronNet,
-  webContents as electronWebContents,
-  globalShortcut,
-  ipcMain,
-  Menu,
-  nativeTheme,
-  powerMonitor,
-  powerSaveBlocker,
-  protocol,
-  safeStorage,
-  screen,
-  session,
-  shell,
-  systemPreferences
+  app
 } from 'electron'
+
 import {
-  cancelScheduledDesktopLogFlush,
-  flushDesktopLogBufferSync,
-  getRecentHermesLogLines,
-  initDesktopLogBuffer,
-  rememberLog
-} from './log-buffer'
-import {
-  POOL_LIMITS_PATH,
   fileExists,
+  POOL_LIMITS_PATH,
   resolveUpdateRoot,
 } from './bootstrap-env-composition'
+import {
+  rememberLog
+} from './log-buffer'
 
 export function persistPoolLimits(limits) {
   try {

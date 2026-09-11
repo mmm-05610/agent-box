@@ -1,50 +1,16 @@
 // Extracted verbatim from index.tsx (see docs/desktop-megafile-decomposition.md).
 
-import { getHermesConfigRecord, listAllProfileSessions } from '@/hermes'
+import type { listAllProfileSessions } from '@/hermes';
 import { sessionTitle } from '@/lib/chat-runtime'
 import {
-  Activity,
-  AppWindow,
-  Archive,
-  BarChart3,
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  Clock,
-  Cpu,
-  Download,
-  Egg,
-  GitBranch,
-  Globe,
   type IconComponent,
-  Info,
-  KeyRound,
-  Layers3,
-  MessageCircle,
   Monitor,
   Moon,
-  Package,
-  Palette,
-  PawPrint,
-  Plus,
-  RefreshCw,
-  Settings,
-  Settings2,
-  SlidersHorizontal,
-  Starmap,
-  Sun,
-  Users,
-  Wrench,
-  Zap
+  Sun
 } from '@/lib/icons'
-import { type ThemeMode, useTheme } from '@/themes/context'
+import { type ThemeMode } from '@/themes/context'
+
 import {
-  PAGE_PARENTS,
-  type PaletteGroup,
-  type PaletteItem,
-  type PalettePage,
-  paletteValue,
-  rankGroups,
   type SessionEntry,
 } from './palette-model'
 

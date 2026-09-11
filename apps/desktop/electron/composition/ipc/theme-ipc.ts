@@ -2,44 +2,24 @@
 // semantics unchanged; state authority stays with main.ts via this deps object.
 
 import {
-  app,
   BrowserWindow,
-  clipboard,
-  dialog,
-  net as electronNet,
-  webContents as electronWebContents,
-  globalShortcut,
   ipcMain,
-  Menu,
-  nativeTheme,
-  powerMonitor,
-  powerSaveBlocker,
-  protocol,
-  safeStorage,
-  screen,
-  session,
-  shell,
-  systemPreferences
+  nativeTheme
 } from 'electron'
+
 import {
   applyTitleBarOverlay,
   applyWindowTranslucency,
-  chatWindowSurfaceOptions,
-  getTitleBarOverlayOptions,
   getTranslucencyState,
   isHexColor,
   setRendererTitleBarTheme,
   setTranslucencyState,
   THEME_SOURCES,
-  translucencyBackedWindows,
-  writePersistedThemeSource,
-  writePersistedTranslucency
+  writePersistedThemeSource
 } from '../../composition/window-theme'
 import {
   glassActive,
-  glassSupportedOn,
   normalizeState as normalizeTranslucency,
-  translucencySupportedOn,
   vibrancyFor as vibrancyForTranslucency,
   windowOpacityFor
 } from '../../translucency'

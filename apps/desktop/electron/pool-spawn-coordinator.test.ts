@@ -11,7 +11,7 @@ import {
   LocalBackendSpawnCoordinator,
   releaseLocalBackendSlotAfterExit
 } from './pool-spawn-coordinator'
-import { mainProcessSources, sliceFromAnyModule } from './test-main-process-sources'
+import { mainProcessSources } from './test-main-process-sources'
 
 
 

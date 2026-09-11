@@ -10,7 +10,6 @@ import {
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuTrigger,
-  Contribute,
   Dialog,
   DialogContent,
   DialogFooter,
@@ -21,12 +20,9 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  ErrorState,
   formatModifierToken,
   host,
   Input,
-  Loader,
-  SearchField,
   Select,
   SelectContent,
   SelectItem,
@@ -35,8 +31,6 @@ import {
   Switch,
   Textarea,
   Tip,
-  TITLEBAR_AREAS,
-  useGrabScroll,
   useMutation,
   useQuery,
   useQueryClient,
@@ -48,21 +42,17 @@ import {
   type ReactNode,
   useEffect,
   useMemo,
-  useRef,
   useState
 } from 'react'
+
 import {
   $boardSlug,
-  $collapsedLanes,
-  $introDismissed,
   $lanesByProfile,
-  boardKey,
   BOARDS_KEY,
   bulkTasks,
   createTask,
   deleteTask,
   estimateNew,
-  fetchBoard,
   fetchBoards,
   fetchProfiles,
   patchTask,
@@ -71,7 +61,6 @@ import {
 import { EMPTY_OVERRIDE, ModelOverrideField, overrideCreateFields, type TaskModelOverride } from './model-override'
 import { columnMeta, type KanbanBoard, type KanbanTask, type TaskEstimate } from './types'
 import {
-  $newTaskLane,
   ago,
   type ArcState,
   arcState,
@@ -81,7 +70,6 @@ import {
   errText,
   FIELD_LABEL,
   isLockedTarget,
-  lockedReason,
   RunClock,
   shortId,
   useDefaultAssignee,

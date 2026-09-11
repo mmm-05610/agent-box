@@ -5,6 +5,7 @@ import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { useStore } from '@nanostores/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'react-router'
+
 import { PlatformAvatar } from '@/app/messaging/platform-icon'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
@@ -131,17 +132,14 @@ import { ackAllSessionsRead } from '@/store/session-unread'
 import { markSessionUnread } from '@/store/session-unread-remote'
 import { $archivedSessions, loadArchivedSessions } from '@/store/sidebar-archive'
 import { $sidebarSessionRankIds } from '@/store/sidebar-sort'
+
 import {
-  type AppView,
-  ARTIFACTS_ROUTE,
-  CRON_ROUTE,
-  MESSAGING_ROUTE,
   SIDEBAR_NAV_AREA,
-  type SidebarNavContribution,
-  SKILLS_ROUTE
+  type SidebarNavContribution
 } from '../../routes'
 import type { SidebarNavItem } from '../../types'
-import { type NewSessionSplitHandler, startNewSessionDrag } from '../new-session-drag'
+import { startNewSessionDrag } from '../new-session-drag'
+
 import { SidebarSectionAddButton } from './chrome'
 import { SidebarCronJobsSection } from './cron-jobs-section'
 import { SidebarFilterMenu } from './filter-menu'
@@ -180,15 +178,14 @@ import {
 } from './section-states'
 import { buildSessionByAnyId, resolvePinnedSessions } from './session-index'
 import { SidebarSessionsSection, VIRTUALIZE_THRESHOLD } from './sessions-section'
-import { CONTEXT_SPLIT_KIT, SplitSubmenu } from './split-submenu'
-import { useEnteredProjectSessions } from './use-entered-project-sessions'
+import type {
+  ChatSidebarProps,
+  MessagingSection} from './sidebar-constants';
 import {
   COMPACT_FLAT,
-  ChatSidebarProps,
   GROUP_BODY,
   HEADER_ACTION_BTN,
   HEADER_NAV_BTN,
-  MessagingSection,
   NON_SESSION_INITIAL_ROWS,
   NON_SESSION_LOAD_STEP,
   PROJECT_TREE_WARM_MS,
@@ -196,6 +193,8 @@ import {
   SCROLL_Y,
   SIDEBAR_NAV,
 } from './sidebar-constants'
+import { CONTEXT_SPLIT_KIT, SplitSubmenu } from './split-submenu'
+import { useEnteredProjectSessions } from './use-entered-project-sessions'
 
 
 export function ChatSidebar({

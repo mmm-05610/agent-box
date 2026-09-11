@@ -2,26 +2,9 @@
 // semantics unchanged; state authority stays with main.ts via this deps object.
 
 import {
-  app,
-  BrowserWindow,
-  clipboard,
-  dialog,
-  net as electronNet,
-  webContents as electronWebContents,
-  globalShortcut,
-  ipcMain,
-  Menu,
-  nativeTheme,
-  powerMonitor,
-  powerSaveBlocker,
-  protocol,
-  safeStorage,
-  screen,
-  session,
-  shell,
-  systemPreferences
+  ipcMain
 } from 'electron'
-import { type FaviconIo, resolveFavicon } from '../../favicon'
+
 import { fetchMarketplaceThemes, searchMarketplaceThemes } from '../../vscode-marketplace'
 
 export interface RegisterPreviewIpcDeps {

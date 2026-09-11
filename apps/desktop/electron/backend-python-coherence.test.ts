@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
-import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { test } from 'vitest'
-import { mainProcessSources, sliceFromAnyModule } from './test-main-process-sources'
+
+import { mainProcessSources } from './test-main-process-sources'
 
 
 

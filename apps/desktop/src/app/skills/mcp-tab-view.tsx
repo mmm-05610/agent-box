@@ -3,6 +3,7 @@
 import { useStore } from '@nanostores/react'
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef, useState } from 'react'
+
 import { type CodeEditorApi } from '@/components/chat/code-editor'
 import { JsonDocumentEditor } from '@/components/chat/json-document-editor'
 import { PageLoader } from '@/components/page-loader'
@@ -10,11 +11,8 @@ import { Button } from '@/components/ui/button'
 import { ErrorBanner } from '@/components/ui/error-state'
 import { TextTab } from '@/components/ui/text-tab'
 import {
-  getActionStatus,
-  getLogs,
   getMcpCatalog,
   type HermesGateway,
-  installMcpCatalogEntry,
   type McpCatalogEntry,
   type McpTestResult,
   type ProfileScope,
@@ -25,21 +23,30 @@ import {
 import { useI18n } from '@/i18n'
 import { estimateServerTokens, serverUsageCount } from '@/lib/mcp-cost'
 import { completeMcpDesktopOAuth } from '@/lib/mcp-dashboard-oauth'
-import { type McpImportEntry, parseMcpImport } from '@/lib/mcp-import'
+import { type McpImportEntry } from '@/lib/mcp-import'
 import { PROBE_TTL_MS, probeCache, probeKey, serverFingerprint } from '@/lib/mcp-probe-cache'
 import { getServers, type McpServers } from '@/lib/mcp-servers'
-import { isToolEnabled, toggleToolInServer } from '@/lib/mcp-tool-filter'
+import { toggleToolInServer } from '@/lib/mcp-tool-filter'
 import { cn } from '@/lib/utils'
 import { notify, notifyError } from '@/store/notifications'
 import { $activeGatewayProfile, normalizeProfileKey } from '@/store/profile'
 import { $activeSessionId } from '@/store/session'
+
 import { hermesConfigCacheWriter, useHermesConfigRecord } from '../hooks/use-config-record'
 import { useOnProfileSwitch } from '../hooks/use-on-profile-switch'
-import { DetailPane, ICON_BUTTON, MASTER_DETAIL_WIDE_COLS } from '../master-detail'
+import { DetailPane, MASTER_DETAIL_WIDE_COLS } from '../master-detail'
 import { PanelAddButton, PanelEmpty } from '../overlays/panel'
 import { useDeepLinkHighlight } from '../settings/use-deep-link-highlight'
+
+import { STARTER_ENTRY } from './mcp-tab'
 import {
-  capabilitySummary,
+  McpCatalog,
+  McpImportButton,
+  McpLogs,
+  McpRow,
+  ServerConfig,
+} from './mcp-tab-parts'
+import {
   loadMcpUsage,
   MCP_CATALOG_KEY,
   parseServersDoc,
@@ -47,28 +54,10 @@ import {
   scanServerBlocks,
   type ServerCost,
   serverEnabled,
-  type ServerStatus,
-  STATUS_DOT,
   statusLine,
   statusOf,
   wrapDoc,
 } from './view-model'
-import {
-  ServerConfig,
-  ServerSwitch,
-  ServerIconActions,
-  McpImportButton,
-  CatalogTag,
-  McpCatalog,
-  LOG_POLL_MS,
-  CATALOG_INSTALL_POLL_MS,
-  STDIO_MARKER_RE,
-  filterStdioSections,
-  McpLogs,
-  McpAvatar,
-  McpRow,
-} from './mcp-tab-parts'
-import { STARTER_ENTRY } from './mcp-tab'
 
 export function McpTab({ gateway, profile }: { gateway: HermesGateway | null; profile?: ProfileScope }) {
   const { t } = useI18n()

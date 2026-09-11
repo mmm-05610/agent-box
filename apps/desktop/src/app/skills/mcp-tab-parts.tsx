@@ -1,7 +1,8 @@
 // Extracted verbatim from mcp-tab.tsx (see docs/desktop-megafile-decomposition.md).
 
 import { useStore } from '@nanostores/react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+
 import { LogTail } from '@/components/chat/log-tail'
 import { PageLoader } from '@/components/page-loader'
 import { AvatarChip } from '@/components/ui/avatar-chip'
@@ -15,41 +16,31 @@ import { Tip } from '@/components/ui/tooltip'
 import {
   getActionStatus,
   getLogs,
-  getMcpCatalog,
-  type HermesGateway,
   installMcpCatalogEntry,
   type McpCatalogEntry,
-  type McpTestResult,
-  type ProfileScope,
-  profileScopeKey,
-  saveMcpServers,
-  testMcpServer
+  type ProfileScope
 } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { startCompletionPoll } from '@/lib/completion-poll'
 import { brandFor } from '@/lib/mcp-brands'
 import { type McpImportEntry, parseMcpImport } from '@/lib/mcp-import'
-import { isToolEnabled, toggleToolInServer } from '@/lib/mcp-tool-filter'
+import { isToolEnabled } from '@/lib/mcp-tool-filter'
 import { cn } from '@/lib/utils'
 import { notify, notifyError } from '@/store/notifications'
-import { $activeGatewayProfile, normalizeProfileKey } from '@/store/profile'
-import { DetailPane, ICON_BUTTON, MASTER_DETAIL_WIDE_COLS } from '../master-detail'
-import { PanelAddButton, PanelEmpty } from '../overlays/panel'
+import { $activeGatewayProfile } from '@/store/profile'
+
+import { ICON_BUTTON } from '../master-detail'
+import { PanelEmpty } from '../overlays/panel'
 import { prettyName } from '../settings/helpers'
+
 import {
   capabilitySummary,
-  loadMcpUsage,
-  MCP_CATALOG_KEY,
-  parseServersDoc,
   type Probe,
-  scanServerBlocks,
   type ServerCost,
   serverEnabled,
   type ServerStatus,
   STATUS_DOT,
-  statusLine,
   statusOf,
-  wrapDoc,
 } from './view-model'
 
 export function ServerConfig({

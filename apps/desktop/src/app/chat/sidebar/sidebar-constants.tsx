@@ -1,28 +1,20 @@
 // Extracted verbatim from index.tsx (see docs/desktop-megafile-decomposition.md).
 
 import { Codicon } from '@/components/ui/codicon'
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem
-} from '@/components/ui/sidebar'
-import { searchSessions, type SessionInfo, type SessionSearchResult } from '@/hermes'
+import type {
+  Sidebar} from '@/components/ui/sidebar';
+import { type SessionInfo } from '@/hermes'
 import { cn } from '@/lib/utils'
+
 import {
   type AppView,
   ARTIFACTS_ROUTE,
   CRON_ROUTE,
   MESSAGING_ROUTE,
-  SIDEBAR_NAV_AREA,
-  type SidebarNavContribution,
   SKILLS_ROUTE
 } from '../../routes'
 import type { SidebarNavItem } from '../../types'
-import { type NewSessionSplitHandler, startNewSessionDrag } from '../new-session-drag'
+import { type NewSessionSplitHandler } from '../new-session-drag'
 
 export const NON_SESSION_INITIAL_ROWS = 3
 

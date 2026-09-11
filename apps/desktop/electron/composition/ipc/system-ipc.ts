@@ -3,48 +3,23 @@
 
 import fs from 'node:fs'
 import path from 'node:path'
+
 import {
   app,
-  BrowserWindow,
-  clipboard,
   dialog,
-  net as electronNet,
-  webContents as electronWebContents,
-  globalShortcut,
   ipcMain,
-  Menu,
-  nativeTheme,
-  powerMonitor,
-  powerSaveBlocker,
-  protocol,
-  safeStorage,
-  screen,
-  session,
-  shell,
-  systemPreferences
+  shell
 } from 'electron'
+
 import { detectBundleSwap } from '../../bundle-swap'
 import {
-  cancelScheduledDesktopLogFlush,
   flushDesktopLogBufferSync,
   getRecentHermesLogLines,
-  initDesktopLogBuffer,
   rememberLog
 } from '../../composition/log-buffer'
-import { attachRendererConsoleCapture, formatRendererBoundaryReport } from '../../renderer-log'
+import { formatRendererBoundaryReport } from '../../renderer-log'
 import {
-  alreadyHasNoSandbox,
-  buildNoSandboxRelaunchArgs,
-  decideWindowsSandboxLaunch,
-  fallbackMarker,
-  grantAllApplicationPackagesAcl,
-  markerAfterSuccessfulBoot,
-  readSandboxMarker,
-  type SandboxFallbackReason,
-  shouldAttemptAclRepair,
-  shouldRelaunchForGpuSandboxCrash,
-  shouldRelaunchForRendererSandboxCrashLoop,
-  writeSandboxMarker
+  buildNoSandboxRelaunchArgs
 } from '../../windows-sandbox-fallback'
 
 export interface RegisterSystemIpcDeps {

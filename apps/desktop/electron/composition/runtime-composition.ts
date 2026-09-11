@@ -3,169 +3,61 @@
 // bottom exist so main can read/write the few mutable bindings the sequence needs.
 
 import fs from 'node:fs'
-import http from 'node:http'
 import path from 'node:path'
+
 import {
-  app,
-  BrowserWindow,
-  clipboard,
-  dialog,
-  net as electronNet,
-  webContents as electronWebContents,
-  globalShortcut,
-  ipcMain,
-  Menu,
-  nativeTheme,
-  powerMonitor,
-  powerSaveBlocker,
-  protocol,
-  safeStorage,
-  screen,
-  session,
-  shell,
-  systemPreferences
+  session
 } from 'electron'
+
 import {
-  cancelScheduledDesktopLogFlush,
-  flushDesktopLogBufferSync,
-  getRecentHermesLogLines,
-  initDesktopLogBuffer,
-  rememberLog
-} from './log-buffer'
-import {
-  apiRequestRegistryConnectionId,
-  authModeFromStatus,
-  buildGatewayWsUrl,
-  buildGatewayWsUrlWithTicket,
-  connectionScopeKey,
-  cookiesHaveLiveSession,
-  cookiesHavePrivyAccessToken,
-  cookiesHavePrivySession,
-  cookiesHaveSession,
-  gatewayTicketFailure,
-  gatewayWsUrlIpcResult,
-  hostLabelFromBaseUrl,
-  localProfileEntry,
   modeIsRemoteLike,
-  normalizeRemoteBaseUrl,
-  normalizeRemoteHeaders,
-  normalizeSshConfig,
-  normAuthMode,
-  pathForRegistryBackendRequest,
-  pathWithGlobalRemoteProfile,
-  profileHasRemoteConnection,
-  profileRemoteOverride,
-  profileSshOverride,
-  type RegistryBackendRequestScope,
-  remoteRequestMatchesBaseUrl,
-  resolveAuthMode,
-  resolveProfileApiRequest,
-  resolveProfileBackendRoute,
-  resolveRemoteSshDashboardProfile,
-  resolveTestWsUrl,
-  savedProfileSsh,
-  tokenPreview,
-  withTransientRetries
+  remoteRequestMatchesBaseUrl
 } from '../connection-config'
 import {
   backendScopeKey,
-  backendScopePrefix,
-  buildAgentRoster,
-  connectionDialFieldsChanged,
-  mergeConnectionInput,
-  migrateV1ToRegistry,
-  normalizeConnectionInput,
-  normalizeRegistry,
-  parseBackendScopeKey,
-  reconcileAppliedGlobalConnection,
-  reconcileRegistryDrift,
-  registrySourceOwnsPrimaryBackend,
-  rememberSshEnumeration,
-  removeConnection,
-  resolvedConnectionId,
-  resolveRegistryLocalRoute,
-  reuseMatchingPrimarySshBackend,
-  setConnectionLaunchMode,
-  setLastUsedConnection,
-  setPrimaryConnection,
-  shouldDeferLocalEnumeration,
-  shouldRetrySshInventory,
-  updateEligibility,
-  upsertConnection
+  backendScopePrefix
 } from '../connection-registry'
-import { resolveDesktopRemoteRoute, v1SshTerminalPoolKey } from '../desktop-remote-route'
+import { resolveDesktopRemoteRoute } from '../desktop-remote-route'
 import {
-  ATTACHMENT_UPLOAD_DEFAULT_MAX_BYTES,
-  clampDataUrlReadMaxMb,
-  DATA_URL_READ_DEFAULT_MAX_MB,
-  dataUrlReadMaxBytesFromMb,
-  DEFAULT_FETCH_TIMEOUT_MS,
-  enableBasicPasswordStoreEncryption,
-  encryptDesktopSecret as encryptDesktopSecretStrict,
-  readFileDataUrlForIpc,
-  resolvePersistedRemoteToken,
-  resolveReadableFileForIpc,
-  resolveRequestedPathForIpc,
-  resolveTimeoutMs,
-  SAFE_STORAGE_ENCODING,
-  TEXT_PREVIEW_SOURCE_MAX_BYTES,
-  tightenSecretFileMode,
   writeSecretFileAtomic
 } from '../hardening'
 import {
   assertManagedUpdatePreflightClear,
   executeManagedRemoteUpdate,
-  fenceManagedSshBootstrapPublication,
-  ManagedConnectionUpdateGate,
   managedSshRecoveryScopes,
   managedSshScopeRole,
-  managedSshTokenPersistencePlan,
   recoverManagedSshScopes,
-  refusedManagedSshUpdate,
   type RemoteUpdateTarget,
   runManagedSshUpdate,
   validateCorrelationId,
   waitForManagedRemoteClearance,
-  waitForManagedSshBootstrapFence,
-  waitForManagedUpdateOperations
+  waitForManagedSshBootstrapFence
 } from '../managed-ssh-update'
-import { clampPoolLimits, parsePoolLimits, POOL_LIMITS_DEFAULTS } from '../pool-limits'
+import { clampPoolLimits } from '../pool-limits'
 import {
-  isBackgroundSlotWaitTimeout,
-  LocalBackendSpawnCoordinator,
-  type LocalBackendSpawnPriority,
-  type LocalBackendSpawnRequest,
-  releaseLocalBackendSlotAfterExit
+  type LocalBackendSpawnPriority
 } from '../pool-spawn-coordinator'
+import * as remoteLifecycle from '../remote-lifecycle'
 import {
-  attachPowerResumeRemoteRevalidation,
-  ensureHealthyPooledRemoteBackendForDispatch,
   RemoteLivenessTracker,
-  RemoteRevalidationCoordinator,
-  revalidatePooledRemoteBackends,
-  revalidateRemoteConnection,
-  revalidateSuspectPooledRemoteBackends
+  RemoteRevalidationCoordinator
 } from '../remote-liveness'
 import {
-  applyRemoteRequestHeaders,
-  createRegistryGatewayWsUrlHandler,
-  createRemoteWsHeaderStore
+  applyRemoteRequestHeaders
 } from '../remote-ws-headers'
-import { createSshProbeConnection, pickLocalPort, redactSecrets, SshConnection } from '../ssh-connection'
+import { createSshProbeConnection } from '../ssh-connection'
 import {
-  connectWindowsRemote,
   detectRemotePlatform,
-  helper,
   probeWindowsRemote,
   terminateOwnedWindowsDashboardForUpdate
 } from '../windows-remote-lifecycle'
+
 import {
-  DESKTOP_MANAGED_SSH_RECOVERY_PATH,
   backendConnectionState,
   backendPool,
-  backendStartFailure,
   connectRegistryBackend,
   decryptRemoteHeaders,
+  DESKTOP_MANAGED_SSH_RECOVERY_PATH,
   encryptDesktopSecret,
   evictLruPoolBackends,
   localBackendSpawnCoordinator,
@@ -180,8 +72,9 @@ import {
   readDesktopConnectionConfig,
   readDesktopConnectionsRegistry,
   readManagedSshRecoveryRecords,
-  remoteReauthFailure,
   remoteWsHeaderStore,
+  setBackendStartFailure,
+  setRemoteReauthFailure,
   sshBootstrapCoordinator,
   sshConnections,
   sshRememberLog,
@@ -192,16 +85,10 @@ import {
   terminalIpc,
   updateBootProgress,
   waitForHermes,
-  getPoolLimits,
-  getBackendStartFailure,
-  setBackendStartFailure,
-  getRemoteReauthFailure,
-  setRemoteReauthFailure,
 } from './bootstrap-env-composition'
 import {
   persistPoolLimits,
 } from './paths-composition'
-import * as remoteLifecycle from '../remote-lifecycle'
 
 export const remoteLiveness = new RemoteLivenessTracker()
 
@@ -828,6 +715,7 @@ export async function recoverManagedSshUpdate(record) {
 export function getRemoteHeaderRulesInstalled() {
   return remoteHeaderRulesInstalled
 }
+
 export function setRemoteHeaderRulesInstalled(value: any) {
   remoteHeaderRulesInstalled = value
 }

@@ -1,4 +1,3 @@
-import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -6,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { BackendDialClaims } from './backend-dial-claim'
 import { parseBackendScopeKey } from './connection-registry'
-import { mainProcessSources, sliceFromAnyModule } from './test-main-process-sources'
+import { mainProcessSources } from './test-main-process-sources'
 
 
 

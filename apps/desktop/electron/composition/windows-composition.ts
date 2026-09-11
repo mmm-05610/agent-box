@@ -1,34 +1,21 @@
-import {
-  nextInstanceBounds,
-  hudBounds,
-} from '../main'
+import fs from 'node:fs'
 // Extracted verbatim from main.ts (see docs/desktop-megafile-decomposition.md).
 // main.ts keeps only the startup/lifecycle statement sequence; the accessors at the
 // bottom exist so main can read/write the few mutable bindings the sequence needs.
-
-import fs from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
+
 import {
   app,
   BrowserWindow,
-  clipboard,
-  dialog,
-  net as electronNet,
-  webContents as electronWebContents,
   globalShortcut,
-  ipcMain,
   Menu,
-  nativeTheme,
-  powerMonitor,
-  powerSaveBlocker,
-  protocol,
-  safeStorage,
   screen,
   session,
   shell,
   systemPreferences
 } from 'electron'
+
 import {
   BROWSER_WINDOW_HEIGHT,
   BROWSER_WINDOW_MIN_HEIGHT,
@@ -38,43 +25,7 @@ import {
 } from '../browser-windows'
 import { detectBundleSkew } from '../bundle-skew'
 import {
-  cancelScheduledDesktopLogFlush,
-  flushDesktopLogBufferSync,
-  getRecentHermesLogLines,
-  initDesktopLogBuffer,
-  rememberLog
-} from './log-buffer'
-import {
-  applyTitleBarOverlay,
-  applyWindowTranslucency,
-  chatWindowSurfaceOptions,
-  getTitleBarOverlayOptions,
-  getTranslucencyState,
-  isHexColor,
-  setRendererTitleBarTheme,
-  setTranslucencyState,
-  THEME_SOURCES,
-  translucencyBackedWindows,
-  writePersistedThemeSource,
-  writePersistedTranslucency
-} from './window-theme'
-import {
-  ATTACHMENT_UPLOAD_DEFAULT_MAX_BYTES,
-  clampDataUrlReadMaxMb,
-  DATA_URL_READ_DEFAULT_MAX_MB,
-  dataUrlReadMaxBytesFromMb,
-  DEFAULT_FETCH_TIMEOUT_MS,
-  enableBasicPasswordStoreEncryption,
-  encryptDesktopSecret as encryptDesktopSecretStrict,
-  readFileDataUrlForIpc,
-  resolvePersistedRemoteToken,
-  resolveReadableFileForIpc,
-  resolveRequestedPathForIpc,
-  resolveTimeoutMs,
-  SAFE_STORAGE_ENCODING,
-  TEXT_PREVIEW_SOURCE_MAX_BYTES,
-  tightenSecretFileMode,
-  writeSecretFileAtomic
+  resolveRequestedPathForIpc
 } from '../hardening'
 import { cursorPointInWindow } from '../hud-cursor'
 import { startHudGameOverlayWatch } from '../hud-game-overlay'
@@ -83,61 +34,45 @@ import { snapHudBounds } from '../hud-snap'
 import { createHudSnapShortcut } from '../hud-snap-shortcut'
 import { buildHudWindowUrl } from '../hud-url'
 import { resolveHudWindowing } from '../hud-windowing'
-import { createQuickEntryShortcut, quickEntryWindowBounds, sanitizeQuickEntrySettings } from '../quick-entry'
-import { attachRendererConsoleCapture, formatRendererBoundaryReport } from '../renderer-log'
+import {
+  hudBounds,
+  nextInstanceBounds,
+} from '../main'
+import { createQuickEntryShortcut, quickEntryWindowBounds } from '../quick-entry'
+import { attachRendererConsoleCapture } from '../renderer-log'
 import {
   buildInstanceWindowUrl,
-  buildSessionWindowUrl,
   chatWindowWebPreferences,
-  createSessionWindowRegistry,
-  instanceWindowBounds,
-  SESSION_WINDOW_MIN_HEIGHT,
-  SESSION_WINDOW_MIN_WIDTH
+  createSessionWindowRegistry
 } from '../session-windows'
-import { enumerateWindowsFrontToBack, enumerationFailed, readWindowBelow } from '../window-below'
+import { enumerateWindowsFrontToBack, enumerationFailed } from '../window-below'
 import { installWindowRendererLifecycle } from '../window-renderer-lifecycle'
 import {
   bindGeometryPersistence,
-  computeWindowOptions,
   debounce,
-  sanitizeWindowState,
   MIN_HEIGHT as WINDOW_MIN_HEIGHT,
   MIN_WIDTH as WINDOW_MIN_WIDTH
 } from '../window-state'
 import {
-  connectWindowsRemote,
-  detectRemotePlatform,
-  helper,
-  probeWindowsRemote,
-  terminateOwnedWindowsDashboardForUpdate
-} from '../windows-remote-lifecycle'
-import {
-  applyZoomLevel,
   DEFAULT_ZOOM_LEVEL,
-  installZoomReassertOnNavigation,
-  installZoomReassertOnWindowEvents,
-  percentToZoomLevel,
   ZOOM_STEP,
-  ZOOM_STORAGE_KEY,
-  zoomLevelToPercent,
   zoomWiringForWindowKind
 } from '../zoom'
+
 import {
   APP_NAME,
   DEV_SERVER,
+  getAppIconPath,
   HUD_WINDOW_TITLE,
   INSTALL_STAMP,
   IS_MAC,
-  PRELOAD_PATH,
-  RENDERER_RELOAD_MAX,
-  RENDERER_RELOAD_WINDOW_MS,
-  WINDOW_BUTTON_POSITION,
-  getAppIconPath,
-  installPreviewShortcut,
   loadWindowUrl,
   mainWindow,
   openExternalUrl,
   petOverlayWindow,
+  PRELOAD_PATH,
+  RENDERER_RELOAD_MAX,
+  RENDERER_RELOAD_WINDOW_MS,
   rendererReloadTimesRef,
   resolveRendererIndex,
   resolveUpdateRoot,
@@ -146,17 +81,25 @@ import {
   sendPreviewNavCommand,
   sendWindowStateChanged,
   setAndPersistZoomLevel,
+  setPetOverlayWindow,
   streamThrottle,
   toggleDevTools,
+  WINDOW_BUTTON_POSITION,
   wireCommonWindowHandlers,
   wireWindowReveal,
   writeFileAtomic,
-  getPetOverlayWindow,
-  setPetOverlayWindow,
 } from './bootstrap-env-composition'
+import {
+  rememberLog
+} from './log-buffer'
 import {
   resolveHermesVersion,
 } from './paths-composition'
+import {
+  chatWindowSurfaceOptions,
+  getTitleBarOverlayOptions,
+  translucencyBackedWindows
+} from './window-theme'
 
 export async function openPreviewInBrowser(rawUrl) {
   const raw = String(rawUrl || '').trim()
@@ -1258,6 +1201,7 @@ export function showAboutPanelFresh() {
 export function getHudWindow() {
   return hudWindow
 }
+
 export function setHudWindow(value: any) {
   hudWindow = value
 }
@@ -1265,6 +1209,7 @@ export function setHudWindow(value: any) {
 export function getHudRestoreMainWindow() {
   return hudRestoreMainWindow
 }
+
 export function setHudRestoreMainWindow(value: any) {
   hudRestoreMainWindow = value
 }
@@ -1272,6 +1217,7 @@ export function setHudRestoreMainWindow(value: any) {
 export function getHudSessionId() {
   return hudSessionId
 }
+
 export function setHudSessionId(value: any) {
   hudSessionId = value
 }
@@ -1279,6 +1225,7 @@ export function setHudSessionId(value: any) {
 export function getHudProfile() {
   return hudProfile
 }
+
 export function setHudProfile(value: any) {
   hudProfile = value
 }
@@ -1286,6 +1233,7 @@ export function setHudProfile(value: any) {
 export function getQuickEntryWindow() {
   return quickEntryWindow
 }
+
 export function setQuickEntryWindow(value: any) {
   quickEntryWindow = value
 }
@@ -1293,6 +1241,7 @@ export function setQuickEntryWindow(value: any) {
 export function getQuickEntryLastState() {
   return quickEntryLastState
 }
+
 export function setQuickEntryLastState(value: any) {
   quickEntryLastState = value
 }

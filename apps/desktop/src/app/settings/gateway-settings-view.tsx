@@ -2,6 +2,7 @@
 
 import { useStore } from '@nanostores/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Input } from '@/components/ui/input'
@@ -15,7 +16,6 @@ import {
   Cloud,
   FileText,
   Globe,
-  HelpCircle,
   Loader2,
   LogIn,
   Monitor,
@@ -31,8 +31,10 @@ import {
   selectConnection
 } from '@/store/connections'
 import { notify, notifyError, readableError } from '@/store/notifications'
+
 import { ConnectionsRegistrySection } from './connections-registry'
 import { CONTROL_TEXT } from './constants'
+import { ModeCard } from './gateway-settings-parts'
 import { ManagedUpdatesSection } from './managed-updates-section'
 import { EmptyState, ListRow, Pill, SettingsContent, SettingsSkeleton, ToggleRow } from './primitives'
 import {
@@ -46,7 +48,6 @@ import {
   SSH_HOST_CUSTOM
 } from './settings-state'
 import { enrichSelectedSshHost, selectSshHost } from './ssh-host-selection'
-import { ModeCard } from './gateway-settings-parts'
 
 export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {}) {
   const { t } = useI18n()
