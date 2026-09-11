@@ -14,6 +14,7 @@ import {
 } from 'react'
 
 import { requestForOwnedSession } from '@/application/session/request-owned-session'
+import { visibleClarifyCard } from '@/components/assistant-ui/clarify-card'
 import { ToolFallback } from '@/components/assistant-ui/tool/fallback'
 import { useSessionView } from '@/components/chat/session-view'
 import { WIDGET_SHELL_CLASS } from '@/components/chat/widget-shell'
@@ -25,7 +26,6 @@ import { Tip } from '@/components/ui/tooltip'
 import { useI18n } from '@/i18n'
 import { triggerHaptic } from '@/lib/haptics'
 import { CircleLetterA, Loader2, MessageQuestion } from '@/lib/icons'
-import { visibleClarifyCard } from '@/lib/keybinds/composer-focus-keys'
 import { cn } from '@/lib/utils'
 import {
   bareChoice,

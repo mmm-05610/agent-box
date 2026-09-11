@@ -12,6 +12,7 @@
 import { useStore } from '@nanostores/react'
 import { type CSSProperties, Fragment, type ReactNode, type RefObject, useEffect, useRef, useState } from 'react'
 
+import { useKeybindHint } from '@/components/keybinds/use-keybind-hint'
 import { ActionsContextMenu, type MenuKit, renderActionItem } from '@/components/ui/actions-menu'
 import { Codicon } from '@/components/ui/codicon'
 import { DecodeText } from '@/components/ui/decode-text'
@@ -28,7 +29,6 @@ import {
 import { ContribBoundary, ContribRender } from '@/extension/contrib/react/boundary'
 import { useContributions } from '@/extension/contrib/react/use-contributions'
 import { useI18n } from '@/i18n'
-import { useKeybindHint } from '@/lib/keybinds/use-keybind-hint'
 import { emptyPaneLifecycleState, reconcilePaneLifecycle } from '@/lib/pane-shell/pane-lifecycle'
 import {
   $tabSelection,

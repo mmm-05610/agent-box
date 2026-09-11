@@ -12,7 +12,7 @@ vi.mock('@/i18n', () => ({
   useI18n: () => ({ t: { sidebar: { nav: { 'new-session': 'New session' } } } })
 }))
 
-vi.mock('@/lib/keybinds/use-keybind-hint', () => ({ useKeybindHint: () => null }))
+vi.mock('@/components/keybinds/use-keybind-hint', () => ({ useKeybindHint: () => null }))
 
 afterEach(cleanup)
 

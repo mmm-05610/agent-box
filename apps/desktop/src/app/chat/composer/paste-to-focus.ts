@@ -18,7 +18,8 @@ import { linkifyUrls } from '@/components/composer/url-refs'
 import { sanitizeComposerInput } from '@/lib/composer-input-sanitize'
 import { DATA_IMAGE_URL_RE } from '@/lib/embedded-images'
 import { isEditableTarget } from '@/lib/keybinds/combo'
-import { composerFocusBlockedBySurface } from '@/lib/keybinds/composer-focus-keys'
+
+import { composerFocusBlockedBySurface } from './focus-keys'
 
 /** Route clipboard contents to the active composer. True when it carried
  *  something a composer can take (the caller should swallow the event). */

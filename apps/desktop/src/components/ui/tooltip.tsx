@@ -1,9 +1,9 @@
 import { Tooltip as TooltipPrimitive } from 'radix-ui'
 import * as React from 'react'
 
+import { useKeybindHint } from '@/components/keybinds/use-keybind-hint'
 import { useI18n } from '@/i18n'
 import { type InputModality, lastInputModality } from '@/lib/input-modality'
-import { useKeybindHint } from '@/lib/keybinds/use-keybind-hint'
 import { cn } from '@/lib/utils'
 
 /** Default hover-open delay for `Tip`. Below 150ms a passing cursor still

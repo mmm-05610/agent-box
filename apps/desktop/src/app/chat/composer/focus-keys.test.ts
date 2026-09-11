@@ -1,16 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { $workspaceIsPage } from '@/app/routes'
+import { visibleClarifyCard } from '@/components/assistant-ui/clarify-card'
 import { $activeTreeGroup, $hoveredTreeGroup } from '@/store/pane-shell/tree'
 import { $switcherOpen, closeSwitcher } from '@/store/session-switcher'
 
-import {
-  composerFocusBlockedBySurface,
-  composerFocusKeysAllowed,
-  isActivateOnEnterTarget,
-  typeToFocusChar,
-  visibleClarifyCard
-} from './composer-focus-keys'
+import { composerFocusBlockedBySurface, composerFocusKeysAllowed, isActivateOnEnterTarget, typeToFocusChar } from './focus-keys'
 
 function keydown(init: KeyboardEventInit & { target?: EventTarget }): KeyboardEvent {
   const event = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init })
