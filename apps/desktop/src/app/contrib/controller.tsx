@@ -23,7 +23,6 @@ import { Download, FileText, LayoutDashboard, PanelBottom, PanelTop, Terminal, U
 import { type KeybindContribution, KEYBINDS_AREA } from '@/lib/keybinds/actions'
 import { allPaneIds, group, groupLeafIds, split } from '@/lib/pane-tree'
 import { TRANSCRIPT_DIRECTIVE_AREA, type TranscriptDirectiveContribution } from '@/lib/transcript-directives'
-import { setYoloEnabled } from '@/lib/yolo-session'
 import { pruneComposerPopoutZones } from '@/store/composer-popout'
 import {
   $fileBrowserOpen,
@@ -76,6 +75,7 @@ import { $botChatScopes } from '@/store/session-states'
 import { watchUnreadWriteGuard } from '@/store/session/unread'
 import { $statusbarVisible } from '@/store/statusbar-prefs'
 import { isBrowserWindow, isHudWindow } from '@/store/windows'
+import { setYoloEnabled } from '@/store/yolo-session'
 
 import { BrowserPopoutShell } from '../chat/browser-popout-shell'
 import { watchPreviewTiles } from '../chat/preview-tile'

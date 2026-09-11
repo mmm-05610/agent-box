@@ -265,16 +265,6 @@ export { type RouteContribution, ROUTES_AREA, SIDEBAR_NAV_AREA, type SidebarNavC
 /** THE compact-number formatter — every user-facing count/token figure goes
  *  through here (1230 → "1.2k", 1_500_000 → "1.5M"). Don't hand-roll `/1000`. */
 export { compactNumber } from '@/lib/format'
-/** THE confirm flow for guarded model switches — when a gateway model-switch
- *  RPC answers `confirm_required` (data-policy / expensive-model guard),
- *  route it through this shared applier instead of forking a per-surface
- *  dialog: it shows the warning and resends with
- *  `confirm_expensive_model: true` on Confirm (#95293). */
-export {
-  type GuardedModelSwitchResult,
-  surfaceModelSwitchConfirm,
-  type SurfaceModelSwitchConfirmOptions
-} from '@/lib/guarded-model-switch'
 export { triggerHaptic as haptic } from '@/lib/haptics'
 export type { HermesOpenTarget } from '@/lib/hermes-open-target'
 /** Grab-to-pan for overflow containers (boards, timelines, wide tables) —
@@ -338,6 +328,16 @@ export {
   type TranscriptDirectiveProps
 } from '@/lib/transcript-directives'
 export { cn } from '@/lib/utils'
+/** THE confirm flow for guarded model switches — when a gateway model-switch
+ *  RPC answers `confirm_required` (data-policy / expensive-model guard),
+ *  route it through this shared applier instead of forking a per-surface
+ *  dialog: it shows the warning and resends with
+ *  `confirm_expensive_model: true` on Confirm (#95293). */
+export {
+  type GuardedModelSwitchResult,
+  surfaceModelSwitchConfirm,
+  type SurfaceModelSwitchConfirmOptions
+} from '@/store/guarded-model-switch'
 /** THE unread store behind `SessionStatusDot`'s emerald dot. A plugin that
  *  learns out-of-band that a session produced something the user hasn't seen
  *  (a roster poll's activity watermark, say) writes HERE rather than keeping

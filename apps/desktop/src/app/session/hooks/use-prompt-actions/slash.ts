@@ -17,7 +17,6 @@ import {
   resolveDesktopCommand
 } from '@/lib/desktop-slash-commands'
 import { isMissingRpcMethod } from '@/lib/gateway-rpc'
-import { setSessionYolo } from '@/lib/yolo-session'
 import { openCommandPalettePage } from '@/store/command-palette'
 import { setComposerDraft } from '@/store/composer'
 import { applyGoalStatusText } from '@/store/goals'
@@ -37,6 +36,7 @@ import {
   setYoloActive
 } from '@/store/session'
 import { $sessionStates } from '@/store/session-states'
+import { setSessionYolo } from '@/store/yolo-session'
 import type { BrowserManageResponse, SessionCompressResponse, SessionTitleResponse, SlashExecResponse } from '@/types/api-responses'
 import type { ClientSessionState } from '@/types/session'
 

@@ -24,7 +24,7 @@ vi.mock('@/hermes', async importOriginal => ({
   restartGateway: vi.fn(),
   updateHermes: vi.fn()
 }))
-vi.mock('@/lib/session-export', () => ({ exportSession: vi.fn() }))
+vi.mock('@/store/session-export', () => ({ exportSession: vi.fn() }))
 vi.mock('./maintenance', () => ({ MaintenancePanel: () => null }))
 
 afterEach(cleanup)
