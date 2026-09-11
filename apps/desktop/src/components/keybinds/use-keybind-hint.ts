@@ -1,10 +1,9 @@
 import { useStore } from '@nanostores/react'
 
 import { $registryVersion } from '@/lib/contributions'
+import { KEYBIND_READONLY } from '@/lib/keybinds/actions'
+import { formatCombo } from '@/lib/keybinds/combo'
 import { $bindings, bindingsFor } from '@/store/keybinds'
-
-import { KEYBIND_READONLY } from './actions'
-import { formatCombo } from './combo'
 
 // The formatted first combo for `actionId`, or null when unbound. Rebindable
 // actions read live from the store; readonly shortcuts (e.g. `composer.steer`)

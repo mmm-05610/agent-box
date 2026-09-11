@@ -15,11 +15,11 @@
 
 import { useEffect, useRef } from 'react'
 
+import { useKeybindHint } from '@/components/keybinds/use-keybind-hint'
 import { KbdCombo } from '@/components/ui/kbd'
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
 import { useI18n } from '@/i18n'
 import { iconSize, X } from '@/lib/icons'
-import { useKeybindHint } from '@/lib/keybinds/use-keybind-hint'
 import type { TipSide } from '@/lib/tips/catalog'
 import type { ActiveTip } from '@/store/tips'
 

@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react'
 
+import { composerFocusBlockedBySurface } from '@/app/chat/composer/focus-keys'
 import { type ComposerTarget, getActiveComposer } from '@/components/composer/focus'
 import { triggerHaptic } from '@/lib/haptics'
-import { composerFocusBlockedBySurface } from '@/lib/keybinds/composer-focus-keys'
 
 interface UseComposerEscCancelOptions {
   awaitingInput: boolean
