@@ -13,6 +13,8 @@
  *  - `host.state.*` — READONLY app state (nanostore atoms; `.get()` or
  *    subscribe; `useValue` in React).
  *  - `host.*` actions — curated, safe verbs (toast, haptic).
+ *  - `ctx.hostViews` — whole host surfaces a plugin may render (Capabilities,
+ *    toolset config, MCP). Optional: an older build provides none.
  *  - `host.request` — the gateway JSON-RPC door; the plugin's real power,
  *    and the future seam for per-plugin capability grants.
  *  - `ui.*` — the design language, so plugin UI looks native by default.
@@ -60,31 +62,8 @@ export type {
   ViewportRect
 } from './host-state'
 
-// -- react bridge -------------------------------------------------------------
-
-/** THE full per-toolset config panel core Settings renders — provider picker,
- *  env vars / API keys, model catalog picker, and post-setup runners. Route-
- *  decoupled (the "manage keys" deep link is a no-op outside the router); pass
- *  `toolset`, optional `onConfiguredChange`, and an optional `profile`. */
-export { ToolsetConfigPanel } from '@/app/settings/toolset-config-panel'
-
 // -- ui: the design language --------------------------------------------------
 
-/** THE whole Capabilities surface (Skills / Tools / MCP tabs, installed
- *  lists, full-skill detail pane, embedded hub picker with one-click
- *  installs). For plugin dialogs pass `embedded` (tab state stays local —
- *  never touches the page router) and `fixedProfile` to pin every tab to one
- *  bot's backend; the internal profile selector hides itself. Add
- *  `fixedConnection` (registry connection id) to pin a bot living on another
- *  registered gateway — probe `SkillsView.supportsFixedConnection` first;
- *  builds without it would route the pin to the ACTIVE gateway. Bot Mode's
- *  Advanced section is the reference consumer. */
-export { SkillsView } from '@/app/skills'
-/** THE full MCP tab core Settings renders — per-server enable + OAuth sign-in
- *  + API-key setup + live probes, not a checkbox list. Route-decoupled so it
- *  renders anywhere (a plugin dialog); pass a live `gateway` (see
- *  `host.getGateway()`) and an optional `profile` to scope it to one bot. */
-export { McpTab } from '@/app/skills/mcp-tab'
 /** Live accent override — set a hex and the ACTIVE theme repaints with its
  *  accent family re-seeded from it (see `retintTheme`); `null` restores the
  *  authored palette. Deliberately not persisted: it is an authoring knob, not
@@ -212,6 +191,7 @@ export type {
   HermesPlugin,
   PluginContext,
   PluginContribution,
+  PluginHostViews,
   PluginNativeNotificationInput,
   PluginNotificationAction,
   PluginOs,

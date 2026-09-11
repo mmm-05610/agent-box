@@ -1,12 +1,13 @@
 /**
- * Bot Mode has to keep linking against an OLDER desktop SDK.
+ * Bot Mode has to keep linking against a host that provides no views.
  *
- * `McpTab`, `ToolsetConfigPanel` and `SkillsView` are capability exports: the
- * shell that hosts the plugin may predate any of them. Every use site is
- * therefore guarded, and the plugin module graph must evaluate — and still
- * hand back a registrable plugin — when all three are missing. A bare
- * top-level use of one of them turns a missing export into a blank Bots pane
- * on an older build, which is exactly the failure this pins.
+ * `ctx.hostViews` is an optional host capability: the shell that hosts the
+ * plugin may predate any of its surfaces (`McpTab`, `ToolsetConfigPanel`,
+ * `SkillsView`). Every use site is therefore guarded, and the plugin module
+ * graph must evaluate — and still hand back a registrable plugin — when the
+ * context carries none of them. A bare top-level use of one of them turns a
+ * missing capability into a blank Bots pane on an older host, which is
+ * exactly the failure this pins.
  */
 
 import { describe, expect, it, vi } from 'vitest'
@@ -57,7 +58,7 @@ vi.mock('@hermes/plugin-sdk', async () => {
   })
 })
 
-describe('an SDK without the optional capability exports', () => {
+describe('a host that provides no views', () => {
   it('still links Bot Mode into a registrable plugin', async () => {
     const plugin = (await import('./plugin')).default
 
@@ -67,11 +68,12 @@ describe('an SDK without the optional capability exports', () => {
 
   it('leaves the SkillsView connection-routing capability off', async () => {
     // `skillsViewRoutesConnections` gates whether a source-scoped bot may open
-    // the Capabilities tab at all — with no SkillsView it must read false, not
-    // throw on the missing export.
-    const { SkillsView, skillsViewRoutesConnections } = await import('./profile-config')
+    // the Capabilities tab at all — with no host views it must read false, not
+    // throw on the missing capability. `getPluginCtx()` stays null here, which
+    // is exactly a plugin no host has registered yet.
+    const { hostViews, skillsViewRoutesConnections } = await import('./profile-config')
 
-    expect(SkillsView).toBeUndefined()
-    expect(skillsViewRoutesConnections).toBe(false)
+    expect(hostViews().SkillsView).toBeUndefined()
+    expect(skillsViewRoutesConnections()).toBe(false)
   })
 })

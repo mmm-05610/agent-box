@@ -5,12 +5,13 @@
  * (per-server enable + OAuth + API keys) — pinned to the bot's own profile,
  * instead of bare checkbox stand-ins.
  *
- * All three are optional SDK namespace exports (hermes-agent#87317), so every
- * use site is feature-detected and older desktop builds keep the staged
- * checklist UI. The sharp edge is a REMOTE bot on a build whose SkillsView
- * predates `supportsFixedConnection`: rendering the live surface there would
- * read and write the ACTIVE gateway's skills under the remote bot's name —
- * the wrong machine — so those builds must fail closed to "staged only".
+ * All three arrive as optional members of `ctx.hostViews` (hermes-agent#87317),
+ * so every use site probes the context and hosts that provide none keep the
+ * staged checklist UI. The sharp edge is a REMOTE bot on a host whose
+ * SkillsView predates `supportsFixedConnection`: rendering the live surface
+ * there would read and write the ACTIVE gateway's skills under the remote
+ * bot's name — the wrong machine — so those hosts must fail closed to
+ * "staged only".
  */
 
 import type * as HermesSdk from '@hermes/plugin-sdk'
@@ -31,7 +32,7 @@ interface StubProps {
   toolset?: string
 }
 
-/** The optional SDK exports, swapped per test to model each desktop build. */
+/** The views one host provides, swapped per test to model each desktop host. */
 const sdk = vi.hoisted(() => {
   const seen: Record<string, StubProps[]> = { McpTab: [], SkillsView: [], ToolsetConfigPanel: [] }
 
@@ -55,9 +56,10 @@ const sdk = vi.hoisted(() => {
   }
 })
 
-// The optional exports are read at MODULE scope, so each build's set has to
-// be live at the moment `vi.resetModules()` re-evaluates the editor — a value
-// baked into the factory would freeze the first test's build for the rest.
+// The editor reads the views off the plugin context at render time, and each
+// build's set is installed on a fresh context per `renderEditor` call — so a
+// set baked into the SDK mock factory could never leak between tests, but the
+// hoisted `exports` object still has to be the live one the context carries.
 vi.mock('@hermes/plugin-sdk', async importOriginal => {
   const original = await importOriginal<typeof HermesSdk>()
 
@@ -75,10 +77,6 @@ vi.mock('@hermes/plugin-sdk', async importOriginal => {
     },
     // The plugin bundle normally lands via `ctx.i18n.register` at load.
     usePluginI18n: () => translateBots
-  }
-
-  for (const name of ['McpTab', 'SkillsView', 'ToolsetConfigPanel']) {
-    Object.defineProperty(mocked, name, { configurable: true, enumerable: true, get: () => sdk.exports[name] })
   }
 
   return mocked
@@ -142,16 +140,17 @@ function withQueryClient(children: ReactNode) {
   )
 }
 
-/** Load the editor against one desktop build's export set. */
-async function renderEditor(
-  exports: Record<string, unknown>,
-  bot: RosterRow,
-  state: Partial<typeof advancedState> = {}
-) {
+/** Load the editor against one host's view set. */
+async function renderEditor(exports: Record<string, unknown>, bot: RosterRow, state: Partial<typeof advancedState> = {}) {
   sdk.exports = exports
   vi.resetModules()
 
   const { AdvancedProfileConfig } = await import('./profile-config')
+  const { setPluginCtx } = await import('./shared')
+
+  // The editor probes `ctx.hostViews` — hand it this test's host, carrying
+  // exactly the views under test.
+  setPluginCtx({ hostViews: sdk.exports } as unknown as HermesSdk.PluginContext)
 
   return render(
     withQueryClient(

@@ -2,22 +2,13 @@
  * The advanced profile editor: skills, toolsets, MCP servers, model and SOUL,
  * backed by `profiles.describe` / `profiles.configure`.
  *
- * The optional-SDK feature detects live here because this is the surface that
+ * The host-view capability reads live here because this is the surface that
  * needs them, and the create dialog — which stages the same capabilities
  * before a profile exists — reads them from here rather than duplicating the
  * detection.
  */
 
-import * as sdk from '@hermes/plugin-sdk'
-import {
-  Checkbox,
-  GlyphSpinner,
-  host,
-  Input,
-  queryClient,
-  surfaceModelSwitchConfirm,
-  Textarea
-} from '@hermes/plugin-sdk'
+import { Checkbox, GlyphSpinner, host, Input, type PluginHostViews, queryClient, surfaceModelSwitchConfirm, Textarea } from '@hermes/plugin-sdk'
 import { useState } from 'react'
 
 import { $lastRoster, ROSTER_KEY } from './data'
@@ -26,21 +17,25 @@ import { useBots } from './i18n'
 import { McpSetupButton } from './mcp-setup'
 import { ModelPicker } from './model-picker'
 import { botBackendProfileScope, requestForBot, resolveBotConnectionRoute } from './routing'
+import { getPluginCtx } from './shared'
 import { HubSkillsSection } from './skills-hub'
 import { ensureMessagingProtocol } from './soul'
 import type { RosterRow } from './types'
 
-// Keep optional exports feature-detected; test harnesses may strip the SDK namespace.
-// The Partial is the point: both are guarded at every use site because an older
-// build (or a stripped harness namespace) simply doesn't export them.
-const { McpTab, ToolsetConfigPanel }: Partial<Pick<typeof sdk, 'McpTab' | 'ToolsetConfigPanel'>> = sdk
-export const SkillsView = typeof sdk === 'undefined' ? undefined : sdk.SkillsView
-// TRUE only on builds whose SkillsView routes `fixedConnection` to the pinned
-// registry connection's backend. Older builds export SkillsView WITHOUT the
-// prop — rendering it for a remote-target draft there would read/write the
-// ACTIVE gateway's skills under the remote bot's name (the wrong machine),
-// so those builds keep the staged checklists for remote targets.
-export const skillsViewRoutesConnections = Boolean(SkillsView && SkillsView.supportsFixedConnection)
+// Read when it is needed, from the context the host handed us — `register(ctx)`
+// runs after this module evaluates, so the context does not exist at module
+// scope, which is why these are functions rather than consts.
+export function hostViews(): PluginHostViews {
+  return getPluginCtx()?.hostViews ?? {}
+}
+
+// TRUE only when the host's SkillsView routes `fixedConnection` to the pinned
+// registry connection's backend. A host whose SkillsView predates the prop
+// would render a remote-target draft against the ACTIVE gateway's skills (the
+// wrong machine), so those hosts keep the staged checklists for remote targets.
+export function skillsViewRoutesConnections(): boolean {
+  return Boolean(hostViews().SkillsView?.supportsFixedConnection)
+}
 
 // ── advanced profile config (skills / toolsets / model / SOUL) ──────────────
 //
@@ -137,6 +132,9 @@ export function AdvancedProfileConfig({ bot, state, setState }: AdvancedProfileC
   const botRoute = resolveBotConnectionRoute(bot).route
   const backendProfile = botRoute?.targetProfile || botRoute?.profile || bot.name
   const backendScope = botBackendProfileScope(botRoute, bot.name)
+  // One read per render, into a local — every guard and render below probes
+  // the same snapshot of what this host provides.
+  const { McpTab, SkillsView, ToolsetConfigPanel } = hostViews()
 
   if (!loaded) {
     setLoaded(true)
@@ -248,14 +246,14 @@ export function AdvancedProfileConfig({ bot, state, setState }: AdvancedProfileC
   const enabledToolsets = state.toolsets.filter(t => t.enabled).length
   const mcpList = state.mcp || []
 
-  // Newer desktop builds export the WHOLE core Capabilities surface
-  // (hermes-agent#87317): Skills (installed list + one-click hub installs +
-  // full-skill detail), Tools (per-toolset config), and MCP — pinned to this
-  // bot via fixedProfile, tab state kept out of the page router via embedded.
-  // Render THAT instead of the checkbox stand-ins; writes go straight to the
-  // bot's backend, so the dirty-section staging below only carries
-  // model + SOUL on these builds. Older builds keep the full checklist UI.
-  if (SkillsView && (!botRoute || skillsViewRoutesConnections)) {
+  // Newer desktop hosts provide the WHOLE core Capabilities surface through
+  // ctx.hostViews (hermes-agent#87317): Skills (installed list + one-click hub
+  // installs + full-skill detail), Tools (per-toolset config), and MCP — pinned
+  // to this bot via fixedProfile, tab state kept out of the page router via
+  // embedded. Render THAT instead of the checkbox stand-ins; writes go straight
+  // to the bot's backend, so the dirty-section staging below only carries
+  // model + SOUL on these hosts. Hosts without it keep the full checklist UI.
+  if (SkillsView && (!botRoute || skillsViewRoutesConnections())) {
     return (
       <div className="grid gap-4">
         <ModelPicker
@@ -304,7 +302,7 @@ export function AdvancedProfileConfig({ bot, state, setState }: AdvancedProfileC
     )
   }
 
-  if (bot?.sourceScoped && botRoute?.mode === 'remote' && !skillsViewRoutesConnections) {
+  if (bot?.sourceScoped && botRoute?.mode === 'remote' && !skillsViewRoutesConnections()) {
     return (
       <div className="grid gap-4">
         <ModelPicker
@@ -417,7 +415,7 @@ export function AdvancedProfileConfig({ bot, state, setState }: AdvancedProfileC
                   </label>
                   {/* The REAL per-toolset config (env vars / API keys / model */
                   /* picker / post-setup), scoped to THIS bot's profile, when */
-                  /* the desktop build exposes it. Older builds: just the toggle. */}
+                  /* the host provides it. Hosts without it: just the toggle. */}
                   {ToolsetConfigPanel ? (
                     <div className="mt-1.5 border-t border-(--ui-stroke-secondary) pt-1.5">
                       <ToolsetConfigPanel profile={backendScope} toolset={tset.name} />

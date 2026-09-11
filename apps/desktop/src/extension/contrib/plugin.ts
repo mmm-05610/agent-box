@@ -12,7 +12,9 @@
  * through the plugin host loader (next phase); this is that seam.
  */
 
-import { pluginRest, type PluginRestOptions, pluginSocket } from '@/hermes'
+import type { ComponentProps, ComponentType } from 'react'
+
+import { type HermesGateway, pluginRest, type PluginRestOptions, pluginSocket, type ProfileScope } from '@/hermes'
 import { createPluginI18n, type PluginI18n } from '@/i18n'
 import { registry } from '@/lib/contributions'
 import { readKey, writeKey } from '@/lib/storage'
@@ -71,6 +73,57 @@ export interface PluginFileDialogOptions {
   title?: string
 }
 
+/** The props `SkillsView` takes. `embedded` keeps tab state out of the URL;
+ *  `fixedProfile` pins the whole surface to one bot; `fixedConnection` pins it
+ *  to a registered gateway's backend and is ignored without `fixedProfile`. */
+export interface PluginSkillsViewProps extends ComponentProps<'section'> {
+  embedded?: boolean
+  fixedProfile?: string
+  fixedConnection?: string
+}
+
+export interface PluginMcpTabProps {
+  gateway: HermesGateway | null
+  profile?: ProfileScope
+}
+
+export interface PluginToolsetConfigPanelProps {
+  toolset: string
+  onConfiguredChange?: () => void
+  profile?: ProfileScope
+}
+
+/** The whole host surfaces a plugin may render, handed over as the `hostViews`
+ *  capability on the context. Every member is optional: a host that predates a
+ *  surface simply doesn't provide it — probe before rendering. */
+export interface PluginHostViews {
+  /** THE full MCP tab core Settings renders — per-server enable + OAuth sign-in
+   *  + API-key setup + live probes, not a checkbox list. Route-decoupled so it
+   *  renders anywhere (a plugin dialog); pass a live `gateway` (see
+   *  `host.getGateway()`) and an optional `profile` to scope it to one bot. */
+  McpTab?: ComponentType<PluginMcpTabProps>
+  /** THE whole Capabilities surface (Skills / Tools / MCP tabs, installed
+   *  lists, full-skill detail pane, embedded hub picker with one-click
+   *  installs). For plugin dialogs pass `embedded` (tab state stays local —
+   *  never touches the page router) and `fixedProfile` to pin every tab to one
+   *  bot's backend; the internal profile selector hides itself. Add
+   *  `fixedConnection` (registry connection id) to pin a bot living on another
+   *  registered gateway — probe `SkillsView.supportsFixedConnection` first;
+   *  builds without it would route the pin to the ACTIVE gateway. Bot Mode's
+   *  Advanced section is the reference consumer. */
+  SkillsView?: ComponentType<PluginSkillsViewProps> & {
+    /** Set by hosts whose SkillsView routes `fixedConnection` to the pinned
+     *  registry connection's backend. Absent = the pin would reach the ACTIVE
+     *  gateway, so keep remote targets on staged checklists. */
+    supportsFixedConnection?: true
+  }
+  /** THE full per-toolset config panel core Settings renders — provider picker,
+   *  env vars / API keys, model catalog picker, and post-setup runners. Route-
+   *  decoupled (the "manage keys" deep link is a no-op outside the router); pass
+   *  `toolset`, optional `onConfiguredChange`, and an optional `profile`. */
+  ToolsetConfigPanel?: ComponentType<PluginToolsetConfigPanelProps>
+}
+
 export interface PluginContext {
   /** The resolved plugin source tag, e.g. `'plugin:cost-meter'`. */
   readonly source: string
@@ -101,6 +154,9 @@ export interface PluginContext {
   /** Plugin-scoped i18n: ship + register locale bundles under this plugin,
    *  resolved against the app's active locale — no core `en.ts` edit. */
   i18n: PluginI18n
+  /** Views this host can hand to a plugin. Absent on a build that predates
+   *  them — probe before rendering, exactly as `os`'s capabilities are probed. */
+  readonly hostViews?: PluginHostViews
 }
 
 export interface HermesPlugin {
@@ -193,6 +249,18 @@ function createPluginOs(pluginId: string): PluginOs {
   }
 }
 
+// The host surfaces published through `setPluginHostViews`, copied onto every
+// context the factory below builds. `app/host-views.ts` fills it at module
+// scope, before plugin discovery runs, so any activated plugin — bundled or
+// runtime-fetched — sees the same value.
+let pluginHostViews: PluginHostViews = {}
+
+/** Publish the host surfaces a plugin may render through `ctx.hostViews`.
+ *  Called once at boot by the app, before plugin discovery. */
+export function setPluginHostViews(views: PluginHostViews): void {
+  pluginHostViews = views
+}
+
 /** Build the scoped context handed to a plugin's `register`. `onDispose`
  *  receives every registration's disposer (the loader's unload/reload hook). */
 export function createPluginContext(pluginId: string, onDispose?: (dispose: () => void) => void): PluginContext {
@@ -214,6 +282,7 @@ export function createPluginContext(pluginId: string, onDispose?: (dispose: () =
     socket: (path, onMessage) => track(pluginSocket(pluginId, path, onMessage)),
     os: createPluginOs(pluginId),
     storage: createPluginStorage(pluginId),
-    i18n: createPluginI18n(pluginId, track)
+    i18n: createPluginI18n(pluginId, track),
+    hostViews: pluginHostViews
   }
 }
