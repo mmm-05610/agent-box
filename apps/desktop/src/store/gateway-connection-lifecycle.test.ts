@@ -22,8 +22,8 @@ const gatewayMocks = vi.hoisted(() => {
 })
 
 const reconnectStateMocks = vi.hoisted(() => ({
-  reconcileBusyStatesOnReconnect: vi.fn(),
-  resetTileRuntimeBindings: vi.fn()
+  afterSecondaryReopen: vi.fn(),
+  beforeSecondaryReopen: vi.fn()
 }))
 
 vi.mock('@/hermes', () => ({
@@ -49,7 +49,6 @@ vi.mock('@/store/session', () => ({
   setGatewayState: vi.fn()
 }))
 vi.mock('@/store/notify-baseline', () => ({ markNativeNotifyBaseline: vi.fn() }))
-vi.mock('@/store/session-states', () => reconnectStateMocks)
 
 const {
   activeGateway,
@@ -64,6 +63,7 @@ const {
   openGatewayForProfile,
   pruneSecondaryGateways,
   reconnectSecondaryGateways,
+  registerSecondaryLifecycleObserver,
   retainGatewayForAgent,
   retireLocalProfileGateways,
   setPrimaryGateway
@@ -246,10 +246,50 @@ describe('legacy secondary teardown', () => {
 })
 
 describe('secondary reconnect runtime scope', () => {
-  it('invalidates stale runtime bindings before a direct secondary reopen publishes open', async () => {
+  // The gateway publishes generational facts and nothing else; the session-state
+  // reaction to them is application/gateway/reconnect-session-effects. These
+  // cases pin the FACTS (which generation boundary fires, in what order) and the
+  // install/dispose contract the application module's single registration rides.
+  interface ReopenFact {
+    connectionId: string
+    phase: 'after-reopen' | 'before-reopen'
+    profile: string
+    scope: string
+  }
+
+  let facts: ReopenFact[]
+  let disposeObserver: () => void
+
+  beforeEach(() => {
+    facts = []
+    disposeObserver = registerSecondaryLifecycleObserver({
+      afterSecondaryReopen: scope => facts.push({ ...scope, phase: 'after-reopen' }),
+      beforeSecondaryReopen: scope => facts.push({ ...scope, phase: 'before-reopen' })
+    })
+  })
+
+  afterEach(() => {
+    disposeObserver()
+  })
+
+  function installAgentDesktop() {
     installDesktop({
       getConnectionFor: vi.fn(async ({ connectionId, profile }) => descriptorFor(connectionId, profile))
     })
+  }
+
+  it('publishes nothing for a scope opening for the first time', async () => {
+    installAgentDesktop()
+
+    await openGatewayForAgent('homelab', 'writer')
+
+    // A first open replaced no backend, so there is no stale generation to
+    // invalidate and no claim from an old socket to reconcile.
+    expect(facts).toEqual([])
+  })
+
+  it('invalidates the previous generation before the dial and reconciles after the socket opens', async () => {
+    installAgentDesktop()
 
     await openGatewayForAgent('homelab', 'writer')
     const firstSocket = gatewayMocks.instances[0]
@@ -272,36 +312,102 @@ describe('secondary reconnect runtime scope', () => {
     const reopening = openGatewayForAgent('homelab', 'writer')
 
     await vi.waitFor(() => expect(gatewayMocks.connect).toHaveBeenCalledTimes(2))
-    expect(reconnectStateMocks.resetTileRuntimeBindings).toHaveBeenCalledWith({
-      connectionId: 'homelab',
-      profile: 'writer'
-    })
-    expect(reconnectStateMocks.resetTileRuntimeBindings.mock.invocationCallOrder[0]).toBeLessThan(
-      gatewayMocks.connect.mock.invocationCallOrder[1]
-    )
+
+    const expectedScope = { connectionId: 'homelab', profile: 'writer', scope: 'conn:homelab::writer' }
+
+    expect(facts).toEqual([{ ...expectedScope, phase: 'before-reopen' }])
+    expect(gatewayMocks.connect).toHaveBeenCalledTimes(2)
 
     finishReconnect()
     await reopening
+
+    // The reconcile fact is withheld until the socket is actually usable.
+    expect(facts).toEqual([
+      { ...expectedScope, phase: 'before-reopen' },
+      { ...expectedScope, phase: 'after-reopen' }
+    ])
   })
 
-  it('rebinds only Bot runtimes owned by the reconnected profile route', async () => {
-    installDesktop({
-      getConnectionFor: vi.fn(async ({ connectionId, profile }) => descriptorFor(connectionId, profile))
-    })
+  it('publishes the reconcile fact only on the far side of the dial', async () => {
+    installAgentDesktop()
 
-    await ensureGatewayForAgent('homelab', 'writer')
-    const socket = gatewayMocks.instances[0]
+    await openGatewayForAgent('homelab', 'writer')
+    const socket = gatewayMocks.instances[0] as unknown as { connectionState: string }
     socket.connectionState = 'closed'
 
     reconnectSecondaryGateways()
 
-    await vi.waitFor(() =>
-      expect(reconnectStateMocks.resetTileRuntimeBindings).toHaveBeenCalledWith({
-        connectionId: 'homelab',
-        profile: 'writer'
-      })
-    )
-    expect(reconnectStateMocks.reconcileBusyStatesOnReconnect).toHaveBeenCalledWith('conn:homelab::writer')
+    await vi.waitFor(() => expect(facts.filter(fact => fact.phase === 'after-reopen')).toHaveLength(1))
+
+    expect(facts.map(fact => fact.phase)).toEqual(['before-reopen', 'after-reopen'])
+    // The composite scope, not the bare profile: a reconnect must reconcile only
+    // the sessions that arrived on THIS socket (two sources share profile names).
+    expect(facts[1].scope).toBe('conn:homelab::writer')
+  })
+
+  it('publishes no reconcile fact when the reopen dial fails', async () => {
+    installAgentDesktop()
+
+    await openGatewayForAgent('homelab', 'writer')
+    pruneSecondaryGateways(new Set())
+
+    gatewayMocks.connect.mockRejectedValueOnce(new Error('ECONNRESET'))
+
+    await expect(openGatewayForAgent('homelab', 'writer')).rejects.toThrow('ECONNRESET')
+
+    // The dial never reached `open`: the session state stays exactly as the
+    // working socket left it, and the reconnect backoff owns recovery.
+    expect(facts.map(fact => fact.phase)).toEqual(['before-reopen'])
+  })
+
+  it('publishes the local pool identity for a legacy profile socket', async () => {
+    installDesktop({
+      getConnection: vi.fn(async (profile: string) => descriptorFor('legacy-local', profile))
+    })
+
+    await openGatewayForProfile('writer')
+    pruneSecondaryGateways(new Set())
+
+    await openGatewayForProfile('writer')
+
+    expect(facts).toEqual([
+      { connectionId: 'local', phase: 'before-reopen', profile: 'writer', scope: 'writer' },
+      { connectionId: 'local', phase: 'after-reopen', profile: 'writer', scope: 'writer' }
+    ])
+  })
+
+  it('keeps the live observer when a superseded installation is disposed', async () => {
+    const stale = vi.fn()
+
+    disposeObserver()
+
+    const disposeStale = registerSecondaryLifecycleObserver({
+      afterSecondaryReopen: stale,
+      beforeSecondaryReopen: stale
+    })
+
+    const current = reconnectStateMocks.beforeSecondaryReopen
+
+    disposeObserver = registerSecondaryLifecycleObserver({
+      afterSecondaryReopen: reconnectStateMocks.afterSecondaryReopen,
+      beforeSecondaryReopen: current
+    })
+
+    installAgentDesktop()
+
+    await openGatewayForAgent('homelab', 'writer')
+    pruneSecondaryGateways(new Set())
+    await openGatewayForAgent('homelab', 'writer')
+
+    // A previous mount's cleanup must not tear down the live wiring.
+    disposeStale()
+
+    await openGatewayForAgent('homelab', 'writer')
+    pruneSecondaryGateways(new Set())
+    await openGatewayForAgent('homelab', 'writer')
+
+    expect(stale).not.toHaveBeenCalled()
+    expect(current).toHaveBeenCalledTimes(2)
   })
 })
 

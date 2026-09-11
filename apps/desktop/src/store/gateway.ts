@@ -4,6 +4,7 @@
 // - secondary-pool  — socket entries: create/open/reconnect/dispose/prune
 // - requests        — one-shot RPC facades
 // - leases          — holds across sequences, relay ticks, live turns
+// - secondary-lifecycle — the reopen port the application reacts to
 // This file stays the stable import path with the unchanged public surface.
 
 export {
@@ -28,6 +29,11 @@ export {
   setPrimaryGatewayConnectionId
 } from './gateway/registry-state'
 export { requestGatewayForAgent, requestGatewayForProfile } from './gateway/requests'
+export {
+  registerSecondaryLifecycleObserver,
+  type SecondaryLifecycleObserver,
+  type SecondaryOpenScope
+} from './gateway/secondary-lifecycle'
 export {
   closeLegacySecondaryGateways,
   closeSecondaryGateways,

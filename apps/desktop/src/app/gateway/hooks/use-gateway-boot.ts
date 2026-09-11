@@ -6,6 +6,7 @@ import {
 } from '@hermes/shared'
 import { useEffect, useRef } from 'react'
 
+import { installReconnectSessionEffects } from '@/application/gateway/reconnect-session-effects'
 import { refreshActiveProfile } from '@/application/profile/catalog'
 import { touchActiveGatewayBackend } from '@/application/profile/runtime-selection'
 import { shouldApplyPostBootProgressError } from '@/components/boot-failure-reauth'
@@ -817,6 +818,14 @@ export function useGatewayBoot({
       }
     })
 
+    // Pooled-socket lifecycle: a secondary reopening replaces a whole backend
+    // generation, so the session state that generation minted (tile runtime
+    // bindings, busy claims) must be invalidated before the new socket opens and
+    // reconciled once it is up. Installed HERE, beside the registry config the
+    // same effect owns — the gateway never reaches session state itself, and a
+    // wiring miss is loud rather than a silently dead callback.
+    const offReconnectSessionEffects = installReconnectSessionEffects()
+
     const offState = gateway.onState(st => {
       // Mirror to the composer only while the primary is the active profile —
       // a background secondary reconnect mustn't flip the foreground state.
@@ -1221,6 +1230,7 @@ export function useGatewayBoot({
       offConnectionApplied?.()
       offConnectionsChanged?.()
       offGatewayReconnect()
+      offReconnectSessionEffects()
       offState()
       offEvent()
       offExit()

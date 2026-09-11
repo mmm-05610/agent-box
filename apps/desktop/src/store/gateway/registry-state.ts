@@ -69,7 +69,7 @@ export interface RegistryConfig {
   /**
    * Scopes a FOREGROUND surface is bound to right now — every mounted
    * session tile's owner and the primary thread's (foregroundSessionScopes in
-   * store/session-states; a config hook because that store imports this
+   * the session-state store; a config hook because that store imports this
    * one). Consulted by EVERY dispose path — the live-work pruner and the
    * dispose-at-refcount-0 request/relay leases alike (#93892): a tile's
    * resume mints its runtime on its owner's socket, and any path that closes
@@ -109,7 +109,7 @@ export interface Secondary {
    * pruneSecondaryGateways would pin every socket ever warmed. A foreground
    * surface that must keep its owner socket (a mounted session tile, the
    * primary thread) is represented in the pruner's keep-set instead — see
-   * foregroundSessionScopes in store/session-states (#93892).
+   * foregroundSessionScopes in the session-state store (#93892).
    */
   retained: boolean
   /**

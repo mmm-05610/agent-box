@@ -1,4 +1,4 @@
-import { registryBackendScopeKey, resolveGatewayWsUrl } from '@hermes/shared'
+import { LOCAL_CONNECTION_ID, registryBackendScopeKey, resolveGatewayWsUrl } from '@hermes/shared'
 
 import { HermesGateway } from '@/hermes'
 import { reconnectBackoffDelayMs } from '@/lib/reconnect-backoff'
@@ -25,6 +25,11 @@ import {
   type SpawnPriority
 } from './registry-state'
 import { isAttachedSharedRemote, sharedPrimaryRoute } from './route-probes'
+import {
+  publishSecondaryReopen,
+  publishSecondaryReopened,
+  type SecondaryOpenScope
+} from './secondary-lifecycle'
 
 /** Own the secondary socket entries and resolve routes onto them: create,
  *  open, reconnect, dispose, prune, pin accounting, and the open/ensure
@@ -72,30 +77,17 @@ export async function openSecondary(entry: Secondary, spawnPriority: SpawnPriori
     // A secondary can be reopened directly by the next routed user action,
     // without passing through reconnectSecondary(). Its previous backend may
     // have been respawned, so every stored→runtime binding for this exact scope
-    // is process-local stale state. Invalidate BEFORE connect publishes `open`:
-    // otherwise an eager route effect / submit can send the old runtime id in
-    // the narrow window between the new socket opening and post-connect cleanup.
-    //
-    // Dynamic import keeps the existing session-states → gateway module cycle
-    // open. Awaiting it is intentional: correctness at the generation boundary
-    // outranks the single local-module microtask this adds to a reconnect.
+    // is process-local stale state. Publish the reopen BEFORE connect can
+    // publish `open`: otherwise an eager route effect / submit can send the old
+    // runtime id in the narrow window between the new socket opening and
+    // post-connect cleanup. The reaction to this fact (invalidate runtime
+    // bindings, then reconcile busy claims once the socket is up) is session
+    // state, and lives in application/gateway/reconnect-session-effects.
     const openedScopes = openedSecondaryScopes()
     const reopening = entry.openedOnce || entry.connection !== null || openedScopes.has(entry.scope)
-    let reconcileBusyAfterOpen: null | (() => void) = null
 
     if (reopening) {
-      try {
-        const { reconcileBusyStatesOnReconnect, resetTileRuntimeBindings } = await import('@/store/session-states')
-
-        resetTileRuntimeBindings({
-          connectionId: entry.connectionId || 'local',
-          profile: entry.profile
-        })
-        reconcileBusyAfterOpen = () => reconcileBusyStatesOnReconnect(entry.scope)
-      } catch {
-        // Best effort for partial test/HMR graphs. Production always loads the
-        // real store; a failed import must not make the transport unrecoverable.
-      }
+      publishSecondaryReopen(openScopeFor(entry))
     }
 
     // Registry-scoped entries dial through getConnectionFor when the bridge has
@@ -155,11 +147,12 @@ export async function openSecondary(entry: Secondary, spawnPriority: SpawnPriori
     entry.openedOnce = true
     openedScopes.add(entry.scope)
 
-    try {
-      reconcileBusyAfterOpen?.()
-    } catch {
-      // The socket is already open. A best-effort UI-state reconcile must not
-      // turn that successful transport recovery into a reported dial failure.
+    // The socket is up: a failed dial threw above and never reaches this line,
+    // so this fact is only ever published for a usable transport. It still runs
+    // before `wantOpen` can close the socket and before publishActiveConnection,
+    // matching the order a routed action observes.
+    if (reopening) {
+      publishSecondaryReopened(openScopeFor(entry))
     }
 
     if (!entry.wantOpen) {
@@ -257,6 +250,18 @@ function isMissingProfileError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error ?? '')
 
   return message.includes('no longer exists') || message.includes('is being deleted')
+}
+
+/** The lifecycle identity of a pooled socket: the exact registry scope the pool
+ *  keys it by, plus the Desktop profile it serves. A legacy entry carries no
+ *  registry id, so it publishes the `local` pool identity the routed-session
+ *  layer speaks for it. */
+function openScopeFor(entry: Secondary): SecondaryOpenScope {
+  return {
+    connectionId: entry.connectionId || LOCAL_CONNECTION_ID,
+    profile: entry.profile,
+    scope: entry.scope
+  }
 }
 
 export function createSecondary(profile: string, connectionId: null | string = null): Secondary {

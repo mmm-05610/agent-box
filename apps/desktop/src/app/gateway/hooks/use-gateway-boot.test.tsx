@@ -18,6 +18,7 @@ import {
   ensureGatewayForAgent,
   ensureGatewayForProfile,
   isActivePrimary,
+  reconnectSecondaryGateways,
   requestGatewayForAgent,
   retainGatewayForAgent
 } from '@/store/gateway'
@@ -43,7 +44,14 @@ import {
   setActiveSessionId,
   setSelectedStoredSessionId
 } from '@/store/session'
-import { $sessionTiles, $workingSessionIds, clearAllSessionStates, publishSessionState } from '@/store/session-states'
+import {
+  $sessionStates,
+  $sessionTiles,
+  $workingSessionIds,
+  clearAllSessionStates,
+  publishSessionState,
+  recordSessionEventScope
+} from '@/store/session-states'
 
 import { deferred } from '../../../test/deferred'
 
@@ -942,6 +950,64 @@ describe('useGatewayBoot remote reconnect loop (real hook, fake socket)', () => 
     // socket remains reusable and cannot arm ws_orphan_reap on the old backend.
     expect(registeredGateway?.connectionState).toBe('open')
     expect(isActivePrimary()).toBe(true)
+  })
+
+  it('arms the pooled-socket session effects from the production boot effect', async () => {
+    // The gateway publishes a secondary reopen as a bare lifecycle fact; the
+    // session-state reaction to it (invalidate the previous generation's tile
+    // runtime bindings, reconcile its busy claims) is wired by the application
+    // and installed by THIS effect. Nothing may "happen to be imported" — a
+    // missing installation would leave every post-reconnect tile bound to a
+    // runtime id the respawned backend never minted, so the production install
+    // point is locked here through the real hook rather than a mocked port.
+    const desktop = fakeDesktop() as ReturnType<typeof fakeDesktop> & {
+      getConnectionFor: ReturnType<typeof vi.fn>
+    }
+
+    desktop.getConnectionFor = vi.fn(async ({ connectionId, profile }: { connectionId: string; profile: string }) => ({
+      ...coderConn,
+      connectionId,
+      profile,
+      wsUrl: `wss://${connectionId}.example.com/api/ws?token=r`
+    }))
+    ;(window as { hermesDesktop?: unknown }).hermesDesktop = desktop
+
+    render(<Harness />)
+    await flushAsync()
+    expect($gatewayState.get()).toBe('open')
+
+    // What the previous backend generation left behind: a tile bound to a
+    // runtime id, and a busy claim minted on that socket.
+    $sessionTiles.set([
+      {
+        ownerRoute: { connectionId: 'cloud', profile: 'default' },
+        runtimeId: 'rt-dead',
+        storedSessionId: 'chat-1'
+      }
+    ])
+    recordSessionEventScope({ connectionId: 'cloud', profile: 'default', session_id: 'rt-dead' })
+    publishSessionState('rt-dead', { ...createClientSessionState('chat-1'), busy: true })
+
+    let opening!: Promise<boolean>
+    act(() => {
+      opening = ensureGatewayForAgent('cloud', 'default')
+    })
+    await flushAsync()
+    await opening
+
+    // A first open replaced no generation, so nothing is invalidated yet.
+    expect($sessionTiles.get()[0].runtimeId).toBe('rt-dead')
+    expect($sessionStates.get()['rt-dead']?.busy).toBe(true)
+
+    // The pooled socket redials: the generation boundary production must react to.
+    act(() => {
+      reconnectSecondaryGateways({ forceOpenSockets: true })
+    })
+    await flushAsync()
+    await flushAsync()
+
+    expect($sessionTiles.get()[0]).not.toHaveProperty('runtimeId')
+    expect($sessionStates.get()['rt-dead']?.busy).toBe(false)
   })
 
   it('re-fetches the profile rail from the NEW backend after a connection apply (#85731)', async () => {
