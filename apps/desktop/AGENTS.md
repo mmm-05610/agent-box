@@ -15,7 +15,12 @@ Desktop is its own native chat surface. It is not the browser dashboard and it
 does not embed the TUI. Three parties, each authoritative for one thing:
 
 - **Electron** owns the machine: process lifecycle, native filesystem/git/
-  windows, install/update, and a narrow, typed capability bridge.
+  windows, install/update, and a narrow, typed capability bridge. Its main
+  process is organised by responsibility into `electron/{app,windows,
+  host-capabilities,process,workcore,ipc,update,security,legacy-hermes}/`; read
+  `docs/architecture/electron-host-boundary.md` before adding a module, because
+  which directory a new module belongs in is a question about *authority*, not
+  about topic.
 - **The renderer** owns the experience: navigation, presentation, and ephemeral
   interaction state.
 - **The agent backend** owns the work: sessions, tools, model calls, streaming.

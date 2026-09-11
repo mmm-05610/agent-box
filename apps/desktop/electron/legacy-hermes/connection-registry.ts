@@ -13,7 +13,7 @@ export type {
   RegistryLocalRoute,
   ResolvedConnectionDescriptor,
   ResolvedConnectionSshDescriptor,
-} from './connection-registry/identity'
+} from './identity'
 export {
   agentHandle,
   backendScopeKey,
@@ -26,10 +26,10 @@ export {
   REGISTRY_VERSION,
   resolvedConnectionId,
   uniqueLabel,
-} from './connection-registry/identity'
+} from './identity'
 export {
   migrateV1ToRegistry,
-} from './connection-registry/migration'
+} from './migration'
 export {
   reconcileAppliedGlobalConnection,
   reconcileRegistryDrift,
@@ -38,31 +38,31 @@ export {
   setLastUsedConnection,
   setPrimaryConnection,
   upsertConnection,
-} from './connection-registry/registry-ops'
+} from './registry-ops'
 export type {
   ConnectionAgents,
   RosterAgent,
   RosterProfileMetadata,
-} from './connection-registry/roster'
+} from './roster'
 export {
   buildAgentRoster,
   parseRemoteProfileListing,
   rememberSshEnumeration,
   shouldRetrySshInventory,
-} from './connection-registry/roster'
+} from './roster'
 export type {
   ReuseMatchingPrimarySshBackendOptions,
-} from './connection-registry/route-resolution'
+} from './route-resolution'
 export {
   registrySourceOwnsPrimaryBackend,
   resolveRegistryLocalRoute,
   reuseMatchingPrimarySshBackend,
   shouldDeferLocalEnumeration,
-} from './connection-registry/route-resolution'
+} from './route-resolution'
 export type {
   ConnectionInput,
   UpdateEligibility,
-} from './connection-registry/schema'
+} from './schema'
 export {
   connectionDialFieldsChanged,
   connectionIdForLabel,
@@ -70,4 +70,4 @@ export {
   normalizeConnectionInput,
   normalizeRegistry,
   updateEligibility,
-} from './connection-registry/schema'
+} from './schema'

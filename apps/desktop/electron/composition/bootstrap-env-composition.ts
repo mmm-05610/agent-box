@@ -25,7 +25,7 @@ import {
 
 import { classifyActiveRuntime } from '../legacy-hermes/active-runtime-state'
 import { jsonAgentFor, withRetry } from '../legacy-hermes/api-transport'
-import { appIconCandidates, resolveAppIcon } from '../app-icon'
+import { appIconCandidates, resolveAppIcon } from '../windows/app-icon'
 import { dashboardFallbackArgs, sourceDeclaresServe } from '../legacy-hermes/backend-command'
 import {
   hermesBackendEnv,
@@ -66,7 +66,7 @@ import {
   resolveLinuxPasswordStore
 } from '../host-capabilities/platform/bootstrap-platform'
 import { runBootstrap } from '../legacy-hermes/bootstrap-runner'
-import { detectBundleSwap } from '../bundle-swap'
+import { detectBundleSwap } from '../update/bundle-swap'
 import { teardownSshState } from '../legacy-hermes/connection-apply'
 import {
   buildGatewayWsUrl,
@@ -97,22 +97,22 @@ import {
   reuseMatchingPrimarySshBackend,
   upsertConnection
 } from '../legacy-hermes/connection-registry'
-import { describeCrashReason } from '../crash-forensics'
+import { describeCrashReason } from '../app/crash-forensics'
 import { adoptServedDashboardToken } from '../legacy-hermes/dashboard-token'
-import { loadOrCreateInstallationId, sshOwnershipId } from '../desktop-installation'
+import { loadOrCreateInstallationId, sshOwnershipId } from '../app/desktop-installation'
 import { resolveDesktopRemoteRoute, v1SshTerminalPoolKey } from '../legacy-hermes/desktop-remote-route'
 import {
   resolveRemovableAppPath
-} from '../desktop-uninstall'
-import { resolveDevCdpPort } from '../dev-cdp'
+} from '../update/desktop-uninstall'
+import { resolveDevCdpPort } from '../app/dev-cdp'
 import { findGitBash as _findGitBash } from '../host-capabilities/platform/find-git-bash'
 import {
   installFindShortcut
-} from '../find-in-page'
+} from '../windows/find-in-page'
 import { createFirstRunSetupGate } from '../legacy-hermes/first-run-setup-gate'
 import { startGatewaysAfterUpdateAbort, stopGatewayBeforeUpdate } from '../legacy-hermes/gateway-stop-before-update'
 import { probeGatewayWebSocket } from '../legacy-hermes/gateway-ws-probe'
-import { readAndConsumeHandoffResult } from '../handoff-result'
+import { readAndConsumeHandoffResult } from '../update/handoff-result'
 import {
   DEFAULT_FETCH_TIMEOUT_MS,
   encryptDesktopSecret as encryptDesktopSecretStrict,
@@ -191,9 +191,9 @@ import {
 import {
   createRemoteWsHeaderStore
 } from '../legacy-hermes/remote-ws-headers'
-import { missingRendererAssets } from '../renderer-bundle'
-import { loadRendererLoadErrorPage } from '../renderer-load-error-page'
-import { attachRendererConsoleCapture } from '../renderer-log'
+import { missingRendererAssets } from '../app/renderer-bundle'
+import { loadRendererLoadErrorPage } from '../windows/renderer-load-error-page'
+import { attachRendererConsoleCapture } from '../app/renderer-log'
 import {
   classifyStoredSecret,
   readSecretStoragePolicy,
@@ -206,20 +206,20 @@ import {
   createSessionWindowRegistry,
   SESSION_WINDOW_MIN_HEIGHT,
   SESSION_WINDOW_MIN_WIDTH
-} from '../session-windows'
+} from '../windows/session-windows'
 import { ensureLoginShellPath } from '../host-capabilities/platform/shell-path'
 import { createBootstrapCoordinator, sshConfigFingerprint } from '../legacy-hermes/ssh-bootstrap-coordinator'
 import { pickLocalPort, redactSecrets, SshConnection } from '../host-capabilities/platform/ssh-connection'
-import { createStreamThrottle } from '../stream-throttle'
+import { createStreamThrottle } from '../windows/stream-throttle'
 import { registerTerminalIpc } from '../host-capabilities/terminal/terminal-ipc'
-import { nativeOverlayWidth as computeNativeOverlayWidth } from '../titlebar-overlay-width'
+import { nativeOverlayWidth as computeNativeOverlayWidth } from '../windows/titlebar-overlay-width'
 import {
   glassSupportedOn,
   translucencySupportedOn
-} from '../translucency'
-import { waitForUpdateClearance } from '../update-gate'
-import { readLiveUpdateMarker, updateHandoffConflict, writeUpdateMarker } from '../update-marker'
-import { isOfficialSshRemote, OFFICIAL_REPO_HTTPS_URL } from '../update-remote'
+} from '../windows/translucency'
+import { waitForUpdateClearance } from '../update/update-gate'
+import { readLiveUpdateMarker, updateHandoffConflict, writeUpdateMarker } from '../update/update-marker'
+import { isOfficialSshRemote, OFFICIAL_REPO_HTTPS_URL } from '../update/update-remote'
 import {
   collectRelaunchArgs,
   observeUpdaterHandoff,
@@ -231,7 +231,7 @@ import {
   stagedUpdaterSupportsPrewrittenMarker,
   windowsUpdatePrerequisiteError,
   wrapHandoffForDetachedConsole
-} from '../updater-process'
+} from '../update/updater-process'
 import {
   formatBlockerMessage,
   formatProbeFailedMessage,
@@ -239,15 +239,15 @@ import {
   stopSafeVenvBlockers
 } from '../legacy-hermes/venv-blocker-scan'
 import { isHermesOwnedVenvDaemon } from '../legacy-hermes/venv-holder-select'
-import { createWakeIndicatorWindowController } from '../wake-indicator-window'
+import { createWakeIndicatorWindowController } from '../windows/wake-indicator-window'
 import {
   registrySshPoolScopeByConnectionId,
   registrySshScopeForWindowRoute,
   WindowConnectionRouteRegistry
 } from '../legacy-hermes/window-connection-route'
-import { createWindowOpenHandler } from '../window-open-policy'
-import { installWindowRendererLifecycle } from '../window-renderer-lifecycle'
-import { createWindowRevealController } from '../window-reveal'
+import { createWindowOpenHandler } from '../security/window-open-policy'
+import { installWindowRendererLifecycle } from '../windows/window-renderer-lifecycle'
+import { createWindowRevealController } from '../windows/window-reveal'
 import {
   bindGeometryPersistence,
   computeWindowOptions,
@@ -255,7 +255,7 @@ import {
   sanitizeWindowState,
   MIN_HEIGHT as WINDOW_MIN_HEIGHT,
   MIN_WIDTH as WINDOW_MIN_WIDTH
-} from '../window-state'
+} from '../windows/window-state'
 import { hiddenWindowsChildOptions } from '../host-capabilities/platform/windows-child-options'
 import {
   buildPathExtCandidates,
@@ -278,7 +278,7 @@ import {
   writeSandboxMarker
 } from '../host-capabilities/platform/windows-sandbox-fallback'
 import { readWindowsUserEnvVar } from '../host-capabilities/platform/windows-user-env'
-import { isPackagedInstallPath as isPackagedInstallPathUnderRoots } from '../workspace-cwd'
+import { isPackagedInstallPath as isPackagedInstallPathUnderRoots } from '../security/workspace-cwd'
 import { setActiveGatewayProfile, setWslBridgeProfileState } from '../host-capabilities/platform/wsl-path-bridge'
 import {
   applyZoomLevel,
@@ -288,21 +288,21 @@ import {
   ZOOM_STEP,
   ZOOM_STORAGE_KEY,
   zoomWiringForWindowKind
-} from '../zoom'
+} from '../windows/zoom'
 
 import {
   getRecentHermesLogLines,
   rememberLog
-} from './log-buffer'
+} from '../app/log-buffer'
 import {
   headersForRemoteRequest,
-} from './runtime-composition'
+} from '../legacy-hermes/runtime-composition'
 import {
   applyTitleBarOverlay,
   chatWindowSurfaceOptions,
   getTitleBarOverlayOptions,
   translucencyBackedWindows
-} from './window-theme'
+} from '../windows/window-theme'
 
 export const USER_DATA_OVERRIDE = process.env.HERMES_DESKTOP_USER_DATA_DIR
 

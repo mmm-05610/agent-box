@@ -19,7 +19,6 @@ import {
   session
 } from 'electron'
 
-import { destroyKeepaliveAgents } from './legacy-hermes/api-transport'
 import {
   closePreviewWatchers,
   dispatchRegistryApiRequest,
@@ -84,6 +83,7 @@ import {
   getBootstrapFailure,
   getBootstrapRepairAttempt,
   getBootstrapRepairRequested,
+  getBootstrapState,
   getF12Blocked,
   getFirstRunSetupGate,
   getIsQuittingForHandoff,
@@ -179,7 +179,7 @@ import {
   openPortalLoginWindow,
   renewPortalAccessSilently,
   resolvePortalBaseUrl,
-} from './composition/cloud-oauth-composition'
+} from './host-capabilities/credentials/cloud-oauth'
 import {
   applySecretStorageEncryption,
   broadcastConnectionsChanged,
@@ -191,7 +191,7 @@ import {
   sanitizeRegistryConnection,
   saveRegistryConnection,
   stopRegistryConnectionBackends,
-} from './composition/connections-composition'
+} from './legacy-hermes/connections-composition'
 import {
   _extractDeepLink,
   get_pendingDeepLink,
@@ -199,27 +199,27 @@ import {
   HERMES_PROTOCOL,
   registerDeepLinkProtocol,
   set_pendingDeepLink,
-} from './composition/deep-link-composition'
-import { registerApiProxyIpc } from './composition/ipc/api-proxy-ipc'
-import { registerBackendIpc } from './composition/ipc/backend-ipc'
-import { registerConnectionIpc } from './composition/ipc/connection-ipc'
-import { registerFilesIpc } from './composition/ipc/files-ipc'
-import { registerPreviewIpc } from './composition/ipc/preview-ipc'
-import { registerSystemIpc } from './composition/ipc/system-ipc'
-import { registerThemeIpc } from './composition/ipc/theme-ipc'
-import { registerWindowIpc } from './composition/ipc/window-ipc'
+} from './app/deep-link-composition'
+import { registerApiProxyIpc } from './ipc/api-proxy-ipc'
+import { registerBackendIpc } from './ipc/backend-ipc'
+import { registerConnectionIpc } from './ipc/connection-ipc'
+import { registerFilesIpc } from './ipc/files-ipc'
+import { registerPreviewIpc } from './ipc/preview-ipc'
+import { registerSystemIpc } from './ipc/system-ipc'
+import { registerThemeIpc } from './ipc/theme-ipc'
+import { registerWindowIpc } from './ipc/window-ipc'
 import {
   cancelScheduledDesktopLogFlush,
   flushDesktopLogBufferSync,
   initDesktopLogBuffer,
   rememberLog
-} from './composition/log-buffer'
+} from './app/log-buffer'
 import {
   initMediaProtocolBridge
-} from './composition/media-protocol'
+} from './host-capabilities/preview/media-bridge'
 import {
   resolveHermesVersion,
-} from './composition/paths-composition'
+} from './legacy-hermes/paths'
 import {
   applySpawnPriority,
   installRemoteHeaderRules,
@@ -232,16 +232,16 @@ import {
   resetHermesConnection,
   setPoolLimits,
   updateManagedSshConnection,
-} from './composition/runtime-composition'
+} from './legacy-hermes/runtime-composition'
 import {
   checkUpdates,
   getUninstallSummary,
   runDesktopUninstall,
-} from './composition/updates-composition'
+} from './update/updates-composition'
 import {
   getTranslucencyState,
   writePersistedTranslucency
-} from './composition/window-theme'
+} from './windows/window-theme'
 import {
   browserWindows,
   buildApplicationMenu,
@@ -267,8 +267,44 @@ import {
   setQuickEntryLastState,
   setQuickEntryWindow,
   spawnBrowserWindow,
-} from './composition/windows-composition'
-import { ensureWslWindowsFonts } from './composition/wsl-fonts'
+} from './windows/windows-composition'
+import { ensureWslWindowsFonts } from './host-capabilities/platform/wsl-fonts'
+import { describeDevCdpDecision } from './app/dev-cdp'
+import { installEmbedReferer } from './security/embed-referer'
+import { createEventDeduper } from './app/event-dedupe'
+import {
+  installFoundInPageForwarder
+} from './windows/find-in-page'
+import { registerMcpOauthCallbackIpc } from './host-capabilities/credentials/mcp-oauth-callback-ipc'
+import { registerFsIpc } from './host-capabilities/filesystem/fs-ipc'
+import {
+  enableBasicPasswordStoreEncryption,
+  resolveReadableFileForIpc,
+  resolveRequestedPathForIpc
+} from './host-capabilities/filesystem/hardening'
+import { registerGitIpc } from './host-capabilities/git/git-ipc'
+import { ensureLoginShellPath } from './host-capabilities/platform/shell-path'
+import { createSshProbeConnection, pickLocalPort } from './host-capabilities/platform/ssh-connection'
+import {
+  alreadyHasNoSandbox,
+  buildNoSandboxRelaunchArgs,
+  decideWindowsSandboxLaunch,
+  fallbackMarker,
+  grantAllApplicationPackagesAcl,
+  markerAfterSuccessfulBoot,
+  readSandboxMarker,
+  shouldAttemptAclRepair,
+  shouldRelaunchForGpuSandboxCrash,
+  writeSandboxMarker
+} from './host-capabilities/platform/windows-sandbox-fallback'
+import { installWindowsSystemCaTrust } from './host-capabilities/platform/windows-system-ca'
+import { setActiveGatewayProfile, setWslBridgeProfileState } from './host-capabilities/platform/wsl-path-bridge'
+import { type FaviconIo, resolveFavicon } from './host-capabilities/preview/favicon'
+import { createMediaProtocolHandler, MEDIA_PROTOCOL } from './host-capabilities/preview/media-protocol'
+import { PreviewReachRegistry } from './host-capabilities/preview/preview-reach'
+import { applyHudResetBounds, defaultHudBounds } from './windows/hud-geometry'
+import { registerHudIpc } from './ipc/hud-ipc'
+import { destroyKeepaliveAgents } from './legacy-hermes/api-transport'
 import { sshQuitShouldBlock } from './legacy-hermes/connection-apply'
 import {
   authModeFromStatus,
@@ -289,37 +325,12 @@ import {
   shouldRetrySshInventory
 } from './legacy-hermes/connection-registry'
 import type { RosterProfileMetadata } from './legacy-hermes/connection-registry'
-import { describeDevCdpDecision } from './dev-cdp'
-import { installEmbedReferer } from './embed-referer'
-import { createEventDeduper } from './event-dedupe'
-import { type FaviconIo, resolveFavicon } from './host-capabilities/preview/favicon'
-import {
-  installFoundInPageForwarder
-} from './find-in-page'
-import { registerFsIpc } from './host-capabilities/filesystem/fs-ipc'
 import { probeGatewayWebSocket } from './legacy-hermes/gateway-ws-probe'
-import { registerGitIpc } from './host-capabilities/git/git-ipc'
-import {
-  enableBasicPasswordStoreEncryption,
-  resolveReadableFileForIpc,
-  resolveRequestedPathForIpc
-} from './host-capabilities/filesystem/hardening'
-import { applyHudResetBounds, defaultHudBounds } from './hud-geometry'
-import { registerHudIpc } from './hud-ipc'
-import { ensureMainWindow } from './main-window-lifecycle'
 import {
   refusedManagedSshUpdate,
   waitForManagedUpdateOperations
 } from './legacy-hermes/managed-ssh-update'
-import { registerMcpOauthCallbackIpc } from './host-capabilities/credentials/mcp-oauth-callback-ipc'
-import { createMediaProtocolHandler, MEDIA_PROTOCOL } from './host-capabilities/preview/media-protocol'
-import { registerNativeNotifications } from './notification-ipc'
-import { registerPetOverlayIpc } from './pet-overlay-ipc'
 import { poolTouchKeys } from './legacy-hermes/pool-touch-scope'
-import { createKeepAwake } from './power-save'
-import { PreviewReachRegistry } from './host-capabilities/preview/preview-reach'
-import { sanitizeQuickEntrySettings } from './quick-entry'
-import { type ActiveWork, mergeActiveWork, quitPromptFor } from './quit-guard'
 import * as remoteLifecycle from './legacy-hermes/remote-lifecycle'
 import {
   attachPowerResumeRemoteRevalidation,
@@ -331,31 +342,21 @@ import {
 } from './legacy-hermes/remote-ws-headers'
 import { fetchRosterSourceData } from './legacy-hermes/roster-source-fetch'
 import {
-  instanceWindowBounds
-} from './session-windows'
-import { ensureLoginShellPath } from './host-capabilities/platform/shell-path'
-import { createSshProbeConnection, pickLocalPort } from './host-capabilities/platform/ssh-connection'
-import {
-  computeWindowOptions
-} from './window-state'
-import {
   detectRemotePlatform,
   helper
 } from './legacy-hermes/windows-remote-lifecycle'
+import { ensureMainWindow } from './windows/main-window-lifecycle'
+import { registerNativeNotifications } from './ipc/notification-ipc'
+import { registerPetOverlayIpc } from './ipc/pet-overlay-ipc'
+import { createKeepAwake } from './app/power-save'
+import { sanitizeQuickEntrySettings } from './windows/quick-entry'
+import { type ActiveWork, mergeActiveWork, quitPromptFor } from './app/quit-guard'
 import {
-  alreadyHasNoSandbox,
-  buildNoSandboxRelaunchArgs,
-  decideWindowsSandboxLaunch,
-  fallbackMarker,
-  grantAllApplicationPackagesAcl,
-  markerAfterSuccessfulBoot,
-  readSandboxMarker,
-  shouldAttemptAclRepair,
-  shouldRelaunchForGpuSandboxCrash,
-  writeSandboxMarker
-} from './host-capabilities/platform/windows-sandbox-fallback'
-import { installWindowsSystemCaTrust } from './host-capabilities/platform/windows-system-ca'
-import { setActiveGatewayProfile, setWslBridgeProfileState } from './host-capabilities/platform/wsl-path-bridge'
+  instanceWindowBounds
+} from './windows/session-windows'
+import {
+  computeWindowOptions
+} from './windows/window-state'
 
 
 
@@ -506,10 +507,6 @@ if (INSTALL_STAMP) {
 initDesktopLogBuffer(DESKTOP_LOG_PATH)
 
 initMediaProtocolBridge({ ensureNativeAccessToken })
-
-function getBootstrapState() {
-  return getBootstrapState()
-}
 
 function continueFirstRunLocalBootstrap() {
   getFirstRunSetupGate().continueLocal()

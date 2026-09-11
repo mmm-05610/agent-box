@@ -29,7 +29,7 @@ three consequences worth knowing before you touch backend resolution:
    adding one back re-couples the two products.
 2. **"No runtime found" is a normal, typed outcome**, not an internal error.
    Resolution returns `HERMES_EXECUTABLE_NOT_FOUND` (see
-   `electron/backend-probes.ts`); the window still opens and the UI says Hermes
+   `electron/legacy-hermes/backend-probes.ts`); the window still opens and the UI says Hermes
    is not installed rather than pretending to connect. Never panic, never fake
    success, never silently retry forever.
 3. **Probe what you are about to rely on.** A resolved binary is not a working
@@ -42,24 +42,63 @@ three consequences worth knowing before you touch backend resolution:
 ## Layout
 
 ```
-apps/desktop/    Electron app — electron/ (main process, pure policy modules),
+apps/desktop/    Electron app — electron/ (main process; the directories below),
                  src/ (React renderer), e2e/ (Playwright), scripts/ (build + dev)
 apps/shared/     @hermes/shared — JsonRpcGatewayClient, WS URL helpers, billing types
 tests-js/        root vitest workspace: cross-workspace contracts + the Playwright
                  mock server that 20 e2e specs import
 scripts/         dev-sandbox.sh, desktop-update/ (updater hand-off), install.sh/.ps1
                  (the installers the first-run bootstrap drives), ci/ helpers
-docs/            desktop-pruning-phase{1,2}.md — the pruning record
+docs/            desktop-pruning-phase{1,2}.md — the pruning record;
+                 architecture/electron-host-boundary.md — the main-process
+                 ownership registry, dependency rules and migration ledger
 ```
+
+### The main process is organised by responsibility
+
+`electron/` is not flat. Each directory owns one kind of decision, and the
+dependency rules between them are enforced by review (the full registry, with a
+per-module owner and the reason for each deferral, is
+`docs/architecture/electron-host-boundary.md`):
+
+```
+electron/
+├── app/                  Electron application lifecycle
+├── windows/              windows, tray, notifications, HUD
+├── host-capabilities/    filesystem, git, terminal, credentials, preview, platform
+├── process/              generic child-process primitives (no product vocabulary)
+├── workcore/             the Work Core infrastructure lifecycle contract (no implementation)
+├── ipc/                  Renderer → Electron IPC registration
+├── update/               Desktop install and update
+├── security/             path, IPC, secret, URL policy
+├── legacy-hermes/        today's Hermes-direct adapter (resolution, argv/env,
+│                         readiness, profile pool, local/SSH/Windows lifecycle)
+├── composition/          assembly seams that are still being dismantled
+├── main.ts, preload.ts   the two bundle entry points
+```
+
+Three rules keep the seams real:
+
+1. `process/` and `host-capabilities/` never import `legacy-hermes/`. A generic
+   primitive or a machine capability that has to ask how to resolve Hermes has
+   absorbed a product decision.
+2. `legacy-hermes/` may import both; the reverse is the violation.
+3. `workcore/` names no harness, no Session, no Execution and no credential
+   policy. Electron owns the Work Core *infrastructure* process; the Work Core
+   owns every Execution/Harness child it spawns. Harness/Execution process
+   management does not move into Electron.
 
 ## Backend lifecycle, briefly
 
 `electron/main.ts` is the orchestration entry point; resolution, probing,
-readiness, and platform policy live in focused modules beside it
-(`backend-probes.ts`, `backend-health.ts`, `backend-command.ts`,
-`backend-env.ts`, `backend-start-failure.ts`, `active-runtime-state.ts`,
-`bootstrap-runner.ts`, `first-run-setup-gate.ts`). Keep it that way — new
-policy belongs in a module with a test, not inline in `main.ts`.
+readiness, and platform policy live in focused modules under
+`electron/legacy-hermes/` (`backend-probes.ts`, `backend-health.ts`,
+`backend-command.ts`, `backend-env.ts`, `backend-start-failure.ts`,
+`active-runtime-state.ts`, `bootstrap-runner.ts`, `first-run-setup-gate.ts`).
+Keep it that way — new policy belongs in a module with a test, not inline in
+`main.ts`. `legacy-hermes/lifecycle.ts` is the narrow seam in front of all of
+it: the composition root does not assemble Hermes argv, env or a connection
+descriptor itself.
 
 Boot order: resolve → probe/validate → (bootstrap if nothing exists) → spawn
 `hermes serve --host 127.0.0.1 --port 0` → read the announced port → confirm

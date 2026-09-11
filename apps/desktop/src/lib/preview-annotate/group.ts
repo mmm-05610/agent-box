@@ -27,7 +27,7 @@
  *   than a constant someone picked.
  */
 
-import type { ComposerReadyAnnotation } from './pack'
+import type { ComposerReadyAnnotation } from './model'
 
 export interface AnnotateGroup {
   /** Shared ancestor prefix, or '' for the group that has no element. */

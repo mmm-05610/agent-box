@@ -1,14 +1,9 @@
 import { type AnnotateGroup, groupAnnotations } from './group'
 import { type CompactIdentity, formatIdentityLine } from './identity'
+import type { ComposerReadyAnnotation } from './model'
 import type { AnnotatePin } from './stack'
 
-export interface ComposerReadyAnnotation {
-  identity?: CompactIdentity
-  imageDataUrl: string
-  note: string
-  number: number
-  prompt: string
-}
+export type { ComposerReadyAnnotation } from './model'
 
 function identityBlock(pin: AnnotatePin): string {
   if (!pin.identity) {

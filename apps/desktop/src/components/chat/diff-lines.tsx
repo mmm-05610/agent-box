@@ -1,8 +1,17 @@
 'use client'
 
 import * as React from 'react'
-import type { BundledLanguage, ShikiTransformer, ThemedToken } from 'shiki'
+import type { BundledLanguage, ThemedToken } from 'shiki'
 
+import {
+  DIFF_KIND_TEXT,
+  DIFF_KIND_TINT,
+  DIFF_LINE_BASE,
+  DiffBody,
+  type DiffKind,
+  type DiffLine,
+  diffLineTransformer
+} from '@/components/chat/diff-body'
 import { chunkLines, type LineChunk, useFixedRowWindow } from '@/components/chat/fixed-row-window'
 import { exceedsHighlightBudget, SHIKI_THEME } from '@/components/chat/shiki-highlighter'
 import { ErrorBoundary } from '@/components/error-boundary'
@@ -17,41 +26,15 @@ import { cn } from '@/lib/utils'
  *    Shiki loads).
  * Both drop git file-headers + `@@` hunk noise and the `+/-` gutter so changes
  * read by color + a 2px gutter accent, the way Cursor does.
+ *
+ * The line model, tints, and plain body they share live in `diff-body.tsx`.
  */
-type DiffKind = 'add' | 'context' | 'remove'
-
-export interface DiffLine {
-  kind: DiffKind
-  text: string
-  /** 1-based line number in the old/new file (absent on the "other" side of an
-   *  add/remove, and on hunk-separator blanks). Only used when line numbers are
-   *  shown (the preview's full diff). */
-  newNo?: number
-  oldNo?: number
-}
-
 interface ParsedHunk {
   lines: Array<{ kind: DiffKind; text: string }>
   newStart: number
   oldStart: number
 }
 
-// Tint + 2px gutter accent per change kind. Text color is included for the
-// plain renderer; the Shiki path omits it so syntax colors win, layering only
-// the background + border.
-const DIFF_KIND_TINT: Record<DiffKind, string> = {
-  add: 'border-(--ui-diff-add-border) bg-(--ui-diff-add-background)',
-  context: 'border-transparent',
-  remove: 'border-(--ui-diff-remove-border) bg-(--ui-diff-remove-background)'
-}
-
-const DIFF_KIND_TEXT: Record<DiffKind, string> = {
-  add: 'text-(--ui-diff-add-foreground)',
-  context: '',
-  remove: 'text-(--ui-diff-remove-foreground)'
-}
-
-const DIFF_LINE_BASE = 'block min-w-max whitespace-pre border-l-2 px-2.5 py-px'
 const PREVIEW_DIFF_LINE_BASE = 'block h-5 min-w-max whitespace-pre px-2.5 leading-5'
 const PREVIEW_CHUNK_LINES = 200
 const PREVIEW_LINE_PX = 20

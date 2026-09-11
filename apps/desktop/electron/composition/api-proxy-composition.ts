@@ -46,7 +46,7 @@ import {
   resolveRequestedPathForIpc,
   resolveTimeoutMs
 } from '../host-capabilities/filesystem/hardening'
-import { createLinkTitleWindow, guardLinkTitleSession, readLinkTitleWindowTitle } from '../link-title-window'
+import { createLinkTitleWindow, guardLinkTitleSession, readLinkTitleWindowTitle } from '../windows/link-title-window'
 import {
   resolveGatedDownloadAuth,
   resolveOauthRestAuth
@@ -105,10 +105,10 @@ import {
 import {
   downloadViaOauthSessionToFile,
   downloadViaTokenToFile,
-} from './cloud-oauth-composition'
+} from '../host-capabilities/credentials/cloud-oauth'
 import {
   rememberLog
-} from './log-buffer'
+} from '../app/log-buffer'
 import {
   LOCAL_PREVIEW_HOSTS,
   PREVIEW_HTML_EXTENSIONS,
@@ -116,10 +116,10 @@ import {
   PREVIEW_PDF_EXTENSIONS,
   PREVIEW_WATCH_DEBOUNCE_MS,
   previewFileMetadata
-} from './media-protocol'
+} from '../host-capabilities/preview/media-bridge'
 import {
   resetHermesConnection,
-} from './runtime-composition'
+} from '../legacy-hermes/runtime-composition'
 
 export const previewWatchers = new Map()
 

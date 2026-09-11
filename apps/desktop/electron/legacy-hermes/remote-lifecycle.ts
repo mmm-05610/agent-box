@@ -6,7 +6,7 @@
 
 export {
   connect,
-} from './remote-lifecycle/connect'
+} from './connect'
 export {
   classifySshReuseProof,
   cleanupStale,
@@ -35,7 +35,7 @@ export {
   terminateOwnedDashboardForUpdate,
   validateRemotePath,
   writeLockfile,
-} from './remote-lifecycle/ownership'
+} from './ownership'
 export {
   assertRemoteInstallUpdateClear,
   listRemoteHermesProfiles,
@@ -43,7 +43,7 @@ export {
   probeHermesVersion,
   probeRemoteHermesHome,
   probeRemotePlatform,
-} from './remote-lifecycle/resolve'
+} from './resolve'
 export {
   adoptOwnedServedToken,
   buildSpawnCommand,
@@ -52,4 +52,4 @@ export {
   remoteSupportsSshOwnership,
   scrapeReadyPort,
   spawnRemoteDashboard,
-} from './remote-lifecycle/spawn'
+} from './spawn'

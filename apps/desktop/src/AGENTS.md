@@ -16,7 +16,7 @@ NOT embed a TUI and has no dashboard frontend — own composer, transcript, slas
 Readiness is probed **with** the session token the app injects into the child, because a runtime
 that gates `GET /api/health` behind that token would otherwise 401 an anonymous probe forever.
 
-**One backward-compat fallback:** `serve` is newer, so the spawn (`electron/backend-command.ts` +
+**One backward-compat fallback:** `serve` is newer, so the spawn (`electron/legacy-hermes/backend-command.ts` +
 `backendSupportsServe()` in `electron/main.ts`) checks the resolved runtime for `serve` support and
 ONLY when it is absent (older managed install / PATH `hermes` not yet updated) rewrites argv to
 legacy `dashboard --no-open`. Without it a new app against an un-upgraded runtime crashes on an
