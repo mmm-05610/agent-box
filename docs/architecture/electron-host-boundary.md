@@ -225,11 +225,18 @@ truth — `indirect` means it routes or configures something that does, without 
 | `process/identity.ts` | 193 | `c/bootstrap-env-composition` | process start marker + claim policy | OS (PID identity) | no | `process/ (moved)` | no |
 | `update-marker.ts` | 189 | `c/bootstrap-env-composition` | PID liveness + update marker file | OS | partial | `process/pid` | no |
 | `process/connection-state.ts` | 103 | `c/bootstrap-env-composition` | generation + owned child | Electron | no | `process/ (moved)` | no |
-| `process/budget.ts` | 101 | `lh/remote-liveness`, `window-renderer-lifecycle` | failure streak + attempt window | pure | no | `process/ (new)` | no |
+| `process/budget.ts` | 101 | `lh/remote-liveness`, `window-renderer-lifecycle`, `wc/lifecycle` | failure streak + attempt window | pure | no | `process/ (new)` | no |
 | `process/child-stop.ts` | 94 | `c/bootstrap-env-composition` | child process + tree | OS | no | `process/ (moved)` | no |
 | `process/output-tail.ts` | 69 | `c/bootstrap-env-composition` | child stdout/stderr ring buffer | OS | no | `process/ (moved)` | no |
 | `process/inflight-claim.ts` | 58 | `c/bootstrap-env-composition` | keyed in-flight claim | Electron | no | `process/ (moved)` | no |
 | `process/pid.ts` | 34 | `process/identity`, `update-marker` | host-process liveness | OS | no | `process/ (moved)` | no |
+
+### WORKCORE_LIFECYCLE — 2 modules, 198 lines
+
+| module | LOC | current callers | operates on | state authority | Hermes-only? | target | Session/Exec/Workspace |
+|---|---:|---|---|---|---|---|---|
+| `workcore/lifecycle.ts` | 134 | `wc/slot` | the six-verb Work Core infrastructure contract | Work Core | no | `workcore/ (new)` | no |
+| `workcore/slot.ts` | 64 | — (tests only) | the single composition position for a Work Core lifecycle | Electron (deliberately unpopulated) | no | `workcore/ (new)` | no |
 
 ### LEGACY_HERMES — 64 modules, 24220 lines
 
@@ -424,6 +431,9 @@ without changing behaviour, keep the production path and record the cycle".
 | E2 | *(this commit)* | argv / env / local-descriptor assembly | inlined at both spawn sites in `composition/bootstrap-env-composition.ts` | `legacy-hermes/lifecycle.ts` (`hermesServeArgs`, `hermesRuntimeArgs`, `hermesBackendEnv`, `hermesLocalWsUrl`, `hermesPrimaryConnectionDescriptor`, `hermesProfiledConnectionDescriptor`) | **Yes** — the composition root no longer contains a Hermes argv literal or the backend env object. `HERMES_HOME`'s doc comment moved with the env producer. |
 | E3 | *(this commit)* | 41 host-capability modules | `electron/*` | `electron/host-capabilities/{filesystem,git,terminal,credentials,preview,platform}/` | **Yes** — moved, import graph re-resolved. Implementations unchanged; no rewrite. |
 | E3 | *(this commit)* | the typed executor boundary | — | `host-capabilities/contract.ts` + `contract.test.ts` | **Yes** — new declared surface; every interface is written with `typeof` against the real export, so a signature drift stops the build. |
+| E4 | *(this commit)* | the Work Core lifecycle contract | — | `workcore/lifecycle.ts` | **Yes** — new contract. Six infrastructure verbs; no harness, no Session, no Execution and no credential policy. Nothing installs it, so it cannot change behavior. |
+| E4 | *(this commit)* | the composition slot | — | `workcore/slot.ts` (`workCoreSlot`) | **Yes** — the position a Work Core lifecycle is installed into. Deliberately unpopulated in production: `current()` is null, the boot path does not branch on it, and there is no fallback behind it. |
+| E4 | *(this commit)* | the real-process fixture | — | `workcore/workcore.test.ts` | **Yes, test-only.** Drives an actual child process through all six verbs using `process/{readiness,output-tail,child-stop,budget}.ts`, and asserts the slot is empty and that no process survives. |
 
 ### What E1 deliberately did not extract
 
@@ -477,23 +487,48 @@ Two properties the interface deliberately asserts:
   `contract.ts`'s header and enforced by the classification: a module that *does* decide one of
   those is `LEGACY_HERMES`.
 
-### Target-directory status after E3
+### What E4 did and did not do
+
+- **A contract, a slot, and a fixture — nothing else.** `workcore/lifecycle.ts` declares the six
+  infrastructure verbs (`resolve`, `launch`, `readiness`, `connectionHandle`, `restart`,
+  `shutdown`). `workcore/slot.ts` is the one composition position a lifecycle can be installed into;
+  it is a plain holder with an install/current/isPopulated surface, not a registry, manifest, or
+  plugin system — this repository has one candidate consumer and no Work Core at all, so anything
+  larger would be a framework built for an imagined second consumer.
+- **The AgentBox POC is not connected.** `apps/desktop/src/agentbox/` and
+  `apps/desktop/src/plugins/agentbox-lab/` are untouched and remain untracked. No import points at
+  them, and nothing here was derived from their runtime shape.
+- **No fake readiness, no fake Session, no fallback.** `resolve()` returning null means "no Work
+  Core"; nothing pretends otherwise. The fixture is test-only and spawns a REAL child process whose
+  readiness is a REAL stdout sentinel — it is a stub *artifact*, not a faked contract.
+- **The interface names no harness.** There is no `harness_type`, `provider_id`, model, tool or
+  execution verb, and no verb can enumerate or signal a child of the Work Core process. Electron
+  owns the infrastructure process; the Work Core owns every Execution/Harness child it spawns
+  (refactor invariant 5). An interface that named a harness here would make every harness a Desktop
+  change.
+- **The `resolve()` step and the boot path are still unconnected.** `workCoreSlot.current()` is null
+  in production and the boot path does not consult it, so this seam cannot alter behavior yet. That
+  is the point: the first real decision it makes will be the null-check, and it will be made when a
+  real Work Core exists.
+
+### Target-directory status after E4
 
 | Target directory | Exists? | Populated? |
 |---|---|---|
 | `app/` | no | — |
 | `windows/` | no | — |
-| `host-capabilities/` | **yes** | **yes** — 41 modules, 9,816 lines, six areas |
+| `host-capabilities/` | yes | yes — 41 modules, 9,816 lines, six areas |
 | `process/` | yes | yes — 8 modules, 859 lines |
-| `workcore/` | no | — |
+| `workcore/` | **yes** | **contract + slot + fixture only** — 2 production modules, 198 lines; no implementation |
 | `host-bridge/` | no | — |
 | `ipc/` | no | — |
 | `update/` | no | — |
 | `security/` | no | — |
 | `legacy-hermes/` | yes | yes — 60 modules, 14,868 lines |
 
-Everything still at the root of `electron/` or in `composition/` (§3 rows whose target is neither
-`process/`, `host-capabilities/` nor `legacy-hermes/`) is registered future ownership.
+`host-bridge/` is deliberately still empty: it is the typed boundary a Work Core calls to reach local
+capabilities, so it needs a Work Core consumer to have a shape. `host-capabilities/contract.ts` (§3,
+`HOST_CAPABILITY`) is the surface it will be built on, and it is already harness-neutral.
 
 ## 8. The next vertical chain (executed by E2)
 
