@@ -15,6 +15,7 @@ import { Codicon } from '@/components/ui/codicon'
 import { ContribBoundary, ContribRender } from '@/extension/contrib/react/boundary'
 import { useContributions } from '@/extension/contrib/react/use-contributions'
 import { HUD_SURFACE } from '@/lib/floating-hud'
+import { paneChrome } from '@/lib/pane-shell/chrome'
 import { readJson, writeJson } from '@/lib/storage'
 import { TITLEBAR_HEIGHT } from '@/lib/titlebar'
 import { cn } from '@/lib/utils'
@@ -31,7 +32,6 @@ import {
   type FloatingViewport,
   reflowRect
 } from './floating-rect'
-import { paneChrome } from './track-model'
 
 const POSITIONS_KEY = 'hermes.desktop.floatingPanes.v1'
 

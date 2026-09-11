@@ -12,6 +12,7 @@ import { type PointerEvent as ReactPointerEvent, useCallback, useMemo, useRef, u
 import { beginSashDrag, endSashDrag } from '@/components/pane-shell/geometry'
 import { useContributions } from '@/extension/contrib/react/use-contributions'
 import { guardGuestPointers } from '@/lib/guest-pointer-guard'
+import { paneChrome, type PaneSizing } from '@/lib/pane-shell/chrome'
 import type { LayoutNode, SplitNode } from '@/lib/pane-tree'
 import { allPaneIds } from '@/lib/pane-tree'
 import { rafCoalesce } from '@/lib/raf-coalesce'
@@ -40,8 +41,6 @@ import {
   fixedTrackSize,
   MIN_PANE_PX,
   MINIMIZED_TRACK,
-  paneChrome,
-  type PaneSizing,
   resolveCssPx,
   rootChildSide,
   shownPaneIds,

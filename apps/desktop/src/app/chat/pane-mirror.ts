@@ -37,18 +37,18 @@ export interface PaneMirror<T> {
   tabLead?: (key: string) => ReactNode
   /** Custom label NODE for the tile's tab, self-subscribing for the same reason
    *  as `tabLead` — a name that moves faster than re-registration (see
-   *  PaneChrome.tabTitle). Falls back to `title`. */
+   *  PaneChromeRender.tabTitle). Falls back to `title`. */
   tabTitle?: (key: string) => ReactNode
-  /** Mint another tile of this kind — the strip's "+" (see PaneChrome.newTab).
+  /** Mint another tile of this kind — the strip's "+" (see PaneChromeRender.newTab).
    *  Per tile so a mirror can offer it for some of its tabs and not others. */
   newTab?: (key: string) => (() => void) | undefined
   render: (key: string) => ReactNode
-  /** Extra rows at the top of the zone tab menu (see PaneChrome.tabMenuPrefix). */
+  /** Extra rows at the top of the zone tab menu (see PaneChromeRender.tabMenuPrefix). */
   tabMenuPrefix?: (key: string) => ((kit: MenuKit) => ReactNode) | undefined
   /** Wrap the tile's TAB (domain context menu — session verbs). */
   tabWrap?: (key: string, tab: ReactElement) => ReactNode
   /** Override the tile's TAB drag (session drop language: stack/split/link).
-   *  Returns whether it took the drag (see PaneChrome.tabDrag). */
+   *  Returns whether it took the drag (see PaneChromeRender.tabDrag). */
   tabDrag?: (key: string, event: ReactPointerEvent<HTMLElement>, onTap: () => void) => boolean
   /** Wired as the pane's closer (tab Close). */
   close: (key: string) => void
@@ -95,7 +95,7 @@ export function paneMirror<T>(cfg: PaneMirror<T>): () => void {
           placement: 'main',
           tabDrag: cfg.tabDrag
             ? (event: ReactPointerEvent<HTMLElement>, onTap: () => void) => cfg.tabDrag!(key, event, onTap)
-            : undefined, // returns boolean (handled) — see PaneChrome.tabDrag
+            : undefined, // returns boolean (handled) — see PaneChromeRender.tabDrag
           tabMenuPrefix: cfg.tabMenuPrefix?.(key),
           tabWrap: cfg.tabWrap ? (tab: ReactElement) => cfg.tabWrap!(key, tab) : undefined
         },

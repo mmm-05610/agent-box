@@ -7,14 +7,10 @@
  * live pane contributions; the React split renderer reads it per render.
  */
 
-import type * as React from 'react'
-
-import type { MenuKit } from '@/components/ui/actions-menu'
+import { paneChrome, type PaneSizing } from '@/lib/pane-shell/chrome'
 import type { GroupNode, LayoutNode } from '@/lib/pane-tree'
 import { allPaneIds } from '@/lib/pane-tree'
 import type { Contribution } from '@/types/contributions'
-
-import type { FloatingAnchor } from './floating-rect'
 
 export const MIN_PANE_PX = 80
 
@@ -26,93 +22,6 @@ export const MIN_PANE_PX = 80
  * against an 80px floor with a sliver of unusable content still showing.
  */
 export const COLLAPSED_ZONE_PX = 28
-
-/** Optional CSS sizing a pane contributes (`data.width` / `data.minWidth`…).
- *  Applied to the pane's GROUP along the axis of the split that contains it —
- *  the same semantics as the app's `Pane width/minWidth/maxWidth` props:
- *  a `width`/`height` makes the zone a FIXED track (sidebar-style — it keeps
- *  its size and the weighted zones absorb the rest); without one the zone
- *  shares leftover space by weight. */
-export interface PaneSizing {
-  width?: string
-  height?: string
-  minWidth?: string
-  maxWidth?: string
-  minHeight?: string
-  maxHeight?: string
-}
-
-/** Chrome behavior flags a pane contributes. Read via `paneChrome`. */
-interface PaneChrome extends PaneSizing {
-  /** Leaves the grid on narrow viewports; revealed as an edge overlay. */
-  collapsible?: boolean
-  /** Arrive minimized — a rail tab rather than an open zone. For a pane that
-   *  docks to an edge this is the vertical strip; the user's first expand is
-   *  persisted on the zone and wins from then on. Applied when the pane ENTERS
-   *  the tree, not on every boot, so it is a default and not an invariant. */
-  defaultCollapsed?: boolean
-  /** Extra ids accepted from PANE_TOGGLE_REVEAL_EVENT (the real app's pane
-   *  ids, e.g. `chat-sidebar` for `sessions`). */
-  revealAliases?: string[]
-  /** Tiling role in the tree, or `'floating'` — the one NON-tiling placement:
-   *  the pane is excluded from the tree entirely and rendered as a fixed card
-   *  above it (see renderer/floating-panes.tsx). A floating pane takes no
-   *  space from any zone, has no tab, and can't be docked or split. */
-  placement?: string
-  /** Spawn corner for `placement: 'floating'` (default `'top-right'`). The
-   *  pane also TRACKS that corner's edges when the window resizes. */
-  anchor?: FloatingAnchor
-  /** Keep this pane mounted when hidden even after the zone's bounded hot
-   *  cache fills. Reserved for stateful resources whose lifetime must not track
-   *  tab visibility (for example terminal PTYs). */
-  lifecycleKeepAlive?: boolean
-  /** No Close in the tab menu — the one surface the app can't lose (the
-   *  main workspace). Session tiles share `placement: 'main'` but close. */
-  uncloseable?: boolean
-  /** Standing chrome tab (sessions / Bots) with NO close verb at all: no ✕,
-   *  no middle / ⌘-click, no Close menu rows. It is shown/hidden instead (the
-   *  zone menu's Show/Hide rows and a ⌘K toggle, via `setStripTabHidden`).
-   *  Close was too destructive for these: an accidental ✕ removed Bot Mode
-   *  until the next launch. The ✕ follows the verb (see `PaneTab.onClose`),
-   *  so dropping the verb here is what takes the chip off the tab. */
-  hideOnly?: boolean
-  /** Wrap this pane's TAB (e.g. in a domain context menu — a session tile's
-   *  pin/branch/rename/archive/delete). The wrapper must render `tab` as its
-   *  interactive child; the zone's own strip menu still owns non-tab space. */
-  tabWrap?: (tab: React.ReactElement) => React.ReactNode
-  /** Extra rows at the top of the zone tab menu. Called when the menu opens
-   *  against the right-clicked pane — a Browser tab's Open-in-external, without
-   *  replacing Reload / Close / the strip. */
-  tabMenuPrefix?: (kit: MenuKit) => React.ReactNode
-  /** Override this pane's TAB drag (a session tab drags like a sidebar row —
-   *  stack / split / composer-link — not the generic pane move). Given the
-   *  tab's tap (activate) so that gesture survives. Returns whether it took the
-   *  drag; `false` (or absent) defers to `startPaneDrag` — e.g. the workspace
-   *  tab on a fresh draft, nothing to link. */
-  tabDrag?: (event: React.PointerEvent<HTMLElement>, onTap: () => void) => boolean
-  /** Suppress the zone header while THIS pane is active — full-page views
-   *  (artifacts/skills/plugin pages) are not tab-able surfaces. The flag is
-   *  live: the workspace contribution re-registers it on route changes. */
-  headerVeto?: boolean
-  /** A lead NODE for this pane's TAB, rendered before the label. A session
-   *  pane (main workspace + tiles) passes its live `SessionStatusDot` here so
-   *  the tab and the sidebar row render status/color from the ONE primitive
-   *  (self-subscribing — it updates without the strip re-registering). */
-  tabLead?: () => React.ReactNode
-  /** Mint another tab of THIS pane's kind — the strip's "+" while this pane is
-   *  active. A Browser tab makes another Browser tab; a pane that is one of a
-   *  kind (a file peek) leaves it absent and the strip falls back to the chat
-   *  "+" if the zone holds session tabs. */
-  newTab?: () => void
-  /** This pane's TAB LABEL, when it changes faster than the contribution
-   *  should. A session pane whose draft is being typed renames on every
-   *  debounce beat; re-registering `title` that often would re-render the
-   *  whole panes area, so the label subscribes for itself instead. Absent, or
-   *  returning nothing, falls back to `title`. */
-  tabTitle?: () => React.ReactNode
-}
-
-export const paneChrome = (c: Contribution | undefined) => (c?.data ?? {}) as PaneChrome
 
 /** Resolve a computed style length ("237px" / "none" / "auto") to px. */
 export function computedPx(value: string, fallback: number): number {

@@ -141,7 +141,7 @@ export function browserTabLabel(target: PreviewTarget, page?: BrowserPage): stri
 }
 
 /** Live tab label for a Browser: it renames itself as the page navigates,
- *  without the contribution re-registering (see PaneChrome.tabTitle). */
+ *  without the contribution re-registering (see PaneChromeRender.tabTitle). */
 function BrowserTabLabel({ tabId }: { tabId: string }) {
   const pages = useStore($browserPages)
   const target = targetFor(tabId)
