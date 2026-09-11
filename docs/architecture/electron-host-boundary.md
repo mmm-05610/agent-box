@@ -613,3 +613,77 @@ it exposes.
 The chain is complete when `main.ts` contains no `'serve'`, no `'--profile'`, no `HERMES_HOME`, no
 `resolveHermesBackend` call and no backend spawn, and both boot smokes are unchanged.
 
+
+## 9. Verification of this round
+
+Recorded so a reviewer can tell a regression from a pre-existing failure without
+re-running everything.
+
+### Gates
+
+| Gate | Result |
+|---|---|
+| `npm run --workspace apps/desktop typecheck` (renderer + electron + e2e) | clean, exit 0 |
+| `npm run --workspace apps/shared typecheck` | clean, exit 0 |
+| `npm test --prefix tests-js` | 8 files / 47 tests passed |
+| `npx eslint electron/` | clean |
+| `git diff --check` | clean |
+| `npm run --workspace apps/desktop test` (full) | 3 files / 6 tests failed, 929 files / 9607 tests passed, 2 files / 6 tests skipped (934 files, 9619 tests) |
+
+### Pre-existing failures, and what is NOT a regression
+
+Baseline at `b55355f` (the commit this round started from), same command:
+
+| | Files | Tests |
+|---|---|---|
+| Baseline `b55355f` | 3 failed / 923 passed / 2 skipped (928) | 5 failed / 9584 passed / 6 skipped (9595) |
+| After E5 | 3 failed / 929 passed / 2 skipped (934) | 6 failed / 9607 passed / 6 skipped (9619) |
+
+The failing **files** are the same three in both runs:
+
+- `electron/.../api-transport.test.ts` — a live-loopback timing assertion
+  (`expected 1 to be greater than 1`).
+- `electron/.../mcp-oauth-callback-ipc.test.ts` — loopback listener
+  `ECONNREFUSED`; this file reports 2 failures in the full baseline run and 3
+  when run alone, and it does so **at `b55355f` as well** (verified by stashing
+  this round's changes and re-running it), so the 2↔3 variation is
+  order-dependent, not new.
+- `src/store/voice-prefs.test.ts` — `expected 'false' to be null`.
+
+The +6 files and +23 passing tests are this round's seven new test files
+(`process/{identity,output-tail,child-stop,connection-state,inflight-claim}`,
+`legacy-hermes/lifecycle`, `host-capabilities/contract`, `workcore/workcore`,
+`main-process-shadowing`). **One** extra test failure appeared (6 vs 5) and it is
+the mcp-oauth file's order-dependent count above.
+
+Two further renderer failures appeared in an intermediate full run
+(`config-settings.test.tsx`, `shiki-block.test.tsx`) and did **not** recur; both
+pass in isolation, and the "warm-switch perf guard" name says why. They are load
+flakes, not regressions from this refactor, whose renderer diff is one type-only
+import path in `src/global.d.ts`.
+
+### Boot smoke (isolated sandbox)
+
+Each run gets its own `HERMES_HOME`, its own Electron userData and a distinct app
+name, so it cannot touch a real instance or its single-instance lock. Residual
+detection reads `/proc/<pid>/environ`, not the command line — an Electron child
+does not carry `HERMES_HOME` in its argv, so a `pgrep -f` check misses exactly
+the orphans it exists to catch (which is how a first attempt at this measurement
+reported "zero residue" while an orphan was still running).
+
+| Variant | Verdict | Renderer | Residual processes |
+|---|---|---|---|
+| with external Hermes (`v0.19.0` on PATH) | `Hermes backend is ready. Finalizing desktop startup` | alive after verdict, 2 renderer processes | none |
+| no Hermes reachable | `errorCode=HERMES_EXECUTABLE_NOT_FOUND` (typed, after `Waiting for first-run setup choice`) | alive after verdict, 2 renderer processes | none |
+
+Observed with-Hermes ladder: `Resolving Hermes backend` → `Resolving Hermes
+runtime` → `Using existing Hermes CLI at …/.local/bin/hermes` → `Starting Hermes
+backend …` → `Waiting for Hermes backend to launch` → `Waiting for Hermes backend
+to become ready` → ready.
+
+One honest caveat about the second variant: reaching it required leaving
+`HERMES_DESKTOP_HERMES` **unset**. An explicit override is trusted verbatim
+(`legacy-hermes/backend-probes.ts::shouldTrustHermesOverride`), so pointing it at
+a bogus path selects that path as the runtime and produces a spawn/ownership
+failure instead. That is pre-existing, deliberate behaviour for an operator
+override and was not changed here.
