@@ -8,7 +8,7 @@ because it is trusted; see `renderer-layer-master-plan.md` §8.
 | | |
 | --- | --- |
 | last updated | 2026-09-12 |
-| HEAD at last update | `be1b0c7` |
+| last commit to change renderer source | `c6889f1` |
 | ledger | **85** |
 | target after Stage A | **49** |
 | tests | **775 files / 7466 tests** |
@@ -89,8 +89,9 @@ One edit per work order, in the same commit as the work or immediately after:
 2. Add a `notes` cell only for something a reader would otherwise have to
    re-derive: a prediction that was wrong, a boundary that had to move, a
    pre-existing failure that is not yours.
-3. Update the header block's ledger and test numbers, and `last updated` /
-   `HEAD`.
+3. Update the header block's ledger and test numbers, and `last updated`. The
+   source-commit anchor moves only when a commit touches `apps/desktop/src`, so a
+   status-only or docs-only commit never moves it.
 4. If the item is the last of a wave, the next wave's items may start — but only
    those whose collision partners are all merged, not the whole wave.
 
