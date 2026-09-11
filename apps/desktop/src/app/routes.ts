@@ -2,7 +2,7 @@ import { atom } from 'nanostores'
 import type { ReactNode } from 'react'
 
 import { noteActiveTreeGroup, revealTreePane } from '@/components/pane-shell/tree/store'
-import { registry } from '@/contrib/registry'
+import { registry } from '@/extension/contrib/registry'
 
 type NavigateLike = (to: string, options?: { replace?: boolean }) => void
 

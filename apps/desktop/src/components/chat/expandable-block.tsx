@@ -2,7 +2,7 @@
 
 import { type ReactNode, useCallback, useRef, useState } from 'react'
 
-import { useResizeObserver } from '@/hooks/use-resize-observer'
+import { useResizeObserver } from '@/lib/hooks/use-resize-observer'
 import { ChevronDown } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 

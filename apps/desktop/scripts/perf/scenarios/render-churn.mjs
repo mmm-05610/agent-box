@@ -4,7 +4,7 @@
 //
 // Drives the same synthetic pipeline as `multitab` — publishSessionState per
 // session per flush via `__HERMES_SESSION_TILES__`, no backend, no credits —
-// then reads the dev-only counters installed by `src/debug/`:
+// then reads the dev-only counters installed by `src/dev/debug/`:
 //
 //   window.__RENDER_COUNTS__  — per-component renders, attributed to
 //                               props / hook state / parent-only ("wasted")
@@ -199,7 +199,7 @@ export default {
 
     if (ok !== 'ok') {
       throw new Error(
-        `render-churn setup failed (${ok}) — needs a dev renderer with src/debug installed ` +
+        `render-churn setup failed (${ok}) — needs a dev renderer with src/dev/debug installed ` +
           '(the counters are aliased out of production builds unless VITE_PERF_PROBE=1).'
       )
     }

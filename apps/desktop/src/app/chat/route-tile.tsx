@@ -9,8 +9,8 @@
 
 import { lazy, type ReactNode, Suspense } from 'react'
 
-import { ContribBoundary, ContribRender } from '@/contrib/react/boundary'
-import { useContributions } from '@/contrib/react/use-contributions'
+import { ContribBoundary, ContribRender } from '@/extension/contrib/react/boundary'
+import { useContributions } from '@/extension/contrib/react/use-contributions'
 import { $routeTiles, closeRouteTile, type RouteTile } from '@/store/route-tiles'
 
 import { ARTIFACTS_ROUTE, contributedRoutes, MESSAGING_ROUTE, ROUTES_AREA, SKILLS_ROUTE } from '../routes'

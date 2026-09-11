@@ -4,11 +4,11 @@ import { MemoryRouter } from 'react-router'
 import { afterEach, expect, it, vi } from 'vitest'
 
 import { SidebarProvider } from '@/components/ui/sidebar'
+import { makeSessionInfo } from '@/dev/test/session-info'
 import { $connectionsRegistry } from '@/store/connection-registry-state'
 import { $sidebarRowMeta, setSidebarGrouping } from '@/store/layout'
 import { $newChatRoute, $profiles } from '@/store/profile'
 import { $sessionProfilesUsage, $sessions } from '@/store/session'
-import { makeSessionInfo } from '@/test/session-info'
 
 import { ChatSidebar } from './index'
 

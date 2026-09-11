@@ -83,7 +83,7 @@ export default [
           // Mount it as a child instead: <ContribRender render={c.render} />.
           selector: 'JSXExpressionContainer CallExpression[callee.property.name="render"]',
           message:
-            'Do not call render() callbacks inline in JSX — the callback\u2019s hooks become the host\u2019s and plugin load/replace changes the host hook count (React #310). Mount it as a component: <ContribRender render={...} /> from @/contrib/react/boundary.'
+            'Do not call render() callbacks inline in JSX — the callback\u2019s hooks become the host\u2019s and plugin load/replace changes the host hook count (React #310). Mount it as a component: <ContribRender render={...} /> from @/extension/contrib/react/boundary.'
         }
       ]
     }

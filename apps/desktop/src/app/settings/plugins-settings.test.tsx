@@ -10,7 +10,7 @@ vi.mock('@/app/gateway/hooks/use-gateway-request', () => ({
   useGatewayRequest: () => ({ requestGateway })
 }))
 
-import { $pluginRecords } from '@/contrib/plugins-store'
+import { $pluginRecords } from '@/extension/contrib/plugins-store'
 import { $agentPlugins, $agentPluginsStatus } from '@/store/agent-plugins'
 import { $gatewayState } from '@/store/session'
 

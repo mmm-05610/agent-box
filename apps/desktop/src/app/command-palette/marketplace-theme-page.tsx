@@ -14,14 +14,14 @@ import { useState } from 'react'
 
 import { StatusRow } from '@/app/command-palette/status-row'
 import { useDebounced } from '@/app/hooks/use-debounced'
+import { installVscodeThemeFromMarketplace } from '@/application/theme/adapters/install'
+import { $marketplaceInstalls } from '@/application/theme/adapters/user-themes'
 import type { DesktopMarketplaceSearchItem } from '@/global'
 import { useI18n } from '@/i18n'
 import { HUD_ITEM, HUD_TEXT } from '@/lib/floating-hud'
 import { triggerHaptic } from '@/lib/haptics'
 import { Check, Download, Loader2, Palette } from '@/lib/icons'
 import { cn } from '@/lib/utils'
-import { installVscodeThemeFromMarketplace } from '@/theme-composition/adapters/install'
-import { $marketplaceInstalls } from '@/theme-composition/adapters/user-themes'
 
 const compactNumber = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 })
 

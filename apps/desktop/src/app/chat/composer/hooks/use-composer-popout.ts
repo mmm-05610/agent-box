@@ -2,8 +2,8 @@ import { useStore } from '@nanostores/react'
 import { type RefObject, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
 
 import { usePaneGroup, usePaneVisible } from '@/components/pane-shell/pane-visibility'
-import { useResizeObserver } from '@/hooks/use-resize-observer'
 import { triggerHaptic } from '@/lib/haptics'
+import { useResizeObserver } from '@/lib/hooks/use-resize-observer'
 import {
   $composerPopoutGesturesEnabled,
   $composerPopoutZone,

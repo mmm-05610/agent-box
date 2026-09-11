@@ -3,13 +3,13 @@ import { MemoryRouter } from 'react-router'
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 import { StatusbarControls, type StatusbarItem } from '@/app/shell/statusbar-controls'
+import { stubMenuDomApis, stubResizeObserver } from '@/dev/test/jsdom'
 import {
   $statusbarHiddenIds,
   $statusbarVisible,
   STATUSBAR_HIDDEN_BY_DEFAULT,
   toggleStatusbarVisible
 } from '@/store/statusbar-prefs'
-import { stubMenuDomApis, stubResizeObserver } from '@/test/jsdom'
 
 beforeAll(() => {
   stubResizeObserver()

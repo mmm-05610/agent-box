@@ -10,7 +10,7 @@ import { useStore } from '@nanostores/react'
 import { type PointerEvent as ReactPointerEvent, useCallback, useMemo, useRef, useSyncExternalStore } from 'react'
 
 import { beginSashDrag, endSashDrag } from '@/components/pane-shell/geometry'
-import { useContributions } from '@/contrib/react/use-contributions'
+import { useContributions } from '@/extension/contrib/react/use-contributions'
 import { guardGuestPointers } from '@/lib/guest-pointer-guard'
 import { rafCoalesce } from '@/lib/raf-coalesce'
 import { cn } from '@/lib/utils'

@@ -72,7 +72,7 @@ import { $sessionTiles, sessionTileOwnerRoute } from '@/store/session-states'
 import { $sessionSeenCounts, $unreadFinishedMarkers } from '@/store/session-unread'
 import { type SessionProfileRoute } from '@/store/session/types'
 
-import { deferred } from '../../../test/deferred'
+import { deferred } from '../../../dev/test/deferred'
 import { NEW_CHAT_ROUTE, sessionRoute } from '../../routes'
 import type { ClientSessionState } from '../../types'
 

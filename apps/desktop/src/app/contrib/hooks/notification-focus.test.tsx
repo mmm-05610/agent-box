@@ -5,7 +5,7 @@ import { paneMirror } from '@/app/chat/pane-mirror'
 import { sessionRoute, syncWorkspaceRoute } from '@/app/routes'
 import { group } from '@/components/pane-shell/tree/model'
 import * as tree from '@/components/pane-shell/tree/store'
-import { registry } from '@/contrib/registry'
+import { registry } from '@/extension/contrib/registry'
 import { $selectedStoredSessionId } from '@/store/session'
 import {
   $sessionTiles,

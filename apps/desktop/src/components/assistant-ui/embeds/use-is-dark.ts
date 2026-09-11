@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-import { useThemeEpoch } from '@/hooks/use-theme-epoch'
+import { useThemeEpoch } from '@/lib/hooks/use-theme-epoch'
 
 const isDarkNow = () => typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
 

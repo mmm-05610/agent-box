@@ -1,6 +1,6 @@
 import { useStore } from '@nanostores/react'
 
-import { $registryVersion } from '@/contrib/registry'
+import { $registryVersion } from '@/extension/contrib/registry'
 import { $bindings, bindingsFor } from '@/store/keybinds'
 
 import { KEYBIND_READONLY } from './actions'

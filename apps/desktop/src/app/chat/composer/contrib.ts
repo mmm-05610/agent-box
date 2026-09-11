@@ -22,8 +22,8 @@
 
 import { useMemo } from 'react'
 
-import { useContributions } from '@/contrib/react/use-contributions'
-import { registry } from '@/contrib/registry'
+import { useContributions } from '@/extension/contrib/react/use-contributions'
+import { registry } from '@/extension/contrib/registry'
 import type { TodoItem } from '@/lib/todos'
 import type { ComposerAction } from '@/store/composer-actions'
 import type { ComposerAttachment } from '@/types/composer'

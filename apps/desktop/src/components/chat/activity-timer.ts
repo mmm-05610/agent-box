@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
-import { useViewedInterval } from '@/hooks/use-viewed-interval'
+import { useViewedInterval } from '@/lib/hooks/use-viewed-interval'
 
 // Module-level registry so timers survive component unmount/remount (e.g.
 // when a tool row scrolls out and back). Keyed by caller-supplied timerKey;

@@ -12,7 +12,7 @@ import {
   setApiRequestProfile,
   triggerCronJob,
   updateCronJob
-} from './hermes'
+} from '@/hermes'
 
 // Contract: every cron helper must carry the active gateway profile, so a
 // multi-profile / remote user's cron list, runs, and mutations hit the backend

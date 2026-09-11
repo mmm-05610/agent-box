@@ -12,7 +12,7 @@ import {
   setNewChatWorkspaceTarget
 } from '@/store/session'
 
-import { deferred } from '../../test/deferred'
+import { deferred } from '../../dev/test/deferred'
 
 import { startWorkspaceSession } from './workspace-session-target'
 

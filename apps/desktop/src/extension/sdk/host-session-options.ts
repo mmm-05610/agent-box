@@ -1,5 +1,5 @@
 import type { OpenSessionIntent } from '@/app/open-session'
-import type { WorkspaceMode } from '@/contrib/types'
+import type { WorkspaceMode } from '@/extension/contrib/types'
 
 import type { PluginProfileRoute } from './host-routing'
 

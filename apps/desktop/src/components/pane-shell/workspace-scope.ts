@@ -16,10 +16,10 @@
 
 import { atom, batch } from 'nanostores'
 
-import type { WorkspaceMode } from '../../contrib/types'
+import type { WorkspaceMode } from '../../extension/contrib/types'
 
 /** Re-exported so workspace consumers can import it from here. */
-export type { WorkspaceMode } from '../../contrib/types'
+export type { WorkspaceMode } from '../../extension/contrib/types'
 
 /** Default workspace mode when the host has not switched surfaces. */
 export const $workspaceMode = atom<WorkspaceMode>('sessions')

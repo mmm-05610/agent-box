@@ -10,9 +10,9 @@ import { useStore } from '@nanostores/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { PaneTab, PaneTabLabel, PaneTabStrip } from '@/components/ui/pane-tab'
-import { ContribBoundary, ContribRender } from '@/contrib/react/boundary'
-import { useContributions } from '@/contrib/react/use-contributions'
-import type { Contribution } from '@/contrib/types'
+import { ContribBoundary, ContribRender } from '@/extension/contrib/react/boundary'
+import { useContributions } from '@/extension/contrib/react/use-contributions'
+import type { Contribution } from '@/extension/contrib/types'
 import { ESCAPE_PRIORITY, isTopEscapeLayer, pushEscapeLayer } from '@/lib/escape-layers'
 import { cn } from '@/lib/utils'
 

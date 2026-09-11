@@ -1,8 +1,8 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { stubMenuDomApis, stubResizeObserver } from '@/dev/test/jsdom'
 import { I18nProvider, type LocalePreferencePort } from '@/i18n'
-import { stubMenuDomApis, stubResizeObserver } from '@/test/jsdom'
 
 import { LanguageSwitcher } from './language-switcher'
 

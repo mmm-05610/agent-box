@@ -6,8 +6,8 @@
 
 import { atom, computed, type ReadableAtom } from 'nanostores'
 
-import { setPluginEnabled } from '@/contrib/plugins-store'
-import { registry } from '@/contrib/registry'
+import { setPluginEnabled } from '@/extension/contrib/plugins-store'
+import { registry } from '@/extension/contrib/registry'
 import { translateNow } from '@/i18n'
 import { SIDEBAR_COLLAPSE_MEDIA_QUERY } from '@/lib/layout-constants'
 import { readJson, readKey, writeJson, writeKey } from '@/lib/storage'

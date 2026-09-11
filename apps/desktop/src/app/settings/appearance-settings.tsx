@@ -3,6 +3,8 @@ import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 
 import { useDebounced } from '@/app/hooks/use-debounced'
+import { installVscodeThemeFromMarketplace } from '@/application/theme/adapters/install'
+import { $marketplaceInstalls, getBaseColors, isUserTheme, removeUserTheme } from '@/application/theme/adapters/user-themes'
 import { LanguageSwitcher } from '@/components/language-switcher'
 import { Button } from '@/components/ui/button'
 import { SegmentedControl } from '@/components/ui/segmented-control'
@@ -51,8 +53,6 @@ import {
 import { $userBubbleTransparency, setUserBubbleTransparency } from '@/store/user-bubble-transparency'
 import { $vibeHeartsEnabled, setVibeHeartsEnabled } from '@/store/vibe-hearts-enabled'
 import { $zoomPercent, setZoomPercent } from '@/store/zoom'
-import { installVscodeThemeFromMarketplace } from '@/theme-composition/adapters/install'
-import { $marketplaceInstalls, getBaseColors, isUserTheme, removeUserTheme } from '@/theme-composition/adapters/user-themes'
 import { useTheme } from '@/themes/context'
 import type { DesktopTheme } from '@/themes/types'
 

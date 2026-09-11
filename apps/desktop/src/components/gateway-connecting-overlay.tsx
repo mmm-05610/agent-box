@@ -2,7 +2,7 @@ import { useStore } from '@nanostores/react'
 import { useEffect, useRef, useState } from 'react'
 
 import { DecodeText } from '@/components/ui/decode-text'
-import { prefersReducedMotion } from '@/hooks/use-media-query'
+import { prefersReducedMotion } from '@/lib/hooks/use-media-query'
 import { cn } from '@/lib/utils'
 import { $desktopBoot } from '@/store/boot'
 import { $gatewaySwitching } from '@/store/gateway-switch'

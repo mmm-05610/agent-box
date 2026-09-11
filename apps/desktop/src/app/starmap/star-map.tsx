@@ -2,7 +2,7 @@ import { type Simulation } from 'd3-force'
 import { atom, type WritableAtom } from 'nanostores'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { useThemeEpoch } from '@/hooks/use-theme-epoch'
+import { useThemeEpoch } from '@/lib/hooks/use-theme-epoch'
 import { createRendererLoopPauseController } from '@/lib/renderer-loop-pause'
 import { createDoubleTapDetector, isSmartZoomWheel } from '@/lib/trackpad-gestures'
 import type { StarmapGraph } from '@/types/hermes'

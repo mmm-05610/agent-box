@@ -2,7 +2,7 @@ import { act, render } from '@testing-library/react'
 import { useRef } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { stubResizeObserver } from '@/test/jsdom'
+import { stubResizeObserver } from '@/dev/test/jsdom'
 
 import { useHudTranscriptBand } from './transcript-band'
 

@@ -13,7 +13,7 @@ interface ArtistModule {
 }
 
 // Use the same plain-ESM delivery form as bundled discovery, without reading source text.
-const modules = import.meta.glob<ArtistModule>('../plugins/radio/plugin.js', { eager: true })
+const modules = import.meta.glob<ArtistModule>('../../plugins/radio/plugin.js', { eager: true })
 const { artistProfile, resolveArtist, trackCredit } = Object.values(modules)[0]
 const ctx = createPluginContext('radio-artist-test')
 const signal = () => new AbortController().signal

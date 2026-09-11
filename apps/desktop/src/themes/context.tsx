@@ -12,7 +12,7 @@
  *   the dev accent override   → `accentOverride`
  *   where the paint goes      → `appearance`
  *
- * — and the composition layer (`src/theme-composition/`) is what reads the
+ * — and the composition layer (`src/application/theme/`) is what reads the
  * profile store, the plugin registry, the backend skin cache and `localStorage`
  * to produce them. The provider never resolves a scope, subscribes to a
  * registry, or writes a preference key itself; `import-boundary.test.ts` keeps

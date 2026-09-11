@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { MemoryRouter, useNavigate } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { stubResizeObserver } from '@/test/jsdom'
+import { stubResizeObserver } from '@/dev/test/jsdom'
 
 import { envVar } from './test-utils'
 

@@ -238,7 +238,7 @@ authority.
 6. **No runtime-neutral startup contract**: binary resolution, argv, env, port discovery, readiness
    probe, token acquisition and RPC/replay method names are all fused into one path.
 7. **No installer/update abstraction**: the ladder assumes "install/update Hermes".
-8. **No capability grant model for plugins.** `src/sdk/index.ts:21-27` names it as future work:
+8. **No capability grant model for plugins.** `src/extension/sdk/index.ts:21-27` names it as future work:
    "`host.request` — the gateway JSON-RPC door; the plugin's real power, and the future seam for
    per-plugin capability grants." It does not exist; the preload's broad channels are reachable from
    renderer code without a per-caller grant (§9).

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import type { ProjectInfo } from '@/types/hermes'
 
-import { makeCwdSession } from '../test/session-info'
+import { makeCwdSession } from '../dev/test/session-info'
 
 import { $projects } from './projects'
 import { $sessions } from './session'

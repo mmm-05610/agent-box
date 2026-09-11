@@ -33,7 +33,7 @@ Two consequences for any cross-repo design:
 
 Where the mass is: `electron/main.ts` (18,291), the i18n catalogs (≈4,000 each × 7),
 `use-session-actions/index.ts` (2,635), `session-states.ts` (2,029), `store/gateway.ts` (1,917),
-`mcp-tab.tsx` (1,856), `sdk/index.ts` (1,780), `types/hermes.ts` (1,678), `remote-lifecycle.ts` (1,700),
+`mcp-tab.tsx` (1,856), `extension/sdk/index.ts` (1,780), `types/hermes.ts` (1,678), `remote-lifecycle.ts` (1,700),
 `connection-registry.ts` (1,676).
 
 ## 3. The backend contract it speaks, end to end
@@ -86,7 +86,7 @@ Where the mass is: `electron/main.ts` (18,291), the i18n catalogs (≈4,000 each
    acquisition and RPC/replay method names are one path.
 7. **No installer/update abstraction** — the ladder assumes "install/update Hermes"; the Windows
    orchestrator is external and its compatibility is unverified (`docs/installer-ownership.md`).
-8. **No capability grant model for plugins** — `src/sdk/index.ts:21-27` names it as future work;
+8. **No capability grant model for plugins** — `src/extension/sdk/index.ts:21-27` names it as future work;
    `host.request` today is an unmediated gateway door.
 9. **No version negotiation against the runtime** — `resolveHermesVersion()` reads a Python file for an
    About string; the relay budget fixture pinned to `0.21.1`

@@ -11,7 +11,7 @@ import type { ReactElement, ReactNode, PointerEvent as ReactPointerEvent } from 
 
 import { registerPaneCloser, removeTreePane, treePanesWithPrefix } from '@/components/pane-shell/tree/store'
 import type { MenuKit } from '@/components/ui/actions-menu'
-import { registry } from '@/contrib/registry'
+import { registry } from '@/extension/contrib/registry'
 import type { TileDock } from '@/store/session-states'
 
 export interface PaneMirror<T> {

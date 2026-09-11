@@ -1,5 +1,8 @@
 import type { HermesSkin } from '@hermes/shared/skin'
 
+// Leaf import (not the `@/themes` barrel) to avoid pulling the ThemeProvider
+// module graph into the gateway event hot path.
+import { ingestBackendSkin } from '@/application/theme/adapters/backend-sync'
 import {
   notifyCronChanged,
   notifyPairingChanged,
@@ -11,9 +14,6 @@ import {
 } from '@/store/live-sync'
 import { markRuntimeGone } from '@/store/runtime-gone'
 import { dropSessionState, unbindTileRuntime } from '@/store/session-states'
-// Leaf import (not the `@/themes` barrel) to avoid pulling the ThemeProvider
-// module graph into the gateway event hot path.
-import { ingestBackendSkin } from '@/theme-composition/adapters/backend-sync'
 
 import type { GatewayEventContext } from './types'
 

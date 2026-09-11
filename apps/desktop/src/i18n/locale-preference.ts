@@ -8,7 +8,7 @@ import type { Locale } from './types'
  * provider never picks a backend, never reaches for a global store, and has no
  * fallback implementation — a surface without persistence passes `null` and
  * says so at its own call site. The production binding is
- * `hermesLocalePreference` (`src/hermes-locale-preference.ts`), which stores
+ * `hermesLocalePreference` (`src/application/hermes-locale-preference.ts`), which stores
  * the choice in the backend's config as `display.language`.
  */
 export interface LocalePreferencePort {

@@ -16,7 +16,7 @@ import {
 } from '@/store/session'
 import * as SessionStates from '@/store/session-states'
 
-import { deferred } from '../../../test/deferred'
+import { deferred } from '../../../dev/test/deferred'
 
 import { useModelControls } from './use-model-controls'
 

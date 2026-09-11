@@ -1,8 +1,8 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 
+import { makeOAuthProvider } from '@/dev/test/oauth-provider'
 import { $desktopOnboarding, type DesktopOnboardingState, type OnboardingContext } from '@/store/onboarding'
-import { makeOAuthProvider } from '@/test/oauth-provider'
 import type { OAuthProvider } from '@/types/hermes'
 
 import { Picker } from '.'

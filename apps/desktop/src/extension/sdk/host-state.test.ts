@@ -25,7 +25,7 @@ describe('host.state focused-session atoms', () => {
   })
 
   async function setup() {
-    const { host } = await import('@/sdk/index')
+    const { host } = await import('@/extension/sdk/index')
     const states = await import('@/store/session-states')
     const session = await import('@/store/session')
 
@@ -73,7 +73,7 @@ describe('host.state focused-session atoms', () => {
     const { host, session, states } = await setup()
     const tree = await import('@/components/pane-shell/tree/store')
     const model = await import('@/components/pane-shell/tree/model')
-    const { registry } = await import('@/contrib/registry')
+    const { registry } = await import('@/extension/contrib/registry')
 
     // A second chat zone holding a session tile, next to the main workspace.
     for (const id of ['workspace', 'session-tile:tile-a']) {
@@ -140,7 +140,7 @@ describe('host.state.focusedSessionProfile', () => {
   })
 
   async function setup() {
-    const { host } = await import('@/sdk/index')
+    const { host } = await import('@/extension/sdk/index')
     const profile = await import('@/store/profile')
     const session = await import('@/store/session')
     const states = await import('@/store/session-states')

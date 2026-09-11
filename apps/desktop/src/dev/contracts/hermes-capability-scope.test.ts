@@ -14,7 +14,7 @@ import {
   setApiRequestProfile,
   setSkillEnabled,
   setToolsetEnabled
-} from './hermes'
+} from '@/hermes'
 
 // Contract: the Capabilities surface (skills / toolsets / MCP / hub / config)
 // can be scoped to a (connection, profile) pair — a profile belongs to ONE

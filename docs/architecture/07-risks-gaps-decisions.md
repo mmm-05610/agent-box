@@ -25,7 +25,7 @@ Two extra failure modes worth naming because this design is exposed to them:
 | Failure mode | Where | Countermeasure |
 |---|---|---|
 | **Session identity conflation** | The Desktop already juggles four identities (runtime id, stored id, lineage root, `(connection, profile)` scope) | Ports carry the durable/stored identity at the boundary and translate inward; a migration must not introduce a fifth |
-| **Renderer trust creep** | The preload exposes 186 channels, several of them effectively a general escape hatch (`hermes:api`, `writeTextFile`, `terminal.start`, `git.*`) | Ports are narrow and typed; a capability grant model is named as future work in the Desktop's own `src/sdk/index.ts:21-27` and must land before a second backend multiplies the surface |
+| **Renderer trust creep** | The preload exposes 186 channels, several of them effectively a general escape hatch (`hermes:api`, `writeTextFile`, `terminal.start`, `git.*`) | Ports are narrow and typed; a capability grant model is named as future work in the Desktop's own `src/extension/sdk/index.ts:21-27` and must land before a second backend multiplies the surface |
 
 ## 2. Facts I established while investigating (not guesses)
 

@@ -2,7 +2,7 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { installWindowStateBridge, type WindowStateBridge } from '../../test/window-state'
+import { installWindowStateBridge, type WindowStateBridge } from '../../dev/test/window-state'
 
 import { DiffusionCanvas } from './image-generation-placeholder'
 

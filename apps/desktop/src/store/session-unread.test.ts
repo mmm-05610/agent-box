@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { $activeGatewayProfile } from '@/store/profile/runtime-route-state'
 import type { SessionInfo } from '@/types/hermes'
 
-import { makeSessionInfo } from '../test/session-info'
+import { makeSessionInfo } from '../dev/test/session-info'
 
 import {
   $cronSessions,

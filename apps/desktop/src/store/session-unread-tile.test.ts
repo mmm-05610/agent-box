@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import * as model from '@/components/pane-shell/tree/model'
 // Cold transforms belong to collection, not the first unread assertion's budget.
 import * as tree from '@/components/pane-shell/tree/store'
-import { registry } from '@/contrib/registry'
+import { registry } from '@/extension/contrib/registry'
 import { createClientSessionState } from '@/lib/chat-runtime'
 
 import * as session from './session'

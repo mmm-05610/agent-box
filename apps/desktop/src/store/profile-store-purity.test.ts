@@ -45,7 +45,7 @@ const ENTRY = 'store/profile.ts'
 const LEAF_DIR = 'store/profile/'
 
 /** Upper layers of the renderer, by directory under `src/`. */
-const FORBIDDEN_ZONES = ['api', 'application', 'app', 'components', 'themes', 'theme-composition'] as const
+const FORBIDDEN_ZONES = ['api', 'application', 'app', 'components', 'themes'] as const
 
 /** Store modules a leaf may not reach: the gateway runtime and the session
  *  store's state both route BACK into the profile leaves, so a leaf that
@@ -389,7 +389,7 @@ describe('the profile store reaches nothing above itself', () => {
       "import { $gateway } from '@/store/gateway'",
       "import { $connection } from '@/store/session'",
       "import { Button } from '@/components/ui/button'",
-      "import { paintStoredAppearance } from '@/theme-composition/boot'",
+      "import { paintStoredAppearance } from '@/application/theme/boot'",
       "import { resolveAppearance } from '@/themes/appearance'",
       "import type { HermesConnection } from '@/global'",
       "export { markSessionUnread } from '@/application/session-read-state'",

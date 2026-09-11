@@ -29,7 +29,7 @@ import {
   setSessionsLoading
 } from '@/store/session'
 
-import { deferred } from '../../../test/deferred'
+import { deferred } from '../../../dev/test/deferred'
 
 import { useSessionListActions } from './use-session-list-actions'
 

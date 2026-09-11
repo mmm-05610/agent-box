@@ -18,7 +18,7 @@ import {
   setDefaultReasoningEffort
 } from '@/store/session'
 
-import { deferred } from '../../../test/deferred'
+import { deferred } from '../../../dev/test/deferred'
 
 import { useHermesConfig } from './use-hermes-config'
 

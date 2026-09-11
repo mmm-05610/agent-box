@@ -2,7 +2,7 @@ import { AssistantRuntimeProvider, type ThreadMessage, useExternalStoreRuntime }
 import type { ReactNode } from 'react'
 import { vi } from 'vitest'
 
-import { stubResizeObserver } from '@/test/jsdom'
+import { stubResizeObserver } from '@/dev/test/jsdom'
 
 /** Fixed clock for message fixtures, so nothing sorts by "now". */
 export const createdAt = new Date('2026-05-01T00:00:00.000Z')

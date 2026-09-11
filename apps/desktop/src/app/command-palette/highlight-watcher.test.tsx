@@ -9,7 +9,7 @@ import { render } from '@testing-library/react'
 import { Command } from 'cmdk'
 import { describe, expect, it, vi } from 'vitest'
 
-import { stubMenuDomApis, stubResizeObserver } from '@/test/jsdom'
+import { stubMenuDomApis, stubResizeObserver } from '@/dev/test/jsdom'
 
 import { HighlightWatcher } from './highlight-watcher'
 

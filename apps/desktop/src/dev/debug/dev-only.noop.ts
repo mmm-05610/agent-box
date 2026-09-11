@@ -3,6 +3,6 @@
 // diagnostics graph — and bippy with it — never reaches a shipped renderer.
 //
 // Keep this file free of imports. It exists precisely so the production
-// bundle contains nothing from `debug/`.
+// bundle contains nothing from `dev/debug/`.
 
 export {}

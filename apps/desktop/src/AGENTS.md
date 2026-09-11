@@ -9,7 +9,7 @@ Two adjacent layers, one direction of dependency:
 
 - **`src/api/**`** builds a request, sends it, parses the response and raises typed errors. It is the
   BOTTOM of the renderer's own dependency order, so it must not reach `@/store`, `@/app`,
-  `@/components`, `@/themes`, `@/theme-composition`, `@/i18n`, `@/contrib`, the `@/hermes` barrel, or
+  `@/components`, `@/themes`, `@/application/theme`, `@/i18n`, `@/extension/contrib`, the `@/hermes` barrel, or
   `@/application` — directly or through any chain of modules. `@/types/**`, `@hermes/shared`, React
   and third-party packages are what it stands on. The platform bridge has exactly ONE address:
   `api/client.ts` (`requestHermesApi` / `hermesApi`); no other file names `window.hermesDesktop.api`.

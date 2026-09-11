@@ -18,7 +18,7 @@ import {
   setMainModelAssignment
 } from '@/store/cron-model-impact'
 
-import { deferred } from '../test/deferred'
+import { deferred } from '../dev/test/deferred'
 
 async function waitForConfirmToast() {
   return vi.waitFor(() => {

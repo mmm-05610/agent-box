@@ -2,7 +2,7 @@ import type { Unstable_TriggerAdapter, Unstable_TriggerItem } from '@assistant-u
 import { useCallback } from 'react'
 
 import { refChipLabel } from '@/components/assistant-ui/directive-text'
-import { useContributions } from '@/contrib/react/use-contributions'
+import { useContributions } from '@/extension/contrib/react/use-contributions'
 import type { HermesGateway } from '@/hermes'
 import { cachedPathCompletion, hasCachedPathCompletion } from '@/lib/slash-completion-cache'
 import { normalize } from '@/lib/text'

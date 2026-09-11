@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { setPluginEnabled } from '@/contrib/plugins-store'
-import { registry } from '@/contrib/registry'
+import { setPluginEnabled } from '@/extension/contrib/plugins-store'
+import { registry } from '@/extension/contrib/registry'
 
 import { allPaneIds, group, split } from './model'
 import { $dismissedPanes, $layoutTree, closeTreePane } from './store'
 
-vi.mock('@/contrib/plugins-store', () => ({ setPluginEnabled: vi.fn() }))
+vi.mock('@/extension/contrib/plugins-store', () => ({ setPluginEnabled: vi.fn() }))
 vi.mock('@/store/notifications', () => ({ notify: vi.fn() }))
 
 const disposers: (() => void)[] = []

@@ -1,8 +1,8 @@
 import type { FC, ReactNode } from 'react'
 import { useMemo } from 'react'
 
-import { type Contribution, useContributions } from '@/contrib'
-import { ContribBoundary, ContribRender } from '@/contrib/react/boundary'
+import { type Contribution, useContributions } from '@/extension/contrib'
+import { ContribBoundary, ContribRender } from '@/extension/contrib/react/boundary'
 import {
   parseTranscriptDirective,
   TRANSCRIPT_DIRECTIVE_AREA,

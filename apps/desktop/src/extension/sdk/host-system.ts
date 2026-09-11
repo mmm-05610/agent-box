@@ -1,6 +1,6 @@
 import { capabilityScoped } from '@/api/client'
 import { completeMcpDesktopOAuth } from '@/application/mcp-oauth'
-import { onGatewayEvent } from '@/contrib/events'
+import { onGatewayEvent } from '@/extension/contrib/events'
 import { getLogs, getStatus, hermesApi, type HermesGateway } from '@/hermes'
 import { $gateway, requestGatewayForAgent } from '@/store/gateway'
 import { notify, notifyError } from '@/store/notifications'

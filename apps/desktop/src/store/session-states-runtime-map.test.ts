@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { requestForOwnedSession } from '@/application/session/request-owned-session'
+import { makeSessionInfo } from '@/dev/test/session-info'
 import { createClientSessionState } from '@/lib/chat-runtime'
 import { $connectionsRegistry } from '@/store/connection-registry-state'
 import { setPrimaryGateway, setPrimaryGatewayConnection } from '@/store/gateway'
@@ -16,7 +17,6 @@ import {
   recordSessionEventScope,
   storedSessionIdForRuntimeId
 } from '@/store/session-states'
-import { makeSessionInfo } from '@/test/session-info'
 
 // #92687-adjacent Bot Mode misroute: a session RPC (prompt.submit et al.)
 // carries its target as a RUNTIME id, while tile owner routes key on the

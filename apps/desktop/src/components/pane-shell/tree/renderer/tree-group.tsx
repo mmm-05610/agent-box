@@ -25,8 +25,8 @@ import {
   PaneTabLabel,
   PaneTabStrip
 } from '@/components/ui/pane-tab'
-import { ContribBoundary, ContribRender } from '@/contrib/react/boundary'
-import { useContributions } from '@/contrib/react/use-contributions'
+import { ContribBoundary, ContribRender } from '@/extension/contrib/react/boundary'
+import { useContributions } from '@/extension/contrib/react/use-contributions'
 import { useI18n } from '@/i18n'
 import { useKeybindHint } from '@/lib/keybinds/use-keybind-hint'
 import { cn } from '@/lib/utils'

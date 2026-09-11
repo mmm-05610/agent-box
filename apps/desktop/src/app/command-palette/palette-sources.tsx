@@ -2,6 +2,7 @@
 
 import { memo, useDeferredValue } from 'react'
 
+import { isUserTheme, resolveTheme } from '@/application/theme/adapters/user-themes'
 import { CommandGroup, CommandItem } from '@/components/ui/command'
 import { HighlightMatches } from '@/components/ui/highlight-matches'
 import { KbdCombo } from '@/components/ui/kbd'
@@ -26,7 +27,6 @@ import {
 } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 import { bindingsFor } from '@/store/keybinds'
-import { isUserTheme, resolveTheme } from '@/theme-composition/adapters/user-themes'
 import { luminance } from '@/themes/color'
 
 import {

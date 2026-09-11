@@ -9,7 +9,7 @@ import type { Locale } from './types'
 // "what was stored?" in, "store this locale" out. Every test below injects a
 // fake — there is no default backend to fall back on, and mapping a raw stored
 // value to `display.language` is the adapter's job
-// (`src/hermes-locale-preference.test.ts`), not this component's.
+// (`src/application/hermes-locale-preference.test.ts`), not this component's.
 function memoryPort(overrides: Partial<LocalePreferencePort> = {}): LocalePreferencePort {
   return {
     load: vi.fn().mockResolvedValue(undefined),

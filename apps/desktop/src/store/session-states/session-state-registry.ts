@@ -2,7 +2,7 @@ import { type GatewayEvent, LOCAL_CONNECTION_ID, registryBackendScopeKey } from 
 import { atom, computed } from 'nanostores'
 
 import type { ClientSessionState } from '@/app/types'
-import type { WorkspaceMode } from '@/contrib/types'
+import type { WorkspaceMode } from '@/extension/contrib/types'
 import { readJson, writeJson } from '@/lib/storage'
 import { normalizeProfileKey } from '@/store/profile/identity'
 import { $activeGatewayProfile } from '@/store/profile/runtime-route-state'

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { getStatus } from '@/hermes'
 
-import { deferred } from '../../../test/deferred'
+import { deferred } from '../../../dev/test/deferred'
 
 import { useStatusSnapshot } from './use-status-snapshot'
 

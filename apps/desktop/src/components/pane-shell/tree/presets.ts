@@ -8,7 +8,7 @@
  * uniform list via `useContributions('layouts')`.
  */
 
-import { registry } from '@/contrib/registry'
+import { registry } from '@/extension/contrib/registry'
 import { readJson, writeJson, writeKey } from '@/lib/storage'
 
 import { isLayoutNode, type LayoutNode } from './model'

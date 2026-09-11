@@ -13,7 +13,7 @@ import {
   setNewChatWorkspaceTarget
 } from '@/store/session'
 
-import { deferred } from '../../../test/deferred'
+import { deferred } from '../../../dev/test/deferred'
 
 import { useCwdActions } from './use-cwd-actions'
 

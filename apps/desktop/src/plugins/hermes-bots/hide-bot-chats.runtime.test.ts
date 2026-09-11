@@ -40,7 +40,7 @@ vi.mock('@hermes/plugin-sdk', async importOriginal => {
   }
 })
 
-const { createPluginContext } = await import('@/contrib/plugin')
+const { createPluginContext } = await import('@/extension/contrib/plugin')
 const { default: plugin } = await import('./plugin')
 
 const flushSweep = async () => {

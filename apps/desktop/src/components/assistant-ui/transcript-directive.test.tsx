@@ -2,7 +2,7 @@
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { registry } from '@/contrib/registry'
+import { registry } from '@/extension/contrib/registry'
 import { TRANSCRIPT_DIRECTIVE_AREA, type TranscriptDirectiveContribution } from '@/lib/transcript-directives'
 
 import { paragraphPlainText, TranscriptDirectiveLeaf } from './transcript-directive'

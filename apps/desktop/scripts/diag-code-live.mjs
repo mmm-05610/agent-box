@@ -14,7 +14,7 @@ try {
       previewShift: src.includes('previewShift'),
       adaptiveFloor: (await (await fetch('/src/app/session/hooks/use-message-stream/index.ts')).text()).includes('adaptiveFloor'),
       structuralSignature: (await (await fetch('/src/components/assistant-ui/thread/list.tsx')).text()).includes('structuralSignature'),
-      sharedRO: (await (await fetch('/src/hooks/use-resize-observer.ts')).text()).includes('sharedObserver'),
+      sharedRO: (await (await fetch('/src/lib/hooks/use-resize-observer.ts')).text()).includes('sharedObserver'),
       rootTipProvider: (await (await fetch('/src/main.tsx')).text()).includes('RootTooltipProvider')
     })
   })()`)

@@ -11,7 +11,7 @@
  * re-importing a module graph.
  */
 
-import { matchesQuery } from '@/hooks/use-media-query'
+import { matchesQuery } from '@/lib/hooks/use-media-query'
 import { normalizeProfileKey } from '@/store/profile/identity'
 import { resolveAppearance } from '@/themes/appearance'
 import { normalizeSkinName, pickTheme } from '@/themes/resolve'

@@ -18,9 +18,9 @@ vi.mock('@/store/pet', () => {
   }
 })
 
-import { reactRoot } from '@/test/react-root'
+import { reactRoot } from '@/dev/test/react-root'
 
-import { installWindowStateBridge, setDocumentHidden, type WindowStateBridge } from '../../test/window-state'
+import { installWindowStateBridge, setDocumentHidden, type WindowStateBridge } from '../../dev/test/window-state'
 
 import { PetSprite } from './pet-sprite'
 

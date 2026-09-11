@@ -1,8 +1,8 @@
 import { type FC, useCallback, useEffect, useRef } from 'react'
 
-import { useResizeObserver } from '@/hooks/use-resize-observer'
-import { onThemeRepaint } from '@/hooks/use-theme-epoch'
 import { createBudgetedLoop } from '@/lib/budgeted-loop'
+import { useResizeObserver } from '@/lib/hooks/use-resize-observer'
+import { onThemeRepaint } from '@/lib/hooks/use-theme-epoch'
 
 type Rgb = { r: number; g: number; b: number }
 

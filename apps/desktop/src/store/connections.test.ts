@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { DesktopConnectionsRegistry } from '@/global'
 
-import { deferred } from '../test/deferred'
+import { deferred } from '../dev/test/deferred'
 
 const $activeGatewayProfile = atom('default')
 const $newChatProfile = atom<null | string>(null)

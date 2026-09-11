@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 
-import type { Contribution } from '@/contrib/types'
+import type { Contribution } from '@/extension/contrib/types'
 import { setTabStripDefault } from '@/store/tabstrip-prefs'
 
 import { resolveTabStripVisible, type StripPane, tabStripVisibleForZone } from './strip-visibility'

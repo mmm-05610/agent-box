@@ -5,8 +5,8 @@ import { type NodeApi, type NodeRendererProps, type RowRendererProps, Tree, type
 
 import { TreeSkeleton } from '@/components/chat/skeletons'
 import { Codicon } from '@/components/ui/codicon'
-import { markRightPanePerf } from '@/debug/right-pane-events'
-import { useResizeObserver } from '@/hooks/use-resize-observer'
+import { markRightPanePerf } from '@/dev/debug/right-pane-events'
+import { useResizeObserver } from '@/lib/hooks/use-resize-observer'
 import { cn } from '@/lib/utils'
 import { type RepoChangeKind, repoChangeKindForPath } from '@/store/coding-status'
 import { $renamingPath, beginInlineRename } from '@/store/file-actions'

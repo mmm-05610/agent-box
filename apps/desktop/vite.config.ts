@@ -52,7 +52,7 @@ const requireFromApp = createRequire(path.join(__dirname, 'vite.config.ts'))
 const reactDir = path.dirname(requireFromApp.resolve('react/package.json'))
 const reactDomDir = path.dirname(requireFromApp.resolve('react-dom/package.json'))
 
-// The dev-only render/state churn counters (src/debug) must be imported
+// The dev-only render/state churn counters (src/dev/debug) must be imported
 // STATICALLY above react-dom — react-dom captures the devtools hook at module
 // init, so a dynamic import lands too late and observes zero commits. A static
 // side-effect import can't be tree-shaken, so instead the whole graph is
@@ -60,8 +60,8 @@ const reactDomDir = path.dirname(requireFromApp.resolve('react-dom/package.json'
 // the perf harness opts a production build back in with VITE_PERF_PROBE=1.
 const debugEntry = (command: string, env: Record<string, string>) =>
   command === 'serve' || env.VITE_PERF_PROBE === '1'
-    ? path.resolve(__dirname, './src/debug/dev-only.ts')
-    : path.resolve(__dirname, './src/debug/dev-only.noop.ts')
+    ? path.resolve(__dirname, './src/dev/debug/dev-only.ts')
+    : path.resolve(__dirname, './src/dev/debug/dev-only.noop.ts')
 
 // The emoji picker (frimousse) fetches `<emojibaseUrl>/<locale>/data.json` at
 // runtime. Its default is a CDN; Electron must work offline, so serve the
@@ -198,9 +198,9 @@ export default defineConfig(({ command }) => ({
   },
   resolve: {
     alias: {
-      '@/debug/dev-only': debugEntry(command, process.env as Record<string, string>),
+      '@/dev/debug/dev-only': debugEntry(command, process.env as Record<string, string>),
       '@': path.resolve(__dirname, './src'),
-      '@hermes/plugin-sdk': path.resolve(__dirname, './src/sdk/index.ts'),
+      '@hermes/plugin-sdk': path.resolve(__dirname, './src/extension/sdk/index.ts'),
       '@hermes/shared/billing': path.resolve(__dirname, '../shared/src/billing-types.ts'),
       '@hermes/shared': path.resolve(__dirname, '../shared/src'),
       // The tour tool's preview surface injects driver.js's prebuilt IIFE into

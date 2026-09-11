@@ -13,7 +13,7 @@ import './store/user-bubble-transparency'
 // (verified — a late install reports renderers=0, commits=0). `vite.config.ts`
 // aliases this specifier to a no-op module for non-dev builds, so neither the
 // counters nor bippy reach a shipped renderer.
-import '@/debug/dev-only'
+import '@/dev/debug/dev-only'
 
 import { QueryClientProvider } from '@tanstack/react-query'
 import { StrictMode } from 'react'
@@ -21,17 +21,17 @@ import { createRoot } from 'react-dom/client'
 import { HashRouter } from 'react-router'
 
 import App from './app'
+import { hermesLocalePreference } from './application/hermes-locale-preference'
 import { startActiveProfileRouting } from './application/profile/active-route-effects'
+import { ThemeProvider } from './application/theme'
 import { RootErrorBoundary } from './components/error-boundary'
 import { HapticsProvider } from './components/haptics-provider'
 import { RootTooltipProvider } from './components/ui/tooltip'
-import { hermesLocalePreference } from './hermes-locale-preference'
 import { I18nProvider } from './i18n'
 import { installClipboardShim } from './lib/clipboard'
 import { queryClient } from './lib/query-client'
 import { installRendererAnimationPauseState } from './lib/renderer-loop-pause'
 import { installSelectionCopyColorGuard } from './lib/selection-copy-colors'
-import { ThemeProvider } from './theme-composition'
 
 // Route profile-scoped REST/WS calls at the profile the live gateway is on, and
 // drop the previous profile's caches when the route moves. Started HERE, once,

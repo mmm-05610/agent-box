@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { HermesConnection } from '@/global'
 
-import { deferred } from '../test/deferred'
+import { deferred } from '../dev/test/deferred'
 
 // Registry-agent activation (ensureGatewayAgent — the SDK ensureAgent door).
 // Two regressions pinned here:

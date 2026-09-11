@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { SessionInfo } from '@/types/hermes'
 
-import { makeSessionInfo } from '../test/session-info'
+import { makeSessionInfo } from '../dev/test/session-info'
 
 import type { SidebarSessionEntry } from './session-branch-tree'
 import { groupEntriesByRecency, hideCollapsedGroupRows, toSessionRows } from './session-date-groups'

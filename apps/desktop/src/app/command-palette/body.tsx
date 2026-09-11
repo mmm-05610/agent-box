@@ -11,13 +11,13 @@ import { listAllProfileSessions } from '@/application/session-lists'
 import { codiconIcon } from '@/components/ui/codicon'
 import { Command, CommandInput, CommandList } from '@/components/ui/command'
 import { getHermesConfigRecord } from '@/hermes'
-import { useMediaQuery } from '@/hooks/use-media-query'
 import { useI18n } from '@/i18n'
 import {
   HUD_POSITION,
   HUD_SURFACE,
   HUD_TEXT
 } from '@/lib/floating-hud'
+import { useMediaQuery } from '@/lib/hooks/use-media-query'
 import {
   Activity,
   AppWindow,

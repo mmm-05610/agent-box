@@ -1,8 +1,8 @@
 import { cleanup, render } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { registry } from '@/contrib/registry'
-import { stubResizeObserver } from '@/test/jsdom'
+import { stubResizeObserver } from '@/dev/test/jsdom'
+import { registry } from '@/extension/contrib/registry'
 
 import { group, split } from '../model'
 import { $hiddenTreePanes, $layoutTree } from '../store'

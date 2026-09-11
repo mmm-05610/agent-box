@@ -4,7 +4,7 @@
  * with an `action` id render that action's live keybind as their hotkey hint.
  */
 
-import { useContributions } from '@/contrib/react/use-contributions'
+import { useContributions } from '@/extension/contrib/react/use-contributions'
 import type { IconComponent } from '@/lib/icons'
 
 export const PALETTE_AREA = 'palette'

@@ -45,7 +45,7 @@ const { _resetSessionOwnerHintsForTests, setCronSessions, setMessagingSessions, 
 
 const { isSessionOwnerResolutionError } = await import('@/store/session-owner-resolution')
 const { $sessionTiles } = await import('@/store/session-states')
-const { makeSessionInfo } = await import('@/test/session-info')
+const { makeSessionInfo } = await import('@/dev/test/session-info')
 
 function dispatcher(
   ambientRequest = vi.fn(async () => ({ ambient: true })),

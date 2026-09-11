@@ -22,8 +22,8 @@ vi.mock('@/api/sessions', async importOriginal => ({
   setSessionUnreadRemote: (id: string, unread: boolean, profile?: null | string) => setUnreadRemote(id, unread, profile)
 }))
 
-import { deferred } from '../test/deferred'
-import { makeSessionInfo } from '../test/session-info'
+import { deferred } from '../dev/test/deferred'
+import { makeSessionInfo } from '../dev/test/session-info'
 
 import {
   $activeSessionId,

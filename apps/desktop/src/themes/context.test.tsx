@@ -12,7 +12,7 @@ import type { ResolvedTheme, ThemeContribution } from './types'
 // needs arrives as a prop, so these tests drive it with plain objects — no
 // store, no registry, no storage, no DOM. What the palette LOOKS like on screen
 // is `appearance.test.ts`; that it reaches the app's surfaces is
-// `@/theme-composition/index.test.tsx`.
+// `@/application/theme/index.test.tsx`.
 
 const BUILT_INS: readonly ThemeContribution[] = listThemes({ user: [], backend: [], contributed: [] })
 

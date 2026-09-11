@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
-import { discoverRuntimePlugins } from '@/contrib/runtime-loader'
+import { discoverRuntimePlugins } from '@/extension/contrib/runtime-loader'
 import { useI18n } from '@/i18n'
 import { ExternalLink } from '@/lib/external-link'
 import { AlertTriangle } from '@/lib/icons'

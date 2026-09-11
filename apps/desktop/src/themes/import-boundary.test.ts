@@ -21,7 +21,7 @@ import { describe, expect, it } from 'vitest'
 // to reach UP into the stores it was supposed to be a client of, which is how
 // `themes/context.tsx` ended up inside the app's second-largest import cycle
 // (SCC-B) through `store/profile → store/notifications → i18n → settings`.
-// Every product integration now sits in `@/theme-composition`, one level above,
+// Every product integration now sits in `@/application/theme`, one level above,
 // and imports DOWN into this directory.
 //
 // Tests are skipped: a test is not a module the app loads.
@@ -130,12 +130,12 @@ describe('the theme directory is a leaf', () => {
     const cases = [
       "import { $activeGatewayProfile } from '@/store/profile'",
       "import { persistString } from '@/lib/storage'",
-      "import { registry } from '@/contrib/registry'",
+      "import { registry } from '@/extension/contrib/registry'",
       "import { requestGateway } from '@/api/gateway'",
       "import { getHermesConfigRecord } from '@/hermes'",
-      "import { ingestBackendSkin } from '@/theme-composition/adapters/backend-sync'",
+      "import { ingestBackendSkin } from '@/application/theme/adapters/backend-sync'",
       "import type { HermesSkin } from '@hermes/shared/skin'",
-      "export { modePref } from '@/theme-composition/adapters/preferences'",
+      "export { modePref } from '@/application/theme/adapters/preferences'",
       "const mod = await import('@/themes/context')",
       "const legacy = require('@/lib/storage')",
       "import { app } from 'electron'",

@@ -2,7 +2,7 @@ import { act, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { registry } from '@/contrib/registry'
+import { registry } from '@/extension/contrib/registry'
 
 import type { GroupNode } from '../model'
 import { $treeDragging, NEW_SESSION_DRAG, SESSION_TILE_DRAG } from '../store'

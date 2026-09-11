@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { registry } from '@/contrib/registry'
+import { registry } from '@/extension/contrib/registry'
 
 import { allPaneIds, group, split } from '../model'
 import { $layoutTree } from '../store'

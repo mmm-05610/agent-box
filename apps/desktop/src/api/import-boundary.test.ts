@@ -43,7 +43,7 @@ const SRC_DIR = resolve(API_DIR, '..')
 const SELF = relative(SRC_DIR, fileURLToPath(import.meta.url))
 
 /** Upper layers of the renderer, by directory under `src/`. */
-const UPPER_ZONES = ['store', 'app', 'components', 'themes', 'theme-composition', 'i18n', 'contrib'] as const
+const UPPER_ZONES = ['store', 'app', 'components', 'themes', 'i18n', 'extension/contrib'] as const
 
 /** `src/hermes.ts` — the compatibility barrel over `api/**` itself. Nothing
  *  under `api/` may close the loop back through it. */
@@ -304,9 +304,9 @@ describe('the api directory is a leaf', () => {
       "vi.doMock('@/store/gateway')",
       "import { useStore } from '@/store'",
       "import { translate } from '@/i18n'",
-      "import { registry } from '@/contrib/registry'",
+      "import { registry } from '@/extension/contrib/registry'",
       "import { modePref } from '@/themes/context'",
-      "import { ingestBackendSkin } from '@/theme-composition/adapters/backend-sync'",
+      "import { ingestBackendSkin } from '@/application/theme/adapters/backend-sync'",
       "import { overlay } from '@/components/ui/dialog'",
       "import { getHermesConfigRecord } from '@/hermes'",
       "import { mcpOAuthRpc } from '@/application/mcp-oauth'"

@@ -1,8 +1,8 @@
 import { act } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { makeOAuthProvider } from '@/dev/test/oauth-provider'
 import * as notifications from '@/store/notifications'
-import { makeOAuthProvider } from '@/test/oauth-provider'
 import type { OAuthProvider } from '@/types/hermes'
 
 import {

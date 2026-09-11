@@ -2,10 +2,10 @@ import { act } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { hiddenPaneProps, PANE_HIDDEN_ATTR } from '@/components/pane-shell/pane-visibility'
+import { reactRoot } from '@/dev/test/react-root'
 import { $paneStates } from '@/store/panes'
-import { reactRoot } from '@/test/react-root'
 
-import { installWindowStateBridge, setDocumentHidden, type WindowStateBridge } from '../../../test/window-state'
+import { installWindowStateBridge, setDocumentHidden, type WindowStateBridge } from '../../../dev/test/window-state'
 import { $terminalTakeover } from '../store'
 
 import { PersistentTerminal, TerminalSlot } from './persistent'

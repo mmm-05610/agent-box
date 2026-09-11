@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useCallback, useEffect } from 'react'
 
 import { useGatewayRequest } from '@/app/gateway/hooks/use-gateway-request'
-import { $pluginRecords } from '@/contrib/plugins-store'
+import { $pluginRecords } from '@/extension/contrib/plugins-store'
 import { getEnvVars, getHermesConfigSchema } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { Package, Palette, Settings2, Wrench } from '@/lib/icons'

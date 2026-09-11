@@ -11,7 +11,7 @@ vi.mock('@/components/pane-shell/pane-visibility', () => ({
   usePaneVisible: () => true
 }))
 
-vi.mock('@/hooks/use-resize-observer', () => ({ useResizeObserver: () => undefined }))
+vi.mock('@/lib/hooks/use-resize-observer', () => ({ useResizeObserver: () => undefined }))
 vi.mock('@/store/windows', () => ({ isSecondaryWindow: () => false }))
 
 function PopoutAffordanceHarness() {

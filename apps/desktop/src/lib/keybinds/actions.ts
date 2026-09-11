@@ -5,7 +5,7 @@
 // like navigate / theme); labels come from i18n (`t.keybinds.actions[id]`). To
 // add a hotkey, add a row here and a handler there — nothing else.
 
-import { registry } from '@/contrib/registry'
+import { registry } from '@/extension/contrib/registry'
 
 import { IS_MAC } from './combo'
 

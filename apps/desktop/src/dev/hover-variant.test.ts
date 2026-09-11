@@ -1,11 +1,11 @@
 // @vitest-environment node
-import { dirname } from 'node:path'
+import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { compile } from '@tailwindcss/node'
 import { describe, expect, it } from 'vitest'
 
-const SRC = dirname(fileURLToPath(import.meta.url))
+const SRC = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 const CANDIDATES = ['hover:opacity-100', 'group-hover/attachment:opacity-100', 'group-hover/code:opacity-100']
 

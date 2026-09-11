@@ -17,7 +17,7 @@ describe('hovered zone retargets the tab verbs', () => {
   async function setup() {
     const tree = await import('@/components/pane-shell/tree/store')
     const model = await import('@/components/pane-shell/tree/model')
-    const { registry } = await import('@/contrib/registry')
+    const { registry } = await import('@/extension/contrib/registry')
 
     for (const id of ['workspace', 'session-tile:a', 'session-tile:b', 'session-tile:c']) {
       registry.register({
@@ -121,7 +121,7 @@ describe('hovered zone retargets the tab verbs', () => {
   // ISN'T a tab strip must hand the keys to the next rung, not swallow them.
   it('an ineligible hovered zone hands off instead of swallowing the key', async () => {
     const { activeOf, model, tree } = await setup()
-    const { registry } = await import('@/contrib/registry')
+    const { registry } = await import('@/extension/contrib/registry')
 
     registry.register({ area: 'panes', data: { placement: 'right' }, id: 'files', render: () => null, title: 'files' })
 

@@ -7,7 +7,7 @@
  * between plugins are impossible.
  *
  * Bundled plugins live in `src/plugins/<name>/plugin.tsx` and are discovered
- * by `discoverBundledPlugins()` (contrib/plugins.ts) — no import, no registry
+ * by `discoverBundledPlugins()` (extension/contrib/plugins.ts) — no import, no registry
  * edit. Runtime-fetched third-party plugins will drive the SAME contract
  * through the plugin host loader (next phase); this is that seam.
  */

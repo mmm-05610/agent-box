@@ -6,7 +6,7 @@ import { DisclosureCaret } from '@/components/ui/disclosure-caret'
 import { Kbd, KbdCombo } from '@/components/ui/kbd'
 import { SearchField } from '@/components/ui/search-field'
 import { Tip } from '@/components/ui/tooltip'
-import { useContributions } from '@/contrib/react/use-contributions'
+import { useContributions } from '@/extension/contrib/react/use-contributions'
 import { useI18n } from '@/i18n'
 import {
   allKeybindActions,

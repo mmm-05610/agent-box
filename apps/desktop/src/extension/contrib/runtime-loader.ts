@@ -3,7 +3,7 @@
  * build time. The pipeline every non-bundled plugin takes:
  *
  *   source (plain ESM js) -> [integrity check] -> bare-specifier rewrite
- *   (`@hermes/plugin-sdk` / `react*` -> live shim blobs, see sdk/runtime.ts)
+ *   (`@hermes/plugin-sdk` / `react*` -> live shim blobs, see extension/sdk/runtime.ts)
  *   -> blob `import()` -> validate default HermesPlugin -> register(ctx)
  *
  * Loading the same plugin id again disposes the previous registrations first
@@ -28,7 +28,7 @@
  * trust seam.
  */
 
-import { installPluginSdk, sdkImportMap } from '@/sdk/runtime'
+import { installPluginSdk, sdkImportMap } from '@/extension/sdk/runtime'
 import { notifyError } from '@/store/notifications'
 
 import { createPluginContext, type HermesPlugin } from './plugin'

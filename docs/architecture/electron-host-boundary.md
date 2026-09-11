@@ -698,13 +698,13 @@ They are not attributable to this round, and the evidence is specific:
 
 - **This round's committed renderer diff is empty.** `git diff b55355f..HEAD -- apps/desktop/src`
   is not empty, but nothing in it was written by this round — see the contamination note
-  below. No `electron/` change can alter a `src/theme-composition` or `src/app/settings` test.
+  below. No `electron/` change can alter a `src/application/theme` or `src/app/settings` test.
 - **A concurrent task is refactoring the renderer in the working tree right now.** `src/`
   currently has 62 modified files, 16 new untracked files, and **1 deleted file**:
   `src/app/settings/field-copy.ts`. Seven files still import or reference it
   (`src/app/settings/constants.ts`, `config-field.tsx`, `settings-search.ts`, four
   `src/i18n/*`). That is a half-applied refactor, which is exactly what makes the settings,
-  i18n, theme-composition, messaging, skills and hermes-bots suites fail at once.
+  i18n, theme, messaging, skills and hermes-bots suites fail at once.
 - The failing test *files* are themselves unmodified; they fail because the modules they
   import are mid-edit.
 

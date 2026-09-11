@@ -154,7 +154,7 @@ store/session-states/
 
 拆解：
 
-1. `apps/desktop/src/sdk/index.ts`
+1. `apps/desktop/src/extension/sdk/index.ts`
 2. `apps/desktop/src/store/projects.ts`
 
 建议职责方向：

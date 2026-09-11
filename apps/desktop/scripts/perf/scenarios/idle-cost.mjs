@@ -220,7 +220,7 @@ export default {
     const ok = await cdp.eval(setup(tiles, seedTurns))
 
     if (ok !== 'ok') {
-      throw new Error(`idle-cost setup failed (${ok}) — needs a dev renderer with src/debug installed.`)
+      throw new Error(`idle-cost setup failed (${ok}) — needs a dev renderer with src/dev/debug installed.`)
     }
 
     for (let n = 1; n <= tiles; n++) {

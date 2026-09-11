@@ -17,7 +17,7 @@ import { describe, expect, it } from 'vitest'
 // Both journeys that used to justify the reverse edges are now coordinated
 // from outside this directory:
 //   - persisting `display.language` is a `LocalePreferencePort` the composition
-//     root injects (`src/hermes-locale-preference.ts`);
+//     root injects (`src/application/hermes-locale-preference.ts`);
 //   - Settings field copy is authored here and CONSUMED by Settings
 //     (`src/app/settings/constants.ts`, `config-field.tsx`, `settings-search.ts`).
 const I18N_DIR = dirname(fileURLToPath(import.meta.url))

@@ -17,7 +17,7 @@ import {
   SidebarContent
 } from '@/components/ui/sidebar'
 import { Tip } from '@/components/ui/tooltip'
-import { useContributions } from '@/contrib/react/use-contributions'
+import { useContributions } from '@/extension/contrib/react/use-contributions'
 import { searchSessions, type SessionInfo, type SessionSearchResult } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { comboTokens } from '@/lib/keybinds/combo'

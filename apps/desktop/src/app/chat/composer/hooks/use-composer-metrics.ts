@@ -8,7 +8,7 @@ import {
   COMPOSER_SURFACE_HEIGHT_VAR,
   setSurfaceVar
 } from '@/app/chat/surface-vars'
-import { useResizeObserver } from '@/hooks/use-resize-observer'
+import { useResizeObserver } from '@/lib/hooks/use-resize-observer'
 
 import {
   COMPOSER_COMPACT_PILL_PX,

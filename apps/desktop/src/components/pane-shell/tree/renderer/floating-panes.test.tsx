@@ -9,8 +9,8 @@
 import { act } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { registry } from '@/contrib/registry'
-import { reactRoot } from '@/test/react-root'
+import { reactRoot } from '@/dev/test/react-root'
+import { registry } from '@/extension/contrib/registry'
 
 import { FloatingPanes } from './floating-panes'
 

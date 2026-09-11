@@ -5,7 +5,7 @@
  * product integration the theme feature needs (backend skins, user installs,
  * plugin contributions, the storage-backed preference, the dev accent atom, the
  * Electron marketplace, the imperative switch door, the `/skin` verb) lives in
- * `@/theme-composition` and is imported from there by path.
+ * `@/application/theme` and is imported from there by path.
  *
  * The split is enforced by `import-boundary.test.ts`: no module under `themes/`
  * may import a `@/…` or `@hermes/…` product module, so this barrel cannot

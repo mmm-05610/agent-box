@@ -9,7 +9,7 @@ window.__ATOM_CHURN__      which store published it, and whether it mattered
 ```
 
 Both are inert until `start()`, so the idle cost is one no-op branch per commit
-and per notify. Neither ships: `vite.config.ts` aliases `@/debug/dev-only` to a
+and per notify. Neither ships: `vite.config.ts` aliases `@/dev/debug/dev-only` to a
 no-op module for any build that isn't the dev server (or `VITE_PERF_PROBE=1`).
 
 ## Using it
@@ -67,7 +67,7 @@ directly: MIT, zero dependencies.
 
 ## The import-order constraint
 
-`main.tsx` imports `@/debug/dev-only` **statically, above `react-dom`**. This is
+`main.tsx` imports `@/dev/debug/dev-only` **statically, above `react-dom`**. This is
 load-bearing, not stylistic.
 
 react-dom captures the devtools hook at **module init**, not at `createRoot`.

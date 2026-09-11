@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { SessionInfo } from '@/types/hermes'
 
-import { makeSessionInfo } from '../test/session-info'
+import { makeSessionInfo } from '../dev/test/session-info'
 
 import { flattenSessionsWithBranches } from './session-branch-tree'
 

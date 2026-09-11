@@ -18,8 +18,8 @@ import {
   setWorkspaceOwnerLabel,
   type WorkspaceNewSessionTarget
 } from '@/components/pane-shell/workspace-scope'
-import { registry } from '@/contrib/registry'
-import type { WorkspaceMode } from '@/contrib/types'
+import { registry } from '@/extension/contrib/registry'
+import type { WorkspaceMode } from '@/extension/contrib/types'
 import {
   activeGatewayConnectionId,
   openGatewayForAgent,

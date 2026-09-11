@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 
 import { writeClipboardText } from '@/components/ui/copy-button'
-import { markRightPanePerf } from '@/debug/right-pane-events'
+import { markRightPanePerf } from '@/dev/debug/right-pane-events'
 import { triggerHaptic } from '@/lib/haptics'
 import { isComposerChord } from '@/lib/keybinds/chords'
 import { $previewTarget } from '@/store/preview'

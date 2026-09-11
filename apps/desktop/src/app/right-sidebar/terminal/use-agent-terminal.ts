@@ -5,7 +5,7 @@ import { Terminal } from '@xterm/xterm'
 import { useEffect, useRef } from 'react'
 
 import { writeClipboardText } from '@/components/ui/copy-button'
-import { markRightPanePerf } from '@/debug/right-pane-events'
+import { markRightPanePerf } from '@/dev/debug/right-pane-events'
 import { triggerHaptic } from '@/lib/haptics'
 import { useTheme } from '@/themes/context'
 

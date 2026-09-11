@@ -8,7 +8,7 @@ import { dropSessionState, publishSessionState } from '@/store/session-states'
 import type * as WindowsStore from '@/store/windows'
 import type { SessionInfo } from '@/types/hermes'
 
-import { makeSessionInfo } from '../../../test/session-info'
+import { makeSessionInfo } from '../../../dev/test/session-info'
 import { sessionRoute } from '../../routes'
 
 import { useDesktopIntegrations } from './use-desktop-integrations'

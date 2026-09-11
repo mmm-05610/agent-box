@@ -12,7 +12,7 @@ vi.mock('@/hermes', () => ({
 
 import { beginCronJobsRequest } from '@/store/cron'
 
-import { deferred } from '../../test/deferred'
+import { deferred } from '../../dev/test/deferred'
 
 import { mutateAndRefreshCronJobs, refreshCronJobs, triggerAndRefreshCronJobs } from './cron-actions'
 

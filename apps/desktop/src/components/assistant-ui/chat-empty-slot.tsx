@@ -1,8 +1,8 @@
 import type { FC } from 'react'
 import { useMemo } from 'react'
 
-import { useContributions } from '@/contrib'
-import { ContribBoundary, ContribRender } from '@/contrib/react/boundary'
+import { useContributions } from '@/extension/contrib'
+import { ContribBoundary, ContribRender } from '@/extension/contrib/react/boundary'
 import { CHAT_EMPTY_AREA, type ChatEmptyContribution } from '@/lib/chat-empty'
 
 /**

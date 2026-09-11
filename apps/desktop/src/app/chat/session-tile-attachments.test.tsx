@@ -10,7 +10,7 @@ import { $connection, $sessions } from '@/store/session'
 import { $sessionStates, type SessionTileDelegate, setSessionTileDelegate } from '@/store/session-states'
 import type { ComposerAttachment } from '@/types/composer'
 
-import { deferred } from '../../test/deferred'
+import { deferred } from '../../dev/test/deferred'
 
 const requestGateway = vi.fn()
 
