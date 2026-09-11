@@ -27,34 +27,40 @@ interface SkillsViewProps {
   fixedProfile?: string
 }
 
-const mocks = vi.hoisted(() => ({
-  connections: vi.fn(async () => [] as { id: string; label: string }[]),
-  createCanonicalChat: vi.fn(async () => 'session-1'),
-  deleteBot: vi.fn(async () => undefined),
-  /** Flipped off to model a desktop build that predates the live surface. */
-  hasSkillsView: { value: true },
-  notify: vi.fn(),
-  notifyError: vi.fn(),
-  request: vi.fn(),
-  requestProfile: vi.fn(async () => ({})),
-  saveBotMeta: vi.fn(),
-  skillsView: [] as SkillsViewProps[]
-}))
+const mocks = vi.hoisted(() => {
+  const skillsView: SkillsViewProps[] = []
 
-vi.mock('@hermes/plugin-sdk', async importOriginal => {
-  const original = await importOriginal<typeof HermesSdk>()
-
+  /** The host's SkillsView stand-in: records the props every render handed it. */
   const SkillsViewStub = (props: SkillsViewProps) => {
-    mocks.skillsView.push(props)
+    skillsView.push(props)
 
     return null
   }
 
-  // Builds that route `fixedConnection` get the live Capabilities tab for
+  // Hosts that route `fixedConnection` get the live Capabilities tab for
   // remote targets too, pinned to the target machine's backend.
   SkillsViewStub.supportsFixedConnection = true
 
-  const mocked: Record<string, unknown> = {
+  return {
+    connections: vi.fn(async () => [] as { id: string; label: string }[]),
+    createCanonicalChat: vi.fn(async () => 'session-1'),
+    deleteBot: vi.fn(async () => undefined),
+    /** Flipped off to model a host that provides no live surface. */
+    hasSkillsView: { value: true },
+    notify: vi.fn(),
+    notifyError: vi.fn(),
+    request: vi.fn(),
+    requestProfile: vi.fn(async () => ({})),
+    saveBotMeta: vi.fn(),
+    SkillsViewStub,
+    skillsView
+  }
+})
+
+vi.mock('@hermes/plugin-sdk', async importOriginal => {
+  const original = await importOriginal<typeof HermesSdk>()
+
+  return {
     ...original,
     host: {
       ...original.host,
@@ -67,14 +73,6 @@ vi.mock('@hermes/plugin-sdk', async importOriginal => {
     // The plugin bundle normally lands via `ctx.i18n.register` at load.
     usePluginI18n: () => translateBots
   }
-
-  Object.defineProperty(mocked, 'SkillsView', {
-    configurable: true,
-    enumerable: true,
-    get: () => (mocks.hasSkillsView.value ? SkillsViewStub : undefined)
-  })
-
-  return mocked
 })
 
 vi.mock('./canonical-chat', () => ({ createCanonicalChat: mocks.createCanonicalChat }))
@@ -106,6 +104,15 @@ async function renderDialog(hasSkillsView: boolean) {
   vi.resetModules()
 
   const { CreateAgentDialog } = await import('./create-dialog')
+  const { setPluginCtx } = await import('./shared')
+
+  // The dialog probes `ctx.hostViews` — hand it a host whose live surface is
+  // present or absent per `hasSkillsView`, read live so a mid-test flip shows.
+  setPluginCtx({
+    get hostViews() {
+      return mocks.hasSkillsView.value ? { SkillsView: mocks.SkillsViewStub } : undefined
+    }
+  } as unknown as HermesSdk.PluginContext)
 
   const view = render(withQueryClient(<CreateAgentDialog onClose={() => undefined} open roster={roster} />))
 

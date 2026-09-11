@@ -41,7 +41,7 @@ import type {
   ProfileConfigurePayload,
   ProfileDescribeResponse
 } from './profile-config'
-import { CheckList, SkillsView, skillsViewRoutesConnections } from './profile-config'
+import { CheckList, hostViews, skillsViewRoutesConnections } from './profile-config'
 import { deleteBot } from './profile-ops'
 import { singleFlight } from './single-flight'
 import { HubSkillsSection } from './skills-hub'
@@ -68,6 +68,9 @@ export interface CreateAgentDialogProps {
 export function CreateAgentDialog({ open, onClose, roster }: CreateAgentDialogProps) {
   const { t } = useI18n()
   const b = useBots()
+  // One read per render: what this host provides decides whether the Advanced
+  // section offers the live Capabilities tab or the staged checklists.
+  const { SkillsView } = hostViews()
   const [name, setName] = useState('')
   // Create mode: the profile is created LAZILY. Capability toggles are staged in
   // component state; the profile is materialized either on Create (submit) or on
@@ -671,7 +674,7 @@ export function CreateAgentDialog({ open, onClose, roster }: CreateAgentDialogPr
                   }
                 }}
                 options={
-                  SkillsView && (!remoteTarget || skillsViewRoutesConnections)
+                  SkillsView && (!remoteTarget || skillsViewRoutesConnections())
                     ? [
                         { id: 'general', label: 'General' },
                         { id: 'capabilities', label: 'Capabilities' }

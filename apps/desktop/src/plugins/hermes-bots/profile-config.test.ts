@@ -55,7 +55,6 @@ vi.mock('@hermes/plugin-sdk', async () => {
     GlyphSpinner: () => null,
     host: hostMock,
     Input: () => null,
-    McpTab: undefined,
     queryClient: { invalidateQueries: invalidateMock },
     ScrollArea: () => null,
     Select: () => null,
@@ -63,16 +62,16 @@ vi.mock('@hermes/plugin-sdk', async () => {
     SelectItem: () => null,
     SelectTrigger: () => null,
     SelectValue: () => null,
-    SkillsView: undefined,
     surfaceModelSwitchConfirm: confirmMock,
     Textarea: () => null,
-    ToolsetConfigPanel: undefined,
     useQuery: vi.fn(() => ({ data: undefined, error: null, isLoading: false })),
     useValue: vi.fn()
   }
 })
 
 vi.mock('./shared', () => ({ getPluginCtx: () => null, ID: 'hermes-bots' }))
+// A null context (above) is exactly "no host views" — the save path under
+// test never reads one, and the editor degrades to the staged checklists.
 // The SOUL protocol append has its own suite; here it must not rewrite the
 // text under the assertions.
 vi.mock('./soul', () => ({ ensureMessagingProtocol: (soul: string) => soul }))
