@@ -1,8 +1,9 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
+import { resolveLocalReadPath } from '../platform/wsl-path-bridge'
+
 import { resolveDirectoryForIpc } from './hardening'
-import { resolveLocalReadPath } from './wsl-path-bridge'
 
 const FS_READDIR_STAT_CONCURRENCY = 16
 

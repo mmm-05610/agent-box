@@ -10,11 +10,12 @@ import path from 'node:path'
 import { app, ipcMain } from 'electron'
 import nodePty from 'node-pty'
 
-import { resolveTerminalConnectionForSender } from './legacy-hermes/connection-apply'
-import { ensureSpawnHelperExecutable } from './spawn-helper-perms'
-import { buildInteractiveSshArgs } from './ssh-connection'
+import { resolveTerminalConnectionForSender } from '../../legacy-hermes/connection-apply'
+import { buildWindowsInteractiveCommand } from '../../legacy-hermes/windows-remote-lifecycle'
+import { ensureSpawnHelperExecutable } from '../platform/spawn-helper-perms'
+import { buildInteractiveSshArgs } from '../platform/ssh-connection'
+
 import { createTerminalOutputGate } from './terminal-output-gate'
-import { buildWindowsInteractiveCommand } from './legacy-hermes/windows-remote-lifecycle'
 
 export interface TerminalIpcDeps {
   isWindows: boolean

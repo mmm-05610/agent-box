@@ -9,7 +9,7 @@ import path from 'node:path'
 
 import { app } from 'electron'
 
-import { isWslEnvironment } from '../bootstrap-platform'
+import { isWslEnvironment } from '../host-capabilities/platform/bootstrap-platform'
 
 import { rememberLog } from './log-buffer'
 

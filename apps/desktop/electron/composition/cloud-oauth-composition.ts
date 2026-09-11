@@ -27,7 +27,7 @@ import {
 import {
   DEFAULT_FETCH_TIMEOUT_MS,
   resolveTimeoutMs
-} from '../hardening'
+} from '../host-capabilities/filesystem/hardening'
 import { installWindowRendererLifecycle } from '../window-renderer-lifecycle'
 
 import {

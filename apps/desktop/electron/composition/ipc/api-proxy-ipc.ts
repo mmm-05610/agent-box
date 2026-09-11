@@ -11,7 +11,7 @@ import {
 import {
   DATA_URL_READ_DEFAULT_MAX_MB,
   dataUrlReadMaxBytesFromMb
-} from '../../hardening'
+} from '../../host-capabilities/filesystem/hardening'
 import {
   dispatchConnectionScopedProfileDelete,
   profileNameFromDeleteRequest

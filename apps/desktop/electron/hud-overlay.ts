@@ -6,7 +6,7 @@
  * that compositor's dialect; `promoteHudOverlay` is the one call site.
  */
 
-import { promoteHudOnHyprland } from './hud-hyprland'
+import { promoteHudOnHyprland } from './host-capabilities/platform/hud-hyprland'
 
 export interface HudElectronOverlayWindow {
   setAlwaysOnTop(flag: boolean, level?: string): void

@@ -2,7 +2,7 @@ import { spawn, type SpawnOptions } from 'node:child_process'
 import { existsSync, statSync } from 'node:fs'
 import path from 'node:path'
 
-import { hiddenWindowsChildOptions } from './windows-child-options'
+import { hiddenWindowsChildOptions } from './host-capabilities/platform/windows-child-options'
 
 /** File prerequisites only: dependency recovery must remain reachable through update. */
 export function windowsUpdatePrerequisiteError(updateRoot: string): string | null {

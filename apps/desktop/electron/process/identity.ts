@@ -23,7 +23,7 @@
 import { execFile } from 'node:child_process'
 import fs from 'node:fs'
 
-import { hiddenWindowsChildOptions } from '../windows-child-options'
+import { hiddenWindowsChildOptions } from '../host-capabilities/platform/windows-child-options'
 
 import { isPidAlive } from './pid'
 

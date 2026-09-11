@@ -30,15 +30,15 @@ import {
   encryptDesktopSecret as encryptDesktopSecretStrict,
   resolvePersistedRemoteToken,
   SAFE_STORAGE_ENCODING
-} from '../hardening'
+} from '../host-capabilities/filesystem/hardening'
 import {
   oauthSessionIsLive
-} from '../native-auth-decisions'
+} from '../host-capabilities/credentials/native-auth-decisions'
 import {
   classifyStoredSecret,
   type SecretStoragePolicy,
   writeSecretStoragePolicy
-} from '../secret-storage-policy'
+} from '../host-capabilities/credentials/secret-storage-policy'
 
 import {
   _nativeTokenStoreIo,

@@ -5,7 +5,7 @@ import {
   ipcMain
 } from 'electron'
 
-import { fetchMarketplaceThemes, searchMarketplaceThemes } from '../../vscode-marketplace'
+import { fetchMarketplaceThemes, searchMarketplaceThemes } from '../../host-capabilities/preview/vscode-marketplace'
 
 export interface RegisterPreviewIpcDeps {
   openExternalUrl: any

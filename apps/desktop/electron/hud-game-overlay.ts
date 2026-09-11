@@ -21,7 +21,7 @@
 // Detection still works there; the HUD is simply behind until the user
 // alt-tabs, which Windows answers by flipping the game to composited output.
 
-import type { EnumeratedWindow } from './window-below'
+import type { EnumeratedWindow } from './host-capabilities/platform/window-below'
 
 export interface GameOverlayState {
   active: boolean

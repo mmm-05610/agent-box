@@ -64,7 +64,7 @@ import {
   isWindowsBinaryPathInWsl,
   isWslEnvironment,
   resolveLinuxPasswordStore
-} from '../bootstrap-platform'
+} from '../host-capabilities/platform/bootstrap-platform'
 import { runBootstrap } from '../legacy-hermes/bootstrap-runner'
 import { detectBundleSwap } from '../bundle-swap'
 import { teardownSshState } from '../legacy-hermes/connection-apply'
@@ -105,7 +105,7 @@ import {
   resolveRemovableAppPath
 } from '../desktop-uninstall'
 import { resolveDevCdpPort } from '../dev-cdp'
-import { findGitBash as _findGitBash } from '../find-git-bash'
+import { findGitBash as _findGitBash } from '../host-capabilities/platform/find-git-bash'
 import {
   installFindShortcut
 } from '../find-in-page'
@@ -121,7 +121,7 @@ import {
   SAFE_STORAGE_ENCODING,
   tightenSecretFileMode,
   writeSecretFileAtomic
-} from '../hardening'
+} from '../host-capabilities/filesystem/hardening'
 import {
   fenceManagedSshBootstrapPublication,
   ManagedConnectionUpdateGate,
@@ -134,16 +134,16 @@ import {
   oauthTicketFailureAuthMessage,
   resolveJsonBody,
   resolveReadinessProbeAuth
-} from '../native-auth-decisions'
+} from '../host-capabilities/credentials/native-auth-decisions'
 import {
   nativeRefreshUrl,
   type NativeTokenSet,
   parseTokenResponse,
   tokenNeedsRefresh
-} from '../native-oauth'
-import { loadNativeTokenSet, type NativeTokenStoreIo, persistNativeTokenSet } from '../native-token-store'
-import { serializeJsonBody, setJsonRequestHeaders } from '../oauth-net-request'
-import { LEGACY_OAUTH_PARTITION, resolveOauthPartition } from '../oauth-partition'
+} from '../host-capabilities/credentials/native-oauth'
+import { loadNativeTokenSet, type NativeTokenStoreIo, persistNativeTokenSet } from '../host-capabilities/credentials/native-token-store'
+import { serializeJsonBody, setJsonRequestHeaders } from '../host-capabilities/credentials/oauth-net-request'
+import { LEGACY_OAUTH_PARTITION, resolveOauthPartition } from '../host-capabilities/credentials/oauth-partition'
 import { createParentStartMarkerResolver, electronProcessStartMarker, parentWatchdogEnv } from '../legacy-hermes/parent-process-identity'
 import {
   pendingNotice as pendingPluginCompatNotice,
@@ -199,7 +199,7 @@ import {
   readSecretStoragePolicy,
   SECRET_STORAGE_POLICY_FILE,
   type SecretStoragePolicy
-} from '../secret-storage-policy'
+} from '../host-capabilities/credentials/secret-storage-policy'
 import {
   buildSessionWindowUrl,
   chatWindowWebPreferences,
@@ -207,11 +207,11 @@ import {
   SESSION_WINDOW_MIN_HEIGHT,
   SESSION_WINDOW_MIN_WIDTH
 } from '../session-windows'
-import { ensureLoginShellPath } from '../shell-path'
+import { ensureLoginShellPath } from '../host-capabilities/platform/shell-path'
 import { createBootstrapCoordinator, sshConfigFingerprint } from '../legacy-hermes/ssh-bootstrap-coordinator'
-import { pickLocalPort, redactSecrets, SshConnection } from '../ssh-connection'
+import { pickLocalPort, redactSecrets, SshConnection } from '../host-capabilities/platform/ssh-connection'
 import { createStreamThrottle } from '../stream-throttle'
-import { registerTerminalIpc } from '../terminal-ipc'
+import { registerTerminalIpc } from '../host-capabilities/terminal/terminal-ipc'
 import { nativeOverlayWidth as computeNativeOverlayWidth } from '../titlebar-overlay-width'
 import {
   glassSupportedOn,
@@ -256,7 +256,7 @@ import {
   MIN_HEIGHT as WINDOW_MIN_HEIGHT,
   MIN_WIDTH as WINDOW_MIN_WIDTH
 } from '../window-state'
-import { hiddenWindowsChildOptions } from '../windows-child-options'
+import { hiddenWindowsChildOptions } from '../host-capabilities/platform/windows-child-options'
 import {
   buildPathExtCandidates,
   chooseUpdaterArgs,
@@ -276,10 +276,10 @@ import {
   type SandboxFallbackReason,
   shouldRelaunchForRendererSandboxCrashLoop,
   writeSandboxMarker
-} from '../windows-sandbox-fallback'
-import { readWindowsUserEnvVar } from '../windows-user-env'
+} from '../host-capabilities/platform/windows-sandbox-fallback'
+import { readWindowsUserEnvVar } from '../host-capabilities/platform/windows-user-env'
 import { isPackagedInstallPath as isPackagedInstallPathUnderRoots } from '../workspace-cwd'
-import { setActiveGatewayProfile, setWslBridgeProfileState } from '../wsl-path-bridge'
+import { setActiveGatewayProfile, setWslBridgeProfileState } from '../host-capabilities/platform/wsl-path-bridge'
 import {
   applyZoomLevel,
   DEFAULT_ZOOM_LEVEL,

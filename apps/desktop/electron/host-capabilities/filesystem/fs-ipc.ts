@@ -7,9 +7,10 @@ import path from 'node:path'
 
 import { ipcMain, shell } from 'electron'
 
+import { gitRootForIpc } from '../git/git-root'
+
 import { installDesktopPluginFromGit, probePluginRepo } from './desktop-plugin-install'
 import { readDirForIpc } from './fs-read-dir'
-import { gitRootForIpc } from './git-root'
 
 export interface FsIpcDeps {
   hermesHome: string

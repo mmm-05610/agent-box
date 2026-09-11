@@ -3,7 +3,8 @@ import { X509Certificate } from 'node:crypto'
 
 import { afterEach, test, vi } from 'vitest'
 
-import { bundledRoot, expiredRoot, privateRoot } from './fixtures/windows-system-ca'
+import { bundledRoot, expiredRoot, privateRoot } from '../../fixtures/windows-system-ca'
+
 import { installWindowsSystemCaTrust, type NodeTlsCaApi } from './windows-system-ca'
 
 afterEach(() => vi.restoreAllMocks())

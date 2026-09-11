@@ -37,7 +37,7 @@ import {
   setWslBridgeActive,
   setWslBridgeProfileState,
   wslPosixToWindowsAccessible
-} from './wsl-path-bridge'
+} from './host-capabilities/platform/wsl-path-bridge'
 
 // ── helpers ──────────────────────────────────────────────────────────
 

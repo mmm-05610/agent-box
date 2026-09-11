@@ -20,7 +20,7 @@ import {
 import { formatRendererBoundaryReport } from '../../renderer-log'
 import {
   buildNoSandboxRelaunchArgs
-} from '../../windows-sandbox-fallback'
+} from '../../host-capabilities/platform/windows-sandbox-fallback'
 
 export interface RegisterSystemIpcDeps {
   REMOTE_DISPLAY_REASON: any

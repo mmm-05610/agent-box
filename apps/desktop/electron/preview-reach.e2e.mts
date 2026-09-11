@@ -8,7 +8,7 @@ import http from 'node:http'
 import { spawn } from 'node:child_process'
 import net from 'node:net'
 
-import { loopbackTarget, PreviewReachRegistry, rewriteToLocalPort } from './preview-reach.ts'
+import { loopbackTarget, PreviewReachRegistry, rewriteToLocalPort } from './host-capabilities/preview/preview-reach'
 
 const HOST = process.argv[2] || 'root@5.161.224.47'
 const REMOTE_PORT = 5173

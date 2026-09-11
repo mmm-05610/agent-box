@@ -45,12 +45,12 @@ import {
   resolveReadableFileForIpc,
   resolveRequestedPathForIpc,
   resolveTimeoutMs
-} from '../hardening'
+} from '../host-capabilities/filesystem/hardening'
 import { createLinkTitleWindow, guardLinkTitleSession, readLinkTitleWindowTitle } from '../link-title-window'
 import {
   resolveGatedDownloadAuth,
   resolveOauthRestAuth
-} from '../native-auth-decisions'
+} from '../host-capabilities/credentials/native-auth-decisions'
 import {
   decideProfileDeleteAction,
   localProfilePoolKeys,
@@ -69,7 +69,7 @@ import {
   spliceRegistrySessionRows,
   tagRegistrySessionResponse
 } from '../legacy-hermes/profile-session-routing'
-import { hiddenWindowsChildOptions } from '../windows-child-options'
+import { hiddenWindowsChildOptions } from '../host-capabilities/platform/windows-child-options'
 
 import {
   backendConnectionState,

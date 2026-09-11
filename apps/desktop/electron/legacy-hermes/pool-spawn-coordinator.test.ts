@@ -6,12 +6,13 @@ import { fileURLToPath } from 'node:url'
 
 import { test } from 'vitest'
 
+import { mainProcessSources } from '../test-main-process-sources'
+
 import {
   LocalBackendSlotWaitTimeoutError,
   LocalBackendSpawnCoordinator,
   releaseLocalBackendSlotAfterExit
 } from './pool-spawn-coordinator'
-import { mainProcessSources } from '../test-main-process-sources'
 
 
 

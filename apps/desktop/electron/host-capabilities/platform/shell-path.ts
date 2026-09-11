@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process'
 
-import { appendUniquePathEntries, delimiterForPlatform, pathEnvKey } from './legacy-hermes/backend-env'
+import { appendUniquePathEntries, delimiterForPlatform, pathEnvKey } from '../../legacy-hermes/backend-env'
 
 // Login-shell PATH resolution for GUI launches.
 //

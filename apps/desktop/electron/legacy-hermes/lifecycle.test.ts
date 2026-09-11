@@ -13,9 +13,9 @@ import { test } from 'vitest'
 
 import { dashboardFallbackArgs } from './backend-command'
 import {
+  hermesBackendEnv,
   type HermesBackendLifecycle,
   type HermesLaunchPlan,
-  hermesBackendEnv,
   hermesLocalWsUrl,
   hermesPrimaryConnectionDescriptor,
   hermesProfiledConnectionDescriptor,

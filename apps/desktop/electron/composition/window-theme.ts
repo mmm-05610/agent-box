@@ -12,7 +12,7 @@ import path from 'node:path'
 
 import { app, nativeTheme } from 'electron'
 
-import { isWslEnvironment } from '../bootstrap-platform'
+import { isWslEnvironment } from '../host-capabilities/platform/bootstrap-platform'
 import { macTitleBarOverlayHeight } from '../titlebar-overlay-width'
 import {
   backgroundMaterialFor,

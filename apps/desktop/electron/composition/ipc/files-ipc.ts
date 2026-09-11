@@ -23,10 +23,10 @@ import {
   resolveReadableFileForIpc,
   resolveRequestedPathForIpc,
   TEXT_PREVIEW_SOURCE_MAX_BYTES
-} from '../../hardening'
-import { capturePreviewContents } from '../../preview-capture'
-import { readWslWindowsClipboardImage } from '../../wsl-clipboard-image'
-import { resolvePickerDefaultPath } from '../../wsl-path-bridge'
+} from '../../host-capabilities/filesystem/hardening'
+import { capturePreviewContents } from '../../host-capabilities/preview/preview-capture'
+import { readWslWindowsClipboardImage } from '../../host-capabilities/platform/wsl-clipboard-image'
+import { resolvePickerDefaultPath } from '../../host-capabilities/platform/wsl-path-bridge'
 
 export interface RegisterFilesIpcDeps {
   mimeTypeForPath: any

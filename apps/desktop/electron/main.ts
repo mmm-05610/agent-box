@@ -292,18 +292,18 @@ import type { RosterProfileMetadata } from './legacy-hermes/connection-registry'
 import { describeDevCdpDecision } from './dev-cdp'
 import { installEmbedReferer } from './embed-referer'
 import { createEventDeduper } from './event-dedupe'
-import { type FaviconIo, resolveFavicon } from './favicon'
+import { type FaviconIo, resolveFavicon } from './host-capabilities/preview/favicon'
 import {
   installFoundInPageForwarder
 } from './find-in-page'
-import { registerFsIpc } from './fs-ipc'
+import { registerFsIpc } from './host-capabilities/filesystem/fs-ipc'
 import { probeGatewayWebSocket } from './legacy-hermes/gateway-ws-probe'
-import { registerGitIpc } from './git-ipc'
+import { registerGitIpc } from './host-capabilities/git/git-ipc'
 import {
   enableBasicPasswordStoreEncryption,
   resolveReadableFileForIpc,
   resolveRequestedPathForIpc
-} from './hardening'
+} from './host-capabilities/filesystem/hardening'
 import { applyHudResetBounds, defaultHudBounds } from './hud-geometry'
 import { registerHudIpc } from './hud-ipc'
 import { ensureMainWindow } from './main-window-lifecycle'
@@ -311,13 +311,13 @@ import {
   refusedManagedSshUpdate,
   waitForManagedUpdateOperations
 } from './legacy-hermes/managed-ssh-update'
-import { registerMcpOauthCallbackIpc } from './mcp-oauth-callback-ipc'
-import { createMediaProtocolHandler, MEDIA_PROTOCOL } from './media-protocol'
+import { registerMcpOauthCallbackIpc } from './host-capabilities/credentials/mcp-oauth-callback-ipc'
+import { createMediaProtocolHandler, MEDIA_PROTOCOL } from './host-capabilities/preview/media-protocol'
 import { registerNativeNotifications } from './notification-ipc'
 import { registerPetOverlayIpc } from './pet-overlay-ipc'
 import { poolTouchKeys } from './legacy-hermes/pool-touch-scope'
 import { createKeepAwake } from './power-save'
-import { PreviewReachRegistry } from './preview-reach'
+import { PreviewReachRegistry } from './host-capabilities/preview/preview-reach'
 import { sanitizeQuickEntrySettings } from './quick-entry'
 import { type ActiveWork, mergeActiveWork, quitPromptFor } from './quit-guard'
 import * as remoteLifecycle from './legacy-hermes/remote-lifecycle'
@@ -333,8 +333,8 @@ import { fetchRosterSourceData } from './legacy-hermes/roster-source-fetch'
 import {
   instanceWindowBounds
 } from './session-windows'
-import { ensureLoginShellPath } from './shell-path'
-import { createSshProbeConnection, pickLocalPort } from './ssh-connection'
+import { ensureLoginShellPath } from './host-capabilities/platform/shell-path'
+import { createSshProbeConnection, pickLocalPort } from './host-capabilities/platform/ssh-connection'
 import {
   computeWindowOptions
 } from './window-state'
@@ -353,9 +353,9 @@ import {
   shouldAttemptAclRepair,
   shouldRelaunchForGpuSandboxCrash,
   writeSandboxMarker
-} from './windows-sandbox-fallback'
-import { installWindowsSystemCaTrust } from './windows-system-ca'
-import { setActiveGatewayProfile, setWslBridgeProfileState } from './wsl-path-bridge'
+} from './host-capabilities/platform/windows-sandbox-fallback'
+import { installWindowsSystemCaTrust } from './host-capabilities/platform/windows-system-ca'
+import { setActiveGatewayProfile, setWslBridgeProfileState } from './host-capabilities/platform/wsl-path-bridge'
 
 
 

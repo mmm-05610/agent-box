@@ -26,7 +26,7 @@ import {
 import { detectBundleSkew } from '../bundle-skew'
 import {
   resolveRequestedPathForIpc
-} from '../hardening'
+} from '../host-capabilities/filesystem/hardening'
 import { cursorPointInWindow } from '../hud-cursor'
 import { startHudGameOverlayWatch } from '../hud-game-overlay'
 import { applyHudElectronOverlay, promoteHudOverlay } from '../hud-overlay'
@@ -45,7 +45,7 @@ import {
   chatWindowWebPreferences,
   createSessionWindowRegistry
 } from '../session-windows'
-import { enumerateWindowsFrontToBack, enumerationFailed } from '../window-below'
+import { enumerateWindowsFrontToBack, enumerationFailed } from '../host-capabilities/platform/window-below'
 import { installWindowRendererLifecycle } from '../window-renderer-lifecycle'
 import {
   bindGeometryPersistence,

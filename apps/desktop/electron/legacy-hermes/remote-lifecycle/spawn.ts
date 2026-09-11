@@ -1,6 +1,6 @@
 import crypto from 'node:crypto'
 
-import { assertBootstrapNotSuperseded } from '../../ssh-connection'
+import { assertBootstrapNotSuperseded } from '../../host-capabilities/platform/ssh-connection'
 
 import { connectReservationPath, DEFAULT_READY_TIMEOUT_MS, expandRemotePath, fingerprintToken, LOCKFILE_SCHEMA_VERSION, lockfilePath, PROTOCOL_VERSION, readLockfile, READY_POLL_INTERVAL_MS, READY_RE, REMOTE_NOFILE_SOFT_LIMIT, remotePidAlive, shq, spawnLogPath, spawnTokenPath, validateSpawnNonce, withRemoteUpdateMutex } from './ownership'
 import { remoteInstallRoot } from './resolve'

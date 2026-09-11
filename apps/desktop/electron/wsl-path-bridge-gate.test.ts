@@ -30,7 +30,7 @@ describe('WSL bridge gate on Windows (#66433)', () => {
   })
 
   test('wsl.exe IS probed for a POSIX path when the bridge is active (control)', async () => {
-    const { resolveLocalReadPath } = await import('./wsl-path-bridge')
+    const { resolveLocalReadPath } = await import('./host-capabilities/platform/wsl-path-bridge')
     resolveLocalReadPath('/home/ubuntu/project')
     expect(execFileSyncMock).toHaveBeenCalled()
     // Sanity: it really was wsl.exe, not some other binary.
@@ -43,7 +43,7 @@ describe('WSL bridge gate on Windows (#66433)', () => {
   })
 
   test('wsl.exe is NEVER probed when the bridge is inactive — even for POSIX paths', async () => {
-    const { resolveLocalReadPath, setWslBridgeActive } = await import('./wsl-path-bridge')
+    const { resolveLocalReadPath, setWslBridgeActive } = await import('./host-capabilities/platform/wsl-path-bridge')
     setWslBridgeActive(false)
     // A POSIX path that WOULD trigger bridging (and the wsl.exe probe) when
     // active — but with the bridge off, resolveDefaultWslDistro is never
@@ -54,7 +54,7 @@ describe('WSL bridge gate on Windows (#66433)', () => {
   })
 
   test('the picker default-path also skips the wsl.exe probe when inactive', async () => {
-    const { resolvePickerDefaultPath, setWslBridgeActive } = await import('./wsl-path-bridge')
+    const { resolvePickerDefaultPath, setWslBridgeActive } = await import('./host-capabilities/platform/wsl-path-bridge')
     setWslBridgeActive(false)
     const result = resolvePickerDefaultPath('/home/ubuntu')
     expect(execFileSyncMock).not.toHaveBeenCalled()
@@ -62,7 +62,7 @@ describe('WSL bridge gate on Windows (#66433)', () => {
   })
 
   test('re-enabling the bridge restores wsl.exe probing', async () => {
-    const { resolveLocalReadPath, setWslBridgeActive } = await import('./wsl-path-bridge')
+    const { resolveLocalReadPath, setWslBridgeActive } = await import('./host-capabilities/platform/wsl-path-bridge')
     setWslBridgeActive(false)
     resolveLocalReadPath('/home/ubuntu/project')
     expect(execFileSyncMock).not.toHaveBeenCalled()

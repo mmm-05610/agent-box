@@ -20,7 +20,7 @@ import {
 } from '../../find-in-page'
 import { sanitizeQuickEntrySettings } from '../../quick-entry'
 import { normalizeActiveWork } from '../../quit-guard'
-import { readWindowBelow } from '../../window-below'
+import { readWindowBelow } from '../../host-capabilities/platform/window-below'
 import {
   DEFAULT_ZOOM_LEVEL,
   percentToZoomLevel,

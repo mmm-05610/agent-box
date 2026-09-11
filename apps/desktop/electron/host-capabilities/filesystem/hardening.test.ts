@@ -6,6 +6,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 
 import { test } from 'vitest'
 
+import { mainProcessSources, sliceFromAnyModule } from '../../test-main-process-sources'
+
 import {
   ATTACHMENT_UPLOAD_DEFAULT_MAX_BYTES,
   clampDataUrlReadMaxMb,
@@ -26,7 +28,6 @@ import {
   tightenSecretFileMode,
   writeSecretFileAtomic
 } from './hardening'
-import { mainProcessSources, sliceFromAnyModule } from './test-main-process-sources'
 
 
 

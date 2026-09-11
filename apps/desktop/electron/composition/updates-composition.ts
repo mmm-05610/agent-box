@@ -20,7 +20,7 @@ import {
   shouldRemoveAppBundle,
   uninstallArgsForMode
 } from '../desktop-uninstall'
-import { clearStaleGitLocks } from '../gitlock'
+import { clearStaleGitLocks } from '../host-capabilities/git/gitlock'
 import {
   compareApiUrl,
   parseCompareBehindCount,
@@ -29,7 +29,7 @@ import {
   shouldCountCommits
 } from '../update-count'
 import { isOfficialSshRemote, OFFICIAL_REPO_HTTPS_URL } from '../update-remote'
-import { hiddenWindowsChildOptions } from '../windows-child-options'
+import { hiddenWindowsChildOptions } from '../host-capabilities/platform/windows-child-options'
 
 import {
   ACTIVE_HERMES_ROOT,

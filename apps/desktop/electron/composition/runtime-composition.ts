@@ -20,7 +20,7 @@ import {
 import { resolveDesktopRemoteRoute } from '../legacy-hermes/desktop-remote-route'
 import {
   writeSecretFileAtomic
-} from '../hardening'
+} from '../host-capabilities/filesystem/hardening'
 import {
   assertManagedUpdatePreflightClear,
   executeManagedRemoteUpdate,
@@ -45,7 +45,7 @@ import {
 import {
   applyRemoteRequestHeaders
 } from '../legacy-hermes/remote-ws-headers'
-import { createSshProbeConnection } from '../ssh-connection'
+import { createSshProbeConnection } from '../host-capabilities/platform/ssh-connection'
 import {
   detectRemotePlatform,
   probeWindowsRemote,
