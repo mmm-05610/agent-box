@@ -16,10 +16,9 @@
 // work gets scheduled: a `lib/` batch, a `store/` batch, and so on.
 
 export const DEBT_LEDGER: readonly string[] = [
-  // components/ — 27
+  // components/ — 24
   'components/assistant-ui/clarify-tool.tsx -> @/app/chat/composer/focus',
   'components/assistant-ui/inline-preview-directive.tsx -> @/app/chat/composer/focus',
-  'components/assistant-ui/thread/assistant-message.tsx -> @/app/routes',
   'components/assistant-ui/thread/changed-files-card.tsx -> @/app/chat/composer/scope',
   'components/assistant-ui/thread/user-edit-composer.tsx -> @/app/chat/composer/directive-actions',
   'components/assistant-ui/thread/user-edit-composer.tsx -> @/app/chat/composer/drop-affordance',
@@ -39,18 +38,16 @@ export const DEBT_LEDGER: readonly string[] = [
   'components/assistant-ui/thread/user-edit-composer.tsx -> @/app/chat/hooks/use-composer-actions',
   'components/assistant-ui/thread/user-edit-composer.tsx -> @/app/session/hooks/use-prompt-actions',
   'components/boot-failure-overlay.tsx -> @/app/settings/gateway-settings',
-  'components/find-bar.tsx -> @/app/routes',
   'components/pet/floating-pet.tsx -> @/app/gateway/hooks/use-gateway-request',
   'components/pet/floating-pet.tsx -> @/app/hooks/use-on-profile-switch',
   'components/pet/floating-pet.tsx -> @/app/hooks/use-route-overlay-active',
-  'components/tips/use-tip-rotation.ts -> @/app/routes',
 
   // extension/ — 3
   'extension/sdk/index.ts -> @/app/settings/toolset-config-panel',
   'extension/sdk/index.ts -> @/app/skills',
   'extension/sdk/index.ts -> @/app/skills/mcp-tab',
 
-  // lib/ — 13
+  // lib/ — 12
   'lib/external-link.tsx -> @/store/preview',
   'lib/guarded-model-switch.ts -> @/store/notifications',
   'lib/keybinds/composer-focus-keys.ts -> @/app/routes',
@@ -60,7 +57,6 @@ export const DEBT_LEDGER: readonly string[] = [
   'lib/oneshot.ts -> @/store/gateway',
   'lib/oneshot.ts -> @/store/session',
   'lib/session-export.ts -> @/store/notifications',
-  'lib/session-link-title.ts -> @/store/session',
   'lib/session-project-label.ts -> @/app/chat/sidebar/projects/workspace-groups',
   'lib/yolo-session.ts -> @/store/gateway',
   'lib/yolo-session.ts -> @/store/session',
