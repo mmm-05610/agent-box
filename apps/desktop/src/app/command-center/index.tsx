@@ -24,13 +24,13 @@ import {
   Trash2,
   Wrench
 } from '@/lib/icons'
-import { exportSession } from '@/lib/session-export'
 import { fmtDateTime } from '@/lib/time'
 import { useStoreSelector } from '@/lib/use-session-slice'
 import { cn } from '@/lib/utils'
 import { upsertDesktopActionTask } from '@/store/activity'
 import { $pinnedSessionIds, pinSession, unpinSession } from '@/store/layout'
 import { $sessions, sessionPinId } from '@/store/session'
+import { exportSession } from '@/store/session-export'
 
 import { useRefreshHotkey } from '../hooks/use-refresh-hotkey'
 import { useRouteEnumParam } from '../hooks/use-route-enum-param'

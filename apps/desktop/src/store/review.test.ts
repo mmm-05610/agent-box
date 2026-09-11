@@ -45,7 +45,7 @@ import { $currentCwd } from './session'
 // reaches the gateway); everything else routes through window.hermesDesktop.git,
 // which we stub per-test like the sibling coding-status.test.ts does.
 const requestOneShot = vi.fn(async (_args: unknown) => 'generated message')
-vi.mock('@/lib/oneshot', () => ({ requestOneShot: (args: unknown) => requestOneShot(args) }))
+vi.mock('@/store/oneshot', () => ({ requestOneShot: (args: unknown) => requestOneShot(args) }))
 // refreshRepoStatus is a fire-and-forget side effect of mutations; stub it so it
 // doesn't try to hit the (absent) probe and log. repoStatusForCwd is read when a
 // new PR binds its session to the branch it came from — no probe here, so no
