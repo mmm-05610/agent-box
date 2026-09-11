@@ -9,7 +9,7 @@ import assert from 'node:assert/strict'
 
 import { describe, test } from 'vitest'
 
-import { createWindowOpenHandler, describeDeniedUrl } from '../apps/desktop/electron/window-open-policy'
+import { createWindowOpenHandler, describeDeniedUrl } from '../apps/desktop/electron/security/window-open-policy'
 
 describe('window-open policy (GHSA-9f4c-93c8-jc8g)', () => {
   test('denies every scheme and reports only the sanitized origin', () => {
