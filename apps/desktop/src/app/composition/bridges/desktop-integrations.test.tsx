@@ -314,7 +314,7 @@ describe('useDesktopIntegrations', () => {
       render({ profileReady: true, sessions: [session({ id: 'remembered-session', profile: 'default' })] })
 
       // The HUD is a fresh full renderer booting at the default route, but its
-      // destination was chosen explicitly by hudTargetSessionId() at open time
+      // destination was chosen explicitly by frontConversationId() at open time
       // — remembered-navigation restore must not hijack it to the last session.
       expect(navigate).not.toHaveBeenCalled()
     })

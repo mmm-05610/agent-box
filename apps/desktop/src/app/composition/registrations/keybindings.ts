@@ -12,6 +12,7 @@
 import { useEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 
+import { frontConversationId } from '@/app/composition/bridges/window-ports'
 import { appViewForPath, isOverlayView } from '@/app/routes'
 import {
   $workspaceIsPage,
@@ -26,7 +27,6 @@ import {
   SKILLS_ROUTE
 } from '@/app/routes'
 import { useKeybindingHost } from '@/app/shell/hooks/use-keybinding-host'
-import { hudTargetSessionId } from '@/app/windows/hud/handoff'
 import { cycleProfile, switchProfileToSlot, switchToDefaultProfile } from '@/application/profile/navigation'
 import { openSession } from '@/application/session/open-session'
 import { closeActiveTerminal, createTerminal, cycleTerminal } from '@/application/terminal/terminals'
@@ -253,7 +253,7 @@ export function useAppKeybindings(deps: KeybindRuntimeDeps): void {
     'view.toggleTabStrip': () => void toggleTargetZoneTabStrip(),
     'view.showFiles': showFiles,
     'view.showBrowser': openBrowserTab,
-    'view.toggleHud': () => toggleHud(hudTargetSessionId()),
+    'view.toggleHud': () => toggleHud(frontConversationId()),
     'view.showTerminal': () => togglePaneVisible('terminal'),
     // Create first so the pane's open-effect ensure sees a non-empty set and
     // doesn't also spawn one — net effect is exactly one fresh terminal.

@@ -1,11 +1,13 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import type { HudWindowPort } from './port'
 import { HUD_RESIZE_DIRECTIONS, hudResizeBounds, hudResizeDirections, useHudResizeHandle } from './resize-handle'
 
-const desktopWindow = window as unknown as { hermesDesktop?: Window['hermesDesktop'] }
-const initialHermesDesktop = desktopWindow.hermesDesktop
 const setBounds = vi.fn()
+
+/** The window-host port as a test double: the resize mechanic only sets bounds. */
+const hudPort = { setBounds } as unknown as HudWindowPort
 
 function setWindowBounds(x: number, y: number, width: number, height: number): void {
   Object.defineProperty(window, 'screenX', { configurable: true, value: x })
@@ -27,17 +29,10 @@ function resizeTarget(): HTMLElement {
 beforeEach(() => {
   setBounds.mockClear()
   setWindowBounds(100, 200, 620, 320)
-  desktopWindow.hermesDesktop = { hud: { setBounds } } as unknown as Window['hermesDesktop']
 })
 
 afterEach(() => {
   document.body.innerHTML = ''
-
-  if (initialHermesDesktop) {
-    desktopWindow.hermesDesktop = initialHermesDesktop
-  } else {
-    delete desktopWindow.hermesDesktop
-  }
 })
 
 describe('hudResizeBounds', () => {
@@ -71,9 +66,9 @@ describe('hudResizeDirections', () => {
 })
 
 describe('useHudResizeHandle', () => {
-  it('sends the selected edge geometry through the HUD bridge', () => {
+  it('sends the selected edge geometry through the window port', () => {
     const target = resizeTarget()
-    const { result } = renderHook(() => useHudResizeHandle())
+    const { result } = renderHook(() => useHudResizeHandle(hudPort))
 
     act(() =>
       result.current.onPointerDown(

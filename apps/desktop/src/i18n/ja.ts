@@ -284,6 +284,22 @@ export const ja = defineLocale({
     resetHudLayout: 'HUD のサイズと位置をリセット'
   },
 
+  windows: {
+    quickEntry: {
+      inputLabel: 'クイック入力',
+      placeholder: '何か尋ねる…',
+      placeholderDisconnected: '未接続 — アプリを開いて再接続してください',
+      sendTo: '送信先',
+      targetCurrent: '現在のチャット',
+      targetLabel: '送信先セッション',
+      targetNew: '新しいセッション'
+    },
+    pet: {
+      composerPlaceholder: 'メッセージ…',
+      openInApp: 'アプリを開く'
+    }
+  },
+
   language: {
     label: '言語',
     description: 'デスクトップインターフェイスの言語を選択します。',

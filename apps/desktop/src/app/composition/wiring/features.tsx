@@ -33,12 +33,12 @@ import {
 } from '@/app/routes'
 import { TitlebarControls } from '@/app/shell/chrome/titlebar/controls'
 import { useWindowControlsOverlayWidth } from '@/app/shell/platform/use-window-controls-overlay-width'
-import { useHudHandoff } from '@/app/windows/hud/handoff'
 import { useHermesConfigRecord } from '@/application/config/use-config-record'
 import { refreshActiveProfile } from '@/application/profile/catalog'
 import { getLatestSessionMessages } from '@/application/session-transcripts'
 import { mainChatOccupied, openSession } from '@/application/session/open-session'
 import { createSessionRpcDispatcher } from '@/application/session/session-rpc-dispatcher'
+import { useSessionHandback } from '@/application/session/window-handoff'
 import { closeAllTerminals } from '@/application/terminal/terminals'
 import { useSkinCommand } from '@/application/theme/use-skin-command'
 import { graftRefreshedTailOntoBackfill } from '@/application/transcript/transcript-backfill'
@@ -698,8 +698,9 @@ export function ContribWiring({ children }: { children: ReactNode }) {
   // session / new session), and it hears gateway truth from this window.
   useQuickEntryBridge({ startFreshSessionDraft, submitText })
 
-  // Leaving HUD mode hands this window the session back (see hud/handoff).
-  useHudHandoff({ navigate, resumeSession })
+  // Leaving HUD mode hands this window the conversation back; the legacy
+  // stream re-attach stays behind the host adapter seam (adoptSession).
+  useSessionHandback({ adoptSession: resumeSession, navigate })
 
   // Clear a failed turn's red error banner. Errors are renderer-local (never
   // persisted): a bare error placeholder is dropped entirely; a partial-output

@@ -4,6 +4,7 @@ import { ComposerPrimitive } from '@assistant-ui/react'
 import { useStore } from '@nanostores/react'
 import { type ClipboardEvent, type FormEvent, type KeyboardEvent, useCallback, useEffect, useMemo, useRef } from 'react'
 
+import { hudWindowPort } from '@/app/composition/bridges/window-ports'
 import { useHudComposerDrag } from '@/app/windows/hud/composer-drag'
 import { composerFill, composerFloatingStrip, composerSurfaceGlass } from '@/components/chat/composer-dock'
 import {
@@ -114,6 +115,7 @@ export function ChatBar({
 
   const { grabbing: hudGrabbing, onPointerDown: onHudDragPointerDown } = useHudComposerDrag(hudMode && !hudNativeDrag, {
     controlDrag: hudWindowing?.controlDrag === true,
+    port: hudWindowPort(),
     workspaceTransfer: hudWindowing?.workspaceTransfer === true
   })
 

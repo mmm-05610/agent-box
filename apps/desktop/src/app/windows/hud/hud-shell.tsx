@@ -1,18 +1,20 @@
 import { useStore } from '@nanostores/react'
-import { type CSSProperties, useCallback, useEffect, useRef, useState } from 'react'
+import { type CSSProperties, type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 
-import { WiredPane } from '@/app/composition/wiring/features'
+import { sessionRoute } from '@/app/routes'
+import { useSurfaceRetarget, useSurfaceSessionReport } from '@/application/session/window-handoff'
 import { RICH_INPUT_SLOT } from '@/components/composer/rich-editor'
 import { chatMessageText } from '@/lib/chat-messages'
 import { useViewedInterval } from '@/lib/hooks/use-viewed-interval'
 import { $activeSessionAwaitingInput } from '@/store/prompts'
-import { $busy, $messages } from '@/store/session'
+import { $busy, $messages, $selectedStoredSessionId } from '@/store/session'
+import { isHudWindow } from '@/store/windows'
 
 import { useHudClickThrough } from './click-through'
 import { useHudGameOverlay } from './game-overlay'
 import { useHudGlass } from './glass'
-import { useHudGoto, useReportHudSession } from './handoff'
+import type { HudWindowPort } from './port'
 import { hudResizeDirections, useHudResizeHandle } from './resize-handle'
 import { useHudThreadFocus } from './thread-focus'
 import { useHudTranscriptBand } from './transcript-band'
@@ -181,11 +183,12 @@ function useHudHeld(gameUnder: boolean): boolean {
 /**
  * HUD mode's shell — the chrome-free floating chat.
  *
- * Deliberately almost nothing: it mounts the SAME wired chat surface the
- * workspace pane does, so the composer here IS the app's composer (slash
- * commands, `@` refs, attachments, queue, voice, model pill) and the transcript
- * is the app's transcript, rendered by the app's renderer. Only the frame
- * changes — no titlebar, no statusbar, no pane tree, no sidebars.
+ * Deliberately almost nothing: it renders the SAME wired chat surface the
+ * workspace pane does — contributed by the composition root, so the composer
+ * here IS the app's composer (slash commands, `@` refs, attachments, queue,
+ * voice, model pill) and the transcript is the app's transcript, rendered by
+ * the app's renderer. Only the frame changes — no titlebar, no statusbar, no
+ * pane tree, no sidebars.
  *
  * The shape is macOS Spotlight: at rest, the centered composer bar is the
  * whole interface. The thread renders as bare text above it and is
@@ -193,12 +196,19 @@ function useHudHeld(gameUnder: boolean): boolean {
  * composer has focus, faded out otherwise (see the `[data-hud-shell]` CSS and
  * `useRecentActivity`).
  */
-export function HudShell() {
+export interface HudShellProps {
+  /** The compact Session surface, contributed by the composition root. */
+  chatSurface: ReactNode
+  /** The neutral window-host port: every OS-window mechanic goes through it. */
+  port: HudWindowPort
+}
+
+export function HudShell({ chatSurface, port }: HudShellProps) {
   const [recent, holdBand] = useRecentActivity()
   // A fullscreen app (a game) is under the HUD: wear `data-hud-game` so the
   // idle bar steps back to overlay opacity (see styles.css). Detection is
   // main's — the page cannot see other apps' windows.
-  const gameUnder = useHudGameOverlay()
+  const gameUnder = useHudGameOverlay(port)
   const held = useHudHeld(gameUnder)
 
   // Clicking away to another APP is the most common way the HUD is let go of,
@@ -212,10 +222,15 @@ export function HudShell() {
     return () => window.removeEventListener('blur', holdBand)
   }, [holdBand])
 
-  // Main holds the session id on this window's behalf, so leaving HUD mode can
-  // hand the app window back whatever conversation ended up here.
-  useReportHudSession()
-  useHudGoto(useNavigate())
+  // The host holds the session id on this window's behalf, so leaving HUD mode
+  // can hand the app window back whatever conversation ended up here — plain
+  // multi-window coordination lives in application/session; the stream-attach
+  // policy stays behind the host adapter.
+  const navigate = useNavigate()
+  const openSessionById = useCallback((sessionId: string) => navigate(sessionRoute(sessionId)), [navigate])
+  useSurfaceRetarget(port.onRetarget, openSessionById)
+  const selectedStoredSessionId = useStore($selectedStoredSessionId)
+  useSurfaceSessionReport(port.reportSession, selectedStoredSessionId, isHudWindow())
 
   // Which screen EDGE the window is parked against. Parked tight to the top,
   // the composer flips to the window's top edge and the thread grows DOWN
@@ -285,20 +300,20 @@ export function HudShell() {
   // which is correct, and asking anything looser paints the slab back.
   const filled = useHudTranscriptBand(rootRef)
 
-  useHudGlass(rootRef, filled)
-  useHudClickThrough(rootRef)
+  useHudGlass(rootRef, filled, port)
+  useHudClickThrough(rootRef, port)
   useHudThreadFocus(rootRef)
 
   // Edge/corner resize frame. The window is created non-resizable so dragging can
   // never be misread as a resize gesture (the Windows transparent-frameless
   // growth bug); the handle is the one sanctioned way to change size, driving
   // the same flip-resizable-for-the-call pattern the pet overlay uses.
-  const { resizing: hudResizing, onPointerDown: onHudResizePointerDown } = useHudResizeHandle()
-  const hudWindowing = window.hermesDesktop?.hud?.windowing
-  const resizeDirections = hudResizeDirections(hudWindowing?.clientPlacement !== false)
+  const { resizing: hudResizing, onPointerDown: onHudResizePointerDown } = useHudResizeHandle(port)
+  const placement = port.placement
+  const resizeDirections = hudResizeDirections(placement?.clientPlacement !== false)
   // Linux X11 cannot ignore-mouse; a visible band that also ignores the
   // pointer just eats the click. The stylesheet keys off this.
-  const hudInput = hudWindowing?.solid ? 'solid' : 'click-through'
+  const hudInput = placement?.solid ? 'solid' : 'click-through'
 
   // Force the HOST layers transparent. index.html's pre-paint script writes an
   // opaque themed background onto <html> as an INLINE style (the anti-white-
@@ -343,7 +358,7 @@ export function HudShell() {
           it paints behind the transcript. */}
       <div aria-hidden data-hud-glass />
 
-      <WiredPane part="chatRoutes" />
+      {chatSurface}
 
       {/* CanvasTTY-style resize frame. Windows/macOS/X11 get every edge and
           corner; native Wayland gets the right/bottom handles it can honour

@@ -279,6 +279,22 @@ export const zh: Translations = {
     layoutEditorTitle: mod => `布局编辑器 — ${mod} 点击重置布局`
   },
 
+  windows: {
+    quickEntry: {
+      inputLabel: '快速输入',
+      placeholder: '输入问题…',
+      placeholderDisconnected: '未连接 — 打开应用以重新连接',
+      sendTo: '发送到',
+      targetCurrent: '当前对话',
+      targetLabel: '目标会话',
+      targetNew: '新会话'
+    },
+    pet: {
+      composerPlaceholder: '消息…',
+      openInApp: '打开应用'
+    }
+  },
+
   keybinds: {
     title: '键盘快捷键',
     subtitle: open => `点击快捷键即可重新绑定 · ${open} 可重新打开此面板。`,

@@ -1,5 +1,7 @@
 import { type PointerEvent as ReactPointerEvent, useCallback, useEffect, useRef, useState } from 'react'
 
+import type { HudWindowPort } from './port'
+
 /** Clamp to the same mins the window was created with (spawnHudWindow). */
 const HUD_MIN_WIDTH = 380
 const HUD_MIN_HEIGHT = 160
@@ -93,15 +95,15 @@ function releasePointer(state: ResizeState): void {
  * The window is created `resizable: false` (see spawnHudWindow — a transparent
  * frameless window must not expose a system resize hot-zone, or every drag
  * grows it), so resizing has to be programmatic: the handle reports absolute
- * screen bounds and main flips resizable on for the setBounds call. Same
- * pattern as the pet overlay's wheel-scale (`hermes:pet-overlay:set-bounds`).
+ * screen bounds and the host flips resizable on for the setBounds call. Same
+ * pattern as the pet overlay's wheel-scale (its set-bounds channel).
  *
  * Each handle preserves its opposite edge, matching ordinary desktop windows
  * and CanvasTTY cards. Deltas are read in SCREEN coordinates, like the composer
  * drag: client coordinates are relative to a window that is changing position
  * and size, so they cannot be trusted mid-resize.
  */
-export function useHudResizeHandle(): {
+export function useHudResizeHandle(port: HudWindowPort): {
   resizing: boolean
   onPointerDown: (event: ReactPointerEvent<HTMLElement>, direction: HudResizeDirection) => void
 } {
@@ -155,7 +157,7 @@ export function useHudResizeHandle(): {
       const dx = event.screenX - state.startX
       const dy = event.screenY - state.startY
 
-      window.hermesDesktop?.hud?.setBounds?.(
+      port.setBounds(
         hudResizeBounds(
           { x: state.originX, y: state.originY, width: state.originW, height: state.originH },
           state.direction,
@@ -184,7 +186,7 @@ export function useHudResizeHandle(): {
       window.removeEventListener('pointerup', onUp, true)
       window.removeEventListener('pointercancel', onUp, true)
     }
-  }, [reset])
+  }, [port, reset])
 
   // A resize interrupted by an unmount must not leave the state dangling.
   useEffect(() => reset, [reset])

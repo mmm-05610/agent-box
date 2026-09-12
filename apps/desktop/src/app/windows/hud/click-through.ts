@@ -1,5 +1,7 @@
 import { type RefObject, useEffect } from 'react'
 
+import type { HudWindowPort } from './port'
+
 /**
  * Whether the OS window should hand the mouse to whatever is behind it.
  *
@@ -63,9 +65,9 @@ export function hudIgnoresMouse(
  * interactive: wherever the cursor is over something the HUD paints, and
  * whenever a portalled overlay holds focus. `forward: true` keeps mousemove
  * flowing while ignoring, which is what lets it re-arm when the cursor comes
- * back to the bar. That option is macOS/Windows only, so on Linux main polls
- * the cursor and pushes it in through `onCursor` — the same point, the same
- * decision, a different courier.
+ * back to the bar. That option is macOS/Windows only, so on Linux the host
+ * polls the cursor and pushes it in through `onCursor` — the same point, the
+ * same decision, a different courier.
  *
  * It follows that nothing in HUD mode may declare `-webkit-app-region: drag`
  * on macOS/Windows: a draggable region swallows the page's mouse events, so
@@ -73,20 +75,21 @@ export function hudIgnoresMouse(
  * decided — usually transparent, which is also why pressing the handle fell
  * through to the app behind. Dragging there is `useHudComposerDrag` instead.
  *
- * Linux is the exception: the solidity decision is fed from MAIN's cursor
+ * Linux is the exception: the solidity decision is fed from the HOST's cursor
  * poll (`startHudCursorFeed`), which a drag region cannot starve — so the
  * HUD composer root declares `-webkit-app-region: drag` (input carved out
  * as no-drag) and the compositor moves the window natively. That is also
  * the only move that works on Wayland, where `setBounds` position is a no-op.
  */
-export function useHudClickThrough(rootRef: RefObject<HTMLElement | null>): void {
+export function useHudClickThrough(rootRef: RefObject<HTMLElement | null>, port: HudWindowPort): void {
   useEffect(() => {
     const root = rootRef.current
-    const setIgnoreMouse = window.hermesDesktop?.hud?.setIgnoreMouse
 
-    if (!root || !setIgnoreMouse) {
+    if (!root) {
       return
     }
+
+    const setIgnoreMouse = (next: boolean) => port.setIgnoreMouse(next)
 
     let ignoring: boolean | null = null
     // Where the cursor was last seen, so a focus change can re-decide without
@@ -121,7 +124,7 @@ export function useHudClickThrough(rootRef: RefObject<HTMLElement | null>): void
     // test; only where the point came from differs, and on macOS and Windows
     // this never fires. `null` is the cursor leaving the window, which is the
     // `onLost` answer.
-    const offCursor = window.hermesDesktop?.hud?.onCursor?.(next => {
+    const offCursor = port.onCursor(next => {
       point = next
       apply()
     })
@@ -147,7 +150,7 @@ export function useHudClickThrough(rootRef: RefObject<HTMLElement | null>): void
 
     return () => {
       setIgnoreMouse(false)
-      offCursor?.()
+      offCursor()
       window.removeEventListener('mousemove', onMove)
       window.removeEventListener('blur', onLost)
       window.removeEventListener('focus', apply)
@@ -155,5 +158,5 @@ export function useHudClickThrough(rootRef: RefObject<HTMLElement | null>): void
       document.removeEventListener('focusin', apply)
       document.removeEventListener('focusout', apply)
     }
-  }, [rootRef])
+  }, [port, rootRef])
 }

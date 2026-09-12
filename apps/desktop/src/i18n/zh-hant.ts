@@ -275,6 +275,22 @@ export const zhHant = defineLocale({
     resetHudLayout: '重設 HUD 大小和位置'
   },
 
+  windows: {
+    quickEntry: {
+      inputLabel: '快速輸入',
+      placeholder: '輸入問題…',
+      placeholderDisconnected: '未連線 — 開啟應用程式以重新連線',
+      sendTo: '傳送到',
+      targetCurrent: '目前對話',
+      targetLabel: '目標工作階段',
+      targetNew: '新工作階段'
+    },
+    pet: {
+      composerPlaceholder: '訊息…',
+      openInApp: '開啟應用程式'
+    }
+  },
+
   language: {
     label: '語言',
     description: '選擇桌面介面的語言。',

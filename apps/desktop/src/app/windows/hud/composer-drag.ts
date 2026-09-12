@@ -2,6 +2,8 @@ import { type PointerEvent as ReactPointerEvent, useCallback, useEffect, useRef,
 
 import { triggerHaptic } from '@/lib/haptics'
 
+import type { HudWindowPort } from './port'
+
 /** Hold anywhere on the HUD composer before the bar becomes draggable. Short
  *  enough to feel like grabbing it, long enough that a click still clicks. */
 const LONG_PRESS_MS = 140
@@ -27,6 +29,8 @@ interface HudComposerDragOptions {
   /** X11/KWin only: keep the grabbed window visible while the user changes
    *  virtual desktops, then pin it to the destination desktop on release. */
   workspaceTransfer?: boolean
+  /** The neutral window-host port: the move bracket + workspace-transfer calls. */
+  port: HudWindowPort
 }
 
 function capturePointer(state: PressState): void {
@@ -49,26 +53,26 @@ function releasePointer(state: PressState): void {
   }
 }
 
-function setWorkspaceTransfer(transferring: boolean): void {
-  window.hermesDesktop?.hud?.setWorkspaceTransfer?.(transferring)
+function setWorkspaceTransfer(port: HudWindowPort, transferring: boolean): void {
+  port.setWorkspaceTransfer?.(transferring)
 }
 
-function moveHud(state: PressState): void {
-  window.hermesDesktop?.hud?.moveBy?.({
+function moveHud(port: HudWindowPort, state: PressState): void {
+  port.moveBy({
     width: state.originW,
     height: state.originH
   })
 }
 
-function armGrab(state: PressState, workspaceTransfer: boolean): void {
+function armGrab(port: HudWindowPort, state: PressState, workspaceTransfer: boolean): void {
   state.armed = true
   state.workspaceTransfer = workspaceTransfer
 
   if (workspaceTransfer) {
-    setWorkspaceTransfer(true)
+    setWorkspaceTransfer(port, true)
   }
 
-  window.hermesDesktop?.hud?.beginMove?.()
+  port.beginMove()
 }
 
 /**
@@ -85,18 +89,18 @@ function armGrab(state: PressState, workspaceTransfer: boolean): void {
  * this renderer path and additionally supports an immediate Ctrl-drag.
  *
  * The renderer only owns hold detection and the size snapshot. Once armed,
- * main samples the native cursor and parks the window at cursor minus grab
+ * the host samples the native cursor and parks the window at cursor minus grab
  * offset (see hud-drag.ts). Client coordinates are relative to the window we
  * are moving, so a window that keeps up reports the same clientX every frame.
  *
- * The size is snapshotted at press and sent with every move, so main can pin it
- * (see hermes:hud:move-by — a transparent frameless window drifts wider on
- * Windows otherwise). Crossing a display can fire pointercancel; that must
- * not end the grab, or the bar sticks on the first monitor.
+ * The size is snapshotted at press and sent with every move, so the host can
+ * pin it (see the HUD move-by channel — a transparent frameless window drifts
+ * wider on Windows otherwise). Crossing a display can fire pointercancel; that
+ * must not end the grab, or the bar sticks on the first monitor.
  */
 export function useHudComposerDrag(
   enabled: boolean,
-  { controlDrag = false, workspaceTransfer = false }: HudComposerDragOptions = {}
+  { controlDrag = false, port, workspaceTransfer = false }: HudComposerDragOptions
 ) {
   const [grabbing, setGrabbing] = useState(false)
   const stateRef = useRef<PressState | null>(null)
@@ -112,11 +116,11 @@ export function useHudComposerDrag(
 
     if (state) {
       if (state.armed) {
-        window.hermesDesktop?.hud?.endMove?.()
+        port.endMove()
       }
 
       if (state.workspaceTransfer) {
-        setWorkspaceTransfer(false)
+        setWorkspaceTransfer(port, false)
       }
 
       releasePointer(state)
@@ -124,7 +128,7 @@ export function useHudComposerDrag(
 
     stateRef.current = null
     setGrabbing(false)
-  }, [])
+  }, [port])
 
   const onPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLElement>) => {
@@ -162,7 +166,7 @@ export function useHudComposerDrag(
       }
 
       if (immediate) {
-        armGrab(state, workspaceTransfer)
+        armGrab(port, state, workspaceTransfer)
         setGrabbing(true)
         triggerHaptic('selection')
         capturePointer(state)
@@ -177,7 +181,7 @@ export function useHudComposerDrag(
           return
         }
 
-        armGrab(state, workspaceTransfer)
+        armGrab(port, state, workspaceTransfer)
         setGrabbing(true)
         triggerHaptic('selection')
 
@@ -190,7 +194,7 @@ export function useHudComposerDrag(
         }
       }, LONG_PRESS_MS)
     },
-    [controlDrag, enabled, workspaceTransfer]
+    [controlDrag, enabled, port, workspaceTransfer]
   )
 
   useEffect(() => {
@@ -217,7 +221,7 @@ export function useHudComposerDrag(
       }
 
       event.preventDefault()
-      moveHud(state)
+      moveHud(port, state)
     }
 
     const onUp = (event: PointerEvent | MouseEvent) => {
@@ -254,7 +258,7 @@ export function useHudComposerDrag(
       }
 
       event.preventDefault()
-      moveHud(state)
+      moveHud(port, state)
       capturePointer(state)
     }
 
@@ -282,7 +286,7 @@ export function useHudComposerDrag(
       window.removeEventListener('dragstart', preventEditorGesture, true)
       window.removeEventListener('selectstart', preventEditorGesture, true)
     }
-  }, [enabled, reset])
+  }, [enabled, port, reset])
 
   useEffect(() => reset, [reset])
 

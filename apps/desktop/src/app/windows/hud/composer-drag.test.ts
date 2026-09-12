@@ -3,17 +3,23 @@ import { createElement } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useHudComposerDrag } from './composer-drag'
+import type { HudWindowPort } from './port'
 
 /** Matches LONG_PRESS_MS in composer-drag.ts. */
 const LONG_PRESS_MS = 140
-
-const desktopWindow = window as unknown as { hermesDesktop?: Window['hermesDesktop'] }
-const initialHermesDesktop = desktopWindow.hermesDesktop
 
 const beginMove = vi.fn()
 const endMove = vi.fn()
 const moveBy = vi.fn()
 const setWorkspaceTransfer = vi.fn()
+
+/** The window-host port as a test double: the four calls the drag gesture makes. */
+const hudPort = {
+  beginMove,
+  endMove,
+  moveBy,
+  setWorkspaceTransfer
+} as unknown as HudWindowPort
 
 function setWindowSize(width: number, height: number) {
   Object.defineProperty(window, 'outerWidth', { configurable: true, value: width })
@@ -38,26 +44,17 @@ beforeEach(() => {
   moveBy.mockClear()
   setWorkspaceTransfer.mockClear()
   setWindowSize(620, 320)
-  desktopWindow.hermesDesktop = {
-    hud: { beginMove, endMove, moveBy, setWorkspaceTransfer }
-  } as unknown as Window['hermesDesktop']
 })
 
 afterEach(() => {
   vi.useRealTimers()
   document.body.innerHTML = ''
-
-  if (initialHermesDesktop) {
-    desktopWindow.hermesDesktop = initialHermesDesktop
-  } else {
-    delete desktopWindow.hermesDesktop
-  }
 })
 
 describe('useHudComposerDrag', () => {
-  it('sends every move with the size snapshotted at press, so main can pin it', () => {
+  it('sends every move with the size snapshotted at press, so the host can pin it', () => {
     const target = pressTarget()
-    const { result } = renderHook(() => useHudComposerDrag(true))
+    const { result } = renderHook(() => useHudComposerDrag(true, { port: hudPort }))
 
     act(() =>
       result.current.onPointerDown({
@@ -89,7 +86,7 @@ describe('useHudComposerDrag', () => {
 
   it('does not move the window until the hold arms', () => {
     const target = pressTarget()
-    const { result } = renderHook(() => useHudComposerDrag(true))
+    const { result } = renderHook(() => useHudComposerDrag(true, { port: hudPort }))
 
     act(() =>
       result.current.onPointerDown({
@@ -110,7 +107,7 @@ describe('useHudComposerDrag', () => {
   it('spans X11 workspaces only for an armed grab, then pins to the current desktop on release', () => {
     const target = pressTarget()
 
-    const { result } = renderHook(() => useHudComposerDrag(true, { controlDrag: true, workspaceTransfer: true }))
+    const { result } = renderHook(() => useHudComposerDrag(true, { controlDrag: true, port: hudPort, workspaceTransfer: true }))
 
     act(() =>
       result.current.onPointerDown({
@@ -135,7 +132,7 @@ describe('useHudComposerDrag', () => {
 
   it('moves immediately with Ctrl over selected text without destroying the selection', () => {
     function Harness() {
-      const { onPointerDown } = useHudComposerDrag(true, { controlDrag: true })
+      const { onPointerDown } = useHudComposerDrag(true, { controlDrag: true, port: hudPort })
 
       return createElement(
         'form',
@@ -198,7 +195,7 @@ describe('useHudComposerDrag', () => {
 
   it('keeps the grab alive when crossing a display cancels the pointer', () => {
     const target = pressTarget()
-    const { result } = renderHook(() => useHudComposerDrag(true))
+    const { result } = renderHook(() => useHudComposerDrag(true, { port: hudPort }))
 
     act(() =>
       result.current.onPointerDown({

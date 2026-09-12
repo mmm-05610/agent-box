@@ -3,8 +3,12 @@ import { useRef } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { useHudGlass } from './glass'
+import type { HudWindowPort } from './port'
 
 const setFrost = vi.fn()
+
+/** The window-host port as a test double: the frost mechanic only sets frost. */
+const hudPort = { setFrost } as unknown as HudWindowPort
 
 /** The HUD's real shape as far as the frost is concerned: the shell, the
  *  composer input that owns the caret, and — when it is open — the completion
@@ -12,7 +16,7 @@ const setFrost = vi.fn()
 function Harness({ backing, drawer }: { backing: boolean; drawer?: boolean }) {
   const ref = useRef<HTMLDivElement | null>(null)
 
-  useHudGlass(ref, backing)
+  useHudGlass(ref, backing, hudPort)
 
   return (
     <div data-hud-shell ref={ref}>
@@ -29,8 +33,6 @@ const nextFrame = () => act(() => new Promise(resolve => requestAnimationFrame((
 afterEach(() => {
   setFrost.mockClear()
 })
-
-Object.assign(window, { hermesDesktop: { hud: { setFrost } } })
 
 describe('useHudGlass', () => {
   // The bug this replaced: the caller widened the gate to "recent or held", so

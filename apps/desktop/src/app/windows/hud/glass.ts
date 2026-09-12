@@ -1,5 +1,7 @@
 import { type RefObject, useEffect } from 'react'
 
+import type { HudWindowPort } from './port'
+
 /** The caret is in the composer — see the `:has()` rules in styles.css. */
 const TYPING_SELECTOR = '[data-slot="composer-rich-input"]:focus'
 
@@ -57,17 +59,18 @@ const DRAWER_SELECTOR = '[data-slot="composer-completion-drawer"]'
  *   prop would need every one of them to remember.
  *
  * Whether the frost is wanted AT ALL is the user's translucency setting, and
- * that answer lives in main (`hudFrostFor`) next to the state it reads. This
+ * that answer lives in the host (`hudFrostFor`) next to the state it reads. This
  * hook reports what the band is doing; it does not decide the material.
  */
-export function useHudGlass(rootRef: RefObject<HTMLElement | null>, backing: boolean): void {
+export function useHudGlass(rootRef: RefObject<HTMLElement | null>, backing: boolean, port: HudWindowPort): void {
   useEffect(() => {
     const root = rootRef.current
-    const setFrost = window.hermesDesktop?.hud?.setFrost
 
-    if (!root || !setFrost) {
+    if (!root) {
       return
     }
+
+    const setFrost = (showing: boolean) => port.setFrost(showing)
 
     let on: boolean | null = null
 
@@ -124,5 +127,5 @@ export function useHudGlass(rootRef: RefObject<HTMLElement | null>, backing: boo
       window.removeEventListener('blur', schedule)
       window.removeEventListener('focus', schedule)
     }
-  }, [backing, rootRef])
+  }, [backing, port, rootRef])
 }

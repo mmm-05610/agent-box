@@ -3,7 +3,24 @@ import { act, cleanup, render } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('@/app/composition/wiring/features', () => ({ WiredPane: () => null }))
+import { HudShell } from './hud-shell'
+import type { HudWindowPort } from './port'
+
+/** The window-host port as a test double: the shell's edge poll touches no
+ *  OS-window state, so every call is an inert stub. */
+const hudPort = {
+  beginMove: () => undefined,
+  endMove: () => undefined,
+  moveBy: () => undefined,
+  onCursor: () => () => undefined,
+  onGameOverlay: () => () => undefined,
+  onRetarget: () => () => undefined,
+  placement: { clientPlacement: true, controlDrag: false, nativeDrag: false, solid: true, workspaceTransfer: false },
+  reportSession: () => undefined,
+  setBounds: () => undefined,
+  setFrost: () => undefined,
+  setIgnoreMouse: () => undefined
+} satisfies HudWindowPort
 
 class ResizeObserverStub {
   observe() {}
@@ -11,8 +28,6 @@ class ResizeObserverStub {
   disconnect() {}
 }
 Object.assign(globalThis, { ResizeObserver: ResizeObserverStub })
-
-import { HudShell } from './hud-shell'
 
 const EDGE_POLL_MS = 300
 
@@ -66,7 +81,7 @@ describe('HudShell edge poll', () => {
 
     render(
       <MemoryRouter>
-        <HudShell />
+        <HudShell chatSurface={null} port={hudPort} />
       </MemoryRouter>
     )
     await act(async () => {
@@ -84,7 +99,7 @@ describe('HudShell edge poll', () => {
 
     render(
       <MemoryRouter>
-        <HudShell />
+        <HudShell chatSurface={null} port={hudPort} />
       </MemoryRouter>
     )
     await act(async () => {
