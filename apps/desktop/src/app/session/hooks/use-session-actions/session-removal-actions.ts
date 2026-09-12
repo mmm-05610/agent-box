@@ -27,7 +27,7 @@ import { sessionRoute } from '../../../routes'
 
 import { type FreshSessionDraftStarter } from './fresh-draft'
 import { type SessionActionsOptions } from './session-actions-options'
-import { applyStoredUsage } from './usage-mirror'
+import { applyStoredUsage } from '@/application/session/usage-mirror'
 import {
   dropListedSession,
   findListedSession,

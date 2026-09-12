@@ -28,7 +28,7 @@ import { SessionStateCache } from '../session-state-cache'
 import {
   invalidatePersistedDisplayTranscriptAuthority,
   suppressTranscriptForView
-} from './use-session-actions/transcript-provenance'
+} from '@/application/session/transcript-provenance'
 import { chatMessageArraysEquivalent } from './use-session-actions/utils'
 
 interface SessionStateCacheOptions {

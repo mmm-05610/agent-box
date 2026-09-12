@@ -1,9 +1,9 @@
 // Responsibilities live in the sibling modules below; this file stays the
 // stable import path (and unchanged public surface) for every caller.
 
-export { type BranchMessage, selectBranchMessages, toBranchMessages } from './branch-messages'
+export { type BranchMessage, selectBranchMessages, toBranchMessages } from '@/application/session/branch-messages'
 
-export { goneSessionVerdict, isSessionGoneError } from './gone-session-verdict'
+export { goneSessionVerdict, isSessionGoneError } from '@/application/session/gone-session-verdict'
 export {
   appendLiveSessionProjection,
   dedupeInflightUserAgainstTranscript,
@@ -17,14 +17,14 @@ export {
   chatReactionsEquivalent,
   isStrictAnswerTextExtension,
   preserveEquivalentTranscript
-} from './message-equivalence'
-export { patchSessionWorkspace, upsertOptimisticSession } from './optimistic-session-rows'
+} from '@/application/session/message-equivalence'
+export { patchSessionWorkspace, upsertOptimisticSession } from '@/application/session/optimistic-session-rows'
 export {
   preserveLocalPendingTurnMessages,
   reconcileResumeMessages,
   resolveResumedBusy
 } from './resume-reconciliation'
-export { applyRuntimeInfo, applyStoredSessionPreviewRuntimeInfo } from './runtime-info-mirror'
+export { applyRuntimeInfo, applyStoredSessionPreviewRuntimeInfo } from '@/application/session/runtime-info-mirror'
 export {
   cachedSessionRow,
   dropListedSession,

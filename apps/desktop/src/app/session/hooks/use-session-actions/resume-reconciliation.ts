@@ -7,7 +7,7 @@ import {
   isLiveTailRow,
   isStrictAnswerTextExtension,
   preserveStructuralParts
-} from './message-equivalence'
+} from '@/application/session/message-equivalence'
 
 /** Reconcile an authoritative resume/activate transcript against the local
  *  pending-turn tail without dropping in-flight work. */

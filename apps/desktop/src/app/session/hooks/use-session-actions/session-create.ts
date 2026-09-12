@@ -44,7 +44,7 @@ import type { SessionCreateResponse } from '@/types/hermes'
 import { sessionRoute } from '../../../routes'
 import { sessionContextDrift } from '../session-context-drift'
 
-import { markSessionCreatedThisRun } from './created-this-run'
+import { markSessionCreatedThisRun } from '@/application/session/created-this-run'
 import { type SessionActionsOptions } from './session-actions-options'
 import { applyRuntimeInfo, upsertOptimisticSession } from './utils'
 

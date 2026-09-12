@@ -1,4 +1,4 @@
-import { pendingClarifyToolPayload } from '@/app/session/hooks/use-session-actions/restore-pending-clarify'
+import { pendingClarifyToolPayload } from '@/application/session/restore-pending-clarify'
 import { translateNow } from '@/i18n'
 import { restorePendingClarifyToolCall, settlePendingClarifyToolCall } from '@/lib/chat-messages'
 import {

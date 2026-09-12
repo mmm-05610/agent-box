@@ -3,7 +3,7 @@ import { assistantTextPart, type ChatMessage, chatMessageText, textPart } from '
 import { parseErrorSurface } from '@/lib/error-surface'
 import type { SessionResumeResponse } from '@/types/hermes'
 
-import { chatMessagesEquivalent, hasStructuralParts, isLiveTailRow } from './message-equivalence'
+import { chatMessagesEquivalent, hasStructuralParts, isLiveTailRow } from '@/application/session/message-equivalence'
 
 /** Merge the gateway's live inflight/queued projection into a stored transcript. */
 /**
