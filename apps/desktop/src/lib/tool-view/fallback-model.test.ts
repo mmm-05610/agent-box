@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { setRuntimeI18nLocale } from '@/i18n'
-
 import {
   buildToolView,
   clampForDisplay,
@@ -10,7 +9,7 @@ import {
   MAX_TOOL_RENDER_CHARS,
   prettyJson,
   type ToolPart
-} from './fallback-model'
+} from '@/lib/tool-view'
 
 const part = (overrides: Partial<ToolPart>): ToolPart => ({
   args: {},

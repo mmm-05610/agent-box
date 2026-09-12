@@ -12,6 +12,7 @@ import { GlyphSpinner } from '@/components/ui/glyph-spinner'
 import { useI18n } from '@/i18n'
 import { AlertCircle, CheckCircle2 } from '@/lib/icons'
 import { displayModelName } from '@/lib/model-status-label'
+import { formatDurationSeconds, type ToolPart } from '@/lib/tool-view'
 import { useSessionSlice } from '@/lib/use-session-slice'
 import { cn } from '@/lib/utils'
 import { $subagentsBySession } from '@/store/subagents'
@@ -24,7 +25,6 @@ import {
   isDelegateRowLive,
   mergeDelegateRows
 } from './delegate-model'
-import { formatDurationSeconds, type ToolPart } from './fallback-model'
 import { ToolRunTicker } from './run-ticker'
 
 // Activity lines kept mounted behind the visible one. Enough for the reel to

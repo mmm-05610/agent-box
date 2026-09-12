@@ -21,14 +21,13 @@ import { AlertCircle, CheckCircle2, Loader2 } from '@/lib/icons'
 import { brandFor, brandGlyphStyle } from '@/lib/mcp-brands'
 import { directoryEntry } from '@/lib/mcp-directory'
 import { prettyName } from '@/lib/text'
+import { selectMessageRunning } from '@/lib/tool-view'
+import { parseMaybeObject } from '@/lib/tool-view/format'
 import { cn } from '@/lib/utils'
 import { $gateway } from '@/store/gateway'
 import { clearMcpSetupRequest, type McpSetupOutcome, sessionMcpSetupRequest } from '@/store/mcp-setup'
 import { notifyError } from '@/store/notifications'
 import { type McpCatalogEntry } from '@/types/hermes'
-
-import { selectMessageRunning } from './tool/fallback-model'
-import { parseMaybeObject } from './tool/fallback-model/format'
 
 type SetupAction = 'authorize' | 'enable' | 'install'
 

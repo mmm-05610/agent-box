@@ -8,7 +8,7 @@ import {
   inlineDiffFromResult,
   isFileEditTool,
   parseMaybeObject
-} from '@/components/assistant-ui/tool/fallback-model'
+} from '@/lib/tool-view'
 
 export interface ChangedFile {
   added: number

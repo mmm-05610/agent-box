@@ -26,6 +26,8 @@ import { Tip } from '@/components/ui/tooltip'
 import { useI18n } from '@/i18n'
 import { triggerHaptic } from '@/lib/haptics'
 import { CircleLetterA, Loader2, MessageQuestion } from '@/lib/icons'
+import { selectMessageRunning } from '@/lib/tool-view'
+import { parseMaybeObject } from '@/lib/tool-view/format'
 import { cn } from '@/lib/utils'
 import {
   bareChoice,
@@ -41,8 +43,6 @@ import { $gateway } from '@/store/gateway'
 import { notifyError } from '@/store/notifications'
 
 import { handleClarifySubmitShortcut } from './clarify-submit-shortcut'
-import { selectMessageRunning } from './tool/fallback-model'
-import { parseMaybeObject } from './tool/fallback-model/format'
 
 interface ClarifyArgs {
   question?: string
