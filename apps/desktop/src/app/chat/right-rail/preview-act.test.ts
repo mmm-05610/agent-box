@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { registerPreviewInput } from '@/application/preview/preview-input'
+import { registerPreviewNav } from '@/application/preview/preview-nav'
+import { registerPreviewScriptRunner } from '@/application/preview/preview-script-runner'
 import { $rightRailActiveTabId } from '@/store/layout'
 import { closeRightRail, openPreview, type PreviewTarget } from '@/store/preview'
 
 import { actOnActivePreview } from './preview-act'
-import { registerPreviewInput } from '@/application/preview/preview-input'
-import { registerPreviewNav } from './preview-nav'
-import { registerPreviewScriptRunner } from './preview-script-runner'
 
 function urlTarget(url: string): PreviewTarget {
   return { kind: 'url', label: 'Browser', source: url, url }

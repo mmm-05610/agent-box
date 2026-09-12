@@ -12,6 +12,7 @@
 
 import { useStore } from '@nanostores/react'
 
+import { forgetPreviewConsole } from '@/application/preview/preview-console-store'
 import { type MenuKit, renderActionItem } from '@/components/ui/actions-menu'
 import { FileTypeIcon } from '@/components/ui/file-type-icon'
 import { ToolIcon } from '@/components/ui/tool-icon'
@@ -37,7 +38,6 @@ import { canOpenBrowserWindow } from '@/store/windows'
 
 import { paneMirror } from './pane-mirror'
 import { PreviewTilePane } from './right-rail/preview'
-import { forgetPreviewConsole } from './right-rail/preview-console-store'
 
 /** The target behind a tile id, or null once its tab is gone. */
 function targetFor(tabId: string): PreviewTarget | null {
