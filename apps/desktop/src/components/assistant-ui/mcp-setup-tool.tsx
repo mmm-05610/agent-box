@@ -5,6 +5,8 @@ import { useStore } from '@nanostores/react'
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { capabilityScoped } from '@/api/client'
+import { addMcpServer, getMcpCatalog, installMcpCatalogEntry, removeMcpServer, setMcpServerEnabled } from '@/api/mcp'
+import { getActionStatus } from '@/api/system'
 import { completeMcpDesktopOAuth, McpOAuthCancelled } from '@/application/mcp-oauth'
 import { ToolFallback } from '@/components/assistant-ui/tool/fallback'
 import { useSessionView } from '@/components/chat/session-view'
@@ -13,15 +15,6 @@ import { invalidateMcpSuggestionIndex } from '@/components/composer/suggestion-p
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
 import { Input } from '@/components/ui/input'
-import {
-  addMcpServer,
-  getActionStatus,
-  getMcpCatalog,
-  installMcpCatalogEntry,
-  type McpCatalogEntry,
-  removeMcpServer,
-  setMcpServerEnabled
-} from '@/hermes'
 import { useI18n } from '@/i18n'
 import { triggerHaptic } from '@/lib/haptics'
 import { AlertCircle, CheckCircle2, Loader2 } from '@/lib/icons'
@@ -32,6 +25,7 @@ import { cn } from '@/lib/utils'
 import { $gateway } from '@/store/gateway'
 import { clearMcpSetupRequest, type McpSetupOutcome, sessionMcpSetupRequest } from '@/store/mcp-setup'
 import { notifyError } from '@/store/notifications'
+import { type McpCatalogEntry } from '@/types/hermes'
 
 import { selectMessageRunning } from './tool/fallback-model'
 import { parseMaybeObject } from './tool/fallback-model/format'

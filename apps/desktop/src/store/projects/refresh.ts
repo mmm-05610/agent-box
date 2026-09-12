@@ -1,4 +1,4 @@
-import { hermesApi } from '@/hermes'
+import { hermesApi } from '@/api/client'
 import { translateNow } from '@/i18n'
 import { activeGateway } from '@/store/gateway'
 import { $sidebarShowAllSessions } from '@/store/layout'

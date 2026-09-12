@@ -1,6 +1,6 @@
 import { LOCAL_CONNECTION_ID, registryBackendScopeKey, resolveGatewayWsUrl } from '@hermes/shared'
 
-import { HermesGateway } from '@/hermes'
+import { HermesGateway } from '@/api/client'
 import { reconnectBackoffDelayMs } from '@/lib/reconnect-backoff'
 import { RECONNECT_ATTEMPT_TIMEOUT_MS, withTimeout } from '@/lib/with-timeout'
 import { stampSecondaryProfileOwner } from '@/store/session-event-provenance'

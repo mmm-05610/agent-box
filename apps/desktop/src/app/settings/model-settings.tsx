@@ -1,22 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
+import { saveHermesConfig, setEnvVar } from '@/api/config'
+import { getAuxiliaryModels, getGlobalModelInfo, getGlobalModelOptions, getMoaModels, getRecommendedDefaultModel, saveMoaModels, setModelAssignment } from '@/api/models'
 import { useOnProfileSwitch } from '@/components/hooks/use-on-profile-switch'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
-import {
-  getAuxiliaryModels,
-  getGlobalModelInfo,
-  getGlobalModelOptions,
-  getMoaModels,
-  getRecommendedDefaultModel,
-  saveHermesConfig,
-  saveMoaModels,
-  setEnvVar,
-  setModelAssignment
-} from '@/hermes'
 import { useI18n } from '@/i18n'
 import { isCodeSkewRestartRequired } from '@/lib/code-skew-error'
 import { AlertTriangle, Cpu, Loader2 } from '@/lib/icons'

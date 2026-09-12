@@ -1,4 +1,5 @@
-import { getApiRequestProfile, setModelAssignment } from '@/hermes'
+import { getApiRequestProfile } from '@/api/client'
+import { setModelAssignment } from '@/api/models'
 import { translateNow } from '@/i18n'
 import { requestCronReview } from '@/store/cron'
 import {

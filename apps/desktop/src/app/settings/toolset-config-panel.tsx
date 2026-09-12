@@ -1,23 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 
+import { type ProfileScope } from '@/api/client'
+import { deleteEnvVar, pollOAuthSession, revealEnvVar, setEnvVar, startOAuthLogin } from '@/api/config'
+import { getActionStatus } from '@/api/system'
+import { getToolsetConfig, getToolsetModels, runToolsetPostSetup, selectToolsetModel, selectToolsetProvider } from '@/api/toolsets'
 import { SETTINGS_ROUTE } from '@/app/routes'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import {
-  deleteEnvVar,
-  getActionStatus,
-  getToolsetConfig,
-  getToolsetModels,
-  pollOAuthSession,
-  type ProfileScope,
-  revealEnvVar,
-  runToolsetPostSetup,
-  selectToolsetModel,
-  selectToolsetProvider,
-  setEnvVar,
-  startOAuthLogin
-} from '@/hermes'
 import { useI18n } from '@/i18n'
 import { Check, Loader2, Save, Terminal } from '@/lib/icons'
 import { cn } from '@/lib/utils'

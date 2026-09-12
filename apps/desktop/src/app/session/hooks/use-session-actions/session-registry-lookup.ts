@@ -1,5 +1,5 @@
+import { getSession } from '@/api/sessions'
 import { sessionOwnerRouteFromRow } from '@/application/session/request-router'
-import { getSession } from '@/hermes'
 import { isMessagingSource, normalizeSessionSource } from '@/lib/session-source'
 import { $activeGatewayProfile, $profiles, normalizeProfileKey } from '@/store/profile'
 import { $projectTree } from '@/store/projects'

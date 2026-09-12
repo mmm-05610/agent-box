@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 
 import { listAllProfileSessions, listSidebarSessions } from '@/application/session-lists'
-import { type SessionInfo } from '@/hermes'
 import { sameCronSignature } from '@/lib/session-signatures'
 import {
   isMessagingSource,
@@ -40,6 +39,7 @@ import {
 } from '@/store/session'
 import { $removedSessionIds } from '@/store/session-removal'
 import { $sessionTiles, $workingSessionIds, getRecentlySettledSessionIds } from '@/store/session-states'
+import { type SessionInfo } from '@/types/hermes'
 
 import { refreshCronJobs as refreshCronJobsStore } from '../../cron/cron-actions'
 

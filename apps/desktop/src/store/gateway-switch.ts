@@ -1,7 +1,7 @@
 import { atom } from 'nanostores'
 
+import { resetSidebarBatchCapability } from '@/api/sessions'
 import { invalidateProfileListFetches } from '@/application/profile/catalog'
-import { resetSidebarBatchCapability } from '@/hermes'
 import { invalidateProfileScopedQueries } from '@/lib/query-client'
 import { clearArtifactRegistry } from '@/store/artifacts'
 import { invalidateCronJobsRequests, setCronJobs } from '@/store/cron'

@@ -6,6 +6,7 @@ import { useStore } from '@nanostores/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'react-router'
 
+import { searchSessions } from '@/api/sessions'
 import { PlatformAvatar } from '@/app/messaging/platform-icon'
 import { markSessionUnread } from '@/application/session-read-state'
 import { Button } from '@/components/ui/button'
@@ -18,7 +19,6 @@ import {
 } from '@/components/ui/sidebar'
 import { Tip } from '@/components/ui/tooltip'
 import { useContributions } from '@/extension/contrib/react/use-contributions'
-import { searchSessions, type SessionInfo, type SessionSearchResult } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { comboTokens } from '@/lib/keybinds/combo'
 import { sessionMatchesSearch } from '@/lib/session-search'
@@ -116,6 +116,7 @@ import { $focusedSessionIsTile, $focusedStoredSessionId, $workingSessionIds } fr
 import { ackAllSessionsRead } from '@/store/session-unread'
 import { $archivedSessions, loadArchivedSessions } from '@/store/sidebar-archive'
 import { $sidebarSessionRankIds } from '@/store/sidebar-sort'
+import { type SessionInfo, type SessionSearchResult } from '@/types/hermes'
 import type { SidebarNavItem } from '@/types/sidebar'
 
 import {

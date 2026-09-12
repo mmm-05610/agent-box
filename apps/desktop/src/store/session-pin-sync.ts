@@ -23,7 +23,7 @@
 
 import { atom } from 'nanostores'
 
-import { setSessionPinnedRemote } from '@/hermes'
+import { setSessionPinnedRemote } from '@/api/sessions'
 import { onConnectionScopeChange } from '@/lib/connection-scoped'
 import { normalizeProfileKey } from '@/lib/profile-identity'
 import { $pinnedSessionIds, pinSession, unpinSession } from '@/store/layout'

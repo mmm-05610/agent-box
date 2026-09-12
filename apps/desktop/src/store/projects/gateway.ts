@@ -1,4 +1,4 @@
-import { type HermesGateway } from '@/hermes'
+import { type HermesGateway } from '@/api/client'
 import { normalizeProfileKey } from '@/lib/profile-identity'
 import { activeGateway, ensureActiveGatewayOpen } from '@/store/gateway'
 import { $activeGatewayProfile } from '@/store/profile/runtime-route-state'

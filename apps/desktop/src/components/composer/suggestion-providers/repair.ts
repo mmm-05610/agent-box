@@ -1,5 +1,5 @@
+import { listMcpServers } from '@/api/mcp'
 import { completeMcpDesktopOAuth, McpOAuthCancelled } from '@/application/mcp-oauth'
-import { listMcpServers } from '@/hermes'
 import { translateNow } from '@/i18n'
 import { prettyName } from '@/lib/text'
 import { type ComposerSuggestion, offerSuggestions } from '@/store/composer-suggestions'

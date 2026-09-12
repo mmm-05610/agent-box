@@ -3,6 +3,10 @@
 import { useStore } from '@nanostores/react'
 import { useEffect, useMemo, useState } from 'react'
 
+import { type ProfileScope } from '@/api/client'
+import { getLogs } from '@/api/config'
+import { installMcpCatalogEntry } from '@/api/mcp'
+import { getActionStatus } from '@/api/system'
 import { LogTail } from '@/components/chat/log-tail'
 import { PageLoader } from '@/components/page-loader'
 import { AvatarChip } from '@/components/ui/avatar-chip'
@@ -13,13 +17,6 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { Tip } from '@/components/ui/tooltip'
-import {
-  getActionStatus,
-  getLogs,
-  installMcpCatalogEntry,
-  type McpCatalogEntry,
-  type ProfileScope
-} from '@/hermes'
 import { useI18n } from '@/i18n'
 import { startCompletionPoll } from '@/lib/completion-poll'
 import { brandFor } from '@/lib/mcp-brands'
@@ -28,6 +25,7 @@ import { isToolEnabled } from '@/lib/mcp-tool-filter'
 import { cn } from '@/lib/utils'
 import { notify, notifyError } from '@/store/notifications'
 import { $activeGatewayProfile } from '@/store/profile'
+import { type McpCatalogEntry } from '@/types/hermes'
 
 import { ICON_BUTTON } from '../master-detail'
 import { PanelEmpty } from '../overlays/panel'

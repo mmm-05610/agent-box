@@ -1,4 +1,4 @@
-import { setApiRequestProfile } from '@/hermes'
+import { setApiRequestProfile } from '@/api/client'
 import { normalizeProfileKey } from '@/lib/profile-identity'
 import { invalidateProfileScopedQueries } from '@/lib/query-client'
 import { markSlashCompletionsStale } from '@/lib/slash-completion-cache'

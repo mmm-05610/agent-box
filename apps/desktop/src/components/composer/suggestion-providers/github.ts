@@ -1,5 +1,5 @@
+import { getGhAuthStatus } from '@/api/system'
 import { requestComposerFocus, requestComposerInsert } from '@/components/composer/focus'
-import { getGhAuthStatus } from '@/hermes'
 import { translateNow } from '@/i18n'
 import { type ComposerSuggestion, registerDraftProvider } from '@/store/composer-suggestions'
 

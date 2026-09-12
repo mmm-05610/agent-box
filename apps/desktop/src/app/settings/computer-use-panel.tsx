@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { getActionStatus } from '@/api/system'
+import { getComputerUseStatus, grantComputerUsePermissions } from '@/api/toolsets'
 import { Button } from '@/components/ui/button'
-import { getActionStatus, getComputerUseStatus, grantComputerUsePermissions } from '@/hermes'
 import { AlertTriangle, Check, ExternalLink, Loader2, RefreshCw, X } from '@/lib/icons'
 import { upsertDesktopActionTask } from '@/store/activity'
 import { notify, notifyError } from '@/store/notifications'

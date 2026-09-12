@@ -6,11 +6,11 @@ import { Dialog as DialogPrimitive } from 'radix-ui'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 
+import { getHermesConfigRecord } from '@/api/config'
 import { SESSION_IMPORT_ROUTE } from '@/app/routes'
 import { listAllProfileSessions } from '@/application/session-lists'
 import { codiconIcon } from '@/components/ui/codicon'
 import { Command, CommandInput, CommandList } from '@/components/ui/command'
-import { getHermesConfigRecord } from '@/hermes'
 import { useI18n } from '@/i18n'
 import {
   HUD_POSITION,

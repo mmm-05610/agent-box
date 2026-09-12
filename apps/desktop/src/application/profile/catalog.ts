@@ -1,4 +1,5 @@
-import { getProfiles, hermesApi, STARTUP_REQUEST_TIMEOUT_MS } from '@/hermes'
+import { hermesApi, STARTUP_REQUEST_TIMEOUT_MS } from '@/api/client'
+import { getProfiles } from '@/api/profiles'
 import { $profiles, setActiveProfile } from '@/store/profile/catalog-state'
 import type { ProfileInfo } from '@/types/hermes'
 

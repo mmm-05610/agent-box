@@ -1,4 +1,6 @@
-import { getGlobalModelOptions, type HermesGateway, type ModelOptionsResponse } from '@/hermes'
+import { type HermesGateway } from '@/api/client'
+import { getGlobalModelOptions } from '@/api/models'
+import { type ModelOptionsResponse } from '@/types/hermes'
 import type { ModelOptionProvider } from '@/types/hermes'
 
 /**

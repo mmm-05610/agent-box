@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-import { deleteEnvVar, getEnvVars, revealEnvVar, setEnvVar } from '@/hermes'
+import { deleteEnvVar, getEnvVars, revealEnvVar, setEnvVar } from '@/api/config'
 import { useI18n } from '@/i18n'
 import { type IconComponent } from '@/lib/icons'
 import { confirm } from '@/store/confirm'

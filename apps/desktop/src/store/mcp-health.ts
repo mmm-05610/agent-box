@@ -12,7 +12,8 @@
  * the other just learned.
  */
 
-import { getHermesConfigRecord, type McpTestResult, testMcpServer } from '@/hermes'
+import { getHermesConfigRecord } from '@/api/config'
+import { type McpTestResult, testMcpServer } from '@/api/mcp'
 import { translateNow } from '@/i18n'
 import { classifyProbe, freshProbe, probeCache, probeKey } from '@/lib/mcp-probe-cache'
 import { getServers } from '@/lib/mcp-servers'

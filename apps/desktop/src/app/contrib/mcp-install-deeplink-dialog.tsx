@@ -2,6 +2,8 @@ import { useStore } from '@nanostores/react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 
+import { getHermesConfigRecord } from '@/api/config'
+import { saveMcpServers } from '@/api/mcp'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -12,7 +14,6 @@ import {
   DialogTitle
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { getHermesConfigRecord, saveMcpServers } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { AlertTriangle } from '@/lib/icons'
 import { MCP_DEEPLINK_NAME_RE } from '@/lib/mcp-deeplink'

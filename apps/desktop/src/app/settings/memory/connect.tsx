@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { getMemoryProviderOAuthStatus, startMemoryProviderOAuth } from '@/api/system'
 import { Button } from '@/components/ui/button'
-import { getMemoryProviderOAuthStatus, startMemoryProviderOAuth } from '@/hermes'
 import { Check, ExternalLink, Loader2 } from '@/lib/icons'
 import { notifyError } from '@/store/notifications'
 import type { MemoryProviderOAuthStatus } from '@/types/hermes'

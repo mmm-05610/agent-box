@@ -2,6 +2,7 @@ import { useStore } from '@nanostores/react'
 import type * as React from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
+import { approvePairing, getMessagingPlatforms, getPairing, revokePairing, updateMessagingPlatform } from '@/api/messaging'
 import { PageLoader } from '@/components/page-loader'
 import { StatusDot, type StatusTone } from '@/components/status-dot'
 import { Button } from '@/components/ui/button'
@@ -11,16 +12,6 @@ import { ErrorBanner } from '@/components/ui/error-state'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { Tip } from '@/components/ui/tooltip'
-import {
-  approvePairing,
-  getMessagingPlatforms,
-  getPairing,
-  type MessagingEnvVarInfo,
-  type MessagingPlatformInfo,
-  type PairingUser,
-  revokePairing,
-  updateMessagingPlatform
-} from '@/hermes'
 import { type Translations, useI18n } from '@/i18n'
 import { openExternalLink } from '@/lib/external-link'
 import { ExternalLink, Save, Trash2 } from '@/lib/icons'
@@ -30,6 +21,7 @@ import { $changeEventsAvailable, $pairingChangeTick, $platformsChangeTick } from
 import { notify, notifyError } from '@/store/notifications'
 import { $settingsRequestProfile } from '@/store/settings-scope'
 import { runGatewayRestart } from '@/store/system-actions'
+import { type MessagingEnvVarInfo, type MessagingPlatformInfo, type PairingUser } from '@/types/hermes'
 
 import { useRefreshHotkey } from '../hooks/use-refresh-hotkey'
 import { useRouteEnumParam } from '../hooks/use-route-enum-param'

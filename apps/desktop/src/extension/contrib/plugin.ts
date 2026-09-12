@@ -14,7 +14,8 @@
 
 import type { ComponentProps, ComponentType } from 'react'
 
-import { type HermesGateway, pluginRest, type PluginRestOptions, pluginSocket, type ProfileScope } from '@/hermes'
+import { type HermesGateway, type ProfileScope } from '@/api/client'
+import { pluginRest, type PluginRestOptions, pluginSocket } from '@/api/plugins'
 import { createPluginI18n, type PluginI18n } from '@/i18n'
 import { registry } from '@/lib/contributions'
 import { readKey, writeKey } from '@/lib/storage'

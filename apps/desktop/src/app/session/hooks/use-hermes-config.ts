@@ -1,7 +1,7 @@
 import { type MutableRefObject, useCallback, useRef } from 'react'
 
+import { getHermesConfig, getHermesConfigDefaults } from '@/api/config'
 import { setTerminalFontFamilyFromConfig } from '@/app/right-sidebar/terminal/terminal-font'
-import { getHermesConfig, getHermesConfigDefaults } from '@/hermes'
 import { BUILTIN_PERSONALITIES, normalizePersonalityValue, personalityNamesFromConfig } from '@/lib/chat-runtime'
 import { normalize } from '@/lib/text'
 import { setDisplayTimestampsFromConfig } from '@/store/display-timestamps'

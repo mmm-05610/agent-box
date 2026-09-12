@@ -1,4 +1,5 @@
-import { type CronJob, getApiRequestConnection, getCronJobs, triggerCronJob } from '@/hermes'
+import { getApiRequestConnection } from '@/api/client'
+import { getCronJobs, triggerCronJob } from '@/api/cron'
 import {
   beginCronJobsAction,
   beginCronJobsRequest,
@@ -7,6 +8,7 @@ import {
   isCronJobsRequestCurrent,
   isCronJobsScopeCurrent
 } from '@/store/cron'
+import { type CronJob } from '@/types/hermes'
 
 export interface CronTriggerRefreshResult {
   jobs: CronJob[] | null

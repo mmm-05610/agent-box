@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 
-import { getLocalModelsStatus } from '@/hermes'
+import { getLocalModelsStatus } from '@/api/local-models'
 import { useI18n } from '@/i18n'
 import { modelOptionsQueryKey, requestModelOptions } from '@/lib/model-options'
 import { modelSearchText } from '@/lib/model-search-text'

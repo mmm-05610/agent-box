@@ -6,12 +6,12 @@ import {
 } from '@hermes/shared'
 import { useEffect, useRef } from 'react'
 
+import { HermesGateway } from '@/api/client'
 import { installReconnectSessionEffects } from '@/application/gateway/reconnect-session-effects'
 import { refreshActiveProfile } from '@/application/profile/catalog'
 import { touchActiveGatewayBackend } from '@/application/profile/runtime-selection'
 import { shouldApplyPostBootProgressError } from '@/components/boot-failure-reauth'
 import type { HermesConnection } from '@/global'
-import { HermesGateway } from '@/hermes'
 import { translateNow } from '@/i18n'
 import { desktopDefaultCwd } from '@/lib/desktop-fs'
 import { decideLivenessForceClose, LIVENESS_REPROBE_DELAY_MS } from '@/lib/gateway-liveness-policy'

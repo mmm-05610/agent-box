@@ -1,5 +1,6 @@
-import { getHermesConfigRecord, type HermesConfigRecord, saveHermesConfig } from '@/hermes'
+import { getHermesConfigRecord, saveHermesConfig } from '@/api/config'
 import { type Locale, localeConfigValue, type LocalePreferencePort } from '@/i18n'
+import { type HermesConfigRecord } from '@/types/hermes'
 
 /**
  * The production binding of i18n's `LocalePreferencePort` to the backend config

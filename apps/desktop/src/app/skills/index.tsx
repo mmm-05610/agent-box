@@ -4,6 +4,11 @@ import type * as React from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 
+import { type ProfileScope, profileScopeKey } from '@/api/client'
+import { getUsageAnalytics } from '@/api/models'
+import { getProfiles } from '@/api/profiles'
+import { editLearningNode, getLearningNode, getOfficialSkills, getSkillContent, getSkills, previewSkillHub, setSkillEnabled } from '@/api/skills'
+import { getToolsets, setToolsetEnabled } from '@/api/toolsets'
 import { ArchiveSkillConfirmDialog } from '@/app/learning/archive-skill-confirm-dialog'
 import { CodeEditor } from '@/components/chat/code-editor'
 import { useOnProfileSwitch } from '@/components/hooks/use-on-profile-switch'
@@ -13,21 +18,6 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { CountSkeleton } from '@/components/ui/skeleton'
 import type { DesktopRosterAgent } from '@/global'
-import {
-  editLearningNode,
-  getLearningNode,
-  getOfficialSkills,
-  getProfiles,
-  getSkillContent,
-  getSkills,
-  getToolsets,
-  getUsageAnalytics,
-  previewSkillHub,
-  type ProfileScope,
-  profileScopeKey,
-  setSkillEnabled,
-  setToolsetEnabled
-} from '@/hermes'
 import { useI18n } from '@/i18n'
 import { isDesktopToolsetVisible } from '@/lib/desktop-toolsets'
 import { compactNumber } from '@/lib/format'

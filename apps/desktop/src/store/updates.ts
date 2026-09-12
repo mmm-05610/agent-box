@@ -5,6 +5,7 @@
 
 import { atom } from 'nanostores'
 
+import { checkHermesUpdate, getActionStatus, updateHermes } from '@/api/system'
 import type {
   DesktopUpdateApplyOptions,
   DesktopUpdateApplyResult,
@@ -14,7 +15,6 @@ import type {
   DesktopUpdateStatus,
   DesktopVersionInfo
 } from '@/global'
-import { checkHermesUpdate, getActionStatus, updateHermes } from '@/hermes'
 import { translateNow } from '@/i18n'
 import { persistString, storedString } from '@/lib/storage'
 import { $connectionsRegistry, refreshConnectionsRegistry } from '@/store/connections'

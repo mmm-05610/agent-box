@@ -4,25 +4,16 @@ import { useQuery } from '@tanstack/react-query'
 import type * as React from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
+import { createCronJob, deleteCronJob, getAutomationBlueprints, instantiateAutomationBlueprint, pauseCronJob, resumeCronJob, updateCronJob } from '@/api/cron'
 import { PageLoader } from '@/components/page-loader'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
-import {
-  type AutomationBlueprint,
-  createCronJob,
-  type CronJob,
-  deleteCronJob,
-  getAutomationBlueprints,
-  instantiateAutomationBlueprint,
-  pauseCronJob,
-  resumeCronJob,
-  updateCronJob
-} from '@/hermes'
 import { useI18n } from '@/i18n'
 import { asText } from '@/lib/text'
 import { $cronFocusJobId, $cronJobs, invalidateCronJobsRequests, setCronFocusJobId } from '@/store/cron'
 import { notify, notifyError } from '@/store/notifications'
 import { $profileScope, ALL_PROFILES } from '@/store/profile'
+import { type AutomationBlueprint, type CronJob } from '@/types/hermes'
 
 import { useRefreshHotkey } from '../hooks/use-refresh-hotkey'
 import {

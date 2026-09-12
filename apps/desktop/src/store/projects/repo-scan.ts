@@ -1,4 +1,5 @@
-import { getHermesConfig, type HermesGateway } from '@/hermes'
+import { type HermesGateway } from '@/api/client'
+import { getHermesConfig } from '@/api/config'
 import { desktopGit } from '@/lib/desktop-git'
 
 import {

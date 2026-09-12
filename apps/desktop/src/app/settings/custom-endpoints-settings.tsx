@@ -1,15 +1,9 @@
 import { useEffect, useState } from 'react'
 
+import { activateCustomEndpoint, deleteCustomEndpoint, getCustomEndpoints, saveCustomEndpoint, validateCustomEndpoint } from '@/api/config'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
-import {
-  activateCustomEndpoint,
-  deleteCustomEndpoint,
-  getCustomEndpoints,
-  saveCustomEndpoint,
-  validateCustomEndpoint
-} from '@/hermes'
 import { triggerHaptic } from '@/lib/haptics'
 import { Check, Globe, Loader2, Plus, Save, Trash2, Zap } from '@/lib/icons'
 import { cn } from '@/lib/utils'

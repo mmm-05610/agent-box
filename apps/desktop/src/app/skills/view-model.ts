@@ -1,8 +1,6 @@
-import {
-  getUsageAnalytics,
-  type McpTestResult,
-  type ProfileScope
-} from '@/hermes'
+import { type ProfileScope } from '@/api/client'
+import { type McpTestResult } from '@/api/mcp'
+import { getUsageAnalytics } from '@/api/models'
 import { type Translations } from '@/i18n'
 import { compactNumber } from '@/lib/format'
 import { NEEDS_AUTH_RE } from '@/lib/mcp-probe-cache'
