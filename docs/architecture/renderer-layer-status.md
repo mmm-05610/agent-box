@@ -8,7 +8,7 @@ because it is trusted; see `renderer-layer-master-plan.md` §8.
 | | |
 | --- | --- |
 | last updated | 2026-09-13 |
-| last commit to change renderer source | `0fee1a5` |
+| last commit to change renderer source | `8b4bad3` |
 | ledger | **0** |
 | target when the run completes | **0 — met** (Phase 3 must leave it at 0) |
 | tests | **776 files / 7466 tests** |
@@ -254,7 +254,7 @@ batch's stop-condition §7.4; no NEW reverse dependency was created (the §B2 mo
 | --- | --- | --- | --- | --- | --- |
 | 31 | Session opening, owner resolution and Session-scoped request dispatch leave composition | Batch 30 executor snapshot: 6 files / 1,096 lines; adjacent `application/session/request-router.ts` 210 lines | `application/session/{open-session,session-owner,session-rpc-dispatcher}*`; `overlay-routing.ts` stays | after Batch 30 merged + independent review; runs alone | merged — `0d32114` (owner + dispatcher) `3f63e53` (open-session) + merges · reviewer: three modules + tests moved R097–R100 with non-import content byte-identical; export lists md5-identical; the two out-of-doc scope adjustments (dispatcher's `resolveSessionOwner` re-spelled to its canonical rank-2 definition; `$workspaceIsPage` atom sunk to new `store/workspace-page.ts` with app/routes re-export, sole writer unchanged, four rank-5 consumers untouched) both ruled SANCTIONED — required for zero edges, behaviour-preserving, established pattern; `overlay-routing.ts` byte-identical; request-router untouched; work-order rg/find checks clean; 774 files / 7431 tests all passing, guard 16/16, ledger 0 constant, eslint 0 |
 | 32 | Shell becomes a product-neutral host: mechanics stay; product actions and coordinators move to composition | semantic review baseline: 2,270 focused lines | `app/shell` host/engine + `app/composition/registrations` product wiring | after 31 merged/reviewed; runs alone | executed — `7a7733d` (keybinding host/registration split) `9adf747` (context-menu verb injection + shell-sections move) `206c837` (tour coordinator move) + stage-5 status/lint commit · pending independent review |
-| 33 | HUD, Pet and Quick Entry become Harness-neutral ViewModel/Intent clients | 21 TS/TSX files / 2,912 lines | neutral window ports; generic handoff to `application/session`; legacy stream policy below UI | after 32 merged/reviewed; runs alone | dispatched — pending prerequisite and execution |
+| 33 | HUD, Pet and Quick Entry become Harness-neutral ViewModel/Intent clients | 21 TS/TSX files / 2,912 lines | neutral window ports; generic handoff to `application/session`; legacy stream policy below UI | after 32 merged/reviewed; runs alone | executed — `e352a76` (Quick Entry port + catalog copy) `3eead8c` (pet five-way split + local activity projection) `8b4bad3` (HUD handoff sinks to `application/session` + `HudWindowPort`) + stage-5 status/lint commit · pending independent review |
 | 34 | dedicated experiment branch: turn the rendered product into an AgentBox Desktop frontend, then draft a neutral Work Core frontend Port | product semantics accepted 2026-09-13; Batch 32/33 are pending prerequisites | `experiment/agentbox-desktop-frontend` in a dedicated sibling worktree; main remains untouched | after 32 and 33 are merged + independently reviewed; branch runs alone; **every stage needs its own independent reviewer's passed verdict + measured numbers before the next stage starts** | dispatched — [Batch 34](renderer-layer-batches/34-agentbox-desktop-frontend-branch.md); no main-branch implementation is authorized |
 
 Contracts: [31](renderer-layer-batches/31-session-routing-sink.md),
@@ -311,6 +311,48 @@ needs untracked `src/agentbox/`, absent from the worktree); focused keybinding/c
 119, menu 38, tour engine 18, preview 51 all green; lint 0 errors / 142 warnings (= baseline; 7
 import-sort errors in the two moved files fixed via `eslint --fix`, verified import-lines only);
 `git diff --check` clean.
+
+**Executor measurements (stageA/33, worktree wt-b, 2026-09-13 — independent review pending).**
+Batch 32 was merged (`056919b`) and independently reviewed (`SHELL_PRODUCT_NEUTRAL_HOST_GREEN`)
+before this batch started; ledger pays nothing (0 before and after, regen byte-identical,
+`renderer-layers.test.ts` layer-direction assertions all green). Stage 2 injected a typed
+`QuickEntryWindowPort` into the capture window (pushed capture context in, prompt + dismissal
+out), assembled from the shell API by the new `app/composition/bridges/window-ports.ts` — the
+one adapter site for all three window ports, no-op when the host is absent (the exact pre-port
+behavior). Stage 3 split the 481-line `pet-overlay-app.tsx` into five responsibilities inside
+`windows/pet/` — `overlay-root` (mount entry, injects the port + I18nProvider),
+`use-pet-overlay-state` (LOCAL activity ViewModel: pushed frames project into the pet's own
+`$petInfo`/`$petActivity`, and the overlay no longer writes the shared session atoms
+`setBusy`/`setAwaitingResponse`; the pushed busy flag rides inside the activity projection, the
+derived pose is unchanged — verified against `deriveLivePetState`'s `activity.busy ?? busy` and
+`activity.awaitingInput` reads), `use-pet-window-behavior` (drag, click-through hit-test,
+focusability, fit-to-scale bounds, Alt+wheel zoom), `pet-overlay-view` (presentation) and
+`pet-overlay-composer` (neutral prompt capture) — plus `PetOverlayWindowPort`. Stage 4 deleted
+`windows/hud/handoff.ts`: the generic multi-window coordination (handback on surface close:
+draft reload, tile-vs-main landing, composer repaint; surface-side retarget and session report)
+sank to the new `application/session/window-handoff.ts` (`useSessionHandback` /
+`useSurfaceRetarget` / `useSurfaceSessionReport`), with the legacy stream re-attach arriving
+only as composition's injected `adoptSession` callback — no resume/socket concept remains in
+the UI. `hud-shell.tsx` now receives the wired chat surface and `HudWindowPort` as props
+(composition passes `<WiredPane part="chatRoutes"/>` + the port adapter); the mechanics hooks
+(click-through, glass, resize, composer drag, game overlay) take the port, every pure
+calculation and listener pattern unchanged; the front-conversation probe moved to the
+composition bridge (`frontConversationId`, titlebar + keybindings repointed). Visible copy
+moved to a new `windows` i18n section (types + all six locales): Quick Entry
+placeholder/'Send to'/'Current chat'/'New session'/'Quick Entry' and the pet mail icon +
+composer placeholder; "Ask Hermes…" → "Ask anything…", "open Hermes to reconnect" → "open the
+app to reconnect", "Open in Hermes" → "Open the app". Aux-window locale behavior is unchanged
+(no backend to read the preference from → catalog default, as before; the roots now mount
+`I18nProvider localePreference={null}` explicitly). Window tests repointed 1:1 to injected
+ports — same 7 files / 26 tests, zero assertion changes beyond the stub construction
+(`window.hermesDesktop` stubs replaced by port doubles). Final state: work-order negative rg 0
+hits under `apps/desktop/src/app/windows` (raw rg exit 1 — no Hermes/Gateway/window.hermesDesktop/
+Ref/resume/socket-ownership token in code, comments or copy); typecheck green; test:ui 772
+files / 7,414 tests twice on the final tree, each with exactly the one environmental failure
+(`leaves no in-flight exclusion stale`, needs untracked `src/agentbox/`, absent from the
+worktree); focused windows+application/session 27 files / 222 tests green; lint 0 errors /
+142 warnings (= baseline; import-order autofixes verified import-lines only); ledger regen
+byte-identical; `git diff --check` clean.
 
 ## How to update this file
 
