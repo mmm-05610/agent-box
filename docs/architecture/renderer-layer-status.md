@@ -129,8 +129,7 @@ proved it the only closure that does not widen the ledger.)
   **Phase 5 additions:** batches 23 (rescoped), 24, 25 and 28 are merged + reviewed; row 22
   carries a planner flag (its shipped destination `session-lists/` vs the amended `sidebar/` —
   batch 28 shipped to `sidebar/` alongside it; coexistence ruled safe, reconciliation is a
-  planner follow-up). **In flight:** batches 24/25 are merged — see rows 24/25. Wait, that
-  duplicates — see the table. **Batch 30:** APP_COMPOSITION_ROOT_GREEN (merged + reviewed).
+  planner follow-up). **Batch 30:** APP_COMPOSITION_ROOT_GREEN (merged + reviewed).
   **Batch 31:** merged + reviewed. **Batch 32:** SHELL_PRODUCT_NEUTRAL_HOST_GREEN (merged +
   reviewed). **Batch 33:** WINDOW_SURFACES_HARNESS_NEUTRAL_GREEN (merged + reviewed).
   **Batch 34:** dispatched as an isolated experiment branch (main untouched, per-stage
