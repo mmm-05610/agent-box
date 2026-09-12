@@ -5,6 +5,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import type * as React from 'react'
 import { type FC, useEffect, useRef } from 'react'
 
+import { sessionRowEstimate } from '@/application/session-lists/session-row-details'
 import { useI18n } from '@/i18n'
 import { type SidebarListRow } from '@/lib/session-date-groups'
 import { sessionBucketLabel } from '@/lib/time'
@@ -15,7 +16,6 @@ import type { SessionInfo } from '@/types/hermes'
 
 import { SidebarDateDivider } from './chrome'
 import { SidebarSessionRow } from './session-row'
-import { sessionRowEstimate } from './session-row-details'
 
 interface SessionRowCommonProps {
   branchStem?: string
