@@ -277,5 +277,12 @@
       "use-prompt-actions/rewind'",
       "gateway-event/session-info'"
     ]
+  },
+  "26 tool-view": {
+    "edges": 0,
+    "modules": [
+      "tool/fallback-model'",
+      "tool/fallback-model/"
+    ]
   }
 }
