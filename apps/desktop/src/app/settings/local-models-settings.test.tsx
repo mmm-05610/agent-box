@@ -10,7 +10,7 @@ import { LocalModelsSettings } from './local-models-settings'
 
 // Mock the API layer — the pane's contract is what it RENDERS from these
 // payloads, not transport.
-vi.mock('@/hermes', () => ({
+vi.mock('@/api/local-models', () => ({
   activateLocalModel: vi.fn(),
   deleteLocalModel: vi.fn(),
   downloadBrowsedModel: vi.fn(),
@@ -28,9 +28,26 @@ vi.mock('@/hermes', () => ({
   sideloadLocalModel: vi.fn()
 }))
 
-import * as hermes from '@/hermes'
+import {
+  downloadBrowsedModel,
+  downloadLocalModel,
+  getLocalCatalog,
+  getLocalHardware,
+  getLocalModelsJobs,
+  getLocalModelsStatus,
+  listHFRepoFiles,
+  quickstartLocalModels,
+  searchHFModels
+} from '@/api/local-models'
 
-const mocked = vi.mocked(hermes)
+const mocked = {
+  downloadLocalModel: vi.mocked(downloadLocalModel),
+  getLocalCatalog: vi.mocked(getLocalCatalog),
+  getLocalHardware: vi.mocked(getLocalHardware),
+  getLocalModelsJobs: vi.mocked(getLocalModelsJobs),
+  getLocalModelsStatus: vi.mocked(getLocalModelsStatus),
+  quickstartLocalModels: vi.mocked(quickstartLocalModels)
+}
 
 const BASE_STATUS: LocalModelsStatus = {
   enabled: true,
@@ -417,10 +434,10 @@ describe('BrowseSection', () => {
     vi.useFakeTimers()
 
     try {
-      vi.mocked(hermes.searchHFModels).mockResolvedValue({
+      vi.mocked(searchHFModels).mockResolvedValue({
         hits: [{ downloads: 872724, gated: false, likes: 47, repo: 'unsloth/Qwen3.8-27B-GGUF', updated: '2026-08-18' }]
       })
-      vi.mocked(hermes.listHFRepoFiles).mockResolvedValue({
+      vi.mocked(listHFRepoFiles).mockResolvedValue({
         files: [
           { fit: 'fits-gpu', label: 'Q4_K_M', paths: ['Qwen3.8-27B-Q4_K_M.gguf'], total_bytes: 17 * 2 ** 30 },
           { fit: 'too-big', label: 'F16', paths: ['Qwen3.8-27B-F16.gguf'], total_bytes: 56 * 2 ** 30 }
@@ -443,11 +460,11 @@ describe('BrowseSection', () => {
       const box = screen.getByPlaceholderText(/search models/i)
       fireEvent.change(box, { target: { value: 'qwen' } })
       // Debounce: no call until the pause elapses.
-      expect(hermes.searchHFModels).not.toHaveBeenCalled()
+      expect(searchHFModels).not.toHaveBeenCalled()
       await act(async () => {
         await vi.advanceTimersByTimeAsync(400)
       })
-      expect(hermes.searchHFModels).toHaveBeenCalledWith('qwen')
+      expect(searchHFModels).toHaveBeenCalledWith('qwen')
       expect(screen.getByText('unsloth/Qwen3.8-27B-GGUF')).toBeTruthy()
 
       fireEvent.click(screen.getByRole('button', { name: /show files/i }))
@@ -462,12 +479,12 @@ describe('BrowseSection', () => {
       expect((f16Btn as HTMLButtonElement).disabled).toBe(true)
       expect((q4Btn as HTMLButtonElement).disabled).toBe(false)
 
-      vi.mocked(hermes.downloadBrowsedModel).mockResolvedValue({ job_id: 'j1', model_id: 'Qwen3.8-27B-Q4_K_M' })
+      vi.mocked(downloadBrowsedModel).mockResolvedValue({ job_id: 'j1', model_id: 'Qwen3.8-27B-Q4_K_M' })
       fireEvent.click(q4Btn)
       await act(async () => {
         await vi.runOnlyPendingTimersAsync()
       })
-      expect(hermes.downloadBrowsedModel).toHaveBeenCalledWith('unsloth/Qwen3.8-27B-GGUF', ['Qwen3.8-27B-Q4_K_M.gguf'])
+      expect(downloadBrowsedModel).toHaveBeenCalledWith('unsloth/Qwen3.8-27B-GGUF', ['Qwen3.8-27B-Q4_K_M.gguf'])
     } finally {
       vi.useRealTimers()
     }
@@ -476,7 +493,7 @@ describe('BrowseSection', () => {
 
 describe('added-by-you rows', () => {
   it('staged models outside the catalog get the full action set', async () => {
-    vi.mocked(hermes.getLocalModelsStatus).mockResolvedValue({
+    vi.mocked(getLocalModelsStatus).mockResolvedValue({
       ...BASE_STATUS,
       loaded_models: { 'Hermes-4.3-36B-Q5_K_M': 'loaded' },
       models: [{ id: 'Hermes-4.3-36B-Q5_K_M', size_bytes: 25 * 2 ** 30, size_label: '25.0 GB' }],
@@ -490,7 +507,7 @@ describe('added-by-you rows', () => {
       },
       server_running: true
     })
-    vi.mocked(hermes.getLocalCatalog).mockResolvedValue({ models: [] })
+    vi.mocked(getLocalCatalog).mockResolvedValue({ models: [] })
 
     renderPane()
     await screen.findByText('Hermes-4.3-36B-Q5_K_M')

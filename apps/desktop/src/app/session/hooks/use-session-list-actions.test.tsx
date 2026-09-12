@@ -83,7 +83,7 @@ interface Deferred<T> {
 
 /** Create a promise whose completion order the stale-response tests control. */
 
-vi.mock('@/hermes', async importOriginal => ({
+vi.mock('@/api/cron', async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
   getCronJobs: (...args: unknown[]) => getCronJobs(...args)
 }))
