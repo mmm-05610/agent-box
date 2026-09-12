@@ -26,7 +26,7 @@ import {
 } from '@/store/session-states'
 import { canOpenSessionWindow, openSessionInNewWindow } from '@/store/windows'
 
-import { $workspaceIsPage, sessionRoute } from './routes'
+import { $workspaceIsPage, sessionRoute } from '@/app/routes'
 
 export type { OpenSessionIntent, OpenSessionScope as OpenSessionWorkspaceScope } from '@/lib/open-session'
 

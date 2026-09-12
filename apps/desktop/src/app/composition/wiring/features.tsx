@@ -13,7 +13,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { type CSSProperties, lazy, type ReactNode, Suspense, useCallback, useEffect, useMemo, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 
-import { useDesktopFsConnection } from '@/app/contrib/hooks/use-desktop-fs-connection'
+import { useDesktopFsConnection } from '@/app/composition/bridges/desktop-filesystem'
 import { refreshActiveProfile } from '@/application/profile/catalog'
 import { getLatestSessionMessages } from '@/application/session-transcripts'
 import { closeAllTerminals } from '@/application/terminal/terminals'
@@ -83,15 +83,15 @@ import { clearSessionTodos, setSessionTodos, todosForHydration } from '@/store/t
 import { isAuxiliaryWindow, isBrowserWindow, isHudWindow } from '@/store/windows'
 
 import { closeWorkspaceTab } from '@/features/chat/close-tab'
-import { CommandPalette } from '../command-palette'
+import { CommandPalette } from '@/app/command-palette'
 import { triggerAndRefreshCronJobs } from '@/features/cron/cron-actions'
 import { useGatewayBoot } from '@/features/runtime/gateway/hooks/use-gateway-boot'
-import { useHermesConfigRecord } from '../hooks/use-config-record'
-import { useKeybinds } from '../hooks/use-keybinds'
-import { useHudHandoff } from '../hud/handoff'
-import { ModelPickerOverlay } from '../model-picker-overlay'
-import { ModelVisibilityOverlay } from '../model-visibility-overlay'
-import { mainChatOccupied, openSession } from '../open-session'
+import { useHermesConfigRecord } from '@/app/hooks/use-config-record'
+import { useKeybinds } from '@/app/hooks/use-keybinds'
+import { useHudHandoff } from '@/app/hud/handoff'
+import { ModelPickerOverlay } from '@/app/model-picker-overlay'
+import { ModelVisibilityOverlay } from '@/app/model-visibility-overlay'
+import { mainChatOccupied, openSession } from '@/app/composition/routing/open-session'
 import { PetGenerateOverlay } from '@/features/pet-generate/pet-generate-overlay'
 import { FileActionDialogs } from '@/features/right-sidebar/file-actions'
 import { RemoteFolderPicker } from '@/features/right-sidebar/files/remote-picker'
@@ -104,10 +104,10 @@ import {
   sessionRoute,
   SETTINGS_ROUTE,
   syncWorkspaceRoute
-} from '../routes'
+} from '@/app/routes'
 import { SessionImportView } from '@/features/session-import'
-import { SessionPickerOverlay } from '../session-picker-overlay'
-import { SessionSwitcher } from '../session-switcher'
+import { SessionPickerOverlay } from '@/app/session-picker-overlay'
+import { SessionSwitcher } from '@/app/session-switcher'
 import { useBackgroundQueueDrain } from '@/features/session/hooks/use-background-queue-drain'
 import { useContextSuggestions } from '@/features/session/hooks/use-context-suggestions'
 import { useCwdActions } from '@/features/session/hooks/use-cwd-actions'
@@ -122,26 +122,26 @@ import { useSessionListActions } from '@/features/session/hooks/use-session-list
 import { useSessionStateCache } from '@/features/session/hooks/use-session-state-cache'
 import { startWorkspaceSession } from '@/features/session/workspace-session-target'
 import { PluginInstallModal } from '@/features/settings/plugin-install-modal'
-import { useOverlayRouting } from '../shell/hooks/use-overlay-routing'
-import { useWindowControlsOverlayWidth } from '../shell/hooks/use-window-controls-overlay-width'
-import { TitlebarControls } from '../shell/titlebar-controls'
-import { UpdatesOverlay } from '../updates-overlay'
+import { useOverlayRouting } from '@/app/shell/hooks/use-overlay-routing'
+import { useWindowControlsOverlayWidth } from '@/app/shell/hooks/use-window-controls-overlay-width'
+import { TitlebarControls } from '@/app/shell/titlebar-controls'
+import { UpdatesOverlay } from '@/app/updates-overlay'
 
-import { ContribWiringContext } from './context'
+import { ContribWiringContext } from '@/app/composition/root/context'
 import {
   reconcileActiveTranscript,
   resolveActiveTranscriptSession,
   useBackgroundSync
 } from '@/features/session/sync/background-sync'
-import { useDesktopIntegrations } from './hooks/use-desktop-integrations'
-import { usePetBridge } from './hooks/use-pet-bridge'
-import { useQuickEntryBridge } from './hooks/use-quick-entry-bridge'
+import { useDesktopIntegrations } from '@/app/composition/bridges/desktop-integrations'
+import { usePetBridge } from '@/app/composition/bridges/pet-window'
+import { useQuickEntryBridge } from '@/app/composition/bridges/quick-entry-window'
 import { useSessionTileDelegate } from '@/features/session/tiles/use-session-tile-delegate'
 import { McpInstallDeepLinkDialog } from '@/features/skills/mcp-install-deeplink-dialog'
 import { useTitlebarToolContributions } from '@/app/composition/registrations/chrome-contributions'
 import { $restartPreviewServer } from '@/features/chat/right-rail/restart-preview-server'
-import { createSessionRpcDispatcher } from './session-rpc-dispatcher'
-import { ChatRoutesSurface, SidebarSurface, StatusbarSurface, TerminalSurface } from './surfaces'
+import { createSessionRpcDispatcher } from '@/app/composition/routing/session-rpc-dispatcher'
+import { ChatRoutesSurface, SidebarSurface, StatusbarSurface, TerminalSurface } from '@/app/composition/registrations/surfaces'
 import type { WiringActions, WiringApi } from './types'
 
 // Overlay views the controller mounts over the shell — lazy, load on demand.
@@ -165,7 +165,7 @@ const GatewaySettingsView = lazy(async () => ({
 // Surfaces (the four wired panes), the render context + WiredPane, and the
 // WiringActions/WiringApi contracts all live in sibling modules — this file is
 // the controller that assembles them.
-export { WiredPane } from './context'
+export { WiredPane } from '@/app/composition/root/context'
 
 export function ContribWiring({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient()
@@ -362,7 +362,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
 
     let dispose: (() => void) | undefined
 
-    void import('./dev/credits-notice-demo').then(m => {
+    void import('@/app/composition/dev/credits-notice-demo').then(m => {
       dispose = m.installCreditsNoticeDemo()
     })
 
@@ -468,7 +468,8 @@ export function ContribWiring({ children }: { children: ReactNode }) {
   })
 
   // Expose the restart handler to the preview pane contribution (module
-  // boundary crossed via atom — contrib-panes can't import this file).
+  // boundary crossed via atom — the preview pane (features/chat/right-rail)
+  // can't import this file).
   useEffect(() => {
     $restartPreviewServer.set(restartPreviewServer)
 

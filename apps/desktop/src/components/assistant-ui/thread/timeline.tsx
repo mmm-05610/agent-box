@@ -203,7 +203,7 @@ const ActiveThreadTimeline: FC = () => {
     return next
     // promptIds is the intentional re-eval TRIGGER, not a value the derivation
     // reads (the transcript comes off the ref) — same shape as ChatRoutesSurface's
-    // gatewayState memo in app/contrib/controller.tsx.
+    // gatewayState memo in app/composition/root/app-composition.tsx.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [promptIds])
 

@@ -42,7 +42,7 @@ import { $focusedStoredSessionId, sessionTileOwnerRoute, storedSessionIdForRunti
 import { type SessionOwnerScope } from '@/store/session/types'
 import type { ClientSessionState } from '@/types/session'
 
-import { findStoredIdForRuntimeId, resolveRoutingSessionId, resolveSessionRpcOwner } from './wiring-routing'
+import { findStoredIdForRuntimeId, resolveRoutingSessionId, resolveSessionRpcOwner } from '@/app/composition/routing/session-owner'
 
 export type AmbientGatewayRequest = <T>(
   method: string,

@@ -8,7 +8,7 @@ import { useViewedInterval } from '@/lib/hooks/use-viewed-interval'
 import { $activeSessionAwaitingInput } from '@/store/prompts'
 import { $busy, $messages } from '@/store/session'
 
-import { WiredPane } from '../contrib/wiring'
+import { WiredPane } from '@/app/composition/wiring/features'
 
 import { useHudClickThrough } from './click-through'
 import { useHudGameOverlay } from './game-overlay'

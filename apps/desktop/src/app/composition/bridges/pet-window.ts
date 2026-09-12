@@ -7,7 +7,7 @@ import { $sessions } from '@/store/session'
 import { $attentionSessionIds } from '@/store/session-states'
 import { isAuxiliaryWindow } from '@/store/windows'
 
-import type { GatewayRequester } from '../types'
+import type { GatewayRequester } from '@/app/composition/wiring/types'
 
 interface PetBridgeParams {
   requestGateway: GatewayRequester

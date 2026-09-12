@@ -72,7 +72,7 @@ import {
 import { canOpenNewWindow, openNewWindow } from '@/store/windows'
 import { type ThemeMode, useTheme } from '@/themes/context'
 
-import { openSession, openSessionIntentFromModifiers } from '../open-session'
+import { openSession, openSessionIntentFromModifiers } from '@/app/composition/routing/open-session'
 import {
   AGENTS_ROUTE,
   ARTIFACTS_ROUTE,

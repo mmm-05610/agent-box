@@ -2,9 +2,9 @@ import { createContext, memo, useContext } from 'react'
 
 import { DecodeText } from '@/components/ui/decode-text'
 
-import { StatusbarControls } from '../shell/statusbar-controls'
+import { StatusbarControls } from '@/app/shell/statusbar-controls'
 
-import type { WiringApi } from './types'
+import type { WiringApi } from '@/app/composition/wiring/types'
 
 /** The controller publishes its wired surfaces here; every registered pane
  *  / chrome slot reads one back through `WiredPane`. */

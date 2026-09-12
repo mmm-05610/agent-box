@@ -4,7 +4,7 @@
  * This is the shape of `useGatewayRequest().requestGateway` written down once,
  * instead of three times in three layers:
  *
- *  - `app/contrib/types.ts` derived it with `ReturnType<typeof useGatewayRequest>`,
+ *  - `app/composition/wiring/types.ts` derived it with `ReturnType<typeof useGatewayRequest>`,
  *    which forced a type-only file to import the whole hook (and, through it,
  *    the app's page surface) just to name a signature;
  *  - `lib/yolo-session.ts` and `app/shell/hooks/use-status-snapshot.ts` each

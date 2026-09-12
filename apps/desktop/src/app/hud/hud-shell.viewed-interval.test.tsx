@@ -3,7 +3,7 @@ import { act, cleanup, render } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('../contrib/wiring', () => ({ WiredPane: () => null }))
+vi.mock('@/app/composition/wiring/features', () => ({ WiredPane: () => null }))
 
 class ResizeObserverStub {
   observe() {}

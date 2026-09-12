@@ -5,7 +5,7 @@ import type { GatewayRequester } from '@/types/gateway'
 import type { ChatView } from '@/features/chat'
 import type { ChatSidebar } from '@/features/chat/sidebar'
 import type { CommandCenterSection } from '@/features/command-center'
-import type { ModelMenuPanel } from '../shell/model-menu-panel'
+import type { ModelMenuPanel } from '@/app/shell/model-menu-panel'
 
 export type { GatewayRequester }
 

@@ -3,4 +3,4 @@
 // the contribution registry (src/extension/contrib) — core surfaces use the same calls
 // plugins do. Everything lives under ./contrib: the wiring (gateway boot,
 // sessions, streams) + pane surfaces, and the pane/layout registration.
-export { ContribController as default } from './contrib'
+export { ContribController as default } from '@/app/composition/index'

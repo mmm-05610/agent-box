@@ -8,10 +8,10 @@ import { dropSessionState, publishSessionState } from '@/store/session-states'
 import type * as WindowsStore from '@/store/windows'
 import type { SessionInfo } from '@/types/hermes'
 
-import { makeSessionInfo } from '../../../dev/test/session-info'
-import { sessionRoute } from '../../routes'
+import { makeSessionInfo } from '@/dev/test/session-info'
+import { sessionRoute } from '@/app/routes'
 
-import { useDesktopIntegrations } from './use-desktop-integrations'
+import { useDesktopIntegrations } from '@/app/composition/bridges/desktop-integrations'
 
 // Mutable HUD-window flag so the restore tests can flip the window kind the
 // hook believes it runs in. Default false keeps the pre-existing restore

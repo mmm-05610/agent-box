@@ -62,7 +62,7 @@ import { useTheme } from '@/themes/context'
 
 import { handleComposerFocusChord } from '@/features/chat/composer/focus-chord'
 import { handleWindowPaste } from '@/features/chat/composer/paste-to-focus'
-import { openSession } from '../open-session'
+import { openSession } from '@/app/composition/routing/open-session'
 import {
   $workspaceIsPage,
   AGENTS_ROUTE,

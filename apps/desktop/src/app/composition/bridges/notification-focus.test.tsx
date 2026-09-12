@@ -15,7 +15,7 @@ import {
   patchSessionTile
 } from '@/store/session-states'
 
-import { useDesktopIntegrations } from './use-desktop-integrations'
+import { useDesktopIntegrations } from '@/app/composition/bridges/desktop-integrations'
 
 const originalBridge = window.hermesDesktop
 

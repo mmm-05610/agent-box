@@ -5,7 +5,7 @@
 // `use-message-stream/gateway-event/status.ts` — toast render, key-replacement
 // escalation, TTL self-dismiss, native OS notification, and billing re-poll.
 //
-// Installed only under `import.meta.env.DEV` (see contrib/wiring.tsx), so none
+// Installed only under `import.meta.env.DEV` (see app/composition/wiring/features.tsx), so none
 // of this ships in a production build.
 
 import type { GatewayEvent } from '@hermes/shared'

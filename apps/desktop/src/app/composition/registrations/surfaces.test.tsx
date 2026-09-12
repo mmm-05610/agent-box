@@ -8,7 +8,7 @@ import { $gateway } from '@/store/gateway'
 import { $activeGatewayProfile } from '@/store/profile'
 
 import { ChatRoutesSurface } from './surfaces'
-import type { WiringActions } from './types'
+import type { WiringActions } from '@/app/composition/wiring/types'
 
 vi.mock('@/extension/contrib/react/use-contributions', () => ({ useContributions: vi.fn() }))
 vi.mock('@/store/connections', () => ({ $activeConnectionId: atom('local') }))
@@ -23,23 +23,23 @@ vi.mock('@/features/chat', () => ({
 }))
 vi.mock('@/features/chat/sidebar', () => ({ ChatSidebar: () => null }))
 vi.mock('@/features/right-sidebar/terminal/chrome', () => ({ TerminalPaneChrome: () => null }))
-vi.mock('../shell/hooks/use-status-snapshot', () => ({ useStatusSnapshot: () => ({}) }))
-vi.mock('../shell/hooks/use-statusbar-items', () => ({
+vi.mock('@/app/shell/hooks/use-status-snapshot', () => ({ useStatusSnapshot: () => ({}) }))
+vi.mock('@/app/shell/hooks/use-statusbar-items', () => ({
   useStatusbarItems: () => ({ leftStatusbarItems: [], statusbarItems: [] })
 }))
-vi.mock('../shell/statusbar-controls', () => ({ StatusbarControls: () => null }))
-vi.mock('../routes', () => ({
+vi.mock('@/app/shell/statusbar-controls', () => ({ StatusbarControls: () => null }))
+vi.mock('@/app/routes', () => ({
   contributedRoutes: () => [],
   NEW_CHAT_ROUTE: '/new',
   ROUTES_AREA: 'routes',
   sessionRoute: (id: string) => `/${id}`
 }))
-vi.mock('./latest-actions', () => ({ latestChatActions: () => ({}), latestSidebarActions: () => ({}) }))
+vi.mock('@/app/composition/wiring/latest-actions', () => ({ latestChatActions: () => ({}), latestSidebarActions: () => ({}) }))
 vi.mock('@/app/composition/registrations/chrome-contributions', () => ({
   setStatusbarItemGroup: vi.fn(),
   useStatusbarContributions: () => []
 }))
-vi.mock('../shell/model-menu-panel', () => ({ ModelMenuPanel: () => null }))
+vi.mock('@/app/shell/model-menu-panel', () => ({ ModelMenuPanel: () => null }))
 
 afterEach(() => {
   cleanup()

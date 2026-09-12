@@ -1,4 +1,4 @@
-import '@/app/host-views'
+import '@/app/composition/registrations/host-views'
 
 import { useStore } from '@nanostores/react'
 import { atom, computed } from 'nanostores'
@@ -91,14 +91,14 @@ import {
   watchSessionTiles,
   WorkspaceTabMenu
 } from '@/features/chat/session-tile'
-import { AppContextMenu } from '../context-menu/app-context-menu'
-import { HudShell } from '../hud/hud-shell'
-import { $workspaceIsPage } from '../routes'
+import { AppContextMenu } from '@/app/context-menu/app-context-menu'
+import { HudShell } from '@/app/hud/hud-shell'
+import { $workspaceIsPage } from '@/app/routes'
 
 import { LogsPane } from '@/features/logs/logs-pane'
 import { FilesPane } from '@/features/right-sidebar/panes/files-pane'
 import { ReviewPaneContent } from '@/features/right-sidebar/panes/review-pane'
-import { ContribWiring, WiredPane } from './wiring'
+import { ContribWiring, WiredPane } from '@/app/composition/wiring/features'
 
 /**
  * Stripped-down app root (bb/contrib-areas) on the layout TREE model, mounting

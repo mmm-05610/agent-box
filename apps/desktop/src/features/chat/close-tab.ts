@@ -1,4 +1,4 @@
-import { mainChatOccupied } from '@/app/open-session'
+import { mainChatOccupied } from '@/app/composition/routing/open-session'
 import { $workspaceIsPage } from '@/app/routes'
 import { closeActiveTerminal } from '@/application/terminal/terminals'
 import { isFocusWithin } from '@/lib/keybinds/combo'

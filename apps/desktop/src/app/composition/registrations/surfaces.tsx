@@ -21,15 +21,15 @@ import { $freshDraftReady, $gatewayState } from '@/store/session'
 import { ChatView } from '@/features/chat'
 import { ChatSidebar } from '@/features/chat/sidebar'
 import { TerminalPaneChrome } from '@/features/right-sidebar/terminal/chrome'
-import { contributedRoutes, NEW_CHAT_ROUTE, ROUTES_AREA, sessionRoute } from '../routes'
-import { useStatusSnapshot } from '../shell/hooks/use-status-snapshot'
-import { useStatusbarItems } from '../shell/hooks/use-statusbar-items'
-import { ModelMenuPanel } from '../shell/model-menu-panel'
-import { StatusbarControls } from '../shell/statusbar-controls'
+import { contributedRoutes, NEW_CHAT_ROUTE, ROUTES_AREA, sessionRoute } from '@/app/routes'
+import { useStatusSnapshot } from '@/app/shell/hooks/use-status-snapshot'
+import { useStatusbarItems } from '@/app/shell/hooks/use-statusbar-items'
+import { ModelMenuPanel } from '@/app/shell/model-menu-panel'
+import { StatusbarControls } from '@/app/shell/statusbar-controls'
 
-import { latestChatActions, latestSidebarActions } from './latest-actions'
+import { latestChatActions, latestSidebarActions } from '@/app/composition/wiring/latest-actions'
 import { setStatusbarItemGroup, useStatusbarContributions } from '@/app/composition/registrations/chrome-contributions'
-import type { SidebarActions, WiringActions } from './types'
+import type { SidebarActions, WiringActions } from '@/app/composition/wiring/types'
 
 // Same lazy-view split as DesktopController — pages load on demand. The
 // full-page views the workspace route table mounts live here; overlay views

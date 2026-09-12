@@ -1209,7 +1209,7 @@ describe('unread finished sessions', () => {
 
     // A no-op navigate — openSession with 'in-place' against the already
     // selected session hits focusOpenSession and returns without loading.
-    const { openSession } = await import('@/app/open-session')
+    const { openSession } = await import('@/app/composition/routing/open-session')
     openSession('s1', () => {}, 'in-place')
 
     expect($unreadFinishedSessionIds.get()).toEqual([])

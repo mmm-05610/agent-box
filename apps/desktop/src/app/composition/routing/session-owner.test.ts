@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { findStoredIdForRuntimeId, resolveRoutingSessionId, resolveSessionRpcOwner } from './wiring-routing'
+import { findStoredIdForRuntimeId, resolveRoutingSessionId, resolveSessionRpcOwner } from '@/app/composition/routing/session-owner'
 
 describe('findStoredIdForRuntimeId', () => {
   it('reverse-resolves a runtime id to its stored id', () => {

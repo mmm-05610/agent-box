@@ -25,7 +25,7 @@ function failBoot() {
   })
 }
 
-// The host (app/contrib/wiring) injects the Gateway settings view; a directly
+// The host (app/composition/wiring/features) injects the Gateway settings view; a directly
 // constructed overlay takes a stub and renders it in the connect slot.
 const StubGatewaySettingsView = ({ embedded }: { embedded?: boolean }) => (
   <div data-embedded={String(Boolean(embedded))} data-testid="stub-gateway-settings" />

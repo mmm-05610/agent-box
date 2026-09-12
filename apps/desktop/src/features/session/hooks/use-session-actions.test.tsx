@@ -6,7 +6,7 @@ import { useEffect, useRef } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { deleteSession, getAllSessionMessages, getSession, setSessionArchived } from '@/api/sessions'
-import { resolveSessionRpcOwner } from '@/app/contrib/wiring-routing'
+import { resolveSessionRpcOwner } from '@/app/composition/routing/session-owner'
 import { ensureGatewayProfile } from '@/application/profile/runtime-selection'
 import { getLatestSessionMessages } from '@/application/session-transcripts'
 import { requestForSessionProfile } from '@/application/session/request-router'

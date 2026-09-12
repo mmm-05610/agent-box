@@ -5,7 +5,7 @@
  * The quick window carries NO gateway connection: it hands its text to the main
  * process, which forwards it to the primary renderer, which sends it through the
  * SAME `submitText` the normal composer uses (see
- * app/contrib/hooks/use-quick-entry-bridge). There is no second submit path and
+ * app/composition/bridges/quick-entry-window). There is no second submit path and
  * no new gateway RPC.
  *
  * The device-local preference (enabled + shortcut) is authoritative in the MAIN

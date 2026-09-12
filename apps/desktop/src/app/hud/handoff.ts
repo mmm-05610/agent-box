@@ -24,7 +24,7 @@ import { $selectedStoredSessionId } from '@/store/session'
 import { focusOpenSession, sessionTileDelegate } from '@/store/session-states'
 import { isHudWindow } from '@/store/windows'
 
-import { openSession, type OpenSessionNavigate } from '../open-session'
+import { openSession, type OpenSessionNavigate } from '@/app/composition/routing/open-session'
 import { sessionRoute } from '../routes'
 
 /** Session tiles route on `tile:<storedSessionId>` (see session-tile.tsx). */

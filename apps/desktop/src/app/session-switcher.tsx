@@ -9,7 +9,7 @@ import { HUD_ITEM, HUD_POSITION, HUD_SURFACE, HUD_TEXT } from '@/lib/floating-hu
 import { cn } from '@/lib/utils'
 import { $switcherIndex, $switcherOpen, $switcherSessions, closeSwitcher } from '@/store/session-switcher'
 
-import { openSession } from './open-session'
+import { openSession } from '@/app/composition/routing/open-session'
 
 // Compact session-switcher HUD — keyboard-driven from `use-keybinds`, rows
 // clickable via mousedown (Ctrl+click on macOS). No Dialog: Tab stays global.

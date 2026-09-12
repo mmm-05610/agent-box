@@ -36,7 +36,7 @@ export function setDesktopFsRemotePicker(next: DesktopFsRemotePicker | null) {
 }
 
 /** The active connection, published by the composition root (see
- *  `app/contrib/hooks/use-desktop-fs-connection.ts`).
+ *  `app/composition/bridges/desktop-filesystem.ts`).
  *
  *  Reading it lazily — a getter rather than a value — is what keeps the
  *  behaviour identical to reading the atom directly: a connection that changes
