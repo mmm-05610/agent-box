@@ -3,10 +3,11 @@ import { JsonRpcGatewayError } from '@hermes/shared'
 import { useStore } from '@nanostores/react'
 import { type MutableRefObject, useCallback, useEffect, useRef } from 'react'
 
+import { uploadComposerAttachment } from '@/application/session/upload-attachment'
 import { useI18n } from '@/i18n'
 import { stripAnsi } from '@/lib/ansi'
 import { type ChatMessage, textPart } from '@/lib/chat-messages'
-import { pathLabel, SLASH_COMMAND_RE } from '@/lib/chat-runtime'
+import { SLASH_COMMAND_RE } from '@/lib/chat-runtime'
 import { sanitizeComposerInput } from '@/lib/composer-input-sanitize'
 import { triggerHaptic } from '@/lib/haptics'
 import { setMutableRef } from '@/lib/mutable-ref'
@@ -32,7 +33,7 @@ import { $sessionStates, isSessionRemote } from '@/store/session-states'
 import { clearSessionSubagents } from '@/store/subagents'
 import { clearSessionTodos } from '@/store/todos'
 import { setSessionDraftingTool } from '@/store/tool-drafting'
-import type { FileAttachResponse, HandoffFailResponse, HandoffRequestResponse, HandoffStateResponse, ImageAttachResponse, SessionRedirectResponse } from '@/types/api-responses'
+import type { HandoffFailResponse, HandoffRequestResponse, HandoffStateResponse, SessionRedirectResponse } from '@/types/api-responses'
 import type { ComposerAttachment } from '@/types/composer'
 import type { ClientSessionState } from '@/types/session'
 
@@ -54,12 +55,8 @@ import { useSlashCommand } from './slash'
 import { useSubmitPrompt } from './submit'
 import {
   delay,
-  friendlyRemoteAttachError,
-  type GatewayRequest,
   inlineErrorMessage,
   markSessionRecentlyInterrupted,
-  readFileDataUrlForAttach,
-  readImageForRemoteAttach,
   shouldInterruptBeforeRewind,
   type SubmitTextOptions,
   withSessionNotFoundResume
@@ -70,143 +67,11 @@ interface HandoffResult {
   error?: string
 }
 
-const WINDOWS_ABSOLUTE_PATH_RE = /^(?:[A-Za-z]:[\\/]|\\\\)/
-const POSIX_ABSOLUTE_PATH_RE = /^\/(?!\/)/
-
-// Terminal backends whose execution environment has its own filesystem
-// (docker/ssh/singularity/modal/...) cannot see the desktop's host paths —
-// they must be crossed as bytes, like remote attachments. Mirrors the
-// container_backend set in tools/terminal_tool.py::_get_env_config.
-const CONTAINER_TERMINAL_BACKENDS = new Set(['docker', 'ssh', 'singularity', 'modal', 'daytona', 'vercel_sandbox'])
-
-// `mode: local` means the gateway was launched locally, not necessarily that
-// Electron and the gateway share a filesystem. Windows Desktop can front a
-// WSL/Docker backend whose cwd is POSIX, so a Windows host path must cross the
-// boundary as bytes just like a remote attachment. Container terminal backends
-// (docker, ssh, ...) always need bytes: the sandbox has its own filesystem and
-// the host path would dangle inside it (#76577).
-function attachmentPathNeedsUpload(path: string, backendCwd?: null | string, terminalBackend?: string): boolean {
-  if (CONTAINER_TERMINAL_BACKENDS.has((terminalBackend || '').trim().toLowerCase())) {
-    return true
-  }
-
-  return WINDOWS_ABSOLUTE_PATH_RE.test(path.trim()) && POSIX_ABSOLUTE_PATH_RE.test(backendCwd?.trim() || '')
-}
-
-/**
- * Stage one file/image attachment into the session workspace and return the
- * attachment rewritten with the gateway-side ref. Attachments upload their
- * bytes for remote gateways and local cross-filesystem backends; otherwise the
- * gateway receives the shared local path. Throws on failure so callers can
- * surface an error. Shared by submit-time sync, the eager drop-time upload, and
- * the message-edit composer drop — keep them in lockstep.
- */
-export async function uploadComposerAttachment(
-  attachment: ComposerAttachment,
-  opts: {
-    backendCwd?: null | string
-    remote: boolean
-    requestGateway: GatewayRequest
-    sessionId: string
-    /** Durable id used to re-register after sleep/wake or a backend restart. */
-    storedSessionId?: null | string
-    /** Called when the attach recovered onto a fresh live id. */
-    onSessionRecovered?: (sessionId: string) => void
-    terminalBackend?: string
-  }
-): Promise<ComposerAttachment> {
-  const { backendCwd, remote, requestGateway, storedSessionId, onSessionRecovered, terminalBackend } = opts
-  const path = attachment.path ?? ''
-  const label = attachment.label || pathLabel(path)
-  const uploadBytes = remote || attachmentPathNeedsUpload(path, backendCwd, terminalBackend)
-
-  // Read bytes/paths ONCE, outside the retry. Only the session-scoped RPC is
-  // replayed on recovery — re-reading a multi-MB file to retry a dead session
-  // id would double the disk/IPC cost of every recovered attach. For images,
-  // the chip's previewUrl already holds the full file as a base64 data URL,
-  // so passing it avoids re-reading the same bytes off disk at submit.
-  let imagePayload: Awaited<ReturnType<typeof readImageForRemoteAttach>> | null = null
-  let fileDataUrl: null | string = null
-
-  if (uploadBytes) {
-    try {
-      if (attachment.kind === 'image') {
-        imagePayload = await readImageForRemoteAttach(path, attachment.previewUrl)
-      } else {
-        fileDataUrl = await readFileDataUrlForAttach(path)
-      }
-    } catch (err) {
-      throw friendlyRemoteAttachError(err, label)
-    }
-
-    if (attachment.kind === 'image' ? !imagePayload : !fileDataUrl) {
-      throw new Error(`Could not read ${label}`)
-    }
-  }
-
-  const stageForSession = async (liveSessionId: string): Promise<ComposerAttachment> => {
-    if (attachment.kind === 'image') {
-      const result = imagePayload
-        ? await requestGateway<ImageAttachResponse>('image.attach_bytes', {
-            session_id: liveSessionId,
-            content_base64: imagePayload.contentBase64,
-            filename: imagePayload.filename
-          })
-        : await requestGateway<ImageAttachResponse>('image.attach', {
-            path,
-            session_id: liveSessionId
-          })
-
-      if (!result.attached) {
-        throw new Error(result.message || `Could not attach ${label}`)
-      }
-
-      const attachedPath = result.path || path
-
-      return {
-        ...attachment,
-        attachedSessionId: liveSessionId,
-        label: attachedPath ? pathLabel(attachedPath) : attachment.label,
-        path: attachedPath,
-        uploadState: undefined
-      }
-    }
-
-    const result = await requestGateway<FileAttachResponse>('file.attach', {
-      name: label,
-      path,
-      session_id: liveSessionId,
-      ...(fileDataUrl ? { data_url: fileDataUrl } : {})
-    })
-
-    if (!result.attached || !result.ref_text) {
-      throw new Error(result.message || `Could not attach ${label}`)
-    }
-
-    return {
-      ...attachment,
-      attachedSessionId: liveSessionId,
-      refText: result.ref_text,
-      uploadState: undefined
-    }
-  }
-
-  // Attach runs BEFORE prompt.submit, so submit's own recovery never gets a
-  // chance: a stale runtime id fails here first and the user sees "session not
-  // found" on an image while plain text works.
-  const { result, sessionId: usedSessionId } = await withSessionNotFoundResume(
-    opts.sessionId,
-    storedSessionId,
-    stageForSession,
-    { requestGateway }
-  )
-
-  if (usedSessionId !== opts.sessionId) {
-    onSessionRecovered?.(usedSessionId)
-  }
-
-  return result
-}
+// The composer's attachment upload is a use-case, not a hook: it lives in
+// application/session/upload-attachment.ts so below-app callers (the edit
+// composer) can reach it. Re-exported here because the session tile actions
+// and index.test.tsx still import it from this module.
+export { uploadComposerAttachment } from '@/application/session/upload-attachment'
 
 interface PromptActionsOptions {
   activeSessionId: string | null

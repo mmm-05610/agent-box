@@ -16,6 +16,5 @@
 // work gets scheduled: a `lib/` batch, a `store/` batch, and so on.
 
 export const DEBT_LEDGER: readonly string[] = [
-  // components/ — 1
-  'components/assistant-ui/thread/user-edit-composer.tsx -> @/app/session/hooks/use-prompt-actions',
+
 ]

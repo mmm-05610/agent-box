@@ -14,7 +14,7 @@ import {
 } from 'react'
 
 import type { HermesGateway } from '@/api/client'
-import { uploadComposerAttachment } from '@/app/session/hooks/use-prompt-actions'
+import { uploadComposerAttachment } from '@/application/session/upload-attachment'
 import { hermesDirectiveFormatter } from '@/components/assistant-ui/directive-text'
 import {
   StickyHumanMessageContainer,
