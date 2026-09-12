@@ -4,7 +4,7 @@ import { $rightRailActiveTabId } from '@/store/layout'
 import { closeRightRail, openPreview, type PreviewTarget } from '@/store/preview'
 
 import { actOnActivePreview } from './preview-act'
-import { registerPreviewInput } from './preview-input'
+import { registerPreviewInput } from '@/application/preview/preview-input'
 import { registerPreviewNav } from './preview-nav'
 import { registerPreviewScriptRunner } from './preview-script-runner'
 

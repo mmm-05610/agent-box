@@ -65,7 +65,7 @@ import {
 import { type ConsoleEntry } from './preview-console-state'
 import { previewConsoleState } from './preview-console-store'
 import { LocalFilePreview, PreviewEmptyState } from './preview-file'
-import { type PreviewInputEvent, registerPreviewInput } from './preview-input'
+import { type PreviewInputEvent, registerPreviewInput } from '@/application/preview/preview-input'
 import { PREVIEW_BROWSER_ATTR, registerPreviewNav } from './preview-nav'
 import { registerPreviewPageReader } from './preview-reader'
 import { registerPreviewScriptRunner } from './preview-script-runner'
