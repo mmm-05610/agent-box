@@ -336,6 +336,10 @@ export interface Translations {
       targetLabel: string
       targetNew: string
     }
+    pet: {
+      composerPlaceholder: string
+      openInApp: string
+    }
   }
 
   keybinds: {

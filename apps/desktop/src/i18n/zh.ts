@@ -288,6 +288,10 @@ export const zh: Translations = {
       targetCurrent: '当前对话',
       targetLabel: '目标会话',
       targetNew: '新会话'
+    },
+    pet: {
+      composerPlaceholder: '消息…',
+      openInApp: '打开应用'
     }
   },
 

@@ -1,3 +1,4 @@
+import type { PetOverlayWindowPort } from '@/app/windows/pet/port'
 import type { QuickEntryWindowPort } from '@/app/windows/quick-entry/port'
 
 /**
@@ -40,4 +41,33 @@ export function quickEntryWindowPort(): QuickEntryWindowPort {
       }
 
   return quickEntryPort
+}
+
+let petOverlayPort: PetOverlayWindowPort | null = null
+
+/** The popped-out pet overlay's host port (no-op when the shell lacks the API). */
+export function petOverlayWindowPort(): PetOverlayWindowPort {
+  if (petOverlayPort) {
+    return petOverlayPort
+  }
+
+  const api = typeof window === 'undefined' ? undefined : window.hermesDesktop?.petOverlay
+
+  petOverlayPort = api
+    ? {
+        control: payload => api.control(payload),
+        onState: callback => api.onState(callback),
+        setBounds: bounds => api.setBounds(bounds),
+        setFocusable: focusable => api.setFocusable(focusable),
+        setIgnoreMouse: ignore => api.setIgnoreMouse(ignore)
+      }
+    : {
+        control: () => undefined,
+        onState: () => () => undefined,
+        setBounds: () => undefined,
+        setFocusable: () => undefined,
+        setIgnoreMouse: () => undefined
+      }
+
+  return petOverlayPort
 }

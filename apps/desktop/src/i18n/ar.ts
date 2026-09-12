@@ -262,6 +262,10 @@ export const ar = defineLocale({
       targetCurrent: 'المحادثة الحالية',
       targetLabel: 'الجلسة الهدف',
       targetNew: 'جلسة جديدة'
+    },
+    pet: {
+      composerPlaceholder: 'رسالة…',
+      openInApp: 'افتح التطبيق'
     }
   },
   keybinds: {

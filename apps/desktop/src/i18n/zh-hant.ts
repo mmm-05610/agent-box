@@ -284,6 +284,10 @@ export const zhHant = defineLocale({
       targetCurrent: '目前對話',
       targetLabel: '目標工作階段',
       targetNew: '新工作階段'
+    },
+    pet: {
+      composerPlaceholder: '訊息…',
+      openInApp: '開啟應用程式'
     }
   },
 

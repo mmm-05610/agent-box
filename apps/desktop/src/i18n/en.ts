@@ -296,6 +296,10 @@ export const en: Translations = {
       targetCurrent: 'Current chat',
       targetLabel: 'Target session',
       targetNew: 'New session'
+    },
+    pet: {
+      composerPlaceholder: 'Message…',
+      openInApp: 'Open the app'
     }
   },
 

@@ -293,6 +293,10 @@ export const ja = defineLocale({
       targetCurrent: '現在のチャット',
       targetLabel: '送信先セッション',
       targetNew: '新しいセッション'
+    },
+    pet: {
+      composerPlaceholder: 'メッセージ…',
+      openInApp: 'アプリを開く'
     }
   },
 

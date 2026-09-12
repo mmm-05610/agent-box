@@ -282,6 +282,10 @@ export const ru = defineLocale({
       targetCurrent: 'Текущий чат',
       targetLabel: 'Целевой сеанс',
       targetNew: 'Новый сеанс'
+    },
+    pet: {
+      composerPlaceholder: 'Сообщение…',
+      openInApp: 'Открыть приложение'
     }
   },
   keybinds: {
