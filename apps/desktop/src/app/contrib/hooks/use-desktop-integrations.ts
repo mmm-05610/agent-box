@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 
-import { closeActiveTab } from '@/app/chat/close-tab'
+import { closeActiveTab } from '@/features/chat/close-tab'
 import { openSession } from '@/app/open-session'
 import { commandFocusedPreview } from '@/application/preview/preview-nav'
 import { requestComposerFocus, requestComposerInsert } from '@/components/composer/focus'

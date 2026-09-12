@@ -5,7 +5,7 @@
  * hint publishing, teardown — and a per-kind RESOLVER supplies the semantics:
  * what the pointer is over (`resolveMove` → DropHint) and what a release
  * does (`onCommit`). Pane/tab drags (below) are the first resolver; the
- * sidebar session drag (app/chat/session-drag.ts) is the second. Native
+ * sidebar session drag (features/chat/session-drag.ts) is the second. Native
  * HTML5 DnD is reserved for true OS boundaries (Finder file drops) — in-app
  * drags never ride it, so no snap-back animation, no hostile-library
  * armor, and Esc aborts synchronously.

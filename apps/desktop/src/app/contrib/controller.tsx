@@ -4,7 +4,7 @@ import { useStore } from '@nanostores/react'
 import { atom, computed } from 'nanostores'
 import type { CSSProperties, ReactElement, PointerEvent as ReactPointerEvent } from 'react'
 
-import { SessionDraftTitle } from '@/app/chat/session-draft-title'
+import { SessionDraftTitle } from '@/features/chat/session-draft-title'
 import { PALETTE_AREA, type PaletteContribution, paletteToggle } from '@/app/command-palette/contrib'
 import { type StatusbarItem } from '@/app/shell/statusbar-controls'
 import { InlinePreviewDirective } from '@/components/assistant-ui/inline-preview-directive'
@@ -80,17 +80,17 @@ import { $terminalTakeover, setTerminalTakeover } from '@/store/terminal-takeove
 import { isBrowserWindow, isHudWindow } from '@/store/windows'
 import { setYoloEnabled } from '@/store/yolo-session'
 
-import { BrowserPopoutShell } from '../chat/browser-popout-shell'
-import { watchPreviewTiles } from '../chat/preview-tile'
-import { watchRouteTiles } from '../chat/route-tile'
-import { startSessionDrag } from '../chat/session-drag'
+import { BrowserPopoutShell } from '@/features/chat/browser-popout-shell'
+import { watchPreviewTiles } from '@/features/chat/preview-tile'
+import { watchRouteTiles } from '@/features/chat/route-tile'
+import { startSessionDrag } from '@/features/chat/session-drag'
 import {
   SessionTileCloseConfirm,
   stackSessionTilesIntoMain,
   startUnrestoredTileTitleBackfill,
   watchSessionTiles,
   WorkspaceTabMenu
-} from '../chat/session-tile'
+} from '@/features/chat/session-tile'
 import { AppContextMenu } from '../context-menu/app-context-menu'
 import { HudShell } from '../hud/hud-shell'
 import { $workspaceIsPage } from '../routes'

@@ -444,7 +444,7 @@ interface SaveOutcome {
 
 /**
  * Drive the app's REAL save surface: the same `saveConnectionConfig` payload
- * Settings → Gateway sends (see src/app/settings/gateway-settings.tsx). We use
+ * Settings → Gateway sends (see src/features/settings/gateway-settings.tsx). We use
  * save rather than apply so the app persists the credential without trying to
  * re-home onto the fake gateway.
  */

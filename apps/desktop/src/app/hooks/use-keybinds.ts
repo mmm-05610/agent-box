@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 
-import { closeActiveTab } from '@/app/chat/close-tab'
-import { composerFocusKeysAllowed, isComposerFocusSoftCombo, typeToFocusChar } from '@/app/chat/composer/focus-keys'
+import { closeActiveTab } from '@/features/chat/close-tab'
+import { composerFocusKeysAllowed, isComposerFocusSoftCombo, typeToFocusChar } from '@/features/chat/composer/focus-keys'
 import { hudTargetSessionId } from '@/app/hud/handoff'
 import { appViewForPath, isOverlayView } from '@/app/routes'
 import { cycleProfile, switchProfileToSlot, switchToDefaultProfile } from '@/application/profile/navigation'
@@ -60,8 +60,8 @@ import { setTerminalTakeover } from '@/store/terminal-takeover'
 import { openNewWindow } from '@/store/windows'
 import { useTheme } from '@/themes/context'
 
-import { handleComposerFocusChord } from '../chat/composer/focus-chord'
-import { handleWindowPaste } from '../chat/composer/paste-to-focus'
+import { handleComposerFocusChord } from '@/features/chat/composer/focus-chord'
+import { handleWindowPaste } from '@/features/chat/composer/paste-to-focus'
 import { openSession } from '../open-session'
 import {
   $workspaceIsPage,

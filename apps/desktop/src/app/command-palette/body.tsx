@@ -85,9 +85,9 @@ import {
   SKILLS_ROUTE,
   STARMAP_ROUTE
 } from '../routes'
-import { SECTIONS } from '../settings/constants'
-import { type SettingsSearchEntry, settingsSearchTargetQuery } from '../settings/settings-search'
-import { useSettingsSearchCatalog } from '../settings/use-settings-search'
+import { SECTIONS } from '@/features/settings/constants'
+import { type SettingsSearchEntry, settingsSearchTargetQuery } from '@/features/settings/settings-search'
+import { useSettingsSearchCatalog } from '@/features/settings/use-settings-search'
 
 import { usePaletteContributions } from './contrib'
 import { HighlightWatcher } from './highlight-watcher'

@@ -51,7 +51,7 @@ installSelectionCopyColorGuard()
 // minified production renderer for representative absolute numbers. Normal
 // `npm run build` leaves the flag unset, so the probe never reaches users.
 if (import.meta.env.MODE !== 'production' || import.meta.env.VITE_PERF_PROBE === '1') {
-  import('./app/chat/perf-probe')
+  import('./features/chat/perf-probe')
 }
 
 const winParam = new URLSearchParams(window.location.search).get('win')

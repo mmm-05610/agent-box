@@ -513,12 +513,12 @@ describe('useSessionTileDelegate interruptSession', () => {
 
   afterEach(async () => {
     setSessions([])
-    const { clearSessionRecentlyInterrupted } = await import('../../session/hooks/use-prompt-actions/utils')
+    const { clearSessionRecentlyInterrupted } = await import('@/features/session/hooks/use-prompt-actions/utils')
     clearSessionRecentlyInterrupted()
   })
 
   it('marks the session recently interrupted so a quick tile edit/resend still interrupt-firsts (#83855)', async () => {
-    const { isSessionRecentlyInterrupted } = await import('../../session/hooks/use-prompt-actions/utils')
+    const { isSessionRecentlyInterrupted } = await import('@/features/session/hooks/use-prompt-actions/utils')
 
     const requestGateway = vi.fn(async () => ({}) as never)
 

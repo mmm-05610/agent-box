@@ -18,9 +18,9 @@ import { $gateway } from '@/store/gateway'
 import { $activeGatewayProfile } from '@/store/profile'
 import { $freshDraftReady, $gatewayState } from '@/store/session'
 
-import { ChatView } from '../chat'
-import { ChatSidebar } from '../chat/sidebar'
-import { TerminalPaneChrome } from '../right-sidebar/terminal/chrome'
+import { ChatView } from '@/features/chat'
+import { ChatSidebar } from '@/features/chat/sidebar'
+import { TerminalPaneChrome } from '@/features/right-sidebar/terminal/chrome'
 import { contributedRoutes, NEW_CHAT_ROUTE, ROUTES_AREA, sessionRoute } from '../routes'
 import { useStatusSnapshot } from '../shell/hooks/use-status-snapshot'
 import { useStatusbarItems } from '../shell/hooks/use-statusbar-items'
@@ -34,8 +34,8 @@ import type { SidebarActions, WiringActions } from './types'
 // Same lazy-view split as DesktopController — pages load on demand. The
 // full-page views the workspace route table mounts live here; overlay views
 // (agents/settings/…) are the controller's and stay in wiring.tsx.
-const ArtifactsView = lazy(async () => ({ default: (await import('../artifacts')).ArtifactsView }))
-const SkillsView = lazy(async () => ({ default: (await import('../skills')).SkillsView }))
+const ArtifactsView = lazy(async () => ({ default: (await import('@/features/artifacts')).ArtifactsView }))
+const SkillsView = lazy(async () => ({ default: (await import('@/features/skills')).SkillsView }))
 
 export function LegacySessionRedirect() {
   const { sessionId } = useParams()

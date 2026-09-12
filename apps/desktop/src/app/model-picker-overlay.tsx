@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
 
 import type { HermesGateway } from '@/api/client'
-import { useModelControls } from '@/app/session/hooks/use-model-controls'
+import { useModelControls } from '@/features/session/hooks/use-model-controls'
 import type { ModelSelection } from '@/app/shell/model-menu-panel'
 import { requestForSessionProfile } from '@/application/session/request-router'
 import { ModelPickerDialog } from '@/components/model-picker'

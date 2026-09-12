@@ -82,9 +82,9 @@ import {
 import { clearSessionTodos, setSessionTodos, todosForHydration } from '@/store/todos'
 import { isAuxiliaryWindow, isBrowserWindow, isHudWindow } from '@/store/windows'
 
-import { closeWorkspaceTab } from '../chat/close-tab'
+import { closeWorkspaceTab } from '@/features/chat/close-tab'
 import { CommandPalette } from '../command-palette'
-import { triggerAndRefreshCronJobs } from '../cron/cron-actions'
+import { triggerAndRefreshCronJobs } from '@/features/cron/cron-actions'
 import { useGatewayBoot } from '../gateway/hooks/use-gateway-boot'
 import { useHermesConfigRecord } from '../hooks/use-config-record'
 import { useKeybinds } from '../hooks/use-keybinds'
@@ -92,11 +92,11 @@ import { useHudHandoff } from '../hud/handoff'
 import { ModelPickerOverlay } from '../model-picker-overlay'
 import { ModelVisibilityOverlay } from '../model-visibility-overlay'
 import { mainChatOccupied, openSession } from '../open-session'
-import { PetGenerateOverlay } from '../pet-generate/pet-generate-overlay'
-import { FileActionDialogs } from '../right-sidebar/file-actions'
-import { RemoteFolderPicker } from '../right-sidebar/files/remote-picker'
-import { resetProjectTreeState } from '../right-sidebar/files/use-project-tree'
-import { PersistentTerminal } from '../right-sidebar/terminal/persistent'
+import { PetGenerateOverlay } from '@/features/pet-generate/pet-generate-overlay'
+import { FileActionDialogs } from '@/features/right-sidebar/file-actions'
+import { RemoteFolderPicker } from '@/features/right-sidebar/files/remote-picker'
+import { resetProjectTreeState } from '@/features/right-sidebar/files/use-project-tree'
+import { PersistentTerminal } from '@/features/right-sidebar/terminal/persistent'
 import {
   CRON_ROUTE,
   navigateToWorkspacePage,
@@ -105,23 +105,23 @@ import {
   SETTINGS_ROUTE,
   syncWorkspaceRoute
 } from '../routes'
-import { SessionImportView } from '../session-import'
+import { SessionImportView } from '@/features/session-import'
 import { SessionPickerOverlay } from '../session-picker-overlay'
 import { SessionSwitcher } from '../session-switcher'
-import { useBackgroundQueueDrain } from '../session/hooks/use-background-queue-drain'
-import { useContextSuggestions } from '../session/hooks/use-context-suggestions'
-import { useCwdActions } from '../session/hooks/use-cwd-actions'
-import { useHermesConfig } from '../session/hooks/use-hermes-config'
-import { useMessageStream } from '../session/hooks/use-message-stream'
-import { useModelControls } from '../session/hooks/use-model-controls'
-import { usePreviewRouting } from '../session/hooks/use-preview-routing'
-import { usePromptActions } from '../session/hooks/use-prompt-actions'
-import { useRouteResume } from '../session/hooks/use-route-resume'
-import { useSessionActions } from '../session/hooks/use-session-actions'
-import { useSessionListActions } from '../session/hooks/use-session-list-actions'
-import { useSessionStateCache } from '../session/hooks/use-session-state-cache'
-import { startWorkspaceSession } from '../session/workspace-session-target'
-import { PluginInstallModal } from '../settings/plugin-install-modal'
+import { useBackgroundQueueDrain } from '@/features/session/hooks/use-background-queue-drain'
+import { useContextSuggestions } from '@/features/session/hooks/use-context-suggestions'
+import { useCwdActions } from '@/features/session/hooks/use-cwd-actions'
+import { useHermesConfig } from '@/features/session/hooks/use-hermes-config'
+import { useMessageStream } from '@/features/session/hooks/use-message-stream'
+import { useModelControls } from '@/features/session/hooks/use-model-controls'
+import { usePreviewRouting } from '@/features/session/hooks/use-preview-routing'
+import { usePromptActions } from '@/features/session/hooks/use-prompt-actions'
+import { useRouteResume } from '@/features/session/hooks/use-route-resume'
+import { useSessionActions } from '@/features/session/hooks/use-session-actions'
+import { useSessionListActions } from '@/features/session/hooks/use-session-list-actions'
+import { useSessionStateCache } from '@/features/session/hooks/use-session-state-cache'
+import { startWorkspaceSession } from '@/features/session/workspace-session-target'
+import { PluginInstallModal } from '@/features/settings/plugin-install-modal'
 import { useOverlayRouting } from '../shell/hooks/use-overlay-routing'
 import { useWindowControlsOverlayWidth } from '../shell/hooks/use-window-controls-overlay-width'
 import { TitlebarControls } from '../shell/titlebar-controls'
@@ -146,19 +146,19 @@ import type { WiringActions, WiringApi } from './types'
 // Overlay views the controller mounts over the shell — lazy, load on demand.
 // The workspace-route full-page views (skills/artifacts) are the
 // ChatRoutesSurface's and live in ./surfaces.
-const AgentsView = lazy(async () => ({ default: (await import('../agents')).AgentsView }))
-const CommandCenterView = lazy(async () => ({ default: (await import('../command-center')).CommandCenterView }))
-const CronView = lazy(async () => ({ default: (await import('../cron')).CronView }))
-const WebhooksView = lazy(async () => ({ default: (await import('../webhooks')).WebhooksView }))
-const ProfilesView = lazy(async () => ({ default: (await import('../profiles')).ProfilesView }))
-const SettingsView = lazy(async () => ({ default: (await import('../settings')).SettingsView }))
-const StarmapView = lazy(async () => ({ default: (await import('../starmap')).StarmapView }))
+const AgentsView = lazy(async () => ({ default: (await import('@/features/agents')).AgentsView }))
+const CommandCenterView = lazy(async () => ({ default: (await import('@/features/command-center')).CommandCenterView }))
+const CronView = lazy(async () => ({ default: (await import('@/features/cron')).CronView }))
+const WebhooksView = lazy(async () => ({ default: (await import('@/features/webhooks')).WebhooksView }))
+const ProfilesView = lazy(async () => ({ default: (await import('@/features/profiles')).ProfilesView }))
+const SettingsView = lazy(async () => ({ default: (await import('@/features/settings')).SettingsView }))
+const StarmapView = lazy(async () => ({ default: (await import('@/features/starmap')).StarmapView }))
 
 // The boot-failure overlay embeds the real Settings → Gateway panel in its
 // recovery surface; the host hands it over as a prop so the overlay never
 // imports an app screen and the code-split lives here with the other views.
 const GatewaySettingsView = lazy(async () => ({
-  default: (await import('../settings/gateway-settings')).GatewaySettings
+  default: (await import('@/features/settings/gateway-settings')).GatewaySettings
 }))
 
 // Surfaces (the four wired panes), the render context + WiredPane, and the

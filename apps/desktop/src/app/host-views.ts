@@ -1,6 +1,6 @@
-import { ToolsetConfigPanel } from '@/app/settings/toolset-config-panel'
-import { SkillsView } from '@/app/skills'
-import { McpTab } from '@/app/skills/mcp-tab'
+import { ToolsetConfigPanel } from '@/features/settings/toolset-config-panel'
+import { SkillsView } from '@/features/skills'
+import { McpTab } from '@/features/skills/mcp-tab'
 import { setPluginHostViews } from '@/extension/contrib/plugin'
 
 /**

@@ -120,7 +120,7 @@ describe('right-clicking a tool panel tab', () => {
 
 describe('⌘W over a focused tool panel', () => {
   it('closes the logs tab and the toggle brings it back', async () => {
-    const { closeActiveTab } = await import('@/app/chat/close-tab')
+    const { closeActiveTab } = await import('@/features/chat/close-tab')
     const { allPaneIds } = await import('@/lib/pane-tree')
     const { revealTreePane, setPaneCollapsed } = await import('@/store/pane-shell/tree')
 

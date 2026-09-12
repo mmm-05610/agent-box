@@ -23,16 +23,16 @@ import {
 import { type SessionOwnerScope } from '@/store/session/types'
 import type { SessionResumeResponse } from '@/types/hermes'
 
-import type { usePromptActions } from '../../session/hooks/use-prompt-actions'
-import { singleFlightSessionResume } from '../../session/hooks/use-prompt-actions/single-flight-resume'
-import { markSessionRecentlyInterrupted, withSessionNotFoundResume } from '../../session/hooks/use-prompt-actions/utils'
+import type { usePromptActions } from '@/features/session/hooks/use-prompt-actions'
+import { singleFlightSessionResume } from '@/features/session/hooks/use-prompt-actions/single-flight-resume'
+import { markSessionRecentlyInterrupted, withSessionNotFoundResume } from '@/features/session/hooks/use-prompt-actions/utils'
 import {
   chatMessageArraysEquivalent,
   preserveLocalPendingTurnMessages,
   reconcileResumeMessages,
   resolveSessionOwner
-} from '../../session/hooks/use-session-actions/utils'
-import type { useSessionStateCache } from '../../session/hooks/use-session-state-cache'
+} from '@/features/session/hooks/use-session-actions/utils'
+import type { useSessionStateCache } from '@/features/session/hooks/use-session-state-cache'
 import type { GatewayRequester } from '../types'
 
 type SessionStateCache = ReturnType<typeof useSessionStateCache>

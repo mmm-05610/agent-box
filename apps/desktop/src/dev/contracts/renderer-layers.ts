@@ -47,7 +47,8 @@ export const LAYERS: readonly LayerRule[] = [
   { rank: 4, rationale: 'Reusable UI. Sits above the state it renders and below the routes that choose it.', zone: 'components' },
   { rank: 4, rationale: 'Distribution over the layers below: the SDK facade and the contribution surfaces.', zone: 'extension' },
   { rank: 4, rationale: 'Dev-only tooling and contract guards. Imported by the app; imports the stores it inspects.', zone: 'dev' },
-  { rank: 5, rationale: 'Routes, pages and shell composition. Nothing may import a route back.', zone: 'app' }
+  { rank: 5, rationale: 'Routes, pages and shell composition. Nothing may import a route back.', zone: 'app' },
+  { rank: 5, rationale: 'Product feature trees, moved whole out of `app/` (batch 30) so composition and product are separable by location. Same rank as `app/`: lateral, not a new layer.', zone: 'features' }
 ]
 
 /** Root-level modules that belong to the ladder. A file that is not listed here

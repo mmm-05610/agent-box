@@ -3,7 +3,7 @@ import { defineFieldCopy } from './field-copy'
 // The English copy every Settings schema field falls back to, and the one the
 // search index and the config form read directly when the active locale has no
 // override. It lives in the catalog because it IS translation copy: Settings
-// consumes these keys (`app/settings/constants.ts` re-exports them), rather
+// consumes these keys (`features/settings/constants.ts` re-exports them), rather
 // than the other way round — the reverse edge used to pull the whole Settings
 // module — icons, theme modes, provider tables — into `en.ts`, and from there
 // into the app's largest import cycle.

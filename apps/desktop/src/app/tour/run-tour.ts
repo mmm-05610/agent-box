@@ -16,7 +16,7 @@ import './app-tour.css'
 
 import { driver as driverFactory } from 'driver.js'
 
-import { runPreviewTour } from '@/app/chat/right-rail/preview-tour'
+import { runPreviewTour } from '@/features/chat/right-rail/preview-tour'
 import { revealDesktopPane } from '@/store/pane-focus'
 
 import { collectTourTargets } from './collect-targets'

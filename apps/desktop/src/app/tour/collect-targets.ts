@@ -103,7 +103,7 @@ export function collectTourTargets(doc: Document, max: number): TourTarget[] {
     // components/pane-shell/pane-visibility.ts). No rect test can tell those
     // two apart, so the attribute is the only answer, and without it a tour can
     // spotlight a background tab's composer. Duplicate `data-tour` handles are
-    // headed off at the source instead (app/chat/tour-marker.ts). Inlined
+    // headed off at the source instead (features/chat/tour-marker.ts). Inlined
     // rather than imported because this function is stringified into the
     // preview webview, where no pane ever carries the attribute.
     if (el.closest('[data-pane-hidden]')) {

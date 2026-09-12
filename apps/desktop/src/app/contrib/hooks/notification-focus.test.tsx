@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
 
-import { paneMirror } from '@/app/chat/pane-mirror'
+import { paneMirror } from '@/features/chat/pane-mirror'
 import { sessionRoute, syncWorkspaceRoute } from '@/app/routes'
 import { registry } from '@/lib/contributions'
 import { group } from '@/lib/pane-tree'
