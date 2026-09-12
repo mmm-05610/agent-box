@@ -248,6 +248,17 @@ already failed with 10 import-sort errors in `app/session/hooks/use-session-acti
 equivalent repoints of pre-existing `app/open-session` / routing-helper consumers sanctioned by the
 batch's stop-condition §7.4; no NEW reverse dependency was created (the §B2 movers are clean).
 
+## Phase 5 — post-Batch-30 semantic ownership
+
+| item | scope | baseline | destination | order | status |
+| --- | --- | --- | --- | --- | --- |
+| 31 | Session opening, owner resolution and Session-scoped request dispatch leave composition | Batch 30 executor snapshot: 6 files / 1,096 lines; adjacent `application/session/request-router.ts` 210 lines | `application/session/{open-session,session-owner,session-rpc-dispatcher}*`; `overlay-routing.ts` stays | after Batch 30 merged + independent review; runs alone | dispatched — waiting for prerequisite |
+| 32 | Hermes/Gateway/RPC/product vocabulary becomes Harness/Runtime/Session/Work Core vocabulary where semantically correct | scope deliberately not frozen yet | coordinated final vocabulary pass | last, after all `app/` semantic reviews and an approved compatibility-aware vocabulary table | reserved — design blocked, do not execute |
+
+Batch 31 contract: [31-session-routing-sink.md](renderer-layer-batches/31-session-routing-sink.md).
+Batch 32 is intentionally absent from the manifest and has no work-order file: its terminology table is
+not yet complete, so an executor must not infer mappings or run a global replacement.
+
 ## How to update this file
 
 One edit per work order, in the same commit as the work or immediately after:

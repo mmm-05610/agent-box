@@ -182,6 +182,23 @@ composition 选择 sections，Shell 只呈现并管理通用 DOM/guest/shell 动
 **执行**：batch [30](renderer-layer-batches/30-app-composition-root.md)。它在 17–29 全部
 merged + reviewed 后独占运行，避免一次全树路径迁移踩正在施工的 UI 文件。
 
+### 8 · `composition/routing` 复审修正
+
+Batch 30 先按旧裁决把 `open-session`、`session-owner` 与
+`session-rpc-dispatcher` 归进 `composition/routing`。独立语义复审后确认，这个分类把
+“参与应用装配”误当成了“属于装配层”：三者分别实现 Session 打开策略、Session owner
+解析和 Session-scoped request 编排，都是 `application/session` 用例。只有
+`overlay-routing.ts` 是 UI composition routing。
+
+因此 Batch 31 将前三组实现与测试原样下沉到 `application/session/`，不顺手改协议、行为或
+词汇，也不把 dispatcher 强行并入已有 `request-router.ts`。后者负责选择并持有 owner transport，
+dispatcher 负责在它之前解析目标 Session 与 owner；它们是相邻上下游。
+
+Hermes/Gateway/RPC/品牌词汇另行保留为低优先级的终端 Batch 32。它必须等
+`composition`、`shell`、`windows` 及相关 product feature 的语义审阅全部完成并形成逐项词汇表后
+才能派工，禁止执行者自行全局替换。兼容性名称（preload global、IPC channel、storage key、
+持久化字段）必须与用户文案、代码符号分开裁决。
+
 ---
 
 ## 三、待裁决

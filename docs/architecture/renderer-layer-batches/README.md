@@ -22,6 +22,10 @@ Phase 4 的终端结构单是 [30](30-app-composition-root.md)：除 composition
 锁定 Shell 的 `chrome/layers/hooks/platform` 结构，以及 Context Menu 的
 composition 组装 / Shell host / Terminal feature 三方拆分。
 
+Phase 5 从独立语义复审开始：[31](31-session-routing-sink.md) 把 Session 打开、owner
+解析和 Session-scoped request 编排从 composition 下沉到 `application/session/`。Batch 32
+只在 status 中保留编号，等待完整 `app/` 语义审阅和兼容性词汇表后才会成为可执行派工单。
+
 | batch | scope | edges paid off |
 | --- | --- | --- |
 | [01](01-lib-services-to-store.md) | four small stateful `lib/` services → `store/` | 6 |

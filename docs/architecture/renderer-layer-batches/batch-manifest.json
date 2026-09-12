@@ -326,5 +326,13 @@
     "modules": [
       "."
     ]
+  },
+  "31 session routing sink": {
+    "edges": 0,
+    "modules": [
+      "app/composition/routing/open-session",
+      "app/composition/routing/session-owner",
+      "app/composition/routing/session-rpc-dispatcher"
+    ]
   }
 }

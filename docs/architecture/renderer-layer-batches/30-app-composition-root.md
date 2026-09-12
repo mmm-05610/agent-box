@@ -195,6 +195,13 @@ statusbar/titlebar contribution area 或调用顺序。拆完旧文件必须删�
 `features/runtime/gateway` 是现有 Hermes Gateway 实现的临时产品归属，不是新的通用协议层。
 本批不把它改写成 ACP，也不把 Hermes 类型改名伪装成通用类型；后续 Harness Port 切片再替换。
 
+> **Independent semantic-review correction (2026-09-13):** Batch 30 preserves its
+> historical move and validation record, but `routing/` is not the final owner of all
+> three Session helpers. Batch 31 moves `open-session`, `session-owner` and
+> `session-rpc-dispatcher` to `application/session/`; only `overlay-routing` remains
+> composition-owned. The correction is a later work order rather than a rewrite of
+> Batch 30's already-built scope.
+
 ### C · `shell/` 只保留主窗口公共骨架
 
 派单时这组候选合计约 **58 个 TS/TSX、11,822 行**。不能整桶塞进 `shell/`：其中既有
