@@ -305,5 +305,14 @@
       "workspace-groups'",
       "session-project-label'"
     ]
+  },
+  "29 messaging config removal": {
+    "edges": 0,
+    "modules": [
+      "MESSAGING_ROUTE",
+      "nav\\.messaging",
+      "MessagingView",
+      "platform-icon'"
+    ]
   }
 }

@@ -170,7 +170,19 @@ out-of-group closure clean.
 | 25 | the interrupted-turn seal is extracted, and `session-info.ts` follows it | 1 (+1 fn) | 459 | `application/session/` | 2 | open |
 | 26 | the tool card's view model — renamed from the misleading `fallback-model` | 4 | 1817 | `lib/tool-view/` | 1 | open |
 | 27 | three zero-hermes form widgets out of the settings page | 3 | 495 | `components/settings/` | 4 | open |
-| 28 | the `sessions` pane's derivations, including the 672-line `workspace-groups.ts` | 3 | 955 | `application/sidebar/` | — | open |
+| 28 | the `sessions` pane's derivations, including the 672-line `workspace-groups.ts` | 3 | 955 | `application/sidebar/` | 7 | open |
+| 29 | **removal** — the messaging platforms' config surface (page · route · nav · palette · keybinds · i18n) | 2 del + 6 edit | ~1,057 | — | 6 | open |
+
+**29 is the first removal batch here, and its evidence is inverted.** A move is
+guarded by `typecheck`: a missed specifier goes red. A removal is not — forgetting to
+delete something leaves green, compiling dead code. So 29 carries a "must NOT delete"
+section ahead of its "delete" section, and the executor reports the *drop* in test
+count as the primary evidence rather than treating it as a regression.
+
+**It also found something the rearrangement needs:** `app/chat/route-tile.tsx` renders
+a page as a layout-tree pane *beside* the main thread (`openRouteTile`). So the
+question "can skills/messaging/artifacts be pulled out and viewed side by side?" — the
+mechanism already exists. Recorded for the `pages/` ruling.
 
 **Two ordering facts the wave table cannot express**, because waves encode *file
 collisions*, not dependencies:
