@@ -1,10 +1,4 @@
-import type { GatewayEventContext } from '@/application/session/gateway-event/types'
-import {
-  applySessionInfoStatePatch,
-  hasSessionInfoStatePatch,
-  PRE_TURN_LIVE_SETTLE_GRACE_MS,
-  sessionInfoStatePatch
-} from '@/application/session/message-stream-utils'
+import { finalizeInterruptedMessages } from '@/application/session/finalize-interrupted-turn'
 import { normalizePersonalityValue } from '@/lib/chat-runtime'
 import { modelOptionsQueryKey } from '@/lib/model-options'
 import { reconcileApprovalModeForProfile } from '@/store/approval-mode'
@@ -34,7 +28,13 @@ import {
 } from '@/store/session'
 import { reportInstallMethodWarning } from '@/store/updates'
 
-import { finalizeInterruptedMessages } from '../../use-prompt-actions/rewind'
+import type { GatewayEventContext } from './gateway-event/types'
+import {
+  applySessionInfoStatePatch,
+  hasSessionInfoStatePatch,
+  PRE_TURN_LIVE_SETTLE_GRACE_MS,
+  sessionInfoStatePatch
+} from './message-stream-utils'
 
 /**
  * Whether a `session.info` payload's `stored_session_id` may be treated as the

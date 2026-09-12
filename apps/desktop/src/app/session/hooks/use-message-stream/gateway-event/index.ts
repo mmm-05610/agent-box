@@ -10,6 +10,7 @@ import type {
   GatewayEventDeps,
   GatewayEventHandler
 } from '@/application/session/gateway-event/types'
+import { handleSessionInfoEvent } from '@/application/session/session-info'
 import type { GatewayEventPayload } from '@/lib/chat-messages'
 import {
   approvalReplaySessionId,
@@ -27,7 +28,6 @@ import type { RpcEvent } from '@/types/hermes'
 
 import { handleDesktopBridgeEvent } from './desktop-bridge'
 import { handleMessageStreamEvent } from './message-stream'
-import { handleSessionInfoEvent } from './session-info'
 import { handleToolEvent } from './tools'
 
 export type { GatewayEventDeps } from '@/application/session/gateway-event/types'
