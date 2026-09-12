@@ -25,7 +25,7 @@ const I18N_DIR = dirname(fileURLToPath(import.meta.url))
 // cannot be one of the files it judges.
 const SELF = fileURLToPath(import.meta.url)
 
-const FORBIDDEN_ROOTS = ['@/hermes', '@/api', '@/app', '@/store', '@/themes', '@/components', '@/lib'] as const
+const FORBIDDEN_ROOTS = ['@/api', '@/app', '@/store', '@/themes', '@/components', '@/lib'] as const
 
 /** Every module specifier a TypeScript/TSX source pulls in — static imports
  *  and re-exports, side-effect imports, dynamic `import()`, `require()`, and
@@ -98,7 +98,7 @@ describe('the i18n directory is a leaf', () => {
   it('catches a forbidden import however it is written', () => {
     // Reverse control: the scanner above is worth nothing if it cannot fail.
     const cases = [
-      "import { getHermesConfigRecord } from '@/hermes'",
+      "import { getHermesConfigRecord } from '@/api/config'",
       "import { FIELD_LABELS } from '@/app/settings/constants'",
       "export { defineFieldCopy } from '@/app/settings/field-copy'",
       "import type { TipId } from '@/lib/tips/catalog'",

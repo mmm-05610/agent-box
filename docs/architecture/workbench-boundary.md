@@ -80,7 +80,7 @@ Measured today, excluding the two in-flight directories:
 | Hermes backend lifecycle | `apps/desktop/electron/legacy-hermes/` | 35,447 lines / 131 files | resolution → probe → readiness → spawn → profile pool → local/SSH/Windows |
 | Hermes protocol | `apps/desktop/src/api/**` + `application/**` | ~6,600 lines | 74 distinct `/api/…` paths + JSON-RPC; `api/client.ts` is the single door |
 | Plugin ABI | `extension/sdk/` + `plugins/` | 418 lines / 172 import sites | after the layer work: names no `app/` module |
-| `@/hermes` compatibility barrel | 180 renderer files | — | **work order 05 already written**, waiting in Phase 2 |
+| `@/hermes` compatibility barrel | was 180 renderer files | — | **removed** — work order 05 executed; call sites import `@/api/*` directly |
 | Naming and branding | renderer + electron + i18n + package.json | ~6,000 / ~3,700 / 1,072 / 33 hits | `HERMES_HOME` alone is 382 references |
 
 The one seam that already has the right shape is
@@ -137,10 +137,11 @@ needs a number rather than a feeling. Same machine as the layer migration:
 4. A **master plan** with waves, review gates, and the silent-failure catalogue —
    the four documents from tonight are the template.
 
-Two things are already banked for this: **work order 05** (delete the `@/hermes`
-barrel, 180 files) and the entire layer migration, which is what makes a port layer
-possible at all — `app/` is a leaf, `components/` and `lib/` are reusable, and the
-plugin ABI no longer points at app files.
+Two things are already banked for this: **work order 05** (the `@/hermes` barrel —
+executed: the barrel is deleted and every call site imports `@/api/*` directly) and the
+layer migration, well underway, which is what makes a port layer possible at all —
+`app/` is a leaf, `components/` and `lib/` are reusable, and the plugin ABI no longer
+points at app files.
 
 ## 6 · Phases
 

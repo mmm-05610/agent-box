@@ -22,7 +22,7 @@ import { describe, expect, it } from 'vitest'
 // Two ways to lose that, both checked here:
 //
 //  1. A leaf that reaches UP — `@/api`, `@/application`, `@/app`,
-//     `@/components`, the `@/hermes` barrel, or the gateway runtime. This is
+//     `@/components`, or the gateway runtime. This is
 //     what put the profile store inside SCC-B: `store/profile.ts → store/gateway
 //     → store/gateway/secondary-pool → store/session-states →
 //     store/session-states/tile-operations → store/profile.ts`.
@@ -51,9 +51,6 @@ const FORBIDDEN_ZONES = ['api', 'application', 'app', 'components', 'themes'] as
  *  store's state both route BACK into the profile leaves, so a leaf that
  *  imported them would close a cycle instead of a dependency. */
 const FORBIDDEN_STORE = ['@/store/gateway', '@/store/session'] as const
-
-/** `src/hermes.ts` — the compatibility barrel over `api/**`. */
-const BARREL = 'hermes.ts'
 
 /** Product modules that are not a zone but are just as forbidden to a leaf:
  *  `@/global` declares the Electron bridge the renderer talks to. */
@@ -123,10 +120,6 @@ export function forbiddenSpecifier(specifier: string): string | null {
     return null
   }
 
-  if (specifier === '@/hermes' || specifier.startsWith('@/hermes/')) {
-    return 'the @/hermes barrel'
-  }
-
   for (const zone of FORBIDDEN_ZONES) {
     if (specifier === `@/${zone}` || specifier.startsWith(`@/${zone}/`)) {
       return `@/${zone}`
@@ -151,10 +144,6 @@ export function forbiddenSpecifier(specifier: string): string | null {
 /** The forbidden zone a `src/`-relative path sits in, or null. Catches the
  *  relative spelling (`../application/session-lists`) no alias prefix would. */
 export function forbiddenPath(path: string): string | null {
-  if (path === BARREL || path.startsWith('hermes/')) {
-    return 'the @/hermes barrel'
-  }
-
   if (path === 'store/session/types.ts') {
     return null
   }
@@ -382,7 +371,7 @@ describe('the profile store reaches nothing above itself', () => {
     const leaf = { path: 'store/profile/catalog-state.ts', source: '' }
 
     const cases = [
-      "import { getProfiles } from '@/hermes'",
+      "import { getProfiles } from '@/api/profiles'",
       "import { refreshProfiles } from '@/application/profile/catalog'",
       "import { ensureGatewayProfile } from '@/application/profile/runtime-selection'",
       "import { $gateway } from '@/store/gateway'",
@@ -393,7 +382,7 @@ describe('the profile store reaches nothing above itself', () => {
       "import type { HermesConnection } from '@/global'",
       "export { markSessionUnread } from '@/application/session-read-state'",
       "const mod = await import('@/store/gateway')",
-      "const legacy = require('@/hermes')",
+      "const legacy = require('@/api/profiles')",
       "vi.mock('@/application/profile/catalog', () => ({}))"
     ]
 

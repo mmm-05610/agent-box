@@ -19,7 +19,7 @@ import { describe, expect, it } from 'vitest'
 //     store             ->  nothing above it
 //
 // So a module under `store/session*` may never reach `@/api`, `@/application`,
-// `@/app`, `@/components` or the `@/hermes` barrel — directly, or through any
+// `@/app` or `@/components` — directly, or through any
 // chain of helpers. The rule is checked twice for the same reason the api leaf
 // is: a direct read of the import statement in front of you misses the helper
 // that reaches a store/API two hops away, and the `from '…'` form is not the
@@ -46,9 +46,6 @@ const PINNED = ['store/session.ts', 'store/session/atoms.ts', 'store/session/unr
 
 /** Upper layers of the renderer, by directory under `src/`. */
 const FORBIDDEN_ZONES = ['api', 'application', 'app', 'components'] as const
-
-/** `src/hermes.ts` — the compatibility barrel over `api/**`. */
-const BARREL = 'hermes.ts'
 
 /** The deleted mixed-responsibility module: neither the file nor an import of
  *  it may come back. */
@@ -94,10 +91,6 @@ export interface Violation {
  *  Matches both the zone (`@/api`) and anything under it (`@/api/sessions`),
  *  plus the relative spelling of the deleted module. */
 export function forbiddenSpecifier(specifier: string): string | null {
-  if (specifier === '@/hermes' || specifier.startsWith('@/hermes/')) {
-    return 'the @/hermes barrel'
-  }
-
   if (specifier.includes(DELETED_NAME)) {
     return DELETED
   }
@@ -114,10 +107,6 @@ export function forbiddenSpecifier(specifier: string): string | null {
 /** The forbidden zone a `src/`-relative path sits in, or null. Catches the
  *  relative spelling (`../api/sessions`) that no alias prefix would. */
 export function forbiddenPath(path: string): string | null {
-  if (path === BARREL || path.startsWith('hermes/')) {
-    return 'the @/hermes barrel'
-  }
-
   if (path === DELETED) {
     return DELETED
   }
@@ -299,7 +288,7 @@ describe('the session store reaches nothing above itself', () => {
       "import { markSessionUnread } from '@/application/session-read-state'",
       "import type { ContextSuggestion } from '@/app/shell/statusbar-controls'",
       "import { Button } from '@/components/ui/button'",
-      "import { getHermesConfigRecord } from '@/hermes'",
+      "import { getHermesConfigRecord } from '@/api/config'",
       "import { clearUnreadOnOpen } from '../session-unread-remote'",
       "export { markSessionUnread } from '@/application/session-read-state'",
       "export * from '@/api/sessions'",
@@ -341,8 +330,8 @@ describe('the session store reaches nothing above itself', () => {
 
     expect(closureViolations([graph[0]], graph).map(v => v.detail)).toHaveLength(1)
 
-    // …and the same walk through the deleted module's path or the barrel,
-    // spelled relatively.
+    // …and the same walk through the deleted module's path, or into a
+    // forbidden zone, spelled relatively.
     const shim = [
       { path: 'store/session.ts', source: "import { markSessionUnread } from './session-unread-remote'" },
       { path: DELETED, source: "import { setSessionUnreadRemote } from '@/api/sessions'" }
@@ -350,13 +339,13 @@ describe('the session store reaches nothing above itself', () => {
 
     expect(closureViolations([shim[0]], shim).map(v => v.detail)).toHaveLength(1)
 
-    const barrel = [
+    const intoApi = [
       { path: 'store/session/atoms.ts', source: "import { helper } from '../session-helper'" },
-      { path: 'store/session-helper.ts', source: "import { getProfiles } from '../hermes'" },
-      { path: BARREL, source: '' }
+      { path: 'store/session-helper.ts', source: "import { getProfiles } from '../api/profiles'" },
+      { path: 'api/profiles.ts', source: '' }
     ]
 
-    expect(closureViolations([barrel[0]], barrel).map(v => v.detail)).toHaveLength(1)
+    expect(closureViolations([intoApi[0]], intoApi).map(v => v.detail)).toHaveLength(1)
 
     // A zone the graph cannot even resolve (a deleted module, a file that does
     // not exist yet) is still an edge: the specifier itself is judged.

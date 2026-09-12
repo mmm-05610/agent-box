@@ -1,38 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { setApiRequestConnection, setApiRequestProfile } from '@/api/client'
+import { getHermesConfig, getHermesConfigDefaults, getStatus } from '@/api/config'
+import { getCronJobs, triggerCronJob } from '@/api/cron'
+import { getGlobalModelInfo, getGlobalModelOptions } from '@/api/models'
+import { pluginSocket } from '@/api/plugins'
+import { deleteProfile, getProfiles } from '@/api/profiles'
+import { deleteSession, getAllSessionMessages, getOlderSessionMessages, getSession, getSessionMessages, LATEST_SESSION_MESSAGES_LIMIT, resetSidebarBatchCapability } from '@/api/sessions'
+import { fetchLatestSessionMessages } from '@/api/sessions'
+import { AUDIO_SPEAK_MAX_REQUEST_TIMEOUT_MS, AUDIO_SPEAK_MIN_REQUEST_TIMEOUT_MS, AUDIO_TRANSCRIBE_MAX_REQUEST_TIMEOUT_MS, AUDIO_TRANSCRIBE_MIN_REQUEST_TIMEOUT_MS, audioSpeakRequestTimeoutMs, audioTranscribeRequestTimeoutMs, speakText, transcribeAudio } from '@/api/system'
 import { refreshActiveProfile } from '@/application/profile/catalog'
 import { listAllProfileSessions, listSessions, listSidebarSessions } from '@/application/session-lists'
-import {
-  AUDIO_SPEAK_MAX_REQUEST_TIMEOUT_MS,
-  AUDIO_SPEAK_MIN_REQUEST_TIMEOUT_MS,
-  AUDIO_TRANSCRIBE_MAX_REQUEST_TIMEOUT_MS,
-  AUDIO_TRANSCRIBE_MIN_REQUEST_TIMEOUT_MS,
-  audioSpeakRequestTimeoutMs,
-  audioTranscribeRequestTimeoutMs,
-  deleteProfile,
-  deleteSession,
-  getAllSessionMessages,
-  getCronJobs,
-  getGlobalModelInfo,
-  getGlobalModelOptions,
-  getHermesConfig,
-  getHermesConfigDefaults,
-  getOlderSessionMessages,
-  getProfiles,
-  getSession,
-  getSessionMessages,
-  getStatus,
-  LATEST_SESSION_MESSAGES_LIMIT,
-  pluginSocket,
-  resetSidebarBatchCapability,
-  setApiRequestConnection,
-  setApiRequestProfile,
-  speakText,
-  transcribeAudio,
-  triggerCronJob
-} from '@/hermes'
-
-import { fetchLatestSessionMessages } from '@/api/sessions'
 
 const emptySessionsResponse = {
   limit: 0,
