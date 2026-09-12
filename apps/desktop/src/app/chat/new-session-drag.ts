@@ -36,6 +36,7 @@ import { queryAllVisible } from '@/lib/pane-visibility'
 import { $treeDragging, type DropHint, NEW_SESSION_DRAG } from '@/store/pane-shell/tree'
 import type { AgentProfileRoute } from '@/store/profile'
 import type { TileDock } from '@/store/session-states'
+import type { SessionOwnerRoute } from '@/types/session'
 
 import { tileZoneHost } from './tile-zone-host'
 
@@ -66,7 +67,7 @@ export interface NewSessionPlacement {
   cwd?: null | string
   dir: TileDock
   profile?: string
-  route?: AgentProfileRoute | null
+  route?: SessionOwnerRoute | null
 }
 
 const snapRect = (el: HTMLElement): ZoneRect => {
