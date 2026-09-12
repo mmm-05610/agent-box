@@ -320,5 +320,11 @@
       "messagingSessions",
       "MessagingSection"
     ]
+  },
+  "30 app composition root": {
+    "edges": 0,
+    "modules": [
+      "."
+    ]
   }
 }

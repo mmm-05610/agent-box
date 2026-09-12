@@ -178,30 +178,33 @@ progress on the migration — read the ledger for that. **Review gate** after it
 its own reviewer, so its result is attributable rather than mixed into a layer
 round.
 
-### Phase 3 — no such phase
+### Phase 3 — UI 下沉与删除（17–29）
 
-Kept as a heading so that anyone who read an earlier version of this plan knows where
-the knots went: there are none. Every one of them was decided and written up, and the
-eleven edges they left behind became batches 13, 14 and 15 in Phase 1. §9 still says
-how a new work order would enter this plan, and it would enter Phase 1, not here.
+Phase 1/2 已经把上行依赖账本归零；Phase 3 处理账本看不见的另一种错位：不渲染的逻辑
+仍住在 rank 4/5，以及维护者已经明确删除的产品适配面。每张单 `edges: 0`，所以它们必须
+让账本继续保持 0，而不是靠账本证明自己有进展。
 
-### Done
+17–22 是最初量出的 sink work orders；23–29 是后续讨论作出裁决后动态追加的批次。
+实际工作列表仍以 status 中未 merged 的行为准，不把任何一次汇总快照当冻结范围。
 
-**Every work order in `renderer-layer-batches/` is merged and reviewed, and the
-ledger is empty.** Not "Phase 1 is green", not "the target shrank" — the ledger file
-holds an empty list and `renderer-layers.test.ts` is its witness.
+两条内容依赖高于碰撞 wave：**17 必须先于 25；23 必须先于 24。** 其余按 §4。
 
-There is no longer a legitimate place to stop short. Every line belongs to a work
-order, so a ledger that is still above zero after all of them means one of two
-defects, and both are reportable rather than acceptable:
+### Phase 4 — `app/` 组合根收口（30）
 
-- a batch under-counted what it pays off, or
-- a batch was skipped, or its edge came back.
+Batch 30 把最高层的组合与产品功能分开：
 
-The old text here said to stop and report if the ledger was above zero, because
-undecided knots used to be the remainder. That is no longer true: §7 is empty and
-the target is 0. Report the number you see and which lines are left, but do not treat
-a non-zero ledger as the end of the run.
+```text
+app/        → index.tsx · routes.ts · composition/ · shell/ · windows/
+features/   → 产品功能整棵迁入，本批不内部重构
+```
+
+它是**终端结构批次**：必须等 17–29 全部 merged + reviewed 后单独执行。原因不是权限，
+而是它会改写 renderer 全树路径；提前运行会让前面每张派工单的路径、碰撞和测试失真。
+
+### Completion
+
+整轮只有在 status 中所有 work order（现在包括 30）都 merged、各自带 reviewer 实测数字、
+账本仍为 0 时完成。Phase 1/2 的 ledger green 不再等于整个 renderer 结构工作完成。
 
 ## 4 · What may run at the same time
 
@@ -217,17 +220,28 @@ node ../../../.agents/skills/architecture-tree-report/scripts/batch-collisions.m
   ../../../docs/architecture/renderer-layer-batches/batch-manifest.json
 ```
 
-Current output — **7 waves is the minimum sequential depth**:
+Current output — **12 graph-color groups for the manifest as it exists now**:
 
 ```
-wave 1: 02 tour, 06c1 sound, 06c2 image-dl, 09 plugin-abi
-wave 2: 04 workspace, 06a1 statusbar, 06b1 haptics
-wave 3: 06a2 link-title, 11 route-vocab
-wave 4: 03 shape+label, 08 pane-shell
-wave 5: 07b external-link, 10 composer-engine
-wave 6: 01 lib-services, 07a keybinds, 14 hooks-sink
-wave 7: 12 host-views, 13 composer-last-edge, 15 singletons
+wave 1: 01 lib-services, 02 tour, 06a2 link-title, 06c1 sound, 07a keybinds, 23 gateway-event clean, 30 app composition root
+wave 2: 06c2 image-dl, 09 plugin-abi, 16 session-recovery, 18 starmap, 20 preview, 26 tool-view
+wave 3: 03 shape+label, 06a1 statusbar, 06b1 haptics, 19 terminal
+wave 4: 04 workspace, 11 route-vocab, 12 host-views, 25 interrupted-turn seal
+wave 5: 24 gateway-event component pins, 27 settings primitives, 29 messaging removal
+wave 6: 07b external-link, 14 hooks-sink, 28 sidebar derivations
+wave 7: 21 transcript, 22 session-lists
+wave 8: 10 composer-engine
+wave 9: 13 composer-last-edge
+wave 10: 08 pane-shell
+wave 11: 15 singletons
+wave 12: 17 session-remainder
 ```
+
+This is a **collision coloring, not an execution scheduler**. A merged batch whose
+patterns now match nothing can share a color with batch 30, but that does not repeal
+the content order in §3: batch 30 still waits for 17–29 to be merged and reviewed,
+then runs alone. Likewise 17 precedes 25 and 23 precedes 24 even if a coloring could
+place them differently.
 
 The collisions that force this:
 

@@ -75,11 +75,14 @@ takes `statusbar`, `session-link-title`, `haptics`, `sound/completion-sound`,
 `hooks/use-image-download`), so it can run before or after them. It has its own
 internal order — see its own document.
 
-## Phase 3 — dispatched, and what was deliberately left out
+## Phase 3 — UI 下沉与删除
 
-Six sink work orders ([17](17-session-remainder-sink.md)–[22](22-session-lists-sink.md))
-move **44 files / 4,892 lines** that render nothing and reach only rank ≤ 2, but live
-at rank 4/5. All six carry `edges: 0` — the ledger is already 0 and must stay 0.
+Work orders [17](17-session-remainder-sink.md)–[29](29-messaging-surface-removal.md)
+处理账本看不见的第二类问题：不渲染的逻辑仍住在 rank 4/5，以及维护者已经明确删除的
+Hermes 消息平台适配面。它们都 carry `edges: 0`——账本已经是 0，施工前后都必须保持 0。
+
+17–22 是最初量出的 44 文件 / 4,892 行；23–29 是后续裁决逐项追加的动态工作列表。
+不要把早期“六张单”当成冻结范围，实际范围始终以 status 中未 merged 的行和本目录为准。
 
 They exist because the ratchet could only see one defect. It rejected **upward
 edges**; it cannot see a module that is *downward-clean* yet still sits at the top of
@@ -90,7 +93,7 @@ file.** Per-file, `app/starmap/color.ts` reports "drags rank 5" — that rank 5 
 own sibling, which necessarily travels with it. Nine of the files that a per-file
 scan calls "stuck" are dissolved by the group moves in 17–22 for exactly this reason.
 
-### Phase 3 — not dispatched
+### Phase 3 — decisions that produced later work orders
 
 About **41 files in five decisions**. Each is blocked by *what the module is*, not by
 where it could go; a mechanical executor handed one of these would have to invent the
@@ -251,6 +254,25 @@ Not decisions — conclusions, recorded so nobody re-opens them:
 - `components/pet/roam-behavior.ts` 98: presentation.
 - `app/session/hooks/use-session-actions/utils.ts` 42: a re-export barrel for app-side
   consumers, deliberately app-side (batch 16c).
+
+## Phase 4 — `app/` 组合根收口
+
+[Batch 30](30-app-composition-root.md) 是前面所有 UI 搬迁之后的终端结构批次：
+
+```text
+app/
+├── index.tsx · routes.ts
+├── composition/
+├── shell/
+└── windows/
+
+features/
+└── 产品功能整棵迁入；本批不内部重构
+```
+
+它不支付层序边，但会改写 renderer 大量 import 路径。**必须在 17–29 全部 merged + reviewed
+后独占运行**；碰撞 manifest 用全树 touched set 保守建模，不能因为 greedy wave 输出把它和
+已无当前命中的旧批次放到同一行，就误认为可以并行。
 
 ## Batch 05 is a different objective
 

@@ -13,8 +13,9 @@ because it is trusted; see `renderer-layer-master-plan.md` §8.
 | target when the run completes | **0 — met** (Phase 3 must leave it at 0) |
 | tests | **776 files / 7466 tests** |
 | reviewed, per-batch numbers | 01 · 02 · 03 · 04 · 05 · 06a1 · 06b1 · 06c2 · 06c1 · 06a2 · 07a · 07b · 08 · 09 · 10 · 11 · 12 · 13 · 14 · 15 · 16 — every merged row names its reviewer's measured numbers |
-| phase 3 | six sink work orders **dispatched, none merged** — 44 files / 4,892 lines, all `edges: 0`; see the Phase 3 table |
-| in scope | **every work order in `renderer-layer-batches/`** — Phase 1, Phase 2 and Phase 3; no phase is a permission gate |
+| phase 3 | work orders 17–29：UI 下沉与消息平台删除；逐项实时状态见 Phase 3 表，全部 `edges: 0` |
+| phase 4 | work order 30：`app/` 收口为组合根；必须等 17–29 全部 merged + reviewed 后独占执行 |
+| in scope | **every work order in `renderer-layer-batches/`** — Phase 1–4；phase 是顺序约束，不是权限门 |
 
 ---
 
@@ -219,6 +220,16 @@ collisions*, not dependencies:
 model fallback, `app/settings/`, `workspace-groups.ts`, and `app/routes.ts`. Each needs
 a decision about *what the module is*, not a destination — the decisions are expanded in
 `renderer-layer-batches/README.md` under "Phase 3 — not dispatched".
+
+## Phase 4 — `app/` composition root
+
+| item | scope | planning baseline | destination | order | status |
+| --- | --- | --- | --- | --- | --- |
+| 30 | `app/` 只留入口、路由、组合、骨架、独立窗口；产品功能整棵退出 | 632 TS/TSX · 163,701 lines（派单时；17–29 后会下降） | `app/{composition,shell,windows}` + rank-5 `features/` | **terminal：17–29 全 merged/reviewed 后独占** | open |
+
+终态和精确移动表见
+[30-app-composition-root.md](renderer-layer-batches/30-app-composition-root.md)。本批不拆
+`chat/session/settings/right-sidebar`，也不把 `features/` 宣布成新的业务核心层。
 
 ## How to update this file
 
