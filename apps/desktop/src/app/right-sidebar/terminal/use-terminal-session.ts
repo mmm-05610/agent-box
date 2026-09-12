@@ -6,6 +6,19 @@ import { Terminal } from '@xterm/xterm'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 
+import { observeActiveTerminalResize } from '@/application/terminal/active-resize'
+import { makeTerminalReader, registerTerminalReader } from '@/application/terminal/buffer'
+import { mirrorSelection, terminalClipboardIntent } from '@/application/terminal/clipboard'
+import {
+  isMacPlatform,
+  resolveSurfaceColor,
+  terminalSelectionAnchor,
+  terminalSelectionLabel,
+  terminalTheme
+} from '@/application/terminal/selection'
+import { registerTerminalContextMenu } from '@/application/terminal/terminal-context-menu'
+import { prepareTerminalFontFamily } from '@/application/terminal/terminal-font'
+import { closeTerminal, updateTerminalRestoreCwd, updateTerminalReviveBuffer } from '@/application/terminal/terminals'
 import { writeClipboardText } from '@/components/ui/copy-button'
 import { markRightPanePerf } from '@/dev/debug/right-pane-events'
 import { triggerHaptic } from '@/lib/haptics'
@@ -14,20 +27,7 @@ import { $previewTarget } from '@/store/preview'
 import { $terminalInjection } from '@/store/terminal-takeover'
 import { useTheme } from '@/themes/context'
 
-import { observeActiveTerminalResize } from './active-resize'
-import { makeTerminalReader, registerTerminalReader } from './buffer'
-import { mirrorSelection, terminalClipboardIntent } from './clipboard'
 import { terminalLinkHandler, terminalWebLinksAddon } from './links'
-import {
-  isMacPlatform,
-  resolveSurfaceColor,
-  terminalSelectionAnchor,
-  terminalSelectionLabel,
-  terminalTheme
-} from './selection'
-import { registerTerminalContextMenu } from './terminal-context-menu'
-import { prepareTerminalFontFamily } from './terminal-font'
-import { closeTerminal, updateTerminalRestoreCwd, updateTerminalReviveBuffer } from './terminals'
 import { useTerminalFontController } from './use-terminal-font'
 
 // How many scrollback lines to serialize for relaunch restore. Mirrors VS Code's

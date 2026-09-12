@@ -1,8 +1,9 @@
 import { useStore } from '@nanostores/react'
 
+import { $terminals } from '@/application/terminal/terminals'
+
 import { TerminalSlot } from './persistent'
 import { TerminalRail } from './rail'
-import { $terminals } from './terminals'
 
 /** Pane-side terminal chrome: the body slot (which the persistent overlay chases)
  *  plus the always-on tab rail. Lives in the real pane DOM — NOT the z-4 terminal

@@ -1,9 +1,8 @@
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import type { ILinkHandler } from '@xterm/xterm'
 
+import { isMacPlatform } from '@/application/terminal/selection'
 import { openLink } from '@/components/external-link'
-
-import { isMacPlatform } from './selection'
 
 // Both of xterm's link paths — the web-links addon (URLs it finds in the
 // buffer) and the core OSC 8 provider (hyperlinks a CLI emits explicitly) —

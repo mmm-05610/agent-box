@@ -1,12 +1,12 @@
 import { useStore } from '@nanostores/react'
 import { useEffect } from 'react'
 
+import { seedAgentTerminalCommand, syncAgentTerminalSnapshot } from '@/application/terminal/agent-terminal-stream'
+import { setActiveTerminalId } from '@/application/terminal/buffer'
+import { $activeTerminalId, $terminals, ensureAgentTerminal } from '@/application/terminal/terminals'
 import { $backgroundStatusBySession } from '@/store/composer-status'
 
-import { seedAgentTerminalCommand, syncAgentTerminalSnapshot } from './agent-terminal-stream'
-import { setActiveTerminalId } from './buffer'
 import { AgentTerminalInstance, TerminalInstance } from './instance'
-import { $activeTerminalId, $terminals, ensureAgentTerminal } from './terminals'
 
 interface TerminalWorkspaceProps {
   onAddSelectionToChat: (text: string, label?: string) => void

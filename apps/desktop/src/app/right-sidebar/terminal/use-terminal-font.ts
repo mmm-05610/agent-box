@@ -4,7 +4,7 @@ import type { Terminal } from '@xterm/xterm'
 import { useEffect, useRef } from 'react'
 import type { RefObject } from 'react'
 
-import { $terminalFontFamily, applyTerminalFontFamily, resolveTerminalFontFamily } from './terminal-font'
+import { $terminalFontFamily, applyTerminalFontFamily, resolveTerminalFontFamily } from '@/application/terminal/terminal-font'
 
 interface TerminalFontControllerOptions {
   fitRef: RefObject<((visible: boolean) => void) | null>
