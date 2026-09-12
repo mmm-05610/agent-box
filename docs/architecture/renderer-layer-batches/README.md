@@ -75,6 +75,85 @@ takes `statusbar`, `session-link-title`, `haptics`, `sound/completion-sound`,
 `hooks/use-image-download`), so it can run before or after them. It has its own
 internal order — see its own document.
 
+## Phase 3 — dispatched, and what was deliberately left out
+
+Six sink work orders ([17](17-session-remainder-sink.md)–[22](22-session-lists-sink.md))
+move **44 files / 4,892 lines** that render nothing and reach only rank ≤ 2, but live
+at rank 4/5. All six carry `edges: 0` — the ledger is already 0 and must stay 0.
+
+They exist because the ratchet could only see one defect. It rejected **upward
+edges**; it cannot see a module that is *downward-clean* yet still sits at the top of
+the ladder, so the UI layer keeps custody of logic that is not presentation.
+
+**Measure a batch's closure over the whole group moving together, never file by
+file.** Per-file, `app/starmap/color.ts` reports "drags rank 5" — that rank 5 is its
+own sibling, which necessarily travels with it. Nine of the files that a per-file
+scan calls "stuck" are dissolved by the group moves in 17–22 for exactly this reason.
+
+### Phase 3 — not dispatched
+
+About **41 files in five decisions**. Each is blocked by *what the module is*, not by
+where it could go; a mechanical executor handed one of these would have to invent the
+answer. Ordered by how much each unblocks.
+
+**A · Where does the gateway-event projection live?** *(the important one)*
+`app/session/hooks/use-message-stream/gateway-event/` — `session-info.ts` 460 ·
+`input-requests.ts` 326 · `status.ts` 227 · `lifecycle.ts` 106 (+ `types.ts`,
+`message-stream.ts`).
+This directory turns gateway events into domain facts. It is the normalisation layer
+a harness-neutral core has to own. Today it reaches `use-prompt-actions/rewind.ts`
+and `use-prompt-actions/utils.ts` — two app-side hooks — which is what pins it.
+*Decision:* is normalisation a core concern (`application/harness/`) or a session-hook
+concern? Answering this settles the four files **and** the two hooks they drag.
+
+**B · Is the tool-call model fallback logic or presentation?**
+`components/assistant-ui/tool/fallback-model/` — `index.ts` 1503 · `format.ts` 154 ·
+`types.ts` 89 · `targets.ts` · plus `components/assistant-ui/tool/delegate-model.ts` 159.
+"Which model should run this tool call" is a decision, not a rendering; it lives in a
+render directory because that is where its first caller was. The family depends on
+nothing but itself.
+*Decision:* sink the family to `application/tools/`, or declare it presentation.
+
+**C · Is `app/settings/` a domain or a pile of forms?**
+`app/settings/constants.ts` 542 · `settings-search.ts` 230 · `billing/errors.ts` 164 ·
+`billing/billing-amounts.ts` 124 · `billing/types.ts` 36 · `billing/open-external.ts` 10
+(+ `helpers.ts`, and `credential-key-ui.tsx`, which is a component).
+*Decision:* if configuration is a domain independent of its forms, it belongs in
+`application/settings/`; if the settings page is just forms, the 542-line constants
+module stays where it is.
+
+**D · The heaviest single file: `workspace-groups.ts` (673 lines)**
+`app/chat/sidebar/projects/` — `workspace-groups.ts` 673 · `session-project-label.ts` 42 ·
+`projects/index.ts` 29, plus its only blocker `app/chat/sidebar/order.ts`.
+Its per-file blocker is a sibling, so it is a **cluster that can move whole**, not a
+knot. The real question is its size: batch [04](04-workspace-groups-split.md) already
+split the membership core out of it (see the note at the top of
+`store/projects/membership.ts`).
+*Decision:* move the cluster to `application/projects/` as-is, or split it further first.
+
+**E · Does `app/routes.ts` sink another layer?**
+`app/open-session.ts` 177 is blocked only by `app/routes.ts`, and
+`app/session/hooks/session-context-drift.ts` 117 is blocked by it too. Batch
+[11](11-route-vocabulary.md) already sank `lib/routes`; `app/routes.ts` is the app-side
+remainder.
+*Decision:* sink it a layer, or accept it as app-level policy — it blocks more than
+one file.
+
+### Settled: these stay at rank 4/5, and that is correct
+
+Not decisions — conclusions, recorded so nobody re-opens them:
+
+- `app/tour/` (`engine.ts` 388 and `collect-targets.ts`): batch
+  [02](02-tour-to-app.md) moved it **up** into `app/` on purpose. It drives spotlights
+  over the live UI; it can never sink.
+- `components/assistant-ui/embeds/providers/*` (7 files, all small): each pulls its own
+  logo component. Presentation, and correctly at rank 4.
+- `components/composer/text-utils.ts` 232: reaches `directive-text.tsx` and the composer
+  rich editor. Presentation.
+- `components/pet/roam-behavior.ts` 98: presentation.
+- `app/session/hooks/use-session-actions/utils.ts` 42: a re-export barrel for app-side
+  consumers, deliberately app-side (batch 16c).
+
 ## Batch 05 is a different objective
 
 [`05-hermes-barrel-removal.md`](05-hermes-barrel-removal.md) removes the

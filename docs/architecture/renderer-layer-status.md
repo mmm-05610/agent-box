@@ -138,10 +138,17 @@ The layer ratchet rejected **upward edges**. It could not see the other defect: 
 module that is *downward-clean* but **lives at the top of the ladder anyway**,
 so the UI layer keeps custody of logic that has nothing to do with presentation.
 
-Measured over `app/` + `components/`: **80 production files (~6.0k lines)** qualify
+Measured over `app/` + `components/`: **~80 production files (~6.0k lines)** qualify
 today, and another **50 (~7.6k lines) look like logic but drag `components/`**, so
 they need a decision rather than a move. Phase 3 dispatches the coherent clusters
 among the first 80; the second group is deliberately not dispatched.
+
+**That second group is not one group, and its 50 is not 50.** Measured file by file
+it says 50 — but **nine of them are already dissolved by the group moves above**
+(starmap's four, `terminals.ts`, and preview's four), because file-by-file
+measurement counts a travelling sibling as a blocker. What is genuinely left is
+**about 41 files in five decisions**, recorded in `renderer-layer-batches/README.md`
+under "Phase 3 — not dispatched". Do not dispatch them from this table.
 
 **Method note, learned the hard way in this phase:** measure the closure of the
 **whole group moving together**, never file by file. Per-file, `app/starmap/color.ts`
