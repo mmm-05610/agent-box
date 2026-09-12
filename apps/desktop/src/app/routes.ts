@@ -1,18 +1,12 @@
-import { atom } from 'nanostores'
-
 import { isWorkspacePageRoute } from '@/lib/routes'
 import { noteActiveTreeGroup, revealTreePane } from '@/store/pane-shell/tree'
+import { $workspaceIsPage } from '@/store/workspace-page'
 
 export * from '@/lib/routes'
 
-type NavigateLike = (to: string, options?: { replace?: boolean }) => void
+export { $workspaceIsPage }
 
-/** True while the workspace pane shows a FULL PAGE (skills/artifacts/
- *  plugin routes) instead of the chat. Published by the wiring
- *  (which owns the router location); the workspace pane contribution mirrors
- *  it as `headerVeto` so the zone tab bar stands down on pages. Overlays
- *  (settings/…) don't count — the chat stays beneath them. */
-export const $workspaceIsPage = atom(false)
+type NavigateLike = (to: string, options?: { replace?: boolean }) => void
 
 function revealWorkspacePane(): void {
   noteActiveTreeGroup(null)

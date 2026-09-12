@@ -17,8 +17,8 @@
 import { useStore } from '@nanostores/react'
 import { useEffect, useRef } from 'react'
 
-import { openSession, type OpenSessionNavigate } from '@/app/composition/routing/open-session'
 import { sessionRoute } from '@/app/routes'
+import { openSession, type OpenSessionNavigate } from '@/application/session/open-session'
 import { getActiveComposer } from '@/components/composer/focus'
 import { reloadPersistedDrafts, requestComposerDraftSync } from '@/store/composer'
 import { reportHudSession, watchHudState } from '@/store/hud'

@@ -33,9 +33,9 @@
  */
 import type { MutableRefObject } from 'react'
 
-import { findStoredIdForRuntimeId, resolveRoutingSessionId, resolveSessionRpcOwner } from '@/app/composition/routing/session-owner'
 import { requestForSessionProfile } from '@/application/session/request-router'
-import { resolveSessionOwner } from '@/features/session/hooks/use-session-actions/utils'
+import { findStoredIdForRuntimeId, resolveRoutingSessionId, resolveSessionRpcOwner } from '@/application/session/session-owner'
+import { resolveSessionOwner } from '@/application/session/session-registry-lookup'
 import { isSessionGoneForBackgroundPolling } from '@/store/runtime-gone'
 import { getSessionOwnerHint, knownSessionOwner, ownerLookupSessionRows, requestSessionResume } from '@/store/session'
 import { assertSessionOwnerResolved } from '@/store/session-owner-resolution'

@@ -25,7 +25,7 @@ vi.mock('@/store/gateway', async importActual => ({
 const probe = vi.hoisted(() => ({ resolveSessionOwner: vi.fn(async () => undefined as unknown) }))
 const sessionMocks = vi.hoisted(() => ({ requestSessionResume: vi.fn() }))
 
-vi.mock('@/features/session/hooks/use-session-actions/utils', async importActual => ({
+vi.mock('@/application/session/session-registry-lookup', async importActual => ({
   ...(await importActual<Record<string, unknown>>()),
   resolveSessionOwner: probe.resolveSessionOwner
 }))

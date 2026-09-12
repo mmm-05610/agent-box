@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 
-import { openSession } from '@/app/composition/routing/open-session'
 import { appViewForPath, isOverlayView } from '@/app/routes'
 import {
   $workspaceIsPage,
@@ -17,6 +16,7 @@ import {
 } from '@/app/routes'
 import { hudTargetSessionId } from '@/app/windows/hud/handoff'
 import { cycleProfile, switchProfileToSlot, switchToDefaultProfile } from '@/application/profile/navigation'
+import { openSession } from '@/application/session/open-session'
 import { closeActiveTerminal, createTerminal, cycleTerminal } from '@/application/terminal/terminals'
 import { requestComposerFocus, requestModelMenuToggle } from '@/components/composer/focus'
 import { closeActiveTab } from '@/features/chat/close-tab'

@@ -252,15 +252,32 @@ batch's stop-condition §7.4; no NEW reverse dependency was created (the §B2 mo
 
 | item | scope | baseline | destination | order | status |
 | --- | --- | --- | --- | --- | --- |
-| 31 | Session opening, owner resolution and Session-scoped request dispatch leave composition | Batch 30 executor snapshot: 6 files / 1,096 lines; adjacent `application/session/request-router.ts` 210 lines | `application/session/{open-session,session-owner,session-rpc-dispatcher}*`; `overlay-routing.ts` stays | after Batch 30 merged + independent review; runs alone | dispatched — waiting for prerequisite |
-| 32 | Shell retains keybinding/menu/Tour mechanisms; product actions and coordination move to composition | focused semantic baseline 2,270 lines; four named knots | generic `app/shell` hosts + `app/composition/registrations/{keybindings,context-menu,tour}` | after Batch 31 reviewed; runs alone; Electron E6 unchanged | dispatched — waiting for prerequisite |
-| 33 | Hermes/Gateway/RPC/product vocabulary becomes Harness/Runtime/Session/Work Core vocabulary where semantically correct | scope deliberately not frozen yet | coordinated final UI vocabulary/compatibility pass | mandatory UI terminal gate after all semantic reviews and an approved compatibility-aware vocabulary table | reserved — design blocked, do not execute |
+| 31 | Session opening, owner resolution and Session-scoped request dispatch leave composition | Batch 30 executor snapshot: 6 files / 1,096 lines; adjacent `application/session/request-router.ts` 210 lines | `application/session/{open-session,session-owner,session-rpc-dispatcher}*`; `overlay-routing.ts` stays | after Batch 30 merged + independent review; runs alone | executed — `0d32114` (owner + dispatcher) + `3f63e53` (open-session) · executor numbers below · independent review pending |
+| 32 | Hermes/Gateway/RPC/product vocabulary becomes Harness/Runtime/Session/Work Core vocabulary where semantically correct | scope deliberately not frozen yet | coordinated final vocabulary pass | last, after all `app/` semantic reviews and an approved compatibility-aware vocabulary table | reserved — design blocked, do not execute |
 
 Batch 31 contract: [31-session-routing-sink.md](renderer-layer-batches/31-session-routing-sink.md).
-Batch 32 contract: [32-shell-host-purity.md](renderer-layer-batches/32-shell-host-purity.md).
-Batch 33 is intentionally absent from the manifest and has no work-order file: its terminology table is
-not yet complete, so an executor must not infer mappings or run a global replacement. It is still a
-mandatory completion gate for today's UI restructuring, not optional future debt.
+Batch 32 is intentionally absent from the manifest and has no work-order file: its terminology table is
+not yet complete, so an executor must not infer mappings or run a global replacement.
+
+**Executor measurements (stageA/31, worktree wt-c, 2026-09-12 — independent review pending).**
+Three modules + tests moved from `app/composition/routing/` to `application/session/` in two commits
+(`session-owner` + `session-rpc-dispatcher`, then `open-session`); 16 importer/mock/test repoints, all
+import-lines; basenames, exports, function bodies and assertions unchanged (renames 97–100%).
+Baseline and end state both: typecheck green; test:ui 772 files / 7,414 tests with exactly the one
+environmental failure (`renderer-layers.test.ts > leaves no in-flight exclusion stale`, needs untracked
+`src/agentbox/`); guard 15/16 (same environmental exception — the layer-direction assertions all pass);
+the four session test files 76/76; ledger 0 before and after, regen byte-identical; lint 0 errors /
+142 warnings (= baseline); `git diff --check` clean. Two scope adjustments forced by the ledger-0
+ratchet, both behaviour-preserving and recorded here for the reviewer: (1) the moved dispatcher's
+`resolveSessionOwner` import left the rank-5 `use-session-actions/utils` re-export barrel for its
+canonical `@/application/session/session-registry-lookup` definition (same binding; the dispatcher
+test's `vi.mock` specifier moved with it); (2) `$workspaceIsPage` sank from `app/routes.ts` to new
+`store/workspace-page.ts` — `app/routes.ts` imports and re-exports it so its public surface and the
+four remaining rank-5 consumers are untouched, while the moved `open-session.ts` reads the atom from
+its store home and `sessionRoute` from `@/lib/routes` (the pre-existing re-export) instead of
+`@/app/routes`; the moved test's `vi.mock('@/app/routes')` split accordingly. `lib/open-session.ts`
+itself is byte-identical (its prose still names the pre-batch-30 `app/open-session.ts` path —
+pre-existing, cosmetic). Composition routing now holds only `overlay-routing.ts`.
 
 ## How to update this file
 

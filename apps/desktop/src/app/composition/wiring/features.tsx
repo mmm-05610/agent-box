@@ -21,9 +21,7 @@ import { useTitlebarToolContributions } from '@/app/composition/registrations/ch
 import { CommandPalette } from '@/app/composition/registrations/command-palette'
 import { ChatRoutesSurface, SidebarSurface, StatusbarSurface, TerminalSurface } from '@/app/composition/registrations/surfaces'
 import { ContribWiringContext } from '@/app/composition/root/context'
-import { mainChatOccupied, openSession } from '@/app/composition/routing/open-session'
 import { useOverlayRouting } from '@/app/composition/routing/overlay-routing'
-import { createSessionRpcDispatcher } from '@/app/composition/routing/session-rpc-dispatcher'
 import {
   CRON_ROUTE,
   navigateToWorkspacePage,
@@ -39,6 +37,8 @@ import { useHudHandoff } from '@/app/windows/hud/handoff'
 import { useHermesConfigRecord } from '@/application/config/use-config-record'
 import { refreshActiveProfile } from '@/application/profile/catalog'
 import { getLatestSessionMessages } from '@/application/session-transcripts'
+import { mainChatOccupied, openSession } from '@/application/session/open-session'
+import { createSessionRpcDispatcher } from '@/application/session/session-rpc-dispatcher'
 import { closeAllTerminals } from '@/application/terminal/terminals'
 import { useSkinCommand } from '@/application/theme/use-skin-command'
 import { graftRefreshedTailOntoBackfill } from '@/application/transcript/transcript-backfill'

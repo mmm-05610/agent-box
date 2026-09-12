@@ -7,7 +7,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 
 import { getHermesConfigRecord } from '@/api/config'
-import { openSession, openSessionIntentFromModifiers } from '@/app/composition/routing/open-session'
 import { SESSION_IMPORT_ROUTE } from '@/app/routes'
 import {
   AGENTS_ROUTE,
@@ -32,6 +31,7 @@ import {
   rankGroups,
 } from '@/app/shell/layers/command-palette/palette-model'
 import { listAllProfileSessions } from '@/application/session-lists'
+import { openSession, openSessionIntentFromModifiers } from '@/application/session/open-session'
 import { codiconIcon } from '@/components/ui/codicon'
 import { Command, CommandInput, CommandList } from '@/components/ui/command'
 import { PetInlineToggle, PetPalettePage } from '@/features/pet-generate/command-palette/pet-palette-page'
