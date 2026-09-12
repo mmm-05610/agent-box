@@ -58,10 +58,14 @@ rg -l "use-message-stream/utils|session-state-cache" --glob '!*.test.*'
 
 ## 已否决的替代（记下来，免得重开）
 
-- **把 `app/session/hooks/use-message-stream/gateway-event/` 整目录一起搬。** 该目录的
-  `session-info.ts`（460）、`status.ts`（227）、`input-requests.ts`（326）、
-  `lifecycle.ts`（106）都还在拖 app 层的东西，整目录搬会开 `application → app` 边。
-  本批只搬不带那些依赖的两件。
+- **把 `app/session/hooks/use-message-stream/gateway-event/` 整目录一起搬。**
+  那个目录是下一件事（README 的决定 A），它**不是**整目录都能搬：数过十个文件之后，
+  六件干净、四件各自有一个具名的障碍——`message-stream.ts` 够着 `components/chat/vibe-hearts`，
+  `tools.ts` 够着 `components/composer/suggestion-providers/*`，
+  `session-info.ts` 够着 `use-prompt-actions/rewind`（外加**本批正在搬的** `../utils`），
+  `desktop-bridge.ts` 够着预览/终端/引导。本批只搬自己这两件，把那个目录留给决定 A。
+  （这一段原本写的是"该目录四件都拖 app 层"，是错的：`status.ts`、`lifecycle.ts`、
+  `input-requests.ts` 够着的都是 rank 0/2 的东西，它们本来就干净。）
 - **把这一批并进 18/19。** 目的地不同（这一批去 `application/session/`），
   消费者不同，合并只会扩大一批的回滚面。
 

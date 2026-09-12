@@ -97,14 +97,88 @@ where it could go; a mechanical executor handed one of these would have to inven
 answer. Ordered by how much each unblocks.
 
 **A · Where does the gateway-event projection live?** *(the important one)*
-`app/session/hooks/use-message-stream/gateway-event/` — `session-info.ts` 460 ·
-`input-requests.ts` 326 · `status.ts` 227 · `lifecycle.ts` 106 (+ `types.ts`,
-`message-stream.ts`).
-This directory turns gateway events into domain facts. It is the normalisation layer
-a harness-neutral core has to own. Today it reaches `use-prompt-actions/rewind.ts`
-and `use-prompt-actions/utils.ts` — two app-side hooks — which is what pins it.
-*Decision:* is normalisation a core concern (`application/harness/`) or a session-hook
-concern? Answering this settles the four files **and** the two hooks they drag.
+
+`app/session/hooks/use-message-stream/gateway-event/` — **10 files, 2,349 lines**, and
+they are a clean shape already: `index.ts` (270) computes the routing context once per
+event and asks an ordered list of family handlers "is this yours?"; each family file
+consumes one kind of event and returns `true` if it did.
+
+| file | lines | the events it owns |
+| --- | --- | --- |
+| `session-info.ts` | 460 | session metadata: title, model, cwd, context usage, subagents |
+| `message-stream.ts` | 400 | streaming text and reasoning deltas; sealing a turn |
+| `input-requests.ts` | 325 | permission requests and questions → the pending-answer queue |
+| `desktop-bridge.ts` | 323 | **the reverse direction** — see below |
+| `status.ts` | 226 | busy / idle / error / waiting-for-input status bits |
+| `tools.ts` | 150 | tool-call start and completion → the tool cards |
+| `lifecycle.ts` | 105 | session created / closed / reclaimed |
+| `types.ts` | 71 | the deps contract, the context shape, the handler type |
+| `session-control.ts` | 20 | control odds and ends |
+| `index.ts` | 270 | routing and the dispatch table |
+
+**The pins, measured across all ten files (corrected — the first version of this
+section said "two imports", which was wrong):**
+
+| file | imports anything above rank 2? |
+| --- | --- |
+| `index.ts` · `types.ts` · `session-control.ts` | no — siblings and `@hermes/shared` only |
+| `status.ts` | no — `@/i18n` is rank 0 |
+| `lifecycle.ts` | no — `@/application/theme/adapters/backend-sync` is already rank 2 |
+| `input-requests.ts` | no — `@/application/session/restore-pending-clarify` is already rank 2 |
+| `session-info.ts` | **yes** — `finalizeInterruptedMessages` from `use-prompt-actions/rewind`, plus `../utils` (batch 17's file) |
+| `message-stream.ts` | **yes** — `@/components/chat/vibe-hearts` |
+| `tools.ts` | **yes** — `@/components/composer/suggestion-providers/{repair,skill}` |
+| `desktop-bridge.ts` | **yes** — five, of which three are batches 19/20's own files |
+
+So **six of the ten sink clean today**, and the four that do not are four small,
+nameable problems rather than a wall:
+
+- `message-stream.ts` reaches for `burstVibeHearts`, a decorative burst.
+- `tools.ts` reaches for `invalidateSkillSuggestionIndex` and `reportMcpToolResult`,
+  two cache/repair hooks on the composer's suggestion providers.
+- `session-info.ts` needs batch 17 to land, and needs `finalizeInterruptedMessages`
+  ("how an interrupted turn is closed out") extracted — that is session semantics, not
+  presentation, and it belongs below anyway.
+- `desktop-bridge.ts` splits three ways, above.
+
+**The two `components/` pins have a one-line remedy that is also the right design.**
+Both files already receive a bag of callbacks (`GatewayEventDeps`) and call them; these
+two imports reach *around* that bag to a component. Move them into the bag as two more
+deps — "show the hearts", "invalidate the suggestion index" — and the handlers stop
+knowing that components exist at all. That is the file's own established pattern, not
+a new mechanism.
+
+*Decision:* is event normalisation a core concern (`application/harness/`) or a
+session-hook concern? Answering this settles nine of the ten files. `desktop-bridge.ts`
+splits, and the split is not a matter of taste — see below.
+
+### A correction: `desktop-bridge.ts` is not "unmovable because it touches the UI"
+
+An earlier draft of this decision said the reverse-direction file could not be split
+because every action in it is a UI action. That was wrong, and the wrongness matters
+because it hides the more useful rule. The file holds **three** concerns, not one:
+
+| inside it | what it looks like | where it goes |
+| --- | --- | --- |
+| **protocol** | `terminal.read.request` → `terminal.read.respond`, correlated by `request_id`, the answer serialised into `text` | **sinks** — this is core |
+| **policy** | `if (isActiveEvent)` — a background turn must never reach into the page the user is working in (`offer, don't hijack`) | **sinks** — a rule that holds for every harness |
+| **implementation** | reading the xterm buffer, reading/driving the embedded browser, revealing a pane, running the tour | **stays** — registered as a declared capability |
+
+The precise rule, which replaces the wrong one:
+
+> **The core can own a data flow's implementation, because that implementation is pure
+> computation and the core can simply have it. The core can never own a control flow's
+> implementation — that must be supplied on site by the UI. It can own only the control
+> flow's protocol and its policy.**
+
+That is the difference between the nine files and this one, and it is about *who
+supplies the implementation*, not about whether a file can be taken apart.
+
+Splitting it also buys the thing the Capability work needs: today the backend **blind-fires**
+eleven event types into an eleven-branch `if` chain and never asks whether the client can
+serve them. After the split the client **declares** what it can do, the backend can ask,
+and a missing capability gets an honest "unsupported" instead of a silent failure —
+which is the rule `acp-desktop-phase1-design.md` §6.4 already states.
 
 **B · Is the tool-call model fallback logic or presentation?**
 `components/assistant-ui/tool/fallback-model/` — `index.ts` 1503 · `format.ts` 154 ·
