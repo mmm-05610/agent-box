@@ -7,10 +7,10 @@
 import { act, cleanup } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { STREAM_DELTA_FLUSH_MS } from '@/application/session/message-stream-utils'
 import type { RpcEvent } from '@/types/hermes'
 
 import { type MessageStreamHarness, renderMessageStream } from './test-harness'
-import { STREAM_DELTA_FLUSH_MS } from './utils'
 
 const SID = 'stale-pending-session'
 

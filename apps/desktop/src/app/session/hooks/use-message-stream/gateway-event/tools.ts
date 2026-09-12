@@ -1,3 +1,4 @@
+import { SUBAGENT_EVENT_TYPES, toTodoPayload } from '@/application/session/message-stream-utils'
 import { reportMcpToolResult } from '@/components/composer/suggestion-providers/repair'
 import { invalidateSkillSuggestionIndex } from '@/components/composer/suggestion-providers/skill'
 import { invalidateSlashCompletions } from '@/lib/slash-completion-cache'
@@ -8,8 +9,6 @@ import { restoreSessionTodosFromSnapshot } from '@/store/todos'
 import { recordToolDiff } from '@/store/tool-diffs'
 import { setSessionDraftingTool } from '@/store/tool-drafting'
 import { notifyWorkspaceChanged, toolChangedPath, toolMayMutateFiles } from '@/store/workspace-events'
-
-import { SUBAGENT_EVENT_TYPES, toTodoPayload } from '../utils'
 
 import type { GatewayEventContext } from './types'
 
