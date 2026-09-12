@@ -97,13 +97,11 @@ function makeRefresh(resolveSession: ActiveTranscriptRefreshDeps['resolveSession
 }
 
 function useSyncHarness({
-  activeIsMessaging = false,
   activeSessionId,
   activeStoredSessionId,
   gatewayState = 'open',
   refreshActiveTranscript
 }: {
-  activeIsMessaging?: boolean
   activeSessionId: string | null
   activeStoredSessionId: string | null
   gatewayState?: string
@@ -120,7 +118,6 @@ function useSyncHarness({
   useBackgroundSync({
     activeConnectionId: 'local',
     activeGatewayProfile: 'default',
-    activeIsMessaging,
     activeSessionId,
     activeStoredSessionId,
     freshDraftReady: false,
@@ -129,7 +126,6 @@ function useSyncHarness({
     refreshCronJobs: vi.fn(),
     refreshCurrentModel: vi.fn(),
     refreshHermesConfig: vi.fn(),
-    refreshMessagingSessions: vi.fn(),
     refreshSessions: vi.fn(),
     updateSessionState,
     requestGateway: vi.fn(async () => ({ sessions: [] })) as never
@@ -137,7 +133,6 @@ function useSyncHarness({
 }
 
 type SyncOptions = {
-  activeIsMessaging?: boolean
   activeSessionId?: null | string
   activeStoredSessionId?: null | string
   gatewayState?: string
@@ -498,24 +493,6 @@ describe('active transcript refresh', () => {
     expect(refresh).toHaveBeenCalledTimes(1)
   })
 
-  it('retains the existing periodic backstop for messaging sessions', async () => {
-    vi.useFakeTimers()
-    $changeEventsAvailable.set(true)
-    const refresh = vi.fn(async () => undefined)
-
-    renderSync(refresh, { activeIsMessaging: true })
-    expect(refresh).toHaveBeenCalledTimes(1)
-    await act(async () => Promise.resolve())
-    refresh.mockClear()
-
-    await act(async () => {
-      vi.advanceTimersByTime(30_000)
-      await Promise.resolve()
-    })
-
-    expect(refresh).toHaveBeenCalledTimes(1)
-  })
-
   it('only defers an external tick while busy, then refreshes once after idle', async () => {
     $changeEventsAvailable.set(true)
     const refresh = vi.fn(async () => undefined)
@@ -840,7 +817,6 @@ describe('typing-aware sessions.changed deferral', () => {
       refreshCronJobs: vi.fn(),
       refreshCurrentModel: vi.fn(),
       refreshHermesConfig: vi.fn(),
-      refreshMessagingSessions: vi.fn(),
       requestGateway: vi.fn(async () => ({ sessions: [] })) as never,
       // Required by the hook's params. This harness never drives the
       // transcript path, so the updater just runs against a throwaway state —
@@ -858,7 +834,6 @@ describe('typing-aware sessions.changed deferral', () => {
       useBackgroundSync({
         activeConnectionId: 'local',
         activeGatewayProfile: 'default',
-        activeIsMessaging: false,
         activeSessionId: null,
         activeStoredSessionId: null,
         freshDraftReady: false,

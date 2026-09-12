@@ -297,7 +297,6 @@ export const ru = defineLocale({
       'nav.settings': 'Открыть настройки',
       'nav.profiles': 'Открыть профили',
       'nav.skills': 'Открыть навыки',
-      'nav.messaging': 'Открыть мессенджеры',
       'nav.artifacts': 'Открыть артефакты',
       'nav.cron': 'Открыть запланированные задачи',
       'nav.agents': 'Открыть агенты',
@@ -1777,7 +1776,6 @@ export const ru = defineLocale({
       newChat: { title: 'Новый сеанс', detail: 'Начать новый сеанс' },
       settings: { title: 'Настройки', detail: 'Настройка Hermes desktop' },
       skills: { title: 'Возможности', detail: 'Навыки, инструменты и MCP-серверы' },
-      messaging: { title: 'Сообщения', detail: 'Настройка Telegram, Slack, Discord и других' },
       artifacts: { title: 'Артефакты', detail: 'Просмотр сгенерированных результатов' }
     },
     sectionEntries: {
@@ -1875,162 +1873,6 @@ export const ru = defineLocale({
       running: 'Выполняется...',
       viewLog: 'Журнал действия'
     }
-  },
-  messaging: {
-    search: 'Поиск в сообщениях...',
-    loading: 'Загрузка платформ сообщений...',
-    loadFailed: 'Не удалось загрузить платформы сообщений',
-    states: {
-      connected: 'Подключено',
-      connecting: 'Подключение',
-      disabled: 'Отключено',
-      fatal: 'Ошибка',
-      gateway_stopped: 'Шлюз сообщений остановлен',
-      not_configured: 'Нужна настройка',
-      pending_restart: 'Нужен перезапуск',
-      retrying: 'Повторная попытка',
-      startup_failed: 'Не удалось запустить'
-    },
-    unknown: 'Неизвестно',
-    hintPendingRestart: 'Перезапустите шлюз из строки состояния, чтобы применить это изменение.',
-    hintGatewayStopped: 'Запустите шлюз из строки состояния для подключения.',
-    credentialsSet: 'Учётные данные заданы',
-    needsSetup: 'Нужна настройка',
-    gatewayStopped: 'Шлюз сообщений остановлен',
-    getCredentials: 'Получить учётные данные',
-    openSetupGuide: 'Открыть руководство по настройке',
-    required: 'Обязательно',
-    recommended: 'Рекомендуется',
-    advanced: count => `Расширенные (${count})`,
-    noTokenNeeded: 'Этой платформе здесь не нужен токен. Используйте руководство выше, затем включите её ниже.',
-    enabled: 'Включено',
-    disabled: 'Отключено',
-    unsavedChanges: 'Несохранённые изменения',
-    saving: 'Сохранение...',
-    saveChanges: 'Сохранить изменения',
-    saved: 'Сохранено',
-    replaceValue: 'Заменить текущее значение',
-    openDocs: 'Открыть документацию',
-    clearField: key => `Очистить ${key}`,
-    enableAria: name => `Включить ${name}`,
-    disableAria: name => `Отключить ${name}`,
-    platformEnabled: name => `${name} включено`,
-    platformDisabled: name => `${name} отключено`,
-    restartToApply: 'Это изменение вступит в силу после перезапуска шлюза.',
-    setupSaved: name => `Настройка ${name} сохранена`,
-    restartToReconnect: 'Новые учётные данные вступят в силу после перезапуска шлюза.',
-    keyCleared: key => `${key} очищено`,
-    setupUpdated: name => `Настройка ${name} обновлена.`,
-    failedUpdate: name => `Не удалось обновить ${name}`,
-    failedSave: name => `Не удалось сохранить ${name}`,
-    failedClear: key => `Не удалось очистить ${key}`,
-    pendingRequests: count => `Ожидающие запросы (${count})`,
-    pendingAria: count =>
-      `${count} ${RU_NOUN(count, 'ожидающий запрос на сопряжение', 'ожидающих запроса на сопряжение', 'ожидающих запросов на сопряжение')}`,
-    approvedUsers: count => `Одобрённые пользователи (${count})`,
-    approve: 'Одобрить',
-    approving: 'Одобрение...',
-    revoke: 'Отозвать',
-    revoking: 'Отзыв...',
-    revokeAria: name => `Отозвать ${name}`,
-    revokeTitle: 'Отозвать доступ',
-    revokeDesc: name => `${name} потеряет доступ и перестанет распознаваться начиная со следующего сообщения.`,
-    approvedUser: name => `${name} одобрен`,
-    approvedHint: 'Они распознаются автоматически начиная с их следующего сообщения.',
-    revokedUser: name => `${name} отозван`,
-    failedApprove: name => `Не удалось одобрить ${name}`,
-    failedRevoke: name => `Не удалось отозвать ${name}`,
-    pairingLockedOut: 'Слишком много неудачных одобрений — эта платформа заблокирована. Попробуйте позже.',
-    waitingSince: minutes => (minutes < 1 ? 'только что' : `${minutes}м назад`),
-    fieldCopy: {
-      TELEGRAM_BOT_TOKEN: {
-        label: 'Токен бота',
-        help: 'Создайте бота через @BotFather и вставьте выданный им токен.',
-        placeholder: 'Вставьте токен бота Telegram'
-      },
-      TELEGRAM_ALLOWED_USERS: {
-        label: 'Разрешённые ID пользователей Telegram',
-        help: 'Рекомендуется. Числовые ID через @userinfobot через запятую. Без этого писать вашему боту может кто угодно.'
-      },
-      TELEGRAM_PROXY: { label: 'URL прокси', help: 'Нужен только в сетях, где Telegram заблокирован.' },
-      DISCORD_BOT_TOKEN: {
-        label: 'Токен бота',
-        help: 'Создайте приложение в Discord Developer Portal, добавьте бота и вставьте его токен.'
-      },
-      DISCORD_ALLOWED_USERS: {
-        label: 'Разрешённые ID пользователей Discord',
-        help: 'Рекомендуется. ID пользователей Discord через запятую.'
-      },
-      DISCORD_REPLY_TO_MODE: { label: 'Стиль ответов', help: 'first, all или off.' },
-      DISCORD_ALLOW_ALL_USERS: {
-        label: 'Разрешить всех пользователей Discord',
-        help: 'Только для разработки. Если true, писать боту в ЛС может кто угодно без allowlist.'
-      },
-      DISCORD_HOME_CHANNEL: {
-        label: 'ID домашнего канала',
-        help: 'Канал, куда бот шлёт проактивные сообщения (результаты cron, напоминания).'
-      },
-      DISCORD_HOME_CHANNEL_NAME: {
-        label: 'Название домашнего канала',
-        help: 'Отображаемое имя домашнего канала в журналах и выводе статуса.'
-      },
-      BLUEBUBBLES_ALLOW_ALL_USERS: {
-        label: 'Разрешить всех пользователей iMessage',
-        help: 'Если true, allowlist BlueBubbles пропускается.'
-      },
-      MATTERMOST_ALLOW_ALL_USERS: { label: 'Разрешить всех пользователей Mattermost' },
-      MATTERMOST_HOME_CHANNEL: { label: 'Домашний канал' },
-      QQ_ALLOW_ALL_USERS: { label: 'Разрешить всех пользователей QQ' },
-      QQBOT_HOME_CHANNEL: { label: 'Домашний канал QQ', help: 'Канал или группа по умолчанию для доставки cron.' },
-      QQBOT_HOME_CHANNEL_NAME: { label: 'Название домашнего канала QQ' },
-      SLACK_BOT_TOKEN: {
-        label: 'Токен бота Slack',
-        help: 'Используйте токен бота из OAuth & Permissions после установки вашего приложения Slack.',
-        placeholder: 'Вставьте токен бота Slack'
-      },
-      SLACK_APP_TOKEN: {
-        label: 'Токен приложения Slack',
-        help: 'Используйте токен уровня приложения, необходимый для Socket Mode.',
-        placeholder: 'Вставьте токен приложения Slack'
-      },
-      SLACK_ALLOWED_USERS: {
-        label: 'Разрешённые ID пользователей Slack',
-        help: 'Рекомендуется. ID пользователей Slack через запятую.'
-      },
-      MATTERMOST_URL: { label: 'URL сервера', placeholder: 'https://mattermost.example.com' },
-      MATTERMOST_TOKEN: { label: 'Токен бота' },
-      MATTERMOST_ALLOWED_USERS: {
-        label: 'Разрешённые ID пользователей',
-        help: 'Рекомендуется. ID пользователей Mattermost через запятую.'
-      },
-      MATRIX_HOMESERVER: { label: 'URL homeserver', placeholder: 'https://matrix.org' },
-      MATRIX_ACCESS_TOKEN: { label: 'Токен доступа' },
-      MATRIX_USER_ID: { label: 'ID пользователя бота', placeholder: '@hermes:example.org' },
-      MATRIX_ALLOWED_USERS: {
-        label: 'Разрешённые ID пользователей Matrix',
-        help: 'Рекомендуется. ID пользователей через запятую в формате @user:server.'
-      },
-      SIGNAL_HTTP_URL: {
-        label: 'URL моста Signal',
-        placeholder: 'http://127.0.0.1:8080',
-        help: 'URL работающего REST-моста signal-cli.'
-      },
-      SIGNAL_ACCOUNT: { label: 'Номер телефона', help: 'Номер, зарегистрированный в вашем мосте signal-cli.' },
-      SIGNAL_ALLOWED_USERS: {
-        label: 'Разрешённые пользователи Signal',
-        help: 'Рекомендуется. Идентификаторы Signal через запятую.'
-      },
-      WHATSAPP_ENABLED: {
-        label: 'Включить мост WhatsApp',
-        help: 'Устанавливается автоматически переключателем ниже. Не меняйте, если точно не нужно.'
-      },
-      WHATSAPP_MODE: { label: 'Режим моста' },
-      WHATSAPP_ALLOWED_USERS: {
-        label: 'Разрешённые пользователи WhatsApp',
-        help: 'Рекомендуется. Номера телефонов или ID WhatsApp через запятую.'
-      }
-    },
-    platformIntro: {}
   },
   webhooks: {
     search: 'Поиск вебхуков...',
@@ -2400,7 +2242,6 @@ export const ru = defineLocale({
     nav: {
       'new-session': 'Новый сеанс',
       skills: 'Возможности',
-      messaging: 'Сообщения',
       artifacts: 'Артефакты',
       cron: 'Запланированные задачи'
     },
@@ -2532,7 +2373,6 @@ export const ru = defineLocale({
       finishedUnread: 'Завершён — не прочитан',
       backgroundRunning: 'Фоновая задача выполняется',
       draftSession: 'Черновик — ещё ничего не отправлено',
-      handoffOrigin: platform => `Передано из ${platform}`,
       ownedByProfile: profile => `Профиль: ${profile}`,
       renamed: 'Переименовано',
       renameFailed: 'Переименование не удалось',

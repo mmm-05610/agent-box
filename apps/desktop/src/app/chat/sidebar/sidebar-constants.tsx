@@ -11,14 +11,9 @@ import {
   type AppView,
   ARTIFACTS_ROUTE,
   CRON_ROUTE,
-  MESSAGING_ROUTE,
   SKILLS_ROUTE
 } from '../../routes'
 import { type NewSessionSplitHandler } from '../new-session-drag'
-
-export const NON_SESSION_INITIAL_ROWS = 3
-
-export const NON_SESSION_LOAD_STEP = 10
 
 export const PROJECT_TREE_WARM_MS = 2_000
 
@@ -36,13 +31,6 @@ export const SIDEBAR_NAV: SidebarNavItem[] = [
     icon: props => <Codicon name="symbol-misc" {...props} />,
     route: SKILLS_ROUTE,
     keybindActionId: 'nav.skills'
-  },
-  {
-    id: 'messaging',
-    label: '',
-    icon: props => <Codicon name="comment" {...props} />,
-    route: MESSAGING_ROUTE,
-    keybindActionId: 'nav.messaging'
   },
   {
     id: 'artifacts',
@@ -78,7 +66,6 @@ export interface ChatSidebarProps extends React.ComponentProps<typeof Sidebar> {
   currentView: AppView
   onNavigate: (item: SidebarNavItem) => void
   onLoadMoreSessions: () => Promise<void> | void
-  onLoadMoreMessaging?: (platform: string) => Promise<void> | void
   onResumeSession: (sessionId: string, session?: SessionInfo) => void
   onDeleteSession: (sessionId: string) => void
   onArchiveSession: (sessionId: string) => void
@@ -93,12 +80,4 @@ export interface ChatSidebarProps extends React.ComponentProps<typeof Sidebar> {
   onNewSessionSplit: NewSessionSplitHandler
   onManageCronJob: (jobId: string) => void
   onTriggerCronJob: (jobId: string) => Promise<void>
-}
-
-export interface MessagingSection {
-  sourceId: string
-  label: string
-  sessions: SessionInfo[]
-  total: number
-  hasMore: boolean
 }

@@ -42,7 +42,6 @@ export type { TipId }
 export const TIP_CATALOG: readonly TipDef[] = [
   { id: 'new-session', keybind: 'session.new', side: 'right', targets: ['[data-tour="sidebar-nav-new-session"]'] },
   { id: 'skills', keybind: 'nav.skills', side: 'right', targets: ['[data-tour="sidebar-nav-skills"]'] },
-  { id: 'messaging', keybind: 'nav.messaging', side: 'right', targets: ['[data-tour="sidebar-nav-messaging"]'] },
   { id: 'artifacts', keybind: 'nav.artifacts', side: 'right', targets: ['[data-tour="sidebar-nav-artifacts"]'] },
   { id: 'cron', keybind: 'nav.cron', side: 'right', targets: ['[data-tour="sidebar-nav-cron"]'] },
   { id: 'command-palette', keybind: 'nav.commandPalette', side: 'right', targets: ['[data-tour="sessions-sidebar"]'] },

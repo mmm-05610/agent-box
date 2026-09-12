@@ -5,8 +5,8 @@ import { readJson, writeJson } from '@/lib/storage'
 import type { SplitDir } from './session-states'
 
 /**
- * Route (page) tiles — a full-page view (Capabilities / Messaging / Artifacts,
- * or any plugin route) rendered as a layout-tree pane BESIDE the main thread,
+ * Route (page) tiles — a full-page view (Capabilities / Artifacts, or any
+ * plugin route) rendered as a layout-tree pane BESIDE the main thread,
  * the page analog of session tiles. Persisted by path so they re-open on boot.
  */
 export interface RouteTile {

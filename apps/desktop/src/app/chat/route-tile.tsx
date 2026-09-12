@@ -1,7 +1,7 @@
 /**
  * ROUTE (PAGE) TILES — a full-page view rendered as a layout-tree pane BESIDE
  * the main thread, the page analog of session tiles. Built-in pages
- * (Capabilities / Messaging / Artifacts) render their view; plugin pages render
+ * (Capabilities / Artifacts) render their view; plugin pages render
  * their `ROUTES_AREA` contribution. Lifecycle mirrors session tiles:
  * `openRouteTile(path)` -> `watchRouteTiles` registers a pane docked beside
  * main -> tree adoption lands it on the chosen edge; closing removes it.
@@ -13,18 +13,16 @@ import { ContribBoundary, ContribRender } from '@/extension/contrib/react/bounda
 import { useContributions } from '@/extension/contrib/react/use-contributions'
 import { $routeTiles, closeRouteTile, type RouteTile } from '@/store/route-tiles'
 
-import { ARTIFACTS_ROUTE, contributedRoutes, MESSAGING_ROUTE, ROUTES_AREA, SKILLS_ROUTE } from '../routes'
+import { ARTIFACTS_ROUTE, contributedRoutes, ROUTES_AREA, SKILLS_ROUTE } from '../routes'
 
 import { paneMirror } from './pane-mirror'
 
 const SkillsView = lazy(async () => ({ default: (await import('../skills')).SkillsView }))
-const MessagingView = lazy(async () => ({ default: (await import('../messaging')).MessagingView }))
 const ArtifactsView = lazy(async () => ({ default: (await import('../artifacts')).ArtifactsView }))
 
 // Built-in page views + their pane titles, keyed by route.
 const BUILTIN_PAGES: Record<string, { render: () => ReactNode; title: string }> = {
   [ARTIFACTS_ROUTE]: { render: () => <ArtifactsView />, title: 'Artifacts' },
-  [MESSAGING_ROUTE]: { render: () => <MessagingView />, title: 'Messaging' },
   [SKILLS_ROUTE]: { render: () => <SkillsView />, title: 'Capabilities' }
 }
 

@@ -83,10 +83,9 @@ function tileTranscriptSignatureKey(tile: TileTranscriptTarget): string {
 
 /**
  * Reconcile the persisted transcripts of every open WORKSPACE TILE (#93942
- * slice 1). Bot canonical chats live here — never in $sessions /
- * $messagingSessions (they carry the core `hidden` flag), so the main-pane
- * reconcile path's resolveSession() bails on them and a background delivery
- * never reaches an open bot chat. Each tile carries its own stored↔runtime id
+ * slice 1). Bot canonical chats live here — never in $sessions (it carries
+ * the core `hidden` flag), so the main-pane reconcile path's resolveSession()
+ * bails on them and a background delivery never reaches an open bot chat. Each tile carries its own stored↔runtime id
  * pair, so no resolution step is needed; refreshes are signature-gated per
  * tile so a no-change event costs nothing, and a busy tile is skipped (its own
  * stream owns the view while streaming).
@@ -282,17 +281,14 @@ export async function reconcileActiveTranscript({
   }
 }
 
-// Cron sessions are written by a background scheduler tick, messaging turns by
-// the background gateway (Telegram, WeChat, Discord, …) — neither signals the
-// desktop websocket directly. Backends with the change watcher broadcast
-// `cron.changed` / `sessions.changed` when those on-disk writes land, so the
-// timers below become slow safety-net backstops; against an older backend
-// (no `change_events` on gateway.ready) they stay at the legacy cadence.
+// Cron sessions are written by a background scheduler tick, which does not
+// signal the desktop websocket directly. Backends with the change watcher
+// broadcast `cron.changed` / `sessions.changed` when those on-disk writes
+// land, so the timers below become slow safety-net backstops; against an
+// older backend (no `change_events` on gateway.ready) they stay at the
+// legacy cadence.
 const CRON_POLL_INTERVAL_MS = 30_000
 const CRON_BACKSTOP_INTERVAL_MS = 5 * 60_000
-const MESSAGING_POLL_INTERVAL_MS = 10_000
-const ACTIVE_MESSAGING_SESSION_POLL_INTERVAL_MS = 5_000
-const ACTIVE_MESSAGING_SESSION_BACKSTOP_INTERVAL_MS = 30_000
 // Match the TUI's live-session refresh cadence. Auto-compression can rotate a
 // stored session id while its turn keeps running; until the next snapshot the
 // sidebar row points at the new id while the renderer still knows the old one.
@@ -475,7 +471,6 @@ export function rehydrateLiveSessionStatuses(
 interface BackgroundSyncParams {
   activeConnectionId: null | string
   activeGatewayProfile: string
-  activeIsMessaging: boolean
   activeSessionId: null | string
   activeStoredSessionId: null | string
   freshDraftReady: boolean
@@ -484,7 +479,6 @@ interface BackgroundSyncParams {
   refreshCronJobs: () => Promise<unknown> | unknown
   refreshCurrentModel: (force?: boolean) => Promise<unknown> | unknown
   refreshHermesConfig: () => Promise<unknown> | unknown
-  refreshMessagingSessions: () => Promise<unknown> | unknown
   refreshSessions: () => Promise<unknown> | unknown
   requestGateway: GatewayRequester
   updateSessionState: (
@@ -541,14 +535,13 @@ function visiblePoll(intervalMs: number, tick: () => void): () => void {
 
 /**
  * Keeps app data live while the gateway is open: an on-connect reseed (model /
- * profile / sessions + relative-cwd resolution), the cron / messaging /
- * open-transcript visibility polls, and the fresh-draft model/config reseed.
+ * profile / sessions + relative-cwd resolution), the cron / open-transcript
+ * visibility polls, and the fresh-draft model/config reseed.
  * All the "the desktop websocket won't tell us, so poll" logic in one place.
  */
 export function useBackgroundSync({
   activeConnectionId,
   activeGatewayProfile,
-  activeIsMessaging,
   activeSessionId,
   activeStoredSessionId,
   freshDraftReady,
@@ -557,7 +550,6 @@ export function useBackgroundSync({
   refreshCronJobs,
   refreshCurrentModel,
   refreshHermesConfig,
-  refreshMessagingSessions,
   refreshSessions,
   requestGateway,
   updateSessionState
@@ -649,10 +641,9 @@ export function useBackgroundSync({
   // down never replay their sessions.changed tick, so the open transcript
   // stayed stale until the user reopened it. Pull one signature-gated tail on
   // every (re)connect — a no-change read costs nothing. Keyed on the
-  // connection, not the session, so a plain session switch adds no read;
-  // messaging transcripts already refresh on open in their own effect below.
+  // connection, not the session, so a plain session switch adds no read.
   useEffect(() => {
-    if (gatewayState === 'open' && !activeIsMessaging && activeSessionId && activeStoredSessionId) {
+    if (gatewayState === 'open' && activeSessionId && activeStoredSessionId) {
       requestActiveTranscriptRefresh(true)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- connect-scoped: session deps would fire on every switch
@@ -723,7 +714,7 @@ export function useBackgroundSync({
   }, [activeConnectionId, activeGatewayProfile, changeEventsAvailable, gatewayState, requestGateway])
 
   // sessions.changed also means the *stored* list may have new rows (a cron
-  // run's session, an inbound messaging turn creating a thread). The full list
+  // run's session, a background turn creating a thread). The full list
   // refresh is heavier than the active_list snapshot, so trail it on a gap
   // instead of firing per tick. Direct atom subscription: the throttle state
   // lives in the effect closure, not in refs synced from renders.
@@ -739,7 +730,6 @@ export function useBackgroundSync({
     const run = () => {
       lastRunAt = Date.now()
       void refreshSessions()
-      void refreshMessagingSessions()
       // The project tree is a grouping of the same stored rows, so a session
       // created/deleted/renamed/re-homed outside this window goes stale in the
       // Projects sidebar without this (#100354). refreshProjectTree() keeps the
@@ -811,14 +801,7 @@ export function useBackgroundSync({
         window.clearTimeout(typingDeferTimer)
       }
     }
-  }, [
-    changeEventsAvailable,
-    gatewayState,
-    refreshMessagingSessions,
-    refreshSessions,
-    requestActiveTranscriptRefresh,
-    updateSessionState
-  ])
+  }, [changeEventsAvailable, gatewayState, refreshSessions, requestActiveTranscriptRefresh, updateSessionState])
 
   // Keyboard warmth for the deferral above: capture phase on window. Any
   // keydown in this renderer (composer, modal, settings) counts — conservative
@@ -867,42 +850,6 @@ export function useBackgroundSync({
 
     requestActiveTranscriptRefresh(true)
   }, [activeSessionId, activeStoredSessionId, activeTranscriptBusy, gatewayState, requestActiveTranscriptRefresh])
-
-  // Preserve the pre-existing messaging behavior: refresh once when a
-  // messaging transcript opens, then keep its visibility backstop. Desktop
-  // sessions never enter this effect and therefore gain no periodic timer.
-  useEffect(() => {
-    if (gatewayState !== 'open' || !activeIsMessaging || !activeSessionId || !activeStoredSessionId) {
-      return
-    }
-
-    const runScheduledRefresh = () => requestActiveTranscriptRefresh(false)
-
-    runScheduledRefresh()
-
-    return visiblePoll(
-      changeEventsAvailable ? ACTIVE_MESSAGING_SESSION_BACKSTOP_INTERVAL_MS : ACTIVE_MESSAGING_SESSION_POLL_INTERVAL_MS,
-      runScheduledRefresh
-    )
-  }, [
-    activeIsMessaging,
-    activeSessionId,
-    activeStoredSessionId,
-    changeEventsAvailable,
-    gatewayState,
-    requestActiveTranscriptRefresh
-  ])
-
-  // Messaging session lists against an older backend: no sessions.changed, so
-  // keep the legacy visible poll. (Event-capable backends fold this into the
-  // trailing sessions.changed refresh above.)
-  useEffect(() => {
-    if (gatewayState !== 'open' || changeEventsAvailable) {
-      return
-    }
-
-    return visiblePoll(MESSAGING_POLL_INTERVAL_MS, () => void refreshMessagingSessions())
-  }, [changeEventsAvailable, gatewayState, refreshMessagingSessions])
 
   // A fresh new-session draft (gateway open, no active session) re-pulls the
   // model + config so the composer pill reflects the profile default.

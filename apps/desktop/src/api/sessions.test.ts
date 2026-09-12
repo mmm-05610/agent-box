@@ -27,9 +27,7 @@ const sidebarRequest = {
   recentsProfile: 'default',
   recentsLimit: 40,
   recentsExclude: [],
-  cronLimit: 20,
-  messagingLimit: 40,
-  messagingExclude: []
+  cronLimit: 20
 }
 
 beforeEach(() => {
@@ -196,7 +194,6 @@ describe('the session list surface returns the backend page untouched', () => {
   it('returns the batched sidebar slices untouched when the route exists', async () => {
     hermesApi.mockResolvedValue({
       cron: { sessions: [] },
-      messaging: { sessions: [] },
       recents: { sessions: [{ id: 'remote-session', pinned: false, profile: 'default' }] }
     } as never)
 
@@ -209,7 +206,7 @@ describe('the session list surface returns the backend page untouched', () => {
 })
 
 describe('batched sidebar route skew', () => {
-  it('falls back to the three per-slice reads and remembers the dead route', async () => {
+  it('falls back to the per-slice reads and remembers the dead route', async () => {
     // The batched route shipped later than the per-slice one, so a newer
     // desktop can meet an older backend. Endpoint-missing is a capability
     // verdict, not a transient failure: probe once, then serve every refresh
@@ -234,8 +231,8 @@ describe('batched sidebar route skew', () => {
 
     const result = await fetchSidebarSessions(sidebarRequest)
 
-    // One batched attempt + three per-slice reads.
-    expect(hermesApi).toHaveBeenCalledTimes(4)
+    // One batched attempt + one per-slice read per remaining slice.
+    expect(hermesApi).toHaveBeenCalledTimes(3)
     const paths = hermesApi.mock.calls.map(call => (call[0] as { path: string }).path)
     expect(paths[1]).toContain('/api/profiles/sessions?limit=40&offset=0&min_messages=1')
     expect(paths[2]).toContain('source=cron')
@@ -246,7 +243,7 @@ describe('batched sidebar route skew', () => {
 
     hermesApi.mockClear()
     await fetchSidebarSessions(sidebarRequest)
-    expect(hermesApi).toHaveBeenCalledTimes(3)
+    expect(hermesApi).toHaveBeenCalledTimes(2)
     expect(hermesApi.mock.calls.every(call => !(call[0] as { path: string }).path.includes('/sidebar'))).toBe(true)
   })
 })

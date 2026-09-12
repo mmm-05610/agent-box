@@ -277,7 +277,6 @@ export const ar = defineLocale({
       'nav.settings': 'فتح الإعدادات',
       'nav.profiles': 'فتح الملفات الشخصية',
       'nav.skills': 'فتح المهارات',
-      'nav.messaging': 'فتح المراسلة',
       'nav.artifacts': 'فتح العناصر',
       'nav.cron': 'فتح المهام المجدولة',
       'nav.agents': 'فتح الوكلاء',
@@ -1201,10 +1200,6 @@ export const ar = defineLocale({
         title: 'المهارات والأدوات',
         detail: 'تفعيل المهارات ومجموعات الأدوات والمزوّدين'
       },
-      messaging: {
-        title: 'المراسلة',
-        detail: 'إعداد Telegram وSlack وDiscord والمزيد'
-      },
       artifacts: {
         title: 'العناصر',
         detail: 'استعراض المخرجات المولّدة'
@@ -1267,179 +1262,6 @@ export const ar = defineLocale({
     topSkills: 'أكثر المهارات استخداما',
     noSkillActivity: 'لا يوجد نشاط مهارات',
     actions: count => `${count} إجراء`
-  },
-  messaging: {
-    search: 'بحث',
-    loading: 'جار التحميل...',
-    loadFailed: 'فشل التحميل',
-    states: {
-      connected: 'متصل',
-      connecting: 'جار الاتصال',
-      disabled: 'معطّل',
-      fatal: 'خطأ',
-      gateway_stopped: 'تم إيقاف بوابة المراسلة',
-      not_configured: 'يحتاج إعدادا',
-      pending_restart: 'يلزم إعادة التشغيل',
-      retrying: 'جار إعادة المحاولة',
-      startup_failed: 'فشل بدء التشغيل'
-    },
-    unknown: 'غير معروف',
-    hintPendingRestart: 'تحتاج إعادة تشغيل لتطبيق التغييرات.',
-    hintGatewayStopped: 'البوابة متوقفة.',
-    credentialsSet: 'بيانات الاعتماد مضبوطة',
-    needsSetup: 'يحتاج إعدادا',
-    gatewayStopped: 'البوابة متوقفة',
-    getCredentials: 'الحصول على بيانات الاعتماد',
-    openSetupGuide: 'فتح دليل الإعداد',
-    required: 'مطلوب',
-    recommended: 'موصى به',
-    advanced: count => `${count} إعدادات متقدمة`,
-    noTokenNeeded: 'لا يحتاج رمز',
-    enabled: 'مفعل',
-    disabled: 'معطل',
-    unsavedChanges: 'تغييرات غير محفوظة',
-    saving: 'جار الحفظ...',
-    saveChanges: 'حفظ التغييرات',
-    saved: 'تم الحفظ',
-    replaceValue: 'استبدال القيمة',
-    openDocs: 'فتح الوثائق',
-    clearField: key => `مسح ${key}`,
-    enableAria: name => `تفعيل ${name}`,
-    disableAria: name => `تعطيل ${name}`,
-    platformEnabled: name => `تم تفعيل ${name}`,
-    platformDisabled: name => `تم تعطيل ${name}`,
-    restartToApply: 'أعد التشغيل لتطبيق التغييرات.',
-    setupSaved: name => `تم حفظ إعداد ${name}`,
-    restartToReconnect: 'أعد التشغيل لإعادة الاتصال.',
-    keyCleared: key => `تم مسح ${key}`,
-    setupUpdated: name => `تم تحديث إعداد ${name}`,
-    failedUpdate: name => `فشل تحديث ${name}`,
-    failedSave: name => `فشل حفظ ${name}`,
-    failedClear: key => `فشل مسح ${key}`,
-    fieldCopy: {
-      TELEGRAM_BOT_TOKEN: {
-        label: 'رمز البوت (token)',
-        help: 'أنشئ بوتا عبر @BotFather، ثم الصق الرمز الذي يمنحك إياه.',
-        placeholder: 'الصق رمز بوت Telegram'
-      },
-      TELEGRAM_ALLOWED_USERS: {
-        label: 'معرّفات مستخدمي Telegram المسموح بهم',
-        help: 'موصى به. معرّفات رقمية مفصولة بفواصل من @userinfobot. بدون ذلك، يمكن لأي شخص مراسلة بوتك مباشرة.'
-      },
-      TELEGRAM_PROXY: {
-        label: 'رابط الـ Proxy',
-        help: 'مطلوب فقط على الشبكات التي يكون فيها Telegram محجوبا.'
-      },
-      DISCORD_BOT_TOKEN: {
-        label: 'رمز البوت (token)',
-        help: 'أنشئ تطبيقا في Discord Developer Portal، وأضف بوتا، ثم الصق رمزه.'
-      },
-      DISCORD_ALLOWED_USERS: {
-        label: 'معرّفات مستخدمي Discord المسموح بهم',
-        help: 'موصى به. معرّفات مستخدمي Discord مفصولة بفواصل.'
-      },
-      DISCORD_REPLY_TO_MODE: {
-        label: 'نمط الرد',
-        help: 'first أو all أو off.'
-      },
-      DISCORD_ALLOW_ALL_USERS: {
-        label: 'السماح لكل مستخدمي Discord',
-        help: 'للتطوير فقط. عند التفعيل، يمكن لأي شخص مراسلة البوت مباشرة دون قائمة سماح.'
-      },
-      DISCORD_HOME_CHANNEL: {
-        label: 'معرّف القناة الرئيسية',
-        help: 'القناة التي يرسل فيها البوت الرسائل الاستباقية (مخرجات cron، التذكيرات).'
-      },
-      DISCORD_HOME_CHANNEL_NAME: {
-        label: 'اسم القناة الرئيسية',
-        help: 'الاسم المعروض للقناة الرئيسية في السجلات ومخرجات الحالة.'
-      },
-      BLUEBUBBLES_ALLOW_ALL_USERS: {
-        label: 'السماح لكل مستخدمي iMessage',
-        help: 'عند التفعيل، يتم تخطي قائمة سماح BlueBubbles.'
-      },
-      MATTERMOST_ALLOW_ALL_USERS: {
-        label: 'السماح لكل مستخدمي Mattermost'
-      },
-      MATTERMOST_HOME_CHANNEL: {
-        label: 'القناة الرئيسية'
-      },
-      QQ_ALLOW_ALL_USERS: {
-        label: 'السماح لكل مستخدمي QQ'
-      },
-      QQBOT_HOME_CHANNEL: {
-        label: 'قناة QQ الرئيسية',
-        help: 'القناة أو المجموعة الافتراضية لتسليم cron.'
-      },
-      QQBOT_HOME_CHANNEL_NAME: {
-        label: 'اسم قناة QQ الرئيسية'
-      },
-      SLACK_BOT_TOKEN: {
-        label: 'رمز بوت Slack',
-        help: 'استخدم رمز البوت من OAuth & Permissions بعد تثبيت تطبيق Slack الخاص بك.',
-        placeholder: 'الصق رمز بوت Slack'
-      },
-      SLACK_APP_TOKEN: {
-        label: 'رمز تطبيق Slack',
-        help: 'استخدم الرمز على مستوى التطبيق المطلوب لـ Socket Mode.',
-        placeholder: 'الصق رمز تطبيق Slack'
-      },
-      SLACK_ALLOWED_USERS: {
-        label: 'معرّفات مستخدمي Slack المسموح بهم',
-        help: 'موصى به. معرّفات مستخدمي Slack مفصولة بفواصل.'
-      },
-      MATTERMOST_URL: {
-        label: 'رابط الخادم',
-        placeholder: 'https://mattermost.example.com'
-      },
-      MATTERMOST_TOKEN: {
-        label: 'رمز البوت (token)'
-      },
-      MATTERMOST_ALLOWED_USERS: {
-        label: 'معرّفات المستخدمين المسموح بهم',
-        help: 'موصى به. معرّفات مستخدمي Mattermost مفصولة بفواصل.'
-      },
-      MATRIX_HOMESERVER: {
-        label: 'رابط Homeserver',
-        placeholder: 'https://matrix.org'
-      },
-      MATRIX_ACCESS_TOKEN: {
-        label: 'رمز الوصول'
-      },
-      MATRIX_USER_ID: {
-        label: 'معرّف مستخدم البوت',
-        placeholder: '@hermes:example.org'
-      },
-      MATRIX_ALLOWED_USERS: {
-        label: 'معرّفات مستخدمي Matrix المسموح بهم',
-        help: 'موصى به. معرّفات مستخدمين مفصولة بفواصل بصيغة @user:server.'
-      },
-      SIGNAL_HTTP_URL: {
-        label: 'رابط جسر Signal',
-        placeholder: 'http://127.0.0.1:8080',
-        help: 'رابط جسر signal-cli REST قيد التشغيل.'
-      },
-      SIGNAL_ACCOUNT: {
-        label: 'رقم الهاتف',
-        help: 'الرقم المسجّل مع جسر signal-cli الخاص بك.'
-      },
-      SIGNAL_ALLOWED_USERS: {
-        label: 'مستخدمو Signal المسموح بهم',
-        help: 'موصى به. معرّفات Signal مفصولة بفواصل.'
-      },
-      WHATSAPP_ENABLED: {
-        label: 'تفعيل جسر WhatsApp',
-        help: 'يُضبط تلقائيا عبر المفتاح أدناه. اتركه دون تغيير ما لم تكن متأكدا من حاجتك إليه.'
-      },
-      WHATSAPP_MODE: {
-        label: 'وضع الجسر'
-      },
-      WHATSAPP_ALLOWED_USERS: {
-        label: 'مستخدمو WhatsApp المسموح بهم',
-        help: 'موصى به. أرقام هواتف أو معرّفات WhatsApp مفصولة بفواصل.'
-      }
-    },
-    platformIntro: {}
   },
   profiles: {
     close: 'إغلاق',
@@ -1746,7 +1568,6 @@ export const ar = defineLocale({
     nav: {
       'new-session': 'جلسة جديدة',
       skills: 'المهارات',
-      messaging: 'المراسلة',
       artifacts: 'العناصر',
       chat: 'المحادثة',
       settings: 'الإعدادات',
@@ -1872,7 +1693,6 @@ export const ar = defineLocale({
       openInSplit: 'فتح في تقسيم',
       ownedByProfile: profile => `مملوكة للملف الشخصي ${profile}`,
       untitledChat: id => `محادثة ${id}`,
-      handoffOrigin: platform => `قادمة من ${platform}`,
       renamed: 'تمت إعادة التسمية',
       renameFailed: 'فشلت إعادة التسمية',
       renameTitle: 'إعادة تسمية الجلسة',
@@ -2999,10 +2819,6 @@ export const ar = defineLocale({
       skills: {
         title: 'علّمه مرة واحدة',
         text: 'المهارات مجلدات من التعليمات يحمّلها Hermes عندما يقتضي العمل ذلك.'
-      },
-      messaging: {
-        title: 'Hermes بعيدًا عن مكتبك',
-        text: 'اربطه بـ Telegram وDiscord وSlack وغيرها — الوكيل نفسه والذاكرة نفسها.'
       },
       artifacts: {
         title: 'كل ما صنعه Hermes',

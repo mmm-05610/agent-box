@@ -1,6 +1,6 @@
 import type * as React from 'react'
 
-export type SidebarNavId = 'artifacts' | 'command-center' | 'cron' | 'messaging' | 'new-session' | 'settings' | 'skills'
+export type SidebarNavId = 'artifacts' | 'command-center' | 'cron' | 'new-session' | 'settings' | 'skills'
 
 export interface SidebarNavItem {
   /** Built-in view id, or a contributed row's namespaced contribution id. */

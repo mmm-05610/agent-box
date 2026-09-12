@@ -1,15 +1,13 @@
 import { getSession } from '@/api/sessions'
 import { sessionOwnerRouteFromRow } from '@/application/session/request-router'
-import { isMessagingSource, normalizeSessionSource } from '@/lib/session-source'
+import { normalizeSessionSource } from '@/lib/session-source'
 import { $activeGatewayProfile, $profiles, normalizeProfileKey } from '@/store/profile'
 import { $projectTree } from '@/store/projects'
 import {
   $cronSessions,
-  $messagingSessions,
   $sessions,
   sessionMatchesStoredId,
   setCronSessions,
-  setMessagingSessions,
   setSessions
 } from '@/store/session'
 import { type SessionOwnerScope, type SessionProfileRoute } from '@/store/session/types'
@@ -21,18 +19,12 @@ export function sessionShouldHaveTranscript(session: SessionInfo | undefined): b
   return (session?.message_count ?? 0) > 0
 }
 
-export type ListedSessionSlice = 'cron' | 'messaging' | 'sessions'
+export type ListedSessionSlice = 'cron' | 'sessions'
 
 export function findListedSession(
   storedSessionId: string
 ): { session: SessionInfo; slice: ListedSessionSlice } | undefined {
   const match = (session: SessionInfo) => sessionMatchesStoredId(session, storedSessionId)
-  const fromMessaging = $messagingSessions.get().find(match)
-
-  if (fromMessaging) {
-    return { session: fromMessaging, slice: 'messaging' }
-  }
-
   const fromCron = $cronSessions.get().find(match)
 
   if (fromCron) {
@@ -52,29 +44,18 @@ export function dropListedSession(storedSessionId: string): void {
   const keep = (session: SessionInfo) => !sessionMatchesStoredId(session, storedSessionId)
 
   setSessions(prev => prev.filter(keep))
-  setMessagingSessions(prev => prev.filter(keep))
   setCronSessions(prev => prev.filter(keep))
 }
 
 export function restoreListedSession(session: SessionInfo, slice?: ListedSessionSlice): void {
   const target: ListedSessionSlice =
     slice ??
-    (isMessagingSource(session.source)
-      ? 'messaging'
-      : normalizeSessionSource(session.source) === 'cron'
-        ? 'cron'
-        : 'sessions')
+    (normalizeSessionSource(session.source) === 'cron' ? 'cron' : 'sessions')
 
   const prepend = (prev: SessionInfo[]) => [
     session,
     ...prev.filter(existing => !sessionMatchesStoredId(existing, session.id))
   ]
-
-  if (target === 'messaging') {
-    setMessagingSessions(prepend)
-
-    return
-  }
 
   if (target === 'cron') {
     setCronSessions(prepend)
@@ -121,7 +102,6 @@ export function cachedSessionRow(storedSessionId: string): SessionInfo | undefin
   const candidates = [
     ...$sessions.get(),
     ...$cronSessions.get(),
-    ...$messagingSessions.get(),
     ...projectTreeSessions()
   ].filter(session => sessionMatchesStoredId(session, storedSessionId))
 
