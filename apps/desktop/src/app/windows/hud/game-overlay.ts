@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 
+import type { HudWindowPort } from './port'
+
 /**
  * Whether a fullscreen app (a game) is under the HUD.
  *
- * Main owns the answer — it polls the OS window list while the HUD is open
+ * The host owns the answer — it polls the OS window list while the HUD is open
  * (see startHudGameOverlayFeed / hud-game-overlay.ts) and pushes changes here.
  * The renderer cannot know this on its own: which OS window owns the screen is
  * not a fact a page can observe.
@@ -14,14 +16,14 @@ import { useEffect, useState } from 'react'
  * and the transcript stays up instead of fading on a timer (see `useHudHeld`) —
  * a chat log you look back at during a lull is useless if it erases itself.
  */
-export function useHudGameOverlay(): boolean {
+export function useHudGameOverlay(port: HudWindowPort): boolean {
   const [active, setActive] = useState(false)
 
   useEffect(() => {
-    const off = window.hermesDesktop?.hud?.onGameOverlay?.(state => setActive(state.active))
+    const off = port.onGameOverlay(state => setActive(state.active))
 
-    return () => off?.()
-  }, [])
+    return () => off()
+  }, [port])
 
   return active
 }

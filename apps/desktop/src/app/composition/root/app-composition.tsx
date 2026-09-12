@@ -4,6 +4,7 @@ import { useStore } from '@nanostores/react'
 import { atom, computed } from 'nanostores'
 import type { CSSProperties, ReactElement, PointerEvent as ReactPointerEvent } from 'react'
 
+import { hudWindowPort } from '@/app/composition/bridges/window-ports'
 import { AppContextMenu } from '@/app/composition/registrations/context-menu'
 import { ContribWiring, WiredPane } from '@/app/composition/wiring/features'
 import { $workspaceIsPage } from '@/app/routes'
@@ -834,7 +835,9 @@ export function ContribController() {
     return (
       <ContribWiring>
         <AppContextMenu />
-        <HudShell />
+        {/* The HUD consumes the compact chat surface as a contribution; the
+            shell owns only the frame and the window mechanics. */}
+        <HudShell chatSurface={<WiredPane part="chatRoutes" />} port={hudWindowPort()} />
       </ContribWiring>
     )
   }

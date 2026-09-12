@@ -1,5 +1,8 @@
+import type { HudWindowPort } from '@/app/windows/hud/port'
 import type { PetOverlayWindowPort } from '@/app/windows/pet/port'
 import type { QuickEntryWindowPort } from '@/app/windows/quick-entry/port'
+import { getActiveComposer } from '@/components/composer/focus'
+import { $selectedStoredSessionId } from '@/store/session'
 
 /**
  * The shell's window API assembled behind the neutral window-host ports.
@@ -70,4 +73,72 @@ export function petOverlayWindowPort(): PetOverlayWindowPort {
       }
 
   return petOverlayPort
+}
+
+let hudPort: HudWindowPort | null = null
+
+/** The HUD's host port (no-op when the shell lacks the API — the mechanics then degrade exactly as before). */
+export function hudWindowPort(): HudWindowPort {
+  if (hudPort) {
+    return hudPort
+  }
+
+  const api = typeof window === 'undefined' ? undefined : window.hermesDesktop?.hud
+
+  hudPort = api
+    ? {
+        beginMove: () => api.beginMove(),
+        endMove: () => api.endMove(),
+        moveBy: size => api.moveBy(size),
+        onCursor: api.onCursor
+          ? callback => api.onCursor(point => callback(point))
+          : // No cursor feed: the mousemove path still decides solidity.
+            () => () => undefined,
+        onGameOverlay: callback => api.onGameOverlay(state => callback({ active: state.active })),
+        onRetarget: callback => api.onGoto(callback),
+        placement: api.windowing,
+        reportSession: sessionId => api.setSession(sessionId),
+        setBounds: bounds => api.setBounds(bounds),
+        setFrost: showing => api.setFrost(showing),
+        setIgnoreMouse: ignore => api.setIgnoreMouse(ignore),
+        setWorkspaceTransfer: api.setWorkspaceTransfer
+          ? transferring => {
+              api.setWorkspaceTransfer?.(transferring)
+            }
+          : undefined
+      }
+    : {
+        beginMove: () => undefined,
+        endMove: () => undefined,
+        moveBy: () => undefined,
+        onCursor: () => () => undefined,
+        onGameOverlay: () => () => undefined,
+        onRetarget: () => () => undefined,
+        reportSession: () => undefined,
+        setBounds: () => undefined,
+        setFrost: () => undefined,
+        setIgnoreMouse: () => undefined
+      }
+
+  return hudPort
+}
+
+/** Session tiles route on `tile:<storedSessionId>` (see session-tile.tsx). */
+const TILE_TARGET_PREFIX = 'tile:'
+
+/**
+ * The conversation the user is actually looking at — the one a newly-opened
+ * compact surface should show. Answered HERE because it reads the composer
+ * focus bus (a component-layer fact): `$selectedStoredSessionId` is the
+ * WORKSPACE pane's session, so reading it alone sent the main tab into the
+ * surface no matter which tile was fronted — the tabs exist precisely so that
+ * isn't the same question. `getActiveComposer()` already answers it for the
+ * focus bus, healing to the visible surface when its cached claim is buried or
+ * gone, and a tile's routing key IS its stored session id.
+ */
+export function frontConversationId(): null | string {
+  const target = getActiveComposer()
+  const tile = target.startsWith(TILE_TARGET_PREFIX) ? target.slice(TILE_TARGET_PREFIX.length) : null
+
+  return tile || $selectedStoredSessionId.get()
 }
