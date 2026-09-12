@@ -3,6 +3,47 @@
 **Edges paid off: 3.** Shared rules and the verification recipe:
 [README](README.md).
 
+## Move A.0 — the two type names the shape needs (amendment, 2026-09-12)
+
+**This step exists because Move A as first written did not work, and the executor was
+right to stop.** `NewSessionPlacement`'s members name two `store/` types —
+`dir: TileDock` and `route?: AgentProfileRoute | null`. Moved to `types/` (rank 0)
+on its own, the interface would pull two `types → store` lines into the ledger: it
+would *add* 2 to remove 2, a net zero. Sink the names first, then the shape moves
+clean.
+
+**A.0a — `SplitDir` and `TileDock` are pane vocabulary (new file `types/pane-dock.ts`).**
+
+```
+store/session-states/session-state-registry.ts:474   export type SplitDir = 'bottom' | 'left' | 'right' | 'top'
+store/session-states/session-state-registry.ts:478   export type TileDock = 'center' | SplitDir
+```
+
+Both are bare unions over rank-0 needs — nothing else. Move them verbatim to
+`types/pane-dock.ts`, and have `session-state-registry.ts` re-export them
+(`export type { SplitDir, TileDock } from '@/types/pane-dock'`). Nine production
+files read them today, and every one of them reads them through
+`@/store/session-states` or that registry (`store/route-tiles.ts`,
+`store/session-states/tile-operations.ts`, `app/chat/{new-session-drag,session-drag,pane-mirror}.ts`,
+`app/chat/sidebar/{chrome.tsx,split-submenu.tsx}`,
+`app/session/hooks/use-session-actions/session-create.ts`) — the re-export is what
+keeps all nine where they are. `store → types` is downward: no new line.
+
+**A.0b — the route half is already at rank 0, so name it directly.**
+
+`AgentProfileRoute` is an alias of `SessionOwnerRoute`
+(`store/profile/new-chat-state.ts:12`), and `SessionOwnerRoute` **already lives on
+the `@/types/session` leaf** — that is the whole point of that leaf's header comment.
+So the moved interface declares `route?: SessionOwnerRoute | null` and imports it
+from `@/types/session`. The store keeps its own `AgentProfileRoute` alias, which is
+store-side naming for store-side readers; nothing about it has to move, and the two
+names are the same type, so no caller changes.
+
+*Why not move `AgentProfileRoute` to `types/` too:* it is an alias, and moving an
+alias gives the same type two rank-0 spellings after `SessionOwnerRoute` is already
+there. `store/session/types.ts:20` already marks its own alias `SessionProfileRoute`
+deprecated for exactly that reason — do not add a second one.
+
 ## Move A — `NewSessionPlacement` is a shape, not a drag handler
 
 `NewSessionPlacement` is an interface declared at
@@ -14,7 +55,7 @@ for it.
 | | |
 | --- | --- |
 | from | `app/chat/new-session-drag.ts:63` (the interface only) |
-| to | `types/session-placement.ts` |
+| to | `types/session-placement.ts` (imports `TileDock` from `@/types/pane-dock`, `SessionOwnerRoute` from `@/types/session`) |
 | repoint | `app/chat/new-session-drag.ts`, `app/chat/sidebar/projects/workspace-group.tsx`, `app/chat/sidebar/project-dialog.tsx`, `store/projects/crud.ts`, `store/projects/dialogs.ts` |
 | edges | 2 |
 
@@ -45,7 +86,10 @@ the specifier to `./workspace-groups` once moved.
 
 ## Steps
 
-1. Do Move A, then Move B. Repoint at every step; do not batch the edits.
+1. Do Move A.0 (both halves), Move A, then Move B. Repoint at every step; do not
+   batch the edits. A.0 moves type declarations only — `typecheck` after it must
+   pass with zero other changes, and the ledger must be **unchanged** (those two
+   names going down is not an edge; the edge it unblocks is Move A's).
 2. `npm run typecheck`.
 3. `npm run ledger:layers`, then `npm run test:ui`.
 
