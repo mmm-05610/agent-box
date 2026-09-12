@@ -247,5 +247,35 @@
       "chat/sidebar/project-filter'",
       "chat/sidebar/profile-scope'"
     ]
+  },
+  "23 gateway-event clean": {
+    "edges": 0,
+    "modules": [
+      "gateway-event/index'",
+      "gateway-event/types'",
+      "gateway-event/status'",
+      "gateway-event/lifecycle'",
+      "gateway-event/input-requests'",
+      "gateway-event/session-control'"
+    ]
+  },
+  "24 gateway-event component pins": {
+    "edges": 0,
+    "modules": [
+      "vibe-hearts'",
+      "suggestion-providers/skill'",
+      "suggestion-providers/repair'",
+      "GatewayEventDeps",
+      "gateway-event/index'",
+      "gateway-event/types'"
+    ]
+  },
+  "25 interrupted-turn seal": {
+    "edges": 0,
+    "modules": [
+      "finalizeInterruptedMessages",
+      "use-prompt-actions/rewind'",
+      "gateway-event/session-info'"
+    ]
   }
 }

@@ -161,14 +161,28 @@ out-of-group closure clean.
 | --- | --- | --- | --- | --- | --- | --- |
 | 17 | session remainder: the event projection and the state cache | 2 | 394 | `application/session/` | 10 | open |
 | 18 | starmap's pure maths (canvas render, simulation, geometry, colour, time axis, share code) | 9 | 1983 | `lib/starmap/` | 1 | open |
-| 19 | terminal internals (buffer, selection, clipboard, resize, font, lifecycle table, event stream) | 8 | 1057 | `application/terminal/` | 4 | open |
-| 20 | preview/browser logic (drive state machine, navigation, script runner, console state, nudge, reader) | 10 | 736 | `application/preview/` | 3 | open |
-| 21 | the transcript projection (split today across `app/chat/` and `components/assistant-ui/thread/`) | 8 | 750 | `application/transcript/` | 3 | open |
+| 19 | terminal internals (buffer, selection, clipboard, resize, font, lifecycle table, event stream) | 8 | 1057 | `application/terminal/` | 3 | open |
+| 20 | preview/browser logic (drive state machine, navigation, script runner, console state, nudge, reader) | 10 | 736 | `application/preview/` | 4 | open |
+| 21 | the transcript projection (split today across `app/chat/` and `components/assistant-ui/thread/`) | 8 | 750 | `application/transcript/` | 4 | open |
 | 22 | session-list derivations out of the `sessions` pane | 7 | 366 | `application/session-lists/` | 1 | open |
+| 23 | the six clean `gateway-event` handlers | 6 | 1017 | `application/session/gateway-event/` | 1 | open |
+| 24 | the two handlers that reach `components/` — three calls join the deps bag, then they move | 2 | 550 | `application/session/gateway-event/` | 5 | open |
+| 25 | the interrupted-turn seal is extracted, and `session-info.ts` follows it | 1 (+1 fn) | 459 | `application/session/` | 2 | open |
 
-**Not dispatched, on purpose:** `app/chat/sidebar/projects/workspace-groups.ts` (673
-lines, the heaviest single file) and the 50 files that reach `components/`. Each needs
-a decision about *what the module is*, not a destination.
+**Two ordering facts the wave table cannot express**, because waves encode *file
+collisions*, not dependencies:
+
+- **25 requires 17 to have landed.** Without it `session-info.ts` still imports
+  `../utils` from the app layer, and moving it would open an `application → app` edge.
+  The wave table puts 25 in wave 2 and 17 in wave 10 — **do 17 first regardless.**
+- **24 must run after 23.** They share `gateway-event/index.ts` and
+  `gateway-event/types.ts`; the collision check sees this (they are in waves 1 and 5),
+  but 23 moving those two files while 24 edits them is the reason, not a coincidence.
+
+**Not dispatched, on purpose:** `desktop-bridge.ts`'s three-way split, the tool-call
+model fallback, `app/settings/`, `workspace-groups.ts`, and `app/routes.ts`. Each needs
+a decision about *what the module is*, not a destination — the decisions are expanded in
+`renderer-layer-batches/README.md` under "Phase 3 — not dispatched".
 
 ## How to update this file
 
