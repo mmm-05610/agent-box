@@ -34,8 +34,8 @@ import { $sessions, sessionPinId } from '@/store/session'
 import { exportSession } from '@/store/session-export'
 import type { ActionStatusResponse, AnalyticsResponse, SessionInfo, StatusResponse } from '@/types/hermes'
 
-import { useRefreshHotkey } from '@/app/hooks/use-refresh-hotkey'
-import { useRouteEnumParam } from '@/app/hooks/use-route-enum-param'
+import { useRefreshHotkey } from '@/components/hooks/use-refresh-hotkey'
+import { useRouteEnumParam } from '@/components/hooks/use-route-enum-param'
 import { OverlayMain, OverlayNav, OverlaySplitLayout } from '@/app/shell/layers/overlays/overlay-split-layout'
 import { OverlayView } from '@/app/shell/layers/overlays/overlay-view'
 

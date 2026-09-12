@@ -74,7 +74,7 @@ import {
   sessionRoute,
   SETTINGS_ROUTE,
   SKILLS_ROUTE
-} from '../routes'
+} from '@/app/routes'
 
 export interface KeybindRuntimeDeps {
   /** Open/close the command center overlay (sessions / system / usage). */

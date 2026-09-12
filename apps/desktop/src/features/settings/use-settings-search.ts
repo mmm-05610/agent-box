@@ -12,7 +12,7 @@ import { $pluginRecords } from '@/store/plugin-state'
 import { $gatewayState } from '@/store/session'
 import { TRANSLUCENCY_SUPPORTED } from '@/store/translucency'
 
-import { useHermesConfigRecord } from '@/app/hooks/use-config-record'
+import { useHermesConfigRecord } from '@/application/config/use-config-record'
 
 import {
   APPEARANCE_SETTING_IDS,

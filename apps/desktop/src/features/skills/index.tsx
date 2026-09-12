@@ -32,8 +32,8 @@ import { notify, notifyError } from '@/store/notifications'
 import { $activeGatewayProfile, normalizeProfileKey } from '@/store/profile'
 import type { OfficialSkillInfo, SkillInfo, ToolsetInfo } from '@/types/hermes'
 
-import { useRefreshHotkey } from '@/app/hooks/use-refresh-hotkey'
-import { useRouteEnumParam } from '@/app/hooks/use-route-enum-param'
+import { useRefreshHotkey } from '@/components/hooks/use-refresh-hotkey'
+import { useRouteEnumParam } from '@/components/hooks/use-route-enum-param'
 import {
   CapRow,
   DetailColumn,

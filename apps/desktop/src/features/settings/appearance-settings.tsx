@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 
 import { saveHermesConfig } from '@/api/config'
-import { useDebounced } from '@/app/hooks/use-debounced'
+import { useDebounced } from '@/components/hooks/use-debounced'
 import { installVscodeThemeFromMarketplace } from '@/application/theme/adapters/install'
 import { $marketplaceInstalls, getBaseColors, isUserTheme, removeUserTheme } from '@/application/theme/adapters/user-themes'
 import { LanguageSwitcher } from '@/components/language-switcher'
@@ -57,7 +57,7 @@ import { $zoomPercent, setZoomPercent } from '@/store/zoom'
 import { useTheme } from '@/themes/context'
 import type { DesktopTheme } from '@/themes/types'
 
-import { setHermesConfigCache, useHermesConfigRecord } from '@/app/hooks/use-config-record'
+import { setHermesConfigCache, useHermesConfigRecord } from '@/application/config/use-config-record'
 
 import { MODE_OPTIONS } from './constants'
 import { setNested } from './helpers'

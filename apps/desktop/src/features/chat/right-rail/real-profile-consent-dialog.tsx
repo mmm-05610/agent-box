@@ -23,7 +23,7 @@ import {
   releaseRealProfilePrompt
 } from '@/store/real-profile-consent'
 
-import { hermesConfigCacheWriter, useHermesConfigRecord } from '@/app/hooks/use-config-record'
+import { hermesConfigCacheWriter, useHermesConfigRecord } from '@/application/config/use-config-record'
 
 interface RealProfileConsentDialogProps {
   /** The Browser tab this pane renders — used only to claim the prompt so

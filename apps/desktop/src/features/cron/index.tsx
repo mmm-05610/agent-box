@@ -15,7 +15,7 @@ import { notify, notifyError } from '@/store/notifications'
 import { $profileScope, ALL_PROFILES } from '@/store/profile'
 import { type AutomationBlueprint, type CronJob } from '@/types/hermes'
 
-import { useRefreshHotkey } from '@/app/hooks/use-refresh-hotkey'
+import { useRefreshHotkey } from '@/components/hooks/use-refresh-hotkey'
 import {
   Panel,
   PanelAddButton,

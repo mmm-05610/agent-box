@@ -19,7 +19,7 @@ import { notifyError, readableError } from '@/store/notifications'
 import { startManualLocalEndpoint, startManualOnboarding, startManualProviderOAuth } from '@/store/onboarding'
 import type { AuxiliaryModelsResponse, AuxiliaryTaskAssignment, MoaConfigResponse, MoaModelSlot, ModelOptionProvider, StaleAuxAssignment } from '@/types/hermes'
 
-import { hermesConfigCacheWriter, invalidateHermesConfig, useHermesConfigRecord } from '@/app/hooks/use-config-record'
+import { hermesConfigCacheWriter, invalidateHermesConfig, useHermesConfigRecord } from '@/application/config/use-config-record'
 
 import { CONTROL_TEXT } from './constants'
 import { getNested, setNested } from './helpers'

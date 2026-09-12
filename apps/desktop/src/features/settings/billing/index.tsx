@@ -18,7 +18,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { BarChart3, CreditCard, ExternalLink, Package, Wrench } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 
-import { useRouteEnumParam } from '@/app/hooks/use-route-enum-param'
+import { useRouteEnumParam } from '@/components/hooks/use-route-enum-param'
 
 import { RowValue } from './account-row-value'
 import { BillingApiProvider } from './api'

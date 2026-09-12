@@ -17,7 +17,7 @@ import { notify, notifyError } from '@/store/notifications'
 import { $profileColors, profileLabel } from '@/store/profile'
 import { type ProfileInfo } from '@/types/hermes'
 
-import { useRefreshHotkey } from '@/app/hooks/use-refresh-hotkey'
+import { useRefreshHotkey } from '@/components/hooks/use-refresh-hotkey'
 import {
   Panel,
   PanelAddButton,

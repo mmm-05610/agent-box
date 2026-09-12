@@ -30,7 +30,7 @@ import { $profileScope } from '@/store/profile'
 import { runGatewayRestart } from '@/store/system-actions'
 import { type WebhookRoute, type WebhooksResponse } from '@/types/hermes'
 
-import { useRefreshHotkey } from '@/app/hooks/use-refresh-hotkey'
+import { useRefreshHotkey } from '@/components/hooks/use-refresh-hotkey'
 import {
   Panel,
   PanelAddButton,

@@ -225,7 +225,7 @@ a decision about *what the module is*, not a destination — the decisions are e
 
 | item | scope | planning baseline | destination | order | status |
 | --- | --- | --- | --- | --- | --- |
-| 30 | `app/` 只留入口、路由、组合、骨架、独立窗口；composition 与 shell 均拆清宿主/功能边界 | 632 TS/TSX · 163,701 lines；composition 候选 36 / 12,420；shell 候选约 58 / 11,822（派单时） | `app/composition/{root,wiring,registrations,routing,bridges,dev}` + `app/shell/{chrome,layers,hooks,platform}` + `windows` + rank-5 `features/` | **terminal：17–29 全 merged/reviewed 后独占；30.4 先拆 Shell host/Context Menu，再下沉产品内容** | open |
+| 30 | `app/` 只留入口、路由、组合、骨架、独立窗口；composition 与 shell 均拆清宿主/功能边界 | 632 TS/TSX · 163,701 lines；composition 候选 36 / 12,420；shell 候选约 58 / 11,822（派单时） | `app/composition/{root,wiring,registrations,routing,bridges,dev}` + `app/shell/{chrome,layers,hooks,platform}` + `windows` + rank-5 `features/` | **terminal：17–29 全 merged/reviewed 后独占；30.4 先拆 Shell host/Context Menu，再下沉产品内容** | built 2026-09-12 — awaiting independent review |
 
 终态和精确移动表见
 [30-app-composition-root.md](renderer-layer-batches/30-app-composition-root.md)。本批不拆
@@ -233,6 +233,20 @@ a decision about *what the module is*, not a destination — the decisions are e
 Gateway boot、background sync、session tile delegate、MCP dialog 和具体 panes 迁到其明确 feature。
 Shell 只留下 chrome 与公共 layer host；Command Palette 由 composition 聚合，Context Menu 拆成
 composition 组装 + Shell host + Terminal feature section。`features/` 仍不是新的业务核心层。
+
+**Executor measurements (stageA/30, worktree wt-c, 2026-09-12 — independent review pending).**
+Start tree after 17–29: `app/` 595 TS/TSX · 153,820 lines. Moved per phase: 30.1 features whole-tree
+471 files / 88,011 lines (dispatch snapshot 505 / 134,320 — shrank by 17–29 as the batch predicted);
+30.2 pseudo-composition out 25 files; 30.3 composition assembly 44 files; 30.4a shell/layers + Context
+Menu three-way split 81 files; 30.4b misplaced shell content + windows/ 60 files; 30.5 hooks + docs.
+Baseline and end state both: typecheck green; test:ui 772 files / 7,414 tests with exactly the one
+environmental failure (`renderer-layers.test.ts > leaves no in-flight exclusion stale`, needs untracked
+`src/agentbox/`); guard 15/16; ledger 0 before and after, regen byte-identical. Baseline `npm run lint`
+already failed with 10 import-sort errors in `app/session/hooks/use-session-actions/` — fixed via
+`eslint --fix` on those files during 30.1 (import lines only). Known documented exception: the §六
+`rg "@/app/composition"` check shows 7 hits — 6 in `src/features` + 1 in `store/session.test.ts` — all
+equivalent repoints of pre-existing `app/open-session` / routing-helper consumers sanctioned by the
+batch's stop-condition §7.4; no NEW reverse dependency was created (the §B2 movers are clean).
 
 ## How to update this file
 

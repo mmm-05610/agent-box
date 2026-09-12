@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { MemoryRouter, useNavigate } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { type KeybindRuntimeDeps, useKeybinds } from '@/app/hooks/use-keybinds'
+import { type KeybindRuntimeDeps, useKeybinds } from '@/app/shell/hooks/use-keybinds'
 import { FindBar } from '@/components/find-bar'
 import { I18nProvider } from '@/i18n'
 import { en } from '@/i18n/en'

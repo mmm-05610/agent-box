@@ -26,7 +26,7 @@ import { $activeGatewayProfile, normalizeProfileKey } from '@/store/profile'
 import { $activeSessionId } from '@/store/session'
 import { type McpCatalogEntry } from '@/types/hermes'
 
-import { hermesConfigCacheWriter, useHermesConfigRecord } from '@/app/hooks/use-config-record'
+import { hermesConfigCacheWriter, useHermesConfigRecord } from '@/application/config/use-config-record'
 import { DetailPane, MASTER_DETAIL_WIDE_COLS } from '@/components/layout/master-detail'
 import { PanelAddButton, PanelEmpty } from '@/app/shell/layers/overlays/panel'
 import { useDeepLinkHighlight } from '../settings/use-deep-link-highlight'

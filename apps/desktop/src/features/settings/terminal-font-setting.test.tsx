@@ -39,7 +39,7 @@ vi.mock('@/store/notifications', () => ({
   notifyError: (...args: unknown[]) => mocks.notifyError(...args)
 }))
 
-vi.mock('@/app/hooks/use-config-record', () => ({
+vi.mock('@/application/config/use-config-record', () => ({
   setHermesConfigCache: (config: Record<string, unknown>) => mocks.cache(config),
   useHermesConfigRecord: () => ({ data: mocks.loadedConfig })
 }))

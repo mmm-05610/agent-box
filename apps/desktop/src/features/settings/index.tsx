@@ -36,7 +36,7 @@ import { $localModelsEnabled } from '@/store/local-models-flag'
 import { notifyError } from '@/store/notifications'
 import { $settingsScopeProfile } from '@/store/settings-scope'
 
-import { useRouteEnumParam } from '@/app/hooks/use-route-enum-param'
+import { useRouteEnumParam } from '@/components/hooks/use-route-enum-param'
 import { OverlayIconButton } from '@/app/shell/layers/overlays/overlay-chrome'
 import { OverlayMain, OverlayNav, type OverlayNavGroup, OverlaySplitLayout } from '@/app/shell/layers/overlays/overlay-split-layout'
 import { OverlayView } from '@/app/shell/layers/overlays/overlay-view'

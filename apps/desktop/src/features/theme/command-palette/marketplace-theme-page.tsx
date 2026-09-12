@@ -13,7 +13,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 
 import { StatusRow } from '@/app/shell/layers/command-palette/status-row'
-import { useDebounced } from '@/app/hooks/use-debounced'
+import { useDebounced } from '@/components/hooks/use-debounced'
 import { installVscodeThemeFromMarketplace } from '@/application/theme/adapters/install'
 import { $marketplaceInstalls } from '@/application/theme/adapters/user-themes'
 import type { DesktopMarketplaceSearchItem } from '@/global'
