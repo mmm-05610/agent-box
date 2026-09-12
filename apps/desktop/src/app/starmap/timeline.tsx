@@ -1,8 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef } from 'react'
 
 import { Codicon } from '@/components/ui/codicon'
-
-import type { TimeAxis } from './time-axis'
+import type { TimeAxis } from '@/lib/starmap/time-axis'
 
 interface TimelineProps {
   axis: TimeAxis
