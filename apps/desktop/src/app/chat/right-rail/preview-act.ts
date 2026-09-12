@@ -27,13 +27,12 @@
  * out of the boot path.
  */
 
+import { clickAt, glideTo, pointerPlaced, pressKey, selectAll, typeText, wheelBy } from '@/application/preview/preview-drive'
+import { activePreviewInput, type PreviewInputHandle } from '@/application/preview/preview-input'
+import { activePreviewNav, type PreviewNavHandle } from '@/application/preview/preview-nav'
+import { activePreviewScriptRunner, type PreviewScriptRunner } from '@/application/preview/preview-script-runner'
 import { actEngineSource, type PreviewActAction, type PreviewActResult } from '@/lib/preview-act/act-in-page'
 import { watchInPage } from '@/lib/preview-act/watch-in-page'
-
-import { clickAt, glideTo, pointerPlaced, pressKey, selectAll, typeText, wheelBy } from './preview-drive'
-import { activePreviewInput, type PreviewInputHandle } from './preview-input'
-import { activePreviewNav, type PreviewNavHandle } from './preview-nav'
-import { activePreviewScriptRunner, type PreviewScriptRunner } from './preview-script-runner'
 
 /** Verbs the pane owns; a guest page cannot drive its own history. */
 const NAV_ACTIONS: readonly (keyof PreviewNavHandle)[] = ['back', 'forward', 'reload']

@@ -4,7 +4,7 @@ vi.mock('./right-rail/preview', () => ({
   PreviewTilePane: () => null
 }))
 
-vi.mock('./right-rail/preview-console-store', () => ({
+vi.mock('@/application/preview/preview-console-store', () => ({
   forgetPreviewConsole: () => undefined
 }))
 

@@ -1,10 +1,10 @@
 import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { forgetPreviewConsole, previewConsoleState } from '@/application/preview/preview-console-store'
 import { onComposerAttachImagesRequest } from '@/components/composer/focus'
 import { $connection, $selectedStoredSessionId } from '@/store/session'
 
-import { forgetPreviewConsole, previewConsoleState } from './preview-console-store'
 import { PreviewPane } from './preview-pane'
 
 // The consent dialog has its own test file and needs a QueryClientProvider;

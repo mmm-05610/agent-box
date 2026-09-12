@@ -1,6 +1,6 @@
 // Side-effect import: watches the turn edge so the overlay keeps a pulse while
 // the model reasons. Lives here because the pane is what makes it reachable.
-import './preview-mind'
+import '@/application/preview/preview-mind'
 
 import { useStore } from '@nanostores/react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
@@ -8,6 +8,23 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { openGuestContextMenu } from '@/app/context-menu/store'
 import { PanelEmpty } from '@/app/overlays/panel'
+import {
+  bindPreviewExecuteJavaScript,
+  captureAnnotateCrop,
+  hideAnnotateDraft,
+  installAnnotateOverlay,
+  type PreviewAnnotateGuest,
+  showAnnotateDraft,
+  syncAnnotatePins,
+  teardownAnnotateOverlay,
+  waitAnnotateEvent
+} from '@/application/preview/preview-annotate-host'
+import { type ConsoleEntry } from '@/application/preview/preview-console-state'
+import { previewConsoleState } from '@/application/preview/preview-console-store'
+import { type PreviewInputEvent, registerPreviewInput } from '@/application/preview/preview-input'
+import { PREVIEW_BROWSER_ATTR, registerPreviewNav } from '@/application/preview/preview-nav'
+import { registerPreviewPageReader } from '@/application/preview/preview-reader'
+import { registerPreviewScriptRunner } from '@/application/preview/preview-script-runner'
 import { requestComposerAttachImages, requestComposerFocus, requestComposerInsert } from '@/components/composer/focus'
 import { Tip } from '@/components/ui/tooltip'
 import { type Translations, useI18n } from '@/i18n'
@@ -42,17 +59,6 @@ import { $selectedStoredSessionId } from '@/store/session'
 import { canOpenBrowserWindow, isBrowserWindow } from '@/store/windows'
 
 import { placeAnnotateCard, PreviewAnnotateCard } from './preview-annotate-card'
-import {
-  bindPreviewExecuteJavaScript,
-  captureAnnotateCrop,
-  hideAnnotateDraft,
-  installAnnotateOverlay,
-  type PreviewAnnotateGuest,
-  showAnnotateDraft,
-  syncAnnotatePins,
-  teardownAnnotateOverlay,
-  waitAnnotateEvent
-} from './preview-annotate-host'
 import { ArtifactPreview } from './preview-artifact'
 import { PreviewBrowserBar } from './preview-browser-bar'
 import {
@@ -62,13 +68,7 @@ import {
   isNearConsoleBottom,
   PreviewConsolePanel
 } from './preview-console'
-import { type ConsoleEntry } from './preview-console-state'
-import { previewConsoleState } from './preview-console-store'
 import { LocalFilePreview, PreviewEmptyState } from './preview-file'
-import { type PreviewInputEvent, registerPreviewInput } from './preview-input'
-import { PREVIEW_BROWSER_ATTR, registerPreviewNav } from './preview-nav'
-import { registerPreviewPageReader } from './preview-reader'
-import { registerPreviewScriptRunner } from './preview-script-runner'
 import { RealProfileConsentDialog } from './real-profile-consent-dialog'
 
 type PreviewWebview = HTMLElement & {
