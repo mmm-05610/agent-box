@@ -40,7 +40,7 @@ import { notify, notifyError } from '@/store/notifications'
 import { useRefreshHotkey } from '@/app/hooks/use-refresh-hotkey'
 import { useRouteEnumParam } from '@/app/hooks/use-route-enum-param'
 import { openSession } from '@/app/composition/routing/open-session'
-import { PageSearchShell } from '@/app/page-search-shell'
+import { PageSearchShell } from '@/components/layout/page-search-shell'
 import type { SetStatusbarItemGroup } from '@/app/shell/chrome/statusbar/statusbar-controls'
 
 import {

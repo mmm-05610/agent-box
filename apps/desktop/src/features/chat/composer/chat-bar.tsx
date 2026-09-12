@@ -5,7 +5,7 @@ import { useStore } from '@nanostores/react'
 import { type ClipboardEvent, type FormEvent, type KeyboardEvent, useCallback, useEffect, useMemo, useRef } from 'react'
 
 import { useTourMarker } from '@/features/chat/tour-marker'
-import { useHudComposerDrag } from '@/app/hud/composer-drag'
+import { useHudComposerDrag } from '@/app/windows/hud/composer-drag'
 import { composerFill, composerFloatingStrip, composerSurfaceGlass } from '@/components/chat/composer-dock'
 import {
   acceptsTriggerCompletion,

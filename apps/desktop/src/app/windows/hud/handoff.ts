@@ -25,7 +25,7 @@ import { focusOpenSession, sessionTileDelegate } from '@/store/session-states'
 import { isHudWindow } from '@/store/windows'
 
 import { openSession, type OpenSessionNavigate } from '@/app/composition/routing/open-session'
-import { sessionRoute } from '../routes'
+import { sessionRoute } from '@/app/routes'
 
 /** Session tiles route on `tile:<storedSessionId>` (see session-tile.tsx). */
 const TILE_TARGET_PREFIX = 'tile:'

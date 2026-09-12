@@ -2,7 +2,7 @@ import { useStore } from '@nanostores/react'
 import { type ComponentProps, type MouseEvent, type ReactNode, useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 
-import { hudTargetSessionId } from '@/app/hud/handoff'
+import { hudTargetSessionId } from '@/app/windows/hud/handoff'
 import { toggleLayoutEditMode } from '@/components/pane-shell/edit-mode'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'

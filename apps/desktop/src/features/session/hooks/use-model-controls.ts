@@ -2,7 +2,7 @@ import { type QueryClient } from '@tanstack/react-query'
 import { useCallback, useRef } from 'react'
 
 import { getGlobalModelInfo } from '@/api/models'
-import type { ModelSelection } from '@/app/shell/model-menu-panel'
+import type { ModelSelection } from '@/features/profiles/model-menu-panel'
 import { useI18n } from '@/i18n'
 import { isBusySessionModelSwitch } from '@/lib/gateway-rpc'
 import { manualPickRemoved, modelOptionsQueryKey } from '@/lib/model-options'

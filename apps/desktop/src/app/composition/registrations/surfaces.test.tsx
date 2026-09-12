@@ -23,8 +23,8 @@ vi.mock('@/features/chat', () => ({
 }))
 vi.mock('@/features/chat/sidebar', () => ({ ChatSidebar: () => null }))
 vi.mock('@/features/right-sidebar/terminal/chrome', () => ({ TerminalPaneChrome: () => null }))
-vi.mock('@/app/shell/hooks/use-status-snapshot', () => ({ useStatusSnapshot: () => ({}) }))
-vi.mock('@/app/shell/hooks/use-statusbar-items', () => ({
+vi.mock('@/features/runtime/use-status-snapshot', () => ({ useStatusSnapshot: () => ({}) }))
+vi.mock('@/app/composition/registrations/statusbar-items', () => ({
   useStatusbarItems: () => ({ leftStatusbarItems: [], statusbarItems: [] })
 }))
 vi.mock('@/app/shell/chrome/statusbar/statusbar-controls', () => ({ StatusbarControls: () => null }))
@@ -39,7 +39,7 @@ vi.mock('@/app/composition/registrations/chrome-contributions', () => ({
   setStatusbarItemGroup: vi.fn(),
   useStatusbarContributions: () => []
 }))
-vi.mock('@/app/shell/model-menu-panel', () => ({ ModelMenuPanel: () => null }))
+vi.mock('@/features/profiles/model-menu-panel', () => ({ ModelMenuPanel: () => null }))
 
 afterEach(() => {
   cleanup()

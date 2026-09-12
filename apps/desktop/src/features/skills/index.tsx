@@ -45,9 +45,9 @@ import {
   type ListStripMenuToggle,
   MasterDetail,
   ToolChip
-} from '@/app/master-detail'
+} from '@/components/layout/master-detail'
 import { PanelEmpty, PanelPill } from '@/app/shell/layers/overlays/panel'
-import { PageSearchShell } from '@/app/page-search-shell'
+import { PageSearchShell } from '@/components/layout/page-search-shell'
 import { SETTINGS_ROUTE } from '@/app/routes'
 import { BrowserRealProfilePanel } from '../settings/browser-real-profile-panel'
 import { ComputerUsePanel } from '../settings/computer-use-panel'

@@ -92,7 +92,7 @@ import {
   WorkspaceTabMenu
 } from '@/features/chat/session-tile'
 import { AppContextMenu } from '@/app/composition/registrations/context-menu'
-import { HudShell } from '@/app/hud/hud-shell'
+import { HudShell } from '@/app/windows/hud/hud-shell'
 import { $workspaceIsPage } from '@/app/routes'
 
 import { LogsPane } from '@/features/logs/logs-pane'

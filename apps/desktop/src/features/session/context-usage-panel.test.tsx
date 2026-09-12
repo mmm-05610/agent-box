@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ContextBreakdown, UsageStats } from '@/types/hermes'
 
 import { ContextUsagePanel } from './context-usage-panel'
-import { useContextBreakdown } from './hooks/use-context-breakdown'
+import { useContextBreakdown } from './use-context-breakdown'
 
 const usage: UsageStats = {
   calls: 1,

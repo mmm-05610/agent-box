@@ -4,7 +4,7 @@ import { useCallback } from 'react'
 
 import type { HermesGateway } from '@/api/client'
 import { useModelControls } from '@/features/session/hooks/use-model-controls'
-import type { ModelSelection } from '@/app/shell/model-menu-panel'
+import type { ModelSelection } from '@/features/profiles/model-menu-panel'
 import { requestForSessionProfile } from '@/application/session/request-router'
 import { ModelPickerDialog } from '@/components/model-picker'
 import { resolveModelPickerOwner } from '@/lib/model-picker-owner'

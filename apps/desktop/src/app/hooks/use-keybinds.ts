@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router'
 
 import { closeActiveTab } from '@/features/chat/close-tab'
 import { composerFocusKeysAllowed, isComposerFocusSoftCombo, typeToFocusChar } from '@/features/chat/composer/focus-keys'
-import { hudTargetSessionId } from '@/app/hud/handoff'
+import { hudTargetSessionId } from '@/app/windows/hud/handoff'
 import { appViewForPath, isOverlayView } from '@/app/routes'
 import { cycleProfile, switchProfileToSlot, switchToDefaultProfile } from '@/application/profile/navigation'
 import { closeActiveTerminal, createTerminal, cycleTerminal } from '@/application/terminal/terminals'

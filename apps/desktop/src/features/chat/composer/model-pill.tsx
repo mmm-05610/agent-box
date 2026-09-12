@@ -2,7 +2,7 @@ import { useStore } from '@nanostores/react'
 import { useEffect, useState } from 'react'
 
 import { useTourMarker } from '@/features/chat/tour-marker'
-import { ModelMenuCloseContext } from '@/app/shell/model-menu-panel'
+import { ModelMenuCloseContext } from '@/features/profiles/model-menu-panel'
 import { useSessionView } from '@/components/chat/session-view'
 import { onComposerModelMenuRequest } from '@/components/composer/focus'
 import { useComposerScope } from '@/components/composer/scope'

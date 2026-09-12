@@ -21,7 +21,7 @@ import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'r
 
 import { useModelControls } from '@/features/session/hooks/use-model-controls'
 import { resolveStoredSession } from '@/features/session/hooks/use-session-actions/utils'
-import { ModelMenuPanel } from '@/app/shell/model-menu-panel'
+import { ModelMenuPanel } from '@/features/profiles/model-menu-panel'
 import { requestForSessionProfile } from '@/application/session/request-router'
 import { CenteredThreadSpinner } from '@/components/assistant-ui/thread/status'
 import { SessionStatusDot } from '@/components/chat/session-status-dot'

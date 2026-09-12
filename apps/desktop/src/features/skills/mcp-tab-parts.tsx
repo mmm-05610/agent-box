@@ -27,7 +27,7 @@ import { notify, notifyError } from '@/store/notifications'
 import { $activeGatewayProfile } from '@/store/profile'
 import { type McpCatalogEntry } from '@/types/hermes'
 
-import { ICON_BUTTON } from '@/app/master-detail'
+import { ICON_BUTTON } from '@/components/layout/master-detail'
 import { PanelEmpty } from '@/app/shell/layers/overlays/panel'
 import { prettyName } from '../settings/helpers'
 
