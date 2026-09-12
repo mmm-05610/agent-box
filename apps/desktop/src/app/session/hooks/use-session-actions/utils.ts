@@ -35,7 +35,7 @@ export {
   resolveStoredSession,
   restoreListedSession,
   sessionShouldHaveTranscript
-} from './session-registry-lookup'
+} from '@/application/session/session-registry-lookup'
 // Re-exported for the many session-actions/tile call sites that already import
 // it from here; the canonical definition lives in @/store/session.
 export { sessionMatchesStoredId } from '@/store/session'
