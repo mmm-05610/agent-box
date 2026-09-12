@@ -2,6 +2,9 @@ import type { QueryClient } from '@tanstack/react-query'
 import { type MutableRefObject, useCallback, useEffect, useRef } from 'react'
 
 import { completionErrorText, delegateTaskPayloads, MAX_STREAM_FLUSH_GAP_MS, STREAM_DELTA_FLUSH_MS } from '@/application/session/message-stream-utils'
+import { burstVibeHearts } from '@/components/chat/vibe-hearts'
+import { reportMcpToolResult } from '@/components/composer/suggestion-providers/repair'
+import { invalidateSkillSuggestionIndex } from '@/components/composer/suggestion-providers/skill'
 import { translateNow } from '@/i18n'
 import {
   appendAssistantTextPart,
@@ -861,6 +864,7 @@ export function useMessageStream({
     activeGatewayProfile,
     appendAssistantDelta,
     appendReasoningDelta,
+    burstVibeHearts,
     activeSessionIdRef,
     compactedTurnRef,
     lastCwdInfoSessionRef,
@@ -870,8 +874,11 @@ export function useMessageStream({
     flushQueuedDeltas,
     finalizeInterimAssistantMessage,
     hydrateFromStoredSession,
+    invalidateSkillSuggestionIndex,
     queryClient,
     refreshHermesConfig,
+    reportMcpToolResult: (sessionId, toolName, isError, resultText) =>
+      reportMcpToolResult(sessionId, toolName, isError, resultText),
     scheduleSessionsRefresh,
     sessionInterrupted,
     sessionStateByRuntimeIdRef,

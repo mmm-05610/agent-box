@@ -1,7 +1,6 @@
 import type { BillingBlock } from '@hermes/shared'
 
 import type { GatewayEventContext } from '@/application/session/gateway-event/types'
-import { burstVibeHearts } from '@/components/chat/vibe-hearts'
 import { translateNow } from '@/i18n'
 import { coerceGatewayText, coerceThinkingText } from '@/lib/chat-runtime'
 import { parseErrorSurface } from '@/lib/error-surface'
@@ -71,6 +70,7 @@ export function handleMessageStreamEvent(ctx: GatewayEventContext): boolean {
   const {
     appendAssistantDelta,
     appendReasoningDelta,
+    burstVibeHearts,
     compactedTurnRef,
     completeAssistantMessage,
     finalizeInterimAssistantMessage,
