@@ -18,6 +18,10 @@ table, and the candidates that look mechanical but are not — is
 [`../renderer-layer-boundary.md`](../renderer-layer-boundary.md). Read it if you
 are deciding *what* to do; read a batch document if you are doing it.
 
+Phase 4 的终端结构单是 [30](30-app-composition-root.md)：除 composition 内部归属外，它还
+锁定 Shell 的 `chrome/layers/hooks/platform` 结构，以及 Context Menu 的
+composition 组装 / Shell host / Terminal feature 三方拆分。
+
 | batch | scope | edges paid off |
 | --- | --- | --- |
 | [01](01-lib-services-to-store.md) | four small stateful `lib/` services → `store/` | 6 |
@@ -263,12 +267,20 @@ Not decisions — conclusions, recorded so nobody re-opens them:
 app/
 ├── index.tsx · routes.ts
 ├── composition/
+│   ├── root/ · wiring/
+│   ├── registrations/ · routing/
+│   └── bridges/ · dev/
 ├── shell/
 └── windows/
 
 features/
-└── 产品功能整棵迁入；本批不内部重构
+├── 产品功能整棵迁入；不内部重构
+└── runtime/session/skills/logs 等接收从 contrib 识别出的功能实现
 ```
+
+`composition/` 不是 `contrib/` 的改名垃圾桶：它只保留选择实现、注册 surface、所有权路由和
+宿主接线。Gateway boot、background sync、session tile delegate、MCP dialog 和具体 pane
+按 Batch 30 的精确表迁出。
 
 它不支付层序边，但会改写 renderer 大量 import 路径。**必须在 17–29 全部 merged + reviewed
 后独占运行**；碰撞 manifest 用全树 touched set 保守建模，不能因为 greedy wave 输出把它和

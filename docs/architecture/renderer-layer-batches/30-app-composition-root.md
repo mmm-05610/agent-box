@@ -37,8 +37,18 @@ apps/desktop/src/
 │   ├── routes.ts                             rank-5 路由/工作区呈现策略
 │   ├── routes.test.ts
 │   ├── routes.workspace-reveal.test.ts
-│   ├── composition/                          注册、注入、生命周期接线
-│   ├── shell/                                主窗口公共骨架
+│   ├── composition/                          只做应用装配，不收留功能实现
+│   │   ├── index.ts                          唯一公开入口
+│   │   ├── root/                             顶层控制器与 Provider 树
+│   │   ├── wiring/                           feature/action 的静态接线
+│   │   ├── registrations/                    surface/pane/chrome/host-view 注册
+│   │   ├── routing/                          session/runtime 所有权选择
+│   │   ├── bridges/                          Electron 宿主能力接入 React 生命周期
+│   │   └── dev/                              只服务装配层的开发演示
+│   ├── shell/                                主窗口公共骨架；不拥有产品菜单内容
+│   │   ├── chrome/                           titlebar/statusbar/sidebar
+│   │   ├── layers/                           overlay/palette/context-menu/tour 宿主
+│   │   └── platform/                         窗口尺寸与宿主平台呈现
 │   └── windows/                              独立窗口挂载入口
 │
 ├── features/                                 ◀ 产品功能；本批只整棵搬，不内部重构
@@ -51,12 +61,14 @@ apps/desktop/src/
 │   ├── pet-generate/
 │   ├── profiles/
 │   ├── right-sidebar/
+│   ├── runtime/                              Runtime 连接/重连功能，不在 composition 实现
 │   ├── session/
 │   ├── session-import/
 │   ├── settings/
 │   ├── skills/
 │   ├── starmap/
-│   └── webhooks/
+│   ├── webhooks/
+│   └── logs/                                 日志 pane；具体 UI 不是装配代码
 │
 ├── application/                              ✓ 本批不重新设计
 ├── store/                                    ✓ 本批不重新设计
@@ -69,6 +81,10 @@ apps/desktop/src/
 **`features/` 在本批仍是 rank 5。** 这是把“组合”与“产品功能”分开，不是把产品功能
 下沉成新的业务层。`features/chat` 是否还要拆成 conversation/sessions/browser，
 `features/session` 里哪些还该进入 `application/`，都属于下一轮；本单不替维护者决定。
+
+`composition/` 的判断式只有一个：**它是在选择实现并接线，还是在实现功能？** 前者留下，
+后者必须去对应 feature/application。高 fan-out 对组合根是正常的；反向由
+`features/application/store/shell → composition` 导入则是结构错误。
 
 ## 三、移动清单
 
@@ -101,37 +117,188 @@ apps/desktop/src/
 本节派单时实测 **505 个 TS/TSX、134,320 行**；17–29 落地后数字会下降。
 执行者报告实际移动数字，不把这里的派单快照当验收数字。
 
-### B · 组合代码归 `app/composition/`
+### B · `composition/` 不是改名后的 `contrib/`
 
-| 从 | 到 | 理由 |
-| --- | --- | --- |
-| `app/contrib/` | `app/composition/` | 它已经是主组合控制器，只是名字不直观 |
-| `app/gateway/` | `app/composition/runtime/` | 外部 Runtime 的启动状态和生命周期接线 |
-| `app/host-views.ts` | `app/composition/host-views.ts` | host view 的注册副作用 |
-| `app/open-session.ts` + test | `app/composition/open-session.ts` + test | rank-5 的“如何打开会话”策略，现有裁决要求留在 app |
+本节覆盖派单时实测的 **36 个 TS/TSX、12,420 行**。不允许把 `app/contrib/` 整桶改名；
+先按职责落位，明显在实现功能的文件移出组合根。
 
-`app/index.tsx` 改为从 `./composition` 导出组合控制器。不要保留旧 `app/contrib`
-转发目录，不要新增兼容 barrel。
+```text
+app/composition/
+├── index.ts                              唯一公开入口
+├── root/
+│   ├── app-composition.tsx               顶层控制器；原 controller.tsx
+│   └── context.tsx                       已装配 Wiring API 的窄 Context
+├── wiring/
+│   ├── features.tsx                      feature/action 接线；原 wiring.tsx
+│   ├── types.ts                          Wiring API
+│   └── latest-actions.ts                 防止注入过期 action
+├── registrations/
+│   ├── surfaces.tsx                      route/sidebar/statusbar surface 注册
+│   └── chrome-contributions.tsx          statusbar/titlebar contribution 接线
+├── routing/
+│   ├── open-session.ts                   应用级打开会话策略
+│   ├── session-owner.ts                  原 wiring-routing.ts
+│   └── session-rpc-dispatcher.ts         请求派给正确 session/runtime owner
+├── bridges/
+│   ├── desktop-filesystem.ts             原 use-desktop-fs-connection.ts
+│   ├── desktop-integrations.ts           原 use-desktop-integrations.ts
+│   ├── pet-window.ts                     原 use-pet-bridge.ts
+│   └── quick-entry-window.ts             原 use-quick-entry-bridge.ts
+└── dev/
+    └── credits-notice-demo.ts
+```
 
-### C · 公共骨架归 `app/shell/`
+精确移动表：
 
 | 从 | 到 |
 | --- | --- |
-| 现有 `app/shell/*` | `app/shell/*`（原地） |
-| `app/command-palette/` | `app/shell/command-palette/` |
-| `app/context-menu/` | `app/shell/context-menu/` |
-| `app/overlays/` | `app/shell/overlays/` |
-| `app/tour/` | `app/shell/tour/` |
-| `app/master-detail.tsx` | `app/shell/layout/master-detail.tsx` |
-| `app/page-search-shell.tsx` | `app/shell/layout/page-search-shell.tsx` |
-| `app/model-picker-overlay.tsx` | `app/shell/overlays/model-picker.tsx` |
-| `app/model-visibility-overlay.tsx` | `app/shell/overlays/model-visibility.tsx` |
-| `app/session-picker-overlay.tsx` | `app/shell/overlays/session-picker.tsx` |
-| `app/session-switcher.tsx` | `app/shell/overlays/session-switcher.tsx` |
-| `app/updates-overlay.tsx` + blocker test | `app/shell/overlays/updates.tsx` + test |
+| `app/contrib/index.ts` | `app/composition/index.ts` |
+| `app/contrib/controller.tsx` | `app/composition/root/app-composition.tsx` |
+| `app/contrib/context.tsx` | `app/composition/root/context.tsx` |
+| `app/contrib/wiring.tsx` | `app/composition/wiring/features.tsx` |
+| `app/contrib/types.ts` | `app/composition/wiring/types.ts` |
+| `app/contrib/latest-actions.ts` + test | `app/composition/wiring/latest-actions.ts` + test |
+| `app/contrib/surfaces.tsx` + test | `app/composition/registrations/surfaces.tsx` + test |
+| `app/contrib/wiring-routing.ts` + test | `app/composition/routing/session-owner.ts` + test |
+| `app/contrib/session-rpc-dispatcher.ts` + test | `app/composition/routing/session-rpc-dispatcher.ts` + test |
+| `app/open-session.ts` + test | `app/composition/routing/open-session.ts` + test |
+| `app/host-views.ts` | `app/composition/registrations/host-views.ts` |
+| `app/contrib/hooks/use-desktop-fs-connection.ts` | `app/composition/bridges/desktop-filesystem.ts` |
+| `app/contrib/hooks/use-desktop-integrations.ts` + test | `app/composition/bridges/desktop-integrations.ts` + test |
+| `app/contrib/hooks/use-pet-bridge.ts` | `app/composition/bridges/pet-window.ts` |
+| `app/contrib/hooks/use-quick-entry-bridge.ts` | `app/composition/bridges/quick-entry-window.ts` |
+| `app/contrib/dev/credits-notice-demo.ts` | `app/composition/dev/credits-notice-demo.ts` |
 
-这不是说 command palette、overlay 或 tour 是产品功能；它们是所有功能共享的应用外壳。
-某项功能贡献给 palette 的命令仍跟随该功能，只有 palette 的容器/聚合器住在 shell。
+保留现有导出名和 hook 名；目的地文件名可以更准确，但本批不重写函数体。
+`app/index.tsx` 改为从 `./composition` 导出组合控制器。不要保留旧 `app/contrib`
+转发目录，不要新增兼容 barrel。
+
+### B2 · 伪组合代码必须迁出
+
+这些文件之所以被原 `contrib/wiring` 调用，并不代表它们属于组合根。组合层只调用它们，
+不拥有它们的算法或 UI。
+
+| 从 | 到 | 理由 |
+| --- | --- | --- |
+| `app/gateway/` | `features/runtime/gateway/` | 1,265 行 boot/reconnect 状态机是 Runtime 连接功能；composition 只调用 `useGatewayBoot` |
+| `app/contrib/hooks/use-background-sync.ts` + 4 tests | `features/session/sync/background-sync.ts` + tests | 915 行 transcript/live-session 同步算法，不是静态接线 |
+| `app/contrib/hooks/use-session-tile-delegate.ts` + test | `features/session/tiles/use-session-tile-delegate.ts` + test | 449 行 tile resume/submit/interrupt 行为属于 Session feature |
+| `app/contrib/mcp-install-deeplink-dialog.tsx` | `features/skills/mcp-install-deeplink-dialog.tsx` | 具体 MCP 安装确认 UI；composition 只挂载 |
+| `app/contrib/panes.tsx` 中 `LogsPane` | `features/logs/logs-pane.tsx` | 读取并渲染日志的具体功能 |
+| 同文件中 `FilesPane`、`ReviewPaneContent` | `features/right-sidebar/panes/{files-pane,review-pane}.tsx` | 文件树与 Git review 的具体 surface |
+| 同文件中 `$restartPreviewServer` | `features/chat/right-rail/restart-preview-server.ts` | Preview feature 的临时 bridge，不是 chrome 注册 |
+| 同文件其余 contribution hooks/setters | `app/composition/registrations/chrome-contributions.tsx` | 只负责把 feature 数据接进 titlebar/statusbar registry |
+
+拆 `panes.tsx` 时只搬现有声明和 import，不改变 registry id、atom 实例、query key、pane render、
+statusbar/titlebar contribution area 或调用顺序。拆完旧文件必须删除。
+
+`features/runtime/gateway` 是现有 Hermes Gateway 实现的临时产品归属，不是新的通用协议层。
+本批不把它改写成 ACP，也不把 Hermes 类型改名伪装成通用类型；后续 Harness Port 切片再替换。
+
+### C · `shell/` 只保留主窗口公共骨架
+
+派单时这组候选合计约 **58 个 TS/TSX、11,822 行**。不能整桶塞进 `shell/`：其中既有
+公共容器，也有 Profile、Session、Runtime、Update 等产品内容。终态按“去掉任意 feature 后
+是否仍然成立”判断：成立的是 shell；只服务某项业务的是 feature；决定把两者接起来的是
+composition。
+
+```text
+app/shell/
+├── chrome/
+│   ├── titlebar/                         窗口标题与窗口按钮
+│   ├── statusbar/                        状态栏容器、显隐和通用菜单
+│   ├── sidebar/                          侧栏 chrome
+│   └── group-setter.ts                   shell 布局分组控件
+├── layers/
+│   ├── overlays/                         overlay chrome/panel/split-layout 宿主
+│   ├── command-palette/                  palette host/model/highlight/status-row
+│   ├── context-menu/                     menu host/store/target + 通用 DOM/guest/shell sections
+│   └── tour/                             应用导览层
+├── hooks/
+│   └── use-keybinds.ts                   全局应用键盘调度
+└── platform/
+    └── use-window-controls-overlay-width.ts
+```
+
+#### C1 · 纯 Shell 文件原地归整
+
+| 从 | 到 |
+| --- | --- |
+| `app/shell/titlebar-controls.tsx` | `app/shell/chrome/titlebar/controls.tsx` |
+| `app/shell/titlebar-icon.tsx` | `app/shell/chrome/titlebar/icon.tsx` |
+| `app/shell/statusbar-controls.tsx` 及显隐/菜单测试 | `app/shell/chrome/statusbar/` |
+| `app/shell/sidebar-label.tsx` | `app/shell/chrome/sidebar/label.tsx` |
+| `app/shell/group-setter.ts` | `app/shell/chrome/group-setter.ts` |
+| `app/overlays/{overlay-view,overlay-chrome,overlay-split-layout,panel}*` | `app/shell/layers/overlays/` |
+| `app/tour/` | `app/shell/layers/tour/` |
+| `app/shell/hooks/use-window-controls-overlay-width.ts` | `app/shell/platform/use-window-controls-overlay-width.ts` |
+| `app/hooks/use-keybinds.ts` | `app/shell/hooks/use-keybinds.ts` |
+
+这些 overlay 文件只提供公开容器合同，不决定显示哪个产品浮层。feature 可以消费这个窄
+Shell UI 合同，但不得反向导入 shell 的内部 store、注册或路由。
+
+#### C2 · Command Palette：宿主与命令内容分开
+
+| 从 | 到 | 理由 |
+| --- | --- | --- |
+| `app/command-palette/index.tsx` | `app/shell/layers/command-palette/host.tsx` | palette 打开、关闭、键盘与渲染宿主 |
+| `palette-model.ts`、`contrib.ts`、highlight watcher、status row | `app/shell/layers/command-palette/` | 通用 palette model、贡献入口与 chrome |
+| `body.tsx`、`palette-sources.ts`、聚合 helpers | `app/composition/registrations/command-palette/` | 它们知道全部产品 feature；是组装，不是 shell |
+| marketplace theme command page | `features/theme/command-palette/` | Theme 功能内容 |
+| pet command page | `features/pet-generate/command-palette/` | Pet 功能内容 |
+
+本批只拆宿主和已有内容，不建立新的插件式 command contribution 协议；各 feature 的更细
+注册机制留给下一轮。宿主不得 import `features/`，由 composition 把内容交给宿主。
+
+#### C3 · Context Menu 设计结：本批先拆所有权，不深拆业务
+
+今天 `app/context-menu/app-context-menu.tsx` 一文件同时拥有 menu host、DOM target 解析、
+通用浏览器菜单、Shell 命令和 Terminal 菜单。本批把这个结拆成三方：
+
+```text
+app/composition/registrations/
+└── context-menu.tsx                       选择 sections，交给 Shell host
+    ├── imports app/shell/.../context-menu ✓ 宿主
+    └── imports features/right-sidebar/
+        terminal/context-menu-sections     ✓ 产品内容
+
+app/shell/layers/context-menu/
+├── host.tsx                               菜单呈现、键盘、关闭生命周期
+├── item.tsx                               通用 menu item renderer
+├── store.ts                               open/close 与当前位置状态
+├── target.ts                              DOM target 归一化
+├── dom-sections.tsx                       link/image/editable/selection 通用动作
+├── guest-sections.tsx                     embedded guest 通用动作
+└── shell-sections.tsx                     new window/palette/settings/tab chrome
+
+features/right-sidebar/terminal/
+└── context-menu-sections.tsx              terminal copy/paste/clear 等产品内容
+```
+
+`AppContextMenu` 的最终组装迁到 `composition/registrations/context-menu.tsx`；Shell host
+接收已经选好的 sections，不认识 Terminal。Terminal section 整段下沉，保持 action id、顺序、
+enabled/visible 条件和快捷键不变。Update action 若当前与 `shellSections` 紧耦合，本批允许作为
+一个已命名的 registration callback 从 composition 注入；不得让 Shell 直接 import Update feature。
+
+**停止边界**：这一步只消除 ownership knot。不要趁机把 dom/guest sections 再抽成新的通用
+插件协议，也不要重写 context-menu 数据模型；等进入各 feature 时再继续拆其内部实现。
+
+#### C4 · 原先被误判为 Shell 的内容下沉
+
+| 从 | 到 |
+| --- | --- |
+| `app/master-detail.tsx`、`app/page-search-shell.tsx` | `components/layout/` |
+| `app/model-picker-overlay.tsx`、`model-visibility-overlay.tsx`、`shell/model-menu-panel*` | `features/profiles/` |
+| `app/session-picker-overlay.tsx`、`session-switcher.tsx`、`shell/{context-usage-panel,use-context-breakdown}*` | `features/session/` |
+| `app/shell/{approval-mode-menu,gateway-menu-panel,use-status-snapshot}*` | `features/runtime/` |
+| `app/shell/system-resources-statusbar.tsx` | `features/system/` |
+| `app/updates-overlay.tsx` + blocker test | `features/updates/` |
+| `app/shell/hooks/use-statusbar-items.tsx` | `app/composition/registrations/statusbar-items.tsx` |
+| `app/shell/live-duration.tsx` | `components/ui/live-duration.tsx` |
+| `app/shell/hooks/use-overlay-routing.ts` | `app/composition/routing/overlay-routing.ts` |
+
+上述目的地在本批只要求职责归位；若 `features/system` 或 `features/updates` 尚不存在，可以创建。
+不继续拆这些 feature 的内部结构，不改行为，也不为了消除 import 而复制 store 或业务算法。
 
 ### D · 独立窗口统一入口
 
@@ -181,6 +348,9 @@ app/routes.workspace-reveal.test.ts
 6. `features/` 加入层序定义，和 `app/` 同为 rank 5；账本仍为 0。
 7. 不新增“读取源码文本来断言路径”的 Vitest。仓库根 `AGENTS.md` 明确禁止。
    结构边界进入现有架构配置/ledger 或 ESLint `no-restricted-imports`，不写 regex 源码测试。
+8. `composition/` 可以导入其他 renderer 层；`features/application/store/shell/components` 不得
+   反向导入 `@/app/composition`。只有 `app/index.tsx` 可启动组合根。
+9. `composition/` 中不得保留 API 轮询、重连算法、session action 实现或具体 feature pane。
 
 ## 五、执行顺序与提交边界
 
@@ -190,10 +360,12 @@ app/routes.workspace-reveal.test.ts
 ```text
 30.0  前置审计：17–29 全部 merged + reviewed；基线数字落盘
 30.1  features/ 整棵迁移                         一个提交
-30.2  composition/ 迁移                          一个提交
-30.3  shell/ + windows/ 迁移                     一个提交
-30.4  hooks 逐个归属 + 层序/文档更新              一个提交
-30.5  全量验收 + reviewer + status                一个提交
+30.2  伪组合代码移入 runtime/session/skills 等 feature  一个提交
+30.3  composition/{root,wiring,registrations,routing,bridges}  一个提交
+30.4a shell chrome/layer host 抽出；Context Menu 三方拆结  一个提交
+30.4b 被误放在 shell 的产品内容下沉 + windows/ 迁移       一个提交
+30.5  hooks 逐个归属 + 层序/文档更新              一个提交
+30.6  全量验收 + reviewer + status                一个提交
 ```
 
 阶段提交是为了让路径迁移可定位，不是允许交付半成品。中间提交可以暂时不 typecheck；
@@ -224,9 +396,15 @@ test ! -e src/app/session
 test ! -e src/app/settings
 test ! -e src/app/contrib
 test ! -e src/app/gateway
+test ! -e src/app/composition/panes.tsx
+test ! -e src/app/context-menu/app-context-menu.tsx
 
 rg -n "@/app/(chat|session|settings|contrib|gateway|hud|pet-overlay|quick-entry|command-palette|context-menu|overlays|tour)(/|')" \
   src --glob '*.{ts,tsx}'
+# 必须零命中
+
+rg -n "@/app/composition" src/features src/application src/store src/components src/app/shell \
+  --glob '*.{ts,tsx}'
 # 必须零命中
 ```
 
@@ -236,6 +414,12 @@ rg -n "@/app/(chat|session|settings|contrib|gateway|hud|pet-overlay|quick-entry|
 最后由独立 reviewer：
 
 - 对照本单的终态树检查每个一级目录；
+- 检查 `composition/` 只有 root/wiring/registrations/routing/bridges/dev 六类职责，且
+  background-sync、gateway boot、session tile delegate、MCP dialog 和具体 panes 均已迁出；
+- 检查 Shell 只含 chrome、公共 layer host、全局 keybind 和平台窗口呈现；Profile、Session、
+  Runtime、Update、System 内容均已下沉；
+- 检查 Context Menu 由 composition 组装、Shell host 不 import Terminal、Terminal section
+  已归 `features/right-sidebar/terminal`，并且 action id/顺序/条件无变化；
 - 抽查 `git diff --find-renames=90%`，证明绝大多数是 rename + import path；
 - 核对没有旧路径 shim、没有新行为、没有未登记的测试下降；
 - 自己重跑 typecheck、test:ui、层序守卫、ledger、lint、diff-check；
@@ -245,6 +429,7 @@ rg -n "@/app/(chat|session|settings|contrib|gateway|hud|pet-overlay|quick-entry|
 
 - 17–29 任一仍未 merged/reviewed，或 status 与 Git 历史冲突。
 - 整棵移动某目录需要改函数体、props、状态结构、route/contribution id 或运行时行为。
+- 将伪组合代码迁出时发现目标 feature 需要导入 `app/composition` 才能工作。
 - 为了让 `features/` 编译，需要新增低层 → `app/composition|shell|windows` 依赖。
   已存在的 `app/routes`/`app/open-session` 路径只做等价 repoint，不趁机扩大。
 - 某个目录无法判断是组合还是产品功能。报告具体文件，不自创第三种垃圾桶。

@@ -152,7 +152,14 @@ app/
 ├── index.tsx
 ├── routes.ts
 ├── composition/
+│   ├── root/ · wiring/
+│   ├── registrations/ · routing/
+│   └── bridges/ · dev/
 ├── shell/
+│   ├── chrome/                      titlebar/statusbar/sidebar
+│   ├── layers/                      overlay/palette/context-menu/tour 宿主
+│   ├── hooks/                       全局键盘调度
+│   └── platform/                    窗口宿主呈现
 └── windows/
 ```
 
@@ -160,9 +167,17 @@ app/
 对例外再次判断，结果目录方案不断变化。真正稳定的边界不是“显示在哪”，而是“这是应用组合，
 还是被应用组合的产品功能”。页、浮层、pane 仍是运行时呈现方式，不再决定功能源码住址。
 
-**本轮只定上层**：`chat/`、`session/`、`right-sidebar/`、`settings/` 等先整棵搬入
-`features/`，不在 batch 30 内决定它们如何继续拆分。`features/` 本轮仍是 rank 5；它不是
-新的业务核心层。
+**内部裁决**：`composition/` 只保留选择实现并接线的代码，按 root、wiring、registrations、
+routing、bridges、dev 六类组织；不能把 `contrib/` 整桶改名。Gateway boot、background sync、
+session tile delegate、MCP 安装 Dialog 和具体 pane 是功能实现，迁到对应 `features/`。
+
+**Shell 内部裁决**：Shell 只拥有主窗口 chrome 和公共 layer host，不拥有显示在这些 host 中的
+产品内容。Command Palette 的聚合放 composition，Theme/Pet 命令跟 feature；Context Menu 由
+composition 选择 sections，Shell 只呈现并管理通用 DOM/guest/shell 动作，Terminal section
+下沉到 `features/right-sidebar/terminal/`。本批只拆清所有权，不继续设计通用贡献协议。
+
+`chat/`、`session/`、`right-sidebar/`、`settings/` 的其余内部业务结构仍不在 batch 30 内决定；
+它们先整棵搬入 `features/`。`features/` 本轮仍是 rank 5，不是新的业务核心层。
 
 **执行**：batch [30](renderer-layer-batches/30-app-composition-root.md)。它在 17–29 全部
 merged + reviewed 后独占运行，避免一次全树路径迁移踩正在施工的 UI 文件。

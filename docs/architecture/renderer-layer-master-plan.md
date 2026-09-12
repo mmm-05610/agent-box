@@ -194,9 +194,16 @@ Phase 1/2 已经把上行依赖账本归零；Phase 3 处理账本看不见的�
 Batch 30 把最高层的组合与产品功能分开：
 
 ```text
-app/        → index.tsx · routes.ts · composition/ · shell/ · windows/
-features/   → 产品功能整棵迁入，本批不内部重构
+app/          → index.tsx · routes.ts · composition/ · shell/ · windows/
+composition/  → root · wiring · registrations · routing · bridges · dev
+shell/        → chrome · layers(hosts) · hooks · platform；不拥有产品菜单内容
+features/     → 产品功能整棵迁入，并接收从 contrib/gateway 识别出的功能实现
 ```
+
+组合根只做实现选择和接线，不实现 Gateway 重连、Session 同步、MCP Dialog 或具体 pane；
+这些归属、`panes.tsx` 的机械拆分，以及 Shell host/产品内容的边界已在 Batch 30 锁定。
+Context Menu 先拆为 composition 组装、Shell host、Terminal feature section；更深的贡献协议
+不在本批发明。
 
 它是**终端结构批次**：必须等 17–29 全部 merged + reviewed 后单独执行。原因不是权限，
 而是它会改写 renderer 全树路径；提前运行会让前面每张派工单的路径、碰撞和测试失真。

@@ -225,11 +225,14 @@ a decision about *what the module is*, not a destination — the decisions are e
 
 | item | scope | planning baseline | destination | order | status |
 | --- | --- | --- | --- | --- | --- |
-| 30 | `app/` 只留入口、路由、组合、骨架、独立窗口；产品功能整棵退出 | 632 TS/TSX · 163,701 lines（派单时；17–29 后会下降） | `app/{composition,shell,windows}` + rank-5 `features/` | **terminal：17–29 全 merged/reviewed 后独占** | open |
+| 30 | `app/` 只留入口、路由、组合、骨架、独立窗口；composition 与 shell 均拆清宿主/功能边界 | 632 TS/TSX · 163,701 lines；composition 候选 36 / 12,420；shell 候选约 58 / 11,822（派单时） | `app/composition/{root,wiring,registrations,routing,bridges,dev}` + `app/shell/{chrome,layers,hooks,platform}` + `windows` + rank-5 `features/` | **terminal：17–29 全 merged/reviewed 后独占；30.4 先拆 Shell host/Context Menu，再下沉产品内容** | open |
 
 终态和精确移动表见
 [30-app-composition-root.md](renderer-layer-batches/30-app-composition-root.md)。本批不拆
-`chat/session/settings/right-sidebar`，也不把 `features/` 宣布成新的业务核心层。
+`chat/session/settings/right-sidebar` 的内部业务结构，但会把原 contrib 中已经确认的
+Gateway boot、background sync、session tile delegate、MCP dialog 和具体 panes 迁到其明确 feature。
+Shell 只留下 chrome 与公共 layer host；Command Palette 由 composition 聚合，Context Menu 拆成
+composition 组装 + Shell host + Terminal feature section。`features/` 仍不是新的业务核心层。
 
 ## How to update this file
 
