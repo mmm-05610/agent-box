@@ -226,79 +226,18 @@ export function clearSubmitInFlight(): void {
   _submitInFlightAt.clear()
 }
 
-export function base64FromDataUrl(dataUrl: string): string {
-  const comma = dataUrl.indexOf(',')
-
-  return comma >= 0 ? dataUrl.slice(comma + 1) : ''
-}
-
-export function imageFilenameFromPath(filePath: string): string {
-  return filePath.split(/[\\/]/).filter(Boolean).pop() || 'image.png'
-}
-
-// Remote gateway: the local composer-image file lives on THIS machine's disk,
-// not the gateway's, so read the bytes here and upload them via
-// image.attach_bytes. Returns null when the file can't be read.
-//
-// `cachedDataUrl` is the attachment's `previewUrl` when the composer already
-// read the file for the chip thumbnail — that preview is the FULL file as a
-// base64 data URL (attachmentPreviewDataUrl → readFileDataUrl), not a
-// downscaled copy, so reusing it skips a second disk read + IPC round-trip of
-// the same bytes at submit. Only a `;base64,` data URL qualifies; anything
-// else falls through to the disk read.
-export async function readImageForRemoteAttach(
-  filePath: string,
-  cachedDataUrl?: string
-): Promise<{ contentBase64: string; filename: string } | null> {
-  if (cachedDataUrl?.includes(';base64,')) {
-    const cached = base64FromDataUrl(cachedDataUrl)
-
-    if (cached) {
-      return { contentBase64: cached, filename: imageFilenameFromPath(filePath) }
-    }
-  }
-
-  const dataUrl = await window.hermesDesktop?.readFileDataUrl(filePath)
-  const contentBase64 = dataUrl ? base64FromDataUrl(dataUrl) : ''
-
-  return contentBase64 ? { contentBase64, filename: imageFilenameFromPath(filePath) } : null
-}
-
-// Read a non-image file as a data URL for upload via file.attach. Returns null
-// when the desktop bridge can't read the file (e.g. it was moved/deleted).
-// Prefer the attach-specific IPC (256 MiB) so remote uploads are not stuck on
-// the preview/Settings default; fall back for older Electron shells.
-export async function readFileDataUrlForAttach(filePath: string): Promise<string | null> {
-  const reader = window.hermesDesktop?.readFileDataUrlForAttach ?? window.hermesDesktop?.readFileDataUrl
-
-  if (!reader) {
-    return null
-  }
-
-  const dataUrl = await reader(filePath)
-
-  return dataUrl || null
-}
-
-// The attach/preview IPC base64-loads the whole file into memory and rejects
-// with a raw "file is too large (N bytes; limit M bytes)" string when over
-// cap. In remote mode every attachment's bytes go through that read, so a big
-// file surfaces that internal message verbatim in the failure toast. Translate
-// it into a friendly "too large to upload to the remote gateway" line, parsing
-// the limit out of the message so it tracks the real cap. Non-cap errors pass
-// through unchanged.
-export function friendlyRemoteAttachError(err: unknown, label: string): Error {
-  const message = err instanceof Error ? err.message : String(err)
-
-  if (!/too large/i.test(message)) {
-    return err instanceof Error ? err : new Error(message)
-  }
-
-  const limitBytes = Number(message.match(/limit (\d+) bytes/)?.[1])
-  const cap = Number.isFinite(limitBytes) && limitBytes > 0 ? ` (max ${Math.floor(limitBytes / (1024 * 1024))} MB)` : ''
-
-  return new Error(`${label} is too large to upload to the remote gateway${cap}.`)
-}
+// The composer's attachment upload (and the read/error helpers it is built
+// from) lives in application/session/upload-attachment.ts so that below-app
+// callers — the message-edit composer — can use it without reaching into app/.
+// Re-exported here because utils.test.ts still consumes these names through
+// this path.
+export {
+  base64FromDataUrl,
+  friendlyRemoteAttachError,
+  imageFilenameFromPath,
+  readFileDataUrlForAttach,
+  readImageForRemoteAttach
+} from '@/application/session/upload-attachment'
 
 export function renderCommandsCatalog(catalog: CommandsCatalogLike, copy: Translations['desktop']): string {
   const desktopCatalog = filterDesktopCommandsCatalog(catalog)
