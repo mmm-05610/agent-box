@@ -273,6 +273,17 @@ export const ru = defineLocale({
     layoutEditor: 'Редактор раскладки',
     layoutEditorTitle: mod => `Редактор раскладки — ${mod}-клик сбрасывает раскладку`
   },
+  windows: {
+    quickEntry: {
+      inputLabel: 'Быстрый ввод',
+      placeholder: 'Спросите о чём угодно…',
+      placeholderDisconnected: 'Нет соединения — откройте приложение, чтобы переподключиться',
+      sendTo: 'Отправить в',
+      targetCurrent: 'Текущий чат',
+      targetLabel: 'Целевой сеанс',
+      targetNew: 'Новый сеанс'
+    }
+  },
   keybinds: {
     title: 'Горячие клавиши',
     subtitle: open => `Нажмите на сочетание, чтобы переназначить · ${open} снова открывает эту панель.`,

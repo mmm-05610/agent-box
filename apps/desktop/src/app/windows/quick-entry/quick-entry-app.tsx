@@ -1,5 +1,6 @@
 import { useEffect, useReducer, useRef } from 'react'
 
+import { useI18n } from '@/i18n'
 import {
   initialQuickComposerState,
   QUICK_TARGET_CURRENT,
@@ -9,53 +10,59 @@ import {
   type QuickComposerState
 } from '@/store/quick-entry'
 
+import type { QuickEntryWindowPort } from './port'
+
 /**
  * The Quick Entry composer — the whole renderer surface of the global-hotkey
- * mini window. Deliberately one input plus a session-target picker and nothing
- * else: this is a capture surface, not a second chat.
+ * mini window. Deliberately one input plus a target picker and nothing else:
+ * this is a capture surface, not a second chat.
  *
  * All behavior rides `quickComposerReducer` (pure, unit-tested): submit sends
- * the trimmed text + target through the shell and asks to hide; an empty submit
- * does neither so a stray Enter can't make the window vanish; Escape and losing
- * focus dismiss without sending; a dead gateway disables the input entirely
- * (the reducer refuses the send AND the input paints the reconnect hint).
+ * the trimmed text + target through the window-host port and asks to hide; an
+ * empty submit does neither so a stray Enter can't make the window vanish;
+ * Escape and losing focus dismiss without sending; a host that can't accept
+ * sends disables the input entirely (the reducer refuses the send AND the
+ * input paints the reconnect hint).
  *
- * The window itself has no gateway connection. Its view of backend truth — is
- * the gateway up, which recent sessions exist — is pushed in by the primary
- * renderer through main (`onState`), and its text goes back the same road to
- * the primary renderer's normal prompt-submit path.
+ * The window itself has no backend connection. Its view of capture truth —
+ * can a prompt be delivered, which visible targets exist — is pushed in by
+ * the primary window through the host port (`onState`), and its text goes
+ * back the same road to the primary window's normal prompt-submit path.
  */
-export function QuickEntryApp() {
+export interface QuickEntryAppProps {
+  /** The neutral window-host port: capture context in, prompt + dismissal out. */
+  port: QuickEntryWindowPort
+}
+
+export function QuickEntryApp({ port }: QuickEntryAppProps) {
+  const { t } = useI18n()
   const inputRef = useRef<HTMLInputElement>(null)
 
   // The reducer returns { send, state }; this wrapper performs the side effect
-  // (hand the payload to the shell, ask to hide) and stores the next state, so
+  // (hand the payload to the host, ask to hide) and stores the next state, so
   // the decision stays pure and testable while the effects stay in one place.
   const [state, dispatch] = useReducer((current: QuickComposerState, event: QuickComposerEvent) => {
     const { send, state: next } = quickComposerReducer(current, event)
-    const api = window.hermesDesktop?.quickEntry
 
     if (send) {
-      api?.submit(send)
+      port.submit(send)
     } else if (!next.visible && current.visible) {
-      api?.dismiss()
+      port.dismiss()
     }
 
     return next
   }, initialQuickComposerState)
 
   // Re-summoned by the chord: the shell reuses the window, so reset the draft
-  // and take the keyboard back for a fresh capture. Also adopt gateway-state
-  // pushes (connection + recent sessions) relayed from the primary renderer.
+  // and take the keyboard back for a fresh capture. Also adopt pushed capture
+  // context (deliverability + visible targets) relayed from the primary window.
   useEffect(() => {
-    const api = window.hermesDesktop?.quickEntry
-
-    const offShown = api?.onShown(() => {
+    const offShown = port.onShown(() => {
       dispatch({ type: 'shown' })
       requestAnimationFrame(() => inputRef.current?.focus())
     })
 
-    const offState = api?.onState(payload => {
+    const offState = port.onState(payload => {
       dispatch({
         connected: payload?.connected === true,
         sessions: Array.isArray(payload?.sessions) ? payload.sessions : [],
@@ -66,10 +73,10 @@ export function QuickEntryApp() {
     inputRef.current?.focus()
 
     return () => {
-      offShown?.()
-      offState?.()
+      offShown()
+      offState()
     }
-  }, [])
+  }, [port])
 
   return (
     <div
@@ -110,7 +117,7 @@ export function QuickEntryApp() {
             ›
           </span>
           <input
-            aria-label="Quick Entry"
+            aria-label={t.windows.quickEntry.inputLabel}
             autoCapitalize="off"
             autoComplete="off"
             autoCorrect="off"
@@ -131,7 +138,9 @@ export function QuickEntryApp() {
                 dispatch({ type: 'dismiss' })
               }
             }}
-            placeholder={state.connected ? 'Ask Hermes…' : 'Not connected — open Hermes to reconnect'}
+            placeholder={
+              state.connected ? t.windows.quickEntry.placeholder : t.windows.quickEntry.placeholderDisconnected
+            }
             ref={inputRef}
             spellCheck={false}
             style={{
@@ -158,10 +167,10 @@ export function QuickEntryApp() {
               userSelect: 'none'
             }}
           >
-            Send to
+            {t.windows.quickEntry.sendTo}
           </label>
           <select
-            aria-label="Target session"
+            aria-label={t.windows.quickEntry.targetLabel}
             disabled={!state.connected}
             id="quick-entry-target"
             onChange={event => dispatch({ target: event.target.value, type: 'target' })}
@@ -182,8 +191,8 @@ export function QuickEntryApp() {
             }}
             value={state.target}
           >
-            <option value={QUICK_TARGET_CURRENT}>Current chat</option>
-            <option value={QUICK_TARGET_NEW}>New session</option>
+            <option value={QUICK_TARGET_CURRENT}>{t.windows.quickEntry.targetCurrent}</option>
+            <option value={QUICK_TARGET_NEW}>{t.windows.quickEntry.targetNew}</option>
             {state.sessions.map(session => (
               <option key={session.id} value={session.id}>
                 {session.title}

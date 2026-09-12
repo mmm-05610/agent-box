@@ -323,6 +323,21 @@ export interface Translations {
     layoutEditorTitle: (modifier: string) => string
   }
 
+  // Auxiliary window surfaces (HUD / Pet / Quick Entry): their copy lives in
+  // the catalog like every other user-facing string, not inline in the
+  // window components.
+  windows: {
+    quickEntry: {
+      inputLabel: string
+      placeholder: string
+      placeholderDisconnected: string
+      sendTo: string
+      targetCurrent: string
+      targetLabel: string
+      targetNew: string
+    }
+  }
+
   keybinds: {
     title: string
     subtitle: (open: string) => string

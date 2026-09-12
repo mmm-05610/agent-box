@@ -287,6 +287,18 @@ export const en: Translations = {
     layoutEditorTitle: mod => `Layout editor — ${mod}-click resets the layout`
   },
 
+  windows: {
+    quickEntry: {
+      inputLabel: 'Quick Entry',
+      placeholder: 'Ask anything…',
+      placeholderDisconnected: 'Not connected — open the app to reconnect',
+      sendTo: 'Send to',
+      targetCurrent: 'Current chat',
+      targetLabel: 'Target session',
+      targetNew: 'New session'
+    }
+  },
+
   keybinds: {
     title: 'Keyboard shortcuts',
     subtitle: open => `Click a shortcut to rebind it · ${open} reopens this panel.`,

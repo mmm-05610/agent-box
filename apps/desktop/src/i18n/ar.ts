@@ -253,6 +253,17 @@ export const ar = defineLocale({
     layoutEditor: 'محرر التخطيط',
     layoutEditorTitle: modifier => `محرر التخطيط — انقر مع ${modifier} لإعادة ضبط التخطيط`
   },
+  windows: {
+    quickEntry: {
+      inputLabel: 'الإدخال السريع',
+      placeholder: 'اسأل عن أي شيء…',
+      placeholderDisconnected: 'غير متصل — افتح التطبيق لإعادة الاتصال',
+      sendTo: 'إرسال إلى',
+      targetCurrent: 'المحادثة الحالية',
+      targetLabel: 'الجلسة الهدف',
+      targetNew: 'جلسة جديدة'
+    }
+  },
   keybinds: {
     title: 'اختصارات لوحة المفاتيح',
     subtitle: open => `انقر على اختصار لإعادة تعيينه · ${open} يعيد فتح هذه اللوحة.`,
