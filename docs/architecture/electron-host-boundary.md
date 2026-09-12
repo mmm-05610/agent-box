@@ -1,6 +1,6 @@
 # Electron host boundary — responsibility and dependency audit
 
-Status: **audit + partial migration.** This document is the E0 deliverable of the Electron
+Status: **audit + E1–E5 migration complete; E6 dispatched.** This document is the E0 deliverable of the Electron
 Desktop Host boundary refactor. Every row below is a *current classification*, not an achievement:
 the "Migration ledger" (§7) is the only place that says what has physically moved.
 
@@ -615,7 +615,12 @@ The E5 column is why this round did not stop there: moving files out of `main.ts
 the composition it exists to express. `composition/` is not empty; the one module that still
 implements rather than assembles is the knot named in §8 step 3, with its cycle written out.
 
-## 8. The next vertical chain (not started)
+## 8. The next vertical chain (E6 dispatched)
+
+The executable work order is
+[`electron-work-orders/E6-composition-knot.md`](electron-work-orders/E6-composition-knot.md).
+It may run alongside Renderer Batch 30 because their production write sets are disjoint; the current
+lead executor owns resource scheduling, Git integration and deduplication of shared heavy gates.
 
 The safest first vertical chain, named so a later round can begin without re-deriving it:
 
@@ -633,7 +638,7 @@ read are out of the composition root: `backendSupportsServe`, `findPythonForRoot
 platform leaves (`host-capabilities/platform/{platform-facts,executables,pathext}.ts`,
 `host-capabilities/filesystem/fs-probe.ts`).
 
-**Step 3 (next, and it starts with the boot-progress refactor, not the spawn).** Extract
+**Step 3 (E6.1–E6.2, dispatched; it starts with the boot-progress refactor, not the spawn).** Extract
 the Desktop-host boot-progress/bootstrap-state cluster out of
 `composition/bootstrap-env-composition.ts` into `app/boot-progress.ts`:
 `bootProgressState`, `advanceBootProgress`, `updateBootProgress`, `broadcastBootstrapEvent`,
@@ -643,7 +648,7 @@ is what breaks the cycle recorded above. Only then move `startHermes` / `spawnPo
 into `legacy-hermes/local-backend.ts`. Do not attempt the second half first: with the cycle
 still present, the move makes the composition root and the launch cluster import each other.
 
-**Step 4 (after that).** `composition/api-proxy-composition.ts` becomes an assembler: its
+**Step 4 (E6.3, may run beside E6.1).** `composition/api-proxy-composition.ts` becomes an assembler: its
 title/favicon cache plumbing and `mimeTypeForPath` belong with the preview capability, and
 `postJsonForBackend` has already moved to `legacy-hermes/gateway-connection.ts`.
 
