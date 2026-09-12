@@ -1,7 +1,6 @@
+import { Pill } from '@/components/settings/primitives'
 import { Button } from '@/components/ui/button'
 import { ExternalLink } from '@/lib/icons'
-
-import { Pill } from '../primitives'
 
 import { openExternal } from './open-external'
 import type { BillingAccountRowView } from './use-billing-state'

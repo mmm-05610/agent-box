@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import { getTerminalBackends, selectTerminalBackend } from '@/api/toolsets'
+import { Pill } from '@/components/settings/primitives'
 import { Button } from '@/components/ui/button'
 import { useI18n } from '@/i18n'
 import { AlertTriangle, Check, Loader2, RefreshCw } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 import { notify, notifyError } from '@/store/notifications'
 import type { TerminalBackendInfo, TerminalBackendsResponse } from '@/types/hermes'
-
-import { Pill } from './primitives'
 
 interface TerminalBackendPanelProps {
   /** Re-read the parent toolset list after a backend change so any derived

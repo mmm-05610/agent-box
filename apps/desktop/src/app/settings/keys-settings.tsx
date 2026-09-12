@@ -1,13 +1,13 @@
 import { useStore } from '@nanostores/react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
+import { SettingsContent, SettingsSkeleton } from '@/components/settings/primitives'
 import { useI18n } from '@/i18n'
 import { $settingsRequestProfile } from '@/store/settings-scope'
 
 import { CredentialKeyCard, credentialPlaceholder, credentialRowLabel } from './credential-key-ui'
 import { useEnvCredentials } from './env-credentials'
 import { asText } from './helpers'
-import { SettingsContent, SettingsSkeleton } from './primitives'
 import { SettingsProfileScope } from './profile-scope'
 import { useDeepLinkHighlight } from './use-deep-link-highlight'
 

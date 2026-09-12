@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { getHermesConfigRecord, saveHermesConfig } from '@/api/config'
 import { deleteSession, setSessionArchived } from '@/api/sessions'
 import { listAllProfileSessions } from '@/application/session-lists'
+import { EmptyState, ListRow, SectionHeading, SettingsContent, SettingsSkeleton, ToggleRow } from '@/components/settings/primitives'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Tip } from '@/components/ui/tooltip'
@@ -18,7 +19,6 @@ import { untombstoneSessions } from '@/store/session-removal'
 import { forgetSessionUnread } from '@/store/session-unread'
 import type { HermesConfigRecord, SessionInfo } from '@/types/hermes'
 
-import { EmptyState, ListRow, SectionHeading, SettingsContent, SettingsSkeleton, ToggleRow } from './primitives'
 import { useDeepLinkHighlight } from './use-deep-link-highlight'
 
 const DEFAULT_AUTO_ARCHIVE_DAYS = 3

@@ -1,6 +1,14 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 
+import {
+  ListRow,
+  ListRowSkeleton,
+  SectionHeading,
+  SectionHeadingSkeleton,
+  SettingsContent,
+  SettingsSection
+} from '@/components/settings/primitives'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Progress } from '@/components/ui/progress'
@@ -11,14 +19,6 @@ import { BarChart3, CreditCard, ExternalLink, Package, Wrench } from '@/lib/icon
 import { cn } from '@/lib/utils'
 
 import { useRouteEnumParam } from '../../hooks/use-route-enum-param'
-import {
-  ListRow,
-  ListRowSkeleton,
-  SectionHeading,
-  SectionHeadingSkeleton,
-  SettingsContent,
-  SettingsSection
-} from '../primitives'
 
 import { RowValue } from './account-row-value'
 import { BillingApiProvider } from './api'

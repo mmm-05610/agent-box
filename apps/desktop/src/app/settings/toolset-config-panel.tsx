@@ -6,6 +6,7 @@ import { deleteEnvVar, pollOAuthSession, revealEnvVar, setEnvVar, startOAuthLogi
 import { getActionStatus } from '@/api/system'
 import { getToolsetConfig, getToolsetModels, runToolsetPostSetup, selectToolsetModel, selectToolsetProvider } from '@/api/toolsets'
 import { SETTINGS_ROUTE } from '@/app/routes'
+import { Pill } from '@/components/settings/primitives'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useI18n } from '@/i18n'
@@ -24,7 +25,6 @@ import type {
 } from '@/types/hermes'
 
 import { EnvVarActionsMenu, EnvVarActionsTrigger, EnvVarContextMenu } from './env-var-actions-menu'
-import { Pill } from './primitives'
 
 interface ToolsetConfigPanelProps {
   toolset: string

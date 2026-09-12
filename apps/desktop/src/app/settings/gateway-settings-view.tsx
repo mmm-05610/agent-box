@@ -4,6 +4,7 @@ import { useStore } from '@nanostores/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { ExternalLink } from '@/components/external-link'
+import { EmptyState, ListRow, Pill, SettingsContent, SettingsSkeleton, ToggleRow } from '@/components/settings/primitives'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Input } from '@/components/ui/input'
@@ -36,7 +37,6 @@ import { ConnectionsRegistrySection } from './connections-registry'
 import { CONTROL_TEXT } from './constants'
 import { ModeCard } from './gateway-settings-parts'
 import { ManagedUpdatesSection } from './managed-updates-section'
-import { EmptyState, ListRow, Pill, SettingsContent, SettingsSkeleton, ToggleRow } from './primitives'
 import {
   type AuthMode,
   type CloudDiscoverStatus,

@@ -8,6 +8,7 @@ import {
   TERMINAL_FONT_SUGGESTIONS
 } from '@/application/terminal/terminal-font'
 import { useOnProfileSwitch } from '@/components/hooks/use-on-profile-switch'
+import { ListRow } from '@/components/settings/primitives'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useI18n } from '@/i18n'
@@ -17,7 +18,6 @@ import type { HermesConfigRecord } from '@/types/hermes'
 import { setHermesConfigCache, useHermesConfigRecord } from '../hooks/use-config-record'
 
 import { getNested, setNested } from './helpers'
-import { ListRow } from './primitives'
 
 const AUTOSAVE_DELAY_MS = 550
 

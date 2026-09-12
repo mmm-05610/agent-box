@@ -1,11 +1,10 @@
 import { useEffect, useRef } from 'react'
 
+import { Pill } from '@/components/settings/primitives'
 import { Button } from '@/components/ui/button'
 import { openExternalLink } from '@/lib/external-link'
 import { ChevronLeft, ExternalLink } from '@/lib/icons'
 import { cn } from '@/lib/utils'
-
-import { Pill } from '../primitives'
 
 import { BillingRefusalInline } from './inline-feedback'
 import { TierArt } from './tier-art'

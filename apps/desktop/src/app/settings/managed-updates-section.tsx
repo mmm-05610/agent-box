@@ -1,5 +1,6 @@
 import { useStore } from '@nanostores/react'
 
+import { ListRow, Pill, SectionHeading } from '@/components/settings/primitives'
 import { Button } from '@/components/ui/button'
 import type { DesktopRegistryConnection } from '@/global'
 import { useI18n } from '@/i18n'
@@ -11,8 +12,6 @@ import {
   type ManagedUpdateState,
   runManagedUpdate
 } from '@/store/managed-updates'
-
-import { ListRow, Pill, SectionHeading } from './primitives'
 
 function stateTone(state: ManagedUpdateState | undefined): 'muted' | 'primary' | 'warn' {
   if (!state || state.status === 'idle') {

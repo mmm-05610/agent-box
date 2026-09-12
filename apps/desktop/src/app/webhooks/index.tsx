@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { createWebhook, deleteWebhook, enableWebhooks, getWebhooks, setWebhookEnabled } from '@/api/messaging'
 import { PageLoader } from '@/components/page-loader'
+import { ListRow } from '@/components/settings/primitives'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
@@ -44,7 +45,6 @@ import {
   PanelPill,
   PanelSectionLabel
 } from '../overlays/panel'
-import { ListRow } from '../settings/primitives'
 
 const DELIVER_OPTIONS: readonly string[] = ['log', 'telegram', 'discord', 'slack', 'email', 'github_comment']
 

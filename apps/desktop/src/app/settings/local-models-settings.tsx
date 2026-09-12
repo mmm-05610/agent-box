@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router'
 
 import { activateLocalModel, deleteLocalModel, downloadBrowsedModel, downloadLocalModel, ejectLocalModel, getLocalCatalog, getLocalHardware, getLocalModelsStatus, type HFFileGroup, type HFSearchHit, installLocalRuntime, listHFRepoFiles, quickstartLocalModels, searchHFModels, setLocalServer, sideloadLocalModel } from '@/api/local-models'
 import { NEW_CHAT_ROUTE } from '@/app/routes'
+import { ListRow, Pill, SettingsContent, SettingsSection, SettingsSkeleton } from '@/components/settings/primitives'
 import { Button } from '@/components/ui/button'
 import { Tip } from '@/components/ui/tooltip'
 import { useI18n } from '@/i18n'
@@ -31,8 +32,6 @@ import {
 } from '@/store/local-runtime-jobs'
 import { notify, notifyError } from '@/store/notifications'
 import type { LocalCatalogModel, LocalHardware, LocalModelsStatus } from '@/types/hermes'
-
-import { ListRow, Pill, SettingsContent, SettingsSection, SettingsSkeleton } from './primitives'
 
 function ProgressBar({ percent }: { percent: number | undefined }) {
   return (

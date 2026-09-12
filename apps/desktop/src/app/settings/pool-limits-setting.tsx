@@ -1,7 +1,7 @@
 import { useStore } from '@nanostores/react'
 import { useEffect, useState } from 'react'
 
-import { ListRow } from '@/app/settings/primitives'
+import { ListRow } from '@/components/settings/primitives'
 import { Input } from '@/components/ui/input'
 import { $poolLimits, loadPoolLimits, savePoolLimits } from '@/store/pool-limits'
 

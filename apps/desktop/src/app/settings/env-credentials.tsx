@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import { deleteEnvVar, getEnvVars, revealEnvVar, setEnvVar } from '@/api/config'
+import { Pill } from '@/components/settings/primitives'
 import { useI18n } from '@/i18n'
 import { type IconComponent } from '@/lib/icons'
 import { confirm } from '@/store/confirm'
@@ -8,7 +9,6 @@ import { notify, notifyError } from '@/store/notifications'
 import type { EnvVarInfo } from '@/types/hermes'
 
 import { asText, includesQuery, redactedValue, withoutKey } from './helpers'
-import { Pill } from './primitives'
 import type { EnvRowProps } from './types'
 
 // Shared filter used by every credential surface (Providers + Keys pages):

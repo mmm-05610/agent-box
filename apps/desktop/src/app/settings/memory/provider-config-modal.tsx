@@ -2,6 +2,7 @@ import { useStore } from '@nanostores/react'
 import { useEffect, useState } from 'react'
 
 import { saveMemoryProviderConfig } from '@/api/system'
+import { ListRow } from '@/components/settings/primitives'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -16,8 +17,6 @@ import { ExternalLink, Loader2, Save, SlidersHorizontal } from '@/lib/icons'
 import { notify, notifyError } from '@/store/notifications'
 import { $activeGatewayProfile } from '@/store/profile'
 import type { MemoryProviderConfig, MemoryProviderField } from '@/types/hermes'
-
-import { ListRow } from '../primitives'
 
 import { FieldControl, FieldTitle } from './field-control'
 

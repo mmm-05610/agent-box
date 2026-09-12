@@ -3,6 +3,7 @@ import { type ReactNode, useEffect } from 'react'
 import { Link } from 'react-router'
 
 import { useGatewayRequest } from '@/components/hooks/use-gateway-request'
+import { EmptyState, Pill, SettingsContent, SettingsSection } from '@/components/settings/primitives'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
 import { Switch } from '@/components/ui/switch'
@@ -17,7 +18,6 @@ import { openPluginInstallRequest } from '@/store/plugin-install-request'
 import { $pluginRecords, type PluginRecord, setPluginEnabled } from '@/store/plugin-state'
 import { $gatewayState } from '@/store/session'
 
-import { EmptyState, Pill, SettingsContent, SettingsSection } from './primitives'
 import { useDeepLinkHighlight } from './use-deep-link-highlight'
 
 const KIND_ORDER: Record<PluginRecord['kind'], number> = { disk: 0, runtime: 1, bundled: 2 }
