@@ -1,7 +1,6 @@
 import { useStore } from '@nanostores/react'
 import { useEffect, useRef, useState } from 'react'
 
-import type { NewSessionPlacement } from '@/app/chat/new-session-drag'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
 import {
@@ -31,6 +30,7 @@ import {
   pickProjectFolder,
   renameProject
 } from '@/store/projects'
+import type { NewSessionPlacement } from '@/types/session-placement'
 
 // Single dialog mounted once in the sidebar; it renders create / rename /
 // add-folder flows driven by the $projectDialog atom. Folders are chosen via

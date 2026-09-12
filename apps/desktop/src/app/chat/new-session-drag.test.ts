@@ -3,8 +3,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type * as TreeModel from '@/lib/pane-tree'
 import type * as TreeStore from '@/store/pane-shell/tree'
 import { NEW_SESSION_DRAG } from '@/store/pane-shell/tree'
+import type { NewSessionPlacement } from '@/types/session-placement'
 
-import { type NewSessionPlacement, startNewProjectDrag, startNewSessionDrag } from './new-session-drag'
+import { startNewProjectDrag, startNewSessionDrag } from './new-session-drag'
 
 // ---------------------------------------------------------------------------
 // The drag MACHINERY (startDragSession) is exercised by the pane-shell's own

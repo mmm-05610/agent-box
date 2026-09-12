@@ -5,6 +5,7 @@ import { normalizeProfileKey } from '@/lib/profile-identity'
 import { readJson, writeJson } from '@/lib/storage'
 import { $activeGatewayProfile } from '@/store/profile/runtime-route-state'
 import type { WorkspaceMode } from '@/types/contributions'
+import type { TileDock } from '@/types/pane-dock'
 import type { ClientSessionState } from '@/types/session'
 
 import { clearAllProviderWaits, clearSessionProviderWait } from '../provider-wait'
@@ -469,13 +470,7 @@ export function reconcileBusyStatesOnReconnect(scope?: string) {
 // Session tiles.
 // ---------------------------------------------------------------------------
 
-/** Edge a tile docks against main when it first joins the tree. Shared by
- *  session tiles and route (page) tiles. */
-export type SplitDir = 'bottom' | 'left' | 'right' | 'top'
-
-/** Where a tile lands on adoption: an edge split, or `center` = stack into
- *  the anchor's zone as a tab (a drop on the zone's tab strip). */
-export type TileDock = 'center' | SplitDir
+export type { SplitDir, TileDock } from '@/types/pane-dock'
 
 export interface SessionTile {
   /** Stored session id — the durable identity (runtime ids are ephemeral). */
