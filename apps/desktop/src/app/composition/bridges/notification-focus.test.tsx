@@ -1,8 +1,9 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
 
-import { paneMirror } from '@/features/chat/pane-mirror'
+import { useDesktopIntegrations } from '@/app/composition/bridges/desktop-integrations'
 import { sessionRoute, syncWorkspaceRoute } from '@/app/routes'
+import { paneMirror } from '@/features/chat/pane-mirror'
 import { registry } from '@/lib/contributions'
 import { group } from '@/lib/pane-tree'
 import * as tree from '@/store/pane-shell/tree'
@@ -14,8 +15,6 @@ import {
   openSessionTile,
   patchSessionTile
 } from '@/store/session-states'
-
-import { useDesktopIntegrations } from '@/app/composition/bridges/desktop-integrations'
 
 const originalBridge = window.hermesDesktop
 

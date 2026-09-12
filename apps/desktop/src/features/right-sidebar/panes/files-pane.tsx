@@ -2,8 +2,8 @@
  * FilesPane — real file browser; activating a file opens it in preview.
  */
 
-import { normalizeOrLocalPreviewTarget } from '@/lib/local-preview'
 import { RightSidebarPane } from '@/features/right-sidebar'
+import { normalizeOrLocalPreviewTarget } from '@/lib/local-preview'
 import { openPreview } from '@/store/preview'
 import { $currentCwd } from '@/store/session'
 

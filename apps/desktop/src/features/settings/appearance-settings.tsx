@@ -3,9 +3,10 @@ import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 
 import { saveHermesConfig } from '@/api/config'
-import { useDebounced } from '@/components/hooks/use-debounced'
+import { setHermesConfigCache, useHermesConfigRecord } from '@/application/config/use-config-record'
 import { installVscodeThemeFromMarketplace } from '@/application/theme/adapters/install'
 import { $marketplaceInstalls, getBaseColors, isUserTheme, removeUserTheme } from '@/application/theme/adapters/user-themes'
+import { useDebounced } from '@/components/hooks/use-debounced'
 import { LanguageSwitcher } from '@/components/language-switcher'
 import { ListRow, SectionHeading, SettingsContent, ToggleRow } from '@/components/settings/primitives'
 import { Button } from '@/components/ui/button'
@@ -56,8 +57,6 @@ import { $vibeHeartsEnabled, setVibeHeartsEnabled } from '@/store/vibe-hearts-en
 import { $zoomPercent, setZoomPercent } from '@/store/zoom'
 import { useTheme } from '@/themes/context'
 import type { DesktopTheme } from '@/themes/types'
-
-import { setHermesConfigCache, useHermesConfigRecord } from '@/application/config/use-config-record'
 
 import { MODE_OPTIONS } from './constants'
 import { setNested } from './helpers'

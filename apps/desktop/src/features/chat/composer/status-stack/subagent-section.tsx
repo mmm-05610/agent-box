@@ -1,10 +1,10 @@
 import { useState } from 'react'
 
-import { SubagentRow } from '@/features/agents'
 import { ActivityTimerText } from '@/components/chat/activity-timer-text'
 import { StatusSection } from '@/components/chat/status-section'
 import { Codicon } from '@/components/ui/codicon'
 import { GlyphSpinner } from '@/components/ui/glyph-spinner'
+import { SubagentRow } from '@/features/agents'
 import { useI18n } from '@/i18n'
 import { useViewedInterval } from '@/lib/hooks/use-viewed-interval'
 import { useSessionSlice } from '@/lib/use-session-slice'

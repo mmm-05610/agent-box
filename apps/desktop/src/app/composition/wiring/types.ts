@@ -1,11 +1,10 @@
 import type { ComponentProps, ReactNode } from 'react'
 
-import type { GatewayRequester } from '@/types/gateway'
-
 import type { ChatView } from '@/features/chat'
 import type { ChatSidebar } from '@/features/chat/sidebar'
 import type { CommandCenterSection } from '@/features/command-center'
 import type { ModelMenuPanel } from '@/features/profiles/model-menu-panel'
+import type { GatewayRequester } from '@/types/gateway'
 
 export type { GatewayRequester }
 

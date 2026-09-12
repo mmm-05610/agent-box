@@ -1,7 +1,5 @@
 import { memo, useCallback, useState } from 'react'
 
-import { queueKickoffIfSessionBusy } from '@/features/session/hooks/use-prompt-actions/queue-if-busy'
-import type { SubmitTextOptions } from '@/features/session/hooks/use-prompt-actions/utils'
 import { StatusSection } from '@/components/chat/status-section'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
@@ -29,6 +27,8 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { Tip } from '@/components/ui/tooltip'
+import { queueKickoffIfSessionBusy } from '@/features/session/hooks/use-prompt-actions/queue-if-busy'
+import type { SubmitTextOptions } from '@/features/session/hooks/use-prompt-actions/utils'
 import { useI18n } from '@/i18n'
 import {
   runSessionControlAction,

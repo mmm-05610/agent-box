@@ -1,12 +1,12 @@
 import { useRef, useState } from 'react'
 
 import { deleteLearningNode, editLearningNode, getLearningNode } from '@/api/skills'
-import { ArchiveSkillConfirmDialog, fireOptimistic } from '@/features/learning/archive-skill-confirm-dialog'
 import { CodeEditor } from '@/components/chat/code-editor'
 import { useOnProfileSwitch } from '@/components/hooks/use-on-profile-switch'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { ArchiveSkillConfirmDialog, fireOptimistic } from '@/features/learning/archive-skill-confirm-dialog'
 import { notifyError } from '@/store/notifications'
 import { evictStarmapNode, loadStarmapGraph } from '@/store/starmap'
 

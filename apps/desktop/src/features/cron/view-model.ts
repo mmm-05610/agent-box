@@ -4,15 +4,14 @@ export interface ScheduleOption {
   value: string
 }
 
+import type { SetStatusbarItemGroup } from '@/app/shell/chrome/statusbar/statusbar-controls'
+import {
+  type PanelPillTone
+} from '@/app/shell/layers/overlays/panel'
 import { type Translations } from '@/i18n'
 import { asText } from '@/lib/text'
 import { ALL_PROFILES } from '@/store/profile'
 import { type CronJob } from '@/types/hermes'
-
-import {
-  type PanelPillTone
-} from '@/app/shell/layers/overlays/panel'
-import type { SetStatusbarItemGroup } from '@/app/shell/chrome/statusbar/statusbar-controls'
 
 import { jobTitle } from './job-state'
 

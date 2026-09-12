@@ -1,8 +1,8 @@
 import { memo, useCallback, useState } from 'react'
 
-import type { SubmitTextOptions } from '@/features/session/hooks/use-prompt-actions/utils'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
+import type { SubmitTextOptions } from '@/features/session/hooks/use-prompt-actions/utils'
 import { useI18n } from '@/i18n'
 import type { SessionControlEntry } from '@/store/session-control'
 

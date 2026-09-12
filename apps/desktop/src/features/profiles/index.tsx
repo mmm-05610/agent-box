@@ -3,21 +3,6 @@ import type * as React from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { getProfileSoul, updateProfileSoul } from '@/api/profiles'
-import { refreshProfiles } from '@/application/profile/catalog'
-import { CodeEditor } from '@/components/chat/code-editor'
-import { PageLoader } from '@/components/page-loader'
-import { Button } from '@/components/ui/button'
-import { ProfileGlyph } from '@/components/ui/profile-glyph'
-import { useI18n } from '@/i18n'
-import { displayPath } from '@/lib/display-path'
-import { AlertTriangle, Save } from '@/lib/icons'
-import { resolveProfileColor } from '@/lib/profile-color'
-import { normalize } from '@/lib/text'
-import { notify, notifyError } from '@/store/notifications'
-import { $profileColors, profileLabel } from '@/store/profile'
-import { type ProfileInfo } from '@/types/hermes'
-
-import { useRefreshHotkey } from '@/components/hooks/use-refresh-hotkey'
 import {
   Panel,
   PanelAddButton,
@@ -32,6 +17,20 @@ import {
   PanelPill,
   PanelSectionLabel
 } from '@/app/shell/layers/overlays/panel'
+import { refreshProfiles } from '@/application/profile/catalog'
+import { CodeEditor } from '@/components/chat/code-editor'
+import { useRefreshHotkey } from '@/components/hooks/use-refresh-hotkey'
+import { PageLoader } from '@/components/page-loader'
+import { Button } from '@/components/ui/button'
+import { ProfileGlyph } from '@/components/ui/profile-glyph'
+import { useI18n } from '@/i18n'
+import { displayPath } from '@/lib/display-path'
+import { AlertTriangle, Save } from '@/lib/icons'
+import { resolveProfileColor } from '@/lib/profile-color'
+import { normalize } from '@/lib/text'
+import { notify, notifyError } from '@/store/notifications'
+import { $profileColors, profileLabel } from '@/store/profile'
+import { type ProfileInfo } from '@/types/hermes'
 
 import { CreateProfileDialog } from './create-profile-dialog'
 import { DeleteProfileDialog } from './delete-profile-dialog'

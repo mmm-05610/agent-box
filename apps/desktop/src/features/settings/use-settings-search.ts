@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useCallback, useEffect } from 'react'
 
 import { getEnvVars, getHermesConfigSchema } from '@/api/config'
+import { useHermesConfigRecord } from '@/application/config/use-config-record'
 import { useGatewayRequest } from '@/components/hooks/use-gateway-request'
 import { useOnProfileSwitch } from '@/components/hooks/use-on-profile-switch'
 import { useI18n } from '@/i18n'
@@ -11,8 +12,6 @@ import { $agentPlugins, isDesktopRelevantPlugin, loadAgentPlugins } from '@/stor
 import { $pluginRecords } from '@/store/plugin-state'
 import { $gatewayState } from '@/store/session'
 import { TRANSLUCENCY_SUPPORTED } from '@/store/translucency'
-
-import { useHermesConfigRecord } from '@/application/config/use-config-record'
 
 import {
   APPEARANCE_SETTING_IDS,

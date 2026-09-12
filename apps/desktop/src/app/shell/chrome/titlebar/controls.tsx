@@ -2,6 +2,7 @@ import { useStore } from '@nanostores/react'
 import { type ComponentProps, type MouseEvent, type ReactNode, useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 
+import { appViewForPath, isOverlayView } from '@/app/routes'
 import { hudTargetSessionId } from '@/app/windows/hud/handoff'
 import { toggleLayoutEditMode } from '@/components/pane-shell/edit-mode'
 import { Badge } from '@/components/ui/badge'
@@ -30,8 +31,6 @@ import {
 } from '@/store/layout'
 import { resetLayoutTree } from '@/store/pane-shell/tree'
 import { $unreadSessionCount } from '@/store/session-dot-state'
-
-import { appViewForPath, isOverlayView } from '@/app/routes'
 
 import { TitlebarIcon } from './icon'
 

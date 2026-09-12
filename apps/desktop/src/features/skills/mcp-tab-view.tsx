@@ -6,10 +6,13 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { type HermesGateway, type ProfileScope, profileScopeKey } from '@/api/client'
 import { getMcpCatalog, type McpTestResult, saveMcpServers, testMcpServer } from '@/api/mcp'
+import { PanelAddButton, PanelEmpty } from '@/app/shell/layers/overlays/panel'
+import { hermesConfigCacheWriter, useHermesConfigRecord } from '@/application/config/use-config-record'
 import { completeMcpDesktopOAuth } from '@/application/mcp-oauth'
 import { type CodeEditorApi } from '@/components/chat/code-editor'
 import { JsonDocumentEditor } from '@/components/chat/json-document-editor'
 import { useOnProfileSwitch } from '@/components/hooks/use-on-profile-switch'
+import { DetailPane, MASTER_DETAIL_WIDE_COLS } from '@/components/layout/master-detail'
 import { PageLoader } from '@/components/page-loader'
 import { Button } from '@/components/ui/button'
 import { ErrorBanner } from '@/components/ui/error-state'
@@ -26,9 +29,6 @@ import { $activeGatewayProfile, normalizeProfileKey } from '@/store/profile'
 import { $activeSessionId } from '@/store/session'
 import { type McpCatalogEntry } from '@/types/hermes'
 
-import { hermesConfigCacheWriter, useHermesConfigRecord } from '@/application/config/use-config-record'
-import { DetailPane, MASTER_DETAIL_WIDE_COLS } from '@/components/layout/master-detail'
-import { PanelAddButton, PanelEmpty } from '@/app/shell/layers/overlays/panel'
 import { useDeepLinkHighlight } from '../settings/use-deep-link-highlight'
 
 import {

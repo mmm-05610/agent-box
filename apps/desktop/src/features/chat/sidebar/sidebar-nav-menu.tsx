@@ -2,6 +2,7 @@
 // The sidebar's primary navigation rows: built-ins plus contributed pages, each
 // with its split-open context menu and the draggable "New session" row.
 
+import { type AppView } from '@/app/routes'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -22,7 +23,6 @@ import { $newChatProfile } from '@/store/profile'
 import { openRouteTile } from '@/store/route-tiles'
 import { type SidebarNavItem } from '@/types/sidebar'
 
-import { type AppView } from '@/app/routes'
 import { startNewSessionDrag } from '../new-session-drag'
 
 import { type ChatSidebarProps, SIDEBAR_NAV } from './sidebar-constants'

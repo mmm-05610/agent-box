@@ -1,6 +1,7 @@
 import { useStore } from '@nanostores/react'
 import { useEffect } from 'react'
 
+import { sessionRoute } from '@/app/routes'
 import { selectStoredSessionForViewing } from '@/application/session-read-state'
 import { useI18n } from '@/i18n'
 import { migrateSessionDraft } from '@/store/composer'
@@ -11,8 +12,6 @@ import {
   resolveComposerSessionKey,
   setActiveSessionStoredIdRotation
 } from '@/store/session'
-
-import { sessionRoute } from '@/app/routes'
 
 import { useBranchActions } from './branching'
 import { useFreshSessionDraft } from './fresh-draft'

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { saveHermesConfig, setEnvVar } from '@/api/config'
 import { getAuxiliaryModels, getGlobalModelInfo, getGlobalModelOptions, getMoaModels, getRecommendedDefaultModel, saveMoaModels, setModelAssignment } from '@/api/models'
+import { hermesConfigCacheWriter, invalidateHermesConfig, useHermesConfigRecord } from '@/application/config/use-config-record'
 import { useOnProfileSwitch } from '@/components/hooks/use-on-profile-switch'
 import { ListRow, Pill, SectionHeading } from '@/components/settings/primitives'
 import { Button } from '@/components/ui/button'
@@ -18,8 +19,6 @@ import { setMainModelAssignment } from '@/store/cron-model-impact'
 import { notifyError, readableError } from '@/store/notifications'
 import { startManualLocalEndpoint, startManualOnboarding, startManualProviderOAuth } from '@/store/onboarding'
 import type { AuxiliaryModelsResponse, AuxiliaryTaskAssignment, MoaConfigResponse, MoaModelSlot, ModelOptionProvider, StaleAuxAssignment } from '@/types/hermes'
-
-import { hermesConfigCacheWriter, invalidateHermesConfig, useHermesConfigRecord } from '@/application/config/use-config-record'
 
 import { CONTROL_TEXT } from './constants'
 import { getNested, setNested } from './helpers'

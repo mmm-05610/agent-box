@@ -7,10 +7,38 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 
 import { getHermesConfigRecord } from '@/api/config'
+import { openSession, openSessionIntentFromModifiers } from '@/app/composition/routing/open-session'
 import { SESSION_IMPORT_ROUTE } from '@/app/routes'
+import {
+  AGENTS_ROUTE,
+  ARTIFACTS_ROUTE,
+  COMMAND_CENTER_ROUTE,
+  CRON_ROUTE,
+  navigateToWorkspacePage,
+  NEW_CHAT_ROUTE,
+  PROFILES_ROUTE,
+  SETTINGS_ROUTE,
+  SKILLS_ROUTE,
+  STARMAP_ROUTE
+} from '@/app/routes'
+import { usePaletteContributions } from '@/app/shell/layers/command-palette/contrib'
+import { HighlightWatcher } from '@/app/shell/layers/command-palette/highlight-watcher'
+import {
+  PAGE_PARENTS,
+  type PaletteGroup,
+  type PaletteItem,
+  type PalettePage,
+  paletteValue,
+  rankGroups,
+} from '@/app/shell/layers/command-palette/palette-model'
 import { listAllProfileSessions } from '@/application/session-lists'
 import { codiconIcon } from '@/components/ui/codicon'
 import { Command, CommandInput, CommandList } from '@/components/ui/command'
+import { PetInlineToggle, PetPalettePage } from '@/features/pet-generate/command-palette/pet-palette-page'
+import { SECTIONS } from '@/features/settings/constants'
+import { type SettingsSearchEntry, settingsSearchTargetQuery } from '@/features/settings/settings-search'
+import { useSettingsSearchCatalog } from '@/features/settings/use-settings-search'
+import { MarketplaceThemePage } from '@/features/theme/command-palette/marketplace-theme-page'
 import { useI18n } from '@/i18n'
 import {
   HUD_POSITION,
@@ -72,26 +100,6 @@ import {
 import { canOpenNewWindow, openNewWindow } from '@/store/windows'
 import { type ThemeMode, useTheme } from '@/themes/context'
 
-import { openSession, openSessionIntentFromModifiers } from '@/app/composition/routing/open-session'
-import {
-  AGENTS_ROUTE,
-  ARTIFACTS_ROUTE,
-  COMMAND_CENTER_ROUTE,
-  CRON_ROUTE,
-  navigateToWorkspacePage,
-  NEW_CHAT_ROUTE,
-  PROFILES_ROUTE,
-  SETTINGS_ROUTE,
-  SKILLS_ROUTE,
-  STARMAP_ROUTE
-} from '@/app/routes'
-import { SECTIONS } from '@/features/settings/constants'
-import { type SettingsSearchEntry, settingsSearchTargetQuery } from '@/features/settings/settings-search'
-import { useSettingsSearchCatalog } from '@/features/settings/use-settings-search'
-
-import { usePaletteContributions } from '@/app/shell/layers/command-palette/contrib'
-import { HighlightWatcher } from '@/app/shell/layers/command-palette/highlight-watcher'
-import { MarketplaceThemePage } from '@/features/theme/command-palette/marketplace-theme-page'
 import {
   FOLDER_PATH_RE,
   SESSION_ID_RE,
@@ -99,19 +107,10 @@ import {
   toSessionEntry,
 } from './palette-helpers'
 import {
-  PAGE_PARENTS,
-  type PaletteGroup,
-  type PaletteItem,
-  type PalettePage,
-  paletteValue,
-  rankGroups,
-} from '@/app/shell/layers/command-palette/palette-model'
-import {
   NON_CONFIG_SETTINGS,
   PaletteGroups,
   themeSupportsMode,
 } from './palette-sources'
-import { PetInlineToggle, PetPalettePage } from '@/features/pet-generate/command-palette/pet-palette-page'
 
 
 

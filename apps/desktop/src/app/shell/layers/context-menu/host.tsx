@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 
-import { augmentSpellcheck, $contextMenu, closeContextMenu } from './store'
+import { $contextMenu, augmentSpellcheck, closeContextMenu } from './store'
 
 /** The context-menu HOST: presentation, keyboard, and the close lifecycle
  *  for a menu whose sections were already chosen by composition. It does

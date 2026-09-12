@@ -1,5 +1,8 @@
 // Extracted verbatim from index.tsx (see docs/desktop-megafile-decomposition.md).
 
+import {
+  type SessionEntry,
+} from '@/app/shell/layers/command-palette/palette-model'
 import type { listAllProfileSessions } from '@/application/session-lists';
 import { sessionTitle } from '@/lib/chat-runtime'
 import {
@@ -9,10 +12,6 @@ import {
   Sun
 } from '@/lib/icons'
 import { type ThemeMode } from '@/themes/context'
-
-import {
-  type SessionEntry,
-} from '@/app/shell/layers/command-palette/palette-model'
 
 export const SESSION_ID_RE = /^\d{8}_\d{6}_[a-f0-9]{6}$/
 

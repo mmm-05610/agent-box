@@ -1,10 +1,9 @@
 import type { ReactNode } from 'react'
 
-import { writeClipboardText } from '@/components/ui/copy-button'
-import { type Translations } from '@/i18n'
-
 import { Item } from '@/app/shell/layers/context-menu/item'
 import type { OpenContextMenu } from '@/app/shell/layers/context-menu/store'
+import { writeClipboardText } from '@/components/ui/copy-button'
+import { type Translations } from '@/i18n'
 
 /** The Terminal product section of the app context menu: copy / paste /
  *  select-all over the registered xterm handle. Ownership split (batch 30

@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react'
 import type { useNavigate } from 'react-router'
 
-import { type Translations } from '@/i18n'
 import { navigateToWorkspacePage, NEW_CHAT_ROUTE, SETTINGS_ROUTE } from '@/app/routes'
+import { type Translations } from '@/i18n'
 import { openCommandPalette } from '@/store/command-palette'
 import { toggleTargetZoneTabStrip } from '@/store/pane-shell/tree'
 import { toggleStatusbarVisible } from '@/store/statusbar-prefs'

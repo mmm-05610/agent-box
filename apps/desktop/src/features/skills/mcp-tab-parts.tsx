@@ -7,7 +7,9 @@ import { type ProfileScope } from '@/api/client'
 import { getLogs } from '@/api/config'
 import { installMcpCatalogEntry } from '@/api/mcp'
 import { getActionStatus } from '@/api/system'
+import { PanelEmpty } from '@/app/shell/layers/overlays/panel'
 import { LogTail } from '@/components/chat/log-tail'
+import { ICON_BUTTON } from '@/components/layout/master-detail'
 import { PageLoader } from '@/components/page-loader'
 import { AvatarChip } from '@/components/ui/avatar-chip'
 import { Button } from '@/components/ui/button'
@@ -27,8 +29,6 @@ import { notify, notifyError } from '@/store/notifications'
 import { $activeGatewayProfile } from '@/store/profile'
 import { type McpCatalogEntry } from '@/types/hermes'
 
-import { ICON_BUTTON } from '@/components/layout/master-detail'
-import { PanelEmpty } from '@/app/shell/layers/overlays/panel'
 import { prettyName } from '../settings/helpers'
 
 import {

@@ -1,6 +1,7 @@
 import { useStore } from '@nanostores/react'
 import type { ComponentProps } from 'react'
 
+import { SidebarPanelLabel } from '@/app/shell/chrome/sidebar/label'
 import { TreeSkeleton } from '@/components/chat/skeletons'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { Button } from '@/components/ui/button'
@@ -14,8 +15,6 @@ import { $panesFlipped } from '@/store/layout'
 import { notifyError } from '@/store/notifications'
 import { openPreview } from '@/store/preview'
 import { $currentCwd, $selectedStoredSessionId, $workspaceCwdOwner } from '@/store/session'
-
-import { SidebarPanelLabel } from '@/app/shell/chrome/sidebar/label'
 
 import { ProjectTree } from './files/tree'
 import { useProjectTree } from './files/use-project-tree'

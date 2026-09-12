@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 
-import type { DragKind } from '@/features/chat/hooks/use-file-drop-zone'
 import { DROP_SHEET_BLUR_CLASS, DROP_SHEET_CLASS } from '@/components/ui/drop-affordance'
+import type { DragKind } from '@/features/chat/hooks/use-file-drop-zone'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
 

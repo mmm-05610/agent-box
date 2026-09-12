@@ -9,14 +9,32 @@ import { getUsageAnalytics } from '@/api/models'
 import { getProfiles } from '@/api/profiles'
 import { editLearningNode, getLearningNode, getOfficialSkills, getSkillContent, getSkills, previewSkillHub, setSkillEnabled } from '@/api/skills'
 import { getToolsets, setToolsetEnabled } from '@/api/toolsets'
-import { ArchiveSkillConfirmDialog } from '@/features/learning/archive-skill-confirm-dialog'
+import { SETTINGS_ROUTE } from '@/app/routes'
+import type { SetStatusbarItemGroup } from '@/app/shell/chrome/statusbar/statusbar-controls'
+import { PanelEmpty, PanelPill } from '@/app/shell/layers/overlays/panel'
 import { CodeEditor } from '@/components/chat/code-editor'
 import { useOnProfileSwitch } from '@/components/hooks/use-on-profile-switch'
+import { useRefreshHotkey } from '@/components/hooks/use-refresh-hotkey'
+import { useRouteEnumParam } from '@/components/hooks/use-route-enum-param'
+import {
+  CapRow,
+  DetailColumn,
+  DetailPane,
+  ListColumn,
+  ListStrip,
+  ListStripButton,
+  ListStripMenu,
+  type ListStripMenuToggle,
+  MasterDetail,
+  ToolChip
+} from '@/components/layout/master-detail'
+import { PageSearchShell } from '@/components/layout/page-search-shell'
 import { PageLoader } from '@/components/page-loader'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { CountSkeleton } from '@/components/ui/skeleton'
+import { ArchiveSkillConfirmDialog } from '@/features/learning/archive-skill-confirm-dialog'
 import type { DesktopRosterAgent } from '@/global'
 import { useI18n } from '@/i18n'
 import { isDesktopToolsetVisible } from '@/lib/desktop-toolsets'
@@ -32,29 +50,11 @@ import { notify, notifyError } from '@/store/notifications'
 import { $activeGatewayProfile, normalizeProfileKey } from '@/store/profile'
 import type { OfficialSkillInfo, SkillInfo, ToolsetInfo } from '@/types/hermes'
 
-import { useRefreshHotkey } from '@/components/hooks/use-refresh-hotkey'
-import { useRouteEnumParam } from '@/components/hooks/use-route-enum-param'
-import {
-  CapRow,
-  DetailColumn,
-  DetailPane,
-  ListColumn,
-  ListStrip,
-  ListStripButton,
-  ListStripMenu,
-  type ListStripMenuToggle,
-  MasterDetail,
-  ToolChip
-} from '@/components/layout/master-detail'
-import { PanelEmpty, PanelPill } from '@/app/shell/layers/overlays/panel'
-import { PageSearchShell } from '@/components/layout/page-search-shell'
-import { SETTINGS_ROUTE } from '@/app/routes'
 import { BrowserRealProfilePanel } from '../settings/browser-real-profile-panel'
 import { ComputerUsePanel } from '../settings/computer-use-panel'
 import { asText, includesQuery, prettyName, toolNames, toolsetDisplayLabel } from '../settings/helpers'
 import { TerminalBackendPanel } from '../settings/terminal-backend-panel'
 import { ToolsetConfigPanel } from '../settings/toolset-config-panel'
-import type { SetStatusbarItemGroup } from '@/app/shell/chrome/statusbar/statusbar-controls'
 
 import { EmbeddedHubPicker } from './embedded-hub-picker'
 import { McpTab } from './mcp-tab'

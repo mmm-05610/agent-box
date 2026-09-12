@@ -25,10 +25,9 @@ vi.mock('@/store/profile/sidebar-scope', async () => {
   return { $showAllProfiles: atom(false), setShowAllProfiles: () => {} }
 })
 
+import { $workspaceIsPage } from '@/app/routes'
 import { $previewTabs, closeRightRail, openPreview, type PreviewTarget } from '@/store/preview'
 import { $activeSessionId, $selectedStoredSessionId } from '@/store/session'
-
-import { $workspaceIsPage } from '@/app/routes'
 
 import { closeActiveTab, closeWorkspaceTab } from './close-tab'
 

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { placeCaretAtEnd } from '@/features/chat/composer/test-utils'
 import { insertInlineRefsIntoEditor } from '@/components/composer/inline-refs'
+import { placeCaretAtEnd } from '@/features/chat/composer/test-utils'
 import { rememberDesktopCommandsCatalog } from '@/lib/desktop-slash-commands'
 
 import {

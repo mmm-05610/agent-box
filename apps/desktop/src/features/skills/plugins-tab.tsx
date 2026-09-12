@@ -2,6 +2,7 @@ import { useStore } from '@nanostores/react'
 import { memo, useEffect, useMemo, useState } from 'react'
 
 import type { ProfileScope } from '@/api/client'
+import { PanelEmpty } from '@/app/shell/layers/overlays/panel'
 import { useGatewayRequest } from '@/components/hooks/use-gateway-request'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
@@ -23,8 +24,6 @@ import {
 import { notify } from '@/store/notifications'
 import { $paneHeightOverride, setPaneHeightOverride } from '@/store/panes'
 import { openPluginInstallRequest } from '@/store/plugin-install-request'
-
-import { PanelEmpty } from '@/app/shell/layers/overlays/panel'
 
 // The REAL Plugin Catalog page (docs site) embedded as a one-click picker —
 // the same pattern as the Skills tab's EmbeddedHubPicker. `?embed=picker`

@@ -1,5 +1,11 @@
 // Extracted verbatim from index.tsx (see docs/desktop-megafile-decomposition.md).
 
+import {
+  type AppView,
+  ARTIFACTS_ROUTE,
+  CRON_ROUTE,
+  SKILLS_ROUTE
+} from '@/app/routes'
 import { Codicon } from '@/components/ui/codicon'
 import type {
   Sidebar} from '@/components/ui/sidebar';
@@ -7,12 +13,6 @@ import { cn } from '@/lib/utils'
 import { type SessionInfo } from '@/types/hermes'
 import type { SidebarNavItem } from '@/types/sidebar'
 
-import {
-  type AppView,
-  ARTIFACTS_ROUTE,
-  CRON_ROUTE,
-  SKILLS_ROUTE
-} from '@/app/routes'
 import { type NewSessionSplitHandler } from '../new-session-drag'
 
 export const PROJECT_TREE_WARM_MS = 2_000

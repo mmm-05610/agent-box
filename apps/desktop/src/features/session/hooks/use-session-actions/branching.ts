@@ -1,6 +1,7 @@
 import { useCallback, useRef } from 'react'
 
 import { getAllSessionMessages } from '@/api/sessions'
+import { sessionRoute } from '@/app/routes'
 import { ensureGatewayAgent } from '@/application/profile/gateway-routing'
 import { ensureGatewayProfile } from '@/application/profile/runtime-selection'
 import { sessionOwnerRouteFromRow } from '@/application/session/request-router'
@@ -16,7 +17,6 @@ import { broadcastSessionsChanged } from '@/store/session-sync'
 import { type SessionOwnerRoute } from '@/store/session/types'
 import type { SessionCreateResponse } from '@/types/hermes'
 
-import { sessionRoute } from '@/app/routes'
 import { sessionContextDrift } from '../session-context-drift'
 
 import { type ResumeSessionAction } from './resume-session'

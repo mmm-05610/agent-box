@@ -3,10 +3,15 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 
 import { getAllSessionMessages } from '@/api/sessions'
+import { openSession } from '@/app/composition/routing/open-session'
+import type { SetStatusbarItemGroup } from '@/app/shell/chrome/statusbar/statusbar-controls'
 import { TitlebarIcon } from '@/app/shell/chrome/titlebar/icon'
 import { listAllProfileSessions } from '@/application/session-lists'
 import { ZoomableImage } from '@/components/chat/zoomable-image'
 import { ExternalLink, ExternalLinkIcon } from '@/components/external-link'
+import { useRefreshHotkey } from '@/components/hooks/use-refresh-hotkey'
+import { useRouteEnumParam } from '@/components/hooks/use-route-enum-param'
+import { PageSearchShell } from '@/components/layout/page-search-shell'
 import { PageLoader } from '@/components/page-loader'
 import { Button } from '@/components/ui/button'
 import { CopyButton } from '@/components/ui/copy-button'
@@ -36,12 +41,6 @@ import { normalize } from '@/lib/text'
 import { fmtDayTime } from '@/lib/time'
 import { cn } from '@/lib/utils'
 import { notify, notifyError } from '@/store/notifications'
-
-import { useRefreshHotkey } from '@/components/hooks/use-refresh-hotkey'
-import { useRouteEnumParam } from '@/components/hooks/use-route-enum-param'
-import { openSession } from '@/app/composition/routing/open-session'
-import { PageSearchShell } from '@/components/layout/page-search-shell'
-import type { SetStatusbarItemGroup } from '@/app/shell/chrome/statusbar/statusbar-controls'
 
 import {
   ARTIFACT_FILTERS,

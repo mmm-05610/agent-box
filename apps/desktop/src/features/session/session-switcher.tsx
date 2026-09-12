@@ -3,13 +3,12 @@ import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router'
 
+import { openSession } from '@/app/composition/routing/open-session'
 import { SessionStatusDot } from '@/components/chat/session-status-dot'
 import { sessionTitle } from '@/lib/chat-runtime'
 import { HUD_ITEM, HUD_POSITION, HUD_SURFACE, HUD_TEXT } from '@/lib/floating-hud'
 import { cn } from '@/lib/utils'
 import { $switcherIndex, $switcherOpen, $switcherSessions, closeSwitcher } from '@/store/session-switcher'
-
-import { openSession } from '@/app/composition/routing/open-session'
 
 // Compact session-switcher HUD — keyboard-driven from `use-keybinds`, rows
 // clickable via mousedown (Ctrl+click on macOS). No Dialog: Tab stays global.

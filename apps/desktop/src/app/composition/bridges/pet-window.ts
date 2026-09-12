@@ -1,13 +1,12 @@
 import { useEffect, useRef } from 'react'
 
+import type { GatewayRequester } from '@/app/composition/wiring/types'
 import { setPetActivity } from '@/store/pet'
 import { setPetScale } from '@/store/pet-gallery'
 import { setPetOverlayOpenAppHandler, setPetOverlayScaleHandler, setPetOverlaySubmitHandler } from '@/store/pet-overlay'
 import { $sessions } from '@/store/session'
 import { $attentionSessionIds } from '@/store/session-states'
 import { isAuxiliaryWindow } from '@/store/windows'
-
-import type { GatewayRequester } from '@/app/composition/wiring/types'
 
 interface PetBridgeParams {
   requestGateway: GatewayRequester

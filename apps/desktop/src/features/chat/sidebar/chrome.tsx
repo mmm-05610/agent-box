@@ -1,7 +1,6 @@
 import { useStore } from '@nanostores/react'
 import type * as React from 'react'
 
-import { type NewSessionSplitHandler, startNewProjectDrag, startNewSessionDrag } from '@/features/chat/new-session-drag'
 import {
   SIDEBAR_ROW_INSET,
   SIDEBAR_ROW_LABEL,
@@ -14,6 +13,7 @@ import { Codicon } from '@/components/ui/codicon'
 import { DisclosureCaret } from '@/components/ui/disclosure-caret'
 import { RowButton } from '@/components/ui/row-button'
 import { Tip } from '@/components/ui/tooltip'
+import { type NewSessionSplitHandler, startNewProjectDrag, startNewSessionDrag } from '@/features/chat/new-session-drag'
 import { compactNumber } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { $sidebarRowMeta } from '@/store/layout'

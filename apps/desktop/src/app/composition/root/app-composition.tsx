@@ -4,9 +4,12 @@ import { useStore } from '@nanostores/react'
 import { atom, computed } from 'nanostores'
 import type { CSSProperties, ReactElement, PointerEvent as ReactPointerEvent } from 'react'
 
-import { SessionDraftTitle } from '@/features/chat/session-draft-title'
-import { PALETTE_AREA, type PaletteContribution, paletteToggle } from '@/app/shell/layers/command-palette/contrib'
+import { AppContextMenu } from '@/app/composition/registrations/context-menu'
+import { ContribWiring, WiredPane } from '@/app/composition/wiring/features'
+import { $workspaceIsPage } from '@/app/routes'
 import { type StatusbarItem } from '@/app/shell/chrome/statusbar/statusbar-controls'
+import { PALETTE_AREA, type PaletteContribution, paletteToggle } from '@/app/shell/layers/command-palette/contrib'
+import { HudShell } from '@/app/windows/hud/hud-shell'
 import { InlinePreviewDirective } from '@/components/assistant-ui/inline-preview-directive'
 import { SessionStatusDot } from '@/components/chat/session-status-dot'
 import type { SessionDragPayload } from '@/components/composer/inline-refs'
@@ -18,6 +21,21 @@ import { discoverBundledPlugins } from '@/extension/contrib/plugins'
 import { Slot } from '@/extension/contrib/react/slot'
 import { useContributions } from '@/extension/contrib/react/use-contributions'
 import { discoverRuntimePlugins } from '@/extension/contrib/runtime-loader'
+import { BrowserPopoutShell } from '@/features/chat/browser-popout-shell'
+import { watchPreviewTiles } from '@/features/chat/preview-tile'
+import { watchRouteTiles } from '@/features/chat/route-tile'
+import { SessionDraftTitle } from '@/features/chat/session-draft-title'
+import { startSessionDrag } from '@/features/chat/session-drag'
+import {
+  SessionTileCloseConfirm,
+  stackSessionTilesIntoMain,
+  startUnrestoredTileTitleBackfill,
+  watchSessionTiles,
+  WorkspaceTabMenu
+} from '@/features/chat/session-tile'
+import { LogsPane } from '@/features/logs/logs-pane'
+import { FilesPane } from '@/features/right-sidebar/panes/files-pane'
+import { ReviewPaneContent } from '@/features/right-sidebar/panes/review-pane'
 import { translateNow } from '@/i18n'
 import { NEW_SESSION_TITLE, sessionTitle as storedSessionTitle } from '@/lib/chat-runtime'
 import { registry } from '@/lib/contributions'
@@ -79,26 +97,6 @@ import { $statusbarVisible } from '@/store/statusbar-prefs'
 import { $terminalTakeover, setTerminalTakeover } from '@/store/terminal-takeover'
 import { isBrowserWindow, isHudWindow } from '@/store/windows'
 import { setYoloEnabled } from '@/store/yolo-session'
-
-import { BrowserPopoutShell } from '@/features/chat/browser-popout-shell'
-import { watchPreviewTiles } from '@/features/chat/preview-tile'
-import { watchRouteTiles } from '@/features/chat/route-tile'
-import { startSessionDrag } from '@/features/chat/session-drag'
-import {
-  SessionTileCloseConfirm,
-  stackSessionTilesIntoMain,
-  startUnrestoredTileTitleBackfill,
-  watchSessionTiles,
-  WorkspaceTabMenu
-} from '@/features/chat/session-tile'
-import { AppContextMenu } from '@/app/composition/registrations/context-menu'
-import { HudShell } from '@/app/windows/hud/hud-shell'
-import { $workspaceIsPage } from '@/app/routes'
-
-import { LogsPane } from '@/features/logs/logs-pane'
-import { FilesPane } from '@/features/right-sidebar/panes/files-pane'
-import { ReviewPaneContent } from '@/features/right-sidebar/panes/review-pane'
-import { ContribWiring, WiredPane } from '@/app/composition/wiring/features'
 
 /**
  * Stripped-down app root (bb/contrib-areas) on the layout TREE model, mounting

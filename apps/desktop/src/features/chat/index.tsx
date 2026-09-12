@@ -7,8 +7,7 @@ import { memo, Suspense, useCallback, useEffect, useId, useMemo, useRef, useStat
 import { useLocation } from 'react-router'
 
 import { type HermesGateway } from '@/api/client'
-import type { SubmitTextOptions } from '@/features/session/hooks/use-prompt-actions/utils'
-import { sessionShouldHaveTranscript } from '@/features/session/hooks/use-session-actions/utils'
+import { primaryRouteSelectedSessionId, routeSessionId } from '@/app/routes'
 import { routedSessionIsLoading, threadLoadingState } from '@/application/transcript/thread-loading'
 import {
   backfillOlderTranscriptPage,
@@ -30,6 +29,8 @@ import { PromptOverlays } from '@/components/prompt-overlays'
 import { Button } from '@/components/ui/button'
 import { ErrorState } from '@/components/ui/error-state'
 import { TitleMenuTrigger } from '@/components/ui/title-menu-trigger'
+import type { SubmitTextOptions } from '@/features/session/hooks/use-prompt-actions/utils'
+import { sessionShouldHaveTranscript } from '@/features/session/hooks/use-session-actions/utils'
 import { useI18n } from '@/i18n'
 import type { ChatMessage } from '@/lib/chat-messages'
 import { NEW_SESSION_TITLE, quickModelOptions, sessionTitle } from '@/lib/chat-runtime'
@@ -66,8 +67,6 @@ import { $focusedStoredSessionId, sessionTileDelegate } from '@/store/session-st
 import { $transcriptTailBySessionId, transcriptTailState } from '@/store/transcript-tail'
 import { isAuxiliaryWindow, isWatchWindow } from '@/store/windows'
 import type { ModelOptionsResponse } from '@/types/hermes'
-
-import { primaryRouteSelectedSessionId, routeSessionId } from '@/app/routes'
 
 import { ChatDropOverlay } from './chat-drop-overlay'
 import { ChatSwapOverlay, ChatSyncBadge } from './chat-swap-overlay'

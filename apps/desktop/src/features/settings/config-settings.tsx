@@ -6,6 +6,8 @@ import { useSearchParams } from 'react-router'
 
 import { getHermesConfigSchema, saveHermesConfig } from '@/api/config'
 import { getElevenLabsVoices } from '@/api/system'
+import { PanelEmpty } from '@/app/shell/layers/overlays/panel'
+import { hermesConfigCacheWriter, useHermesConfigRecord } from '@/application/config/use-config-record'
 import { useOnProfileSwitch } from '@/components/hooks/use-on-profile-switch'
 import { EmptyState, ListRow, SettingsContent, SettingsSkeleton, ToggleRow } from '@/components/settings/primitives'
 import { Button } from '@/components/ui/button'
@@ -29,9 +31,6 @@ import { normalizeProfileKey } from '@/store/profile'
 import { repoDiscoveryPolicyFromConfig, repoDiscoveryPolicySignature, scanAndRecordRepos } from '@/store/projects'
 import { $settingsRequestProfile } from '@/store/settings-scope'
 import type { ConfigFieldSchema, HermesConfigRecord } from '@/types/hermes'
-
-import { hermesConfigCacheWriter, useHermesConfigRecord } from '@/application/config/use-config-record'
-import { PanelEmpty } from '@/app/shell/layers/overlays/panel'
 
 import { ConfigField } from './config-field'
 import {

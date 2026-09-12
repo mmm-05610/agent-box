@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { saveHermesConfig } from '@/api/config'
+import { setHermesConfigCache, useHermesConfigRecord } from '@/application/config/use-config-record'
 import {
   normalizeTerminalFontFamily,
   resolveTerminalFontFamily,
@@ -14,8 +15,6 @@ import { Input } from '@/components/ui/input'
 import { useI18n } from '@/i18n'
 import { notifyError } from '@/store/notifications'
 import type { HermesConfigRecord } from '@/types/hermes'
-
-import { setHermesConfigCache, useHermesConfigRecord } from '@/application/config/use-config-record'
 
 import { getNested, setNested } from './helpers'
 

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 
-import { type CommandCenterSection } from '@/features/command-center'
 import {
   AGENTS_ROUTE,
   appViewForPath,
@@ -10,6 +9,7 @@ import {
   NEW_CHAT_ROUTE,
   STARMAP_ROUTE
 } from '@/app/routes'
+import { type CommandCenterSection } from '@/features/command-center'
 
 const SECTIONS = ['sessions', 'system', 'usage'] as const
 

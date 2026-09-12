@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
 
+import { NEW_CHAT_ROUTE } from '@/app/routes'
 import { clearNotifications } from '@/store/notifications'
 import { revealTreePane } from '@/store/pane-shell/tree'
 import {
@@ -25,8 +26,6 @@ import {
   setWorkspaceCwdOwner,
   setYoloActive
 } from '@/store/session'
-
-import { NEW_CHAT_ROUTE } from '@/app/routes'
 
 import { type SessionActionsOptions } from './session-actions-options'
 

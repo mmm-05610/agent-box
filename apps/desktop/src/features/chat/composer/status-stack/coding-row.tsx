@@ -1,7 +1,6 @@
 import { useStore } from '@nanostores/react'
 import { memo, useEffect } from 'react'
 
-import { PrTag } from '@/features/chat/pr-tag'
 import { StatusRow } from '@/components/chat/status-row'
 import {
   type ActionItemSpec,
@@ -14,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
 import { CopyButton } from '@/components/ui/copy-button'
 import { DiffCount } from '@/components/ui/diff-count'
+import { PrTag } from '@/features/chat/pr-tag'
 import type { HermesGitBranch } from '@/global'
 import { useI18n } from '@/i18n'
 import { displayPath } from '@/lib/display-path'

@@ -1,9 +1,8 @@
 import { useCallback } from 'react'
 
+import { navigateToWorkspacePage, NEW_CHAT_ROUTE, sessionRoute, SETTINGS_ROUTE } from '@/app/routes'
 import { setWorkspaceScope } from '@/store/pane-shell/workspace-scope'
 import type { SidebarNavItem } from '@/types/sidebar'
-
-import { navigateToWorkspacePage, NEW_CHAT_ROUTE, sessionRoute, SETTINGS_ROUTE } from '@/app/routes'
 
 import { type FreshSessionDraftStarter } from './fresh-draft'
 import { type SessionActionsOptions } from './session-actions-options'

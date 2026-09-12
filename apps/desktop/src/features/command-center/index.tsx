@@ -3,7 +3,11 @@ import { type MouseEvent, type ReactNode, useCallback, useEffect, useMemo, useRe
 import { getLogs, getStatus } from '@/api/config'
 import { getUsageAnalytics } from '@/api/models'
 import { getActionStatus, restartGateway, updateHermes } from '@/api/system'
+import { OverlayMain, OverlayNav, OverlaySplitLayout } from '@/app/shell/layers/overlays/overlay-split-layout'
+import { OverlayView } from '@/app/shell/layers/overlays/overlay-view'
 import { LogTail } from '@/components/chat/log-tail'
+import { useRefreshHotkey } from '@/components/hooks/use-refresh-hotkey'
+import { useRouteEnumParam } from '@/components/hooks/use-route-enum-param'
 import { PageLoader } from '@/components/page-loader'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
@@ -33,11 +37,6 @@ import { $pinnedSessionIds, pinSession, unpinSession } from '@/store/layout'
 import { $sessions, sessionPinId } from '@/store/session'
 import { exportSession } from '@/store/session-export'
 import type { ActionStatusResponse, AnalyticsResponse, SessionInfo, StatusResponse } from '@/types/hermes'
-
-import { useRefreshHotkey } from '@/components/hooks/use-refresh-hotkey'
-import { useRouteEnumParam } from '@/components/hooks/use-route-enum-param'
-import { OverlayMain, OverlayNav, OverlaySplitLayout } from '@/app/shell/layers/overlays/overlay-split-layout'
-import { OverlayView } from '@/app/shell/layers/overlays/overlay-view'
 
 import { MaintenancePanel } from './maintenance'
 

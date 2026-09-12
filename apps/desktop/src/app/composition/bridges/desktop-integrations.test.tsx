@@ -1,17 +1,15 @@
 import { renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { useDesktopIntegrations } from '@/app/composition/bridges/desktop-integrations'
+import { sessionRoute } from '@/app/routes'
+import { makeSessionInfo } from '@/dev/test/session-info'
 import { createClientSessionState } from '@/lib/chat-runtime'
 import { requestMcpInstallFromDeepLink } from '@/store/mcp-deeplink-install'
 import { _resetLegacyDiscardForTests } from '@/store/session'
 import { dropSessionState, publishSessionState } from '@/store/session-states'
 import type * as WindowsStore from '@/store/windows'
 import type { SessionInfo } from '@/types/hermes'
-
-import { makeSessionInfo } from '@/dev/test/session-info'
-import { sessionRoute } from '@/app/routes'
-
-import { useDesktopIntegrations } from '@/app/composition/bridges/desktop-integrations'
 
 // Mutable HUD-window flag so the restore tests can flip the window kind the
 // hook believes it runs in. Default false keeps the pre-existing restore

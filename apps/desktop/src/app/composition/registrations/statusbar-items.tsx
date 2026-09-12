@@ -2,16 +2,17 @@ import { useStore } from '@nanostores/react'
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router'
 
+import type { StatusbarItem } from '@/app/shell/chrome/statusbar/statusbar-controls'
+import { Codicon } from '@/components/ui/codicon'
+import { GlyphSpinner } from '@/components/ui/glyph-spinner'
+import { LiveDuration } from '@/components/ui/live-duration'
 import { ConnectionSwitcher } from '@/features/chat/sidebar/connection-switcher'
 import type { CommandCenterSection } from '@/features/command-center'
 import { useApprovalModeStatusbarItem } from '@/features/runtime/approval-mode-menu'
-import { ContextUsagePanel } from '@/features/session/context-usage-panel'
 import { GatewayMenuPanel } from '@/features/runtime/gateway-menu-panel'
+import { ContextUsagePanel } from '@/features/session/context-usage-panel'
 import { useContextBreakdown } from '@/features/session/use-context-breakdown'
-import { LiveDuration } from '@/components/ui/live-duration'
 import { useSystemResourcesStatusbarItem } from '@/features/system/system-resources-statusbar'
-import { Codicon } from '@/components/ui/codicon'
-import { GlyphSpinner } from '@/components/ui/glyph-spinner'
 import { useI18n } from '@/i18n'
 import { displayPath, pathLeaf } from '@/lib/display-path'
 import {
@@ -65,7 +66,6 @@ import {
 import type { StatusResponse, UsageStats } from '@/types/hermes'
 
 import { CRON_ROUTE, SETTINGS_ROUTE, WEBHOOKS_ROUTE } from '../../routes'
-import type { StatusbarItem } from '@/app/shell/chrome/statusbar/statusbar-controls'
 
 const EMPTY_USAGE: UsageStats = { calls: 0, input: 0, output: 0, total: 0 }
 

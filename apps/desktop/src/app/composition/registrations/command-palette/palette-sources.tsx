@@ -2,6 +2,11 @@
 
 import { memo, useDeferredValue } from 'react'
 
+import {
+  type PaletteGroup,
+  type PaletteItem,
+  paletteValue,
+} from '@/app/shell/layers/command-palette/palette-model'
 import { isUserTheme, resolveTheme } from '@/application/theme/adapters/user-themes'
 import { CommandGroup, CommandItem } from '@/components/ui/command'
 import { HighlightMatches } from '@/components/ui/highlight-matches'
@@ -28,12 +33,6 @@ import {
 import { cn } from '@/lib/utils'
 import { bindingsFor } from '@/store/keybinds'
 import { luminance } from '@/themes/color'
-
-import {
-  type PaletteGroup,
-  type PaletteItem,
-  paletteValue,
-} from '@/app/shell/layers/command-palette/palette-model'
 
 export const EMPTY_GROUPS: PaletteGroup[] = []
 

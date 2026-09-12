@@ -14,6 +14,29 @@ import { type CSSProperties, lazy, type ReactNode, Suspense, useCallback, useEff
 import { useLocation, useNavigate } from 'react-router'
 
 import { useDesktopFsConnection } from '@/app/composition/bridges/desktop-filesystem'
+import { useDesktopIntegrations } from '@/app/composition/bridges/desktop-integrations'
+import { usePetBridge } from '@/app/composition/bridges/pet-window'
+import { useQuickEntryBridge } from '@/app/composition/bridges/quick-entry-window'
+import { useTitlebarToolContributions } from '@/app/composition/registrations/chrome-contributions'
+import { CommandPalette } from '@/app/composition/registrations/command-palette'
+import { ChatRoutesSurface, SidebarSurface, StatusbarSurface, TerminalSurface } from '@/app/composition/registrations/surfaces'
+import { ContribWiringContext } from '@/app/composition/root/context'
+import { mainChatOccupied, openSession } from '@/app/composition/routing/open-session'
+import { useOverlayRouting } from '@/app/composition/routing/overlay-routing'
+import { createSessionRpcDispatcher } from '@/app/composition/routing/session-rpc-dispatcher'
+import {
+  CRON_ROUTE,
+  navigateToWorkspacePage,
+  routeSessionId,
+  sessionRoute,
+  SETTINGS_ROUTE,
+  syncWorkspaceRoute
+} from '@/app/routes'
+import { TitlebarControls } from '@/app/shell/chrome/titlebar/controls'
+import { useKeybinds } from '@/app/shell/hooks/use-keybinds'
+import { useWindowControlsOverlayWidth } from '@/app/shell/platform/use-window-controls-overlay-width'
+import { useHudHandoff } from '@/app/windows/hud/handoff'
+import { useHermesConfigRecord } from '@/application/config/use-config-record'
 import { refreshActiveProfile } from '@/application/profile/catalog'
 import { getLatestSessionMessages } from '@/application/session-transcripts'
 import { closeAllTerminals } from '@/application/terminal/terminals'
@@ -34,6 +57,42 @@ import { RemoteDisplayBanner } from '@/components/remote-display-banner'
 import { SendDiagnosticsHost } from '@/components/send-diagnostics-dialog'
 import { TipHost } from '@/components/tips'
 import { emitGatewayEvent } from '@/extension/contrib/events'
+import { closeWorkspaceTab } from '@/features/chat/close-tab'
+import { $restartPreviewServer } from '@/features/chat/right-rail/restart-preview-server'
+import { triggerAndRefreshCronJobs } from '@/features/cron/cron-actions'
+import { PetGenerateOverlay } from '@/features/pet-generate/pet-generate-overlay'
+import { ModelPickerOverlay } from '@/features/profiles/model-picker-overlay'
+import { ModelVisibilityOverlay } from '@/features/profiles/model-visibility-overlay'
+import { FileActionDialogs } from '@/features/right-sidebar/file-actions'
+import { RemoteFolderPicker } from '@/features/right-sidebar/files/remote-picker'
+import { resetProjectTreeState } from '@/features/right-sidebar/files/use-project-tree'
+import { PersistentTerminal } from '@/features/right-sidebar/terminal/persistent'
+import { useGatewayBoot } from '@/features/runtime/gateway/hooks/use-gateway-boot'
+import { SessionImportView } from '@/features/session-import'
+import { useBackgroundQueueDrain } from '@/features/session/hooks/use-background-queue-drain'
+import { useContextSuggestions } from '@/features/session/hooks/use-context-suggestions'
+import { useCwdActions } from '@/features/session/hooks/use-cwd-actions'
+import { useHermesConfig } from '@/features/session/hooks/use-hermes-config'
+import { useMessageStream } from '@/features/session/hooks/use-message-stream'
+import { useModelControls } from '@/features/session/hooks/use-model-controls'
+import { usePreviewRouting } from '@/features/session/hooks/use-preview-routing'
+import { usePromptActions } from '@/features/session/hooks/use-prompt-actions'
+import { useRouteResume } from '@/features/session/hooks/use-route-resume'
+import { useSessionActions } from '@/features/session/hooks/use-session-actions'
+import { useSessionListActions } from '@/features/session/hooks/use-session-list-actions'
+import { useSessionStateCache } from '@/features/session/hooks/use-session-state-cache'
+import { SessionPickerOverlay } from '@/features/session/session-picker-overlay'
+import { SessionSwitcher } from '@/features/session/session-switcher'
+import {
+  reconcileActiveTranscript,
+  resolveActiveTranscriptSession,
+  useBackgroundSync
+} from '@/features/session/sync/background-sync'
+import { useSessionTileDelegate } from '@/features/session/tiles/use-session-tile-delegate'
+import { startWorkspaceSession } from '@/features/session/workspace-session-target'
+import { PluginInstallModal } from '@/features/settings/plugin-install-modal'
+import { McpInstallDeepLinkDialog } from '@/features/skills/mcp-install-deeplink-dialog'
+import { UpdatesOverlay } from '@/features/updates/updates-overlay'
 import { type ChatMessage, chatMessageText, preserveLocalAssistantErrors, toChatMessages } from '@/lib/chat-messages'
 import { formatRefValue } from '@/lib/format-ref-value'
 import {
@@ -82,66 +141,6 @@ import {
 import { clearSessionTodos, setSessionTodos, todosForHydration } from '@/store/todos'
 import { isAuxiliaryWindow, isBrowserWindow, isHudWindow } from '@/store/windows'
 
-import { closeWorkspaceTab } from '@/features/chat/close-tab'
-import { CommandPalette } from '@/app/composition/registrations/command-palette'
-import { triggerAndRefreshCronJobs } from '@/features/cron/cron-actions'
-import { useGatewayBoot } from '@/features/runtime/gateway/hooks/use-gateway-boot'
-import { useHermesConfigRecord } from '@/application/config/use-config-record'
-import { useKeybinds } from '@/app/shell/hooks/use-keybinds'
-import { useHudHandoff } from '@/app/windows/hud/handoff'
-import { ModelPickerOverlay } from '@/features/profiles/model-picker-overlay'
-import { ModelVisibilityOverlay } from '@/features/profiles/model-visibility-overlay'
-import { mainChatOccupied, openSession } from '@/app/composition/routing/open-session'
-import { PetGenerateOverlay } from '@/features/pet-generate/pet-generate-overlay'
-import { FileActionDialogs } from '@/features/right-sidebar/file-actions'
-import { RemoteFolderPicker } from '@/features/right-sidebar/files/remote-picker'
-import { resetProjectTreeState } from '@/features/right-sidebar/files/use-project-tree'
-import { PersistentTerminal } from '@/features/right-sidebar/terminal/persistent'
-import {
-  CRON_ROUTE,
-  navigateToWorkspacePage,
-  routeSessionId,
-  sessionRoute,
-  SETTINGS_ROUTE,
-  syncWorkspaceRoute
-} from '@/app/routes'
-import { SessionImportView } from '@/features/session-import'
-import { SessionPickerOverlay } from '@/features/session/session-picker-overlay'
-import { SessionSwitcher } from '@/features/session/session-switcher'
-import { useBackgroundQueueDrain } from '@/features/session/hooks/use-background-queue-drain'
-import { useContextSuggestions } from '@/features/session/hooks/use-context-suggestions'
-import { useCwdActions } from '@/features/session/hooks/use-cwd-actions'
-import { useHermesConfig } from '@/features/session/hooks/use-hermes-config'
-import { useMessageStream } from '@/features/session/hooks/use-message-stream'
-import { useModelControls } from '@/features/session/hooks/use-model-controls'
-import { usePreviewRouting } from '@/features/session/hooks/use-preview-routing'
-import { usePromptActions } from '@/features/session/hooks/use-prompt-actions'
-import { useRouteResume } from '@/features/session/hooks/use-route-resume'
-import { useSessionActions } from '@/features/session/hooks/use-session-actions'
-import { useSessionListActions } from '@/features/session/hooks/use-session-list-actions'
-import { useSessionStateCache } from '@/features/session/hooks/use-session-state-cache'
-import { startWorkspaceSession } from '@/features/session/workspace-session-target'
-import { PluginInstallModal } from '@/features/settings/plugin-install-modal'
-import { useOverlayRouting } from '@/app/composition/routing/overlay-routing'
-import { useWindowControlsOverlayWidth } from '@/app/shell/platform/use-window-controls-overlay-width'
-import { TitlebarControls } from '@/app/shell/chrome/titlebar/controls'
-import { UpdatesOverlay } from '@/features/updates/updates-overlay'
-
-import { ContribWiringContext } from '@/app/composition/root/context'
-import {
-  reconcileActiveTranscript,
-  resolveActiveTranscriptSession,
-  useBackgroundSync
-} from '@/features/session/sync/background-sync'
-import { useDesktopIntegrations } from '@/app/composition/bridges/desktop-integrations'
-import { usePetBridge } from '@/app/composition/bridges/pet-window'
-import { useQuickEntryBridge } from '@/app/composition/bridges/quick-entry-window'
-import { useSessionTileDelegate } from '@/features/session/tiles/use-session-tile-delegate'
-import { McpInstallDeepLinkDialog } from '@/features/skills/mcp-install-deeplink-dialog'
-import { useTitlebarToolContributions } from '@/app/composition/registrations/chrome-contributions'
-import { $restartPreviewServer } from '@/features/chat/right-rail/restart-preview-server'
-import { createSessionRpcDispatcher } from '@/app/composition/routing/session-rpc-dispatcher'
-import { ChatRoutesSurface, SidebarSurface, StatusbarSurface, TerminalSurface } from '@/app/composition/registrations/surfaces'
 import type { WiringActions, WiringApi } from './types'
 
 // Overlay views the controller mounts over the shell — lazy, load on demand.

@@ -4,6 +4,16 @@ import { PROMPT_SUBMIT_REQUEST_TIMEOUT_MS } from '@/api/client'
 import { fetchStoredTranscriptAcrossBackends, getLatestSessionMessages } from '@/application/session-transcripts'
 import { requestForSessionProfile } from '@/application/session/request-router'
 import { graftRefreshedTailOntoBackfill } from '@/application/transcript/transcript-backfill'
+import type { usePromptActions } from '@/features/session/hooks/use-prompt-actions'
+import { singleFlightSessionResume } from '@/features/session/hooks/use-prompt-actions/single-flight-resume'
+import { markSessionRecentlyInterrupted, withSessionNotFoundResume } from '@/features/session/hooks/use-prompt-actions/utils'
+import {
+  chatMessageArraysEquivalent,
+  preserveLocalPendingTurnMessages,
+  reconcileResumeMessages,
+  resolveSessionOwner
+} from '@/features/session/hooks/use-session-actions/utils'
+import type { useSessionStateCache } from '@/features/session/hooks/use-session-state-cache'
 import { translateNow } from '@/i18n/runtime'
 import { type ChatMessage, chatMessageText, toChatMessages } from '@/lib/chat-messages'
 import { notify } from '@/store/notifications'
@@ -21,19 +31,8 @@ import {
   setSessionTileDelegate
 } from '@/store/session-states'
 import { type SessionOwnerScope } from '@/store/session/types'
-import type { SessionResumeResponse } from '@/types/hermes'
-
-import type { usePromptActions } from '@/features/session/hooks/use-prompt-actions'
-import { singleFlightSessionResume } from '@/features/session/hooks/use-prompt-actions/single-flight-resume'
-import { markSessionRecentlyInterrupted, withSessionNotFoundResume } from '@/features/session/hooks/use-prompt-actions/utils'
-import {
-  chatMessageArraysEquivalent,
-  preserveLocalPendingTurnMessages,
-  reconcileResumeMessages,
-  resolveSessionOwner
-} from '@/features/session/hooks/use-session-actions/utils'
-import type { useSessionStateCache } from '@/features/session/hooks/use-session-state-cache'
 import type { GatewayRequester } from '@/types/gateway'
+import type { SessionResumeResponse } from '@/types/hermes'
 
 type SessionStateCache = ReturnType<typeof useSessionStateCache>
 

@@ -2,19 +2,19 @@ import { useAuiState } from '@assistant-ui/react'
 import { type RefObject, useCallback, useEffect, useRef, useState } from 'react'
 
 import {
-  chatSurfaceRoot,
-  clearSurfaceVar,
-  COMPOSER_HEIGHT_VAR,
-  COMPOSER_SURFACE_HEIGHT_VAR,
-  setSurfaceVar
-} from '@/features/chat/surface-vars'
-import {
   COMPOSER_COMPACT_PILL_PX,
   COMPOSER_FOLD_VOICE_PX,
   COMPOSER_MINIMAL_PX,
   COMPOSER_SINGLE_LINE_MAX_PX,
   COMPOSER_STACK_BREAKPOINT_PX
 } from '@/components/composer/composer-utils'
+import {
+  chatSurfaceRoot,
+  clearSurfaceVar,
+  COMPOSER_HEIGHT_VAR,
+  COMPOSER_SURFACE_HEIGHT_VAR,
+  setSurfaceVar
+} from '@/features/chat/surface-vars'
 import { useResizeObserver } from '@/lib/hooks/use-resize-observer'
 
 interface UseComposerMetricsArgs {

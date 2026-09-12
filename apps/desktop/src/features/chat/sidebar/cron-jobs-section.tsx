@@ -3,6 +3,7 @@ import { useStore } from '@nanostores/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { deleteCronJob, getCronJobRuns, pauseCronJob, resumeCronJob } from '@/api/cron'
+import { SidebarPanelLabel } from '@/app/shell/chrome/sidebar/label'
 import { usePaneVisible } from '@/components/pane-shell/pane-visibility'
 import { ActionsContextMenu, type MenuKit, renderActionItem } from '@/components/ui/actions-menu'
 import { Codicon } from '@/components/ui/codicon'
@@ -22,7 +23,6 @@ import { type SessionInfo } from '@/types/hermes'
 import type { CronJob } from '@/types/hermes'
 
 import { jobState, jobTitle, STATE_DOT } from '../../cron/job-state'
-import { SidebarPanelLabel } from '@/app/shell/chrome/sidebar/label'
 
 import { SidebarRowBody, SidebarRowLabel, SidebarRowLead, SidebarRowShell } from './chrome'
 import { SidebarLoadMoreRow } from './load-more-row'

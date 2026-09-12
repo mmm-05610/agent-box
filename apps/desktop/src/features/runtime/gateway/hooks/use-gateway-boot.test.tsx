@@ -2,6 +2,7 @@ import { act, cleanup, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ensureGatewayProfile } from '@/application/profile/runtime-selection'
+import { deferred } from '@/dev/test/deferred'
 import type { DesktopConnectionsRegistry } from '@/global'
 import { createClientSessionState } from '@/lib/chat-runtime'
 import { $desktopBoot } from '@/store/boot'
@@ -52,8 +53,6 @@ import {
   publishSessionState,
   recordSessionEventScope
 } from '@/store/session-states'
-
-import { deferred } from '@/dev/test/deferred'
 
 import { takeGatewaySurvivor } from './gateway-hmr-survivor'
 import { primaryRuntimeConnectionId, useGatewayBoot } from './use-gateway-boot'

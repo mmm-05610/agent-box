@@ -2,11 +2,6 @@ import { useStore } from '@nanostores/react'
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router'
 
-import { terminalMenuHandleFor } from '@/application/terminal/terminal-context-menu'
-import { HERMES_CONTEXT_MENU_TRIGGER_ATTR } from '@/components/ui/context-menu'
-import { terminalSections } from '@/features/right-sidebar/terminal/context-menu-sections'
-import { useI18n } from '@/i18n'
-
 import { domSections } from '@/app/shell/layers/context-menu/dom-sections'
 import { guestSections } from '@/app/shell/layers/context-menu/guest-sections'
 import { ContextMenuHost } from '@/app/shell/layers/context-menu/host'
@@ -17,6 +12,10 @@ import {
   openTerminalContextMenu
 } from '@/app/shell/layers/context-menu/store'
 import { CONTEXT_MENU_SKIP_ATTR, resolveDomTarget } from '@/app/shell/layers/context-menu/target'
+import { terminalMenuHandleFor } from '@/application/terminal/terminal-context-menu'
+import { HERMES_CONTEXT_MENU_TRIGGER_ATTR } from '@/components/ui/context-menu'
+import { terminalSections } from '@/features/right-sidebar/terminal/context-menu-sections'
+import { useI18n } from '@/i18n'
 
 /**
  * THE app context menu assembly (batch 30 C3): composition selects the

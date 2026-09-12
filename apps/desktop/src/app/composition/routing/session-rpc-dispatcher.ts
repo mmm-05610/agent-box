@@ -33,16 +33,15 @@
  */
 import type { MutableRefObject } from 'react'
 
-import { resolveSessionOwner } from '@/features/session/hooks/use-session-actions/utils'
+import { findStoredIdForRuntimeId, resolveRoutingSessionId, resolveSessionRpcOwner } from '@/app/composition/routing/session-owner'
 import { requestForSessionProfile } from '@/application/session/request-router'
+import { resolveSessionOwner } from '@/features/session/hooks/use-session-actions/utils'
 import { isSessionGoneForBackgroundPolling } from '@/store/runtime-gone'
 import { getSessionOwnerHint, knownSessionOwner, ownerLookupSessionRows, requestSessionResume } from '@/store/session'
 import { assertSessionOwnerResolved } from '@/store/session-owner-resolution'
 import { $focusedStoredSessionId, sessionTileOwnerRoute, storedSessionIdForRuntimeId } from '@/store/session-states'
 import { type SessionOwnerScope } from '@/store/session/types'
 import type { ClientSessionState } from '@/types/session'
-
-import { findStoredIdForRuntimeId, resolveRoutingSessionId, resolveSessionRpcOwner } from '@/app/composition/routing/session-owner'
 
 export type AmbientGatewayRequest = <T>(
   method: string,

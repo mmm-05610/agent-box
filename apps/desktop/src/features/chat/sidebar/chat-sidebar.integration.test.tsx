@@ -3,6 +3,7 @@ import { act, cleanup, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
+import { type AppView, ROUTES_AREA, SIDEBAR_NAV_AREA } from '@/app/routes'
 import { SidebarProvider } from '@/components/ui/sidebar'
 import { makeSessionInfo } from '@/dev/test/session-info'
 import { registry } from '@/lib/contributions'
@@ -10,8 +11,6 @@ import { group, split } from '@/lib/pane-tree'
 import { $layoutTree, noteActiveTreeGroup } from '@/store/pane-shell/tree'
 import { $selectedStoredSessionId, $sessions } from '@/store/session'
 import { $removedSessionIds } from '@/store/session-removal'
-
-import { type AppView, ROUTES_AREA, SIDEBAR_NAV_AREA } from '@/app/routes'
 
 import { ChatSidebar } from './index'
 

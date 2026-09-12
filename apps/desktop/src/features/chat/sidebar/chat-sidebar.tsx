@@ -7,6 +7,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'react-router'
 
 import { searchSessions } from '@/api/sessions'
+import {
+  SIDEBAR_NAV_AREA,
+  type SidebarNavContribution
+} from '@/app/routes'
 import { filterSessionsByProfileScope } from '@/application/session-lists/profile-scope'
 import { resolveLiveProjectFilter } from '@/application/session-lists/project-filter'
 import { searchResultToSession } from '@/application/session-lists/search-view-model'
@@ -116,11 +120,6 @@ import { $archivedSessions, loadArchivedSessions } from '@/store/sidebar-archive
 import { $sidebarSessionRankIds } from '@/store/sidebar-sort'
 import { type SessionInfo, type SessionSearchResult } from '@/types/hermes'
 import type { SidebarNavItem } from '@/types/sidebar'
-
-import {
-  SIDEBAR_NAV_AREA,
-  type SidebarNavContribution
-} from '@/app/routes'
 
 import { SidebarSectionAddButton } from './chrome'
 import { SidebarCronJobsSection } from './cron-jobs-section'

@@ -2,11 +2,10 @@ import { useCallback, useState } from 'react'
 
 import { type ProfileScope } from '@/api/client'
 import { saveHermesConfigRecord } from '@/api/config'
+import { hermesConfigCacheWriter, useHermesConfigRecord } from '@/application/config/use-config-record'
 import { ToggleRow } from '@/components/settings/primitives'
 import { useI18n } from '@/i18n'
 import { notify, notifyError } from '@/store/notifications'
-
-import { hermesConfigCacheWriter, useHermesConfigRecord } from '@/application/config/use-config-record'
 
 interface BrowserRealProfilePanelProps {
   /** Capabilities profile-scope override — the toggle reads/writes THIS

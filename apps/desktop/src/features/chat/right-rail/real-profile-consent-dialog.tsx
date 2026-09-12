@@ -2,7 +2,7 @@ import { useStore } from '@nanostores/react'
 import { useCallback, useEffect, useState } from 'react'
 
 import { saveHermesConfigRecord } from '@/api/config'
-import { readUseRealProfile } from '@/features/settings/browser-real-profile-panel'
+import { hermesConfigCacheWriter, useHermesConfigRecord } from '@/application/config/use-config-record'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog'
+import { readUseRealProfile } from '@/features/settings/browser-real-profile-panel'
 import { useI18n } from '@/i18n'
 import { Check, Globe } from '@/lib/icons'
 import { notify, notifyError } from '@/store/notifications'
@@ -22,8 +23,6 @@ import {
   claimRealProfilePrompt,
   releaseRealProfilePrompt
 } from '@/store/real-profile-consent'
-
-import { hermesConfigCacheWriter, useHermesConfigRecord } from '@/application/config/use-config-record'
 
 interface RealProfileConsentDialogProps {
   /** The Browser tab this pane renders — used only to claim the prompt so

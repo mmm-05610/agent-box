@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { deleteSession, getAllSessionMessages, getSession, setSessionArchived } from '@/api/sessions'
 import { resolveSessionRpcOwner } from '@/app/composition/routing/session-owner'
+import { NEW_CHAT_ROUTE, sessionRoute } from '@/app/routes'
 import { ensureGatewayProfile } from '@/application/profile/runtime-selection'
 import { getLatestSessionMessages } from '@/application/session-transcripts'
 import { requestForSessionProfile } from '@/application/session/request-router'
@@ -65,7 +66,6 @@ import { type SessionInfo, type SessionResumeResponse } from '@/types/hermes'
 import type { ClientSessionState } from '@/types/session'
 
 import { deferred } from '../../../dev/test/deferred'
-import { NEW_CHAT_ROUTE, sessionRoute } from '@/app/routes'
 
 import sessionResumeActiveTurn from './__fixtures__/session-resume-active-turn.json'
 import { useSessionActions } from './use-session-actions'

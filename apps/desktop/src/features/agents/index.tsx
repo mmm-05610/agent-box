@@ -1,6 +1,7 @@
 import { useStore } from '@nanostores/react'
 import { type ReactNode, useEffect, useMemo, useState } from 'react'
 
+import { Panel, PanelEmpty, PanelHeader } from '@/app/shell/layers/overlays/panel'
 import { useElapsedSeconds } from '@/components/chat/activity-timer'
 import { ActivityTimerText } from '@/components/chat/activity-timer-text'
 import { usePaneVisible } from '@/components/pane-shell/pane-visibility'
@@ -20,8 +21,6 @@ import {
   type SubagentStatus,
   type SubagentStreamEntry
 } from '@/store/subagents'
-
-import { Panel, PanelEmpty, PanelHeader } from '@/app/shell/layers/overlays/panel'
 
 // Mirrors statusGlyph() in tool-fallback.tsx so subagent rows speak the
 // same visual vocabulary as the chat tool blocks.

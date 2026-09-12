@@ -36,10 +36,10 @@ import { clearSessionSubagents } from '@/store/subagents'
 import { clearSessionTodos } from '@/store/todos'
 import { setSessionDraftingTool } from '@/store/tool-drafting'
 import type { ComposerAttachment } from '@/types/composer'
+import type { GatewayRequester } from '@/types/gateway'
 import type { SessionInfo } from '@/types/hermes'
 import type { ClientSessionState } from '@/types/session'
 
-import type { GatewayRequester } from '@/types/gateway'
 import { uploadComposerAttachment } from '../session/hooks/use-prompt-actions'
 import {
   appendMidTurnUserMessage,

@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router'
 
 import { getHermesConfigRecord } from '@/api/config'
 import { saveMcpServers } from '@/api/mcp'
+import { setHermesConfigCache } from '@/application/config/use-config-record'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -20,8 +21,6 @@ import { MCP_DEEPLINK_NAME_RE } from '@/lib/mcp-deeplink'
 import { getServers } from '@/lib/mcp-servers'
 import { $mcpInstallRequest } from '@/store/mcp-deeplink-install'
 import { notify, readableError } from '@/store/notifications'
-
-import { setHermesConfigCache } from '@/application/config/use-config-record'
 
 /**
  * Explicit-confirm gate for `hermes://mcp/install` deep links. The payload is

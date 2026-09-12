@@ -9,11 +9,10 @@
 
 import { lazy, type ReactNode, Suspense } from 'react'
 
+import { ARTIFACTS_ROUTE, contributedRoutes, ROUTES_AREA, SKILLS_ROUTE } from '@/app/routes'
 import { ContribBoundary, ContribRender } from '@/extension/contrib/react/boundary'
 import { useContributions } from '@/extension/contrib/react/use-contributions'
 import { $routeTiles, closeRouteTile, type RouteTile } from '@/store/route-tiles'
-
-import { ARTIFACTS_ROUTE, contributedRoutes, ROUTES_AREA, SKILLS_ROUTE } from '@/app/routes'
 
 import { paneMirror } from './pane-mirror'
 

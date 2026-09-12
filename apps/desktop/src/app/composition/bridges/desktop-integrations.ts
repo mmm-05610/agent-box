@@ -1,9 +1,10 @@
 import { useEffect, useRef } from 'react'
 
-import { closeActiveTab } from '@/features/chat/close-tab'
 import { openSession } from '@/app/composition/routing/open-session'
+import { appViewForPath, isOverlayView, NEW_CHAT_ROUTE, routeSessionId, sessionRoute } from '@/app/routes'
 import { commandFocusedPreview } from '@/application/preview/preview-nav'
 import { requestComposerFocus, requestComposerInsert } from '@/components/composer/focus'
+import { closeActiveTab } from '@/features/chat/close-tab'
 import { resolveDeepLinkAction } from '@/lib/deeplink-routes'
 import { pathFromHermesDeepLink, resolveHermesOpenPath } from '@/lib/hermes-open-target'
 import { storedSessionIdForNotification } from '@/lib/session-ids'
@@ -30,8 +31,6 @@ import { onSessionsChanged } from '@/store/session-sync'
 import { openUpdatesWindow, startUpdatePoller, stopUpdatePoller } from '@/store/updates'
 import { isBrowserWindow, isHudWindow, isSecondaryWindow } from '@/store/windows'
 import type { SessionInfo } from '@/types/hermes'
-
-import { appViewForPath, isOverlayView, NEW_CHAT_ROUTE, routeSessionId, sessionRoute } from '@/app/routes'
 
 type RememberedSession = Pick<SessionInfo, '_lineage_root_id' | 'id' | 'profile'>
 

@@ -2,14 +2,6 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { registerTerminalContextMenu } from '@/application/terminal/terminal-context-menu'
-import { ContextMenu, ContextMenuTrigger, HERMES_CONTEXT_MENU_TRIGGER_ATTR } from '@/components/ui/context-menu'
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
-import { formatCombo } from '@/lib/keybinds/combo'
-import { $previewTabs, closeRightRail } from '@/store/preview'
-import { $connection } from '@/store/session'
-
-import { AppContextMenu } from './context-menu'
 import {
   $contextMenu,
   augmentSpellcheck,
@@ -18,6 +10,14 @@ import {
   openGuestContextMenu
 } from '@/app/shell/layers/context-menu/store'
 import { resolveDomTarget } from '@/app/shell/layers/context-menu/target'
+import { registerTerminalContextMenu } from '@/application/terminal/terminal-context-menu'
+import { ContextMenu, ContextMenuTrigger, HERMES_CONTEXT_MENU_TRIGGER_ATTR } from '@/components/ui/context-menu'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { formatCombo } from '@/lib/keybinds/combo'
+import { $previewTabs, closeRightRail } from '@/store/preview'
+import { $connection } from '@/store/session'
+
+import { AppContextMenu } from './context-menu'
 
 const desktopWindow = window as unknown as { hermesDesktop?: Window['hermesDesktop'] }
 

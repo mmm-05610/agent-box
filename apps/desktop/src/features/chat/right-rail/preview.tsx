@@ -1,9 +1,9 @@
 import { useStore } from '@nanostores/react'
 
-import { $restartPreviewServer } from './restart-preview-server'
 import { $previewReloadRequest, $previewTabs } from '@/store/preview'
 
 import { PreviewPane } from './preview-pane'
+import { $restartPreviewServer } from './restart-preview-server'
 
 interface PreviewTilePaneProps {
   /** The `$previewTabs` id this pane renders. */

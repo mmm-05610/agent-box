@@ -1,13 +1,28 @@
 import { useEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 
-import { closeActiveTab } from '@/features/chat/close-tab'
-import { composerFocusKeysAllowed, isComposerFocusSoftCombo, typeToFocusChar } from '@/features/chat/composer/focus-keys'
-import { hudTargetSessionId } from '@/app/windows/hud/handoff'
+import { openSession } from '@/app/composition/routing/open-session'
 import { appViewForPath, isOverlayView } from '@/app/routes'
+import {
+  $workspaceIsPage,
+  AGENTS_ROUTE,
+  ARTIFACTS_ROUTE,
+  CRON_ROUTE,
+  navigateToWorkspacePage,
+  NEW_CHAT_ROUTE,
+  PROFILES_ROUTE,
+  sessionRoute,
+  SETTINGS_ROUTE,
+  SKILLS_ROUTE
+} from '@/app/routes'
+import { hudTargetSessionId } from '@/app/windows/hud/handoff'
 import { cycleProfile, switchProfileToSlot, switchToDefaultProfile } from '@/application/profile/navigation'
 import { closeActiveTerminal, createTerminal, cycleTerminal } from '@/application/terminal/terminals'
 import { requestComposerFocus, requestModelMenuToggle } from '@/components/composer/focus'
+import { closeActiveTab } from '@/features/chat/close-tab'
+import { handleComposerFocusChord } from '@/features/chat/composer/focus-chord'
+import { composerFocusKeysAllowed, isComposerFocusSoftCombo, typeToFocusChar } from '@/features/chat/composer/focus-keys'
+import { handleWindowPaste } from '@/features/chat/composer/paste-to-focus'
 import { findBarClaimsCombo } from '@/lib/find-in-page'
 import { contributedKeybindHandler, PROFILE_SLOT_COUNT, SESSION_SLOT_COUNT } from '@/lib/keybinds/actions'
 import { actionAllowedInInput, comboFromEvent, isEditableTarget } from '@/lib/keybinds/combo'
@@ -59,22 +74,6 @@ import { toggleStatusbarVisible } from '@/store/statusbar-prefs'
 import { setTerminalTakeover } from '@/store/terminal-takeover'
 import { openNewWindow } from '@/store/windows'
 import { useTheme } from '@/themes/context'
-
-import { handleComposerFocusChord } from '@/features/chat/composer/focus-chord'
-import { handleWindowPaste } from '@/features/chat/composer/paste-to-focus'
-import { openSession } from '@/app/composition/routing/open-session'
-import {
-  $workspaceIsPage,
-  AGENTS_ROUTE,
-  ARTIFACTS_ROUTE,
-  CRON_ROUTE,
-  navigateToWorkspacePage,
-  NEW_CHAT_ROUTE,
-  PROFILES_ROUTE,
-  sessionRoute,
-  SETTINGS_ROUTE,
-  SKILLS_ROUTE
-} from '@/app/routes'
 
 export interface KeybindRuntimeDeps {
   /** Open/close the command center overlay (sessions / system / usage). */

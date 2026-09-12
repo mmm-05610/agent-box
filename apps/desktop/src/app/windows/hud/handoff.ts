@@ -17,15 +17,14 @@
 import { useStore } from '@nanostores/react'
 import { useEffect, useRef } from 'react'
 
+import { openSession, type OpenSessionNavigate } from '@/app/composition/routing/open-session'
+import { sessionRoute } from '@/app/routes'
 import { getActiveComposer } from '@/components/composer/focus'
 import { reloadPersistedDrafts, requestComposerDraftSync } from '@/store/composer'
 import { reportHudSession, watchHudState } from '@/store/hud'
 import { $selectedStoredSessionId } from '@/store/session'
 import { focusOpenSession, sessionTileDelegate } from '@/store/session-states'
 import { isHudWindow } from '@/store/windows'
-
-import { openSession, type OpenSessionNavigate } from '@/app/composition/routing/open-session'
-import { sessionRoute } from '@/app/routes'
 
 /** Session tiles route on `tile:<storedSessionId>` (see session-tile.tsx). */
 const TILE_TARGET_PREFIX = 'tile:'

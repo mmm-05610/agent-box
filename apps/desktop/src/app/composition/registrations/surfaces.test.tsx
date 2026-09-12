@@ -4,11 +4,11 @@ import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { HermesGateway } from '@/api/client'
+import type { WiringActions } from '@/app/composition/wiring/types'
 import { $gateway } from '@/store/gateway'
 import { $activeGatewayProfile } from '@/store/profile'
 
 import { ChatRoutesSurface } from './surfaces'
-import type { WiringActions } from '@/app/composition/wiring/types'
 
 vi.mock('@/extension/contrib/react/use-contributions', () => ({ useContributions: vi.fn() }))
 vi.mock('@/store/connections', () => ({ $activeConnectionId: atom('local') }))

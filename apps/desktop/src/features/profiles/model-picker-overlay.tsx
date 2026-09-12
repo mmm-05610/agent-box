@@ -3,10 +3,10 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
 
 import type { HermesGateway } from '@/api/client'
-import { useModelControls } from '@/features/session/hooks/use-model-controls'
-import type { ModelSelection } from '@/features/profiles/model-menu-panel'
 import { requestForSessionProfile } from '@/application/session/request-router'
 import { ModelPickerDialog } from '@/components/model-picker'
+import type { ModelSelection } from '@/features/profiles/model-menu-panel'
+import { useModelControls } from '@/features/session/hooks/use-model-controls'
 import { resolveModelPickerOwner } from '@/lib/model-picker-owner'
 import { useStoreSelector } from '@/lib/use-session-slice'
 import {
