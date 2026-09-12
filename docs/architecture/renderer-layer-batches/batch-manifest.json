@@ -325,7 +325,8 @@
     "edges": 0,
     "modules": [
       "."
-    ]
+    ],
+    "merged": true
   },
   "31 session routing sink": {
     "edges": 0,
@@ -333,7 +334,8 @@
       "app/composition/routing/open-session",
       "app/composition/routing/session-owner",
       "app/composition/routing/session-rpc-dispatcher"
-    ]
+    ],
+    "merged": true
   },
   "32 shell host purity": {
     "edges": 0,
@@ -361,6 +363,17 @@
       "app/windows/hud/game-overlay",
       "app/windows/hud/glass",
       "app/windows/hud/resize-handle"
+    ]
+  },
+  "34 AgentBox Desktop frontend branch": {
+    "edges": 0,
+    "modules": [
+      "app/",
+      "features/",
+      "application/",
+      "store/",
+      "api/",
+      "lib/routes"
     ]
   }
 }

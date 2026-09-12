@@ -297,12 +297,22 @@ features/
 Batch 30 established the top-level shape. The follow-up batches correct ownership
 without reopening that tree:
 
-- [31](31-session-routing-sink.md): Session use cases leave composition.
-- [32](32-shell-host-purity.md): Shell keeps mechanics and receives product actions.
-- [33](33-window-surfaces-neutral.md): HUD, Pet and Quick Entry consume ViewModels and
-  Intents through neutral window ports; legacy stream ownership leaves their UI.
-- 34 is reserved for the final compatibility-aware Hermes vocabulary/preload pass and
-  must not be inferred or executed before its terminology table is approved.
+| batch | scope | edges paid off |
+| --- | --- | --- |
+| [30](30-app-composition-root.md) | `app/` 收口为组合根；业务目录整棵搬到 `src/features/` | 0 |
+| [31](31-session-routing-sink.md) | Session 打开、owner 解析与 Session-scoped 请求编排离开 composition | 0 |
+| [32](32-shell-host-purity.md) | Shell 收口为产品中立的宿主，产品动作与协调器移入 composition | 0 |
+| [33](33-window-surfaces-neutral.md) | HUD、Pet、Quick Entry 只消费 ViewModel 并发出 Intent | 0 |
+| [34](34-agentbox-desktop-frontend-branch.md) | **独立实验分支**：把渲染层改成 AgentBox Desktop 前端，并起草中立的 Work Core Port | 0 |
+
+34 曾经是"最后的词汇兼容性收口"占位符，**已被取代**：它现在是一个独立分支计划
+（`experiment/agentbox-desktop-frontend`），产品语义先冻结、再逐层重构，主分支不承载试验。
+它仍然要求**在每个改动过的表层单独审阅语义之后**才做词汇改动，禁止任何盲目的全局替换；
+但它不再等一张"词汇表"——见
+[`../app-product-semantics.md`](../app-product-semantics.md) 的语义裁决。
+
+**34 的两条硬前置**：Batch 32 与 33 各自**独立复核并合并**之后才可开工；它在独立 worktree
+上独占运行，每个阶段留一个检查点。详见该工单的 "Branch and checkpoint discipline"。
 
 The cross-repository consequence of Batch 33 is fixed in
 [`../session-multi-surface-ownership.md`](../session-multi-surface-ownership.md): Work

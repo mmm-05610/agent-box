@@ -136,3 +136,17 @@ ownership.
 This classification precedes the final compatibility-aware vocabulary batch. It is not
 permission for blind replacement of Hermes/Gateway/RPC names, preload globals, IPC
 channels, storage keys or persisted fields.
+
+## Accepted disposition of legacy core surfaces
+
+The first content audit settled the current core surfaces before implementation begins:
+
+- the current cross-Session **Agents** page is a Hermes subagent aggregate. Remove its
+  route and UI; a future AgentBox delegation product is deliberately a separate design.
+- remove the current global **Artifacts** library and its entries. Session output,
+  attachments and generated files remain generic Session content.
+- retain scheduling only as a neutral, non-fixed **Automation** contribution. It may
+  not retain Hermes profile-on-disk, Gateway restart or runtime-specific wording.
+- Skills/Toolsets/MCP are Profile-contextual configuration; Starmap is at most an
+  optional Profile Memory contribution; Webhooks/messaging delivery leaves the core
+  Desktop surface; Command Center is dissolved rather than renamed.

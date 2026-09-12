@@ -187,7 +187,16 @@ Phase 1/2 已经把上行依赖账本归零；Phase 3 处理账本看不见的�
 17–22 是最初量出的 sink work orders；23–29 是后续讨论作出裁决后动态追加的批次。
 实际工作列表仍以 status 中未 merged 的行为准，不把任何一次汇总快照当冻结范围。
 
-两条内容依赖高于碰撞 wave：**17 必须先于 25；23 必须先于 24。** 其余按 §4。
+两条内容依赖高于碰撞 wave：**17 必须先于 25；23 必须先于 24。**
+
+第三条内容依赖，而且它比前两条强得多：**34 必须在 32 与 33 各自独立复核合并之后**，
+并且它在独立分支 `experiment/agentbox-desktop-frontend` 上独占运行。
+§4 的碰撞表把 34 排在 wave 2——那是**文件相交的颜色，不是执行顺序**：
+碰撞工具只回答"哪些文件相交"，不是业务依赖调度器，显式内容依赖优先。
+34 的 touched set 覆盖 `app/`、`features/`、`application/`、`store/`、`api/`，
+所以它和几乎每个批次都相交，任何 wave 编号对它都没有意义。
+
+其余按 §4。
 
 ### Phase 4 — `app/` 组合根收口（30）
 
@@ -223,11 +232,12 @@ ownership, backend Ref concepts and direct Hermes bridge access from their UI bo
 The Work Core multi-consumer ownership decision is recorded separately; this batch does
 not invent its eventual wire protocol.
 
-Batch 34 is reserved for a final coordinated Hermes-neutral vocabulary pass. It is not
-executable yet: each remaining `app/` branch must first be semantically reviewed and a
-table must distinguish user copy/code symbols from compatibility-sensitive preload,
-IPC, storage and persistence names. Structural moves run first; vocabulary changes run
-last, once, without blind global replacement.
+Batch 34 is now an isolated experiment-branch programme. It starts only after 32/33's
+reviewed merges, and turns the accepted product semantics into an AgentBox Desktop
+frontend while keeping `main` unchanged. It replaces the former vocabulary-only
+placeholder: vocabulary changes remain compatibility-aware and occur only after each
+surface has reached its semantic destination. The branch proposes a frontend Work Core
+Port but does not claim an AgentBox backend integration.
 
 The product-language source for that classification is
 [`app-product-semantics.md`](app-product-semantics.md). Route/sidebar/command/menu/
@@ -256,18 +266,18 @@ Current output is generated from the manifest; re-run the command after each new
 
 ```
 wave 1: 01 lib-services, 02 tour, 06a2 link-title, 06c1 sound, 07a keybinds, 26 tool-view, 27 settings primitives, 30 app composition root, 31 session routing sink
-wave 2: 06c2 image-dl, 09 plugin-abi, 16 session-recovery, 18 starmap, 23 gateway-event clean
-wave 3: 04 workspace, 07b external-link, 11 route-vocab, 12 host-views, 20 preview, 25 interrupted-turn seal, 29 messaging removal
-wave 4: 06a1 statusbar, 21 transcript, 28 sidebar derivations
-wave 5: 03 shape+label, 06b1 haptics, 17 session-remainder, 24 gateway-event component pins
-wave 6: 14 hooks-sink
+wave 2: 18 starmap, 34 AgentBox Desktop frontend branch
+wave 3: 06c2 image-dl, 09 plugin-abi, 16 session-recovery, 23 gateway-event clean
+wave 4: 04 workspace, 07b external-link, 11 route-vocab, 12 host-views, 20 preview, 25 interrupted-turn seal, 29 messaging removal
+wave 5: 03 shape+label, 06a1 statusbar, 06b1 haptics, 19 terminal, 24 gateway-event component pins
+wave 6: 21 transcript, 28 sidebar derivations, 32 shell host purity
 wave 7: 08 pane-shell, 22 session-lists
-wave 8: 10 composer-engine
-wave 9: 13 composer-last-edge
-wave 10: 15 singletons
+wave 8: 14 hooks-sink
+wave 9: 10 composer-engine
+wave 10: 13 composer-last-edge
 wave 11: 33 window surfaces neutral
-wave 12: 19 terminal
-wave 13: 32 shell host purity
+wave 12: 15 singletons
+wave 13: 17 session-remainder
 ```
 
 This is a **collision coloring, not an execution scheduler**. A merged batch whose
