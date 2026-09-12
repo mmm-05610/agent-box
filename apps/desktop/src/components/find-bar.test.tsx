@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { MemoryRouter, useNavigate } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { type KeybindRuntimeDeps, useKeybinds } from '@/app/shell/hooks/use-keybinds'
+import { type KeybindRuntimeDeps, useAppKeybindings } from '@/app/composition/registrations/keybindings'
 import { FindBar } from '@/components/find-bar'
 import { I18nProvider } from '@/i18n'
 import { en } from '@/i18n/en'
@@ -23,7 +23,8 @@ import {
   updateFindResults
 } from '@/store/find-in-page'
 
-// useKeybinds only needs the theme context for resolvedMode/setMode; the real
+// The keybinding registration only needs the theme context for
+// resolvedMode/setMode; the real
 // provider persists themes and subscribes to backend sync, which is unrelated
 // to the find-in-page gate under test.
 vi.mock('@/themes/context', () => ({
@@ -936,11 +937,11 @@ describe('FindBar', () => {
 // ── Keybind gate: view.findInPage on overlay routes ─────────────────────────
 // The component guard above proves hidden RENDERING; this proves the keybind
 // itself never OPENS the bar on an overlay route. Mounted against the real
-// useKeybinds listener + combo index so a regression in either the handler
+// useAppKeybindings listener + combo index so a regression in either the handler
 // wiring or the route classification fails the test.
 
 function KeybindHarness({ deps }: { deps: KeybindRuntimeDeps }) {
-  useKeybinds(deps)
+  useAppKeybindings(deps)
 
   return null
 }

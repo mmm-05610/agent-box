@@ -19,6 +19,7 @@ import { usePetBridge } from '@/app/composition/bridges/pet-window'
 import { useQuickEntryBridge } from '@/app/composition/bridges/quick-entry-window'
 import { useTitlebarToolContributions } from '@/app/composition/registrations/chrome-contributions'
 import { CommandPalette } from '@/app/composition/registrations/command-palette'
+import { useAppKeybindings } from '@/app/composition/registrations/keybindings'
 import { ChatRoutesSurface, SidebarSurface, StatusbarSurface, TerminalSurface } from '@/app/composition/registrations/surfaces'
 import { ContribWiringContext } from '@/app/composition/root/context'
 import { useOverlayRouting } from '@/app/composition/routing/overlay-routing'
@@ -31,7 +32,6 @@ import {
   syncWorkspaceRoute
 } from '@/app/routes'
 import { TitlebarControls } from '@/app/shell/chrome/titlebar/controls'
-import { useKeybinds } from '@/app/shell/hooks/use-keybinds'
 import { useWindowControlsOverlayWidth } from '@/app/shell/platform/use-window-controls-overlay-width'
 import { useHudHandoff } from '@/app/windows/hud/handoff'
 import { useHermesConfigRecord } from '@/application/config/use-config-record'
@@ -899,7 +899,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
 
   // Single global listener for every rebindable hotkey plus the on-screen
   // keybind editor's capture mode (same as DesktopController).
-  useKeybinds({
+  useAppKeybindings({
     archiveSelectedSession,
     openNewSessionTab,
     startFreshSession: startFreshSessionDraft,
