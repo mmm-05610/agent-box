@@ -1,6 +1,5 @@
+import { mergeVisibleReorder } from '@/application/sidebar/order'
 import { Codecs, persistentAtom } from '@/lib/persisted'
-
-import { mergeVisibleReorder } from './order'
 
 const PREFIX = 'hermes.desktop.sidebar.gatewayGroups.v1'
 export const $gatewayGroupAliases = persistentAtom(`${PREFIX}.aliases`, {}, Codecs.stringRecord)

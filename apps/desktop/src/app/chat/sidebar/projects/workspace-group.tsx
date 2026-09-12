@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { type NewSessionSplitHandler, startNewSessionDrag } from '@/app/chat/new-session-drag'
 import { selectProfile } from '@/application/profile/navigation'
 import { newSessionInProfile, pinNewChatProfile } from '@/application/profile/new-session'
+import { rankSessions } from '@/application/sidebar/order'
 import { Codicon } from '@/components/ui/codicon'
 import { ProfileGlyph } from '@/components/ui/profile-glyph'
 import { useI18n } from '@/i18n'
@@ -20,7 +21,6 @@ import type { SessionInfo } from '@/types/hermes'
 import type { NewSessionPlacement } from '@/types/session-placement'
 
 import { SidebarGroupRow, SidebarRowLead, SidebarRowLink, SidebarRowStack } from '../chrome'
-import { rankSessions } from '../order'
 
 import { PROJECT_PREVIEW_COUNT, SIDEBAR_GROUP_PAGE, useWorkspaceNodeOpen } from './model'
 import {

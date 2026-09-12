@@ -6,6 +6,7 @@ import { useState } from 'react'
 
 import { type NewSessionSplitHandler, startNewSessionDrag } from '@/app/chat/new-session-drag'
 import { newSessionInAgent, newSessionInProfile } from '@/application/profile/new-session'
+import { rankSessions } from '@/application/sidebar/order'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
 import {
@@ -36,7 +37,6 @@ import {
   reorderGatewayGroups,
   toggleGatewayGroup
 } from './gateway-group-preferences'
-import { rankSessions } from './order'
 import { SIDEBAR_GROUP_PAGE } from './projects/model'
 import { WorkspaceAddButton, WorkspaceShowMoreButton } from './projects/workspace-header'
 import { ReorderableList, useSortableBindings } from './reorderable-list'

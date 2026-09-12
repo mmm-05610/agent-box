@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo } from 'react'
 
 import { type NewSessionSplitHandler, startNewSessionDrag } from '@/app/chat/new-session-drag'
 import { SidebarPanelLabel } from '@/app/shell/sidebar-label'
+import { mergeVisibleReorder, orderRowsWithinGroups, reorderableRowIds } from '@/application/sidebar/order'
 import { DisclosureCaret } from '@/components/ui/disclosure-caret'
 import { SidebarGroup, SidebarGroupContent } from '@/components/ui/sidebar'
 import type { HermesGitWorktree } from '@/global'
@@ -32,7 +33,6 @@ import type { SessionInfo } from '@/types/hermes'
 
 import { SidebarDateDivider, SidebarSectionMeta } from './chrome'
 import { GatewayProfileGroups } from './gateway-groups'
-import { mergeVisibleReorder, orderRowsWithinGroups, reorderableRowIds } from './order'
 import {
   EnteredProjectContent,
   ProjectOverviewRow,

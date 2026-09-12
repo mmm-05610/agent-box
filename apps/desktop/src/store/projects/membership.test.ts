@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { sessionMatchesProjectFilter } from '@/app/chat/sidebar/projects/workspace-groups'
+import { sessionMatchesProjectFilter } from '@/application/sidebar/workspace-groups'
 import { makeCwdSession } from '@/dev/test/session-info'
 import type { ProjectInfo } from '@/types/hermes'
 

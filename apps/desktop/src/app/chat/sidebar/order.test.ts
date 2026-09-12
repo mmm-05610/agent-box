@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest'
 
-import type { SidebarListRow } from '@/lib/session-date-groups'
-import type { SessionInfo } from '@/types/hermes'
-
 import {
   mergeVisibleReorder,
   orderByIds,
@@ -12,7 +9,9 @@ import {
   reorderableRowIds,
   resolveManualSessionOrderIds,
   sameIds
-} from './order'
+} from '@/application/sidebar/order'
+import type { SidebarListRow } from '@/lib/session-date-groups'
+import type { SessionInfo } from '@/types/hermes'
 
 describe('resolveManualSessionOrderIds', () => {
   it('clears legacy auto-seeded order until the user manually reorders sessions', () => {

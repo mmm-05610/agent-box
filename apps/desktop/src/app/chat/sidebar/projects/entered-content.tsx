@@ -3,6 +3,7 @@ import type * as React from 'react'
 import { useMemo, useState } from 'react'
 
 import { type NewSessionSplitHandler, startNewSessionDrag } from '@/app/chat/new-session-drag'
+import { mergeRepoWorktreeGroups, overlayRepoLanes } from '@/application/sidebar/workspace-groups'
 import { Codicon } from '@/components/ui/codicon'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import type { HermesGitWorktree } from '@/global'
@@ -18,7 +19,6 @@ import { SidebarRowStack } from '../chrome'
 
 import { useWorkspaceNodeOpen } from './model'
 import { SidebarWorkspaceGroup } from './workspace-group'
-import { mergeRepoWorktreeGroups, overlayRepoLanes } from './workspace-groups'
 import { WorkspaceAddButton, WorkspaceHeader } from './workspace-header'
 
 // The entered project's body. Main-checkout sessions render directly — no
