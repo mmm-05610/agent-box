@@ -181,7 +181,7 @@ export default defineConfig(({ command }) => ({
     }
   },
   // driver.js only enters the graph through the tour's DYNAMIC import chain
-  // (lib/tour/run-tour.ts), so the dep scanner never sees it at startup. Left
+  // (app/tour/run-tour.ts), so the dep scanner never sees it at startup. Left
   // alone, first use registers it as a missing dep at runtime — which (a)
   // esbuild-prebundles the `?raw` IIFE import as a JS module, breaking the
   // raw-text transform ("does not provide an export named 'default'"), and

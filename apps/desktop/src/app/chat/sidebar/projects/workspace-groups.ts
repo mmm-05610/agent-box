@@ -23,8 +23,8 @@ import { rankSessions } from '../order'
 // over the tree shapes and membership core that live in
 // `@/store/projects/membership`. It never decides session membership.
 
-// Kept importable from this module for `@/lib/session-project-label.ts`, which
-// still names it here; that importer moves into `app/` in its own batch.
+// Re-exported for the label helper that now sits beside this module
+// (`./session-project-label.ts`, batch 03), which names it here.
 export { liveSessionProjectId }
 
 /** A path with trailing separators stripped, for stable equality checks. */
