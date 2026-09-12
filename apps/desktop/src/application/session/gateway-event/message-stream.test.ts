@@ -6,9 +6,8 @@ const { refreshSupportedSessionControlAfterTurn } = vi.hoisted(() => ({
 
 vi.mock('@/store/session-control', () => ({ refreshSupportedSessionControlAfterTurn }))
 
-import type { GatewayEventContext } from '@/application/session/gateway-event/types'
-
 import { handleMessageStreamEvent } from './message-stream'
+import type { GatewayEventContext } from './types'
 
 function context(type: string): GatewayEventContext {
   return {

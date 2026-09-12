@@ -1,6 +1,5 @@
 import type { BillingBlock } from '@hermes/shared'
 
-import type { GatewayEventContext } from '@/application/session/gateway-event/types'
 import { translateNow } from '@/i18n'
 import { coerceGatewayText, coerceThinkingText } from '@/lib/chat-runtime'
 import { parseErrorSurface } from '@/lib/error-surface'
@@ -17,6 +16,8 @@ import { refreshSupportedSessionControlAfterTurn } from '@/store/session-control
 import { playCompletionSound } from '@/store/sound/player'
 import { pruneFinishedSessionSubagents } from '@/store/subagents'
 import { clearActiveSessionTodos } from '@/store/todos'
+
+import type { GatewayEventContext } from './types'
 
 function firstBillingLine(text: string): string {
   return (text || '').split('\n')[0]?.trim() ?? ''
