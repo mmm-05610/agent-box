@@ -2,6 +2,7 @@ import { type ThreadMessage } from '@assistant-ui/react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { formatTimelineRange } from '@/application/transcript/timestamp'
 import { $displayTimestamps } from '@/store/display-timestamps'
 import { clearAllPrompts, setApprovalRequest } from '@/store/prompts'
 import { $activeSessionId } from '@/store/session'
@@ -10,7 +11,6 @@ import { $toolDisclosureStates } from '@/store/tool-view'
 
 import { stubThreadEnvironment, stubThreadViewportSize, ThreadRuntime } from '../test-utils'
 import { Thread } from '../thread'
-import { formatTimelineRange } from '../thread/timestamp'
 
 // Timeline timestamps render only when `display.timestamps` is enabled.
 $displayTimestamps.set(true)

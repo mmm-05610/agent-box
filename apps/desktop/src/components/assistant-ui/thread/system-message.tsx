@@ -1,8 +1,8 @@
 import { MessagePrimitive, useAuiState } from '@assistant-ui/react'
 import { type FC, useState } from 'react'
 
+import { messageContentText } from '@/application/transcript/content'
 import { MarkdownTextContent } from '@/components/assistant-ui/markdown-text'
-import { messageContentText } from '@/components/assistant-ui/thread/content'
 import { MessageTimelineTimestamp } from '@/components/assistant-ui/thread/timeline-timestamp'
 import { SCAFFOLD_LABEL_CLASS, ScaffoldRow } from '@/components/chat/scaffold-row'
 import { LinkifiedText } from '@/components/external-link'

@@ -10,12 +10,12 @@ import { useStore } from '@nanostores/react'
 import { type FC, type ReactNode, useCallback, useMemo, useState } from 'react'
 import { useInRouterContext, useNavigate } from 'react-router'
 
-import { ChangedFilesCard } from '@/components/assistant-ui/thread/changed-files-card'
 import {
   contentHasVisibleText,
   messageContentText,
   pickPrimaryPreviewTarget
-} from '@/components/assistant-ui/thread/content'
+} from '@/application/transcript/content'
+import { ChangedFilesCard } from '@/components/assistant-ui/thread/changed-files-card'
 import { MESSAGE_PARTS_COMPONENTS } from '@/components/assistant-ui/thread/message-parts'
 import { ReactionPicker } from '@/components/assistant-ui/thread/message-reactions'
 import { ResponseLoadingIndicator, TurnActivityIndicator } from '@/components/assistant-ui/thread/status'

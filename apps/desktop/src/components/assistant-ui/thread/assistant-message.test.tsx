@@ -8,11 +8,10 @@ import { AssistantRuntimeProvider, type ThreadMessage, useExternalStoreRuntime }
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { formatTimelineRange, formatTimelineTimestamp } from '@/application/transcript/timestamp'
 import { $displayTimestamps } from '@/store/display-timestamps'
 
 import { stubThreadEnvironment } from '../test-utils'
-
-import { formatTimelineRange, formatTimelineTimestamp } from './timestamp'
 
 import { Thread } from '.'
 

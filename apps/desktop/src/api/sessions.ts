@@ -403,7 +403,7 @@ export function getSessionMessages(
  * times over, small enough that opening a long session doesn't ship (and
  * convert) hundreds of rows nobody has scrolled to. Older rows load on demand
  * via `getOlderSessionMessages` when "Show earlier" exhausts the in-memory
- * store (see app/chat/transcript-backfill).
+ * store (see application/transcript/transcript-backfill).
  */
 export const LATEST_SESSION_MESSAGES_LIMIT = 120
 

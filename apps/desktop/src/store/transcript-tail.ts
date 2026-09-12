@@ -6,7 +6,7 @@
  * limit), older rows likely exist on the backend; this store records that
  * fact plus the offset the next older page starts at, so the transcript
  * window's "Show earlier" action knows to backfill over REST once the
- * in-memory store is fully materialized (see app/chat/transcript-backfill).
+ * in-memory store is fully materialized (see application/transcript/transcript-backfill).
  *
  * Offsets use the backend's `order: 'latest'` semantics: measured back from
  * the NEWEST row, with each page returned in chronological order — so the

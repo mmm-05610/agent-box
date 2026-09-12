@@ -1,9 +1,9 @@
 import { useEffect } from 'react'
 
 import { PROMPT_SUBMIT_REQUEST_TIMEOUT_MS } from '@/api/client'
-import { graftRefreshedTailOntoBackfill } from '@/app/chat/transcript-backfill'
 import { fetchStoredTranscriptAcrossBackends, getLatestSessionMessages } from '@/application/session-transcripts'
 import { requestForSessionProfile } from '@/application/session/request-router'
+import { graftRefreshedTailOntoBackfill } from '@/application/transcript/transcript-backfill'
 import { translateNow } from '@/i18n/runtime'
 import { type ChatMessage, chatMessageText, toChatMessages } from '@/lib/chat-messages'
 import { notify } from '@/store/notifications'

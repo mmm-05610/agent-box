@@ -1,17 +1,16 @@
 import { useAui, useAuiState } from '@assistant-ui/react'
 import { type FC, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { usePaneVisible } from '@/components/pane-shell/pane-visibility'
-import { triggerHaptic } from '@/lib/haptics'
-import { cn } from '@/lib/utils'
-
 import {
   activeTimelineIndex,
   deriveTimelineEntries,
   sameTimelineEntries,
   type TimelineEntry,
   type TimelineSourceMessage
-} from './timeline-data'
+} from '@/application/transcript/timeline-data'
+import { usePaneVisible } from '@/components/pane-shell/pane-visibility'
+import { triggerHaptic } from '@/lib/haptics'
+import { cn } from '@/lib/utils'
 
 const MIN_ENTRIES = 4
 const VIEWPORT = '[data-slot="aui_thread-viewport"]'

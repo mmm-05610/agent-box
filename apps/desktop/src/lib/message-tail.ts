@@ -6,7 +6,7 @@ import type { ChatMessage } from '@/lib/chat-messages/types'
  * A pure, dependency-free reading of `ChatMessage[]`, so it can live under
  * `lib/` and be shared by the layers that must not import each other: the
  * session store's `$lastVisibleMessageIsUser` computed and the chat surfaces'
- * loading-state derivations (app/chat/thread-loading re-exports nothing — both
+ * loading-state derivations (application/transcript/thread-loading re-exports nothing — both
  * import this module).
  */
 export function lastVisibleMessageIsUser(messages: ChatMessage[]): boolean {
