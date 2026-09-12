@@ -235,6 +235,34 @@ projection，将 HUD 变成 compact Session surface；通用焦点/可见性/选
 
 ---
 
+### 11 · 固定产品对象只有 Workspace、Session 与 Profile
+
+**决定**：固定主导航只有 Workspaces 与 Profiles。Session 按当前 Workspace 归组但可在活动
+之间切换 Workspace；Profile 是用户选择的独立角色，也是独立管理 Surface。完整语义地图见
+[`app-product-semantics.md`](app-product-semantics.md)。
+
+**Connection** 不是独立或共享资源：每个 Remote Workspace 私有持有一个逻辑 Connection，
+创建、编辑、验证、诊断都从该 Workspace 进入；删除 Settings > Connections 产品面。后端可以
+透明复用物理 channel，但不能把共享关系重新暴露给产品。
+
+**Harness 与 Execution 均弱化到后台**：Harness 只是 Profile 执行时使用的工具台，名称可以在
+Profile Picker 中作为分组/`powered by` 信息出现，但没有独立管理页；Execution 只作为 Work
+Core 事实存在，UI 以 Session 的 ready/working/waiting/failed/stopped 状态表达活动。
+
+**Profile 的双面语义**：用户看到可复用角色；后端持有静态、完整的 Harness-home blueprint。
+Session 内 model 等修改是 Session-local override，不隐式反写 Profile；独立管理的 Skill、Memory、
+Tool、Credential 等资源由 Work Core 动态装配。跨 Profile/Harness 切换策略和错误由后端权威
+处理，产品组件只提交稳定意图并消费结果。
+
+**入口边界**：Git/Worktree/Files/Terminal/Browser 是 Workspace 上下文；Transcript、Composer、
+Artifacts 是 Session 上下文；Skills/Memory/Tools/Permissions 是 Profile 上下文。其他插件按
+pane、section、overlay、command 或必要时 navigation page 动态贡献。Settings 只保留应用级偏好。
+
+**下一步**：先把现有 route、sidebar、command、context menu、Settings 和独立窗口逐项归入
+上述分类，再写实施批次；本裁决本身不授权移动或删除代码，也不授权全局词汇替换。
+
+---
+
 ## 三、待裁决
 
 按"卡在哪"排，不按重要性。

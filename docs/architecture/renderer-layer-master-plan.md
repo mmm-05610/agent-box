@@ -229,6 +229,10 @@ table must distinguish user copy/code symbols from compatibility-sensitive prelo
 IPC, storage and persistence names. Structural moves run first; vocabulary changes run
 last, once, without blind global replacement.
 
+The product-language source for that classification is
+[`app-product-semantics.md`](app-product-semantics.md). Route/sidebar/command/menu/
+Settings inventory must be classified against it before Batch 34 becomes executable.
+
 ### Completion
 
 整轮只有在 status 中所有 executable work order（现在包括 31–33）都 merged、各自带 reviewer 实测数字、
