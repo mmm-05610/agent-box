@@ -12,6 +12,7 @@ import type {
   GatewayEventDeps,
   GatewayEventHandler
 } from '@/application/session/gateway-event/types'
+import { handleSessionInfoEvent } from '@/application/session/session-info'
 import type { GatewayEventPayload } from '@/lib/chat-messages'
 import {
   approvalReplaySessionId,
@@ -28,7 +29,6 @@ import { setSessionDraftingTool } from '@/store/tool-drafting'
 import type { RpcEvent } from '@/types/hermes'
 
 import { handleDesktopBridgeEvent } from './desktop-bridge'
-import { handleSessionInfoEvent } from './session-info'
 
 export type { GatewayEventDeps } from '@/application/session/gateway-event/types'
 

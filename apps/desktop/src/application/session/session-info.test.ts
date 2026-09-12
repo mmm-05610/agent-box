@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { GatewayEventContext } from '@/application/session/gateway-event/types'
 import { createClientSessionState } from '@/lib/chat-runtime'
 import {
   $currentCwd,
@@ -11,6 +10,7 @@ import {
 } from '@/store/session'
 import type { ClientSessionState } from '@/types/session'
 
+import type { GatewayEventContext } from './gateway-event/types'
 import { handleSessionInfoEvent } from './session-info'
 
 // `_session_info` stamps `stored_session_id: session_key or ""`, so every
