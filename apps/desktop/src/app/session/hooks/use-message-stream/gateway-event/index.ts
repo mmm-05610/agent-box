@@ -1,6 +1,15 @@
 import { registryBackendScopeKey } from '@hermes/shared'
 import { useCallback, useEffect, useRef } from 'react'
 
+import { handleInputRequestEvent } from '@/application/session/gateway-event/input-requests'
+import { handleLifecycleEvent } from '@/application/session/gateway-event/lifecycle'
+import { handleControlEvent } from '@/application/session/gateway-event/session-control'
+import { handleStatusEvent } from '@/application/session/gateway-event/status'
+import type {
+  GatewayEventContext,
+  GatewayEventDeps,
+  GatewayEventHandler
+} from '@/application/session/gateway-event/types'
 import type { GatewayEventPayload } from '@/lib/chat-messages'
 import {
   approvalReplaySessionId,
@@ -17,16 +26,11 @@ import { setSessionDraftingTool } from '@/store/tool-drafting'
 import type { RpcEvent } from '@/types/hermes'
 
 import { handleDesktopBridgeEvent } from './desktop-bridge'
-import { handleInputRequestEvent } from './input-requests'
-import { handleLifecycleEvent } from './lifecycle'
 import { handleMessageStreamEvent } from './message-stream'
-import { handleControlEvent } from './session-control'
 import { handleSessionInfoEvent } from './session-info'
-import { handleStatusEvent } from './status'
 import { handleToolEvent } from './tools'
-import type { GatewayEventContext, GatewayEventDeps, GatewayEventHandler } from './types'
 
-export type { GatewayEventDeps } from './types'
+export type { GatewayEventDeps } from '@/application/session/gateway-event/types'
 
 /**
  * Events that retire a "drafting a tool call" claim.

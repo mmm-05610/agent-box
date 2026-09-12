@@ -1,5 +1,6 @@
 import type { TourAction, TourStep } from '@/app/tour'
 import { readActivePreview } from '@/application/preview/preview-reader'
+import type { GatewayEventContext } from '@/application/session/gateway-event/types'
 import { writeAgentTerminalChunk } from '@/application/terminal/agent-terminal-stream'
 import { readActiveTerminal } from '@/application/terminal/buffer'
 import { closeAgentTerminalByProc } from '@/application/terminal/terminals'
@@ -10,8 +11,6 @@ import { recordAgentReaction } from '@/store/reactions-local'
 import { setMessages } from '@/store/session'
 import { $tipsEnabled, type ActiveTip, showTip } from '@/store/tips'
 import { $toursEnabled } from '@/store/tours'
-
-import type { GatewayEventContext } from './types'
 
 /** The preview engine, loaded on demand so ~25KB of page-injectable source stays
  *  off the boot path.

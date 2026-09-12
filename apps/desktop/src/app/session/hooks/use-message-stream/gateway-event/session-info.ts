@@ -1,3 +1,4 @@
+import type { GatewayEventContext } from '@/application/session/gateway-event/types'
 import { normalizePersonalityValue } from '@/lib/chat-runtime'
 import { modelOptionsQueryKey } from '@/lib/model-options'
 import { reconcileApprovalModeForProfile } from '@/store/approval-mode'
@@ -34,8 +35,6 @@ import {
   PRE_TURN_LIVE_SETTLE_GRACE_MS,
   sessionInfoStatePatch
 } from '../utils'
-
-import type { GatewayEventContext } from './types'
 
 /**
  * Whether a `session.info` payload's `stored_session_id` may be treated as the

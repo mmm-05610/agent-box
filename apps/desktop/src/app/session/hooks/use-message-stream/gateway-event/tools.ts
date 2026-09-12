@@ -1,3 +1,4 @@
+import type { GatewayEventContext } from '@/application/session/gateway-event/types'
 import { reportMcpToolResult } from '@/components/composer/suggestion-providers/repair'
 import { invalidateSkillSuggestionIndex } from '@/components/composer/suggestion-providers/skill'
 import { invalidateSlashCompletions } from '@/lib/slash-completion-cache'
@@ -10,8 +11,6 @@ import { setSessionDraftingTool } from '@/store/tool-drafting'
 import { notifyWorkspaceChanged, toolChangedPath, toolMayMutateFiles } from '@/store/workspace-events'
 
 import { SUBAGENT_EVENT_TYPES, toTodoPayload } from '../utils'
-
-import type { GatewayEventContext } from './types'
 
 /** tool.generating / tool.start / tool.progress / tool.complete / subagent.*. */
 export function handleToolEvent(ctx: GatewayEventContext): boolean {
