@@ -2,13 +2,12 @@ import { useCallback, useEffect, useState } from 'react'
 
 import { getMemoryProviderConfig, saveMemoryProviderConfig } from '@/api/system'
 import { PageLoader } from '@/components/page-loader'
+import { ListRow, Pill } from '@/components/settings/primitives'
 import { Button } from '@/components/ui/button'
 import { DisclosureCaret } from '@/components/ui/disclosure-caret'
 import { SlidersHorizontal } from '@/lib/icons'
 import { notifyError } from '@/store/notifications'
 import type { MemoryProviderConfig, MemoryProviderField } from '@/types/hermes'
-
-import { ListRow, Pill } from '../primitives'
 
 import { FieldControl, FieldTitle } from './field-control'
 import { ProviderConfigModal } from './provider-config-modal'

@@ -1,11 +1,11 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
+import { rankSearchOption, SearchableSelect } from '@/components/settings/searchable-select'
 import { stubResizeObserver } from '@/dev/test/jsdom'
 import type { ConfigFieldSchema } from '@/types/hermes'
 
 import { ConfigField } from './config-field'
-import { rankSearchOption, SearchableSelect } from './searchable-select'
 
 beforeAll(() => {
   stubResizeObserver()

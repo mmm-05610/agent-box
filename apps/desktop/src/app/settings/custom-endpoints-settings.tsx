@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import { activateCustomEndpoint, deleteCustomEndpoint, getCustomEndpoints, saveCustomEndpoint, validateCustomEndpoint } from '@/api/config'
+import { EmptyState, Pill, SectionHeading, SettingsContent, SettingsSkeleton } from '@/components/settings/primitives'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
@@ -10,8 +11,6 @@ import { cn } from '@/lib/utils'
 import { confirm } from '@/store/confirm'
 import { notify, notifyError } from '@/store/notifications'
 import type { CustomEndpoint, CustomEndpointUpdate } from '@/types/hermes'
-
-import { EmptyState, Pill, SectionHeading, SettingsContent, SettingsSkeleton } from './primitives'
 
 interface CustomEndpointsSettingsProps {
   onConfigSaved?: () => void

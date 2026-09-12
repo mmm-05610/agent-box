@@ -2,13 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { getActionStatus } from '@/api/system'
 import { getComputerUseStatus, grantComputerUsePermissions } from '@/api/toolsets'
+import { Pill } from '@/components/settings/primitives'
 import { Button } from '@/components/ui/button'
 import { AlertTriangle, Check, ExternalLink, Loader2, RefreshCw, X } from '@/lib/icons'
 import { upsertDesktopActionTask } from '@/store/activity'
 import { notify, notifyError } from '@/store/notifications'
 import type { ComputerUseStatus } from '@/types/hermes'
-
-import { Pill } from './primitives'
 
 interface ComputerUsePanelProps {
   /** Re-read the parent toolset list after a permission/install change so the

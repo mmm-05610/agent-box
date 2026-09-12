@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { saveHermesConfig, setEnvVar } from '@/api/config'
 import { getAuxiliaryModels, getGlobalModelInfo, getGlobalModelOptions, getMoaModels, getRecommendedDefaultModel, saveMoaModels, setModelAssignment } from '@/api/models'
 import { useOnProfileSwitch } from '@/components/hooks/use-on-profile-switch'
+import { ListRow, Pill, SectionHeading } from '@/components/settings/primitives'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -22,7 +23,6 @@ import { hermesConfigCacheWriter, invalidateHermesConfig, useHermesConfigRecord 
 
 import { CONTROL_TEXT } from './constants'
 import { getNested, setNested } from './helpers'
-import { ListRow, Pill, SectionHeading } from './primitives'
 import { useDeepLinkHighlight } from './use-deep-link-highlight'
 
 // Skeleton mirror of the Model settings DOM so the page keeps its shape while

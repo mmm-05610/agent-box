@@ -1,6 +1,7 @@
 import { useStore } from '@nanostores/react'
 import type { ReactNode } from 'react'
 
+import { ListRow, SectionHeading, SettingsContent, ToggleRow } from '@/components/settings/primitives'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useI18n } from '@/i18n'
@@ -19,7 +20,6 @@ import { $completionSoundVariantId, setCompletionSoundVariantId } from '@/store/
 import { COMPLETION_SOUND_VARIANTS, previewCompletionSound } from '@/store/sound/player'
 
 import { CONTROL_TEXT } from './constants'
-import { ListRow, SectionHeading, SettingsContent, ToggleRow } from './primitives'
 
 const CAPTION = 'text-[length:var(--conversation-caption-font-size)] text-(--ui-text-tertiary)'
 

@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react'
 
+import { SectionHeading } from '@/components/settings/primitives'
 import { Button } from '@/components/ui/button'
 import type { DesktopUninstallMode, DesktopUninstallSummary } from '@/global'
 import { AlertTriangle, Loader2, Trash2 } from '@/lib/icons'
 import { cn } from '@/lib/utils'
-
-import { SectionHeading } from './primitives'
 
 interface ModeOption {
   mode: DesktopUninstallMode

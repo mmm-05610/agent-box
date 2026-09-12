@@ -1,5 +1,6 @@
 import { type ChangeEvent, type KeyboardEvent } from 'react'
 
+import { ListRow } from '@/components/settings/primitives'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { translateNow, useI18n } from '@/i18n'
@@ -9,7 +10,6 @@ import type { EnvVarInfo } from '@/types/hermes'
 
 import { CONTROL_TEXT } from './constants'
 import { prettyName, withoutKey } from './helpers'
-import { ListRow } from './primitives'
 import type { EnvRowProps } from './types'
 
 export type KeyRowProps = Omit<EnvRowProps, 'info' | 'varKey'>

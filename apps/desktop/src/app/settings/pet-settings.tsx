@@ -3,6 +3,7 @@ import { type ReactNode, useEffect, useState } from 'react'
 
 import { useGatewayRequest } from '@/components/hooks/use-gateway-request'
 import { PetThumb } from '@/components/pet/pet-thumb'
+import { ListRow, SectionHeading } from '@/components/settings/primitives'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -36,8 +37,6 @@ import {
   setPetScale
 } from '@/store/pet-gallery'
 import { $gatewayState } from '@/store/session'
-
-import { ListRow, SectionHeading } from './primitives'
 
 /**
  * Appearance opt-in for the floating petdex mascot. A thin view over the shared

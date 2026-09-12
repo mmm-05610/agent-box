@@ -1,6 +1,7 @@
 import { useStore } from '@nanostores/react'
 import { useEffect, useState } from 'react'
 
+import { ListRow, ToggleRow } from '@/components/settings/primitives'
 import { Input } from '@/components/ui/input'
 import { useI18n } from '@/i18n'
 import {
@@ -10,8 +11,6 @@ import {
   QUICK_ENTRY_DEFAULT_SHORTCUT,
   saveQuickEntrySettings
 } from '@/store/quick-entry'
-
-import { ListRow, ToggleRow } from './primitives'
 
 /**
  * Quick Entry — the global-hotkey mini composer's settings rows.

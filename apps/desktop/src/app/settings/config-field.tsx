@@ -1,5 +1,8 @@
 import type { ReactNode } from 'react'
 
+import { ComboboxInput } from '@/components/settings/combobox-input'
+import { ListRow } from '@/components/settings/primitives'
+import { SearchableSelect } from '@/components/settings/searchable-select'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
@@ -10,11 +13,8 @@ import { prettyName } from '@/lib/text'
 import { cn } from '@/lib/utils'
 import type { ConfigFieldSchema } from '@/types/hermes'
 
-import { ComboboxInput } from './combobox-input'
 import { CONTROL_TEXT, EMPTY_SELECT_VALUE, FIELD_DESCRIPTIONS, FIELD_LABELS, FREE_INPUT_KEYS } from './constants'
 import { FallbackModelsField } from './fallback-models-field'
-import { ListRow } from './primitives'
-import { SearchableSelect } from './searchable-select'
 
 /**
  * One generic config row: label + description resolved from the i18n field
