@@ -20,12 +20,11 @@ import { useEffect, useRef } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { usePromptActions } from '@/app/session/hooks/use-prompt-actions'
+import { STREAM_DELTA_FLUSH_MS } from '@/application/session/message-stream-utils'
 import { chatMessageText } from '@/lib/chat-messages'
 import { createClientSessionState } from '@/lib/chat-runtime'
 import type { RpcEvent } from '@/types/hermes'
 import type { ClientSessionState } from '@/types/session'
-
-import { STREAM_DELTA_FLUSH_MS } from './utils'
 
 import { useMessageStream } from './index'
 

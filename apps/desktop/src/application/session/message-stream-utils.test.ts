@@ -8,7 +8,7 @@ import {
   hasSessionInfoStatePatch,
   sessionInfoStatePatch,
   toTodoPayload
-} from './utils'
+} from './message-stream-utils'
 
 const payload = (over: Record<string, unknown>): GatewayEventPayload => over as GatewayEventPayload
 

@@ -1,6 +1,11 @@
 import { useStore } from '@nanostores/react'
 import { type MutableRefObject, useCallback, useEffect, useRef } from 'react'
 
+import { SessionStateCache } from '@/application/session/session-state-cache'
+import {
+  invalidatePersistedDisplayTranscriptAuthority,
+  suppressTranscriptForView
+} from '@/application/session/transcript-provenance'
 import { PRIMARY_SESSION_VIEW } from '@/components/chat/session-view'
 import type { ChatMessage } from '@/lib/chat-messages'
 import { preserveLocalAssistantErrors } from '@/lib/chat-messages'
@@ -23,12 +28,6 @@ import {
 import { $sessionStates, $sessionTiles, publishSessionState, releaseSessionTranscript } from '@/store/session-states'
 import type { ClientSessionState } from '@/types/session'
 
-import { SessionStateCache } from '../session-state-cache'
-
-import {
-  invalidatePersistedDisplayTranscriptAuthority,
-  suppressTranscriptForView
-} from '@/application/session/transcript-provenance'
 import { chatMessageArraysEquivalent } from './use-session-actions/utils'
 
 interface SessionStateCacheOptions {

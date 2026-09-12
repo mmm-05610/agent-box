@@ -1,3 +1,9 @@
+import {
+  applySessionInfoStatePatch,
+  hasSessionInfoStatePatch,
+  PRE_TURN_LIVE_SETTLE_GRACE_MS,
+  sessionInfoStatePatch
+} from '@/application/session/message-stream-utils'
 import { normalizePersonalityValue } from '@/lib/chat-runtime'
 import { modelOptionsQueryKey } from '@/lib/model-options'
 import { reconcileApprovalModeForProfile } from '@/store/approval-mode'
@@ -28,12 +34,6 @@ import {
 import { reportInstallMethodWarning } from '@/store/updates'
 
 import { finalizeInterruptedMessages } from '../../use-prompt-actions/rewind'
-import {
-  applySessionInfoStatePatch,
-  hasSessionInfoStatePatch,
-  PRE_TURN_LIVE_SETTLE_GRACE_MS,
-  sessionInfoStatePatch
-} from '../utils'
 
 import type { GatewayEventContext } from './types'
 
