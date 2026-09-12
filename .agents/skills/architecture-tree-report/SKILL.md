@@ -5,16 +5,40 @@ description: >-
   dependency cleanup, import-direction problems, "梳理架构", "盘点混乱点", deciding
   where a module belongs, planning a refactor or a staged migration, tracking
   structural debt, or answering "现在架构什么情况". In this project the annotated
-  directory tree IS the interface — the user reads a tree with right-hand
-  annotations, not prose or letter-coded summaries. Every stage of architecture
-  work must open or close with one. Trigger this even when the user only asks for
-  a status update or asks a single question about where something lives, because
-  the answer is expected in tree form.
+  directory tree IS the interface. During design discussion, iterate from the
+  latest executor-produced architecture report without repeatedly rescanning the
+  repository; measure live code only for an explicit audit or at a dispatch boundary.
 ---
 
 # 架构汇报：用带标注的目录树
 
 这个仓库的架构工作，**交互形式就是一张带标注的目录树**。用户明确说过，密集的散文式汇报（字母代号 + 百分比 + 满屏表格）他读不懂；树 + 右侧注解他能一眼看完。所以树不是"配图"，它是交付物本身。
+
+## 先选择工作模式
+
+### 讨论模式（默认）
+
+连续的架构讨论以执行代理 Zcode 最近产出的架构树、审计报告或已经落盘的设计文档为基线。
+用户对树作出调整时，直接在这份逻辑模型上修改并解释，不为每一个局部问题重新运行
+`find`、`rg`、依赖扫描、测试或 Git 检查。
+
+- 沿用最近一次有来源的数字；必要时标注“来自最近一次执行报告”，不要把它冒充实时测量。
+- 用户问概念、职责、归属、目标树或设计取舍时，不访问工作树也能回答。
+- 讨论中发现的新决定先留在当前设计模型，不边聊边反复更新文档。
+- 当一个阶段的边界、目的地和不变量已经明确，而话题准备进入下一阶段时，主动总结该阶段，
+  并询问用户是否现在落成增量派工单。不要要求用户记住一个固定口令。
+
+### 审计模式
+
+仅在用户明确要求“检查、验收、看当前代码/进度”，或已有报告彼此冲突、缺少作出决定所必需
+的事实时，读取工作树。把相关检查合并为尽量少的命令，只检查当前问题的目录和依赖，不做
+无关的全仓发现。
+
+### 派工边界
+
+用户确认落盘后，切换到增量派工流程。此时只补齐执行所必需且尚未由 Zcode 报告证明的事实；
+不要为了重写同一棵树而完整重跑审计。新增范围、碰撞集合发生变化或来源明显过期时，才进行
+相应的定向测量。
 
 ## 为什么是树
 
@@ -62,20 +86,24 @@ description: >-
 
 **3. 一句"本轮改了什么"**，以及（如果有）**"需要你定的那件事"**。没有待定事项就明说没有，不要为了显得有进展而造一个。
 
-## 让树可信的规则
+## 审计或派工时让树可信的规则
 
-树上的每个数字都必须是**量出来的**，不是记得的。这个仓库的数字一直在动（一次搬迁就能让 97 变 82），凭记忆写的数字会当场被证伪。
+需要声称“当前实测”时，每个数字都必须有测量来源。讨论模式可以沿用最近一次 Zcode 报告的
+数字，但必须把它当作报告快照，而不是重新声称实时状态。这个仓库的数字一直在动（一次搬迁
+就能让 97 变 82），无来源的记忆不能写成事实。
 
-- 数依赖、数文件、数条数之前，先跑命令。用了什么命令如果结论反直觉，就写出来。
-- **`npm run arch:tree`** 会从真实仓库和债务账本生成树的骨架、方向表和导入者排名——**先用它**，别手工数（见下）。
+- 审计模式下，数依赖、文件或行数才运行命令；能从同一份执行报告取得的，不重复测量。
+- **`npm run arch:tree`** 用于正式审计或派工前确需刷新基线时，不用于每轮讨论。
 - 账本 `apps/desktop/src/dev/contracts/renderer-layers.debt.ts` 是唯一权威的债务清单。它是棘轮：只许变短。树上的 `⚠` 条数要和它对得上。
 - 说"已修好"之前，跑一次守卫。`✓` 是有证据的断言，不是"应该没问题"。
 
-## 提出任何搬迁之前，先查这一件事
+## 正式派出搬迁之前，才检查这一件事
 
 这是整个仓库最容易踩的坑，已经踩到过三次：**要搬的东西，有没有被更下层导入？**
 
-有的话，往上搬会把"上层抓下层"变成"下层抓上层"——**方向反了，但条数不变**，看起来像白干，或者更糟：`lib/keybinds/`（1386 行）整体上移到 `app/` 会给它的 **9 个**导入者新增上行边（`components` 6、`extension` 1、`lib` 1、`store` 1），而它今天只欠 4 条。所以：
+讨论时可以先基于已知架构判断；只有准备把搬迁写进派工单时，且最近的执行报告没有覆盖
+导入者方向，才检查下层导入者。有的话，往上搬会把"上层抓下层"变成"下层抓上层"——
+**方向反了，但条数不变**。所以：
 
 ```bash
 rg -l "<要搬的模块>" --glob '!*.test.*' . | sed 's|^\./||' | cut -d/ -f1 | sort -u
