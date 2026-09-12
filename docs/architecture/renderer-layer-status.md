@@ -8,7 +8,7 @@ because it is trusted; see `renderer-layer-master-plan.md` §8.
 | | |
 | --- | --- |
 | last updated | 2026-09-13 |
-| last commit to change renderer source | `d5964ed` |
+| last commit to change renderer source | `0fee1a5` |
 | ledger | **0** |
 | target when the run completes | **0 — met** (Phase 3 must leave it at 0) |
 | tests | **776 files / 7466 tests** |
@@ -253,7 +253,7 @@ batch's stop-condition §7.4; no NEW reverse dependency was created (the §B2 mo
 | item | scope | baseline | destination | order | status |
 | --- | --- | --- | --- | --- | --- |
 | 31 | Session opening, owner resolution and Session-scoped request dispatch leave composition | Batch 30 executor snapshot: 6 files / 1,096 lines; adjacent `application/session/request-router.ts` 210 lines | `application/session/{open-session,session-owner,session-rpc-dispatcher}*`; `overlay-routing.ts` stays | after Batch 30 merged + independent review; runs alone | merged — `0d32114` (owner + dispatcher) `3f63e53` (open-session) + merges · reviewer: three modules + tests moved R097–R100 with non-import content byte-identical; export lists md5-identical; the two out-of-doc scope adjustments (dispatcher's `resolveSessionOwner` re-spelled to its canonical rank-2 definition; `$workspaceIsPage` atom sunk to new `store/workspace-page.ts` with app/routes re-export, sole writer unchanged, four rank-5 consumers untouched) both ruled SANCTIONED — required for zero edges, behaviour-preserving, established pattern; `overlay-routing.ts` byte-identical; request-router untouched; work-order rg/find checks clean; 774 files / 7431 tests all passing, guard 16/16, ledger 0 constant, eslint 0 |
-| 32 | Shell becomes a product-neutral host: mechanics stay; product actions and coordinators move to composition | semantic review baseline: 2,270 focused lines | `app/shell` host/engine + `app/composition/registrations` product wiring | after 31 merged/reviewed; runs alone | dispatched — see Batch 32; pending execution/review |
+| 32 | Shell becomes a product-neutral host: mechanics stay; product actions and coordinators move to composition | semantic review baseline: 2,270 focused lines | `app/shell` host/engine + `app/composition/registrations` product wiring | after 31 merged/reviewed; runs alone | executed — `7a7733d` (keybinding host/registration split) `9adf747` (context-menu verb injection + shell-sections move) `206c837` (tour coordinator move) + stage-5 status/lint commit · pending independent review |
 | 33 | HUD, Pet and Quick Entry become Harness-neutral ViewModel/Intent clients | 21 TS/TSX files / 2,912 lines | neutral window ports; generic handoff to `application/session`; legacy stream policy below UI | after 32 merged/reviewed; runs alone | dispatched — pending prerequisite and execution |
 | 34 | Hermes/Gateway/RPC/product vocabulary becomes Harness/Runtime/Session/Work Core vocabulary where semantically correct | scope deliberately not frozen yet | coordinated final vocabulary/preload compatibility pass | last, after all UI semantic reviews and an approved compatibility-aware vocabulary table | reserved — design blocked, do not execute |
 
@@ -282,6 +282,35 @@ its store home and `sessionRoute` from `@/lib/routes` (the pre-existing re-expor
 `@/app/routes`; the moved test's `vi.mock('@/app/routes')` split accordingly. `lib/open-session.ts`
 itself is byte-identical (its prose still names the pre-batch-30 `app/open-session.ts` path —
 pre-existing, cosmetic). Composition routing now holds only `overlay-routing.ts`.
+
+**Executor measurements (stageA/32, worktree wt-b, 2026-09-13 — independent review pending).**
+Three-stage ownership/injection split, ledger pays nothing (0 before and after, regen
+byte-identical). Stage 2 split the 462-line `use-keybinds.ts` into the product-neutral host
+`app/shell/hooks/use-keybinding-host.ts` (listener lifecycle, binding capture, combo normalization,
+IME guard, editable gating, dispatch) plus `app/composition/registrations/keybindings.ts`, which
+receives a narrow typed callback bag (`handlers` + `interceptKeyDown` + `claimsCombo` +
+`onUnboundKey` + `gateSoftCombo`) carrying the full product action map and the dispatch policies
+(switcher Esc-abandon, find-bar combo claim, type-to-focus, soft composer combos); the switcher
+keyup/blur/contextmenu, window paste and composer focus chord companion listeners moved with the
+registration, same listener count/options/cleanup. Stage 3 injected the context-menu verbs: the
+host's spellcheck subscription is injected (`ContextMenuSpellcheckSubscribe`), dom/guest sections
+keep rows/labels/order/enabled rules/focus timing but receive
+edit/spellcheck/image/link/preview verbs and capability facts (in-app pane availability, loopback
+resolution) built by composition from the existing bridges; the fallback product menu moved to
+`context-menu-shell-sections.tsx`; `store.ts` stayed Shell with a structural `TerminalMenuHandle`
+mirror and an injected `ClipboardTextProbe` replacing the `@/application` type import and the
+`readClipboard` preload call (both required by the shell-purity invariant, beyond the scope
+table's explicit rows). Stage 4 moved the coordinator to `registrations/tour.ts` (routing, pane
+reveal, Preview selection, `TourSurface`, the verbs); engine/collect-targets/spotlight/app-tour.css
+and their tests stayed Shell, driver.js lazy loading and the desktop-bridge dynamic import
+preserved (repointed to the coordinator). Find-bar keybind-gate tests repointed to the registration
+(subject moved; assertions untouched); counts unchanged everywhere. Final state: both work-order
+negative rg guards 0 hits under `src/app/shell`; typecheck green; test:ui 772 files / 7,414 tests
+twice, each with exactly the one environmental failure (`leaves no in-flight exclusion stale`,
+needs untracked `src/agentbox/`, absent from the worktree); focused keybinding/capture/switcher
+119, menu 38, tour engine 18, preview 51 all green; lint 0 errors / 142 warnings (= baseline; 7
+import-sort errors in the two moved files fixed via `eslint --fix`, verified import-lines only);
+`git diff --check` clean.
 
 ## How to update this file
 
