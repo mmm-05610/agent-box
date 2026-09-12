@@ -159,6 +159,7 @@ target — see §0.
 | 13 | the last composer edge: the attachment upload moves out | 1 |
 | 14 | three hooks sink, and the pet stops reaching up | 3 |
 | 15 | the last three singletons | 3 |
+| 16 | the session-recovery core sinks — the enabler for 13 | 0 |
 
 85 edges — **the whole ledger**. Phase 1 and Phase 2 together are the complete set:
 every line in the ledger belongs to a work order listed here, and §1's target is 0.
@@ -420,6 +421,12 @@ reasoning). The last three batches —
 [14](renderer-layer-batches/14-hooks-sink.md) and
 [15](renderer-layer-batches/15-singletons.md) — are the seven edges those left, and
 none of them needed a decision either.
+
+The last two are a pair with an order: 13 cannot move the attachment upload until
+[16](renderer-layer-batches/16-session-recovery-sink.md) has sunk the session-recovery
+core it calls — left in `app/`, it would put an `application → app` edge in the
+ledger that no work order sanctions. 16 pays 0 and 13 pays the last line, so the
+target is 0 either way; the order is what matters.
 
 Two batches carry a documented "not here" of their own, and both are worth reading
 before anyone retries them: 09's last section is a module-scope capability read that

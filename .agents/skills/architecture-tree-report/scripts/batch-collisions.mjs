@@ -60,11 +60,28 @@ for (const [name, spec] of batches) {
 }
 
 /** Every production file that imports one of `patterns`. */
-function touched(patterns) {
+const emptyPatterns = new Map()
+
+function touched(name, patterns) {
   const found = new Set()
+  const empty = []
 
   for (const pattern of patterns) {
-    const out = execFileSync('rg', ['-l', pattern, '--glob', '!*.test.*', '.'], { encoding: 'utf8' })
+    let out = ''
+
+    try {
+      out = execFileSync('rg', ['-l', pattern, '--glob', '!*.test.*', '.'], { encoding: 'utf8' })
+    } catch (err) {
+      // rg exits 1 when nothing matches, and that is not an error here: once a
+      // batch's modules have moved, its patterns legitimately match nothing. The
+      // batch is finished and has nothing left to collide with. Report it rather
+      // than crashing, because a *stale* pattern looks the same from rg's side.
+      if (err.status !== 1) {
+        throw err
+      }
+
+      empty.push(pattern)
+    }
 
     for (const line of out.split('\n')) {
       const path = line.replace(/^\.\//, '').trim()
@@ -75,11 +92,20 @@ function touched(patterns) {
     }
   }
 
+  if (empty.length) {
+    emptyPatterns.set(name, empty)
+  }
+
   return found
 }
 
-const sets = Object.fromEntries(batches.map(([name, spec]) => [name, touched(spec.modules)]))
+const sets = Object.fromEntries(batches.map(([name, spec]) => [name, touched(name, spec.modules)]))
 const claimed = batches.reduce((sum, [, spec]) => sum + spec.edges, 0)
+// A batch marked `merged` has landed, so its edges are already gone from the ledger.
+// What the ledger should hold right now is exactly what the unmerged batches claim —
+// which is a stronger statement than the old `ledgerNow - claimed`, because that one
+// silently assumed nothing had merged yet.
+const remaining = batches.reduce((sum, [, spec]) => sum + (spec.merged ? 0 : spec.edges), 0)
 
 console.log('batches\n')
 console.log('  batch                 edges   touched files')
@@ -93,13 +119,33 @@ for (const [name, spec] of batches) {
 const ledgerSource = readFileSync(LEDGER, 'utf8')
 const ledgerNow = ledgerSource.split('\n').filter(line => /^\s*'/.test(line)).length
 
-console.log(`\n  claimed by every batch   ${String(claimed).padStart(3)} edges`)
-console.log(`  ledger right now         ${String(ledgerNow).padStart(3)}`)
-console.log(`  ledger after all of them ${String(ledgerNow - claimed).padStart(3)}`)
+console.log(`\n  claimed by every batch     ${String(claimed).padStart(3)} edges`)
+console.log(`  still unmerged             ${String(remaining).padStart(3)} edges`)
+console.log(`  ledger right now           ${String(ledgerNow).padStart(3)}`)
+console.log(`  ledger after the rest      ${String(ledgerNow - remaining).padStart(3)}`)
+
+if (ledgerNow !== remaining) {
+  console.log(
+    `\n  ✗ THE BOOKKEEPING IS OFF: the ledger holds ${ledgerNow} line(s) but the unmerged ` +
+      `batches claim ${remaining}. Either a merged batch's lines did not all disappear, or a ` +
+      `count is wrong, or a \`merged\` flag is premature.`
+  )
+  process.exitCode = 1
+}
+
+if (emptyPatterns.size) {
+  console.log('\n  patterns matching nothing (expected once a batch has moved):')
+
+  for (const [name, pats] of emptyPatterns) {
+    console.log(`    ${name}: ${pats.join(', ')}`)
+  }
+}
 // Detect the drift rather than merely declaring a winner. The plan labels its
 // aggregate as derived; if the label is there and the number disagrees with this
 // arithmetic, the plan was not updated when a batch was added. That is exactly the
-// failure this project already hit once, and it is cheap to catch.
+// failure this project already hit once, and it is cheap to catch. The comparison is
+// against what is *left*, not against the full historical total: merged batches have
+// already paid their lines, so subtracting all 85 would go negative once they land.
 const planPath = join(dirname(resolve(manifestPath)), '..', 'renderer-layer-master-plan.md')
 
 try {
@@ -108,10 +154,10 @@ try {
 
   if (!stated) {
     console.log('\n  (the plan states no §3 target — nothing to cross-check)')
-  } else if (Number(stated[1]) === ledgerNow - claimed) {
+  } else if (Number(stated[1]) === ledgerNow - remaining) {
     console.log('\n  ✓ the plan\'s §3 target agrees with this arithmetic')
   } else {
-    console.log(`\n  ✗ THE PLAN IS STALE: it says ${stated[1]}, the manifest and ledger say ${ledgerNow - claimed}.`)
+    console.log(`\n  ✗ THE PLAN IS STALE: it says ${stated[1]}, the manifest and ledger say ${ledgerNow - remaining}.`)
     console.log('    The manifest and the ledger are the source; fix the plan.')
     process.exitCode = 1
   }

@@ -7,69 +7,80 @@
       "lib/yolo-session'",
       "lib/guarded-model-switch'",
       "lib/session-export'"
-    ]
+    ],
+    "merged": true
   },
   "02 tour": {
     "edges": 2,
     "modules": [
       "lib/tour'"
-    ]
+    ],
+    "merged": true
   },
   "03 shape+label": {
     "edges": 3,
     "modules": [
       "lib/session-project-label'",
       "new-session-drag'"
-    ]
+    ],
+    "merged": true
   },
   "04 workspace": {
     "edges": 4,
     "modules": [
       "workspace-groups'"
-    ]
+    ],
+    "merged": true
   },
   "06a1 statusbar": {
     "edges": 1,
     "modules": [
       "lib/statusbar'"
-    ]
+    ],
+    "merged": true
   },
   "06a2 link-title": {
     "edges": 1,
     "modules": [
       "lib/session-link-title'"
-    ]
+    ],
+    "merged": true
   },
   "06b1 haptics": {
     "edges": 1,
     "modules": [
       "lib/haptics'"
-    ]
+    ],
+    "merged": true
   },
   "06c1 sound": {
     "edges": 3,
     "modules": [
       "lib/sound/completion-sound'"
-    ]
+    ],
+    "merged": true
   },
   "06c2 image-dl": {
     "edges": 1,
     "modules": [
       "hooks/use-image-download'"
-    ]
+    ],
+    "merged": true
   },
   "07a keybinds": {
     "edges": 4,
     "modules": [
       "lib/keybinds/use-keybind-hint'",
       "lib/keybinds/composer-focus-keys'"
-    ]
+    ],
+    "merged": true
   },
   "07b external-link": {
     "edges": 1,
     "modules": [
       "lib/external-link'"
-    ]
+    ],
+    "merged": true
   },
   "08 pane-shell": {
     "edges": 9,
@@ -85,7 +96,8 @@
       "grid-to-tree'",
       "tab-selection'",
       "floating-rect'"
-    ]
+    ],
+    "merged": true
   },
   "09 plugin-abi": {
     "edges": 14,
@@ -106,7 +118,8 @@
       "command-palette/contrib'",
       "composer/contrib'",
       "open-session'"
-    ]
+    ],
+    "merged": true
   },
   "10 composer-engine": {
     "edges": 22,
@@ -135,7 +148,8 @@
       "hooks/use-composer-undo'",
       "hooks/use-emoji-completions'",
       "\\./use-live-completion-adapter'"
-    ]
+    ],
+    "merged": true
   },
   "11 route-vocab": {
     "edges": 3,
@@ -143,14 +157,16 @@
       "app/routes'",
       "\\.\\./routes'",
       "\\./routes'"
-    ]
+    ],
+    "merged": true
   },
   "12 host-views": {
     "edges": 3,
     "modules": [
       "profile-config'",
       "contrib/plugin'"
-    ]
+    ],
+    "merged": true
   },
   "13 composer-last-edge": {
     "edges": 1,
@@ -165,7 +181,8 @@
       "use-gateway-request'",
       "use-on-profile-switch'",
       "use-route-overlay-active'"
-    ]
+    ],
+    "merged": true
   },
   "15 singletons": {
     "edges": 3,
@@ -173,6 +190,14 @@
       "gateway-settings'",
       "resetLiveRuntimeTracking",
       "right-sidebar/store'"
+    ],
+    "merged": true
+  },
+  "16 session-recovery": {
+    "edges": 0,
+    "modules": [
+      "withSessionNotFoundResume",
+      "single-flight-resume'"
     ]
   }
 }

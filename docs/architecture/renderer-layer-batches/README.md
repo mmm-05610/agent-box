@@ -34,6 +34,7 @@ are deciding *what* to do; read a batch document if you are doing it.
 | [13](13-composer-last-edge.md) | the last composer edge: the attachment upload moves out | 1 |
 | [14](14-hooks-sink.md) | three hooks sink, and the pet stops reaching up | 3 |
 | [15](15-singletons.md) | the last three singletons | 3 |
+| [16](16-session-recovery-sink.md) | the session-recovery core sinks — the enabler for 13 | 0 |
 | | | **85** |
 
 **All eighty-five.** Every line in the ledger has a work order, and the target is
