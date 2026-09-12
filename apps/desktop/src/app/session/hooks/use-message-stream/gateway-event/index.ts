@@ -3,8 +3,10 @@ import { useCallback, useEffect, useRef } from 'react'
 
 import { handleInputRequestEvent } from '@/application/session/gateway-event/input-requests'
 import { handleLifecycleEvent } from '@/application/session/gateway-event/lifecycle'
+import { handleMessageStreamEvent } from '@/application/session/gateway-event/message-stream'
 import { handleControlEvent } from '@/application/session/gateway-event/session-control'
 import { handleStatusEvent } from '@/application/session/gateway-event/status'
+import { handleToolEvent } from '@/application/session/gateway-event/tools'
 import type {
   GatewayEventContext,
   GatewayEventDeps,
@@ -26,9 +28,7 @@ import { setSessionDraftingTool } from '@/store/tool-drafting'
 import type { RpcEvent } from '@/types/hermes'
 
 import { handleDesktopBridgeEvent } from './desktop-bridge'
-import { handleMessageStreamEvent } from './message-stream'
 import { handleSessionInfoEvent } from './session-info'
-import { handleToolEvent } from './tools'
 
 export type { GatewayEventDeps } from '@/application/session/gateway-event/types'
 

@@ -1,7 +1,4 @@
-import type { GatewayEventContext } from '@/application/session/gateway-event/types'
 import { SUBAGENT_EVENT_TYPES, toTodoPayload } from '@/application/session/message-stream-utils'
-import { reportMcpToolResult } from '@/components/composer/suggestion-providers/repair'
-import { invalidateSkillSuggestionIndex } from '@/components/composer/suggestion-providers/skill'
 import { invalidateSlashCompletions } from '@/lib/slash-completion-cache'
 import { refreshBackgroundProcesses } from '@/store/composer-status'
 import { flashPetActivity, setPetActivity } from '@/store/pet'
@@ -11,10 +8,21 @@ import { recordToolDiff } from '@/store/tool-diffs'
 import { setSessionDraftingTool } from '@/store/tool-drafting'
 import { notifyWorkspaceChanged, toolChangedPath, toolMayMutateFiles } from '@/store/workspace-events'
 
+import type { GatewayEventContext } from './types'
+
 /** tool.generating / tool.start / tool.progress / tool.complete / subagent.*. */
 export function handleToolEvent(ctx: GatewayEventContext): boolean {
   const { deps, event, payload, sessionId, isActiveEvent, occurredAt } = ctx
-  const { flushQueuedDeltas, nativeSubagentSessionsRef, sessionInterrupted, updateSessionState, upsertToolCall } = deps
+
+  const {
+    flushQueuedDeltas,
+    invalidateSkillSuggestionIndex,
+    nativeSubagentSessionsRef,
+    reportMcpToolResult,
+    sessionInterrupted,
+    updateSessionState,
+    upsertToolCall
+  } = deps
 
   if (event.type === 'todo.updated') {
     if (sessionId && !sessionInterrupted(sessionId)) {

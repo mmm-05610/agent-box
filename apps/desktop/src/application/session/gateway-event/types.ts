@@ -13,6 +13,7 @@ export interface GatewayEventDeps {
   nativeSubagentSessionsRef: MutableRefObject<Set<string>>
   appendAssistantDelta: (sessionId: string, delta: string, occurredAt?: number) => void
   appendReasoningDelta: (sessionId: string, delta: string, replace?: boolean, occurredAt?: number) => void
+  burstVibeHearts: (count?: number) => void
   completeAssistantMessage: (
     sessionId: string,
     text: string,
@@ -28,8 +29,15 @@ export interface GatewayEventDeps {
     storedSessionId?: string | null,
     runtimeSessionId?: string | null
   ) => Promise<void>
+  invalidateSkillSuggestionIndex: () => void
   queryClient: QueryClient
   refreshHermesConfig: () => Promise<void>
+  reportMcpToolResult: (
+    sessionId: string | null | undefined,
+    toolName: string,
+    isError: boolean,
+    resultText: string
+  ) => void
   scheduleSessionsRefresh: () => void
   sessionInterrupted: (sessionId: string) => boolean
   sessionStateByRuntimeIdRef: MutableRefObject<Map<string, ClientSessionState>>

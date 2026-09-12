@@ -6,9 +6,8 @@ const { refreshSupportedSessionControlAfterTurn } = vi.hoisted(() => ({
 
 vi.mock('@/store/session-control', () => ({ refreshSupportedSessionControlAfterTurn }))
 
-import type { GatewayEventContext } from '@/application/session/gateway-event/types'
-
 import { handleMessageStreamEvent } from './message-stream'
+import type { GatewayEventContext } from './types'
 
 function context(type: string): GatewayEventContext {
   return {
@@ -17,16 +16,19 @@ function context(type: string): GatewayEventContext {
       activeSessionIdRef: { current: 's1' },
       appendAssistantDelta: vi.fn(),
       appendReasoningDelta: vi.fn(),
+      burstVibeHearts: vi.fn(),
       compactedTurnRef: { current: new Set() },
       completeAssistantMessage: vi.fn(),
       failAssistantMessage: vi.fn(),
       finalizeInterimAssistantMessage: vi.fn(),
       flushQueuedDeltas: vi.fn(),
       hydrateFromStoredSession: vi.fn(async () => undefined),
+      invalidateSkillSuggestionIndex: vi.fn(),
       lastCwdInfoSessionRef: { current: null },
       nativeSubagentSessionsRef: { current: new Set() },
       queryClient: {} as GatewayEventContext['deps']['queryClient'],
       refreshHermesConfig: vi.fn(async () => undefined),
+      reportMcpToolResult: vi.fn(),
       scheduleSessionsRefresh: vi.fn(),
       sessionInterrupted: vi.fn(() => false),
       sessionStateByRuntimeIdRef: { current: new Map() },
