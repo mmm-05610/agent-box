@@ -83,7 +83,7 @@ import { clearSessionTodos, setSessionTodos, todosForHydration } from '@/store/t
 import { isAuxiliaryWindow, isBrowserWindow, isHudWindow } from '@/store/windows'
 
 import { closeWorkspaceTab } from '@/features/chat/close-tab'
-import { CommandPalette } from '@/app/command-palette'
+import { CommandPalette } from '@/app/composition/registrations/command-palette'
 import { triggerAndRefreshCronJobs } from '@/features/cron/cron-actions'
 import { useGatewayBoot } from '@/features/runtime/gateway/hooks/use-gateway-boot'
 import { useHermesConfigRecord } from '@/app/hooks/use-config-record'
@@ -123,8 +123,8 @@ import { useSessionStateCache } from '@/features/session/hooks/use-session-state
 import { startWorkspaceSession } from '@/features/session/workspace-session-target'
 import { PluginInstallModal } from '@/features/settings/plugin-install-modal'
 import { useOverlayRouting } from '@/app/shell/hooks/use-overlay-routing'
-import { useWindowControlsOverlayWidth } from '@/app/shell/hooks/use-window-controls-overlay-width'
-import { TitlebarControls } from '@/app/shell/titlebar-controls'
+import { useWindowControlsOverlayWidth } from '@/app/shell/platform/use-window-controls-overlay-width'
+import { TitlebarControls } from '@/app/shell/chrome/titlebar/controls'
 import { UpdatesOverlay } from '@/app/updates-overlay'
 
 import { ContribWiringContext } from '@/app/composition/root/context'

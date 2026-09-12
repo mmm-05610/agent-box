@@ -14,8 +14,8 @@ import { cn } from '@/lib/utils'
 import { setSessionOwnerHint } from '@/store/session'
 import type { SessionOwnerRoute } from '@/store/session/types'
 
-import { OverlayView } from '@/app/overlays/overlay-view'
-import { PanelEmpty } from '@/app/overlays/panel'
+import { OverlayView } from '@/app/shell/layers/overlays/overlay-view'
+import { PanelEmpty } from '@/app/shell/layers/overlays/panel'
 
 import { type ForeignImportResult, type ForeignPage, type ForeignPreview, foreignRequest } from './api'
 

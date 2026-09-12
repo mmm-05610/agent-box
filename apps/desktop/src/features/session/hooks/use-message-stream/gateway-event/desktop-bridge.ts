@@ -1,4 +1,4 @@
-import type { TourAction, TourStep } from '@/app/tour'
+import type { TourAction, TourStep } from '@/app/shell/layers/tour'
 import { readActivePreview } from '@/application/preview/preview-reader'
 import type { GatewayEventContext } from '@/application/session/gateway-event/types'
 import { writeAgentTerminalChunk } from '@/application/terminal/agent-terminal-stream'
@@ -190,7 +190,7 @@ export function handleDesktopBridgeEvent(ctx: GatewayEventContext): boolean {
         // a spotlight the user can't see.
         void answer({ error: 'The user has turned guided tours off.', success: false })
       } else if (isActiveEvent) {
-        void import('@/app/tour')
+        void import('@/app/shell/layers/tour')
           .then(({ runTour }) =>
             runTour(
               {

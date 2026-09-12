@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 
-import { StatusbarControls, type StatusbarItem } from '@/app/shell/statusbar-controls'
+import { StatusbarControls, type StatusbarItem } from '@/app/shell/chrome/statusbar/statusbar-controls'
 import { stubMenuDomApis, stubResizeObserver } from '@/dev/test/jsdom'
 import {
   $statusbarHiddenIds,

@@ -2,7 +2,7 @@ import { useStore } from '@nanostores/react'
 import { useEffect, useState } from 'react'
 
 import { getLocalHardware } from '@/api/local-models'
-import type { StatusbarItem } from '@/app/shell/statusbar-controls'
+import type { StatusbarItem } from '@/app/shell/chrome/statusbar/statusbar-controls'
 import { useI18n } from '@/i18n'
 import { Activity } from '@/lib/icons'
 import { $localModelsEnabled } from '@/store/local-models-flag'

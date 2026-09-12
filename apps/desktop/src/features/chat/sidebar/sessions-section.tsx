@@ -4,7 +4,7 @@ import type * as React from 'react'
 import { useCallback, useEffect, useMemo } from 'react'
 
 import { type NewSessionSplitHandler, startNewSessionDrag } from '@/features/chat/new-session-drag'
-import { SidebarPanelLabel } from '@/app/shell/sidebar-label'
+import { SidebarPanelLabel } from '@/app/shell/chrome/sidebar/label'
 import { mergeVisibleReorder, orderRowsWithinGroups, reorderableRowIds } from '@/application/sidebar/order'
 import { DisclosureCaret } from '@/components/ui/disclosure-caret'
 import { SidebarGroup, SidebarGroupContent } from '@/components/ui/sidebar'

@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
-import { StatusbarControls } from '@/app/shell/statusbar-controls'
+import { StatusbarControls } from '@/app/shell/chrome/statusbar/statusbar-controls'
 import { stubMenuDomApis, stubResizeObserver } from '@/dev/test/jsdom'
 import { I18nProvider } from '@/i18n'
 import { $approvalModes } from '@/store/approval-mode'

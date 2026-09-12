@@ -25,7 +25,7 @@ import { contributedRoutes, NEW_CHAT_ROUTE, ROUTES_AREA, sessionRoute } from '@/
 import { useStatusSnapshot } from '@/app/shell/hooks/use-status-snapshot'
 import { useStatusbarItems } from '@/app/shell/hooks/use-statusbar-items'
 import { ModelMenuPanel } from '@/app/shell/model-menu-panel'
-import { StatusbarControls } from '@/app/shell/statusbar-controls'
+import { StatusbarControls } from '@/app/shell/chrome/statusbar/statusbar-controls'
 
 import { latestChatActions, latestSidebarActions } from '@/app/composition/wiring/latest-actions'
 import { setStatusbarItemGroup, useStatusbarContributions } from '@/app/composition/registrations/chrome-contributions'

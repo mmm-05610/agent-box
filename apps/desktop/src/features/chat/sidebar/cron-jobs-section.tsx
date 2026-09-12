@@ -22,7 +22,7 @@ import { type SessionInfo } from '@/types/hermes'
 import type { CronJob } from '@/types/hermes'
 
 import { jobState, jobTitle, STATE_DOT } from '../../cron/job-state'
-import { SidebarPanelLabel } from '@/app/shell/sidebar-label'
+import { SidebarPanelLabel } from '@/app/shell/chrome/sidebar/label'
 
 import { SidebarRowBody, SidebarRowLabel, SidebarRowLead, SidebarRowShell } from './chrome'
 import { SidebarLoadMoreRow } from './load-more-row'

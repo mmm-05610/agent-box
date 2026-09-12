@@ -28,7 +28,7 @@ import { type McpCatalogEntry } from '@/types/hermes'
 
 import { hermesConfigCacheWriter, useHermesConfigRecord } from '@/app/hooks/use-config-record'
 import { DetailPane, MASTER_DETAIL_WIDE_COLS } from '@/app/master-detail'
-import { PanelAddButton, PanelEmpty } from '@/app/overlays/panel'
+import { PanelAddButton, PanelEmpty } from '@/app/shell/layers/overlays/panel'
 import { useDeepLinkHighlight } from '../settings/use-deep-link-highlight'
 
 import {

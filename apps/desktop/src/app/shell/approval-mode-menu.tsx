@@ -1,7 +1,7 @@
 import { useStore } from '@nanostores/react'
 import { useEffect, useMemo } from 'react'
 
-import type { StatusbarItem } from '@/app/shell/statusbar-controls'
+import type { StatusbarItem } from '@/app/shell/chrome/statusbar/statusbar-controls'
 import {
   DropdownMenuLabel,
   DropdownMenuRadioGroup,

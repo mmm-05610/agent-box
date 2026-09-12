@@ -84,14 +84,14 @@ import {
   SETTINGS_ROUTE,
   SKILLS_ROUTE,
   STARMAP_ROUTE
-} from '../routes'
+} from '@/app/routes'
 import { SECTIONS } from '@/features/settings/constants'
 import { type SettingsSearchEntry, settingsSearchTargetQuery } from '@/features/settings/settings-search'
 import { useSettingsSearchCatalog } from '@/features/settings/use-settings-search'
 
-import { usePaletteContributions } from './contrib'
-import { HighlightWatcher } from './highlight-watcher'
-import { MarketplaceThemePage } from './marketplace-theme-page'
+import { usePaletteContributions } from '@/app/shell/layers/command-palette/contrib'
+import { HighlightWatcher } from '@/app/shell/layers/command-palette/highlight-watcher'
+import { MarketplaceThemePage } from '@/features/theme/command-palette/marketplace-theme-page'
 import {
   FOLDER_PATH_RE,
   SESSION_ID_RE,
@@ -105,13 +105,13 @@ import {
   type PalettePage,
   paletteValue,
   rankGroups,
-} from './palette-model'
+} from '@/app/shell/layers/command-palette/palette-model'
 import {
   NON_CONFIG_SETTINGS,
   PaletteGroups,
   themeSupportsMode,
 } from './palette-sources'
-import { PetInlineToggle, PetPalettePage } from './pet-palette-page'
+import { PetInlineToggle, PetPalettePage } from '@/features/pet-generate/command-palette/pet-palette-page'
 
 
 

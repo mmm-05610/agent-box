@@ -25,7 +25,7 @@ import {
   PanelList,
   PanelListRow,
   PanelSectionLabel
-} from '@/app/overlays/panel'
+} from '@/app/shell/layers/overlays/panel'
 
 import type {
   EditorState,

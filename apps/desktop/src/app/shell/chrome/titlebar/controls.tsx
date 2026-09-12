@@ -31,9 +31,9 @@ import {
 import { resetLayoutTree } from '@/store/pane-shell/tree'
 import { $unreadSessionCount } from '@/store/session-dot-state'
 
-import { appViewForPath, isOverlayView } from '../routes'
+import { appViewForPath, isOverlayView } from '@/app/routes'
 
-import { TitlebarIcon } from './titlebar-icon'
+import { TitlebarIcon } from './icon'
 
 export interface TitlebarTool {
   id: string

@@ -44,7 +44,7 @@ import {
   PanelMeta,
   PanelPill,
   PanelSectionLabel
-} from '@/app/overlays/panel'
+} from '@/app/shell/layers/overlays/panel'
 
 const DELIVER_OPTIONS: readonly string[] = ['log', 'telegram', 'discord', 'slack', 'email', 'github_comment']
 

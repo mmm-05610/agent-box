@@ -12,7 +12,7 @@ import { type ThemeMode } from '@/themes/context'
 
 import {
   type SessionEntry,
-} from './palette-model'
+} from '@/app/shell/layers/command-palette/palette-model'
 
 export const SESSION_ID_RE = /^\d{8}_\d{6}_[a-f0-9]{6}$/
 

@@ -33,7 +33,7 @@ import {
   unstageReviewFile
 } from '@/store/review'
 
-import { SidebarPanelLabel } from '@/app/shell/sidebar-label'
+import { SidebarPanelLabel } from '@/app/shell/chrome/sidebar/label'
 import { PaneEmptyState, RightSidebarSectionHeader } from '../index'
 
 import { ReviewFileTree } from './file-tree'

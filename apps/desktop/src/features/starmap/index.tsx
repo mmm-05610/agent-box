@@ -6,7 +6,7 @@ import { useI18n } from '@/i18n'
 import { $starmapError, $starmapGraph, $starmapLoading, loadStarmapGraph } from '@/store/starmap'
 import type { StarmapGraph } from '@/types/hermes'
 
-import { Panel, PanelEmpty } from '@/app/overlays/panel'
+import { Panel, PanelEmpty } from '@/app/shell/layers/overlays/panel'
 
 import { StarMap } from './star-map'
 

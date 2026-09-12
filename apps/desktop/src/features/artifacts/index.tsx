@@ -3,7 +3,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 
 import { getAllSessionMessages } from '@/api/sessions'
-import { TitlebarIcon } from '@/app/shell/titlebar-icon'
+import { TitlebarIcon } from '@/app/shell/chrome/titlebar/icon'
 import { listAllProfileSessions } from '@/application/session-lists'
 import { ZoomableImage } from '@/components/chat/zoomable-image'
 import { ExternalLink, ExternalLinkIcon } from '@/components/external-link'
@@ -41,7 +41,7 @@ import { useRefreshHotkey } from '@/app/hooks/use-refresh-hotkey'
 import { useRouteEnumParam } from '@/app/hooks/use-route-enum-param'
 import { openSession } from '@/app/composition/routing/open-session'
 import { PageSearchShell } from '@/app/page-search-shell'
-import type { SetStatusbarItemGroup } from '@/app/shell/statusbar-controls'
+import type { SetStatusbarItemGroup } from '@/app/shell/chrome/statusbar/statusbar-controls'
 
 import {
   ARTIFACT_FILTERS,

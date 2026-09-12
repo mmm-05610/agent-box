@@ -1,6 +1,6 @@
 import { type CSSProperties, type ReactNode, useEffect } from 'react'
 
-import { TitlebarIcon } from '@/app/shell/titlebar-icon'
+import { TitlebarIcon } from '@/app/shell/chrome/titlebar/icon'
 import { Button } from '@/components/ui/button'
 import { translateNow } from '@/i18n'
 import { ESCAPE_PRIORITY, isTopEscapeLayer, pushEscapeLayer } from '@/lib/escape-layers'

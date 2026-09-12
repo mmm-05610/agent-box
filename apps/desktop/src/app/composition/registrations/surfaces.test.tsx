@@ -27,7 +27,7 @@ vi.mock('@/app/shell/hooks/use-status-snapshot', () => ({ useStatusSnapshot: () 
 vi.mock('@/app/shell/hooks/use-statusbar-items', () => ({
   useStatusbarItems: () => ({ leftStatusbarItems: [], statusbarItems: [] })
 }))
-vi.mock('@/app/shell/statusbar-controls', () => ({ StatusbarControls: () => null }))
+vi.mock('@/app/shell/chrome/statusbar/statusbar-controls', () => ({ StatusbarControls: () => null }))
 vi.mock('@/app/routes', () => ({
   contributedRoutes: () => [],
   NEW_CHAT_ROUTE: '/new',

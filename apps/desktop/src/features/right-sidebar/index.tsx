@@ -15,7 +15,7 @@ import { notifyError } from '@/store/notifications'
 import { openPreview } from '@/store/preview'
 import { $currentCwd, $selectedStoredSessionId, $workspaceCwdOwner } from '@/store/session'
 
-import { SidebarPanelLabel } from '@/app/shell/sidebar-label'
+import { SidebarPanelLabel } from '@/app/shell/chrome/sidebar/label'
 
 import { ProjectTree } from './files/tree'
 import { useProjectTree } from './files/use-project-tree'

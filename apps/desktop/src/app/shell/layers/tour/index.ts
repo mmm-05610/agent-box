@@ -7,7 +7,7 @@
  * - Your own curated tours, via this module:
  *
  * ```ts
- * import { startTour, showTourStep, stopTour } from '@/app/tour'
+ * import { startTour, showTourStep, stopTour } from '@/app/shell/layers/tour'
  *
  * startTour([
  *   { selector: '[data-tour="composer"]', title: 'Composer', text: 'Type here.' },

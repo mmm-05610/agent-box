@@ -6,8 +6,8 @@ import { useStore } from '@nanostores/react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { openGuestContextMenu } from '@/app/context-menu/store'
-import { PanelEmpty } from '@/app/overlays/panel'
+import { openGuestContextMenu } from '@/app/shell/layers/context-menu/store'
+import { PanelEmpty } from '@/app/shell/layers/overlays/panel'
 import {
   bindPreviewExecuteJavaScript,
   captureAnnotateCrop,

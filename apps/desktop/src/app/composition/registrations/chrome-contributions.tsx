@@ -9,9 +9,9 @@
 import { ContribBoundary, ContribRender } from '@/extension/contrib/react/boundary'
 import { useContributions } from '@/extension/contrib/react/use-contributions'
 import { registry } from '@/lib/contributions'
-import type { GroupSetter } from '@/app/shell/group-setter'
-import type { StatusbarItem } from '@/app/shell/statusbar-controls'
-import type { TitlebarTool } from '@/app/shell/titlebar-controls'
+import type { GroupSetter } from '@/app/shell/chrome/group-setter'
+import type { StatusbarItem } from '@/app/shell/chrome/statusbar/statusbar-controls'
+import type { TitlebarTool } from '@/app/shell/chrome/titlebar/controls'
 
 /** Collect statusbar contributions for one side. A `render()` contribution
  *  becomes a render-item (arbitrary stateful node); otherwise the declarative

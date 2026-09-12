@@ -1,18 +1,17 @@
 import { useStore } from '@nanostores/react'
 import { Dialog as DialogPrimitive } from 'radix-ui'
 import { useCallback, useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
 
 import {
   $commandPaletteOpen,
   setCommandPaletteOpen
 } from '@/store/command-palette'
-
-import { CommandPaletteBody } from './body'
-
-export { CommandPaletteBody }
 const EXIT_FALLBACK_MS = 1000
 
-export function CommandPalette() {
+/** The palette host owns open/close, the remount key and the exit fallback;
+ *  the body content is handed in by composition (it knows the features). */
+export function CommandPalette({ children }: { children: (state: { key: number; onExited: () => void }) => ReactNode }) {
   const open = useStore($commandPaletteOpen)
   const [mounted, setMounted] = useState(open)
   const [openCount, setOpenCount] = useState(0)
@@ -43,7 +42,7 @@ export function CommandPalette() {
 
   return (
     <DialogPrimitive.Root onOpenChange={setCommandPaletteOpen} open={open}>
-      {mounted && <CommandPaletteBody key={openCount} onExited={retire} />}
+      {mounted && children({ key: openCount, onExited: retire })}
     </DialogPrimitive.Root>
   )
 }

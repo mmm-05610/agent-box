@@ -10,7 +10,7 @@
 import { useStore } from '@nanostores/react'
 import { useEffect, useMemo } from 'react'
 
-import { StatusRow } from '@/app/command-palette/status-row'
+import { StatusRow } from '@/app/shell/layers/command-palette/status-row'
 import { useGatewayRequest } from '@/components/hooks/use-gateway-request'
 import { PetThumb } from '@/components/pet/pet-thumb'
 import { useI18n } from '@/i18n'

@@ -31,7 +31,7 @@ import { $settingsRequestProfile } from '@/store/settings-scope'
 import type { ConfigFieldSchema, HermesConfigRecord } from '@/types/hermes'
 
 import { hermesConfigCacheWriter, useHermesConfigRecord } from '@/app/hooks/use-config-record'
-import { PanelEmpty } from '@/app/overlays/panel'
+import { PanelEmpty } from '@/app/shell/layers/overlays/panel'
 
 import { ConfigField } from './config-field'
 import {

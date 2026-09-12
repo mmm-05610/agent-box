@@ -33,7 +33,7 @@ import {
   type PaletteGroup,
   type PaletteItem,
   paletteValue,
-} from './palette-model'
+} from '@/app/shell/layers/command-palette/palette-model'
 
 export const EMPTY_GROUPS: PaletteGroup[] = []
 

@@ -37,9 +37,9 @@ import { notifyError } from '@/store/notifications'
 import { $settingsScopeProfile } from '@/store/settings-scope'
 
 import { useRouteEnumParam } from '@/app/hooks/use-route-enum-param'
-import { OverlayIconButton } from '@/app/overlays/overlay-chrome'
-import { OverlayMain, OverlayNav, type OverlayNavGroup, OverlaySplitLayout } from '@/app/overlays/overlay-split-layout'
-import { OverlayView } from '@/app/overlays/overlay-view'
+import { OverlayIconButton } from '@/app/shell/layers/overlays/overlay-chrome'
+import { OverlayMain, OverlayNav, type OverlayNavGroup, OverlaySplitLayout } from '@/app/shell/layers/overlays/overlay-split-layout'
+import { OverlayView } from '@/app/shell/layers/overlays/overlay-view'
 import { SKILLS_ROUTE } from '@/app/routes'
 
 import { AboutSettings } from './about-settings'

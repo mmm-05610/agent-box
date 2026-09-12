@@ -65,7 +65,7 @@ import {
 import type { StatusResponse, UsageStats } from '@/types/hermes'
 
 import { CRON_ROUTE, SETTINGS_ROUTE, WEBHOOKS_ROUTE } from '../../routes'
-import type { StatusbarItem } from '../statusbar-controls'
+import type { StatusbarItem } from '@/app/shell/chrome/statusbar/statusbar-controls'
 
 const EMPTY_USAGE: UsageStats = { calls: 0, input: 0, output: 0, total: 0 }
 

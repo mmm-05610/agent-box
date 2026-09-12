@@ -24,7 +24,7 @@ import { notify } from '@/store/notifications'
 import { $paneHeightOverride, setPaneHeightOverride } from '@/store/panes'
 import { openPluginInstallRequest } from '@/store/plugin-install-request'
 
-import { PanelEmpty } from '@/app/overlays/panel'
+import { PanelEmpty } from '@/app/shell/layers/overlays/panel'
 
 // The REAL Plugin Catalog page (docs site) embedded as a one-click picker —
 // the same pattern as the Skills tab's EmbeddedHubPicker. `?embed=picker`

@@ -5,8 +5,8 @@ import { atom, computed } from 'nanostores'
 import type { CSSProperties, ReactElement, PointerEvent as ReactPointerEvent } from 'react'
 
 import { SessionDraftTitle } from '@/features/chat/session-draft-title'
-import { PALETTE_AREA, type PaletteContribution, paletteToggle } from '@/app/command-palette/contrib'
-import { type StatusbarItem } from '@/app/shell/statusbar-controls'
+import { PALETTE_AREA, type PaletteContribution, paletteToggle } from '@/app/shell/layers/command-palette/contrib'
+import { type StatusbarItem } from '@/app/shell/chrome/statusbar/statusbar-controls'
 import { InlinePreviewDirective } from '@/components/assistant-ui/inline-preview-directive'
 import { SessionStatusDot } from '@/components/chat/session-status-dot'
 import type { SessionDragPayload } from '@/components/composer/inline-refs'
@@ -91,7 +91,7 @@ import {
   watchSessionTiles,
   WorkspaceTabMenu
 } from '@/features/chat/session-tile'
-import { AppContextMenu } from '@/app/context-menu/app-context-menu'
+import { AppContextMenu } from '@/app/composition/registrations/context-menu'
 import { HudShell } from '@/app/hud/hud-shell'
 import { $workspaceIsPage } from '@/app/routes'
 

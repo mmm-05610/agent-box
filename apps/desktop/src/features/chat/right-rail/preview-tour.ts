@@ -18,8 +18,8 @@
 import driverCss from 'driver.js/dist/driver.css?raw'
 import driverIife from 'driver.js/dist/driver.js.iife.js?raw'
 
-import { collectTourTargets } from '@/app/tour/collect-targets'
-import { runTourEngine, type TourAction, type TourResult } from '@/app/tour/engine'
+import { collectTourTargets } from '@/app/shell/layers/tour/collect-targets'
+import { runTourEngine, type TourAction, type TourResult } from '@/app/shell/layers/tour/engine'
 import { activePreviewScriptRunner } from '@/application/preview/preview-script-runner'
 
 /** Build the idempotent inject-and-run script for one tour action. */

@@ -46,7 +46,7 @@ import {
   MasterDetail,
   ToolChip
 } from '@/app/master-detail'
-import { PanelEmpty, PanelPill } from '@/app/overlays/panel'
+import { PanelEmpty, PanelPill } from '@/app/shell/layers/overlays/panel'
 import { PageSearchShell } from '@/app/page-search-shell'
 import { SETTINGS_ROUTE } from '@/app/routes'
 import { BrowserRealProfilePanel } from '../settings/browser-real-profile-panel'
@@ -54,7 +54,7 @@ import { ComputerUsePanel } from '../settings/computer-use-panel'
 import { asText, includesQuery, prettyName, toolNames, toolsetDisplayLabel } from '../settings/helpers'
 import { TerminalBackendPanel } from '../settings/terminal-backend-panel'
 import { ToolsetConfigPanel } from '../settings/toolset-config-panel'
-import type { SetStatusbarItemGroup } from '@/app/shell/statusbar-controls'
+import type { SetStatusbarItemGroup } from '@/app/shell/chrome/statusbar/statusbar-controls'
 
 import { EmbeddedHubPicker } from './embedded-hub-picker'
 import { McpTab } from './mcp-tab'

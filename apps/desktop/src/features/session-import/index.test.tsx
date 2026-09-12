@@ -13,7 +13,7 @@ vi.mock('@/store/session', () => ({ setSessionOwnerHint: vi.fn() }))
 vi.mock('@/components/assistant-ui/markdown-text', () => ({
   MarkdownTextContent: ({ text }: { text: string }) => <p>{text}</p>
 }))
-vi.mock('@/app/overlays/overlay-view', () => ({
+vi.mock('@/app/shell/layers/overlays/overlay-view', () => ({
   OverlayView: ({ children }: { children: React.ReactNode }) => <div>{children}</div>
 }))
 

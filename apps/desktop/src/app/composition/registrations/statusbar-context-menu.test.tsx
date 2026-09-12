@@ -2,9 +2,9 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
-import { AppContextMenu } from '@/app/context-menu/app-context-menu'
-import { $contextMenu } from '@/app/context-menu/store'
-import { StatusbarControls } from '@/app/shell/statusbar-controls'
+import { AppContextMenu } from '@/app/composition/registrations/context-menu'
+import { $contextMenu } from '@/app/shell/layers/context-menu/store'
+import { StatusbarControls } from '@/app/shell/chrome/statusbar/statusbar-controls'
 import { $statusbarHiddenIds, STATUSBAR_HIDDEN_BY_DEFAULT } from '@/store/statusbar-prefs'
 
 class TestResizeObserver {

@@ -43,7 +43,7 @@ import {
   PanelMeta,
   PanelPill,
   PanelSectionLabel
-} from '@/app/overlays/panel'
+} from '@/app/shell/layers/overlays/panel'
 
 import { BlueprintSlotControl, blueprintSlotHelp, cleanBlueprintFieldError, initialBlueprintValues } from './blueprints'
 import {

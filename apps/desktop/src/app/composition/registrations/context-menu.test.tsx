@@ -9,15 +9,15 @@ import { formatCombo } from '@/lib/keybinds/combo'
 import { $previewTabs, closeRightRail } from '@/store/preview'
 import { $connection } from '@/store/session'
 
-import { AppContextMenu } from './app-context-menu'
+import { AppContextMenu } from './context-menu'
 import {
   $contextMenu,
   augmentSpellcheck,
   type GuestMenuHandle,
   type GuestMenuParams,
   openGuestContextMenu
-} from './store'
-import { resolveDomTarget } from './target'
+} from '@/app/shell/layers/context-menu/store'
+import { resolveDomTarget } from '@/app/shell/layers/context-menu/target'
 
 const desktopWindow = window as unknown as { hermesDesktop?: Window['hermesDesktop'] }
 

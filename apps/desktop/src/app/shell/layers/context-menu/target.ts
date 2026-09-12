@@ -60,3 +60,8 @@ export function resolveDomTarget(element: Element | null): ContextMenuDomTarget 
 export function isWebUrl(url: string): boolean {
   return /^https?:\/\//i.test(url)
 }
+
+/** Marks a surface that owns PLAIN right-clicks itself (the user-message
+ *  reaction bubble). Owned targets inside it — links, images, editables,
+ *  selections — still get the app menu. */
+export const CONTEXT_MENU_SKIP_ATTR = 'data-context-menu-skip'

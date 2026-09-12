@@ -11,8 +11,8 @@ import { type CronJob } from '@/types/hermes'
 
 import {
   type PanelPillTone
-} from '@/app/overlays/panel'
-import type { SetStatusbarItemGroup } from '@/app/shell/statusbar-controls'
+} from '@/app/shell/layers/overlays/panel'
+import type { SetStatusbarItemGroup } from '@/app/shell/chrome/statusbar/statusbar-controls'
 
 import { jobTitle } from './job-state'
 

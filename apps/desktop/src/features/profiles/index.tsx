@@ -31,7 +31,7 @@ import {
   PanelMeta,
   PanelPill,
   PanelSectionLabel
-} from '@/app/overlays/panel'
+} from '@/app/shell/layers/overlays/panel'
 
 import { CreateProfileDialog } from './create-profile-dialog'
 import { DeleteProfileDialog } from './delete-profile-dialog'

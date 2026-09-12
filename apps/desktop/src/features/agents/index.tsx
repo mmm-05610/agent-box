@@ -21,7 +21,7 @@ import {
   type SubagentStreamEntry
 } from '@/store/subagents'
 
-import { Panel, PanelEmpty, PanelHeader } from '@/app/overlays/panel'
+import { Panel, PanelEmpty, PanelHeader } from '@/app/shell/layers/overlays/panel'
 
 // Mirrors statusGlyph() in tool-fallback.tsx so subagent rows speak the
 // same visual vocabulary as the chat tool blocks.

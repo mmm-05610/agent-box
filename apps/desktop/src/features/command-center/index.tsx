@@ -36,8 +36,8 @@ import type { ActionStatusResponse, AnalyticsResponse, SessionInfo, StatusRespon
 
 import { useRefreshHotkey } from '@/app/hooks/use-refresh-hotkey'
 import { useRouteEnumParam } from '@/app/hooks/use-route-enum-param'
-import { OverlayMain, OverlayNav, OverlaySplitLayout } from '@/app/overlays/overlay-split-layout'
-import { OverlayView } from '@/app/overlays/overlay-view'
+import { OverlayMain, OverlayNav, OverlaySplitLayout } from '@/app/shell/layers/overlays/overlay-split-layout'
+import { OverlayView } from '@/app/shell/layers/overlays/overlay-view'
 
 import { MaintenancePanel } from './maintenance'
 
