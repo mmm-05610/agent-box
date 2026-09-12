@@ -164,12 +164,13 @@ out-of-group closure clean.
 | 19 | terminal internals (buffer, selection, clipboard, resize, font, lifecycle table, event stream) | 8 | 1057 | `application/terminal/` | 3 | open |
 | 20 | preview/browser logic (drive state machine, navigation, script runner, console state, nudge, reader) | 10 | 736 | `application/preview/` | 4 | open |
 | 21 | the transcript projection (split today across `app/chat/` and `components/assistant-ui/thread/`) | 8 | 750 | `application/transcript/` | 4 | open |
-| 22 | session-list derivations out of the `sessions` pane | 7 | 366 | `application/session-lists/` | 1 | open |
+| 22 | session-list derivations out of the `sessions` pane | 7 | 366 | `application/sidebar/` | 1 | open |
 | 23 | the six clean `gateway-event` handlers | 6 | 1017 | `application/session/gateway-event/` | 1 | open |
 | 24 | the two handlers that reach `components/` — three calls join the deps bag, then they move | 2 | 550 | `application/session/gateway-event/` | 5 | open |
 | 25 | the interrupted-turn seal is extracted, and `session-info.ts` follows it | 1 (+1 fn) | 459 | `application/session/` | 2 | open |
 | 26 | the tool card's view model — renamed from the misleading `fallback-model` | 4 | 1817 | `lib/tool-view/` | 1 | open |
 | 27 | three zero-hermes form widgets out of the settings page | 3 | 495 | `components/settings/` | 4 | open |
+| 28 | the `sessions` pane's derivations, including the 672-line `workspace-groups.ts` | 3 | 955 | `application/sidebar/` | — | open |
 
 **Two ordering facts the wave table cannot express**, because waves encode *file
 collisions*, not dependencies:

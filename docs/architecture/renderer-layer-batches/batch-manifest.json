@@ -239,13 +239,13 @@
   "22 session-lists": {
     "edges": 0,
     "modules": [
-      "chat/sidebar/fleet-rail'",
-      "chat/sidebar/session-index'",
-      "chat/sidebar/session-row-gesture'",
-      "chat/sidebar/session-row-details'",
-      "chat/sidebar/search-view-model'",
-      "chat/sidebar/project-filter'",
-      "chat/sidebar/profile-scope'"
+      "fleet-rail'",
+      "session-row-gesture'",
+      "session-row-details'",
+      "search-view-model'",
+      "project-filter'",
+      "profile-scope'",
+      "sidebar/session-index'"
     ]
   },
   "23 gateway-event clean": {
@@ -291,9 +291,19 @@
       "'\\./primitives'",
       "'\\./combobox-input'",
       "'\\./searchable-select'",
-      "settings/primitives'",
-      "settings/combobox-input'",
-      "settings/searchable-select'"
+      "'primitives'",
+      "'combobox-input'",
+      "'searchable-select'"
+    ]
+  },
+  "28 sidebar derivations": {
+    "edges": 0,
+    "modules": [
+      "'\\./order'",
+      "'\\.\\./order'",
+      "sidebar/order'",
+      "workspace-groups'",
+      "session-project-label'"
     ]
   }
 }

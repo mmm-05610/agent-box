@@ -224,13 +224,18 @@ split the membership core out of it (see the note at the top of
 `store/projects/membership.ts`).
 *Decision:* move the cluster to `application/projects/` as-is, or split it further first.
 
-**E · Does `app/routes.ts` sink another layer?**
+**E · `app/routes.ts` stays — ruled, 2026-09-12**
+
 `app/open-session.ts` 177 is blocked only by `app/routes.ts`, and
-`app/session/hooks/session-context-drift.ts` 117 is blocked by it too. Batch
-[11](11-route-vocabulary.md) already sank `lib/routes`; `app/routes.ts` is the app-side
-remainder.
-*Decision:* sink it a layer, or accept it as app-level policy — it blocks more than
-one file.
+`app/session/hooks/session-context-drift.ts` 117 is blocked by it too.
+
+**Ruled: accept it as app-level policy.** It is 63 lines and its content is "what else
+has to happen when we navigate" — mirror the is-a-page flag, front the workspace pane.
+That is the definition of the rank-5 layer (`routes, pages and shell composition`), so
+sinking it would hollow the layer out rather than clean it. `open-session.ts` and
+`session-context-drift.ts` stay with it: they reach a *policy*, not a misplaced module.
+
+Closed. It no longer blocks anything on this list.
 
 ### Settled: these stay at rank 4/5, and that is correct
 

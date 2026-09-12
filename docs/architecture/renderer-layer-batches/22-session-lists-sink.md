@@ -9,10 +9,16 @@
 算 fleet rail 的分组。它们住在 rank 5 只是因为左栏的组件住在旁边。
 
 **这一批直接对着"改 UI 形状"那件事**：左栏是五个 pane 里最重的一块
-（`projects/workspace-groups.ts` 673 行是整仓最重的单文件，但**不在本批**，见下）。
+（`projects/workspace-groups.ts` 673 行是整仓最重的单文件，**不在本批**——它在
+[batch 28](28-sidebar-derivations-sink.md)）。
 把派生拿走之后，剩在 `app/chat/sidebar/` 的就是行、栏、列表和它们的样子。
 
-## 移动清单 → `application/session-lists/`（basename 不变）
+## 移动清单 → `application/sidebar/`（basename 不变）
+
+**目的地原本写作 `application/session-lists/`，2026-09-12 改名为 `application/sidebar/`。**
+两批都还没执行，所以不欠账。改名的理由：batch 28 搬的三件里有项目/分支泳道的分组
+和行上的项目名，**它们不是"会话列表"**；三个文件加上本批的七件，服务的是同一件事——
+左栏显示什么。一个更窄的名字会逼着下一批再新开一个目录。
 
 | 从 `app/chat/sidebar/` | 行数 |
 | --- | --- |
