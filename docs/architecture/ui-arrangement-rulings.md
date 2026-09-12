@@ -194,10 +194,22 @@ Batch 30 先按旧裁决把 `open-session`、`session-owner` 与
 词汇，也不把 dispatcher 强行并入已有 `request-router.ts`。后者负责选择并持有 owner transport，
 dispatcher 负责在它之前解析目标 Session 与 owner；它们是相邻上下游。
 
-Hermes/Gateway/RPC/品牌词汇另行保留为低优先级的终端 Batch 32。它必须等
+Hermes/Gateway/RPC/品牌词汇另行保留为终端 Batch 33。它必须等
 `composition`、`shell`、`windows` 及相关 product feature 的语义审阅全部完成并形成逐项词汇表后
 才能派工，禁止执行者自行全局替换。兼容性名称（preload global、IPC channel、storage key、
 持久化字段）必须与用户文案、代码符号分开裁决。
+
+### 9 · Shell 只拥有机制，不拥有产品动作
+
+语义复审确认 Batch 30 对 Shell 的第一层拆分仍不彻底：`use-keybinds.ts` 同时拥有全局事件
+机制和全部 Session/Profile/Composer/Workspace 动作；Context Menu host/sections 直接访问
+Hermes preload、Gateway topology、Preview 和更新动作；`run-tour.ts` 同时选择 app/preview 并
+驱动产品 pane。这些都不是通用 Shell。
+
+Batch 32 保留 Shell 的 keybinding listener/capture、menu host/model/DOM mechanics 与 Tour
+engine/spotlight，把产品 action map、fallback menu content 和 Tour surface coordination 移到
+composition registrations。所有现有行为不变，不引入新协议。Shell 本批不得再直接出现
+`window.hermesDesktop`；整个 Renderer 与 preload 的兼容名迁移仍由终端 Batch 33 协调。
 
 ---
 

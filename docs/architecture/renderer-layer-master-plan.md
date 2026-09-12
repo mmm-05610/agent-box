@@ -208,14 +208,17 @@ Context Menu 先拆为 composition 组装、Shell host、Terminal feature sectio
 它是**终端结构批次**：必须等 17–29 全部 merged + reviewed 后单独执行。原因不是权限，
 而是它会改写 renderer 全树路径；提前运行会让前面每张派工单的路径、碰撞和测试失真。
 
-### Phase 5 — semantic ownership follow-up (31; 32 reserved)
+### Phase 5 — semantic ownership follow-up (31–32; 33 terminal)
 
 Independent review of Batch 30 corrected one ownership decision: Session opening,
 owner resolution and Session-scoped request dispatch are application use cases, not
 composition routing. Batch 31 moves those three families to `application/session/` and
 leaves only overlay presentation routing in `app/composition/routing/`.
 
-Batch 32 is reserved for a final coordinated Hermes-neutral vocabulary pass. It is not
+Batch 32 then makes Shell a product-neutral host: keybinding/menu/Tour mechanics stay in
+Shell while product actions and surface coordination move to composition registrations.
+
+Batch 33 is reserved for a final coordinated Hermes-neutral vocabulary pass. It is not
 executable yet: each remaining `app/` branch must first be semantically reviewed and a
 table must distinguish user copy/code symbols from compatibility-sensitive preload,
 IPC, storage and persistence names. Structural moves run first; vocabulary changes run
@@ -240,15 +243,15 @@ node ../../../.agents/skills/architecture-tree-report/scripts/batch-collisions.m
   ../../../docs/architecture/renderer-layer-batches/batch-manifest.json
 ```
 
-Current output — **12 graph-color groups for the manifest as it exists now**
-(recomputed after adding Batch 31):
+Current output — **13 graph-color groups for the manifest as it exists now**
+(recomputed after adding Batch 32):
 
 ```
 wave 1: 01 lib-services, 02 tour, 06a2 link-title, 06c1 sound, 07a keybinds, 26 tool-view, 27 settings primitives, 30 app composition root
 wave 2: 06c2 image-dl, 09 plugin-abi, 16 session-recovery, 18 starmap, 23 gateway-event clean
 wave 3: 04 workspace, 07b external-link, 11 route-vocab, 12 host-views, 20 preview, 25 interrupted-turn seal, 29 messaging removal
-wave 4: 03 shape+label, 06a1 statusbar, 06b1 haptics, 17 session-remainder, 24 gateway-event component pins
-wave 5: 21 transcript, 28 sidebar derivations
+wave 4: 06a1 statusbar, 21 transcript, 28 sidebar derivations
+wave 5: 03 shape+label, 06b1 haptics, 17 session-remainder, 24 gateway-event component pins
 wave 6: 14 hooks-sink
 wave 7: 31 session routing sink
 wave 8: 08 pane-shell, 22 session-lists
@@ -256,6 +259,7 @@ wave 9: 10 composer-engine
 wave 10: 13 composer-last-edge
 wave 11: 15 singletons
 wave 12: 19 terminal
+wave 13: 32 shell host purity
 ```
 
 This is a **collision coloring, not an execution scheduler**. A merged batch whose

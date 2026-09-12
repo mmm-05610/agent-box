@@ -334,5 +334,17 @@
       "app/composition/routing/session-owner",
       "app/composition/routing/session-rpc-dispatcher"
     ]
+  },
+  "32 shell host purity": {
+    "edges": 0,
+    "modules": [
+      "app/shell/hooks/use-keybinds",
+      "app/shell/layers/context-menu/dom-sections",
+      "app/shell/layers/context-menu/guest-sections",
+      "app/shell/layers/context-menu/host",
+      "app/shell/layers/context-menu/shell-sections",
+      "app/shell/layers/tour/run-tour",
+      "app/composition/registrations/context-menu"
+    ]
   }
 }

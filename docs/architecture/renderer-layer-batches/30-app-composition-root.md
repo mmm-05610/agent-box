@@ -202,6 +202,10 @@ statusbar/titlebar contribution area 或调用顺序。拆完旧文件必须删�
 > composition-owned. The correction is a later work order rather than a rewrite of
 > Batch 30's already-built scope.
 
+> **Shell semantic-review follow-up (2026-09-13):** Batch 32 further separates
+> keybinding/menu/Tour host mechanisms from product actions. This preserves Batch 30's
+> historical move record while correcting its remaining “Shell content” exceptions.
+
 ### C · `shell/` 只保留主窗口公共骨架
 
 派单时这组候选合计约 **58 个 TS/TSX、11,822 行**。不能整桶塞进 `shell/`：其中既有

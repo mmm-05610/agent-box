@@ -253,11 +253,14 @@ batch's stop-condition §7.4; no NEW reverse dependency was created (the §B2 mo
 | item | scope | baseline | destination | order | status |
 | --- | --- | --- | --- | --- | --- |
 | 31 | Session opening, owner resolution and Session-scoped request dispatch leave composition | Batch 30 executor snapshot: 6 files / 1,096 lines; adjacent `application/session/request-router.ts` 210 lines | `application/session/{open-session,session-owner,session-rpc-dispatcher}*`; `overlay-routing.ts` stays | after Batch 30 merged + independent review; runs alone | dispatched — waiting for prerequisite |
-| 32 | Hermes/Gateway/RPC/product vocabulary becomes Harness/Runtime/Session/Work Core vocabulary where semantically correct | scope deliberately not frozen yet | coordinated final vocabulary pass | last, after all `app/` semantic reviews and an approved compatibility-aware vocabulary table | reserved — design blocked, do not execute |
+| 32 | Shell retains keybinding/menu/Tour mechanisms; product actions and coordination move to composition | focused semantic baseline 2,270 lines; four named knots | generic `app/shell` hosts + `app/composition/registrations/{keybindings,context-menu,tour}` | after Batch 31 reviewed; runs alone; Electron E6 unchanged | dispatched — waiting for prerequisite |
+| 33 | Hermes/Gateway/RPC/product vocabulary becomes Harness/Runtime/Session/Work Core vocabulary where semantically correct | scope deliberately not frozen yet | coordinated final UI vocabulary/compatibility pass | mandatory UI terminal gate after all semantic reviews and an approved compatibility-aware vocabulary table | reserved — design blocked, do not execute |
 
 Batch 31 contract: [31-session-routing-sink.md](renderer-layer-batches/31-session-routing-sink.md).
-Batch 32 is intentionally absent from the manifest and has no work-order file: its terminology table is
-not yet complete, so an executor must not infer mappings or run a global replacement.
+Batch 32 contract: [32-shell-host-purity.md](renderer-layer-batches/32-shell-host-purity.md).
+Batch 33 is intentionally absent from the manifest and has no work-order file: its terminology table is
+not yet complete, so an executor must not infer mappings or run a global replacement. It is still a
+mandatory completion gate for today's UI restructuring, not optional future debt.
 
 ## How to update this file
 

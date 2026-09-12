@@ -23,8 +23,9 @@ Phase 4 的终端结构单是 [30](30-app-composition-root.md)：除 composition
 composition 组装 / Shell host / Terminal feature 三方拆分。
 
 Phase 5 从独立语义复审开始：[31](31-session-routing-sink.md) 把 Session 打开、owner
-解析和 Session-scoped request 编排从 composition 下沉到 `application/session/`。Batch 32
-只在 status 中保留编号，等待完整 `app/` 语义审阅和兼容性词汇表后才会成为可执行派工单。
+解析和 Session-scoped request 编排从 composition 下沉到 `application/session/`；
+[32](32-shell-host-purity.md) 把 Shell 收口为产品中立的键盘、菜单和 Tour 宿主。Batch 33
+只在 status 中保留编号，等待完整 UI 语义审阅和兼容性词汇表后成为本阶段的强制终门。
 
 | batch | scope | edges paid off |
 | --- | --- | --- |

@@ -68,7 +68,7 @@ ladder while putting both use cases under one owner.
 - Preserve public exports and test behavior. Move tests with their implementations.
 - Keep `overlay-routing.ts` in composition.
 - Do not rename `RPC`, `Gateway`, Hermes bridge globals, storage keys, IPC channels or
-  user-facing copy here. Batch 32 owns the coordinated vocabulary pass after its
+  user-facing copy here. Batch 33 owns the coordinated vocabulary pass after its
   vocabulary table is approved.
 - Do not add compatibility barrels or re-export the moved files from composition.
 - Do not redesign `application/session/request-router.ts` or transport/store APIs.
