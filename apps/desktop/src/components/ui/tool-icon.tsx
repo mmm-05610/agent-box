@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
 // *font*, so an outline glyph has no separate fillable region — a filled look
 // can't be derived from it (stroke-thickening just bolds the outline). To get
 // the Cursor-style filled tool icons we render dedicated solid SVG paths,
-// keyed by the same names used in `TOOL_META` (tool-fallback-model.ts).
+// keyed by the same names used in `TOOL_META` (@/lib/tool-view).
 //
 // Paths are Phosphor Icons (MIT) "fill" weight, 256×256 viewBox. Inlining the
 // path data mirrors the existing precedent in `directive-text.tsx`.

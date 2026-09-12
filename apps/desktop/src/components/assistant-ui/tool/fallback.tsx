@@ -45,15 +45,6 @@ import { useI18n } from '@/i18n'
 import { urlSlugTitleLabel } from '@/lib/external-link'
 import { AlertCircle, CheckCircle2 } from '@/lib/icons'
 import { normalize } from '@/lib/text'
-import { useEnterAnimation } from '@/lib/use-enter-animation'
-import { cn } from '@/lib/utils'
-import { recordPreviewArtifact } from '@/store/preview-status'
-import { sessionApprovalRequest } from '@/store/prompts'
-import { $toolInlineDiff } from '@/store/tool-diffs'
-import { $toolRowDismissed, dismissToolRow } from '@/store/tool-dismiss'
-import { $anyToolDisclosureOpen, $toolDisclosureOpen, $toolViewMode, setToolDisclosureOpen } from '@/store/tool-view'
-
-import { APPROVAL_TOOLS, PendingToolApproval } from './approval'
 import {
   buildToolView,
   clampForDisplay,
@@ -72,7 +63,16 @@ import {
   toolPartDisclosureId,
   type ToolStatus,
   type ToolTitleAction
-} from './fallback-model'
+} from '@/lib/tool-view'
+import { useEnterAnimation } from '@/lib/use-enter-animation'
+import { cn } from '@/lib/utils'
+import { recordPreviewArtifact } from '@/store/preview-status'
+import { sessionApprovalRequest } from '@/store/prompts'
+import { $toolInlineDiff } from '@/store/tool-diffs'
+import { $toolRowDismissed, dismissToolRow } from '@/store/tool-dismiss'
+import { $anyToolDisclosureOpen, $toolDisclosureOpen, $toolViewMode, setToolDisclosureOpen } from '@/store/tool-view'
+
+import { APPROVAL_TOOLS, PendingToolApproval } from './approval'
 import { isToolCallPart, summarizeToolRun } from './run-summary'
 import { ToolRunTicker } from './run-ticker'
 
