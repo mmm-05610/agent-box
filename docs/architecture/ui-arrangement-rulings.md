@@ -194,7 +194,7 @@ Batch 30 先按旧裁决把 `open-session`、`session-owner` 与
 词汇，也不把 dispatcher 强行并入已有 `request-router.ts`。后者负责选择并持有 owner transport，
 dispatcher 负责在它之前解析目标 Session 与 owner；它们是相邻上下游。
 
-Hermes/Gateway/RPC/品牌词汇另行保留为终端 Batch 33。它必须等
+Hermes/Gateway/RPC/品牌词汇另行保留为终端 Batch 34。它必须等
 `composition`、`shell`、`windows` 及相关 product feature 的语义审阅全部完成并形成逐项词汇表后
 才能派工，禁止执行者自行全局替换。兼容性名称（preload global、IPC channel、storage key、
 持久化字段）必须与用户文案、代码符号分开裁决。
@@ -209,7 +209,29 @@ Hermes preload、Gateway topology、Preview 和更新动作；`run-tour.ts` 同�
 Batch 32 保留 Shell 的 keybinding listener/capture、menu host/model/DOM mechanics 与 Tour
 engine/spotlight，把产品 action map、fallback menu content 和 Tour surface coordination 移到
 composition registrations。所有现有行为不变，不引入新协议。Shell 本批不得再直接出现
-`window.hermesDesktop`；整个 Renderer 与 preload 的兼容名迁移仍由终端 Batch 33 协调。
+`window.hermesDesktop`；整个 Renderer 与 preload 的兼容名迁移仍由终端 Batch 34 协调。
+
+---
+
+### 10 · 独立窗口只消费投影，不拥有 Session/Execution 流
+
+**决定**：HUD、Pet、Quick Entry 都保留为通用产品界面，但 `app/windows/` 只接收
+ViewModel、发出用户 Intent、调用中性窗口宿主端口。它不认识 Harness 实现、Gateway、后端
+Ref、cursor、resume 或消息流所有权。
+
+**为什么**：同一 Session 同时显示在主窗口、HUD 和 Pet 是正常的多视图产品能力；异常的是
+Hermes Gateway 的单 WebSocket/`resume` 限制泄漏到 `hud/handoff.ts`，迫使窗口之间“抢流”。
+AgentBox Work Core 更适合持有持续 Execution、事件账本、replay/live fan-out 和后台 Ref，各窗口
+只是并发消费者。详细决策见
+[`session-multi-surface-ownership.md`](session-multi-surface-ownership.md)。
+
+**代价**：当前 Hermes 的 resume/socket 转移行为在 Direct Hermes 退役前仍需兼容，但只能藏在
+legacy adapter/port 实现后面；本轮不发明 AgentBox wire 协议。UI 可以有不透明 `id` 用于
+React identity 和选择，不得把它提升成 Ref/capability/revision/native continuation。
+
+**结构结果**：Batch 33 将 Quick Entry 变成通用 Prompt surface，将 Pet 变成只读 Activity
+projection，将 HUD 变成 compact Session surface；通用焦点/可见性/选择/草稿协调下沉到
+`application/session`，窗口 mechanics 留在 `app/windows`。原终端词汇批次顺延为 Batch 34。
 
 ---
 

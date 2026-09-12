@@ -24,8 +24,9 @@ composition 组装 / Shell host / Terminal feature 三方拆分。
 
 Phase 5 从独立语义复审开始：[31](31-session-routing-sink.md) 把 Session 打开、owner
 解析和 Session-scoped request 编排从 composition 下沉到 `application/session/`；
-[32](32-shell-host-purity.md) 把 Shell 收口为产品中立的键盘、菜单和 Tour 宿主。Batch 33
-只在 status 中保留编号，等待完整 UI 语义审阅和兼容性词汇表后成为本阶段的强制终门。
+[32](32-shell-host-purity.md) 把 Shell 收口为产品中立的键盘、菜单和 Tour 宿主；
+[33](33-window-surfaces-neutral.md) 让 HUD、Pet、Quick Entry 只消费投影并发出 Intent。
+Batch 34 只在 status 中保留编号，等待完整 UI 语义审阅和兼容性词汇表后成为本阶段的强制终门。
 
 | batch | scope | edges paid off |
 | --- | --- | --- |
@@ -290,6 +291,24 @@ features/
 它不支付层序边，但会改写 renderer 大量 import 路径。**必须在 17–29 全部 merged + reviewed
 后独占运行**；碰撞 manifest 用全树 touched set 保守建模，不能因为 greedy wave 输出把它和
 已无当前命中的旧批次放到同一行，就误认为可以并行。
+
+## Phase 5 — semantic ownership after the `app/` split
+
+Batch 30 established the top-level shape. The follow-up batches correct ownership
+without reopening that tree:
+
+- [31](31-session-routing-sink.md): Session use cases leave composition.
+- [32](32-shell-host-purity.md): Shell keeps mechanics and receives product actions.
+- [33](33-window-surfaces-neutral.md): HUD, Pet and Quick Entry consume ViewModels and
+  Intents through neutral window ports; legacy stream ownership leaves their UI.
+- 34 is reserved for the final compatibility-aware Hermes vocabulary/preload pass and
+  must not be inferred or executed before its terminology table is approved.
+
+The cross-repository consequence of Batch 33 is fixed in
+[`../session-multi-surface-ownership.md`](../session-multi-surface-ownership.md): Work
+Core owns Sessions, Executions, event fan-out and backend Refs; Renderer windows do not.
+That document is an ownership decision, not authorization to invent the future wire
+protocol during a UI refactor.
 
 ## Batch 05 is a different objective
 

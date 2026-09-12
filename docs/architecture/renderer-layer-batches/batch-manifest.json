@@ -346,5 +346,21 @@
       "app/shell/layers/tour/run-tour",
       "app/composition/registrations/context-menu"
     ]
+  },
+  "33 window surfaces neutral": {
+    "edges": 0,
+    "modules": [
+      "app/windows/quick-entry/quick-entry-app",
+      "app/windows/quick-entry/quick-entry-root",
+      "app/windows/pet/pet-overlay-app",
+      "app/windows/pet/overlay-root",
+      "app/windows/hud/hud-shell",
+      "app/windows/hud/handoff",
+      "app/windows/hud/click-through",
+      "app/windows/hud/composer-drag",
+      "app/windows/hud/game-overlay",
+      "app/windows/hud/glass",
+      "app/windows/hud/resize-handle"
+    ]
   }
 }

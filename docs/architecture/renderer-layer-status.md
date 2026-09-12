@@ -7,7 +7,7 @@ because it is trusted; see `renderer-layer-master-plan.md` §8.
 
 | | |
 | --- | --- |
-| last updated | 2026-09-12 |
+| last updated | 2026-09-13 |
 | last commit to change renderer source | `d5964ed` |
 | ledger | **0** |
 | target when the run completes | **0 — met** (Phase 3 must leave it at 0) |
@@ -253,11 +253,15 @@ batch's stop-condition §7.4; no NEW reverse dependency was created (the §B2 mo
 | item | scope | baseline | destination | order | status |
 | --- | --- | --- | --- | --- | --- |
 | 31 | Session opening, owner resolution and Session-scoped request dispatch leave composition | Batch 30 executor snapshot: 6 files / 1,096 lines; adjacent `application/session/request-router.ts` 210 lines | `application/session/{open-session,session-owner,session-rpc-dispatcher}*`; `overlay-routing.ts` stays | after Batch 30 merged + independent review; runs alone | executed — `0d32114` (owner + dispatcher) + `3f63e53` (open-session) · executor numbers below · independent review pending |
-| 32 | Hermes/Gateway/RPC/product vocabulary becomes Harness/Runtime/Session/Work Core vocabulary where semantically correct | scope deliberately not frozen yet | coordinated final vocabulary pass | last, after all `app/` semantic reviews and an approved compatibility-aware vocabulary table | reserved — design blocked, do not execute |
+| 32 | Shell becomes a product-neutral host: mechanics stay; product actions and coordinators move to composition | semantic review baseline: 2,270 focused lines | `app/shell` host/engine + `app/composition/registrations` product wiring | after 31 merged/reviewed; runs alone | dispatched — see Batch 32; pending execution/review |
+| 33 | HUD, Pet and Quick Entry become Harness-neutral ViewModel/Intent clients | 21 TS/TSX files / 2,912 lines | neutral window ports; generic handoff to `application/session`; legacy stream policy below UI | after 32 merged/reviewed; runs alone | dispatched — pending prerequisite and execution |
+| 34 | Hermes/Gateway/RPC/product vocabulary becomes Harness/Runtime/Session/Work Core vocabulary where semantically correct | scope deliberately not frozen yet | coordinated final vocabulary/preload compatibility pass | last, after all UI semantic reviews and an approved compatibility-aware vocabulary table | reserved — design blocked, do not execute |
 
-Batch 31 contract: [31-session-routing-sink.md](renderer-layer-batches/31-session-routing-sink.md).
-Batch 32 is intentionally absent from the manifest and has no work-order file: its terminology table is
-not yet complete, so an executor must not infer mappings or run a global replacement.
+Contracts: [31](renderer-layer-batches/31-session-routing-sink.md),
+[32](renderer-layer-batches/32-shell-host-purity.md), and
+[33](renderer-layer-batches/33-window-surfaces-neutral.md). Batch 34 is intentionally absent from the
+manifest and has no work-order file: its terminology table is not yet complete, so an executor must not
+infer mappings or run a global replacement.
 
 **Executor measurements (stageA/31, worktree wt-c, 2026-09-12 — independent review pending).**
 Three modules + tests moved from `app/composition/routing/` to `application/session/` in two commits
