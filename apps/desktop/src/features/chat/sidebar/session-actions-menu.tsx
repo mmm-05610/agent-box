@@ -3,7 +3,7 @@ import type * as React from 'react'
 import { useEffect, useRef, useState } from 'react'
 
 import { renameSession } from '@/api/sessions'
-import { openSession } from '@/app/composition/routing/open-session'
+import { openSession } from '@/application/session/open-session'
 import {
   type ActionItemSpec,
   ActionsContextMenu,

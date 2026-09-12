@@ -1,4 +1,3 @@
-import { $workspaceIsPage, sessionRoute } from '@/app/routes'
 /**
  * One door for "open this session" — every surface (sidebar, ⌘K, notifications,
  * session switcher, refs, cron/artifacts) goes through here so a chat that's
@@ -17,6 +16,7 @@ import { $workspaceIsPage, sessionRoute } from '@/app/routes'
  */
 import { markStoredSessionViewed } from '@/application/session-read-state'
 import { type OpenSessionIntent, type OpenSessionScope, setOpenSessionHandler } from '@/lib/open-session'
+import { sessionRoute } from '@/lib/routes'
 import { $activeSessionId, $selectedStoredSessionId } from '@/store/session'
 import {
   focusedSessionNeedsRoute,
@@ -26,6 +26,7 @@ import {
   setSessionTileWorkspaceScope
 } from '@/store/session-states'
 import { canOpenSessionWindow, openSessionInNewWindow } from '@/store/windows'
+import { $workspaceIsPage } from '@/store/workspace-page'
 
 export type { OpenSessionIntent, OpenSessionScope as OpenSessionWorkspaceScope } from '@/lib/open-session'
 

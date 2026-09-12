@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react'
 
-import { openSession } from '@/app/composition/routing/open-session'
 import { appViewForPath, isOverlayView, NEW_CHAT_ROUTE, routeSessionId, sessionRoute } from '@/app/routes'
 import { commandFocusedPreview } from '@/application/preview/preview-nav'
+import { openSession } from '@/application/session/open-session'
 import { requestComposerFocus, requestComposerInsert } from '@/components/composer/focus'
 import { closeActiveTab } from '@/features/chat/close-tab'
 import { resolveDeepLinkAction } from '@/lib/deeplink-routes'

@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router'
 
-import { openSession } from '@/app/composition/routing/open-session'
+import { openSession } from '@/application/session/open-session'
 import { SessionStatusDot } from '@/components/chat/session-status-dot'
 import { sessionTitle } from '@/lib/chat-runtime'
 import { HUD_ITEM, HUD_POSITION, HUD_SURFACE, HUD_TEXT } from '@/lib/floating-hud'

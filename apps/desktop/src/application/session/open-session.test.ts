@@ -22,9 +22,12 @@ vi.mock('@/store/windows', () => ({
   openSessionInNewWindow: (...args: unknown[]) => openSessionInNewWindow(...args)
 }))
 
-vi.mock('@/app/routes', () => ({
-  $workspaceIsPage: { get: () => workspaceIsPageGet() },
+vi.mock('@/lib/routes', () => ({
   sessionRoute: (id: string) => `/c/${encodeURIComponent(id)}`
+}))
+
+vi.mock('@/store/workspace-page', () => ({
+  $workspaceIsPage: { get: () => workspaceIsPageGet() }
 }))
 
 import { $activeSessionId, $selectedStoredSessionId } from '@/store/session'
