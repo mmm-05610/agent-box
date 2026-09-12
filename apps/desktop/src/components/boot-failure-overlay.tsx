@@ -24,7 +24,7 @@ import {
 
 interface BootFailureOverlayProps {
   /** The Settings → Gateway panel shown by the recovery surface. Injected by
-   *  the host (app/contrib/wiring, the only render site) as a lazy component so
+   *  the host (app/composition/wiring/features, the only render site) as a lazy component so
    *  the overlay never imports an app screen and the code-split stays put.
    *  Absent — or not yet resolved — the slot renders nothing. */
   GatewaySettingsView?: ComponentType<{ embedded?: boolean }>

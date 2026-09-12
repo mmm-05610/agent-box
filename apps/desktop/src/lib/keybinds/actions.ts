@@ -254,7 +254,7 @@ export const KEYBIND_READONLY: readonly KeybindReadonly[] = [
   // action above. As a result, the panel shows one "Focus composer" label
   // for both. The row is fixed because the selection shortcut below uses the
   // same chord. Who claims a contested press: see the priority ladder in
-  // app/chat/composer/focus-chord.ts.
+  // features/chat/composer/focus-chord.ts.
   { id: 'composer.focus', category: 'composer', keys: ['mod+l'] },
   // Fixed, context-local shortcuts, listed so users can find them. This row
   // uses the same ⌘/Ctrl+L chord as `composer.focus` above. It is the

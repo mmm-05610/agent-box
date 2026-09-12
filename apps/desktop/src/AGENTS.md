@@ -56,11 +56,11 @@ via `/api/gateway/*`). Never re-parent the gateway under the backend — `gatewa
   picker-owned / settings-owned / advanced). `isDesktopSlashCommand(name)` gates **execution** (true
   for built-ins AND any non-built-in so typed skill/quick commands run);
   `isDesktopSlashSuggestion(name)` gates **discovery** — used by BOTH completion paths in
-  `app/chat/composer/hooks/use-slash-completions.ts` and by `filterDesktopCommandsCatalog`;
+  `features/chat/composer/hooks/use-slash-completions.ts` and by `filterDesktopCommandsCatalog`;
   `isDesktopSlashExtensionCommand(name)` is true for anything not a known built-in, and both
   suggestion and catalog paths let extensions through (the allow-list once silently dropped every
   skill/quick command from completions even though they executed when typed).
-- Dispatch: `app/session/hooks/use-prompt-actions/slash.ts` (`runSlash`) — desktop-owned built-ins
+- Dispatch: `features/session/hooks/use-prompt-actions/slash.ts` (`runSlash`) — desktop-owned built-ins
   (`/skin`, `/help`, `/new`, ...) locally or via `commands.catalog`; everything else `slash.exec` →
   `command.dispatch` fallback; a skill command resolves to `{type: "skill", message}` and is
   submitted as a normal prompt.

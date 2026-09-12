@@ -6,7 +6,7 @@ import type { ProjectInfo } from '@/types/hermes'
 
 import { liveSessionProjectId, NO_PROJECT_ID, sessionProjectColor } from './membership'
 
-// The membership core (moved out of app/chat/sidebar/projects/
+// The membership core (moved out of features/chat/sidebar/projects/
 // workspace-groups.test.ts along with its subject): which project a session
 // belongs to, the color derived from that answer, and the row-filter rule
 // built on both.

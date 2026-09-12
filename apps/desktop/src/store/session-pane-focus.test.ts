@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
-import { paneMirror } from '@/app/chat/pane-mirror'
+import { paneMirror } from '@/features/chat/pane-mirror'
 import { registry } from '@/lib/contributions'
 import * as model from '@/lib/pane-tree'
 import * as tree from '@/store/pane-shell/tree'
