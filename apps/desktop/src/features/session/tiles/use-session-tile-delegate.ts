@@ -33,7 +33,7 @@ import {
   resolveSessionOwner
 } from '@/features/session/hooks/use-session-actions/utils'
 import type { useSessionStateCache } from '@/features/session/hooks/use-session-state-cache'
-import type { GatewayRequester } from '../types'
+import type { GatewayRequester } from '@/types/gateway'
 
 type SessionStateCache = ReturnType<typeof useSessionStateCache>
 

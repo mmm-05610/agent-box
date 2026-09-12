@@ -1,6 +1,6 @@
 import { useStore } from '@nanostores/react'
 
-import { $restartPreviewServer } from '@/app/contrib/panes'
+import { $restartPreviewServer } from './restart-preview-server'
 import { $previewReloadRequest, $previewTabs } from '@/store/preview'
 
 import { PreviewPane } from './preview-pane'

@@ -95,7 +95,9 @@ import { AppContextMenu } from '../context-menu/app-context-menu'
 import { HudShell } from '../hud/hud-shell'
 import { $workspaceIsPage } from '../routes'
 
-import { FilesPane, LogsPane, ReviewPaneContent } from './panes'
+import { LogsPane } from '@/features/logs/logs-pane'
+import { FilesPane } from '@/features/right-sidebar/panes/files-pane'
+import { ReviewPaneContent } from '@/features/right-sidebar/panes/review-pane'
 import { ContribWiring, WiredPane } from './wiring'
 
 /**

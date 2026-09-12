@@ -35,7 +35,10 @@ vi.mock('../routes', () => ({
   sessionRoute: (id: string) => `/${id}`
 }))
 vi.mock('./latest-actions', () => ({ latestChatActions: () => ({}), latestSidebarActions: () => ({}) }))
-vi.mock('./panes', () => ({ setStatusbarItemGroup: vi.fn(), useStatusbarContributions: () => [] }))
+vi.mock('@/app/composition/registrations/chrome-contributions', () => ({
+  setStatusbarItemGroup: vi.fn(),
+  useStatusbarContributions: () => []
+}))
 vi.mock('../shell/model-menu-panel', () => ({ ModelMenuPanel: () => null }))
 
 afterEach(() => {

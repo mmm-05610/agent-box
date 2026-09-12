@@ -28,7 +28,7 @@ import { ModelMenuPanel } from '../shell/model-menu-panel'
 import { StatusbarControls } from '../shell/statusbar-controls'
 
 import { latestChatActions, latestSidebarActions } from './latest-actions'
-import { setStatusbarItemGroup, useStatusbarContributions } from './panes'
+import { setStatusbarItemGroup, useStatusbarContributions } from '@/app/composition/registrations/chrome-contributions'
 import type { SidebarActions, WiringActions } from './types'
 
 // Same lazy-view split as DesktopController — pages load on demand. The

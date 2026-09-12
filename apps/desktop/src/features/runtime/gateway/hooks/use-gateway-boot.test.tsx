@@ -53,7 +53,7 @@ import {
   recordSessionEventScope
 } from '@/store/session-states'
 
-import { deferred } from '../../../dev/test/deferred'
+import { deferred } from '@/dev/test/deferred'
 
 import { takeGatewaySurvivor } from './gateway-hmr-survivor'
 import { primaryRuntimeConnectionId, useGatewayBoot } from './use-gateway-boot'

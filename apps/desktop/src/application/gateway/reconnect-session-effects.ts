@@ -22,7 +22,7 @@ import { reconcileBusyStatesOnReconnect, resetTileRuntimeBindings } from '@/stor
  *    — no reconcile of a generation that never came up.
  *
  * `installReconnectSessionEffects` is called once by the production boot effect
- * (`app/gateway/hooks/use-gateway-boot.ts`, beside `configureGatewayRegistry`)
+ * (`features/runtime/gateway/hooks/use-gateway-boot.ts`, beside `configureGatewayRegistry`)
  * and returns its disposer, so an unmount unregisters precisely this wiring.
  */
 export function installReconnectSessionEffects(): () => void {

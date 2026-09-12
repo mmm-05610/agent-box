@@ -21,7 +21,7 @@ import { getServers } from '@/lib/mcp-servers'
 import { $mcpInstallRequest } from '@/store/mcp-deeplink-install'
 import { notify, readableError } from '@/store/notifications'
 
-import { setHermesConfigCache } from '../hooks/use-config-record'
+import { setHermesConfigCache } from '@/app/hooks/use-config-record'
 
 /**
  * Explicit-confirm gate for `hermes://mcp/install` deep links. The payload is

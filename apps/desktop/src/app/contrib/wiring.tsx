@@ -85,7 +85,7 @@ import { isAuxiliaryWindow, isBrowserWindow, isHudWindow } from '@/store/windows
 import { closeWorkspaceTab } from '@/features/chat/close-tab'
 import { CommandPalette } from '../command-palette'
 import { triggerAndRefreshCronJobs } from '@/features/cron/cron-actions'
-import { useGatewayBoot } from '../gateway/hooks/use-gateway-boot'
+import { useGatewayBoot } from '@/features/runtime/gateway/hooks/use-gateway-boot'
 import { useHermesConfigRecord } from '../hooks/use-config-record'
 import { useKeybinds } from '../hooks/use-keybinds'
 import { useHudHandoff } from '../hud/handoff'
@@ -132,13 +132,14 @@ import {
   reconcileActiveTranscript,
   resolveActiveTranscriptSession,
   useBackgroundSync
-} from './hooks/use-background-sync'
+} from '@/features/session/sync/background-sync'
 import { useDesktopIntegrations } from './hooks/use-desktop-integrations'
 import { usePetBridge } from './hooks/use-pet-bridge'
 import { useQuickEntryBridge } from './hooks/use-quick-entry-bridge'
-import { useSessionTileDelegate } from './hooks/use-session-tile-delegate'
-import { McpInstallDeepLinkDialog } from './mcp-install-deeplink-dialog'
-import { $restartPreviewServer, useTitlebarToolContributions } from './panes'
+import { useSessionTileDelegate } from '@/features/session/tiles/use-session-tile-delegate'
+import { McpInstallDeepLinkDialog } from '@/features/skills/mcp-install-deeplink-dialog'
+import { useTitlebarToolContributions } from '@/app/composition/registrations/chrome-contributions'
+import { $restartPreviewServer } from '@/features/chat/right-rail/restart-preview-server'
 import { createSessionRpcDispatcher } from './session-rpc-dispatcher'
 import { ChatRoutesSurface, SidebarSurface, StatusbarSurface, TerminalSurface } from './surfaces'
 import type { WiringActions, WiringApi } from './types'

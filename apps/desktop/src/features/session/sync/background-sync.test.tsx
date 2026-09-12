@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { $changeEventsAvailable, $cronChangeTick, $sessionsChangeTick } from '@/store/live-sync'
 import { $activeSessionId } from '@/store/session'
 
-import { useBackgroundSync } from './use-background-sync'
+import { useBackgroundSync } from './background-sync'
 
 const noop = () => undefined
 const requestGateway = async () => ({ sessions: [] })

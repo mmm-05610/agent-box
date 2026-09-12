@@ -10,7 +10,7 @@ import {
   publishSessionState
 } from '@/store/session-states'
 
-import { rehydrateLiveSessionStatuses } from './use-background-sync'
+import { rehydrateLiveSessionStatuses } from './background-sync'
 
 /**
  * `session.active_list` is the authoritative snapshot of what is RUNNING in the

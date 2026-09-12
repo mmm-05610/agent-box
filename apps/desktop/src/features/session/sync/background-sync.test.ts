@@ -34,7 +34,7 @@ import {
   resolveActiveTranscriptSession,
   useBackgroundSync,
   windowIsActivelyViewed
-} from './use-background-sync'
+} from './background-sync'
 
 vi.mock('@/application/session-transcripts', async importOriginal => ({
   ...(await importOriginal()),
