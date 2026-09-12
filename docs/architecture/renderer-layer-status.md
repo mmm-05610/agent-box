@@ -10,7 +10,7 @@ because it is trusted; see `renderer-layer-master-plan.md` §8.
 | last updated | 2026-09-13 |
 | last commit to change renderer source | `8b4bad3` |
 | ledger | **0** |
-| target when the run completes | **0 — met** (Phase 3 must leave it at 0) |
+| target when the run completes | **0 — met, sustained through Phase 5** |
 | tests | **776 files / 7466 tests** |
 | reviewed, per-batch numbers | 01 · 02 · 03 · 04 · 05 · 06a1 · 06b1 · 06c2 · 06c1 · 06a2 · 07a · 07b · 08 · 09 · 10 · 11 · 12 · 13 · 14 · 15 · 16 — every merged row names its reviewer's measured numbers |
 | phase 3 | work orders 17–29：UI 下沉与消息平台删除；逐项实时状态见 Phase 3 表，全部 `edges: 0` |
@@ -125,11 +125,21 @@ proved it the only closure that does not widen the ledger.)
   every ledger-bearing work order in this directory merged with a reviewer's
   numbers: 85 edges paid across 16 work orders plus the Phase 2 barrel removal,
   85 − 85 = 0 against the merged set.
-- **Phase 3 is open: six sink work orders, 44 files, 4,892 lines, all `edges: 0`.**
-  The ledger is *already* 0, so these pay nothing and must leave it at 0 — they
-  move logic that is merely **living in the wrong layer** (rank 4/5 modules that
-  render nothing and reach only rank ≤ 2). See the table below. Baseline for every
-  one of them: 776 files / 7466 tests, guard 16/16, ledger 0 before and after.
+- **Phase 3 is complete: all six sink work orders merged + independently reviewed** (rows 17–22).
+  **Phase 5 additions:** batches 23 (rescoped), 24, 25 and 28 are merged + reviewed; row 22
+  carries a planner flag (its shipped destination `session-lists/` vs the amended `sidebar/` —
+  batch 28 shipped to `sidebar/` alongside it; coexistence ruled safe, reconciliation is a
+  planner follow-up). **In flight:** batches 24/25 are merged — see rows 24/25. Wait, that
+  duplicates — see the table. **Batch 30:** APP_COMPOSITION_ROOT_GREEN (merged + reviewed).
+  **Batch 31:** merged + reviewed. **Batch 32:** SHELL_PRODUCT_NEUTRAL_HOST_GREEN (merged +
+  reviewed). **Batch 33:** WINDOW_SURFACES_HARNESS_NEUTRAL_GREEN (merged + reviewed).
+  **Batch 34:** dispatched as an isolated experiment branch (main untouched, per-stage
+  independent reviewers) — not started; the maintainer owns its go/no-go.
+- **Known maintainer-WIP collision (one-line fix, maintainer-owned):** the untracked
+  `src/plugins/agentbox-lab/lab.tsx:22` still imports `@/app/chat/runtime-repository`,
+  which batch 30 moved. It breaks the main checkout's typecheck by one error and loads
+  a radio-plugin test file to failure via the eager plugin glob. A clean tree (or that
+  one import line) is fully green.
 
 ---
 
@@ -253,8 +263,8 @@ batch's stop-condition §7.4; no NEW reverse dependency was created (the §B2 mo
 | item | scope | baseline | destination | order | status |
 | --- | --- | --- | --- | --- | --- |
 | 31 | Session opening, owner resolution and Session-scoped request dispatch leave composition | Batch 30 executor snapshot: 6 files / 1,096 lines; adjacent `application/session/request-router.ts` 210 lines | `application/session/{open-session,session-owner,session-rpc-dispatcher}*`; `overlay-routing.ts` stays | after Batch 30 merged + independent review; runs alone | merged — `0d32114` (owner + dispatcher) `3f63e53` (open-session) + merges · reviewer: three modules + tests moved R097–R100 with non-import content byte-identical; export lists md5-identical; the two out-of-doc scope adjustments (dispatcher's `resolveSessionOwner` re-spelled to its canonical rank-2 definition; `$workspaceIsPage` atom sunk to new `store/workspace-page.ts` with app/routes re-export, sole writer unchanged, four rank-5 consumers untouched) both ruled SANCTIONED — required for zero edges, behaviour-preserving, established pattern; `overlay-routing.ts` byte-identical; request-router untouched; work-order rg/find checks clean; 774 files / 7431 tests all passing, guard 16/16, ledger 0 constant, eslint 0 |
-| 32 | Shell becomes a product-neutral host: mechanics stay; product actions and coordinators move to composition | semantic review baseline: 2,270 focused lines | `app/shell` host/engine + `app/composition/registrations` product wiring | after 31 merged/reviewed; runs alone | executed — `7a7733d` (keybinding host/registration split) `9adf747` (context-menu verb injection + shell-sections move) `206c837` (tour coordinator move) + stage-5 status/lint commit · pending independent review |
-| 33 | HUD, Pet and Quick Entry become Harness-neutral ViewModel/Intent clients | 21 TS/TSX files / 2,912 lines | neutral window ports; generic handoff to `application/session`; legacy stream policy below UI | after 32 merged/reviewed; runs alone | executed — `e352a76` (Quick Entry port + catalog copy) `3eead8c` (pet five-way split + local activity projection) `8b4bad3` (HUD handoff sinks to `application/session` + `HudWindowPort`) + stage-5 status/lint commit · pending independent review |
+| 32 | Shell becomes a product-neutral host: mechanics stay; product actions and coordinators move to composition | semantic review baseline: 2,270 focused lines | `app/shell` host/engine + `app/composition/registrations` product wiring | after 31 merged/reviewed; runs alone  | merged — `7a7733d` (keybinding host/registration split) `9adf747` (context-menu verb injection) `206c837` (tour coordinator) `0fee1a5` (import order) `73fec18` (status) + merge `056919b` · SHELL_PRODUCT_NEUTRAL_HOST_GREEN · independent reviewer: handler-map region textually identical id-for-id (18 static + slot loops 1-18/1-9); host onKeyDown order preserved (IME->capture->intercept->combo->claims->unbound->editable->soft-gate->dispatch); narrow typed bag, no services-any; context-menu operation-for-operation injection with timing/visibility/enabled unchanged; tour engine/collect-targets byte-identical; negative rg zero under app/shell; ledger 0 constant; 774 files / 7429 tests (0 test failures; 1 WIP-attributable file-load failure), guard 16/16, eslint 0/142 warnings |
+| 33 | HUD, Pet and Quick Entry become Harness-neutral ViewModel/Intent clients | 21 TS/TSX files / 2,912 lines | neutral window ports; generic handoff to `application/session`; legacy stream policy below UI | after 32 merged/reviewed; runs alone  | merged — `e352a76` (Quick Entry port) `3eead8c` (Pet five-way split) `8b4bad3` (HUD handoff sink + HudWindowPort) + merge · WINDOW_SURFACES_HARNESS_NEUTRAL_GREEN · independent reviewer: negative semantic rg ZERO under app/windows (code, comments, user copy); window.hermesDesktop ZERO under app/windows; WiredPane assembly no longer imported by app/windows; the legacy resume enters only as composition's injected adoptSession; 4 window tests repointed 1:1 with zero assertion changes; Pet's removed shared-atom writes proven behaviour-neutral; ledger 0 constant; 774 files / 7429 tests (0 test failures), guard 16/16, eslint 0 |
 | 34 | dedicated experiment branch: turn the rendered product into an AgentBox Desktop frontend, then draft a neutral Work Core frontend Port | product semantics accepted 2026-09-13; Batch 32/33 are pending prerequisites | `experiment/agentbox-desktop-frontend` in a dedicated sibling worktree; main remains untouched | after 32 and 33 are merged + independently reviewed; branch runs alone; **every stage needs its own independent reviewer's passed verdict + measured numbers before the next stage starts** | dispatched — [Batch 34](renderer-layer-batches/34-agentbox-desktop-frontend-branch.md); no main-branch implementation is authorized |
 
 Contracts: [31](renderer-layer-batches/31-session-routing-sink.md),
