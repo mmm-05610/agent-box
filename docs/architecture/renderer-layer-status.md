@@ -170,19 +170,40 @@ out-of-group closure clean.
 | 25 | the interrupted-turn seal is extracted, and `session-info.ts` follows it | 1 (+1 fn) | 459 | `application/session/` | 2 | open |
 | 26 | the tool card's view model — renamed from the misleading `fallback-model` | 4 | 1817 | `lib/tool-view/` | 1 | open |
 | 27 | three zero-hermes form widgets out of the settings page | 3 | 495 | `components/settings/` | 4 | open |
-| 28 | the `sessions` pane's derivations, including the 672-line `workspace-groups.ts` | 3 | 955 | `application/sidebar/` | 7 | open |
-| 29 | **removal** — the messaging platforms' config surface (page · route · nav · palette · keybinds · i18n) | 2 del + 6 edit | ~1,057 | — | 6 | open |
+| 28 | the `sessions` pane's derivations, including the 672-line `workspace-groups.ts` | 3 | 955 | `application/sidebar/` | 6 | open |
+| 29 | **removal** — the messaging platform surface, config **and** adaptation | 3 del + ~15 edit, 30 files touched | ~1,500 | — | 5 | open |
+
+**29 was widened on 2026-09-12, and the reason matters.** The first version deleted only
+the *config* surface (one page) and kept the *adaptation*: a hardcoded list of **20
+platform ids** in `lib/session-source.ts`, **12 brand icons** in
+`app/messaging/platform-icon.tsx`, per-platform sidebar sections, and a `messaging`
+slice in the sidebar data model. The ruling changed from "not maintaining it for now" to
+"**not adapting to hermes's platform model at all**" — that belongs in the backend's
+next design, so adapting to it now is wasted work.
+
+So the end state is not "one page fewer": it is **the concept of a platform leaving the
+renderer**. Sessions from a platform do not disappear — the client-side exclusion list
+that hid them goes away too, so they land in the same list as everything else, ungrouped
+and unbadged. That is what "not adapting" looks like, and it is a behaviour change, not
+just fewer files.
 
 **29 is the first removal batch here, and its evidence is inverted.** A move is
 guarded by `typecheck`: a missed specifier goes red. A removal is not — forgetting to
-delete something leaves green, compiling dead code. So 29 carries a "must NOT delete"
-section ahead of its "delete" section, and the executor reports the *drop* in test
-count as the primary evidence rather than treating it as a regression.
+delete something leaves green, compiling dead code, a command that does nothing, orphan
+i18n. So 29 carries a "must NOT delete" section ahead of its "delete" section, and the
+executor reports the *drop* in test count as the primary evidence rather than treating
+it as a regression.
+
+**Kept on purpose, against the instinct to clean everything:** `api/messaging.ts` whole
+(it is the record of the existing protocol shape, and four of its eleven functions are
+webhooks, whose page stays), `app/webhooks/`, and
+`settings/keys-settings.tsx`'s exclusion of messaging credentials — that last one now
+means "nowhere to configure", which is the accepted cost of this ruling.
 
 **It also found something the rearrangement needs:** `app/chat/route-tile.tsx` renders
 a page as a layout-tree pane *beside* the main thread (`openRouteTile`). So the
-question "can skills/messaging/artifacts be pulled out and viewed side by side?" — the
-mechanism already exists. Recorded for the `pages/` ruling.
+question "can skills/artifacts be pulled out and viewed side by side?" — the mechanism
+already exists. Recorded for the `pages/` ruling.
 
 **Two ordering facts the wave table cannot express**, because waves encode *file
 collisions*, not dependencies:

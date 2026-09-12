@@ -306,13 +306,19 @@
       "session-project-label'"
     ]
   },
-  "29 messaging config removal": {
+  "29 messaging removal": {
     "edges": 0,
     "modules": [
       "MESSAGING_ROUTE",
       "nav\\.messaging",
       "MessagingView",
-      "platform-icon'"
+      "platform-icon'",
+      "isMessagingSource",
+      "MESSAGING_SESSION_SOURCE_IDS",
+      "handoffOriginSource",
+      "sessionSourceLabel",
+      "messagingSessions",
+      "MessagingSection"
     ]
   }
 }
