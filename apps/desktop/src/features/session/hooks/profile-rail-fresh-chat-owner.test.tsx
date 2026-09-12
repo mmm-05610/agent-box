@@ -5,10 +5,10 @@ import { useEffect, useMemo, useRef } from 'react'
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest'
 
 import { getSession } from '@/api/sessions'
-import { createSessionRpcDispatcher } from '@/app/composition/routing/session-rpc-dispatcher'
 import { ensureGatewayAgent } from '@/application/profile/gateway-routing'
 import { selectProfile } from '@/application/profile/navigation'
 import { newSessionInProfile } from '@/application/profile/new-session'
+import { createSessionRpcDispatcher } from '@/application/session/session-rpc-dispatcher'
 import {
   activeGateway,
   activeGatewayConnectionId,
