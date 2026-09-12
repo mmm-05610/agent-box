@@ -314,6 +314,12 @@ without reopening that tree:
 **34 的两条硬前置**：Batch 32 与 33 各自**独立复核并合并**之后才可开工；它在独立 worktree
 上独占运行，每个阶段留一个检查点。详见该工单的 "Branch and checkpoint discipline"。
 
+**每个阶段都要独立复核，而那不是一道审批闸。** 阶段的实现提交落地**不等于**阶段完成——
+完成的标准是有一个**独立子代理**自己跑命令、自己核树与数字，给出通过结论。阶段没通过复核，
+下一个阶段不开工。**这条闸在阶段之间，不在你和执行者之间**：全程不需要人工点头，
+但执行者不能自己宣布一个阶段做完了。这条沿用主线的规矩（status 的一行要写 `merged`，
+必须带提交**和**复核者实测的数字），分支计划不因为不碰 `main` 就降低标准。
+
 The cross-repository consequence of Batch 33 is fixed in
 [`../session-multi-surface-ownership.md`](../session-multi-surface-ownership.md): Work
 Core owns Sessions, Executions, event fan-out and backend Refs; Renderer windows do not.

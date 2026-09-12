@@ -45,6 +45,37 @@ resulting tree, remaining Hermes leaks, exact test result and next permitted sta
 Do not merge the branch, rebase `main`, reset, stash, or stage unrelated files. The
 untracked AgentBox POC is not copied, modified, or staged.
 
+### Every stage ends with an independent review, and that is not an approval gate
+
+A stage is **not complete** when its commit lands. It is complete when an **independent
+subagent** has reviewed it and returned its own measured numbers. This is the rule the
+main line already runs on — a status row may only say `merged` when it names a commit
+*and* a reviewer's numbers — and a branch programme does not get a weaker bar just
+because it does not touch `main`.
+
+The reviewer must:
+
+1. run the commands itself rather than read the implementer's summary;
+2. re-derive the stage's claimed tree and diff, not accept the journal's description;
+3. report the numbers it measured: affected tests passing/failing, the full `test:ui`
+   totals against the recorded baseline, `git diff --check`, and the count of remaining
+   Hermes/Gateway/RPC leaks in the surfaces this stage touched;
+4. walk the stage's own disposition row and confirm nothing it was told to remove is
+   still reachable, and nothing it was told to keep was quietly removed;
+5. verify the branch discipline held — no `main` commit, no rebase/reset/stash, no
+   protected path touched or staged, no unrelated file staged;
+6. state a verdict and append it to the branch journal, with its own numbers, next to
+   the implementer's.
+
+A stage whose reviewer did not pass it is **not done**, and the next stage does not
+start. That is a correctness barrier between stages, not a permission gate: nothing
+here waits for a human. The executor runs the whole programme; what it cannot do is
+call a stage finished on its own say-so.
+
+Stage 5 is the programme's acceptance review and follows the same rule, at the whole
+branch's scope: an independent reviewer re-runs the acceptance validation and reports
+the after tree, the remaining-leak table and the test comparison itself.
+
 ## Product target
 
 ```text
@@ -145,6 +176,12 @@ docs/desktop-src-tree.md
 
 ## Stages and commit boundaries
 
+Each stage's `Commit:` line is where that stage's implementation lands. **It is not
+where the stage ends.** Before the next stage begins, the stage must carry an
+independent reviewer's verdict and measured numbers in the branch journal (see
+"Every stage ends with an independent review" above). A stage without that review is
+an open stage, and the next one does not start.
+
 ### 0. Branch baseline and semantic map
 
 - Verify Batch 32 and 33 review records, clean `main`, base commit and protected-path exclusion.
@@ -225,6 +262,10 @@ git diff --check
 git status --short
 ```
 
+**The stage reviewer runs these commands itself** and records its own numbers; the
+implementer's run is evidence about the work, not evidence that the stage passed. Where
+a number cannot be compared to a baseline, say so rather than reporting it bare.
+
 Retain a manual classification of every changed route/sidebar/menu/Settings entry. A
 grep may aid review but may not be made into a brittle source-text test.
 
@@ -236,10 +277,18 @@ grep may aid review but may not be made into a brittle source-text test.
 - Preserving a feature requires UI Ref/cursor/Execution/Harness details.
 - The Hermes adapter cannot implement a Port intent without runtime behavior changes.
 - The branch adds a new failure, touches a protected path, or needs destructive Git.
+- **Two review rounds on the same stage disagree, or a reviewer's numbers contradict the
+  stage's own claim.** Do not resolve it by re-running the review until it passes, and do
+  not proceed to the next stage on the implementer's reading.
 
 ## Acceptance state
 
 - Green: `AGENTBOX_DESKTOP_FRONTEND_BRANCH_GREEN` — semantic UI boundary and a tested
-  frontend Port proposal exist on the experiment branch; no claim of backend integration.
+  frontend Port proposal exist on the experiment branch; **every stage carries an
+  independent reviewer's passed verdict with its own measured numbers**, and Stage 5's
+  acceptance was re-derived by a reviewer rather than accepted from the implementer's
+  summary. No claim of backend integration.
 - Partial: `AGENTBOX_DESKTOP_FRONTEND_BRANCH_PARTIAL` — exact stage, blocked capability
-  and evidence are recorded in the branch journal.
+  and evidence are recorded in the branch journal; name which stage(s) lack an
+  independent passed review, because a partial with unreviewed stages is not the same
+  as a partial with reviewed ones.
