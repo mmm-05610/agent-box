@@ -180,6 +180,25 @@ serve them. After the split the client **declares** what it can do, the backend 
 and a missing capability gets an honest "unsupported" instead of a silent failure —
 which is the rule `acp-desktop-phase1-design.md` §6.4 already states.
 
+### A — ruled, 2026-09-12
+
+**Build the client's own declaration table first; align the field names with ACP but do
+not adopt ACP's `clientCapabilities` mechanism yet.** The ruling came with the ordering
+that governs this whole phase:
+
+> 先把 UI 层整理干净，然后再去重组。
+
+So `desktop-bridge.ts` is **not** split in this round. The pattern to split it into is
+now written down, and four pieces are named — policy (core), the three event types ACP
+already standardises (`terminal.read/agent.terminal.output/terminal.close` →
+`clientCapabilities.terminal`), the eight Hermes-only ones (`preview.*`, `window.read`,
+`tour.request`, `tip.show`, `pane.reveal`, `layout.apply`, `message.reaction` → `_meta`
+extensions), and the eleven implementations (stay, registered as a table). It waits for
+the Extension mechanism, because the eight Hermes-only events are an Extension surface
+and their shape depends on that mechanism existing.
+
+**Do not dispatch a `desktop-bridge` work order before the mechanism is decided.**
+
 **B · Is the tool-call model fallback logic or presentation?**
 `components/assistant-ui/tool/fallback-model/` — `index.ts` 1503 · `format.ts` 154 ·
 `types.ts` 89 · `targets.ts` · plus `components/assistant-ui/tool/delegate-model.ts` 159.
