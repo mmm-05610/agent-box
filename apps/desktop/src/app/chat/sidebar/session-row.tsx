@@ -8,6 +8,8 @@ import { startSessionDrag } from '@/app/chat/session-drag'
 import { sessionProjectLabel } from '@/app/chat/sidebar/projects/session-project-label'
 import { PlatformAvatar } from '@/app/messaging/platform-icon'
 import { openSession } from '@/app/open-session'
+import { sessionRowDetails } from '@/application/session-lists/session-row-details'
+import { resolveSessionRowClick } from '@/application/session-lists/session-row-gesture'
 import { formatMessageTimestamp } from '@/components/assistant-ui/thread/timestamp'
 import { SessionStatusDot } from '@/components/chat/session-status-dot'
 import { Button } from '@/components/ui/button'
@@ -46,8 +48,6 @@ import {
   SidebarRowShell
 } from './chrome'
 import { SessionActionsMenu, SessionContextMenu } from './session-actions-menu'
-import { sessionRowDetails } from './session-row-details'
-import { resolveSessionRowClick } from './session-row-gesture'
 import { useProfilePrewarm } from './use-profile-prewarm'
 
 interface SidebarSessionRowProps extends React.ComponentProps<'div'> {

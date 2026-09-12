@@ -8,6 +8,10 @@ import { useLocation } from 'react-router'
 
 import { searchSessions } from '@/api/sessions'
 import { PlatformAvatar } from '@/app/messaging/platform-icon'
+import { filterSessionsByProfileScope } from '@/application/session-lists/profile-scope'
+import { resolveLiveProjectFilter } from '@/application/session-lists/project-filter'
+import { searchResultToSession } from '@/application/session-lists/search-view-model'
+import { buildSessionByAnyId, resolvePinnedSessions } from '@/application/session-lists/session-index'
 import { markSessionUnread } from '@/application/session-read-state'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
@@ -130,10 +134,8 @@ import { SidebarFilterMenu } from './filter-menu'
 import { useGatewaySessionGroups } from './gateway-group-model'
 import { SidebarLoadMoreRow } from './load-more-row'
 import { orderByIds, reconcileOrderIds, resolveManualSessionOrderIds, sameIds } from './order'
-import { filterSessionsByProfileScope } from './profile-scope'
 import { ProfileRail } from './profile-switcher'
 import { ProjectDialog } from './project-dialog'
-import { resolveLiveProjectFilter } from './project-filter'
 import {
   excludeProjectSessions,
   orderProjectsByIds,
@@ -153,14 +155,12 @@ import {
   useRepoWorktreeMap
 } from './projects'
 import { WorktreeDialog } from './projects/worktree-dialog'
-import { searchResultToSession } from './search-view-model'
 import {
   SidebarBlankState,
   SidebarLoadErrorState,
   SidebarPinnedEmptyState,
   SidebarSessionSkeletons
 } from './section-states'
-import { buildSessionByAnyId, resolvePinnedSessions } from './session-index'
 import { SidebarSessionsSection, VIRTUALIZE_THRESHOLD } from './sessions-section'
 import type {
   ChatSidebarProps,
