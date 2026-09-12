@@ -169,6 +169,7 @@ out-of-group closure clean.
 | 24 | the two handlers that reach `components/` — three calls join the deps bag, then they move | 2 | 550 | `application/session/gateway-event/` | 5 | open |
 | 25 | the interrupted-turn seal is extracted, and `session-info.ts` follows it | 1 (+1 fn) | 459 | `application/session/` | 2 | open |
 | 26 | the tool card's view model — renamed from the misleading `fallback-model` | 4 | 1817 | `lib/tool-view/` | 1 | open |
+| 27 | three zero-hermes form widgets out of the settings page | 3 | 495 | `components/settings/` | 4 | open |
 
 **Two ordering facts the wave table cannot express**, because waves encode *file
 collisions*, not dependencies:

@@ -284,5 +284,16 @@
       "tool/fallback-model'",
       "tool/fallback-model/"
     ]
+  },
+  "27 settings primitives": {
+    "edges": 0,
+    "modules": [
+      "'\\./primitives'",
+      "'\\./combobox-input'",
+      "'\\./searchable-select'",
+      "settings/primitives'",
+      "settings/combobox-input'",
+      "settings/searchable-select'"
+    ]
   }
 }
