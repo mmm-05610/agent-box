@@ -35,8 +35,10 @@ const mocks = vi.hoisted(() => {
   }
 })
 
-vi.mock('@/hermes', () => ({
+vi.mock('@/api/config', () => ({
   getHermesConfigRecord: mocks.getHermesConfigRecord,
+}))
+vi.mock('@/api/mcp', () => ({
   testMcpServer: vi.fn()
 }))
 

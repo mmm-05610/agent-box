@@ -1,6 +1,6 @@
 import { atom } from 'nanostores'
 
-import { getLocalModelsJobs, getLocalModelsStatus } from '@/hermes'
+import { getLocalModelsJobs, getLocalModelsStatus } from '@/api/local-models'
 import { translateNow } from '@/i18n'
 import { notify, notifyError } from '@/store/notifications'
 import type { LocalRuntimeJob } from '@/types/hermes'

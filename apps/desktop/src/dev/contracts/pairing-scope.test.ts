@@ -14,8 +14,9 @@ describe('pairing requests carry the active profile', () => {
   beforeEach(() => api.mockClear())
 
   it('scopes approve and revoke by body, and the listing by query', async () => {
-    const mod = await import('@/hermes')
-    mod.setApiRequestProfile('work')
+    const mod = await import('@/api/messaging')
+    const client = await import('@/api/client')
+    client.setApiRequestProfile('work')
 
     await mod.approvePairing('telegram', 'a'.repeat(16))
     await mod.revokePairing('telegram', 'U1')
@@ -29,8 +30,9 @@ describe('pairing requests carry the active profile', () => {
   })
 
   it('omits the profile entirely for single-profile users', async () => {
-    const mod = await import('@/hermes')
-    mod.setApiRequestProfile(null)
+    const mod = await import('@/api/messaging')
+    const client = await import('@/api/client')
+    client.setApiRequestProfile(null)
 
     await mod.approvePairing('telegram', 'a'.repeat(16))
     await mod.getPairing()

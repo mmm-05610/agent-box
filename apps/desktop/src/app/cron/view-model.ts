@@ -4,12 +4,10 @@ export interface ScheduleOption {
   value: string
 }
 
-import {
-  type CronJob
-} from '@/hermes'
 import { type Translations } from '@/i18n'
 import { asText } from '@/lib/text'
 import { ALL_PROFILES } from '@/store/profile'
+import { type CronJob } from '@/types/hermes'
 
 import {
   type PanelPillTone

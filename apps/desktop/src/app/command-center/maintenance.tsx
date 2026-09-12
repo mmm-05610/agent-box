@@ -1,30 +1,16 @@
 import { useCallback, useEffect, useState } from 'react'
 
+import { getActionStatus, getCuratorStatus, getMemoryStatus, resetMemory, runBackup, runCurator, runDebugShare, runDoctor, runSecurityAudit, setCuratorPaused } from '@/api/system'
 import { PageLoader } from '@/components/page-loader'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
-  type ActionResponse,
-  type CuratorStatusResponse,
-  type DebugShareResponse,
-  getActionStatus,
-  getCuratorStatus,
-  getMemoryStatus,
-  type MemoryStatusResponse,
-  resetMemory,
-  runBackup,
-  runCurator,
-  runDebugShare,
-  runDoctor,
-  runSecurityAudit,
-  setCuratorPaused
-} from '@/hermes'
 import { useI18n } from '@/i18n'
 import { AlertCircle } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 import { upsertDesktopActionTask } from '@/store/activity'
 import { confirm } from '@/store/confirm'
 import { notify, notifyError } from '@/store/notifications'
+import { type ActionResponse, type CuratorStatusResponse, type DebugShareResponse, type MemoryStatusResponse } from '@/types/hermes'
 import type { ActionStatusResponse } from '@/types/hermes'
 
 const ACTION_POLL_MS = 1200

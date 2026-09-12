@@ -1,6 +1,6 @@
 import { atom } from 'nanostores'
 
-import { getStarmapGraph } from '@/hermes'
+import { getStarmapGraph } from '@/api/skills'
 import type { StarmapGraph } from '@/types/hermes'
 
 // On-demand cache for the star map. The graph scan touches the skills catalog +

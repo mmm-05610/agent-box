@@ -1,20 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import {
-  getHermesConfigRecord,
-  getMcpCatalog,
-  getSkillContent,
-  getSkills,
-  getToolsets,
-  getUsageAnalytics,
-  installSkillFromHub,
-  profileScopeKey,
-  saveMcpServers,
-  setApiRequestConnection,
-  setApiRequestProfile,
-  setSkillEnabled,
-  setToolsetEnabled
-} from '@/hermes'
+import { profileScopeKey, setApiRequestConnection, setApiRequestProfile } from '@/api/client'
+import { getHermesConfigRecord } from '@/api/config'
+import { getMcpCatalog, saveMcpServers } from '@/api/mcp'
+import { getUsageAnalytics } from '@/api/models'
+import { getSkillContent, getSkills, installSkillFromHub, setSkillEnabled } from '@/api/skills'
+import { getToolsets, setToolsetEnabled } from '@/api/toolsets'
 
 // Contract: the Capabilities surface (skills / toolsets / MCP / hub / config)
 // can be scoped to a (connection, profile) pair — a profile belongs to ONE

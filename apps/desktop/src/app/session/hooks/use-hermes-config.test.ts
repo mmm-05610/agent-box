@@ -2,8 +2,8 @@
 import { act, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { getHermesConfig } from '@/api/config'
 import { $terminalFontFamily, setTerminalFontFamilyFromConfig } from '@/app/right-sidebar/terminal/terminal-font'
-import { getHermesConfig } from '@/hermes'
 import { persistString } from '@/lib/storage'
 import {
   $currentCwd,
@@ -22,7 +22,7 @@ import { deferred } from '../../../dev/test/deferred'
 
 import { useHermesConfig } from './use-hermes-config'
 
-vi.mock('@/hermes', () => ({
+vi.mock('@/api/config', () => ({
   getHermesConfig: vi.fn(),
   getHermesConfigDefaults: vi.fn().mockResolvedValue({})
 }))

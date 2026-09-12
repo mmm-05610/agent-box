@@ -1,18 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import {
-  createCronJob,
-  deleteCronJob,
-  getCronJob,
-  getCronJobRuns,
-  getCronJobs,
-  pauseCronJob,
-  resumeCronJob,
-  setApiRequestConnection,
-  setApiRequestProfile,
-  triggerCronJob,
-  updateCronJob
-} from '@/hermes'
+import { setApiRequestConnection, setApiRequestProfile } from '@/api/client'
+import { createCronJob, deleteCronJob, getCronJob, getCronJobRuns, getCronJobs, pauseCronJob, resumeCronJob, triggerCronJob, updateCronJob } from '@/api/cron'
 
 // Contract: every cron helper must carry the active gateway profile, so a
 // multi-profile / remote user's cron list, runs, and mutations hit the backend

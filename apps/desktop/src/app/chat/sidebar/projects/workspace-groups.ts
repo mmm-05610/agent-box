@@ -1,5 +1,4 @@
 import type { HermesGitWorktree } from '@/global'
-import type { ProjectInfo, SessionInfo } from '@/hermes'
 import { normalize } from '@/lib/text'
 import {
   comparisonSegments,
@@ -12,6 +11,7 @@ import {
   type SidebarSessionGroup,
   type SidebarWorkspaceTree
 } from '@/store/projects/membership'
+import type { ProjectInfo, SessionInfo } from '@/types/hermes'
 
 import { rankSessions } from '../order'
 

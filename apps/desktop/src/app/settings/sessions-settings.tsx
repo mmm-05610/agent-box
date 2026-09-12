@@ -1,15 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 
+import { getHermesConfigRecord, saveHermesConfig } from '@/api/config'
+import { deleteSession, setSessionArchived } from '@/api/sessions'
 import { listAllProfileSessions } from '@/application/session-lists'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Tip } from '@/components/ui/tooltip'
-import {
-  deleteSession,
-  getHermesConfigRecord,
-  saveHermesConfig,
-  setSessionArchived
-} from '@/hermes'
 import { useI18n } from '@/i18n'
 import { sessionTitle } from '@/lib/chat-runtime'
 import { pathLeaf } from '@/lib/display-path'

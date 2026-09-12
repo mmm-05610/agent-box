@@ -13,11 +13,13 @@ vi.mock('@/store/gateway', async () => {
     openGatewayForProfile: vi.fn(async () => undefined)
   }
 })
-vi.mock('@/hermes', () => ({
+vi.mock('@/api/client', () => ({
+  setApiRequestProfile: vi.fn()
+}))
+vi.mock('@/api/profiles', () => ({
   exportProfileArchive: vi.fn(async () => ({ archive: '/tmp/out.tar.gz', ok: true })),
   getProfiles: vi.fn(async () => ({ profiles: [] })),
   importProfileArchive: vi.fn(async () => ({ desktop: null, name: 'imported', ok: true, path: '/tmp/p' })),
-  setApiRequestProfile: vi.fn()
 }))
 vi.mock('@/lib/query-client', () => ({ invalidateProfileScopedQueries: vi.fn() }))
 vi.mock('@/store/starmap', () => ({ resetStarmapGraph: vi.fn() }))
@@ -27,7 +29,7 @@ const { $profileColors, setProfileColor } = await import('@/store/profile/appear
 const { modePref, skinPref } = await import('@/application/theme/adapters/preferences')
 const { $userThemes } = await import('@/application/theme/adapters/user-themes')
 const { $layoutTree } = await import('@/store/pane-shell/tree')
-const { exportProfileArchive } = await import('@/hermes')
+const { exportProfileArchive } = await import('@/api/profiles')
 
 // isValidTheme only requires background/foreground/primary at runtime; the
 // static type wants the full palette, hence the cast.

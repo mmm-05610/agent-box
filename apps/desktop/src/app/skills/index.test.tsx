@@ -5,7 +5,10 @@ import { MemoryRouter } from 'react-router'
 import type * as ReactRouterDom from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type * as HermesApi from '@/hermes'
+import type * as modelsApi from '@/api/models'
+import type * as profilesApi from '@/api/profiles'
+import type * as skillsApi from '@/api/skills'
+import type * as toolsetsApi from '@/api/toolsets'
 import { queryClient } from '@/lib/query-client'
 import type * as HubActions from '@/store/hub-actions'
 
@@ -24,19 +27,28 @@ const getOfficialSkills = vi.fn()
 // whose import-time subscription calls setApiRequestProfile) and stub only the
 // calls we assert on. Args are forwarded so the per-profile scope arg is
 // observable.
-vi.mock('@/hermes', async importOriginal => ({
-  ...(await importOriginal<typeof HermesApi>()),
+vi.mock('@/api/models', async importOriginal => ({
+  ...(await importOriginal<typeof modelsApi>()),
+  getUsageAnalytics: (days: number, profile?: null | string) => getUsageAnalytics(days, profile),
+}))
+vi.mock('@/api/profiles', async importOriginal => ({
+  ...(await importOriginal<typeof profilesApi>()),
+  getProfiles: () => getProfiles(),
+}))
+vi.mock('@/api/skills', async importOriginal => ({
+  ...(await importOriginal<typeof skillsApi>()),
   getSkills: (profile?: null | string) => getSkills(profile),
-  getToolsets: (profile?: null | string) => getToolsets(profile),
   setSkillEnabled: (name: string, enabled: boolean, profile?: null | string) => setSkillEnabled(name, enabled, profile),
+  getSkillContent: (name: string, profile?: null | string) => getSkillContent(name, profile),
+  getOfficialSkills: (profile?: null | string) => getOfficialSkills(profile)
+}))
+vi.mock('@/api/toolsets', async importOriginal => ({
+  ...(await importOriginal<typeof toolsetsApi>()),
+  getToolsets: (profile?: null | string) => getToolsets(profile),
   setToolsetEnabled: (name: string, enabled: boolean, profile?: null | string) =>
     setToolsetEnabled(name, enabled, profile),
   getToolsetConfig: (name: string, profile?: null | string) => getToolsetConfig(name, profile),
   selectToolsetProvider: (toolset: string, provider: string) => selectToolsetProvider(toolset, provider),
-  getUsageAnalytics: (days: number, profile?: null | string) => getUsageAnalytics(days, profile),
-  getProfiles: () => getProfiles(),
-  getSkillContent: (name: string, profile?: null | string) => getSkillContent(name, profile),
-  getOfficialSkills: (profile?: null | string) => getOfficialSkills(profile)
 }))
 
 // Notifications hit nanostores/timers we don't care about here.

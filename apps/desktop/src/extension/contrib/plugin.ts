@@ -14,14 +14,15 @@
 
 import type { ComponentProps, ComponentType } from 'react'
 
-import { type HermesGateway, pluginRest, type PluginRestOptions, pluginSocket, type ProfileScope } from '@/hermes'
+import { type HermesGateway, type ProfileScope } from '@/api/client'
+import { pluginRest, type PluginRestOptions, pluginSocket } from '@/api/plugins'
 import { createPluginI18n, type PluginI18n } from '@/i18n'
 import { registry } from '@/lib/contributions'
 import { readKey, writeKey } from '@/lib/storage'
 import { dispatchPluginNativeNotification, type PluginNativeNotificationInput } from '@/store/native-notifications'
 import type { Contribution } from '@/types/contributions'
 
-export type { PluginRestOptions } from '@/hermes'
+export type { PluginRestOptions } from '@/api/plugins'
 export type { HermesOpenTarget } from '@/lib/hermes-open-target'
 export type { PluginNativeNotificationInput, PluginNotificationAction } from '@/store/native-notifications'
 

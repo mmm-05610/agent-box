@@ -1,18 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import {
-  checkHermesUpdate,
-  getActionStatus,
-  getElevenLabsVoices,
-  getMemoryProviderConfig,
-  getStatus,
-  restartGateway,
-  saveMemoryProviderConfig,
-  setApiRequestProfile,
-  speakText,
-  transcribeAudio,
-  updateHermes
-} from '@/hermes'
+import { setApiRequestProfile } from '@/api/client'
+import { getStatus } from '@/api/config'
+import { checkHermesUpdate, getActionStatus, getElevenLabsVoices, getMemoryProviderConfig, restartGateway, saveMemoryProviderConfig, speakText, transcribeAudio, updateHermes } from '@/api/system'
 
 // Contract: every backend-targeted action helper must carry the active gateway
 // profile, so a multi-profile / global-remote user's restart, status poll, and

@@ -19,13 +19,17 @@ vi.mock('@/lib/profile-identity', () => ({ normalizeProfileKey: (p: string | nul
 vi.mock('@/store/profile/runtime-route-state', () => ({ $activeGatewayProfile: atom('alpha') }))
 vi.mock('@/application/profile/catalog', () => ({ refreshProfiles: async () => {} }))
 
-vi.mock('@/hermes', () => ({
+vi.mock('@/api/client', () => ({
   setApiRequestProfile: vi.fn(),
-  getProfiles: async () => ({ profiles: (await import('@/store/profile/catalog-state')).$profiles.get() }),
+}))
+vi.mock('@/api/config', () => ({
   setEnvVar: (key: string, value: string, profile?: string) => setEnvVar(key, value, profile),
   disconnectOAuthProvider: (...args: unknown[]) => disconnectOAuthProvider(...args),
   getEnvVars: (...args: unknown[]) => getEnvVars(...args),
   listOAuthProviders: (...args: unknown[]) => listOAuthProviders(...args)
+}))
+vi.mock('@/api/profiles', () => ({
+  getProfiles: async () => ({ profiles: (await import('@/store/profile/catalog-state')).$profiles.get() }),
 }))
 
 vi.mock('@/store/onboarding', () => ({

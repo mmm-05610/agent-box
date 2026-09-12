@@ -7,7 +7,7 @@ const { requestGateway } = vi.hoisted(() => ({ requestGateway: vi.fn() }))
 vi.mock('@/components/hooks/use-gateway-request', () => ({
   useGatewayRequest: () => ({ requestGateway })
 }))
-vi.mock('@/hermes', async importOriginal => ({
+vi.mock('@/api/profiles', async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
   getProfiles: async () => ({ profiles: [] })
 }))

@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 
-import { type ProfileScope, saveHermesConfigRecord } from '@/hermes'
+import { type ProfileScope } from '@/api/client'
+import { saveHermesConfigRecord } from '@/api/config'
 import { useI18n } from '@/i18n'
 import { notify, notifyError } from '@/store/notifications'
 

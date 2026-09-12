@@ -1,9 +1,9 @@
 import { skillInvocationText } from '@hermes/shared'
 import { type MutableRefObject, useCallback, useRef } from 'react'
 
+import { getProfiles } from '@/api/profiles'
 import { captureNewChatSource } from '@/application/profile/new-session'
 import { ensureGatewayProfile } from '@/application/profile/runtime-selection'
-import { getProfiles } from '@/hermes'
 import type { Translations } from '@/i18n'
 import { type ChatMessage, toChatMessages } from '@/lib/chat-messages'
 import { parseCommandDispatch, parseSlashCommand, sessionTitle } from '@/lib/chat-runtime'

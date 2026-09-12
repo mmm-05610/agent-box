@@ -6,7 +6,7 @@ import type { MemoryProviderConfig } from '@/types/hermes'
 const getMemoryProviderConfig = vi.fn()
 const saveMemoryProviderConfig = vi.fn()
 
-vi.mock('@/hermes', () => ({
+vi.mock('@/api/system', () => ({
   getMemoryProviderConfig: (provider: string) => getMemoryProviderConfig(provider),
   saveMemoryProviderConfig: (provider: string, values: unknown) => saveMemoryProviderConfig(provider, values)
 }))

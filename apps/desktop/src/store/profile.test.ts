@@ -28,9 +28,11 @@ vi.mock('@/store/pool-limits', async () => {
 
   return { $poolLimits: atom({ idleMs: 600_000, maxBackends: 3 }) }
 })
-vi.mock('@/hermes', () => ({
-  getProfiles: vi.fn(async () => ({ profiles: [] })),
+vi.mock('@/api/client', () => ({
   setApiRequestProfile: vi.fn()
+}))
+vi.mock('@/api/profiles', () => ({
+  getProfiles: vi.fn(async () => ({ profiles: [] })),
 }))
 vi.mock('@/lib/query-client', () => ({ invalidateProfileScopedQueries: vi.fn() }))
 vi.mock('@/store/starmap', () => ({ resetStarmapGraph }))
@@ -45,7 +47,7 @@ const { $poolLimits } = await import('@/store/pool-limits')
 
 const { $connection } = await import('./session')
 const { invalidateProfileScopedQueries } = await import('@/lib/query-client')
-const { getProfiles } = await import('@/hermes')
+const { getProfiles } = await import('@/api/profiles')
 
 const profile = (name: string, isDefault = false): ProfileInfo => ({
   has_env: false,

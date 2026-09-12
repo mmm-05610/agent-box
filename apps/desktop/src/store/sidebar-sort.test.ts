@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import type { SessionInfo } from '@/hermes'
+import type { SessionInfo } from '@/types/hermes'
 
 import { resetSidebarView, setSidebarOrdering } from './layout'
 import { $sessions } from './session'

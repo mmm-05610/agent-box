@@ -1,4 +1,4 @@
-import { type SessionInfo, type SessionSearchResult } from '@/hermes'
+import { type SessionInfo, type SessionSearchResult } from '@/types/hermes'
 
 /** Sidebar search view-model: FTS snippet cleanup and result mapping. */
 

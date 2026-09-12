@@ -8,11 +8,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const getActionStatus = vi.fn()
 const installSkillFromHub = vi.fn()
 
-vi.mock('@/hermes', () => ({
-  getActionStatus: (...args: unknown[]) => getActionStatus(...args),
+vi.mock('@/api/skills', () => ({
   installSkillFromHub: (...args: unknown[]) => installSkillFromHub(...args),
   uninstallSkillFromHub: vi.fn(),
   updateSkillsFromHub: vi.fn()
+}))
+vi.mock('@/api/system', () => ({
+  getActionStatus: (...args: unknown[]) => getActionStatus(...args),
 }))
 
 vi.mock('@/lib/query-client', () => ({

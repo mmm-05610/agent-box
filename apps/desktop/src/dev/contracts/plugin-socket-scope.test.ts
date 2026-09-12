@@ -11,7 +11,7 @@ import type { HermesConnection } from '@/global'
 //  2. A registry-agent activation routes it to the agent's SOURCE connection
 //     (getConnectionFor), not the local pool — the post-#87600 shape.
 
-vi.mock('@/hermes', async importOriginal => {
+vi.mock('@/api/client', async importOriginal => {
   const actual = await importOriginal<Record<string, unknown>>()
 
   return {
@@ -33,7 +33,8 @@ vi.mock('@/hermes', async importOriginal => {
 vi.mock('@/lib/query-client', () => ({ invalidateProfileScopedQueries: vi.fn() }))
 vi.mock('@/store/starmap', () => ({ resetStarmapGraph: vi.fn() }))
 
-const { pluginSocket, setApiRequestConnection, setApiRequestProfile } = await import('@/hermes')
+const { pluginSocket } = await import('@/api/plugins')
+const { setApiRequestConnection, setApiRequestProfile } = await import('@/api/client')
 const { closeSecondaryGateways, configureGatewayRegistry, setPrimaryGateway } = await import('@/store/gateway')
 const { $activeGatewayProfile } = await import('@/store/profile/runtime-route-state')
 const { startActiveProfileRouting } = await import('@/application/profile/active-route-effects')

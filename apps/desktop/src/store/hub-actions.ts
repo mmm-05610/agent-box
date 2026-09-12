@@ -1,12 +1,8 @@
 import { atom, map } from 'nanostores'
 
-import {
-  getActionStatus,
-  installSkillFromHub,
-  type ProfileScope,
-  uninstallSkillFromHub,
-  updateSkillsFromHub
-} from '@/hermes'
+import { type ProfileScope } from '@/api/client'
+import { installSkillFromHub, uninstallSkillFromHub, updateSkillsFromHub } from '@/api/skills'
+import { getActionStatus } from '@/api/system'
 import { normalizeProfileKey } from '@/lib/profile-identity'
 import { queryClient } from '@/lib/query-client'
 import { invalidateSlashCompletions } from '@/lib/slash-completion-cache'

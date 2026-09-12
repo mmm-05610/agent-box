@@ -1,16 +1,7 @@
 import { atom } from 'nanostores'
 
-import {
-  cancelOAuthSession,
-  getGlobalModelOptions,
-  getRecommendedDefaultModel,
-  listOAuthProviders,
-  pollOAuthSession,
-  setEnvVar,
-  startOAuthLogin,
-  submitOAuthCode,
-  validateProviderCredential
-} from '@/hermes'
+import { cancelOAuthSession, listOAuthProviders, pollOAuthSession, setEnvVar, startOAuthLogin, submitOAuthCode, validateProviderCredential } from '@/api/config'
+import { getGlobalModelOptions, getRecommendedDefaultModel } from '@/api/models'
 import { translateNow } from '@/i18n'
 import { isProviderSetupErrorMessage } from '@/lib/provider-setup-errors'
 import { evaluateRuntimeReadiness, type RuntimeReadinessResult } from '@/lib/runtime-readiness'

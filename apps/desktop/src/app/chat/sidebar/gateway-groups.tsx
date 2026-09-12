@@ -19,13 +19,13 @@ import {
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { ProfileGlyph } from '@/components/ui/profile-glyph'
-import type { SessionInfo } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { useStoreSelector } from '@/lib/use-session-slice'
 import { $connectionsRegistry } from '@/store/connection-registry-state'
 import type { SidebarSessionGroup } from '@/store/projects/membership'
 import { $sessionProfilesUsage } from '@/store/session'
 import { $sidebarSessionRankIds } from '@/store/sidebar-sort'
+import type { SessionInfo } from '@/types/hermes'
 
 import { SidebarGroupRow, SidebarRowGrab, SidebarRowLink, SidebarRowStack } from './chrome'
 import {

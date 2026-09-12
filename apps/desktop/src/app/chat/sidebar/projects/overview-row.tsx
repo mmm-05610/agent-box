@@ -5,11 +5,11 @@ import { useRef } from 'react'
 import { type NewSessionSplitHandler, startNewSessionDrag } from '@/app/chat/new-session-drag'
 import { Codicon } from '@/components/ui/codicon'
 import { Tip } from '@/components/ui/tooltip'
-import type { SessionInfo } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
 import { $sidebarShowAllSessions } from '@/store/layout'
 import type { SidebarProjectTree } from '@/store/projects/membership'
+import type { SessionInfo } from '@/types/hermes'
 
 import {
   SIDEBAR_LEAD_ICON_SIZE,

@@ -1,11 +1,11 @@
 import { useStore } from '@nanostores/react'
 import { memo, useEffect, useMemo, useState } from 'react'
 
+import type { ProfileScope } from '@/api/client'
 import { useGatewayRequest } from '@/components/hooks/use-gateway-request'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Tip } from '@/components/ui/tooltip'
-import type { ProfileScope } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { Loader2, Package } from '@/lib/icons'
 import { cn } from '@/lib/utils'

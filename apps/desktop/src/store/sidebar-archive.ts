@@ -1,7 +1,7 @@
 import { atom, computed } from 'nanostores'
 
 import { listAllProfileSessions } from '@/application/session-lists'
-import { type SessionInfo } from '@/hermes'
+import { type SessionInfo } from '@/types/hermes'
 
 import { $sessions } from './session'
 

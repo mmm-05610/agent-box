@@ -2,27 +2,10 @@ import { useStore } from '@nanostores/react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 
+import { activateLocalModel, deleteLocalModel, downloadBrowsedModel, downloadLocalModel, ejectLocalModel, getLocalCatalog, getLocalHardware, getLocalModelsStatus, type HFFileGroup, type HFSearchHit, installLocalRuntime, listHFRepoFiles, quickstartLocalModels, searchHFModels, setLocalServer, sideloadLocalModel } from '@/api/local-models'
 import { NEW_CHAT_ROUTE } from '@/app/routes'
 import { Button } from '@/components/ui/button'
 import { Tip } from '@/components/ui/tooltip'
-import {
-  activateLocalModel,
-  deleteLocalModel,
-  downloadBrowsedModel,
-  downloadLocalModel,
-  ejectLocalModel,
-  getLocalCatalog,
-  getLocalHardware,
-  getLocalModelsStatus,
-  type HFFileGroup,
-  type HFSearchHit,
-  installLocalRuntime,
-  listHFRepoFiles,
-  quickstartLocalModels,
-  searchHFModels,
-  setLocalServer,
-  sideloadLocalModel
-} from '@/hermes'
 import { useI18n } from '@/i18n'
 import {
   Check,

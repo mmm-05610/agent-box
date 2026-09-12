@@ -6,13 +6,13 @@ import { type NewSessionSplitHandler, startNewSessionDrag } from '@/app/chat/new
 import { Codicon } from '@/components/ui/codicon'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import type { HermesGitWorktree } from '@/global'
-import type { SessionInfo } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { displayPath } from '@/lib/display-path'
 import { $dismissedWorktreeIds, $removedWorktreeIds, dismissWorktree, setWorkspaceNodeOpen } from '@/store/layout'
 import { notifyError } from '@/store/notifications'
 import { removeWorktreePath } from '@/store/projects'
 import type { SidebarProjectTree, SidebarSessionGroup, SidebarWorkspaceTree } from '@/store/projects/membership'
+import type { SessionInfo } from '@/types/hermes'
 
 import { SidebarRowStack } from '../chrome'
 

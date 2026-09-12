@@ -13,11 +13,11 @@
  * dialogs and the backend share the filesystem for local and pooled backends.
  */
 
+import { exportProfileArchive, importProfileArchive } from '@/api/profiles'
 import { refreshActiveProfile } from '@/application/profile/catalog'
 import { selectProfile } from '@/application/profile/navigation'
 import { modePref, skinPref } from '@/application/theme/adapters/preferences'
 import { $userThemes, installUserTheme, resolveTheme } from '@/application/theme/adapters/user-themes'
-import { exportProfileArchive, importProfileArchive } from '@/hermes'
 import { translateNow } from '@/i18n'
 import { isLayoutNode, normalize } from '@/lib/pane-tree'
 import { normalizeProfileKey } from '@/lib/profile-identity'

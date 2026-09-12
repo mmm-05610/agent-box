@@ -1,7 +1,7 @@
+import { deleteProfile } from '@/api/profiles'
 import { refreshProfiles } from '@/application/profile/catalog'
 import { ensureGatewayAgent } from '@/application/profile/gateway-routing'
 import { selectProfile } from '@/application/profile/navigation'
-import { deleteProfile } from '@/hermes'
 import {
   activeGatewayConnectionId,
   openGatewayForAgent,

@@ -16,9 +16,8 @@ const gatewayMocks = vi.hoisted(() => {
   }
 })
 
-vi.mock('@/hermes', () => ({
+vi.mock('@/api/client', () => ({
   setApiRequestProfile: vi.fn(),
-  getProfiles: vi.fn(async () => ({ profiles: [] })),
   HermesGateway: class {
     connectionState = 'closed'
     close = vi.fn(() => {
@@ -34,6 +33,9 @@ vi.mock('@/hermes', () => ({
       gatewayMocks.instances.push(this as never)
     }
   }
+}))
+vi.mock('@/api/profiles', () => ({
+  getProfiles: vi.fn(async () => ({ profiles: [] })),
 }))
 vi.mock('@/store/session', () => ({
   setConnection: vi.fn(),

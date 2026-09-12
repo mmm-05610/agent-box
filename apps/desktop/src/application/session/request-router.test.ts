@@ -22,7 +22,7 @@ const secondaryGateways: Array<{
 
 let promptAckStatus: null | string = null
 
-vi.mock('@/hermes', () => ({
+vi.mock('@/api/client', () => ({
   HermesGateway: class {
     connectionState = 'closed'
     eventHandler: ((event: { payload?: Record<string, unknown>; session_id?: string; type: string }) => void) | null =

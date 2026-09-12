@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { HermesConfigRecord } from '@/hermes'
+import type { HermesConfigRecord } from '@/types/hermes'
 
 import { getConfigDisplayLanguage, hermesLocalePreference, withConfigDisplayLanguage } from './hermes-locale-preference'
 

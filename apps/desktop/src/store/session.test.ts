@@ -9,7 +9,8 @@ const setUnreadRemote = vi.fn<(id: string, unread: boolean, profile?: null | str
   Promise.resolve({ ok: true })
 )
 
-vi.mock('@/hermes', () => ({
+vi.mock('@/api/client', () => ({
+
   // The store only needs the request-scope seam; keep the barrel mock minimal.
   setApiRequestProfile: () => {}
 }))

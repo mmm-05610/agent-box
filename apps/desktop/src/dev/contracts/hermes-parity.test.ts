@@ -1,21 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import {
-  getCuratorStatus,
-  getMcpCatalog,
-  getMemoryStatus,
-  getOfficialSkills,
-  getSkillHubSources,
-  getToolsetModels,
-  installSkillFromHub,
-  resetMemory,
-  runDebugShare,
-  searchSkillsHub,
-  selectToolsetModel,
-  setCuratorPaused,
-  setMcpServerEnabled,
-  testMcpServer
-} from '@/hermes'
+import { getMcpCatalog, setMcpServerEnabled, testMcpServer } from '@/api/mcp'
+import { getOfficialSkills, getSkillHubSources, installSkillFromHub, searchSkillsHub } from '@/api/skills'
+import { getCuratorStatus, getMemoryStatus, resetMemory, runDebugShare, setCuratorPaused } from '@/api/system'
+import { getToolsetModels, selectToolsetModel } from '@/api/toolsets'
 
 describe('Hermes REST parity helpers (hub / mcp / maintenance)', () => {
   let api: ReturnType<typeof vi.fn>

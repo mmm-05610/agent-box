@@ -1,6 +1,7 @@
 import { useStore } from '@nanostores/react'
 import { useCallback, useEffect, useState } from 'react'
 
+import { saveHermesConfigRecord } from '@/api/config'
 import { readUseRealProfile } from '@/app/settings/browser-real-profile-panel'
 import { Button } from '@/components/ui/button'
 import {
@@ -11,7 +12,6 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog'
-import { saveHermesConfigRecord } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { Check, Globe } from '@/lib/icons'
 import { notify, notifyError } from '@/store/notifications'

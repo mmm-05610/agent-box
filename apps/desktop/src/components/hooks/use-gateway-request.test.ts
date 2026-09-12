@@ -11,8 +11,8 @@ const gatewayMocks = vi.hoisted(() => ({
   }>
 }))
 
-vi.mock('@/hermes', async importOriginal => {
-  const actual = await importOriginal<typeof HermesModule>()
+vi.mock('@/api/client', async importOriginal => {
+  const actual = await importOriginal<typeof clientApi>()
 
   class FakeHermesGateway {
     connectionState = 'closed'
@@ -50,8 +50,8 @@ vi.mock('@/hermes', async importOriginal => {
   return { ...actual, HermesGateway: FakeHermesGateway }
 })
 
-import type * as HermesModule from '@/hermes'
-import type { HermesGateway } from '@/hermes'
+import type { HermesGateway } from '@/api/client'
+import type * as clientApi from '@/api/client'
 import {
   $gateway,
   closeSecondaryGateways,

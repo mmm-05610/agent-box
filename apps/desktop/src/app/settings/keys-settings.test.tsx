@@ -10,11 +10,13 @@ const getEnvVars = vi.fn()
 
 stubResizeObserver()
 
-vi.mock('@/hermes', () => ({
+vi.mock('@/api/client', () => ({
+  setApiRequestProfile: () => undefined,
+}))
+vi.mock('@/api/config', () => ({
   deleteEnvVar: vi.fn(),
   getEnvVars: (profile?: null | string) => getEnvVars(profile),
   revealEnvVar: vi.fn(),
-  setApiRequestProfile: () => undefined,
   setEnvVar: vi.fn()
 }))
 

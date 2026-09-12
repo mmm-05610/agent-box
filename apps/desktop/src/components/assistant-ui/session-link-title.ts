@@ -8,7 +8,7 @@
  */
 import { useEffect, useMemo, useState } from 'react'
 
-import { getSession } from '@/hermes'
+import { getSession } from '@/api/sessions'
 import { parseSessionRefValue, sessionRefCacheKey, sessionRefFallbackLabel } from '@/lib/session-refs'
 import { $sessions, sessionMatchesStoredId } from '@/store/session'
 import type { SessionInfo } from '@/types/hermes'

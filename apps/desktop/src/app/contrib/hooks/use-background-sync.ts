@@ -1,10 +1,10 @@
 import { useStore } from '@nanostores/react'
 import { type MutableRefObject, useCallback, useEffect, useRef } from 'react'
 
+import { type ProfileScope } from '@/api/client'
 import { graftRefreshedTailOntoBackfill } from '@/app/chat/transcript-backfill'
 import { refreshActiveProfile } from '@/application/profile/catalog'
 import { getLatestSessionMessages } from '@/application/session-transcripts'
-import { type ProfileScope } from '@/hermes'
 import { preserveLocalAssistantErrors, sealOpenToolParts, toChatMessages } from '@/lib/chat-messages'
 import { createClientSessionState } from '@/lib/chat-runtime'
 import { sessionMessagesSignature } from '@/lib/session-signatures'

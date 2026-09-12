@@ -132,7 +132,7 @@ describe('the theme directory is a leaf', () => {
       "import { persistString } from '@/lib/storage'",
       "import { registry } from '@/lib/contributions'",
       "import { requestGateway } from '@/api/gateway'",
-      "import { getHermesConfigRecord } from '@/hermes'",
+      "import { getHermesConfigRecord } from '@/api/config'",
       "import { ingestBackendSkin } from '@/application/theme/adapters/backend-sync'",
       "import type { HermesSkin } from '@hermes/shared/skin'",
       "export { modePref } from '@/application/theme/adapters/preferences'",

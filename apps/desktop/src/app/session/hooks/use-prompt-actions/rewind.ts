@@ -11,7 +11,7 @@
 
 import type { AppendMessage, ThreadMessage } from '@assistant-ui/react'
 
-import { PROMPT_SUBMIT_REQUEST_TIMEOUT_MS } from '@/hermes'
+import { PROMPT_SUBMIT_REQUEST_TIMEOUT_MS } from '@/api/client'
 import {
   branchGroupForUser,
   type ChatMessage,

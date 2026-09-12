@@ -2,7 +2,7 @@ import { cleanup, render } from '@testing-library/react'
 import type * as React from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { SessionInfo } from '@/hermes'
+import type { SessionInfo } from '@/types/hermes'
 
 import { SidebarSessionsSection, VIRTUALIZE_THRESHOLD } from './sessions-section'
 import type { VirtualSessionListProps } from './virtual-session-list'

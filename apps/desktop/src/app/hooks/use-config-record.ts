@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 
-import { getHermesConfigRecord, type ProfileScope, profileScopeKey } from '@/hermes'
+import { type ProfileScope, profileScopeKey } from '@/api/client'
+import { getHermesConfigRecord } from '@/api/config'
 import { queryClient, writeCache } from '@/lib/query-client'
 import type { HermesConfigRecord } from '@/types/hermes'
 

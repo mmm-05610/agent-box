@@ -21,9 +21,11 @@ beforeAll(() => {
 
 const getGlobalModelOptions = vi.fn()
 
-vi.mock('@/hermes', () => ({
-  getGlobalModelOptions: (...args: unknown[]) => getGlobalModelOptions(...args),
+vi.mock('@/api/client', () => ({
   setApiRequestProfile: vi.fn()
+}))
+vi.mock('@/api/models', () => ({
+  getGlobalModelOptions: (...args: unknown[]) => getGlobalModelOptions(...args),
 }))
 
 beforeEach(() => {

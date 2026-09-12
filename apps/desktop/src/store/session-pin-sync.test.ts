@@ -6,10 +6,13 @@ const patch = vi.fn<(id: string, pinned: boolean, profile?: null | string) => Pr
   Promise.resolve({ ok: true })
 )
 
-vi.mock('@/hermes', () => ({
+vi.mock('@/api/client', () => ({
+
   // The layout store reaches the profile store, which sets the request profile
   // at import time; this suite only cares about the pin call.
   setApiRequestProfile: () => {},
+}))
+vi.mock('@/api/sessions', () => ({
   setSessionPinnedRemote: (id: string, pinned: boolean, profile?: null | string) => patch(id, pinned, profile)
 }))
 

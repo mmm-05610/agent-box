@@ -25,8 +25,8 @@ vi.mock('@/application/session-lists', async () => ({
   })
 }))
 
-vi.mock('@/hermes', async () => ({
-  ...(await vi.importActual('@/hermes')),
+vi.mock('@/api/sessions', async () => ({
+  ...(await vi.importActual('@/api/sessions')),
   getAllSessionMessages: async () => ({
     messages: [
       {

@@ -5,19 +5,12 @@ import type { MutableRefObject } from 'react'
 import { useEffect, useRef } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { type ProfileScope } from '@/api/client'
+import { deleteSession, getAllSessionMessages, getSession, setSessionArchived } from '@/api/sessions'
 import { resolveSessionRpcOwner } from '@/app/contrib/wiring-routing'
 import { ensureGatewayProfile } from '@/application/profile/runtime-selection'
 import { getLatestSessionMessages } from '@/application/session-transcripts'
 import { requestForSessionProfile } from '@/application/session/request-router'
-import {
-  deleteSession,
-  getAllSessionMessages,
-  getSession,
-  type ProfileScope,
-  type SessionInfo,
-  type SessionResumeResponse,
-  setSessionArchived
-} from '@/hermes'
 import { createClientSessionState } from '@/lib/chat-runtime'
 import { $clarifyRequests, clearClarifyRequest, setClarifyRequest } from '@/store/clarify'
 import { clearSessionDraft, stashSessionDraft, takeSessionDraft } from '@/store/composer'
@@ -71,6 +64,7 @@ import { $sessionTiles, sessionTileOwnerRoute } from '@/store/session-states'
 import { $sessionSeenCounts, $unreadFinishedMarkers } from '@/store/session-unread'
 import { type SessionProfileRoute } from '@/store/session/types'
 import { $terminalTakeover, setTerminalTakeover } from '@/store/terminal-takeover'
+import { type SessionInfo, type SessionResumeResponse } from '@/types/hermes'
 import type { ClientSessionState } from '@/types/session'
 
 import { deferred } from '../../../dev/test/deferred'
@@ -80,12 +74,15 @@ import sessionResumeActiveTurn from './__fixtures__/session-resume-active-turn.j
 import { useSessionActions } from './use-session-actions'
 import { useSessionStateCache } from './use-session-state-cache'
 
-vi.mock('@/hermes', async importOriginal => ({
+vi.mock('@/api/client', async importOriginal => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  setApiRequestProfile: vi.fn(),
+}))
+vi.mock('@/api/sessions', async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
   deleteSession: vi.fn(),
   getSession: vi.fn(),
   getAllSessionMessages: vi.fn(),
-  setApiRequestProfile: vi.fn(),
   setSessionArchived: vi.fn()
 }))
 

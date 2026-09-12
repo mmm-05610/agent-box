@@ -1,7 +1,7 @@
-import type { SessionInfo } from '@/hermes'
-import { getAllSessionMessages } from '@/hermes'
+import { getAllSessionMessages } from '@/api/sessions'
 import { translateNow } from '@/i18n'
 import { notify, notifyError } from '@/store/notifications'
+import type { SessionInfo } from '@/types/hermes'
 
 interface ExportSessionParams {
   sessionId: string

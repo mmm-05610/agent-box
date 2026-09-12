@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-import { getStatus } from '@/hermes'
+import { getStatus } from '@/api/config'
 import { evaluateRuntimeReadiness, type RuntimeReadinessResult } from '@/lib/runtime-readiness'
 import type { GatewayRequester } from '@/types/gateway'
 import type { StatusResponse } from '@/types/hermes'

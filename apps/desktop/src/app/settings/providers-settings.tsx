@@ -2,6 +2,7 @@ import { useStore } from '@nanostores/react'
 import type { ReactNode } from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
+import { disconnectOAuthProvider, listOAuthProviders } from '@/api/config'
 import {
   FEATURED_ID,
   FeaturedProviderRow,
@@ -15,7 +16,6 @@ import {
 import { Button } from '@/components/ui/button'
 import { RowButton } from '@/components/ui/row-button'
 import { SearchField } from '@/components/ui/search-field'
-import { disconnectOAuthProvider, listOAuthProviders } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { Check, ChevronDown, ChevronRight, KeyRound, Loader2, Terminal, Trash2 } from '@/lib/icons'
 import { normalize } from '@/lib/text'

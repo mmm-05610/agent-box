@@ -1,8 +1,8 @@
 import { useCallback } from 'react'
 
+import { deleteSession, setSessionArchived } from '@/api/sessions'
 import { selectStoredSessionForViewing } from '@/application/session-read-state'
 import { requestForSessionProfile } from '@/application/session/request-router'
-import { deleteSession, setSessionArchived } from '@/hermes'
 import { type Translations } from '@/i18n'
 import { clearQueuedPrompts } from '@/store/composer-queue'
 import { $pinnedSessionIds } from '@/store/layout'

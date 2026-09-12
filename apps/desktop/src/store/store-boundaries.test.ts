@@ -50,7 +50,7 @@ const OWNER_RESOLUTION = 'store/session-owner-resolution.ts'
 
 /** Upper layers of the renderer plus the transport: what a store of session
  *  state may not reach, by directory under `src/`. */
-const SESSION_STATE_FORBIDDEN = ['api/', 'application/', 'hermes.ts', 'hermes/', GATEWAY_ENTRY, GATEWAY_DIR] as const
+const SESSION_STATE_FORBIDDEN = ['api/', 'application/', GATEWAY_ENTRY, GATEWAY_DIR] as const
 
 /** The session view store: what the transport may not reach. */
 const GATEWAY_FORBIDDEN = [SESSION_STATE_ENTRY, SESSION_STATE_DIR] as const
@@ -321,7 +321,7 @@ describe('the gateway transport does not know session state', () => {
 
 describe('fail-closed owner resolution stays a store query', () => {
   const pinned = graph.filter(module => module.path === OWNER_RESOLUTION)
-  const forbidden = ['application/', 'hermes.ts', 'hermes/', GATEWAY_ENTRY, GATEWAY_DIR] as const
+  const forbidden = ['application/', GATEWAY_ENTRY, GATEWAY_DIR] as const
 
   it('exists to judge', () => {
     expect(pinned).toHaveLength(1)
@@ -398,9 +398,9 @@ describe('the application layer is where the two sides meet', () => {
 })
 
 describe('the two store facades re-export nothing from above', () => {
-  // `application/` only. The gateway facade DOES legitimately reach `@/hermes`
-  // and the API modules — it is the RPC client — and the session-state facade's
-  // own rule above is already stricter. What neither facade may ever carry is an
+  // `application/` only. The gateway facade DOES legitimately reach the API
+  // modules — it is the RPC client — and the session-state facade's own rule
+  // above is already stricter. What neither facade may ever carry is an
   // application USE-CASE: that is the edge that would hand every consumer of the
   // store the orchestration, and through it the transport, back.
   const forbidden = ['application/'] as const
@@ -444,7 +444,7 @@ describe('the scanners can fail', () => {
       "const { markSessionUnread } = await import('@/application/session-read-state')",
       "const remote = require('@/api/sessions')",
       "vi.mock('@/store/gateway', () => ({ requestGatewayForProfile: vi.fn() }))",
-      "import { HermesGateway } from '@/hermes'"
+      "import { HermesGateway } from '@/api/client'"
     ]
 
     for (const source of cases) {
@@ -512,7 +512,7 @@ describe('the scanners can fail', () => {
 
   it('judges a type-only import by the direct rule but not by the runtime walk', () => {
     const modules: Module[] = [
-      { path: SESSION_STATE_ENTRY, source: "import type { HermesGateway } from '@/hermes'" }
+      { path: SESSION_STATE_ENTRY, source: "import type { HermesGateway } from '@/api/client'" }
     ]
 
     // Naming the transport in the store's own type surface is the violation the
@@ -523,8 +523,8 @@ describe('the scanners can fail', () => {
     expect(closureViolations(modules, modules, forbidden)).toEqual([])
 
     // An inline type modifier erases the same way; a mixed import does not.
-    expect(runtimeImportSpecifiers("import { type HermesGateway } from '@/hermes'")).toEqual([])
-    expect(runtimeImportSpecifiers("import { type HermesGateway, $gateway } from '@/hermes'")).toEqual(['@/hermes'])
+    expect(runtimeImportSpecifiers("import { type HermesGateway } from '@/api/client'")).toEqual([])
+    expect(runtimeImportSpecifiers("import { type HermesGateway, hermesApi } from '@/api/client'")).toEqual(['@/api/client'])
   })
 
   it('catches a session-state module reached from the gateway', () => {

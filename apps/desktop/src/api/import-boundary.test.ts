@@ -8,9 +8,9 @@ import { describe, expect, it } from 'vitest'
 //
 // `api/` builds requests, sends them, parses responses and raises typed errors.
 // It is the bottom of the front-end's own dependency order: the stores, the
-// routes, the components, the themes, the i18n catalogs, the contribution
-// registry and the `@/hermes` compatibility barrel all sit ABOVE it, and every
-// one of them is free to import `api/`. None of them may be reachable back.
+// routes, the components, the themes, the i18n catalogs and the contribution
+// registry all sit ABOVE it, and every one of them is free to import `api/`.
+// None of them may be reachable back.
 //
 // The rule is checked twice, because one check is not enough:
 //
@@ -44,10 +44,6 @@ const SELF = relative(SRC_DIR, fileURLToPath(import.meta.url))
 
 /** Upper layers of the renderer, by directory under `src/`. */
 const UPPER_ZONES = ['store', 'app', 'components', 'themes', 'i18n', 'extension/contrib'] as const
-
-/** `src/hermes.ts` — the compatibility barrel over `api/**` itself. Nothing
- *  under `api/` may close the loop back through it. */
-const BARREL = 'hermes.ts'
 
 /** `application/` is the layer that composes `api/` with the stores; being
  *  above `api/`, it is off limits in the same direction. (The objective names
@@ -94,10 +90,6 @@ export interface Violation {
 /** The upper layer a bare specifier names, or null when it names none. Matches
  *  both the directory (`@/store`) and anything under it (`@/store/session`). */
 export function upperLayerOfSpecifier(specifier: string): string | null {
-  if (specifier === '@/hermes' || specifier.startsWith('@/hermes/')) {
-    return 'the @/hermes barrel'
-  }
-
   for (const zone of ZONES) {
     if (specifier === `@/${zone}` || specifier.startsWith(`@/${zone}/`)) {
       return `@/${zone}`
@@ -110,10 +102,6 @@ export function upperLayerOfSpecifier(specifier: string): string | null {
 /** The upper layer a `src/`-relative path sits in, or null. Catches the
  *  relative spelling (`../store/session`) that no alias prefix would. */
 export function upperLayerOfPath(path: string): string | null {
-  if (path === BARREL || path.startsWith('hermes/')) {
-    return 'the @/hermes barrel'
-  }
-
   for (const zone of ZONES) {
     if (path.startsWith(`${zone}/`)) {
       return `${zone}/`
@@ -311,7 +299,7 @@ describe('the api directory is a leaf', () => {
       "import { modePref } from '@/themes/context'",
       "import { ingestBackendSkin } from '@/application/theme/adapters/backend-sync'",
       "import { overlay } from '@/components/ui/dialog'",
-      "import { getHermesConfigRecord } from '@/hermes'",
+      "import { refreshActiveProfile } from '@/application/profile/catalog'",
       "import { mcpOAuthRpc } from '@/application/mcp-oauth'"
     ]
 
@@ -344,14 +332,15 @@ describe('the api directory is a leaf', () => {
 
     expect(closureViolations([graph[0]], graph).map(violation => violation.detail)).toHaveLength(1)
 
-    // …and the same walk through the barrel, spelled relatively.
-    const barrelGraph = [
-      { path: 'api/probe.ts', source: "import { getProfiles } from '../hermes'" },
-      { path: 'hermes.ts', source: "export * from './api/profiles'" },
-      { path: 'api/profiles.ts', source: '' }
+    // …and the same walk into an upper layer through a helper, spelled
+    // relatively — no alias in sight, the edge is there all the same.
+    const helperGraph = [
+      { path: 'api/probe.ts', source: "import { helper } from '../lib/helper'" },
+      { path: 'lib/helper.ts', source: "import { refreshActiveProfile } from '../application/profile/catalog'" },
+      { path: 'application/profile/catalog.ts', source: '' }
     ]
 
-    expect(closureViolations([barrelGraph[0]], barrelGraph).map(violation => violation.detail)).toHaveLength(1)
+    expect(closureViolations([helperGraph[0]], helperGraph).map(violation => violation.detail)).toHaveLength(1)
 
     // A helper chain that stays below `api/` is clean.
     const clean = [

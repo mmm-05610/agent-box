@@ -1,9 +1,9 @@
 import { useCallback, useRef } from 'react'
 
+import { getAllSessionMessages } from '@/api/sessions'
 import { ensureGatewayAgent } from '@/application/profile/gateway-routing'
 import { ensureGatewayProfile } from '@/application/profile/runtime-selection'
 import { sessionOwnerRouteFromRow } from '@/application/session/request-router'
-import { getAllSessionMessages } from '@/hermes'
 import { type Translations } from '@/i18n'
 import { type ChatMessage, toChatMessages } from '@/lib/chat-messages'
 import { requestGatewayForAgent } from '@/store/gateway'

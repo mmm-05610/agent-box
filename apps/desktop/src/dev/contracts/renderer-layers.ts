@@ -54,9 +54,6 @@ export const LAYERS: readonly LayerRule[] = [
  *  and does not sit under a zone is skipped, not silently treated as legal:
  *  `*.d.ts` are declarations, and adding a new root module is a decision. */
 export const ROOT_RANKS: Readonly<Record<string, number>> = {
-  // The compatibility barrel re-exporting `api/**`. It is the bottom, because
-  // everything above is allowed to read it and it may reach nothing above.
-  'hermes.ts': 0,
   // The renderer entry point: mounting the app is the top of the ladder.
   'main.tsx': 5
 }

@@ -4,6 +4,8 @@ import { useStore } from '@nanostores/react'
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
+import { type HermesGateway, type ProfileScope, profileScopeKey } from '@/api/client'
+import { getMcpCatalog, type McpTestResult, saveMcpServers, testMcpServer } from '@/api/mcp'
 import { completeMcpDesktopOAuth } from '@/application/mcp-oauth'
 import { type CodeEditorApi } from '@/components/chat/code-editor'
 import { JsonDocumentEditor } from '@/components/chat/json-document-editor'
@@ -12,16 +14,6 @@ import { PageLoader } from '@/components/page-loader'
 import { Button } from '@/components/ui/button'
 import { ErrorBanner } from '@/components/ui/error-state'
 import { TextTab } from '@/components/ui/text-tab'
-import {
-  getMcpCatalog,
-  type HermesGateway,
-  type McpCatalogEntry,
-  type McpTestResult,
-  type ProfileScope,
-  profileScopeKey,
-  saveMcpServers,
-  testMcpServer
-} from '@/hermes'
 import { useI18n } from '@/i18n'
 import { estimateServerTokens, serverUsageCount } from '@/lib/mcp-cost'
 import { type McpImportEntry } from '@/lib/mcp-import'
@@ -32,6 +24,7 @@ import { cn } from '@/lib/utils'
 import { notify, notifyError } from '@/store/notifications'
 import { $activeGatewayProfile, normalizeProfileKey } from '@/store/profile'
 import { $activeSessionId } from '@/store/session'
+import { type McpCatalogEntry } from '@/types/hermes'
 
 import { hermesConfigCacheWriter, useHermesConfigRecord } from '../hooks/use-config-record'
 import { DetailPane, MASTER_DETAIL_WIDE_COLS } from '../master-detail'

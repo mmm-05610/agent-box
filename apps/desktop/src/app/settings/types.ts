@@ -1,6 +1,6 @@
 import type { Dispatch, SetStateAction } from 'react'
 
-import type { HermesGateway } from '@/hermes'
+import type { HermesGateway } from '@/api/client'
 import type { IconComponent } from '@/lib/icons'
 import type { EnvVarInfo } from '@/types/hermes'
 

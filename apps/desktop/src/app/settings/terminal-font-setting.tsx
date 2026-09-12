@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
+import { saveHermesConfig } from '@/api/config'
 import {
   normalizeTerminalFontFamily,
   resolveTerminalFontFamily,
@@ -9,7 +10,6 @@ import {
 import { useOnProfileSwitch } from '@/components/hooks/use-on-profile-switch'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { saveHermesConfig } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { notifyError } from '@/store/notifications'
 import type { HermesConfigRecord } from '@/types/hermes'

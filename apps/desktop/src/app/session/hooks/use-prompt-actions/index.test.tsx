@@ -4,7 +4,7 @@ import type { MutableRefObject } from 'react'
 import { useEffect, useRef } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { getSession } from '@/hermes'
+import { getSession } from '@/api/sessions'
 import { textPart } from '@/lib/chat-messages'
 import { createClientSessionState } from '@/lib/chat-runtime'
 import { $composerAttachments, $composerDraft, setComposerDraft } from '@/store/composer'
@@ -43,11 +43,17 @@ beforeEach(() => {
   clearSingleFlightSessionResumeState()
 })
 
-vi.mock('@/hermes', () => ({
-  getProfiles: vi.fn(async () => ({ profiles: [] })),
-  getSession: vi.fn(),
+vi.mock('@/api/client', () => ({
   PROMPT_SUBMIT_REQUEST_TIMEOUT_MS: 1_800_000,
   setApiRequestProfile: vi.fn(),
+}))
+vi.mock('@/api/profiles', () => ({
+  getProfiles: vi.fn(async () => ({ profiles: [] })),
+}))
+vi.mock('@/api/sessions', () => ({
+  getSession: vi.fn(),
+}))
+vi.mock('@/api/system', () => ({
   transcribeAudio: vi.fn()
 }))
 

@@ -64,6 +64,9 @@ export type {
 
 // -- ui: the design language --------------------------------------------------
 
+/** The live gateway instance type — for typing the `gateway` prop `McpTab`
+ *  takes; obtain the instance from `host.getGateway()`. */
+export type { HermesGateway } from '@/api/client'
 /** Live accent override — set a hex and the ACTIVE theme repaints with its
  *  accent family re-seeded from it (see `retintTheme`); `null` restores the
  *  authored palette. Deliberately not persisted: it is an authoring knob, not
@@ -75,6 +78,7 @@ export { $accentOverride, setAccentOverride } from '@/application/theme/adapters
  *  this theme installed?" check. */
 export { requestTheme } from '@/application/theme/adapters/request'
 export { THEMES_AREA } from '@/application/theme/adapters/user-themes'
+
 /** THE session status dot — the one primitive the sidebar row, the pane tabs
  *  and the session switcher render, so a session's status can never disagree
  *  between surfaces. Pass the STORED session id and it resolves the rest
@@ -83,7 +87,6 @@ export { THEMES_AREA } from '@/application/theme/adapters/user-themes'
  *  circle beside it — a plugin's own dot inverts core's color vocabulary the
  *  moment either side moves. */
 export { SessionStatusDot } from '@/components/chat/session-status-dot'
-
 /** One glyph per gateway kind — device, cloud, terminal, network. The statusbar
  *  switcher, the fleet profile rail and any plugin rail listing gateways share
  *  it, so a connection looks the same wherever it is named. */
@@ -204,9 +207,6 @@ export type {
  *  `ctx.register` stays the door for permanent contributions. Namespace the
  *  id with your plugin slug (`kanban:board-switcher`). */
 export { Contribute, type ContributeProps } from '@/extension/contrib/react/contribute'
-/** The live gateway instance type — for typing the `gateway` prop `McpTab`
- *  takes; obtain the instance from `host.getGateway()`. */
-export type { HermesGateway } from '@/hermes'
 
 // -- contracts ----------------------------------------------------------------
 

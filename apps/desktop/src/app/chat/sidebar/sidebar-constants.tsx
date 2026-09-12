@@ -3,8 +3,8 @@
 import { Codicon } from '@/components/ui/codicon'
 import type {
   Sidebar} from '@/components/ui/sidebar';
-import { type SessionInfo } from '@/hermes'
 import { cn } from '@/lib/utils'
+import { type SessionInfo } from '@/types/hermes'
 import type { SidebarNavItem } from '@/types/sidebar'
 
 import {

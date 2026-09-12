@@ -17,7 +17,7 @@ const secondaryGateways: Array<{
 
 let connectGate: Promise<void> | null = null
 
-vi.mock('@/hermes', () => ({
+vi.mock('@/api/client', () => ({
   HermesGateway: class {
     connectionState = 'closed'
     connect = vi.fn(async () => {

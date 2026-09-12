@@ -7,9 +7,11 @@ import type { ModelAssignmentResponse } from '@/types/hermes'
 const setModelAssignment = vi.fn()
 const getApiRequestProfile = vi.fn<() => string | null>(() => 'default')
 
-vi.mock('@/hermes', () => ({
-  setModelAssignment: (...args: unknown[]) => setModelAssignment(...args),
+vi.mock('@/api/client', () => ({
   getApiRequestProfile: () => getApiRequestProfile()
+}))
+vi.mock('@/api/models', () => ({
+  setModelAssignment: (...args: unknown[]) => setModelAssignment(...args),
 }))
 
 import {

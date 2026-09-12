@@ -1,3 +1,4 @@
+import { hermesApi } from '@/api/client'
 import type {
   HermesGitBaseBranch,
   HermesGitBranch,
@@ -7,7 +8,6 @@ import type {
   HermesReviewList,
   HermesReviewShipInfo
 } from '@/global'
-import { hermesApi } from '@/hermes'
 
 import { desktopFsProfile, isDesktopFsRemoteMode } from './desktop-fs'
 

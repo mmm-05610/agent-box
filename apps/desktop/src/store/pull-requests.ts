@@ -1,9 +1,10 @@
 import { atom } from 'nanostores'
 
+import { scanSessionPullRequests } from '@/api/sessions'
 import type { HermesBranchPullRequest } from '@/global'
-import { scanSessionPullRequests, type SessionInfo } from '@/hermes'
 import { desktopGit } from '@/lib/desktop-git'
 import { Codecs, persistentAtom } from '@/lib/persisted'
+import { type SessionInfo } from '@/types/hermes'
 
 /** How a row's PR reads at a glance — and what the sidebar filters on. A
  *  session with no branch, no PR, or an unreachable `gh` is `none`. */

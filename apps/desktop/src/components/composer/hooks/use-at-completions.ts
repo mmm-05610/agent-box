@@ -1,9 +1,9 @@
 import type { Unstable_TriggerAdapter, Unstable_TriggerItem } from '@assistant-ui/core'
 import { useCallback } from 'react'
 
+import type { HermesGateway } from '@/api/client'
 import { refChipLabel } from '@/components/assistant-ui/directive-text'
 import { useContributions } from '@/extension/contrib/react/use-contributions'
-import type { HermesGateway } from '@/hermes'
 import type { CompletionEntry, CompletionPayload } from '@/lib/composer/hooks/use-live-completion-adapter'
 import { useLiveCompletionAdapter } from '@/lib/composer/hooks/use-live-completion-adapter'
 import { cachedPathCompletion, hasCachedPathCompletion } from '@/lib/slash-completion-cache'

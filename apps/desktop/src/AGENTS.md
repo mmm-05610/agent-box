@@ -9,7 +9,7 @@ Two adjacent layers, one direction of dependency:
 
 - **`src/api/**`** builds a request, sends it, parses the response and raises typed errors. It is the
   BOTTOM of the renderer's own dependency order, so it must not reach `@/store`, `@/app`,
-  `@/components`, `@/themes`, `@/application/theme`, `@/i18n`, `@/extension/contrib`, the `@/hermes` barrel, or
+  `@/components`, `@/themes`, `@/application/theme`, `@/i18n`, `@/extension/contrib`, or
   `@/application` — directly or through any chain of modules. `@/types/**`, `@hermes/shared`, React
   and third-party packages are what it stands on. The platform bridge has exactly ONE address:
   `api/client.ts` (`requestHermesApi` / `hermesApi`); no other file names `window.hermesDesktop.api`.
@@ -17,8 +17,9 @@ Two adjacent layers, one direction of dependency:
   (`mcp-oauth.ts`), session-list assembly and the one-shot legacy owner backfill
   (`session-lists.ts`, `legacy-session-owner-backfill.ts`), transcript tail bookkeeping and the
   cross-backend stored-transcript probe (`session-transcripts.ts`). It imports `api/` and the stores
-  freely, and is imported by `app/`/`store/` call sites — never re-exported from the `@/hermes`
-  barrel, which would route it back into `api/`'s cycle.
+  freely, and is imported by `app/`/`store/` call sites — its use-cases are never re-exported
+  from any other layer, which would hand that layer's consumers the orchestration and, through
+  it, the transport.
 
 `src/api/import-boundary.test.ts` enforces all of it (direct specifiers, `import()`/`require()`/
 `vi.mock()`, and the transitive closure), with reverse controls proving the scanner can fail. When a
