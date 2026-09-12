@@ -1,10 +1,14 @@
 /**
- * RUN TOUR — the tour verbs, on either surface.
+ * RUN TOUR — the tour coordinator: the verbs, on either surface, wired to the
+ * app's assembly. App routing (a route IS `location.hash`), pane reveal and
+ * Preview Tour selection are assembly decisions, so the coordinator registers
+ * here next to the rest of the app's wiring (batch 32); the engine, target
+ * collection and spotlight/style remain generic Shell machinery.
  *
  * `runTour` is the generic entry (one normalized action in, a result out) and
  * the named verbs below are the ergonomic API — used by the agent tool through
  * the gateway, and by any curated in-app tour. surface='app' drives driver.js
- * against the Hermes DOM; surface='preview' runs the same engine source inside
+ * against the app DOM; surface='preview' runs the same engine source inside
  * the preview pane's guest page.
  *
  * Dynamic-imported by gateway-event.ts, so driver.js (and the preview's raw
@@ -12,14 +16,14 @@
  */
 
 import 'driver.js/dist/driver.css'
-import './app-tour.css'
+import '@/app/shell/layers/tour/app-tour.css'
 
 import { driver as driverFactory } from 'driver.js'
 
 import { runPreviewTour } from '@/features/chat/right-rail/preview-tour'
 import { revealDesktopPane } from '@/store/pane-focus'
 
-import { collectTourTargets } from './collect-targets'
+import { collectTourTargets } from '@/app/shell/layers/tour/collect-targets'
 import {
   runTourEngine,
   type TourAction,
@@ -28,8 +32,8 @@ import {
   type TourResult,
   type TourStep,
   type TourStyle
-} from './engine'
-import { type Stage, stopSpotlightBlur, syncSpotlightBlur } from './spotlight-blur'
+} from '@/app/shell/layers/tour/engine'
+import { type Stage, stopSpotlightBlur, syncSpotlightBlur } from '@/app/shell/layers/tour/spotlight-blur'
 
 /** Which document a tour runs against. */
 export type TourSurface = 'app' | 'preview'

@@ -43,7 +43,8 @@ export interface Stage {
   y: number
 }
 
-/** Reads driver.js's live (animated) stage rect. Supplied by run-tour. */
+/** Reads driver.js's live (animated) stage rect. Supplied by the coordinator
+ *  that drives the engine. */
 type StageSource = () => null | Stage
 
 let frame = 0

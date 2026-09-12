@@ -8,7 +8,7 @@
    (--radius-scalar: 0.2) and 12px-based.
 
    The scrim and the cutout geometry are config, not CSS — see TOUR_STYLE in
-   run-tour.ts.
+   the coordinator that drives the engine.
 
    The preview surface keeps the stock look on purpose: it renders inside a
    guest page where none of these variables exist. */

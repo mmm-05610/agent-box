@@ -11,8 +11,8 @@
  * reuse the live driver instance. Injection is idempotent and vanishes with
  * the page (a navigation resets the tour, which is the right behavior).
  *
- * Dynamic-imported by run-tour.ts so the raw driver.js payload stays out of
- * the boot path.
+ * Dynamic-imported by the tour coordinator (composition registrations) so the
+ * raw driver.js payload stays out of the boot path.
  */
 
 import driverCss from 'driver.js/dist/driver.css?raw'

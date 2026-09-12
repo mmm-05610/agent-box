@@ -1,35 +1,16 @@
 /**
- * TOURS — highlight-and-narrate walkthroughs for any surface.
+ * TOUR ENGINE MACHINERY — the generic half of the tour system.
  *
- * Two consumers, one engine:
+ * The engine drives a spotlight over whatever document it is handed, target
+ * collection reports what is addressable, and the spotlight blur mirrors the
+ * cutout. mark elements with `data-tour="…"` to give them durable handles
+ * (`collectTourTargets` reports those first and flags every selector as
+ * stable or positional).
  *
- * - The `tour` agent tool, via the gateway (see run-tour.ts).
- * - Your own curated tours, via this module:
- *
- * ```ts
- * import { startTour, showTourStep, stopTour } from '@/app/shell/layers/tour'
- *
- * startTour([
- *   { selector: '[data-tour="composer"]', title: 'Composer', text: 'Type here.' },
- *   { selector: '[data-tour="files"]', title: 'Files', text: 'Your project.' }
- * ])
- * ```
- *
- * Tours run against whatever is in the DOM — mark elements with `data-tour="…"`
- * to give them durable handles (see `collectTourTargets`, which reports those
- * first and flags every selector as stable or positional).
+ * The verbs that coordinate the app's surfaces — routing, pane reveal,
+ * Preview Tour selection, surface choice — are assembly decisions and
+ * register with the app's composition (batch 32), not here.
  */
 
 export { collectTourTargets, type TourTarget } from './collect-targets'
 export type { TourAction, TourHost, TourResult, TourStep } from './engine'
-export {
-  isTourActive,
-  listTourTargets,
-  nextTourStep,
-  previousTourStep,
-  runTour,
-  showTourStep,
-  startTour,
-  stopTour,
-  type TourSurface
-} from './run-tour'
