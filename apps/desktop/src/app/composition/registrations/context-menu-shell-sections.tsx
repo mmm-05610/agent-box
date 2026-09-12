@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import type { useNavigate } from 'react-router'
 
 import { navigateToWorkspacePage, NEW_CHAT_ROUTE, SETTINGS_ROUTE } from '@/app/routes'
+import { Item } from '@/app/shell/layers/context-menu/item'
 import { type Translations } from '@/i18n'
 import { openCommandPalette } from '@/store/command-palette'
 import { toggleTargetZoneTabStrip } from '@/store/pane-shell/tree'
@@ -9,15 +10,15 @@ import { toggleStatusbarVisible } from '@/store/statusbar-prefs'
 import { requestActiveUpdate } from '@/store/updates'
 import { canOpenNewWindow, openNewWindow } from '@/store/windows'
 
-import { Item } from './item'
-
 export type ShellVerbs = {
   navigate: ReturnType<typeof useNavigate>
   t: Translations
 }
 
-/** Bare right-click on app chrome: the window verbs (the old shell fallback). */
-export function shellSections({ navigate, t }: ShellVerbs): ReactNode[][] {
+/** Bare right-click on app chrome: the window verbs (the old shell fallback).
+ *  Product content — new Session, window, palette, layout, settings and the
+ *  update action — so it registers here, not in the Shell host (batch 32). */
+export function contextMenuShellSections({ navigate, t }: ShellVerbs): ReactNode[][] {
   return [
     [
       <Item
