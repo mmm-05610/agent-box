@@ -11,7 +11,6 @@ import {
   type AppView,
   ARTIFACTS_ROUTE,
   CRON_ROUTE,
-  MESSAGING_ROUTE,
   SKILLS_ROUTE
 } from '../../routes'
 import { type NewSessionSplitHandler } from '../new-session-drag'
@@ -36,13 +35,6 @@ export const SIDEBAR_NAV: SidebarNavItem[] = [
     icon: props => <Codicon name="symbol-misc" {...props} />,
     route: SKILLS_ROUTE,
     keybindActionId: 'nav.skills'
-  },
-  {
-    id: 'messaging',
-    label: '',
-    icon: props => <Codicon name="comment" {...props} />,
-    route: MESSAGING_ROUTE,
-    keybindActionId: 'nav.messaging'
   },
   {
     id: 'artifacts',

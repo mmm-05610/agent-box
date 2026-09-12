@@ -1,5 +1,5 @@
 /**
- * A full page (Capabilities/Messaging/Artifacts/a contributed route) renders
+ * A full page (Capabilities/Artifacts/a contributed route) renders
  * INSIDE the `workspace` pane, so navigating to one has to front that pane —
  * otherwise a main zone parked on a session tile keeps the tile on screen and
  * the click looks dead until the app restarts (#72602).
@@ -19,7 +19,6 @@ import {
   appViewForPath,
   ARTIFACTS_ROUTE,
   CRON_ROUTE,
-  MESSAGING_ROUTE,
   navigateToWorkspacePage,
   NEW_CHAT_ROUTE,
   routePathname,
@@ -116,7 +115,7 @@ describe('syncWorkspaceRoute', () => {
     vi.mocked(revealTreePane).mockClear()
     vi.mocked(noteActiveTreeGroup).mockClear()
 
-    syncWorkspaceRoute(MESSAGING_ROUTE)
+    syncWorkspaceRoute(SKILLS_ROUTE)
 
     expect($workspaceIsPage.get()).toBe(true)
     expect(fronted()).toBe(true)

@@ -68,7 +68,6 @@ import {
   AGENTS_ROUTE,
   ARTIFACTS_ROUTE,
   CRON_ROUTE,
-  MESSAGING_ROUTE,
   navigateToWorkspacePage,
   NEW_CHAT_ROUTE,
   PROFILES_ROUTE,
@@ -107,7 +106,7 @@ export function useKeybinds(deps: KeybindRuntimeDeps): void {
   const profileSwitchHandlers: HandlerMap = {}
 
   // A tab key that lands on the WORKSPACE tab while a full page (skills /
-  // messaging / artifacts / a plugin route) covers it must also route back to
+  // artifacts / a plugin route) covers it must also route back to
   // the chat: the workspace pane is already the zone's active tab behind the
   // page, so fronting it alone changes nothing on screen and the key reads
   // dead. Mirrors `openSession`'s full-page rule — only a route change puts
@@ -202,7 +201,6 @@ export function useKeybinds(deps: KeybindRuntimeDeps): void {
     'nav.settings': () => navigate(SETTINGS_ROUTE),
     'nav.profiles': () => navigate(PROFILES_ROUTE),
     'nav.skills': () => navigateToWorkspacePage(navigate, SKILLS_ROUTE),
-    'nav.messaging': () => navigateToWorkspacePage(navigate, MESSAGING_ROUTE),
     'nav.artifacts': () => navigateToWorkspacePage(navigate, ARTIFACTS_ROUTE),
     'nav.cron': () => navigate(CRON_ROUTE),
     'nav.agents': () => navigate(AGENTS_ROUTE),
