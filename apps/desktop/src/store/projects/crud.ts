@@ -1,4 +1,3 @@
-import type { NewSessionPlacement } from '@/app/chat/new-session-drag'
 import {
   writeDesktopFileText
 } from '@/lib/desktop-fs'
@@ -10,6 +9,7 @@ import { $activeGatewayProfile } from '@/store/profile/runtime-route-state'
 import { liveSessionProjectId, type SidebarProjectTree } from '@/store/projects/membership'
 import { $selectedStoredSessionId, $sessions, sessionMatchesStoredId } from '@/store/session'
 import type { ProjectInfo, ProjectsPayload } from '@/types/hermes'
+import type { NewSessionPlacement } from '@/types/session-placement'
 
 import { projectIdForCwd } from './cwd-identity'
 import { $newProjectSessionRequest } from './dialogs'

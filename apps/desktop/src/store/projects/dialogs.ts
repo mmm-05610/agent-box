@@ -1,8 +1,8 @@
 import { atom } from 'nanostores'
 
-import type { NewSessionPlacement } from '@/app/chat/new-session-drag'
 import { translateNow } from '@/i18n'
 import { notify } from '@/store/notifications'
+import type { NewSessionPlacement } from '@/types/session-placement'
 
 import { $projectsRpcAvailable } from './scope'
 
