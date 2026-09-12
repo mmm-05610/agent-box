@@ -1537,7 +1537,8 @@ export interface Translations {
     archivedChats: string
     sections: Record<'maintenance' | 'sessions' | 'system' | 'usage', string>
     sectionDescriptions: Record<'maintenance' | 'sessions' | 'system' | 'usage', string>
-    nav: Record<'newChat' | 'settings' | 'skills' | 'messaging' | 'artifacts', { title: string; detail: string }>
+    nav: Record<'newChat' | 'settings' | 'skills' | 'artifacts', { title: string; detail: string }>
+
     sectionEntries: Record<'sessions' | 'system' | 'usage', { title: string; detail: string }>
     providerNavigate: string
     providerSessions: string
@@ -1629,65 +1630,6 @@ export interface Translations {
       running: string
       viewLog: string
     }
-  }
-
-  messaging: {
-    search: string
-    loading: string
-    loadFailed: string
-    states: Record<string, string>
-    unknown: string
-    hintPendingRestart: string
-    hintGatewayStopped: string
-    credentialsSet: string
-    needsSetup: string
-    gatewayStopped: string
-    getCredentials: string
-    openSetupGuide: string
-    required: string
-    recommended: string
-    advanced: (count: number) => string
-    noTokenNeeded: string
-    enabled: string
-    disabled: string
-    unsavedChanges: string
-    saving: string
-    saveChanges: string
-    saved: string
-    replaceValue: string
-    openDocs: string
-    clearField: (key: string) => string
-    enableAria: (name: string) => string
-    disableAria: (name: string) => string
-    platformEnabled: (name: string) => string
-    platformDisabled: (name: string) => string
-    restartToApply: string
-    setupSaved: (name: string) => string
-    restartToReconnect: string
-    keyCleared: (key: string) => string
-    setupUpdated: (name: string) => string
-    failedUpdate: (name: string) => string
-    failedSave: (name: string) => string
-    failedClear: (key: string) => string
-    pendingRequests: (count: number) => string
-    pendingAria: (count: number) => string
-    approvedUsers: (count: number) => string
-    approve: string
-    approving: string
-    revoke: string
-    revoking: string
-    revokeAria: (name: string) => string
-    revokeTitle: string
-    revokeDesc: (name: string) => string
-    approvedUser: (name: string) => string
-    approvedHint: string
-    revokedUser: (name: string) => string
-    failedApprove: (name: string) => string
-    failedRevoke: (name: string) => string
-    pairingLockedOut: string
-    waitingSince: (minutes: number) => string
-    fieldCopy: Record<string, { label?: string; help?: string; placeholder?: string }>
-    platformIntro: Record<string, string>
   }
 
   webhooks: {
@@ -2175,7 +2117,6 @@ export interface Translations {
       finishedUnread: string
       backgroundRunning: string
       draftSession: string
-      handoffOrigin: (platform: string) => string
       ownedByProfile: (profile: string) => string
       renamed: string
       renameFailed: string

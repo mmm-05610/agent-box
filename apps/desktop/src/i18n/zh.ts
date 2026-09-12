@@ -303,7 +303,6 @@ export const zh: Translations = {
       'nav.settings': '打开设置',
       'nav.profiles': '打开配置',
       'nav.skills': '打开技能',
-      'nav.messaging': '打开消息',
       'nav.artifacts': '打开制品',
       'nav.cron': '打开定时任务',
       'nav.agents': '打开智能体',
@@ -1910,7 +1909,6 @@ export const zh: Translations = {
       newChat: { title: '新建会话', detail: '开始一个新会话' },
       settings: { title: '设置', detail: '配置 Hermes 桌面端' },
       skills: { title: '技能与工具', detail: '启用技能、工具集与提供方' },
-      messaging: { title: '消息平台', detail: '配置 Telegram、Slack、Discord 等' },
       artifacts: { title: '产物', detail: '浏览生成的输出' }
     },
     sectionEntries: {
@@ -2007,154 +2005,6 @@ export const zh: Translations = {
       actionFailed: name => `${name} 启动失败`,
       running: '运行中…',
       viewLog: '操作日志'
-    }
-  },
-
-  messaging: {
-    search: '搜索消息平台…',
-    loading: '正在加载消息平台…',
-    loadFailed: '消息平台加载失败',
-    states: {
-      connected: '已连接',
-      connecting: '连接中',
-      disabled: '已禁用',
-      fatal: '错误',
-      gateway_stopped: '消息网关已停止',
-      not_configured: '需要设置',
-      pending_restart: '需要重启',
-      retrying: '重试中',
-      startup_failed: '启动失败'
-    },
-    unknown: '未知',
-    hintPendingRestart: '在状态栏重启网关以应用此更改。',
-    hintGatewayStopped: '在状态栏启动网关以建立连接。',
-    credentialsSet: '凭据已设置',
-    needsSetup: '需要设置',
-    gatewayStopped: '消息网关已停止',
-    getCredentials: '获取你的凭据',
-    openSetupGuide: '打开设置指南',
-    required: '必填',
-    recommended: '推荐',
-    advanced: count => `高级 (${count})`,
-    noTokenNeeded: '此平台无需在此填写令牌。请按上方设置指南操作，然后在下方启用。',
-    enabled: '已启用',
-    disabled: '已禁用',
-    unsavedChanges: '有未保存的更改',
-    saving: '保存中…',
-    saveChanges: '保存更改',
-    saved: '已保存',
-    replaceValue: '替换当前值',
-    openDocs: '打开文档',
-    clearField: key => `清除 ${key}`,
-    enableAria: name => `启用 ${name}`,
-    disableAria: name => `禁用 ${name}`,
-    platformEnabled: name => `${name} 已启用`,
-    platformDisabled: name => `${name} 已禁用`,
-    restartToApply: '此更改将在网关重启后生效。',
-    setupSaved: name => `${name} 设置已保存`,
-    restartToReconnect: '新凭据将在网关重启后生效。',
-    keyCleared: key => `${key} 已清除`,
-    setupUpdated: name => `${name} 设置已更新。`,
-    failedUpdate: name => `更新 ${name} 失败`,
-    failedSave: name => `保存 ${name} 失败`,
-    failedClear: key => `清除 ${key} 失败`,
-    pendingRequests: count => `待处理请求（${count}）`,
-    pendingAria: count => `${count} 条待处理配对请求`,
-    approvedUsers: count => `已批准用户（${count}）`,
-    approve: '批准',
-    approving: '批准中…',
-    revoke: '撤销',
-    revoking: '撤销中…',
-    revokeAria: name => `撤销 ${name}`,
-    revokeTitle: '撤销访问权限',
-    revokeDesc: name => `${name} 将失去访问权限，下次发送消息时不再被识别。`,
-    approvedUser: name => `已批准 ${name}`,
-    approvedHint: '对方下次发送消息时会被自动识别。',
-    revokedUser: name => `已撤销 ${name}`,
-    failedApprove: name => `批准 ${name} 失败`,
-    failedRevoke: name => `撤销 ${name} 失败`,
-    pairingLockedOut: '批准失败次数过多，该平台已被暂时锁定，请稍后再试。',
-    waitingSince: minutes => (minutes < 1 ? '刚刚' : `${minutes} 分钟前`),
-    fieldCopy: {
-      TELEGRAM_BOT_TOKEN: {
-        label: 'Bot 令牌',
-        help: '用 @BotFather 创建一个机器人，然后粘贴它给你的令牌。',
-        placeholder: '粘贴 Telegram bot 令牌'
-      },
-      TELEGRAM_ALLOWED_USERS: {
-        label: '允许的 Telegram 用户 ID',
-        help: '推荐。来自 @userinfobot 的逗号分隔数字 ID。不设置则任何人都能私信你的机器人。'
-      },
-      TELEGRAM_PROXY: { label: '代理 URL', help: '仅在 Telegram 被屏蔽的网络中需要。' },
-      DISCORD_BOT_TOKEN: { label: 'Bot 令牌', help: '在 Discord 开发者门户创建应用，添加机器人，然后粘贴其令牌。' },
-      DISCORD_ALLOWED_USERS: { label: '允许的 Discord 用户 ID', help: '推荐。逗号分隔的 Discord 用户 ID。' },
-      DISCORD_REPLY_TO_MODE: { label: '回复方式', help: 'first、all 或 off。' },
-      DISCORD_ALLOW_ALL_USERS: {
-        label: '允许所有 Discord 用户',
-        help: '仅用于开发。为 true 时，任何人都可以私信 bot，不需要允许列表。'
-      },
-      DISCORD_HOME_CHANNEL: { label: '主页频道 ID', help: 'bot 主动发送消息的频道（cron 输出、提醒等）。' },
-      DISCORD_HOME_CHANNEL_NAME: { label: '主页频道名称', help: '日志和状态输出中显示的主页频道名称。' },
-      BLUEBUBBLES_ALLOW_ALL_USERS: { label: '允许所有 iMessage 用户', help: '为 true 时跳过 BlueBubbles 允许列表。' },
-      MATTERMOST_ALLOW_ALL_USERS: { label: '允许所有 Mattermost 用户' },
-      MATTERMOST_HOME_CHANNEL: { label: '主页频道' },
-      QQ_ALLOW_ALL_USERS: { label: '允许所有 QQ 用户' },
-      QQBOT_HOME_CHANNEL: { label: 'QQ 主页频道', help: 'cron 投递的默认频道或群组。' },
-      QQBOT_HOME_CHANNEL_NAME: { label: 'QQ 主页频道名称' },
-      SLACK_BOT_TOKEN: {
-        label: 'Slack bot 令牌',
-        help: '安装 Slack 应用后，在 OAuth & Permissions 中找到 bot 令牌。',
-        placeholder: '粘贴 Slack bot 令牌'
-      },
-      SLACK_APP_TOKEN: {
-        label: 'Slack app 令牌',
-        help: 'Socket Mode 需要 app 级令牌。',
-        placeholder: '粘贴 Slack app 令牌'
-      },
-      SLACK_ALLOWED_USERS: { label: '允许的 Slack 用户 ID', help: '推荐。逗号分隔的 Slack 用户 ID。' },
-      MATTERMOST_URL: { label: '服务器 URL', placeholder: 'https://mattermost.example.com' },
-      MATTERMOST_TOKEN: { label: 'Bot 令牌' },
-      MATTERMOST_ALLOWED_USERS: { label: '允许的用户 ID', help: '推荐。逗号分隔的 Mattermost 用户 ID。' },
-      MATRIX_HOMESERVER: { label: 'Homeserver URL', placeholder: 'https://matrix.org' },
-      MATRIX_ACCESS_TOKEN: { label: '访问令牌' },
-      MATRIX_USER_ID: { label: 'Bot 用户 ID', placeholder: '@hermes:example.org' },
-      MATRIX_ALLOWED_USERS: { label: '允许的 Matrix 用户 ID', help: '推荐。@user:server 格式的逗号分隔用户 ID。' },
-      SIGNAL_HTTP_URL: {
-        label: 'Signal 桥接 URL',
-        placeholder: 'http://127.0.0.1:8080',
-        help: '运行中的 signal-cli REST 桥接的 URL。'
-      },
-      SIGNAL_ACCOUNT: { label: '电话号码', help: '在 signal-cli 桥接中注册的号码。' },
-      SIGNAL_ALLOWED_USERS: { label: '允许的 Signal 用户', help: '推荐。逗号分隔的 Signal 标识符。' },
-      WHATSAPP_ENABLED: { label: '启用 WhatsApp 桥接', help: '由下方开关自动设置。除非确知需要，否则请勿改动。' },
-      WHATSAPP_MODE: { label: '桥接模式' },
-      WHATSAPP_ALLOWED_USERS: { label: '允许的 WhatsApp 用户', help: '推荐。逗号分隔的电话号码或 WhatsApp ID。' }
-    },
-    platformIntro: {
-      telegram:
-        '在 Telegram 中，与 @BotFather 对话，运行 /newbot，复制它给你的令牌。然后从 @userinfobot 获取你的数字用户 ID。',
-      discord:
-        '打开 Discord 开发者门户，创建应用，添加 Bot，然后复制其令牌。用正确的权限范围把机器人邀请到你的服务器。',
-      slack: '创建 Slack 应用，启用 Socket Mode，安装到你的工作区，然后复制 bot 令牌和 app 级令牌。',
-      mattermost: '在你的 Mattermost 服务器上，创建机器人账户或个人访问令牌，然后在此粘贴服务器 URL 和令牌。',
-      matrix: '用机器人账户登录你的 homeserver，然后复制访问令牌、用户 ID 和 homeserver URL。',
-      signal: '在可访问的位置运行 signal-cli REST 桥接，然后把 Hermes 指向该 URL 和已注册的电话号码。',
-      whatsapp: '启动 Hermes 自带的 WhatsApp 桥接，首次运行时扫描二维码，然后启用该平台。',
-      bluebubbles:
-        '在装有 iMessage 的 Mac 上运行 BlueBubbles Server，暴露其 API，然后用服务器密码把 Hermes 指向该 URL。',
-      homeassistant: '在 Home Assistant 中打开你的个人资料并创建长期访问令牌。把它连同你的 HA URL 一起粘贴到这里。',
-      email: '使用专用邮箱。对于 Gmail/Workspace,创建应用专用密码并使用 imap.gmail.com / smtp.gmail.com。',
-      sms: '从 Twilio 控制台获取你的 Account SID 和 Auth Token，以及一个可发送短信的电话号码。',
-      dingtalk: '在开发者控制台创建钉钉应用，然后在此复制 Client ID(App key) 和 Client Secret。',
-      feishu: '创建飞书 / Lark 应用，配置机器人能力，复制 App ID、App secret 和事件加密密钥。',
-      wecom: '在企业微信中添加群机器人，复制其 webhook key 作为 WECOM_BOT_ID。仅可发送——双向请用企业微信 (应用) 选项。',
-      wecom_callback: '设置一个企业微信自建应用，暴露其回调 URL，并提供 corp ID、secret、agent ID 和 AES key。',
-      weixin:
-        '运行 `hermes gateway setup`，选择 Weixin，然后使用个人微信账号扫描并确认二维码。Hermes 会通过腾讯 iLink Bot API 连接并保存凭据。',
-      qqbot: '在 QQ 开放平台 (q.qq.com) 注册一个应用，复制 App ID 和 Client Secret。',
-      api_server:
-        '把 Hermes 暴露为兼容 OpenAI 的 API。设置一个鉴权密钥，然后把 Open WebUI / LobeChat 等指向 host:port。',
-      webhook: '运行一个 HTTP 服务器，供其他工具 (GitHub、GitLab、自定义应用)POST。用 secret 验证签名。'
     }
   },
 
@@ -2569,7 +2419,6 @@ export const zh: Translations = {
     nav: {
       'new-session': '新建会话',
       skills: '技能与工具',
-      messaging: '消息平台',
       artifacts: '产物',
       cron: '定时任务'
     },
@@ -2699,7 +2548,6 @@ export const zh: Translations = {
       finishedUnread: '已完成 — 未读',
       backgroundRunning: '后台任务运行中',
       draftSession: '草稿 — 尚未发送',
-      handoffOrigin: platform => `从 ${platform} 转接`,
       ownedByProfile: profile => `配置档：${profile}`,
       renamed: '已重命名',
       renameFailed: '重命名失败',
@@ -3941,10 +3789,6 @@ export const zh: Translations = {
       skills: {
         title: '教一次就够',
         text: '技能是一组说明文件，Hermes 会在需要时自行加载。'
-      },
-      messaging: {
-        title: '离开电脑也能用',
-        text: '接入 Telegram、Discord、Slack 等 — 同一个智能体，同一份记忆。'
       },
       artifacts: {
         title: 'Hermes 做过的一切',

@@ -4,7 +4,7 @@ import type * as sessionsApi from '@/api/sessions'
 import { getSession } from '@/api/sessions'
 import { $activeGatewayProfile, $profiles } from '@/store/profile'
 import { $projectTree } from '@/store/projects'
-import { $cronSessions, $messagingSessions, $sessions } from '@/store/session'
+import { $cronSessions, $sessions } from '@/store/session'
 import type { SessionInfo } from '@/types/hermes'
 
 import { cachedSessionRow, resolveSessionProfile, resolveStoredSession } from './utils'
@@ -23,7 +23,6 @@ const profiles = (...names: string[]) => names.map(name => ({ name }) as never)
 describe('resolveStoredSession profile ownership', () => {
   beforeEach(() => {
     $cronSessions.set([])
-    $messagingSessions.set([])
     $sessions.set([])
     $projectTree.set([])
     $profiles.set(profiles('default', 'meta'))
@@ -33,7 +32,6 @@ describe('resolveStoredSession profile ownership', () => {
 
   afterEach(() => {
     $cronSessions.set([])
-    $messagingSessions.set([])
     $sessions.set([])
     $projectTree.set([])
     $profiles.set([])
@@ -49,18 +47,18 @@ describe('resolveStoredSession profile ownership', () => {
     expect(mockGetSession).not.toHaveBeenCalled()
   })
 
-  it.each([
-    ['cron', $cronSessions],
-    ['messaging', $messagingSessions]
-  ])('resolves a %s sidebar row without duplicating it into regular sessions', async (_source, store) => {
-    store.set([session({ id: 's1', profile: 'default' })])
+  it.each([['cron', $cronSessions]])(
+    'resolves a %s sidebar row without duplicating it into regular sessions',
+    async (_source, store) => {
+      store.set([session({ id: 's1', profile: 'default' })])
 
-    const resolved = await resolveStoredSession('s1')
+      const resolved = await resolveStoredSession('s1')
 
-    expect(resolved?.profile).toBe('default')
-    expect(mockGetSession).not.toHaveBeenCalled()
-    expect($sessions.get()).toEqual([])
-  })
+      expect(resolved?.profile).toBe('default')
+      expect(mockGetSession).not.toHaveBeenCalled()
+      expect($sessions.get()).toEqual([])
+    }
+  )
 
   it('treats a profile-less cache hit as unresolved when multiple profiles exist', async () => {
     $sessions.set([session({ id: 's1' })])
@@ -157,7 +155,6 @@ describe('cachedSessionRow owner preference', () => {
 
   beforeEach(() => {
     $cronSessions.set([])
-    $messagingSessions.set([])
     $sessions.set([])
     $projectTree.set([])
     mockGetSession.mockReset()
@@ -165,7 +162,6 @@ describe('cachedSessionRow owner preference', () => {
 
   afterEach(() => {
     $cronSessions.set([])
-    $messagingSessions.set([])
     $sessions.set([])
     $projectTree.set([])
   })

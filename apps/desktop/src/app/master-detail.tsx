@@ -40,8 +40,8 @@ export function ToolChip({ children, title }: { children: ReactNode; title?: str
 
 // Master–detail page scaffolding (14rem rail, p-2, centered max-w-2xl detail):
 // dense uniform rows on the left, roomy inspector on the right. Shared by the
-// Capabilities and Messaging pages — pages bring their own row/detail content
-// (CapRow here is the toggle-row flavor; Messaging has its own avatar rows).
+// Capabilities page — pages bring their own row/detail content (CapRow here is
+// the toggle-row flavor).
 
 // `pane` docks a full-bleed work surface (editor, log viewer, terminal) below
 // the whole master–detail grid — the app's bottom-pane pattern, page-local.
@@ -59,7 +59,7 @@ const SPLIT_MIN_RIGHT_PX = 320
 
 // `split="wide"` gives list-heavy pages a rail that shares the page with a
 // sparse detail (skills/tools/mcp); the default 14rem rail suits pages whose
-// detail carries the weight (messaging). A `resizeId` turns the column seam
+// detail carries the weight. A `resizeId` turns the column seam
 // into a drag sash: the rail width persists in the pane store under that id
 // (same store as the terminal/editor panes), double-click resets to default.
 export function MasterDetail({

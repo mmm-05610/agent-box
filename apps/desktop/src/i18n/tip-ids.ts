@@ -13,7 +13,6 @@ export type TipId =
   | 'command-palette'
   | 'composer-mentions'
   | 'cron'
-  | 'messaging'
   | 'new-session'
   | 'profiles'
   | 'right-pane'

@@ -311,7 +311,6 @@ export const en: Translations = {
       'nav.settings': 'Open settings',
       'nav.profiles': 'Open profiles',
       'nav.skills': 'Open skills',
-      'nav.messaging': 'Open messaging',
       'nav.artifacts': 'Open artifacts',
       'nav.cron': 'Open scheduled jobs',
       'nav.agents': 'Open agents',
@@ -1742,7 +1741,6 @@ export const en: Translations = {
       newChat: { title: 'New session', detail: 'Start a fresh session' },
       settings: { title: 'Settings', detail: 'Configure Hermes desktop' },
       skills: { title: 'Capabilities', detail: 'Skills, tools, and MCP servers' },
-      messaging: { title: 'Messaging', detail: 'Set up Telegram, Slack, Discord, and more' },
       artifacts: { title: 'Artifacts', detail: 'Browse generated outputs' }
     },
     sectionEntries: {
@@ -1840,156 +1838,6 @@ export const en: Translations = {
       running: 'Running...',
       viewLog: 'Action log'
     }
-  },
-
-  messaging: {
-    search: 'Search messaging...',
-    loading: 'Loading messaging platforms...',
-    loadFailed: 'Messaging platforms failed to load',
-    states: {
-      connected: 'Connected',
-      connecting: 'Connecting',
-      disabled: 'Disabled',
-      fatal: 'Error',
-      gateway_stopped: 'Messaging gateway stopped',
-      not_configured: 'Needs setup',
-      pending_restart: 'Restart needed',
-      retrying: 'Retrying',
-      startup_failed: 'Startup failed'
-    },
-    unknown: 'Unknown',
-    hintPendingRestart: 'Restart the gateway from the status bar to apply this change.',
-    hintGatewayStopped: 'Start the gateway from the status bar to connect.',
-    credentialsSet: 'Credentials set',
-    needsSetup: 'Needs setup',
-    gatewayStopped: 'Messaging gateway stopped',
-    getCredentials: 'Get your credentials',
-    openSetupGuide: 'Open setup guide',
-    required: 'Required',
-    recommended: 'Recommended',
-    advanced: count => `Advanced (${count})`,
-    noTokenNeeded: 'This platform does not need a token here. Use the setup guide above, then enable it below.',
-    enabled: 'Enabled',
-    disabled: 'Disabled',
-    unsavedChanges: 'Unsaved changes',
-    saving: 'Saving...',
-    saveChanges: 'Save changes',
-    saved: 'Saved',
-    replaceValue: 'Replace current value',
-    openDocs: 'Open docs',
-    clearField: key => `Clear ${key}`,
-    enableAria: name => `Enable ${name}`,
-    disableAria: name => `Disable ${name}`,
-    platformEnabled: name => `${name} enabled`,
-    platformDisabled: name => `${name} disabled`,
-    restartToApply: 'This change takes effect after a gateway restart.',
-    setupSaved: name => `${name} setup saved`,
-    restartToReconnect: 'New credentials take effect after a gateway restart.',
-    keyCleared: key => `${key} cleared`,
-    setupUpdated: name => `${name} setup was updated.`,
-    failedUpdate: name => `Failed to update ${name}`,
-    failedSave: name => `Failed to save ${name}`,
-    failedClear: key => `Failed to clear ${key}`,
-    pendingRequests: count => `Pending requests (${count})`,
-    pendingAria: count => `${count} pending pairing ${count === 1 ? 'request' : 'requests'}`,
-    approvedUsers: count => `Approved users (${count})`,
-    approve: 'Approve',
-    approving: 'Approving...',
-    revoke: 'Revoke',
-    revoking: 'Revoking...',
-    revokeAria: name => `Revoke ${name}`,
-    revokeTitle: 'Revoke access',
-    revokeDesc: (name: string) => `${name} will lose access and stop being recognized on their next message.`,
-    approvedUser: name => `${name} approved`,
-    approvedHint: 'They are recognized automatically on their next message.',
-    revokedUser: name => `${name} revoked`,
-    failedApprove: name => `Failed to approve ${name}`,
-    failedRevoke: name => `Failed to revoke ${name}`,
-    pairingLockedOut: 'Too many failed approvals — this platform is locked out. Try again later.',
-    waitingSince: minutes => (minutes < 1 ? 'just now' : `${minutes}m ago`),
-    fieldCopy: {
-      TELEGRAM_BOT_TOKEN: {
-        label: 'Bot token',
-        help: 'Create a bot with @BotFather, then paste the token it gives you.',
-        placeholder: 'Paste Telegram bot token'
-      },
-      TELEGRAM_ALLOWED_USERS: {
-        label: 'Allowed Telegram user IDs',
-        help: 'Recommended. Comma-separated numeric IDs from @userinfobot. Without this, anyone can DM your bot.'
-      },
-      TELEGRAM_PROXY: { label: 'Proxy URL', help: 'Only needed on networks where Telegram is blocked.' },
-      DISCORD_BOT_TOKEN: {
-        label: 'Bot token',
-        help: 'Create an application in the Discord Developer Portal, add a bot, then paste its token.'
-      },
-      DISCORD_ALLOWED_USERS: {
-        label: 'Allowed Discord user IDs',
-        help: 'Recommended. Comma-separated Discord user IDs.'
-      },
-      DISCORD_REPLY_TO_MODE: { label: 'Reply style', help: 'first, all, or off.' },
-      DISCORD_ALLOW_ALL_USERS: {
-        label: 'Allow all Discord users',
-        help: 'Development only. When true, anyone can DM the bot without an allowlist.'
-      },
-      DISCORD_HOME_CHANNEL: {
-        label: 'Home channel ID',
-        help: 'Channel where the bot sends proactive messages (cron output, reminders).'
-      },
-      DISCORD_HOME_CHANNEL_NAME: {
-        label: 'Home channel name',
-        help: 'Display name for the home channel in logs and status output.'
-      },
-      BLUEBUBBLES_ALLOW_ALL_USERS: {
-        label: 'Allow all iMessage users',
-        help: 'When true, skip the BlueBubbles allowlist.'
-      },
-      MATTERMOST_ALLOW_ALL_USERS: { label: 'Allow all Mattermost users' },
-      MATTERMOST_HOME_CHANNEL: { label: 'Home channel' },
-      QQ_ALLOW_ALL_USERS: { label: 'Allow all QQ users' },
-      QQBOT_HOME_CHANNEL: { label: 'QQ home channel', help: 'Default channel or group for cron delivery.' },
-      QQBOT_HOME_CHANNEL_NAME: { label: 'QQ home channel name' },
-      SLACK_BOT_TOKEN: {
-        label: 'Slack bot token',
-        help: 'Use the bot token from OAuth & Permissions after installing your Slack app.',
-        placeholder: 'Paste Slack bot token'
-      },
-      SLACK_APP_TOKEN: {
-        label: 'Slack app token',
-        help: 'Use the app-level token required for Socket Mode.',
-        placeholder: 'Paste Slack app token'
-      },
-      SLACK_ALLOWED_USERS: { label: 'Allowed Slack user IDs', help: 'Recommended. Comma-separated Slack user IDs.' },
-      MATTERMOST_URL: { label: 'Server URL', placeholder: 'https://mattermost.example.com' },
-      MATTERMOST_TOKEN: { label: 'Bot token' },
-      MATTERMOST_ALLOWED_USERS: {
-        label: 'Allowed user IDs',
-        help: 'Recommended. Comma-separated Mattermost user IDs.'
-      },
-      MATRIX_HOMESERVER: { label: 'Homeserver URL', placeholder: 'https://matrix.org' },
-      MATRIX_ACCESS_TOKEN: { label: 'Access token' },
-      MATRIX_USER_ID: { label: 'Bot user ID', placeholder: '@hermes:example.org' },
-      MATRIX_ALLOWED_USERS: {
-        label: 'Allowed Matrix user IDs',
-        help: 'Recommended. Comma-separated user IDs in @user:server format.'
-      },
-      SIGNAL_HTTP_URL: {
-        label: 'Signal bridge URL',
-        placeholder: 'http://127.0.0.1:8080',
-        help: 'URL of a running signal-cli REST bridge.'
-      },
-      SIGNAL_ACCOUNT: { label: 'Phone number', help: 'The number registered with your signal-cli bridge.' },
-      SIGNAL_ALLOWED_USERS: { label: 'Allowed Signal users', help: 'Recommended. Comma-separated Signal identifiers.' },
-      WHATSAPP_ENABLED: {
-        label: 'Enable WhatsApp bridge',
-        help: 'Set automatically by the toggle below. Leave alone unless you know you need it.'
-      },
-      WHATSAPP_MODE: { label: 'Bridge mode' },
-      WHATSAPP_ALLOWED_USERS: {
-        label: 'Allowed WhatsApp users',
-        help: 'Recommended. Comma-separated phone numbers or WhatsApp IDs.'
-      }
-    },
-    platformIntro: {}
   },
 
   webhooks: {
@@ -2406,7 +2254,6 @@ export const en: Translations = {
     nav: {
       'new-session': 'New session',
       skills: 'Capabilities',
-      messaging: 'Messaging',
       artifacts: 'Artifacts',
       cron: 'Scheduled jobs'
     },
@@ -2538,7 +2385,6 @@ export const en: Translations = {
       finishedUnread: 'Finished — unread',
       backgroundRunning: 'Background task running',
       draftSession: 'Draft — nothing sent yet',
-      handoffOrigin: platform => `Handed off from ${platform}`,
       ownedByProfile: profile => `Profile: ${profile}`,
       renamed: 'Renamed',
       renameFailed: 'Rename failed',
@@ -3817,10 +3663,6 @@ export const en: Translations = {
       skills: {
         title: 'Teach it once',
         text: 'Skills are folders of instructions Hermes loads when the work calls for them.'
-      },
-      messaging: {
-        title: 'Hermes away from your desk',
-        text: 'Connect Telegram, Discord, Slack and more — same agent, same memory.'
       },
       artifacts: {
         title: 'Everything Hermes made',

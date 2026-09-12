@@ -40,9 +40,7 @@ const sidebarRequest = {
   recentsProfile: 'default',
   recentsLimit: 40,
   recentsExclude: [],
-  cronLimit: 20,
-  messagingLimit: 40,
-  messagingExclude: []
+  cronLimit: 20
 }
 
 beforeEach(() => {
@@ -95,7 +93,6 @@ describe('registry ownership stamping', () => {
     getApiRequestConnection.mockReturnValue('prometheus')
     fetchSidebarSessions.mockResolvedValue({
       cron: { sessions: [row({ id: 'cron-1' })] },
-      messaging: { sessions: [row({ id: 'msg-1' })] },
       recents: { sessions: [row({ id: 'rec-1' })] }
     } as never)
 
@@ -103,14 +100,12 @@ describe('registry ownership stamping', () => {
 
     expect(result.recents.sessions[0].connection_id).toBe('prometheus')
     expect(result.cron.sessions[0].connection_id).toBe('prometheus')
-    expect(result.messaging.sessions[0].connection_id).toBe('prometheus')
   })
 
   it('stamps the legacy per-slice fallback the same way', async () => {
     getApiRequestConnection.mockReturnValue('prometheus')
     fetchSidebarSessions.mockResolvedValue({
       cron: { sessions: [row({ id: 'cron-1' })] },
-      messaging: { sessions: [row({ id: 'msg-1' })] },
       recents: { profiles_truncated: {}, sessions: [row({ id: 'rec-1' })] }
     } as never)
 

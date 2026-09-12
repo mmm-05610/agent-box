@@ -83,9 +83,9 @@ export async function listAllProfileSessions(
   }
 }
 
-/** Recents, cron and messaging in one refresh, every slice stamped. The slices
- *  arrive raw from `api/sessions.ts`; the legacy per-slice fallback stamps the
- *  same way, so both routes hand the sidebar identical ownership. */
+/** Recents and cron in one refresh, every slice stamped. The slices arrive
+ *  raw from `api/sessions.ts`; the legacy per-slice fallback stamps the same
+ *  way, so both routes hand the sidebar identical ownership. */
 export async function listSidebarSessions(req: SidebarSessionsRequest): Promise<SidebarSessionsResponse> {
   const result = await fetchSidebarSessions(req)
 
@@ -98,11 +98,6 @@ export async function listSidebarSessions(req: SidebarSessionsRequest): Promise<
     cron: {
       ...result.cron,
       sessions: stampActiveConnectionOwner(result.cron?.sessions ?? []),
-      ...(result.errors?.length ? { errors: result.errors } : {})
-    },
-    messaging: {
-      ...result.messaging,
-      sessions: stampActiveConnectionOwner(result.messaging?.sessions ?? []),
       ...(result.errors?.length ? { errors: result.errors } : {})
     },
     errors: result.errors

@@ -36,7 +36,6 @@ import { TipHost } from '@/components/tips'
 import { emitGatewayEvent } from '@/extension/contrib/events'
 import { type ChatMessage, chatMessageText, preserveLocalAssistantErrors, toChatMessages } from '@/lib/chat-messages'
 import { formatRefValue } from '@/lib/format-ref-value'
-import { isMessagingSource } from '@/lib/session-source'
 import {
   titlebarControlsPosition,
   titlebarControlsYNudge,
@@ -66,7 +65,6 @@ import {
   $freshDraftReady,
   $gatewayState,
   $messages,
-  $messagingSessions,
   $resumeExhaustedSessionId,
   $resumeFailedSessionId,
   $selectedStoredSessionId,
@@ -146,7 +144,7 @@ import { ChatRoutesSurface, SidebarSurface, StatusbarSurface, TerminalSurface } 
 import type { WiringActions, WiringApi } from './types'
 
 // Overlay views the controller mounts over the shell — lazy, load on demand.
-// The workspace-route full-page views (skills/messaging/artifacts) are the
+// The workspace-route full-page views (skills/artifacts) are the
 // ChatRoutesSurface's and live in ./surfaces.
 const AgentsView = lazy(async () => ({ default: (await import('../agents')).AgentsView }))
 const CommandCenterView = lazy(async () => ({ default: (await import('../command-center')).CommandCenterView }))
@@ -222,7 +220,6 @@ export function ContribWiring({ children }: { children: ReactNode }) {
   const resumeExhaustedSessionId = useStore($resumeExhaustedSessionId)
   const sessionResumeRequest = useStore($sessionResumeRequest)
   const selectedStoredSessionId = useStore($selectedStoredSessionId)
-  const messagingSessions = useStore($messagingSessions)
   const sessions = useStore($sessions)
   const activeConnectionId = useStore($activeConnectionId)
   const activeGatewayProfile = useStore($activeGatewayProfile)
@@ -309,8 +306,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     [ambientRequestGateway, runtimeIdByStoredSessionIdRef, selectedStoredSessionIdRef, sessionStateByRuntimeIdRef]
   )
 
-  const { loadMoreMessagingForPlatform, loadMoreSessions, refreshCronJobs, refreshMessagingSessions, refreshSessions } =
-    useSessionListActions({ profileScope })
+  const { loadMoreSessions, refreshCronJobs, refreshSessions } = useSessionListActions({ profileScope })
 
   const updateActiveSessionRuntimeInfo = useCallback(
     (info: { branch?: string; cwd?: string }) => {
@@ -790,18 +786,11 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     refreshSessions
   })
 
-  const activeIsMessaging =
-    !!selectedStoredSessionId &&
-    isMessagingSource(messagingSessions.find(s => sessionMatchesStoredId(s, selectedStoredSessionId))?.source)
-
-  // sessions.changed refreshes every open transcript; only messaging retains
-  // the periodic safety-net it already had before this fix.
   // Keep app data live while the gateway is open (on-connect reseed + the
-  // cron / messaging / transcript visibility polls + fresh-draft reseed).
+  // cron / transcript visibility polls + fresh-draft reseed).
   useBackgroundSync({
     activeConnectionId,
     activeGatewayProfile,
-    activeIsMessaging,
     activeSessionId,
     activeStoredSessionId: selectedStoredSessionId,
     freshDraftReady,
@@ -810,7 +799,6 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     refreshCronJobs,
     refreshCurrentModel,
     refreshHermesConfig,
-    refreshMessagingSessions,
     refreshSessions,
     requestGateway,
     updateSessionState
@@ -962,7 +950,6 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     onDeleteSession: sessionId => void removeSession(sessionId),
     onDismissError: dismissError,
     onEdit: editMessage,
-    onLoadMoreMessaging: loadMoreMessagingForPlatform,
     onLoadMoreSessions: loadMoreSessions,
     onManageCronJob: jobId => {
       setCronFocusJobId(jobId)

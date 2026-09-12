@@ -31,7 +31,6 @@ vi.mock('@/i18n', () => ({
           ageNow: 'now',
           backgroundRunning: 'Running in background',
           finishedUnread: 'Finished',
-          handoffOrigin: (platform: string) => `Started on ${platform}`,
           messageCount: (count: number) => `${count} messages`,
           needsInput: 'Needs input',
           sessionActions: 'Session actions',
@@ -52,12 +51,6 @@ vi.mock('@/i18n', () => ({
 
 vi.mock('@/app/chat/profile-tag', () => ({ ProfileTag: () => null }))
 vi.mock('@/app/chat/session-drag', () => ({ startSessionDrag: vi.fn() }))
-// PlatformAvatar is intentionally NOT mocked (do not reintroduce this — see
-// #67500, Gille's third pass): it's a forwardRef component that spreads its
-// props onto the rendered span, and mocking it with a stand-in that spreads
-// props itself only proves the MOCK forwards them, not that the real
-// component does. This file exercises the actual production component so a
-// regression in its ref/prop forwarding fails here again.
 // Only `sessionTitle` is overridden (makeSession fakes a bare `title` the real
 // one wouldn't read); the rest of the module is genuine so the arc test can
 // build session state with the same factory the app uses. It is a spy because
@@ -71,10 +64,6 @@ vi.mock('@/lib/chat-runtime', async importOriginal => {
   return { ...actual, sessionTitle: (s: SessionInfo) => sessionTitle(s) }
 })
 vi.mock('@/lib/haptics', () => ({ triggerHaptic: vi.fn() }))
-vi.mock('@/lib/session-source', () => ({
-  handoffOriginSource: (state?: string, platform?: string) => (state && platform ? platform : null),
-  sessionSourceLabel: (source: string) => source
-}))
 vi.mock('@/lib/time', async importOriginal => {
   const actual = await importOriginal<typeof Time>()
 
@@ -122,7 +111,7 @@ vi.mock('@/store/windows', async importOriginal => {
 
 // SessionActionsMenu open behavior is covered in session-actions-menu.test.tsx
 // against the real component. Stub it here so this file stays focused on the
-// row chrome (handoff avatar tip, etc.).
+// row chrome.
 vi.mock('./session-actions-menu', () => ({
   SessionActionsMenu: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   SessionContextMenu: ({ children }: { children: React.ReactNode }) => <>{children}</>
@@ -134,8 +123,6 @@ vi.mock('./use-profile-prewarm', () => ({
 
 function makeSession(overrides: Partial<SessionInfo> & { title: string }): SessionInfo {
   return {
-    handoff_platform: null,
-    handoff_state: null,
     id: 's1',
     last_active: 0,
     profile: 'default',
@@ -145,14 +132,6 @@ function makeSession(overrides: Partial<SessionInfo> & { title: string }): Sessi
 }
 
 const tipTrigger = (el: HTMLElement) => el.closest('[data-slot="tooltip-trigger"]')
-
-// The status dot always paints an aria-hidden placeholder so every row's title
-// keeps the same left edge, so "the row's aria-hidden span" no longer names the
-// avatar on its own. `inline-grid` is PlatformAvatar's own layout class in both
-// of its branches — brand glyph and first-letter fallback — and the row passes
-// it no display class that tailwind-merge could drop it for.
-const handoffAvatar = (container: HTMLElement) =>
-  container.querySelector<HTMLElement>('span[aria-hidden="true"].inline-grid')
 
 const noop = vi.fn()
 
@@ -362,53 +341,6 @@ describe('SidebarSessionRow', () => {
     expect(tipTrigger(age)).toBeTruthy()
   })
 
-  it('does not render a handoff avatar for a locally-started session', () => {
-    const { container } = render(
-      <SidebarSessionRow
-        isPinned={false}
-        isSelected={false}
-        onArchive={noop}
-        onDelete={noop}
-        onPin={noop}
-        onResume={noop}
-        onToggleUnread={noop}
-        session={makeSession({ title: 'Local session' })}
-        unread={false}
-      />
-    )
-
-    expect(handoffAvatar(container)).toBeNull()
-  })
-
-  it('wraps the handoff platform avatar in a Tip for a session started on another platform', () => {
-    const { container } = render(
-      <SidebarSessionRow
-        isPinned={false}
-        isSelected={false}
-        onArchive={noop}
-        onDelete={noop}
-        onPin={noop}
-        onResume={noop}
-        onToggleUnread={noop}
-        session={makeSession({
-          handoff_platform: 'telegram',
-          handoff_state: 'active',
-          title: 'Continued from Telegram'
-        })}
-        unread={false}
-      />
-    )
-
-    // PlatformAvatar is the REAL component here (see the note above the vi.mock
-    // block, #67500 third pass) — it renders the Telegram brand SVG rather
-    // than the platform name as text, so query the avatar span itself rather
-    // than text content, and confirm its tooltip trigger actually attaches to
-    // it — proving the real forwardRef/...rest path works, not a mock that
-    // fakes it.
-    const avatar = handoffAvatar(container)
-    expect(avatar).toBeTruthy()
-    expect(tipTrigger(avatar as HTMLElement)).toBeTruthy()
-  })
 })
 
 describe('Inbox-style session card', () => {
