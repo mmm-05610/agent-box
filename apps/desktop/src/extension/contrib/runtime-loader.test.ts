@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import type * as configApi from '@/api/config'
 import type { HermesReadDirResult } from '@/global'
-import type * as HermesModule from '@/hermes'
 import { $pluginRecords, publishPlugin, setPluginEnabled } from '@/store/plugin-state'
 
 import { discoverRuntimePlugins, loadRuntimePlugin, watchRuntimePlugins } from './runtime-loader'
@@ -10,8 +10,8 @@ import { discoverRuntimePlugins, loadRuntimePlugin, watchRuntimePlugins } from '
 // remote mode. The disk scanner must NOT derive the plugin root from it (#66899).
 const getStatus = vi.fn(async () => ({ hermes_home: '/remote/box/.hermes' }))
 
-vi.mock('@/hermes', async importActual => ({
-  ...(await importActual<typeof HermesModule>()),
+vi.mock('@/api/config', async importActual => ({
+  ...(await importActual<typeof configApi>()),
   getStatus: () => getStatus()
 }))
 

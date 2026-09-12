@@ -25,8 +25,10 @@ beforeAll(() => {
 
 const getGlobalModelOptions = vi.fn()
 
-vi.mock('@/hermes', () => ({
-  getGlobalModelOptions: (...args: unknown[]) => getGlobalModelOptions(...args),
+vi.mock('@/api/client', () => ({
+  setApiRequestProfile: vi.fn()
+}))
+vi.mock('@/api/local-models', () => ({
   // The menu kicks the app-level job poller on mount; echo the store so a
   // poll can't wipe the jobs a test staged (the real backend is authority,
   // and here the store plays that part).
@@ -36,7 +38,9 @@ vi.mock('@/hermes', () => ({
     return { jobs: [...$localRuntimeJobs.get()] }
   }),
   getLocalModelsStatus: vi.fn().mockResolvedValue({ loading: {} }),
-  setApiRequestProfile: vi.fn()
+}))
+vi.mock('@/api/models', () => ({
+  getGlobalModelOptions: (...args: unknown[]) => getGlobalModelOptions(...args),
 }))
 
 beforeEach(() => {

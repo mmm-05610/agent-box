@@ -6,7 +6,7 @@ import type { TerminalBackendsResponse } from '@/types/hermes'
 const getTerminalBackends = vi.fn()
 const selectTerminalBackend = vi.fn()
 
-vi.mock('@/hermes', () => ({
+vi.mock('@/api/toolsets', () => ({
   getTerminalBackends: () => getTerminalBackends(),
   selectTerminalBackend: (backend: string) => selectTerminalBackend(backend)
 }))

@@ -29,9 +29,11 @@ beforeAll(() => {
 
 const getGlobalModelOptions = vi.fn()
 
-vi.mock('@/hermes', () => ({
-  getGlobalModelOptions: (...args: unknown[]) => getGlobalModelOptions(...args),
+vi.mock('@/api/client', () => ({
   setApiRequestProfile: vi.fn()
+}))
+vi.mock('@/api/models', () => ({
+  getGlobalModelOptions: (...args: unknown[]) => getGlobalModelOptions(...args),
 }))
 
 // MoA presets now arrive as the catalog's virtual `moa` provider row (the same

@@ -27,20 +27,24 @@ const startManualOnboarding = vi.fn()
 const startManualProviderOAuth = vi.fn()
 let profileSwitchHandler: (() => void) | null = null
 
-vi.mock('@/hermes', () => ({
-  getGlobalModelInfo: (profile?: null | string) => getGlobalModelInfo(profile),
-  getGlobalModelOptions: (opts?: unknown, profile?: null | string) => getGlobalModelOptions(opts, profile),
-  getAuxiliaryModels: (profile?: null | string) => getAuxiliaryModels(profile),
+vi.mock('@/api/client', () => ({
   getApiRequestProfile: () => 'default',
-  getMoaModels: (profile?: null | string) => getMoaModels(profile),
   profileScopeKey: (scope?: null | string) => (scope ?? '').trim() || 'default',
-  setModelAssignment: (body: unknown) => setModelAssignment(body),
-  getRecommendedDefaultModel: (slug: string) => getRecommendedDefaultModel(slug),
-  saveMoaModels: (body: unknown) => saveMoaModels(body),
+  setApiRequestProfile: () => {}
+}))
+vi.mock('@/api/config', () => ({
   setEnvVar: (key: string, value: string) => setEnvVar(key, value),
   getHermesConfigRecord: () => getHermesConfigRecord(),
   saveHermesConfig: (config: unknown) => saveHermesConfig(config),
-  setApiRequestProfile: () => {}
+}))
+vi.mock('@/api/models', () => ({
+  getGlobalModelInfo: (profile?: null | string) => getGlobalModelInfo(profile),
+  getGlobalModelOptions: (opts?: unknown, profile?: null | string) => getGlobalModelOptions(opts, profile),
+  getAuxiliaryModels: (profile?: null | string) => getAuxiliaryModels(profile),
+  getMoaModels: (profile?: null | string) => getMoaModels(profile),
+  setModelAssignment: (body: unknown) => setModelAssignment(body),
+  getRecommendedDefaultModel: (slug: string) => getRecommendedDefaultModel(slug),
+  saveMoaModels: (body: unknown) => saveMoaModels(body),
 }))
 
 vi.mock('@/store/onboarding', () => ({
