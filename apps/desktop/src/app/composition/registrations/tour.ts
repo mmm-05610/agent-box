@@ -20,9 +20,6 @@ import '@/app/shell/layers/tour/app-tour.css'
 
 import { driver as driverFactory } from 'driver.js'
 
-import { runPreviewTour } from '@/features/chat/right-rail/preview-tour'
-import { revealDesktopPane } from '@/store/pane-focus'
-
 import { collectTourTargets } from '@/app/shell/layers/tour/collect-targets'
 import {
   runTourEngine,
@@ -34,6 +31,8 @@ import {
   type TourStyle
 } from '@/app/shell/layers/tour/engine'
 import { type Stage, stopSpotlightBlur, syncSpotlightBlur } from '@/app/shell/layers/tour/spotlight-blur'
+import { runPreviewTour } from '@/features/chat/right-rail/preview-tour'
+import { revealDesktopPane } from '@/store/pane-focus'
 
 /** Which document a tour runs against. */
 export type TourSurface = 'app' | 'preview'

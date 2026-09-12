@@ -3,24 +3,23 @@ import { useEffect } from 'react'
 import { useNavigate } from 'react-router'
 
 import {
-  domSections,
-  type DomContextMenuActions
+  type DomContextMenuActions,
+  domSections
 } from '@/app/shell/layers/context-menu/dom-sections'
 import {
-  guestSections,
-  type GuestContextMenuActions
+  type GuestContextMenuActions,
+  guestSections
 } from '@/app/shell/layers/context-menu/guest-sections'
-import { type ContextMenuSpellcheckSubscribe, ContextMenuHost } from '@/app/shell/layers/context-menu/host'
+import { ContextMenuHost, type ContextMenuSpellcheckSubscribe } from '@/app/shell/layers/context-menu/host'
 import {
   $contextMenu,
   openDomContextMenu,
-  openTerminalContextMenu,
-  type SpellcheckContext
+  openTerminalContextMenu
 } from '@/app/shell/layers/context-menu/store'
 import { CONTEXT_MENU_SKIP_ATTR, resolveDomTarget } from '@/app/shell/layers/context-menu/target'
 import { terminalMenuHandleFor } from '@/application/terminal/terminal-context-menu'
-import { writeClipboardText } from '@/components/ui/copy-button'
 import { HERMES_CONTEXT_MENU_TRIGGER_ATTR } from '@/components/ui/context-menu'
+import { writeClipboardText } from '@/components/ui/copy-button'
 import { terminalSections } from '@/features/right-sidebar/terminal/context-menu-sections'
 import { useI18n } from '@/i18n'
 import { isRemoteGateway } from '@/lib/desktop-fs'
