@@ -9,6 +9,13 @@ import { useLocation } from 'react-router'
 import { type HermesGateway } from '@/api/client'
 import type { SubmitTextOptions } from '@/app/session/hooks/use-prompt-actions/utils'
 import { sessionShouldHaveTranscript } from '@/app/session/hooks/use-session-actions/utils'
+import { routedSessionIsLoading, threadLoadingState } from '@/application/transcript/thread-loading'
+import {
+  backfillOlderTranscriptPage,
+  mergeOlderTranscriptPage,
+  transcriptBackfillAvailable
+} from '@/application/transcript/transcript-backfill'
+import { advanceSessionTranscriptWindow, type SessionWindowMemo } from '@/application/transcript/transcript-window'
 import { Thread } from '@/components/assistant-ui/thread'
 import { TranscriptWindowProvider } from '@/components/assistant-ui/thread/transcript-window'
 import { Backdrop } from '@/components/Backdrop'
@@ -72,13 +79,6 @@ import { isRouteSessionMismatch } from './route-session-state'
 import { useRuntimeMessageRepository } from './runtime-repository'
 import { ScrollToBottomButton } from './scroll-to-bottom-button'
 import { SessionActionsMenu } from './sidebar/session-actions-menu'
-import { routedSessionIsLoading, threadLoadingState } from './thread-loading'
-import {
-  backfillOlderTranscriptPage,
-  mergeOlderTranscriptPage,
-  transcriptBackfillAvailable
-} from './transcript-backfill'
-import { advanceSessionTranscriptWindow, type SessionWindowMemo } from './transcript-window'
 
 interface ChatViewProps extends Omit<React.ComponentProps<'div'>, 'onSubmit'> {
   gateway: HermesGateway | null

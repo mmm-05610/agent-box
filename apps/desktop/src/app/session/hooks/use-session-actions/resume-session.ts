@@ -1,11 +1,20 @@
 import { useCallback, useRef } from 'react'
 
-import { graftRefreshedTailOntoBackfill } from '@/app/chat/transcript-backfill'
 import { ensureGatewayAgent } from '@/application/profile/gateway-routing'
 import { ensureGatewayProfile } from '@/application/profile/runtime-selection'
 import { selectStoredSessionForViewing } from '@/application/session-read-state'
 import { fetchStoredTranscriptAcrossBackends, getLatestSessionMessages } from '@/application/session-transcripts'
+import { wasSessionCreatedThisRun } from '@/application/session/created-this-run'
 import { requestForSessionProfile } from '@/application/session/request-router'
+import { pendingClarifyToolPayload, restorePendingClarifyFromSnapshot } from '@/application/session/restore-pending-clarify'
+import {
+  createPersistedDisplayTranscriptProvenance,
+  hasPersistedDisplayTranscriptProvenance,
+  suppressTranscriptForView,
+  withoutTranscriptProvenance
+} from '@/application/session/transcript-provenance'
+import { applyStoredUsage } from '@/application/session/usage-mirror'
+import { graftRefreshedTailOntoBackfill } from '@/application/transcript/transcript-backfill'
 import { type Translations } from '@/i18n'
 import {
   type ChatMessage,
@@ -59,17 +68,8 @@ import type { ClientSessionState } from '@/types/session'
 
 import { singleFlightSessionResume } from '../use-prompt-actions/single-flight-resume'
 
-import { wasSessionCreatedThisRun } from '@/application/session/created-this-run'
 import { type FreshSessionDraftStarter } from './fresh-draft'
-import { pendingClarifyToolPayload, restorePendingClarifyFromSnapshot } from '@/application/session/restore-pending-clarify'
 import { type SessionActionsOptions } from './session-actions-options'
-import {
-  createPersistedDisplayTranscriptProvenance,
-  hasPersistedDisplayTranscriptProvenance,
-  suppressTranscriptForView,
-  withoutTranscriptProvenance
-} from '@/application/session/transcript-provenance'
-import { applyStoredUsage } from '@/application/session/usage-mirror'
 import {
   appendLiveSessionProjection,
   applyRuntimeInfo,
