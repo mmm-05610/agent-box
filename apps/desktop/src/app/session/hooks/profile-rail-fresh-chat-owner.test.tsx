@@ -4,11 +4,11 @@ import { act, cleanup, render, waitFor } from '@testing-library/react'
 import { useEffect, useMemo, useRef } from 'react'
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest'
 
+import { getSession } from '@/api/sessions'
 import { createSessionRpcDispatcher } from '@/app/contrib/session-rpc-dispatcher'
 import { ensureGatewayAgent } from '@/application/profile/gateway-routing'
 import { selectProfile } from '@/application/profile/navigation'
 import { newSessionInProfile } from '@/application/profile/new-session'
-import { getSession } from '@/hermes'
 import {
   activeGateway,
   activeGatewayConnectionId,
@@ -144,7 +144,7 @@ function answer(socket: MockGateway, method: string, params: Record<string, unkn
   return {}
 }
 
-vi.mock('@/hermes', async importOriginal => ({
+vi.mock('@/api/client', async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
   HermesGateway: class {
     connectUrl: null | string = null
@@ -190,11 +190,14 @@ vi.mock('@/hermes', async importOriginal => ({
       sockets.push(this as unknown as MockGateway)
     }
   },
+  setApiRequestConnection: vi.fn(),
+  setApiRequestProfile: vi.fn()
+}))
+vi.mock('@/api/sessions', async importOriginal => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   getSession: vi.fn(async () => {
     throw new Error('REST cross-profile probe must not be needed: the owner is known')
   }),
-  setApiRequestConnection: vi.fn(),
-  setApiRequestProfile: vi.fn()
 }))
 
 function installDesktop(): void {

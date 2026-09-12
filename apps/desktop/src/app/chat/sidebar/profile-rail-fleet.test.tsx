@@ -125,7 +125,7 @@ vi.mock('./use-profile-rail-refresh-on-active', () => ({
   useProfileRailRefreshOnActive: () => undefined
 }))
 
-vi.mock('@/hermes', () => ({
+vi.mock('@/api/profiles', () => ({
   getProfileSoul: vi.fn().mockResolvedValue({ content: '' }),
   updateProfileSoul: vi.fn()
 }))

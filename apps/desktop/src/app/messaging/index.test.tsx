@@ -12,17 +12,21 @@ const approvePairing = vi.fn()
 const revokePairing = vi.fn()
 const openExternalLink = vi.fn()
 
-vi.mock('@/hermes', () => ({
+vi.mock('@/api/client', () => ({
+  setApiRequestProfile: vi.fn(),
+}))
+vi.mock('@/api/messaging', () => ({
   approvePairing: (platformId: string, requestId: string, profile?: null | string) =>
     approvePairing(platformId, requestId, profile),
   getMessagingPlatforms: (profile?: null | string) => getMessagingPlatforms(profile),
   getPairing: (profile?: null | string) => getPairing(profile),
-  getProfiles: vi.fn(async () => ({ profiles: [] })),
   revokePairing: (platformId: string, userId: string, profile?: null | string) =>
     revokePairing(platformId, userId, profile),
-  setApiRequestProfile: vi.fn(),
   updateMessagingPlatform: (id: string, body: unknown, profile?: null | string) =>
     updateMessagingPlatform(id, body, profile)
+}))
+vi.mock('@/api/profiles', () => ({
+  getProfiles: vi.fn(async () => ({ profiles: [] })),
 }))
 
 // Keep store/profile's side-effecting imports inert (pulled in via the shared

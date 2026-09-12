@@ -65,7 +65,7 @@ class FakeHermesGateway {
   removeEventListener() {}
 }
 
-vi.mock('@/hermes', async importOriginal => ({
+vi.mock('@/api/client', async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
   HermesGateway: FakeHermesGateway,
   setApiRequestConnection: vi.fn()

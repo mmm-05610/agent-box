@@ -2,9 +2,9 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import type * as Nanostores from 'nanostores'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { deleteProfile } from '@/api/profiles'
 import { refreshProfiles } from '@/application/profile/catalog'
 import { selectProfile } from '@/application/profile/navigation'
-import { deleteProfile } from '@/hermes'
 import { retireLocalProfileGateways } from '@/store/gateway'
 import { setActiveProfile } from '@/store/profile/catalog-state'
 import type { ProfileInfo } from '@/types/hermes'
@@ -29,7 +29,7 @@ vi.mock('@/components/chat/code-editor', () => ({
   CodeEditor: () => null
 }))
 
-vi.mock('@/hermes', () => ({
+vi.mock('@/api/profiles', () => ({
   createProfile: vi.fn(async () => ({ name: 'x', ok: true, path: '/x' })),
   deleteProfile: vi.fn(async () => ({ ok: true, path: '/x' })),
   getProfileSoul: vi.fn(async () => ({ content: '', exists: true })),

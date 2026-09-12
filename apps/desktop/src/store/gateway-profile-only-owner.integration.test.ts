@@ -10,7 +10,7 @@ const gatewayMocks = vi.hoisted(() => {
   return { instances }
 })
 
-vi.mock('@/hermes', async importActual => ({
+vi.mock('@/api/client', async importActual => ({
   ...(await importActual<Record<string, unknown>>()),
   setApiRequestConnection: vi.fn(),
   HermesGateway: class {

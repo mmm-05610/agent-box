@@ -13,9 +13,11 @@ vi.mock('@/store/gateway', () => ({
   ensureGatewayForProfile: vi.fn(async () => undefined),
   openGatewayForProfile: vi.fn(async () => undefined)
 }))
-vi.mock('@/hermes', () => ({
-  getProfiles: vi.fn(async () => ({ profiles: [] })),
+vi.mock('@/api/client', () => ({
   setApiRequestProfile: vi.fn()
+}))
+vi.mock('@/api/profiles', () => ({
+  getProfiles: vi.fn(async () => ({ profiles: [] })),
 }))
 vi.mock('@/lib/query-client', () => ({ invalidateProfileScopedQueries: vi.fn() }))
 vi.mock('@/store/starmap', () => ({ resetStarmapGraph: vi.fn() }))

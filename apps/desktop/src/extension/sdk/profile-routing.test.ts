@@ -14,7 +14,9 @@ vi.mock('@/store/pane-shell/tree', async () => {
   return { $narrowViewport: atom(false) }
 })
 vi.mock('@/extension/contrib/events', () => ({ onGatewayEvent: vi.fn() }))
-vi.mock('@/hermes', () => ({ deleteProfile: vi.fn(), getLogs: vi.fn(), getStatus: vi.fn(), hermesApi: vi.fn() }))
+vi.mock('@/api/client', () => ({ hermesApi: vi.fn() }))
+vi.mock('@/api/config', () => ({ getLogs: vi.fn(), getStatus: vi.fn() }))
+vi.mock('@/api/profiles', () => ({ deleteProfile: vi.fn() }))
 vi.mock('@/store/notifications', () => ({ notify: vi.fn(), notifyError: vi.fn() }))
 vi.mock('@/store/system-actions', () => ({ runGatewayRestart: vi.fn() }))
 vi.mock('@/store/session', async () => {
@@ -124,7 +126,8 @@ vi.mock('@/store/gateway', async () => {
 const { BOT_CHAT_SESSION_HYDRATION_TIMEOUT_MS, DEFAULT_SESSION_HYDRATION_TIMEOUT_MS, host } = await import('./index')
 
 const { requestOpenSession: openSessionCore } = await import('@/lib/open-session')
-const { deleteProfile, hermesApi } = await import('@/hermes')
+const { deleteProfile } = await import('@/api/profiles')
+const { hermesApi } = await import('@/api/client')
 
 const {
   activeGatewayConnectionId,

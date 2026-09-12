@@ -10,12 +10,16 @@ const getHermesConfigSchema = vi.fn()
 const saveHermesConfig = vi.fn()
 const getElevenLabsVoices = vi.fn()
 
-vi.mock('@/hermes', () => ({
+vi.mock('@/api/client', () => ({
+  setApiRequestProfile: () => {}
+}))
+vi.mock('@/api/config', () => ({
   getHermesConfigRecord: () => getHermesConfigRecord(),
   getHermesConfigSchema: () => getHermesConfigSchema(),
   saveHermesConfig: (config: unknown, profile?: string) => saveHermesConfig(config, profile),
+}))
+vi.mock('@/api/system', () => ({
   getElevenLabsVoices: () => getElevenLabsVoices(),
-  setApiRequestProfile: () => {}
 }))
 
 vi.mock('@/components/hooks/use-on-profile-switch', () => ({

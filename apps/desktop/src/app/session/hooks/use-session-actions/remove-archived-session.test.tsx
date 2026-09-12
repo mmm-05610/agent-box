@@ -9,19 +9,23 @@ import type { MutableRefObject } from 'react'
 import { useEffect } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { deleteSession, type SessionInfo } from '@/hermes'
+import { deleteSession } from '@/api/sessions'
 import { setSessions } from '@/store/session'
 import { $archivedSessions } from '@/store/sidebar-archive'
+import { type SessionInfo } from '@/types/hermes'
 import type { ClientSessionState } from '@/types/session'
 
 import { useSessionActions } from './index'
 
-vi.mock('@/hermes', async importOriginal => ({
+vi.mock('@/api/client', async importOriginal => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  setApiRequestProfile: vi.fn(),
+}))
+vi.mock('@/api/sessions', async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
   deleteSession: vi.fn(),
   getSession: vi.fn(),
   getAllSessionMessages: vi.fn(),
-  setApiRequestProfile: vi.fn(),
   setSessionArchived: vi.fn()
 }))
 

@@ -9,8 +9,10 @@ const patch = vi.fn<(id: string, pinned: boolean, profile?: null | string) => Pr
   Promise.resolve({ ok: true })
 )
 
-vi.mock('@/hermes', () => ({
+vi.mock('@/api/client', () => ({
   setApiRequestProfile: () => {},
+}))
+vi.mock('@/api/sessions', () => ({
   setSessionPinnedRemote: (id: string, pinned: boolean, profile?: null | string) => patch(id, pinned, profile)
 }))
 

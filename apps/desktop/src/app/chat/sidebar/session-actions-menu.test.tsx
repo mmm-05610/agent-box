@@ -16,9 +16,11 @@ vi.mock('@/store/pane-shell/tree', () => ({
   closeTreeTabsToRight: vi.fn(),
   treeTabCloseTargets: vi.fn(() => null)
 }))
-vi.mock('@/hermes', () => ({
-  renameSession: vi.fn(),
+vi.mock('@/api/client', () => ({
   setApiRequestProfile: vi.fn(),
+}))
+vi.mock('@/api/sessions', () => ({
+  renameSession: vi.fn(),
   setSessionUnreadRemote: vi.fn(() => Promise.resolve({ ok: true }))
 }))
 vi.mock('@/i18n', () => ({

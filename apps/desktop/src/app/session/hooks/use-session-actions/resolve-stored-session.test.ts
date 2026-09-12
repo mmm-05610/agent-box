@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type * as HermesModule from '@/hermes'
-import { getSession } from '@/hermes'
+import type * as sessionsApi from '@/api/sessions'
+import { getSession } from '@/api/sessions'
 import { $activeGatewayProfile, $profiles } from '@/store/profile'
 import { $projectTree } from '@/store/projects'
 import { $cronSessions, $messagingSessions, $sessions } from '@/store/session'
@@ -9,8 +9,8 @@ import type { SessionInfo } from '@/types/hermes'
 
 import { cachedSessionRow, resolveSessionProfile, resolveStoredSession } from './utils'
 
-vi.mock('@/hermes', async importActual => ({
-  ...(await importActual<typeof HermesModule>()),
+vi.mock('@/api/sessions', async importActual => ({
+  ...(await importActual<typeof sessionsApi>()),
   getSession: vi.fn()
 }))
 

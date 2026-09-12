@@ -47,7 +47,28 @@ const getHermesConfigSchema = vi.fn()
 const saveHermesConfig = vi.fn()
 const getElevenLabsVoices = vi.fn()
 
-vi.mock('@/hermes', () => ({
+vi.mock('@/api/client', () => ({
+  // @/store/profile (pulled in transitively via use-config-record's
+  // normalizeProfileKey import) calls this at module-init; the full-replacement
+  // mock must provide it or the module graph throws on load.
+  setApiRequestProfile: () => undefined,
+  getApiRequestProfile: () => null
+}))
+vi.mock('@/api/config', () => ({
+  setEnvVar: (key: string, value: string) => setEnvVar(key, value),
+  deleteEnvVar: (key: string) => deleteEnvVar(key),
+  revealEnvVar: (key: string) => revealEnvVar(key),
+  startOAuthLogin: (providerId: string) => startOAuthLogin(providerId),
+  pollOAuthSession: (providerId: string, sessionId: string) => pollOAuthSession(providerId, sessionId),
+  getHermesConfigRecord: () => getHermesConfigRecord(),
+  getHermesConfigSchema: () => getHermesConfigSchema(),
+  saveHermesConfig: (config: unknown) => saveHermesConfig(config),
+}))
+vi.mock('@/api/system', () => ({
+  getActionStatus: (name: string, lines?: number) => getActionStatus(name, lines),
+  getElevenLabsVoices: () => getElevenLabsVoices(),
+}))
+vi.mock('@/api/toolsets', () => ({
   getToolsetConfig: (name: string) => getToolsetConfig(name),
   getToolsetModels: (name: string, provider?: string) => getToolsetModels(name, provider),
   selectToolsetModel: (name: string, model: string, provider?: string) => selectToolsetModel(name, model, provider),
@@ -55,22 +76,7 @@ vi.mock('@/hermes', () => ({
     capability === undefined
       ? selectToolsetProvider(name, provider)
       : selectToolsetProvider(name, provider, capability),
-  setEnvVar: (key: string, value: string) => setEnvVar(key, value),
-  deleteEnvVar: (key: string) => deleteEnvVar(key),
-  revealEnvVar: (key: string) => revealEnvVar(key),
   runToolsetPostSetup: (name: string, key: string) => runToolsetPostSetup(name, key),
-  getActionStatus: (name: string, lines?: number) => getActionStatus(name, lines),
-  startOAuthLogin: (providerId: string) => startOAuthLogin(providerId),
-  pollOAuthSession: (providerId: string, sessionId: string) => pollOAuthSession(providerId, sessionId),
-  getHermesConfigRecord: () => getHermesConfigRecord(),
-  getHermesConfigSchema: () => getHermesConfigSchema(),
-  saveHermesConfig: (config: unknown) => saveHermesConfig(config),
-  getElevenLabsVoices: () => getElevenLabsVoices(),
-  // @/store/profile (pulled in transitively via use-config-record's
-  // normalizeProfileKey import) calls this at module-init; the full-replacement
-  // mock must provide it or the module graph throws on load.
-  setApiRequestProfile: () => undefined,
-  getApiRequestProfile: () => null
 }))
 
 vi.mock('@/store/notifications', () => ({

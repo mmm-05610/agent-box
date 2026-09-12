@@ -64,12 +64,16 @@ vi.mock('@/lib/desktop-git', async importOriginal => ({
   desktopGit: vi.fn()
 }))
 
-vi.mock('@/hermes', () => ({
-  getHermesConfig: vi.fn(),
-  getProfiles: vi.fn(),
+vi.mock('@/api/client', () => ({
   hermesApi: vi.fn(),
   setApiRequestProfile: vi.fn(),
   STARTUP_REQUEST_TIMEOUT_MS: 1000
+}))
+vi.mock('@/api/config', () => ({
+  getHermesConfig: vi.fn()
+}))
+vi.mock('@/api/profiles', () => ({
+  getProfiles: vi.fn()
 }))
 
 const fs = await import('@/lib/desktop-fs')
@@ -84,8 +88,10 @@ const gatewayAtom = gw.$gateway
 const git = await import('@/lib/desktop-git')
 const desktopGit = vi.mocked(git.desktopGit)
 
-const hermes = await import('@/hermes')
-const getHermesConfig = vi.mocked(hermes.getHermesConfig)
+const config = await import('@/api/config')
+const getHermesConfig = vi.mocked(config.getHermesConfig)
+const client = await import('@/api/client')
+const hermesApi = vi.mocked(client.hermesApi)
 const notifications = await import('@/store/notifications')
 const notify = vi.mocked(notifications.notify)
 
@@ -429,7 +435,7 @@ describe('createProject', () => {
     const tree = { id: created.id, label: created.name, path: created.primary_path, repos: [], sessionCount: 0 }
     const request = vi.fn().mockResolvedValue({ project: created })
     activeGateway.mockReturnValue({ connectionState: 'open', request } as never)
-    vi.mocked(hermes.hermesApi).mockResolvedValue({ projects: [tree], active_id: created.id })
+    hermesApi.mockResolvedValue({ projects: [tree], active_id: created.id })
     $activeGatewayProfile.set(profile)
     setShowAllProfiles(true)
 
@@ -440,7 +446,7 @@ describe('createProject', () => {
     expect($projects.get()).toContainEqual(created)
     expect($projectTree.get()).toEqual(expect.arrayContaining([expect.objectContaining({ id: created.id })]))
     expect($activeProjectId.get()).toBe(created.id)
-    expect(hermes.hermesApi).toHaveBeenCalledWith(
+    expect(hermesApi).toHaveBeenCalledWith(
       expect.objectContaining({ path: '/api/profiles/projects/tree?preview_limit=3' })
     )
   })
