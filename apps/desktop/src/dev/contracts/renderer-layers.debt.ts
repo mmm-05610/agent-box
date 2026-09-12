@@ -18,11 +18,4 @@
 export const DEBT_LEDGER: readonly string[] = [
   // components/ — 1
   'components/assistant-ui/thread/user-edit-composer.tsx -> @/app/session/hooks/use-prompt-actions',
-
-  // lib/ — 1
-  'lib/session-project-label.ts -> @/app/chat/sidebar/projects/workspace-groups',
-
-  // store/ — 2
-  'store/projects/crud.ts -> @/app/chat/new-session-drag',
-  'store/projects/dialogs.ts -> @/app/chat/new-session-drag',
 ]
