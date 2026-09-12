@@ -1,15 +1,40 @@
 import type { ReactNode } from 'react'
 
-import { writeClipboardText } from '@/components/ui/copy-button'
 import { type Translations } from '@/i18n'
-import { isRemoteGateway } from '@/lib/desktop-fs'
-import { hostPathLabel, hudForcesNativeLinks, normalizeExternalUrl, openExternalLink } from '@/lib/external-link'
-import { reachablePreviewUrl } from '@/lib/preview-reach'
-import { openPreview } from '@/store/preview'
+import { normalizeExternalUrl } from '@/lib/external-link'
 
 import { EDIT_SHORTCUTS, Item } from './item'
 import { closeContextMenu, type OpenContextMenu } from './store'
 import { isWebUrl } from './target'
+
+/** The host-supplied operations the generic DOM sections dispatch to, plus
+ *  the capability facts that gate rows. The sections own row structure,
+ *  labels, ordering, enabled rules and the focus timing; the operations own
+ *  what actually happens (preview pane, clipboard, external browser, the
+ *  host's edit/spellcheck/image commands). */
+export interface DomContextMenuActions {
+  /** Whether this window can host the in-app browser pane (the HUD cannot). */
+  readonly canOpenLinksInApp: boolean
+  /** Whether loopback links offer the resolved-URL copy (a remote gateway
+   *  resolves them through main's forward). */
+  readonly canResolveLoopbackLinks: boolean
+  /** Copy the clicked image's bytes (tracked from the menu gesture). */
+  readonly copyImage: () => void
+  /** Resolve `url` to one THIS machine can reach, then copy it. */
+  readonly copyResolvedLinkUrl: (url: string) => void
+  /** Write text to the clipboard. */
+  readonly copyText: (text: string) => void
+  /** Cut/copy/paste against the window's focused editable. */
+  readonly editCommand: (command: 'copy' | 'cut' | 'paste') => void
+  /** Open `url` in the system browser. */
+  readonly openLinkExternal: (url: string) => void
+  /** Open `url` in the in-app browser pane. */
+  readonly openLinkInApp: (url: string) => void
+  /** Save the image at `url` to disk. */
+  readonly saveImage: (url: string) => void
+  /** Replace the misspelled word or add it to the dictionary. */
+  readonly spellcheckAction: (action: { kind: 'add' | 'replace'; word: string }) => void
+}
 
 const LOOPBACK_HOST_RE = /^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[?::1\]?)$/i
 
@@ -21,15 +46,19 @@ function isLoopbackUrl(url: string): boolean {
   }
 }
 
-export function domSections(open: Extract<OpenContextMenu, { kind: 'dom' }>, t: Translations): ReactNode[][] {
+export function domSections(
+  open: Extract<OpenContextMenu, { kind: 'dom' }>,
+  t: Translations,
+  actions: DomContextMenuActions
+): ReactNode[][] {
   const copy = t.contextMenu
   const { spellcheck, target } = open
   const sections: ReactNode[][] = []
   const linkUrl = target.linkUrl ? normalizeExternalUrl(target.linkUrl) : ''
   const linkIsWeb = isWebUrl(linkUrl)
   const imageIsWeb = isWebUrl(target.imageUrl)
-  const openInApp = !hudForcesNativeLinks()
-  const showResolvedCopy = linkIsWeb && isRemoteGateway() && isLoopbackUrl(linkUrl)
+  const openInApp = actions.canOpenLinksInApp
+  const showResolvedCopy = linkIsWeb && actions.canResolveLoopbackLinks && isLoopbackUrl(linkUrl)
 
   // The edit verbs and spell-check actions act on the sender's FOCUSED
   // element in main. Focus cannot be restored while the menu is open: the
@@ -48,7 +77,7 @@ export function domSections(open: Extract<OpenContextMenu, { kind: 'dom' }>, t: 
   }
 
   const editableCommand = (command: 'copy' | 'cut' | 'paste') => {
-    withEditableFocus(() => void window.hermesDesktop?.contextMenuEdit?.(command))
+    withEditableFocus(() => actions.editCommand(command))
   }
 
   // Select all runs entirely in the renderer, scoped to the editable itself.
@@ -80,43 +109,28 @@ export function domSections(open: Extract<OpenContextMenu, { kind: 'dom' }>, t: 
   }
 
   const spellcheckAction = (action: { kind: 'add' | 'replace'; word: string }) => {
-    withEditableFocus(() => void window.hermesDesktop?.contextMenuSpellcheck?.(action))
+    withEditableFocus(() => actions.spellcheckAction(action))
   }
 
   if (linkUrl) {
     sections.push(
       [
         linkIsWeb && openInApp ? (
-          <Item
-            icon="globe"
-            key="link-open-app"
-            label={copy.link.openInApp}
-            onSelect={() =>
-              openPreview(
-                { kind: 'url', label: hostPathLabel(linkUrl), source: linkUrl, url: linkUrl },
-                'explicit-link'
-              )
-            }
-          />
+          <Item icon="globe" key="link-open-app" label={copy.link.openInApp} onSelect={() => actions.openLinkInApp(linkUrl)} />
         ) : null,
         <Item
           icon="link-external"
           key="link-open-external"
           label={copy.link.openExternal}
-          onSelect={() => openExternalLink(linkUrl)}
+          onSelect={() => actions.openLinkExternal(linkUrl)}
         />,
-        <Item
-          icon="copy"
-          key="link-copy"
-          label={copy.link.copyUrl}
-          onSelect={() => void writeClipboardText(linkUrl)}
-        />,
+        <Item icon="copy" key="link-copy" label={copy.link.copyUrl} onSelect={() => actions.copyText(linkUrl)} />,
         showResolvedCopy ? (
           <Item
             icon="copy"
             key="link-copy-resolved"
             label={copy.link.copyResolvedUrl}
-            onSelect={() => reachablePreviewUrl(linkUrl).then(writeClipboardText)}
+            onSelect={() => actions.copyResolvedLinkUrl(linkUrl)}
           />
         ) : null
       ].filter(Boolean)
@@ -131,12 +145,7 @@ export function domSections(open: Extract<OpenContextMenu, { kind: 'dom' }>, t: 
             icon="globe"
             key="image-open-app"
             label={copy.link.openInApp}
-            onSelect={() =>
-              openPreview(
-                { kind: 'url', label: hostPathLabel(target.imageUrl), source: target.imageUrl, url: target.imageUrl },
-                'explicit-link'
-              )
-            }
+            onSelect={() => actions.openLinkInApp(target.imageUrl)}
           />
         ) : null,
         imageIsWeb ? (
@@ -144,30 +153,20 @@ export function domSections(open: Extract<OpenContextMenu, { kind: 'dom' }>, t: 
             icon="link-external"
             key="image-open-external"
             label={copy.link.openExternal}
-            onSelect={() => openExternalLink(target.imageUrl)}
+            onSelect={() => actions.openLinkExternal(target.imageUrl)}
           />
         ) : null,
-        <Item
-          icon="file-media"
-          key="image-copy"
-          label={copy.image.copyImage}
-          onSelect={() => void window.hermesDesktop?.contextMenuCopyImage?.()}
-        />,
+        <Item icon="file-media" key="image-copy" label={copy.image.copyImage} onSelect={() => actions.copyImage()} />,
         target.imageUrl ? (
           <Item
             icon="copy"
             key="image-copy-address"
             label={copy.image.copyImageAddress}
-            onSelect={() => void writeClipboardText(target.imageUrl)}
+            onSelect={() => actions.copyText(target.imageUrl)}
           />
         ) : null,
         target.imageUrl ? (
-          <Item
-            icon="save"
-            key="image-save"
-            label={copy.image.saveImageAs}
-            onSelect={() => void window.hermesDesktop?.saveImageFromUrl?.(target.imageUrl)}
-          />
+          <Item icon="save" key="image-save" label={copy.image.saveImageAs} onSelect={() => actions.saveImage(target.imageUrl)} />
         ) : null
       ].filter(Boolean)
     )
@@ -252,12 +251,7 @@ export function domSections(open: Extract<OpenContextMenu, { kind: 'dom' }>, t: 
     ])
   } else if (target.selectionText) {
     sections.push([
-      <Item
-        icon="copy"
-        key="selection-copy"
-        label={t.common.copy}
-        onSelect={() => void writeClipboardText(target.selectionText)}
-      />
+      <Item icon="copy" key="selection-copy" label={t.common.copy} onSelect={() => actions.copyText(target.selectionText)} />
     ])
   }
 

@@ -1,3 +1,14 @@
+/**
+ * THE product keybinding registration: every action that names a product
+ * surface — Session switcher/slots, Profile slots, Composer focus/paste/model
+ * picker, Workspace/worktree, Terminal, Preview, HUD, panes, theme, routes,
+ * product stores — plus the dispatch policies around them (switcher Esc
+ * abandon, find-bar combo claims, type-to-focus, soft composer combos), all
+ * injected into the product-neutral Shell host (`useKeybindingHost`, batch 32).
+ * The host owns capture/normalize/gate/dispatch mechanics; this file owns what
+ * the keys DO.
+ */
+
 import { useEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 
@@ -14,6 +25,7 @@ import {
   SETTINGS_ROUTE,
   SKILLS_ROUTE
 } from '@/app/routes'
+import { useKeybindingHost } from '@/app/shell/hooks/use-keybinding-host'
 import { hudTargetSessionId } from '@/app/windows/hud/handoff'
 import { cycleProfile, switchProfileToSlot, switchToDefaultProfile } from '@/application/profile/navigation'
 import { openSession } from '@/application/session/open-session'
@@ -24,8 +36,8 @@ import { handleComposerFocusChord } from '@/features/chat/composer/focus-chord'
 import { composerFocusKeysAllowed, isComposerFocusSoftCombo, typeToFocusChar } from '@/features/chat/composer/focus-keys'
 import { handleWindowPaste } from '@/features/chat/composer/paste-to-focus'
 import { findBarClaimsCombo } from '@/lib/find-in-page'
-import { contributedKeybindHandler, PROFILE_SLOT_COUNT, SESSION_SLOT_COUNT } from '@/lib/keybinds/actions'
-import { actionAllowedInInput, comboFromEvent, isEditableTarget } from '@/lib/keybinds/combo'
+import { PROFILE_SLOT_COUNT, SESSION_SLOT_COUNT } from '@/lib/keybinds/actions'
+import { isEditableTarget } from '@/lib/keybinds/combo'
 import { onReleaseTypingFocus } from '@/lib/typing-focus'
 import { openWorktreeDialog } from '@/store/coding-status'
 import { $commandPaletteOpen, openCommandPalettePage, toggleCommandPalette } from '@/store/command-palette'
@@ -36,7 +48,6 @@ import {
   openFindBar
 } from '@/store/find-in-page'
 import { toggleHud } from '@/store/hud'
-import { $capture, $comboIndex, endCapture, setBinding } from '@/store/keybinds'
 import {
   requestSessionSearchFocus,
   setFileBrowserOpen,
@@ -90,10 +101,10 @@ export interface KeybindRuntimeDeps {
 
 type HandlerMap = Record<string, () => void>
 
-// Mount once near the top of the app. Owns the single global keydown listener
-// for every rebindable hotkey: it runs the matched action, or — while capture
-// mode is active (edit overlay / panel rebind) — records the pressed combo.
-export function useKeybinds(deps: KeybindRuntimeDeps): void {
+// Mount once near the top of the app: the product action map for the global
+// keybinding host, plus the companion listeners (switcher commit mechanics,
+// window paste, the composer focus chord) that share its lifetime.
+export function useAppKeybindings(deps: KeybindRuntimeDeps): void {
   const navigate = useNavigate()
   const location = useLocation()
   const { resolvedMode, setMode } = useTheme()
@@ -290,6 +301,53 @@ export function useKeybinds(deps: KeybindRuntimeDeps): void {
     'profile.create': requestProfileCreate
   }
 
+  useKeybindingHost({
+    // While the session switcher is up, Esc abandons it (stay put) before any
+    // combo dispatch — ⌃Tab keeps stepping through the existing handler.
+    interceptKeyDown: event => {
+      if (switcherActive() && event.key === 'Escape') {
+        event.preventDefault()
+        event.stopPropagation()
+        closeSwitcher()
+
+        return true
+      }
+
+      return false
+    },
+    // The open find bar owns ⌘G / ⌘⇧G / Escape. Its own capture-phase
+    // listener runs those actions; the host must yield so the registry
+    // doesn't ALSO fire the action bound to the same combo (⌘G =
+    // view.toggleReview, Escape = composer.cancel, which would abort a live
+    // turn).
+    claimsCombo: combo => $findInPage.get().active && findBarClaimsCombo(combo),
+    // Unbound printable → type-to-focus.
+    onUnboundKey: event => {
+      const typeChar = typeToFocusChar(event)
+
+      if (typeChar && composerFocusKeysAllowed(event, 'type')) {
+        event.preventDefault()
+        requestComposerFocus('active', { typeChar })
+      }
+    },
+    // Soft `/` / Enter: gated so dialogs/buttons/terminal keep those keys.
+    gateSoftCombo: (actionId, combo, event) => {
+      if (actionId !== 'composer.focus' || !isComposerFocusSoftCombo(combo)) {
+        return 'pass'
+      }
+
+      if (!composerFocusKeysAllowed(event, combo)) {
+        return 'blocked'
+      }
+
+      event.preventDefault()
+      requestComposerFocus('active', { typeChar: combo === '/' ? '/' : undefined })
+
+      return 'consumed'
+    },
+    handlers: handlersRef.current
+  })
+
   // A keyboard-driven overlay closing hands typing back to the composer: Radix
   // restores focus to the trigger (a toolbar button for the model pill), so
   // without this the Enter that committed a model also eats the next keystroke.
@@ -309,112 +367,6 @@ export function useKeybinds(deps: KeybindRuntimeDeps): void {
   )
 
   useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      // An active IME composition owns the keyboard. Windows Chinese IMEs
-      // (Microsoft Pinyin, Sogou) use Ctrl+, as their punctuation-mode toggle,
-      // so without this guard that keystroke ALSO matched `nav.settings` and
-      // navigated away mid-word — unmounting the composer and destroying the
-      // unsent draft (#41079). The draft stash below makes navigation safe;
-      // this makes the IME keystroke not navigate at all.
-      if (event.isComposing) {
-        return
-      }
-
-      // Capture mode: the next real key becomes the binding. Swallow everything
-      // so e.g. ⌘K rebinds instead of opening the palette.
-      const capturing = $capture.get()
-
-      if (capturing) {
-        event.preventDefault()
-        event.stopPropagation()
-
-        if (event.key === 'Escape') {
-          endCapture()
-
-          return
-        }
-
-        const combo = comboFromEvent(event)
-
-        if (!combo) {
-          return
-        }
-
-        setBinding(capturing, [combo])
-        endCapture()
-
-        return
-      }
-
-      // While the session switcher is up, Esc abandons it (stay put) before any
-      // combo dispatch — ⌃Tab keeps stepping through the existing handler.
-      if (switcherActive() && event.key === 'Escape') {
-        event.preventDefault()
-        event.stopPropagation()
-        closeSwitcher()
-
-        return
-      }
-
-      const combo = comboFromEvent(event)
-
-      if (!combo) {
-        return
-      }
-
-      // The open find bar owns ⌘G / ⌘⇧G / Escape. Its own capture-phase
-      // listener runs those actions; bail here so the registry doesn't ALSO
-      // fire the action bound to the same combo (⌘G = view.toggleReview,
-      // Escape = composer.cancel, which would abort a live turn). Both
-      // listeners are on `window`, so stopPropagation in the bar can't
-      // suppress this one — the dispatcher has to yield explicitly.
-      if ($findInPage.get().active && findBarClaimsCombo(combo)) {
-        return
-      }
-
-      const actionId = $comboIndex.get().get(combo)
-
-      // Unbound printable → type-to-focus. Bound chords (shift+n, …) win above.
-      if (!actionId) {
-        const typeChar = typeToFocusChar(event)
-
-        if (typeChar && composerFocusKeysAllowed(event, 'type')) {
-          event.preventDefault()
-          requestComposerFocus('active', { typeChar })
-        }
-
-        return
-      }
-
-      if (isEditableTarget(event.target) && !actionAllowedInInput(actionId, combo)) {
-        return
-      }
-
-      // Soft `/` / Enter: gated so dialogs/buttons/terminal keep those keys.
-      // Rebound chords fall through to the normal handler.
-      if (actionId === 'composer.focus' && isComposerFocusSoftCombo(combo)) {
-        if (!composerFocusKeysAllowed(event, combo)) {
-          return
-        }
-
-        event.preventDefault()
-        requestComposerFocus('active', { typeChar: combo === '/' ? '/' : undefined })
-
-        return
-      }
-
-      // Built-in handlers first (they carry React context); contributed
-      // actions bring their own `run` through the registry.
-      const handler = handlersRef.current[actionId] ?? contributedKeybindHandler(actionId)
-
-      if (!handler) {
-        return
-      }
-
-      event.preventDefault()
-      handler()
-    }
-
     // Mac-app-switcher commit: lifting Ctrl with the overlay open lands on the
     // highlighted session. A window blur (Cmd+Tab away mid-switch) cancels so
     // the overlay never gets stranded waiting for a keyup that never comes.
@@ -438,7 +390,6 @@ export function useKeybinds(deps: KeybindRuntimeDeps): void {
       }
     }
 
-    window.addEventListener('keydown', onKeyDown, { capture: true })
     window.addEventListener('keyup', onKeyUp, { capture: true })
     window.addEventListener('blur', onBlur)
     window.addEventListener('contextmenu', onContextMenu, { capture: true })
@@ -451,7 +402,6 @@ export function useKeybinds(deps: KeybindRuntimeDeps): void {
     window.addEventListener('keydown', handleComposerFocusChord)
 
     return () => {
-      window.removeEventListener('keydown', onKeyDown, { capture: true })
       window.removeEventListener('keyup', onKeyUp, { capture: true })
       window.removeEventListener('blur', onBlur)
       window.removeEventListener('contextmenu', onContextMenu, { capture: true })

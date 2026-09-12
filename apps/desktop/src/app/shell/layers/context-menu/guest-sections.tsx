@@ -1,25 +1,44 @@
 import type { ReactNode } from 'react'
 
-import { writeClipboardText } from '@/components/ui/copy-button'
 import { type Translations } from '@/i18n'
-import { hostPathLabel, hudForcesNativeLinks, openExternalLink } from '@/lib/external-link'
-import { openPreview } from '@/store/preview'
 
 import { EDIT_SHORTCUTS, Item } from './item'
 import { closeContextMenu, type OpenContextMenu } from './store'
 import { isWebUrl } from './target'
 
+/** The host-supplied operations the generic guest sections dispatch to, plus
+ *  the capability fact that gates link rows. The sections own row structure,
+ *  labels, ordering and the Chromium editFlags gating; the guest handle
+ *  carries the page verbs, and these operations own the rest (preview pane,
+ *  clipboard, external browser, image save). */
+export interface GuestContextMenuActions {
+  /** Whether this window can host the in-app browser pane (the HUD cannot). */
+  readonly canOpenLinksInApp: boolean
+  /** Write text to the clipboard. */
+  readonly copyText: (text: string) => void
+  /** Open `url` in the system browser. */
+  readonly openLinkExternal: (url: string) => void
+  /** Open `url` in the in-app browser pane. */
+  readonly openLinkInApp: (url: string) => void
+  /** Save the image at `url` to disk. */
+  readonly saveImage: (url: string) => void
+}
+
 /** The guest (in-app browser) menu: link/image/selection/editable sections
  *  from the Chromium params, plus select all for the page, closed by
  *  Inspect element. The page-level verbs (copy URL, open externally,
  *  console) live on the browser bar, not here. */
-export function guestSections(open: Extract<OpenContextMenu, { kind: 'guest' }>, t: Translations): ReactNode[][] {
+export function guestSections(
+  open: Extract<OpenContextMenu, { kind: 'guest' }>,
+  t: Translations,
+  actions: GuestContextMenuActions
+): ReactNode[][] {
   const copy = t.contextMenu
   const { guest, params } = open
   const sections: ReactNode[][] = []
   const linkUrl = params.linkURL
   const imageUrl = params.srcURL
-  const openInApp = !hudForcesNativeLinks()
+  const openInApp = actions.canOpenLinksInApp
 
   // Same trap-timing rule as the dom side: dispatch AFTER the menu closes,
   // so the webview's focus() is not stolen back by the radix content.
@@ -32,30 +51,15 @@ export function guestSections(open: Extract<OpenContextMenu, { kind: 'guest' }>,
     sections.push(
       [
         isWebUrl(linkUrl) && openInApp ? (
-          <Item
-            icon="globe"
-            key="guest-link-open-app"
-            label={copy.link.openInApp}
-            onSelect={() =>
-              openPreview(
-                { kind: 'url', label: hostPathLabel(linkUrl), source: linkUrl, url: linkUrl },
-                'explicit-link'
-              )
-            }
-          />
+          <Item icon="globe" key="guest-link-open-app" label={copy.link.openInApp} onSelect={() => actions.openLinkInApp(linkUrl)} />
         ) : null,
         <Item
           icon="link-external"
           key="guest-link-open-external"
           label={copy.link.openExternal}
-          onSelect={() => openExternalLink(linkUrl)}
+          onSelect={() => actions.openLinkExternal(linkUrl)}
         />,
-        <Item
-          icon="copy"
-          key="guest-link-copy"
-          label={copy.link.copyUrl}
-          onSelect={() => void writeClipboardText(linkUrl)}
-        />
+        <Item icon="copy" key="guest-link-copy" label={copy.link.copyUrl} onSelect={() => actions.copyText(linkUrl)} />
       ].filter(Boolean)
     )
   }
@@ -68,7 +72,7 @@ export function guestSections(open: Extract<OpenContextMenu, { kind: 'guest' }>,
             icon="link-external"
             key="guest-image-open-external"
             label={copy.link.openExternal}
-            onSelect={() => openExternalLink(imageUrl)}
+            onSelect={() => actions.openLinkExternal(imageUrl)}
           />
         ) : null,
         params.hasImageContents ? (
@@ -79,16 +83,11 @@ export function guestSections(open: Extract<OpenContextMenu, { kind: 'guest' }>,
             icon="copy"
             key="guest-image-copy-address"
             label={copy.image.copyImageAddress}
-            onSelect={() => void writeClipboardText(imageUrl)}
+            onSelect={() => actions.copyText(imageUrl)}
           />
         ) : null,
         imageUrl ? (
-          <Item
-            icon="save"
-            key="guest-image-save"
-            label={copy.image.saveImageAs}
-            onSelect={() => void window.hermesDesktop?.saveImageFromUrl?.(imageUrl)}
-          />
+          <Item icon="save" key="guest-image-save" label={copy.image.saveImageAs} onSelect={() => actions.saveImage(imageUrl)} />
         ) : null
       ].filter(Boolean)
     )

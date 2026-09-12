@@ -190,7 +190,7 @@ export function handleDesktopBridgeEvent(ctx: GatewayEventContext): boolean {
         // a spotlight the user can't see.
         void answer({ error: 'The user has turned guided tours off.', success: false })
       } else if (isActiveEvent) {
-        void import('@/app/shell/layers/tour')
+        void import('@/app/composition/registrations/tour')
           .then(({ runTour }) =>
             runTour(
               {

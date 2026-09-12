@@ -9,17 +9,30 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 
-import { $contextMenu, augmentSpellcheck, closeContextMenu } from './store'
+import { $contextMenu, augmentSpellcheck, closeContextMenu, type SpellcheckContext } from './store'
+
+/** A host-provided source for the late spell-check facts of the open menu.
+ *  Returns the unsubscribe (or nothing when there is no such source). */
+export type ContextMenuSpellcheckSubscribe = (
+  onFacts: (payload: SpellcheckContext) => void
+) => (() => void) | undefined
 
 /** The context-menu HOST: presentation, keyboard, and the close lifecycle
  *  for a menu whose sections were already chosen by composition. It does
- *  not know what those sections are. */
-export function ContextMenuHost({ sections }: { sections: ReactNode[][] }) {
+ *  not know what those sections are, and it does not know where spell-check
+ *  facts come from — that subscription is injected. */
+export function ContextMenuHost({
+  sections,
+  subscribeSpellcheck
+}: {
+  sections: ReactNode[][]
+  subscribeSpellcheck?: ContextMenuSpellcheckSubscribe
+}) {
   const open = useStore($contextMenu)
 
-  // Spell-check facts arrive from main after the menu opens (Chromium reports
-  // them on its own context-menu event); attach them to the open menu.
-  useEffect(() => window.hermesDesktop?.onContextMenuSpellcheck?.(augmentSpellcheck), [])
+  // Spell-check facts arrive after the menu opens (Chromium reports them on
+  // its own context-menu event); attach them to the open menu.
+  useEffect(() => subscribeSpellcheck?.(augmentSpellcheck), [subscribeSpellcheck])
 
   if (!open) {
     return null

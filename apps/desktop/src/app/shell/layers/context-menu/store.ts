@@ -1,7 +1,5 @@
 import { atom } from 'nanostores'
 
-import type { TerminalMenuHandle } from '@/application/terminal/terminal-context-menu'
-
 import type { ContextMenuDomTarget } from './target'
 
 /** Spell-check facts for the open editable menu. They arrive AFTER the menu
@@ -44,6 +42,19 @@ export interface GuestMenuHandle {
   replaceMisspelling: (word: string) => void
 }
 
+/** The context-menu handle a GUI terminal registers for its host (xterm
+ *  paints to a canvas, so a right-click inside it has no DOM to resolve).
+ *  Structural mirror of the registered handle, kept local so the store
+ *  never imports the terminal's application module; the runtime object is
+ *  the terminal's own, so any member the menus gain access to must exist
+ *  there or the consumers fail to compile. */
+export interface TerminalMenuHandle {
+  getSelection: () => string
+  /** Null on the read-only agent mirror — it has no PTY to paste into. */
+  paste: ((text: string) => void) | null
+  selectAll: () => void
+}
+
 export type OpenContextMenu =
   | {
       kind: 'dom'
@@ -77,15 +88,18 @@ export type OpenContextMenu =
  *  menus can never be open at once. */
 export const $contextMenu = atom<null | OpenContextMenu>(null)
 
+/** A clipboard text read the HOST supplies (main owns the clipboard).
+ *  Undefined when this window has no such bridge. */
+export type ClipboardTextProbe = () => Promise<string> | undefined
+
 /** Read the clipboard and flag the OPEN terminal menu when text is
  *  available. The read is an IPC round-trip, so the menu opens first
  *  (empty-clipboard verdict) and the flag lands a tick later — same
  *  late-fact pattern as spellcheck. Guarded by identity: a stale read
  *  never flags a newer menu. */
-function probeClipboard(opened: Extract<OpenContextMenu, { kind: 'terminal' }>): void {
-  void window.hermesDesktop
-    ?.readClipboard?.()
-    .then((text: string) => {
+function probeClipboard(opened: Extract<OpenContextMenu, { kind: 'terminal' }>, readClipboardText: ClipboardTextProbe): void {
+  void readClipboardText()
+    ?.then((text: string) => {
       const current = $contextMenu.get()
 
       if (current === opened && current.kind === 'terminal' && text) {
@@ -103,13 +117,18 @@ export function openGuestContextMenu(x: number, y: number, params: GuestMenuPara
   $contextMenu.set({ kind: 'guest', x, y, params, guest })
 }
 
-export function openTerminalContextMenu(x: number, y: number, terminal: TerminalMenuHandle): void {
+export function openTerminalContextMenu(
+  x: number,
+  y: number,
+  terminal: TerminalMenuHandle,
+  readClipboardText?: ClipboardTextProbe
+): void {
   const opened: OpenContextMenu = { kind: 'terminal', x, y, terminal, clipboardHasText: false }
 
   $contextMenu.set(opened)
 
-  if (terminal.paste) {
-    probeClipboard(opened)
+  if (terminal.paste && readClipboardText) {
+    probeClipboard(opened, readClipboardText)
   }
 }
 
