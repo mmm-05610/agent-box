@@ -13,7 +13,7 @@ import {
 } from '@/store/projects/membership'
 import type { ProjectInfo, SessionInfo } from '@/types/hermes'
 
-import { rankSessions } from '../order'
+import { rankSessions } from './order'
 
 // Session grouping is now computed authoritatively on the backend
 // (`tui_gateway/project_tree.py`, exposed via `projects.tree` /

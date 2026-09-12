@@ -3,7 +3,7 @@ import type { ProjectInfo, SessionInfo } from '@/types/hermes'
 // The membership core of the sidebar project tree: which project a session
 // belongs to (`liveSessionProjectId`), the color derived from that same answer
 // (`sessionProjectColor`), and the three tree shapes the answer is rendered
-// into. Split out of `app/chat/sidebar/projects/workspace-groups.ts` (which
+// into. Split out of `application/sidebar/workspace-groups.ts` (which
 // keeps the tree-building half) so `store/` can answer the membership question
 // without reaching up into `app/`.
 //

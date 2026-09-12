@@ -10,6 +10,7 @@ export {
 export { ProjectBackRow, ProjectOverviewRow } from './overview-row'
 export { ProjectMenu } from './project-menu'
 export { SidebarWorkspaceGroup } from './workspace-group'
+export { StartWorkButton } from './workspace-header'
 export {
   excludeProjectSessions,
   overlayLiveLanes,
@@ -17,8 +18,7 @@ export {
   reconcileEnteredProjectSessions,
   sessionMatchesProjectFilter,
   sessionRecency
-} from './workspace-groups'
-export { StartWorkButton } from './workspace-header'
+} from '@/application/sidebar/workspace-groups'
 // The membership core lives in `store/`; the tree-building half stays local.
 export {
   liveSessionProjectId,
