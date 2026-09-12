@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import type { GatewayEventContext } from '@/application/session/gateway-event/types'
 import { createClientSessionState } from '@/lib/chat-runtime'
 import {
   $currentCwd,
@@ -11,7 +12,6 @@ import {
 import type { ClientSessionState } from '@/types/session'
 
 import { handleSessionInfoEvent } from './session-info'
-import type { GatewayEventContext } from './types'
 
 // `_session_info` stamps `stored_session_id: session_key or ""`, so every
 // not-yet-persisted session on the gateway emits an UNNAMED session.info that

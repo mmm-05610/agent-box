@@ -1,3 +1,4 @@
+import type { GatewayEventContext } from '@/application/session/gateway-event/types'
 import {
   applySessionInfoStatePatch,
   hasSessionInfoStatePatch,
@@ -34,8 +35,6 @@ import {
 import { reportInstallMethodWarning } from '@/store/updates'
 
 import { finalizeInterruptedMessages } from '../../use-prompt-actions/rewind'
-
-import type { GatewayEventContext } from './types'
 
 /**
  * Whether a `session.info` payload's `stored_session_id` may be treated as the
