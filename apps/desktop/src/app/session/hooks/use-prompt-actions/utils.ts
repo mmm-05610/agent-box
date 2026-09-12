@@ -100,8 +100,8 @@ export interface SessionRecoveryDeps {
 }
 
 async function defaultResolveProfile(storedSessionId: string): Promise<string | undefined> {
-  // Lazy so utils.ts has no init-time cycle with use-session-actions.
-  const { resolveSessionProfile } = await import('../use-session-actions/utils')
+  // Lazy so utils.ts has no init-time dependency on the session-registry fetch chain.
+  const { resolveSessionProfile } = await import('@/application/session/session-registry-lookup')
 
   return resolveSessionProfile(storedSessionId)
 }
