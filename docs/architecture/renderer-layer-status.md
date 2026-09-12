@@ -8,11 +8,11 @@ because it is trusted; see `renderer-layer-master-plan.md` §8.
 | | |
 | --- | --- |
 | last updated | 2026-09-12 |
-| last commit to change renderer source | `e9a61ec` |
-| ledger | **4** |
+| last commit to change renderer source | `9df3d0c` |
+| ledger | **1** |
 | target when the run completes | **0** |
 | tests | **776 files / 7466 tests** |
-| reviewed, per-batch numbers | 01 · 02 · 04 · 05 · 06a1 · 06b1 · 06c2 · 06c1 · 06a2 · 07a · 07b · 08 · 09 · 10 · 11 · 12 · 14 · 15 — every merged row names its reviewer's measured numbers |
+| reviewed, per-batch numbers | 01 · 02 · 03 · 04 · 05 · 06a1 · 06b1 · 06c2 · 06c1 · 06a2 · 07a · 07b · 08 · 09 · 10 · 11 · 12 · 14 · 15 — every merged row names its reviewer's measured numbers |
 | in scope | **every work order in `renderer-layer-batches/`** — Phase 1 and Phase 2 both; no phase is a permission gate |
 
 ---
@@ -28,7 +28,7 @@ numbers come from the collision check
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 01 | four stateful `lib/` services → `store/` | 6 | 6 | merged | `0d3f10c` + regen `ccb7ccf` | group reviewer ({01,07a,14,12,15}): 4 renames md5-identical, 10 files import/mock-line-only, `sdk/index.ts` block move = specifier + eslint-sorted position only, 23→10 across the round, 776/7466, guard 16/16 | commit subject records ledger 23→17 — this batch's 6 plus 07a's 4 and 14's 3, regenerated together |
 | 02 | `lib/tour/` → `app/tour/` | 2 | 1 | merged | `ca2b693` | wave-1 reviewer: ledger 85→76 exact, regen idempotent · 776 files/7466 tests · guard 16/16 · eslint 0 err | only 2 of the 5 named files had real imports; the other 3 held prose comments only. Stale prose left at `vite.config.ts:181` and `app/tour/index.ts:10` (cosmetic) |
-| 03 | a misplaced shape and a sidebar label | 3 | 4 | unblocked | — | — | the defect the executor found stands; remedy written into the work order as **Move A.0**: sink `SplitDir`/`TileDock` to the new `types/pane-dock.ts` (registry re-exports them, 9 consumers unmoved) and name `SessionOwnerRoute` directly instead of the `AgentProfileRoute` alias — then Move A pays its 2 without adding a `types → store` line, and Move B is unchanged |
+| 03 | a misplaced shape and a sidebar label | 3 | 4 | merged | `9bcb15c` (A.0) `f136e79` (A+B) + regen `9df3d0c` (4→1) | group reviewer: A.0 byte-identical type sink with the re-export in the required form, session-placement.ts = the interface + doc comment verbatim after the authorised `SessionOwnerRoute` re-spelling, no re-export left behind, all importer diffs import-lines-only, 12 files every hunk read, 4→1 exact, 776/7466, guard 16/16 | executed under the amendment: A.0 sinks `SplitDir`/`TileDock` to `types/pane-dock.ts` (registry re-exports, nine readers unmoved) and the interface names `SessionOwnerRoute` directly; batch 04's `liveSessionProjectId` re-export is now load-bearing for the moved label (its `:26` comment's path mention is stale — cosmetic) |
 | 04 | split `workspace-groups.ts`, membership core → `store/` | 4 | 2 | merged | `7037d03` | wave-1 reviewer: 4 lines verified gone, no duplication, test split byte-identical | closure pulled `isWindowsPath`/`comparisonSegments` down with `isPathUnder` (app half imports them back); temporary re-export of `liveSessionProjectId` left in the app module — batch 03 consumes it |
 | 06a1 | `lib/statusbar.tsx` — the React half leaves | 1 | 2 | merged | `e6f67b0` | wave-1 reviewer: edge gone, moves verbatim | `formatDuration` turned out to be exported already; it traveled with `LiveDuration` |
 | 06a2 | `lib/session-link-title.ts` → its only consumer | 1 | 3 | merged | `eb0b0c6` | group reviewer: byte-identical move (hash-compared), 4 specifier-only repoints, ledger 59→55 exact, 776/7466, guard 16/16 | |
@@ -118,10 +118,7 @@ proved it the only closure that does not widen the ledger.)
 
 ## Open items
 
-- Nothing is blocked. Every work order has a verified destination, a self-contained
-  brief and a place in Phase 1 or 2. Nothing is undecided and nothing is unassigned:
-  the run's stopping point is the ledger reaching **0**, which is the first time in
-  this migration that "done" and "zero" are the same number.
+- **One line remains: batch 13's** (`components/assistant-ui/thread/user-edit-composer.tsx -> @/app/session/hooks/use-prompt-actions`). Its executor hit the work order's own rank-≤2 stop condition and proved it six ways: the five declarations call `withSessionNotFoundResume`, whose app-rooted recovery core is entangled with the `use-session-actions` chain — moved to `application/` they would ADD an `application → app` edge not in the ledger. The remedy is a design step (sink the session-recovery core first, per §9), not a mechanical move; nothing was merged for 13 and nothing was improvised. Every other work order in this directory is merged and reviewed; the ledger arithmetic is 85 − 84 = 1 against the merged set, and the regen is idempotent on it.
 
 ## How to update this file
 
