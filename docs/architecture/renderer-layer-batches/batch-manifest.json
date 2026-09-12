@@ -173,7 +173,8 @@
     "modules": [
       "use-prompt-actions'",
       "uploadComposerAttachment"
-    ]
+    ],
+    "merged": true
   },
   "14 hooks-sink": {
     "edges": 3,
@@ -198,6 +199,53 @@
     "modules": [
       "withSessionNotFoundResume",
       "single-flight-resume'"
+    ],
+    "merged": true
+  },
+  "17 session-remainder": {
+    "edges": 0,
+    "modules": [
+      "use-message-stream/utils'",
+      "session-state-cache'"
+    ]
+  },
+  "18 starmap": {
+    "edges": 0,
+    "modules": [
+      "starmap/"
+    ]
+  },
+  "19 terminal": {
+    "edges": 0,
+    "modules": [
+      "right-sidebar/terminal/"
+    ]
+  },
+  "20 preview": {
+    "edges": 0,
+    "modules": [
+      "right-rail/preview-"
+    ]
+  },
+  "21 transcript": {
+    "edges": 0,
+    "modules": [
+      "assistant-ui/thread/",
+      "transcript-window'",
+      "transcript-backfill'",
+      "thread-loading'"
+    ]
+  },
+  "22 session-lists": {
+    "edges": 0,
+    "modules": [
+      "chat/sidebar/fleet-rail'",
+      "chat/sidebar/session-index'",
+      "chat/sidebar/session-row-gesture'",
+      "chat/sidebar/session-row-details'",
+      "chat/sidebar/search-view-model'",
+      "chat/sidebar/project-filter'",
+      "chat/sidebar/profile-scope'"
     ]
   }
 }

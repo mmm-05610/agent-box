@@ -8,12 +8,13 @@ because it is trusted; see `renderer-layer-master-plan.md` §8.
 | | |
 | --- | --- |
 | last updated | 2026-09-12 |
-| last commit to change renderer source | `54bd7b0` |
+| last commit to change renderer source | `d5964ed` |
 | ledger | **0** |
-| target when the run completes | **0 — met** |
+| target when the run completes | **0 — met** (Phase 3 must leave it at 0) |
 | tests | **776 files / 7466 tests** |
 | reviewed, per-batch numbers | 01 · 02 · 03 · 04 · 05 · 06a1 · 06b1 · 06c2 · 06c1 · 06a2 · 07a · 07b · 08 · 09 · 10 · 11 · 12 · 13 · 14 · 15 · 16 — every merged row names its reviewer's measured numbers |
-| in scope | **every work order in `renderer-layer-batches/`** — Phase 1 and Phase 2 both; no phase is a permission gate |
+| phase 3 | six sink work orders **dispatched, none merged** — 44 files / 4,892 lines, all `edges: 0`; see the Phase 3 table |
+| in scope | **every work order in `renderer-layer-batches/`** — Phase 1, Phase 2 and Phase 3; no phase is a permission gate |
 
 ---
 
@@ -119,7 +120,48 @@ proved it the only closure that does not widen the ledger.)
 
 ## Open items
 
-- **None. The ledger is 0** — an empty `DEBT_LEDGER`, regen idempotent on it, every work order in this directory merged with a reviewer's numbers. The run's stopping point ("done" and "zero" are the same number) is reached: 85 edges paid across 16 work orders plus the Phase 2 barrel removal, 85 − 85 = 0 against the merged set.
+- **The ledger work is finished.** An empty `DEBT_LEDGER`, regen idempotent on it,
+  every ledger-bearing work order in this directory merged with a reviewer's
+  numbers: 85 edges paid across 16 work orders plus the Phase 2 barrel removal,
+  85 − 85 = 0 against the merged set.
+- **Phase 3 is open: six sink work orders, 44 files, 4,892 lines, all `edges: 0`.**
+  The ledger is *already* 0, so these pay nothing and must leave it at 0 — they
+  move logic that is merely **living in the wrong layer** (rank 4/5 modules that
+  render nothing and reach only rank ≤ 2). See the table below. Baseline for every
+  one of them: 776 files / 7466 tests, guard 16/16, ledger 0 before and after.
+
+---
+
+## Phase 3 — the sink work orders
+
+The layer ratchet rejected **upward edges**. It could not see the other defect: a
+module that is *downward-clean* but **lives at the top of the ladder anyway**,
+so the UI layer keeps custody of logic that has nothing to do with presentation.
+
+Measured over `app/` + `components/`: **80 production files (~6.0k lines)** qualify
+today, and another **50 (~7.6k lines) look like logic but drag `components/`**, so
+they need a decision rather than a move. Phase 3 dispatches the coherent clusters
+among the first 80; the second group is deliberately not dispatched.
+
+**Method note, learned the hard way in this phase:** measure the closure of the
+**whole group moving together**, never file by file. Per-file, `app/starmap/color.ts`
+reports "drags rank 5" — that rank 5 is its own sibling, which necessarily travels
+with it. A sibling in the same batch is not a blocker. Every group below was
+verified this way, and the group's destination rank is the *minimum* that keeps the
+out-of-group closure clean.
+
+| item | scope | files | lines | destination | wave | status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 17 | session remainder: the event projection and the state cache | 2 | 394 | `application/session/` | 10 | open |
+| 18 | starmap's pure maths (canvas render, simulation, geometry, colour, time axis, share code) | 9 | 1983 | `lib/starmap/` | 1 | open |
+| 19 | terminal internals (buffer, selection, clipboard, resize, font, lifecycle table, event stream) | 8 | 1057 | `application/terminal/` | 4 | open |
+| 20 | preview/browser logic (drive state machine, navigation, script runner, console state, nudge, reader) | 10 | 736 | `application/preview/` | 3 | open |
+| 21 | the transcript projection (split today across `app/chat/` and `components/assistant-ui/thread/`) | 8 | 750 | `application/transcript/` | 3 | open |
+| 22 | session-list derivations out of the `sessions` pane | 7 | 366 | `application/session-lists/` | 1 | open |
+
+**Not dispatched, on purpose:** `app/chat/sidebar/projects/workspace-groups.ts` (673
+lines, the heaviest single file) and the 50 files that reach `components/`. Each needs
+a decision about *what the module is*, not a destination.
 
 ## How to update this file
 
