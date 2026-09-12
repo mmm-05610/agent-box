@@ -2,6 +2,7 @@ import { useStore } from '@nanostores/react'
 import { atom } from 'nanostores'
 import { type CSSProperties, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
+import { ensureTerminal } from '@/application/terminal/terminals'
 import { markRightPanePerf } from '@/dev/debug/right-pane-events'
 import { isElementInHiddenPane, PANE_HIDDEN_ATTR } from '@/lib/pane-visibility'
 import { createRendererLoopPauseController } from '@/lib/renderer-loop-pause'
@@ -9,7 +10,6 @@ import { $layoutTree } from '@/store/pane-shell/tree'
 import { $paneStates } from '@/store/panes'
 import { $terminalTakeover } from '@/store/terminal-takeover'
 
-import { ensureTerminal } from './terminals'
 import { TerminalWorkspace } from './workspace'
 
 /**

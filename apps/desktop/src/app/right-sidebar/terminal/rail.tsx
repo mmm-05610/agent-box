@@ -1,5 +1,15 @@
 import { useStore } from '@nanostores/react'
 
+import {
+  $activeTerminalId,
+  $terminals,
+  closeAllTerminals,
+  closeOtherTerminals,
+  closeTerminal,
+  createTerminal,
+  selectTerminal,
+  type TerminalEntry
+} from '@/application/terminal/terminals'
 import { Codicon } from '@/components/ui/codicon'
 import {
   ContextMenu,
@@ -15,17 +25,6 @@ import { isMetaClose, middleClickHandlers } from '@/lib/middle-click'
 import { cn } from '@/lib/utils'
 import { $bindings } from '@/store/keybinds'
 import { setTerminalTakeover } from '@/store/terminal-takeover'
-
-import {
-  $activeTerminalId,
-  $terminals,
-  closeAllTerminals,
-  closeOtherTerminals,
-  closeTerminal,
-  createTerminal,
-  selectTerminal,
-  type TerminalEntry
-} from './terminals'
 
 const RAIL_ACTION =
   'grid size-6 place-items-center rounded text-(--ui-text-tertiary) transition-colors hover:bg-(--chrome-action-hover) hover:text-foreground focus-visible:bg-(--chrome-action-hover) focus-visible:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring [-webkit-app-region:no-drag]'

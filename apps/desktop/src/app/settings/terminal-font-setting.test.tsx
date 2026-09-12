@@ -2,7 +2,7 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { $terminalFontFamily } from '../right-sidebar/terminal/terminal-font'
+import { $terminalFontFamily } from '@/application/terminal/terminal-font'
 
 import { TerminalFontSetting } from './terminal-font-setting'
 

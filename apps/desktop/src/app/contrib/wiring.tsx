@@ -16,6 +16,7 @@ import { useLocation, useNavigate } from 'react-router'
 import { useDesktopFsConnection } from '@/app/contrib/hooks/use-desktop-fs-connection'
 import { refreshActiveProfile } from '@/application/profile/catalog'
 import { getLatestSessionMessages } from '@/application/session-transcripts'
+import { closeAllTerminals } from '@/application/terminal/terminals'
 import { useSkinCommand } from '@/application/theme/use-skin-command'
 import { graftRefreshedTailOntoBackfill } from '@/application/transcript/transcript-backfill'
 import { BootFailureOverlay } from '@/components/boot-failure-overlay'
@@ -98,7 +99,6 @@ import { FileActionDialogs } from '../right-sidebar/file-actions'
 import { RemoteFolderPicker } from '../right-sidebar/files/remote-picker'
 import { resetProjectTreeState } from '../right-sidebar/files/use-project-tree'
 import { PersistentTerminal } from '../right-sidebar/terminal/persistent'
-import { closeAllTerminals } from '../right-sidebar/terminal/terminals'
 import {
   CRON_ROUTE,
   navigateToWorkspacePage,

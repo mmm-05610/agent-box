@@ -1,12 +1,12 @@
 import '@xterm/xterm/css/xterm.css'
 
+import { reportTerminalShell } from '@/application/terminal/terminals'
 import { Button } from '@/components/ui/button'
 import { KbdCombo } from '@/components/ui/kbd'
 import { Loader } from '@/components/ui/loader'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
 
-import { reportTerminalShell } from './terminals'
 import { useAgentTerminal } from './use-agent-terminal'
 import { useTerminalSession } from './use-terminal-session'
 

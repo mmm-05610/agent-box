@@ -1,6 +1,6 @@
 import { Profiler, type ProfilerOnRenderCallback, type ReactNode } from 'react'
 
-import { writeAgentTerminalChunk } from '@/app/right-sidebar/terminal/agent-terminal-stream'
+import { writeAgentTerminalChunk } from '@/application/terminal/agent-terminal-stream'
 import {
   $activeTerminalId,
   $terminals,
@@ -8,7 +8,7 @@ import {
   ensureAgentTerminal,
   selectTerminal,
   type TerminalEntry
-} from '@/app/right-sidebar/terminal/terminals'
+} from '@/application/terminal/terminals'
 import { $repoStatusByCwd } from '@/store/coding-status'
 import { $gateway } from '@/store/gateway'
 import { $currentCwd, $messages, setBusy, setCurrentCwdTransient, setMessages } from '@/store/session'

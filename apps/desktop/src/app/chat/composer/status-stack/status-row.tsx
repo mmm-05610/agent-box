@@ -1,6 +1,6 @@
 import { Fragment, memo, type ReactNode } from 'react'
 
-import { openAgentTerminal } from '@/app/right-sidebar/terminal/terminals'
+import { openAgentTerminal } from '@/application/terminal/terminals'
 import { StatusRow } from '@/components/chat/status-row'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'

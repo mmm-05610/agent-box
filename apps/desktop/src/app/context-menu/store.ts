@@ -1,6 +1,6 @@
 import { atom } from 'nanostores'
 
-import type { TerminalMenuHandle } from '@/app/right-sidebar/terminal/terminal-context-menu'
+import type { TerminalMenuHandle } from '@/application/terminal/terminal-context-menu'
 
 import type { ContextMenuDomTarget } from './target'
 

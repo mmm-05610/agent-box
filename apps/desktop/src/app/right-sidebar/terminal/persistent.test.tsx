@@ -14,7 +14,7 @@ vi.mock('@/store/terminal-takeover', async () => ({
   $terminalTakeover: (await import('nanostores')).atom(false)
 }))
 
-vi.mock('./terminals', () => ({
+vi.mock('@/application/terminal/terminals', () => ({
   ensureTerminal: vi.fn()
 }))
 

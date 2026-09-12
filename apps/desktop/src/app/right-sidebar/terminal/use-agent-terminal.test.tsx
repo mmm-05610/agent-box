@@ -84,11 +84,11 @@ vi.mock('@/themes/context', () => ({
   })
 }))
 
-vi.mock('./agent-terminal-stream', () => ({
+vi.mock('@/application/terminal/agent-terminal-stream', () => ({
   registerAgentTerminalWriter: terminalRegistrations.registerWriter
 }))
 
-vi.mock('./buffer', () => ({
+vi.mock('@/application/terminal/buffer', () => ({
   makeTerminalReader: terminalRegistrations.makeTerminalReader,
   registerTerminalReader: terminalRegistrations.registerReader
 }))

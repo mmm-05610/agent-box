@@ -6,7 +6,7 @@ import {
   resolveTerminalFontFamily,
   setTerminalFontFamilyFromConfig,
   TERMINAL_FONT_SUGGESTIONS
-} from '@/app/right-sidebar/terminal/terminal-font'
+} from '@/application/terminal/terminal-font'
 import { useOnProfileSwitch } from '@/components/hooks/use-on-profile-switch'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
