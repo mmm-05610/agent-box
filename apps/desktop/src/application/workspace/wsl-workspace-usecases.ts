@@ -14,10 +14,10 @@
  */
 
 import {
+  archiveWslWorkspace,
   listWslWorkspaces,
   reconnectWslWorkspace,
   releaseWslConnection,
-  removeWslWorkspace,
   renameWslWorkspace,
   saveWslWorkspace
 } from '@/api/workspace'
@@ -157,16 +157,18 @@ export async function renameWslWorkspaceProjection(workspaceId: string, name: st
   return { ok: true, workspace: result.workspace }
 }
 
-export type WslRemoveOutcome = { ok: true; removed: boolean } | WslFailure
+export type WslArchiveOutcome = { ok: true; archived: boolean } | WslFailure
 
 /**
- * Remove a workspace's sidebar record. The row leaves the projection only on
- * the host's answer; a `removed: false` (already gone) still clears a stale
- * local row. Files, sessions, history and the distribution are untouched —
- * the record was the only thing removed.
+ * "Remove from sidebar" is an ARCHIVE (36R): the host keeps the record behind
+ * its `archivedAt` marker — id, identity and renamed name survive — and the
+ * row leaves the projection only on the host's answer. An `archived: false`
+ * (already archived / unknown id) still drops a stale local row. Files,
+ * sessions, history and the distribution are untouched, and re-opening the
+ * same directory restores the original record with its original id.
  */
-export async function removeWslWorkspaceProjection(workspaceId: string): Promise<WslRemoveOutcome> {
-  const result = await removeWslWorkspace(workspaceId)
+export async function archiveWslWorkspaceProjection(workspaceId: string): Promise<WslArchiveOutcome> {
+  const result = await archiveWslWorkspace(workspaceId)
 
   if (!result.ok) {
     return result
@@ -180,5 +182,5 @@ export async function removeWslWorkspaceProjection(workspaceId: string): Promise
 
   $wslWorkspaceValidation.set(validation)
 
-  return { ok: true, removed: result.removed }
+  return { ok: true, archived: result.archived }
 }

@@ -1930,6 +1930,8 @@ export const zhHant = defineLocale({
       reveal: '在資料夾中顯示',
       copyPath: '複製路徑',
       removeFromSidebar: '從側邊欄移除',
+      pathScopeWindowsPath: '該資料夾是 Windows 路徑，而會話在遠端後端上執行，無法開啟它。請改用後端瀏覽器選擇資料夾。',
+      pathScopeUnverified: '後端檔案系統未回應，無法核驗該資料夾。未建立、未啟動任何內容——請重新連線後再選擇資料夾。',
       createFailed: '無法建立專案',
       staleBackend: '請更新 Hermes 後端以建立專案——目前後端比桌面應用舊（設定 → 更新 → 後端）。',
       deleteConfirm: '這會從 Hermes 中移除已儲存的專案。檔案、git 儲存庫和工作樹維持不變。',
@@ -3237,6 +3239,7 @@ export const zhHant = defineLocale({
     errWslSaveFailed: '儲存工作區失敗。',
     errWslNotFound: '該工作區已不存在。',
     errWslStoreFutureVersion: '工作區儲存由更新版本的應用寫入，請先升級應用再操作。',
+    errWslStoreIllegalVersion: '工作區儲存檔案已損壞（版本號無法識別）。未做任何變更；請手動修復或刪除該檔案。',
     errUnexpected: '發生意外錯誤。'
   },
 

@@ -115,7 +115,7 @@ import { $focusedSessionIsTile, $focusedStoredSessionId, $workingSessionIds } fr
 import { ackAllSessionsRead } from '@/store/session-unread'
 import { $archivedSessions, loadArchivedSessions } from '@/store/sidebar-archive'
 import { $sidebarSessionRankIds } from '@/store/sidebar-sort'
-import { selectWorkspaceView } from '@/store/workspace-view'
+import { isWorkspaceLocallyHidden, selectWorkspaceView, workspaceHiddenKey } from '@/store/workspace-view'
 import { $wslWorkspaces, openWslWorkspaceWizard } from '@/store/wsl-workspace'
 import { type SessionInfo, type SessionSearchResult } from '@/types/hermes'
 import { type WorkspaceListItem } from '@/types/workspace'
@@ -735,6 +735,15 @@ export function ChatSidebar({
   const projectModel = useMemo<SidebarProjectTree[]>(() => {
     const sorted = sortProjectsForOverview(
       filterVisibleProjects(projectTree, dismissedAutoProjects)
+        // 36R: "remove from sidebar" HIDES an explicit local project behind the
+        // backend/profile/id-scoped view pref — the backend record (and its id)
+        // stays authoritative, and re-opening the folder unhides it. Home is a
+        // fixture and can never hide.
+        .filter(
+          project =>
+            project.isNoProject ||
+            !isWorkspaceLocallyHidden(workspaceHiddenKey({ backend: 'local', id: project.id, profile: profileScope }))
+        )
         // A filtered-out project drops its whole lane, header included — hiding
         // only its rows would leave a row of empty folders behind.
         .filter(project => !projectFilter.length || projectFilter.includes(project.id))
@@ -765,6 +774,7 @@ export function ChatSidebar({
     projectFilter,
     projectOrderIds,
     isHiddenFromProjects,
+    profileScope,
     s
   ])
 

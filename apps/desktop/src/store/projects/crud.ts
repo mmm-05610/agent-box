@@ -4,10 +4,12 @@ import {
 import { isMissingRpcMethod } from '@/lib/gateway-rpc'
 import { normalizeProfileKey } from '@/lib/profile-identity'
 import { setSidebarAgentsGrouped } from '@/store/layout'
+import { $profileScope } from '@/store/profile'
 import { requestFreshSession } from '@/store/profile/request-atoms'
 import { $activeGatewayProfile } from '@/store/profile/runtime-route-state'
 import { liveSessionProjectId, type SidebarProjectTree } from '@/store/projects/membership'
 import { $selectedStoredSessionId, $sessions, sessionMatchesStoredId } from '@/store/session'
+import { unhideLocalWorkspace, workspaceHiddenKey } from '@/store/workspace-view'
 import type { ProjectInfo, ProjectsPayload } from '@/types/hermes'
 import type { NewSessionPlacement } from '@/types/session-placement'
 
@@ -245,6 +247,11 @@ export async function createProject(input: CreateProjectInput): Promise<ProjectI
     if (!$projectTree.get().some(node => node.id === created.id)) {
       $projectTree.set([projectInfoToTreeNode(created), ...$projectTree.get()])
     }
+
+    // 36R: a create that the backend answered with an EXISTING record (the
+    // same folder re-opened) must also UNHIDE it — the sidebar-hidden view
+    // pref never blocks a reopen, and the record's id is the identity.
+    unhideLocalWorkspace(workspaceHiddenKey({ backend: 'local', id: created.id, profile: $profileScope.get() }))
 
     if (input.use) {
       $activeProjectId.set(created.id)

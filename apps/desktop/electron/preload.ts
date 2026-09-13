@@ -208,7 +208,7 @@ contextBridge.exposeInMainWorld('hermesDesktop', {
     saveWorkspace: payload => ipcRenderer.invoke('hermes:wsl-workspace:save', payload),
     listWorkspaces: () => ipcRenderer.invoke('hermes:wsl-workspace:workspaces:list'),
     renameWorkspace: payload => ipcRenderer.invoke('hermes:wsl-workspace:rename', payload),
-    removeWorkspace: payload => ipcRenderer.invoke('hermes:wsl-workspace:remove', payload),
+    archiveWorkspace: payload => ipcRenderer.invoke('hermes:wsl-workspace:archive', payload),
     reconnectWorkspace: payload => ipcRenderer.invoke('hermes:wsl-workspace:reconnect', payload),
     releaseConnection: payload => ipcRenderer.invoke('hermes:wsl-workspace:connection:release', payload),
     cancelOperation: payload => ipcRenderer.invoke('hermes:wsl-workspace:operation:cancel', payload)

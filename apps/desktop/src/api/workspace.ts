@@ -7,6 +7,7 @@
  */
 
 import type {
+  WslArchiveWorkspaceResult,
   WslConnectRequest,
   WslConnectResult,
   WslDirectoryListing,
@@ -57,8 +58,10 @@ export function renameWslWorkspace(
   return bridge().renameWorkspace(request)
 }
 
-export function removeWslWorkspace(workspaceId: string): Promise<{ ok: true; removed: boolean } | WslFailure> {
-  return bridge().removeWorkspace({ workspaceId })
+/** Archive a workspace's sidebar record (36R: removal is a hide, not a
+ *  delete). The host keeps the record behind its archive marker. */
+export function archiveWslWorkspace(workspaceId: string): Promise<WslArchiveWorkspaceResult | WslFailure> {
+  return bridge().archiveWorkspace({ workspaceId })
 }
 
 export function reconnectWslWorkspace(workspaceId: string): Promise<WslReconnectResult> {

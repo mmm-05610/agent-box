@@ -101,11 +101,11 @@ export function registerWorkspaceIpc({ wslWorkspaceHost }: RegisterWorkspaceIpcD
     }
   })
 
-  ipcMain.handle('hermes:wsl-workspace:remove', async (_event, payload) => {
+  ipcMain.handle('hermes:wsl-workspace:archive', async (_event, payload) => {
     const body = payloadObject(payload)
 
     try {
-      return await wslWorkspaceHost.removeWorkspace({ workspaceId: body.workspaceId })
+      return await wslWorkspaceHost.archiveWorkspace({ workspaceId: body.workspaceId })
     } catch (error) {
       return unexpectedError(error)
     }

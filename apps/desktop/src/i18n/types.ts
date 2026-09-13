@@ -2073,6 +2073,10 @@ export interface Translations {
       reveal: string
       copyPath: string
       removeFromSidebar: string
+      // 36R path boundary: a local pick that cannot be verified against the
+      // backend's path space is refused BEFORE any project/session is created.
+      pathScopeWindowsPath: string
+      pathScopeUnverified: string
       createFailed: string
       staleBackend: string
       deleteConfirm: string
@@ -3350,6 +3354,7 @@ export interface Translations {
     errWslSaveFailed: string
     errWslNotFound: string
     errWslStoreFutureVersion: string
+    errWslStoreIllegalVersion: string
     errUnexpected: string
   }
 

@@ -45,6 +45,7 @@ function wslRecord(overrides: Partial<WslWorkspaceRecord> = {}): WslWorkspaceRec
     rootPath: '/home/maoqh/验收目录',
     createdAt: 1,
     updatedAt: 1,
+    archivedAt: null,
     ...overrides
   }
 }

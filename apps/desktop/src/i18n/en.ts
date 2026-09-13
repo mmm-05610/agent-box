@@ -2334,6 +2334,10 @@ export const en: Translations = {
       reveal: 'Reveal in folder',
       copyPath: 'Copy path',
       removeFromSidebar: 'Hide from sidebar',
+      pathScopeWindowsPath:
+        'This folder is a Windows path, but sessions run on the remote backend, which cannot open it. Pick the folder through the backend browser instead.',
+      pathScopeUnverified:
+        'The backend file system did not answer, so this folder cannot be verified. Nothing was created or started — reconnect and pick the folder again.',
       createFailed: 'Could not create project',
       staleBackend:
         'Update the Hermes backend to create projects — your backend is older than this desktop app (Settings → Updates → Backend).',
@@ -3781,6 +3785,7 @@ export const en: Translations = {
     errWslSaveFailed: 'Saving the workspace failed.',
     errWslNotFound: 'This workspace no longer exists.',
     errWslStoreFutureVersion: 'The workspace store was written by a newer version of the app. Update the app before making changes.',
+    errWslStoreIllegalVersion: 'The workspace store file is damaged (unreadable version). Nothing was changed; fix or remove the file by hand.',
     errUnexpected: 'Something went wrong.'
   },
 

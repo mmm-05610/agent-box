@@ -24,7 +24,7 @@ import { randomBytes } from 'node:crypto'
 import fs from 'node:fs'
 
 import { IS_WSL } from './platform-facts'
-import { WslWorkspaceStoreFutureVersionError } from './wsl-workspace-store'
+import { WslWorkspaceStoreFutureVersionError, WslWorkspaceStoreIllegalVersionError } from './wsl-workspace-store'
 
 export type WslErrorCode =
   | 'WSL_UNAVAILABLE'
@@ -42,6 +42,7 @@ export type WslErrorCode =
   | 'WSL_SAVE_FAILED'
   | 'WSL_NOT_FOUND'
   | 'WSL_STORE_FUTURE_VERSION'
+  | 'WSL_STORE_ILLEGAL_VERSION'
 
 export interface WslFailure {
   /** Literal discriminant so success/failure unions narrow in every caller. */
@@ -74,6 +75,12 @@ export interface WslWorkspaceRecord {
   rootPath: string
   createdAt: number
   updatedAt: number
+  /**
+   * Removal is an ARCHIVE (36R): the record keeps its id, identity and renamed
+   * name; a non-null stamp hides it from the list and a later save of the same
+   * location restores it — same record, same id. Null = live.
+   */
+  archivedAt: number | null
 }
 
 export interface WslDirectoryEntry {
@@ -483,13 +490,16 @@ export interface WslWorkspaceHost {
     WslOutcome<{ workspace: WslWorkspaceRecord }>
   >
   /**
-   * Remove a workspace's sidebar record. Idempotent: an already-removed (or
-   * unknown) id answers `removed: false`, never an error — a double-click or a
-   * stale row must not read as data loss. Files, sessions, history and the WSL
-   * distribution are NOT touched; re-adding the same directory starts a fresh
-   * record (sessions reattach by cwd, which the workspaces never owned).
+   * Archive a workspace's sidebar record (36R: removal is a hide, not a
+   * delete). The record keeps its id, identity and renamed name behind an
+   * `archivedAt` marker; the list excludes it; a later save of the same
+   * location (a NEW open intent) restores the original record. Idempotent: an
+   * already-archived (or unknown) id answers `archived: false`, never an
+   * error. Files, sessions, history and the WSL distribution are NOT touched.
    */
-  removeWorkspace: (input: { workspaceId: unknown }) => Promise<WslOutcome<{ removed: boolean }>>
+  archiveWorkspace: (input: { workspaceId: unknown }) => Promise<
+    WslOutcome<{ archived: boolean; workspace: WslWorkspaceRecord | null }>
+  >
   reconnectWorkspace: (input: { workspaceId: unknown }) => Promise<
     WslOutcome<
       | { status: 'connected'; workspace: WslWorkspaceRecord; actualUser: string; userChanged: boolean }
@@ -535,6 +545,13 @@ export function createWslWorkspaceHost(
         return {
           ok: false,
           ...wslFailure('WSL_STORE_FUTURE_VERSION', 'This workspace store was written by a newer version of the app. Update the app before making changes.', false)
+        }
+      }
+
+      if (error instanceof WslWorkspaceStoreIllegalVersionError) {
+        return {
+          ok: false,
+          ...wslFailure('WSL_STORE_ILLEGAL_VERSION', 'The workspace store file is damaged (unreadable version). Nothing was changed; fix or remove the file by hand.', false)
         }
       }
 
@@ -621,11 +638,20 @@ export function createWslWorkspaceHost(
     const file = loaded.file
 
     // Idempotent by request id: a retried save of the same operation returns
-    // the record the first attempt produced, never a second row.
+    // the record the first attempt produced, never a second row. A record the
+    // user ARCHIVED after the original save is not resurrected by the retry —
+    // that would turn a transport retry into an undelete (36R).
     const replay = file.savedRequests[requestId]
 
     if (replay) {
       const existing = file.workspaces.find(w => w.id === replay.workspaceId)
+
+      if (existing && existing.archivedAt !== null) {
+        return {
+          ok: false,
+          ...wslFailure('WSL_NOT_FOUND', 'This workspace was removed from the sidebar after it was saved. Reopen the folder to add it back.', false)
+        }
+      }
 
       if (existing) {
         return { ok: true, workspace: existing, requestIdReplay: true }
@@ -634,8 +660,11 @@ export function createWslWorkspaceHost(
 
     const timestamp = now()
 
-    // Re-adding the exact same location must not duplicate rows: the
-    // existing record is reused (its name may be refreshed) instead.
+    // Re-adding the exact same location must not duplicate rows: the existing
+    // record is reused — its id, and the name the user may have renamed it to,
+    // survive. For an ARCHIVED record the same save is the user's NEW open
+    // intent: the archive marker clears and the original record (id, name)
+    // comes back (36R).
     const duplicate = file.workspaces.find(
       w =>
         w.kind === 'wsl' &&
@@ -651,7 +680,8 @@ export function createWslWorkspaceHost(
         ...duplicate,
         name: typeof name === 'string' && name.trim() ? name.trim() : duplicate.name,
         actualUser: connection.actualUser,
-        updatedAt: timestamp
+        updatedAt: timestamp,
+        archivedAt: null
       }
 
       file.workspaces = file.workspaces.map(w => (w.id === duplicate.id ? record : w))
@@ -665,7 +695,8 @@ export function createWslWorkspaceHost(
         actualUser: connection.actualUser,
         rootPath: normalized,
         createdAt: timestamp,
-        updatedAt: timestamp
+        updatedAt: timestamp,
+        archivedAt: null
       }
 
       file.workspaces.push(record)
@@ -929,7 +960,9 @@ export function createWslWorkspaceHost(
         return loaded
       }
 
-      return { ok: true, workspaces: loaded.file.workspaces }
+      // Archived records stay in the store (identity survives removal) but
+      // never render: the list is the live projection only.
+      return { ok: true, workspaces: loaded.file.workspaces.filter(w => w.archivedAt === null) }
     },
 
     async renameWorkspace({ workspaceId, name }) {
@@ -974,11 +1007,15 @@ export function createWslWorkspaceHost(
       })
     },
 
-    async removeWorkspace({ workspaceId }) {
+    async archiveWorkspace({ workspaceId }) {
       if (typeof workspaceId !== 'string' || !workspaceId) {
         return { ok: false, ...wslFailure('WSL_NOT_FOUND', 'A workspace id is required.', false) }
       }
 
+      // Same serialized section as a save/rename (batch 35's concurrency
+      // contract): the archive is a read-modify-write over the freshly loaded
+      // store, so it can never erase a concurrent commit — and a concurrent
+      // commit can never resurrect what this archive just hid.
       return enqueueCommit(() => {
         const loaded = readStore()
 
@@ -987,14 +1024,22 @@ export function createWslWorkspaceHost(
         }
 
         const file = loaded.file
-        const existing = file.workspaces.some(w => w.id === workspaceId)
+        const existing = file.workspaces.find(w => w.id === workspaceId)
 
         if (!existing) {
-          // Already gone: a repeated remove succeeds by having done nothing.
-          return { ok: true, removed: false }
+          // Unknown id: already gone as far as the sidebar is concerned —
+          // succeed by having done nothing.
+          return { ok: true, archived: false, workspace: null }
         }
 
-        file.workspaces = file.workspaces.filter(w => w.id !== workspaceId)
+        if (existing.archivedAt !== null) {
+          // Already archived (a double-click, a stale row): nothing to do.
+          return { ok: true, archived: false, workspace: existing }
+        }
+
+        const record: WslWorkspaceRecord = { ...existing, archivedAt: now(), updatedAt: now() }
+
+        file.workspaces = file.workspaces.map(w => (w.id === workspaceId ? record : w))
 
         try {
           store.persist(file)
@@ -1002,7 +1047,7 @@ export function createWslWorkspaceHost(
           return { ok: false, ...wslFailure('WSL_SAVE_FAILED', `Could not save the workspace: ${String((error as Error)?.message || error)}`, true) }
         }
 
-        return { ok: true, removed: true }
+        return { ok: true, archived: true, workspace: record }
       })
     },
 

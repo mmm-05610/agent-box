@@ -7,14 +7,14 @@ const saveWslWorkspace = vi.fn()
 const listWslWorkspaces = vi.fn()
 const reconnectWslWorkspace = vi.fn()
 const renameWslWorkspace = vi.fn()
-const removeWslWorkspace = vi.fn()
+const archiveWslWorkspace = vi.fn()
 
 vi.mock('@/api/workspace', () => ({
   saveWslWorkspace: (...args: unknown[]) => saveWslWorkspace(...args),
   listWslWorkspaces: (...args: unknown[]) => listWslWorkspaces(...args),
   reconnectWslWorkspace: (...args: unknown[]) => reconnectWslWorkspace(...args),
   renameWslWorkspace: (...args: unknown[]) => renameWslWorkspace(...args),
-  removeWslWorkspace: (...args: unknown[]) => removeWslWorkspace(...args),
+  archiveWslWorkspace: (...args: unknown[]) => archiveWslWorkspace(...args),
   releaseWslConnection: vi.fn(async () => ({ ok: true as const, released: true })),
   connectWsl: vi.fn(),
   listWslDirectories: vi.fn(),
@@ -25,9 +25,9 @@ vi.mock('@/api/workspace', () => ({
 import { $wslWorkspaces, $wslWorkspaceValidation, setWslWorkspaces } from '@/store/wsl-workspace'
 
 import {
+  archiveWslWorkspaceProjection,
   reconnectWslWorkspaceProjection,
   refreshWslWorkspaces,
-  removeWslWorkspaceProjection,
   renameWslWorkspaceProjection,
   resetWslValidationsOnStartup,
   saveWslWorkspaceFromWizard
@@ -44,6 +44,7 @@ function record(overrides: Partial<WslWorkspaceRecord> = {}): WslWorkspaceRecord
     rootPath: '/home/maoqh/proj',
     createdAt: 1,
     updatedAt: 1,
+    archivedAt: null,
     ...overrides
   }
 }
@@ -178,35 +179,35 @@ describe('renameWslWorkspaceProjection', () => {
   })
 })
 
-describe('removeWslWorkspaceProjection', () => {
-  it('drops the row and its validation state once the host removed it', async () => {
+describe('archiveWslWorkspaceProjection', () => {
+  it('drops the row and its validation state once the host archived it', async () => {
     setWslWorkspaces([record(), record({ id: 'wsl_ws_2', rootPath: '/srv/b' })])
     $wslWorkspaceValidation.set({ wsl_ws_1: { status: 'validated', actualUser: 'u', userChanged: false, verifiedAt: 1 } })
-    removeWslWorkspace.mockResolvedValue({ ok: true, removed: true })
+    archiveWslWorkspace.mockResolvedValue({ ok: true, archived: true, workspace: null })
 
-    const outcome = await removeWslWorkspaceProjection('wsl_ws_1')
+    const outcome = await archiveWslWorkspaceProjection('wsl_ws_1')
 
-    expect(outcome.ok && outcome.removed).toBe(true)
+    expect(outcome.ok && outcome.archived).toBe(true)
     expect($wslWorkspaces.get().map(w => w.id)).toEqual(['wsl_ws_2'])
     expect($wslWorkspaceValidation.get()['wsl_ws_1']).toBeUndefined()
     expect($wslWorkspaceValidation.get()['wsl_ws_2']).toBeUndefined()
   })
 
-  it('an already-removed id still clears a stale local row (idempotent remove)', async () => {
+  it('an already-archived id still clears a stale local row (idempotent archive)', async () => {
     setWslWorkspaces([record()])
-    removeWslWorkspace.mockResolvedValue({ ok: true, removed: false })
+    archiveWslWorkspace.mockResolvedValue({ ok: true, archived: false, workspace: null })
 
-    const outcome = await removeWslWorkspaceProjection('wsl_ws_1')
+    const outcome = await archiveWslWorkspaceProjection('wsl_ws_1')
 
-    expect(outcome.ok && outcome.removed).toBe(false)
+    expect(outcome.ok && outcome.archived).toBe(false)
     expect($wslWorkspaces.get()).toEqual([])
   })
 
-  it('a failed remove keeps the row so the user can retry', async () => {
+  it('a failed archive keeps the row so the user can retry', async () => {
     setWslWorkspaces([record()])
-    removeWslWorkspace.mockResolvedValue(failure('WSL_SAVE_FAILED'))
+    archiveWslWorkspace.mockResolvedValue(failure('WSL_SAVE_FAILED'))
 
-    const outcome = await removeWslWorkspaceProjection('wsl_ws_1')
+    const outcome = await archiveWslWorkspaceProjection('wsl_ws_1')
 
     expect(outcome.ok).toBe(false)
     expect($wslWorkspaces.get().map(w => w.id)).toEqual(['wsl_ws_1'])

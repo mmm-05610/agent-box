@@ -2499,6 +2499,8 @@ export const zh: Translations = {
       reveal: '在文件夹中显示',
       copyPath: '复制路径',
       removeFromSidebar: '从侧边栏移除',
+      pathScopeWindowsPath: '该文件夹是 Windows 路径，而会话在远程后端上运行，无法打开它。请改用后端浏览器选择文件夹。',
+      pathScopeUnverified: '后端文件系统未响应，无法核验该文件夹。未创建、未启动任何内容——请重新连接后再选择文件夹。',
       createFailed: '无法创建项目',
       staleBackend: '请更新 Hermes 后端以创建项目——当前后端比桌面应用旧（设置 → 更新 → 后端）。',
       deleteConfirm: '这会从 Hermes 中移除已保存的项目。文件、git 仓库和工作树保持不变。',
@@ -3907,6 +3909,7 @@ export const zh: Translations = {
     errWslSaveFailed: '保存工作区失败。',
     errWslNotFound: '该工作区已不存在。',
     errWslStoreFutureVersion: '工作区存储由更新版本的应用写入，请先升级应用再操作。',
+    errWslStoreIllegalVersion: '工作区存储文件已损坏（版本号无法识别）。未做任何更改；请手动修复或删除该文件。',
     errUnexpected: '出现意外错误。'
   },
 

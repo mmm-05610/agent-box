@@ -20,7 +20,12 @@ import {
   stripWslOutputNuls,
   type WslWorkspaceRecord
 } from './wsl-workspace'
-import { createWslWorkspaceStore, normalizeWorkspaceStoreFile } from './wsl-workspace-store'
+import {
+  createWslWorkspaceStore,
+  normalizeWorkspaceStoreFile,
+  WSL_WORKSPACE_STORE_VERSION,
+  WslWorkspaceStoreIllegalVersionError
+} from './wsl-workspace-store'
 
 function isListArgv(argv: string[]): boolean {
   return argv.includes('/bin/sh') && String(argv[argv.indexOf('-c') + 1] || '').startsWith('LC_ALL=C exec ls')
@@ -557,7 +562,8 @@ test('reconnectWorkspace reports a failed revalidation with its typed code', asy
     actualUser: 'maoqh',
     rootPath: '/srv/x',
     createdAt: 1,
-    updatedAt: 1
+    updatedAt: 1,
+    archivedAt: null
   })
 
   const reconnected = await host.reconnectWorkspace({ workspaceId: 'wsl_ws_x' })
@@ -582,7 +588,8 @@ test('listWorkspaces is a projection without any online status', async () => {
     actualUser: 'maoqh',
     rootPath: '/srv/x',
     createdAt: 1,
-    updatedAt: 1
+    updatedAt: 1,
+    archivedAt: null
   })
 
   const listed = host.listWorkspaces()
@@ -609,12 +616,15 @@ test('normalizeWorkspaceStoreFile repairs shape damage and rejects future versio
   })
 
   assert.equal(repaired.workspaces.length, 1)
+  // v1 records migrate with a null archive marker: everything that survived a
+  // v1 file was live when it was written (36R).
+  assert.equal(repaired.workspaces[0].archivedAt, null)
   assert.equal(repaired.savedRequests.r1.workspaceId, 'wsl_ws_x')
   assert.equal('bad' in repaired.savedRequests, false)
 
   const future = normalizeWorkspaceStoreFile({ version: 99, workspaces: [{ id: 'x', distribution: 'd', rootPath: '/x' }] })
 
-  assert.deepEqual(future, { version: 1, workspaces: [], savedRequests: {} })
+  assert.deepEqual(future, { version: WSL_WORKSPACE_STORE_VERSION, workspaces: [], savedRequests: {} })
 })
 
 // --- concurrent saves -------------------------------------------------------
@@ -877,23 +887,109 @@ test('renameWorkspace rejects blank names and unknown ids with typed failures', 
   assert.equal(store.state.file.workspaces[0].name, seeded.name, 'a failed rename changes nothing')
 })
 
-test('removeWorkspace drops only the record and answers idempotently afterwards', async () => {
+test('archiveWorkspace keeps the record, hides it from the list, and answers idempotently', async () => {
   const { host, store } = createHost()
   const seeded = await seedWorkspace(host)
 
   assert.ok(seeded)
 
-  const removed = await host.removeWorkspace({ workspaceId: seeded.id })
+  const archived = await host.archiveWorkspace({ workspaceId: seeded.id })
 
-  assert.equal(removed.ok && removed.removed, true)
-  assert.equal(store.state.file.workspaces.length, 0)
+  assert.equal(archived.ok && archived.archived, true)
+  assert.equal(store.state.file.workspaces.length, 1, 'the record survives the archive')
+  assert.ok(store.state.file.workspaces[0].archivedAt !== null, 'the archive marker is stamped')
+  assert.equal(store.state.file.workspaces[0].id, seeded.id, 'identity survives removal')
 
-  const persistCallsAfterRemove = store.state.persistCalls
+  // The list is the live projection: the archived row never renders.
+  const listed = host.listWorkspaces()
 
-  const again = await host.removeWorkspace({ workspaceId: seeded.id })
+  assert.equal(listed.ok && listed.workspaces.length, 0)
 
-  assert.equal(again.ok && again.removed, false, 'a repeated remove is a no-op, not an error')
-  assert.equal(store.state.persistCalls, persistCallsAfterRemove, 'the no-op must not write')
+  const persistCallsAfterArchive = store.state.persistCalls
+
+  const again = await host.archiveWorkspace({ workspaceId: seeded.id })
+
+  assert.equal(again.ok && again.archived, false, 'a repeated archive is a no-op, not an error')
+  assert.equal(store.state.persistCalls, persistCallsAfterArchive, 'the no-op must not write')
+})
+
+test('a save of the archived location is a NEW open intent: same id, same name, archive cleared', async () => {
+  const { host, store } = createHost()
+  const seeded = await seedWorkspace(host)
+
+  assert.ok(seeded)
+
+  // The user renamed the workspace, then removed it from the sidebar.
+  const renamed = await host.renameWorkspace({ workspaceId: seeded.id, name: '我的项目' })
+
+  assert.ok(renamed.ok)
+
+  const archived = await host.archiveWorkspace({ workspaceId: seeded.id })
+
+  assert.ok(archived.ok && archived.archived)
+
+  // Re-opening the same directory (a NEW request id = a new intent) restores
+  // the ORIGINAL record: same id, the renamed name kept, archive cleared.
+  const connected = await host.connect({ distribution: 'Ubuntu', user: 'maoqh' })
+
+  assert.ok(connected.ok)
+
+  const reopened = await host.saveWorkspace({
+    connectionId: connected.ok ? connected.connectionId : '',
+    path: '/home/maoqh/proj',
+    requestId: 'reopen-1'
+  })
+
+  assert.equal(reopened.ok, true)
+
+  if (reopened.ok) {
+    assert.equal(reopened.workspace.id, seeded.id, 'reopen restores the original id')
+    assert.equal(reopened.workspace.name, '我的项目', 'reopen keeps the renamed name')
+    assert.equal(reopened.workspace.archivedAt, null)
+    assert.equal(reopened.requestIdReplay, false)
+  }
+
+  const listed = host.listWorkspaces()
+
+  assert.ok(listed.ok)
+  assert.deepEqual(listed.ok ? listed.workspaces.map(w => w.id) : [], [seeded.id], 'the restored row renders again')
+  assert.equal(store.state.file.workspaces.length, 1, 'no duplicate row was created')
+})
+
+test('a retried save whose record was archived does NOT resurrect it', async () => {
+  const { host, store } = createHost()
+  const seeded = await seedWorkspace(host)
+
+  assert.ok(seeded)
+
+  const archived = await host.archiveWorkspace({ workspaceId: seeded.id })
+
+  assert.ok(archived.ok && archived.archived)
+
+  // The wizard retried its original request AFTER the user archived the row:
+  // a transport retry must never act as an undelete.
+  const connected = await host.connect({ distribution: 'Ubuntu', user: 'maoqh' })
+
+  assert.ok(connected.ok)
+
+  const retried = await host.saveWorkspace({
+    connectionId: connected.ok ? connected.connectionId : '',
+    path: '/home/maoqh/proj',
+    requestId: 'seed-1'
+  })
+
+  assert.equal(retried.ok, false, 'the replay is refused once its record is archived')
+
+  if (!retried.ok) {
+    assert.equal(retried.code, 'WSL_NOT_FOUND')
+  }
+
+  assert.equal(store.state.file.workspaces.length, 1)
+  assert.ok(store.state.file.workspaces[0].archivedAt !== null, 'the record stays archived')
+
+  const listed = host.listWorkspaces()
+
+  assert.equal(listed.ok && listed.workspaces.length, 0)
 })
 
 test('a rename racing a save cannot be erased by the save (shared commit chain)', async () => {
@@ -955,7 +1051,7 @@ test('a rename racing a save cannot be erased by the save (shared commit chain)'
   assert.equal(renamedRecord?.name, 'After')
 })
 
-test('rename and remove refuse to touch a future-version store', async () => {
+test('rename and archive refuse to touch a future-version store', async () => {
   const dir = mkdtempSync(join(os.tmpdir(), 'wsl-store-future-'))
   const storePath = join(dir, 'wsl-workspaces.json')
 
@@ -973,7 +1069,7 @@ test('rename and remove refuse to touch a future-version store', async () => {
   const { host } = createHost({ store: { state: { file: normalizeWorkspaceStoreFile(null), persistCalls: 0 }, load: () => realStore.load(), persist: file => realStore.persist(file) } })
 
   const renamed = await host.renameWorkspace({ workspaceId: 'wsl_ws_future', name: 'X' })
-  const removed = await host.removeWorkspace({ workspaceId: 'wsl_ws_future' })
+  const archived = await host.archiveWorkspace({ workspaceId: 'wsl_ws_future' })
 
   assert.equal(renamed.ok, false)
 
@@ -981,11 +1077,103 @@ test('rename and remove refuse to touch a future-version store', async () => {
     assert.equal(renamed.code, 'WSL_STORE_FUTURE_VERSION')
   }
 
-  assert.equal(removed.ok, false)
+  assert.equal(archived.ok, false)
 
-  if (!removed.ok) {
-    assert.equal(removed.code, 'WSL_STORE_FUTURE_VERSION')
+  if (!archived.ok) {
+    assert.equal(archived.code, 'WSL_STORE_FUTURE_VERSION')
   }
 
   assert.deepEqual(readFileSync(storePath), Buffer.from(bytes, 'utf8'))
+})
+
+// --- archive store schema v1 → v2 (work order 36R) ----------------------------
+
+test('a v1 store file reads cleanly and the first v2 write takes a byte-exact backup', async () => {
+  const dir = mkdtempSync(join(os.tmpdir(), 'wsl-store-v1-'))
+  const storePath = join(dir, 'wsl-workspaces.json')
+
+  const v1File = {
+    version: 1,
+    workspaces: [
+      {
+        id: 'wsl_ws_v1',
+        name: '老名字',
+        kind: 'wsl',
+        distribution: 'Ubuntu',
+        configuredUser: null,
+        actualUser: 'maoqh',
+        rootPath: '/srv/v1',
+        createdAt: 1,
+        updatedAt: 1
+      }
+    ],
+    savedRequests: {}
+  }
+
+  const v1Bytes = `${JSON.stringify(v1File, null, 2)}\n`
+
+  writeFileSync(storePath, v1Bytes, 'utf8')
+
+  const realStore = createWslWorkspaceStore(storePath)
+  const loaded = realStore.load()
+
+  // Old files are readable and migrate: every record was live in v1.
+  assert.equal(loaded.workspaces.length, 1)
+  assert.equal(loaded.workspaces[0].archivedAt, null)
+  assert.equal(loaded.workspaces[0].name, '老名字')
+
+  // The first write of upgraded data documents the migration with a backup of
+  // the ORIGINAL bytes.
+  realStore.persist({ ...loaded, workspaces: loaded.workspaces.map(w => ({ ...w, archivedAt: null })) })
+
+  const backupBytes = readFileSync(`${storePath}.v1.bak`, 'utf8')
+
+  assert.equal(backupBytes, v1Bytes, 'the backup preserves the v1 file byte for byte')
+
+  const onDisk = JSON.parse(readFileSync(storePath, 'utf8') as unknown as string) as { version: number; workspaces: Array<{ archivedAt: number | null }> }
+
+  assert.equal(onDisk.version, 2)
+  assert.equal(onDisk.workspaces[0].archivedAt, null)
+
+  // Later writes are ordinary saves, not migrations: no second backup.
+  realStore.persist({ ...loaded, workspaces: loaded.workspaces })
+
+  assert.deepEqual(readFileSync(`${storePath}.v1.bak`, 'utf8'), v1Bytes, 'the backup is written once')
+})
+
+test('an illegal version refuses reads AND writes, leaving the bytes untouched', async () => {
+  for (const badVersion of ['two', 0, 1.5, null]) {
+    const dir = mkdtempSync(join(os.tmpdir(), 'wsl-store-bad-'))
+    const storePath = join(dir, 'wsl-workspaces.json')
+    const badFile = { version: badVersion, workspaces: [], savedRequests: {} }
+    const bytes = `${JSON.stringify(badFile, null, 2)}\n`
+
+    writeFileSync(storePath, bytes, 'utf8')
+
+    const realStore = createWslWorkspaceStore(storePath)
+
+    let threw = false
+
+    try {
+      realStore.load()
+    } catch (error) {
+      threw = error instanceof WslWorkspaceStoreIllegalVersionError
+    }
+
+    assert.ok(threw, `version ${JSON.stringify(badVersion)} must be refused`)
+
+    // The host surfaces the refusal as a typed failure, never as an empty
+    // store a save could overwrite.
+    const { host } = createHost({ store: { state: { file: normalizeWorkspaceStoreFile(null), persistCalls: 0 }, load: () => realStore.load(), persist: file => realStore.persist(file) } })
+
+    const listed = host.listWorkspaces()
+
+    assert.equal(listed.ok, false)
+
+    if (!listed.ok) {
+      assert.equal(listed.code, 'WSL_STORE_ILLEGAL_VERSION')
+    }
+
+    assert.deepEqual(readFileSync(storePath), Buffer.from(bytes, 'utf8'), 'the illegal-version file must remain byte-identical')
+  }
 })

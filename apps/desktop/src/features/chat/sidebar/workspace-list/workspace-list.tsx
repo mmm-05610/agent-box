@@ -4,7 +4,7 @@ import type * as React from 'react'
 import { useState } from 'react'
 
 import { projectWorkspaceList } from '@/application/workspace/workspace-projection'
-import { removeWslWorkspaceProjection, renameWslWorkspaceProjection } from '@/application/workspace/wsl-workspace-usecases'
+import { archiveWslWorkspaceProjection, renameWslWorkspaceProjection } from '@/application/workspace/wsl-workspace-usecases'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -200,7 +200,7 @@ export function WorkspaceList({
             return
           }
 
-          const outcome = await removeWslWorkspaceProjection(removeTarget.id)
+          const outcome = await archiveWslWorkspaceProjection(removeTarget.id)
 
           if (!outcome.ok) {
             notifyError(outcome, w.removeFailed)

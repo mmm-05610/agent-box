@@ -56,6 +56,9 @@ export function wslFailureText(t: ReturnType<typeof useI18n>['t'], code: WslWork
     case 'WSL_STORE_FUTURE_VERSION':
       return w.errWslStoreFutureVersion
 
+    case 'WSL_STORE_ILLEGAL_VERSION':
+      return w.errWslStoreIllegalVersion
+
     default:
       return w.errUnexpected
   }

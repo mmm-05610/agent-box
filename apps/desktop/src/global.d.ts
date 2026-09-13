@@ -12,6 +12,7 @@ import type {
 } from './store/pet-overlay'
 import type { QuickEntryStatePush, QuickEntryStatus, QuickEntrySubmitPayload } from './store/quick-entry'
 import type {
+  WslArchiveWorkspaceResult,
   WslConnectRequest,
   WslConnectResult,
   WslDirectoryListing,
@@ -220,7 +221,7 @@ declare global {
         saveWorkspace: (request: WslSaveWorkspaceRequest) => Promise<WslSaveWorkspaceResult | WslFailure>
         listWorkspaces: () => Promise<WslWorkspacesResult | WslFailure>
         renameWorkspace: (request: WslRenameWorkspaceRequest) => Promise<WslRenameWorkspaceResult | WslFailure>
-        removeWorkspace: (request: { workspaceId: string }) => Promise<{ ok: true; removed: boolean } | WslFailure>
+        archiveWorkspace: (request: { workspaceId: string }) => Promise<WslArchiveWorkspaceResult | WslFailure>
         reconnectWorkspace: (request: { workspaceId: string }) => Promise<WslReconnectResult>
         releaseConnection: (request: { connectionId: string }) => Promise<{ ok: true; released: boolean }>
         cancelOperation: (request: { operationId: string }) => Promise<{ ok: true; cancelled: boolean }>

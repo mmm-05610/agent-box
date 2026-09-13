@@ -48,6 +48,7 @@ export type WslWorkspaceErrorCode =
   | 'WSL_SAVE_FAILED'
   | 'WSL_NOT_FOUND'
   | 'WSL_STORE_FUTURE_VERSION'
+  | 'WSL_STORE_ILLEGAL_VERSION'
 
 export interface WslFailure {
   ok: false
@@ -139,11 +140,15 @@ export interface WslWorkspaceRecord {
   rootPath: string
   createdAt: number
   updatedAt: number
+  /** Removal is an archive (36R): non-null hides the row; a later save of the
+   *  same location restores the SAME record/id. Null = live. */
+  archivedAt: number | null
 }
 
 export interface WslWorkspacesResult {
   ok: true
-  /** A projection only — deliberately carries no online status. */
+  /** A projection only — deliberately carries no online status. Archived
+   *  records are excluded: the list is the live projection. */
   workspaces: WslWorkspaceRecord[]
 }
 
@@ -169,3 +174,11 @@ export type WslReconnectResult =
     }
   | { ok: true; status: 'failed'; code: WslWorkspaceErrorCode; message: string }
   | WslFailure
+
+/** Archive = the sidebar's "remove" (36R): the record survives behind its
+ *  marker; `archived: false` answers an already-archived or unknown id. */
+export type WslArchiveWorkspaceResult = {
+  ok: true
+  archived: boolean
+  workspace: WslWorkspaceRecord | null
+}
