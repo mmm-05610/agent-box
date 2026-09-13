@@ -129,10 +129,22 @@ async function main() {
   // reload, then verify the projects header is present.
   await page.evaluate(() => {
     window.localStorage.setItem('hermes.desktop.agentsGroupedByWorkspace', 'true')
+    // Same keys the onboarding store writes for "choose later"/configured, so
+    // the first-run overlay cannot re-cover the sidebar after the reload.
+    window.localStorage.setItem('hermes-onboarding-skipped-v1', '1')
+    window.localStorage.setItem('hermes-desktop-onboarded-v1', '1')
   })
   await page.reload()
   await page.waitForLoadState('domcontentloaded')
   await page.waitForTimeout(4000)
+
+  try {
+    await page.getByText(/I'll choose a provider later|稍后选择|以后再说/).first().click({ timeout: 3000 })
+    await page.waitForTimeout(800)
+  } catch {
+    // overlay not present
+  }
+
   await screenshot(page, 'projects-overview')
 
   const addButton = page.getByRole('button', { name: /New project|新建项目/ }).first()
