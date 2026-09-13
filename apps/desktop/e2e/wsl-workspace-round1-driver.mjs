@@ -355,9 +355,19 @@ async function main() {
 
   let unknownOk = true
   try {
-    await addButton.click()
-    await page.waitForTimeout(500)
-    await page.getByText(/Remote connection|远程连接/).first().click()
+    // Same dual-shape entry as the first wizard run: blank state button, or
+    // the header "+" menu when projects exist.
+    if (await blankRemote.isVisible().catch(() => false)) {
+      await blankRemote.click()
+    } else {
+      await page
+        .locator('[data-slot="dropdown-menu-trigger"]')
+        .filter({ has: page.locator('[aria-label="New project"], [aria-label="新建项目"]') })
+        .first()
+        .click()
+      await page.waitForTimeout(500)
+      await page.getByText(/Remote connection|远程连接/).first().click()
+    }
     await page.waitForTimeout(600)
     await page.getByText(/Browse Linux directories|浏览本机 WSL/).first().click()
     await page.waitForTimeout(400)

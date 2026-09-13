@@ -83,8 +83,15 @@ export function WslWorkspaceSection({ className }: { className?: string }) {
                 <span className="grid size-4 shrink-0 place-items-center text-(--ui-text-tertiary)">
                   <Codicon name="vm-connect" size="0.875rem" />
                 </span>
-                <span className="min-w-0 flex-1 truncate text-xs">{workspace.name}</span>
-                <span className="shrink-0 text-[0.625rem] text-(--ui-text-quaternary)">{workspace.distribution}</span>
+                {/* Two stacked lines: the name must stay readable even when the
+                    pills squeeze the row — a name collapsed to zero width reads
+                    as a distribution, not a project. */}
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-xs leading-4">{workspace.name}</span>
+                  <span className="block truncate text-[0.625rem] leading-3.5 text-(--ui-text-quaternary)">
+                    {workspace.distribution} · {workspace.rootPath}
+                  </span>
+                </span>
                 <Pill tone={status.tone}>{status.label}</Pill>
                 <Pill tone="muted">{w.wslBadge}</Pill>
                 {validating && <Codicon className="shrink-0 text-(--ui-text-tertiary)" name="loading" size="0.75rem" spinning />}
