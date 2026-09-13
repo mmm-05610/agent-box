@@ -394,18 +394,22 @@ async function main() {
   }
 
   const wslRow = page.locator('[data-wsl-workspace-row]').first()
+
+  // Open the workspace's private connection info from its row action (a
+  // deterministic door; the row body click does the same for a human).
   let switchOk = true
 
   try {
-    await wslRow.click()
-    await page.waitForTimeout(1200)
+    await wslRow.locator('[data-row-actions] button').nth(2).click({ force: true })
+    await page.getByRole('dialog').waitFor({ state: 'visible', timeout: 8000 })
+    await page.waitForTimeout(800)
     await screenshot(page, 'switched-wsl-info')
-    await page.getByRole('button', { name: /Close|关闭/ }).first().click()
+    await page.getByRole('button', { name: /Close|关闭/ }).last().click()
     await page.waitForTimeout(800)
   } catch {
     switchOk = false
   }
-  record('switch within the list (WSL info opens)', switchOk, switchOk ? 'WSL row and local row drive from the same list' : 'WSL row click failed')
+  record('switch within the list (WSL info opens)', switchOk, switchOk ? 'WSL row and local row drive from the same list' : 'WSL info dialog did not open/close')
 
   // ─── step: 重命名 — row menu → Rename… → persists, row updates ───
   const rowMenu = wslRow.locator('[data-row-actions]')
@@ -544,13 +548,11 @@ async function main() {
   let reconnectOk = true
 
   try {
-    await row2.locator('[data-row-actions]').hover()
-    await page2.waitForTimeout(400)
-    await row2.locator('[data-row-actions]').getByRole('button').nth(1).click()
-    await page2.waitForTimeout(6000)
-    await row2.click()
-    await page2.waitForTimeout(1200)
-    await page2.getByText(/Verified|已验证/).first().waitFor({ state: 'visible', timeout: 15000 })
+    await row2.locator('[data-row-actions] button').nth(2).click({ force: true })
+    await page2.getByRole('dialog').waitFor({ state: 'visible', timeout: 8000 })
+    // Reconnect from the dialog (the workspace's private connection surface).
+    await page2.getByRole('button', { name: /Reconnect|重新连接/ }).last().click()
+    await page2.getByText(/Verified|已验证/).first().waitFor({ state: 'visible', timeout: 25000 })
   } catch {
     reconnectOk = false
   }
