@@ -42,9 +42,17 @@ preview = [
   "agent-box-artifacts==2.0.0a1",
 ]
 web = ["agent-box-web==2.0.0a1"]
+server = [
+  "fastapi>=0.115,<1",
+  "uvicorn>=0.30,<1",
+  "agent-box-harnesses==2.0.0a1",
+  "agent-box-runtime-wsl==2.0.0a1",
+]
 
 [project.scripts]
 agent-box = "agent_box.cli:main"
+agent-box-server = "agent_box.server.__main__:main"
+agent-box-server-credential = "agent_box.server.credential_cli:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
