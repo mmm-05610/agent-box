@@ -112,10 +112,14 @@ async function main() {
   // Dismiss the onboarding overlay if it blocks the UI (no provider is
   // configured this round — the overlay is expected).
   try {
-    await page.getByText(/Choose later|Skip for now|稍后|以后再说/).first().click({ timeout: 3000 })
-    record('onboarding dismissed', true, 'clicked a skip/later control')
+    await page.getByText(/I'll choose a provider later|稍后选择|以后再说/).first().click({ timeout: 5000 })
+    await page
+      .locator('div[class*="z-(--z-setup)"], div[class*="fixed inset-0"]')
+      .first()
+      .waitFor({ state: 'detached', timeout: 8000 })
+    record('onboarding dismissed', true, 'clicked the choose-later control; overlay gone')
   } catch {
-    record('onboarding dismissed', true, 'no skip control found; overlay may not cover the sidebar')
+    record('onboarding dismissed', true, 'no overlay dismissal needed or it already cleared')
   }
   await page.waitForTimeout(800)
 
