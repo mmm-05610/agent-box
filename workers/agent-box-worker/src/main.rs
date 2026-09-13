@@ -14,6 +14,7 @@ use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 use std::os::unix::process::CommandExt;
 use std::path::{Component, Path, PathBuf};
 use std::process::Stdio;
+use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::process::Command;
@@ -26,6 +27,11 @@ const MAX_ARTIFACT_BYTES: usize = 64 * 1024 * 1024;
 const MAX_FETCH_BYTES: usize = 32 * 1024;
 const MAX_SECRET_BYTES: usize = 1024 * 1024;
 const MAX_STDIN_BYTES: usize = 4 * 1024;
+const MAX_INTERACTIVE_WRITE_BYTES: usize = 64 * 1024;
+/// Pre-terminal forwarding budget per interactive attempt. Once exceeded, the
+/// worker emits one truncated marker and stops forwarding; the bounded final
+/// buffers still record complete digests.
+const MAX_INTERACTIVE_EVENT_BYTES: usize = 1024 * 1024;
 const DEFAULT_TIMEOUT_MS: u64 = 30_000;
 const MAX_TIMEOUT_MS: u64 = 120_000;
 const RESULT_TTL_SECS: u64 = 300;
@@ -63,6 +69,10 @@ struct ProcessRecord {
 struct Running {
     generation: u64,
     cancel: watch::Sender<bool>,
+    /// Interactive attempts receive their child stdin through this slot once
+    /// the child has spawned. `stdin.close` takes the handle out and drops it:
+    /// tokio pipes have no half-close, so EOF is delivered by closing the fd.
+    interactive_stdin: Option<Arc<tokio::sync::OnceCell<Arc<tokio::sync::Mutex<Option<tokio::process::ChildStdin>>>>>>,
 }
 
 struct Finished {
@@ -165,6 +175,16 @@ async fn serve(root: PathBuf, workspace: Option<PathBuf>, result_ttl_secs: u64) 
             "effective user mismatch",
         ));
     }
+    if bootstrap.protocol_version != protocol::PROTOCOL_VERSION {
+        return Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            format!(
+                "PROTOCOL_VERSION_UNSUPPORTED: client bootstrap {} != worker {}",
+                bootstrap.protocol_version,
+                protocol::PROTOCOL_VERSION
+            ),
+        ));
+    }
     let authorized_executables = authorize_executables(&bootstrap.executables)?;
     write_json(
         &mut output,
@@ -173,6 +193,7 @@ async fn serve(root: PathBuf, workspace: Option<PathBuf>, result_ttl_secs: u64) 
         1,
         &json!({
             "workerVersion": WORKER_VERSION, "wireVersion": 1,
+            "protocolVersion": protocol::PROTOCOL_VERSION,
             "workerDigest": executable_digest,
             "connectionId": bootstrap.connection_id,
             "serverInstanceId": bootstrap.server_instance_id,
@@ -201,9 +222,18 @@ async fn serve(root: PathBuf, workspace: Option<PathBuf>, result_ttl_secs: u64) 
     let mut finished: HashMap<String, Finished> = HashMap::new();
     let mut tasks: JoinSet<(String, io::Result<ProcessOutcome>)> = JoinSet::new();
     let mut tick = tokio::time::interval(Duration::from_millis(100));
+    let (event_tx, mut event_rx) = mpsc::channel::<Value>(256);
 
     loop {
         tokio::select! {
+            // event_tx lives for the whole loop, so recv() stays pending
+            // (never None) whenever no interactive output is queued.
+            event = event_rx.recv() => {
+                if let Some(event) = event {
+                    write_json(&mut output, FrameKind::Data, 0, sequence, &event).await?;
+                    sequence += 1;
+                }
+            }
             frame = input_rx.recv() => {
                 let encoded = match frame.unwrap_or_else(|| Err(io::Error::new(io::ErrorKind::UnexpectedEof, "control reader stopped"))) {
                     Ok(value) => value,
@@ -273,11 +303,27 @@ async fn serve(root: PathBuf, workspace: Option<PathBuf>, result_ttl_secs: u64) 
                             Err((code, message)) => { write_error_for(&mut output, sequence, &request.request_id, code, message).await?; sequence += 1; continue; }
                         };
                         let (cancel_tx, cancel_rx) = watch::channel(false);
-                        running.insert(attempt_id.clone(), Running { generation, cancel: cancel_tx });
+                        // Interactive attempts receive their child stdin handle
+                        // through this slot once run_process has spawned.
+                        let stdin_slot = Arc::new(tokio::sync::OnceCell::new());
+                        running.insert(
+                            attempt_id.clone(),
+                            Running {
+                                generation,
+                                cancel: cancel_tx,
+                                interactive_stdin: if spec.interactive { Some(stdin_slot.clone()) } else { None },
+                            },
+                        );
                         let task_root = root.clone();
                         let task_id = attempt_id.clone();
+                        let task_events = event_tx.clone();
                         tasks.spawn(async move {
-                            let mut outcome = run_process(spec, cancel_rx).await;
+                            let mut outcome = run_process(
+                                spec, cancel_rx, task_events,
+                                (task_id.clone(), generation),
+                                Some(stdin_slot),
+                            )
+                            .await;
                             if let Ok(value) = &mut outcome {
                                 value.record.attempt_id = task_id.clone();
                                 value.record.generation = generation;
@@ -305,6 +351,57 @@ async fn serve(root: PathBuf, workspace: Option<PathBuf>, result_ttl_secs: u64) 
                         }
                         Err((code,message)) => write_error_for(&mut output, sequence, &request.request_id, code, message).await?,
                     },
+                    "attempt.write" | "stdin.close" => match exact_attempt(&request) {
+                        Ok((attempt_id, generation)) => {
+                            let running_entry = running.get(attempt_id).filter(|item| item.generation == generation);
+                            let slot = running_entry.and_then(|item| item.interactive_stdin.clone());
+                            let Some(slot) = slot else {
+                                write_error_for(&mut output, sequence, &request.request_id, "ATTEMPT_NOT_INTERACTIVE", "attempt does not accept stdin writes").await?;
+                                sequence += 1; continue;
+                            };
+                            let handle = slot.get().cloned();
+                            let Some(handle) = handle else {
+                                write_error_for(&mut output, sequence, &request.request_id, "ATTEMPT_NOT_READY", "interactive child has not spawned").await?;
+                                sequence += 1; continue;
+                            };
+                            if request.op == "stdin.close" {
+                                // tokio pipes have no half-close, so EOF is
+                                // delivered by dropping the handle (fd close).
+                                let mut stdin = handle.lock().await;
+                                let taken = stdin.take();
+                                drop(stdin);
+                                match taken {
+                                    Some(mut child_stdin) => {
+                                        let _ = child_stdin.shutdown().await;
+                                        drop(child_stdin);
+                                        write_response(&mut output, sequence, &request.request_id, json!({"closed": true})).await?
+                                    }
+                                    None => write_error_for(&mut output, sequence, &request.request_id, "ATTEMPT_STDIN_CLOSED", "child stdin is no longer open").await?,
+                                }
+                                sequence += 1; continue;
+                            }
+                            let payload = request.arguments.get("data").and_then(|value| value.as_str()).and_then(|value| BASE64.decode(value).ok());
+                            let Some(bytes) = payload else {
+                                write_error_for(&mut output, sequence, &request.request_id, "STDIN_INVALID", "stdin chunk payload is invalid").await?;
+                                sequence += 1; continue;
+                            };
+                            if bytes.len() > MAX_INTERACTIVE_WRITE_BYTES {
+                                write_error_for(&mut output, sequence, &request.request_id, "STDIN_INVALID", "stdin chunk exceeds bound").await?;
+                                sequence += 1; continue;
+                            }
+                            let mut stdin = handle.lock().await;
+                            let write = match stdin.as_mut() {
+                                Some(child_stdin) => child_stdin.write_all(&bytes).await.map(|_| bytes.len()),
+                                None => Err(io::Error::new(io::ErrorKind::BrokenPipe, "stdin closed")),
+                            };
+                            drop(stdin);
+                            match write {
+                                Ok(written) => write_response(&mut output, sequence, &request.request_id, json!({"written": written})).await?,
+                                Err(_) => write_error_for(&mut output, sequence, &request.request_id, "ATTEMPT_STDIN_CLOSED", "child stdin is no longer open").await?,
+                            }
+                        }
+                        Err((code,message)) => write_error_for(&mut output, sequence, &request.request_id, code, message).await?,
+                    },
                     "result.get" | "result.ack" | "attempt.cleanup" => match handle_result(&root, &request) {
                         Ok(value) => write_response(&mut output, sequence, &request.request_id, value).await?,
                         Err((code,message)) => write_error_for(&mut output, sequence, &request.request_id, code, message).await?,
@@ -320,6 +417,13 @@ async fn serve(root: PathBuf, workspace: Option<PathBuf>, result_ttl_secs: u64) 
                             Ok(outcome) => {
                                 let generation = active.generation;
                                 finished.insert(attempt_id.clone(), Finished { generation, finished_at: Instant::now() });
+                                // Pre-terminal events must reach the client before
+                                // the terminal frame, including whatever is still
+                                // queued in the shared event channel.
+                                while let Ok(event) = event_rx.try_recv() {
+                                    write_json(&mut output, FrameKind::Data, 0, sequence, &event).await?;
+                                    sequence += 1;
+                                }
                                 write_json(&mut output, FrameKind::Exit, 0, sequence, &json!({"event":"process.terminal","result":outcome.record})).await?;
                             }
                             Err(_) => write_error(&mut output, sequence, "PROCESS_FAILED", "process execution failed").await?,
@@ -346,6 +450,8 @@ fn capabilities() -> Value {
         "view@1",
         "secret@1",
         "spawn@1",
+        "spawn.interactive@2",
+        "attempt.write@2",
         "observe@1",
         "cancel@1",
         "result@1",
@@ -623,6 +729,10 @@ struct SpawnArgs {
     timeout_ms: u64,
     #[serde(default)]
     stdin_base64: Option<String>,
+    /// Interactive attempts keep stdin open for `attempt.write` chunks and
+    /// forward pre-terminal stdout/stderr as bounded process.output events.
+    #[serde(default)]
+    interactive: bool,
 }
 fn default_timeout() -> u64 {
     DEFAULT_TIMEOUT_MS
@@ -750,15 +860,15 @@ fn authorize_executables(
 async fn run_process(
     spec: SpawnArgs,
     mut cancel: watch::Receiver<bool>,
+    events: mpsc::Sender<Value>,
+    identity: (String, u64),
+    stdin_slot: Option<Arc<tokio::sync::OnceCell<Arc<tokio::sync::Mutex<Option<tokio::process::ChildStdin>>>>>>,
 ) -> io::Result<ProcessOutcome> {
+    let (attempt_id, generation) = identity;
     let mut command = Command::new(&spec.argv[0]);
     command
         .args(&spec.argv[1..])
-        .stdin(if spec.stdin_base64.is_some() {
-            Stdio::piped()
-        } else {
-            Stdio::null()
-        })
+        .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .kill_on_drop(true);
@@ -778,17 +888,23 @@ async fn run_process(
         .stderr
         .take()
         .ok_or_else(|| io::Error::other("stderr unavailable"))?;
-    if let Some(value) = spec.stdin_base64 {
+    let mut initial_stdin = child
+        .stdin
+        .take()
+        .ok_or_else(|| io::Error::other("stdin unavailable"))?;
+    if let Some(value) = &spec.stdin_base64 {
         let bytes = BASE64.decode(value).map_err(io::Error::other)?;
-        let mut stdin = child
-            .stdin
-            .take()
-            .ok_or_else(|| io::Error::other("stdin unavailable"))?;
-        stdin.write_all(&bytes).await?;
-        stdin.shutdown().await?;
+        initial_stdin.write_all(&bytes).await?;
     }
-    let out_task = tokio::spawn(drain(stdout, MAX_OUTPUT_BYTES));
-    let err_task = tokio::spawn(drain(stderr, MAX_OUTPUT_BYTES));
+    if !spec.interactive {
+        initial_stdin.shutdown().await?;
+        drop(initial_stdin);
+    } else if let Some(slot) = stdin_slot {
+        let _ = slot.set(Arc::new(tokio::sync::Mutex::new(Some(initial_stdin))));
+    }
+    let forward = if spec.interactive { Some((events, attempt_id, generation)) } else { None };
+    let out_task = tokio::spawn(drain(stdout, MAX_OUTPUT_BYTES, forward.clone(), "stdout"));
+    let err_task = tokio::spawn(drain(stderr, MAX_OUTPUT_BYTES, forward, "stderr"));
     let mut timed_out = false;
     let mut cancelled = false;
     let status = tokio::select! {
@@ -833,14 +949,57 @@ async fn terminate(
     }
     child.wait().await
 }
-async fn drain<R: AsyncRead + Unpin>(mut reader: R, limit: usize) -> io::Result<(Vec<u8>, bool)> {
+
+async fn drain<R: AsyncRead + Unpin>(
+    mut reader: R,
+    limit: usize,
+    forward: Option<(mpsc::Sender<Value>, String, u64)>,
+    stream: &'static str,
+) -> io::Result<(Vec<u8>, bool)> {
     let mut kept = Vec::new();
     let mut buf = [0u8; 8192];
     let mut exceeded = false;
+    let mut sequence: u64 = 0;
+    let mut forwarded_bytes = 0usize;
+    let mut truncation_reported = false;
     loop {
         let count = reader.read(&mut buf).await?;
         if count == 0 {
             break;
+        }
+        if let Some((events, attempt_id, generation)) = &forward {
+            sequence += 1;
+            if forwarded_bytes + count <= MAX_INTERACTIVE_EVENT_BYTES {
+                forwarded_bytes += count;
+                let event = json!({
+                    "event": "process.output",
+                    "result": {
+                        "attemptId": attempt_id,
+                        "generation": generation,
+                        "stream": stream,
+                        "seq": sequence,
+                        "data": BASE64.encode(&buf[..count]),
+                        "eof": false,
+                    }
+                });
+                if events.send(event).await.is_err() {
+                }
+            } else if !truncation_reported {
+                truncation_reported = true;
+                let event = json!({
+                    "event": "process.output",
+                    "result": {
+                        "attemptId": attempt_id,
+                        "generation": generation,
+                        "stream": stream,
+                        "seq": sequence,
+                        "data": "",
+                        "eof": false,
+                        "truncated": true,
+                    }
+                });
+                let _ = events.send(event).await;
+            }
         }
         let room = limit.saturating_sub(kept.len());
         kept.extend_from_slice(&buf[..count.min(room)]);

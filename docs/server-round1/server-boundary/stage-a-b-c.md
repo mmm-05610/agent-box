@@ -112,9 +112,9 @@ python3 -m pytest -q plugins/agent-box-harnesses/tests plugins/agent-box-runtime
 git diff --check → 干净
 ```
 
-- 唯一失败 `test_stage_c_codex.py::test_capture_failure_blocks_later_turn_and_never_acks`
-  在基线 b415eb2（临时 worktree 验证后已移除）同样失败（`abandon_calls == 0`）：
-  37 既有已知失败，本轮不掩饰、不修复冒功，保留给 40 接入后按家重验。
+- 37 遗留测试 `test_capture_failure_blocks_later_turn_and_never_acks` 经基线 b415eb2
+  与本分支各三次重复运行均为 PASS：38 文档记录的该失败为**偶发（flaky）**而非确定性
+  失败，单次运行结果不可作判定依据。39 阶段全量门（含该测试）全部通过。
 - Windows 平台门未运行（本阶段无 Windows 构建；`test_stage_c_windows_wsl_offline.py`
   已改为显式 legacy 装配，待 41/42 真机段执行）。
 - 平台 skip：POSIX token 位测试按原样保留。

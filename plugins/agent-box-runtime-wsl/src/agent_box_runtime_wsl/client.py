@@ -1,6 +1,7 @@
 """ABW1 client; Worker control frames never share child output streams."""
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import queue
@@ -8,7 +9,7 @@ import struct
 import subprocess
 import threading
 import time
-from typing import Any, BinaryIO, Sequence
+from typing import Any, BinaryIO, Callable, Sequence
 from uuid import uuid4
 
 
@@ -21,6 +22,10 @@ HELLO_ACK = 2
 DATA = 5
 EXIT = 7
 WORKER_ERROR = 8
+# Control-protocol generation. The frame format is unchanged; version 2 adds
+# interactive spawn, attempt.write, and pre-terminal process.output events.
+# The mismatch is a loud handshake failure, never silent one-shot fallback.
+PROTOCOL_VERSION = 2
 
 
 class WorkerError(RuntimeError):
@@ -86,6 +91,34 @@ class WorkerClient:
         self._request_sequence = 2
         self._terminals: dict[tuple[str, int], dict[str, Any]] = {}
         self._pending: dict[str, dict[str, Any]] = {}
+        self._event_listeners: list[Callable[[dict[str, Any]], None]] = []
+
+    def subscribe_output(self, listener: Callable[[dict[str, Any]], None]) -> Callable[[], None]:
+        """Receive pre-terminal worker events (process.output, ...)."""
+        self._event_listeners.append(listener)
+        return lambda: self._event_listeners.remove(listener) if listener in self._event_listeners else None
+
+    def _dispatch_event(self, value: dict[str, Any]) -> bool:
+        if not value.get("event") or value.get("event") == "process.terminal":
+            return False
+        for listener in tuple(self._event_listeners):
+            try:
+                listener(value)
+            except Exception:
+                pass
+        return True
+
+    def write_stdin(self, attempt_id: str, generation: int, data: bytes, *, timeout: float = 10.0) -> int:
+        """Append one bounded stdin chunk to a live interactive attempt."""
+        result = self.request(
+            "attempt.write", {"data": base64.b64encode(data).decode()},
+            attempt_id=attempt_id, generation=generation, timeout=timeout,
+        )
+        return int(result["written"])
+
+    def close_stdin(self, attempt_id: str, generation: int, *, timeout: float = 10.0) -> None:
+        """Deliver EOF to a live interactive attempt's stdin."""
+        self.request("stdin.close", {}, attempt_id=attempt_id, generation=generation, timeout=timeout)
 
     def start(self, *, timeout: float = 10.0) -> dict[str, Any]:
         if self._process is not None:
@@ -102,6 +135,7 @@ class WorkerClient:
             "connectionId": self.connection_id, "projectId": self.project_id,
             "effectiveUser": self.effective_user, "instanceNonce": f"nonce-{uuid4().hex}",
             "serverInstanceId": self.server_instance_id, "leaseMs": self.lease_ms,
+            "protocolVersion": PROTOCOL_VERSION,
             "executables": list(self.executable_authorizations),
         }
         self._write(HELLO, 0, 1, bootstrap)
@@ -110,6 +144,12 @@ class WorkerClient:
             self.close()
             raise WorkerError("HANDSHAKE_REJECTED", "Worker did not acknowledge bootstrap")
         value = json.loads(payload)
+        if value.get("protocolVersion") != PROTOCOL_VERSION:
+            self.close()
+            raise WorkerError(
+                "HANDSHAKE_VERSION_UNSUPPORTED",
+                f"Worker control protocol {value.get('protocolVersion')!r} != required {PROTOCOL_VERSION}",
+            )
         if (value.get("workerVersion") != self.worker_version
                 or value.get("workerDigest") != self.worker_digest
                 or value.get("connectionId") != self.connection_id
@@ -145,6 +185,8 @@ class WorkerClient:
                 result = value["result"]
                 self._terminals[(result["attemptId"], result["generation"])] = result
                 continue
+            if self._dispatch_event(value):
+                continue
             target = value.get("requestId")
             if target != request_id:
                 if target:
@@ -175,6 +217,8 @@ class WorkerClient:
                 if target == key:
                     return result
                 self._terminals[target] = result
+            elif self._dispatch_event(value):
+                pass
             elif value.get("requestId"):
                 self._pending[value["requestId"]] = value
         raise TimeoutError("Worker terminal result timed out")
@@ -217,7 +261,19 @@ class WorkerClient:
         try:
             assert self._process and self._process.stdout
             while True:
-                self._frames.put(read_frame(self._process.stdout))
+                kind, stream_id, sequence, payload = read_frame(self._process.stdout)
+                if kind == DATA:
+                    # Pre-terminal worker events go straight to subscribers from
+                    # the reader thread: nobody may be inside a receive loop
+                    # between prompts, yet streamed output must still arrive.
+                    try:
+                        value = json.loads(payload)
+                    except ValueError:
+                        value = None
+                    if isinstance(value, dict) and value.get("event"):
+                        self._dispatch_event(value)
+                        continue
+                self._frames.put((kind, stream_id, sequence, payload))
         except BaseException as exc:
             self._frames.put(exc)
 

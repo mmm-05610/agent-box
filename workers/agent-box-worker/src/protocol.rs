@@ -7,6 +7,10 @@ pub const MAGIC: [u8; 4] = *b"ABW1";
 pub const VERSION: u16 = 1;
 pub const HEADER_LEN: usize = 60;
 pub const MAX_PAYLOAD: usize = 64 * 1024;
+/// Control-protocol generation. Version 2 adds bidirectional stdin writes and
+/// pre-terminal stdout/stderr events for long-lived attempts; the frame format
+/// itself is unchanged and the mismatch is always a loud handshake failure.
+pub const PROTOCOL_VERSION: u32 = 2;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
@@ -53,6 +57,11 @@ pub struct Bootstrap {
     pub instance_nonce: String,
     pub server_instance_id: String,
     pub lease_ms: u64,
+    /// Control-protocol generation carried since the interactive-channel
+    /// upgrade. Bootstrap 0 is rejected so a legacy client fails loudly
+    /// instead of silently degrading to one-shot semantics.
+    #[serde(default)]
+    pub protocol_version: u32,
     #[serde(default)]
     pub executables: Vec<ExecutableAuthorization>,
 }

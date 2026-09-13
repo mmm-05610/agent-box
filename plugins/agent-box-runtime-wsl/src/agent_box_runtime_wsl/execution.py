@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 import base64
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import hashlib
-from typing import Any, Mapping
+import queue
+from typing import Any, Callable, Mapping
 
 from agent_box_sandbox_bwrap import compile_remote_bwrap_argv
 
@@ -13,6 +14,7 @@ from .connector import WslConnector
 
 
 TRANSFER_CHUNK = 32 * 1024
+INTERACTIVE_EVENT_CHUNK_BYTES = 32 * 1024
 
 
 @dataclass
@@ -23,6 +25,35 @@ class WslAttempt:
     view_id: str
     secret_frame_id: str
     terminal: Mapping[str, Any] | None = None
+    interactive: bool = False
+    _outputs: "queue.Queue[Mapping[str, Any]]" = field(default_factory=queue.Queue)
+
+    def subscribe_output(self, listener: Callable[[Mapping[str, Any]], None]) -> Callable[[], None]:
+        """Forward pre-terminal process.output events to the listener."""
+        if not self.interactive:
+            raise RuntimeError("ATTEMPT_NOT_INTERACTIVE")
+
+        def _dispatch(event: Mapping[str, Any]) -> None:
+            listener(event.get("result") or {})
+
+        return self.client.subscribe_output(_dispatch)
+
+    def next_output(self, timeout: float | None = None):
+        """Pop the oldest buffered pre-terminal output event, or None."""
+        try:
+            return self._outputs.get(timeout=timeout) if timeout is not None else self._outputs.get_nowait()
+        except queue.Empty:
+            return None
+
+    def write_stdin(self, data: bytes, *, timeout: float = 10.0) -> int:
+        if not self.interactive:
+            raise RuntimeError("ATTEMPT_NOT_INTERACTIVE")
+        return self.client.write_stdin(self.attempt_id, self.generation, data, timeout=timeout)
+
+    def close_stdin(self, *, timeout: float = 10.0) -> None:
+        if not self.interactive:
+            raise RuntimeError("ATTEMPT_NOT_INTERACTIVE")
+        self.client.close_stdin(self.attempt_id, self.generation, timeout=timeout)
 
 
 class WslExecutionTransport:
@@ -40,6 +71,7 @@ class WslExecutionTransport:
         plan: Any, credential: bytes, restored_files: Mapping[str, bytes],
         credential_target: str = "/runtime/home/auth.json",
         projected_files: Mapping[str, bytes] | None = None,
+        interactive: bool = False,
     ) -> WslAttempt:
         client = self.connector.client_for_workspace(
             distribution=workspace["distribution"], user=workspace["remote_user"],
@@ -85,10 +117,17 @@ class WslExecutionTransport:
             client.request(
                 "spawn",
                 {"argv": argv, "timeoutMs": int(plan.timeout_ms),
-                 "stdinBase64": base64.b64encode(plan.stdin).decode()},
+                 "stdinBase64": base64.b64encode(plan.stdin).decode(),
+                 **({"interactive": True} if interactive else {})},
                 attempt_id=attempt_id, generation=generation,
             )
-            return WslAttempt(client, attempt_id, generation, view_id, secret_frame_id)
+            attempt = WslAttempt(
+                client, attempt_id, generation, view_id, secret_frame_id,
+                interactive=interactive,
+            )
+            if interactive:
+                attempt.subscribe_output(attempt._outputs.put)
+            return attempt
         except BaseException:
             self._best_effort_pre_result_cleanup(client, attempt_id, view_id, secret_frame_id)
             client.close()
