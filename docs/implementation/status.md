@@ -2,7 +2,7 @@
 
 更新：2026-09-14（设计者派单，未执行生产修改）。37 的独立验收仍为 PARTIAL；历史证据保留。
 当前授权39→40→41→42，覆盖下方历史“等待抽取授权/后续未派”表述；38研究已结束，不重跑广筛。
-代码起点b415eb2；新分支由39建立。当前没有新增模型/凭据授权，不自动接管Desktop。
+代码起点b415eb2；新分支由39建立。新增DeepSeek官方API授权见42 §D；不自动接管Desktop。
 
 | 单号 | 状态 | 证据 | 下一步 |
 | --- | --- | --- | --- |
@@ -20,7 +20,9 @@
 - frontend_checked_at / observed_head / writer_lease / next_check_at: 未开始。
 - wire_version / schema_digest / code_checkpoint_pair: 待核对。
 - integration_owner: NONE；workbench_model_verified_count: 0（指本轮，非历史37）。
-- model_authorization: PENDING_SOURCE_MODEL_AND_BUDGET；four_harness_matrix: 40逐家记录。
+- model_authorization: DEEPSEEK_OFFICIAL_AUTHORIZED_MAX_CNY_10；凭据locator见42 §D，不写内容。
+- 本轮调用数0，已知费用0，预留0；后续执行者统一记账，所有Harness/重试累计计算。
+- four_harness_matrix: 40逐家记录；40历史表格中的“不授权模型”由42 §D窄授权覆盖。
 - 每阶段与goal结束前检查状态已更新；41READY后进入42等待，不提前报整体完成。
 
 以下是37/38历史说明，不覆盖39–42新授权。
