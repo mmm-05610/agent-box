@@ -1,21 +1,6 @@
 {
   "schema_version": 1,
-  "scope": "cross-repository-backend-dispatch",
-  "orders": [
-    {
-      "id": "37",
-      "document": "work-orders/37-http-codex.md",
-      "baseline": "80d2017e9a708421556914cd99d843573daf4c68",
-      "worktree": "/home/maoqh/projects/agent-box-server-round1",
-      "branch": "feature/server-http-codex-r1",
-      "depends_on": [],
-      "stages": ["A", "B", "C", "D"],
-      "write_paths": ["src/agent_box/server/**", "src/agent_box/storage/**", "src/agent_box/work_core/**", "src/agent_box/extensions/**", "src/agent_box/resource_contracts/**", "plugins/agent-box-harnesses/**", "plugins/agent-box-runtime-wsl/**", "plugins/agent-box-runtime-local/**", "plugins/agent-box-sandbox-bwrap/**", "plugins/agent-box-terminal-session/**", "workers/**", "protocols/worker/**", "tests/**", "pyproject.toml", "lockfiles", "docs/server-round1/**", "scripts/server-round1/**"],
-      "read_only_repositories": ["/home/maoqh/projects/agent-box-studio-codex-vertical", "/home/maoqh/projects/agent-box-studio-ui-reconstruction"],
-      "forbidden_write_roots": ["/home/maoqh/projects/agent-box", "/home/maoqh/projects/agent-box-desktop-next", "/home/maoqh/projects/agent-box-desktop-next-wsl-round1"],
-      "parallel_code_with": ["desktop:36"],
-      "exclusive_resources": ["Windows native build slot", "real Codex rehearsal slot"],
-      "note": "write_paths are relative to worktree only; forbidden roots do not include the distinct sibling worktree. This is not the renderer import-edge manifest."
-    }
-  ]
+  "status": "RETIRED_MOVED",
+  "authority": "/home/maoqh/projects/agent-box-server-round1/docs/implementation/manifest.json",
+  "orders": []
 }

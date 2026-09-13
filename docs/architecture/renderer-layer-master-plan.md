@@ -4,7 +4,9 @@
 
 Work order [36](renderer-layer-batches/36-workspace-sidebar-product.md) is now the only
 executable Desktop increment. Backend [37](backend-server/work-orders/37-http-codex.md)
-is separately authorized in an independent backend worktree; its scope and resource
+is assigned to a NEW independent Codex goal, not this Desktop/Zcode executor.
+Its scheduling authority has moved to agent-box-server-round1/docs/implementation;
+the local backend-server links are retired navigation only. Its scope and resource
 exclusions are in [backend master plan](backend-server/master-plan.md). It does not
 enable Desktop Codex integration, data migration, or older paused orders.
 35 is accepted on `feature/desktop-wsl-round1` at `c8d59f3`, NOT
