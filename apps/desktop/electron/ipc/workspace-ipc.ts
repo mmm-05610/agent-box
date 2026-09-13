@@ -91,6 +91,26 @@ export function registerWorkspaceIpc({ wslWorkspaceHost }: RegisterWorkspaceIpcD
     }
   })
 
+  ipcMain.handle('hermes:wsl-workspace:rename', async (_event, payload) => {
+    const body = payloadObject(payload)
+
+    try {
+      return await wslWorkspaceHost.renameWorkspace({ workspaceId: body.workspaceId, name: body.name })
+    } catch (error) {
+      return unexpectedError(error)
+    }
+  })
+
+  ipcMain.handle('hermes:wsl-workspace:remove', async (_event, payload) => {
+    const body = payloadObject(payload)
+
+    try {
+      return await wslWorkspaceHost.removeWorkspace({ workspaceId: body.workspaceId })
+    } catch (error) {
+      return unexpectedError(error)
+    }
+  })
+
   ipcMain.handle('hermes:wsl-workspace:reconnect', async (_event, payload) => {
     const body = payloadObject(payload)
 

@@ -79,7 +79,6 @@ import { notifyError } from '@/store/notifications'
 import { $profiles, $profileScope, ALL_PROFILES, normalizeProfileKey } from '@/store/profile'
 import {
   $activeProjectId,
-  $newProjectDropPlacement,
   $projects,
   $projectScope,
   $projectTree,
@@ -88,7 +87,7 @@ import {
   ALL_PROJECTS,
   enterProject,
   exitProjectScope,
-  openProjectCreate,
+  openFolderAsProject,
   refreshProjects,
   refreshProjectTree,
   refreshWorktrees,
@@ -1426,13 +1425,14 @@ export function ChatSidebar({
                           addMenu={
                             agentsGrouped ? (
                               <>
-                                <DropdownMenuLabel>{s.projects.newButton}</DropdownMenuLabel>
-                                {/* Round-1 add-project menu: the local folder flow
-                                    keeps its existing dialog; the remote entry opens
-                                    the WSL workspace wizard. No fake entries. */}
+                                <DropdownMenuLabel>{t.wslWorkspace.menuOpenFolder}</DropdownMenuLabel>
+                                {/* Round-36 add menu: exactly two entries. The local
+                                    folder flow completes directly (pick a directory →
+                                    open/join the list — no naming page); the remote
+                                    entry opens the simplified WSL wizard. */}
                                 <DropdownMenuItem
                                   onSelect={() => {
-                                    openProjectCreate()
+                                    void openFolderAsProject()
                                   }}
                                 >
                                   <Codicon name="folder-opened" size="0.875rem" />
@@ -1445,26 +1445,16 @@ export function ChatSidebar({
                                   }}
                                 >
                                   <Codicon name="vm-connect" size="0.875rem" />
-                                  {t.wslWorkspace.menuRemoteConnection}
+                                  {t.wslWorkspace.menuOpenRemoteFolder}
                                 </DropdownMenuItem>
                               </>
                             ) : undefined
                           }
-                          ariaLabel={agentsGrouped ? s.projects.newButton : s.nav['new-session']}
-                          onNewProjectDrag={
-                            agentsGrouped
-                              ? {
-                                  // Dragging the "New project" + arms WHERE the
-                                  // project should start; the dialog flow consumes
-                                  // it on create (see $newProjectDropPlacement).
-                                  onArm: placement => $newProjectDropPlacement.set(placement)
-                                }
-                              : undefined
-                          }
+                          ariaLabel={agentsGrouped ? t.wslWorkspace.menuOpenFolder : s.nav['new-session']}
                           onNewSessionSplit={agentsGrouped ? undefined : onNewSessionSplit}
                           onPlainClick={() => {
                             if (agentsGrouped) {
-                              openProjectCreate()
+                              void openFolderAsProject()
                             } else {
                               onNewSessionInWorkspace(null)
                             }
@@ -1538,7 +1528,7 @@ export function ChatSidebar({
             empty state) still shows saved workspaces. */}
         {!inProject && <WslWorkspaceSection />}
 
-        {!showSessionSections && <SidebarBlankState onNewProject={openProjectCreate} onRemoteConnection={openWslWorkspaceWizard} />}
+        {!showSessionSections && <SidebarBlankState onNewProject={() => void openFolderAsProject()} onRemoteConnection={openWslWorkspaceWizard} />}
 
         <div className="shrink-0 px-0.5 pb-1 pt-0.5">
           <ProfileRail />

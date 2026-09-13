@@ -3283,16 +3283,12 @@ export interface Translations {
   }
 
   wslWorkspace: {
-    // Add-project menu entries (round 1: only WSL is real).
+    // Add-project menu entries (round 36: open folder / open remote folder).
     menuOpenFolder: string
-    menuRemoteConnection: string
+    menuOpenRemoteFolder: string
     // Wizard steps
-    stepMethod: string
     stepConfig: string
-    stepConnecting: string
     stepBrowse: string
-    wslOption: string
-    wslOptionDesc: string
     distributionLabel: string
     distributionStateRunning: string
     distributionStateStopped: string
@@ -3324,6 +3320,14 @@ export interface Translations {
     rootPathLabel: string
     sessionUnavailable: string
     wslBadge: string
+    // Row management (round 36): rename / remove from the row menu.
+    menuRename: string
+    menuRemove: string
+    removeTitle: (name: string) => string
+    removeDesc: string
+    renameTitle: (name: string) => string
+    renameFailed: string
+    removeFailed: string
     // Typed failure copy, keyed by the host's WslWorkspaceErrorCode.
     errWslUnavailable: string
     errWslUnknownDistribution: string

@@ -813,3 +813,179 @@ test('a store written by a newer version blocks reads and saves byte-for-byte', 
 
   assert.deepEqual(readFileSync(storePath), Buffer.from(bytes, 'utf8'), 'the future-version file must remain byte-identical')
 })
+
+// --- rename / remove (work order 36) -----------------------------------------
+
+async function seedWorkspace(host: ReturnType<typeof createHost>['host'], requestId = 'seed-1') {
+  const connected = await host.connect({ distribution: 'Ubuntu', user: 'maoqh' })
+
+  assert.ok(connected.ok)
+
+  const saved = await host.saveWorkspace({
+    connectionId: connected.ok ? connected.connectionId : '',
+    path: '/home/maoqh/proj',
+    requestId
+  })
+
+  assert.ok(saved.ok)
+
+  return saved.ok ? saved.workspace : null
+}
+
+test('renameWorkspace persists a new display name and keeps the record identity', async () => {
+  const { host, store } = createHost()
+  const seeded = await seedWorkspace(host)
+
+  assert.ok(seeded)
+
+  const renamed = await host.renameWorkspace({ workspaceId: seeded.id, name: '  我的项目  ' })
+
+  assert.equal(renamed.ok, true)
+
+  if (renamed.ok) {
+    assert.equal(renamed.workspace.id, seeded.id, 'rename must not create a second record')
+    assert.equal(renamed.workspace.name, '我的项目')
+    assert.ok(renamed.workspace.updatedAt >= seeded.updatedAt)
+  }
+
+  assert.equal(store.state.file.workspaces.length, 1)
+  assert.equal(store.state.file.workspaces[0].name, '我的项目')
+})
+
+test('renameWorkspace rejects blank names and unknown ids with typed failures', async () => {
+  const { host, store } = createHost()
+  const seeded = await seedWorkspace(host)
+
+  assert.ok(seeded)
+
+  const blank = await host.renameWorkspace({ workspaceId: seeded.id, name: '   ' })
+
+  assert.equal(blank.ok, false)
+
+  if (!blank.ok) {
+    assert.equal(blank.code, 'WSL_SAVE_FAILED')
+  }
+
+  const unknown = await host.renameWorkspace({ workspaceId: 'wsl_ws_missing', name: 'X' })
+
+  assert.equal(unknown.ok, false)
+
+  if (!unknown.ok) {
+    assert.equal(unknown.code, 'WSL_NOT_FOUND')
+  }
+
+  assert.equal(store.state.file.workspaces[0].name, seeded.name, 'a failed rename changes nothing')
+})
+
+test('removeWorkspace drops only the record and answers idempotently afterwards', async () => {
+  const { host, store } = createHost()
+  const seeded = await seedWorkspace(host)
+
+  assert.ok(seeded)
+
+  const removed = await host.removeWorkspace({ workspaceId: seeded.id })
+
+  assert.equal(removed.ok && removed.removed, true)
+  assert.equal(store.state.file.workspaces.length, 0)
+
+  const persistCallsAfterRemove = store.state.persistCalls
+
+  const again = await host.removeWorkspace({ workspaceId: seeded.id })
+
+  assert.equal(again.ok && again.removed, false, 'a repeated remove is a no-op, not an error')
+  assert.equal(store.state.persistCalls, persistCallsAfterRemove, 'the no-op must not write')
+})
+
+test('a rename racing a save cannot be erased by the save (shared commit chain)', async () => {
+  // Gate only the SECOND ls (the race save's verification); the seed's ls
+  // passes straight through so the record exists before the race.
+  const raceGate = deferred()
+  let lsCount = 0
+
+  const { host, calls, store } = createHost({
+    exec: async call => {
+      if (isListArgv(call.argv)) {
+        lsCount += 1
+
+        if (lsCount >= 2) {
+          await raceGate.promise
+        }
+
+        return { stdout: 'inner/\n', stderr: '' }
+      }
+
+      return { stdout: 'user=maoqh\nhome=/home/maoqh\n', stderr: '' }
+    }
+  })
+
+  const pendingLs = () => calls.filter(call => isListArgv(call.argv)).length
+
+  const seeded = await seedWorkspace(host)
+
+  assert.ok(seeded)
+
+  // The race: a save (gated) plus a rename of the seeded record issued while
+  // that save is still in flight. Without the shared commit chain, the
+  // rename's whole-store write could land after the save's and erase the new
+  // record (or the save could erase the rename).
+  const connected = await host.connect({ distribution: 'Ubuntu' })
+
+  assert.ok(connected.ok)
+
+  const pendingSave = host.saveWorkspace({
+    connectionId: connected.ok ? connected.connectionId : '',
+    path: '/srv/race',
+    requestId: 'r-race'
+  })
+
+  await waitUntil(() => pendingLs() >= 2)
+
+  const pendingRename = host.renameWorkspace({ workspaceId: seeded.id, name: 'After' })
+
+  raceGate.resolve()
+
+  const [saved, renamed] = await Promise.all([pendingSave, pendingRename])
+
+  assert.ok(saved.ok)
+  assert.ok(renamed.ok)
+  assert.equal(store.state.file.workspaces.length, 2, 'both mutations must survive the race')
+
+  const renamedRecord = store.state.file.workspaces.find(w => w.id === seeded.id)
+
+  assert.equal(renamedRecord?.name, 'After')
+})
+
+test('rename and remove refuse to touch a future-version store', async () => {
+  const dir = mkdtempSync(join(os.tmpdir(), 'wsl-store-future-'))
+  const storePath = join(dir, 'wsl-workspaces.json')
+
+  const futureFile = {
+    version: 99,
+    workspaces: [],
+    savedRequests: {}
+  }
+
+  const bytes = `${JSON.stringify(futureFile, null, 2)}\n`
+
+  writeFileSync(storePath, bytes, 'utf8')
+
+  const realStore = createWslWorkspaceStore(storePath)
+  const { host } = createHost({ store: { state: { file: normalizeWorkspaceStoreFile(null), persistCalls: 0 }, load: () => realStore.load(), persist: file => realStore.persist(file) } })
+
+  const renamed = await host.renameWorkspace({ workspaceId: 'wsl_ws_future', name: 'X' })
+  const removed = await host.removeWorkspace({ workspaceId: 'wsl_ws_future' })
+
+  assert.equal(renamed.ok, false)
+
+  if (!renamed.ok) {
+    assert.equal(renamed.code, 'WSL_STORE_FUTURE_VERSION')
+  }
+
+  assert.equal(removed.ok, false)
+
+  if (!removed.ok) {
+    assert.equal(removed.code, 'WSL_STORE_FUTURE_VERSION')
+  }
+
+  assert.deepEqual(readFileSync(storePath), Buffer.from(bytes, 'utf8'))
+})

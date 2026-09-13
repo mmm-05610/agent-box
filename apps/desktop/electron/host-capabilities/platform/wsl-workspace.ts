@@ -474,6 +474,22 @@ export interface WslWorkspaceHost {
     requestId: unknown
   }) => Promise<WslOutcome<{ workspace: WslWorkspaceRecord; requestIdReplay: boolean }>>
   listWorkspaces: () => WslOutcome<{ workspaces: WslWorkspaceRecord[] }>
+  /**
+   * Rename a saved workspace's display name. Sidebar-record surgery only: the
+   * directory, its files, sessions and history are untouched, and the private
+   * connection config (distribution/user/root) does not move.
+   */
+  renameWorkspace: (input: { workspaceId: unknown; name: unknown }) => Promise<
+    WslOutcome<{ workspace: WslWorkspaceRecord }>
+  >
+  /**
+   * Remove a workspace's sidebar record. Idempotent: an already-removed (or
+   * unknown) id answers `removed: false`, never an error — a double-click or a
+   * stale row must not read as data loss. Files, sessions, history and the WSL
+   * distribution are NOT touched; re-adding the same directory starts a fresh
+   * record (sessions reattach by cwd, which the workspaces never owned).
+   */
+  removeWorkspace: (input: { workspaceId: unknown }) => Promise<WslOutcome<{ removed: boolean }>>
   reconnectWorkspace: (input: { workspaceId: unknown }) => Promise<
     WslOutcome<
       | { status: 'connected'; workspace: WslWorkspaceRecord; actualUser: string; userChanged: boolean }
@@ -914,6 +930,80 @@ export function createWslWorkspaceHost(
       }
 
       return { ok: true, workspaces: loaded.file.workspaces }
+    },
+
+    async renameWorkspace({ workspaceId, name }) {
+      if (typeof workspaceId !== 'string' || !workspaceId) {
+        return { ok: false, ...wslFailure('WSL_NOT_FOUND', 'A workspace id is required.', false) }
+      }
+
+      const trimmed = typeof name === 'string' ? name.trim() : ''
+
+      if (!trimmed) {
+        return { ok: false, ...wslFailure('WSL_SAVE_FAILED', 'A workspace name is required.', false) }
+      }
+
+      // Same serialized section as a save: the rename is a read-modify-write
+      // over the freshly loaded store, so a concurrent save/rename/remove can
+      // never erase it (batch 35's concurrency contract).
+      return enqueueCommit(() => {
+        const loaded = readStore()
+
+        if (isWslFailure(loaded)) {
+          return loaded
+        }
+
+        const file = loaded.file
+        const existing = file.workspaces.find(w => w.id === workspaceId)
+
+        if (!existing) {
+          return { ok: false, ...wslFailure('WSL_NOT_FOUND', 'This workspace no longer exists.', false) }
+        }
+
+        const record: WslWorkspaceRecord = { ...existing, name: trimmed, updatedAt: now() }
+
+        file.workspaces = file.workspaces.map(w => (w.id === workspaceId ? record : w))
+
+        try {
+          store.persist(file)
+        } catch (error) {
+          return { ok: false, ...wslFailure('WSL_SAVE_FAILED', `Could not save the workspace: ${String((error as Error)?.message || error)}`, true) }
+        }
+
+        return { ok: true, workspace: record }
+      })
+    },
+
+    async removeWorkspace({ workspaceId }) {
+      if (typeof workspaceId !== 'string' || !workspaceId) {
+        return { ok: false, ...wslFailure('WSL_NOT_FOUND', 'A workspace id is required.', false) }
+      }
+
+      return enqueueCommit(() => {
+        const loaded = readStore()
+
+        if (isWslFailure(loaded)) {
+          return loaded
+        }
+
+        const file = loaded.file
+        const existing = file.workspaces.some(w => w.id === workspaceId)
+
+        if (!existing) {
+          // Already gone: a repeated remove succeeds by having done nothing.
+          return { ok: true, removed: false }
+        }
+
+        file.workspaces = file.workspaces.filter(w => w.id !== workspaceId)
+
+        try {
+          store.persist(file)
+        } catch (error) {
+          return { ok: false, ...wslFailure('WSL_SAVE_FAILED', `Could not save the workspace: ${String((error as Error)?.message || error)}`, true) }
+        }
+
+        return { ok: true, removed: true }
+      })
     },
 
     async reconnectWorkspace({ workspaceId }) {

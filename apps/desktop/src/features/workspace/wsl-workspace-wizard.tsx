@@ -28,7 +28,7 @@ import { cn } from '@/lib/utils'
 import { $wslWorkspaceWizardOpen, closeWslWorkspaceWizard } from '@/store/wsl-workspace'
 import type { WslDirectoryEntry, WslDistributionInfo, WslWorkspaceErrorCode } from '@/types/workspace'
 
-type Step = 'method' | 'config' | 'connecting' | 'browse'
+type Step = 'config' | 'browse'
 
 type DiscoveryState =
   | { kind: 'loading' }
@@ -37,18 +37,20 @@ type DiscoveryState =
   | { kind: 'error'; code: WslWorkspaceErrorCode | null }
 
 /**
- * The round-1 WSL connection wizard, mounted once in the project sidebar:
- * choose the connection type (only WSL exists this round) → distribution and
- * optional Linux user → bounded connecting step with cancel → browse the real
- * Linux tree → save the workspace. A cancelled wizard persists nothing, and a
- * failed save keeps the selection for retry.
+ * The round-36 WSL connection wizard, mounted once in the workspace sidebar:
+ * distribution (default preselected) and an optional Linux user → connect and
+ * browse the real Linux tree → picking a directory saves and opens the
+ * workspace. There is no method-selection page (only WSL exists this round)
+ * and no separate connecting page — connecting is a loading state on the same
+ * page, with cancel, typed errors and retry. A cancelled wizard persists
+ * nothing, and a failed save keeps the selection for retry.
  */
 export function WslWorkspaceWizard() {
   const { t } = useI18n()
   const w = t.wslWorkspace
   const open = useStore($wslWorkspaceWizardOpen)
 
-  const [step, setStep] = useState<Step>('method')
+  const [step, setStep] = useState<Step>('config')
   const [discovery, setDiscovery] = useState<DiscoveryState>({ kind: 'loading' })
   const [distribution, setDistribution] = useState('')
   const [user, setUser] = useState('')
@@ -98,7 +100,7 @@ export function WslWorkspaceWizard() {
 
     // Fresh wizard per open: nothing from a previous attempt leaks in, and
     // closing/cancelling never leaves a project behind.
-    setStep('method')
+    setStep('config')
     setDistribution('')
     setUser('')
     setConnectionId(null)
@@ -182,7 +184,6 @@ export function WslWorkspaceWizard() {
     connectOperation.current = operationId
     setConnecting(true)
     setConnectError(null)
-    setStep('connecting')
 
     const result = await connectWsl({ distribution, operationId, user: user.trim() || undefined })
 
@@ -190,8 +191,9 @@ export function WslWorkspaceWizard() {
     connectOperation.current = null
 
     if (!result.ok) {
+      // Back on the same page: the typed error is inline, the config stays
+      // editable, and Connect itself is the retry.
       setConnectError(result.code)
-      setStep('config')
 
       return
     }
@@ -237,35 +239,15 @@ export function WslWorkspaceWizard() {
     closeWslWorkspaceWizard()
   }
 
-  const stepLabel = (target: Step) =>
-    target === 'method' ? w.stepMethod : target === 'config' ? w.stepConfig : target === 'connecting' ? w.stepConnecting : w.stepBrowse
-
   return (
     <Dialog onOpenChange={onClose} open={open}>
       <DialogContent className="max-w-lg" onInteractOutside={event => event.preventDefault()}>
         <DialogHeader>
-          <DialogTitle>{w.menuRemoteConnection}</DialogTitle>
+          <DialogTitle>{w.menuOpenRemoteFolder}</DialogTitle>
           <DialogDescription>
-            {step === 'browse' ? `${w.stepBrowse} · ${w.sessionUnavailable}` : stepLabel(step)}
+            {step === 'browse' ? `${w.stepBrowse} · ${w.sessionUnavailable}` : w.stepConfig}
           </DialogDescription>
         </DialogHeader>
-
-        {step === 'method' && (
-          <div className="flex flex-col gap-2">
-            <button
-              className="flex items-center gap-3 rounded-lg border border-(--ui-stroke-tertiary) px-3 py-2.5 text-left transition-colors hover:border-(--ui-stroke-secondary) hover:bg-(--ui-control-hover-background)"
-              onClick={() => setStep('config')}
-              type="button"
-            >
-              <Codicon className="shrink-0 text-(--ui-text-secondary)" name="vm-connect" size="1.125rem" />
-              <span className="min-w-0">
-                <span className="block text-[0.8125rem] font-medium">{w.wslOption}</span>
-                <span className="block text-[0.75rem] text-(--ui-text-tertiary)">{w.wslOptionDesc}</span>
-              </span>
-              <Codicon className="ml-auto shrink-0 text-(--ui-text-quaternary)" name="chevron-right" size="0.875rem" />
-            </button>
-          </div>
-        )}
 
         {step === 'config' && (
           <div className="flex flex-col gap-3">
@@ -301,6 +283,7 @@ export function WslWorkspaceWizard() {
                     {w.distributionLabel}
                   </label>
                   <Select
+                    disabled={connecting}
                     onValueChange={setDistribution}
                     value={distribution || discovery.defaultDistribution || discovery.distributions[0]?.name || ''}
                   >
@@ -322,6 +305,7 @@ export function WslWorkspaceWizard() {
                     {w.userLabel}
                   </label>
                   <Input
+                    disabled={connecting}
                     id="wsl-user"
                     onChange={event => setUser(event.target.value)}
                     placeholder={w.userPlaceholder}
@@ -337,16 +321,6 @@ export function WslWorkspaceWizard() {
                 )}
               </>
             )}
-          </div>
-        )}
-
-        {step === 'connecting' && (
-          <div className="flex flex-col items-center gap-3 py-6">
-            <Codicon className="text-(--ui-text-secondary)" name="loading" size="1.25rem" spinning />
-            <div className="text-[0.75rem] text-(--ui-text-tertiary)">{w.connectingDesc}</div>
-            <Button disabled={!connecting} onClick={cancelConnect} size="sm" type="button" variant="ghost">
-              {t.common.cancel}
-            </Button>
           </div>
         )}
 
@@ -434,9 +408,12 @@ export function WslWorkspaceWizard() {
 
         <DialogFooter>
           <Button
-            disabled={connecting}
             onClick={() => {
-              if (step === 'connecting') {
+              // Connecting: the primary action becomes the cancel — the only
+              // honest way out of an in-flight connect.
+              if (connecting) {
+                cancelConnect()
+
                 return
               }
 
@@ -453,7 +430,13 @@ export function WslWorkspaceWizard() {
             type="button"
             variant="ghost"
           >
-            {step === 'browse' ? t.common.back : step === 'config' ? t.common.cancel : t.common.close}
+            {connecting
+              ? t.common.cancel
+              : step === 'browse'
+                ? t.common.back
+                : step === 'config' && connectionId
+                  ? t.common.close
+                  : t.common.cancel}
           </Button>
 
           {step === 'config' && (
@@ -462,7 +445,14 @@ export function WslWorkspaceWizard() {
               onClick={() => void startConnect()}
               type="button"
             >
-              {t.common.connect}
+              {connecting ? (
+                <>
+                  <Codicon className="shrink-0" name="loading" size="0.75rem" spinning />
+                  {w.connectingDesc}
+                </>
+              ) : (
+                t.common.connect
+              )}
             </Button>
           )}
 

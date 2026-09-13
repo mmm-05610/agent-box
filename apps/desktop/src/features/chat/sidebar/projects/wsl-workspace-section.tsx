@@ -1,15 +1,31 @@
 import { useStore } from '@nanostores/react'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 
-import { reconnectWslWorkspaceProjection, refreshWslWorkspaces } from '@/application/workspace/wsl-workspace-usecases'
+import { reconnectWslWorkspaceProjection, refreshWslWorkspaces, removeWslWorkspaceProjection, renameWslWorkspaceProjection } from '@/application/workspace/wsl-workspace-usecases'
 import { Pill } from '@/components/settings/primitives'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from '@/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu'
+import { Input } from '@/components/ui/input'
 import { Tip } from '@/components/ui/tooltip'
 import { wslFailureText } from '@/features/workspace/wsl-failure-text'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
-import { notify } from '@/store/notifications'
+import { notify, notifyError } from '@/store/notifications'
 import { $wslWorkspaceInfoId, $wslWorkspaces, $wslWorkspaceValidation, openWslWorkspaceInfo } from '@/store/wsl-workspace'
 import type { WslWorkspaceValidationState } from '@/store/wsl-workspace'
 
@@ -32,11 +48,12 @@ function statusPill(t: ReturnType<typeof useI18n>['t'], state: WslWorkspaceValid
 }
 
 /**
- * The sidebar's remote-project projection (work order 35): one row per WSL
- * Workspace saved in the Electron host, peer to the local project rows. A row
- * shows the name, the WSL badge, the distribution and the (re)validation
- * status — never a fake online state. Its entries: connection info (this
- * workspace's private connection) and reconnect (re-verify).
+ * The sidebar's remote-workspace row (work order 35, extended by 36): one row
+ * per WSL Workspace saved in the Electron host, peer to the local project rows.
+ * A row shows the name first, then the distribution/path line and the WSL badge
+ * — never a fake online state. Its entries: connection info (this workspace's
+ * private connection), reconnect (re-verify), and the round-36 row menu
+ * (rename / remove — record-only surgery: files, sessions and history stay).
  */
 export function WslWorkspaceSection({ className }: { className?: string }) {
   const { t } = useI18n()
@@ -44,6 +61,10 @@ export function WslWorkspaceSection({ className }: { className?: string }) {
   const workspaces = useStore($wslWorkspaces)
   const validation = useStore($wslWorkspaceValidation)
   const infoId = useStore($wslWorkspaceInfoId)
+  // One rename dialog + one remove confirm for the whole section, aimed at the
+  // row whose menu action fired.
+  const [renameTarget, setRenameTarget] = useState<null | { id: string; name: string }>(null)
+  const [removeTarget, setRemoveTarget] = useState<null | { id: string; name: string }>(null)
 
   // The projection is a cache of the host's store: refresh on mount so a
   // reopen shows the saved rows, each starting as "not verified". A failed
@@ -137,11 +158,140 @@ export function WslWorkspaceSection({ className }: { className?: string }) {
                     <Codicon name="info" size="0.75rem" />
                   </Button>
                 </Tip>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      aria-label={w.connectionInfo}
+                      className="text-(--ui-text-quaternary) opacity-0 transition-opacity hover:bg-(--ui-control-hover-background) hover:text-foreground group-hover/remote-row:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100"
+                      size="icon-xs"
+                      variant="ghost"
+                    >
+                      <Codicon name="kebab-vertical" size="0.75rem" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48" sideOffset={6}>
+                    <DropdownMenuItem onSelect={() => setRenameTarget({ id: workspace.id, name: workspace.name })}>
+                      <Codicon name="edit" size="0.875rem" />
+                      <span>{w.menuRename}</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive"
+                      onSelect={() => setRemoveTarget({ id: workspace.id, name: workspace.name })}
+                    >
+                      <Codicon name="trash" size="0.875rem" />
+                      <span>{w.menuRemove}</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onSelect={() => openWslWorkspaceInfo(workspace.id)}>
+                      <Codicon name="info" size="0.875rem" />
+                      <span>{w.connectionInfo}</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
           )
         })}
       </div>
+
+      {renameTarget && (
+        <WslWorkspaceRenameDialog
+          name={renameTarget.name}
+          onClose={() => setRenameTarget(null)}
+          workspaceId={renameTarget.id}
+        />
+      )}
+
+      <ConfirmDialog
+        confirmLabel={w.menuRemove}
+        description={w.removeDesc}
+        destructive
+        onClose={() => setRemoveTarget(null)}
+        onConfirm={async () => {
+          if (!removeTarget) {
+            return
+          }
+
+          const outcome = await removeWslWorkspaceProjection(removeTarget.id)
+
+          if (!outcome.ok) {
+            notifyError(outcome, w.removeFailed)
+          }
+        }}
+        open={removeTarget !== null}
+        title={w.removeTitle(removeTarget?.name ?? '')}
+      />
     </div>
+  )
+}
+
+// Record-only rename: the host persists the new display name; the projection
+// updates from its answer. A typed failure surfaces as a toast and keeps the
+// dialog open for retry.
+function WslWorkspaceRenameDialog({
+  name,
+  onClose,
+  workspaceId
+}: {
+  name: string
+  onClose: () => void
+  workspaceId: string
+}) {
+  const { t } = useI18n()
+  const w = t.wslWorkspace
+  const [value, setValue] = useState(name)
+  const [busy, setBusy] = useState(false)
+  const trimmed = value.trim()
+
+  const submit = async () => {
+    if (busy || !trimmed || trimmed === name) {
+      onClose()
+
+      return
+    }
+
+    setBusy(true)
+
+    const outcome = await renameWslWorkspaceProjection(workspaceId, trimmed)
+
+    setBusy(false)
+
+    if (!outcome.ok) {
+      notifyError(outcome, w.renameFailed)
+
+      return
+    }
+
+    onClose()
+  }
+
+  return (
+    <Dialog onOpenChange={next => !next && !busy && onClose()} open>
+      <DialogContent className="max-w-sm" onInteractOutside={event => event.preventDefault()}>
+        <DialogHeader>
+          <DialogTitle>{w.renameTitle(name)}</DialogTitle>
+        </DialogHeader>
+        <Input
+          autoFocus
+          disabled={busy}
+          onChange={event => setValue(event.target.value)}
+          onKeyDown={event => {
+            if (event.key === 'Enter') {
+              event.preventDefault()
+              void submit()
+            }
+          }}
+          value={value}
+        />
+        <DialogFooter>
+          <Button disabled={busy} onClick={onClose} type="button" variant="ghost">
+            {t.common.cancel}
+          </Button>
+          <Button disabled={busy || !trimmed} onClick={() => void submit()} type="button">
+            {busy ? t.common.saving : t.common.save}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

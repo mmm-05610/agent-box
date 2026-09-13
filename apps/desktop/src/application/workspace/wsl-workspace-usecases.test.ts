@@ -6,11 +6,15 @@ import type { WslFailure } from '@/types/workspace'
 const saveWslWorkspace = vi.fn()
 const listWslWorkspaces = vi.fn()
 const reconnectWslWorkspace = vi.fn()
+const renameWslWorkspace = vi.fn()
+const removeWslWorkspace = vi.fn()
 
 vi.mock('@/api/workspace', () => ({
   saveWslWorkspace: (...args: unknown[]) => saveWslWorkspace(...args),
   listWslWorkspaces: (...args: unknown[]) => listWslWorkspaces(...args),
   reconnectWslWorkspace: (...args: unknown[]) => reconnectWslWorkspace(...args),
+  renameWslWorkspace: (...args: unknown[]) => renameWslWorkspace(...args),
+  removeWslWorkspace: (...args: unknown[]) => removeWslWorkspace(...args),
   releaseWslConnection: vi.fn(async () => ({ ok: true as const, released: true })),
   connectWsl: vi.fn(),
   listWslDirectories: vi.fn(),
@@ -23,6 +27,8 @@ import { $wslWorkspaces, $wslWorkspaceValidation, setWslWorkspaces } from '@/sto
 import {
   reconnectWslWorkspaceProjection,
   refreshWslWorkspaces,
+  removeWslWorkspaceProjection,
+  renameWslWorkspaceProjection,
   resetWslValidationsOnStartup,
   saveWslWorkspaceFromWizard
 } from './wsl-workspace-usecases'
@@ -146,5 +152,63 @@ describe('resetWslValidationsOnStartup', () => {
 
     expect($wslWorkspaceValidation.get()['wsl_ws_1']).toEqual({ status: 'unverified' })
     expect($wslWorkspaceValidation.get()['wsl_ws_2']?.status).toBe('failed')
+  })
+})
+
+describe('renameWslWorkspaceProjection', () => {
+  it('updates the projected record only from the host answer', async () => {
+    setWslWorkspaces([record()])
+    renameWslWorkspace.mockResolvedValue({ ok: true, workspace: record({ name: '新名字', updatedAt: 2 }) })
+
+    const outcome = await renameWslWorkspaceProjection('wsl_ws_1', '新名字')
+
+    expect(outcome.ok).toBe(true)
+    expect(renameWslWorkspace).toHaveBeenCalledWith({ workspaceId: 'wsl_ws_1', name: '新名字' })
+    expect($wslWorkspaces.get()[0]).toMatchObject({ id: 'wsl_ws_1', name: '新名字' })
+  })
+
+  it('a failed rename leaves the projection untouched', async () => {
+    setWslWorkspaces([record()])
+    renameWslWorkspace.mockResolvedValue(failure('WSL_NOT_FOUND'))
+
+    const outcome = await renameWslWorkspaceProjection('wsl_ws_1', 'X')
+
+    expect(outcome.ok).toBe(false)
+    expect($wslWorkspaces.get()[0]?.name).toBe('proj')
+  })
+})
+
+describe('removeWslWorkspaceProjection', () => {
+  it('drops the row and its validation state once the host removed it', async () => {
+    setWslWorkspaces([record(), record({ id: 'wsl_ws_2', rootPath: '/srv/b' })])
+    $wslWorkspaceValidation.set({ wsl_ws_1: { status: 'validated', actualUser: 'u', userChanged: false, verifiedAt: 1 } })
+    removeWslWorkspace.mockResolvedValue({ ok: true, removed: true })
+
+    const outcome = await removeWslWorkspaceProjection('wsl_ws_1')
+
+    expect(outcome.ok && outcome.removed).toBe(true)
+    expect($wslWorkspaces.get().map(w => w.id)).toEqual(['wsl_ws_2'])
+    expect($wslWorkspaceValidation.get()['wsl_ws_1']).toBeUndefined()
+    expect($wslWorkspaceValidation.get()['wsl_ws_2']).toBeUndefined()
+  })
+
+  it('an already-removed id still clears a stale local row (idempotent remove)', async () => {
+    setWslWorkspaces([record()])
+    removeWslWorkspace.mockResolvedValue({ ok: true, removed: false })
+
+    const outcome = await removeWslWorkspaceProjection('wsl_ws_1')
+
+    expect(outcome.ok && outcome.removed).toBe(false)
+    expect($wslWorkspaces.get()).toEqual([])
+  })
+
+  it('a failed remove keeps the row so the user can retry', async () => {
+    setWslWorkspaces([record()])
+    removeWslWorkspace.mockResolvedValue(failure('WSL_SAVE_FAILED'))
+
+    const outcome = await removeWslWorkspaceProjection('wsl_ws_1')
+
+    expect(outcome.ok).toBe(false)
+    expect($wslWorkspaces.get().map(w => w.id)).toEqual(['wsl_ws_1'])
   })
 })

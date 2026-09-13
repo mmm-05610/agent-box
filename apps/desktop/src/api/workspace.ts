@@ -14,6 +14,8 @@ import type {
   WslFailure,
   WslListDirectoriesRequest,
   WslReconnectResult,
+  WslRenameWorkspaceRequest,
+  WslRenameWorkspaceResult,
   WslSaveWorkspaceRequest,
   WslSaveWorkspaceResult,
   WslWorkspacesResult
@@ -47,6 +49,16 @@ export function saveWslWorkspace(request: WslSaveWorkspaceRequest): Promise<WslS
 
 export function listWslWorkspaces(): Promise<WslWorkspacesResult | WslFailure> {
   return bridge().listWorkspaces()
+}
+
+export function renameWslWorkspace(
+  request: WslRenameWorkspaceRequest
+): Promise<WslRenameWorkspaceResult | WslFailure> {
+  return bridge().renameWorkspace(request)
+}
+
+export function removeWslWorkspace(workspaceId: string): Promise<{ ok: true; removed: boolean } | WslFailure> {
+  return bridge().removeWorkspace({ workspaceId })
 }
 
 export function reconnectWslWorkspace(workspaceId: string): Promise<WslReconnectResult> {

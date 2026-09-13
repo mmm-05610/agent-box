@@ -121,6 +121,17 @@ export interface WslWorkspacesResult {
   workspaces: WslWorkspaceRecord[]
 }
 
+export interface WslRenameWorkspaceRequest {
+  workspaceId: string
+  /** Trimmed by the host; empty/absent is a typed failure, never a silent keep. */
+  name: string
+}
+
+export type WslRenameWorkspaceResult = {
+  ok: true
+  workspace: WslWorkspaceRecord
+}
+
 export type WslReconnectResult =
   | {
       ok: true

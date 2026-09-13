@@ -17,9 +17,12 @@ import {
   listWslWorkspaces,
   reconnectWslWorkspace,
   releaseWslConnection,
+  removeWslWorkspace,
+  renameWslWorkspace,
   saveWslWorkspace
 } from '@/api/workspace'
 import {
+  $wslWorkspaces,
   $wslWorkspaceValidation,
   setWslWorkspaces,
   setWslWorkspaceValidation,
@@ -136,4 +139,46 @@ export function resetWslValidationsOnStartup(): void {
   }
 
   $wslWorkspaceValidation.set(next)
+}
+
+export type WslRenameOutcome = { ok: true; workspace: WslWorkspaceRecord } | WslFailure
+
+/** Rename a workspace's sidebar record. The projection is updated only from
+ *  the host's answer — the renderer never invents a record. */
+export async function renameWslWorkspaceProjection(workspaceId: string, name: string): Promise<WslRenameOutcome> {
+  const result = await renameWslWorkspace({ name, workspaceId })
+
+  if (!result.ok) {
+    return result
+  }
+
+  upsertWslWorkspace(result.workspace)
+
+  return { ok: true, workspace: result.workspace }
+}
+
+export type WslRemoveOutcome = { ok: true; removed: boolean } | WslFailure
+
+/**
+ * Remove a workspace's sidebar record. The row leaves the projection only on
+ * the host's answer; a `removed: false` (already gone) still clears a stale
+ * local row. Files, sessions, history and the distribution are untouched —
+ * the record was the only thing removed.
+ */
+export async function removeWslWorkspaceProjection(workspaceId: string): Promise<WslRemoveOutcome> {
+  const result = await removeWslWorkspace(workspaceId)
+
+  if (!result.ok) {
+    return result
+  }
+
+  const remaining = $wslWorkspaces.get().filter(w => w.id !== workspaceId)
+
+  setWslWorkspaces(remaining)
+
+  const { [workspaceId]: _removed, ...validation } = $wslWorkspaceValidation.get()
+
+  $wslWorkspaceValidation.set(validation)
+
+  return { ok: true, removed: result.removed }
 }

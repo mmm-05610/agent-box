@@ -19,6 +19,8 @@ import type {
   WslFailure,
   WslListDirectoriesRequest,
   WslReconnectResult,
+  WslRenameWorkspaceRequest,
+  WslRenameWorkspaceResult,
   WslSaveWorkspaceRequest,
   WslSaveWorkspaceResult,
   WslWorkspacesResult
@@ -217,6 +219,8 @@ declare global {
         listDirectories: (request: WslListDirectoriesRequest) => Promise<WslDirectoryListing | WslFailure>
         saveWorkspace: (request: WslSaveWorkspaceRequest) => Promise<WslSaveWorkspaceResult | WslFailure>
         listWorkspaces: () => Promise<WslWorkspacesResult | WslFailure>
+        renameWorkspace: (request: WslRenameWorkspaceRequest) => Promise<WslRenameWorkspaceResult | WslFailure>
+        removeWorkspace: (request: { workspaceId: string }) => Promise<{ ok: true; removed: boolean } | WslFailure>
         reconnectWorkspace: (request: { workspaceId: string }) => Promise<WslReconnectResult>
         releaseConnection: (request: { connectionId: string }) => Promise<{ ok: true; released: boolean }>
         cancelOperation: (request: { operationId: string }) => Promise<{ ok: true; cancelled: boolean }>
