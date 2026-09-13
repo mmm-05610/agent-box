@@ -139,3 +139,119 @@ reference and did not consume a third deep-candidate slot.
 - **Eliminated:** `twaldin/harness` for the live-backend gaps recorded above.
 - **Lower component:** Codex ACP is included only inside the Harness Remote
   recommendation and remains insufficient as a multi-Harness project alone.
+
+# Round-two candidate screen
+
+## Why the first conclusion was reopened
+
+The first screen compared the four candidates named in the work order and found
+no qualified backup within that set. The phrase “no fully qualified backup” in
+the first Stage C decision is therefore limited to those reviewed candidates.
+It never established an ecosystem-wide `NO_FIT`. The second screen uses the
+broader discovery record in [search-coverage.md](search-coverage.md) and applies
+the same fixed-source, native-fidelity, thin-glue, ownership, and license rules.
+
+## Same-standard comparison before experiments
+
+| Candidate | Existing multi-Harness implementation | Native fidelity and Codex path | Reuse closure / ownership | Round-two Stage A result |
+| --- | --- | --- | --- | --- |
+| Harness Remote `v3.0.2` | ACP profiles for Codex/Claude/Pi/OMP plus native OpenCode HTTP/SSE | Codex delegates to fixed Codex ACP app-server; OMP actions and per-Harness native journals remain distinct | Smallest reviewed source slice, but must remove `npx`, isolate environment/home, exclude its task stores, and carry one approval callback patch | Retained first-screen benchmark and provisional leader; no new test in this round |
+| Paseo `d1b705a` | Provider registry contains Codex app-server, OpenCode, Claude, Pi, OMP, and generic ACP implementations | Rich approvals, questions, reasoning, diffs, subagents, compaction, and native resume | Providers depend on Paseo AgentSession/timeline/workspace/process/history types; provider tree is about 105k lines | Source reference; do not experiment because extraction is not thin |
+| LinkCode `22c337f` | Common `AgentAdapter` for Codex, Pi, OpenCode, Claude, and Grok | Real Codex app-server and native SDK/server paths; structured approvals/questions and adapter-specific options | About 55k relevant lines plus private workspace packages and daemon assumptions; BUSL-1.1 additional-use grant is a release blocker for the contemplated hosted/embedded use | Eliminate from production recommendation pending explicit license acceptance; no experiment |
+| AgentPool `b6ddbea` | Codex, Claude, and ACP backends inside a large Python agent framework | Codex app-server exists, but approval denial maps to allow; EOF/cancel/finish-reason paths lose fidelity | 20k+ line lower-bound closure, 389 locked packages, storage/jobs/process control plane, import and real-home side effects | **NO_FIT** at fixed source |
+| Mjolnir `3ec9163` | Rust ACP worker selects Codex, Claude, Kimi, Grok, DeepSeek, and Muse Harnesses | Real ACP streaming, approval, resume and branded branches | Published crates still pull relay/goal/memory/review/checkpoint/SQLite semantics; GPL-3.0-only | Source reference; extraction is a major separation and license acceptance is unresolved |
+| `acp-adapter v0.3.8` | Three aligned, embedded Go runtimes: Codex, Claude, Pi | Codex app-server; Pi RPC; Claude stream-json; fake fixtures cover native identity, stream, approval, cancel and errors | About 17.3k Go lines, no third-party Go module dependencies, and no product database/scheduler. Still needs an AgentBox ACP/Go boundary and host-injected native homes | **Stage B entrant 1** |
+| `acpx ffbefbb` | Embeddable ACP runtime accepting any injected fixed adapter registry | Strong common session/event/permission/cancel contract; Codex is only indirect through a separately fixed Codex ACP artifact; arbitrary metadata is allowlisted/reduced | About 10.5k runtime/ACP TypeScript lines; store, env, registry, and process lifecycle are injectable. Default registry uses ranges and `npx -y` and must be excluded | **Stage B entrant 2** |
+| CodexHost `38903be` | Excellent plugin interface and native Pi/OpenCode/Claude/OMP adapters | Codex app-server is the reserved official Desktop host, not a plugin adapter | Extracting Codex requires the host runtime, thread persistence, approvals/account/remote logic, renderer protocol and Rust shim; four other adapters plus generic runtime exceed 3.1 MB source | Eliminate as a complete candidate; retain contract/reference value |
+| Agent API `v0.12.2` | Broad CLI facade plus experimental ACP | Most named CLIs use terminal screen parsing; ACP auto-allows permission and returns empty file/terminal success | No faithful native multi-Harness lifecycle closure | Eliminate |
+| Agent Mux `4a27d5` | Go registry and adapters for several named CLIs | Codex hard-codes `codex exec --json`/`exec resume`; common events drop native capabilities | Small enough to inspect, but the required lifecycle is absent rather than merely needing glue | Eliminate |
+
+## Round-two source paths behind the decisions
+
+### Paseo
+
+`packages/server/src/server/agent/provider-registry.ts` registers the actual
+provider set. `packages/plugin/src/server/provider.ts` defines the provider
+registration/connection lifecycle, while
+`packages/plugin/src/server/acp-internal/connection.ts` implements ACP process,
+session, prompt, permission, interrupt, configuration, archive, and close.
+Codex in `codex-app-server-agent.ts` and `codex/app-server-transport.ts` starts
+`codex app-server`, resumes threads, starts/interrupts turns, routes approvals,
+and maps streaming reasoning/diff/error events. `opencode-agent.ts` uses the
+native SDK/server and retains permission/question, subagent, compaction, todo,
+image and error paths. These are real adapters, but they import Paseo session,
+timeline, workspace-git, managed-process, MCP and history types throughout.
+
+### LinkCode
+
+`packages/host/agent-adapter/src/registry.ts::createAdapter` registers five
+native backends. `adapter.ts` and `base.ts` define the common live lifecycle.
+`native/codex/app-server.ts` starts app-server; `native/codex/adapter.ts` owns
+thread start/resume, turn start/interrupt, item notifications, command/file
+approvals, model/effort and diffs. OpenCode uses its server/SDK/SSE permission
+and question APIs; Pi and Claude use native SDKs. The implementation meets the
+technical fidelity test, but the private workspace closure and BUSL-1.1 terms
+make it unsuitable for the current recommendation.
+
+### AgentPool
+
+`src/agentpool/agents/{codex_agent,claude_code_agent,acp_agent}` contain genuine
+integrations. The hard failures are source-visible: Codex maps `skip` and abort
+outcomes to allow; its wrapper drops configured environment/binary/profile;
+`codexed.Dispatch` leaves requests pending at EOF; cancel failures are swallowed;
+and Claude constructs/scans its default `~/.claude` storage even when logging is
+disabled. Importing the package also calls dotenv/global registration, while
+registry preparation may fetch mutable `latest`, run `npx -y`/`uvx`, or write a
+binary under the user home. Fixing all of these plus separating AgentPool's
+storage, jobs, process and todo managers is a continuing fork.
+
+### `acp-adapter`
+
+`pkg/{codexacp,claudeacp,piacp}` each export `RunStdio` and
+`NewEmbeddedRuntime`; their embedded runtimes use an in-process transport and
+expose requests, subscriptions and permission responses. `internal/codex`
+implements the app-server supervisor, thread/turn lifecycle, approval registry,
+event coalescing and errors. `internal/pi` owns Pi RPC session state, tools,
+permissions, commands and cancellation. `internal/claude` drives the
+machine-readable `claude -p --output-format stream-json` path. This is a real
+library boundary, but Windows installer support is absent, WSL is unverified,
+and the host must inject all native state roots and bridge ACP into the Worker.
+
+### `acpx`
+
+`package.json` exports `./runtime`. `src/runtime.ts::createAcpRuntime`,
+`src/runtime/public/contract.ts`, and `src/runtime/engine/manager.ts` separate
+live events from terminal results and inject `AcpAgentRegistry`,
+`AcpSessionStore`, child-only environment, permission policy and process
+lifecycle. `src/acp/client.ts` implements initialize/new/load/resume/prompt,
+steer, cancel, permission, client filesystem/terminal, models, config, plans,
+commands and child-exit failure. `src/agent-registry.ts` is unacceptable in its
+default production form because it contains ranges and dynamic `npx`; the
+experiment must use only an injected absolute command. Codex app-server remains
+a property of the separately supplied adapter, not of `acpx` itself.
+
+### CodexHost
+
+`packages/harness-adapter/src/{text-session,plugin}.ts` and
+`packages/host-runtime/src/harness-plugin-loader.ts` form a strong factory and
+manifest boundary. Pi, OpenCode, Claude and OMP each have native adapter
+packages. However, `packages/shared-contracts/src/harness-plugins.ts` reserves
+`codex`, and Codex lives in `host-runtime/src/app-server-host.ts`,
+`official-app-server-connection.ts`, Desktop persistence/account control and a
+Rust shim. There is no Codex plugin factory to extract alongside the others.
+
+## Stage B entrants and limits
+
+Only `acp-adapter` and `acpx` advance from the new screen. The former is tested
+only through its own fake fixtures and only if an isolated Go 1.24 toolchain is
+available. The latter may be built with its fixed lock under an isolated home
+and exercised against its candidate-owned fake ACP peer with an injected
+registry/store/environment. Neither experiment may use default registry
+resolution, a native Harness, a provider, a login, or credentials.
+
+A Stage B pass establishes only the behaviors actually observed. A candidate
+cannot become a full backup unless two different Harness-specific capability
+paths, Codex app-server, identity/resume, pre-terminal events, approvals,
+cancel/disconnect distinction, isolation, and cleanup all have fixed-artifact
+evidence. Missing toolchains and absent lower adapters remain unknowns rather
+than inferred passes.

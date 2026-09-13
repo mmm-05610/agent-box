@@ -1,29 +1,29 @@
 # Work Order 38 — Harness extension selection
 
-Work Order 38 is **ready for user decision**. The conditional recommendation is
-to approve a minimal extraction spike based on `giuliastro/harness-remote` at
-tag `v3.0.2`, commit
-`21ce6db49af708c4c7c3f96ef6a50f62dced8dab`.
+Work Order 38 is **researching a second, broader candidate screen**. The first
+screen conditionally recommended `giuliastro/harness-remote` tag `v3.0.2`,
+commit `21ce6db49af708c4c7c3f96ef6a50f62dced8dab`, for a minimal extraction
+spike. That conclusion covered the candidates reviewed in the first screen; it
+was not an ecosystem-wide finding.
 
-There is no fully qualified backup. `agent-controller` has useful isolated
-runtime packages, but its Codex implementation uses `codex exec`; replacing it
-with app-server would require a new lifecycle translator. `twaldin/harness` has
-no Codex or Hermes live backend. `codex-acp` is a verified Codex-only lower
-component inside the recommendation and is not itself the multi-Harness answer.
+The broader screen source-locked Paseo, LinkCode, AgentPool, Mjolnir,
+CodexHost, `acp-adapter`, `acpx`, Agent API, and Agent Mux, then recorded
+lighter eliminations for projects that expose terminals, assets, registries, or
+new control planes instead of a reusable native lifecycle boundary. Two new
+candidates enter bounded Stage B work: `beyond5959/acp-adapter` and
+`openclaw/acpx`. The final recommendation remains open until their evidence is
+integrated under the same reuse, fidelity, ownership, and license standard.
 
-The recommendation is conditional on a fixed Apache-2.0 source snapshot,
-offline adapter locks, Worker-owned isolation/process cleanup, Windows-owned
-product state, and one narrow asynchronous permission-resolver patch. If these
-conditions are rejected or the implementation requires rewriting candidate
-lifecycle, translation, or registration, the result becomes `NO_FIT` rather
-than a self-written replacement.
-
-No provider request, model invocation, login, or credential read was used.
-Candidate-owned tests and the committed experiments use fake peers to prove
-adapter seams; they do not claim real Harness conformance.
+The first-screen Harness Remote recommendation is still conditional on a fixed
+Apache-2.0 source snapshot, offline adapter locks, Worker-owned
+isolation/process cleanup, Windows-owned product state, and one narrow
+asynchronous permission-resolver patch. Work Order 38 still does not authorize
+production code, a Harness Remote extraction, provider calls, model invocations,
+login, or credential reads.
 
 Evidence:
 
-- [Recommendation and reuse boundary](boundary.md)
+- [Search coverage](search-coverage.md)
 - [Candidate comparison](candidates.md)
+- [Recommendation and reuse boundary](boundary.md)
 - [Behavior verification](verification.md)
