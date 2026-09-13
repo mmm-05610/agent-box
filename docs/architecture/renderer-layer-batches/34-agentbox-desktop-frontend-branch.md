@@ -1,15 +1,13 @@
 # Batch 34 — AgentBox Desktop frontend branch
 
-**Baseline:** the renderer layer ledger is `0`; Batch 30 and 31 are merged and reviewed.
-Batch 32 (Shell host purity) and Batch 33 (neutral auxiliary windows) are the required
-predecessors. Product meaning is frozen by
+**Baseline:** the renderer layer ledger is `0`; Batches 30–33 are merged and reviewed.
+The product model is partly fixed by
 [`app-product-semantics.md`](../app-product-semantics.md) and
 [`session-multi-surface-ownership.md`](../session-multi-surface-ownership.md).
 
-> **Order:** this is a branch programme, not a direct-main migration. Start only after
-> Batches 32 and 33 are merged and independently reviewed. Create its dedicated branch
-> and worktree from that exact clean `main` commit; all implementation checkpoints land
-> there until a separate product review authorizes any merge.
+> **DESIGN HOLD (2026-09-13): do not execute this work order.** The owner paused the
+> branch before implementation. Finish the remaining UI semantic audit and approve the
+> frontend ↔ Work Core protocol first. Only a later explicit ruling may remove this hold.
 
 ## Objective
 

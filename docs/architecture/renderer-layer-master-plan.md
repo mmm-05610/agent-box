@@ -232,12 +232,11 @@ ownership, backend Ref concepts and direct Hermes bridge access from their UI bo
 The Work Core multi-consumer ownership decision is recorded separately; this batch does
 not invent its eventual wire protocol.
 
-Batch 34 is now an isolated experiment-branch programme. It starts only after 32/33's
-reviewed merges, and turns the accepted product semantics into an AgentBox Desktop
-frontend while keeping `main` unchanged. It replaces the former vocabulary-only
-placeholder: vocabulary changes remain compatibility-aware and occur only after each
-surface has reached its semantic destination. The branch proposes a frontend Work Core
-Port but does not claim an AgentBox backend integration.
+Batch 34 is an isolated experiment-branch programme, currently under a **design hold**.
+Batches 32/33 are merged, but the remaining UI content semantics and the frontend ↔
+Work Core protocol must be reviewed before execution. A later approved revision will
+turn the Port proposal into a self-contained contract. Until then no branch is created
+and no executor is authorized to infer the missing protocol.
 
 The product-language source for that classification is
 [`app-product-semantics.md`](app-product-semantics.md). Route/sidebar/command/menu/
