@@ -5,23 +5,25 @@
 
 ## 执行快照（handoff-policy 每阶段必填）
 
-- updated_at: 2026-09-14 01:40 (+08:00)
+- updated_at: 2026-09-14 02:00 (+08:00)
 - 执行者: 前端产品 goal（本会话，desktop-product 队列唯一写入者）
 - 工作树/分支: /home/maoqh/projects/agent-box-desktop-next-wsl-round1 @ feature/agentbox-desktop-product
 - 代码检查点: ebb1233（P00）→ 8d4b3df / 47b5b47 / dbb902f（P01 代码与几何修复）→
-  文档 2e8a1c7（61c7ff7 导入）→ 8cf78db（P07 检查点1）→ P01 证据收尾提交见 git log
-- 已消费发布文档提交: 86d5a7b（P00–P06 全套）、61c7ff7（P07+handoff-policy+core-semantics/1）
-- 当前阶段: P01_GREEN（真机 allOk=true）；P07 检查点1完成；下一项 P07 检查点2
-  （wire-v1）+ P02 上层产品，串行穿插
-- 完成范围: P00；P01 全部返修（唯一选择协调、名称宽度结构修复、驱动双布局断言、
-  Windows 真机 27 PASS）；P07 检查点1（语义合入+逐节映射）
-- 下一项: P07 检查点 2 —— contracts/wire-v1/ 单一候选 schema（PROPOSED_WIRE）+
-  正反 fixture + 隔离合同测试；随后 P02A（app/shell 组合与服务可用性分离）
-- 阻断: 无（本地 Windows 真实打开 PENDING 属 36R 遗留边界，按 P01 转移 P05）
+  26b32fc（P01 GREEN 证据）→ 文档 468e6ac+d7e9a57（d3c0196+ffbcfaf 导入）→
+  P07 检查点2 提交见 git log
+- 已消费发布文档提交: 86d5a7b、61c7ff7、d3c0196（对齐后端42交接）、ffbcfaf（反馈通道+去早停）
+- 当前阶段: P07 检查点 2 完成（wire-v1 候选已编制+自测+工件导出）；下一项 =
+  P07 检查点 3（§9 正反 fixture+隔离合同测试）与 P02A 并行穿插
+- 完成范围: P00；P01 全部返修；P07 检查点 1、2
+- 下一项: P07 检查点 3；P02A（app/shell 组合与服务可用性分离）
+- 阻断: 无。后端 wire-review.md 尚未出现（无答复≠拒绝，按反馈通道规则继续）；
+  已发布候选供 39 阶段起核对
 
 - contract_semantics_version: core-semantics/1（APPROVED_SEMANTICS，2026-09-14）
-- wire_version/schema_digest: 尚无（P07 检查点 2 产出后登记 PROPOSED_WIRE 摘要）
-- 合同测试: 尚无（检查点 3）；覆盖缺口=core v1 §9 九组场景全部待建
+- wire_version/schema_digest: wire-v1 PROPOSED_WIRE；权威 sha256:8e20ccd3e0718214，
+  工件 sha256:cd80103b3effbc4e（contracts/wire-v1/README.md 登记）
+- 合同测试: 信封/方法注册/JSON Schema 投影 12 项通过（src/types/wire/wire-v1.test.ts）；
+  覆盖缺口=core v1 §9 九组场景的完整 fixture 矩阵（检查点 3）
 - UI_READY: 侧栏工作区列表（36R+P01）真机全绿；产品级 GREEN 未宣称
 - CONTRACT_CLIENT_READY: 否（wire 未编制/未锁定）
 - REAL_FLOW_VERIFIED: 否（无真实 Server/Harness 链路证据；本地打开 PENDING 转 P05）
