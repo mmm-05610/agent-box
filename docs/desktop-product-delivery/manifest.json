@@ -1,0 +1,164 @@
+{
+  "schema_version": 1,
+  "scope": "desktop-product-delivery",
+  "product_worktree": "/home/maoqh/projects/agent-box-desktop-next-wsl-round1",
+  "baseline": "39291df26b908806fd2c4ee22540d54886515978",
+  "branch": "feature/agentbox-desktop-product",
+  "desktop_writer": "new-session-only",
+  "windows_build_slots": 1,
+  "default_execution": "serial; capability-level progress may bypass waiting subitems",
+  "orders": [
+    {
+      "id": "P00",
+      "file": "work-orders/P00-handoff.md",
+      "depends_on": [],
+      "exclusive_group": "desktop-product",
+      "scope": [
+        "docs/desktop-product-delivery/**"
+      ],
+      "requires_approved_contract": false,
+      "all_require": [
+        "read applicable AGENTS/skills",
+        "preserve protected paths",
+        "record cross-layer edits in status"
+      ],
+      "may_edit_consumers_within_desktop": true
+    },
+    {
+      "id": "P01",
+      "file": "work-orders/P01-sidebar-repair.md",
+      "depends_on": [
+        "P00"
+      ],
+      "exclusive_group": "desktop-product",
+      "scope": [
+        "apps/desktop/src/features/chat/sidebar/**",
+        "apps/desktop/src/store/workspace-view*",
+        "apps/desktop/src/application/workspace/**",
+        "apps/desktop/src/store/projects/**",
+        "apps/desktop/e2e/**"
+      ],
+      "requires_approved_contract": false,
+      "all_require": [
+        "read applicable AGENTS/skills",
+        "preserve protected paths",
+        "record cross-layer edits in status"
+      ],
+      "may_edit_consumers_within_desktop": true
+    },
+    {
+      "id": "P02",
+      "file": "work-orders/P02-product-surfaces.md",
+      "depends_on": [
+        "P01"
+      ],
+      "exclusive_group": "desktop-product",
+      "scope": [
+        "apps/desktop/src/app/**",
+        "apps/desktop/src/features/**",
+        "apps/desktop/src/components/**",
+        "apps/desktop/src/i18n/**"
+      ],
+      "requires_approved_contract": false,
+      "all_require": [
+        "read applicable AGENTS/skills",
+        "preserve protected paths",
+        "record cross-layer edits in status"
+      ],
+      "may_edit_consumers_within_desktop": true
+    },
+    {
+      "id": "P03",
+      "file": "work-orders/P03-application-state-api.md",
+      "depends_on": [
+        "P02"
+      ],
+      "exclusive_group": "desktop-product",
+      "scope": [
+        "apps/desktop/src/application/**",
+        "apps/desktop/src/store/**",
+        "apps/desktop/src/api/**",
+        "apps/desktop/src/types/**",
+        "apps/desktop/src/lib/**"
+      ],
+      "requires_approved_contract": false,
+      "all_require": [
+        "read applicable AGENTS/skills",
+        "preserve protected paths",
+        "record cross-layer edits in status"
+      ],
+      "may_edit_consumers_within_desktop": true
+    },
+    {
+      "id": "P04",
+      "file": "work-orders/P04-host-retirement.md",
+      "depends_on": [
+        "P03"
+      ],
+      "exclusive_group": "desktop-product",
+      "scope": [
+        "apps/desktop/electron/**",
+        "apps/desktop/scripts/**",
+        "scripts/**"
+      ],
+      "requires_approved_contract": false,
+      "all_require": [
+        "read applicable AGENTS/skills",
+        "preserve protected paths",
+        "record cross-layer edits in status"
+      ],
+      "may_edit_consumers_within_desktop": true
+    },
+    {
+      "id": "P05",
+      "file": "work-orders/P05-contract-integration.md",
+      "depends_on": [
+        "P02"
+      ],
+      "exclusive_group": "desktop-product",
+      "scope": [
+        "apps/desktop/**",
+        "apps/shared/**",
+        "tests-js/**"
+      ],
+      "requires_approved_contract": true,
+      "all_require": [
+        "read applicable AGENTS/skills",
+        "preserve protected paths",
+        "record cross-layer edits in status"
+      ],
+      "may_edit_consumers_within_desktop": true
+    },
+    {
+      "id": "P06",
+      "file": "work-orders/P06-acceptance.md",
+      "depends_on": [
+        "P01",
+        "P02",
+        "P03",
+        "P04",
+        "P05"
+      ],
+      "exclusive_group": "desktop-product",
+      "scope": [
+        "apps/desktop/**",
+        "apps/shared/**",
+        "tests-js/**"
+      ],
+      "requires_approved_contract": false,
+      "all_require": [
+        "read applicable AGENTS/skills",
+        "preserve protected paths",
+        "record cross-layer edits in status"
+      ],
+      "may_edit_consumers_within_desktop": true
+    }
+  ],
+  "protected": [
+    "apps/desktop/src/agentbox/**",
+    "apps/desktop/src/plugins/agentbox-lab/**",
+    "docs/architecture/acp-desktop-phase1-design.md",
+    "docs/desktop-src-tree.md",
+    "all backend repositories and real user data"
+  ]
+}

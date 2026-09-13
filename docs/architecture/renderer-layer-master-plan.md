@@ -1,6 +1,18 @@
 # Renderer layer — master construction plan
 
-## Current owner override — Workspace sidebar repair (36R)
+## Current owner override — new Desktop product delivery session
+
+The owner has authorized a NEW replacement Desktop session using
+[the product delivery master plan](../desktop-product-delivery/master-plan.md).
+It takes over the clean 36R checkpoint `39291df` in the existing WSL-round1 worktree,
+on a new product branch, after confirming the previous Desktop writer has stopped.
+Only that new session consumes P00–P06; previous sessions must not auto-start them.
+36R remains PARTIAL historical evidence, not final product acceptance.
+This supersedes the Desktop-only scheduling restrictions below, not backend ownership.
+Backend research/implementation remains in its independent queue; no backend writes
+or harness-selection approval are granted here. Old automatic batch waves stay paused.
+
+## Previous owner override — Workspace sidebar repair (36R)
 
 36 at `250fb79` is **PARTIAL after maintainer review**, not accepted GREEN.
 The only executable Desktop increment is [36R](renderer-layer-batches/36R-workspace-structure-repair.md):
