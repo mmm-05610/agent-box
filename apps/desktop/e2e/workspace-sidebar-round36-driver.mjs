@@ -435,12 +435,24 @@ async function main() {
     return
   }
 
-  await headerAdd.click({ force: true })
-  await page.waitForTimeout(600)
-  await screenshot(page, 'add-menu')
+  // Radix menu open can lose a race with a cold first paint (run p01r5): the
+  // force-click landed before the trigger's listeners mounted and the menu
+  // never opened. Retry: Escape first so a stale open menu is re-opened
+  // rather than toggled shut.
+  let menuOpenFolder = 0
+  let menuOpenRemote = 0
 
-  const menuOpenFolder = await page.getByRole('menuitem', { name: /Open folder|打开文件夹/ }).count()
-  const menuOpenRemote = await page.getByRole('menuitem', { name: /Open remote folder|打开远程文件夹/ }).count()
+  for (let attempt = 0; attempt < 3 && (menuOpenFolder === 0 || menuOpenRemote === 0); attempt += 1) {
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(200)
+    await headerAdd.click({ force: true })
+    await page.waitForTimeout(700)
+    menuOpenFolder = await page.getByRole('menuitem', { name: /Open folder|打开文件夹/ }).count()
+    menuOpenRemote = await page.getByRole('menuitem', { name: /Open remote folder|打开远程文件夹/ }).count()
+  }
+
+  await page.waitForTimeout(200)
+  await screenshot(page, 'add-menu')
 
   record(
     'add menu entries',
@@ -650,7 +662,7 @@ async function main() {
     let copied = ''
 
     try {
-      await freshLocalRow.hover()
+      await freshLocalRow.hover({ position: { x: 12, y: 8 } })
       await page.waitForTimeout(300)
       await freshLocalRow.locator('div[data-row-actions] button').first().click()
       await page.getByRole('menuitem', { name: /Copy path|复制路径/ }).first().click({ timeout: 10000 })
@@ -835,9 +847,12 @@ async function main() {
       // click proves the reveal is really reachable)...
       const rowB = page.locator(`[data-wsl-workspace-row="${secondId}"]`)
 
-      await rowB.hover()
+      await rowB.hover({ position: { x: 12, y: 8 } })
       await page.waitForTimeout(300)
-      await rowB.locator('div[data-row-actions] button[aria-label]').nth(1).click()
+      // ...open row B's connection info via its dedicated button. Role+name,
+      // not positional: the row's disclosure caret also lives in the trailing
+      // column, so any index over that column's buttons is ambiguous.
+      await rowB.getByRole('button', { name: /Connection info|连接信息/ }).click()
       await page.getByRole('dialog').waitFor({ state: 'visible', timeout: 8000 })
       await page.waitForTimeout(500)
       await screenshot(page, 'info-open-on-b')
@@ -869,7 +884,7 @@ async function main() {
     // Hover the ROW: the actions overlay reveals on row hover; the overlay
     // column itself is zero-width while idle, so hovering it is impossible by
     // construction (that is the layout relation being enforced).
-    await removableRow.hover()
+    await removableRow.hover({ position: { x: 12, y: 8 } })
     await page.waitForTimeout(400)
     await removableRow.locator('div[data-row-actions]').getByRole('button').last().click()
     await page.waitForTimeout(600)
@@ -1011,22 +1026,24 @@ async function main() {
 
     const defaultMetrics = await measureRowName()
 
-    // Hidden actions occupy no width, the overlay is truly hidden while idle,
-    // and the name shows its FULL text at the default layout (the 36R defect
-    // was a 37px name against 81px of text at exactly this layout).
+    // Hidden actions occupy no flow width: the trailing column holds ONLY the
+    // fixed caret strip (≤24px), the overlay itself is out of flow (its width
+    // shows in overlayW, not in the column), the overlay is truly hidden
+    // while idle, and the name shows its FULL text at the default layout (the
+    // 36R defect was a 37px name against 81px of text at exactly this layout).
     const defaultOk =
       Boolean(defaultMetrics) &&
-      defaultMetrics.outerActionsW <= 2 &&
+      defaultMetrics.outerActionsW <= 24 &&
       defaultMetrics.overlayOpacity === '0' &&
       defaultMetrics.name + 2 >= defaultMetrics.nameScroll
     record(
       'WSL row keeps its name readable (default layout)',
       defaultOk ? 'PASS' : 'FAIL',
-      `name=${defaultMetrics?.name}px of "${defaultMetrics?.nameText}" (text needs ${defaultMetrics?.nameScroll}px, label=${defaultMetrics?.label}px, row=${defaultMetrics?.row}px); hidden actions column=${defaultMetrics?.outerActionsW}px (must be ≤2), overlay opacity=${defaultMetrics?.overlayOpacity} while idle`
+      `name=${defaultMetrics?.name}px of "${defaultMetrics?.nameText}" (text needs ${defaultMetrics?.nameScroll}px, label=${defaultMetrics?.label}px, row=${defaultMetrics?.row}px); trailing strip (caret only)=${defaultMetrics?.outerActionsW}px (must be ≤24), overlay width=${defaultMetrics?.overlayW}px out of flow, overlay opacity=${defaultMetrics?.overlayOpacity} while idle`
     )
 
     // Hover the row: the overlay fades IN over the label's tail…
-    await wslRow.hover()
+    await wslRow.hover({ position: { x: 12, y: 8 } })
     await page.waitForTimeout(400)
 
     const hoverMetrics = await measureRowName()
@@ -1055,8 +1072,8 @@ async function main() {
     )
 
     // Narrow layout: SAME assertions on the floor relations — the squeeze may
-    // truncate, but the name stays readable and hidden actions still hold no
-    // width.
+    // truncate, but the name stays readable, the trailing strip stays
+    // caret-only, and the overlay stays out of flow.
     const narrow = page.viewportSize()
 
     await page.setViewportSize({ width: Math.max(640, Math.floor((narrow?.width ?? 1200) * 0.55)), height: narrow?.height ?? 700 })
@@ -1071,12 +1088,12 @@ async function main() {
     const narrowOk =
       Boolean(narrowMetrics) &&
       narrowMetrics.name > 20 &&
-      narrowMetrics.outerActionsW <= 2 &&
+      narrowMetrics.outerActionsW <= 24 &&
       narrowMetrics.overlayOpacity === '0'
     record(
       'WSL row keeps its name readable (narrow layout)',
       narrowOk ? 'PASS' : 'FAIL',
-      `narrow: name=${narrowMetrics?.name}px of "${narrowMetrics?.nameText}" (text needs ${narrowMetrics?.nameScroll}px, row=${narrowMetrics?.row}px); hidden actions column=${narrowMetrics?.outerActionsW}px, overlay opacity=${narrowMetrics?.overlayOpacity}`
+      `narrow: name=${narrowMetrics?.name}px of "${narrowMetrics?.nameText}" (text needs ${narrowMetrics?.nameScroll}px, row=${narrowMetrics?.row}px); trailing strip (caret only)=${narrowMetrics?.outerActionsW}px (must be ≤24), overlay opacity=${narrowMetrics?.overlayOpacity}`
     )
 
     await page.setViewportSize({ width: narrow?.width ?? 1200, height: narrow?.height ?? 700 })
@@ -1166,9 +1183,12 @@ async function main() {
     // Connection info is the row's dedicated button (aria-label), never the
     // main row — opening it must not be how you switch workspace. Hover the
     // row to reveal the actions overlay, then click plainly.
-    await row2.hover()
+    // Connection info is the row's dedicated button (role+name), never the
+    // main row — opening it must not be how you switch workspace. Hover the
+    // row header to reveal the actions overlay, then click plainly.
+    await row2.hover({ position: { x: 12, y: 8 } })
     await page2.waitForTimeout(300)
-    await row2.locator('div[data-row-actions] button[aria-label]').nth(1).click()
+    await row2.getByRole('button', { name: /Connection info|连接信息/ }).click()
     const dialog = page2.getByRole('dialog')
 
     await dialog.waitFor({ state: 'visible', timeout: 8000 })
@@ -1219,7 +1239,7 @@ async function rowMenuFor(page, rowId) {
   const row = page.locator(`[data-wsl-workspace-row="${rowId}"]`)
   const actions = row.locator('div[data-row-actions]')
 
-  await row.hover()
+  await row.hover({ position: { x: 12, y: 8 } })
   await page.waitForTimeout(400)
   await actions.getByRole('button').last().click()
 }

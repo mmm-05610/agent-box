@@ -516,3 +516,30 @@ SKIP 2 / PENDING 1）中，统一工作区列表、同列表内主行选中与�
 "第 1 项缺陷"（WSL 行名称）已按维护者口径修复（`a061995`）并在修复后复跑中翻正，
 交付状态以上一节"## 交付状态（36R，修复后复跑）"为准；本行原文保留以对应修复前的待决
 事项。
+
+---
+
+## P01（产品队列返修轮）— 唯一选择协调 + 名称宽度 + 驱动断言修复
+
+2026-09-14，分支 `feature/agentbox-desktop-product`（工作树同上）。代码检查点：
+`8d4b3df` → `47b5b47` → `dbb902f`。36R 遗留三项（名称 37px/所需 81px、两套选择、
+窄窗断言无效）全部返修：
+
+1. **唯一选择**：本地行与 WSL 行同读 `$workspaceViewSelectedId`；`enterProject`/
+   `setActiveProject` 写同一原子。装配反例：本地A↔WSL B↔本地A 每步恰一个
+   `data-workspace-row-selected`；搜索命中激活/清空不抢选择；开另一行信息不移动选择。
+2. **名称宽度（结构性，非阈值）**：`SidebarGroupRow` 新增 opt-in `actionsOverlay`
+   ——隐藏操作绝对定位于行尾、idle 不占布局宽；caret 固定宽停行尾，overlay 右缘
+   构造性止于 caret 左缘（展开目标任何行宽都不可被盖）；容器统一持有
+   hover / focus-within / has-[[data-state=open]] / caret-hover 让位。
+3. **驱动**：普通/窄窗双布局断言、隐藏/显示布局关系（尾列=仅 caret 条、idle opacity 0、
+   hover 显现→移开让回→focus 显现）、B selected 日志取反修复、表头坐标悬停、
+   add menu 冷启动重试、info 按钮 role+name 定位。
+
+**真机复跑（`docs/validation/windows-acceptance-round36r-p01/`，p01r7，executed 27 →
+PASS 27 / FAIL 0 / SKIP 2 / PENDING 1，exit=0）**：统一列表、主行选中/展开、改名（同 id）、
+移除=归档、重开恢复、空工作区搜索/清空、开 info 不算切换、窄侧栏名称完整可读
+（107px 全文本）、键盘 Enter 选择、focus-within 显现、WSL 重连复核全部真机通过。
+非PASS 仍为两条诚实项：本地 Windows 真实打开 PENDING（WSL-only 后端边界，按 P01
+工单转 P05）、置顶真机 SKIP（无真实会话，行为测试覆盖）。36R postfix 的旧证据目录
+与记录原样保留。

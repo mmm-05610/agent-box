@@ -1,0 +1,161 @@
+{
+  "allOk": true,
+  "counts": {
+    "PASS": 27,
+    "FAIL": 0,
+    "SKIP": 2,
+    "PENDING": 1
+  },
+  "steps": [
+    {
+      "step": "app opens",
+      "status": "PASS",
+      "detail": "window title: Hermes"
+    },
+    {
+      "step": "isolated app identity",
+      "status": "PASS",
+      "detail": "exe=C:\\Users\\maoqh\\agentbox-wsl-round1\\apps\\desktop\\node_modules\\electron\\dist\\electron.exe (electron=true, in-worktree=true); userData isolated=true; name=Hermes (productName match=true; HERMES_DESKTOP_APP_NAME is a label-only override, app.setName is never called); build=0.17.2 (match=true)"
+    },
+    {
+      "step": "single-instance blocks reuse",
+      "status": "PASS",
+      "detail": "second instance failed to start: Error: electron.launch: Process failed to launch!\nCall log:\n\u001b[2m  - <launching> \"C:\\Users\\maoqh\\agentbox-wsl-round1\\apps; original window still live (readyState=complete, title=\"Hermes\")"
+    },
+    {
+      "step": "backend this run drives",
+      "status": "PASS",
+      "detail": "no gate (saved connection); boot log: remote backend http://127.0.0.1:9127 ready"
+    },
+    {
+      "step": "unified sidebar",
+      "status": "PASS",
+      "detail": "Capabilities:gone, Artifacts:gone, Scheduled jobs:gone, BotsTab:gone; profilesEntry=true; settingsEntry=true"
+    },
+    {
+      "step": "add menu entries",
+      "status": "PASS",
+      "detail": "open-folder=1, open-remote=1 (no naming page behind the menu)"
+    },
+    {
+      "step": "wizard opens on config (no method page)",
+      "status": "PASS",
+      "detail": "distribution select visible on the first page"
+    },
+    {
+      "step": "connect → browse on one page",
+      "status": "PASS",
+      "detail": "directory browser visible, no separate connecting page"
+    },
+    {
+      "step": "WSL open lands on the real directory",
+      "status": "PASS",
+      "detail": "host record wsl_ws_c14cbd1903ef0342 rootPath=/home/maoqh/wsl-round1-验收 目录"
+    },
+    {
+      "step": "WSL save registers exactly one desktop-side record; row lives at [data-workspace-list]",
+      "status": "PASS",
+      "detail": "list={\"localIds\":[\"p_a7cdbae7\",\"p_57a756fd\"],\"wslIds\":[\"wsl_ws_c14cbd1903ef0342\"]}; host records=[{\"id\":\"wsl_ws_c14cbd1903ef0342\",\"name\":\"wsl-round1-验收 目录\",\"archivedAt\":null}]; backend-known local rows=2 (reported, not judged)"
+    },
+    {
+      "step": "WSL main row selects the workspace",
+      "status": "PASS",
+      "detail": "data-workspace-row-selected=wsl_ws_c14cbd1903ef0342"
+    },
+    {
+      "step": "WSL row expands to the honest unavailable prompt",
+      "status": "PASS",
+      "detail": "prompt visible=true; text=\"Sessions in WSL workspaces are not part of this round yet.\"; session starters on the row=0"
+    },
+    {
+      "step": "local open (Windows real path)",
+      "status": "PENDING",
+      "detail": "Windows-local real open unsupported against this WSL-only backend: the picker never asked for the OS dialog (osDialogCalls=0, dialog=\"Choose remote folderBrowse folders on the connected backend.\"), so a Windows-local directory cannot enter the flow — no local-acceptance-r36r-mu0324qz row was created"
+    },
+    {
+      "step": "local-row dependent steps",
+      "status": "SKIP",
+      "detail": "copy-path/entered-project/local-hide steps require a successfully opened local row (this run: PENDING); behavior tests cover them"
+    },
+    {
+      "step": "rename persists under the SAME id",
+      "status": "PASS",
+      "detail": "row shows the new name; host record=[{\"id\":\"wsl_ws_c14cbd1903ef0342\",\"name\":\"round36R-验收\",\"archivedAt\":null}]"
+    },
+    {
+      "step": "second WSL workspace saved",
+      "status": "PASS",
+      "detail": "host records=[{\"id\":\"wsl_ws_5400c02cc90bdf3c\",\"name\":\"子目录\",\"archivedAt\":null},{\"id\":\"wsl_ws_c14cbd1903ef0342\",\"name\":\"round36R-验收\",\"archivedAt\":null}]"
+    },
+    {
+      "step": "opening info is NOT selecting",
+      "status": "PASS",
+      "detail": "A selectedCount=1, B selectedCount=0 while B's info dialog is open (A must be exactly 1, B exactly 0)"
+    },
+    {
+      "step": "archive keeps the record, drops only the row",
+      "status": "PASS",
+      "detail": "rows before=[wsl_ws_5400c02cc90bdf3c,wsl_ws_c14cbd1903ef0342] after=[wsl_ws_c14cbd1903ef0342]; host=[{\"id\":\"wsl_ws_5400c02cc90bdf3c\",\"name\":\"子目录\",\"archivedAt\":1789320279628},{\"id\":\"wsl_ws_c14cbd1903ef0342\",\"name\":\"round36R-验收\",\"archivedAt\":null}]; dir still on disk=true"
+    },
+    {
+      "step": "reopen restores the ORIGINAL record (same id, archive cleared)",
+      "status": "PASS",
+      "detail": "restored={\"id\":\"wsl_ws_5400c02cc90bdf3c\",\"name\":\"子目录\",\"kind\":\"wsl\",\"distribution\":\"Ubuntu\",\"configuredUser\":null,\"actualUser\":\"maoqh\",\"rootPath\":\"/home/maoqh/wsl-round1-验收 目录/子目录\",\"createdAt\":1789320271122,\"updatedAt\":1789320287352,\"archivedAt\":null}; expected id=wsl_ws_5400c02cc90bdf3c"
+    },
+    {
+      "step": "empty-workspace search reaches the workspace by name",
+      "status": "PASS",
+      "detail": "hit for round36R-验收: true"
+    },
+    {
+      "step": "clearing search restores the selection",
+      "status": "PASS",
+      "detail": "selection=wsl_ws_c14cbd1903ef0342 present after clear"
+    },
+    {
+      "step": "WSL row keeps its name readable (default layout)",
+      "status": "PASS",
+      "detail": "name=107px of \"round36R-验收\" (text needs 107px, label=147px, row=213px); trailing strip (caret only)=20px (must be ≤24), overlay width=72px out of flow, overlay opacity=0 while idle"
+    },
+    {
+      "step": "hidden actions reveal on row hover and keep the name readable",
+      "status": "PASS",
+      "detail": "hover: overlay opacity=1, width=72px, name still 107px"
+    },
+    {
+      "step": "actions yield the name back when the pointer leaves",
+      "status": "PASS",
+      "detail": "after leave: overlay opacity=0 (must be 0)"
+    },
+    {
+      "step": "WSL row keeps its name readable (narrow layout)",
+      "status": "PASS",
+      "detail": "narrow: name=107px of \"round36R-验收\" (text needs 107px, row=213px); trailing strip (caret only)=20px (must be ≤24), overlay opacity=0"
+    },
+    {
+      "step": "keyboard selects the workspace (Enter on the main row)",
+      "status": "PASS",
+      "detail": "selected=true"
+    },
+    {
+      "step": "keyboard focus reveals the hidden actions (focus-within)",
+      "status": "PASS",
+      "detail": "focused kebab: overlay opacity=1 (must be 1)"
+    },
+    {
+      "step": "pinned sessions on the real machine",
+      "status": "SKIP",
+      "detail": "no real session exists in the isolated provider-less sandbox and no model request is allowed; pin/unpin behavior tests cover the row contract"
+    },
+    {
+      "step": "reopen: renamed workspace restored under its id",
+      "status": "PASS",
+      "detail": "row visible=true; list={\"localIds\":[\"p_a7cdbae7\",\"p_57a756fd\"],\"wslIds\":[\"wsl_ws_c14cbd1903ef0342\",\"wsl_ws_5400c02cc90bdf3c\"]}"
+    },
+    {
+      "step": "reopen: reconnect re-verifies",
+      "status": "PASS",
+      "detail": "connection info reports the verified identity at /home/maoqh/wsl-round1-验收 目录 (dialog shows the real rootPath=true)"
+    }
+  ]
+}
