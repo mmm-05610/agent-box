@@ -248,7 +248,10 @@ async function main() {
     await blankOpenFolder.click()
     record('add entry', true, 'blank-state Open folder entry')
   } else {
-    await headerAdd.click()
+    // Radix opens this menu on POINTERDOWN and sets pointer-events:none on
+    // <body> while it is open, so a plain Playwright click can time out on
+    // its own hit-target recheck. A force click dispatches the raw events.
+    await headerAdd.click({ force: true })
     await page.waitForTimeout(600)
     await screenshot(page, 'add-menu')
 
@@ -280,7 +283,7 @@ async function main() {
   await screenshot(page, 'local-in-list')
 
   // ─── step: WSL 打开目录 — simplified wizard: no method page ───
-  await headerAdd.click()
+  await headerAdd.click({ force: true })
   await page.waitForTimeout(500)
   await page.getByRole('menuitem', { name: /Open remote folder|打开远程文件夹/ }).first().click()
   await page.waitForTimeout(1200)
@@ -387,7 +390,7 @@ async function main() {
   const rowMenu = wslRow.locator('[data-row-actions]')
   await rowMenu.hover()
   await page.waitForTimeout(400)
-  await rowMenu.getByRole('button').last().click()
+  await rowMenu.getByRole('button').last().click({ force: true })
   await page.waitForTimeout(600)
   await screenshot(page, 'row-menu')
 
@@ -422,7 +425,7 @@ async function main() {
   let secondSaved = true
 
   try {
-    await headerAdd.click()
+    await headerAdd.click({ force: true })
     await page.waitForTimeout(500)
     await page.getByRole('menuitem', { name: /Open remote folder|打开远程文件夹/ }).first().click()
     await page.waitForTimeout(1000)
@@ -454,7 +457,7 @@ async function main() {
       .first()
     await removableRow.locator('[data-row-actions]').hover()
     await page.waitForTimeout(400)
-    await removableRow.locator('[data-row-actions]').getByRole('button').last().click()
+    await removableRow.locator('[data-row-actions]').getByRole('button').last().click({ force: true })
     await page.waitForTimeout(600)
     await screenshot(page, 'remove-menu')
     await page.getByRole('menuitem', { name: /Remove from sidebar|从侧栏移除/ }).first().click()
