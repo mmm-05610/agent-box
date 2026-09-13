@@ -1,5 +1,9 @@
 # Renderer layer — mechanical batches
 
+**Current dispatch:** [35 — WSL Workspace round 1](35-wsl-workspace-round1.md) is a
+standalone first round for the newly authorized session. Use its own scope and checkpoints.
+Batch 34 and preview development remain paused; do not consume the entire historical queue.
+
 One document per batch. Each is self-contained: an agent should be able to pick
 up a single file and execute it without reading the others.
 

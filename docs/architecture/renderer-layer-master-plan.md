@@ -1,5 +1,18 @@
 # Renderer layer — master construction plan
 
+## Current owner override — WSL first round
+
+The owner authorized a new executor for [work order 35](renderer-layer-batches/35-wsl-workspace-round1.md).
+Only that first round is executable in the new session: real Windows Desktop WSL
+onboarding on `feature/desktop-wsl-round1` in its own worktree. Batch 34 and preview
+development remain paused. No automatic merge into main, no automatic continuation into
+Codex/Work Core rounds. This explicit scope overrides the older “all work orders” executor
+brief and automatic collision waves. Existing source changes must not run concurrently.
+
+This is the start of the WSL-first route; it preserves the accepted Workspace/private
+Connection semantics. Round 1's temporary persistence authority is Electron; Work Core
+migration will be separately specified after the Desktop behavior is verified.
+
 This is the governing document for the layer migration. It aggregates every work
 order, fixes the order, says what may run at the same time, and says what is not
 delegated.

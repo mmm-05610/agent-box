@@ -365,6 +365,13 @@
       "app/windows/hud/resize-handle"
     ]
   },
+  "35 WSL Workspace round 1": {
+    "edges": 0,
+    "modules": ["workspace", "connections", "wsl", "preload"],
+    "exclusive": true,
+    "depends_on": ["32 shell host purity", "33 window surfaces neutral"],
+    "note": "Explicit exclusive scheduling overrides automatic waves; scanner only covers Renderer. Electron IPC/host/preload and tests are also in scope. No automatic main merge."
+  },
   "34 AgentBox Desktop frontend branch": {
     "edges": 0,
     "modules": [

@@ -1,5 +1,15 @@
 # Renderer layer — construction status
 
+## Current dispatch override
+
+| Item | Scope | Status | Order |
+| --- | --- | --- | --- |
+| [35 / WSL round 1](renderer-layer-batches/35-wsl-workspace-round1.md) | real Windows Desktop: add WSL Workspace, browse directories, persist and reopen | dispatched; implementation and Windows acceptance not yet verified | new user-authorized session; dedicated `feature/desktop-wsl-round1` worktree; exclusive; no main merge |
+
+Batch 34 and its preview exception are paused. Round 35 is independently executable
+after existing 30–33 results; it is not authority to resume the whole historical queue.
+Success state: `DESKTOP_WSL_WORKSPACE_R1_GREEN`; incomplete: `DESKTOP_WSL_WORKSPACE_R1_PARTIAL`.
+
 The live state of the migration. **A row may only say `merged` when it names a
 commit and a reviewer's numbers** — there is no "mostly done", and no row moves
 before a reviewer has passed it. A status file that lags is worse than none,
