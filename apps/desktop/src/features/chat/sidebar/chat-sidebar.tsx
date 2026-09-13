@@ -1519,12 +1519,6 @@ export function ChatSidebar({
               />
             )}
 
-            {/* Remote WSL workspaces, peer to the local projects above — in the
-                project overview AND in the flat list (a fresh install lives in
-                the flat mode; hiding the entry there would strand saved
-                workspaces). Only when a workspace was saved. */}
-            {!inProject && <WslWorkspaceSection />}
-
             {!trimmedQuery && !worktreeGroupingActive && cronJobs.length > 0 && (
               <SidebarCronJobsSection
                 jobs={cronJobs}
@@ -1538,6 +1532,11 @@ export function ChatSidebar({
             )}
           </div>
         )}
+
+        {/* Remote WSL workspaces, peer to the local projects — OUTSIDE the
+            session-sections conditional so a fresh flat-mode sidebar (and the
+            empty state) still shows saved workspaces. */}
+        {!inProject && <WslWorkspaceSection />}
 
         {!showSessionSections && <SidebarBlankState onNewProject={openProjectCreate} onRemoteConnection={openWslWorkspaceWizard} />}
 
