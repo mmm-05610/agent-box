@@ -16,6 +16,17 @@ import type { WslWorkspaceRecord } from './wsl-workspace'
 
 export const WSL_WORKSPACE_STORE_VERSION = 1
 
+/**
+ * Thrown when the file on disk was written by a NEWER version of this app.
+ * The caller must refuse to read OR write: returning an empty store would let
+ * a save clobber data this build cannot parse.
+ */
+export class WslWorkspaceStoreFutureVersionError extends Error {
+  constructor(readonly foundVersion: number) {
+    super(`Workspace store version ${foundVersion} is newer than this app supports (${WSL_WORKSPACE_STORE_VERSION}).`)
+  }
+}
+
 export interface WslWorkspaceStoreFile {
   version: number
   workspaces: WslWorkspaceRecord[]
@@ -108,13 +119,23 @@ export function createWslWorkspaceStore(storePath: string, deps?: { read?: (p: s
       return emptyStore()
     }
 
+    let parsed: unknown
+
     try {
-      return normalizeWorkspaceStoreFile(JSON.parse(raw))
+      parsed = JSON.parse(raw)
     } catch {
       preserveCorruptSidecar(storePath, raw)
 
       return emptyStore()
     }
+
+    const candidateVersion = (parsed as { version?: unknown })?.version
+
+    if (typeof candidateVersion === 'number' && candidateVersion > WSL_WORKSPACE_STORE_VERSION) {
+      throw new WslWorkspaceStoreFutureVersionError(candidateVersion)
+    }
+
+    return normalizeWorkspaceStoreFile(parsed)
   }
 
   function persist(file: WslWorkspaceStoreFile): void {

@@ -28,6 +28,7 @@ import {
 } from '@/store/wsl-workspace'
 import type {
   WslFailure,
+  WslWorkspaceErrorCode,
   WslWorkspaceRecord
 } from '@/types/workspace'
 
@@ -37,14 +38,23 @@ export function createWslSaveRequestId(): string {
   return `wsl_save_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
 }
 
-export async function refreshWslWorkspaces(): Promise<void> {
+export interface WslRefreshOutcome {
+  ok: boolean
+  code?: WslWorkspaceErrorCode
+}
+
+export async function refreshWslWorkspaces(): Promise<WslRefreshOutcome> {
   const result = await listWslWorkspaces()
 
   if (result.ok) {
     setWslWorkspaces(result.workspaces)
+
+    return { ok: true }
   }
+
   // A host failure keeps the current projection: an unanswered host is not
-  // an empty workspace list.
+  // an empty workspace list. The caller surfaces the typed code.
+  return { ok: false, code: result.code }
 }
 
 export type WslSaveOutcome = { ok: true; workspace: WslWorkspaceRecord } | WslFailure

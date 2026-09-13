@@ -106,37 +106,92 @@ configuredUser: null, actualUser: maoqh, rootPath: /home/maoqh/wsl-round1-验收
 
 <!-- WSL_R1_WINDOWS_RESULT -->
 
-## 复现启动方法（Windows）
+## 复现手动验收步骤（Windows，可直接照做）
+
+**已知限制（本轮如实声明）**：当前应用在 Windows 无本地 Hermes 运行时会停在
+首跑安装门，因此验收需要先启动一个外部 Hermes 网关让应用通过启动门。这只是让
+应用达到可操作状态的手段——本轮不修复启动架构、不宣称脱离 Hermes，也绝不经过
+该网关发送模型请求。应用侧的 WSL Workspace 能力本身只走 Electron IPC，与网关无关。
+
+### 一次性准备（本机已完成，重现时才需要）
 
 ```bat
-:: 一次性（已执行过，克隆与依赖均在）
+git clone <本仓任意检出> C:\Users\maoqh\agentbox-wsl-round1
 cd C:\Users\maoqh\agentbox-wsl-round1
 npm install --engine-strict=false --no-audit --no-fund
 cd apps\desktop && npm run build
+```
 
-:: 1) 在 WSL 启动隔离网关（隔离 HERMES_HOME，token 随机生成写入 session-token.txt）
-::    wsl -d Ubuntu -- /home/maoqh/wsl-round1-gateway-home/start-gateway.sh
+### 每次验收
 
-:: 2) 隔离启动真实 Desktop（读取 session-token.txt 作为 WSL_R1_GATEWAY_TOKEN）
+**第 1 步 — WSL 内启动隔离网关**（HERMES_HOME 隔离、无 provider；token 由网关
+运行时随机生成，写入仅网关目录可见的 session-token.txt，权限 600；不硬编码、
+不打印、不入库）。在 WSL 终端执行：
+
+```bash
+GATEWAY_HOME="$HOME/wsl-round1-gateway-home"
+mkdir -p "$GATEWAY_HOME"
+printf '# round1 acceptance gateway: intentionally provider-less\n' > "$GATEWAY_HOME/config.yaml"
+cat > "$GATEWAY_HOME/start-gateway.sh" <<'SCRIPT'
+#!/usr/bin/env bash
+set -e
+GATEWAY_HOME="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# 首次启动生成 token；后续启动复用，桌面端保存的连接跨重启仍然有效。
+if [ -s "$GATEWAY_HOME/session-token.txt" ]; then
+  TOKEN="$(cat "$GATEWAY_HOME/session-token.txt")"
+else
+  TOKEN="$(openssl rand -hex 24)"
+  printf '%s' "$TOKEN" > "$GATEWAY_HOME/session-token.txt"
+  chmod 600 "$GATEWAY_HOME/session-token.txt"
+fi
+HERMES_HOME="$GATEWAY_HOME" HERMES_DASHBOARD_SESSION_TOKEN="$TOKEN" \
+  nohup hermes serve --host 127.0.0.1 --port 9127 --skip-build > "$GATEWAY_HOME/serve.log" 2>&1 &
+echo "gateway started (pid $!)"
+SCRIPT
+cat > "$GATEWAY_HOME/stop-gateway.sh" <<'SCRIPT'
+#!/usr/bin/env bash
+PIDS="$(pgrep -f 'hermes serve --host 127.0.0.1 --port 9127' || true)"
+[ -n "$PIDS" ] && kill $PIDS 2>/dev/null; echo "gateway stopped"
+SCRIPT
+chmod +x "$GATEWAY_HOME/start-gateway.sh" "$GATEWAY_HOME/stop-gateway.sh"
+"$GATEWAY_HOME/start-gateway.sh"
+```
+
+**第 2 步 — Windows 启动隔离 Desktop 并通过启动门**（三个环境变量保证与真实
+安装完全隔离；独立应用名避免争单例锁）：
+
+```bat
+cd C:\Users\maoqh\agentbox-wsl-round1\apps\desktop
 set HERMES_HOME=C:\Users\maoqh\agentbox-wsl-round1-sandbox\hermes-home
 set HERMES_DESKTOP_USER_DATA_DIR=C:\Users\maoqh\agentbox-wsl-round1-sandbox\user-data
 set HERMES_DESKTOP_APP_NAME=HermesWslRound1
-set WSL_R1_GATEWAY_URL=http://127.0.0.1:9127
-set /p WSL_R1_GATEWAY_TOKEN=<C:\Users\maoqh\agentbox-wsl-round1-sandbox\..\..\..\..\home\dummy 2>nul
-::    （token 在 WSL 侧 /home/maoqh/wsl-round1-gateway-home/session-token.txt，手工粘贴）
 npx electron .
-
-:: 或一键完整验收驱动（截图 + acceptance-log.json）
-cd apps\desktop
-node e2e\wsl-workspace-round1-driver.mjs C:\Users\maoqh\agentbox-wsl-round1-sandbox <outDir>
 ```
 
-说明：`hermes serve` 仅作为让 Windows Desktop 完整启动的真实网关（产品正规的
-"连接到已有 Hermes" 路径）；本轮不经过它发送任何模型请求。用户也可在真实
-Hermes 已安装的机器上直接启动 Desktop，跳过网关步骤。
+应用打开后停在 "Set up Hermes Desktop" 门 → 选 **Connect to existing Hermes** →
+Gateway URL 填 `http://127.0.0.1:9127` → 出现 token 输入框后，把 WSL 侧
+`~/wsl-round1-gateway-home/session-token.txt` 的内容粘贴进 Session token →
+**Test connection**（应显示 Connected to …）→ **Apply and reconnect**。
 
-验收用 WSL 目录（本轮创建，含空格+中文）：`/home/maoqh/wsl-round1-验收 目录/`（含
-`子目录/`）。验收后该目录保留供用户复验；应用退出不关闭用户的 WSL 发行版。
+**第 3 步 — WSL Workspace 验收路径**（对应上表 3–15）：项目侧栏 → 远程连接
+（空白态直连按钮；有项目时经 "+" 菜单）→ WSL → Ubuntu（用户留空）→ Connect →
+前往 `/home/maoqh/wsl-round1-验收 目录` → 进出 `子目录` → **Use this directory** →
+侧栏 REMOTE 行 → 连接信息 → Reconnect → 关闭应用重开复验。
+
+### 精确退出与回收
+
+1. 退出应用：关闭 HermesWslRound1 窗口（数据保留在隔离 userData，供重开复验）。
+2. 停隔离网关（WSL 终端）：`"$HOME/wsl-round1-gateway-home/stop-gateway.sh"`
+   —— 只杀 9127 上这一个 `hermes serve`，**不关闭你的 WSL 发行版**。
+3. 或者一键完整验收驱动（自动经 UNC 读取网关自行生成的 token，无需经手；
+   截图与 acceptance-log.json 落盘到输出目录）：
+
+```bat
+cd C:\Users\maoqh\agentbox-wsl-round1\apps\desktop
+node e2e\wsl-workspace-round1-driver.mjs C:\Users\maoqh\agentbox-wsl-round1-sandbox C:\Users\maoqh\agentbox-wsl-round1-sandbox\acceptance-out
+```
+
+验收用 WSL 目录（含空格+中文，保留供复验）：`/home/maoqh/wsl-round1-验收 目录/`（含 `子目录/`）。
 
 ## 待办与限制
 

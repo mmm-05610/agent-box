@@ -3898,6 +3898,7 @@ export const zh: Translations = {
     errWslListOverflow: '该目录条目过多，无法列出。',
     errWslSaveFailed: '保存工作区失败。',
     errWslNotFound: '该工作区已不存在。',
+    errWslStoreFutureVersion: '工作区存储由更新版本的应用写入，请先升级应用再操作。',
     errUnexpected: '出现意外错误。'
   },
 

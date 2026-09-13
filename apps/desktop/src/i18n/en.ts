@@ -3772,6 +3772,7 @@ export const en: Translations = {
     errWslListOverflow: 'This directory has too many entries to list.',
     errWslSaveFailed: 'Saving the workspace failed.',
     errWslNotFound: 'This workspace no longer exists.',
+    errWslStoreFutureVersion: 'The workspace store was written by a newer version of the app. Update the app before making changes.',
     errUnexpected: 'Something went wrong.'
   },
 

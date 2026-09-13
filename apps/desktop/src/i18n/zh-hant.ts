@@ -3228,6 +3228,7 @@ export const zhHant = defineLocale({
     errWslListOverflow: '該目錄項目過多，無法列出。',
     errWslSaveFailed: '儲存工作區失敗。',
     errWslNotFound: '該工作區已不存在。',
+    errWslStoreFutureVersion: '工作區儲存由更新版本的應用寫入，請先升級應用再操作。',
     errUnexpected: '發生意外錯誤。'
   },
 

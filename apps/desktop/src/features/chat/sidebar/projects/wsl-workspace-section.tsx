@@ -6,8 +6,10 @@ import { Pill } from '@/components/settings/primitives'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
 import { Tip } from '@/components/ui/tooltip'
+import { wslFailureText } from '@/features/workspace/wsl-failure-text'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
+import { notify } from '@/store/notifications'
 import { $wslWorkspaceInfoId, $wslWorkspaces, $wslWorkspaceValidation, openWslWorkspaceInfo } from '@/store/wsl-workspace'
 import type { WslWorkspaceValidationState } from '@/store/wsl-workspace'
 
@@ -44,10 +46,23 @@ export function WslWorkspaceSection({ className }: { className?: string }) {
   const infoId = useStore($wslWorkspaceInfoId)
 
   // The projection is a cache of the host's store: refresh on mount so a
-  // reopen shows the saved rows, each starting as "not verified".
+  // reopen shows the saved rows, each starting as "not verified". A failed
+  // refresh is never rendered as an empty list — the rows stay and the user
+  // gets the typed reason.
   useEffect(() => {
-    void refreshWslWorkspaces()
-  }, [])
+    // One warning per mount (the effect runs once): the store does not fix
+    // itself between renders.
+    let failureNotified = false
+
+    void refreshWslWorkspaces().then(outcome => {
+      if (!outcome.ok && !failureNotified) {
+        failureNotified = true
+        notify({ kind: 'warning', message: wslFailureText(t, outcome.code ?? null) })
+      }
+    })
+    // `t` rides the deps so a locale switch re-translates; the refresh itself
+    // is an idempotent read, and failureNotified resets with the effect.
+  }, [t])
 
   if (workspaces.length === 0) {
     return null
@@ -73,6 +88,7 @@ export function WslWorkspaceSection({ className }: { className?: string }) {
                 'group/remote-row grid grid-cols-[minmax(0,1fr)_auto] items-stretch rounded-md',
                 infoId === workspace.id && 'bg-(--ui-control-hover-background)'
               )}
+              data-wsl-workspace-row={workspace.id}
               key={workspace.id}
             >
               <button

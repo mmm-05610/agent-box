@@ -23,6 +23,9 @@
  * single-instance lock of a real install is not contended.
  */
 
+/* eslint-disable no-undef -- the page.evaluate callbacks run in the renderer,
+ * where window/document exist; this file itself is a plain node driver. */
+
 import fs from 'node:fs'
 import path from 'node:path'
 import { createRequire } from 'node:module'
@@ -116,7 +119,12 @@ async function main() {
   // token via env; the gateway never sees credentials of the user and no
   // model call is made this round).
   const gatewayUrl = process.env.WSL_R1_GATEWAY_URL || 'http://127.0.0.1:9127'
-  const gatewayToken = process.env.WSL_R1_GATEWAY_TOKEN || ''
+
+  // The gateway generates its own session token at start (start-gateway.sh
+  // writes it where only the gateway home can see it). Read it straight from
+  // there; never log it, never commit it.
+  const tokenFile = process.env.WSL_R1_TOKEN_FILE || '\\\\wsl.localhost\\Ubuntu\\home\\maoqh\\wsl-round1-gateway-home\\session-token.txt'
+  const gatewayToken = process.env.WSL_R1_GATEWAY_TOKEN || (fs.existsSync(tokenFile) ? fs.readFileSync(tokenFile, 'utf8').trim() : '')
 
   const setupGate = page.getByText(/Connect to existing Hermes|连接到已有的 Hermes/).first()
 
@@ -345,13 +353,26 @@ async function main() {
   }
 
   // ─── step: unknown path fails with a typed error, cancel saves nothing ───
-  const beforeCount = await page.evaluate(() => {
-    return new Promise(resolve => {
-      // Count remote rows via the section DOM marker.
-      const section = document.querySelector('[data-wsl-workspace-section]')
-      resolve(section ? section.querySelectorAll('button').length : 0)
-    })
-  })
+  // Workspace identity, not a button census: the row count uses the row's
+  // data-wsl-workspace-row id, and the assertion is confirmed against the
+  // host's own persisted record set (userData/wsl-workspaces.json).
+  const rowIds = () =>
+    page.evaluate(() => Array.from(document.querySelectorAll('[data-wsl-workspace-row]')).map(row => row.getAttribute('data-wsl-workspace-row')))
+
+  const hostRecordIds = () => {
+    const storeFile = path.join(userDataDir, 'wsl-workspaces.json')
+
+    if (!fs.existsSync(storeFile)) {
+      return []
+    }
+
+    const parsed = JSON.parse(fs.readFileSync(storeFile, 'utf8'))
+
+    return (parsed.workspaces || []).map(w => w.id).sort()
+  }
+
+  const beforeRows = await rowIds()
+  const beforeHostIds = hostRecordIds()
 
   let unknownOk = true
   try {
@@ -395,11 +416,10 @@ async function main() {
     // fall through
   }
 
-  const afterCount = await page.evaluate(() => {
-    const section = document.querySelector('[data-wsl-workspace-section]')
-    return section ? section.querySelectorAll('button').length : 0
-  })
-  record('cancel saves nothing', afterCount === beforeCount, `remote rows before=${beforeCount} after=${afterCount}`)
+  const afterRows = await rowIds()
+  const afterHostIds = hostRecordIds()
+  const cancelOk = JSON.stringify(afterRows) === JSON.stringify(beforeRows) && JSON.stringify(afterHostIds) === JSON.stringify(beforeHostIds)
+  record('cancel saves nothing', cancelOk, `rows before=[${beforeRows}] after=[${afterRows}]; host records unchanged=${JSON.stringify(afterHostIds) === JSON.stringify(beforeHostIds)}`)
   await screenshot(page, 'after-cancel')
 
   // ─── step: quit and reopen — the saved workspace persists, unverified ───

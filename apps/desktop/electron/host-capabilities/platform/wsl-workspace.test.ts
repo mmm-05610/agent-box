@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict'
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import os from 'node:os'
+import { join } from 'node:path'
 
 import { test } from 'vitest'
 
@@ -17,7 +20,7 @@ import {
   stripWslOutputNuls,
   type WslWorkspaceRecord
 } from './wsl-workspace'
-import { normalizeWorkspaceStoreFile } from './wsl-workspace-store'
+import { createWslWorkspaceStore, normalizeWorkspaceStoreFile } from './wsl-workspace-store'
 
 function isListArgv(argv: string[]): boolean {
   return argv.includes('/bin/sh') && String(argv[argv.indexOf('-c') + 1] || '').startsWith('LC_ALL=C exec ls')
@@ -145,7 +148,11 @@ function createMemoryStore() {
 
   return {
     state: store,
-    load: () => store.file,
+    // A disk file re-parses on every read: each load must hand out a fresh
+    // object, or two in-flight saves silently share one mutable "snapshot"
+    // and the interleaving the concurrency tests exist to catch never
+    // happens.
+    load: () => normalizeWorkspaceStoreFile(JSON.parse(JSON.stringify(store.file))),
     persist: (file: StoreState['file']) => {
       store.file = file
       store.persistCalls += 1
@@ -207,6 +214,7 @@ function createHost(options?: {
 
 function abortError() {
   const error = new Error('This operation was aborted')
+
   ;(error as { code?: string }).code = 'ABORT_ERR'
 
   return error
@@ -462,6 +470,7 @@ test('a different user or distribution produces a separate workspace record', as
 test('store failure surfaces as a retryable WSL_SAVE_FAILED with nothing half-written', async () => {
   // The fake store mimics a disk file: every load re-reads what was persisted.
   const disk = { written: 0, data: null as string | null }
+
   const failingStore = {
     state: { file: normalizeWorkspaceStoreFile(null), persistCalls: 0 },
     load: () => normalizeWorkspaceStoreFile(disk.data === null ? null : JSON.parse(disk.data)),
@@ -606,4 +615,201 @@ test('normalizeWorkspaceStoreFile repairs shape damage and rejects future versio
   const future = normalizeWorkspaceStoreFile({ version: 99, workspaces: [{ id: 'x', distribution: 'd', rootPath: '/x' }] })
 
   assert.deepEqual(future, { version: 1, workspaces: [], savedRequests: {} })
+})
+
+// --- concurrent saves -------------------------------------------------------
+
+function deferred(): { promise: Promise<void>; resolve: () => void } {
+  let resolve!: () => void
+
+  const promise = new Promise<void>(resolvePromise => {
+    resolve = resolvePromise
+  })
+
+  return { promise, resolve }
+}
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+
+/**
+ * Interleaving harness: every directory verification suspends on its own gate
+ * so the test holds both saves inside the window where each has loaded a stale
+ * store snapshot — the exact window where a read-modify-write outside a commit
+ * section loses records.
+ */
+function gateLsCalls(execForOtherCalls: ExecScript): { script: ExecScript; releaseNext: () => void } {
+  const gates = [deferred(), deferred(), deferred()]
+  let lsIndex = 0
+
+  const script: ExecScript = async call => {
+    if (isListArgv(call.argv)) {
+      const gate = gates[Math.min(lsIndex, gates.length - 1)]
+      lsIndex += 1
+
+      if (gate) {
+        await gate.promise
+      }
+
+      return { stdout: 'inner/\n', stderr: '' }
+    }
+
+    return execForOtherCalls(call, -1)
+  }
+
+  return { script, releaseNext: () => gates.shift()?.resolve() }
+}
+
+async function waitUntil(predicate: () => boolean): Promise<void> {
+  for (let attempt = 0; attempt < 500 && !predicate(); attempt += 1) {
+    await sleep(2)
+  }
+}
+
+test('concurrent saves of different workspaces both survive', async () => {
+  const { script, releaseNext } = gateLsCalls(async () => ({ stdout: 'user=maoqh\nhome=/home/maoqh\n', stderr: '' }))
+  const { host, calls, store } = createHost({ exec: script })
+  const pendingLs = () => calls.filter(call => isListArgv(call.argv)).length
+
+  const connA = await host.connect({ distribution: 'Ubuntu' })
+  const connB = await host.connect({ distribution: 'Ubuntu', user: 'deploy' })
+
+  assert.ok(connA.ok && connB.ok)
+
+  const pendingA = host.saveWorkspace({ connectionId: connA.ok ? connA.connectionId : '', path: '/srv/a', requestId: 'r-a' })
+  await waitUntil(() => pendingLs() >= 1)
+
+  const pendingB = host.saveWorkspace({ connectionId: connB.ok ? connB.connectionId : '', path: '/srv/b', requestId: 'r-b' })
+  await waitUntil(() => pendingLs() >= 2)
+
+  // Both saves now hold stale snapshots; let them commit in order.
+  releaseNext()
+  releaseNext()
+
+  const [resultA, resultB] = await Promise.all([pendingA, pendingB])
+
+  assert.ok(resultA.ok, `save A failed: ${JSON.stringify(resultA)}`)
+  assert.ok(resultB.ok, `save B failed: ${JSON.stringify(resultB)}`)
+  assert.equal(store.state.file.workspaces.length, 2, 'both records must survive the concurrent commits')
+
+  const roots = store.state.file.workspaces.map(w => w.rootPath).sort()
+
+  assert.deepEqual(roots, ['/srv/a', '/srv/b'])
+})
+
+test('concurrent retries of the same requestId return the same record', async () => {
+  const { script, releaseNext } = gateLsCalls(async () => ({ stdout: 'user=maoqh\nhome=/home/maoqh\n', stderr: '' }))
+  const { host, calls, store } = createHost({ exec: script })
+  const pendingLs = () => calls.filter(call => isListArgv(call.argv)).length
+
+  const connected = await host.connect({ distribution: 'Ubuntu' })
+
+  assert.ok(connected.ok)
+
+  const connectionId = connected.ok ? connected.connectionId : ''
+  const pendingFirst = host.saveWorkspace({ connectionId, path: '/srv/same', requestId: 'r-same' })
+  await waitUntil(() => pendingLs() >= 1)
+
+  const pendingRetry = host.saveWorkspace({ connectionId, path: '/srv/same', requestId: 'r-same' })
+  await waitUntil(() => pendingLs() >= 2)
+
+  releaseNext()
+  releaseNext()
+
+  const [first, retry] = await Promise.all([pendingFirst, pendingRetry])
+
+  assert.ok(first.ok && retry.ok, 'both attempts must answer')
+
+  if (first.ok && retry.ok) {
+    assert.equal(retry.workspace.id, first.workspace.id, 'a concurrent replay resolves to the same record')
+    assert.equal(first.requestIdReplay, false)
+    assert.equal(retry.requestIdReplay || store.state.file.workspaces.length === 1, true)
+  }
+
+  assert.equal(store.state.file.workspaces.length, 1)
+})
+
+test('concurrent saves of the same location with different request ids do not duplicate', async () => {
+  const { script, releaseNext } = gateLsCalls(async () => ({ stdout: 'user=maoqh\nhome=/home/maoqh\n', stderr: '' }))
+  const { host, calls, store } = createHost({ exec: script })
+  const pendingLs = () => calls.filter(call => isListArgv(call.argv)).length
+
+  const connected = await host.connect({ distribution: 'Ubuntu' })
+
+  assert.ok(connected.ok)
+
+  const connectionId = connected.ok ? connected.connectionId : ''
+  const pendingFirst = host.saveWorkspace({ connectionId, path: '/srv/same', requestId: 'r-1' })
+  await waitUntil(() => pendingLs() >= 1)
+
+  const pendingSecond = host.saveWorkspace({ connectionId, path: '/srv/same', requestId: 'r-2' })
+  await waitUntil(() => pendingLs() >= 2)
+
+  releaseNext()
+  releaseNext()
+
+  const [first, second] = await Promise.all([pendingFirst, pendingSecond])
+
+  assert.ok(first.ok && second.ok)
+  assert.equal(store.state.file.workspaces.length, 1, 'the same location must converge on one record')
+
+  if (first.ok && second.ok) {
+    assert.equal(second.workspace.id, first.workspace.id)
+  }
+})
+
+// --- newer store version ----------------------------------------------------
+
+test('a store written by a newer version blocks reads and saves byte-for-byte', async () => {
+  const dir = mkdtempSync(join(os.tmpdir(), 'wsl-store-future-'))
+  const storePath = join(dir, 'wsl-workspaces.json')
+
+  const futureFile = {
+    version: 99,
+    workspaces: [
+      {
+        id: 'wsl_ws_future',
+        name: 'future',
+        kind: 'wsl',
+        distribution: 'Ubuntu',
+        configuredUser: null,
+        actualUser: 'someone',
+        rootPath: '/srv/future',
+        createdAt: 1,
+        updatedAt: 1
+      }
+    ],
+    savedRequests: {}
+  }
+
+  const bytes = `${JSON.stringify(futureFile, null, 2)}\n`
+
+  writeFileSync(storePath, bytes, 'utf8')
+
+  const realStore = createWslWorkspaceStore(storePath)
+  const { host } = createHost({ store: { state: { file: normalizeWorkspaceStoreFile(null), persistCalls: 0 }, load: () => realStore.load(), persist: file => realStore.persist(file) } })
+
+  // Reads refuse to pretend the store is empty.
+  const listed = host.listWorkspaces()
+
+  assert.equal(listed.ok, false)
+
+  if (!listed.ok) {
+    assert.equal(listed.code, 'WSL_STORE_FUTURE_VERSION')
+    assert.equal(listed.retryable, false)
+  }
+
+  // A save must not clobber the newer writer's data.
+  const connected = await host.connect({ distribution: 'Ubuntu' })
+
+  assert.ok(connected.ok)
+
+  const saved = await host.saveWorkspace({ connectionId: connected.ok ? connected.connectionId : '', path: '/srv/new', requestId: 'r-new' })
+
+  assert.equal(saved.ok, false)
+
+  if (!saved.ok) {
+    assert.equal(saved.code, 'WSL_STORE_FUTURE_VERSION')
+  }
+
+  assert.deepEqual(readFileSync(storePath), Buffer.from(bytes, 'utf8'), 'the future-version file must remain byte-identical')
 })

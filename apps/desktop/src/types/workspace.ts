@@ -21,6 +21,7 @@ export type WslWorkspaceErrorCode =
   | 'WSL_LIST_OVERFLOW'
   | 'WSL_SAVE_FAILED'
   | 'WSL_NOT_FOUND'
+  | 'WSL_STORE_FUTURE_VERSION'
 
 export interface WslFailure {
   ok: false

@@ -24,6 +24,7 @@ import { randomBytes } from 'node:crypto'
 import fs from 'node:fs'
 
 import { IS_WSL } from './platform-facts'
+import { WslWorkspaceStoreFutureVersionError } from './wsl-workspace-store'
 
 export type WslErrorCode =
   | 'WSL_UNAVAILABLE'
@@ -40,6 +41,7 @@ export type WslErrorCode =
   | 'WSL_LIST_OVERFLOW'
   | 'WSL_SAVE_FAILED'
   | 'WSL_NOT_FOUND'
+  | 'WSL_STORE_FUTURE_VERSION'
 
 export interface WslFailure {
   /** Literal discriminant so success/failure unions narrow in every caller. */
@@ -504,6 +506,46 @@ export function createWslWorkspaceHost(
   const operations = new Map<string, AbortController>()
   const SAVED_REQUEST_LIMIT = 64
 
+  /**
+   * Every store READ goes through here. A file written by a newer app version
+   * must surface as a typed failure — never as an empty store, which a save
+   * would then "helpfully" overwrite.
+   */
+  function readStore(): { ok: true; file: ReturnType<typeof store.load> } | WslFailure {
+    try {
+      return { ok: true, file: store.load() }
+    } catch (error) {
+      if (error instanceof WslWorkspaceStoreFutureVersionError) {
+        return {
+          ok: false,
+          ...wslFailure('WSL_STORE_FUTURE_VERSION', 'This workspace store was written by a newer version of the app. Update the app before making changes.', false)
+        }
+      }
+
+      return { ok: false, ...wslFailure('WSL_SAVE_FAILED', `Could not read the workspace store: ${String((error as Error)?.message || error)}`, true) }
+    }
+  }
+
+  /**
+   * Save commits run strictly one at a time. The directory verification (a
+   * remote read) happens OUTSIDE the section; the section itself is the
+   * shortest possible read-modify-write: re-load the store, replay-check the
+   * request id, dedupe the location, persist. Without the chain, two in-flight
+   * saves both load before either persists and the second write erases the
+   * first record.
+   */
+  let commitChain: Promise<unknown> = Promise.resolve()
+
+  function enqueueCommit<T>(task: () => T): Promise<T> {
+    const run = commitChain.then(task, task)
+    commitChain = run.then(
+      () => undefined,
+      () => undefined
+    )
+
+    return run
+  }
+
   function trackOperation(operationId: unknown): AbortController | null {
     if (typeof operationId !== 'string' || !operationId) {
       return null
@@ -541,6 +583,91 @@ export function createWslWorkspaceHost(
     connection.lastUsedAt = now()
 
     return { ok: true, connection }
+  }
+
+  /**
+   * The serialized tail of a save: runs inside the commit chain over the
+   * FRESHLY loaded store, so a replay check and a location dedupe always see
+   * every record a concurrent commit just wrote.
+   */
+  function commitSave(
+    connection: { distribution: string; configuredUser: null | string; actualUser: string },
+    normalized: string,
+    name: unknown,
+    requestId: string
+  ): WslOutcome<{ workspace: WslWorkspaceRecord; requestIdReplay: boolean }> {
+    const loaded = readStore()
+
+    if (isWslFailure(loaded)) {
+      return loaded
+    }
+
+    const file = loaded.file
+
+    // Idempotent by request id: a retried save of the same operation returns
+    // the record the first attempt produced, never a second row.
+    const replay = file.savedRequests[requestId]
+
+    if (replay) {
+      const existing = file.workspaces.find(w => w.id === replay.workspaceId)
+
+      if (existing) {
+        return { ok: true, workspace: existing, requestIdReplay: true }
+      }
+    }
+
+    const timestamp = now()
+
+    // Re-adding the exact same location must not duplicate rows: the
+    // existing record is reused (its name may be refreshed) instead.
+    const duplicate = file.workspaces.find(
+      w =>
+        w.kind === 'wsl' &&
+        w.distribution === connection.distribution &&
+        (w.configuredUser ?? null) === connection.configuredUser &&
+        w.rootPath === normalized
+    )
+
+    let record: WslWorkspaceRecord
+
+    if (duplicate) {
+      record = {
+        ...duplicate,
+        name: typeof name === 'string' && name.trim() ? name.trim() : duplicate.name,
+        actualUser: connection.actualUser,
+        updatedAt: timestamp
+      }
+
+      file.workspaces = file.workspaces.map(w => (w.id === duplicate.id ? record : w))
+    } else {
+      record = {
+        id: `wsl_ws_${randomBytes(8).toString('hex')}`,
+        name: typeof name === 'string' && name.trim() ? name.trim() : normalized.split('/').filter(Boolean).pop() || normalized,
+        kind: 'wsl',
+        distribution: connection.distribution,
+        configuredUser: connection.configuredUser,
+        actualUser: connection.actualUser,
+        rootPath: normalized,
+        createdAt: timestamp,
+        updatedAt: timestamp
+      }
+
+      file.workspaces.push(record)
+    }
+
+    const savedRequestEntries = Object.entries(file.savedRequests)
+
+    file.savedRequests = Object.fromEntries(
+      [...savedRequestEntries.slice(Math.max(0, savedRequestEntries.length - (SAVED_REQUEST_LIMIT - 1))), [requestId, { workspaceId: record.id, at: timestamp }]]
+    )
+
+    try {
+      store.persist(file)
+    } catch (error) {
+      return { ok: false, ...wslFailure('WSL_SAVE_FAILED', `Could not save the workspace: ${String((error as Error)?.message || error)}`, true) }
+    }
+
+    return { ok: true, workspace: record, requestIdReplay: false }
   }
 
   function listArgvFor(connection: { distribution: string; configuredUser: null | string }, path: string, showHidden: boolean): string[] {
@@ -721,8 +848,13 @@ export function createWslWorkspaceHost(
 
       try {
         if (typeof workspaceId === 'string' && workspaceId) {
-          const file = store.load()
-          const record = file.workspaces.find(w => w.id === workspaceId)
+          const loaded = readStore()
+
+          if (isWslFailure(loaded)) {
+            return loaded
+          }
+
+          const record = loaded.file.workspaces.find(w => w.id === workspaceId)
 
           if (!record) {
             return { ok: false, ...wslFailure('WSL_NOT_FOUND', 'This workspace no longer exists.', false) }
@@ -761,84 +893,27 @@ export function createWslWorkspaceHost(
       }
 
       const connection = taken.connection
-      const file = store.load()
-
-      // Idempotent by request id: a retried save of the same operation returns
-      // the record the first attempt produced, never a second row.
-      const replay = file.savedRequests[requestId]
-
-      if (replay) {
-        const existing = file.workspaces.find(w => w.id === replay.workspaceId)
-
-        if (existing) {
-          return { ok: true, workspace: existing, requestIdReplay: true }
-        }
-      }
 
       // The host re-verifies the directory before persisting; the renderer's
-      // view of the tree may already be stale.
+      // view of the tree may already be stale. This is a REMOTE read and runs
+      // outside the commit section — it must never hold the commit chain.
       const verified = await listOnConnection(connection, normalized, false)
 
       if (isWslFailure(verified)) {
         return verified
       }
 
-      const timestamp = now()
-
-      // Re-adding the exact same location must not duplicate rows: the
-      // existing record is reused (its name may be refreshed) instead.
-      const duplicate = file.workspaces.find(
-        w =>
-          w.kind === 'wsl' &&
-          w.distribution === connection.distribution &&
-          (w.configuredUser ?? null) === connection.configuredUser &&
-          w.rootPath === normalized
-      )
-
-      let record: WslWorkspaceRecord
-
-      if (duplicate) {
-        record = {
-          ...duplicate,
-          name: typeof name === 'string' && name.trim() ? name.trim() : duplicate.name,
-          actualUser: connection.actualUser,
-          updatedAt: timestamp
-        }
-
-        file.workspaces = file.workspaces.map(w => (w.id === duplicate.id ? record : w))
-      } else {
-        record = {
-          id: `wsl_ws_${randomBytes(8).toString('hex')}`,
-          name: typeof name === 'string' && name.trim() ? name.trim() : normalized.split('/').filter(Boolean).pop() || normalized,
-          kind: 'wsl',
-          distribution: connection.distribution,
-          configuredUser: connection.configuredUser,
-          actualUser: connection.actualUser,
-          rootPath: normalized,
-          createdAt: timestamp,
-          updatedAt: timestamp
-        }
-
-        file.workspaces.push(record)
-      }
-
-      const savedRequestEntries = Object.entries(file.savedRequests)
-
-      file.savedRequests = Object.fromEntries(
-        [...savedRequestEntries.slice(Math.max(0, savedRequestEntries.length - (SAVED_REQUEST_LIMIT - 1))), [requestId, { workspaceId: record.id, at: timestamp }]]
-      )
-
-      try {
-        store.persist(file)
-      } catch (error) {
-        return { ok: false, ...wslFailure('WSL_SAVE_FAILED', `Could not save the workspace: ${String((error as Error)?.message || error)}`, true) }
-      }
-
-      return { ok: true, workspace: record, requestIdReplay: false }
+      return enqueueCommit(() => commitSave(connection, normalized, name, requestId))
     },
 
     listWorkspaces() {
-      return { ok: true, workspaces: store.load().workspaces }
+      const loaded = readStore()
+
+      if (isWslFailure(loaded)) {
+        return loaded
+      }
+
+      return { ok: true, workspaces: loaded.file.workspaces }
     },
 
     async reconnectWorkspace({ workspaceId }) {
@@ -846,8 +921,13 @@ export function createWslWorkspaceHost(
         return { ok: false, ...wslFailure('WSL_NOT_FOUND', 'A workspace id is required.', false) }
       }
 
-      const file = store.load()
-      const record = file.workspaces.find(w => w.id === workspaceId)
+      const loaded = readStore()
+
+      if (isWslFailure(loaded)) {
+        return loaded
+      }
+
+      const record = loaded.file.workspaces.find(w => w.id === workspaceId)
 
       if (!record) {
         return { ok: false, ...wslFailure('WSL_NOT_FOUND', 'This workspace no longer exists.', false) }

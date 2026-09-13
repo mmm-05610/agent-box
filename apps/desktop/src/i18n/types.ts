@@ -3339,6 +3339,7 @@ export interface Translations {
     errWslListOverflow: string
     errWslSaveFailed: string
     errWslNotFound: string
+    errWslStoreFutureVersion: string
     errUnexpected: string
   }
 
