@@ -379,6 +379,13 @@
     "depends_on": ["35 WSL Workspace round 1"],
     "note": "Continue accepted c8d59f3 on feature/desktop-wsl-round1, not main. Exclusive override: 34 and all other product edits paused. Includes Electron persistence/IPC and i18n beyond Renderer scanner."
   },
+  "36R Workspace root structure repair": {
+    "edges": 0,
+    "modules": ["sidebar", "workspace", "projects", "layout", "wsl", "preload"],
+    "exclusive": true,
+    "depends_on": ["36 unified Workspace sidebar"],
+    "note": "Repair 250fb79 PARTIAL on same Zcode branch/worktree; do not require 36 GREEN. Scope adds local visibility/identity and path-space guards, WSL archive schema, root workspace projection. Electron/e2e/i18n beyond renderer scanner. Desktop only; backend37 independent Codex. Explicit exclusive schedule overrides waves."
+  },
   "34 AgentBox Desktop frontend branch": {
     "edges": 0,
     "modules": [

@@ -1,6 +1,7 @@
 # Renderer layer — mechanical batches
 
-**Current dispatch:** [36 — unified Workspace sidebar](36-workspace-sidebar-product.md).
+**Current dispatch:** [36R — Workspace structure repair](36R-workspace-structure-repair.md).
+36 at 250fb79 is PARTIAL after maintainer review; preserve its valid work and repair in place.
 35 is accepted at `c8d59f3` on the implementation branch, not merged. Continue that branch
 exclusively; preserve 35. Batch 34, previews and Codex/Work Core rounds remain paused.
 
