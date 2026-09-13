@@ -6,12 +6,13 @@
  * NOT a Playwright spec: a standalone driver that launches the built app on
  * Windows with an isolated userData and drives the 36R user path:
  *
- *   isolated identity (exe/userData/app name/build version, second instance
- *   must fail) → first-run gate → unified sidebar → 本地打开目录 (marker +
- *   real path via Copy path) → WSL 打开目录 → 同一列表（data-workspace-list
- *   层级断言） → 主行选中/展开（打开 info 不算切换） → 重命名 →
- *   移除=归档（同 id 重开恢复） → 空工作区搜索 → 本地隐藏(仅 WSL 列表) →
- *   窄侧栏名称/键盘 → 重开恢复 → WSL 重连
+ *   isolated identity (exe in the worktree/userData/build version, second
+ *   instance must fail and the first must survive) → first-run gate → unified
+ *   sidebar → 本地打开目录 (marker + real path via Copy path; a typed
+ *   path-scope refusal is recorded PENDING, never PASS) → WSL 打开目录 →
+ *   同一列表（data-workspace-list 层级断言） → 主行选中/展开（打开 info
+ *   不算切换） → 重命名 → 移除=归档（同 id 重开恢复） → 空工作区搜索 →
+ *   本地隐藏(仅 WSL 列表) → 窄侧栏名称/键盘 → 重开恢复 → WSL 重连
  *
  * Only the OS directory PICKER is stubbed (app.evaluate over the main-process
  * `dialog` module) — the picker performs the SELECTION only; the RESULT is
@@ -30,7 +31,9 @@
  *   node e2e/workspace-sidebar-round36-driver.mjs <sandboxRoot> <outDir>
  *
  * No model request is made, no credential is read, and the user's real
- * userData is never touched (app name overridden for the instance lock).
+ * userData is never touched: the isolated userData dir is the sandbox, and
+ * HERMES_DESKTOP_APP_NAME keeps the About/menu label distinct (the product
+ * never calls app.setName, so `app.getName()` stays the packaged productName).
  */
 
 /* eslint-disable no-undef -- the page.evaluate callbacks run in the renderer,
@@ -66,10 +69,22 @@ fs.writeFileSync(path.join(hermesHome, 'config.yaml'), '# acceptance round 36R: 
 // The local workspace the ＋→打开文件夹 flow opens. Real directory on the
 // Windows machine, created (not deleted) by the driver. A marker file inside
 // it is the DIRECTORY MARKER the result is verified against.
-const localDir = path.join(sandboxRoot, 'local-acceptance')
+//
+// The name carries a per-run suffix on purpose: the fresh sandbox covers
+// Electron's userData, but NOT the connected backend's Hermes home — a local
+// open from an earlier run stays in the gateway's project DB, so a fixed name
+// would let a STALE backend project answer for this run's pick.
+const localDirName = `local-acceptance-r36r-${Date.now().toString(36)}`
+const localDir = path.join(sandboxRoot, localDirName)
 const localMarker = path.join(localDir, '.36r-directory-marker')
 
+// The typed refusal the product shows when a Windows-local pick cannot live in
+// the backend's path space (the 36R boundary). Seeing it is the SAFETY BOUNDARY
+// passing, not a local product pass — it is recorded PENDING, never PASS.
+const PATH_SCOPE_REFUSAL = /Windows path|Windows 路径|Windows 路徑|remote backend|远程后端|遠端後端/
+
 const expectedBuildVersion = JSON.parse(fs.readFileSync(path.join(DESKTOP_ROOT, 'package.json'), 'utf8')).version
+const expectedProductName = JSON.parse(fs.readFileSync(path.join(DESKTOP_ROOT, 'package.json'), 'utf8')).productName
 
 // PASS/FAIL = executed; SKIP = not executable here (behavior tests cover it);
 // PENDING = correctly unsupported in this environment.
@@ -183,7 +198,15 @@ async function main() {
   record('app opens', 'PASS', `window title: ${title}`)
   await screenshot(page, 'boot')
 
-  // ─── step: isolated identity — REAL process path, userData, name, version ───
+  // ─── step: isolated identity — REAL process path, userData, version ───
+  // What the product contracts: `app.getPath('exe')` is the worktree's
+  // electron, `userData` is the sandbox override, and the build version is the
+  // worktree's own. `app.getName()` is NOT a sandbox override in this product:
+  // HERMES_DESKTOP_APP_NAME feeds APP_NAME (About panel / menu label / HUD
+  // title) and app.setName is never called, so the real process always answers
+  // with the packaged productName. Asserting the override there would test a
+  // feature the product does not claim; the isolated userData is what proves
+  // this is not the user's instance.
   let identityOk = true
   let identityDetail = ''
 
@@ -196,16 +219,17 @@ async function main() {
         version: electronApp.getVersion(),
         expected
       }),
-      { userDataDir, name: 'HermesWslRound1', version: expectedBuildVersion }
+      { userDataDir, name: expectedProductName, version: expectedBuildVersion }
     )
 
     const exeReal = facts.exePath.toLowerCase().endsWith('electron.exe')
+    const exeInWorktree = path.resolve(facts.exePath).toLowerCase().startsWith(path.resolve(REPO_ROOT).toLowerCase())
     const userDataOk = path.resolve(facts.userData).toLowerCase() === path.resolve(userDataDir).toLowerCase()
     const nameOk = facts.name === facts.expected.name
     const versionOk = facts.version === facts.expected.version
 
-    identityOk = exeReal && userDataOk && nameOk && versionOk
-    identityDetail = `exe=${facts.exePath} (real=${exeReal}); userData isolated=${userDataOk}; name=${facts.name} (match=${nameOk}); build=${facts.version} (match=${versionOk})`
+    identityOk = exeReal && exeInWorktree && userDataOk && nameOk && versionOk
+    identityDetail = `exe=${facts.exePath} (electron=${exeReal}, in-worktree=${exeInWorktree}); userData isolated=${userDataOk}; name=${facts.name} (productName match=${nameOk}; HERMES_DESKTOP_APP_NAME is a label-only override, app.setName is never called); build=${facts.version} (match=${versionOk})`
   } catch (error) {
     identityOk = false
     identityDetail = String(error).slice(0, 200)
@@ -227,18 +251,26 @@ async function main() {
     // The second process must not hand us a usable window: either the launch
     // itself fails, or every window it reports is gone (the lock quit it).
     await second.close().catch(() => undefined)
-    singleInstanceDetail = 'second instance exited (requestSingleInstanceLock refused it)'
+    singleInstanceDetail = 'second instance exited (requestSingleInstanceLock refused it — the same env, exe and args launched the first window, so the difference is the lock)'
   } catch (error) {
     singleInstanceDetail = `second instance failed to start: ${String(error).slice(0, 120)}`
   }
 
-  // The FIRST window must still be the live one.
+  // The FIRST window must still be the live one — and still answering: a
+  // surviving-but-frozen window is not evidence the lock let the second
+  // instance through, it is evidence of a hang.
   try {
     const windowsAfter = app.windows().length
+    const liveProbe = await page.evaluate(() => ({ title: document.title, ready: document.readyState }))
 
     if (windowsAfter < 1) {
       singleInstanceOk = false
       singleInstanceDetail = 'original window disappeared after the second launch'
+    } else if (liveProbe.ready !== 'complete') {
+      singleInstanceOk = false
+      singleInstanceDetail = `original window survived but is not live: readyState=${liveProbe.ready}`
+    } else {
+      singleInstanceDetail += `; original window still live (readyState=${liveProbe.ready}, title="${liveProbe.title}")`
     }
   } catch (error) {
     singleInstanceOk = false
@@ -277,7 +309,30 @@ async function main() {
     record('first-run setup applied', 'PASS', 'desktop reconnected against the real gateway')
     await page.waitForTimeout(3000)
   } else {
-    record('first-run setup', 'PASS', 'gate not shown; runtime already set up')
+    // The gate is skipped when a saved connection already exists (the desktop
+    // keeps its connection in the app's own config dir, outside userData, so a
+    // fresh sandbox does not guarantee a fresh gate). Do not take "already set
+    // up" on faith: the boot log must name the backend this run actually
+    // drives, and it must be the isolated WSL gateway — not a local runtime.
+    const bootLog = path.join(hermesHome, 'logs', 'desktop.log')
+    let log = ''
+
+    try {
+      log = fs.readFileSync(bootLog, 'utf8')
+    } catch {
+      log = ''
+    }
+
+    const connectedToGateway = log.includes(`Connecting to remote Hermes backend at ${gatewayUrl}`)
+    const backendReady = log.includes('Remote Hermes backend is ready')
+
+    record(
+      'backend this run drives',
+      connectedToGateway && backendReady ? 'PASS' : 'FAIL',
+      connectedToGateway && backendReady
+        ? `no gate (saved connection); boot log: remote backend ${gatewayUrl} ready`
+        : `boot log does not show ${gatewayUrl} ready (saw connection=${connectedToGateway}, ready=${backendReady})`
+    )
   }
 
   try {
@@ -350,9 +405,17 @@ async function main() {
   await page.waitForTimeout(400)
 
   // Stub ONLY the OS directory picker (the one thing an automated window
-  // cannot do); everything after the pick runs the real flow.
+  // cannot do); everything after the pick runs the real flow. The stub counts
+  // its own invocations, because whether the product ever ASKS for the OS
+  // dialog decides how the local open must be classified: remote mode routes
+  // the folder picker to the in-app backend browser instead, and then a
+  // Windows-local pick cannot enter the flow at all.
   await app.evaluate(({ dialog }, dir) => {
-    dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [dir] })
+    globalThis.__r36rOsDialogCalls = 0
+    dialog.showOpenDialog = async () => {
+      globalThis.__r36rOsDialogCalls += 1
+      return { canceled: false, filePaths: [dir] }
+    }
   }, localDir)
 
   const headerAdd = page.locator('[data-slot="dropdown-menu-trigger"][aria-label="Open folder"], [data-slot="dropdown-menu-trigger"][aria-label="打开文件夹"]').first()
@@ -446,7 +509,15 @@ async function main() {
     wslRecord1 ? `host record ${wslRecord1.id} rootPath=${wslRecord1.rootPath}` : `no host record with rootPath=${acceptanceDir}; store=${JSON.stringify(hostRecordIds())}`
   )
 
-  // ─── step: the WSL-only workspace body + EXPAND to the honest prompt ───
+  // ─── step: the workspace-only body after the FIRST (WSL) save + EXPAND to
+  // the honest prompt ───
+  //
+  // The assertion level is the one list (`[data-workspace-list]`), never an
+  // ancestor sweep. `localIds` is REPORTED, not judged: the connected backend
+  // is authoritative for projects, and its Hermes home (outside the fresh
+  // sandbox) still knows projects an earlier run left behind — those are
+  // backend truth, not a local workspace this run created. What this run owns
+  // is the desktop-side store, so that is what the step pins.
   let wslOnlyList = null
 
   try {
@@ -456,11 +527,20 @@ async function main() {
     wslOnlyList = null
   }
 
-  const wslOnlyOk = Boolean(wslOnlyList) && wslOnlyList.wslIds.length >= 1 && wslOnlyList.localIds.length === 0
+  const storeAfterFirstSave = hostStore().workspaces
+  const onlyThisWslRecord =
+    storeAfterFirstSave.length === 1 &&
+    storeAfterFirstSave[0].id === wslRecord1?.id &&
+    storeAfterFirstSave[0].kind === 'wsl' &&
+    storeAfterFirstSave[0].archivedAt === null
+  const wslOnlyOk =
+    Boolean(wslOnlyList) && wslOnlyList.wslIds.includes(wslRecord1?.id) && onlyThisWslRecord
   record(
-    'WSL-only workspace body (no sessions, no local projects)',
+    'WSL save registers exactly one desktop-side record; row lives at [data-workspace-list]',
     wslOnlyOk ? 'PASS' : 'FAIL',
-    wslOnlyList ? `list=${JSON.stringify(wslOnlyList)}` : 'no [data-workspace-list] rendered'
+    wslOnlyList
+      ? `list=${JSON.stringify(wslOnlyList)}; host records=${JSON.stringify(hostRecordIds())}; backend-known local rows=${wslOnlyList.localIds.length} (reported, not judged)`
+      : 'no [data-workspace-list] rendered'
   )
   await screenshot(page, 'wsl-only-list')
 
@@ -478,17 +558,21 @@ async function main() {
   const promptAfterExpand = await page.locator(`[data-wsl-workspace-empty="${wslRowId}"]`).count()
 
   let expandText = ''
-  let noSessionStarted = true
 
   if (promptAfterExpand === 1) {
     expandText = (await page.locator(`[data-wsl-workspace-empty="${wslRowId}"]`).textContent()) || ''
-    noSessionStarted = true // no "new session" affordance exists on the row at all
   }
+
+  // The honest empty state must not offer a session starter it cannot honor:
+  // a WSL row's actions are reconnect / connection info / kebab, and the
+  // expanded body is the "not part of this round yet" note — nothing that
+  // would pretend a session can be created here.
+  const sessionStarter = await wslRow.getByRole('button', { name: /New session|新建会话/ }).count()
 
   record(
     'WSL row expands to the honest unavailable prompt',
-    promptAfterExpand === 1 && expandText.trim().length > 0 ? 'PASS' : 'FAIL',
-    `prompt visible=${promptAfterExpand === 1}; text="${expandText.trim().slice(0, 80)}"`
+    promptAfterExpand === 1 && expandText.trim().length > 0 && sessionStarter === 0 ? 'PASS' : 'FAIL',
+    `prompt visible=${promptAfterExpand === 1}; text="${expandText.trim().slice(0, 80)}"; session starters on the row=${sessionStarter}`
   )
   await screenshot(page, 'wsl-expanded')
 
@@ -498,52 +582,78 @@ async function main() {
   await headerAdd.click({ force: true })
   await page.waitForTimeout(500)
   await page.getByRole('menuitem', { name: /Open folder|打开文件夹/ }).first().click()
-  await page.waitForTimeout(4000)
+
+  // Poll for the typed refusal while it is still on screen (a toast lives a
+  // couple of seconds) and stop early if this run's OWN row appears instead.
+  // The row is matched by the per-run directory name, so a stale backend
+  // project with a similar name can never answer for this pick.
+  const freshLocalRow = page
+    .locator('[data-workspace-list] [data-sessions-project]')
+    .filter({ hasText: localDirName })
+    .first()
+
+  let refusalText = ''
+
+  for (let attempt = 0; attempt < 20 && !refusalText; attempt += 1) {
+    await page.waitForTimeout(300)
+
+    if (await freshLocalRow.isVisible().catch(() => false)) {
+      break
+    }
+
+    const refusal = page.getByText(PATH_SCOPE_REFUSAL).first()
+
+    if (await refusal.isVisible().catch(() => false)) {
+      refusalText = ((await refusal.textContent().catch(() => '')) || '').trim()
+    }
+  }
+
+  await page.waitForTimeout(1200)
   await screenshot(page, 'local-opened')
 
-  // The typed refusal (remote-mode backend + a Windows path) is the safety
-  // boundary passing: record PENDING — the local REAL open is unsupported in
-  // a WSL-Hermes-only environment, and this run does not claim it.
-  const refusalVisible = await page
-    .getByText(/Windows path|无法打开|cannot be verified|无法核验|cannot open it/)
-    .first()
-    .isVisible()
-    .catch(() => false)
-
   let localStepStatus = 'FAIL'
-  let localDetail = 'local-acceptance row missing after the pick'
+  let localDetail = `no row for ${localDirName} after the pick and no typed refusal`
+  let freshLocalRowId = ''
 
-  const localRowInList = await page
-    .locator('[data-workspace-list] [data-sessions-project]')
-    .filter({ hasText: 'local-acceptance' })
+  const localRowInList = await freshLocalRow.isVisible().catch(() => false)
+  const osDialogCalls = await app.evaluate(() => globalThis.__r36rOsDialogCalls ?? 0).catch(() => -1)
+  // Which surface is up now: the backend browser is a Dialog, so report what it
+  // says it is instead of guessing.
+  const openDialogText = await page
+    .getByRole('dialog')
     .first()
-    .isVisible()
-    .catch(() => false)
+    .textContent()
+    .catch(() => null)
+  const pickerSurface = `osDialogCalls=${osDialogCalls}, dialog="${(openDialogText || '').replace(/\s+/g, ' ').trim().slice(0, 60)}"`
 
-  if (refusalVisible) {
+  if (refusalText) {
+    // The typed refusal (remote-mode backend + a Windows path) is the safety
+    // boundary passing: record PENDING — the local REAL open is unsupported in
+    // a WSL-Hermes-only environment, and this run does not claim it.
     localStepStatus = 'PENDING'
-    localDetail = 'typed path-scope refusal shown: Windows-local real open is unsupported against this WSL-only backend (boundary passed; local path recorded PENDING)'
+    localDetail = `typed path-scope refusal: "${refusalText.slice(0, 160)}" — Windows-local real open unsupported against this WSL-only backend (boundary passed; local product path recorded PENDING)`
     await screenshot(page, 'local-refused')
     record('local open (Windows real path)', localStepStatus, localDetail)
   } else if (localRowInList) {
     localStepStatus = 'PASS'
-    localDetail = 'local-acceptance row inside [data-workspace-list]'
+    localDetail = `${localDirName} row inside [data-workspace-list]`
     record('local open (Windows real path)', localStepStatus, localDetail)
+
+    freshLocalRowId = (await freshLocalRow.getAttribute('data-sessions-project')) || ''
 
     // Directory marker: the pick's result is the REAL directory.
     record('local directory marker present', fs.existsSync(localMarker) ? 'PASS' : 'FAIL', localMarker)
 
-    // The project's own path via the real UI: row context menu → Copy path,
-    // then read the MAIN-process clipboard.
+    // The project's own path via the real UI: the row's kebab menu → Copy
+    // path, then read the MAIN-process clipboard.
     let copyPathOk = false
     let copied = ''
 
     try {
-      const localRowBody = page.locator('[data-workspace-list] [data-sessions-project]').filter({ hasText: 'local-acceptance' }).first()
-
-      await localRowBody.click({ button: 'right' })
-      await page.waitForTimeout(700)
-      await page.getByRole('menuitem', { name: /Copy path|复制路径/ }).first().click()
+      await freshLocalRow.hover()
+      await page.waitForTimeout(300)
+      await freshLocalRow.locator('div[data-row-actions] button').first().click({ force: true })
+      await page.getByRole('menuitem', { name: /Copy path|复制路径/ }).first().click({ timeout: 10000 })
       await page.waitForTimeout(900)
 
       copied = await app.evaluate(({ clipboard }) => clipboard.readText())
@@ -557,8 +667,35 @@ async function main() {
       copyPathOk ? 'PASS' : 'FAIL',
       `clipboard=${copied}; expected=${localDir}`
     )
-  } else {
+  } else if (osDialogCalls === 0) {
+    // The product never asked for the OS dialog: in remote mode the folder
+    // picker is the backend browser (the desktop's own path space is not what
+    // the pick addresses). A Windows-local directory therefore cannot enter
+    // this flow — no row for this run's directory was created, and this run
+    // does not claim a local product pass. Boundary intact; recorded PENDING.
+    localStepStatus = 'PENDING'
+    localDetail = `Windows-local real open unsupported against this WSL-only backend: the picker never asked for the OS dialog (${pickerSurface}), so a Windows-local directory cannot enter the flow — no ${localDirName} row was created`
+    await screenshot(page, 'local-picker-surface')
     record('local open (Windows real path)', localStepStatus, localDetail)
+  } else {
+    localDetail = `the OS dialog ran (calls=${osDialogCalls}) and returned ${localDir}, but the product created no row and showed no typed refusal`
+    record('local open (Windows real path)', localStepStatus, localDetail)
+  }
+
+  // Close whatever picker surface is still up so the row steps below drive the
+  // sidebar, not a modal.
+  if (openDialogText) {
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(600)
+
+    if (await page.getByRole('dialog').first().isVisible().catch(() => false)) {
+      await page
+        .getByRole('button', { name: /^Cancel$|取消|^Close$|关闭/ })
+        .last()
+        .click({ force: true })
+        .catch(() => undefined)
+      await page.waitForTimeout(600)
+    }
   }
 
   await screenshot(page, 'local-in-list')
@@ -568,15 +705,15 @@ async function main() {
   if (!localOpened) {
     record(
       'local-row dependent steps',
-      localStepStatus === 'PENDING' ? 'SKIP' : 'SKIP',
-      'copy-path/entered-project/local-hide steps require a successfully opened local row; behavior tests cover them'
+      'SKIP',
+      `copy-path/entered-project/local-hide steps require a successfully opened local row (this run: ${localStepStatus}); behavior tests cover them`
     )
   }
 
   // ─── step: BOTH rows live in the ONE workspace list (asserted AT the list) ───
   if (localOpened) {
     const both = await workspaceListContents(page)
-    const bothOk = Boolean(both) && both.wslIds.length >= 1 && both.localIds.length >= 1
+    const bothOk = Boolean(both) && both.wslIds.length >= 1 && both.localIds.includes(freshLocalRowId)
 
     record(
       'local and WSL in one list (asserted at [data-workspace-list])',
@@ -590,7 +727,9 @@ async function main() {
     let enterOk = true
 
     try {
-      await page.locator('[data-workspace-list] [data-sessions-project]').filter({ hasText: 'local-acceptance' }).first().click()
+      // The main row's select surface is its label button (the same convention
+      // as the WSL row), not the wrapper div.
+      await freshLocalRow.locator('button').first().click()
       await page.waitForTimeout(1500)
       await screenshot(page, 'switched-local')
 
@@ -694,7 +833,7 @@ async function main() {
       // ...open row B's connection info via its dedicated button...
       const rowB = page.locator(`[data-wsl-workspace-row="${secondId}"]`)
 
-      await rowB.locator('[data-row-actions] button[aria-label]').nth(1).click({ force: true })
+      await rowB.locator('div[data-row-actions] button[aria-label]').nth(1).click({ force: true })
       await page.getByRole('dialog').waitFor({ state: 'visible', timeout: 8000 })
       await page.waitForTimeout(500)
       await screenshot(page, 'info-open-on-b')
@@ -723,9 +862,9 @@ async function main() {
       .locator('[data-wsl-workspace-row]')
       .filter({ hasText: '子目录' })
       .first()
-    await removableRow.locator('[data-row-actions]').hover()
+    await removableRow.locator('div[data-row-actions]').hover()
     await page.waitForTimeout(400)
-    await removableRow.locator('[data-row-actions]').getByRole('button').last().click({ force: true })
+    await removableRow.locator('div[data-row-actions]').getByRole('button').last().click({ force: true })
     await page.waitForTimeout(600)
     await screenshot(page, 'remove-menu')
     await page.getByRole('menuitem', { name: /Remove from sidebar|从侧栏移除/ }).first().click()
@@ -814,31 +953,54 @@ async function main() {
     record('empty-workspace search', 'FAIL', String(error).slice(0, 160))
   }
 
-  // ─── step: 窄侧栏 + 键盘 — the name survives the squeeze, keyboard selects ───
+  // ─── step: 窄侧栏 + 键盘 — the name stays readable, keyboard selects ───
+  //
+  // The row's OWN claim ("the name must stay readable even when the badges
+  // squeeze the row") is measured, not assumed: the name span's rendered width
+  // against its scrollWidth at the default layout, plus the same numbers under
+  // a squeezed window. A name collapsed to a few pixels is a FAIL, not a
+  // "narrow layout" excuse — the row is the same width in both cases.
+  const measureRowName = () =>
+    page.evaluate(id => {
+      const row = document.querySelector(`[data-wsl-workspace-row="${id}"]`)
+
+      if (!row) {
+        return null
+      }
+
+      const rect = element => (element ? element.getBoundingClientRect() : null)
+      const label = row.querySelector('button')
+      const nameSpan = label?.querySelector('span span')
+
+      return {
+        label: Math.round(rect(label)?.width ?? -1),
+        name: Math.round(rect(nameSpan)?.width ?? -1),
+        nameScroll: nameSpan?.scrollWidth ?? -1,
+        nameText: (nameSpan?.textContent || '').trim(),
+        row: Math.round(rect(row)?.width ?? -1)
+      }
+    }, wslRowId)
+
   try {
+    const defaultMetrics = await measureRowName()
     const narrow = page.viewportSize()
 
     await page.setViewportSize({ width: Math.max(640, Math.floor((narrow?.width ?? 1200) * 0.55)), height: narrow?.height ?? 700 })
     await page.waitForTimeout(800)
+    const narrowMetrics = await measureRowName()
+    await screenshot(page, 'narrow-sidebar')
 
-    const nameWidth = await page.evaluate(id => {
-      const row = document.querySelector(`[data-wsl-workspace-row="${id}"]`)
-
-      if (!row) {
-        return -1
-      }
-
-      const nameSpan = row.querySelector('button span span')
-
-      return nameSpan ? nameSpan.getBoundingClientRect().width : -1
-    }, wslRowId)
-
-    record('narrow sidebar keeps the WSL name readable', nameWidth > 20 ? 'PASS' : 'FAIL', `name width=${Math.round(nameWidth)}px`)
+    const nameOk = Boolean(defaultMetrics) && defaultMetrics.name > 20
+    record(
+      'WSL row keeps its name readable',
+      nameOk ? 'PASS' : 'FAIL',
+      `default layout: name=${defaultMetrics?.name}px of "${defaultMetrics?.nameText}" (label=${defaultMetrics?.label}px, row=${defaultMetrics?.row}px, text needs ${defaultMetrics?.nameScroll}px); squeezed window: name=${narrowMetrics?.name}px`
+    )
 
     await page.setViewportSize({ width: narrow?.width ?? 1200, height: narrow?.height ?? 700 })
     await page.waitForTimeout(600)
   } catch (error) {
-    record('narrow sidebar keeps the WSL name readable', 'FAIL', String(error).slice(0, 160))
+    record('WSL row keeps its name readable', 'FAIL', String(error).slice(0, 160))
   }
 
   try {
@@ -891,17 +1053,30 @@ async function main() {
   // (the diagnostics surface) reports the verified identity ───
   const row2 = page2.locator(`[data-wsl-workspace-row="${wslRowId}"]`)
   let reconnectOk = true
+  let reconnectDetail = ''
 
   try {
-    await row2.locator('[data-row-actions] button').nth(2).click({ force: true })
-    await page2.getByRole('dialog').waitFor({ state: 'visible', timeout: 8000 })
+    // Connection info is the row's dedicated button (aria-label), never the
+    // main row — opening it must not be how you switch workspace.
+    await row2.locator('div[data-row-actions] button[aria-label]').nth(1).click({ force: true })
+    const dialog = page2.getByRole('dialog')
+
+    await dialog.waitFor({ state: 'visible', timeout: 8000 })
     // Reconnect from the dialog (the workspace's private connection surface).
-    await page2.getByRole('button', { name: /Reconnect|重新连接/ }).last().click()
-    await page2.getByText(/Verified|已验证/).first().waitFor({ state: 'visible', timeout: 25000 })
-  } catch {
+    await dialog.getByRole('button', { name: /Reconnect|重新连接/ }).click()
+    // The status pill must end at exactly "Verified" (an exact match keeps the
+    // always-present "Verified user" label row out of the assertion).
+    await dialog.getByText('Verified', { exact: true }).waitFor({ state: 'visible', timeout: 30000 })
+
+    // The dialog's own Directory row is the product's report of the real path.
+    const reportsRealPath = (await dialog.textContent().catch(() => ''))?.includes(acceptanceDir)
+    reconnectDetail = `connection info reports the verified identity at ${acceptanceDir} (dialog shows the real rootPath=${Boolean(reportsRealPath)})`
+    reconnectOk = Boolean(reportsRealPath)
+  } catch (error) {
     reconnectOk = false
+    reconnectDetail = `re-verification failed: ${String(error).slice(0, 140)}`
   }
-  record('reopen: reconnect re-verifies', reconnectOk ? 'PASS' : 'FAIL', reconnectOk ? 'connection info reports the verified identity' : 're-verification failed')
+  record('reopen: reconnect re-verifies', reconnectOk ? 'PASS' : 'FAIL', reconnectDetail)
   await screenshot(page2, 'reopen-reconnected')
 
   await app2.close()
@@ -924,10 +1099,13 @@ async function main() {
   process.exit(allOk ? 0 : 1)
 }
 
-/** Open a WSL row's kebab menu (hover-revealed actions). */
+/** Open a WSL row's kebab menu (hover-revealed actions).
+ *
+ *  Scoped to the actions DIV: the row's disclosure caret is also marked
+ *  `data-row-actions`, so the bare attribute selector matches two elements. */
 async function rowMenuFor(page, rowId) {
   const row = page.locator(`[data-wsl-workspace-row="${rowId}"]`)
-  const actions = row.locator('[data-row-actions]')
+  const actions = row.locator('div[data-row-actions]')
 
   await actions.hover()
   await page.waitForTimeout(400)
