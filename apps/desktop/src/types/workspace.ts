@@ -1,10 +1,36 @@
 /**
- * types/workspace.ts — WSL Workspace DTOs (work order 35).
+ * types/workspace.ts — WSL Workspace DTOs (work order 35) and the neutral
+ * workspace list shapes (work order 36R).
  *
  * Neutral request/response shapes and the persisted Workspace projection.
  * Rank 0: imports nothing product-side. These mirror the Electron host
  * service's outcome shapes; the renderer never parses wsl.exe output.
  */
+
+/** Which authority a workspace row comes from (36R): the backend project tree
+ *  or the Electron host's WSL workspace store. View-preference keys build on
+ *  this so a hide never crosses backends. */
+export type WorkspaceBackend = 'local' | 'wsl'
+
+/** One row of the unified workspace list — a VIEW of two authoritative stores,
+ *  carrying neither sessions nor online status. Neutral on purpose: any layer
+ *  may consume it without importing features/store/application. */
+export interface WorkspaceListItem {
+  id: string
+  backend: WorkspaceBackend
+  name: string
+  /** Local project path (desktop path space) or the WSL rootPath (POSIX). */
+  path: null | string
+  /** Secondary line (e.g. `Ubuntu · /home/…` for WSL rows). */
+  detail: null | string
+  sessionCount: number
+}
+
+/** A workspace that answered a sidebar search by its name or its path. */
+export interface WorkspaceSearchHit {
+  item: WorkspaceListItem
+  matchedBy: 'name' | 'path'
+}
 
 export type WslWorkspaceErrorCode =
   | 'WSL_UNAVAILABLE'

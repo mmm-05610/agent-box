@@ -14,6 +14,9 @@ import { searchResultToSession } from '@/application/session-lists/search-view-m
 import { buildSessionByAnyId, resolvePinnedSessions } from '@/application/session-lists/session-index'
 import { markSessionUnread } from '@/application/session-read-state'
 import { orderByIds, reconcileOrderIds, resolveManualSessionOrderIds, sameIds } from '@/application/sidebar/order'
+import { projectWorkspaceList, searchWorkspaceItems } from '@/application/workspace/workspace-projection'
+import { refreshWslWorkspaces } from '@/application/workspace/wsl-workspace-usecases'
+import { Pill } from '@/components/settings/primitives'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
 import { DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
@@ -112,8 +115,10 @@ import { $focusedSessionIsTile, $focusedStoredSessionId, $workingSessionIds } fr
 import { ackAllSessionsRead } from '@/store/session-unread'
 import { $archivedSessions, loadArchivedSessions } from '@/store/sidebar-archive'
 import { $sidebarSessionRankIds } from '@/store/sidebar-sort'
-import { openWslWorkspaceWizard } from '@/store/wsl-workspace'
+import { $workspaceViewSelectedId, selectWorkspaceView } from '@/store/workspace-view'
+import { $wslWorkspaces, openWslWorkspaceWizard } from '@/store/wsl-workspace'
 import { type SessionInfo, type SessionSearchResult } from '@/types/hermes'
+import { type WorkspaceListItem } from '@/types/workspace'
 
 import { SidebarSectionAddButton } from './chrome'
 import { SidebarFilterMenu } from './filter-menu'
@@ -240,6 +245,8 @@ export function ChatSidebar({
   const projectOrderIds = useStore($sidebarProjectOrderIds)
   const projects = useStore($projects)
   const projectTree = useStore($projectTree)
+  const wslWorkspaces = useStore($wslWorkspaces)
+  const workspaceViewSelectedId = useStore($workspaceViewSelectedId)
 
   // The persisted project filter's storage is shared across profiles, so ids
   // picked in another profile don't resolve in the active one and the raw
@@ -272,6 +279,15 @@ export function ChatSidebar({
     window.addEventListener(SESSION_SEARCH_FOCUS_EVENT, onFocus)
 
     return () => window.removeEventListener(SESSION_SEARCH_FOCUS_EVENT, onFocus)
+  }, [])
+
+  // The WSL projection is the sidebar's own authority cache (36R): refresh it
+  // when the sidebar mounts, so WSL-only environments render their workspace
+  // rows even when no session/project gives the body a reason to exist.
+  // Failures stay silent here — the section's own refresh surfaces the typed
+  // reason once, when its rows are actually on screen.
+  useEffect(() => {
+    void refreshWslWorkspaces().then(() => undefined, () => undefined)
   }, [])
 
   const activeSidebarSessionId = currentView === 'chat' ? selectedSessionId : null
@@ -513,7 +529,14 @@ export function ChatSidebar({
   // Workspace grouping is a `project -> repo -> lane -> sessions` tree computed
   // authoritatively on the backend (projects.tree). Parents reorder via
   // workspaceParentOrderIds; worktrees within a parent via workspaceOrderIds.
-  const worktreeGroupingActive = agentsGrouped && !showArchived
+  //
+  // Round 36R: the workspace tree is the sidebar's SUBJECT, not a grouping
+  // option. Date/status/flat preferences shape the sessions INSIDE workspaces;
+  // they no longer cut the workspace body off. Only the archived view (a flat
+  // list of its own set) and the all-profiles group view keep the old
+  // body swap. Legacy "group by project" preferences are simply ignored here —
+  // no localStorage migration is required.
+  const worktreeGroupingActive = !showArchived && grouping !== 'profile'
   const gatewayReady = gatewayState === 'open'
 
   // The backend project tree is a structural snapshot, NOT a per-message feed.
@@ -944,6 +967,39 @@ export function ChatSidebar({
     [projectModel, syncProjectCwd]
   )
 
+  // The unified workspace projection (36R): local rows from the ordered
+  // project model, WSL rows appended as peers. Feeds both the search hits and
+  // (from stage 2 on) the root workspace list.
+  const workspaceItems = useMemo(
+    () => projectWorkspaceList({ projects: projectModel, wslWorkspaces }),
+    [projectModel, wslWorkspaces]
+  )
+
+  // Search reaches workspaces by NAME or PATH — a zero-session workspace is
+  // still findable. Read-only over the view state: clearing the query restores
+  // the exact prior selection/expansion.
+  const workspaceSearchHits = useMemo(
+    () => searchWorkspaceItems(workspaceItems, trimmedQuery),
+    [workspaceItems, trimmedQuery]
+  )
+
+  // Activating a workspace hit navigates to it: local rows enter their project
+  // (existing navigation), WSL rows select the workspace row — the same intent
+  // the main rows carry. The search text clears so the workspace body (which
+  // owns the selection) comes back into view.
+  const onWorkspaceHitActivate = useCallback(
+    (item: WorkspaceListItem) => {
+      if (item.backend === 'local') {
+        onEnterProject(item.id)
+      } else {
+        selectWorkspaceView(item.id)
+      }
+
+      setSearchQuery('')
+    },
+    [onEnterProject]
+  )
+
   // The Sessions section is a project switcher in grouped mode: its label reads
   // "Sessions" when flat, "Projects" at the overview, and the project's name
   // once you've entered one.
@@ -1095,10 +1151,14 @@ export function ChatSidebar({
   // every background refresh instead of the empty state.
   const showSessionSkeletons = sessionsLoading && scopedSessions.length === 0
 
-  // Filtered down to nothing still renders the section: the empty state is what
-  // tells you the filter — not an empty account — is why the list is bare.
+  // The workspace is the subject: WSL-only rows (no sessions, no local
+  // projects) still get the sidebar body (36R).
   const showSessionSections =
-    showSessionSkeletons || filtersActive || sortedSessions.length > 0 || projectModel.length > 0
+    showSessionSkeletons ||
+    filtersActive ||
+    sortedSessions.length > 0 ||
+    projectModel.length > 0 ||
+    wslWorkspaces.length > 0
 
   // The sidebar's session-area mode — exposed as data-attributes so custom
   // skins can target project mode (overview vs. entered), archived, or search
@@ -1171,14 +1231,49 @@ export function ChatSidebar({
             data-sessions-mode={sessionsMode}
             data-sessions-project={inProject ? (enteredProjectId ?? undefined) : undefined}
           >
+            {/* Workspace hits (36R): a workspace answers the search by its
+                name or its path — even with zero sessions — and keeps its own
+                navigable row above the session results. */}
+            {trimmedQuery && workspaceSearchHits.length > 0 && (
+              <div className="shrink-0 px-1.5 pb-1" data-workspace-search-results>
+                <div className="flex flex-col gap-px">
+                  {workspaceSearchHits.map(hit => (
+                    <button
+                      aria-label={hit.item.name}
+                      className="flex min-w-0 items-center gap-2 rounded-md px-1.5 py-1.5 text-left transition-colors hover:bg-(--ui-control-hover-background)"
+                      data-workspace-search-hit={hit.item.id}
+                      key={hit.item.id}
+                      onClick={() => onWorkspaceHitActivate(hit.item)}
+                      type="button"
+                    >
+                      <span className="grid size-4 shrink-0 place-items-center text-(--ui-text-tertiary)">
+                        <Codicon
+                          name={hit.item.backend === 'wsl' ? 'vm-connect' : 'folder-library'}
+                          size="0.875rem"
+                        />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-xs leading-4">{hit.item.name}</span>
+                        {hit.item.path && (
+                          <span className="block truncate text-[0.625rem] leading-3.5 text-(--ui-text-quaternary)">
+                            {hit.item.detail ?? hit.item.path}
+                          </span>
+                        )}
+                      </span>
+                      {hit.item.backend === 'wsl' && <Pill tone="muted">{t.wslWorkspace.wslBadge}</Pill>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {trimmedQuery && (
               <SidebarSessionsSection
                 activeSessionId={activeSidebarSessionId}
                 // Search results always render as cards: the card header line
                 // IS the workspace attribution, and a search hit must say
                 // which workspace it lives in (round 36).
-                card
-                contentClassName={cn('flex min-h-0 flex-1 flex-col gap-px pb-1.75', SCROLL_Y)}
+                card                contentClassName={cn('flex min-h-0 flex-1 flex-col gap-px pb-1.75', SCROLL_Y)}
                 emptyState={
                   searchPending ? (
                     <SidebarSessionSkeletons />
@@ -1357,7 +1452,7 @@ export function ChatSidebar({
                             the dropped spot. */}
                         <SidebarSectionAddButton
                           addMenu={
-                            agentsGrouped ? (
+                            worktreeGroupingActive ? (
                               <>
                                 <DropdownMenuLabel>{t.wslWorkspace.menuOpenFolder}</DropdownMenuLabel>
                                 {/* Round-36 add menu: exactly two entries. The local
@@ -1384,10 +1479,10 @@ export function ChatSidebar({
                               </>
                             ) : undefined
                           }
-                          ariaLabel={agentsGrouped ? t.wslWorkspace.menuOpenFolder : s.nav['new-session']}
-                          onNewSessionSplit={agentsGrouped ? undefined : onNewSessionSplit}
+                          ariaLabel={worktreeGroupingActive ? t.wslWorkspace.menuOpenFolder : s.nav['new-session']}
+                          onNewSessionSplit={worktreeGroupingActive ? undefined : onNewSessionSplit}
                           onPlainClick={() => {
-                            if (agentsGrouped) {
+                            if (worktreeGroupingActive) {
                               void openFolderAsProject()
                             } else {
                               onNewSessionInWorkspace(null)

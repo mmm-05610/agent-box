@@ -26,6 +26,7 @@ import { wslFailureText } from '@/features/workspace/wsl-failure-text'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
 import { notify, notifyError } from '@/store/notifications'
+import { $workspaceViewSelectedId, selectWorkspaceView } from '@/store/workspace-view'
 import { $wslWorkspaceInfoId, $wslWorkspaces, $wslWorkspaceValidation, openWslWorkspaceInfo } from '@/store/wsl-workspace'
 import type { WslWorkspaceValidationState } from '@/store/wsl-workspace'
 import type { WslWorkspaceRecord } from '@/types/workspace'
@@ -144,6 +145,7 @@ function WslWorkspaceRow({
   const { t } = useI18n()
   const w = t.wslWorkspace
   const validating = state?.status === 'validating'
+  const selected = useStore($workspaceViewSelectedId) === workspace.id
   // WSL rows start collapsed — unlike local projects (whose previews read
   // better expanded), the no-sessions prompt is a detail the user opens.
   const [open, toggleOpen] = useWorkspaceNodeOpen(workspace.id, false)
@@ -157,8 +159,15 @@ function WslWorkspaceRow({
       data-wsl-workspace-row={workspace.id}
     >
       <button
-        className="flex min-w-0 items-center gap-2 rounded-md px-1.5 py-1.5 text-left transition-colors hover:bg-(--ui-control-hover-background)"
-        onClick={() => openWslWorkspaceInfo(workspace.id)}
+        className={cn(
+          'flex min-w-0 items-center gap-2 rounded-md px-1.5 py-1.5 text-left transition-colors hover:bg-(--ui-control-hover-background)',
+          selected && 'bg-(--ui-row-active-background)'
+        )}
+        // Round 36R: the main row's meaning is SELECT (the same intent the
+        // local rows carry) — never "open connection info". Connection info
+        // stays on its dedicated button and menu entry.
+        data-workspace-row-selected={selected ? workspace.id : undefined}
+        onClick={() => selectWorkspaceView(workspace.id)}
         type="button"
       >
         <span className="grid size-4 shrink-0 place-items-center text-(--ui-text-tertiary)">
