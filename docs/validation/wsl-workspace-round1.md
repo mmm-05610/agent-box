@@ -95,6 +95,42 @@ Windows Desktop 连接该真实网关后完整启动（状态栏 client v0.17.2 
 configuredUser: null, actualUser: maoqh, rootPath: /home/maoqh/wsl-round1-验收 目录}`；
 跨多次运行的重复保存（不同 requestId）全部幂等去重到同一条。
 
+## 定向返修（同分支第二轮，2026-09-13）
+
+提交 `d010d48` + 证据更新提交。测试先行：4 个新测试先在旧实现上红，修复后绿。
+
+1. **并发保存安全**：目录验证（远程读）移到提交区外；提交区经 promise 链串行化，
+   区内"重新 load → requestId 幂等 → 同位置去重 → persist"。行为测试（门控 ls
+   强制两者都持有旧快照后依次提交）：
+   - 并发保存不同 Workspace → 两条均保留 ✓
+   - 相同 requestId 并发重试 → 同一记录 ✓
+   - 不同 requestId 并发保存同一位置 → 单条 ✓
+   （配套：内存假 store 的 load 改为每次深拷贝，对齐磁盘语义，否则竞态不可观测。）
+2. **新版存储保护**：`version > 1` 的存储文件读取抛
+   `WslWorkspaceStoreFutureVersionError`，service 全部读路径经 `readStore()`
+   返回 typed failure `WSL_STORE_FUTURE_VERSION`（不可重试），保存被阻止；
+   测试断言读取+尝试保存后原文件字节不变。Renderer：新增错误文案（en/zh/zh-hant）、
+   向导映射；侧栏刷新失败保留现有行并以 typed 原因告警（不再可能伪装成空列表）。
+3. **验收断言修正**：驱动"取消不新增"改为比较 `data-wsl-workspace-row` 行身份
+   集合 + 宿主 `wsl-workspaces.json` 记录集合前后一致（不再统计区块内全部 button）。
+4. **手动验收入口**：文档重写为真实可执行步骤（网关启停脚本、通过启动门的操作
+   顺序、精确退出与回收）；删除 home\dummy 占位命令。token 由网关运行时生成
+   （首启生成、重启复用，权限 600），驱动经 UNC 直接读取、不经手不打印；
+   明确标注依赖外部 Hermes 网关通过启动门是本轮已知限制，未修复启动架构。
+
+### 本轮新验证 vs 沿用证据
+
+- 本轮新验证（返修后）：
+  - 定向测试 `wsl-workspace.test.ts` 31/31（含 3 个并发行为 + 新版本字节不变），
+    `wsl-workspace-usecases` 11/11；
+  - Desktop typecheck（3 个 tsc 项目）绿；变更文件 eslint 0 问题；`git diff --check` 干净；
+  - Windows 真机：重建 dist 后驱动全量 15/15 两次（其中一次不注入 token 环境变量，
+    端到端验证驱动经 UNC 自动读取网关生成的 token）；取消断言输出
+    `rows before=[wsl_ws_66fa0e088b498d61] after=[…] ; host records unchanged=true`。
+    `windows-acceptance/` 内截图与 log 已被本轮运行刷新。
+- 沿用历史证据：首轮 15/15 的原始过程（首跑门连接、发现、浏览、保存、重开）与
+  本轮运行覆盖相同路径；差异仅在断言方式与返修后的实现，上表逐步含义不变。
+
 ### 验收中发现并修复的真实缺陷
 
 1. 默认发行版只显示未写入 state，Connect 永久禁用（驱动第 7 步超时暴露）。

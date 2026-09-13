@@ -59,7 +59,7 @@
     {
       "step": "cancel saves nothing",
       "ok": true,
-      "detail": "remote rows before=3 after=3"
+      "detail": "rows before=[wsl_ws_66fa0e088b498d61] after=[wsl_ws_66fa0e088b498d61]; host records unchanged=true"
     },
     {
       "step": "host store written",
