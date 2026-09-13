@@ -257,8 +257,13 @@ async function main() {
   }
 
   // Keep the default distribution; leave the user field empty (distribution
-  // default user), then connect.
-  await page.getByRole('button', { name: /Connect|连接/ }).first().click()
+  // default user), then connect. Exact match: /Connect|连接/ also matches
+  // unrelated status text deeper in the page and picks a hidden node first.
+  const connectButton = page
+    .getByRole('button', { name: 'Connect', exact: true })
+    .or(page.getByRole('button', { name: '连接', exact: true }))
+    .first()
+  await connectButton.click()
   await page.waitForTimeout(800)
   await screenshot(page, 'connecting')
 
@@ -356,7 +361,11 @@ async function main() {
     await page.waitForTimeout(600)
     await page.getByText(/Browse Linux directories|浏览本机 WSL/).first().click()
     await page.waitForTimeout(400)
-    await page.getByRole('button', { name: /Connect|连接/ }).first().click()
+    await page
+      .getByRole('button', { name: 'Connect', exact: true })
+      .or(page.getByRole('button', { name: '连接', exact: true }))
+      .first()
+      .click()
     await page.getByPlaceholder(/Path|路径/).first().waitFor({ state: 'visible', timeout: 30000 })
     await page.getByPlaceholder(/Path|路径/).first().fill('/definitely/not/here-9137')
     await page.getByRole('button', { name: /^Go$|前往/ }).first().click()
