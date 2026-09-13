@@ -104,13 +104,49 @@
       "forbidden_write_roots": ["/home/maoqh/projects/agent-box-desktop-next", "/home/maoqh/projects/agent-box-desktop-next-wsl-round1", "/home/maoqh/projects/agent-box-studio"],
       "exclusive_resources": ["backend production writer", "backend status writer", "Windows native build slot"],
       "note": "Gated fixed-source reuse and narrow documented patches authorized; four independent component acceptance states, no models/real credentials, no fullstack takeover."
+    },
+    {
+      "id": "41",
+      "document": "work-orders/41-core-service-acceptance.md",
+      "baseline": "39/40 checkpoints",
+      "worktree": "/home/maoqh/projects/agent-box-server-round1",
+      "branch": "feature/server-harness-extension-v1",
+      "depends_on": ["39", "40"],
+      "dependency_condition": "39 ready and at least one 40 component verified; all four not required. Serialize common files with remaining 40 work.",
+      "stages": ["A", "B", "C", "D", "E"],
+      "write_paths": ["src/agent_box/server/**", "src/agent_box/storage/**", "src/agent_box/work_core/**", "src/agent_box/extensions/**", "src/agent_box/resource_contracts/**", "plugins/agent-box-harnesses/**", "plugins/agent-box-runtime-local/**", "plugins/agent-box-runtime-wsl/**", "plugins/agent-box-sandbox-bwrap/**", "workers/**", "protocols/**", "tests/**", "pyproject.toml", "uv.lock", "scripts/server-round1/**", "docs/server-round1/**", "docs/implementation/status.md"],
+      "parallel_code_with": ["desktop:product-delivery"],
+      "forbidden_write_roots": ["/home/maoqh/projects/agent-box-desktop-next", "/home/maoqh/projects/agent-box-desktop-next-wsl-round1", "/home/maoqh/projects/agent-box-studio"],
+      "exclusive_resources": ["backend shared files", "backend status writer", "Windows native build slot"]
+    },
+    {
+      "id": "42",
+      "document": "work-orders/42-fullstack-delivery.md",
+      "baseline": "41 ready plus verified Desktop handoff",
+      "worktree": "/home/maoqh/projects/agent-box-server-round1",
+      "branch": "feature/server-harness-extension-v1",
+      "depends_on": ["41"],
+      "dependency_condition": "Enter waiting after backend READY; integration requires Desktop READY, same wire and released writer lease",
+      "stages": ["A", "B", "C", "D", "E"],
+      "write_paths": ["src/agent_box/server/**", "src/agent_box/storage/**", "src/agent_box/work_core/**", "src/agent_box/extensions/**", "src/agent_box/resource_contracts/**", "plugins/agent-box-harnesses/**", "plugins/agent-box-runtime-local/**", "plugins/agent-box-runtime-wsl/**", "plugins/agent-box-sandbox-bwrap/**", "workers/**", "protocols/**", "tests/**", "pyproject.toml", "uv.lock", "scripts/server-round1/**", "docs/server-round1/**", "docs/implementation/status.md"],
+      "conditional_cross_repo_write": {
+        "worktree": "/home/maoqh/projects/agent-box-desktop-next-wsl-round1",
+        "expected_branch": "feature/agentbox-desktop-product",
+        "condition": "42 B dual-ready gates, verified handoff and writer_lease RELEASED; record exclusive integration owner",
+        "write_paths": ["apps/desktop/**", "apps/shared/**", "tests-js/**", "scripts/**", "package.json", "package-lock.json", "docs/desktop-product-delivery/status.md", "docs/desktop-product-delivery/evidence/**", "docs/desktop-product-delivery/contracts/**"],
+        "protected_paths": ["apps/desktop/src/agentbox/**", "apps/desktop/src/plugins/agentbox-lab/**", "unrelated user changes"]
+      },
+      "parallel_code_with": [],
+      "forbidden_write_roots": ["/home/maoqh/projects/agent-box-desktop-next", "/home/maoqh/projects/agent-box-studio"],
+      "exclusive_resources": ["backend writer", "Desktop execution worktree writer", "Windows native build slot", "authorized real model rehearsal slot"],
+      "note": "Polling is read-only before gate. Same unchanged frontend status is expected waiting, not a blocker. Final commits in both execution branches, no push or merge."
     }
   ],
   "authority": "docs/implementation",
   "execution_override": {
     "date": "2026-09-14",
-    "sequence": ["39", "40"],
+    "sequence": ["39", "40", "41", "42"],
     "historical_orders": ["37", "38"],
-    "rule": "39 and 40 serialize shared production/status/lock paths; no resumed 37/38 writer. Desktop product code may proceed independently; no cross-repo writes."
+    "rule": "39-41 serialize shared backend paths; 41 may proceed with at least one 40 component verified. 42 waits for both READY and released frontend lease before exclusive cross-repo integration. No resumed 37/38 writer."
   }
 }

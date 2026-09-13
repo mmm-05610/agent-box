@@ -12,7 +12,10 @@ Before work and at every stage boundary, read:
 The sole scheduling authority is `docs/implementation/` in this worktree.
 Write implementation evidence under `docs/server-round1/`. Preserve unrelated
 uncommitted work and concurrent planner edits; stage explicit paths only.
-Do not reset/stash/clean, automatically merge main, push, or edit sibling repositories.
+Do not reset/stash/clean, automatically merge main, or push. Sibling repositories
+are read-only except Work Order 42's explicitly named Desktop execution worktree
+after both implementation-ready gates and its released writer lease are verified.
+This exception does not authorize editing the Desktop publishing main.
 
 Work Core remains provider-neutral. Server composes plugins; plugins own native
 Harness semantics. Windows owns persistent Profile/Session data; remote Workers
