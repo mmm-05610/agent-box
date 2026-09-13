@@ -3,10 +3,12 @@ import type { ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { SidebarProjectTree } from '@/store/projects/membership'
-import type { SessionInfo } from '@/types/hermes'
 
-import { ProjectOverviewRow } from './overview-row'
+import { LocalWorkspaceRow } from './workspace-row'
 
+// Round 36R: these are the project-overview-row pins, re-targeted onto the
+// LocalWorkspaceRow that now carries the local rows inside the workspace root
+// list (ProjectOverviewRow was retired with the old append seam).
 afterEach(cleanup)
 
 vi.mock('@/i18n', () => ({
@@ -25,49 +27,63 @@ vi.mock('@/i18n', () => ({
   })
 }))
 
-vi.mock('./model', () => ({
+vi.mock('../projects/model', () => ({
   PROJECT_PREVIEW_COUNT: 3,
   latestProjectSessions: () => [],
   useWorkspaceNodeOpen: () => [false, vi.fn()]
 }))
 
 // ProjectMenu (the kebab) has its own dedicated test file — stub it here so
-// this file only exercises overview-row's own Tip usage (the disclosure
-// toggle) plus the WorkspaceAddButton wiring. ProjectContextMenu (the row's
+// this file only exercises the row's own Tip usage (the disclosure toggle)
+// plus the WorkspaceAddButton wiring. ProjectContextMenu (the row's
 // right-click wrapper) is stubbed as a pass-through so the row still renders.
-vi.mock('./project-menu', () => ({
+vi.mock('../projects/project-menu', () => ({
   ProjectContextMenu: ({ children }: { children: ReactNode }) => children,
   ProjectMenu: () => null
 }))
 
 const project = { id: 'p1', label: 'Test D' } as unknown as SidebarProjectTree
 
+const item = {
+  id: 'p1',
+  backend: 'local' as const,
+  name: 'Test D',
+  path: null,
+  detail: null,
+  sessionCount: 0
+}
+
 const tipTrigger = (el: HTMLElement) => el.closest('[data-slot="tooltip-trigger"]')
 
-describe('ProjectOverviewRow', () => {
+function renderRow(overrides: Partial<Parameters<typeof LocalWorkspaceRow>[0]> = {}) {
+  return render(
+    <LocalWorkspaceRow
+      expandable={false}
+      item={item}
+      project={project}
+      {...overrides}
+    />
+  )
+}
+
+describe('LocalWorkspaceRow (local rows of the workspace root list)', () => {
   it('wraps the "new session" add button in a Tip with the project-scoped label', () => {
-    render(<ProjectOverviewRow onNewSession={vi.fn()} project={project} />)
+    renderRow({ onNewSession: vi.fn() })
 
     const button = screen.getByRole('button', { name: 'New session in Test D' })
     expect(tipTrigger(button)).toBeTruthy()
   })
 
-  it('wraps the disclosure toggle in a Tip when there are preview sessions', () => {
-    render(
-      <ProjectOverviewRow
-        previewSessions={[{ id: 's1' } as unknown as SessionInfo]}
-        project={project}
-        renderRows={() => null}
-      />
-    )
+  it('wraps the disclosure toggle in a Tip when there is content to reveal', () => {
+    renderRow({ content: <div />, expandable: true })
 
     // Collapsed by default, so the disclosure offers to show the sessions.
     const button = screen.getByRole('button', { name: 'Show Test D sessions' })
     expect(tipTrigger(button)).toBeTruthy()
   })
 
-  it('does not render the disclosure toggle when there is nothing to preview', () => {
-    render(<ProjectOverviewRow project={project} />)
+  it('does not render the disclosure toggle when there is nothing to reveal', () => {
+    renderRow()
 
     expect(screen.queryByRole('button', { name: 'Show Test D sessions' })).toBeNull()
   })
@@ -82,22 +98,25 @@ describe('ProjectOverviewRow', () => {
 
     const onNewSession = vi.fn()
 
-    render(<ProjectOverviewRow onNewSession={onNewSession} project={home} />)
+    renderRow({ onNewSession, project: home })
     fireEvent.click(screen.getByRole('button', { name: 'New session in Home' }))
 
     expect(onNewSession).toHaveBeenCalledWith(null)
   })
 
-  it('tags the row with data-sessions-project so a skin can target one project', () => {
-    const { container } = render(<ProjectOverviewRow project={project} />)
+  it('tags the row with its id markers: data-sessions-project and the shared workspace-row id', () => {
+    const { container } = renderRow()
 
+    // The project marker (custom skins) and the shared workspace-row marker
+    // (the one row language) both carry the row's id.
     expect(container.querySelector('[data-sessions-project="p1"]')).toBeTruthy()
+    expect(container.querySelector('[data-workspace-row="p1"]')).toBeTruthy()
   })
 
   it('explicit projects keep the folder-library glyph and a plain accessible name', () => {
     const explicit = { id: 'p1', label: 'Explicit' } as unknown as SidebarProjectTree
 
-    const { container } = render(<ProjectOverviewRow project={explicit} />)
+    const { container } = renderRow({ project: explicit })
 
     expect(container.querySelector('.codicon-folder-library')).toBeTruthy()
     expect(container.querySelector('.codicon-repo')).toBeNull()
@@ -107,7 +126,7 @@ describe('ProjectOverviewRow', () => {
   it('auto-discovered repos get the repo glyph, an "Auto-discovered" tooltip, and an accessible name that says so', () => {
     const auto = { id: '/Users/dev/my-repo', label: 'my-repo', isAuto: true } as unknown as SidebarProjectTree
 
-    const { container } = render(<ProjectOverviewRow project={auto} />)
+    const { container } = renderRow({ project: auto })
 
     expect(container.querySelector('.codicon-repo')).toBeTruthy()
     expect(container.querySelector('.codicon-folder-library')).toBeNull()

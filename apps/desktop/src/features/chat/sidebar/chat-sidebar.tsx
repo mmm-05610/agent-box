@@ -115,7 +115,7 @@ import { $focusedSessionIsTile, $focusedStoredSessionId, $workingSessionIds } fr
 import { ackAllSessionsRead } from '@/store/session-unread'
 import { $archivedSessions, loadArchivedSessions } from '@/store/sidebar-archive'
 import { $sidebarSessionRankIds } from '@/store/sidebar-sort'
-import { $workspaceViewSelectedId, selectWorkspaceView } from '@/store/workspace-view'
+import { selectWorkspaceView } from '@/store/workspace-view'
 import { $wslWorkspaces, openWslWorkspaceWizard } from '@/store/wsl-workspace'
 import { type SessionInfo, type SessionSearchResult } from '@/types/hermes'
 import { type WorkspaceListItem } from '@/types/workspace'
@@ -144,12 +144,12 @@ import {
   useRepoWorktreeMap
 } from './projects'
 import { WorktreeDialog } from './projects/worktree-dialog'
-import { WslWorkspaceSection } from './projects/wsl-workspace-section'
 import {
   SidebarBlankState,
   SidebarLoadErrorState,
   SidebarSessionSkeletons
 } from './section-states'
+import { useSidebarRowRenderer } from './session-row-renderer'
 import { SidebarSessionsSection, VIRTUALIZE_THRESHOLD } from './sessions-section'
 import type { ChatSidebarProps } from './sidebar-constants'
 import {
@@ -162,6 +162,7 @@ import {
 } from './sidebar-constants'
 import { SidebarNavMenu } from './sidebar-nav-menu'
 import { useEnteredProjectSessions } from './use-entered-project-sessions'
+import { WorkspaceList } from './workspace-list/workspace-list'
 
 
 export function ChatSidebar({
@@ -246,7 +247,6 @@ export function ChatSidebar({
   const projects = useStore($projects)
   const projectTree = useStore($projectTree)
   const wslWorkspaces = useStore($wslWorkspaces)
-  const workspaceViewSelectedId = useStore($workspaceViewSelectedId)
 
   // The persisted project filter's storage is shared across profiles, so ids
   // picked in another profile don't resolve in the active one and the raw
@@ -1006,6 +1006,64 @@ export function ChatSidebar({
   const sessionsLabel =
     inProject && enteredProject ? enteredProject.label : worktreeGroupingActive ? s.projects.sectionLabel : s.sessions
 
+  // The workspace root list renders its previews through the SAME row renderer
+  // as every other session surface (36R): one row language everywhere, the
+  // session tree reused through props, never rewritten.
+  const workspaceRowRenderer = useSidebarRowRenderer({
+    activeSessionId: activeSidebarSessionId,
+    card: cardRows,
+    manualOrderIds: agentOrderManual ? agentOrderIds : sortOrderIds,
+    showProfileTags: showAllProfiles,
+    onArchiveSession,
+    onBranchSession,
+    onDeleteSession,
+    onNewSessionInWorkspace,
+    onNewSessionSplit,
+    onResumeSession,
+    onTogglePin: pinSession,
+    onToggleUnread: toggleUnread
+  })
+
+  // Workspace-mode header: the "+" opens the round-36 add menu — exactly two
+  // entries. The local folder flow completes directly (pick a directory →
+  // open/join the list — no naming page); the remote entry opens the
+  // simplified WSL wizard.
+  const workspaceHeaderAction = (
+    <>
+      <SidebarSectionAddButton
+        addMenu={
+          <>
+            <DropdownMenuLabel>{t.wslWorkspace.menuOpenFolder}</DropdownMenuLabel>
+            <DropdownMenuItem
+              onSelect={() => {
+                void openFolderAsProject()
+              }}
+            >
+              <Codicon name="folder-opened" size="0.875rem" />
+              {t.wslWorkspace.menuOpenFolder}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onSelect={() => {
+                openWslWorkspaceWizard()
+              }}
+            >
+              <Codicon name="vm-connect" size="0.875rem" />
+              {t.wslWorkspace.menuOpenRemoteFolder}
+            </DropdownMenuItem>
+          </>
+        }
+        ariaLabel={t.wslWorkspace.menuOpenFolder}
+        onPlainClick={() => {
+          void openFolderAsProject()
+        }}
+      />
+      <div className="grid size-6 place-items-center">
+        <SidebarFilterMenu className={HEADER_NAV_BTN} />
+      </div>
+    </>
+  )
+
   // Mirror the section's skeleton gate (projectsLoading + nothing to show yet):
   // while the skeleton is up there's no point also spinning the header count.
   const projectsSkeletonVisible =
@@ -1109,13 +1167,14 @@ export function ChatSidebar({
 
   // Mirror the section's own virtualization inputs (the props it receives),
   // not the raw tree cache: agentProjectTree persists after leaving Project
-  // grouping, and keying on it here while the section keys on projectOverview
-  // (which is nulled the moment grouping changes) left the two disagreeing —
+  // grouping, and keying on it here while the section keyed on projectOverview
+  // (which nulled the moment grouping changed) left the two disagreeing —
   // wrapper classes built for a virtualized list around a non-virtual one.
   // Entered-project content is the third prop that suppresses virtualization.
+  // (Since 36R the workspace root list owns the overview body — the section
+  // itself no longer renders one.)
   const recentsVirtualizes =
     !displayAgentGroups?.length &&
-    !projectOverview?.length &&
     !(inProject && enteredProjectContent) &&
     displayAgentSessions.length >= VIRTUALIZE_THRESHOLD
 
@@ -1326,8 +1385,50 @@ export function ChatSidebar({
             )}
 
             {!trimmedQuery && inProject && projectLoadFailed && <SidebarLoadErrorState onRetry={retryProject} />}
-            {!trimmedQuery && (
-              <SidebarSessionsSection
+            {!trimmedQuery &&
+              (worktreeGroupingActive && !inProject && (projectModel.length > 0 || wslWorkspaces.length > 0) ? (
+                /* THE workspace root list (36R): local folders and WSL
+                   workspaces as peers, independent of session count and of the
+                   date/status/flat preferences. It replaces the flat body only
+                   when there IS a workspace to show — with no workspaces at
+                   all the flat recents below keep their fallback (sessions
+                   are never dropped from view). Archived and the all-profiles
+                   group view keep the old body swap too. */
+                <WorkspaceList
+                  activeProjectId={activeProjectId}
+                  dndSensors={dndSensors}
+                  emptyState={
+                    projectTreeLoading && !wslWorkspaces.length ? (
+                      <SidebarSessionSkeletons />
+                    ) : (
+                      <div className="grid min-h-16 place-items-center rounded-lg px-2 text-center text-xs text-(--ui-text-tertiary)">
+                        {s.noSessions}
+                      </div>
+                    )
+                  }
+                  headerAction={workspaceHeaderAction}
+                  label={s.projects.sectionLabel}
+                  labelMeta={
+                    reposScanning && !projectsSkeletonVisible ? (
+                      <GlyphSpinner ariaLabel={s.loading} className="text-[0.6875rem] text-(--ui-text-quaternary)" />
+                    ) : undefined
+                  }
+                  onEnterProject={onEnterProject}
+                  onNewSessionInWorkspace={onNewSessionInWorkspace}
+                  onNewSessionSplit={onNewSessionSplit}
+                  onReorderProjects={showAllProfiles ? undefined : reorderProjects}
+                  projectPreviews={overviewPreviews}
+                  projectRows={projectOverview ?? []}
+                  renderPreviewRows={workspaceRowRenderer.renderPreviewRows}
+                  renderRows={workspaceRowRenderer.renderRows}
+                  rootClassName={cn(
+                    'min-h-32 flex-1 overflow-hidden p-0',
+                    !recentsVirtualizes && 'compact:min-h-0 compact:flex-none compact:overflow-visible'
+                  )}
+                  showAllSessions={showAllSessions}
+                />
+              ) : (
+                <SidebarSessionsSection
                 activeProjectId={activeProjectId}
                 activeSessionId={activeSidebarSessionId}
                 // Inbox style is a render variant, not a grouping — it rides
@@ -1445,48 +1546,14 @@ export function ChatSidebar({
                         {/* The flat-list header "+" is a drag source too — the
                             same gesture as the nav's "New session" row: drag
                             it onto a chat zone's tab strip / edge / center to
-                            create the session exactly there. Project-overview
-                            mode drags its "+" (the "New project" button) with
-                            the project-drag variant: a drop opens the SAME
-                            project dialog, and the created project starts at
-                            the dropped spot. */}
+                            create the session exactly there. (The workspace
+                            root list carries the round-36 add menu on ITS
+                            header — see workspaceHeaderAction.) */}
                         <SidebarSectionAddButton
-                          addMenu={
-                            worktreeGroupingActive ? (
-                              <>
-                                <DropdownMenuLabel>{t.wslWorkspace.menuOpenFolder}</DropdownMenuLabel>
-                                {/* Round-36 add menu: exactly two entries. The local
-                                    folder flow completes directly (pick a directory →
-                                    open/join the list — no naming page); the remote
-                                    entry opens the simplified WSL wizard. */}
-                                <DropdownMenuItem
-                                  onSelect={() => {
-                                    void openFolderAsProject()
-                                  }}
-                                >
-                                  <Codicon name="folder-opened" size="0.875rem" />
-                                  {t.wslWorkspace.menuOpenFolder}
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  onSelect={() => {
-                                    openWslWorkspaceWizard()
-                                  }}
-                                >
-                                  <Codicon name="vm-connect" size="0.875rem" />
-                                  {t.wslWorkspace.menuOpenRemoteFolder}
-                                </DropdownMenuItem>
-                              </>
-                            ) : undefined
-                          }
-                          ariaLabel={worktreeGroupingActive ? t.wslWorkspace.menuOpenFolder : s.nav['new-session']}
-                          onNewSessionSplit={worktreeGroupingActive ? undefined : onNewSessionSplit}
+                          ariaLabel={s.nav['new-session']}
+                          onNewSessionSplit={onNewSessionSplit}
                           onPlainClick={() => {
-                            if (worktreeGroupingActive) {
-                              void openFolderAsProject()
-                            } else {
-                              onNewSessionInWorkspace(null)
-                            }
+                            onNewSessionInWorkspace(null)
                           }}
                         />
                         <div className="grid size-6 place-items-center">
@@ -1509,10 +1576,8 @@ export function ChatSidebar({
                 onArchiveSession={onArchiveSession}
                 onBranchSession={onBranchSession}
                 onDeleteSession={onDeleteSession}
-                onEnterProject={onEnterProject}
                 onNewSessionInWorkspace={onNewSessionInWorkspace}
                 onNewSessionSplit={onNewSessionSplit}
-                onReorderProjects={showAllProfiles ? undefined : reorderProjects}
                 onReorderSessions={showAllProfiles ? undefined : reorderSessions}
                 onResumeSession={onResumeSession}
                 onToggle={() => setSidebarRecentsOpen(!agentsOpen)}
@@ -1524,10 +1589,7 @@ export function ChatSidebar({
                   inProject ? <ProjectBackRow label={s.projects.back} onClick={exitProjectScope} /> : undefined
                 }
                 projectContent={inProject ? enteredProjectContent : undefined}
-                projectOverview={projectOverview}
-                projectOverviewPreviews={overviewPreviews}
                 projectRepoWorktrees={inProject ? scopedRepoWorktrees : undefined}
-                projectsLoading={worktreeGroupingActive ? projectTreeLoading : false}
                 removedSessionIds={inProject ? removedSessionIds : undefined}
                 rootClassName={cn(
                   'min-h-32 flex-1 overflow-hidden p-0',
@@ -1535,12 +1597,8 @@ export function ChatSidebar({
                 )}
                 sessions={displayAgentSessions}
                 sortable={!showAllProfiles && agentSessions.length > 1}
-                // WSL workspace rows share the ONE workspace list: same scroll
-                // area, same row chrome, peer to the local folders (round 36).
-                // Hidden while a project is entered (scoped view) or searching.
-                workspaceRows={!trimmedQuery && !inProject ? <WslWorkspaceSection /> : undefined}
               />
-            )}
+              ))}
           </div>
         )}
 

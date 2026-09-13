@@ -93,6 +93,7 @@ export function SidebarSectionAddButton({
             className={HEADER_ACTION_BTN}
             onClick={event => {
               event.stopPropagation()
+
               // With an add menu, the plain click's job is ONLY to open that
               // menu (Radix owns it via the trigger) — running onPlainClick
               // here too would fire the menu AND the direct flow at once.
@@ -277,7 +278,9 @@ export function SidebarGroupRow({
   actions?: React.ReactNode
   label: React.ReactNode
   lead: React.ReactNode
-  toggle?: { ariaLabel: string; onToggle: () => void; open: boolean }
+  /** `data` rides the disclosure button so a row kind can mark its own expand
+   *  control (e.g. the workspace list's per-row expand test hook). */
+  toggle?: { ariaLabel: string; data?: Record<string, string>; onToggle: () => void; open: boolean }
   totals?: SidebarGroupTotals
 }) {
   const rowMeta = useStore($sidebarRowMeta)
@@ -320,6 +323,7 @@ export function SidebarGroupRow({
               aria-label={toggle.ariaLabel}
               className="flex flex-1 items-center self-stretch bg-transparent p-0"
               data-row-actions
+              {...toggle.data}
               onClick={toggle.onToggle}
               type="button"
             >

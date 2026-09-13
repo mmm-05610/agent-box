@@ -14,6 +14,7 @@ import {
 } from './projects'
 import { SidebarSessionsSection, VIRTUALIZE_THRESHOLD } from './sessions-section'
 import type { VirtualSessionListProps } from './virtual-session-list'
+import { WorkspaceList } from './workspace-list/workspace-list'
 
 const startNewSessionDrag = vi.hoisted(() => vi.fn())
 
@@ -74,6 +75,12 @@ vi.mock('@/i18n', () => ({
           toggle: (label: string, open: boolean) => `${open ? 'Show' : 'Hide'} ${label} sessions`
         },
         showMoreIn: (count: number, label: string) => `Show ${count} more in ${label}`
+      },
+      wslWorkspace: {
+        menuRemove: 'Remove from sidebar',
+        moreActions: 'More actions',
+        removeDesc: 'Only this sidebar record is removed.',
+        removeTitle: (name: string) => `Remove "${name}"?`
       },
       profiles: { switchToProfile: (label: string) => `Switch to ${label}` },
       statusStack: { coding: { switchFailed: (label: string) => `Could not switch to ${label}` } }
@@ -177,8 +184,17 @@ describe('project-associated new-session drag sources', () => {
   it('drags from the project overview + with the project cwd', () => {
     const onNewSessionSplit = vi.fn()
 
+    // 36R: the overview lives in the workspace root list now — the drag comes
+    // from ITS local row's "+".
     render(
-      <SidebarSessionsSection {...baseProps()} onNewSessionSplit={onNewSessionSplit} projectOverview={[project()]} />
+      <WorkspaceList
+        emptyState={null}
+        label='Projects'
+        onNewSessionInWorkspace={() => undefined}
+        onNewSessionSplit={onNewSessionSplit}
+        projectRows={[project()]}
+        showAllSessions={false}
+      />
     )
 
     fireEvent.pointerDown(screen.getByRole('button', { name: 'New session in Project One' }), { button: 0 })

@@ -309,12 +309,13 @@ describe('ChatSidebar workspace assembly (36R)', () => {
       expect(container.querySelector('[data-wsl-workspace-row="wsl_ws_1"]')).not.toBeNull()
     })
 
-    // One list body: the WSL section's parent is the section body that also
-    // holds the local row — one tree, not two.
-    const sectionBody = container.querySelector('[data-wsl-workspace-section]')?.parentElement
+    // One list body: both rows live inside the ONE workspace root list —
+    // one tree, not two (36R replaced the old append seam).
+    const listBody = container.querySelector('[data-workspace-list]')
 
-    expect(sectionBody).not.toBeNull()
-    expect(sectionBody?.querySelector('[data-sessions-project="proj-1"]')).not.toBeNull()
+    expect(listBody).not.toBeNull()
+    expect(listBody?.querySelector('[data-sessions-project="proj-1"]')).not.toBeNull()
+    expect(listBody?.querySelector('[data-wsl-workspace-row="wsl_ws_1"]')).not.toBeNull()
   })
 
   it('clicking a local workspace main row selects (enters) that workspace', () => {

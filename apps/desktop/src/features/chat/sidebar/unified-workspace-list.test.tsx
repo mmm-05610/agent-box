@@ -1,4 +1,9 @@
 // @vitest-environment jsdom
+//
+// Round 36R: the unified workspace list is workspace-list/workspace-list.tsx —
+// THE workspace root list. These are the round-36 behavior pins, re-targeted
+// from the retired "workspaceRows append" seam (SidebarSessionsSection +
+// projects/wsl-workspace-section) onto the component that now owns the body.
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -9,12 +14,11 @@ import type { SidebarProjectTree } from '@/store/projects/membership'
 import { $wslWorkspaceValidation, setWslWorkspaces } from '@/store/wsl-workspace'
 import type { WslWorkspaceRecord } from '@/types/workspace'
 
-import { WslWorkspaceSection } from './projects/wsl-workspace-section'
 import { SidebarBlankState } from './section-states'
-import { SidebarSessionsSection } from './sessions-section'
+import { WorkspaceList } from './workspace-list/workspace-list'
 
-// The WSL rows refresh the host projection on mount; the harness has no
-// Electron bridge, so the api layer is a controlled fake.
+// The WSL rows read the host projection store; the harness has no Electron
+// bridge, so the api layer is a controlled fake.
 const listWslWorkspaces = vi.fn()
 
 vi.mock('@/api/workspace', () => ({
@@ -54,11 +58,23 @@ const localProject = {
   repos: []
 } as unknown as SidebarProjectTree
 
-function renderSection(ui: React.ReactNode) {
+function renderList(ui: React.ReactNode) {
   return render(
     <MemoryRouter>
       <SidebarProvider>{ui}</SidebarProvider>
     </MemoryRouter>
+  )
+}
+
+function renderWorkspaceList() {
+  return renderList(
+    <WorkspaceList
+      emptyState={null}
+      label='Workspaces'
+      projectRows={[localProject]}
+      renderRows={() => null}
+      showAllSessions={false}
+    />
   )
 }
 
@@ -74,42 +90,25 @@ afterEach(() => {
   $wslWorkspaceValidation.set({})
 })
 
-describe('unified workspace list (round 36)', () => {
-  it('renders local and WSL workspaces in the SAME section body, peer to each other', () => {
+describe('unified workspace list (round 36R)', () => {
+  it('renders local and WSL workspaces in the SAME list body, peer to each other', () => {
     setWslWorkspaces([wslRecord()])
 
-    const { container } = renderSection(
-      <SidebarSessionsSection
-        activeSessionId={null}
-        emptyState={null}
-        label='Workspaces'
-        onArchiveSession={() => undefined}
-        onDeleteSession={() => undefined}
-        onResumeSession={() => undefined}
-        onToggle={() => undefined}
-        onTogglePin={() => undefined}
-        onToggleUnread={() => undefined}
-        open
-        pinned={false}
-        projectOverview={[localProject]}
-        sessions={[]}
-        workspaceRows={<WslWorkspaceSection />}
-      />
-    )
+    const { container } = renderWorkspaceList()
 
-    const sectionBody = container.querySelector('[data-wsl-workspace-section]')?.parentElement
+    const listBody = container.querySelector('[data-workspace-list]')
 
-    expect(sectionBody).not.toBeNull()
+    expect(listBody).not.toBeNull()
     // The local row and the WSL row share one list: both are children of the
-    // same section body — not two separate trees.
-    expect(sectionBody?.querySelector('[data-sessions-project="proj-1"]')).not.toBeNull()
-    expect(sectionBody?.querySelector('[data-wsl-workspace-row="wsl_ws_1"]')).not.toBeNull()
+    // same workspace list — not two separate trees.
+    expect(listBody?.querySelector('[data-sessions-project="proj-1"]')).not.toBeNull()
+    expect(listBody?.querySelector('[data-wsl-workspace-row="wsl_ws_1"]')).not.toBeNull()
   })
 
-  it('a WSL row expands to the honest no-sessions prompt and collapses again', async () => {
+  it('a WSL row expands to the honest no-sessions prompt and collapses again', () => {
     setWslWorkspaces([wslRecord()])
 
-    const { container } = renderSection(<WslWorkspaceSection />)
+    const { container } = renderWorkspaceList()
 
     const row = container.querySelector('[data-wsl-workspace-row="wsl_ws_1"]')
 
@@ -138,7 +137,7 @@ describe('unified workspace list (round 36)', () => {
       wsl_ws_1: { status: 'validated', actualUser: 'maoqh', userChanged: false, verifiedAt: 1 }
     })
 
-    const { container } = renderSection(<WslWorkspaceSection />)
+    const { container } = renderWorkspaceList()
 
     expect(screen.queryByText('Verified')).toBeNull()
     expect(screen.queryByText('Not verified')).toBeNull()
@@ -152,7 +151,7 @@ describe('unified workspace list (round 36)', () => {
       wsl_ws_1: { status: 'failed', code: 'WSL_UNAVAILABLE', message: 'WSL is not running.', verifiedAt: 1 }
     })
 
-    const { container } = renderSection(<WslWorkspaceSection />)
+    const { container } = renderWorkspaceList()
 
     // The failure surface is the row's error glyph (with the actionable
     // message as its tooltip), never an "online" claim.
@@ -163,7 +162,7 @@ describe('unified workspace list (round 36)', () => {
     const onNewProject = vi.fn()
     const onRemoteConnection = vi.fn()
 
-    renderSection(<SidebarBlankState onNewProject={onNewProject} onRemoteConnection={onRemoteConnection} />)
+    renderList(<SidebarBlankState onNewProject={onNewProject} onRemoteConnection={onRemoteConnection} />)
 
     const local = screen.getByRole('button', { name: /Open folder/ })
     const remote = screen.getByRole('button', { name: /Open remote folder/ })
@@ -184,7 +183,7 @@ describe('unified workspace list (round 36)', () => {
 
     await refreshWslWorkspaces()
 
-    const { container } = renderSection(<WslWorkspaceSection />)
+    const { container } = renderWorkspaceList()
 
     expect(container.querySelector('[data-wsl-workspace-row="wsl_ws_1"]')?.textContent).toContain('新名字')
   })

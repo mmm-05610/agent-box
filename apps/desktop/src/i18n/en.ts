@@ -3759,6 +3759,7 @@ export const en: Translations = {
     // Row management (round 36): rename / remove from the row menu.
     menuRename: 'Rename…',
     menuRemove: 'Remove from sidebar',
+    moreActions: 'More actions',
     removeTitle: name => `Remove "${name}"?`,
     removeDesc: 'Only this sidebar record is removed. Files, sessions and history in the directory are kept, and re-opening the folder picks them up again.',
     renameTitle: name => `Rename "${name}"`,

@@ -3325,6 +3325,9 @@ export interface Translations {
     // Row management (round 36): rename / remove from the row menu.
     menuRename: string
     menuRemove: string
+    // The row's kebab (36R): must never read as "connection info" — that is a
+    // separate, dedicated action.
+    moreActions: string
     removeTitle: (name: string) => string
     removeDesc: string
     renameTitle: (name: string) => string

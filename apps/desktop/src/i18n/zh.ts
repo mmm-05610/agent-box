@@ -3885,6 +3885,7 @@ export const zh: Translations = {
     // Row management (round 36): rename / remove from the row menu.
     menuRename: '重命名…',
     menuRemove: '从侧栏移除',
+    moreActions: '更多操作',
     removeTitle: name => `移除「${name}」？`,
     removeDesc: '只移除侧栏记录；目录中的文件、会话与历史都会保留，重新打开该目录可再次接入。',
     renameTitle: name => `重命名「${name}」`,

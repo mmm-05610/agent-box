@@ -3215,6 +3215,7 @@ export const zhHant = defineLocale({
     // Row management (round 36): rename / remove from the row menu.
     menuRename: '重新命名…',
     menuRemove: '從側欄移除',
+    moreActions: '更多動作',
     removeTitle: name => `移除「${name}」？`,
     removeDesc: '只移除側欄記錄；目錄中的檔案、會話與歷史都會保留，重新開啟該目錄可再次接入。',
     renameTitle: name => `重新命名「${name}」`,

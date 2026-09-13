@@ -7,7 +7,10 @@ export {
   sortProjectsForOverview,
   useRepoWorktreeMap
 } from './model'
-export { ProjectBackRow, ProjectOverviewRow } from './overview-row'
+// ProjectOverviewRow retired in 36R: the workspace root list
+// (workspace-list/workspace-row.tsx) carries the local rows on the shared
+// workspace-row skeleton. The back row and the project icon stay here.
+export { ProjectBackRow, projectIcon } from './overview-row'
 export { ProjectMenu } from './project-menu'
 export { SidebarWorkspaceGroup } from './workspace-group'
 export { StartWorkButton } from './workspace-header'
