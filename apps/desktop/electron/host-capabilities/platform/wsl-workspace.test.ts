@@ -136,8 +136,12 @@ interface StoreState {
   persistCalls: number
 }
 
-function createStore(state?: Partial<StoreState>) {
-  const store: StoreState = state ?? { file: normalizeWorkspaceStoreFile(null), persistCalls: 0 }
+function createStore(): ReturnType<typeof createMemoryStore> {
+  return createMemoryStore()
+}
+
+function createMemoryStore() {
+  const store: StoreState = { file: normalizeWorkspaceStoreFile(null), persistCalls: 0 }
 
   return {
     state: store,

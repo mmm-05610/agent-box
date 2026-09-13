@@ -11,6 +11,18 @@ import type {
   PetOverlayStatePayload
 } from './store/pet-overlay'
 import type { QuickEntryStatePush, QuickEntryStatus, QuickEntrySubmitPayload } from './store/quick-entry'
+import type {
+  WslConnectRequest,
+  WslConnectResult,
+  WslDirectoryListing,
+  WslDiscoveryResult,
+  WslFailure,
+  WslListDirectoriesRequest,
+  WslReconnectResult,
+  WslSaveWorkspaceRequest,
+  WslSaveWorkspaceResult,
+  WslWorkspacesResult
+} from './types/workspace'
 
 export {}
 
@@ -197,6 +209,18 @@ declare global {
         ) => () => void
       }
       sshConfigHosts: () => Promise<DesktopSshHostsResult>
+      // WSL Workspace (work order 35). Structured outcomes from
+      // src/types/workspace.ts; never throws for expected failures.
+      wslWorkspace: {
+        discover: () => Promise<WslDiscoveryResult>
+        connect: (request: WslConnectRequest) => Promise<WslConnectResult | WslFailure>
+        listDirectories: (request: WslListDirectoriesRequest) => Promise<WslDirectoryListing | WslFailure>
+        saveWorkspace: (request: WslSaveWorkspaceRequest) => Promise<WslSaveWorkspaceResult | WslFailure>
+        listWorkspaces: () => Promise<WslWorkspacesResult | WslFailure>
+        reconnectWorkspace: (request: { workspaceId: string }) => Promise<WslReconnectResult>
+        releaseConnection: (request: { connectionId: string }) => Promise<{ ok: true; released: boolean }>
+        cancelOperation: (request: { operationId: string }) => Promise<{ ok: true; cancelled: boolean }>
+      }
       sshResolveHost: (host: string) => Promise<DesktopSshResolveResult>
       probeConnectionConfig: (remoteUrl: string) => Promise<DesktopConnectionProbeResult>
       oauthLoginConnectionConfig: (remoteUrl: string) => Promise<DesktopOauthLoginResult>

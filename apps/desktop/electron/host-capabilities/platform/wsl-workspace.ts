@@ -42,13 +42,15 @@ export type WslErrorCode =
   | 'WSL_NOT_FOUND'
 
 export interface WslFailure {
+  /** Literal discriminant so success/failure unions narrow in every caller. */
+  ok: false
   code: WslErrorCode
   message: string
   retryable: boolean
 }
 
 export function wslFailure(code: WslErrorCode, message: string, retryable: boolean): WslFailure {
-  return { code, message, retryable }
+  return { ok: false, code, message, retryable }
 }
 
 export interface WslDistributionInfo {
@@ -366,8 +368,7 @@ export function createDefaultWslExec(): WslExec {
           maxBuffer,
           signal,
           windowsHide: true,
-          env: { ...process.env, WSL_UTF8: '1' },
-          stdio: ['ignore', 'pipe', 'pipe']
+          env: { ...process.env, WSL_UTF8: '1' }
         },
         (error, stdout, stderr) => {
           if (error) {
@@ -424,7 +425,27 @@ function isFailure(value: unknown): value is WslFailure {
   )
 }
 
-export type WslOutcome<T> = { ok: true } & T | ({ ok: false } & WslFailure)
+export type WslOutcome<T> = ({ ok: true } & T) | WslFailure
+
+/**
+ * Discriminant narrowing (`if (!x.ok)`) is unavailable in this tsc project —
+ * `strictNullChecks: false` widens the `true`/`false` literals to `boolean`,
+ * so no member is distinguishable. Every success/failure branch goes through
+ * this predicate instead; it behaves identically under either strictness.
+ */
+export function isWslFailure(outcome: { ok: unknown }): outcome is WslFailure {
+  return outcome.ok === false
+}
+
+/**
+ * Internal helpers return these CONCRETE unions rather than the generic
+ * `WslOutcome<T>`: TypeScript cannot discriminate-narrow an intersection
+ * with a generic parameter, so every `if (!x.ok)` inside the service would
+ * silently fail to narrow and leak success shapes into failure paths.
+ */
+type ConnectProbeOutcome = WslFailure | { ok: true; actualUser: string; home: string }
+type TempConnectionOutcome = WslFailure | { ok: true; connection: TempWslConnection }
+type ListingOutcome = WslFailure | { ok: true; path: string; parent: string; entries: WslDirectoryEntry[] }
 
 export interface WslWorkspaceHost {
   discover: () => Promise<
@@ -498,7 +519,7 @@ export function createWslWorkspaceHost(
     }
   }
 
-  function takeTempConnection(connectionId: unknown): WslOutcome<{ connection: TempWslConnection }> {
+  function takeTempConnection(connectionId: unknown): TempConnectionOutcome {
     if (typeof connectionId !== 'string' || !connectionId) {
       return { ok: false, ...wslFailure('WSL_CONNECTION_EXPIRED', 'The connection is no longer available.', false) }
     }
@@ -529,7 +550,7 @@ export function createWslWorkspaceHost(
     path: string,
     showHidden: boolean,
     signal?: AbortSignal
-  ): Promise<WslOutcome<{ path: string; parent: string; entries: WslDirectoryEntry[] }>> {
+  ): Promise<ListingOutcome> {
     let stdout: string
 
     try {
@@ -557,7 +578,7 @@ export function createWslWorkspaceHost(
     distribution: string,
     user: null | string,
     signal?: AbortSignal
-  ): Promise<WslOutcome<{ actualUser: string; home: string }>> {
+  ): Promise<ConnectProbeOutcome> {
     let stdout: string
     let stderr = ''
 
@@ -659,7 +680,7 @@ export function createWslWorkspaceHost(
       try {
         const probe = await probeConnection(distro, configuredUser, controller?.signal)
 
-        if (!probe.ok) {
+        if (isWslFailure(probe)) {
           return probe
         }
 
@@ -710,7 +731,7 @@ export function createWslWorkspaceHost(
 
         const taken = takeTempConnection(connectionId)
 
-        if (!taken.ok) {
+        if (isWslFailure(taken)) {
           return taken
         }
 
@@ -733,7 +754,7 @@ export function createWslWorkspaceHost(
 
       const taken = takeTempConnection(connectionId)
 
-      if (!taken.ok) {
+      if (isWslFailure(taken)) {
         return taken
       }
 
@@ -756,7 +777,7 @@ export function createWslWorkspaceHost(
       // view of the tree may already be stale.
       const verified = await listOnConnection(connection, normalized, false)
 
-      if (!verified.ok) {
+      if (isWslFailure(verified)) {
         return verified
       }
 
@@ -832,7 +853,7 @@ export function createWslWorkspaceHost(
 
       const probe = await probeConnection(record.distribution, record.configuredUser)
 
-      if (!probe.ok) {
+      if (isWslFailure(probe)) {
         return {
           ok: true,
           status: 'failed',
@@ -843,7 +864,7 @@ export function createWslWorkspaceHost(
 
       const verified = await listOnConnection({ distribution: record.distribution, configuredUser: record.configuredUser }, record.rootPath, false)
 
-      if (!verified.ok) {
+      if (isWslFailure(verified)) {
         return { ok: true, status: 'failed', code: verified.code, message: verified.message }
       }
 

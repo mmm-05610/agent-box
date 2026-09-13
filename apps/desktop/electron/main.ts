@@ -103,6 +103,8 @@ import {
 import { installWindowsSystemCaTrust } from './host-capabilities/platform/windows-system-ca'
 import { ensureWslWindowsFonts } from './host-capabilities/platform/wsl-fonts'
 import { setActiveGatewayProfile, setWslBridgeProfileState } from './host-capabilities/platform/wsl-path-bridge'
+import { createDefaultWslWorkspaceHost } from './host-capabilities/platform/wsl-workspace'
+import { createWslWorkspaceStore } from './host-capabilities/platform/wsl-workspace-store'
 import { createFaviconCache } from './host-capabilities/preview/favicon-cache'
 import {
   initMediaProtocolBridge
@@ -119,6 +121,7 @@ import { registerPreviewIpc } from './ipc/preview-ipc'
 import { registerSystemIpc } from './ipc/system-ipc'
 import { registerThemeIpc } from './ipc/theme-ipc'
 import { registerWindowIpc } from './ipc/window-ipc'
+import { registerWorkspaceIpc } from './ipc/workspace-ipc'
 import { destroyKeepaliveAgents } from './legacy-hermes/api-transport'
 import { cloudAgentSilentSignIn } from './legacy-hermes/cloud-agents'
 import { sshQuitShouldBlock } from './legacy-hermes/connection-apply'
@@ -566,6 +569,16 @@ registerFsIpc({
 })
 
 registerGitIpc({ resolveGitBinary, resolveGhBinary })
+
+// WSL Workspace (work order 35): the host service owns distribution
+// discovery, connection verification, directory browsing and the versioned
+// workspace store in this app's (isolated) userData. Round-1 ownership of
+// that store is temporary by design; it moves to the Work Core later.
+registerWorkspaceIpc({
+  wslWorkspaceHost: createDefaultWslWorkspaceHost(
+    createWslWorkspaceStore(path.join(app.getPath('userData'), 'wsl-workspaces.json'))
+  )
+})
 
 registerMcpOauthCallbackIpc()
 

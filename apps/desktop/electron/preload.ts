@@ -198,6 +198,19 @@ contextBridge.exposeInMainWorld('hermesDesktop', {
     }
   },
   sshConfigHosts: () => ipcRenderer.invoke('hermes:ssh-config:hosts'),
+  // WSL Workspace (work order 35): discover distributions, connect with an
+  // optional Linux user, browse the real Linux tree, and save/reconnect
+  // Workspaces persisted by the main process. Structured outcomes only.
+  wslWorkspace: {
+    discover: () => ipcRenderer.invoke('hermes:wsl-workspace:discover'),
+    connect: payload => ipcRenderer.invoke('hermes:wsl-workspace:connect', payload),
+    listDirectories: payload => ipcRenderer.invoke('hermes:wsl-workspace:directories:list', payload),
+    saveWorkspace: payload => ipcRenderer.invoke('hermes:wsl-workspace:save', payload),
+    listWorkspaces: () => ipcRenderer.invoke('hermes:wsl-workspace:workspaces:list'),
+    reconnectWorkspace: payload => ipcRenderer.invoke('hermes:wsl-workspace:reconnect', payload),
+    releaseConnection: payload => ipcRenderer.invoke('hermes:wsl-workspace:connection:release', payload),
+    cancelOperation: payload => ipcRenderer.invoke('hermes:wsl-workspace:operation:cancel', payload)
+  },
   sshResolveHost: host => ipcRenderer.invoke('hermes:ssh-config:resolve', host),
   probeConnectionConfig: remoteUrl => ipcRenderer.invoke('hermes:connection-config:probe', remoteUrl),
   oauthLoginConnectionConfig: remoteUrl => ipcRenderer.invoke('hermes:connection-config:oauth-login', remoteUrl),
