@@ -216,7 +216,10 @@ export function WslWorkspaceWizard() {
 
       setEntries(result.entries)
       setPath(result.path)
-      setPathInput(result.path)
+      // Echo the resolved path into the input ONLY while the user has not
+      // typed something newer — the initial listing of a slow connect must
+      // not wipe a path the user is already entering.
+      setPathInput(previous => (previous === target ? result.path : previous))
     },
     []
   )
