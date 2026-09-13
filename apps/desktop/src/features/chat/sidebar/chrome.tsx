@@ -310,11 +310,52 @@ export function SidebarGroupRow({
   const OVERLAY_REVEAL =
     'pointer-events-none opacity-0 transition-opacity group-hover/workspace:pointer-events-auto group-hover/workspace:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100 has-[[data-state=open]]:pointer-events-auto has-[[data-state=open]]:opacity-100 group-has-[[data-row-toggle]:hover]:pointer-events-none group-has-[[data-row-toggle]:hover]:opacity-0'
 
-  // Overlay mode reserves a trailing strip as wide as the fixed caret: the
-  // strip pins the overlay's right edge exactly at the caret's left edge, so
-  // the floating controls can never cover the expand target — not even at
-  // narrow rows where the label stretches under them.
-  const overlayTrail = actionsOverlay && !facts.length ? 'w-5' : ''
+  const caretButton = toggle ? (
+    <Tip label={toggle.ariaLabel}>
+      <button
+        aria-label={toggle.ariaLabel}
+        className={cn(
+          'flex items-center self-stretch bg-transparent p-0',
+          // Overlay mode: a FIXED-width caret parked at the row's trailing
+          // edge, outside the actions overlay. The first Windows run failed
+          // here: the stretched caret's click surface ran under the
+          // hover-revealed controls — a primary gesture and an action cluster
+          // cannot share the same pixels.
+          actionsOverlay ? 'w-5 shrink-0' : 'flex-1'
+        )}
+        data-row-actions
+        data-row-toggle
+        {...toggle.data}
+        onClick={toggle.onToggle}
+        type="button"
+      >
+        <DisclosureCaret
+          className="shrink-0 text-(--ui-text-tertiary) opacity-0 transition group-hover/workspace:opacity-100"
+          open={toggle.open}
+        />
+      </button>
+    </Tip>
+  ) : null
+
+  // Overlay mode: the caret lives in the trailing column, so the overlay's
+  // right edge (`right-5` = the caret's width) stops exactly at the caret's
+  // left edge by construction — the expand target is never covered, at any
+  // row width. The facts figures keep their in-flow slot ahead of the caret.
+  const trailing = actionsOverlay ? (
+    <div className="relative flex items-center">
+      {facts.length ? (
+        <span className="min-w-9 whitespace-nowrap text-right text-[0.625rem] leading-none text-(--ui-text-tertiary) transition-opacity group-hover/workspace:opacity-0">
+          {facts.join(' · ')}
+        </span>
+      ) : null}
+      {caretButton}
+      {actions ? (
+        <div className={cn('absolute right-5 flex items-center', OVERLAY_REVEAL)} data-row-actions>
+          {actions}
+        </div>
+      ) : null}
+    </div>
+  ) : null
 
   return (
     <SidebarRowShell
@@ -326,22 +367,17 @@ export function SidebarGroupRow({
         // group, never both at once. Overlay mode extends the same overlay to
         // the no-facts case, where in-flow actions would hold their width open
         // against nothing and steal it from the name.
-        actionsOverlay || facts.length ? (
-          <div className={cn('relative flex items-center', overlayTrail)}>
-            {facts.length ? (
-              <span className="min-w-9 whitespace-nowrap text-right text-[0.625rem] leading-none text-(--ui-text-tertiary) transition-opacity group-hover/workspace:opacity-0">
-                {facts.join(' · ')}
-              </span>
-            ) : null}
-            {actions ? (
-              <div className={cn('absolute right-0 flex items-center', actionsOverlay && OVERLAY_REVEAL)} data-row-actions>
-                {actions}
-              </div>
-            ) : null}
+        trailing ??
+        (facts.length ? (
+          <div className="relative flex items-center">
+            <span className="min-w-9 whitespace-nowrap text-right text-[0.625rem] leading-none text-(--ui-text-tertiary) transition-opacity group-hover/workspace:opacity-0">
+              {facts.join(' · ')}
+            </span>
+            {actions ? <div className="absolute right-0 flex items-center">{actions}</div> : null}
           </div>
         ) : (
           actions
-        )
+        ))
       }
       className={cn('group/workspace', className)}
       {...props}
@@ -349,33 +385,7 @@ export function SidebarGroupRow({
       <SidebarRowCluster className="min-w-0 flex-1">
         {lead}
         {label}
-        {toggle ? (
-          <Tip label={toggle.ariaLabel}>
-            <button
-              aria-label={toggle.ariaLabel}
-              className={cn(
-                'flex items-center self-stretch bg-transparent p-0',
-                // Overlay mode: a FIXED-width caret, not a stretched one. The
-                // stretched caret's click surface ran under the hover-revealed
-                // actions all the way to the row's edge — a primary gesture
-                // and an action cluster cannot share the same pixels.
-                actionsOverlay ? 'w-5 shrink-0' : 'flex-1'
-              )}
-              data-row-actions
-              data-row-toggle
-              {...toggle.data}
-              onClick={toggle.onToggle}
-              type="button"
-            >
-              <DisclosureCaret
-                className="shrink-0 text-(--ui-text-tertiary) opacity-0 transition group-hover/workspace:opacity-100"
-                open={toggle.open}
-              />
-            </button>
-          </Tip>
-        ) : (
-          <span className="flex-1" />
-        )}
+        {!actionsOverlay && (toggle ? caretButton : <span className="flex-1" />)}
       </SidebarRowCluster>
     </SidebarRowShell>
   )
