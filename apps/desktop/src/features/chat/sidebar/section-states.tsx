@@ -23,7 +23,16 @@ export function SidebarSessionSkeletons() {
   )
 }
 
-export function SidebarBlankState({ onNewProject }: { onNewProject: () => void }) {
+export function SidebarBlankState({
+  onNewProject,
+  onRemoteConnection
+}: {
+  onNewProject: () => void
+  /** Remote-connection entry (round 1: WSL wizard). Absent on skins that
+   *  hide the feature; the empty sidebar must still offer both entries so
+   *  the add-project menu is reachable with zero projects. */
+  onRemoteConnection?: () => void
+}) {
   const { t } = useI18n()
   const s = t.sidebar
 
@@ -36,6 +45,12 @@ export function SidebarBlankState({ onNewProject }: { onNewProject: () => void }
           <Codicon name="add" size="0.75rem" />
           {s.projects.newButton}
         </Button>
+        {onRemoteConnection && (
+          <Button className="text-(--ui-text-secondary)" onClick={onRemoteConnection} size="sm" variant="ghost">
+            <Codicon name="vm-connect" size="0.75rem" />
+            {t.wslWorkspace.menuRemoteConnection}
+          </Button>
+        )}
       </div>
     </div>
   )

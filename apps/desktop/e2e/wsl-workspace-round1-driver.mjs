@@ -195,27 +195,45 @@ async function main() {
     return
   }
 
-  // ─── step: add-project menu shows the remote-connection entry ───
-  await addButton.click()
-  await page.waitForTimeout(600)
-  await screenshot(page, 'add-project-menu')
+  // ─── step: the add-project path reaches the remote-connection entry ───
+  // Two shapes, both first-class: a fresh sidebar shows the blank state's
+  // remote button; a sidebar with projects shows the header "+" menu.
+  const blankRemote = page.getByRole('button', { name: /Remote connection|远程连接/ }).first()
+  let wizardOpened = false
 
-  const remoteItem = page.getByText(/Remote connection|远程连接/).first()
-  let remoteMenuOk = true
+  if (await blankRemote.isVisible().catch(() => false)) {
+    await blankRemote.click()
+    wizardOpened = true
+    record('add-project entry', true, 'blank-state remote connection button')
+  } else {
+    await page.locator('[data-slot="dropdown-menu-trigger"]').filter({ has: page.locator('[aria-label="New project"], [aria-label="新建项目"]') }).first().click()
+    await page.waitForTimeout(600)
+    await screenshot(page, 'add-project-menu')
 
-  try {
-    await remoteItem.waitFor({ state: 'visible', timeout: 5000 })
-  } catch {
-    remoteMenuOk = false
+    const remoteItem = page.getByText(/Remote connection|远程连接/).first()
+    let remoteMenuOk = true
+
+    try {
+      await remoteItem.waitFor({ state: 'visible', timeout: 5000 })
+    } catch {
+      remoteMenuOk = false
+    }
+
+    record('add-project menu', remoteMenuOk, remoteMenuOk ? 'remote connection entry visible' : 'remote connection entry missing')
+    if (!remoteMenuOk) {
+      await finish(app, false)
+      return
+    }
+
+    await remoteItem.click()
+    wizardOpened = true
   }
 
-  record('add-project menu', remoteMenuOk, remoteMenuOk ? 'remote connection entry visible' : 'remote connection entry missing')
-  if (!remoteMenuOk) {
+  if (!wizardOpened) {
     await finish(app, false)
     return
   }
 
-  await remoteItem.click()
   await page.waitForTimeout(800)
   await screenshot(page, 'wizard-method')
 
