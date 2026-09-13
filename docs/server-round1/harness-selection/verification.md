@@ -188,3 +188,160 @@ Codex as one artifact until a future adapter exposes a reliable version gate.
 - There were zero model/provider calls, login calls, and credential-content
   reads. All behavior evidence remains fake-peer or controlled-subprocess
   evidence with the limitations above.
+
+# Round-two Stage B verification
+
+## Isolation and fixed inputs
+
+The second screen used the owned temporary root
+`/tmp/agentbox-harness-selection-38-round2.3oxRoE`, marked by
+`.agentbox-owner` with exact content
+`agentbox-work-order-38-round2-research`. Candidate checkouts, dependency stores,
+homes, XDG directories, logs, and generated builds stayed below that root,
+except for two corrected operational deviations recorded below.
+
+Platform: WSL2 Linux x86_64, Node `v22.23.2`, npm `10.9.8`, pnpm `11.26.0`.
+No Go executable is installed on this host. All executable tests used `env -i`
+with an explicit Node/system `PATH`, owned `HOME`, XDG and temporary paths, and
+only the candidate/research variables required by the runner. No native Harness,
+provider, model, login, or credential operation ran.
+
+Round-two source inputs were:
+
+- `beyond5959/acp-adapter` tag `v0.3.8`, peeled commit
+  `491151b16846682396aca8c31e9285e414e4f3b8`;
+- `openclaw/acpx` commit
+  `ffbefbbb726b1fd4623b8e51708a17d21b10b576`, five days newer than the
+  distinct `v0.15.1` tag while still declaring package version `0.15.1`.
+
+The acpx lock was installed with scripts disabled into an owned pnpm store, then
+its published runtime entry point and candidate-owned fake peer were built. The
+committed experiment imports `dist/runtime.js`; it does not copy or replace the
+candidate's ACP implementation.
+
+## Commands and results
+
+### `acp-adapter`
+
+The intended candidate-owned fake suites could not start because the host has
+no Go toolchain:
+
+```text
+cd /tmp/agentbox-harness-selection-38-round2.3oxRoE/checkouts/acp-adapter
+env -i \
+  HOME=/tmp/agentbox-harness-selection-38-round2.3oxRoE/acp-adapter/home \
+  XDG_CONFIG_HOME=/tmp/agentbox-harness-selection-38-round2.3oxRoE/acp-adapter/xdg \
+  GOCACHE=/tmp/agentbox-harness-selection-38-round2.3oxRoE/acp-adapter/gocache \
+  GOMODCACHE=/tmp/agentbox-harness-selection-38-round2.3oxRoE/acp-adapter/gomodcache \
+  GOPATH=/tmp/agentbox-harness-selection-38-round2.3oxRoE/acp-adapter/gopath \
+  TMPDIR=/tmp/agentbox-harness-selection-38-round2.3oxRoE/acp-adapter/tmp \
+  PATH=/usr/local/go/bin:/usr/bin:/bin \
+  go test ./pkg/codexacp ./pkg/claudeacp ./pkg/piacp -count=1
+result: exit 127; env: ‘go’: No such file or directory
+```
+
+The failure occurred before a test binary or fake peer ran. Static source review
+confirmed the three embedded runtime APIs and their fixture suites, but this
+round records every behavior as source-backed/unverified rather than passed.
+The prepared narrow selectors deliberately exclude `*_real_e2e_test.go` and
+all real-provider tests.
+
+### `acpx`
+
+```text
+cd /tmp/agentbox-harness-selection-38-round2.3oxRoE/checkouts/acpx-review
+env -i <owned HOME/XDG/cache/tmp and fixed Node PATH> \
+  pnpm install --frozen-lockfile --ignore-scripts \
+  --store-dir /tmp/agentbox-harness-selection-38-round2.3oxRoE/acpx/pnpm-store
+result: exit 0; 395 packages installed from the fixed lock; lifecycle scripts disabled
+
+env -i <same isolation> pnpm run build:quiet
+result: exit 0
+
+env -i <same isolation> pnpm run build:test
+result: exit 0
+
+env -i <same isolation> \
+  ACPX_CHECKOUT=/tmp/agentbox-harness-selection-38-round2.3oxRoE/checkouts/acpx-review \
+  AGENTBOX_RESEARCH_ROOT=/tmp/agentbox-harness-selection-38-round2.3oxRoE \
+  node --test \
+  docs/server-round1/harness-selection/experiments/acpx_round2_stage_b.test.mjs
+first run: exit 1; 0 passed, 2 failed because the experiment expected the
+           reconnect response to rewrite the public handle immediately and
+           expected the asynchronous exit observer before it had settled
+corrected run: exit 0; 2 passed, 0 failed
+```
+
+The corrected assertions follow candidate semantics: a reused persistent handle
+keeps its checkpointed native id until the next prompt reconnects; `getStatus`
+then reports the resume response's native id. The process exit observer is
+best-effort asynchronous, so the experiment waits within a fixed two-second
+bound instead of racing it. No candidate code or fixture was changed to make the
+run pass.
+
+Candidate-owned directed suites also passed:
+
+```text
+env -i <same isolation> node --test \
+  --test-name-pattern='AcpClient (handlePermissionRequest short-circuits|onPermissionRequest decision short-circuits|onPermissionRequest cancels a late decision|onPermissionRequest treats abort rejections)' \
+  dist-test/test/client.test.js
+result: exit 0; 4 passed, 0 failed
+
+env -i <same isolation> node --test dist-test/test/spawn-options.test.js
+result: exit 0; 40 passed, 0 failed
+```
+
+The second suite covers child environment precedence/validation, protected auth
+keys, actual controlled child spawning, Windows batch argv handling, WSL path
+translation and bounded helper termination. Because the outer environment was
+empty except for explicit test variables, it did not inspect or copy a real
+credential.
+
+## Observed behavior and limits
+
+| Required behavior | `acp-adapter v0.3.8` | `acpx ffbefbb` | Evidence limit |
+| --- | --- | --- | --- |
+| Event before run end | Source and fake tests exist; **not executed** | **PASS:** candidate runtime emitted `visible-before-result` while `turn.result` was unresolved | acpx used its own fake ACP peer, not a real Harness |
+| Native identity/resume | Codex/Pi/Claude source paths present; **not executed** | **PASS at ACP host boundary:** exact backend session id survived close/reconnect and the resume response updated the namespaced native id after the next prompt | The fake labelled Cod native id; no Codex/Pi/Claude binary ran |
+| Cancel versus disconnect | Separate source paths exist; **not executed** | **PASS:** explicit cancel returned `status=cancelled`; peer exit 91 returned `status=failed` and a lifecycle exit record | WSL/Windows descendant-tree cleanup remains unproven |
+| Approval | Source permission bridges exist; **not executed** | **PASS:** host callback rejected an edit request and the peer observed `reject`; candidate tests prove stale decisions are cancelled | Production must use `deny-all` plus callback; callback failure otherwise falls through to the configured mode |
+| Invalid capability/config | Source validation exists; **not executed** | **PASS:** an unadvertised config key was rejected; advertised reasoning effort was accepted and returned | Generic ACP configuration only |
+| Two different Harness-specific capabilities | Codex, Pi and Claude paths are source-backed; **not executed** | **NOT PROVEN:** plans/config/commands are normalized, but the experiment used one generic ACP fixture and no second fixed native adapter | This blocks a fully qualified backup claim |
+| Codex app-server | Implemented in `internal/codex`; **not executed** | **Inherited lower-component evidence only:** acpx does not implement it; its default Codex entry points to a ranged Codex ACP package | The first-screen fixed Codex ACP test is not rerun or reattributed to acpx |
+| Isolation and supply chain | Host injection required; Windows installer unsupported | **PARTIAL:** injected absolute argv, in-memory store, outer `env -i`, owned homes, and lifecycle hooks worked; default ranges/`npx` were bypassed | acpx itself merges its parent environment, so the Worker must launch its sidecar with a minimal environment |
+
+The experiment establishes that acpx is a credible embeddable ACP host. It does
+not establish that acpx plus its default registry is a complete, pinned,
+native-capability-preserving Harness implementation. Its public contract keeps
+structured tools, plan snapshots, model/config controls, commands, permissions,
+usage, selected turn `_meta`, and typed failure, while intentionally allowing
+only selected origin metadata and reducing some command/config schemas. A full
+backup qualification would still require two fixed lower adapters with distinct
+native extension behavior and an exact offline artifact closure.
+
+`acp-adapter` remains the strongest newly found source-level backup because its
+three lower implementations and embedded APIs are in one MIT repository without
+a product database or scheduler. The missing Go toolchain prevents it from
+becoming behavior-qualified in this round.
+
+## Operational deviations and cleanup evidence
+
+- A Paseo install attempt created two uniquely named temporary home/cache
+  directories and two grep-output files outside the owned root. The responsible
+  reviewer stopped only its own npm processes, removed those exact paths, and
+  verified each path absent. No global install completed.
+- One acpx `build:test` invocation accidentally set `HOME` to the unique path
+  `/tmp/DUMMY?`. pnpm created only `.local/state/pnpm` and `.local/share/pnpm`
+  there. The path was identified as owned by this run, removed exactly with a
+  Python directory operation, and verified absent. The build output itself
+  stayed in the owned checkout.
+- The first CodexHost shallow clone stalled in its owned process group. That
+  exact group was terminated; a large archive request timed out and left a
+  zero-byte file inside the owned root. Fixed-commit GitHub tree and raw files
+  were then used for source review. No user or unrelated process was touched.
+- Several low-priority partial clones were stopped only by their exact owned
+  process groups after higher-signal source candidates were available. They
+  remain below the marker-owned research root until final cleanup.
+
+Final marker validation, process audit, and removal of the entire second-round
+research root occur only after all committed evidence no longer depends on it.
