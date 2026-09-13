@@ -299,6 +299,11 @@ pane、section、overlay、command 或必要时 navigation page 动态贡献。S
 4. 每一条都写清它**推翻了哪个现状**——否则执行者不知道要动什么。
 # Workspace sidebar ruling — 2026-09-13, work order 36
 
+维护者复审后追加 [36R](renderer-layer-batches/36R-workspace-structure-repair.md)：
+工作区树是侧栏主体，不能受旧会话分组/数量控制；共享主行选择/展开，搜索包括无会话
+的工作区。移除为隐藏/归档并保留身份。本地路径所属环境不匹配必须拒绝，不能用同名行
+冒充打开成功。该局部结构修正已授权；不接后端、不新建持久化权威。36@250fb79 为PARTIAL。
+
 Supersedes the four-step onboarding and split PROJECTS/REMOTE presentation of 35, not its
 host capability. Keep Profile/角色 near the top and keep pinned sessions as shortcuts to
 original sessions. Remove Sessions/Bots tabs, global Capabilities/Artifacts and the bottom

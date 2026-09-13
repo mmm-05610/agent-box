@@ -1,5 +1,8 @@
 # Work order 36 — 统一 Workspace 左侧栏
 
+> 2026-09-13 维护者复审：250fb79 = PARTIAL，执行者旧 GREEN 不成立。
+> 接续执行 [36R](36R-workspace-structure-repair.md)，本单其余要求保留；冲突以36R为准。
+
 ## 目标、基线与调度
 
 35 已在 `feature/desktop-wsl-round1` 的 `c8d59f3` 验收，尚未合并 main。复核者定向

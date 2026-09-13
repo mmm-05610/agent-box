@@ -1,11 +1,31 @@
 # Renderer layer — master construction plan
 
-## Current owner override — Workspace sidebar (36)
+## Current owner override — Workspace sidebar repair (36R)
+
+36 at `250fb79` is **PARTIAL after maintainer review**, not accepted GREEN.
+The only executable Desktop increment is [36R](renderer-layer-batches/36R-workspace-structure-repair.md):
+continue the same Zcode session/branch/worktree, preserve existing work, unify the workspace
+root list and fix identity/path/evidence boundaries. Import this documentation-only commit;
+no main product merge. New scope/collisions are recorded in the manifest; 36R runs alone.
+Dispatch check against 250fb79: collision scanner exit 0, conservative 36R pattern set
+matches 435 files; ledger remains 0. This is a collision superset, NOT permission to
+edit all matches. Automatic waves ignore product prerequisites; only 36R may execute.
+Backend 37 remains assigned to the independent Codex goal; Zcode must not consume it.
+
+## Previous dispatch — Workspace sidebar (36)
 
 Work order [36](renderer-layer-batches/36-workspace-sidebar-product.md) is now the only
-executable increment. 35 is accepted on `feature/desktop-wsl-round1` at `c8d59f3`, NOT
+Desktop increment in that previous dispatch; it is now amended by 36R above.
+Backend [37](backend-server/work-orders/37-http-codex.md)
+is assigned to a NEW independent Codex goal, not this Desktop/Zcode executor.
+Its scheduling authority has moved to agent-box-server-round1/docs/implementation;
+the local backend-server links are retired navigation only. Its scope and resource
+exclusions are in [backend master plan](backend-server/master-plan.md). It does not
+enable Desktop Codex integration, data migration, or older paused orders.
+35 is accepted on `feature/desktop-wsl-round1` at `c8d59f3`, NOT
 merged into main. Continue that branch/worktree after importing this documentation-only
-dispatch commit. 36 runs exclusively; 34, previews, Codex and Work Core remain paused.
+dispatch commit. 36 runs exclusively within Desktop; 34, previews and Desktop
+Codex/Work Core integration remain paused. Backend 37 does not write Desktop code.
 No automatic main merge. This overrides the first-round-only instruction below.
 
 ## Previous owner override — WSL first round
