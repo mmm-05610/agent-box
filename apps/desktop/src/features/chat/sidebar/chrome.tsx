@@ -304,9 +304,17 @@ export function SidebarGroupRow({
   // The overlay mode's reveal lives on the container, not on each button: one
   // place owns "hidden but reachable", and a control that opens floating UI
   // (the kebab's menu) keeps the cluster visible through `has-[[data-state=open]]`
-  // even after the pointer moves into the portal'd menu.
+  // even after the pointer moves into the portal'd menu. Hovering the row's
+  // disclosure caret makes the overlay yield (hide + click-through) — the
+  // caret is a primary gesture and must never fight the floating controls.
   const OVERLAY_REVEAL =
-    'pointer-events-none opacity-0 transition-opacity group-hover/workspace:pointer-events-auto group-hover/workspace:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100 has-[[data-state=open]]:pointer-events-auto has-[[data-state=open]]:opacity-100'
+    'pointer-events-none opacity-0 transition-opacity group-hover/workspace:pointer-events-auto group-hover/workspace:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100 has-[[data-state=open]]:pointer-events-auto has-[[data-state=open]]:opacity-100 group-has-[[data-row-toggle]:hover]:pointer-events-none group-has-[[data-row-toggle]:hover]:opacity-0'
+
+  // Overlay mode reserves a trailing strip as wide as the fixed caret: the
+  // strip pins the overlay's right edge exactly at the caret's left edge, so
+  // the floating controls can never cover the expand target — not even at
+  // narrow rows where the label stretches under them.
+  const overlayTrail = actionsOverlay && !facts.length ? 'w-5' : ''
 
   return (
     <SidebarRowShell
@@ -319,7 +327,7 @@ export function SidebarGroupRow({
         // the no-facts case, where in-flow actions would hold their width open
         // against nothing and steal it from the name.
         actionsOverlay || facts.length ? (
-          <div className="relative flex items-center">
+          <div className={cn('relative flex items-center', overlayTrail)}>
             {facts.length ? (
               <span className="min-w-9 whitespace-nowrap text-right text-[0.625rem] leading-none text-(--ui-text-tertiary) transition-opacity group-hover/workspace:opacity-0">
                 {facts.join(' · ')}
@@ -345,8 +353,16 @@ export function SidebarGroupRow({
           <Tip label={toggle.ariaLabel}>
             <button
               aria-label={toggle.ariaLabel}
-              className="flex flex-1 items-center self-stretch bg-transparent p-0"
+              className={cn(
+                'flex items-center self-stretch bg-transparent p-0',
+                // Overlay mode: a FIXED-width caret, not a stretched one. The
+                // stretched caret's click surface ran under the hover-revealed
+                // actions all the way to the row's edge — a primary gesture
+                // and an action cluster cannot share the same pixels.
+                actionsOverlay ? 'w-5 shrink-0' : 'flex-1'
+              )}
               data-row-actions
+              data-row-toggle
               {...toggle.data}
               onClick={toggle.onToggle}
               type="button"
