@@ -297,7 +297,19 @@ pane、section、overlay、command 或必要时 navigation page 动态贡献。S
    一份会被悄悄覆盖的裁决表，比没有裁决表更糟。
 3. 待裁决的问题在第三节有归属；定下来之后从这里搬进第二节。
 4. 每一条都写清它**推翻了哪个现状**——否则执行者不知道要动什么。
-# WSL-first implementation ruling
+# Workspace sidebar ruling — 2026-09-13, work order 36
+
+Supersedes the four-step onboarding and split PROJECTS/REMOTE presentation of 35, not its
+host capability. Keep Profile/角色 near the top and keep pinned sessions as shortcuts to
+original sessions. Remove Sessions/Bots tabs, global Capabilities/Artifacts and the bottom
+utility strip. Settings hosts secondary retained capabilities. Local/WSL Workspaces are
+one peer list, not two sections. Add offers open folder/open remote folder; choose directory
+to finish, no naming/confirmation page. Only WSL exists, so omit connection-type step;
+connecting is a loading state. Rename/remove live in row menus; removal never deletes files
+or history. Private connection details/reconnect belong to the Workspace. No fake remote
+Session, no group chat, no new execution/backend. See [36](renderer-layer-batches/36-workspace-sidebar-product.md).
+
+# WSL-first implementation ruling (historical; flow amended by 36)
 
 The owner authorizes work order [35](renderer-layer-batches/35-wsl-workspace-round1.md)
 as the only executable next round for a new session. Follow the supplied Zcode flow:

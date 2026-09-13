@@ -1,6 +1,14 @@
 # Renderer layer — master construction plan
 
-## Current owner override — WSL first round
+## Current owner override — Workspace sidebar (36)
+
+Work order [36](renderer-layer-batches/36-workspace-sidebar-product.md) is now the only
+executable increment. 35 is accepted on `feature/desktop-wsl-round1` at `c8d59f3`, NOT
+merged into main. Continue that branch/worktree after importing this documentation-only
+dispatch commit. 36 runs exclusively; 34, previews, Codex and Work Core remain paused.
+No automatic main merge. This overrides the first-round-only instruction below.
+
+## Previous owner override — WSL first round
 
 The owner authorized a new executor for [work order 35](renderer-layer-batches/35-wsl-workspace-round1.md).
 Only that first round is executable in the new session: real Windows Desktop WSL
