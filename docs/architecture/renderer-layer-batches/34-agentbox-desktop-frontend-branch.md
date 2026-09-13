@@ -9,6 +9,31 @@ The product model is partly fixed by
 > branch before implementation. Finish the remaining UI semantic audit and approve the
 > frontend ↔ Work Core protocol first. Only a later explicit ruling may remove this hold.
 
+### Preview-only exception to the hold
+
+The executor may produce one review aid before the hold is lifted: an **in-place visual
+preview built from the real Hermes Desktop renderer**. This is not Stage 0 and is not
+permission to begin the refactor.
+
+- Use a dedicated preview branch/worktree. Do not modify `main`.
+- Reuse the real `app/shell`, sidebar, Session view, Composer, Profiles, Settings,
+  themes and shared UI components. Inject static preview data only at the product-data
+  boundary.
+- Do not create a standalone HTML page, standalone CSS design system, replacement app
+  shell, AgentBox transport, Electron IPC or backend protocol.
+- Render only accepted semantics: Workspaces and Profiles as primary surfaces; Settings
+  as utility; Sessions under Workspaces; private Connection inside a Remote Workspace;
+  no global Agents or Artifacts; Automation as a non-primary contribution.
+- Any interaction whose semantics are still open must visibly say `Design pending` in
+  the preview rather than being invented by the executor.
+- Provide a local preview URL, before/after screenshots at the same viewport, and a
+  short mapping from each changed visible element to its reused production component.
+- Stop if the preview requires replacing core visual components, adding a second theme,
+  editing a protected path, or changing production persistence/preload/IPC behavior.
+
+Acceptance for this exception is `AGENTBOX_DESKTOP_IN_PLACE_PREVIEW_READY`. It does not
+change Batch 34's `design hold` status.
+
 ## Objective
 
 Turn the current Hermes Desktop renderer into a small, product-semantic **AgentBox
