@@ -124,6 +124,16 @@ async function main() {
 
   const { app, page } = await launchApp(electronBin, env)
 
+  // Renderer console + page errors → the driver log (diagnostics only).
+  const consoleLog = path.join(outDir, 'renderer-console.log')
+
+  page.on('console', message => {
+    fs.appendFileSync(consoleLog, `[${message.type()}] ${message.text()}\n`)
+  })
+  page.on('pageerror', error => {
+    fs.appendFileSync(consoleLog, `[pageerror] ${error}\n`)
+  })
+
   const title = await page.title()
   record('app opens', true, `window title: ${title}`)
   await screenshot(page, 'boot')
@@ -266,7 +276,13 @@ async function main() {
       menuOpenFolder === 1 && menuOpenRemote === 1,
       `open-folder=${menuOpenFolder}, open-remote=${menuOpenRemote} (no naming page behind the menu)`
     )
-    await page.getByRole('menuitem', { name: /Open folder|打开文件夹/ }).first().click()
+    const item = page.getByRole('menuitem', { name: /Open folder|打开文件夹/ }).first()
+
+    await item.click()
+    // Did the select actually land? The menu must close on select.
+    await page.waitForTimeout(1200)
+    const menuStillOpen = await item.isVisible().catch(() => false)
+    record('menu item selected', !menuStillOpen, `menu closed after select=${!menuStillOpen}`)
   }
 
   await page.waitForTimeout(4000)
