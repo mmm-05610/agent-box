@@ -1,9 +1,13 @@
 # Backend Server — status
 
-更新：2026-09-13。37 的实施者报告 GREEN，独立验收裁决为 PARTIAL；保留真实三轮和冷续接证据，不覆盖原完成报告。当前只执行38选型验证，不自动修37或接Desktop。
+更新：2026-09-14（设计者派单，未执行生产修改）。37 的独立验收仍为 PARTIAL；历史证据保留。
+当前授权39→40，覆盖下方历史“等待抽取授权/后续未派”表述；38研究已结束，不重跑广筛。
+代码起点b415eb2；新分支由39建立。当前没有新增模型/凭据授权，不自动接管Desktop。
 
 | 单号 | 状态 | 证据 | 下一步 |
 | --- | --- | --- | --- |
+| [39](work-orders/39-server-boundaries.md) | **READY** | [批准蓝图](server-architecture-v1.md) | 建立新分支，落实中立业务边界、事务与能力诚实性 |
+| [40](work-orders/40-four-harness-integration.md) | **QUEUED** | 复用38固定来源；Codex/Hermes/Pi/OpenCode均NOT_STARTED | 39接缝就绪后按家验证；允许有门禁生产接入，不授权模型 |
 | [37](work-orders/37-http-codex.md) | **SERVER_HTTP_CODEX_R1_PARTIAL** | [原完成审计](../server-round1/completion-audit.md) / [C/D证据](../server-round1/stage-c-d.md)保留；检查点5a45303/5b71393/cd5efbe/67c6b40。独立定向23 passed，另复现同键并发两次accept导致状态矛盾；非实时消息、角色状态未实现却报能力、composition混入原生语义，详见[38 §2](work-orders/38-harness-extension-selection.md) | 返修待选型后派单；本轮不重跑模型、不读取保留验收数据 |
 | [38](work-orders/38-harness-extension-selection.md) | **HARNESS_EXTENSION_SELECTION_READY_FOR_DECISION** | 两轮 A/B/C 完成：[最终建议与边界](../server-round1/harness-selection/boundary.md) / [候选](../server-round1/harness-selection/candidates.md) / [检索覆盖](../server-round1/harness-selection/search-coverage.md) / [行为证据](../server-round1/harness-selection/verification.md)。保留有条件首选 `harness-remote v3.0.2`；`acp-adapter v0.3.8` 为待补 Go fake 验证的最佳新增备选；`acpx` 仅为已验证 ACP host 组件；零模型/凭据 | 等待用户决定是否另派最小无模型 Harness Remote 抽取单；本单不开始生产接入 |
 

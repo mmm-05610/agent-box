@@ -1,7 +1,19 @@
 # AgentBox Server — 总实施方针
 
 2026-09-13。独立后端 Codex goal 的唯一施工权威，不属于 Desktop/Zcode 队列。
-37 已产生 A/B/C/D 检查点；独立验收仍为 PARTIAL。当前仅授权 38 的选型研究与隔离验证。
+37 已产生 A/B/C/D 检查点；独立验收仍为 PARTIAL。
+
+## 2026-09-14 调度覆盖（优先于下方历史安排）
+
+用户已批准[Server职责蓝图](server-architecture-v1.md)与四家 Harness 接入尝试。
+当前队列：[39 中立Server边界](work-orders/39-server-boundaries.md) →
+[40 四Harness复用接入](work-orders/40-four-harness-integration.md)。38研究结束，不再重复广筛；
+采用有条件首选进入有门禁的抽取/接入，不是无条件认定四家支持。37历史状态不升级。
+执行工作目录不变，新施工分支由39创建 `feature/server-harness-extension-v1`，保留b415eb2历史。
+下方“只研究/不能生产”仅描述37/38历史授权，不适用于39/40。没有正在运行的后端goal时，
+等待用户启动执行会话；本次文档派发不自动启动旧研究goal。
+各阶段必须更新status；任何goal结束前复核状态、证据、待验和写权。单家阻断继续其他可做任务。
+真实模型/凭据仍未授权；两端READY前不联调，跨仓写权留给列明实际工作树的全栈单。
 
 ## 定位和入口
 

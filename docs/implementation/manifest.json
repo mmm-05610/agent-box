@@ -75,7 +75,42 @@
       "parallel_code_with": ["desktop:36R"],
       "exclusive_resources": ["Windows native build slot", "backend status writer"],
       "note": "Research only. No production edits, real models or credentials. Shares report/status scope with paused 37; serialize status edits. Third-party integration reuse mandatory; final selection requires user decision."
+    },
+    {
+      "id": "39",
+      "document": "work-orders/39-server-boundaries.md",
+      "baseline": "b415eb2",
+      "worktree": "/home/maoqh/projects/agent-box-server-round1",
+      "branch": "feature/server-harness-extension-v1",
+      "depends_on": ["38"],
+      "dependency_condition": "Research delivered; 38 writer finished; user authorized architecture and gated reuse attempts",
+      "stages": ["A", "B", "C", "D"],
+      "write_paths": ["src/agent_box/server/**", "src/agent_box/storage/**", "src/agent_box/work_core/db.py", "src/agent_box/extensions/**", "tests/**", "pyproject.toml", "uv.lock", "docs/server-round1/**", "docs/implementation/status.md"],
+      "parallel_code_with": ["desktop:product-delivery"],
+      "forbidden_write_roots": ["/home/maoqh/projects/agent-box-desktop-next", "/home/maoqh/projects/agent-box-desktop-next-wsl-round1", "/home/maoqh/projects/agent-box-studio"],
+      "exclusive_resources": ["backend production writer", "backend status writer", "Windows native build slot"],
+      "note": "No model calls/credential reads; narrowly repair Core database injection only. Preserve historical checkpoints."
+    },
+    {
+      "id": "40",
+      "document": "work-orders/40-four-harness-integration.md",
+      "baseline": "39 checkpoint",
+      "worktree": "/home/maoqh/projects/agent-box-server-round1",
+      "branch": "feature/server-harness-extension-v1",
+      "depends_on": ["39"],
+      "stages": ["A", "B", "C", "D"],
+      "write_paths": ["src/agent_box/server/**", "src/agent_box/storage/**", "src/agent_box/extensions/**", "plugins/agent-box-harnesses/**", "plugins/agent-box-runtime-wsl/**", "plugins/agent-box-sandbox-bwrap/**", "workers/**", "protocols/worker/**", "tests/**", "pyproject.toml", "uv.lock", "scripts/server-round1/**", "docs/server-round1/**", "docs/implementation/status.md"],
+      "parallel_code_with": ["desktop:product-delivery"],
+      "forbidden_write_roots": ["/home/maoqh/projects/agent-box-desktop-next", "/home/maoqh/projects/agent-box-desktop-next-wsl-round1", "/home/maoqh/projects/agent-box-studio"],
+      "exclusive_resources": ["backend production writer", "backend status writer", "Windows native build slot"],
+      "note": "Gated fixed-source reuse and narrow documented patches authorized; four independent component acceptance states, no models/real credentials, no fullstack takeover."
     }
   ],
-  "authority": "docs/implementation"
+  "authority": "docs/implementation",
+  "execution_override": {
+    "date": "2026-09-14",
+    "sequence": ["39", "40"],
+    "historical_orders": ["37", "38"],
+    "rule": "39 and 40 serialize shared production/status/lock paths; no resumed 37/38 writer. Desktop product code may proceed independently; no cross-repo writes."
+  }
 }
