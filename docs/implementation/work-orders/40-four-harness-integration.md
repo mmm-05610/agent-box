@@ -1,7 +1,7 @@
 # Work Order 40 — 四 Harness 复用接入尝试
 
 状态：QUEUED，依赖39中立接口可用。2026-09-14用户批准尝试 Codex、Hermes、Pi、OpenCode。
-本单解除38的“只研究、不接生产”限制，允许下述固定源码复用和窄补丁，**不授权模型请求或读取真实凭据**。
+本单允许下述固定源码复用和窄补丁。模型请求与凭据仅依[42 §D](42-fullstack-delivery.md)的DeepSeek限定授权。
 目标是四家独立完成真实协议组件接入，不承诺今夜全部真实模型 GREEN。
 
 ## 复用裁决与边界
@@ -51,10 +51,10 @@ Harness 接入是扩展插口，具体 Harness 是接入实现。暂不做用户
   审批 allow/deny/过期/冲突、原生状态投影和回收；不支持项明确 unavailable 而非假成功。
 - 每家至少记录一个差异能力或限制，差异留在扩展，前端用描述性字段，不能品牌硬编码。
 - 能零凭据完成的真实二进制版本/启动握手可有界运行，清空凭据来源并隔离 HOME；
-  若工具握手会读取用户认证或触发付费请求则不运行，只列待验。
+  需认证或付费的测试只使用42 §D授权来源并记账；未授权的用户认证不得读取。
 - Server服务可在零 Harness/某家失败时启动；其余实现仍可用。无 secrets 进入证据。
 
-调用授权、来源与预算另派；本单不得沿用37旧DeepSeek密钥、用户登录态或聊天密钥。
+调用授权、来源与预算已在42 §D登记；只消费其私密locator，不沿用37密钥或其他登录态。
 “接入已实现”与“真实模型验收通过”分列；只有后者有授权且实跑才能记 MODEL_VERIFIED。
 
 ## 范围、停止与交接
@@ -66,10 +66,10 @@ Harness 接入是扩展插口，具体 Harness 是接入实现。暂不做用户
 不因这一单独立完成就宣称整个后端完成。
 
 继承 Desktop `handoff-policy.md`：两端真实 IMPLEMENTATION_READY 且前端writer_lease RELEASED
-后才能全栈联调。本单仍禁止跨仓生产写；全栈单须列明当时前端实际工作树及写权后再接管。
+后才能全栈联调。本单仍禁止跨仓生产写；达到42双门后依其明确工作树和写权接管。
 在此前可只读交换合同、继续后端独立工作；不能跳过双门提前联调。
 
 证据写 `docs/server-round1/harness-integration/`；每阶段及goal结束前检查status已更新，
 包括分支HEAD、命令、四家矩阵、待验、资源和写权。每家状态：NOT_STARTED / IMPLEMENTING /
 COMPONENT_VERIFIED / BLOCKED / MODEL_VERIFIED；本单终态
-`FOUR_HARNESS_COMPONENTS_READY`（四家组件门全过，仍无模型验收）或 `FOUR_HARNESS_PARTIAL`。
+`FOUR_HARNESS_COMPONENTS_READY`（四家组件门全过，模型另列实测结果）或 `FOUR_HARNESS_PARTIAL`。

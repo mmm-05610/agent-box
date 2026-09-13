@@ -30,6 +30,14 @@ plugins/agent-box-harnesses/     ◀ 原生路径由40的复用实现替代
    创建 `feature/server-harness-extension-v1`（同一后端工作树）。保留历史分支，不 reset。
    读取 Desktop 核心语义、P07 与 handoff-policy，记录版本/摘要。沿用已有 wire 候选，
    只进行双方允许的机械 schema 对齐；不私造另一套产品协议。
+   从本阶段开始读取前端实际工作树的 `docs/desktop-product-delivery/contracts/wire-v1/`
+   及contracts/index.md，每个阶段边界检查摘要变更，不等40/41完成才答复。
+   将确认/具体更正写到本仓 `docs/server-round1/wire-review.md`，含候选来源HEAD、schema摘要、
+   ACCEPTED或CHANGES_REQUESTED、逐项差异、测试证据和建议patch（只写本仓，前端自行消费）。
+   前端候选是首选；尚未存在时发布需求差异并继续独立工作，不与正在编制的P07另起竞争schema。
+   前端明确移交候选编制时才能采用41的后端候选路径，并在双方index记录唯一编制方。
+   前端提交修订或接受后端更正后，核对同一摘要；双方分别在各自文档记录接受即可锁定。
+   不需用户逐字段批准，也不需等待完整服务/真实模型验证才锁wire。
 2. B：分离业务和基础设施；对同幂等键并发请求先写反例再修，确保一次业务接受，
    重放返回同一身份。数据库提交与派发之间的恢复必须有证据；不宣称外部副作用 exactly-once。
 3. C：能力声明由实际注册实现与验证结果产生；未实现能力不报支持。中立用例测试中用两个

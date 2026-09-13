@@ -9,7 +9,7 @@
 `contracts/core-semantics-v1.md`、`contracts/index.md`、`handoff-policy.md`。
 前端实际产物在 `/home/maoqh/projects/agent-box-desktop-next-wsl-round1/docs/desktop-product-delivery/`，
 需读实际分支状态，不把发布源初始状态当成执行进度。
-P07产出的wire优先复用；无候选时根据已批准语义编制一个候选到本仓 `protocols/desktop/`，
+P07产出的wire优先复用；前端明确移交候选编制时，按已批准语义编制到本仓 `protocols/desktop/`，
 交换候选和测试证据，不在两边各造一套协议。锁定版本与摘要前只标候选；必要安全/业务裁决仍交用户。
 
 ```text
@@ -26,7 +26,8 @@ protocols/desktop/                ◀ 单一wire及双方共享契约用例
 
 ## 实施阶段（各阶段定向验证、提交后继续）
 
-1. A 合同：把core-semantics/1的逻辑能力逐行映射到wire、实现及行为测试，标真实/组件/未实现。
+1. A 合同：沿用39已开始的wire-review反馈通道，不把合同反馈推迟到本阶段。
+   把core-semantics/1的逻辑能力逐行映射到wire、实现及行为测试，标真实/组件/未实现。
    复用P07 schema并核对双方摘要，记录 WIRE_LOCKED_FOR_IMPLEMENTATION；不得降低已批准语义。
    认证引导须仅loopback、每实例随机凭据、窄受控引导和受保护存储，凭据不放URL/argv/日志；
    拒绝未认证和越域请求，模型凭据不通过普通事件传递。无法满足的安全边界不得默认开放。
@@ -58,4 +59,4 @@ protocols/desktop/                ◀ 单一wire及双方共享契约用例
 并列Harness组件矩阵和模型未验范围；否则 `BACKEND_IMPLEMENTATION_PARTIAL`。
 Ready不是全栈Green。将状态、代码HEAD、wire摘要、启动命令、缺口/owner和证据写status，继续42。
 非必要不暂停：单家/单平台问题先推进可独立路径；真实安全裁决或受保护数据才请求输入。
-禁止真实模型调用及用户凭据读取，直至42规定的独立授权满足。
+真实模型调用只依42 §D已经登记的DeepSeek来源及累计预算，禁止读取其他用户凭据。

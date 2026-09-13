@@ -103,7 +103,7 @@
       "parallel_code_with": ["desktop:product-delivery"],
       "forbidden_write_roots": ["/home/maoqh/projects/agent-box-desktop-next", "/home/maoqh/projects/agent-box-desktop-next-wsl-round1", "/home/maoqh/projects/agent-box-studio"],
       "exclusive_resources": ["backend production writer", "backend status writer", "Windows native build slot"],
-      "note": "Gated fixed-source reuse and narrow documented patches authorized; four independent component acceptance states, no models/real credentials, no fullstack takeover."
+      "note": "Gated fixed-source reuse and narrow documented patches; model tests only under order 42 section D authorization and shared budget; no fullstack takeover in 40."
     },
     {
       "id": "41",
