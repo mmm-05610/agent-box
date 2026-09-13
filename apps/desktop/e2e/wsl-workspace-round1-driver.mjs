@@ -383,3 +383,8 @@ async function finish(app, allOk) {
   console.log(allOk ? 'ACCEPTANCE: ALL STEPS PASSED' : 'ACCEPTANCE: FAILURES PRESENT')
   process.exit(allOk ? 0 : 1)
 }
+
+main().catch(error => {
+  console.error('DRIVER FAILED:', error)
+  process.exit(1)
+})
