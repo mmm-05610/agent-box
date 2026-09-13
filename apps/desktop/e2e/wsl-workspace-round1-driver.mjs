@@ -109,17 +109,53 @@ async function main() {
   record('app opens', true, `window title: ${title}`)
   await screenshot(page, 'boot')
 
-  // Dismiss the onboarding overlay if it blocks the UI (no provider is
-  // configured this round — the overlay is expected).
+  // ─── first-run setup gate ───
+  // A machine without a local Hermes runtime gates the UI on a setup choice.
+  // The product's intended path for this machine: connect to the REAL Hermes
+  // gateway running in the WSL distro (isolated HERMES_HOME, fixed session
+  // token via env; the gateway never sees credentials of the user and no
+  // model call is made this round).
+  const gatewayUrl = process.env.WSL_R1_GATEWAY_URL || 'http://127.0.0.1:9127'
+  const gatewayToken = process.env.WSL_R1_GATEWAY_TOKEN || ''
+
+  const setupGate = page.getByText(/Connect to existing Hermes|连接到已有的 Hermes/).first()
+
+  try {
+    await setupGate.waitFor({ state: 'visible', timeout: 6000 })
+  } catch {
+    // gate not shown (runtime already set up)
+  }
+
+  if (await setupGate.isVisible().catch(() => false)) {
+    await setupGate.click()
+    await page.getByPlaceholder(/gateway.example.com/).first().waitFor({ state: 'visible', timeout: 10000 })
+    await page.getByPlaceholder(/gateway.example.com/).first().fill(gatewayUrl)
+    await page.waitForTimeout(2500)
+
+    const tokenInput = page.getByPlaceholder(/Paste session token|粘贴会话令牌/).first()
+    await tokenInput.waitFor({ state: 'visible', timeout: 15000 })
+    await tokenInput.fill(gatewayToken)
+
+    await page.getByRole('button', { name: /Test connection|测试连接/ }).first().click()
+    await page.getByText(/Connected to|已连接到/).first().waitFor({ state: 'visible', timeout: 20000 })
+    record('gateway probe', true, `test connection succeeded against ${gatewayUrl}`)
+    await screenshot(page, 'gateway-tested')
+
+    await page.getByRole('button', { name: /Apply and reconnect|应用并重新连接/ }).first().click()
+    await setupGate.waitFor({ state: 'detached', timeout: 60000 })
+    record('first-run setup applied', true, 'desktop reconnected against the real gateway')
+    await page.waitForTimeout(3000)
+  } else {
+    record('first-run setup', true, 'gate not shown; runtime already set up')
+  }
+
+  await screenshot(page, 'main-ui')
+
   try {
     await page.getByText(/I'll choose a provider later|稍后选择|以后再说/).first().click({ timeout: 5000 })
-    await page
-      .locator('div[class*="z-(--z-setup)"], div[class*="fixed inset-0"]')
-      .first()
-      .waitFor({ state: 'detached', timeout: 8000 })
-    record('onboarding dismissed', true, 'clicked the choose-later control; overlay gone')
+    record('provider onboarding dismissed', true, 'clicked the choose-later control')
   } catch {
-    record('onboarding dismissed', true, 'no overlay dismissal needed or it already cleared')
+    record('provider onboarding dismissed', true, 'no provider overlay present')
   }
   await page.waitForTimeout(800)
 
