@@ -230,13 +230,14 @@ async function main() {
   }, localDir)
 
   // ─── step: 本地打开目录 — pick a directory, it opens directly ───
-  // A fresh sandbox shows the BLANK STATE's two entries (a first-class door,
-  // same two flows as the header ＋ menu).
-  const blankOpenFolder = page.getByRole('button', { name: /^Open folder$/ }).first()
+  // The blank state (zero workspaces) shows the two entries as plain BUTTONS;
+  // once any workspace exists the header ＋ owns both flows. Discriminate by
+  // the remote entry's ROLE, never by the shared "Open folder" label.
+  const blankRemoteButton = page.getByRole('button', { name: /^Open remote folder$/ }).first()
   const headerAdd = page.locator('[data-slot="dropdown-menu-trigger"][aria-label="Open folder"], [data-slot="dropdown-menu-trigger"][aria-label="打开文件夹"]').first()
 
   try {
-    await blankOpenFolder.or(headerAdd).first().waitFor({ state: 'visible', timeout: 15000 })
+    await blankRemoteButton.or(headerAdd).first().waitFor({ state: 'visible', timeout: 15000 })
   } catch {
     record('add entry visible', false, 'neither blank-state entry nor header + appeared')
     await screenshot(page, 'failure-state')
@@ -244,8 +245,10 @@ async function main() {
     return
   }
 
-  if (await blankOpenFolder.isVisible().catch(() => false)) {
-    await blankOpenFolder.click()
+  const isBlankSidebar = await blankRemoteButton.isVisible().catch(() => false)
+
+  if (isBlankSidebar) {
+    await page.getByRole('button', { name: /^Open folder$/ }).first().click()
     record('add entry', true, 'blank-state Open folder entry')
   } else {
     // Radix opens this menu on POINTERDOWN and sets pointer-events:none on
@@ -283,6 +286,8 @@ async function main() {
   await screenshot(page, 'local-in-list')
 
   // ─── step: WSL 打开目录 — simplified wizard: no method page ───
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(400)
   await headerAdd.click({ force: true })
   await page.waitForTimeout(500)
   await page.getByRole('menuitem', { name: /Open remote folder|打开远程文件夹/ }).first().click()
@@ -425,6 +430,8 @@ async function main() {
   let secondSaved = true
 
   try {
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(400)
     await headerAdd.click({ force: true })
     await page.waitForTimeout(500)
     await page.getByRole('menuitem', { name: /Open remote folder|打开远程文件夹/ }).first().click()
