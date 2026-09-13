@@ -13,6 +13,9 @@
 > 返工轮 36R 的真机重跑、逐项结论与最终交付状态见文末
 > **"## 36R（返工轮）"** 一节；本批 36 的所有记录、截图与命令均未删改，仅保留为
 > 历史证据（`docs/validation/windows-acceptance-round36/`）。
+> 后续：36R 的第 21 项 FAIL 经产品修复（`a061995`）后已真机复跑翻正，见同节
+> **"### 8. 修复后复跑"** 与文末 **"## 交付状态（36R，修复后复跑）"**；修复前的 FAIL
+> 记录与上方 GREEN 均原文保留。
 
 ## 检查点
 
@@ -348,6 +351,124 @@ cd C:\Users\maoqh\agentbox-wsl-round1\apps\desktop
   0 error / 0 warning（本轮顺带清掉 936c19a 留下的 `no-unused-vars`）。
 - `git diff --check`：干净。
 
+### 8. 修复后复跑（post-fix，2026-09-13，第二次真机运行）
+
+**为什么重跑**：第 5 节把第 21 项（名称可读性）如实记为 FAIL 上报后，产品侧按"与本地行
+同一类修法、只改一行"的口径修了标签宽度：`apps/desktop/src/features/chat/sidebar/
+workspace-list/workspace-row.tsx` 里 WSL 行标签按钮的 `flex-1` 改为 `shrink`（提交
+`a061995`，代码注释与提交正文写明理由），与本地行共用的 `SidebarRowLink`
+（`min-w-0 shrink`、按内容宽度排布）统一。本节是**该修复在真机上的复跑结果**；第 2 节的
+FAIL 表、第 5 节的缺陷明细、以及上方所有 36R 记录**原文保留，不删不改**。
+
+**同步（WSL → Windows 克隆 `C:\Users\maoqh\agentbox-wsl-round1`，未 force / 未 rebase / 未动 main）**：
+
+```bash
+git -C /mnt/c/Users/maoqh/agentbox-wsl-round1 fetch \
+  /home/maoqh/projects/agent-box-desktop-next-wsl-round1 feature/desktop-wsl-round1
+git -C /mnt/c/Users/maoqh/agentbox-wsl-round1 merge --ff-only FETCH_HEAD   # 936c19a → a061995
+```
+第一次 merge 被拒：克隆工作区里有一份**未提交**的
+`apps/desktop/e2e/workspace-sidebar-round36-driver.mjs`（工作区 blob `4cf8da2`，与
+`a061995` 的目标 blob **逐字节相同**）。先 `git checkout -- <该文件>` 再 ff-only 合并，
+合并后该文件仍是同一 blob `4cf8da2`（合并前已备份到 `/tmp`，无内容丢失；未用
+stash/reset）。克隆里另有一个未跟踪文件 `apps/desktop/t.mjs`（内容 `console.log(1+1)`，
+非本轮产物），未动。合并后克隆 HEAD=`a061995`，除该未跟踪文件外工作区干净。
+
+**重建（Windows 侧原生执行，未从 UNC 构建）**：
+
+```bat
+REM 工单原文的 "cd apps\desktop && npm run build --workspace apps/desktop" 在该目录下会以
+REM apps\desktop 为工作区根，直接报 "npm error No workspaces found"，故改为从仓库根执行
+cd C:\Users\maoqh\agentbox-wsl-round1
+npm run build --workspace apps/desktop            REM exit 0（postbuild assert-dist-built 通过）
+```
+产物新于修复源码：`dist/index.html` 22:45:34、`dist/assets` 22:45:34、
+`dist/electron-main.mjs` 22:45:35，均晚于 `workspace-row.tsx` 22:44:45；并且
+`dist/assets/index-BKgulhDf.js` 里 WSL 行标签按钮的 className 已是
+`flex min-w-0 shrink items-center gap-2 rounded-md bg-transparent p-0 text-left`（修复前为
+`min-w-0 flex-1 …`）——构建确实带上了修复。
+
+**驱动命令（全新隔离沙箱 `…-round36r5-sandbox`，未复用 round36r4）**：
+
+```bat
+cd C:\Users\maoqh\agentbox-wsl-round1\apps\desktop
+"C:\Program Files\nodejs\node.exe" e2e\workspace-sidebar-round36-driver.mjs ^
+  C:\Users\maoqh\agentbox-wsl-round36r5-sandbox ^
+  C:\Users\maoqh\agentbox-wsl-round36r5-sandbox\acceptance-out
+```
+隔离网关未重启：跑前 `curl -o /dev/null -w '%{http_code}' http://127.0.0.1:9127/api/health`
+= **401**（在跑且受 token 门控）；Windows 侧跑前确认无遗留 `electron` 进程。
+
+**两次尝试（如实记录）**：第 1 次在 `03-add-menu` 截图处
+`page.screenshot: Timeout 30000ms exceeded` 中断——此时只记录了前 5 项（全 PASS），
+**没有任何一步被判 FAIL**，属 harness 侧的截帧超时（Chromium 未在 30s 内交出帧），
+不是产品步骤失败；日志留存为 `driver-run-attempt1-aborted.log`。删除该沙箱后重跑第 2 次
+（userData / 宿主记录全新），26 项跑完、退出码 0。**本节证据全部来自第 2 次**。
+
+证据目录：`docs/validation/windows-acceptance-round36r-postfix/`（23 张截图 +
+`acceptance-log.json` + `driver-run.log` + `driver-run-attempt1-aborted.log`）。
+修复前的证据目录 `docs/validation/windows-acceptance-round36r/` **未改动**。
+总计：executed **23** → **PASS 23 / FAIL 0 / SKIP 2 / PENDING 1**，`allOk=true`
+（只聚合已执行项；SKIP 未写成 ok，PENDING 未折算为通过）。
+
+**逐项表（本节 = 修复后实测；末列标注与第 2 节修复前表的差异）**
+
+| # | 步骤 | 结论 | 与修复前相比 | 证据（截图 / 日志原文） |
+| --- | --- | --- | --- | --- |
+| 1 | app opens | PASS | 同 | `01-boot.png`（窗口标题 Hermes） |
+| 2 | isolated app identity | PASS | 同 | exe=`C:\Users\maoqh\agentbox-wsl-round1\apps\desktop\node_modules\electron\dist\electron.exe`（worktree 内）、userData=沙箱、build=0.17.2=`package.json`；`app.getName()`=Hermes=productName |
+| 3 | single-instance blocks reuse | PASS | 同 | 第二次启动进程直接失败（同 exe/env/参数，第一次成功即窗口存活），且原窗口仍活：`readyState=complete` |
+| 4 | backend this run drives | PASS | 同 | boot log：`no gate (saved connection); boot log: remote backend http://127.0.0.1:9127 ready` |
+| 5 | unified sidebar | PASS | 同 | `02-unified-sidebar.png`；Capabilities/Artifacts/Scheduled jobs/BotsTab 均 gone，profiles/settings 入口在 |
+| 6 | add menu entries | PASS | 同 | `03-add-menu.png`；`open-folder=1, open-remote=1` |
+| 7 | wizard opens on config (no method page) | PASS | 同 | `04-wizard-direct-config.png`；首页即发行版选择 |
+| 8 | connect → browse on one page | PASS | 同 | `05-connecting-inline.png`、`06-browse-acceptance-dir.png`；真实目录（空格+中文） |
+| 9 | WSL open lands on the real directory | PASS | 同（本轮记录 id 不同，属正常） | `07-wsl-saved-sidebar.png`；`wsl_ws_836bfe2c95708a39`，`rootPath=/home/maoqh/wsl-round1-验收 目录` |
+| 10 | WSL save registers exactly one desktop-side record; row at `[data-workspace-list]` | PASS | 同 | `08-wsl-only-list.png`；`host records=1`（kind=wsl、archivedAt=null）；`list={"localIds":[p_a7cdbae7,p_57a756fd],"wslIds":[本轮 id]}`（后端既有本地行 2 条，reported 不判定） |
+| 11 | WSL main row selects the workspace | PASS | 同 | `data-workspace-row-selected=wsl_ws_836bfe2c95708a39` |
+| 12 | WSL row expands to the honest unavailable prompt | PASS | 同 | `09-wsl-expanded.png`；`text="Sessions in WSL workspaces are not part of this round yet."`；行上会话入口=0 |
+| 13 | local open (Windows real path) | **PENDING** | 同（环境不支持，非产品通过） | `10-local-opened.png`、`11-local-picker-surface.png`；原文：`the picker never asked for the OS dialog (osDialogCalls=0, dialog="Choose remote folderBrowse folders on the connected backend.")… no local-acceptance-r36r-mtzxh10q row was created` |
+| — | local-row dependent steps | SKIP | 同（依赖第 13 项） | `12-local-in-list.png`；行为测试覆盖 |
+| 14 | rename persists under the SAME id | PASS | 同 | `13-row-menu.png`、`14-rename-dialog.png`、`15-renamed.png`；宿主记录 `round36R-验收` 同 id |
+| 15 | second WSL workspace saved | PASS | 同（本轮 id 不同） | 宿主记录两条（`wsl_ws_836bfe2c95708a39` 与 `wsl_ws_c40cf7460f9feafb`=子目录） |
+| 16 | opening info is NOT selecting | PASS | 同 | `16-info-open-on-b.png`；打开 B 的 info 时 A/B 均 selected=true |
+| 17 | archive keeps the record, drops only the row | PASS | 同 | `17-remove-menu.png`、`18-remove-confirm.png`、`19-after-archive.png`；行 2→1、记录保留且 `archivedAt=1789310895433`、目录仍在磁盘=true |
+| 18 | reopen restores the ORIGINAL record (same id, archive cleared) | PASS | 同 | 同 id=`wsl_ws_c40cf7460f9feafb`、`archivedAt=null`、`rootPath=/home/maoqh/wsl-round1-验收 目录/子目录` |
+| 19 | empty-workspace search reaches the workspace by name | PASS | 同 | `20-workspace-search-hit.png`；命中 `[data-workspace-search-hit]` |
+| 20 | clearing search restores the selection | PASS | 同 | 清空后 `data-workspace-row-selected=wsl_ws_836bfe2c95708a39` 复位 |
+| 21 | WSL row keeps its name readable | **PASS（修复前 FAIL）** | **翻正** | `21-narrow-sidebar.png`；原文见下方"翻正"段 |
+| 22 | keyboard selects the workspace (Enter on the main row) | PASS | 同 | `data-workspace-row-selected` 出现 |
+| — | pinned sessions on the real machine | SKIP | 同 | 沙箱无 provider、不允许发模型请求；行为测试覆盖置顶行契约 |
+| 23 | reopen: renamed workspace restored under its id | PASS | 同 | `22-reopen-restored.png`；行在、列表内 id 一致 |
+| 24 | reopen: reconnect re-verifies | PASS | 同 | `23-reopen-reconnected.png`；连接信息显示真实 `rootPath`（dialog shows the real rootPath=true） |
+
+**第 21 项翻正（驱动自报原文，修复前 → 修复后）**：
+
+```text
+修复前（第 2 节，FAIL）: default layout: name=4px of "round36R-验收" (label=45px, row=213px, text needs 81px); squeezed window: name=4px
+修复后（本节，  PASS）: default layout: name=37px of "round36R-验收" (label=77px, row=213px, text needs 81px); squeezed window: name=37px
+```
+断言阈值 20px，实测默认布局 **37px**（4px → 37px，约 9.2 倍；标签 45px → 77px），
+压缩窗口同样 37px——不是"窄布局例外"。**残留观察（如实）**：名称自然宽度 81px，实测
+37px，因此在 213px 行宽下名称**仍以省略号截断**（行的收缩顺序是 caret / 动作簇在前、
+标签在后）。也就是说：断言相对阈值成立、名称从"读不到"变为"可读"，但**尚未完整显示**；
+若要完整显示，需产品侧另行决定行内收缩优先级（本轮未动、也未改断言阈值）。
+
+**本次变更后的本地门禁（本工作树实跑，2026-09-13 22:50）**
+
+- `npm run --workspace apps/desktop typecheck`（renderer/electron/e2e 三个 tsc 项目）：exit 0。
+- `npx vitest run --project ui src/features/chat/sidebar --maxWorkers=2`：**27 files / 166 tests 全过**，exit 0。
+- 变更文件 eslint（`src/features/chat/sidebar/workspace-list/workspace-row.tsx`
+  + `e2e/workspace-sidebar-round36-driver.mjs`）：0 error / 0 warning，exit 0。
+- 层序守卫 `npx vitest run --project ui src/dev/contracts/renderer-layers.test.ts`：
+  15 passed / **1 failed**，唯一失败仍是**已知环境基线**
+  （`leaves no in-flight exclusion stale`：`IN_FLIGHT` 含 `agentbox`，而干净工作树没有
+  `src/agentbox/`）。未删守卫、未复制 POC、未改账本。
+- 账本：`apps/desktop/src/dev/contracts/renderer-layers.debt.ts` 条目 **0** 条；
+  `UPDATE_LAYER_LEDGER=1 npx vitest run --project ui src/dev/contracts/renderer-layers.debt.test.ts`
+  重生成后 md5 仍为 `57011a548be7447a3321d917ef7572fa`（**逐字节不变**），exit 0。
+- `git diff --check`：干净。
+
 ## 交付状态（36R）
 
 **DESKTOP_WORKSPACE_SIDEBAR_PARTIAL** — 不是 GREEN，也不是全部未过。36R 真机重跑
@@ -367,4 +488,31 @@ SKIP 2 / PENDING 1）中，统一工作区列表、同列表内主行选中与�
 4. 旧批 36 的 15 项"全 PASS"与 GREEN 结论**作废**（理由见第 1 节），其证据目录保留
    为历史。
 
-提交当前分支后停止，等待用户体验与决定（是否修第 1 项缺陷）。
+## 交付状态（36R，修复后复跑 —— 取代上方修复前记录；上方原文保留可见）
+
+**DESKTOP_WORKSPACE_SIDEBAR_PARTIAL** —— 仍不是 GREEN，也不是"全部未过"。修复后复跑
+（`docs/validation/windows-acceptance-round36r-postfix/`，executed 23 →
+**PASS 23 / FAIL 0 / SKIP 2 / PENDING 1**，`allOk=true` 只覆盖已执行项）中，统一工作区
+列表、同列表内主行选中与展开、重命名（同 id）、移除非删除（=归档，记录保留、目录仍在）、
+重开恢复与 WSL 重连**全部真机通过**；上方修复前记录的 FAIL（WSL 行名称被压到 4px）已由
+`a061995` 修好并在真机上翻正（`name=4px → 37px`，阈值 20px）。剩余项**恰好两条**，逐条
+如实分类、未折算：
+
+1. **PENDING — Windows 本地真实打开**：WSL-only 后端下不可达（远程模式的"打开文件夹"
+   指向后端路径空间浏览器，OS 选择器调用数 0，本轮唯一名目录未产生任何记录）。安全边界
+   通过，但**本地产品功能未通过**——PENDING 不记 ok、不折算为本地通过，须在有本地
+   Hermes 运行时的机器上复验。其下游"依赖本地行的 copy-path / 进入项目 / 本地隐藏"因此
+   同为 SKIP（行为测试覆盖，见第 7、8 节）。
+2. **SKIP — 置顶真机**：沙箱无真实会话、本轮不允许发模型请求；置顶/取消置顶的行契约由
+   行为测试保留覆盖。
+
+补充两条如实说明：（a）第 21 项虽翻正，名称在 213px 行宽下仍以省略号截断（自然宽 81px、
+实测 37px），属"可读但未完整显示"，若要完整显示需产品侧另定行内收缩优先级（本轮未动、
+未改阈值）；（b）修复前 FAIL 的完整记录（第 2 节表、第 5 节明细、旧证据目录
+`windows-acceptance-round36r/`）与旧批 36 的 GREEN 均**保留原文**，其中 GREEN 与
+"15 项全 PASS"仍作废（理由见第 1 节）。
+
+提交当前分支后停止，等待用户体验与决定（是否修第 1 项缺陷）。**（修复后更新）**上述
+"第 1 项缺陷"（WSL 行名称）已按维护者口径修复（`a061995`）并在修复后复跑中翻正，
+交付状态以上一节"## 交付状态（36R，修复后复跑）"为准；本行原文保留以对应修复前的待决
+事项。
