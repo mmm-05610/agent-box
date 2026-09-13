@@ -1,0 +1,12 @@
+{
+  "requestId": "request-2",
+  "connectionId": "connection-1",
+  "serverInstanceId": "server-1",
+  "op": "view.put",
+  "arguments": {
+    "viewId": "view-1",
+    "path": "../outside",
+    "data": "bmV2ZXItd3JpdHRlbg=="
+  },
+  "expectedError": "PATH_INVALID"
+}

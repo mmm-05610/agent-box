@@ -1,0 +1,7 @@
+{
+  "requestId": "request-1",
+  "connectionId": "connection-1",
+  "serverInstanceId": "server-1",
+  "op": "handshake",
+  "arguments": {}
+}

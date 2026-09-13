@@ -1,3 +1,3 @@
-from .provider import BwrapSandboxProvider, PROVIDER_ID
+from .provider import BwrapSandboxProvider, PROVIDER_ID, compile_remote_bwrap_argv
 
-__all__ = ["BwrapSandboxProvider", "PROVIDER_ID"]
+__all__ = ["BwrapSandboxProvider", "PROVIDER_ID", "compile_remote_bwrap_argv"]

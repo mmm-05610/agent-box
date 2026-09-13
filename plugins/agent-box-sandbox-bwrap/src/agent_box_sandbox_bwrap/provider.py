@@ -51,11 +51,83 @@ def _minimal_rootfs_argv(binary: Path, network_mode: str = "none") -> list[str]:
     for system in _SYSTEM_MOUNTS:
         if Path(system).exists():
             argv += ["--ro-bind", system, system]
+    resolv = Path("/etc/resolv.conf")
+    if resolv.exists() and resolv.is_symlink():
+        # WSL commonly exposes this as a symlink into /mnt/wsl. Bind the
+        # resolved file at the symlink target without mounting broad /mnt.
+        target = str(resolv.resolve())
+        for parent in reversed(PurePosixPath(target).parents[:-1]):
+            if str(parent) != "/":
+                argv += ["--dir", str(parent)]
+        argv += ["--ro-bind", "/etc/resolv.conf", target]
     # Native Codex (and many static ELF runtimes) use /proc/self/exe during
     # early configuration validation.  This is the procfs namespace mount,
     # not a host directory or a HOME/package projection.
     argv += ["--proc", "/proc"]
     return argv
+
+
+def compile_remote_bwrap_argv(
+    *, workspace: str, native_home: str, executable: str,
+    command: tuple[str, ...], environment: Mapping[str, str],
+    secret: str | None = None,
+    secret_target: str = "/runtime/home/auth.json",
+) -> list[str]:
+    """Compile the fixed WSL execution template from Linux-side paths.
+
+    Path existence and digest authorization belong to the remote Worker. This
+    function owns only the bwrap guest policy and emits no secret contents.
+    """
+    host_paths = [workspace, native_home, executable]
+    if secret is not None:
+        host_paths.append(secret)
+    if any(
+        not isinstance(value, str)
+        or not value.startswith("/")
+        or "\x00" in value
+        or "//" in value
+        or any(part in {".", ".."} for part in value.split("/"))
+        or str(PurePosixPath(value)) != value
+        for value in host_paths
+    ):
+        raise ProjectionRejected("remote mount source is not a canonical absolute path")
+    if not command or command[0] != "/runtime/bin/codex" or len(command) > 64:
+        raise ProjectionRejected("remote command is outside the Codex template")
+    if secret_target not in {"/runtime/home/auth.json", "/runtime/home/config.toml"}:
+        raise ProjectionRejected("remote secret target is outside the Codex template")
+    for key, value in environment.items():
+        if not _ENV_KEY.fullmatch(key) or len(value) > 8192 or "\x00" in value:
+            raise ProjectionRejected("invalid remote environment")
+        if re.search(r"(TOKEN|SECRET|KEY|PASSWORD|CREDENTIAL|AUTH)", key, re.I):
+            raise ProjectionRejected("credential-shaped remote environment key")
+    # This compiler runs in the Windows Server, so pathlib.Path would render
+    # Linux executable paths with backslashes. Keep the remote argv POSIX-only.
+    argv = [
+        "/usr/bin/bwrap", "--die-with-parent", "--new-session",
+        "--unshare-user", "--unshare-pid", "--unshare-ipc", "--unshare-uts",
+        "--dir", "/", "--proc", "/proc",
+    ]
+    argv += ["--dev", "/dev", "--tmpfs", "/tmp"]
+    for system in _SYSTEM_MOUNTS:
+        if system not in argv:
+            argv += ["--ro-bind", system, system]
+    # The remote template is WSL-specific. /etc/resolv.conf points to this
+    # WSL-owned file, so recreate only its parent and bind that single file.
+    argv += ["--dir", "/mnt", "--dir", "/mnt/wsl",
+             "--ro-bind", "/etc/resolv.conf", "/mnt/wsl/resolv.conf"]
+    for directory in ("/workspace", "/runtime", "/runtime/home", "/runtime/bin"):
+        argv += ["--dir", directory]
+    argv += [
+        "--bind", workspace, "/workspace",
+        "--bind", native_home, "/runtime/home",
+        "--ro-bind", executable, "/runtime/bin/codex",
+    ]
+    if secret is not None:
+        argv += ["--ro-bind", secret, secret_target]
+    argv += ["--chdir", "/workspace", "--clearenv"]
+    for key, value in sorted(environment.items()):
+        argv += ["--setenv", key, value]
+    return argv + ["--", *command]
 
 @dataclass(frozen=True)
 class NegotiatedSandboxCapabilities:

@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentbox.local/protocols/worker/v1.schema.json",
+  "title": "AgentBox Worker v1 request payload",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["requestId", "connectionId", "serverInstanceId", "op", "arguments"],
+  "properties": {
+    "requestId": {"$ref": "#/$defs/id"},
+    "connectionId": {"$ref": "#/$defs/id"},
+    "serverInstanceId": {"$ref": "#/$defs/id"},
+    "attemptId": {"$ref": "#/$defs/id"},
+    "generation": {"type": "integer", "minimum": 1},
+    "op": {
+      "enum": [
+        "handshake", "heartbeat", "browse", "canonicalize",
+        "view.prepare", "view.put", "view.commit", "view.list", "view.get", "view.cleanup",
+        "secret.put", "secret.cleanup", "spawn", "observe", "cancel",
+        "result.get", "result.ack", "attempt.cleanup"
+      ]
+    },
+    "arguments": {"type": "object"}
+  },
+  "$defs": {
+    "id": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9._-]+$"},
+    "bootstrap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["workerVersion", "workerDigest", "connectionId", "projectId", "effectiveUser", "instanceNonce", "serverInstanceId", "leaseMs"],
+      "properties": {
+        "workerVersion": {"type": "string", "minLength": 1, "maxLength": 1024},
+        "workerDigest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "connectionId": {"$ref": "#/$defs/id"},
+        "projectId": {"$ref": "#/$defs/id"},
+        "effectiveUser": {"type": "string", "minLength": 1, "maxLength": 1024},
+        "instanceNonce": {"$ref": "#/$defs/id"},
+        "serverInstanceId": {"$ref": "#/$defs/id"},
+        "leaseMs": {"type": "integer", "minimum": 1000, "maximum": 120000},
+        "executables": {
+          "type": "array", "maxItems": 16,
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["path", "digest"],
+            "properties": {
+              "path": {"type": "string", "minLength": 1, "maxLength": 4096},
+              "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+            }
+          }
+        }
+      }
+    }
+  }
+}
