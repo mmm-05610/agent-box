@@ -128,6 +128,9 @@ export function WslWorkspaceWizard() {
 
     if (result.ok && result.available) {
       setDiscovery({ kind: 'ready', distributions: result.distributions, defaultDistribution: result.defaultDistribution })
+      // The select shows the default immediately; the state must agree, or
+      // the Connect button would stay disabled until the user re-picked.
+      setDistribution(result.defaultDistribution ?? result.distributions[0]?.name ?? '')
     } else if (result.ok) {
       setDiscovery({ kind: 'unavailable', reason: result.reason })
     } else {
