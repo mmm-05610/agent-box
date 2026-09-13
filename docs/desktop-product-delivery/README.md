@@ -2,6 +2,11 @@
 
 这是用户批准的新会话施工队列，不是后端队列，也不是另一份UI预览。
 
+2026-09-14：现有goal持续执行，追加[P07](work-orders/P07-core-contract-and-handoff.md)，
+消费[已批准核心语义](contracts/core-semantics-v1.md)。每阶段及goal结束前必须更新status；
+前端完成独立交接后，由未来后端goal在双端READY时接管全栈，见[规则](handoff-policy.md)。
+不是等两端已联调通过才准联调；本端实施READY与联合验收GREEN严格分开。
+
 ```text
 desktop-product-delivery/
 ├── master-plan.md            总目标、上下层边界、自主权、资源与验收纪律

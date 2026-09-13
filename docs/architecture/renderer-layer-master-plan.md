@@ -1,5 +1,9 @@
 # Renderer layer — master construction plan
 
+2026-09-14增量：现有Desktop产品goal继续消费
+[P07核心合同与交接](../desktop-product-delivery/work-orders/P07-core-contract-and-handoff.md)，
+不新开goal、不重做36R。批准语义及最终状态核对规则已进入产品总方针；旧自动批次仍不启用。
+
 ## Current owner override — new Desktop product delivery session
 
 The owner has authorized a NEW replacement Desktop session using

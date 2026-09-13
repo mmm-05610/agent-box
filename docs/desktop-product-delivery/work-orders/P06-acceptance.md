@@ -1,5 +1,10 @@
 # P06 — 完整Desktop验收与交付
 
+2026-09-14责任更新：本单首先完成前端实施验收与交接；下述真实全栈用户路径作为联合验收清单保留，
+不是等待后端的循环前置。前端独立功能与合同客户端验收完成即可DESKTOP_IMPLEMENTATION_READY，
+REAL_FLOW_VERIFIED仍为待验；后续后端执行者通过双端READY及写权交接后负责真实联调和跨端修复。
+遵守[交接规则](../handoff-policy.md)，goal结束前必须检查并更新status。
+
 遵守[总方针](../master-plan.md)全部授权、保护区、资源与持续执行纪律。
 输入：[产品决定](../../night-work-planning/product-decisions.md)；基线见[状态](../status.md)。
 

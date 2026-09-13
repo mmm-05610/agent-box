@@ -3,6 +3,18 @@
 状态：AUTHORIZED_FOR_NEW_SESSION。用户已批准本产品目标及新会话持续施工。
 本文件授权Desktop实施，不授权修改AgentBox后端或自动作出产品/服务合同裁决。
 
+## 最新增量：2026-09-14，持续施工与双端交接
+
+本节覆盖下文“只有APPROVED完整合同才能推进”的笼统限制与原P06单会话全栈终检责任。
+用户已批准[核心语义v1](contracts/core-semantics-v1.md)，现有前端goal继续，不开第二个前端goal。
+立即纳入[P07](work-orders/P07-core-contract-and-handoff.md)，可在当前小检查点后与P02–P05串行穿插。
+前端按语义完成全部独立范围，不因真实Server尚未完成停工；wire编制与锁定规则见合同index。
+前端达到DESKTOP_IMPLEMENTATION_READY后发布状态与交接，未联调仍不叫产品GREEN。
+未来后端执行者先完成后端，再只读检查前端同版本交接；双方实施完成、前端明确释放写权后，
+后端执行者才成为全栈集成人，在明确工作树上进行跨端联调与修复。
+这不是要求后端在施工期间抢写前端，也不使当前研究goal自动获得生产/全栈授权。
+完整规则见[状态与双端交接](handoff-policy.md)。
+
 ## 1. 工作区与交接
 
 - 文档发布源：/home/maoqh/projects/agent-box-desktop-next/docs/desktop-product-delivery/。
@@ -27,6 +39,7 @@ contracts/index.md与新增work-orders。记录消费的文件摘要/合同版�
 发布源后续新增内容只读消费，经明确路径复制/补丁同步到工作分支；不合入main整条产品历史。
 禁止覆盖发布源的状态以免与设计者冲突；执行status与evidence写在产品分支。
 合同只认index中明确APPROVED的记录；PROPOSED不是生产接口授权。
+合同状态以index最新分级为准；“语义已批准”与“wire已锁定”分开，不用旧句子阻断P07。
 
 ## 3. 上到下的目标树（职责，非强制新造目录）
 

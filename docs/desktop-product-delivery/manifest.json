@@ -4,10 +4,30 @@
   "product_worktree": "/home/maoqh/projects/agent-box-desktop-next-wsl-round1",
   "baseline": "39291df26b908806fd2c4ee22540d54886515978",
   "branch": "feature/agentbox-desktop-product",
-  "desktop_writer": "new-session-only",
+  "desktop_writer": "current-product-goal; future fullstack owner only after dual readiness and lease release",
+  "coordination_policy": "handoff-policy.md",
   "windows_build_slots": 1,
   "default_execution": "serial; capability-level progress may bypass waiting subitems",
   "orders": [
+    {
+      "id": "P07",
+      "file": "work-orders/P07-core-contract-and-handoff.md",
+      "depends_on": ["P00"],
+      "exclusive_group": "desktop-product",
+      "scope": [
+        "docs/desktop-product-delivery/**",
+        "apps/desktop/src/types/**",
+        "apps/desktop/src/api/**",
+        "apps/desktop/src/application/**",
+        "apps/desktop/src/features/**",
+        "apps/desktop/electron/**",
+        "apps/desktop/e2e/**"
+      ],
+      "requires_approved_contract": false,
+      "semantic_contract": "contracts/core-semantics-v1.md",
+      "scheduling": "next small checkpoint after P00; interleave serially with P02-P05, do not wait for P06",
+      "may_edit_consumers_within_desktop": true
+    },
     {
       "id": "P00",
       "file": "work-orders/P00-handoff.md",

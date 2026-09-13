@@ -1,8 +1,19 @@
 # 前后端能力合同增量入口
 
-当前：NO_APPROVED_DESKTOP_SERVER_CONTRACT。
-没有任何HTTP路径、认证方案或事件协议因本文件创建而获批。
+当前：CORE_SEMANTICS_APPROVED_WIRE_PENDING。
+2026-09-14用户批准的核心行为已登记；不再以“所有产品合同未定”为由等待。
+没有任何HTTP路径、认证方案因语义批准而自动获批。
 既有后端实现和冻结Tauri合同可做事实输入，不自动视为Electron合同。
+
+| 版本 | 状态 | 覆盖 | 编制/实现入口 |
+| --- | --- | --- | --- |
+| [core-semantics/1](core-semantics-v1.md) | APPROVED_SEMANTICS | 生命周期、Worker/数据、Workspace、Profile/模型、消息/队列、审批/恢复 | 前端P07编制同一份wire候选；后端接单核对锁定；现有后端不宣称已实现 |
+
+APPROVED_SEMANTICS允许通用类型/用例/测试实现；PROPOSED_WIRE允许隔离测试服务与客户端适配验证，
+不能宣称已获真实服务支持。双方核对单一可执行schema及安全引导后登记WIRE_LOCKED_FOR_IMPLEMENTATION，
+附schema摘要、版本和两端接受检查点；不改变已批准语义的机械编码无须逐字段询问用户。
+涉及权限、权威、持久化保证、产品行为变化仍须裁决，不能在编码时暗改。
+锁定后前端可完成生产客户端；仍由联调门确认真实服务可用，不以版本标签替代验收。
 
 设计者后续在本目录追加合同并在此登记：
 版本/状态(APPROVED或PROPOSED)/覆盖能力/替代版本/后端实现与验收入口/兼容迁移。
