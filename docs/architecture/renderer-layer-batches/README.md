@@ -1,8 +1,8 @@
 # Renderer layer — mechanical batches
 
-**Current dispatch:** [35 — WSL Workspace round 1](35-wsl-workspace-round1.md) is a
-standalone first round for the newly authorized session. Use its own scope and checkpoints.
-Batch 34 and preview development remain paused; do not consume the entire historical queue.
+**Current dispatch:** [36 — unified Workspace sidebar](36-workspace-sidebar-product.md).
+35 is accepted at `c8d59f3` on the implementation branch, not merged. Continue that branch
+exclusively; preserve 35. Batch 34, previews and Codex/Work Core rounds remain paused.
 
 One document per batch. Each is self-contained: an agent should be able to pick
 up a single file and execute it without reading the others.
