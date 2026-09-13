@@ -3754,6 +3754,7 @@ export const en: Translations = {
     statusFailed: 'Unreachable',
     userChangedWarning: user => `The distribution's default user is now ${user}, which differs from the identity saved with this workspace.`,
     defaultUserLabel: 'Distribution default',
+    verifiedUserLabel: 'Verified user',
     rootPathLabel: 'Directory',
     sessionUnavailable: 'Sessions in WSL workspaces are not part of this round yet.',
     wslBadge: 'WSL',

@@ -3880,6 +3880,7 @@ export const zh: Translations = {
     statusFailed: '无法连接',
     userChangedWarning: user => `发行版默认用户已变为 ${user}，与保存时核实的身份不同。`,
     defaultUserLabel: '发行版默认',
+    verifiedUserLabel: '核实的用户',
     rootPathLabel: '目录',
     sessionUnavailable: '本轮暂不支持在 WSL 工作区新建会话。',
     wslBadge: 'WSL',

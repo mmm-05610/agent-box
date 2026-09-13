@@ -3210,6 +3210,7 @@ export const zhHant = defineLocale({
     statusFailed: '無法連線',
     userChangedWarning: user => `發行版預設使用者已變為 ${user}，與儲存時核實的身份不同。`,
     defaultUserLabel: '發行版預設',
+    verifiedUserLabel: '核實的使用者',
     rootPathLabel: '目錄',
     sessionUnavailable: '本輪暫不支援在 WSL 工作區建立工作階段。',
     wslBadge: 'WSL',

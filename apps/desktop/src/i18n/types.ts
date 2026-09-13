@@ -3320,6 +3320,7 @@ export interface Translations {
     statusFailed: string
     userChangedWarning: (user: string) => string
     defaultUserLabel: string
+    verifiedUserLabel: string
     rootPathLabel: string
     sessionUnavailable: string
     wslBadge: string

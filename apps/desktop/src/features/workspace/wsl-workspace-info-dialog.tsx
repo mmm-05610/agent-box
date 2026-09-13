@@ -81,7 +81,7 @@ export function WslWorkspaceInfoDialog() {
           <div className="flex flex-col gap-2 text-[0.75rem]">
             <InfoRow label={w.distributionLabel} value={record.distribution} />
             <InfoRow label={w.userLabel} value={record.configuredUser ?? w.defaultUserLabel} />
-            <InfoRow label="ID" value={record.actualUser} />
+            <InfoRow label={w.verifiedUserLabel} value={record.actualUser} />
             <InfoRow label={w.rootPathLabel} mono value={record.rootPath} />
 
             <div className="mt-1 flex items-center gap-2">
