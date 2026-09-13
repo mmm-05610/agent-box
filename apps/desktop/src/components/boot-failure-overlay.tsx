@@ -8,8 +8,8 @@ import { LogView } from '@/components/ui/log-view'
 import type { DesktopConnectionConfig } from '@/global'
 import { useI18n } from '@/i18n'
 import { openExternalLink } from '@/lib/external-link'
-import { ChevronLeft, ExternalLink, FileText, Loader2, LogIn, RefreshCw, SlidersHorizontal, Wrench } from '@/lib/icons'
-import { $desktopBoot } from '@/store/boot'
+import { ChevronLeft, ExternalLink, FileText, Loader2, LogIn, RefreshCw, SlidersHorizontal, Wrench, X } from '@/lib/icons'
+import { $bootFailureDismissed, $desktopBoot, dismissBootFailure, isBootFailureDismissed } from '@/store/boot'
 import { notify, notifyError } from '@/store/notifications'
 import { $desktopOnboarding } from '@/store/onboarding'
 
@@ -46,6 +46,7 @@ type RecoveryView = 'connect' | 'recovery'
 // to retry, repair the install, switch the gateway, or find the logs.
 export function BootFailureOverlay({ GatewaySettingsView }: BootFailureOverlayProps) {
   const boot = useStore($desktopBoot)
+  const dismissed = useStore($bootFailureDismissed)
   const onboarding = useStore($desktopOnboarding)
   const { t } = useI18n()
   const [busy, setBusy] = useState<BusyAction>(null)
@@ -61,7 +62,12 @@ export function BootFailureOverlay({ GatewaySettingsView }: BootFailureOverlayPr
   // juggling, no second connection form to maintain).
   const [view, setView] = useState<RecoveryView>('recovery')
 
-  const visible = Boolean(boot.error) && !boot.running
+  // Non-blocking (P02A): the panel floats over the working shell instead of
+  // masking it. Dismissal hides it only for THIS failed boot — a different
+  // error re-arms the surface.
+  const visible =
+    boot.error !== null && !boot.running && !isBootFailureDismissed(boot.error, dismissed)
+
   // While first-run onboarding owns the picker/flow we let it surface its own
   // progress; the recovery overlay is for hard failures, which it covers via a
   // higher z-index regardless of onboarding state.
@@ -349,13 +355,10 @@ export function BootFailureOverlay({ GatewaySettingsView }: BootFailureOverlayPr
 
   if (view === 'connect') {
     return (
-      <div
-        className="fixed inset-0 z-(--z-setup) flex items-center justify-center bg-(--ui-chat-surface-background) p-6"
-        // Masks the whole app on boot failure — must stay filled under window
-        // glass. Contract: `[data-glass-opaque]` in styles.css.
-        data-glass-opaque=""
-      >
-        <div className="flex max-h-[86vh] w-full max-w-[46rem] flex-col overflow-hidden rounded-xl border border-(--stroke-nous) bg-(--ui-chat-bubble-background) shadow-nous">
+      // P02A: recovery surfaces float — no full-screen mask, the shell stays
+      // interactive (sidebar, settings, offline-capable views all work).
+      <div className="pointer-events-none fixed inset-0 z-(--z-setup) flex items-end justify-end p-4">
+        <div className="pointer-events-auto flex max-h-[86vh] w-full max-w-[46rem] flex-col overflow-hidden rounded-xl border border-(--stroke-nous) bg-(--ui-chat-bubble-background) shadow-nous">
           {/* Subtle back affordance (projects/overlay idiom): muted → foreground
               on hover, no divider. */}
           <button
@@ -379,16 +382,11 @@ export function BootFailureOverlay({ GatewaySettingsView }: BootFailureOverlayPr
   }
 
   return (
-    <div
-      className="fixed inset-0 z-(--z-setup) flex items-center justify-center bg-(--ui-chat-surface-background) p-6"
-      // Masks the whole app on boot failure — must stay filled under window
-      // glass. Contract: `[data-glass-opaque]` in styles.css.
-      data-glass-opaque=""
-    >
-      <div className="w-full max-w-[40rem] overflow-hidden rounded-xl border border-(--stroke-nous) bg-(--ui-chat-bubble-background) shadow-nous">
+    <div className="pointer-events-none fixed inset-0 z-(--z-setup) flex items-end justify-end p-4">
+      <div className="pointer-events-auto w-full max-w-[40rem] overflow-hidden rounded-xl border border-(--stroke-nous) bg-(--ui-chat-bubble-background) shadow-nous">
         <div className="flex items-start gap-3 px-5 py-4">
           <ErrorIcon className="mt-0.5" size="1.25rem" />
-          <div>
+          <div className="min-w-0 flex-1">
             <h2 className="text-[0.9375rem] font-semibold tracking-tight">
               {remoteReauth
                 ? copy.remoteTitle
@@ -408,6 +406,15 @@ export function BootFailureOverlay({ GatewaySettingsView }: BootFailureOverlayPr
                     : copy.description}
             </p>
           </div>
+          <button
+            aria-label={copy.dismiss}
+            className="grid size-6 shrink-0 place-items-center rounded-sm text-(--ui-text-tertiary) transition-colors hover:bg-(--ui-control-hover-background) hover:text-foreground"
+            onClick={() => boot.error && dismissBootFailure(boot.error)}
+            title={copy.dismiss}
+            type="button"
+          >
+            <X className="size-3.5" />
+          </button>
         </div>
 
         <div className="grid gap-4 p-5 pt-0">

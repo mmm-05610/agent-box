@@ -131,6 +131,7 @@ export const ja = defineLocale({
       gatewaySettings: 'ゲートウェイ設定',
       back: '戻る',
       openLogs: 'ログを開く',
+      dismiss: '閉じる',
       repairHint: '修復はインストーラーを再実行します。新しいマシンでは数分かかる場合があります。',
       remoteSignInHint: signInLabel =>
         `保存済みのリモートブラウザセッションからサインアウトし、${signInLabel}を開きます。代わりにバンドルされたバックエンドに切り替えるには「ローカルゲートウェイを使用」を選択してください。`,

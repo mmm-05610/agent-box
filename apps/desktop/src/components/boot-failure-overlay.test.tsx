@@ -1,7 +1,7 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { $desktopBoot } from '@/store/boot'
+import { $bootFailureDismissed, $desktopBoot, dismissBootFailure } from '@/store/boot'
 import { $desktopOnboarding } from '@/store/onboarding'
 
 import { BootFailureOverlay } from './boot-failure-overlay'
@@ -235,5 +235,55 @@ describe('BootFailureOverlay', () => {
     } finally {
       restore()
     }
+  })
+
+  // P02A — the recovery surface is non-blocking: the product stays usable
+  // with the backend down, the panel can be dismissed, and a DIFFERENT
+  // failure re-arms it. The old full-screen mask (data-glass-opaque over
+  // fixed inset-0) must be gone.
+  describe('non-blocking failure surface (P02A)', () => {
+    it('renders as a floating panel without the full-screen glass mask', () => {
+      failBoot()
+
+      const { container } = render(<BootFailureOverlay />)
+
+      expect(screen.getByRole('button', { name: /retry/i })).toBeTruthy()
+      // The glass contract marks full-screen masks; a floating panel must
+      // not carry it anywhere in the failure UI.
+      expect(container.querySelector('[data-glass-opaque]')).toBeNull()
+    })
+
+    it('dismisses the failed boot and stays hidden for that error', () => {
+      failBoot()
+
+      const { container } = render(<BootFailureOverlay />)
+
+      fireEvent.click(screen.getByRole('button', { name: /dismiss/i }))
+
+      // The panel is gone for THIS error…
+      expect(container.querySelector('[aria-label="Dismiss"]')).toBeNull()
+      expect(screen.queryByRole('button', { name: /retry/i })).toBeNull()
+      // …and the dismissal atom is latched to the failed boot's message.
+      expect($bootFailureDismissed.get()).toBe('Could not connect to Hermes gateway')
+    })
+
+    it('re-arms the surface when a different error arrives after dismissal', () => {
+      failBoot()
+      dismissBootFailure('Could not connect to Hermes gateway')
+
+      const { container } = render(<BootFailureOverlay />)
+
+      expect(screen.queryByRole('button', { name: /retry/i })).toBeNull()
+
+      // A new, different failure must be visible — dismissal never hides a
+      // failure the user has not seen.
+      act(() => {
+        failBoot()
+        $desktopBoot.set({ ...$desktopBoot.get(), error: 'backend exited during startup' })
+      })
+
+      expect(screen.getByRole('button', { name: /retry/i })).toBeTruthy()
+      expect(container).toBeTruthy()
+    })
   })
 })

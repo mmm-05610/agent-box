@@ -177,6 +177,7 @@ export interface Translations {
       gatewaySettings: string
       back: string
       openLogs: string
+      dismiss: string
       repairHint: string
       remoteSignInHint: (signInLabel: string) => string
       signOutAndSignIn: string
