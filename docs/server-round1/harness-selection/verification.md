@@ -158,7 +158,7 @@ Codex as one artifact until a future adapter exposes a reliable version gate.
   translator from its ADL/wire protocol; Stage B found no existing source for
   that translator and does not treat writing one as thin glue.
 
-## Stage C completion audit
+## First-round Stage C completion audit
 
 - State and source versions agree across README, candidate table, boundary,
   status, and experiments: Harness Remote `v3.0.2` at
@@ -326,10 +326,11 @@ becoming behavior-qualified in this round.
 
 ## Operational deviations and cleanup evidence
 
-- A Paseo install attempt created two uniquely named temporary home/cache
-  directories and two grep-output files outside the owned root. The responsible
-  reviewer stopped only its own npm processes, removed those exact paths, and
-  verified each path absent. No global install completed.
+- A Paseo install attempt created `/tmp/paseo-research-home.1m341Z`,
+  `/tmp/paseo-research-cache.Bsmp5z`, `/tmp/wsl-rg.out`,
+  `/tmp/windows-rg.out`, and `/tmp/install-rg.out` outside the owned root. The
+  responsible reviewer stopped only its own npm processes, removed those exact
+  paths, and verified each path absent. No global install completed.
 - One acpx `build:test` invocation accidentally set `HOME` to the unique path
   `/tmp/DUMMY?`. pnpm created only `.local/state/pnpm` and `.local/share/pnpm`
   there. The path was identified as owned by this run, removed exactly with a
@@ -341,7 +342,31 @@ becoming behavior-qualified in this round.
   were then used for source review. No user or unrelated process was touched.
 - Several low-priority partial clones were stopped only by their exact owned
   process groups after higher-signal source candidates were available. They
-  remain below the marker-owned research root until final cleanup.
+  remained below the marker-owned research root until the final cleanup.
 
-Final marker validation, process audit, and removal of the entire second-round
-research root occur only after all committed evidence no longer depends on it.
+The final process audit found zero live processes referencing the owned root.
+The marker content (`agentbox-work-order-38-round2-research`) and pointer path
+were validated exactly, then
+`/tmp/agentbox-harness-selection-38-round2.3oxRoE` and
+`/tmp/agentbox-harness-selection-38-round2.current` were removed. Both are
+absent, as are every explicitly listed out-of-root deviation path. No user or
+unrelated path was removed.
+
+## Round-two completion audit
+
+- Source versions and evidence levels agree across README, search coverage,
+  candidate table, boundary, verification, and status.
+- The diff from first-round checkpoint `3611d0e` contains only
+  `docs/server-round1/harness-selection/**` and
+  `docs/implementation/status.md`. Production source, dependency metadata,
+  lockfiles, prior reports, and sibling repositories are unchanged.
+- Work Orders 37 and 38 intersect only at the broad report/status declarations;
+  37 remained paused and the status update was serialized. Desktop 36R has no
+  shared write path.
+- Repository-local Markdown links resolve, `git diff --check` succeeds, and
+  explicit staging is limited to the six final Stage C document paths.
+- The second-round research root and pointer are absent after marker-checked
+  cleanup. The process audit found no owned live process, and all explicitly
+  recorded out-of-root paths are absent.
+- There were zero native Harness/provider/model/login calls and zero
+  credential-content reads.

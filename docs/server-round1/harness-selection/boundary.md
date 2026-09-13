@@ -8,10 +8,11 @@ recommendation:
 
 - Select `giuliastro/harness-remote` tag `v3.0.2`, commit
   `21ce6db49af708c4c7c3f96ef6a50f62dced8dab`, for a minimal extraction spike.
-- There is no fully qualifying backup. `agent-controller` is a useful Pi,
-  OpenCode, and Claude component reference, but its Codex runtime uses
-  `codex exec`. Replacing that runtime with Codex ACP requires a new
-  ACP/app-server-to-ADL lifecycle translator and is outside thin glue.
+- Among candidates reviewed in the first screen, there was no fully
+  qualifying backup. `agent-controller` is a useful Pi, OpenCode, and Claude
+  component reference, but its Codex runtime uses `codex exec`. Replacing that
+  runtime with Codex ACP requires a new ACP/app-server-to-ADL lifecycle
+  translator and is outside thin glue.
 - If a fixed source snapshot plus the small permission-resolver patch described
   below is unacceptable, the practical decision is `NO_FIT`. The selection
   must not fall back to an AgentBox-written multi-Harness implementation.
@@ -278,10 +279,132 @@ Never float a branch, npm range, `npx`, or native binary. To upgrade:
    integrities, licenses, and separate build SBOM;
 3. inspect upstream diffs in every reused call path and rebase the small
    permission patch with prominent change notes;
-4. run the upstream narrow suites and the three committed Work Order 38 seam
-   experiments against the new checkout;
+4. run the Harness Remote seam against its new checkout and the Codex ACP seam
+   against the newly locked downstream adapter; keep the Agent Controller and
+   acpx experiments as comparison evidence for their own fixed sources;
 5. run the future Server→Worker fake acceptance, then Windows/WSL process tests;
 6. require a new explicit source authorization before any real provider test.
 
 There is no unattended upgrade. A change that breaks the source closure or
 requires a lifecycle fork triggers a new selection review.
+
+# Round-two Stage C addendum
+
+## Updated decision
+
+**Retain** the conditional Harness Remote `v3.0.2` recommendation for a future,
+separately authorized minimal extraction spike. The broader search did not find
+a stronger candidate under the same evidence standard. This is a conclusion
+about the source-locked candidates in [search-coverage.md](search-coverage.md),
+not a claim that every public or private project in the ecosystem is unsuitable.
+
+**Defer** `beyond5959/acp-adapter v0.3.8` as the best newly found prospective
+backup. It has the clearest alternative reuse boundary and three real embedded
+lower implementations, but the unavailable Go 1.24 toolchain prevented its
+fake suites from running. It is not behavior-qualified, Windows-supported, or
+WSL-qualified in this round.
+
+Keep `openclaw/acpx` as a reusable ACP-host component. Its imported fixed
+runtime passed the bounded experiment, but a complete multi-Harness solution
+still depends on separately fixed native adapter packages. The experiment did
+not prove two different Harness-specific extension paths, and acpx's default
+registry is a dynamic range/`npx` supply chain. It therefore does not replace
+Harness Remote or count as a fully qualified backup.
+
+The remaining source-locked candidates are eliminated or retained only as
+references: LinkCode has the strongest large native adapter set but a BUSL-1.1
+Competitive Offering clause that may block the contemplated use pending
+legal/product review, plus about 55k relevant lines; Paseo, Mjolnir and
+CodexHost need
+large product/control-plane extraction; AgentPool has multiple current safety
+and lifecycle defects; Agent API and Agent Mux lack the required native
+lifecycle fidelity.
+
+This addendum updates the recommendation only. It does not authorize the
+Harness Remote extraction, production edits, real Harness/provider/model calls,
+login, credential reads, or Work Order 37 repairs.
+
+## Same-standard final comparison
+
+| Option | Upstream source that would be reused | AgentBox-owned glue required | State/control-plane fit | Native fidelity evidence | License / upgrade cost | Disposition |
+| --- | --- | --- | --- | --- | --- | --- |
+| Harness Remote `v3.0.2` | About 6,072 reviewed bridge lines: profile registry, ACP client/service, three native journal readers, OMP actions, OpenCode host/SSE/router; fixed Codex ACP lower artifact | Generic sidecar envelope, Worker isolation/cleanup, artifact verifier, projection-only persistence, and one asynchronous permission-resolver patch | Candidate task/registry/worktree stores are excluded; Windows remains authoritative and Worker owns the bounded projection | Separate fixed-component fake seams passed pre-terminal events, resume, cancel/disconnect, invalid variants, the Codex ACP app-server path, and OMP/OpenCode-specific paths | Apache-2.0 source snapshot; exact offline npm/native artifacts and patch rebase required per upgrade | **Retain conditional leader** |
+| `acp-adapter v0.3.8` | About 17.3k Go lines: public embedded Codex/Claude/Pi runtimes, shared ACP server, provider clients/supervisors, and fake fixtures | Go sidecar or Worker bridge, generic AgentBox event envelope, isolated native roots, artifact/SBOM packaging | No product DB/scheduler; native processes and sessions stay in provider backends; Windows remains authoritative | Source has Codex app-server, Pi RPC, Claude stream-json, native resume/approval/cancel/errors; no suite executed here | MIT, no third-party Go module requirements; Go 1.24 build, Windows packaging and WSL behavior unresolved | **Prospective backup; qualification deferred** |
+| `acpx ffbefbb` | About 10.5k TypeScript ACP/runtime lines: client, manager, public contract, injected store/registry/env/process lifecycle | Generic sidecar envelope, outer minimal environment, in-memory/projection store, exact registry, plus separately sourced and licensed lower adapters | Store injection fits bounded projections; CLI file store and queue/flow features are excluded | Imported runtime passed common lifecycle, identity, config, permission, cancel/disconnect and cleanup observation; two native extension paths and its own Codex app-server are absent | MIT; fixed core lock is available, but default adapter ranges and `npx -y` must be replaced by exact artifacts | **Reusable component, not full backup** |
+| LinkCode `22c337f` | Roughly 55k relevant TypeScript lines plus workspace schema/transport/common | Major workspace extraction, environment/home hardening, persistence replacement, package/build separation | Daemon SQLite can be excluded, but engine/session types and private monorepo remain coupled | Strong source evidence for Codex app-server, Pi, OpenCode and Claude native behavior | BUSL-1.1 Competitive Offering clause may cover the contemplated paid hosted/embedded use; legal/product applicability review is required | **Do not recommend** |
+| Paseo `d1b705a` | Provider registry/contract plus Codex, OpenCode, Claude, Pi, OMP and ACP adapters | Large contract cut from AgentSession/timeline/workspace/git/process/MCP/history | Daemon stores can be excluded, but provider code is deeply shaped by Paseo product state | Rich source evidence; no directed build/test in this round | Apache-2.0; about 105k provider-tree lines and large dependency closure | **Reference only** |
+| CodexHost `38903be` | Strong Harness plugin loader/contract and Pi/OpenCode/Claude/OMP adapters | Codex would require extracting official host, persistence/account/remote logic, renderer protocol and Rust shim | Codex is part of the Desktop control plane and explicitly reserved from plugins | Four plugin adapters are strong; no reusable Codex plugin exists | MIT root; multi-package Node/Rust closure and dependency-license audit required | **Reference only; full candidate fails** |
+| AgentPool `b6ddbea` | Codex/Claude/ACP agents plus broad shared framework | Multiple safety fixes and a 20k+ line lower-bound framework extraction | Full object creates storage/jobs/process/todo control planes and real-home side effects | Current source loses denial, EOF, finish and cancel fidelity in critical paths | MIT root, 389 locked packages, dynamic registries/installers | **NO_FIT** |
+
+## Alternative reuse trees
+
+The retained Harness Remote tree and process/data flow above remain the proposed
+first slice. The two new options would have these boundaries if a later work
+order investigates them; no directory is created now.
+
+```text
+acp-adapter prospective backup
+plugins/agent-box-harnesses/             AgentBox generic registration only
+└── runtime-go-sidecar/                   generic envelope + provenance
+    └── third_party/acp-adapter-v0.3.8/   upstream-owned Go module
+        ├── pkg/{codexacp,claudeacp,piacp}/  embedded public runtimes
+        └── internal/{acp,codex,claude,pi}/  native lifecycle implementations
+
+WSL Worker                              process group, bwrap, limits, cleanup
+└── Go sidecar
+    └── chosen embedded runtime
+        └── native Harness child         isolated HOME/XDG/provider state
+
+Windows Server                         Profile/Session/execution authority
+```
+
+The acceptable AgentBox changes would be the sidecar envelope, provider-neutral
+selection, environment/process setup, provenance validation, and opaque
+checkpoint transfer. Implementing ACP or any of the three branded lifecycles in
+AgentBox would fail this reuse boundary.
+
+```text
+acpx component option
+plugins/agent-box-harnesses/             AgentBox generic registration only
+└── runtime-node-sidecar/                 outer env + generic envelope
+    ├── third_party/acpx/                 fixed upstream runtime/ACP host
+    └── artifacts/adapters/               separately fixed ACP executables
+        ├── codex-acp + bundled Codex     app-server lower path
+        └── second native adapter         still must prove proprietary behavior
+
+WSL Worker                              process group, bwrap, limits, cleanup
+└── acpx createAcpRuntime
+    ├── injected in-memory projection store
+    ├── injected absolute-command registry
+    └── candidate-owned child lifecycle observer
+
+Windows Server                         Profile/Session/execution authority
+```
+
+This option has a clean host boundary but a weaker completeness claim: acpx
+owns ACP client semantics, while the required multi-Harness native
+implementations and their supply chain live in separate projects. If AgentBox
+must add branded translation or compose a new adapter framework around those
+artifacts, the option becomes `NO_FIT` under Work Order 38 rather than a backup.
+
+## Outstanding proof before any implementation decision
+
+Harness Remote still needs the previously listed thin-glue spike gates. The
+round-two evidence adds these decision facts:
+
+- `acp-adapter` needs a Go 1.24 environment to run only its fake fixture suites,
+  then a source-locked Windows/WSL packaging and process-tree review. A pass
+  could promote it to a genuine backup without changing the current leader.
+- acpx would need exact offline lower adapters and two distinct proprietary
+  capability paths. Its outer sidecar must start from a minimal environment
+  because `agentProcessEnv` is an overlay on the parent environment.
+- LinkCode cannot advance without legal/product review of whether the contemplated
+  use falls within its Competitive Offering restriction; no code test can resolve
+  that applicability question.
+- No selected candidate repairs Work Order 37 idempotency, Server event
+  publication timing, role-state honesty, or Windows state authority. Those
+  remain separately dispatched production work.
+
+The user decision remains whether to authorize a new no-model Harness Remote
+extraction work order under the original bounded gates. This research does not
+make that decision on the user's behalf.

@@ -1,29 +1,34 @@
 # Work Order 38 — Harness extension selection
 
-Work Order 38 is **researching a second, broader candidate screen**. The first
-screen conditionally recommended `giuliastro/harness-remote` tag `v3.0.2`,
-commit `21ce6db49af708c4c7c3f96ef6a50f62dced8dab`, for a minimal extraction
-spike. That conclusion covered the candidates reviewed in the first screen; it
-was not an ecosystem-wide finding.
+Work Order 38 is **ready for user decision** after a second, broader candidate
+screen. Retain the conditional recommendation to investigate a minimal
+extraction of `giuliastro/harness-remote` tag `v3.0.2`, commit
+`21ce6db49af708c4c7c3f96ef6a50f62dced8dab`, in a separately authorized,
+no-model work order.
 
-The broader screen source-locked Paseo, LinkCode, AgentPool, Mjolnir,
-CodexHost, `acp-adapter`, `acpx`, Agent API, and Agent Mux, then recorded
-lighter eliminations for projects that expose terminals, assets, registries, or
-new control planes instead of a reusable native lifecycle boundary. Two new
-candidates enter bounded Stage B work: `beyond5959/acp-adapter` and
-`openclaw/acpx`. The final recommendation remains open until their evidence is
-integrated under the same reuse, fidelity, ownership, and license standard.
+This recommendation is limited to the source-locked candidates reviewed in the
+two screens. It is not an ecosystem-wide `NO_FIT` finding. The broader search
+found a credible prospective backup in `beyond5959/acp-adapter v0.3.8`, but its
+fake suites could not run because this host has no Go toolchain, so backup
+qualification is deferred. `openclaw/acpx` passed an imported-runtime fake
+experiment and is reusable as an ACP host; it lacks fixed lower adapters and
+proof for two different Harness-specific capabilities, so it is not the full
+multi-Harness answer.
 
-The first-screen Harness Remote recommendation is still conditional on a fixed
-Apache-2.0 source snapshot, offline adapter locks, Worker-owned
-isolation/process cleanup, Windows-owned product state, and one narrow
-asynchronous permission-resolver patch. Work Order 38 still does not authorize
-production code, a Harness Remote extraction, provider calls, model invocations,
-login, or credential reads.
+Harness Remote remains conditional on a fixed Apache-2.0 source snapshot,
+offline adapter locks, Worker-owned isolation/process cleanup, Windows-owned
+product state, and one narrow asynchronous permission-resolver patch. If the
+spike needs a lifecycle fork, branded logic in AgentBox Core/Server, or the
+candidate's control stores as authority, it returns `NO_FIT`.
+
+No production code or dependency changed. No native Harness, provider request,
+model invocation, login, or credential read was used. Fake-peer evidence proves
+only the specified adapter seams. Work Order 38 does not approve the extraction
+or any real call.
 
 Evidence:
 
-- [Search coverage](search-coverage.md)
+- [Final recommendation and reuse boundary](boundary.md)
 - [Candidate comparison](candidates.md)
-- [Recommendation and reuse boundary](boundary.md)
+- [Search coverage](search-coverage.md)
 - [Behavior verification](verification.md)

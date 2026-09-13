@@ -157,9 +157,9 @@ the same fixed-source, native-fidelity, thin-glue, ownership, and license rules.
 | --- | --- | --- | --- | --- |
 | Harness Remote `v3.0.2` | ACP profiles for Codex/Claude/Pi/OMP plus native OpenCode HTTP/SSE | Codex delegates to fixed Codex ACP app-server; OMP actions and per-Harness native journals remain distinct | Smallest reviewed source slice, but must remove `npx`, isolate environment/home, exclude its task stores, and carry one approval callback patch | Retained first-screen benchmark and provisional leader; no new test in this round |
 | Paseo `d1b705a` | Provider registry contains Codex app-server, OpenCode, Claude, Pi, OMP, and generic ACP implementations | Rich approvals, questions, reasoning, diffs, subagents, compaction, and native resume | Providers depend on Paseo AgentSession/timeline/workspace/process/history types; provider tree is about 105k lines | Source reference; do not experiment because extraction is not thin |
-| LinkCode `22c337f` | Common `AgentAdapter` for Codex, Pi, OpenCode, Claude, and Grok | Real Codex app-server and native SDK/server paths; structured approvals/questions and adapter-specific options | About 55k relevant lines plus private workspace packages and daemon assumptions; BUSL-1.1 additional-use grant is a release blocker for the contemplated hosted/embedded use | Eliminate from production recommendation pending explicit license acceptance; no experiment |
+| LinkCode `22c337f` | Common `AgentAdapter` for Codex, Pi, OpenCode, Claude, and Grok | Real Codex app-server and native SDK/server paths; structured approvals/questions and adapter-specific options | About 55k relevant lines plus private workspace packages and daemon assumptions; BUSL-1.1 Competitive Offering clause is a potential applicability blocker for the contemplated paid hosted/embedded use | Do not recommend pending legal/product applicability review; no experiment |
 | AgentPool `b6ddbea` | Codex, Claude, and ACP backends inside a large Python agent framework | Codex app-server exists, but approval denial maps to allow; EOF/cancel/finish-reason paths lose fidelity | 20k+ line lower-bound closure, 389 locked packages, storage/jobs/process control plane, import and real-home side effects | **NO_FIT** at fixed source |
-| Mjolnir `3ec9163` | Rust ACP worker selects Codex, Claude, Kimi, Grok, DeepSeek, and Muse Harnesses | Real ACP streaming, approval, resume and branded branches | Published crates still pull relay/goal/memory/review/checkpoint/SQLite semantics; GPL-3.0-only | Source reference; extraction is a major separation and license acceptance is unresolved |
+| Mjolnir `3ec9163` | Rust ACP worker selects Codex, Claude, Kimi, Grok, DeepSeek, and Muse Harnesses | Real ACP streaming, approval, resume and branded branches | Published crates still pull relay/goal/memory/review/checkpoint/SQLite semantics; GPL-3.0-only | Source reference; extraction is a major separation and license obligations and product compatibility are unresolved |
 | `acp-adapter v0.3.8` | Three aligned, embedded Go runtimes: Codex, Claude, Pi | Codex app-server; Pi RPC; Claude stream-json; fake fixtures cover native identity, stream, approval, cancel and errors | About 17.3k Go lines, no third-party Go module dependencies, and no product database/scheduler. Still needs an AgentBox ACP/Go boundary and host-injected native homes | **Stage B entrant 1** |
 | `acpx ffbefbb` | Embeddable ACP runtime accepting any injected fixed adapter registry | Strong common session/event/permission/cancel contract; Codex is only indirect through a separately fixed Codex ACP artifact; arbitrary metadata is allowlisted/reduced | About 10.5k runtime/ACP TypeScript lines; store, env, registry, and process lifecycle are injectable. Default registry uses ranges and `npx -y` and must be excluded | **Stage B entrant 2** |
 | CodexHost `38903be` | Excellent plugin interface and native Pi/OpenCode/Claude/OMP adapters | Codex app-server is the reserved official Desktop host, not a plugin adapter | Extracting Codex requires the host runtime, thread persistence, approvals/account/remote logic, renderer protocol and Rust shim; four other adapters plus generic runtime exceed 3.1 MB source | Eliminate as a complete candidate; retain contract/reference value |
@@ -255,3 +255,25 @@ paths, Codex app-server, identity/resume, pre-terminal events, approvals,
 cancel/disconnect distinction, isolation, and cleanup all have fixed-artifact
 evidence. Missing toolchains and absent lower adapters remain unknowns rather
 than inferred passes.
+
+## Round-two Stage C disposition
+
+- **Retain conditional leader:** Harness Remote `v3.0.2`. Its reviewed source
+  closure still supplies the most complete fixed multi-Harness implementation
+  and separately executed fixed-component evidence for Codex app-server, OMP,
+  and OpenCode behavior. This applies to the reviewed set, not the whole ecosystem.
+- **Defer prospective backup:** `acp-adapter v0.3.8`. The source boundary is
+  credible and has no product control plane, but no Go fixture suite executed.
+- **Keep as lower host component:** `acpx ffbefbb`. Its imported runtime passed
+  common lifecycle tests, but fixed native adapters and two proprietary paths
+  are missing from the qualification evidence.
+- **Do not recommend:** LinkCode until legal/product review determines whether
+  its BUSL-1.1
+  Competitive Offering restriction applies; Paseo, Mjolnir and CodexHost
+  because extraction is broad or the Codex plugin boundary is absent; AgentPool because current source has safety,
+  isolation and lifecycle hard failures; all terminal/config/control-plane
+  projects for the hard reasons in the search table.
+
+No round-two result authorizes the Harness Remote extraction. The proposed next
+slice in [boundary.md](boundary.md) still requires a new work order and user
+decision.
