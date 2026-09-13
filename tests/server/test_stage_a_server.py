@@ -8,12 +8,29 @@ import sqlite3
 from fastapi.testclient import TestClient
 import pytest
 
-from agent_box.server.application import ProductService
-from agent_box.server.composition import build_runtime
-from agent_box.server.persistence import ProductRepository
+from agent_box.server.bootstrap import build_runtime
+from agent_box.server.credentials import CredentialRecords
+from agent_box.server.execution import HarnessDescriptor, HarnessRegistry
+from agent_box.server.idempotency import IdempotentRecords
+from agent_box.server.profiles import ProfileRecords, ProfileService
 from agent_box.server.transport.http import create_app
 from agent_box.storage import Database, FutureSchemaError, ObjectStore
 from agent_box.work_core import db as core_db
+
+
+def codex_validator(value):
+    if not isinstance(value, dict):
+        raise ValueError()
+    return None
+
+
+def codex_registry(claims=None):
+    registry = HarnessRegistry()
+    registry.register(HarnessDescriptor(
+        "codex", credential_kind="codex-login",
+        configuration_validator=codex_validator, capability_claims=claims or {},
+    ))
+    return registry
 
 
 class WslFixture:
@@ -39,8 +56,8 @@ def server(tmp_path):
     root = tmp_path / "server-data"
     runtime = build_runtime(
         root,
-        profile_validators={"codex": lambda value: None if isinstance(value, dict) else ValueError()},
-        wsl=WslFixture(),
+        harnesses=codex_registry(),
+        connector=WslFixture(),
     )
     with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
         headers = {"Authorization": f"Bearer {runtime.token}"}
@@ -59,7 +76,10 @@ def test_liveness_is_minimal_and_every_product_route_requires_auth(server):
     assert denied.json()["error"]["code"] == "AUTHENTICATION_REQUIRED"
     ready = client.get("/api/v1/readiness", headers=headers)
     assert ready.status_code == 200
-    assert ready.json()["capabilities"]["codex"] is False
+    codex = ready.json()["capabilities"]["harnesses"]["codex"]
+    assert codex["available"] is False
+    assert codex["capability_claims"] == {}
+    assert codex["unavailable_reason"] == "EXECUTION_CAPABILITY_UNAVAILABLE"
     assert client.get("/openapi.json").status_code == 404
     assert client.get("/api/v1/openapi.json").status_code == 401
     assert client.get("/api/v1/openapi.json", headers=headers).status_code == 200
@@ -82,7 +102,7 @@ def test_profile_workspace_and_session_records_are_idempotent(server):
     first_workspace = post(client, headers, "/api/v1/workspaces", workspace_body, "workspace-1")
     assert first_workspace.status_code == 201
     assert post(client, headers, "/api/v1/workspaces", workspace_body, "workspace-1").json() == first_workspace.json()
-    assert runtime.service.wsl.open_calls == 1
+    assert runtime.service.workspaces.connector.open_calls == 1
 
     profile_body = {
         "name": "Codex role", "harness_type": "codex",
@@ -107,7 +127,7 @@ def test_profile_workspace_and_session_records_are_idempotent(server):
 
 def test_product_records_survive_server_restart(tmp_path):
     root = tmp_path / "restart"
-    first = build_runtime(root, profile_validators={"codex": lambda value: None}, wsl=WslFixture())
+    first = build_runtime(root, harnesses=codex_registry(), connector=WslFixture())
     with TestClient(create_app(first), base_url="http://127.0.0.1") as client:
         headers = {"Authorization": f"Bearer {first.token}"}
         workspace = post(client, headers, "/api/v1/workspaces", {"probe_id": "probe_fixture", "path": "/workspace"}, "w")
@@ -117,7 +137,7 @@ def test_product_records_survive_server_restart(tmp_path):
         }, "s")
         session_id = session.json()["session_id"]
         token = first.token
-    second = build_runtime(root, profile_validators={"codex": lambda value: None}, wsl=WslFixture())
+    second = build_runtime(root, harnesses=codex_registry(), connector=WslFixture())
     assert second.token == token
     with TestClient(create_app(second), base_url="http://127.0.0.1") as client:
         headers = {"Authorization": f"Bearer {token}"}
@@ -138,14 +158,15 @@ def test_secret_shaped_configuration_is_rejected_before_object_publication(serve
 
 
 def test_unconfigured_runtime_reports_typed_capability_blockers(tmp_path):
-    runtime = build_runtime(tmp_path / "unavailable", profile_validators={})
+    runtime = build_runtime(tmp_path / "unavailable")
     with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
         headers = {"Authorization": f"Bearer {runtime.token}"}
         readiness = client.get("/api/v1/readiness", headers=headers).json()
-        assert {item["code"] for item in readiness["blockers"]} >= {
-            "WSL_CONNECTOR_UNAVAILABLE", "CODEX_HARNESS_UNAVAILABLE",
-            "CREDENTIAL_SOURCE_NOT_AUTHORIZED",
+        assert {item["code"] for item in readiness["blockers"]} == {
+            "WSL_CONNECTOR_UNAVAILABLE", "EXECUTION_CAPABILITY_UNAVAILABLE",
         }
+        assert readiness["capabilities"]["harnesses"] == {}
+        assert readiness["capabilities"]["execution"] is False
         response = client.get("/api/v1/wsl/distributions", headers=headers)
         assert response.status_code == 503
         assert response.json()["error"]["code"] == "WSL_CONNECTOR_UNAVAILABLE"
@@ -153,12 +174,12 @@ def test_unconfigured_runtime_reports_typed_capability_blockers(tmp_path):
 
 def test_future_schema_refuses_startup_without_overwrite(tmp_path):
     root = tmp_path / "future"
-    runtime = build_runtime(root, profile_validators={})
+    runtime = build_runtime(root)
     runtime.start()
     runtime.stop()
     with sqlite3.connect(root / "state" / "agentbox.sqlite") as conn:
         conn.execute("UPDATE agentbox_product_schema SET version=999 WHERE singleton=1")
-    newer = build_runtime(root, profile_validators={})
+    newer = build_runtime(root)
     with pytest.raises(FutureSchemaError):
         newer.start()
     with sqlite3.connect(root / "state" / "agentbox.sqlite") as conn:
@@ -171,14 +192,14 @@ def test_existing_unowned_directory_is_refused_without_modification(tmp_path):
     sentinel = root / "sentinel.txt"
     sentinel.write_text("preserve", encoding="utf-8")
     with pytest.raises(RuntimeError, match="DATA_ROOT_UNOWNED"):
-        build_runtime(root, profile_validators={})
+        build_runtime(root)
     assert sentinel.read_text(encoding="utf-8") == "preserve"
     assert set(path.name for path in root.iterdir()) == {"sentinel.txt"}
 
 
 @pytest.mark.skipif(os.name == "nt", reason="POSIX mode bits are not Windows ACL evidence")
 def test_bootstrap_token_is_owner_only_on_posix(tmp_path):
-    runtime = build_runtime(tmp_path / "protected-token", profile_validators={})
+    runtime = build_runtime(tmp_path / "protected-token")
     try:
         assert runtime.token_path.stat().st_mode & 0o777 == 0o600
     finally:
@@ -186,12 +207,12 @@ def test_bootstrap_token_is_owner_only_on_posix(tmp_path):
 
 
 def test_data_roots_are_isolated_and_single_owner_is_enforced(tmp_path):
-    first = build_runtime(tmp_path / "one", profile_validators={})
-    second = build_runtime(tmp_path / "two", profile_validators={})
+    first = build_runtime(tmp_path / "one")
+    second = build_runtime(tmp_path / "two")
     first.start()
     try:
         with pytest.raises(RuntimeError, match="DATA_ROOT_IN_USE"):
-            build_runtime(tmp_path / "one", profile_validators={})
+            build_runtime(tmp_path / "one")
         second.start()
         try:
             assert first.database.path != second.database.path
@@ -210,10 +231,14 @@ def test_object_failure_cannot_leave_a_dangling_profile_reference(tmp_path):
 
     database = Database(tmp_path / "broken")
     database.initialize()
-    repository = ProductRepository(database)
-    service = ProductService(repository, BrokenObjects(tmp_path / "broken"), profile_validators={"codex": lambda value: None})
+    idempotency = IdempotentRecords(database)
+    service = ProfileService(
+        ProfileRecords(database, idempotency), idempotency,
+        BrokenObjects(tmp_path / "broken"),
+        harnesses=codex_registry(), credentials=CredentialRecords(database),
+    )
     with pytest.raises(OSError, match="injected"):
-        service.create_profile("key", {
+        service.create("key", {
             "name": "role", "harness_type": "codex", "configuration": {}, "credential_id": None,
         })
     with database.read() as conn:
@@ -221,7 +246,7 @@ def test_object_failure_cannot_leave_a_dangling_profile_reference(tmp_path):
 
 
 def test_core_uses_the_server_owned_database_file(tmp_path):
-    runtime = build_runtime(tmp_path / "core-shared", profile_validators={})
+    runtime = build_runtime(tmp_path / "core-shared")
     runtime.start()
     try:
         row = core_db.get_conn().execute("PRAGMA database_list").fetchone()
@@ -271,7 +296,7 @@ def test_schema_one_migrates_turn_identity_columns_idempotently(tmp_path):
 
 def test_restart_seals_unfinished_turn_as_unknown_without_redispatch(tmp_path):
     root = tmp_path / "interrupted"
-    first = build_runtime(root, profile_validators={"codex": lambda value: None}, wsl=WslFixture())
+    first = build_runtime(root, harnesses=codex_registry(), connector=WslFixture())
     first.start()
     try:
         workspace = first.repository.create_workspace(
@@ -295,7 +320,7 @@ def test_restart_seals_unfinished_turn_as_unknown_without_redispatch(tmp_path):
     finally:
         first.stop()
 
-    second = build_runtime(root, profile_validators={"codex": lambda value: None}, wsl=WslFixture())
+    second = build_runtime(root, harnesses=codex_registry(), connector=WslFixture())
     second.start()
     try:
         recovered = second.repository.get_session(session["session_id"])

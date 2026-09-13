@@ -1,4 +1,10 @@
-"""Root composition of Core, the Codex Harness, WSL transport, and product records."""
+"""Work Order 37 historical Codex execution path.
+
+NOT part of production assembly: nothing in `server/bootstrap` imports this
+module. It is retained so the retained 37 stage-C regression suites keep
+exercising the recorded behavior while Work Order 40 replaces the native
+path with the fixed third-party Harness integration.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -17,7 +23,7 @@ from agent_box.resource_contracts import (
     WorkspaceV1,
 )
 from agent_box.server.errors import ServerError
-from agent_box.server.persistence import ProductRepository
+from agent_box.server.persistence import ProductRepositoryView as ProductRepository
 from agent_box.storage import ObjectStore, SecretStore
 from agent_box.work_core import (
     ExecutionFinalizationRequest,

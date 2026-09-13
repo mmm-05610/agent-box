@@ -17,7 +17,7 @@ def main(argv: list[str] | None = None) -> int:
     if not 1 <= args.port <= 65535:
         parser().error("--port must be between 1 and 65535")
     from uvicorn import run
-    from agent_box.server.composition import build_runtime
+    from agent_box.server.bootstrap import build_runtime
     from agent_box.server.transport.http import create_app
 
     runtime = build_runtime(args.data_root)

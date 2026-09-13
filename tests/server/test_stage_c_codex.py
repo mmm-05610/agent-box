@@ -11,10 +11,21 @@ from urllib.request import Request, urlopen
 from fastapi.testclient import TestClient
 import uvicorn
 
-from agent_box.server.composition import build_runtime
+from agent_box.server.bootstrap import build_runtime
+from agent_box.server.execution import HarnessDescriptor, HarnessRegistry
+from agent_box.server.legacy_codex import CodexExecutionBackend
 from agent_box.server.transport.http import create_app
 from agent_box.storage import MemorySecretStore
 from agent_box_harnesses.codex.remote import validate_remote_configuration
+
+
+def codex_registry():
+    registry = HarnessRegistry()
+    registry.register(HarnessDescriptor(
+        "codex", credential_kind="codex-login",
+        configuration_validator=validate_remote_configuration,
+    ))
+    return registry
 
 
 THREAD_ID = "01999999-aaaa-7777-bbbb-cccccccccccc"
@@ -147,11 +158,25 @@ def _open_product(runtime, client, headers):
 
 
 def _runtime(root, transport, secrets=None):
-    return build_runtime(
-        root, profile_validators={"codex": validate_remote_configuration},
-        wsl=WslFixture(), secret_store=secrets or MemorySecretStore({"fixture": b"{}"}),
-        codex_transport=transport,
+    """Assemble the retained Work Order 37 legacy Codex path explicitly.
+
+    Production bootstrap no longer wires any native Harness; these 37
+    regression suites construct the historical backend themselves.
+    """
+    runtime = build_runtime(
+        root,
+        harnesses=codex_registry(),
+        connector=WslFixture(),
+        secret_store=secrets or MemorySecretStore({"fixture": b"{}"}),
     )
+    backend = CodexExecutionBackend(
+        runtime.repository, runtime.objects, runtime.secret_store, transport,
+        on_event=runtime.notifier.notify,
+    )
+    runtime.execution = backend
+    runtime.service.execution = backend
+    runtime.service.sessions.execution = backend
+    return runtime
 
 
 def test_two_turns_use_core_and_exact_native_resume(tmp_path):

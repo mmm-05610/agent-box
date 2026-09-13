@@ -1,4 +1,9 @@
-"""The only Server module that imports concrete plugin implementations."""
+"""Bootstrap assembly: the only place concrete implementations are selected.
+
+Production assembly is provider-neutral: no Harness is wired by default, so
+unimplemented capabilities report honestly unavailable until Work Order 40
+registers real extension implementations.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -8,16 +13,18 @@ import os
 from pathlib import Path
 import secrets
 import subprocess
-import threading
-from typing import Any, Callable, Mapping
+from typing import Any
 from uuid import uuid4
 
-from agent_box.server.application import ProductService, WslConnectionPort
-from agent_box.server.persistence import ProductRepository
-from agent_box.storage import (
-    Database, ObjectStore, SecretStore, WindowsDpapiSecretStore,
-)
-from agent_box.work_core import db as core_db
+from agent_box.server.credentials import CredentialRecords
+from agent_box.server.events import EventNotifier
+from agent_box.server.execution import HarnessRegistry, TurnExecutionPort
+from agent_box.server.idempotency import IdempotentRecords
+from agent_box.server.profiles import ProfileRecords, ProfileService
+from agent_box.server.services import ProductService
+from agent_box.server.sessions import SessionRecords, SessionService
+from agent_box.server.workspaces import WorkspaceRecords, WorkspaceService, WslConnectionPort
+from agent_box.storage import Database, ObjectStore, SecretStore
 
 
 class DataRootOwner:
@@ -116,16 +123,7 @@ def _protect_token(path: Path) -> None:
     )
 
 
-def _builtin_profile_validators() -> dict[str, Callable[[dict[str, Any]], None]]:
-    """Load explicitly enabled official Harness validators without persistence."""
-    try:
-        from agent_box_harnesses.codex.remote import validate_remote_configuration
-    except ImportError:
-        return {}
-    return {"codex": validate_remote_configuration}
-
-
-def _builtin_wsl(server_instance_id: str) -> WslConnectionPort | None:
+def _builtin_connector(server_instance_id: str) -> WslConnectionPort | None:
     manifest = os.environ.get("AGENT_BOX_WSL_WORKER_MANIFEST")
     worker = os.environ.get("AGENT_BOX_WSL_WORKER_LINUX_PATH")
     if os.name != "nt" or not manifest or not worker:
@@ -140,40 +138,20 @@ def _builtin_wsl(server_instance_id: str) -> WslConnectionPort | None:
     )
 
 
-class EventNotifier:
-    """Process-local wakeup; SQLite remains the source of event truth."""
-
-    def __init__(self) -> None:
-        self._condition = threading.Condition()
-        self._generation = 0
-
-    def notify(self) -> None:
-        with self._condition:
-            self._generation += 1
-            self._condition.notify_all()
-
-    def generation(self) -> int:
-        with self._condition:
-            return self._generation
-
-    def wait_after(self, generation: int, timeout: float = 15.0) -> int:
-        with self._condition:
-            self._condition.wait_for(lambda: self._generation != generation, timeout)
-            return self._generation
-
-
 @dataclass
 class ServerRuntime:
     data_root: Path
     database: Database
     objects: ObjectStore
-    repository: ProductRepository
+    repository: "ProductRepositoryView"
     service: ProductService
     owner: DataRootOwner
     token: str = field(repr=False)
     token_path: Path
     notifier: EventNotifier
-    execution: Any | None = None
+    secret_store: SecretStore | None = None
+    harnesses: HarnessRegistry | None = None
+    execution: TurnExecutionPort | None = None
     started: bool = False
 
     def start(self) -> None:
@@ -185,19 +163,22 @@ class ServerRuntime:
             self.database.initialize()
             self.repository.mark_workspaces_unverified()
             self.repository.recover_interrupted_turns()
+            from agent_box.work_core import db as core_db
             core_db.configure_database(self.database.path)
             core_db.get_conn()
         except BaseException:
+            from agent_box.work_core import db as core_db
             core_db.configure_database(None)
             self.owner.release()
             raise
         self.started = True
 
     def stop(self) -> None:
-        if self.execution is not None:
+        if self.execution is not None and hasattr(self.execution, "stop"):
             if not self.execution.stop():
                 raise RuntimeError("SERVER_STOP_TIMEOUT")
         if self.started:
+            from agent_box.work_core import db as core_db
             core_db.configure_database(None)
         self.owner.release()
         self.started = False
@@ -205,11 +186,18 @@ class ServerRuntime:
 
 def build_runtime(
     data_root: Path | str, *,
-    profile_validators: Mapping[str, Callable[[dict[str, Any]], None]] | None = None,
-    wsl: WslConnectionPort | None = None,
+    harnesses: HarnessRegistry | None = None,
+    connector: WslConnectionPort | None = None,
     secret_store: SecretStore | None = None,
-    codex_transport: Any | None = None,
+    execution: TurnExecutionPort | None = None,
 ) -> ServerRuntime:
+    """Assemble a provider-neutral Server runtime.
+
+    `harnesses` carries only descriptors for implementations registered for
+    this deployment. `execution` is an explicit port injection (tests, or a
+    future bootstrap that composes the Work Order 40 Harness plugin); the
+    production default stays None so capability answers stay honest.
+    """
     root = Path(data_root).resolve()
     owner = DataRootOwner(root)
     owner.acquire()
@@ -219,35 +207,39 @@ def build_runtime(
         owner.release()
         raise
     database = Database(root)
-    repository = ProductRepository(database)
     objects = ObjectStore(root)
     notifier = EventNotifier()
-    validators = dict(profile_validators) if profile_validators is not None else _builtin_profile_validators()
-    connector = wsl if wsl is not None else _builtin_wsl(owner.instance_id)
+    registry = harnesses if harnesses is not None else HarnessRegistry()
+    connector_instance = connector if connector is not None else _builtin_connector(owner.instance_id)
     secrets_store = secret_store
-    transport = codex_transport
-    if transport is None and os.name == "nt" and connector is not None:
-        codex_path = os.environ.get("AGENT_BOX_CODEX_LINUX_PATH")
-        codex_digest = os.environ.get("AGENT_BOX_CODEX_SHA256")
-        if codex_path and codex_digest:
-            from agent_box_runtime_wsl import WslExecutionTransport
-            transport = WslExecutionTransport(
-                connector, codex_linux_path=codex_path, codex_digest=codex_digest,
-            )
     if secrets_store is None and os.name == "nt":
+        from agent_box.storage import WindowsDpapiSecretStore
         secrets_store = WindowsDpapiSecretStore(root)
-    execution = None
-    if transport is not None and secrets_store is not None:
-        from .codex import CodexExecutionBackend
-        execution = CodexExecutionBackend(
-            repository, objects, secrets_store, transport, on_event=notifier.notify,
-        )
+
+    idempotency = IdempotentRecords(database)
+    credentials = CredentialRecords(database)
+    workspace_records = WorkspaceRecords(database, idempotency)
+    profile_records = ProfileRecords(database, idempotency)
+    session_records = SessionRecords(database, idempotency)
+
+    workspace_service = WorkspaceService(workspace_records, idempotency, connector=connector_instance)
+    profile_service = ProfileService(profile_records, idempotency, objects,
+                                     harnesses=registry, credentials=credentials)
+    session_service = SessionService(session_records, idempotency, objects,
+                                     harnesses=registry, profiles=profile_records,
+                                     credentials=credentials, execution=execution,
+                                     on_event=notifier.notify)
     service = ProductService(
-        repository, objects, profile_validators=validators,
-        wsl=connector, execution=execution, on_event=notifier.notify,
-        credential_kinds={"codex": "codex-login"},
+        workspace_service, profile_service, session_service,
+        harnesses=registry, credentials=credentials, execution=execution,
+        notifier=notifier,
+    )
+    from agent_box.server.persistence import ProductRepositoryView
+    repository = ProductRepositoryView(
+        database=database, idempotency=idempotency, credentials=credentials,
+        workspaces=workspace_records, profiles=profile_records, sessions=session_records,
     )
     return ServerRuntime(
         root, database, objects, repository, service, owner, token, token_path,
-        notifier, execution,
+        notifier, secrets_store, registry, execution,
     )

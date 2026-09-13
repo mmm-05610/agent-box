@@ -8,11 +8,22 @@ import time
 from fastapi.testclient import TestClient
 import pytest
 
-from agent_box.server.composition import build_runtime
+from agent_box.server.bootstrap import build_runtime
+from agent_box.server.execution import HarnessDescriptor, HarnessRegistry
+from agent_box.server.legacy_codex import CodexExecutionBackend
 from agent_box.server.transport.http import create_app
 from agent_box.storage import MemorySecretStore
 from agent_box_harnesses.codex.remote import validate_remote_configuration
 from agent_box_runtime_wsl import WslConnector, WslExecutionTransport
+
+
+def codex_registry():
+    registry = HarnessRegistry()
+    registry.register(HarnessDescriptor(
+        "codex", credential_kind="codex-login",
+        configuration_validator=validate_remote_configuration,
+    ))
+    return registry
 
 
 pytestmark = pytest.mark.skipif(
@@ -44,7 +55,7 @@ def _wait(client, headers, session_id, count):
 def _runtime(root, instance, secrets):
     connector = WslConnector(
         manifest_path=os.environ["AGENT_BOX_TEST_WSL_MANIFEST"],
-        linux_worker_path=os.environ["AGENT_BOX_TEST_WSL_WORKER"],
+        linux_worker_path=os.environ["AGENT_BOX_TEST_WORKER"],
         server_instance_id=instance,
     )
     executable = Path(os.environ["AGENT_BOX_TEST_CODEX_WINDOWS_PATH"])
@@ -52,10 +63,18 @@ def _runtime(root, instance, secrets):
         connector, codex_linux_path=os.environ["AGENT_BOX_TEST_CODEX_LINUX_PATH"],
         codex_digest=_digest(executable),
     )
-    return build_runtime(
-        root, profile_validators={"codex": validate_remote_configuration},
-        wsl=connector, secret_store=secrets, codex_transport=transport,
+    runtime = build_runtime(
+        root, harnesses=codex_registry(),
+        connector=connector, secret_store=secrets,
     )
+    backend = CodexExecutionBackend(
+        runtime.repository, runtime.objects, runtime.secret_store, transport,
+        on_event=runtime.notifier.notify,
+    )
+    runtime.execution = backend
+    runtime.service.execution = backend
+    runtime.service.sessions.execution = backend
+    return runtime
 
 
 def test_windows_http_wsl_bwrap_two_turns_and_restart(tmp_path):

@@ -27,10 +27,10 @@ def main(argv: list[str] | None = None) -> int:
     if source != confirmed:
         parser().error("--confirm-source must resolve to the exact --source path")
 
-    from agent_box.server.composition import build_runtime
+    from agent_box.server.bootstrap import build_runtime
     from agent_box.storage import WindowsDpapiSecretStore
 
-    runtime = build_runtime(args.data_root, profile_validators={})
+    runtime = build_runtime(args.data_root)
     store = WindowsDpapiSecretStore(runtime.data_root)
     locator = None
     try:

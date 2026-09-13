@@ -1,243 +1,41 @@
-"""Product-owned records; Core tables remain accessible only through Core."""
+"""Storage for Sessions, Turns, and durable session events.
+
+Each business acceptance runs inside exactly one `BEGIN IMMEDIATE`
+transaction that also inserts its idempotency row, so concurrent racers
+cannot both own an acceptance: the loser observes the committed receipt.
+"""
 from __future__ import annotations
 
-from datetime import datetime, timezone
 import json
-from typing import Any, Callable
-from uuid import uuid4
+from typing import Any
 
-from agent_box.storage import Database
 from agent_box.server.errors import ServerError
+from agent_box.server.idempotency import IdempotentRecords
+from agent_box.server.ids import now, opaque_id
+from agent_box.storage import Database
 
 
-def now() -> str:
-    return datetime.now(timezone.utc).isoformat()
-
-
-def opaque_id(prefix: str) -> str:
-    return f"{prefix}_{uuid4().hex}"
-
-
-class ProductRepository:
-    def __init__(self, database: Database) -> None:
+class SessionRecords:
+    def __init__(self, database: Database, idempotency: IdempotentRecords) -> None:
         self.database = database
+        self.idempotency = idempotency
 
-    @staticmethod
-    def _idempotent(conn, scope: str, key: str, request_digest: str):
-        row = conn.execute(
-            "SELECT * FROM server_idempotency WHERE scope=? AND key=?", (scope, key)
-        ).fetchone()
-        if row is None:
-            return None
-        if row["request_digest"] != request_digest:
-            raise ServerError(
-                "IDEMPOTENCY_CONFLICT",
-                "Idempotency-Key was already used with a different request",
-                status=409,
-            )
-        return int(row["status_code"]), json.loads(row["response_json"])
-
-    @staticmethod
-    def _save_idempotent(conn, scope, key, request_digest, status, body) -> None:
-        conn.execute(
-            "INSERT INTO server_idempotency(scope,key,request_digest,status_code,response_json,created_at) "
-            "VALUES (?,?,?,?,?,?)",
-            (scope, key, request_digest, status, json.dumps(body, sort_keys=True), now()),
-        )
-
-    def get_idempotent(self, scope: str, key: str, request_digest: str):
-        with self.database.read() as conn:
-            return self._idempotent(conn, scope, key, request_digest)
-
-    def save_idempotent(self, scope: str, key: str, request_digest: str, status: int, body: dict[str, Any]):
-        with self.database.transaction() as conn:
-            prior = self._idempotent(conn, scope, key, request_digest)
-            if prior:
-                return prior
-            self._save_idempotent(conn, scope, key, request_digest, status, body)
-            return status, body
-
-    def create_workspace(
-        self, *, key: str, request_digest: str, distribution: str,
-        remote_user: str | None, remote_path: str, connection_id: str,
-    ) -> tuple[int, dict[str, Any]]:
-        with self.database.transaction() as conn:
-            prior = self._idempotent(conn, "POST:/workspaces", key, request_digest)
-            if prior:
-                return prior
-            timestamp = now()
-            body = {
-                "workspace_id": opaque_id("ws"), "connection_id": connection_id,
-                "distribution": distribution, "user": remote_user,
-                "path": remote_path, "connection_state": "verified",
-            }
-            conn.execute(
-                "INSERT INTO server_workspaces(id,connection_id,distribution,remote_user,remote_path,connection_state,created_at,updated_at) "
-                "VALUES (?,?,?,?,?,?,?,?)",
-                (body["workspace_id"], connection_id, distribution, remote_user, remote_path,
-                 "verified", timestamp, timestamp),
-            )
-            self._save_idempotent(conn, "POST:/workspaces", key, request_digest, 201, body)
-            return 201, body
-
-    def list_workspaces(self) -> list[dict[str, Any]]:
-        with self.database.read() as conn:
-            rows = conn.execute(
-                "SELECT * FROM server_workspaces ORDER BY created_at,id"
-            ).fetchall()
-        return [{
-            "workspace_id": row["id"], "connection_id": row["connection_id"],
-            "distribution": row["distribution"], "user": row["remote_user"],
-            "path": row["remote_path"], "connection_state": row["connection_state"],
-        } for row in rows]
-
-    def mark_workspaces_unverified(self) -> None:
-        with self.database.transaction() as conn:
-            conn.execute(
-                "UPDATE server_workspaces SET connection_state='unverified', updated_at=? "
-                "WHERE connection_state!='unverified'",
-                (now(),),
-            )
-
-    def recover_interrupted_turns(self) -> int:
-        """Seal pre-restart active Turns as unknown; never redispatch them."""
-        active_states = ("accepted", "dispatching", "running", "capturing")
-        with self.database.transaction() as conn:
-            rows = conn.execute(
-                "SELECT * FROM server_turns WHERE state IN (?,?,?,?) ORDER BY created_at,id",
-                active_states,
-            ).fetchall()
-            timestamp = now()
-            for row in rows:
-                conn.execute(
-                    "UPDATE server_turns SET state='unknown',capture_state='unknown',"
-                    "cleanup_state='unknown',error_code='SERVER_RESTART_INTERRUPTED',updated_at=? "
-                    "WHERE id=?",
-                    (timestamp, row["id"]),
-                )
-                conn.execute(
-                    "UPDATE server_sessions SET status='recovery_required',updated_at=? WHERE id=?",
-                    (timestamp, row["session_id"]),
-                )
-                conn.execute(
-                    "UPDATE server_profiles SET run_state='idle',recovery_pending=1,updated_at=? WHERE id=?",
-                    (timestamp, row["profile_id"]),
-                )
-                self._append_session_event(
-                    conn, row["session_id"], row["id"], "turn.capture",
-                    {"state": "unknown", "error_code": "SERVER_RESTART_INTERRUPTED"},
-                )
-                self._append_session_event(
-                    conn, row["session_id"], row["id"], "turn.state",
-                    {"state": "unknown", "error_code": "SERVER_RESTART_INTERRUPTED"},
-                )
-            return len(rows)
-
-    def register_credential(
-        self, credential_id: str, kind: str, secret_locator: str,
-    ) -> dict[str, Any]:
-        with self.database.transaction() as conn:
-            conn.execute(
-                "INSERT INTO server_credentials(id,kind,secret_locator,created_at) VALUES (?,?,?,?)",
-                (credential_id, kind, secret_locator, now()),
-            )
-        return {"credential_id": credential_id, "kind": kind}
-
-    def get_credential(self, credential_id: str, *, kind: str | None = None) -> dict[str, Any]:
-        with self.database.read() as conn:
-            row = conn.execute(
-                "SELECT * FROM server_credentials WHERE id=?", (credential_id,),
-            ).fetchone()
-        if row is None or (kind is not None and row["kind"] != kind):
-            raise ServerError("CREDENTIAL_NOT_FOUND", "Credential was not found", status=404)
-        return dict(row)
-
-    def has_credentials(self, *, kind: str | None = None) -> bool:
-        with self.database.read() as conn:
-            if kind is None:
-                row = conn.execute("SELECT 1 FROM server_credentials LIMIT 1").fetchone()
-            else:
-                row = conn.execute(
-                    "SELECT 1 FROM server_credentials WHERE kind=? LIMIT 1", (kind,),
-                ).fetchone()
-        return row is not None
-
-    def get_workspace_record(self, workspace_id: str) -> dict[str, Any]:
-        with self.database.read() as conn:
-            row = conn.execute(
-                "SELECT * FROM server_workspaces WHERE id=?", (workspace_id,),
-            ).fetchone()
-        if row is None:
-            raise ServerError("WORKSPACE_NOT_FOUND", "Workspace was not found", status=404)
-        return dict(row)
-
-    def mark_workspace_verified(self, workspace_id: str) -> None:
-        with self.database.transaction() as conn:
-            conn.execute(
-                "UPDATE server_workspaces SET connection_state='verified',updated_at=? WHERE id=?",
-                (now(), workspace_id),
-            )
-
-    def get_profile_record(self, profile_id: str) -> dict[str, Any]:
-        with self.database.read() as conn:
-            row = conn.execute(
-                "SELECT * FROM server_profiles WHERE id=?", (profile_id,),
-            ).fetchone()
-        if row is None:
-            raise ServerError("PROFILE_NOT_FOUND", "Profile was not found", status=404)
-        return dict(row)
-
-    def create_profile(
-        self, *, key: str, request_digest: str, name: str, harness_type: str,
-        config_digest: str, credential_id: str | None,
-    ) -> tuple[int, dict[str, Any]]:
-        with self.database.transaction() as conn:
-            prior = self._idempotent(conn, "POST:/profiles", key, request_digest)
-            if prior:
-                return prior
-            if credential_id is not None and conn.execute(
-                "SELECT 1 FROM server_credentials WHERE id=?", (credential_id,),
-            ).fetchone() is None:
-                raise ServerError("CREDENTIAL_NOT_FOUND", "Credential was not found", status=404)
-            timestamp = now()
-            body = {
-                "profile_id": opaque_id("profile"), "name": name,
-                "harness_type": harness_type, "config_revision": 1,
-                "native_generation": 0, "credential_id": credential_id,
-                "run_state": "idle", "capabilities": {"native_memory": harness_type == "codex"},
-            }
-            conn.execute(
-                "INSERT INTO server_profiles(id,name,harness_type,config_revision,native_generation,config_object_digest,credential_id,created_at,updated_at) "
-                "VALUES (?,?,?,?,?,?,?,?,?)",
-                (body["profile_id"], name, harness_type, 1, 0, config_digest,
-                 credential_id, timestamp, timestamp),
-            )
-            self._save_idempotent(conn, "POST:/profiles", key, request_digest, 201, body)
-            return 201, body
-
-    def list_profiles(self) -> list[dict[str, Any]]:
-        with self.database.read() as conn:
-            rows = conn.execute("SELECT * FROM server_profiles ORDER BY created_at,id").fetchall()
-        return [{
-            "profile_id": row["id"], "name": row["name"],
-            "harness_type": row["harness_type"],
-            "config_revision": row["config_revision"],
-            "native_generation": row["native_generation"],
-            "credential_id": row["credential_id"], "run_state": row["run_state"],
-            "recovery_pending": bool(row["recovery_pending"]),
-            "capabilities": {"native_memory": row["harness_type"] == "codex"},
-        } for row in rows]
+    # -- session records -------------------------------------------------
 
     def create_session(
         self, *, key: str, request_digest: str, workspace_id: str, profile_id: str,
     ) -> tuple[int, dict[str, Any]]:
         with self.database.transaction() as conn:
-            prior = self._idempotent(conn, "POST:/sessions", key, request_digest)
+            prior = self.idempotency.check(conn, "POST:/sessions", key, request_digest)
             if prior:
                 return prior
-            if conn.execute("SELECT 1 FROM server_workspaces WHERE id=?", (workspace_id,)).fetchone() is None:
+            if conn.execute(
+                "SELECT 1 FROM server_workspaces WHERE id=?", (workspace_id,),
+            ).fetchone() is None:
                 raise ServerError("WORKSPACE_NOT_FOUND", "Workspace was not found", status=404)
-            if conn.execute("SELECT 1 FROM server_profiles WHERE id=?", (profile_id,)).fetchone() is None:
+            if conn.execute(
+                "SELECT 1 FROM server_profiles WHERE id=?", (profile_id,),
+            ).fetchone() is None:
                 raise ServerError("PROFILE_NOT_FOUND", "Profile was not found", status=404)
             timestamp = now()
             body = {
@@ -248,41 +46,26 @@ class ProductRepository:
                 "INSERT INTO server_sessions(id,workspace_id,profile_id,status,created_at,updated_at) VALUES (?,?,?,?,?,?)",
                 (body["session_id"], workspace_id, profile_id, "ready", timestamp, timestamp),
             )
-            self._save_idempotent(conn, "POST:/sessions", key, request_digest, 201, body)
+            self.idempotency.insert(conn, "POST:/sessions", key, request_digest, 201, body)
             return 201, body
 
-    @staticmethod
-    def _append_session_event(
-        conn, session_id: str, turn_id: str | None, kind: str,
-        data: dict[str, Any],
-    ) -> dict[str, Any]:
-        seq = int(conn.execute(
-            "SELECT COALESCE(MAX(seq),0)+1 FROM server_session_events WHERE session_id=?",
-            (session_id,),
-        ).fetchone()[0])
-        event_id = opaque_id("event")
-        created_at = now()
-        conn.execute(
-            "INSERT INTO server_session_events(session_id,seq,event_id,turn_id,kind,schema_version,data_json,created_at) "
-            "VALUES (?,?,?,?,?,?,?,?)",
-            (session_id, seq, event_id, turn_id, kind, 1,
-             json.dumps(data, ensure_ascii=False, sort_keys=True), created_at),
-        )
-        return {
-            "session_id": session_id, "seq": seq, "event_id": event_id,
-            "turn_id": turn_id, "kind": kind, "schema_version": 1,
-            "data": data, "created_at": created_at,
-        }
+    # -- turn acceptance (one transaction owns it) ------------------------
 
     def create_turn(
         self, *, session_id: str, key: str, request_digest: str,
         input_object_digest: str, expected_profile_revision: int,
-    ) -> tuple[int, dict[str, Any]]:
+    ) -> tuple[bool, int, dict[str, Any]]:
+        """Accept one business intent.
+
+        Returns `(claimed, status, body)`. `claimed` is true only for the
+        racer whose transaction inserted the idempotency row; that racer —
+        and no replay — owns the right to dispatch.
+        """
         scope = f"POST:/sessions/{session_id}/turns"
         with self.database.transaction() as conn:
-            prior = self._idempotent(conn, scope, key, request_digest)
+            prior = self.idempotency.check(conn, scope, key, request_digest)
             if prior:
-                return prior
+                return False, prior[0], prior[1]
             session = conn.execute(
                 "SELECT * FROM server_sessions WHERE id=?", (session_id,),
             ).fetchone()
@@ -338,8 +121,46 @@ class ProductRepository:
                 "turn_id": turn_id, "session_id": session_id, "state": "accepted",
                 "event_seq": event["seq"],
             }
-            self._save_idempotent(conn, scope, key, request_digest, 202, body)
-            return 202, body
+            self.idempotency.insert(conn, scope, key, request_digest, 202, body)
+            return True, 202, body
+
+    # -- restart recovery evidence ----------------------------------------
+
+    def seal_interrupted_turns(self) -> int:
+        """Seal pre-restart active Turns as unknown; never redispatch them."""
+        active_states = ("accepted", "dispatching", "running", "capturing")
+        with self.database.transaction() as conn:
+            rows = conn.execute(
+                "SELECT * FROM server_turns WHERE state IN (?,?,?,?) ORDER BY created_at,id",
+                active_states,
+            ).fetchall()
+            timestamp = now()
+            for row in rows:
+                conn.execute(
+                    "UPDATE server_turns SET state='unknown',capture_state='unknown',"
+                    "cleanup_state='unknown',error_code='SERVER_RESTART_INTERRUPTED',updated_at=? "
+                    "WHERE id=?",
+                    (timestamp, row["id"]),
+                )
+                conn.execute(
+                    "UPDATE server_sessions SET status='recovery_required',updated_at=? WHERE id=?",
+                    (timestamp, row["session_id"]),
+                )
+                conn.execute(
+                    "UPDATE server_profiles SET run_state='idle',recovery_pending=1,updated_at=? WHERE id=?",
+                    (timestamp, row["profile_id"]),
+                )
+                self._append_session_event(
+                    conn, row["session_id"], row["id"], "turn.capture",
+                    {"state": "unknown", "error_code": "SERVER_RESTART_INTERRUPTED"},
+                )
+                self._append_session_event(
+                    conn, row["session_id"], row["id"], "turn.state",
+                    {"state": "unknown", "error_code": "SERVER_RESTART_INTERRUPTED"},
+                )
+            return len(rows)
+
+    # -- dispatch/cancel/terminal transitions ------------------------------
 
     def get_turn_context(self, turn_id: str) -> dict[str, Any]:
         with self.database.read() as conn:
@@ -434,7 +255,7 @@ class ProductRepository:
                 (state, now(), turn_id),
             )
 
-    def cancel_turn(self, turn_id: str) -> dict[str, Any]:
+    def record_cancel_request(self, turn_id: str) -> dict[str, Any]:
         with self.database.transaction() as conn:
             row = conn.execute("SELECT * FROM server_turns WHERE id=?", (turn_id,)).fetchone()
             if row is None:
@@ -503,6 +324,8 @@ class ProductRepository:
                 {"state": state, "error_code": code[:128]},
             )
 
+    # -- reads --------------------------------------------------------------
+
     def get_session(self, session_id: str, *, event_limit: int = 200) -> dict[str, Any]:
         with self.database.read() as conn:
             row = conn.execute("SELECT * FROM server_sessions WHERE id=?", (session_id,)).fetchone()
@@ -529,12 +352,6 @@ class ProductRepository:
             "events": [self._event_dict(item) for item in events],
         }
 
-    @staticmethod
-    def _event_dict(row) -> dict[str, Any]:
-        item = dict(row)
-        item["data"] = json.loads(item.pop("data_json"))
-        return item
-
     def list_events(self, session_id: str, after: int, *, limit: int = 500) -> list[dict[str, Any]]:
         with self.database.read() as conn:
             if conn.execute("SELECT 1 FROM server_sessions WHERE id=?", (session_id,)).fetchone() is None:
@@ -549,7 +366,35 @@ class ProductRepository:
                 "FROM server_session_events WHERE session_id=? AND seq>? ORDER BY seq LIMIT ?",
                 (session_id, after, limit),
             ).fetchall()
-        result = []
-        for row in rows:
-            result.append(self._event_dict(row))
-        return result
+        return [self._event_dict(row) for row in rows]
+
+    # -- internals ------------------------------------------------------------
+
+    @staticmethod
+    def _append_session_event(
+        conn, session_id: str, turn_id: str | None, kind: str,
+        data: dict[str, Any],
+    ) -> dict[str, Any]:
+        seq = int(conn.execute(
+            "SELECT COALESCE(MAX(seq),0)+1 FROM server_session_events WHERE session_id=?",
+            (session_id,),
+        ).fetchone()[0])
+        event_id = opaque_id("event")
+        created_at = now()
+        conn.execute(
+            "INSERT INTO server_session_events(session_id,seq,event_id,turn_id,kind,schema_version,data_json,created_at) "
+            "VALUES (?,?,?,?,?,?,?,?)",
+            (session_id, seq, event_id, turn_id, kind, 1,
+             json.dumps(data, ensure_ascii=False, sort_keys=True), created_at),
+        )
+        return {
+            "session_id": session_id, "seq": seq, "event_id": event_id,
+            "turn_id": turn_id, "kind": kind, "schema_version": 1,
+            "data": data, "created_at": created_at,
+        }
+
+    @staticmethod
+    def _event_dict(row) -> dict[str, Any]:
+        item = dict(row)
+        item["data"] = json.loads(item.pop("data_json"))
+        return item

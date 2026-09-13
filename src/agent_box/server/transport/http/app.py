@@ -12,7 +12,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
-from agent_box.server.composition import ServerRuntime
+from agent_box.server.bootstrap import ServerRuntime
 from agent_box.server.errors import ServerError
 
 
@@ -162,7 +162,7 @@ def create_app(runtime: ServerRuntime) -> FastAPI:
 
     @app.get("/api/v1/profiles", dependencies=protected)
     def list_profiles():
-        return {"items": runtime.repository.list_profiles()}
+        return {"items": runtime.service.profiles.list()}
 
     @app.post("/api/v1/sessions", dependencies=protected)
     def create_session(body: SessionRequest, response: Response, key: str = Depends(idempotency_key)):
