@@ -1,7 +1,13 @@
 # 阶段状态与前后端全栈交接
 
 状态：APPROVED_HANDOFF_POLICY，2026-09-14。适用现有前端goal与之后单独派出的后端goal。
-后端工单尚未派出；本文件是其必须继承的交接规则，不自动激活旧38研究会话生产施工。
+后端39–42施工文档已批准，执行会话由用户另行启动；不自动激活旧38研究goal。
+后端调度权威：`/home/maoqh/projects/agent-box-server-round1/docs/implementation/`。
+42指定的前端执行工作树为 `/home/maoqh/projects/agent-box-desktop-next-wsl-round1`，
+预期分支feature/agentbox-desktop-product，实际接管必须核对交接HEAD，发布源main不授予写权。
+后端独立READY后每5分钟只读检查本工作树的状态与交接，前端未完成就等待，不抢写。
+本前端goal仍按原范围完成并更新状态；停止全部写入后明确RELEASED，不因后端等待而伪报READY。
+双门后42授权后端为唯一全栈集成人，修复并分别提交两仓，不push/merge。原前端goal不得自动恢复写入。
 
 ## 谁写哪里
 
