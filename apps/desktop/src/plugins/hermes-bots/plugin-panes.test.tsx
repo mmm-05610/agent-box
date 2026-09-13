@@ -161,20 +161,19 @@ afterEach(() => {
 })
 
 describe('the Bots pane dock', () => {
-  it('center-stacks into the sessions zone as a standing invariant', () => {
+  // Round 36 retired the SESSIONS | BOTS tab strip: the plugin no longer
+  // registers a `pane` contribution at all, so no Bots tab can appear in any
+  // zone (the pane tree filters unregistered panes out of every strip). The
+  // plugin's services (roster data, meta storage, pet, hide-sweep) keep
+  // running — only the sidebar residency is gone.
+  it('registers no pane, so the sidebar grows no Bots tab', () => {
     paneStores()
 
     const harness = recordingContext()
 
     plugin.register(harness.ctx)
 
-    const data = harness.find('pane')!.data!
-
-    expect(data.dock).toEqual({ enforce: true, pane: 'sessions', pos: 'center' })
-    // A 'bottom' split was the old workaround for the lone-pane auto-hide trap.
-    expect((data.dock as { pos: string }).pos).not.toBe('bottom')
-    // No heal token: the invariant runs at every adoption, unconditionally.
-    expect(data).not.toHaveProperty('heal')
+    expect(harness.find('pane')).toBeUndefined()
 
     harness.dispose()
   })

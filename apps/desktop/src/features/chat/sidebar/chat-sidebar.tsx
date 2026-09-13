@@ -4,13 +4,10 @@ import { KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/c
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { useStore } from '@nanostores/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useLocation } from 'react-router'
+import { useLocation, useNavigate } from 'react-router'
 
 import { searchSessions } from '@/api/sessions'
-import {
-  SIDEBAR_NAV_AREA,
-  type SidebarNavContribution
-} from '@/app/routes'
+import { SETTINGS_ROUTE } from '@/app/routes'
 import { filterSessionsByProfileScope } from '@/application/session-lists/profile-scope'
 import { resolveLiveProjectFilter } from '@/application/session-lists/project-filter'
 import { searchResultToSession } from '@/application/session-lists/search-view-model'
@@ -24,25 +21,21 @@ import { GlyphSpinner } from '@/components/ui/glyph-spinner'
 import { SearchField } from '@/components/ui/search-field'
 import {
   Sidebar,
-  SidebarContent
+  SidebarContent,
+  SidebarMenuButton
 } from '@/components/ui/sidebar'
 import { Tip } from '@/components/ui/tooltip'
-import { useContributions } from '@/extension/contrib/react/use-contributions'
 import { WslWorkspaceInfoDialog } from '@/features/workspace/wsl-workspace-info-dialog'
 import { WslWorkspaceWizard } from '@/features/workspace/wsl-workspace-wizard'
 import { useI18n } from '@/i18n'
-import { comboTokens } from '@/lib/keybinds/combo'
 import { sessionMatchesSearch } from '@/lib/session-search'
 import { cn } from '@/lib/utils'
 import { $activeConnectionId } from '@/store/connections'
-import { $cronJobs } from '@/store/cron'
-import { $bindings } from '@/store/keybinds'
 import {
   $dismissedAutoProjectIds,
   $panesFlipped,
   $pinnedSessionIds,
   $sidebarCardRows,
-  $sidebarCronOpen,
   $sidebarFiltersActive,
   $sidebarGrouping,
   $sidebarOrdering,
@@ -64,7 +57,6 @@ import {
   pinSession,
   SESSION_SEARCH_FOCUS_EVENT,
   setPinnedSessionOrder,
-  setSidebarCronOpen,
   setSidebarPinsOpen,
   setSidebarProjectOrderIds,
   setSidebarRecentsOpen,
@@ -122,14 +114,11 @@ import { $archivedSessions, loadArchivedSessions } from '@/store/sidebar-archive
 import { $sidebarSessionRankIds } from '@/store/sidebar-sort'
 import { openWslWorkspaceWizard } from '@/store/wsl-workspace'
 import { type SessionInfo, type SessionSearchResult } from '@/types/hermes'
-import type { SidebarNavItem } from '@/types/sidebar'
 
 import { SidebarSectionAddButton } from './chrome'
-import { SidebarCronJobsSection } from './cron-jobs-section'
 import { SidebarFilterMenu } from './filter-menu'
 import { useGatewaySessionGroups } from './gateway-group-model'
 import { SidebarLoadMoreRow } from './load-more-row'
-import { ProfileRail } from './profile-switcher'
 import { ProjectDialog } from './project-dialog'
 import {
   excludeProjectSessions,
@@ -154,7 +143,6 @@ import { WslWorkspaceSection } from './projects/wsl-workspace-section'
 import {
   SidebarBlankState,
   SidebarLoadErrorState,
-  SidebarPinnedEmptyState,
   SidebarSessionSkeletons
 } from './section-states'
 import { SidebarSessionsSection, VIRTUALIZE_THRESHOLD } from './sessions-section'
@@ -180,39 +168,12 @@ export function ChatSidebar({
   onArchiveSession,
   onBranchSession,
   onNewSessionInWorkspace,
-  onNewSessionSplit,
-  onManageCronJob,
-  onTriggerCronJob
+  onNewSessionSplit
 }: ChatSidebarProps) {
   const { t } = useI18n()
   const s = t.sidebar
   const { pathname } = useLocation()
-  // Contributed nav rows (plugins pairing a page with a sidebar entry) render
-  // below the built-ins with the same chrome; active = at their route.
-  const navContributions = useContributions(SIDEBAR_NAV_AREA)
-
-  const contributedNav = useMemo<SidebarNavItem[]>(
-    () =>
-      navContributions.flatMap(c => {
-        const data = c.data as Partial<SidebarNavContribution> | undefined
-
-        if (!data?.path?.startsWith('/') || !data.label) {
-          return []
-        }
-
-        const codicon = data.codicon || 'plug'
-
-        return [
-          {
-            id: c.id,
-            label: data.label,
-            icon: (props: { className?: string }) => <Codicon name={codicon} {...props} />,
-            route: data.path
-          }
-        ]
-      }),
-    [navContributions]
-  )
+  const navigate = useNavigate()
 
   const panesFlipped = useStore($panesFlipped)
   const grouping = useStore($sidebarGrouping)
@@ -238,7 +199,6 @@ export function ChatSidebar({
   const unconfirmedPinWrites = useStore($unconfirmedPinWrites)
   const pinsOpen = useStore($sidebarPinsOpen)
   const agentsOpen = useStore($sidebarRecentsOpen)
-  const cronOpen = useStore($sidebarCronOpen)
   // The sidebar highlight tracks the FOCUSED session — the interacted tile's
   // tab, else the main selection — so it stays 1:1 with whatever tab is active.
   const selectedSessionId = useStore($focusedStoredSessionId)
@@ -246,7 +206,6 @@ export function ChatSidebar({
   const currentView = focusedSessionIsTile ? 'chat' : routeView
   const sessions = useStore($sessions)
   const cronSessions = useStore($cronSessions)
-  const cronJobs = useStore($cronJobs)
   const sessionsLoading = useStore($sessionsLoading)
   const sessionProfilesTruncated = useStore($sessionProfilesTruncated)
   const unreadCount = useStore($unreadFinishedSessionIds).length
@@ -299,12 +258,9 @@ export function ChatSidebar({
   const currentCwd = useStore($currentCwd)
   const gatewayState = useStore($gatewayState)
   const dismissedAutoProjects = useStore($dismissedAutoProjectIds)
-  const newSessionCombo = useStore($bindings)['session.new']?.[0]
-  const newSessionKbd = newSessionCombo ? comboTokens(newSessionCombo) : []
   const [searchQuery, setSearchQuery] = useState('')
   const [serverMatches, setServerMatches] = useState<SessionSearchResult[]>([])
   const [searchPending, setSearchPending] = useState(false)
-  const [newSessionKbdFlash, setNewSessionKbdFlash] = useState(false)
   const [recentsLoadMorePending, setRecentsLoadMorePending] = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const trimmedQuery = searchQuery.trim()
@@ -316,25 +272,6 @@ export function ChatSidebar({
     window.addEventListener(SESSION_SEARCH_FOCUS_EVENT, onFocus)
 
     return () => window.removeEventListener(SESSION_SEARCH_FOCUS_EVENT, onFocus)
-  }, [])
-
-  // Flash the ⌘N hint full-opacity (no transition) for the press, so hitting
-  // the shortcut visibly pings its affordance in the sidebar.
-  useEffect(() => {
-    let timeout: ReturnType<typeof setTimeout> | undefined
-
-    const onShortcut = () => {
-      setNewSessionKbdFlash(true)
-      clearTimeout(timeout)
-      timeout = setTimeout(() => setNewSessionKbdFlash(false), 140)
-    }
-
-    window.addEventListener('hermes:new-session-shortcut', onShortcut)
-
-    return () => {
-      window.removeEventListener('hermes:new-session-shortcut', onShortcut)
-      clearTimeout(timeout)
-    }
   }, [])
 
   const activeSidebarSessionId = currentView === 'chat' ? selectedSessionId : null
@@ -1214,16 +1151,7 @@ export function ChatSidebar({
       data-tour="sessions-sidebar"
     >
       <SidebarContent className="gap-0 overflow-hidden bg-transparent px-2.5">
-        <SidebarNavMenu
-          contributedNav={contributedNav}
-          currentView={currentView}
-          newSessionKbd={newSessionKbd}
-          newSessionKbdFlash={newSessionKbdFlash}
-          onNavigate={onNavigate}
-          onNewSessionSplit={onNewSessionSplit}
-          pathname={pathname}
-          s={s}
-        />
+        <SidebarNavMenu currentView={currentView} onNavigate={onNavigate} pathname={pathname} s={s} />
 
         {showSessionSections && (
           <div className="shrink-0 px-2 pb-1 pt-1">
@@ -1246,6 +1174,10 @@ export function ChatSidebar({
             {trimmedQuery && (
               <SidebarSessionsSection
                 activeSessionId={activeSidebarSessionId}
+                // Search results always render as cards: the card header line
+                // IS the workspace attribution, and a search hit must say
+                // which workspace it lives in (round 36).
+                card
                 contentClassName={cn('flex min-h-0 flex-1 flex-col gap-px pb-1.75', SCROLL_Y)}
                 emptyState={
                   searchPending ? (
@@ -1272,12 +1204,14 @@ export function ChatSidebar({
               />
             )}
 
-            {!trimmedQuery && (
+            {/* Pinned: real session shortcuts into their own workspaces.
+                Hidden entirely while empty — no placeholder block (round 36). */}
+            {!trimmedQuery && pinnedSessions.length > 0 && (
               <SidebarSessionsSection
                 activeSessionId={activeSidebarSessionId}
                 contentClassName="flex flex-col gap-px rounded-lg pb-2 pt-1"
                 dndSensors={dndSensors}
-                emptyState={<SidebarPinnedEmptyState />}
+                emptyState={null}
                 label={s.pinned}
                 onArchiveSession={onArchiveSession}
                 onBranchSession={onBranchSession}
@@ -1506,38 +1440,40 @@ export function ChatSidebar({
                 )}
                 sessions={displayAgentSessions}
                 sortable={!showAllProfiles && agentSessions.length > 1}
-              />
-            )}
-
-            {!trimmedQuery && !worktreeGroupingActive && cronJobs.length > 0 && (
-              <SidebarCronJobsSection
-                jobs={cronJobs}
-                label={s.cronJobs}
-                onManageJob={onManageCronJob}
-                onOpenRun={onResumeSession}
-                onToggle={() => setSidebarCronOpen(!cronOpen)}
-                onTriggerJob={onTriggerCronJob}
-                open={cronOpen}
+                // WSL workspace rows share the ONE workspace list: same scroll
+                // area, same row chrome, peer to the local folders (round 36).
+                // Hidden while a project is entered (scoped view) or searching.
+                workspaceRows={!trimmedQuery && !inProject ? <WslWorkspaceSection /> : undefined}
               />
             )}
           </div>
         )}
 
-        {/* Remote WSL workspaces, peer to the local projects — OUTSIDE the
-            session-sections conditional so a fresh flat-mode sidebar (and the
-            empty state) still shows saved workspaces. */}
-        {!inProject && <WslWorkspaceSection />}
-
         {!showSessionSections && <SidebarBlankState onNewProject={() => void openFolderAsProject()} onRemoteConnection={openWslWorkspaceWizard} />}
 
+        {/* Secondary entry point: Settings. The retired sidebar residents
+            (Scheduled jobs, HUD/Pet toggles) stay reachable from the surfaces
+            that still own them — Scheduled jobs from here, HUD/Pet from the
+            command palette. */}
         <div className="shrink-0 px-0.5 pb-1 pt-0.5">
-          <ProfileRail />
+          <SidebarMenuButton
+            aria-label={s.settingsEntry}
+            className="flex h-7 w-full justify-start gap-2 rounded-md border border-transparent px-2 text-left text-[0.8125rem] font-medium text-(--ui-text-secondary) [-webkit-app-region:no-drag] hover:bg-(--ui-control-hover-background) hover:text-foreground"
+            data-tip-region=""
+            data-tour="sidebar-nav-settings"
+            onClick={() => navigate(SETTINGS_ROUTE)}
+            tooltip={s.settingsEntry}
+            type="button"
+          >
+            <Codicon className="size-4 shrink-0 text-[color-mix(in_srgb,currentColor_72%,transparent)]" name="settings-gear" />
+            <span className="min-w-0 truncate">{s.settingsEntry}</span>
+          </SidebarMenuButton>
         </div>
       </SidebarContent>
       <ProjectDialog />
-      {/* WSL Workspace (work order 35): the four-step remote-connection wizard
-          and the per-workspace connection-info dialog mount once here; the
-          remote rows themselves render below the projects section. */}
+      {/* WSL Workspace (work orders 35/36): the simplified remote-connection
+          wizard and the per-workspace connection-info dialog mount once here;
+          the workspace rows render inside the unified workspace list. */}
       <WslWorkspaceWizard />
       <WslWorkspaceInfoDialog />
       {/* One mount for the whole app. The header of WorktreeDialog tells why. */}

@@ -329,6 +329,7 @@ export const zhHant = defineLocale({
       keysSettings: '設定',
       mcp: 'MCP',
       archivedChats: '已封存聊天',
+      scheduledJobs: '排程工作',
       about: '關於',
       billing: '帳單',
       notifications: '通知'
@@ -1874,6 +1875,8 @@ export const zhHant = defineLocale({
       artifacts: '成品',
       cron: '排程工作'
     },
+    profilesEntry: '角色',
+    settingsEntry: '設定',
     searchAria: '搜尋工作階段',
     searchPlaceholder: '搜尋工作階段…',
     clearSearch: '清除搜尋',
@@ -1897,7 +1900,7 @@ export const zhHant = defineLocale({
     noFilterMatches: '沒有工作階段符合這些篩選條件',
     projects: {
       showAllSessions: '顯示所有工作階段',
-      sectionLabel: '專案',
+      sectionLabel: '工作區',
       home: '主頁',
       autoDiscovered: '自動探索',
       newButton: '新增專案',
@@ -3196,7 +3199,6 @@ export const zhHant = defineLocale({
     showHidden: '顯示隱藏目錄',
     emptyDirectory: '此目錄下沒有子目錄',
     chooseDirectory: '選擇此目錄',
-    remoteSectionLabel: '遠端',
     connectionInfo: '連線資訊',
     reconnect: '重新連線',
     reconnecting: '正在驗證…',
@@ -3217,6 +3219,7 @@ export const zhHant = defineLocale({
     removeDesc: '只移除側欄記錄；目錄中的檔案、會話與歷史都會保留，重新開啟該目錄可再次接入。',
     renameTitle: name => `重新命名「${name}」`,
     renameFailed: '工作區重新命名失敗。',
+    toggleExpand: (name, open) => `${open ? '收起' : '展開'}「${name}」`,
     removeFailed: '工作區移除失敗。',
     errWslUnavailable: '此機器上 WSL 不可用。',
     errWslUnknownDistribution: '該發行版不存在，請重新整理後重新選擇。',

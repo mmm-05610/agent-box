@@ -1,12 +1,6 @@
 // Extracted verbatim from index.tsx (see docs/desktop-megafile-decomposition.md).
 
-import {
-  type AppView,
-  ARTIFACTS_ROUTE,
-  CRON_ROUTE,
-  SKILLS_ROUTE
-} from '@/app/routes'
-import { Codicon } from '@/components/ui/codicon'
+import { type AppView } from '@/app/routes'
 import type {
   Sidebar} from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils'
@@ -16,37 +10,6 @@ import type { SidebarNavItem } from '@/types/sidebar'
 import { type NewSessionSplitHandler } from '../new-session-drag'
 
 export const PROJECT_TREE_WARM_MS = 2_000
-
-export const SIDEBAR_NAV: SidebarNavItem[] = [
-  {
-    id: 'new-session',
-    label: '',
-    icon: props => <Codicon name="robot" {...props} />,
-    action: 'new-session',
-    keybindActionId: 'session.new'
-  },
-  {
-    id: 'skills',
-    label: '',
-    icon: props => <Codicon name="symbol-misc" {...props} />,
-    route: SKILLS_ROUTE,
-    keybindActionId: 'nav.skills'
-  },
-  {
-    id: 'artifacts',
-    label: '',
-    icon: props => <Codicon name="files" {...props} />,
-    route: ARTIFACTS_ROUTE,
-    keybindActionId: 'nav.artifacts'
-  },
-  {
-    id: 'cron',
-    label: '',
-    icon: props => <Codicon name="watch" {...props} />,
-    route: CRON_ROUTE,
-    keybindActionId: 'nav.cron'
-  }
-]
 
 export const COMPACT_FLAT = 'compact:max-h-none compact:overflow-visible'
 
@@ -78,6 +41,4 @@ export interface ChatSidebarProps extends React.ComponentProps<typeof Sidebar> {
    *  buttons), which land a fresh session exactly where it's dropped. The
    *  context-menu "Open in split" path passes just a `dir`. */
   onNewSessionSplit: NewSessionSplitHandler
-  onManageCronJob: (jobId: string) => void
-  onTriggerCronJob: (jobId: string) => Promise<void>
 }

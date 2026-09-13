@@ -181,6 +181,10 @@ interface SidebarSessionsSectionProps {
   // grouping is active — the flat recents list opts in; dense tree surfaces
   // (pinned, projects, messaging) keep the one-line row.
   card?: boolean
+  // Extra workspace rows rendered INSIDE the same section body, after the
+  // session/project content — the unified list's remote workspace rows
+  // (round 36: local folders and WSL folders in one list, one row language).
+  workspaceRows?: React.ReactNode
 }
 
 export function SidebarSessionsSection({
@@ -225,7 +229,8 @@ export function SidebarSessionsSection({
   dndSensors,
   showProfileTags = false,
   grouping = 'none',
-  card = false
+  card = false,
+  workspaceRows
 }: SidebarSessionsSectionProps) {
   const { t } = useI18n()
   const showAllSessions = useStore($sidebarShowAllSessions)
@@ -619,6 +624,7 @@ export function SidebarSessionsSection({
       {sectionOpen && (
         <SidebarGroupContent className={resolvedContentClassName}>
           {inner}
+          {workspaceRows}
           {footer}
         </SidebarGroupContent>
       )}

@@ -393,6 +393,7 @@ export interface Translations {
       keysSettings: string
       mcp: string
       archivedChats: string
+      scheduledJobs: string
       about: string
       billing: string
       notifications: string
@@ -2012,6 +2013,8 @@ export interface Translations {
       actions: string
     }
     nav: Record<string, string>
+    profilesEntry: string
+    settingsEntry: string
     searchAria: string
     searchPlaceholder: string
     clearSearch: string
@@ -3306,7 +3309,6 @@ export interface Translations {
     emptyDirectory: string
     chooseDirectory: string
     // Sidebar projection
-    remoteSectionLabel: string
     connectionInfo: string
     reconnect: string
     reconnecting: string
@@ -3328,6 +3330,7 @@ export interface Translations {
     renameTitle: (name: string) => string
     renameFailed: string
     removeFailed: string
+    toggleExpand: (name: string, open: boolean) => string
     // Typed failure copy, keyed by the host's WslWorkspaceErrorCode.
     errWslUnavailable: string
     errWslUnknownDistribution: string

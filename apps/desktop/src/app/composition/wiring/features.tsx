@@ -59,7 +59,6 @@ import { TipHost } from '@/components/tips'
 import { emitGatewayEvent } from '@/extension/contrib/events'
 import { closeWorkspaceTab } from '@/features/chat/close-tab'
 import { $restartPreviewServer } from '@/features/chat/right-rail/restart-preview-server'
-import { triggerAndRefreshCronJobs } from '@/features/cron/cron-actions'
 import { PetGenerateOverlay } from '@/features/pet-generate/pet-generate-overlay'
 import { ModelPickerOverlay } from '@/features/profiles/model-picker-overlay'
 import { ModelVisibilityOverlay } from '@/features/profiles/model-visibility-overlay'
@@ -105,7 +104,7 @@ import { latestSessionTodos } from '@/lib/todos'
 import { $billingSettingsRequest } from '@/store/billing-block'
 import { $desktopBoot } from '@/store/boot'
 import { $activeConnectionId } from '@/store/connections'
-import { $cronReviewRequest, setCronFocusJobId } from '@/store/cron'
+import { $cronReviewRequest } from '@/store/cron'
 import { $pinnedSessionIds, pinSession, restoreWorktree, unpinSession } from '@/store/layout'
 import { $newSessionTabAction, registerPaneCloser } from '@/store/pane-shell/tree'
 import {
@@ -115,7 +114,7 @@ import {
   setWorkspaceScope
 } from '@/store/pane-shell/workspace-scope'
 import { $previewTarget } from '@/store/preview'
-import { $activeGatewayProfile, $freshSessionRequest, $profileScope, ALL_PROFILES, normalizeProfileKey } from '@/store/profile'
+import { $activeGatewayProfile, $freshSessionRequest, $profileScope, normalizeProfileKey } from '@/store/profile'
 import { $newProjectSessionRequest, $startWorkSessionRequest, followActiveSessionCwd } from '@/store/projects'
 import {
   $activeSessionId,
@@ -953,10 +952,6 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     onDismissError: dismissError,
     onEdit: editMessage,
     onLoadMoreSessions: loadMoreSessions,
-    onManageCronJob: jobId => {
-      setCronFocusJobId(jobId)
-      navigate(CRON_ROUTE)
-    },
     onNavigate: selectSidebarItem,
     onNewSessionInWorkspace: path => startSessionInWorkspace(path, { openTab: true }),
     onNewSessionSplit: (dir, opts) =>
@@ -1003,10 +998,6 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     onSubmit: submitText,
     onThreadMessagesChange: handleThreadMessagesChange,
     onToggleSelectedPin: toggleSelectedPin,
-    onTriggerCronJob: jobId =>
-      triggerAndRefreshCronJobs(jobId, profileScope === ALL_PROFILES ? 'all' : profileScope)
-        .then(() => undefined)
-        .catch(() => undefined),
     getGateway: () => gatewayRef.current,
     openAgents,
     openCommandCenterSection,

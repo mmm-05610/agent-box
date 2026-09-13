@@ -28,32 +28,19 @@ import { cn } from '@/lib/utils'
 import { notify, notifyError } from '@/store/notifications'
 import { $wslWorkspaceInfoId, $wslWorkspaces, $wslWorkspaceValidation, openWslWorkspaceInfo } from '@/store/wsl-workspace'
 import type { WslWorkspaceValidationState } from '@/store/wsl-workspace'
+import type { WslWorkspaceRecord } from '@/types/workspace'
 
-function statusPill(t: ReturnType<typeof useI18n>['t'], state: WslWorkspaceValidationState | undefined) {
-  const w = t.wslWorkspace
-
-  switch (state?.status) {
-    case 'validating':
-      return { label: w.statusValidating, tone: 'primary' as const }
-
-    case 'validated':
-      return { label: w.statusValidated, tone: 'success' as const }
-
-    case 'failed':
-      return { label: w.statusFailed, tone: 'destructive' as const }
-
-    default:
-      return { label: w.statusUnverified, tone: 'muted' as const }
-  }
-}
+import { useWorkspaceNodeOpen } from './model'
 
 /**
- * The sidebar's remote-workspace row (work order 35, extended by 36): one row
- * per WSL Workspace saved in the Electron host, peer to the local project rows.
- * A row shows the name first, then the distribution/path line and the WSL badge
- * — never a fake online state. Its entries: connection info (this workspace's
- * private connection), reconnect (re-verify), and the round-36 row menu
- * (rename / remove — record-only surgery: files, sessions and history stay).
+ * The sidebar's remote-workspace rows (work order 35, extended by 36): one row
+ * per WSL Workspace saved in the Electron host, peer to the local project rows
+ * INSIDE the one workspace list — same row language (name first, expand,
+ * kebab menu), the small WSL badge as the only marking, never a fake online
+ * state. Row entries: expand (honest "no sessions yet" prompt), connection
+ * info (this workspace's private connection), reconnect (re-verify), and the
+ * row menu (rename / remove — record-only surgery: files, sessions and
+ * history stay).
  */
 export function WslWorkspaceSection({ className }: { className?: string }) {
   const { t } = useI18n()
@@ -90,108 +77,21 @@ export function WslWorkspaceSection({ className }: { className?: string }) {
   }
 
   return (
+    // No section header of its own (round 36): these rows render INSIDE the
+    // unified workspace list, peer to the local folders — the WSL badge on
+    // each row is the only marking they need.
     <div className={cn('shrink-0 px-1.5 pb-1', className)} data-wsl-workspace-section>
-      <div className="flex items-center justify-between px-1.5 pb-0.5 pt-1">
-        <span className="text-[0.625rem] font-medium uppercase tracking-wide text-(--ui-text-quaternary)">
-          {w.remoteSectionLabel}
-        </span>
-      </div>
-
       <div className="flex flex-col gap-px">
-        {workspaces.map(workspace => {
-          const state = validation[workspace.id]
-          const status = statusPill(t, state)
-          const validating = state?.status === 'validating'
-
-          return (
-            <div
-              className={cn(
-                'group/remote-row grid grid-cols-[minmax(0,1fr)_auto] items-stretch rounded-md',
-                infoId === workspace.id && 'bg-(--ui-control-hover-background)'
-              )}
-              data-wsl-workspace-row={workspace.id}
-              key={workspace.id}
-            >
-              <button
-                className="flex min-w-0 items-center gap-2 rounded-md px-1.5 py-1.5 text-left transition-colors hover:bg-(--ui-control-hover-background)"
-                onClick={() => openWslWorkspaceInfo(workspace.id)}
-                type="button"
-              >
-                <span className="grid size-4 shrink-0 place-items-center text-(--ui-text-tertiary)">
-                  <Codicon name="vm-connect" size="0.875rem" />
-                </span>
-                {/* Two stacked lines: the name must stay readable even when the
-                    pills squeeze the row — a name collapsed to zero width reads
-                    as a distribution, not a project. */}
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-xs leading-4">{workspace.name}</span>
-                  <span className="block truncate text-[0.625rem] leading-3.5 text-(--ui-text-quaternary)">
-                    {workspace.distribution} · {workspace.rootPath}
-                  </span>
-                </span>
-                <Pill tone={status.tone}>{status.label}</Pill>
-                <Pill tone="muted">{w.wslBadge}</Pill>
-                {validating && <Codicon className="shrink-0 text-(--ui-text-tertiary)" name="loading" size="0.75rem" spinning />}
-              </button>
-
-              <div className="flex shrink-0 items-center self-stretch pr-1" data-row-actions>
-                <Tip label={w.reconnect}>
-                  <Button
-                    aria-label={w.reconnect}
-                    className="text-(--ui-text-quaternary) opacity-0 transition-opacity hover:text-foreground group-hover/remote-row:opacity-100 focus-visible:opacity-100"
-                    disabled={validating}
-                    onClick={() => void reconnectWslWorkspaceProjection(workspace.id)}
-                    size="icon-xs"
-                    variant="ghost"
-                  >
-                    <Codicon name="refresh" size="0.75rem" />
-                  </Button>
-                </Tip>
-                <Tip label={w.connectionInfo}>
-                  <Button
-                    aria-label={w.connectionInfo}
-                    className="text-(--ui-text-quaternary) opacity-0 transition-opacity hover:text-foreground group-hover/remote-row:opacity-100 focus-visible:opacity-100"
-                    onClick={() => openWslWorkspaceInfo(workspace.id)}
-                    size="icon-xs"
-                    variant="ghost"
-                  >
-                    <Codicon name="info" size="0.75rem" />
-                  </Button>
-                </Tip>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      aria-label={w.connectionInfo}
-                      className="text-(--ui-text-quaternary) opacity-0 transition-opacity hover:bg-(--ui-control-hover-background) hover:text-foreground group-hover/remote-row:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100"
-                      size="icon-xs"
-                      variant="ghost"
-                    >
-                      <Codicon name="kebab-vertical" size="0.75rem" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-48" sideOffset={6}>
-                    <DropdownMenuItem onSelect={() => setRenameTarget({ id: workspace.id, name: workspace.name })}>
-                      <Codicon name="edit" size="0.875rem" />
-                      <span>{w.menuRename}</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      className="text-destructive focus:text-destructive"
-                      onSelect={() => setRemoveTarget({ id: workspace.id, name: workspace.name })}
-                    >
-                      <Codicon name="trash" size="0.875rem" />
-                      <span>{w.menuRemove}</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onSelect={() => openWslWorkspaceInfo(workspace.id)}>
-                      <Codicon name="info" size="0.875rem" />
-                      <span>{w.connectionInfo}</span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </div>
-          )
-        })}
+        {workspaces.map(workspace => (
+          <WslWorkspaceRow
+            infoOpen={infoId === workspace.id}
+            key={workspace.id}
+            onRemove={setRemoveTarget}
+            onRename={setRenameTarget}
+            state={validation[workspace.id]}
+            workspace={workspace}
+          />
+        ))}
       </div>
 
       {renameTarget && (
@@ -221,6 +121,154 @@ export function WslWorkspaceSection({ className }: { className?: string }) {
         open={removeTarget !== null}
         title={w.removeTitle(removeTarget?.name ?? '')}
       />
+    </div>
+  )
+}
+
+// One WSL workspace row, peer to a local project row: name first, WSL badge,
+// expand toggle revealing the honest no-sessions prompt, and the same kebab
+// menu shape (rename / remove / connection info) plus reconnect.
+function WslWorkspaceRow({
+  infoOpen,
+  onRemove,
+  onRename,
+  state,
+  workspace
+}: {
+  infoOpen: boolean
+  onRemove: (target: { id: string; name: string }) => void
+  onRename: (target: { id: string; name: string }) => void
+  state: WslWorkspaceValidationState | undefined
+  workspace: WslWorkspaceRecord
+}) {
+  const { t } = useI18n()
+  const w = t.wslWorkspace
+  const validating = state?.status === 'validating'
+  // WSL rows start collapsed — unlike local projects (whose previews read
+  // better expanded), the no-sessions prompt is a detail the user opens.
+  const [open, toggleOpen] = useWorkspaceNodeOpen(workspace.id, false)
+
+  return (
+    <div
+      className={cn(
+        'group/remote-row grid grid-cols-[minmax(0,1fr)_auto] items-stretch rounded-md',
+        infoOpen && 'bg-(--ui-control-hover-background)'
+      )}
+      data-wsl-workspace-row={workspace.id}
+    >
+      <button
+        className="flex min-w-0 items-center gap-2 rounded-md px-1.5 py-1.5 text-left transition-colors hover:bg-(--ui-control-hover-background)"
+        onClick={() => openWslWorkspaceInfo(workspace.id)}
+        type="button"
+      >
+        <span className="grid size-4 shrink-0 place-items-center text-(--ui-text-tertiary)">
+          <Codicon name="vm-connect" size="0.875rem" />
+        </span>
+        {/* Two stacked lines, name first: the name must stay readable even
+            when the badges squeeze the row — a name collapsed to zero width
+            reads as a distribution, not a project. */}
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-xs leading-4">{workspace.name}</span>
+          <span className="block truncate text-[0.625rem] leading-3.5 text-(--ui-text-quaternary)">
+            {workspace.distribution} · {workspace.rootPath}
+          </span>
+        </span>
+        {/* No standing Verified/Not-verified badges (round 36): an unverified
+            reopen is not a fault. Validation shows a spinner only while it
+            runs, and a real failure shows one quiet actionable marker — never
+            a faked online state. */}
+        <Pill tone="muted">{w.wslBadge}</Pill>
+        {validating && (
+          <Tip label={w.statusValidating}>
+            <span className="grid shrink-0 place-items-center text-(--ui-text-tertiary)">
+              <Codicon name="loading" size="0.75rem" spinning />
+            </span>
+          </Tip>
+        )}
+        {state?.status === 'failed' && (
+          <Tip label={state.message}>
+            <span className="grid shrink-0 place-items-center text-(--ui-red)">
+              <Codicon name="error" size="0.75rem" />
+            </span>
+          </Tip>
+        )}
+      </button>
+
+      <div className="flex shrink-0 items-center self-stretch pr-1" data-row-actions>
+        <Tip label={w.toggleExpand(workspace.name, open)}>
+          <Button
+            aria-label={w.toggleExpand(workspace.name, open)}
+            className="text-(--ui-text-quaternary) opacity-0 transition-opacity hover:bg-(--ui-control-hover-background) hover:text-foreground group-hover/remote-row:opacity-100 focus-visible:opacity-100"
+            data-wsl-workspace-expand={workspace.id}
+            onClick={toggleOpen}
+            size="icon-xs"
+            variant="ghost"
+          >
+            <Codicon name={open ? 'chevron-down' : 'chevron-right'} size="0.75rem" />
+          </Button>
+        </Tip>
+        <Tip label={w.reconnect}>
+          <Button
+            aria-label={w.reconnect}
+            className="text-(--ui-text-quaternary) opacity-0 transition-opacity hover:text-foreground group-hover/remote-row:opacity-100 focus-visible:opacity-100"
+            disabled={validating}
+            onClick={() => void reconnectWslWorkspaceProjection(workspace.id)}
+            size="icon-xs"
+            variant="ghost"
+          >
+            <Codicon name="refresh" size="0.75rem" />
+          </Button>
+        </Tip>
+        <Tip label={w.connectionInfo}>
+          <Button
+            aria-label={w.connectionInfo}
+            className="text-(--ui-text-quaternary) opacity-0 transition-opacity hover:text-foreground group-hover/remote-row:opacity-100 focus-visible:opacity-100"
+            onClick={() => openWslWorkspaceInfo(workspace.id)}
+            size="icon-xs"
+            variant="ghost"
+          >
+            <Codicon name="info" size="0.75rem" />
+          </Button>
+        </Tip>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              aria-label={w.connectionInfo}
+              className="text-(--ui-text-quaternary) opacity-0 transition-opacity hover:bg-(--ui-control-hover-background) hover:text-foreground group-hover/remote-row:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100"
+              size="icon-xs"
+              variant="ghost"
+            >
+              <Codicon name="kebab-vertical" size="0.75rem" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48" sideOffset={6}>
+            <DropdownMenuItem onSelect={() => onRename({ id: workspace.id, name: workspace.name })}>
+              <Codicon name="edit" size="0.875rem" />
+              <span>{w.menuRename}</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onSelect={() => onRemove({ id: workspace.id, name: workspace.name })}
+            >
+              <Codicon name="trash" size="0.875rem" />
+              <span>{w.menuRemove}</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => openWslWorkspaceInfo(workspace.id)}>
+              <Codicon name="info" size="0.875rem" />
+              <span>{w.connectionInfo}</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      {open && (
+        <div className="col-span-2 px-8 pb-1.5" data-wsl-workspace-empty={workspace.id}>
+          <div className="rounded-md px-2 py-1.5 text-[0.6875rem] leading-4 text-(--ui-text-tertiary)">
+            {w.sessionUnavailable}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

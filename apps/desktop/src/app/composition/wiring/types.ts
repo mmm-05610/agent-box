@@ -15,12 +15,10 @@ export type SidebarActions = Pick<
   | 'onBranchSession'
   | 'onDeleteSession'
   | 'onLoadMoreSessions'
-  | 'onManageCronJob'
   | 'onNavigate'
   | 'onNewSessionInWorkspace'
   | 'onNewSessionSplit'
   | 'onResumeSession'
-  | 'onTriggerCronJob'
 >
 
 /** The ChatView handlers the controller owns — forwarded verbatim. */

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 
 import { getHermesConfigDefaults, getHermesConfigRecord, saveHermesConfig } from '@/api/config'
-import { SKILLS_ROUTE } from '@/app/routes'
+import { CRON_ROUTE, SKILLS_ROUTE } from '@/app/routes'
 import { OverlayIconButton } from '@/app/shell/layers/overlays/overlay-chrome'
 import { OverlayMain, OverlayNav, type OverlayNavGroup, OverlaySplitLayout } from '@/app/shell/layers/overlays/overlay-split-layout'
 import { OverlayView } from '@/app/shell/layers/overlays/overlay-view'
@@ -18,6 +18,7 @@ import {
   Archive,
   BarChart3,
   Bell,
+  Clock,
   Cpu,
   Download,
   Globe,
@@ -301,9 +302,18 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
         id: 'about',
         label: t.settings.nav.about,
         onSelect: () => setActiveView('about')
+      },
+      {
+        // Automation entry (round 36): Scheduled jobs keeps its own surface and
+        // its honest name; only the primary-sidebar residency is retired.
+        active: false,
+        icon: Clock,
+        id: 'scheduled-jobs',
+        label: t.settings.nav.scheduledJobs,
+        onSelect: () => navigate(CRON_ROUTE)
       }
     ],
-    [activeView, keysView, providerView, t, setActiveView, openProviderView, openKeysView]
+    [activeView, keysView, navigate, providerView, t, setActiveView, openProviderView, openKeysView]
   )
 
   // Type-to-search: printable keystrokes on the Settings surface (outside any
