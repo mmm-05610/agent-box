@@ -3,9 +3,14 @@
 ## Current owner override — Workspace sidebar (36)
 
 Work order [36](renderer-layer-batches/36-workspace-sidebar-product.md) is now the only
-executable increment. 35 is accepted on `feature/desktop-wsl-round1` at `c8d59f3`, NOT
+executable Desktop increment. Backend [37](backend-server/work-orders/37-http-codex.md)
+is separately authorized in an independent backend worktree; its scope and resource
+exclusions are in [backend master plan](backend-server/master-plan.md). It does not
+enable Desktop Codex integration, data migration, or older paused orders.
+35 is accepted on `feature/desktop-wsl-round1` at `c8d59f3`, NOT
 merged into main. Continue that branch/worktree after importing this documentation-only
-dispatch commit. 36 runs exclusively; 34, previews, Codex and Work Core remain paused.
+dispatch commit. 36 runs exclusively within Desktop; 34, previews and Desktop
+Codex/Work Core integration remain paused. Backend 37 does not write Desktop code.
 No automatic main merge. This overrides the first-round-only instruction below.
 
 ## Previous owner override — WSL first round

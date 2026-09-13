@@ -7,7 +7,10 @@
 | [35 / WSL round 1](renderer-layer-batches/35-wsl-workspace-round1.md) | discover/connect/browse/persist/reopen | accepted on branch `c8d59f3`; reviewer reran 39/39; executor Windows 15/15; user confirms WSL behavior; NOT merged | complete; preserve成果 |
 | [36 / unified sidebar](renderer-layer-batches/36-workspace-sidebar-product.md) | role entry above, pins retained, local/WSL peers, simplified open-folder flow | dispatched; implementation pending | after accepted 35; same branch/worktree; exclusive; no main merge |
 
-Batch 34 and previews remain paused. Only 36 is now executable; historical queue does not resume.
+Batch 34 and previews remain paused. Only 36 is now executable in Desktop; historical queue does not resume.
+Backend [37](backend-server/work-orders/37-http-codex.md) is DISPATCHED_NOT_STARTED in
+a separate worktree/queue ([status](backend-server/status.md)); no Desktop changes or
+automatic integration are authorized. Shared Windows builds/real rehearsals are serialized.
 36 states: `DESKTOP_WORKSPACE_SIDEBAR_GREEN` / `DESKTOP_WORKSPACE_SIDEBAR_PARTIAL`.
 35 retains `DESKTOP_WSL_WORKSPACE_R1_GREEN`, including its disclosed Hermes startup dependency.
 
