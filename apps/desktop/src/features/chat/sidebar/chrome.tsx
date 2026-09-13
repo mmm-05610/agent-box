@@ -268,6 +268,7 @@ export interface SidebarGroupTotals {
  */
 export function SidebarGroupRow({
   actions,
+  actionsOverlay = false,
   className,
   label,
   lead,
@@ -276,6 +277,14 @@ export function SidebarGroupRow({
   ...props
 }: React.ComponentProps<'div'> & {
   actions?: React.ReactNode
+  /** Overlay the actions on the row's trailing idle space instead of letting
+   *  them hold width in flow. The workspace list turns this on: hidden
+   *  (hover-revealed) controls must not continuously squeeze the row's name —
+   *  the column collapses to zero while idle, and the controls float over the
+   *  label's tail only while they are actually reachable (hover, keyboard
+   *  focus, or an open menu). Callers whose actions are always visible keep
+   *  the default, which lays them out in flow. */
+  actionsOverlay?: boolean
   label: React.ReactNode
   lead: React.ReactNode
   /** `data` rides the disclosure button so a row kind can mark its own expand
@@ -292,6 +301,13 @@ export function SidebarGroupRow({
     totals && rowMeta.includes('cost') && totals.costUsd >= 0.01 ? `$${totals.costUsd.toFixed(2)}` : null
   ].filter(Boolean) as string[]
 
+  // The overlay mode's reveal lives on the container, not on each button: one
+  // place owns "hidden but reachable", and a control that opens floating UI
+  // (the kebab's menu) keeps the cluster visible through `has-[[data-state=open]]`
+  // even after the pointer moves into the portal'd menu.
+  const OVERLAY_REVEAL =
+    'pointer-events-none opacity-0 transition-opacity group-hover/workspace:pointer-events-auto group-hover/workspace:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100 has-[[data-state=open]]:pointer-events-auto has-[[data-state=open]]:opacity-100'
+
   return (
     <SidebarRowShell
       actions={
@@ -299,13 +315,21 @@ export function SidebarGroupRow({
         // flow they hold their width open at all times, which reads as a gap
         // torn between the total and the row's edge. Same trade the session row
         // makes with its kebab and age — you read the number or you act on the
-        // group, never both at once.
-        facts.length ? (
+        // group, never both at once. Overlay mode extends the same overlay to
+        // the no-facts case, where in-flow actions would hold their width open
+        // against nothing and steal it from the name.
+        actionsOverlay || facts.length ? (
           <div className="relative flex items-center">
-            <span className="min-w-9 whitespace-nowrap text-right text-[0.625rem] leading-none text-(--ui-text-tertiary) transition-opacity group-hover/workspace:opacity-0">
-              {facts.join(' · ')}
-            </span>
-            {actions ? <div className="absolute right-0 flex items-center">{actions}</div> : null}
+            {facts.length ? (
+              <span className="min-w-9 whitespace-nowrap text-right text-[0.625rem] leading-none text-(--ui-text-tertiary) transition-opacity group-hover/workspace:opacity-0">
+                {facts.join(' · ')}
+              </span>
+            ) : null}
+            {actions ? (
+              <div className={cn('absolute right-0 flex items-center', actionsOverlay && OVERLAY_REVEAL)} data-row-actions>
+                {actions}
+              </div>
+            ) : null}
           </div>
         ) : (
           actions

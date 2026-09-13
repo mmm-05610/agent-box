@@ -24,6 +24,7 @@ import { $sidebarWorkspaceNodeOpen, setSidebarAgentsGrouped, setSidebarGrouping 
 import type { SidebarProjectTree } from '@/store/projects/membership'
 import { $projectTree, $projectTreeLoading, exitProjectScope } from '@/store/projects/scope'
 import { $selectedStoredSessionId, $sessions, $sessionsLoading } from '@/store/session'
+import { $workspaceViewSelectedId } from '@/store/workspace-view'
 import { $wslWorkspaceInfoId, setWslWorkspaces } from '@/store/wsl-workspace'
 import type { WslWorkspaceRecord } from '@/types/workspace'
 
@@ -348,5 +349,148 @@ describe('ChatSidebar workspace assembly (36R)', () => {
     // project tree lane exists yet).
     expect(screen.getByText('Tile one')).toBeTruthy()
     expect(container.querySelector('[data-sessions-project="proj-1"]')).not.toBeNull()
+  })
+})
+
+// P01 — the unified list has ONE neutral selection. The 36R list let the local
+// rows highlight from the backend's active-project pointer while the WSL rows
+// highlighted from the view atom, so "local A → WSL B" left TWO rows reading
+// as current. Every row now reads the same atom, and every navigation path
+// writes it.
+describe('ChatSidebar workspace selection (P01)', () => {
+  beforeEach(() => {
+    $workspaceViewSelectedId.set(null)
+  })
+
+  const selectedRows = (container: HTMLElement): string[] =>
+    Array.from(container.querySelectorAll('[data-workspace-row-selected]')).map(row =>
+      row.getAttribute('data-workspace-row-selected') ?? ''
+    )
+
+  it('local A ↔ WSL B ↔ local A leaves exactly one current selection at every step', async () => {
+    $projectTree.set([homeNode, localProject])
+    listWslWorkspaces.mockResolvedValue({ ok: true as const, workspaces: [wslRecord()] })
+
+    const { container } = renderSidebar()
+
+    await waitFor(() => {
+      expect(container.querySelector('[data-wsl-workspace-row="wsl_ws_1"]')).not.toBeNull()
+    })
+
+    // Select WSL B from its main row.
+    const wslRow = container.querySelector('[data-wsl-workspace-row="wsl_ws_1"]') as HTMLElement
+
+    act(() => {
+      fireEvent.click(wslRow.querySelector('button') as HTMLElement)
+    })
+    expect(selectedRows(container)).toEqual(['wsl_ws_1'])
+
+    // Open local A from its main row — the entered-project view replaces the
+    // root list, so no row claims selection while it is mounted.
+    act(() => {
+      fireEvent.click(screen.getByText('local-acceptance'))
+    })
+    expect(container.querySelector('[data-sessions-mode="project"]')).not.toBeNull()
+    expect(selectedRows(container)).toEqual([])
+
+    // Back to the root list: A is THE one current selection — the old wiring
+    // lit A from the backend's active pointer AND kept B lit from the stale
+    // view atom, two half-truths in one list.
+    act(() => {
+      fireEvent.click(screen.getByText('All projects'))
+    })
+    expect(selectedRows(container)).toEqual(['proj-1'])
+
+    // The alternation keeps exactly one: B takes the highlight (without
+    // navigation), A takes it back (with it).
+    const wslRowAgain = container.querySelector('[data-wsl-workspace-row="wsl_ws_1"]') as HTMLElement
+
+    act(() => {
+      fireEvent.click(wslRowAgain.querySelector('button') as HTMLElement)
+    })
+    expect(selectedRows(container)).toEqual(['wsl_ws_1'])
+
+    act(() => {
+      fireEvent.click(screen.getByText('local-acceptance'))
+    })
+    expect(container.querySelector('[data-sessions-mode="project"]')).not.toBeNull()
+
+    act(() => {
+      fireEvent.click(screen.getByText('All projects'))
+    })
+    expect(selectedRows(container)).toEqual(['proj-1'])
+  })
+
+  it('clearing the search never steals a local selection', async () => {
+    $projectTree.set([homeNode, localProject])
+    listWslWorkspaces.mockResolvedValue({ ok: true as const, workspaces: [wslRecord()] })
+
+    const { container } = renderSidebar()
+
+    await waitFor(() => {
+      expect(container.querySelector('[data-wsl-workspace-row="wsl_ws_1"]')).not.toBeNull()
+    })
+
+    // Activate the local row through its search hit — the hit's activation is
+    // the same "open this workspace" intent the main row carries.
+    const search = screen.getByPlaceholderText('Search sessions…')
+
+    act(() => {
+      fireEvent.change(search, { target: { value: 'local-acceptance' } })
+    })
+    act(() => {
+      fireEvent.click(container.querySelector('[data-workspace-search-hit="proj-1"]') as HTMLElement)
+    })
+
+    expect(container.querySelector('[data-sessions-mode="project"]')).not.toBeNull()
+
+    // Back to the list: the hit's activation is the current selection.
+    act(() => {
+      fireEvent.click(screen.getByText('All projects'))
+    })
+    expect(selectedRows(container)).toEqual(['proj-1'])
+
+    // A later search (and its clear) is read-only over the view state.
+    act(() => {
+      fireEvent.change(search, { target: { value: '验收目录' } })
+    })
+    act(() => {
+      fireEvent.change(search, { target: { value: '' } })
+    })
+
+    expect(selectedRows(container)).toEqual(['proj-1'])
+  })
+
+  it('opening another row\'s connection info does not move the selection', async () => {
+    listWslWorkspaces.mockResolvedValue({
+      ok: true as const,
+      workspaces: [wslRecord(), wslRecord({ id: 'wsl_ws_2', name: '子目录', rootPath: '/home/maoqh/子目录' })]
+    })
+
+    const { container } = renderSidebar()
+
+    await waitFor(() => {
+      expect(container.querySelector('[data-wsl-workspace-row="wsl_ws_2"]')).not.toBeNull()
+    })
+
+    // Select row A from its main row…
+    const rowA = container.querySelector('[data-wsl-workspace-row="wsl_ws_1"]') as HTMLElement
+
+    act(() => {
+      fireEvent.click(rowA.querySelector('button') as HTMLElement)
+    })
+    expect(selectedRows(container)).toEqual(['wsl_ws_1'])
+
+    // …then open row B's info from its own controls — a secondary action that
+    // must not read as "B is now current".
+    const rowB = container.querySelector('[data-wsl-workspace-row="wsl_ws_2"]') as HTMLElement
+    const infoButton = rowB.querySelector('[data-row-actions] button[aria-label="Connection info"]') as HTMLElement
+
+    act(() => {
+      fireEvent.click(infoButton)
+    })
+
+    expect($wslWorkspaceInfoId.get()).toBe('wsl_ws_2')
+    expect(selectedRows(container)).toEqual(['wsl_ws_1'])
   })
 })

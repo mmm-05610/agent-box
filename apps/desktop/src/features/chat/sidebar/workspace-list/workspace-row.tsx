@@ -75,7 +75,16 @@ export function WorkspaceRowShell({
       data-workspace-row-selected={selected ? rowId : undefined}
       {...props}
     >
-      <SidebarGroupRow actions={actions} label={label} lead={lead} toggle={toggle} totals={totals} />
+      <SidebarGroupRow
+        // The workspace list's hidden actions must not squeeze the name: the
+        // overlay keeps the trailing controls out of flow while idle.
+        actions={actions}
+        actionsOverlay
+        label={label}
+        lead={lead}
+        toggle={toggle}
+        totals={totals}
+      />
       {expanded && expandedContent ? <SidebarRowNest>{expandedContent}</SidebarRowNest> : null}
     </div>
   )
@@ -102,8 +111,9 @@ export interface LocalWorkspaceRowProps {
 
 /**
  * A local folder's workspace row: the project-overview row, rebuilt on the
- * shared skeleton. Selection is the main row's click (enter the workspace);
- * expansion reveals the session previews through WorkspaceContent.
+ * shared skeleton. The main row's click ACTIVATES the workspace — it sets the
+ * one neutral selection (the same atom the WSL rows read) and enters the
+ * project; expansion reveals the session previews through WorkspaceContent.
  */
 export function LocalWorkspaceRow({
   project,
@@ -123,6 +133,11 @@ export function LocalWorkspaceRow({
   const { t } = useI18n()
   const s = t.sidebar
   const isActive = project.id === activeProjectId
+  // The row highlight reads the ONE neutral selection, exactly like the WSL
+  // rows — entering the project through any path writes the same atom (the
+  // navigation coordinator), so "local A → WSL B → local A" always leaves a
+  // single current selection instead of two half-truths.
+  const selected = useStore($workspaceViewSelectedId) === project.id
   const [open, toggleOpen] = useWorkspaceNodeOpen(project.id)
   // The appearance popover anchors here (the full row) so it opens flush with
   // the sidebar's content edge regardless of which side the sidebar is on.
@@ -201,7 +216,7 @@ export function LocalWorkspaceRow({
       lead={lead}
       ref={rowRef}
       rowId={project.id}
-      selected={isActive}
+      selected={selected}
       // The label is grab surface too, not just the lead's grabber — same
       // listeners, minus the controls that keep their own gestures. A project
       // row has no rival drag (its title navigates on CLICK), so the sortable
@@ -316,7 +331,7 @@ export function WslWorkspaceRow({ infoOpen, item, onRemove, onRename, state, wor
           <Tip label={w.reconnect}>
             <Button
               aria-label={w.reconnect}
-              className="text-(--ui-text-quaternary) opacity-0 transition-opacity hover:text-foreground group-hover/workspace:opacity-100 focus-visible:opacity-100"
+              className="text-(--ui-text-quaternary) hover:text-foreground"
               disabled={validating}
               onClick={() => void reconnectWslWorkspaceProjection(workspace.id)}
               size="icon-xs"
@@ -328,7 +343,7 @@ export function WslWorkspaceRow({ infoOpen, item, onRemove, onRename, state, wor
           <Tip label={w.connectionInfo}>
             <Button
               aria-label={w.connectionInfo}
-              className="text-(--ui-text-quaternary) opacity-0 transition-opacity hover:text-foreground group-hover/workspace:opacity-100 focus-visible:opacity-100"
+              className="text-(--ui-text-quaternary) hover:text-foreground"
               onClick={() => openWslWorkspaceInfo(workspace.id)}
               size="icon-xs"
               variant="ghost"
@@ -340,7 +355,7 @@ export function WslWorkspaceRow({ infoOpen, item, onRemove, onRename, state, wor
             <DropdownMenuTrigger asChild>
               <Button
                 aria-label={w.moreActions}
-                className="text-(--ui-text-quaternary) opacity-0 transition-opacity hover:bg-(--ui-control-hover-background) hover:text-foreground group-hover/workspace:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100"
+                className="text-(--ui-text-quaternary) hover:bg-(--ui-control-hover-background) hover:text-foreground"
                 size="icon-xs"
                 variant="ghost"
               >
