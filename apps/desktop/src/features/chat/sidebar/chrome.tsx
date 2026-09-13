@@ -1,5 +1,6 @@
 import { useStore } from '@nanostores/react'
 import type * as React from 'react'
+import { useState } from 'react'
 
 import {
   SIDEBAR_ROW_INSET,
@@ -11,6 +12,7 @@ import { SidebarRowLead } from '@/components/chat/sidebar/row-lead'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
 import { DisclosureCaret } from '@/components/ui/disclosure-caret'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { RowButton } from '@/components/ui/row-button'
 import { Tip } from '@/components/ui/tooltip'
 import { type NewSessionSplitHandler, startNewProjectDrag, startNewSessionDrag } from '@/features/chat/new-session-drag'
@@ -52,6 +54,7 @@ const HEADER_ACTION_BTN =
 // (only the nav "New session" row resets it, since it navigates to the draft
 // composer instead).
 export function SidebarSectionAddButton({
+  addMenu,
   ariaLabel,
   onNewProjectDrag,
   onNewSessionSplit,
@@ -71,16 +74,27 @@ export function SidebarSectionAddButton({
    *  supplied. */
   onNewSessionSplit?: NewSessionSplitHandler
   onPlainClick: () => void
+  /** When present, a plain click opens this menu instead of running
+   *  `onPlainClick` directly (the add-project menu: open folder / remote
+   *  connection). Drag semantics are untouched — a drag still arms its
+   *  placement, and a sub-threshold tap falls through to the menu. */
+  addMenu?: React.ReactNode
 }) {
+  const [menuOpen, setMenuOpen] = useState(false)
+
   return (
     <Tip label={ariaLabel}>
-      <Button
-        aria-label={ariaLabel}
-        className={HEADER_ACTION_BTN}
-        onClick={event => {
-          event.stopPropagation()
-          onPlainClick()
-        }}
+      <DropdownMenu onOpenChange={setMenuOpen} open={menuOpen}>
+        <DropdownMenuTrigger asChild>
+          <Button
+            aria-expanded={addMenu ? menuOpen : undefined}
+            aria-haspopup={addMenu ? 'menu' : undefined}
+            aria-label={ariaLabel}
+            className={HEADER_ACTION_BTN}
+            onClick={event => {
+              event.stopPropagation()
+              onPlainClick()
+            }}
         onPointerDown={
           onNewProjectDrag
             ? event => {
@@ -97,8 +111,11 @@ export function SidebarSectionAddButton({
         size="icon-xs"
         variant="ghost"
       >
-        <Codicon name="add" size="0.75rem" />
-      </Button>
+          <Codicon name="add" size="0.75rem" />
+        </Button>
+      </DropdownMenuTrigger>
+      {addMenu ? <DropdownMenuContent align="start" side="bottom">{addMenu}</DropdownMenuContent> : null}
+      </DropdownMenu>
     </Tip>
   )
 }

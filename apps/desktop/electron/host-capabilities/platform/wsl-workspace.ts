@@ -20,8 +20,8 @@
  */
 
 import { execFile } from 'node:child_process'
-import fs from 'node:fs'
 import { randomBytes } from 'node:crypto'
+import fs from 'node:fs'
 
 import { IS_WSL } from './platform-facts'
 
@@ -196,6 +196,7 @@ export function normalizeLinuxDirectoryPath(input: unknown): null | string {
 
     if (segment === '..') {
       resolved.pop()
+
       continue
     }
 
@@ -378,6 +379,7 @@ export function createDefaultWslExec(): WslExec {
             ;(error as { stdout?: string }).stdout = String(stdout || '')
 
             reject(error)
+
             return
           }
 

@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { WslWorkspaceRecord } from '@/types/workspace'
-
 import type { WslFailure } from '@/types/workspace'
 
 const saveWslWorkspace = vi.fn()
@@ -19,13 +18,14 @@ vi.mock('@/api/workspace', () => ({
   cancelWslOperation: vi.fn()
 }))
 
+import { $wslWorkspaces, $wslWorkspaceValidation, setWslWorkspaces } from '@/store/wsl-workspace'
+
 import {
-  refreshWslWorkspaces,
   reconnectWslWorkspaceProjection,
+  refreshWslWorkspaces,
   resetWslValidationsOnStartup,
   saveWslWorkspaceFromWizard
 } from './wsl-workspace-usecases'
-import { $wslWorkspaces, $wslWorkspaceValidation, setWslWorkspaces } from '@/store/wsl-workspace'
 
 function record(overrides: Partial<WslWorkspaceRecord> = {}): WslWorkspaceRecord {
   return {

@@ -3282,6 +3282,65 @@ export interface Translations {
     openLogs: string
   }
 
+  wslWorkspace: {
+    // Add-project menu entries (round 1: only WSL is real).
+    menuOpenFolder: string
+    menuRemoteConnection: string
+    // Wizard steps
+    stepMethod: string
+    stepConfig: string
+    stepConnecting: string
+    stepBrowse: string
+    wslOption: string
+    wslOptionDesc: string
+    distributionLabel: string
+    distributionStateRunning: string
+    distributionStateStopped: string
+    discovering: string
+    discoverFailed: string
+    wslUnavailableDesc: string
+    userLabel: string
+    userPlaceholder: string
+    connectingDesc: string
+    // Directory browser
+    pathLabel: string
+    goTo: string
+    upOneLevel: string
+    showHidden: string
+    emptyDirectory: string
+    chooseDirectory: string
+    // Sidebar projection
+    remoteSectionLabel: string
+    connectionInfo: string
+    reconnect: string
+    reconnecting: string
+    statusValidated: string
+    statusUnverified: string
+    statusValidating: string
+    statusFailed: string
+    userChangedWarning: (user: string) => string
+    defaultUserLabel: string
+    rootPathLabel: string
+    sessionUnavailable: string
+    wslBadge: string
+    // Typed failure copy, keyed by the host's WslWorkspaceErrorCode.
+    errWslUnavailable: string
+    errWslUnknownDistribution: string
+    errWslUserNotFound: string
+    errWslConnectTimeout: string
+    errWslConnectFailed: string
+    errWslCancelled: string
+    errWslConnectionExpired: string
+    errWslInvalidPath: string
+    errWslDirectoryNotFound: string
+    errWslDirectoryNoPermission: string
+    errWslListFailed: string
+    errWslListOverflow: string
+    errWslSaveFailed: string
+    errWslNotFound: string
+    errUnexpected: string
+  }
+
   ui: {
     search: {
       clear: string

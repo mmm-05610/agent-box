@@ -25,6 +25,9 @@ export const $wslWorkspaceValidation = atom<Record<string, WslWorkspaceValidatio
 /** Wizard dialog mount state; the four steps live in the dialog component. */
 export const $wslWorkspaceWizardOpen = atom(false)
 
+/** Which workspace's connection-info dialog is open (null = closed). */
+export const $wslWorkspaceInfoId = atom<null | string>(null)
+
 export function setWslWorkspaces(workspaces: WslWorkspaceRecord[]): void {
   $wslWorkspaces.set(workspaces)
 }
@@ -47,4 +50,12 @@ export function openWslWorkspaceWizard(): void {
 
 export function closeWslWorkspaceWizard(): void {
   $wslWorkspaceWizardOpen.set(false)
+}
+
+export function openWslWorkspaceInfo(workspaceId: string): void {
+  $wslWorkspaceInfoId.set(workspaceId)
+}
+
+export function closeWslWorkspaceInfo(): void {
+  $wslWorkspaceInfoId.set(null)
 }

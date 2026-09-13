@@ -20,7 +20,6 @@ import {
   saveWslWorkspace
 } from '@/api/workspace'
 import {
-  $wslWorkspaces,
   $wslWorkspaceValidation,
   setWslWorkspaces,
   setWslWorkspaceValidation,

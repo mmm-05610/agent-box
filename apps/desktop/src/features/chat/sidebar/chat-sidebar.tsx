@@ -19,6 +19,7 @@ import { markSessionUnread } from '@/application/session-read-state'
 import { orderByIds, reconcileOrderIds, resolveManualSessionOrderIds, sameIds } from '@/application/sidebar/order'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
+import { DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
 import { GlyphSpinner } from '@/components/ui/glyph-spinner'
 import { SearchField } from '@/components/ui/search-field'
 import {
@@ -27,6 +28,8 @@ import {
 } from '@/components/ui/sidebar'
 import { Tip } from '@/components/ui/tooltip'
 import { useContributions } from '@/extension/contrib/react/use-contributions'
+import { WslWorkspaceInfoDialog } from '@/features/workspace/wsl-workspace-info-dialog'
+import { WslWorkspaceWizard } from '@/features/workspace/wsl-workspace-wizard'
 import { useI18n } from '@/i18n'
 import { comboTokens } from '@/lib/keybinds/combo'
 import { sessionMatchesSearch } from '@/lib/session-search'
@@ -118,6 +121,7 @@ import { $focusedSessionIsTile, $focusedStoredSessionId, $workingSessionIds } fr
 import { ackAllSessionsRead } from '@/store/session-unread'
 import { $archivedSessions, loadArchivedSessions } from '@/store/sidebar-archive'
 import { $sidebarSessionRankIds } from '@/store/sidebar-sort'
+import { openWslWorkspaceWizard } from '@/store/wsl-workspace'
 import { type SessionInfo, type SessionSearchResult } from '@/types/hermes'
 import type { SidebarNavItem } from '@/types/sidebar'
 
@@ -147,6 +151,7 @@ import {
   useRepoWorktreeMap
 } from './projects'
 import { WorktreeDialog } from './projects/worktree-dialog'
+import { WslWorkspaceSection } from './projects/wsl-workspace-section'
 import {
   SidebarBlankState,
   SidebarLoadErrorState,
@@ -1418,6 +1423,33 @@ export function ChatSidebar({
                             project dialog, and the created project starts at
                             the dropped spot. */}
                         <SidebarSectionAddButton
+                          addMenu={
+                            agentsGrouped ? (
+                              <>
+                                <DropdownMenuLabel>{s.projects.newButton}</DropdownMenuLabel>
+                                {/* Round-1 add-project menu: the local folder flow
+                                    keeps its existing dialog; the remote entry opens
+                                    the WSL workspace wizard. No fake entries. */}
+                                <DropdownMenuItem
+                                  onSelect={() => {
+                                    openProjectCreate()
+                                  }}
+                                >
+                                  <Codicon name="folder-opened" size="0.875rem" />
+                                  {t.wslWorkspace.menuOpenFolder}
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onSelect={() => {
+                                    openWslWorkspaceWizard()
+                                  }}
+                                >
+                                  <Codicon name="vm-connect" size="0.875rem" />
+                                  {t.wslWorkspace.menuRemoteConnection}
+                                </DropdownMenuItem>
+                              </>
+                            ) : undefined
+                          }
                           ariaLabel={agentsGrouped ? s.projects.newButton : s.nav['new-session']}
                           onNewProjectDrag={
                             agentsGrouped
@@ -1487,6 +1519,10 @@ export function ChatSidebar({
               />
             )}
 
+            {/* Remote WSL workspaces, peer to the local projects above. Only in
+                project-overview mode, and only when a workspace was saved. */}
+            {agentsGrouped && !inProject && <WslWorkspaceSection />}
+
             {!trimmedQuery && !worktreeGroupingActive && cronJobs.length > 0 && (
               <SidebarCronJobsSection
                 jobs={cronJobs}
@@ -1508,6 +1544,11 @@ export function ChatSidebar({
         </div>
       </SidebarContent>
       <ProjectDialog />
+      {/* WSL Workspace (work order 35): the four-step remote-connection wizard
+          and the per-workspace connection-info dialog mount once here; the
+          remote rows themselves render below the projects section. */}
+      <WslWorkspaceWizard />
+      <WslWorkspaceInfoDialog />
       {/* One mount for the whole app. The header of WorktreeDialog tells why. */}
       <WorktreeDialog />
     </Sidebar>
