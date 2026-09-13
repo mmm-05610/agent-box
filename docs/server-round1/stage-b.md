@@ -93,4 +93,5 @@ reclamation, and isolated result TTL deletion.
 
 Real model requests: **0**. Model credential-content reads: **0**.
 
-This stage is committed with explicit Work Order 37 pathspecs.
+This stage is committed with explicit Work Order 37 pathspecs in checkpoint
+`5b71393`.

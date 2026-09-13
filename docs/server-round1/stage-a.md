@@ -75,8 +75,5 @@ database injection seam.
 Real model requests: **0**. Model credential-content reads: **0**. Model,
 credential import source, and real Codex execution remain blocked for Stage C.
 
-Checkpoint creation was attempted with explicit pathspecs after all gates. Git
-could not create the worktree `index.lock` because the managed environment exposes
-the parent repository's `.git/worktrees/agent-box-server-round1` metadata read-only.
-No path was staged. The Stage A tree and evidence remain intact for a later
-checkpoint when that Git metadata is writable.
+The Stage A implementation and evidence are committed with explicit Work Order
+37 pathspecs in checkpoint `5a45303`.
