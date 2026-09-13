@@ -22,6 +22,15 @@ distribution, the chosen fixed package tarballs and every production dependency
 must be scanned from the final lockfile/SBOM; Stage A did not execute package
 install scripts.
 
+The selected Harness Remote profile versions were independently resolved from
+the npm registry during Stage C:
+
+| Artifact | Registry license | Integrity / license caveat |
+| --- | --- | --- |
+| `@agentclientprotocol/codex-acp@1.1.14` | Apache-2.0 | `sha512-6JKLbGYH0/Gcz788U6KnljwSdNvUnXOyjJDOgsWsbwmXbxn/BXH+urF5AciACdgq13+KgAP9O96Kp6h33BgyKg==`; production lock resolves bundled `@openai/codex 0.147.0`. |
+| `@automatalabs/pi-acp@0.5.0` | Apache-2.0 | `sha512-dyG1EBgY9SXjvYzu8fZieAYNnuXZGkXCUI0skKSzLDWNpW08mFnOEbWcZ+PPpoC8nUfcSXbtic2ceYUuv6vjIg==`; direct Pi packages `0.84.2` report MIT. |
+| `@agentclientprotocol/claude-agent-acp@0.75.1` | Apache-2.0 | Registry metadata was saved and read three times with identical bytes; future production must take the full integrity from its committed lock. Its direct Claude Agent SDK `0.3.257` license says all rights reserved and refers to Anthropic legal terms, so the Claude profile is excluded until license review. |
+
 ## Source call paths behind the decisions
 
 ### `harness-remote`
@@ -113,8 +122,20 @@ third-party implementations for both deep candidates.
 
 ## Stage B entrants
 
-`harness-remote` and `agent-controller` proceed. The former is the strongest
-complete multi-Harness product implementation; the latter has the cleanest
-out-of-process runtime packages. Neither is selected yet. `codex-acp` remains a
-fixed lower-component reference and does not consume a third deep-candidate
-slot.
+`harness-remote` and `agent-controller` proceeded. The former was the strongest
+complete multi-Harness product implementation; the latter had the cleanest
+out-of-process runtime packages. `codex-acp` remained a fixed lower-component
+reference and did not consume a third deep-candidate slot.
+
+## Stage C disposition
+
+- **Conditional recommendation:** Harness Remote `v3.0.2`, limited to the fixed
+  source and artifact boundary in [boundary.md](boundary.md). Its immediate
+  static approval response requires one narrow asynchronous resolver patch;
+  broader lifecycle changes trigger `NO_FIT`.
+- **Eliminated as full backup:** Agent Controller. Its Codex `exec` transport is
+  a hard mismatch, and no existing ACP/app-server-to-ADL translator was found.
+  Its other runtime packages remain informative component references.
+- **Eliminated:** `twaldin/harness` for the live-backend gaps recorded above.
+- **Lower component:** Codex ACP is included only inside the Harness Remote
+  recommendation and remains insufficient as a multi-Harness project alone.

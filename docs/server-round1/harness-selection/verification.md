@@ -157,3 +157,34 @@ Codex as one artifact until a future adapter exposes a reliable version gate.
   fail for AgentBox. Replacing it with Codex ACP would require a new lifecycle
   translator from its ADL/wire protocol; Stage B found no existing source for
   that translator and does not treat writing one as thin glue.
+
+## Stage C completion audit
+
+- State and source versions agree across README, candidate table, boundary,
+  status, and experiments: Harness Remote `v3.0.2` at
+  `21ce6db49af708c4c7c3f96ef6a50f62dced8dab`; its selected Codex ACP
+  `v1.1.14` at `5faefec5d55ded33c54b68ffec93def4f6c547f5` with locked bundled Codex
+  `0.147.0`.
+- Manifest collision review is declarative because no dedicated collision tool
+  exists. Work Order 38 and paused 37 overlap only at the broad
+  `docs/server-round1/**` report root and `docs/implementation/status.md`; 38
+  created only `docs/server-round1/harness-selection/**` and serialized the
+  status edit. Desktop 36R has no shared write path.
+- Production `src/`, `plugins/`, `workers/`, `protocols/`, `tests/`, project
+  metadata, and lockfiles were unchanged. No sibling repository was written.
+- `git diff --check` exited `0`. All repository-local Markdown links in the
+  Harness selection report resolved. Final staging used explicit Work Order 38
+  paths only.
+- The research root owner marker was verified before cleanup. The exact owned
+  root `/tmp/agentbox-harness-selection-38.otEluD` and its pointer file were
+  removed; neither exists after cleanup. No user cache or unrelated temporary
+  directory was removed.
+- One Stage C npm metadata lookup accidentally used the default npm cache before
+  the cache override was applied. It may have updated `~/.npm/_cacache`; the
+  exact debug log it created was removed after its path and metadata were
+  verified. It did not install a package or change npm configuration. All
+  subsequent lookups used the isolated research cache. Shared cache entries were
+  left untouched because their ownership could not be proven.
+- There were zero model/provider calls, login calls, and credential-content
+  reads. All behavior evidence remains fake-peer or controlled-subprocess
+  evidence with the limitations above.
