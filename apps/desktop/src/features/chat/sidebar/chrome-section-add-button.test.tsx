@@ -70,6 +70,24 @@ describe('SidebarSectionAddButton', () => {
     expect(onPlainClick).not.toHaveBeenCalled()
   })
 
+  it('an add menu owns the plain click: the direct flow must not fire behind it', () => {
+    const onPlainClick = vi.fn()
+
+    render(
+      <SidebarSectionAddButton
+        addMenu={<button type="button">Open folder</button>}
+        ariaLabel="Open folder"
+        onPlainClick={onPlainClick}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open folder' }))
+
+    // The menu entry is the local flow's only door: a click that opened the
+    // menu must not ALSO run the direct open (native picker behind a menu).
+    expect(onPlainClick).not.toHaveBeenCalled()
+  })
+
   it('drags the project variant when the + creates a project (project-overview mode)', () => {
     const onArm = vi.fn()
     const onPlainClick = vi.fn()

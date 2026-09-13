@@ -93,7 +93,12 @@ export function SidebarSectionAddButton({
             className={HEADER_ACTION_BTN}
             onClick={event => {
               event.stopPropagation()
-              onPlainClick()
+              // With an add menu, the plain click's job is ONLY to open that
+              // menu (Radix owns it via the trigger) — running onPlainClick
+              // here too would fire the menu AND the direct flow at once.
+              if (!addMenu) {
+                onPlainClick()
+              }
             }}
         onPointerDown={
           onNewProjectDrag
