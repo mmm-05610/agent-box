@@ -20,8 +20,11 @@ Windows原应用验收：无Harness启动→打开目录/WSL同级项目→选�
 设置真实保存/失败/引用保护、退出回收、本机数据权威与远端投影清理都要各有证据。
 一份最终报告：产品分支HEAD、功能矩阵、截图、完整启动/退出步骤、调用次数、残留、已知问题。
 UI_READY不等于CONTRACT_CONNECTED，后者不等于REAL_FLOW_VERIFIED。
-满足所有本次必需验收才AGENTBOX_DESKTOP_PRODUCT_GREEN；否则PARTIAL附精确缺口。
-完成停在产品分支待用户验收，禁止自动merge/push。
+本端独立范围和锁定合同客户端验收完成即记录DESKTOP_IMPLEMENTATION_READY，并提交交接、
+停止所有前端写入后记录writer_lease=RELEASED；不等用户手动体验批准，也不等真实全栈通过才交接。
+后端按42双门自行接管；前端goal此时可完成自身目标，不主动恢复写入、不自动merge/push。
+真实全栈及外围能力未验不报AGENTBOX_DESKTOP_PRODUCT_GREEN，单列待验而非阻塞本端READY。
+仍有本端代码/行为缺陷则继续修，不能包装为后端未到。
 
 阶段终态：P06_GREEN 或 P06_PARTIAL。
 PARTIAL必须拆出等待子项与下一可做项，不默认终止整个goal。
