@@ -69,10 +69,15 @@ function record(step, ok, detail) {
 }
 
 async function main() {
-  const electronBin = path.join(REPO_ROOT, 'node_modules', 'electron', 'dist', 'electron.exe')
+  // npm hoists electron to the root only when nothing conflicts; both layouts
+  // are ordinary. Nearest package first — mirrors e2e/electron-binary.ts.
+  const electronBin = [
+    path.join(DESKTOP_ROOT, 'node_modules', 'electron', 'dist', 'electron.exe'),
+    path.join(REPO_ROOT, 'node_modules', 'electron', 'dist', 'electron.exe')
+  ].find(candidate => fs.existsSync(candidate))
 
-  if (!fs.existsSync(electronBin)) {
-    throw new Error(`electron binary not found at ${electronBin}`)
+  if (!electronBin) {
+    throw new Error('electron.exe not found under apps/desktop or repo root node_modules')
   }
 
   if (!fs.existsSync(path.join(DESKTOP_ROOT, 'dist'))) {
