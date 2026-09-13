@@ -1519,9 +1519,11 @@ export function ChatSidebar({
               />
             )}
 
-            {/* Remote WSL workspaces, peer to the local projects above. Only in
-                project-overview mode, and only when a workspace was saved. */}
-            {agentsGrouped && !inProject && <WslWorkspaceSection />}
+            {/* Remote WSL workspaces, peer to the local projects above — in the
+                project overview AND in the flat list (a fresh install lives in
+                the flat mode; hiding the entry there would strand saved
+                workspaces). Only when a workspace was saved. */}
+            {!inProject && <WslWorkspaceSection />}
 
             {!trimmedQuery && !worktreeGroupingActive && cronJobs.length > 0 && (
               <SidebarCronJobsSection
