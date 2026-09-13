@@ -52,6 +52,29 @@
         "real Codex rehearsal slot"
       ],
       "note": "write_paths are relative to worktree only; forbidden roots do not include the distinct sibling worktree. This is not the renderer import-edge manifest."
+    },
+    {
+      "id": "38",
+      "document": "work-orders/38-harness-extension-selection.md",
+      "baseline": "67c6b40",
+      "worktree": "/home/maoqh/projects/agent-box-server-round1",
+      "branch": "feature/server-http-codex-r1",
+      "depends_on": ["37"],
+      "dependency_condition": "37 checkpoints exist and prior goal ended; GREEN not required; 37 production repair paused",
+      "stages": ["A", "B", "C"],
+      "write_paths": [
+        "docs/server-round1/harness-selection/**",
+        "docs/implementation/status.md"
+      ],
+      "temporary_write_scope": "new owned mktemp research root only; isolated pinned third-party checkouts/environments",
+      "forbidden_write_roots": [
+        "/home/maoqh/projects/agent-box",
+        "/home/maoqh/projects/agent-box-desktop-next",
+        "/home/maoqh/projects/agent-box-desktop-next-wsl-round1"
+      ],
+      "parallel_code_with": ["desktop:36R"],
+      "exclusive_resources": ["Windows native build slot", "backend status writer"],
+      "note": "Research only. No production edits, real models or credentials. Shares report/status scope with paused 37; serialize status edits. Third-party integration reuse mandatory; final selection requires user decision."
     }
   ],
   "authority": "docs/implementation"

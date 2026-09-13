@@ -1,13 +1,16 @@
 # Backend Server — status
 
-更新：2026-09-13。Work Order 37 的 A/B/C/D 行为门和显式 Git 检查点均已完成。用户授权的 DeepSeek 来源已通过一次性 Windows 导入器写入 current-user DPAPI；真实 `deepseek-flash` 两轮续接和 Server 冷启动后的第三轮续接均成功。
+更新：2026-09-13。37 的实施者报告 GREEN，独立验收裁决为 PARTIAL；保留真实三轮和冷续接证据，不覆盖原完成报告。当前只执行38选型验证，不自动修37或接Desktop。
 
 | 单号 | 状态 | 证据 | 下一步 |
 | --- | --- | --- | --- |
-| [37](work-orders/37-http-codex.md) | **SERVER_HTTP_CODEX_R1_GREEN** | [完成审计](../server-round1/completion-audit.md) / [C/D 证据](../server-round1/stage-c-d.md)：Windows Server→HTTP/SSE→Ubuntu Worker→bwrap→Codex 0.153.4→DeepSeek Responses；C 两次、D 冷启动一次；同一 native thread，事件 1..18，无历史缺口；根测试 179 passed/1 skipped、Codex/WSL/bwrap 52 passed/3 skipped、Windows 22 passed/2 skipped、Rust 3 passed、显式 Windows/WSL 门 1 passed；A/B/C/D 均有显式 pathspec 检查点 | 当前无新增可执行工单；保留 Windows 本机加密验收数据供复核，停止 Server，不扩展到 Desktop/Pi/UI/安装器 |
+| [37](work-orders/37-http-codex.md) | **SERVER_HTTP_CODEX_R1_PARTIAL** | [原完成审计](../server-round1/completion-audit.md) / [C/D证据](../server-round1/stage-c-d.md)保留；检查点5a45303/5b71393/cd5efbe/67c6b40。独立定向23 passed，另复现同键并发两次accept导致状态矛盾；非实时消息、角色状态未实现却报能力、composition混入原生语义，详见[38 §2](work-orders/38-harness-extension-selection.md) | 返修待选型后派单；本轮不重跑模型、不读取保留验收数据 |
+| [38](work-orders/38-harness-extension-selection.md) | **HARNESS_EXTENSION_SELECTION_QUEUED** | 用户已确定扩展插槽、必须复用现成多Harness实现、保留专有能力；[蓝图§11](blueprint.md) | A初筛→B隔离实验→C推荐；仅文档/实验，最终选型等用户裁决 |
 
 终态：`SERVER_HTTP_CODEX_R1_GREEN` / `SERVER_HTTP_CODEX_R1_PARTIAL`。
 阶段态：`SERVER_HTTP_R1_A_READY`、`SERVER_WSL_R1_B_READY`、`SERVER_CODEX_R1_C_READY`。
-GREEN 的全部运行行为、验收物和检查点要求均已满足。
+37 不按完整 GREEN 接受。38 的 READY_FOR_DECISION 仅指研究可交付，不替代37验收或生产授权。
 
 已知边界：Codex CLI 此路径没有硬输出 token cap，验收以短回答提示、4 KiB 输入与 120 秒超时约束；首轮仅白名单 `deepseek-flash`。后续 Desktop 接线/Pi/记忆并发合并/安装器未派。
+
+38终态：`HARNESS_EXTENSION_SELECTION_READY_FOR_DECISION` / `HARNESS_EXTENSION_SELECTION_NO_FIT` / `HARNESS_EXTENSION_SELECTION_PARTIAL`；阶段态 `HARNESS_EXTENSION_SELECTION_RESEARCHING`。没有合格候选不得转手写。
