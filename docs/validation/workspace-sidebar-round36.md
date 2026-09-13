@@ -7,6 +7,13 @@
 （Windows 真机用户路径全部通过，15 项记录全 PASS，2026-09-13；置顶/搜索真机项按
 工单规则如实标注为"无真实会话可供置顶"，见下文"行为测试 vs 真机待验"）
 
+> **36R 更正（2026-09-13，本节下文原样保留）**：维护者复核推翻了上述 GREEN。
+> 旧记录在"本地打开目录"一项上报了通过，而它当时并未真正成立（后端 projects 库里
+> 留下了一条由 Windows 路径拼成的伪项目记录），且把 SKIP 计入了 ok:true 聚合。
+> 返工轮 36R 的真机重跑、逐项结论与最终交付状态见文末
+> **"## 36R（返工轮）"** 一节；本批 36 的所有记录、截图与命令均未删改，仅保留为
+> 历史证据（`docs/validation/windows-acceptance-round36/`）。
+
 ## 检查点
 
 | 阶段 | 提交 | 内容 |
@@ -163,3 +170,201 @@ d1a8e46 round36: driver discriminates blank state by remote entry role, escapes 
 移除目录仍在 → 重开恢复 → WSL 重连）中，置顶一项在真机上无真实会话可验（沙箱
 无 provider、禁止造数据），已按工单要求与行为测试分开报告；其余全部真机通过，
 证据齐备。提交当前分支后停止，等待用户体验。
+
+---
+
+## 36R（返工轮）— 真机证据重跑与旧结论更正
+
+2026-09-13，分支 `feature/desktop-wsl-round1`（工作树
+`../agent-box-desktop-next-wsl-round1`）。阶段提交：`5b7a382`（阶段 1 反例）→
+`442a5e0`（阶段 2 统一工作区列表）→ `f35c493`（阶段 3 移除=归档/schema v2/路径边界）
+→ `936c19a`（阶段 4 驱动按 36R 证据要求重写）→ **`f7285ca`（阶段 4 真机重跑：证据
++ 驱动修正）**。上一节批 36 的全部记录、截图与命令原样保留，本节只追加更正与新证据。
+
+### 1. 旧 GREEN 为什么被推翻（推翻依据，逐条可复核）
+
+1. **上报了并未成立的"本地打开"**：批 36 记录第 6 项"本地打开目录直接完成"= PASS，
+   但后端项目库里留下的是 `p_a7cdbae7`，路径
+   `/home/maoqh/C:\Users\maoqh\agentbox-wsl-round36-sandbox\local-acceptance`
+   （`~/wsl-round1-gateway-home/projects.db`，`createdAt` ≈ 18:49）。产品当时接受
+   `C:\…` 并按 POSIX 语义拼接存储——也就是说这条用户路径当时**并没有真正可用**，
+   却被记为通过；这同时是"用行文本定位"的后果：本次重跑发现旧文本
+   `local-acceptance` 会命中这条后端遗留项目行（新的驱动改用**每次运行唯一的目录名**
+   定位本轮的打开结果，见第 3 节修复 R1）。
+2. **SKIP 被计入聚合**：旧 `driver-run.log` 中
+   `PASS  pinned/search on Windows  SKIPPED — no real session exists…`。跳过项以
+   ok:true 记入 `ACCEPTANCE: ALL STEPS PASSED`，违反"PASS/FAIL/SKIP/PENDING 分开记录、
+   聚合只覆盖已执行项"。本轮驱动把 SKIP/PENDING 独立记录，`allOk` 只聚合执行过的项
+   （本轮 `allOk=false`，计数 22/1/2/1）。
+3. **行定位层级不足**：旧驱动以 `getByText(...)`、`document.querySelector('[data-sessions-project]')`
+   加祖先遍历定位，未锚定唯一列表体 `[data-workspace-list]`；且"同一列表"是用祖先
+   遍历反推的。本轮所有列表断言都在 `[data-workspace-list]` 内查询（见
+   `workspaceListContents`）。
+4. **单例断言过软**：旧文"单实例锁下新实例可能沿用了在世实例的窗口（但无害）"。
+   本轮要求：第二次启动必须**失败**且**原窗口仍然存活可响应**，二者同时成立才 PASS。
+5. **选择语义缺一项**：旧驱动没有"打开 info ≠ 切换工作区"的两行断言——本轮加了
+   "选中 A → 打开 B 的连接信息 → A 仍为唯一选中"的断言。
+
+### 2. 36R 真机结果（本次实测，非复用旧证据）
+
+环境与命令（Windows 侧；构建 `C:\Users\maoqh\agentbox-wsl-round1`，源码 = `936c19a`
++ 驱动 = `f7285ca`；`dist/` 22:14 构建，与阶段 2/3 源码 mtime 比对后确认最新，未重建）：
+
+```bat
+REM WSL 侧（隔离网关，已在跑；/api/health 返回 401 = 在跑且受 token 门控）
+"$HOME/wsl-round1-gateway-home/start-gateway.sh"
+
+REM Windows 侧（一次跑完，全新隔离沙箱；EXIT=1 表示 allOk=false）
+cd C:\Users\maoqh\agentbox-wsl-round1\apps\desktop
+"C:\Program Files\nodejs\node.exe" e2e\workspace-sidebar-round36-driver.mjs ^
+  C:\Users\maoqh\agentbox-wsl-round36r4-sandbox ^
+  C:\Users\maoqh\agentbox-wsl-round36r4-sandbox\acceptance-out
+```
+
+证据目录：`docs/validation/windows-acceptance-round36r/`（23 张截图 +
+`acceptance-log.json` + `driver-run.log`；旧目录
+`docs/validation/windows-acceptance-round36/` 未改动）。总计：executed **23** →
+**PASS 22 / FAIL 1 / SKIP 2 / PENDING 1**，`allOk=false`（只聚合已执行项）。
+
+| # | 步骤 | 结论 | 证据（截图 / 日志原文） |
+| --- | --- | --- | --- |
+| 1 | app opens | PASS | `01-boot.png`（窗口标题 Hermes） |
+| 2 | isolated app identity | PASS | exe=`…\agentbox-wsl-round1\apps\desktop\node_modules\electron\dist\electron.exe`（worktree 内）、userData=沙箱、build=0.17.2=`package.json`；`app.getName()`=Hermes=productName（`HERMES_DESKTOP_APP_NAME` 只进 About/菜单标签，产品从不调 `app.setName`） |
+| 3 | single-instance blocks reuse | PASS | 第二次启动失败（同 exe/同 env/同参数，第一次成功即窗口存活），且原窗口仍活：`readyState=complete` |
+| 4 | backend this run drives | PASS | boot log：`Connecting to remote Hermes backend at http://127.0.0.1:9127` + `Remote Hermes backend is ready`（未拉起本地运行时） |
+| 5 | unified sidebar | PASS | `02-unified-sidebar.png`；Capabilities/Artifacts/Scheduled jobs/Bots 均消失，Profiles/Settings 在位 |
+| 6 | add menu entries | PASS | `03-add-menu.png`；菜单恰两项（1/1） |
+| 7 | wizard opens on config | PASS | `04-wizard-direct-config.png`；首页即发行版列表，无"方式"页 |
+| 8 | connect → browse on one page | PASS | `05-connecting-inline.png`、`06-browse-acceptance-dir.png`；真实目录含空格+中文 |
+| 9 | WSL open lands on the real directory | PASS | `07-wsl-saved-sidebar.png`；宿主记录 `rootPath=/home/maoqh/wsl-round1-验收 目录`（按 rootPath 断言，不按行名） |
+| 10 | WSL save registers exactly one desktop-side record; row at `[data-workspace-list]` | PASS | `08-wsl-only-list.png`；`host records=1`（id 一致、kind=wsl、archivedAt=null），`list={"localIds":[2 条后端既有项目],"wslIds":[本轮 id]}` |
+| 11 | WSL main row selects the workspace | PASS | `data-workspace-row-selected=<id>`（点主行=选中） |
+| 12 | WSL row expands to the honest unavailable prompt | PASS | `09-wsl-expanded.png`；提示文本 + 行上"新建会话"入口数=0（不假装能开） |
+| 13 | local open (Windows real path) | **PENDING** | `10-local-opened.png`、`11-local-picker-surface.png`；原文：`the picker never asked for the OS dialog (osDialogCalls=0, dialog="Choose remote folderBrowse folders on the connected backend.")… no local-acceptance-r36r-… row was created` |
+| — | local-row dependent steps | SKIP | `12-local-in-list.png`；copy-path/进入项目/本地隐藏依赖已打开的本地行（本轮 PENDING），行为测试在开发侧覆盖 |
+| 14 | rename persists under the SAME id | PASS | `13-row-menu.png`、`14-rename-dialog.png`、`15-renamed.png`；宿主记录同名同 id |
+| 15 | second WSL workspace saved | PASS | 宿主两条记录（`…/子目录`） |
+| 16 | opening info is NOT selecting | PASS | `16-info-open-on-b.png`；选中 A 时打开 B 的 info：A selected=true、B selected=false |
+| 17 | archive keeps the record, drops only the row | PASS | `17-remove-menu.png`、`18-remove-confirm.png`、`19-after-archive.png`；行 2→1、记录保留且 `archivedAt!=null`、目录仍在磁盘 |
+| 18 | reopen restores the ORIGINAL record (same id, archive cleared) | PASS | 同 id、`archivedAt=null` |
+| 19 | empty-workspace search reaches the workspace by name | PASS | `20-workspace-search-hit.png`；命中 `[data-workspace-search-hit]`（真机、无模型） |
+| 20 | clearing search restores the selection | PASS | 清空后 `data-workspace-row-selected` 复位 |
+| 21 | WSL row keeps its name readable | **FAIL** | `21-narrow-sidebar.png`；`name=4px of "round36R-验收" (label=45px, row=213px, text needs 81px)` |
+| 22 | keyboard selects the workspace (Enter on the main row) | PASS | `data-workspace-row-selected` 出现（键盘等价于主行选择） |
+| — | pinned sessions on the real machine | SKIP | 沙箱无 provider、不允许为造数据发模型请求；行为测试覆盖置顶行契约（沿用批 36 先例） |
+| 23 | reopen: renamed workspace restored under its id | PASS | `22-reopen-restored.png`；行在、列表内 id 一致 |
+| 24 | reopen: reconnect re-verifies | PASS | `23-reopen-reconnected.png`；连接信息对话框状态 Pill 精确为 "Verified"，并显示真实 `rootPath` |
+
+### 3. 本轮修的驱动缺陷（只改 harness，未动产品）
+
+- **R1 结果按本行身份定位**：本地打开目录名带逐次运行后缀（`local-acceptance-r36r-<base36 时间>`）。
+  原因：沙箱只隔离 Electron userData，**不隔离后端 Hermes home**——上一轮（含批 36）
+  的本地打开会留在网关的项目库里，旧的固定名 `local-acceptance` 会让**旧项目行替本轮通过**
+  （批 36 的伪项目正是如此）。
+- **R2 只要产品没要 OS 选择器，就不能算本地通过**：驱动 stub 只替换 OS 选择器并**计数**；
+  点"打开文件夹"后轮询 typed 拒绝（`PATH_SCOPE_REFUSAL`，覆盖 en/zh/zh-hant），
+  并记录当时真实出现的对话框标题。本轮实测：`osDialogCalls=0`，出现的是
+  **"Choose remote folder / Browse folders on the connected backend."**（远程模式下面向
+  后端路径空间的浏览器），且没有产生任何本行行——故记为 **PENDING**（环境不支持，
+  不是本地产品通过）；若 OS 选择器被调用却既无拒绝也无行，则记 FAIL（真实缺陷）。
+- **R3 严格模式修正**：`[data-row-actions]` 在行内同时匹配**展开按钮**与动作容器
+  （`chrome.tsx`：caret 也可 `data-row-actions`），旧驱动 `hover()`/`.last()` 直接抛
+  strict mode violation 中断整轮。全部改为 `div[data-row-actions]`（动作容器）。
+- **R4 交互目标修正**：本地行"进入项目"改为点**主行标签按钮**（与 WSL 行同一套语义）；
+  Copy path 改走行内 kebab（`ProjectMenu`）菜单项，不再依赖右键上下文菜单。
+- **R5 身份/后端断言**：`app.getName()` 与产品真实契约对齐（productName + 说明
+  `HERMES_DESKTOP_APP_NAME` 的适用范围）；首启门未出现时不再写"已配置好"，改为
+  **读 boot log 断言本轮驱动的就是隔离网关**（新增第 4 项断言）。
+- **R6 名称可读性改为测量**：原断言只取 span 宽度，本轮同时取 `row/label/scrollWidth`
+  与默认布局/压缩窗口两组数据（第 5 节 FAIL 即由此暴露）。
+
+### 4. 本轮结论中的 PENDING / SKIP（如实分类，不折算为通过）
+
+- **PENDING 1 项 — Windows 本地真实打开**：本机没有本地 Hermes 运行时，网关在 WSL 内；
+  远程模式把"打开文件夹"的选择器指向**后端浏览器**（"Choose remote folder"），
+  Windows 路径因此根本无法进入该流程（OS 选择器调用数=0，本轮唯一名目录行未出现）。
+  边界成立（没有猜 `/mnt/c`、没有伪记录），但**本地产品功能本身未通过**，故记 PENDING。
+  复验前提：装一台有本地 Hermes 运行时的机器（或本地模式的桌面实例）。
+- **SKIP 2 项 — 置顶真机**（无真实会话、禁止造数据）与**依赖本地行的步骤**
+  （copy-path / 进入本地项目 / 本地隐藏）。两者的行为测试在开发侧通过（第 5 节）。
+- **附：旧伪项目仍在隔离网关库里**（`~/wsl-round1-gateway-home/projects.db`，
+  `p_a7cdbae7`）。本轮未清理该环境（它属批 36 遗留证据），仅不再被用于定位。
+
+### 5. 本轮 FAIL 明细（产品缺陷，按工单只报不改）
+
+- **现象**：WSL 工作区行在侧栏里**看不到名字**。实测（`21-narrow-sidebar.png`，默认布局）：
+  行宽 213px、标签按钮仅 45px，其中名称块被压到 **4px**（文字实际需要 81px），
+  另一 33px 被 `WSL` 徽标（`shrink-0`）占掉；同一行的展开 caret 按钮宽 45px、
+  动作簇 72px。本地行则正常（名称按其自然宽度 96px/28px 呈现）。
+- **首个原因**：36R 阶段 2 的统一行骨架 `SidebarGroupRow` 把**展开 caret 按钮**
+  与标签放进同一个 flex 簇，且 caret 为 `flex flex-1`；标签块是 `min-w-0 flex-1`，
+  其最小宽度只剩 `shrink-0` 的徽标，于是名称块被压到 ~4px。批 36 之前的 WSL 行
+  （`projects/wsl-workspace-section.tsx`，删除于 `442a5e0`）把 caret 放在尾部
+  `shrink-0` 的动作簇里、标签按内容宽度排布，因此那时名称是可读的——这是 36R
+  引入的**用户可见回归**（产品自己的注释写着 "the name must stay readable even when
+  the badges squeeze the row"，现在正好相反）。
+- **为什么旧式断言没抓到**：宽带度的名字 span 仍是一个 4px 宽的非空盒子，
+  Playwright 的 `visible` 判定为真——所以 `getByText(名字)` 一类等待仍然通过。
+  只有**测量渲染宽度**才会暴露（本轮 R6 的改动）。
+- **处置**：按 36R 工单"只改驱动/不动产品"，本轮**未修产品**，如实记为 FAIL 并上报；
+  复现成本：任一 WSL 行即可（本地行不受影响）。
+
+### 6. 精确启动 / 退出方法（复验）
+
+1. WSL：`"$HOME/wsl-round1-gateway-home/start-gateway.sh"`（隔离网关 9127；token 由网关
+   生成于该目录 `session-token.txt`，权限 600，驱动经 `\\wsl.localhost\…` 读取，
+   不打印、不入库）。
+2. Windows：构建已最新时无需重建；需重建则
+   `cd C:\Users\maoqh\agentbox-wsl-round1\apps\desktop && npm run build --workspace apps/desktop`
+   （Windows 侧原生执行，勿从 UNC 构建）。
+3. 一键驱动（见第 2 节命令；`node.exe` 用 Windows 侧，参数为 Windows 路径；每次用
+   **全新沙箱目录**，否则单例锁与宿主记录会污染本轮）。
+4. 手动实例（三个环境变量隔离，与驱动一致）：
+   ```bat
+   set HERMES_HOME=C:\Users\maoqh\agentbox-wsl-round36r4-sandbox\hermes-home
+   set HERMES_DESKTOP_USER_DATA_DIR=C:\Users\maoqh\agentbox-wsl-round36r4-sandbox\user-data
+   set HERMES_DESKTOP_APP_NAME=HermesWslRound1
+   npx electron .
+   ```
+5. 退出：关闭 HermesWslRound1 窗口（数据保留供复验）；停网关：
+   `"$HOME/wsl-round1-gateway-home/stop-gateway.sh"`（只杀 9127，不关发行版）。
+6. 隔离性说明：Electron userData 由 `HERMES_DESKTOP_USER_DATA_DIR` 隔离（驱动已断言），
+   但**连接配置不在 userData**（产品把它存在 `%APPDATA%\Hermes`），所以首启门在"全新
+   沙箱"里也不会出现；本轮以 boot log 断言"驱动的就是隔离网关"（第 2 节第 4 项）。
+   无模型请求、无凭据读取、未触碰用户真实实例数据。
+
+### 7. 36R 本地行为测试（本工作树实跑）
+
+- `npm run --workspace apps/desktop typecheck`：renderer/electron/e2e 三个 tsc 项目全绿。
+- 定向 vitest（`--maxWorkers=2`）：
+  `unified-workspace-list`(6) + `workspace-list/workspace-row`(7) +
+  `chat-sidebar.workspace-assembly`(11) + `chat-sidebar.integration`(4) +
+  `chrome-section-add-button`(5) + `store/projects`(45) → **78 passed / 6 files**；
+  另 `wsl-workspace-usecases`(13) + `path-scope`(4)（阶段 3 路径边界）→ 28 passed / 3 files。
+- 层序守卫 `src/dev/contracts/renderer-layers.test.ts`：32 passed / 1 failed，唯一失败为
+  **已知环境基线**（"leaves no in-flight exclusion stale"——干净工作树无 `src/agentbox/`，
+  35 已确立的基线，未删守卫、未动账本）。
+- 变更文件 eslint（`npx eslint apps/desktop/e2e/workspace-sidebar-round36-driver.mjs`）：
+  0 error / 0 warning（本轮顺带清掉 936c19a 留下的 `no-unused-vars`）。
+- `git diff --check`：干净。
+
+## 交付状态（36R）
+
+**DESKTOP_WORKSPACE_SIDEBAR_PARTIAL** — 不是 GREEN，也不是全部未过。36R 真机重跑
+（`docs/validation/windows-acceptance-round36r/`，executed 23 → PASS 22 / FAIL 1 /
+SKIP 2 / PENDING 1）中，统一工作区列表、同列表内主行选中与展开、重命名（同 id）、
+移除非删除（=归档，记录保留、目录仍在）、重开恢复与 WSL 重连全部真机通过；
+剩余项逐条如下，均为如实分类、未折算：
+
+1. **FAIL（产品缺陷，未修）**：WSL 行的**名称在侧栏被压到 4px**，用户读不到工作区名
+   （首个原因：统一行骨架里 `flex flex-1` 的展开 caret 与标签块争宽，标签最小宽度
+   只剩 `shrink-0` 的 WSL 徽标）。需要产品侧修（36R 工单限定本轮只动驱动）。
+2. **PENDING**：**Windows 本地真实打开**在 WSL-only 后端下不可达（远程模式选择器=
+   后端浏览器，OS 选择器调用数 0，未创建任何记录）。边界通过，本地产品功能待有本地
+   运行时的机器复验。
+3. **SKIP**：置顶真机（无真实会话、禁止造数据）；依赖本地行的 copy-path/进入项目/
+   本地隐藏（行为测试覆盖）。
+4. 旧批 36 的 15 项"全 PASS"与 GREEN 结论**作废**（理由见第 1 节），其证据目录保留
+   为历史。
+
+提交当前分支后停止，等待用户体验与决定（是否修第 1 项缺陷）。
