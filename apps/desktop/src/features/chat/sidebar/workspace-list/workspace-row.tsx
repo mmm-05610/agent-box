@@ -269,7 +269,12 @@ export function WslWorkspaceRow({ infoOpen, item, onRemove, onRename, state, wor
     <button
       aria-label={workspace.name}
       className={cn(
-        'flex min-w-0 flex-1 items-center gap-2 rounded-md bg-transparent p-0 text-left',
+        // `shrink`, not `flex-1`: the label sizes to its content and only gives
+        // width up when the row overflows — the shared sidebar convention
+        // (SidebarRowLink). With `flex-1` the label's zero basis split the
+        // cluster with the disclosure caret, and the shrink-0 WSL badge inside
+        // left the name four pixels wide at every window size (measured).
+        'flex min-w-0 shrink items-center gap-2 rounded-md bg-transparent p-0 text-left',
         selected && 'text-foreground'
       )}
       onClick={() => selectWorkspaceView(workspace.id)}
