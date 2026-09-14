@@ -48,6 +48,7 @@ export const session = {
   workspaceId: localWorkspace.id,
   profileId: profile.id,
   displayName: 'Fix the race',
+  pinned: false,
   archivedAt: null,
   createdAt: fixtureTime,
   updatedAt: fixtureTime

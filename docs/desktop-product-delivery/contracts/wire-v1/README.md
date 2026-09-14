@@ -13,7 +13,7 @@ ACCEPTED_WITH_MECHANICAL_CORRECTIONS；新摘要待后端登记）。
 | 服务端评审面 | `generated/wire-v1.schema.json` | 由 `wireJsonSchemas()` 生成，禁止手改；重生成命令见下 |
 | 语义对照 | [semantics-map.md](semantics-map.md) | core v1 §8 每项能力 → 方法/事件/错误；幂等作用域逐方法登记；§9 场景 → fixture 计划 |
 
-摘要（SHA-256，前 16 位）：权威 `2874fae7c763a6e7`；生成工件 `c9be8a63097aa6b1`。
+摘要（SHA-256，前 16 位）：权威 `986889e47bcf5f25`；生成工件 `d3f7412710e7e951`。
 重生成：`cd apps/desktop && node --experimental-strip-types -e "import('./src/types/wire/wire-v1.ts').then(async m => { const fs = await import('node:fs'); fs.writeFileSync('../../docs/desktop-product-delivery/contracts/wire-v1/generated/wire-v1.schema.json', JSON.stringify(m.wireJsonSchemas(), null, 2) + '\\n') })"`
 
 **放置说明（机械选择）**：权威放 `src/types/wire/` 而非本目录，是为了让客户端直接
@@ -46,6 +46,10 @@ import 同一模块（类型/校验/导出同源，且不破坏 renderer 层序�
 后端 11:05 的 `CHANGES_REQUESTED_CORE_COVERAGE` 已机械落实为同一 wire-v1 的
 `profiles.create/update/archive/updateConfig` 与 `providerModels.list/create/update/archive`；
 Provider/Model 凭据只传不透明 `credentialId`，引用保护使用 `CONFLICT_REFERENCE`。
+
+P03 生产接线补差同时纳入 `sessions.list/update/archive`、可恢复 message role/display/order、
+独立 `olderCursor`、`queue.updated`，以及模糊发送确认所需的 queue/config 回执。否则 Desktop
+重启只能依赖 renderer 旧缓存，无法兑现 core §3/§7。
 
 ## 尚未进入本核心 wire 的增量范围
 

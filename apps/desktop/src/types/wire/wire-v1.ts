@@ -255,6 +255,8 @@ export const SessionRecordSchema = z.object({
    *  per-send actual configuration lives on executions (core v1 §5/§6). */
   profileId: WireIdSchema.nullable(),
   displayName: z.string(),
+  /** Shared business metadata, not a renderer-local sidebar preference. */
+  pinned: z.boolean(),
   archivedAt: WireTimestampSchema.nullable(),
   createdAt: WireTimestampSchema,
   updatedAt: WireTimestampSchema
@@ -380,6 +382,21 @@ export const DraftMessageSchema = z.object({
 })
 export type DraftMessage = z.infer<typeof DraftMessageSchema>
 
+/** Queue (core v1 §6): the SERVER owns it — one ordinary execution per
+ *  session, follow-up default, steer is a separate declared capability. */
+export const QueueItemSchema = z.object({
+  itemId: WireIdSchema,
+  version: RecordVersionSchema,
+  submittedAt: WireTimestampSchema,
+  /** Frozen at submission (core v1 §6: later choices never rewrite it). */
+  message: DraftMessageSchema,
+  profileId: WireIdSchema,
+  /** Effective configuration frozen when this item was accepted. */
+  configVersion: RecordVersionSchema,
+  state: z.enum(['pending', 'dispatched', 'withdrawn', 'paused'])
+})
+export type QueueItem = z.infer<typeof QueueItemSchema>
+
 /** The ONE approval shape (core v1 §7): the server owns the fact; a decision
  *  binds operation content + version; scope beyond "once" must be explicit. */
 export const ApprovalRequestSchema = z.object({
@@ -416,13 +433,17 @@ export type ApprovalDecisionScope = z.infer<typeof ApprovalDecisionScopeSchema>
  *  (core v1 §7: replay restores presentation, never re-does work). */
 export const WireEventSchema = z.discriminatedUnion('kind', [
   z.strictObject({
-    kind: z.literal('message.delta'), sessionId: WireIdSchema, messageId: WireIdSchema, text: z.string()
+    kind: z.literal('message.delta'), sessionId: WireIdSchema, messageId: WireIdSchema,
+    role: z.literal('assistant'), text: z.string()
   }),
   z.strictObject({
-    kind: z.literal('message.final'), sessionId: WireIdSchema, messageId: WireIdSchema, text: z.string()
+    kind: z.literal('message.final'), sessionId: WireIdSchema, messageId: WireIdSchema,
+    role: z.enum(['user', 'assistant', 'system']),
+    displayKind: z.enum(['visible', 'hidden']), text: z.string()
   }),
   z.strictObject({
     kind: z.literal('tool.update'), sessionId: WireIdSchema, toolCallId: WireIdSchema,
+    messageId: WireIdSchema.nullable(),
     tool: z.string().nullable(),
     state: z.enum(['requested', 'running', 'awaiting_approval', 'completed', 'failed', 'denied']),
     summary: z.string().nullable().optional(),
@@ -446,6 +467,9 @@ export const WireEventSchema = z.discriminatedUnion('kind', [
     state: z.enum(['queued', 'dispatched', 'running', 'stopping', 'stopped', 'completed', 'failed', 'unknown']),
     /** Terminal states carry the reason; unknown ≠ failed (core v1 §6/§11). */
     reason: z.string().nullable().optional()
+  }),
+  z.strictObject({
+    kind: z.literal('queue.updated'), sessionId: WireIdSchema, item: QueueItemSchema
   }),
   z.strictObject({
     kind: z.literal('workspace.connection'), workspaceId: WireIdSchema,
@@ -650,6 +674,45 @@ export const ConfigResolveResultSchema = z.discriminatedUnion('outcome', [
 ])
 export type ConfigResolveResult = z.infer<typeof ConfigResolveResultSchema>
 
+/** Session catalog and shared metadata. Listing is the restart discovery path;
+ * renderer caches never stand in for this authority. */
+export const SessionsListParamsSchema = z.strictObject({
+  workspaceId: WireIdSchema.nullable().optional(),
+  includeArchived: z.boolean().default(false),
+  page: WirePageSchema.optional()
+})
+export type SessionsListParams = z.infer<typeof SessionsListParamsSchema>
+export const SessionsListResultSchema = z.strictObject({
+  items: z.array(SessionRecordSchema),
+  nextCursor: WireCursorSchema.nullable()
+})
+export type SessionsListResult = z.infer<typeof SessionsListResultSchema>
+
+export const SessionsUpdateParamsSchema = z
+  .strictObject({
+    requestId: RequestIdSchema,
+    sessionId: WireIdSchema,
+    expectedVersion: RecordVersionSchema,
+    displayName: z.string().min(1).optional(),
+    pinned: z.boolean().optional(),
+    workspaceId: WireIdSchema.optional()
+  })
+  .refine(value => value.displayName !== undefined || value.pinned !== undefined || value.workspaceId !== undefined, {
+    message: 'A Session update must change at least one field'
+  })
+export type SessionsUpdateParams = z.infer<typeof SessionsUpdateParamsSchema>
+export const SessionsUpdateResultSchema = z.strictObject({ session: SessionRecordSchema })
+export type SessionsUpdateResult = z.infer<typeof SessionsUpdateResultSchema>
+
+export const SessionsArchiveParamsSchema = z.strictObject({
+  requestId: RequestIdSchema,
+  sessionId: WireIdSchema,
+  expectedVersion: RecordVersionSchema
+})
+export type SessionsArchiveParams = z.infer<typeof SessionsArchiveParamsSchema>
+export const SessionsArchiveResultSchema = z.strictObject({ session: SessionRecordSchema })
+export type SessionsArchiveResult = z.infer<typeof SessionsArchiveResultSchema>
+
 /** Same-harness profile switch on an EXISTING session: server-confirmed,
  *  old state kept on failure (core v1 §3/§5). Idempotent per requestId. */
 export const SessionsSwitchProfileParamsSchema = z.object({
@@ -729,26 +792,17 @@ export const SendOutcomeQueryParamsSchema = z.object({ requestId: RequestIdSchem
 export type SendOutcomeQueryParams = z.infer<typeof SendOutcomeQueryParamsSchema>
 
 export const SendOutcomeQueryResultSchema = z.discriminatedUnion('outcome', [
-  z.object({ outcome: z.literal('accepted'), sessionId: WireIdSchema, executionId: WireIdSchema.nullable() }),
+  z.object({
+    outcome: z.literal('accepted'),
+    sessionId: WireIdSchema,
+    executionId: WireIdSchema.nullable(),
+    configVersion: RecordVersionSchema,
+    queueItemId: WireIdSchema.nullable()
+  }),
   z.object({ outcome: z.literal('rejected_before_accept'), reason: z.string() }),
   z.object({ outcome: z.literal('unknown') })
 ])
 export type SendOutcomeQueryResult = z.infer<typeof SendOutcomeQueryResultSchema>
-
-/** Queue (core v1 §6): the SERVER owns it — one ordinary execution per
- *  session, follow-up default, steer is a separate declared capability. */
-export const QueueItemSchema = z.object({
-  itemId: WireIdSchema,
-  version: RecordVersionSchema,
-  submittedAt: WireTimestampSchema,
-  /** Frozen at submission (core v1 §6: later choices never rewrite it). */
-  message: DraftMessageSchema,
-  profileId: WireIdSchema,
-  /** Effective configuration frozen when this item was accepted. */
-  configVersion: RecordVersionSchema,
-  state: z.enum(['pending', 'dispatched', 'withdrawn', 'paused'])
-})
-export type QueueItem = z.infer<typeof QueueItemSchema>
 
 export const QueueGetParamsSchema = z.object({ sessionId: WireIdSchema })
 export type QueueGetParams = z.infer<typeof QueueGetParamsSchema>
@@ -819,7 +873,9 @@ export const HistorySnapshotResultSchema = z.discriminatedUnion('outcome', [
     outcome: z.literal('snapshot'),
     frames: z.array(EventFrameSchema),
     /** Feed the subscription from here for a gap-free join. */
-    resumeCursor: WireCursorSchema
+    resumeCursor: WireCursorSchema,
+    /** A distinct backward-pagination cursor; never reused as a live cursor. */
+    olderCursor: WireCursorSchema.nullable()
   }),
   z.object({ outcome: z.literal('resync_required'), reason: z.string() })
 ])
@@ -847,6 +903,9 @@ export const WireMethods = {
   'providerModels.archive': [ProviderModelsArchiveParamsSchema, ProviderModelsArchiveResultSchema],
   'config.describe': [ConfigDescribeParamsSchema, ConfigDescribeResultSchema],
   'config.resolve': [ConfigResolveParamsSchema, ConfigResolveResultSchema],
+  'sessions.list': [SessionsListParamsSchema, SessionsListResultSchema],
+  'sessions.update': [SessionsUpdateParamsSchema, SessionsUpdateResultSchema],
+  'sessions.archive': [SessionsArchiveParamsSchema, SessionsArchiveResultSchema],
   'sessions.switchProfile': [SessionsSwitchProfileParamsSchema, SessionsSwitchProfileResultSchema],
   'sessions.createAndSend': [SessionsCreateAndSendParamsSchema, SessionsCreateAndSendResultSchema],
   'sessions.send': [SessionsSendParamsSchema, SessionsSendResultSchema],

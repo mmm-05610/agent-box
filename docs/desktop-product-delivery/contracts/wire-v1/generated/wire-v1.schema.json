@@ -186,6 +186,10 @@
                 "type": "string",
                 "minLength": 1
               },
+              "role": {
+                "type": "string",
+                "const": "assistant"
+              },
               "text": {
                 "type": "string"
               }
@@ -194,6 +198,7 @@
               "kind",
               "sessionId",
               "messageId",
+              "role",
               "text"
             ],
             "additionalProperties": false
@@ -213,6 +218,21 @@
                 "type": "string",
                 "minLength": 1
               },
+              "role": {
+                "type": "string",
+                "enum": [
+                  "user",
+                  "assistant",
+                  "system"
+                ]
+              },
+              "displayKind": {
+                "type": "string",
+                "enum": [
+                  "visible",
+                  "hidden"
+                ]
+              },
               "text": {
                 "type": "string"
               }
@@ -221,6 +241,8 @@
               "kind",
               "sessionId",
               "messageId",
+              "role",
+              "displayKind",
               "text"
             ],
             "additionalProperties": false
@@ -239,6 +261,17 @@
               "toolCallId": {
                 "type": "string",
                 "minLength": 1
+              },
+              "messageId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "tool": {
                 "anyOf": [
@@ -286,6 +319,7 @@
               "kind",
               "sessionId",
               "toolCallId",
+              "messageId",
               "tool",
               "state"
             ],
@@ -514,6 +548,115 @@
             "properties": {
               "kind": {
                 "type": "string",
+                "const": "queue.updated"
+              },
+              "sessionId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "item": {
+                "type": "object",
+                "properties": {
+                  "itemId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "submittedAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                  },
+                  "message": {
+                    "type": "object",
+                    "properties": {
+                      "text": {
+                        "type": "string"
+                      },
+                      "attachments": {
+                        "default": [],
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "ref": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "displayName": {
+                              "type": "string"
+                            },
+                            "mediaKind": {
+                              "type": "string",
+                              "enum": [
+                                "file",
+                                "image",
+                                "other"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "ref",
+                            "displayName",
+                            "mediaKind"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": [
+                      "text",
+                      "attachments"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "profileId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "configVersion": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "pending",
+                      "dispatched",
+                      "withdrawn",
+                      "paused"
+                    ]
+                  }
+                },
+                "required": [
+                  "itemId",
+                  "version",
+                  "submittedAt",
+                  "message",
+                  "profileId",
+                  "configVersion",
+                  "state"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "kind",
+              "sessionId",
+              "item"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
                 "const": "workspace.connection"
               },
               "workspaceId": {
@@ -638,6 +781,10 @@
             "type": "string",
             "minLength": 1
           },
+          "role": {
+            "type": "string",
+            "const": "assistant"
+          },
           "text": {
             "type": "string"
           }
@@ -646,6 +793,7 @@
           "kind",
           "sessionId",
           "messageId",
+          "role",
           "text"
         ],
         "additionalProperties": false
@@ -665,6 +813,21 @@
             "type": "string",
             "minLength": 1
           },
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "assistant",
+              "system"
+            ]
+          },
+          "displayKind": {
+            "type": "string",
+            "enum": [
+              "visible",
+              "hidden"
+            ]
+          },
           "text": {
             "type": "string"
           }
@@ -673,6 +836,8 @@
           "kind",
           "sessionId",
           "messageId",
+          "role",
+          "displayKind",
           "text"
         ],
         "additionalProperties": false
@@ -691,6 +856,17 @@
           "toolCallId": {
             "type": "string",
             "minLength": 1
+          },
+          "messageId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "tool": {
             "anyOf": [
@@ -738,6 +914,7 @@
           "kind",
           "sessionId",
           "toolCallId",
+          "messageId",
           "tool",
           "state"
         ],
@@ -958,6 +1135,115 @@
           "sessionId",
           "executionId",
           "state"
+        ],
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "queue.updated"
+          },
+          "sessionId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "item": {
+            "type": "object",
+            "properties": {
+              "itemId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "version": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "submittedAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+              },
+              "message": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "attachments": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "ref": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "displayName": {
+                          "type": "string"
+                        },
+                        "mediaKind": {
+                          "type": "string",
+                          "enum": [
+                            "file",
+                            "image",
+                            "other"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "ref",
+                        "displayName",
+                        "mediaKind"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "text",
+                  "attachments"
+                ],
+                "additionalProperties": false
+              },
+              "profileId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "configVersion": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "state": {
+                "type": "string",
+                "enum": [
+                  "pending",
+                  "dispatched",
+                  "withdrawn",
+                  "paused"
+                ]
+              }
+            },
+            "required": [
+              "itemId",
+              "version",
+              "submittedAt",
+              "message",
+              "profileId",
+              "configVersion",
+              "state"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "kind",
+          "sessionId",
+          "item"
         ],
         "additionalProperties": false
       },
@@ -3774,6 +4060,357 @@
       }
     ]
   },
+  "sessions.list#params": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "workspaceId": {
+        "anyOf": [
+          {
+            "type": "string",
+            "minLength": 1
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "includeArchived": {
+        "default": false,
+        "type": "boolean"
+      },
+      "page": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 500
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "includeArchived"
+    ],
+    "additionalProperties": false
+  },
+  "sessions.list#result": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "version": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "workspaceId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "profileId": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "displayName": {
+              "type": "string"
+            },
+            "pinned": {
+              "type": "boolean"
+            },
+            "archivedAt": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "createdAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+            },
+            "updatedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+            }
+          },
+          "required": [
+            "id",
+            "version",
+            "workspaceId",
+            "profileId",
+            "displayName",
+            "pinned",
+            "archivedAt",
+            "createdAt",
+            "updatedAt"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "nextCursor": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
+    "required": [
+      "items",
+      "nextCursor"
+    ],
+    "additionalProperties": false
+  },
+  "sessions.update#params": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "requestId": {
+        "type": "string",
+        "minLength": 8
+      },
+      "sessionId": {
+        "type": "string",
+        "minLength": 1
+      },
+      "expectedVersion": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      },
+      "displayName": {
+        "type": "string",
+        "minLength": 1
+      },
+      "pinned": {
+        "type": "boolean"
+      },
+      "workspaceId": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "required": [
+      "requestId",
+      "sessionId",
+      "expectedVersion"
+    ],
+    "additionalProperties": false
+  },
+  "sessions.update#result": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "session": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "profileId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "pinned": {
+            "type": "boolean"
+          },
+          "archivedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "workspaceId",
+          "profileId",
+          "displayName",
+          "pinned",
+          "archivedAt",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "session"
+    ],
+    "additionalProperties": false
+  },
+  "sessions.archive#params": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "requestId": {
+        "type": "string",
+        "minLength": 8
+      },
+      "sessionId": {
+        "type": "string",
+        "minLength": 1
+      },
+      "expectedVersion": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "requestId",
+      "sessionId",
+      "expectedVersion"
+    ],
+    "additionalProperties": false
+  },
+  "sessions.archive#result": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "session": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "profileId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "pinned": {
+            "type": "boolean"
+          },
+          "archivedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "workspaceId",
+          "profileId",
+          "displayName",
+          "pinned",
+          "archivedAt",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "session"
+    ],
+    "additionalProperties": false
+  },
   "sessions.switchProfile#params": {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "type": "object",
@@ -3844,6 +4481,9 @@
               "displayName": {
                 "type": "string"
               },
+              "pinned": {
+                "type": "boolean"
+              },
               "archivedAt": {
                 "anyOf": [
                   {
@@ -3873,6 +4513,7 @@
               "workspaceId",
               "profileId",
               "displayName",
+              "pinned",
               "archivedAt",
               "createdAt",
               "updatedAt"
@@ -3926,6 +4567,9 @@
               "displayName": {
                 "type": "string"
               },
+              "pinned": {
+                "type": "boolean"
+              },
               "archivedAt": {
                 "anyOf": [
                   {
@@ -3955,6 +4599,7 @@
               "workspaceId",
               "profileId",
               "displayName",
+              "pinned",
               "archivedAt",
               "createdAt",
               "updatedAt"
@@ -4097,6 +4742,9 @@
               "displayName": {
                 "type": "string"
               },
+              "pinned": {
+                "type": "boolean"
+              },
               "archivedAt": {
                 "anyOf": [
                   {
@@ -4126,6 +4774,7 @@
               "workspaceId",
               "profileId",
               "displayName",
+              "pinned",
               "archivedAt",
               "createdAt",
               "updatedAt"
@@ -4394,12 +5043,30 @@
                 "type": "null"
               }
             ]
+          },
+          "configVersion": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "queueItemId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
           "outcome",
           "sessionId",
-          "executionId"
+          "executionId",
+          "configVersion",
+          "queueItemId"
         ],
         "additionalProperties": false
       },
@@ -5123,6 +5790,10 @@
                           "type": "string",
                           "minLength": 1
                         },
+                        "role": {
+                          "type": "string",
+                          "const": "assistant"
+                        },
                         "text": {
                           "type": "string"
                         }
@@ -5131,6 +5802,7 @@
                         "kind",
                         "sessionId",
                         "messageId",
+                        "role",
                         "text"
                       ],
                       "additionalProperties": false
@@ -5150,6 +5822,21 @@
                           "type": "string",
                           "minLength": 1
                         },
+                        "role": {
+                          "type": "string",
+                          "enum": [
+                            "user",
+                            "assistant",
+                            "system"
+                          ]
+                        },
+                        "displayKind": {
+                          "type": "string",
+                          "enum": [
+                            "visible",
+                            "hidden"
+                          ]
+                        },
                         "text": {
                           "type": "string"
                         }
@@ -5158,6 +5845,8 @@
                         "kind",
                         "sessionId",
                         "messageId",
+                        "role",
+                        "displayKind",
                         "text"
                       ],
                       "additionalProperties": false
@@ -5176,6 +5865,17 @@
                         "toolCallId": {
                           "type": "string",
                           "minLength": 1
+                        },
+                        "messageId": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         },
                         "tool": {
                           "anyOf": [
@@ -5223,6 +5923,7 @@
                         "kind",
                         "sessionId",
                         "toolCallId",
+                        "messageId",
                         "tool",
                         "state"
                       ],
@@ -5451,6 +6152,115 @@
                       "properties": {
                         "kind": {
                           "type": "string",
+                          "const": "queue.updated"
+                        },
+                        "sessionId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "item": {
+                          "type": "object",
+                          "properties": {
+                            "itemId": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "version": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "submittedAt": {
+                              "type": "string",
+                              "format": "date-time",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                            },
+                            "message": {
+                              "type": "object",
+                              "properties": {
+                                "text": {
+                                  "type": "string"
+                                },
+                                "attachments": {
+                                  "default": [],
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "ref": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "displayName": {
+                                        "type": "string"
+                                      },
+                                      "mediaKind": {
+                                        "type": "string",
+                                        "enum": [
+                                          "file",
+                                          "image",
+                                          "other"
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "ref",
+                                      "displayName",
+                                      "mediaKind"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                }
+                              },
+                              "required": [
+                                "text",
+                                "attachments"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "profileId": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "configVersion": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "state": {
+                              "type": "string",
+                              "enum": [
+                                "pending",
+                                "dispatched",
+                                "withdrawn",
+                                "paused"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "itemId",
+                            "version",
+                            "submittedAt",
+                            "message",
+                            "profileId",
+                            "configVersion",
+                            "state"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "sessionId",
+                        "item"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
                           "const": "workspace.connection"
                         },
                         "workspaceId": {
@@ -5560,12 +6370,23 @@
           },
           "resumeCursor": {
             "type": "string"
+          },
+          "olderCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
           "outcome",
           "frames",
-          "resumeCursor"
+          "resumeCursor",
+          "olderCursor"
         ],
         "additionalProperties": false
       },

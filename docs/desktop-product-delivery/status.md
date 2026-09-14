@@ -5,7 +5,7 @@
 
 ## 执行快照（handoff-policy 每阶段必填）— 接管施工中
 
-- updated_at: 2026-09-14 11:28 (+08:00)
+- updated_at: 2026-09-14 11:35 (+08:00)
 - 执行者: Codex 前端产品 goal（接力会话）；**已从暂停的 Zcode 执行者接管**
 - 工作树/分支: /home/maoqh/projects/agent-box-desktop-next-wsl-round1 @ feature/agentbox-desktop-product
 - 接管核验: 用户指定交接 HEAD `5c0fbfe` 与实际 HEAD
@@ -13,7 +13,7 @@
   未发现该工作树、Windows 构建树的 Electron/Vite/Vitest/Playwright/验收驱动进程；
   dirty 集合仅为下列 4 项已授权交接改动。发布源规则文件与本执行树逐文件 SHA-256 一致，
   保留本文件实时进度，不复制发布源初始状态。
-- 代码检查点（已提交 HEAD）: `9881bb8`（P07 检查点 4 / 核心维护覆盖增量）
+- 代码检查点（已提交 HEAD）: `3f3bbb9`（P04 宿主纵切 1 / 隔离 AgentBox host transport）
   链: ebb1233（P00）→ 8d4b3df/47b5b47/dbb902f（P01 代码与几何修复）→ 26b32fc（P01 GREEN 证据）
   → 468e6ac/d7e9a57（发布源 d3c0196+ffbcfaf 导入）→ 893d560（P07 检查点2 wire-v1）
   → 957a523（P02A 盘点）→ 07f5386（P02A slice 1：失败面非阻塞）→ 3a25edc（P02A slice 2）
@@ -21,9 +21,10 @@
   → 0b3a341（wire client/replay/fixture）→ e4337c8（P02C1）→ fffbf443（P02C2）
   → 22125f3（P02D/B3）→ 57ceae6（P03 持久幂等 send）→ d179dba（P03 服务投影）
   → 9881bb8（P07 核心维护覆盖增量）
+  → 3f3bbb9（P04 隔离 host transport）
 - 已消费发布文档提交: 86d5a7b、61c7ff7、d3c0196、ffbcfaf
-- 当前检查点改动: P04 宿主纵切 1（待提交）：main-only authenticated HTTP transport、窄 IPC/
-  preload bridge、空 lifecycle 诚实 unavailable，且无 Hermes fallback。
+- 当前检查点改动: P07 检查点 5（待提交）：Session 目录、可恢复 transcript、独立历史分页
+  cursor、queue 事件与模糊发送回执；同步完善 P03 catalog/stop/event 投影。
 - 当前阶段: P00 GREEN；P01 GREEN；**P07 检查点 1–4 完成**；P02 A/B1/B2/C/D 已提交；
   P02B3 UI 边界已完成、服务投影随 P03；P03 纵切 1–2 已提交
 - 完成范围: P00；P01 全部返修（真机 27 PASS）；P07 检查点 1（语义映射）、检查点 2
@@ -35,10 +36,10 @@
   legacy 退役、P05 生产接线和 P06 独立验收待续；wire 新摘要待后端登记但不阻塞本端施工
 
 - contract_semantics_version: core-semantics/1（APPROVED_SEMANTICS，2026-09-14）
-- wire_version/schema_digest: wire-v1 WIRE_REVISION_PENDING_BACKEND；新权威
-  sha256:2874fae7c763a6e7，工件 sha256:c9be8a63097aa6b1；17 方法已由后端按上一摘要
-  通过，11:05 核心维护覆盖增量已在本端落实为 25 方法并待后端登记
-- 合同测试: schema/client/fixture 3 files / 33 tests passed；core v1 §9 九组场景矩阵已完整执行；
+- wire_version/schema_digest: wire-v1 WIRE_REVISION_PENDING_BACKEND；当前权威
+  sha256:986889e47bcf5f25，工件 sha256:d3f7412710e7e951；原 17 方法已由后端按旧摘要
+  通过，核心维护与 Session/history 必要补差已合为 28 方法并待后端登记
+- 合同测试: schema/client/fixture 3 files / 34 tests passed；core v1 §9 九组场景矩阵已完整执行；
   真实 wire event stream 与后端投影差异仍是联调项，不以 fixture 伪称服务通过
 - UI_READY: 侧栏工作区列表（36R+P01）真机全绿；P02A 真机 8 PASS / 0 FAIL / 1 PENDING
 - CONTRACT_CLIENT_READY: 隔离客户端与 fixture READY；生产 Electron transport 待 P04，wire 新摘要待后端登记
@@ -78,6 +79,9 @@
   typecheck 通过。25 方法 schema、Profile wire 适配、不透明 Harness 候选与新生成工件已验证。
 - P04 宿主纵切 1：Electron 2 files / 5 tests passed；改动文件 ESLint 0/0；三项目 typecheck
   通过。覆盖主进程独占 endpoint/token、IPC 目标约束、typed 401、危险 endpoint、空 slot 禁回落。
+- P07 检查点 5：Session/history 合并面 7 files / 55 tests passed；合同核心 3 files / 34 tests；
+  改动文件 ESLint 0/0；三项目 typecheck 通过。覆盖重启目录、消息角色/顺序、双 cursor、queue
+  event、停止 transport unknown 与 send outcome queue 身份。
 
 ## 测试与基线（上一执行者交接时点，历史）
 
@@ -122,7 +126,7 @@ wire-review.md通道自39阶段协调。执行者下个检查点消费这些规�
 | P04 宿主与遗留退役 | IN_PROGRESS（窄 request transport 完成；lifecycle/event/legacy 退役待续） | 与 P03 穿插 |
 | P05 正式合同接入 | WIRE_REVISION_PENDING_BACKEND | 新摘要待后端登记；独立客户端先行 |
 | P06 前端验收与交接 | IMPLEMENTATION_HANDOFF_GATE | 本端独立范围完成；真实全栈门由后续集成人负责 |
-| P07 核心合同与状态交接 | 检查点1–4已提交 | 25 方法摘要待后端登记；Session/history 必要增量待编入 |
+| P07 核心合同与状态交接 | 检查点1–4已提交；检查点5待提交 | 28 方法摘要待后端登记 |
 
 ## 测试与证据基线（本轮实跑）
 

@@ -1,5 +1,28 @@
 # 前端对后端 wire-review 的回应（2026-09-14）
 
+## 11:34 Session 目录与可恢复 transcript 必要补差
+
+P03 生产接线审计发现：25 方法版本仍无法满足已批准的 Desktop 重启恢复，因为没有 Server
+Session 目录；同时 `message.*` 无角色、用户消息与顺序语义，`history.snapshot` 也把实时续订
+cursor 与向前分页位置混成一个字段。若直接接 UI，只能拿 renderer 旧缓存伪装历史。
+
+因此本端在**同一 wire-v1** 继续机械补齐，不改变已批准行为：
+
+- `SessionRecord.pinned` 明确为 Server 业务元数据；新增 `sessions.list/update/archive`，总方法数
+  28。列表是重启发现入口；rename/pin/move 使用 CAS；archive 保留身份和历史。
+- `message.delta` 固定 `role:'assistant'`；`message.final` 必带 `role` 与 visible/hidden；Server 在
+  send 接受后须持久化 user final，才能恢复用户输入。`tool.update` 增加可空 `messageId`。
+- `history.snapshot` 分开 live `resumeCursor` 与 backward `olderCursor`；事件投影维护稳定消息顺序。
+- 新增 `queue.updated`，多窗口按 Server 事实同步队列；withdrawn 只在服务事件/回执后移除。
+- `sendOutcome.query.accepted` 补 `configVersion/queueItemId`，模糊发送确认后仍能判定立即执行或排队。
+- 停止 transport 失败落 `unconfirmed` 并保留原 execution，不再永久卡在 requesting。
+
+当前权威完整 SHA-256：
+`986889e47bcf5f25353bf8cb62afb009cd367ece7b90cbcbf8ce89bd5ed4c257`；
+当前生成工件完整 SHA-256：
+`d3f7412710e7e951674922aebdb72ffbb028fc76b2e353a86b53097fd02abe22`。
+这两个摘要**取代**下节 25 方法的中间摘要；请以后端对当前 28 方法工件的回归登记为准。
+
 ## 11:05 `CHANGES_REQUESTED_CORE_COVERAGE` 回应
 
 已按后端列出的机械增量扩展**同一** TS 权威，没有新建竞争协议：

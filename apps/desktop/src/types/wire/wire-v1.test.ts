@@ -87,7 +87,7 @@ describe('wire v1 envelope', () => {
   it('every registered method exposes params and result schemas', () => {
     const names = Object.keys(WireMethods)
 
-    expect(names.length).toBe(25)
+    expect(names.length).toBe(28)
 
     for (const [name, [params, result]] of Object.entries(WireMethods)) {
       expect(params, `${name} params`).toBeDefined()
@@ -121,6 +121,7 @@ describe('wire v1 core behaviors pinned by schema shape', () => {
         workspaceId: asWireId('ws_1'),
         profileId: asWireId('prof_1'),
         displayName: 'hello',
+        pinned: false,
         archivedAt: null,
         createdAt: '2026-09-14T00:00:00.000Z',
         updatedAt: '2026-09-14T00:00:00.000Z'
@@ -183,7 +184,8 @@ describe('wire v1 core behaviors pinned by schema shape', () => {
     const snapshot: HistorySnapshotResult = {
       outcome: 'snapshot',
       frames: [frame],
-      resumeCursor: asCursor('cur-2')
+      resumeCursor: asCursor('cur-2'),
+      olderCursor: null
     }
 
     expect(HistorySnapshotResultSchema.parse(snapshot).outcome).toBe('snapshot')
@@ -315,7 +317,7 @@ describe('wire v1 core behaviors pinned by schema shape', () => {
       emittedAt: '2026-09-14T00:00:00.000Z'
     }
 
-    expect(EventFrameSchema.parse({ ...base, event: { kind: 'message.delta', sessionId: asWireId('ses_1'), messageId: asWireId('msg_1'), text: 'he' } }).seq).toBe(41)
+    expect(EventFrameSchema.parse({ ...base, event: { kind: 'message.delta', sessionId: asWireId('ses_1'), messageId: asWireId('msg_1'), role: 'assistant', text: 'he' } }).seq).toBe(41)
     expect(() => EventFrameSchema.parse({ ...base, event: { kind: 'message.delta', sessionId: asWireId('ses_1'), messageId: asWireId('msg_1') } })).toThrow()
   })
 })

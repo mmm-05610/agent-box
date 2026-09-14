@@ -222,13 +222,15 @@ describe('core-semantics/1 §9 executable fixture matrix', () => {
       kind: 'message.delta',
       sessionId: session.id,
       messageId: asWireId('message-1'),
+      role: 'assistant',
       text: 'hello'
     })
 
     const snapshot = HistorySnapshotResultSchema.parse({
       outcome: 'snapshot',
       frames: [firstFrame],
-      resumeCursor: firstFrame.cursor
+      resumeCursor: firstFrame.cursor,
+      olderCursor: null
     })
 
     if (snapshot.outcome !== 'snapshot') {
@@ -239,9 +241,11 @@ describe('core-semantics/1 §9 executable fixture matrix', () => {
     expect(applyWireEventFrame(applied.projection, snapshot.frames[0]!).outcome).toBe('duplicate')
 
     const late = frame('event-message-2', 32, {
+      displayKind: 'visible',
       kind: 'message.final',
       sessionId: session.id,
       messageId: asWireId('message-1'),
+      role: 'assistant',
       text: 'hello world'
     })
 
@@ -249,7 +253,11 @@ describe('core-semantics/1 §9 executable fixture matrix', () => {
     expect(gap).toMatchObject({ outcome: 'gap', projection: { needsResync: true } })
 
     const resynced = markWireProjectionResynced(gap.projection, { cursor: asCursor('cursor-31'), lastSeq: 31 })
-    expect(applyWireEventFrame(resynced, late).outcome).toBe('applied')
+    const completed = applyWireEventFrame(resynced, late)
+
+    expect(completed.outcome).toBe('applied')
+    expect(completed.projection.messageOrder).toEqual(['message-1'])
+    expect(completed.projection.messages['message-1']).toMatchObject({ role: 'assistant', text: 'hello world' })
     expect(HistorySnapshotResultSchema.parse({ outcome: 'resync_required', reason: 'cursor expired' }).outcome).toBe(
       'resync_required'
     )
@@ -284,6 +292,7 @@ describe('core-semantics/1 §9 executable fixture matrix', () => {
   it('09 — strict event frames reject secret material instead of stripping it', () => {
     const safe = frame('event-safe', 50, {
       kind: 'tool.update',
+      messageId: null,
       sessionId: session.id,
       toolCallId: asWireId('tool-1'),
       tool: 'managed_tool',

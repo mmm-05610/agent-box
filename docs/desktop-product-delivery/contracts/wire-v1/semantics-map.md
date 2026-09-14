@@ -11,18 +11,19 @@
 | 环境准备/浏览 | `workspaces.browse`；进度走 `workspace.connection` 事件（connecting/preparing[worker\|harness]/failed+reason） | 目录条目、canOpen/canWrite 分列、真实失败原因 | requestIds 全局唯一 |
 | 工作区打开/维护 | `workspaces.open`、`workspaces.list`、`workspaces.archive` | 权威 WorkspaceRecord（同环境+规范化路径重开保 id，`created` 标记新建）；归档=记录保留 | (environment, normalizedPath)；archive 按 expectedVersion |
 | 角色/模型维护 | `profiles.list/create/update/archive/updateConfig`；`providerModels.list/create/update/archive` | ProfileRecord、ProviderModelConfigRecord（harness/provider 仅作数据，credentialId 仅不透明引用）；配置只对 next_send 生效；被引用资源拒绝归档 | list 不适用；写按方法+requestId，update/archive 另带 expectedVersion |
+| Session 目录/业务元数据 | `sessions.list/update/archive` | 重启可发现稳定 Session；名称/置顶/Workspace 归属/归档跨客户端一致，归档不删历史 | list 不适用；update/archive 按 requestId+expectedVersion |
 | 配置描述/解析/切换 | `config.describe`、`config.resolve`、`sessions.switchProfile` | 控件描述（有限 kind 枚举）、securityLockedIds、effectTiming；解析=服务端算生效值或列 invalid；切换 confirmed/rejected+reason 且带旧记录 | switch 按 requestId |
 | 首次发送/继续发送 | `sessions.createAndSend`、`sessions.send` | accepted{session,executionId,configVersion} / rejected_before_accept（无 session，草稿不动） | requestId 全局（跨方法与 sendOutcome.query 同域） |
 | 查询接受结果 | `sendOutcome.query` | accepted / rejected_before_accept / **unknown**（不是安全重发信号） | 同上 |
 | 队列管理 | `queue.get`、`queue.withdraw` | 权威队列项（提交时角色/内容冻结）；撤回 too_late 明示；暂停/继续由 execution.state+queue 状态表达 | withdraw 按 requestId+expectedVersion |
-| 会话历史/订阅 | `history.snapshot` + `wire.eventStream/1` 帧流 | snapshot{frames,resumeCursor} / resync_required；帧含 eventId+seq+cursor，重放幂等 | 不适用（游标寻址） |
+| 会话历史/订阅 | `history.snapshot` + `wire.eventStream/1` 帧流 | snapshot{frames,resumeCursor,olderCursor} / resync_required；消息含 role/display 并有稳定顺序；实时续订与向前分页游标分离 | 不适用（游标寻址） |
 | 停止/审批决定 | `runs.stop`、`approvals.decide` | stop_requested≠已停止（终态走 execution.state）；决定 recorded/already_recorded/invalid；scope=once 或显式 bounded | stop 按 requestId；decide 按 approvalId+expectedVersion |
 | 续接/重试 | 外围合同（核心仅要求"不改写旧失败"——sessions.send 以新 requestId 建**关联**新执行，关联事实由服务端事件携带） | — | — |
 
 ## 事件归一（core v1 §6/§7）
 
 `message.delta / message.final / tool.update / approval.requested / approval.settled /
-config.changed / execution.state / workspace.connection`。
+config.changed / execution.state / queue.updated / workspace.connection`。
 不透传原生 raw 协议与秘密；Execution 只作后台身份字段，不进用户心智。
 
 ## §9 必测场景 → 可执行 fixture 矩阵（P07 检查点 3）

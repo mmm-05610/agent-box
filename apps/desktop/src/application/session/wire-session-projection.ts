@@ -1,5 +1,12 @@
 import type { ApprovalRequest, EventFrame, WireCursor, WireEvent } from '@/types/wire/wire-v1'
 
+export interface WireTranscriptMessage {
+  displayKind: 'hidden' | 'visible'
+  messageId: string
+  role: 'assistant' | 'system' | 'user'
+  text: string
+}
+
 export interface WireSessionProjection {
   appliedEventIds: string[]
   approvals: Record<string, ApprovalRequest>
@@ -11,8 +18,10 @@ export interface WireSessionProjection {
     state: Extract<WireEvent, { kind: 'execution.state' }>['state']
   }
   lastSeq: null | number
-  messages: Record<string, string>
+  messageOrder: string[]
+  messages: Record<string, WireTranscriptMessage>
   needsResync: boolean
+  olderCursor: null | WireCursor
   resumeCursor: null | WireCursor
   sessionId: string
   tools: Record<
@@ -36,8 +45,10 @@ export function emptyWireSessionProjection(sessionId: string): WireSessionProjec
     configEffectiveFor: null,
     execution: null,
     lastSeq: null,
+    messageOrder: [],
     messages: {},
     needsResync: false,
+    olderCursor: null,
     resumeCursor: null,
     sessionId,
     tools: {}
@@ -76,14 +87,39 @@ export function applyWireEventFrame(
 
 function reduceWireEvent(projection: WireSessionProjection, event: WireEvent): WireSessionProjection {
   if (event.kind === 'message.delta') {
+    const current = projection.messages[event.messageId]
+
     return {
       ...projection,
-      messages: { ...projection.messages, [event.messageId]: `${projection.messages[event.messageId] ?? ''}${event.text}` }
+      messageOrder: current ? projection.messageOrder : [...projection.messageOrder, event.messageId],
+      messages: {
+        ...projection.messages,
+        [event.messageId]: {
+          displayKind: current?.displayKind ?? 'visible',
+          messageId: event.messageId,
+          role: event.role,
+          text: `${current?.text ?? ''}${event.text}`
+        }
+      }
     }
   }
 
   if (event.kind === 'message.final') {
-    return { ...projection, messages: { ...projection.messages, [event.messageId]: event.text } }
+    return {
+      ...projection,
+      messageOrder: projection.messages[event.messageId]
+        ? projection.messageOrder
+        : [...projection.messageOrder, event.messageId],
+      messages: {
+        ...projection.messages,
+        [event.messageId]: {
+          displayKind: event.displayKind,
+          messageId: event.messageId,
+          role: event.role,
+          text: event.text
+        }
+      }
+    }
   }
 
   if (event.kind === 'execution.state') {
@@ -125,7 +161,13 @@ function reduceWireEvent(projection: WireSessionProjection, event: WireEvent): W
 
 export function markWireProjectionResynced(
   projection: WireSessionProjection,
-  input: { cursor: WireCursor; lastSeq?: number }
+  input: { cursor: WireCursor; lastSeq?: number; olderCursor?: null | WireCursor }
 ): WireSessionProjection {
-  return { ...projection, lastSeq: input.lastSeq ?? projection.lastSeq, needsResync: false, resumeCursor: input.cursor }
+  return {
+    ...projection,
+    lastSeq: input.lastSeq ?? projection.lastSeq,
+    needsResync: false,
+    olderCursor: input.olderCursor === undefined ? projection.olderCursor : input.olderCursor,
+    resumeCursor: input.cursor
+  }
 }

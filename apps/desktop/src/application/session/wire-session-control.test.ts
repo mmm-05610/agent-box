@@ -123,9 +123,33 @@ describe('AgentBox stop and event projection', () => {
     expect($agentBoxStopStates.get()[sessionId]).toEqual({ detail: 'transport uncertain', phase: 'unconfirmed' })
   })
 
+  it('does not strand stop at requesting when the transport outcome is unknown', async () => {
+    ingestAgentBoxEvent(
+      frame(0, { executionId: asWireId('execution-1'), kind: 'execution.state', sessionId, state: 'running' })
+    )
+    const wire = client(async () => Promise.reject(new Error('connection lost')))
+
+    await expect(requestAgentBoxStop(wire, { executionId: asWireId('execution-1'), sessionId })).rejects.toThrow(
+      'connection lost'
+    )
+    expect($agentBoxSessionProjections.get()[sessionId]?.execution?.state).toBe('running')
+    expect($agentBoxStopStates.get()[sessionId]).toEqual({ detail: 'connection lost', phase: 'unconfirmed' })
+  })
+
+  it('projects cross-window queue events from server truth', () => {
+    ingestAgentBoxEvent(frame(0, { item: queueItem(), kind: 'queue.updated', sessionId }))
+    expect($agentBoxQueues.get()[sessionId]).toEqual([queueItem()])
+
+    ingestAgentBoxEvent(
+      frame(1, { item: queueItem({ state: 'withdrawn', version: 2 }), kind: 'queue.updated', sessionId })
+    )
+    expect($agentBoxQueues.get()[sessionId]).toEqual([])
+  })
+
   it('deduplicates replay, projects tool facts, and marks a sequence gap for resync', () => {
     const tool = frame(0, {
       kind: 'tool.update',
+      messageId: null,
       resultExcerpt: null,
       sessionId,
       state: 'awaiting_approval',
@@ -140,7 +164,14 @@ describe('AgentBox stop and event projection', () => {
 
     expect(
       ingestAgentBoxEvent(
-        frame(2, { kind: 'message.final', messageId: asWireId('message-2'), sessionId, text: 'late' })
+        frame(2, {
+          displayKind: 'visible',
+          kind: 'message.final',
+          messageId: asWireId('message-2'),
+          role: 'assistant',
+          sessionId,
+          text: 'late'
+        })
       ).outcome
     ).toBe('gap')
     expect($agentBoxSessionProjections.get()[sessionId]?.needsResync).toBe(true)
@@ -181,12 +212,21 @@ describe('AgentBox stop and event projection', () => {
 describe('AgentBox history recovery', () => {
   it('retries from a clean snapshot when the saved cursor is too old', async () => {
     ingestAgentBoxEvent(
-      frame(8, { kind: 'message.final', messageId: asWireId('old-message'), sessionId, text: 'stale' })
+      frame(8, {
+        displayKind: 'visible',
+        kind: 'message.final',
+        messageId: asWireId('old-message'),
+        role: 'assistant',
+        sessionId,
+        text: 'stale'
+      })
     )
 
     const fresh = frame(0, {
+      displayKind: 'visible',
       kind: 'message.final',
       messageId: asWireId('fresh-message'),
+      role: 'assistant',
       sessionId,
       text: 'restored'
     })
@@ -194,13 +234,20 @@ describe('AgentBox history recovery', () => {
     const wire = client(async (_method, params) =>
       'cursor' in (params as Record<string, unknown>)
         ? { outcome: 'resync_required', reason: 'cursor expired' }
-        : { frames: [fresh], outcome: 'snapshot', resumeCursor: asCursor('cursor-fresh') }
+        : { frames: [fresh], olderCursor: null, outcome: 'snapshot', resumeCursor: asCursor('cursor-fresh') }
     )
 
     const result = await hydrateAgentBoxHistory(wire, sessionId)
 
     expect(result.outcome).toBe('snapshot')
-    expect($agentBoxSessionProjections.get()[sessionId]?.messages).toEqual({ 'fresh-message': 'restored' })
+    expect($agentBoxSessionProjections.get()[sessionId]?.messages).toEqual({
+      'fresh-message': {
+        displayKind: 'visible',
+        messageId: 'fresh-message',
+        role: 'assistant',
+        text: 'restored'
+      }
+    })
     expect(wire.call).toHaveBeenCalledTimes(2)
   })
 

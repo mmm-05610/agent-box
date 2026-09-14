@@ -65,10 +65,20 @@ export async function requestAgentBoxStop(
 ): Promise<RunsStopResult> {
   setAgentBoxStopState(input.sessionId, { detail: null, phase: 'requesting' })
 
-  const result = await client.call('runs.stop', {
-    ...input,
-    requestId: (options.createRequestId ?? defaultRequestId)()
-  })
+  let result: RunsStopResult
+
+  try {
+    result = await client.call('runs.stop', {
+      ...input,
+      requestId: (options.createRequestId ?? defaultRequestId)()
+    })
+  } catch (error) {
+    setAgentBoxStopState(input.sessionId, {
+      detail: error instanceof Error ? error.message : String(error),
+      phase: 'unconfirmed'
+    })
+    throw error
+  }
 
   if (result.outcome === 'stop_requested') {
     const projection = agentBoxSessionProjection(input.sessionId)
@@ -117,6 +127,21 @@ export function ingestAgentBoxEvent(frame: EventFrame) {
     })
   }
 
+  if (frame.event.kind === 'queue.updated' && result.outcome === 'applied') {
+    const event = frame.event
+    const current = $agentBoxQueues.get()[frame.sessionId] ?? []
+    const index = current.findIndex(item => item.itemId === event.item.itemId)
+    const items = [...current]
+
+    if (index < 0) {
+      items.push(event.item)
+    } else {
+      items[index] = event.item
+    }
+
+    setAgentBoxQueue(frame.sessionId, items.filter(item => item.state !== 'withdrawn'))
+  }
+
   return result
 }
 
@@ -156,6 +181,7 @@ export async function hydrateAgentBoxHistory(client: WireV1Client, sessionId: Wi
 
   projection = markWireProjectionResynced(projection, {
     cursor: snapshot.resumeCursor,
+    olderCursor: snapshot.olderCursor,
     ...(snapshot.frames.length > 0 ? { lastSeq: snapshot.frames.at(-1)!.seq } : {})
   })
   setAgentBoxSessionProjection(sessionId, projection)

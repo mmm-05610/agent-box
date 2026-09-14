@@ -15,6 +15,7 @@ const session: SessionRecord = {
   createdAt: '2026-09-14T00:00:00.000Z',
   displayName: 'Ship it',
   id: asWireId('session-1'),
+  pinned: false,
   profileId: asWireId('profile-1'),
   updatedAt: '2026-09-14T00:00:00.000Z',
   version: 1,
@@ -88,8 +89,10 @@ describe('sendAgentBoxMessage', () => {
     })
 
     wire.call.mockResolvedValueOnce({
+      configVersion: 2,
       executionId: asWireId('execution-2'),
       outcome: 'accepted',
+      queueItemId: null,
       sessionId: session.id
     })
 

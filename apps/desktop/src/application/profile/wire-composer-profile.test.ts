@@ -13,6 +13,7 @@ const session = (profileId: string, version = 4): SessionRecord => ({
   createdAt: '2026-09-14T00:00:00.000Z',
   displayName: 'Session',
   id: asWireId('session-a'),
+  pinned: false,
   profileId: asWireId(profileId),
   updatedAt: '2026-09-14T00:00:00.000Z',
   version,

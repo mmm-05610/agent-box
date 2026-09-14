@@ -155,7 +155,7 @@ async function queryAgentBoxSendOutcome(
       executionId: result.executionId,
       intentKey,
       outcome: 'accepted',
-      queueItemId: null,
+      queueItemId: result.queueItemId,
       requestId,
       sessionId: result.sessionId
     }
