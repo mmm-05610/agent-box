@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { createAgentBoxWireEventTransport } from './agentbox-wire-event-transport'
+import { AgentBoxWireEventError, createAgentBoxWireEventTransport } from './agentbox-wire-event-transport'
 
 class FakeSocket {
   static instances: FakeSocket[] = []
@@ -119,6 +119,8 @@ describe('AgentBox main-only wire event transport', () => {
     socket.emit('error', { message: 'Bearer secret-token leaked by socket' })
     expect(onError).toHaveBeenCalledOnce()
     expect(onError.mock.calls[0]?.[0].message).toBe('AgentBox event stream is unavailable')
+    expect(onError.mock.calls[0]?.[0]).toBeInstanceOf(AgentBoxWireEventError)
+    expect((onError.mock.calls[0]?.[0] as AgentBoxWireEventError).code).toBe('socket_error')
 
     cleanup()
     socket.emit('error', { message: 'late secret-token error' })
@@ -144,16 +146,44 @@ describe('AgentBox main-only wire event transport', () => {
     const cleanup = subscribe({ sessionId: 's', cursor: '' }, vi.fn())
     cleanup()
     expect(factory).not.toHaveBeenCalled()
+    expect(onError).toHaveBeenCalledOnce()
     expect(onError).toHaveBeenCalledWith(
       expect.objectContaining({ message: expect.not.stringContaining('secret-token') })
     )
+    expect((onError.mock.calls[0]?.[0] as AgentBoxWireEventError).code).toBe('endpoint_rejected')
   })
 
-  it('stays unavailable without a connection or when the factory fails', () => {
+  // The stream used to be silent here: no connection meant an empty cleanup and
+  // no signal, so "the service never came up" and "events quietly stopped" were
+  // the same observation. Every derivation of "no connection" now reports the
+  // same stable category, exactly once, and hands back a cleanup that is safe to
+  // release repeatedly — the IPC layer releases subscriptions on its own timers.
+  it.each([
+    ['null', () => null],
+    ['a thrown accessor', () => {
+      throw new Error('lifecycle closure exploded with secret-token')
+    }],
+    ['a connection with no token', () => ({ endpoint: 'http://127.0.0.1:48152', sessionToken: '' })]
+  ])('reports an unusable connection (%s) exactly once and returns an idempotent cleanup', (_label, readConnection) => {
     const onError = vi.fn()
-    const unavailable = createAgentBoxWireEventTransport({ connection: () => null, onError })
-    expect(() => unavailable({ sessionId: 's', cursor: '' }, vi.fn())).not.toThrow()
-    expect(onError).not.toHaveBeenCalled()
+    const subscribe = createAgentBoxWireEventTransport({ connection: readConnection, onError })
+
+    const cleanup = subscribe({ sessionId: 's', cursor: '' }, vi.fn())
+
+    expect(onError).toHaveBeenCalledOnce()
+    expect((onError.mock.calls[0]?.[0] as AgentBoxWireEventError).code).toBe('connection_unavailable')
+    expect(onError.mock.calls[0]?.[0].message).not.toContain('secret-token')
+
+    expect(() => {
+      cleanup()
+      cleanup()
+      cleanup()
+    }).not.toThrow()
+    expect(onError).toHaveBeenCalledOnce()
+  })
+
+  it('keeps a failing factory and a missing socket implementation on the same channel', () => {
+    const onError = vi.fn()
 
     const failed = createAgentBoxWireEventTransport({
       connection: () => connection,
@@ -166,5 +196,48 @@ describe('AgentBox main-only wire event transport', () => {
     expect(() => failed({ sessionId: 's', cursor: '' }, vi.fn())).not.toThrow()
     expect(onError).toHaveBeenCalledOnce()
     expect(onError.mock.calls[0]?.[0].message).not.toContain('secret-token')
+    expect((onError.mock.calls[0]?.[0] as AgentBoxWireEventError).code).toBe('socket_unavailable')
+
+    // A host with no WebSocket implementation at all is the same category, not
+    // a crash and not a silent no-op.
+    const noSocket = createAgentBoxWireEventTransport({
+      connection: () => connection,
+      createWebSocket: {} as unknown as typeof FakeSocket,
+      onError
+    })
+
+    expect(() => noSocket({ sessionId: 's', cursor: '' }, vi.fn())).not.toThrow()
+    expect(onError).toHaveBeenCalledTimes(2)
+    expect((onError.mock.calls[1]?.[0] as AgentBoxWireEventError).code).toBe('socket_unavailable')
+  })
+
+  it('survives a diagnostic sink and a frame listener that both throw', () => {
+    FakeSocket.instances = []
+
+    const throwingSink = createAgentBoxWireEventTransport({
+      connection: () => null,
+      onError: () => {
+        throw new Error('the sink itself is broken')
+      }
+    })
+
+    // A throwing sink must not become a main-process crash.
+    expect(() => throwingSink({ sessionId: 's', cursor: '' }, vi.fn())).not.toThrow()
+
+    const listenerThrows = createAgentBoxWireEventTransport({
+      connection: () => connection,
+      createWebSocket: FakeSocket
+    })
+
+    const cleanup = listenerThrows(
+      { sessionId: 's', cursor: '' },
+      () => {
+        throw new Error('renderer listener blew up')
+      }
+    )
+
+    const socket = FakeSocket.instances[0]!
+    expect(() => socket.emit('message', { data: '{"eventId":"e1"}' })).not.toThrow()
+    expect(() => cleanup()).not.toThrow()
   })
 })

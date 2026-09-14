@@ -1,3 +1,4 @@
+import { resolveAgentBoxWireEndpoint } from './agentbox-wire-endpoint-policy'
 import type { AgentBoxWireHostConnection } from './agentbox-wire-transport'
 
 interface AgentBoxWireEventSocket {
@@ -12,6 +13,30 @@ interface AgentBoxWireEventSocketConstructor {
   new (url: string, options?: { headers: Record<string, string> }): AgentBoxWireEventSocket
 }
 
+/**
+ * Why an event stream could not be served. Stable categories, not prose: a
+ * diagnostic sink is allowed to record one of these and nothing else, because
+ * the endpoint and the session token live in the lifecycle closure and must
+ * never reach a log line.
+ */
+export type AgentBoxWireEventErrorCode =
+  | 'connection_unavailable'
+  | 'endpoint_rejected'
+  | 'socket_error'
+  | 'socket_unavailable'
+
+/** The message is fixed for every cause; `code` carries the category. A raw
+ *  transport cause could quote the endpoint or the token, so none is attached. */
+export class AgentBoxWireEventError extends Error {
+  readonly code: AgentBoxWireEventErrorCode
+
+  constructor(code: AgentBoxWireEventErrorCode, message = 'AgentBox event stream is unavailable') {
+    super(message)
+    this.name = 'AgentBoxWireEventError'
+    this.code = code
+  }
+}
+
 export interface AgentBoxWireEventTransportOptions {
   connection: () => AgentBoxWireHostConnection | null
   createWebSocket?: AgentBoxWireEventSocketConstructor
@@ -23,45 +48,20 @@ export type AgentBoxWireEventSubscriber = (
   listener: (frame: unknown) => void
 ) => () => void
 
-const LOOPBACK_IPV4 = /^127\.(?:\d{1,3}\.){2}\d{1,3}$/
+function eventStreamUrl(endpoint: string, sessionId: string, cursor: string): null | string {
+  const decision = resolveAgentBoxWireEndpoint(endpoint)
 
-function isLoopbackHost(hostname: string): boolean {
-  if (hostname === 'localhost' || hostname === '::1' || hostname === '[::1]') {
-    return true
-  }
-
-  if (!LOOPBACK_IPV4.test(hostname)) {
-    return false
-  }
-
-  return hostname
-    .split('.')
-    .slice(1)
-    .every(part => Number(part) <= 255)
-}
-
-function eventStreamUrl(endpoint: string, sessionId: string, cursor: string): string | null {
-  try {
-    const base = new URL(endpoint)
-
-    if (
-      !['http:', 'https:'].includes(base.protocol) ||
-      base.username ||
-      base.password ||
-      !isLoopbackHost(base.hostname)
-    ) {
-      return null
-    }
-
-    const url = new URL(base.origin)
-    url.protocol = base.protocol === 'https:' ? 'wss:' : 'ws:'
-    url.pathname = '/wire/v1/event-stream'
-    url.search = new URLSearchParams({ cursor, sessionId }).toString()
-
-    return url.toString()
-  } catch {
+  if (!decision.endpoint) {
     return null
   }
+
+  const url = new URL(decision.endpoint.origin)
+
+  url.protocol = decision.endpoint.protocol === 'https:' ? 'wss:' : 'ws:'
+  url.pathname = '/wire/v1/event-stream'
+  url.search = new URLSearchParams({ cursor, sessionId }).toString()
+
+  return url.toString()
 }
 
 function addSocketListener(socket: AgentBoxWireEventSocket, type: string, listener: (event: unknown) => void): void {
@@ -95,22 +95,33 @@ export function createAgentBoxWireEventTransport({
     try {
       current = connection()
     } catch {
-      reportError(onError)
+      reportError(onError, 'connection_unavailable')
 
-      return () => undefined
+      return noSubscription()
     }
 
     if (!current?.sessionToken) {
-      return () => undefined
+      // A missing connection is a fact the caller has to be able to see. The
+      // stream used to answer this with a silent no-op cleanup, which made "no
+      // event source" and "events stopped arriving" indistinguishable.
+      reportError(onError, 'connection_unavailable')
+
+      return noSubscription()
     }
 
     const url = eventStreamUrl(current.endpoint, sessionId, cursor)
     const WebSocketImpl = createWebSocket ?? (globalThis.WebSocket as unknown as AgentBoxWireEventSocketConstructor)
 
-    if (!url || typeof WebSocketImpl !== 'function') {
-      reportError(onError)
+    if (!url) {
+      reportError(onError, 'endpoint_rejected')
 
-      return () => undefined
+      return noSubscription()
+    }
+
+    if (typeof WebSocketImpl !== 'function') {
+      reportError(onError, 'socket_unavailable')
+
+      return noSubscription()
     }
 
     let socket: AgentBoxWireEventSocket
@@ -118,9 +129,9 @@ export function createAgentBoxWireEventTransport({
     try {
       socket = new WebSocketImpl(url, { headers: { authorization: `Bearer ${current.sessionToken}` } })
     } catch {
-      reportError(onError)
+      reportError(onError, 'socket_unavailable')
 
-      return () => undefined
+      return noSubscription()
     }
 
     let closed = false
@@ -153,12 +164,21 @@ export function createAgentBoxWireEventTransport({
 
     const onSocketError = () => {
       if (!closed) {
-        reportError(onError)
+        reportError(onError, 'socket_error')
       }
     }
 
-    addSocketListener(socket, 'message', onMessage)
-    addSocketListener(socket, 'error', onSocketError)
+    try {
+      addSocketListener(socket, 'message', onMessage)
+      addSocketListener(socket, 'error', onSocketError)
+    } catch {
+      // A socket that could not be wired up is still a socket that must not
+      // stay open, and the caller still deserves the same diagnostic channel.
+      closeQuietly(socket)
+      reportError(onError, 'socket_error')
+
+      return noSubscription()
+    }
 
     return () => {
       if (closed) {
@@ -168,19 +188,28 @@ export function createAgentBoxWireEventTransport({
       closed = true
       removeSocketListener(socket, 'message', onMessage)
       removeSocketListener(socket, 'error', onSocketError)
-
-      try {
-        socket.close?.()
-      } catch {
-        // Teardown is best effort and remains idempotent.
-      }
+      closeQuietly(socket)
     }
   }
 }
 
-function reportError(onError: ((error: Error) => void) | undefined): void {
+/** Returned when no stream was opened. Idempotent by construction: it holds no
+ *  state, so the IPC layer may release it any number of times. */
+function noSubscription(): () => void {
+  return () => undefined
+}
+
+function closeQuietly(socket: AgentBoxWireEventSocket): void {
   try {
-    onError?.(new Error('AgentBox event stream is unavailable'))
+    socket.close?.()
+  } catch {
+    // Teardown is best effort and remains idempotent.
+  }
+}
+
+function reportError(onError: ((error: Error) => void) | undefined, code: AgentBoxWireEventErrorCode): void {
+  try {
+    onError?.(new AgentBoxWireEventError(code))
   } catch {
     // Diagnostics must not turn a transport failure into a main-process crash.
   }

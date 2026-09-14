@@ -1,4 +1,5 @@
 import {
+  AgentBoxWireEventError,
   type AgentBoxWireEventSubscriber,
   createAgentBoxWireEventTransport
 } from '../security/agentbox-wire-event-transport'
@@ -25,6 +26,20 @@ export interface AgentBoxServiceComposition {
   subscribeWireEvents: AgentBoxWireEventSubscriber
 }
 
+/**
+ * The production diagnostic outlet for a stream the host could not serve.
+ *
+ * It records the stable category and nothing else. The endpoint and the session
+ * token live in the lifecycle closure, which is the whole point of that
+ * closure — so no message, cause or connection object is allowed near this
+ * line, and a caller-supplied sink has to accept the same restriction.
+ */
+function reportEventStreamCategory(error: Error): void {
+  const code = error instanceof AgentBoxWireEventError ? error.code : 'unknown'
+
+  console.warn(`[agentbox-wire] event stream ${code}`)
+}
+
 export function createAgentBoxServiceComposition(
   options: AgentBoxServiceCompositionOptions = {}
 ): AgentBoxServiceComposition {
@@ -49,7 +64,7 @@ export function createAgentBoxServiceComposition(
     }),
     subscribeWireEvents: createAgentBoxWireEventTransport({
       connection: connectionSlot.current,
-      onError: options.onEventError
+      onError: options.onEventError ?? reportEventStreamCategory
     })
   }
 }

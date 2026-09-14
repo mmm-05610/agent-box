@@ -1,3 +1,5 @@
+import { resolveAgentBoxWireEndpoint } from './agentbox-wire-endpoint-policy'
+
 export interface AgentBoxWireHostConnection {
   endpoint: string
   /** Main-process-only session token. Never return or log this value. */
@@ -26,17 +28,26 @@ export class AgentBoxWireHostUnavailableError extends Error {
   }
 }
 
-function requestUrl(endpoint: string, requestPath: string): URL {
-  const base = new URL(endpoint)
+/** Endpoint rejections are reported as one of these two stable strings. The
+ *  endpoint itself never appears in a message: this error can surface in the
+ *  renderer, and the endpoint is a main-only fact. */
+const ENDPOINT_INVALID = 'AgentBox service endpoint is invalid'
+const ENDPOINT_NOT_LOOPBACK = 'AgentBox service endpoint is not loopback'
+const TARGET_INVALID = 'AgentBox wire request target is invalid'
 
-  if (!['http:', 'https:'].includes(base.protocol) || base.username || base.password) {
-    throw new AgentBoxWireHostUnavailableError('AgentBox service endpoint is invalid')
+function requestUrl(endpoint: string, requestPath: string): URL {
+  const decision = resolveAgentBoxWireEndpoint(endpoint)
+
+  if (!decision.endpoint) {
+    throw new AgentBoxWireHostUnavailableError(
+      decision.reason === 'non_loopback' ? ENDPOINT_NOT_LOOPBACK : ENDPOINT_INVALID
+    )
   }
 
-  const url = new URL(requestPath, `${base.origin}/`)
+  const url = new URL(requestPath, `${decision.endpoint.origin}/`)
 
-  if (url.origin !== base.origin || !url.pathname.startsWith('/wire/v1/')) {
-    throw new AgentBoxWireHostUnavailableError('AgentBox wire request target is invalid')
+  if (url.origin !== decision.endpoint.origin || !url.pathname.startsWith('/wire/v1/')) {
+    throw new AgentBoxWireHostUnavailableError(TARGET_INVALID)
   }
 
   return url
@@ -45,6 +56,10 @@ function requestUrl(endpoint: string, requestPath: string): URL {
 /**
  * Main-only HTTP dispatcher. Endpoint and bearer token live in the injected
  * lifecycle closure; the renderer supplies neither and receives neither.
+ *
+ * The endpoint is judged before `fetch` is reached, so a non-loopback target
+ * fails as a typed unavailable error rather than as an outbound connection the
+ * host should never have made. The same judgement the event stream uses.
  */
 export function createAgentBoxWireHttpTransport({
   connection,

@@ -45,6 +45,7 @@ describe('AgentBox service composition', () => {
   })
 
   it('binds event subscription to the same dynamic slot', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const composition = createAgentBoxServiceComposition()
 
     expect(typeof composition.subscribeWireEvents).toBe('function')
@@ -52,5 +53,44 @@ describe('AgentBox service composition', () => {
     expect(typeof agentBoxServiceComposition.connectionSlot.current).toBe('function')
     // No connection means no production socket construction or Hermes fallback.
     composition.subscribeWireEvents({ sessionId: 's', cursor: '' }, vi.fn())
+    expect(warn).toHaveBeenCalledTimes(1)
+
+    warn.mockRestore()
+  })
+
+  // Production has to have somewhere for a dead event stream to be visible,
+  // and that somewhere may not carry the endpoint or the token. The default
+  // sink records the stable category and nothing else.
+  it('reports a missing event stream through the default sink as a category only', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const composition = createAgentBoxServiceComposition()
+
+    composition.connectionSlot.install({
+      endpoint: 'http://user:secret-password@127.0.0.1:48152',
+      sessionToken: 'host-only-token'
+    })
+    composition.subscribeWireEvents({ sessionId: 's', cursor: '' }, vi.fn())
+
+    const logged = warn.mock.calls.flat().join(' ')
+
+    expect(logged).toContain('event stream')
+    expect(logged).not.toContain('host-only-token')
+    expect(logged).not.toContain('secret-password')
+    expect(logged).not.toContain('127.0.0.1')
+
+    warn.mockRestore()
+  })
+
+  it('lets a caller-supplied sink replace the default one', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const onEventError = vi.fn()
+    const composition = createAgentBoxServiceComposition({ onEventError })
+
+    composition.subscribeWireEvents({ sessionId: 's', cursor: '' }, vi.fn())
+
+    expect(onEventError).toHaveBeenCalledOnce()
+    expect(warn).not.toHaveBeenCalled()
+
+    warn.mockRestore()
   })
 })
