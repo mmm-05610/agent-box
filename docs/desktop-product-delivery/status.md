@@ -5,7 +5,7 @@
 
 ## 执行快照（handoff-policy 每阶段必填）— 接管施工中
 
-- updated_at: 2026-09-14 11:05 (+08:00)
+- updated_at: 2026-09-14 11:10 (+08:00)
 - 执行者: Codex 前端产品 goal（接力会话）；**已从暂停的 Zcode 执行者接管**
 - 工作树/分支: /home/maoqh/projects/agent-box-desktop-next-wsl-round1 @ feature/agentbox-desktop-product
 - 接管核验: 用户指定交接 HEAD `5c0fbfe` 与实际 HEAD
@@ -13,22 +13,22 @@
   未发现该工作树、Windows 构建树的 Electron/Vite/Vitest/Playwright/验收驱动进程；
   dirty 集合仅为下列 4 项已授权交接改动。发布源规则文件与本执行树逐文件 SHA-256 一致，
   保留本文件实时进度，不复制发布源初始状态。
-- 代码检查点（已提交 HEAD）: `22125f3`（P02D/B3 / AgentBox 设置与队列权威门）
+- 代码检查点（已提交 HEAD）: `57ceae6`（P03 纵切 1 / 持久幂等 send）
   链: ebb1233（P00）→ 8d4b3df/47b5b47/dbb902f（P01 代码与几何修复）→ 26b32fc（P01 GREEN 证据）
   → 468e6ac/d7e9a57（发布源 d3c0196+ffbcfaf 导入）→ 893d560（P07 检查点2 wire-v1）
   → 957a523（P02A 盘点）→ 07f5386（P02A slice 1：失败面非阻塞）→ 3a25edc（P02A slice 2）
   → df84838（P02A GREEN）→ 91305d8（P02B1）→ 2a5b65d（P02B2）→ a132a49（wire 回应）
   → 0b3a341（wire client/replay/fixture）→ e4337c8（P02C1）→ fffbf443（P02C2）
-  → 22125f3（P02D/B3）
+  → 22125f3（P02D/B3）→ 57ceae6（P03 持久幂等 send）
 - 已消费发布文档提交: 86d5a7b、61c7ff7、d3c0196、ffbcfaf
-- 当前检查点改动: P03 纵切 1（本提交）：首发/续发持久幂等身份、模糊传输结果查询；
-  accepted 才采纳 Session，rejected 才释放请求，unknown 保留同一 requestId 且阻止新草稿越过旧请求。
+- 当前检查点改动: P03 纵切 2（本提交）：server-owned queue get/withdraw、停止请求状态、
+  approval 决策确认边界、历史 snapshot/resync 与事件去重/缺口/工具投影。
 - 当前阶段: P00 GREEN；P01 GREEN；**P07 检查点 1–3 完成**；P02 A/B1/B2/C/D 已提交；
-  P02B3 UI 边界已完成、服务投影随 P03；P03 纵切 1 本提交收口
+  P02B3 UI 边界已完成、服务投影随 P03；P03 纵切 1 已提交、纵切 2 本提交收口
 - 完成范围: P00；P01 全部返修（真机 27 PASS）；P07 检查点 1（语义映射）、检查点 2
   （wire-v1 候选：17 方法 + schema 测试 + JSON Schema 工件；已消费后端机械反馈并回应）；
   P02A（失败面非阻塞+可关闭、Artifacts 页退役、失败终态竞态修复与真机门）
-- 下一项: P03 队列/停止服务投影与历史事件补齐；随后 P04 Electron host transport 及遗留
+- 下一项: P03 生产 Composer/Session 调用者接线；随后 P04 Electron host transport 及遗留
   Hermes 控制流退役。P02B3 的服务队列动作随 P03 生产投影完成后转 GREEN。
 - 阻断: 无真实阻断。剩余 P02B3–D（上层产品）、P03 生产投影、P04 Electron transport/
   legacy 退役、P05 生产接线和 P06 独立验收待续；wire 新摘要待后端登记但不阻塞本端施工
@@ -70,6 +70,9 @@
 - P03 纵切 1：wire send + core fixture + capability 3 files / 17 tests passed；改动文件 ESLint 0/0；
   三项目 typecheck 通过。覆盖首发采纳服务 Session、传输模糊后同 requestId 查询、跨重试不重发、
   新草稿不得越过旧 unknown，以及明确拒绝才释放 pending identity。
+- P03 纵切 2：session control + core fixture 2 files / 19 tests passed；改动文件 ESLint 0/0；
+  三项目 typecheck 通过。覆盖服务队列替换、withdraw/too-late、stop requested/unconfirmed、approval
+  等事件 settle、重复帧、序列缺口、tool 投影、过期 cursor 全量 resync 与持续不可补齐。
 
 ## 测试与基线（上一执行者交接时点，历史）
 
@@ -110,7 +113,7 @@ wire-review.md通道自39阶段协调。执行者下个检查点消费这些规�
 | P00 接管与基线 | GREEN | 旧Desktop会话无并发写入（evidence/P00.md） |
 | P01 36R收口 | GREEN | 真机 27 PASS/2 SKIP/1 PENDING（evidence/P01.md；本地打开 PENDING 转 P05） |
 | P02 上层产品 | IN_PROGRESS（A、B1、B2、C、D 完成；B3 服务投影随 P03 收口） | P01 已满足 |
-| P03 用例状态与API | IN_PROGRESS（client/replay + 持久幂等 send 完成；队列/停止/生产投影待续） | 与 P02 穿插 |
+| P03 用例状态与API | IN_PROGRESS（send/queue/stop/history/event 用例完成；生产调用者待接） | 与 P02 穿插 |
 | P04 宿主与遗留退役 | READY_AFTER_P03 | P03 |
 | P05 正式合同接入 | WIRE_REVISION_PENDING_BACKEND | 新摘要待后端登记；独立客户端先行 |
 | P06 前端验收与交接 | IMPLEMENTATION_HANDOFF_GATE | 本端独立范围完成；真实全栈门由后续集成人负责 |

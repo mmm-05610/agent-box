@@ -15,6 +15,10 @@ export interface WireSessionProjection {
   needsResync: boolean
   resumeCursor: null | WireCursor
   sessionId: string
+  tools: Record<
+    string,
+    Extract<WireEvent, { kind: 'tool.update' }>
+  >
 }
 
 export type WireFrameApplyOutcome = 'applied' | 'duplicate' | 'gap' | 'wrong_session'
@@ -35,7 +39,8 @@ export function emptyWireSessionProjection(sessionId: string): WireSessionProjec
     messages: {},
     needsResync: false,
     resumeCursor: null,
-    sessionId
+    sessionId,
+    tools: {}
   }
 }
 
@@ -88,6 +93,10 @@ function reduceWireEvent(projection: WireSessionProjection, event: WireEvent): W
     }
   }
 
+  if (event.kind === 'tool.update') {
+    return { ...projection, tools: { ...projection.tools, [event.toolCallId]: event } }
+  }
+
   if (event.kind === 'approval.requested') {
     return {
       ...projection,
@@ -116,7 +125,7 @@ function reduceWireEvent(projection: WireSessionProjection, event: WireEvent): W
 
 export function markWireProjectionResynced(
   projection: WireSessionProjection,
-  input: { cursor: WireCursor; lastSeq: number }
+  input: { cursor: WireCursor; lastSeq?: number }
 ): WireSessionProjection {
-  return { ...projection, lastSeq: input.lastSeq, needsResync: false, resumeCursor: input.cursor }
+  return { ...projection, lastSeq: input.lastSeq ?? projection.lastSeq, needsResync: false, resumeCursor: input.cursor }
 }
