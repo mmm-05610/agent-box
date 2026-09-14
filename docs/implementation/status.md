@@ -65,7 +65,8 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   42-D 工件投影检查点=`dba9c0f`+`f846f09`；Pi 生产封装检查点=`0f499b7`+`9f3dd9c`（封装实现 + 证据），
   Pi gate 清理返修=`828bc5b`+`f6f7411`；
   Hermes 封装检查点=`19f945a`、OpenCode 封装检查点=`d3a543a`、通用原生 driver 接缝检查点=`fc62037`、
-  两家证据/status 收口检查点=`625cc2b`（其余三个检查点互不替代）；
+  两家证据/status 收口检查点=`625cc2b`；提交态假绿返修 + driver status 合同检查点=`407c379`
+  （其后的 docs 提交只记录本轮复跑证据，不另立检查点）；
   前端合同检查点=`3aba5c5c`、前端观察 HEAD=`bd1b28b4`；前端尚无最终交接检查点。
 - pi_production_chain: **PI_PRODUCTION_CHAIN_PREPARED**（真实 `@automatalabs/pi-acp@0.5.0` + 真实 Pi
   依赖闭包 → c4 release Worker + bwrap → 本机 loopback 假 DeepSeek 端点；Pi 运行时工件 317 包 /
@@ -102,6 +103,20 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   重开相位 `createsInsideReopenPhase=[]` 且 `hostStarts≥2`；provider 恰 2 次、`requestsBeyondBudget=0`；
   受控重试实测上界 **6**（取代 42d 无证据的 12）；未知模型/缺凭据/坏 checkpoint/漂移二进制全部拒绝；
   token 在事件/状态/报告/Git 零命中；清理 `removed=true`。仍 MODEL_NOT_VERIFIED）。
+- opencode_gate_token_false_green_fixed: **提交态假绿已复现并返修**——OpenCode 全链门把固定假 token
+  （`opencode-gate-fake-token-…`）写进自身 tracked 源码，同时 cleanup 断言"tracked Git 零命中"，
+  于是源码未提交时能绿、提交后必然命中自己：在最终提交态复现为
+  `tests/server/test_opencode_gate_cleanup.py` 4 项失败（均被 `OPENCODE_GATE_TOKEN_IN_GIT` 顶替）。
+  返修：token 改为**每次运行现生成**（`agentbox-opencode-gate-fake-token-` 前缀 + `secrets.token_hex(16)`），
+  生命周期收在 `main()` 的一次运行窗口内（进入时创建、清理核验后清空；窗口外取用即
+  `OPENCODE_GATE_NO_ACTIVE_RUN`）；扫描改为检查**本次实际注入的完整值**（`token_appears_in_tracked_content`），
+  不打印、不进 argv、不读真实 locator。补 3 项提交态回归：动态值不在 tracked 内容、两次运行 token 不同、
+  把本次 token 写进临时登记的 tracked fixture 必须让门以 `OPENCODE_GATE_TOKEN_IN_GIT` 失败并在测试内
+  完整撤销（index 条目与文件都不留）。返修后五文件定向 78 passed、全链门 exit 0 且
+  `cleanup.tokenInTrackedGitContent=false`。
+- native_driver_contract_tightened: driver 必需方法集合加入 **`status`**（envelope 暴露的操作；
+  缺它时注册即以 `DRIVER_METHOD_MISSING` 拒绝，不再等到轮次中途失败）；测试**从接缝模块读取
+  方法表**并对测试 fixture 与真实 OpenCode driver 各构造一次实例核对齐备。
 - native_driver_seam: 新增**中立原生 driver 接缝**（`runtime/native-driver.mjs` + `worker-entry.mjs`
   op 路由 + `adapter.driver` 打包 + `message_delta`/`driver_exit` 映射；只从同一 bundle 的
   `deployment/` 加载、凭据只经 `spawnProcess` 进子进程、事件深红删），Server/Core/Worker/bwrap
@@ -113,7 +128,8 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   `WorkerClient.wait_terminal` 里发）。第一手复现：同一 fixture 驱动静默 8 秒，`lease_ms=5000`
   下轮次被取消（收尾以 `WorkerError: attempt does not accept stdin writes`），仅改为 `120000`
   后两轮 `completed`。既有假端点门因毫秒级应答从未暴露；**任何首 token 超过 5 秒的真实模型轮次
-  都会被掐断**，因此**修好之前不启动四家真实模型门**。本阶段如实登记、未扩范围修复。
+  都会被掐断**，因此**修好之前不启动四家真实模型门**。本阶段如实登记、未扩范围修复；
+  **提交态假绿返修轮同样未修租约（本轮只修验收与合同缺口）**，该阻断项保持未解决。
 - runtime_artifact_projection: **RUNTIME_ARTIFACT_PROJECTION_READY**（`runtimeArtifactMounts`
   Server仅形状校验透传 / Worker WSL 内权威验树摘要 / bwrap 只读 `/runtime/artifacts/<name>`；
   跨 Python-Rust tree digest v1 + golden fixture；上限 32768 条目 / 1 GiB / 4096 字节路径；
@@ -133,8 +149,9 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   正式 WS 事件流、附件、审批、取消/断连、队列续派/暂停、Profile/Provider-Model 维护均有证据；
   Codex模型选择与凭据生产投影代码已接线但尚未以真实受管 Harness 执行；42-D 已完成中立运行时工件
   投影底座（`runtimeArtifactMounts` + Worker 协议 3 + c4 bundle + 真实 Worker+bwrap 无模型门），
-  并在其上完成 **Pi 生产封装**（PI_PRODUCTION_CHAIN_PREPARED，仍 MODEL_NOT_VERIFIED），
-  尚未完成的是 **Hermes/OpenCode 两家封装**；c4 亦未取得 Windows 平台证据）。
+  并在其上完成 **Pi 生产封装**（PI_PRODUCTION_CHAIN_PREPARED，仍 MODEL_NOT_VERIFIED；该句是 r4 当时
+  的进展描述，Hermes/OpenCode 两家封装随后完成，见本文件 hermes_production_chain /
+  opencode_production_chain 两条）；**Codex 封装仍未完成**；c4 亦未取得 Windows 平台证据）。
 - integration_owner: NONE；workbench_model_verified_count: **0**（指本轮；组件门与工件投影门通过
   不等于真实模型可用）。
 - model_authorization: DEEPSEEK_OFFICIAL_AUTHORIZED_MAX_CNY_10；凭据locator见42 §D，不写内容。
@@ -157,7 +174,11 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   Server sidecar 单套 91 passed；既有 runtime-artifact gate 仍 exit 0（底座未退化）；
   Pi 全链 gate exit 0。Windows r4 **本阶段未重跑**。
   Hermes/OpenCode 生产封装增量后（主会话串行复跑同一命令）：python **529 passed/4 skipped/0 failed**
-  （本轮 +85：Hermes 36、OpenCode 25、driver 接缝 17、Pi 别名/翻译断言加强等；4 项既有 skip 未扩大）；
+  （该轮 +85：Hermes 36、OpenCode 25、driver 接缝 17、Pi 别名/翻译断言加强等；4 项既有 skip 未扩大）；
+  **最终提交态返修（HEAD `407c379`）复跑**：同一条全量命令 python **534 passed/4 skipped/0 failed**
+  （较上一条 +5：OpenCode 提交态 token 回归 3、driver status 合同 2；4 项既有 skip 未扩大）；
+  五文件定向 **78 passed**；`build-opencode-authorization.test.mjs` 9/9；OpenCode 全链门 exit 0
+  （`cleanup.tokenInTrackedGitContent=false`）、Hermes 全链门 exit 0；`git diff --check` 干净；
   node：harness_remote 25/25、42d 4/4、Pi 构建器 11/11、Hermes 构建器 20/20、OpenCode 授权工具 9/9；
   Server sidecar 单套 91 passed；Hermes 全链 gate exit 0、OpenCode 全链 gate exit 0、
   Pi 全链 gate exit 0（底座未退化）、runtime-artifact gate exit 0。Windows r4 本阶段未重跑。
@@ -199,11 +220,10 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   摘要在 bootstrap 校验一次（bootstrap→spawn 之间的 TOCTOU 窗口与既有 executable 授权模型一致，
   未新增每 attempt 重验）；bwrap 网络姿态未改（未加 `--unshare-net`）。
 - 调度维护：39即参与wire反馈，通道docs/server-round1/wire-review.md（首轮已写入）。
-- 42 双门（2026-09-14 14:54 只读复核）：后端 READY=否（运行时工件投影底座已完成并通过真实
-  Worker+bwrap 无模型门；**Pi 已完成生产封装**，Hermes/OpenCode 的封装与**四家真实模型门**均未执行；
-  Windows r4 平台门已通过、
-  本阶段未重跑）、前端 READY=否（PARTIAL、`writer_lease` ACTIVE；本次工作树 clean）→
-  未记录集成人、未写前端、未联调。前端施工中不是阻断，不取得写权。
+- 42 双门 —— **历史快照（2026-09-14 14:54 只读复核），已被本文件顶部的 18:21 判定取代，不作当前结论**：
+  当时后端 READY=否（运行时工件投影底座已完成并通过真实 Worker+bwrap 无模型门；Pi 已完成生产封装，
+  Hermes/OpenCode 的封装与四家真实模型门均未执行；Windows r4 平台门已通过、当阶段未重跑）、
+  前端 READY=否（PARTIAL、`writer_lease` ACTIVE；当时工作树 clean）→ 未记录集成人、未写前端、未联调。
 - 每阶段与goal结束前检查状态已更新；41READY后进入42等待，不提前报整体完成，不宣称goal完成。
 
 以下是37/38历史说明，不覆盖39–42新授权。

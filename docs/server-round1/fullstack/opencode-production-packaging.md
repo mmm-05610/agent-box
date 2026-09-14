@@ -97,7 +97,10 @@ TOKEN/SECRET/KEY/PASSWORD/CREDENTIAL/AUTH，也不含 `LD_PRELOAD` / `AGENTBOX_E
 5. 在发包前用 `GET /config/providers` 校验模型可寻址，未命中即
    `OPENCODE_MODEL_NOT_AVAILABLE: Harness model is not available: <值>`；
 6. 附件显式拒绝（`OPENCODE_ATTACHMENTS_UNSUPPORTED`），不静默丢弃；
-7. `close` 停托管进程并等其退出（必要时 SIGKILL），随后 Server 回读 state 投影。
+7. `close` 停托管进程并等其退出（必要时 SIGKILL），随后 Server 回读 state 投影；
+8. `status` 与 `start/create/open/prompt/abort/close` 同属接缝的**必需**方法集合：缺任一个，注册阶段即被
+   `DRIVER_METHOD_MISSING` 拒绝（本阶段把 `status` 明确纳入合同，并由测试从接缝模块读取方法表、
+   对 fixture 与真实 driver 各构造一次实例核验）。
 
 ## 3. 本机假端点全链门（任务 C）
 
@@ -184,14 +187,21 @@ messages = system(9553 字符) + user(48, 含 NONCE-1) + assistant(45, 含 NONCE
 
 ### 3.7 凭据零泄漏
 
-假 token 是门自建的 **0600** 临时文件，经既有 `MemorySecretStore` → `CredentialRecords` →
+假 token 是门**每次运行现生成**的（`agentbox-opencode-gate-fake-token-` 前缀 + `secrets.token_hex(16)`），
+只存在 0600 临时文件与运行窗口内，经既有 `MemorySecretStore` → `CredentialRecords` →
 `ProviderModel.credentialId` → 冻结执行配置 → Worker `secret.put` → sidecar 环境注入：
 
 - 端点两次请求都带**相符**的 `Authorization`（说明秘密确实送达原生进程）；
 - 持久事件里 `tokenInEvents=false`；checkpoint 的**每一个**捕获状态文件 `tokenHits=[]`
   （4 个文件、827 593 字节，含 SQLite 三件套与原生日志）；
-- 门报告自身 `tokenInReportableState=false`；`git grep -F <token>` 无命中
-  （`tokenInTrackedGitContent=false`）。
+- 门报告自身 `tokenInReportableState=false`；扫描的是**本次实际注入的完整值**
+  （`token_appears_in_tracked_content`），提交态复跑 `tokenInTrackedGitContent=false`。
+
+**修复记录（提交态假绿）**：门最初把固定假 token 写进自身 tracked 源码，同时断言 tracked Git 零命中——
+未提交时能绿，提交后源码自己就是命中项，4 项清理语义测试在提交态必红。现改为运行期生成、运行窗口内
+持有、核验后清空（窗口外 `current_token()` 抛 `OPENCODE_GATE_NO_ACTIVE_RUN`），并补 3 项提交态回归
+（动态值不在 tracked 内容、两次运行不同、把本次 token 写进临时登记为 tracked 的 fixture 必须失败且
+完整撤销）。生成值不打印、不进 argv、不读真实 locator。
 
 ### 3.8 非 loopback 访问：实际证明到什么程度
 

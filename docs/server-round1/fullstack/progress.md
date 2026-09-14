@@ -73,6 +73,31 @@
   引导拒绝；token 在事件/状态（827 KB）/报告/Git 零命中；清理 `removed=true`。
 - 残余：驱动显式拒绝附件（不静默丢弃）；原生日志会进入 checkpoint（已扫描无凭据）。
 
+### 2026-09-14 — 提交态假绿返修（OpenCode gate token / driver status 合同）
+
+- **复现**：在最终提交态 `736060b` 上跑五文件定向 pytest → 69 passed / 4 failed，4 项均被
+  `OPENCODE_GATE_TOKEN_IN_GIT` 顶替。根因：门把固定假 token 写进自身 tracked 源码，同时 cleanup 断言
+  "tracked Git 零命中"——源码未提交时能绿，提交后源码自己就是命中项。
+- **返修**：token 改为每次运行现生成（前缀 `agentbox-opencode-gate-fake-token-` + `secrets.token_hex(16)`），
+  生命周期收在 `main()` 的一次运行窗口内（进入时创建、清理核验后 `clear()`，窗口外 `current_token()`
+  抛 `OPENCODE_GATE_NO_ACTIVE_RUN`）；扫描函数 `token_appears_in_tracked_content(root, value)` 只对
+  **本次实际注入的完整值**逐字匹配；生成值不打印、不进 argv、不读真实 locator。
+- **新增回归 3 项**（`tests/server/test_opencode_gate_cleanup.py`）：动态 token 不在 tracked 内容且
+  报告与输出都不含它；两次运行 token 不同且不写回源码；把本次 token 写进**临时登记为 tracked** 的
+  fixture 必须让门以 `OPENCODE_GATE_TOKEN_IN_GIT` 失败，测试结束时 index 条目与文件完整撤销
+  （`git status --porcelain -- <path>` 为空、扫描归零）。
+- **driver 合同收紧**：`runtime/native-driver.mjs` 的 `DRIVER_METHODS` 加入 `status`；新增 2 项测试——
+  缺 `status` 的驱动注册即以 `DRIVER_METHOD_MISSING` 拒绝（并指出缺失方法名），以及**从接缝模块读取
+  方法表**、对测试 fixture 与真实 OpenCode driver 各构造一次实例核对齐备。
+- **最终提交态（`407c379`）复跑**：五文件定向 **78 passed**；`build-opencode-authorization.test.mjs`
+  9/9；OpenCode 全链门 exit 0（`OPENCODE_PRODUCTION_CHAIN_PREPARED`，两轮 delta 4,5,6<9 与
+  13,14,15<18，`cleanup.tokenInTrackedGitContent=false`、`fakeTokenRemoved=true`、`removed=true`）；
+  Hermes 全链门 exit 0（delta 4<7、11<14，provider 请求 2、越预算 0）；全量 python
+  **534 passed / 4 skipped / 0 failed**；`git diff --check` 干净；tracked 内容只有 token **前缀**
+  （门里的常量），无任何生成值；无进程/监听端口/临时根残留。
+- 本轮只修验收与合同缺口：**未改 Worker lease、Worker 协议、Windows bundle 与前端**；
+  模型调用 0、费用增量 ¥0（两条门仍只连 127.0.0.1 假端点，假 token 运行期生成、用后丢弃）。
+
 ### 通用接缝：中立原生 driver
 
 - 新增 `plugins/agent-box-harnesses/runtime/native-driver.mjs`（加载规则 + 事件深红删）、
