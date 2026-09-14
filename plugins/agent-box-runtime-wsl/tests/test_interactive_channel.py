@@ -125,6 +125,23 @@ def test_interactive_cancel_terminates_the_child_tree(tmp_path):
         client.close()
 
 
+def test_worker_disconnect_wakes_long_lived_channel_owner(tmp_path):
+    client, _project = worker_client(tmp_path)
+    disconnected = []
+    client.subscribe_disconnect(disconnected.append)
+    client.start()
+    assert client._process is not None  # controlled crash fixture
+    client._process.kill()
+    deadline = time.monotonic() + 5
+    while not disconnected and time.monotonic() < deadline:
+        time.sleep(0.02)
+    try:
+        assert len(disconnected) == 1
+        assert disconnected[0].code == "WORKER_DISCONNECTED"
+    finally:
+        client.close()
+
+
 def test_interactive_output_budget_reports_truncation(tmp_path):
     client, project = worker_client(tmp_path)
     client.start()

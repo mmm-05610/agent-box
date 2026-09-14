@@ -45,9 +45,26 @@ class SessionService:
         self._assert_profile_executable(profile_id)
         if overrides:
             self._validate_overrides_for(profile_id, overrides)
+        kwargs["effective_config_object_digest"] = self._publish_effective_configuration(
+            profile_id, overrides or [],
+        )
         kwargs["queue_records"] = self.queue
         kwargs["resolve_config_version"] = self._resolve_config_version
         return self.records.accept_intent(profile_id=profile_id, **kwargs)
+
+    def _publish_effective_configuration(
+        self, profile_id: str, overrides: list[dict[str, Any]],
+    ) -> str:
+        profile = self.profiles.get(profile_id)
+        stored = json.loads(self.objects.read(profile["config_object_digest"]))
+        configuration = dict(stored.get("configuration") or {})
+        configuration.update({item["controlId"]: item["value"] for item in overrides})
+        record = self.objects.publish(json.dumps({
+            "schema_version": 1,
+            "harness_type": profile["harness_type"],
+            "configuration": configuration,
+        }, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode())
+        return record.digest
 
     def _assert_profile_executable(self, profile_id: str) -> None:
         profile = self.profiles.get(profile_id)

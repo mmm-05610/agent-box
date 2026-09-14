@@ -7,7 +7,7 @@ import secrets
 from typing import Annotated, Any
 from uuid import uuid4
 
-from fastapi import Depends, FastAPI, Header, Query, Request, Response
+from fastapi import Depends, FastAPI, Header, Query, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
@@ -252,6 +252,53 @@ def create_app(runtime: ServerRuntime) -> FastAPI:
                 current_generation = next_generation
 
         return StreamingResponse(stream(), media_type="text/event-stream")
+
+    @app.websocket("/wire/v1/event-stream")
+    async def wire_event_stream(websocket: WebSocket):
+        """Authenticated `wire.eventStream/1` channel carrying EventFrame JSON."""
+        host = websocket.headers.get("host", "")
+        origin = websocket.headers.get("origin")
+        provided = websocket.headers.get("authorization")
+        if (not _loopback_authority(host)
+                or (origin and not _loopback_authority(origin.split("//", 1)[-1]))):
+            await websocket.close(code=4403, reason="LOOPBACK_POLICY_REJECTED")
+            return
+        if provided is None or not secrets.compare_digest(provided, "Bearer " + runtime.token):
+            await websocket.close(code=4401, reason="UNAUTHENTICATED")
+            return
+        session_id = websocket.query_params.get("sessionId", "")
+        cursor = websocket.query_params.get("cursor")
+        if not session_id or len(session_id) > 160:
+            await websocket.close(code=4400, reason="INVALID_REQUEST")
+            return
+        try:
+            frames, cursor = runtime.wire.event_stream_batch(session_id, cursor)
+        except (WireError, ServerError):
+            await websocket.close(code=4400, reason="INVALID_CURSOR_OR_SESSION")
+            return
+        await websocket.accept()
+        try:
+            while True:
+                if frames:
+                    for frame in frames:
+                        await websocket.send_json(frame)
+                    frames = []
+                    continue
+                frames, cursor = runtime.wire.event_stream_batch(session_id, cursor)
+                if frames:
+                    continue
+                import asyncio
+                # Waiting only on an in-process Condition cannot observe a peer
+                # close.  A bounded receive detects disconnects while the next
+                # persisted batch remains the sole source of event truth.
+                try:
+                    message = await asyncio.wait_for(websocket.receive(), timeout=1.0)
+                    if message.get("type") == "websocket.disconnect":
+                        return
+                except asyncio.TimeoutError:
+                    pass
+        except WebSocketDisconnect:
+            return
 
     @app.post("/api/v1/turns/{turn_id}/cancel", dependencies=protected)
     def cancel(turn_id: str, response: Response, key: str = Depends(idempotency_key)):

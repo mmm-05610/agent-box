@@ -4,6 +4,10 @@ from agent_box.server.bootstrap.runtime import (
     EventNotifier,
     ServerRuntime,
     build_runtime,
+    build_runtime_from_sidecar_deployment,
 )
 
-__all__ = ["DataRootOwner", "EventNotifier", "ServerRuntime", "build_runtime"]
+__all__ = [
+    "DataRootOwner", "EventNotifier", "ServerRuntime", "build_runtime",
+    "build_runtime_from_sidecar_deployment",
+]

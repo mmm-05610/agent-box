@@ -7,7 +7,10 @@ Windows acceptance or for a real-model gate.
 """
 from __future__ import annotations
 
+import hashlib
 import json
+import os
+from pathlib import Path
 import threading
 
 from fastapi.testclient import TestClient
@@ -19,8 +22,10 @@ from agent_box.server.transport.http import create_app
 
 
 class FakeConnector:
-    def __init__(self):
+    def __init__(self, files=None):
         self.open_calls = 0
+        self.files = files or {}
+        self.read_calls = []
 
     def distributions(self):
         return [{"name": "Ubuntu"}]
@@ -35,6 +40,16 @@ class FakeConnector:
         self.open_calls += 1
         return {"connection_id": f"conn-{path}", "distribution": "Ubuntu",
                 "user": "tester", "path": path}
+
+    def read_workspace_file(
+        self, *, distribution, user, connection_id, workspace_path, relative_path,
+    ):
+        self.read_calls.append({
+            "distribution": distribution, "user": user, "connection_id": connection_id,
+            "workspace_path": workspace_path, "relative_path": relative_path,
+        })
+        content = self.files[relative_path]
+        return content, "sha256:" + hashlib.sha256(content).hexdigest()
 
 
 class RecordingExecution:
@@ -84,6 +99,16 @@ class Wire:
         )
         body = response.json()
         assert body.get("jsonrpc") == "2.0", body
+        schema_path = os.environ.get("AGENT_BOX_WIRE_SCHEMA")
+        if schema_path:
+            import jsonschema
+            schema = json.loads(Path(schema_path).read_text(encoding="utf-8"))
+            if "result" in body:
+                if f"{method}#params" in schema:
+                    jsonschema.validate(params, schema[f"{method}#params"])
+                jsonschema.validate(body["result"], schema[f"{method}#result"])
+            else:
+                jsonschema.validate(body["error"], schema["WireError"])
         return response.status_code, body
 
     def ok(self, method, params):
@@ -208,6 +233,18 @@ def test_envelope_rejects_malformed_and_unknown_requests(wire):
     status, body = api.call("notAMethod", {})
     assert status == 400 and body["error"]["code"] == "INVALID_REQUEST"
 
+    for params in (
+        {"requestId": "short", "environment": ENVIRONMENT, "path": "/tmp"},
+        {"requestId": "long-enough", "environment": ENVIRONMENT, "path": "/tmp",
+         "unexpected": True},
+    ):
+        invalid = api.client.post("/wire/v1/workspaces.browse", headers=api.headers, json={
+            "jsonrpc": "2.0", "id": "strict", "method": "workspaces.browse",
+            "params": params,
+        })
+        assert invalid.status_code == 200
+        assert invalid.json()["error"]["code"] == "INVALID_REQUEST"
+
 
 # --- workspaces -------------------------------------------------------------
 
@@ -295,6 +332,90 @@ def test_profiles_list_exposes_harness_as_data_only(wire):
     assert listing["nextCursor"] is None
 
 
+def test_profile_and_provider_model_maintenance_is_versioned_and_referential(wire):
+    _runtime, api, _execution = wire
+    provider = api.ok("providerModels.create", {
+        "requestId": "provider-create", "displayName": "Official API",
+        "harness": "alpha", "provider": "opaque-provider", "credentialId": None,
+        "configuration": [],
+        "models": [{
+            "modelId": "model-a", "displayName": "Model A",
+            "availability": "unknown", "unavailableReason": None,
+        }],
+    })["providerModel"]
+    assert provider["version"] == 1
+    assert provider["credentialId"] is None
+    assert api.ok("providerModels.list", {"includeArchived": False})["items"] == [provider]
+    provider = api.ok("providerModels.update", {
+        "requestId": "provider-update", "providerModelId": provider["id"],
+        "expectedVersion": 1, "displayName": "Official API v2", "credentialId": None,
+        "configuration": [{"controlId": "endpoint", "value": "https://example.invalid"}],
+        "models": [{
+            "modelId": "model-a", "displayName": "Model A",
+            "availability": "available", "unavailableReason": None,
+        }],
+    })["providerModel"]
+    assert provider["version"] == 2
+    assert provider["configuration"] == [
+        {"controlId": "endpoint", "value": "https://example.invalid"},
+    ]
+
+    created = api.ok("profiles.create", {
+        "requestId": "profile-wire-create", "displayName": "Builder", "harness": "alpha",
+    })["profile"]
+    assert created["version"] == 1
+    renamed = api.ok("profiles.update", {
+        "requestId": "profile-wire-rename", "profileId": created["id"],
+        "expectedVersion": 1, "displayName": "Builder 2",
+    })["profile"]
+    assert renamed["version"] == 2 and renamed["displayName"] == "Builder 2"
+
+    stale = api.err("profiles.update", {
+        "requestId": "profile-wire-stale", "profileId": created["id"],
+        "expectedVersion": 1, "displayName": "stale",
+    })
+    assert stale["code"] == "CONFLICT_VERSION"
+    assert stale["current"]["displayName"] == "Builder 2"
+
+    configured = api.ok("profiles.updateConfig", {
+        "requestId": "profile-wire-config", "profileId": created["id"],
+        "expectedVersion": 2,
+        "values": [{"controlId": "model", "value": {
+            "providerId": provider["id"], "modelId": "model-a",
+        }}],
+    })
+    assert configured["profile"]["version"] == 3
+    assert configured["configVersion"] == 2
+    assert configured["effectiveFor"] == "next_send"
+    descriptor = api.ok("config.describe", {
+        "profileId": created["id"], "workspaceId": None,
+    })["descriptor"]
+    model_control = next(item for item in descriptor["controls"] if item["controlId"] == "model")
+    assert model_control["kind"] == "model_slot"
+    assert model_control["slots"][0]["model"] == {
+        "providerId": provider["id"], "modelId": "model-a",
+        "availability": "available", "unavailableReason": None,
+    }
+
+    referenced = api.err("providerModels.archive", {
+        "requestId": "provider-archive-conflict", "providerModelId": provider["id"],
+        "expectedVersion": 2,
+    })
+    assert referenced["code"] == "CONFLICT_REFERENCE"
+    assert referenced["details"]["referenceIds"] == [created["id"]]
+
+    archived_profile = api.ok("profiles.archive", {
+        "requestId": "profile-wire-archive", "profileId": created["id"],
+        "expectedVersion": 3,
+    })["profile"]
+    assert archived_profile["archivedAt"]
+    archived_provider = api.ok("providerModels.archive", {
+        "requestId": "provider-archive", "providerModelId": provider["id"],
+        "expectedVersion": 2,
+    })["providerModel"]
+    assert archived_provider["archivedAt"]
+
+
 def test_config_describe_declares_controls_and_locks(wire):
     _runtime, api, _execution = wire
     profile = make_profile(api, name="describe", extra={"sandbox": "strict"})
@@ -341,7 +462,7 @@ def test_create_and_send_accepts_once_and_replays_the_same_execution(wire):
     workspace = open_workspace(api)["workspace"]
     profile = make_profile(api, name="sender")
     params = {
-        "requestId": "send-1", "workspaceId": workspace["id"],
+        "requestId": "send-one", "workspaceId": workspace["id"],
         "profileId": profile["profile_id"], "message": MESSAGE, "overrides": [],
     }
     first = api.ok("sessions.createAndSend", params)
@@ -354,6 +475,60 @@ def test_create_and_send_accepts_once_and_replays_the_same_execution(wire):
     assert replay["executionId"] == first["executionId"]
     assert replay["session"]["id"] == first["session"]["id"]
     assert len(execution.accepted) == 1, execution.accepted
+
+
+def test_attachment_is_worker_authorized_captured_and_recoverable(tmp_path):
+    attachment = b"captured-once-by-authorized-worker"
+    connector = FakeConnector({"assets/reference.png": attachment})
+    runtime = build_runtime(
+        tmp_path / "data", harnesses=registry(), connector=connector,
+        execution=RecordingExecution(block=True),
+    )
+    with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
+        api = Wire(client, {"Authorization": f"Bearer {runtime.token}"})
+        workspace = open_workspace(api, "/home/tester/attachments")["workspace"]
+        profile = make_profile(api, name="attachment-role")
+        accepted = api.ok("sessions.createAndSend", {
+            "requestId": "attachment-send-1", "workspaceId": workspace["id"],
+            "profileId": profile["profile_id"], "overrides": [],
+            "message": {"text": "inspect this", "attachments": [{
+                "ref": "assets/reference.png", "displayName": "reference.png",
+                "mediaKind": "image",
+            }]},
+        })
+
+        assert len(connector.read_calls) == 1
+        read_call = connector.read_calls[0]
+        stored_workspace = runtime.repository.workspaces.get(workspace["id"])
+        assert read_call == {
+            "distribution": "Ubuntu", "user": "tester",
+            "connection_id": stored_workspace["connection_id"],
+            "workspace_path": "/home/tester/attachments",
+            "relative_path": "assets/reference.png",
+        }
+        assert read_call["connection_id"] != "conn-/home/tester/attachments"
+        with runtime.repository.database.read() as connection:
+            row = connection.execute(
+                "SELECT input_object_digest FROM server_turns WHERE id=?",
+                (accepted["executionId"],),
+            ).fetchone()
+        stored = json.loads(runtime.objects.read(row["input_object_digest"]))["message"]
+        captured = stored["attachments"][0]
+        assert captured["_contentDigest"] == "sha256:" + hashlib.sha256(attachment).hexdigest()
+        assert captured["_size"] == len(attachment)
+        assert runtime.objects.read(captured["_contentDigest"]) == attachment
+
+        # Public queue/history projections never expose the internal object key.
+        assert "_contentDigest" not in json.dumps(accepted)
+
+        rejected = api.err("sessions.send", {
+            "requestId": "attachment-send-2", "sessionId": accepted["session"]["id"],
+            "overrides": [], "message": {"text": "bad", "attachments": [{
+                "ref": "../outside", "displayName": "outside", "mediaKind": "file",
+            }]},
+        })
+        assert rejected["code"] == "INVALID_REQUEST"
+        assert len(connector.read_calls) == 1
 
 
 def test_concurrent_same_request_id_accepts_exactly_one_execution(wire):
@@ -398,22 +573,25 @@ def test_send_while_running_queues_and_withdrawal_reports_too_late(wire):
     workspace = open_workspace(api)["workspace"]
     profile = make_profile(api, name="queuer")
     first = api.ok("sessions.createAndSend", {
-        "requestId": "q-1", "workspaceId": workspace["id"],
+        "requestId": "queue-one", "workspaceId": workspace["id"],
         "profileId": profile["profile_id"], "message": MESSAGE, "overrides": [],
     })
     session_id = first["session"]["id"]
     second = api.ok("sessions.send", {
-        "requestId": "q-2", "sessionId": session_id,
+        "requestId": "queue-two", "sessionId": session_id,
         "message": {"text": "second", "attachments": []}, "overrides": [],
     })
     assert second["outcome"] == "accepted"
     assert second["executionId"] is None  # queued behind the running execution
+    assert second["queueItemId"]
 
     queue = api.ok("queue.get", {"sessionId": session_id})
     assert len(queue["items"]) == 1
     item = queue["items"][0]
     assert item["state"] == "pending"
     assert item["message"]["text"] == "second"
+    assert item["configVersion"] == second["configVersion"]
+    assert item["itemId"] == second["queueItemId"]
 
     stale = api.err("queue.withdraw", {
         "requestId": "q-withdraw-stale", "sessionId": session_id, "itemId": item["itemId"],
@@ -439,11 +617,11 @@ def test_stop_reports_requested_then_already_finished(wire):
     workspace = open_workspace(api, "/home/tester/stopper")["workspace"]
     profile = make_profile(api, name="stopper")
     accepted = api.ok("sessions.createAndSend", {
-        "requestId": "stop-1", "workspaceId": workspace["id"],
+        "requestId": "stop-one", "workspaceId": workspace["id"],
         "profileId": profile["profile_id"], "message": MESSAGE, "overrides": [],
     })
     stopped = api.ok("runs.stop", {
-        "requestId": "stop-2", "sessionId": accepted["session"]["id"],
+        "requestId": "stop-two", "sessionId": accepted["session"]["id"],
         "executionId": accepted["executionId"],
     })
     assert stopped["outcome"] == "stop_requested"
@@ -467,12 +645,12 @@ def test_switching_role_is_refused_while_an_execution_runs(wire):
     first_profile = make_profile(api, name="switch-a")
     second_profile = make_profile(api, name="switch-b")
     accepted = api.ok("sessions.createAndSend", {
-        "requestId": "sw-1", "workspaceId": workspace["id"],
+        "requestId": "switch-one", "workspaceId": workspace["id"],
         "profileId": first_profile["profile_id"], "message": MESSAGE, "overrides": [],
     })
     session = accepted["session"]
     result = api.ok("sessions.switchProfile", {
-        "requestId": "sw-2", "sessionId": session["id"],
+        "requestId": "switch-two", "sessionId": session["id"],
         "profileId": second_profile["profile_id"], "expectedVersion": session["version"],
     })
     assert result["outcome"] == "rejected"
@@ -489,7 +667,7 @@ def test_approval_decisions_are_atomic_and_validate_scope(wire):
     workspace = open_workspace(api, "/home/tester/approvals")["workspace"]
     profile = make_profile(api, name="approver")
     accepted = api.ok("sessions.createAndSend", {
-        "requestId": "ap-1", "workspaceId": workspace["id"],
+        "requestId": "approval-one", "workspaceId": workspace["id"],
         "profileId": profile["profile_id"], "message": MESSAGE, "overrides": [],
     })
     session_id = accepted["session"]["id"]
@@ -503,32 +681,66 @@ def test_approval_decisions_are_atomic_and_validate_scope(wire):
             request={"tool": "shell", "command": "ls"},
         )
     assert row["state"] == "open"
+    approval_frame = api.ok("history.snapshot", {"sessionId": session_id})["frames"][-1]
+    projected = approval_frame["event"]
+    assert projected["kind"] == "approval.requested"
+    assert projected["approval"] == {
+        "approvalId": row["approvalId"], "sessionId": session_id,
+        "executionId": accepted["executionId"], "version": 1,
+        "operation": {
+            "title": "shell", "detail": [{"label": "command", "value": "ls"}],
+            "tool": "shell",
+        },
+        "expiresAt": None,
+    }
 
     first = api.ok("approvals.decide", {
-        "requestId": "dec-1", "approvalId": row["approvalId"], "decision": "allow",
+        "requestId": "decision-one", "approvalId": row["approvalId"], "decision": "allow",
         "scope": {"kind": "once"}, "expectedVersion": row["version"],
     })
     assert first == {"outcome": "recorded", "decision": "allow"}
+    settled = api.ok("history.snapshot", {"sessionId": session_id})["frames"][-1]["event"]
+    assert settled == {
+        "kind": "approval.settled", "sessionId": session_id,
+        "approvalId": row["approvalId"], "outcome": "allowed",
+    }
 
     # A repeat of the same request never applies a second decision.
     repeat = api.ok("approvals.decide", {
-        "requestId": "dec-1", "approvalId": row["approvalId"], "decision": "allow",
+        "requestId": "decision-one", "approvalId": row["approvalId"], "decision": "allow",
         "scope": {"kind": "once"}, "expectedVersion": row["version"],
     })
     assert repeat == {"outcome": "already_recorded", "decision": "allow"}
 
     # A contradictory decision after settlement is invalid, not applied.
     contradictory = api.ok("approvals.decide", {
-        "requestId": "dec-2", "approvalId": row["approvalId"], "decision": "deny",
+        "requestId": "decision-two", "approvalId": row["approvalId"], "decision": "deny",
         "scope": {"kind": "once"}, "expectedVersion": row["version"] + 1,
     })
     assert contradictory["outcome"] == "invalid"
 
     bad_scope = api.err("approvals.decide", {
-        "requestId": "dec-3", "approvalId": row["approvalId"], "decision": "allow",
+        "requestId": "decision-three", "approvalId": row["approvalId"], "decision": "allow",
         "scope": {"kind": "forever"}, "expectedVersion": 2,
     })
     assert bad_scope["code"] == "INVALID_REQUEST"
+
+    with runtime.database.transaction() as conn:
+        late = runtime.approvals.request_in_transaction(
+            conn, session_id=session_id, execution_id=accepted["executionId"],
+            request={"tool": "shell", "command": "touch too-late"},
+        )
+    runtime.repository.finish_cancelled(accepted["executionId"])
+    refused = api.ok("approvals.decide", {
+        "requestId": "dec-too-late", "approvalId": late["approvalId"],
+        "decision": "allow", "scope": {"kind": "once"},
+        "expectedVersion": late["version"],
+    })
+    assert refused == {"outcome": "invalid", "reason": "execution_not_actionable"}
+    assert runtime.approvals.get(late["approvalId"])["state"] == "invalid"
+    late_settled = api.ok("history.snapshot", {"sessionId": session_id})["frames"][-1]["event"]
+    assert late_settled["approvalId"] == late["approvalId"]
+    assert late_settled["outcome"] == "invalidated"
 
 
 # --- history ----------------------------------------------------------------
@@ -539,7 +751,7 @@ def test_history_snapshot_frames_use_cursors_and_resume_without_gaps(wire):
     workspace = open_workspace(api, "/home/tester/history")["workspace"]
     profile = make_profile(api, name="historian")
     accepted = api.ok("sessions.createAndSend", {
-        "requestId": "h-1", "workspaceId": workspace["id"],
+        "requestId": "history-one", "workspaceId": workspace["id"],
         "profileId": profile["profile_id"], "message": MESSAGE, "overrides": [],
     })
     session_id = accepted["session"]["id"]
@@ -568,3 +780,33 @@ def test_history_snapshot_requires_a_real_session(wire):
     _runtime, api, _execution = wire
     error = api.err("history.snapshot", {"sessionId": "session-missing"})
     assert error["code"] == "NOT_FOUND"
+
+
+def test_wire_event_stream_resumes_from_snapshot_cursor_without_sse(wire):
+    runtime, api, _execution = wire
+    workspace = open_workspace(api, "/home/tester/live-wire")["workspace"]
+    profile = make_profile(api, name="live-wire")
+    accepted = api.ok("sessions.createAndSend", {
+        "requestId": "live-one", "workspaceId": workspace["id"],
+        "profileId": profile["profile_id"], "message": MESSAGE, "overrides": [],
+    })
+    session_id = accepted["session"]["id"]
+    snapshot = api.ok("history.snapshot", {"sessionId": session_id})
+    path = (
+        f"/wire/v1/event-stream?sessionId={session_id}"
+        f"&cursor={snapshot['resumeCursor']}"
+    )
+    with api.client.websocket_connect(
+        path, headers={**api.headers, "Host": "127.0.0.1"},
+    ) as socket:
+        runtime.repository.append_turn_event(
+            accepted["executionId"], "message.delta", {"text": "persisted before publish"},
+        )
+        runtime.notifier.notify()
+        frame = socket.receive_json()
+        assert frame["sessionId"] == session_id
+        assert frame["event"] == {
+            "kind": "message.delta", "sessionId": session_id,
+            "messageId": accepted["executionId"], "text": "persisted before publish",
+        }
+        assert frame["seq"] > snapshot["frames"][-1]["seq"]

@@ -45,9 +45,18 @@ class ApprovalRecords:
         }
         self._append_event(
             conn, session_id, execution_id, "approval.requested",
-            {"approval_id": approval_id, "request": request},
+            {"approval_id": approval_id, "version": 1, "request": request},
         )
         return body
+
+    def request(
+        self, *, session_id: str, execution_id: str, request: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Persist a sidecar permission request before publishing it."""
+        with self.database.transaction() as conn:
+            return self.request_in_transaction(
+                conn, session_id=session_id, execution_id=execution_id, request=request,
+            )
 
     def get(self, approval_id: str) -> dict[str, Any]:
         with self.database.read() as conn:
@@ -78,10 +87,28 @@ class ApprovalRecords:
                 body = {
                     "outcome": "invalid",
                     "reason": f"approval_state:{prior['state']}",
-                    "approvalId": approval_id,
                 }
                 self.idempotency_note(conn, approval_id, body)
                 return 200, body
+            execution = conn.execute(
+                "SELECT state FROM server_turns WHERE id=?", (prior["execution_id"],),
+            ).fetchone()
+            if execution is None or execution["state"] in {
+                "completed", "failed", "cancelled", "unknown",
+            }:
+                timestamp = now()
+                conn.execute(
+                    "UPDATE server_approvals SET state=?,version=version+1,settled_at=? "
+                    "WHERE id=? AND state=?",
+                    (INVALID, timestamp, approval_id, OPEN),
+                )
+                self._append_event(
+                    conn, prior["session_id"], prior["execution_id"], "approval.settled",
+                    {"approval_id": approval_id, "decision": "invalidated"},
+                )
+                return 200, {
+                    "outcome": "invalid", "reason": "execution_not_actionable",
+                }
             if int(prior["version"]) != expected_version:
                 raise _current_error(ServerError(
                     "APPROVAL_VERSION_CONFLICT",
@@ -111,9 +138,29 @@ class ApprovalRecords:
             if row is None or row["state"] != OPEN:
                 return
             conn.execute(
-                "UPDATE server_approvals SET state=?,settled_at=? WHERE id=? AND state=?",
+                "UPDATE server_approvals SET state=?,version=version+1,settled_at=? "
+                "WHERE id=? AND state=?",
                 (INVALID, now(), approval_id, OPEN),
             )
+
+    def invalidate_for_execution(self, execution_id: str, reason: str) -> int:
+        """Atomically close every grant route after its execution is terminal."""
+        with self.database.transaction() as conn:
+            rows = conn.execute(
+                "SELECT * FROM server_approvals WHERE execution_id=? AND state=?",
+                (execution_id, OPEN),
+            ).fetchall()
+            for row in rows:
+                conn.execute(
+                    "UPDATE server_approvals SET state=?,version=version+1,settled_at=? "
+                    "WHERE id=? AND state=?",
+                    (INVALID, now(), row["id"], OPEN),
+                )
+                self._append_event(
+                    conn, row["session_id"], execution_id, "approval.settled",
+                    {"approval_id": row["id"], "decision": "invalidated", "reason": reason},
+                )
+            return len(rows)
 
     def open_for_execution(self, execution_id: str) -> list[dict[str, Any]]:
         with self.database.read() as conn:
@@ -124,8 +171,10 @@ class ApprovalRecords:
         return [self._row(row) for row in rows]
 
     def expire_for_execution(self, conn, execution_id: str, reason: str) -> int:
+        del reason
         cursor = conn.execute(
-            "UPDATE server_approvals SET state=?,settled_at=? WHERE execution_id=? AND state=?",
+            "UPDATE server_approvals SET state=?,version=version+1,settled_at=? "
+            "WHERE execution_id=? AND state=?",
             (INVALID, now(), execution_id, OPEN),
         )
         return cursor.rowcount

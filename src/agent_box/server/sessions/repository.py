@@ -63,6 +63,7 @@ class SessionRecords:
         overrides: list[dict[str, Any]] | None = None,
         expected_version: int | None = None, queue_records=None,
         resolve_config_version=None,
+        effective_config_object_digest: str | None = None,
     ) -> tuple[str, dict[str, Any]]:
         """Accept one send intent atomically.
 
@@ -120,6 +121,8 @@ class SessionRecords:
             ).fetchone()
             if profile is None:
                 raise ServerError("PROFILE_NOT_FOUND", "Profile was not found", status=404)
+            if bool(profile["archived_at"]):
+                raise ServerError("PROFILE_ARCHIVED", "Profile is archived", status=409)
             if bool(profile["recovery_pending"]):
                 raise ServerError(
                     "PROFILE_RECOVERY_REQUIRED",
@@ -140,6 +143,7 @@ class SessionRecords:
                     conn, session_id=session_id, profile=profile,
                     config_version=config_version,
                     input_object_digest=message_object_digest,
+                    effective_config_object_digest=effective_config_object_digest,
                 )
                 body = {
                     "outcome": "accepted", "sessionId": session_id,
@@ -156,6 +160,7 @@ class SessionRecords:
                     config_version=config_version, request_id=request_id,
                     request_digest=request_digest,
                     message_object_digest=message_object_digest,
+                    effective_config_object_digest=effective_config_object_digest,
                 )
                 body = {
                     "outcome": "accepted", "sessionId": session_id,
@@ -168,17 +173,20 @@ class SessionRecords:
 
     def _insert_execution(
         self, conn, *, session_id: str, profile, config_version: int,
-        input_object_digest: str,
+        input_object_digest: str, effective_config_object_digest: str | None = None,
+        queue_item_id: str | None = None,
     ) -> str:
         execution_id = opaque_id("execution")
         timestamp = now()
         try:
             conn.execute(
                 "INSERT INTO server_turns(id,session_id,profile_id,profile_revision,native_generation,"
-                "state,capture_state,cleanup_state,input_object_digest,created_at,updated_at) "
-                "VALUES (?,?,?,?,?,'accepted','pending','pending',?,?,?)",
+                "state,capture_state,cleanup_state,input_object_digest,effective_config_object_digest,"
+                "queue_item_id,created_at,updated_at) "
+                "VALUES (?,?,?,?,?,'accepted','pending','pending',?,?,?,?,?)",
                 (execution_id, session_id, profile["id"], config_version,
-                 int(profile["native_generation"]), input_object_digest, timestamp, timestamp),
+                 int(profile["native_generation"]), input_object_digest,
+                 effective_config_object_digest, queue_item_id, timestamp, timestamp),
             )
         except Exception as exc:
             if "UNIQUE constraint failed" in str(exc):
@@ -225,10 +233,13 @@ class SessionRecords:
                 raise _version_error(
                     "Session changed before the role switch", self._session_view(conn, session_id),
                 )
-            if conn.execute(
-                "SELECT 1 FROM server_profiles WHERE id=?", (profile_id,),
-            ).fetchone() is None:
+            target = conn.execute(
+                "SELECT * FROM server_profiles WHERE id=?", (profile_id,),
+            ).fetchone()
+            if target is None:
                 raise ServerError("PROFILE_NOT_FOUND", "Profile was not found", status=404)
+            if bool(target["archived_at"]):
+                raise ServerError("PROFILE_ARCHIVED", "Profile is archived", status=409)
             active = conn.execute(
                 "SELECT 1 FROM server_turns WHERE session_id=? AND state IN "
                 "('accepted','dispatching','running','capturing') LIMIT 1",
@@ -396,7 +407,9 @@ class SessionRecords:
         with self.database.read() as conn:
             row = conn.execute(
                 "SELECT t.*,s.workspace_id,s.checkpoint_object_digest,s.checkpoint_native_id,"
-                "p.harness_type,p.config_object_digest,p.credential_id,"
+                "p.harness_type,p.config_object_digest AS profile_config_object_digest,"
+                "COALESCE(t.effective_config_object_digest,p.config_object_digest) "
+                "AS config_object_digest,p.credential_id,"
                 "w.connection_id,w.distribution,w.remote_user,w.remote_path "
                 "FROM server_turns t JOIN server_sessions s ON s.id=t.session_id "
                 "JOIN server_profiles p ON p.id=t.profile_id "
@@ -432,7 +445,7 @@ class SessionRecords:
 
     def complete_turn(
         self, turn_id: str, *, checkpoint_object_digest: str,
-        checkpoint_native_id: str, result_object_digest: str,
+        checkpoint_native_id: str, result_object_digest: str, queue_records=None,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         with self.database.transaction() as conn:
             row = conn.execute("SELECT * FROM server_turns WHERE id=?", (turn_id,)).fetchone()
@@ -475,8 +488,32 @@ class SessionRecords:
             self._append_session_event(
                 conn, row["session_id"], turn_id, "turn.state", {"state": "completed"},
             )
+            if row["queue_item_id"] is not None:
+                conn.execute(
+                    "UPDATE server_queue_items SET state='completed',version=version+1,updated_at=? "
+                    "WHERE id=? AND state='dispatched'",
+                    (timestamp, row["queue_item_id"]),
+                )
+            next_execution_id = None
+            if queue_records is not None:
+                item = queue_records.claim_next(conn, row["session_id"])
+                if item is not None:
+                    profile = conn.execute(
+                        "SELECT * FROM server_profiles WHERE id=?", (item["profileId"],),
+                    ).fetchone()
+                    if profile is None:
+                        raise ServerError("PROFILE_NOT_FOUND", "Queued Profile was not found", status=404)
+                    next_execution_id = self._insert_execution(
+                        conn, session_id=row["session_id"], profile=profile,
+                        config_version=item["configVersion"],
+                        input_object_digest=item["_messageObjectDigest"],
+                        effective_config_object_digest=item["_effectiveConfigObjectDigest"],
+                        queue_item_id=item["itemId"],
+                    )
             updated = conn.execute("SELECT * FROM server_turns WHERE id=?", (turn_id,)).fetchone()
-            return dict(updated), event
+            result = dict(updated)
+            result["next_execution_id"] = next_execution_id
+            return result, event
 
     def mark_turn_cleanup(self, turn_id: str, state: str) -> None:
         with self.database.transaction() as conn:
@@ -490,12 +527,18 @@ class SessionRecords:
             row = conn.execute("SELECT * FROM server_turns WHERE id=?", (turn_id,)).fetchone()
             if row is None:
                 raise ServerError("TURN_NOT_FOUND", "Turn was not found", status=404)
+            timestamp = now()
+            conn.execute(
+                "UPDATE server_turns SET stop_requested_at=COALESCE(stop_requested_at,?),updated_at=? "
+                "WHERE id=?",
+                (timestamp, timestamp, turn_id),
+            )
             return self._append_session_event(
                 conn, row["session_id"], turn_id, "turn.state",
                 {"state": row["state"], "cancel_requested": True},
             )
 
-    def finish_cancelled(self, turn_id: str) -> dict[str, Any]:
+    def finish_cancelled(self, turn_id: str, *, queue_records=None) -> dict[str, Any]:
         with self.database.transaction() as conn:
             row = conn.execute("SELECT * FROM server_turns WHERE id=?", (turn_id,)).fetchone()
             if row is None:
@@ -516,12 +559,22 @@ class SessionRecords:
                 "UPDATE server_profiles SET run_state='idle',updated_at=? WHERE id=?",
                 (timestamp, row["profile_id"]),
             )
+            if queue_records is not None:
+                queue_records.pause_pending(conn, row["session_id"], "cancelled")
+            if row["queue_item_id"] is not None:
+                conn.execute(
+                    "UPDATE server_queue_items SET state='cancelled',version=version+1,updated_at=? "
+                    "WHERE id=? AND state='dispatched'",
+                    (timestamp, row["queue_item_id"]),
+                )
             return self._append_session_event(
                 conn, row["session_id"], turn_id, "turn.state",
                 {"state": "cancelled", "error_code": "TURN_CANCELLED"},
             )
 
-    def fail_turn(self, turn_id: str, code: str, *, capture_state: str = "failed") -> dict[str, Any]:
+    def fail_turn(
+        self, turn_id: str, code: str, *, capture_state: str = "failed", queue_records=None,
+    ) -> dict[str, Any]:
         with self.database.transaction() as conn:
             row = conn.execute("SELECT * FROM server_turns WHERE id=?", (turn_id,)).fetchone()
             if row is None:
@@ -545,6 +598,14 @@ class SessionRecords:
                 "UPDATE server_profiles SET run_state='idle',recovery_pending=?,updated_at=? WHERE id=?",
                 (1 if recovery_required else 0, timestamp, row["profile_id"]),
             )
+            if queue_records is not None:
+                queue_records.pause_pending(conn, row["session_id"], code)
+            if row["queue_item_id"] is not None:
+                conn.execute(
+                    "UPDATE server_queue_items SET state='failed',version=version+1,updated_at=? "
+                    "WHERE id=? AND state='dispatched'",
+                    (timestamp, row["queue_item_id"]),
+                )
             self._append_session_event(
                 conn, row["session_id"], turn_id, "turn.capture",
                 {"state": capture_state, "error_code": code[:128]},
@@ -563,7 +624,8 @@ class SessionRecords:
                 raise ServerError("SESSION_NOT_FOUND", "Session was not found", status=404)
             turns = conn.execute(
                 "SELECT id,state,capture_state,cleanup_state,profile_revision,native_generation,"
-                "work_id,execution_id,dispatch_id,result_object_digest,error_code,created_at "
+                "work_id,execution_id,dispatch_id,result_object_digest,error_code,"
+                "stop_requested_at,created_at "
                 "FROM server_turns WHERE session_id=? ORDER BY created_at,id LIMIT ?",
                 (session_id, event_limit),
             ).fetchall()

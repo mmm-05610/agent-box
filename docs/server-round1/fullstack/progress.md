@@ -5,25 +5,26 @@
 
 ## A — 后端完成后的前端只读等待
 
-按 42-A 做了一次只读检查（未写前端任何文件、未杀其进程、未发第二个 goal）：
+后端 41 READY 后按 42-A 做只读检查（未写前端任何文件、未杀其进程、未发第二个 goal）：
 
-- 工作树 `/home/maoqh/projects/agent-box-desktop-next-wsl-round1`，HEAD `91305d86`
-  （其后 `df848380`、`5c0fbfe1`）。
-- 其自身 status：`frontend_implementation=PARTIAL`（P00/P01 GREEN、P07 检查点 1–2、
-  P02A GREEN、P02B1 待提交；B/C/D 待施工），
+- 工作树 `/home/maoqh/projects/agent-box-desktop-next-wsl-round1`，2026-09-14 11:21 +08:00
+  实际 HEAD `9881bb821176ecb59a5e71f32cdd9493fd065f6e`，工作树 clean。
+- 其自身 status：`frontend_implementation=PARTIAL`（P00/P01 GREEN、P02 A/B1/B2/C/D、
+  P03纵切1–2和 P07 25方法增量已提交；P03生产调用者及 P04–P06待续），
   `writer_lease=ACTIVE — Codex frontend goal`（09:20 接管），
-  `CONTRACT_CLIENT_READY=否`（wire 未锁定）。
-- wire 交换经 [wire-review.md](../wire-review.md) 进行；后端已按其候选实现并请其确认
-  3 项机械差异与登记摘要，等待答复。
+  尚未达到 `DESKTOP_IMPLEMENTATION_READY`。
+- 前端已消费核心维护反馈并提交 25 方法新摘要；后端按实际生成工件 25/25 回归后在
+  [wire-review.md](../wire-review.md) 登记 `WIRE_LOCKED_FOR_IMPLEMENTATION`。前端下一阶段读取即可，
+  无需再等待用户逐字段批准。
 
 ## B — 双门判定（**均未满足，故未进入联调**）
 
 | 门 | 判定 | 依据 |
 | --- | --- | --- |
-| BACKEND_IMPLEMENTATION_READY | **否** | 41 终态为 PARTIAL：41-E Windows 真机段未做（本会话在 WSL2 Linux 内）；经 WSL Worker 的部署接线未完成（仅在本地进程启动器上验证 Server→sidecar→fake Harness） |
-| DESKTOP_IMPLEMENTATION_READY | **否** | 前端自报 PARTIAL，且 `writer_lease=ACTIVE`（未释放），wire 未锁定 |
+| BACKEND_IMPLEMENTATION_READY | **是** | 41 A–E 完成；Windows原生Server→真实WSL Worker→bwrap exit 0；Python 266/4 skip、Node 25/25、Rust 4/4 |
+| DESKTOP_IMPLEMENTATION_READY | **否** | 前端自报 PARTIAL，且 `writer_lease=ACTIVE`（未释放）；同 wire 已锁定但实现/验收门未完 |
 
-因此**没有**记录 `FULLSTACK_INTEGRATION_OWNER`，**没有**接管前端工作树，
+因此仍**没有**记录 `FULLSTACK_INTEGRATION_OWNER`，**没有**接管前端工作树，
 **没有**启动跨端链路。这是纪律要求，不是进度不足的借口。
 
 ## C — 无模型联调
@@ -77,7 +78,7 @@
 
 ## E — 最终验收与提交
 
-未执行（依赖双门与真实门）。已提交的后端检查点见 status：
+未执行（依赖双门与真实门）。41 READY 代码/证据检查点为本次待提交；更早检查点见 status：
 `b84dc87`(39) → `38b28d6`(40-A) → `05053f9`(40-B) → `340fcad`(40-C) → `b70cd3f`(40-D)
 → `7e9ffd8`(41) → `8eeb422`(42-A 观察) → `978918d`(sidecar 桥)。
 未 push、未 merge、未 force、未改动发布源或用户真实数据。

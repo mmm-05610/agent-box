@@ -8,7 +8,7 @@ import threading
 from typing import Iterator
 
 
-PRODUCT_SCHEMA_VERSION = 3
+PRODUCT_SCHEMA_VERSION = 4
 
 
 class FutureSchemaError(RuntimeError):
@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS server_workspaces (
 );
 CREATE TABLE IF NOT EXISTS server_profiles (
     id TEXT PRIMARY KEY,
+    version INTEGER NOT NULL DEFAULT 1,
     name TEXT NOT NULL,
     harness_type TEXT NOT NULL,
     config_revision INTEGER NOT NULL CHECK (config_revision >= 1),
@@ -57,6 +58,19 @@ CREATE TABLE IF NOT EXISTS server_credentials (
     kind TEXT NOT NULL,
     secret_locator TEXT NOT NULL UNIQUE,
     created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS server_provider_models (
+    id TEXT PRIMARY KEY,
+    version INTEGER NOT NULL DEFAULT 1,
+    display_name TEXT NOT NULL,
+    harness_type TEXT NOT NULL,
+    provider_type TEXT NOT NULL,
+    credential_id TEXT REFERENCES server_credentials(id),
+    config_object_digest TEXT NOT NULL,
+    models_object_digest TEXT NOT NULL,
+    archived_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS server_sessions (
     id TEXT PRIMARY KEY,
@@ -81,6 +95,8 @@ CREATE TABLE IF NOT EXISTS server_turns (
     capture_state TEXT NOT NULL,
     cleanup_state TEXT NOT NULL,
     input_object_digest TEXT NOT NULL,
+    effective_config_object_digest TEXT,
+    queue_item_id TEXT REFERENCES server_queue_items(id),
     work_id TEXT,
     execution_id TEXT,
     dispatch_id TEXT,
@@ -125,6 +141,7 @@ CREATE TABLE IF NOT EXISTS server_queue_items (
     request_id TEXT NOT NULL,
     request_digest TEXT NOT NULL,
     message_object_digest TEXT NOT NULL,
+    effective_config_object_digest TEXT,
     submitted_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -254,6 +271,28 @@ def _migrate_2_to_3(conn: sqlite3.Connection) -> None:
     _backfill(conn, "server_profiles", "display_name", "name")
 
 
+def _migrate_3_to_4(conn: sqlite3.Connection) -> None:
+    """Freeze the effective configuration with accepted and queued work."""
+    _add_columns(conn, "server_turns", {
+        "effective_config_object_digest": "TEXT",
+        "queue_item_id": "TEXT REFERENCES server_queue_items(id)",
+    })
+    _add_columns(conn, "server_queue_items", {
+        "effective_config_object_digest": "TEXT",
+    })
+    _add_columns(conn, "server_profiles", {
+        "version": "INTEGER NOT NULL DEFAULT 1",
+    })
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS server_provider_models ("
+        "id TEXT PRIMARY KEY,version INTEGER NOT NULL DEFAULT 1,display_name TEXT NOT NULL,"
+        "harness_type TEXT NOT NULL,provider_type TEXT NOT NULL,"
+        "credential_id TEXT REFERENCES server_credentials(id),"
+        "config_object_digest TEXT NOT NULL,models_object_digest TEXT NOT NULL,"
+        "archived_at TEXT,created_at TEXT NOT NULL,updated_at TEXT NOT NULL)"
+    )
+
+
 class Database:
     """One local SQLite file with explicit, bounded transaction scopes."""
 
@@ -291,6 +330,8 @@ class Database:
                 _migrate_1_to_2(conn)
             if current in (1, 2):
                 _migrate_2_to_3(conn)
+            if current in (1, 2, 3):
+                _migrate_3_to_4(conn)
             conn.executescript(_SCHEMA)
             conn.execute(
                 "INSERT OR IGNORE INTO agentbox_product_schema(singleton, version, applied_at) "

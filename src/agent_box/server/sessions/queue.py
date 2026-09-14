@@ -26,16 +26,18 @@ class QueueRecords:
     def enqueue_in_transaction(
         self, conn, *, session_id: str, profile_id: str, config_version: int,
         request_id: str, request_digest: str, message_object_digest: str,
+        effective_config_object_digest: str | None = None,
     ) -> dict[str, Any]:
         item_id = opaque_id("queue")
         timestamp = now()
         conn.execute(
             "INSERT INTO server_queue_items("
             "id,session_id,version,state,profile_id,config_version,request_id,"
-            "request_digest,message_object_digest,submitted_at,updated_at) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            "request_digest,message_object_digest,effective_config_object_digest,"
+            "submitted_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
             (item_id, session_id, 1, "pending", profile_id, config_version,
-             request_id, request_digest, message_object_digest, timestamp, timestamp),
+             request_id, request_digest, message_object_digest,
+             effective_config_object_digest, timestamp, timestamp),
         )
         return self._row_to_item(conn.execute(
             "SELECT * FROM server_queue_items WHERE id=?", (item_id,),
@@ -140,6 +142,8 @@ class QueueRecords:
             "state": row["state"],
             "configVersion": int(row["config_version"]),
             "requestId": row["request_id"],
+            "_messageObjectDigest": row["message_object_digest"],
+            "_effectiveConfigObjectDigest": row["effective_config_object_digest"],
         }
 
 

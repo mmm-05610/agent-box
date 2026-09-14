@@ -80,9 +80,16 @@ class WorkspaceService:
     def _validate_environment(environment: Any) -> tuple[str, str | None, str | None]:
         if not isinstance(environment, Mapping):
             raise ServerError("ENVIRONMENT_INVALID", "environment must be an object", status=422)
+        if set(environment) != {"kind", "host", "user"}:
+            raise ServerError("ENVIRONMENT_INVALID", "environment shape is invalid", status=422)
         kind = environment.get("kind")
         if kind not in {"local", "wsl", "ssh"}:
             raise ServerError("ENVIRONMENT_INVALID", "environment.kind is not supported", status=422)
+        if any(
+            value is not None and not isinstance(value, str)
+            for value in (environment.get("host"), environment.get("user"))
+        ):
+            raise ServerError("ENVIRONMENT_INVALID", "environment identity is invalid", status=422)
         return kind, environment.get("host"), environment.get("user")
 
     def _wsl_probe(self, host: str | None, user: str | None) -> dict[str, Any]:

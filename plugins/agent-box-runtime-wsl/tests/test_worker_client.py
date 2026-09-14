@@ -54,10 +54,36 @@ def test_python_frame_matches_rust_golden():
 def test_real_worker_browse_view_secret_and_identity_guards(tmp_path):
     client, project, root = worker_client(tmp_path)
     (project / "子目录").mkdir()
+    attachment = (project / "子目录" / "attachment.bin")
+    attachment_content = b"worker-authorized-attachment"
+    attachment.write_bytes(attachment_content)
+    outside = tmp_path / "outside.txt"
+    outside.write_bytes(b"must-not-be-readable")
+    (project / "escape-link").symlink_to(outside)
     client.start()
     try:
         browse = client.request("browse", {"path": str(project)})
         assert browse["directories"] == ["子目录"]
+
+        first_chunk = client.request("workspace.get", {
+            "path": "子目录/attachment.bin", "offset": 0, "maxLength": 7,
+        })
+        second_chunk = client.request("workspace.get", {
+            "path": "子目录/attachment.bin", "offset": first_chunk["nextOffset"],
+            "maxLength": 64,
+        })
+        assert base64.b64decode(first_chunk["data"]) + base64.b64decode(second_chunk["data"]) == attachment_content
+        assert first_chunk["digest"] == second_chunk["digest"] == (
+            "sha256:" + hashlib.sha256(attachment_content).hexdigest()
+        )
+        assert second_chunk["eof"] is True
+
+        with pytest.raises(WorkerError) as traversal_attachment:
+            client.request("workspace.get", {"path": "../outside.txt"})
+        assert traversal_attachment.value.code == "PATH_INVALID"
+        with pytest.raises(WorkerError) as linked_attachment:
+            client.request("workspace.get", {"path": "escape-link"})
+        assert linked_attachment.value.code == "ATTACHMENT_UNAUTHORIZED"
 
         content = "受控内容\n".encode()
         view_digest = "sha256:" + hashlib.sha256(content).hexdigest()

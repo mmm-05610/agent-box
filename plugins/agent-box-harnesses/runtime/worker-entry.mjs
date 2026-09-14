@@ -45,14 +45,19 @@ function makePermissionResolver(emit, timeoutMs) {
   return async ({ toolCall, options }) => {
     const requestId = randomUUID()
     const decision = new Promise((resolve) => {
-      pendingPermissions.set(requestId, resolve)
+      pendingPermissions.set(requestId, { resolve, options: Array.isArray(options) ? options : [] })
       if (timeoutMs > 0) {
         setTimeout(() => {
           if (pendingPermissions.delete(requestId)) resolve(undefined)
         }, timeoutMs)
       }
     })
-    emit({ event: "permission_request", data: { requestId, toolCall: toolCall ?? null, options } })
+    emit({ event: "permission_request", data: {
+      requestId,
+      toolCall: toolCall ?? null,
+      options,
+      expiresAt: timeoutMs > 0 ? new Date(Date.now() + timeoutMs).toISOString() : null,
+    } })
     const optionId = await decision
     return typeof optionId === "string" ? optionId : undefined
   }
@@ -116,10 +121,11 @@ async function main() {
       }
     }
     if (op === "permission_decision") {
-      const resolve = pendingPermissions.get(request.requestId)
-      if (!resolve) throw envelopeError("PERMISSION_REQUEST_UNKNOWN")
+      const pending = pendingPermissions.get(request.requestId)
+      if (!pending) throw envelopeError("PERMISSION_REQUEST_UNKNOWN")
+      const optionId = permissionOption(pending.options, request.decision, request.scope)
       pendingPermissions.delete(request.requestId)
-      resolve(request.optionId)
+      pending.resolve(optionId)
       return { recorded: true }
     }
     if (!registration) throw envelopeError("NOT_REGISTERED")
@@ -148,6 +154,7 @@ async function main() {
       case "prompt": {
         const result = await registration.service.promptAndWait(
           request.sessionId, request.text, request.model ?? undefined,
+          Array.isArray(request.attachments) ? request.attachments : [],
         )
         return result ?? { done: true }
       }
@@ -178,20 +185,40 @@ async function main() {
       fail({ code: "ENVELOPE_MALFORMED" })
       continue
     }
-    try {
-      emit({ id: request.id ?? null, ok: true, result: await handle(request) })
-    } catch (error) {
-      emit({
+    // A prompt may pause on a permission request. Keep consuming the control
+    // stream so its permission_decision can complete that same in-flight op;
+    // response ids preserve correlation while callers still sequence setup.
+    void handle(request).then(
+      (result) => emit({ id: request.id ?? null, ok: true, result }),
+      (error) => emit({
         id: request.id ?? null,
         ok: false,
         error: {
           code: error?.code ?? "SIDECAR_OP_FAILED",
           message: String(error?.message ?? error).slice(0, 500),
         },
-      })
-    }
+      }),
+    )
   }
   process.exit(0)
+}
+
+function permissionOption(options, decision, scope) {
+  if (!["allow", "deny"].includes(decision)) throw envelopeError("PERMISSION_DECISION_INVALID")
+  const bounded = scope?.kind === "bounded"
+  if (scope?.kind !== "once" && !bounded) throw envelopeError("PERMISSION_SCOPE_INVALID")
+  const wanted = decision === "allow"
+    ? (bounded ? ["allow_always", "allow"] : ["allow_once", "allow"])
+    : (bounded ? ["reject_always", "deny_always", "reject", "deny"]
+      : ["reject_once", "deny_once", "reject", "deny"])
+  const normalized = (value) => String(value ?? "").toLowerCase().replace(/[ -]+/g, "_")
+  for (const kind of wanted) {
+    const option = options.find((item) =>
+      [item?.kind, item?.name, item?.label].some((value) => normalized(value) === kind),
+    )
+    if (typeof option?.optionId === "string") return option.optionId
+  }
+  throw envelopeError("PERMISSION_OPTION_UNAVAILABLE")
 }
 
 function wireForwarding(registration, emit) {

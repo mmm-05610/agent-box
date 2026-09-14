@@ -19,6 +19,10 @@ class ProfileService:
         self.objects = objects
         self.harnesses = harnesses
         self.credentials = credentials
+        self.model_configs = None
+
+    def bind_model_configs(self, model_configs) -> None:
+        self.model_configs = model_configs
 
     def create(self, key: str, body: dict[str, Any]):
         harness_type = body["harness_type"]
@@ -62,3 +66,64 @@ class ProfileService:
                 "capabilities": self.harnesses.claims_for(row["harness_type"]),
             })
         return items
+
+    def create_wire(self, key: str, *, display_name: str, harness: str) -> dict[str, Any]:
+        _status, body = self.create(key, {
+            "name": display_name, "harness_type": harness,
+            "configuration": {}, "credential_id": None,
+        })
+        return self.records.get(body["profile_id"])
+
+    def update_display_name(
+        self, key: str, *, profile_id: str, expected_version: int, display_name: str,
+    ) -> dict[str, Any]:
+        _status, body = self.records.update_display_name(
+            profile_id=profile_id, expected_version=expected_version,
+            display_name=display_name, key=key,
+            request_digest=digest({
+                "profileId": profile_id, "expectedVersion": expected_version,
+                "displayName": display_name,
+            }),
+        )
+        return body["profile"]
+
+    def update_configuration(
+        self, key: str, *, profile_id: str, expected_version: int,
+        values: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        profile = self.records.get(profile_id)
+        if profile["archived_at"] is not None:
+            raise ServerError("PROFILE_ARCHIVED", "Profile is archived", status=409)
+        reject_sensitive_keys(values)
+        if self.model_configs is not None:
+            self.model_configs.validate_references(profile["harness_type"], values)
+        configuration = {item["controlId"]: item["value"] for item in values}
+        descriptor = self.harnesses.get(profile["harness_type"])
+        if descriptor.configuration_validator is not None:
+            try:
+                descriptor.configuration_validator(configuration)
+            except ServerError:
+                raise
+            except (TypeError, ValueError) as exc:
+                raise ServerError("PROFILE_CONFIGURATION_INVALID", str(exc), status=422) from exc
+        record = self.objects.publish(canonical({
+            "schema_version": 1, "harness_type": profile["harness_type"],
+            "configuration": configuration,
+        }))
+        _status, body = self.records.update_configuration(
+            profile_id=profile_id, expected_version=expected_version,
+            config_digest=record.digest, key=key,
+            request_digest=digest({
+                "profileId": profile_id, "expectedVersion": expected_version, "values": values,
+            }),
+        )
+        return body["profile"]
+
+    def archive(self, key: str, *, profile_id: str, expected_version: int) -> dict[str, Any]:
+        _status, body = self.records.archive(
+            profile_id=profile_id, expected_version=expected_version, key=key,
+            request_digest=digest({
+                "profileId": profile_id, "expectedVersion": expected_version,
+            }),
+        )
+        return body["profile"]

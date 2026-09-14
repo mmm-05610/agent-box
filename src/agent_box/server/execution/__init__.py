@@ -64,3 +64,10 @@ class HarnessRegistry:
 
     def __contains__(self, harness_type: str) -> bool:
         return harness_type in self._descriptors
+
+
+from .sidecar_backend import SidecarExecutionBackend  # noqa: E402
+
+__all__ = [
+    "HarnessDescriptor", "HarnessRegistry", "SidecarExecutionBackend", "TurnExecutionPort",
+]

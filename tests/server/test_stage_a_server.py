@@ -288,11 +288,12 @@ def test_schema_one_migrates_turn_identity_columns_idempotently(tmp_path):
     with database.read() as conn:
         assert conn.execute(
             "SELECT version FROM agentbox_product_schema WHERE singleton=1"
-        ).fetchone()[0] == 3
+        ).fetchone()[0] == 4
         row = conn.execute("SELECT * FROM server_turns WHERE id='turn-old'").fetchone()
         assert row["profile_id"] == "profile-old"
         assert {"work_id", "execution_id", "dispatch_id", "result_object_digest",
-                "error_code", "stop_requested_at", "terminal_reason"} <= set(row.keys())
+                "error_code", "stop_requested_at", "terminal_reason",
+                "effective_config_object_digest", "queue_item_id"} <= set(row.keys())
         # The wire identity fields arrived with the same non-destructive pass.
         workspace = conn.execute("SELECT * FROM server_workspaces LIMIT 1").fetchone()
         assert workspace is None or {"version", "display_name", "normalized_path"} <= set(workspace.keys())

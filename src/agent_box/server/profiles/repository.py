@@ -39,10 +39,11 @@ class ProfileRecords:
                 "run_state": "idle",
             }
             conn.execute(
-                "INSERT INTO server_profiles(id,name,harness_type,config_revision,native_generation,config_object_digest,credential_id,created_at,updated_at) "
-                "VALUES (?,?,?,?,?,?,?,?,?)",
-                (body["profile_id"], name, harness_type, 1, 0, config_digest,
-                 credential_id, timestamp, timestamp),
+                "INSERT INTO server_profiles(id,version,name,harness_type,config_revision,native_generation,config_object_digest,credential_id,display_name,created_at,updated_at) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                (body["profile_id"], 1, name, harness_type, 1, 0, config_digest,
+                 credential_id, name,
+                 timestamp, timestamp),
             )
             self.idempotency.insert(conn, "POST:/profiles", key, request_digest, 201, body)
             return 201, body
@@ -70,3 +71,70 @@ class ProfileRecords:
                     "SELECT * FROM server_profiles WHERE archived_at IS NULL ORDER BY created_at,id"
                 ).fetchall()
         return [dict(row) for row in rows]
+
+    def update_display_name(
+        self, *, profile_id: str, expected_version: int, display_name: str,
+        key: str, request_digest: str,
+    ) -> tuple[int, dict[str, Any]]:
+        return self._mutate(
+            profile_id=profile_id, expected_version=expected_version, key=key,
+            request_digest=request_digest, operation="update",
+            assignments={"name": display_name, "display_name": display_name},
+        )
+
+    def update_configuration(
+        self, *, profile_id: str, expected_version: int, config_digest: str,
+        key: str, request_digest: str,
+    ) -> tuple[int, dict[str, Any]]:
+        return self._mutate(
+            profile_id=profile_id, expected_version=expected_version, key=key,
+            request_digest=request_digest, operation="updateConfig",
+            assignments={"config_object_digest": config_digest}, bump_config=True,
+        )
+
+    def archive(
+        self, *, profile_id: str, expected_version: int, key: str, request_digest: str,
+    ) -> tuple[int, dict[str, Any]]:
+        return self._mutate(
+            profile_id=profile_id, expected_version=expected_version, key=key,
+            request_digest=request_digest, operation="archive",
+            assignments={"archived_at": now()},
+        )
+
+    def _mutate(
+        self, *, profile_id: str, expected_version: int, key: str,
+        request_digest: str, operation: str, assignments: dict[str, Any],
+        bump_config: bool = False,
+    ) -> tuple[int, dict[str, Any]]:
+        scope = f"profiles.{operation}:{profile_id}"
+        with self.database.transaction() as conn:
+            prior = self.idempotency.check(conn, scope, key, request_digest)
+            if prior:
+                return prior
+            row = conn.execute("SELECT * FROM server_profiles WHERE id=?", (profile_id,)).fetchone()
+            if row is None:
+                raise ServerError("PROFILE_NOT_FOUND", "Profile was not found", status=404)
+            if int(row["version"]) != expected_version:
+                error = ServerError(
+                    "RECORD_VERSION_CONFLICT", "Profile changed before the update", status=409,
+                )
+                error.current = dict(row)  # type: ignore[attr-defined]
+                raise error
+            if operation == "archive" and row["archived_at"] is not None:
+                assignments = {"archived_at": row["archived_at"]}
+            timestamp = now()
+            fragments = [f"{name}=?" for name in assignments]
+            values = list(assignments.values())
+            fragments.extend(["version=version+1", "updated_at=?"])
+            if bump_config:
+                fragments.append("config_revision=config_revision+1")
+            conn.execute(
+                f"UPDATE server_profiles SET {','.join(fragments)} WHERE id=?",
+                (*values, timestamp, profile_id),
+            )
+            updated = dict(conn.execute(
+                "SELECT * FROM server_profiles WHERE id=?", (profile_id,),
+            ).fetchone())
+            body = {"profile": updated}
+            self.idempotency.insert(conn, scope, key, request_digest, 200, body)
+            return 200, body

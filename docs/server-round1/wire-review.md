@@ -3,6 +3,105 @@
 维护者：后端执行者（39–42）。用途：在双方锁定单一 wire 前交换事实与约束，
 避免两边各造一套协议。此处只写后端事实与差异请求，不批准前端合同。
 
+## 2026-09-14 11:21 +08:00 · `WIRE_LOCKED_FOR_IMPLEMENTATION`
+
+前端已在干净检查点 `9881bb821176ecb59a5e71f32cdd9493fd065f6e` 消费下节
+`CHANGES_REQUESTED_CORE_COVERAGE`，把 Profile 与 Provider/Model 维护加入原有同一份
+`wire-v1`，总计 25 方法；没有产生第二份协议。后端逐项核对实际 TS 与生成工件并完成实现：
+
+| 工件 | 双方锁定的完整 sha256 |
+| --- | --- |
+| TS 权威 `apps/desktop/src/types/wire/wire-v1.ts` | `2874fae7c763a6e7fb488159bccc64903458ec6e4c3310ba306a4e0faa0060a9` |
+| 生成工件 `generated/wire-v1.schema.json` | `c9be8a63097aa6b1658da3b3450b669e128ed1f314780c93841fd34a52e3145a` |
+
+后端以环境变量 `AGENT_BOX_WIRE_SCHEMA=<上述生成工件>` 直接验证真实 wire handler 的请求、
+成功结果与错误信封：`tests/server/test_wire_v1.py` **25 passed**。新增门覆盖
+Profile create/update/archive/updateConfig、Provider/Model list/create/update/archive、记录版本与
+配置版本分离、模型槽稳定引用、归档引用冲突和秘密字段拒绝。已有 17 方法及正式 WS 事件流继续
+通过同一工件。
+
+结论：后端接受前端登记的上述两个完整摘要；前端 `backend-response.md` 已接受后端机械/安全项，
+所以双方接受记录齐备，状态锁定为 **`WIRE_LOCKED_FOR_IMPLEMENTATION`**。这表示实现合同可稳定
+施工，不替代各端独立验收或最终真实全栈验收。
+
+## 2026-09-14 11:05 +08:00 · 检查点 3 摘要核对与核心维护方法补齐请求
+
+只读核对前端执行树 HEAD `fffbf443dec52e6da0e3f979bdb545103028887d`；合同文件无
+未提交改动（当时 dirty 仅 P03 send-intent 三个新文件）。当前权威与生成工件的完整摘要为：
+
+| 工件 | sha256 |
+| --- | --- |
+| `apps/desktop/src/types/wire/wire-v1.ts` | `793bc995fd8199df5dfbc4b5a942a29f6fd5f514c56447d223e535a2960c7baf` |
+| `contracts/wire-v1/generated/wire-v1.schema.json` | `5f6bc31dd63444f6beb6c02e1769c2f1e142b5ad9b57a9b73c6587016dd45791` |
+
+后端已按这份生成工件校验当前 17 方法与正式事件流：`tests/server/test_wire_v1.py`
+24 passed。前端 `backend-response.md` 所列 `sessions.send`、审批、`config.changed`、
+`workspace.connection` 和正式 `wire.eventStream/1` 五组机械差异均已在后端实现并通过该工件。
+三项安全反馈也已双方接受。因此，**上述 17 方法子集摘要已机械对齐**。
+
+但完整 wire 暂不能登记 `WIRE_LOCKED_FOR_IMPLEMENTATION`：最新权威仍只有
+`profiles.list`，而前端 `ProfileMaintenancePort` 明确标作 `INTERNAL_NOT_WIRE`；
+Provider/Model 也只有 `ProviderModelRef`，没有维护资源。它遗漏了已批准
+`core-semantics/1` §3、§5、§8 的 Profile 创建/更新/归档与可复用 Provider/Model
+配置维护。这些是 41 核心范围，不是外围增量。结论为：
+**`CHANGES_REQUESTED_CORE_COVERAGE`（既有 17 方法不回退，仅向同一 wire-v1 增补）**。
+
+### 单一 wire-v1 的机械增量（请前端编入同一 TS 权威并重生成摘要）
+
+保留现有 `ProfileRecord` 与 `ProviderModelRef`，新增以下中立类型；所有对象继续 strict：
+
+```text
+ProviderModelConfigRecord = {
+  id: WireId, version: RecordVersion, displayName: string,
+  harness: string, provider: string,
+  credentialId: WireId | null,                 // 仅不透明引用，不含秘密内容/locator
+  configuration: ConfigOverride[],             // reject sensitive keys；由接入层校验
+  models: [{ modelId: string, displayName: string,
+             availability: unknown|available|unavailable,
+             unavailableReason: string|null }],
+  archivedAt: WireTimestamp|null, createdAt: WireTimestamp, updatedAt: WireTimestamp
+}
+```
+
+方法增量与结果（沿用现有 `requestId`、`expectedVersion`、错误族及分页编码）：
+
+| 方法 | 必需 params | result |
+| --- | --- | --- |
+| `profiles.create` | `requestId, displayName, harness` | `{profile}` |
+| `profiles.update` | `requestId, profileId, expectedVersion, displayName` | `{profile}` |
+| `profiles.archive` | `requestId, profileId, expectedVersion` | `{profile}` |
+| `providerModels.list` | `includeArchived` | `paginated(ProviderModelConfigRecord)` |
+| `providerModels.create` | `requestId, displayName, harness, provider, credentialId, configuration, models` | `{providerModel}` |
+| `providerModels.update` | `requestId, providerModelId, expectedVersion, displayName, credentialId, configuration, models` | `{providerModel}` |
+| `providerModels.archive` | `requestId, providerModelId, expectedVersion` | `{providerModel}` |
+
+机械约束：
+
+- Profile 创建只选择后端 `server.hello`/能力描述列出的 opaque Harness；不允许客户端按品牌
+  推断默认配置。创建后通过已有 `config.describe` 取得完整描述，配置默认值仍由接入层提供。
+- Profile update 本增量只修改 `displayName`。Harness 身份不可原地换家；完整配置修改随后应由
+  `profiles.updateConfig(requestId, profileId, expectedVersion, values: ConfigOverride[])`
+  单独编码，以便 `configVersion` 与普通记录 `version` 都返回并保持运行中“next_send”语义。
+  请把该方法同时纳入本轮；结果 `{profile, configVersion, effectiveFor:'next_send'}`。
+- Profile archive 不删 Session、历史、项目文件或 native memory；已运行任务收尾，新发送/新选择
+  拒绝。归档本身不是永久删除。
+- `provider` 与 `harness` 都是不透明接入层数据。Provider/Model 可用性由后端验证结果给出，
+  “保存成功”不等于“模型可运行”。`credentialId` 只是 Server SecretStore 记录引用，秘密内容、
+  locator、Authorization header 均不得进入 wire/事件/日志。
+- Provider/Model 配置 archive 前做引用检查；仍被任一未归档 Profile 的模型槽引用时返回
+  `CONFLICT_VERSION` 不合语义，故请在现有错误族增加机械错误 `CONFLICT_REFERENCE`，错误 data
+  只含稳定引用对象 id。不得静默替换 Profile 选择。
+- Profile 的模型槽引用继续只使用现有 `{providerId, modelId}`，其中 `providerId` 精确指向
+  `ProviderModelConfigRecord.id`；模型 id 不用字符串拆分。具体多槽位仍由 `config.describe`
+  的 `model_slot` 控件声明，不在 Server 或 Desktop 按 Harness 品牌硬编码。
+- create/update/archive 幂等 scope 分别为方法名+`requestId`；同 id 异 payload 继续
+  `CONFLICT_REQUEST`。所有 update/archive 使用 CAS，冲突 data 携带当前权威记录。
+
+后端会在 41 内按上述增量实现持久化、引用完整性和行为测试。前端只需扩展现有同源 TS 权威、
+生成 JSON Schema 并把 `ProfileMaintenancePort` 接到新增方法；不要另建 REST/fixture-only 合同。
+前端提交新完整摘要后，后端再用该同一工件运行 schema 回归并登记
+`WIRE_LOCKED_FOR_IMPLEMENTATION`。
+
 ## 2026-09-14 · 对 P07 检查点 2 候选 `wire-v1` 的答复
 
 核对对象（只读）：

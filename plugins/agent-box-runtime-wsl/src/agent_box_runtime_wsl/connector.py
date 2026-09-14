@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import base64
+import hashlib
 import json
 import locale
 from pathlib import Path
@@ -98,6 +100,39 @@ class WslConnector:
             connection_id=connection_id,
             executable_authorizations=executable_authorizations,
         )
+
+    def read_workspace_file(
+        self, *, distribution: str, user: str, connection_id: str,
+        workspace_path: str, relative_path: str,
+    ) -> tuple[bytes, str]:
+        """Read one bounded, Worker-authorized file for an attachment."""
+        client = self.client_for_workspace(
+            distribution=distribution, user=user, connection_id=connection_id,
+            workspace_path=workspace_path,
+        )
+        chunks = bytearray()
+        expected = None
+        client.start()
+        try:
+            while True:
+                item = client.request("workspace.get", {
+                    "path": relative_path, "offset": len(chunks), "maxLength": 32 * 1024,
+                })
+                expected = expected or item["digest"]
+                if item["digest"] != expected or int(item["offset"]) != len(chunks):
+                    raise WorkerError(
+                        "ATTACHMENT_IDENTITY_CONFLICT", "workspace file changed during delivery",
+                    )
+                chunks.extend(base64.b64decode(item["data"], validate=True))
+                if item["eof"]:
+                    break
+        finally:
+            client.close()
+        content = bytes(chunks)
+        actual = "sha256:" + hashlib.sha256(content).hexdigest()
+        if actual != expected:
+            raise WorkerError("ATTACHMENT_DIGEST_MISMATCH", "workspace attachment digest changed")
+        return content, actual
 
     def _probe(self, probe_id: str) -> Probe:
         probe = self._probes.get(probe_id)

@@ -7,6 +7,8 @@ behavior lives here: this module is the contract's edge.
 from __future__ import annotations
 
 import json
+import mimetypes
+from pathlib import PurePosixPath
 from typing import Any, Callable, Mapping
 
 from agent_box.server.errors import ServerError
@@ -29,6 +31,14 @@ CAPABILITY_IDS = (
     "workspaces.list",
     "workspaces.archive",
     "profiles.list",
+    "profiles.create",
+    "profiles.update",
+    "profiles.updateConfig",
+    "profiles.archive",
+    "providerModels.list",
+    "providerModels.create",
+    "providerModels.update",
+    "providerModels.archive",
     "config.describe",
     "config.resolve",
     "sessions.createAndSend",
@@ -41,6 +51,48 @@ CAPABILITY_IDS = (
     "approvals.decide",
     "history.snapshot",
 )
+
+_PARAM_SHAPES = {
+    "server.hello": ({"clientVersions", "clientPresentationSupports"}, set()),
+    "workspaces.open": ({"requestId", "environment", "path"}, {"expectedVersion"}),
+    "workspaces.list": ({"includeArchived"}, set()),
+    "workspaces.browse": ({"requestId", "environment", "path"}, set()),
+    "workspaces.archive": ({"requestId", "workspaceId", "expectedVersion"}, set()),
+    "profiles.list": ({"includeArchived"}, set()),
+    "profiles.create": ({"requestId", "displayName", "harness"}, set()),
+    "profiles.update": ({"requestId", "profileId", "expectedVersion", "displayName"}, set()),
+    "profiles.updateConfig": ({"requestId", "profileId", "expectedVersion", "values"}, set()),
+    "profiles.archive": ({"requestId", "profileId", "expectedVersion"}, set()),
+    "providerModels.list": ({"includeArchived"}, set()),
+    "providerModels.create": (
+        {"requestId", "displayName", "harness", "provider", "credentialId",
+         "configuration", "models"}, set(),
+    ),
+    "providerModels.update": (
+        {"requestId", "providerModelId", "expectedVersion", "displayName", "credentialId",
+         "configuration", "models"}, set(),
+    ),
+    "providerModels.archive": (
+        {"requestId", "providerModelId", "expectedVersion"}, set(),
+    ),
+    "config.describe": ({"profileId", "workspaceId"}, set()),
+    "config.resolve": ({"profileId", "workspaceId", "overrides"}, set()),
+    "sessions.switchProfile": (
+        {"requestId", "sessionId", "profileId", "expectedVersion"}, set(),
+    ),
+    "sessions.createAndSend": (
+        {"requestId", "workspaceId", "profileId", "overrides", "message"}, set(),
+    ),
+    "sessions.send": ({"requestId", "sessionId", "overrides", "message"}, set()),
+    "sendOutcome.query": ({"requestId"}, set()),
+    "queue.get": ({"sessionId"}, set()),
+    "queue.withdraw": ({"requestId", "sessionId", "itemId", "expectedVersion"}, set()),
+    "runs.stop": ({"requestId", "sessionId", "executionId"}, set()),
+    "approvals.decide": (
+        {"requestId", "approvalId", "expectedVersion", "decision", "scope"}, set(),
+    ),
+    "history.snapshot": ({"sessionId"}, {"cursor", "page"}),
+}
 
 
 def _require(params: Mapping[str, Any], *names: str) -> None:
@@ -55,6 +107,19 @@ def _bounded(value: Any, name: str, limit: int = 4096) -> str:
     return value
 
 
+def _request_id(value: Any) -> str:
+    result = _bounded(value, "requestId")
+    if len(result) < 8:
+        raise WireError("INVALID_REQUEST", "requestId must contain at least 8 characters")
+    return result
+
+
+def _version(value: Any, name: str = "expectedVersion") -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or not (0 <= value <= 2**53 - 1):
+        raise WireError("INVALID_REQUEST", f"{name} must be a non-negative safe integer")
+    return value
+
+
 def _overrides(params: Mapping[str, Any]) -> list[dict[str, Any]] | None:
     value = params.get("overrides")
     if value is None:
@@ -62,10 +127,48 @@ def _overrides(params: Mapping[str, Any]) -> list[dict[str, Any]] | None:
     if not isinstance(value, list):
         raise WireError("INVALID_REQUEST", "overrides must be a list of control assignments")
     for item in value:
-        if not isinstance(item, Mapping) or "controlId" not in item or "value" not in item:
+        if (not isinstance(item, Mapping) or set(item) != {"controlId", "value"}
+                or not isinstance(item["controlId"], str)):
             raise WireError("INVALID_REQUEST", "each override needs controlId and value")
     reject_sensitive_keys(value)
+    reject_sensitive_keys({item["controlId"]: item["value"] for item in value})
     return [dict(item) for item in value]
+
+
+def _assignments(value: Any, name: str) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        raise WireError("INVALID_REQUEST", f"{name} must be a list of control assignments")
+    result = []
+    for item in value:
+        if (not isinstance(item, Mapping) or set(item) != {"controlId", "value"}
+                or not isinstance(item["controlId"], str) or not item["controlId"]):
+            raise WireError("INVALID_REQUEST", f"each {name} item needs controlId and value")
+        result.append(dict(item))
+    reject_sensitive_keys(result)
+    reject_sensitive_keys({item["controlId"]: item["value"] for item in result})
+    return result
+
+
+def _models(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        raise WireError("INVALID_REQUEST", "models must be a list")
+    result = []
+    allowed = {"modelId", "displayName", "availability", "unavailableReason"}
+    for item in value:
+        if not isinstance(item, Mapping) or set(item) != allowed:
+            raise WireError("INVALID_REQUEST", "each model has an invalid shape")
+        availability = item["availability"]
+        reason = item["unavailableReason"]
+        if availability not in {"unknown", "available", "unavailable"}:
+            raise WireError("INVALID_REQUEST", "model availability is invalid")
+        if reason is not None and not isinstance(reason, str):
+            raise WireError("INVALID_REQUEST", "unavailableReason must be a string or null")
+        result.append({
+            "modelId": _bounded(item["modelId"], "modelId", 256),
+            "displayName": _bounded(item["displayName"], "displayName", 256),
+            "availability": availability, "unavailableReason": reason,
+        })
+    return result
 
 
 class WireService:
@@ -74,6 +177,7 @@ class WireService:
     def __init__(
         self, *, server_id_provider: Callable[[], str], workspaces, profiles, sessions,
         queue, approvals, harnesses, objects, execution, cursor_secret: bytes,
+        model_configs=None,
         token_required: bool = True,
     ) -> None:
         self._server_id_provider = server_id_provider
@@ -85,6 +189,7 @@ class WireService:
         self.harnesses = harnesses
         self.objects = objects
         self.execution = execution
+        self.model_configs = model_configs
         self.codec = CursorCodec(cursor_secret)
         self.token_required = token_required
         self._handlers: dict[str, Callable[[Mapping[str, Any]], Any]] = {
@@ -94,6 +199,14 @@ class WireService:
             "workspaces.list": self.workspaces_list,
             "workspaces.archive": self.workspaces_archive,
             "profiles.list": self.profiles_list,
+            "profiles.create": self.profiles_create,
+            "profiles.update": self.profiles_update,
+            "profiles.updateConfig": self.profiles_update_config,
+            "profiles.archive": self.profiles_archive,
+            "providerModels.list": self.provider_models_list,
+            "providerModels.create": self.provider_models_create,
+            "providerModels.update": self.provider_models_update,
+            "providerModels.archive": self.provider_models_archive,
             "config.describe": self.config_describe,
             "config.resolve": self.config_resolve,
             "sessions.createAndSend": self.sessions_create_and_send,
@@ -111,6 +224,16 @@ class WireService:
         handler = self._handlers.get(method)
         if handler is None:
             raise WireError("INVALID_REQUEST", f"{method} is not a wire/1 method")
+        required, optional = _PARAM_SHAPES[method]
+        missing = required - set(params)
+        extra = set(params) - required - optional
+        if missing or extra:
+            reason = "missing " + ", ".join(sorted(missing)) if missing else (
+                "unexpected " + ", ".join(sorted(extra))
+            )
+            raise WireError("INVALID_REQUEST", f"params shape is invalid: {reason}")
+        if "requestId" in params:
+            _request_id(params["requestId"])
         try:
             return handler(params)
         except ServerError as exc:
@@ -121,7 +244,11 @@ class WireService:
     def hello(self, params: Mapping[str, Any]) -> dict[str, Any]:
         _require(params, "clientVersions", "clientPresentationSupports")
         versions = params["clientVersions"]
-        if not isinstance(versions, list) or not versions:
+        presentations = params["clientPresentationSupports"]
+        if (not isinstance(versions, list) or not versions
+                or any(not isinstance(item, str) for item in versions)
+                or not isinstance(presentations, list)
+                or any(not isinstance(item, str) for item in presentations)):
             raise WireError("INVALID_REQUEST", "clientVersions must be a non-empty list")
         capabilities = []
         for capability_id in CAPABILITY_IDS:
@@ -151,7 +278,7 @@ class WireService:
             return True, None
         if capability_id == "approvals.decide":
             return True, None
-        if capability_id == "profiles.list":
+        if capability_id.startswith("profiles.") or capability_id.startswith("providerModels."):
             return True, None
         return True, None
 
@@ -166,8 +293,8 @@ class WireService:
     def workspaces_open(self, params: Mapping[str, Any]) -> dict[str, Any]:
         _require(params, "requestId", "environment", "path")
         expected = params.get("expectedVersion")
-        if expected is not None and not isinstance(expected, int):
-            raise WireError("INVALID_REQUEST", "expectedVersion must be an integer")
+        if expected is not None:
+            expected = _version(expected)
         created, row = self.workspaces.open_environment(
             environment=params["environment"], path=_bounded(params["path"], "path"),
             expected_version=expected,
@@ -186,7 +313,7 @@ class WireService:
         try:
             row = self.workspaces.archive(
                 workspace_id=_bounded(params["workspaceId"], "workspaceId"),
-                expected_version=int(params["expectedVersion"]),
+                expected_version=_version(params["expectedVersion"]),
             )
         except ServerError as exc:
             current = getattr(exc, "current", None)
@@ -205,8 +332,141 @@ class WireService:
         include = params.get("includeArchived", False)
         if not isinstance(include, bool):
             raise WireError("INVALID_REQUEST", "includeArchived must be a boolean")
-        items = [profile_record(row) for row in self.profiles.records.list(include_archived=include)]
+        items = []
+        for row in self.profiles.records.list(include_archived=include):
+            items.append(self._profile(row))
         return {"items": items, "nextCursor": None}
+
+    def _profile(self, row: Mapping[str, Any]) -> dict[str, Any]:
+        item = profile_record(row)
+        descriptor = (
+            self.harnesses.get(row["harness_type"])
+            if row["harness_type"] in self.harnesses else None
+        )
+        item["capabilities"] = {
+            str(key): bool(value)
+            for key, value in (descriptor.capability_claims if descriptor else {}).items()
+            if isinstance(value, bool)
+        }
+        return item
+
+    def profiles_create(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        row = self.profiles.create_wire(
+            _request_id(params["requestId"]),
+            display_name=_bounded(params["displayName"], "displayName", 128),
+            harness=_bounded(params["harness"], "harness", 64),
+        )
+        return {"profile": self._profile(row)}
+
+    def profiles_update(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        try:
+            row = self.profiles.update_display_name(
+                _request_id(params["requestId"]),
+                profile_id=_bounded(params["profileId"], "profileId"),
+                expected_version=_version(params["expectedVersion"]),
+                display_name=_bounded(params["displayName"], "displayName", 128),
+            )
+        except ServerError as exc:
+            raise self._profile_error(exc) from exc
+        return {"profile": self._profile(row)}
+
+    def profiles_update_config(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        values = _assignments(params.get("values"), "values")
+        try:
+            row = self.profiles.update_configuration(
+                _request_id(params["requestId"]),
+                profile_id=_bounded(params["profileId"], "profileId"),
+                expected_version=_version(params["expectedVersion"]), values=values,
+            )
+        except ServerError as exc:
+            raise self._profile_error(exc) from exc
+        return {
+            "profile": self._profile(row), "configVersion": int(row["config_revision"]),
+            "effectiveFor": "next_send",
+        }
+
+    def profiles_archive(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        try:
+            row = self.profiles.archive(
+                _request_id(params["requestId"]),
+                profile_id=_bounded(params["profileId"], "profileId"),
+                expected_version=_version(params["expectedVersion"]),
+            )
+        except ServerError as exc:
+            raise self._profile_error(exc) from exc
+        return {"profile": self._profile(row)}
+
+    def _profile_error(self, exc: ServerError) -> WireError:
+        error = WireError.from_server_error(exc)
+        current = getattr(exc, "current", None)
+        if current is not None:
+            error.current = self._profile(current)
+        return error
+
+    def provider_models_list(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        self._require_model_configs()
+        include = params["includeArchived"]
+        if not isinstance(include, bool):
+            raise WireError("INVALID_REQUEST", "includeArchived must be a boolean")
+        return {"items": self.model_configs.list(include_archived=include), "nextCursor": None}
+
+    def provider_models_create(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        self._require_model_configs()
+        body = self._provider_model_body(params, creating=True)
+        record = self.model_configs.create(_request_id(params["requestId"]), body)
+        return {"providerModel": record}
+
+    def provider_models_update(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        self._require_model_configs()
+        record_id = _bounded(params["providerModelId"], "providerModelId")
+        try:
+            record = self.model_configs.update(
+                record_id, _version(params["expectedVersion"]),
+                _request_id(params["requestId"]),
+                self._provider_model_body(params, creating=False),
+            )
+        except ServerError as exc:
+            error = WireError.from_server_error(exc)
+            current = getattr(exc, "current", None)
+            if current is not None:
+                error.current = self.model_configs.project(current)
+            raise error from exc
+        return {"providerModel": record}
+
+    def provider_models_archive(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        self._require_model_configs()
+        try:
+            record = self.model_configs.archive(
+                _bounded(params["providerModelId"], "providerModelId"),
+                _version(params["expectedVersion"]), _request_id(params["requestId"]),
+            )
+        except ServerError as exc:
+            error = WireError.from_server_error(exc)
+            references = getattr(exc, "references", None)
+            if references is not None:
+                error.details["referenceIds"] = list(references)
+            raise error from exc
+        return {"providerModel": record}
+
+    def _provider_model_body(
+        self, params: Mapping[str, Any], *, creating: bool,
+    ) -> dict[str, Any]:
+        body = {
+            "displayName": _bounded(params["displayName"], "displayName", 128),
+            "credentialId": params["credentialId"],
+            "configuration": _assignments(params["configuration"], "configuration"),
+            "models": _models(params["models"]),
+        }
+        if body["credentialId"] is not None:
+            body["credentialId"] = _bounded(body["credentialId"], "credentialId")
+        if creating:
+            body["harness"] = _bounded(params["harness"], "harness", 64)
+            body["provider"] = _bounded(params["provider"], "provider", 128)
+        return body
+
+    def _require_model_configs(self) -> None:
+        if self.model_configs is None:
+            raise WireError("UNAVAILABLE", "Provider/Model configuration storage is unavailable")
 
     # -- configuration -----------------------------------------------------
 
@@ -249,21 +509,36 @@ class WireService:
     def _controls(self, profile: Mapping[str, Any]) -> list[dict[str, Any]]:
         harness = profile["harness_type"]
         controls: list[dict[str, Any]] = []
+        configured = self._configuration(profile)
         if harness in self.harnesses:
             descriptor = self.harnesses.get(harness)
             for control_id, values in sorted((descriptor.control_options or {}).items()):
+                current = configured.get(control_id)
+                if (isinstance(current, Mapping) and self.model_configs is not None
+                        and isinstance(current.get("providerId"), str)
+                        and isinstance(current.get("modelId"), str)):
+                    model = self.model_configs.reference(current["providerId"], current["modelId"])
+                    controls.append({
+                        "kind": "model_slot", "controlId": control_id, "editable": True,
+                        "slots": [{"name": control_id, "model": model}],
+                    })
+                    continue
                 controls.append({
                     "kind": "enum", "controlId": control_id,
                     "values": list(values), "editable": True,
+                    **({"currentValue": current} if isinstance(current, str) else {}),
                 })
-        for control_id, value in sorted(self._configuration(profile).items()):
+        for control_id, value in sorted(configured.items()):
             if any(control["controlId"] == control_id for control in controls):
                 continue
-            controls.append({
+            control = {
                 "kind": "boolean" if isinstance(value, bool) else "string",
                 "controlId": control_id, "editable": True,
                 "currentValue": value,
-            })
+            }
+            if control["kind"] == "string":
+                control["multiline"] = False
+            controls.append(control)
         return controls
 
     def _locked_controls(self, profile: Mapping[str, Any]) -> list[str]:
@@ -297,7 +572,9 @@ class WireService:
 
     def sessions_create_and_send(self, params: Mapping[str, Any]) -> dict[str, Any]:
         _require(params, "requestId", "workspaceId", "profileId", "message", "overrides")
-        message = self._message(params["message"])
+        workspace_id = _bounded(params["workspaceId"], "workspaceId")
+        workspace = self.workspaces.records.get(workspace_id)
+        message = self._message(params["message"], workspace)
         overrides = _overrides(params) or []
         request_id = _bounded(params["requestId"], "requestId")
         digest_value = digest({
@@ -306,7 +583,7 @@ class WireService:
         })
         outcome, body = self.sessions.accept_intent(
             session_id=None,
-            workspace_id=_bounded(params["workspaceId"], "workspaceId"),
+            workspace_id=workspace_id,
             profile_id=_bounded(params["profileId"], "profileId"),
             request_id=request_id, request_digest=digest_value,
             message_object_digest=self._publish_message(message), overrides=overrides,
@@ -335,11 +612,12 @@ class WireService:
 
     def sessions_send(self, params: Mapping[str, Any]) -> dict[str, Any]:
         _require(params, "requestId", "sessionId", "message", "overrides")
-        message = self._message(params["message"])
         overrides = _overrides(params) or []
         request_id = _bounded(params["requestId"], "requestId")
         session_id = _bounded(params["sessionId"], "sessionId")
         session = self.sessions.records.get_session(session_id)
+        workspace = self.workspaces.records.get(session["workspace_id"])
+        message = self._message(params["message"], workspace)
         digest_value = digest({
             "sessionId": session_id, "message": message, "overrides": overrides,
         })
@@ -356,11 +634,13 @@ class WireService:
                 "outcome": "accepted",
                 "executionId": body.get("executionId"),
                 "configVersion": body.get("configVersion"),
+                "queueItemId": body.get("queueItemId"),
             }
         return {
             "outcome": "accepted",
             "executionId": body.get("executionId"),
             "configVersion": body.get("configVersion"),
+            "queueItemId": body.get("queueItemId"),
         }
 
     def sessions_switch_profile(self, params: Mapping[str, Any]) -> dict[str, Any]:
@@ -370,7 +650,7 @@ class WireService:
         profile_id = _bounded(params["profileId"], "profileId")
         outcome, body = self.sessions.records.switch_profile(
             session_id=session_id, profile_id=profile_id,
-            expected_version=int(params["expectedVersion"]), request_id=request_id,
+            expected_version=_version(params["expectedVersion"]), request_id=request_id,
             request_digest=digest({"sessionId": session_id, "profileId": profile_id,
                                    "expectedVersion": params["expectedVersion"]}),
         )
@@ -393,7 +673,7 @@ class WireService:
         status, body = self.queue.withdraw(
             session_id=_bounded(params["sessionId"], "sessionId"),
             item_id=_bounded(params["itemId"], "itemId"),
-            expected_version=int(params["expectedVersion"]), request_id=request_id,
+            expected_version=_version(params["expectedVersion"]), request_id=request_id,
             request_digest=digest({
                 "sessionId": params["sessionId"], "itemId": params["itemId"],
                 "expectedVersion": params["expectedVersion"],
@@ -412,7 +692,8 @@ class WireService:
         return {
             "itemId": item["itemId"], "version": item["version"],
             "submittedAt": item["submittedAt"], "message": body,
-            "profileId": item["profileId"], "state": item["state"],
+            "profileId": item["profileId"], "configVersion": item["configVersion"],
+            "state": item["state"],
         }
 
     # -- runs and approvals --------------------------------------------------
@@ -448,12 +729,28 @@ class WireService:
         scope = params["scope"]
         if not isinstance(scope, Mapping) or scope.get("kind") not in {"once", "bounded"}:
             raise WireError("INVALID_REQUEST", "scope must be once or a bounded grant")
+        if scope["kind"] == "once" and set(scope) != {"kind"}:
+            raise WireError("INVALID_REQUEST", "once scope has unexpected fields")
+        if scope["kind"] == "bounded" and (
+            set(scope) != {"kind", "until", "environmentId"}
+            or scope.get("until") != "session_end"
+            or not (scope.get("environmentId") is None
+                    or isinstance(scope.get("environmentId"), str)
+                    and scope.get("environmentId"))
+        ):
+            raise WireError("INVALID_REQUEST", "bounded scope is invalid")
         request_id = _bounded(params["requestId"], "requestId")
         _status, body = self.approvals.decide(
             approval_id=_bounded(params["approvalId"], "approvalId"),
             decision=decision, scope=dict(scope),
-            expected_version=int(params["expectedVersion"]), request_id=request_id,
+            expected_version=_version(params["expectedVersion"]), request_id=request_id,
         )
+        if body.get("outcome") == "recorded" and hasattr(self.execution, "decide_approval"):
+            # The Server decision is committed first.  A transport failure may
+            # fail the execution, but can never execute an unrecorded grant.
+            self.execution.decide_approval(
+                params["approvalId"], decision, dict(scope),
+            )
         return body
 
     # -- history ------------------------------------------------------------
@@ -462,7 +759,11 @@ class WireService:
         _require(params, "sessionId")
         session_id = _bounded(params["sessionId"], "sessionId")
         page = params.get("page") or {}
-        limit = int(page.get("limit", 200))
+        if not isinstance(page, Mapping) or set(page) - {"cursor", "limit"}:
+            raise WireError("INVALID_REQUEST", "page shape is invalid")
+        limit = page.get("limit", 200)
+        if isinstance(limit, bool) or not isinstance(limit, int):
+            raise WireError("INVALID_REQUEST", "page.limit must be an integer")
         if not (1 <= limit <= 500):
             raise WireError("INVALID_REQUEST", "page.limit must be between 1 and 500")
         cursor_value = params.get("cursor") or page.get("cursor")
@@ -478,16 +779,35 @@ class WireService:
                 return {"outcome": "resync_required", "reason": "cursor_beyond_history"}
             raise
         frames = [frame for frame in (event_frame(row, self.codec) for row in rows) if frame]
-        resume_seq = max((frame["seq"] for frame in frames), default=after)
+        # Advance across internal bookkeeping rows too. Otherwise a trailing
+        # non-wire event would be queried forever by the live stream.
+        resume_seq = int(rows[-1]["seq"]) if rows else after
         return {
             "outcome": "snapshot",
             "frames": frames,
             "resumeCursor": self.codec.encode(session_id, resume_seq),
         }
 
+    def event_stream_batch(
+        self, session_id: str, cursor: str | None, *, limit: int = 200,
+    ) -> tuple[list[dict[str, Any]], str]:
+        """Read the next persisted wire frame batch for the live channel."""
+        after = 0
+        if cursor:
+            _session, after = self.codec.decode(cursor, expected_session=session_id)
+        try:
+            rows = self.sessions.records.raw_events(session_id, after, limit=limit)
+        except ServerError as exc:
+            if exc.code == "EVENT_CURSOR_AHEAD":
+                raise WireError("INVALID_REQUEST", "event cursor is beyond current history") from exc
+            raise
+        frames = [frame for frame in (event_frame(row, self.codec) for row in rows) if frame]
+        next_seq = int(rows[-1]["seq"]) if rows else after
+        return frames, self.codec.encode(session_id, next_seq)
+
     # -- helpers ------------------------------------------------------------
 
-    def _message(self, value: Any) -> dict[str, Any]:
+    def _message(self, value: Any, workspace: Mapping[str, Any]) -> dict[str, Any]:
         if not isinstance(value, Mapping) or "text" not in value or "attachments" not in value:
             raise WireError("INVALID_REQUEST", "message needs text and attachments")
         text = value["text"]
@@ -496,19 +816,60 @@ class WireService:
         attachments = value["attachments"]
         if not isinstance(attachments, list):
             raise WireError("INVALID_REQUEST", "message.attachments must be a list")
+        if len(attachments) > 32:
+            raise WireError("INVALID_REQUEST", "message has too many attachments")
+        resolved = []
+        total = 0
         for item in attachments:
             if not isinstance(item, Mapping) or set(item) != {"ref", "displayName", "mediaKind"}:
                 raise WireError("INVALID_REQUEST", "attachment shape is invalid")
+            if (not isinstance(item["ref"], str) or len(item["ref"]) > 4096
+                    or not isinstance(item["displayName"], str)
+                    or len(item["displayName"]) > 512):
+                raise WireError("INVALID_REQUEST", "attachment names are invalid")
             if item["mediaKind"] not in {"file", "image", "other"}:
                 raise WireError("INVALID_REQUEST", "attachment mediaKind is invalid")
-        return {"text": text, "attachments": [dict(item) for item in attachments]}
+            relative = PurePosixPath(item["ref"])
+            if (relative.is_absolute() or not relative.parts
+                    or any(part in {"", ".", ".."} for part in relative.parts)
+                    or relative.as_posix() != item["ref"]):
+                raise WireError("INVALID_REQUEST", "attachment ref must be a normalized workspace path")
+            connector = self.workspaces.connector
+            reader = getattr(connector, "read_workspace_file", None)
+            if not callable(reader):
+                raise WireError("CAPABILITY_UNSUPPORTED", "workspace attachment reading is unavailable")
+            try:
+                content, content_digest = reader(
+                    distribution=workspace["distribution"], user=workspace["remote_user"],
+                    connection_id=workspace["connection_id"],
+                    workspace_path=workspace["remote_path"], relative_path=relative.as_posix(),
+                )
+            except Exception as exc:
+                raise WireError("INVALID_REQUEST", "attachment is outside the authorized workspace or unreadable") from exc
+            total += len(content)
+            if total > 8 * 1024 * 1024:
+                raise WireError("INVALID_REQUEST", "attachments exceed the bounded message size")
+            record = self.objects.publish(content)
+            if record.digest != content_digest:
+                raise WireError("OUTCOME_UNKNOWN", "attachment changed during capture")
+            resolved.append({
+                **dict(item), "_contentDigest": record.digest, "_size": record.size,
+                "_mime": mimetypes.guess_type(str(item["displayName"]))[0]
+                or ("image/png" if item["mediaKind"] == "image" else "application/octet-stream"),
+            })
+        return {"text": text, "attachments": resolved}
 
     def _publish_message(self, message: Mapping[str, Any]) -> str:
         return self.objects.publish(canonical({"schema_version": 1, "message": dict(message)})).digest
 
     def _stored_message(self, digest_value: str) -> dict[str, Any]:
         stored = json.loads(self.objects.read(digest_value))
-        return dict(stored.get("message") or stored)
+        message = dict(stored.get("message") or stored)
+        message["attachments"] = [
+            {key: item[key] for key in ("ref", "displayName", "mediaKind")}
+            for item in message.get("attachments", ())
+        ]
+        return message
 
     def _dispatch(self, execution_id: str, overrides: list[dict[str, Any]]) -> None:
         try:

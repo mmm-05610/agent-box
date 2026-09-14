@@ -92,21 +92,32 @@ class WorkerClient:
         self._terminals: dict[tuple[str, int], dict[str, Any]] = {}
         self._pending: dict[str, dict[str, Any]] = {}
         self._event_listeners: list[Callable[[dict[str, Any]], None]] = []
+        self._disconnect_listeners: list[Callable[[WorkerError], None]] = []
 
     def subscribe_output(self, listener: Callable[[dict[str, Any]], None]) -> Callable[[], None]:
         """Receive pre-terminal worker events (process.output, ...)."""
         self._event_listeners.append(listener)
         return lambda: self._event_listeners.remove(listener) if listener in self._event_listeners else None
 
+    def subscribe_disconnect(self, listener: Callable[[WorkerError], None]) -> Callable[[], None]:
+        """Wake long-lived channel owners when the Worker control stream dies."""
+        self._disconnect_listeners.append(listener)
+        return lambda: (
+            self._disconnect_listeners.remove(listener)
+            if listener in self._disconnect_listeners else None
+        )
+
     def _dispatch_event(self, value: dict[str, Any]) -> bool:
-        if not value.get("event") or value.get("event") == "process.terminal":
+        if not value.get("event"):
             return False
         for listener in tuple(self._event_listeners):
             try:
                 listener(value)
             except Exception:
                 pass
-        return True
+        # Terminal frames are also queued for wait_terminal after listeners
+        # observe them; other pre-terminal events are subscriber-only.
+        return value.get("event") != "process.terminal"
 
     def write_stdin(self, attempt_id: str, generation: int, data: bytes, *, timeout: float = 10.0) -> int:
         """Append one bounded stdin chunk to a live interactive attempt."""
@@ -275,6 +286,12 @@ class WorkerClient:
                         continue
                 self._frames.put((kind, stream_id, sequence, payload))
         except BaseException as exc:
+            disconnected = WorkerError("WORKER_DISCONNECTED", "Worker control stream closed")
+            for listener in tuple(self._disconnect_listeners):
+                try:
+                    listener(disconnected)
+                except Exception:
+                    pass
             self._frames.put(exc)
 
     def _next(self, timeout: float):

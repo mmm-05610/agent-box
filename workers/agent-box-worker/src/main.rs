@@ -26,6 +26,7 @@ const MAX_OUTPUT_BYTES: usize = 1024 * 1024;
 const MAX_ARTIFACT_BYTES: usize = 64 * 1024 * 1024;
 const MAX_FETCH_BYTES: usize = 32 * 1024;
 const MAX_SECRET_BYTES: usize = 1024 * 1024;
+const MAX_WORKSPACE_FILE_BYTES: usize = 8 * 1024 * 1024;
 const MAX_STDIN_BYTES: usize = 4 * 1024;
 const MAX_INTERACTIVE_WRITE_BYTES: usize = 64 * 1024;
 /// Pre-terminal forwarding budget per interactive attempt. Once exceeded, the
@@ -72,7 +73,9 @@ struct Running {
     /// Interactive attempts receive their child stdin through this slot once
     /// the child has spawned. `stdin.close` takes the handle out and drops it:
     /// tokio pipes have no half-close, so EOF is delivered by closing the fd.
-    interactive_stdin: Option<Arc<tokio::sync::OnceCell<Arc<tokio::sync::Mutex<Option<tokio::process::ChildStdin>>>>>>,
+    interactive_stdin: Option<
+        Arc<tokio::sync::OnceCell<Arc<tokio::sync::Mutex<Option<tokio::process::ChildStdin>>>>>,
+    >,
 }
 
 struct Finished {
@@ -273,6 +276,15 @@ async fn serve(root: PathBuf, workspace: Option<PathBuf>, result_ttl_secs: u64) 
                         Ok(value) => write_response(&mut output, sequence, &request.request_id, value).await?,
                         Err((code, message)) => write_error_for(&mut output, sequence, &request.request_id, code, message).await?,
                     },
+                    "workspace.get" => {
+                        let result = workspace.as_ref()
+                            .ok_or(("WORKSPACE_UNAUTHORIZED", "worker has no authorized workspace"))
+                            .and_then(|workspace| workspace_get(workspace, &request.arguments));
+                        match result {
+                            Ok(value) => write_response(&mut output, sequence, &request.request_id, value).await?,
+                            Err((code, message)) => write_error_for(&mut output, sequence, &request.request_id, code, message).await?,
+                        }
+                    }
                     "view.prepare" | "view.put" | "view.commit" | "view.list" | "view.get" | "view.cleanup" => {
                         match handle_view(&root, &request.op, &request.arguments) {
                             Ok(value) => write_response(&mut output, sequence, &request.request_id, value).await?,
@@ -447,6 +459,7 @@ async fn serve(root: PathBuf, workspace: Option<PathBuf>, result_ttl_secs: u64) 
 fn capabilities() -> Value {
     json!([
         "browse@1",
+        "workspace.read@1",
         "view@1",
         "secret@1",
         "spawn@1",
@@ -459,7 +472,7 @@ fn capabilities() -> Value {
     ])
 }
 fn limits(result_ttl_secs: u64) -> Value {
-    json!({"frameBytes":MAX_PAYLOAD,"outputBytes":MAX_OUTPUT_BYTES,"artifactBytes":MAX_ARTIFACT_BYTES,"fetchBytes":MAX_FETCH_BYTES,"secretBytes":MAX_SECRET_BYTES,"stdinBytes":MAX_STDIN_BYTES,"defaultTimeoutMs":DEFAULT_TIMEOUT_MS,"maxTimeoutMs":MAX_TIMEOUT_MS,"resultTtlSeconds":result_ttl_secs})
+    json!({"frameBytes":MAX_PAYLOAD,"outputBytes":MAX_OUTPUT_BYTES,"artifactBytes":MAX_ARTIFACT_BYTES,"workspaceFileBytes":MAX_WORKSPACE_FILE_BYTES,"fetchBytes":MAX_FETCH_BYTES,"secretBytes":MAX_SECRET_BYTES,"stdinBytes":MAX_STDIN_BYTES,"defaultTimeoutMs":DEFAULT_TIMEOUT_MS,"maxTimeoutMs":MAX_TIMEOUT_MS,"resultTtlSeconds":result_ttl_secs})
 }
 
 fn schedule_result_cleanup(root: &Path, delay_secs: u64) -> io::Result<()> {
@@ -719,6 +732,48 @@ fn canonicalize(arguments: &Value) -> Result<Value, (&'static str, &'static str)
     Ok(json!({"path":path}))
 }
 
+fn workspace_get(
+    workspace: &Path,
+    arguments: &Value,
+) -> Result<Value, (&'static str, &'static str)> {
+    let relative = safe_relative(value_string(arguments, "path")?)?;
+    let path = workspace
+        .join(&relative)
+        .canonicalize()
+        .map_err(|_| ("ATTACHMENT_UNAVAILABLE", "workspace file is unavailable"))?;
+    if !path.starts_with(workspace) || !path.is_file() {
+        return Err((
+            "ATTACHMENT_UNAUTHORIZED",
+            "workspace file is outside the authorized scope",
+        ));
+    }
+    let bytes =
+        fs::read(&path).map_err(|_| ("ATTACHMENT_UNAVAILABLE", "workspace file cannot be read"))?;
+    if bytes.len() > MAX_WORKSPACE_FILE_BYTES {
+        return Err((
+            "ATTACHMENT_TOO_LARGE",
+            "workspace file exceeds the bounded input size",
+        ));
+    }
+    let offset = arguments.get("offset").and_then(Value::as_u64).unwrap_or(0) as usize;
+    let maximum = arguments
+        .get("maxLength")
+        .and_then(Value::as_u64)
+        .unwrap_or(MAX_FETCH_BYTES as u64) as usize;
+    if maximum == 0 || maximum > MAX_FETCH_BYTES || offset > bytes.len() {
+        return Err((
+            "ATTACHMENT_INVALID",
+            "workspace fetch range is outside bounds",
+        ));
+    }
+    let end = (offset + maximum).min(bytes.len());
+    Ok(json!({
+        "path": relative, "offset": offset, "nextOffset": end,
+        "totalBytes": bytes.len(), "digest": digest(&bytes),
+        "data": BASE64.encode(&bytes[offset..end]), "eof": end == bytes.len(),
+    }))
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct SpawnArgs {
@@ -834,9 +889,7 @@ fn validate_bwrap(
     Ok(())
 }
 
-fn authorize_executables(
-    values: &[protocol::ExecutableAuthorization],
-) -> io::Result<Vec<PathBuf>> {
+fn authorize_executables(values: &[protocol::ExecutableAuthorization]) -> io::Result<Vec<PathBuf>> {
     let mut result = Vec::new();
     for value in values {
         let path = Path::new(&value.path).canonicalize()?;
@@ -862,7 +915,9 @@ async fn run_process(
     mut cancel: watch::Receiver<bool>,
     events: mpsc::Sender<Value>,
     identity: (String, u64),
-    stdin_slot: Option<Arc<tokio::sync::OnceCell<Arc<tokio::sync::Mutex<Option<tokio::process::ChildStdin>>>>>>,
+    stdin_slot: Option<
+        Arc<tokio::sync::OnceCell<Arc<tokio::sync::Mutex<Option<tokio::process::ChildStdin>>>>>,
+    >,
 ) -> io::Result<ProcessOutcome> {
     let (attempt_id, generation) = identity;
     let mut command = Command::new(&spec.argv[0]);
@@ -902,7 +957,11 @@ async fn run_process(
     } else if let Some(slot) = stdin_slot {
         let _ = slot.set(Arc::new(tokio::sync::Mutex::new(Some(initial_stdin))));
     }
-    let forward = if spec.interactive { Some((events, attempt_id, generation)) } else { None };
+    let forward = if spec.interactive {
+        Some((events, attempt_id, generation))
+    } else {
+        None
+    };
     let out_task = tokio::spawn(drain(stdout, MAX_OUTPUT_BYTES, forward.clone(), "stdout"));
     let err_task = tokio::spawn(drain(stderr, MAX_OUTPUT_BYTES, forward, "stderr"));
     let mut timed_out = false;
@@ -982,8 +1041,7 @@ async fn drain<R: AsyncRead + Unpin>(
                         "eof": false,
                     }
                 });
-                if events.send(event).await.is_err() {
-                }
+                if events.send(event).await.is_err() {}
             } else if !truncation_reported {
                 truncation_reported = true;
                 let event = json!({
@@ -1298,10 +1356,7 @@ fn handle_view(root: &Path, op: &str, args: &Value) -> Result<Value, (&'static s
                 return Err(("VIEW_INVALID", "view file is not capturable"));
             }
             let bytes = fs::read(target).map_err(|_| ("VIEW_IO", "view file read failed"))?;
-            let offset = args
-                .get("offset")
-                .and_then(Value::as_u64)
-                .unwrap_or(0) as usize;
+            let offset = args.get("offset").and_then(Value::as_u64).unwrap_or(0) as usize;
             let maximum = args
                 .get("maxLength")
                 .and_then(Value::as_u64)
@@ -1310,7 +1365,9 @@ fn handle_view(root: &Path, op: &str, args: &Value) -> Result<Value, (&'static s
                 return Err(("VIEW_INVALID", "view fetch range is invalid"));
             }
             let end = (offset + maximum).min(bytes.len());
-            Ok(json!({"path":value_string(args,"path")?,"offset":offset,"nextOffset":end,"totalBytes":bytes.len(),"digest":digest(&bytes),"data":BASE64.encode(&bytes[offset..end]),"eof":end==bytes.len()}))
+            Ok(
+                json!({"path":value_string(args,"path")?,"offset":offset,"nextOffset":end,"totalBytes":bytes.len(),"digest":digest(&bytes),"data":BASE64.encode(&bytes[offset..end]),"eof":end==bytes.len()}),
+            )
         }
         "view.cleanup" => {
             if dir.exists() {

@@ -129,6 +129,49 @@ def compile_remote_bwrap_argv(
         argv += ["--setenv", key, value]
     return argv + ["--", *command]
 
+
+def compile_remote_sidecar_bwrap_argv(
+    *, workspace: str, runtime_view: str, environment: Mapping[str, str],
+    entrypoint: str = "/runtime/view/agentbox-sidecar/runtime/worker-entry.mjs",
+) -> list[str]:
+    """Compile the fixed Worker-hosted Harness sidecar template.
+
+    The sidecar closure is transferred into the Worker's bounded view and is
+    mounted read-only.  The project stays the only writable workspace.  This
+    template deliberately selects only the system Node runtime and the single
+    reviewed entrypoint; adapter/native semantics remain inside the sidecar.
+    """
+    for value in (workspace, runtime_view):
+        if (not isinstance(value, str) or not value.startswith("/") or "\x00" in value
+                or "//" in value or any(part in {".", ".."} for part in value.split("/"))
+                or str(PurePosixPath(value)) != value):
+            raise ProjectionRejected("remote mount source is not a canonical absolute path")
+    if entrypoint != "/runtime/view/agentbox-sidecar/runtime/worker-entry.mjs":
+        raise ProjectionRejected("sidecar entrypoint is outside the fixed template")
+    for key, value in environment.items():
+        if not _ENV_KEY.fullmatch(key) or len(value) > 8192 or "\x00" in value:
+            raise ProjectionRejected("invalid remote environment")
+        if re.search(r"(TOKEN|SECRET|KEY|PASSWORD|CREDENTIAL|AUTH)", key, re.I):
+            raise ProjectionRejected("credential-shaped remote environment key")
+    argv = [
+        "/usr/bin/bwrap", "--die-with-parent", "--new-session",
+        "--unshare-user", "--unshare-pid", "--unshare-ipc", "--unshare-uts",
+        "--dir", "/", "--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp",
+    ]
+    for system in _SYSTEM_MOUNTS:
+        argv += ["--ro-bind", system, system]
+    argv += [
+        "--dir", "/mnt", "--dir", "/mnt/wsl",
+        "--ro-bind", "/etc/resolv.conf", "/mnt/wsl/resolv.conf",
+        "--dir", "/workspace", "--dir", "/runtime", "--dir", "/runtime/view",
+        "--bind", workspace, "/workspace",
+        "--ro-bind", runtime_view, "/runtime/view",
+        "--chdir", "/workspace", "--clearenv",
+    ]
+    for key, value in sorted(environment.items()):
+        argv += ["--setenv", key, value]
+    return argv + ["--", "/usr/bin/node", entrypoint]
+
 @dataclass(frozen=True)
 class NegotiatedSandboxCapabilities:
     digest: str

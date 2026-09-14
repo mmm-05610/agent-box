@@ -42,7 +42,7 @@ _EVENT_KIND_MAP = {
 
 _EXECUTION_STATE_MAP = {
     "accepted": "queued",
-    "dispatching": "queued",
+    "dispatching": "dispatched",
     "running": "running",
     "capturing": "running",
     "completed": "completed",
@@ -95,7 +95,7 @@ def accessibility_for(row: Mapping[str, Any]) -> dict[str, Any]:
 def profile_record(row: Mapping[str, Any]) -> dict[str, Any]:
     return {
         "id": row["id"],
-        "version": int(row.get("config_revision") or 1),
+        "version": int(row.get("version") or 1),
         "displayName": row.get("display_name") or row.get("name") or row["id"],
         "harness": row["harness_type"],
         "archivedAt": row.get("archived_at"),
@@ -182,30 +182,53 @@ def _event_body(kind: str, row: Mapping[str, Any], data: Mapping[str, Any]) -> d
             "state": str(data.get("state", "requested")),
         }
     if kind == "approval.requested":
+        request = data.get("request") if isinstance(data.get("request"), Mapping) else {}
+        operation = request.get("operation") if isinstance(request.get("operation"), Mapping) else None
+        if operation is None:
+            tool_call = request.get("toolCall") if isinstance(request.get("toolCall"), Mapping) else {}
+            tool = request.get("tool") or tool_call.get("name") or tool_call.get("kind")
+            detail = []
+            for label, value in sorted(request.items()):
+                if label in {"requestId", "operation", "expiresAt", "toolCall", "options", "tool", "title"}:
+                    continue
+                if isinstance(value, (str, int, float, bool)):
+                    detail.append({"label": str(label), "value": str(value)})
+            operation = {
+                "title": str(request.get("title") or tool or "Approval required"),
+                "detail": detail,
+                "tool": str(tool) if tool is not None else None,
+            }
         return {
             "kind": kind,
             "sessionId": session_id,
-            "approvalId": str(data.get("approval_id")),
-            "executionId": row.get("turn_id"),
-            "request": data.get("request") or {},
+            "approval": {
+                "approvalId": str(data.get("approval_id")),
+                "sessionId": session_id,
+                "executionId": row.get("turn_id"),
+                "version": int(data.get("version") or 1),
+                "operation": dict(operation),
+                "expiresAt": request.get("expiresAt"),
+            },
         }
     if kind == "approval.settled":
         return {
             "kind": kind,
             "sessionId": session_id,
             "approvalId": str(data.get("approval_id")),
-            "decision": data.get("decision"),
+            "outcome": {
+                "allow": "allowed", "deny": "denied",
+                "expired": "expired", "invalidated": "invalidated",
+            }.get(str(data.get("decision")), "invalidated"),
         }
     if kind == "config.changed":
         return {
             "kind": kind,
             "sessionId": session_id,
-            "configVersion": int(data.get("config_version") or 0),
+            "effectiveFor": str(data.get("effective_for") or "next_send"),
         }
     if kind == "workspace.connection":
         return {
             "kind": kind,
-            "sessionId": session_id,
             "workspaceId": str(data.get("workspace_id", "")),
             "connection": data.get("connection") or {"state": "connecting"},
         }

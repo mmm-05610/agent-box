@@ -1,0 +1,156 @@
+"""Provider-neutral validation and object projections for model configurations."""
+from __future__ import annotations
+
+import json
+from typing import Any, Mapping
+
+from agent_box.server.errors import ServerError, unavailable
+from agent_box.server.records import canonical, digest, reject_sensitive_keys
+
+
+class ProviderModelService:
+    def __init__(self, records, objects, *, harnesses, credentials, profiles) -> None:
+        self.records = records
+        self.objects = objects
+        self.harnesses = harnesses
+        self.credentials = credentials
+        self.profiles = profiles
+
+    def list(self, *, include_archived: bool = False) -> list[dict[str, Any]]:
+        return [self.project(row) for row in self.records.list(include_archived=include_archived)]
+
+    def create(self, key: str, body: dict[str, Any]) -> dict[str, Any]:
+        self._validate(body, creating=True)
+        config = self.objects.publish(canonical({
+            "schema_version": 1, "configuration": {
+                item["controlId"]: item["value"] for item in body["configuration"]
+            },
+        }))
+        models = self.objects.publish(canonical({"schema_version": 1, "models": body["models"]}))
+        _status, result = self.records.create(
+            key=key, request_digest=digest(body), display_name=body["displayName"],
+            harness_type=body["harness"], provider_type=body["provider"],
+            credential_id=body.get("credentialId"), config_digest=config.digest,
+            models_digest=models.digest,
+        )
+        return self.project(self.records.get(result["providerModelId"]))
+
+    def update(self, record_id: str, expected_version: int, key: str, body: dict[str, Any]):
+        current = self.records.get(record_id)
+        merged = {
+            **body, "harness": current["harness_type"], "provider": current["provider_type"],
+        }
+        self._validate(merged, creating=False)
+        config = self.objects.publish(canonical({
+            "schema_version": 1, "configuration": {
+                item["controlId"]: item["value"] for item in body["configuration"]
+            },
+        }))
+        models = self.objects.publish(canonical({"schema_version": 1, "models": body["models"]}))
+        _status, result = self.records.update(
+            record_id=record_id, expected_version=expected_version, key=key,
+            request_digest=digest(body), display_name=body["displayName"],
+            credential_id=body.get("credentialId"), config_digest=config.digest,
+            models_digest=models.digest,
+        )
+        return self.project(self.records.get(result["providerModelId"]))
+
+    def archive(self, record_id: str, expected_version: int, key: str):
+        references = self.profile_references(record_id)
+        if references:
+            error = ServerError(
+                "REFERENCE_CONFLICT", "Provider/Model config is referenced by active Profiles", status=409,
+            )
+            error.references = references  # type: ignore[attr-defined]
+            raise error
+        _status, result = self.records.archive(
+            record_id=record_id, expected_version=expected_version, key=key,
+            request_digest=digest({"providerModelId": record_id, "expectedVersion": expected_version}),
+        )
+        return self.project(self.records.get(result["providerModelId"]))
+
+    def validate_references(self, harness: str, values: list[dict[str, Any]]) -> None:
+        for assignment in values:
+            for reference in _model_references(assignment.get("value")):
+                row = self.records.get(reference["providerId"])
+                if row["archived_at"] is not None or row["harness_type"] != harness:
+                    raise ServerError(
+                        "PROFILE_CONFIGURATION_INVALID",
+                        "Provider/Model reference is archived or for a different Harness", status=422,
+                    )
+                model_ids = {item["modelId"] for item in self._models(row)}
+                if reference["modelId"] not in model_ids:
+                    raise ServerError(
+                        "PROFILE_CONFIGURATION_INVALID", "Referenced model was not found", status=422,
+                    )
+
+    def reference(self, provider_id: str, model_id: str) -> dict[str, Any]:
+        row = self.records.get(provider_id)
+        match = next((item for item in self._models(row) if item["modelId"] == model_id), None)
+        if match is None:
+            raise ServerError("PROVIDER_MODEL_NOT_FOUND", "Referenced model was not found", status=404)
+        return {
+            "providerId": provider_id, "modelId": model_id,
+            "availability": match["availability"],
+            "unavailableReason": match.get("unavailableReason"),
+        }
+    def profile_references(self, record_id: str) -> list[str]:
+        references = []
+        for profile in self.profiles.list(include_archived=False):
+            stored = json.loads(self.objects.read(profile["config_object_digest"]))
+            if any(ref["providerId"] == record_id for ref in _model_references(stored)):
+                references.append(profile["id"])
+        return references
+
+    def project(self, row: Mapping[str, Any]) -> dict[str, Any]:
+        config = json.loads(self.objects.read(row["config_object_digest"]))
+        return {
+            "id": row["id"], "version": int(row["version"]),
+            "displayName": row["display_name"], "harness": row["harness_type"],
+            "provider": row["provider_type"], "credentialId": row["credential_id"],
+            "configuration": [
+                {"controlId": key, "value": value}
+                for key, value in sorted(dict(config.get("configuration") or {}).items())
+            ],
+            "models": self._models(row), "archivedAt": row["archived_at"],
+            "createdAt": row["created_at"], "updatedAt": row["updated_at"],
+        }
+
+    def _models(self, row: Mapping[str, Any]) -> list[dict[str, Any]]:
+        return list(json.loads(self.objects.read(row["models_object_digest"])).get("models") or [])
+
+    def _validate(self, body: Mapping[str, Any], *, creating: bool) -> None:
+        harness = body["harness"]
+        if harness not in self.harnesses:
+            raise unavailable("HARNESS_UNAVAILABLE", "Requested Harness is not configured")
+        reject_sensitive_keys(body["configuration"])
+        descriptor = self.harnesses.get(harness)
+        credential_id = body.get("credentialId")
+        if credential_id is not None:
+            if descriptor.credential_kind is None:
+                raise ServerError(
+                    "PROFILE_CONFIGURATION_INVALID", "Harness does not accept credentials", status=422,
+                )
+            self.credentials.get(credential_id, kind=descriptor.credential_kind)
+        models = body["models"]
+        ids = [item["modelId"] for item in models]
+        if not models or len(ids) != len(set(ids)):
+            raise ServerError(
+                "PROFILE_CONFIGURATION_INVALID", "Models must be non-empty and unique", status=422,
+            )
+        for item in models:
+            if item["availability"] == "unavailable" and not item.get("unavailableReason"):
+                raise ServerError(
+                    "PROFILE_CONFIGURATION_INVALID", "Unavailable models require a reason", status=422,
+                )
+
+
+def _model_references(value: Any):
+    if isinstance(value, Mapping):
+        if set(value) >= {"providerId", "modelId"}:
+            yield {"providerId": str(value["providerId"]), "modelId": str(value["modelId"])}
+        for nested in value.values():
+            yield from _model_references(nested)
+    elif isinstance(value, list):
+        for nested in value:
+            yield from _model_references(nested)
