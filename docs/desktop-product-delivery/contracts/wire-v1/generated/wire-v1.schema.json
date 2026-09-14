@@ -1,5 +1,4 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
   "$protocolVersion": "wire/1",
   "WireRequest": {
     "$schema": "http://json-schema.org/draft-07/schema#",
@@ -279,9 +278,7 @@
               "sessionId",
               "toolCallId",
               "tool",
-              "state",
-              "summary",
-              "resultExcerpt"
+              "state"
             ],
             "additionalProperties": false
           },
@@ -480,7 +477,8 @@
                   "stopping",
                   "stopped",
                   "completed",
-                  "failed"
+                  "failed",
+                  "unknown"
                 ]
               },
               "reason": {
@@ -498,8 +496,7 @@
               "kind",
               "sessionId",
               "executionId",
-              "state",
-              "reason"
+              "state"
             ],
             "additionalProperties": false
           },
@@ -733,9 +730,7 @@
           "sessionId",
           "toolCallId",
           "tool",
-          "state",
-          "summary",
-          "resultExcerpt"
+          "state"
         ],
         "additionalProperties": false
       },
@@ -934,7 +929,8 @@
               "stopping",
               "stopped",
               "completed",
-              "failed"
+              "failed",
+              "unknown"
             ]
           },
           "reason": {
@@ -952,8 +948,7 @@
           "kind",
           "sessionId",
           "executionId",
-          "state",
-          "reason"
+          "state"
         ],
         "additionalProperties": false
       },
@@ -1106,7 +1101,8 @@
               "type": "boolean"
             },
             "reason": {
-              "type": "string"
+              "type": "string",
+              "minLength": 1
             }
           },
           "required": [
@@ -2095,6 +2091,16 @@
             "harness": {
               "type": "string"
             },
+            "capabilities": {
+              "default": {},
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "boolean"
+              }
+            },
             "archivedAt": {
               "anyOf": [
                 {
@@ -2123,6 +2129,7 @@
             "version",
             "displayName",
             "harness",
+            "capabilities",
             "archivedAt",
             "createdAt",
             "updatedAt"
@@ -2206,66 +2213,27 @@
                       "type": "string",
                       "const": "enum"
                     },
-                    "id": {
+                    "controlId": {
                       "type": "string"
                     },
-                    "candidates": {
+                    "values": {
                       "type": "array",
                       "items": {
-                        "type": "object",
-                        "properties": {
-                          "value": {
-                            "type": "string"
-                          },
-                          "label": {
-                            "type": "string"
-                          },
-                          "disabledReason": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ]
-                          }
-                        },
-                        "required": [
-                          "value",
-                          "label",
-                          "disabledReason"
-                        ],
-                        "additionalProperties": false
+                        "type": "string"
                       }
                     },
-                    "current": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
+                    "editable": {
+                      "type": "boolean"
                     },
-                    "default": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
+                    "currentValue": {
+                      "type": "string"
                     }
                   },
                   "required": [
                     "kind",
-                    "id",
-                    "candidates",
-                    "current",
-                    "default"
+                    "controlId",
+                    "values",
+                    "editable"
                   ],
                   "additionalProperties": false
                 },
@@ -2276,28 +2244,14 @@
                       "type": "string",
                       "const": "string"
                     },
-                    "id": {
+                    "controlId": {
                       "type": "string"
                     },
-                    "current": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
+                    "editable": {
+                      "type": "boolean"
                     },
-                    "default": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
+                    "currentValue": {
+                      "type": "string"
                     },
                     "multiline": {
                       "default": false,
@@ -2306,9 +2260,8 @@
                   },
                   "required": [
                     "kind",
-                    "id",
-                    "current",
-                    "default",
+                    "controlId",
+                    "editable",
                     "multiline"
                   ],
                   "additionalProperties": false
@@ -2320,35 +2273,20 @@
                       "type": "string",
                       "const": "boolean"
                     },
-                    "id": {
+                    "controlId": {
                       "type": "string"
                     },
-                    "current": {
-                      "anyOf": [
-                        {
-                          "type": "boolean"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
+                    "editable": {
+                      "type": "boolean"
                     },
-                    "default": {
-                      "anyOf": [
-                        {
-                          "type": "boolean"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
+                    "currentValue": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
                     "kind",
-                    "id",
-                    "current",
-                    "default"
+                    "controlId",
+                    "editable"
                   ],
                   "additionalProperties": false
                 },
@@ -2359,8 +2297,11 @@
                       "type": "string",
                       "const": "model_slot"
                     },
-                    "id": {
+                    "controlId": {
                       "type": "string"
+                    },
+                    "editable": {
+                      "type": "boolean"
                     },
                     "slots": {
                       "type": "array",
@@ -2422,22 +2363,15 @@
                         "additionalProperties": false
                       }
                     },
-                    "default": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
+                    "currentValue": {
+                      "type": "string"
                     }
                   },
                   "required": [
                     "kind",
-                    "id",
-                    "slots",
-                    "default"
+                    "controlId",
+                    "editable",
+                    "slots"
                   ],
                   "additionalProperties": false
                 }
@@ -3092,7 +3026,7 @@
   },
   "sessions.send#result": {
     "$schema": "http://json-schema.org/draft-07/schema#",
-    "oneOf": [
+    "anyOf": [
       {
         "type": "object",
         "properties": {
@@ -3108,12 +3042,44 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 9007199254740991
+          },
+          "queueItemId": {
+            "type": "null"
           }
         },
         "required": [
           "outcome",
           "executionId",
-          "configVersion"
+          "configVersion",
+          "queueItemId"
+        ],
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "const": "accepted"
+          },
+          "executionId": {
+            "type": "null"
+          },
+          "configVersion": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "queueItemId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "outcome",
+          "executionId",
+          "configVersion",
+          "queueItemId"
         ],
         "additionalProperties": false
       },
@@ -3299,6 +3265,11 @@
               "type": "string",
               "minLength": 1
             },
+            "configVersion": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
             "state": {
               "type": "string",
               "enum": [
@@ -3315,6 +3286,7 @@
             "submittedAt",
             "message",
             "profileId",
+            "configVersion",
             "state"
           ],
           "additionalProperties": false
@@ -3430,6 +3402,11 @@
                 "type": "string",
                 "minLength": 1
               },
+              "configVersion": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
               "state": {
                 "type": "string",
                 "enum": [
@@ -3446,6 +3423,7 @@
               "submittedAt",
               "message",
               "profileId",
+              "configVersion",
               "state"
             ],
             "additionalProperties": false
@@ -3533,6 +3511,11 @@
                     "type": "string",
                     "minLength": 1
                   },
+                  "configVersion": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
                   "state": {
                     "type": "string",
                     "enum": [
@@ -3549,6 +3532,7 @@
                   "submittedAt",
                   "message",
                   "profileId",
+                  "configVersion",
                   "state"
                 ],
                 "additionalProperties": false
@@ -3986,9 +3970,7 @@
                         "sessionId",
                         "toolCallId",
                         "tool",
-                        "state",
-                        "summary",
-                        "resultExcerpt"
+                        "state"
                       ],
                       "additionalProperties": false
                     },
@@ -4187,7 +4169,8 @@
                             "stopping",
                             "stopped",
                             "completed",
-                            "failed"
+                            "failed",
+                            "unknown"
                           ]
                         },
                         "reason": {
@@ -4205,8 +4188,7 @@
                         "kind",
                         "sessionId",
                         "executionId",
-                        "state",
-                        "reason"
+                        "state"
                       ],
                       "additionalProperties": false
                     },

@@ -4,7 +4,7 @@ import { z } from 'zod'
  * AgentBox Desktop wire candidate v1 — the SINGLE executable authority for
  * the desktop↔server core contract (P07 checkpoint 2).
  *
- * Status: PROPOSED_WIRE (see docs/desktop-product-delivery/contracts/wire-v1/).
+ * Status: WIRE_REVISION_PENDING_BACKEND (see docs/desktop-product-delivery/contracts/wire-v1/).
  * Semantics authority: contracts/core-semantics-v1.md (APPROVED_SEMANTICS) —
  * every shape below implements already-approved behavior; the HTTP/WS
  * ENCODING (envelope, method names, header names) is this file's mechanical
@@ -99,7 +99,7 @@ export const WireErrorCodeSchema = z.enum([
 ])
 export type WireErrorCode = z.infer<typeof WireErrorCodeSchema>
 
-export const WireErrorSchema = z.object({
+export const WireErrorSchema = z.strictObject({
   code: WireErrorCodeSchema,
   /** User-presentable summary; the server owns the phrasing, the client
    *  renders it — it does not pattern-match on messages (core v1 §5/§8). */
@@ -115,7 +115,7 @@ export type WireError = z.infer<typeof WireErrorSchema>
 // ─── Envelope (JSON-RPC 2.0 flavored; encoding is a PROPOSED mechanical
 // ─── choice — see module doc) ────────────────────────────────────────────────
 
-export const WireRequestSchema = z.object({
+export const WireRequestSchema = z.strictObject({
   jsonrpc: z.literal('2.0'),
   id: z.union([z.string(), z.number()]),
   method: z.string().regex(/^[a-z][a-zA-Z0-9]*(\.[a-z][a-zA-Z0-9]*)+$/),
@@ -123,12 +123,18 @@ export const WireRequestSchema = z.object({
 })
 export type WireRequest = z.infer<typeof WireRequestSchema>
 
-export const WireResponseSchema = z.object({
-  jsonrpc: z.literal('2.0'),
-  id: z.union([z.string(), z.number()]),
-  result: z.unknown().optional(),
-  error: WireErrorSchema.optional()
-})
+export const WireResponseSchema = z
+  .strictObject({
+    jsonrpc: z.literal('2.0'),
+    id: z.union([z.string(), z.number()]),
+    result: z.unknown().optional(),
+    error: WireErrorSchema.optional()
+  })
+  .superRefine((response, context) => {
+    if (('result' in response) === ('error' in response)) {
+      context.addIssue({ code: 'custom', message: 'A wire response must carry exactly one of result or error' })
+    }
+  })
 export type WireResponse = z.infer<typeof WireResponseSchema>
 
 /** Common pagination request/response pair (core v1 §8: pagination position
@@ -145,12 +151,18 @@ export function paginated<T extends z.ZodTypeAny>(items: T) {
 
 // ─── Capability discovery & auth bootstrap (core v1 §2/§8 row 1) ────────────
 
-export const WireCapabilitySchema = z.object({
-  id: z.string().min(1),
-  supported: z.boolean(),
-  /** Present when supported=false — the honest "why", user-presentable. */
-  reason: z.string().optional()
-})
+export const WireCapabilitySchema = z
+  .strictObject({
+    id: z.string().min(1),
+    supported: z.boolean(),
+    /** Required when supported=false — the honest "why", user-presentable. */
+    reason: z.string().min(1).optional()
+  })
+  .superRefine((capability, context) => {
+    if (!capability.supported && !capability.reason) {
+      context.addIssue({ code: 'custom', message: 'An unsupported capability must carry a reason', path: ['reason'] })
+    }
+  })
 export type WireCapability = z.infer<typeof WireCapabilitySchema>
 
 export const ServerHelloParamsSchema = z.object({
@@ -166,7 +178,9 @@ export const ServerHelloResultSchema = z.object({
   serverId: WireIdSchema,
   protocolVersion: z.literal(WIRE_PROTOCOL_VERSION),
   capabilities: z.array(WireCapabilitySchema),
-  /** What the server needs before calls other than hello are accepted. */
+  /** What the authenticated host session uses. Hello itself is authenticated
+   *  with the same host-only token; this describes enabled schemes, not an
+   *  unauthenticated token exchange. */
   auth: z.discriminatedUnion('required', [
     z.object({ required: z.literal(false) }),
     z.object({
@@ -245,6 +259,9 @@ export const ProfileRecordSchema = z.object({
   /** Which native harness family this role targets — presented as data
    *  (badge/filter), never a client-side branch (core v1 §5). */
   harness: z.string(),
+  /** Native capabilities are server claims. Missing/unknown harnesses expose
+   *  an empty map; the client never invents brand defaults. */
+  capabilities: z.record(z.string(), z.boolean()).default({}),
   archivedAt: WireTimestampSchema.nullable(),
   createdAt: WireTimestampSchema,
   updatedAt: WireTimestampSchema
@@ -266,29 +283,30 @@ export type ProviderModelRef = z.infer<typeof ProviderModelRefSchema>
 export const ConfigControlSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('enum'),
-    id: z.string(),
-    candidates: z.array(z.object({ value: z.string(), label: z.string(), disabledReason: z.string().nullable() })),
-    current: z.string().nullable(),
-    default: z.string().nullable()
+    controlId: z.string(),
+    values: z.array(z.string()),
+    editable: z.boolean(),
+    currentValue: z.string().optional()
   }),
   z.object({
     kind: z.literal('string'),
-    id: z.string(),
-    current: z.string().nullable(),
-    default: z.string().nullable(),
+    controlId: z.string(),
+    editable: z.boolean(),
+    currentValue: z.string().optional(),
     multiline: z.boolean().default(false)
   }),
   z.object({
     kind: z.literal('boolean'),
-    id: z.string(),
-    current: z.boolean().nullable(),
-    default: z.boolean().nullable()
+    controlId: z.string(),
+    editable: z.boolean(),
+    currentValue: z.boolean().optional()
   }),
   z.object({
     kind: z.literal('model_slot'),
-    id: z.string(),
+    controlId: z.string(),
+    editable: z.boolean(),
     slots: z.array(z.object({ name: z.string(), model: ProviderModelRefSchema.nullable() })),
-    default: z.string().nullable()
+    currentValue: z.string().optional()
   })
 ])
 export type ConfigControl = z.infer<typeof ConfigControlSchema>
@@ -373,9 +391,9 @@ export const WireEventSchema = z.discriminatedUnion('kind', [
     kind: z.literal('tool.update'), sessionId: WireIdSchema, toolCallId: WireIdSchema,
     tool: z.string().nullable(),
     state: z.enum(['requested', 'running', 'awaiting_approval', 'completed', 'failed', 'denied']),
-    summary: z.string().nullable(),
+    summary: z.string().nullable().optional(),
     /** Presentable result excerpt; full content is fetched, not streamed raw. */
-    resultExcerpt: z.string().nullable()
+    resultExcerpt: z.string().nullable().optional()
   }),
   z.object({
     kind: z.literal('approval.requested'), sessionId: WireIdSchema, approval: ApprovalRequestSchema
@@ -391,9 +409,9 @@ export const WireEventSchema = z.discriminatedUnion('kind', [
   }),
   z.object({
     kind: z.literal('execution.state'), sessionId: WireIdSchema, executionId: WireIdSchema,
-    state: z.enum(['queued', 'dispatched', 'running', 'stopping', 'stopped', 'completed', 'failed']),
+    state: z.enum(['queued', 'dispatched', 'running', 'stopping', 'stopped', 'completed', 'failed', 'unknown']),
     /** Terminal states carry the reason; unknown ≠ failed (core v1 §6/§11). */
-    reason: z.string().nullable()
+    reason: z.string().nullable().optional()
   }),
   z.object({
     kind: z.literal('workspace.connection'), workspaceId: WireIdSchema,
@@ -569,8 +587,20 @@ export const SessionsSendParamsSchema = z.object({
 })
 export type SessionsSendParams = z.infer<typeof SessionsSendParamsSchema>
 
-export const SessionsSendResultSchema = z.discriminatedUnion('outcome', [
-  z.object({ outcome: z.literal('accepted'), executionId: WireIdSchema, configVersion: RecordVersionSchema }),
+export const SessionsSendResultSchema = z.union([
+  z.object({
+    outcome: z.literal('accepted'),
+    executionId: WireIdSchema,
+    configVersion: RecordVersionSchema,
+    queueItemId: z.null()
+  }),
+  z.object({
+    outcome: z.literal('accepted'),
+    /** A null execution plus a queue id is an accepted, frozen follow-up. */
+    executionId: z.null(),
+    configVersion: RecordVersionSchema,
+    queueItemId: WireIdSchema
+  }),
   z.object({ outcome: z.literal('rejected_before_accept'), reason: z.string() })
 ])
 export type SessionsSendResult = z.infer<typeof SessionsSendResultSchema>
@@ -596,6 +626,8 @@ export const QueueItemSchema = z.object({
   /** Frozen at submission (core v1 §6: later choices never rewrite it). */
   message: DraftMessageSchema,
   profileId: WireIdSchema,
+  /** Effective configuration frozen when this item was accepted. */
+  configVersion: RecordVersionSchema,
   state: z.enum(['pending', 'dispatched', 'withdrawn', 'paused'])
 })
 export type QueueItem = z.infer<typeof QueueItemSchema>

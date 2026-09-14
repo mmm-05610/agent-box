@@ -7,12 +7,15 @@ import {
   asCursor,
   asRequestId,
   asWireId,
+  ConfigDescribeResultSchema,
   EventFrameSchema,
   HistorySnapshotResultSchema,
+  QueueItemSchema,
   SendOutcomeQueryResultSchema,
   ServerHelloResultSchema,
   SessionsCreateAndSendParamsSchema,
   SessionsCreateAndSendResultSchema,
+  SessionsSendResultSchema,
   WIRE_EVENT_STREAM,
   WIRE_PROTOCOL_VERSION,
   WireErrorCodeSchema,
@@ -38,7 +41,6 @@ import type {
   WireResponse,
   WorkspacesOpenParams
 } from './wire-v1'
-
 
 // Checkpoint-2 guard: the wire candidate validates real message shapes and
 // every registered method projects to JSON Schema. The §9 behavior matrix
@@ -73,6 +75,9 @@ describe('wire v1 envelope', () => {
 
     expect(WireResponseSchema.parse(response)).toEqual(response)
     expect(WireErrorCodeSchema.options).toContain('OUTCOME_UNKNOWN')
+    expect(WireResponseSchema.safeParse({ jsonrpc: '2.0', id: 't-1' }).success).toBe(false)
+    expect(WireResponseSchema.safeParse({ jsonrpc: '2.0', id: 't-1', result: {}, error }).success).toBe(false)
+    expect(WireRequestSchema.safeParse({ jsonrpc: '2.0', id: 't-1', method: 'server.hello', params: {}, extra: true }).success).toBe(false)
   })
 
   it('every registered method exposes params and result schemas', () => {
@@ -196,6 +201,63 @@ describe('wire v1 core behaviors pinned by schema shape', () => {
 
     expect(parsed.capabilities[0]?.reason).toContain('not implemented')
     expect(parsed.auth.required).toBe(true)
+    expect(
+      ServerHelloResultSchema.safeParse({
+        ...hello,
+        capabilities: [{ id: 'queue', supported: false }]
+      }).success
+    ).toBe(false)
+  })
+
+  it('accepts the server-described control vocabulary without brand branches', () => {
+    const result = ConfigDescribeResultSchema.parse({
+      descriptor: {
+        profileId: asWireId('prof_1'),
+        workspaceId: null,
+        controls: [
+          { kind: 'enum', controlId: 'model', values: ['alpha-default', 'alpha-fast'], editable: true },
+          { kind: 'boolean', controlId: 'sandbox', currentValue: true, editable: false }
+        ],
+        securityLockedIds: ['sandbox'],
+        effectTiming: 'next_send'
+      }
+    })
+
+    expect(result.descriptor.controls.map(control => control.controlId)).toEqual(['model', 'sandbox'])
+  })
+
+  it('distinguishes a dispatched send from an accepted server-queued follow-up', () => {
+    expect(
+      SessionsSendResultSchema.parse({
+        outcome: 'accepted',
+        executionId: null,
+        configVersion: 4,
+        queueItemId: asWireId('queue_1')
+      })
+    ).toMatchObject({ queueItemId: 'queue_1' })
+
+    expect(
+      SessionsSendResultSchema.safeParse({
+        outcome: 'accepted',
+        executionId: null,
+        configVersion: 4,
+        queueItemId: null
+      }).success
+    ).toBe(false)
+  })
+
+  it('pins a queue item to its accepted configuration version', () => {
+    expect(
+      QueueItemSchema.parse({
+        itemId: asWireId('queue_1'),
+        version: 1,
+        submittedAt: '2026-09-14T00:00:00.000Z',
+        message: { text: 'next', attachments: [] },
+        profileId: asWireId('prof_1'),
+        configVersion: 9,
+        state: 'pending'
+      }).configVersion
+    ).toBe(9)
   })
 
   it('event frames carry stable ids, session-scoped seq, and an opaque cursor', () => {

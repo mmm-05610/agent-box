@@ -5,7 +5,7 @@
 
 ## 执行快照（handoff-policy 每阶段必填）— 接管施工中
 
-- updated_at: 2026-09-14 09:50 (+08:00)
+- updated_at: 2026-09-14 09:58 (+08:00)
 - 执行者: Codex 前端产品 goal（接力会话）；**已从暂停的 Zcode 执行者接管**
 - 工作树/分支: /home/maoqh/projects/agent-box-desktop-next-wsl-round1 @ feature/agentbox-desktop-product
 - 接管核验: 用户指定交接 HEAD `5c0fbfe` 与实际 HEAD
@@ -23,17 +23,17 @@
   不把 Linux path 送入遗留本机探针。
 - 当前阶段: P00 GREEN；P01 GREEN；P07 检查点 1–2 完成；**P02A GREEN，P02B1 已提交，P02B2 待提交**
 - 完成范围: P00；P01 全部返修（真机 27 PASS）；P07 检查点 1（语义映射）、检查点 2
-  （wire-v1 PROPOSED_WIRE：17 方法 + 12 项 schema 测试 + JSON Schema 工件）；
+  （wire-v1 候选：17 方法 + schema 测试 + JSON Schema 工件；已消费后端机械反馈并回应）；
   P02A（失败面非阻塞+可关闭、Artifacts 页退役、失败终态竞态修复与真机门）
 - 下一项: 提交 P02B2；继续 P02B Session 运行/离线/停止/队列表面，再进入 P02C 角色配置。
 - 阻断: 无真实阻断。剩余 P02B–D（上层产品）、P07 检查点 3（§9 fixture 矩阵）、
   P03/P04/P05/P06 均未开工或待续
 
 - contract_semantics_version: core-semantics/1（APPROVED_SEMANTICS，2026-09-14）
-- wire_version/schema_digest: wire-v1 PROPOSED_WIRE；权威 sha256:8e20ccd3e0718214，
-  工件 sha256:cd80103b3effbc4e（contracts/wire-v1/README.md 登记）；后端 wire-review.md
-  已出现但首段仍基于“P07 候选未产出”的旧时点，正在按实际双方文件机械核对
-- 合同测试: 12 项 schema/信封测试通过（src/types/wire/wire-v1.test.ts）；
+- wire_version/schema_digest: wire-v1 WIRE_REVISION_PENDING_BACKEND；权威
+  sha256:59529dfc4ca01dc5，工件 sha256:4f90256d5545af6a；已接受后端 hello 认证、宿主
+  token 文件、Harness 仅作数据三项，并在 backend-response.md 登记实际源码待补差异
+- 合同测试: 15 项 schema/信封测试通过（src/types/wire/wire-v1.test.ts）；
   覆盖缺口 = core v1 §9 九组场景的完整 fixture 矩阵（P07 检查点 3，未开工）
 - UI_READY: 侧栏工作区列表（36R+P01）真机全绿；P02A 真机 8 PASS / 0 FAIL / 1 PENDING
 - CONTRACT_CLIENT_READY: 否（wire 未锁定）
