@@ -5,7 +5,7 @@
 
 ## 执行快照（handoff-policy 每阶段必填）— 接管施工中
 
-- updated_at: 2026-09-14 13:01 (+08:00)
+- updated_at: 2026-09-14 13:36 (+08:00)
 - 执行者: Codex 前端产品 goal（接力会话）；**已从暂停的 Zcode 执行者接管**
 - 工作树/分支: /home/maoqh/projects/agent-box-desktop-next-wsl-round1 @ feature/agentbox-desktop-product
 - 接管核验: 用户指定交接 HEAD `5c0fbfe` 与实际 HEAD
@@ -13,7 +13,7 @@
   未发现该工作树、Windows 构建树的 Electron/Vite/Vitest/Playwright/验收驱动进程；
   dirty 集合仅为下列 4 项已授权交接改动。发布源规则文件与本执行树逐文件 SHA-256 一致，
   保留本文件实时进度，不复制发布源初始状态。
-- 代码检查点（已提交 HEAD）: `f8807b1`（P02/P05：AgentBox 主界面模型控件中立化）
+- 代码检查点（已提交 HEAD）: `2991bff`（P02/P05：中立 Provider/Model 设置）
   链: ebb1233（P00）→ 8d4b3df/47b5b47/dbb902f（P01 代码与几何修复）→ 26b32fc（P01 GREEN 证据）
   → 468e6ac/d7e9a57（发布源 d3c0196+ffbcfaf 导入）→ 893d560（P07 检查点2 wire-v1）
   → 957a523（P02A 盘点）→ 07f5386（P02A slice 1：失败面非阻塞）→ 3a25edc（P02A slice 2）
@@ -31,18 +31,21 @@
   → 35659c5（Session/cursor IPC + renderer replay 接线）→ 1513ff2（P04 event 证据）
   → 5f8b2a5（AgentBox service composition）→ 405f6be（main 注册与退出 cleanup）
   → e1adda9（P04 状态记录）→ f8807b1（AgentBox 模型控件中立化）
+  → 0db8bc7（中立模型控件状态）→ 1331a1d（Profile/ProviderModel 维护端口）
+  → d6ec993（服务模型目录与临时槽）→ 2991bff（中立 Provider/Model 设置）
 - 已消费发布文档提交: 86d5a7b、61c7ff7、d3c0196、ffbcfaf
-- 当前检查点改动: P04 production connection slot、HTTP/WS transport、Session event IPC 与 main
-  注册/退出 cleanup 已提交；AgentBox 主聊天区不再挂载 Hermes ModelPill/本地模型加载状态，模型选择
-  仅由服务描述的 Profile/临时配置控件承载。slot 因缺正式 Server 启动/发现合同保持 null，诚实
-  UNAVAILABLE。
+- 当前检查点改动: 已锁定的 `providerModels.list/create/update/archive` 与
+  `profiles.updateConfig` 具备中立 application 端口；Settings → Models 已接服务权威列表、多模型
+  增删、CAS 更新与引用保护归档。Composer 的 `model_slot` 从同一目录选取 exact
+  `{providerId, modelId}`，不再把 slot 名误当模型值；slot 因缺正式 Server 启动/发现合同保持 null，
+  诚实 UNAVAILABLE。
 - 当前阶段: P00 GREEN；P01 GREEN；**P07 检查点 1–6 完成且 wire 已锁定**；
   P02 A/B1/B2/C/D 与 B3 服务投影已提交；P03 纵切 1–4 已提交；P04 切片1–8已提交
 - 完成范围: P00；P01 全部返修（真机 27 PASS）；P07 检查点 1（语义映射）、检查点 2
   （wire-v1 候选：17 方法 + schema 测试 + JSON Schema 工件；已消费后端机械反馈并回应）；
   P02A（失败面非阻塞+可关闭、Artifacts 页退役、失败终态竞态修复与真机门）
-- 下一项: 接入已锁定的 providerModels 与 profiles.updateConfig 客户端/产品界面；随后收口 P05
-  客户端矩阵并准备 P06 无模型 Windows 独立验收。
+- 下一项: 在 Profiles 页把 `profiles.updateConfig` 接成服务描述的默认配置编辑，并按返回 version
+  串行 CAS；随后收口 P05 客户端矩阵并准备 P06 无模型 Windows 独立验收。
 - 阻断: 无真实阻断。剩余 P04 production lifecycle connection 与显式 legacy 消费者收口、
   P05 生产接线核查和 P06 独立验收待续；wire 摘要已锁定，真实全栈仍由后续集成人验证
 
@@ -54,7 +57,8 @@
   core fixture 1 file / 10 tests passed；core v1 §9 九组场景矩阵已完整执行；
   真实 wire event stream 与后端投影差异仍是联调项，不以 fixture 伪称服务通过
 - UI_READY: 侧栏工作区列表（36R+P01）真机全绿；P02A 真机 8 PASS / 0 FAIL / 1 PENDING
-- CONTRACT_CLIENT_READY: wire-v1 客户端/fixture 与 28 方法摘要 LOCKED；生产 Electron lifecycle/event source 待 P04
+- CONTRACT_CLIENT_READY: wire-v1 客户端/fixture 与 28 方法摘要 LOCKED；production request/event
+  transport 已接线，Server lifecycle connection 来源待正式跨端合同
 - REAL_FLOW_VERIFIED: 否（无真实 Server/Harness 链路证据）
 
 - frontend_implementation: PARTIAL（P02A、P02B1、P02B2、P02C1、P02C2、P02D/B3 与
@@ -127,6 +131,10 @@
 - P02/P05 模型控件中立化：AgentBox composer controls 1 file / 10 tests passed；desktop 三项目
   typecheck、改动文件 ESLint 0/0 与 diff check 通过。主聊天区不再显示 Hermes 模型 pill 或读取
   legacy model-loading 状态；动态 descriptor（含 model_slot）仍是产品配置权威，legacy route 不变。
+- P05 Provider/Model：application 端口 2 files / 6 tests；目录/Composer/Settings 合并门 7 files /
+  36 tests passed；desktop renderer/electron/e2e 三项目 typecheck 通过；全部受影响 TS/TSX ESLint
+  0 error / 0 warning，diff check 干净。覆盖 capability 缺失、缓存保留/single-flight、带斜杠 id、
+  opaque Harness 隔离、多 model_slot、服务当前值、模型多行增删、防双发、CAS/引用冲突与服务返回投影。
 
 ## 测试与基线（上一执行者交接时点，历史）
 
@@ -166,10 +174,10 @@ wire-review.md通道自39阶段协调。执行者下个检查点消费这些规�
 | --- | --- | --- |
 | P00 接管与基线 | GREEN | 旧Desktop会话无并发写入（evidence/P00.md） |
 | P01 36R收口 | GREEN | 真机 27 PASS/2 SKIP/1 PENDING（evidence/P01.md；本地打开 PENDING 转 P05） |
-| P02 上层产品 | IN_PROGRESS（A、B1、B2、C、D 完成；B3 服务投影随 P03 收口） | P01 已满足 |
+| P02 上层产品 | IN_PROGRESS（A/B/C/D 主面与服务投影完成；Profile 默认配置编辑待收口） | P01 已满足 |
 | P03 用例状态与API | IN_PROGRESS（主 route 生产调用者与 event reducer 接入已完成；真实 Server 源待 P04） | 与 P02 穿插 |
 | P04 宿主与遗留退役 | IN_PROGRESS（production request/Session-event transport + IPC + supervisor；正常冷启动 Hermes 自动门已退役，Server connection合同待后端） | 与 P03 穿插 |
-| P05 正式合同接入 | WIRE_LOCKED_FOR_IMPLEMENTATION | 28 方法摘要双端锁定；production lifecycle/联调待续 |
+| P05 正式合同接入 | IN_PROGRESS（28 方法客户端/transport/模型维护已接；Profile 默认配置与 lifecycle 外部缺口待续） | wire 双端锁定 |
 | P06 前端验收与交接 | IMPLEMENTATION_HANDOFF_GATE | 本端独立范围完成；真实全栈门由后续集成人负责 |
 | P07 核心合同与状态交接 | 检查点1–6已提交；WIRE_LOCKED | 28 方法双端摘要一致；fixture/客户端已锁定 |
 
