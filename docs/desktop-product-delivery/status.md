@@ -1,11 +1,26 @@
 # Desktop产品交付状态（执行工作树维护）
 
-调度：ACTIVE_EXECUTOR_INCREMENT_AVAILABLE。本文件是产品工作树的执行事实；
+调度：**FRONTEND_GOAL_CLOSED / writer_lease=RELEASED — 等待后端执行者按 handoff-policy 接管全栈**。
+本文件是产品工作树的执行事实（前端侧已冻结）；
 发布源初始表不代表实时状态。消费文档更新时保留执行状态行，只合入规则/新订单。
+
+## 交付终态（前端已停止写入）
+
+- **P06 = `P06_GREEN — FRONTEND_INDEPENDENT_ACCEPTANCE`**
+- **`DESKTOP_IMPLEMENTATION_READY`**（前端实现交接就绪；证据与入口见
+  `evidence/P06.md`、`evidence/DESKTOP_IMPLEMENTATION_HANDOFF.md`）
+- `REAL_FLOW_VERIFIED = 否`（无真实 Server/Harness/模型链路证据）
+- `AGENTBOX_DESKTOP_PRODUCT_GREEN = 否 / 待全栈`（整体产品需外围能力矩阵另验，核心联调 GREEN 不等于产品 GREEN）
+- **`writer_lease = RELEASED`** —— 前端 goal 已停止全部写入（含文档）。
+  **后端执行者可按 `docs/desktop-product-delivery/handoff-policy.md` 的 42 双门规则接管全栈**：
+  读取本文件与 `evidence/DESKTOP_IMPLEMENTATION_HANDOFF.md`，核对分支/HEAD/摘要/可运行性，
+  确认无新前端 writer、无子代理、无未交接修改后，在正式派单指定的工作树记录
+  `FULLSTACK_INTEGRATION_OWNER` 成为唯一集成人并安装 lifecycle connection。
+  若需要前端配合的跨端修复，请由用户另派前端任务并重新划分写权——本 goal 不会自行恢复写入。
 
 ## 执行快照（handoff-policy 每阶段必填）— P06 独立验收完成
 
-- updated_at: 2026-09-14 23:05 (+08:00)
+- updated_at: 2026-09-14 23:20 (+08:00), writer_lease=RELEASED（本行之后本文件冻结）
 - 执行者: Zcode 前端产品 goal（新一轮会话，串行施工）；**已从 Codex 前端产品 goal 接管**
 - 工作树/分支: /home/maoqh/projects/agent-box-desktop-next-wsl-round1 @ feature/agentbox-desktop-product
 - 本阶段（P06 独立验收、证据交付与写权释放）起点核验: HEAD `9ecf1a0a`、
@@ -422,7 +437,9 @@
   **同批新发现仍未迁移**：Command Center 浮层（route 可达）与插件 SDK `host.status()`（B7/B8），
   结构门使其不再拉起运行时、只得到 `LEGACY_RUNTIME_DISABLED_FOR_PRODUCT`。
   见 `evidence/P05-final-audit.md` §10
-- REAL_FLOW_VERIFIED: 否（无真实 Server/Harness 链路证据）
+- REAL_FLOW_VERIFIED: **否**（无真实 Server/Harness/模型链路证据；`UI_READY` 与
+  `CONTRACT_CLIENT_READY` 成立，三者不互相替代）。真实全栈由接管 `FULLSTACK_INTEGRATION_OWNER`
+  的后端执行者按 handoff-policy 验证；本端不声明 `AGENTBOX_DESKTOP_PRODUCT_GREEN`。
 
 - frontend_implementation: **DESKTOP_IMPLEMENTATION_READY**（P06 独立验收完成，`evidence/P06.md` +
   `evidence/DESKTOP_IMPLEMENTATION_HANDOFF.md`）——已批准且前端可独立完成的产品面、application/store、
@@ -431,10 +448,14 @@
   完整测试、Windows 原应用与交付材料达到前端交接标准。
   **它不表示** `REAL_FLOW_VERIFIED`、真实 Server/Harness/模型已联调、全栈 GREEN 或外围合同已到。
   （历史：同一行曾记录为 PARTIAL；分阶段完成记录见本文各检查点与 `evidence/P02..P07.md`。）
-- writer_lease: **ACTIVE — Zcode frontend goal**（2026-09-14 接管自 Codex 前端产品 goal；
-  本阶段起点 `ad3feb16`、工作树 clean；两个 Luna 子代理（A 状态栏/命令面板、B 侧栏搜索/Archived）
-  写集互不重叠且禁止 stage/commit，主执行者持有共享文件与组合接线、串行提交并写文档；
-  完成后停止写入不 RELEASE；后端工作树只读，Windows 构建/验收资源串行）
+- writer_lease: **RELEASED（2026-09-14，P06 收口）** —— 前端 goal 已停止全部写入，现无前端 writer。
+  释放前逐项确认：所有子代理已结束（A 功能矩阵审计、B 边界/交接审计均为只读且已回报）；
+  WSL 无 Vitest/Vite/Playwright/Electron/tsc 进程，Windows 无 electron/node/hermes 进程；
+  工作树与暂存区 clean（`git status --short` 为空、`git diff --check` exit 0）；
+  `evidence/P06.md`、`evidence/P06-assets/**`、`evidence/DESKTOP_IMPLEMENTATION_HANDOFF.md` 已提交；
+  无剩余本端实现缺陷（P06 查出并修复 B10/B11/B12、连接遮罩、渲染端 legacy 请求）。
+  释放前的 lease 记录：ACTIVE — Zcode frontend goal（2026-09-14 接管自 Codex 前端产品 goal），
+  各阶段起点与子代理划分见下方各检查点。released 之后本文件不再修改。
 
 ## 测试与基线（接力会话实跑）
 
