@@ -20,9 +20,17 @@
 - backend_implementation: IN_PROGRESS（39完成；40 A/B/C完成，D未完；41未完）。
 - frontend_observed_state: IN_PROGRESS（只读观察，2026-09-14；前端P07 checkpoint 1、wire未产出）。
 - frontend_worktree: /home/maoqh/projects/agent-box-desktop-next-wsl-round1 @ feature/agentbox-desktop-product。
-- frontend_checked_at: 2026-09-14；observed_head: 文档消费61c7ff7、代码ebb1233/8d4b3df/2e8a1c7；
-  writer_lease: ACTIVE（未交接）；next_check_at: 41 READY后开始5分钟只读循环。
-- wire_version / schema_digest: 尚无（前端P07 checkpoint 2未产出；后端37 HTTP候选事实已写入wire-review.md）。
+- frontend_checked_at: 2026-09-14（41完成后只读复查）；observed_head: `91305d86`
+  （其后 `df848380`、`5c0fbfe1`）。其 status.md 记录 frontend_implementation=**PARTIAL**
+  （P00/P01 GREEN、P07 检查点1–2、P02A GREEN、P02B1 待提交；B/C/D 待施工），
+  writer_lease=**ACTIVE — Codex frontend goal**（09:20 接管），CONTRACT_CLIENT_READY=否（wire 未锁定）。
+- 42 双门判定（2026-09-14）：BACKEND_IMPLEMENTATION_READY=**否**（41-E 与 Worker→sidecar 缺）；
+  DESKTOP_IMPLEMENTATION_READY=**否**（PARTIAL 且写权未释放）。**未进入全栈联调**，
+  未写前端任何文件；wire 交换经 [wire-review.md](../server-round1/wire-review.md) 进行，
+  等待前端对 3 项确认与摘要登记的答复。
+- wire_version / schema_digest: 前端 `wire-v1` PROPOSED_WIRE 权威 `8e20ccd3e0718214`、
+  生成工件 `cd80103b3effbc4e`（后端实现所对）；登记为
+  WIRE_CANDIDATE_ACCEPTED_BY_BACKEND，**未锁定**。
 - code_checkpoint_pair: 后端=41 提交HEAD；前端无交接检查点。
 - wire_status: WIRE_CANDIDATE_ACCEPTED_BY_BACKEND（对前端 wire-v1 工件 cd80103b3effbc4e）；
   未锁定：需双方登记同一摘要，前端尚未答复 wire-review.md 的3项确认。
