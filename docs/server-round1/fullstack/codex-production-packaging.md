@@ -118,7 +118,7 @@ Windows c5 r4 + PostCheck                   → exit 0 / …_POSTCHECK_CLEAN
 - Codex 仍 **MODEL_NOT_VERIFIED**：本门用 loopback 假端点与固定 nonce，不是模型能力证据；四家真实模型门
   均未执行。
 - **bundle 演进 c4 → c5 → c6**（Worker 的 view 列表修复与合同收紧）：c4 与 c5 均未被覆盖、仍是历史有效
-  证据；最新 Windows r4 用的是 **c6**
+  证据；该报告撰写时的最新 Windows r4 用 **c6**（其后已先后用 c7/c8 复跑，见 state-error-boundary.md）
   （`sha256:96256b2ea76218448183fc0b1063aba92c15fca3fb22fa8a00f7e0f7efc2466e`）。版本口径：
   **ABW1 frame 与 manifest `wireVersion = 1`**，而 **Worker control `PROTOCOL_VERSION = 3`**——
   本轮没有改变任何响应形状，因此 control protocol 不升版。
