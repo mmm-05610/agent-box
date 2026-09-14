@@ -267,6 +267,9 @@ export function LocalWorkspaceRow({
 }
 
 export interface WslWorkspaceRowProps {
+  /** The matched service Workspace's AgentBox Session rows. Present = the
+   *  service owns the expansion; absent = the honest unavailable prompt. */
+  agentBoxContent?: React.ReactNode
   infoOpen: boolean
   item: WorkspaceListItem
   /** AgentBox service archive for this row — separate from the host's own
@@ -288,6 +291,7 @@ export interface WslWorkspaceRowProps {
  * menu entry, never on the main row.
  */
 export function WslWorkspaceRow({
+  agentBoxContent,
   infoOpen,
   item,
   onArchiveInAgentBox,
@@ -420,7 +424,7 @@ export function WslWorkspaceRow({
       className={cn(infoOpen && 'bg-(--ui-control-hover-background)')}
       data-wsl-workspace-row={workspace.id}
       expanded={open}
-      expandedContent={<WorkspaceContent item={item} />}
+      expandedContent={<WorkspaceContent agentBoxContent={agentBoxContent} item={item} />}
       label={labelNode}
       lead={
         <span className="grid size-4 shrink-0 place-items-center text-(--ui-text-tertiary)">

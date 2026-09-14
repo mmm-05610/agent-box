@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Input } from '@/components/ui/input'
 import { SidebarGroup } from '@/components/ui/sidebar'
 import { type NewSessionSplitHandler } from '@/features/chat/new-session-drag'
+import { AgentBoxSessionList } from '@/features/chat/sidebar/agentbox-sessions/agentbox-session-list'
 import { useI18n } from '@/i18n'
 import {
   $agentBoxHello,
@@ -103,15 +104,25 @@ export function WorkspaceList({
 
   // The service-side twin of a shell row, by the same complete identity the
   // registration uses. No match — or no declared capability — means no action.
-  const agentBoxArchiveFor = (target: {
+  const agentBoxWorkspaceFor = (target: {
     localPath?: string
     wsl?: { distribution: string; rootPath: string; user: null | string }
   }) => {
-    if (agentBoxService.phase !== 'ready' || !agentBoxCapabilitySupported(agentBoxHello, 'workspaces.archive')) {
+    if (agentBoxService.phase !== 'ready') {
       return undefined
     }
 
     return resolveAgentBoxWorkspace(agentBoxWorkspaces, target) ?? undefined
+  }
+
+  // The archive ACTION additionally needs the declared capability; the
+  // projection itself only needs the record.
+  const agentBoxArchiveFor = (target: Parameters<typeof agentBoxWorkspaceFor>[0]) => {
+    if (!agentBoxCapabilitySupported(agentBoxHello, 'workspaces.archive')) {
+      return undefined
+    }
+
+    return agentBoxWorkspaceFor(target)
   }
 
   const items = projectWorkspaceList({ projects: projectRows, wslWorkspaces })
@@ -135,16 +146,27 @@ export function WorkspaceList({
     const preview =
       renderRows || renderPreviewRows ? (fetched.length ? fetched : latestProjectSessions(project, limit)) : []
 
-    const content = preview.length
+    // Home is a bucket, not a record, and a row without its own folder has no
+    // location — neither can carry a service Workspace.
+    const serviceWorkspace =
+      !project.isNoProject && project.path ? agentBoxWorkspaceFor({ localPath: project.path }) : undefined
+
+    // A matched service Workspace OWNS the expanded content: its AgentBox
+    // Sessions render here (loading/empty included) and the legacy preview
+    // rows never bleed back in. The archive action additionally needs the
+    // declared capability.
+    const archiveWorkspace =
+      serviceWorkspace && agentBoxCapabilitySupported(agentBoxHello, 'workspaces.archive')
+        ? serviceWorkspace
+        : undefined
+
+    const content = serviceWorkspace ? (
+      <AgentBoxSessionList key={serviceWorkspace.id} shellId={project.id} workspace={serviceWorkspace} />
+    ) : preview.length
       ? showAllSessions && renderPreviewRows
         ? renderPreviewRows(preview, project.id)
         : renderRows?.(preview)
       : undefined
-
-    // Home is a bucket, not a record, and a row without its own folder has no
-    // location — neither can carry a service Workspace.
-    const serviceWorkspace =
-      !project.isNoProject && project.path ? agentBoxArchiveFor({ localPath: project.path }) : undefined
 
     return (
       <LocalWorkspaceRow
@@ -164,7 +186,7 @@ export function WorkspaceList({
           }
         }
         onArchiveInAgentBox={
-          serviceWorkspace ? () => setArchiveTarget({ shellId: project.id, workspace: serviceWorkspace }) : undefined
+          archiveWorkspace ? () => setArchiveTarget({ shellId: project.id, workspace: archiveWorkspace }) : undefined
         }
         onEnter={onEnterProject}
         onNewSession={onNewSessionInWorkspace}
@@ -196,44 +218,58 @@ export function WorkspaceList({
       ) : (
         sortableProjects.map(project => localRow(project))
       )}
-      {wslWorkspaces.map(workspace => (
-        <WslWorkspaceRow
-          infoOpen={infoId === workspace.id}
-          item={
-            itemsById.get(workspace.id) ?? {
-              id: workspace.id,
-              backend: 'wsl',
-              name: workspace.name,
-              path: workspace.rootPath,
-              detail: `${workspace.distribution} · ${workspace.rootPath}`,
-              sessionCount: 0
-            }
+      {wslWorkspaces.map(workspace => {
+        const identity = {
+          wsl: {
+            distribution: workspace.distribution,
+            rootPath: workspace.rootPath,
+            user: workspace.actualUser
           }
-          key={workspace.id}
-          // The selected workspace id is the draft identity. Passing its Linux
-          // path through the legacy local-workspace callback would make
-          // Electron probe it as a host path, so WSL enters a detached draft
-          // until the neutral wire client resolves the workspace by id.
-          onArchiveInAgentBox={(() => {
-            const serviceWorkspace = agentBoxArchiveFor({
-              wsl: {
-                distribution: workspace.distribution,
-                rootPath: workspace.rootPath,
-                user: workspace.actualUser
-              }
-            })
+        }
+        // The matched service Workspace owns the expansion exactly like the
+        // local rows — its AgentBox Sessions replace the honest "unavailable"
+        // prompt, and a WSL row the service never registered keeps it.
 
-            return serviceWorkspace
-              ? () => setArchiveTarget({ shellId: workspace.id, workspace: serviceWorkspace })
-              : undefined
-          })()}
-          onEnter={() => onNewSessionInWorkspace?.(null)}
-          onRemove={setRemoveTarget}
-          onRename={setRenameTarget}
-          state={validation[workspace.id]}
-          workspace={workspace}
-        />
-      ))}
+        const serviceWorkspace = agentBoxWorkspaceFor(identity)
+
+        return (
+          <WslWorkspaceRow
+            agentBoxContent={
+              serviceWorkspace ? (
+                <AgentBoxSessionList key={serviceWorkspace.id} shellId={workspace.id} workspace={serviceWorkspace} />
+              ) : undefined
+            }
+            infoOpen={infoId === workspace.id}
+            item={
+              itemsById.get(workspace.id) ?? {
+                id: workspace.id,
+                backend: 'wsl',
+                name: workspace.name,
+                path: workspace.rootPath,
+                detail: `${workspace.distribution} · ${workspace.rootPath}`,
+                sessionCount: 0
+              }
+            }
+            key={workspace.id}
+            // The selected workspace id is the draft identity. Passing its Linux
+            // path through the legacy local-workspace callback would make
+            // Electron probe it as a host path, so WSL enters a detached draft
+            // until the neutral wire client resolves the workspace by id.
+            onArchiveInAgentBox={(() => {
+              const archiveWorkspace = agentBoxArchiveFor(identity)
+
+              return archiveWorkspace
+                ? () => setArchiveTarget({ shellId: workspace.id, workspace: archiveWorkspace })
+                : undefined
+            })()}
+            onEnter={() => onNewSessionInWorkspace?.(null)}
+            onRemove={setRemoveTarget}
+            onRename={setRenameTarget}
+            state={validation[workspace.id]}
+            workspace={workspace}
+          />
+        )
+      })}
     </div>
   )
 

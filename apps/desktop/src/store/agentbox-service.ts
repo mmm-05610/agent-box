@@ -58,8 +58,25 @@ export function setDraftConfigState(scope: string, state: DraftConfigState): voi
   $draftConfigStates.set({ ...$draftConfigStates.get(), [scope]: state })
 }
 
+/** A service answer OLDER than what the cache already holds must not win: the
+ *  merge is version-monotonic, so a late list page or a late mutation answer
+ *  can never roll a session record back. The same or a higher version adopts
+ *  the service value verbatim (including its normalized fields). */
+export function adoptAgentBoxSession(
+  sessions: Record<string, SessionRecord>,
+  session: SessionRecord
+): Record<string, SessionRecord> {
+  const current = sessions[session.id]
+
+  if (current && session.version < current.version) {
+    return sessions
+  }
+
+  return { ...sessions, [session.id]: session }
+}
+
 export function upsertAgentBoxSession(session: SessionRecord): void {
-  $agentBoxSessions.set({ ...$agentBoxSessions.get(), [session.id]: session })
+  $agentBoxSessions.set(adoptAgentBoxSession($agentBoxSessions.get(), session))
 }
 
 export function upsertAgentBoxProfile(profile: ProfileRecord): void {

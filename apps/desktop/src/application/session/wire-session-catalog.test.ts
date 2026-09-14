@@ -40,6 +40,27 @@ describe('AgentBox Session catalog', () => {
     })
   })
 
+  it('never lets a stale list page roll a newer record back', async () => {
+    $agentBoxSessions.set({ 'session-1': session({ displayName: 'Newer', version: 7 }) })
+
+    const call = vi.fn(async () => ({ items: [session({ displayName: 'Stale', version: 6 })], nextCursor: null }))
+
+    await refreshAgentBoxSessions({ call } as unknown as WireV1Client)
+
+    expect($agentBoxSessions.get()['session-1']?.displayName).toBe('Newer')
+    expect($agentBoxSessions.get()['session-1']?.version).toBe(7)
+  })
+
+  it('adopts the same or a newer version from a list page', async () => {
+    $agentBoxSessions.set({ 'session-1': session({ displayName: 'Old', version: 1 }) })
+
+    const call = vi.fn(async () => ({ items: [session({ displayName: 'Normalized', version: 1 })], nextCursor: null }))
+
+    await refreshAgentBoxSessions({ call } as unknown as WireV1Client)
+
+    expect($agentBoxSessions.get()['session-1']?.displayName).toBe('Normalized')
+  })
+
   it('adopts only server-confirmed shared metadata and archive records', async () => {
     const responses = [
       { session: session({ displayName: 'Renamed', pinned: true, version: 2 }) },

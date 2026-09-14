@@ -23,6 +23,7 @@ import { useAppKeybindings } from '@/app/composition/registrations/keybindings'
 import { ChatRoutesSurface, SidebarSurface, StatusbarSurface, TerminalSurface } from '@/app/composition/registrations/surfaces'
 import { ContribWiringContext } from '@/app/composition/root/context'
 import { useOverlayRouting } from '@/app/composition/routing/overlay-routing'
+import { toggleRoutedAgentBoxSessionPin } from '@/app/composition/wiring/agentbox-session-commands'
 import {
   CRON_ROUTE,
   navigateToWorkspacePage,
@@ -91,6 +92,7 @@ import { useSessionTileDelegate } from '@/features/session/tiles/use-session-til
 import { startWorkspaceSession } from '@/features/session/workspace-session-target'
 import { PluginInstallModal } from '@/features/settings/plugin-install-modal'
 import { UpdatesOverlay } from '@/features/updates/updates-overlay'
+import { useI18n } from '@/i18n'
 import { type ChatMessage, chatMessageText, preserveLocalAssistantErrors, toChatMessages } from '@/lib/chat-messages'
 import { formatRefValue } from '@/lib/format-ref-value'
 import {
@@ -105,6 +107,7 @@ import { $desktopBoot } from '@/store/boot'
 import { $activeConnectionId } from '@/store/connections'
 import { $cronReviewRequest } from '@/store/cron'
 import { $pinnedSessionIds, pinSession, restoreWorktree, unpinSession } from '@/store/layout'
+import { notifyError } from '@/store/notifications'
 import { $newSessionTabAction, registerPaneCloser } from '@/store/pane-shell/tree'
 import {
   $workspaceMode,
@@ -165,6 +168,7 @@ const GatewaySettingsView = lazy(async () => ({
 export { WiredPane } from '@/app/composition/root/context'
 
 export function ContribWiring({ children }: { children: ReactNode }) {
+  const { t } = useI18n()
   const queryClient = useQueryClient()
   const location = useLocation()
   const navigate = useNavigate()
@@ -827,8 +831,29 @@ export function ContribWiring({ children }: { children: ReactNode }) {
   })
 
   // Pin/unpin the selected session (statusbar keybind + chat header) — pinned
-  // on the durable lineage-root id so it survives auto-compression.
+  // on the durable lineage-root id so it survives auto-compression. On an
+  // AgentBox session route the service record is the authority and the flip
+  // rides `sessions.update` CAS instead of the renderer-local pin store; the
+  // narrow command module keeps that decision independently testable.
   const toggleSelectedPin = useCallback(() => {
+    const routed = toggleRoutedAgentBoxSessionPin(location.pathname)
+
+    if (routed) {
+      // The service's reason surfaces exactly like the sidebar row's does —
+      // the old pinned state stands (nothing was written locally).
+      void routed.promise.catch(error =>
+        notifyError(error, routed.pinned ? t.sidebar.agentBoxSession.pinFailed : t.sidebar.agentBoxSession.unpinFailed)
+      )
+
+      return
+    }
+
+    if (routeSessionId(location.pathname)) {
+      // A session route the service cannot prove (no record, no service, no
+      // declared capability) fails closed — no wire call, no legacy pin.
+      return
+    }
+
     const sessionId = $selectedStoredSessionId.get()
 
     if (!sessionId) {
@@ -843,7 +868,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     } else {
       pinSession(pinId)
     }
-  }, [])
+  }, [location.pathname, t])
 
   // The tab-strip "+" and ⌘T share one action: open a new session as its own
   // tab (stacked into the workspace zone) WITHOUT polluting the session list.

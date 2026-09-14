@@ -10,11 +10,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { refreshWslWorkspaces } from '@/application/workspace/wsl-workspace-usecases'
 import { SidebarProvider } from '@/components/ui/sidebar'
-import { $agentBoxHello, $agentBoxService, $agentBoxWorkspaces } from '@/store/agentbox-service'
+import {
+  $agentBoxCatalogReadiness,
+  $agentBoxHello,
+  $agentBoxService,
+  $agentBoxSessions,
+  $agentBoxWorkspaces
+} from '@/store/agentbox-service'
+import { $sidebarWorkspaceNodeOpen } from '@/store/layout'
 import type { SidebarProjectTree } from '@/store/projects/membership'
 import { $workspaceLocalHiddenIds, $workspaceViewSelectedId, selectWorkspaceView } from '@/store/workspace-view'
 import { $wslWorkspaceValidation, setWslWorkspaces } from '@/store/wsl-workspace'
-import { asWireId, WIRE_PROTOCOL_VERSION, type WorkspaceRecord } from '@/types/wire/wire-v1'
+import type { SessionInfo } from '@/types/hermes'
+import { asWireId, type SessionRecord, WIRE_PROTOCOL_VERSION, type WorkspaceRecord } from '@/types/wire/wire-v1'
 import type { WslWorkspaceRecord } from '@/types/workspace'
 
 import { SidebarBlankState } from './section-states'
@@ -511,5 +519,187 @@ describe('AgentBox workspace archive in the unified list', () => {
     // The service's answer is authoritative: an unarchived record stays.
     expect($agentBoxWorkspaces.get()).toHaveLength(1)
     expect($agentBoxWorkspaces.get()[0]?.version).toBe(4)
+  })
+})
+
+describe('AgentBox sessions in the unified workspace list', () => {
+  const serviceWorkspace = (overrides: Partial<WorkspaceRecord> = {}): WorkspaceRecord => ({
+    accessibility: { executableForRole: null, readable: true, reasons: [], writable: true },
+    archivedAt: null,
+    connection: { state: 'connected' },
+    createdAt: '2026-09-14T00:00:00.000Z',
+    displayName: 'App',
+    environment: { host: null, kind: 'local', user: null },
+    id: asWireId('workspace-1'),
+    normalizedPath: 'C:/work/app',
+    updatedAt: '2026-09-14T00:00:00.000Z',
+    version: 3,
+    ...overrides
+  })
+
+  const agentBoxSession = (overrides: Partial<SessionRecord> = {}): SessionRecord => ({
+    archivedAt: null,
+    createdAt: '2026-09-14T00:00:00.000Z',
+    displayName: 'Fix the login flow',
+    id: asWireId('session-1'),
+    pinned: false,
+    profileId: null,
+    updatedAt: '2026-09-14T09:00:00.000Z',
+    version: 1,
+    workspaceId: asWireId('workspace-1'),
+    ...overrides
+  })
+
+  const readyHello = () => ({
+    auth: { required: false as const },
+    capabilities: [{ id: 'sessions.update', supported: true }],
+    protocolVersion: WIRE_PROTOCOL_VERSION as typeof WIRE_PROTOCOL_VERSION,
+    serverId: asWireId('server-1')
+  })
+
+  // This block's own local row builder (the archive block's is describe-scoped).
+  const sessionRow = (path: null | string) =>
+    ({
+      id: 'proj-1',
+      isAuto: false,
+      isNoProject: false,
+      label: 'local-proj',
+      path,
+      repos: [],
+      sessionCount: 1
+    }) as unknown as SidebarProjectTree
+
+  const renderWith = (rows: SidebarProjectTree[] = [sessionRow('C:/work/app')]) =>
+    renderList(
+      <WorkspaceList
+        emptyState={null}
+        label="Workspaces"
+        projectPreviews={{ 'proj-1': [{}] as unknown as SessionInfo[] }}
+        projectRows={rows}
+        renderRows={() => <div data-legacy-preview="proj-1" />}
+        showAllSessions={false}
+      />
+    )
+
+  beforeEach(() => {
+    $sidebarWorkspaceNodeOpen.set({})
+    $agentBoxService.set({ detail: null, phase: 'ready' })
+    $agentBoxHello.set(readyHello())
+    $agentBoxCatalogReadiness.set({ sessions: true, workspaces: true })
+    $agentBoxWorkspaces.set([serviceWorkspace()])
+    $agentBoxSessions.set({})
+  })
+
+  afterEach(() => {
+    cleanup()
+    $agentBoxWorkspaces.set([])
+    $agentBoxSessions.set({})
+    $agentBoxHello.set(null)
+    $agentBoxService.set({ detail: null, phase: 'idle' })
+    $agentBoxCatalogReadiness.set({ sessions: false, workspaces: false })
+  })
+
+  it('a matched LOCAL workspace owns the expansion: its AgentBox rows render, legacy previews do not', () => {
+    $agentBoxSessions.set({ 'session-1': agentBoxSession() })
+
+    const { container } = renderWith()
+
+    expect(container.querySelector('[data-agentbox-sessions="workspace-1"]')).toBeTruthy()
+    expect(container.querySelector('[data-agentbox-session-row="session-1"]')?.textContent).toContain(
+      'Fix the login flow'
+    )
+    // The matched workspace never falls back to the legacy Hermes preview.
+    expect(container.querySelector('[data-legacy-preview="proj-1"]')).toBeNull()
+  })
+
+  it('a matched WSL workspace shows its AgentBox sessions instead of the unavailable prompt', () => {
+    setWslWorkspaces([wslRecord()])
+    $agentBoxWorkspaces.set([
+      serviceWorkspace({
+        environment: { host: 'Ubuntu', kind: 'wsl', user: 'maoqh' },
+        id: asWireId('workspace-wsl'),
+        normalizedPath: '/home/maoqh/验收目录'
+      })
+    ])
+    $agentBoxSessions.set({
+      'session-wsl': agentBoxSession({ id: asWireId('session-wsl'), workspaceId: asWireId('workspace-wsl') })
+    })
+
+    const { container } = renderWith([])
+
+    const row = container.querySelector('[data-wsl-workspace-row="wsl_ws_1"]')
+    const expand = container.querySelector('[data-wsl-workspace-expand="wsl_ws_1"]') as HTMLElement
+
+    expect(row).toBeTruthy()
+
+    act(() => {
+      fireEvent.click(expand)
+    })
+
+    expect(container.querySelector('[data-agentbox-sessions="workspace-wsl"]')).toBeTruthy()
+    expect(container.querySelector('[data-agentbox-session-row="session-wsl"]')?.textContent).toContain(
+      'Fix the login flow'
+    )
+    expect(container.querySelector('[data-wsl-workspace-empty="wsl_ws_1"]')).toBeNull()
+  })
+
+  it('the same WSL path under another user is NOT this row\'s workspace: the honest prompt stays', () => {
+    setWslWorkspaces([wslRecord()])
+    $agentBoxWorkspaces.set([
+      serviceWorkspace({
+        environment: { host: 'Ubuntu', kind: 'wsl', user: 'someone-else' },
+        id: asWireId('workspace-other'),
+        normalizedPath: '/home/maoqh/验收目录'
+      })
+    ])
+
+    const { container } = renderWith([])
+
+    const expand = container.querySelector('[data-wsl-workspace-expand="wsl_ws_1"]') as HTMLElement
+
+    act(() => {
+      fireEvent.click(expand)
+    })
+
+    expect(container.querySelector('[data-agentbox-sessions]')).toBeNull()
+    expect(container.querySelector('[data-wsl-workspace-empty="wsl_ws_1"]')).toBeTruthy()
+  })
+
+  it('sessions of ANOTHER workspace never render under this row', () => {
+    $agentBoxSessions.set({
+      'session-foreign': agentBoxSession({ id: asWireId('session-foreign'), workspaceId: asWireId('workspace-2') })
+    })
+
+    const { container } = renderWith()
+
+    expect(container.querySelector('[data-agentbox-sessions-empty="workspace-1"]')).toBeTruthy()
+    expect(container.querySelector('[data-agentbox-session-row]')).toBeNull()
+  })
+
+  it('a matched workspace with an EMPTY projection shows the neutral empty state, not the legacy preview', () => {
+    const { container } = renderWith()
+
+    expect(container.querySelector('[data-agentbox-sessions-empty="workspace-1"]')?.textContent).toContain(
+      'No AgentBox sessions'
+    )
+    expect(container.querySelector('[data-legacy-preview="proj-1"]')).toBeNull()
+  })
+
+  it('a matched workspace whose catalog has not arrived shows the honest loading state', () => {
+    $agentBoxCatalogReadiness.set({ sessions: false, workspaces: true })
+
+    const { container } = renderWith()
+
+    expect(container.querySelector('[data-agentbox-sessions-loading="workspace-1"]')).toBeTruthy()
+    expect(container.querySelector('[data-legacy-preview="proj-1"]')).toBeNull()
+  })
+
+  it('an UNMATCHED local row keeps its legacy preview — the existing behavior is untouched', () => {
+    $agentBoxWorkspaces.set([])
+
+    const { container } = renderWith([sessionRow('C:/work/app')])
+
+    expect(container.querySelector('[data-agentbox-sessions]')).toBeNull()
+    expect(container.querySelector('[data-legacy-preview="proj-1"]')).toBeTruthy()
   })
 })

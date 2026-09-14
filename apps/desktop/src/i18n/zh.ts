@@ -2476,6 +2476,31 @@ export const zh: Translations = {
       failed: '无法归档工作区'
 
     },
+    agentBoxSession: {
+
+      loading: '正在加载 Session…',
+
+      empty: '这里还没有 AgentBox Session。',
+
+      menuActions: 'Session 操作',
+
+      menuRename: '重命名…',
+
+      menuPin: '置顶',
+
+      menuUnpin: '取消置顶',
+
+      pinned: '已置顶',
+
+      renameTitle: name => `重命名“${name}”`,
+
+      renameFailed: '无法重命名 Session',
+
+      pinFailed: '无法置顶 Session',
+
+      unpinFailed: '无法取消置顶 Session'
+
+    },
     gatewayGroups: {
       grouping: '网关与配置',
       rename: '重命名分组',

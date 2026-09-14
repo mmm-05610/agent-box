@@ -2035,6 +2035,21 @@ export interface Translations {
       desc: string
       failed: string
     }
+    /** The AgentBox SessionRecords inside a matched service workspace: the
+     *  honest states plus the `sessions.update` maintenance menu. */
+    agentBoxSession: {
+      loading: string
+      empty: string
+      menuActions: string
+      menuRename: string
+      menuPin: string
+      menuUnpin: string
+      pinned: string
+      renameTitle: (name: string) => string
+      renameFailed: string
+      pinFailed: string
+      unpinFailed: string
+    }
     gatewayGroups: {
       grouping: string
       rename: string

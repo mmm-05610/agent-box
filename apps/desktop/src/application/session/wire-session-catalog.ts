@@ -1,5 +1,5 @@
 import type { WireV1Client } from '@/api/wire-v1-client'
-import { $agentBoxSessions, upsertAgentBoxSession } from '@/store/agentbox-service'
+import { $agentBoxSessions, adoptAgentBoxSession, upsertAgentBoxSession } from '@/store/agentbox-service'
 import {
   asRequestId,
   asWireId,
@@ -15,7 +15,8 @@ export interface WireSessionCatalogOptions {
 const defaultRequestId = (): RequestId => asRequestId(`desktop-${crypto.randomUUID()}`)
 
 /** Merge a server page into the renderer cache; a partial page never erases
- * live records learned through another response or event. */
+ *  live records learned through another response or event, and a page entry
+ *  older than what we hold never rolls it back. */
 export async function refreshAgentBoxSessions(
   client: WireV1Client,
   input: { includeArchived?: boolean; workspaceId?: null | WireId } = {}
@@ -25,10 +26,10 @@ export async function refreshAgentBoxSessions(
     ...(input.workspaceId !== undefined ? { workspaceId: input.workspaceId } : {})
   })
 
-  const merged = { ...$agentBoxSessions.get() }
+  let merged = $agentBoxSessions.get()
 
   for (const session of result.items) {
-    merged[session.id] = session
+    merged = adoptAgentBoxSession(merged, session)
   }
 
   $agentBoxSessions.set(merged)

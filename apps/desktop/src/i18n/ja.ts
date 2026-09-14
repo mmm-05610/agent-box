@@ -1973,6 +1973,31 @@ export const ja = defineLocale({
       failed: 'ワークスペースをアーカイブできませんでした'
 
     },
+    agentBoxSession: {
+
+      loading: 'Session を読み込み中…',
+
+      empty: 'ここにはまだ AgentBox Session がありません。',
+
+      menuActions: 'Session 操作',
+
+      menuRename: '名前を変更…',
+
+      menuPin: 'ピン留め',
+
+      menuUnpin: 'ピン留めを解除',
+
+      pinned: 'ピン留め済み',
+
+      renameTitle: name => `「${name}」の名前を変更`,
+
+      renameFailed: 'Session の名前を変更できませんでした',
+
+      pinFailed: 'Session をピン留めできませんでした',
+
+      unpinFailed: 'Session のピン留めを解除できませんでした'
+
+    },
     gatewayGroups: {
       grouping: 'ゲートウェイとプロファイル',
       rename: 'グループ名を変更',

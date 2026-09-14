@@ -1913,6 +1913,31 @@ export const zhHant = defineLocale({
       failed: '無法封存工作區'
 
     },
+    agentBoxSession: {
+
+      loading: '正在載入 Session…',
+
+      empty: '這裡還沒有 AgentBox Session。',
+
+      menuActions: 'Session 操作',
+
+      menuRename: '重新命名…',
+
+      menuPin: '置頂',
+
+      menuUnpin: '取消置頂',
+
+      pinned: '已置頂',
+
+      renameTitle: name => `重新命名「${name}」`,
+
+      renameFailed: '無法重新命名 Session',
+
+      pinFailed: '無法置頂 Session',
+
+      unpinFailed: '無法取消置頂 Session'
+
+    },
     gatewayGroups: {
       grouping: '閘道與設定檔',
       rename: '重新命名群組',

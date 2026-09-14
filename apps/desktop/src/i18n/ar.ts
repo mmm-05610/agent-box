@@ -1618,6 +1618,19 @@ export const ar = defineLocale({
       desc: 'تؤرشف سجل مساحة العمل في الخدمة فقط. يبقى مدخل الشريط الجانبي والملفات وSession والسجل كما هي، ولا تُوقف المهام الجارية.',
       failed: 'تعذر أرشفة مساحة العمل'
     },
+    agentBoxSession: {
+      loading: 'جارٍ تحميل الجلسات…',
+      empty: 'لا توجد جلسات AgentBox هنا بعد.',
+      menuActions: 'إجراءات Session',
+      menuRename: 'إعادة تسمية…',
+      menuPin: 'تثبيت',
+      menuUnpin: 'إلغاء التثبيت',
+      pinned: 'مثبتة',
+      renameTitle: name => `إعادة تسمية «${name}»`,
+      renameFailed: 'تعذرت إعادة تسمية Session',
+      pinFailed: 'تعذر تثبيت Session',
+      unpinFailed: 'تعذر إلغاء تثبيت Session'
+    },
     gatewayGroups: {
       grouping: 'البوابة والملف الشخصي',
       rename: 'إعادة تسمية المجموعة',

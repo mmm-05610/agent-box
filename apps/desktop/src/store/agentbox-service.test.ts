@@ -1,11 +1,20 @@
 import { describe, expect, it } from 'vitest'
 
-import { asWireId, type ServerHelloResult, WIRE_PROTOCOL_VERSION, type WorkspaceRecord } from '@/types/wire/wire-v1'
+import {
+  asWireId,
+  type ServerHelloResult,
+  type SessionRecord,
+  WIRE_PROTOCOL_VERSION,
+  type WorkspaceRecord
+} from '@/types/wire/wire-v1'
 
 import {
+  $agentBoxSessions,
   $agentBoxWorkspaces,
+  adoptAgentBoxSession,
   agentBoxCapabilitySupported,
   agentBoxQueueControlsAvailable,
+  upsertAgentBoxSession,
   upsertAgentBoxWorkspace
 } from './agentbox-service'
 
@@ -37,6 +46,66 @@ describe('AgentBox service capability projection', () => {
     expect(agentBoxQueueControlsAvailable(hello(true), undefined)).toBe(false)
     expect(agentBoxQueueControlsAvailable(hello(false), 'server')).toBe(false)
     expect(agentBoxQueueControlsAvailable(hello(true), 'server')).toBe(true)
+  })
+})
+
+const sessionRecord = (overrides: Partial<SessionRecord> = {}): SessionRecord => ({
+  archivedAt: null,
+  createdAt: '2026-09-14T00:00:00.000Z',
+  displayName: 'Session',
+  id: asWireId('session-1'),
+  pinned: false,
+  profileId: null,
+  updatedAt: '2026-09-14T00:00:00.000Z',
+  version: 1,
+  workspaceId: asWireId('workspace-1'),
+  ...overrides
+})
+
+describe('AgentBox Session cache (version-monotonic adoption)', () => {
+  it('keeps the newer record when a stale answer arrives after it', () => {
+    const newest = sessionRecord({ displayName: 'Newest', version: 7 })
+
+    expect(adoptAgentBoxSession({ 'session-1': newest }, sessionRecord({ version: 6 }))).toEqual({
+      'session-1': newest
+    })
+  })
+
+  it('adopts the service value on the same or a higher version', () => {
+    const normalized = sessionRecord({ displayName: 'Normalized', version: 7 })
+
+    expect(adoptAgentBoxSession({}, normalized)).toEqual({ 'session-1': normalized })
+    // An equal version is still the service's word: its normalized fields win.
+    expect(adoptAgentBoxSession({ 'session-1': sessionRecord({ version: 7 }) }, normalized)).toEqual({
+      'session-1': normalized
+    })
+  })
+
+  it('keeps other ids intact while one id rolls back', () => {
+    const newer = sessionRecord({ id: asWireId('session-2'), version: 9 })
+
+    expect(
+      adoptAgentBoxSession(
+        {
+          'session-1': sessionRecord({ version: 7 }),
+          'session-2': newer
+        },
+        sessionRecord({ id: asWireId('session-2'), version: 8 })
+      )
+    ).toEqual({
+      'session-1': sessionRecord({ version: 7 }),
+      'session-2': newer
+    })
+  })
+
+  it('upserts a fresh record into the store without erasing the rest', () => {
+    $agentBoxSessions.set({ 'session-live': sessionRecord({ id: asWireId('session-live'), version: 5 }) })
+
+    upsertAgentBoxSession(sessionRecord({ displayName: 'Renamed', version: 2 }))
+
+    expect($agentBoxSessions.get()['session-1']?.displayName).toBe('Renamed')
+    expect($agentBoxSessions.get()['session-live']?.version).toBe(5)
+    $agentBoxSessions.set({})
   })
 })
 

@@ -2313,6 +2313,32 @@ export const en: Translations = {
       failed: 'Workspace could not be archived'
 
     },
+
+    agentBoxSession: {
+
+      loading: 'Loading sessions…',
+
+      empty: 'No AgentBox sessions here yet.',
+
+      menuActions: 'Session actions',
+
+      menuRename: 'Rename…',
+
+      menuPin: 'Pin',
+
+      menuUnpin: 'Unpin',
+
+      pinned: 'Pinned',
+
+      renameTitle: name => `Rename “${name}”`,
+
+      renameFailed: 'Session could not be renamed',
+
+      pinFailed: 'Session could not be pinned',
+
+      unpinFailed: 'Session could not be unpinned'
+
+    },
     gatewayGroups: {
       grouping: 'Gateway & profile',
       rename: 'Rename group',

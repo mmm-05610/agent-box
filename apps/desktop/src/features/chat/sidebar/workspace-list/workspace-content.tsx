@@ -6,15 +6,29 @@ import type { WorkspaceListItem } from '@/types/workspace'
 /**
  * The body a workspace row reveals when it expands (36R):
  *
- * - LOCAL workspaces render their session tree — the rows arrive as a prop
- *   from the existing session renderer, so the tree rendering is REUSED, not
- *   rewritten, and this component never learns how sessions are drawn.
- * - WSL workspaces render the honest unavailable prompt: sessions in WSL
- *   workspaces are not wired in this round, and no Hermes session is created
- *   behind the user's back.
+ * - A matched AgentBox service Workspace OWNS the body: its Session records
+ *   render there (loading, empty and rows alike) — never a legacy fallback.
+ * - LOCAL workspaces without one render their session tree — the rows arrive
+ *   as a prop from the existing session renderer, so the tree rendering is
+ *   REUSED, not rewritten, and this component never learns how sessions are
+ *   drawn.
+ * - WSL workspaces the service does not know render the honest unavailable
+ *   prompt: no Hermes session is created behind the user's back.
  */
-export function WorkspaceContent({ item, sessionContent }: { item: WorkspaceListItem; sessionContent?: React.ReactNode }) {
+export function WorkspaceContent({
+  agentBoxContent,
+  item,
+  sessionContent
+}: {
+  agentBoxContent?: React.ReactNode
+  item: WorkspaceListItem
+  sessionContent?: React.ReactNode
+}) {
   const { t } = useI18n()
+
+  if (agentBoxContent) {
+    return <>{agentBoxContent}</>
+  }
 
   if (item.backend === 'local') {
     return sessionContent ? <>{sessionContent}</> : null
