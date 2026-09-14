@@ -137,9 +137,10 @@ def test_a_harness_definition_produces_the_canonical_declaration_view():
         for capability_id, item in by_id.items():
             assert item["declared"] is (capability_id in definition.capabilities)
             assert item["scope"] == caps.CAPABILITY_SCOPES[capability_id]
-            # An unobserved semantic ability is never promoted by declaration alone.
-            if capability_id in caps.SEMANTIC_CAPABILITIES:
-                assert item["supported"] is False
-                assert item["reason"] in {caps.CAPABILITY_NOT_OBSERVED, caps.CAPABILITY_NOT_DECLARED}
-            else:
-                assert item["supported"] is item["declared"]
+            # No ability is promoted by its declaration alone: the static view
+            # reports the declared ceiling and every unobserved entry as unsupported.
+            assert item["observed"] is None
+            assert item["supported"] is False
+            expected = (caps.CAPABILITY_NOT_OBSERVED if item["declared"]
+                        else caps.CAPABILITY_NOT_DECLARED)
+            assert item["reason"] == expected, (capability_id, item)

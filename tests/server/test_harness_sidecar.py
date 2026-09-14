@@ -1942,3 +1942,96 @@ def test_release_worker_refuses_a_runtime_artifact_tree_that_drifted(
     finally:
         runtime.stop()
     _await_worker_projection_cleanup(tmp_path / "worker-root")
+
+
+def test_stopping_the_runtime_waits_for_its_durable_completion_workers(tmp_path):
+    """A stopped runtime leaves no completion worker writing the shared database.
+
+    `_complete` runs on its own thread and goes through the shared Work Core
+    connection after the prompt worker finished. Returning from `stop()` while it
+    is still inside that connection lets the next shutdown - or the next test -
+    reset it underneath the thread, which crashed the interpreter inside SQLite.
+    """
+    runtime = _local_sidecar_runtime(tmp_path)
+    try:
+        with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
+            opened = _wire_post(client, runtime.token, "workspaces.open", {
+                "requestId": "lifetime-open", "path": str(tmp_path),
+                "environment": {"kind": "wsl", "host": "Ubuntu", "user": None},
+            })["workspace"]
+            profile = client.post("/api/v1/profiles", headers={
+                "Authorization": f"Bearer {runtime.token}",
+                "Idempotency-Key": "lifetime-profile",
+            }, json={"name": "lifetime", "harness_type": "pi", "configuration": {},
+                     "credential_id": None}).json()
+            sent = _wire_post(client, runtime.token, "sessions.createAndSend", {
+                "requestId": "lifetime-send", "workspaceId": opened["id"],
+                "profileId": profile["profile_id"], "overrides": [],
+                "message": {"text": "durable completion", "attachments": []},
+            })
+            session_id = sent["session"]["id"]
+            deadline = time.monotonic() + 20
+            while time.monotonic() < deadline:
+                session = runtime.repository.get_session(session_id)
+                if session["turns"] and session["turns"][0]["state"] == "completed":
+                    break
+                time.sleep(0.05)
+            assert session["turns"][0]["state"] == "completed"
+
+        assert runtime.execution.stop() is True
+        surviving = [
+            thread for thread in threading.enumerate()
+            if "_complete" in (getattr(getattr(thread, "_target", None), "__qualname__", "") or "")
+        ]
+        assert surviving == [], f"a completion worker outlived stop(): {surviving}"
+        assert runtime.execution._completion_threads == set()
+    finally:
+        runtime.stop()
+
+
+def test_stop_blocks_until_a_live_completion_worker_finishes():
+    """The wait itself is the contract, not the absence of a rare race."""
+    backend = SidecarExecutionBackend(
+        records=None, objects=None, approvals=None, port_factory=lambda *_: None,
+    )
+    started_running = threading.Event()
+
+    def tail():
+        started_running.set()
+        time.sleep(0.6)
+
+    worker = threading.Thread(target=tail, daemon=True)
+    with backend._lock:
+        backend._completion_threads.add(worker)
+    worker.start()
+    assert started_running.wait(2)
+
+    started = time.monotonic()
+    assert backend.stop() is True
+    waited = time.monotonic() - started
+    assert waited >= 0.4, f"stop() returned while a completion worker was running ({waited:.2f}s)"
+    assert not worker.is_alive()
+    assert backend._completion_threads == set()
+
+
+def test_stop_reports_honestly_when_a_completion_worker_outlasts_the_deadline(monkeypatch):
+    """No silent success: a worker that will not settle makes stop() return False."""
+    backend = SidecarExecutionBackend(
+        records=None, objects=None, approvals=None, port_factory=lambda *_: None,
+    )
+    monkeypatch.setattr(type(backend), "STOP_DEADLINE_SECONDS", 0.3)
+    release = threading.Event()
+
+    def tail():
+        release.wait(5)
+
+    worker = threading.Thread(target=tail, daemon=True)
+    with backend._lock:
+        backend._completion_threads.add(worker)
+    worker.start()
+    try:
+        assert backend.stop() is False
+    finally:
+        release.set()
+        worker.join(2)
+        assert not worker.is_alive()

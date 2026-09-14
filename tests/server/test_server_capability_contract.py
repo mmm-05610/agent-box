@@ -106,9 +106,8 @@ def test_canonical_capabilities_returns_a_validated_canonical_snapshot():
     # true / false → 原生明确否掉
     ({"stream": True}, {"stream": False}, "stream", False,
      caps.CAPABILITY_OBSERVED_UNSUPPORTED),
-    # true / 未观测，实现级 → 按声明取用
-    ({"stream": True}, {}, "stream", True, None),
-    # true / 未观测，语义级 → 保守 false
+    # true / 未观测 → 一律不支持（实现级也一样：分类只说明证据从哪来，不代替观测）
+    ({"stream": True}, {}, "stream", False, caps.CAPABILITY_NOT_OBSERVED),
     ({"native_continuation": True}, {}, "native_continuation", False,
      caps.CAPABILITY_NOT_OBSERVED),
     # false / true → fail closed，不得抬高产品能力
@@ -136,6 +135,8 @@ def test_merge_produces_every_canonical_id_and_keeps_supported_implies_declared(
     assert tuple(item.id for item in declarations) == caps.CANONICAL_CAPABILITY_IDS
     for item in declarations:
         assert item.supported <= item.declared, item
+        # 唯一规则：supported == declared and observed is True
+        assert item.supported is (item.declared is True and item.observed is True), item
         assert item.scope == caps.CAPABILITY_SCOPES[item.id]
         if not item.declared:
             assert item.supported is False
@@ -182,8 +183,12 @@ def test_descriptor_validates_claims_at_construction_and_registry_exposes_canoni
     assert registry.canonical_claims("alpha") == {"stream": True}
     by_id = {item["id"]: item for item in registry.capability_view("alpha")["capabilities"]}
     assert set(by_id) == set(caps.CANONICAL_CAPABILITY_IDS)
-    assert by_id["stream"]["supported"] is True
-    # 语义级能力不会因为被声明就变成 supported
+    # 静态视图只报 declared 候选：没有运行观测，任何能力都不得报 supported
+    assert by_id["stream"]["declared"] is True
+    assert by_id["stream"]["observed"] is None
+    assert by_id["stream"]["supported"] is False
+    assert by_id["stream"]["reason"] == caps.CAPABILITY_NOT_OBSERVED
+    # 语义级能力同样不会因为被声明就变成 supported
     assert by_id["native_continuation"]["reason"] == caps.CAPABILITY_NOT_DECLARED
     declarations = registry.capability_declarations("alpha")
     assert tuple(item.id for item in declarations) == caps.CANONICAL_CAPABILITY_IDS

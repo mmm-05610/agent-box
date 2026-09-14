@@ -40,8 +40,9 @@ CAPABILITY_SCOPES: dict[str, str] = {
     "permissions": "execution", "native_continuation": "session",
 }
 
-#: 实现级能力：已注册且被真实调用的 sidecar/driver 操作合同**就是**它的观测来源；
-#: 没有更强证据时按静态声明取用（不会超过静态上限）。
+#: 实现级能力：观测来源是"已注册且被真实调用的 sidecar/driver 操作"（拿到原生会话
+#: 身份、prompt 返回、首条真实增量）。**未观测仍然是不支持**——本分类只说明证据从哪来，
+#: 不允许把声明当成观测。
 IMPLEMENTATION_LEVEL_CAPABILITIES = frozenset({"start", "observe", "finish", "stream"})
 
 #: 语义级能力：必须有显式运行时证据才 supported；未观测一律 false（保守）。
@@ -221,18 +222,26 @@ def merge_capabilities(
 ) -> tuple[CapabilityDeclaration, ...]:
     """按合并规则产出 canonical 视图（按 id 顺序，含 false 项）。
 
-    合并规则（逐条可测）：
+    唯一规则（逐条可测）：
+
+        supported == (declared is true and observed is true)
 
     ====================  ====================  =========  ===================================================
     declared               observed              supported  reason
     ====================  ====================  =========  ===================================================
     true                  true                  true       None
     true                  false                 false      CAPABILITY_OBSERVED_UNSUPPORTED
-    true                  None（实现级）         true       None
-    true                  None（语义级）         false      CAPABILITY_NOT_OBSERVED
+    true                  None                  false      CAPABILITY_NOT_OBSERVED
     false                 true                  false      CAPABILITY_CONFLICT_OBSERVED_WITHOUT_DECLARATION
     false                 false / None          false      CAPABILITY_NOT_DECLARED
     ====================  ====================  =========  ===================================================
+
+    **未观测不等于支持。** ``IMPLEMENTATION_LEVEL_CAPABILITIES`` /
+    ``SEMANTIC_CAPABILITIES`` 只规定"观测从哪里来、需要多强的证据"，绝不代替观测本身：
+    实现级能力的观测来自已注册且被真实调用的 sidecar/driver 操作（拿到原生会话身份、
+    prompt 返回、首条真实增量），语义级能力还要求各自的原生证据（`attach` 的
+    prompt 能力、`permissions` 的真实 round-trip、`native_continuation` 的
+    `sessionCapabilities.resume`）。没有观测就是 `CAPABILITY_NOT_OBSERVED`。
 
     未出现在 ``declared`` 里的 id 视作 false：运行时观测只能被静态声明“确认”，不能把
     产品能力抬高到声明之外（fail closed）。
@@ -248,12 +257,8 @@ def merge_capabilities(
             supported, reason = True, None
         elif is_declared and observation is False:
             supported, reason = False, CAPABILITY_OBSERVED_UNSUPPORTED
-        elif is_declared:  # 声明了但本次没有观测
-            if capability_id in IMPLEMENTATION_LEVEL_CAPABILITIES:
-                # 实现级：操作合同已注册且被真实调用，没有再强的证据可要。
-                supported, reason = True, None
-            else:
-                supported, reason = False, CAPABILITY_NOT_OBSERVED
+        elif is_declared:  # 声明了但本次没有观测：不得因为"属于实现级"就假装支持
+            supported, reason = False, CAPABILITY_NOT_OBSERVED
         elif observation is True:
             supported, reason = False, CAPABILITY_CONFLICT_OBSERVED_WITHOUT_DECLARATION
         else:

@@ -35,6 +35,10 @@ class _Run:
     cancel_confirmed: bool = False
     result: Mapping[str, Any] | None = None
     error: BaseException | None = None
+    #: The worker that persists the durable turn result. It outlives the prompt
+    #: worker by design, so a runtime is only really stopped once it is done:
+    #: the Work Core connection is shared and is not safe to use after shutdown.
+    completion_thread: threading.Thread | None = None
 
 
 class _BoundResources:
@@ -79,6 +83,20 @@ class _CoreSidecarProvider:
         return ProviderDescriptor(self.provider_id, "Harness sidecar execution", "1")
 
     def capabilities(self):
+        """Work Core execution-provider operation contract (NOT Harness abilities).
+
+        This mapping belongs to the Work Core SPI: `ExtensionRegistry.require_capability`
+        reads it to decide whether a provider may be asked for an operation, and its
+        keys are Work Core operation names (`streaming`, `cancel`, `approvals`).
+
+        The Harness capability contract is a *different* namespace with a different
+        question ("what can this harness do, as declared and observed?"), and the
+        two must never be projected into one another: these keys are not canonical
+        abilities, they must not reach a Profile view, a Session/execution effective
+        capability view, `server.hello` or a deployment's `capabilityClaims`, and a
+        canonical ability must not be invented here. `test_capability_namespace_boundary.py`
+        fails if that separation is broken.
+        """
         return {"streaming": "supported", "cancel": "supported", "approvals": "supported"}
 
     def input_limits(self):
@@ -142,6 +160,11 @@ class SidecarExecutionBackend:
         self._turn_by_core: dict[str, str] = {}
         self._contexts: dict[str, Mapping[str, Any]] = {}
         self._active: dict[str, _Run] = {}
+        #: Completion workers still running. A run is retired from `_active` when
+        #: its durable result is written, but the worker itself may still be
+        #: finishing; stopping must wait for every live one, so they are tracked
+        #: here rather than only on the run.
+        self._completion_threads: set[threading.Thread] = set()
         self._approval_ports: dict[str, SidecarHarnessPort] = {}
         self._message_parts: dict[str, list[str]] = {}
         self._lock = threading.RLock()
@@ -208,7 +231,12 @@ class SidecarExecutionBackend:
             with self._lock:
                 self._active[turn_id] = run
             self.on_event()
-            threading.Thread(target=self._complete, args=(run,), daemon=True).start()
+            run.completion_thread = threading.Thread(
+                target=self._complete_then_retire, args=(run,), daemon=True,
+            )
+            with self._lock:
+                self._completion_threads.add(run.completion_thread)
+            run.completion_thread.start()
         except BaseException as exc:
             self.records.fail_turn(turn_id, _safe_code(exc), queue_records=self.queue)
             self.resources.release(turn_id)
@@ -394,6 +422,14 @@ class SidecarExecutionBackend:
                 # any still-pending items; the completed predecessor stays final.
                 pass
 
+    def _complete_then_retire(self, run: "_Run") -> None:
+        """Run the durable completion and stop being a live worker afterwards."""
+        try:
+            self._complete(run)
+        finally:
+            with self._lock:
+                self._completion_threads.discard(threading.current_thread())
+
     def cancel(self, turn_id: str) -> bool:
         with self._lock:
             run = self._active.get(turn_id)
@@ -405,15 +441,33 @@ class SidecarExecutionBackend:
                 run.cancel_confirmed = True
             return accepted
 
+    #: How long `stop()` waits for prompts and durable completions to settle.
+    STOP_DEADLINE_SECONDS = 15.0
+
     def stop(self) -> bool:
         with self._lock:
             runs = list(self._active.values())
         for run in runs:
             self.cancel(run.turn_id)
-        deadline = time.monotonic() + 15
+        deadline = time.monotonic() + self.STOP_DEADLINE_SECONDS
         for run in runs:
             run.done.wait(max(0, deadline - time.monotonic()))
-        return all(run.done.is_set() for run in runs)
+        # The prompt worker finishing is not the end of the turn: the completion
+        # worker still writes the durable result through the shared Work Core
+        # connection. Returning before it finishes let a later shutdown (or the
+        # next test) reset that connection underneath it, which crashed the
+        # interpreter inside SQLite. Wait for it, bounded, and report honestly.
+        for thread in list(self._completion_threads):
+            thread.join(max(0, deadline - time.monotonic()))
+        prompts_done = all(run.done.is_set() for run in runs)
+        with self._lock:
+            # Keep the set meaning "workers still running": a finished worker is
+            # retired here even if it was not started through the wrapper.
+            self._completion_threads = {
+                thread for thread in self._completion_threads if thread.is_alive()
+            }
+            completions_done = not self._completion_threads
+        return prompts_done and completions_done
 
 
 def _sidecar_attachments(
