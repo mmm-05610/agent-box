@@ -8,14 +8,14 @@
  */
 
 import { useStore } from '@nanostores/react'
-import { type ComponentProps, lazy, memo, type ReactNode, Suspense, useMemo } from 'react'
+import { type ComponentProps, memo, type ReactNode, Suspense, useMemo } from 'react'
 import { Navigate, Route, Routes, useParams } from 'react-router'
 
-import { setStatusbarItemGroup, useStatusbarContributions } from '@/app/composition/registrations/chrome-contributions'
+import { useStatusbarContributions } from '@/app/composition/registrations/chrome-contributions'
 import { useStatusbarItems } from '@/app/composition/registrations/statusbar-items'
 import { latestChatActions, latestSidebarActions } from '@/app/composition/wiring/latest-actions'
 import type { SidebarActions, WiringActions } from '@/app/composition/wiring/types'
-import { contributedRoutes, NEW_CHAT_ROUTE, ROUTES_AREA, sessionRoute } from '@/app/routes'
+import { contributedRoutes, NEW_CHAT_ROUTE, ROUTES_AREA, sessionRoute, SETTINGS_ROUTE } from '@/app/routes'
 import { StatusbarControls } from '@/app/shell/chrome/statusbar/statusbar-controls'
 import { ContribBoundary, ContribRender } from '@/extension/contrib/react/boundary'
 import { useContributions } from '@/extension/contrib/react/use-contributions'
@@ -32,8 +32,6 @@ import { $freshDraftReady, $gatewayState } from '@/store/session'
 // Same lazy-view split as DesktopController — pages load on demand. The
 // full-page views the workspace route table mounts live here; overlay views
 // (agents/settings/…) are the controller's and stay in wiring.tsx.
-const SkillsView = lazy(async () => ({ default: (await import('@/features/skills')).SkillsView }))
-
 export function LegacySessionRedirect() {
   const { sessionId } = useParams()
 
@@ -163,7 +161,7 @@ export const ChatRoutesSurface = memo(function ChatRoutesSurface({
     <Routes>
       <Route element={chatView} index />
       <Route element={chatView} path=":sessionId" />
-      <Route element={page(<SkillsView setStatusbarItemGroup={setStatusbarItemGroup} />)} path="skills" />
+      <Route element={<Navigate replace to={`${SETTINGS_ROUTE}?tab=product:resources`} />} path="skills" />
       <Route element={null} path="agents" />
       <Route element={null} path="command-center" />
       <Route element={null} path="cron" />

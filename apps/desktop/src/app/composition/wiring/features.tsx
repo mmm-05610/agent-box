@@ -90,7 +90,6 @@ import {
 import { useSessionTileDelegate } from '@/features/session/tiles/use-session-tile-delegate'
 import { startWorkspaceSession } from '@/features/session/workspace-session-target'
 import { PluginInstallModal } from '@/features/settings/plugin-install-modal'
-import { McpInstallDeepLinkDialog } from '@/features/skills/mcp-install-deeplink-dialog'
 import { UpdatesOverlay } from '@/features/updates/updates-overlay'
 import { type ChatMessage, chatMessageText, preserveLocalAssistantErrors, toChatMessages } from '@/lib/chat-messages'
 import { formatRefValue } from '@/lib/format-ref-value'
@@ -1144,7 +1143,6 @@ export function ContribWiring({ children }: { children: ReactNode }) {
       <PetGenerateOverlay />
       <SessionSwitcher />
       <FileActionDialogs />
-      <McpInstallDeepLinkDialog />
       <RemoteFolderPicker />
       <FindBar />
 

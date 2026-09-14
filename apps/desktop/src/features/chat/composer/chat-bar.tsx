@@ -41,7 +41,7 @@ import { Slot as ContribSlot } from '@/extension/contrib/react/slot'
 import { useTourMarker } from '@/features/chat/tour-marker'
 import { useI18n } from '@/i18n'
 import { chatMessageText } from '@/lib/chat-messages'
-import { PR_COMMENT_URL_RE } from '@/lib/chat-runtime'
+import { PR_COMMENT_URL_RE, SLASH_COMMAND_RE } from '@/lib/chat-runtime'
 import { sanitizeComposerInput } from '@/lib/composer-input-sanitize'
 import { COMPOSER_DROP_ACTIVE_CLASS, COMPOSER_DROP_FADE_CLASS } from '@/lib/composer/drop-affordance'
 import { useEmojiCompletions } from '@/lib/composer/hooks/use-emoji-completions'
@@ -51,6 +51,7 @@ import { DATA_IMAGE_URL_RE } from '@/lib/embedded-images'
 import { triggerHaptic } from '@/lib/haptics'
 import { useStoresSelector } from '@/lib/use-session-slice'
 import { cn } from '@/lib/utils'
+import { $agentBoxHello, agentBoxQueueControlsAvailable } from '@/store/agentbox-service'
 import { sessionCompacting } from '@/store/compaction'
 import { browseBackward, browseForward, deriveUserHistory, isBrowsingHistory } from '@/store/composer-input-history'
 import { POPOUT_WIDTH_REM } from '@/store/composer-popout'
@@ -152,6 +153,8 @@ export function ChatBar({
   // undelivered behind the blocked tool batch). Drives the button affordance.
   const blockingPrompt = useStore(useMemo(() => sessionBlockingPrompt(sessionId ?? null), [sessionId]))
   const activeQueueSessionKey = queueSessionKey || sessionId || draftScopeKey || null
+  const serverQueueSupported = agentBoxQueueControlsAvailable(useStore($agentBoxHello), state.queue?.authority)
+  const queueAuthorityKey = serverQueueSupported ? activeQueueSessionKey : null
 
   // Status items (subagents, background processes) are keyed by the RUNTIME
   // session id — gateway events and process.list both speak that id. Only the
@@ -281,7 +284,7 @@ export function ChatBar({
     steerQueuedNow,
     stepQueuedEdit
   } = useComposerQueue({
-    activeQueueSessionKey,
+    activeQueueSessionKey: queueAuthorityKey,
     attachments,
     busy,
     clearDraft,
@@ -292,7 +295,7 @@ export function ChatBar({
     onSteer,
     onSubmit,
     queueEditRef,
-    queueSessionKey,
+    queueSessionKey: serverQueueSupported ? queueSessionKey : null,
     sessionId
   })
 
@@ -307,10 +310,10 @@ export function ChatBar({
   // busy) call the raw onCancel and keep draining on settle. Parked entries
   // stay in the panel until resumed, sent, edited, or deleted.
   const haltRun = useCallback(() => {
-    parkQueuedPrompts(activeQueueSessionKeyRef.current)
+    parkQueuedPrompts(queueAuthorityKey)
 
     return onCancel()
-  }, [activeQueueSessionKeyRef, onCancel])
+  }, [onCancel, queueAuthorityKey])
 
   const { compactPill, minimal, stacked } = useComposerMetrics({
     composerDockRef,
@@ -321,7 +324,6 @@ export function ChatBar({
   })
 
   const hasComposerPayload = hasText || attachments.length > 0
-  const canSubmit = busy || hasComposerPayload
 
   // Steer only makes sense mid-turn, text-only (the gateway can't carry images
   // into a tool result) and never for a slash command (those execute inline).
@@ -329,18 +331,25 @@ export function ChatBar({
   // is parked on the user, so a steer can't reach the model — text queues.
   const canSteer = busy && !compacting && !blockingPrompt && !!onSteer && attachments.length === 0 && isSteerableText
 
+  const canSubmit = busy
+    ? !hasComposerPayload ||
+      canSteer ||
+      serverQueueSupported ||
+      (attachments.length === 0 && SLASH_COMMAND_RE.test(draftRef.current))
+    : hasComposerPayload
+
   // While busy: text redirects the live turn (Cursor-style stop-and-correct),
   // attachments queue for the next turn, an empty composer stops.
   const busyAction: 'steer' | 'queue' | 'stop' = canSteer
     ? 'steer'
-    : compacting || hasComposerPayload
+    : serverQueueSupported && (compacting || hasComposerPayload)
       ? 'queue'
       : 'stop'
 
   // The submit engine — the orchestration seam where draft + queue meet. Owns
   // the submit decision tree, the send-with-restore primitive, and steer.
   const { queueDraft, steerDraft, submitDraft } = useComposerSubmit({
-    activeQueueSessionKey,
+    activeQueueSessionKey: queueAuthorityKey,
     activeQueueSessionKeyRef,
     attachments,
     busy,

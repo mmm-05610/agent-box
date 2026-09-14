@@ -453,6 +453,38 @@ export const en: Translations = {
       notifications: 'Notifications',
       plugins: 'Plugins'
     },
+    product: {
+      unavailable: 'Not available yet',
+      unavailableDescription:
+        'Controls appear only after the AgentBox service declares the matching capability. Desktop does not fall back to legacy Hermes settings or pretend a local change was saved.',
+      scope: 'Product scope',
+      boundary: 'Safety boundary',
+      models: {
+        title: 'Models',
+        description: 'Configure model defaults and model slots declared by the service.',
+        boundary: 'Model fields come from service descriptors; Desktop does not hard-code provider or Harness options.'
+      },
+      resources: {
+        title: 'Skills & MCP',
+        description: 'Manage a shared resource library, then explicitly select resources on each Profile.',
+        boundary: 'Discovery never auto-enables a resource, and adding MCP configuration does not start it.'
+      },
+      identities: {
+        title: 'Identities',
+        description: 'Manage named logins and API-key identities without requiring an AgentBox account for local use.',
+        boundary: 'Credentials remain service-owned and are excluded from ordinary configuration and backups.'
+      },
+      harnesses: {
+        title: 'Harnesses',
+        description: 'Install and update supported Harnesses on this computer only.',
+        boundary: 'Workspace connections and remote targets stay with each Workspace; Desktop never invents install commands.'
+      },
+      data: {
+        title: 'Data management',
+        description: 'Back up app configuration, sessions, drafts, Profile memory, and managed resources.',
+        boundary: 'Credentials, project files, and downloadable tools are excluded; restore requires a compatible service contract.'
+      }
+    },
     plugins: {
       title: 'Desktop plugins',
       blurb: 'Bundled or dropped into the desktop-plugins folder. Disable to unload live.',

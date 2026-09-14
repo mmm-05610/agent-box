@@ -22,6 +22,17 @@ export const $agentBoxProfiles = atom<ProfileRecord[]>([])
 export const $agentBoxSessions = atom<Record<string, SessionRecord>>({})
 export const $draftConfigStates = atom<Record<string, DraftConfigState>>({})
 
+export function agentBoxCapabilitySupported(hello: ServerHelloResult | null, capabilityId: string): boolean {
+  return hello?.capabilities.some(capability => capability.id === capabilityId && capability.supported) ?? false
+}
+
+export function agentBoxQueueControlsAvailable(
+  hello: ServerHelloResult | null,
+  authority: 'server' | undefined
+): boolean {
+  return authority === 'server' && agentBoxCapabilitySupported(hello, 'queue')
+}
+
 export function setDraftConfigState(scope: string, state: DraftConfigState): void {
   $draftConfigStates.set({ ...$draftConfigStates.get(), [scope]: state })
 }

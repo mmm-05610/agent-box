@@ -343,6 +343,38 @@ export const ja = defineLocale({
       billing: '請求',
       notifications: '通知'
     },
+    product: {
+      unavailable: '現在は利用できません',
+      unavailableDescription:
+        'AgentBox サービスが対応機能を宣言した場合にのみ操作を表示します。Desktop は旧 Hermes 設定へフォールバックせず、ローカル変更を保存済みとして扱いません。',
+      scope: '製品範囲',
+      boundary: '安全境界',
+      models: {
+        title: 'モデル',
+        description: 'サービスが宣言するモデル既定値とモデルスロットを設定します。',
+        boundary: 'モデル項目はサービス記述から取得し、Desktop はプロバイダーや Harness を固定しません。'
+      },
+      resources: {
+        title: 'Skills と MCP',
+        description: '共有リソースライブラリを管理し、各 Profile で明示的に選択します。',
+        boundary: '検出だけでは有効化されず、MCP 設定の追加だけでは起動しません。'
+      },
+      identities: {
+        title: 'ID',
+        description: '名前付きログインと API キー ID を管理します。ローカル利用に AgentBox アカウントは不要です。',
+        boundary: '認証情報はサービスが所有し、通常設定とバックアップから除外します。'
+      },
+      harnesses: {
+        title: 'Harness',
+        description: 'このコンピューター上の対応 Harness のみをインストール、更新します。',
+        boundary: 'Workspace 接続とリモート対象は各 Workspace が所有し、Desktop はインストールコマンドを作りません。'
+      },
+      data: {
+        title: 'データ管理',
+        description: 'アプリ設定、セッション、下書き、Profile メモリ、管理対象リソースをバックアップします。',
+        boundary: '認証情報、プロジェクトファイル、再取得可能なツールは除外し、復元には互換サービス契約が必要です。'
+      }
+    },
     notifications: {
       title: '通知',
       intro: 'アプリ内トーストとは別の、ネイティブのデスクトップ通知です。設定は端末ごとに保存されます。',

@@ -6,7 +6,6 @@ import { Dialog as DialogPrimitive } from 'radix-ui'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 
-import { getHermesConfigRecord } from '@/api/config'
 import { SESSION_IMPORT_ROUTE } from '@/app/routes'
 import {
   AGENTS_ROUTE,
@@ -16,7 +15,6 @@ import {
   NEW_CHAT_ROUTE,
   PROFILES_ROUTE,
   SETTINGS_ROUTE,
-  SKILLS_ROUTE,
   STARMAP_ROUTE
 } from '@/app/routes'
 import { usePaletteContributions } from '@/app/shell/layers/command-palette/contrib'
@@ -34,7 +32,6 @@ import { openSession, openSessionIntentFromModifiers } from '@/application/sessi
 import { codiconIcon } from '@/components/ui/codicon'
 import { Command, CommandInput, CommandList } from '@/components/ui/command'
 import { PetInlineToggle, PetPalettePage } from '@/features/pet-generate/command-palette/pet-palette-page'
-import { SECTIONS } from '@/features/settings/constants'
 import { type SettingsSearchEntry, settingsSearchTargetQuery } from '@/features/settings/settings-search'
 import { useSettingsSearchCatalog } from '@/features/settings/use-settings-search'
 import { MarketplaceThemePage } from '@/features/theme/command-palette/marketplace-theme-page'
@@ -56,21 +53,17 @@ import {
   Download,
   Egg,
   GitBranch,
-  Layers3,
   MessageCircle,
   Palette,
   PawPrint,
   Plus,
   RefreshCw,
   Settings,
-  SlidersHorizontal,
   Starmap,
   Sun,
   Users,
-  Wrench,
   Zap
 } from '@/lib/icons'
-import { getServers } from '@/lib/mcp-servers'
 import { cn } from '@/lib/utils'
 import { resolveVersionStatus } from '@/lib/version-status'
 import { $repoWorktrees } from '@/store/coding-status'
@@ -207,31 +200,12 @@ export function CommandPaletteBody({ onExited }: { onExited: () => void }) {
     }
   }, [])
 
-  // Server-backed sources for the type-to-search groups. This component only
-  // exists while the palette is open, so the queries are inherently lazy — no
-  // `enabled` gate needed. react-query handles caching/dedup/staleness, so a
-  // reopen paints from cache and revalidates in the background.
-  const configQuery = useQuery({
-    queryKey: ['command-palette', 'config'],
-    queryFn: () => getHermesConfigRecord()
-  })
-
   const sessionsQuery = useQuery({
     queryKey: ['command-palette', 'sessions'],
     queryFn: () => listAllProfileSessions(200, 1, 'exclude')
   })
 
-  const archivedQuery = useQuery({
-    queryKey: ['command-palette', 'archived'],
-    queryFn: () => listAllProfileSessions(200, 0, 'only')
-  })
-
-  // getServers is the shared choke point that also drops malformed (null/
-  // scalar) entries, so the palette never lists a server the MCP tab dropped.
-  const mcpServers = useMemo(() => Object.keys(getServers(configQuery.data ?? null)).sort(), [configQuery.data])
-
   const sessions = useMemo(() => (sessionsQuery.data?.sessions ?? []).map(toSessionEntry), [sessionsQuery.data])
-  const archivedSessions = useMemo(() => (archivedQuery.data?.sessions ?? []).map(toSessionEntry), [archivedQuery.data])
 
   // Search/sub-page are local to a mount, and this component remounts per open
   // (keyed by open count), so each open starts clean without a reset effect.
@@ -282,9 +256,10 @@ export function CommandPaletteBody({ onExited }: { onExited: () => void }) {
     setPage(prev => (prev ? (PAGE_PARENTS[prev] ?? null) : null))
   }, [])
 
-  const settingsSectionLabel = useCallback(
-    (section: (typeof SECTIONS)[number]) => t.settings.sections[section.id] ?? section.label,
-    [t.settings.sections]
+  const settingsEntryLabel = useCallback(
+    (entry: (typeof NON_CONFIG_SETTINGS)[number]) =>
+      entry.labelKey === 'about' ? t.settings.nav.about : t.settings.product[entry.labelKey].title,
+    [t]
   )
 
   // Running a keepOpen row (a toggle) changes state the rows themselves report,
@@ -385,14 +360,6 @@ export function CommandPaletteBody({ onExited }: { onExited: () => void }) {
             id: 'nav-settings',
             label: cc.nav.settings.title,
             run: go(SETTINGS_ROUTE)
-          },
-          {
-            action: 'nav.skills',
-            icon: Wrench,
-            id: 'nav-skills',
-            keywords: ['skills', 'tools', 'toolsets', 'mcp', 'capabilities'],
-            label: cc.nav.skills.title,
-            run: go(SKILLS_ROUTE)
           },
           {
             action: 'nav.cron',
@@ -538,18 +505,18 @@ export function CommandPaletteBody({ onExited }: { onExited: () => void }) {
       {
         heading: cc.settings,
         items: [
-          ...SECTIONS.map(section => ({
-            icon: section.icon,
-            id: `set-config-${section.id}`,
-            keywords: ['settings', section.label, settingsSectionLabel(section)],
-            label: settingsSectionLabel(section),
-            run: go(settingsTab(`config:${section.id}`))
-          })),
+          {
+            icon: Palette,
+            id: 'set-appearance',
+            keywords: ['settings', 'appearance', 'theme'],
+            label: t.settings.sections.appearance,
+            run: go(settingsTab('appearance'))
+          },
           ...NON_CONFIG_SETTINGS.map(entry => ({
             icon: entry.icon,
             id: `set-${entry.tab}`,
             keywords: ['settings', ...(entry.keywords ?? [])],
-            label: t.settings.nav[entry.labelKey],
+            label: settingsEntryLabel(entry),
             run: go(settingsTab(entry.tab))
           }))
         ]
@@ -565,7 +532,7 @@ export function CommandPaletteBody({ onExited }: { onExited: () => void }) {
     go,
     projectTree,
     selectTick,
-    settingsSectionLabel,
+    settingsEntryLabel,
     t,
     updateVersionLabel
   ])
@@ -634,38 +601,6 @@ export function CommandPaletteBody({ onExited }: { onExited: () => void }) {
         ]
       })
     }
-
-    // Deep-link straight to a Capabilities sub-tab. The root "Go to" entry only
-    // lands on the top-level Skills view; typing "mcp"/"tools"/"skills" should
-    // jump to the exact tab (matches the "not just the top lvl" ask).
-    const capLabel = t.commandCenter.nav.skills.title
-
-    result.push({
-      heading: capLabel,
-      items: [
-        {
-          icon: Wrench,
-          id: 'cap-skills',
-          keywords: ['skills', 'capabilities'],
-          label: `${capLabel}: ${t.skills.tabSkills}`,
-          run: go(`${SKILLS_ROUTE}?tab=skills`)
-        },
-        {
-          icon: SlidersHorizontal,
-          id: 'cap-toolsets',
-          keywords: ['tools', 'toolsets', 'capabilities'],
-          label: `${capLabel}: ${t.skills.tabToolsets}`,
-          run: go(`${SKILLS_ROUTE}?tab=toolsets`)
-        },
-        {
-          icon: Layers3,
-          id: 'cap-mcp',
-          keywords: ['mcp', 'servers', 'tools', 'capabilities', 'model context protocol'],
-          label: `${capLabel}: ${t.skills.tabMcp}`,
-          run: go(`${SKILLS_ROUTE}?tab=mcp`)
-        }
-      ]
-    })
 
     // Apply a theme directly from the root search (e.g. "nous" → Nous). Live
     // preview via keepOpen, mirroring the nested theme picker. If the theme
@@ -754,45 +689,10 @@ export function CommandPaletteBody({ onExited }: { onExited: () => void }) {
       })
     }
 
-    if (mcpServers.length > 0) {
-      result.push({
-        heading: t.commandCenter.mcpServers,
-        items: mcpServers.map(name => ({
-          icon: Wrench,
-          id: `mcp-${name}`,
-          keywords: ['mcp', 'server', 'tool'],
-          label: name,
-          run: go(`${SKILLS_ROUTE}?tab=mcp&server=${encodeURIComponent(name)}`)
-        }))
-      })
-    }
-
-    if (archivedSessions.length > 0) {
-      result.push({
-        heading: t.commandCenter.archivedChats,
-        items: archivedSessions.map(session => ({
-          icon: Archive,
-          id: `archived-${session.id}`,
-          keywords: [
-            'archived',
-            'chat',
-            'session',
-            ...(session.preview ? [session.preview] : []),
-            ...(session.git_branch ? [session.git_branch] : [])
-          ],
-          label: session.title,
-          run: go(`${SETTINGS_ROUTE}?tab=sessions&session=${encodeURIComponent(session.id)}`)
-        }))
-      })
-    }
-
     return result
   }, [
-    archivedSessions,
     availableThemes,
-    go,
     goSession,
-    mcpServers,
     mode,
     previewTheme,
     resolvedMode,
@@ -828,18 +728,18 @@ export function CommandPaletteBody({ onExited }: { onExited: () => void }) {
       {
         heading: cc.settings,
         items: [
-          ...SECTIONS.map(section => ({
-            icon: section.icon,
-            id: `sp-config-${section.id}`,
-            keywords: ['settings', section.label, settingsSectionLabel(section)],
-            label: settingsSectionLabel(section),
-            run: go(settingsTab(`config:${section.id}`))
-          })),
+          {
+            icon: Palette,
+            id: 'sp-appearance',
+            keywords: ['settings', 'appearance', 'theme'],
+            label: t.settings.sections.appearance,
+            run: go(settingsTab('appearance'))
+          },
           ...NON_CONFIG_SETTINGS.map(entry => ({
             icon: entry.icon,
             id: `sp-${entry.tab}`,
             keywords: ['settings', ...(entry.keywords ?? [])],
-            label: t.settings.nav[entry.labelKey],
+            label: settingsEntryLabel(entry),
             run: go(settingsTab(entry.tab))
           }))
         ]
@@ -868,7 +768,7 @@ export function CommandPaletteBody({ onExited }: { onExited: () => void }) {
     }
 
     return result
-  }, [go, search, settingsCatalog, settingsEntryItem, settingsSectionLabel, t])
+  }, [go, search, settingsCatalog, settingsEntryItem, settingsEntryLabel, t])
 
   // Nested palette pages (VS Code-style submenus). Reusable: add an entry here
   // and point a root item at it via `to`.

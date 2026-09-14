@@ -335,6 +335,38 @@ export const zhHant = defineLocale({
       billing: '帳單',
       notifications: '通知'
     },
+    product: {
+      unavailable: '暫不可用',
+      unavailableDescription:
+        '僅在 AgentBox 服務宣告對應能力後顯示操作控制。Desktop 不回退舊 Hermes 設定，也不會把本機變更假裝成已儲存。',
+      scope: '產品範圍',
+      boundary: '安全邊界',
+      models: {
+        title: '模型',
+        description: '設定由服務宣告的模型預設值與模型槽位。',
+        boundary: '模型欄位來自服務描述；Desktop 不硬編碼提供方或 Harness 選項。'
+      },
+      resources: {
+        title: 'Skills 與 MCP',
+        description: '管理共享資源庫，再由每個 Profile 明確選擇資源。',
+        boundary: '發現資源不會自動啟用，加入 MCP 設定也不會自動啟動。'
+      },
+      identities: {
+        title: '身分',
+        description: '管理具名登入與 API Key 身分；本機使用不要求 AgentBox 帳號。',
+        boundary: '憑證由服務管理，且不進入一般設定與備份。'
+      },
+      harnesses: {
+        title: 'Harness',
+        description: '只在這台電腦上安裝與更新支援的 Harness。',
+        boundary: '工作區連線與遠端目標屬於各自 Workspace；Desktop 不自造安裝命令。'
+      },
+      data: {
+        title: '資料管理',
+        description: '備份應用程式設定、會話、草稿、Profile 記憶與受管資源。',
+        boundary: '憑證、專案檔案與可重新下載的工具不進入備份；還原需要相容的服務合約。'
+      }
+    },
     notifications: {
       title: '通知',
       intro: '原生桌面通知，與應用程式內提示不同。設定會依裝置保存，每台電腦各自獨立。',

@@ -22,13 +22,12 @@ import {
   Archive,
   Check,
   ChevronRight,
-  Globe,
+  Cpu,
   type IconComponent,
   Info,
-  KeyRound,
   Package,
-  Settings2,
-  Zap
+  Users,
+  Wrench
 } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 import { bindingsFor } from '@/store/keybinds'
@@ -141,14 +140,11 @@ export const PaletteRow = memo(function PaletteRow({
 
 export type NonConfigSettingsLabel =
   | 'about'
-  | 'archivedChats'
-  | 'gateway'
-  | 'keysSettings'
-  | 'keysTools'
-  | 'mcp'
-  | 'plugins'
-  | 'providerAccounts'
-  | 'providerApiKeys'
+  | 'data'
+  | 'harnesses'
+  | 'identities'
+  | 'models'
+  | 'resources'
 
 export const NON_CONFIG_SETTINGS: ReadonlyArray<{
   icon: IconComponent
@@ -157,54 +153,35 @@ export const NON_CONFIG_SETTINGS: ReadonlyArray<{
   tab: string
 }> = [
   {
-    icon: Zap,
-    keywords: ['accounts', 'sign in', 'oauth', 'login', 'subscription', 'models', 'anthropic', 'openai'],
-    labelKey: 'providerAccounts',
-    tab: 'providers&pview=accounts'
-  },
-  {
-    icon: KeyRound,
-    keywords: ['providers', 'api key', 'keys', 'secrets', 'tokens', 'egress', 'iron proxy', 'sandbox proxy'],
-    labelKey: 'providerApiKeys',
-    tab: 'providers&pview=keys'
-  },
-  {
-    icon: Globe,
-    // The Connections registry merged into the unified Gateways page.
-    keywords: [
-      'connection',
-      'connections',
-      'messaging',
-      'remote',
-      'multi',
-      'instances',
-      'ssh',
-      'cloud',
-      'add gateway',
-      'registry'
-    ],
-    labelKey: 'gateway',
-    tab: 'gateway'
-  },
-  {
-    icon: KeyRound,
-    keywords: ['api', 'secrets', 'tokens', 'credentials', 'browser', 'search'],
-    labelKey: 'keysTools',
-    tab: 'keys&kview=tools'
-  },
-  {
-    icon: Settings2,
-    keywords: ['gateway', 'proxy', 'server', 'webhook', 'env', 'egress proxy', 'iron proxy'],
-    labelKey: 'keysSettings',
-    tab: 'keys&kview=settings'
+    icon: Cpu,
+    keywords: ['models', 'defaults', 'slots', 'providers'],
+    labelKey: 'models',
+    tab: 'product:models'
   },
   {
     icon: Package,
-    keywords: ['plugins', 'extensions', 'desktop plugins', 'addon', 'add-on'],
-    labelKey: 'plugins',
-    tab: 'plugins'
+    keywords: ['skills', 'mcp', 'resources', 'tools'],
+    labelKey: 'resources',
+    tab: 'product:resources'
   },
-  { icon: Archive, keywords: ['history', 'archived'], labelKey: 'archivedChats', tab: 'sessions' },
+  {
+    icon: Users,
+    keywords: ['accounts', 'sign in', 'oauth', 'login', 'api keys', 'credentials'],
+    labelKey: 'identities',
+    tab: 'product:identities'
+  },
+  {
+    icon: Wrench,
+    keywords: ['harness', 'install', 'update', 'local tools'],
+    labelKey: 'harnesses',
+    tab: 'product:harnesses'
+  },
+  {
+    icon: Archive,
+    keywords: ['backup', 'restore', 'data', 'drafts', 'memory'],
+    labelKey: 'data',
+    tab: 'product:data'
+  },
   { icon: Info, keywords: ['version', 'about'], labelKey: 'about', tab: 'about' }
 ]
 

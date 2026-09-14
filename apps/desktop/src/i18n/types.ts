@@ -400,6 +400,17 @@ export interface Translations {
       notifications: string
       plugins: string
     }
+    product: {
+      unavailable: string
+      unavailableDescription: string
+      scope: string
+      boundary: string
+      models: { title: string; description: string; boundary: string }
+      resources: { title: string; description: string; boundary: string }
+      identities: { title: string; description: string; boundary: string }
+      harnesses: { title: string; description: string; boundary: string }
+      data: { title: string; description: string; boundary: string }
+    }
     plugins: {
       title: string
       blurb: string

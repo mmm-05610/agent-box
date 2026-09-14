@@ -35,6 +35,10 @@ export interface ChatBarState {
   tools: { enabled: boolean; label: string; suggestions?: ContextSuggestion[] }
   voice: { enabled: boolean; active: boolean }
   profile?: ComposerProfileState
+  /** Present only after the composer is wired to the server-owned queue
+   * projection. A hello capability by itself must never reactivate the old
+   * renderer-local queue engine. */
+  queue?: { authority: 'server' }
 }
 
 export interface ComposerProfileOption {

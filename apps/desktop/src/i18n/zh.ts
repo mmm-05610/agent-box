@@ -439,6 +439,38 @@ export const zh: Translations = {
       notifications: '通知',
       plugins: '插件'
     },
+    product: {
+      unavailable: '暂不可用',
+      unavailableDescription:
+        '仅当 AgentBox 服务声明对应能力后才显示操作控件。Desktop 不回退到旧 Hermes 设置，也不会把本机改动伪装成已保存。',
+      scope: '产品范围',
+      boundary: '安全边界',
+      models: {
+        title: '模型',
+        description: '配置由服务声明的模型默认值与模型槽位。',
+        boundary: '模型字段来自服务描述；Desktop 不硬编码提供方或 Harness 选项。'
+      },
+      resources: {
+        title: 'Skills 与 MCP',
+        description: '管理共享资源库，再由每个 Profile 明确选择资源。',
+        boundary: '发现资源不会自动启用，添加 MCP 配置也不会自动启动。'
+      },
+      identities: {
+        title: '身份',
+        description: '管理命名登录与 API Key 身份；本地使用不要求 AgentBox 账号。',
+        boundary: '凭据由服务管理，并排除在普通配置与备份之外。'
+      },
+      harnesses: {
+        title: 'Harness',
+        description: '只在这台电脑上安装和更新受支持的 Harness。',
+        boundary: '工作区连接与远端目标归各自 Workspace；Desktop 不自造安装命令。'
+      },
+      data: {
+        title: '数据管理',
+        description: '备份应用配置、会话、草稿、Profile 记忆与受管资源。',
+        boundary: '凭据、项目文件和可重新下载的工具不进入备份；恢复需要兼容的服务合同。'
+      }
+    },
     plugins: {
       title: '桌面插件',
       blurb:
