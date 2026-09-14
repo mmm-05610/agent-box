@@ -1591,6 +1591,8 @@ export const ja = defineLocale({
       system: 'ステータス、ログ、システムアクション',
       usage: 'トークン、コスト、スキルの活動履歴'
     },
+    agentBoxUnavailableTitle: 'AgentBox ではこの画面を提供していません',
+    agentBoxUnavailableBody: 'システム・使用状況・メンテナンスのパネルは従来の Hermes ランタイムの機能で、AgentBox は呼び出しません。',
     nav: {
       newChat: { title: '新しいセッション', detail: '新しいセッションを開始' },
       settings: { title: '設定', detail: 'Hermes デスクトップを設定' },

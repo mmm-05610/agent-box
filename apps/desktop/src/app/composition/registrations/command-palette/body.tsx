@@ -29,6 +29,7 @@ import {
 import { openSession, openSessionIntentFromModifiers } from '@/application/session/open-session'
 import { codiconIcon } from '@/components/ui/codicon'
 import { Command, CommandInput, CommandList } from '@/components/ui/command'
+import type { SessionAuthority } from '@/features/chat/sidebar/sidebar-constants'
 import { PetInlineToggle, PetPalettePage } from '@/features/pet-generate/command-palette/pet-palette-page'
 import { type SettingsSearchEntry, settingsSearchTargetQuery } from '@/features/settings/settings-search'
 import { useSettingsSearchCatalog } from '@/features/settings/use-settings-search'
@@ -106,7 +107,31 @@ import {
 
 
 
-export function CommandPaletteBody({ onExited }: { onExited: () => void }) {
+export interface CommandPaletteBodyProps {
+  /** Required: which runtime owns this mount. Under `'agentbox'` the palette
+   *  never offers or runs the legacy Hermes data-plane shortcuts (restart
+   *  gateway / update Hermes) — the authority alone decides, never gateway
+   *  state or cache contents. */
+  authority: SessionAuthority
+  onExited: () => void
+}
+
+/**
+ * Contributed palette rows that are SHORTCUTS onto the legacy Hermes runtime
+ * rather than AgentBox decisions. `Toggle logs` is the whole list: its only job
+ * is to summon the logs pane, and that pane polls `GET /api/logs` — the product
+ * runtime refuses that request outright, so the row could only ever promise a
+ * capability the shell does not serve.
+ *
+ * Declared here, by id, because the contributions themselves are registered by
+ * the composition root (which is not this module's to change). A feature whose
+ * backing capability is legacy — profile export/import — is a different class:
+ * it stays visible and fails honestly where it is pressed, and it is recorded
+ * as a known residual rather than hidden behind one of its two doors.
+ */
+export const LEGACY_PALETTE_ROW_IDS: readonly string[] = ['logs.toggle']
+
+export function CommandPaletteBody({ authority, onExited }: CommandPaletteBodyProps) {
   const { t } = useI18n()
   const pendingPage = useStore($commandPalettePage)
   const pendingSeed = useStore($commandPaletteSeed)
@@ -270,6 +295,18 @@ export function CommandPaletteBody({ onExited }: { onExited: () => void }) {
 
   const contributedItems = usePaletteContributions()
 
+  // Contributed rows a plugin or the composition root registered are offered as
+  // given, with one exception: a shortcut onto the legacy Hermes runtime is not
+  // an AgentBox row, so under `'agentbox'` it is dropped before it can render or
+  // be run. See LEGACY_PALETTE_ROW_IDS.
+  const visibleContributedItems = useMemo(
+    () =>
+      authority === 'agentbox'
+        ? contributedItems.filter(item => !LEGACY_PALETTE_ROW_IDS.includes(item.id))
+        : contributedItems,
+    [authority, contributedItems]
+  )
+
   // The active repo's worktrees → "new conversation in <branch>". This is the
   // ⌘K-typed "I want to work on <branch>" reflex: each entry seeds a fresh
   // session anchored to that worktree's checkout (requestStartWorkSession),
@@ -384,11 +421,11 @@ export function CommandPaletteBody({ onExited }: { onExited: () => void }) {
       projectGroup,
       // Registry-contributed rows (core features + plugins) — one group,
       // omitted while nothing contributes.
-      ...(contributedItems.length > 0
+      ...(visibleContributedItems.length > 0
         ? [
             {
               heading: cc.commands,
-              items: contributedItems.map(item => ({
+              items: visibleContributedItems.map(item => ({
                 action: item.action,
                 // Read on mount and after every select (the deps below), so a
                 // row that reports state can't show the state it just left.
@@ -421,35 +458,44 @@ export function CommandPaletteBody({ onExited }: { onExited: () => void }) {
             label: t.sessionImport.action,
             run: go(SESSION_IMPORT_ROUTE)
           },
-          {
-            icon: Activity,
-            id: 'cc-system',
-            keywords: ['command center', 'system', 'status', 'logs'],
-            label: cc.sections.system,
-            run: go(`${COMMAND_CENTER_ROUTE}?section=system`)
-          },
-          {
-            icon: BarChart3,
-            id: 'cc-usage',
-            keywords: ['command center', 'usage', 'tokens', 'cost'],
-            label: cc.sections.usage,
-            run: go(`${COMMAND_CENTER_ROUTE}?section=usage`)
-          },
-          {
-            icon: RefreshCw,
-            id: 'cc-restart-gateway',
-            keywords: ['gateway', 'restart', 'messaging', 'reconnect', 'system'],
-            label: cc.restartGateway,
-            run: () => void runGatewayRestart()
-          },
-          {
-            detail: updateVersionLabel,
-            icon: Download,
-            id: 'cc-update-hermes',
-            keywords: ['update', 'upgrade', 'hermes', 'version', 'system', 'restart'],
-            label: cc.updateHermes,
-            run: () => requestActiveUpdate()
-          },
+          // The legacy Hermes data-plane shortcuts: the system/usage panels and
+          // the restart/update actions belong to the legacy runtime, so only
+          // the `hermes` authority offers them. Under `agentbox` they neither
+          // render nor can run — the authority alone decides, and these
+          // actions are never called.
+          ...(authority === 'hermes'
+            ? [
+                {
+                  icon: Activity,
+                  id: 'cc-system',
+                  keywords: ['command center', 'system', 'status', 'logs'],
+                  label: cc.sections.system,
+                  run: go(`${COMMAND_CENTER_ROUTE}?section=system`)
+                },
+                {
+                  icon: BarChart3,
+                  id: 'cc-usage',
+                  keywords: ['command center', 'usage', 'tokens', 'cost'],
+                  label: cc.sections.usage,
+                  run: go(`${COMMAND_CENTER_ROUTE}?section=usage`)
+                },
+                {
+                  icon: RefreshCw,
+                  id: 'cc-restart-gateway',
+                  keywords: ['gateway', 'restart', 'messaging', 'reconnect', 'system'],
+                  label: cc.restartGateway,
+                  run: () => void runGatewayRestart()
+                },
+                {
+                  detail: updateVersionLabel,
+                  icon: Download,
+                  id: 'cc-update-hermes',
+                  keywords: ['update', 'upgrade', 'hermes', 'version', 'system', 'restart'],
+                  label: cc.updateHermes,
+                  run: () => requestActiveUpdate()
+                }
+              ]
+            : []),
           {
             icon: RefreshCw,
             id: 'cc-reload-window',
@@ -528,14 +574,15 @@ export function CommandPaletteBody({ onExited }: { onExited: () => void }) {
     // that kept the palette open — eslint only sees an unused dep.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    contributedItems,
+    authority,
     dismissedAutoProjects,
     go,
     projectTree,
     selectTick,
     settingsEntryLabel,
     t,
-    updateVersionLabel
+    updateVersionLabel,
+    visibleContributedItems
   ])
 
   // The long, granular lists (settings fields, API keys, MCP servers, archived

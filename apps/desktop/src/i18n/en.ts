@@ -1810,6 +1810,9 @@ export const en: Translations = {
       system: 'Status, logs, and system actions',
       usage: 'Token, cost, and skill activity over time'
     },
+    agentBoxUnavailableTitle: 'AgentBox does not provide this surface',
+    agentBoxUnavailableBody:
+      'System, usage and maintenance panels belong to the legacy Hermes runtime, which the AgentBox shell does not call.',
     nav: {
       newChat: { title: 'New session', detail: 'Start a fresh session' },
       settings: { title: 'Settings', detail: 'Configure Hermes desktop' },

@@ -308,6 +308,51 @@ describe('primary AgentBox chat production binding', () => {
     expect(unsubscribe).toHaveBeenCalledTimes(1)
   })
 
+  it('records history hydration before the stream subscription and subscribes from the hydrated cursor', async () => {
+    const order: string[] = []
+
+    const subscribeEvents = vi.fn((input: { cursor: string; sessionId: string }) => {
+      order.push(`subscribe:${input.cursor}`)
+
+      return vi.fn()
+    })
+
+    window.agentBoxDesktop = { wire: { subscribeEvents, request: vi.fn() } }
+    $agentBoxSessions.set({ [session.id]: session })
+
+    mocks.hydrateHistory.mockImplementation(
+      (() => {
+        order.push('history.snapshot')
+
+        return Promise.resolve({
+          outcome: 'snapshot',
+          projection: { ...emptyWireSessionProjection(session.id), resumeCursor: 'cursor-resume' as never }
+        })
+      }) as never
+    )
+    mocks.refreshQueue.mockImplementation(async () => {
+      order.push('queue.get')
+
+      return undefined
+    })
+
+    renderHook(useAgentBoxMainChat, { wrapper: wrapper('/session-1') })
+
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    // The reconnect order is causal: the snapshot must resolve before the
+    // event stream is subscribed, and the subscription starts at the cursor
+    // the snapshot returned.
+    expect(order).toEqual(['history.snapshot', 'queue.get', 'subscribe:cursor-resume'])
+    expect(subscribeEvents).toHaveBeenCalledWith(
+      { cursor: 'cursor-resume', sessionId: 'session-1' },
+      expect.any(Function)
+    )
+  })
+
   it('stops the old subscription before hydrating after a sequence gap', async () => {
     const unsubscribe = vi.fn()
     let listener: ((frame: unknown) => void) | undefined

@@ -5,6 +5,7 @@ import {
   asWireId,
   type EventFrame,
   type ProfileRecord,
+  type QueueItem,
   type SessionRecord,
   type WorkspaceRecord
 } from '../wire-v1'
@@ -83,16 +84,47 @@ export function frame(
   }
 }
 
-/** Traceable §9 fixture inventory; executable assertions live beside it. */
+export function queueItem(overrides: Partial<QueueItem> = {}): QueueItem {
+  return {
+    configVersion: 1,
+    itemId: asWireId('queue-item-1'),
+    message: { attachments: [], text: 'queued follow-up' },
+    profileId: profile.id,
+    state: 'pending',
+    submittedAt: fixtureTime,
+    version: 1,
+    ...overrides
+  }
+}
+
+/**
+ * Traceable §9 fixture inventory; executable assertions live beside it.
+ *
+ * Rows 05, 06 and 08 are front-end behaviour fixtures driven by scripted
+ * frames and a scripted transport. They pin the client's reconnect and replay
+ * behaviour only — no fixture executes or claims a live Server restart.
+ */
 export const CORE_V1_FIXTURE_MATRIX = [
   { id: '01-unavailable', covers: 1, title: 'Unavailable service and honest capability degradation' },
   { id: '02-workspace-identity', covers: 2, title: 'Environment-qualified workspace identity and reopen' },
   { id: '03-send-idempotency', covers: 3, title: 'Atomic first send, replay, conflict, and unknown outcome' },
   { id: '04-config-freeze', covers: 4, title: 'Profile conflict and queued configuration freeze' },
-  { id: '05-stop-queue', covers: 5, title: 'Stop request, terminal confirmation, and paused queue' },
-  { id: '06-approval-race', covers: 6, title: 'Approval race, invalidation, and presentation-only replay' },
+  {
+    id: '05-stop-queue',
+    covers: 5,
+    title: 'Stop request, terminal confirmation, queue continuation, and paused queue'
+  },
+  {
+    id: '06-approval-race',
+    covers: 6,
+    title: 'Approval race, expiry/invalidation, and presentation-only replay'
+  },
   { id: '07-snapshot-join', covers: 7, title: 'Snapshot join, event dedupe, gap, and resync' },
-  { id: '08-reconnect', covers: 8, title: 'Reconnect reads history without redispatch' },
+  {
+    id: '08-reconnect',
+    covers: 8,
+    title: 'Reconnect reads history first and reconciles the outstanding send by its original requestId'
+  },
   { id: '09-secret-boundary', covers: 9, title: 'Remote references and events contain no secret material' }
 ] as const
 

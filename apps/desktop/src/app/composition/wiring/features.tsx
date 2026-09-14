@@ -1230,7 +1230,12 @@ export function ContribWiring({ children }: { children: ReactNode }) {
 
       {commandCenterOpen && (
         <Suspense fallback={null}>
+          {/* The AgentBox product shell names its session authority explicitly —
+              never inferred from gateway state, errors or cache contents — so an
+              agentbox Command Center reads the service cache and cannot mount
+              or call the legacy Hermes system/usage/maintenance panels. */}
           <CommandCenterView
+            authority="agentbox"
             initialSection={commandCenterInitialSection}
             onClose={closeOverlayToPreviousRoute}
             onDeleteSession={removeSession}

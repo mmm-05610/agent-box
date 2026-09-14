@@ -1977,6 +1977,8 @@ export const zh: Translations = {
       system: '状态、日志与系统操作',
       usage: '一段时间内的词元、成本与技能活动'
     },
+    agentBoxUnavailableTitle: 'AgentBox 不提供此界面',
+    agentBoxUnavailableBody: '系统、用量与维护面板属于旧版 Hermes 运行时，AgentBox 外壳不会调用它。',
     nav: {
       newChat: { title: '新建会话', detail: '开始一个新会话' },
       settings: { title: '设置', detail: '配置 Hermes 桌面端' },

@@ -1,4 +1,5 @@
-import { readdirSync } from 'node:fs'
+import { readdirSync, statSync } from 'node:fs'
+import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
@@ -36,7 +37,6 @@ import { DEBT_LEDGER } from './renderer-layers.debt'
 // bottom feed it violations it must catch.
 
 const srcEntries = readdirSync(SRC_DIR, { withFileTypes: true })
-const topLevelDirs = srcEntries.filter(entry => entry.isDirectory()).map(entry => entry.name)
 
 /** Root modules in the ladder. `*.d.ts` are excluded deliberately: a declaration
  *  file emits nothing, so it has no position in a runtime order. */
@@ -86,11 +86,14 @@ describe('the renderer layer ladder is written down completely', () => {
   it('leaves no in-flight exclusion stale', () => {
     // The exclusion list is what keeps someone else's uncommitted branch out of
     // this round's numbers. It may not grow silently, and it may not outlive the
-    // work: every entry must still be a real directory.
-    const missing = IN_FLIGHT.filter(prefix => !topLevelDirs.includes(prefix.split('/')[0]))
+    // work: every entry must still be a real directory — checked in full, so a
+    // nested prefix whose top-level directory survives is still reported.
+    const missing = IN_FLIGHT.filter(
+      prefix => !statSync(join(SRC_DIR, prefix), { throwIfNoEntry: false })?.isDirectory()
+    )
 
     expect(missing).toEqual([])
-    expect(IN_FLIGHT).toHaveLength(2)
+    expect(IN_FLIGHT).toHaveLength(0)
   })
 })
 

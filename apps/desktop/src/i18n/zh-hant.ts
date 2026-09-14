@@ -1539,6 +1539,8 @@ export const zhHant = defineLocale({
       system: '狀態、記錄和系統動作',
       usage: '一段時間內的詞元、費用和技能活動'
     },
+    agentBoxUnavailableTitle: 'AgentBox 不提供此介面',
+    agentBoxUnavailableBody: '系統、使用量與維護面板屬於舊版 Hermes 執行階段，AgentBox 外殼不會呼叫它。',
     nav: {
       newChat: { title: '新工作階段', detail: '開始新的工作階段' },
       settings: { title: '設定', detail: '設定 Hermes 桌面端' },

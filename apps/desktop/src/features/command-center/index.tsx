@@ -1,8 +1,10 @@
+import { useStore } from '@nanostores/react'
 import { type MouseEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { getLogs, getStatus } from '@/api/config'
 import { getUsageAnalytics } from '@/api/models'
 import { getActionStatus, restartGateway, updateHermes } from '@/api/system'
+import { projectAgentBoxPaletteSessions } from '@/app/composition/registrations/command-palette/palette-helpers'
 import { OverlayMain, OverlayNav, OverlaySplitLayout } from '@/app/shell/layers/overlays/overlay-split-layout'
 import { OverlayView } from '@/app/shell/layers/overlays/overlay-view'
 import { LogTail } from '@/components/chat/log-tail'
@@ -15,6 +17,7 @@ import { SearchField } from '@/components/ui/search-field'
 import { SegmentedControl } from '@/components/ui/segmented-control'
 import { ResponsiveTabs } from '@/components/ui/tab-dropdown'
 import { Tip } from '@/components/ui/tooltip'
+import type { SessionAuthority } from '@/features/chat/sidebar/sidebar-constants'
 import { useI18n } from '@/i18n'
 import { sessionTitle } from '@/lib/chat-runtime'
 import { compactNumber } from '@/lib/format'
@@ -33,6 +36,7 @@ import { fmtDateTime } from '@/lib/time'
 import { useStoreSelector } from '@/lib/use-session-slice'
 import { cn } from '@/lib/utils'
 import { upsertDesktopActionTask } from '@/store/activity'
+import { $agentBoxSessions } from '@/store/agentbox-service'
 import { $pinnedSessionIds, pinSession, unpinSession } from '@/store/layout'
 import { $sessions, sessionPinId } from '@/store/session'
 import { exportSession } from '@/store/session-export'
@@ -57,6 +61,11 @@ const EMPTY_SESSIONS: readonly never[] = []
 const EMPTY_PINNED: readonly string[] = []
 
 interface CommandCenterViewProps {
+  /** Required: which runtime owns this mount. `'agentbox'` reads the service
+   *  cache and never reaches the legacy Hermes REST surface; `'hermes'` keeps
+   *  the legacy panels. Never inferred from gateway state, errors or cache
+   *  contents — the caller names the authority explicitly. */
+  authority: SessionAuthority
   initialSection?: CommandCenterSection
   onClose: () => void
   onDeleteSession: (sessionId: string) => Promise<void>
@@ -134,7 +143,14 @@ function EmptyPanel({ action, description, title }: { action?: ReactNode; descri
   )
 }
 
-export function CommandCenterView({ initialSection, onClose, onDeleteSession, onOpenSession }: CommandCenterViewProps) {
+/** The legacy Hermes Command Center: system/usage/maintenance panels and the
+ *  legacy session list, unchanged. Only mounted under the `'hermes'` authority. */
+function HermesCommandCenter({
+  initialSection,
+  onClose,
+  onDeleteSession,
+  onOpenSession
+}: Omit<CommandCenterViewProps, 'authority'>) {
   const { t } = useI18n()
   const cc = t.commandCenter
   // $sessions ticks on every streaming token (title updates, new sessions),
@@ -525,6 +541,134 @@ export function CommandCenterView({ initialSection, onClose, onDeleteSession, on
           title={t.sidebar.row.deleteTitle}
         />
       )}
+    </OverlayView>
+  )
+}
+
+/** The Command Center's public entry point. The authority is an explicit
+ *  input, never inferred: an `'agentbox'` mount never constructs the legacy
+ *  subtrees, so it never subscribes to `$sessions`/`$pinnedSessionIds`, never
+ *  mounts system/usage/maintenance, and never calls the legacy REST API. */
+export function CommandCenterView({ authority, ...props }: CommandCenterViewProps) {
+  return authority === 'agentbox' ? <AgentBoxCommandCenter {...props} /> : <HermesCommandCenter {...props} />
+}
+
+/** SessionRecord.updatedAt is an ISO instant, unlike the legacy epoch-second
+ *  fields `formatTimestamp` takes. */
+function formatServiceTimestamp(value: string): string {
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return ''
+  }
+
+  return fmtDateTime.format(date)
+}
+
+/** The AgentBox Command Center: sessions come from the AgentBox service cache
+ *  and nothing else. The legacy system/usage/maintenance panels — and the
+ *  legacy fetch, restart, update, pin, export and delete actions — are not
+ *  mounted, not called and not offered. A deep link into a section the service
+ *  has no wire equivalent for explains that in place instead of reaching a
+ *  Hermes REST endpoint. */
+function AgentBoxCommandCenter({ initialSection, onClose, onOpenSession }: Omit<CommandCenterViewProps, 'authority'>) {
+  const { t } = useI18n()
+  const cc = t.commandCenter
+  const [section, setSection] = useRouteEnumParam('section', SECTIONS, initialSection ?? 'sessions')
+  const sessions = useStore($agentBoxSessions)
+
+  const [query, setQuery] = useState('')
+  const debouncedQuery = useDebouncedValue(query.trim(), 180)
+
+  // The same projection the command palette uses: archived records are out,
+  // pinned records lead, then newest `updatedAt` — every field is the service
+  // record's own, and no legacy preview/branch/title/cost exists to read.
+  const records = useMemo(() => projectAgentBoxPaletteSessions(sessions), [sessions])
+
+  // The local filter matches only what the service record carries: displayName
+  // and the service id, case-insensitively.
+  const filteredSessions = useMemo(() => {
+    const needle = debouncedQuery.toLowerCase()
+
+    if (!needle) {
+      return records
+    }
+
+    return records.filter(
+      session => session.displayName.toLowerCase().includes(needle) || session.id.toLowerCase().includes(needle)
+    )
+  }, [debouncedQuery, records])
+
+  // Only the sections this authority can serve get a nav row. Every id stays in
+  // SECTIONS so a deep link still parses (`?section=system`) and lands on the
+  // panel below rather than silently falling back to Sessions.
+  const navGroups = useMemo(
+    () =>
+      SECTIONS.filter(value => value === 'sessions').map(value => ({
+        active: section === value,
+        icon: MessageCircle,
+        id: value,
+        label: cc.sections[value],
+        onSelect: () => setSection(value)
+      })),
+    [cc, section, setSection]
+  )
+
+  const sectionAvailable = section === 'sessions'
+
+  return (
+    <OverlayView closeLabel={cc.close} onClose={onClose}>
+      <OverlaySplitLayout>
+        <OverlayNav groups={navGroups} />
+
+        <OverlayMain>
+          <header className="mb-4 flex items-center justify-between gap-3 max-[47.5rem]:mb-2">
+            <div className="min-w-0 max-[47.5rem]:hidden">
+              <h2 className="text-[length:var(--conversation-text-font-size)] font-semibold text-foreground">
+                {cc.sections[section]}
+              </h2>
+              {sectionAvailable && (
+                <p className="mt-0.5 text-[length:var(--conversation-caption-font-size)] leading-(--conversation-caption-line-height) text-(--ui-text-tertiary)">
+                  {cc.sectionDescriptions[section]}
+                </p>
+              )}
+            </div>
+            {sectionAvailable && (
+              <div className="flex shrink-0 items-center gap-2">
+                <SearchField
+                  containerClassName="max-w-[40vw]"
+                  onChange={next => setQuery(next)}
+                  placeholder={cc.searchPlaceholder}
+                  value={query}
+                />
+              </div>
+            )}
+          </header>
+
+          {!sectionAvailable ? (
+            <EmptyPanel description={cc.agentBoxUnavailableBody} title={cc.agentBoxUnavailableTitle} />
+          ) : filteredSessions.length === 0 ? (
+            <EmptyPanel description={debouncedQuery ? cc.noResults : cc.noSessions} />
+          ) : (
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <ul>
+                {filteredSessions.map(session => (
+                  <li className="flex items-center gap-2 py-2" key={session.id}>
+                    <button className="min-w-0 flex-1 text-left" onClick={() => onOpenSession(session.id)} type="button">
+                      <div className="truncate text-[length:var(--conversation-text-font-size)] font-medium text-foreground">
+                        {session.displayName}
+                      </div>
+                      <div className="truncate text-[length:var(--conversation-caption-font-size)] text-(--ui-text-tertiary)">
+                        {formatServiceTimestamp(session.updatedAt)}
+                      </div>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </OverlayMain>
+      </OverlaySplitLayout>
     </OverlayView>
   )
 }

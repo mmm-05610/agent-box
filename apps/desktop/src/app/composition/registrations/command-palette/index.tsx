@@ -9,5 +9,14 @@ import { CommandPaletteBody } from './body'
 export { CommandPaletteBody }
 
 export function CommandPalette() {
-  return <CommandPaletteHost>{({ key, onExited }) => <CommandPaletteBody key={key} onExited={onExited} />}</CommandPaletteHost>
+  return (
+    <CommandPaletteHost>
+      {({ key, onExited }) => (
+        // The AgentBox product shell names the authority explicitly — never
+        // inferred from gateway state or cache contents — so the palette never
+        // offers or runs the legacy Hermes data-plane shortcuts.
+        <CommandPaletteBody authority="agentbox" key={key} onExited={onExited} />
+      )}
+    </CommandPaletteHost>
+  )
 }

@@ -73,8 +73,9 @@ export const SANCTIONED: readonly { from: string; rationale: string; to: string 
 
 /** Work that is not part of the shipped tree yet. Scanning it would report
  *  whoever's uncommitted branch as this round's regression. Pinned by a test so
- *  the exclusion cannot quietly grow. */
-export const IN_FLIGHT: readonly string[] = ['agentbox', 'plugins/agentbox-lab']
+ *  the exclusion cannot quietly grow; it is empty today because every directory
+ *  it ever excluded has left the tree, and it may only shrink from here. */
+export const IN_FLIGHT: readonly string[] = []
 
 /** Plugins get a rule, not a rank. A plugin is handed the host through
  *  `@hermes/plugin-sdk` (aliased to `extension/sdk`, which itself sits at the

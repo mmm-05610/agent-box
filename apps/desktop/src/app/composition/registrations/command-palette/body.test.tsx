@@ -13,10 +13,15 @@ import { useEffect } from 'react'
 import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { PALETTE_AREA } from '@/app/shell/layers/command-palette/contrib'
 import * as sessionListsModule from '@/application/session-lists'
 import { stubMenuDomApis, stubResizeObserver } from '@/dev/test/jsdom'
+import type { SessionAuthority } from '@/features/chat/sidebar/sidebar-constants'
+import { registry } from '@/lib/contributions'
 import { $agentBoxSessions } from '@/store/agentbox-service'
 import { $commandPaletteOpen, $commandPalettePage, $commandPaletteSeed } from '@/store/command-palette'
+import * as systemActionsModule from '@/store/system-actions'
+import * as updatesModule from '@/store/updates'
 import { asWireId, type SessionRecord } from '@/types/wire/wire-v1'
 
 import { CommandPaletteBody } from './body'
@@ -26,6 +31,17 @@ vi.mock('@/application/session-lists', async importOriginal => ({
   listAllProfileSessions: vi.fn(async () => ({
     sessions: [{ git_branch: 'legacy-branch', id: 'legacy-1', preview: 'legacy preview', title: 'Legacy Session' }]
   }))
+}))
+
+// The legacy shortcut actions are mocked to ANSWER, so an AgentBox assertion
+// fails on the call count rather than on an unmocked crash.
+vi.mock('@/store/system-actions', async importOriginal => ({
+  ...(await importOriginal<typeof systemActionsModule>()),
+  runGatewayRestart: vi.fn()
+}))
+vi.mock('@/store/updates', async importOriginal => ({
+  ...(await importOriginal<typeof updatesModule>()),
+  requestActiveUpdate: vi.fn()
 }))
 
 const session = (overrides: { id: string } & Omit<Partial<SessionRecord>, 'id'>): SessionRecord => {
@@ -57,13 +73,13 @@ function RouteProbe({ paths }: { paths: string[] }) {
   return null
 }
 
-function renderPalette() {
+function renderPalette(authority: SessionAuthority = 'agentbox') {
   const paths: string[] = []
 
   render(
     <MemoryRouter initialEntries={['/']}>
       <DialogPrimitive.Root open>
-        <CommandPaletteBody onExited={() => {}} />
+        <CommandPaletteBody authority={authority} onExited={() => {}} />
       </DialogPrimitive.Root>
       <RouteProbe paths={paths} />
     </MemoryRouter>
@@ -80,6 +96,8 @@ beforeEach(() => {
   stubResizeObserver()
   stubMenuDomApis()
   vi.mocked(sessionListsModule.listAllProfileSessions).mockClear()
+  vi.mocked(systemActionsModule.runGatewayRestart).mockClear()
+  vi.mocked(updatesModule.requestActiveUpdate).mockClear()
   $agentBoxSessions.set({})
   $commandPaletteOpen.set(false)
   $commandPalettePage.set(null)
@@ -144,5 +162,92 @@ describe('CommandPaletteBody — sessions come from the AgentBox service', () =>
 
     expect(screen.queryByRole('option', { name: /Legacy Session/ })).toBeNull()
     expect(vi.mocked(sessionListsModule.listAllProfileSessions)).not.toHaveBeenCalled()
+  })
+})
+
+describe('CommandPaletteBody — legacy Hermes shortcuts follow the authority', () => {
+  it('renders no system/usage/restart/update rows and calls neither action under AgentBox authority', async () => {
+    renderPalette('agentbox')
+    await act(async () => {})
+
+    expect(screen.queryByRole('option', { name: /Restart gateway/ })).toBeNull()
+    expect(screen.queryByRole('option', { name: /Update Hermes/ })).toBeNull()
+    expect(screen.queryByRole('option', { name: 'System' })).toBeNull()
+    expect(screen.queryByRole('option', { name: 'Usage' })).toBeNull()
+
+    expect(vi.mocked(systemActionsModule.runGatewayRestart)).not.toHaveBeenCalled()
+    expect(vi.mocked(updatesModule.requestActiveUpdate)).not.toHaveBeenCalled()
+  })
+
+  it('still opens an AgentBox service session under AgentBox authority', async () => {
+    $agentBoxSessions.set({
+      'session-alpha': session({ displayName: 'Alpha Product Notes', id: 'session-alpha' })
+    })
+
+    const { paths } = renderPalette('agentbox')
+
+    searchFor('alpha')
+
+    const row = await screen.findByRole('option', { name: /Alpha Product Notes/ })
+    fireEvent.click(row)
+    await act(async () => {})
+
+    expect(paths.at(-1)).toBe('/session-alpha')
+    expect(vi.mocked(systemActionsModule.runGatewayRestart)).not.toHaveBeenCalled()
+    expect(vi.mocked(updatesModule.requestActiveUpdate)).not.toHaveBeenCalled()
+  })
+
+  it('keeps the restart/update rows and runs them under Hermes authority', async () => {
+    renderPalette('hermes')
+    await act(async () => {})
+
+    expect(screen.getByRole('option', { name: /Update Hermes/ })).toBeTruthy()
+    expect(screen.getByRole('option', { name: 'System' })).toBeTruthy()
+    expect(screen.getByRole('option', { name: 'Usage' })).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('option', { name: /Restart gateway/ }))
+    await act(async () => {})
+
+    expect(vi.mocked(systemActionsModule.runGatewayRestart)).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(updatesModule.requestActiveUpdate)).not.toHaveBeenCalled()
+  })
+})
+
+// `Toggle logs` is a registry-contributed row, not one of the hardcoded groups,
+// so the authority split above cannot see it. It is the contributed row whose
+// only job is to summon a legacy Hermes surface — the pane it opens polls
+// `GET /api/logs`, which the product runtime refuses outright — so under
+// AgentBox authority it must not be offered at all.
+describe('CommandPaletteBody — contributed legacy shortcuts follow the authority', () => {
+  const disposers: Array<() => void> = []
+
+  const contribute = (id: string, label: string) => {
+    disposers.push(registry.register({ area: PALETTE_AREA, data: { id, label, run: vi.fn() }, id }))
+  }
+
+  afterEach(() => {
+    while (disposers.length > 0) {
+      disposers.pop()?.()
+    }
+  })
+
+  it('drops the legacy logs shortcut under AgentBox authority but keeps a plugin row', async () => {
+    contribute('logs.toggle', 'Toggle logs')
+    contribute('kanban.open', 'Kanban: Open board')
+
+    renderPalette('agentbox')
+    await act(async () => {})
+
+    expect(screen.queryByRole('option', { name: 'Toggle logs' })).toBeNull()
+    expect(screen.getByRole('option', { name: 'Kanban: Open board' })).toBeTruthy()
+  })
+
+  it('keeps the legacy logs shortcut under Hermes authority', async () => {
+    contribute('logs.toggle', 'Toggle logs')
+
+    renderPalette('hermes')
+    await act(async () => {})
+
+    expect(screen.getByRole('option', { name: 'Toggle logs' })).toBeTruthy()
   })
 })

@@ -1257,6 +1257,8 @@ export const ar = defineLocale({
       system: 'الحالة والسجلات وإجراءات النظام',
       usage: 'نشاط الرموز والتكلفة والمهارات عبر الزمن'
     },
+    agentBoxUnavailableTitle: 'لا يوفّر AgentBox هذه الواجهة',
+    agentBoxUnavailableBody: 'تنتمي لوحات النظام والاستخدام والصيانة إلى بيئة Hermes القديمة، ولا يستدعيها AgentBox.',
     nav: {
       newChat: {
         title: 'جلسة جديدة',

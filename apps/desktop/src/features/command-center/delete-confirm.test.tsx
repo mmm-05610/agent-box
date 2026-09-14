@@ -54,6 +54,7 @@ function renderCommandCenter(onDeleteSession: (id: string) => Promise<void>) {
   return render(
     <MemoryRouter>
       <CommandCenterView
+        authority="hermes"
         initialSection="sessions"
         onClose={() => {}}
         onDeleteSession={onDeleteSession}

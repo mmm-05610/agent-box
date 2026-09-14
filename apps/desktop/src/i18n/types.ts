@@ -1596,6 +1596,10 @@ export interface Translations {
     archivedChats: string
     sections: Record<'maintenance' | 'sessions' | 'system' | 'usage', string>
     sectionDescriptions: Record<'maintenance' | 'sessions' | 'system' | 'usage', string>
+    /** AgentBox authority: a section with no wire equivalent explains itself
+     *  instead of mounting a legacy Hermes panel. */
+    agentBoxUnavailableTitle: string
+    agentBoxUnavailableBody: string
     nav: Record<'newChat' | 'settings' | 'skills' | 'artifacts', { title: string; detail: string }>
 
     sectionEntries: Record<'sessions' | 'system' | 'usage', { title: string; detail: string }>

@@ -1,17 +1,27 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { wireCapability, WireRemoteError, WireUnavailableError, WireV1Client } from '@/api/wire-v1-client'
 import type { WireTransport, WireTransportRequest } from '@/api/wire-v1-client'
 import { planWireReconnect } from '@/application/session/wire-reconnect-plan'
+import { resolvePendingAgentBoxSend } from '@/application/session/wire-send'
+import {
+  decideAgentBoxApproval,
+  hydrateAgentBoxHistory,
+  ingestAgentBoxEvent,
+  refreshAgentBoxQueue
+} from '@/application/session/wire-session-control'
 import {
   applyWireEventFrame,
   emptyWireSessionProjection,
   markWireProjectionResynced
 } from '@/application/session/wire-session-projection'
+import { $agentBoxQueues, $agentBoxSessionProjections, $agentBoxStopStates } from '@/store/agentbox-runtime'
+import { $pendingAgentBoxSends } from '@/store/agentbox-send-intents'
 
 import {
   ApprovalsDecideResultSchema,
   asCursor,
+  asRequestId,
   asWireId,
   EventFrameSchema,
   HistorySnapshotResultSchema,
@@ -29,9 +39,19 @@ import {
   frame,
   localWorkspace,
   profile,
+  queueItem,
   session,
   wslWorkspace
 } from './core-v1'
+
+beforeEach(() => {
+  // The application seams below project into the shared nanostores; each
+  // fixture owns a clean slate so one scenario cannot leak into the next.
+  $agentBoxQueues.set({})
+  $agentBoxSessionProjections.set({})
+  $agentBoxStopStates.set({})
+  $pendingAgentBoxSends.set({ items: {}, version: 1 })
+})
 
 function scriptedTransport(
   handler: (request: WireTransportRequest, envelope: WireRequest) => unknown | Promise<unknown>
@@ -197,6 +217,68 @@ describe('core-semantics/1 §9 executable fixture matrix', () => {
     ).toBe('paused')
   })
 
+  it('05b — normal completion continues the queue from server events, and replay resurrects nothing', async () => {
+    const finishedA = queueItem({ itemId: asWireId('queue-a'), state: 'pending' })
+    const dispatchedB = queueItem({ itemId: asWireId('queue-b'), state: 'dispatched', version: 2 })
+
+    const host = scriptedTransport((_request, envelope) => {
+      if (envelope.method === 'queue.get') {
+        return { jsonrpc: '2.0', id: envelope.id, result: { items: [finishedA] } }
+      }
+
+      throw new Error(`queue continuation is event-driven; the client must not call ${envelope.method}`)
+    })
+
+    const client = new WireV1Client({ transport: host })
+
+    await refreshAgentBoxQueue(client, session.id)
+    expect($agentBoxQueues.get()[session.id]).toEqual([finishedA])
+
+    const pendingA = frame('event-queue-a-pending', 0, {
+      item: finishedA,
+      kind: 'queue.updated',
+      sessionId: session.id
+    })
+
+    const completedA = frame('event-queue-a-completed', 1, {
+      item: { ...finishedA, state: 'completed', version: 2 },
+      kind: 'queue.updated',
+      sessionId: session.id
+    })
+
+    const nextB = frame('event-queue-b-dispatched', 2, {
+      item: dispatchedB,
+      kind: 'queue.updated',
+      sessionId: session.id
+    })
+
+    ingestAgentBoxEvent(pendingA)
+    ingestAgentBoxEvent(completedA)
+
+    // A reaching a terminal state removes it from the active projection...
+    expect($agentBoxQueues.get()[session.id]).toEqual([])
+
+    // ...and the SERVER dispatching the next item is what continues the queue.
+    // The client only renders the fact.
+    ingestAgentBoxEvent(nextB)
+    expect($agentBoxQueues.get()[session.id]).toEqual([dispatchedB])
+
+    // Negative cases: a duplicate of A's terminal frame and a late replay of
+    // A's own pre-terminal frame are both deduplicated by eventId, so the
+    // finished item never comes back.
+    expect(ingestAgentBoxEvent(completedA).outcome).toBe('duplicate')
+    expect(ingestAgentBoxEvent(pendingA).outcome).toBe('duplicate')
+    expect($agentBoxQueues.get()[session.id]).toEqual([dispatchedB])
+
+    const sendCalls = host.request.mock.calls.filter(([request]) => {
+      const method = (request.body as WireRequest).method
+
+      return method === 'sessions.send' || method === 'sessions.createAndSend'
+    })
+
+    expect(sendCalls).toEqual([])
+  })
+
   it('06 — approval retries are one fact and replay never re-decides', () => {
     expect(ApprovalsDecideResultSchema.parse({ outcome: 'recorded', decision: 'allow' }).outcome).toBe('recorded')
     expect(ApprovalsDecideResultSchema.parse({ outcome: 'already_recorded', decision: 'allow' }).outcome).toBe(
@@ -215,6 +297,100 @@ describe('core-semantics/1 §9 executable fixture matrix', () => {
     expect(first.projection.approvals[approval.approvalId]).toEqual(approval)
     expect(replay.outcome).toBe('duplicate')
     expect(replay.projection).toBe(first.projection)
+  })
+
+  it('06b — expiry and invalidation settle pending approvals, and a settled replay decides nothing twice', async () => {
+    // Wire representation only: expiry arrives as `expired`, while a content
+    // change or a cancellation arrives as `invalidated`. No new schema value
+    // is invented, and replaying a settled frame emits no approvals.decide.
+    const host = scriptedTransport((_request, envelope) => {
+      if (envelope.method === 'approvals.decide') {
+        return { jsonrpc: '2.0', id: envelope.id, result: { decision: 'allow', outcome: 'recorded' } }
+      }
+
+      throw new Error(`approval settlement is event-driven; the client must not call ${envelope.method}`)
+    })
+
+    const client = new WireV1Client({ transport: host })
+    const changed = { ...approval, approvalId: asWireId('approval-2'), version: 5 }
+
+    const requestedFirst = frame('event-approval-1-requested', 20, {
+      approval,
+      kind: 'approval.requested',
+      sessionId: session.id
+    })
+
+    const expiredFirst = frame('event-approval-1-expired', 21, {
+      approvalId: approval.approvalId,
+      kind: 'approval.settled',
+      outcome: 'expired',
+      sessionId: session.id
+    })
+
+    const requestedSecond = frame('event-approval-2-requested', 22, {
+      approval: changed,
+      kind: 'approval.requested',
+      sessionId: session.id
+    })
+
+    const invalidatedSecond = frame('event-approval-2-invalidated', 23, {
+      approvalId: changed.approvalId,
+      kind: 'approval.settled',
+      outcome: 'invalidated',
+      sessionId: session.id
+    })
+
+    let projection = applyWireEventFrame(emptyWireSessionProjection(session.id), requestedFirst).projection
+
+    // The user's ONE decision is the only approvals.decide this flow emits.
+    await decideAgentBoxApproval(
+      client,
+      {
+        approvalId: approval.approvalId,
+        decision: 'allow',
+        expectedVersion: approval.version,
+        scope: { kind: 'once' }
+      },
+      { createRequestId: () => asRequestId('request-approval-0001') }
+    )
+
+    const expired = applyWireEventFrame(projection, expiredFirst)
+
+    expect(expired.outcome).toBe('applied')
+    expect(expired.projection.approvals[approval.approvalId]).toBeUndefined()
+    expect(expired.projection.approvalOutcomes[approval.approvalId]).toBe('expired')
+
+    // Replaying the settled frame is a duplicate even though the approval had
+    // been decided: nothing settles a second time.
+    const expiredReplay = applyWireEventFrame(expired.projection, expiredFirst)
+
+    expect(expiredReplay.outcome).toBe('duplicate')
+    expect(expiredReplay.projection).toBe(expired.projection)
+    projection = expiredReplay.projection
+
+    const secondRequested = applyWireEventFrame(projection, requestedSecond)
+
+    expect(secondRequested.projection.approvals[changed.approvalId]).toEqual(changed)
+
+    const invalidated = applyWireEventFrame(secondRequested.projection, invalidatedSecond)
+
+    expect(invalidated.outcome).toBe('applied')
+    // The card is gone, so nothing is left to decide.
+    expect(invalidated.projection.approvals).toEqual({})
+    expect(invalidated.projection.approvalOutcomes).toEqual({
+      [approval.approvalId]: 'expired',
+      [changed.approvalId]: 'invalidated'
+    })
+
+    const invalidatedReplay = applyWireEventFrame(invalidated.projection, invalidatedSecond)
+
+    expect(invalidatedReplay.outcome).toBe('duplicate')
+    expect(invalidatedReplay.projection).toBe(invalidated.projection)
+
+    // One user decision, zero replay decisions.
+    expect(host.request.mock.calls.map(([request]) => (request.body as WireRequest).method)).toEqual([
+      'approvals.decide'
+    ])
   })
 
   it('07 — snapshot joins dedupe replay, detect gaps, and honor explicit resync', () => {
@@ -287,6 +463,101 @@ describe('core-semantics/1 §9 executable fixture matrix', () => {
     )
 
     expect(failed.projection.execution).toMatchObject({ state: 'failed', reason: 'WORKER_UNREACHABLE' })
+  })
+
+  it('08b — front-end reconnect fixture: history first, reconcile by the original requestId, terminal state clears stop', async () => {
+    // Scripted frames over a scripted transport only. This is a FRONT-END
+    // reconnect behaviour fixture: it pins what the client does when it
+    // resumes — it does not execute or claim a live Server restart.
+    const originalRequestId = asRequestId('request-before-reconnect-0001')
+
+    $pendingAgentBoxSends.set({
+      items: { [session.id]: { intentKey: '4', requestId: originalRequestId } },
+      version: 1
+    })
+    $agentBoxStopStates.set({ [session.id]: { detail: null, phase: 'stopping' } })
+
+    // The snapshot's own final execution state is terminal: the resumed stream
+    // continues after its cursor, so this frame is never re-delivered live.
+    const alreadyStopped = frame('event-execution-stopped', 0, {
+      executionId: asWireId('execution-1'),
+      kind: 'execution.state',
+      reason: 'stop confirmed before reconnect',
+      sessionId: session.id,
+      state: 'stopped'
+    })
+
+    const methods: string[] = []
+
+    const host = scriptedTransport((_request, envelope) => {
+      methods.push(envelope.method)
+
+      if (envelope.method === 'history.snapshot') {
+        return {
+          jsonrpc: '2.0',
+          id: envelope.id,
+          result: {
+            frames: [alreadyStopped],
+            olderCursor: null,
+            outcome: 'snapshot',
+            resumeCursor: asCursor('cursor-resume')
+          }
+        }
+      }
+
+      if (envelope.method === 'sendOutcome.query') {
+        return {
+          jsonrpc: '2.0',
+          id: envelope.id,
+          result: {
+            configVersion: 7,
+            executionId: asWireId('execution-1'),
+            outcome: 'accepted',
+            queueItemId: null,
+            sessionId: session.id
+          }
+        }
+      }
+
+      throw new Error(`reconnect must not call ${envelope.method}`)
+    })
+
+    const client = new WireV1Client({ transport: host })
+
+    const history = await hydrateAgentBoxHistory(client, session.id)
+
+    expect(history.outcome).toBe('snapshot')
+    expect($agentBoxSessionProjections.get()[session.id]?.resumeCursor).toBe('cursor-resume')
+
+    // The snapshot already declared the run over, so the previously requested
+    // stop is reconciled from that fact alone — no live frame is re-delivered.
+    expect($agentBoxSessionProjections.get()[session.id]?.execution).toMatchObject({ state: 'stopped' })
+    expect($agentBoxStopStates.get()[session.id]).toEqual({
+      detail: 'stop confirmed before reconnect',
+      phase: 'idle'
+    })
+
+    // The resume path reads the snapshot BEFORE anything else...
+    expect(methods[0]).toBe('history.snapshot')
+
+    // ...and the outstanding send is settled by querying its ORIGINAL
+    // requestId, never by re-sending it as a new request.
+    const recovered = await resolvePendingAgentBoxSend(client, session.id)
+
+    expect(recovered).toMatchObject({ outcome: 'accepted', requestId: originalRequestId })
+    expect($pendingAgentBoxSends.get().items).toEqual({})
+    expect(methods).toEqual(['history.snapshot', 'sendOutcome.query'])
+
+    const queryParams = host.request.mock.calls
+      .map(([request]) => request.body as WireRequest)
+      .filter(body => body.method === 'sendOutcome.query')
+      .map(body => body.params)
+
+    expect(queryParams).toEqual([{ requestId: originalRequestId }])
+
+    expect(
+      methods.filter(method => method === 'sessions.send' || method === 'sessions.createAndSend')
+    ).toEqual([])
   })
 
   it('09 — strict event frames reject secret material instead of stripping it', () => {

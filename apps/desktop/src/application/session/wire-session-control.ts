@@ -20,6 +20,11 @@ import { applyWireEventFrame, emptyWireSessionProjection, markWireProjectionResy
 
 const QUEUE_TERMINAL_STATES = new Set(['withdrawn', 'completed', 'failed', 'cancelled'])
 
+/** `execution.state` values that mean the run is over. The wire enum has no
+ *  `cancelled` execution state (`stopped` covers it), and `unknown` is NOT
+ *  terminal. */
+const TERMINAL_EXECUTION_STATES = new Set(['completed', 'stopped', 'failed'])
+
 export interface WireSessionControlOptions {
   createRequestId?: () => RequestId
 }
@@ -187,6 +192,15 @@ export async function hydrateAgentBoxHistory(client: WireV1Client, sessionId: Wi
     ...(snapshot.frames.length > 0 ? { lastSeq: snapshot.frames.at(-1)!.seq } : {})
   })
   setAgentBoxSessionProjection(sessionId, projection)
+
+  // The snapshot can be the only place a terminal execution frame ever
+  // appears: the resumed stream continues after its cursor, so it is not
+  // re-delivered. Reconcile the stop affordance from that final state.
+  // Non-terminal states are deliberately left alone — a snapshot that still
+  // says `running` must not erase a stop the user already requested.
+  if (projection.execution && TERMINAL_EXECUTION_STATES.has(projection.execution.state)) {
+    setAgentBoxStopState(sessionId, { detail: projection.execution.reason, phase: 'idle' })
+  }
 
   return { outcome: 'snapshot' as const, projection }
 }

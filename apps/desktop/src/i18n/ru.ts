@@ -1843,6 +1843,8 @@ export const ru = defineLocale({
       system: 'Статус, журналы и системные действия',
       usage: 'Токены, стоимость и активность навыков со временем'
     },
+    agentBoxUnavailableTitle: 'AgentBox не предоставляет этот раздел',
+    agentBoxUnavailableBody: 'Панели «Система», «Использование» и «Обслуживание» относятся к старой среде Hermes, которую AgentBox не вызывает.',
     nav: {
       newChat: { title: 'Новый сеанс', detail: 'Начать новый сеанс' },
       settings: { title: 'Настройки', detail: 'Настройка Hermes desktop' },
