@@ -4,6 +4,25 @@
 已发生的1次可达性请求由后端受控进程读取仓库外 locator，未把内容写入仓库或输出。
 授权真实 credential 的 SecretStore→Worker 投影尚未执行，不以测试值路径冒充付费验收事实。
 
+## 2026-09-15 — Worker view 合同收紧 + state 捕获内容稳定性门（返修轮）
+
+- **先复现后修**：Rust 新测（4 项）在实现前编译失败即"合同不存在"；Python 新测 `test_state_capture_settle.py`
+  7 项在实现前全部失败（同长度改写被判稳定、deadline 静默返回）。
+- **Worker view 合同**：目录递归、文件列出、**符号链接跳过但不跟随/不读取/不捕获**、**特殊文件（FIFO/socket/
+  设备）类型化拒绝整个 listing**（原先被静默跳过）；**所有访问条目计入统一 traversal 上限 4096**，超过即
+  `VIEW_INVALID`；`view.get` 仍拒绝一切非普通文件；被跳过的链接不被删除、cleanup 仍可用。
+- **state 捕获**：完整 snapshot（path+size+digest）连续两次相同才算稳定，返回的字节即与稳定 snapshot 相符
+  的那一份；分块读取中 digest 改变继续等待（有界）；**deadline 到期抛 `SIDECAR_STATE_NOT_SETTLED`**，不再
+  静默进入 checkpoint；空 state 两次空 snapshot 即稳定；256 文件/8 MiB/受保护路径/凭据扫描规则不变。
+- **c6**：`sha256:96256b2ea76218448183fc0b1063aba92c15fca3fb22fa8a00f7e0f7efc2466e`（c4/c5 未覆盖）。
+  版本口径：ABW1 frame/manifest `wireVersion=1`；Worker control `PROTOCOL_VERSION=3`（响应形状未变，不升版）。
+- **验证**：python 793 passed/4 skipped；Rust 15 passed；四家 gate + runtime-artifact gate 用 c6 串行 exit 0
+  （Codex 外部工件模式 exit 0）；**Windows r4 用 c6 exit 0 + `-PostCheck…CLEAN`**。
+- **Codex 配置边界只读复核**：产品值未改；用工件内 0.147.0 二进制探测确认 `ephemeral` 受支持（非法值报
+  `expected one of file, keyring, auto, ephemeral`）；运行后 checkpoint 无 `auth.json`；未执行官方脚本、
+  未读用户 `~/.codex`。
+- 模型调用 0、费用增量 ¥0；四家仍 MODEL_NOT_VERIFIED。
+
 ## 2026-09-15 — 四家原生 HOME 隔离实施 + Codex 生产封装（并行两条 lane）
 
 详细证据：[profile-home-isolation.md](profile-home-isolation.md) §8b（隔离实施）、
@@ -615,11 +634,11 @@ powershell.exe -File accept-e.ps1 … -Port 18744 -PostCheck -InstanceId <两实
 - 尚未进入全栈联调；Windows r4 重确认已完成（见顶部）。真实模型调用数与费用无变化：累计1次、
   12 tokens、<¥0.01。
 
-## A — 前端只读观察与 wire 增量协作
+## A — 前端只读观察与 wire 增量协作（**历史快照，段内观察均属 2026-09-14；当前结论见本文件顶部最新条目**）
 
 后端在41收口期间按42-A同等写权约束做只读检查（未写前端任何文件、未杀其进程、未发第二个 goal）。
 
-### 2026-09-14 14:24 +08:00 — 最新只读观察（本文件引用前端事实以此为准）
+### 2026-09-14 14:24 +08:00 — 历史只读观察（**不构成当前结论**；最新观察见本文件顶部 42 条与 status）
 
 - 工作树 `/home/maoqh/projects/agent-box-desktop-next-wsl-round1`，分支
   `feature/agentbox-desktop-product`，实际 HEAD `b02093ce9ee60dfaea7867afefe3500262ec8cc0`
@@ -652,7 +671,7 @@ powershell.exe -File accept-e.ps1 … -Port 18744 -PostCheck -InstanceId <两实
   completed/failed/cancelled 编码。后端对实际生成工件 29/29 回归通过，双方摘要已锁定；
   无需用户逐字段批准。
 
-## B — 双门判定（**均未满足，故未进入联调**）
+## B — 双门判定（**2026-09-14 历史快照；当前判定见 status 的 42 双门与前端观察字段**）
 
 | 门 | 判定 | 依据 |
 | --- | --- | --- |

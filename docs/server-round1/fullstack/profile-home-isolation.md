@@ -247,6 +247,6 @@ listing/读取失败。两点都不是品牌分支。
 - 四家目录迁移**已实施**（`implementation = DONE_FOR_FOUR_FAMILIES`，见 §8b）；Codex 生产封装见
   [codex-production-packaging.md](codex-production-packaging.md)。
 - 不得据此登记 `BACKEND_IMPLEMENTATION_READY`；`workbench_model_verified_count` 仍为 0。
-- 四家真实模型门、Codex 生产封装、c4 的 Windows 复验各自独立推进，本设计不是它们的前置或替代。
+- 四家真实模型门仍是唯一的开放项（本文件不是它们的前置或替代）。**Codex 生产封装已完成**，**Windows 复验已完成**（本轮用 bundle c6 通过 + 独立 `-PostCheck` clean；c4/c5 是历史证据、未被覆盖）。
   **Worker 5 秒租约缺陷已完成修复（`WORKER_LEASE_KEEPALIVE_FIXED`，含 Windows 真机 8 秒静默证据）**，
   不再列为当前缺口；本设计仍不改变租约语义。

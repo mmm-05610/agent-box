@@ -52,20 +52,26 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   同一 native id、上下文与真实重开方法；三家仍 MODEL_NOT_VERIFIED）。须继续 Codex 同级封装、
   最终门为**四家真实模型门**（Worker 5s 租约缺陷已修：`WORKER_LEASE_KEEPALIVE_FIXED`）
   （Codex/Pi/Hermes/OpenCode），任一封装就绪都不折算为已通过）。
-- frontend_observed_state: **DESKTOP_IMPLEMENTATION_READY（前端自述）**（只读观察，2026-09-15 00:26:14
-  +08:00；前端 HEAD `6ddf6be9f4912c234fa8b248e56a231de5e2447d`（`docs(desktop): release the frontend
-  implementation lease (honesty repair)`，23:49:26 +08:00 提交），工作树 **dirty 19 行**；
-  其 status.md 自述 `frontend_implementation=DESKTOP_IMPLEMENTATION_READY`（P06 独立验收完成，
-  `evidence/P06.md`，updated_at 23:20 +08:00）且 **`writer_lease=RELEASED`（本行之后该文件冻结）**）。
-  按只读观察如实记录，未写前端任何文件、未接管；**42-B 双门是否成立仍需下一阶段正式核对交接证据**。
+- frontend_handoff: **DESKTOP_HANDOFF_INCONSISTENT（READY 声明待核实）**——只读审计 2026-09-15
+  00:50:50 +08:00：前端 HEAD 已从 `6ddf6be9`（23:49「release the frontend implementation lease」）推进到
+  `3b22aae78970d53ab630816d84f09bc2df9dca28`（00:45:00「fix(desktop): close the P06 product-surface gaps
+  the r2 GREEN paused on」），其 status.md 顶部自述 `writer_lease=RELEASED` **因协调验收发现两个本端缺陷而
+  暂停**，末行仍留着 23:20 的"本行之后本文件冻结"标记——即**释放被其自己暂停、写入仍在继续**（工作树
+  6 改 + 1 未跟踪：`docs/desktop-product-delivery/status.md` 与 `evidence/{DESKTOP_IMPLEMENTATION_HANDOFF,
+  P02,P04,P05,P06}.md`，mtime 00:50；未跟踪目录 `evidence/P06-assets-r3/`，mtime 00:48）。**未发现可归属
+  前端的活跃写入进程**（按工作树路径扫描无命中），按纪律**未终止任何进程**；**未取得写权**、未记录
+  `FULLSTACK_INTEGRATION_OWNER`、未写前端任何文件。wire 两摘要只读重算仍与锁定值一致
+  （`11e3b3e7…` / `5d4fa3bf…`）。后端独立任务继续，此项**不构成本轮阻断**；下一阶段按其 handoff-policy
+  核对"READY 声明 + r2 证据 + lease 真正静止"三者一致后才可接管。
+- frontend_observed_state: **DESKTOP_IMPLEMENTATION_READY（前端自述，交接待核实）**（只读观察，2026-09-15
+  00:50:50 +08:00；其 status.md 自述 `frontend_implementation=DESKTOP_IMPLEMENTATION_READY` 与
+  `writer_lease=RELEASED（已暂停）`）。
 - frontend_worktree: /home/maoqh/projects/agent-box-desktop-next-wsl-round1 @ feature/agentbox-desktop-product。
-- frontend_checked_at: 2026-09-15 00:26:14 +08:00；observed_head:
-  `6ddf6be9f4912c234fa8b248e56a231de5e2447d`；`git status --porcelain` 本次 19 行（写权已释放但工作树非
-  clean，需下一阶段核对是否属交接遗留）；wire 两个摘要就地重算仍与锁定值一致
-  （`11e3b3e7…` / `5d4fa3bf…`，未重锁）。
-- 42 双门判定（2026-09-15 00:26 +08:00）：BACKEND_IMPLEMENTATION_READY=**否（暂时：四家真实模型门仍未
-  执行；四家生产封装与 HOME 隔离已完成）**；DESKTOP_IMPLEMENTATION_READY=**前端自述是、且写权已 RELEASED，
-  但后端尚未独立核对交接证据**（工作树 dirty 19 行）。**仍未进入全栈联调**，未写前端文件、未接管。
+- frontend_checked_at: 2026-09-15 00:50:50 +08:00；observed_head:
+  `3b22aae78970d53ab630816d84f09bc2df9dca28`；`git status --porcelain` 本次 7 行（6 改 + 1 未跟踪）。
+- 42 双门判定（2026-09-15 00:50 +08:00）：BACKEND_IMPLEMENTATION_READY=**否（暂时：四家真实模型门仍未
+  执行；四家生产封装与 HOME 隔离已完成）**；DESKTOP_IMPLEMENTATION_READY=**前端自述是，但交接不一致
+  （lease 释放被其自己暂停、仍在提交与修改），需下一阶段核验**。**仍未进入全栈联调**、未写前端文件。
 - wire_version / schema_digest: 当前28方法提交 `3aba5c5c` 为 **WIRE_LOCKED_FOR_IMPLEMENTATION**，TS
   `11e3b3e70d332585d31900c09ba063d95aa6b72b1904921c665fb72f81c10035`、生成工件
   `5d4fa3bfeec6c3273c6073b37794e4ab2aca6e07e48184bc3a2b878c1fe5e4ed`。15:48 在前端工作树**就地
@@ -145,6 +151,30 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   仍然只见通用 deployment 字段、无任何 Harness 品牌分支；通用测试 17 项，ACP 路径回归 91 passed、
   Node 25/25。证据见 [native-driver-seam.md](../server-round1/fullstack/native-driver-seam.md)。
   driver 路径已用一次性探针在真实 Worker+bwrap 上验证（模块投递、凭据到孙进程、state 回投）。
+- worker_view_contract_hardened: **Worker view 列表合同收紧**——普通目录递归、普通文件列出，**符号链接不跟随
+  不读取不捕获**（允许跳过 Codex 运行期的 argv0 别名），但**每一个访问到的条目（目录/文件/符号链接/特殊
+  文件）都计入统一 traversal 上限**（`MAX_VIEW_TRAVERSAL_ENTRIES = 4096`，超过即类型化失败）；FIFO/socket/
+  设备等**特殊文件类型化拒绝整个 listing**（原先被静默跳过，等于报告一个并不存在的目录）；`view.get`
+  继续拒绝 symlink 与一切非普通文件；被跳过的符号链接不被删除，cleanup 仍然可用。Rust 测试 15 passed。
+- state_capture_content_stable: **state 捕获改为内容稳定性门**——不再只比较 `(path, size)`（同长度改写会
+  被误判稳定），改为完整 snapshot `relative path + size + digest`、连续两次身份相同才算稳定，且**返回的
+  字节就是与稳定 snapshot 相符的那一份**；任一文件在分块读取中 digest 改变则继续等待（有界）；deadline
+  到期抛 **`SIDECAR_STATE_NOT_SETTLED`**，**绝不静默生成 checkpoint**；空 state 连续两次空 snapshot 即
+  稳定；256 文件/8 MiB/受保护路径/凭据扫描规则全部保持。定向测试 7 项。
+- worker_bundle_c6: 因 Worker 合同收紧重建 **`.acceptance-bundle-c6`**
+  （`sha256:96256b2ea76218448183fc0b1063aba92c15fca3fb22fa8a00f7e0f7efc2466e`）；**c4/c5 未覆盖**、仍为
+  历史有效证据。版本口径：ABW1 frame 与 manifest **`wireVersion = 1`**，Worker control
+  **`PROTOCOL_VERSION = 3`**（本轮未改响应形状，故 control protocol 不升版）。
+- windows_r4_c6: Windows r4 用 **c6** 通过（exit 0、`worker_digest=sha256:96256b2e…`、
+  `state_projection=/runtime/home/sessions`、`session/new→session/resume`、delta 10 < completed 12、
+  8 秒静默在默认 5 秒租约下 `elapsed_ms=8857` 完成）+ 独立 `-PostCheck …CLEAN`。
+- codex_config_boundary: Codex 生产配置边界**只读复核**（未改产品值）：`model=deepseek-flash`、
+  `base_url=https://api.deepseek.com/`、`wire_api=responses`、`CODEX_HOME=/runtime/home/.codex`、
+  `env_key=CODEX_API_KEY`、`cli_auth_credentials_store=ephemeral`。`CODEX_API_KEY` 只是 deployment 声明的
+  **临时环境变量名**；用工件内 0.147.0 二进制**只读**探测确认 `ephemeral` 是受支持值（非法值报
+  `expected one of file, keyring, auto, ephemeral`），且 Codex 运行后的 checkpoint 里**没有 `auth.json`**
+  （未落盘认证），token 不入 deployment/事件/state/workspace/Git；**未执行**签入的官方 setup 脚本、
+  **未读**用户 `~/.codex`。
 - native_home_isolation: **PROFILE_NATIVE_HOME_ISOLATION_IMPLEMENTED** /
   `DONE_FOR_FOUR_FAMILIES`（guest `HOME=/runtime/home`；Codex `/runtime/home/.codex` + `CODEX_HOME`、
   Pi `.pi/agent` + `PI_CODING_AGENT_DIR`、Hermes `.hermes` + `HERMES_HOME`、OpenCode `.config/opencode` +
@@ -225,7 +255,9 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   跨 Python-Rust tree digest v1 + golden fixture；上限 32768 条目 / 1 GiB / 4096 字节路径；
   Worker control protocol **2→3** 双向拒绝（含真实 c3 旧二进制）；c4 bundle
   `sha256:31e92959b06b3ee9f30ebfb9ce6b2bee74af847e4a147bba906bff7ecf681fa6`（c2/c3 未覆盖）。
-  **c4 尚未在 Windows 复跑**：c3 的 r4 仍是历史有效证据；本阶段不运行 Windows r4）。
+  **（历史阶段 r4-era 记录）当时 c4 尚未在 Windows 复跑**：c3 的 r4 是那一阶段的历史有效证据。
+  此后 Windows r4 已分别用 bundle c5 与 **c6** 通过（见本文件 worker_view_contract_hardened /
+  state_capture_content_stable 两条）；c4/c5 保留为历史证据，未被覆盖）。
 - runtime_artifact_projection_gate: 真实 release Worker(c4)+bwrap 本地 fixture，无网络无模型，
   `scripts/server-round1/runtime-artifact-gate.py` exit 0（fixture 从 `/runtime/artifacts/fixture-dep`
   加载依赖并返回固定值、guest 写入被拒、宿主树未变、摘要不符时 turn 失败且无伪造 session、无残留
@@ -265,7 +297,10 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   Pi 全链 gate exit 0。Windows r4 **本阶段未重跑**。
   Hermes/OpenCode 生产封装增量后（主会话串行复跑同一命令）：python **529 passed/4 skipped/0 failed**
   （该轮 +85：Hermes 36、OpenCode 25、driver 接缝 17、Pi 别名/翻译断言加强等；4 项既有 skip 未扩大）；
-  HOME 隔离 + Codex 封装轮（本阶段）复跑：python **786 passed/4 skipped/0 failed**（较上一条 +103）：
+  state 捕获/Worker 合同收紧轮（本阶段）复跑：python **793 passed/4 skipped/0 failed**（较上一条 +7：
+  content-stable settle 7；Rust **15 passed**）；四家 gate + runtime-artifact gate 用 **c6** 串行 exit 0
+  （Codex 默认与外部工件两种模式都 exit 0）；**Windows r4 用 c6 通过 + `-PostCheck…CLEAN`**。
+  HOME 隔离 + Codex 封装轮（上一轮）复跑：python **786 passed/4 skipped/0 failed**（较上一条 +103）：
   四家 gate（Pi/Hermes/OpenCode/Codex）串行 exit 0、Codex 外部工件模式 exit 0、runtime-artifact gate(c5)
   exit 0；node 25/25、13/13、42d 4/4、构建器 11/20/9/9；Rust fmt 干净 + 11 passed；
   **Windows r4 用 c5 bundle 通过**（`sha256:92eac03a…`、`state_projection=/runtime/home/sessions`、

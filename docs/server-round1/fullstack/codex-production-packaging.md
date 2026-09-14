@@ -30,6 +30,11 @@ Server → Core → generic sidecar deployment → c5 release Worker(ABW1 intera
 `[model_providers.deepseek]`（`name="deepseek"`、`base_url="https://api.deepseek.com/"`、
 `wire_api="responses"`、`env_key="CODEX_API_KEY"`）。不含 loopback 地址、不含 token、不含 `/v1`。
 
+`cli_auth_credentials_store = "ephemeral"` 的受支持性经**只读探测**确认（用工件内 0.147.0 二进制，
+`CODEX_HOME` 指向临时目录）：非法值报
+`unknown variant 'definitely-not-a-value', expected one of 'file', 'keyring', 'auto', 'ephemeral'`，
+`ephemeral` 被接受；且 Codex 运行后的 checkpoint 里**没有 `auth.json`**（认证未落盘）。
+
 两处与最初设想的差异，均为实测必需：`env_key` 与注入名必须是 **`CODEX_API_KEY`**（`codex-acp 1.1.14`
 的 ACP api-key 认证只读 `CODEX_API_KEY`/`OPENAI_API_KEY`，且原生 provider 只认 `env_key`；这与 42-D 早已
 登记的 `CODEX_API_KEY` 首选认证接缝一致）；`cli_auth_credentials_store="ephemeral"` 用于避免把凭据落盘
@@ -87,8 +92,11 @@ Server → Core → generic sidecar deployment → c5 release Worker(ABW1 intera
 ## 5. 本阶段发现的两个通用缺陷（已修）
 
 1. **Worker view 列表遇符号链接即整份失败**：Codex 运行期必写 argv0 别名链接，导致 state 捕获必然
-   `VIEW_INVALID`。修复：`list_view_files` 跳过非普通条目，`view.get` 仍拒绝非普通文件（跳过的条目
-   不在 manifest，永远无法被解析）。附 Worker 单测。
+   `VIEW_INVALID`。修复（后续返修轮进一步收紧为最终合同）：`list_view_files` **跳过符号链接**（不跟随、
+   不读取、不捕获，且不删除，cleanup 仍可用），`view.get` 仍拒绝非普通文件；**FIFO/socket/设备类型化
+   拒绝整个 listing**（不再静默跳过）；**所有访问条目计入统一 traversal 上限 4096**；state 捕获改为
+   **内容稳定性门**（完整 snapshot path+size+digest 连续两次相同才接受，deadline 到期抛
+   `SIDECAR_STATE_NOT_SETTLED`，绝不静默生成 checkpoint）。
 2. **gate 在"外部工件缺失"时会挂起而非失败**：`finally` 里 `endpoint.stop()` 对**从未 start** 的
    `serve_forever` 调 `shutdown()` 会永久阻塞（实测 40 分钟）。修复：四个 gate 的端点 stop 幂等且只有
    真正 start 过才 shutdown；Codex gate 对缺失的外部工件给类型化 `CODEX_GATE_ARTIFACT_MISSING` 立即失败，
@@ -109,8 +117,11 @@ Windows c5 r4 + PostCheck                   → exit 0 / …_POSTCHECK_CLEAN
 
 - Codex 仍 **MODEL_NOT_VERIFIED**：本门用 loopback 假端点与固定 nonce，不是模型能力证据；四家真实模型门
   均未执行。
-- **bundle 从 c4 → c5**（Worker 的 view 列表修复）：c4 未被覆盖、仍为历史有效证据；本阶段 Windows r4 用的
-  是 c5（`sha256:92eac03a…`），协议版本未变（仍 1）。
+- **bundle 演进 c4 → c5 → c6**（Worker 的 view 列表修复与合同收紧）：c4 与 c5 均未被覆盖、仍是历史有效
+  证据；最新 Windows r4 用的是 **c6**
+  （`sha256:96256b2ea76218448183fc0b1063aba92c15fca3fb22fa8a00f7e0f7efc2466e`）。版本口径：
+  **ABW1 frame 与 manifest `wireVersion = 1`**，而 **Worker control `PROTOCOL_VERSION = 3`**——
+  本轮没有改变任何响应形状，因此 control protocol 不升版。
 - 已知残余：`cli_auth_credentials_store="ephemeral"` 属官方支持的配置键，但"凭据完全不落盘"仍取决于该
   版本实现，后续真实模型门应在真实凭据下复核；工件摘要在 bootstrap 校验一次（既有 TOCTOU 窗口）；
   bwrap 网络姿态未改。
