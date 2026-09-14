@@ -35,10 +35,12 @@ SecretStore → Worker secret 帧 → 环境注入到达适配器进程，不写
 * 原生 Codex 的模型请求凭证来自 `env_key`，所以 `env_key` 与注入名必须是同一个
   变量（实测：两者都在时请求头用的是 `env_key` 的值；只有 `env_key` 没有
   ACP 认证变量时认证步骤失败）。
-* `cli_auth_credentials_store = "ephemeral"` 让那次 ACP 认证不把凭据落成
-  `$CODEX_HOME/auth.json`：凭据只属于该进程的环境，不成为原生状态，也就不可能进入
-  checkpoint（实测：该值为 `file`/缺省时 app-server 会写出含原文的 `auth.json`，
-  sidecar 的 state 捕获会以 `SIDECAR_STATE_CONTAINS_SECRET` 拒绝这种捕获）。
+* `cli_auth_credentials_store = "ephemeral"` 让那次 ACP 认证在实测轮里不把凭据落成
+  `$CODEX_HOME/auth.json`（实测：该值为 `file`/缺省时 app-server 会写出含原文的
+  `auth.json`，sidecar 的 state 捕获会以 `SIDECAR_STATE_CONTAINS_SECRET` 拒绝这种捕获）。
+  **这只证明 auth.json 未生成**；其他 native state 路径尚未证明安全——2026-09-15 的
+  无模型门中约 1/15 轮凭据扫描在原生 state 命中过假 token（fail-closed 拦截，写入文件
+  待捕获），见 docs/server-round1/fullstack/state-error-boundary.md §4.3。
 
 本模块**不**读、不存、不产出任何凭据内容。
 """

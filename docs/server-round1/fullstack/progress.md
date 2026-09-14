@@ -70,8 +70,9 @@
   全部如实记录、红不掩盖。
 - **两个第一手定位的 Codex 原生行为发现（待用户裁决）**：①运行时把内置 plugin/skill 语料解包进
   `$CODEX_HOME/.tmp/plugins/`（实测峰值 **5529 文件**；与列表上限 1024 相撞即确定性
-  `VIEW_FILE_LIMIT`——旧行为同条件是重试 10s 后 `NOT_SETTLED`；在本机已由间歇转为稳定复现，
-  Codex 门现行红）；②约 1/15 轮凭据扫描在原生 state 命中假 token（扫描正确拒绝，命中文件
+  `VIEW_FILE_LIMIT`——旧行为同条件是重试 10s 后 `NOT_SETTLED`；该突发与捕获的重叠为
+  未解决的红绿间歇【历史快照：2026-09-15 晚间曾连续 5 轮红】）；②约 1/15 轮凭据扫描在原生
+  state 命中假 token（扫描正确拒绝，命中文件
   待捕获）。Reviewer 复审亦给出方案 A/B/C 并推荐 A（部署层 attempt-ephemeral 投影 `.tmp`
   + fail-closed 扫描），**待用户裁决**。均见
   [state-error-boundary.md](state-error-boundary.md) §4.2/§4.3。

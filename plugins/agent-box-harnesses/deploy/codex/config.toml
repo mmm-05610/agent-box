@@ -13,9 +13,12 @@
 #     It must be the same name the ACP adapter's `api-key` authentication reads
 #     (`codex-acp` 1.1.14 reads CODEX_API_KEY/OPENAI_API_KEY only), because the
 #     reviewed upstream bridge always performs that authentication step.
-#   * `cli_auth_credentials_store = "ephemeral"` keeps that authentication from
-#     persisting the credential into `$CODEX_HOME/auth.json`: the credential is
-#     read from the environment for this process only and never becomes native
+#   * `cli_auth_credentials_store = "ephemeral"` kept that authentication from
+#     persisting the credential into `$CODEX_HOME/auth.json` in the verified
+#     runs: the credential is read from the environment for this process only.
+#     This proves only that auth.json is absent; other native-state paths are
+#     not yet proven safe and have an observed counterexample (a gate run whose
+#     credential scan hit a fake token inside the native state - fail-closed).
 #     state (and therefore never reaches a checkpoint).
 model = "deepseek-flash"
 model_provider = "deepseek"

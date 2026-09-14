@@ -1681,9 +1681,6 @@ def run_requests(runs: list[list[dict]], index: int) -> list[dict]:
 # --------------------------------------------------------------------------
 
 
-#: The failure codes that belong to the state-capture step. Only a turn that
-#: failed *in that step* with one of these codes can be causally attributed to
-#: the alias-symlink problem; anything else is recorded as a co-observation.
 def annotate_known_blocker(report: dict | None = None) -> None:
     """Record alias-link observations next to a failed turn, without causal claims.
 
