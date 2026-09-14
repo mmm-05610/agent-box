@@ -4,6 +4,22 @@
 已发生的1次可达性请求由后端受控进程读取仓库外 locator，未把内容写入仓库或输出。
 受管 Harness 的 SecretStore→Worker 投影尚未执行，不以计划中的注入路径冒充已验事实。
 
+## 2026-09-14 — Codex 官方 Responses 隔离投影检查点
+
+- 只读取得 DeepSeek 官方 `codex-deepseek-setup.sh` 1.3.0，脚本 SHA-256
+  `0a3a33704e1fb1579300d559f009279c7db8e06aa428a0cba07ac9e265a130ca`；未执行脚本、未修改用户
+  `~/.codex`。仓内 `deepseek-models.json` 与官方 heredoc 原始字节完全一致，包含
+  `deepseek-flash`、`deepseek-v4-pro` 各39字段；AgentBox运行白名单仍只有 `deepseek-flash`。
+- `399d78d` 增加 Harness-owned 无密钥配置生成、实际wheel目录包含性、deployment内的adapter source/
+  非敏感环境/配置文件、摘要固定外部可执行文件挂载，以及ACP `api-key`首选认证接缝。TOML固定
+  `responses`、官方根URL、`high`、禁用搜索，catalog指向隔离内实际绝对路径；首次真实尝试只走
+  Worker秘密帧注入的 `CODEX_API_KEY`，配置里没有 `experimental_bearer_token`。
+- 定向验证为 Python 53 passed、Node 25 passed，wheel确实包含完整目录；未读密钥、未发模型或网络请求，
+  费用账不变。
+- 集成审阅发现并如实降级：当前每turn清理临时native home，只有native id、没有会话文件，尚不能证明
+  第二轮上下文或原生resume。下一检查点补通用有界捕获/Windows ObjectStore持久化/下一轮回投及密钥扫描，
+  不在Server/Core增加Codex分支。
+
 ## 2026-09-14 12:44 +08:00 — 模型冻结与秘密投影代码检查点
 
 - `502f4b5` 将 Profile 的模型引用解析为包含 ProviderModel id/version、provider、model、credentialId
@@ -46,7 +62,7 @@
 
 | 门 | 判定 | 依据 |
 | --- | --- | --- |
-| BACKEND_IMPLEMENTATION_READY | **否（暂时）** | 28方法+队列终态已锁定并29/29；只待串行Windows r4重确认 |
+| BACKEND_IMPLEMENTATION_READY | **否（暂时）** | 28方法+队列终态已锁定并29/29；native state捕获/恢复与Windows r4待完成 |
 | DESKTOP_IMPLEMENTATION_READY | **否** | 前端自报 PARTIAL，且 `writer_lease=ACTIVE`（未释放）；独立实现/验收门未完 |
 
 因此仍**没有**记录 `FULLSTACK_INTEGRATION_OWNER`，**没有**接管前端工作树，
@@ -82,8 +98,8 @@
    Responses。用户提供的 DeepSeek 官方 `codex-deepseek-setup.sh` 1.3.0（2026-09-14 只读取得
    SHA-256 `0a3a33704e1fb1579300d559f009279c7db8e06aa428a0cba07ac9e265a130ca`）明确配置
    `base_url="https://api.deepseek.com/"` 与 `wire_api="responses"`，并提供完整模型目录。
-   因此撤回“协议不兼容/证伪”结论；原错误与零模型调用事实保留。目前正在 AgentBox 隔离 Profile
-   中按官方配置验证，不执行该脚本、不修改用户真实 `~/.codex`、不建设协议代理。
+因此撤回“协议不兼容/证伪”结论；原错误与零模型调用事实保留。`399d78d` 已完成官方 Responses
+非敏感配置和完整目录投影，但尚未发真实模型请求；不会执行该脚本、修改用户真实 `~/.codex` 或建设协议代理。
 
 ### 未完成
 

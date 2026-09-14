@@ -1,6 +1,6 @@
 # Work Order 41 — 核心产品合同与后端独立验收
 
-日期：2026-09-14。当前状态：**`BACKEND_WINDOWS_RECONFIRM_IN_PROGRESS`**。分支
+日期：2026-09-14。当前状态：**`BACKEND_NATIVE_RESUME_IN_PROGRESS`**。分支
 `feature/server-harness-extension-v1`；25方法/Windows基线检查点为 `72d6258`。此结论只代表后端独立门，不代表
 真实模型或全栈 Green。41 全程使用显式 no-model ACP fixture，未读模型凭据、未发模型请求，
 费用 ¥0；42 已有费用账继续单独累计。
@@ -11,8 +11,8 @@
 及发送结果回查，并以 `3aba5c5c` 提交队列终态修订，总计28方法。当前 TS 摘要
 `11e3b3e70d332585d31900c09ba063d95aa6b72b1904921c665fb72f81c10035`，生成工件
 `5d4fa3bfeec6c3273c6073b37794e4ab2aca6e07e48184bc3a2b878c1fe5e4ed`。后端直接按工件
-**29/29通过**，当前摘要已锁定，精确确认见 [wire-review.md](wire-review.md)。Windows r4
-重确认完成前，本文件不冒称最终 READY。
+**29/29通过**，当前摘要已锁定，精确确认见 [wire-review.md](wire-review.md)。真实 native state
+捕获/恢复与 Windows r4 完成前，本文件不冒称最终 READY。
 
 ### 已完成的25方法稳定基线
 
@@ -70,9 +70,11 @@ Windows Server → SessionService → Work Core → Harness extension port
 ```
 
 Worker 只持有带生命周期的运行投影；Server 是 Session/Profile/队列/事件权威。每个执行保存 Core
-work/execution/dispatch identity 与原生 Session id。当前组件声明 `resumable:false` 时 checkpoint
-如实记录，不假装原生进程可跨重启恢复。Server 重启把未完成执行封为 unknown/recovery_required，
-恢复队列记录但不自动重派；Worker 失联、投影回收和清理失败均有持久状态。
+work/execution/dispatch identity 与原生 Session id。`399d78d` 已把摘要固定的 adapter/native executable、
+只读非敏感配置、完整官方目录和一次性凭据接入同一生产链；Python 53、Node 25 与 wheel 包含性通过。
+审阅同时确认：仅保存 native id 不足以跨 turn resume，因为每次清理会销毁临时 native home；有界会话
+文件捕获→Windows ObjectStore→下一轮回投正在补齐，未完成前 checkpoint 继续诚实标 `resumable:false`。
+Server 重启把未完成执行封为 unknown/recovery_required；Worker 失联、投影回收和清理失败均有持久状态。
 
 ## E — Windows 独立验收
 
