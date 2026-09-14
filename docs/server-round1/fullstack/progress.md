@@ -4,6 +4,41 @@
 已发生的1次可达性请求由后端受控进程读取仓库外 locator，未把内容写入仓库或输出。
 授权真实 credential 的 SecretStore→Worker 投影尚未执行，不以测试值路径冒充付费验收事实。
 
+## 2026-09-14 — 42-D 运行时工件投影底座（provider-neutral）
+
+详细证据：[runtime-artifact-projection.md](runtime-artifact-projection.md)。终态
+**RUNTIME_ARTIFACT_PROJECTION_READY**；`BACKEND_IMPLEMENTATION_READY` 仍未登记。
+
+- 新增中立能力 `runtimeArtifactMounts`：部署声明「canonical WSL 源目录 + 受限 target
+  `/runtime/artifacts/<stable-name>` + 稳定 tree digest」；Server 只做通用 schema 校验并透传，
+  connector bootstrap 携带预期摘要，**Worker 在 WSL 内权威重算并比对**，bwrap 只对该已授权目录
+  `--ro-bind`。Server/Core/Worker/bwrap 无品牌分支；Harness 专有路径/环境变量留给后续插件阶段。
+- 跨语言 tree digest v1（Python `agent_box_sandbox_bwrap.artifacts` / Rust `artifacts.rs`），
+  golden fixture 两侧逐字节一致（`protocols/worker/golden/runtime-artifact-tree-v1*.json`）。硬上限
+  32768 条目 / 1 GiB 内容 / 4096 字节路径；拒绝 root 或内部 symlink、FIFO/socket/设备、非可打印
+  ASCII 路径、重复或 ASCII 大小写冲突、越界、与 workspace/worker root 重叠。
+- Worker control protocol **2 → 3**（bootstrap 结构变化），双向拒绝均有测试；其中「新客户端 + 旧
+  Worker」用真实历史二进制 `.acceptance-bundle-c3` 复现。bootstrap 拒绝改为类型化 `WORKER_ERROR`
+  帧，Server 侧重抛为带 code 的 `SidecarError`，原因进入持久 dispatch 账本。
+- 新 acceptance bundle `.acceptance-bundle-c4`：
+  `sha256:31e92959b06b3ee9f30ebfb9ce6b2bee74af847e4a147bba906bff7ecf681fa6`；c2/c3 未覆盖未删除。
+  **本阶段不运行 Windows r4**：c3 的 r4 仍为历史有效证据，c4 尚无 Windows 平台证据。
+- 真实 release Worker(c4)+bwrap 无网络无模型门 exit 0：
+  `python3 scripts/server-round1/runtime-artifact-gate.py --worker <.acceptance-bundle-c4/agent-box-worker>`
+  → fixture 从 `/runtime/artifacts/fixture-dep` 加载依赖返回固定值、guest 写入被拒、宿主树未变、
+  摘要不符时 turn 失败且无伪造 session、无残留 view/secret。只登记**运行工件投影门**，
+  **不登记任何 Harness/model 通过**。
+- 缺陷核查：工作令所述 sidecar bundle「重复嵌套分块上传」在 HEAD `989c9f2` 上**未复现**（单个
+  (path, offset) 唯一一次 `view.put`）；已补行为测试并按工作令形态做临时反证（测试随即失败）后
+  还原，未做无谓“修复”、未降低 view digest 或完整性断言。细节见证据文档 §7。
+- Python 全套 `424 passed, 4 skipped, 0 failed`（41 记录基线 348/4；本阶段收集 +76 项）；Node 25/25
+  与 42d 4/4；Rust `cargo fmt --check` 干净、`cargo test --locked --release` 10 passed（基线 4）。
+- 模型调用 0、费用增量 ¥0；累计仍 1 次 / 12 tokens / <¥0.01；未读凭据内容。
+- 前端只读观察（14:54 +08:00）：HEAD `6a29fd7043fc2c1af34eb478eaaa08564763c986`、工作树 clean、
+  `writer_lease=ACTIVE`、`frontend_implementation=PARTIAL`；TS/生成工件摘要就地重算未变（未重锁）。
+- 下一阶段：在同一底座上分别封装 Pi（Node 模块目录）、Hermes（隔离 Python 包闭包）、
+  OpenCode（单文件二进制沿用 existing executableMounts，不退化），随后进入 42-D 逐家真实门。
+
 ## 2026-09-14 — Work Order 41 Windows r4 平台门通过
 
 Windows 真机、`py.exe -3.12`、真实 `wsl.exe`、digest 固定的 release Worker、locked 28 方法 wire schema、
