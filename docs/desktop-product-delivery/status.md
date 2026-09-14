@@ -885,3 +885,32 @@ wire-review.md通道自39阶段协调。执行者下个检查点消费这些规�
 - **终态**: `P06_GREEN — FRONTEND_INDEPENDENT_ACCEPTANCE`、`DESKTOP_IMPLEMENTATION_READY`
   在 r2 证据齐备后重新声明；`REAL_FLOW_VERIFIED=否`、`AGENTBOX_DESKTOP_PRODUCT_GREEN=否/待全栈`
   不变；`history.snapshot` 旧页分页与不可达 `SessionPickerOverlay` 保持已知项，本单未扩范围。
+
+---
+
+## release（2026-09-15）：P06 诚实性返修结束，写权再次释放
+
+- updated_at: 2026-09-15（+08:00），**writer_lease = RELEASED**（本行之后本文件冻结）
+- 代码与证据最终 HEAD: `2a728d91`（产品+驱动修复与证据文档）；**最终 HEAD 为本 release
+  文档检查点自身**——即 `git rev-parse HEAD`（`git log -1`），它只改本文件，不含代码或证据变更
+- 返修提交链: `9fe414a2`（起点）→ `f47e5219`（产品 authority 门 + 驱动 fail-closed）→
+  `1ed11197`（驱动挣得 boot 覆盖证明）→ `2a728d91`（证据与状态文档）→ 本 release 检查点
+- **重新声明的终态**（以 r2 Windows 证据为据，`evidence/P06.md` §11）：
+  - **P06 = `P06_GREEN — FRONTEND_INDEPENDENT_ACCEPTANCE`** —— r2 驱动
+    **22 PASS / 0 FAIL / 0 SKIP / 0 PENDING，`allOk=true`**，两道 legacy REST 门独立成立
+    （main refusals **0**；renderer `residualLegacyPaths` 严格 **`[]`**），计数与 steps 数机械一致
+  - **`DESKTOP_IMPLEMENTATION_READY`** —— 入口 `evidence/DESKTOP_IMPLEMENTATION_HANDOFF.md`
+  - `REAL_FLOW_VERIFIED = 否`（无真实 Server/Harness/模型链路证据）
+  - `AGENTBOX_DESKTOP_PRODUCT_GREEN = 否 / 待全栈`（外围能力矩阵未下单）
+- 用户通过本派单重新授予的**有限前端写权已用完并交回**：停写范围含文档 amend。原前端 goal 不因
+  后端等待或其他原因自行恢复写入。
+- 工作树 `git status --short` 为空（含未跟踪文件）；无残留 Vitest/Playwright/Electron 进程
+  （WSL 与 Windows 构建树均已核对）；子代理全部结束。
+- **后端接管**：按 `docs/desktop-product-delivery/handoff-policy.md` 的 42 双门规则，读取本文件与
+  `evidence/DESKTOP_IMPLEMENTATION_HANDOFF.md`，核对分支/HEAD/摘要/可运行性，确认无新前端 writer、
+  无子代理、无未交接修改后，在正式派单指定的工作树记录 `FULLSTACK_INTEGRATION_OWNER` 并安装
+  lifecycle connection。**本轮未开始后端全栈联调，未改后端。**
+- **已知边界（本单未扩范围，见 `P06.md` §12）**：`history.snapshot` 旧页分页未挂载、
+  `SessionPickerOverlay` 潜在未门控且当前不可达、Appearance 设置页直接导航仍有一次被拒的
+  `GET /api/config`、`hermes-bots` session sweep 的 REST 读取需活服务、WSL loopback 环境基线、
+  未删除的 dead legacy 模块清单。
