@@ -65,7 +65,7 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   42-D 工件投影检查点=`dba9c0f`+`f846f09`；Pi 生产封装检查点=`0f499b7`+`9f3dd9c`（封装实现 + 证据），
   Pi gate 清理返修=`828bc5b`+`f6f7411`；
   Hermes 封装检查点=`19f945a`、OpenCode 封装检查点=`d3a543a`、通用原生 driver 接缝检查点=`fc62037`、
-  两家证据/status 收口检查点=`3721398`（本阶段四个检查点互不替代）；
+  两家证据/status 收口检查点=`625cc2b`（其余三个检查点互不替代）；
   前端合同检查点=`3aba5c5c`、前端观察 HEAD=`bd1b28b4`；前端尚无最终交接检查点。
 - pi_production_chain: **PI_PRODUCTION_CHAIN_PREPARED**（真实 `@automatalabs/pi-acp@0.5.0` + 真实 Pi
   依赖闭包 → c4 release Worker + bwrap → 本机 loopback 假 DeepSeek 端点；Pi 运行时工件 317 包 /
