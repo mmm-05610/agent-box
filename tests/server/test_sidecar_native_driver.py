@@ -145,6 +145,7 @@ def test_port_turns_neutral_driver_deltas_into_product_facts(bundle, tmp_path):
         environment=sidecar_environment(tmp_path),
         profile="fixture-native",
         adapter=launch_for(bundle),
+        declared_capabilities={"native_continuation": True},
         model="fixture-model",
         state_directory=str(tmp_path / "state"),
         directory=str(tmp_path),

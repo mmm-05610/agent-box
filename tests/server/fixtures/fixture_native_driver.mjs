@@ -13,9 +13,11 @@
 export async function createDriver(context) {
   const sessions = new Set()
   return {
+    // Mirrors the controlled ACP peer's native abilities on purpose: the two
+    // transports must project the same canonical capability view.
     capabilities: {
       agentInfo: { name: "fixture-native-driver", version: "1.0" },
-      promptCapabilities: { image: false },
+      promptCapabilities: { image: true },
       sessionCapabilities: { resume: {}, list: {} },
     },
     async start() {},

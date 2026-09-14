@@ -66,7 +66,7 @@ def alpha_beta_registry():
     registry.register(HarnessDescriptor(
         "alpha", credential_kind="alpha-key",
         configuration_validator=lambda value: None if isinstance(value, dict) else ValueError(),
-        capability_claims={"streaming": True},
+        capability_claims={"stream": True},
     ))
     registry.register(HarnessDescriptor(
         "beta", credential_kind=None,
@@ -182,7 +182,7 @@ def test_two_neutral_providers_are_selectable_without_server_changes(tmp_path):
             "name": "beta role", "harness_type": "beta",
             "configuration": {"required": True}, "credential_id": None,
         }, "beta-profile").json()
-        assert alpha_profile["capabilities"] == {"streaming": True}
+        assert alpha_profile["capabilities"] == {"stream": True}
         assert beta_profile["capabilities"] == {}
 
         for name, profile in (("alpha", alpha_profile), ("beta", beta_profile)):
@@ -206,7 +206,7 @@ def test_two_neutral_providers_are_selectable_without_server_changes(tmp_path):
 
         listed = client.get("/api/v1/profiles", headers=headers).json()["items"]
         claims = {item["harness_type"]: item["capabilities"] for item in listed}
-        assert claims == {"alpha": {"streaming": True}, "beta": {}}
+        assert claims == {"alpha": {"stream": True}, "beta": {}}
 
 
 def test_capability_answers_reflect_registration_only(tmp_path):
@@ -233,7 +233,7 @@ def test_capability_answers_reflect_registration_only(tmp_path):
         readiness = client.get("/api/v1/readiness", headers=headers).json()
         harnesses = readiness["capabilities"]["harnesses"]
         assert set(harnesses) == {"alpha", "beta"}
-        assert harnesses["alpha"]["capability_claims"] == {"streaming": True}
+        assert harnesses["alpha"]["capability_claims"] == {"stream": True}
         assert harnesses["alpha"]["available"] is False
         assert harnesses["alpha"]["unavailable_reason"] == "EXECUTION_CAPABILITY_UNAVAILABLE"
         assert harnesses["beta"]["capability_claims"] == {}

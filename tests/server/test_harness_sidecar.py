@@ -558,7 +558,7 @@ def test_server_core_real_worker_persists_stream_before_terminal(tmp_path, monke
         "schemaVersion": 1,
         "pluginRoot": str(PLUGIN),
         "harnesses": [{
-            "id": "pi", "capabilityClaims": {"streaming": True},
+            "id": "pi", "capabilityClaims": {"stream": True, "attach": True},
             "adapter": {
                 "command": "/usr/bin/node",
                 "args": [
@@ -704,6 +704,9 @@ def _stateful_real_worker_runtime(tmp_path, monkeypatch, *, harness_id):
     deployment.write_text(json.dumps({
         "schemaVersion": 1, "pluginRoot": str(PLUGIN),
         "harnesses": [{"id": harness_id, "timeoutMs": 30_000,
+                       # The stateful peer advertises sessionCapabilities.resume, and the
+                       # unified capability contract requires the static ceiling too.
+                       "capabilityClaims": {"native_continuation": True},
                        "stateProjection": {"target": "/tmp/agentbox-home/sessions"},
                        "adapter": {"command": "/usr/bin/node", "args": [],
                                    "source": STATEFUL_FIXTURE_RELATIVE}}],
@@ -965,7 +968,7 @@ def test_unusable_checkpoint_fails_the_turn_without_inventing_a_session(
 def _local_sidecar_runtime(tmp_path, *, provider_model=False):
     registry = HarnessRegistry()
     registry.register(HarnessDescriptor(
-        "pi", capability_claims={"streaming": True},
+        "pi", capability_claims={"stream": True},
         model_control_id="model" if provider_model else None,
         control_options={"model": ("initial", "queued", "later")},
     ))
@@ -1152,7 +1155,7 @@ def test_stop_or_failure_pauses_queued_turn(tmp_path, first_text, terminal):
 def test_sidecar_permission_round_trip_uses_server_approval_store(tmp_path):
     registry = HarnessRegistry()
     registry.register(HarnessDescriptor("pi", capability_claims={
-        "streaming": True, "approvals": True,
+        "stream": True, "permissions": True,
     }))
 
     class Connector:
@@ -1320,7 +1323,10 @@ class _CapabilityLauncher:
 ])
 def test_sidecar_reports_resume_only_when_the_harness_advertised_it(advertised, expected):
     launcher = _CapabilityLauncher(advertised)
-    port = SidecarHarnessPort(launcher, environment={"AGENTBOX_SIDECAR_ISOLATED": "1"}, profile="pi")
+    port = SidecarHarnessPort(
+        launcher, environment={"AGENTBOX_SIDECAR_ISOLATED": "1"}, profile="pi",
+        declared_capabilities={"native_continuation": True},
+    )
     try:
         assert port.open_execution("exec-capability") == "native-fake"
         captured = port.capture_execution("exec-capability")

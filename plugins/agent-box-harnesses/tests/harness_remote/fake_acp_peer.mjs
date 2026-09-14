@@ -40,7 +40,13 @@ for await (const line of rl) {
   if (method === "initialize") {
     send({ jsonrpc: "2.0", id, result: {
       agentInfo: { name: "controlled-peer", version: "test" },
-      agentCapabilities: { loadSession: true, promptCapabilities: { image: true } },
+      // `sessionCapabilities: { resume: {} }`——ACP 用**空对象**表示"已播发该能力"
+      // （真实 Hermes / Pi 播发的就是这种形状）。客户端的 `acp-client.js` 只从
+      // `agentCapabilities.sessionCapabilities` 取会话能力，所以这里少了它，这条受控
+      // peer 的 `native_continuation` 观测就永远是 not-observed，与 native driver
+      // fixture（播发 `sessionCapabilities: { resume: {} }`）不对等。
+      agentCapabilities: { loadSession: true, sessionCapabilities: { resume: {} },
+                           promptCapabilities: { image: true } },
       authMethods: [{ id: "none", name: "none" }],
     } })
   } else if (method === "authenticate") {

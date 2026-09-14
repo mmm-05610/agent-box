@@ -77,7 +77,7 @@ class RecordingExecution:
 def registry():
     reg = HarnessRegistry()
     reg.register(HarnessDescriptor(
-        "alpha", capability_claims={"streaming": True},
+        "alpha", capability_claims={"stream": True},
         control_options={"model": ("alpha-default", "alpha-fast")},
         security_locked_controls=("sandbox",),
         configuration_validator=lambda value: None if isinstance(value, dict) else ValueError(),

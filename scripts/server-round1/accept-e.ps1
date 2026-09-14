@@ -282,7 +282,9 @@ $deployment = [ordered]@{
         [ordered]@{
             id = "pi"
             modelControlId = "model"
-            capabilityClaims = [ordered]@{ streaming = $true; approvals = $true; attachments = $true }
+            # Canonical capability ids only: streaming/approvals/attachments are
+            # the drifted aliases the unified contract no longer accepts.
+            capabilityClaims = [ordered]@{ stream = $true; permissions = $true; attach = $true }
             controlOptions = [ordered]@{ model = @("fixture-model") }
             adapter = [ordered]@{
                 command = "/usr/bin/node"
@@ -297,7 +299,11 @@ $deployment = [ordered]@{
         # executable is the checked-in Node fixture, never a native Harness.
         [ordered]@{
             id = "hermes"
-            capabilityClaims = [ordered]@{ streaming = $true }
+            # The stateful peer advertises sessionCapabilities.resume, and the
+            # unified contract requires the static ceiling too: without it the
+            # checkpoint is honestly non-resumable and this gate's restart/resume
+            # assertion would fail.
+            capabilityClaims = [ordered]@{ stream = $true; native_continuation = $true }
             adapter = [ordered]@{
                 command = "/usr/bin/node"
                 args = @("/workspace/stateful_acp_peer.mjs")
@@ -311,7 +317,7 @@ $deployment = [ordered]@{
         # five second lease still finishes, with no override of the lease.
         [ordered]@{
             id = "omp"
-            capabilityClaims = [ordered]@{ streaming = $true }
+            capabilityClaims = [ordered]@{ stream = $true }
             modelControlId = "model"
             controlOptions = [ordered]@{ model = @("fixture-model") }
             adapter = [ordered]@{
