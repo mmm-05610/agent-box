@@ -4,6 +4,71 @@
 已发生的1次可达性请求由后端受控进程读取仓库外 locator，未把内容写入仓库或输出。
 授权真实 credential 的 SecretStore→Worker 投影尚未执行，不以测试值路径冒充付费验收事实。
 
+## 2026-09-14 — 原生 HOME 隔离设计锁定 + Worker 租约保活修复（本轮）
+
+详细设计：[profile-home-isolation.md](profile-home-isolation.md)。缺陷与修复设计：
+[native-driver-seam.md](native-driver-seam.md) §5。
+
+### 原生 HOME 双重收敛隔离：设计已锁定，实施待完成
+
+- 用户批准后落文档 `docs/server-round1/fullstack/profile-home-isolation.md`：
+  `PROFILE_NATIVE_HOME_ISOLATION_DESIGN_LOCKED` / `implementation=PENDING_HARDENING`。
+- 核心：安全边界由 bwrap mount namespace 提供（环境变量**不是**边界）；Windows 保持 Profile/Session
+  权威、不把权威根长期 RW 挂给 Worker；Server 生成有界 WSL Profile view，Worker 校验后映射到
+  `/runtime/home`，只回收批准的状态子树；每家**同时**设置隔离 `HOME` 与其原生专用变量，使默认路径与
+  显式路径收敛到同一投影；配置 RO / session 有界 RW / cache·log 临时或按声明 / credential 只走临时
+  secret；Server/Core/Worker 不新增品牌分支。
+- 逐家目标（Codex `/runtime/home/.codex`+`CODEX_HOME`；Pi `/runtime/home/.pi/agent`+
+  `PI_CODING_AGENT_DIR`；Hermes `/runtime/home/.hermes`+`HERMES_HOME`；OpenCode
+  `HOME`/`XDG_CONFIG_HOME`/`XDG_DATA_HOME`/`OPENCODE_CONFIG`）、权限矩阵、sentinel 双向验收、以及
+  "迁移后三家假端点门必须重跑"都写在文档里。
+- **当前差距如实登记**：四家今天仍跑 `/tmp/agentbox-home` 系路径（Hermes 的 bootstrap 物化配置是过渡
+  实现），**未迁移**、**未验收**。该文档不登记 READY、不提高模型验收计数。
+
+### Hermes 精确模型映射：产品模型 id 即线上值（用户裁决 → 官方自定义 provider 路径）
+
+- 调查结论（H 子代理，零改动、只读）：Hermes 0.19 在 `agent_init` 里对非聚合 provider **无条件**调用
+  归一化，`_normalize_for_deepseek()` 把非一等公民 id 折叠为 `deepseek-chat`；`model.default`、
+  `providers.<p>.models.<id>` 的 per-model 元数据、`HERMES_*` 环境变量都**不能**保留原 id（ACP 不读
+  这些变量），唯一受支持路径是 Hermes 官方的"用户自定义 provider"声明。按硬性规则向用户提问后，用户
+  **裁决采用该路径**（并授权同步修改 42-D 权威配置与其测试）。
+- 实施与实测：`model.provider` 与块键都用 Hermes **实际持久化的裸 `custom`**（`providers.custom` 块内容
+  不变：官方根 / `key_env` / `chat_completions` / `models.deepseek-flash` / `extra_body.thinking=disabled`）。
+  关键发现：`custom:<key>` 形式在新会话能命中块，但 Hermes 持久化的是裸身份 `custom`，**resume 轮**按它
+  重解析会退化为默认端点（OpenRouter）+ 占位密钥——第一版实现正是这样丢了凭据（门 exit 0 但第二轮
+  `unauthorizedRequests=1`）。改用裸 `custom` 后四条解析路径（new/resume 各两条）全部命中声明的块。
+- 结果：两轮请求体 `model` **精确为 `deepseek-flash`**（`observedModels` 三相位一致），产品 id / native
+  选择（`custom:deepseek-flash`）/ 线上值三者硬断言；历史 `EFFECTIVE_MODEL_ID="deepseek-chat"` 接受
+  逻辑已删除；门新增 `HERMES_GATE_CREDENTIAL_NOT_DELIVERED`（任何请求未带注入假 token 即失败）。
+  其余 10 条验收不退化（同 native id、第二轮上下文、`resume_session`、未知模型发包前拒绝、缺凭据
+  `CREDENTIAL_REQUIRED`、请求数/重试上界不变、工件与 state 不退化、token 零泄漏、差异逐字段）。
+- 代价（如实登记）：native 选择为 `custom:deepseek-flash`、provider 身份 `custom`、上下文元数据由内建
+  1,000,000 回退为启发式 **128,000**；模型控制仍不声明（Hermes 的 ACP configOptions 面为空）。
+  Hermes 仍 **MODEL_NOT_VERIFIED**。
+
+### Worker 5 秒租约缺陷：已修复（WORKER_LEASE_KEEPALIVE_FIXED）
+
+- 机制：Worker 只在收到**客户端帧**时刷新租约；唯一发送方曾是 `wait_terminal`，而一轮 prompt 期间
+  Server 阻塞在 prompt 响应、channel 线程阻塞在队列上 → 静默超过 5 秒的 attempt 被 Worker 取消。
+  修复前第一手复现：8 秒静默 → 轮次被取消（`attempt does not accept stdin writes`）；仅把租约改成
+  120000 才通过。
+- 修复：`WorkerClient` 新增**保活 owner**（间隔 = `max(lease_ms/3000, 0.05)`，不写死 5 秒；attempt
+  spawn 前启动，terminal/cleanup/disconnect/异常时停止并 join）；`request()` 全程串行化（帧号、写入、
+  响应路由同锁），heartbeat 不与 cancel/stdin 交错；失败类型化为
+  `WORKER_LEASE_HEARTBEAT_FAILED`，由 `_WorkerChannels.iter_chunks()` 有界轮询发现并经
+  `SidecarEnvelope` 把 code 交给等待方（prompt 不再无限等待）；**默认租约仍 5000、Worker 过期取消
+  未关**（停止保活后孤儿 attempt 仍在租约边界内被回收）。
+- 反例：客户端层 13 条 + sidecar 层 5 条（8 秒静默完成且实测 5 次 heartbeat、terminal 后冻结、
+  stop/close 无线程残留、disconnect 读写两侧类型化、静默中 cancel 有界、heartbeat 出错类型化、
+  停止保活后 2.1s 内 Worker 仍写 `cancelled=true`、并发不串 `requestId`/`sequence`、间隔随租约派生、
+  `wait_terminal` 不退化）。
+- **Windows 真机证据**（c4 release Worker `sha256:31e92959…`，**未重建**）：`accept-e.ps1` 新增
+  "默认租约 + 8 秒静默"一步，实测 `lease_ms=5000`、`lease_override=false`、`elapsed_ms=8839`、
+  `turn_state=completed`、`delta_text="controlled stream"`；整轮 exit 0，
+  `-PostCheck` = `…_POSTCHECK_CLEAN`（DataRoot/workspace/端口/进程/worker view 全部干净）。
+- 残余：保活 fail-closed——单请求长时间独占串行化锁（约一个租约周期）会把该轮判为
+  `WORKER_LEASE_HEARTBEAT_FAILED`；当前无已知正常路径触发，留待真实模型门观察。
+
 ## 2026-09-14 — 42-D Hermes 与 OpenCode 生产封装（并行两条）
 
 详细证据：[hermes-production-packaging.md](hermes-production-packaging.md) /

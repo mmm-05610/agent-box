@@ -85,7 +85,7 @@ RECORD 记录但未安装的文件、既无 RECORD 又无 top_level、仅大小�
 
 | 项 | 生产值 |
 | --- | --- |
-| 产品/ProviderModel modelId | `deepseek-flash`（不变；**线上生效值见 §2.2**：Hermes 归一为 `deepseek-chat`，门逐轮断言） |
+| 产品/ProviderModel modelId | `deepseek-flash`（不变；**线上生效值也是 `deepseek-flash`，见 §2.2**，门逐轮硬断言） |
 | provider | `deepseek`；`transport: chat_completions` |
 | 根地址 | `https://api.deepseek.com`（**官方根地址**，`model.base_url` 与 `providers.deepseek.api` 两处） |
 | API key | 环境引用 `DEEPSEEK_API_KEY`（配置文件内无任何秘密） |
@@ -131,28 +131,35 @@ RECORD 记录但未安装的文件、既无 RECORD 又无 top_level、仅大小�
   都会失败**。产品模型只在 native 配置里**声明**（`model.default`），实际生效值由 Hermes 自己的归一
   规则决定（下一条）；门用一个显式的 test-only 变体（`model_control_id="model"`）把这条限制作为
   证据跑出来，而不是写在注释里（§3 的 `modelControl`）。
-- **有效模型不等于产品模型：这是本家 native 名称归一的必然结果，且已加硬断言。**
-  Hermes 在 `agent_init` 里对非聚合 provider 调用
+- **产品模型 id 就是线上值：用 Hermes 官方的"用户自定义 provider"声明换取原样透传（本阶段修复）。**
+  背景（实测，见下）：Hermes 在 `agent_init` 里对非聚合 provider 调用
   `hermes_cli.model_normalize.normalize_model_for_provider()`，DeepSeek 走
-  `_normalize_for_deepseek()`：只有**一等公民 id**（`deepseek-v<数字>...`）与 reasoner 类名称能原样通过，
-  其余一律折叠为 `deepseek-chat`（纯字符串逻辑；该模块内**没有任何网络调用**，实测 grep 无
-  `requests/httpx/urllib/fetch`）。`deepseek-flash` 既非一等公民也不含 reasoner 关键字 ⇒ 线上模型是
+  `_normalize_for_deepseek()`——只有一等公民 id（`deepseek-v<数字>...`）与 reasoner 类名称原样通过，
+  其余一律折叠为 `deepseek-chat`（纯字符串逻辑，不联网）；`deepseek-flash` 因此曾在线路上变成
   `deepseek-chat`。
-  在 42-D 冻结配置下**无法**让 native 有效模型等于 `deepseek-flash`：`model.default`、`model.provider`
-  都是权威配置字段（模板必须与 42-D 逐字段相等），而能原样透传的写法只有 `deepseek-v4-flash` 这类
-  一等公民 id 或换成 `provider: custom`——两者都会改动权威配置，本阶段不做也不该做。因此：
-  - 门**断言**而不是观测：`observedModels`（round-1 / round-2 / retry 三个相位）必须逐一等于记录值
-    `deepseek-chat`，任何漂移即 `HERMES_GATE_EFFECTIVE_MODEL_DRIFT` 失败；
-  - `modelResolution` 记录 `configuredModelDefault=deepseek-flash`、`effectiveModel=deepseek-chat`、
-    规则来源（从**工件内**读到的 `site-packages/hermes_cli/model_normalize.py`）、`networkDependent=false`
-    与两个谓词的求值结果（`passthroughPatternMatched=false`、`reasonerPrefixMatched=false`）。
-  - **联网与否不改变这一结论**：被离线守门拒绝的 `models.dev`/`openrouter.ai` 只喂"可选模型列表"
-    （ACP `models.availableModels`），固定版本的 bridge **不使用**它；折叠规则本身不联网。所以真实
-    （联网）生产里有效模型同样是 `deepseek-chat`。**但这只是"会不会发 deepseek-flash"的证据**：线上
-    究竟发哪个 id 属于真实模型验收范围，本条不得当作"产品模型已通过"。
-  - 结论：**产品模型选择在本家 ACP 面上不可寻址，有效模型是 Hermes 自己的默认值**；这是本家进入
-    **真实模型门之前必须先解决的残余风险**（AgentBox 白名单只有 `deepseek-flash`）。
-
+  修复：`model.provider` 改用 Hermes 官方支持的**用户自定义 provider**（`providers:` 段即其自述入口），
+  块内容一字不变（官方根 `https://api.deepseek.com`、`key_env: DEEPSEEK_API_KEY`、
+  `transport: chat_completions`、`models.deepseek-flash`、`extra_body.thinking.type=disabled`），
+  `model.default` 仍是产品 id。自定义 provider 分支**不做归一化**，于是线上 `model` 精确等于产品 id。
+  代价（如实登记）：Hermes 侧 provider 身份变成 `custom`、ACP 模型选择值是 `custom:deepseek-flash`；
+  上下文元数据由内建 deepseek 表的 1,000,000 回退为启发式 **128,000**（Hermes 日志原文：
+  `Using hardcoded context length 128,000 for model 'deepseek-flash' (custom endpoint, catalog match on 'deepseek')`）。
+- **`custom:deepseek` 这个拼写在本家不可用（关键技术发现）。** Hermes 会把**已解析的 provider 身份**
+  持久化进会话库，重开（`session/resume`）时按该值重新解析：`custom:<key>` 形式在新会话能命中块，但
+  resume 轮拿到的是裸 `custom`，命中不到 → 退化为默认端点（OpenRouter）与**占位密钥**。第一版实现
+  正好踩中：门 exit 0，但第二轮 `authorizationMatchesInjectedToken=false`、`unauthorizedRequests=1`
+  （生产等效 401，凭据不再经 `key_env` 注入）。因此块键与 `model.provider` 都用 Hermes 实际持久化的
+  **裸 `custom`**；门另加 `HERMES_GATE_CREDENTIAL_NOT_DELIVERED` 硬断言：任何一次 `/chat/completions`
+  未携带注入的假 token 即失败。实测四条解析路径（new/resume 各两条）全部命中
+  `custom_provider:DeepSeek official` → 官方根 + 注入 token。
+- **三者硬断言**（任一漂移即失败）：产品/ProviderModel id = `deepseek-flash`；native 选择（guard 在真实
+  链路里读回的 ACP `models` 状态）= `custom:deepseek-flash`（provider 身份 `custom`）；线上请求体
+  `model` = `deepseek-flash`。`observedModels`（round-1 / round-2 / retry 三相位）语义已变为
+  **"必须等于 `deepseek-flash`"**；历史上的 `EFFECTIVE_MODEL_ID="deepseek-chat"` 接受逻辑与
+  `deepseek-chat` 断言**已全部删除**，`deepseek-chat` 现在只作为"必须失败"的反例出现在单测里。
+- **模型控制仍不声明**（`MODEL_CONTROL_ID=None`）：Hermes 的 ACP `configOptions` 面仍是空的，声明控制只会
+  制造 `Harness model is not available` 的拒绝路径；模型由 native 配置钉住，门断言**线上值**。产品
+  ProviderModel 的选择语义因此是"声明 + 线路验证"，不是"运行期下发"。
 ### 2.3 生产环境与只读闸门的差异（运行期施加，不落盘为生产配置）
 
 1. 假端点：`model.base_url` 与 `providers.deepseek.api` 改指 loopback（`documented_differences`
@@ -198,19 +205,20 @@ sidecar 注入 `DEEPSEEK_API_KEY` 到 adapter 进程。
                                     "state.db", "state.db-shm", "state.db-wal"]},
  "nativeStorePath": {"files": ["state.db", "state.db-wal"], "note": "Hermes keeps its authoritative session database at $HERMES_HOME/state.db …"},
  "chainProviderRequests": {"round1": 1, "round2": 1},
- "round2Continuation": {"model": "deepseek-chat", "maxTokens": 64, "stream": true, "toolCount": 15,
+ "round2Continuation": {"model": "deepseek-flash", "maxTokens": 64, "stream": true, "toolCount": 15,
                         "roles": ["system", "user", "assistant", "user"],
                         "round2CarriesRound1User": true, "round2CarriesRound1Assistant": true},
  "acpMethods": {"chain": ["new_session", "resume_session"],
                 "chainAndModelControl": ["new_session", "resume_session", "new_session", "resume_session", "new_session", "resume_session"]},
- "modelResolution": {"configuredModelDefault": "deepseek-flash", "effectiveModel": "deepseek-chat",
+ "modelResolution": {"configuredModelDefault": "deepseek-flash", "wireModel": "deepseek-flash",
+                    "nativeSelection": "custom:deepseek-flash", "providerIdentity": "custom",
                      "rule": "hermes_cli.model_normalize._normalize_for_deepseek (read from the artifact)",
                      "networkDependent": false,
                      "witness": {"passthroughPatternMatched": false, "reasonerPrefixMatched": false, "foldReturnPresent": true},
                      "note": "product model id is not addressable on this harness's native surface; the effective model is Hermes' own default"},
- "observedModels": [{"phase": "round-1", "model": "deepseek-chat"},
-                    {"phase": "round-2", "model": "deepseek-chat"},
-                    {"phase": "retry", "model": "deepseek-chat"}],
+ "observedModels": [{"phase": "round-1", "model": "deepseek-flash"},
+                    {"phase": "round-2", "model": "deepseek-flash"},
+                    {"phase": "retry", "model": "deepseek-flash"}],
  "egress": {"classified": {"guard-self-test": 16, "harness-catalog-probe": 8,
                            "provider-default-endpoint": 6, "unclassified": 0},
             "zeroSuccessfulNonLoopbackConnections": true},
@@ -311,12 +319,11 @@ sidecar 注入 `DEEPSEEK_API_KEY` 到 adapter 进程。
    Server/Core/Worker/bwrap 任何一行。
 2. **固定版本 bridge 无法把模型选择送达 Hermes 0.19**（configOptions 面缺失，§2.2）：这是真实
    产品能力缺口，本阶段以"不声明模型控制 + 门内显式取证"的方式如实登记，而不是让每一轮都失败。
-3. **产品模型 id 在本家 native 面上不可寻址，有效模型被静态折叠**：Hermes 的
-   `_normalize_for_deepseek()`（纯字符串逻辑、不联网）把非一等公民的 `deepseek-flash` 折叠成
-   `deepseek-chat`；在 42-D 冻结配置下没有不改权威配置的 native 途径可让线值等于产品模型 id。门已把
-   "本轮实际生效模型 = 记录值" 做成硬断言（漂移即失败）并记录规则来源。这是**真实模型门之前的必须先
-   解决的残余风险**（白名单只有 `deepseek-flash`）：要么把产品/白名单模型改成 Hermes 一等公民 id
-   （如 `deepseek-v4-flash`），要么由 harness 侧给出显式映射，**不得**据此主张已通过。
+3. **产品模型 id 曾被 Hermes 静态折叠（已修复）**：`_normalize_for_deepseek()`（纯字符串逻辑、
+   不联网）会把非一等公民的 `deepseek-flash` 折叠成 `deepseek-chat`。经用户裁决后改用 Hermes 官方的
+   用户自定义 provider 声明（§2.2），线值恢复为产品 id；期间还发现并修掉了 `custom:<key>` 在 resume
+   轮解析失败导致的凭据丢失（§2.2 第二段）。**代价与残余**：provider 身份为 `custom`、上下文元数据
+   128K（内建 1M）、模型控制仍不可声明。
 4. **`HERMES_MAX_TOKENS` 无法作为 adapter 环境键声明**：Server 的凭据形态键校验命中 `TOKEN`。上限
    改由 `config.yaml` 声明，门断言线上值。
 5. **Hermes 运行期会探测非配置端点**：`api.deepseek.com:443`（每次 adapter 启动，供应商默认端点）与
@@ -332,8 +339,11 @@ sidecar 注入 `DEEPSEEK_API_KEY` 到 adapter 进程。
 node --test scripts/server-round1/build-hermes-runtime-artifact.test.mjs          → 20 passed, 0 failed
 python3 -m pytest -q plugins/agent-box-harnesses/tests/test_hermes_production_template.py
                                                                                   → 15 passed
-python3 -m pytest -q tests/server/test_hermes_production_chain.py                 → 16 passed
+python3 -m pytest -q tests/server/test_hermes_production_chain.py                 → 18 passed
+node --test scripts/server-round1/model-validation-42d.test.mjs                   → 4 passed, 0 failed
 python3 scripts/server-round1/hermes-production-chain-gate.py --json              → 退出码 0；HERMES_PRODUCTION_CHAIN_GATE_OK
+    （observedModels 三相位均为 deepseek-flash；两轮 delta 4<7、11<14；provider 请求 2、越预算 0、
+     unauthorized 0；重开 new_session→resume_session；cleanup removed=true）
 python3 scripts/server-round1/hermes-production-chain-gate.py --artifact <built>  → 退出码 0；工件只读且清理后仍在
 python3 scripts/server-round1/hermes-production-chain-gate.py --artifact <built> --keep
                                                                                   → 退出码 0；run.removed=false，报告保留路径
@@ -351,12 +361,12 @@ python3 -m py_compile <全部改动 py 文件> / node --check <全部改动 mjs>
   端点。累计额度不变（上限 ¥10）。
 - **c4 仍无 Windows 平台证据**：按要求未运行 Windows r4、未占用 Windows 构建槽，直接驱动 WSL 内的
   release Worker（同一 ABW1 协议）。
-- 未做（后续阶段）：Codex/OpenCode 的同级封装（OpenCode 由并行子代理推进）、以及四家真实模型门。
-  Hermes 侧在真实模型验收前必须先解决 §4.2/§4.3（模型控制与产品模型 id）。
-- 已知残余（进入真实模型门前必须处理）：
-  1. **产品模型不可寻址 / 有效模型被静态折叠**（§2.2、§4.3）：白名单只有 `deepseek-flash`，而 Hermes
-     会把它折叠为 `deepseek-chat`；必须先定产品模型 id 或提供显式映射；
-  2. 模型控制缺口（上游 bridge 只认 `configOptions`，Hermes 0.19 只播发 ACP `models`）；
+- 未做（后续阶段）：Codex 的同级封装、以及四家真实模型门。
+- 已知残余（进入真实模型门前需知悉）：
+  1. **provider 身份为 `custom`、上下文元数据回退 128K**（§2.2）：线值与产品 id 一致，但 Hermes 侧
+     不再是内建 `deepseek` provider；真实模型门必须按此口径验收（不得把它写成"内建 deepseek 路径"）；
+  2. 模型控制缺口（上游 bridge 只认 `configOptions`，Hermes 0.19 只播发 ACP `models`）→ 产品模型选择
+     是"声明 + 线路验证"，不是运行期下发；
   3. Hermes 辅助探针的外联姿态（`api.deepseek.com` 默认端点、`models.dev`、`openrouter.ai`）与
      Python 守门不覆盖原生绕过；
   4. 工件摘要在 bootstrap 校验一次（既有 TOCTOU 窗口，与本阶段无关）；

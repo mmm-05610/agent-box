@@ -79,34 +79,55 @@ ACP（禁止伪装成 ACP profile），它是一条原生 host/CLI 路径，因�
   模块大小受 `_sidecar_deployment_file` 的 8 MiB 上限约束；`AGENTBOX_DRIVER_AUDIT` 之类的测试期
   审计开关只允许出现在 gate 运行期，生产模板不得声明（各家 gate 有断言）。
 
-## 5. 本阶段发现的通用接缝缺陷（尚未修复，阻塞四家真实模型门）
+## 5. 本阶段发现的通用接缝缺陷（已修复：WORKER_LEASE_KEEPALIVE_FIXED）
 
-**Worker 的 5 秒租约会取消"客户端静默"的运行中 attempt —— 任何首 token 超过 5 秒的真实模型轮次都会被掐断。**
+**缺陷**：Worker 的 5 秒租约会取消"客户端静默"的运行中 attempt——任何首 token 超过 5 秒的真实模型
+轮次都会被掐断。
 
 - **机制（代码级）**：Worker 引导接受 `leaseMs`（`workers/agent-box-worker/src/protocol.rs`，默认
   `5_000`，合法范围 1 000–120 000）。`main.rs` 只在**收到客户端帧**时刷新
   `lease_deadline = Instant::now() + lease`；定时分支一旦发现 `Instant::now() >= lease_deadline`
-  就对**所有运行中的进程**发 cancel。客户端侧唯一的发送方是
-  `WorkerClient.wait_terminal()`（`plugins/agent-box-runtime-wsl/src/.../client.py`）：它在读超时后
-  发 `heartbeat`。而一轮 prompt 在飞行中时，Server 阻塞在
-  `SidecarEnvelope.request({"op":"prompt"})`（最长 600s），**没有任何线程在给 Worker 发帧**，
-  于是 adapter 只要静默超过 5 秒就会被取消。
-- **第一手复现（本次，一次性探针，未入库）**：同一 fixture 驱动在 `prompt` 里静默 8 秒，
-  经真实 Server→Core→sidecar→c4 Worker+bwrap：
-  - 生产默认（`lease_ms=5000`）：轮次被取消，Server 侧最终以
-    `WorkerError: attempt does not accept stdin writes` 结束（关闭阶段 abort 也写不进去）；
-  - 同一代码同一静默，仅把 Worker 租约设为 `lease_ms=120000`：两轮全部 `completed`，
-    checkpoint `resumable=true`、native id 稳定、state 回投正常。
-  两者只差租约，故因果明确。
-- **为什么既有门没暴露**：Pi/Hermes/OpenCode 的假端点**立即**应答（首 token 与增量都在毫秒级），
-  每轮静默远小于 5 秒；Windows r4/41 的 fixture 同样是即时应答。真实 DeepSeek 调用在首 token
-  之前就可能超过 5 秒（网关排队、长思考、工具前延迟），因此**四家真实模型门会大面积踩中**。
-- **影响面**：通用（与 Harness 家无关）—— ACP 路径与 native driver 路径同样中招；这不是本阶段
-  两家封装各自的缺陷，而是 Server↔Worker 的租约契约缺口。
-- **本阶段处置**：**如实登记、不在本阶段扩范围修复**（修复涉及 `src/agent_box/server/**` 与
-  `plugins/agent-box-runtime-wsl/**` 的租约/心跳契约，需要自己的回归与 Windows 复验）。
-  候选修法（未实施、未验证）：在 `SidecarHarnessPort` 等待某个可能长时间静默的操作期间，由
-  `_WorkerChannels` 所在层按 `lease/3` 周期发 `heartbeat`（与 `wait_terminal` 同一机制），
-  并补上"客户端存活但 adapter 静默"的参数化测试；或由部署显式声明更长的租约。
-  **在修好之前，四家真实模型门不得启动。**
+  就对**所有运行中的进程**发 cancel。客户端侧唯一的发送方曾是
+  `WorkerClient.wait_terminal()`（`plugins/agent-box-runtime-wsl/src/agent_box_runtime_wsl/client.py`）。
+- **为什么一轮 prompt 会中招**：Server 阻塞在 `SidecarEnvelope.request({"op":"prompt"})`，而
+  `_WorkerChannels.iter_chunks()` 阻塞在自己的队列上；**没有任何线程进入 `wait_terminal`**，于是
+  adapter 只要静默超过 5 秒就被取消。
+- **第一手复现（修复前）**：同一 fixture 驱动在 prompt 里静默 8 秒，生产默认 `lease_ms=5000` 下轮次被
+  取消并最终报 `WorkerError: attempt does not accept stdin writes`；仅把租约改成 `120000` 后两轮
+  `completed`。既有假端点门因毫秒级应答从未暴露。
 
+### 修复设计（租约 owner）
+
+- `WorkerClient` 新增**保活 owner**：间隔由租约派生（`max(lease_ms/3000, 0.05)`，即至多约 `lease/3`，
+  不写死只适合 5 秒）；`start()` 在 attempt spawn **之前**进入保活，`stop()` 幂等并 join 线程；
+  生命周期在 terminal、`close()`、disconnect 与异常时都被显式收束，不留后台线程、timer 或未消费的
+  heartbeat 响应。
+- `request()` 全程串行化（一把锁覆盖帧号递增、写入与响应路由），因此 heartbeat **不会**与 `cancel`
+  或 `attempt.write` 交错；并发场景下没有两个 request 消费者争抢同一响应队列。`wait_terminal` 的既有
+  语义（回投非 terminal 帧、收 terminal 帧）保持不变。
+- heartbeat 失败**类型化上浮**为 `WORKER_LEASE_HEARTBEAT_FAILED`：owner 记录 failure，channel 的
+  `_WorkerChannels.iter_chunks()` 以有界轮询（0.25s）发现它并抛出，`SidecarEnvelope` 把该原因与 code
+  交给正在等待的调用方——**prompt 不会无限等待**。
+- sidecar 侧由 `_WorkerChannels` 拥有保活：`subscribe()` 启动、terminal/`close()`/disconnect 停止；
+  只有声明了 `keep_lease` 的客户端才启用（测试替身不受影响）。
+- **默认租约未改**（仍 5000，生产 connector 不传覆盖）；**Worker 的过期取消未关**：保活停止后，静默
+  attempt 仍会在租约边界内被 Worker 取消（有专门反例）。
+
+### 反例与证据
+
+- 客户端层 13 条门禁（`plugins/agent-box-runtime-wsl/tests/`）：默认 5s 租约 + 8s 静默完成（期间实测
+  **5 次 heartbeat**）、terminal 后计数冻结、`stop()`/`close()` 后无线程无残留、disconnect 在读/写两侧
+  均类型化、静默中 cancel 有界（<3s，实测 <0.1s）、heartbeat 出错类型化且不无限等待、**停止保活后
+  2.1s 内** Worker 仍写出 `cancelled=true`、并发事件与 heartbeat 不串 `requestId`/`sequence`、
+  `wait_terminal` 既有 heartbeat 行为不退化、间隔随租约派生（1000/5000/120000 → lease/3）。
+- sidecar 层 5 条门禁（`tests/server/test_sidecar_lease_keepalive.py`）：默认租约值未被覆盖、**8 秒静默
+  的 prompt 正常完成**（`elapsed >= 8s`，delta 到达，无 failed）、一轮结束后无保活线程残留、注入
+  heartbeat 失败时该轮以 `WORKER_LEASE_HEARTBEAT_FAILED` 结束（且**快于** fixture 的静默），静默中
+  cancel 不被饿死（<3s）。
+- **Windows 真机证据**（c4 release Worker `sha256:31e92959…`，未重建）：Windows Server→`wsl.exe`→Worker
+  →bwrap 的验收新增"默认租约 + 8 秒静默"一步，实测
+  `elapsed_ms=8839`、`turn_state=completed`、`delta_text="controlled stream"`、
+  `lease_ms=5000`、`lease_override=false`；整轮 exit 0，`-PostCheck` 为 `…_POSTCHECK_CLEAN`。
+- 残余（如实登记）：保活是 **fail-closed** 的——若某个请求长时间独占串行化锁（超过约一个租约周期），
+  owner 会判 `WORKER_LEASE_HEARTBEAT_FAILED` 并让该轮失败；当前无已知正常路径会这样做，但这是一个需要
+  在真实模型门里观察的自伤面。`_read_loop` 在 reader 线程同步调用事件监听器这一既有约束未改变。
