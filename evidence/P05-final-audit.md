@@ -25,8 +25,10 @@
 
 > **2026-09-14 后续增量（已实施）**：本表记录的 legacy 可达性与阶段标记是**审计当时**的事实；
 > B1–B6 已按其后的收口检查点关闭（结构门 `f7759148`、面迁移 `a6b751ff`），B7 与其后的 transport/
-> fixture/账本项已由 **§11** 的最终收口关闭；新发现残留（B8/B9）见 **§10.4** 与 **§11.5**。
-> 本表"P05_CLIENT_GREEN 不得声明"一行记录的是**审计当时**的判定，最终判定以 §11.3 为准。
+> fixture/账本项已由 **§11** 的最终收口关闭；B8 见 **§10.4**，B9 见 **§11.5**（发现当时）与 **§12**
+> （关闭与口径更正）。
+> 本表"P05_CLIENT_GREEN 不得声明"一行记录的是**审计当时**的判定；最终判定以 **§12.5** 为准
+> （§11.3 的 GREEN 声明已由 §12.1 更正为过早）。
 > 本文件 §1–§9 保持审计当时原样，不回填。
 
 一句话：**28 个 wire 方法的客户端接线确实完整，但"产品已完成"不成立**——AgentBox 正常产品外壳里仍有
@@ -434,8 +436,8 @@ writer_lease 保持 **ACTIVE**。
 
 | 原条目 | 现在 |
 | --- | --- |
-| §7.1 `P05_CLIENT_GREEN` 不得声明 | **更新**：本阶段列出的客户端实现门全部通过，可声明 **`P05_GREEN — CLIENT_IMPLEMENTATION_COMPLETE`**（见 [P05.md](P05.md) 最终收口检查点 §8） |
-| §7.2 产品已完成 / 主路径无 Hermes 控制流 | **仍不成立**：B9（profile 分享经 `api/profiles.ts`，入口含侧栏筛选菜单与命令面板两行）仍是可达 legacy 调用路径，被结构门拒绝但未迁移 |
+| §7.1 `P05_CLIENT_GREEN` 不得声明 | **更新**：本阶段列出的客户端实现门全部通过，可声明 **`P05_GREEN — CLIENT_IMPLEMENTATION_COMPLETE`**（见 [P05.md](P05.md) 最终收口检查点 §8）。**→ 该声明已由 §12.1 更正为过早**：同一检查点发现并登记了 B9，两者不能同时成立 |
+| §7.2 产品已完成 / 主路径无 Hermes 控制流 | **仍不成立**：B9（profile 分享经 `api/profiles.ts`，入口含侧栏筛选菜单与命令面板两行）仍是可达 legacy 调用路径，被结构门拒绝但未迁移。**→ 已由 §12 关闭** |
 | §7.3 REAL_FLOW / P06 GREEN / DESKTOP_IMPLEMENTATION_READY | **仍不得声明**（lifecycle connection 仍是外部缺口） |
 | §7.4 "事件源不可用时诚实呈现"/"transport 限制 loopback" | **现在成立**：WS 无连接可观测、HTTP 与 WS 共用 loopback 判据（§11.2） |
 | §7.5 P07 检查点 3 未完整覆盖 §9 | **更新**：§9.5/§9.6/§9.8 深度缺口关闭；§9 其余场景维持既有覆盖层次（前端行为 fixture，非真实 Server 联调） |
@@ -456,6 +458,9 @@ writer_lease 保持 **ACTIVE**。
 
 ### 11.5 新登记（未修）
 
+> **→ 本节的 B9 已由 §12 关闭（`d31897dc`）**：侧栏筛选菜单与命令面板两行在 agentbox authority 下
+> 不再渲染、不可执行；下方原文保留为发现当时的记录。
+
 **B9 — profile 分享的 legacy 数据面**：`store/profile-share.ts` → `api/profiles.ts`（`hermesApi`）；
 可达入口为侧栏筛选菜单 Profile 子菜单的 `Import profile…`（`features/chat/sidebar/filter-menu.tsx:362`，
 无 authority 判据）与命令面板 `Export/Import profile…` 两行。需先经原生文件框选定路径；请求被 W4 结构门
@@ -465,3 +470,78 @@ writer_lease 保持 **ACTIVE**。
 **B8 最终分类**：`UNREACHABLE_OR_PROTECTED`（非活动产品阻断）。无已挂载消费点；唯一被激活路径
 （hermes-bots hide-sweep 在插件激活时经 `profiles.list`/`listPersistedSessions`）同样被硬门拒绝。
 本阶段按工单不删除、不扩大到插件 API 重构。
+
+## 12. B9 关闭与 P05_GREEN 声明时点更正（2026-09-14，第二个收口检查点）
+
+起点 HEAD `30e3cf42`；代码检查点 `d31897dc`。只改 renderer 的侧栏筛选菜单与命令面板贡献行过滤，
+未修改后端、wire schema、Electron（含 `hermes:api` 硬门）、preload、shared、package/lock，
+未运行模型。执行者为单写者（主执行者），未开子代理。
+
+### 12.1 声明时点更正（本条为追加口径更正，不删除历史记录）
+
+`30e3cf42` 记录的 **`P05_GREEN — CLIENT_IMPLEMENTATION_COMPLETE` 是过早的**：同一检查点在 §11.5
+**发现并登记了 B9**（profile 分享仍是可达的 legacy 调用路径），却仍以"本阶段列出的客户端实现门全部
+通过"为由声明 GREEN。两份事实不能同时成立——发现一条可达 legacy 控制流与"客户端实现完成"不兼容。
+本文件 §11.3 第 1 行、§11.5 与 [P05.md](P05.md) 相应段落**保留原文**，由本节追加更正，不回填、不删数字。
+
+更正内容：
+- `30e3cf42` 的 GREEN 声明**作废**，该检查点应记为 **`P05_PARTIAL`（B9 待修）**；
+- B9 在本检查点（`d31897dc`）**关闭**；
+- 只有 B9 行为门 + 全部定向门通过后，才在**新 HEAD** 上重新声明 `P05_GREEN`。
+
+### 12.2 B9 三个入口的关闭方式
+
+| 入口 | 关闭方式 |
+| --- | --- |
+| 侧栏筛选菜单 `Import profile…`（`filter-menu.tsx`） | `SidebarFilterMenu` 增加**必填** `sessionAuthority`（与 `ChatSidebar` 同一 `SessionAuthority` 类型）；agentbox 下该行不渲染，`runImportProfileFlow` 与 `window.hermesDesktop.selectPaths` 均 0 次 |
+| 命令面板贡献项 `profile.export` | 既有 legacy 贡献行过滤机制（`body.tsx` 的 `LEGACY_PALETTE_ROW_IDS`）扩展 id 集合；agentbox 下不渲染、搜索不到、不执行 |
+| 命令面板贡献项 `profile.import` | 同上 |
+
+同一 authority 还关闭了"把 legacy 逐 profile 过滤框当作 AgentBox Profile 权威呈现"：per-profile 过滤框在
+agentbox 下不渲染**（门控在 authority 上，而不是依赖 legacy 缓存恰好为空——测试特意把 `$profiles` 填满
+`alpha`/`beta` 后再断言两者都不出现）**。
+
+**Profile 创建不是 B9，且必须保留**：`requestProfileCreate` 只写入 `$profileCreateRequest`，
+由 `SidebarNavMenu` 导航到 `PROFILES_ROUTE`——即 AgentBox 自己的服务权威 Profile 管理页；该页的新建、
+编辑、归档与配置能力（P02C 的 wire 维护端口）本检查点**零改动**。
+
+### 12.3 为什么隐藏而不是报"暂不支持"
+
+`wire-v1` 没有 Profile bundle 的 import/export 方法。产品不在 AgentBox authority 下发明协议、不接
+mock、不把 legacy bundle 当作 AgentBox Profile，也不放一个"暂不支持"的假入口——直接不展示。
+Hermes compatibility helper（`store/profile-share.ts`、`api/profiles.ts` 与 `profile-switcher.tsx`）
+**保留但不可达**：`profile-switcher.tsx` 仍无生产导入者，`profile-share.ts` 的唯一生产调用点
+（`filter-menu.tsx`）已在 `sessionAuthority === 'hermes'` 分支内。
+
+### 12.4 行为证据
+
+| 门 | 结果 |
+| --- | --- |
+| B9 定向（`filter-menu.test.tsx` 新增、`chat-sidebar.integration.test.tsx`、`chat-sidebar.workspace-assembly.test.tsx`、`command-palette/body.test.tsx`） | **4 files / 43 tests passed** |
+| 侧栏回归（`src/features/chat/sidebar`） | **31 files / 256 tests passed** |
+| 命令面板回归（`command-palette/`） | **2 files / 17 tests passed** |
+| `npm run --workspace apps/desktop typecheck` | **exit 0** |
+| ESLint（7 个改动/新增 TS/TSX） | **exit 0** |
+| `git diff --check` | **exit 0** |
+
+测试均为行为断言：先证明 Profile 子菜单**确实打开**（`New profile` 存在），再断言 `Import profile…`
+不存在——否则"行不存在"会因为菜单根本没挂载而假通过。两处 `SidebarFilterMenu` 挂载分别由
+`ChatSidebar` 的组装测试覆盖（工作区根列表 header 与扁平列表 header），并各自翻转 `$gatewayState`
+证明 authority 不随 gateway 状态改变、不产生 legacy 回落。未读取源码文本。
+
+只读核验：**AgentBox 侧栏不可达 `runImportProfileFlow`**（唯一生产调用点在 hermes 分支内）；
+**AgentBox 命令面板不可达 `runImportProfileFlow`/`runExportProfileFlow`**（两 id 均在过滤集内）；
+`profile-switcher.tsx` 仍无生产挂载点；B8 无挂载消费点且 `hermes:api` 硬门未变（本检查点 electron
+目录 0 文件改动）；28/28 矩阵集合全等、`wire-v1.ts` 摘要仍为
+`11e3b3e70d332585d31900c09ba063d95aa6b72b1904921c665fb72f81c10035`、fixture 与 transport 未改。
+
+### 12.5 重新声明与新 HEAD 上的状态
+
+在新 HEAD 上重新成立：**`P05_GREEN — CLIENT_IMPLEMENTATION_COMPLETE`**（本检查点的 B9 行为门与
+全部定向门通过）。**同时保持**：`REAL_FLOW_VERIFIED=否`（无真实 Server/Harness 链路）；lifecycle
+connection 仍是后端/全栈集成阶段的外部缺口；未运行真实模型；`writer_lease` 保持 **ACTIVE**；
+**不声明** P06 GREEN、DESKTOP_IMPLEMENTATION_READY 或全栈 GREEN。
+
+**B7/B8/B9 最终分类**：B7 **关闭**；B8 **`UNREACHABLE_OR_PROTECTED`**（非活动产品阻断，按工单不删除）；
+**B9 关闭**。当前**没有**已知的 AgentBox 产品可达 legacy 调用路径；§11.5 登记的三处入口已由
+`d31897dc` 关闭，`evidence/P05-client-matrix.md` §9 的对应未决项同步更正。

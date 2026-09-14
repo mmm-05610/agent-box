@@ -5,10 +5,15 @@
 
 ## 执行快照（handoff-policy 每阶段必填）— 接管施工中
 
-- updated_at: 2026-09-14 21:05 (+08:00)
+- updated_at: 2026-09-14 21:30 (+08:00)
 - 执行者: Zcode 前端产品 goal（新一轮会话，串行施工）；**已从 Codex 前端产品 goal 接管**
 - 工作树/分支: /home/maoqh/projects/agent-box-desktop-next-wsl-round1 @ feature/agentbox-desktop-product
-- 本阶段（P05 最终收口）起点核验: HEAD `a94a197cb71e5dd960c1a9b8c27d8d80accde72a`、
+- 本阶段（P05 返修：B9 关闭与 GREEN 时点更正）起点核验: HEAD `30e3cf42277d41ac8a5bda023c71e4bef7141ffb`、
+  分支 feature/agentbox-desktop-product、`git status --short` 为空；writer lease 仍为同一前端 goal 的 ACTIVE
+  lease，未发现同工作树写入者或残留 Electron/Vitest/Playwright 进程。单写者执行（未开子代理），只改
+  renderer 的侧栏筛选菜单与命令面板贡献行过滤；未改后端、wire schema、Electron（含 `hermes:api` 硬门）、
+  preload、shared、package/lock，未运行模型。完成后停止写入并回报，不提前 RELEASE。
+- 上一阶段（P05 最终收口）起点核验: HEAD `a94a197cb71e5dd960c1a9b8c27d8d80accde72a`、
   分支 feature/agentbox-desktop-product、`git status --short` 为空、`git diff --check` exit 0；writer lease 仍为
   同一前端 goal 的 ACTIVE lease，未发现同工作树写入者或残留 Electron/Vitest/Playwright 进程。执行方式为
   两个平行 Luna 子代理（A：Command Center authority + 架构账本 + i18n；B：P07 §9.5/§9.6/§9.8 fixture 深度）
@@ -39,11 +44,15 @@
   前端 goal 的 ACTIVE lease。该阶段按用户增量开了两个并行子代理（application/当前会话命令、
   侧栏归档交互），两个写集互不重叠且在委派时均未被主代理修改；主代理负责 `features.tsx` 三分支装配、
   定向/回归门、文档与提交。完成后停止写入并回报，不提前 RELEASE。
-- 代码检查点（已提交 HEAD）: `e087c976`（P05 最终收口：Command Center authority + 命令面板 legacy
+- 代码检查点（已提交 HEAD）: `d31897dc`（P05 返修：B9 profile 分享在 AgentBox authority 下隐藏 +
+  GREEN 声明时点更正）；阶段标记 **`P05_GREEN — CLIENT_IMPLEMENTATION_COMPLETE`**（在 `d31897dc` 上
+  **重新成立**——`30e3cf42` 的同一标记**是过早的**，因为该检查点刚发现并登记了 B9，两者不能同时成立；
+  该检查点应记为 `P05_PARTIAL`，详见 [P05-final-audit.md](../../evidence/P05-final-audit.md) §12.1）。
+  前序检查点 `e087c976`（P05 最终收口：Command Center authority + 命令面板 legacy
   快捷项 + §9.5/§9.6/§9.8 fixture 深度 + 陈旧 IN_FLIGHT 清除）、`4efd1ec5`（AgentBox HTTP/WS transport
-  安全对齐）；阶段标记 **`P05_GREEN — CLIENT_IMPLEMENTATION_COMPLETE`**。前一个代码检查点为
-  `a6b751ff`（P05 legacy 客户端收口：面迁移与组合接线；其前为 `f7759148` 的 `hermes:api` 结构门；
-  阶段标记 `LEGACY_CLIENT_CLOSEOUT_READY`——该标记**只表示 B1–B6 收口**，不表示 B1–B6 之外也完成）。历史检查点
+  安全对齐）；再前为 `a6b751ff`（P05 legacy 客户端收口：面迁移与组合接线；其前为 `f7759148` 的
+  `hermes:api` 结构门；阶段标记 `LEGACY_CLIENT_CLOSEOUT_READY`——该标记**只表示 B1–B6 收口**，
+  不表示 B1–B6 之外也完成）。历史检查点
   `cbdccf7c`（P05 sessions.archive 生产接线：统一侧栏服务 Session 归档 +
   当前会话归档命令；矩阵 28 reachable / 0 gap，阶段状态 SESSIONS_ARCHIVE_CLIENT_READY）
   链: ebb1233（P00）→ 8d4b3df/47b5b47/dbb902f（P01 代码与几何修复）→ 26b32fc（P01 GREEN 证据）
@@ -88,11 +97,40 @@
   fetch 前拒绝、WS 无连接恰好报告一次 + typed code、生产只记录稳定类别的安全 sink）**
   → **e087c976（P05 最终收口：Command Center 必填 authority + 命令面板 legacy 快捷项（含注册贡献行
   `Toggle logs`）+ §9.5/§9.6/§9.8 fixture 深度 + 陈旧 IN_FLIGHT 清除）**
+  → **d31897dc（P05 返修：B9 关闭——`SidebarFilterMenu` 必填 `sessionAuthority`（两处挂载显式传入）、
+  agentbox 下隐藏 `Import profile…` 与 legacy per-profile 过滤框、命令面板 `profile.export`/`profile.import`
+  进入 legacy 贡献行过滤集；Profile 创建与 Profiles 页能力不变）**
 - 已消费发布文档提交: 86d5a7b、61c7ff7、d3c0196、ffbcfaf
-- 当前检查点改动（**P05 最终收口，已实施**，代码提交 `4efd1ec5` + `e087c976`，产物
+- 当前检查点改动（**P05 返修：B9 关闭与 GREEN 时点更正，已实施**，代码提交 `d31897dc`，产物
+  `evidence/P05.md` §9、`evidence/P05-final-audit.md` §12、`evidence/P05-client-matrix.md` §9、
+  `evidence/P04.md` B9 回填）:
+  起点 HEAD `30e3cf42`，工作树 clean，单写者执行（未开子代理）。实际结果——
+  （a）**时点更正**：`30e3cf42` 的 `P05_GREEN` 声明**作废**（同一检查点刚登记 B9，二者不能同时成立），
+  该检查点记为 `P05_PARTIAL`；两份事实已显式对齐，**不删除任何历史数字**，只追加口径更正。
+  （b）**B9 关闭**：`SidebarFilterMenu` 取得与 `ChatSidebar` 同一 `SessionAuthority` 的**必填** prop，
+  两处挂载（工作区根列表 header 与扁平列表 header）分别显式传入；agentbox 下 `Import profile…` 不渲染，
+  `runImportProfileFlow` 与 `window.hermesDesktop.selectPaths` 均 **0 次**，legacy per-profile 过滤框
+  **门控在 authority 上**（测试特意填满 `$profiles` 再断言不出现，不依赖缓存为空）；命令面板
+  `profile.export`/`profile.import` 进入既有 `LEGACY_PALETTE_ROW_IDS`，列表与搜索都取不到、也不可执行。
+  （c）**保留项**：Profile 创建 `requestProfileCreate` → `SidebarNavMenu` 导航 `PROFILES_ROUTE`（AgentBox
+  服务权威 Profile 管理页）在两种 authority 下都保留；Profiles 页新建/编辑/归档/配置零改动；
+  `store/profile-share.ts`/`api/profiles.ts`/`profile-switcher.tsx` 未改，helper 保留但不可达；
+  `wire-v1` 无 Profile bundle 方法，故不放"暂不支持"假入口、不接 mock、不把 legacy bundle 当 AgentBox Profile。
+  实测门：B9 定向 4 files / 43 tests；`src/features/chat/sidebar` 回归 31 files / 256 tests；
+  `command-palette/` 回归 2 files / 17 tests；`npm run typecheck` exit 0；改动/新增 7 个 TS/TSX ESLint exit 0；
+  `git diff --check` exit 0。只读核验：AgentBox 侧栏与命令面板均不可达 profile 分享 flow；
+  `profile-switcher.tsx` 仍无生产挂载点；B8 无挂载消费点且硬门未变（electron/ 0 文件改动）；
+  28/28 矩阵集合全等、`wire-v1.ts` 摘要不变、fixture 与 transport 未改。
+  阶段标记在新 HEAD 上重新成立 **`P05_GREEN — CLIENT_IMPLEMENTATION_COMPLETE`**；同时保留
+  `REAL_FLOW_VERIFIED=否`、lifecycle connection 为外部缺口、未运行真实模型、writer_lease 保持 ACTIVE，
+  **不声明** P06 GREEN 或 DESKTOP_IMPLEMENTATION_READY。**B7 关闭；B8 = `UNREACHABLE_OR_PROTECTED`；
+  B9 关闭**——当前没有已知的 AgentBox 产品可达 legacy 调用路径。
+- 上一检查点改动（**P05 最终收口，已实施**，代码提交 `4efd1ec5` + `e087c976`，产物
   `evidence/P05.md` 最终收口检查点、`evidence/P05-final-audit.md` §11、`evidence/P04.md` 切片 9、
   `evidence/P07.md` 检查点 7、`evidence/P05-client-matrix.md` §4/§9）:
   起点 HEAD `a94a197c`，工作树 clean。实际结果——
+  > 本检查点的 `P05_GREEN` 声明已由 `d31897dc` 更正为**过早**（同检查点发现 B9），其 B9 条目**已被
+  > `d31897dc` 关闭**；下方原文保留为该检查点当时的记录。
   （a）**Command Center 数据面（B7 关闭）**：`CommandCenterView` 增加**必填** `authority: 'agentbox' | 'hermes'`，
   生产组合显式传 `'agentbox'`（不按错误/gateway 状态/缓存推断），实现拆为两个组件而非条件 hook，使"不订阅"
   成为字面事实；agentbox 下 legacy system/usage/maintenance/session 子树不构造，`getStatus`/`getLogs`/
@@ -129,6 +167,8 @@
   按工单不删除、不重构插件 API）；B9 新登记未修**（profile 分享经 `api/profiles.ts`，入口为侧栏筛选菜单
   `Import profile…` 与命令面板 Export/Import 两行，被结构门拒绝但未迁移）——因此"产品外壳所有可达 UI
   均无 legacy API 调用"这一只读核验**不成立**，B9 为精确剩余项。
+  **→ 本检查点的 GREEN 声明已由下一检查点 `d31897dc` 更正为过早，B9 亦在该点关闭**；上方原文保留为
+  该检查点当时的记录。
 - 上一检查点改动（**P05 legacy 客户端收口，已实施**，代码提交 `f7759148` + `a6b751ff`，
   产物 `evidence/P05-final-audit.md` §10、`evidence/P05-client-matrix.md` §5、`evidence/P05.md`、`evidence/P04.md`）:
   起点 HEAD `ad3feb16`，工作树 clean。实际结果——
@@ -292,28 +332,27 @@
   P04 切片1–9已提交；P05 sessions.archive 客户端接线已提交（`cbdccf7c`）；
   **P05 最终客户端审计已执行（只读，`6ca5d17a`）**：28 方法矩阵 28 生产可达 / 0 前端缺口且集合与
   计数机械全等、摘要三方一致、事件链生产接线完整；
-  **随后 legacy 收口与最终收口均已实施**：B1–B6 由 `f7759148`/`a6b751ff` 关闭；B7（Command Center）、
+  **随后 legacy 收口、最终收口与返修均已实施**：B1–B6 由 `f7759148`/`a6b751ff` 关闭；B7（Command Center）、
   命令面板 legacy 快捷项（含注册贡献行 `Toggle logs`）、P07 §9.5/§9.6/§9.8 fixture 深度、HTTP/WS
-  transport 一致性、陈旧 `IN_FLIGHT` 由 `4efd1ec5`/`e087c976` 关闭
-  　→ **P05 = `P05_GREEN — CLIENT_IMPLEMENTATION_COMPLETE`**；仍不声明 `REAL_FLOW_VERIFIED`、
+  transport 一致性、陈旧 `IN_FLIGHT` 由 `4efd1ec5`/`e087c976` 关闭；**B9（profile 分享）由 `d31897dc` 关闭**
+  　→ **P05 = `P05_GREEN — CLIENT_IMPLEMENTATION_COMPLETE`（成立于 `d31897dc`；`30e3cf42` 的同一标记
+  因同检查点刚登记 B9 而作废，该点记为 `P05_PARTIAL`）**；仍不声明 `REAL_FLOW_VERIFIED`、
   P06 GREEN、DESKTOP_IMPLEMENTATION_READY（lifecycle connection 为后端/集成外部缺口）；
-  **B8 = `UNREACHABLE_OR_PROTECTED`；B9（profile 分享 legacy 数据面）为精确剩余项，已登记未修**；
+  **B8 = `UNREACHABLE_OR_PROTECTED`；B9 已关闭**——无已知的 AgentBox 可达 legacy 调用路径；
   P06 独立验收待续
 - 完成范围: P00；P01 全部返修（真机 27 PASS）；P07 检查点 1（语义映射）、检查点 2
   （wire-v1 候选：17 方法 + schema 测试 + JSON Schema 工件；已消费后端机械反馈并回应）；
   P02A（失败面非阻塞+可关闭、Artifacts 页退役、失败终态竞态修复与真机门）
 - 下一项: 本阶段到此停止写入，不开始 P06。剩余工作按其归属分列——
-  （1）**P06 独立集成验收**（前端本端可做的部分）；
-  （2）**B9 profile 分享**：`store/profile-share.ts`/`api/profiles.ts` 的 legacy REST 入口
-  （侧栏筛选菜单 `Import profile…`、命令面板 Export/Import 两行）需按既有 authority 模式迁移或加门，
-  写集 `features/chat/sidebar/filter-menu.tsx`、`app/composition/root/app-composition.tsx`、
-  `store/profile-share.ts`（本阶段写集不含）；
-  （3）**Server lifecycle connection 合同到达后接生产接线**，再验证 REAL_FLOW；
+  （1）**P06 独立集成验收**（前端本端可做的部分，含最终全量门）；
+  （2）**Server lifecycle connection 合同到达后接生产接线**，再验证 REAL_FLOW；
+  （3）**B9 已关闭**（原入口 `features/chat/sidebar/filter-menu.tsx` 与命令面板贡献行过滤；
+  `profile-switcher.tsx`、`store/profile-share.ts`、`api/profiles.ts` 保留为不可达的 legacy 兼容代码，
+  将来若 AgentBox 需要 profile 打包能力，需先有 wire-v1 合同）；
   B8 按工单不删除、不重构插件 API，仅在将来误挂载时由 `hermes:api` 硬门保护。
   不再重新研究协议，不因矩阵 28/28 跳过上述任一项。
-- 阻断: **有前端阻断（本端可修，非外部）**：`ACTIVE_AGENTBOX_BLOCKER` B1–B5 使 AgentBox 正常产品
-  外壳仍可触达 Hermes REST 并拉起 legacy 运行时，故不能声明产品完成/CLIENT_GREEN；
-  另有 P04 production lifecycle connection（外部合同）与 P06 独立验收待续；
+- 阻断: **本端已知 legacy 可达面已清零**：B1–B7 与 B9 关闭，B8 属 `UNREACHABLE_OR_PROTECTED`；
+  剩余非本端项为 P04 production lifecycle connection（外部合同）与 P06 独立验收；
   wire 摘要已锁定，真实全栈仍由后续集成人验证
 
 - contract_semantics_version: core-semantics/1（APPROVED_SEMANTICS，2026-09-14）
@@ -349,6 +388,16 @@
   完成后停止写入不 RELEASE；后端工作树只读，Windows 构建/验收资源串行）
 
 ## 测试与基线（接力会话实跑）
+
+- **P05 返修（`d31897dc`，实跑）**：B9 定向 4 文件（`features/chat/sidebar/filter-menu.test.tsx`（新增 5）、
+  `chat-sidebar.integration.test.tsx`(10)、`chat-sidebar.workspace-assembly.test.tsx`(16)、
+  `command-palette/body.test.tsx`(12)）→ **4 files / 43 tests passed, exit 0**；
+  `src/features/chat/sidebar` 回归 → **31 files / 256 tests passed, exit 0**；
+  `command-palette/` 回归 → **2 files / 17 tests passed, exit 0**；
+  `npm run --workspace apps/desktop typecheck` 三项目 exit 0；改动/新增 7 个 TS/TSX ESLint exit 0；
+  `git diff --check` exit 0。未重跑完整 UI（上一 HEAD 已通过 811 files / 7882 tests，P06 统一跑最终全量门）。
+  两处 `SidebarFilterMenu` 挂载分别由组装测试覆盖，均翻转 `$gatewayState` 证明 authority 不随 gateway
+  状态改变、无 legacy 回落；测试先证明 Profile 子菜单确实打开再断言 `Import profile…` 不存在。
 
 - **P05 最终收口（`4efd1ec5` + `e087c976`，实跑）**：UI 定向 10 文件（`features/command-center`（index 15 +
   delete-confirm 3）、`command-palette/body.test.tsx`(9) + `palette-helpers.test.ts`(5)、
@@ -633,8 +682,8 @@ wire-review.md通道自39阶段协调。执行者下个检查点消费这些规�
 | P01 36R收口 | GREEN | 真机 27 PASS/2 SKIP/1 PENDING（evidence/P01.md；本地打开 PENDING 转 P05） |
 | P02 上层产品 | IN_PROGRESS（A/B/C/D 主面与服务投影完成；Profile 默认配置编辑、Workspace 选择登记、统一侧栏服务 Session 投影/改名/置顶与 **Session 归档**已接（含 `86911029` 服务状态边界返修与 `cbdccf7c` 归档接线）；矩阵 28 生产可达 / 0 前端缺口） | P01 已满足 |
 | P03 用例状态与API | IN_PROGRESS（主 route 生产调用者与 event reducer 接入已完成；真实 Server 源待 P04） | 与 P02 穿插 |
-| P04 宿主与遗留退役 | IN_PROGRESS（production request/Session-event transport + IPC + supervisor；两道急切 autostart 门已退役，**惰性 `hermes:api` 门已于 `f7759148` 收口**——agentbox runtime 下任何 `hermes:api` 请求都在路由/`ensureBackend` 之前以 `LEGACY_RUNTIME_DISABLED_FOR_PRODUCT` 拒绝；**HTTP/WS loopback 判据已统一、WS 无连接可观测已由 `4efd1ec5` 关闭（切片 9）**；B7 已于 `e087c976` 关闭；B8 归类 `UNREACHABLE_OR_PROTECTED`（无已挂载消费点 + 硬门保护，非活动阻断）；B9 profile 分享 legacy 数据面已登记未修；Server connection 合同待后端） | 与 P03 穿插 |
-| P05 正式合同接入 | **`P05_GREEN — CLIENT_IMPLEMENTATION_COMPLETE`**（`6ca5d17a` 最终审计：28 方法矩阵 **28 生产可达 / 0 前端缺口**、集合与计数机械全等、摘要三方一致、事件链生产接线完整；legacy 可达性 5 条 `ACTIVE_AGENTBOX_BLOCKER` + 1 条已上膛**已在 `f7759148`/`a6b751ff` 收口（B1–B6）**；**B7、命令面板 legacy 快捷项（含 `Toggle logs`）、§9.5/§9.6/§9.8 fixture 深度、HTTP/WS transport 一致性、陈旧 `IN_FLIGHT` 已由 `4efd1ec5`/`e087c976` 关闭**；全量 UI 811 files / 7882 tests 全通过。仍不声明 `REAL_FLOW_VERIFIED`（lifecycle connection 为后端/集成外部缺口）、P06 GREEN、DESKTOP_IMPLEMENTATION_READY；**B8 = `UNREACHABLE_OR_PROTECTED`，B9 profile 分享仍为可达但被结构门拒绝的精确剩余项**） | wire 双端锁定 |
+| P04 宿主与遗留退役 | IN_PROGRESS（production request/Session-event transport + IPC + supervisor；两道急切 autostart 门已退役，**惰性 `hermes:api` 门已于 `f7759148` 收口**——agentbox runtime 下任何 `hermes:api` 请求都在路由/`ensureBackend` 之前以 `LEGACY_RUNTIME_DISABLED_FOR_PRODUCT` 拒绝；**HTTP/WS loopback 判据已统一、WS 无连接可观测已由 `4efd1ec5` 关闭（切片 9）**；B7 已于 `e087c976` 关闭；**B9 profile 分享 legacy 数据面已于 `d31897dc` 在 renderer 侧关闭（该点 electron/ 零改动，门与 transport 未变）**；B8 归类 `UNREACHABLE_OR_PROTECTED`（无已挂载消费点 + 硬门保护，非活动阻断）；Server connection 合同待后端） | 与 P03 穿插 |
+| P05 正式合同接入 | **`P05_GREEN — CLIENT_IMPLEMENTATION_COMPLETE`（成立于 `d31897dc`）**（`6ca5d17a` 最终审计：28 方法矩阵 **28 生产可达 / 0 前端缺口**、集合与计数机械全等、摘要三方一致、事件链生产接线完整；legacy 可达性 5 条 `ACTIVE_AGENTBOX_BLOCKER` + 1 条已上膛**已在 `f7759148`/`a6b751ff` 收口（B1–B6）**；**B7、命令面板 legacy 快捷项（含 `Toggle logs`）、§9.5/§9.6/§9.8 fixture 深度、HTTP/WS transport 一致性、陈旧 `IN_FLIGHT` 已由 `4efd1ec5`/`e087c976` 关闭；B9 profile 分享已由 `d31897dc` 关闭**；全量 UI 811 files / 7882 tests 全通过。`30e3cf42` 的 GREEN 声明因同检查点刚登记 B9 而**作废**，该点记为 `P05_PARTIAL`。仍不声明 `REAL_FLOW_VERIFIED`（lifecycle connection 为后端/集成外部缺口）、P06 GREEN、DESKTOP_IMPLEMENTATION_READY；**B8 = `UNREACHABLE_OR_PROTECTED`；B9 已关闭——无已知 AgentBox 可达 legacy 调用路径**） | wire 双端锁定 |
 | P06 前端验收与交接 | IMPLEMENTATION_HANDOFF_GATE（**前置未满足**：P05 的 legacy 客户端收口已完成，但 P07 fixture 深度门与 transport 一致性/无连接可观测性未完成；真实全栈门由后续集成人负责） | 本端独立范围未完成 |
 | P07 核心合同与状态交接 | 检查点1–6已提交；WIRE_LOCKED（**检查点 3 的 fixture 深度经最终审计下调**：§9.5/§9.6/§9.8 无测试，不得声称完整覆盖） | 28 方法双端摘要一致；fixture/客户端已锁定 |
 

@@ -622,9 +622,13 @@ package/lock、后端与 Windows 构建树；未重跑完整测试、未跑 Wind
 - **B7 已关闭**：Command Center 取得必填 authority，agentbox 下零 legacy 调用、深链本地化说明。
 - **B8 归类 `UNREACHABLE_OR_PROTECTED`**（不是活动产品阻断）：插件 SDK 无已挂载消费点，且任何误调用
   仍被 `hermes:api` 硬门挡在 `ensureBackend` 之前；本阶段按工单不删除、不重构插件 API。
-- **B9（本轮新登记，未修）**：`store/profile-share.ts` 经 `api/profiles.ts` 走 legacy REST，入口为侧栏
-  筛选菜单的 `Import profile…`（无 authority 判据）与命令面板的 Export/Import profile 两行；被结构门拒绝、
-  不拉起运行时，但仍是可达调用路径。最终审计 §10.4 的同类登记。
+- ~~**B9（新登记，未修）**~~ **已关闭**（`d31897dc`）：`store/profile-share.ts` 经 `api/profiles.ts` 走
+  legacy REST，入口为侧栏筛选菜单的 `Import profile…` 与命令面板的 Export/Import profile 两行；现
+  `SidebarFilterMenu` 取得与 `ChatSidebar` 同一必填 `sessionAuthority`（两处挂载均显式传入），agentbox 下
+  该行不渲染、flow 与原生选择框 0 次、legacy per-profile 过滤框不再作为 AgentBox Profile 权威呈现；
+  命令面板两行进入既有 legacy 贡献行过滤集（列表与搜索都取不到）。Profile 创建保留（导航到 AgentBox
+  Profile 管理页）。`store/profile-share.ts`/`api/profiles.ts`/`profile-switcher.tsx` 未改，helper 保留
+  但不可达；`wire-v1` 无 Profile bundle 方法，因此不放"暂不支持"假入口。
 - 真实 Server lifecycle connection（本文件 §4）→ 阻断 28 个方法与事件流的 REAL_FLOW 验证。
 - 侧栏批量 legacy 会话树的迁移账本（`$gatewayState` 门控的部分）→ 开门前不会触发，开门后必须先迁移。
 - `wire-v1` 未纳入范围的增量（steer 语义、Worker 通道合同、快照分页参数）仍为外围合同。
