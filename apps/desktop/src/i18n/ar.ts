@@ -2953,5 +2953,12 @@ export const ar = defineLocale({
       description: 'تنقل التطبيق',
       toggle: open => `${open ? 'إظهار' : 'إخفاء'} الشريط الجانبي`
     }
+  },
+  wslWorkspace: {
+    browseUnavailable: 'تصفح الدلائل في AgentBox غير متاح',
+    readOnly: 'للقراءة فقط',
+    cannotOpen: 'تعذر الفتح',
+    kindFile: 'ملف',
+    kindOther: 'أخرى'
   }
 })

@@ -1,16 +1,13 @@
 import { useStore } from '@nanostores/react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import {
-  cancelWslOperation,
-  connectWsl,
-  discoverWsl,
-  listWslDirectories
-} from '@/api/workspace'
+import { agentBoxRuntimeClient } from '@/api/agentbox-runtime-client'
+import { wireCapability } from '@/api/wire-v1-client'
+import { cancelWslOperation, connectWsl, discoverWsl } from '@/api/workspace'
 import { createLatestWins } from '@/application/workspace/latest-wins'
+import { wireAgentBoxWorkspaceBrowserPort } from '@/application/workspace/wire-workspace-browser'
 import { releaseWizardConnection, saveWslWorkspaceFromWizard } from '@/application/workspace/wsl-workspace-usecases'
 import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Codicon } from '@/components/ui/codicon'
 import {
   Dialog,
@@ -22,11 +19,14 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { AgentBoxWorkspaceBrowser } from '@/features/workspace/agentbox-workspace-browser'
 import { wslFailureText as failureText } from '@/features/workspace/wsl-failure-text'
 import { useI18n } from '@/i18n'
-import { cn } from '@/lib/utils'
+import { $agentBoxHello, $agentBoxService } from '@/store/agentbox-service'
+import { selectWorkspaceView } from '@/store/workspace-view'
 import { $wslWorkspaceWizardOpen, closeWslWorkspaceWizard } from '@/store/wsl-workspace'
-import type { WslDirectoryEntry, WslDistributionInfo, WslWorkspaceErrorCode } from '@/types/workspace'
+import type { EnvironmentIdentity } from '@/types/wire/wire-v1'
+import type { WslDistributionInfo, WslWorkspaceErrorCode } from '@/types/workspace'
 
 type Step = 'config' | 'browse'
 
@@ -36,6 +36,8 @@ type DiscoveryState =
   | { kind: 'unavailable'; reason: string }
   | { kind: 'error'; code: WslWorkspaceErrorCode | null }
 
+const CONFIG_RESOLVE_UNSUPPORTED = 'CAPABILITY_NOT_DECLARED'
+
 /**
  * The round-36 WSL connection wizard, mounted once in the workspace sidebar:
  * distribution (default preselected) and an optional Linux user → connect and
@@ -44,11 +46,18 @@ type DiscoveryState =
  * and no separate connecting page — connecting is a loading state on the same
  * page, with cancel, typed errors and retry. A cancelled wizard persists
  * nothing, and a failed save keeps the selection for retry.
+ *
+ * The host owns discovery and the verified connection; DIRECTORY LISTING is the
+ * AgentBox service's job (workspaces.browse), never the host's. Without a ready
+ * service that declares the method the wizard offers nothing rather than
+ * falling back to host enumeration.
  */
 export function WslWorkspaceWizard() {
   const { t } = useI18n()
   const w = t.wslWorkspace
   const open = useStore($wslWorkspaceWizardOpen)
+  const service = useStore($agentBoxService)
+  const hello = useStore($agentBoxHello)
 
   const [step, setStep] = useState<Step>('config')
   const [discovery, setDiscovery] = useState<DiscoveryState>({ kind: 'loading' })
@@ -57,20 +66,19 @@ export function WslWorkspaceWizard() {
   const [connectionId, setConnectionId] = useState<null | string>(null)
   const [connectError, setConnectError] = useState<WslWorkspaceErrorCode | null>(null)
   const [connecting, setConnecting] = useState(false)
+  // The identity the host verified and the home directory it proved: the
+  // service browses THAT environment, starting where the host left off.
+  const [target, setTarget] = useState<null | { environment: EnvironmentIdentity; initialPath: string }>(null)
 
-  // Directory browser state. `browserTurn` implements latest-wins: a slow
-  // listing for an older path must never overwrite the user's newer one.
-  const [path, setPath] = useState('/')
-  const [pathInput, setPathInput] = useState('/')
-  const [entries, setEntries] = useState<WslDirectoryEntry[]>([])
-  const [showHidden, setShowHidden] = useState(false)
-  const [listing, setListing] = useState(false)
-  const [listError, setListError] = useState<WslWorkspaceErrorCode | null>(null)
-  const [saving, setSaving] = useState(false)
-  const [saveError, setSaveError] = useState<WslWorkspaceErrorCode | null>(null)
-
-  const browseTurns = useRef(createLatestWins())
   const connectOperation = useRef<null | string>(null)
+  const saveTurns = useRef(createLatestWins())
+  const browserPort = useMemo(() => wireAgentBoxWorkspaceBrowserPort(agentBoxRuntimeClient()), [])
+
+  // Browsing is only offered when the service is usable AND declares the
+  // method. Absence is reported, never replaced by host enumeration.
+  const browseCapability = hello ? wireCapability(hello, 'workspaces.browse') : null
+  const browseSupported = service.phase === 'ready' && Boolean(browseCapability?.supported)
+  const browseReason = browseCapability?.reason || CONFIG_RESOLVE_UNSUPPORTED
 
   const runDiscovery = useCallback(async () => {
     setDiscovery({ kind: 'loading' })
@@ -78,7 +86,11 @@ export function WslWorkspaceWizard() {
     const result = await discoverWsl()
 
     if (result.ok && result.available) {
-      setDiscovery({ kind: 'ready', distributions: result.distributions, defaultDistribution: result.defaultDistribution })
+      setDiscovery({
+        kind: 'ready',
+        distributions: result.distributions,
+        defaultDistribution: result.defaultDistribution
+      })
       // The select shows the default immediately; the state must agree, or
       // the Connect button would stay disabled until the user re-picked.
       setDistribution(result.defaultDistribution ?? result.distributions[0]?.name ?? '')
@@ -106,14 +118,7 @@ export function WslWorkspaceWizard() {
     setConnectionId(null)
     setConnectError(null)
     setConnecting(false)
-    setPath('/')
-    setPathInput('/')
-    setEntries([])
-    setShowHidden(false)
-    setListing(false)
-    setListError(null)
-    setSaving(false)
-    setSaveError(null)
+    setTarget(null)
     connectOperation.current = null
 
     void runDiscovery()
@@ -135,48 +140,8 @@ export function WslWorkspaceWizard() {
     closeWslWorkspaceWizard()
   }
 
-  const listDirectory = useCallback(
-    async (connection: null | string, target: string, hidden: boolean) => {
-      const turn = browseTurns.current.begin()
-
-      setListing(true)
-      setListError(null)
-      setPath(target)
-      setPathInput(target)
-
-      const result = await listWslDirectories({
-        connectionId: connection ?? undefined,
-        operationId: `browse_${turn}`,
-        path: target,
-        showHidden: hidden
-      })
-
-      // Latest-wins: a stale listing (user already navigated elsewhere) is
-      // dropped, never applied over the newer view.
-      if (!browseTurns.current.isCurrent(turn)) {
-        return
-      }
-
-      setListing(false)
-
-      if (!result.ok) {
-        setListError(result.code)
-
-        return
-      }
-
-      setEntries(result.entries)
-      setPath(result.path)
-      // Echo the resolved path into the input ONLY while the user has not
-      // typed something newer — the initial listing of a slow connect must
-      // not wipe a path the user is already entering.
-      setPathInput(previous => (previous === target ? result.path : previous))
-    },
-    []
-  )
-
   const startConnect = async () => {
-    if (connecting || !distribution) {
+    if (connecting || !distribution || !browseSupported) {
       return
     }
 
@@ -198,12 +163,14 @@ export function WslWorkspaceWizard() {
       return
     }
 
+    // The host verified the identity and the home directory; the service lists
+    // from there, for exactly that verified user.
     setConnectionId(result.connectionId)
-    setPath(result.home)
-    setPathInput(result.home)
-    setEntries([])
+    setTarget({
+      environment: { host: result.distribution, kind: 'wsl', user: result.user },
+      initialPath: result.home
+    })
     setStep('browse')
-    void listDirectory(result.connectionId, result.home, false)
   }
 
   const cancelConnect = () => {
@@ -212,32 +179,32 @@ export function WslWorkspaceWizard() {
     }
   }
 
-  const save = async () => {
-    if (saving || !connectionId) {
-      return
-    }
+  // The host saves the shell record; selecting its row is what the main chat
+  // observes to register the service Workspace. A late answer after the wizard
+  // moved on must not re-select anything.
+  const save = useCallback(
+    async (path: string): Promise<{ message: string; ok: false } | { ok: true }> => {
+      if (!connectionId) {
+        return { message: failureText(t, 'WSL_SAVE_FAILED'), ok: false }
+      }
 
-    setSaving(true)
-    setSaveError(null)
+      const turn = saveTurns.current.begin()
+      const result = await saveWslWorkspaceFromWizard({ connectionId, name: undefined, path })
 
-    const result = await saveWslWorkspaceFromWizard({
-      connectionId,
-      name: undefined,
-      path
-    })
+      if (!result.ok) {
+        return { message: failureText(t, result.code), ok: false }
+      }
 
-    if (!result.ok) {
-      // The selection stays as-is so the user can retry without re-navigating.
-      setSaving(false)
-      setSaveError(result.code)
+      if (saveTurns.current.isCurrent(turn)) {
+        selectWorkspaceView(result.workspace.id)
+        void releaseWizardConnection(connectionId)
+        closeWslWorkspaceWizard()
+      }
 
-      return
-    }
-
-    setSaving(false)
-    void releaseWizardConnection(connectionId)
-    closeWslWorkspaceWizard()
-  }
+      return { ok: true }
+    },
+    [connectionId, t]
+  )
 
   return (
     <Dialog onOpenChange={onClose} open={open}>
@@ -251,6 +218,12 @@ export function WslWorkspaceWizard() {
 
         {step === 'config' && (
           <div className="flex flex-col gap-3">
+            {!browseSupported && (
+              <div className="text-[0.75rem] text-(--ui-red)" data-browser-capability="">
+                {w.browseUnavailable} · {service.detail || browseReason}
+              </div>
+            )}
+
             {discovery.kind === 'loading' && (
               <div className="flex items-center gap-2 text-[0.75rem] text-(--ui-text-tertiary)">
                 <Codicon name="loading" size="0.75rem" spinning />
@@ -265,7 +238,13 @@ export function WslWorkspaceWizard() {
             {discovery.kind === 'error' && (
               <div className="flex flex-col gap-2 text-[0.75rem] text-(--ui-red)">
                 <span>{discovery.code ? failureText(t, discovery.code) : w.discoverFailed}</span>
-                <Button className="self-start" onClick={() => void runDiscovery()} size="sm" type="button" variant="ghost">
+                <Button
+                  className="self-start"
+                  onClick={() => void runDiscovery()}
+                  size="sm"
+                  type="button"
+                  variant="ghost"
+                >
                   <Codicon name="refresh" size="0.75rem" />
                   {t.common.retry}
                 </Button>
@@ -324,86 +303,14 @@ export function WslWorkspaceWizard() {
           </div>
         )}
 
-        {step === 'browse' && (
-          <div className="flex min-h-0 flex-col gap-2">
-            <div className="flex items-center gap-1.5">
-              <TiplessButton
-                ariaLabel={w.upOneLevel}
-                disabled={path === '/' || listing}
-                onClick={() => void listDirectory(connectionId, path === '/' ? '/' : path.replace(/\/[^/]*$/, '') || '/', showHidden)}
-              >
-                <Codicon name="arrow-up" size="0.875rem" />
-              </TiplessButton>
-              <Input
-                className="h-7 flex-1 text-[0.75rem]"
-                onChange={event => setPathInput(event.target.value)}
-                onKeyDown={event => {
-                  if (event.key === 'Enter') {
-                    event.preventDefault()
-                    void listDirectory(connectionId, pathInput, showHidden)
-                  }
-                }}
-                placeholder={w.pathLabel}
-                value={pathInput}
-              />
-              <Button disabled={listing} onClick={() => void listDirectory(connectionId, pathInput, showHidden)} size="sm" type="button" variant="ghost">
-                {w.goTo}
-              </Button>
-            </div>
-
-            <label className="flex w-fit items-center gap-1.5 text-[0.6875rem] text-(--ui-text-tertiary)">
-              <Checkbox
-                checked={showHidden}
-                onCheckedChange={checked => {
-                  const hidden = checked === true
-
-                  setShowHidden(hidden)
-                  void listDirectory(connectionId, path, hidden)
-                }}
-              />
-              {w.showHidden}
-            </label>
-
-            <div className="h-64 overflow-y-auto rounded-md border border-(--ui-stroke-tertiary)">
-              {listError && (
-                <div className="p-3 text-[0.75rem] text-(--ui-red)">{failureText(t, listError)}</div>
-              )}
-
-              {!listError && entries.length === 0 && !listing && (
-                <div className="p-3 text-[0.75rem] text-(--ui-text-quaternary)">{w.emptyDirectory}</div>
-              )}
-
-              {entries.map(entry => (
-                <button
-                  className={cn(
-                    'flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[0.75rem] transition-colors',
-                    'hover:bg-(--ui-control-hover-background)'
-                  )}
-                  key={entry.path}
-                  onClick={() => void listDirectory(connectionId, entry.path, showHidden)}
-                  type="button"
-                >
-                  <Codicon className="shrink-0 text-(--ui-text-tertiary)" name="folder" size="0.75rem" />
-                  <span className="min-w-0 flex-1 truncate">{entry.name}</span>
-                  <span className="shrink-0 text-[0.625rem] text-(--ui-text-quaternary)">{entry.path}</span>
-                </button>
-              ))}
-
-              {listing && (
-                <div className="flex items-center gap-2 p-3 text-[0.75rem] text-(--ui-text-tertiary)">
-                  <Codicon name="loading" size="0.75rem" spinning />
-                  {t.common.loading}
-                </div>
-              )}
-            </div>
-
-            {saveError && (
-              <div className="flex items-start gap-2 text-[0.75rem] text-(--ui-red)">
-                <Codicon className="mt-0.5 shrink-0" name="error" size="0.75rem" />
-                {failureText(t, saveError)}
-              </div>
-            )}
-          </div>
+        {step === 'browse' && target && (
+          <AgentBoxWorkspaceBrowser
+            environment={target.environment}
+            initialPath={target.initialPath}
+            onBack={() => setStep('config')}
+            onChoose={save}
+            port={browserPort}
+          />
         )}
 
         <DialogFooter>
@@ -441,7 +348,7 @@ export function WslWorkspaceWizard() {
 
           {step === 'config' && (
             <Button
-              disabled={discovery.kind !== 'ready' || !distribution || connecting}
+              disabled={discovery.kind !== 'ready' || !distribution || connecting || !browseSupported}
               onClick={() => void startConnect()}
               type="button"
             >
@@ -455,24 +362,8 @@ export function WslWorkspaceWizard() {
               )}
             </Button>
           )}
-
-          {step === 'browse' && (
-            <Button disabled={saving || listing} onClick={() => void save()} type="button">
-              <Codicon name="check" size="0.75rem" />
-              {saving ? t.common.saving : w.chooseDirectory}
-            </Button>
-          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
-}
-
-/** Minimal icon button for the browser toolbar. */
-function TiplessButton({ children, ...props }: React.ComponentProps<'button'> & { ariaLabel: string }) {
-  return (
-    <Button {...props} aria-label={props['aria-label'] ?? props.ariaLabel} size="icon-sm" type="button" variant="ghost">
-      {children}
-    </Button>
   )
 }

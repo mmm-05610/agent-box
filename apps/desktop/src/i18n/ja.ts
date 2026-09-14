@@ -3395,5 +3395,12 @@ export const ja = defineLocale({
       description: 'モバイルサイドバーを表示します。',
       toggle: open => `サイドバーを${open ? '表示' : '非表示'}`
     }
+  },
+  wslWorkspace: {
+    browseUnavailable: 'AgentBox のディレクトリ閲覧を利用できません',
+    readOnly: '読み取り専用',
+    cannotOpen: '開けません',
+    kindFile: 'ファイル',
+    kindOther: 'その他'
   }
 })

@@ -3700,5 +3700,12 @@ export const ru = defineLocale({
       description: 'Показывает мобильную боковую панель.',
       toggle: open => `${open ? 'Показать' : 'Скрыть'} боковую панель`
     }
+  },
+  wslWorkspace: {
+    browseUnavailable: 'Просмотр каталогов AgentBox недоступен',
+    readOnly: 'Только чтение',
+    cannotOpen: 'Не удаётся открыть',
+    kindFile: 'Файл',
+    kindOther: 'Другое'
   }
 })

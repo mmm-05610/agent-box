@@ -3366,6 +3366,11 @@ export interface Translations {
     goTo: string
     upOneLevel: string
     showHidden: string
+    browseUnavailable: string
+    readOnly: string
+    cannotOpen: string
+    kindFile: string
+    kindOther: string
     emptyDirectory: string
     chooseDirectory: string
     // Sidebar projection
