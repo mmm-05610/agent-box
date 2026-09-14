@@ -14,6 +14,11 @@ opencode --dry-run` 逐字段比对）。里面没有任何秘密：API key 是�
 
 本阶段实测记录（详见 docs/server-round1/fullstack/opencode-production-packaging.md）：
 
+* guest 布局是四家共用的那一套：唯一隔离 HOME 根 `/runtime/home` 下，只读配置
+  `/runtime/home/.config/opencode/opencode.json`（= `$XDG_CONFIG_HOME/opencode/
+  opencode.json`），唯一可写 state `/runtime/home/.local/share/opencode`
+  （= `$XDG_DATA_HOME/opencode`，OpenCode 自己的默认数据目录）。两者**不同子树**，
+  因此本家没有受保护的 state 路径：只读配置不可能被 state bind 遮蔽。
 * `limit.output: 64` 真的进入 provider 请求体（假端点看到 `max_tokens=64`），
   因此不需要 42d 用过的 `OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX`；后者的名字
   含 `TOKEN`，会被 Server/Core 的环境变量名规则拒绝，本模板不得声明它。
@@ -23,7 +28,7 @@ opencode --dry-run` 逐字段比对）。里面没有任何秘密：API key 是�
   见门的 retry 观测）。42d 预备脚本里的 `maxProviderAttempts: 12` 没有证据，
   本阶段以实测值取代，并由门在真实链路中复核。
 * 会话与消息持久化在 `$XDG_DATA_HOME/opencode/opencode.db`（SQLite，连同
-  `-wal`/`-shm`），所以 state 投影目标就是驱动进程的 `XDG_DATA_HOME`。
+  `-wal`/`-shm`），所以 state 投影目标就是 `$XDG_DATA_HOME` 下的 `opencode/`。
 """
 from __future__ import annotations
 
@@ -53,22 +58,31 @@ BINARY_TARGET = f"/runtime/bin/{BINARY_NAME}"
 #: 生产 argv：直接执行挂载好的二进制（不加壳、不加解释器）。
 BINARY_ARGV: tuple[str, ...] = ()
 
-#: 隔离 HOME 下的原生配置与原生数据目录（state 投影）。
-AGENT_HOME = "/tmp/agentbox-home"
-CONFIG_TARGET = f"{AGENT_HOME}/opencode.json"
-STATE_TARGET = f"{AGENT_HOME}/opencode-state"
+#: 隔离 HOME 下的原生配置与原生数据目录（state 投影）。两者都由 guest 环境里
+#: 那一个 HOME/XDG 根派生：`OPENCODE_CONFIG` 指向只读配置的**确切路径**，
+#: 而 state 投影目标正是 `$XDG_DATA_HOME/opencode`，即 OpenCode 自己的默认
+#: 数据目录——显式声明与默认解析收敛到同一目录，不可能分裂成两个 home。
+#: guest 环境给出的两个 XDG 根（`sidecar.GUEST_HOME` 派生），这里的常量只是把
+#: 同一份事实写下来，供模板测试断言"默认路径 == 显式目标"。
+GUEST_HOME = "/runtime/home"
+XDG_CONFIG_HOME = f"{GUEST_HOME}/.config"
+XDG_DATA_HOME = f"{GUEST_HOME}/.local/share"
+CONFIG_TARGET = f"{XDG_CONFIG_HOME}/opencode/opencode.json"
+STATE_TARGET = f"{XDG_DATA_HOME}/opencode"
 
 #: 生产 adapter 环境。每一项都有明确理由：
-#: * `OPENCODE_CONFIG` 指向只读投影进来的原生配置（避免读 guest 里的用户目录）；
-#: * `XDG_DATA_HOME` 指向 state 投影目标，SQLite 存储因此可被 Server 回读；
+#: * `OPENCODE_CONFIG` 指向只读投影进来的原生配置（避免读 guest 里的用户目录），
+#:   该路径同时等于 `$XDG_CONFIG_HOME/opencode/opencode.json`（guest 环境已给出
+#:   XDG 变量），因此显式变量与默认路径同一文件；
 #: * 三个 DISABLE_* 关闭自动更新、模型目录下载与 LSP 下载，使一次运行只与
 #:   provider 端点通信（42d 预备运行同样设置）。
+#: **不声明 XDG_DATA_HOME**：guest 环境已给出 `/runtime/home/.local/share`，
+#: 声明它只会制造第二处真相；state 目标就是它下面的 `opencode/`。
 #: 依赖环境变量名里**不得**出现 TOKEN/SECRET/KEY/PASSWORD/CREDENTIAL/AUTH，
 #: 因此这里没有 `OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX`（输出上限由配置的
 #: `limit.output` 承载，已实测进入请求体）。
 ADAPTER_ENVIRONMENT = {
     "OPENCODE_CONFIG": CONFIG_TARGET,
-    "XDG_DATA_HOME": STATE_TARGET,
     "OPENCODE_DISABLE_AUTOUPDATE": "1",
     "OPENCODE_DISABLE_MODELS_FETCH": "1",
     "OPENCODE_DISABLE_LSP_DOWNLOAD": "1",

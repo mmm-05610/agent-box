@@ -109,6 +109,11 @@ export function auditPathFor(environment, directory) {
   return value
 }
 
+/** OpenCode 在给定的 XDG 数据根下使用的目录名。 */
+export function dataDirectoryUnder(xdgDataHome) {
+  return `${String(xdgDataHome).replace(/\/+$/, "")}/opencode`
+}
+
 /** 在 serve 之前插入 `--pure`（对外部插件的关闭与 42d 的 `run --pure` 对齐）。 */
 export function withPure(args) {
   if (!Array.isArray(args) || args.length === 0 || args[0] !== "serve") return args
@@ -136,9 +141,14 @@ export async function createDriver(context) {
   const environment = { ...(context?.environment ?? {}) }
   const directory = typeof context?.directory === "string" ? context.directory : process.cwd()
   const stateDirectory = typeof context?.stateDirectory === "string" ? context.stateDirectory : null
-  // OpenCode 的持久化根（SQLite 与快照）就是 XDG_DATA_HOME；deployment 把它指向
-  // stateProjection 的目标，Server 关闭后再从该投影回读。
-  const dataDirectory = typeof environment.XDG_DATA_HOME === "string" ? environment.XDG_DATA_HOME : null
+  // OpenCode 的持久化根（SQLite 与快照）是 `$XDG_DATA_HOME/opencode`。XDG 根由
+  // guest 环境给出，deployment **不**再声明它（否则同一个事实会有两份、可以漂移）；
+  // 本进程就跑在那个 guest 环境里，所以审计/status 用的数据目录优先取声明值、
+  // 其次取进程环境。它只用于审计，不参与任何寻址决定。
+  const xdgDataHome = typeof environment.XDG_DATA_HOME === "string"
+    ? environment.XDG_DATA_HOME
+    : typeof process.env.XDG_DATA_HOME === "string" ? process.env.XDG_DATA_HOME : null
+  const dataDirectory = xdgDataHome ? dataDirectoryUnder(xdgDataHome) : null
   const auditTarget = auditPathFor(environment, directory)
   const authorization = () => "Basic " + Buffer.from(`${username}:${password}`).toString("base64")
   const username = "agentbox"

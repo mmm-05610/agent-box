@@ -5,7 +5,7 @@ Runs the production Server assembly over the real c4 release Worker, bwrap, and
 the genuine `hermes-agent` 0.19.0 distribution with the genuine installed Python
 dependency closure, and points Hermes at a loopback OpenAI-compatible endpoint
 that this gate starts. Two rounds on one Server Session prove the parts a
-component-level gate cannot: configuration materialization, credential
+component-level gate cannot: configuration verification, credential
 projection, the native session store path, streaming order, continuation of the
 Hermes-owned transcript, and the reopen method Hermes actually used.
 
@@ -19,7 +19,7 @@ Boundaries enforced by the gate itself:
     hold the official DeepSeek root. The loopback endpoint exists only as an
     explicit, listed override (`model.base_url` and `providers.custom.api`)
     applied to this run's projected copy.
-  * A reviewed offline guard is projected as `/tmp/agentbox-home/sitecustomize.py`
+  * A reviewed offline guard is projected as `/runtime/home/.hermes/sitecustomize.py`
     and put first on the adapter's `PYTHONPATH`, so every non-loopback
     destination is refused before resolution or connection, in the guest, with
     an audit trail this gate reads back from the workspace. The guard also
@@ -392,6 +392,7 @@ class FakeEndpoint:
         import socket as socket_module
 
         self.thread.start()
+        self._started = True
         deadline = time.monotonic() + 5.0
         while time.monotonic() < deadline:
             probe = socket_module.socket()
@@ -406,6 +407,15 @@ class FakeEndpoint:
         fail("HERMES_GATE_ENDPOINT_UNREACHABLE", "the fake endpoint never accepted a loopback connection")
 
     def stop(self) -> None:
+        """Stop the endpoint, or do nothing if it never served.
+
+        `shutdown()` waits for `serve_forever` to return, so calling it on a
+        server that never started blocks forever - which would turn an early
+        gate failure into a hang. Stopping is idempotent.
+        """
+        if not getattr(self, "_started", False):
+            return
+        self._started = False
         self.server.shutdown()
         self.server.server_close()
 
@@ -502,7 +512,9 @@ class DirectWorkerConnector:
         return _RecordingClient(client, self.spawns)
 
 
-def assert_worker_posture(spawns: list, artifact_target: str, state_target: str) -> dict:
+def assert_worker_posture(spawns: list, artifact_target: str, state_target: str, *,
+                          config_target: str | None = None,
+                          guard_target: str | None = None) -> dict:
     """The Worker must have been asked to run exactly one shape of sandbox.
 
     Two writable binds are allowed and expected - the project workspace and the
@@ -510,12 +522,19 @@ def assert_worker_posture(spawns: list, artifact_target: str, state_target: str)
     runtime artifact, the projected configuration, the guard and the credential
     must all be read-only binds, and no user home or user site directory may be
     mounted at all.
+
+    When the read-only configuration lives *inside* the writable state
+    directory, its bind must come after the state directory's bind: a bind of an
+    ancestor replaces what was mounted below it, so the opposite order would
+    leave the guest an empty mount point where the reviewed configuration should
+    be. That order is asserted per spawn, not assumed from the compiler.
     """
     if not spawns:
         fail("HERMES_GATE_WORKER_NOT_SPAWNED", "the Worker was never asked to spawn the sidecar")
     writable: list[tuple[str, str]] = []
     readonly: list[tuple[str, str]] = []
     expected = sorted({"/workspace", state_target})
+    nested = [target for target in (config_target, guard_target) if target]
     for argv in spawns:
         per_spawn: list[tuple[str, str]] = []
         for index, token in enumerate(argv):
@@ -530,6 +549,24 @@ def assert_worker_posture(spawns: list, artifact_target: str, state_target: str)
         if len(per_spawn) != len(set(per_spawn)):
             fail("HERMES_GATE_WRITABLE_MOUNT_DUPLICATED",
                  f"one sandbox declares a writable bind twice: {per_spawn}")
+        for target in nested:
+            if not target.startswith(state_target + "/"):
+                continue
+            state_index = mount_index(argv, state_target)
+            target_index = mount_index(argv, target)
+            if state_index < 0 or target_index < 0:
+                fail("HERMES_GATE_CONFIG_NOT_MOUNTED",
+                     f"{target} was not bound in the guest template")
+            if argv[state_index] != "--bind":
+                fail("HERMES_GATE_WRITABLE_MOUNT_UNEXPECTED",
+                     f"the state target {state_target} is not a writable bind")
+            if argv[target_index] != "--ro-bind":
+                fail("HERMES_GATE_CONFIG_MOUNT_MISSED",
+                     f"{target} is not a read-only bind inside the state directory")
+            if state_index > target_index:
+                fail("HERMES_GATE_CONFIG_SHADOWED",
+                     f"{target} is bound before the state directory it lives in, so the state "
+                     "bind would replace it with an empty mount point")
         writable.extend(per_spawn)
     writable_targets = sorted({target for _source, target in writable})
     readonly_targets = {target for _source, target in readonly}
@@ -543,14 +580,35 @@ def assert_worker_posture(spawns: list, artifact_target: str, state_target: str)
         fail("HERMES_GATE_CREDENTIAL_NOT_MOUNTED", "the credential frame was not mounted read-only")
     if "/runtime/view" not in readonly_targets:
         fail("HERMES_GATE_VIEW_NOT_MOUNTED", "the reviewed sidecar view was not mounted read-only")
+    for target in nested:
+        if target not in readonly_targets:
+            fail("HERMES_GATE_CONFIG_NOT_MOUNTED",
+                 f"{target} was not mounted read-only by the Worker")
     return {
         "spawns": len(spawns),
         "writableTargets": writable_targets,
         "readOnlyTargets": sorted(readonly_targets),
+        "protectedTargets": list(nested),
         "artifactMountedReadOnly": True,
         "credentialMountedReadOnly": True,
         "viewMountedReadOnly": True,
+        "readOnlyInsideWritableBoundAfterIt": True,
     }
+
+
+def mount_index(argv: list, target: str) -> int:
+    """The argv index of the mount flag whose *destination* is `target`.
+
+    A directory target is created by an earlier ``--dir`` before it is bound, so
+    the mount occurrence - ``--bind|--ro-bind <source> <target>`` - is the one
+    whose second argument is the target, not the first mention of the path.
+    """
+    for index, token in enumerate(argv):
+        if token == target and index >= 2 and argv[index - 2] in {
+            "--bind", "--dev-bind", "--ro-bind",
+        }:
+            return index - 2
+    return -1
 
 
 # --------------------------------------------------------------------------
@@ -756,6 +814,19 @@ def run_chain(temporary, workspace, worker, artifact, digest, endpoint, producti
             if not any(name.endswith("state.db") for name in result["checkpointAfterFirst"]["files"]):
                 fail("HERMES_GATE_STATE_STORE_MISSING",
                      "the captured state does not contain Hermes' own state.db")
+            # The reviewed configuration is not state: it lives inside the
+            # writable directory but must never enter the checkpoint. The name
+            # exclusion is what says so - not the read-only overlay, which would
+            # merely happen to hide it.
+            protected = protected_state_paths(production, production.LOOPBACK_GUARD_TARGET)
+            leaked = [
+                name for name in result["checkpointAfterFirst"]["files"]
+                if any(name == item or name.endswith("/" + item) for item in protected)
+            ]
+            if leaked:
+                fail("HERMES_GATE_PROTECTED_CONFIG_CAPTURED",
+                     f"the checkpoint captured read-only projections: {leaked}")
+            result["protectedStatePaths"] = list(protected)
             endpoint.begin_phase("round-2", 2)
             second = wire_post(client, runtime.token, "sessions.send", {
                 "requestId": "hermes-gate-round-2", "sessionId": first["session"]["id"],
@@ -1229,6 +1300,21 @@ def scan_state(runtime, session: dict, native_id: str) -> dict:
 # direct-launcher observations: reopen method and retry bound
 # --------------------------------------------------------------------------
 
+def protected_state_paths(production, *targets: str) -> tuple[str, ...]:
+    """The read-only projections the writable state directory must protect.
+
+    Derived exactly the way the Server derives it: a projection that lives
+    inside the declared state target is named relative to that target. For
+    Hermes that is the reviewed `config.yaml` itself (Hermes reads it from
+    inside its own home), plus the guard this run projects beside it.
+    """
+    prefix = production.STATE_TARGET + "/"
+    return tuple(sorted({
+        target[len(prefix):] for target in (production.CONFIG_TARGET, *targets)
+        if target.startswith(prefix)
+    }))
+
+
 def direct_bundle(production, endpoint) -> dict:
     """The reviewed sidecar closure plus this run's projected files."""
     from agent_box.server.execution.sidecar import sidecar_bundle_files
@@ -1268,7 +1354,10 @@ def direct_port(temporary, workspace, worker, artifact, digest, production, bund
              production.LOOPBACK_GUARD_TARGET),
         ),
         state_bundle_prefix="agentbox-sidecar/deployment/hermes/native-state",
-        state_target=production.STATE_TARGET, restored_state=restored_state,
+        state_target=production.STATE_TARGET,
+        protected_state_paths=protected_state_paths(
+            production, production.LOOPBACK_GUARD_TARGET),
+        restored_state=restored_state,
         timeout_ms=120_000,
     )
     return SidecarHarnessPort(
@@ -1526,8 +1615,31 @@ def main() -> int:
             fail("HERMES_GATE_TEMPLATE_MODEL_MISMATCH",
                  f"the configuration declares model.provider {declaration!r}")
 
+        # The guest layout: one isolated home root, `HERMES_HOME` and Hermes'
+        # own default path naming the same directory, and the reviewed
+        # configuration projected read-only inside that directory - which is
+        # what makes it a protected state path rather than state.
+        if not production.AGENT_HOME.startswith("/runtime/home/"):
+            fail("HERMES_GATE_GUEST_HOME_INVALID",
+                 f"the harness home is not inside the isolated guest root: {production.AGENT_HOME!r}")
+        if production.STATE_TARGET != production.AGENT_HOME:
+            fail("HERMES_GATE_GUEST_HOME_INVALID",
+                 f"HERMES_HOME {production.STATE_TARGET!r} is not the harness home "
+                 f"{production.AGENT_HOME!r}")
+        if production.ADAPTER_ENVIRONMENT["HERMES_HOME"] != production.STATE_TARGET:
+            fail("HERMES_GATE_GUEST_HOME_INVALID",
+                 "the adapter environment points HERMES_HOME somewhere else")
+        if not production.CONFIG_TARGET.startswith(production.STATE_TARGET + "/"):
+            fail("HERMES_GATE_GUEST_HOME_INVALID",
+                 f"the reviewed configuration {production.CONFIG_TARGET!r} is not inside the "
+                 f"persisted home {production.STATE_TARGET!r}")
+
         endpoint = FakeEndpoint(FAKE_TOKEN)
         endpoint.assert_loopback_only()
+        # The exact bytes this run projects as the reviewed configuration. Every
+        # launcher below projects this same value, so the artifact's verification
+        # digest can be compared with what the deployment declared.
+        projected_config_bytes = production.loopback_config_yaml(endpoint.base_url).encode("utf-8")
         differences = production.documented_differences(endpoint.base_url)
         REPORT["template"] = {
             "officialBaseUrl": official,
@@ -1544,6 +1656,8 @@ def main() -> int:
             "credentialEnvironment": production.CREDENTIAL_ENVIRONMENT,
             "stateTarget": production.STATE_TARGET,
             "configTarget": production.CONFIG_TARGET,
+            "protectedStatePaths": list(
+                protected_state_paths(production, production.LOOPBACK_GUARD_TARGET)),
             "modelControlId": production.MODEL_CONTROL_ID,
             "maxProviderAttempts": production.MAX_PROVIDER_ATTEMPTS,
         }
@@ -1652,7 +1766,13 @@ def main() -> int:
                  f"a non-loopback attempt was not one of the reviewed classes: "
                  f"{classified['unclassified'][:3]}")
         REPORT["bootstrap"] = {
-            "applied": [line for line in bootstrap if line.startswith("bootstrap-applied")],
+            # The artifact verifies the reviewed configuration in place (it never
+            # writes one), so the audit line records the digest of the bytes
+            # Hermes will read. That digest is compared with the projection this
+            # run declared: "Hermes read the reviewed file" is then an equality,
+            # not an assumption.
+            "verified": [line for line in bootstrap if line.startswith("bootstrap-verified")],
+            "projectedDigest": "sha256:" + hashlib.sha256(projected_config_bytes).hexdigest(),
             "auditPresent": (workspace / BOOTSTRAP_AUDIT_NAME).is_file(),
         }
         if not REPORT["egress"]["guardLoaded"]:
@@ -1660,10 +1780,19 @@ def main() -> int:
         if not REPORT["egress"]["selfTestOk"]:
             fail("HERMES_GATE_EGRESS_GUARD_UNPROVEN",
                  "the guard's fail-closed self-test did not record a refusal")
-        if not REPORT["bootstrap"]["applied"]:
-            fail("HERMES_GATE_BOOTSTRAP_ABSENT", "the artifact bootstrap did not materialize the configuration")
+        if not REPORT["bootstrap"]["verified"]:
+            fail("HERMES_GATE_BOOTSTRAP_ABSENT",
+                 "the artifact verifier did not confirm the projected configuration")
+        if not any(
+            f"digest={REPORT['bootstrap']['projectedDigest']}" in line
+            for line in REPORT["bootstrap"]["verified"]
+        ):
+            fail("HERMES_GATE_BOOTSTRAP_CONFIG_DRIFT",
+                 "the configuration Hermes read is not the reviewed projection this run declared")
         REPORT["workerPosture"] = assert_worker_posture(
-            spawns, production.ARTIFACT_TARGET, production.STATE_TARGET)
+            spawns, production.ARTIFACT_TARGET, production.STATE_TARGET,
+            config_target=production.CONFIG_TARGET,
+            guard_target=production.LOOPBACK_GUARD_TARGET)
         audit_before_reopen = read_audit(workspace, ACP_AUDIT_NAME)
         REPORT["acpMethods"] = {
             "chain": REPORT["acpMethodsChain"],

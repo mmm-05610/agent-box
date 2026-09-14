@@ -110,7 +110,7 @@ def test_the_sandbox_posture_requires_exactly_two_writable_binds(gate):
         "--bind", "/host/state", production.STATE_TARGET,
     ]
     outcome = gate.assert_worker_posture([good], production.ARTIFACT_TARGET, production.STATE_TARGET)
-    assert outcome["writableTargets"] == ["/tmp/agentbox-home/state", "/workspace"]
+    assert outcome["writableTargets"] == [production.STATE_TARGET, "/workspace"]
     assert production.ARTIFACT_TARGET in outcome["readOnlyTargets"]
     with pytest.raises(gate.GateFailure) as extra:
         gate.assert_worker_posture(

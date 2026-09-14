@@ -9,6 +9,7 @@ than assumed.
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -178,16 +179,17 @@ def test_deployment_document_declares_the_managed_chain():
         "target": "/runtime/artifacts/hermes-runtime",
         "treeDigest": "sha256:" + "a" * 64,
     }]
-    assert harness["stateProjection"] == {"target": "/tmp/agentbox-home/state"}
+    assert harness["stateProjection"] == {"target": "/runtime/home/.hermes"}
     assert harness["stateProjection"]["target"] == production.STATE_TARGET
     assert harness["projectionFiles"] == [
-        {"source": "deploy/hermes/config.yaml", "target": "/tmp/agentbox-home/config.yaml"},
+        {"source": "deploy/hermes/config.yaml", "target": "/runtime/home/.hermes/config.yaml"},
     ]
-    # The projected configuration sits one level above the home Hermes reads it
-    # from, and the artifact bootstrap is what closes that gap.
+    # The projected configuration sits *inside* Hermes' own home, at exactly the
+    # path Hermes reads it from, and is therefore a protected state path: the
+    # read-only file is not state and never reaches a checkpoint.
     assert harness["projectionFiles"][0]["target"] == production.CONFIG_TARGET
-    assert Path(harness["projectionFiles"][0]["target"]).parent == Path(production.AGENT_HOME)
-    assert Path(production.STATE_TARGET).parent == Path(production.AGENT_HOME)
+    assert Path(harness["projectionFiles"][0]["target"]).parent == Path(production.STATE_TARGET)
+    assert production.STATE_TARGET == production.AGENT_HOME
     adapter = harness["adapter"]
     assert adapter["command"] == "/usr/bin/python3"
     assert adapter["args"] == ["-m", "hermes_cli.main", "acp"]
@@ -246,15 +248,29 @@ def test_a_model_control_can_only_be_declared_explicitly_for_a_gate():
 def test_projection_and_overlay_files_exist_next_to_the_deployment_template():
     for projection in production.projection_files():
         assert (production.PLUGIN_ROOT / projection["source"]).is_file()
-        assert Path(projection["target"]).parent == Path(production.AGENT_HOME)
+        assert Path(projection["target"]).parent == Path(production.STATE_TARGET)
     assert production.CONFIG_TEMPLATE.is_file()
     assert production.LOOPBACK_GUARD.is_file()
+    # The gate's guard goes into the same protected home: it is a read-only
+    # projection for this run only, never part of the production deployment.
     assert production.LOOPBACK_GUARD_TARGET == f"{production.AGENT_HOME}/sitecustomize.py"
+    assert production.LOOPBACK_GUARD_TARGET.startswith(production.STATE_TARGET + "/")
+    assert production.LOOPBACK_GUARD_TARGET not in json.dumps(production.projection_files())
     assert (DEPLOY / "bootstrap.py").is_file()
     assert (DEPLOY / "sitecustomize.py").is_file()
     # The artifact publishes the same two names the deployment relies on.
     assert production.BOOTSTRAP_MODULE == "agentbox_hermes_bootstrap"
     assert (DEPLOY / "bootstrap.py").read_text(encoding="utf-8").count("def apply()") == 1
+
+
+def test_the_guest_home_is_the_one_isolated_root_and_both_paths_converge():
+    """One home root: `HERMES_HOME` and `$HOME/.hermes` are the same directory."""
+    assert production.AGENT_HOME == "/runtime/home/.hermes"
+    assert production.STATE_TARGET == production.AGENT_HOME
+    assert production.ADAPTER_ENVIRONMENT["HERMES_HOME"] == production.STATE_TARGET
+    guest_home = "/runtime/home"
+    assert production.AGENT_HOME == f"{guest_home}/.hermes"
+    assert production.CONFIG_TARGET == f"{production.STATE_TARGET}/config.yaml"
 
 
 def test_deployment_document_refuses_an_invalid_artifact_declaration():
@@ -304,45 +320,74 @@ def test_only_one_configuration_copy_exists_in_the_plugin():
     assert production.CONFIG_TEMPLATE.parent == DEPLOY
 
 
-def test_the_bootstrap_materializes_the_projected_configuration(tmp_path):
-    """The artifact bootstrap copies the projection into the persisted home."""
+def test_the_bootstrap_verifies_the_projected_configuration_in_place(tmp_path):
+    """The artifact verifies the reviewed file; it never writes one.
+
+    The reviewed `config.yaml` is a read-only projection *inside* the home, so
+    there is nothing to materialize and nothing that may be rewritten.  What the
+    module still owns is the fail-closed check: Hermes must never start when the
+    projected configuration is missing, unreadable, empty or a symlink.
+    """
     module = load_bootstrap()
-    assert module.INBOX == production.AGENT_HOME
-    assert module.SOURCE_NAME == production.CONFIG_NAME
-    inbox = tmp_path / "inbox"
-    inbox.mkdir()
-    (inbox / "config.yaml").write_text(production.config_yaml_text(), encoding="utf-8")
-    state = tmp_path / "state"
-    module.INBOX = str(inbox)
-    os.environ["HERMES_HOME"] = str(state)
+    assert module.HOME_ROOT == "/runtime/home"
+    assert module.HOME_ENVIRONMENT == "HERMES_HOME"
+    assert module.CONFIG_NAME == production.CONFIG_NAME
+    home = tmp_path / "home"
+    home.mkdir()
+    config = home / production.CONFIG_NAME
+    config.write_text(production.config_yaml_text(), encoding="utf-8")
+    # A controlled stand-in for the projected read-only bind: the deployment
+    # mounts the reviewed file read-only, and so does this fixture.
+    config.chmod(0o444)
+    audit = tmp_path / "audit"
+    # The isolated root is the anchor the check is written against; the test
+    # points it at its own controlled directory so nothing outside `tmp_path`
+    # is ever read or written.
+    isolated_root = module.HOME_ROOT
+    module.HOME_ROOT = str(tmp_path)
+    os.environ["HERMES_HOME"] = str(home)
+    os.environ[module.AUDIT_ENVIRONMENT] = str(audit)
     try:
         outcome = module.apply()
-        assert outcome["config"] == "written"
-        target = state / "config.yaml"
-        assert target.read_text(encoding="utf-8") == production.config_yaml_text()
-        assert target.read_bytes() == production.CONFIG_TEMPLATE.read_bytes()
-        # Idempotent, and it repairs a home whose configuration drifted.
-        assert module.apply()["config"] == "unchanged"
-        target.write_text("model: {}\n", encoding="utf-8")
-        assert module.apply()["config"] == "written"
-        assert target.read_text(encoding="utf-8") == production.config_yaml_text()
-        # A home that is the inbox itself cannot hold the persisted store.
-        os.environ["HERMES_HOME"] = str(inbox)
+        assert outcome["config"] == "verified"
+        assert outcome["path"] == str(config)
+        assert outcome["bytes"] == config.stat().st_size
+        assert outcome["digest"] == "sha256:" + hashlib.sha256(config.read_bytes()).hexdigest()
+        # Nothing was written: the reviewed bytes are still the projected bytes.
+        assert config.read_text(encoding="utf-8") == production.config_yaml_text()
+        lines = audit.read_text(encoding="utf-8").splitlines()
+        assert len(lines) == 1 and lines[0].startswith("bootstrap-verified ")
+        assert f"digest={outcome['digest']}" in lines[0]
+        assert "posture=read-only" in lines[0]
+        # A *writable* reviewed configuration is refused: the deployment's whole
+        # point is that nothing can rewrite the endpoint of the next turn.
+        config.chmod(0o600)
+        with pytest.raises(module.HermesBootstrapError) as writable:
+            module.apply()
+        assert "WRITABLE" in str(writable.value)
+        config.chmod(0o444)
+        # A missing, empty or symlinked configuration is fatal, not tolerated.
+        config.unlink()
         with pytest.raises(module.HermesBootstrapError):
             module.apply()
-        # Neither can a deployment without a home or without the projection.
-        os.environ.pop("HERMES_HOME", None)
+        config.write_text("", encoding="utf-8")
+        config.chmod(0o444)
         with pytest.raises(module.HermesBootstrapError):
             module.apply()
-        os.environ["HERMES_HOME"] = str(state)
-        (inbox / "config.yaml").unlink()
+        config.unlink()
+        config.symlink_to(production.CONFIG_TEMPLATE)
         with pytest.raises(module.HermesBootstrapError):
             module.apply()
-        (inbox / "config.yaml").write_text("", encoding="utf-8")
-        with pytest.raises(module.HermesBootstrapError):
-            module.apply()
+        # A home that is not inside the isolated root is refused as well.
+        module.HOME_ROOT = isolated_root
+        for value in ("", "relative/home", "/tmp/agentbox-home", "/home/tester/.hermes"):
+            os.environ["HERMES_HOME"] = value
+            with pytest.raises(module.HermesBootstrapError):
+                module.apply()
     finally:
+        module.HOME_ROOT = isolated_root
         os.environ.pop("HERMES_HOME", None)
+        os.environ.pop(module.AUDIT_ENVIRONMENT, None)
 
 
 def test_the_artifact_sitecustomize_fails_loudly_and_delegates():

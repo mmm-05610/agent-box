@@ -75,9 +75,10 @@ DRIVER_AUDIT_NAME = ".agentbox-driver-audit"
 #: 观测与反例阶段各自用独立审计文件，阶段之间不会互相污染证据。
 DRIVER_AUDIT_OBSERVE = ".agentbox-driver-audit-observe"
 DRIVER_AUDIT_NEGATIVE = ".agentbox-driver-audit-negative"
-#: guest 内 loopback 守卫的只读投影目标（单层，符合固定模板）。
+#: guest 内 loopback 守卫的只读投影目标：与只读配置同目录（同一个 XDG 配置根），
+#: 不在可写 state 子树里，因此它自己是只读的、也不需要受保护路径。
 GUARD_SOURCE = "deploy/opencode/egress-guard.so"
-GUARD_TARGET = "/tmp/agentbox-home/opencode-egress-guard.so"
+GUARD_TARGET = "/runtime/home/.config/opencode/opencode-egress-guard.so"
 DRIVER_BUNDLE_PATH = "agentbox-sidecar/deployment/opencode/driver.mjs"
 CONFIG_BUNDLE_PATH = "agentbox-sidecar/deployment/opencode/opencode.json"
 STATE_BUNDLE_PREFIX = "agentbox-sidecar/deployment/opencode/native-state"
@@ -368,8 +369,18 @@ class FakeEndpoint:
 
     def start(self) -> None:
         self.thread.start()
+        self._started = True
 
     def stop(self) -> None:
+        """Stop the endpoint, or do nothing if it never served.
+
+        `shutdown()` waits for `serve_forever` to return, so calling it on a
+        server that never started blocks forever - which would turn an early
+        gate failure into a hang. Stopping is idempotent.
+        """
+        if not getattr(self, "_started", False):
+            return
+        self._started = False
         self.server.shutdown()
         self.server.server_close()
 
@@ -526,7 +537,8 @@ def terminal_result(client, attempt_id: str, generation: int) -> dict:
 
 
 def run_guest_probe(connector: DirectWorkerConnector, workspace: Path, binary_source: Path,
-                    binary_digest: str, guard: Path, script: str, report: dict, *, label: str) -> dict:
+                    binary_digest: str, guard: Path, script: str, report: dict, *, label: str,
+                    projection: tuple[str, str, bytes] | None = None) -> dict:
     """在评审过的 guest 策略里跑一段门的探针脚本。
 
     bwrap argv 由 `compile_remote_sidecar_bwrap_argv` 生成（与生产完全同一套策略：
@@ -547,6 +559,11 @@ def run_guest_probe(connector: DirectWorkerConnector, workspace: Path, binary_so
     try:
         view_id = f"view-gate-probe-{label}"
         files = {"gate/probe.mjs": script.encode("utf-8"), "gate/egress-guard.so": guard.read_bytes()}
+        if projection is not None:
+            # The reviewed configuration is projected into the probe's own view:
+            # the probe reads it through the path the deployment declares and
+            # proves it is read-only there.
+            files[projection[0]] = projection[2]
         client.request("view.prepare", {"viewId": view_id, "files": [
             {"path": name, "size": len(content), "digest": digest_of(content)}
             for name, content in sorted(files.items())]})
@@ -560,12 +577,15 @@ def run_guest_probe(connector: DirectWorkerConnector, workspace: Path, binary_so
         argv = compile_remote_sidecar_bwrap_argv(
             workspace=str(workspace), runtime_view=view,
             environment={
-                "PATH": "/usr/bin:/bin", "LANG": "C.UTF-8", "HOME": "/tmp/agentbox-home",
+                "PATH": "/usr/bin:/bin", "LANG": "C.UTF-8", "HOME": "/runtime/home",
                 "LD_PRELOAD": GUARD_TARGET,
                 "AGENTBOX_EGRESS_AUDIT": f"/workspace/{AUDIT_NAME}",
             },
             executable_mounts=((str(binary_source), "/runtime/bin/opencode"),),
-            projection_mounts=((f"{view}/gate/egress-guard.so", GUARD_TARGET),),
+            projection_mounts=(
+                (f"{view}/gate/egress-guard.so", GUARD_TARGET),
+                *(((f"{view}/{projection[0]}", projection[1]),) if projection else ()),
+            ),
         )
         # 只替换入口命令：reviewed 模板尾部恒为 `-- /usr/bin/node <sidecar entrypoint>`。
         # 探针脚本就放在本视图里（`/runtime/view/gate/probe.mjs`），由同一模板只读挂载，
@@ -1537,7 +1557,7 @@ def worker_digest_refusal(temporary: Path, workspace: Path, worker: Path, author
 
 GUEST_PROBE = r"""
 import { execFileSync } from "node:child_process"
-import { writeFileSync } from "node:fs"
+import { readFileSync, writeFileSync } from "node:fs"
 import net from "node:net"
 
 const output = { cwd: process.cwd(), path: process.env.PATH }
@@ -1552,6 +1572,20 @@ try {
 } catch (error) {
   output.runtimeBinWritable = false
   output.runtimeBinError = error.code ?? String(error)
+}
+try {
+  output.config = JSON.parse(readFileSync("/runtime/home/.config/opencode/opencode.json", "utf8"))
+  output.configReadable = true
+} catch (error) {
+  output.configReadable = false
+  output.configError = error.code ?? String(error)
+}
+try {
+  writeFileSync("/runtime/home/.config/opencode/opencode.json", "tamper")
+  output.configWritable = true
+} catch (error) {
+  output.configWritable = false
+  output.configWriteError = error.code ?? String(error)
 }
 try {
   writeFileSync("/workspace/.gate-probe-write", "ok")
@@ -1572,11 +1606,13 @@ process.stdout.write(JSON.stringify(output) + "\n")
 
 
 def guest_probes(temporary: Path, workspace: Path, worker: Path, authorization: dict,
-                 guard: Path, report: dict) -> dict:
+                 guard: Path, report: dict, production, config_bytes: bytes,
+                 expected_base_url: str) -> dict:
     connector = DirectWorkerConnector(temporary, worker, workspace)
     output = run_guest_probe(
         connector, workspace, Path(authorization["source"]), authorization["digest"], guard,
         GUEST_PROBE, report, label="version-readonly-egress",
+        projection=("gate/opencode.json", production.CONFIG_TARGET, config_bytes),
     )
     if output.get("version") != "1.18.21":
         fail("OPENCODE_GATE_GUEST_VERSION_MISMATCH",
@@ -1585,6 +1621,23 @@ def guest_probes(temporary: Path, workspace: Path, worker: Path, authorization: 
         fail("OPENCODE_GATE_RUNTIME_BIN_WRITABLE", "the guest could write to /runtime/bin")
     if output.get("workspaceWritable") is not True:
         fail("OPENCODE_GATE_WORKSPACE_NOT_WRITABLE", "the guest could not write to its workspace")
+    # The reviewed configuration is readable at exactly the declared target and
+    # is read-only there: a guest that could rewrite it would rewrite the
+    # endpoint of its own next turn.
+    if output.get("configReadable") is not True:
+        fail("OPENCODE_GATE_GUEST_CONFIG_UNREADABLE",
+             f"the declared configuration target was not readable: {output.get('configError')!r}")
+    config = output.get("config") or {}
+    base_url = (((config.get("provider") or {}).get("deepseek") or {}).get("options") or {}).get("baseURL")
+    if base_url != expected_base_url:
+        fail("OPENCODE_GATE_GUEST_CONFIG_UNEXPECTED",
+             f"the guest read baseURL {base_url!r}, this run projected {expected_base_url!r}")
+    if output.get("configWritable") is not False:
+        fail("OPENCODE_GATE_GUEST_CONFIG_WRITABLE",
+             "the guest could write the read-only configuration target")
+    if output.get("configWriteError") not in {"EROFS", "EACCES", "EPERM"}:
+        fail("OPENCODE_GATE_GUEST_CONFIG_WRITE_ERROR",
+             f"unexpected write refusal {output.get('configWriteError')!r}")
     egress = output.get("egress") or {}
     if egress.get("remote") != "EACCES":
         fail("OPENCODE_GATE_EGRESS_CONTROL_FAILED",
@@ -1844,7 +1897,11 @@ def main() -> int:
             REPORT["driverNegatives"] = driver_negatives(
                 temporary, workspace, worker, authorization, endpoint, production, guard)
             REPORT["guestProbeResult"] = guest_probes(
-                temporary, workspace, worker, authorization, guard, REPORT)
+                temporary, workspace, worker, authorization, guard, REPORT, production,
+                json.dumps(
+                    production.loopback_config_document(endpoint.base_url), sort_keys=True,
+                ).encode("utf-8"),
+                endpoint.base_url)
             REPORT["authorizationNegatives"] = authorization_negatives(
                 temporary, authorization, REPORT)
             REPORT["workerDigestNegative"] = worker_digest_refusal(

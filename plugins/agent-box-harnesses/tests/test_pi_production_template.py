@@ -111,16 +111,16 @@ def test_deployment_document_declares_the_managed_chain():
         "target": "/runtime/artifacts/pi-runtime",
         "treeDigest": "sha256:" + "a" * 64,
     }]
-    assert harness["stateProjection"] == {"target": "/tmp/agentbox-home/sessions"}
+    assert harness["stateProjection"] == {"target": "/runtime/home/.pi/agent/sessions"}
     assert harness["projectionFiles"] == [
-        {"source": "deploy/pi/models.json", "target": "/tmp/agentbox-home/models.json"},
-        {"source": "deploy/pi/settings.json", "target": "/tmp/agentbox-home/settings.json"},
+        {"source": "deploy/pi/models.json", "target": "/runtime/home/.pi/agent/models.json"},
+        {"source": "deploy/pi/settings.json", "target": "/runtime/home/.pi/agent/settings.json"},
     ]
     adapter = harness["adapter"]
     assert adapter["command"] == "/usr/bin/node"
     assert adapter["args"] == [
         "/runtime/artifacts/pi-runtime/node_modules/@automatalabs/pi-acp/dist/index.js"]
-    assert adapter["environment"]["PI_CODING_AGENT_DIR"] == "/tmp/agentbox-home"
+    assert adapter["environment"]["PI_CODING_AGENT_DIR"] == "/runtime/home/.pi/agent"
     assert adapter["environment"]["PI_OFFLINE"] == "1"
     # Nothing test-only may leak into the production default: no preloaded
     # guard, no audit path, and no credential material anywhere.
@@ -135,6 +135,30 @@ def test_projection_sources_exist_next_to_the_deployment_template():
         assert projection["target"].startswith(f"{production.AGENT_HOME}/")
     assert production.LOOPBACK_GUARD.is_file()
     assert production.LOOPBACK_GUARD_TARGET.startswith(f"{production.AGENT_HOME}/")
+
+
+def test_the_guest_home_is_the_one_isolated_root_and_both_paths_converge():
+    """One home root: the dedicated variable and `$HOME` name the same target.
+
+    Pi's own default is `$HOME/.pi/agent`, and the deployment declares that same
+    directory through `PI_CODING_AGENT_DIR`; the read-only configuration and the
+    writable journal are both inside it, so configuration and state can never be
+    split across two homes (or land on the host's).
+    """
+    assert production.AGENT_HOME == "/runtime/home/.pi/agent"
+    assert production.ADAPTER_ENVIRONMENT["PI_CODING_AGENT_DIR"] == production.AGENT_HOME
+    # Pi's own default is `$HOME/.pi/agent`; the guest's HOME is the one
+    # isolated root, so the default and the declared variable are one directory.
+    guest_home = "/runtime/home"
+    assert production.AGENT_HOME == f"{guest_home}/.pi/agent"
+    assert production.STATE_TARGET == f"{production.AGENT_HOME}/sessions"
+    assert production.STATE_TARGET.startswith(production.AGENT_HOME + "/")
+    # The read-only configuration is *not* inside the writable state subtree:
+    # nothing has to be protected, and nothing can be shadowed by the bind.
+    for projection in production.projection_files():
+        assert not projection["target"].startswith(production.STATE_TARGET + "/")
+        assert projection["target"] != production.STATE_TARGET
+    assert not production.LOOPBACK_GUARD_TARGET.startswith(production.STATE_TARGET + "/")
 
 
 def test_adapter_entry_is_derived_from_the_artifact_target():

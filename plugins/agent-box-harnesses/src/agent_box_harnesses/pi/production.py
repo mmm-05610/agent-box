@@ -22,6 +22,18 @@ copying `models.json` and replacing `baseUrl` alone.
 Nothing here reads, stores, or emits credential content: the API key is an
 environment *reference* (`$DEEPSEEK_API_KEY`) resolved by the Harness inside
 the sandbox, where the Worker materialized it.
+
+The guest layout is the common one every Harness uses: exactly one isolated home
+root (`/runtime/home`) holds a read-only projection of the reviewed native
+configuration and exactly one writable state directory
+
+* read-only ``models.json`` / ``settings.json`` at ``/runtime/home/.pi/agent/``,
+* writable ``/runtime/home/.pi/agent/sessions`` for Pi's own journal,
+* ``PI_CODING_AGENT_DIR=/runtime/home/.pi/agent`` for both halves.
+
+The dedicated variable and Pi's `$HOME`-derived default therefore resolve to the
+same directory: nothing is copied into a writable home at run time, and the
+reviewed files are the only configuration the process can read.
 """
 from __future__ import annotations
 
@@ -53,8 +65,12 @@ ADAPTER_ARTIFACT_ENTRY = f"{ARTIFACT_TARGET}/{ADAPTER_ARTIFACT_RELATIVE_ENTRY}"
 ADAPTER_PACKAGE = "@automatalabs/pi-acp"
 ADAPTER_VERSION = "0.5.0"
 
-#: Confined agent home and the native session journal subtree inside it.
-AGENT_HOME = "/tmp/agentbox-home"
+#: Confined agent home and the native session journal subtree inside it. The
+#: home is a projection inside the one isolated guest home root
+#: (`/runtime/home`), never the host home: `PI_CODING_AGENT_DIR` below names the
+#: same directory, and Pi's own default (`$HOME/.pi/agent`) resolves to it too,
+#: so an explicit variable and the default path can never disagree.
+AGENT_HOME = "/runtime/home/.pi/agent"
 STATE_TARGET = f"{AGENT_HOME}/sessions"
 
 #: Production adapter environment. `PI_OFFLINE` disables Pi's startup network

@@ -3,9 +3,10 @@
 This is a test asset, deliberately NOT part of the production deployment: the
 production template talks to the official DeepSeek root, which is what it
 records. A gate that points Hermes at a local fake endpoint projects this file
-read-only into ``/tmp/agentbox-home/sitecustomize.py`` and puts
-``/tmp/agentbox-home`` first on ``PYTHONPATH``, so the gate - not the
-production artifact - owns the ``sitecustomize`` CPython imports.
+read-only into ``$HERMES_HOME/sitecustomize.py`` and puts ``$HERMES_HOME``
+first on ``PYTHONPATH``, so the gate - not the production artifact - owns the
+``sitecustomize`` CPython imports. ``$HERMES_HOME`` is the isolated projection
+inside the guest home root (``/runtime/home``); it is never a host directory.
 
 It does three things and nothing else:
 

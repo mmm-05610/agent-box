@@ -266,8 +266,18 @@ class FakeEndpoint:
 
     def start(self) -> None:
         self.thread.start()
+        self._started = True
 
     def stop(self) -> None:
+        """Stop the endpoint, or do nothing if it never served.
+
+        `shutdown()` waits for `serve_forever` to return, so calling it on a
+        server that never started blocks forever - which would turn an early
+        gate failure into a hang. Stopping is idempotent.
+        """
+        if not getattr(self, "_started", False):
+            return
+        self._started = False
         self.server.shutdown()
         self.server.server_close()
 

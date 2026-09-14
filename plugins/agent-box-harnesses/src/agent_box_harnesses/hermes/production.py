@@ -24,13 +24,17 @@ production chain gate rather than assumed:
 
 * **The native session store is a file inside the Hermes home.** Hermes keeps
   its authoritative session database at ``$HERMES_HOME/state.db`` (SQLite, with
-  ``-wal``/``-shm`` beside it), not in a subdirectory. The deployment contract
-  can persist exactly one writable *directory* child of ``/tmp/agentbox-home``,
-  so ``HERMES_HOME`` is that persisted directory (``STATE_TARGET``) and the
-  reviewed `config.yaml` is projected read-only one level above it, into
-  ``/tmp/agentbox-home/config.yaml``, where the artifact's own bootstrap
-  materializes it before Hermes reads it (see
-  `plugins/agent-box-harnesses/deploy/hermes/bootstrap.py`).
+  ``-wal``/``-shm`` beside it), not in a subdirectory. The deployment persists
+  exactly one writable *directory* per Harness home, so ``HERMES_HOME`` is that
+  persisted directory (``STATE_TARGET``) and the reviewed `config.yaml` is
+  projected read-only *inside* it, at exactly ``$HERMES_HOME/config.yaml`` - the
+  path Hermes itself reads. Nothing is materialized at run time any more: the
+  reviewed file is a read-only mount, a write to it fails instead of forking a
+  second configuration, and the projection is therefore a **protected state
+  path** - it is excluded from every checkpoint and a checkpoint that tries to
+  restore it is refused (see
+  `plugins/agent-box-harnesses/deploy/hermes/bootstrap.py`, which now verifies
+  rather than copies it).
 * **Hermes 0.19's ACP surface has no model control this bridge can address.**
   Its adapter advertises the ACP `models` session state and implements
   `session/set_model`; it deliberately answers `session/set_config_option` with
@@ -141,16 +145,24 @@ ENTRY_RELATIVE = "hermes_cli/main.py"
 ADAPTER_COMMAND = "/usr/bin/python3"
 ADAPTER_ARGS = ("-m", ENTRY_MODULE, "acp")
 
-#: The confined guest home: the read-only projection inbox and the persisted
-#: state directory the Worker binds, mounts and reads back.
-AGENT_HOME = "/tmp/agentbox-home"
+#: The confined guest home: the read-only projection of the reviewed
+#: configuration and the persisted state directory are the *same* directory.
+#: It is a projection inside the one isolated guest home root (`/runtime/home`),
+#: never the host home: `HERMES_HOME` names it, and Hermes' own default
+#: (`$HOME/.hermes`) resolves to it too, so the explicit variable and the
+#: default path can never disagree.
+AGENT_HOME = "/runtime/home/.hermes"
 CONFIG_SOURCE = "deploy/hermes/config.yaml"
 CONFIG_NAME = "config.yaml"
 CONFIG_TARGET = f"{AGENT_HOME}/{CONFIG_NAME}"
-STATE_TARGET = f"{AGENT_HOME}/state"
-#: The artifact's `sitecustomize.py` applies the bootstrap that copies the
-#: projected configuration into `HERMES_HOME`; these two names are what the
-#: builder publishes and what the checks below look for.
+#: Hermes' own home, i.e. the one directory the Worker binds writable and reads
+#: back. The reviewed `config.yaml` is projected read-only *inside* it and is
+#: therefore a protected state path (see the module docstring): it is not state
+#: and never reaches or comes from a checkpoint.
+STATE_TARGET = AGENT_HOME
+#: The artifact's own `sitecustomize.py` runs the deployment verifier
+#: (`agentbox_hermes_bootstrap`) before Hermes reads any configuration; the two
+#: names are what the builder publishes and what it looks for.
 BOOTSTRAP_MODULE = "agentbox_hermes_bootstrap"
 SITECUSTOMIZE_NAME = "sitecustomize.py"
 
@@ -169,7 +181,9 @@ MODEL_CONTROL_ID: str | None = None
 #: * `PYTHONDONTWRITEBYTECODE` - the artifact is mounted read-only, so Python
 #:   must never try to write a `__pycache__` beside a module it imports.
 #: * `HERMES_HOME` - the persisted native home (see `STATE_TARGET`); Hermes
-#:   keeps `state.db` and the restored transcript there.
+#:   keeps `state.db` and the restored transcript there, and reads the reviewed
+#:   `config.yaml` from `$HERMES_HOME/config.yaml`, which is exactly the
+#:   read-only projection this template declares.
 #: * `HERMES_IGNORE_USER_CONFIG` / `HERMES_IGNORE_RULES` - no ambient
 #:   `AGENTS.md`, `SOUL.md`, memory or preloaded skills may reach a managed
 #:   run; the projected configuration is the only configuration.
@@ -357,11 +371,12 @@ def native_model(model: object) -> object:
 
 
 def projection_files() -> tuple[dict[str, str], ...]:
-    """The reviewed native configuration, read-only, one level above HOME.
+    """The reviewed native configuration, read-only, inside Hermes' own home.
 
-    `HERMES_HOME` is the persisted state directory, so the file Hermes reads
-    (`$HERMES_HOME/config.yaml`) is materialized from this projection by the
-    artifact bootstrap; the projection itself is the reviewed source of truth.
+    `HERMES_HOME` is the persisted state directory, and the file Hermes reads is
+    `$HERMES_HOME/config.yaml` - the path this projection names. Nothing copies
+    or materializes it at run time: the reviewed file *is* the file Hermes
+    opens, so configuration cannot drift into a second, writable copy.
     """
     return ({"source": CONFIG_SOURCE, "target": CONFIG_TARGET},)
 

@@ -119,12 +119,22 @@ def test_deployment_document_declares_the_managed_chain():
         "digest": "sha256:" + "a" * 64,
     }]
     assert "runtimeArtifactMounts" not in harness
-    # 原生会话存储 = 驱动进程的 XDG_DATA_HOME = state 投影目标。
+    # 原生会话存储 = 驱动进程的默认数据目录 = state 投影目标。两者由同一个
+    # `$XDG_DATA_HOME` 派生，模板**不**再自行声明 XDG_DATA_HOME：guest 环境
+    # 给出的那个根是唯一真相，多声明一份只会制造第二处可漂移的事实。
     assert harness["stateProjection"] == {"target": production.STATE_TARGET}
-    assert production.ADAPTER_ENVIRONMENT["XDG_DATA_HOME"] == production.STATE_TARGET
+    assert production.STATE_TARGET == f"{production.XDG_DATA_HOME}/opencode"
+    assert "XDG_DATA_HOME" not in production.ADAPTER_ENVIRONMENT
     assert harness["projectionFiles"] == [
         {"source": "deploy/opencode/opencode.json", "target": production.CONFIG_TARGET}]
     assert production.ADAPTER_ENVIRONMENT["OPENCODE_CONFIG"] == production.CONFIG_TARGET
+    assert production.CONFIG_TARGET == f"{production.XDG_CONFIG_HOME}/opencode/opencode.json"
+    # 配置与 state 在**不同**子树里：不存在需要保护的 state 路径，也就不可能有
+    # 只读配置被 state bind 遮蔽的情形。
+    assert not production.CONFIG_TARGET.startswith(production.STATE_TARGET + "/")
+    assert not production.STATE_TARGET.startswith(production.CONFIG_TARGET + "/")
+    assert production.CONFIG_TARGET != production.STATE_TARGET
+    assert production.GUEST_HOME == "/runtime/home"
     adapter = harness["adapter"]
     assert adapter["command"] == "/runtime/bin/opencode"
     assert adapter["args"] == []
@@ -162,7 +172,8 @@ def test_deployment_document_refuses_invalid_binary_declarations():
 def test_projection_sources_exist_next_to_the_deployment_template():
     for projection in production.projection_files():
         assert (production.PLUGIN_ROOT / projection["source"]).is_file()
-        assert projection["target"].startswith(f"{production.AGENT_HOME}/")
+        assert projection["target"].startswith(f"{production.GUEST_HOME}/")
+        assert projection["target"] == production.CONFIG_TARGET
     assert production.DRIVER_TEMPLATE.is_file()
     # 离线守卫是门资产，不是生产配置。
     assert production.EGRESS_GUARD.is_file()
