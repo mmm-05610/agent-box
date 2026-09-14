@@ -5,7 +5,7 @@
 
 ## 执行快照（handoff-policy 每阶段必填）— 接管施工中
 
-- updated_at: 2026-09-14 17:20 (+08:00)
+- updated_at: 2026-09-14 17:45 (+08:00)
 - 执行者: Codex 前端产品 goal（接力会话）；**已从暂停的 Zcode 执行者接管**
 - 工作树/分支: /home/maoqh/projects/agent-box-desktop-next-wsl-round1 @ feature/agentbox-desktop-product
 - 接管核验（历史，Zcode→Codex 交接）: 用户指定交接 HEAD `5c0fbfe` 与实际 HEAD
@@ -16,7 +16,7 @@
 - 本阶段起点核验: HEAD `1cbc4f58d602b212f55c7c4dd9c2bc38718cba83`、分支
   feature/agentbox-desktop-product、工作树 clean，无同工作树并发写入者；writer lease 仍为同一
   前端 goal 的 ACTIVE lease，本阶段串行施工，完成后停止写入并回报，不提前 RELEASE。
-- 代码检查点（已提交 HEAD）: `a8142125`（P05：`workspaces.browse` 生产接线）
+- 代码检查点（已提交 HEAD）: `4a057609`（P05 返修：远端浏览保存的迟到响应收口）
   链: ebb1233（P00）→ 8d4b3df/47b5b47/dbb902f（P01 代码与几何修复）→ 26b32fc（P01 GREEN 证据）
   → 468e6ac/d7e9a57（发布源 d3c0196+ffbcfaf 导入）→ 893d560（P07 检查点2 wire-v1）
   → 957a523（P02A 盘点）→ 07f5386（P02A slice 1：失败面非阻塞）→ 3a25edc（P02A slice 2）
@@ -41,9 +41,15 @@
   → 矩阵审计文档检查点（evidence/P05-client-matrix.md）→ 940c9df4（config.resolve 生产接线）
   → b6d0bc6f（返修：旧 pending 发送优先恢复）→ 3e207376（workspaces.open 生产接线）
   → 072c7eac（返修：Workspace 身份完整三元组匹配）→ f6b457b5（workspaces.archive 生产接线）
-  → **a8142125（workspaces.browse 生产接线；阶段 WORKSPACES_BROWSE_CLIENT_READY）**
+  → a8142125（workspaces.browse 生产接线）→ **4a057609（返修：远端保存迟到响应收口；
+  WORKSPACES_BROWSE_CLIENT_READY 以本次提交为最终依据）**
 - 已消费发布文档提交: 86d5a7b、61c7ff7、d3c0196、ffbcfaf
-- 当前检查点改动（workspaces.browse 接线）: WSL「Open remote folder」的目录枚举由宿主切到服务
+- 当前检查点改动（远端保存迟到响应返修）: 向导在关闭、Back、以及每次重新打开时使当前 save turn 失效，
+  迟到保存成功不再 selectWorkspaceView/释放连接/关闭对话框（不会误关重新打开的新向导），当前保存语义不变、
+  不伪称取消宿主保存；浏览组件在保存期间锁定 Back/Up/路径输入/Go/隐藏项/目录导航与 Enter，卸载后 choose 的
+  成功/失败/throw 均不写 state 且无未处理 rejection；误命名常量改为 `BROWSE_CAPABILITY_UNSUPPORTED`（值不变）。
+  矩阵仍 26 reachable / 2 gap。
+- 上一检查点改动（workspaces.browse 接线）: WSL「Open remote folder」的目录枚举由宿主切到服务
   （`workspaces.browse`）：宿主只 discover/connect/验证 `{distribution,user,home}` 并保存 shell 记录，产品
   路径不再调用 `listWslDirectories` 且无兜底。浏览组件采用服务权威路径、latest-wins、失败保留上次清单、
   只读可进入可选、不可打开禁用并显示服务 reason、file/other 不导航、隐藏项仅本地过滤；能力缺失/服务未就绪
@@ -200,6 +206,14 @@
   省略恢复默认、exact 模型引用与带斜杠 id）、
   双 model_slot 独立编辑、unavailable 禁选与目录外当前值、CAS 顺序 update(N)→updateConfig(N+1)、
   部分成功重试不重发改名、pending 连点单发、服务规范化后采用返回 descriptor、迟到 descriptor 不串写。
+- 远端保存迟到响应返修（4a057609）：验收 `npx vitest run --project ui
+  src/features/workspace/agentbox-workspace-browser.test.tsx
+  src/features/workspace/wsl-workspace-wizard.test.tsx` → **2 files / 33 tests passed，exit 0**；扩大门
+  （+ wire-workspace-browser、latest-wins）**4 files / 40 tests passed，exit 0**；相关门（wire-workspace-catalog、
+  agentbox-main-chat、unified workspace list）3 files / 63 tests passed；`src/features/workspace` +
+  `src/features/chat` 96 files / 673 tests passed；`src/application/workspace` + `src/app/composition`
+  12 files / 145 tests passed；`npm run typecheck` 三项目通过；改动 4 个 TS/TSX 文件 ESLint 0 error /
+  0 warning；`git diff --check` 干净。
 - workspaces.browse 生产接线（a8142125）：验收 `npx vitest run --project ui
   src/application/workspace/wire-workspace-browser.test.ts src/application/workspace/latest-wins.test.ts
   src/features/workspace/agentbox-workspace-browser.test.tsx

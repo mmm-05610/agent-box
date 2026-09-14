@@ -8,6 +8,13 @@
 （application 用例 + 发送前强制校验 + renderer 预览 latest-wins + hello 能力门），矩阵中该行改为
 `PRODUCTION_REACHABLE`（EXT），汇总 23 reachable / 5 gap；G4 改写为「已接线」记录，其余缺口不变。
 
+**返修（2026-09-14，代码检查点 `4a057609`）**：`workspaces.browse` 选择/保存的**迟到响应**收口——向导在
+Back/关闭/重新打开时使当前 save turn 失效，迟到答案不再 `selectWorkspaceView`/释放连接/关闭对话框（不会误关
+重新打开的新向导）；浏览组件在保存进行中锁定 Back/Up/路径输入/Go/隐藏项/目录导航，并在卸载后丢弃 choose 的
+成功、失败与 throw（无未处理 rejection）。矩阵仍为 **26 reachable / 2 gap**（workspaces.browse 仍
+`PRODUCTION_REACHABLE`（EXT）），剩余 sessions.update、sessions.archive；`WORKSPACES_BROWSE_CLIENT_READY`
+以本次返修后的提交为最终依据。
+
 **增量（2026-09-14，代码检查点 `a8142125`）**：`workspaces.browse` 已接入 WSL「Open remote folder」流程——
 宿主只负责 discover/connect/验证 {distribution,user,home} 与保存 shell 记录，**目录枚举改由服务**
 （`workspaces.browse`，`features/workspace/agentbox-workspace-browser.tsx`），产品路径不再调用
@@ -180,6 +187,9 @@ lifecycle 外部缺口不变。详见 §3-G4 与 evidence/P05.md。
   `releaseWslConnection`/`saveWslWorkspaceFromWizard`，并继续验证 `{distribution, user, home}`；**目录枚举
   完全由服务承担**，`listWslDirectories` 在产品路径调用次数为 0，失败时不回落宿主枚举；service 未 ready 或
   hello 未声明 `workspaces.browse` 时显示真实原因且不发请求、不伪装空目录。
+- 迟到保护（`4a057609` 返修）：向导在 Back、关闭、以及每次重新打开（新一代）时使当前 save turn 失效，
+  迟到成功不再选择/释放/关闭，迟到失败也不影响新向导；浏览器在保存期间锁定 Back/Up/路径输入/Go/隐藏项/目录
+  导航（保存目标与屏幕目录不分叉），choose 在卸载后不写 state 且捕获 throw——不新增全局状态或并发状态机。
 - 不变量（已由测试钉住）：采用服务返回的 `result.path` 为权威路径；手输/父目录/子目录都发新请求；A→B
   latest-wins（迟到的成功与失败都不覆盖 B），卸载后不写 state；`kind==='directory' && canOpen` 才可进入，
   `canOpen=false` 禁用并显示 reason（点击零请求），`canOpen && !canWrite` 可进入且仍可选择（显示只读），
@@ -397,6 +407,7 @@ dynamic connection slot            electron/composition/agentbox-service-composi
 | workspaces.open 接线定向门（`3e207376` + 收口 + 身份匹配返修，4 files / 55 tests） | 通过（exit 0） |
 | workspaces.archive 接线定向门（`f6b457b5`，4 files / 45 tests） | 通过（exit 0） |
 | workspaces.browse 接线定向门（`a8142125`，4 files / 31 tests） | 通过（exit 0） |
+| workspaces.browse 迟到保存返修门（`4a057609`，4 files / 40 tests） | 通过（exit 0） |
 | `git status --short` | 只含本阶段写集（见 §9） |
 
 矩阵完整性核验（一次性只读命令，不新增仓库脚本）：从 `WireMethods` 导出键、从本文件表格抽取
