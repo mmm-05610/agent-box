@@ -11,6 +11,7 @@ import type {
   PetOverlayStatePayload
 } from './store/pet-overlay'
 import type { QuickEntryStatePush, QuickEntryStatus, QuickEntrySubmitPayload } from './store/quick-entry'
+import type { WireMethodName } from './types/wire/wire-v1'
 import type {
   WslArchiveWorkspaceResult,
   WslConnectRequest,
@@ -31,6 +32,15 @@ export {}
 
 declare global {
   interface Window {
+    agentBoxDesktop?: {
+      wire: {
+        request: (request: {
+          body: unknown
+          method: WireMethodName
+          path: `/wire/v1/${WireMethodName}`
+        }) => Promise<unknown>
+      }
+    }
     hermesDesktop: {
       // Resolve a backend connection. Omit `profile` (or pass the primary) for
       // the window's backend; pass a named profile to lazily spawn/reuse that

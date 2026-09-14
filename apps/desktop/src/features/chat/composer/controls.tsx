@@ -11,6 +11,7 @@ import { $hudMode, closeHud, resetHudLayout } from '@/store/hud'
 
 import { GHOST_ICON_BTN, PRIMARY_ICON_BTN } from './control-classes'
 import { ModelPill } from './model-pill'
+import { ComposerProfileControls } from './profile-controls'
 
 // Re-exported: `context-menu.tsx` and other row neighbours have always reached
 // for these here, and the row is where they read as belonging.
@@ -48,6 +49,7 @@ export function ComposerControls({
 
   return (
     <div className="ml-auto flex min-w-0 shrink items-center gap-(--composer-control-gap)">
+      {!hudMode && state.profile ? <ComposerProfileControls profile={state.profile} /> : null}
       {minimal ? null : <ModelPill compact={compactModelPill} disabled={disabled} model={state.model} />}
       {showQueueButton ? (
         <Tip label={<TipKeybindLabel actionId="composer.queue" text={c.queueMessage} />}>

@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import type { HermesGateway } from '@/api/client'
 import type { QuickModelOption, SubmitTextOptions } from '@/types/composer'
 import type { ContextSuggestion } from '@/types/context-suggestion'
+import type { ConfigDescriptor, ConfigOverride } from '@/types/wire/wire-v1'
 
 /** One entry resolved from a drop event. Declared here rather than beside the
  *  runtime that resolves it (`hooks/use-composer-actions`), so a consumer that
@@ -33,6 +34,26 @@ export interface ChatBarState {
   }
   tools: { enabled: boolean; label: string; suggestions?: ContextSuggestion[] }
   voice: { enabled: boolean; active: boolean }
+  profile?: ComposerProfileState
+}
+
+export interface ComposerProfileOption {
+  displayName: string
+  harness: string
+  id: string
+  selectable: boolean
+  unavailableReason?: string
+}
+
+export interface ComposerProfileState {
+  configDescriptor?: ConfigDescriptor | null
+  onOverrideChange: (overrides: ConfigOverride[]) => void
+  onSelect: (profileId: string) => Promise<boolean> | boolean
+  options: ComposerProfileOption[]
+  overrides: ConfigOverride[]
+  selectedId: null | string
+  switching?: boolean
+  unavailableReason?: string
 }
 
 export interface ChatBarProps {

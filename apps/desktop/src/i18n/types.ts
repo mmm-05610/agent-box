@@ -2144,6 +2144,19 @@ export interface Translations {
 
   composer: {
     message: string
+    profile: string
+    chooseProfile: string
+    profileRequired: string
+    harness: (name: string) => string
+    switchingProfile: string
+    profileSwitchUnavailable: string
+    temporaryConfig: string
+    temporaryConfigEmpty: string
+    takesEffectNextSend: string
+    takesEffectImmediately: string
+    securityLocked: string
+    clearTemporaryValue: string
+    configUnavailable: string
     wakingProfile: (profile: string) => string
     placeholderStarting: string
     placeholderReconnecting: string

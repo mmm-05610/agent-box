@@ -72,6 +72,7 @@ import type { ModelOptionsResponse } from '@/types/hermes'
 import { ChatDropOverlay } from './chat-drop-overlay'
 import { ChatSwapOverlay, ChatSyncBadge } from './chat-swap-overlay'
 import { ChatBar, ChatBarFallback } from './composer'
+import { useComposerProfile } from './composer/hooks/use-composer-profile'
 import { type DragKind, useFileDropZone } from './hooks/use-file-drop-zone'
 import { shouldShowIntro } from './intro-visibility'
 import { ProfileTag } from './profile-tag'
@@ -296,9 +297,17 @@ function ChatRuntimeBoundary({
     ? getSessionOwnerHint(storedId, connectionId ? { connectionId, profile: activeProfile } : undefined)
     : undefined
 
-  const tailProfile = ownerRoute
-    ? { connectionId: ownerRoute.connectionId, profile: ownerRoute.targetProfile || ownerRoute.profile }
-    : undefined
+  const ownerConnectionId = ownerRoute?.connectionId
+  const ownerProfile = ownerRoute?.profile
+  const ownerTargetProfile = ownerRoute?.targetProfile
+
+  const tailProfile = useMemo(
+    () =>
+      ownerConnectionId
+        ? { connectionId: ownerConnectionId, profile: ownerTargetProfile || ownerProfile || 'default' }
+        : undefined,
+    [ownerConnectionId, ownerProfile, ownerTargetProfile]
+  )
 
   const tailState = storedId && transcriptTailStates ? transcriptTailState(storedId, tailProfile) : undefined
   const restBackfillAvailable = Boolean(tailState?.possiblyTruncated)
@@ -473,6 +482,15 @@ const ChatViewContent = memo(function ChatViewContent({
     return resolveComposerSessionKey(effectiveSelectedSessionId, sessions)
   }, [isPrimary, location.pathname, selectedSessionId, sessions])
 
+  const selectedWorkspaceDraftScope =
+    isPrimary && selectedWorkspaceId ? workspaceDraftScope(selectedWorkspaceId) : null
+
+  const composerProfile = useComposerProfile({
+    draftScope: queueSessionKey || selectedWorkspaceDraftScope,
+    sessionId: selectedSessionId,
+    workspaceId: selectedWorkspaceId
+  })
+
   // When the tip row arrives after compression, migrate any tip-keyed stash onto
   // the durable lineage key before the composer remounts onto that key.
   //
@@ -598,9 +616,10 @@ const ChatViewContent = memo(function ChatViewContent({
       voice: {
         enabled: true,
         active: false
-      }
+      },
+      profile: composerProfile
     }),
-    [contextSuggestions, currentModel, currentProvider, gatewayOpen, modelMenuContent, quickModels]
+    [composerProfile, contextSuggestions, currentModel, currentProvider, gatewayOpen, modelMenuContent, quickModels]
   )
 
   // Drop files anywhere in the conversation area, not just on the composer
@@ -749,7 +768,7 @@ const ChatViewContent = memo(function ChatViewContent({
               busy={busy}
               cwd={currentCwd}
               disabled={!gatewayOpen}
-              draftScopeKey={isPrimary && selectedWorkspaceId ? workspaceDraftScope(selectedWorkspaceId) : null}
+              draftScopeKey={selectedWorkspaceDraftScope}
               focusKey={activeSessionId}
               gateway={gateway}
               maxRecordingSeconds={maxVoiceRecordingSeconds}
