@@ -57,8 +57,8 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   （Pi/Hermes/OpenCode/Codex \*_PRODUCTION_CHAIN_PREPARED，真实 adapter/agent + c5/c6/c7 Worker +
   bwrap + 本机假端点两轮，同一 native id、上下文与真实重开方法；**四家仍 MODEL_NOT_VERIFIED**）。
   2026-09-15 完成 **state capture 类型化错误边界返修（c7 起步，经 Reviewer 复审修复后现行 c8）**：
-  runtime-artifact/Pi/Hermes/OpenCode 四门 + Windows r4/PostCheck 用 c8 串行 exit 0；Codex 门
-  为未解决的红绿间歇（见 codex_native_state_findings）；详见
+  runtime-artifact/Pi/Hermes/OpenCode 四门 + Windows r4/PostCheck 用 c8 串行 exit 0；Codex 门为 USER_DECISION_REQUIRED／未解决的红绿间歇
+  （10 绿→5 红→最近 3 绿，见 codex_native_state_findings）；详见
   [state-error-boundary.md](../server-round1/fullstack/state-error-boundary.md)。
   剩余唯一后端门为**四家真实模型门**（Worker 5s 租约缺陷已修：`WORKER_LEASE_KEEPALIVE_FIXED`），
   任一封装就绪都不折算为已通过）。
@@ -194,11 +194,11 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   非本修复引入；修复只让失败从 10s 后的 NOT_SETTLED 变为立即准确码），随后 10 轮复跑未再现、
   view 峰值稳定 114 文件；gate 现常驻采样并报告 `stateProjectionObservation`。
   详见 [state-error-boundary.md](../server-round1/fullstack/state-error-boundary.md)。
-- worker_bundle_c7: 因错误码边界重建 **`.acceptance-bundle-c7`**
+- worker_bundle_c7: 【历史检查点，现行 bundle 由 worker_bundle_c8 取代】因错误码边界重建 **`.acceptance-bundle-c7`**
   （`sha256:6408fbc7da63e9b85c52ab1902ab12e3faa5160021187328b03b5fa9dc9848d4`）；**c4/c5/c6 未覆盖**、
   均为历史有效证据（复跑前后摘要逐一核对未变）。版本口径不变：ABW1 frame 与 manifest
   **`wireVersion = 1`**，Worker control **`PROTOCOL_VERSION = 3`**（只新增错误码值，响应形状未变）。
-- windows_r4_c7: Windows r4 用 **c7** 通过（exit 0、`worker_digest=sha256:6408fbc7…`、
+- windows_r4_c7: 【历史检查点，现行由 windows_r4_c8 记录取代（见 worker_bundle_c8 条）】Windows r4 用 **c7** 通过（exit 0、`worker_digest=sha256:6408fbc7…`、
   `stop_mode=tree_terminate`、`state_projection=/runtime/home/sessions`、
   `session/new→session/resume`、delta 10 < completed 12、8 秒静默在默认 5 秒租约下
   `elapsed_ms=8840` 完成）+ 独立 `-PostCheck …CLEAN`。
@@ -358,14 +358,13 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   content-stable settle 7；Rust **15 passed**）；四家 gate + runtime-artifact gate 用 **c6** 串行 exit 0
   （Codex 默认与外部工件两种模式都 exit 0）；**Windows r4 用 c6 通过 + `-PostCheck…CLEAN`**。
   state 错误边界/Reviewer 复审修复（c7→c8）轮（2026-09-15）复跑：python **820 passed/4 skipped/0 failed**
-  （+27 相对 793：边界新测、gate 诊断 5、真实 Worker 端到端等；4 项既有 skip 未扩大）；
+  （相对 793 的增量含边界新测、真实 Worker 端到端、gate 诊断（现为 3 例）等；4 项既有 skip 未扩大）；
   Rust fmt 干净 + `cargo test --locked --release` **27 passed**；
   runtime-artifact/Pi/Hermes/OpenCode 四门 + Windows r4/PostCheck 用 **c8** 串行 exit 0；
   **Windows r4 用 c8 通过 + 独立 `-PostCheck…CLEAN`**（8 秒静默 `elapsed_ms=8821`，实例核对）；`git diff --check` 通过。
   （此前轮次计数 812/22 与中间 820/27、822 均已被本条取代。）
-  **Codex 门现行状态：红**——c8+现行脚本下 `.tmp/plugins` 技能物化突发在本机已稳定复现
-  （连续 5 轮峰值恰 5529 文件 → 确定性 `VIEW_FILE_LIMIT`，见 codex_native_state_findings），
-  裁决前不掩盖、不假绿；此前 c7 轮曾有 10 轮绿的记录（突发为间歇），两条记录都如实保留。
+  **Codex 门现行状态：USER_DECISION_REQUIRED／未解决的红绿间歇（10 绿→5 红→最近 3 绿）**——
+  根因 `.tmp/plugins` 技能物化突发（见 codex_native_state_findings），裁决前不掩盖、不假绿。
   错误边界 c7 轮（2026-09-15）复跑：python **812 passed/4 skipped/0 failed**（较上一条 +19：
   错误边界 19 项，其中含 2 项真实 Worker 进程端到端；4 项既有 skip 未扩大）；
   Rust fmt 干净 + `cargo test --locked --release` **22 passed**；

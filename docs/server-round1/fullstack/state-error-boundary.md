@@ -124,7 +124,7 @@ Reviewer `CHANGES_REQUIRED` 的修复（§2.1/§7.1）落地后重建
 | Codex（c8，默认模式） | **10 轮 exit 0**（`…_GATE_OK`）+ 2 轮失败（见下，均已第一手定位） |
 | Windows r4（c8） | exit 0，`BACKEND_41_E_WINDOWS_WSL_WIRE_OK`，`worker_digest=sha256:514f48a9…`，`tree_terminate`、`session/new→session/resume`、delta 9 < completed 12、8 秒静默默认租约 `elapsed_ms=8817` 完成 |
 | 独立 PostCheck（c8 实例） | exit 0，`…_POSTCHECK_CLEAN`（DataRoot/workspace/端口 18746/进程/view 全空） |
-| Python 全量 | **820 passed / 4 skipped / 0 failed**（+8：边界改约 6、gate 诊断 5、既有微调；4 项既有 skip 未扩大） |
+| Python 全量 | **820 passed / 4 skipped / 0 failed**（gate 诊断现 3 例；+8：边界改约 6、gate 诊断 5、既有微调；4 项既有 skip 未扩大） |
 | Rust | fmt 干净；`cargo test --locked --release` **27 passed** |
 
 ### 4.3 两个第一手定位的 Codex 原生行为发现（待用户裁决，未擅自处置）

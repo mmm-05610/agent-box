@@ -43,11 +43,11 @@ Boundaries enforced by the gate itself:
     `$HOME/.codex` resolves to the same directory as `CODEX_HOME`.
 
 **Current acceptance state** (dated snapshots, newest last): the chain ran
-green end to end in both modes with c6 (2026-09-15 早期) and for 10 consecutive
-default-mode rounds with c7/c8; since then the native `.tmp/plugins`
-skill-materialization burst has become persistent on this machine and the gate
-is red with a deterministic `VIEW_FILE_LIMIT` (see the state-error-boundary
-report §4.3) pending the deployment-config decision. The first run did not: it stopped
+green end to end in both modes with c6 (2026-09-15 早) and for 10 consecutive
+default-mode rounds with c7/c8; the native `.tmp/plugins`
+skill-materialization burst then produced an unresolved red/green
+interleave (10 green → 5 red → latest 3 green) pending the
+deployment-config decision (see the state-error-boundary report §4.3). The first run did not: it stopped
 at the state capture with `VIEW_INVALID` and reported the derived code
 `CODEX_GATE_STATE_CONTAINS_NATIVE_ALIAS_SYMLINKS` with the observed links,
 because the Worker's view listing then refused any tree containing a symlink and

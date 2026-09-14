@@ -66,8 +66,8 @@
   修复后重建 **c8**（`sha256:514f48a9…`，c4–c7 未覆盖；Worker 源在 c8 构建后未再变，
   c8 仍为现行 bundle）复跑：runtime-artifact/Pi/Hermes/OpenCode exit 0、Windows r4 +
   `-PostCheck…CLEAN`（fresh 实例核对）、python **820 passed/4 skipped**、Rust **27 passed**
-  （中间轮为 python 820 / Rust 27；更早 c7 轮为 812/22——均已日期化取代）。Codex 门：间歇期 10 轮绿 + 当前连续 5 轮红（突发稳定期），
-  两个记录都如实保留、红不掩盖。
+  （中间轮为 python 820 / Rust 27；更早 c7 轮为 812/22——均已日期化取代）。Codex 门：USER_DECISION_REQUIRED／未解决的红绿间歇（10 绿→5 红→最近 3 绿），
+  全部如实记录、红不掩盖。
 - **两个第一手定位的 Codex 原生行为发现（待用户裁决）**：①运行时把内置 plugin/skill 语料解包进
   `$CODEX_HOME/.tmp/plugins/`（实测峰值 **5529 文件**；与列表上限 1024 相撞即确定性
   `VIEW_FILE_LIMIT`——旧行为同条件是重试 10s 后 `NOT_SETTLED`；在本机已由间歇转为稳定复现，
