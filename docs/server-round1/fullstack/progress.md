@@ -4,6 +4,56 @@
 已发生的1次可达性请求由后端受控进程读取仓库外 locator，未把内容写入仓库或输出。
 授权真实 credential 的 SecretStore→Worker 投影尚未执行，不以测试值路径冒充付费验收事实。
 
+## 2026-09-15 — state capture 类型化错误边界 + c7 + 前端最终交接收口（返修轮）
+
+详细证据：[state-error-boundary.md](state-error-boundary.md)。本阶段禁止真实模型调用，
+模型调用 **0**、费用增量 **¥0**。
+
+- **先复现后修**：实现前 Rust 新测/改断言 **8 failed / 12 passed**、Python 新测
+  `test_state_capture_error_boundary.py` **13 failed / 4 passed**。跨层测试从 Worker 源的
+  被审计位置**提取实际错误码**（结构化标记，不匹配英文 message）驱动真实 settle 循环；
+  另有 2 项测试驱动**真实 Worker 进程**端到端核对特殊文件/文件数上限/vanish/shrink 的实际返回码。
+- **错误分类收口**：`VIEW_SPECIAL_FILE`（FIFO/socket/设备、get 目标非普通文件）、
+  `VIEW_TRAVERSAL_LIMIT`（>4096 访问条目）、`VIEW_FILE_LIMIT`（>1024 文件，listing 与 manifest）
+  为确定性拒绝、**立即失败且不改写**；`VIEW_CHANGED`（文件/目录消失、fetch 越过缩短后的末尾）
+  为唯一可重试的 Worker 侧码；sidecar 瞬态集合收窄为
+  `{SIDECAR_STATE_IDENTITY_CONFLICT, VIEW_CHANGED}`，`VIEW_INVALID`/`VIEW_IO`/`VIEW_INCOMPLETE`
+  不再被无条件重试。分类只读 `code`（message 交叉互换测试锁定）。上限/symlink/特殊文件/
+  凭据/受保护路径语义全部保持；deadline 到期仍是 `SIDECAR_STATE_NOT_SETTLED`。
+- **协议兼容**：只新增错误码值，`{"ok":false,"error":{"code","message"}}` 帧形状未变
+  （`view_error_envelope_tests` 逐帧断言），**ABW1 `wireVersion=1` 与 control
+  `PROTOCOL_VERSION=3` 均不升版**，兼容性说明入 `protocol.rs` 并由测试锁定。
+- **如实记录一次间歇失败**：Codex 门首两跑（分别用 c7 与 c6）曾在第一轮捕获报
+  `VIEW_FILE_LIMIT`/`VIEW_INVALID`（capture 时 view 超 1024 文件）。两版 Worker 都出现、
+  计数规则未改 → 非本修复引入；修复只把"10s 重试后 NOT_SETTLED"变成"立即准确码"。
+  此后 c7 复跑 **10 轮全部 exit 0**、view 峰值稳定 **114** 文件，触发条件未找到，
+  作为未解决环境级间歇项记录；gate 现常驻采样 `stateProjectionObservation`（峰值/最重子树/
+  是否超限），且 blocker 注记只在"观察到别名链接且 turn 失败"时输出。
+- **c7**：`sha256:6408fbc7da63e9b85c52ab1902ab12e3faa5160021187328b03b5fa9dc9848d4`
+  （c4 `31e92959…`/c5 `92eac03a…`/c6 `96256b2e…` 未覆盖，复跑前后摘要核对未变）。
+  版本口径：ABW1 frame/manifest `wireVersion=1`；Worker control `PROTOCOL_VERSION=3`。
+- **五门 + Windows 用 c7 串行复跑**：runtime-artifact `…_GATE_OK`；Codex 默认模式 10 轮
+  `…_GATE_OK` + 外部工件模式 exit 0（treeDigest `sha256:9051b844…`）；Pi `…_GATE_OK`；
+  Hermes `…_GATE_OK`；OpenCode `…_PREPARED`；**Windows r4 exit 0**
+  （`worker_digest=sha256:6408fbc7…`、`tree_terminate`、`session/new→session/resume`、
+  delta 10<12、`state_projection=/runtime/home/sessions`、8 秒静默默认租约
+  `elapsed_ms=8840` 完成）+ **独立 `-PostCheck …_POSTCHECK_CLEAN`**。
+- **全量验证**：python **812 passed/4 skipped/0 failed**（+19：错误边界 19 项；4 项既有
+  平台/环境 skip 未扩大）；`cargo fmt --check` 干净、`cargo test --locked --release`
+  **22 passed**；`git diff --check` 通过。残留：门临时根无残留，两个 `--keep` 诊断根与
+  Rust scratch 目录按属主核对后删除；进程表仅剩 pytest `--delay-seconds 300` 有界自退助手。
+- **前端最终交接（只读复测，HEAD 已推进）**：`8e7c138c96337fc20ed61d3c21100e6449c8ec95`
+  （00:51 release 提交）、`git status --porcelain` **0 行**、`writer_lease=RELEASED`、
+  `DESKTOP_IMPLEMENTATION_READY`、r3 `28 PASS/0 FAIL/0 SKIP/0 PENDING`、handoff 文件在场，
+  上一轮的 `DESKTOP_HANDOFF_INCONSISTENT` 被该 release 提交收口；wire 两摘要重算一致
+  （TS `11e3b3e7…` / 工件 `5d4fa3bf…`）。工作树内仅 2 个长闲置进程，无写入者；
+  **未取得写权、未记录 `FULLSTACK_INTEGRATION_OWNER`、未写前端任何文件**。
+- **Reviewer 自动化 §4.1 通道门通过**：固定 session 真实 `codex exec resume`（read-only、
+  flock、无 bypass）exit 0，`VERDICT: ACCEPT` + `REVIEWER_CHANNEL_OK` 机械命中，
+  调用前后仓库零写入。§4.2 当前阶段真实审查在阶段提交后执行。
+- 四家仍 **MODEL_NOT_VERIFIED**、`workbench_model_verified_count=0`；
+  `BACKEND_IMPLEMENTATION_READY` 未登记。
+
 ## 2026-09-15 — Worker view 合同收紧 + state 捕获内容稳定性门（返修轮）
 
 - **先复现后修**：Rust 新测（4 项）在实现前编译失败即"合同不存在"；Python 新测 `test_state_capture_settle.py`
@@ -671,12 +721,12 @@ powershell.exe -File accept-e.ps1 … -Port 18744 -PostCheck -InstanceId <两实
   completed/failed/cancelled 编码。后端对实际生成工件 29/29 回归通过，双方摘要已锁定；
   无需用户逐字段批准。
 
-## B — 双门判定（**2026-09-14 历史快照；当前判定见 status 的 42 双门与前端观察字段**）
+## B — 双门判定（**2026-09-14 历史快照；当前判定见 status 的 42 双门与前端观察字段**；表内"剩余"项已于其后各轮完成——Codex 封装与四家 HOME 见 c5 轮、错误边界/c7 见 2026-09-15 轮）
 
 | 门 | 判定 | 依据 |
 | --- | --- | --- |
-| BACKEND_IMPLEMENTATION_READY | **否（暂时）** | 28方法+队列终态已锁定并29/29；Windows r4 平台门已通过（`stop_mode=tree_terminate` 有界强制树终止后的崩溃式重启、DataRoot 锁释放/重新获取、同 native id `session/resume`、终止前 delta、ObjectStore checkpoint、清理与独立 `-PostCheck`；正常生命周期退出未覆盖）；**Pi/Hermes/OpenCode 三家已完成生产封装（\*_PRODUCTION_CHAIN_PREPARED，仍 MODEL_NOT_VERIFIED）**；剩余的是 **Codex 生产封装、四家原生 HOME 实施、四家真实模型门** |
-| DESKTOP_IMPLEMENTATION_READY | **否** | 前端自报 PARTIAL，且 `writer_lease=ACTIVE`（未释放）；独立实现/验收门未完 |
+| BACKEND_IMPLEMENTATION_READY | **否（暂时）** | 28方法+队列终态已锁定并29/29；Windows r4 平台门已通过（`stop_mode=tree_terminate` 有界强制树终止后的崩溃式重启、DataRoot 锁释放/重新获取、同 native id `session/resume`、终止前 delta、ObjectStore checkpoint、清理与独立 `-PostCheck`；正常生命周期退出未覆盖）；**四家生产封装与四家原生 HOME 隔离均已完成**（\*_PRODUCTION_CHAIN_PREPARED，仍 MODEL_NOT_VERIFIED）；此后剩余的唯一后端门是 **四家真实模型门**（历史表述"剩余 Codex 生产封装、四家原生 HOME 实施"已被 c5 轮与错误边界/c7 轮取代） |
+| DESKTOP_IMPLEMENTATION_READY | **否（历史快照）** | 前端自报 PARTIAL，且 `writer_lease=ACTIVE`（未释放）；独立实现/验收门未完。（已被其后前端 r2/r3 与 2026-09-15 复测取代：r3 28 PASS、lease RELEASED、clean、HEAD `8e7c138c`） |
 
 因此仍**没有**记录 `FULLSTACK_INTEGRATION_OWNER`，**没有**接管前端工作树，
 **没有**启动跨端链路。这是纪律要求，不是进度不足的借口。

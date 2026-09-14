@@ -17,8 +17,12 @@ checkpoint 由 Windows ObjectStore 校验、退出后按 marker 清理并独立 
 真实 adapter/agent（Pi 依赖闭包、Hermes 隔离 Python 闭包、OpenCode 摘要固定单文件二进制）经 c4
 Worker+bwrap 连接本机 loopback 假 DeepSeek 端点，两轮同一 Server Session、上下文与重放/重开证据齐备。
 **三家因此只是封装就绪，仍是 MODEL_NOT_VERIFIED**（假端点与固定 nonce，不是付费模型验收）。
-剩余的是 **Codex 封装**，而最终门始终是 **Codex/Pi/Hermes/OpenCode 四家真实模型门**——两者不是同一件事，
-不得混写。**已修复两条通用缺陷**：Worker 默认 5 秒租约会取消"客户端静默"的运行中 attempt
+**Codex 生产封装也已完成**（见下行），**四家封装全部就绪、全部仍 MODEL_NOT_VERIFIED**；
+最终门始终是 **Codex/Pi/Hermes/OpenCode 四家真实模型门**——与封装就绪不是同一件事，
+不得混写。**state capture 类型化错误边界返修已完成**（2026-09-15：确定性拒绝立即失败并保留
+准确码、`VIEW_CHANGED` 窄码承担重试、`VIEW_INVALID` 不再泛化为瞬态；c7 证据见
+[state-error-boundary.md](../server-round1/fullstack/state-error-boundary.md)）。
+**已修复两条通用缺陷**：Worker 默认 5 秒租约会取消"客户端静默"的运行中 attempt
 （**WORKER_LEASE_KEEPALIVE_FIXED**，含 Windows 真机 8 秒静默证据，见
 [原生 driver 接缝](../server-round1/fullstack/native-driver-seam.md) §5）；Hermes 会把产品模型
 `deepseek-flash` 静态折叠成 `deepseek-chat`（已按其官方自定义 provider 路径修复，两轮线上值精确为
@@ -39,7 +43,7 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 | [39](work-orders/39-server-boundaries.md) | **READY_FOR_HARNESS** | [阶段证据](../server-round1/server-boundary/stage-a-b-c.md)：幂等并发双派发缺陷先复现后修复、能力声明改为注册派生、双中立provider测试、legacy codex 退出生产装配 | wire反馈通道 [wire-review.md](../server-round1/wire-review.md) 已建立并写入首轮 |
 | [40](work-orders/40-four-harness-integration.md) | **FOUR_HARNESS_COMPONENTS_READY** | [40-A 底座](../server-round1/harness-integration/stage-a.md) / [40-B 通道](../server-round1/harness-integration/stage-b.md) / [40-C 矩阵](../server-round1/harness-integration/stage-c.md) / [40-D 汇总](../server-round1/harness-integration/stage-d.md) + [握手证据JSON](../server-round1/harness-integration/handshake-40c.json)：四家组件门 25/25；全量 227 passed/4 skipped/0 failed；Rust 4 passed；真实二进制零凭据握手 pi/hermes INITIALIZED、opencode HEALTH_OK、codex 诚实要求凭据 | 本单终态；Server 侧编排与 wire 锁定进入 41；真实模型门留待 42 §D |
 | [41](work-orders/41-core-service-acceptance.md) | **BACKEND_WINDOWS_R4_READY** | [后端验收](../server-round1/backend-acceptance.md)：28 方法+队列终态严格 schema 回归 29/29；Windows r4 exit 0（保守旧门 + `tree_terminate` 强制树终止后的有状态崩溃式重启/同 native id `session/resume`/终止前 delta/ObjectStore checkpoint/marker 清理/独立 `-PostCheck`）；反例含 5 种不可用 checkpoint 与 4 种拒绝清理；全量 348 passed/4 skipped，Node 25/25+4/4，Rust 4/4 | 42 双门未满足，整体 READY 仍受约束 |
-| [42](work-orders/42-fullstack-delivery.md) | **PRE_GATE_WORK_IN_PROGRESS**（两端门当前均未满足，未联调） | [进度与费用账](../server-round1/fullstack/progress.md) + [运行时工件投影底座](../server-round1/fullstack/runtime-artifact-projection.md) + [Pi 生产封装](../server-round1/fullstack/pi-production-packaging.md) + [Hermes 生产封装](../server-round1/fullstack/hermes-production-packaging.md) + [OpenCode 生产封装](../server-round1/fullstack/opencode-production-packaging.md) + [通用 driver 接缝](../server-round1/fullstack/native-driver-seam.md)：工件投影 **RUNTIME_ARTIFACT_PROJECTION_READY**；Pi/Hermes/OpenCode 三家 **\*_PRODUCTION_CHAIN_PREPARED**（真实 adapter/agent + c4 Worker + bwrap + 本机假端点，两轮同一 native id / 两轮上下文 / 真实重开方法，两条门本会话串行复跑 exit 0，均 `MODEL_NOT_VERIFIED`）；**Worker 5s 租约取消静默 attempt** 已第一手复现并**已修复**（`WORKER_LEASE_KEEPALIVE_FIXED`，含 Windows 真机 8 秒静默证据）；能力合同已统一为 canonical 词汇（`HARNESS_CAPABILITY_CONTRACT_READY`）；**四家原生 HOME 隔离已实施**（`PROFILE_NATIVE_HOME_ISOLATION_IMPLEMENTED`）、**Codex 生产封装已完成**（`CODEX_PRODUCTION_CHAIN_PREPARED`），四家都有生产封装且都仍 MODEL_NOT_VERIFIED；前端仍 PARTIAL、writer_lease ACTIVE；28 方法 wire 摘要未变；DeepSeek 官方 API 可达（12 tokens） | **四家（Codex/Pi/Hermes/OpenCode）真实模型门**；双门后联调 |
+| [42](work-orders/42-fullstack-delivery.md) | **PRE_GATE_WORK_IN_PROGRESS**（后端门=四家真实模型门未执行；前端实现门自述已满足但未接管，未联调） | [进度与费用账](../server-round1/fullstack/progress.md) + [运行时工件投影底座](../server-round1/fullstack/runtime-artifact-projection.md) + [Pi 生产封装](../server-round1/fullstack/pi-production-packaging.md) + [Hermes 生产封装](../server-round1/fullstack/hermes-production-packaging.md) + [OpenCode 生产封装](../server-round1/fullstack/opencode-production-packaging.md) + [通用 driver 接缝](../server-round1/fullstack/native-driver-seam.md)：工件投影 **RUNTIME_ARTIFACT_PROJECTION_READY**；Pi/Hermes/OpenCode 三家 **\*_PRODUCTION_CHAIN_PREPARED**（真实 adapter/agent + c4 Worker + bwrap + 本机假端点，两轮同一 native id / 两轮上下文 / 真实重开方法，两条门本会话串行复跑 exit 0，均 `MODEL_NOT_VERIFIED`）；**Worker 5s 租约取消静默 attempt** 已第一手复现并**已修复**（`WORKER_LEASE_KEEPALIVE_FIXED`，含 Windows 真机 8 秒静默证据）；能力合同已统一为 canonical 词汇（`HARNESS_CAPABILITY_CONTRACT_READY`）；**四家原生 HOME 隔离已实施**（`PROFILE_NATIVE_HOME_ISOLATION_IMPLEMENTED`）、**Codex 生产封装已完成**（`CODEX_PRODUCTION_CHAIN_PREPARED`），四家都有生产封装且都仍 MODEL_NOT_VERIFIED；**state 错误边界返修 + c7 完成（2026-09-15）**：五门 + Windows r4/PostCheck 全部用 c7 串行 exit 0（见 [state-error-boundary.md](../server-round1/fullstack/state-error-boundary.md)）；前端复测（2026-09-15 02:1x）：`DESKTOP_IMPLEMENTATION_READY` 自述成立、HEAD `8e7c138c`、worktree/index clean、`writer_lease=RELEASED`、r3 28 PASS/0 FAIL、wire 两摘要一致；28 方法 wire 摘要未变；DeepSeek 官方 API 可达（12 tokens） | **四家（Codex/Pi/Hermes/OpenCode）真实模型门**；双门后联调 |
 | [37](work-orders/37-http-codex.md) | **SERVER_HTTP_CODEX_R1_PARTIAL** | [原完成审计](../server-round1/completion-audit.md) / [C/D证据](../server-round1/stage-c-d.md)保留；检查点5a45303/5b71393/cd5efbe/67c6b40。独立定向23 passed；同键并发双accept已由39复现并修复；能力不诚实已由39结构性修复 | abandon 断言经探针定性为**测试侧竞态**（终止状态持久化后约50ms才 abandon；负载高时10/10失败），已改为有界等待、断言强度不变，修后10/10通过；原生语义迁移由40执行 |
 | [38](work-orders/38-harness-extension-selection.md) | **HARNESS_EXTENSION_SELECTION_READY_FOR_DECISION** | 两轮 A/B/C 完成：[最终建议与边界](../server-round1/harness-selection/boundary.md)。保留有条件首选 `harness-remote v3.0.2`；零模型/凭据 | 首选已由40消费进入有门禁接入；不再等待决定 |
 
@@ -47,31 +51,33 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 
 - backend_implementation: **POST_RESUME_GATES_PENDING**（39/40组件门完成；41的28方法+队列终态已按
   锁定摘要29/29；Windows r4 平台门通过，**BACKEND_WINDOWS_R4_READY**。42-D 已补
-  **RUNTIME_ARTIFACT_PROJECTION_READY**（工件投影底座）与 Pi/Hermes/OpenCode 三家
-  **\*_PRODUCTION_CHAIN_PREPARED**（真实 adapter/agent + c4 Worker + bwrap + 本机假端点两轮，
-  同一 native id、上下文与真实重开方法；三家仍 MODEL_NOT_VERIFIED）。须继续 Codex 同级封装、
-  最终门为**四家真实模型门**（Worker 5s 租约缺陷已修：`WORKER_LEASE_KEEPALIVE_FIXED`）
-  （Codex/Pi/Hermes/OpenCode），任一封装就绪都不折算为已通过）。
-- frontend_handoff: **DESKTOP_HANDOFF_INCONSISTENT（READY 声明待核实）**——只读审计 2026-09-15
-  00:50:50 +08:00：前端 HEAD 已从 `6ddf6be9`（23:49「release the frontend implementation lease」）推进到
-  `3b22aae78970d53ab630816d84f09bc2df9dca28`（00:45:00「fix(desktop): close the P06 product-surface gaps
-  the r2 GREEN paused on」），其 status.md 顶部自述 `writer_lease=RELEASED` **因协调验收发现两个本端缺陷而
-  暂停**，末行仍留着 23:20 的"本行之后本文件冻结"标记——即**释放被其自己暂停、写入仍在继续**（工作树
-  6 改 + 1 未跟踪：`docs/desktop-product-delivery/status.md` 与 `evidence/{DESKTOP_IMPLEMENTATION_HANDOFF,
-  P02,P04,P05,P06}.md`，mtime 00:50；未跟踪目录 `evidence/P06-assets-r3/`，mtime 00:48）。**未发现可归属
-  前端的活跃写入进程**（按工作树路径扫描无命中），按纪律**未终止任何进程**；**未取得写权**、未记录
-  `FULLSTACK_INTEGRATION_OWNER`、未写前端任何文件。wire 两摘要只读重算仍与锁定值一致
-  （`11e3b3e7…` / `5d4fa3bf…`）。后端独立任务继续，此项**不构成本轮阻断**；下一阶段按其 handoff-policy
-  核对"READY 声明 + r2 证据 + lease 真正静止"三者一致后才可接管。
-- frontend_observed_state: **DESKTOP_IMPLEMENTATION_READY（前端自述，交接待核实）**（只读观察，2026-09-15
-  00:50:50 +08:00；其 status.md 自述 `frontend_implementation=DESKTOP_IMPLEMENTATION_READY` 与
-  `writer_lease=RELEASED（已暂停）`）。
+  **RUNTIME_ARTIFACT_PROJECTION_READY**（工件投影底座）与 **四家生产封装全部完成**
+  （Pi/Hermes/OpenCode/Codex \*_PRODUCTION_CHAIN_PREPARED，真实 adapter/agent + c5/c6/c7 Worker +
+  bwrap + 本机假端点两轮，同一 native id、上下文与真实重开方法；**四家仍 MODEL_NOT_VERIFIED**）。
+  2026-09-15 完成 **state capture 类型化错误边界返修 + c7**（五门 + Windows r4/PostCheck 用 c7 串行
+  exit 0，见 [state-error-boundary.md](../server-round1/fullstack/state-error-boundary.md)）。
+  剩余唯一后端门为**四家真实模型门**（Worker 5s 租约缺陷已修：`WORKER_LEASE_KEEPALIVE_FIXED`），
+  任一封装就绪都不折算为已通过）。
+- frontend_handoff: **DESKTOP_HANDOFF_CONSISTENT（按其自述成立；后端仍未接管）**——只读复测
+  2026-09-15 02:1x +08:00：HEAD `8e7c138c96337fc20ed61d3c21100e6449c8ec95`
+  （00:51:21 release 提交），`git status --porcelain` **0 行**（含 untracked），
+  `writer_lease=RELEASED`、`DESKTOP_IMPLEMENTATION_READY`、`REAL_FLOW_VERIFIED=否`、
+  r3 证据 `executed 28 → allOk=true，counts={"PASS":28,"FAIL":0,"SKIP":0,"PENDING":0}`，
+  `evidence/DESKTOP_IMPLEMENTATION_HANDOFF.md` 在场且与 status 终态一致；
+  wire 两摘要就地重算仍与锁定值一致（`11e3b3e7…` / `5d4fa3bf…`）。
+  上一轮 00:50 观察到的 `DESKTOP_HANDOFF_INCONSISTENT`（lease 释放被自己暂停、工作树 6 改 + 1 未跟踪）
+  已被该 release 提交收口，属历史观察。工作树内仅 2 个长闲置进程（zcode-cli/bash，均始于 09-14），
+  无 electron/node 写入者、release 后无文件更新；按纪律**未终止任何进程**、**未取得写权**、
+  未记录 `FULLSTACK_INTEGRATION_OWNER`、未写前端任何文件。接管仍以双门成立为前提。
+- frontend_observed_state: **DESKTOP_IMPLEMENTATION_READY（前端自述；本轮复测与其 status/handoff
+  一致）**（只读观察，2026-09-15 02:1x +08:00）。
 - frontend_worktree: /home/maoqh/projects/agent-box-desktop-next-wsl-round1 @ feature/agentbox-desktop-product。
-- frontend_checked_at: 2026-09-15 00:50:50 +08:00；observed_head:
-  `3b22aae78970d53ab630816d84f09bc2df9dca28`；`git status --porcelain` 本次 7 行（6 改 + 1 未跟踪）。
-- 42 双门判定（2026-09-15 00:50 +08:00）：BACKEND_IMPLEMENTATION_READY=**否（暂时：四家真实模型门仍未
-  执行；四家生产封装与 HOME 隔离已完成）**；DESKTOP_IMPLEMENTATION_READY=**前端自述是，但交接不一致
-  （lease 释放被其自己暂停、仍在提交与修改），需下一阶段核验**。**仍未进入全栈联调**、未写前端文件。
+- frontend_checked_at: 2026-09-15 02:1x +08:00；observed_head:
+  `8e7c138c96337fc20ed61d3c21100e6449c8ec95`；`git status --porcelain` 本次 **0 行**。
+- 42 双门判定（2026-09-15 02:1x +08:00）：BACKEND_IMPLEMENTATION_READY=**否（暂时：唯一剩余后端门
+  是四家真实模型门；四家生产封装、HOME 隔离与 state 错误边界/c7 均已完成）**；
+  DESKTOP_IMPLEMENTATION_READY=**前端自述是，本轮复测一致（clean、lease released、r3 28 PASS、
+  同 wire）**。**仍未进入全栈联调**、未写前端文件。
 - wire_version / schema_digest: 当前28方法提交 `3aba5c5c` 为 **WIRE_LOCKED_FOR_IMPLEMENTATION**，TS
   `11e3b3e70d332585d31900c09ba063d95aa6b72b1904921c665fb72f81c10035`、生成工件
   `5d4fa3bfeec6c3273c6073b37794e4ab2aca6e07e48184bc3a2b878c1fe5e4ed`。15:48 在前端工作树**就地
@@ -168,6 +174,33 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 - windows_r4_c6: Windows r4 用 **c6** 通过（exit 0、`worker_digest=sha256:96256b2e…`、
   `state_projection=/runtime/home/sessions`、`session/new→session/resume`、delta 10 < completed 12、
   8 秒静默在默认 5 秒租约下 `elapsed_ms=8857` 完成）+ 独立 `-PostCheck …CLEAN`。
+- state_capture_error_boundary: **确定性 view 失败不再被 settle 循环吞掉**（2026-09-15）。Worker 把
+  特殊文件/`VIEW_SPECIAL_FILE`、traversal 上限/`VIEW_TRAVERSAL_LIMIT`、文件数上限/`VIEW_FILE_LIMIT`
+  改为各自的准确码并立即失败；真正的 live-state 变化（文件/目录消失、文件被缩短）改用窄码
+  **`VIEW_CHANGED`**；sidecar `_STATE_TRANSIENT_CODES` 收窄为
+  `{SIDECAR_STATE_IDENTITY_CONFLICT, VIEW_CHANGED}`——`VIEW_INVALID`/`VIEW_IO`/`VIEW_INCOMPLETE`
+  不再被无条件当作瞬态，拒绝类失败**不再被改写成 `SIDECAR_STATE_NOT_SETTLED`**；分类只读 code
+  不读英文 message；4096/1024/256/8 MiB 上限、symlink 与特殊文件语义、凭据/受保护路径规则全部保持。
+  先失败后修：Rust 8 failed→pass、Python 13 failed→pass（跨层测试从 Worker 源的被审计位置提取真实码
+  驱动真实循环；另有两个测试驱动**真实 Worker 进程**端到端验证）。响应形状未变、
+  ABW1 `wireVersion=1` 与 control `PROTOCOL_VERSION=3` 均不升版（envelope 逐帧测试锁定）。
+  如实记录：Codex 门曾出现 2 次"capture 时 view 超 1024 文件"的间歇失败（c6/c7 两个 Worker 都出现，
+  非本修复引入；修复只让失败从 10s 后的 NOT_SETTLED 变为立即准确码），随后 10 轮复跑未再现、
+  view 峰值稳定 114 文件；gate 现常驻采样并报告 `stateProjectionObservation`。
+  详见 [state-error-boundary.md](../server-round1/fullstack/state-error-boundary.md)。
+- worker_bundle_c7: 因错误码边界重建 **`.acceptance-bundle-c7`**
+  （`sha256:6408fbc7da63e9b85c52ab1902ab12e3faa5160021187328b03b5fa9dc9848d4`）；**c4/c5/c6 未覆盖**、
+  均为历史有效证据（复跑前后摘要逐一核对未变）。版本口径不变：ABW1 frame 与 manifest
+  **`wireVersion = 1`**，Worker control **`PROTOCOL_VERSION = 3`**（只新增错误码值，响应形状未变）。
+- windows_r4_c7: Windows r4 用 **c7** 通过（exit 0、`worker_digest=sha256:6408fbc7…`、
+  `stop_mode=tree_terminate`、`state_projection=/runtime/home/sessions`、
+  `session/new→session/resume`、delta 10 < completed 12、8 秒静默在默认 5 秒租约下
+  `elapsed_ms=8840` 完成）+ 独立 `-PostCheck …CLEAN`。
+- reviewer_automation: §4.1 通道门**已通过**（2026-09-15）：固定 session 机械比对一致、真实
+  `codex exec resume`（read-only sandbox、flock、无 bypass）exit 0、verdict `VERDICT: ACCEPT`
+  含 `REVIEWER_CHANNEL_OK`、`REVIEWED_HEAD` 与调用前 HEAD 一致、调用前后 `git status --porcelain`
+  零变化。§4.2 的当前阶段真实审查闭环在阶段提交后执行；两者都通过才登记
+  `REVIEWER_AUTOMATION_READY`。
 - codex_config_boundary: Codex 生产配置边界**只读复核**（未改产品值）：`model=deepseek-flash`、
   `base_url=https://api.deepseek.com/`、`wire_api=responses`、`CODEX_HOME=/runtime/home/.codex`、
   `env_key=CODEX_API_KEY`、`cli_auth_credentials_store=ephemeral`。`CODEX_API_KEY` 只是 deployment 声明的
@@ -269,11 +302,12 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   marker 清理与独立 `-PostCheck`；该停止路径不是正常/graceful 退出，正常 Desktop/Server 生命周期退出
   与最终清理仍留作全栈最终验收项；
   正式 WS 事件流、附件、审批、取消/断连、队列续派/暂停、Profile/Provider-Model 维护均有证据；
-  Codex模型选择与凭据生产投影代码已接线但尚未以真实受管 Harness 执行；42-D 已完成中立运行时工件
-  投影底座（`runtimeArtifactMounts` + Worker 协议 3 + c4 bundle + 真实 Worker+bwrap 无模型门），
-  并在其上完成 **Pi 生产封装**（PI_PRODUCTION_CHAIN_PREPARED，仍 MODEL_NOT_VERIFIED；该句是 r4 当时
-  的进展描述，Hermes/OpenCode 两家封装随后完成，见本文件 hermes_production_chain /
-  opencode_production_chain 两条）；**Codex 封装仍未完成**；c4 亦未取得 Windows 平台证据）。
+  Codex 模型选择与凭据生产投影已接线并经**无模型全链门**验证（`CODEX_PRODUCTION_CHAIN_PREPARED`，
+  见本文件 codex_config_boundary / codex_production_chain 两条）；**四家生产封装全部完成**
+  （见本文件 hermes_production_chain / opencode_production_chain / pi_production_chain /
+  codex_production_chain 与 windows_r4_c7 各条）；（历史括注已过时的表述保留于下，仅作当时快照：
+  ~~Codex 封装仍未完成；c4 亦未取得 Windows 平台证据~~——Codex 封装已在 c5 轮完成，
+  Windows 平台证据已先后用 c4/c5/c6/c7 取得）。唯一剩余后端门是**四家真实模型门**）。
 - integration_owner: NONE；workbench_model_verified_count: **0**（指本轮；组件门与工件投影门通过
   不等于真实模型可用）。
 - model_authorization: DEEPSEEK_OFFICIAL_AUTHORIZED_MAX_CNY_10；凭据locator见42 §D，不写内容。
@@ -300,6 +334,11 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   state 捕获/Worker 合同收紧轮（本阶段）复跑：python **793 passed/4 skipped/0 failed**（较上一条 +7：
   content-stable settle 7；Rust **15 passed**）；四家 gate + runtime-artifact gate 用 **c6** 串行 exit 0
   （Codex 默认与外部工件两种模式都 exit 0）；**Windows r4 用 c6 通过 + `-PostCheck…CLEAN`**。
+  state 错误边界/c7 轮（2026-09-15）复跑：python **812 passed/4 skipped/0 failed**（较上一条 +19：
+  错误边界 19 项，其中含 2 项真实 Worker 进程端到端；4 项既有 skip 未扩大）；
+  Rust fmt 干净 + `cargo test --locked --release` **22 passed**；
+  runtime-artifact/Codex（默认 10 轮 + 外部工件 1 轮）/Pi/Hermes/OpenCode 五门用 **c7** 串行 exit 0；
+  **Windows r4 用 c7 通过 + 独立 `-PostCheck…CLEAN`**（8 秒静默 `elapsed_ms=8840`）；`git diff --check` 通过。
   HOME 隔离 + Codex 封装轮（上一轮）复跑：python **786 passed/4 skipped/0 failed**（较上一条 +103）：
   四家 gate（Pi/Hermes/OpenCode/Codex）串行 exit 0、Codex 外部工件模式 exit 0、runtime-artifact gate(c5)
   exit 0；node 25/25、13/13、42d 4/4、构建器 11/20/9/9；Rust fmt 干净 + 11 passed；
