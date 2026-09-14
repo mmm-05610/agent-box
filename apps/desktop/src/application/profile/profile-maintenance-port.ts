@@ -3,7 +3,9 @@ import {
   asRequestId,
   asWireId,
   type ConfigDescriptor,
+  type ConfigOverride,
   type ProfileRecord,
+  type ProfilesUpdateConfigResult,
   type RequestId
 } from '@/types/wire/wire-v1'
 
@@ -28,11 +30,19 @@ export interface ArchiveProfileIntent {
   profileId: string
 }
 
+export interface UpdateProfileConfigIntent {
+  expectedVersion: number
+  profileId: string
+  values: ConfigOverride[]
+}
+
 export interface ProfileMaintenancePort {
   archive(intent: ArchiveProfileIntent): Promise<ProfileRecord>
   create(intent: CreateProfileIntent): Promise<ProfileRecord>
   harnessChoices: ProfileHarnessChoice[]
   update(intent: UpdateProfileIntent): Promise<ProfileRecord>
+  /** Optional while profile presentation migrates to editable service config. */
+  updateConfig?(intent: UpdateProfileConfigIntent): Promise<ProfilesUpdateConfigResult>
 }
 
 export interface WireProfileMaintenanceOptions {
@@ -64,6 +74,13 @@ export function wireProfileMaintenancePort(
       })
 
       return result.profile
+    },
+    async updateConfig(intent) {
+      return client.call('profiles.updateConfig', {
+        ...intent,
+        profileId: asWireId(intent.profileId),
+        requestId: requestId()
+      })
     },
     async archive(intent) {
       const result = await client.call('profiles.archive', {

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import type { WireV1Client } from '@/api/wire-v1-client'
-import { asRequestId, asWireId, type ProfileRecord } from '@/types/wire/wire-v1'
+import { asRequestId, asWireId, type ProfileRecord, type ProfilesUpdateConfigResult } from '@/types/wire/wire-v1'
 
 import { harnessChoicesFromProfiles, wireProfileMaintenancePort } from './profile-maintenance-port'
 
@@ -49,6 +49,36 @@ describe('wireProfileMaintenancePort', () => {
         { expectedVersion: 2, profileId: 'profile-1', requestId: 'request-archive' }
       ]
     ])
+  })
+
+  it('maps profile config updates and preserves the complete service result', async () => {
+    const result: ProfilesUpdateConfigResult = {
+      configVersion: 7,
+      effectiveFor: 'next_send',
+      profile: profile({ version: 4 })
+    }
+
+    const call = vi.fn(async () => result)
+    const client = { call } as unknown as WireV1Client
+
+    const port = wireProfileMaintenancePort(client, {
+      createRequestId: () => asRequestId('request-config'),
+      harnessChoices: []
+    })
+
+    await expect(
+      port.updateConfig!({
+        expectedVersion: 3,
+        profileId: 'profile-1',
+        values: [{ controlId: 'role', value: 'reviewer' }]
+      })
+    ).resolves.toBe(result)
+    expect(call).toHaveBeenCalledWith('profiles.updateConfig', {
+      expectedVersion: 3,
+      profileId: 'profile-1',
+      requestId: 'request-config',
+      values: [{ controlId: 'role', value: 'reviewer' }]
+    })
   })
 
   it('derives choices only from opaque service records', () => {
