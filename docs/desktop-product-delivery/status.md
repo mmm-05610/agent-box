@@ -5,7 +5,7 @@
 
 ## 执行快照（handoff-policy 每阶段必填）— 接管施工中
 
-- updated_at: 2026-09-14 15:25 (+08:00)
+- updated_at: 2026-09-14 16:05 (+08:00)
 - 执行者: Codex 前端产品 goal（接力会话）；**已从暂停的 Zcode 执行者接管**
 - 工作树/分支: /home/maoqh/projects/agent-box-desktop-next-wsl-round1 @ feature/agentbox-desktop-product
 - 接管核验（历史，Zcode→Codex 交接）: 用户指定交接 HEAD `5c0fbfe` 与实际 HEAD
@@ -16,7 +16,7 @@
 - 本阶段起点核验: HEAD `1cbc4f58d602b212f55c7c4dd9c2bc38718cba83`、分支
   feature/agentbox-desktop-product、工作树 clean，无同工作树并发写入者；writer lease 仍为同一
   前端 goal 的 ACTIVE lease，本阶段串行施工，完成后停止写入并回报，不提前 RELEASE。
-- 代码检查点（已提交 HEAD）: `3e207376`（P05：`workspaces.open` 生产接线）
+- 代码检查点（已提交 HEAD）: `072c7eac`（P05 返修：Workspace 身份按完整 environment identity 匹配）
   链: ebb1233（P00）→ 8d4b3df/47b5b47/dbb902f（P01 代码与几何修复）→ 26b32fc（P01 GREEN 证据）
   → 468e6ac/d7e9a57（发布源 d3c0196+ffbcfaf 导入）→ 893d560（P07 检查点2 wire-v1）
   → 957a523（P02A 盘点）→ 07f5386（P02A slice 1：失败面非阻塞）→ 3a25edc（P02A slice 2）
@@ -39,12 +39,14 @@
   → 1cbc4f58（Provider 模型检查点）→ dfcd7027（Profile 默认配置编辑与串行 CAS）
   → 88f3d934（enum/boolean 编辑覆盖）→ af0c08e3（返修：服务权威名称回写）
   → 矩阵审计文档检查点（evidence/P05-client-matrix.md）→ 940c9df4（config.resolve 生产接线）
-  → b6d0bc6f（返修：旧 pending 发送优先恢复）→ **3e207376（workspaces.open 生产接线）**
+  → b6d0bc6f（返修：旧 pending 发送优先恢复）→ 3e207376（workspaces.open 生产接线）
+  → **072c7eac（返修：Workspace 身份完整三元组匹配）**
 - 已消费发布文档提交: 86d5a7b、61c7ff7、d3c0196、ffbcfaf
 - 当前检查点改动（workspaces.open 接线）: 已有本地/WSL 侧栏选择经 `workspaces.open` 登记为服务权威
   Workspace，并进入服务 Workspace 的新会话草稿（**不建 Session、不启 Harness**）。身份 exact：本地
   `{local,null,null}` + `project.path`（严格取项目自身文件夹；null/空串=无路径项目，不产生 open），
-  WSL `{wsl, actualUser, distribution}` + rootPath，path 不改写；
+  WSL `{wsl, actualUser, distribution}` + rootPath，path 不改写；匹配要求完整 `{kind,user,host}` +
+  normalized path 全等（WSL 含 actualUser，local 必须 host/user 双 null）；
   唯一身份是服务返回的 `WorkspaceRecord.id`（shell row id 不参与命中，直查走显式 `serviceWorkspaceId`）。
   同一 target 单飞、迟到只入服务缓存不切回界面/草稿/选择；provisional shell 草稿经既有
   `migrateSessionDraft` 迁移到服务 scope（目标非空则不覆盖、两边不删除）；能力未声明不发请求并呈现 hello
@@ -186,13 +188,14 @@
 - workspaces.open 生产接线（3e207376）：验收 `npx vitest run --project ui
   src/application/workspace/wire-workspace-catalog.test.ts src/store/agentbox-service.test.ts
   src/app/composition/wiring/agentbox-main-chat.test.tsx src/features/chat/agentbox-chat-view.test.ts`
-  → **4 files / 50 tests passed，exit 0**；相关回归 4 files / 59 tests passed（agentbox-composer、
+  → **4 files / 55 tests passed，exit 0**；相关回归 4 files / 59 tests passed（agentbox-composer、
   wire-send、sidebar workspace assembly、composer store）；`src/features/chat` 全目录 94 files /
   627 tests passed；`npm run typecheck` 三项目通过；改动文件 ESLint 0 error / 0 warning；
   `git diff --check` 干净。覆盖本地/WSL exact payload、created=false 采纳服务 id、同 path 不同环境不互认、
   shell id 与无关 wire id 相同不误命中、服务已有记录不 open、单飞、迟到 A/B、capability/失败处理、
   provisional→authoritative 草稿迁移（含目标非空不覆盖）、无自身文件夹的项目（含其有 repo 路径者）与
-  Home bucket/空路径均不 open、Session route 不 open。
+  Home bucket/空路径均不 open、Session route 不 open；身份匹配返修后同 distro/path 的错 user 记录不误命中、
+  只有错 user 时仍 open 且 payload user 精确、exact user 命中时 open 零调用。
 - pending 恢复顺序返修（b6d0bc6f）：`npx vitest run --project ui
   src/application/session/wire-send.test.ts src/application/session/agentbox-composer.test.ts
   src/app/composition/wiring/agentbox-main-chat.test.tsx src/application/profile/wire-composer-profile.test.ts

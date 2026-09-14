@@ -8,6 +8,11 @@
 （application 用例 + 发送前强制校验 + renderer 预览 latest-wins + hello 能力门），矩阵中该行改为
 `PRODUCTION_REACHABLE`（EXT），汇总 23 reachable / 5 gap；G4 改写为「已接线」记录，其余缺口不变。
 
+**增量（2026-09-14，代码检查点 `072c7eac`）**：Workspace 身份匹配返修——匹配改为**完整
+`{kind,user,host}` 三元组 + normalized path 全等**（WSL 需 distro 与 actualUser 都相等，local 需 host/user
+双 null），修复"同一 distro/path 下另一用户的记录被误当当前 Workspace"的缺口；矩阵状态计数不变
+（24 reachable / 4 gap），lifecycle 外部缺口不变。
+
 **增量（2026-09-14，代码检查点 `3e207376`）**：`workspaces.open` 已按 G1 的目标文件与不变量完成生产接线
 （shell 选择 → open → 服务 WorkspaceRecord → 服务 Workspace 对应的新会话草稿，含 provisional 草稿迁移与
 迟到响应保护），矩阵中该行改为 `PRODUCTION_REACHABLE`（EXT），汇总 **24 reachable / 4 gap**；G1 改写为
@@ -118,7 +123,7 @@ lifecycle 外部缺口不变。详见 §3-G4 与 evidence/P05.md。
 原缺口（只登记未修）已按原目标文件与不变量实现：
 
 - 目标文件（实际改动）：`application/workspace/wire-workspace-catalog.ts`（`openAgentBoxWorkspace` +
-  按 environment/path 的 `resolveAgentBoxWorkspace`）、`store/agentbox-service.ts`
+  按完整 environment identity + normalized path 的 `resolveAgentBoxWorkspace`）、`store/agentbox-service.ts`
   （`upsertAgentBoxWorkspace`）、`app/composition/wiring/agentbox-main-chat.ts`（shell target 构造、
   单飞自动登记、迟到归属判定、草稿迁移、`workspaceOpen` 状态）、
   `features/chat/agentbox-chat-view.tsx`（opening/unavailable 呈现）。
@@ -128,8 +133,10 @@ lifecycle 外部缺口不变。详见 §3-G4 与 evidence/P05.md。
   open——项目内的 repo 路径不作替代），WSL `environment = {kind:'wsl', user:actualUser, host:distribution}` 且
   `path = rootPath`；path 不做任何 Windows/POSIX/UNC 改写；不建 Session、不启 Harness、不调 config、
   不回落 legacy gateway；transport/typed error 原样抛出，不乐观伪造记录。
-- 不变量（已由测试钉住）：本地 target 的 path 严格取 `project.path`，为 null/空串（含 Home bucket、纯 repo
-  项目）即不产生 open，也不为其分配 shell 草稿作用域；唯一身份是服务返回的 `WorkspaceRecord.id`（shell row id 即使字符串相等也不得
+- 不变量（已由测试钉住）：身份匹配要求**完整 `{kind,user,host}` 三元组 + normalized path 全等**（WSL 含
+  actualUser，local 必须 host/user 双 null；身份字符串不透明精确比较，不转小写不猜用户名）；本地 target 的
+  path 严格取 `project.path`，为 null/空串（含 Home bucket、纯 repo 项目）即不产生 open，也不为其分配 shell
+  草稿作用域；唯一身份是服务返回的 `WorkspaceRecord.id`（shell row id 即使字符串相等也不得
   命中，只经显式 `serviceWorkspaceId` 直查）；本地与 WSL 即使 path 字符串相同也必须是两个位置；
   同一 target 未决期间最多一次调用（重渲染不发第二个 requestId），不同 target 可各自发起；迟到响应只
   进入服务缓存，不得把界面/草稿/选择切回旧 target（await 后重新读取当前选择判定归属）；能力未声明时
@@ -138,7 +145,7 @@ lifecycle 外部缺口不变。详见 §3-G4 与 evidence/P05.md。
   迁移到服务 scope（目标已有内容则拒绝覆盖、两边都不删除）。
 - 验收（已执行）：`npx vitest run --project ui src/application/workspace/wire-workspace-catalog.test.ts
   src/store/agentbox-service.test.ts src/app/composition/wiring/agentbox-main-chat.test.tsx
-  src/features/chat/agentbox-chat-view.test.ts` → 4 files / **50 tests passed**（exit 0）；相关回归
+  src/features/chat/agentbox-chat-view.test.ts` → 4 files / **55 tests passed**（exit 0）；相关回归
   （agentbox-composer、wire-send、sidebar workspace assembly、composer store）4 files / 59 tests passed；
   `src/features/chat` 全目录 94 files / 627 tests passed。
 - 仍属外部缺口（不变）：真实 open 结果、真实环境访问性与连接事实只能在 Server lifecycle connection 之后
@@ -329,7 +336,7 @@ dynamic connection slot            electron/composition/agentbox-service-composi
 | `git diff --check` | 通过（exit 0） |
 | config.resolve 接线定向门（`940c9df4`，5 files / 47 tests） | 通过（exit 0） |
 | pending 恢复顺序定向门（`b6d0bc6f`，6 files / 62 tests） | 通过（exit 0） |
-| workspaces.open 接线定向门（`3e207376` + 收口，4 files / 50 tests） | 通过（exit 0） |
+| workspaces.open 接线定向门（`3e207376` + 收口 + 身份匹配返修，4 files / 55 tests） | 通过（exit 0） |
 | `git status --short` | 只含本阶段写集（见 §9） |
 
 矩阵完整性核验（一次性只读命令，不新增仓库脚本）：从 `WireMethods` 导出键、从本文件表格抽取
