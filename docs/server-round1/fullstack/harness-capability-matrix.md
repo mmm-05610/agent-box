@@ -55,10 +55,21 @@ harnesses.toml（静态声明，registry 校验）
 | --- | --- | --- | --- |
 | true | true | true | — |
 | true | false | false | `CAPABILITY_OBSERVED_UNSUPPORTED` |
-| true | not-observed（实现级） | true | —（操作合同即观测） |
-| true | not-observed（语义级） | **false** | `CAPABILITY_NOT_OBSERVED` |
+| true | not-observed | **false** | `CAPABILITY_NOT_OBSERVED` |
 | false | true | **false**（fail closed，runtime 不得抬高产品能力） | `CAPABILITY_CONFLICT_OBSERVED_WITHOUT_DECLARATION` |
 | false | false / not-observed | false | `CAPABILITY_NOT_DECLARED` |
+
+**唯一规则：`supported == (declared is true and observed is true)`。** 实现级/语义级的分类**只用来说明
+"观测从哪里来、需要多强的证据"**，不代替观测本身：实现级能力的观测来自已注册且被真实调用的
+sidecar/driver 操作（拿到原生会话身份 → `observe`；`prompt` 返回 → `finish`；首条真实增量 →
+`stream`；`open_execution` 成功 → `start`），语义级能力还要求各自的原生证据。
+
+**返修记录（能力诚实性）**：本文件首版把"声明了但未观测"的实现级能力直接算成 `supported=true`，于是
+①`HarnessRegistry.capability_view("codex")` 在 Codex **无生产封装、零运行观测**时报 start/observe/
+finish/stream 为支持；②sidecar 执行中**首条 delta 之前** `stream.supported` 就可能为 true；③任何
+`declared=true, observed=null` 的组合都会给出虚假的支持结论。已按上面的唯一规则修正，并补了真值表、
+Registry 静态视图、Codex 空观测、delta 前后、finish 前后与"不得预填观测"的回归
+（`tests/server/test_capability_truth_table.py`）。
 
 运行时观测**只影响当前 execution 的有效能力**，绝不回写全局 Profile 静态声明（有专门断言）。
 
@@ -74,9 +85,12 @@ harnesses.toml（静态声明，registry 校验）
 
 ## 4. 四家矩阵（逐项证据，不预填）
 
+下表 "声明 T/F" 是静态**候选上限**；"已观测/未观测"是真实运行证据。按上面的唯一规则，**未观测即
+`supported=false`**（下表因此不再存在"声明即支持"的行）。
+
 | 家 | start | observe | finish | stream | attach | steer | permissions | native_continuation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| **Codex** | 声明 T / 未观测 | T / 未观测 | T / 未观测 | T / 未观测 | T / 未观测 | F | T / 未观测 | T / 未观测 |
+| **Codex** | 声明 T / 未观测 → `supported=false`（全部能力） | 同 | 同 | 同 | 同 | F | 同 | 同 |
 | **Pi** | T / **已观测** | T / **已观测** | T / **已观测** | T / **已观测** | T / **未观测** | F | F | T / **已观测** |
 | **Hermes** | T / **已观测** | T / **已观测** | T / **已观测** | T / **已观测** | F | F | F | T / **已观测** |
 | **OpenCode** | T / **已观测** | T / **已观测** | T / **已观测** | T / **已观测** | F | F | F | T / **已观测** |
@@ -125,6 +139,7 @@ harnesses.toml（静态声明，registry 校验）
 ## 7. 验证（本会话串行复跑）
 
 ```text
+tests/server（能力真值表 + 命名空间边界 + 合同/集成/投影/sidecar）         → 见本轮复跑（诚实性返修后）
 plugins/agent-box-harnesses/tests（registry + 四家模板 + 能力合同）        → 112 passed / 3 skipped
 node --test plugins/.../harness_remote/*.test.mjs                          → 25 passed / 0 failed
 node --test plugins/agent-box-harnesses/tests/capability_claims.test.mjs   → 13 passed / 0 failed
@@ -148,5 +163,11 @@ Windows 证据要点：8 秒静默在**默认 5 秒租约**下完成（`elapsed_
 - **Pi 的 `attach`**：静态候选保留，有效能力为 false，直到有一次真实附件运行。
 - **Profile HOME 隔离**：`PROFILE_NATIVE_HOME_ISOLATION_DESIGN_LOCKED` /
   `implementation=PENDING_HARDENING`，与本文件无关但同属后续工作。
-- **`_CoreSidecarProvider.capabilities()`** 仍是 Work Core 自己的 operation 词汇
-  （`streaming`/`cancel`/`approvals` 字符串 map），无消费方，本阶段**故意未动**；若要全量收口需另开一轮。
+- **两个"capabilities"命名空间绝不互相投影**：Work Core 的
+  `ExecutionProvider.capabilities()` / `ExtensionRegistry.require_capability()` 回答的是"能不能向这个
+  provider 要这个 operation"，键是 operation 名（`streaming`/`cancel`/`approvals`）；Harness canonical
+  能力回答的是"这个 harness 声明并观测到了什么"。`require_capability` **就是**前者的消费方（含
+  `CapabilityUnsupported` 拒绝路径），因此**不得**再称其"无消费方"。边界由
+  `tests/server/test_capability_namespace_boundary.py` 锁死：operation 键不是 canonical id、不会出现在
+  Profile / Session effective / `server.hello` / deployment `capabilityClaims` 任何一处，反向亦然；
+  未发现任何交叉消费或向上泄漏，故无需最小修复方案。本阶段**未**大规模改名（无必要性）。

@@ -4,6 +4,35 @@
 已发生的1次可达性请求由后端受控进程读取仓库外 locator，未把内容写入仓库或输出。
 授权真实 credential 的 SecretStore→Worker 投影尚未执行，不以测试值路径冒充付费验收事实。
 
+## 2026-09-14 — 能力合同诚实性返修（假阳性 + 命名空间边界 + 完成线程生命周期）
+
+- **假阳性（先复现后修）**：首版 `merge_capabilities` 把"声明了但**未观测**"的实现级能力算成
+  `supported=true`，于是 ①`HarnessRegistry.capability_view("codex")` 在 Codex 无生产封装、零观测时报
+  start/observe/finish/stream 支持；②sidecar 执行中**首条 delta 之前** `stream.supported` 已为 true；
+  ③任何 `declared=true, observed=null` 都给出虚假支持。先写失败回归（`tests/server/test_capability_truth_table.py`，
+  7 failed）再改语义。
+- **修正后的唯一规则**：`supported == (declared is true and observed is true)`；真值表四行（含
+  `true/null → false / CAPABILITY_NOT_OBSERVED`）。实现级/语义级分类保留，但只用于规定**观测来源与证据
+  强度**，不再代替观测。真实观测路径保持：`open_execution`→start、拿到原生会话身份→observe、
+  `prompt` 返回→finish、首条真实 delta→stream；attach/permissions/native_continuation 各自要求原生证据；
+  steer 不虚构。Profile 的静态 `{id: declared}` 形状不变，静态 canonical 视图只报候选上限、全部
+  `supported=false`。
+- **命名空间边界**：Work Core 的 `ExecutionProvider.capabilities()` /
+  `ExtensionRegistry.require_capability()` 是 **operation** 词汇（`streaming`/`cancel`/`approvals`），与
+  Harness canonical 能力绝不互相投影；`require_capability` **就是**消费方（含 `CapabilityUnsupported`
+  拒绝路径），此前"无消费方"的说法已更正。边界由
+  `tests/server/test_capability_namespace_boundary.py` 锁死（operation 键不得出现在 Profile / Session
+  effective / `server.hello` / deployment claims 任何一处，反向亦然；未发现交叉消费或向上泄漏）。
+- **真实崩溃（同轮修复）**：`SidecarExecutionBackend._complete` 的完成线程在 prompt worker 结束后仍通过
+  **共享** Work Core 连接写账，而 `stop()` 只等 prompt worker → 后续重置连接时在 SQLite 段错误（两次实测
+  core dump，栈见 status）。现在 `stop()` 追踪所有存活完成线程并**有界等待**（独立于会被回收的
+  `_active`），超时**如实返回 False**；补 3 项定向测试（等待语义 / 诚实 False / 无残留线程），去掉
+  join 即失败（双向验证）。
+- **验证**：python 全量 **683 passed/4 skipped**；受影响子集连续 3 次 **237 passed**（修前会段错误）；
+  node 25/25 与 13/13；`git diff --check` 干净。按工单未重跑 Windows r4、四条 gate 与工件构建（本轮未改
+  Windows 脚本、Worker、协议或生产部署）。
+- 模型调用 0、费用增量 ¥0；未读凭据；Codex 生产封装、Profile HOME 实施与四家真实模型门仍未做。
+
 ## 2026-09-14 — 四家能力合同统一（canonical capability contract）
 
 详细矩阵与证据：[harness-capability-matrix.md](harness-capability-matrix.md)。
@@ -220,7 +249,7 @@
 - 一次性探针（未入库）在真实 c4 Worker+bwrap 上证明：模块投递与加载、凭据经 `spawnProcess` 进到
   driver 的**孙进程**（`CRED_OK`）、可写 state 投影回读为 checkpoint 并在下一轮回投、native id 稳定。
 
-### 本阶段发现的通用缺陷（未修复，阻塞四家真实模型门）
+### 本阶段发现的通用缺陷（历史快照：当时未修复、阻塞四家真实模型门；**已由 WORKER_LEASE_KEEPALIVE_FIXED 取代**）
 
 - **Worker 默认 5 秒租约会取消"客户端静默"的运行中 attempt**。代码级：只有客户端帧刷新
   `lease_deadline`，而一轮 prompt 飞行中 Server 不发任何帧（心跳只在 `wait_terminal` 里发）。
