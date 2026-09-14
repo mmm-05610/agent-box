@@ -25,6 +25,10 @@ use tokio::task::JoinSet;
 const WORKER_VERSION: &str = "0.1.0";
 const MAX_OUTPUT_BYTES: usize = 1024 * 1024;
 const MAX_ARTIFACT_BYTES: usize = 64 * 1024 * 1024;
+/// Every entry a view listing visits - directory, file, skipped symlink or
+/// special file - counts against this bound, so a tree of empty directories or
+/// dangling links cannot be walked without limit.
+const MAX_VIEW_TRAVERSAL_ENTRIES: usize = 4096;
 const MAX_FETCH_BYTES: usize = 32 * 1024;
 const MAX_SECRET_BYTES: usize = 1024 * 1024;
 const MAX_WORKSPACE_FILE_BYTES: usize = 8 * 1024 * 1024;
@@ -1455,7 +1459,8 @@ fn handle_view(root: &Path, op: &str, args: &Value) -> Result<Value, (&'static s
             }
             let ready = dir.join("ready");
             let mut files = Vec::new();
-            list_view_files(&ready, &ready, &mut files)?;
+            let mut visited = 0usize;
+            list_view_files(&ready, &ready, &mut files, &mut visited)?;
             if files.len() > 1024 {
                 return Err(("VIEW_INVALID", "view exceeds file limit"));
             }
@@ -1505,6 +1510,7 @@ fn list_view_files(
     base: &Path,
     directory: &Path,
     files: &mut Vec<Value>,
+    visited: &mut usize,
 ) -> Result<(), (&'static str, &'static str)> {
     for entry in fs::read_dir(directory).map_err(|_| ("VIEW_IO", "view listing failed"))? {
         let entry = entry.map_err(|_| ("VIEW_IO", "view listing failed"))?;
@@ -1512,18 +1518,23 @@ fn list_view_files(
             .path()
             .symlink_metadata()
             .map_err(|_| ("VIEW_IO", "view metadata failed"))?;
+        // Every visited entry costs one step, whatever its type.
+        *visited += 1;
+        if *visited > MAX_VIEW_TRAVERSAL_ENTRIES {
+            return Err(("VIEW_INVALID", "view exceeds traversal bound"));
+        }
         // A view lists regular files. Harnesses legitimately leave short-lived
-        // non-regular entries in their home - Codex writes argv0 alias symlinks
-        // under its home's tmp/ directory while it runs - and one of those must
-        // not invalidate the whole listing. Skipping is safe because a skipped
-        // entry is never declared in the manifest, and reads only ever serve
-        // declared regular files, so nothing can be resolved through it.
-        if metadata.file_type().is_symlink() || !(metadata.is_dir() || metadata.is_file()) {
+        // symlinks in their home - Codex writes argv0 aliases under its tmp/
+        // directory while it runs - and one of those must not invalidate the
+        // whole listing. A skipped symlink is never declared in the manifest and
+        // reads only serve declared regular files, so nothing resolves through
+        // it; skipping never deletes it either, so cleanup still works.
+        if metadata.file_type().is_symlink() {
             continue;
         }
         if metadata.is_dir() {
-            list_view_files(base, &entry.path(), files)?;
-        } else {
+            list_view_files(base, &entry.path(), files, visited)?;
+        } else if metadata.is_file() {
             let relative = entry
                 .path()
                 .strip_prefix(base)
@@ -1534,6 +1545,10 @@ fn list_view_files(
             if files.len() > 1024 {
                 return Err(("VIEW_INVALID", "view exceeds file limit"));
             }
+        } else {
+            // A FIFO, socket or device is not a view file, and silently leaving
+            // it out would describe a directory that is not what is there.
+            return Err(("VIEW_INVALID", "view contains a special file"));
         }
     }
     Ok(())
@@ -1591,6 +1606,24 @@ fn handle_secret(
 #[cfg(test)]
 mod view_listing_tests {
     use super::*;
+    use std::os::unix::net::UnixListener;
+
+    fn scratch(name: &str) -> std::path::PathBuf {
+        let root = std::env::temp_dir().join(format!("agentbox-{}-{}", name, std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        root
+    }
+
+    fn listing(root: &std::path::Path) -> Result<Vec<String>, (&'static str, &'static str)> {
+        let mut files = Vec::new();
+        let mut visited = 0usize;
+        list_view_files(root, root, &mut files, &mut visited)?;
+        Ok(files
+            .iter()
+            .map(|item| item["path"].as_str().unwrap().to_string())
+            .collect())
+    }
 
     /// A non-regular entry inside a view must not invalidate the listing.
     ///
@@ -1599,21 +1632,64 @@ mod view_listing_tests {
     /// stay strict: an entry that is not listed is never declared, so `view.get`
     /// can never serve it.
     #[test]
-    fn view_listing_skips_non_regular_entries_and_keeps_regular_files() {
-        let root =
-            std::env::temp_dir().join(format!("agentbox-view-listing-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&root);
+    fn view_listing_skips_symlinks_and_keeps_regular_files() {
+        let root = scratch("view-listing");
         fs::create_dir_all(root.join("tmp").join("arg0")).unwrap();
         fs::write(root.join("state.db"), b"state").unwrap();
         std::os::unix::fs::symlink("alias-target", root.join("tmp").join("arg0").join("codex"))
             .unwrap();
-        let mut files = Vec::new();
-        list_view_files(&root, &root, &mut files).unwrap();
-        let paths: Vec<String> = files
-            .iter()
-            .map(|item| item["path"].as_str().unwrap().to_string())
-            .collect();
-        assert_eq!(paths, vec!["state.db".to_string()]);
+        assert_eq!(listing(&root).unwrap(), vec!["state.db".to_string()]);
         let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_special_file_is_refused_instead_of_skipped() {
+        // Skipping a FIFO or socket would let a capture report a view that does
+        // not describe what is actually there, so they are typed failures.
+        let root = scratch("view-fifo");
+        fs::write(root.join("state.db"), b"state").unwrap();
+        let fifo = root.join("pipe");
+        let name = std::ffi::CString::new(fifo.to_str().unwrap()).unwrap();
+        assert_eq!(unsafe { libc::mkfifo(name.as_ptr(), 0o600) }, 0);
+        let refused = listing(&root);
+        assert_eq!(refused.unwrap_err().0, "VIEW_INVALID");
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_unix_socket_is_refused_instead_of_skipped() {
+        let root = scratch("view-socket");
+        let _socket = UnixListener::bind(root.join("agent.sock")).unwrap();
+        assert_eq!(listing(&root).unwrap_err().0, "VIEW_INVALID");
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_forest_of_directories_and_links_stays_within_the_traversal_bound() {
+        // Empty directories and skipped symlinks used to cost nothing, so a tree
+        // made only of them could be walked without limit. Every entry visited is
+        // counted, so traversal is bounded whatever the mix is.
+        let root = scratch("view-forest");
+        for index in 0..(MAX_VIEW_TRAVERSAL_ENTRIES + 8) {
+            let directory = root.join(format!("d{index}"));
+            fs::create_dir(&directory).unwrap();
+            std::os::unix::fs::symlink("nowhere", directory.join("alias")).unwrap();
+        }
+        assert_eq!(listing(&root).unwrap_err().0, "VIEW_INVALID");
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn skipped_symlinks_survive_the_listing_and_are_still_cleanable() {
+        let root = scratch("view-cleanup");
+        fs::write(root.join("state.db"), b"state").unwrap();
+        std::os::unix::fs::symlink("state.db", root.join("alias")).unwrap();
+        assert_eq!(listing(&root).unwrap(), vec!["state.db".to_string()]);
+        assert!(
+            root.join("alias").symlink_metadata().is_ok(),
+            "skipping must not delete the entry"
+        );
+        fs::remove_dir_all(&root).unwrap();
+        assert!(!root.exists());
     }
 }

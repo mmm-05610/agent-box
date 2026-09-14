@@ -30,6 +30,19 @@ from agent_box.resource_contracts.harness_capabilities import (
 #: a failed lease ends the turn promptly, large enough not to spin.
 LEASE_POLL_SECONDS = 0.25
 
+#: Failures while reading a state subtree that mean "it is still moving", so the
+#: capture keeps waiting (bounded) instead of accepting a mixed snapshot. Bound
+#: violations and credential material are never treated as churn.
+_STATE_TRANSIENT_CODES = frozenset({
+    "SIDECAR_STATE_IDENTITY_CONFLICT", "VIEW_INVALID", "VIEW_IO", "VIEW_INCOMPLETE",
+})
+
+
+def _state_error_is_transient(error: BaseException) -> bool:
+    code = getattr(error, "code", None)
+    return isinstance(code, str) and code in _STATE_TRANSIENT_CODES
+
+
 #: The guest's isolated home root. Every Harness home is a projection inside it:
 #: read-only configuration files and one bounded writable state subtree, both
 #: declared by the deployment. It is never the host home and never a Windows
@@ -499,52 +512,23 @@ class _WorkerChannels:
             except BaseException:  # noqa: BLE001 - stopping must never mask the turn
                 pass
 
-    #: A native Harness may still be finishing its own writes right after
-    #: `close` - appending transcript files, removing the short-lived alias
-    #: links it created while running. Reading the tree while it churns yields
-    #: transient listing or read failures, so a capture first waits, bounded,
-    #: for the tree to settle.
+    #: A capture accepts only bytes that stopped changing. Comparing paths and
+    #: sizes is not enough - a rewrite that keeps its length looks stable - so two
+    #: consecutive snapshots must agree on path, size *and* digest, and the bytes
+    #: returned are exactly the ones that matched.
     STATE_SETTLE_INTERVAL_SECONDS = 0.25
-    STATE_SETTLE_DEADLINE_SECONDS = 5.0
+    STATE_SETTLE_DEADLINE_SECONDS = 10.0
 
-    def settle_state(self, *, deadline_seconds: float | None = None,
-                     interval: float | None = None) -> None:
-        """Wait, bounded, until the state subtree stops changing.
+    def _state_snapshot(self) -> tuple[dict[str, tuple[int, str]], dict[str, bytes]]:
+        """List the declared state subtree and read it, within every bound.
 
-        Two identical consecutive listings mean the writer stopped. Transient
-        read errors are expected while waiting and are not swallowed away: if
-        the tree never settles this simply returns after the deadline and the
-        capture that follows reports its own honest failure.
+        Returns the content identity of what was read plus the bytes themselves.
+        Bound violations and credential material are typed failures; a file that
+        changes while it is being read surfaces as an identity conflict, which
+        the settle loop treats as "not settled yet".
         """
         if self.state_bundle_prefix is None:
-            return
-        deadline = time.monotonic() + (
-            self.STATE_SETTLE_DEADLINE_SECONDS if deadline_seconds is None else deadline_seconds
-        )
-        pause = self.STATE_SETTLE_INTERVAL_SECONDS if interval is None else interval
-        previous = None
-        while time.monotonic() < deadline:
-            try:
-                listing = self.client.request(
-                    "view.list", {"viewId": self.view_id}, timeout=5,
-                )
-                signature = sorted(
-                    (str(item.get("path")), int(item.get("size", -1)))
-                    for item in listing.get("files", ())
-                )
-            except BaseException:  # noqa: BLE001 - a churning tree is not a settled one
-                previous = None
-                time.sleep(pause)
-                continue
-            if signature == previous:
-                return
-            previous = signature
-            time.sleep(pause)
-
-    def capture_state(self) -> dict[str, bytes]:
-        """Read back only the deployment-declared writable state subtree."""
-        if self.state_bundle_prefix is None:
-            return {}
+            return {}, {}
         prefix = self.state_bundle_prefix + "/"
         listing = self.client.request("view.list", {"viewId": self.view_id})
         selected: list[tuple[str, str, int]] = []
@@ -567,15 +551,72 @@ class _WorkerChannels:
             if len(selected) >= 256 or total > 8 * 1024 * 1024:
                 raise SidecarError("SIDECAR_STATE_OUTSIDE_BOUNDS", "state projection exceeds bound")
             selected.append((path, relative, size))
-        captured: dict[str, bytes] = {}
+        contents: dict[str, bytes] = {}
+        identity: dict[str, tuple[int, str]] = {}
         for path, relative, size in selected:
-            content, _digest_value = self._view_bytes(path)
+            content, digest_value = self._view_bytes(path)
             if len(content) != size:
-                raise SidecarError("SIDECAR_STATE_IDENTITY_CONFLICT", "state size changed during capture")
+                raise SidecarError(
+                    "SIDECAR_STATE_IDENTITY_CONFLICT", "state size changed during capture",
+                )
             if self._forbidden_content and self._forbidden_content in content:
-                raise SidecarError("SIDECAR_STATE_CONTAINS_SECRET", "credential material found in native state")
-            captured[relative] = content
-        return captured
+                raise SidecarError(
+                    "SIDECAR_STATE_CONTAINS_SECRET", "credential material found in native state",
+                )
+            contents[relative] = content
+            identity[relative] = (size, digest_value)
+        return identity, contents
+
+    def _settled_state(self, *, deadline_seconds: float | None = None,
+                       interval_seconds: float | None = None) -> dict[str, bytes]:
+        """Wait, bounded, until the state subtree stops changing, then return it.
+
+        A native Harness may still be finishing its own writes right after
+        `close` - appending transcripts, removing the short-lived alias links it
+        created - so the first snapshots can differ. Two identical consecutive
+        snapshots mean it stopped, and only then are those bytes returned; a
+        subtree that never stops changing fails with `SIDECAR_STATE_NOT_SETTLED`
+        rather than producing a checkpoint that mixes two moments.
+        """
+        if self.state_bundle_prefix is None:
+            return {}
+        deadline = time.monotonic() + (
+            self.STATE_SETTLE_DEADLINE_SECONDS if deadline_seconds is None else deadline_seconds
+        )
+        pause = (self.STATE_SETTLE_INTERVAL_SECONDS
+                 if interval_seconds is None else interval_seconds)
+        previous: dict[str, tuple[int, str]] | None = None
+        while True:
+            try:
+                identity, contents = self._state_snapshot()
+            except BaseException as error:  # noqa: BLE001 - classified, not swallowed
+                if not _state_error_is_transient(error):
+                    raise
+                identity, contents = None, None
+            if identity is not None and previous is not None and identity == previous:
+                return contents
+            previous = identity
+            if time.monotonic() >= deadline:
+                raise SidecarError(
+                    "SIDECAR_STATE_NOT_SETTLED",
+                    "the native state subtree did not stop changing before the deadline",
+                )
+            time.sleep(pause)
+
+    def capture_state(self, *, deadline_seconds: float | None = None,
+                      interval_seconds: float | None = None) -> dict[str, bytes]:
+        """Read back only the deployment-declared writable state subtree, once it
+        has stopped changing."""
+        return self._settled_state(
+            deadline_seconds=deadline_seconds, interval_seconds=interval_seconds,
+        )
+
+    def settle_state(self, *, deadline_seconds: float | None = None,
+                     interval_seconds: float | None = None) -> None:
+        """Wait until the state subtree stops changing, without reading it out."""
+        self._settled_state(
+            deadline_seconds=deadline_seconds, interval_seconds=interval_seconds,
+        )
 
     def _view_bytes(self, path: str) -> tuple[bytes, str]:
         chunks = bytearray()
@@ -915,9 +956,6 @@ class SidecarHarnessPort:
             envelope.request({"op": "close"}, timeout=10)
             with self._lock:
                 self._native_closed.add(execution_id)
-            # A stopped Harness is not necessarily a quiet one: wait, bounded,
-            # for its state subtree to stop changing before reading it back.
-            envelope.settle_state()
         state = envelope.capture_state()
         # checkpoint 的可续接性读的是有效能力：静态声明了 native_continuation
         # 且本次执行真的被原生播发过，才允许声明 resumable。
