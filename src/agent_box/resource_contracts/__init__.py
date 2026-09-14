@@ -8,9 +8,31 @@ from __future__ import annotations
 from types import MappingProxyType
 from typing import Mapping
 
+from . import harness_capabilities
 from .agent_box_profile_v1 import AgentBoxProfileV1
 from .agent_skill_v1 import AgentSkillV1
 from .credential_v1 import CredentialRefV1
+from .harness_capabilities import (
+    CANONICAL_CAPABILITY_IDS,
+    CAPABILITY_CLAIMS_INVALID,
+    CAPABILITY_CONFLICT_OBSERVED_WITHOUT_DECLARATION,
+    CAPABILITY_NOT_DECLARED,
+    CAPABILITY_NOT_OBSERVED,
+    CAPABILITY_OBSERVED_UNSUPPORTED,
+    CAPABILITY_SCHEMA_VERSION,
+    CAPABILITY_SCOPES,
+    CAPABILITY_UNKNOWN_ID,
+    CAPABILITY_VALUE_NOT_BOOLEAN,
+    CapabilityClaimsInvalid,
+    CapabilityDeclaration,
+    CapabilityDeclarationError,
+    CapabilityUnknownId,
+    CapabilityValueNotBoolean,
+    canonical_capabilities,
+    capability_view,
+    merge_capabilities,
+    validate_claims,
+)
 from .prompt_fragment_v1 import PromptFragmentV1
 from .workspace_v1 import WorkspaceV1
 
@@ -37,9 +59,29 @@ def contract_type(contract_id: str) -> type:
 __all__ = [
     "AgentBoxProfileV1",
     "AgentSkillV1",
-    "CredentialRefV1",
+    "CANONICAL_CAPABILITY_IDS",
+    "CAPABILITY_CLAIMS_INVALID",
+    "CAPABILITY_CONFLICT_OBSERVED_WITHOUT_DECLARATION",
+    "CAPABILITY_NOT_DECLARED",
+    "CAPABILITY_NOT_OBSERVED",
+    "CAPABILITY_OBSERVED_UNSUPPORTED",
+    "CAPABILITY_SCHEMA_VERSION",
+    "CAPABILITY_SCOPES",
+    "CAPABILITY_UNKNOWN_ID",
+    "CAPABILITY_VALUE_NOT_BOOLEAN",
     "CONTRACT_TYPES",
+    "CapabilityClaimsInvalid",
+    "CapabilityDeclaration",
+    "CapabilityDeclarationError",
+    "CapabilityUnknownId",
+    "CapabilityValueNotBoolean",
+    "CredentialRefV1",
     "PromptFragmentV1",
     "WorkspaceV1",
+    "canonical_capabilities",
+    "capability_view",
     "contract_type",
+    "harness_capabilities",
+    "merge_capabilities",
+    "validate_claims",
 ]

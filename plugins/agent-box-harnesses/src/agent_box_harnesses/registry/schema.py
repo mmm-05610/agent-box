@@ -4,8 +4,14 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Mapping
 
+# 能力词汇表**不是**这里定义的：canonical 合同（`agent_box.resource_contracts.
+# harness_capabilities`）是唯一事实来源，注册表只把它当作封闭集合使用。这样
+# TOML、部署声明与 wire 投影不可能各说一套；此处若有第二个手写集合，就等于
+# 又开了一份可以静默漂移的 schema。
+from agent_box.resource_contracts.harness_capabilities import CANONICAL_CAPABILITY_IDS
+
 _KINDS = frozenset({"stdio", "pty"})
-_CAPS = frozenset({"start", "observe", "finish", "attach", "steer", "stream", "permissions", "native_continuation"})
+_CAPS = frozenset(CANONICAL_CAPABILITY_IDS)
 
 def _s(value, name, limit=128):
     if not isinstance(value, str) or not value or len(value) > limit: raise ValueError(f"invalid {name}")
@@ -98,9 +104,14 @@ def definition_from_dict(raw: Mapping) -> HarnessDefinition:
     if set(cont)-{"kind","contract_id","target_provider"}: raise ValueError("unknown continuation field")
     continuation=ContinuationSpec(_s(cont.get("kind","none"),"continuation kind"),cont.get("contract_id"),cont.get("target_provider"))
     if continuation.kind == "none" and (continuation.contract_id or continuation.target_provider): raise ValueError("none continuation cannot declare a route")
-    caps=frozenset(raw.get("capabilities",()))
-    if not caps <= _CAPS: raise ValueError("unknown capability")
-    if continuation.kind != "none" and "native_continuation" not in caps and continuation.kind == "native_session": raise ValueError("native continuation capability missing")
+    raw_caps=raw.get("capabilities",())
+    if not isinstance(raw_caps,(list,tuple)) or any(not isinstance(item,str) or not item for item in raw_caps):
+        raise ValueError("capabilities must be a list of capability ids")
+    caps=frozenset(raw_caps)
+    # 未知 id（含 streaming/approvals/attachments/sessions 这类**原生**别名）一律类型化拒绝：
+    # 运行时只认 canonical 词汇，别名一旦进得来，消费方就会把它当成一个真的产品能力。
+    if not caps <= _CAPS: raise ValueError(f"unknown capability: {sorted(caps - _CAPS)}")
+    if continuation.kind == "native_session" and "native_continuation" not in caps: raise ValueError("native continuation capability missing")
     cred=raw.get("credential"); credential=None
     if cred:
         if set(cred)-{"contract","locator_provider","guest_target_class","materializer","required"}: raise ValueError("unknown credential field")

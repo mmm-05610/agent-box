@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "harnessTypes": {
+    "codex": ["attach", "finish", "native_continuation", "observe", "permissions", "start", "stream"],
+    "claude-code": ["attach", "finish", "native_continuation", "observe", "start"],
+    "opencode": ["finish", "native_continuation", "observe", "start", "stream"],
+    "hermes": ["finish", "native_continuation", "observe", "start", "stream"],
+    "pi": ["attach", "finish", "native_continuation", "observe", "start", "stream"]
+  }
+}
