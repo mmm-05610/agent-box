@@ -4,16 +4,19 @@
 （分支 `feature/agentbox-desktop-product`，工作树 clean）。
 本文件只盘点**实际生产接线与缺口**，不修改生产代码。
 
-**增量（2026-09-14，代码检查点 `940c9df4`）**：`config.resolve` 已按 G4 的目标文件与不变量完成生产接线
-（application 用例 + 发送前强制校验 + renderer 预览 latest-wins + hello 能力门），矩阵中该行改为
-`PRODUCTION_REACHABLE`（EXT），汇总 23 reachable / 5 gap；G4 改写为「已接线」记录，其余缺口不变。
+**增量（2026-09-14，代码检查点 `8cdd1381`）**：`sessions.update` 已按 G5a 的目标文件与不变量完成生产接线
+——统一侧栏在**服务 Workspace 匹配后由其 AgentBox Session 投影接管展开内容**（新纯投影 + 版本单调缓存 +
+`agentbox-sessions/` 行与列表 + 侧栏改名/置顶 CAS + 当前会话置顶命令走同一 seam），矩阵中该行改为
+`PRODUCTION_REACHABLE`（EXT），汇总 **27 reachable / 1 gap**；G5 拆为「G5a `sessions.update` 已接线 /
+G5b `sessions.archive` 待接」，**唯一剩余前端缺口为 `sessions.archive`**。阶段状态记为
+`SESSIONS_UPDATE_CLIENT_READY`（P05 仍 IN_PROGRESS），REAL_FLOW_VERIFIED 仍为否。详见 §3-G5a。
 
-**返修（2026-09-14，代码检查点 `4a057609`）**：`workspaces.browse` 选择/保存的**迟到响应**收口——向导在
+**增量（2026-09-14，代码检查点 `4a057609`）**：`workspaces.browse` 选择/保存的**迟到响应**收口——向导在
 Back/关闭/重新打开时使当前 save turn 失效，迟到答案不再 `selectWorkspaceView`/释放连接/关闭对话框（不会误关
 重新打开的新向导）；浏览组件在保存进行中锁定 Back/Up/路径输入/Go/隐藏项/目录导航，并在卸载后丢弃 choose 的
-成功、失败与 throw（无未处理 rejection）。矩阵仍为 **26 reachable / 2 gap**（workspaces.browse 仍
+成功、失败与 throw（无未处理 rejection）。矩阵当时为 **26 reachable / 2 gap**（workspaces.browse 仍
 `PRODUCTION_REACHABLE`（EXT）），剩余 sessions.update、sessions.archive；`WORKSPACES_BROWSE_CLIENT_READY`
-以本次返修后的提交为最终依据。
+以该次返修后的提交为最终依据。
 
 **增量（2026-09-14，代码检查点 `a8142125`）**：`workspaces.browse` 已接入 WSL「Open remote folder」流程——
 宿主只负责 discover/connect/验证 {distribution,user,home} 与保存 shell 记录，**目录枚举改由服务**
@@ -44,6 +47,10 @@ pending 优先级最高，先用原 requestId 查询（`sendOutcome.query`），
 `config.resolve` 只在「当前 scope 没有旧 pending、准备建立新发送意图」时执行。**这不是跳过新发送的配置
 校验**：scope 清空后仍严格 resolve→send，rejected/typed error 仍不发送。汇总 23 reachable / 5 gap 不变，
 lifecycle 外部缺口不变。详见 §3-G4 与 evidence/P05.md。
+
+**增量（2026-09-14，代码检查点 `940c9df4`）**：`config.resolve` 已按 G4 的目标文件与不变量完成生产接线
+（application 用例 + 发送前强制校验 + renderer 预览 latest-wins + hello 能力门），矩阵中该行改为
+`PRODUCTION_REACHABLE`（EXT），汇总当时为 23 reachable / 5 gap；G4 改写为「已接线」记录，其余缺口不变。
 
 权威方法集合：`apps/desktop/src/types/wire/wire-v1.ts` 的 `WireMethods`（28 项）。
 摘要核对：TS 权威 `11e3b3e70d332585d31900c09ba063d95aa6b72b1904921c665fb72f81c10035`、
@@ -98,9 +105,9 @@ lifecycle 外部缺口不变。详见 §3-G4 与 evidence/P05.md。
 | `providerModels.archive` | ✓ schema+client | 端口 `:82` | 同上 | 同上 | `PRODUCTION_REACHABLE`（EXT） | `CONFLICT_REFERENCE` 不删除/替换 Profile 引用 |
 | `config.describe` | ✓ schema+client | `describeDraftConfig` `application/profile/wire-composer-profile.ts:85`；`loadProfileRuntimeDescriptor` `profile-maintenance-port.ts:109` | Composer 临时配置弹层（`useComposerProfile`）、Profiles 页配置区 | `wire-composer-profile.test.ts`、`features/profiles/index.test.tsx`、`profile-config-editor.test.tsx` | `PRODUCTION_REACHABLE`（EXT） | 描述控件/当前值/securityLockedIds/effectTiming；迟到描述按 scope 的 `profileId` 校验后丢弃。与 `config.resolve` 职责未互相代替：客户端不自行计算生效值 |
 | `config.resolve` | ✓ schema+client | `resolveComposerConfig` `application/profile/wire-composer-profile.ts:183`（exact `{profileId, workspaceId, overrides}`，只读、无 requestId）；提交侧 `submitAgentBoxComposer` `application/session/agentbox-composer.ts:116` 在构造 send intent 前强制调用 | Composer 提交路径（`agentbox-main-chat.ts:onSubmit`→`submitAgentBoxComposer`）+ 临时配置弹层预览（`useComposerProfile`→`ComposerProfileControls`） | `application/profile/wire-composer-profile.test.ts`、`application/session/agentbox-composer.test.ts`、`features/chat/composer/hooks/use-composer-profile.test.tsx`、`features/chat/composer/profile-controls.test.tsx`、`app/composition/wiring/agentbox-main-chat.test.tsx` | `PRODUCTION_REACHABLE`（EXT） | core §5/§8：生效值由服务按「接入默认→Profile 默认→临时覆盖→安全限制」计算，客户端不推算。发送前 resolved 才发（rejected→`invalidControls`+`CONFIG_REJECTED`，零 send；typed/transport 失败零 send）；**顺序**：scope 有旧 pending 时先以原 requestId 查询并只返回该结果，`config.resolve` 与新发送都不执行；scope 清空后才 resolve→send。预览按 scope/overrides latest-wins，hello 未声明即不发请求；运行实际版本仍只在服务接受发送时按回执 `configVersion` 固定。见 §3-G4 |
-| `sessions.list` | ✓ schema+client | `refreshAgentBoxSessions` `application/session/wire-session-catalog.ts:19` | `ensureAgentBoxDesktopCatalog`←主聊天挂载 | `wire-session-catalog.test.ts`、`app/composition/wiring/agentbox-main-chat.test.tsx` | `PRODUCTION_REACHABLE`（EXT） | 服务分页合并进 `$agentBoxSessions`，部分页不擦除已学记录。**边界**：该投影当前只驱动主聊天面/Composer 选角；侧栏会话列表仍是 legacy Hermes（见 §5） |
-| `sessions.update` | ✓ schema+client | `updateAgentBoxSession` `wire-session-catalog.ts:39`（requestId+expectedVersion，采纳服务返回） | **无** | `wire-session-catalog.test.ts` | `FIXTURE_ONLY_FRONTEND_GAP` | 批准行为的触发点（侧栏改名/置顶）仍走 legacy session API（`store/session-pin-sync`、`api/sessions`）。需要前端把统一侧栏行为接到该方法并采纳服务版本。见 §3-G5 |
-| `sessions.archive` | ✓ schema+client | `archiveAgentBoxSession` `wire-session-catalog.ts:64` | **无** | `wire-session-catalog.test.ts` | `FIXTURE_ONLY_FRONTEND_GAP` | 同 G5：侧栏归档入口（`store/sidebar-archive`→`application/session-lists`）走 legacy Hermes 数据面；服务侧归档语义（不删历史）已编码但无产品调用者 |
+| `sessions.list` | ✓ schema+client | `refreshAgentBoxSessions` `application/session/wire-session-catalog.ts:20` | `ensureAgentBoxDesktopCatalog`←主聊天挂载；统一侧栏工作区展开后的服务 Session 投影读同一缓存 | `wire-session-catalog.test.ts`、`app/composition/wiring/agentbox-main-chat.test.tsx`、`features/chat/sidebar/unified-workspace-list.test.tsx` | `PRODUCTION_REACHABLE`（EXT） | 服务分页按 version 单调合并进 `$agentBoxSessions`（迟到旧页不覆盖新记录），部分页不擦除已学记录。侧栏在服务 Workspace 匹配后显示该投影（见 §3-G5a） |
+| `sessions.update` | ✓ schema+client | `updateAgentBoxSession` `wire-session-catalog.ts:40`（requestId+expectedVersion，采纳服务返回）；当前会话命令经 `toggleAgentBoxSessionPin` 走同一 seam | 侧栏 `AgentBoxSessionList`（改名对话框 + 行菜单置顶/取消置顶，`features/chat/sidebar/agentbox-sessions/agentbox-session-list.tsx`）+ 当前会话置顶命令（`app/composition/wiring/agentbox-session-commands.ts` ← `features.tsx` 快捷键/标题栏/命令入口） | `wire-session-catalog.test.ts`、`agentbox-session-list.test.tsx`、`agentbox-session-row.test.tsx`、`agentbox-session-commands.test.ts`、`unified-workspace-list.test.tsx` | `PRODUCTION_REACHABLE`（EXT） | 打开改名时捕获当时的 `id/version/displayName`，保存发送 exact CAS；每次意图新 requestId；不乐观改名/置顶，只采纳服务返回记录；`CONFLICT_VERSION` 保留草稿、对话框与服务投影，不自动重试；pending 锁定同 Session 维护动作且连点单发；能力未声明时行仍可看可打开但零 wire 调用。见 §3-G5a |
+| `sessions.archive` | ✓ schema+client | `archiveAgentBoxSession` `wire-session-catalog.ts:65` | **无** | `wire-session-catalog.test.ts` | `FIXTURE_ONLY_FRONTEND_GAP` | 同 G5b：侧栏归档入口（`store/sidebar-archive`→`application/session-lists`）走 legacy Hermes 数据面；服务侧归档语义（不删历史）已编码但无产品调用者 |
 | `sessions.switchProfile` | ✓ schema+client | `selectComposerProfile` `application/profile/wire-composer-profile.ts:114` | Composer 角色选择器（`useComposerProfile`←`AgentBoxChatView`） | `wire-composer-profile.test.ts`、`features/chat/composer/profile-controls.test.tsx` | `PRODUCTION_REACHABLE`（EXT） | `expectedVersion=当前 session.version`、requestId；`confirmed/rejected` 都采纳服务返回 Session（rejected 保留旧实际值），迟到确认不覆盖更新意图 |
 | `sessions.createAndSend` | ✓ schema+client | `sendAgentBoxMessage` `application/session/wire-send.ts:60`（经 `submitAgentBoxComposer` `agentbox-composer.ts`） | Composer 提交 `agentbox-main-chat.ts:201`→`ChatBar.onSubmit` | `wire-send.test.ts`、`agentbox-composer.test.ts`、`types/wire/fixtures/core-v1.test.ts` | `PRODUCTION_REACHABLE`（EXT） | requestId 贯穿；`rejected_before_accept` 不造空 Session、草稿保留；transport 未知时用**同一** requestId 查询而非重发 |
 | `sessions.send` | ✓ schema+client | 同上 `:103` | 同上（既有 Session 续发） | 同上 + `api/wire-v1-client.test.ts` | `PRODUCTION_REACHABLE`（EXT） | 稳定 Session 关联；`queueItemId` 来自服务回执；未 stage 附件在传输前拒绝 |
@@ -115,30 +122,29 @@ lifecycle 外部缺口不变。详见 §3-G4 与 evidence/P05.md。
 
 | 状态 | 数量 | 方法 |
 | --- | --- | --- |
-| `PRODUCTION_REACHABLE` | **26** | server.hello、workspaces.open、workspaces.list、workspaces.browse、workspaces.archive、profiles.list/create/update/archive/updateConfig、providerModels.list/create/update/archive、config.describe、config.resolve、sessions.list、sessions.switchProfile、sessions.createAndSend、sessions.send、sendOutcome.query、queue.get、queue.withdraw、runs.stop、approvals.decide、history.snapshot |
+| `PRODUCTION_REACHABLE` | **27** | server.hello、workspaces.open、workspaces.list、workspaces.browse、workspaces.archive、profiles.list/create/update/archive/updateConfig、providerModels.list/create/update/archive、config.describe、config.resolve、sessions.list、sessions.update、sessions.switchProfile、sessions.createAndSend、sessions.send、sendOutcome.query、queue.get、queue.withdraw、runs.stop、approvals.decide、history.snapshot |
 | `CLIENT_READY_NO_SURFACE` | 0 | — |
-| `FIXTURE_ONLY_FRONTEND_GAP` | **2** | sessions.update、sessions.archive |
-| `EXTERNAL_LIFECYCLE_BLOCKED` | **26 行同一外部缺口**（不等于前端缺口，见 §4） | 上表 26 个 `PRODUCTION_REACHABLE` 行的运行终态 |
+| `FIXTURE_ONLY_FRONTEND_GAP` | **1** | sessions.archive |
+| `EXTERNAL_LIFECYCLE_BLOCKED` | **27 行同一外部缺口**（不等于前端缺口，见 §4） | 上表 27 个 `PRODUCTION_REACHABLE` 行的运行终态 |
 | `NOT_APPLICABLE` | 0 | — |
 | 合计 | 28 | 与 `WireMethods` 逐项一致（§6 核验） |
 
 ## 2. 非 `PRODUCTION_REACHABLE` 逐项原因
 
-此前列于此表的 `workspaces.open`、`workspaces.browse`、`workspaces.archive`、`config.resolve`
-已分别接线为 `PRODUCTION_REACHABLE`（EXT），接线过程见文件前言各增量与 §3-G1–G4，不再是缺口。
-当前非 `PRODUCTION_REACHABLE` 的方法仅剩下表两行：
+此前列于此表的 `workspaces.open`、`workspaces.browse`、`workspaces.archive`、`config.resolve`、
+`sessions.update` 已分别接线为 `PRODUCTION_REACHABLE`（EXT），接线过程见文件前言各增量与 §3-G1–G5a，
+不再是缺口。当前非 `PRODUCTION_REACHABLE` 的方法只剩下一行：
 
 | 方法 | 为什么不是 PRODUCTION_REACHABLE |
 | --- | --- |
-| `sessions.update` | application 入口存在且已测（requestId+expectedVersion+服务投影采纳），但**无生产调用者**：侧栏改名/置顶仍走 legacy Hermes 会话 API。 |
-| `sessions.archive` | 同上；侧栏归档入口（`store/sidebar-archive`/`application/session-lists`）走 legacy 数据面。 |
+| `sessions.archive` | application 入口存在且已测（requestId+expectedVersion+服务投影采纳），但**无生产调用者**：侧栏归档入口（`store/sidebar-archive`/`application/session-lists`）走 legacy 数据面。归 G5b，下一机械实现批次。 |
 
 ## 3. 确证的前端缺口（目标文件 / 接口 / 不变量 / 建议验收）
 
-以下为审计时确认的缺口清单。G1–G4 已在后续代码检查点分别落地并改写为接线记录（G4 `config.resolve`
+以下为审计时确认的缺口清单。G1–G4 与 G5a 已在后续代码检查点分别落地并改写为接线记录（G4 `config.resolve`
 `940c9df4`、G1 `workspaces.open` `3e207376`、G2 `workspaces.browse` `a8142125`、G3
-`workspaces.archive` `f6b457b5`；各条目保留原目标文件与不变量以便对照）；当前仅剩 G5
-sessions.update/archive 未接线，仍是本端可独立补齐的机械实现批次。
+`workspaces.archive` `f6b457b5`、G5a `sessions.update` `8cdd1381`；各条目保留原目标文件与不变量以便对照）；
+当前仅剩 G5b `sessions.archive` 未接线，仍是本端可独立补齐的机械实现批次。
 
 **G1 `workspaces.open` — 已接线（代码检查点 `3e207376`）**
 
@@ -276,15 +282,55 @@ sessions.update/archive 未接线，仍是本端可独立补齐的机械实现�
   联调验证；本端只保证请求语义、顺序、失败面与迟到保护。运行实际版本仍由接受回执的 `configVersion`
   固定，预览不冒充最终配置。
 
-**G5 `sessions.update/archive` 未接（统一侧栏会话行为）**
-- 目标文件：`src/features/chat/sidebar/`（改名/置顶/归档入口）与其数据源
-  `src/application/session-lists.ts`；改用 `application/session/wire-session-catalog.ts`。
-- 接口：`sessions.update({sessionId, displayName?/pinned?/workspaceId?, expectedVersion, requestId})`、
-  `sessions.archive({sessionId, expectedVersion, requestId})`。
-- 不变量：改名/置顶/归档跨客户端一致且由服务版本 CAS；归档不删历史；`CONFLICT_VERSION` 保留服务
-  投影与用户输入，不静默后写覆盖。
-- 建议验收：两个入口（侧栏与命令面板）产生同一服务调用；版本冲突后界面保留服务值；归档后侧栏
-  由服务投影移除而历史仍可恢复。
+**G5a `sessions.update` — 已接线（代码检查点 `8cdd1381`）**
+
+原缺口（只登记未修）已按目标文件与不变量实现，G5 由此拆为 G5a（已接）与 G5b（待接）：
+
+- 目标文件（实际改动/新增）：`application/session/agentbox-session-projection.ts`（纯投影）、
+  `store/agentbox-service.ts`（`adoptAgentBoxSession` 版本单调采纳）、
+  `features/chat/sidebar/agentbox-sessions/agentbox-session-list.tsx`（服务列表、改名状态、更新协调）、
+  `features/chat/sidebar/agentbox-sessions/agentbox-session-row.tsx`（只呈现 SessionRecord）、
+  `features/chat/sidebar/workspace-list/{workspace-list,workspace-row,workspace-content}.tsx`（服务
+  Workspace 匹配后的展开内容接管）、`app/composition/wiring/agentbox-session-commands.ts`（当前路由置顶
+  决策 + 共享 CAS seam）、`app/composition/wiring/features.tsx`（调用该 seam）、i18n 六语言新键。
+- 接口（实现）：`updateAgentBoxSession(client, {sessionId, expectedVersion, displayName?/pinned?}, {createRequestId?})`
+  → `sessions.update` → 只采纳服务返回 `SessionRecord`；侧栏行与当前会话命令都经
+  `toggleAgentBoxSessionPin` 这一条 seam，payload 形状不漂移。
+- 投影不变量（已由测试钉住）：只返回 exact `workspaceId` 且 `archivedAt===null` 的记录，pinned 在前、
+  组内 `updatedAt` 降序、`id` 稳定 tie-break；不读取 cwd/profile 名/tokens/cost/message count/PR/lineage
+  等 Hermes 字段，也不把 `SessionRecord` cast/填充成 `SessionInfo`。
+- 缓存不变量（已由测试钉住）：同 id 只采纳 version ≥ 当前的服务记录（v7 之后到达的 v6 不覆盖），
+  部分页不擦除其他 id；本阶段未改变 archived 记录在底层 cache 的保留策略（由投影过滤）。
+- 侧栏不变量（已由测试钉住）：本地与 WSL 都用**完整 `{kind,user,host}` + normalized path** 匹配服务
+  Workspace；匹配后其展开内容由服务投影接管——catalog 未 ready 显示诚实 loading、ready 且空显示中立
+  empty、有记录显示服务行，**绝不回落 legacy SessionInfo 预览**；WSL 不再对已匹配 Workspace 显示
+  “sessions unavailable”；未匹配的 shell 行行为不变；打开一条记录 = `selectWorkspaceView(shellId)` →
+  `navigate(sessionRoute(id))`，零 `workspaces.open`/send/harness/legacy 调用。
+- 改名/置顶不变量（已由测试钉住）：打开改名时捕获当时的 `id/version/displayName`，保存发送
+  `{sessionId, expectedVersion, displayName}`（trim 后），每次意图新 requestId；不乐观改名、不写
+  `$pinnedSessionIds`；服务规范化名称立即回显；`CONFLICT_VERSION`/typed failure 保留对话框、草稿与
+  服务投影并显示错误，不自动重试、不换版本静默覆盖；pending 时输入/保存/取消与同 Session 维护动作
+  锁定，连点只发一次；`sessions.update` 未声明时行仍可看可打开但无可执行入口、零 wire 调用。
+- 当前会话命令不变量（已由测试钉住）：Session route 以 route id 为权威，命中 `$agentBoxSessions` 时走
+  同一 `sessions.update` CAS；记录未到达/服务未 ready/能力未声明一律 fail closed（不回落同 id 的 legacy
+  Session、不产生 wire 调用）；非 Session route 的既有 legacy 行为逐字保留。
+- 验收（已执行）：`npx vitest run --project ui` 定向门 8 files / **76 tests passed**（exit 0，含
+  `agentbox-session-projection`、`wire-session-catalog`、`agentbox-service`、
+  `agentbox-session-list`、`agentbox-session-row`、`unified-workspace-list`、`workspace-row`、
+  `agentbox-session-commands`）；相关回归 5 files / 70 tests passed；`npm run typecheck` 三项目通过；
+  实际改动文件 ESLint 0 error / 0 warning；`git diff --check` 干净。
+- 仍属外部缺口（不变）：真实改名/置顶结果、跨客户端一致性只能在 Server lifecycle connection 之后
+  联调验证；本端只保证请求语义、CAS 形状、失败面与投影归属。
+
+**G5b `sessions.archive` 未接（统一侧栏会话归档）**
+- 目标文件：`src/features/chat/sidebar/`（归档入口）与其数据源 `src/application/session-lists.ts`；
+  改用 `application/session/wire-session-catalog.ts` 的 `archiveAgentBoxSession`，并串行扩展 G5a 已建的
+  `agentbox-sessions/` 行与投影（同一行、同一投影，不另起数据面）。
+- 接口：`sessions.archive({sessionId, expectedVersion, requestId})`。
+- 不变量：归档跨客户端一致且由服务版本 CAS；归档不删历史；`CONFLICT_VERSION` 保留服务投影与用户输入，
+  不静默后写覆盖；`archivedAt` 记录经投影过滤从侧栏消失而历史仍可恢复。
+- 建议验收：侧栏归档入口产生 exact `{sessionId, expectedVersion, requestId}`；冲突后界面保留服务值；
+  归档后由服务投影移除且不触碰本地隐藏/宿主记录/Session 历史。
 
 **次级观察（非产品阻断，建议下一机械实现一并处理）**
 - 现状：hello 能力门只覆盖 profiles 维护 4 方法、providerModels 维护 4 方法、`profiles.list`、
@@ -299,7 +345,7 @@ sessions.update/archive 未接线，仍是本端可独立补齐的机械实现�
 
 ## 4. `EXTERNAL_LIFECYCLE_BLOCKED` 的精确边界（单一外部缺口）
 
-上表 26 个 `PRODUCTION_REACHABLE` 方法的前端路径（UI/application → client → preload IPC →
+上表 27 个 `PRODUCTION_REACHABLE` 方法的前端路径（UI/application → client → preload IPC →
 main-only transport）**已完整**，其中断点只有一处：**main 进程的 AgentBox connection slot 目前为
 null**。因此这些方法的运行终态都属于同一个 `EXTERNAL_LIFECYCLE_BLOCKED`，不是各自的缺口。
 
@@ -313,7 +359,7 @@ null**。因此这些方法的运行终态都属于同一个 `EXTERNAL_LIFECYCLE
 - `electron/workcore/slot.ts`：生产未安装任何 lifecycle（只有测试安装）。
 - 事件流同样终止于此：`agentbox-wire-event-transport.ts` 连接为 null 时诚实 unavailable。
 
-一旦 lifecycle 在 readiness 后安装 `{endpoint, sessionToken}`，这 26 个方法与事件流即可在**不改
+一旦 lifecycle 在 readiness 后安装 `{endpoint, sessionToken}`，这 27 个方法与事件流即可在**不改
 客户端**的前提下进入真实联调；在此之前 REAL_FLOW 未验证，也不得声称。
 
 ## 5. 遗留 Hermes 可达性结论
@@ -327,7 +373,7 @@ null**。因此这些方法的运行终态都属于同一个 `EXTERNAL_LIFECYCLE
 | Composer | `ChatBar` 以 `runtimeAuthority="agentbox"`、`gateway={null}`、`model.hidden=true` 挂载（`features/chat/agentbox-chat-view.tsx:133-197`） | 同文件 + `features/profiles` 模型控件中立化证据 |
 | Profiles / Models | `ProfilesView`（四方法 hello 门）、`AgentBoxModelSettings`（四方法 hello 门） | `features/profiles/index.tsx:86`、`features/settings/agentbox-model-settings.tsx:46` |
 | 冷启动 | renderer 与 Electron 两道 legacy 自动启动门均已关闭（P04 切片 4/5） | `evidence/P04.md` + `electron/app/product-runtime-policy.ts` |
-| 侧栏会话列表 | **仍为 legacy Hermes 数据面**：`ChatSidebar` 由产品外壳挂载（`surfaces.tsx:48`），其会话节点走 `application/session-lists.ts` → `api/sessions.ts` → `api/client.ts`（`window.hermesDesktop.api`），并以 `$gatewayState==='open'` 为条件（`chat-sidebar.tsx:540`） | 非测试导入链 + `api/client.ts:82-103` |
+| 侧栏会话列表 | **部分迁移（`8cdd1381`）**：统一工作区列表里**已匹配服务 Workspace 的展开内容**改由 AgentBox 服务投影接管（`agentbox-sessions/` + `workspace-list`，零 legacy 调用）；**未匹配的 shell 行、扁平/进入视图与遗留会话树**仍是 legacy Hermes 数据面——`ChatSidebar` 由产品外壳挂载（`surfaces.tsx:48`），其会话节点走 `application/session-lists.ts` → `api/sessions.ts` → `api/client.ts`（`window.hermesDesktop.api`），并以 `$gatewayState==='open'` 为条件（`chat-sidebar.tsx:540`） | 非测试导入链 + `api/client.ts:82-103` + 本检查点验收门 |
 | 工作区根列表 | 已是中立的 36R 行：本地行来自本机项目存储、WSL 行来自宿主能力；选择经中立 store 驱动 AgentBox 侧解析 | `features/chat/sidebar/workspace-list/workspace-list.tsx`、`agentbox-main-chat.ts` |
 | 旧 Profile 对话框 | `create/delete/rename-profile-dialog` 只被 `features/chat/sidebar/profile-switcher.tsx` 引用，而该组件**无任何挂载点** → 不可达（保留文件与其测试） | 非测试导入链 |
 | 旧模型浮层 | `ModelPickerOverlay`/`ModelVisibilityOverlay` 在 `features.tsx` 全应用挂载，但其开合来自 legacy 模型控件 store（`$modelPickerOpen`、`use-model-controls`），AgentBox 聊天面既隐藏模型 pill 也不驱动它们 → 挂载但无 AgentBox 触发点 | `features/profiles/model-picker-overlay.tsx:55`、`agentbox-chat-view.tsx:135` |
@@ -410,6 +456,8 @@ dynamic connection slot            electron/composition/agentbox-service-composi
 | workspaces.archive 接线定向门（`f6b457b5`，4 files / 45 tests） | 通过（exit 0） |
 | workspaces.browse 接线定向门（`a8142125`，4 files / 31 tests） | 通过（exit 0） |
 | workspaces.browse 迟到保存返修门（`4a057609`，4 files / 40 tests） | 通过（exit 0） |
+| sessions.update 接线定向门（`8cdd1381`，8 files / 76 tests） | 通过（exit 0） |
+| sessions.update 相关回归门（`8cdd1381`，5 files / 70 tests） | 通过（exit 0） |
 | `git status --short` | 只含本阶段写集（见 §9） |
 
 矩阵完整性核验（一次性只读命令，不新增仓库脚本）：从 `WireMethods` 导出键、从本文件表格抽取
@@ -418,14 +466,16 @@ dynamic connection slot            electron/composition/agentbox-service-composi
 ## 9. 写集与未决
 
 审计阶段写集：本文件（新增）、`evidence/P05.md`、`docs/desktop-product-delivery/status.md`；
-后续 `config.resolve` 接线检查点 `940c9df4` 的写集见其提交与 evidence/P05.md。
+后续接线检查点（`940c9df4`、`3e207376`、`f6b457b5`、`a8142125`、`4a057609`、`8cdd1381`）的写集见各提交
+与 evidence/P05.md。`8cdd1381` 只改 `sessions.update` 相关写集（见 §3-G5a 目标文件），未触碰
+`sessions.archive`、legacy 侧栏数据面、wire schema 或后端。
 未修改 `types/wire/**` 合同、`types/wire/**`、contracts 文档、preload、Electron main、
 package/lock、后端与 Windows 构建树；未重跑完整测试、未跑 Windows、未安装依赖、未读后端密钥、
 未执行模型调用。
 
 未决（不因本审计消失）：
-- 真实 Server lifecycle connection（§4）→ 阻断 26 个方法与事件流的 REAL_FLOW 验证。
-- 2 个 `FIXTURE_ONLY_FRONTEND_GAP`（§3）→ 本端可独立补齐的下一机械实现批次。
+- 真实 Server lifecycle connection（§4）→ 阻断 27 个方法与事件流的 REAL_FLOW 验证。
+- 1 个 `FIXTURE_ONLY_FRONTEND_GAP`（`sessions.archive`，§3-G5b）→ 本端可独立补齐的下一机械实现批次。
 - 侧栏会话列表的 legacy 数据面（§5）→ P03/P04 迁移账本中最重的剩余消费者。
 - `wire-v1` 未纳入范围的增量（steer 语义、Worker 通道合同、快照分页参数）仍为外围合同。
 
