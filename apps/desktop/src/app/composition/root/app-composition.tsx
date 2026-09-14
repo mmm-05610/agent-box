@@ -5,6 +5,7 @@ import { atom, computed } from 'nanostores'
 import type { CSSProperties, ReactElement, PointerEvent as ReactPointerEvent } from 'react'
 
 import { hudWindowPort } from '@/app/composition/bridges/window-ports'
+import { DESKTOP_PRODUCT_RUNTIME } from '@/app/composition/product-runtime'
 import { AppContextMenu } from '@/app/composition/registrations/context-menu'
 import { ContribWiring, WiredPane } from '@/app/composition/wiring/features'
 import { $workspaceIsPage } from '@/app/routes'
@@ -293,7 +294,7 @@ registry.registerMany([
       id: 'plugins.reload',
       label: 'Reload desktop plugins',
       keywords: ['plugins', 'reload', 'refresh', 'desktop'],
-      run: () => void discoverRuntimePlugins()
+      run: () => void discoverRuntimePlugins(DESKTOP_PRODUCT_RUNTIME)
     } satisfies PaletteContribution
   },
   // The core `::preview{file="…"}` transcript directive — the model (or a
@@ -449,8 +450,9 @@ declareDefaultTree(DEFAULT_TREE)
 
 // Bundled plugins load AFTER core, so a same-id contribution from a plugin
 // deliberately overrides the core default (last writer wins). Third-party
-// runtime plugins will flow through the same discovery seam.
-discoverBundledPlugins()
+// runtime plugins will flow through the same discovery seam. The product
+// authority is stated explicitly here; discovery never infers it.
+discoverBundledPlugins(DESKTOP_PRODUCT_RUNTIME)
 
 // Plugin panes join the tree by their `placement` hint the moment they
 // register — incl. runtime plugins arriving seconds after boot.

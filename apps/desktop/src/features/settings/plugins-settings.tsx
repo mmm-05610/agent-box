@@ -2,6 +2,7 @@ import { useStore } from '@nanostores/react'
 import { type ReactNode, useEffect } from 'react'
 import { Link } from 'react-router'
 
+import { DESKTOP_PRODUCT_RUNTIME } from '@/app/composition/product-runtime'
 import { useGatewayRequest } from '@/components/hooks/use-gateway-request'
 import { EmptyState, Pill, SettingsContent, SettingsSection } from '@/components/settings/primitives'
 import { Button } from '@/components/ui/button'
@@ -246,7 +247,7 @@ export function PluginsSettings() {
           <Button
             onClick={() => {
               triggerHaptic('selection')
-              void discoverRuntimePlugins()
+              void discoverRuntimePlugins(DESKTOP_PRODUCT_RUNTIME)
             }}
             size="sm"
             type="button"

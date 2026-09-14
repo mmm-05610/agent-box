@@ -21,7 +21,7 @@ import { createRoot } from 'react-dom/client'
 import { HashRouter } from 'react-router'
 
 import App from './app'
-import { hermesLocalePreference } from './application/hermes-locale-preference'
+import { desktopLocalePreference } from './application/desktop-preferences/locale-preference'
 import { startActiveProfileRouting } from './application/profile/active-route-effects'
 import { ThemeProvider } from './application/theme'
 import { RootErrorBoundary } from './components/error-boundary'
@@ -76,8 +76,11 @@ if (winParam === 'overlay') {
         <QueryClientProvider client={queryClient}>
           {/* Language persistence is bound HERE, not inside i18n: the provider
               knows only the `LocalePreferencePort` shape, and this is the one
-              place that gets to decide the choice lives in the Hermes config. */}
-          <I18nProvider localePreference={hermesLocalePreference}>
+              place that gets to decide where the choice lives. The AgentBox
+              product keeps it on this machine (Desktop-local storage) — the
+              Hermes-config binding (`hermesLocalePreference`) stays available
+              for an explicit Hermes authority. */}
+          <I18nProvider localePreference={desktopLocalePreference}>
             <ThemeProvider>
               <HapticsProvider>
                 {/* ONE tooltip provider for the whole app. Every `Tip` used to

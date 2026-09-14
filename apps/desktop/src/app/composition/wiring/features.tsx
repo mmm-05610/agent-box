@@ -37,6 +37,8 @@ import {
 } from '@/app/routes'
 import { TitlebarControls } from '@/app/shell/chrome/titlebar/controls'
 import { useWindowControlsOverlayWidth } from '@/app/shell/platform/use-window-controls-overlay-width'
+import { $resumeLastSession, hydrateResumeLastSession } from '@/application/desktop-preferences/resume-last-session'
+import { hydrateTerminalFontFamilyPreference } from '@/application/desktop-preferences/terminal-font-preference'
 import { refreshActiveProfile } from '@/application/profile/catalog'
 import { getLatestSessionMessages } from '@/application/session-transcripts'
 import { openSession } from '@/application/session/open-session'
@@ -144,7 +146,7 @@ import {
 import { clearSessionTodos, setSessionTodos, todosForHydration } from '@/store/todos'
 import { isAuxiliaryWindow, isBrowserWindow, isHudWindow } from '@/store/windows'
 
-import { applyProductRuntimePolicy, resolveProductResumeLastSession } from '../product-runtime'
+import { applyProductRuntimePolicy } from '../product-runtime'
 
 import type { WiringActions, WiringApi } from './types'
 
@@ -156,6 +158,14 @@ import type { WiringActions, WiringApi } from './types'
 // product-runtime.ts (never `GET /api/config`), and the MCP legacy health
 // checker is not started under the agentbox authority (desktop-integrations).
 applyProductRuntimePolicy()
+
+// The product's Desktop-local preferences are read once here — at the
+// composition root, before any surface can mount — so the terminal gets the
+// stored font on its first paint and the cold-start restore latch below reads
+// the same authority the Appearance switch writes. Both reads are synchronous
+// and side-effect-free beyond their atoms.
+hydrateResumeLastSession()
+hydrateTerminalFontFamilyPreference()
 
 // Overlay views the controller mounts over the shell — lazy, load on demand.
 // The workspace-route full-page views (skills/artifacts) are the
@@ -818,12 +828,12 @@ export function ContribWiring({ children }: { children: ReactNode }) {
   // remembered-session restore, and cross-window session-list sync.
   const previewTarget = useStore($previewTarget)
 
-  // Cold-start restore is a product policy (product-runtime.ts), not a setting
-  // read back from the legacy Hermes config record. The decision is definite —
-  // never `undefined` — so the restore resolves at cold start without waiting
-  // for any backend: the AgentBox product restores the last session/draft,
-  // exactly the outcome the failed legacy `GET /api/config` used to produce.
-  const resumeLastSession = resolveProductResumeLastSession()
+  // Cold-start restore is a Desktop-local preference (hydrated from storage at
+  // this module's import), not a setting read back from the legacy Hermes
+  // config record and not a hardcoded constant: the Appearance page writes the
+  // same `$resumeLastSession` atom. The value is definite — never `undefined` —
+  // so the restore resolves at cold start without waiting for any backend.
+  const resumeLastSession = useStore($resumeLastSession)
 
   useDesktopIntegrations({
     activeProfile: normalizeProfileKey(activeGatewayProfile),
@@ -1210,6 +1220,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
       {settingsOpen && (
         <Suspense fallback={null}>
           <SettingsView
+            authority="agentbox"
             gateway={gateway}
             onClose={closeOverlayToPreviousRoute}
             onConfigSaved={() => {

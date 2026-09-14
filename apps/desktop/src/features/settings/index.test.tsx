@@ -7,7 +7,9 @@ import { stubResizeObserver } from '@/dev/test/jsdom'
 import { SettingsView } from './index'
 
 vi.mock('./about-settings', () => ({ AboutSettings: () => <div>about-local</div> }))
-vi.mock('./appearance-settings', () => ({ AppearanceSettings: () => <div>appearance-local</div> }))
+vi.mock('./appearance-settings', () => ({
+  AppearanceSettings: ({ authority }: { authority: string }) => <div>appearance-local:{authority}</div>
+}))
 vi.mock('./keybind-settings', () => ({ KeybindSettings: () => <div>keybinds-local</div> }))
 vi.mock('./notifications-settings', () => ({ NotificationsSettings: () => <div>notifications-local</div> }))
 
@@ -20,7 +22,7 @@ function LocationProbe() {
 function renderSettings(entry = '/settings') {
   return render(
     <MemoryRouter initialEntries={[entry]}>
-      <SettingsView onClose={vi.fn()} />
+      <SettingsView authority="agentbox" onClose={vi.fn()} />
       <LocationProbe />
     </MemoryRouter>
   )
@@ -55,5 +57,23 @@ describe('AgentBox SettingsView', () => {
 
     expect(screen.getByText(/sessions, drafts, Profile memory/i)).toBeTruthy()
     expect(screen.queryByRole('button', { name: /export|import|backup|restore/i })).toBeNull()
+  })
+
+  it('hands the explicit AgentBox authority to the appearance page', () => {
+    renderSettings('/settings?tab=appearance')
+
+    // The authority is a caller input, never inferred from gateway state: the
+    // page must receive exactly what the product composition root stated.
+    expect(screen.getByText('appearance-local:agentbox')).toBeTruthy()
+  })
+
+  it('keeps the neutral local tabs reachable under the AgentBox authority', () => {
+    renderSettings('/settings?tab=notifications')
+    expect(screen.getByText('notifications-local')).toBeTruthy()
+  })
+
+  it('keeps the keybind editor reachable under the AgentBox authority', () => {
+    renderSettings('/settings?tab=keybinds')
+    expect(screen.getByText('keybinds-local')).toBeTruthy()
   })
 })

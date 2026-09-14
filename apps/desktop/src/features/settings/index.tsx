@@ -40,7 +40,7 @@ const SETTINGS_VIEWS: readonly SettingsViewId[] = [
   ...Object.keys(LEGACY_SETTINGS_REDIRECTS)
 ] as SettingsViewId[]
 
-export function SettingsView({ onClose }: SettingsPageProps) {
+export function SettingsView({ authority, onClose }: SettingsPageProps) {
   const { t } = useI18n()
   const [routeView, setRouteView] = useRouteEnumParam('tab', SETTINGS_VIEWS, 'product:models')
   const activeView = resolveSettingsView(routeView)
@@ -142,7 +142,11 @@ export function SettingsView({ onClose }: SettingsPageProps) {
 
   const activeSettingsContent =
     activeView === 'appearance' ? (
-      <AppearanceSettings />
+      // The authority rides through to the page itself: Appearance's resume /
+      // terminal-font controls are Desktop-local under agentbox and
+      // backend-config-backed under hermes, and that choice must not be
+      // re-derived below (see appearance-settings.tsx).
+      <AppearanceSettings authority={authority} />
     ) : activeView === 'about' ? (
       <AboutSettings />
     ) : activeView === 'keybinds' ? (

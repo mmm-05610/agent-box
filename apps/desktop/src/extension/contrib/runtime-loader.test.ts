@@ -59,7 +59,7 @@ describe('scanDiskPlugins (#66899)', () => {
     agentPluginsRoot.mockResolvedValue('/local/.hermes/plugins')
     readDir.mockResolvedValue({ entries: [] })
 
-    await discoverRuntimePlugins()
+    await discoverRuntimePlugins('hermes')
 
     expect(desktopPluginsRoot).toHaveBeenCalled()
     expect(readDir).toHaveBeenCalledWith('/local/.hermes/desktop-plugins')
@@ -73,7 +73,7 @@ describe('scanDiskPlugins (#66899)', () => {
     desktopPluginsRoot.mockResolvedValue('')
     agentPluginsRoot.mockResolvedValue('')
 
-    await discoverRuntimePlugins()
+    await discoverRuntimePlugins('hermes')
 
     expect(readDir).not.toHaveBeenCalled()
   })
@@ -95,7 +95,7 @@ describe('scanDiskPlugins (#66899)', () => {
       return { entries: [] }
     })
 
-    await discoverRuntimePlugins()
+    await discoverRuntimePlugins('hermes')
 
     expect(readDir).toHaveBeenCalledWith('/local/.hermes/plugins/my-feature')
     expect(readDir).not.toHaveBeenCalledWith('/local/.hermes/plugins/my-feature/desktop')
@@ -120,7 +120,7 @@ describe('scanDiskPlugins (#66899)', () => {
       return { entries: [] }
     })
 
-    await discoverRuntimePlugins()
+    await discoverRuntimePlugins('hermes')
 
     expect(readFileText).not.toHaveBeenCalled()
     expect($pluginRecords.get().odd).toBeUndefined()
@@ -131,7 +131,7 @@ describe('scanDiskPlugins (#66899)', () => {
     desktopPluginsRoot.mockResolvedValue('/local/.hermes/desktop-plugins')
     readDir.mockResolvedValue({ entries: [] })
 
-    await discoverRuntimePlugins()
+    await discoverRuntimePlugins('hermes')
 
     expect(readDir).toHaveBeenCalledWith('/local/.hermes/desktop-plugins')
     expect(readDir).toHaveBeenCalledTimes(1)
@@ -201,7 +201,7 @@ describe('scanDiskPlugins (#66899)', () => {
     )
 
     try {
-      await discoverRuntimePlugins()
+      await discoverRuntimePlugins('hermes')
 
       // Inventoried for Settings → Plugins, but the root's opt-in posture wins:
       // ~/.hermes/plugins stays installed-but-inert until the user toggles it.
@@ -217,7 +217,7 @@ describe('scanDiskPlugins (#66899)', () => {
       // remains) unloads the previous Desktop registration instead of leaving
       // a live ghost behind.
       desktopEntryPresent = false
-      await discoverRuntimePlugins()
+      await discoverRuntimePlugins('hermes')
       expect($pluginRecords.get().uni).toBeUndefined()
       expect(stopPreviewFileWatch).toHaveBeenCalledWith('w-uni')
     } finally {
@@ -236,7 +236,7 @@ describe('watchRuntimePlugins dir watch (#66899)', () => {
     readDir.mockResolvedValue({ entries: [] })
     watchDirectory.mockResolvedValue({ id: 'watch-1' })
 
-    watchRuntimePlugins()
+    watchRuntimePlugins('hermes')
     // Drain the async scan + startDirWatches chains.
     await vi.waitFor(() => expect(watchDirectory).toHaveBeenCalledTimes(2))
 
@@ -312,7 +312,7 @@ describe('plugin source reads (512 KiB preview-cap bug)', () => {
     const restore = blobToDataUrl()
 
     try {
-      await discoverRuntimePlugins()
+      await discoverRuntimePlugins('hermes')
 
       // The EVALUATED source came from the full read, not the truncated preview.
       expect(readPluginSource).toHaveBeenCalledWith('/local/.hermes/desktop-plugins/big/plugin.js')
@@ -338,7 +338,7 @@ describe('plugin source reads (512 KiB preview-cap bug)', () => {
     const restore = blobToDataUrl()
 
     try {
-      await discoverRuntimePlugins()
+      await discoverRuntimePlugins('hermes')
 
       // No live plugin — an error inventory row names the folder instead.
       expect($pluginRecords.get().huge).toMatchObject({
@@ -368,7 +368,7 @@ describe('plugin source reads (512 KiB preview-cap bug)', () => {
     const restore = blobToDataUrl()
 
     try {
-      await discoverRuntimePlugins()
+      await discoverRuntimePlugins('hermes')
 
       expect(register).toHaveBeenCalledTimes(1)
       expect($pluginRecords.get().small).toMatchObject({ kind: 'disk', status: 'loaded' })
@@ -408,7 +408,7 @@ describe('bundled-shadowed disk copies', () => {
       const id = await loadRuntimePlugin(
         'export default { id: "hermes-bots", name: "Bot Mode", register() {} }',
         'hermes-bots',
-        { file: '/local/.hermes/desktop-plugins/hermes-bots/plugin.js' }
+        { authority: 'hermes', file: '/local/.hermes/desktop-plugins/hermes-bots/plugin.js' }
       )
 
       // Skipped — the bundled copy stays the only live registration...
@@ -426,6 +426,114 @@ describe('bundled-shadowed disk copies', () => {
       createObjectURL.mockRestore()
       revokeObjectURL.mockRestore()
       vi.stubGlobal('Blob', RealBlob)
+    }
+  })
+})
+
+describe('retired disk copies', () => {
+  /** Blob→data: URL reroute so the loader's `import(blobUrl)` evaluates the
+   *  test source in this realm (same trick as the shadow case above). */
+  async function withBlobReroute<T>(run: () => Promise<T>): Promise<T> {
+    const createObjectURL = vi
+      .spyOn(URL, 'createObjectURL')
+      .mockImplementation(
+        blob =>
+          `data:text/javascript;base64,${Buffer.from((blob as unknown as { parts: string[] }).parts.join('')).toString('base64')}`
+      )
+
+    const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined)
+    const RealBlob = globalThis.Blob
+
+    vi.stubGlobal(
+      'Blob',
+      class {
+        parts: string[]
+        constructor(parts: string[]) {
+          this.parts = parts
+        }
+      }
+    )
+
+    try {
+      return await run()
+    } finally {
+      createObjectURL.mockRestore()
+      revokeObjectURL.mockRestore()
+      vi.stubGlobal('Blob', RealBlob)
+    }
+  }
+
+  it('refuses a retired plugin id under the agentbox authority, with no way to activate it', async () => {
+    // The product never publishes a bundled record for a retired id, so the
+    // shadow rule above has nothing to match — without the retirement check a
+    // standalone copy would register the retired surface through this door.
+    // (Records are module state shared with the shadow test above: clear them
+    // so this really is the product's world, with no bundled twin present.)
+    $pluginRecords.set({})
+
+    const registered = vi.fn()
+
+    const source = `export default { id: "hermes-bots", name: "Bot Mode", register() { globalThis.__retiredDiskRegister?.() } }`
+
+    ;(globalThis as unknown as { __retiredDiskRegister?: () => void }).__retiredDiskRegister = registered
+
+    try {
+      const id = await withBlobReroute(() =>
+        loadRuntimePlugin(source, 'hermes-bots', {
+          authority: 'agentbox',
+          file: '/local/.hermes/desktop-plugins/hermes-bots/plugin.js'
+        })
+      )
+
+      // Never evaluated into the app, never handed an activate handle…
+      expect(id).toBeNull()
+      expect(registered).not.toHaveBeenCalled()
+      expect($pluginRecords.get()['hermes-bots']).toBeUndefined()
+
+      // …and the folder stays visible with its path, so it can be deleted.
+      expect($pluginRecords.get()['hermes-bots:retired']).toMatchObject({
+        file: '/local/.hermes/desktop-plugins/hermes-bots/plugin.js',
+        kind: 'disk',
+        status: 'disabled'
+      })
+
+      await setPluginEnabled('hermes-bots:retired', true)
+      expect(registered).not.toHaveBeenCalled()
+      expect($pluginRecords.get()['hermes-bots:retired'].status).toBe('disabled')
+    } finally {
+      delete (globalThis as unknown as { __retiredDiskRegister?: unknown }).__retiredDiskRegister
+    }
+  })
+
+  it('loads the same disk copy normally when the authority did not retire it', async () => {
+    $pluginRecords.set({})
+
+    const registered = vi.fn()
+
+    ;(globalThis as unknown as { __keptDiskRegister?: () => void }).__keptDiskRegister = registered
+
+    try {
+      const id = await withBlobReroute(() =>
+        loadRuntimePlugin(
+          `export default { id: "kept-plugin", name: "Kept", register() { globalThis.__keptDiskRegister?.() } }`,
+          'kept-plugin',
+          { authority: 'hermes', file: '/local/.hermes/desktop-plugins/kept-plugin/plugin.js' }
+        )
+      )
+
+      // The standalone disk door keeps its default-on trust: only the retired
+      // id is refused, everything else behaves exactly as before.
+      expect(id).toBe('kept-plugin')
+      expect($pluginRecords.get()['kept-plugin']).toMatchObject({ kind: 'disk', status: 'loaded' })
+      expect(registered).toHaveBeenCalledTimes(1)
+
+      await setPluginEnabled('kept-plugin', false)
+      expect($pluginRecords.get()['kept-plugin'].status).toBe('disabled')
+
+      await setPluginEnabled('kept-plugin', true)
+      expect(registered).toHaveBeenCalledTimes(2)
+    } finally {
+      delete (globalThis as unknown as { __keptDiskRegister?: unknown }).__keptDiskRegister
     }
   })
 })

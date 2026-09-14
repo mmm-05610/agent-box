@@ -2,12 +2,13 @@
  * Plugin discovery — both delivery modes:
  *
  *  - BUNDLED: every `src/plugins/<name>/plugin.{js,ts,tsx}` default-exporting
- *    a `HermesPlugin` registers automatically (vite glob — drop a folder in).
- *    `hermes-bots` (Bot Mode) ships in-tree and is ON by default; other
- *    reference/demo plugins live in the companion `hermes-example-plugins`
- *    repo. `.js` entries are SDK-consumer plugins adopted from standalone
- *    repos — they keep the plain-ESM plugin.js form so the file stays
- *    loadable by older desktops' runtime door too.
+ *    a `HermesPlugin` registers automatically (vite glob — drop a folder in)
+ *    UNLESS the product retired its id. `hermes-bots` (Bot Mode) ships in-tree
+ *    and is ON by default under the legacy authority; other reference/demo
+ *    plugins live in the companion `hermes-example-plugins` repo. `.js`
+ *    entries are SDK-consumer plugins adopted from standalone repos — they
+ *    keep the plain-ESM plugin.js form so the file stays loadable by older
+ *    desktops' runtime door too.
  *  - RUNTIME: the on-disk doors (`<hermes home>/desktop-plugins/<name>/plugin.js`
  *    and the unified-package half `<hermes home>/plugins/<name>/desktop/plugin.js`)
  *    — the agent's/user's doors, watched + hot-reloaded by the runtime loader.
@@ -15,6 +16,7 @@
 
 import { pluginActive, publishPlugin } from '@/store/plugin-state'
 
+import { bundledPluginRetired, type ProductAuthority } from './bundled-plugin-policy'
 import { createPluginContext, type HermesPlugin } from './plugin'
 import { watchRuntimePlugins } from './runtime-loader'
 
@@ -26,7 +28,11 @@ const modules = import.meta.glob<{ default: HermesPlugin }>('../../plugins/*/plu
 // HMR.
 let loaded = false
 
-export function discoverBundledPlugins(): void {
+/** Discover the bundled plugins for the product the renderer was composed for.
+ *  `authority` is stated by the composition root (`DESKTOP_PRODUCT_RUNTIME`)
+ *  and consulted ONLY through the pure `bundledPluginRetired` policy — never
+ *  derived from gateway state, caches, plugin decisions or a failed call. */
+export function discoverBundledPlugins(authority: ProductAuthority): void {
   if (loaded) {
     return
   }
@@ -39,6 +45,15 @@ export function discoverBundledPlugins(): void {
     if (!plugin?.id || typeof plugin.register !== 'function') {
       console.warn(`[plugins] ${path} has no valid default HermesPlugin export — skipped`)
 
+      continue
+    }
+
+    // Product retirement, not a user toggle: drop the id BEFORE the record and
+    // its activate/deactivate handles exist, so `setPluginEnabled(id, true)`
+    // has nothing to call and a persisted `enabled: true` never reaches
+    // `pluginActive`. Registering the plugin and hiding its surfaces later
+    // would leave its relay, clocks and sweeps running.
+    if (bundledPluginRetired(plugin.id, authority)) {
       continue
     }
 
@@ -81,5 +96,7 @@ export function discoverBundledPlugins(): void {
 
   // The SELF-MAINTAINING disk door (fs-watched hot reloads, slow folder
   // reconciliation) — the runtime loader pipeline's real, shipping consumer.
-  watchRuntimePlugins()
+  // It gets the same authority: a retired id must not return through a
+  // standalone copy on disk once bundled discovery stopped publishing it.
+  watchRuntimePlugins(authority)
 }

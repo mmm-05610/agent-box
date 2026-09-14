@@ -66,17 +66,23 @@ export interface LegacyPaletteEntry {
 }
 
 export const ACCEPTANCE_STATUSES: readonly AcceptanceStatus[]
+export const BOT_MODE_ENTRY_PATTERNS: readonly RegExp[]
+export const BOT_MODE_PALETTE_PATTERNS: readonly { id: string; pattern: RegExp }[]
+export const BOT_MODE_STORAGE_PREFIX: string
 export const LEGACY_PALETTE_ENTRY_PATTERNS: readonly { id: string; pattern: RegExp }[]
 export const LEGACY_REST_MARKER: string
 export const LEGACY_RUNTIME_DISABLED_FOR_PRODUCT: string
 export const REQUIRED_STEP_IDS: readonly string[]
 export const UNAVAILABLE_COPY_PATTERN: RegExp
 
+export function botModeStorageKeys(keys: unknown): string[]
 export function countMainLegacyRestRefusals(mainLogText: string): number
 export function createStepRecorder(
   steps: AcceptanceStep[],
   onRecord?: (step: AcceptanceStep) => void
 ): (id: string, step: string, status: string, detail?: unknown) => AcceptanceStep
+export function findBotModeEntries(texts: unknown): string[]
+export function findBotModePaletteEntries(optionTexts: readonly string[]): LegacyPaletteEntry[]
 export function findLegacyPaletteEntries(optionTexts: readonly string[]): LegacyPaletteEntry[]
 export function legacyRestGate(input: LegacyRestGateInput): LegacyRestGateVerdict
 export function makeAcceptanceStep(id: string, step: string, status: string, detail?: unknown): AcceptanceStep

@@ -2,13 +2,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { getHermesConfigRecord } from '@/api/config'
 import { isLegacyRestAllowed, LEGACY_REST_DISABLED_FOR_PRODUCT, setLegacyRestAllowed } from '@/api/legacy-rest'
-
 import {
-  applyProductRuntimePolicy,
-  DESKTOP_PRODUCT_RUNTIME,
-  PRODUCT_RESUME_LAST_SESSION,
-  resolveProductResumeLastSession
-} from './product-runtime'
+  RESUME_LAST_SESSION_DEFAULT,
+  setResumeLastSession
+} from '@/application/desktop-preferences/resume-last-session'
+
+import { applyProductRuntimePolicy, DESKTOP_PRODUCT_RUNTIME, resolveProductResumeLastSession } from './product-runtime'
 
 // The main process gates itself on DESKTOP_PRODUCT_RUNTIME. The renderer has to
 // make the same decision on the requests it issues, or the product still asks
@@ -35,6 +34,9 @@ function stubBridge() {
 
 afterEach(() => {
   setLegacyRestAllowed(true)
+  // Desktop preferences are read from real localStorage now; leave none behind
+  // for the next test in this file.
+  window.localStorage.clear()
   vi.restoreAllMocks()
 })
 
@@ -85,11 +87,21 @@ describe('resolveProductResumeLastSession', () => {
     const decision: boolean = resolveProductResumeLastSession()
 
     expect(decision).toBe(true)
-    expect(PRODUCT_RESUME_LAST_SESSION).toBe(true)
+    expect(RESUME_LAST_SESSION_DEFAULT).toBe(true)
   })
 
   it('never resolves undefined, so the restore latch cannot be held open by a fetch', () => {
     expect(resolveProductResumeLastSession()).not.toBeUndefined()
     expect(typeof resolveProductResumeLastSession()).toBe('boolean')
+  })
+
+  it('follows the Desktop-local preference the Appearance switch writes', () => {
+    setResumeLastSession(false)
+
+    expect(resolveProductResumeLastSession()).toBe(false)
+
+    setResumeLastSession(true)
+
+    expect(resolveProductResumeLastSession()).toBe(true)
   })
 })

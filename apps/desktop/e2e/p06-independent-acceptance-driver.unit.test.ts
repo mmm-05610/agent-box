@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest'
 
 import {
   ACCEPTANCE_STATUSES,
+  botModeStorageKeys,
   collectDescendants,
   countMainLegacyRestRefusals,
   createStepRecorder,
+  findBotModeEntries,
+  findBotModePaletteEntries,
   findLegacyPaletteEntries,
   hermesRuntimeProcesses,
   legacyRestGate,
@@ -125,6 +128,54 @@ describe('findLegacyPaletteEntries', () => {
   })
 })
 
+describe('findBotModePaletteEntries', () => {
+  it('flags the retired Bot Mode command rows', () => {
+    expect(findBotModePaletteEntries(['New Bot…', 'Routines', 'Bots', 'Start a group chat']).map(hit => hit.id)).toEqual([
+      'new-bot',
+      'routines',
+      'bots',
+      'group-chat'
+    ])
+  })
+
+  it('leaves ordinary product rows alone', () => {
+    // "both", "robot" and "routine-ish" words must not be read as Bot Mode.
+    expect(findBotModePaletteEntries(['New session', 'Profiles', 'Toggle logs', 'Both panes'])).toEqual([])
+    expect(findBotModePaletteEntries(['Robot studio'])).toEqual([])
+  })
+
+  it('reports the offending text so a failure names what it saw', () => {
+    expect(findBotModePaletteEntries(['   New Bot…  '])[0]?.text).toBe('New Bot…')
+  })
+})
+
+describe('botModeStorageKeys', () => {
+  it('finds the retired plugin\'s own storage namespace', () => {
+    expect(
+      botModeStorageKeys(['hermes.plugin.hermes-bots.bot-meta-v2', 'hermes.plugin.radio.volume', 'theme'])
+    ).toEqual(['hermes.plugin.hermes-bots.bot-meta-v2'])
+  })
+
+  it('is empty for an unrelated or unreadable inventory', () => {
+    expect(botModeStorageKeys([])).toEqual([])
+    expect(botModeStorageKeys(undefined)).toEqual([])
+  })
+})
+
+describe('findBotModeEntries', () => {
+  it('flags tabs, menus and sidebar entries that name the retired surfaces', () => {
+    expect(findBotModeEntries(['Sessions Files Terminal', 'Bots', 'Routines 3', 'Group chat'])).toEqual([
+      'Bots',
+      'Routines 3',
+      'Group chat'
+    ])
+  })
+
+  it('does not flag entries that merely contain the letters', () => {
+    expect(findBotModeEntries(['Sessions Files Terminal Review', '', 'Both'])).toEqual([])
+  })
+})
+
 describe('statesUnavailable', () => {
   it('accepts the honest unavailable statements in the shipped locales', () => {
     expect(statesUnavailable('Models are unavailable until the service is connected.')).toBe(true)
@@ -231,6 +282,12 @@ describe('REQUIRED_STEP_IDS', () => {
         'workspace-entries',
         'settings-opens-closes',
         'profiles-honest',
+        'appearance-page-operable',
+        'appearance-language-persists',
+        'appearance-resume-pref-persists',
+        'appearance-terminal-font-persists',
+        'appearance-no-legacy-rest',
+        'bot-mode-retired',
         'sidebar-operable',
         'legacy-view-routes-retired',
         'exit-no-orphans',

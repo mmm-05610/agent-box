@@ -12,6 +12,7 @@
  */
 
 import { setLegacyRestAllowed } from '@/api/legacy-rest'
+import { readResumeLastSession } from '@/application/desktop-preferences/resume-last-session'
 
 export const DESKTOP_PRODUCT_RUNTIME = 'agentbox' as const
 
@@ -25,20 +26,18 @@ export function applyProductRuntimePolicy(): void {
  *
  * The legacy shell gates this on `display.resume_last_session` read from the
  * Hermes config record (`GET /api/config`). The product serves no legacy REST
- * surface, so the decision is stated here instead of derived from a fetch this
- * shell must never issue — and it states the behaviour that fetch already
- * produced: when the record failed to load, `resumeLastSession` evaluated
- * `true` (the absent setting is not `false`). The approved product behaviour is
- * exactly that: restore the last AgentBox session/draft on cold start.
+ * surface, so the decision belongs to this machine: it is the Desktop-local
+ * preference (`application/desktop-preferences/resume-last-session`), the same
+ * authority the Appearance switch writes and the product composition root
+ * hydrates at import (`$resumeLastSession`).
  *
  * Deliberately typed `boolean`, never `boolean | undefined`: the legacy
  * `undefined` ("hold the restore latch open until the config answers")
  * describes a fetch this composition does not make, so the cold-start decision
- * is definite and the restore resolves without waiting for any backend.
+ * is definite and the restore resolves without waiting for any backend. The
+ * default, when nothing was ever stored, is the approved product behaviour:
+ * restore the last AgentBox session/draft on cold start.
  */
-export const PRODUCT_RESUME_LAST_SESSION: boolean = true
-
-/** The product's definite cold-start restore decision (see above). */
 export function resolveProductResumeLastSession(): boolean {
-  return PRODUCT_RESUME_LAST_SESSION
+  return readResumeLastSession()
 }

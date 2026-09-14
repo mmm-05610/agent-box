@@ -32,9 +32,16 @@ import { installPluginSdk, sdkImportMap } from '@/extension/sdk/runtime'
 import { notifyError } from '@/store/notifications'
 import { $pluginRecords, dropPlugin, pluginActive, type PluginKind, publishPlugin } from '@/store/plugin-state'
 
+import { bundledPluginRetired, type ProductAuthority } from './bundled-plugin-policy'
 import { createPluginContext, type HermesPlugin } from './plugin'
 
 interface LoadOptions {
+  /** Which product this door is loading FOR. Required, and stated by whoever
+   *  opened the door (`watchRuntimePlugins` / `discoverRuntimePlugins`), never
+   *  inferred here: a retired plugin id must be refused on the disk door as
+   *  well as at bundled discovery, or a standalone copy of it would quietly
+   *  reinstate the surface the product retired. */
+  authority: ProductAuthority
   /** Root-level default-enable CAP: `false` ships the plugin opt-in (inventory
    *  row, off until the user toggles) even if the plugin says otherwise. The
    *  unified agent-plugin root sets this so `~/.hermes/plugins` keeps its
@@ -108,7 +115,7 @@ export function unloadRuntimePlugin(id: string): void {
 export async function loadRuntimePlugin(
   source: string,
   origin: string,
-  options: LoadOptions = {}
+  options: LoadOptions
 ): Promise<null | string> {
   installPluginSdk()
 
@@ -156,6 +163,29 @@ export async function loadRuntimePlugin(
         id: `${plugin.id}:disk-shadowed`,
         name: `${plugin.name ?? plugin.id} (stale disk copy)`,
         description: `Shadowed by the bundled "${plugin.id}" plugin — this folder is no longer used and can be deleted.`,
+        kind: options.kind ?? 'disk',
+        file: options.file,
+        status: 'disabled'
+      })
+
+      return null
+    }
+
+    // Retirement is a product decision, not a user preference, and it binds the
+    // disk door too. The shadow rule above only fires while a bundled twin
+    // publishes; once the product stops shipping the plugin there is no twin to
+    // shadow with, and a standalone install written before the plugin moved
+    // in-tree (`desktop-plugins/hermes-bots/plugin.js`) would come back through
+    // this door — the product running the very surface it retired. Same posture
+    // as the shadow case: never evaluated into the app, never activatable (no
+    // handle is published), but visible with its path so the folder can be
+    // deleted instead of silently ignored.
+    if (bundledPluginRetired(plugin.id, options.authority)) {
+      console.info(`[plugins] ${origin} skipped — "${plugin.id}" is retired in this product`)
+      publishPlugin({
+        id: `${plugin.id}:retired`,
+        name: `${plugin.name ?? plugin.id} (retired)`,
+        description: `Retired in this product — this folder is no longer used and can be deleted.`,
         kind: options.kind ?? 'disk',
         file: options.file,
         status: 'disabled'
@@ -328,13 +358,14 @@ async function readPluginSourceText(file: string): Promise<string> {
 /** Returns false when the entry file could not be read (vanished mid-read) so
  *  the caller can reconcile/unload the registration instead of retaining a
  *  live ghost for a missing entry. */
-async function loadDiskPlugin(entry: DiskPlugin): Promise<boolean> {
+async function loadDiskPlugin(entry: DiskPlugin, authority: ProductAuthority): Promise<boolean> {
   const prevId = entry.id
 
   try {
     const text = await readPluginSourceText(entry.file)
 
     const id = await loadRuntimePlugin(text, entry.origin, {
+      authority,
       defaultEnabled: entry.defaultEnabled,
       file: entry.file
     })
@@ -412,7 +443,7 @@ async function resolveDiskPluginEntry(
   return null
 }
 
-async function scanDiskPlugins(): Promise<void> {
+async function scanDiskPlugins(authority: ProductAuthority): Promise<void> {
   const desktop = window.hermesDesktop
 
   // Re-entrancy guard: the 5s poll must not overlap a slow in-flight scan
@@ -470,7 +501,7 @@ async function scanDiskPlugins(): Promise<void> {
 
         disk.set(file, record)
 
-        if (!(await loadDiskPlugin(record))) {
+        if (!(await loadDiskPlugin(record, authority))) {
           disk.delete(file)
 
           continue
@@ -512,11 +543,11 @@ async function scanDiskPlugins(): Promise<void> {
 }
 
 /** Manual rescan (the ⌘K "Reload desktop plugins" fallback). */
-export const discoverRuntimePlugins = scanDiskPlugins
+export const discoverRuntimePlugins = (authority: ProductAuthority) => scanDiskPlugins(authority)
 
 /** Start the self-maintaining disk door: initial scan, per-file hot reload,
  *  fs-watched folder reconciliation (poll fallback on older shells). Idempotent. */
-export function watchRuntimePlugins(): void {
+export function watchRuntimePlugins(authority: ProductAuthority): void {
   const desktop = window.hermesDesktop
 
   if (watching || !desktop) {
@@ -531,16 +562,16 @@ export function watchRuntimePlugins(): void {
   desktop.onPreviewFileChanged(({ id }) => {
     // Directory tick: a plugin folder appeared or vanished — reconcile.
     if (dirWatchIds.has(id)) {
-      void scanDiskPlugins()
+      void scanDiskPlugins(authority)
 
       return
     }
 
     for (const record of disk.values()) {
       if (record.watchId === id) {
-        void loadDiskPlugin(record).then(readable => {
+        void loadDiskPlugin(record, authority).then(readable => {
           if (!readable) {
-            void scanDiskPlugins()
+            void scanDiskPlugins(authority)
           }
         })
 
@@ -581,7 +612,7 @@ export function watchRuntimePlugins(): void {
     return all
   }
 
-  void scanDiskPlugins()
+  void scanDiskPlugins(authority)
   void startDirWatches().then(watched => {
     if (watched) {
       return
@@ -592,7 +623,7 @@ export function watchRuntimePlugins(): void {
         return
       }
 
-      void scanDiskPlugins()
+      void scanDiskPlugins(authority)
 
       // A root may have appeared since — upgrade to the watches and retire
       // this poll once every root is covered.

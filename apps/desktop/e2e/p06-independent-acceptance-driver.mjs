@@ -25,7 +25,13 @@
  *      workspace or session;
  *   13. the send entry fails closed with no backend (no fake Session);
  *   14. closing the window exits Electron with no orphaned process;
- *   15. no Hermes runtime process appears during the run.
+ *   15. no Hermes runtime process appears during the run;
+ *   16. the Appearance page is a real, operable product page whose two
+ *      backend-shaped controls (reopen-last-chat, terminal font) are
+ *      Desktop-local preferences and the language switch persists — all of it
+ *      with a strictly empty renderer legacy-REST residual;
+ *   17. the retired Bot Mode surface is gone from the product: no New Bot
+ *      command, no Bots/Routines tab or entry, no plugin storage of its own.
  *
  * Usage (Windows, from apps/desktop):
  *   node e2e/p06-independent-acceptance-driver.mjs <sandboxRoot> <outDir>
@@ -49,9 +55,12 @@ import { createRequire } from 'node:module'
 import path from 'node:path'
 
 import {
+  botModeStorageKeys,
   collectDescendants,
   countMainLegacyRestRefusals,
   createStepRecorder,
+  findBotModeEntries,
+  findBotModePaletteEntries,
   findLegacyPaletteEntries,
   hermesRuntimeProcesses,
   legacyRestGate,
@@ -77,6 +86,7 @@ if (!sandboxRoot || !outDir) {
 
 const WINDOW_DEADLINE_MS = 30_000
 const REQUIRED_SCREENSHOTS = [
+  'appearance-local-preferences.png',
   'arrival-no-service.png',
   'command-center-agentbox.png',
   'command-palette-agentbox.png',
@@ -84,6 +94,12 @@ const REQUIRED_SCREENSHOTS = [
   'settings-no-service.png',
   'workspace-sidebar.png'
 ]
+
+/** Grace period after a reloaded renderer has painted the hook the next read
+ *  needs. The arrival path measured ~1s on the acceptance machine; this covers
+ *  only the effects that follow that paint — the paint itself is waited for
+ *  through the page's own hook, not guessed. */
+const RELOAD_SETTLE_MS = 1_500
 
 const results = []
 const screenshots = []
@@ -494,6 +510,161 @@ async function main() {
       `after open: hash=${settingsOpen.hash}, text=${settingsOpen.text.length} chars; after close: hash=${settingsClosed.hash}`
     )
 
+    // ── 16. Appearance: a real product page with Desktop-local preferences ──
+    // This page used to be the product's last legacy-config surface (its
+    // reopen-last-chat switch and terminal-font field read/wrote
+    // `GET/PUT /api/config`). It is a REQUIRED step now — reached by its own
+    // route rather than as a `product:*` tab — and it is exercised for real:
+    // the page has to paint, the two preferences have to survive a relaunch,
+    // the language switch has to persist, and none of it may issue a legacy
+    // REST request.
+    await goto(page, '#/settings?tab=appearance')
+
+    /** Read the page through the stable hooks the product ships for exactly
+     *  this purpose — never through copy, which the sandbox locale may change
+     *  and which the language step is about to switch. */
+    const appearanceHooks = await page.evaluate(() => ({
+      fontInput: document.querySelectorAll('[data-setting="terminal-font"]').length,
+      languageRow: document.querySelectorAll('[id="setting-field-appearance.language"]').length,
+      resumeRow: document.querySelectorAll('[data-setting="resume-last-session"]').length,
+      resumeSwitch: document.querySelectorAll('[data-setting="resume-last-session"] [role="switch"]').length,
+      text: (document.body.textContent || '').replace(/\s+/g, ' ').trim(),
+      themeRow: document.querySelectorAll('[id="setting-field-appearance.theme"]').length,
+      uiScaleRow: document.querySelectorAll('[id="setting-field-appearance.ui-scale"]').length
+    }))
+
+    await screenshot(page, 'appearance-local-preferences.png')
+
+    const appearanceOperable =
+      appearanceHooks.fontInput === 1 &&
+      appearanceHooks.languageRow === 1 &&
+      appearanceHooks.resumeRow === 1 &&
+      appearanceHooks.resumeSwitch === 1 &&
+      appearanceHooks.themeRow === 1 &&
+      appearanceHooks.uiScaleRow === 1 &&
+      appearanceHooks.text.length > 200
+
+    record(
+      'appearance-page-operable',
+      'the Appearance page opens as a real product page with its local controls painted',
+      appearanceOperable ? 'PASS' : 'FAIL',
+      `hooks: language row=${appearanceHooks.languageRow}, theme row=${appearanceHooks.themeRow}, ui-scale row=${appearanceHooks.uiScaleRow}, resume row=${appearanceHooks.resumeRow} (switch=${appearanceHooks.resumeSwitch}), terminal font input=${appearanceHooks.fontInput}; page text=${appearanceHooks.text.length} chars; hash=${(await page.evaluate(() => window.location.hash))}`
+    )
+
+    /** Pick a locale through the REAL picker, by locale CODE (which the row
+     *  renders verbatim) so no localized label is ever matched. The choice is
+     *  made through the picker's own search field — type the code, Enter takes
+     *  the selected row; a pointer click at the option's box is not accepted by
+     *  the cmdk list in this build (the point resolves to the list container),
+     *  and the search field is the picker's documented input path regardless. */
+    async function switchLocale(code) {
+      await page
+        .locator('[id="setting-field-appearance.language"] button[aria-expanded]')
+        .first()
+        .click({ timeout: 8000 })
+      await page.waitForTimeout(600)
+      await page.locator('[data-slot="command-input"]').first().fill(code)
+      await page.waitForTimeout(500)
+      await page.keyboard.press('Enter')
+      await page.waitForTimeout(800)
+    }
+
+    async function reloadAndSettle() {
+      await page.reload({ waitUntil: 'domcontentloaded' })
+      // The hash route survives a reload, so the Appearance page comes back:
+      // wait for its own hook rather than a fixed sleep, then let the effects
+      // that follow the paint settle.
+      await page.waitForSelector('[data-setting="resume-last-session"]', { timeout: 20_000 })
+      await page.waitForTimeout(RELOAD_SETTLE_MS)
+    }
+
+    // The language is a Desktop-local preference: it has to survive the
+    // relaunch, and the run has to leave the test language in place.
+    const localeStart = await page.evaluate(() => document.documentElement.lang)
+    const localeTarget = localeStart === 'ja' ? 'en' : 'ja'
+
+    await switchLocale(localeTarget)
+    const localeAfterSwitch = await page.evaluate(() => document.documentElement.lang)
+
+    await reloadAndSettle()
+    const localeAfterReload = await page.evaluate(() => document.documentElement.lang)
+
+    await switchLocale(localeStart)
+    const localeRestored = await page.evaluate(() => document.documentElement.lang)
+
+    record(
+      'appearance-language-persists',
+      'the language switch persists across a relaunch and the test language is restored',
+      localeAfterSwitch === localeTarget && localeAfterReload === localeTarget && localeRestored === localeStart
+        ? 'PASS'
+        : 'FAIL',
+      `documentElement.lang: start=${localeStart} → ${localeTarget}=${localeAfterSwitch} → after reload=${localeAfterReload} → restored=${localeRestored}`
+    )
+
+    // Reopen-last-chat is a Desktop-local preference too (default: on). Off
+    // now, still off after a relaunch — the cold-start authority, not a view.
+    const resumeSwitch = page.locator('[data-setting="resume-last-session"] [role="switch"]').first()
+
+    const resumeBefore = await resumeSwitch.getAttribute('aria-checked')
+
+    await resumeSwitch.click({ timeout: 8000 })
+    await page.waitForTimeout(400)
+    const resumeAfterClick = await resumeSwitch.getAttribute('aria-checked')
+
+    await reloadAndSettle()
+    const resumeAfterReload = await resumeSwitch.getAttribute('aria-checked')
+
+    await resumeSwitch.click({ timeout: 8000 })
+    await page.waitForTimeout(400)
+    const resumeRestored = await resumeSwitch.getAttribute('aria-checked')
+
+    record(
+      'appearance-resume-pref-persists',
+      'the reopen-last-chat preference is local, survives a relaunch, and is switched back',
+      resumeBefore === 'true' && resumeAfterClick === 'false' && resumeAfterReload === 'false' && resumeRestored === 'true'
+        ? 'PASS'
+        : 'FAIL',
+      `resume switch aria-checked: default=${resumeBefore} → off=${resumeAfterClick} → after reload=${resumeAfterReload} → restored=${resumeRestored}`
+    )
+
+    // Terminal font: set it, relaunch, find it still set; then hand the field
+    // back its "bundled default" (empty) state.
+    const terminalFont = page.locator('[data-setting="terminal-font"]').first()
+    const fontChoice = 'FiraCode Nerd Font'
+
+    await terminalFont.fill(fontChoice)
+    await page.waitForTimeout(400)
+    const fontAfterType = await terminalFont.inputValue()
+
+    await reloadAndSettle()
+    const fontAfterReload = await terminalFont.inputValue()
+
+    await terminalFont.fill('')
+    await page.waitForTimeout(400)
+    const fontAfterReset = await terminalFont.inputValue()
+
+    record(
+      'appearance-terminal-font-persists',
+      'the terminal font is a local preference: set, kept across a relaunch, then reset to the default',
+      fontAfterType === fontChoice && fontAfterReload === fontChoice && fontAfterReset === '' ? 'PASS' : 'FAIL',
+      `terminal font field: typed=${JSON.stringify(fontAfterType)} → after reload=${JSON.stringify(fontAfterReload)} → reset=${JSON.stringify(fontAfterReset)}`
+    )
+
+    // The Appearance interactions above ran with the console capture live (it
+    // has covered a whole boot since before the reload), so the renderer's
+    // legacy-REST residual for THIS phase is a real reading. The session-wide
+    // gate at the end is a separate required step: this one makes the claim
+    // about the page the product used to reach for `GET /api/config`.
+    const consoleAtAppearance = fs.readFileSync(consoleLog, 'utf8')
+    const appearanceResiduals = residualLegacyRestPaths(consoleAtAppearance)
+
+    record(
+      'appearance-no-legacy-rest',
+      'the Appearance page issues no legacy REST request, refused or otherwise',
+      captureCoversBoot === true && appearanceResiduals.length === 0 ? 'PASS' : 'FAIL',
+      `renderer residual legacy paths after the Appearance steps=${JSON.stringify(appearanceResiduals)} (must be []); console capture: ${captureBasis}; renderer-console.log=${consoleAtAppearance.length} chars`
+    )
+
     // ── 8/9. Profiles and product settings state unavailability honestly ───
     await goto(page, '#/profiles')
     const profiles = await shellReport(page)
@@ -558,13 +729,45 @@ async function main() {
     await screenshot(page, 'command-palette-agentbox.png')
 
     const legacyEntries = findLegacyPaletteEntries(paletteOptions)
+    const botEntries = findBotModePaletteEntries(paletteOptions)
     const hasProfilesRow = paletteOptions.some(text => /profiles/i.test(text))
 
     record(
       'command-palette-agentbox',
       'the command palette offers AgentBox navigation and no legacy restart/logs/profile share rows',
-      paletteOptions.length > 0 && hasProfilesRow && legacyEntries.length === 0 ? 'PASS' : 'FAIL',
-      `options=${paletteOptions.length}; profiles row=${hasProfilesRow}; legacy entries=${JSON.stringify(legacyEntries)}; first options=${JSON.stringify(paletteOptions.slice(0, 12))}`
+      paletteOptions.length > 0 && hasProfilesRow && legacyEntries.length === 0 && botEntries.length === 0 ? 'PASS' : 'FAIL',
+      `options=${paletteOptions.length}; profiles row=${hasProfilesRow}; legacy entries=${JSON.stringify(legacyEntries)}; retired Bot Mode entries=${JSON.stringify(botEntries)} (New Bot must be absent); first options=${JSON.stringify(paletteOptions.slice(0, 12))}`
+    )
+
+    // ── 17. The retired Bot Mode surface is absent from the product shell ──
+    // Bot Mode is retired at plugin-discovery time under this authority, so
+    // nothing it contributes can exist: no New Bot command (asserted on the
+    // palette above and on this page's own DOM scan), no Bots/Routines tab or
+    // sidebar entry, and none of the plugin-storage metadata its register()
+    // writes. The point is the CONTRIBUTION layer, not a hidden UI: a retired
+    // plugin that still activated would keep its relay, clocks and sweeps
+    // running behind whatever the shell chose to paint.
+    const botSurface = await page.evaluate(() => ({
+      botChatEmptySlots: document.querySelectorAll('[data-slot="bot_chat_empty"]').length,
+      entries: [
+        ...Array.from(document.querySelectorAll('[role="tab"], [role="menuitem"], [role="tablist"]')).map(
+          node => node.textContent || ''
+        ),
+        document.querySelector('[data-tour="sessions-sidebar"]')?.textContent || ''
+      ],
+      storageKeys: Object.keys(window.localStorage)
+    }))
+
+    const botSurfaceEntries = findBotModeEntries(botSurface.entries)
+    const botStorage = botModeStorageKeys(botSurface.storageKeys)
+
+    record(
+      'bot-mode-retired',
+      'the retired Bot Mode surface contributes no command, tab, entry or plugin storage',
+      botEntries.length === 0 && botSurfaceEntries.length === 0 && botSurface.botChatEmptySlots === 0 && botStorage.length === 0
+        ? 'PASS'
+        : 'FAIL',
+      `palette New Bot/Bots rows=${JSON.stringify(botEntries)}; Bots/Routines entries in tabs, menus and the sidebar=${JSON.stringify(botSurfaceEntries)}; chat-empty bot slot nodes=${botSurface.botChatEmptySlots}; "hermes.plugin.hermes-bots.*" storage keys=${JSON.stringify(botStorage)}`
     )
 
     await page.keyboard.press('Escape')

@@ -34,6 +34,54 @@ export function findLegacyPaletteEntries(optionTexts) {
   return hits
 }
 
+/** Rendered palette rows that belong to the RETIRED Bot Mode surface. The
+ *  product retires the plugin at discovery, so none of these can be
+ *  registered — a hit means the retirement did not hold (or something else
+ *  re-registered it) and the run must say so. Matched against visible rows,
+ *  never against registry ids the user cannot see. */
+export const BOT_MODE_PALETTE_PATTERNS = [
+  { id: 'new-bot', pattern: /\bnew bot\b/i },
+  { id: 'bots', pattern: /\bbots\b/i },
+  { id: 'routines', pattern: /\broutines?\b/i },
+  { id: 'group-chat', pattern: /\bgroup chat/i }
+]
+
+export function findBotModePaletteEntries(optionTexts) {
+  const hits = []
+
+  for (const text of optionTexts) {
+    for (const entry of BOT_MODE_PALETTE_PATTERNS) {
+      if (entry.pattern.test(String(text))) {
+        hits.push({ id: entry.id, text: String(text).trim().slice(0, 120) })
+      }
+    }
+  }
+
+  return hits
+}
+
+/** Bot Mode's plugin-storage namespace (`createPluginStorage` prefixes every
+ *  key with `hermes.plugin.<plugin id>.`). Its `register()` writes metadata
+ *  there, so a stored key under this prefix means the retired plugin ran. */
+export const BOT_MODE_STORAGE_PREFIX = 'hermes.plugin.hermes-bots.'
+
+export function botModeStorageKeys(keys) {
+  return (Array.isArray(keys) ? keys : []).filter(key => String(key).startsWith(BOT_MODE_STORAGE_PREFIX))
+}
+
+/** Rendered tabs / entries whose text names the retired Bot Mode surfaces.
+ *  Read from the DOM rather than from copy keys: whatever the app is localized
+ *  to, a Bots pane or a Routines tab has to call itself something with these
+ *  words in it. */
+export const BOT_MODE_ENTRY_PATTERNS = [/\bbots?\b/i, /\broutines?\b/i, /\bgroup chat/i]
+
+export function findBotModeEntries(texts) {
+  return (Array.isArray(texts) ? texts : [])
+    .map(text => String(text).replace(/\s+/g, ' ').trim())
+    .filter(text => text.length > 0 && BOT_MODE_ENTRY_PATTERNS.some(pattern => pattern.test(text)))
+    .slice(0, 20)
+}
+
 /** Copy that states a capability is genuinely not available here. The driver
  *  accepts either language because the sandbox's system locale is not ours to
  *  choose, and it never accepts a fabricated row in place of this copy. */
@@ -149,6 +197,12 @@ export const REQUIRED_STEP_IDS = [
   'legacy-fake-boot-ignored',
   'send-fails-closed',
   'settings-opens-closes',
+  'appearance-page-operable',
+  'appearance-language-persists',
+  'appearance-resume-pref-persists',
+  'appearance-terminal-font-persists',
+  'appearance-no-legacy-rest',
+  'bot-mode-retired',
   'profiles-honest',
   'product-settings-honest',
   'command-center-agentbox',
