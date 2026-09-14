@@ -121,6 +121,7 @@ import { registerPreviewIpc } from './ipc/preview-ipc'
 import { registerSystemIpc } from './ipc/system-ipc'
 import { registerThemeIpc } from './ipc/theme-ipc'
 import { registerWindowIpc } from './ipc/window-ipc'
+import { registerWorkCoreWireIpc } from './ipc/workcore-wire-ipc'
 import { registerWorkspaceIpc } from './ipc/workspace-ipc'
 import { destroyKeepaliveAgents } from './legacy-hermes/api-transport'
 import { cloudAgentSilentSignIn } from './legacy-hermes/cloud-agents'
@@ -196,6 +197,7 @@ import {
   sshInventoryAttemptedAt,
   sshRosterCache
 } from './legacy-hermes/ssh-inventory'
+import { unavailableAgentBoxWireDispatcher } from './security/agentbox-wire-transport'
 import { installEmbedReferer } from './security/embed-referer'
 import {
   checkUpdates,
@@ -801,6 +803,8 @@ registerApiProxyIpc({
   getDataUrlReadMaxMb: () => getDataUrlReadMaxMb(),
   persistDataUrlReadMaxMb,
 })
+
+registerWorkCoreWireIpc({ requestWire: unavailableAgentBoxWireDispatcher })
 
 registerFilesIpc({
   IS_WINDOWS,

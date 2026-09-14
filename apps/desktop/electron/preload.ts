@@ -12,6 +12,12 @@ const hudWindowing = ipcRenderer.sendSync('hermes:hud:windowing')
 const hudNativeDrag = hudWindowing?.nativeDrag === true
 const launchFlags = ipcRenderer.sendSync('hermes:launch-flags')
 
+contextBridge.exposeInMainWorld('agentBoxDesktop', {
+  wire: {
+    request: request => ipcRenderer.invoke('agentbox:wire:request', request)
+  }
+})
+
 contextBridge.exposeInMainWorld('hermesDesktop', {
   glassSupported: translucencySupport?.glass === true,
   translucencySupported: translucencySupport?.translucency === true,
