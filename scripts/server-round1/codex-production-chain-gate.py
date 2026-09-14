@@ -1681,11 +1681,14 @@ def run_requests(runs: list[list[dict]], index: int) -> list[dict]:
 #: The failure codes that belong to the state-capture step. Only a turn that
 #: failed *in that step* with one of these codes can be causally attributed to
 #: the alias-symlink problem; anything else is recorded as a co-observation.
+#: Only codes whose cause can plausibly *be* the alias symlinks belong here.
+#: `VIEW_FILE_LIMIT` and `SIDECAR_STATE_CONTAINS_SECRET` are deliberately
+#: excluded: both have first-hand, unrelated causes (a plugin-materialization
+#: file burst; credential material in native state), so attributing them to
+#: the alias links would misdirect a contract or config decision.
 STATE_CAPTURE_CODES = frozenset({
-    "VIEW_SPECIAL_FILE", "VIEW_TRAVERSAL_LIMIT", "VIEW_FILE_LIMIT", "VIEW_MISSING",
-    "VIEW_CHANGED", "VIEW_INVALID", "VIEW_IO", "VIEW_INCOMPLETE", "VIEW_DIGEST_MISMATCH",
-    "SIDECAR_STATE_NOT_SETTLED", "SIDECAR_STATE_IDENTITY_CONFLICT",
-    "SIDECAR_STATE_CONTAINS_SECRET", "SIDECAR_STATE_OUTSIDE_BOUNDS",
+    "VIEW_SPECIAL_FILE", "VIEW_TRAVERSAL_LIMIT", "VIEW_MISSING",
+    "VIEW_CHANGED", "SIDECAR_STATE_NOT_SETTLED", "SIDECAR_STATE_IDENTITY_CONFLICT",
 })
 
 

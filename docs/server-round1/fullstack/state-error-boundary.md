@@ -19,7 +19,8 @@
   的**被审计位置**提取 Worker 实际返回的错误码（结构化标记，不是英文 message），
   再用这些码驱动真实 settle 循环，所以"确定性拒绝被当作 churn"在实现前是可观测失败。
 - 跨层端到端：同文件另有两个测试**启动真实 Worker 进程**（ABW1 协议）验证
-  特殊文件/文件数上限/vanish/shrink 的实际返回码，并把返回码与 sidecar 分类对照。
+  特殊文件/文件数上限/缺失/首次越界的实际返回码，并把返回码与 sidecar 分类对照
+  （vanish 与首次越界的现行语义见 §2 修复后合同；本句为第一轮时的措辞）。
 
 ## 2. 最终错误分类表（Worker → Sidecar）
 
@@ -142,6 +143,29 @@ Reviewer `CHANGES_REQUIRED` 的修复（§2.1/§7.1）落地后重建
    **瞬时写进自己的 home**。对付费真实模型门这是关键前置风险：真实 key 一旦入 state，
    捕获扫描会（正确地）拒绝。
 
+## 4.4 Reviewer 第二轮后的修复与最终复跑（2026-09-15）
+
+第二轮 `CHANGES_REQUIRED` 的窄化发现与处置：
+
+1. **真实分块截断的失败层级**：`_view_bytes` 现把"已持有至少一个分块后的 range
+   `VIEW_INVALID`"转换为 `SIDECAR_STATE_IDENTITY_CONFLICT`（瞬态、有界重试）；首次请求的
+   range 错误保持确定性硬失败。新增三层反例：脚本视图"首块成功→后续块 VIEW_INVALID"持续
+   →`NOT_SETTLED` 且 get≥3、单次→以完整新字节收敛、真实 Worker 端到端（40 000 字节文件
+   两块 put，第一块返回后截断，第二块得确定性 `VIEW_INVALID`）。
+2. **alias blocker 因果再收窄**：`VIEW_FILE_LIMIT` 与 `SIDECAR_STATE_CONTAINS_SECRET` 从
+   `STATE_CAPTURE_CODES` 移除（二者已有第一手的无关根因）；新增负向测试
+   （file-limit/secret-scan 即使 capture 失败也不得生成 alias blocker）。
+3. **文档矛盾清理**：status/progress/evidence 中 c7 现行表述、旧 `VIEW_CHANGED` 语义、
+   "token 绝不入 state"绝对结论、812/22 计数——全部日期化标注取代关系。
+
+最终复跑（Worker 源自 c8 构建后未再变，`git diff <fix-commit> -- workers/` 为空，c8 摘要
+仍为现行 bundle；c4–c7 未覆盖）：runtime-artifact/Pi/Hermes/OpenCode **exit 0**；Windows r4
+（c8）**exit 0** + 独立 `-PostCheck…CLEAN`（本次 fresh 实例核对）；Python 全量
+**822 passed / 4 skipped / 0 failed**（820/27 为上一轮，已被取代）；Rust fmt 干净 +
+`cargo test --locked --release` **27 passed**；`git diff --check` 通过。
+**Codex 门现行状态：红**——`.tmp/plugins` 突发在本机已稳定复现（连续 5 轮峰值恰 5529 →
+确定性 `VIEW_FILE_LIMIT`），按 §4.3 待用户裁决；此前 10 轮绿的间歇期记录如实保留。
+
 ## 5. 全量验证与清理
 
 精确命令（原始输出留在本轮会话日志，不入 Git）：
@@ -164,15 +188,15 @@ powershell.exe -File accept-e.ps1（-SourceRoot \\wsl.localhost\Ubuntu\… -Data
 git diff --check <起点>..<HEAD>
 ```
 
-- Python 全量（tests + 全部插件 tests）：**812 passed / 4 skipped / 0 failed**
-  （较上轮 793 +19：错误边界 19 项新测；4 项既有平台/环境 skip 未扩大）。
-- Rust：`cargo fmt --check` 干净；`cargo test --locked --release` **22 passed / 0 failed**。
+- 【已被 §4.2 的 c8 计数取代：python 820/4；Rust 27】c7 轮当时：Python 全量
+  812 passed / 4 skipped / 0 failed；Rust fmt 干净、`cargo test --locked --release`
+  22 passed / 0 failed。
 - 残留：本轮五个门的临时根无残留；Windows DataRoot/workspace/端口/进程由 `-PostCheck`
   独立复核为 CLEAN；两个 `--keep` 诊断根与 Rust 测试 scratch 目录已按属主核对后删除；
   `git diff --check` 通过。进程表里仅剩 pytest 的 `--delay-seconds 300` 清理助手
   （有界自退），不是门残留。
 
-## 6. 前端最终交接（只读复测，2026-09-15 02:1x +08:00）
+## 6. 前端最终交接（只读复测 2026-09-15 01:4x，并于 02:51 以同一结论复测）
 
 - 工作树 `/home/maoqh/projects/agent-box-desktop-next-wsl-round1`，分支
   `feature/agentbox-desktop-product`，HEAD `8e7c138c96337fc20ed61d3c21100e6449c8ec95`

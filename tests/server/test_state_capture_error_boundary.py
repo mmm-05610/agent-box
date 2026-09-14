@@ -329,6 +329,43 @@ def test_a_file_truncated_between_chunks_is_retried_and_never_mixed():
     assert view.get_calls >= 3, "the truncated read must have been retried"
 
 
+def test_a_mid_read_range_refusal_is_retried_but_the_first_is_not():
+    """A range refusal after a served chunk means the file got shorter under
+    the read; the same refusal on a first request has no such history."""
+    # The file spans two chunks: the first get succeeds (the capture holds
+    # bytes), so a range refusal from the second get lands mid-read.
+    def mid_read_view(persistent: bool) -> ScriptedView:
+        view = ScriptedView({STATE_FILE: b"x" * 40_000})
+        original = view.request
+
+        def fail_after_first_chunk(op, arguments=None, **keywords):
+            if op == "view.get" and int(arguments.get("offset", 0)) > 0:
+                if persistent or view.get_calls <= 2:
+                    raise refusal("VIEW_INVALID")
+            return original(op, arguments, **keywords)
+
+        view.request = fail_after_first_chunk
+        return view
+
+    mid_read = mid_read_view(persistent=True)
+    with pytest.raises(SidecarError) as retried:
+        settle(mid_read, deadline=0.3, interval=0.05)
+    assert retried.value.code == "SIDECAR_STATE_NOT_SETTLED"
+    assert mid_read.get_calls >= 3
+
+    one_shot = mid_read_view(persistent=False)
+    assert settle(one_shot, deadline=2.0) == {"state.db": b"x" * 40_000}
+
+    # Without that history the same code is a plain refusal: a first-request
+    # range error on a short file is reported as it arrived.
+    first_request = ScriptedView({STATE_FILE: b"state"})
+    first_request.get_failures = [refusal("VIEW_INVALID")]
+    with pytest.raises(WorkerError) as refused:
+        settle(first_request, deadline=2.0)
+    assert refused.value.code == "VIEW_INVALID"
+    assert first_request.get_calls == 1
+
+
 def test_an_unknown_code_fails_closed():
     """A code this generation does not know is a refusal and is never retried."""
     view = ScriptedView({STATE_FILE: b"state"})
@@ -527,6 +564,37 @@ def test_a_real_worker_names_every_view_failure_the_capture_classifies(tmp_path)
                 "offset": len(content) + 16,
             })
         assert shrunk.value.code == refused_sites()["a shortened fetch"]
+
+        # A real mid-read truncation: the first chunk succeeds, the file is
+        # truncated, and the next chunk's range is now past the end. The
+        # Worker stays deterministic; the capture layer owns the conversion.
+        long_content = b"x" * 40_000
+        long_digest = "sha256:" + hashlib.sha256(long_content).hexdigest()
+        assert client.request("view.prepare", {"viewId": "boundary-long", "files": [
+            {"path": f"{PREFIX}/long.db", "digest": long_digest, "size": len(long_content)},
+        ]})["status"] == "prepared"
+        split = 32_768
+        client.request("view.put", {
+            "viewId": "boundary-long", "path": f"{PREFIX}/long.db", "offset": 0,
+            "data": base64.b64encode(long_content[:split]).decode(),
+        })
+        client.request("view.put", {
+            "viewId": "boundary-long", "path": f"{PREFIX}/long.db", "offset": split,
+            "data": base64.b64encode(long_content[split:]).decode(),
+        })
+        assert client.request("view.commit", {"viewId": "boundary-long"})["status"] == "ready"
+        first = client.request("view.get", {
+            "viewId": "boundary-long", "path": f"{PREFIX}/long.db",
+            "offset": 0, "maxLength": 32_768,
+        })
+        assert first["eof"] is False
+        (root / "views" / "boundary-long" / "ready" / PREFIX / "long.db").write_bytes(b"tiny")
+        with pytest.raises(WorkerError) as truncated:
+            client.request("view.get", {
+                "viewId": "boundary-long", "path": f"{PREFIX}/long.db",
+                "offset": first["nextOffset"], "maxLength": 32_768,
+            })
+        assert truncated.value.code == refused_sites()["a shortened fetch"]
 
         # The classification the capture applies to exactly these codes.
         assert moved_sites()["an entry that changed while being read"] in _STATE_TRANSIENT_CODES

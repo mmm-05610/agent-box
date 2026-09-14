@@ -35,11 +35,24 @@ def annotate(turn):
 
 
 def test_a_capture_failure_with_a_state_code_is_the_blocker():
-    report = annotate({"state": "failed", "capture_state": "failed", "error_code": "VIEW_FILE_LIMIT"})
+    report = annotate({
+        "state": "failed", "capture_state": "failed", "error_code": "VIEW_SPECIAL_FILE",
+    })
     blocker = report["blocker"]
     assert blocker["code"] == "CODEX_GATE_STATE_CONTAINS_NATIVE_ALIAS_SYMLINKS"
-    assert blocker["turnErrorCode"] == "VIEW_FILE_LIMIT"
+    assert blocker["turnErrorCode"] == "VIEW_SPECIAL_FILE"
     assert "stateSymlinkCoObservation" not in report
+
+
+def test_file_limit_and_secret_scan_never_become_alias_blockers():
+    """Both codes have first-hand unrelated causes (the plugin file burst;
+    credential material in native state), so they must stay co-observations."""
+    for error_code in ("VIEW_FILE_LIMIT", "SIDECAR_STATE_CONTAINS_SECRET"):
+        report = annotate({
+            "state": "failed", "capture_state": "failed", "error_code": error_code,
+        })
+        assert "blocker" not in report, error_code
+        assert report["stateSymlinkCoObservation"]["turnErrorCode"] == error_code
 
 
 def test_an_unrelated_turn_failure_is_only_a_co_observation():

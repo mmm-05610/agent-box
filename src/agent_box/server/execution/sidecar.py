@@ -661,13 +661,22 @@ class _WorkerChannels:
                     "offset": len(chunks), "maxLength": 32 * 1024,
                 })
             except BaseException as error:  # noqa: BLE001 - classified, not swallowed
+                code = getattr(error, "code", None)
                 # The Worker refuses a missing path as a deterministic
                 # VIEW_MISSING because it cannot know whether the caller ever
                 # saw the file. This capture just listed it, so here - and only
                 # here - the refusal means "the bytes moved": retry, bounded.
-                if getattr(error, "code", None) == "VIEW_MISSING":
+                if code == "VIEW_MISSING":
                     raise SidecarError(
                         "SIDECAR_STATE_IDENTITY_CONFLICT", "state file is gone",
+                    ) from error
+                # A range refusal mid-read means the file no longer reaches the
+                # offset this capture was served a moment ago - it got shorter
+                # under the read. The first request has no such history, so its
+                # range refusal stays the deterministic error it arrived as.
+                if code == "VIEW_INVALID" and chunks:
+                    raise SidecarError(
+                        "SIDECAR_STATE_IDENTITY_CONFLICT", "state fetch offset moved",
                     ) from error
                 raise
             if expected is None:

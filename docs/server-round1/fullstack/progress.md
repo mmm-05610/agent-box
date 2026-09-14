@@ -6,6 +6,11 @@
 
 ## 2026-09-15 — state capture 类型化错误边界 + c7 + 前端最终交接收口（返修轮）
 
+【历史轮次注：本节的错误码语义（"文件/目录消失、文件被缩短"=`VIEW_CHANGED`）与
+812/22 计数已被同日的 **Reviewer 复审修复轮（c8，820/27）** 取代——见下一节
+"Reviewer 复审闭环"；真实 Worker 端到端中 vanish/首次越界的现行语义为确定性
+`VIEW_MISSING`/`VIEW_INVALID` + capture 层转换。】
+
 详细证据：[state-error-boundary.md](state-error-boundary.md)。本阶段禁止真实模型调用，
 模型调用 **0**、费用增量 **¥0**。
 
@@ -58,13 +63,17 @@
   capture 阶段 + state/view 码，其余记 co-observation）并新增 5 例诊断测试；清理 trailing
   whitespace；status 旧表述日期化。反例测试新增：末组件换链（外部 sentinel 不被读）、父目录
   换链、超限不无界读、manifest 1025 拒绝、分块中截断→重试不混字、未知码 fail-closed。
-  修复后重建 **c8**（`sha256:514f48a9…`，c4–c7 未覆盖）复跑：runtime-artifact/Pi/Hermes/
-  OpenCode exit 0、Codex 10 轮 exit 0、Windows r4 + `-PostCheck…CLEAN`、python **820 passed/
-  4 skipped**、Rust **27 passed**。
+  修复后重建 **c8**（`sha256:514f48a9…`，c4–c7 未覆盖；Worker 源在 c8 构建后未再变，
+  c8 仍为现行 bundle）复跑：runtime-artifact/Pi/Hermes/OpenCode exit 0、Windows r4 +
+  `-PostCheck…CLEAN`（fresh 实例核对）、python **822 passed/4 skipped**、Rust **27 passed**
+  （820/22 为中间轮，已被取代）。Codex 门：间歇期 10 轮绿 + 当前连续 5 轮红（突发稳定期），
+  两个记录都如实保留、红不掩盖。
 - **两个第一手定位的 Codex 原生行为发现（待用户裁决）**：①运行时把内置 plugin/skill 语料解包进
-  `$CODEX_HOME/.tmp/plugins/`（实测峰值 **5529 文件**、瞬态；与列表上限 1024 相撞即确定性
-  `VIEW_FILE_LIMIT`——旧行为同条件是重试 10s 后 `NOT_SETTLED`）；②约 1/15 轮凭据扫描在原生
-  state 命中假 token（扫描正确拒绝，命中文件待捕获）。均见
+  `$CODEX_HOME/.tmp/plugins/`（实测峰值 **5529 文件**；与列表上限 1024 相撞即确定性
+  `VIEW_FILE_LIMIT`——旧行为同条件是重试 10s 后 `NOT_SETTLED`；在本机已由间歇转为稳定复现，
+  Codex 门现行红）；②约 1/15 轮凭据扫描在原生 state 命中假 token（扫描正确拒绝，命中文件
+  待捕获）。Reviewer 复审亦给出方案 A/B/C 并推荐 A（部署层 attempt-ephemeral 投影 `.tmp`
+  + fail-closed 扫描），**待用户裁决**。均见
   [state-error-boundary.md](state-error-boundary.md) §4.2/§4.3。
 - **Reviewer 自动化 §4.1 通道门通过**：固定 session 真实 `codex exec resume`（read-only、
   flock、无 bypass）exit 0，`VERDICT: ACCEPT` + `REVIEWER_CHANNEL_OK` 机械命中，

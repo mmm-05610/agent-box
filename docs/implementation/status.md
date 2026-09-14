@@ -19,8 +19,10 @@ Worker+bwrap 连接本机 loopback 假 DeepSeek 端点，两轮同一 Server Ses
 **三家因此只是封装就绪，仍是 MODEL_NOT_VERIFIED**（假端点与固定 nonce，不是付费模型验收）。
 **Codex 生产封装也已完成**（见下行），**四家封装全部就绪、全部仍 MODEL_NOT_VERIFIED**；
 最终门始终是 **Codex/Pi/Hermes/OpenCode 四家真实模型门**——与封装就绪不是同一件事，
-不得混写。**state capture 类型化错误边界返修已完成**（2026-09-15：确定性拒绝立即失败并保留
-准确码、`VIEW_CHANGED` 窄码承担重试、`VIEW_INVALID` 不再泛化为瞬态；c7 证据见
+不得混写。**state capture 类型化错误边界返修已完成并经 Reviewer 复审修复**（现行检查点 c8：
+fd 锚定 no-follow 读取、确定性拒绝立即失败并保留准确码、`VIEW_CHANGED` 仅表示
+"fd 读取中身份改变"、`VIEW_MISSING`/首次越界为确定性码并由 capture 层按上下文转换；
+证据见
 [state-error-boundary.md](../server-round1/fullstack/state-error-boundary.md)）。
 **已修复两条通用缺陷**：Worker 默认 5 秒租约会取消"客户端静默"的运行中 attempt
 （**WORKER_LEASE_KEEPALIVE_FIXED**，含 Windows 真机 8 秒静默证据，见
@@ -75,7 +77,7 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 - frontend_checked_at: 2026-09-15 02:51 +08:00；observed_head:
   `8e7c138c96337fc20ed61d3c21100e6449c8ec95`；`git status --porcelain` 本次 **0 行**。
 - 42 双门判定（2026-09-15 02:51 +08:00）：BACKEND_IMPLEMENTATION_READY=**否（暂时：唯一剩余后端门
-  是四家真实模型门；四家生产封装、HOME 隔离与 state 错误边界/c7 均已完成）**；
+  是四家真实模型门；四家生产封装、HOME 隔离与 state 错误边界（现行 c8）均已完成）**；
   DESKTOP_IMPLEMENTATION_READY=**前端自述是，本轮复测一致（clean、lease released、r3 28 PASS、
   同 wire）**。**仍未进入全栈联调**、未写前端文件。
 - wire_version / schema_digest: 当前28方法提交 `3aba5c5c` 为 **WIRE_LOCKED_FOR_IMPLEMENTATION**，TS
@@ -176,8 +178,10 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   8 秒静默在默认 5 秒租约下 `elapsed_ms=8857` 完成）+ 独立 `-PostCheck …CLEAN`。
 - state_capture_error_boundary: **确定性 view 失败不再被 settle 循环吞掉**（2026-09-15）。Worker 把
   特殊文件/`VIEW_SPECIAL_FILE`、traversal 上限/`VIEW_TRAVERSAL_LIMIT`、文件数上限/`VIEW_FILE_LIMIT`
-  改为各自的准确码并立即失败；真正的 live-state 变化（文件/目录消失、文件被缩短）改用窄码
-  **`VIEW_CHANGED`**；sidecar `_STATE_TRANSIENT_CODES` 收窄为
+  改为各自的准确码并立即失败；Worker 侧唯一重试码 **`VIEW_CHANGED`** 只表示"fd 打开后
+  读取中身份（dev/ino/size）改变"；不存在的路径=确定性 `VIEW_MISSING`、首次越界
+  offset=`VIEW_INVALID`，二者由 capture 层在"刚列出过/已持有分块"的上下文转换为
+  `SIDECAR_STATE_IDENTITY_CONFLICT` 重试（Reviewer 复审后语义，取代本条初版描述）；sidecar `_STATE_TRANSIENT_CODES` 收窄为
   `{SIDECAR_STATE_IDENTITY_CONFLICT, VIEW_CHANGED}`——`VIEW_INVALID`/`VIEW_IO`/`VIEW_INCOMPLETE`
   不再被无条件当作瞬态，拒绝类失败**不再被改写成 `SIDECAR_STATE_NOT_SETTLED`**；分类只读 code
   不读英文 message；4096/1024/256/8 MiB 上限、symlink 与特殊文件语义、凭据/受保护路径规则全部保持。
@@ -197,17 +201,22 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   `session/new→session/resume`、delta 10 < completed 12、8 秒静默在默认 5 秒租约下
   `elapsed_ms=8840` 完成）+ 独立 `-PostCheck …CLEAN`。
 - worker_bundle_c8: Reviewer 复审修复（fd 锚定 no-follow + `VIEW_MISSING` 合同 + gate 诊断因果化）后重建
-  **`.acceptance-bundle-c8`**（`sha256:514f48a9c24c8a13edefa4eb3aa5473b0f3a25d88a94aea1a19bb16ea2707975`）；
-  **c4–c7 未覆盖**（摘要逐一核对未变）。c8 上串行复跑：runtime-artifact/Pi/Hermes/OpenCode exit 0、
-  Codex 10 轮 exit 0（另有 2 轮第一手定位的原生行为失败，见下）、Windows r4 exit 0 +
-  独立 `-PostCheck…CLEAN`（实例核对）。Python 全量 **820 passed/4 skipped**；Rust **27 passed**。
+  **`.acceptance-bundle-c8`**（`sha256:514f48a9c24c8a13edefa4eb3aa5473b0f3a25d88a94aea1a19bb16ea2707975`；
+  Worker 源在 c8 构建后未再变——`git diff <fix-commit> -- workers/ 为空`，故 c8 摘要仍为现行 bundle；
+  **c4–c7 未覆盖**，摘要逐一核对未变）。c8 上串行复跑：runtime-artifact/Pi/Hermes/OpenCode exit 0、
+  Windows r4 exit 0 + 独立 `-PostCheck…CLEAN`（实例核对）；Python 全量 **822 passed/4 skipped**；
+  Rust **27 passed**。Codex 门：10 轮绿（突发间歇期）+ 当前连续 5 轮红（突发稳定期），
+  均如实记录。
 - codex_native_state_findings: 两个**待用户裁决**的第一手发现（证据见
   [state-error-boundary.md](../server-round1/fullstack/state-error-boundary.md) §4.3）：
   ①Codex 0.147.0 运行时把内置 plugin/skill 语料解包进 `$CODEX_HOME/.tmp/plugins/`（实测峰值
   **5529 文件**，瞬态；绿跑峰值 114），与列表上限 1024 相撞即确定性 `VIEW_FILE_LIMIT`；
   ②约 1/15 轮 sidecar 凭据扫描在原生 state 命中假 token（`SIDECAR_STATE_CONTAINS_SECRET`，
-  扫描正确拒绝；命中文件待捕获）。二者直接影响 Codex 付费真实模型门的前置条件，
-  处置选项（上限调升 / 部署排除 `.tmp` / gate 级重试 / 原生配置关闭解包）已整理待问。
+  扫描正确拒绝；命中文件待捕获）。①在本机已转为**稳定复现**（连续 5 轮峰值恰 5529 → 门红），
+  未掩盖。二者直接影响 Codex 付费真实模型门的前置条件；Reviewer 复审亦以 HARNESS_QUESTION
+  给出方案 A（部署层 attempt-ephemeral 投影 `.tmp` + fail-closed 扫描；不提高通用上限、
+  无品牌分支）/B（官方配置关闭解包与凭据持久化）/C（Codex 暂 MODEL_NOT_VERIFIED），
+  推荐 A——**待用户裁决**。
 - reviewer_automation: §4.1 通道门**已通过**（2026-09-15）：固定 session 机械比对一致、真实
   `codex exec resume`（read-only sandbox、flock、无 bypass）exit 0、verdict `VERDICT: ACCEPT`
   含 `REVIEWER_CHANNEL_OK`、`REVIEWED_HEAD` 与调用前 HEAD 一致、调用前后 `git status --porcelain`
@@ -218,7 +227,7 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   `env_key=CODEX_API_KEY`、`cli_auth_credentials_store=ephemeral`。`CODEX_API_KEY` 只是 deployment 声明的
   **临时环境变量名**；用工件内 0.147.0 二进制**只读**探测确认 `ephemeral` 是受支持值（非法值报
   `expected one of file, keyring, auto, ephemeral`），且 Codex 运行后的 checkpoint 里**没有 `auth.json`**
-  （未落盘认证），token 不入 deployment/事件/state/workspace/Git；**未执行**签入的官方 setup 脚本、
+  （未落盘认证），token 不入 deployment/事件/argv/workspace/Git——**state 例外须更正：2026-09-15 门内实测约 1/15 轮凭据扫描在原生 state 命中假 token（正确拦截，见 state-error-boundary.md §4.3），『token 绝不入 state』的旧绝对结论已被该观测取代，付费门前必须先解决**；**未执行**签入的官方 setup 脚本、
   **未读**用户 `~/.codex`。
 - native_home_isolation: **PROFILE_NATIVE_HOME_ISOLATION_IMPLEMENTED** /
   `DONE_FOR_FOUR_FAMILIES`（guest `HOME=/runtime/home`；Codex `/runtime/home/.codex` + `CODEX_HOME`、
@@ -346,12 +355,15 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   state 捕获/Worker 合同收紧轮（本阶段）复跑：python **793 passed/4 skipped/0 failed**（较上一条 +7：
   content-stable settle 7；Rust **15 passed**）；四家 gate + runtime-artifact gate 用 **c6** 串行 exit 0
   （Codex 默认与外部工件两种模式都 exit 0）；**Windows r4 用 c6 通过 + `-PostCheck…CLEAN`**。
-  state 错误边界/Reviewer 复审修复（c7→c8）轮（2026-09-15）复跑：python **820 passed/4 skipped/0 failed**
+  state 错误边界/Reviewer 复审修复（c7→c8）轮（2026-09-15）复跑：python **822 passed/4 skipped/0 failed**
   （+27 相对 793：边界新测、gate 诊断 5、真实 Worker 端到端等；4 项既有 skip 未扩大）；
-  Rust fmt 干净 + `cargo test --locked --release` **27 passed**；
-  runtime-artifact/Pi/Hermes/OpenCode 四门 + Codex（10 轮绿）用 **c8** 串行；
-  **Windows r4 用 c8 通过 + 独立 `-PostCheck…CLEAN`**（8 秒静默 `elapsed_ms=8817`）；`git diff --check` 通过。
-  （此前 c7 轮：python 812 passed/4 skipped；五门 + Windows r4/PostCheck 用 c7 exit 0。）
+  Rust fmt 干净 + `cargo test --locked --release` **27 passed**（820/22 为其前一轮，已被取代）；
+  runtime-artifact/Pi/Hermes/OpenCode 四门 + Windows r4/PostCheck 用 **c8** 串行 exit 0；
+  **Windows r4 用 c8 通过 + 独立 `-PostCheck…CLEAN`**（8 秒静默 `elapsed_ms=8821`，实例核对）；`git diff --check` 通过。
+  （此前轮次 812/22、820/27 均已被本条取代。）
+  **Codex 门现行状态：红**——c8+现行脚本下 `.tmp/plugins` 技能物化突发在本机已稳定复现
+  （连续 5 轮峰值恰 5529 文件 → 确定性 `VIEW_FILE_LIMIT`，见 codex_native_state_findings），
+  裁决前不掩盖、不假绿；此前 c7 轮曾有 10 轮绿的记录（突发为间歇），两条记录都如实保留。
   错误边界 c7 轮（2026-09-15）复跑：python **812 passed/4 skipped/0 failed**（较上一条 +19：
   错误边界 19 项，其中含 2 项真实 Worker 进程端到端；4 项既有 skip 未扩大）；
   Rust fmt 干净 + `cargo test --locked --release` **22 passed**；
