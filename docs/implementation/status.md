@@ -52,18 +52,20 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   同一 native id、上下文与真实重开方法；三家仍 MODEL_NOT_VERIFIED）。须继续 Codex 同级封装、
   最终门为**四家真实模型门**（Worker 5s 租约缺陷已修：`WORKER_LEASE_KEEPALIVE_FIXED`）
   （Codex/Pi/Hermes/OpenCode），任一封装就绪都不折算为已通过）。
-- frontend_observed_state: IN_PROGRESS（只读观察，2026-09-14 22:00:50 +08:00；前端 HEAD 已推进到
-  `docs(desktop): correct and close the P05 client gate`，工作树 **dirty（10 行，施工中）**；
-  其 status.md 自述 `frontend_implementation=PARTIAL`、`writer_lease=ACTIVE — Zcode frontend goal`）。
+- frontend_observed_state: **DESKTOP_IMPLEMENTATION_READY（前端自述）**（只读观察，2026-09-15 00:26:14
+  +08:00；前端 HEAD `6ddf6be9f4912c234fa8b248e56a231de5e2447d`（`docs(desktop): release the frontend
+  implementation lease (honesty repair)`，23:49:26 +08:00 提交），工作树 **dirty 19 行**；
+  其 status.md 自述 `frontend_implementation=DESKTOP_IMPLEMENTATION_READY`（P06 独立验收完成，
+  `evidence/P06.md`，updated_at 23:20 +08:00）且 **`writer_lease=RELEASED`（本行之后该文件冻结）**）。
+  按只读观察如实记录，未写前端任何文件、未接管；**42-B 双门是否成立仍需下一阶段正式核对交接证据**。
 - frontend_worktree: /home/maoqh/projects/agent-box-desktop-next-wsl-round1 @ feature/agentbox-desktop-product。
-- frontend_checked_at: 2026-09-14 22:00:50 +08:00；observed_head:
-  `9ecf1a0a6b0b38dd8196ca263e3554061d8618d0`（`docs(desktop): correct and close the P05 client gate`，
-  提交于 21:28:46 +08:00）；`git status --porcelain` 本次 10 行（施工中）；
-  其 status.md 自述 updated_at=2026-09-14 21:30 (+08:00)；wire 两个摘要就地重算仍与锁定值一致
-  （`11e3b3e7…` / `5d4fa3bf…`，未重锁）。按只读观察如实记录、仅报告，不修改前端。
-- 42 双门判定（2026-09-14 22:00 +08:00）：BACKEND_IMPLEMENTATION_READY=**否（暂时：Codex 封装未做、
-  四家真实模型门未执行；能力合同与租约缺陷已修）**；DESKTOP_IMPLEMENTATION_READY=**否**（PARTIAL、
-  工作树 dirty 且写权未释放）。**未进入全栈联调**，未写前端任何文件；前端施工中不是阻断。
+- frontend_checked_at: 2026-09-15 00:26:14 +08:00；observed_head:
+  `6ddf6be9f4912c234fa8b248e56a231de5e2447d`；`git status --porcelain` 本次 19 行（写权已释放但工作树非
+  clean，需下一阶段核对是否属交接遗留）；wire 两个摘要就地重算仍与锁定值一致
+  （`11e3b3e7…` / `5d4fa3bf…`，未重锁）。
+- 42 双门判定（2026-09-15 00:26 +08:00）：BACKEND_IMPLEMENTATION_READY=**否（暂时：四家真实模型门仍未
+  执行；四家生产封装与 HOME 隔离已完成）**；DESKTOP_IMPLEMENTATION_READY=**前端自述是、且写权已 RELEASED，
+  但后端尚未独立核对交接证据**（工作树 dirty 19 行）。**仍未进入全栈联调**，未写前端文件、未接管。
 - wire_version / schema_digest: 当前28方法提交 `3aba5c5c` 为 **WIRE_LOCKED_FOR_IMPLEMENTATION**，TS
   `11e3b3e70d332585d31900c09ba063d95aa6b72b1904921c665fb72f81c10035`、生成工件
   `5d4fa3bfeec6c3273c6073b37794e4ab2aca6e07e48184bc3a2b878c1fe5e4ed`。15:48 在前端工作树**就地
