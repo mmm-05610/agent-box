@@ -5,7 +5,7 @@
 
 ## 执行快照（handoff-policy 每阶段必填）— 接管施工中
 
-- updated_at: 2026-09-14 12:27 (+08:00)
+- updated_at: 2026-09-14 12:31 (+08:00)
 - 执行者: Codex 前端产品 goal（接力会话）；**已从暂停的 Zcode 执行者接管**
 - 工作树/分支: /home/maoqh/projects/agent-box-desktop-next-wsl-round1 @ feature/agentbox-desktop-product
 - 接管核验: 用户指定交接 HEAD `5c0fbfe` 与实际 HEAD
@@ -13,7 +13,7 @@
   未发现该工作树、Windows 构建树的 Electron/Vite/Vitest/Playwright/验收驱动进程；
   dirty 集合仅为下列 4 项已授权交接改动。发布源规则文件与本执行树逐文件 SHA-256 一致，
   保留本文件实时进度，不复制发布源初始状态。
-- 代码检查点（已提交 HEAD）: `3aba5c5`（P07 检查点6 / queue 终态机械对齐）
+- 代码检查点（已提交 HEAD）: `7b38cf5`（P04 切片3 / WorkCore lifecycle supervisor）
   链: ebb1233（P00）→ 8d4b3df/47b5b47/dbb902f（P01 代码与几何修复）→ 26b32fc（P01 GREEN 证据）
   → 468e6ac/d7e9a57（发布源 d3c0196+ffbcfaf 导入）→ 893d560（P07 检查点2 wire-v1）
   → 957a523（P02A 盘点）→ 07f5386（P02A slice 1：失败面非阻塞）→ 3a25edc（P02A slice 2）
@@ -24,10 +24,10 @@
   → 3f3bbb9（P04 隔离 host transport）→ b10e455（P07 检查点5）
   → ff05157（P03 Composer send seam）→ 2c3aa7f（P03 主 route 生产挂载）
   → b9b816d（P04 event subscription seam）→ 292d351（P04 状态记录）
-  → 3aba5c5（P07 queue 终态机械对齐）
+  → 3aba5c5（P07 queue 终态机械对齐）→ 7b38cf5（P04 WorkCore supervisor）
 - 已消费发布文档提交: 86d5a7b、61c7ff7、d3c0196、ffbcfaf
-- 当前检查点改动: P04 切片3（待提交）：WorkCore 注入式 supervisor，覆盖单飞、正常
-  unavailable、失败诊断、owned-process 回收与 shutdown 竞态；renderer Hermes 自动启动退役在独立写集施工。
+- 当前检查点改动: P04 遗留自动启动退役分两道门施工：renderer `useGatewayBoot` 与 Electron
+  `createWindow` 各由一个 Luna 在互斥写集完成；shared main/preload/status 仍由主代理串行持有。
 - 当前阶段: P00 GREEN；P01 GREEN；**P07 检查点 1–5 完成**；P02 A/B1/B2/C/D 已提交；
   P02B3 UI 边界与服务投影已接；P03 纵切 1–4 已提交；P04 切片1–2已提交
 - 完成范围: P00；P01 全部返修（真机 27 PASS）；P07 检查点 1（语义映射）、检查点 2
