@@ -2,9 +2,11 @@
 //
 // The AgentBox session list owns the unified sidebar's service-side session
 // behavior: open (select shell row → session route, nothing else), rename and
-// pin over `sessions.update` version CAS, and the honest loading/empty states.
-// The real `updateAgentBoxSession` seam runs — only the wire client is fake —
-// so every assertion below is the exact payload that would cross the wire.
+// pin over `sessions.update` version CAS, archive over `sessions.archive`
+// version CAS, and the honest loading/empty states. The real
+// `updateAgentBoxSession`/`archiveAgentBoxSession` seams run — only the wire
+// client is fake — so every assertion below is the exact payload that would
+// cross the wire.
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { useEffect } from 'react'
 import { MemoryRouter, useLocation } from 'react-router'
@@ -102,8 +104,8 @@ function renderList(events: string[]) {
   )
 }
 
-const openRowMenu = () => {
-  const trigger = screen.getByRole('button', { name: 'Session actions' })
+const openRowMenu = (index = 0) => {
+  const trigger = screen.getAllByRole('button', { name: 'Session actions' })[index]!
 
   fireEvent.pointerDown(trigger, { button: 0, pointerType: 'mouse' })
   fireEvent.pointerUp(trigger, { button: 0, pointerType: 'mouse' })
@@ -453,6 +455,268 @@ describe('AgentBox session list — pin via sessions.update', () => {
 
     expect(agentBoxCapabilitySupported($agentBoxHello.get(), 'sessions.update')).toBe(false)
     expect(wireClient.call).not.toHaveBeenCalled()
+  })
+})
+
+describe('AgentBox session list — archive via sessions.archive', () => {
+  // Archive needs its OWN declared capability; update is irrelevant to it.
+  const archiveHello = () => hello(['sessions.archive', 'sessions.update'])
+
+  const openArchiveDialog = async () => {
+    openRowMenu()
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Archive in AgentBox' }))
+
+    return screen.findByRole('dialog')
+  }
+
+  const clickConfirm = async (dialog: HTMLElement) => {
+    await act(async () => {
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Archive in AgentBox' }))
+    })
+  }
+
+  it('sends the exact CAS of the displayed record once — no optimistic hide, no other call', async () => {
+    $agentBoxHello.set(archiveHello())
+    $agentBoxSessions.set({ 'session-1': session({ displayName: 'Live', version: 3 }) })
+
+    const pending = deferred<{ session: SessionRecord }>()
+    wireClient.call.mockReturnValue(pending.promise)
+
+    const events: string[] = []
+    const { container } = renderList(events)
+
+    const dialog = await openArchiveDialog()
+
+    // The menu click captures the target but hides nothing and sends nothing:
+    // the row stays the service's current truth until the service answers.
+    expect(container.querySelector('[data-agentbox-session-row="session-1"]')).toBeTruthy()
+    expect(wireClient.call).not.toHaveBeenCalled()
+
+    await clickConfirm(dialog)
+
+    // The ONLY wire call is the archive CAS — no runs.stop, no
+    // sessions.createAndSend/send, no sessions.update, no workspaces.archive.
+    expect(wireClient.call.mock.calls).toEqual([
+      [
+        'sessions.archive',
+        {
+          expectedVersion: 3,
+          requestId: expect.stringMatching(/^desktop-/),
+          sessionId: 'session-1'
+        }
+      ]
+    ])
+
+    // In flight is not hidden either, and the dialog is still open mid-CAS.
+    expect(container.querySelector('[data-agentbox-session-row="session-1"]')).toBeTruthy()
+    expect(screen.getByRole('dialog')).toBeTruthy()
+
+    await act(async () => {
+      pending.resolve({ session: session({ archivedAt: '2026-09-14T06:00:00.000Z', version: 4 }) })
+    })
+
+    // The projection's own `archivedAt !== null` filter drops the row; the
+    // cache keeps the record the service returned.
+    expect(container.querySelector('[data-agentbox-session-row="session-1"]')).toBeNull()
+    expect($agentBoxSessions.get()['session-1']?.archivedAt).toBe('2026-09-14T06:00:00.000Z')
+    expect($agentBoxSessions.get()['session-1']?.version).toBe(4)
+    // Archive does not open, select, navigate, send or stop anything.
+    expect(events).toEqual([])
+    expect($workspaceViewSelectedId.get()).toBeNull()
+  })
+
+  it('keeps the dialog open and sends exactly one request when confirm is pressed twice', async () => {
+    $agentBoxHello.set(archiveHello())
+    $agentBoxSessions.set({ 'session-1': session({ displayName: 'Live', version: 3 }) })
+
+    const pending = deferred<{ session: SessionRecord }>()
+    wireClient.call.mockReturnValue(pending.promise)
+
+    renderList([])
+
+    const dialog = await openArchiveDialog()
+    // The label swaps to the busy copy while saving, so hold the node itself.
+    const confirmButton = within(dialog).getByRole('button', { name: 'Archive in AgentBox' })
+
+    await act(async () => {
+      fireEvent.click(confirmButton)
+    })
+    await act(async () => {
+      fireEvent.click(confirmButton)
+    })
+
+    expect(wireClient.call).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('dialog')).toBeTruthy()
+
+    await act(async () => {
+      pending.resolve({ session: session({ archivedAt: '2026-09-14T06:00:00.000Z', version: 4 }) })
+    })
+  })
+
+  it('keeps the dialog, the record and the row on CONFLICT_VERSION — no retry, no version bump', async () => {
+    $agentBoxHello.set(archiveHello())
+    $agentBoxSessions.set({ 'session-1': session({ displayName: 'Live', version: 3 }) })
+    wireClient.call.mockRejectedValue(new Error('CONFLICT_VERSION'))
+
+    const { container } = renderList([])
+
+    const dialog = await openArchiveDialog()
+
+    await clickConfirm(dialog)
+
+    // The readable service reason is visible, the dialog stays open, the
+    // projection is untouched (version AND archivedAt) and nothing retried.
+    expect(within(screen.getByRole('dialog')).getByText('CONFLICT_VERSION')).toBeTruthy()
+    expect($agentBoxSessions.get()['session-1']?.version).toBe(3)
+    expect($agentBoxSessions.get()['session-1']?.archivedAt).toBeNull()
+    expect(container.querySelector('[data-agentbox-session-row="session-1"]')).toBeTruthy()
+    expect(wireClient.call).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps the row with the service version and name when the service answers unarchived', async () => {
+    $agentBoxHello.set(archiveHello())
+    $agentBoxSessions.set({ 'session-1': session({ displayName: 'Live', version: 3 }) })
+    wireClient.call.mockResolvedValue({ session: session({ displayName: 'Service name', version: 4 }) })
+
+    const { container } = renderList([])
+
+    const dialog = await openArchiveDialog()
+
+    await clickConfirm(dialog)
+
+    // The service's answer is authoritative: an unarchived record stays, with
+    // the version and name the service returned.
+    expect($agentBoxSessions.get()['session-1']?.version).toBe(4)
+    expect($agentBoxSessions.get()['session-1']?.displayName).toBe('Service name')
+    expect(container.querySelector('[data-agentbox-session-row="session-1"]')?.textContent).toContain('Service name')
+  })
+
+  it('makes zero wire calls and shows the failure when the service went away while the dialog was open', async () => {
+    $agentBoxHello.set(archiveHello())
+    $agentBoxSessions.set({ 'session-1': session({ displayName: 'Live', version: 3 }) })
+
+    renderList([])
+
+    const dialog = await openArchiveDialog()
+
+    await act(async () => {
+      $agentBoxService.set({ detail: 'service went away', phase: 'unavailable' })
+    })
+    await clickConfirm(dialog)
+
+    // Fail closed: the intent is not sent on faith, and the dialog names the
+    // failure instead of pretending success.
+    expect(wireClient.call).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog')).toBeTruthy()
+    expect(within(screen.getByRole('dialog')).getByText('Session could not be archived')).toBeTruthy()
+    expect($agentBoxSessions.get()['session-1']?.archivedAt).toBeNull()
+  })
+
+  it('makes zero wire calls when hello stopped declaring sessions.archive while the dialog was open', async () => {
+    $agentBoxHello.set(archiveHello())
+    $agentBoxSessions.set({ 'session-1': session({ displayName: 'Live', version: 3 }) })
+
+    renderList([])
+
+    const dialog = await openArchiveDialog()
+
+    await act(async () => {
+      $agentBoxHello.set(hello(['sessions.update']))
+    })
+    await clickConfirm(dialog)
+
+    expect(wireClient.call).not.toHaveBeenCalled()
+    expect(within(screen.getByRole('dialog')).getByText('Session could not be archived')).toBeTruthy()
+  })
+
+  it('gates rename/pin and archive on their own capabilities independently', async () => {
+    $agentBoxSessions.set({ 'session-1': session({ displayName: 'Live', version: 3 }) })
+
+    // update only → rename + pin, no archive entry.
+    $agentBoxHello.set(hello(['sessions.update']))
+    renderList([])
+    openRowMenu()
+    expect(await screen.findByRole('menuitem', { name: 'Rename…' })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: 'Pin' })).toBeTruthy()
+    expect(screen.queryByRole('menuitem', { name: 'Archive in AgentBox' })).toBeNull()
+
+    cleanup()
+
+    // archive only → archive alone.
+    $agentBoxHello.set(hello(['sessions.archive']))
+    renderList([])
+    openRowMenu()
+    expect(await screen.findByRole('menuitem', { name: 'Archive in AgentBox' })).toBeTruthy()
+    expect(screen.queryByRole('menuitem', { name: 'Rename…' })).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: 'Pin' })).toBeNull()
+
+    cleanup()
+
+    // both → all three.
+    $agentBoxHello.set(hello(['sessions.update', 'sessions.archive']))
+    renderList([])
+    openRowMenu()
+    expect(await screen.findByRole('menuitem', { name: 'Rename…' })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: 'Pin' })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: 'Archive in AgentBox' })).toBeTruthy()
+
+    // neither is the existing "affordance-free" case: no menu exists at all,
+    // so no entry and no wire call can happen.
+    expect(wireClient.call).not.toHaveBeenCalled()
+  })
+
+  it('keeps the cached rows and their honest status but offers no archive entry while unavailable', async () => {
+    $agentBoxHello.set(archiveHello())
+    $agentBoxSessions.set({ 'session-1': session({ displayName: 'Live', version: 3 }) })
+    $agentBoxService.set({ detail: 'connect ECONNREFUSED 127.0.0.1:8732', phase: 'unavailable' })
+
+    const { container } = renderList([])
+
+    // The declared capability is not a promise the service can answer: the
+    // row and the reason stay, the archive entry is withdrawn.
+    expect(container.querySelector('[data-agentbox-session-row="session-1"]')?.textContent).toContain('Live')
+    expect(container.querySelector('[data-agentbox-sessions-unavailable="workspace-1"]')?.textContent).toContain(
+      'connect ECONNREFUSED 127.0.0.1:8732'
+    )
+    expect(screen.queryByRole('button', { name: 'Session actions' })).toBeNull()
+    expect(wireClient.call).not.toHaveBeenCalled()
+  })
+
+  it('captures the version of the session whose menu was used, not another row', async () => {
+    $agentBoxHello.set(archiveHello())
+    $agentBoxSessions.set({
+      'session-1': session({ displayName: 'First', id: 'session-1', updatedAt: '2026-09-14T09:00:00.000Z', version: 3 }),
+      'session-2': session({ displayName: 'Second', id: 'session-2', updatedAt: '2026-09-14T08:00:00.000Z', version: 7 })
+    })
+    wireClient.call.mockResolvedValue({
+      session: session({ archivedAt: '2026-09-14T06:00:00.000Z', id: 'session-2', version: 8 })
+    })
+
+    renderList([])
+
+    // Projection order is newest first: [session-1, session-2] — aim at the
+    // second row's own menu.
+    openRowMenu(1)
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Archive in AgentBox' }))
+
+    const dialog = await screen.findByRole('dialog')
+
+    expect(within(dialog).getByText(/Second/)).toBeTruthy()
+
+    await clickConfirm(dialog)
+
+    expect(wireClient.call.mock.calls).toEqual([
+      [
+        'sessions.archive',
+        {
+          expectedVersion: 7,
+          requestId: expect.stringMatching(/^desktop-/),
+          sessionId: 'session-2'
+        }
+      ]
+    ])
+    expect($agentBoxSessions.get()['session-1']?.archivedAt).toBeNull()
+    expect($agentBoxSessions.get()['session-2']?.archivedAt).toBe('2026-09-14T06:00:00.000Z')
   })
 })
 

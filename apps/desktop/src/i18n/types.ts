@@ -2049,11 +2049,18 @@ export interface Translations {
       menuRename: string
       menuPin: string
       menuUnpin: string
+      /** The `sessions.archive` menu entry on a session row. */
+      menuArchive: string
       pinned: string
       renameTitle: (name: string) => string
       renameFailed: string
       pinFailed: string
       unpinFailed: string
+      archiveTitle: (name: string) => string
+      /** Says the record is archived on the service, history is kept, nothing
+       *  running is stopped and no files are touched. */
+      archiveDesc: string
+      archiveFailed: string
     }
     gatewayGroups: {
       grouping: string

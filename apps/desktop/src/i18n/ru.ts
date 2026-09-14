@@ -2302,11 +2302,15 @@ export const ru = defineLocale({
       menuRename: 'Переименовать…',
       menuPin: 'Закрепить',
       menuUnpin: 'Открепить',
+      menuArchive: 'Архивировать в AgentBox',
       pinned: 'Закреплена',
       renameTitle: name => `Переименовать «${name}»`,
       renameFailed: 'Не удалось переименовать сессию',
       pinFailed: 'Не удалось закрепить сессию',
-      unpinFailed: 'Не удалось открепить сессию'
+      unpinFailed: 'Не удалось открепить сессию',
+      archiveTitle: name => `Архивировать «${name}» в AgentBox?`,
+      archiveDesc: 'Архивируется только запись Session в сервисе. История сохраняется, ничего выполняющегося не останавливается, файлы не затрагиваются.',
+      archiveFailed: 'Не удалось архивировать сессию'
     },
     gatewayGroups: {
       grouping: 'Шлюз и профиль',

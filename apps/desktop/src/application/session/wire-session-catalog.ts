@@ -62,13 +62,19 @@ export async function updateAgentBoxSession(
   return result.session
 }
 
+/** Archive one session through the one CAS seam the sidebar row and the
+ *  current-session command share: exact `expectedVersion` of the record shown,
+ *  a freshly minted requestId, and only the returned record is adopted. The
+ *  archived record STAYS in `$agentBoxSessions` — hiding archived rows is the
+ *  sidebar projection's job, not the cache's — and the version-monotonic
+ *  upsert keeps a late page from rolling the archive back. */
 export async function archiveAgentBoxSession(
   client: WireV1Client,
   input: { expectedVersion: number; sessionId: string },
   options: WireSessionCatalogOptions = {}
 ): Promise<SessionRecord> {
   const result = await client.call('sessions.archive', {
-    ...input,
+    expectedVersion: input.expectedVersion,
     sessionId: asWireId(input.sessionId),
     requestId: (options.createRequestId ?? defaultRequestId)()
   })

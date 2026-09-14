@@ -7,6 +7,7 @@ import { AgentBoxSessionRow } from './agentbox-session-row'
 
 const labels = {
   menuActions: 'Session actions',
+  menuArchive: 'Archive in AgentBox',
   menuPin: 'Pin',
   menuRename: 'Rename…',
   menuUnpin: 'Unpin',
@@ -41,6 +42,7 @@ const renderRow = (overrides: Partial<Parameters<typeof AgentBoxSessionRow>[0]> 
     <AgentBoxSessionRow
       labels={overrides.labels ?? labels}
       meta={overrides.meta ?? '2h ago'}
+      onArchive={overrides.onArchive}
       onOpen={overrides.onOpen ?? vi.fn()}
       onPin={overrides.onPin}
       onRename={overrides.onRename}
@@ -103,22 +105,70 @@ describe('AgentBoxSessionRow', () => {
     expect(onPin).not.toHaveBeenCalled()
   })
 
+  // The `sessions.update` and `sessions.archive` capabilities are independent:
+  // the list injects one handler set, the other, both or neither, and this row
+  // renders exactly the entries it was given — never an entry whose action it
+  // cannot execute.
+  it('shows no archive entry when only the update handlers are injected', async () => {
+    renderRow({ onPin: vi.fn(), onRename: vi.fn() })
+
+    openMenu(screen.getByRole('button', { name: 'Session actions' }))
+
+    expect(await screen.findByRole('menuitem', { name: 'Rename…' })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: 'Pin' })).toBeTruthy()
+    expect(screen.queryByRole('menuitem', { name: 'Archive in AgentBox' })).toBeNull()
+  })
+
+  it('shows only the archive entry when only the archive handler is injected', async () => {
+    renderRow({ onArchive: vi.fn() })
+
+    openMenu(screen.getByRole('button', { name: 'Session actions' }))
+
+    expect(await screen.findByRole('menuitem', { name: 'Archive in AgentBox' })).toBeTruthy()
+    expect(screen.queryByRole('menuitem', { name: 'Rename…' })).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: 'Pin' })).toBeNull()
+  })
+
+  it('shows all three entries when both handler sets are injected, and archive fires once', async () => {
+    const onArchive = vi.fn()
+    const onPin = vi.fn()
+    const onRename = vi.fn()
+
+    renderRow({ onArchive, onPin, onRename })
+
+    openMenu(screen.getByRole('button', { name: 'Session actions' }))
+
+    expect(await screen.findByRole('menuitem', { name: 'Rename…' })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: 'Pin' })).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Archive in AgentBox' }))
+
+    expect(onArchive).toHaveBeenCalledTimes(1)
+    expect(onRename).not.toHaveBeenCalled()
+    expect(onPin).not.toHaveBeenCalled()
+  })
+
   it('locks the menu while this row has maintenance pending', async () => {
+    const onArchive = vi.fn()
     const onRename = vi.fn()
     const onPin = vi.fn()
 
-    renderRow({ onPin, onRename, pending: true })
+    renderRow({ onArchive, onPin, onRename, pending: true })
 
     openMenu(screen.getByRole('button', { name: 'Session actions' }))
 
     const rename = await screen.findByRole('menuitem', { name: 'Rename…' })
+    const archive = screen.getByRole('menuitem', { name: 'Archive in AgentBox' })
 
     expect(rename.getAttribute('aria-disabled')).toBe('true')
     expect(screen.getByRole('menuitem', { name: 'Pin' }).getAttribute('aria-disabled')).toBe('true')
+    expect(archive.getAttribute('aria-disabled')).toBe('true')
 
     fireEvent.click(rename)
+    fireEvent.click(archive)
 
     expect(onRename).not.toHaveBeenCalled()
     expect(onPin).not.toHaveBeenCalled()
+    expect(onArchive).not.toHaveBeenCalled()
   })
 })

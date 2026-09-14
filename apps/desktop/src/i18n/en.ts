@@ -2332,6 +2332,8 @@ export const en: Translations = {
 
       menuUnpin: 'Unpin',
 
+      menuArchive: 'Archive in AgentBox',
+
       pinned: 'Pinned',
 
       renameTitle: name => `Rename “${name}”`,
@@ -2340,7 +2342,13 @@ export const en: Translations = {
 
       pinFailed: 'Session could not be pinned',
 
-      unpinFailed: 'Session could not be unpinned'
+      unpinFailed: 'Session could not be unpinned',
+
+      archiveTitle: name => `Archive “${name}” in AgentBox?`,
+
+      archiveDesc: 'Archives the session record on the service only. History is kept, nothing running is stopped and no files are touched.',
+
+      archiveFailed: 'Session could not be archived'
 
     },
     gatewayGroups: {

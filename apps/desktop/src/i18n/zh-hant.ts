@@ -1931,6 +1931,8 @@ export const zhHant = defineLocale({
 
       menuUnpin: '取消置頂',
 
+      menuArchive: '在 AgentBox 中封存',
+
       pinned: '已置頂',
 
       renameTitle: name => `重新命名「${name}」`,
@@ -1939,7 +1941,13 @@ export const zhHant = defineLocale({
 
       pinFailed: '無法置頂 Session',
 
-      unpinFailed: '無法取消置頂 Session'
+      unpinFailed: '無法取消置頂 Session',
+
+      archiveTitle: name => `在 AgentBox 中封存「${name}」？`,
+
+      archiveDesc: '只封存服務中的 Session 記錄；歷史會保留，執行中的任務不會停止，也不會改動任何檔案。',
+
+      archiveFailed: '無法封存 Session'
 
     },
     gatewayGroups: {

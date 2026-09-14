@@ -23,7 +23,10 @@ import { useAppKeybindings } from '@/app/composition/registrations/keybindings'
 import { ChatRoutesSurface, SidebarSurface, StatusbarSurface, TerminalSurface } from '@/app/composition/registrations/surfaces'
 import { ContribWiringContext } from '@/app/composition/root/context'
 import { useOverlayRouting } from '@/app/composition/routing/overlay-routing'
-import { toggleRoutedAgentBoxSessionPin } from '@/app/composition/wiring/agentbox-session-commands'
+import {
+  archiveRoutedAgentBoxSession,
+  toggleRoutedAgentBoxSessionPin
+} from '@/app/composition/wiring/agentbox-session-commands'
 import {
   CRON_ROUTE,
   navigateToWorkspacePage,
@@ -903,8 +906,30 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     void openNewSessionTile('center', { listed: false })
   }, [openNewSessionTile])
 
-  // Archive the selected session (rebindable `session.archive` hotkey).
+  // Archive the selected session (rebindable `session.archive` hotkey). On an
+  // AgentBox session route the service record is the authority and the archive
+  // rides `sessions.archive` CAS; the narrow command module keeps that decision
+  // independently testable. The open route, its history and any running turn
+  // are left exactly as they are — archiving hides the row from the sidebar,
+  // it does not close what the user is reading.
   const archiveSelectedSession = useCallback(() => {
+    const routed = archiveRoutedAgentBoxSession(location.pathname)
+
+    if (routed) {
+      // The service's reason surfaces exactly like the sidebar's does — no
+      // local mutation happened, so nothing on screen has to roll back.
+      void routed.promise.catch(error => notifyError(error, t.sidebar.agentBoxSession.archiveFailed))
+
+      return
+    }
+
+    if (routeSessionId(location.pathname)) {
+      // A session route the service cannot prove (no record, no service, no
+      // declared capability, or an already archived record) fails closed — no
+      // wire call, and never the same-id legacy session.
+      return
+    }
+
     const sessionId = $selectedStoredSessionId.get()
 
     if (!sessionId) {
@@ -912,7 +937,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     }
 
     void archiveSession(sessionId)
-  }, [archiveSession])
+  }, [archiveSession, location.pathname, t])
 
   // Single global listener for every rebindable hotkey plus the on-screen
   // keybind editor's capture mode (same as DesktopController).

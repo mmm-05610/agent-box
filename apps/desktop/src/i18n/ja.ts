@@ -1991,6 +1991,8 @@ export const ja = defineLocale({
 
       menuUnpin: 'ピン留めを解除',
 
+      menuArchive: 'AgentBox でアーカイブ',
+
       pinned: 'ピン留め済み',
 
       renameTitle: name => `「${name}」の名前を変更`,
@@ -1999,7 +2001,13 @@ export const ja = defineLocale({
 
       pinFailed: 'Session をピン留めできませんでした',
 
-      unpinFailed: 'Session のピン留めを解除できませんでした'
+      unpinFailed: 'Session のピン留めを解除できませんでした',
+
+      archiveTitle: name => `「${name}」を AgentBox でアーカイブしますか？`,
+
+      archiveDesc: 'サービス側の Session 記録のみをアーカイブします。履歴は保持され、実行中のタスクは停止せず、ファイルにも変更を加えません。',
+
+      archiveFailed: 'Session をアーカイブできませんでした'
 
     },
     gatewayGroups: {

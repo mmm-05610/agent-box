@@ -2494,6 +2494,8 @@ export const zh: Translations = {
 
       menuUnpin: '取消置顶',
 
+      menuArchive: '在 AgentBox 中归档',
+
       pinned: '已置顶',
 
       renameTitle: name => `重命名“${name}”`,
@@ -2502,7 +2504,13 @@ export const zh: Translations = {
 
       pinFailed: '无法置顶 Session',
 
-      unpinFailed: '无法取消置顶 Session'
+      unpinFailed: '无法取消置顶 Session',
+
+      archiveTitle: name => `在 AgentBox 中归档“${name}”？`,
+
+      archiveDesc: '只归档服务中的 Session 记录；历史会保留，运行中的任务不会停止，也不会改动任何文件。',
+
+      archiveFailed: '无法归档 Session'
 
     },
     gatewayGroups: {

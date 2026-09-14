@@ -97,4 +97,109 @@ describe('AgentBox Session catalog', () => {
     ])
     expect($agentBoxSessions.get()['session-1']?.archivedAt).not.toBeNull()
   })
+
+  it('keeps the archived record cached and never rolls it back from a lower version', async () => {
+    const archived = session({ archivedAt: '2026-09-14T01:00:00.000Z', version: 3 })
+
+    const responses = [
+      { session: archived },
+      { items: [session({ displayName: 'Stale page', version: 2 })], nextCursor: null },
+      { session: session({ displayName: 'Stale update', version: 1 }) }
+    ]
+
+    const call = vi.fn(async () => responses.shift()!)
+    const client = { call } as unknown as WireV1Client
+
+    await archiveAgentBoxSession(client, { expectedVersion: 2, sessionId: 'session-1' })
+
+    // The cache retains the record: hiding archived rows is the sidebar
+    // projection's business, not the store's.
+    expect('session-1' in $agentBoxSessions.get()).toBe(true)
+
+    // A stale list page (lower version, unarchived) cannot resurrect it…
+    await refreshAgentBoxSessions(client)
+
+    expect($agentBoxSessions.get()['session-1']?.archivedAt).toBe('2026-09-14T01:00:00.000Z')
+    expect($agentBoxSessions.get()['session-1']?.displayName).toBe('Session')
+    expect($agentBoxSessions.get()['session-1']?.version).toBe(3)
+
+    // …and neither can a stale mutation answer, even though it is returned.
+    await expect(
+      updateAgentBoxSession(client, { displayName: 'Stale update', expectedVersion: 2, sessionId: 'session-1' })
+    ).resolves.toMatchObject({ displayName: 'Stale update', version: 1 })
+
+    expect($agentBoxSessions.get()['session-1']?.archivedAt).toBe('2026-09-14T01:00:00.000Z')
+    expect($agentBoxSessions.get()['session-1']?.displayName).toBe('Session')
+    expect($agentBoxSessions.get()['session-1']?.version).toBe(3)
+  })
+
+  it('adopts the same or a newer version over the archived record', async () => {
+    const responses = [
+      { session: session({ archivedAt: '2026-09-14T01:00:00.000Z', version: 3 }) },
+      {
+        items: [
+          session({ archivedAt: '2026-09-14T01:00:00.000Z', displayName: 'Normalized', version: 3 })
+        ],
+        nextCursor: null
+      },
+      {
+        items: [
+          session({ archivedAt: '2026-09-14T02:00:00.000Z', displayName: 'Restored then archived again', version: 5 })
+        ],
+        nextCursor: null
+      }
+    ]
+
+    const call = vi.fn(async () => responses.shift()!)
+    const client = { call } as unknown as WireV1Client
+
+    await archiveAgentBoxSession(client, { expectedVersion: 2, sessionId: 'session-1' })
+    await refreshAgentBoxSessions(client)
+
+    expect($agentBoxSessions.get()['session-1']?.displayName).toBe('Normalized')
+    expect($agentBoxSessions.get()['session-1']?.version).toBe(3)
+
+    await refreshAgentBoxSessions(client)
+
+    expect($agentBoxSessions.get()['session-1']?.archivedAt).toBe('2026-09-14T02:00:00.000Z')
+    expect($agentBoxSessions.get()['session-1']?.displayName).toBe('Restored then archived again')
+    expect($agentBoxSessions.get()['session-1']?.version).toBe(5)
+  })
+
+  it('sends exactly the archive CAS payload with a fresh requestId per intent', async () => {
+    const archived = session({ archivedAt: '2026-09-14T02:00:00.000Z', version: 2 })
+    const requestIds: string[] = []
+
+    const call = vi.fn(async (_method: string, params: { requestId: string }) => {
+      requestIds.push(params.requestId)
+
+      return { session: archived }
+    })
+
+    const client = { call } as unknown as WireV1Client
+
+    await archiveAgentBoxSession(client, { expectedVersion: 1, sessionId: 'session-1' })
+    await archiveAgentBoxSession(client, { expectedVersion: 1, sessionId: 'session-2' })
+
+    expect(call.mock.calls).toEqual([
+      [
+        'sessions.archive',
+        {
+          expectedVersion: 1,
+          requestId: expect.stringMatching(/^desktop-/),
+          sessionId: 'session-1'
+        }
+      ],
+      [
+        'sessions.archive',
+        {
+          expectedVersion: 1,
+          requestId: expect.stringMatching(/^desktop-/),
+          sessionId: 'session-2'
+        }
+      ]
+    ])
+    expect(requestIds).toHaveLength(2)
+    expect(requestIds[0]).not.toBe(requestIds[1])
+  })
 })

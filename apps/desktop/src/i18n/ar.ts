@@ -1627,11 +1627,15 @@ export const ar = defineLocale({
       menuRename: 'إعادة تسمية…',
       menuPin: 'تثبيت',
       menuUnpin: 'إلغاء التثبيت',
+      menuArchive: 'أرشفة في AgentBox',
       pinned: 'مثبتة',
       renameTitle: name => `إعادة تسمية «${name}»`,
       renameFailed: 'تعذرت إعادة تسمية Session',
       pinFailed: 'تعذر تثبيت Session',
-      unpinFailed: 'تعذر إلغاء تثبيت Session'
+      unpinFailed: 'تعذر إلغاء تثبيت Session',
+      archiveTitle: name => `أرشفة «${name}» في AgentBox؟`,
+      archiveDesc: 'تؤرشف سجل Session في الخدمة فقط. يبقى السجل محفوظًا، ولا تُوقف أي مهام جارية، ولا تُمس أي ملفات.',
+      archiveFailed: 'تعذر أرشفة Session'
     },
     gatewayGroups: {
       grouping: 'البوابة والملف الشخصي',

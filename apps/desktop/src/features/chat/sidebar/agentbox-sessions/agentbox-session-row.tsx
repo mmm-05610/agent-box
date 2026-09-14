@@ -12,10 +12,12 @@ import type { SessionRecord } from '@/types/wire/wire-v1'
 
 import { SidebarRowBody, SidebarRowLead, SidebarRowLeadGlyph, SidebarRowShell } from '../chrome'
 
-/** The trailing menu's copy. The menu EXISTS only when the service declared
- *  `sessions.update`; the list injects handlers, this row never wires. */
+/** The trailing menu's copy. The menu EXISTS only when at least one handler
+ *  was injected (`sessions.update` for rename/pin, `sessions.archive` for
+ *  archive); the list injects handlers, this row never wires. */
 export interface AgentBoxSessionRowLabels {
   menuActions: string
+  menuArchive: string
   menuPin: string
   menuRename: string
   menuUnpin: string
@@ -26,6 +28,9 @@ export interface AgentBoxSessionRowProps {
   labels: AgentBoxSessionRowLabels
   /** The session's age for the secondary slot — localized by the list. */
   meta?: null | string
+  /** Archive this record on the service. Receives the row's own record at
+   *  intent time; the confirm dialog and the CAS belong to the list. */
+  onArchive?: () => void
   /** The row's ONE primary action: open the session the record stands for. */
   onOpen: () => void
   /** Maintenance affordances. Absent = no affordance and zero wire calls —
@@ -46,13 +51,14 @@ export interface AgentBoxSessionRowProps {
 export function AgentBoxSessionRow({
   labels,
   meta,
+  onArchive,
   onOpen,
   onPin,
   onRename,
   pending = false,
   session
 }: AgentBoxSessionRowProps) {
-  const kebab = onRename || onPin
+  const kebab = onRename || onPin || onArchive
     ? (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -76,6 +82,12 @@ export function AgentBoxSessionRow({
               <DropdownMenuItem disabled={pending} onSelect={() => onPin()}>
                 <Codicon name={session.pinned ? 'pinned' : 'pin'} size="0.875rem" />
                 <span>{session.pinned ? labels.menuUnpin : labels.menuPin}</span>
+              </DropdownMenuItem>
+            ) : null}
+            {onArchive ? (
+              <DropdownMenuItem disabled={pending} onSelect={() => onArchive()}>
+                <Codicon name="archive" size="0.875rem" />
+                <span>{labels.menuArchive}</span>
               </DropdownMenuItem>
             ) : null}
           </DropdownMenuContent>
