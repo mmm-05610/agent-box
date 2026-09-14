@@ -12,6 +12,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import stat
 import subprocess
@@ -335,11 +336,13 @@ def test_the_gate_never_swallows_a_removal_failure_in_source():
 
 # --------------------------------------------------------------------------
 # 提交态回归：假 token 每次运行现生成，被扫描的永远是本次那个值
+#
+# 阳性反证必须真的有一个 tracked 里含本次 token 的仓库，所以本文件自己建一个
+# **测试独占的临时 Git 仓库**（tmp_path 内 git init + 本地 user + add + commit），
+# 扫描仍旧走生产入口 `token_appears_in_tracked_content`。AgentBox 主仓的 index
+# 与工作树在整个文件里都不得被写入——下面的 autouse fixture 逐测试比对
+# porcelain 与 cached diff 来证明这件事。
 # --------------------------------------------------------------------------
-
-#: 受扫描的 tracked fixture 路径（测试期间临时登记为 tracked，结束时完整撤销）。
-TOKEN_PROBE = (Path(__file__).resolve().parents[2] / "tests" / "server" / "fixtures"
-               / ".opencode-gate-token-probe")
 
 
 def frozen_token(module, monkeypatch, digit: str) -> str:
@@ -352,21 +355,81 @@ def frozen_token(module, monkeypatch, digit: str) -> str:
     return module.TOKEN_PREFIX + digit * 32
 
 
-def restore_probe(repo: Path, probe: Path) -> None:
-    """把临时登记的 fixture 从 index 与工作树里完整撤销。"""
-    subprocess.run(["git", "-C", str(repo), "reset", "-q", "--", str(probe)],
-                   check=False, capture_output=True, text=True, timeout=120)
-    probe.unlink(missing_ok=True)
+def git(repository: Path, *arguments: str, check: bool = True) -> subprocess.CompletedProcess:
+    """在给定仓库里跑一条 git 命令（只由调用方决定它指向哪个仓库）。"""
+    return subprocess.run(
+        ["git", "-C", str(repository), *arguments],
+        check=check, capture_output=True, text=True, timeout=120,
+    )
 
 
-def test_the_dynamic_token_is_not_tracked_content(gate, monkeypatch, capsys):
+def main_repository_state(repository: Path) -> tuple[str, str]:
+    """主仓的不变式快照：porcelain 状态与 cached diff。"""
+    porcelain = git(repository, "status", "--porcelain=v1").stdout
+    cached = git(repository, "diff", "--cached", "--name-only").stdout
+    return porcelain, cached
+
+
+@pytest.fixture(autouse=True)
+def the_agentbox_index_and_worktree_stay_untouched(gate):
+    """本文件每个测试前后，主仓状态必须逐字节相同。
+
+    要求的是"前后一致"而不是"clean"：起始树若非 clean，测试只能保留并绕开，
+    不得顺手清理。任何对主仓的 index 写入都会在这里现形。
+    """
+    before = main_repository_state(gate.REPO)
+    yield
+    after = main_repository_state(gate.REPO)
+    assert after == before, (
+        "a regression in this file changed the AgentBox repository state",
+        {"before": before, "after": after},
+    )
+
+
+def isolated_token_repo(tmp_path: Path, token: str | None) -> Path:
+    """测试独占的临时 Git 仓库；给定 token 时把它提交成真正 tracked 的内容。
+
+    这里（且只有这里）允许 index 写入，因为它操作的是 tmp_path 里的仓库，不是
+    AgentBox 主仓；user.name / user.email 也只配置在该临时仓库本地。
+    """
+    repository = tmp_path / "token-probe-repository"
+    repository.mkdir(parents=True)
+    git(repository, "init", "-q")
+    git(repository, "config", "user.email", "token-probe@example.invalid")
+    git(repository, "config", "user.name", "AgentBox token probe")
+    fixture = repository / "tracked-fixture.txt"
+    fixture.write_text(
+        "a committed fixture that carries no gate token\n" if token is None else f"{token}\n",
+        encoding="utf-8",
+    )
+    git(repository, "add", "--", "tracked-fixture.txt")
+    git(repository, "commit", "-q", "-m", "token probe fixture")
+    return repository
+
+
+def test_the_scan_reads_only_what_the_repository_tracks(gate, monkeypatch, tmp_path):
+    """扫描入口的阴阳两性，都在测试独占的临时仓库里取证。"""
+    token = frozen_token(gate, monkeypatch, "a")
+    carrying = isolated_token_repo(tmp_path / "carrying", token)
+    clean = isolated_token_repo(tmp_path / "clean", None)
+
+    tracked = git(carrying, "ls-files").stdout.split()
+    assert tracked == ["tracked-fixture.txt"], tracked
+    assert git(carrying, "grep", "-q", "-F", "--", token, check=False).returncode == 0, (
+        "临时仓库里应当有一份真正 tracked 的 token 内容")
+
+    assert gate.token_appears_in_tracked_content(carrying, token) is True
+    assert gate.token_appears_in_tracked_content(clean, token) is False
+    assert gate.token_appears_in_tracked_content(carrying, token + "0") is False
+
+
+def test_the_dynamic_token_is_not_tracked_content(gate, monkeypatch, capsys, tmp_path):
     """提交态下，本次运行的假 token 不得出现在 tracked 内容里。
 
     门源码自己就在被扫描的树里：固定 token 会命中自己（这正是返修前提交后必红的
     原因）。这里冻结生成值跑完整流程，再对**运行期实际生成的那个值**做 git 扫描。
     """
-    token = frozen_token(gate, monkeypatch, "a")
-    restore_probe(gate.REPO, TOKEN_PROBE)
+    token = frozen_token(gate, monkeypatch, "b")
     with pytest.raises(RuntimeError) as outside:
         gate.current_token()
     assert "OPENCODE_GATE_NO_ACTIVE_RUN" in str(outside.value), (
@@ -408,32 +471,56 @@ def test_each_run_generates_its_own_token(gate, monkeypatch, capsys):
         assert value not in GATE.read_text(encoding="utf-8"), "token 本体不得写回源码"
 
 
-def test_a_token_that_reaches_tracked_content_fails_the_gate(gate, monkeypatch, capsys):
-    """反证：本次 token 一旦进入受扫描的 tracked fixture，门必须以类型化错误失败。
+def test_a_token_that_reaches_tracked_content_fails_the_gate(gate, monkeypatch, capsys, tmp_path):
+    """反证：本次 token 一旦进入受扫描的 tracked 内容，门必须以类型化错误失败。
 
-    fixture 只在本测试期间被登记为 tracked（intent-to-add），结束时连同 index 条目
-    一起撤销，工作树不留任何修改。
+    含 token 的仓库是测试独占的临时仓库（真有 commit，不是 mock 成常量 true）：
+    扫描函数被委托给它，逐次断言它收到的正是**本次注入的那个值**；AgentBox 主仓
+    自始至终只被读取。
     """
-    token = frozen_token(gate, monkeypatch, "b")
-    restore_probe(gate.REPO, TOKEN_PROBE)
-    TOKEN_PROBE.write_text(f"{token}\n", encoding="utf-8")
-    subprocess.run(["git", "-C", str(gate.REPO), "add", "-N", "--", str(TOKEN_PROBE)],
-                   check=True, capture_output=True, text=True, timeout=120)
-    try:
-        assert gate.token_appears_in_tracked_content(gate.REPO, token) is True, (
-            "被登记为 tracked 的 fixture 没有被扫描到，反证失去意义")
-        stub_gate(gate, monkeypatch)
-        code, report = run_gate(gate, monkeypatch, capsys, "--worker", str(WORKER), "--json")
-        assert code == 1, report
-        assert report["code"] == "OPENCODE_GATE_TOKEN_IN_GIT", report
-        assert report["cleanup"]["tokenInTrackedGitContent"] is True
-    finally:
-        restore_probe(gate.REPO, TOKEN_PROBE)
-    # 完整恢复：路径不存在、index 无条目、扫描重新归零。
-    assert not TOKEN_PROBE.exists()
-    status = subprocess.run(
-        ["git", "-C", str(gate.REPO), "status", "--porcelain", "--", str(TOKEN_PROBE)],
-        capture_output=True, text=True, timeout=120,
-    ).stdout.strip()
-    assert status == "", f"the token probe left tracked state behind: {status!r}"
-    assert gate.token_appears_in_tracked_content(gate.REPO, token) is False
+    token = frozen_token(gate, monkeypatch, "c")
+    carrying = isolated_token_repo(tmp_path, token)
+    scanned: list[tuple[str, str]] = []
+    real_scan = gate.token_appears_in_tracked_content
+
+    def scan_the_isolated_repository(root, value):
+        scanned.append((str(root), value))
+        return real_scan(carrying, value)
+
+    monkeypatch.setattr(gate, "token_appears_in_tracked_content", scan_the_isolated_repository)
+    stub_gate(gate, monkeypatch)
+    code, report = run_gate(gate, monkeypatch, capsys, "--worker", str(WORKER), "--json")
+
+    assert scanned, "门没有调用扫描入口"
+    assert {value for _root, value in scanned} == {token}, (
+        "门的扫描必须检查本次实际注入的值", scanned)
+    assert code == 1, report
+    assert report["code"] == "OPENCODE_GATE_TOKEN_IN_GIT", report
+    assert report["cleanup"]["tokenInTrackedGitContent"] is True
+    # 阳性事实来自临时仓库自己的 tracked 内容，而主仓对同一 token 仍是阴性。
+    assert git(carrying, "grep", "-q", "-F", "--", token, check=False).returncode == 0
+    assert real_scan(gate.REPO, token) is False
+    assert not (gate.REPO / "tests" / "server" / "fixtures" / ".opencode-gate-token-probe").exists()
+
+
+#: 会写 index 的 git 子命令（本文件只允许它们出现在临时仓库助手里）。
+INDEX_WRITING_SUBCOMMANDS = ("add", "commit", "reset", "restore", "checkout", "stash",
+                             "clean", "rm", "amend")
+
+
+def test_index_writing_git_commands_live_only_in_the_isolated_helper():
+    """index 写入只允许出现在临时仓库助手里，主仓永远只被读取。
+
+    这条守的是"以后别再长回来"：逐行找出真正会执行 git 的写子命令调用，要求它们
+    全部绑定在临时仓库变量上，且任何一行都不得把主仓 `gate.REPO` 当目标。
+    """
+    source = Path(__file__).read_text(encoding="utf-8")
+    pattern = re.compile(r'git\([^)]*"(?:%s)"' % "|".join(INDEX_WRITING_SUBCOMMANDS))
+    writing_lines = [line.strip() for line in source.splitlines() if pattern.search(line)]
+    assert writing_lines, "the isolated helper must still create a committed fixture"
+    for line in writing_lines:
+        assert line.startswith("git(repository,"), f"index write outside the helper: {line}"
+        assert "gate.REPO" not in line, f"index write against the AgentBox repository: {line}"
+    # 阳性对照：临时仓库助手确实做了 add + commit（否则上面的扫描可以全部通过而什么都没保证）。
+    joined = "\n".join(writing_lines)
+    assert '"add"' in joined and '"commit"' in joined
