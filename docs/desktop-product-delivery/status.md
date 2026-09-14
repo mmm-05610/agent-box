@@ -5,17 +5,22 @@
 
 ## 执行快照（handoff-policy 每阶段必填）— 接管施工中
 
-- updated_at: 2026-09-14 18:40 (+08:00)
+- updated_at: 2026-09-14 19:20 (+08:00)
 - 执行者: Zcode 前端产品 goal（新一轮会话，串行施工）；**已从 Codex 前端产品 goal 接管**
 - 工作树/分支: /home/maoqh/projects/agent-box-desktop-next-wsl-round1 @ feature/agentbox-desktop-product
+- 本阶段（P05 最终客户端审计）起点核验: HEAD `6ca5d17aff32d0f984fccd90cd507c98994bfe96`、
+  分支 feature/agentbox-desktop-product、`git status --short` 为空、`git diff --check` exit 0；
+  writer lease 仍为同一前端 goal 的 ACTIVE lease，无同工作树并发写入者。本阶段只做**只读审计**：
+  两个只读子代理（A 合同/事件/fixture、B legacy 可达性）并行调查且均被禁止写文件/stage/commit，
+  主执行者复核结论、逐行复验四处关键事实、跑定向门并串行写文档；完成后停止写入并回报，不提前 RELEASE。
 - 接管核验（历史，Zcode→Codex 交接）: 用户指定交接 HEAD `5c0fbfe` 与实际 HEAD
   `5c0fbfe119de5c2fe979e3964ad59223767398d7` 一致；接管前 `writer_lease=RELEASED`；
   未发现该工作树、Windows 构建树的 Electron/Vite/Vitest/Playwright/验收驱动进程；
   dirty 集合仅为下列 4 项已授权交接改动。发布源规则文件与本执行树逐文件 SHA-256 一致，
   保留本文件实时进度，不复制发布源初始状态。
-- 本阶段起点核验: HEAD `bd1b28b44a7565f6864d26b90bb30a991b0654e1`、分支
+- 上一阶段起点核验（历史）: HEAD `bd1b28b44a7565f6864d26b90bb30a991b0654e1`、分支
   feature/agentbox-desktop-product、工作树 clean，无同工作树并发写入者；writer lease 仍为同一
-  前端 goal 的 ACTIVE lease。本阶段按用户增量开了两个并行子代理（application/当前会话命令、
+  前端 goal 的 ACTIVE lease。该阶段按用户增量开了两个并行子代理（application/当前会话命令、
   侧栏归档交互），两个写集互不重叠且在委派时均未被主代理修改；主代理负责 `features.tsx` 三分支装配、
   定向/回归门、文档与提交。完成后停止写入并回报，不提前 RELEASE。
 - 代码检查点（已提交 HEAD）: `cbdccf7c`（P05 sessions.archive 生产接线：统一侧栏服务 Session 归档 +
@@ -55,7 +60,38 @@
   CAS、缺失/已归档 fail closed、不回落 legacy）；矩阵 28 reachable / 0 gap，SESSIONS_ARCHIVE_CLIENT_READY
   以本次提交为最终依据）**
 - 已消费发布文档提交: 86d5a7b、61c7ff7、d3c0196、ffbcfaf
-- 当前检查点改动（sessions.archive 生产接线，代码提交 `cbdccf7c`）: 归档的是服务 SessionRecord——底层
+- 当前检查点改动（**P05 最终客户端审计，只读 + 文档收口，无生产代码变化**，
+  产物 `evidence/P05-final-audit.md`）: 起点=终点 HEAD `6ca5d17a`，工作树 clean。实际结果——
+  （a）`WireMethods` 28 键与 `evidence/P05-client-matrix.md` 28 行**集合全等**（无遗漏/重复/多余），
+  逐行状态计数 28 `PRODUCTION_REACHABLE` 与表格声明一致，28/28 有真实生产调用者；
+  （b）摘要三方一致：TS 权威 `11e3b3e70d332585d31900c09ba063d95aa6b72b1904921c665fb72f81c10035`、
+  生成工件 `5d4fa3bfeec6c3273c6073b37794e4ab2aca6e07e48184bc3a2b878c1fe5e4ed`，与后端
+  `wire-review.md` 12:15 `WIRE_LOCKED_FOR_IMPLEMENTATION` 登记逐字节相同，且工件可由 TS 权威
+  按文档命令流式复现且逐字节相同；
+  （c）事件流九跳（renderer subscribe → preload → main sender-owned → main-only token/WS → 帧 schema
+  → reducer → gap 补水重订阅 → route 卸载/will-quit cleanup）**全部为生产接线**，token 只在 main
+  闭包与 HTTP/WS 头；
+  （d）**legacy 可达性未通过**：发现 5 条 `ACTIVE_AGENTBOX_BLOCKER`——状态栏 `getStatus()` 轮询
+  （挂载/聚焦即发，**无需用户任何操作**）、命令面板打开时的 `listAllProfileSessions`、侧栏搜索
+  `searchSessions`、Archived 视图 `loadArchivedSessions`（四条均**不查** `$gatewayState`），以及
+  持久化 "All profiles" 后的 Open folder；它们经 `api/client.ts` → `hermes:api` →
+  `api-proxy-ipc.ts` → `handleHermesApiRequest` → `ensureBackend` → **`startHermes()`**，
+  即不只读 legacy 数据还会**拉起 legacy 运行时**，而 `startHermes()` 不读取产品 runtime 策略
+  （全仓仅 `bootstrap-env-composition.ts:7194` 一处消费）；另有 1 条已上膛但当前无数据源的未匹配
+  本地行预览。两道 autostart 门（renderer `features.tsx:778`、Electron
+  `product-runtime-policy.ts`）**确实关闭**，但只约束急切启动；
+  （e）两处如实性更正：WS 空连接是静默 no-op（生产未传 `onError`），"诚实 unavailable"只对 HTTP 成立；
+  loopback 限制只在 WS，HTTP `requestUrl` 不校验 host；
+  （f）P07 检查点 3 fixture 九组编号齐全且核心行为有真实行为测试（含 accepted/rejected/unknown、
+  同 requestId 回查、队列三终态、`stop_requested`→终态、审批重放、history 快照/重同步），
+  但 §9.5 队列续派、§9.6 审批失效族、§9.8 Server 重启核对**无测试**，`execution.state` 只验了 `failed`；
+  （g）矩阵两处事实错误就地更正（发送三件套其实有 hello 门；队列能力门在 AgentBox 面不生效）。
+  定向门：UI 4 files / **63 tests passed, exit 0**（core-v1 fixture、wire-v1-client、
+  wire-session-control、agentbox-main-chat）；Electron 4 files / **22 tests passed, exit 0**
+  （workcore-wire-ipc、agentbox-wire-transport、agentbox-wire-event-transport、
+  agentbox-service-composition）。本阶段**未修改任何 TS/TSX、测试、schema、合同、Electron、preload、
+  package/lock 或后端文件**，未跑完整 9600+ 套件、未跑 Windows、未运行模型。
+- 上一检查点改动（sessions.archive 生产接线，代码提交 `cbdccf7c`）: 归档的是服务 SessionRecord——底层
   `$agentBoxSessions` **保留**归档记录（含服务返回的 `archivedAt`），侧栏纯投影因 `archivedAt !== null` 移除
   该行；不删除历史/消息、不停止运行、不归档 Workspace/Profile、不触碰文件，不做 `SessionRecord`→`SessionInfo`
   转换。application 侧 `archiveAgentBoxSession` 仍是唯一 seam，payload 收窄为显式 `{sessionId,
@@ -73,8 +109,8 @@
   `features.tsx` 的当前会话归档命令（`session.archive` 快捷键）在 AgentBox route 走同一 CAS，成功后不导航、
   不清 route、不停止运行；非 Session route 旧行为不变。i18n 新增 `menuArchive`/`archiveTitle`/`archiveDesc`/
   `archiveFailed`（type 与六语言同步）。矩阵 `sessions.archive` 改为 `PRODUCTION_REACHABLE`（EXT），汇总
-  **28 reachable / 0 gap**；G5b 改写为接线记录；P05 仍 IN_PROGRESS（待下一阶段最终矩阵/fixture/legacy 审计），
-  REAL_FLOW_VERIFIED 仍为否。
+  **28 reachable / 0 gap**；G5b 改写为接线记录；该检查点当时记 P05 仍 IN_PROGRESS（待最终矩阵/fixture/legacy
+  审计，**该审计已于 `6ca5d17a` 执行**，结果见本文件当前检查点）；REAL_FLOW_VERIFIED 仍为否。
 - 上一检查点改动（sessions.update 侧栏投影服务状态边界返修）: 把 Workspace **归属**与**服务可调用性**分开——
   `agentBoxWorkspaceFor` 只按缓存 `$agentBoxWorkspaces` 与既有完整 `{kind,user,host}` + normalized path 匹配，
   不再要求 `phase === 'ready'`，因此 loading/unavailable 期间本地行不再回落 legacy `SessionInfo` 预览、WSL 行
@@ -150,17 +186,27 @@
   部分成功保留服务确认的名称/版本与草稿，重试不重发改名；成功后重读 describe 采用服务规范化结果。
 - 当前阶段: P00 GREEN；P01 GREEN；**P07 检查点 1–6 完成且 wire 已锁定**；
   P02 A/B1/B2/C（角色页只读→默认配置编辑）/D 与 B3 服务投影已提交；P03 纵切 1–4 已提交；
-  P04 切片1–8已提交；**P05 sessions.archive 客户端接线已提交（`cbdccf7c`，SESSIONS_ARCHIVE_CLIENT_READY
-  以该提交为最终依据）；28 方法矩阵 28 生产可达 / 0 前端缺口；P05 仍 IN_PROGRESS，等待下一阶段最终
-  矩阵/fixture/legacy 审计与 P06 独立验收**
+  P04 切片1–8已提交；P05 sessions.archive 客户端接线已提交（`cbdccf7c`）；
+  **P05 最终客户端审计已执行（只读，`6ca5d17a`，产物 `evidence/P05-final-audit.md`）：
+  28 方法矩阵 28 生产可达 / 0 前端缺口且集合与计数机械全等、摘要三方一致、事件链生产接线完整；
+  但 legacy 可达性未通过（5 条 `ACTIVE_AGENTBOX_BLOCKER` + 1 条已上膛）**
+  　→ **P05 保持 PARTIAL / IN_PROGRESS，阶段标记 `CLIENT_MATRIX_COMPLETE_LEGACY_CLOSEOUT_REQUIRED`；
+  不声明 P05_CLIENT_GREEN**（已证明 AgentBox 正常产品外壳仍有 legacy Hermes 触达路径）；
+  P06 独立验收待续
 - 完成范围: P00；P01 全部返修（真机 27 PASS）；P07 检查点 1（语义映射）、检查点 2
   （wire-v1 候选：17 方法 + schema 测试 + JSON Schema 工件；已消费后端机械反馈并回应）；
   P02A（失败面非阻塞+可关闭、Artifacts 页退役、失败终态竞态修复与真机门）
-- 下一项: 不自行启动 P05 最终审计或 P06。下一阶段按 P06 收口无模型独立验收（最终 28 方法矩阵/fixture
-  对账、前端 legacy 消费者剩余账本）；Server lifecycle connection 合同到达后接生产接线，再验证 REAL_FLOW。
-  不再重新研究协议。
-- 阻断: 无真实阻断。剩余 P04 production lifecycle connection 与显式 legacy 消费者收口、
-  P05 最终矩阵/fixture/legacy 审计（28 方法已 28 生产可达 / 0 前端缺口）和 P06 独立验收待续；
+- 下一项: 按 `evidence/P05-final-audit.md` §6 的互不重叠写集先做 legacy 收口：**W4 结构门（先立）**
+  `app/composition/registrations` 之外的 renderer `api/client.ts` + main `hermes:api` 处加产品 runtime
+  拒绝策略；**W1** 状态栏 `use-status-snapshot.ts` + `surfaces.tsx` 注入中立状态来源；
+  **W2** 命令面板 `command-palette/body.tsx` 会话行改读 AgentBox 目录；**W3** 侧栏 `chat-sidebar.tsx`
+  搜索/归档改走中立来源（`store/sidebar-archive.ts` 同批）；**W5** 资源层加固（HTTP 复用 WS 的
+  loopback 判据、WS 空连接改为可观测）。四组写集互不重叠，W4 先落地可把现状变成诚实不可用。
+  完成后再按 P06 收口；Server lifecycle connection 合同到达后接生产接线，再验证 REAL_FLOW。
+  不再重新研究协议，不因矩阵 28/28 跳过 legacy 收口。
+- 阻断: **有前端阻断（本端可修，非外部）**：`ACTIVE_AGENTBOX_BLOCKER` B1–B5 使 AgentBox 正常产品
+  外壳仍可触达 Hermes REST 并拉起 legacy 运行时，故不能声明产品完成/CLIENT_GREEN；
+  另有 P04 production lifecycle connection（外部合同）与 P06 独立验收待续；
   wire 摘要已锁定，真实全栈仍由后续集成人验证
 
 - contract_semantics_version: core-semantics/1（APPROVED_SEMANTICS，2026-09-14）
@@ -168,23 +214,42 @@
   sha256:11e3b3e70d332585，工件 sha256:5d4fa3bfeec6c327；后端 `c8d9d3c` 以该工件
   29 passed in 67.57s 并登记同一摘要；锁定不替代生产联调
 - 合同测试: schema/client/fixture 3 files / 34 tests passed；queue 终态合并面 2 files / 31 tests、
-  core fixture 1 file / 10 tests passed；core v1 §9 九组场景矩阵已完整执行；
-  真实 wire event stream 与后端投影差异仍是联调项，不以 fixture 伪称服务通过
+  core fixture 1 file / 10 tests passed；core v1 §9 九组场景矩阵已执行，但**最终审计确认三处深度缺口**
+  （§9.5 队列续派、§9.6 审批失效族、§9.8 Server 重启核对无测试；`execution.state` 只验 `failed`），
+  故不得声称 fixture 覆盖完整；真实 wire event stream 与后端投影差异仍是联调项，
+  不以 fixture 伪称服务通过
 - UI_READY: 侧栏工作区列表（36R+P01）真机全绿；P02A 真机 8 PASS / 0 FAIL / 1 PENDING
 - CONTRACT_CLIENT_READY: wire-v1 客户端/fixture 与 28 方法摘要 LOCKED；production request/event
   transport 已接线，28 个方法在 AgentBox 产品组合中全部有生产调用者（`cbdccf7c` 后 0 前端缺口）；
-  Server lifecycle connection 来源待正式跨端合同
+  摘要三方一致且工件可流式复现（`6ca5d17a` 复核）；Server lifecycle connection 来源待正式跨端合同。
+  **该标签只覆盖 wire-v1 方法面，不覆盖 legacy REST 可达性**（见下行）
+- LEGACY_CLIENT_CLOSEOUT: **未通过**（`6ca5d17a` 最终审计）——5 条 `ACTIVE_AGENTBOX_BLOCKER`
+  （状态栏轮询 / 命令面板 / 侧栏搜索 / Archived / 条件性 Open folder）+ 1 条已上膛的未匹配本地行预览；
+  见 `evidence/P05-final-audit.md` §4、§6
 - REAL_FLOW_VERIFIED: 否（无真实 Server/Harness 链路证据）
 
 - frontend_implementation: PARTIAL（P02A、P02B1、P02B2、P02C1、P02C2、P02D/B3、Profile 默认配置
   编辑、P03 主 route 服务投影、P05 sessions.update 统一侧栏接线（含 `86911029` 服务状态边界返修）与
-  P05 sessions.archive 统一侧栏归档/当前会话归档命令（`cbdccf7c`）已完成；P04/P05/P06 待收口）
-- writer_lease: **ACTIVE — Zcode frontend goal**（2026-09-14 接管自 Codex 前端产品 goal；本阶段
-  起点 `bd1b28b4`、工作树 clean，两个并行子代理写集互不重叠，完成后停止写入不 RELEASE；提交
-  `cbdccf7c` 后无未提交改动；后端工作树只读，Windows 构建/验收资源串行）
+  P05 sessions.archive 统一侧栏归档/当前会话归档命令（`cbdccf7c`）已完成；**P05 最终审计已完成但
+  legacy 收口未通过**，P04/P05/P06 待收口）
+- writer_lease: **ACTIVE — Zcode frontend goal**（2026-09-14 接管自 Codex 前端产品 goal；
+  本阶段起点 `6ca5d17a`、工作树 clean、只读审计只写文档，两个只读子代理未写任何共享文件，
+  完成后停止写入不 RELEASE；后端工作树只读，Windows 构建/验收资源串行）
 
 ## 测试与基线（接力会话实跑）
 
+- **P05 最终客户端审计（`6ca5d17a`，只读）**：定向门 `npx vitest run --project ui
+  src/types/wire/fixtures/core-v1.test.ts src/api/wire-v1-client.test.ts
+  src/application/session/wire-session-control.test.ts
+  src/app/composition/wiring/agentbox-main-chat.test.tsx` → **4 files / 63 tests passed, exit 0**；
+  `npx vitest run --project electron electron/ipc/workcore-wire-ipc.test.ts
+  electron/security/agentbox-wire-transport.test.ts
+  electron/security/agentbox-wire-event-transport.test.ts
+  electron/composition/agentbox-service-composition.test.ts` → **4 files / 22 tests passed, exit 0**。
+  机械核验：`WireMethods` 28 键 ↔ 矩阵 28 行集合全等（missing/extra/duplicate 均空）、
+  逐行状态计数 28 `PRODUCTION_REACHABLE`、`git diff --check` exit 0、`git status --short` 空。
+  摘要：TS `11e3b3e7…c10035` / 工件 `5d4fa3bf…5e4ed`，工件可由 TS 权威流式复现且逐字节相同。
+  未跑完整 9600+ 套件、未跑 Windows、未运行模型、未装依赖、未读密钥、未改生产代码。
 - 本地：P02A 相关组件/连接面 3 files / 22 tests passed；合并面 3 files / 31 tests passed；
   改动文件 ESLint 0 error / 0 warning；三项目 typecheck 通过；`git diff --check` 干净。
 - Windows P02A：`docs/validation/windows-acceptance-p02a/runs/` 保留 p02a6/p02a7 两轮
@@ -232,7 +297,9 @@
   回收 owned process，shutdown/晚到启动不能发布 ready；production artifact/plan 仍待正式合同。
 - P04 宿主纵切 4：gateway boot 1 file / 48 tests passed；三项目 typecheck、受影响文件 ESLint 与
   diff check 通过。产品 composition 在读取 Hermes bridge 前关闭 legacy autostart；gateway 不伪造
-  open，旧 boot overlay 退出，AgentBox availability 保持独立。
+  open，旧 boot overlay 退出，AgentBox availability 保持独立。**范围更正（`6ca5d17a` 最终审计）**：
+  "在读取 Hermes bridge 前关闭"只对 `useGatewayBoot` 这条路径成立——状态栏、命令面板、侧栏搜索/归档
+  等其他已挂载面**不经过该门**即读取 bridge，见 `evidence/P05-final-audit.md` §4.3。
 - P04 宿主纵切 5：product runtime policy + main-window lifecycle 2 files / 7 tests passed；Electron
   typecheck、受影响文件 ESLint、Prettier 与 diff check 通过。正常 createWindow 对 AgentBox runtime
   调 legacy starter 0 次；仅显式 legacy 分支保留，不伪造 AgentBox ready。
@@ -416,10 +483,10 @@ wire-review.md通道自39阶段协调。执行者下个检查点消费这些规�
 | P01 36R收口 | GREEN | 真机 27 PASS/2 SKIP/1 PENDING（evidence/P01.md；本地打开 PENDING 转 P05） |
 | P02 上层产品 | IN_PROGRESS（A/B/C/D 主面与服务投影完成；Profile 默认配置编辑、Workspace 选择登记、统一侧栏服务 Session 投影/改名/置顶与 **Session 归档**已接（含 `86911029` 服务状态边界返修与 `cbdccf7c` 归档接线）；矩阵 28 生产可达 / 0 前端缺口） | P01 已满足 |
 | P03 用例状态与API | IN_PROGRESS（主 route 生产调用者与 event reducer 接入已完成；真实 Server 源待 P04） | 与 P02 穿插 |
-| P04 宿主与遗留退役 | IN_PROGRESS（production request/Session-event transport + IPC + supervisor；正常冷启动 Hermes 自动门已退役，Server connection合同待后端） | 与 P03 穿插 |
-| P05 正式合同接入 | IN_PROGRESS（SESSIONS_ARCHIVE_CLIENT_READY，以 `cbdccf7c` 为最终依据；28 方法矩阵：**28 生产可达 / 0 前端缺口**；`config.resolve`、`workspaces.open`、`workspaces.archive`、`workspaces.browse`、`sessions.update`、`sessions.archive` 已接；剩余为 lifecycle 外部缺口与下一阶段最终矩阵/fixture/legacy 审计） | wire 双端锁定 |
-| P06 前端验收与交接 | IMPLEMENTATION_HANDOFF_GATE | 本端独立范围完成；真实全栈门由后续集成人负责 |
-| P07 核心合同与状态交接 | 检查点1–6已提交；WIRE_LOCKED | 28 方法双端摘要一致；fixture/客户端已锁定 |
+| P04 宿主与遗留退役 | IN_PROGRESS（production request/Session-event transport + IPC + supervisor；两道急切 autostart 门已退役，**但惰性 `hermes:api` 门未收口——最终审计确认产品外壳仍可经它拉起 legacy Hermes**，见 `evidence/P05-final-audit.md` §4.2/§6 W4；Server connection合同待后端） | 与 P03 穿插 |
+| P05 正式合同接入 | IN_PROGRESS / **`CLIENT_MATRIX_COMPLETE_LEGACY_CLOSEOUT_REQUIRED`**（`6ca5d17a` 最终审计：28 方法矩阵 **28 生产可达 / 0 前端缺口**、集合与计数机械全等、摘要三方一致、事件链生产接线完整；**legacy 可达性未通过 → 5 条 `ACTIVE_AGENTBOX_BLOCKER` + 1 条已上膛**，故不得声明 CLIENT_GREEN；`config.resolve`、`workspaces.open`、`workspaces.archive`、`workspaces.browse`、`sessions.update`、`sessions.archive` 已接；剩余为 §6 W1–W5 写集与 lifecycle 外部缺口） | wire 双端锁定 |
+| P06 前端验收与交接 | IMPLEMENTATION_HANDOFF_GATE（**前置未满足**：P05 的 `ACTIVE_AGENTBOX_BLOCKER` 未收口前不得进入独立验收/交接；真实全栈门由后续集成人负责） | 本端独立范围完成但 legacy 收口待做 |
+| P07 核心合同与状态交接 | 检查点1–6已提交；WIRE_LOCKED（**检查点 3 的 fixture 深度经最终审计下调**：§9.5/§9.6/§9.8 无测试，不得声称完整覆盖） | 28 方法双端摘要一致；fixture/客户端已锁定 |
 
 ## 测试与证据基线（本轮实跑）
 

@@ -1,8 +1,14 @@
 # P05 最终客户端矩阵审计（28 RPC + 事件流）
 
-日期：2026-09-14。审计 HEAD：`280b3cbcae6b84fe7fce85b99698fdeef0d8a94f`
-（分支 `feature/agentbox-desktop-product`，工作树 clean）。
+日期：2026-09-14。初次审计 HEAD：`280b3cbcae6b84fe7fce85b99698fdeef0d8a94f`；
+**最终审计（本文件当前状态）HEAD：`6ca5d17aff32d0f984fccd90cd507c98994bfe96`**
+（分支 `feature/agentbox-desktop-product`，工作树 clean，`git diff --check` exit 0）。
 本文件只盘点**实际生产接线与缺口**，不修改生产代码。
+
+> **最终审计更正（2026-09-14）**：28 方法矩阵、摘要与事件流结论经复核**维持不变**；
+> §5 遗留 Hermes 可达性结论**作废并已改写**（下方 §5 就地更正）。完整依据与逐链清单见
+> [`P05-final-audit.md`](P05-final-audit.md)。阶段状态因此为
+> **P05 PARTIAL / IN_PROGRESS，标记 `CLIENT_MATRIX_COMPLETE_LEGACY_CLOSEOUT_REQUIRED`**。
 
 **增量（2026-09-14，代码检查点 `cbdccf7c`）**：`sessions.archive` 已按 G5b 的目标文件与不变量完成生产接线
 ——统一侧栏的 `AgentBoxSessionRow` 增加独立归档菜单项，`AgentBoxSessionList` 持有唯一 `{displayName,
@@ -407,14 +413,21 @@ connection（不计作前端缺口）。
 
 **次级观察（非产品阻断，建议下一机械实现一并处理）**
 - 现状：hello 能力门只覆盖 profiles 维护 4 方法、providerModels 维护 4 方法、`profiles.list`、
-  `providerModels.list` 与 queue 控件（`store/agentbox-service.ts:46,50`、
-  `features/profiles/index.tsx:86`、`features/settings/agentbox-model-settings.tsx:46`、
-  `features/chat/composer/chat-bar.tsx:159`）。
-  `sessions.*`、`workspaces.*`、`sessions.createAndSend/send`、`sendOutcome.query`、`runs.stop`、
-  `approvals.decide`、`history.snapshot` 的调用只依赖 `$agentBoxService.phase==='ready'`，不逐方法查
-  hello 声明；未声明时会以服务 typed 错误（`CAPABILITY_UNSUPPORTED`/`UNAVAILABLE`）呈现，而不是
-  在 UI 上提前禁用。建议为发送/停止/审批/队列这些"会假装成功"的入口补 hello 门（不猜测支持）。
-  建议验收：hello 缺少 `sessions.createAndSend` 时提交按钮禁用并给出该 reason，且不产生任何调用。
+  `providerModels.list`、`workspaces.*`（含 `workspaces.open/browse/archive`）、`config.resolve`、
+  发送三件套（`sessions.createAndSend`/`sessions.send`/`sendOutcome.query`，见
+  `app/composition/wiring/agentbox-main-chat.ts:256-274`）与 `sessions.update/archive`。
+- **2026-09-14 最终审计更正两处**：
+  1. 原称发送三件套"只依赖 `phase==='ready'`、不逐方法查 hello"**错误**——发送面确实查
+     `sendOutcome.query`/`config.resolve`/发送动词声明；该缺口描述只适用于其余方法。
+  2. 原称队列 UI 操作需 hello `queue` + `state.queue.authority==='server'`**对 AgentBox 面不成立**：
+     `features/chat/composer/chat-bar.tsx:159` 的 `serverQueueSupported` 只用于 `!agentBoxAuthority`
+     分支（`:346-362`），AgentBox 面的 `busyAction` 恒为 `stop`，队列面板（`agentbox-queue-panel.tsx`）
+     渲染时不查该能力门。
+- 仍**无**逐方法 hello 门的方法：`config.describe`、`sessions.switchProfile`、`queue.get`、
+  `queue.withdraw`、`runs.stop`、`approvals.decide`、`history.snapshot`。未声明时以服务 typed 错误
+  （`CAPABILITY_UNSUPPORTED`/`UNAVAILABLE`）呈现，而非 UI 提前禁用。建议为停止/审批/队列这些
+  "会假装成功"的入口补 hello 门（不猜测支持）。
+  建议验收：hello 缺少 `runs.stop` 时停止入口禁用并给出该 reason，且不产生任何调用。
 
 ## 4. `EXTERNAL_LIFECYCLE_BLOCKED` 的精确边界（单一外部缺口）
 
@@ -430,31 +443,51 @@ null**。因此这些方法的运行终态都属于同一个 `EXTERNAL_LIFECYCLE
 - `electron/security/agentbox-wire-transport.ts:98`：无连接时返回 `UNAVAILABLE` typed 错误
   （无固定 8732、无测试替身、无 Hermes 回落）。
 - `electron/workcore/slot.ts`：生产未安装任何 lifecycle（只有测试安装）。
-- 事件流同样终止于此：`agentbox-wire-event-transport.ts` 连接为 null 时诚实 unavailable。
+- 事件流同样终止于此。**2026-09-14 最终审计更正**：WS 在连接为 null 时并非"诚实 unavailable"——
+  `agentbox-wire-event-transport.ts:103-105` 返回**静默 no-op unsubscribe**，且生产组合未传 `onError`
+  （`agentbox-service-composition.ts:50-53`），连接缺失在 renderer 侧不可观测。HTTP 侧才是诚实的
+  （抛 typed `UNAVAILABLE`，`agentbox-wire-transport.ts:57-59,98-100`）。另：loopback 限制只存在于 WS
+  （`agentbox-wire-event-transport.ts:26-65`），HTTP `requestUrl`（`agentbox-wire-transport.ts:29-43`）
+  不校验 host。两项均登记为接线同批要收紧的加固项（最终审计 §6 W5）。
 
 一旦 lifecycle 在 readiness 后安装 `{endpoint, sessionToken}`，这 28 个方法与事件流即可在**不改
 客户端**的前提下进入真实联调；在此之前 REAL_FLOW 未验证，也不得声称。
 
 ## 5. 遗留 Hermes 可达性结论
 
-结论：**AgentBox 产品主路径不含 Hermes 专属控制流**；残留项集中在产品外壳的一个共享侧栏数据源
-与几处已无触发点的挂载/死代码。
+> **2026-09-14 最终审计更正**：本节原结论"AgentBox 产品主路径不含 Hermes 专属控制流"**不成立，已作废**。
+> 原核对只覆盖 `$gatewayState === 'open'` 门控的批量会话树/项目树/浮层，漏掉**不查该状态**的四条路径：
+> 状态栏 `getStatus()` 轮询（挂载/聚焦即发）、命令面板打开时的 `listAllProfileSessions`、侧栏搜索
+> `searchSessions`、Archived 视图 `loadArchivedSessions`。它们经 `api/client.ts:96-98` → `hermes:api` →
+> `electron/ipc/api-proxy-ipc.ts:36-64` → `handleHermesApiRequest` → `ensureBackend`
+> （`bootstrap-env-composition.ts:5570-5589`）→ `startHermes()`：**不只读 legacy 数据，还会拉起 legacy 运行时**，
+> 而 `startHermes()` 不读取产品 runtime 策略（全仓仅 `:7194` 一处消费）。另有 1 条条件路径
+> （持久化 "All profiles" 后 Open folder）与 1 条已上膛但当前无数据源的未匹配本地行预览。
+
+**取代码的结论**：主 route 的聊天面确实只有 AgentBox 面；但**共享外壳**（状态栏、命令面板、侧栏搜索/归档）
+存在 `ACTIVE_AGENTBOX_BLOCKER`。下表逐面记录事实；其中"侧栏会话列表"一行**只对** `$gatewayState === 'open'`
+门控的部分成立，不得推广到状态栏/命令面板/搜索/归档。逐链记录、分类与最小写集见
+[`P05-final-audit.md`](P05-final-audit.md) §4/§6。
 
 | 面 | 结论 | 依据 |
 | --- | --- | --- |
 | 主 route / 聊天面 | 仅 `AgentBoxChatView`（`app/composition/registrations/surfaces.tsx:113`）；legacy `ChatView`（`features/chat/index.tsx`）只被 `wiring/types.ts` 作**类型**引用，未挂载 | 非测试导入链 |
+| 状态栏（**新增行**） | `StatusbarSurface`（`surfaces.tsx:62-78`）经 `use-status-snapshot.ts:44-60` **无条件**调 `getStatus()`（仅 visibility/focus 门），经 `hermes:api` 触达 legacy REST 并拉起 legacy 运行时 → `ACTIVE_AGENTBOX_BLOCKER` | 最终审计 §4.3 B1 |
+| 命令面板（**新增行**） | `features.tsx:1192` 常挂；打开时 `command-palette/body.tsx:203-206` 发 `listAllProfileSessions(200,1,'exclude')`，无 `enabled` 门 → `ACTIVE_AGENTBOX_BLOCKER` | 最终审计 §4.3 B2 |
+| 侧栏搜索 / Archived（**新增行**） | `chat-sidebar.tsx:438-469`（搜索）与 `:1153-1157`（归档）在 `showSessionSections` 可见时**不查** `$gatewayState` 即发 legacy REST → `ACTIVE_AGENTBOX_BLOCKER` | 最终审计 §4.3 B3/B4 |
 | Composer | `ChatBar` 以 `runtimeAuthority="agentbox"`、`gateway={null}`、`model.hidden=true` 挂载（`features/chat/agentbox-chat-view.tsx:133-197`） | 同文件 + `features/profiles` 模型控件中立化证据 |
 | Profiles / Models | `ProfilesView`（四方法 hello 门）、`AgentBoxModelSettings`（四方法 hello 门） | `features/profiles/index.tsx:86`、`features/settings/agentbox-model-settings.tsx:46` |
 | 冷启动 | renderer 与 Electron 两道 legacy 自动启动门均已关闭（P04 切片 4/5） | `evidence/P04.md` + `electron/app/product-runtime-policy.ts` |
-| 侧栏会话列表 | **部分迁移（`8cdd1381` + `cbdccf7c`）**：统一工作区列表里**已匹配服务 Workspace 的展开内容**改由 AgentBox 服务投影接管（`agentbox-sessions/` + `workspace-list`，零 legacy 调用），其上的改名/置顶（`sessions.update`）与归档（`sessions.archive`）都只走服务 seam，不再使用 legacy 归档入口；**未匹配的 shell 行、扁平/进入视图与遗留会话树**仍是 legacy Hermes 数据面——`ChatSidebar` 由产品外壳挂载（`surfaces.tsx:48`），其会话节点走 `application/session-lists.ts` → `api/sessions.ts` → `api/client.ts`（`window.hermesDesktop.api`），并以 `$gatewayState==='open'` 为条件（`chat-sidebar.tsx:540`） | 非测试导入链 + `api/client.ts:82-103` + 本检查点验收门 |
-| 工作区根列表 | 已是中立的 36R 行：本地行来自本机项目存储、WSL 行来自宿主能力；选择经中立 store 驱动 AgentBox 侧解析 | `features/chat/sidebar/workspace-list/workspace-list.tsx`、`agentbox-main-chat.ts` |
+| 侧栏会话列表 | **部分迁移（`8cdd1381` + `cbdccf7c`）**：统一工作区列表里**已匹配服务 Workspace 的展开内容**改由 AgentBox 服务投影接管（`agentbox-sessions/` + `workspace-list`，零 legacy 调用），其上的改名/置顶（`sessions.update`）与归档（`sessions.archive`）都只走服务 seam，不再使用 legacy 归档入口；**未匹配的 shell 行、扁平/进入视图与遗留会话树**仍是 legacy Hermes 数据面——`ChatSidebar` 由产品外壳挂载（`surfaces.tsx:48`），其会话节点走 `application/session-lists.ts` → `api/sessions.ts` → `api/client.ts`（`window.hermesDesktop.api`）。**门控范围更正**：`$gatewayState==='open'`（`chat-sidebar.tsx:540`）只约束**批量会话树/项目树**这一批；侧栏**搜索**（`:438-469`）与 **Archived**（`:1153-1157`）不查该状态，属 §4.3 的 blocker | 非测试导入链 + `api/client.ts:82-103` + 最终审计 §4.3 B3/B4 |
+| 工作区根列表 | 已是中立的 36R 行：本地行来自本机项目存储、WSL 行来自宿主能力；选择经中立 store 驱动 AgentBox 侧解析；**未匹配本地行**的 legacy 预览分支（`workspace-list.tsx:150-166`）当前无数据源故不触发，但已上膛 | `features/chat/sidebar/workspace-list/workspace-list.tsx`、`agentbox-main-chat.ts`、最终审计 §4.3 B6 |
 | 旧 Profile 对话框 | `create/delete/rename-profile-dialog` 只被 `features/chat/sidebar/profile-switcher.tsx` 引用，而该组件**无任何挂载点** → 不可达（保留文件与其测试） | 非测试导入链 |
 | 旧模型浮层 | `ModelPickerOverlay`/`ModelVisibilityOverlay` 在 `features.tsx` 全应用挂载，但其开合来自 legacy 模型控件 store（`$modelPickerOpen`、`use-model-controls`），AgentBox 聊天面既隐藏模型 pill 也不驱动它们 → 挂载但无 AgentBox 触发点 | `features/profiles/model-picker-overlay.tsx:55`、`agentbox-chat-view.tsx:135` |
-| `plugins/hermes-bots` | 随包注册且默认开启（`src/extension/contrib/plugins.ts`），其数据面是 legacy gateway（`host.request('profiles.list'/'profiles.configure'/'profiles.get_asset'/'profiles.create')`）。这些**不是** wire-v1 方法，也不得计作 AgentBox 生产接线；其产品入口已在 P02A 退役 | `src/plugins/hermes-bots/**`、`evidence/P02.md` |
+| `plugins/hermes-bots` | 随包注册且默认开启（`src/extension/contrib/plugins.ts`），其数据面是 legacy gateway（`host.request('profiles.list'/'profiles.configure'/'profiles.get_asset'/'profiles.create')`）。这些**不是** wire-v1 方法，也不得计作 AgentBox 生产接线；其产品入口已在 P02A 退役，pane 注册被注释（`plugin.tsx:375-387`） | `src/plugins/hermes-bots/**`、`evidence/P02.md`、最终审计 §4.3 |
 
-允许保留（不视为缺陷）：显式 legacy 分支与宿主能力共用代码、历史迁移键、品牌/版权数据、
-只读旧历史兼容、以及上表中"挂载但无 AgentBox 触发点"的待退役项——退役按 P04 消费者审计账本
-逐项进行，本阶段只记录事实。
+允许保留（不视为缺陷）：显式 legacy 分支与宿主能力共用代码（`EXPLICIT_LEGACY_COMPAT_ALLOWED` 当前生产条目为 0，
+凡可达者一律按 blocker 记账）、历史迁移键、品牌/版权数据、只读旧历史兼容、以及上表中"挂载但无 AgentBox
+触发点"的待退役项——退役按 P04 消费者审计账本逐项进行。**但"共享外壳"不构成保留理由**：
+状态栏、命令面板、侧栏搜索/归档四条路径必须按最终审计 §6 的 W1–W4 关闭。
 
 ## 6. 事件流（`wire.eventStream/1`，不计入 28 RPC）
 
@@ -520,7 +553,9 @@ dynamic connection slot            electron/composition/agentbox-service-composi
 | --- | --- |
 | `node -e "import('./src/types/wire/wire-v1.ts').then(m=>console.log(Object.keys(m.WireMethods).length))"`（apps/desktop） | `28` |
 | `WireMethods` 键与矩阵首列逐项比较（一次性只读 node + python 管道，排序后全等比较） | 28 ↔ 28 全等：无遗漏、无重复、无多余 |
-| `sha256sum src/types/wire/wire-v1.ts generated/wire-v1.schema.json` | `11e3b3e7…c10035` / `5d4fa3bf…5e4ed`，与后端登记一致 |
+| `sha256sum apps/desktop/src/types/wire/wire-v1.ts docs/desktop-product-delivery/contracts/wire-v1/generated/wire-v1.schema.json`（**路径更正**：`apps/desktop/` 下无 `generated/`，工件在 `docs/.../contracts/wire-v1/generated/`） | `11e3b3e7…c10035` / `5d4fa3bf…5e4ed`，与后端登记一致 |
+| 生成工件复现（`node --experimental-strip-types … wireJsonSchemas()` 流式输出 + `sha256sum`，不落盘） | 与入库工件逐字节相同（证明其确由 TS 权威生成、非手改） |
+| 最终审计定向门（`6ca5d17a`，见 `P05-final-audit.md` §8） | UI 4 files / 63 tests、Electron 4 files / 22 tests，均 exit 0 |
 | `grep -rn "\.call('" src --include=*.ts --include=*.tsx \| grep -v test` | 28 方法调用点全部落在上表 application 入口 |
 | `git diff --check` | 通过（exit 0） |
 | config.resolve 接线定向门（`940c9df4`，5 files / 47 tests） | 通过（exit 0） |
@@ -562,8 +597,15 @@ package/lock、后端与 Windows 构建树；未重跑完整测试、未跑 Wind
 `SESSIONS_ARCHIVE_CLIENT_READY` 以该提交为最终依据；P05 仍 IN_PROGRESS，待下一阶段最终矩阵/fixture/legacy 审计。
 
 未决（不因本审计消失）：
-- 真实 Server lifecycle connection（§4）→ 阻断 28 个方法与事件流的 REAL_FLOW 验证。
-- 侧栏会话列表的 legacy 数据面（§5）→ P03/P04 迁移账本中最重的剩余消费者。
+- **`ACTIVE_AGENTBOX_BLOCKER` B1–B5（最终审计 §4.3，最小写集与不变量见 §6）**——共享外壳的四条
+  legacy 触达路径（状态栏轮询、命令面板、侧栏搜索、Archived）+ 1 条条件路径；它们经 `hermes:api`
+  直达 `ensureBackend`/`startHermes()`，不受两道 autostart 门约束。这是 P05 不能声明 CLIENT_GREEN 的
+  唯一原因，阶段标记 `CLIENT_MATRIX_COMPLETE_LEGACY_CLOSEOUT_REQUIRED`。
+- legacy 资源层加固：WS 空连接静默 no-op、HTTP 无 loopback 判据（最终审计 §2.2、§6 W5）。
+- P07 检查点 3 fixture 的三处深度缺口（§9.5 队列续派、§9.6 审批失效族、§9.8 重启核对）：
+  见最终审计 §3，属"仍可声明 fixture 完整"的反例。
+- 真实 Server lifecycle connection（本文件 §4）→ 阻断 28 个方法与事件流的 REAL_FLOW 验证。
+- 侧栏批量 legacy 会话树的迁移账本（`$gatewayState` 门控的部分）→ 开门前不会触发，开门后必须先迁移。
 - `wire-v1` 未纳入范围的增量（steer 语义、Worker 通道合同、快照分页参数）仍为外围合同。
 
 ## 附录 A：外围能力（`WAITING_PERIPHERAL_CONTRACT`，不属 28 方法）
