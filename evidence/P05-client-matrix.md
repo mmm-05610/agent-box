@@ -444,11 +444,16 @@ null**。因此这些方法的运行终态都属于同一个 `EXTERNAL_LIFECYCLE
   （无固定 8732、无测试替身、无 Hermes 回落）。
 - `electron/workcore/slot.ts`：生产未安装任何 lifecycle（只有测试安装）。
 - 事件流同样终止于此。**2026-09-14 最终审计更正**：WS 在连接为 null 时并非"诚实 unavailable"——
-  `agentbox-wire-event-transport.ts:103-105` 返回**静默 no-op unsubscribe**，且生产组合未传 `onError`
-  （`agentbox-service-composition.ts:50-53`），连接缺失在 renderer 侧不可观测。HTTP 侧才是诚实的
-  （抛 typed `UNAVAILABLE`，`agentbox-wire-transport.ts:57-59,98-100`）。另：loopback 限制只存在于 WS
-  （`agentbox-wire-event-transport.ts:26-65`），HTTP `requestUrl`（`agentbox-wire-transport.ts:29-43`）
-  不校验 host。两项均登记为接线同批要收紧的加固项（最终审计 §6 W5）。
+  返回**静默 no-op unsubscribe**，且生产组合未传 `onError`，连接缺失在 renderer 侧不可观测。HTTP 侧才是
+  诚实的（抛 typed `UNAVAILABLE`）。另：loopback 限制当时只存在于 WS，HTTP `requestUrl` 不校验 host。
+  **2026-09-14 收口检查点（已实施）**：两项加固已落地且两条 transport 共用一份判据——
+  `electron/security/agentbox-wire-endpoint-policy.ts`（loopback `localhost`/`::1`/合法 `127/8`、
+  仅 `http(s)`、禁凭据；拒绝只给稳定类别且不回显 endpoint）；HTTP 在 `fetch` 之前拒绝非 loopback
+  （既有 typed `UNAVAILABLE`，失败文本不含 endpoint/token，`/wire/v1/` 目标规则不变）；WS 在
+  connection 为 null、accessor 抛错或无 token 时 `onError` **恰好一次**并返回幂等 cleanup，
+  `AgentBoxWireEventError.code` 区分 `connection_unavailable`/`endpoint_rejected`/`socket_unavailable`/
+  `socket_error` 且不附带原始 cause（原始错误可能引用 endpoint/token）；生产组合默认 sink 只记录稳定
+  类别。定向门 5 files / 67 tests passed（[P04.md](P04.md) 切片 9）。
 
 一旦 lifecycle 在 readiness 后安装 `{endpoint, sessionToken}`，这 28 个方法与事件流即可在**不改
 客户端**的前提下进入真实联调；在此之前 REAL_FLOW 未验证，也不得声称。
@@ -603,13 +608,23 @@ package/lock、后端与 Windows 构建树；未重跑完整测试、未跑 Wind
 `SESSIONS_ARCHIVE_CLIENT_READY` 以该提交为最终依据；P05 仍 IN_PROGRESS，待下一阶段最终矩阵/fixture/legacy 审计。
 
 未决（不因本审计消失）：
-- **`ACTIVE_AGENTBOX_BLOCKER` B1–B5（最终审计 §4.3，最小写集与不变量见 §6）**——共享外壳的四条
-  legacy 触达路径（状态栏轮询、命令面板、侧栏搜索、Archived）+ 1 条条件路径；它们经 `hermes:api`
-  直达 `ensureBackend`/`startHermes()`，不受两道 autostart 门约束。这是 P05 不能声明 CLIENT_GREEN 的
-  唯一原因，阶段标记 `CLIENT_MATRIX_COMPLETE_LEGACY_CLOSEOUT_REQUIRED`。
-- legacy 资源层加固：WS 空连接静默 no-op、HTTP 无 loopback 判据（最终审计 §2.2、§6 W5）。
-- P07 检查点 3 fixture 的三处深度缺口（§9.5 队列续派、§9.6 审批失效族、§9.8 重启核对）：
-  见最终审计 §3，属"仍可声明 fixture 完整"的反例。
+
+> **2026-09-14 收口检查点更新**：下列前三条已关闭，其余保持。逐项行为证据见
+> [P05-final-audit.md](P05-final-audit.md) §10/§11 与 [P05.md](P05.md) 最终收口检查点。
+
+- ~~**`ACTIVE_AGENTBOX_BLOCKER` B1–B5**~~ **已关闭**（结构门 `f7759148` + 面迁移 `a6b751ff`）：
+  状态栏改注入式 `null` 状态源、命令面板改服务 SessionRecord、侧栏搜索/Archived 由显式 authority
+  分界、B5 的 all-profiles REST 分支被结构门挡在 `ensureBackend` 之前。B6（未匹配本地行）同批关闭。
+- ~~legacy 资源层加固~~ **已关闭**：两条 transport 共用 `agentbox-wire-endpoint-policy.ts`，HTTP 在
+  `fetch` 前拒绝非 loopback，WS 无连接时恰好报告一次（见 §4 与本文件上半部分）。
+- ~~P07 检查点 3 fixture 的三处深度缺口~~ **已关闭**：§9.5 队列续派、§9.6 审批失效族与重放不重复决定、
+  §9.8 先快照后订阅/原 requestId 核对/终态清 stop 状态，均以行为 fixture 覆盖（[P07.md](P07.md) 检查点 7）。
+- **B7 已关闭**：Command Center 取得必填 authority，agentbox 下零 legacy 调用、深链本地化说明。
+- **B8 归类 `UNREACHABLE_OR_PROTECTED`**（不是活动产品阻断）：插件 SDK 无已挂载消费点，且任何误调用
+  仍被 `hermes:api` 硬门挡在 `ensureBackend` 之前；本阶段按工单不删除、不重构插件 API。
+- **B9（本轮新登记，未修）**：`store/profile-share.ts` 经 `api/profiles.ts` 走 legacy REST，入口为侧栏
+  筛选菜单的 `Import profile…`（无 authority 判据）与命令面板的 Export/Import profile 两行；被结构门拒绝、
+  不拉起运行时，但仍是可达调用路径。最终审计 §10.4 的同类登记。
 - 真实 Server lifecycle connection（本文件 §4）→ 阻断 28 个方法与事件流的 REAL_FLOW 验证。
 - 侧栏批量 legacy 会话树的迁移账本（`$gatewayState` 门控的部分）→ 开门前不会触发，开门后必须先迁移。
 - `wire-v1` 未纳入范围的增量（steer 语义、Worker 通道合同、快照分页参数）仍为外围合同。

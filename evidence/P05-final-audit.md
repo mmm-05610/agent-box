@@ -24,8 +24,10 @@
 | writer_lease | 保持 **ACTIVE** |
 
 > **2026-09-14 后续增量（已实施）**：本表记录的 legacy 可达性与阶段标记是**审计当时**的事实；
-> B1–B6 已按其后的收口检查点关闭（结构门 `f7759148`、面迁移 `a6b751ff`），最终状态、行为证据与
-> 新发现残留下文 **§10**。本文件 §1–§9 保持审计当时原样，不回填。
+> B1–B6 已按其后的收口检查点关闭（结构门 `f7759148`、面迁移 `a6b751ff`），B7 与其后的 transport/
+> fixture/账本项已由 **§11** 的最终收口关闭；新发现残留（B8/B9）见 **§10.4** 与 **§11.5**。
+> 本表"P05_CLIENT_GREEN 不得声明"一行记录的是**审计当时**的判定，最终判定以 §11.3 为准。
+> 本文件 §1–§9 保持审计当时原样，不回填。
 
 一句话：**28 个 wire 方法的客户端接线确实完整，但"产品已完成"不成立**——AgentBox 正常产品外壳里仍有
 5 条不经任何 legacy 选择即可触达 Hermes REST 数据的路径，其中 4 条还会经 lazily 启动门拉起 legacy
@@ -390,3 +392,76 @@ maintenance/usage 分节还调 `getUsageAnalytics` 与 `api/system` 系列，并
 （下阶段补 P07 §9.5/§9.6/§9.8 fixture 深度门与 HTTP/WS transport 一致性/无连接可观测性）。
 不得声明 P05_CLIENT_GREEN、REAL_FLOW_VERIFIED、P06 GREEN、DESKTOP_IMPLEMENTATION_READY；
 writer_lease 保持 **ACTIVE**。
+
+> **口径更正（2026-09-14，§11 回填）**：`LEGACY_CLIENT_CLOSEOUT_READY` 只表示 **B1–B6 收口**，
+> **不得**被解读为"B1–B6 之外也已完成"。该标记出现时仍明确存在 B7（Command Center 浮层）与
+> B8（插件 SDK legacy 适配），且 §9.5/§9.6/§9.8 深度门与 HTTP/WS transport 一致性均未完成——
+> 这些已由 §11 关闭。
+
+## 11. P05 最终收口（2026-09-14 后续增量，已实施）
+
+起点 HEAD `a94a197c`；代码检查点 `4efd1ec5`（transport）与 `e087c976`（Command Center / fixture /
+账本）。本阶段未修改后端、wire schema、preload、shared、package/lock；未跑 Windows、未运行模型、
+未读密钥。执行方式：两个并行子代理 + 主执行者同时做 Electron transport，三方写集不重叠。
+
+### 11.1 本阶段关闭的项
+
+| 项 | 结论 | 行为证据 |
+| --- | --- | --- |
+| **B7** Command Center 浮层 | **关闭** | `CommandCenterView` 必填 `authority`，生产组合显式 `'agentbox'`；agentbox 下 system/usage/maintenance/session 子树不构造，六个 legacy API 各 0 次、不订阅 `$sessions`/`$pinnedSessionIds`、无 delete/export/pin；会话取 `$agentBoxSessions`（排除 archived、服务 displayName/id/updatedAt/pinned、本地只匹配 displayName 与服务 id、以服务 id 经中立 seam 打开）；深链到无 wire 对应能力的 section 显示六语言本地化说明而不是 `LEGACY_RUNTIME_DISABLED_FOR_PRODUCT`；hermes 面板隔离测试保持不变 |
+| **命令面板 legacy 快捷项** | **关闭** | 同一必填 authority：agentbox 下 `cc-restart-gateway`/`cc-update-hermes`/`cc-system`/`cc-usage` 不渲染不可执行（动作 mock 成"会应答"，断言只看调用次数）；**新发现并关闭** registry 贡献行 `Toggle logs`（其 pane 每 5s 轮询 `GET /api/logs`），插件行保留；已迁移的服务 Session 行继续工作 |
+| **§9.5/§9.6/§9.8 fixture 深度** | **关闭** | 见 [P07.md](P07.md) 检查点 7：事件序列与反例逐项登记；5 files / 95 tests passed |
+| **HTTP/WS transport 一致性** | **关闭** | 见 [P04.md](P04.md) 切片 9 与 §11.2；5 files / 67 tests passed |
+| **陈旧 `IN_FLIGHT`** | **清除** | `IN_FLIGHT` → `[]`（两项均已不存在）；长度断言 2→0，陈旧检查由顶层目录名加强为全前缀 `statSync` |
+| **`LEGACY_CLIENT_CLOSEOUT_READY` 口径** | **更正** | 该标记只表示 B1–B6 收口，不表示 B1–B6 之外也完成；B7/B8 与 §9 深度门、transport 一致性当时均未完成 |
+
+### 11.2 HTTP/WS 共用 endpoint 策略（本阶段事实）
+
+- 唯一裁决处 `electron/security/agentbox-wire-endpoint-policy.ts`：允许 `localhost`、`::1`、合法 `127/8`；
+  拒绝非 loopback hostname/IP、带 username/password、非 `http:`/`https:`，并（HTTP 侧）拒绝越出
+  `/wire/v1/` 的目标。拒绝返回稳定类别（`invalid` / `non_loopback`），**从不抛错、从不回显 endpoint**。
+- HTTP：判据在 `fetch` **之前**执行，失败抛既有 `AgentBoxWireHostUnavailableError`，消息为三条稳定文本
+  之一，不含 endpoint 或 token；`redirect:'error'` 与 `/wire/v1/` 目标规则不变。
+- WS：无 connection、connection accessor 抛错、无 token 三条推导统一 `onError` **恰好一次**并返回幂等
+  cleanup（此前 null 是静默 no-op）；非法 endpoint、WebSocket 构造失败、socket error 走同一通道；
+  `AgentBoxWireEventError` 带稳定 `code`、固定 message、**不附带原始 cause**；listener 抛错被吞、
+  `onError` 抛错不崩 main、listener 注册失败会关掉半注册 socket 再报告。
+- 生产出口：composition 默认 sink 只记录 `[agentbox-wire] event stream <code>`，不输出 connection/token；
+  调用方可覆盖。
+- 边界：不发明 renderer 业务事件，不把 transport 失败伪装成 Session 终态。
+
+### 11.3 对本文件 §7「不能声明」清单的更新
+
+| 原条目 | 现在 |
+| --- | --- |
+| §7.1 `P05_CLIENT_GREEN` 不得声明 | **更新**：本阶段列出的客户端实现门全部通过，可声明 **`P05_GREEN — CLIENT_IMPLEMENTATION_COMPLETE`**（见 [P05.md](P05.md) 最终收口检查点 §8） |
+| §7.2 产品已完成 / 主路径无 Hermes 控制流 | **仍不成立**：B9（profile 分享经 `api/profiles.ts`，入口含侧栏筛选菜单与命令面板两行）仍是可达 legacy 调用路径，被结构门拒绝但未迁移 |
+| §7.3 REAL_FLOW / P06 GREEN / DESKTOP_IMPLEMENTATION_READY | **仍不得声明**（lifecycle connection 仍是外部缺口） |
+| §7.4 "事件源不可用时诚实呈现"/"transport 限制 loopback" | **现在成立**：WS 无连接可观测、HTTP 与 WS 共用 loopback 判据（§11.2） |
+| §7.5 P07 检查点 3 未完整覆盖 §9 | **更新**：§9.5/§9.6/§9.8 深度缺口关闭；§9 其余场景维持既有覆盖层次（前端行为 fixture，非真实 Server 联调） |
+
+### 11.4 本阶段实测门
+
+| 门 | 结果 |
+| --- | --- |
+| UI 定向（10 files） | **141 tests passed** |
+| B1–B7 legacy 回归（10 files） | **135 tests passed** |
+| Electron 定向（7 files） | **75 tests passed** |
+| `renderer-layers.test.ts` 单独 | **1 file / 16 tests passed**（陈旧 `IN_FLIGHT` 失败消失） |
+| `npm run --workspace apps/desktop typecheck` | **exit 0** |
+| ESLint（29 个改动/新增 TS/TSX） | **exit 0** |
+| `git diff --check` | **exit 0** |
+| 全量 UI suite | **811 files / 7882 tests 全部通过** |
+| 全量 Electron suite（原样记录） | **171 files / 2288 tests：2 files / 4 tests failed**（另一轮 5 failed）——`mcp-oauth-callback-ipc.test.ts` 与 `legacy-hermes/api-transport.test.ts`，均为自建 loopback 服务在本环境 `ECONNREFUSED`，且不 import 本阶段改动模块 |
+
+### 11.5 新登记（未修）
+
+**B9 — profile 分享的 legacy 数据面**：`store/profile-share.ts` → `api/profiles.ts`（`hermesApi`）；
+可达入口为侧栏筛选菜单 Profile 子菜单的 `Import profile…`（`features/chat/sidebar/filter-menu.tsx:362`，
+无 authority 判据）与命令面板 `Export/Import profile…` 两行。需先经原生文件框选定路径；请求被 W4 结构门
+在 `ensureBackend` 之前以 `LEGACY_RUNTIME_DISABLED_FOR_PRODUCT` 拒绝。因此本阶段**不能**声称"产品外壳
+所有可达 UI 均无 legacy API 调用"——该只读核验不成立，B9 为精确剩余项，本阶段写集不含上述三文件。
+
+**B8 最终分类**：`UNREACHABLE_OR_PROTECTED`（非活动产品阻断）。无已挂载消费点；唯一被激活路径
+（hermes-bots hide-sweep 在插件激活时经 `profiles.list`/`listPersistedSessions`）同样被硬门拒绝。
+本阶段按工单不删除、不扩大到插件 API 重构。
