@@ -117,19 +117,23 @@ export interface CommandPaletteBodyProps {
 }
 
 /**
- * Contributed palette rows that are SHORTCUTS onto the legacy Hermes runtime
- * rather than AgentBox decisions. `Toggle logs` is the whole list: its only job
- * is to summon the logs pane, and that pane polls `GET /api/logs` — the product
- * runtime refuses that request outright, so the row could only ever promise a
- * capability the shell does not serve.
+ * Contributed palette rows that belong to the legacy Hermes runtime rather than
+ * to AgentBox, so the AgentBox palette neither renders nor runs them.
+ *
+ * - `logs.toggle` only summons the logs pane, and that pane polls
+ *   `GET /api/logs`.
+ * - `profile.export` / `profile.import` share a profile as a CLI tar.gz bundle
+ *   through `api/profiles.ts`. wire-v1 has no Profile bundle method, so there is
+ *   nothing for AgentBox to stand behind them with — and the product does not
+ *   offer a fake "not supported yet" row in their place. The profile manager
+ *   page keeps create/edit/archive, and `nav-profiles` still navigates there.
  *
  * Declared here, by id, because the contributions themselves are registered by
- * the composition root (which is not this module's to change). A feature whose
- * backing capability is legacy — profile export/import — is a different class:
- * it stays visible and fails honestly where it is pressed, and it is recorded
- * as a known residual rather than hidden behind one of its two doors.
+ * the composition root (which is not this module's to change). Filters are the
+ * authority for what the palette offers; nothing is inferred from the gateway,
+ * the cache or whether a legacy call would happen to succeed.
  */
-export const LEGACY_PALETTE_ROW_IDS: readonly string[] = ['logs.toggle']
+export const LEGACY_PALETTE_ROW_IDS: readonly string[] = ['logs.toggle', 'profile.export', 'profile.import']
 
 export function CommandPaletteBody({ authority, onExited }: CommandPaletteBodyProps) {
   const { t } = useI18n()

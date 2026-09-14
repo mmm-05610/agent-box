@@ -87,7 +87,10 @@ const homeNode: SidebarProjectTree = {
   sessionCount: 0
 }
 
-function renderSidebar({ onNewSessionInWorkspace = noop }: { onNewSessionInWorkspace?: (path: null | string) => void } = {}) {
+function renderSidebar({
+  onNewSessionInWorkspace = noop,
+  sessionAuthority = 'hermes'
+}: { onNewSessionInWorkspace?: (path: null | string) => void; sessionAuthority?: 'agentbox' | 'hermes' } = {}) {
   return render(
     <MemoryRouter initialEntries={['/']}>
       <SidebarProvider>
@@ -101,7 +104,7 @@ function renderSidebar({ onNewSessionInWorkspace = noop }: { onNewSessionInWorks
           onNewSessionInWorkspace={onNewSessionInWorkspace}
           onNewSessionSplit={noop}
           onResumeSession={noop}
-          sessionAuthority="hermes"
+          sessionAuthority={sessionAuthority}
         />
       </SidebarProvider>
     </MemoryRouter>
@@ -497,5 +500,51 @@ describe('ChatSidebar workspace selection (P01)', () => {
 
     expect($wslWorkspaceInfoId.get()).toBe('wsl_ws_2')
     expect(selectedRows(container)).toEqual(['wsl_ws_1'])
+  })
+})
+
+// The workspace root list header carries its own filter menu instance. It takes
+// the sidebar's authority too, so the legacy profile-share row cannot reappear
+// by switching to the workspace body.
+describe('ChatSidebar workspace header filter menu (P05 B9)', () => {
+  /** Open the workspace header's filter menu and its Profile submenu, and
+   *  report whether the submenu really opened — its `New profile` row is the
+   *  proof that a missing `Import profile…` is a decision, not an empty menu. */
+  const openProfileSubmenu = () => {
+    const trigger = screen.getByRole('button', { name: 'Filters' })
+
+    fireEvent.pointerDown(trigger, { button: 0, pointerType: 'mouse' })
+    fireEvent.pointerUp(trigger, { button: 0, pointerType: 'mouse' })
+    fireEvent.click(trigger)
+    fireEvent.click(screen.getByText('Profile'))
+
+    return Boolean(screen.queryByText('New profile'))
+  }
+
+  const renderWorkspaceBody = async (sessionAuthority: 'agentbox' | 'hermes') => {
+    listWslWorkspaces.mockResolvedValue({ ok: true as const, workspaces: [wslRecord()] })
+
+    const rendered = renderSidebar({ sessionAuthority })
+
+    await waitFor(() => {
+      expect(rendered.container.querySelector('[data-wsl-workspace-row="wsl_ws_1"]')).not.toBeNull()
+      expect(screen.getByRole('button', { name: 'Filters' })).toBeTruthy()
+    })
+
+    return rendered
+  }
+
+  it('offers no Import profile row in the workspace header under AgentBox authority', async () => {
+    await renderWorkspaceBody('agentbox')
+
+    expect(openProfileSubmenu()).toBe(true)
+    expect(screen.queryByText('Import profile…')).toBeNull()
+  })
+
+  it('keeps the Import profile row in the workspace header under Hermes authority', async () => {
+    await renderWorkspaceBody('hermes')
+
+    expect(openProfileSubmenu()).toBe(true)
+    expect(screen.getByText('Import profile…')).toBeTruthy()
   })
 })

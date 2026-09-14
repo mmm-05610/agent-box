@@ -451,3 +451,65 @@ describe('ChatSidebar AgentBox authority', () => {
     expect(loadArchivedSessions).not.toHaveBeenCalled()
   })
 })
+
+// The sidebar mounts the filter menu in two headers (the workspace root header
+// and the flat-list header). Both take the sidebar's own authority, so the
+// legacy profile-share row is absent from whichever one is on screen — and a
+// gateway-state flip cannot bring it back, because the authority never reads
+// that state.
+describe('ChatSidebar filter menu authority', () => {
+  const selectPaths = vi.fn()
+
+  beforeEach(() => {
+    $selectedStoredSessionId.set('tile-one')
+    $sessions.set(sessionRows)
+    $removedSessionIds.set(new Set())
+    Object.assign(window, { hermesDesktop: { selectPaths } })
+    selectPaths.mockClear()
+  })
+
+  afterEach(() => {
+    cleanup()
+    $selectedStoredSessionId.set(null)
+    $sessions.set([])
+    $removedSessionIds.set(new Set())
+    $gatewayState.set('idle')
+  })
+
+  /** Open the filter menu that is on screen, then its Profile submenu, and
+   *  return whether the submenu really opened (its `New profile` row is the
+   *  proof — without it, "no Import row" would pass for the wrong reason). */
+  const openFilterMenu = () => {
+    const trigger = screen.getAllByRole('button', { name: 'Filters' })[0]!
+
+    fireEvent.pointerDown(trigger, { button: 0, pointerType: 'mouse' })
+    fireEvent.pointerUp(trigger, { button: 0, pointerType: 'mouse' })
+    fireEvent.click(trigger)
+    fireEvent.click(screen.getByText('Profile'))
+
+    return Boolean(screen.queryByText('New profile'))
+  }
+
+  it('offers no legacy profile import under AgentBox authority, gateway state included', () => {
+    renderSidebar('/', 'chat', 'agentbox')
+
+    expect(openFilterMenu()).toBe(true)
+    expect(screen.queryByText('Import profile…')).toBeNull()
+    expect(selectPaths).not.toHaveBeenCalled()
+
+    // The sidebar re-renders on this flip; the authority must not. Whatever
+    // body the gateway state mounts, the legacy row is not in it and nothing
+    // reached the flow.
+    act(() => $gatewayState.set('open'))
+
+    expect(screen.queryAllByText('Import profile…')).toEqual([])
+    expect(selectPaths).not.toHaveBeenCalled()
+  })
+
+  it('keeps the legacy profile import under Hermes authority', () => {
+    renderSidebar('/', 'chat', 'hermes')
+
+    expect(openFilterMenu()).toBe(true)
+    expect(screen.getByText('Import profile…')).toBeTruthy()
+  })
+})

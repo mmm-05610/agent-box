@@ -1082,7 +1082,7 @@ export function ChatSidebar({
         }}
       />
       <div className="grid size-6 place-items-center">
-        <SidebarFilterMenu className={HEADER_NAV_BTN} />
+        <SidebarFilterMenu className={HEADER_NAV_BTN} sessionAuthority={sessionAuthority} />
       </div>
     </>
   )
@@ -1593,7 +1593,7 @@ export function ChatSidebar({
                           }}
                         />
                         <div className="grid size-6 place-items-center">
-                          <SidebarFilterMenu className={HEADER_NAV_BTN} />
+                          <SidebarFilterMenu className={HEADER_NAV_BTN} sessionAuthority={sessionAuthority} />
                         </div>
                       </>
                     )}

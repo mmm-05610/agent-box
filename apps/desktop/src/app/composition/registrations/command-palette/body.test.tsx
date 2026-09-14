@@ -213,16 +213,21 @@ describe('CommandPaletteBody — legacy Hermes shortcuts follow the authority', 
   })
 })
 
-// `Toggle logs` is a registry-contributed row, not one of the hardcoded groups,
-// so the authority split above cannot see it. It is the contributed row whose
-// only job is to summon a legacy Hermes surface — the pane it opens polls
-// `GET /api/logs`, which the product runtime refuses outright — so under
-// AgentBox authority it must not be offered at all.
+// `Toggle logs` and the profile share rows are registry-contributed, not part
+// of the hardcoded groups, so the authority split above cannot see them. They
+// all reach the legacy Hermes runtime — the logs pane polls `GET /api/logs`,
+// and profile sharing goes through `api/profiles.ts` with no wire-v1 Profile
+// bundle method behind it — so under AgentBox authority none of them may be
+// offered, by list or by search.
 describe('CommandPaletteBody — contributed legacy shortcuts follow the authority', () => {
   const disposers: Array<() => void> = []
 
   const contribute = (id: string, label: string) => {
-    disposers.push(registry.register({ area: PALETTE_AREA, data: { id, label, run: vi.fn() }, id }))
+    const run = vi.fn()
+
+    disposers.push(registry.register({ area: PALETTE_AREA, data: { id, label, run }, id }))
+
+    return run
   }
 
   afterEach(() => {
@@ -249,5 +254,48 @@ describe('CommandPaletteBody — contributed legacy shortcuts follow the authori
     await act(async () => {})
 
     expect(screen.getByRole('option', { name: 'Toggle logs' })).toBeTruthy()
+  })
+
+  it('offers no profile share row under AgentBox authority, even by search', async () => {
+    const exportRun = contribute('profile.export', 'Export profile…')
+    const importRun = contribute('profile.import', 'Import profile…')
+
+    renderPalette('agentbox')
+
+    for (const query of ['export', 'import', 'profile']) {
+      searchFor(query)
+      await act(async () => {})
+
+      expect(screen.queryByRole('option', { name: /Export profile/ })).toBeNull()
+      expect(screen.queryByRole('option', { name: /Import profile/ })).toBeNull()
+    }
+
+    expect(exportRun).not.toHaveBeenCalled()
+    expect(importRun).not.toHaveBeenCalled()
+  })
+
+  it('keeps the profile manager navigation row under AgentBox authority', async () => {
+    // The capability the share rows are not allowed to stand in for — managing
+    // profiles — still has its own door.
+    renderPalette('agentbox')
+    searchFor('profiles')
+    await act(async () => {})
+
+    expect(screen.getByRole('option', { name: /Profiles/ })).toBeTruthy()
+  })
+
+  it('keeps and runs both profile share rows under Hermes authority', async () => {
+    const exportRun = contribute('profile.export', 'Export profile…')
+    contribute('profile.import', 'Import profile…')
+
+    renderPalette('hermes')
+    await act(async () => {})
+
+    expect(screen.getByRole('option', { name: /Import profile/ })).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('option', { name: /Export profile/ }))
+    await act(async () => {})
+
+    expect(exportRun).toHaveBeenCalledTimes(1)
   })
 })
