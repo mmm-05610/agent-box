@@ -50,7 +50,9 @@ export function ComposerControls({
   return (
     <div className="ml-auto flex min-w-0 shrink items-center gap-(--composer-control-gap)">
       {!hudMode && state.profile ? <ComposerProfileControls profile={state.profile} /> : null}
-      {minimal ? null : <ModelPill compact={compactModelPill} disabled={disabled} model={state.model} />}
+      {minimal || state.model.hidden ? null : (
+        <ModelPill compact={compactModelPill} disabled={disabled} model={state.model} />
+      )}
       {showQueueButton ? (
         <Tip label={<TipKeybindLabel actionId="composer.queue" text={c.queueMessage} />}>
           <Button

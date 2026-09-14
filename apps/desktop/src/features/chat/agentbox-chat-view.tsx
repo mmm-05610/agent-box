@@ -132,7 +132,7 @@ export function AgentBoxChatView({ maxVoiceRecordingSeconds }: { maxVoiceRecordi
 
   const chatBarState = useMemo<ChatBarState>(
     () => ({
-      model: { canSwitch: false, loading: !binding.catalogReady, model: '', provider: '' },
+      model: { canSwitch: false, hidden: true, loading: !binding.catalogReady, model: '', provider: '' },
       profile: composerProfile,
       queue: { authority: 'server' },
       tools: { enabled: false, label: t.composer.attach },

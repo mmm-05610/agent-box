@@ -27,6 +27,8 @@ export interface ChatBarState {
     model: string
     provider: string
     canSwitch: boolean
+    /** Hides the legacy model pill while retaining profile-owned config UI. */
+    hidden?: boolean
     loading?: boolean
     quickModels?: QuickModelOption[]
     /** Reused status-bar dropdown (built with gateway + selectModel upstream). */
