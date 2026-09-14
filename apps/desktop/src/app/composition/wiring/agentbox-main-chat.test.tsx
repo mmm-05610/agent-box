@@ -878,3 +878,64 @@ describe('primary AgentBox chat Workspace registration', () => {
     expect(result.current.draftScopeKey).toBe('session-1')
   })
 })
+
+describe('primary AgentBox chat local open target', () => {
+  const flush = async () => {
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+  }
+
+  it('registers nothing for a project that has no folder of its own', async () => {
+    $agentBoxWorkspaces.set([])
+    $workspaceViewSelectedId.set('pathless-project')
+    $projectTree.set([
+      {
+        id: 'pathless-project',
+        label: 'Pathless',
+        path: null,
+        // A repo folder inside the project is not the project's own path.
+        repos: [{ groups: [], id: 'repo-1', label: 'repo', path: 'C:/somewhere/repo', sessionCount: 0 }],
+        sessionCount: 0
+      }
+    ])
+
+    const { result } = renderHook(useAgentBoxMainChat, { wrapper: wrapper('/new') })
+
+    await flush()
+
+    expect(mocks.openWorkspace).not.toHaveBeenCalled()
+    expect(result.current.workspaceOpen).toEqual({ status: 'idle' })
+    expect(result.current.workspace).toBeNull()
+    expect(result.current.sendAvailable).toBe(false)
+    // No location means no location-scoped draft: the composer keeps its
+    // generic draft scope, and nothing is registered on the user's behalf.
+    expect(result.current.draftScopeKey).toBeNull()
+  })
+
+  it('registers nothing for the Home bucket or an empty path', async () => {
+    $agentBoxWorkspaces.set([])
+    $workspaceViewSelectedId.set('home-bucket')
+    $projectTree.set([
+      { id: 'home-bucket', isNoProject: true, label: 'Home', path: null, repos: [], sessionCount: 0 },
+      { id: 'empty-path', label: 'Empty', path: '   ', repos: [], sessionCount: 0 }
+    ])
+
+    const home = renderHook(useAgentBoxMainChat, { wrapper: wrapper('/new') })
+
+    await flush()
+    expect(home.result.current.workspaceOpen).toEqual({ status: 'idle' })
+    home.unmount()
+
+    act(() => $workspaceViewSelectedId.set('empty-path'))
+
+    const empty = renderHook(useAgentBoxMainChat, { wrapper: wrapper('/new') })
+
+    await flush()
+
+    expect(mocks.openWorkspace).not.toHaveBeenCalled()
+    expect(empty.result.current.workspaceOpen).toEqual({ status: 'idle' })
+    expect(empty.result.current.draftScopeKey).toBeNull()
+  })
+})

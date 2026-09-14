@@ -36,7 +36,7 @@ import {
   migrateSessionDraft,
   workspaceDraftScope
 } from '@/store/composer'
-import { $projectTree, projectRootCwd } from '@/store/projects/scope'
+import { $projectTree } from '@/store/projects/scope'
 import { $workspaceViewSelectedId } from '@/store/workspace-view'
 import { $wslWorkspaces } from '@/store/wsl-workspace'
 import type { SubmitTextOptions } from '@/types/composer'
@@ -119,8 +119,10 @@ export function useAgentBoxMainChat() {
   const session = routedId ? (sessions[routedId] ?? null) : null
 
   // The shell's own record for the selected row: a WSL row first (it carries
-  // the host-verified identity), otherwise the project tree node. A Home bucket
-  // or a row with no working root has no location to register.
+  // the host-verified identity), otherwise the project tree node. The local path
+  // is the project's OWN folder — a Home bucket or a project without one has no
+  // location to register, and a repo path inside it is not a substitute for the
+  // project's path.
   const shellTarget = useMemo<AgentBoxShellWorkspaceTarget | null>(() => {
     if (session || !selectedWorkspaceId) {
       return null
@@ -138,7 +140,8 @@ export function useAgentBoxMainChat() {
         : null
     }
 
-    const path = projectRootCwd(projectTree.find(node => node.id === selectedWorkspaceId))
+    const project = projectTree.find(node => node.id === selectedWorkspaceId)
+    const path = project?.path?.trim() ?? ''
 
     return path ? { environment: { host: null, kind: 'local', user: null }, path, shellId: selectedWorkspaceId } : null
   }, [projectTree, selectedWorkspaceId, session, wslWorkspaces])
