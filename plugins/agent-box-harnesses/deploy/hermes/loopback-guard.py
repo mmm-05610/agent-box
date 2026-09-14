@@ -25,7 +25,11 @@ It does three things and nothing else:
    observation of "how the stored Session was reopened" (``session/load`` vs
    ``session/resume`` vs a fresh ``session/new``) which the Server cannot see,
    because the reopen happens inside the Worker. Lines go to the file named by
-   ``AGENTBOX_ACP_AUDIT``.
+   ``AGENTBOX_ACP_AUDIT``. The same wrapper also records the ACP model state a
+   session-creating method answered with (``acp-model <method> current=...
+   available=...``), so "which model the adapter itself considers active" is a
+   measurement of the real chain rather than a derivation from the
+   configuration.
 
 3. It applies the same reviewed deployment bootstrap the production artifact's
    own ``sitecustomize.py`` applies (``agentbox_hermes_bootstrap``), so the gate
@@ -35,6 +39,7 @@ A bootstrap failure is fatal (``SystemExit``), exactly as in production.
 """
 from __future__ import annotations
 
+import inspect
 import ipaddress
 import os
 import socket
@@ -145,6 +150,41 @@ def _install_egress_guard(audit: str | None) -> int:
     return refused
 
 
+def _record_model_state(audit: str | None, name: str, result: object) -> None:
+    """Record the ACP model state a session method answered with, if it carried one.
+
+    ``session/new`` (and the load/resume/fork responses) return the adapter's own
+    model selector payload: ``models.currentModelId`` plus the advertised
+    ``availableModels`` ids. That value is what Hermes itself resolved for the
+    session - including any provider-side rewriting - so reading it back is the
+    measurement of the native model id. It is recorded as
+    ``acp-model <method> current=<id> available=<id,...>``; a response without a
+    model state records nothing. Attribute access is defensive (the ACP schema is
+    a third-party shape) but a crash here would fail the adapter, so it is only
+    ever reading.
+    """
+    try:
+        models = getattr(result, "models", None)
+        if models is None:
+            return
+        current = getattr(models, "current_model_id", None)
+        if current is None:
+            current = getattr(models, "currentModelId", None)
+        available = getattr(models, "available_models", None)
+        if available is None:
+            available = getattr(models, "availableModels", None)
+        identifiers: list[str] = []
+        for item in available or ():
+            identifier = getattr(item, "model_id", None)
+            if identifier is None:
+                identifier = getattr(item, "modelId", None)
+            if identifier:
+                identifiers.append(str(identifier))
+        _record(audit, f"acp-model {name} current={current or ''} available={','.join(identifiers)}")
+    except Exception:  # noqa: BLE001 - observation must never break the adapter
+        _record(audit, f"acp-model {name} unreadable")
+
+
 class _AcpMethodObserver:
     """Wrap Hermes' ACP session methods so the gate can read them back.
 
@@ -153,6 +193,12 @@ class _AcpMethodObserver:
     module executes and before any session can be created. The observation is
     fail-loud: a missing class or method raises at import time instead of
     reporting "no reopen happened" later.
+
+    Every wrapped method records its name when it is called (the order the gate
+    reads back), and the session-creating ones additionally record the ACP model
+    state their response carried once it returns. The model line is recorded with
+    the *result*, so it needs an await on the async methods; both wrappers keep
+    the native signature and return the native value untouched.
     """
 
     OBSERVED = ("new_session", "load_session", "resume_session", "set_session_model", "set_config_option")
@@ -190,9 +236,18 @@ class _AcpMethodObserver:
             if original is None:
                 raise SystemExit(f"AGENTBOX_ACP_INSTRUMENTATION_FAILED: {name} is missing")
 
-            def observed(self, *args, **kwargs):  # noqa: ANN001 - the native signature
-                _record(audit, f"acp-method {name} pid={os.getpid()}")
-                return original(self, *args, **kwargs)
+            if inspect.iscoroutinefunction(original):
+                async def observed(self, *args, **kwargs):  # noqa: ANN001 - the native signature
+                    _record(audit, f"acp-method {name} pid={os.getpid()}")
+                    result = await original(self, *args, **kwargs)
+                    _record_model_state(audit, name, result)
+                    return result
+            else:
+                def observed(self, *args, **kwargs):  # noqa: ANN001 - the native signature
+                    _record(audit, f"acp-method {name} pid={os.getpid()}")
+                    result = original(self, *args, **kwargs)
+                    _record_model_state(audit, name, result)
+                    return result
 
             observed.__name__ = name
             setattr(agent, name, observed)

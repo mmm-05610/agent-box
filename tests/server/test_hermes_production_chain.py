@@ -127,7 +127,7 @@ def test_the_sandbox_posture_requires_exactly_two_writable_binds(gate):
 def test_continuation_evidence_requires_the_first_round_in_the_second_request(gate):
     good = [{
         "structure": {
-            "maxTokens": 64, "model": "deepseek-chat", "stream": True, "toolCount": 3,
+            "maxTokens": 64, "model": gate.WIRE_MODEL_ID, "stream": True, "toolCount": 3,
             "messages": [
                 {"role": "system", "chars": 100},
                 {"role": "user", "chars": 40, "containsRound1User": True},
@@ -140,10 +140,11 @@ def test_continuation_evidence_requires_the_first_round_in_the_second_request(ga
     assert evidence["round2CarriesRound1User"] is True
     assert evidence["round2CarriesRound1Assistant"] is True
     assert evidence["maxTokens"] == 64
+    assert evidence["model"] == gate.WIRE_MODEL_ID
 
     without_context = [{
         "structure": {
-            "maxTokens": 64, "stream": True, "model": gate.EFFECTIVE_MODEL_ID,
+            "maxTokens": 64, "stream": True, "model": gate.WIRE_MODEL_ID,
             "messages": [{"role": "system", "chars": 1}, {"role": "user", "chars": 2}],
         },
     }]
@@ -153,7 +154,7 @@ def test_continuation_evidence_requires_the_first_round_in_the_second_request(ga
 
     over_ceiling = [{
         "structure": {
-            "maxTokens": 4096, "stream": True, "model": gate.EFFECTIVE_MODEL_ID,
+            "maxTokens": 4096, "stream": True, "model": gate.WIRE_MODEL_ID,
             "messages": [
                 {"role": "user", "containsRound1User": True},
                 {"role": "assistant", "containsRound1Assistant": True},
@@ -165,29 +166,88 @@ def test_continuation_evidence_requires_the_first_round_in_the_second_request(ga
     assert ceiling.value.code == "HERMES_GATE_OUTPUT_CEILING_EXCEEDED"
 
 
-def test_the_effective_model_is_asserted_not_observed(gate):
-    """The wire model is Hermes' own fold of the product model id, and it is pinned.
+def test_the_wire_model_is_the_product_id_and_is_asserted(gate):
+    """The provider request carries the product id itself, and that is pinned.
 
-    The prepared configuration declares `model.default: deepseek-flash`, but
-    Hermes normalizes a DeepSeek id with static string logic: only first-class
-    `deepseek-v<digit>...` ids and reasoner-like names survive, everything else
-    folds to `deepseek-chat`. Any other value on the wire is a gate failure, so a
-    harness or configuration change cannot quietly ship a different model.
+    The prepared configuration declares `model.default: deepseek-flash` through
+    Hermes' user-defined-provider kind (`custom`), which passes the id through
+    unchanged, so the provider must receive exactly the product id. The value this
+    gate previously accepted (`deepseek-chat`, Hermes' fold under the built-in
+    provider) is now a hard failure: a harness that silently re-resolves the
+    model, or a deployment that changes it, cannot pass.
     """
     observed: list = []
-    assert gate.EFFECTIVE_MODEL_ID == "deepseek-chat"
-    assert production.config_document()["model"]["default"] == production.PRODUCT_MODEL_ID == "deepseek-flash"
-    gate.assert_effective_model({"model": gate.EFFECTIVE_MODEL_ID}, "unit", observed)
-    assert observed == [{"phase": "unit", "model": "deepseek-chat"}]
+    assert gate.WIRE_MODEL_ID == "deepseek-flash"
+    assert gate.NATIVE_MODEL_SELECTION == "custom:deepseek-flash"
+    assert gate.NATIVE_PROVIDER_IDENTITY == "custom"
+    assert production.config_document()["model"]["default"] == production.PRODUCT_MODEL_ID
+    assert production.config_document()["model"]["provider"] == production.MODEL_PROVIDER_DECLARATION
+    assert production.NATIVE_MODEL_VALUE == production.PRODUCT_MODEL_ID == gate.WIRE_MODEL_ID
+    gate.assert_wire_model({"model": gate.WIRE_MODEL_ID}, "unit", observed)
+    assert observed == [{"phase": "unit", "model": "deepseek-flash"}]
+    for drifted in ("deepseek-chat", "deepseek/deepseek-flash", "deepseek-v4-flash", "", None):
+        with pytest.raises(gate.GateFailure) as failure:
+            gate.assert_wire_model({"model": drifted}, "unit", observed)
+        assert failure.value.code == "HERMES_GATE_WIRE_MODEL_DRIFT"
+
+
+def test_the_credential_must_reach_the_provider_on_every_round(gate):
+    """A provider request without the injected bearer is a gate failure."""
+    gate.assert_credential_delivery({
+        "injectedTokenReachedProvider": True, "unauthorizedRequests": 0})
+    for credential in (
+        {"injectedTokenReachedProvider": False, "unauthorizedRequests": 1},
+        {"injectedTokenReachedProvider": True, "unauthorizedRequests": 1},
+        {"injectedTokenReachedProvider": False, "unauthorizedRequests": 0},
+        {},
+    ):
+        with pytest.raises(gate.GateFailure) as refused:
+            gate.assert_credential_delivery(credential)
+        assert refused.value.code == "HERMES_GATE_CREDENTIAL_NOT_DELIVERED"
+
+
+def test_the_native_model_state_is_read_back_from_the_guard(gate, tmp_path):
+    """The ACP model state Hermes answered with is an observation, and it is pinned."""
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    audit = workspace / gate.ACP_AUDIT_NAME
+    audit.write_text(
+        "acp-instrumented new_session,load_session,resume_session,set_session_model,set_config_option\n"
+        "acp-method new_session pid=1\n"
+        "acp-model new_session current=custom:deepseek-flash available=custom:deepseek-flash\n"
+        "acp-method resume_session pid=2\n"
+        "acp-model resume_session current=custom:deepseek-flash available=custom:deepseek-flash\n",
+        encoding="utf-8",
+    )
+    record = gate.native_model_observation(workspace)
+    assert record["currentModelIds"] == [gate.NATIVE_MODEL_SELECTION]
+    assert record["availableModelIds"] == [gate.NATIVE_MODEL_SELECTION]
+    assert [item["method"] for item in record["records"]] == ["new_session", "resume_session"]
+    assert record["expectedNativeProviderIdentity"] == "custom"
+    # A harness that re-resolves the model is caught, whatever spelling it uses.
+    audit.write_text(
+        "acp-model new_session current=deepseek:deepseek-chat available=deepseek:deepseek-chat\n",
+        encoding="utf-8",
+    )
     with pytest.raises(gate.GateFailure) as drifted:
-        gate.assert_effective_model({"model": "deepseek-flash"}, "unit", observed)
-    assert drifted.value.code == "HERMES_GATE_EFFECTIVE_MODEL_DRIFT"
-    with pytest.raises(gate.GateFailure):
-        gate.assert_effective_model({"model": None}, "unit", observed)
+        gate.native_model_observation(workspace)
+    assert drifted.value.code == "HERMES_GATE_NATIVE_MODEL_DRIFT"
+    # No recorded model state at all is a failure too: the assertion must not
+    # pass vacuously when the observation channel breaks.
+    audit.write_text("acp-method new_session pid=1\n", encoding="utf-8")
+    with pytest.raises(gate.GateFailure) as unobserved:
+        gate.native_model_observation(workspace)
+    assert unobserved.value.code == "HERMES_GATE_NATIVE_MODEL_UNOBSERVED"
 
 
-def test_the_model_fold_is_derived_from_the_artifact_not_assumed(gate, tmp_path):
+def test_the_pass_through_declaration_is_derived_from_the_artifact_not_assumed(gate, tmp_path):
     """The conclusion cites the artifact's normalizer and evaluates its predicates."""
+    # Both user-defined-provider spellings are recognized; the built-in provider
+    # (and anything that only looks like a prefix) is not.
+    assert gate.is_custom_provider_declaration("custom") is True
+    assert gate.is_custom_provider_declaration("custom:deepseek") is True
+    for value in ("deepseek", "customs", "custom ", "", None):
+        assert gate.is_custom_provider_declaration(value) is False, value
     artifact = tmp_path / "artifact"
     normalizer = artifact / "site-packages" / "hermes_cli"
     normalizer.mkdir(parents=True)
@@ -198,24 +258,39 @@ def test_the_model_fold_is_derived_from_the_artifact_not_assumed(gate, tmp_path)
         "    bare = model_name.lower()\n"
         "    if _DEEPSEEK_V_SERIES_RE.match(bare):\n"
         "        return bare\n"
-        "    return 'deepseek-chat'\n".replace("'", '"'),
+        "    return 'deepseek-chat'\n"
+        "def normalize_model_for_provider(name, provider):\n"
+        "    if provider == 'deepseek':\n"
+        "        return _normalize_for_deepseek(name)\n"
+        "    # --- Custom & all others: pass through as-is ---\n"
+        "    return name\n".replace("'", '"'),
         encoding="utf-8",
     )
-    record = gate.model_resolution_witness(artifact, "deepseek-flash")
-    assert record["effectiveModel"] == "deepseek-chat"
+    record = gate.model_resolution_witness(artifact, "custom:deepseek", "deepseek-flash")
+    assert record["configuredProviderDeclaration"] == "custom:deepseek"
+    assert record["wireModel"] == gate.WIRE_MODEL_ID
     assert record["networkDependent"] is False
+    assert record["witness"]["declarationIsCustomProvider"] is True
+    assert record["witness"]["builtinProviderWouldFold"] is True
     assert record["witness"]["passthroughPatternMatched"] is False
     assert record["witness"]["reasonerPrefixMatched"] is False
+    assert record["witness"]["foldReturnPresent"] is True
+    assert record["witness"]["customPassThroughPresent"] is True
     assert record["artifactRuleFile"] == "site-packages/hermes_cli/model_normalize.py"
-    # A first-class DeepSeek id is exactly what does *not* fold, which is the
-    # reason the gate refuses to silently accept it as the configured default.
-    with pytest.raises(gate.GateFailure) as unexpected:
-        gate.model_resolution_witness(artifact, "deepseek-v4-flash")
-    assert unexpected.value.code == "HERMES_GATE_MODEL_FOLD_UNEXPECTED"
+    # A first-class DeepSeek id would survive the built-in provider, so the
+    # pass-through declaration would not be needed - the gate refuses that as
+    # this deployment's declaration, exactly as it refuses a built-in provider.
+    for provider in ("custom:deepseek",):
+        with pytest.raises(gate.GateFailure) as unexpected:
+            gate.model_resolution_witness(artifact, provider, "deepseek-v4-flash")
+        assert unexpected.value.code == "HERMES_GATE_MODEL_DECLARATION_UNEXPECTED"
+    with pytest.raises(gate.GateFailure) as builtin:
+        gate.model_resolution_witness(artifact, "deepseek", "deepseek-flash")
+    assert builtin.value.code == "HERMES_GATE_MODEL_DECLARATION_UNEXPECTED"
     # An artifact without the reviewed normalizer is a hard failure.
     (normalizer / "model_normalize.py").unlink()
     with pytest.raises(gate.GateFailure) as unreadable:
-        gate.model_resolution_witness(artifact, "deepseek-flash")
+        gate.model_resolution_witness(artifact, "custom:deepseek", "deepseek-flash")
     assert unreadable.value.code == "HERMES_GATE_MODEL_NORMALIZER_UNREADABLE"
 
 

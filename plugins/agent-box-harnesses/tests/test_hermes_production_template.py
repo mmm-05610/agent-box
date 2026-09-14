@@ -82,18 +82,42 @@ def test_native_configuration_is_the_prepared_42d_configuration(tmp_path):
 
 def test_production_template_pins_the_confirmed_model_and_official_root():
     document = production.config_document()
-    provider = document["providers"][production.HERMES_PROVIDER]
+    provider = document["providers"][production.PROVIDER_BLOCK_KEY]
     assert production.PRODUCT_MODEL_ID == "deepseek-flash"
     assert production.NATIVE_MODEL_VALUE == "deepseek-flash"
+    # The product's provider identity stays DeepSeek official - it lives in the
+    # declared block's content (root, credential reference, catalogue), not in the
+    # key Hermes resolves.
     assert production.HERMES_PROVIDER == "deepseek"
+    assert production.PROVIDER_BLOCK_KEY == "custom"
+    assert provider["name"] == "DeepSeek official"
     assert provider["api"] == production.OFFICIAL_BASE_URL == "https://api.deepseek.com"
     assert document["model"]["base_url"] == production.OFFICIAL_BASE_URL
-    assert document["model"]["provider"] == production.HERMES_PROVIDER
+    # The model is declared through Hermes' user-defined-provider kind, not through
+    # the built-in `deepseek` provider: the built-in one rewrites the model id
+    # before the request (only first-class `deepseek-v<digit>...` ids and
+    # reasoner-like names survive; everything else becomes `deepseek-chat`), which
+    # would send a model id the product never declared. A custom provider passes
+    # the id through unchanged.
+    assert production.MODEL_PROVIDER_DECLARATION == production.PROVIDER_BLOCK_KEY == "custom"
+    assert document["model"]["provider"] == production.MODEL_PROVIDER_DECLARATION
+    assert production.MODEL_PROVIDER_DECLARATION != production.HERMES_PROVIDER
+    # Measured: the block is keyed by the bare kind, because Hermes persists the
+    # resolved provider identity and resumes through it; a `custom:<key>`
+    # reference would leave a resumed session without this block (placeholder
+    # credential). The key must therefore equal Hermes' resolved identity.
+    assert production.MODEL_PROVIDER_DECLARATION == production.NATIVE_PROVIDER_IDENTITY
+    assert production.NATIVE_MODEL_SELECTION == "custom:deepseek-flash"
     assert document["model"]["default"] == production.PRODUCT_MODEL_ID
     assert document["model"]["max_tokens"] == production.OUTPUT_TOKEN_LIMIT == 64
     assert provider["key_env"] == production.CREDENTIAL_ENVIRONMENT == "DEEPSEEK_API_KEY"
     assert provider["extra_body"]["thinking"] == {"type": "disabled"}
     assert provider["transport"] == "chat_completions"
+    # The block a built-in declaration would have used is the same content:
+    # provider, root, credential reference and catalogue did not change - only
+    # which Hermes provider kind resolves them.
+    assert provider["default_model"] == production.PRODUCT_MODEL_ID
+    assert provider["models"] == {production.PRODUCT_MODEL_ID: {}}
 
 
 def test_the_retry_bound_is_the_lowest_supported_and_declared():
@@ -109,14 +133,14 @@ def test_the_retry_bound_is_the_lowest_supported_and_declared():
 def test_loopback_override_changes_only_the_two_endpoint_fields():
     override = production.loopback_config_document("http://127.0.0.1:8080")
     differences = production.documented_differences("http://127.0.0.1:8080")
-    assert sorted(differences) == ["model.base_url", f"providers.{production.HERMES_PROVIDER}.api"]
+    assert sorted(differences) == ["model.base_url", f"providers.{production.PROVIDER_BLOCK_KEY}.api"]
     for before, after in differences.values():
         assert before == "https://api.deepseek.com"
         assert after == "http://127.0.0.1:8080"
     assert override["model"]["max_tokens"] == 64
     assert override["agent"] == production.config_document()["agent"]
-    assert override["providers"][production.HERMES_PROVIDER]["models"] == (
-        production.config_document()["providers"][production.HERMES_PROVIDER]["models"])
+    assert override["providers"][production.PROVIDER_BLOCK_KEY]["models"] == (
+        production.config_document()["providers"][production.PROVIDER_BLOCK_KEY]["models"])
     # Reproducing the override never rewrites the projection source.
     assert production.config_document()["model"]["base_url"] == production.OFFICIAL_BASE_URL
     assert "127.0.0.1" not in production.config_yaml_text()
@@ -179,6 +203,11 @@ def test_deployment_document_declares_the_managed_chain():
     assert environment["HERMES_IGNORE_RULES"] == "1"
     assert environment["HERMES_SKIP_NODE_BOOTSTRAP"] == "1"
     assert environment["HERMES_MAX_ITERATIONS"] == "1"
+    # The environment mirrors the prepared declaration: the provider value is the
+    # same custom-provider reference the configuration resolves.
+    assert environment["HERMES_TUI_PROVIDER"] == production.MODEL_PROVIDER_DECLARATION
+    assert environment["HERMES_INFERENCE_PROVIDER"] == production.MODEL_PROVIDER_DECLARATION
+    assert environment["HERMES_MODEL"] == production.NATIVE_MODEL_VALUE
     # The output ceiling is not an environment key: the Server's deployment
     # validation refuses credential-shaped keys and `HERMES_MAX_TOKENS` matches
     # its `TOKEN` pattern. It is declared in the projected configuration
@@ -332,6 +361,12 @@ def test_the_gate_guard_is_test_only_and_delegates_to_the_bootstrap():
     assert "AGENTBOX_EGRESS_AUDIT" in guard
     assert "AGENTBOX_ACP_AUDIT" in guard
     assert "self-test-ok" in guard
+    # The guard also reads the adapter's own ACP model state back (`acp-model`
+    # lines), so the native identity of the model is a measurement of the real
+    # chain rather than a derivation from the configuration.
+    assert "acp-model" in guard
+    assert "def _record_model_state" in guard
+    assert "inspect.iscoroutinefunction" in guard
     # It is preloaded by the gate through PYTHONPATH only: the production
     # environment names neither the guard nor its audit sinks.
     environment = production.ADAPTER_ENVIRONMENT

@@ -12,14 +12,14 @@ see the generic `runtimeArtifactMounts` / `projectionFiles` / `stateProjection`
 
 The native configuration (`deploy/hermes/config.yaml`) is byte-equal in content
 to the configuration Work Order 42-D prepared (`hermesModelConfig()` in
-`scripts/server-round1/model-validation-42d.mjs`): one provider, the
+`scripts/server-round1/model-validation-42d.mjs`): one provider block, the
 user-confirmed product model `deepseek-flash`, the official DeepSeek root, a
 64-token output ceiling, thinking disabled, and the lowest retry count the
 harness supports (`agent.api_max_retries: 1`, i.e. at most two provider attempts
 per prompt). A test asserts that equality, so the template cannot drift into a
 second implementation.
 
-Two measured facts shape this template, and both are re-checked by the
+Three measured facts shape this template, and all three are re-checked by the
 production chain gate rather than assumed:
 
 * **The native session store is a file inside the Hermes home.** Hermes keeps
@@ -42,6 +42,32 @@ production chain gate rather than assumed:
   (`MODEL_CONTROL_ID is None`) and pins the model in the native configuration
   instead; the gate demonstrates the refusal explicitly so the limitation is
   recorded rather than papered over.
+* **The model is declared through Hermes' own user-defined-provider kind, and
+  that is deliberate.** `model.provider` reads `custom` and the configuration
+  declares one `providers.custom` block holding the product's provider content:
+  the official root, the `key_env` reference, the `chat_completions` transport,
+  the model catalogue and `extra_body` thinking off. Hermes' built-in `deepseek`
+  provider would instead rewrite the model id before the request
+  (`hermes_cli.model_normalize.normalize_model_for_provider` ->
+  `_normalize_for_deepseek`: only `deepseek-v<digit>...` ids and reasoner-like
+  names survive, everything else becomes `deepseek-chat`), so the provider would
+  receive a model id the product never declared. A custom provider passes the id
+  through unchanged, which is what makes the wire value exactly
+  `deepseek-flash`. The block key is the bare kind (`custom`, not
+  `custom:deepseek`) because Hermes' ACP session store persists the *resolved*
+  provider identity and resumes a session through it: with a `custom:<key>`
+  reference a resumed session resolves no provider block and falls back to a
+  placeholder credential (measured; without the restored base URL it would even
+  fall back to Hermes' default OpenRouter root), while the bare kind resolves the
+  declared block on both the fresh and the resumed path. Recorded cost of this
+  declaration, measured and asserted rather than hidden: Hermes' resolved
+  provider identity and its ACP model state read `custom` /
+  `custom:deepseek-flash` (`NATIVE_PROVIDER_IDENTITY`, `NATIVE_MODEL_SELECTION`),
+  and the model-metadata lookup no longer matches the built-in DeepSeek table, so
+  the context window falls back to the heuristic 128,000 instead of 1,000,000.
+  The endpoint, credential reference, transport, request body options, output
+  ceiling and retry bound are unchanged; nothing proxies, patches or renames a
+  model.
 
 Nothing here reads, stores, or emits credential content: the API key is an
 environment *reference* (`$DEEPSEEK_API_KEY`) resolved by the harness inside the
@@ -55,13 +81,37 @@ import json
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+#: The block the configuration declares carries the product's provider identity in
+#: its content: the official DeepSeek root, the credential reference, the
+#: transport, the request body options and the model catalogue.
 HERMES_PROVIDER = "deepseek"
+#: The `providers.<key>` the reviewed configuration actually declares, and the
+#: value `model.provider` carries. Both are `custom`: Hermes' user-defined-provider
+#: kind, which passes the model id through unchanged, while its built-in
+#: `deepseek` provider folds everything that is not a first-class
+#: `deepseek-v<digit>...` id or reasoner-like to `deepseek-chat`.
+#:
+#: Measured, and the reason the declaration is the bare kind rather than a
+#: `custom:<key>` reference: Hermes' ACP session store persists the *resolved*
+#: provider identity (`custom`), and a session is resumed through that stored
+#: value. `custom:deepseek` resolves the block on a fresh session but a bare
+#: `custom` does not, so a resumed session would fall back to a placeholder
+#: credential (and, without the restored base URL, Hermes' default OpenRouter
+#: root). Naming the block `custom` is what keeps the same endpoint, the same
+#: `key_env` reference and the same model on both paths. See the module docstring.
+PROVIDER_BLOCK_KEY = "custom"
+MODEL_PROVIDER_DECLARATION = PROVIDER_BLOCK_KEY
+#: Hermes' resolved provider identity under that declaration (`custom`), and the
+#: ACP `models` spelling it produces (`custom:deepseek-flash`). Both are
+#: observations the chain gate records, not values any layer above may act on.
+NATIVE_PROVIDER_IDENTITY = "custom"
+NATIVE_MODEL_SELECTION = f"{NATIVE_PROVIDER_IDENTITY}:{'deepseek-flash'}"
 #: The product/ProviderModel model id the user confirmed (unchanged).
 PRODUCT_MODEL_ID = "deepseek-flash"
-#: Hermes resolves `model.default` through its own catalogue, where the product
-#: id is spelled the same way; unlike Pi there is no provider-prefixed native
-#: value to translate to. `model_aliases()` is therefore empty, and a test
-#: asserts the sidecar glue has no entry for Hermes either.
+#: The model id Hermes sends. Unlike Pi there is no provider-prefixed native
+#: value to translate to: the pass-through declaration above is exactly what
+#: makes the provider request carry the product id itself. `model_aliases()` is
+#: therefore empty, and a test asserts the sidecar glue has no entry for Hermes.
 NATIVE_MODEL_VALUE = PRODUCT_MODEL_ID
 OFFICIAL_BASE_URL = "https://api.deepseek.com"
 CREDENTIAL_KIND = "api-key"
@@ -136,7 +186,9 @@ MODEL_CONTROL_ID: str | None = None
 #:   prepared. Measured: the ACP entry point takes both from `config.yaml`
 #:   (`model.default`, `model.provider`), so these are declaration-consistent
 #:   rather than load-bearing; they are kept so the environment a managed run
-#:   sees is the environment that was prepared.
+#:   sees is the environment that was prepared. The provider value is the same
+#:   `custom` declaration the configuration carries, so a path that ever
+#:   consulted it could not silently resolve the built-in provider instead.
 ADAPTER_ENVIRONMENT = {
     "PYTHONPATH": ARTIFACT_SITE_PACKAGES,
     "PYTHONNOUSERSITE": "1",
@@ -148,8 +200,8 @@ ADAPTER_ENVIRONMENT = {
     "HERMES_MAX_ITERATIONS": "1",
     "HERMES_MODEL": PRODUCT_MODEL_ID,
     "HERMES_INFERENCE_MODEL": PRODUCT_MODEL_ID,
-    "HERMES_TUI_PROVIDER": HERMES_PROVIDER,
-    "HERMES_INFERENCE_PROVIDER": HERMES_PROVIDER,
+    "HERMES_TUI_PROVIDER": MODEL_PROVIDER_DECLARATION,
+    "HERMES_INFERENCE_PROVIDER": MODEL_PROVIDER_DECLARATION,
 }
 
 PLUGIN_ROOT = Path(__file__).resolve().parents[3]
@@ -197,9 +249,9 @@ def loopback_config_document(base_url: str) -> dict[str, Any]:
     document = copy.deepcopy(config_document())
     document["model"]["base_url"] = base_url
     providers = document.get("providers") or {}
-    if HERMES_PROVIDER not in providers:
+    if PROVIDER_BLOCK_KEY not in providers:
         raise HermesProductionTemplateError("HERMES_CONFIG_TEMPLATE_INVALID")
-    providers[HERMES_PROVIDER]["api"] = base_url
+    providers[PROVIDER_BLOCK_KEY]["api"] = base_url
     return document
 
 
@@ -220,10 +272,10 @@ def documented_differences(base_url: str) -> dict[str, tuple[Any, Any]]:
     """Exactly which fields a loopback override changes, for auditing it.
 
     The prepared configuration records the endpoint twice (`model.base_url`,
-    which the runtime provider resolution prefers, and `providers.deepseek.api`,
-    the provider's own declaration). Both must point at the loopback endpoint
-    for the gate to be able to prove that nothing else was contacted, and every
-    difference is listed here rather than assumed.
+    which the runtime provider resolution prefers, and `providers.custom.api`,
+    the declared provider block's own endpoint). Both must point at the loopback
+    endpoint for the gate to be able to prove that nothing else was contacted,
+    and every difference is listed here rather than assumed.
     """
     production = _flatten(config_document())
     override = _flatten(loopback_config_document(base_url))
@@ -273,16 +325,22 @@ def _emit(value: Any, lines: list[str], indent: int) -> None:
 def model_aliases() -> dict[str, str]:
     """Product model id -> native catalogue value (empty for Hermes).
 
-    Hermes resolves `model.default` in its own catalogue and the product id is
-    spelled identically, so there is nothing to translate. The sidecar glue's
-    table must not invent one either; `test_hermes_production_template.py`
-    compares the two.
+    Hermes receives the product id itself: the configuration declares the
+    pass-through provider reference (`MODEL_PROVIDER_DECLARATION`) instead of the
+    built-in provider that would fold the id, so there is nothing to translate
+    and no alias may be invented here. A test compares this table with the
+    sidecar glue's own.
     """
     return {}
 
 
 def native_model(model: object) -> object:
-    """Pass a product model id through untouched (no alias exists)."""
+    """Pass a product model id through untouched (no alias exists).
+
+    The translation Hermes needs is *not* a model-name mapping: it is the
+    provider declaration that stops Hermes from normalizing the id. The value the
+    sidecar glue carries therefore stays the product id.
+    """
     return model
 
 
@@ -386,7 +444,9 @@ def main(arguments: Sequence[str] | None = None) -> int:
     print(json.dumps({
         "result": "HERMES_PRODUCTION_DEPLOYMENT_EMITTED",
         "out": str(output), "artifactTarget": ARTIFACT_TARGET,
-        "productModelId": PRODUCT_MODEL_ID, "stateTarget": STATE_TARGET,
+        "productModelId": PRODUCT_MODEL_ID,
+        "modelProviderDeclaration": MODEL_PROVIDER_DECLARATION,
+        "stateTarget": STATE_TARGET,
     }, sort_keys=True))
     return 0
 

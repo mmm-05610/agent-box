@@ -45,11 +45,22 @@ for (const family of ["pi", "hermes", "opencode"]) {
         provider: { maxRetries: 0, maxRetryDelayMs: 1_000 } })
     }
     if (family === "hermes") assert.deepEqual(result.config.model, {
-      provider: "deepseek", default: "deepseek-flash", max_tokens: 64, base_url: "https://api.deepseek.com",
+      // `custom` is the user-defined-provider kind that resolves the providers.custom block and
+      // leaves the model id unchanged; the built-in `deepseek` provider would fold
+      // `deepseek-flash` to `deepseek-chat` before the provider request.
+      provider: "custom", default: "deepseek-flash", max_tokens: 64, base_url: "https://api.deepseek.com",
     })
     if (family === "hermes") {
       assert.equal(result.config.agent.api_max_retries, 1)
-      assert.deepEqual(result.config.providers.deepseek.extra_body, { thinking: { type: "disabled" } })
+      // The declared block is keyed by Hermes' user-defined-provider kind, which is also what
+      // model.provider resolves and what a resumed ACP session persists.
+      assert.equal(result.config.model.provider, "custom")
+      assert.equal(result.config.providers.custom.api, "https://api.deepseek.com")
+      assert.equal(result.config.providers.custom.key_env, "DEEPSEEK_API_KEY")
+      assert.equal(result.config.providers.custom.transport, "chat_completions")
+      assert.equal(result.config.providers.custom.default_model, "deepseek-flash")
+      assert.deepEqual(result.config.providers.custom.models, { "deepseek-flash": {} })
+      assert.deepEqual(result.config.providers.custom.extra_body, { thinking: { type: "disabled" } })
     }
     if (family === "opencode") {
       assert.equal(result.model, "deepseek/deepseek-flash")

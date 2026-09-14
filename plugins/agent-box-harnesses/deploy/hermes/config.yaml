@@ -1,10 +1,10 @@
 model:
-  provider: deepseek
+  provider: custom
   default: deepseek-flash
   max_tokens: 64
   base_url: https://api.deepseek.com
 providers:
-  deepseek:
+  custom:
     name: DeepSeek official
     api: https://api.deepseek.com
     key_env: DEEPSEEK_API_KEY

@@ -17,7 +17,7 @@ Boundaries enforced by the gate itself:
 
   * The production deployment template is loaded from the plugin and asserted to
     hold the official DeepSeek root. The loopback endpoint exists only as an
-    explicit, listed override (`model.base_url` and `providers.deepseek.api`)
+    explicit, listed override (`model.base_url` and `providers.custom.api`)
     applied to this run's projected copy.
   * A reviewed offline guard is projected as `/tmp/agentbox-home/sitecustomize.py`
     and put first on the adapter's `PYTHONPATH`, so every non-loopback
@@ -34,9 +34,18 @@ Boundaries enforced by the gate itself:
   * The Worker's argv is captured and asserted to contain exactly one writable
     bind (the declared state directory) and read-only binds everywhere else.
   * The model that reaches the provider is *asserted*, not observed: the
-    prepared configuration's `model.default: deepseek-flash` is folded by
-    Hermes' own static rule to `deepseek-chat`, and every round must request
-    exactly that value or the gate fails.
+    prepared configuration declares the product model id `deepseek-flash`
+    through Hermes' user-defined-provider kind (`model.provider: custom`), whose
+    block carries the official root and passes the id through unchanged, and
+    every round must request exactly `deepseek-flash` or the gate fails. Hermes'
+    built-in `deepseek` provider would instead fold that id to `deepseek-chat`
+    before the request; the gate reads that fold out of the artifact's own
+    normalizer, which is why the declaration is not the built-in one.
+  * The native identity of the same model is recorded, not derived: the reviewed
+    guard reads the ACP `models` state out of the adapter's session responses
+    (`acp-model ... current=custom:deepseek-flash`), so the provider identity
+    `custom` and the native model selection are measurements of the real chain
+    and are asserted on every observed value.
   * Every non-loopback refusal the reviewed guard records is classified
     (guard self-test, harness catalogue probe, provider default endpoint); a
     refusal to anything else, or a provider request that does not arrive at the
@@ -85,18 +94,28 @@ OUTPUT_TOKEN_LIMIT = 64
 #: Context-length probes (`POST /api/show`) are not model requests; they are
 #: recorded separately and bounded so a probe storm cannot pass unnoticed.
 CONTEXT_PROBE_LIMIT = 240
-#: The model that actually reaches the provider, and the reason it is not the
-#: product model id. Hermes normalizes a provider's model id with its own static
-#: rule (`hermes_cli/model_normalize._normalize_for_deepseek`, measured to
-#: contain no network call at all): a first-class `deepseek-v<digit>...` id
-#: passes through, a reasoner-like name folds to `deepseek-reasoner`, and
-#: everything else folds to `deepseek-chat`. The prepared configuration's
-#: `model.default: deepseek-flash` is none of the first two, so the effective
-#: model is `deepseek-chat`. The gate *asserts* this rather than observing it, so
-#: a Hermes upgrade that changes the fold (or a deployment that changes the
-#: default) fails loudly instead of quietly shipping a different model.
-EFFECTIVE_MODEL_ID = "deepseek-chat"
-#: The two native predicates that decide the fold above.
+#: The model id the provider request body must carry: the product/ProviderModel
+#: id itself. The prepared configuration declares it through Hermes'
+#: user-defined-provider kind (`model.provider: custom`), whose block carries the
+#: official root, the credential reference, the chat_completions transport and
+#: thinking off, and which passes the id through unchanged. Hermes' built-in
+#: `deepseek` provider would instead rewrite it
+#: (`hermes_cli/model_normalize._normalize_for_deepseek`: only first-class
+#: `deepseek-v<digit>...` ids and reasoner-like names survive, everything else
+#: becomes `deepseek-chat`), which is why the declaration is not the built-in
+#: one. The gate *asserts* this value on every round, so a Hermes upgrade or a
+#: deployment change fails loudly instead of quietly shipping a different model.
+WIRE_MODEL_ID = "deepseek-flash"
+#: The native spellings the same declaration produces, recorded from the ACP
+#: `models` state the adapter answered with (provider identity `custom`, model
+#: selection `custom:deepseek-flash`). Both are measurements of the real chain
+#: (the reviewed guard's `acp-model` records) and every observed value is
+#: asserted, so a harness that starts re-resolving the model is caught.
+NATIVE_MODEL_SELECTION = "custom:deepseek-flash"
+NATIVE_PROVIDER_IDENTITY = "custom"
+#: The two native predicates that decide the built-in provider's fold, kept so
+#: the gate can show *why* the pass-through declaration is required: the
+#: configured model id is neither first-class nor reasoner-like.
 MODEL_PASSTHROUGH_PATTERN = r"^deepseek-v[0-9]+([-.].+)?$"
 MODEL_REASONER_PREFIX = "deepseek-r"
 #: Destinations a refused egress attempt may name, each with its category. A
@@ -630,7 +649,7 @@ def gate_deployment(production, artifact: Path, digest: str, endpoint, *, model_
     """The production document plus this run's listed, test-only overrides.
 
     Listed differences from the production template: the fake endpoint
-    (`model.base_url` and `providers.deepseek.api`), the loopback guard projected
+    (`model.base_url` and `providers.custom.api`), the loopback guard projected
     as the guest `sitecustomize.py` and put first on `PYTHONPATH`, and the three
     audit sinks inside the project workspace.
     """
@@ -719,7 +738,7 @@ def run_chain(temporary, workspace, worker, artifact, digest, endpoint, producti
             session = wait_for_turn(runtime, first["session"]["id"], 0, "completed")
             result["rounds"]["first"] = summarize_turn(session, 0)
             for record in endpoint.phase_requests("round-1"):
-                assert_effective_model(
+                assert_wire_model(
                     record["structure"], "round-1", REPORT.setdefault("observedModels", []))
             result["sessionId"] = first["session"]["id"]
             native_id = session["checkpoint"]["native_id"] if session["checkpoint"] else None
@@ -768,6 +787,7 @@ def run_chain(temporary, workspace, worker, artifact, digest, endpoint, producti
                 "tokenInEvents": FAKE_TOKEN in json.dumps(session["events"]),
                 "tokenInReportableState": FAKE_TOKEN in json.dumps(REPORT),
             }
+            assert_credential_delivery(result["credential"])
             result["stateScan"] = scan_state(runtime, session, native_id)
             result["deltaAttribution"] = delta_attribution(session)
             return result
@@ -775,29 +795,60 @@ def run_chain(temporary, workspace, worker, artifact, digest, endpoint, producti
         runtime.stop()
 
 
-def assert_effective_model(structure: dict, phase: str, observed: list) -> None:
-    """The model on the wire must be the one this gate recorded.
+def assert_credential_delivery(credential: dict) -> None:
+    """Every provider request must carry the credential the Worker injected.
+
+    A request that reaches the endpoint without the injected bearer value means the
+    credential reference did not resolve on that round - for this deployment it is
+    the difference between `key_env` being honoured and Hermes falling back to a
+    placeholder key (which a real endpoint answers with 401). The measurement
+    exists either way; this makes it a gate failure instead of a reported number.
+    """
+    if credential.get("injectedTokenReachedProvider") and not credential.get("unauthorizedRequests"):
+        return
+    fail("HERMES_GATE_CREDENTIAL_NOT_DELIVERED",
+         f"a provider request did not carry the injected credential: {json.dumps(credential)}")
+
+
+def assert_wire_model(structure: dict, phase: str, observed: list) -> None:
+    """The model on the wire must be the product model id, exactly.
 
     `structure.model` is what the provider actually received. The deployed
-    configuration declares `model.default: deepseek-flash`; Hermes' own static
-    normalization folds that to `deepseek-chat` (see `EFFECTIVE_MODEL_ID`). Any
-    other value means either the fold changed or the deployment changed, and
-    either way the gate must not pass on a model nobody reviewed.
+    configuration declares `model.default: deepseek-flash` through Hermes'
+    pass-through provider reference, so the value has to be the product id
+    itself - not a folded `deepseek-chat`, not a provider-prefixed slug, not an
+    empty value. Any other value means either the harness rewrote the model or
+    the deployment changed, and either way the gate must not pass on a model
+    nobody reviewed.
     """
     model = structure.get("model")
     observed.append({"phase": phase, "model": model})
-    if model != EFFECTIVE_MODEL_ID:
-        fail("HERMES_GATE_EFFECTIVE_MODEL_DRIFT",
-             f"phase {phase} requested model {model!r}, recorded value is {EFFECTIVE_MODEL_ID!r}")
+    if model != WIRE_MODEL_ID:
+        fail("HERMES_GATE_WIRE_MODEL_DRIFT",
+             f"phase {phase} requested model {model!r}; the product model id is {WIRE_MODEL_ID!r}")
 
 
-def model_resolution_witness(artifact: Path, configured: str) -> dict:
-    """Why the effective model is what it is: the artifact's own normalizer.
+def is_custom_provider_declaration(value: object) -> bool:
+    """True for Hermes' user-defined-provider declarations.
+
+    Hermes resolves a model through one of these instead of a built-in provider,
+    and passes the model id through unchanged. Both spellings exist (`custom` for
+    the bare kind, `custom:<key>` for a keyed reference); the reviewed
+    configuration uses the bare kind because Hermes persists the resolved
+    identity and resumes a session through it.
+    """
+    text = str(value or "")
+    return text == "custom" or text.startswith("custom:")
+
+
+def model_resolution_witness(artifact: Path, configured_provider: str, configured_model: str) -> dict:
+    """Why the wire value can be the product id: the declaration plus the artifact's normalizer.
 
     The rule is read from the artifact under test, not from this machine's
-    installed copy, and the two native predicates are evaluated here so the
-    conclusion ("the product id folds to `deepseek-chat`") is derived rather
-    than asserted from memory.
+    installed copy, and the two native predicates are evaluated here, so the
+    record derives (rather than asserts from memory) that a *built-in* deepseek
+    declaration would have folded this model id and that the configured
+    declaration is the user-defined-provider kind that passes it through.
     """
     import re as re_module
 
@@ -808,34 +859,95 @@ def model_resolution_witness(artifact: Path, configured: str) -> dict:
     content = source.read_text(encoding="utf-8", errors="replace")
     v_series = "return bare" in content and "deepseek-v" in content
     fold = 'return "deepseek-chat"' in content
-    if not (v_series and fold):
+    custom_passthrough = "pass through as-is" in content and "return name" in content
+    if not (v_series and fold and custom_passthrough):
         fail("HERMES_GATE_MODEL_NORMALIZER_UNREADABLE",
-             "the artifact's DeepSeek normalizer does not contain the reviewed fold")
-    passthrough = re_module.match(MODEL_PASSTHROUGH_PATTERN, configured.lower()) is not None
-    reasoner = configured.lower().startswith(MODEL_REASONER_PREFIX)
-    if passthrough or reasoner:
-        fail("HERMES_GATE_MODEL_FOLD_UNEXPECTED",
-             f"the configured model {configured!r} should not fold to {EFFECTIVE_MODEL_ID!r}")
+             "the artifact's normalizer does not contain the reviewed fold and custom pass-through")
+    declaration_is_custom = is_custom_provider_declaration(configured_provider)
+    passthrough = re_module.match(MODEL_PASSTHROUGH_PATTERN, configured_model.lower()) is not None
+    reasoner = configured_model.lower().startswith(MODEL_REASONER_PREFIX)
+    builtin_would_fold = not (passthrough or reasoner)
+    if not declaration_is_custom or not builtin_would_fold:
+        fail("HERMES_GATE_MODEL_DECLARATION_UNEXPECTED",
+             f"provider {configured_provider!r} with model {configured_model!r} would not need the "
+             "pass-through declaration")
     return {
-        "configuredModelDefault": configured,
-        "effectiveModel": EFFECTIVE_MODEL_ID,
-        "rule": "hermes_cli.model_normalize._normalize_for_deepseek (read from the artifact)",
+        "configuredProviderDeclaration": configured_provider,
+        "configuredModelDefault": configured_model,
+        "wireModel": WIRE_MODEL_ID,
+        "rule": "hermes_cli.model_normalize.normalize_model_for_provider (read from the artifact)",
         "artifactRuleFile": str(source.relative_to(artifact)),
         "ruleIsStatic": True,
         "networkDependent": False,
         "witness": {
+            "declarationIsCustomProvider": declaration_is_custom,
+            "builtinProviderWouldFold": builtin_would_fold,
             "passthroughPatternMatched": passthrough,
             "reasonerPrefixMatched": reasoner,
             "foldReturnPresent": fold,
+            "customPassThroughPresent": custom_passthrough,
         },
         "note": (
-            "Hermes folds a DeepSeek model id that is neither first-class "
-            "(deepseek-v<digit>...) nor reasoner-like to deepseek-chat, in pure string logic with "
-            "no network call in the module. The refused catalogue probes (models.dev, "
-            "openrouter.ai) feed only the available-model list, which the pinned bridge does not "
-            "use. The product model id is therefore not addressable on this harness's native "
-            "surface, and the effective model is Hermes' own default; the wire value is asserted "
-            "on every round rather than assumed."
+            "Hermes' built-in deepseek provider folds a model id that is neither first-class "
+            "(deepseek-v<digit>...) nor reasoner-like into deepseek-chat, in pure string logic with "
+            "no network call in the module (`_normalize_for_deepseek`). The prepared configuration "
+            "therefore declares the product model through Hermes' user-defined-provider kind "
+            "(model.provider: custom), which carries the same official provider block and passes "
+            "the id through unchanged; the provider request value is asserted on every round, and "
+            "the native ACP identity Hermes derived is recorded separately (see nativeModel)."
+        ),
+    }
+
+
+def native_model_observation(workspace: Path) -> dict:
+    """The ACP model state Hermes itself answered with, read back from the guard.
+
+    The adapter returns its own model selector payload from `session/new` (and
+    from the reopen methods). The reviewed guard records it as
+    `acp-model <method> current=<id> available=<id,...>`, which makes the native
+    provider identity and native model selection observations of the real chain:
+    neither the Server, nor the sidecar bridge, nor this gate's configuration ever
+    see that value. Every observed `current` id must be the reviewed native
+    selection; the advertised list is recorded for context only.
+    """
+    records: list[dict] = []
+    for line in read_audit(workspace, ACP_AUDIT_NAME):
+        parts = line.split()
+        if len(parts) < 3 or parts[0] != "acp-model":
+            continue
+        fields = {token.split("=", 1)[0]: token.split("=", 1)[1]
+                  for token in parts[2:] if "=" in token}
+        records.append({
+            "method": parts[1],
+            "current": fields.get("current", ""),
+            "available": [item for item in fields.get("available", "").split(",") if item],
+        })
+    currents = sorted({record["current"] for record in records if record["current"]})
+    available = sorted({item for record in records for item in record["available"]})
+    if not currents:
+        fail("HERMES_GATE_NATIVE_MODEL_UNOBSERVED",
+             "no ACP model state was recorded by the guard during this run")
+    drifted = [value for value in currents if value != NATIVE_MODEL_SELECTION]
+    if drifted:
+        fail("HERMES_GATE_NATIVE_MODEL_DRIFT",
+             f"the adapter answered with {drifted}, the reviewed native selection is "
+             f"{NATIVE_MODEL_SELECTION!r}")
+    return {
+        "records": records,
+        "currentModelIds": currents,
+        "availableModelIds": available,
+        "expectedNativeModelSelection": NATIVE_MODEL_SELECTION,
+        "expectedNativeProviderIdentity": NATIVE_PROVIDER_IDENTITY,
+        "source": (
+            "the reviewed guard's acp-model lines: it reads models.currentModelId out of the "
+            "adapter's own session responses, inside the guest, during the rounds above"
+        ),
+        "note": (
+            "The native spelling is an observation, not a requirement of the product contract: the "
+            "product/ProviderModel id is deepseek-flash and the provider request carries exactly "
+            "that. Hermes reports its resolved provider identity as `custom` for a user-defined "
+            "provider reference, which is recorded here so a change in that identity cannot pass "
+            "unnoticed."
         ),
     }
 
@@ -850,7 +962,7 @@ def continuation_evidence(round_two: list) -> dict:
     if not round_two:
         fail("HERMES_GATE_ROUND2_MISSING", "the second round produced no provider request")
     request = round_two[-1]
-    assert_effective_model(request["structure"], "round-2", REPORT.setdefault("observedModels", []))
+    assert_wire_model(request["structure"], "round-2", REPORT.setdefault("observedModels", []))
     messages = request["structure"].get("messages") or []
     user = any(item.get("role") == "user" and item.get("containsRound1User") for item in messages)
     assistant = any(
@@ -867,7 +979,7 @@ def continuation_evidence(round_two: list) -> dict:
         "round2CarriesRound1Assistant": assistant,
         "roles": [item.get("role") for item in messages],
         "model": request["structure"].get("model"),
-        "effectiveModel": EFFECTIVE_MODEL_ID,
+        "wireModel": WIRE_MODEL_ID,
         "maxTokens": max_tokens,
         "toolCount": request["structure"].get("toolCount"),
         "stream": request["structure"].get("stream"),
@@ -968,12 +1080,12 @@ def run_model_control_phase(temporary, workspace, worker, artifact, digest, endp
                 })
             outcome["requestsBeforePhase"] = before
             outcome["productModelId"] = production.PRODUCT_MODEL_ID
-            outcome["effectiveModel"] = EFFECTIVE_MODEL_ID
+            outcome["wireModel"] = WIRE_MODEL_ID
             outcome["note"] = (
                 "A declared model control is refused inside the sidecar for every value, because "
                 "Hermes 0.19 advertises no ACP configOptions for the pinned bridge to select from; "
-                "the production template therefore declares none and the effective model is the "
-                "harness's own default, asserted on the wire in the other phases."
+                "the production template therefore declares none and the model the configuration "
+                "pins is the one the provider receives, asserted on the wire in the other phases."
             )
             outcome["requestsAfterPhase"] = len(endpoint.requests)
             if not all(case["refusedBeforeProviderRequest"] for case in outcome["cases"]):
@@ -1305,7 +1417,7 @@ def observe_retry(temporary, workspace, worker, artifact, digest, production) ->
         endpoint.stop()
     requests = endpoint.phase_requests("retry")
     for record in requests:
-        assert_effective_model(record["structure"], "retry", REPORT.setdefault("observedModels", []))
+        assert_wire_model(record["structure"], "retry", REPORT.setdefault("observedModels", []))
     outcome["modelRequests"] = len(requests)
     outcome["injectedFailure"] = "500 on the first /chat/completions of this phase"
     outcome["retriedAfterInjectedFailure"] = len(requests) > 1
@@ -1394,6 +1506,25 @@ def main() -> int:
         if production.MODEL_CONTROL_ID is not None:
             fail("HERMES_GATE_TEMPLATE_DECLARES_MODEL_CONTROL",
                  "the production template declares a model control the harness cannot accept")
+        # The three ids this gate asserts are the template's, not this script's:
+        # the product id, the model id the harness sends, and the native spelling
+        # Hermes derives from the pass-through declaration.
+        if not (production.PRODUCT_MODEL_ID == production.NATIVE_MODEL_VALUE == WIRE_MODEL_ID):
+            fail("HERMES_GATE_TEMPLATE_MODEL_MISMATCH",
+                 f"product {production.PRODUCT_MODEL_ID!r}, native {production.NATIVE_MODEL_VALUE!r}, "
+                 f"wire {WIRE_MODEL_ID!r}")
+        if production.NATIVE_MODEL_SELECTION != NATIVE_MODEL_SELECTION:
+            fail("HERMES_GATE_TEMPLATE_NATIVE_IDENTITY_MISMATCH",
+                 f"template native selection {production.NATIVE_MODEL_SELECTION!r}, "
+                 f"gate {NATIVE_MODEL_SELECTION!r}")
+        if production.NATIVE_PROVIDER_IDENTITY != NATIVE_PROVIDER_IDENTITY:
+            fail("HERMES_GATE_TEMPLATE_NATIVE_IDENTITY_MISMATCH",
+                 f"template provider identity {production.NATIVE_PROVIDER_IDENTITY!r}, "
+                 f"gate {NATIVE_PROVIDER_IDENTITY!r}")
+        declaration = production.config_document()["model"]["provider"]
+        if declaration != production.MODEL_PROVIDER_DECLARATION or not is_custom_provider_declaration(declaration):
+            fail("HERMES_GATE_TEMPLATE_MODEL_MISMATCH",
+                 f"the configuration declares model.provider {declaration!r}")
 
         endpoint = FakeEndpoint(FAKE_TOKEN)
         endpoint.assert_loopback_only()
@@ -1403,6 +1534,9 @@ def main() -> int:
             "loopbackOverrideChanges": {key: list(value) for key, value in differences.items()},
             "productModelId": production.PRODUCT_MODEL_ID,
             "nativeModelValue": production.NATIVE_MODEL_VALUE,
+            "modelProviderDeclaration": production.MODEL_PROVIDER_DECLARATION,
+            "nativeProviderIdentity": production.NATIVE_PROVIDER_IDENTITY,
+            "nativeModelSelection": production.NATIVE_MODEL_SELECTION,
             "artifactTarget": production.ARTIFACT_TARGET,
             "adapterCommand": production.ADAPTER_COMMAND,
             "adapterArgs": list(production.ADAPTER_ARGS),
@@ -1413,7 +1547,7 @@ def main() -> int:
             "modelControlId": production.MODEL_CONTROL_ID,
             "maxProviderAttempts": production.MAX_PROVIDER_ATTEMPTS,
         }
-        expected = {"model.base_url", f"providers.{production.HERMES_PROVIDER}.api"}
+        expected = {"model.base_url", f"providers.{production.PROVIDER_BLOCK_KEY}.api"}
         if set(differences) != expected:
             fail("HERMES_GATE_OVERRIDE_NOT_MINIMAL", f"the loopback override changed {sorted(differences)}")
 
@@ -1432,7 +1566,7 @@ def main() -> int:
         digest = verify_artifact(artifact, REPORT)
         REPORT["artifactDriftCheck"] = drift_check(artifact, temporary)
         REPORT["modelResolution"] = model_resolution_witness(
-            artifact, production.config_document()["model"]["default"])
+            artifact, declaration, production.config_document()["model"]["default"])
 
         token_path = temporary / "hermes-gate-token"
         token_path.write_bytes(FAKE_TOKEN.encode())
@@ -1487,12 +1621,15 @@ def main() -> int:
                 "harnessCatalogProbe": (
                     "Hermes' model-metadata probes (models.dev, openrouter.ai). They fetch a "
                     "catalogue the pinned bridge does not use, are refused offline, and cannot "
-                    "change the effective model: the DeepSeek name fold is static string logic"
+                    "change the model the provider receives: the model is declared in the native "
+                    "configuration and passed through unchanged (see modelResolution), and every "
+                    "provider request is asserted to carry the product id"
                 ),
                 "providerDefaultEndpoint": (
-                    "Hermes' own auxiliary/context-length path uses the provider's default "
-                    "endpoint (api.deepseek.com) instead of the configured one; the model requests "
-                    "themselves all arrived at the loopback endpoint (see provider.requests)"
+                    "Hermes' own auxiliary/context-length path can fall back to the provider's "
+                    "default endpoint (api.deepseek.com) instead of the configured one; the model "
+                    "requests themselves must all arrive at the loopback endpoint (see "
+                    "provider.requests), which is asserted separately"
                 ),
             },
             "failureSemantics": (
@@ -1536,6 +1673,7 @@ def main() -> int:
             temporary, workspace, worker, artifact, digest, production, audit_before_reopen)
         REPORT["retryObservation"] = observe_retry(
             temporary, workspace, worker, artifact, digest, production)
+        REPORT["nativeModel"] = native_model_observation(workspace)
         cleanup_check(temporary, workspace, token_path)
         REPORT["result"] = "HERMES_PRODUCTION_CHAIN_GATE_OK"
     except GateFailure as failure:
