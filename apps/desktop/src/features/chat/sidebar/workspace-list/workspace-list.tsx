@@ -103,22 +103,21 @@ export function WorkspaceList({
   const [archiveTarget, setArchiveTarget] = useState<null | { shellId: string; workspace: WorkspaceRecord }>(null)
 
   // The service-side twin of a shell row, by the same complete identity the
-  // registration uses. No match — or no declared capability — means no action.
+  // registration uses. Ownership reads the CACHE alone: a matched record keeps
+  // its shell row while the service is loading or unavailable, so the row
+  // never falls back to the legacy Hermes preview behind the user's back. The
+  // service phase decides what a matched row can DO (archive), never what it
+  // shows.
   const agentBoxWorkspaceFor = (target: {
     localPath?: string
     wsl?: { distribution: string; rootPath: string; user: null | string }
-  }) => {
-    if (agentBoxService.phase !== 'ready') {
-      return undefined
-    }
+  }) => resolveAgentBoxWorkspace(agentBoxWorkspaces, target) ?? undefined
 
-    return resolveAgentBoxWorkspace(agentBoxWorkspaces, target) ?? undefined
-  }
-
-  // The archive ACTION additionally needs the declared capability; the
-  // projection itself only needs the record.
+  // The archive ACTION additionally needs a service that can answer AND the
+  // declared capability: an old hello outliving an unavailable service must
+  // not keep offering an entry whose request cannot be executed.
   const agentBoxArchiveFor = (target: Parameters<typeof agentBoxWorkspaceFor>[0]) => {
-    if (!agentBoxCapabilitySupported(agentBoxHello, 'workspaces.archive')) {
+    if (agentBoxService.phase !== 'ready' || !agentBoxCapabilitySupported(agentBoxHello, 'workspaces.archive')) {
       return undefined
     }
 
@@ -152,13 +151,11 @@ export function WorkspaceList({
       !project.isNoProject && project.path ? agentBoxWorkspaceFor({ localPath: project.path }) : undefined
 
     // A matched service Workspace OWNS the expanded content: its AgentBox
-    // Sessions render here (loading/empty included) and the legacy preview
-    // rows never bleed back in. The archive action additionally needs the
-    // declared capability.
+    // Sessions render here (loading/unavailable/empty included) and the legacy
+    // preview rows never bleed back in. The archive action separately needs a
+    // callable service and the declared capability.
     const archiveWorkspace =
-      serviceWorkspace && agentBoxCapabilitySupported(agentBoxHello, 'workspaces.archive')
-        ? serviceWorkspace
-        : undefined
+      !project.isNoProject && project.path ? agentBoxArchiveFor({ localPath: project.path }) : undefined
 
     const content = serviceWorkspace ? (
       <AgentBoxSessionList key={serviceWorkspace.id} shellId={project.id} workspace={serviceWorkspace} />

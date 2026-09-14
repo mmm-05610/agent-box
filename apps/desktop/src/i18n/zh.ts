@@ -2482,6 +2482,10 @@ export const zh: Translations = {
 
       empty: '这里还没有 AgentBox Session。',
 
+      unavailable: 'AgentBox 服务当前不可用。',
+
+      unavailableReasonFallback: '服务未提供原因。',
+
       menuActions: 'Session 操作',
 
       menuRename: '重命名…',

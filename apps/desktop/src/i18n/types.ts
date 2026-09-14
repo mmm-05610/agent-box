@@ -2040,6 +2040,11 @@ export interface Translations {
     agentBoxSession: {
       loading: string
       empty: string
+      /** The service is not callable: its cached records stay visible, and
+       *  this line names the state above them. */
+      unavailable: string
+      /** Shown in place of the reason when the service reported no detail. */
+      unavailableReasonFallback: string
       menuActions: string
       menuRename: string
       menuPin: string

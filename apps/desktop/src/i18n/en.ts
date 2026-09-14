@@ -2320,6 +2320,10 @@ export const en: Translations = {
 
       empty: 'No AgentBox sessions here yet.',
 
+      unavailable: 'AgentBox service is unavailable.',
+
+      unavailableReasonFallback: 'The service reported no reason.',
+
       menuActions: 'Session actions',
 
       menuRename: 'Rename…',

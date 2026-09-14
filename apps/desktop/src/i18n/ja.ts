@@ -1979,6 +1979,10 @@ export const ja = defineLocale({
 
       empty: 'ここにはまだ AgentBox Session がありません。',
 
+      unavailable: 'AgentBox サービスを利用できません。',
+
+      unavailableReasonFallback: 'サービスから理由は報告されていません。',
+
       menuActions: 'Session 操作',
 
       menuRename: '名前を変更…',

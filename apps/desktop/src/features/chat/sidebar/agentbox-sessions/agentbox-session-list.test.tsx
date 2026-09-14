@@ -455,3 +455,173 @@ describe('AgentBox session list — pin via sessions.update', () => {
     expect(wireClient.call).not.toHaveBeenCalled()
   })
 })
+
+// The service boundary: what the list shows is the CACHE it already holds, and
+// what the service phase changes is only what the rows can do next. A service
+// that goes away must never erase its own sessions, hand the row back to the
+// legacy Hermes list, or accept maintenance intents it cannot honor.
+describe('AgentBox session list — service state boundary', () => {
+  const unavailableDetail = 'connect ECONNREFUSED 127.0.0.1:8732'
+
+  const rows = (container: HTMLElement) => container.querySelectorAll('[data-agentbox-session-row]')
+
+  it('keeps the cached rows when the service goes unavailable: reason shown, maintenance fail-closed, row still opens', async () => {
+    $agentBoxSessions.set({ 'session-1': session({ displayName: 'Live', version: 2 }) })
+
+    const events: string[] = []
+    const { container } = renderList(events)
+
+    expect(rows(container)).toHaveLength(1)
+    expect(screen.getByRole('button', { name: 'Session actions' })).toBeTruthy()
+
+    await act(async () => {
+      $agentBoxService.set({ detail: unavailableDetail, phase: 'unavailable' })
+    })
+
+    // The record we already hold is still the row — the service phase does not
+    // erase it and the list does not go back to legacy Hermes.
+    expect(rows(container)).toHaveLength(1)
+    expect(rows(container)[0]?.textContent).toContain('Live')
+    // The service's own reason, verbatim.
+    expect(container.querySelector('[data-agentbox-sessions-unavailable="workspace-1"]')?.textContent).toContain(
+      unavailableDetail
+    )
+    // Unavailable is not a spinner.
+    expect(container.querySelector('[data-agentbox-sessions-loading="workspace-1"]')).toBeNull()
+    // No maintenance entry can exist, so no `sessions.update` can be sent.
+    expect(screen.queryByRole('button', { name: 'Session actions' })).toBeNull()
+    expect(wireClient.call).not.toHaveBeenCalled()
+
+    // The cached row is still openable: select the shell row, then navigate.
+    const stopSelection = $workspaceViewSelectedId.listen(() => events.push('select'))
+    const callCountBefore = wireClient.call.mock.calls.length
+
+    fireEvent.click(screen.getByRole('button', { name: /Live/ }))
+    await act(async () => {})
+
+    stopSelection()
+
+    expect(events).toEqual(['select', '/session-1'])
+    expect($workspaceViewSelectedId.get()).toBe('proj-1')
+    expect(wireClient.call.mock.calls.length).toBe(callCountBefore)
+  })
+
+  it('renders the service reason as plain text, with the localized fallback when it is empty', async () => {
+    $agentBoxSessions.set({ 'session-1': session() })
+    $agentBoxService.set({ detail: '<b>not markup</b>', phase: 'unavailable' })
+
+    const { container } = renderList([])
+    const detail = container.querySelector('[data-agentbox-service-detail]')
+
+    expect(detail?.textContent).toBe('<b>not markup</b>')
+    expect(detail?.querySelector('b')).toBeNull()
+
+    await act(async () => {
+      $agentBoxService.set({ detail: '   ', phase: 'unavailable' })
+    })
+
+    expect(container.querySelector('[data-agentbox-service-detail]')?.textContent).toBe(
+      'The service reported no reason.'
+    )
+  })
+
+  it('keeps the cached rows and adds the compact loading marker while the catalog is not ready', async () => {
+    $agentBoxSessions.set({ 'session-1': session({ displayName: 'Live' }) })
+    $agentBoxService.set({ detail: null, phase: 'loading' })
+
+    const { container } = renderList([])
+
+    expect(rows(container)).toHaveLength(1)
+    expect(container.querySelector('[data-agentbox-sessions-loading="workspace-1"]')?.textContent).toContain(
+      'Loading sessions'
+    )
+    // Loading is an addition beside the records, never a replacement for them
+    // and never the empty state.
+    expect(container.querySelector('[data-agentbox-sessions-empty="workspace-1"]')).toBeNull()
+
+    // A ready service whose catalog has not arrived is the same picture.
+    await act(async () => {
+      $agentBoxService.set({ detail: null, phase: 'ready' })
+      $agentBoxCatalogReadiness.set({ sessions: false, workspaces: true })
+    })
+
+    expect(rows(container)).toHaveLength(1)
+    expect(container.querySelector('[data-agentbox-sessions-loading="workspace-1"]')).toBeTruthy()
+  })
+
+  it('shows unavailable — never a spinner — for a workspace with nothing cached', () => {
+    $agentBoxService.set({ detail: unavailableDetail, phase: 'unavailable' })
+
+    const { container } = renderList([])
+
+    expect(container.querySelector('[data-agentbox-sessions-unavailable="workspace-1"]')?.textContent).toContain(
+      unavailableDetail
+    )
+    expect(container.querySelector('[data-agentbox-sessions-loading="workspace-1"]')).toBeNull()
+    expect(container.querySelector('[data-agentbox-sessions-empty="workspace-1"]')).toBeNull()
+    expect(rows(container)).toHaveLength(0)
+    expect(wireClient.call).not.toHaveBeenCalled()
+  })
+
+  it('sends nothing when a rename dialog outlives the service it was opened on', async () => {
+    $agentBoxSessions.set({ 'session-1': session({ displayName: 'Old', version: 3 }) })
+
+    renderList([])
+
+    openRowMenu()
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Rename…' }))
+
+    const dialog = await screen.findByRole('dialog')
+
+    await act(async () => {
+      fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: 'New name' } })
+    })
+    await act(async () => {
+      $agentBoxService.set({ detail: 'service went away', phase: 'unavailable' })
+    })
+    await act(async () => {
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
+    })
+
+    // Fail closed: the intent is not sent on faith, the draft is not thrown
+    // away with it, and nothing is written.
+    expect(wireClient.call).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog')).toBeTruthy()
+    expect(within(screen.getByRole('dialog')).getByRole<HTMLInputElement>('textbox').value).toBe('New name')
+    expect($agentBoxSessions.get()['session-1']?.displayName).toBe('Old')
+  })
+
+  it('restores maintenance when the service comes back, without duplicating the rows', async () => {
+    $agentBoxSessions.set({ 'session-1': session({ displayName: 'Live', version: 4 }) })
+    $agentBoxService.set({ detail: unavailableDetail, phase: 'unavailable' })
+    wireClient.call.mockResolvedValue({ session: session({ pinned: true, version: 5 }) })
+
+    const { container } = renderList([])
+
+    expect(rows(container)).toHaveLength(1)
+    expect(screen.queryByRole('button', { name: 'Session actions' })).toBeNull()
+
+    await act(async () => {
+      $agentBoxService.set({ detail: null, phase: 'ready' })
+    })
+
+    // One record, one row — the recovery re-renders, it does not re-project.
+    expect(rows(container)).toHaveLength(1)
+    expect(container.querySelector('[data-agentbox-sessions-unavailable="workspace-1"]')).toBeNull()
+
+    openRowMenu()
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Pin' }))
+
+    expect(wireClient.call).toHaveBeenCalledWith('sessions.update', {
+      expectedVersion: 4,
+      pinned: true,
+      requestId: expect.stringMatching(/^desktop-/),
+      sessionId: 'session-1'
+    })
+
+    await act(async () => {})
+
+    expect($agentBoxSessions.get()['session-1']?.pinned).toBe(true)
+    expect(rows(container)).toHaveLength(1)
+  })
+})

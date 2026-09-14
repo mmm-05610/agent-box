@@ -1919,6 +1919,10 @@ export const zhHant = defineLocale({
 
       empty: '這裡還沒有 AgentBox Session。',
 
+      unavailable: 'AgentBox 服務目前無法使用。',
+
+      unavailableReasonFallback: '服務未提供原因。',
+
       menuActions: 'Session 操作',
 
       menuRename: '重新命名…',

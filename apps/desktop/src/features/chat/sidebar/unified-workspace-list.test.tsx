@@ -396,6 +396,39 @@ describe('AgentBox workspace archive in the unified list', () => {
     expect(agentBoxMocks.archive).not.toHaveBeenCalled()
   })
 
+  it('withdraws the entry on an unavailable service even though hello still declares the capability', async () => {
+    // The cached hello is not a promise that the service can answer: an
+    // archive the sidebar cannot execute must not be offered at all.
+    $agentBoxService.set({ detail: 'connect ECONNREFUSED 127.0.0.1:8732', phase: 'unavailable' })
+    renderListWith([localRow('C:/work/app')])
+
+    openLocalMenu()
+    expect(await screen.findByRole('menuitem', { name: 'Hide from sidebar' })).toBeTruthy()
+    expect(screen.queryByRole('menuitem', { name: 'Archive in AgentBox' })).toBeNull()
+    cleanup()
+
+    setWslWorkspaces([wslRecord()])
+    $agentBoxWorkspaces.set([
+      serviceWorkspace({
+        environment: { host: 'Ubuntu', kind: 'wsl', user: 'maoqh' },
+        id: asWireId('workspace-wsl'),
+        normalizedPath: '/home/maoqh/验收目录'
+      })
+    ])
+    renderListWith([])
+    openWslMenu()
+    expect(await screen.findByRole('menuitem', { name: 'Remove from sidebar' })).toBeTruthy()
+    expect(screen.queryByRole('menuitem', { name: 'Archive in AgentBox' })).toBeNull()
+    expect(agentBoxMocks.archive).not.toHaveBeenCalled()
+
+    // The same callable service brings it back — nothing else changed.
+    await act(async () => {
+      $agentBoxService.set({ detail: null, phase: 'ready' })
+    })
+
+    expect(await screen.findByRole('menuitem', { name: 'Archive in AgentBox' })).toBeTruthy()
+  })
+
   it('archives with the service id and version, then adopts the returned record and clears the selection first', async () => {
     selectWorkspaceView('proj-1')
 
@@ -701,5 +734,191 @@ describe('AgentBox sessions in the unified workspace list', () => {
 
     expect(container.querySelector('[data-agentbox-sessions]')).toBeNull()
     expect(container.querySelector('[data-legacy-preview="proj-1"]')).toBeTruthy()
+  })
+})
+
+// The ownership boundary: the MATCH is what decides whose sessions a row
+// shows, and it is read from the cache. The service phase changes what the row
+// can do and what honest status it carries — never whether the matched
+// workspace's own sessions are shown, and never a fallback to legacy Hermes.
+describe('AgentBox sessions — service state boundary in the unified list', () => {
+  const serviceWorkspace = (overrides: Partial<WorkspaceRecord> = {}): WorkspaceRecord => ({
+    accessibility: { executableForRole: null, readable: true, reasons: [], writable: true },
+    archivedAt: null,
+    connection: { state: 'connected' },
+    createdAt: '2026-09-14T00:00:00.000Z',
+    displayName: 'App',
+    environment: { host: null, kind: 'local', user: null },
+    id: asWireId('workspace-1'),
+    normalizedPath: 'C:/work/app',
+    updatedAt: '2026-09-14T00:00:00.000Z',
+    version: 3,
+    ...overrides
+  })
+
+  const wslServiceWorkspace = () =>
+    serviceWorkspace({
+      environment: { host: 'Ubuntu', kind: 'wsl', user: 'maoqh' },
+      id: asWireId('workspace-wsl'),
+      normalizedPath: '/home/maoqh/验收目录'
+    })
+
+  const agentBoxSession = (overrides: Partial<SessionRecord> = {}): SessionRecord => ({
+    archivedAt: null,
+    createdAt: '2026-09-14T00:00:00.000Z',
+    displayName: 'Fix the login flow',
+    id: asWireId('session-1'),
+    pinned: false,
+    profileId: null,
+    updatedAt: '2026-09-14T09:00:00.000Z',
+    version: 1,
+    workspaceId: asWireId('workspace-1'),
+    ...overrides
+  })
+
+  const localRow = (path: null | string) =>
+    ({
+      id: 'proj-1',
+      isAuto: false,
+      isNoProject: false,
+      label: 'local-proj',
+      path,
+      repos: [],
+      sessionCount: 1
+    }) as unknown as SidebarProjectTree
+
+  const readyHello = () => ({
+    auth: { required: false as const },
+    capabilities: [{ id: 'sessions.update', supported: true }],
+    protocolVersion: WIRE_PROTOCOL_VERSION as typeof WIRE_PROTOCOL_VERSION,
+    serverId: asWireId('server-1')
+  })
+
+  const renderWith = (rows: SidebarProjectTree[] = [localRow('C:/work/app')]) =>
+    renderList(
+      <WorkspaceList
+        emptyState={null}
+        label="Workspaces"
+        projectPreviews={{ 'proj-1': [{}] as unknown as SessionInfo[] }}
+        projectRows={rows}
+        renderRows={() => <div data-legacy-preview="proj-1" />}
+        showAllSessions={false}
+      />
+    )
+
+  const unavailableDetail = 'connect ECONNREFUSED 127.0.0.1:8732'
+
+  beforeEach(() => {
+    $sidebarWorkspaceNodeOpen.set({})
+    $agentBoxService.set({ detail: null, phase: 'ready' })
+    $agentBoxHello.set(readyHello())
+    $agentBoxCatalogReadiness.set({ sessions: true, workspaces: true })
+    $agentBoxWorkspaces.set([serviceWorkspace()])
+    $agentBoxSessions.set({})
+    $workspaceViewSelectedId.set(null)
+  })
+
+  afterEach(() => {
+    cleanup()
+    setWslWorkspaces([])
+    $agentBoxWorkspaces.set([])
+    $agentBoxSessions.set({})
+    $agentBoxHello.set(null)
+    $agentBoxService.set({ detail: null, phase: 'idle' })
+    $agentBoxCatalogReadiness.set({ sessions: false, workspaces: false })
+    $workspaceViewSelectedId.set(null)
+  })
+
+  it('a matched LOCAL row keeps its cached AgentBox rows when the service goes unavailable', async () => {
+    $agentBoxSessions.set({ 'session-1': agentBoxSession() })
+
+    const { container } = renderWith()
+
+    expect(container.querySelector('[data-agentbox-session-row="session-1"]')).toBeTruthy()
+
+    await act(async () => {
+      $agentBoxService.set({ detail: unavailableDetail, phase: 'unavailable' })
+    })
+
+    // The cache still owns the row: same record, no duplication, and the
+    // legacy Hermes preview never appears in any service phase.
+    expect(container.querySelectorAll('[data-agentbox-session-row]')).toHaveLength(1)
+    expect(container.querySelector('[data-agentbox-session-row="session-1"]')?.textContent).toContain(
+      'Fix the login flow'
+    )
+    expect(container.querySelector('[data-agentbox-sessions-unavailable="workspace-1"]')?.textContent).toContain(
+      unavailableDetail
+    )
+    expect(container.querySelector('[data-legacy-preview="proj-1"]')).toBeNull()
+
+    // Still openable: the row selects its shell workspace.
+    fireEvent.click(screen.getByRole('button', { name: /Fix the login flow/ }))
+
+    expect($workspaceViewSelectedId.get()).toBe('proj-1')
+  })
+
+  it('a matched WSL row shows its cached AgentBox rows while unavailable, not the old sessions prompt', async () => {
+    setWslWorkspaces([wslRecord()])
+    $agentBoxWorkspaces.set([wslServiceWorkspace()])
+    $agentBoxSessions.set({
+      'session-wsl': agentBoxSession({ id: asWireId('session-wsl'), workspaceId: asWireId('workspace-wsl') })
+    })
+    $agentBoxService.set({ detail: unavailableDetail, phase: 'unavailable' })
+
+    const { container } = renderWith([])
+
+    act(() => {
+      fireEvent.click(container.querySelector('[data-wsl-workspace-expand="wsl_ws_1"]') as HTMLElement)
+    })
+
+    expect(container.querySelector('[data-agentbox-session-row="session-wsl"]')?.textContent).toContain(
+      'Fix the login flow'
+    )
+    expect(container.querySelector('[data-agentbox-sessions-unavailable="workspace-wsl"]')?.textContent).toContain(
+      unavailableDetail
+    )
+    // The old "sessions unavailable" prompt belongs to UNMATCHED rows only.
+    expect(container.querySelector('[data-wsl-workspace-empty="wsl_ws_1"]')).toBeNull()
+  })
+
+  it('a matched workspace with nothing cached shows unavailable — not a spinner, not a legacy preview', () => {
+    $agentBoxService.set({ detail: unavailableDetail, phase: 'unavailable' })
+
+    const { container } = renderWith()
+
+    expect(container.querySelector('[data-agentbox-sessions-unavailable="workspace-1"]')?.textContent).toContain(
+      unavailableDetail
+    )
+    expect(container.querySelector('[data-agentbox-sessions-loading="workspace-1"]')).toBeNull()
+    expect(container.querySelector('[data-agentbox-sessions="workspace-1"]')).toBeNull()
+    expect(container.querySelector('[data-legacy-preview="proj-1"]')).toBeNull()
+  })
+
+  it('keeps the cached rows visible while loading, with a compact loading marker and no legacy preview', () => {
+    $agentBoxSessions.set({ 'session-1': agentBoxSession() })
+    $agentBoxService.set({ detail: null, phase: 'loading' })
+
+    const { container } = renderWith()
+
+    expect(container.querySelector('[data-agentbox-session-row="session-1"]')).toBeTruthy()
+    expect(container.querySelector('[data-agentbox-sessions-loading="workspace-1"]')).toBeTruthy()
+    expect(container.querySelector('[data-legacy-preview="proj-1"]')).toBeNull()
+  })
+
+  it('returns to the plain ready projection when the service recovers, without duplicate rows', async () => {
+    $agentBoxSessions.set({ 'session-1': agentBoxSession() })
+    $agentBoxService.set({ detail: unavailableDetail, phase: 'unavailable' })
+
+    const { container } = renderWith()
+
+    expect(container.querySelector('[data-agentbox-sessions-unavailable="workspace-1"]')).toBeTruthy()
+
+    await act(async () => {
+      $agentBoxService.set({ detail: null, phase: 'ready' })
+    })
+
+    expect(container.querySelectorAll('[data-agentbox-session-row]')).toHaveLength(1)
+    expect(container.querySelector('[data-agentbox-sessions-unavailable="workspace-1"]')).toBeNull()
+    expect(container.querySelector('[data-agentbox-sessions-loading="workspace-1"]')).toBeNull()
   })
 })

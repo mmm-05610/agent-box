@@ -2296,6 +2296,8 @@ export const ru = defineLocale({
     agentBoxSession: {
       loading: 'Загрузка сессий…',
       empty: 'Здесь пока нет сессий AgentBox.',
+      unavailable: 'Сервис AgentBox недоступен.',
+      unavailableReasonFallback: 'Сервис не сообщил причину.',
       menuActions: 'Действия с сессией',
       menuRename: 'Переименовать…',
       menuPin: 'Закрепить',

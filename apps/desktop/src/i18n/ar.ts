@@ -1621,6 +1621,8 @@ export const ar = defineLocale({
     agentBoxSession: {
       loading: 'جارٍ تحميل الجلسات…',
       empty: 'لا توجد جلسات AgentBox هنا بعد.',
+      unavailable: 'خدمة AgentBox غير متاحة.',
+      unavailableReasonFallback: 'لم تُبلّغ الخدمة عن سبب.',
       menuActions: 'إجراءات Session',
       menuRename: 'إعادة تسمية…',
       menuPin: 'تثبيت',

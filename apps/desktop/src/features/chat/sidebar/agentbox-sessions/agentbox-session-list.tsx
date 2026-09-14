@@ -36,9 +36,10 @@ interface RenameTarget {
  * The AgentBox SessionRecords of ONE service Workspace, in the shell row that
  * matched it. Ownership is by the service's own record — the shell row handed
  * us a matched WorkspaceRecord, so this list shows service truth or nothing:
- * an honest loading while the catalog has not arrived, a neutral empty state
- * for a workspace without sessions, and it NEVER falls back to the legacy
- * Hermes session rows.
+ * the records already cached stay on screen through a loading or unavailable
+ * service (with an honest, localized status line and the service's own
+ * reason), a catalog that has not arrived is a loading state, and it NEVER
+ * falls back to the legacy Hermes session rows.
  *
  * Rename and pin ride `sessions.update` with the version CAS the sidebar row
  * showed at intent time; nothing is optimistic — only the service's returned
@@ -64,7 +65,13 @@ export function AgentBoxSessionList({ shellId, workspace }: { shellId: string; w
   const [renameError, setRenameError] = useState<null | string>(null)
   const [pinPendingId, setPinPendingId] = useState<null | string>(null)
 
+  // The cache is the projection; the service phase only says what it can do
+  // next. Records we already hold keep rendering in EVERY phase — a service
+  // that is loading or unavailable never hides its own sessions and never
+  // hands the row back to the legacy Hermes session list.
   const records = projectAgentBoxSessionsForWorkspace(sessions, workspace.id)
+  const catalogReady = service.phase === 'ready' && readiness.sessions
+  const status = service.phase === 'unavailable' ? 'unavailable' : catalogReady ? 'ready' : 'loading'
 
   const openSession = (session: SessionRecord) => {
     // Opening an existing session: select the shell row it lives in, then
@@ -84,7 +91,10 @@ export function AgentBoxSessionList({ shellId, workspace }: { shellId: string; w
   }
 
   const submitRename = async () => {
-    if (!renameTarget || renamePending) {
+    // The service must still be able to answer when Save is pressed: an intent
+    // opened while ready and submitted after the service went away is not sent
+    // on faith. The dialog and the draft stay, nothing is written.
+    if (!renameTarget || renamePending || !maintenanceAvailable) {
       return
     }
 
@@ -142,18 +152,40 @@ export function AgentBoxSessionList({ shellId, workspace }: { shellId: string; w
     }
   }
 
-  if (service.phase !== 'ready' || !readiness.sessions) {
-    return (
+  // The honest service status that accompanies the records instead of
+  // replacing them: `unavailable` names the state and carries the service's
+  // own reason (or the localized fallback when it gave none), `loading` is the
+  // catalog that has not arrived. Rendering the reason as text is the whole
+  // point — it is a sentence from another process, not markup.
+  const statusLine =
+    status === 'unavailable' ? (
+      <div className="px-2 pb-1.5" data-agentbox-sessions-unavailable={workspace.id}>
+        <div className="rounded-md px-2 py-1.5 text-[0.6875rem] leading-4 text-(--ui-text-tertiary)">
+          <span className="flex items-center gap-2">
+            <Codicon name="error" size="0.75rem" />
+            {copy.unavailable}
+          </span>
+          <span className="mt-0.5 block text-(--ui-text-quaternary)" data-agentbox-service-detail>
+            {service.detail?.trim() ? service.detail : copy.unavailableReasonFallback}
+          </span>
+        </div>
+      </div>
+    ) : status === 'loading' ? (
       <div className="px-2 pb-1.5" data-agentbox-sessions-loading={workspace.id}>
         <div className="flex items-center gap-2 rounded-md px-2 py-1.5 text-[0.6875rem] leading-4 text-(--ui-text-tertiary)">
           <Codicon name="loading" size="0.75rem" spinning />
           {copy.loading}
         </div>
       </div>
-    )
-  }
+    ) : null
 
   if (records.length === 0) {
+    // No cached record to stand on: the service state IS the whole answer —
+    // unavailable is not a spinner, a not-yet-arrived catalog is not empty.
+    if (statusLine) {
+      return statusLine
+    }
+
     return (
       <div className="px-2 pb-1.5" data-agentbox-sessions-empty={workspace.id}>
         <div className="rounded-md px-2 py-1.5 text-[0.6875rem] leading-4 text-(--ui-text-tertiary)">
@@ -173,6 +205,9 @@ export function AgentBoxSessionList({ shellId, workspace }: { shellId: string; w
 
   return (
     <div className="flex flex-col gap-px pb-1.5" data-agentbox-sessions={workspace.id}>
+      {/* The cached rows are already the truth; the status line only adds what
+          the service can currently do, above them, never instead of them. */}
+      {statusLine}
       {records.map(session => (
         <AgentBoxSessionRow
           key={session.id}
