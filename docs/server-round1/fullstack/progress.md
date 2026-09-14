@@ -4,6 +4,37 @@
 已发生的1次可达性请求由后端受控进程读取仓库外 locator，未把内容写入仓库或输出。
 授权真实 credential 的 SecretStore→Worker 投影尚未执行，不以测试值路径冒充付费验收事实。
 
+## 2026-09-14 — 四家能力合同统一（canonical capability contract）
+
+详细矩阵与证据：[harness-capability-matrix.md](harness-capability-matrix.md)。
+
+- **唯一词汇**：8 个 canonical id + scope + 实现级/语义级分类版本化在
+  `src/agent_box/resource_contracts/harness_capabilities.py`（`CAPABILITY_SCHEMA_VERSION=1`）；registry 不再
+  持有自己的常量副本。**五处声明收敛**：TOML == JS 只读投影（`capability_declarations.json`）== 四家
+  production `capabilityClaims`（逐项等值测试），JS 原生映射 ⊆ 上限（Node 断言）。
+- **声明/观测/有效**：`deployment.capabilityClaims` 严格校验（canonical id + 真 bool，漂移别名类型化拒绝）；
+  合并规则 6 行逐条参数化，`supported ⇒ declared`，runtime 不得抬高产品能力；`observed` 三态，且观测
+  **不回写**静态声明。ACP `resume`：空对象算已播发、显式 false 为不支持、缺失为未观测。
+- **行为从有效能力读取**：checkpoint `resumable`、附件门（未生效即派发前 `ATTACHMENT_UNSUPPORTED` 且不留
+  孤儿会话）、审批（未声明不产生虚假支持）都改读有效视图；`SidecarHarnessPort.effective_capabilities()`
+  为唯一读出口。
+- **边界分离**：`hello.capabilities`（28 wire 方法，未改）、Profile 视图（canonical 静态声明，不读 DB
+  快照）、Session/execution 有效能力。
+- **四家矩阵（逐项证据）**：Codex 全部未观测（无生产封装，`codex/production.py` 只有能力声明、
+  `HAS_PRODUCTION_DEPLOYMENT=False`）；Pi/Hermes/OpenCode 的 start/observe/finish/stream/
+  native_continuation 已观测；Pi 的 `attach` 只有一半证据（真实播发 image 但从未送过非空附件）→ 有效
+  false；`steer` 无人声明。Hermes/OpenCode 的静态 `continuation.kind` 按证据从 `transcript_handoff`
+  收口为 `native_session`（消费方核对：该字段只被 registry 自身校验读取，legacy 两家 provider 未注册、
+  语义不交叉，无冲突）。
+- **顺带修复**：Server 端口品牌默认值去除；通道已关闭时的裸 `ValueError`（会在停机取消时逃逸并连带一次
+  flaky 段错误）改为类型化 `SIDECAR_CLOSED`；三家 gate 与 Windows 验收部署的别名迁 canonical；有状态
+  harness 补 `native_continuation`（否则 checkpoint 诚实地变成不可续接）；能力投影 JSON 进入 sidecar bundle。
+- **验证**：python 全量 664 passed/4 skipped；插件套件 112 passed/3 skipped；node 25/25 + 13/13 + 42d 4/4 +
+  构建器 11/20/9；Rust fmt 干净 + 10 passed；四条门串行 exit 0；Windows c4 r4 exit 0 + `-PostCheck` CLEAN
+  （8 秒静默在默认 5 秒租约下完成、resume 链与 delta 顺序不变）。**Wire 未改**：`wire/1`、28 方法、TS 与
+  生成工件摘要与锁定值一致。
+- **模型调用 0、费用增量 ¥0**；未读真实凭据；Codex 生产封装、Profile HOME 实施与四家真实模型门仍未做。
+
 ## 2026-09-14 — 原生 HOME 隔离设计锁定 + Worker 租约保活修复（本轮）
 
 详细设计：[profile-home-isolation.md](profile-home-isolation.md)。缺陷与修复设计：

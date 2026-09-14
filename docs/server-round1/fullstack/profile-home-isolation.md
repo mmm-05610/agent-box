@@ -65,18 +65,14 @@ HOME=/runtime/home
 | 有界可写 | `sessions/`、`log/`、`state/`（按批准范围） |
 | 凭据 | **不提供**用户真实 `auth.json`；需要时只经临时 secret 投影 |
 
-官方说明（本轮实测抓取，`https://developers.openai.com/codex/config-advanced/`，页面重定向到
-`https://learn.chatgpt.com/docs/config-file/config-advanced`）原文：
+官方说明（本轮实测抓取，`https://developers.openai.com/codex/config-advanced/`，页面会重定向到
+`https://learn.chatgpt.com/docs/config-file/config-advanced`）。原文只保留关键定义句，其余为中文转述：
 
-> "Config and state locations — Codex stores its local state under `CODEX_HOME` (defaults to
->  `~/.codex`). Common files you may see there: `config.toml` (your local configuration),
->  `auth.json` (if you use file-based credential storage) or your OS keychain/keyring,
->  `history.jsonl` (if history persistence is enabled) …"
+> Codex stores its local state under `CODEX_HOME` (defaults to `~/.codex`).
 
-以及：
-
-> "By default, Codex saves local session transcripts under `CODEX_HOME` (for example,
->  `~/.codex/history.jsonl`)."
+中文转述：该页把 `CODEX_HOME` 说明为 Codex 的**本地状态根**，默认 `~/.codex`；常见内容有本地配置
+`config.toml`、基于文件的凭据 `auth.json`（或系统钥匙串），以及开启历史持久化时的会话记录
+`history.jsonl`（默认写在 `CODEX_HOME` 下）。这些只是**路径语义**的描述，不是 AgentBox 的隔离依据。
 
 **文档不足以作为验收**：仍必须以真实 `codex-acp` → Codex `app-server` 的**黑盒**运行验证继承行为
 （子进程实际读写的目录、`CODEX_HOME` 是否被子进程继承、默认路径在未设变量时是否回落到隔离
