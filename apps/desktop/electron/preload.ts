@@ -1,5 +1,7 @@
 import { contextBridge, ipcRenderer, webFrame, webUtils } from 'electron'
 
+let nextWireSubscriptionId = 0
+
 // Which translucency the OS can back. Asked synchronously because the renderer
 // needs it before its first paint, and answered by main because deciding it
 // needs `os.release()` — a sandboxed preload may only require electron, events,
@@ -15,12 +17,21 @@ const launchFlags = ipcRenderer.sendSync('hermes:launch-flags')
 contextBridge.exposeInMainWorld('agentBoxDesktop', {
   wire: {
     request: request => ipcRenderer.invoke('agentbox:wire:request', request),
-    onEvent: callback => {
-      const listener = (_event, frame) => callback(frame)
+    subscribeEvents: ({ sessionId, cursor }, callback) => {
+      const subscriptionId = `renderer-${++nextWireSubscriptionId}`
+      const listener = (_event, payload) => {
+        if (payload && typeof payload === 'object' && payload.subscriptionId === subscriptionId) {
+          callback(payload.frame)
+        }
+      }
 
       ipcRenderer.on('agentbox:wire:event', listener)
+      ipcRenderer.send('agentbox:wire:events:subscribe', { cursor, sessionId, subscriptionId })
 
-      return () => ipcRenderer.removeListener('agentbox:wire:event', listener)
+      return () => {
+        ipcRenderer.removeListener('agentbox:wire:event', listener)
+        ipcRenderer.send('agentbox:wire:events:unsubscribe', { subscriptionId })
+      }
     }
   }
 })

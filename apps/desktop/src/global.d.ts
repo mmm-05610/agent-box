@@ -34,7 +34,7 @@ declare global {
   interface Window {
     agentBoxDesktop?: {
       wire: {
-        onEvent: (callback: (frame: unknown) => void) => () => void
+        subscribeEvents: (input: { cursor: string; sessionId: string }, callback: (frame: unknown) => void) => () => void
         request: (request: {
           body: unknown
           method: WireMethodName

@@ -1,5 +1,5 @@
 import { useStore } from '@nanostores/react'
-import { useCallback, useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 
 import { agentBoxRuntimeClient } from '@/api/agentbox-runtime-client'
@@ -43,6 +43,7 @@ export function useAgentBoxMainChat() {
   const selectedWorkspaceId = useStore($workspaceViewSelectedId)
   const currentCwd = useStore($currentCwd)
   const wslWorkspaces = useStore($wslWorkspaces)
+  const [streamStart, setStreamStart] = useState<{ cursor: string; sessionId: string } | null>(null)
 
   useEffect(() => {
     if (!readiness.sessions || !readiness.workspaces || service.phase === 'idle') {
@@ -88,37 +89,101 @@ export function useAgentBoxMainChat() {
 
   useEffect(() => {
     if (!catalogReady || !sessionId) {
+      setStreamStart(null)
       return
     }
 
+    setStreamStart(null)
     const client = agentBoxRuntimeClient()
+    let cancelled = false
 
-    void Promise.all([hydrateAgentBoxHistory(client, sessionId), refreshAgentBoxQueue(client, sessionId)]).catch(
-      () => undefined
-    )
+    void Promise.all([hydrateAgentBoxHistory(client, sessionId), refreshAgentBoxQueue(client, sessionId)])
+      .then(([history]) => {
+        if (!cancelled && history.outcome === 'snapshot' && history.projection.resumeCursor) {
+          setStreamStart({ cursor: history.projection.resumeCursor, sessionId })
+        }
+      })
+      .catch(() => undefined)
+
+    return () => {
+      cancelled = true
+    }
   }, [catalogReady, sessionId])
 
   useEffect(() => {
-    const onEvent = window.agentBoxDesktop?.wire.onEvent
+    const subscribeEvents = window.agentBoxDesktop?.wire.subscribeEvents
 
-    if (!onEvent) {
+    if (
+      !subscribeEvents ||
+      !sessionId ||
+      !streamStart ||
+      streamStart.sessionId !== sessionId ||
+      projection?.needsResync
+    ) {
       return
     }
 
-    return onEvent(value => {
+    let subscribed = true
+    let alive = true
+    let sourceStopped = false
+    let unsubscribeSource: () => void = () => {}
+    const unsubscribe = () => {
+      if (sourceStopped) {
+        return
+      }
+
+      sourceStopped = true
+      try {
+        unsubscribeSource()
+      } catch {
+        // Bridge cleanup is best-effort during unmount and route changes.
+      }
+    }
+    const sourceCleanup = subscribeEvents({ cursor: streamStart.cursor, sessionId }, value => {
+      if (!subscribed) {
+        return
+      }
       const parsed = EventFrameSchema.safeParse(value)
 
       if (!parsed.success) {
         return
       }
 
+      if (parsed.data.sessionId !== sessionId) {
+        return
+      }
+
       const result = ingestAgentBoxEvent(parsed.data)
 
       if (result.outcome === 'gap') {
-        void hydrateAgentBoxHistory(agentBoxRuntimeClient(), parsed.data.sessionId).catch(() => undefined)
+        subscribed = false
+        unsubscribe()
+        setStreamStart(null)
+        void hydrateAgentBoxHistory(agentBoxRuntimeClient(), parsed.data.sessionId)
+          .then(history => {
+            if (alive && history.outcome === 'snapshot' && history.projection.resumeCursor) {
+              setStreamStart({ cursor: history.projection.resumeCursor, sessionId })
+            }
+          })
+          .catch(() => undefined)
       }
     })
-  }, [])
+    unsubscribeSource = sourceCleanup
+
+    if (sourceStopped) {
+      try {
+        sourceCleanup()
+      } catch {
+        // Effect cleanup remains best-effort when a source closes during setup.
+      }
+    }
+
+    return () => {
+      alive = false
+      subscribed = false
+      unsubscribe()
+    }
+  }, [projection?.needsResync, sessionId, streamStart])
 
   const onSubmit = useCallback(
     async (text: string, options?: SubmitTextOptions) => {

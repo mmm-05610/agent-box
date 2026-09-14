@@ -4,7 +4,12 @@ import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { emptyWireSessionProjection } from '@/application/session/wire-session-projection'
-import { $agentBoxQueues, $agentBoxSessionProjections, $agentBoxStopStates } from '@/store/agentbox-runtime'
+import {
+  $agentBoxQueues,
+  $agentBoxSessionProjections,
+  $agentBoxStopStates,
+  setAgentBoxSessionProjection
+} from '@/store/agentbox-runtime'
 import {
   $agentBoxCatalogReadiness,
   $agentBoxService,
@@ -110,6 +115,42 @@ beforeEach(() => {
 afterEach(() => cleanup())
 
 describe('primary AgentBox chat production binding', () => {
+  it('does not subscribe before a non-empty resume cursor is hydrated', () => {
+    const subscribeEvents = vi.fn(() => vi.fn())
+    window.agentBoxDesktop = { wire: { subscribeEvents, request: vi.fn() } }
+    $agentBoxSessions.set({ [session.id]: session })
+
+    renderHook(useAgentBoxMainChat, { wrapper: wrapper('/session-1') })
+
+    expect(subscribeEvents).not.toHaveBeenCalled()
+  })
+
+  it('does not publish a stream start when hydration resolves after unmount', async () => {
+    const subscribeEvents = vi.fn(() => vi.fn())
+    let resolveHistory: ((value: unknown) => void) | undefined
+    mocks.hydrateHistory.mockImplementation(
+      () =>
+        new Promise(resolve => {
+          resolveHistory = resolve
+        }) as never
+    )
+    window.agentBoxDesktop = { wire: { subscribeEvents, request: vi.fn() } }
+    $agentBoxSessions.set({ [session.id]: session })
+
+    const { unmount } = renderHook(useAgentBoxMainChat, { wrapper: wrapper('/session-1') })
+    unmount()
+
+    await act(async () => {
+      resolveHistory?.({
+        outcome: 'snapshot',
+        projection: { ...emptyWireSessionProjection(session.id), resumeCursor: 'cursor-late' as never }
+      })
+      await Promise.resolve()
+    })
+
+    expect(subscribeEvents).not.toHaveBeenCalled()
+  })
+
   it('maps the selected shell project to a server Workspace before first send', async () => {
     const { result } = renderHook(useAgentBoxMainChat, { wrapper: wrapper('/new') })
 
@@ -165,13 +206,13 @@ describe('primary AgentBox chat production binding', () => {
     )
   })
 
-  it('validates host event frames before ingest and unsubscribes with the route surface', () => {
+  it('subscribes only from a hydrated cursor, validates frames, and unsubscribes with the route surface', async () => {
     const unsubscribe = vi.fn()
     let listener: ((frame: unknown) => void) | undefined
 
     window.agentBoxDesktop = {
       wire: {
-        onEvent(callback) {
+        subscribeEvents(_input, callback) {
           listener = callback
 
           return unsubscribe
@@ -180,7 +221,21 @@ describe('primary AgentBox chat production binding', () => {
       }
     }
 
-    const { unmount } = renderHook(useAgentBoxMainChat, { wrapper: wrapper('/new') })
+    $agentBoxSessions.set({ [session.id]: session })
+    setAgentBoxSessionProjection(session.id, {
+      ...emptyWireSessionProjection(session.id),
+      resumeCursor: 'cursor-0' as never
+    })
+    mocks.hydrateHistory.mockResolvedValue({
+      outcome: 'snapshot',
+      projection: { ...emptyWireSessionProjection(session.id), resumeCursor: 'cursor-0' as never }
+    } as never)
+
+    const { result, unmount } = renderHook(useAgentBoxMainChat, { wrapper: wrapper('/session-1') })
+    await act(async () => await Promise.resolve())
+
+    expect(result.current.sessionId).toBe('session-1')
+    expect(listener).toBeTypeOf('function')
 
     act(() => listener?.({ not: 'a frame' }))
     expect(mocks.ingestEvent).not.toHaveBeenCalled()
@@ -204,6 +259,88 @@ describe('primary AgentBox chat production binding', () => {
     )
 
     expect(mocks.ingestEvent).toHaveBeenCalledTimes(1)
+    unmount()
+    expect(unsubscribe).toHaveBeenCalledTimes(1)
+  })
+
+  it('stops the old subscription before hydrating after a sequence gap', async () => {
+    const unsubscribe = vi.fn()
+    let listener: ((frame: unknown) => void) | undefined
+    window.agentBoxDesktop = {
+      wire: {
+        subscribeEvents(_input, callback) {
+          listener = callback
+          return unsubscribe
+        },
+        request: vi.fn()
+      }
+    }
+    $agentBoxSessions.set({ [session.id]: session })
+    setAgentBoxSessionProjection(session.id, { ...emptyWireSessionProjection(session.id), resumeCursor: 'cursor-0' as never })
+    mocks.hydrateHistory.mockResolvedValue({
+      outcome: 'snapshot',
+      projection: { ...emptyWireSessionProjection(session.id), resumeCursor: 'cursor-0' as never }
+    } as never)
+    mocks.ingestEvent.mockReturnValue({ outcome: 'gap' })
+
+    renderHook(useAgentBoxMainChat, { wrapper: wrapper('/session-1') })
+    await act(async () => await Promise.resolve())
+    mocks.hydrateHistory.mockClear()
+    unsubscribe.mockClear()
+
+    await act(async () => {
+      listener?.({
+        cursor: 'cursor-2',
+        emittedAt: '2026-09-14T00:00:00.000Z',
+        event: { displayKind: 'visible', kind: 'message.final', messageId: 'message-1', role: 'assistant', sessionId: 'session-1', text: 'hello' },
+        eventId: 'event-2',
+        seq: 2,
+        sessionId: 'session-1'
+      })
+    })
+
+    expect(unsubscribe).toHaveBeenCalledTimes(1)
+    expect(mocks.hydrateHistory).toHaveBeenCalledWith({ id: 'client' }, 'session-1')
+  })
+
+  it('releases a synchronously gapped source after subscribe returns its cleanup', async () => {
+    const unsubscribe = vi.fn()
+    window.agentBoxDesktop = {
+      wire: {
+        subscribeEvents(_input, callback) {
+          callback({
+            cursor: 'cursor-2',
+            emittedAt: '2026-09-14T00:00:00.000Z',
+            event: {
+              displayKind: 'visible',
+              kind: 'message.final',
+              messageId: 'message-1',
+              role: 'assistant',
+              sessionId: 'session-1',
+              text: 'hello'
+            },
+            eventId: 'event-2',
+            seq: 2,
+            sessionId: 'session-1'
+          })
+
+          return unsubscribe
+        },
+        request: vi.fn()
+      }
+    }
+    $agentBoxSessions.set({ [session.id]: session })
+    setAgentBoxSessionProjection(session.id, { ...emptyWireSessionProjection(session.id), resumeCursor: 'cursor-0' as never })
+    mocks.hydrateHistory.mockResolvedValue({
+      outcome: 'snapshot',
+      projection: { ...emptyWireSessionProjection(session.id), resumeCursor: 'cursor-0' as never }
+    } as never)
+    mocks.ingestEvent.mockReturnValue({ outcome: 'gap' })
+
+    const { unmount } = renderHook(useAgentBoxMainChat, { wrapper: wrapper('/session-1') })
+    await act(async () => await Promise.resolve())
+
+    expect(unsubscribe).toHaveBeenCalledTimes(1)
     unmount()
     expect(unsubscribe).toHaveBeenCalledTimes(1)
   })

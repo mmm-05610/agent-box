@@ -1,17 +1,23 @@
 import type { IpcMainInvokeEvent } from 'electron'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const host = vi.hoisted(() => ({ getAllWindows: vi.fn(() => []), handle: vi.fn() }))
+const host = vi.hoisted(() => ({
+  handle: vi.fn(),
+  on: vi.fn(),
+  removeListener: vi.fn()
+}))
 
-vi.mock('electron', () => ({ BrowserWindow: { getAllWindows: host.getAllWindows }, ipcMain: { handle: host.handle } }))
+vi.mock('electron', () => ({
+  ipcMain: { handle: host.handle, on: host.on, removeListener: host.removeListener }
+}))
 
 import { registerWorkCoreWireIpc } from './workcore-wire-ipc'
 
 describe('Work Core wire IPC', () => {
   beforeEach(() => {
-    host.getAllWindows.mockReset()
-    host.getAllWindows.mockReturnValue([])
     host.handle.mockReset()
+    host.on.mockReset()
+    host.removeListener.mockReset()
   })
 
   it('accepts only a matching known method, path, and envelope', async () => {
@@ -60,29 +66,78 @@ describe('Work Core wire IPC', () => {
     expect(requestWire).not.toHaveBeenCalled()
   })
 
-  it('forwards an injected lifecycle event source to live renderer windows and returns its cleanup', () => {
+  it('owns subscriptions by sender and id, forwards only to that sender, and cleans the source once', () => {
     const send = vi.fn()
     const unsubscribe = vi.fn()
     let publish: ((frame: unknown) => void) | undefined
-
-    host.getAllWindows.mockReturnValue([
-      { isDestroyed: () => false, webContents: { send } },
-      { isDestroyed: () => true, webContents: { send: vi.fn() } }
-    ] as never)
+    const sender = { id: 7, isDestroyed: () => false, send, once: vi.fn(), removeListener: vi.fn() }
 
     const cleanup = registerWorkCoreWireIpc({
       requestWire: vi.fn(),
-      subscribeWireEvents(listener) {
+      subscribeWireEvents(input, listener) {
+        expect(input).toEqual({ cursor: 'cursor-1', sessionId: 'session-1' })
         publish = listener
 
         return unsubscribe
       }
     })
 
+    const subscribe = host.on.mock.calls.find(([channel]) => channel === 'agentbox:wire:events:subscribe')?.[1] as (
+      event: { sender: typeof sender },
+      value: unknown
+    ) => void
+    const unsubscribeHandler = host.on.mock.calls.find(([channel]) => channel === 'agentbox:wire:events:unsubscribe')?.[1] as (
+      event: { sender: typeof sender },
+      value: unknown
+    ) => void
+    expect(() => subscribe({ sender }, { sessionId: '', cursor: 'cursor-1', subscriptionId: 'bad' })).not.toThrow()
+    subscribe({ sender }, { cursor: 'cursor-1', sessionId: 'session-1', subscriptionId: 'sub-1' })
     publish?.({ eventId: 'event-1' })
 
-    expect(send).toHaveBeenCalledWith('agentbox:wire:event', { eventId: 'event-1' })
-    cleanup()
+    expect(send).toHaveBeenCalledWith('agentbox:wire:event', {
+      frame: { eventId: 'event-1' },
+      subscriptionId: 'sub-1'
+    })
+    unsubscribeHandler({ sender }, { subscriptionId: 'sub-1' })
+    unsubscribeHandler({ sender }, { subscriptionId: 'sub-1' })
     expect(unsubscribe).toHaveBeenCalledTimes(1)
+    cleanup()
+    expect(host.removeListener).toHaveBeenCalledTimes(2)
+  })
+
+  it('cleans a synchronously failing source and all subscriptions on sender destruction', () => {
+    const cleanupOne = vi.fn()
+    const cleanupTwo = vi.fn(() => {
+      throw new Error('already closed')
+    })
+    const sender = { id: 11, isDestroyed: () => false, send: vi.fn(), once: vi.fn(), removeListener: vi.fn() }
+    let destroyed: (() => void) | undefined
+    sender.once.mockImplementation((_event: string, listener: () => void) => {
+      destroyed = listener
+    })
+    let sourceCalls = 0
+    const subscribeWireEvents = vi.fn((_input: unknown, _listener: (frame: unknown) => void) => {
+      sourceCalls += 1
+      if (sourceCalls === 1) {
+        throw new Error('source unavailable')
+      }
+      return sourceCalls === 2 ? cleanupOne : cleanupTwo
+    })
+    const cleanup = registerWorkCoreWireIpc({ requestWire: vi.fn(), subscribeWireEvents })
+    const subscribe = host.on.mock.calls.find(([channel]) => channel === 'agentbox:wire:events:subscribe')?.[1] as (
+      event: { sender: typeof sender },
+      value: unknown
+    ) => void
+
+    subscribe({ sender }, { cursor: 'c1', sessionId: 's1', subscriptionId: 'sub-fails' })
+    subscribe({ sender }, { cursor: 'c2', sessionId: 's1', subscriptionId: 'sub-one' })
+    subscribe({ sender }, { cursor: 'c3', sessionId: 's1', subscriptionId: 'sub-two' })
+
+    expect(() => destroyed?.()).not.toThrow()
+    expect(cleanupOne).toHaveBeenCalledTimes(1)
+    expect(cleanupTwo).toHaveBeenCalledTimes(1)
+    cleanup()
+    expect(cleanupOne).toHaveBeenCalledTimes(1)
+    expect(cleanupTwo).toHaveBeenCalledTimes(1)
   })
 })
