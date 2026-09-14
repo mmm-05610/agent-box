@@ -5,7 +5,7 @@
 
 ## 执行快照（handoff-policy 每阶段必填）— 接管施工中
 
-- updated_at: 2026-09-14 14:52 (+08:00)
+- updated_at: 2026-09-14 15:05 (+08:00)
 - 执行者: Codex 前端产品 goal（接力会话）；**已从暂停的 Zcode 执行者接管**
 - 工作树/分支: /home/maoqh/projects/agent-box-desktop-next-wsl-round1 @ feature/agentbox-desktop-product
 - 接管核验（历史，Zcode→Codex 交接）: 用户指定交接 HEAD `5c0fbfe` 与实际 HEAD
@@ -16,7 +16,7 @@
 - 本阶段起点核验: HEAD `1cbc4f58d602b212f55c7c4dd9c2bc38718cba83`、分支
   feature/agentbox-desktop-product、工作树 clean，无同工作树并发写入者；writer lease 仍为同一
   前端 goal 的 ACTIVE lease，本阶段串行施工，完成后停止写入并回报，不提前 RELEASE。
-- 代码检查点（已提交 HEAD）: `940c9df4`（P05：`config.resolve` 生产接线）
+- 代码检查点（已提交 HEAD）: `b6d0bc6f`（P05 返修：旧 pending 发送优先恢复）
   链: ebb1233（P00）→ 8d4b3df/47b5b47/dbb902f（P01 代码与几何修复）→ 26b32fc（P01 GREEN 证据）
   → 468e6ac/d7e9a57（发布源 d3c0196+ffbcfaf 导入）→ 893d560（P07 检查点2 wire-v1）
   → 957a523（P02A 盘点）→ 07f5386（P02A slice 1：失败面非阻塞）→ 3a25edc（P02A slice 2）
@@ -38,9 +38,17 @@
   → d6ec993（服务模型目录与临时槽）→ 2991bff（中立 Provider/Model 设置）
   → 1cbc4f58（Provider 模型检查点）→ dfcd7027（Profile 默认配置编辑与串行 CAS）
   → 88f3d934（enum/boolean 编辑覆盖）→ af0c08e3（返修：服务权威名称回写）
-  → 矩阵审计文档检查点（evidence/P05-client-matrix.md）→ **940c9df4（config.resolve 生产接线）**
+  → 矩阵审计文档检查点（evidence/P05-client-matrix.md）→ 940c9df4（config.resolve 生产接线）
+  → **b6d0bc6f（返修：旧 pending 发送优先恢复）**
 - 已消费发布文档提交: 86d5a7b、61c7ff7、d3c0196、ffbcfaf
-- 当前检查点改动（config.resolve 接线）: 已锁定 `config.resolve` 接入产品路径——application 窄函数
+- 当前检查点改动（pending 恢复顺序返修）: 发送边界顺序修正——已产生 `requestId` 的旧 pending 优先级
+  最高，只以原 requestId 调 `sendOutcome.query`；当前草稿的配置 rejected/unavailable、Profile/Workspace
+  缺失、附件未 stage、文本不同都不得阻断该恢复（`resolvePendingAgentBoxSend`，单一查询状态机，
+  `sendAgentBoxMessage` 内部仍复检 pending 防并发）。生产能力门区分「恢复」与「新建」：有 pending 时
+  `sendAvailable` 只要求可调用服务 + `sendOutcome.query` + draftScopeKey，不要求 `config.resolve`、发送
+  动词或当前 Profile/Workspace，`onSubmit` 也不因 !workspace 提前返回。`config.resolve` 只在 scope 清空
+  后执行——**不是跳过新发送的配置校验**，rejected/typed error 仍不发送。矩阵 23 reachable / 5 gap 不变。
+- 上一检查点改动（config.resolve 接线）: 已锁定 `config.resolve` 接入产品路径——application 窄函数
   发 exact `{profileId, workspaceId, overrides}`；发送前强制服务校验（rejected→`invalidControls`
   且零 send，transport/typed 失败零 send）；Composer 预览按 scope/overrides latest-wins 且 hello
   未声明不发请求；`sendAvailable` 收紧为「hello 声明 `config.resolve` + 该路由的发送动词」。矩阵中
@@ -166,6 +174,16 @@
   省略恢复默认、exact 模型引用与带斜杠 id）、
   双 model_slot 独立编辑、unavailable 禁选与目录外当前值、CAS 顺序 update(N)→updateConfig(N+1)、
   部分成功重试不重发改名、pending 连点单发、服务规范化后采用返回 descriptor、迟到 descriptor 不串写。
+- pending 恢复顺序返修（b6d0bc6f）：`npx vitest run --project ui
+  src/application/session/wire-send.test.ts src/application/session/agentbox-composer.test.ts
+  src/app/composition/wiring/agentbox-main-chat.test.tsx src/application/profile/wire-composer-profile.test.ts
+  src/features/chat/composer/hooks/use-composer-profile.test.tsx
+  src/features/chat/composer/profile-controls.test.tsx` → **6 files / 62 tests passed，exit 0**；
+  回归面（composer 全目录 + legacy chat view + agentbox chat view）44 files / 265 tests passed；
+  `npm run typecheck` 三项目通过；改动 6 个 TS/TSX 文件 ESLint 0 error / 0 warning；
+  `git diff --check` 干净。覆盖 pending 优先于配置与草稿校验（调用序列严格 `['sendOutcome.query']`）、
+  旧 accepted 不清新草稿、unknown 保持同一 requestId、rejected 清 pending 保留草稿、恢复/新建/缺 query
+  三种能力门，以及无 pending 时 resolve→send、rejected、typed error 的回归。
 - config.resolve 生产接线（940c9df4）：`npx vitest run --project ui
   src/application/profile/wire-composer-profile.test.ts src/application/session/agentbox-composer.test.ts
   src/features/chat/composer/profile-controls.test.tsx

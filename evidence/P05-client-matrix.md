@@ -8,6 +8,12 @@
 （application 用例 + 发送前强制校验 + renderer 预览 latest-wins + hello 能力门），矩阵中该行改为
 `PRODUCTION_REACHABLE`（EXT），汇总 23 reachable / 5 gap；G4 改写为「已接线」记录，其余缺口不变。
 
+**增量（2026-09-14，代码检查点 `b6d0bc6f`）**：发送边界的**顺序**修正——已产生 `requestId` 的旧
+pending 优先级最高，先用原 requestId 查询（`sendOutcome.query`），配置/身份/附件/文本都不得阻断该恢复；
+`config.resolve` 只在「当前 scope 没有旧 pending、准备建立新发送意图」时执行。**这不是跳过新发送的配置
+校验**：scope 清空后仍严格 resolve→send，rejected/typed error 仍不发送。汇总 23 reachable / 5 gap 不变，
+lifecycle 外部缺口不变。详见 §3-G4 与 evidence/P05.md。
+
 权威方法集合：`apps/desktop/src/types/wire/wire-v1.ts` 的 `WireMethods`（28 项）。
 摘要核对：TS 权威 `11e3b3e70d332585d31900c09ba063d95aa6b72b1904921c665fb72f81c10035`、
 生成工件 `5d4fa3bfeec6c3273c6073b37794e4ab2aca6e07e48184bc3a2b878c1fe5e4ed`，与后端
@@ -60,7 +66,7 @@
 | `providerModels.update` | ✓ schema+client | 端口 `:72` | 同上 | 同上 | `PRODUCTION_REACHABLE`（EXT） | version CAS；失败保留上一权威行 |
 | `providerModels.archive` | ✓ schema+client | 端口 `:82` | 同上 | 同上 | `PRODUCTION_REACHABLE`（EXT） | `CONFLICT_REFERENCE` 不删除/替换 Profile 引用 |
 | `config.describe` | ✓ schema+client | `describeDraftConfig` `application/profile/wire-composer-profile.ts:85`；`loadProfileRuntimeDescriptor` `profile-maintenance-port.ts:109` | Composer 临时配置弹层（`useComposerProfile`）、Profiles 页配置区 | `wire-composer-profile.test.ts`、`features/profiles/index.test.tsx`、`profile-config-editor.test.tsx` | `PRODUCTION_REACHABLE`（EXT） | 描述控件/当前值/securityLockedIds/effectTiming；迟到描述按 scope 的 `profileId` 校验后丢弃。与 `config.resolve` 职责未互相代替：客户端不自行计算生效值 |
-| `config.resolve` | ✓ schema+client | `resolveComposerConfig` `application/profile/wire-composer-profile.ts:183`（exact `{profileId, workspaceId, overrides}`，只读、无 requestId）；提交侧 `submitAgentBoxComposer` `application/session/agentbox-composer.ts:116` 在构造 send intent 前强制调用 | Composer 提交路径（`agentbox-main-chat.ts:onSubmit`→`submitAgentBoxComposer`）+ 临时配置弹层预览（`useComposerProfile`→`ComposerProfileControls`） | `application/profile/wire-composer-profile.test.ts`、`application/session/agentbox-composer.test.ts`、`features/chat/composer/hooks/use-composer-profile.test.tsx`、`features/chat/composer/profile-controls.test.tsx`、`app/composition/wiring/agentbox-main-chat.test.tsx` | `PRODUCTION_REACHABLE`（EXT） | core §5/§8：生效值由服务按「接入默认→Profile 默认→临时覆盖→安全限制」计算，客户端不推算。发送前 resolved 才发（rejected→`invalidControls`+`CONFIG_REJECTED`，零 send；typed/transport 失败零 send）；预览按 scope/overrides latest-wins，hello 未声明即不发请求；运行实际版本仍只在服务接受发送时按回执 `configVersion` 固定。见 §3-G4 |
+| `config.resolve` | ✓ schema+client | `resolveComposerConfig` `application/profile/wire-composer-profile.ts:183`（exact `{profileId, workspaceId, overrides}`，只读、无 requestId）；提交侧 `submitAgentBoxComposer` `application/session/agentbox-composer.ts:116` 在构造 send intent 前强制调用 | Composer 提交路径（`agentbox-main-chat.ts:onSubmit`→`submitAgentBoxComposer`）+ 临时配置弹层预览（`useComposerProfile`→`ComposerProfileControls`） | `application/profile/wire-composer-profile.test.ts`、`application/session/agentbox-composer.test.ts`、`features/chat/composer/hooks/use-composer-profile.test.tsx`、`features/chat/composer/profile-controls.test.tsx`、`app/composition/wiring/agentbox-main-chat.test.tsx` | `PRODUCTION_REACHABLE`（EXT） | core §5/§8：生效值由服务按「接入默认→Profile 默认→临时覆盖→安全限制」计算，客户端不推算。发送前 resolved 才发（rejected→`invalidControls`+`CONFIG_REJECTED`，零 send；typed/transport 失败零 send）；**顺序**：scope 有旧 pending 时先以原 requestId 查询并只返回该结果，`config.resolve` 与新发送都不执行；scope 清空后才 resolve→send。预览按 scope/overrides latest-wins，hello 未声明即不发请求；运行实际版本仍只在服务接受发送时按回执 `configVersion` 固定。见 §3-G4 |
 | `sessions.list` | ✓ schema+client | `refreshAgentBoxSessions` `application/session/wire-session-catalog.ts:19` | `ensureAgentBoxDesktopCatalog`←主聊天挂载 | `wire-session-catalog.test.ts`、`app/composition/wiring/agentbox-main-chat.test.tsx` | `PRODUCTION_REACHABLE`（EXT） | 服务分页合并进 `$agentBoxSessions`，部分页不擦除已学记录。**边界**：该投影当前只驱动主聊天面/Composer 选角；侧栏会话列表仍是 legacy Hermes（见 §5） |
 | `sessions.update` | ✓ schema+client | `updateAgentBoxSession` `wire-session-catalog.ts:39`（requestId+expectedVersion，采纳服务返回） | **无** | `wire-session-catalog.test.ts` | `FIXTURE_ONLY_FRONTEND_GAP` | 批准行为的触发点（侧栏改名/置顶）仍走 legacy session API（`store/session-pin-sync`、`api/sessions`）。需要前端把统一侧栏行为接到该方法并采纳服务版本。见 §3-G5 |
 | `sessions.archive` | ✓ schema+client | `archiveAgentBoxSession` `wire-session-catalog.ts:64` | **无** | `wire-session-catalog.test.ts` | `FIXTURE_ONLY_FRONTEND_GAP` | 同 G5：侧栏归档入口（`store/sidebar-archive`→`application/session-lists`）走 legacy Hermes 数据面；服务侧归档语义（不删历史）已编码但无产品调用者 |
@@ -149,13 +155,22 @@
   resolved）；预览按 Profile/Workspace/overrides 变化重解析，旧请求迟到不得覆盖新 scope 或新
   overrides，卸载后不写状态；hello 未声明 `config.resolve` 时不发请求并以该 reason 呈现；
   安全锁定项仍不可编辑，服务 rejected 不清除用户值。
-- 验收（已执行）：`npx vitest run --project ui src/application/profile/wire-composer-profile.test.ts
-  src/application/session/agentbox-composer.test.ts src/features/chat/composer/profile-controls.test.tsx
-  src/app/composition/wiring/agentbox-main-chat.test.tsx
-  src/features/chat/composer/hooks/use-composer-profile.test.tsx` → 5 files / **47 tests passed**（exit 0）。
-- 仍属外部缺口（不变）：真实配置解析结果只能在 Server lifecycle connection 之后联调验证；本端只
-  保证请求语义、失败面与迟到保护。运行实际版本仍由接受回执的 `configVersion` 固定，预览不冒充
-  最终配置。
+- 顺序补充（代码检查点 `b6d0bc6f`）：`config.resolve` 只在「当前 scope 没有旧 pending、准备建立新
+  发送意图」时执行。旧 pending 由 `resolvePendingAgentBoxSend(client, scopeKey)` 以**原 requestId** 查询
+  （`sendOutcome.query`），当前草稿的配置 rejected/unavailable、Profile/Workspace 缺失、附件未 stage、
+  文本不同都不得阻断该查询；查询只被调用一次状态机，`sendAgentBoxMessage` 内部仍会再查 pending 以
+  防止并发绕过。旧请求 accepted 而 draftVersion 已更新 → `acceptedForDraft=false`（不清新草稿）；
+  `rejected_before_accept` 清旧 pending 但保留草稿；`unknown` 保留同一 requestId，不新建发送。
+  **这不是跳过新发送的配置校验**：scope 清空后仍严格 `config.resolve` → `createAndSend`/`send`，
+  rejected 与 typed error 仍不发送（回归用例保留）。
+- 验收（已执行）：`npx vitest run --project ui src/application/session/wire-send.test.ts
+  src/application/session/agentbox-composer.test.ts src/app/composition/wiring/agentbox-main-chat.test.tsx
+  src/application/profile/wire-composer-profile.test.ts
+  src/features/chat/composer/hooks/use-composer-profile.test.tsx
+  src/features/chat/composer/profile-controls.test.tsx` → 6 files / **62 tests passed**（exit 0）。
+- 仍属外部缺口（不变）：真实配置解析结果与真实 pending 结果只能在 Server lifecycle connection 之后
+  联调验证；本端只保证请求语义、顺序、失败面与迟到保护。运行实际版本仍由接受回执的 `configVersion`
+  固定，预览不冒充最终配置。
 
 **G5 `sessions.update/archive` 未接（统一侧栏会话行为）**
 - 目标文件：`src/features/chat/sidebar/`（改名/置顶/归档入口）与其数据源
@@ -286,6 +301,7 @@ dynamic connection slot            electron/composition/agentbox-service-composi
 | `grep -rn "\.call('" src --include=*.ts --include=*.tsx \| grep -v test` | 28 方法调用点全部落在上表 application 入口 |
 | `git diff --check` | 通过（exit 0） |
 | config.resolve 接线定向门（`940c9df4`，5 files / 47 tests） | 通过（exit 0） |
+| pending 恢复顺序定向门（`b6d0bc6f`，6 files / 62 tests） | 通过（exit 0） |
 | `git status --short` | 只含本阶段写集（见 §9） |
 
 矩阵完整性核验（一次性只读命令，不新增仓库脚本）：从 `WireMethods` 导出键、从本文件表格抽取
