@@ -83,9 +83,39 @@ def test_remote_sidecar_argv_uses_bounded_readonly_projection_targets():
     ]
 
 
+def test_remote_sidecar_writable_projection_is_a_direct_bind_inside_view():
+    argv = compile_remote_sidecar_bwrap_argv(
+        workspace="/workspace/project", runtime_view="/worker/views/view-1",
+        environment={"HOME": "/tmp/agentbox-home"},
+        writable_projection_mounts=(("/worker/views/view-1/sessions/thread.jsonl",
+                                     "/tmp/agentbox-home/sessions.jsonl"),),
+    )
+    marker = argv.index("/worker/views/view-1/sessions/thread.jsonl")
+    assert argv[marker - 1:marker + 2] == [
+        "--bind", "/worker/views/view-1/sessions/thread.jsonl", "/tmp/agentbox-home/sessions.jsonl",
+    ]
+    assert ["--ro-bind", "/worker/views/view-1/sessions/thread.jsonl",
+            "/tmp/agentbox-home/sessions.jsonl"] not in [argv[marker - 1:marker + 2]]
+
+
+@pytest.mark.parametrize("mounts", [
+    (("/worker/views/view-1/state", "/tmp/agentbox-home/../escape"),),
+    (("/worker/views/view-1/../outside", "/tmp/agentbox-home/state"),),
+])
+def test_remote_sidecar_writable_projection_rejects_escape(mounts):
+    with pytest.raises(ProjectionRejected):
+        compile_remote_sidecar_bwrap_argv(
+            workspace="/workspace/project", runtime_view="/worker/views/view-1",
+            environment={"HOME": "/tmp/agentbox-home"},
+            writable_projection_mounts=mounts,
+        )
+
+
 @pytest.mark.parametrize("kwargs", [
     {"projection_mounts": (("/worker/views/view-1/file", "/runtime/home/escape"),)},
     {"projection_mounts": (("/worker/views/other/file", "/tmp/agentbox-home/x"),)},
+    {"writable_projection_mounts": (("/worker/views/../outside/file", "/tmp/agentbox-home/x"),)},
+    {"writable_projection_mounts": (("/worker/views/view-1/file", "/tmp/agentbox-home/sub/x"),)},
     {"executable_mounts": (("/worker/bin/node", "/runtime/bin/../escape"),)},
     {"executable_mounts": (("/worker/bin/../node", "/runtime/bin/node"),)},
     {"environment": {"API_TOKEN": "secret"}},

@@ -31,6 +31,7 @@ _SESSION_PATH = re.compile(r"^sessions(?:/[A-Za-z0-9._-]+)+\.jsonl$")
 _DEEPSEEK_API_KEY = re.compile(rb"^sk-[A-Za-z0-9_-]{8,248}$")
 _DEEPSEEK_MODELS = frozenset({"deepseek-flash"})
 _DEEPSEEK_CATALOG_PATH = Path(__file__).with_name("deepseek-models.json")
+_DEEPSEEK_SIDECAR_CONFIG_PATH = Path(__file__).with_name("deepseek-sidecar-config.toml")
 _DEEPSEEK_CATALOG_CANONICAL_SHA256 = "738ac1b92a557273ab0c128b286967e54cd993c9e901f93869f7e73581d591fa"
 
 
@@ -71,25 +72,13 @@ def build_acp_sidecar_projection(catalog_path: str) -> RemoteCodexCredentialProj
     interface deliberately accepts no credential material and never emits the
     legacy bearer-token setting used by the exec projection.
     """
-    if not isinstance(catalog_path, str) or not catalog_path.startswith("/tmp/agentbox-home/"):
+    if catalog_path != "/tmp/agentbox-home/models.json":
         raise ValueError("CODEX_CATALOG_PATH_INVALID")
     path = Path(catalog_path)
     if (not path.is_absolute() or str(path) != catalog_path
             or any(part in {"", ".", ".."} for part in path.parts)):
         raise ValueError("CODEX_CATALOG_PATH_INVALID")
-    config = (
-        'model = "deepseek-flash"\n'
-        'model_provider = "deepseek"\n'
-        'preferred_auth_method = "apikey"\n'
-        'forced_login_method = "api"\n'
-        'model_reasoning_effort = "high"\n'
-        'web_search = "disabled"\n'
-        f'model_catalog_json = "{catalog_path}"\n'
-        '[model_providers.deepseek]\n'
-        'name = "deepseek"\n'
-        'base_url = "https://api.deepseek.com/"\n'
-        'wire_api = "responses"\n'
-    ).encode()
+    config = _DEEPSEEK_SIDECAR_CONFIG_PATH.read_bytes()
     return RemoteCodexCredentialProjection(
         "/tmp/agentbox-home/config.toml", config, {"models.json": _deepseek_model_catalog()},
     )

@@ -243,6 +243,11 @@ def test_sidecar_deployment_projects_bounded_files_and_register_metadata(tmp_pat
     {"adapter": {"command": "/usr/bin/node", "source": "../escape.mjs"}},
     {"adapter": {"command": "/usr/bin/node", "args": ["bad\x00arg"]}},
     {"projectionFiles": [{"source": "settings.json", "target": "/runtime/home/x"}]},
+    {"timeoutMs": 120_001},
+    {"timeoutMs": True},
+    {"timeoutMs": "30000"},
+    {"stateProjection": {"target": "/tmp/agentbox-home/sub/x"}},
+    {"stateProjection": {"target": "/runtime/home/state"}},
     {"adapter": {"command": "/usr/bin/node", "environment": {"API_TOKEN": "secret"}}},
 ])
 def test_sidecar_deployment_rejects_unbounded_fields(tmp_path, field):
@@ -254,6 +259,44 @@ def test_sidecar_deployment_rejects_unbounded_fields(tmp_path, field):
     }), encoding="utf-8")
     with pytest.raises(RuntimeError, match="SIDECAR_DEPLOYMENT_INVALID"):
         build_runtime_from_sidecar_deployment(tmp_path / "server", deployment)
+
+
+def test_sidecar_deployment_rejects_readonly_and_writable_target_collision(tmp_path):
+    settings = tmp_path / "settings.json"
+    settings.write_text("{}", encoding="utf-8")
+    deployment = tmp_path / "deployment.json"
+    deployment.write_text(json.dumps({
+        "schemaVersion": 1, "pluginRoot": str(PLUGIN),
+        "harnesses": [{
+            "id": "pi", "adapter": {"command": "/usr/bin/node", "args": []},
+            "projectionFiles": [{
+                "source": settings.name, "target": "/tmp/agentbox-home/sessions",
+            }],
+            "stateProjection": {"target": "/tmp/agentbox-home/sessions"},
+        }],
+    }), encoding="utf-8")
+    with pytest.raises(RuntimeError, match="SIDECAR_DEPLOYMENT_INVALID"):
+        build_runtime_from_sidecar_deployment(tmp_path / "server", deployment)
+
+
+def test_sidecar_checkpoint_manifest_rejects_wrong_schema_and_bounds():
+    from agent_box.server.bootstrap.runtime import _restore_sidecar_state
+
+    class Objects:
+        def __init__(self, value): self.value = value
+        def read(self, _digest): return self.value
+
+    bad = [
+        {"schema_version": 1, "resumable": True, "nativeSessionId": "native", "files": []},
+        {"schema_version": 2, "resumable": True, "nativeSessionId": "native",
+         "files": [{"path": "../escape", "digest": "sha256:" + "0" * 64, "size": 1}]},
+    ]
+    for manifest in bad:
+        import json as _json
+        with pytest.raises(RuntimeError, match="SIDECAR_CHECKPOINT_INVALID"):
+            _restore_sidecar_state(Objects(_json.dumps(manifest)), {
+                "checkpoint_object_digest": "checkpoint", "checkpoint_native_id": "native",
+            }, enabled=True)
 
 
 def test_real_worker_bwrap_interactive_sidecar_streams_before_terminal(tmp_path):
@@ -467,6 +510,100 @@ def test_server_core_real_worker_persists_stream_before_terminal(tmp_path, monke
         assert cancelled_turn["state"] == "cancelled"
         assert cancelled_turn["stop_requested_at"]
     assert not (tmp_path / "server-worker-root" / "views").exists()
+
+
+def test_real_worker_state_projection_resumes_two_fresh_sidecars(tmp_path, monkeypatch):
+    """Two Core executions must resume the fixture's one native session."""
+    worker = REPO / "workers" / "agent-box-worker" / "target" / "debug" / "agent-box-worker"
+    if not worker.is_file() or not shutil.which("bwrap"):
+        pytest.skip("current Worker and bwrap are required")
+
+    class Connector:
+        def distributions(self): return [{"name": "Ubuntu"}]
+        def probe(self, distribution, user): return {"probe_id": "probe", "distribution": distribution, "user": user}
+        def browse(self, probe_id, path): return {"path": path, "directories": [], "files": []}
+        def open_workspace(self, probe_id, path):
+            return {"connection_id": "connection-stateful", "distribution": "Ubuntu",
+                    "user": os.environ["USER"], "path": str(REPO)}
+        def client_for_workspace(self, **arguments):
+            return WorkerClient(
+                [str(worker), "--root", str(tmp_path / "worker-root"), "--workspace", str(REPO)],
+                worker_digest="sha256:" + hashlib.sha256(worker.read_bytes()).hexdigest(),
+                worker_version="0.1.0", connection_id=arguments["connection_id"],
+                project_id=arguments["connection_id"], effective_user=os.environ["USER"],
+                server_instance_id="server-stateful", executable_authorizations=(),
+            )
+
+    deployment = tmp_path / "stateful-deployment.json"
+    deployment.write_text(json.dumps({
+        "schemaVersion": 1, "pluginRoot": str(PLUGIN),
+        "harnesses": [{"id": "pi", "timeoutMs": 30_000,
+                       "stateProjection": {"target": "/tmp/agentbox-home/sessions"},
+                       "adapter": {"command": "/usr/bin/node", "args": [],
+                                   "source": "tests/server/fixtures/stateful_acp_peer.mjs"}}],
+    }), encoding="utf-8")
+    import agent_box.server.bootstrap.runtime as runtime_module
+    monkeypatch.setattr(runtime_module, "_builtin_connector", lambda _id: Connector())
+    original_file = runtime_module._sidecar_deployment_file
+    monkeypatch.setattr(
+        runtime_module, "_sidecar_deployment_file",
+        lambda root, value, relative: (pathlib.Path(__file__).parent / "fixtures" / "stateful_acp_peer.mjs").read_bytes()
+        if relative == "tests/server/fixtures/stateful_acp_peer.mjs"
+        else original_file(root, value, relative),
+    )
+    runtime = build_runtime_from_sidecar_deployment(tmp_path / "server", deployment)
+    try:
+        with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
+            headers = {"Authorization": f"Bearer {runtime.token}"}
+            opened_response = client.post("/wire/v1/workspaces.open", headers=headers, json={
+                "jsonrpc": "2.0", "id": "open", "method": "workspaces.open",
+                "params": {"requestId": "open-stateful", "path": str(REPO),
+                           "environment": {"kind": "wsl", "host": "Ubuntu", "user": os.environ["USER"]}},
+            })
+            assert "result" in opened_response.json(), opened_response.json()
+            opened = opened_response.json()["result"]["workspace"]
+            profile = client.post("/api/v1/profiles", headers={**headers, "Idempotency-Key": "profile"},
+                                  json={"name": "stateful", "harness_type": "pi", "configuration": {},
+                                        "credential_id": None}).json()
+            first = client.post("/wire/v1/sessions.createAndSend", headers=headers, json={
+                "jsonrpc": "2.0", "id": "first", "method": "sessions.createAndSend",
+                "params": {"requestId": "first-stateful", "workspaceId": opened["id"],
+                           "profileId": profile["profile_id"], "overrides": [],
+                           "message": {"text": "remember STATEFUL-NONCE-ABC123", "attachments": []}},
+            }).json()["result"]
+            deadline = time.monotonic() + 10
+            while time.monotonic() < deadline:
+                session = runtime.repository.get_session(first["session"]["id"])
+                if session["turns"][0]["state"] == "completed": break
+                time.sleep(0.02)
+            assert session["turns"][0]["state"] == "completed", {"turn": session["turns"][0], "events": session["events"]}
+            checkpoint = json.loads(runtime.objects.read(session["checkpoint"]["object_digest"]))
+            assert checkpoint["schema_version"] == 2 and checkpoint["resumable"] is True
+            assert checkpoint["harnessType"] == "pi" and checkpoint["files"]
+            native_id = checkpoint["nativeSessionId"]
+            second = client.post("/wire/v1/sessions.send", headers=headers, json={
+                "jsonrpc": "2.0", "id": "second", "method": "sessions.send",
+                "params": {"requestId": "second-stateful", "sessionId": first["session"]["id"],
+                           "overrides": [], "message": {"text": "recall", "attachments": []}},
+            }).json()["result"]
+            deadline = time.monotonic() + 10
+            while time.monotonic() < deadline:
+                session = runtime.repository.get_session(first["session"]["id"])
+                if len(session["turns"]) == 2 and session["turns"][1]["state"] == "completed": break
+                time.sleep(0.02)
+            assert session["turns"][1]["state"] == "completed", {
+                "error_code": session["turns"][1]["error_code"],
+                "dispatch_id": session["turns"][1]["dispatch_id"],
+            }
+            assert session["checkpoint"]["native_id"] == native_id
+            events = [e for e in session["events"] if e.get("turn_id") == second["executionId"]]
+            delta = next(e for e in events if e["kind"] == "message.delta")
+            terminal = next(e for e in events if e["kind"] == "turn.state" and e["data"].get("state") == "completed")
+            assert delta["data"]["text"] == "STATEFUL-NONCE-ABC123" and delta["seq"] < terminal["seq"]
+    finally:
+        runtime.stop()
+    assert not (tmp_path / "worker-root" / "views").exists()
+    assert not (tmp_path / "worker-root" / "secrets").exists()
 
 
 def _local_sidecar_runtime(tmp_path, *, provider_model=False):
@@ -939,3 +1076,95 @@ def test_worker_channels_does_not_retry_other_stdin_errors():
     with pytest.raises(SidecarError, match="WORKER_DISCONNECTED"):
         channels.write_line("hello")
     assert len(client.writes) == 1
+
+
+class _StateCaptureClient:
+    def __init__(self, files, payloads):
+        self.files = files
+        self.payloads = payloads
+        self.calls = []
+
+    def request(self, op, arguments=None, **_identity):
+        self.calls.append((op, arguments or {}))
+        if op == "view.list":
+            return {"files": self.files}
+        if op == "view.get":
+            path = arguments["path"]
+            value = self.payloads[path]
+            offset = arguments["offset"]
+            chunk = value[offset:offset + arguments["maxLength"]]
+            return {"data": base64.b64encode(chunk).decode(), "offset": offset,
+                    "digest": "sha256:" + hashlib.sha256(value).hexdigest(),
+                    "nextOffset": offset + len(chunk),
+                    "eof": offset + len(chunk) == len(value)}
+        return {"accepted": True}
+
+    def close(self):
+        pass
+
+    def close_stdin(self, *_args, **_kwargs):
+        pass
+
+    def wait_terminal(self, *_args, **_kwargs):
+        return {}
+
+
+def test_worker_channels_captures_declared_state_only_and_excludes_marker():
+    value = b"native-state"
+    prefix = "agentbox-sidecar/deployment/pi/native-state"
+    client = _StateCaptureClient([
+        {"path": prefix + "/.agentbox-state", "size": 10},
+        {"path": prefix + "/sessions/thread.jsonl", "size": len(value)},
+        {"path": "other/secret", "size": 99},
+    ], {prefix + "/sessions/thread.jsonl": value})
+    channels = _WorkerChannels(client, "attempt", 1, "view", state_bundle_prefix=prefix)
+    assert channels.capture_state() == {"sessions/thread.jsonl": value}
+
+
+@pytest.mark.parametrize("files", [
+    [{"path": "agentbox-sidecar/deployment/pi/native-state/x", "size": 8 * 1024 * 1024 + 1}],
+    [{"path": "agentbox-sidecar/deployment/pi/native-state/a/../x", "size": 1}],
+])
+def test_worker_channels_rejects_state_bounds_and_path_identity(files):
+    client = _StateCaptureClient(files, {files[0]["path"]: b"x"})
+    channels = _WorkerChannels(
+        client, "attempt", 1, "view",
+        state_bundle_prefix="agentbox-sidecar/deployment/pi/native-state",
+    )
+    with pytest.raises((SidecarError, ValueError)):
+        channels.capture_state()
+
+
+def test_worker_channels_rejects_state_digest_change_and_secret_bytes():
+    prefix = "agentbox-sidecar/deployment/pi/native-state"
+    value = b"not-the-secret"
+    client = _StateCaptureClient(
+        [{"path": prefix + "/state.json", "size": len(value)}],
+        {prefix + "/state.json": value},
+    )
+    channels = _WorkerChannels(client, "attempt", 1, "view", state_bundle_prefix=prefix,
+                               forbidden_content=b"secret")
+    with pytest.raises(SidecarError, match="SECRET"):
+        channels.capture_state()
+    assert channels._forbidden_content == b"secret"
+    channels.close()
+    assert channels._forbidden_content == b""
+
+
+def test_worker_channels_rejects_state_digest_change():
+    prefix = "agentbox-sidecar/deployment/pi/native-state"
+    value = b"native-state"
+    client = _StateCaptureClient(
+        [{"path": prefix + "/state.json", "size": len(value)}],
+        {prefix + "/state.json": value},
+    )
+    original = client.request
+    def wrong_digest(op, arguments=None, **identity):
+        result = original(op, arguments, **identity)
+        if op == "view.get":
+            result["digest"] = "sha256:" + "0" * 64
+        return result
+    client.request = wrong_digest
+    channels = _WorkerChannels(client, "attempt", 1, "view", state_bundle_prefix=prefix)
+    with pytest.raises(SidecarError, match="DIGEST"):
+        channels.capture_state()

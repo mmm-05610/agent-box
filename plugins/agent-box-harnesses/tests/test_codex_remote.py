@@ -115,7 +115,9 @@ def test_codex_catalog_is_declared_as_package_data():
     package = tomllib.loads((Path(__file__).parents[1] / "pyproject.toml").read_text())
     patterns = package["tool"]["setuptools"]["package-data"]["agent_box_harnesses"]
     assert "codex/*.json" in patterns
+    assert "codex/*.toml" in patterns
     assert (Path(__file__).parents[1] / "src/agent_box_harnesses/codex/deepseek-models.json").is_file()
+    assert (Path(__file__).parents[1] / "src/agent_box_harnesses/codex/deepseek-sidecar-config.toml").is_file()
 
 
 def test_decoder_and_path_classifier_fail_closed():

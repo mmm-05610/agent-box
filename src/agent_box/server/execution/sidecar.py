@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 import base64
 import hashlib
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import queue
 import subprocess
 import threading
@@ -133,7 +133,10 @@ class WslSidecarLauncher:
         executable_authorizations: Sequence[Mapping[str, str]] = (),
         executable_mounts: Sequence[tuple[str, str]] = (),
         projection_mounts: Sequence[tuple[str, str]] = (),
-        timeout_ms: int = 600_000,
+        state_bundle_prefix: str | None = None,
+        state_target: str | None = None,
+        restored_state: Mapping[str, bytes] | None = None,
+        timeout_ms: int = 120_000,
     ) -> None:
         self.connector = connector
         self.workspace = dict(workspace)
@@ -142,6 +145,24 @@ class WslSidecarLauncher:
         self.executable_authorizations = tuple(dict(item) for item in executable_authorizations)
         self.executable_mounts = tuple((str(source), str(target)) for source, target in executable_mounts)
         self.projection_mounts = tuple((str(source), str(target)) for source, target in projection_mounts)
+        self.state_bundle_prefix = state_bundle_prefix
+        self.state_target = state_target
+        if (state_bundle_prefix is None) != (state_target is None):
+            raise ValueError("SIDECAR_STATE_PROJECTION_INVALID")
+        if state_bundle_prefix is not None:
+            _safe_relative_state_path(state_bundle_prefix)
+            marker_path = f"{state_bundle_prefix}/.agentbox-state"
+            if marker_path in self.bundle:
+                raise ValueError("SIDECAR_STATE_PATH_CONFLICT")
+            self.bundle[marker_path] = b"state-v1\n"
+            for relative, content in (restored_state or {}).items():
+                _safe_relative_state_path(relative)
+                bundle_path = f"{state_bundle_prefix}/{relative}"
+                if bundle_path in self.bundle:
+                    raise ValueError("SIDECAR_STATE_PATH_CONFLICT")
+                self.bundle[bundle_path] = bytes(content)
+            if len(self.bundle) > 1024 or sum(map(len, self.bundle.values())) > 64 * 1024 * 1024:
+                raise ValueError("SIDECAR_BUNDLE_OUTSIDE_WORKER_BOUNDS")
         self.timeout_ms = timeout_ms
 
     def launch(self, environment: Mapping[str, str]):
@@ -150,6 +171,7 @@ class WslSidecarLauncher:
         attempt_id = f"sidecar-{uuid4().hex}"
         view_id = f"view-{attempt_id}"
         secret_frame_id = "harness-credential"
+        credential_material, self.credential = self.credential, None
         client = self.connector.client_for_workspace(
             distribution=self.workspace["distribution"],
             user=self.workspace["remote_user"],
@@ -182,11 +204,16 @@ class WslSidecarLauncher:
                 ),
             }
             secret = None
-            if self.credential is not None:
+            if credential_material is not None:
                 secret = client.request("secret.put", {
                     "attemptId": attempt_id, "frameId": secret_frame_id,
-                    "data": base64.b64encode(self.credential).decode(),
+                    "data": base64.b64encode(credential_material).decode(),
                 })["path"]
+            writable_projection_mounts = ()
+            if self.state_bundle_prefix is not None:
+                writable_projection_mounts = ((
+                    runtime_view + "/" + self.state_bundle_prefix, str(self.state_target),
+                ),)
             argv = compile_remote_sidecar_bwrap_argv(
                 workspace=self.workspace["remote_path"], runtime_view=runtime_view,
                 environment=guest_environment, secret=secret,
@@ -195,10 +222,13 @@ class WslSidecarLauncher:
                     (runtime_view + "/" + source, target)
                     for source, target in self.projection_mounts
                 ),
+                writable_projection_mounts=writable_projection_mounts,
             )
             channels = _WorkerChannels(
                 client, attempt_id, 1, view_id,
                 secret_frame_id if secret is not None else None,
+                state_bundle_prefix=self.state_bundle_prefix,
+                forbidden_content=(credential_material or b"").strip(),
             )
             channels.subscribe()
             client.request(
@@ -208,7 +238,7 @@ class WslSidecarLauncher:
             )
             return channels
         except BaseException:
-            if self.credential is not None:
+            if credential_material is not None:
                 try:
                     client.request("secret.cleanup", {
                         "attemptId": attempt_id, "frameId": secret_frame_id,
@@ -227,12 +257,16 @@ class _WorkerChannels:
     def __init__(
         self, client, attempt_id: str, generation: int, view_id: str,
         secret_frame_id: str | None = None,
+        state_bundle_prefix: str | None = None,
+        forbidden_content: bytes = b"",
     ) -> None:
         self.client = client
         self.attempt_id = attempt_id
         self.generation = generation
         self.view_id = view_id
         self.secret_frame_id = secret_frame_id
+        self.state_bundle_prefix = state_bundle_prefix
+        self._forbidden_content = forbidden_content
         self._chunks: queue.Queue = queue.Queue()
         self._unsubscribe = None
         self._disconnect_unsubscribe = None
@@ -302,6 +336,67 @@ class _WorkerChannels:
                 raise item
             yield item
 
+    def capture_state(self) -> dict[str, bytes]:
+        """Read back only the deployment-declared writable state subtree."""
+        if self.state_bundle_prefix is None:
+            return {}
+        prefix = self.state_bundle_prefix + "/"
+        listing = self.client.request("view.list", {"viewId": self.view_id})
+        selected: list[tuple[str, str, int]] = []
+        total = 0
+        for item in listing.get("files", ()):
+            path = item.get("path")
+            size = item.get("size")
+            if not isinstance(path, str) or not path.startswith(prefix):
+                continue
+            relative = path[len(prefix):]
+            if relative == ".agentbox-state":
+                continue
+            _safe_relative_state_path(relative)
+            if not isinstance(size, int) or size < 0 or size > 8 * 1024 * 1024:
+                raise SidecarError("SIDECAR_STATE_OUTSIDE_BOUNDS", "state file exceeds bound")
+            total += size
+            if len(selected) >= 256 or total > 8 * 1024 * 1024:
+                raise SidecarError("SIDECAR_STATE_OUTSIDE_BOUNDS", "state projection exceeds bound")
+            selected.append((path, relative, size))
+        captured: dict[str, bytes] = {}
+        for path, relative, size in selected:
+            content, _digest_value = self._view_bytes(path)
+            if len(content) != size:
+                raise SidecarError("SIDECAR_STATE_IDENTITY_CONFLICT", "state size changed during capture")
+            if self._forbidden_content and self._forbidden_content in content:
+                raise SidecarError("SIDECAR_STATE_CONTAINS_SECRET", "credential material found in native state")
+            captured[relative] = content
+        return captured
+
+    def _view_bytes(self, path: str) -> tuple[bytes, str]:
+        chunks = bytearray()
+        expected = None
+        while True:
+            item = self.client.request("view.get", {
+                "viewId": self.view_id, "path": path,
+                "offset": len(chunks), "maxLength": 32 * 1024,
+            })
+            if expected is None:
+                expected = item.get("digest")
+            if (item.get("digest") != expected or item.get("offset") != len(chunks)
+                    or not isinstance(item.get("data"), str)):
+                raise SidecarError("SIDECAR_STATE_IDENTITY_CONFLICT", "state fetch identity changed")
+            try:
+                chunks.extend(base64.b64decode(item["data"], validate=True))
+            except ValueError as exc:
+                raise SidecarError("SIDECAR_STATE_INVALID", "state chunk is invalid") from exc
+            if item.get("nextOffset") != len(chunks):
+                raise SidecarError("SIDECAR_STATE_IDENTITY_CONFLICT", "state fetch offset changed")
+            if item.get("eof") is True:
+                break
+            if item.get("nextOffset") == item.get("offset"):
+                raise SidecarError("SIDECAR_STATE_INVALID", "state fetch made no progress")
+        content = bytes(chunks)
+        if expected != _sha256(content):
+            raise SidecarError("SIDECAR_STATE_DIGEST_MISMATCH", "state digest did not match")
+        return content, str(expected)
+
     def close(self) -> None:
         if self._closed:
             return
@@ -335,6 +430,7 @@ class _WorkerChannels:
                     except BaseException:
                         pass
         finally:
+            self._forbidden_content = b""
             if self._unsubscribe:
                 self._unsubscribe()
             if self._disconnect_unsubscribe:
@@ -345,6 +441,15 @@ class _WorkerChannels:
 
 def _sha256(content: bytes) -> str:
     return "sha256:" + hashlib.sha256(content).hexdigest()
+
+
+def _safe_relative_state_path(value: str) -> str:
+    if (not isinstance(value, str) or not value or value.startswith("/")
+            or "\\" in value or "\x00" in value or "//" in value
+            or any(part in {"", ".", ".."} for part in value.split("/"))
+            or str(PurePosixPath(value)) != value):
+        raise ValueError("SIDECAR_STATE_PATH_INVALID")
+    return value
 
 
 class SidecarEnvelope:
@@ -396,6 +501,10 @@ class SidecarEnvelope:
             self._closed.set()
             with self._condition:
                 self._condition.notify_all()
+
+    def capture_state(self) -> dict[str, bytes]:
+        capture = getattr(self._channels, "capture_state", None)
+        return capture() if callable(capture) else {}
 
     # -- reader ------------------------------------------------------------
 
@@ -460,6 +569,7 @@ class SidecarHarnessPort:
         profile: str = "codex", adapter: Mapping[str, Any] | None = None,
         model: str | None = None, credential_environment: str | None = None,
         preferred_auth_method: str | None = None,
+        resume_native_id: str | None = None,
         state_directory: str = "/tmp/agentbox-sidecar",
         directory: str = "/workspace", on_event=None,
     ) -> None:
@@ -470,12 +580,15 @@ class SidecarHarnessPort:
         self.model = model
         self.credential_environment = credential_environment
         self.preferred_auth_method = preferred_auth_method
+        self.resume_native_id = resume_native_id
         self.state_directory = state_directory
         self.directory = directory
         self.on_event = on_event or (lambda *_: None)
         self._sessions: dict[str, SidecarEnvelope] = {}
         self._native_sessions: dict[str, str] = {}
         self._approvals: dict[str, tuple[str, str]] = {}
+        self._resumable: dict[str, bool] = {}
+        self._native_closed: set[str] = set()
         self._current: str = ""
         self._lock = threading.Lock()
 
@@ -497,10 +610,13 @@ class SidecarHarnessPort:
                 "stateDirectory": self.state_directory, "directory": self.directory,
                 "permissionRoundTrip": True, "permissionTimeoutMs": 60_000,
             })
-            envelope.request({"op": "start"})
-            session = envelope.request({
-                "op": "create", "title": execution_id, "model": self.model,
-            })
+            started = envelope.request({"op": "start"})
+            if self.resume_native_id is None:
+                session = envelope.request({
+                    "op": "create", "title": execution_id, "model": self.model,
+                })
+            else:
+                session = envelope.request({"op": "open", "sessionId": self.resume_native_id})
         except BaseException:
             envelope.close()
             raise
@@ -511,11 +627,28 @@ class SidecarHarnessPort:
         with self._lock:
             self._sessions[execution_id] = envelope
             self._native_sessions[execution_id] = native
+            self._resumable[execution_id] = bool(
+                (started.get("sessionCapabilities") or {}).get("resume")
+            )
             self._current = execution_id
         self.on_event(execution_id, "started", {
             "nativeSessionId": native, "provenance": registered.get("provenance"),
         })
         return native
+
+    def capture_execution(self, execution_id: str) -> tuple[dict[str, bytes], bool]:
+        """Flush the adapter, then capture its declared native state before cleanup."""
+        envelope = self._require(execution_id)
+        with self._lock:
+            already_closed = execution_id in self._native_closed
+        if not already_closed:
+            envelope.request({"op": "close"}, timeout=10)
+            with self._lock:
+                self._native_closed.add(execution_id)
+        state = envelope.capture_state()
+        with self._lock:
+            resumable = self._resumable.get(execution_id, False)
+        return state, resumable
 
     def accept(self, execution_id: str, *, overrides: Mapping[str, Any] | None = None) -> None:
         """Open the execution; the prompt is issued by `prompt`."""
@@ -551,12 +684,16 @@ class SidecarHarnessPort:
         with self._lock:
             envelope = self._sessions.pop(execution_id, None)
             self._native_sessions.pop(execution_id, None)
+            self._resumable.pop(execution_id, None)
+            native_closed = execution_id in self._native_closed
+            self._native_closed.discard(execution_id)
             self._approvals = {
                 key: value for key, value in self._approvals.items() if value[0] != execution_id
             }
         if envelope is not None:
             try:
-                envelope.request({"op": "close"}, timeout=5)
+                if not native_closed:
+                    envelope.request({"op": "close"}, timeout=5)
             except BaseException:
                 pass
             envelope.close()
@@ -566,6 +703,8 @@ class SidecarHarnessPort:
             sessions = list(self._sessions.values())
             self._sessions.clear()
             self._native_sessions.clear()
+            self._resumable.clear()
+            self._native_closed.clear()
             self._approvals.clear()
         for envelope in sessions:
             try:

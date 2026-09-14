@@ -333,13 +333,15 @@ def build_runtime_from_sidecar_deployment(
         model_control_id = item.get("modelControlId")
         credential_kind = item.get("credentialKind")
         credential_environment = item.get("credentialEnvironment")
+        timeout_ms = item.get("timeoutMs", 120_000)
         if (harness_id in deployments
                 or re.fullmatch(r"[a-z][a-z0-9._-]{0,63}", harness_id) is None
                 or not isinstance(adapter, dict)
                 or not isinstance(adapter.get("command"), str)
                 or not isinstance(adapter.get("args", []), list)
                 or any(not isinstance(argument, str) or len(argument) > 8192 or "\x00" in argument
-                       for argument in adapter.get("args", []))):
+                       for argument in adapter.get("args", []))
+                or type(timeout_ms) is not int or not 1 <= timeout_ms <= 120_000):
             raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
         if model_control_id is not None and (
             not isinstance(model_control_id, str) or not model_control_id
@@ -356,6 +358,7 @@ def build_runtime_from_sidecar_deployment(
         ):
             raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
         deployment = dict(item)
+        deployment["_timeout_ms"] = timeout_ms
         adapter = dict(adapter)
         adapter_source = adapter.pop("source", None)
         if adapter_source is not None:
@@ -418,6 +421,24 @@ def build_runtime_from_sidecar_deployment(
             or re.fullmatch(r"[a-z][a-z0-9._-]{0,63}", preferred_auth_method) is None
         ):
             raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
+        state_projection = item.get("stateProjection")
+        if state_projection is not None:
+            if (not isinstance(state_projection, dict)
+                    or set(state_projection) != {"target"}
+                    or not isinstance(state_projection.get("target"), str)
+                    or re.fullmatch(
+                        r"/tmp/agentbox-home/[A-Za-z0-9._-]+", state_projection["target"],
+                    ) is None):
+                raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
+            if state_projection["target"] in {target for _source, target in projection_mounts}:
+                raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
+            deployment["_state_bundle_prefix"] = (
+                f"agentbox-sidecar/deployment/{harness_id}/native-state"
+            )
+            deployment["_state_target"] = state_projection["target"]
+        else:
+            deployment["_state_bundle_prefix"] = None
+            deployment["_state_target"] = None
         deployments[harness_id] = deployment
         registry.register(HarnessDescriptor(
             harness_id,
@@ -454,6 +475,10 @@ def build_runtime_from_sidecar_deployment(
                 if secret_store is None:
                     raise RuntimeError("CREDENTIAL_STORE_UNAVAILABLE")
                 credential = secret_store.read(record["secret_locator"])
+            resume_native_id, restored_state = _restore_sidecar_state(
+                objects, context,
+                enabled=deployment["_state_bundle_prefix"] is not None,
+            )
             launcher = WslSidecarLauncher(
                 connector,
                 workspace={
@@ -466,7 +491,10 @@ def build_runtime_from_sidecar_deployment(
                 executable_authorizations=deployment["_executable_authorizations"],
                 executable_mounts=deployment["_executable_mounts"],
                 projection_mounts=deployment["_projection_mounts"],
-                timeout_ms=int(deployment.get("timeoutMs", 600_000)),
+                state_bundle_prefix=deployment["_state_bundle_prefix"],
+                state_target=deployment["_state_target"],
+                restored_state=restored_state,
+                timeout_ms=deployment["_timeout_ms"],
             )
             return SidecarHarnessPort(
                 launcher, environment={"AGENTBOX_SIDECAR_ISOLATED": "1"},
@@ -476,6 +504,7 @@ def build_runtime_from_sidecar_deployment(
                     descriptor.credential_environment if credential is not None else None
                 ),
                 preferred_auth_method=deployment.get("preferredAuthMethod"),
+                resume_native_id=resume_native_id,
                 state_directory="/tmp/agentbox-sidecar-state", directory="/workspace",
                 on_event=on_event,
             )
@@ -507,3 +536,51 @@ def _sidecar_deployment_file(
     if not resolved.is_file() or resolved.stat().st_size > 8 * 1024 * 1024:
         raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
     return resolved.read_bytes()
+
+
+def _restore_sidecar_state(
+    objects: ObjectStore, context: Mapping[str, Any], *, enabled: bool,
+) -> tuple[str | None, dict[str, bytes]]:
+    """Load one bounded opaque native checkpoint from Windows authority."""
+    checkpoint_digest = context.get("checkpoint_object_digest")
+    native_id = context.get("checkpoint_native_id")
+    if not enabled or not checkpoint_digest or not native_id:
+        return None, {}
+    try:
+        manifest = json.loads(objects.read(checkpoint_digest))
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        raise RuntimeError("SIDECAR_CHECKPOINT_INVALID") from None
+    files = manifest.get("files") if isinstance(manifest, dict) else None
+    if isinstance(manifest, dict) and manifest.get("harnessType") != context.get("harness_type"):
+        return None, {}
+    if (manifest.get("schema_version") != 2 or manifest.get("resumable") is not True
+            or manifest.get("nativeSessionId") != native_id or not isinstance(files, list)
+            or not files):
+        raise RuntimeError("SIDECAR_CHECKPOINT_INVALID")
+    restored: dict[str, bytes] = {}
+    total = 0
+    for item in files:
+        if not isinstance(item, dict) or set(item) != {"path", "digest", "size"}:
+            raise RuntimeError("SIDECAR_CHECKPOINT_INVALID")
+        relative = item.get("path")
+        digest_value = item.get("digest")
+        size = item.get("size")
+        if (not isinstance(relative, str) or relative.startswith("/") or "\\" in relative
+                or "\x00" in relative or "//" in relative
+                or any(part in {"", ".", ".."} for part in relative.split("/"))
+                or str(PurePosixPath(relative)) != relative
+                or relative in restored or not isinstance(digest_value, str)
+                or re.fullmatch(r"sha256:[0-9a-f]{64}", digest_value) is None
+                or not isinstance(size, int) or size < 0 or size > 8 * 1024 * 1024):
+            raise RuntimeError("SIDECAR_CHECKPOINT_INVALID")
+        try:
+            content = objects.read(digest_value)
+        except (OSError, ValueError):
+            raise RuntimeError("SIDECAR_CHECKPOINT_INVALID") from None
+        if len(content) != size:
+            raise RuntimeError("SIDECAR_CHECKPOINT_INVALID")
+        total += size
+        if len(restored) >= 256 or total > 8 * 1024 * 1024:
+            raise RuntimeError("SIDECAR_CHECKPOINT_INVALID")
+        restored[relative] = content
+    return str(native_id), restored

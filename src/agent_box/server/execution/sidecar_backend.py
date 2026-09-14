@@ -313,18 +313,37 @@ class SidecarExecutionBackend:
                 raise run.error
             with self._lock:
                 text = "".join(self._message_parts.get(run.turn_id, ()))
-            self.records.append_turn_event(run.turn_id, "message.final", {"text": text})
+            state, native_resume_supported = run.port.capture_execution(run.turn_id)
+            state_files = []
+            total = 0
+            for path, content in sorted(state.items()):
+                if (not isinstance(path, str) or not path or path.startswith("/")
+                        or "\\" in path or "\x00" in path or "//" in path
+                        or any(part in {"", ".", ".."} for part in path.split("/"))
+                        or str(PurePosixPath(path)) != path or not isinstance(content, bytes)):
+                    raise RuntimeError("SIDECAR_STATE_INVALID")
+                total += len(content)
+                if len(state_files) >= 256 or total > 8 * 1024 * 1024:
+                    raise RuntimeError("SIDECAR_STATE_OUTSIDE_BOUNDS")
+                state_object = self.objects.publish(content)
+                state_files.append({
+                    "path": path, "digest": state_object.digest, "size": state_object.size,
+                })
+            resumable = bool(native_resume_supported and state_files)
             checkpoint = self.objects.publish(json.dumps({
-                "schema_version": 1, "nativeSessionId": run.native_id,
-                "resumable": False, "sourceExecutionId": run.core_execution_id,
+                "schema_version": 2, "nativeSessionId": run.native_id,
+                "harnessType": self._contexts[run.turn_id]["harness_type"],
+                "resumable": resumable, "sourceExecutionId": run.core_execution_id,
+                "files": state_files,
             }, sort_keys=True, separators=(",", ":")).encode())
             result = self.objects.publish(json.dumps({
                 "schema_version": 1, "text": text, "nativeResult": run.result or {},
             }, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode())
+            self.records.append_turn_event(run.turn_id, "message.final", {"text": text})
             self.execution_service.apply_finalization(ExecutionFinalizationRequest(
                 run.core_execution_id, f"turn-finalize:{run.turn_id}",
                 ExecutionProjection(
-                    Phase.TERMINAL, Outcome.SUCCEEDED, False, Freshness.OBSERVED,
+                    Phase.TERMINAL, Outcome.SUCCEEDED, resumable, Freshness.OBSERVED,
                     datetime.now(timezone.utc),
                 ),
                 native_refs=(Ref(RefType.SESSION, self.provider.provider_id, run.native_id),),

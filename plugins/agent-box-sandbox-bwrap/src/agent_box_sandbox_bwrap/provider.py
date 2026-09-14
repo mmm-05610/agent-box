@@ -136,6 +136,7 @@ def compile_remote_sidecar_bwrap_argv(
     secret_target: str = "/runtime/secret/credential",
     executable_mounts: Sequence[tuple[str, str]] = (),
     projection_mounts: Sequence[tuple[str, str]] = (),
+    writable_projection_mounts: Sequence[tuple[str, str]] = (),
     entrypoint: str = "/runtime/view/agentbox-sidecar/runtime/worker-entry.mjs",
 ) -> list[str]:
     """Compile the fixed Worker-hosted Harness sidecar template.
@@ -164,6 +165,12 @@ def compile_remote_sidecar_bwrap_argv(
             raise ProjectionRejected("sidecar projection source is outside the reviewed view")
         if re.fullmatch(r"/tmp/agentbox-home/[A-Za-z0-9._-]+", target) is None:
             raise ProjectionRejected("sidecar projection target is outside the fixed template")
+    for source, target in writable_projection_mounts:
+        _validate_remote_path(source)
+        if not source.startswith(runtime_view + "/"):
+            raise ProjectionRejected("sidecar writable projection source is outside the reviewed view")
+        if re.fullmatch(r"/tmp/agentbox-home/[A-Za-z0-9._-]+", target) is None:
+            raise ProjectionRejected("sidecar writable projection target is outside the fixed template")
     for key, value in environment.items():
         if not _ENV_KEY.fullmatch(key) or len(value) > 8192 or "\x00" in value:
             raise ProjectionRejected("invalid remote environment")
@@ -185,10 +192,14 @@ def compile_remote_sidecar_bwrap_argv(
         "--bind", workspace, "/workspace",
         "--ro-bind", runtime_view, "/runtime/view",
     ]
+    for _source, target in writable_projection_mounts:
+        argv += ["--dir", target]
     for source, target in executable_mounts:
         argv += ["--ro-bind", source, target]
     for source, target in projection_mounts:
         argv += ["--ro-bind", source, target]
+    for source, target in writable_projection_mounts:
+        argv += ["--bind", source, target]
     if secret is not None:
         argv += ["--ro-bind", secret, secret_target]
     argv += ["--chdir", "/workspace", "--clearenv"]
