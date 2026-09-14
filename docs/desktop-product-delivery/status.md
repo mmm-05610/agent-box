@@ -5,15 +5,18 @@
 
 ## 执行快照（handoff-policy 每阶段必填）— 接管施工中
 
-- updated_at: 2026-09-14 13:36 (+08:00)
+- updated_at: 2026-09-14 14:05 (+08:00)
 - 执行者: Codex 前端产品 goal（接力会话）；**已从暂停的 Zcode 执行者接管**
 - 工作树/分支: /home/maoqh/projects/agent-box-desktop-next-wsl-round1 @ feature/agentbox-desktop-product
-- 接管核验: 用户指定交接 HEAD `5c0fbfe` 与实际 HEAD
+- 接管核验（历史，Zcode→Codex 交接）: 用户指定交接 HEAD `5c0fbfe` 与实际 HEAD
   `5c0fbfe119de5c2fe979e3964ad59223767398d7` 一致；接管前 `writer_lease=RELEASED`；
   未发现该工作树、Windows 构建树的 Electron/Vite/Vitest/Playwright/验收驱动进程；
   dirty 集合仅为下列 4 项已授权交接改动。发布源规则文件与本执行树逐文件 SHA-256 一致，
   保留本文件实时进度，不复制发布源初始状态。
-- 代码检查点（已提交 HEAD）: `2991bff`（P02/P05：中立 Provider/Model 设置）
+- 本阶段起点核验: HEAD `1cbc4f58d602b212f55c7c4dd9c2bc38718cba83`、分支
+  feature/agentbox-desktop-product、工作树 clean，无同工作树并发写入者；writer lease 仍为同一
+  前端 goal 的 ACTIVE lease，本阶段串行施工，完成后停止写入并回报，不提前 RELEASE。
+- 代码检查点（已提交 HEAD）: `dfcd7027`（P02/P05：Profile 默认配置编辑与串行 CAS）
   链: ebb1233（P00）→ 8d4b3df/47b5b47/dbb902f（P01 代码与几何修复）→ 26b32fc（P01 GREEN 证据）
   → 468e6ac/d7e9a57（发布源 d3c0196+ffbcfaf 导入）→ 893d560（P07 检查点2 wire-v1）
   → 957a523（P02A 盘点）→ 07f5386（P02A slice 1：失败面非阻塞）→ 3a25edc（P02A slice 2）
@@ -33,19 +36,23 @@
   → e1adda9（P04 状态记录）→ f8807b1（AgentBox 模型控件中立化）
   → 0db8bc7（中立模型控件状态）→ 1331a1d（Profile/ProviderModel 维护端口）
   → d6ec993（服务模型目录与临时槽）→ 2991bff（中立 Provider/Model 设置）
+  → 1cbc4f58（Provider 模型检查点）→ dfcd7027（Profile 默认配置编辑与串行 CAS）
 - 已消费发布文档提交: 86d5a7b、61c7ff7、d3c0196、ffbcfaf
-- 当前检查点改动: 已锁定的 `providerModels.list/create/update/archive` 与
-  `profiles.updateConfig` 具备中立 application 端口；Settings → Models 已接服务权威列表、多模型
-  增删、CAS 更新与引用保护归档。Composer 的 `model_slot` 从同一目录选取 exact
-  `{providerId, modelId}`，不再把 slot 名误当模型值；slot 因缺正式 Server 启动/发现合同保持 null，
-  诚实 UNAVAILABLE。
+- 当前检查点改动: Profiles 页从只读 `config.describe` 升级为可编辑的 Profile 默认配置，接到
+  wire-v1 已锁定的 `profiles.updateConfig`（整份替换语义）。生产能力门要求
+  `profiles.create`/`update`/`updateConfig`/`archive` 四条齐备，缺任一方法不渲染可保存控件；
+  保存提交整份 `values`（未编辑与安全锁定值按服务当前值带回、显式恢复默认的控件省略、模型只发
+  exact `{providerId, modelId}`）。改名与配置同时变化时按服务返回的新 version 串行 CAS，
+  部分成功保留服务确认的名称/版本与草稿，重试不重发改名；成功后重读 describe 采用服务规范化结果。
 - 当前阶段: P00 GREEN；P01 GREEN；**P07 检查点 1–6 完成且 wire 已锁定**；
-  P02 A/B1/B2/C/D 与 B3 服务投影已提交；P03 纵切 1–4 已提交；P04 切片1–8已提交
+  P02 A/B1/B2/C（角色页只读→默认配置编辑）/D 与 B3 服务投影已提交；P03 纵切 1–4 已提交；
+  P04 切片1–8已提交
 - 完成范围: P00；P01 全部返修（真机 27 PASS）；P07 检查点 1（语义映射）、检查点 2
   （wire-v1 候选：17 方法 + schema 测试 + JSON Schema 工件；已消费后端机械反馈并回应）；
   P02A（失败面非阻塞+可关闭、Artifacts 页退役、失败终态竞态修复与真机门）
-- 下一项: 在 Profiles 页把 `profiles.updateConfig` 接成服务描述的默认配置编辑，并按返回 version
-  串行 CAS；随后收口 P05 客户端矩阵并准备 P06 无模型 Windows 独立验收。
+- 下一项: P05 最终客户端矩阵核对（28 方法客户端、Profile 默认配置、模型维护、事件/队列反例），
+  以及 P06 无模型独立验收收口；Server lifecycle connection 合同到达后接生产接线。
+  不再重新研究协议。
 - 阻断: 无真实阻断。剩余 P04 production lifecycle connection 与显式 legacy 消费者收口、
   P05 生产接线核查和 P06 独立验收待续；wire 摘要已锁定，真实全栈仍由后续集成人验证
 
@@ -58,11 +65,12 @@
   真实 wire event stream 与后端投影差异仍是联调项，不以 fixture 伪称服务通过
 - UI_READY: 侧栏工作区列表（36R+P01）真机全绿；P02A 真机 8 PASS / 0 FAIL / 1 PENDING
 - CONTRACT_CLIENT_READY: wire-v1 客户端/fixture 与 28 方法摘要 LOCKED；production request/event
-  transport 已接线，Server lifecycle connection 来源待正式跨端合同
+  transport 已接线，`profiles.updateConfig` 客户端与 Profile 默认配置编辑已接（组件级验证）；
+  Server lifecycle connection 来源待正式跨端合同
 - REAL_FLOW_VERIFIED: 否（无真实 Server/Harness 链路证据）
 
-- frontend_implementation: PARTIAL（P02A、P02B1、P02B2、P02C1、P02C2、P02D/B3 与
-  P03 主 route 服务投影已完成；P04/P05/P06 待收口）
+- frontend_implementation: PARTIAL（P02A、P02B1、P02B2、P02C1、P02C2、P02D/B3、Profile 默认配置
+  编辑与 P03 主 route 服务投影已完成；P04/P05/P06 待收口）
 - writer_lease: **ACTIVE — Codex frontend goal**（2026-09-14 09:20 +08:00 接管；
   后端工作树只读，Windows 构建/验收资源串行）
 
@@ -135,6 +143,16 @@
   36 tests passed；desktop renderer/electron/e2e 三项目 typecheck 通过；全部受影响 TS/TSX ESLint
   0 error / 0 warning，diff check 干净。覆盖 capability 缺失、缓存保留/single-flight、带斜杠 id、
   opaque Harness 隔离、多 model_slot、服务当前值、模型多行增删、防双发、CAS/引用冲突与服务返回投影。
+- Profile 默认配置编辑（dfcd7027）：定向门 4 files / **28 tests passed，exit 0**
+  （`src/application/profile/profile-maintenance-port.test.ts` 3、
+  `src/application/provider-model/wire-provider-model-catalog.test.ts` 3、
+  `src/features/profiles/index.test.tsx` 12、`src/features/profiles/profile-config-editor.test.tsx` 10）；
+  相关回归面 5 files / 23 tests passed（composer profile-controls、wire-composer-profile、
+  agentbox-model-settings、settings 首页、composition surfaces）；`npm run typecheck` 三项目通过；
+  改动 13 个文件 ESLint 0 error / 0 warning；`git diff --check` 干净。覆盖四方法能力门、
+  描述式控件、整份 values（保留未编辑/锁定、省略恢复默认、exact 模型引用与带斜杠 id）、
+  双 model_slot 独立编辑、unavailable 禁选与目录外当前值、CAS 顺序 update(N)→updateConfig(N+1)、
+  部分成功重试不重发改名、pending 连点单发、服务规范化后采用返回 descriptor、迟到 descriptor 不串写。
 
 ## 测试与基线（上一执行者交接时点，历史）
 
@@ -174,10 +192,10 @@ wire-review.md通道自39阶段协调。执行者下个检查点消费这些规�
 | --- | --- | --- |
 | P00 接管与基线 | GREEN | 旧Desktop会话无并发写入（evidence/P00.md） |
 | P01 36R收口 | GREEN | 真机 27 PASS/2 SKIP/1 PENDING（evidence/P01.md；本地打开 PENDING 转 P05） |
-| P02 上层产品 | IN_PROGRESS（A/B/C/D 主面与服务投影完成；Profile 默认配置编辑待收口） | P01 已满足 |
+| P02 上层产品 | IN_PROGRESS（A/B/C/D 主面与服务投影完成；Profile 默认配置编辑已接服务描述与串行 CAS，外围能力仍待合同） | P01 已满足 |
 | P03 用例状态与API | IN_PROGRESS（主 route 生产调用者与 event reducer 接入已完成；真实 Server 源待 P04） | 与 P02 穿插 |
 | P04 宿主与遗留退役 | IN_PROGRESS（production request/Session-event transport + IPC + supervisor；正常冷启动 Hermes 自动门已退役，Server connection合同待后端） | 与 P03 穿插 |
-| P05 正式合同接入 | IN_PROGRESS（28 方法客户端/transport/模型维护已接；Profile 默认配置与 lifecycle 外部缺口待续） | wire 双端锁定 |
+| P05 正式合同接入 | IN_PROGRESS（28 方法客户端/transport/模型维护/Profile 默认配置已接；lifecycle 外部缺口待续） | wire 双端锁定 |
 | P06 前端验收与交接 | IMPLEMENTATION_HANDOFF_GATE | 本端独立范围完成；真实全栈门由后续集成人负责 |
 | P07 核心合同与状态交接 | 检查点1–6已提交；WIRE_LOCKED | 28 方法双端摘要一致；fixture/客户端已锁定 |
 
