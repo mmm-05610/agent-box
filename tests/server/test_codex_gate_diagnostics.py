@@ -1,10 +1,11 @@
-"""The Codex gate's alias-symlink annotation must be causal, not correlational.
+"""The Codex gate's alias-link annotation is a co-observation, never a blocker.
 
 The gate observes the native CLI's argv0 alias links while an attempt runs.
-Those links are normal, so they may only be promoted to a *blocker* diagnosis
-when the turn actually failed in the state-capture step with a view/state code;
-any other failure is recorded as a co-observation so the blocker evidence stays
-clean. Neither branch ever changes an outcome - this is diagnostics only.
+Those links are normal, and a failing turn's error code alone never proves they
+caused it (the file-limit and secret-scan failures each have first-hand
+unrelated causes), so every failure that coincides with the observed links is
+recorded as a co-observation and no `blocker` key is ever produced. This is
+diagnostics only; it never changes an outcome.
 """
 from __future__ import annotations
 

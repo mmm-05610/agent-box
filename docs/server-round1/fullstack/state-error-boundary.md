@@ -109,7 +109,7 @@ c7 首跑与 c6 对照跑（01:2x–01:3x +08:00）曾在**第一轮 state 捕�
   且 `annotate_known_blocker` 只在"观察到别名链接且 turn 失败"时输出历史诊断
   （绿跑不再误报 blocker）。
 
-## 4.2 Reviewer 复审后的修复验证（c8）
+## 4.2 Reviewer 复审后的修复验证（c8）【历史快照：本节计数与 Codex 门状态已被 §4.4 取代】
 
 Reviewer `CHANGES_REQUIRED` 的修复（§2.1/§7.1）落地后重建
 **`.acceptance-bundle-c8` = `sha256:514f48a9c24c8a13edefa4eb3aa5473b0f3a25d88a94aea1a19bb16ea2707975`**
@@ -121,7 +121,7 @@ Reviewer `CHANGES_REQUIRED` 的修复（§2.1/§7.1）落地后重建
 | Pi（c8） | exit 0，`PI_PRODUCTION_CHAIN_GATE_OK` |
 | Hermes（c8） | exit 0，`HERMES_PRODUCTION_CHAIN_GATE_OK` |
 | OpenCode（c8） | exit 0，`OPENCODE_PRODUCTION_CHAIN_PREPARED` |
-| Codex（c8，默认模式） | **10 轮 exit 0**（`…_GATE_OK`）+ 2 轮失败（见下，均已第一手定位） |
+| Codex（c8，默认模式）【历史快照：现行状态见 §4.4 的红绿间歇】 | 当轮 10 轮 exit 0（`…_GATE_OK`）+ 2 轮失败（见下，均已第一手定位） |
 | Windows r4（c8） | exit 0，`BACKEND_41_E_WINDOWS_WSL_WIRE_OK`，`worker_digest=sha256:514f48a9…`，`tree_terminate`、`session/new→session/resume`、delta 9 < completed 12、8 秒静默默认租约 `elapsed_ms=8817` 完成 |
 | 独立 PostCheck（c8 实例） | exit 0，`…_POSTCHECK_CLEAN`（DataRoot/workspace/端口 18746/进程/view 全空） |
 | Python 全量 | **820 passed / 4 skipped / 0 failed**（gate 诊断当时 5 例、并例后现行 3 例；+8：边界改约 6、既有微调；4 项既有 skip 未扩大） |

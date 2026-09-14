@@ -9,8 +9,10 @@ loopback **Responses** endpoint this gate starts. Two rounds on one Server
 Session prove what a component-level gate cannot: that the isolated `CODEX_HOME`
 is the one the adapter and its `app-server` child really read, that the full
 official `models.json` catalogue is read from there, that the product model is
-carried into a `/responses` request, that the credential only ever travelled
-through the real SecretStore -> Worker secret frame -> environment path, and that
+carried into a `/responses` request, that the credential's AgentBox injection
+path was the real SecretStore -> Worker secret frame -> environment route (the
+Harness's own behaviour after receiving the environment value is not proven
+safe here and has a fail-closed counterexample), and that
 the second round reopened the same native thread with the first round's context.
 
 This is NOT a model acceptance. The endpoint is a local fake that returns two

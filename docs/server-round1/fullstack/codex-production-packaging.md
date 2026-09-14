@@ -123,5 +123,5 @@ Windows c5 r4 + PostCheck                   → exit 0 / …_POSTCHECK_CLEAN
   **ABW1 frame 与 manifest `wireVersion = 1`**，而 **Worker control `PROTOCOL_VERSION = 3`**——
   本轮没有改变任何响应形状，因此 control protocol 不升版。
 - 已知残余：`cli_auth_credentials_store="ephemeral"` 属官方支持的配置键，但"凭据完全不落盘"仍取决于该
-  版本实现，后续真实模型门应在真实凭据下复核；工件摘要在 bootstrap 校验一次（既有 TOCTOU 窗口）；
+  版本实现；**2026-09-15 更新：无模型门已观测到假 token 进入原生 state 的反例（fail-closed 拦截），必须先用假 token 定位并消除该泄漏路径、且经付费 preflight Reviewer ACCEPT 后，才允许读取真实 locator 或运行真实模型门**；工件摘要在 bootstrap 校验一次（既有 TOCTOU 窗口）；
   bwrap 网络姿态未改。
