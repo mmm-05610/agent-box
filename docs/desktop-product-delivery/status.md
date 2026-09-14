@@ -143,14 +143,15 @@
   36 tests passed；desktop renderer/electron/e2e 三项目 typecheck 通过；全部受影响 TS/TSX ESLint
   0 error / 0 warning，diff check 干净。覆盖 capability 缺失、缓存保留/single-flight、带斜杠 id、
   opaque Harness 隔离、多 model_slot、服务当前值、模型多行增删、防双发、CAS/引用冲突与服务返回投影。
-- Profile 默认配置编辑（dfcd7027）：定向门 4 files / **28 tests passed，exit 0**
+- Profile 默认配置编辑（dfcd7027）：定向门 4 files / **29 tests passed，exit 0**
   （`src/application/profile/profile-maintenance-port.test.ts` 3、
   `src/application/provider-model/wire-provider-model-catalog.test.ts` 3、
-  `src/features/profiles/index.test.tsx` 12、`src/features/profiles/profile-config-editor.test.tsx` 10）；
+  `src/features/profiles/index.test.tsx` 13、`src/features/profiles/profile-config-editor.test.tsx` 10）；
   相关回归面 5 files / 23 tests passed（composer profile-controls、wire-composer-profile、
   agentbox-model-settings、settings 首页、composition surfaces）；`npm run typecheck` 三项目通过；
   改动 13 个文件 ESLint 0 error / 0 warning；`git diff --check` 干净。覆盖四方法能力门、
-  描述式控件、整份 values（保留未编辑/锁定、省略恢复默认、exact 模型引用与带斜杠 id）、
+  描述式控件（enum/string/boolean/model_slot 均可编辑并按其值发送）、整份 values（保留未编辑/锁定、
+  省略恢复默认、exact 模型引用与带斜杠 id）、
   双 model_slot 独立编辑、unavailable 禁选与目录外当前值、CAS 顺序 update(N)→updateConfig(N+1)、
   部分成功重试不重发改名、pending 连点单发、服务规范化后采用返回 descriptor、迟到 descriptor 不串写。
 

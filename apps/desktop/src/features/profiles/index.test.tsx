@@ -92,6 +92,7 @@ const serviceDescriptor = (profileId: string, values: { mode?: string; notes?: s
       values: ['fast', 'balanced']
     },
     { controlId: 'notes', currentValue: values.notes ?? 'keep me', editable: true, kind: 'string', multiline: false },
+    { controlId: 'verbose', currentValue: true, editable: true, kind: 'boolean' },
     { controlId: 'locked_flag', currentValue: true, editable: true, kind: 'boolean' },
     {
       controlId: 'primary_model',
@@ -304,9 +305,34 @@ describe('AgentBox ProfilesView', () => {
     expect(update).not.toHaveBeenCalled()
     expect(updateConfig.mock.calls[0]?.[0].values).toEqual([
       { controlId: 'notes', value: 'edited' },
+      { controlId: 'verbose', value: true },
       { controlId: 'locked_flag', value: true },
       { controlId: 'primary_model', value: { modelId: 'vendor/family/model-v1', providerId: 'provider-one' } }
     ])
+  })
+
+  it('sends the service-offered enum value, the toggled boolean, and the locked service value', async () => {
+    const updateConfig = vi.fn(async (_intent: UpdateProfileConfigIntent) => configResult())
+    $agentBoxProfiles.set([profile()])
+
+    render(<ProfilesView maintenance={maintenancePort({ updateConfig })} onClose={vi.fn()} />)
+
+    await screen.findByRole('combobox', { name: 'Mode' })
+    openSelect('Mode')
+    fireEvent.click(await screen.findByRole('option', { name: 'fast' }))
+
+    fireEvent.click(screen.getByRole('switch', { name: 'Verbose' }))
+
+    // A security-locked control answers no click, and keeps its service value.
+    fireEvent.click(screen.getByRole('switch', { name: 'Locked flag' }))
+    fireEvent.click(saveButton())
+
+    await waitFor(() => expect(updateConfig).toHaveBeenCalledTimes(1))
+
+    const values = updateConfig.mock.calls[0]?.[0].values
+    expect(values).toContainEqual({ controlId: 'mode', value: 'fast' })
+    expect(values).toContainEqual({ controlId: 'verbose', value: false })
+    expect(values).toContainEqual({ controlId: 'locked_flag', value: true })
   })
 
   it('sends the exact provider/model reference chosen from the directory', async () => {
