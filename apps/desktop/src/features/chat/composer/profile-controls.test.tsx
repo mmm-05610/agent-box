@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { type ReactElement, useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { stubMenuDomApis, stubResizeObserver } from '@/dev/test/jsdom'
@@ -29,6 +30,7 @@ const profileState = (overrides: Partial<ComposerProfileState> = {}): ComposerPr
     securityLockedIds: [],
     workspaceId: asWireId('workspace-a')
   },
+  modelChoices: [],
   onOverrideChange: vi.fn(),
   onSelect: vi.fn(() => true),
   options: profiles,
@@ -127,5 +129,156 @@ describe('ComposerProfileControls', () => {
       'Locked by the service security policy'
     )
     expect(onOverrideChange).not.toHaveBeenCalled()
+  })
+
+  it('uses opaque provider/model references for model slots and keeps unavailable entries disabled', async () => {
+    let activeOverrides: ComposerProfileState['overrides'] = []
+
+    const onOverrideChange = vi.fn((next: ComposerProfileState['overrides']) => {
+      activeOverrides = next
+    })
+
+    render(
+      <ComposerProfileControls
+        profile={profileState({
+          configDescriptor: {
+            controls: [
+              { controlId: 'primary', editable: true, kind: 'model_slot', slots: [{ name: 'primary', model: null }] },
+              { controlId: 'review', editable: true, kind: 'model_slot', slots: [{ name: 'review', model: null }] }
+            ],
+            effectTiming: 'next_send',
+            profileId: asWireId('profile-reviewer'),
+            securityLockedIds: [],
+            workspaceId: asWireId('workspace-a')
+          },
+          modelChoices: [
+            {
+              availability: 'unknown',
+              displayName: 'Slash model',
+              modelId: 'family/model-v1',
+              providerDisplayName: 'Provider One',
+              providerId: 'provider-one',
+              unavailableReason: null
+            },
+            {
+              availability: 'unavailable',
+              displayName: 'Offline model',
+              modelId: 'offline/model-v2',
+              providerDisplayName: 'Provider Two',
+              providerId: 'provider-two',
+              unavailableReason: 'Provider is offline'
+            }
+          ],
+          onOverrideChange,
+          overrides: activeOverrides
+        })}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Temporary settings' }))
+    const controls = screen.getAllByRole('combobox')
+    fireEvent.click(controls[0])
+
+    expect(controls[0].textContent).toContain('Use profile default')
+
+    expect(await screen.findByText('Provider One: Slash model')).toBeTruthy()
+    const unavailable = await screen.findByText('Provider Two: Offline model')
+    expect(unavailable.closest('[role="option"]')?.getAttribute('data-disabled')).not.toBeNull()
+
+    fireEvent.click(screen.getAllByText('Provider One: Slash model').at(-1)!)
+    expect(onOverrideChange).toHaveBeenLastCalledWith([
+      { controlId: 'primary', value: { modelId: 'family/model-v1', providerId: 'provider-one' } }
+    ])
+
+    expect(controls).toHaveLength(2)
+  })
+
+  it('preserves a descriptor model reference when it is absent from the catalog', async () => {
+    render(
+      <ComposerProfileControls
+        profile={profileState({
+          configDescriptor: {
+            controls: [
+              {
+                controlId: 'primary',
+                editable: true,
+                kind: 'model_slot',
+                slots: [
+                  {
+                    name: 'primary',
+                    model: {
+                      availability: 'unavailable',
+                      modelId: 'vendor/missing-model',
+                      providerId: asWireId('missing-provider'),
+                      unavailableReason: 'Not installed'
+                    }
+                  }
+                ]
+              }
+            ],
+            effectTiming: 'next_send',
+            profileId: asWireId('profile-reviewer'),
+            securityLockedIds: [],
+            workspaceId: asWireId('workspace-a')
+          }
+        })}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Temporary settings' }))
+    fireEvent.click(screen.getByRole('combobox', { name: 'Primary' }))
+    expect((await screen.findAllByText('missing-provider: vendor/missing-model')).length).toBeGreaterThan(0)
+  })
+
+  it('keeps the first exact override when a second model slot is changed', async () => {
+    const choice = {
+      availability: 'unknown' as const,
+      displayName: 'Slash model',
+      modelId: 'family/model-v1',
+      providerDisplayName: 'Provider One',
+      providerId: 'provider-one',
+      unavailableReason: null
+    }
+
+    const onOverrideChange = vi.fn()
+
+    function Controlled(): ReactElement {
+      const [overrides, setOverrides] = useState<ComposerProfileState['overrides']>([])
+
+      return (
+        <ComposerProfileControls
+          profile={profileState({
+            configDescriptor: {
+              controls: [
+                { controlId: 'primary', editable: true, kind: 'model_slot', slots: [{ name: 'primary', model: null }] },
+                { controlId: 'review', editable: true, kind: 'model_slot', slots: [{ name: 'review', model: null }] }
+              ],
+              effectTiming: 'next_send',
+              profileId: asWireId('profile-reviewer'),
+              securityLockedIds: [],
+              workspaceId: asWireId('workspace-a')
+            },
+            modelChoices: [choice],
+            onOverrideChange: next => {
+              onOverrideChange(next)
+              setOverrides(next)
+            },
+            overrides
+          })}
+        />
+      )
+    }
+
+    render(<Controlled />)
+    fireEvent.click(screen.getByRole('button', { name: 'Temporary settings' }))
+    fireEvent.click(screen.getAllByRole('combobox')[0])
+    fireEvent.click(screen.getByText('Provider One: Slash model'))
+    fireEvent.click(screen.getAllByRole('combobox')[1])
+    fireEvent.click(screen.getAllByText('Provider One: Slash model').at(-1)!)
+
+    expect(onOverrideChange).toHaveBeenLastCalledWith([
+      { controlId: 'primary', value: { modelId: 'family/model-v1', providerId: 'provider-one' } },
+      { controlId: 'review', value: { modelId: 'family/model-v1', providerId: 'provider-one' } }
+    ])
   })
 })

@@ -7,9 +7,16 @@ import {
   selectComposerProfile,
   setComposerTemporaryOverrides
 } from '@/application/profile/wire-composer-profile'
+import { ensureAgentBoxProviderModelCatalog } from '@/application/provider-model/wire-provider-model-catalog'
 import { useI18n } from '@/i18n'
 import type { ComposerProfileState } from '@/lib/composer/types'
-import { $agentBoxProfiles, $agentBoxService, $agentBoxSessions, $draftConfigStates } from '@/store/agentbox-service'
+import {
+  $agentBoxProfiles,
+  $agentBoxProviderModels,
+  $agentBoxService,
+  $agentBoxSessions,
+  $draftConfigStates
+} from '@/store/agentbox-service'
 import { $draftExecutionContexts, composerDraftScopeKey } from '@/store/composer'
 import { $workspaceProfilePreferences } from '@/store/workspace-profile-preference'
 
@@ -28,6 +35,7 @@ export function useComposerProfile({
   const sessions = useStore($agentBoxSessions)
   const contexts = useStore($draftExecutionContexts)
   const configStates = useStore($draftConfigStates)
+  const providerModels = useStore($agentBoxProviderModels)
   const workspaceProfilePreferences = useStore($workspaceProfilePreferences)
   const [switching, setSwitching] = useState(false)
   const scope = composerDraftScopeKey(draftScope)
@@ -40,6 +48,7 @@ export function useComposerProfile({
     currentSession?.profileId ?? draftContext.profileId ?? (rememberedProfileExists ? rememberedProfileId : null)
 
   const currentProfile = profiles.find(profile => profile.id === currentSession?.profileId) ?? null
+  const selectedProfile = profiles.find(profile => profile.id === selectedId) ?? currentProfile
   const sessionUnavailable = Boolean(sessionId && !currentSession)
 
   useEffect(() => {
@@ -118,11 +127,38 @@ export function useComposerProfile({
 
   const config = selectedId ? configStates[scope] : undefined
 
+  const hasModelSlot =
+    config?.status === 'ready' && config.descriptor?.controls.some(control => control.kind === 'model_slot')
+
+  useEffect(() => {
+    if (hasModelSlot) {
+      void ensureAgentBoxProviderModelCatalog(agentBoxRuntimeClient())
+    }
+  }, [hasModelSlot])
+
+  const modelChoices = useMemo(
+    () =>
+      providerModels
+        .filter(model => model.harness === selectedProfile?.harness)
+        .flatMap(model =>
+          model.models.map(entry => ({
+            availability: entry.availability,
+            displayName: entry.displayName,
+            modelId: entry.modelId,
+            providerDisplayName: model.displayName,
+            providerId: model.id,
+            unavailableReason: entry.unavailableReason
+          }))
+        ),
+    [providerModels, selectedProfile?.harness]
+  )
+
   return {
     configDescriptor: config?.status === 'ready' ? config.descriptor : config?.status === 'unavailable' ? null : undefined,
     onOverrideChange,
     onSelect,
     options,
+    modelChoices,
     overrides: draftContext.overrides,
     selectedId,
     switching,

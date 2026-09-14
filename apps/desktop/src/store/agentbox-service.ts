@@ -3,6 +3,7 @@ import { atom } from 'nanostores'
 import type {
   ConfigDescriptor,
   ProfileRecord,
+  ProviderModelConfigRecord,
   ServerHelloResult,
   SessionRecord,
   WorkspaceRecord
@@ -27,6 +28,11 @@ export interface AgentBoxCatalogReadiness {
   workspaces: boolean
 }
 
+export interface AgentBoxProviderModelState {
+  detail: null | string
+  phase: AgentBoxServicePhase
+}
+
 export const $agentBoxService = atom<AgentBoxServiceState>({ detail: null, phase: 'idle' })
 export const $agentBoxHello = atom<ServerHelloResult | null>(null)
 export const $agentBoxProfiles = atom<ProfileRecord[]>([])
@@ -34,6 +40,8 @@ export const $agentBoxWorkspaces = atom<WorkspaceRecord[]>([])
 export const $agentBoxSessions = atom<Record<string, SessionRecord>>({})
 export const $draftConfigStates = atom<Record<string, DraftConfigState>>({})
 export const $agentBoxCatalogReadiness = atom<AgentBoxCatalogReadiness>({ sessions: false, workspaces: false })
+export const $agentBoxProviderModels = atom<ProviderModelConfigRecord[]>([])
+export const $agentBoxProviderModelState = atom<AgentBoxProviderModelState>({ detail: null, phase: 'idle' })
 
 export function agentBoxCapabilitySupported(hello: ServerHelloResult | null, capabilityId: string): boolean {
   return hello?.capabilities.some(capability => capability.id === capabilityId && capability.supported) ?? false
@@ -73,4 +81,16 @@ export function upsertAgentBoxProfile(profile: ProfileRecord): void {
   const next = [...profiles]
   next[index] = profile
   $agentBoxProfiles.set(next)
+}
+
+export function setAgentBoxProviderModels(models: ProviderModelConfigRecord[]): void {
+  $agentBoxProviderModels.set(models.filter(model => !model.archivedAt))
+}
+
+export function upsertAgentBoxProviderModel(model: ProviderModelConfigRecord): void {
+  const models = $agentBoxProviderModels.get()
+  const next = models.filter(candidate => candidate.id !== model.id)
+
+  if (!model.archivedAt) {next.push(model)}
+  $agentBoxProviderModels.set(next)
 }

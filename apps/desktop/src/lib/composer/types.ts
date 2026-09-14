@@ -52,6 +52,7 @@ export interface ComposerProfileOption {
 }
 
 export interface ComposerProfileState {
+  modelChoices?: ComposerProviderModelChoice[]
   configDescriptor?: ConfigDescriptor | null
   onOverrideChange: (overrides: ConfigOverride[]) => void
   onSelect: (profileId: string) => Promise<boolean> | boolean
@@ -60,6 +61,15 @@ export interface ComposerProfileState {
   selectedId: null | string
   switching?: boolean
   unavailableReason?: string
+}
+
+export interface ComposerProviderModelChoice {
+  availability: 'available' | 'unknown' | 'unavailable'
+  displayName: string
+  modelId: string
+  providerDisplayName: string
+  providerId: string
+  unavailableReason: string | null
 }
 
 export interface ChatBarProps {

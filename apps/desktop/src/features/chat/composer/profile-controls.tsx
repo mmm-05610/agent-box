@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import { Tip } from '@/components/ui/tooltip'
 import { useI18n } from '@/i18n'
-import type { ComposerProfileState } from '@/lib/composer/types'
+import type { ComposerProfileState, ComposerProviderModelChoice } from '@/lib/composer/types'
 import { cn } from '@/lib/utils'
 import type { ConfigControl, ConfigOverride } from '@/types/wire/wire-v1'
 
@@ -44,6 +44,46 @@ const replaceOverride = (overrides: ConfigOverride[], controlId: string, value: 
 
 const removeOverride = (overrides: ConfigOverride[], controlId: string): ConfigOverride[] =>
   overrides.filter(override => override.controlId !== controlId)
+
+const modelChoiceKey = (choice: Pick<ComposerProviderModelChoice, 'modelId' | 'providerId'>): string =>
+  JSON.stringify([choice.providerId, choice.modelId])
+
+const modelChoiceFromRef = (ref: {
+  availability: ComposerProviderModelChoice['availability']
+  modelId: string
+  providerId: string
+  unavailableReason: string | null
+}): ComposerProviderModelChoice => ({
+  availability: ref.availability,
+  displayName: ref.modelId,
+  modelId: ref.modelId,
+  providerDisplayName: ref.providerId,
+  providerId: ref.providerId,
+  unavailableReason: ref.unavailableReason
+})
+
+const modelChoiceFromValue = (
+  value: unknown,
+  choices: ComposerProviderModelChoice[],
+  fallback?: ComposerProviderModelChoice | null
+): ComposerProviderModelChoice | null => {
+  if (!value || typeof value !== 'object') {
+    return fallback ?? null
+  }
+
+  const candidate = value as { modelId?: unknown; providerId?: unknown }
+
+  return typeof candidate.providerId === 'string' && typeof candidate.modelId === 'string'
+    ? (choices.find(choice => choice.providerId === candidate.providerId && choice.modelId === candidate.modelId) ?? {
+        availability: 'unknown',
+        displayName: candidate.modelId,
+        modelId: candidate.modelId,
+        providerDisplayName: candidate.providerId,
+        providerId: candidate.providerId,
+        unavailableReason: null
+      })
+    : (fallback ?? null)
+}
 
 export function ComposerProfileControls({ profile }: { profile: ComposerProfileState }) {
   const { t } = useI18n()
@@ -159,6 +199,7 @@ function TemporaryConfigPopover({ profile }: { profile: ComposerProfileState }) 
                 control={control}
                 key={control.controlId}
                 locked={descriptor.securityLockedIds.includes(control.controlId)}
+                modelChoices={profile.modelChoices ?? []}
                 onChange={value =>
                   profile.onOverrideChange(
                     value === undefined
@@ -182,13 +223,15 @@ function ConfigControlField({
   locked,
   onChange,
   overridden,
-  overrides
+  overrides,
+  modelChoices
 }: {
   control: ConfigControl
   locked: boolean
   onChange: (value: unknown | undefined) => void
   overridden: boolean
   overrides: ConfigOverride[]
+  modelChoices: ComposerProviderModelChoice[]
 }) {
   const { t } = useI18n()
   const copy = t.composer
@@ -197,15 +240,52 @@ function ConfigControlField({
   const label = controlLabel(control.controlId)
   const title = locked ? copy.securityLocked : !control.editable ? copy.configUnavailable : undefined
 
-  const choices = useMemo(
-    () =>
-      control.kind === 'enum'
-        ? control.values
-        : control.kind === 'model_slot'
-          ? control.slots.map(slot => slot.name)
-          : [],
-    [control]
-  )
+  const choices = useMemo(() => {
+    if (control.kind === 'enum') {
+      return control.values
+    }
+
+    if (control.kind !== 'model_slot') {
+      return []
+    }
+
+    const currentSlot =
+      control.slots.find(slot => slot.name === control.currentValue)?.model ??
+      control.slots.find(slot => slot.model)?.model
+
+    const currentChoice = currentSlot
+      ? (modelChoices.find(
+          choice => choice.providerId === currentSlot.providerId && choice.modelId === currentSlot.modelId
+        ) ?? modelChoiceFromRef(currentSlot))
+      : null
+
+    const override = overrides.find(candidate => candidate.controlId === control.controlId)?.value
+    const overrideChoice = modelChoiceFromValue(override, modelChoices)
+    const extraChoice = overrideChoice ?? currentChoice
+
+    return extraChoice && !modelChoices.some(choice => modelChoiceKey(choice) === modelChoiceKey(extraChoice))
+      ? [...modelChoices, extraChoice]
+      : modelChoices
+  }, [control, modelChoices, overrides])
+
+  const modelChoicesForControl = control.kind === 'model_slot' ? (choices as ComposerProviderModelChoice[]) : []
+
+  const descriptorRef =
+    control.kind === 'model_slot'
+      ? (control.slots.find(slot => slot.name === control.currentValue)?.model ??
+        control.slots.find(slot => slot.model)?.model)
+      : null
+
+  const hasOverride = overrides.some(override => override.controlId === control.controlId)
+
+  const modelValue =
+    control.kind === 'model_slot'
+      ? modelChoiceFromValue(
+          current,
+          modelChoicesForControl,
+          hasOverride ? null : descriptorRef && modelChoiceFromRef(descriptorRef)
+        )
+      : null
 
   return (
     <div className="space-y-1" data-control-id={control.controlId} title={title}>
@@ -239,6 +319,39 @@ function ConfigControlField({
           size="sm"
           value={typeof current === 'string' ? current : ''}
         />
+      ) : control.kind === 'model_slot' ? (
+        <Select
+          disabled={!editable}
+          onValueChange={value => {
+            if (value === UNSET_VALUE) {
+              return onChange(undefined)
+            }
+
+            const choice = modelChoicesForControl.find(candidate => modelChoiceKey(candidate) === value)
+
+            if (choice?.availability !== 'unavailable') {
+              onChange(choice ? { providerId: choice.providerId, modelId: choice.modelId } : undefined)
+            }
+          }}
+          value={modelValue ? modelChoiceKey(modelValue) : UNSET_VALUE}
+        >
+          <SelectTrigger aria-label={label} className="w-full" size="sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={UNSET_VALUE}>{copy.clearTemporaryValue}</SelectItem>
+            {modelChoicesForControl.map(choice => (
+              <SelectItem
+                disabled={choice.availability === 'unavailable'}
+                key={modelChoiceKey(choice)}
+                title={choice.unavailableReason || undefined}
+                value={modelChoiceKey(choice)}
+              >
+                {choice.providerDisplayName}: {choice.displayName}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       ) : (
         <Select
           disabled={!editable}
@@ -250,7 +363,7 @@ function ConfigControlField({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={UNSET_VALUE}>{copy.clearTemporaryValue}</SelectItem>
-            {choices.map(value => (
+            {(choices as string[]).map(value => (
               <SelectItem key={value} value={value}>
                 {value}
               </SelectItem>
