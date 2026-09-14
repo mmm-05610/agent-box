@@ -199,9 +199,12 @@ messages = system(9553 字符) + user(48, 含 NONCE-1) + assistant(45, 含 NONCE
 
 **修复记录（提交态假绿）**：门最初把固定假 token 写进自身 tracked 源码，同时断言 tracked Git 零命中——
 未提交时能绿，提交后源码自己就是命中项，4 项清理语义测试在提交态必红。现改为运行期生成、运行窗口内
-持有、核验后清空（窗口外 `current_token()` 抛 `OPENCODE_GATE_NO_ACTIVE_RUN`），并补 3 项提交态回归
-（动态值不在 tracked 内容、两次运行不同、把本次 token 写进临时登记为 tracked 的 fixture 必须失败且
-完整撤销）。生成值不打印、不进 argv、不读真实 locator。
+持有、核验后清空（窗口外 `current_token()` 抛 `OPENCODE_GATE_NO_ACTIVE_RUN`），并补 5 项提交态回归。
+其中**阳性反证在测试独占的临时 Git 仓库里执行**：`tmp_path` 内 `git init` + 仓库本地 user +
+把本轮实际 token 写成 fixture 后 `git add`/`git commit` 成真正的 tracked 内容，再用生产扫描入口
+`token_appears_in_tracked_content` 对它取到 `true`（真的跑 `git grep`，不是 mock 成常量），并让完整门
+以 `OPENCODE_GATE_TOKEN_IN_GIT` 非零失败；**AgentBox 主仓的 index 与工作树从未被写入**（该文件每个测试
+前后比对 porcelain 与 cached diff）。生成值不打印、不进 argv、不读真实 locator。
 
 ### 3.8 非 loopback 访问：实际证明到什么程度
 

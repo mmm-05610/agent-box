@@ -82,10 +82,16 @@
   生命周期收在 `main()` 的一次运行窗口内（进入时创建、清理核验后 `clear()`，窗口外 `current_token()`
   抛 `OPENCODE_GATE_NO_ACTIVE_RUN`）；扫描函数 `token_appears_in_tracked_content(root, value)` 只对
   **本次实际注入的完整值**逐字匹配；生成值不打印、不进 argv、不读真实 locator。
-- **新增回归 3 项**（`tests/server/test_opencode_gate_cleanup.py`）：动态 token 不在 tracked 内容且
-  报告与输出都不含它；两次运行 token 不同且不写回源码；把本次 token 写进**临时登记为 tracked** 的
-  fixture 必须让门以 `OPENCODE_GATE_TOKEN_IN_GIT` 失败，测试结束时 index 条目与文件完整撤销
-  （`git status --porcelain -- <path>` 为空、扫描归零）。
+- **新增回归 5 项**（`tests/server/test_opencode_gate_cleanup.py`）：动态 token 不在 tracked 内容且
+  报告与输出都不含它；两次运行 token 不同且不写回源码；扫描入口在测试独占的临时仓库上取到真/假两性；
+  阳性反证（见下）；以及"index 写入只允许绑定临时仓库变量"的源码守卫。
+- **阳性反证的隔离（本轮返修）**：早先的实现用 `git add -N` 把 fixture 临时登记进 **AgentBox 主仓的
+  index**、再用 `git reset` 撤销——测试全绿也不可接受：那是共享 checkout 的 index 写入，中途崩溃会把
+  index 留给其它写入者。现在阳性反证完全在 `tmp_path` 里的**测试独占 Git 仓库**执行（`git init` +
+  仓库本地 `user.name`/`user.email` + 写入本轮实际 token + `git add` + `git commit`），生产扫描入口
+  `token_appears_in_tracked_content` 对它有真实 `git grep` 命中，完整门据此以
+  `OPENCODE_GATE_TOKEN_IN_GIT` 非零失败；主仓只被读取，且该文件每个测试前后比对
+  `git status --porcelain=v1` 与 `git diff --cached --name-only` 必须完全相同。
 - **driver 合同收紧**：`runtime/native-driver.mjs` 的 `DRIVER_METHODS` 加入 `status`；新增 2 项测试——
   缺 `status` 的驱动注册即以 `DRIVER_METHOD_MISSING` 拒绝（并指出缺失方法名），以及**从接缝模块读取
   方法表**、对测试 fixture 与真实 OpenCode driver 各构造一次实例核对齐备。
@@ -95,6 +101,16 @@
   Hermes 全链门 exit 0（delta 4<7、11<14，provider 请求 2、越预算 0）；全量 python
   **534 passed / 4 skipped / 0 failed**；`git diff --check` 干净；tracked 内容只有 token **前缀**
   （门里的常量），无任何生成值；无进程/监听端口/临时根残留。
+- **反馈返修（同一轮）：阳性反证不得写主仓 index**。上一版用 `git add -N` 把 fixture 临时登记进 AgentBox
+  主仓 index、再 `git reset` 撤销——测试全绿也不可接受（共享 checkout 的 index 写入，中途崩溃会留给别的
+  写入者）。现改为：阳性反证在 `tmp_path` 内**测试独占的 Git 仓库**里做真 `git add` + `git commit`，
+  生产扫描入口对它真实 `git grep` 命中并使门以 `OPENCODE_GATE_TOKEN_IN_GIT` 非零失败；扫描函数只在测试内
+  以委托形式指向临时仓库（生产默认仍扫真实 `REPO`，没有新增任何"跳过主仓扫描"的运行时选项）；
+  该文件每条测试前后比对 `git status --porcelain=v1` 与 `git diff --cached --name-only` 必须完全相同，
+  另有源码守卫要求写 index 的 git 调用只能绑定临时仓库变量。复跑：五文件定向 80 passed、
+  gate cleanup + native driver 定向 39 passed、node 工具 9/9、两条全链门 exit 0、`git diff --check` 干净、
+  无进程/端口/临时根残留，主仓 index 前后一致。
+
 - 本轮只修验收与合同缺口：**未改 Worker lease、Worker 协议、Windows bundle 与前端**；
   模型调用 0、费用增量 ¥0（两条门仍只连 127.0.0.1 假端点，假 token 运行期生成、用后丢弃）。
 

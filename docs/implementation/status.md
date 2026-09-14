@@ -110,10 +110,15 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   返修：token 改为**每次运行现生成**（`agentbox-opencode-gate-fake-token-` 前缀 + `secrets.token_hex(16)`），
   生命周期收在 `main()` 的一次运行窗口内（进入时创建、清理核验后清空；窗口外取用即
   `OPENCODE_GATE_NO_ACTIVE_RUN`）；扫描改为检查**本次实际注入的完整值**（`token_appears_in_tracked_content`），
-  不打印、不进 argv、不读真实 locator。补 3 项提交态回归：动态值不在 tracked 内容、两次运行 token 不同、
-  把本次 token 写进临时登记的 tracked fixture 必须让门以 `OPENCODE_GATE_TOKEN_IN_GIT` 失败并在测试内
-  完整撤销（index 条目与文件都不留）。返修后五文件定向 78 passed、全链门 exit 0 且
-  `cleanup.tokenInTrackedGitContent=false`。
+  不打印、不进 argv、不读真实 locator。补 5 项提交态回归：动态值不在 tracked 内容、两次运行 token 不同、
+  扫描入口在测试独占仓库上的真/假两性、index 写入守卫，以及**阳性反证在 `tmp_path` 内的测试独占 Git
+  仓库执行**（真 `git add`/`git commit` 后由生产扫描入口命中，门以 `OPENCODE_GATE_TOKEN_IN_GIT` 非零
+  失败）；**AgentBox 主仓 index 与工作树从未被写入**，该文件每个测试前后比对 porcelain 与 cached diff
+  必须逐字节相同（早先"主仓 `git add -N` 后再 `git reset`"的写法已按此返修，历史说明保留在 progress）。
+  隔离返修后复跑：五文件定向 **80 passed**、OpenCode gate cleanup + native driver 定向 **39 passed**、
+  `build-opencode-authorization.test.mjs` 9/9、OpenCode 与 Hermes 两条全链门 **exit 0**
+  （`cleanup.tokenInTrackedGitContent=false`）、`git diff --check` 干净、tracked 内容与门输出都没有
+  生成值、主仓 porcelain/cached diff 在测试前后逐字节相同。
 - native_driver_contract_tightened: driver 必需方法集合加入 **`status`**（envelope 暴露的操作；
   缺它时注册即以 `DRIVER_METHOD_MISSING` 拒绝，不再等到轮次中途失败）；测试**从接缝模块读取
   方法表**并对测试 fixture 与真实 OpenCode driver 各构造一次实例核对齐备。
