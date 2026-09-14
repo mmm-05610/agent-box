@@ -351,6 +351,65 @@ def test_sidecar_deployment_carries_digest_pinned_artifact_declarations(tmp_path
     assert captured["files"] == {}
 
 
+def test_sidecar_deployment_refuses_a_session_without_a_declared_credential(tmp_path, monkeypatch):
+    """A Harness that declares a credential kind must be given one.
+
+    The declaration is data (`credentialKind`), so the refusal is neutral: the
+    Server asks for an authorized credential because the deployment said the
+    Harness needs one, and no Worker, sandbox or adapter is contacted before it
+    answers.
+    """
+    deployment = tmp_path / "deployment.json"
+    deployment.write_text(json.dumps({
+        "schemaVersion": 1, "pluginRoot": str(PLUGIN),
+        "harnesses": [{
+            "id": "pi", "credentialKind": "api-key",
+            "credentialEnvironment": "DEEPSEEK_API_KEY",
+            "adapter": {"command": "/usr/bin/node", "args": []},
+        }],
+    }), encoding="utf-8")
+
+    class StubConnector:
+        def distributions(self): return [{"name": "Ubuntu"}]
+        def probe(self, distribution, user):
+            return {"probe_id": "probe", "distribution": distribution, "user": user}
+        def browse(self, probe_id, path):
+            return {"path": path, "directories": [], "files": []}
+        def open_workspace(self, probe_id, path):
+            return {"connection_id": "connection", "distribution": "Ubuntu",
+                    "user": os.environ["USER"], "path": str(tmp_path)}
+
+    import agent_box.server.bootstrap.runtime as runtime_module
+    monkeypatch.setattr(runtime_module, "_builtin_connector", lambda _id: StubConnector())
+    runtime = runtime_module.build_runtime_from_sidecar_deployment(tmp_path / "server", deployment)
+    try:
+        with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
+            headers = {"Authorization": f"Bearer {runtime.token}"}
+            opened = _wire_post(client, runtime.token, "workspaces.open", {
+                "requestId": "open-credential", "path": str(tmp_path),
+                "environment": {"kind": "wsl", "host": "Ubuntu", "user": os.environ["USER"]},
+            })["workspace"]
+            profile = client.post("/api/v1/profiles", headers={
+                **headers, "Idempotency-Key": "credential-profile",
+            }, json={"name": "no credential", "harness_type": "pi", "configuration": {},
+                     "credential_id": None}).json()
+            refused = client.post("/wire/v1/sessions.createAndSend", headers=headers, json={
+                "jsonrpc": "2.0", "id": "credential-send", "method": "sessions.createAndSend",
+                "params": {"requestId": "credential-send", "workspaceId": opened["id"],
+                           "profileId": profile["profile_id"], "overrides": [],
+                           "message": {"text": "no credential", "attachments": []}},
+            }).json()
+            assert "error" in refused, refused
+            assert refused["error"]["code"] == "UNAVAILABLE", refused
+            assert refused["error"]["details"]["internalCode"] == "CREDENTIAL_REQUIRED"
+            # Nothing was dispatched, so no Session exists to fail later.
+            with runtime.database.read() as conn:
+                sessions = conn.execute("SELECT COUNT(*) FROM server_sessions").fetchone()[0]
+            assert sessions == 0
+    finally:
+        runtime.stop()
+
+
 def test_sidecar_deployment_rejects_readonly_and_writable_target_collision(tmp_path):
     settings = tmp_path / "settings.json"
     settings.write_text("{}", encoding="utf-8")
@@ -1217,6 +1276,59 @@ class _CaptureLauncher:
 
     def launch(self, _environment):
         return self.channels
+
+
+class _CapabilityChannels(_EnvelopeChannels):
+    """A sidecar peer whose `start` answer declares the given capabilities."""
+
+    def __init__(self, session_capabilities):
+        super().__init__()
+        self.session_capabilities = session_capabilities
+
+    def write_line(self, value):
+        request = json.loads(value)
+        if request.get("op") == "start":
+            self.requests.append(request)
+            with self._condition:
+                self.lines.append(json.dumps({
+                    "id": request["id"], "ok": True,
+                    "result": {"sessionCapabilities": self.session_capabilities},
+                }) + "\n")
+                self._condition.notify_all()
+            return
+        super().write_line(value)
+
+
+class _CapabilityLauncher:
+    def __init__(self, session_capabilities):
+        self.channels = _CapabilityChannels(session_capabilities)
+
+    def launch(self, _environment):
+        return self.channels
+
+
+@pytest.mark.parametrize("advertised,expected", [
+    # ACP marks a capability by its presence, conventionally as an empty object.
+    # Reading that as a boolean made every such Harness look unable to resume.
+    ({"resume": {}}, True),
+    ({"resume": True}, True),
+    ({"resume": {"cwd": True}}, True),
+    ({"resume": False}, False),
+    ({"resume": None}, False),
+    ({}, False),
+    ({"fork": {}}, False),
+])
+def test_sidecar_reports_resume_only_when_the_harness_advertised_it(advertised, expected):
+    launcher = _CapabilityLauncher(advertised)
+    port = SidecarHarnessPort(launcher, environment={"AGENTBOX_SIDECAR_ISOLATED": "1"}, profile="pi")
+    try:
+        assert port.open_execution("exec-capability") == "native-fake"
+        captured = port.capture_execution("exec-capability")
+        assert captured == ({}, expected), (
+            f"advertised {advertised!r} must read as resumable={expected}"
+        )
+    finally:
+        port.stop()
 
 
 def test_sidecar_create_carries_model_and_only_credential_environment_declaration():

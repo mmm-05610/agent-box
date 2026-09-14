@@ -11,10 +11,10 @@ Runs two gates over the production Server assembly:
      tree must fail the turn with the typed reason, and must not invent a
      session.
 
-This host has no `wsl.exe`, so the connector used here launches the reviewed
-Worker binary directly and speaks the same ABW1 control frames the Windows
-connector uses. The Windows `wsl.exe` path is separate, previously recorded
-evidence and is not re-run by this script. The fixture makes no network access
+This gate deliberately launches the release Worker inside WSL itself and speaks
+the same ABW1 control frames: it does not go through the Windows Server to
+`wsl.exe` path. Re-verifying the c4 Worker on the Windows platform is still
+outstanding and is not claimed here. The fixture makes no network access
 and no model request; this registers runtime artifact projection only, never a
 Harness or model result.
 

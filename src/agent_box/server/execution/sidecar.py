@@ -88,6 +88,17 @@ class _ProcessChannels:
                 process.wait(timeout=3)
 
 
+def _advertised(capability: Any) -> bool:
+    """True when a Harness advertised a capability, however ACP spelled it.
+
+    ACP marks a session capability by its presence, conventionally as an empty
+    object. Treating the value as a boolean would make every such Harness look
+    incapable in Python, where `{}` is falsy but an absent or explicitly false
+    value is the only honest "no".
+    """
+    return capability is not None and capability is not False
+
+
 def _require_matching_artifact_authorizations(
     authorizations: Sequence[Mapping[str, str]],
     mounts: Sequence[tuple[str, str]],
@@ -670,8 +681,13 @@ class SidecarHarnessPort:
         with self._lock:
             self._sessions[execution_id] = envelope
             self._native_sessions[execution_id] = native
-            self._resumable[execution_id] = bool(
-                (started.get("sessionCapabilities") or {}).get("resume")
+            # ACP advertises a session capability as the presence of an object
+            # marker (`resume: {}`), not as a boolean, and an empty mapping is
+            # falsy in Python - so raw truthiness would report every
+            # conventional ACP Harness as unable to resume. A capability counts
+            # as advertised when it is present and not explicitly false.
+            self._resumable[execution_id] = _advertised(
+                (started.get("sessionCapabilities") or {}).get("resume"),
             )
             self._current = execution_id
         self.on_event(execution_id, "started", {

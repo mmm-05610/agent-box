@@ -81,12 +81,16 @@ async function main() {
     return
   }
   const { createAcpRegistration } = await import(path.join(bridgeSrc, "acp-registration.js"))
-  const { resolveHarnessProfile, registeredHarnessIDs } = await import(
+  const { resolveHarnessProfile, registeredHarnessIDs, resolveNativeModel } = await import(
     path.join(here, "profile_extensions.mjs")
   )
 
   let registration = null
   let credentialValue = null
+  // The registration names the Harness this sidecar speaks for, so the product
+  // model id a caller sends is translated into that Harness's own catalogue
+  // value here rather than by any layer above.
+  let registeredProfileID = null
 
   function safeText(value, maximum) {
     let text = String(value ?? "")
@@ -150,6 +154,7 @@ async function main() {
         })
       }
       const profile = resolveHarnessProfile(request.profile)
+      registeredProfileID = request.profile
       registration = await createAcpRegistration({
         profile: preferredAuthMethod == null ? profile : { ...profile, authMethod: preferredAuthMethod },
         directory: request.directory ?? process.cwd(),
@@ -197,13 +202,14 @@ async function main() {
         const session = await registration.service.createSession({
           directory: request.directory ?? process.cwd(),
           title: request.title,
-          model: request.model,
+          model: resolveNativeModel(registeredProfileID, request.model),
         })
         return { sessionId: session.id ?? session.sessionId, title: session.title ?? null }
       }
       case "prompt": {
         const result = await registration.service.promptAndWait(
-          request.sessionId, request.text, request.model ?? undefined,
+          request.sessionId, request.text,
+          resolveNativeModel(registeredProfileID, request.model) ?? undefined,
           Array.isArray(request.attachments) ? request.attachments : [],
         )
         return result ?? { done: true }

@@ -310,8 +310,16 @@ def build_runtime(
 
 def build_runtime_from_sidecar_deployment(
     data_root: Path | str, deployment_path: Path | str,
+    secret_store: SecretStore | None = None,
 ) -> ServerRuntime:
-    """Compose registered Harnesses from an explicit non-secret deployment file."""
+    """Compose registered Harnesses from an explicit non-secret deployment file.
+
+    `secret_store` is the same explicit injection `build_runtime` accepts: a
+    deployment that declares a credential kind needs a store to read the
+    credential from, and a caller that already owns one (Windows DPAPI, or an
+    acceptance harness with an ephemeral store) passes it here rather than
+    relying on the platform default.
+    """
     path = Path(deployment_path).resolve()
     value = json.loads(path.read_text(encoding="utf-8"))
     if (not isinstance(value, dict) or value.get("schemaVersion") != 1
@@ -522,7 +530,8 @@ def build_runtime_from_sidecar_deployment(
             on_event=notifier.notify,
         )
 
-    return build_runtime(data_root, harnesses=registry, execution_factory=factory)
+    return build_runtime(data_root, harnesses=registry, execution_factory=factory,
+                        secret_store=secret_store)
 
 
 def _runtime_artifact_declarations(value: Any) -> tuple[dict[str, str], ...]:
