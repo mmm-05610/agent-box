@@ -5,7 +5,7 @@
 
 ## 执行快照（handoff-policy 每阶段必填）— 接管施工中
 
-- updated_at: 2026-09-14 12:54 (+08:00)
+- updated_at: 2026-09-14 13:01 (+08:00)
 - 执行者: Codex 前端产品 goal（接力会话）；**已从暂停的 Zcode 执行者接管**
 - 工作树/分支: /home/maoqh/projects/agent-box-desktop-next-wsl-round1 @ feature/agentbox-desktop-product
 - 接管核验: 用户指定交接 HEAD `5c0fbfe` 与实际 HEAD
@@ -13,7 +13,7 @@
   未发现该工作树、Windows 构建树的 Electron/Vite/Vitest/Playwright/验收驱动进程；
   dirty 集合仅为下列 4 项已授权交接改动。发布源规则文件与本执行树逐文件 SHA-256 一致，
   保留本文件实时进度，不复制发布源初始状态。
-- 代码检查点（已提交 HEAD）: `405f6be`（P04 切片8 / production transport composition 与 main 注册）
+- 代码检查点（已提交 HEAD）: `f8807b1`（P02/P05：AgentBox 主界面模型控件中立化）
   链: ebb1233（P00）→ 8d4b3df/47b5b47/dbb902f（P01 代码与几何修复）→ 26b32fc（P01 GREEN 证据）
   → 468e6ac/d7e9a57（发布源 d3c0196+ffbcfaf 导入）→ 893d560（P07 检查点2 wire-v1）
   → 957a523（P02A 盘点）→ 07f5386（P02A slice 1：失败面非阻塞）→ 3a25edc（P02A slice 2）
@@ -30,16 +30,19 @@
   → 08a116d（wire-v1 双端锁定登记）→ 00d8862（main-only WS event transport）
   → 35659c5（Session/cursor IPC + renderer replay 接线）→ 1513ff2（P04 event 证据）
   → 5f8b2a5（AgentBox service composition）→ 405f6be（main 注册与退出 cleanup）
+  → e1adda9（P04 状态记录）→ f8807b1（AgentBox 模型控件中立化）
 - 已消费发布文档提交: 86d5a7b、61c7ff7、d3c0196、ffbcfaf
 - 当前检查点改动: P04 production connection slot、HTTP/WS transport、Session event IPC 与 main
-  注册/退出 cleanup 已提交；slot 因缺正式 Server 启动/发现合同保持 null，诚实 UNAVAILABLE。
+  注册/退出 cleanup 已提交；AgentBox 主聊天区不再挂载 Hermes ModelPill/本地模型加载状态，模型选择
+  仅由服务描述的 Profile/临时配置控件承载。slot 因缺正式 Server 启动/发现合同保持 null，诚实
+  UNAVAILABLE。
 - 当前阶段: P00 GREEN；P01 GREEN；**P07 检查点 1–6 完成且 wire 已锁定**；
   P02 A/B1/B2/C/D 与 B3 服务投影已提交；P03 纵切 1–4 已提交；P04 切片1–8已提交
 - 完成范围: P00；P01 全部返修（真机 27 PASS）；P07 检查点 1（语义映射）、检查点 2
   （wire-v1 候选：17 方法 + schema 测试 + JSON Schema 工件；已消费后端机械反馈并回应）；
   P02A（失败面非阻塞+可关闭、Artifacts 页退役、失败终态竞态修复与真机门）
-- 下一项: 定向验证产品默认 composition 中剩余 legacy hooks 的运行时不可达性；收口 P05 客户端
-  矩阵并准备 P06 无模型 Windows 独立验收。
+- 下一项: 接入已锁定的 providerModels 与 profiles.updateConfig 客户端/产品界面；随后收口 P05
+  客户端矩阵并准备 P06 无模型 Windows 独立验收。
 - 阻断: 无真实阻断。剩余 P04 production lifecycle connection 与显式 legacy 消费者收口、
   P05 生产接线核查和 P06 独立验收待续；wire 摘要已锁定，真实全栈仍由后续集成人验证
 
@@ -121,6 +124,9 @@
 - P04 宿主纵切 8：composition 1 file / 4 tests；HTTP/WS/IPC 跨模块 4 files / 22 tests passed；Electron
   typecheck、接线文件 ESLint 0/0 与 diff check 通过。HTTP/event 共用动态 main-only slot，main 注册
   production seam 并在 will-quit 清理；slot 初始 null，不猜 Server 端口/argv、不回落 Hermes。
+- P02/P05 模型控件中立化：AgentBox composer controls 1 file / 10 tests passed；desktop 三项目
+  typecheck、改动文件 ESLint 0/0 与 diff check 通过。主聊天区不再显示 Hermes 模型 pill 或读取
+  legacy model-loading 状态；动态 descriptor（含 model_slot）仍是产品配置权威，legacy route 不变。
 
 ## 测试与基线（上一执行者交接时点，历史）
 
