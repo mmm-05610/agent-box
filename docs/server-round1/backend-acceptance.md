@@ -1,19 +1,18 @@
 # Work Order 41 — 核心产品合同与后端独立验收
 
-日期：2026-09-14。当前状态：**`BACKEND_WIRE_ALIGNMENT_IN_PROGRESS`**。分支
+日期：2026-09-14。当前状态：**`BACKEND_WINDOWS_RECONFIRM_IN_PROGRESS`**。分支
 `feature/server-harness-extension-v1`；25方法/Windows基线检查点为 `72d6258`。此结论只代表后端独立门，不代表
 真实模型或全栈 Green。41 全程使用显式 no-model ACP fixture，未读模型凭据、未发模型请求，
 费用 ¥0；42 已有费用账继续单独累计。
 
 ## A — 单一 wire 合同（当前增量）
 
-前端随后在同一权威提交 `b10e455f763b964b99b489b4e66cfd4ae50d86a7`，补齐已批准的
-Session目录/维护、消息角色与用户消息、history双游标、queue事件及发送结果回查，总计28方法。
-当前 TS 摘要 `986889e47bcf5f25353bf8cb62afb009cd367ece7b90cbcbf8ce89bd5ed4c257`，生成工件
-`d3f7412710e7e951674922aebdb72ffbb028fc76b2e353a86b53097fd02abe22`。后端主体已直接按工件
-**28/28通过**，新增行为门在无schema时 **29/29通过**；当前工件唯一未对齐处是 queue.updated
-无法编码 completed/failed/cancelled 后的权威移除，精确反馈见 [wire-review.md](wire-review.md)。
-新摘要与Windows增量门完成前，本文件不冒称最终 READY。
+前端随后在同一权威补齐已批准的 Session目录/维护、消息角色与用户消息、history双游标、queue事件
+及发送结果回查，并以 `3aba5c5c` 提交队列终态修订，总计28方法。当前 TS 摘要
+`11e3b3e70d332585d31900c09ba063d95aa6b72b1904921c665fb72f81c10035`，生成工件
+`5d4fa3bfeec6c3273c6073b37794e4ab2aca6e07e48184bc3a2b878c1fe5e4ed`。后端直接按工件
+**29/29通过**，当前摘要已锁定，精确确认见 [wire-review.md](wire-review.md)。Windows r4
+重确认完成前，本文件不冒称最终 READY。
 
 ### 已完成的25方法稳定基线
 
@@ -117,10 +116,25 @@ runtime-local/skills 等插件目录在收集期 7 errors、0 tests，补齐全�
 原25方法基线曾有一次收集期21 errors、0 tests；一次 Node 从 Worker 子目录展开通配符
 得到 0 tests，回仓根重跑取得 25/25。两次命令错误均不计作通过。
 
+### 28 方法队列终态重锁（12:15）
+
+前端提交 `3aba5c5c` 后，TS 权威摘要为
+`11e3b3e70d332585d31900c09ba063d95aa6b72b1904921c665fb72f81c10035`，生成工件摘要为
+`5d4fa3bfeec6c3273c6073b37794e4ab2aca6e07e48184bc3a2b878c1fe5e4ed`。后端直接读取该工件执行：
+
+```text
+AGENT_BOX_WIRE_SCHEMA=<5d4fa3bf…前端生成工件> pytest -q tests/server/test_wire_v1.py
+→ 29 passed in 67.57s
+```
+
+新工件接受 `completed/failed/cancelled` 终态事件，同时将 `queue.get` 限定为活动三态；此前唯一
+schema 失败关闭。当前 wire 已恢复 `WIRE_LOCKED_FOR_IMPLEMENTATION`。Windows r3 证据仍有效，
+但按本轮调度另跑 r4 重确认后才重新登记 `BACKEND_IMPLEMENTATION_READY`。
+
 ## 终态边界
 
-`72d6258` 已满足当时25方法的 `BACKEND_IMPLEMENTATION_READY`；当前因同一合同的28方法已批准增量
-暂时回到 `BACKEND_WIRE_ALIGNMENT_IN_PROGRESS`，待队列终态新摘要和Windows增量复验后恢复 READY。
+`72d6258` 已满足当时25方法的 `BACKEND_IMPLEMENTATION_READY`；当前同一合同的28方法及队列终态
+已经锁定，后端代码检查点为 `847c818`。只待 Windows r4 对锁定工件重确认后恢复 READY。
 四家组件仍保持 40 的
 `COMPONENT_VERIFIED / MODEL_NOT_VERIFIED` 分账。Pi/Hermes/OpenCode 的 DeepSeek Provider 配置与
 独立真实模型门、Codex 协议不兼容记录，进入 42-D；前端仍由其独立 writer 施工，当前不具备跨仓

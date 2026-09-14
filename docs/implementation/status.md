@@ -3,9 +3,9 @@
 更新：2026-09-14（执行者：后端 goal 会话，分支 feature/server-harness-extension-v1）。
 37 的独立验收仍为 PARTIAL；历史证据保留。
 当前授权39→40→41→42。执行进度：39 完成；40 A/B/C/D 完成（四家组件门通过，
-无真实模型）；41 的 25 方法稳定检查点与 Windows 独立验收已完成，但前端随后在同一合同加入
-已批准的 Session/history 机械覆盖，当前为 **BACKEND_WIRE_ALIGNMENT_IN_PROGRESS**：28 方法主体
-已按新工件 28/28 通过，队列终态编码等待前端消费精确反馈后重锁并重跑 Windows 增量门；
+无真实模型）；41 的 28 方法与队列终态已按前端 `3aba5c5c` 新摘要严格 29/29 重锁，当前为
+**BACKEND_WINDOWS_RECONFIRM_IN_PROGRESS**：代码检查点 `847c818` 与 Windows r3 已通过，只待按
+锁定工件跑 r4 重确认后重新登记后端 READY；
 42 的独立模型任务可并行继续，前端仍由其 writer 施工，尚未进入跨仓联调。检查点见下表。
 DeepSeek 官方 API 授权见42 §D；累计发生 1 次 API 可达性调用（12 tokens，费用 <¥0.01），
 Codex 配置尝试在模型请求前失败，不能记作模型调用或 Harness 验收。
@@ -14,35 +14,33 @@ Codex 配置尝试在模型请求前失败，不能记作模型调用或 Harness
 | --- | --- | --- | --- |
 | [39](work-orders/39-server-boundaries.md) | **READY_FOR_HARNESS** | [阶段证据](../server-round1/server-boundary/stage-a-b-c.md)：幂等并发双派发缺陷先复现后修复、能力声明改为注册派生、双中立provider测试、legacy codex 退出生产装配 | wire反馈通道 [wire-review.md](../server-round1/wire-review.md) 已建立并写入首轮 |
 | [40](work-orders/40-four-harness-integration.md) | **FOUR_HARNESS_COMPONENTS_READY** | [40-A 底座](../server-round1/harness-integration/stage-a.md) / [40-B 通道](../server-round1/harness-integration/stage-b.md) / [40-C 矩阵](../server-round1/harness-integration/stage-c.md) / [40-D 汇总](../server-round1/harness-integration/stage-d.md) + [握手证据JSON](../server-round1/harness-integration/handshake-40c.json)：四家组件门 25/25；全量 227 passed/4 skipped/0 failed；Rust 4 passed；真实二进制零凭据握手 pi/hermes INITIALIZED、opencode HEALTH_OK、codex 诚实要求凭据 | 本单终态；Server 侧编排与 wire 锁定进入 41；真实模型门留待 42 §D |
-| [41](work-orders/41-core-service-acceptance.md) | **BACKEND_WIRE_ALIGNMENT_IN_PROGRESS** | [后端验收](../server-round1/backend-acceptance.md)：前端 `b10e455` 的 28 方法主体严格 schema 回归 28/28，终态队列门无 schema 29/29，全量270/4 skip；Windows r3 新增 Session目录/元数据/归档/用户历史并 exit 0；当前工件唯一失败为缺 `completed/failed/cancelled` 队列事件编码，见[wire-review](../server-round1/wire-review.md) | 前端自行补机械枚举/reducer并提交摘要；后端回归同一工件后恢复 READY |
-| [42](work-orders/42-fullstack-delivery.md) | **PRE_GATE_WORK_IN_PROGRESS**（两端门当前均未满足，未联调） | [进度与费用账](../server-round1/fullstack/progress.md)：前端仍 PARTIAL、writer_lease ACTIVE；28 方法 wire 正在重锁；DeepSeek 官方 API 可达（12 tokens）；**Codex 家与 DeepSeek 协议不兼容**（codex 0.147.0 只收 Responses API，DeepSeek 为 chat 形状） | 继续 Pi/Hermes/OpenCode 独立真实模型门与41机械收口；待双端 READY+同摘要+释放写权后联调 |
+| [41](work-orders/41-core-service-acceptance.md) | **BACKEND_WINDOWS_RECONFIRM_IN_PROGRESS** | [后端验收](../server-round1/backend-acceptance.md)：前端 `3aba5c5c` 的 28 方法+队列终态严格 schema 回归 29/29；全量270/4 skip；Windows r3 新增 Session目录/元数据/归档/用户历史并 exit 0；同摘要见[wire-review](../server-round1/wire-review.md) | 串行跑 Windows r4 锁定工件重确认后恢复 READY |
+| [42](work-orders/42-fullstack-delivery.md) | **PRE_GATE_WORK_IN_PROGRESS**（两端门当前均未满足，未联调） | [进度与费用账](../server-round1/fullstack/progress.md)：前端仍 PARTIAL、writer_lease ACTIVE；28 方法 wire 已重锁；DeepSeek 官方 API 可达（12 tokens）；**Codex 家与 DeepSeek 协议不兼容**（codex 0.147.0 只收 Responses API，DeepSeek 为 chat 形状） | 无模型准备 Pi/Hermes/OpenCode 独立真实门；串行 Windows r4；待双端 READY+同摘要+释放写权后联调 |
 | [37](work-orders/37-http-codex.md) | **SERVER_HTTP_CODEX_R1_PARTIAL** | [原完成审计](../server-round1/completion-audit.md) / [C/D证据](../server-round1/stage-c-d.md)保留；检查点5a45303/5b71393/cd5efbe/67c6b40。独立定向23 passed；同键并发双accept已由39复现并修复；能力不诚实已由39结构性修复 | abandon 断言经探针定性为**测试侧竞态**（终止状态持久化后约50ms才 abandon；负载高时10/10失败），已改为有界等待、断言强度不变，修后10/10通过；原生语义迁移由40执行 |
 | [38](work-orders/38-harness-extension-selection.md) | **HARNESS_EXTENSION_SELECTION_READY_FOR_DECISION** | 两轮 A/B/C 完成：[最终建议与边界](../server-round1/harness-selection/boundary.md)。保留有条件首选 `harness-remote v3.0.2`；零模型/凭据 | 首选已由40消费进入有门禁接入；不再等待决定 |
 
 ## 当前长期goal状态字段（执行者每阶段维护）
 
-- backend_implementation: **ALIGNMENT_IN_PROGRESS**（39/40完成；41的28方法主体及Windows r3完成，
-  只等待队列终态机械修订与同工件严格复验）。
-- frontend_observed_state: IN_PROGRESS（只读观察，2026-09-14 11:43 +08:00；前端仍在施工，
-  P07 Session/history 28方法增量已提交，writer工作树随后进入P03下一切片）。
+- backend_implementation: **WINDOWS_RECONFIRM_IN_PROGRESS**（39/40完成；41的28方法+队列终态
+  已按锁定摘要29/29，Windows r3完成；只待r4重确认）。
+- frontend_observed_state: IN_PROGRESS（只读观察，2026-09-14 12:15 +08:00；前端仍在施工，
+  P07 28方法队列终态已提交，writer工作树随后进入P04下一切片）。
 - frontend_worktree: /home/maoqh/projects/agent-box-desktop-next-wsl-round1 @ feature/agentbox-desktop-product。
-- frontend_checked_at: 2026-09-14 11:43 +08:00；observed_head: `b10e455f`。
+- frontend_checked_at: 2026-09-14 12:15 +08:00；observed_head: `3aba5c5c`。
   其 status.md 记录 frontend_implementation=**PARTIAL**
   （P00/P01 GREEN、P07 28方法增量完成、P02 A/B1/B2/C/D完成；P03继续施工），
-  writer_lease=**ACTIVE — Codex frontend goal**（09:20 接管）；其 11:20 快照尚未消费后端最终锁定记录。
-- 42 双门判定（2026-09-14 11:47 +08:00）：BACKEND_IMPLEMENTATION_READY=**否（暂时）**；
+  writer_lease=**ACTIVE — Codex frontend goal**（09:20 接管）；其合同已消费后端终态反馈。
+- 42 双门判定（2026-09-14 12:15 +08:00）：BACKEND_IMPLEMENTATION_READY=**否（暂时）**；
   DESKTOP_IMPLEMENTATION_READY=**否**（PARTIAL 且写权未释放）。**未进入全栈联调**，
   未写前端任何文件；wire 交换经 [wire-review.md](../server-round1/wire-review.md) 进行，
-  前端已答复安全确认并提交28方法增量；队列终态机械差异待修订。
-- wire_version / schema_digest: 25方法摘要是已锁定稳定检查点；当前28方法提交
-  `b10e455f` 为 **WIRE_REVISION_PENDING_QUEUE_TERMINALS**，TS
-  `986889e47bcf5f25353bf8cb62afb009cd367ece7b90cbcbf8ce89bd5ed4c257`、生成工件
-  `d3f7412710e7e951674922aebdb72ffbb028fc76b2e353a86b53097fd02abe22`。
-- code_checkpoint_pair: 后端=`72d6258`（25方法41 READY基线）+当前未提交28方法收口；
-  前端合同检查点=`b10e455f`；前端尚无最终交接检查点。
-- wire_status: **WIRE_REVISION_PENDING_QUEUE_TERMINALS**（28方法主体28/28通过；队列终态定向门精确失败）。
+  前端已答复安全确认并提交28方法+队列终态增量；同摘要已严格通过。
+- wire_version / schema_digest: 当前28方法提交 `3aba5c5c` 为 **WIRE_LOCKED_FOR_IMPLEMENTATION**，TS
+  `11e3b3e70d332585d31900c09ba063d95aa6b72b1904921c665fb72f81c10035`、生成工件
+  `5d4fa3bfeec6c3273c6073b37794e4ab2aca6e07e48184bc3a2b878c1fe5e4ed`。
+- code_checkpoint_pair: 后端=`847c818`；前端合同检查点=`3aba5c5c`；前端尚无最终交接检查点。
+- wire_status: **WIRE_LOCKED_FOR_IMPLEMENTATION**（28方法+队列终态严格schema 29/29通过）。
 - backend_implementation_ready: **否（暂时）**（Windows r3原生Server→真实WSL Worker→bwrap增量门通过；
-  新28方法合同只待队列终态修订和同摘要严格回归后重新登记；
+  新28方法合同已重锁，只待Windows r4重确认后重新登记；
   正式 WS 事件流、附件、审批、取消/断连、队列续派/暂停、Profile/Provider-Model 维护均有证据）。
 - integration_owner: NONE；workbench_model_verified_count: **0**（指本轮；组件门通过不等于真实模型可用）。
 - model_authorization: DEEPSEEK_OFFICIAL_AUTHORIZED_MAX_CNY_10；凭据locator见42 §D，不写内容。
@@ -66,7 +64,7 @@ Codex 配置尝试在模型请求前失败，不能记作模型调用或 Harness
   已更正40-A证据）；Hermes 启动有 lazy 依赖安装与 PYTHONPATH 要求，42-D需生产级收口；
   真实凭据只可经授权 SecretStore→限时 Worker 投影，尚待三家模型门验证。
 - 调度维护：39即参与wire反馈，通道docs/server-round1/wire-review.md（首轮已写入）。
-- 42 双门（2026-09-14 11:47）：后端 READY=否（28方法重锁中）、前端 READY=否 →
+- 42 双门（2026-09-14 12:15）：后端 READY=否（Windows r4重确认中）、前端 READY=否 →
   未记录集成人、未写前端、未联调。
 - 每阶段与goal结束前检查状态已更新；41READY后进入42等待，不提前报整体完成。
 

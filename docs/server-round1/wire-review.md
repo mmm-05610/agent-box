@@ -3,6 +3,28 @@
 维护者：后端执行者（39–42）。用途：在双方锁定单一 wire 前交换事实与约束，
 避免两边各造一套协议。此处只写后端事实与差异请求，不批准前端合同。
 
+## 2026-09-14 12:15 +08:00 · `WIRE_LOCKED_FOR_IMPLEMENTATION`（28 方法 + 队列终态）
+
+前端已在提交 `3aba5c5c8743401b964f80c88bd43e847fa3d5a8` 消费唯一待改项：
+`QueueItem.state` 增加 `completed/failed/cancelled`，`queue.get` 改用只含
+`pending/dispatched/paused` 的 `ActiveQueueItem`，客户端 reducer 对四种终态
+`withdrawn/completed/failed/cancelled` 均移除活动投影。提交后的完整摘要与前端
+`backend-response.md` 登记一致：
+
+| 工件 | 双方锁定的完整 sha256 |
+| --- | --- |
+| TS 权威 `apps/desktop/src/types/wire/wire-v1.ts` | `11e3b3e70d332585d31900c09ba063d95aa6b72b1904921c665fb72f81c10035` |
+| 生成工件 `generated/wire-v1.schema.json` | `5d4fa3bfeec6c3273c6073b37794e4ab2aca6e07e48184bc3a2b878c1fe5e4ed` |
+
+后端以 `AGENT_BOX_WIRE_SCHEMA=<上述前端生成工件>` 直接校验 28 个方法、成功结果、错误信封与
+终态事件：`tests/server/test_wire_v1.py` **29 passed in 67.57s**。此前唯一 schema 失败已消失，
+没有新增差异。顶层 history `cursor` 继续只作实时恢复/订阅续点，`page.cursor` 只作向旧历史翻页；
+后端拒绝二者同请求并以不同签名域解析，`resumeCursor` 与 `olderCursor` 不互换。该行为已属于当前
+实现合同，无需再扩方法或另造 schema。
+
+结论：当前 28 方法工件状态为 **`WIRE_LOCKED_FOR_IMPLEMENTATION`**。Windows r4 复验与前端
+生产接线继续分别记账；它们不改变本节摘要，也不由本次 schema 门冒充。
+
 ## 2026-09-14 11:47 +08:00 · 28 方法提交已回归，等待队列终态机械更正
 
 前端已将上一节草稿原样提交为 `b10e455f763b964b99b489b4e66cfd4ae50d86a7`；两份完整摘要仍为

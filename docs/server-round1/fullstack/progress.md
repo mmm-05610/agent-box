@@ -1,28 +1,39 @@
 # Work Order 42 — 交付、等待与真实模型验收进度
 
 日期：2026-09-14。本轮零泄漏：任何证据、日志、命令行参数均不含凭据内容；
-密钥只经进程环境变量传给受管 Harness 投影，且未写入任何文件或输出。
+已发生的1次可达性请求由后端受控进程读取仓库外 locator，未把内容写入仓库或输出。
+受管 Harness 的 SecretStore→Worker 投影尚未执行，不以计划中的注入路径冒充已验事实。
+
+## 2026-09-14 12:15 +08:00 — 28 方法 wire 重锁
+
+- 前端提交：`3aba5c5c8743401b964f80c88bd43e847fa3d5a8`；writer lease 仍 ACTIVE，未接管前端。
+- 双方摘要：TS `11e3b3e70d332585d31900c09ba063d95aa6b72b1904921c665fb72f81c10035`；生成工件
+  `5d4fa3bfeec6c3273c6073b37794e4ab2aca6e07e48184bc3a2b878c1fe5e4ed`。
+- 后端对该实际工件严格回归 `29 passed in 67.57s`，队列终态差异关闭，状态
+  `WIRE_LOCKED_FOR_IMPLEMENTATION`。
+- 尚未进入全栈联调；下一后端门是 Windows r4 重确认。真实模型调用数与费用无变化：累计1次、
+  12 tokens、<¥0.01。
 
 ## A — 前端只读观察与 wire 增量协作
 
-后端 41 READY 后按 42-A 做只读检查（未写前端任何文件、未杀其进程、未发第二个 goal）：
+后端在41收口期间按42-A同等写权约束做只读检查（未写前端任何文件、未杀其进程、未发第二个 goal）：
 
-- 工作树 `/home/maoqh/projects/agent-box-desktop-next-wsl-round1`，2026-09-14 11:43 +08:00
-  实际 HEAD `b10e455f763b964b99b489b4e66cfd4ae50d86a7`；writer 正在 P03 下一切片，工作树非 clean。
+- 工作树 `/home/maoqh/projects/agent-box-desktop-next-wsl-round1`，2026-09-14 12:15 +08:00
+  实际 HEAD `3aba5c5c8743401b964f80c88bd43e847fa3d5a8`；writer 正在 P04 下一切片，工作树非 clean。
 - 其自身 status：`frontend_implementation=PARTIAL`（P00/P01 GREEN、P02 A/B1/B2/C/D、
   P03纵切1–2和 P07 28方法增量已提交；P03生产调用者及 P04–P06待续），
   `writer_lease=ACTIVE — Codex frontend goal`（09:20 接管），
   尚未达到 `DESKTOP_IMPLEMENTATION_READY`。
-- 前端已消费核心维护反馈，并在同一 wire 提交 Session/history 28方法增量。后端对实际生成工件
-  28/28 回归通过；新增队列终态门证明当前 schema 无法表示 completed/failed/cancelled 后的移除，
-  已在 [wire-review.md](../wire-review.md) 给出最小机械更正。前端自行落实，无需用户逐字段批准。
+- 前端已消费核心维护与队列终态反馈，并在同一 wire 提交 Session/history 28方法增量及
+  completed/failed/cancelled 编码。后端对实际生成工件 29/29 回归通过，双方摘要已锁定；
+  无需用户逐字段批准。
 
 ## B — 双门判定（**均未满足，故未进入联调**）
 
 | 门 | 判定 | 依据 |
 | --- | --- | --- |
-| BACKEND_IMPLEMENTATION_READY | **否（暂时）** | 28方法主体及Windows r3增量门已完成；只等待队列终态新摘要与严格schema复验 |
-| DESKTOP_IMPLEMENTATION_READY | **否** | 前端自报 PARTIAL，且 `writer_lease=ACTIVE`（未释放）；28方法 wire 尚在机械重锁，独立实现/验收门未完 |
+| BACKEND_IMPLEMENTATION_READY | **否（暂时）** | 28方法+队列终态已锁定并29/29；只待串行Windows r4重确认 |
+| DESKTOP_IMPLEMENTATION_READY | **否** | 前端自报 PARTIAL，且 `writer_lease=ACTIVE`（未释放）；独立实现/验收门未完 |
 
 因此仍**没有**记录 `FULLSTACK_INTEGRATION_OWNER`，**没有**接管前端工作树，
 **没有**启动跨端链路。这是纪律要求，不是进度不足的借口。
