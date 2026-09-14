@@ -115,7 +115,7 @@ lifecycle 外部缺口不变。详见 §3-G4 与 evidence/P05.md。
 
 | 状态 | 数量 | 方法 |
 | --- | --- | --- |
-| `PRODUCTION_REACHABLE` | **25** | server.hello、workspaces.open、**workspaces.archive**、workspaces.list、profiles.list/create/update/archive/updateConfig、providerModels.list/create/update/archive、config.describe、config.resolve、sessions.list、sessions.switchProfile、sessions.createAndSend、sessions.send、sendOutcome.query、queue.get、queue.withdraw、runs.stop、approvals.decide、history.snapshot |
+| `PRODUCTION_REACHABLE` | **26** | server.hello、workspaces.open、workspaces.list、workspaces.browse、workspaces.archive、profiles.list/create/update/archive/updateConfig、providerModels.list/create/update/archive、config.describe、config.resolve、sessions.list、sessions.switchProfile、sessions.createAndSend、sessions.send、sendOutcome.query、queue.get、queue.withdraw、runs.stop、approvals.decide、history.snapshot |
 | `CLIENT_READY_NO_SURFACE` | 0 | — |
 | `FIXTURE_ONLY_FRONTEND_GAP` | **2** | sessions.update、sessions.archive |
 | `EXTERNAL_LIFECYCLE_BLOCKED` | **26 行同一外部缺口**（不等于前端缺口，见 §4） | 上表 26 个 `PRODUCTION_REACHABLE` 行的运行终态 |
@@ -124,19 +124,21 @@ lifecycle 外部缺口不变。详见 §3-G4 与 evidence/P05.md。
 
 ## 2. 非 `PRODUCTION_REACHABLE` 逐项原因
 
+此前列于此表的 `workspaces.open`、`workspaces.browse`、`workspaces.archive`、`config.resolve`
+已分别接线为 `PRODUCTION_REACHABLE`（EXT），接线过程见文件前言各增量与 §3-G1–G4，不再是缺口。
+当前非 `PRODUCTION_REACHABLE` 的方法仅剩下表两行：
+
 | 方法 | 为什么不是 PRODUCTION_REACHABLE |
 | --- | --- |
-| `workspaces.open` | ~~`application/` 无入口~~ —— 已在代码检查点 `3e207376` 接线（见 §3-G1），不再是缺口。 |
-| `workspaces.browse` | 除 schema 外**零引用**（无入口、无 fixture、无测试）。批准行为（远端目录列举与呈现）当前由 Electron 宿主能力承担，缺 AgentBox 环境身份与 `canOpen/canWrite` 分列。 |
-| `workspaces.archive` | 除 schema 外零引用。侧栏"移除"是 renderer 本地隐藏，与服务归档（记录保留、跨客户端一致）不是同一语义。 |
-| `config.resolve` | ~~除 schema 外零引用~~ —— 已在代码检查点 `940c9df4` 接线（见 §3-G4），不再是缺口。 |
 | `sessions.update` | application 入口存在且已测（requestId+expectedVersion+服务投影采纳），但**无生产调用者**：侧栏改名/置顶仍走 legacy Hermes 会话 API。 |
 | `sessions.archive` | 同上；侧栏归档入口（`store/sidebar-archive`/`application/session-lists`）走 legacy 数据面。 |
 
 ## 3. 确证的前端缺口（目标文件 / 接口 / 不变量 / 建议验收）
 
-以下为审计时确认的缺口清单。其中 G4 已在后续代码检查点 `940c9df4` 落地（保留原条目并改写为接线记录，
-以便对照原不变量）；其余仍是本端可独立补齐的机械实现批次。
+以下为审计时确认的缺口清单。G1–G4 已在后续代码检查点分别落地并改写为接线记录（G4 `config.resolve`
+`940c9df4`、G1 `workspaces.open` `3e207376`、G2 `workspaces.browse` `a8142125`、G3
+`workspaces.archive` `f6b457b5`；各条目保留原目标文件与不变量以便对照）；当前仅剩 G5
+sessions.update/archive 未接线，仍是本端可独立补齐的机械实现批次。
 
 **G1 `workspaces.open` — 已接线（代码检查点 `3e207376`）**
 

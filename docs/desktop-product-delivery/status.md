@@ -314,7 +314,7 @@ wire-review.md通道自39阶段协调。执行者下个检查点消费这些规�
 | --- | --- | --- |
 | P00 接管与基线 | GREEN | 旧Desktop会话无并发写入（evidence/P00.md） |
 | P01 36R收口 | GREEN | 真机 27 PASS/2 SKIP/1 PENDING（evidence/P01.md；本地打开 PENDING 转 P05） |
-| P02 上层产品 | IN_PROGRESS（A/B/C/D 主面与服务投影完成；Profile 默认配置编辑与 Workspace 选择登记已接；矩阵剩 4 项前端缺口） | P01 已满足 |
+| P02 上层产品 | IN_PROGRESS（A/B/C/D 主面与服务投影完成；Profile 默认配置编辑与 Workspace 选择登记已接；矩阵 26 生产可达 / 2 前端缺口） | P01 已满足 |
 | P03 用例状态与API | IN_PROGRESS（主 route 生产调用者与 event reducer 接入已完成；真实 Server 源待 P04） | 与 P02 穿插 |
 | P04 宿主与遗留退役 | IN_PROGRESS（production request/Session-event transport + IPC + supervisor；正常冷启动 Hermes 自动门已退役，Server connection合同待后端） | 与 P03 穿插 |
 | P05 正式合同接入 | IN_PROGRESS（WORKSPACES_BROWSE_CLIENT_READY；28 方法矩阵：26 生产可达 / 2 前端缺口；`config.resolve`、`workspaces.open`、`workspaces.archive`、`workspaces.browse` 已接；lifecycle 外部缺口待续） | wire 双端锁定 |
