@@ -197,6 +197,17 @@ def test_existing_unowned_directory_is_refused_without_modification(tmp_path):
     assert set(path.name for path in root.iterdir()) == {"sentinel.txt"}
 
 
+def test_data_root_with_a_foreign_owner_marker_is_refused(tmp_path):
+    root = tmp_path / "foreign"
+    root.mkdir()
+    (root / ".agentbox-server-root").write_text("agentbox-server-r9\n", encoding="utf-8")
+    sentinel = root / "sentinel.txt"
+    sentinel.write_text("preserve", encoding="utf-8")
+    with pytest.raises(RuntimeError, match="DATA_ROOT_MARKER_INVALID"):
+        build_runtime(root)
+    assert sentinel.read_text(encoding="utf-8") == "preserve"
+
+
 @pytest.mark.skipif(os.name == "nt", reason="POSIX mode bits are not Windows ACL evidence")
 def test_bootstrap_token_is_owner_only_on_posix(tmp_path):
     runtime = build_runtime(tmp_path / "protected-token")

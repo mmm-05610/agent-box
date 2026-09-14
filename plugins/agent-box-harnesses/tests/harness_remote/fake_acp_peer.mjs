@@ -13,6 +13,18 @@ let pendingCancel = false
 let pendingPrompt = null
 let pendingPermission = null
 
+// The peer declares exactly the one model it accepts. A bridge that is asked for
+// a model resolves it against the options the harness advertised and refuses
+// anything not on the list, so a peer that advertises none is a harness that can
+// run no configured model at all.
+const MODEL_OPTION = {
+  id: "model",
+  name: "Model",
+  category: "model",
+  currentValue: "fixture-model",
+  options: [{ value: "fixture-model", name: "Fixture model" }],
+}
+
 for await (const line of rl) {
   if (!line.trim()) continue
   const request = JSON.parse(line)
@@ -27,9 +39,15 @@ for await (const line of rl) {
     send({ jsonrpc: "2.0", id, result: {} })
   } else if (method === "session/new") {
     sessions += 1
-    send({ jsonrpc: "2.0", id, result: { sessionId: `fake-native-${process.pid}-${sessions}` } })
+    send({ jsonrpc: "2.0", id, result: {
+      sessionId: `fake-native-${process.pid}-${sessions}`,
+      configOptions: [MODEL_OPTION],
+    } })
   } else if (method === "session/load") {
-    send({ jsonrpc: "2.0", id, result: { sessionId: params.sessionId } })
+    send({ jsonrpc: "2.0", id, result: {
+      sessionId: params.sessionId,
+      configOptions: [MODEL_OPTION],
+    } })
   } else if (method === "session/prompt") {
     const image = params.prompt.find((item) => item.type === "image")
     const streamed = image
@@ -85,7 +103,9 @@ for await (const line of rl) {
     send({ jsonrpc: "2.0", id: pendingPermission.promptId, result: { stopReason: "end_turn" } })
     pendingPermission = null
   } else if (method === "session/set_config_option") {
-    send({ jsonrpc: "2.0", id, result: {} })
+    send({ jsonrpc: "2.0", id, result: {
+      configOptions: [{ ...MODEL_OPTION, currentValue: params.value }],
+    } })
   } else if (id !== undefined) {
     send({ jsonrpc: "2.0", id, result: {} })
   }

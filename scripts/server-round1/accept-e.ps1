@@ -10,10 +10,216 @@ param(
     [int]$Port = 18741,
     [string]$PythonExe = "py.exe",
     [string]$PythonPrefix = "-3.12",
-    [switch]$Cleanup
+    [switch]$Cleanup,
+    [switch]$PostCheck,
+    [string[]]$InstanceId = @()
 )
 
 $ErrorActionPreference = "Stop"
+
+# ---------------------------------------------------------------------------
+# Cleanup guards.
+#
+# The cleanup path at the end of this script and the negative self-check below
+# call the same functions, so a refusal observed by the self-check is the same
+# refusal a real cleanup performs. Nothing here decides by itself that a path is
+# disposable: the owner marker, the directory identity and the absence of a
+# reparse point are all re-read from the filesystem at the moment of removal.
+# ---------------------------------------------------------------------------
+
+function Assert-OwnerMarkedDataRoot {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    $item = Get-Item -LiteralPath $Path -Force
+    if (-not $item.PSIsContainer -or
+        (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0)) {
+        throw "Data cleanup refused: data root is not a real directory"
+    }
+    $marker = Join-Path $Path ".agentbox-server-root"
+    if (-not (Test-Path -LiteralPath $marker -PathType Leaf)) {
+        throw "Data cleanup refused: owner marker missing"
+    }
+    $markerItem = Get-Item -LiteralPath $marker -Force
+    if (($markerItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "Data cleanup refused: owner marker is a link"
+    }
+    $markerText = (Get-Content -LiteralPath $marker -Raw) -replace "`r`n", "`n"
+    if ($markerText -ne "agentbox-server-r1`n") {
+        throw "Data cleanup refused: owner marker mismatch"
+    }
+}
+
+function Test-CleanableDataRoot {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    try { Assert-OwnerMarkedDataRoot -Path $Path; return $true } catch { return $false }
+}
+
+function Assert-MarkedWorkspace {
+    param([string]$Distribution, [string]$MarkerPath)
+    & wsl.exe --distribution $Distribution --exec /usr/bin/test -f $MarkerPath
+    if ($LASTEXITCODE -ne 0) { throw "Workspace cleanup refused: owner marker missing" }
+}
+
+function Test-ResidualProcesses {
+    param([string]$DataRoot, [string]$Distribution, [string[]]$InstanceIds = @())
+    $found = @()
+    $windows = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+        Where-Object {
+            $_.Name -match '^(python|pythonw|py)\.exe$' -and $_.CommandLine -and
+            $_.CommandLine.Contains($DataRoot)
+        })
+    foreach ($item in $windows) { $found += "windows:pid=$($item.ProcessId) $($item.Name)" }
+    $scoped = @($InstanceIds | Where-Object { $_ })
+    $pattern = if ($scoped.Count) {
+        (($scoped | ForEach-Object { "agentbox-worker-r1/$_" }) -join "|")
+    } else {
+        # Unscoped fallback: the Worker root prefix only. Matching on the binary
+        # name as well would also match this acceptance command line and the
+        # Worker copies other test runs are still holding open.
+        "agentbox-worker-r1"
+    }
+    $lines = @(& wsl.exe --distribution $Distribution --exec /usr/bin/pgrep -af $pattern)
+    foreach ($line in $lines) {
+        $text = "$line".Trim()
+        # The wsl.exe host running this very query carries the pattern in its own
+        # command line, and the shell that launched the acceptance carries the
+        # script name. Neither is a Worker or a sidecar.
+        if ($text -and $text -notmatch "/usr/bin/pgrep " -and $text -notmatch "accept-e\.ps1") {
+            $found += "wsl:$text"
+        }
+    }
+    return $found
+}
+
+function Get-WorkerViewResidue {
+    # Views and secrets are per-execution Worker projections: a clean stop leaves
+    # neither behind.
+    param([string]$Distribution, [string[]]$InstanceIds = @())
+    $scoped = @($InstanceIds | Where-Object { $_ })
+    if ($scoped.Count -eq 0) { return @() }
+    $residue = @()
+    foreach ($instance in $scoped) {
+        $root = "/tmp/agentbox-worker-r1/$instance"
+        & wsl.exe --distribution $Distribution --exec /usr/bin/test -d $root
+        if ($LASTEXITCODE -ne 0) { continue }
+        $found = @(& wsl.exe --distribution $Distribution --exec /usr/bin/find $root `
+            -maxdepth 3 -type d "(" -name views -o -name secrets ")" |
+            ForEach-Object { "$_".Trim() } | Where-Object { $_ })
+        $residue += $found
+    }
+    return $residue
+}
+
+# Negative case for the guards: every path below must be refused, and each is
+# constructed by the check itself so no real data root is ever at risk.
+function Invoke-CleanupGuardChecks {
+    param([string]$Distribution, [string]$WorkspaceLinuxPath)
+    $probeRoot = Join-Path ([IO.Path]::GetTempPath()) `
+        ("agentbox-guard-" + [guid]::NewGuid().ToString("N"))
+    $workspaceProbe = "$WorkspaceLinuxPath-guard-$([guid]::NewGuid().ToString('N'))"
+    $results = [ordered]@{}
+    try {
+        New-Item -ItemType Directory -Path $probeRoot | Out-Null
+
+        $unowned = Join-Path $probeRoot "unowned"
+        New-Item -ItemType Directory -Path $unowned | Out-Null
+        $results.data_root_without_owner_marker_refused = -not (Test-CleanableDataRoot -Path $unowned)
+
+        $mismatched = Join-Path $probeRoot "mismatched"
+        New-Item -ItemType Directory -Path $mismatched | Out-Null
+        [IO.File]::WriteAllText((Join-Path $mismatched ".agentbox-server-root"), "agentbox-server-r9`n")
+        $results.data_root_with_mismatched_marker_refused = -not (Test-CleanableDataRoot -Path $mismatched)
+
+        $owned = Join-Path $probeRoot "owned"
+        New-Item -ItemType Directory -Path $owned | Out-Null
+        [IO.File]::WriteAllText((Join-Path $owned ".agentbox-server-root"), "agentbox-server-r1`n")
+        $results.data_root_with_owner_marker_accepted = Test-CleanableDataRoot -Path $owned
+
+        $link = Join-Path $probeRoot "linked"
+        New-Item -ItemType Junction -Path $link -Target $owned | Out-Null
+        $results.linked_data_root_target_refused = -not (Test-CleanableDataRoot -Path $link)
+
+        $file = Join-Path $probeRoot "not-a-directory"
+        [IO.File]::WriteAllText($file, "agentbox-server-r1`n")
+        $results.data_root_that_is_not_a_directory_refused = -not (Test-CleanableDataRoot -Path $file)
+
+        & wsl.exe --distribution $Distribution --exec /usr/bin/mkdir -p -- $workspaceProbe
+        if ($LASTEXITCODE -ne 0) { throw "Could not create the workspace guard probe" }
+        $marker = "$workspaceProbe/.agentbox-server-r1-acceptance-e"
+        try {
+            Assert-MarkedWorkspace -Distribution $Distribution -MarkerPath $marker
+            $results.workspace_without_owner_marker_refused = $false
+        } catch { $results.workspace_without_owner_marker_refused = $true }
+        & wsl.exe --distribution $Distribution --exec /usr/bin/touch -- $marker
+        if ($LASTEXITCODE -ne 0) { throw "Could not mark the workspace guard probe" }
+        try {
+            Assert-MarkedWorkspace -Distribution $Distribution -MarkerPath $marker
+            $results.marked_workspace_accepted = $true
+        } catch { $results.marked_workspace_accepted = $false }
+
+        $failed = @($results.Keys | Where-Object { "$_" -match '_refused$|_accepted$' -and $results[$_] -eq $false })
+        if ($failed.Count -ne 0) {
+            throw "Cleanup guard checks failed: $($failed -join ', ')"
+        }
+        # Delete the junction itself, never through it: a recursive delete that
+        # followed the reparse point would be the very hazard under test.
+        (Get-Item -LiteralPath $link -Force).Delete()
+        return $results
+    } finally {
+        Remove-Item -LiteralPath $probeRoot -Recurse -Force -ErrorAction SilentlyContinue
+        & wsl.exe --distribution $Distribution --exec /usr/bin/test -d $workspaceProbe
+        if ($LASTEXITCODE -eq 0) {
+            & wsl.exe --distribution $Distribution --exec /usr/bin/rm -r -- $workspaceProbe
+        }
+    }
+}
+
+if ($PostCheck) {
+    # Independent after-the-fact verification: this runs as its own process,
+    # after the acceptance process has exited, so its own children cannot mask a
+    # leftover.
+    $report = [ordered]@{}
+    $report.check = "BACKEND_41_E_WINDOWS_POSTCHECK"
+    $report.data_root = $DataRoot
+    $report.workspace = $WorkspaceLinuxPath
+    $report.port = $Port
+    $report.data_root_absent = -not (Test-Path -LiteralPath $DataRoot)
+    $probe = New-Object Net.Sockets.TcpClient
+    $portOpen = $false
+    try {
+        $probe.Connect("127.0.0.1", $Port)
+        $portOpen = $true
+    } catch [System.Net.Sockets.SocketException] {
+    } finally {
+        $probe.Dispose()
+    }
+    $report.port_listening = $portOpen
+    # `test -e -- <path>` is not usable: GNU test rejects the separator and exits
+    # 2 whether or not the path exists, which would make this assertion vacuous.
+    & wsl.exe --distribution $Distribution --exec /usr/bin/test -e $WorkspaceLinuxPath
+    $workspaceProbe = $LASTEXITCODE
+    if ($workspaceProbe -eq 2) { throw "Post-check failed: workspace existence could not be evaluated" }
+    $report.workspace_absent = ($workspaceProbe -ne 0)
+    $scopedInstances = @($InstanceId | Where-Object { $_ })
+    $report.residual_processes = @(Test-ResidualProcesses -DataRoot $DataRoot `
+        -Distribution $Distribution -InstanceIds $scopedInstances)
+    if ($scopedInstances.Count -eq 0) {
+        # Without a recorded instance the check still has to be able to fail, so
+        # an unrestricted scan is used and reported as such.
+        $report.residue_scope = "unscoped"
+    } else {
+        $report.residue_scope = "instance"
+    }
+    $report.worker_view_residue = @(Get-WorkerViewResidue -Distribution $Distribution `
+        -InstanceIds $scopedInstances)
+    if (-not $report.data_root_absent) { throw "Post-check failed: data root still exists" }
+    if (-not $report.workspace_absent) { throw "Post-check failed: WSL workspace still exists" }
+    if ($report.port_listening) { throw "Post-check failed: acceptance port is still listening" }
+    if ($report.residual_processes.Count -ne 0) { throw "Post-check failed: residual processes remain" }
+    if ($report.worker_view_residue.Count -ne 0) { throw "Post-check failed: Worker views/secrets remain" }
+    $report.result = "BACKEND_41_E_WINDOWS_POSTCHECK_CLEAN"
+    $report | ConvertTo-Json -Compress -Depth 6
+    return
+}
 if (Test-Path -LiteralPath $DataRoot) {
     throw "DataRoot must not exist before this acceptance run: $DataRoot"
 }
@@ -38,6 +244,7 @@ try {
 
 $workspaceMarker = "$WorkspaceLinuxPath/.agentbox-server-r1-acceptance-e"
 & wsl.exe --distribution $Distribution --exec /usr/bin/test -e $WorkspaceLinuxPath
+if ($LASTEXITCODE -eq 2) { throw "Workspace existence could not be evaluated before this run" }
 if ($LASTEXITCODE -eq 0) {
     throw "WorkspaceLinuxPath must not exist before this acceptance run: $WorkspaceLinuxPath"
 }
@@ -49,6 +256,10 @@ if ($LASTEXITCODE -ne 0) { throw "Could not mark the isolated WSL workspace" }
     "$SourceLinuxPath/plugins/agent-box-harnesses/tests/harness_remote/fake_acp_peer.mjs" `
     "$WorkspaceLinuxPath/fake_acp_peer.mjs"
 if ($LASTEXITCODE -ne 0) { throw "Could not project the explicit no-model ACP fixture" }
+& wsl.exe --distribution $Distribution --exec /usr/bin/cp -- `
+    "$SourceLinuxPath/tests/server/fixtures/stateful_acp_peer.mjs" `
+    "$WorkspaceLinuxPath/stateful_acp_peer.mjs"
+if ($LASTEXITCODE -ne 0) { throw "Could not project the stateful native-state fixture" }
 & wsl.exe --distribution $Distribution --exec /usr/bin/cp -- `
     "$SourceLinuxPath/pyproject.toml" "$WorkspaceLinuxPath/assets/reference.png"
 if ($LASTEXITCODE -ne 0) { throw "Could not project the attachment fixture" }
@@ -67,17 +278,42 @@ $deploymentPath = Join-Path ([IO.Path]::GetTempPath()) `
 $deployment = [ordered]@{
     schemaVersion = 1
     pluginRoot = $pluginRoot
-    harnesses = @([ordered]@{
-        id = "pi"
-        modelControlId = "model"
-        capabilityClaims = [ordered]@{ streaming = $true; approvals = $true; attachments = $true }
-        controlOptions = [ordered]@{ model = @("fixture-model") }
-        adapter = [ordered]@{
-            command = "/usr/bin/node"
-            args = @("/workspace/fake_acp_peer.mjs")
+    harnesses = @(
+        [ordered]@{
+            id = "pi"
+            modelControlId = "model"
+            capabilityClaims = [ordered]@{ streaming = $true; approvals = $true; attachments = $true }
+            controlOptions = [ordered]@{ model = @("fixture-model") }
+            adapter = [ordered]@{
+                command = "/usr/bin/node"
+                args = @("/workspace/fake_acp_peer.mjs")
+            }
+            timeoutMs = 30000
+        },
+        # Second explicit no-model Harness for the bounded native-state gate. It
+        # declares no model control and no credential, so nothing here can read
+        # model configuration or attached credentials. The registry key selects
+        # the ACP profile whose session capabilities the adapter negotiates; the
+        # executable is the checked-in Node fixture, never a native Harness.
+        [ordered]@{
+            id = "hermes"
+            capabilityClaims = [ordered]@{ streaming = $true }
+            adapter = [ordered]@{
+                command = "/usr/bin/node"
+                args = @("/workspace/stateful_acp_peer.mjs")
+            }
+            timeoutMs = 30000
+            stateProjection = [ordered]@{ target = "/tmp/agentbox-home/sessions" }
         }
-        timeoutMs = 30000
-    })
+    )
+}
+$statefulHarness = $deployment.harnesses | Where-Object { $_.id -eq "hermes" }
+if ($null -eq $statefulHarness -or $statefulHarness.Contains("credentialKind") -or
+    $statefulHarness.Contains("credentialEnvironment") -or
+    $statefulHarness.Contains("modelControlId") -or
+    $statefulHarness.timeoutMs -gt 120000 -or
+    $statefulHarness.stateProjection.target -ne "/tmp/agentbox-home/sessions") {
+    throw "The native-state fixture Harness must declare no credential, no model control and a bounded state projection"
 }
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 [IO.File]::WriteAllText(
@@ -131,14 +367,23 @@ function Invoke-Wire {
 }
 
 function Wait-TurnState {
-    param([string]$SessionId, [string]$ExecutionId, [string[]]$States, [hashtable]$Headers)
-    for ($attempt = 0; $attempt -lt 200; $attempt++) {
+    param([string]$SessionId, [string]$ExecutionId, [string[]]$States,
+        [hashtable]$Headers, [int]$Attempts = 600)
+    $turn = $null
+    for ($attempt = 0; $attempt -lt $Attempts; $attempt++) {
         $session = Invoke-RestMethod -Uri "$baseUrl/api/v1/sessions/$SessionId" -Headers $Headers
         $turn = @($session.turns | Where-Object { $_.id -eq $ExecutionId })[0]
         if ($null -ne $turn -and $States -contains $turn.state) { return $turn }
         Start-Sleep -Milliseconds 50
     }
-    throw "Execution $ExecutionId did not reach $($States -join ',')"
+    # A turn that failed rather than stalled must not be reported as a timeout.
+    $observed = if ($null -eq $turn) { "no turn row was created" } `
+        else { "observed state=$($turn.state) error_code=$($turn.error_code) capture_state=$($turn.capture_state)" }
+    $trail = @($session.events | Where-Object { $_.turn_id -eq $ExecutionId } |
+        Select-Object -Last 6 |
+        ForEach-Object { "$($_.kind)=$($_.data | ConvertTo-Json -Compress -Depth 4)" })
+    throw ("Execution $ExecutionId did not reach $($States -join ',') within $($Attempts * 50)ms: " +
+        "$observed; events: $($trail -join ' || ')")
 }
 
 function Receive-WireDelta {
@@ -159,7 +404,151 @@ function Receive-WireDelta {
     throw "wire event stream did not deliver a persisted message.delta"
 }
 
+function Get-ObjectStorePath {
+    param([string]$Digest)
+    if ($Digest -notmatch '^sha256:[0-9a-f]{64}$') {
+        throw "Server returned a non-identifier object digest: $Digest"
+    }
+    $hex = $Digest.Substring(7)
+    return Join-Path $DataRoot ("objects/sha256/" + $hex.Substring(0, 2) + "/" + $hex)
+}
+
+function Read-DataRootObject {
+    # Read one immutable object straight out of the Windows DataRoot authority.
+    # The content is re-hashed, so an object that was altered after publication
+    # is reported instead of being believed.
+    param([string]$Digest)
+    $path = Get-ObjectStorePath -Digest $Digest
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+        throw "Object is absent from the Windows ObjectStore: $Digest"
+    }
+    $bytes = [IO.File]::ReadAllBytes($path)
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try { $actual = "sha256:" + ([BitConverter]::ToString($sha.ComputeHash($bytes)) -replace "-", "").ToLowerInvariant() }
+    finally { $sha.Dispose() }
+    if ($actual -ne $Digest) {
+        throw "Object content does not match its immutable digest: $Digest"
+    }
+    return , $bytes
+}
+
+function Assert-R4Checkpoint {
+    # Validate the Server-returned native-state checkpoint against the bytes the
+    # Windows DataRoot actually holds. The checkpoint is only read here; nothing
+    # in this script rewrites it, so a passing gate is evidence about the value
+    # the Server produced.
+    param([string]$Digest, [string]$NativeId, [string]$HarnessType, [string]$Label)
+    $bytes = Read-DataRootObject -Digest $Digest
+    $manifest = [Text.Encoding]::UTF8.GetString($bytes) | ConvertFrom-Json
+    if ($manifest.schema_version -ne 2) { throw "$Label checkpoint schema_version is not 2" }
+    if ($manifest.resumable -ne $true) { throw "$Label checkpoint is not resumable" }
+    if ($manifest.harnessType -ne $HarnessType) {
+        throw "$Label checkpoint harnessType $($manifest.harnessType) crossed Profile scope"
+    }
+    if ($manifest.nativeSessionId -ne $NativeId) {
+        throw "$Label checkpoint does not bind the reported native session id"
+    }
+    $files = @($manifest.files)
+    if ($files.Count -eq 0) { throw "$Label checkpoint carries no native state files" }
+    foreach ($file in $files) {
+        $names = @($file.PSObject.Properties.Name)
+        if (@($names | Where-Object { $_ -notin @("path", "digest", "size") }).Count -ne 0 -or
+            $names.Count -ne 3) {
+            throw "$Label checkpoint file entry has an unexpected shape"
+        }
+        if ($file.path -notmatch '^[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$') {
+            throw "$Label checkpoint carries an unsafe state path: $($file.path)"
+        }
+        if ($file.size -isnot [int] -and $file.size -isnot [long]) {
+            throw "$Label checkpoint carries a non-integer state size"
+        }
+        if ($file.size -le 0 -or $file.size -gt 8388608) {
+            throw "$Label checkpoint carries an out-of-bounds state size: $($file.size)"
+        }
+        $content = Read-DataRootObject -Digest $file.digest
+        if ($content.Length -ne $file.size) {
+            throw "$Label checkpoint size does not match the stored object: $($file.path)"
+        }
+    }
+    return $manifest
+}
+
+function Get-R4StateFile {
+    param([object]$Manifest, [string]$Path)
+    $entry = @($Manifest.files | Where-Object { $_.path -eq $Path })
+    if ($entry.Count -ne 1) { throw "Native state file $Path is missing from the checkpoint" }
+    return [Text.Encoding]::UTF8.GetString((Read-DataRootObject -Digest $entry[0].digest))
+}
+
+function Get-R4ReopenMethods {
+    # Every ACP operation the fixture served, oldest first. The last entry is the
+    # one the current round used to open the stored native session.
+    param([object]$Manifest)
+    $lines = @((Get-R4StateFile -Manifest $Manifest -Path "reopen-method.txt") -split "`n" |
+        ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    if ($lines.Count -eq 0) {
+        throw "Native state did not record the ACP operation that opened the session"
+    }
+    return , $lines
+}
+
+function Get-DataRootLockOwner {
+    # The owning Server holds a byte-range lock on `server.lock`, which Windows
+    # enforces against other processes, so the file cannot be read while any
+    # Server owns the data root. A successful read is therefore itself the
+    # "lock released" evidence, and the content names the instance that held it.
+    param([string]$LockPath, [int]$Attempts = 100)
+    for ($attempt = 0; $attempt -lt $Attempts; $attempt++) {
+        try {
+            $owner = (Get-Content -LiteralPath $LockPath -Raw -ErrorAction Stop).Trim()
+            if ($owner) { return $owner }
+        } catch {
+        }
+        Start-Sleep -Milliseconds 100
+    }
+    throw "Data root lock was not released: $LockPath stayed unreadable"
+}
+
+function Stop-AgentBoxServer {
+    # Bounded stop of the currently running Server. A close request is attempted
+    # first; the exit path actually used is returned so the evidence names it.
+    param([System.Diagnostics.Process]$Process)
+    if ($null -eq $Process -or $Process.HasExited) { return "already_exited" }
+    $stem = Join-Path ([IO.Path]::GetTempPath()) `
+        ("agentbox-stop-" + [guid]::NewGuid().ToString("N"))
+    $logOut = "$stem.out.log"
+    $logErr = "$stem.err.log"
+    try {
+        try {
+            Start-Process -FilePath "taskkill.exe" -ArgumentList @("/PID", "$($Process.Id)") `
+                -Wait -NoNewWindow -RedirectStandardOutput $logOut -RedirectStandardError $logErr
+        } catch {
+        }
+        if ($Process.WaitForExit(10000)) { return "close_request" }
+        # The Server is launched through the py.exe launcher, which owns the
+        # python.exe child; a tree termination is what actually ends the Server.
+        Start-Process -FilePath "taskkill.exe" `
+            -ArgumentList @("/PID", "$($Process.Id)", "/T", "/F") `
+            -Wait -NoNewWindow -RedirectStandardOutput $logOut -RedirectStandardError $logErr
+        if (-not $Process.WaitForExit(15000)) {
+            throw "Server process did not exit during stop"
+        }
+        return "tree_terminate"
+    } finally {
+        Remove-Item -LiteralPath $logOut, $logErr -Force -ErrorAction SilentlyContinue
+    }
+}
+
+$lockPath = Join-Path $DataRoot "server.lock"
+$lockAfterFirstStop = ""
+$lockAfterFinalStop = ""
+$guardResults = $null
+$primaryFailure = $null
+$acceptanceResult = $null
+
 try {
+    $guardResults = Invoke-CleanupGuardChecks -Distribution $Distribution `
+        -WorkspaceLinuxPath $WorkspaceLinuxPath
     $process = Start-AgentBoxServer
     $null = Wait-Liveness -Process $process
     $tokenPath = Join-Path $DataRoot "secrets/http-token"
@@ -369,7 +758,112 @@ try {
         throw "Provider/Model archive was not persisted"
     }
 
-    [pscustomobject]@{
+    # -----------------------------------------------------------------------
+    # Bounded native-state gate: two rounds on one Session, a real Server
+    # restart in between, and the Windows DataRoot as the only durable
+    # authority for the native checkpoint.
+    # -----------------------------------------------------------------------
+    $r4Nonce = "STATEFUL-NONCE-R4-7F3A9C"
+    $statefulProfile = Invoke-Wire -Method "profiles.create" -Headers $auth -Params @{
+        requestId = "accept-e-r4-profile"
+        displayName = "Windows native state fixture"
+        harness = "hermes"
+    }
+    if ($statefulProfile.profile.harness -ne "hermes") {
+        throw "Native-state Profile was not created for the fixture Harness"
+    }
+    $r4First = Invoke-Wire -Method "sessions.createAndSend" -Headers $auth -Params @{
+        requestId = "accept-e-r4-first"
+        workspaceId = $opened.workspace.id
+        profileId = $statefulProfile.profile.id
+        overrides = @()
+        message = @{ text = "persist-native-state $r4Nonce"; attachments = @() }
+    }
+    $null = Wait-TurnState -SessionId $r4First.session.id -ExecutionId $r4First.executionId `
+        -States @("completed") -Headers $auth
+
+    $r4Before = Invoke-RestMethod -Uri "$baseUrl/api/v1/sessions/$($r4First.session.id)" -Headers $auth
+    if ($null -eq $r4Before.checkpoint -or -not $r4Before.checkpoint.object_digest) {
+        throw "Server did not return a native-state checkpoint after the first round"
+    }
+    $roundOneManifest = Assert-R4Checkpoint -Digest $r4Before.checkpoint.object_digest `
+        -NativeId $r4Before.checkpoint.native_id -HarnessType "hermes" -Label "first-round"
+    # sourceExecutionId binds the checkpoint to the Core execution, which is the
+    # identity the Session turn row records for it.
+    if ($roundOneManifest.sourceExecutionId -ne $r4Before.turns[0].execution_id) {
+        throw "First-round checkpoint is not bound to its own Core execution"
+    }
+    $nativeSessionId = $roundOneManifest.nativeSessionId
+    $roundOneReopen = Get-R4ReopenMethods -Manifest $roundOneManifest
+    if ($roundOneReopen[-1] -ne "session/new") {
+        throw "First round did not open a fresh native session: $($roundOneReopen -join '/')"
+    }
+    $roundOneSnapshot = Invoke-Wire -Method "history.snapshot" -Headers $auth `
+        -Params @{ sessionId = $r4First.session.id; page = @{ limit = 500 } }
+    $roundOneHead = ($roundOneSnapshot.frames | Measure-Object -Property seq -Maximum).Maximum
+
+    # Restart on the same isolated DataRoot: the lock must be released and the
+    # authoritative Session/Profile/checkpoint facts must still be readable.
+    $stopMode = Stop-AgentBoxServer -Process $process
+    $lockAfterFirstStop = Get-DataRootLockOwner -LockPath $lockPath
+    $process = Start-AgentBoxServer
+    $null = Wait-Liveness -Process $process
+    $token = (Get-Content -LiteralPath $tokenPath -Raw).Trim()
+    $auth = @{ Authorization = "Bearer $token" }
+    $helloAfter = Invoke-Wire -Method "server.hello" -Headers $auth -Params @{
+        clientVersions = @("wire/1"); clientPresentationSupports = @("wire.eventStream/1")
+    }
+    if ($helloAfter.serverId -ne $hello.serverId) {
+        throw "Restarted Server presented a different stable identity for the same data root"
+    }
+    $recovered = Invoke-Wire -Method "sessions.list" -Headers $auth -Params @{
+        workspaceId = $opened.workspace.id; includeArchived = $false
+    }
+    if (@($recovered.items | Where-Object { $_.id -eq $r4First.session.id }).Count -ne 1) {
+        throw "Restarted Server lost the authoritative Session catalog"
+    }
+
+    $r4Second = Invoke-Wire -Method "sessions.send" -Headers $auth -Params @{
+        requestId = "accept-e-r4-second"
+        sessionId = $r4First.session.id
+        overrides = @()
+        message = @{ text = "recall-native-state"; attachments = @() }
+    }
+    $null = Wait-TurnState -SessionId $r4First.session.id -ExecutionId $r4Second.executionId `
+        -States @("completed") -Headers $auth
+
+    $r4After = Invoke-RestMethod -Uri "$baseUrl/api/v1/sessions/$($r4First.session.id)" -Headers $auth
+    if ($r4After.checkpoint.native_id -ne $nativeSessionId) {
+        throw "Second round did not keep the first-round native session identity"
+    }
+    $roundTwoManifest = Assert-R4Checkpoint -Digest $r4After.checkpoint.object_digest `
+        -NativeId $nativeSessionId -HarnessType "hermes" -Label "second-round"
+    if ($roundTwoManifest.nativeSessionId -ne $nativeSessionId) {
+        throw "Second-round checkpoint created a different native session"
+    }
+    $roundTwoReopen = Get-R4ReopenMethods -Manifest $roundTwoManifest
+    if ($roundTwoReopen[-1] -ne "session/resume") {
+        throw "Second round did not reopen the stored native session through session/resume: $($roundTwoReopen -join '/')"
+    }
+    $roundTwoSnapshot = Invoke-Wire -Method "history.snapshot" -Headers $auth `
+        -Params @{ sessionId = $r4First.session.id; page = @{ limit = 500 } }
+    $roundTwoFrames = @($roundTwoSnapshot.frames | Where-Object { $_.seq -gt $roundOneHead })
+    $roundTwoDelta = @($roundTwoFrames | Where-Object {
+        $_.event.kind -eq "message.delta" -and $_.event.text -eq $r4Nonce
+    })
+    if ($roundTwoDelta.Count -eq 0) {
+        throw "Second round did not return the first-round nonce from native state"
+    }
+    $roundTwoTerminal = @($roundTwoFrames | Where-Object {
+        $_.event.kind -eq "execution.state" -and `
+        $_.event.executionId -eq $r4Second.executionId -and $_.event.state -eq "completed"
+    })
+    if ($roundTwoTerminal.Count -ne 1) { throw "Second round has no single completed state frame" }
+    if ($roundTwoDelta[0].seq -ge $roundTwoTerminal[0].seq) {
+        throw "Second-round delta was not persisted before the completed state"
+    }
+
+    $acceptanceResult = [pscustomobject]@{
         result = "BACKEND_41_E_WINDOWS_WSL_WIRE_OK"
         windows_server = $true
         distribution = $Distribution
@@ -386,43 +880,120 @@ try {
         data_root = $DataRoot
         workspace = $WorkspaceLinuxPath
         fixture = "explicit no-model ACP peer"
-    } | ConvertTo-Json -Compress
+        r4 = [ordered]@{
+            fixture = "tests/server/fixtures/stateful_acp_peer.mjs"
+            harness = "hermes"
+            state_projection = "/tmp/agentbox-home/sessions"
+            timeout_ms = 30000
+            nonce = $r4Nonce
+            session_id = $r4First.session.id
+            first_execution = $r4First.executionId
+            second_execution = $r4Second.executionId
+            checkpoint_digest = $r4After.checkpoint.object_digest
+            checkpoint_native_id = $nativeSessionId
+            checkpoint_files = @($roundTwoManifest.files | ForEach-Object { $_.path })
+            first_round_reopen = $roundOneReopen
+            second_round_reopen = $roundTwoReopen
+            delta_seq = $roundTwoDelta[0].seq
+            completed_seq = $roundTwoTerminal[0].seq
+            stop_mode = $stopMode
+            lock_instance_after_first_stop = $lockAfterFirstStop
+            lock_instance_after_final_stop = $null
+            server_id_after_restart = $helloAfter.serverId
+            cleanup_guards = $guardResults
+        }
+    }
+} catch {
+    $primaryFailure = $_
 } finally {
+    # Cleanup problems are collected instead of thrown from the cleanup path, so a
+    # failed cleanup can never replace the failure that actually stopped the run.
+    $cleanupProblems = @()
     if ($null -ne $socket) { $socket.Dispose() }
     if ($null -ne $process -and -not $process.HasExited) {
-        Stop-Process -Id $process.Id -ErrorAction SilentlyContinue
-        if (-not $process.WaitForExit(10000)) { throw "Server process did not exit during cleanup" }
-    }
-    Remove-Item -LiteralPath $stdoutPath, $stderrPath, $deploymentPath `
-        -Force -ErrorAction SilentlyContinue
-    if ($Cleanup -and (Test-Path -LiteralPath $DataRoot)) {
-        $dataItem = Get-Item -LiteralPath $DataRoot -Force
-        if (-not $dataItem.PSIsContainer -or (($dataItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0)) {
-            throw "Data cleanup refused: data root is not a real directory"
+        try {
+            $null = Stop-AgentBoxServer -Process $process
+        } catch {
+            $cleanupProblems += "Server stop failed: $($_.Exception.Message)"
         }
-        $marker = Join-Path $DataRoot ".agentbox-server-root"
-        if (-not (Test-Path -LiteralPath $marker -PathType Leaf)) { throw "Data cleanup refused: owner marker missing" }
-        $markerItem = Get-Item -LiteralPath $marker -Force
-        if (($markerItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw "Data cleanup refused: owner marker is a link" }
-        $markerText = (Get-Content -LiteralPath $marker -Raw) -replace "`r`n", "`n"
-        if ($markerText -eq "agentbox-server-r1`n") {
+    }
+    if (Test-Path -LiteralPath $lockPath) {
+        try {
+            $lockAfterFinalStop = Get-DataRootLockOwner -LockPath $lockPath
+            if ($null -ne $acceptanceResult) {
+                $acceptanceResult.r4.lock_instance_after_final_stop = $lockAfterFinalStop
+            }
+            if ($lockAfterFirstStop -and $lockAfterFinalStop -eq $lockAfterFirstStop) {
+                $cleanupProblems += "Data root lock was not re-acquired by the restarted Server"
+            }
+        } catch {
+            $cleanupProblems += "Data root lock check failed: $($_.Exception.Message)"
+        }
+    } elseif ($Cleanup) {
+        $cleanupProblems += "Data root lock file disappeared before cleanup verification"
+    }
+    if ($null -ne $primaryFailure -or $cleanupProblems.Count -ne 0) {
+        # A failed run keeps the Server output so the cause is inspectable.
+        Write-Host "Server stdout retained: $stdoutPath"
+        Write-Host "Server stderr retained: $stderrPath"
+    } else {
+        Remove-Item -LiteralPath $stdoutPath, $stderrPath, $deploymentPath `
+            -Force -ErrorAction SilentlyContinue
+    }
+    if ($Cleanup -and (Test-Path -LiteralPath $DataRoot)) {
+        try {
+            Assert-OwnerMarkedDataRoot -Path $DataRoot
             Remove-Item -LiteralPath $DataRoot -Recurse -Force
-        } else {
-            throw "Data cleanup refused: owner marker mismatch"
+            if (Test-Path -LiteralPath $DataRoot) { $cleanupProblems += "Data cleanup left residual data" }
+        } catch {
+            $cleanupProblems += "Data cleanup refused or failed: $($_.Exception.Message)"
         }
     }
     if ($Cleanup) {
-        & wsl.exe --distribution $Distribution --exec /usr/bin/test -f $workspaceMarker
-        if ($LASTEXITCODE -ne 0) { throw "Workspace cleanup refused: owner marker missing" }
-        & wsl.exe --distribution $Distribution --exec /usr/bin/rm -r -- $WorkspaceLinuxPath
-        if ($LASTEXITCODE -ne 0) { throw "Workspace cleanup failed" }
-        & wsl.exe --distribution $Distribution --exec /usr/bin/test -e -- $WorkspaceLinuxPath
-        if ($LASTEXITCODE -eq 0) { throw "Workspace cleanup left residual data" }
+        try {
+            Assert-MarkedWorkspace -Distribution $Distribution -MarkerPath $workspaceMarker
+            & wsl.exe --distribution $Distribution --exec /usr/bin/rm -r -- $WorkspaceLinuxPath
+            if ($LASTEXITCODE -ne 0) { $cleanupProblems += "Workspace cleanup failed" }
+            # `test -e -- <path>` exits 2 for any input, so the residue assertion has
+            # to read the exit code and treat "could not evaluate" as a failure too.
+            & wsl.exe --distribution $Distribution --exec /usr/bin/test -e $WorkspaceLinuxPath
+            $workspaceProbe = $LASTEXITCODE
+            if ($workspaceProbe -eq 2) {
+                $cleanupProblems += "Workspace existence could not be evaluated after cleanup"
+            } elseif ($workspaceProbe -eq 0) {
+                $cleanupProblems += "Workspace cleanup left residual data"
+            }
+        } catch {
+            $cleanupProblems += "Workspace cleanup refused or failed: $($_.Exception.Message)"
+        }
+        $portReachable = $false
         try {
             $probe = New-Object Net.Sockets.TcpClient
             $probe.Connect("127.0.0.1", $Port)
             $probe.Dispose()
-            throw "Server port remains reachable after cleanup: $Port"
+            $portReachable = $true
         } catch [System.Net.Sockets.SocketException] { }
+        if ($portReachable) { $cleanupProblems += "Server port remains reachable after cleanup: $Port" }
+        $scopedInstances = @(@($lockAfterFirstStop, $lockAfterFinalStop) | Where-Object { $_ })
+        $residual = @(Test-ResidualProcesses -DataRoot $DataRoot -Distribution $Distribution `
+            -InstanceIds $scopedInstances)
+        if ($residual.Count -ne 0) {
+            $cleanupProblems += "Residual Server/Worker/sidecar processes remain: $($residual -join '; ')"
+        }
+        $residue = @(Get-WorkerViewResidue -Distribution $Distribution `
+            -InstanceIds $scopedInstances)
+        if ($residue.Count -ne 0) {
+            $cleanupProblems += "Worker views/secrets remain after cleanup: $($residue -join '; ')"
+        }
+    }
+    if ($cleanupProblems.Count -ne 0 -and $null -ne $primaryFailure) {
+        throw ("Acceptance failed: $($primaryFailure.Exception.Message); " +
+            "cleanup verification also failed: $($cleanupProblems -join ' | ')")
+    }
+    if ($cleanupProblems.Count -ne 0) {
+        throw "Cleanup verification failed: $($cleanupProblems -join ' | ')"
     }
 }
+if ($null -ne $primaryFailure) { throw $primaryFailure }
+# Printed only once every gate, including the cleanup verification above, has held.
+$acceptanceResult | ConvertTo-Json -Compress -Depth 6

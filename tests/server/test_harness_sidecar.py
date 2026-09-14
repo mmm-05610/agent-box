@@ -32,6 +32,7 @@ from agent_box.server.execution.sidecar import (
 from agent_box_runtime_wsl import WorkerClient
 from agent_box.server.transport.http import create_app
 from agent_box.server.model_configs.service import ProviderModelService
+from agent_box.work_core.events import EventType
 from fastapi.testclient import TestClient
 
 
@@ -346,7 +347,7 @@ def test_real_worker_bwrap_interactive_sidecar_streams_before_terminal(tmp_path)
         ), observed
     finally:
         port.stop()
-    assert not (tmp_path / "worker-root" / "views").exists()
+    _await_worker_projection_cleanup(tmp_path / "worker-root")
 
 
 def test_server_core_real_worker_persists_stream_before_terminal(tmp_path, monkeypatch):
@@ -512,46 +513,119 @@ def test_server_core_real_worker_persists_stream_before_terminal(tmp_path, monke
     assert not (tmp_path / "server-worker-root" / "views").exists()
 
 
-def test_real_worker_state_projection_resumes_two_fresh_sidecars(tmp_path, monkeypatch):
-    """Two Core executions must resume the fixture's one native session."""
+STATEFUL_FIXTURE_RELATIVE = "tests/server/fixtures/stateful_acp_peer.mjs"
+
+
+class _StatefulWslConnector:
+    """WSL connector bound to the current Worker build and this checkout."""
+
+    def __init__(self, tmp_path, worker):
+        self.tmp_path = tmp_path
+        self.worker = worker
+
+    def distributions(self): return [{"name": "Ubuntu"}]
+
+    def probe(self, distribution, user):
+        return {"probe_id": "probe", "distribution": distribution, "user": user}
+
+    def browse(self, probe_id, path):
+        return {"path": path, "directories": [], "files": []}
+
+    def open_workspace(self, probe_id, path):
+        return {"connection_id": "connection-stateful", "distribution": "Ubuntu",
+                "user": os.environ["USER"], "path": str(REPO)}
+
+    def client_for_workspace(self, **arguments):
+        return WorkerClient(
+            [str(self.worker), "--root", str(self.tmp_path / "worker-root"),
+             "--workspace", str(REPO)],
+            worker_digest="sha256:" + hashlib.sha256(self.worker.read_bytes()).hexdigest(),
+            worker_version="0.1.0", connection_id=arguments["connection_id"],
+            project_id=arguments["connection_id"], effective_user=os.environ["USER"],
+            server_instance_id="server-stateful", executable_authorizations=(),
+        )
+
+
+def _stateful_real_worker_runtime(tmp_path, monkeypatch, *, harness_id):
+    """A Server whose one Harness declares a bounded writable native-state subtree."""
     worker = REPO / "workers" / "agent-box-worker" / "target" / "debug" / "agent-box-worker"
     if not worker.is_file() or not shutil.which("bwrap"):
         pytest.skip("current Worker and bwrap are required")
 
-    class Connector:
-        def distributions(self): return [{"name": "Ubuntu"}]
-        def probe(self, distribution, user): return {"probe_id": "probe", "distribution": distribution, "user": user}
-        def browse(self, probe_id, path): return {"path": path, "directories": [], "files": []}
-        def open_workspace(self, probe_id, path):
-            return {"connection_id": "connection-stateful", "distribution": "Ubuntu",
-                    "user": os.environ["USER"], "path": str(REPO)}
-        def client_for_workspace(self, **arguments):
-            return WorkerClient(
-                [str(worker), "--root", str(tmp_path / "worker-root"), "--workspace", str(REPO)],
-                worker_digest="sha256:" + hashlib.sha256(worker.read_bytes()).hexdigest(),
-                worker_version="0.1.0", connection_id=arguments["connection_id"],
-                project_id=arguments["connection_id"], effective_user=os.environ["USER"],
-                server_instance_id="server-stateful", executable_authorizations=(),
-            )
-
-    deployment = tmp_path / "stateful-deployment.json"
+    deployment = tmp_path / f"stateful-{harness_id}-deployment.json"
     deployment.write_text(json.dumps({
         "schemaVersion": 1, "pluginRoot": str(PLUGIN),
-        "harnesses": [{"id": "pi", "timeoutMs": 30_000,
+        "harnesses": [{"id": harness_id, "timeoutMs": 30_000,
                        "stateProjection": {"target": "/tmp/agentbox-home/sessions"},
                        "adapter": {"command": "/usr/bin/node", "args": [],
-                                   "source": "tests/server/fixtures/stateful_acp_peer.mjs"}}],
+                                   "source": STATEFUL_FIXTURE_RELATIVE}}],
     }), encoding="utf-8")
     import agent_box.server.bootstrap.runtime as runtime_module
-    monkeypatch.setattr(runtime_module, "_builtin_connector", lambda _id: Connector())
+    monkeypatch.setattr(
+        runtime_module, "_builtin_connector",
+        lambda _id: _StatefulWslConnector(tmp_path, worker),
+    )
     original_file = runtime_module._sidecar_deployment_file
+    fixture = pathlib.Path(__file__).parent / "fixtures" / "stateful_acp_peer.mjs"
     monkeypatch.setattr(
         runtime_module, "_sidecar_deployment_file",
-        lambda root, value, relative: (pathlib.Path(__file__).parent / "fixtures" / "stateful_acp_peer.mjs").read_bytes()
-        if relative == "tests/server/fixtures/stateful_acp_peer.mjs"
+        lambda root, value, relative: fixture.read_bytes()
+        if relative == STATEFUL_FIXTURE_RELATIVE
         else original_file(root, value, relative),
     )
-    runtime = build_runtime_from_sidecar_deployment(tmp_path / "server", deployment)
+    return build_runtime_from_sidecar_deployment(tmp_path / "server", deployment)
+
+
+def _checkpoint_manifest(runtime, session):
+    return json.loads(runtime.objects.read(session["checkpoint"]["object_digest"]))
+
+
+def _reopen_method(runtime, session):
+    """The ACP operation the adapter last used to open the stored native Session.
+
+    The fixture appends every open it serves, so the last line is the method the
+    current round really sent — not the one this test assumed it would send.
+    """
+    manifest = _checkpoint_manifest(runtime, session)
+    entry = next(
+        item for item in manifest["files"] if item["path"] == "reopen-method.txt"
+    )
+    lines = [line for line in runtime.objects.read(entry["digest"]).decode().splitlines() if line]
+    assert lines, "the captured native state did not record the ACP reopen method"
+    return lines[-1]
+
+
+def _wait_for_turn(runtime, session_id, index, state, *, timeout=15):
+    deadline = time.monotonic() + timeout
+    while True:
+        session = runtime.repository.get_session(session_id)
+        if len(session["turns"]) > index and session["turns"][index]["state"] == state:
+            return session
+        assert time.monotonic() < deadline, {
+            "turns": session["turns"], "events": session["events"],
+        }
+        time.sleep(0.02)
+
+
+def _await_worker_projection_cleanup(root, *, timeout=15):
+    """Wait, bounded, for the Worker to retire its per-execution projections.
+
+    A turn becomes durably terminal before the Worker releases its view, so the
+    two are not simultaneous; the assertion is that nothing is left once the run
+    has settled, not that the release happened before the turn did.
+    """
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if not (root / "views").exists() and not (root / "secrets").exists():
+            return
+        time.sleep(0.05)
+    assert not (root / "views").exists()
+    assert not (root / "secrets").exists()
+
+
+def test_real_worker_state_projection_resumes_two_fresh_sidecars(tmp_path, monkeypatch):
+    """Two Core executions must resume the fixture's one native session."""
+    runtime = _stateful_real_worker_runtime(tmp_path, monkeypatch, harness_id="pi")
     try:
         with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
             headers = {"Authorization": f"Bearer {runtime.token}"}
@@ -596,14 +670,148 @@ def test_real_worker_state_projection_resumes_two_fresh_sidecars(tmp_path, monke
                 "dispatch_id": session["turns"][1]["dispatch_id"],
             }
             assert session["checkpoint"]["native_id"] == native_id
+            # PI declares an authoritative journal, so the bridge reopens the stored
+            # Session through the replaying `session/load` rather than `session/resume`.
+            # The method the adapter really sent is read from the captured native state.
+            assert _reopen_method(runtime, session) == "session/load"
             events = [e for e in session["events"] if e.get("turn_id") == second["executionId"]]
             delta = next(e for e in events if e["kind"] == "message.delta")
             terminal = next(e for e in events if e["kind"] == "turn.state" and e["data"].get("state") == "completed")
             assert delta["data"]["text"] == "STATEFUL-NONCE-ABC123" and delta["seq"] < terminal["seq"]
     finally:
         runtime.stop()
-    assert not (tmp_path / "worker-root" / "views").exists()
-    assert not (tmp_path / "worker-root" / "secrets").exists()
+    _await_worker_projection_cleanup(tmp_path / "worker-root")
+
+
+def test_real_worker_state_projection_reopens_through_acp_resume(tmp_path, monkeypatch):
+    """A Harness without an authoritative journal must reopen through `session/resume`."""
+    runtime = _stateful_real_worker_runtime(tmp_path, monkeypatch, harness_id="hermes")
+    try:
+        with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
+            headers = {"Authorization": f"Bearer {runtime.token}"}
+            opened = _wire_post(client, runtime.token, "workspaces.open", {
+                "requestId": "open-resume", "path": str(REPO),
+                "environment": {"kind": "wsl", "host": "Ubuntu", "user": os.environ["USER"]},
+            })["workspace"]
+            profile = client.post("/api/v1/profiles", headers={
+                **headers, "Idempotency-Key": "resume-profile",
+            }, json={"name": "resume", "harness_type": "hermes", "configuration": {},
+                     "credential_id": None}).json()
+            first = _wire_post(client, runtime.token, "sessions.createAndSend", {
+                "requestId": "resume-first", "workspaceId": opened["id"],
+                "profileId": profile["profile_id"], "overrides": [],
+                "message": {"text": "remember STATEFUL-NONCE-RESUME-1", "attachments": []},
+            })
+            session = _wait_for_turn(runtime, first["session"]["id"], 0, "completed")
+            assert _reopen_method(runtime, session) == "session/new"
+            native_id = session["checkpoint"]["native_id"]
+            _wire_post(client, runtime.token, "sessions.send", {
+                "requestId": "resume-second", "sessionId": first["session"]["id"],
+                "overrides": [], "message": {"text": "recall", "attachments": []},
+            })
+            session = _wait_for_turn(runtime, first["session"]["id"], 1, "completed")
+            assert session["checkpoint"]["native_id"] == native_id
+            assert _reopen_method(runtime, session) == "session/resume"
+    finally:
+        runtime.stop()
+    _await_worker_projection_cleanup(tmp_path / "worker-root")
+
+
+@pytest.mark.parametrize("poison", [
+    "schema_version", "resumable", "native_id", "checkpoint_object", "state_object",
+])
+def test_unusable_checkpoint_fails_the_turn_without_inventing_a_session(
+    tmp_path, monkeypatch, poison,
+):
+    """A checkpoint the Server cannot restore must fail the turn, never succeed.
+
+    The poisoned value is written straight into the authoritative session row, so
+    the second turn starts from a checkpoint that claims to be resumable for this
+    Harness and is not.
+    """
+    runtime = _stateful_real_worker_runtime(tmp_path, monkeypatch, harness_id="hermes")
+    try:
+        with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
+            headers = {"Authorization": f"Bearer {runtime.token}"}
+            opened = _wire_post(client, runtime.token, "workspaces.open", {
+                "requestId": "open-poison", "path": str(REPO),
+                "environment": {"kind": "wsl", "host": "Ubuntu", "user": os.environ["USER"]},
+            })["workspace"]
+            profile = client.post("/api/v1/profiles", headers={
+                **headers, "Idempotency-Key": "poison-profile",
+            }, json={"name": "poison", "harness_type": "hermes", "configuration": {},
+                     "credential_id": None}).json()
+            first = _wire_post(client, runtime.token, "sessions.createAndSend", {
+                "requestId": "poison-first", "workspaceId": opened["id"],
+                "profileId": profile["profile_id"], "overrides": [],
+                "message": {"text": "remember STATEFUL-NONCE-POISON-1", "attachments": []},
+            })
+            session = _wait_for_turn(runtime, first["session"]["id"], 0, "completed")
+            good_digest = session["checkpoint"]["object_digest"]
+            native_id = session["checkpoint"]["native_id"]
+            manifest = json.loads(runtime.objects.read(good_digest))
+
+            def publish(value):
+                return runtime.objects.publish(
+                    json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+                ).digest
+
+            if poison == "schema_version":
+                poisoned = publish({**manifest, "schema_version": 1})
+            elif poison == "resumable":
+                poisoned = publish({**manifest, "resumable": False})
+            elif poison == "native_id":
+                poisoned = publish({**manifest, "nativeSessionId": "native-somebody-else"})
+            elif poison == "checkpoint_object":
+                poisoned = "sha256:" + "ab" * 32
+            else:
+                missing = {**manifest["files"][0], "digest": "sha256:" + "cd" * 32}
+                poisoned = publish({**manifest, "files": [missing]})
+            with runtime.database.transaction() as conn:
+                conn.execute(
+                    "UPDATE server_sessions SET checkpoint_object_digest=? WHERE id=?",
+                    (poisoned, first["session"]["id"]),
+                )
+
+            second = _wire_post(client, runtime.token, "sessions.send", {
+                "requestId": "poison-second", "sessionId": first["session"]["id"],
+                "overrides": [], "message": {"text": "recall", "attachments": []},
+            })
+            session = _wait_for_turn(runtime, first["session"]["id"], 1, "failed")
+            turn = session["turns"][1]
+            assert turn["id"] == second["executionId"]
+            # Core cannot prove from an extension that a rejected start had no side
+            # effect, so it records the dispatch as ambiguous and keeps the reason
+            # verbatim. The failed restore must therefore be visible in the durable
+            # dispatch ledger, and the only accepted dispatch in this Session must
+            # still be the first round's.
+            with runtime.database.read() as conn:
+                ledger = [
+                    (row["type"], json.loads(row["data_json"]))
+                    for row in conn.execute(
+                        "SELECT type,data_json FROM core_events WHERE type IN (?,?) "
+                        "ORDER BY occurred_at,id",
+                        (EventType.EXECUTION_DISPATCH_AMBIGUOUS.value,
+                         EventType.EXECUTION_DISPATCH_ACCEPTED.value),
+                    )
+                ]
+            ambiguous = [data for kind, data in ledger if kind == "ExecutionDispatchAmbiguous"]
+            accepted = [kind for kind, _data in ledger if kind == "ExecutionDispatchAccepted"]
+            assert len(ambiguous) == 1 and "SIDECAR_CHECKPOINT_INVALID" in ambiguous[0]["error"], ledger
+            assert len(accepted) == 1, ledger
+            assert turn["state"] == "failed"
+            assert [item["state"] for item in session["turns"]] == ["completed", "failed"]
+            # The failed restore neither replaced the checkpoint nor minted a native
+            # identity: the Session still points exactly where it did before it.
+            assert session["checkpoint"]["object_digest"] == poisoned
+            assert session["checkpoint"]["native_id"] == native_id
+            assert not any(
+                event["kind"] == "message.delta" and event.get("turn_id") == second["executionId"]
+                for event in session["events"]
+            )
+    finally:
+        runtime.stop()
+    _await_worker_projection_cleanup(tmp_path / "worker-root")
 
 
 def _local_sidecar_runtime(tmp_path, *, provider_model=False):
