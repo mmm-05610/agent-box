@@ -11,7 +11,9 @@ use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io;
-use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+use std::os::unix::ffi::OsStrExt;
+use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
+use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 use std::os::unix::process::CommandExt;
 use std::path::{Component, Path, PathBuf};
 use std::process::Stdio;
@@ -1441,10 +1443,19 @@ fn handle_view(root: &Path, op: &str, args: &Value) -> Result<Value, (&'static s
         }
         "view.commit" => {
             let manifest = read_view_manifest(&dir)?;
+            let view_fd = pinned_view_fd(&dir)?;
+            let ready = open_beneath(view_fd.as_raw_fd(), Path::new("ready"), true)?;
             for file in &manifest.files {
-                let path = dir.join("ready").join(safe_relative(&file.path)?);
-                let bytes =
-                    fs::read(path).map_err(|_| ("VIEW_INCOMPLETE", "view has incomplete files"))?;
+                let relative = safe_relative(&file.path)?;
+                let bytes = match read_view_entry(ready.as_raw_fd(), &relative) {
+                    Ok(bytes) => bytes,
+                    // A declared file that is not there is an incomplete view,
+                    // not churn: commit is a one-shot publication step.
+                    Err(("VIEW_MISSING", _)) => {
+                        return Err(("VIEW_INCOMPLETE", "view has incomplete files"))
+                    }
+                    Err(error) => return Err(error),
+                };
                 if bytes.len() as u64 != file.size || digest(&bytes) != file.digest {
                     return Err(("VIEW_DIGEST_MISMATCH", "view read-back did not match"));
                 }
@@ -1457,10 +1468,11 @@ fn handle_view(root: &Path, op: &str, args: &Value) -> Result<Value, (&'static s
             if !dir.join(".committed").is_file() {
                 return Err(("VIEW_INCOMPLETE", "view is not committed"));
             }
-            let ready = dir.join("ready");
+            let view_fd = pinned_view_fd(&dir)?;
+            let ready = open_beneath(view_fd.as_raw_fd(), Path::new("ready"), true)?;
             let mut files = Vec::new();
             let mut visited = 0usize;
-            list_view_files(&ready, &ready, &mut files, &mut visited)?;
+            list_view_files(ready.as_raw_fd(), "", &mut files, &mut visited)?;
             if files.len() > 1024 {
                 return Err(("VIEW_FILE_LIMIT", "view exceeds file limit"));
             }
@@ -1471,40 +1483,25 @@ fn handle_view(root: &Path, op: &str, args: &Value) -> Result<Value, (&'static s
             if !dir.join(".committed").is_file() {
                 return Err(("VIEW_INCOMPLETE", "view is not committed"));
             }
-            let rel = safe_relative(value_string(args, "path")?)?;
-            let target = dir.join("ready").join(rel);
-            let metadata = view_entry_metadata(&target)?;
-            // A view lists regular files. An entry of any other type is either a
-            // special file that was never a view file, or a regular file that
-            // changed type under the read; both are refused, and the caller's
-            // classifier decides whether the second one is retryable.
-            if metadata.file_type().is_symlink() || !metadata.is_file() {
-                return Err(("VIEW_SPECIAL_FILE", "view file is not a regular file"));
-            }
-            if metadata.len() as usize > MAX_ARTIFACT_BYTES {
-                return Err(("VIEW_INVALID", "view file exceeds the artifact bound"));
-            }
-            let bytes = read_view_bytes(&target)?;
+            let relative = safe_relative(value_string(args, "path")?)?;
+            let view_fd = pinned_view_fd(&dir)?;
+            let ready = open_beneath(view_fd.as_raw_fd(), Path::new("ready"), true)?;
+            let file = read_view_entry(ready.as_raw_fd(), &relative)?;
             let offset = args.get("offset").and_then(Value::as_u64).unwrap_or(0) as usize;
             let maximum = args
                 .get("maxLength")
                 .and_then(Value::as_u64)
                 .unwrap_or(MAX_FETCH_BYTES as u64) as usize;
-            if maximum == 0 || maximum > MAX_FETCH_BYTES {
+            // The fetch range is validated as a request, on its own face: a
+            // first request past the end is simply invalid, and a genuine
+            // shortening between two chunks of one read is caught by the
+            // caller's digest check on the chunk that no longer matches.
+            if maximum == 0 || maximum > MAX_FETCH_BYTES || offset > file.len() {
                 return Err(("VIEW_INVALID", "view fetch range is invalid"));
             }
-            if offset > bytes.len() {
-                // Every offset but the first comes from this Worker's previous
-                // response, so an offset past the end means the file got shorter
-                // while it was being fetched.
-                return Err((
-                    "VIEW_CHANGED",
-                    "view file shrank below the requested offset",
-                ));
-            }
-            let end = (offset + maximum).min(bytes.len());
+            let end = (offset + maximum).min(file.len());
             Ok(
-                json!({"path":value_string(args,"path")?,"offset":offset,"nextOffset":end,"totalBytes":bytes.len(),"digest":digest(&bytes),"data":BASE64.encode(&bytes[offset..end]),"eof":end==bytes.len()}),
+                json!({"path":value_string(args,"path")?,"offset":offset,"nextOffset":end,"totalBytes":file.len(),"digest":digest(&file),"data":BASE64.encode(&file[offset..end]),"eof":end==file.len()}),
             )
         }
         "view.cleanup" => {
@@ -1517,43 +1514,152 @@ fn handle_view(root: &Path, op: &str, args: &Value) -> Result<Value, (&'static s
     }
 }
 
-/// List one view directory, distinguishing a subtree that moved under the walk
-/// from a plain fault: only the first is a content change a caller may retry.
-fn read_view_dir(directory: &Path) -> Result<fs::ReadDir, (&'static str, &'static str)> {
-    fs::read_dir(directory).map_err(|error| match error.kind() {
-        std::io::ErrorKind::NotFound => (
-            "VIEW_CHANGED",
-            "view directory vanished while it was being listed",
-        ),
-        _ => ("VIEW_IO", "view listing failed"),
+/// Open the committed view directory itself as an fd, so every later step
+/// anchors at an inode instead of a path a Harness-writable bind could swap.
+fn pinned_view_fd(dir: &Path) -> Result<fs::File, (&'static str, &'static str)> {
+    fs::File::open(dir).map_err(|_| ("VIEW_IO", "view open failed"))
+}
+
+/// Open one path component beneath a pinned directory fd without following a
+/// symlink, so an entry or a parent directory that is swapped for a link
+/// between a check and an open cannot redirect the read. `directory` requires
+/// the final component to be a directory. `O_NONBLOCK` keeps a FIFO that
+/// appeared in the view from blocking the open; the type check rejects it.
+fn open_at(
+    base: RawFd,
+    name: &std::ffi::OsStr,
+    directory: bool,
+) -> Result<RawFd, (&'static str, &'static str)> {
+    let mut flags = libc::O_RDONLY | libc::O_CLOEXEC | libc::O_NOFOLLOW | libc::O_NONBLOCK;
+    if directory {
+        flags |= libc::O_DIRECTORY;
+    }
+    // CString is required: `openat` needs the terminator, and `OsStr::as_bytes`
+    // alone would let it read past the name.
+    let c_name = std::ffi::CString::new(name.as_bytes())
+        .map_err(|_| ("PATH_INVALID", "relative path is invalid"))?;
+    let fd = unsafe { libc::openat(base, c_name.as_ptr(), flags, 0) };
+    if fd >= 0 {
+        return Ok(fd);
+    }
+    let error = std::io::Error::last_os_error();
+    Err(match error.raw_os_error() {
+        // A link in the resolved path is a refusal: the view contract reads
+        // declared regular files only, and nothing may resolve through a link.
+        Some(libc::ELOOP) => ("VIEW_SPECIAL_FILE", "view path resolves through a symlink"),
+        Some(libc::ENOTDIR) => ("VIEW_INVALID", "view path crosses a non-directory"),
+        _ if error.kind() == std::io::ErrorKind::NotFound => {
+            ("VIEW_MISSING", "view entry is not there")
+        }
+        _ => ("VIEW_IO", "view open failed"),
     })
 }
 
-/// The metadata of one view entry, distinguishing "it moved" from "it failed".
-fn view_entry_metadata(path: &Path) -> Result<fs::Metadata, (&'static str, &'static str)> {
-    path.symlink_metadata().map_err(|error| match error.kind() {
-        std::io::ErrorKind::NotFound => ("VIEW_CHANGED", "view entry vanished before it was read"),
-        _ => ("VIEW_IO", "view metadata failed"),
-    })
+/// Resolve `relative` beneath `base_fd` one component at a time, every open
+/// with `O_NOFOLLOW`, and return the final fd as an owned file. Only that fd
+/// is left open; a parent swap therefore cannot redirect any later component.
+fn open_beneath(
+    base_fd: RawFd,
+    relative: &Path,
+    final_is_directory: bool,
+) -> Result<fs::File, (&'static str, &'static str)> {
+    let components: Vec<&std::ffi::OsStr> = relative
+        .components()
+        .map(|component| match component {
+            Component::Normal(name) => Some(name),
+            _ => None,
+        })
+        .collect::<Option<Vec<_>>>()
+        .ok_or(("PATH_INVALID", "relative path is invalid"))?;
+    if components.is_empty() {
+        return Err(("PATH_INVALID", "relative path is invalid"));
+    }
+    let mut opened: Vec<RawFd> = Vec::new();
+    let result = (|| {
+        let mut current = base_fd;
+        for (index, name) in components.iter().enumerate() {
+            let directory = final_is_directory || index + 1 < components.len();
+            let fd = open_at(current, name, directory)?;
+            opened.push(fd);
+            current = fd;
+        }
+        Ok(())
+    })();
+    match result {
+        Ok(()) => {
+            let final_fd = opened.pop().expect("at least one component");
+            for fd in opened {
+                unsafe { libc::close(fd) };
+            }
+            // SAFETY: `final_fd` is a freshly opened descriptor this call owns.
+            Ok(unsafe { fs::File::from_raw_fd(final_fd) })
+        }
+        Err(error) => {
+            for fd in opened {
+                unsafe { libc::close(fd) };
+            }
+            Err(error)
+        }
+    }
 }
 
-/// The bytes of one declared view file, distinguishing "it moved" from a fault.
-fn read_view_bytes(path: &Path) -> Result<Vec<u8>, (&'static str, &'static str)> {
-    fs::read(path).map_err(|error| match error.kind() {
-        std::io::ErrorKind::NotFound => ("VIEW_CHANGED", "view file vanished during the read"),
-        _ => ("VIEW_IO", "view file read failed"),
-    })
+/// Read one open view entry to the end, proving the bytes belong to the file
+/// that was opened: the fd was opened with `O_NOFOLLOW`, the type and size are
+/// taken from that fd, the read is bounded by the artifact limit no matter
+/// what the metadata claimed, and a swap or a truncate during the read is a
+/// content change rather than bytes this Worker will serve.
+fn read_view_entry(
+    view_fd: RawFd,
+    relative: &Path,
+) -> Result<Vec<u8>, (&'static str, &'static str)> {
+    use std::io::Read;
+    let mut file = open_beneath(view_fd, relative, false)?;
+    let before = file
+        .metadata()
+        .map_err(|_| ("VIEW_IO", "view file metadata failed"))?;
+    if !before.is_file() {
+        // A directory, FIFO, socket or device that sits where a declared file
+        // should be is a refusal; nothing is ever read from it.
+        return Err(("VIEW_SPECIAL_FILE", "view file is not a regular file"));
+    }
+    if before.len() as usize > MAX_ARTIFACT_BYTES {
+        return Err(("VIEW_INVALID", "view file exceeds the artifact bound"));
+    }
+    let mut bytes = Vec::with_capacity(before.len() as usize);
+    (&mut file)
+        .take(MAX_ARTIFACT_BYTES as u64 + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|_| ("VIEW_IO", "view file read failed"))?;
+    let after = file
+        .metadata()
+        .map_err(|_| ("VIEW_IO", "view file metadata failed"))?;
+    let identity = |metadata: &fs::Metadata| (metadata.dev(), metadata.ino(), metadata.len());
+    if identity(&after) != identity(&before) || bytes.len() as u64 > MAX_ARTIFACT_BYTES as u64 {
+        return Err(("VIEW_CHANGED", "view file changed while it was being read"));
+    }
+    Ok(bytes)
 }
 
+/// Walk one pinned directory fd. Descent re-opens every child with
+/// `openat(.., O_NOFOLLOW | O_DIRECTORY)` from the pinned parent, so no swap
+/// can redirect the walk; an entry that vanishes or turns into a link under
+/// the walk is skipped (the next snapshot simply differs), and everything else
+/// keeps its typed refusal.
 fn list_view_files(
-    base: &Path,
-    directory: &Path,
+    directory_fd: RawFd,
+    prefix: &str,
     files: &mut Vec<Value>,
     visited: &mut usize,
 ) -> Result<(), (&'static str, &'static str)> {
-    for entry in read_view_dir(directory)? {
+    for entry in
+        fs::read_dir(fd_path(directory_fd)).map_err(|_| ("VIEW_IO", "view listing failed"))?
+    {
         let entry = entry.map_err(|_| ("VIEW_IO", "view listing failed"))?;
-        let metadata = view_entry_metadata(&entry.path())?;
+        let name = entry.file_name();
+        // DirEntry::metadata is lstat: a swapped-in link is seen as a link.
+        let metadata = entry
+            .metadata()
+            .map_err(|_| ("VIEW_IO", "view metadata failed"))?;
         // Every visited entry costs one step, whatever its type.
         *visited += 1;
         if *visited > MAX_VIEW_TRAVERSAL_ENTRIES {
@@ -1568,16 +1674,25 @@ fn list_view_files(
         if metadata.file_type().is_symlink() {
             continue;
         }
+        let child_prefix = if prefix.is_empty() {
+            name.to_string_lossy().into_owned()
+        } else {
+            format!("{prefix}/{}", name.to_string_lossy())
+        };
         if metadata.is_dir() {
-            list_view_files(base, &entry.path(), files, visited)?;
+            match open_at(directory_fd, &name, true) {
+                Ok(child_fd) => {
+                    let walked = list_view_files(child_fd, &child_prefix, files, visited);
+                    unsafe { libc::close(child_fd) };
+                    walked?;
+                }
+                // A child that vanished or turned into a link under the walk is
+                // churn, not a fault: the listing simply stops seeing it.
+                Err(("VIEW_MISSING", _)) | Err(("VIEW_SPECIAL_FILE", _)) => {}
+                Err(other) => return Err(other),
+            }
         } else if metadata.is_file() {
-            let relative = entry
-                .path()
-                .strip_prefix(base)
-                .map_err(|_| ("VIEW_INVALID", "view path escaped"))?
-                .to_string_lossy()
-                .replace('\\', "/");
-            files.push(json!({"path":relative,"size":metadata.len()}));
+            files.push(json!({"path":child_prefix,"size":metadata.len()}));
             if files.len() > 1024 {
                 return Err(("VIEW_FILE_LIMIT", "view exceeds file limit"));
             }
@@ -1588,6 +1703,12 @@ fn list_view_files(
         }
     }
     Ok(())
+}
+
+/// The path that reads back a pinned directory fd, so iteration is anchored to
+/// the inode the Worker already verified instead of to a swappable name.
+fn fd_path(fd: RawFd) -> PathBuf {
+    PathBuf::from(format!("/proc/self/fd/{fd}"))
 }
 fn handle_secret(
     root: &Path,
@@ -1652,9 +1773,10 @@ mod view_listing_tests {
     }
 
     fn listing(root: &std::path::Path) -> Result<Vec<String>, (&'static str, &'static str)> {
+        let view_fd = fs::File::open(root).map_err(|_| ("VIEW_IO", "view open failed"))?;
         let mut files = Vec::new();
         let mut visited = 0usize;
-        list_view_files(root, root, &mut files, &mut visited)?;
+        list_view_files(view_fd.as_raw_fd(), "", &mut files, &mut visited)?;
         Ok(files
             .iter()
             .map(|item| item["path"].as_str().unwrap().to_string())
@@ -1725,21 +1847,46 @@ mod view_listing_tests {
         let _ = fs::remove_dir_all(&root);
     }
 
-    /// A directory that moved while it was listed is churn, not a plain fault.
+    /// A view entry that is not there is a deterministic refusal. The sidecar
+    /// knows a captured path was just listed, so converting that refusal into
+    /// "the bytes moved" is its decision, never the Worker's.
     #[test]
-    fn a_directory_that_vanished_mid_listing_is_reported_as_a_change() {
-        let root = scratch("view-vanished-dir");
-        fs::write(root.join("state.db"), b"state").unwrap();
-        let mut files = Vec::new();
-        let mut visited = 0usize;
-        let missing = root.join("gone");
+    fn a_missing_view_entry_is_refused_without_a_retry_hint() {
+        let root = scratch("view-missing-entry");
+        committed_view(&root, "view-1");
+        let refused = handle_view(
+            &root,
+            "view.get",
+            &json!({"viewId":"view-1","path":"state.db"}),
+        );
+        assert_eq!(refused.unwrap_err().0, "VIEW_MISSING");
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn open_at_maps_a_link_a_missing_entry_and_a_non_directory() {
+        let root = scratch("view-open-mapping");
+        fs::write(root.join("regular"), b"x").unwrap();
+        std::os::unix::fs::symlink("regular", root.join("link")).unwrap();
+        let fd = fs::File::open(&root).unwrap();
+        let base = fd.as_raw_fd();
         assert_eq!(
-            list_view_files(&root, &missing, &mut files, &mut visited)
+            open_at(base, std::ffi::OsStr::new("link"), false).unwrap_err(),
+            ("VIEW_SPECIAL_FILE", "view path resolves through a symlink")
+        );
+        assert_eq!(
+            open_at(base, std::ffi::OsStr::new("gone"), true)
                 .unwrap_err()
                 .0,
-            "VIEW_CHANGED",
+            "VIEW_MISSING"
         );
-        assert!(files.is_empty());
+        assert_eq!(
+            open_at(base, std::ffi::OsStr::new("regular"), true)
+                .unwrap_err()
+                .0,
+            "VIEW_INVALID"
+        );
+        drop(fd);
         let _ = fs::remove_dir_all(&root);
     }
 
@@ -1751,7 +1898,7 @@ mod view_listing_tests {
     }
 
     #[test]
-    fn a_file_that_shortened_under_the_fetch_is_reported_as_a_change() {
+    fn a_first_fetch_past_the_end_is_an_invalid_request_not_churn() {
         let root = scratch("view-shrunk");
         let dir = committed_view(&root, "view-shrunk-1");
         fs::write(dir.join("ready").join("state.db"), b"brief").unwrap();
@@ -1760,7 +1907,7 @@ mod view_listing_tests {
             "view.get",
             &json!({"viewId":"view-shrunk-1","path":"state.db","offset":64}),
         );
-        assert_eq!(refused.unwrap_err().0, "VIEW_CHANGED");
+        assert_eq!(refused.unwrap_err().0, "VIEW_INVALID");
         let _ = fs::remove_dir_all(&root);
     }
 
@@ -1769,7 +1916,7 @@ mod view_listing_tests {
         for (name, code, make) in [
             ("view-get-symlink", "VIEW_SPECIAL_FILE", 0u8),
             ("view-get-fifo", "VIEW_SPECIAL_FILE", 1u8),
-            ("view-get-missing", "VIEW_CHANGED", 2u8),
+            ("view-get-missing", "VIEW_MISSING", 2u8),
         ] {
             let root = scratch(name);
             let dir = committed_view(&root, "view-1");
@@ -1798,6 +1945,100 @@ mod view_listing_tests {
             );
             let _ = fs::remove_dir_all(&root);
         }
+    }
+
+    /// A declared file that is swapped for a link to something outside the
+    /// view is never read through: the open refuses the link itself.
+    #[test]
+    fn a_swapped_in_symlink_is_never_read_through_to_its_target() {
+        let root = scratch("view-swap-final");
+        let dir = committed_view(&root, "view-1");
+        let outside = root.join("outside-sentinel");
+        fs::write(&outside, b"VIEW-OUTSIDE-SENTINEL").unwrap();
+        let ready = dir.join("ready");
+        fs::write(ready.join("state.db"), b"state").unwrap();
+        let link = ready.join("state.db.link");
+        std::os::unix::fs::symlink(&outside, &link).unwrap();
+        fs::rename(&link, ready.join("state.db")).unwrap();
+        let refused = handle_view(
+            &root,
+            "view.get",
+            &json!({"viewId":"view-1","path":"state.db"}),
+        );
+        assert_eq!(refused.unwrap_err().0, "VIEW_SPECIAL_FILE");
+        assert_eq!(fs::read(&outside).unwrap(), b"VIEW-OUTSIDE-SENTINEL");
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// A declared parent directory swapped for a link cannot redirect the
+    /// walk either: every component is opened no-follow from the pinned view.
+    #[test]
+    fn a_swapped_parent_directory_cannot_redirect_the_read() {
+        let root = scratch("view-swap-parent");
+        let dir = committed_view(&root, "view-1");
+        let outside = root.join("outside-tree");
+        fs::create_dir_all(outside.join("b")).unwrap();
+        fs::write(outside.join("b").join("state.db"), b"VIEW-OUTSIDE-SENTINEL").unwrap();
+        let ready = dir.join("ready");
+        fs::create_dir_all(ready.join("a").join("b")).unwrap();
+        fs::write(ready.join("a").join("b").join("state.db"), b"state").unwrap();
+        let link = ready.join("a.link");
+        std::os::unix::fs::symlink(&outside, &link).unwrap();
+        fs::remove_dir_all(ready.join("a")).unwrap();
+        fs::rename(&link, ready.join("a")).unwrap();
+        let refused = handle_view(
+            &root,
+            "view.get",
+            &json!({"viewId":"view-1","path":"a/b/state.db"}),
+        );
+        // The kernel answers ENOTDIR/ELOOP for a link where a walkable
+        // directory was required; both are deterministic hard failures, never
+        // churn, and the outside bytes are never served.
+        assert_eq!(refused.unwrap_err().0, "VIEW_INVALID");
+        assert_eq!(
+            fs::read(outside.join("b").join("state.db")).unwrap(),
+            b"VIEW-OUTSIDE-SENTINEL"
+        );
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// The size bound is taken from the opened fd and the read is bounded by
+    /// it, so a file that lies about - or exceeds - the bound is refused
+    /// without the Worker ever buffering more than the limit allows.
+    #[test]
+    fn an_oversized_declared_file_is_refused_without_an_unbounded_read() {
+        let root = scratch("view-oversize");
+        let dir = committed_view(&root, "view-1");
+        let file = dir.join("ready").join("state.db");
+        let oversize = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&file)
+            .unwrap();
+        oversize.set_len(MAX_ARTIFACT_BYTES as u64 + 1).unwrap();
+        drop(oversize);
+        let refused = handle_view(
+            &root,
+            "view.get",
+            &json!({"viewId":"view-1","path":"state.db"}),
+        );
+        assert_eq!(refused.unwrap_err().0, "VIEW_INVALID");
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_manifest_over_the_file_limit_is_refused_at_prepare() {
+        let root = scratch("view-prepare-limit");
+        let entry = json!({"path":"f","digest":format!("sha256:{}", "0".repeat(64)),"size":0});
+        let files = (0..1025).map(|_| entry.clone()).collect::<Vec<_>>();
+        assert_eq!(
+            handle_view(&root, "view.prepare", &json!({"viewId":"v","files":files}))
+                .unwrap_err()
+                .0,
+            "VIEW_FILE_LIMIT"
+        );
+        assert!(!root.join("views").join("v").exists());
+        let _ = fs::remove_dir_all(&root);
     }
 
     #[test]

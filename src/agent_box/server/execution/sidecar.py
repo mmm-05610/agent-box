@@ -38,13 +38,18 @@ LEASE_POLL_SECONDS = 0.25
 #:
 #: Audited Worker view sites, and what their codes mean here:
 #:
-#:   VIEW_CHANGED          an entry, directory or file vanished, or a file
-#:                         shrank, while it was being listed or read - churn
-#:   VIEW_SPECIAL_FILE     a FIFO, socket or device, or an entry that is not a
-#:                         regular file - a refusal, never churn
+#:   VIEW_CHANGED          an entry changed identity while the Worker was
+#:                         reading it from an already-opened fd - churn
+#:   VIEW_MISSING          an entry is not there - a refusal by the Worker
+#:                         (it cannot know the caller ever saw it); this
+#:                         capture converts it to its identity conflict
+#:                         because it just listed the path
+#:   VIEW_SPECIAL_FILE     a FIFO, socket or device, or a path resolving
+#:                         through a symlink - a refusal, never churn
 #:   VIEW_TRAVERSAL_LIMIT  more than 4096 visited entries - a refusal
 #:   VIEW_FILE_LIMIT       more than 1024 files, in a listing or a manifest
 #:   VIEW_INVALID          malformed identity, manifest, path or fetch range
+#:                         (including a first fetch past the end of a file)
 #:   VIEW_IO               a real listing, metadata, read or write fault
 #:   VIEW_INCOMPLETE       the view is not committed, or a file is missing
 #:   VIEW_DIGEST_MISMATCH  read-back did not match what was declared
@@ -585,8 +590,11 @@ class _WorkerChannels:
                     "SIDECAR_STATE_IDENTITY_CONFLICT", "state size changed during capture",
                 )
             if self._forbidden_content and self._forbidden_content in content:
+                # The path is diagnostics and names the file to investigate;
+                # the message never carries the matched material itself.
                 raise SidecarError(
-                    "SIDECAR_STATE_CONTAINS_SECRET", "credential material found in native state",
+                    "SIDECAR_STATE_CONTAINS_SECRET",
+                    f"credential material found in native state: {relative}",
                 )
             contents[relative] = content
             identity[relative] = (size, digest_value)
@@ -647,10 +655,21 @@ class _WorkerChannels:
         chunks = bytearray()
         expected = None
         while True:
-            item = self.client.request("view.get", {
-                "viewId": self.view_id, "path": path,
-                "offset": len(chunks), "maxLength": 32 * 1024,
-            })
+            try:
+                item = self.client.request("view.get", {
+                    "viewId": self.view_id, "path": path,
+                    "offset": len(chunks), "maxLength": 32 * 1024,
+                })
+            except BaseException as error:  # noqa: BLE001 - classified, not swallowed
+                # The Worker refuses a missing path as a deterministic
+                # VIEW_MISSING because it cannot know whether the caller ever
+                # saw the file. This capture just listed it, so here - and only
+                # here - the refusal means "the bytes moved": retry, bounded.
+                if getattr(error, "code", None) == "VIEW_MISSING":
+                    raise SidecarError(
+                        "SIDECAR_STATE_IDENTITY_CONFLICT", "state file is gone",
+                    ) from error
+                raise
             if expected is None:
                 expected = item.get("digest")
             if (item.get("digest") != expected or item.get("offset") != len(chunks)

@@ -118,8 +118,14 @@ def codes_after(text: str, marker: str, *, window: int = 300) -> list[str]:
 
 #: The audited sites, named statically so a moved marker fails inside the test
 #: that reads it instead of at collection time.
-REFUSED_SITES = ("the traversal bound", "the file-count bound", "a special file")
-MOVED_SITES = ("a vanished entry", "a shortened file")
+REFUSED_SITES = (
+    "the traversal bound",
+    "the file-count bound",
+    "a special file",
+    "a missing entry",
+    "a shortened fetch",
+)
+MOVED_SITES = ("an entry that changed while being read",)
 
 
 @lru_cache(maxsize=1)
@@ -129,20 +135,19 @@ def refused_sites() -> dict[str, str]:
         "the traversal bound": code_after(worker_source(), "*visited > MAX_VIEW_TRAVERSAL_ENTRIES"),
         "the file-count bound": code_after(worker_source(), "files.push(json!"),
         "a special file": _last_code(listing_span()),
+        "a missing entry": code_after(worker_source(), "std::io::ErrorKind::NotFound"),
+        "a shortened fetch": code_after(view_get_span(), "offset > file.len()"),
     }
 
 
 @lru_cache(maxsize=1)
 def moved_sites() -> dict[str, str]:
     """The codes the Worker emits when the bytes moved underneath a read."""
-    vanished = set(codes_after(worker_source(), "std::io::ErrorKind::NotFound"))
-    assert len(vanished) == 1, (
-        f"every vanished-entry site must name the same kind of failure, saw {sorted(vanished)}"
+    changed = set(codes_after(worker_source(), "bytes.len() as u64 > MAX_ARTIFACT_BYTES as u64"))
+    assert len(changed) == 1, (
+        f"every read-identity site must name the same kind of failure, saw {sorted(changed)}"
     )
-    return {
-        "a vanished entry": vanished.pop(),
-        "a shortened file": code_after(view_get_span(), "offset > bytes.len()"),
-    }
+    return {"an entry that changed while being read": changed.pop()}
 
 
 def _last_code(text: str) -> str:
@@ -286,13 +291,52 @@ def test_a_live_state_change_is_retried_and_ends_bounded(site):
     assert time.monotonic() - started < 3, "the deadline must bound the wait"
 
 
-def test_a_brief_live_state_change_then_stability_still_captures():
-    code = moved_sites()["a vanished entry"]
+def test_a_missing_state_file_is_retried_through_its_identity_conflict():
+    """The Worker refuses a missing path deterministically; the capture - which
+    just listed the path - is the layer that knows it is churn, so it retries
+    its own identity conflict and only ever reports the bounded verdict."""
+    code = refused_sites()["a missing entry"]
     view = ScriptedView({STATE_FILE: b"state"})
-    view.get_failures = [refusal(code), refusal(code)]
+    view.get_failures = [refusal(code) for _ in range(1000)]
+    with pytest.raises(SidecarError) as refused:
+        settle(view, deadline=0.3, interval=0.05)
+    assert refused.value.code == "SIDECAR_STATE_NOT_SETTLED", refused.value
+    assert view.get_calls >= 3, "a listed file that vanished must be re-read, not abandoned"
+
+    brief = ScriptedView({STATE_FILE: b"state"})
+    brief.get_failures = [refusal(code)]
+    assert settle(brief, deadline=2.0) == {"state.db": b"state"}
+
+
+def test_a_file_truncated_between_chunks_is_retried_and_never_mixed():
+    """A genuine shortening mid-read surfaces in the chunk identity checks and
+    the capture converges on the settled bytes - never a mixture of the two
+    moments, and never a Worker guess about who is to blame for an offset."""
+    # The file must span more than one fetch, so the truncation lands on a
+    # chunk the caller reads after the first one.
+    view = ScriptedView({STATE_FILE: b"x" * 40_000})
+    original = view.request
+
+    def truncate_on_second_chunk(op, arguments=None, **keywords):
+        if op == "view.get" and int(arguments.get("offset", 0)) > 0:
+            view.files[STATE_FILE] = b"short"
+        return original(op, arguments, **keywords)
+
+    view.request = truncate_on_second_chunk
     captured = settle(view, deadline=2.0)
-    assert captured == {"state.db": b"state"}
-    assert view.get_calls >= 3, "the churn must have been retried before the capture"
+    assert captured == {"state.db": b"short"}, captured
+    assert captured["state.db"] == view.files[STATE_FILE]
+    assert view.get_calls >= 3, "the truncated read must have been retried"
+
+
+def test_an_unknown_code_fails_closed():
+    """A code this generation does not know is a refusal and is never retried."""
+    view = ScriptedView({STATE_FILE: b"state"})
+    view.list_failures = [refusal("VIEW_UNSPECIFIED_FUTURE")]
+    with pytest.raises(WorkerError) as refused:
+        settle(view, deadline=2.0)
+    assert refused.value.code == "VIEW_UNSPECIFIED_FUTURE"
+    assert view.list_calls == 1
 
 
 # --------------------------------------------------------------------------
@@ -301,7 +345,7 @@ def test_a_brief_live_state_change_then_stability_still_captures():
 
 def test_the_classification_never_reads_the_error_message():
     """Codes and messages are crossed in both directions on purpose."""
-    live = moved_sites()["a vanished entry"]
+    live = moved_sites()["an entry that changed while being read"]
     deterministic = refused_sites()["a special file"]
     view = ScriptedView({STATE_FILE: b"state"})
     # A refusal's wording on a live-state code: still retried, still bounded.
@@ -406,7 +450,7 @@ def real_worker(worker_tmp_path: Path):
 
     root = worker_tmp_path / "worker-root"
     client = WorkerClient(
-        [str(WORKER), "--root", str(root)], 
+        [str(WORKER), "--root", str(root)],
         worker_digest="sha256:" + hashlib.sha256(WORKER.read_bytes()).hexdigest(),
         worker_version="0.1.0", connection_id="boundary", project_id="boundary",
         effective_user=os.environ["USER"], server_instance_id="boundary",
@@ -465,26 +509,27 @@ def test_a_real_worker_names_every_view_failure_the_capture_classifies(tmp_path)
         for path in extra:
             path.unlink()
 
-        # A file that vanished between the listing and the read: churn.
+        # A file that vanished between the listing and the read: the Worker
+        # refuses deterministically (it cannot know the caller saw it); the
+        # capture converts that refusal for a listed path.
         listed = client.request("view.list", {"viewId": VIEW_ID})["files"]
         assert listed, "the state file must be listed before it is read"
         (ready / PREFIX / "state.db").unlink()
         with pytest.raises(WorkerError) as vanished:
             client.request("view.get", {"viewId": VIEW_ID, "path": f"{PREFIX}/state.db"})
-        assert vanished.value.code == moved_sites()["a vanished entry"]
+        assert vanished.value.code == refused_sites()["a missing entry"]
 
-        # A fetch that starts past the end means the file got shorter: churn.
+        # A first fetch past the end is an invalid request, never churn.
         (ready / PREFIX / "state.db").write_bytes(content)
         with pytest.raises(WorkerError) as shrunk:
             client.request("view.get", {
                 "viewId": VIEW_ID, "path": f"{PREFIX}/state.db",
                 "offset": len(content) + 16,
             })
-        assert shrunk.value.code == moved_sites()["a shortened file"]
+        assert shrunk.value.code == refused_sites()["a shortened fetch"]
 
         # The classification the capture applies to exactly these codes.
-        assert moved_sites()["a vanished entry"] in _STATE_TRANSIENT_CODES
-        assert moved_sites()["a shortened file"] in _STATE_TRANSIENT_CODES
+        assert moved_sites()["an entry that changed while being read"] in _STATE_TRANSIENT_CODES
         assert set(refused_sites().values()) - _STATE_TRANSIENT_CODES == set(refused_sites().values())
     finally:
         client.close()

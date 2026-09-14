@@ -420,6 +420,8 @@ class StateSymlinkWatcher:
         self.observed: list[dict] = []
         self.peak_files = 0
         self.peak_files_at = ""
+        self.peak_sample: list[str] = []
+        self.peak_directory_counts: list[tuple[str, int]] = []
         self.peak_special = 0
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run, daemon=True)
@@ -436,10 +438,15 @@ class StateSymlinkWatcher:
         while not self._stop.is_set():
             if views.is_dir():
                 for ready in sorted(views.glob("*/ready")):
-                    files, special = self._count(ready)
+                    files, special, directories = self._count(ready)
                     if files > self.peak_files:
                         self.peak_files = files
                         self.peak_files_at = self._busiest(ready)
+                        self.peak_directory_counts = sorted(
+                            directories.items(),
+                            key=lambda item: -item[1][0],
+                        )[:5]
+                        self.peak_sample = self._sample(directories, ready)
                     if special > self.peak_special:
                         self.peak_special = special
                 for location in sorted(views.glob("*/ready/**/native-state/**/*")):
@@ -456,12 +463,15 @@ class StateSymlinkWatcher:
             self._stop.wait(self.interval)
 
     @staticmethod
-    def _count(ready: Path) -> tuple[int, int]:
+    def _count(ready: Path) -> tuple[int, int, dict[str, tuple[int, list[str]]]]:
         """Regular files and non-regular, non-symlink entries, as a listing sees
-        them. A symlink is skipped by the listing, so it is not counted here."""
+        them, plus per-directory counts with a few file names each. A symlink is
+        skipped by the listing, so it is not counted here."""
         files = 0
         special = 0
-        for root, directories, names in os.walk(ready):
+        directories: dict[str, tuple[int, list[str]]] = {}
+        for root, _directories, names in os.walk(ready):
+            relative = os.path.relpath(root, ready).replace(os.sep, "/")
             for name in names:
                 try:
                     status = os.lstat(os.path.join(root, name))
@@ -471,9 +481,25 @@ class StateSymlinkWatcher:
                     continue
                 if stat.S_ISREG(status.st_mode):
                     files += 1
+                    count, sample = directories.get(relative, (0, []))
+                    directories[relative] = (count + 1, sample)
                 else:
                     special += 1
-        return files, special
+        return files, special, directories
+
+    @staticmethod
+    def _sample(
+        directories: dict[str, tuple[int, list[str]]], ready: Path, limit: int = 12
+    ) -> list[str]:
+        """File names from the directory holding most of the peak, so a capture
+        that hit the listing bound can be traced to what produced the files."""
+        if not directories:
+            return []
+        busiest = max(sorted(directories), key=lambda key: directories[key][0])
+        return [
+            f"{busiest}/{name}"
+            for name in sorted(os.listdir(ready / busiest))[:limit]
+        ]
 
     @staticmethod
     def _busiest(ready: Path) -> str:
@@ -718,6 +744,11 @@ def main() -> int:
             REPORT["stateProjectionObservation"] = {
                 "peakRegularFiles": watcher.peak_files,
                 "peakRegularFilesSubtree": watcher.peak_files_at,
+                "peakDirectoryCounts": [
+                    {"directory": directory, "files": count}
+                    for directory, (count, _sample) in watcher.peak_directory_counts
+                ],
+                "peakSamplePaths": watcher.peak_sample,
                 "peakNonRegularEntries": watcher.peak_special,
                 "listingFileLimit": StateSymlinkWatcher.FILE_LIMIT,
                 "overListingLimit": watcher.peak_files > StateSymlinkWatcher.FILE_LIMIT,
@@ -1647,7 +1678,18 @@ def run_requests(runs: list[list[dict]], index: int) -> list[dict]:
 # --------------------------------------------------------------------------
 
 
-def annotate_known_blocker() -> None:
+#: The failure codes that belong to the state-capture step. Only a turn that
+#: failed *in that step* with one of these codes can be causally attributed to
+#: the alias-symlink problem; anything else is recorded as a co-observation.
+STATE_CAPTURE_CODES = frozenset({
+    "VIEW_SPECIAL_FILE", "VIEW_TRAVERSAL_LIMIT", "VIEW_FILE_LIMIT", "VIEW_MISSING",
+    "VIEW_CHANGED", "VIEW_INVALID", "VIEW_IO", "VIEW_INCOMPLETE", "VIEW_DIGEST_MISMATCH",
+    "SIDECAR_STATE_NOT_SETTLED", "SIDECAR_STATE_IDENTITY_CONFLICT",
+    "SIDECAR_STATE_CONTAINS_SECRET", "SIDECAR_STATE_OUTSIDE_BOUNDS",
+})
+
+
+def annotate_known_blocker(report: dict | None = None) -> None:
     """Record the first-hand diagnosis of the alias-symlink blocker if it returns.
 
     Historical, and kept because it was reproduced on a real run: the native
@@ -1658,15 +1700,35 @@ def annotate_known_blocker() -> None:
     that does not wait for the adapter process to exit. The listing now skips
     non-regular entries, `view.get` still refuses them, and only a genuine
     content change is retried, so a capture no longer depends on native cleanup
-    timing. The annotation fires only when a run both observed those links and
-    failed its turn; it never turns a failure into a pass.
+    timing.
+
+    Causality is narrow by construction: the blocker is attached only when the
+    failed turn failed *in the capture step* with a state/view code. A turn that
+    failed for any other reason (credentials, adapter, provider) while links
+    happened to be observed is recorded as a co-observation instead, so the
+    blocker evidence cannot be polluted. Neither branch changes an outcome.
     """
-    diagnostics = REPORT.get("diagnostics") or {}
+    report = REPORT if report is None else report
+    diagnostics = report.get("diagnostics") or {}
     turn = diagnostics.get("turn") or {}
-    observed = REPORT.get("stateSymlinksObserved") or []
+    observed = report.get("stateSymlinksObserved") or []
     if not observed or not turn.get("error_code"):
         return
-    REPORT["blocker"] = {
+    capture_failed = turn.get("capture_state") == "failed"
+    state_code = turn.get("error_code") in STATE_CAPTURE_CODES
+    if not (capture_failed and state_code):
+        report["stateSymlinkCoObservation"] = {
+            "note": (
+                "alias links were observed while the turn failed for a reason "
+                "outside the state capture; recorded as a co-observation, not "
+                "a causal blocker"
+            ),
+            "observedStateSymlinks": observed[:8],
+            "turnErrorCode": turn.get("error_code"),
+            "turnCaptureState": turn.get("capture_state"),
+        }
+        return
+    report["blocker"] = {
         "code": "CODEX_GATE_STATE_CONTAINS_NATIVE_ALIAS_SYMLINKS",
         "layer": "Worker view listing + sidecar capture timing (neither is plugin-owned)",
         "observedStateSymlinks": observed[:8],
