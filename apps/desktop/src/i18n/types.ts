@@ -2045,6 +2045,16 @@ export interface Translations {
       unavailable: string
       /** Shown in place of the reason when the service reported no detail. */
       unavailableReasonFallback: string
+      /** The Archived view with no archived records to show. */
+      archivedEmpty: string
+      /** The Archived view's fetch failed; the service's own reason follows. */
+      loadFailed: string
+      /** The service is ready but its hello does not declare `sessions.list`,
+       *  so the Archived set cannot be asked for — named, never implied. */
+      listUnsupported: string
+      /** A local workspace row the service has no Workspace for: its expansion
+       *  says so instead of rendering legacy Hermes session previews. */
+      workspaceNotProvided: string
       menuActions: string
       menuRename: string
       menuPin: string

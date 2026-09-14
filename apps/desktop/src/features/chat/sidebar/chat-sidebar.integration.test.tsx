@@ -1,17 +1,21 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { searchSessions } from '@/api/sessions'
 import { type AppView, ROUTES_AREA, SIDEBAR_NAV_AREA } from '@/app/routes'
 import { SidebarProvider } from '@/components/ui/sidebar'
 import { makeCwdSession, makeSessionInfo } from '@/dev/test/session-info'
 import { registry } from '@/lib/contributions'
 import { group, split } from '@/lib/pane-tree'
-import { $pinnedSessionIds } from '@/store/layout'
+import { $agentBoxHello, $agentBoxService, $agentBoxSessions } from '@/store/agentbox-service'
+import { $pinnedSessionIds, setSidebarShowArchived } from '@/store/layout'
 import { $layoutTree, noteActiveTreeGroup } from '@/store/pane-shell/tree'
-import { $selectedStoredSessionId, $sessions } from '@/store/session'
+import { $gatewayState, $selectedStoredSessionId, $sessions, $sessionsLoading } from '@/store/session'
 import { $removedSessionIds } from '@/store/session-removal'
+import { loadArchivedSessions } from '@/store/sidebar-archive'
+import { asWireId, type ServerHelloResult, type SessionRecord, WIRE_PROTOCOL_VERSION } from '@/types/wire/wire-v1'
 
 import { ChatSidebar } from './index'
 
@@ -24,6 +28,22 @@ const noopAsync = async () => {}
 vi.mock('@/api/sessions', () => ({
   searchSessions: vi.fn(async () => ({ results: [] }))
 }))
+
+// P05: the AgentBox-authority branch must never call the legacy archive
+// loader. The store's own atoms stay real; only the fetch is observed.
+const loadArchivedSessionsMock = vi.hoisted(() => vi.fn(async () => undefined))
+
+vi.mock('@/store/sidebar-archive', async importOriginal => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  loadArchivedSessions: loadArchivedSessionsMock
+}))
+
+// P05: the AgentBox service is spoken to through the fake wire client — the
+// real refreshAgentBoxSessions seam runs, so the payload is exactly what would
+// cross the wire.
+const agentBoxWireClient = { call: vi.fn() }
+
+vi.mock('@/api/agentbox-runtime-client', () => ({ agentBoxRuntimeClient: () => agentBoxWireClient }))
 
 vi.mock('@/api/workspace', () => ({
   listWslWorkspaces: vi.fn(async () => ({ ok: true as const, workspaces: [] })),
@@ -43,7 +63,11 @@ const sessionRows = [
   makeSessionInfo({ id: 'tile-two', last_active: 2, profile: 'default', started_at: 1, title: 'Tile two' })
 ]
 
-const renderSidebar = (pathname: string, currentView: AppView) =>
+const renderSidebar = (
+  pathname: string,
+  currentView: AppView,
+  sessionAuthority: 'agentbox' | 'hermes' = 'hermes'
+) =>
   render(
     <MemoryRouter initialEntries={[pathname]}>
       <SidebarProvider>
@@ -57,6 +81,7 @@ const renderSidebar = (pathname: string, currentView: AppView) =>
           onNewSessionInWorkspace={noop}
           onNewSessionSplit={noop}
           onResumeSession={noop}
+          sessionAuthority={sessionAuthority}
         />
       </SidebarProvider>
     </MemoryRouter>
@@ -242,6 +267,7 @@ describe('ChatSidebar unified pinned + search (round 36)', () => {
             onNewSessionInWorkspace={noop}
             onNewSessionSplit={noop}
             onResumeSession={onResumeSession}
+            sessionAuthority="hermes"
           />
         </SidebarProvider>
       </MemoryRouter>
@@ -276,5 +302,152 @@ describe('ChatSidebar unified pinned + search (round 36)', () => {
     // The card header line is the workspace context: the cwd leaf for a
     // session not claimed by an explicit project.
     expect(screen.getByText('验收项目')).toBeTruthy()
+  })
+})
+
+// P05 — under AgentBox authority the sidebar's search and Archived views read
+// the service cache and never the legacy Hermes REST endpoints, in every
+// gateway/service state. The real `refreshAgentBoxSessions` seam runs; only the
+// wire client and the legacy archive loader are observed fakes.
+describe('ChatSidebar AgentBox authority', () => {
+  const agentBoxSession = (overrides: Omit<Partial<SessionRecord>, 'id'> & { id?: string } = {}): SessionRecord => {
+    const { id = 'agentbox-session-1', ...rest } = overrides
+
+    return {
+      archivedAt: null,
+      createdAt: '2026-09-14T00:00:00.000Z',
+      displayName: `AgentBox ${id}`,
+      id: asWireId(id),
+      pinned: false,
+      profileId: null,
+      updatedAt: '2026-09-14T00:00:00.000Z',
+      version: 1,
+      workspaceId: asWireId('workspace-1'),
+      ...rest
+    }
+  }
+
+  const agentBoxHello = (ids: string[] = ['sessions.list']): ServerHelloResult => ({
+    auth: { required: false },
+    capabilities: ids.map(id => ({ id, supported: true })),
+    protocolVersion: WIRE_PROTOCOL_VERSION,
+    serverId: asWireId('server-1')
+  })
+
+  beforeEach(() => {
+    localStorage.clear()
+    vi.mocked(searchSessions).mockClear()
+    loadArchivedSessionsMock.mockClear()
+    agentBoxWireClient.call.mockReset()
+    setSidebarShowArchived(false)
+    $sessionsLoading.set(true)
+    $selectedStoredSessionId.set(null)
+    $sessions.set([])
+    $removedSessionIds.set(new Set())
+    $layoutTree.set(null)
+    $agentBoxService.set({ detail: null, phase: 'ready' })
+    $agentBoxHello.set(agentBoxHello())
+    $agentBoxSessions.set({})
+  })
+
+  afterEach(() => {
+    cleanup()
+    setSidebarShowArchived(false)
+    $gatewayState.set('idle')
+    $sessionsLoading.set(false)
+    $selectedStoredSessionId.set(null)
+    $sessions.set([])
+    $agentBoxService.set({ detail: null, phase: 'idle' })
+    $agentBoxHello.set(null)
+    $agentBoxSessions.set({})
+  })
+
+  it('search reads the service cache: zero legacy search calls, even after the debounce window', async () => {
+    $sessions.set([
+      makeSessionInfo({ id: 'legacy-1', last_active: 2, profile: 'default', started_at: 1, title: 'needle legacy' })
+    ])
+    $agentBoxSessions.set({
+      'agentbox-live': agentBoxSession({ displayName: 'Needle service', id: 'agentbox-live' })
+    })
+
+    renderSidebar('/', 'chat', 'agentbox')
+
+    fireEvent.change(screen.getByPlaceholderText('Search sessions…'), { target: { value: 'NEEDLE' } })
+
+    // The service record matches locally (displayName, case-insensitive)…
+    expect(screen.getByText('Needle service')).toBeTruthy()
+    // …and the legacy row that would have matched never enters the result set.
+    expect(screen.queryByText('needle legacy')).toBeNull()
+
+    // No gateway transition can re-enable the legacy endpoint: authority alone
+    // decides the data source.
+    act(() => {
+      $gatewayState.set('closed')
+      $gatewayState.set('open')
+    })
+
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 250))
+    })
+
+    expect(searchSessions).not.toHaveBeenCalled()
+  })
+
+  it('archived reads sessions.list(includeArchived) once and never the legacy loader', async () => {
+    agentBoxWireClient.call.mockResolvedValue({
+      items: [
+        agentBoxSession({ archivedAt: '2026-09-01T00:00:00.000Z', displayName: 'Archived one', id: 'ab-archived' }),
+        agentBoxSession({ displayName: 'Active one', id: 'ab-active' })
+      ]
+    })
+
+    renderSidebar('/', 'chat', 'agentbox')
+
+    act(() => setSidebarShowArchived(true))
+
+    await waitFor(() => expect(screen.getByText('Archived one')).toBeTruthy())
+
+    expect(screen.queryByText('Active one')).toBeNull()
+    expect(loadArchivedSessions).not.toHaveBeenCalled()
+    expect(agentBoxWireClient.call).toHaveBeenCalledTimes(1)
+    expect(agentBoxWireClient.call).toHaveBeenCalledWith('sessions.list', { includeArchived: true })
+  })
+
+  it('sends no archived request when the service cannot answer, and never fakes an empty list', () => {
+    $agentBoxHello.set(agentBoxHello(['sessions.update']))
+
+    const { container } = renderSidebar('/', 'chat', 'agentbox')
+
+    act(() => setSidebarShowArchived(true))
+
+    expect(agentBoxWireClient.call).not.toHaveBeenCalled()
+    expect(loadArchivedSessions).not.toHaveBeenCalled()
+    // Named as unsupported — not as "nothing archived".
+    expect(container.querySelector('[data-agentbox-global-unsupported]')).not.toBeNull()
+    expect(container.querySelector('[data-agentbox-global-empty]')).toBeNull()
+  })
+
+  it('a service failure shows the real reason and keeps the cached archived rows', async () => {
+    $agentBoxSessions.set({
+      'ab-cached': agentBoxSession({
+        archivedAt: '2026-09-01T00:00:00.000Z',
+        displayName: 'Cached archive',
+        id: 'ab-cached'
+      })
+    })
+    agentBoxWireClient.call.mockRejectedValue(new Error('connect ECONNREFUSED 127.0.0.1:8732'))
+
+    const { container } = renderSidebar('/', 'chat', 'agentbox')
+
+    act(() => setSidebarShowArchived(true))
+
+    await waitFor(() => expect(container.querySelector('[data-agentbox-global-error]')).not.toBeNull())
+
+    // The cached row survives the failure…
+    expect(screen.getByText('Cached archive')).toBeTruthy()
+    // …and the failure is the service's own reason, never "no results".
+    expect(container.querySelector('[data-agentbox-global-empty]')).toBeNull()
+    expect(screen.getByText('connect ECONNREFUSED 127.0.0.1:8732')).toBeTruthy()
+    expect(loadArchivedSessions).not.toHaveBeenCalled()
   })
 })

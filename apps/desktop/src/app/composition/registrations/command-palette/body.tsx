@@ -1,7 +1,6 @@
 // Extracted verbatim from index.tsx (see docs/desktop-megafile-decomposition.md).
 
 import { useStore } from '@nanostores/react'
-import { useQuery } from '@tanstack/react-query'
 import { Dialog as DialogPrimitive } from 'radix-ui'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
@@ -27,7 +26,6 @@ import {
   paletteValue,
   rankGroups,
 } from '@/app/shell/layers/command-palette/palette-model'
-import { listAllProfileSessions } from '@/application/session-lists'
 import { openSession, openSessionIntentFromModifiers } from '@/application/session/open-session'
 import { codiconIcon } from '@/components/ui/codicon'
 import { Command, CommandInput, CommandList } from '@/components/ui/command'
@@ -66,6 +64,7 @@ import {
 } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 import { resolveVersionStatus } from '@/lib/version-status'
+import { $agentBoxSessions } from '@/store/agentbox-service'
 import { $repoWorktrees } from '@/store/coding-status'
 import {
   $commandPaletteOpen,
@@ -93,9 +92,9 @@ import { type ThemeMode, useTheme } from '@/themes/context'
 
 import {
   FOLDER_PATH_RE,
+  projectAgentBoxPaletteSessions,
   SESSION_ID_RE,
-  THEME_MODES,
-  toSessionEntry,
+  THEME_MODES
 } from './palette-helpers'
 import {
   NON_CONFIG_SETTINGS,
@@ -200,12 +199,14 @@ export function CommandPaletteBody({ onExited }: { onExited: () => void }) {
     }
   }, [])
 
-  const sessionsQuery = useQuery({
-    queryKey: ['command-palette', 'sessions'],
-    queryFn: () => listAllProfileSessions(200, 1, 'exclude')
-  })
+  // Session rows come from the AgentBox service cache and nothing else: the
+  // palette has no legacy session enumeration to fall back to, so an empty
+  // cache is an empty list, not a prompt to go ask Hermes. There is also no
+  // second copy to protect — a late response to some other backend cannot
+  // overwrite a row, because the only writer is the service's own record.
+  const agentBoxSessions = useStore($agentBoxSessions)
 
-  const sessions = useMemo(() => (sessionsQuery.data?.sessions ?? []).map(toSessionEntry), [sessionsQuery.data])
+  const sessions = useMemo(() => projectAgentBoxPaletteSessions(agentBoxSessions), [agentBoxSessions])
 
   // Search/sub-page are local to a mount, and this component remounts per open
   // (keyed by open count), so each open starts clean without a reset effect.
@@ -657,13 +658,11 @@ export function CommandPaletteBody({ onExited }: { onExited: () => void }) {
         items: sessions.map(session => ({
           icon: MessageCircle,
           id: `session-${session.id}`,
-          keywords: [
-            'chat',
-            'session',
-            ...(session.preview ? [session.preview] : []),
-            ...(session.git_branch ? [session.git_branch] : [])
-          ],
-          label: session.title,
+          // Only the service record's own facts: displayName names the row and
+          // the id opens it. There is no preview/branch/model/cost to search —
+          // those fields do not exist on a SessionRecord.
+          keywords: ['chat', 'session'],
+          label: session.displayName,
           runWithEvent: goSession(session.id)
         }))
       })

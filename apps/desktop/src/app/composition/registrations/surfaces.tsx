@@ -45,7 +45,11 @@ export const SidebarSurface = memo(function SidebarSurface({
 }) {
   const latestActions = useMemo(() => latestSidebarActions(actions), [actions])
 
-  return <ChatSidebar currentView={currentView} {...latestActions} />
+  // The AgentBox product shell names its session authority explicitly — never
+  // inferred from gateway state, cache emptiness or method presence — so the
+  // sidebar's search, Archived view and workspace rows read the service cache
+  // and cannot reach the legacy Hermes REST surface.
+  return <ChatSidebar currentView={currentView} sessionAuthority="agentbox" {...latestActions} />
 })
 
 export const TerminalSurface = memo(function TerminalSurface() {
@@ -75,7 +79,11 @@ export const StatusbarSurface = memo(function StatusbarSurface({
   const gatewayState = useStore($gatewayState)
   const freshDraftReady = useStore($freshDraftReady)
   const gatewayScope = `${activeConnectionId ?? ''}\0${activeGatewayProfile}`
-  const { inferenceStatus, statusSnapshot } = useStatusSnapshot(gatewayState, actions.requestGateway, gatewayScope)
+  // No status source exists in the AgentBox product runtime: the bar is handed
+  // an explicit null, so mounting, focusing or returning to the window polls
+  // nothing instead of lazily reaching a Hermes REST endpoint. It reports the
+  // neutral null state — never a fabricated healthy one.
+  const { inferenceStatus, statusSnapshot } = useStatusSnapshot(null, gatewayState, gatewayScope)
   const extraLeftItems = useStatusbarContributions('left')
   const extraRightItems = useStatusbarContributions('right')
 

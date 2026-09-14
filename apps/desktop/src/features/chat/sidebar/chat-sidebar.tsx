@@ -120,6 +120,7 @@ import { $wslWorkspaces, openWslWorkspaceWizard } from '@/store/wsl-workspace'
 import { type SessionInfo, type SessionSearchResult } from '@/types/hermes'
 import { type WorkspaceListItem } from '@/types/workspace'
 
+import { AgentBoxGlobalSessions } from './agentbox-sessions/agentbox-global-sessions'
 import { SidebarSectionAddButton } from './chrome'
 import { SidebarFilterMenu } from './filter-menu'
 import { useGatewaySessionGroups } from './gateway-group-model'
@@ -167,6 +168,7 @@ import { WorkspaceList } from './workspace-list/workspace-list'
 
 export function ChatSidebar({
   currentView: routeView,
+  sessionAuthority,
   onNavigate,
   onLoadMoreSessions,
   onResumeSession,
@@ -435,7 +437,16 @@ export function ChatSidebar({
   // Full-text search across *all* sessions (not just the loaded page) so 699
   // sessions stay findable. Debounced; loaded sessions are matched instantly
   // client-side and merged ahead of the server hits.
+  //
+  // AgentBox authority never reaches this endpoint: its search is a local
+  // filter over the service cache, rendered by AgentBoxGlobalSessions. The
+  // guard is on the authority alone — no gateway state can re-enable the
+  // legacy path.
   useEffect(() => {
+    if (sessionAuthority === 'agentbox') {
+      return
+    }
+
     if (!trimmedQuery) {
       setServerMatches([])
       setSearchPending(false)
@@ -466,7 +477,7 @@ export function ChatSidebar({
       cancelled = true
       window.clearTimeout(id)
     }
-  }, [trimmedQuery])
+  }, [trimmedQuery, sessionAuthority])
 
   const searchResults = useMemo(() => {
     if (!trimmedQuery) {
@@ -1148,13 +1159,16 @@ export function ChatSidebar({
     }
   }, [onLoadMoreSessions, recentsLoadMorePending])
 
-  // Archived rows are excluded from the sessions query, so the view has to
-  // fetch its own set.
+  // Archived rows are excluded from the sessions query, so the Hermes view has
+  // to fetch its own set. AgentBox authority is served by AgentBoxGlobalSessions
+  // (one `sessions.list` with includeArchived when the service declares it) —
+  // the legacy endpoint is never called in a product runtime, in any gateway
+  // state.
   useEffect(() => {
-    if (showArchived) {
+    if (showArchived && sessionAuthority === 'hermes') {
       void loadArchivedSessions()
     }
-  }, [showArchived])
+  }, [showArchived, sessionAuthority])
 
   // Ranking by size is a question about the whole list ("what did I burn money
   // on"), so it drops the calendar dividers and ranks globally — "Today" above
@@ -1338,7 +1352,11 @@ export function ChatSidebar({
               </div>
             )}
 
-            {trimmedQuery && (
+            {trimmedQuery && sessionAuthority === 'agentbox' ? (
+              /* Product runtime: the service cache IS the result set — local,
+                 case-insensitive filter over displayName / service id. */
+              <AgentBoxGlobalSessions mode="search" query={trimmedQuery} />
+            ) : trimmedQuery ? (
               <SidebarSessionsSection
                 activeSessionId={activeSidebarSessionId}
                 // Search results always render as cards: the card header line
@@ -1368,7 +1386,7 @@ export function ChatSidebar({
                 sessions={searchResults}
                 showProfileTags={showAllProfiles}
               />
-            )}
+            ) : null}
 
             {/* Pinned: real session shortcuts into their own workspaces.
                 Hidden entirely while empty — no placeholder block (round 36). */}
@@ -1398,7 +1416,12 @@ export function ChatSidebar({
 
             {!trimmedQuery && inProject && projectLoadFailed && <SidebarLoadErrorState onRetry={retryProject} />}
             {!trimmedQuery &&
-              (worktreeGroupingActive && !inProject && (projectModel.length > 0 || wslWorkspaces.length > 0) ? (
+              (showArchived && sessionAuthority === 'agentbox' ? (
+                /* Product runtime Archived: the service's archived records,
+                   fetched once while the service can answer — never the legacy
+                   archived-sessions endpoint. */
+                <AgentBoxGlobalSessions mode="archived" />
+              ) : worktreeGroupingActive && !inProject && (projectModel.length > 0 || wslWorkspaces.length > 0) ? (
                 /* THE workspace root list (36R): local folders and WSL
                    workspaces as peers, independent of session count and of the
                    date/status/flat preferences. It replaces the flat body only
@@ -1437,6 +1460,7 @@ export function ChatSidebar({
                     'min-h-32 flex-1 overflow-hidden p-0',
                     !recentsVirtualizes && 'compact:min-h-0 compact:flex-none compact:overflow-visible'
                   )}
+                  sessionAuthority={sessionAuthority}
                   showAllSessions={showAllSessions}
                 />
               ) : (

@@ -101,6 +101,7 @@ function renderSidebar({ onNewSessionInWorkspace = noop }: { onNewSessionInWorks
           onNewSessionInWorkspace={onNewSessionInWorkspace}
           onNewSessionSplit={noop}
           onResumeSession={noop}
+          sessionAuthority="hermes"
         />
       </SidebarProvider>
     </MemoryRouter>
@@ -285,6 +286,7 @@ describe('ChatSidebar workspace assembly (36R)', () => {
             onNewSessionInWorkspace={onNewSessionInWorkspace}
             onNewSessionSplit={noop}
             onResumeSession={noop}
+            sessionAuthority="hermes"
           />
         </SidebarProvider>
       </MemoryRouter>

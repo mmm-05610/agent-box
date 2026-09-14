@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 
-import { getStatus } from '@/api/config'
 import { evaluateRuntimeReadiness, type RuntimeReadinessResult } from '@/lib/runtime-readiness'
 import type { GatewayRequester } from '@/types/gateway'
 import type { StatusResponse } from '@/types/hermes'
@@ -10,15 +9,49 @@ import type { StatusResponse } from '@/types/hermes'
 // visibility listeners refresh immediately on return.
 const REFRESH_MS = 60_000
 
+/** The data the statusbar poll needs, injected by the composition root. The
+ *  hook never imports a backend itself: which runtime (if any) can answer the
+ *  status leg is a product decision, and a product runtime has no legacy
+ *  status endpoint to fall back to. */
+export interface StatusSnapshotSource {
+  getStatus: () => Promise<StatusResponse>
+  requestGateway: GatewayRequester
+}
+
+/**
+ * Poll the injected source for the statusbar snapshot and inference readiness.
+ *
+ * `source === null` is a normal, final answer: no source exists for this
+ * runtime, so nothing is polled, no timer or focus/visibility listener is
+ * registered, and the hook publishes the neutral `null`/`null` state instead
+ * of inventing health.
+ */
 export function useStatusSnapshot(
+  source: StatusSnapshotSource | null,
   gatewayState: string | undefined,
-  requestGateway: GatewayRequester,
   gatewayScope = ''
-) {
+): { inferenceStatus: RuntimeReadinessResult | null; statusSnapshot: StatusResponse | null } {
   const [statusSnapshot, setStatusSnapshot] = useState<StatusResponse | null>(null)
   const [inferenceStatus, setInferenceStatus] = useState<RuntimeReadinessResult | null>(null)
 
+  // Depend on the two callables, not the source object: a caller that builds
+  // the source inline still gets one effect per real source change instead of
+  // one per render.
+  const getStatus = source?.getStatus
+  const requestGateway = source?.requestGateway
+
   useEffect(() => {
+    if (!getStatus || !requestGateway) {
+      // Clear whatever a previous source published and register nothing. The
+      // absence of a source is not a reason to schedule work: a timer or a
+      // focus listener here would only be machinery for calls this hook is
+      // forbidden to make under a product runtime.
+      setStatusSnapshot(null)
+      setInferenceStatus(null)
+
+      return
+    }
+
     let cancelled = false
     let timer: number | undefined
 
@@ -111,7 +144,7 @@ export function useStatusSnapshot(
         window.clearTimeout(timer)
       }
     }
-  }, [gatewayScope, gatewayState, requestGateway])
+  }, [gatewayScope, gatewayState, getStatus, requestGateway])
 
   return { inferenceStatus, statusSnapshot }
 }

@@ -2486,6 +2486,14 @@ export const zh: Translations = {
 
       unavailableReasonFallback: '服务未提供原因。',
 
+      archivedEmpty: 'AgentBox 中还没有已归档的 Session。',
+
+      loadFailed: '无法加载已归档的 Session',
+
+      listUnsupported: '当前 AgentBox 服务不支持列出 Session。',
+
+      workspaceNotProvided: '此工作区没有可用的 AgentBox Session。',
+
       menuActions: 'Session 操作',
 
       menuRename: '重命名…',

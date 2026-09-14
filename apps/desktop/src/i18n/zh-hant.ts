@@ -1923,6 +1923,14 @@ export const zhHant = defineLocale({
 
       unavailableReasonFallback: '服務未提供原因。',
 
+      archivedEmpty: 'AgentBox 中還沒有已封存的 Session。',
+
+      loadFailed: '無法載入已封存的 Session',
+
+      listUnsupported: '目前的 AgentBox 服務不支援列出 Session。',
+
+      workspaceNotProvided: '此工作區沒有可用的 AgentBox Session。',
+
       menuActions: 'Session 操作',
 
       menuRename: '重新命名…',

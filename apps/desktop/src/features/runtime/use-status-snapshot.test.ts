@@ -1,16 +1,15 @@
 import { act, cleanup, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { getStatus } from '@/api/config'
 import { deferred } from '@/dev/test/deferred'
+import type { GatewayRequester } from '@/types/gateway'
+import type { StatusResponse } from '@/types/hermes'
 
-import { useStatusSnapshot } from './use-status-snapshot'
+import { type StatusSnapshotSource, useStatusSnapshot } from './use-status-snapshot'
 
-vi.mock('@/api/config', () => ({
-  getStatus: vi.fn()
-}))
+const getStatusStub = () => vi.fn(async () => ({}) as StatusResponse)
 
-type GatewayRequester = <T = unknown>(method: string, params?: Record<string, unknown>) => Promise<T>
+const requestGatewayStub = () => vi.fn(async () => ({})) as unknown as GatewayRequester
 
 async function flushAsync() {
   await act(async () => {
@@ -21,9 +20,6 @@ async function flushAsync() {
 beforeEach(() => {
   vi.useFakeTimers()
   vi.spyOn(document, 'hasFocus').mockReturnValue(true)
-  vi.mocked(getStatus)
-    .mockReset()
-    .mockResolvedValue({} as never)
 })
 
 afterEach(() => {
@@ -32,12 +28,13 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-describe('useStatusSnapshot', () => {
+describe('useStatusSnapshot — injected source', () => {
   it('pauses status RPCs while visible but unfocused, then catches up on focus', async () => {
     vi.mocked(document.hasFocus).mockReturnValue(false)
-    const requestGateway = vi.fn().mockResolvedValue({}) as unknown as GatewayRequester
+    const getStatus = getStatusStub()
+    const requestGateway = requestGatewayStub()
 
-    renderHook(() => useStatusSnapshot('open', requestGateway))
+    renderHook(() => useStatusSnapshot({ getStatus, requestGateway }, 'open'))
     await flushAsync()
 
     expect(getStatus).not.toHaveBeenCalled()
@@ -47,6 +44,7 @@ describe('useStatusSnapshot', () => {
       await vi.advanceTimersByTimeAsync(60_000)
     })
     expect(getStatus).not.toHaveBeenCalled()
+    expect(requestGateway).not.toHaveBeenCalled()
 
     vi.mocked(document.hasFocus).mockReturnValue(true)
     window.dispatchEvent(new Event('focus'))
@@ -70,9 +68,12 @@ describe('useStatusSnapshot', () => {
       return (method === 'setup.runtime_check' ? { ok: true } : { provider_configured: true }) as never
     })
 
-    const requestGateway = requestGatewayMock as unknown as GatewayRequester
+    const source: StatusSnapshotSource = {
+      getStatus: getStatusStub(),
+      requestGateway: requestGatewayMock as unknown as GatewayRequester
+    }
 
-    const { result } = renderHook(() => useStatusSnapshot('open', requestGateway))
+    const { result } = renderHook(() => useStatusSnapshot(source, 'open'))
 
     await flushAsync()
     expect(result.current.inferenceStatus).toMatchObject({ ready: true, source: 'runtime_check' })
@@ -89,9 +90,12 @@ describe('useStatusSnapshot', () => {
       throw new Error(`${method} connection closed`)
     })
 
-    const requestGateway = requestGatewayMock as unknown as GatewayRequester
+    const source: StatusSnapshotSource = {
+      getStatus: getStatusStub(),
+      requestGateway: requestGatewayMock as unknown as GatewayRequester
+    }
 
-    const { result } = renderHook(() => useStatusSnapshot('open', requestGateway))
+    const { result } = renderHook(() => useStatusSnapshot(source, 'open'))
 
     await flushAsync()
 
@@ -106,9 +110,12 @@ describe('useStatusSnapshot', () => {
           : { provider_configured: true }) as never
     )
 
-    const requestGateway = requestGatewayMock as unknown as GatewayRequester
+    const source: StatusSnapshotSource = {
+      getStatus: getStatusStub(),
+      requestGateway: requestGatewayMock as unknown as GatewayRequester
+    }
 
-    const { result } = renderHook(() => useStatusSnapshot('open', requestGateway))
+    const { result } = renderHook(() => useStatusSnapshot(source, 'open'))
 
     await flushAsync()
 
@@ -120,10 +127,10 @@ describe('useStatusSnapshot', () => {
   })
 
   it('clears readiness immediately when the gateway disconnects', async () => {
-    const pendingStatus = deferred<never>()
+    const pendingStatus = deferred<StatusResponse>()
 
-    vi.mocked(getStatus)
-      .mockResolvedValueOnce({} as never)
+    const getStatus = vi.fn()
+      .mockResolvedValueOnce({} as StatusResponse)
       .mockReturnValueOnce(pendingStatus.promise)
 
     const requestGateway = vi.fn(
@@ -131,7 +138,9 @@ describe('useStatusSnapshot', () => {
         (method === 'setup.runtime_check' ? { ok: true } : { provider_configured: true }) as never
     ) as unknown as GatewayRequester
 
-    const { rerender, result } = renderHook(({ gatewayState }) => useStatusSnapshot(gatewayState, requestGateway), {
+    const source: StatusSnapshotSource = { getStatus, requestGateway }
+
+    const { rerender, result } = renderHook(({ gatewayState }) => useStatusSnapshot(source, gatewayState), {
       initialProps: { gatewayState: 'open' }
     })
 
@@ -151,17 +160,23 @@ describe('useStatusSnapshot', () => {
     const homeSetup = deferred<unknown>()
     let source = 'work'
 
-    const requestGateway = vi.fn((method: string) => {
+    const requestGatewayMock = vi.fn((method: string) => {
       if (source === 'work') {
         return method === 'setup.runtime_check' ? workRuntime.promise : workSetup.promise
       }
 
       return method === 'setup.runtime_check' ? homeRuntime.promise : homeSetup.promise
-    }) as unknown as GatewayRequester
-
-    const { rerender, result } = renderHook(({ scope }) => useStatusSnapshot('open', requestGateway, scope), {
-      initialProps: { scope: 'work\0default' }
     })
+
+    const snapshotSource: StatusSnapshotSource = {
+      getStatus: getStatusStub(),
+      requestGateway: requestGatewayMock as unknown as GatewayRequester
+    }
+
+    const { rerender, result } = renderHook(
+      ({ scope }) => useStatusSnapshot(snapshotSource, 'open', scope),
+      { initialProps: { scope: 'work\0default' } }
+    )
 
     await flushAsync()
     source = 'home'
@@ -193,9 +208,12 @@ describe('useStatusSnapshot', () => {
       (method: string) => (method === 'setup.runtime_check' ? runtime.promise : setup.promise) as never
     )
 
-    const requestGateway = requestGatewayMock as unknown as GatewayRequester
+    const source: StatusSnapshotSource = {
+      getStatus: getStatusStub(),
+      requestGateway: requestGatewayMock as unknown as GatewayRequester
+    }
 
-    renderHook(() => useStatusSnapshot('open', requestGateway))
+    renderHook(() => useStatusSnapshot(source, 'open'))
     await flushAsync()
 
     expect(requestGatewayMock).toHaveBeenCalledTimes(2)
@@ -221,5 +239,81 @@ describe('useStatusSnapshot', () => {
       await vi.advanceTimersByTimeAsync(1)
     })
     expect(requestGatewayMock).toHaveBeenCalledTimes(4)
+  })
+})
+
+describe('useStatusSnapshot — no source', () => {
+  it('is inert: no legacy call on mount, focus, visibility or the 60s timer, and stays neutral', async () => {
+    // The spies stand in for the legacy callables a hidden import path would
+    // reach for. Under a product runtime there is no source to hand them to,
+    // and every trigger below must leave both counters at zero.
+    const legacyGetStatus = getStatusStub()
+    const legacyRequestGateway = requestGatewayStub()
+
+    const { result } = renderHook(() => useStatusSnapshot(null, 'open'))
+
+    await flushAsync()
+    window.dispatchEvent(new Event('focus'))
+    document.dispatchEvent(new Event('visibilitychange'))
+    await flushAsync()
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(180_000)
+    })
+
+    expect(legacyGetStatus).not.toHaveBeenCalled()
+    expect(legacyRequestGateway).not.toHaveBeenCalled()
+    expect(result.current.statusSnapshot).toBeNull()
+    expect(result.current.inferenceStatus).toBeNull()
+  })
+
+  it('does not register a refresh timer at all', async () => {
+    renderHook(() => useStatusSnapshot(null, 'open'))
+    await flushAsync()
+
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('drops the previous source snapshot and its timer when the source goes away', async () => {
+    const getStatus = getStatusStub()
+
+    const requestGatewayMock = vi.fn(
+      async (method: string) =>
+        (method === 'setup.runtime_check' ? { ok: true } : { provider_configured: true }) as never
+    )
+
+    const requestGateway = requestGatewayMock as unknown as GatewayRequester
+
+    const { rerender, result } = renderHook(
+      ({ hasSource }: { hasSource: boolean }) =>
+        useStatusSnapshot(hasSource ? { getStatus, requestGateway } : null, 'open'),
+      { initialProps: { hasSource: true } }
+    )
+
+    await flushAsync()
+    expect(result.current.statusSnapshot).toEqual({})
+    expect(result.current.inferenceStatus).toMatchObject({ ready: true, source: 'runtime_check' })
+
+    const statusCalls = getStatus.mock.calls.length
+    const gatewayCalls = requestGatewayMock.mock.calls.length
+
+    rerender({ hasSource: false })
+
+    // The previous source's snapshot and readiness are gone in the same commit
+    // that loses the source.
+    expect(result.current.statusSnapshot).toBeNull()
+    expect(result.current.inferenceStatus).toBeNull()
+
+    // The old 60s timer and the focus/visibility listeners were torn down with
+    // the effect: none of them can fire a stale call at the retired source.
+    window.dispatchEvent(new Event('focus'))
+    document.dispatchEvent(new Event('visibilitychange'))
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(180_000)
+    })
+
+    expect(getStatus.mock.calls.length).toBe(statusCalls)
+    expect(requestGatewayMock.mock.calls.length).toBe(gatewayCalls)
+    expect(vi.getTimerCount()).toBe(0)
   })
 })

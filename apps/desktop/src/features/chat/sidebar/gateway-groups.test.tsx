@@ -29,6 +29,7 @@ const mount = () =>
           onNewSessionInWorkspace={noop}
           onNewSessionSplit={noop}
           onResumeSession={resume}
+          sessionAuthority="hermes"
         />
       </SidebarProvider>
     </MemoryRouter>

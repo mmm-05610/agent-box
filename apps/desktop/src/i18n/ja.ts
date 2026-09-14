@@ -1983,6 +1983,14 @@ export const ja = defineLocale({
 
       unavailableReasonFallback: 'サービスから理由は報告されていません。',
 
+      archivedEmpty: 'AgentBox にアーカイブされた Session はまだありません。',
+
+      loadFailed: 'アーカイブされた Session を読み込めませんでした',
+
+      listUnsupported: 'この AgentBox サービスは Session の一覧表示に対応していません。',
+
+      workspaceNotProvided: 'このワークスペースで利用できる AgentBox Session はありません。',
+
       menuActions: 'Session 操作',
 
       menuRename: '名前を変更…',

@@ -2324,6 +2324,14 @@ export const en: Translations = {
 
       unavailableReasonFallback: 'The service reported no reason.',
 
+      archivedEmpty: 'Nothing archived in AgentBox.',
+
+      loadFailed: 'Archived sessions could not be loaded',
+
+      listUnsupported: 'This AgentBox service does not support listing sessions.',
+
+      workspaceNotProvided: 'No AgentBox sessions are available for this workspace.',
+
       menuActions: 'Session actions',
 
       menuRename: 'Rename…',

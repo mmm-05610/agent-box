@@ -35,6 +35,7 @@ import type { WorkspaceRecord } from '@/types/wire/wire-v1'
 import { latestProjectSessions, PROJECT_PREVIEW_COUNT } from '../projects/model'
 import { ReorderableList, useSortableBindings } from '../reorderable-list'
 import { SidebarSectionHeader } from '../sessions-section'
+import { type SessionAuthority } from '../sidebar-constants'
 
 import { LocalWorkspaceRow, WslWorkspaceRow } from './workspace-row'
 
@@ -66,6 +67,7 @@ export function WorkspaceList({
   renderPreviewRows,
   renderRows,
   rootClassName,
+  sessionAuthority = 'hermes',
   showAllSessions
 }: {
   activeProjectId?: null | string
@@ -83,6 +85,10 @@ export function WorkspaceList({
   renderPreviewRows?: (items: SessionInfo[], projectId: string) => React.ReactNode
   renderRows?: (items: SessionInfo[]) => React.ReactNode
   rootClassName?: string
+  /** The session authority behind this list. ChatSidebar always passes its own
+   *  explicitly; the default keeps direct mounts of this component (tests and
+   *  future shells that predate the product runtime) on the legacy contract. */
+  sessionAuthority?: SessionAuthority
   showAllSessions: boolean
 }) {
   const { t } = useI18n()
@@ -129,6 +135,18 @@ export function WorkspaceList({
 
   const hasRows = projectRows.length > 0 || wslWorkspaces.length > 0
 
+  // Product runtime's neutral answer for a local row the service has no
+  // Workspace for: the row says so instead of rendering legacy Hermes session
+  // previews. It invents no rows, and a Home bucket (not a record, never a
+  // service workspace) simply stays unexpandable.
+  const notProvided = (projectId: string) => (
+    <div className="px-1 pb-1.5" data-agentbox-workspace-unavailable={projectId}>
+      <div className="rounded-md px-2 py-1.5 text-[0.6875rem] leading-4 text-(--ui-text-tertiary)">
+        {t.sidebar.agentBoxSession.workspaceNotProvided}
+      </div>
+    </div>
+  )
+
   const localRow = (
     project: SidebarProjectTree,
     dragging = false,
@@ -159,6 +177,10 @@ export function WorkspaceList({
 
     const content = serviceWorkspace ? (
       <AgentBoxSessionList key={serviceWorkspace.id} shellId={project.id} workspace={serviceWorkspace} />
+    ) : sessionAuthority === 'agentbox' ? (
+      // Product runtime: no matched service Workspace means no service
+      // sessions to show — the legacy preview rows are never rendered here.
+      project.isNoProject ? undefined : notProvided(project.id)
     ) : preview.length
       ? showAllSessions && renderPreviewRows
         ? renderPreviewRows(preview, project.id)

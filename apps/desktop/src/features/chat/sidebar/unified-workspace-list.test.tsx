@@ -735,6 +735,30 @@ describe('AgentBox sessions in the unified workspace list', () => {
     expect(container.querySelector('[data-agentbox-sessions]')).toBeNull()
     expect(container.querySelector('[data-legacy-preview="proj-1"]')).toBeTruthy()
   })
+
+  it('under AgentBox authority an UNMATCHED local row shows the neutral state instead of the legacy preview', () => {
+    // Product runtime: the service has no Workspace for this folder, so there
+    // are no service sessions to show — legacy Hermes previews are not rendered
+    // and no row is invented.
+    $agentBoxWorkspaces.set([])
+
+    const { container } = renderList(
+      <WorkspaceList
+        emptyState={null}
+        label="Workspaces"
+        projectPreviews={{ 'proj-1': [{}] as unknown as SessionInfo[] }}
+        projectRows={[sessionRow('C:/work/app')]}
+        renderRows={() => <div data-legacy-preview="proj-1" />}
+        sessionAuthority="agentbox"
+        showAllSessions={false}
+      />
+    )
+
+    expect(container.querySelector('[data-legacy-preview="proj-1"]')).toBeNull()
+    expect(container.querySelector('[data-agentbox-workspace-unavailable="proj-1"]')?.textContent).toContain(
+      'No AgentBox sessions are available for this workspace.'
+    )
+  })
 })
 
 // The ownership boundary: the MATCH is what decides whose sessions a row
