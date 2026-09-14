@@ -914,3 +914,118 @@ wire-review.md通道自39阶段协调。执行者下个检查点消费这些规�
   `SessionPickerOverlay` 潜在未门控且当前不可达、Appearance 设置页直接导航仍有一次被拒的
   `GET /api/config`、`hermes-bots` session sweep 的 REST 读取需活服务、WSL loopback 环境基线、
   未删除的 dead legacy 模块清单。
+
+---
+
+## 接管（2026-09-15）：P06 product-surface closeout — writer_lease=ACTIVE
+
+- **writer_lease = `ACTIVE — P06 product-surface closeout`**。用户通过本派单显式**一次性重新授予**
+  前端写权（范围见下）。本行覆盖本文件此前所有 `RELEASED` 陈述的**当前**效力；
+  历史行一律保留，不删除、不改写。
+- 起点核验: HEAD `6ddf6be9f4912c234fa8b248e56a231de5e2447d`（与派单预期一致）、
+  分支 `feature/agentbox-desktop-product`、`git status --short` 为空、无并发写入、
+  WSL 无残留 Vitest/Vite/Playwright/Electron 进程。未 reset/stash/clean/push/merge。
+
+### 暂停声明（不删除 `6ddf6be9` 的 GREEN 记录与 r1/r2 证据）
+
+`6ddf6be9` 声明的 **`P06_GREEN — FRONTEND_INDEPENDENT_ACCEPTANCE`** 与
+**`DESKTOP_IMPLEMENTATION_READY`** 因**协调验收发现三个产品面缺口**而**暂停生效**
+（非作废记录；`evidence/P06.md` §1–§13、`evidence/P06-assets/`、`-r2-attempt1/`、`-r2/`
+全部原样保留）：
+
+1. **Appearance 设置页是活动 legacy config 路径**：`#/settings?tab=appearance` 直接导航仍以
+   `useHermesConfigRecord()` 读 `GET /api/config`（`P06.md` §10.1/§12.3 曾登记为"已知残余"，
+   实为**产品面决定**，本轮关闭：给 `SettingsView`/`AppearanceSettings` 明确 authority）。
+2. **语言（locale）静默不持久化**：agentbox 下 `hermesLocalePreference` 的 `save()` 成为
+   **会话内 no-op**（`hermes-locale-preference.ts:63-66`），切换语言"看起来成功"却重启即丢——
+   违反「写失败必须诚实呈现、禁止 silent no-op」。
+3. **`hermes-bots` 内置插件默认启用**：bundled Bot Mode 在产品组合中仍被
+   `discoverBundledPlugins()`（`plugin.defaultEnabled ?? true`）注册并激活，
+   而 master-plan §4 已把 Bots/群聊列为**退役项**。
+
+在三个缺口修复与**新的 Windows r3 证据**齐备之前，本文件**不维持** `P06_GREEN` /
+`DESKTOP_IMPLEMENTATION_READY` 的现行效力。`REAL_FLOW_VERIFIED=否` 与
+`AGENTBOX_DESKTOP_PRODUCT_GREEN=否` 不变。`history.snapshot` 旧页分页、
+当前不可达的 `SessionPickerOverlay`、外围合同等待项继续作为已知项，本单不扩范围。
+
+### 本轮范围（有限写权）
+
+- 任务 A：Appearance 与本地 Desktop 偏好（Settings authority、resume、终端字体、语言本地端口）。
+- 任务 B：从 AgentBox 产品组合退役 bundled Bot Mode（发现/激活边界，不删实现）。
+- 主执行者：共享文档、P06 验收驱动扩展、Windows 构建树与最终 release。
+- 不动后端/wire schema/contracts/package/lock；不读密钥；不运行模型。
+
+---
+
+## 执行快照（handoff-policy 每阶段必填）— P06 product-surface closeout（r3）
+
+- updated_at: 2026-09-15（+08:00），writer_lease = `ACTIVE — P06 product-surface closeout`
+- 执行者: Zcode 前端产品 goal（新一轮会话）；用户通过派单显式**一次性重新授予**前端写权
+- 工作树/分支: `/home/maoqh/projects/agent-box-desktop-next-wsl-round1` @ `feature/agentbox-desktop-product`
+- 起点核验: HEAD `6ddf6be9`（与派单一致）、`git status --short` 为空、无并发写入、
+  WSL 无残留 Vitest/Vite/Playwright/Electron 进程、Windows 构建树无 electron/node/hermes 进程；
+  未 reset/stash/clean/push/merge，未读密钥，未运行模型，未改后端/wire schema/contracts/package/lock
+- 代码检查点: **`3b22aae7`**（产品缺口修复 + 驱动扩展 + 测试；docs 见本行之后的检查点）
+- 执行方式: 两个并行子代理（A：Appearance 与本地 Desktop 偏好；B：bundled Bot Mode 退役），写集互不重叠；
+  主执行者审查实际 diff 后**串行集成**，并自行完成运行时门（磁盘门同策）、Linux 自校验探针、
+  Windows 构建树、验收与文档。子代理未 stage/commit/改文档/使用 Windows 树。
+
+### 三个产品缺口（暂停 `6ddf6be9` GREEN 的原因）与关闭
+
+（a）**Appearance 是活动 legacy config 路径** → `SettingsView`/`AppearanceSettings` 取得**必填**
+`authority: 'agentbox' | 'hermes'`，生产组合显式传 `agentbox`；agentbox 分支**根本不构造**
+Hermes-config 组件（组件拆分，不是条件 hook），因此「零 legacy 调用」是字面事实而非「请求恰好被拒」。
+Appearance 仍是正式产品页：主题/模式/缩放/通知/快捷键/语言一行未减。
+（b）**语言静默不持久化** → 新增 Desktop 本地 `LocalePreferencePort`（`main.tsx` 注入，
+不再注入 `hermesLocalePreference`；后者保留给明确 Hermes authority），写入**写后 read-back 校验**，
+没落地就 reject，由 i18n 既有契约回滚并弹错——不再有「看起来成功」的 no-op。
+（c）**`hermes-bots` 默认启用** → `discoverBundledPlugins(authority)` 在**发现/激活边界**按纯策略
+`bundledPluginRetired(id, authority)` 丢弃该 id：不产生 inventory 记录（因此无 enable 句柄）、
+不 `register()`，历史持久化 `enabled:true` 无法绕过。**主执行者补的洞**：`loadRuntimePlugin` 的
+必填 `authority` 使**磁盘门同策**，否则产品不再发布 bundled 记录后，用户机器上历史独立安装的
+`desktop-plugins/hermes-bots/plugin.js` 会复活该面（现留可见的 `hermes-bots:retired` 禁用行）。
+（d）**顺带产品化**：「重开上次聊天」（默认 true）与终端字体改为 Desktop 本地偏好
+（`application/desktop-preferences/**`，persist-then-publish，冷启动从同一权威 hydrate）。
+
+### 实测门（Linux/WSL，主执行者）
+
+| 门 | 结果 |
+| --- | --- |
+| 定向面（Appearance/locale/terminal 偏好 + 插件发现/authority + settings + composition + 命令面板 + i18n） | **71 files / 635 tests passed，exit 0** |
+| 完整 renderer Vitest | **823 files / 7970 tests passed，exit 0**（r2 时 816 / 7929） |
+| P06 驱动单测 | **1 file / 52 tests passed，exit 0**（r2 时 45） |
+| 三项目 typecheck | **exit 0** |
+| 改动文件 ESLint（33 个） | **exit 0，0 error**（`.d.mts` 的「无匹配配置」是既有配置缺口，非本轮引入） |
+| `git diff --check` / `apps/desktop build` | **exit 0** / **exit 0** |
+| 自校验 CDP 探针（临时，未入库） | 8 项全 PASS；renderer 残余 `[]`、main refusals 0；**并抓到驱动自身两个缺陷**（resume 行钩子缺失、语言选项指针点击被列表容器拦截→改走选择器搜索框），Windows 轮之前已修 |
+
+首次失败与真实修复（不靠重跑掩盖）：新增 `runtime-loader.test.ts` 两条用例首跑 2 failed（records 模块级
+共享状态污染 + 误判磁盘门默认态）已按真实契约改正；`discoverRuntimePlugins` 必填化漏改两个调用点由
+typecheck 当场暴露；新测试 4 条 ESLint warning 收口为 0。
+
+### Windows r3（原应用，权威门）
+
+- 同步：`git diff --name-only 6ddf6be9..3b22aae7` 的 **33 个 tracked 文件**，先 dry-run，
+  逐文件 SHA-256 **33/33 逐字节一致**；**未重装依赖**。
+- 构建：`npm run build` **exit 0**（vite + bundle + stage-native-deps + assert-dist-built；日志入库）。
+- 驱动（全新沙箱 `agentbox-p06-sandbox-r3` → `agentbox-p06-evidence-r3`）：
+  **28 PASS / 0 FAIL / 0 SKIP / 0 PENDING，`allOk=true`，exit 0**；counts 与 steps 机械一致
+  （`PASS+FAIL+SKIP+PENDING+unknown = 28 = len(steps)`，无重复 id）；两道 legacy REST 门独立成立
+  （main refusals **0**；renderer `residualLegacyPaths` 严格 **`[]`**）；无 Hermes runtime；
+  `no-blocking-overlay` 覆盖 0.0%；`exit-no-orphans` 20s 进程树全空。
+- 新增必需步全部 PASS：`appearance-page-operable`、`appearance-language-persists`
+  （`en → ja → reload=ja → restored=en`）、`appearance-resume-pref-persists`
+  （`true → off=false → reload=false → restored=true`）、`appearance-terminal-font-persists`
+  （`"FiraCode Nerd Font" → reload 保留 → reset=""`）、`appearance-no-legacy-rest`（残余 `[]`）、
+  `bot-mode-retired`（palette/入口/存储命中全为空）。原 20 条必需 id 一条未删、一条未降级。
+- 证据：**`evidence/P06-assets-r3/`**（7 张截图含新增 `appearance-local-preferences.png`、
+  `results.json`、两份日志、驱动 stdout、`windows-build.log`、`SHA256SUMS`）；脚本复核
+  `results.json` 机械一致（`ISSUES=[]`）且 9 个文件哈希与入库文件相符。
+  `P06-assets/`、`P06-assets-r2-attempt1/`、`P06-assets-r2/` **原样保留未动**。
+
+### 已知边界（本单未扩范围）
+
+`history.snapshot` 旧页分页未挂载；当前不可达的 `SessionPickerOverlay`；外围合同（Skills/MCP/Data/
+备份恢复）未下单；WSL loopback 基线 2 文件（r1 Windows 裁决仍有效，本轮未改相关模块）；
+4 个 Bot Mode Playwright spec 描述已退役的面且本就需外部真实 Hermes runtime（无则 skip），
+不在 P06 门内、本轮未改；dead legacy 模块与 `hermes-bots` 实现按既有先例保留不删。
