@@ -56,7 +56,7 @@
 
 未进入（依赖 B 的双门）。
 
-## D — 真实模型授权与逐家验收（**进行中，1 家证伪，其余待验**）
+## D — 真实模型授权与逐家验收（**进行中，四家待验**）
 
 授权：仅 DeepSeek 官方 API，全轮累计 ≤ ¥10；凭据 locator 见工单 §D。
 
@@ -68,7 +68,7 @@
    `model=deepseek-chat`，`max_tokens=8`。返回 HTTP 200，内容 `ok`，
    usage `{prompt_tokens: 11, completion_tokens: 1, total_tokens: 12}`。
    **这是 API 可达性证据，不是 Harness 验收**。
-3. **Codex 家：协议不兼容（证伪）**。用受支持的 Provider 配置
+3. **Codex 家：保留错误配置失败，撤回协议不兼容结论。** 先前 Provider 配置
    （`$CODEX_HOME/config.toml` 定义 `model_providers.deepseek`，`base_url` 指向
    DeepSeek 官方、`env_key=DEEPSEEK_API_KEY`）驱动内嵌 Codex 0.147.0：
 
@@ -78,11 +78,12 @@
    supported. How to fix: set `wire_api = \"responses\"` in your provider config."
    ```
 
-   即该 Codex 版本只接受 **OpenAI Responses API** 形状，而 DeepSeek 官方提供的是
-   chat-completions 形状。按 42-D「协议不兼容则记录该家待验，不私建模型代理」处理：
-   **Codex 家与 DeepSeek 官方 API 当前不兼容，标记该家真实模型待验**。
-   未修改 Codex 工件、未搭建任何代理、未换用其他凭据。
-   注意：这不影响 Codex 的组件门（40-C 已通过）；它只说明该家无法用本轮授权模型做真实闭环。
+   这只能证明 Codex 0.147.0 拒绝过时的 `wire_api="chat"`，不能证明 DeepSeek 官方服务不支持
+   Responses。用户提供的 DeepSeek 官方 `codex-deepseek-setup.sh` 1.3.0（2026-09-14 只读取得
+   SHA-256 `0a3a33704e1fb1579300d559f009279c7db8e06aa428a0cba07ac9e265a130ca`）明确配置
+   `base_url="https://api.deepseek.com/"` 与 `wire_api="responses"`，并提供完整模型目录。
+   因此撤回“协议不兼容/证伪”结论；原错误与零模型调用事实保留。目前正在 AgentBox 隔离 Profile
+   中按官方配置验证，不执行该脚本、不修改用户真实 `~/.codex`、不建设协议代理。
 
 ### 未完成
 
@@ -97,7 +98,7 @@
 | 项 | 调用数 | 用量 | 估算费用 |
 | --- | --- | --- | --- |
 | DeepSeek 官方 API 可达性检查 | 1 | 12 tokens（11 in / 1 out） | < ¥0.01 |
-| Codex 真实模型尝试 | 0 次模型调用 | 0（在 `session/new` 阶段即失败，未发起模型请求） | ¥0 |
+| Codex 错误 chat 配置尝试 | 0 次模型调用 | 0（在 `session/new` 阶段即失败，未发起模型请求） | ¥0 |
 | **合计** | **1** | 12 tokens | **< ¥0.01 / 上限 ¥10** |
 
 未预留、未充值。若后续继续，建议按 8 元停止新增测试留结算余量（工单建议）。

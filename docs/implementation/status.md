@@ -15,7 +15,7 @@ Codex 配置尝试在模型请求前失败，不能记作模型调用或 Harness
 | [39](work-orders/39-server-boundaries.md) | **READY_FOR_HARNESS** | [阶段证据](../server-round1/server-boundary/stage-a-b-c.md)：幂等并发双派发缺陷先复现后修复、能力声明改为注册派生、双中立provider测试、legacy codex 退出生产装配 | wire反馈通道 [wire-review.md](../server-round1/wire-review.md) 已建立并写入首轮 |
 | [40](work-orders/40-four-harness-integration.md) | **FOUR_HARNESS_COMPONENTS_READY** | [40-A 底座](../server-round1/harness-integration/stage-a.md) / [40-B 通道](../server-round1/harness-integration/stage-b.md) / [40-C 矩阵](../server-round1/harness-integration/stage-c.md) / [40-D 汇总](../server-round1/harness-integration/stage-d.md) + [握手证据JSON](../server-round1/harness-integration/handshake-40c.json)：四家组件门 25/25；全量 227 passed/4 skipped/0 failed；Rust 4 passed；真实二进制零凭据握手 pi/hermes INITIALIZED、opencode HEALTH_OK、codex 诚实要求凭据 | 本单终态；Server 侧编排与 wire 锁定进入 41；真实模型门留待 42 §D |
 | [41](work-orders/41-core-service-acceptance.md) | **BACKEND_WINDOWS_RECONFIRM_IN_PROGRESS** | [后端验收](../server-round1/backend-acceptance.md)：前端 `3aba5c5c` 的 28 方法+队列终态严格 schema 回归 29/29；`502f4b5` 已把 Provider/Model 版本冻结、credentialId→SecretStore→Worker 一次性帧→bwrap 固定只读挂载接入生产 sidecar，相关 Python 45、Worker/bwrap 32、Node 4 项通过；Windows r3 exit 0 | 串行跑 Windows r4 锁定工件重确认后恢复 READY |
-| [42](work-orders/42-fullstack-delivery.md) | **PRE_GATE_WORK_IN_PROGRESS**（两端门当前均未满足，未联调） | [进度与费用账](../server-round1/fullstack/progress.md)：前端仍 PARTIAL、writer_lease ACTIVE；28 方法 wire 已重锁；DeepSeek 官方 API 可达（12 tokens）；**Codex 家与 DeepSeek 协议不兼容**（codex 0.147.0 只收 Responses API，DeepSeek 为 chat 形状） | 无模型准备 Pi/Hermes/OpenCode 独立真实门；串行 Windows r4；待双端 READY+同摘要+释放写权后联调 |
+| [42](work-orders/42-fullstack-delivery.md) | **PRE_GATE_WORK_IN_PROGRESS**（两端门当前均未满足，未联调） | [进度与费用账](../server-round1/fullstack/progress.md)：前端仍 PARTIAL、writer_lease ACTIVE；28 方法 wire 已重锁；DeepSeek 官方 API 可达（12 tokens）；Codex 先前 `wire_api="chat"` 失败现已按官方脚本更正解释，Responses 隔离配置施工中 | Codex/Pi/Hermes/OpenCode 独立真实门；串行 Windows r4；待双端 READY+同摘要+释放写权后联调 |
 | [37](work-orders/37-http-codex.md) | **SERVER_HTTP_CODEX_R1_PARTIAL** | [原完成审计](../server-round1/completion-audit.md) / [C/D证据](../server-round1/stage-c-d.md)保留；检查点5a45303/5b71393/cd5efbe/67c6b40。独立定向23 passed；同键并发双accept已由39复现并修复；能力不诚实已由39结构性修复 | abandon 断言经探针定性为**测试侧竞态**（终止状态持久化后约50ms才 abandon；负载高时10/10失败），已改为有界等待、断言强度不变，修后10/10通过；原生语义迁移由40执行 |
 | [38](work-orders/38-harness-extension-selection.md) | **HARNESS_EXTENSION_SELECTION_READY_FOR_DECISION** | 两轮 A/B/C 完成：[最终建议与边界](../server-round1/harness-selection/boundary.md)。保留有条件首选 `harness-remote v3.0.2`；零模型/凭据 | 首选已由40消费进入有门禁接入；不再等待决定 |
 
@@ -58,9 +58,9 @@ Codex 配置尝试在模型请求前失败，不能记作模型调用或 Harness
     真实二进制零凭据 INITIALIZED）；
   - opencode：COMPONENT_VERIFIED（同快照 ManagedOpenCodeHost；真实二进制 HEALTH_OK，
     不伪装为 ACP profile）。
-  - 四家均 **MODEL_NOT_VERIFIED**；其中 **codex 已证伪**：内嵌 Codex 0.147.0 要求
-    `wire_api="responses"`，与 DeepSeek 官方 chat-completions 形状不兼容（证据见42进度文档）；
-    pi/hermes/opencode 的无模型 Provider 配置准备已在 `bc7d95b` 完成；生产 sidecar 的非敏感模型
+  - 四家均 **MODEL_NOT_VERIFIED**。Codex 0.147.0 先前只证明 `wire_api="chat"` 配置被客户端拒绝；
+    DeepSeek 官方 `codex-deepseek-setup.sh` 1.3.0 明确给出 Responses 配置，故已撤回“不兼容/证伪”
+    结论并保留原始失败为错误配置证据。pi/hermes/opencode 的无模型 Provider 配置准备已在 `bc7d95b` 完成；生产 sidecar 的非敏感模型
     冻结与一次性凭据投影已在 `502f4b5` 完成。三家付费真实门仍未执行，不能记为可用。
 - 已知待办/风险：内嵌 codex 二进制安装后**必须校验**（本轮发现过一次截断安装，
   已更正40-A证据）；Hermes 启动有 lazy 依赖安装与 PYTHONPATH 要求，42-D需生产级收口；

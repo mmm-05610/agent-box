@@ -46,5 +46,6 @@ environment variable, and performs no network I/O.
 
 Remaining handoff: production full-chain injection of the authorized secret through the existing
 Windows/Worker protected locator, plus the real per-Harness model gate, remains outside this
-no-model preparation task. Codex protocol incompatibility remains unchanged and is not repaired
-here.
+no-model preparation task. The earlier Codex `wire_api="chat"` failure was subsequently reclassified
+as an incorrect configuration after DeepSeek's official Responses setup was supplied; it is not
+evidence of protocol incompatibility.

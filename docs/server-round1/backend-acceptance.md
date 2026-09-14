@@ -142,5 +142,5 @@ SecretStore 按 locator 读取、Worker `secret.put` 一次性帧、bwrap 固定
 Windows r4 对锁定工件重确认后恢复 READY。
 四家组件仍保持 40 的
 `COMPONENT_VERIFIED / MODEL_NOT_VERIFIED` 分账。Pi/Hermes/OpenCode 的 DeepSeek Provider 配置与
-独立真实模型门、Codex 协议不兼容记录，进入 42-D；前端仍由其独立 writer 施工，当前不具备跨仓
+独立真实模型门以及 Codex 官方 Responses 隔离配置验证进入 42-D；前端仍由其独立 writer 施工，当前不具备跨仓
 写权，未执行全栈联调。
