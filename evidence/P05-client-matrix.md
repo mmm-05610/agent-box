@@ -4,6 +4,17 @@
 （分支 `feature/agentbox-desktop-product`，工作树 clean）。
 本文件只盘点**实际生产接线与缺口**，不修改生产代码。
 
+**增量（2026-09-14，代码检查点 `86911029`）**：`sessions.update` 侧栏投影的服务状态边界返修——Workspace
+**归属**与**服务可调用性**分离：`agentBoxWorkspaceFor` 只按缓存 `$agentBoxWorkspaces` 与既有完整身份 +
+normalized path 匹配，不再要求 `service.phase === 'ready'`，因此本地/WSL shell 行在 loading/unavailable 期间
+仍由服务 Workspace 拥有（不再回落 legacy 预览或旧「sessions unavailable」）；`agentBoxArchiveFor` 单独继续要求
+`ready` + hello 声明 `workspaces.archive` + 缓存匹配。`AgentBoxSessionList` 改为**先算缓存 records 再决定展示**：
+有缓存时任何服务状态都显示服务行（unavailable 附紧凑状态与 `service.detail` 纯文本，loading 附紧凑 loading），
+维护入口仅在 ready + 能力声明时可执行，其余状态行仍可打开且零 wire 调用；无缓存时 unavailable 显示
+unavailable（不是 spinner），loading/idle 或 catalog 未 ready 显示 loading，仅 ready + catalog ready 显示空态。
+矩阵状态计数不变（**27 reachable / 1 gap**，唯一剩余前端缺口仍为 `sessions.archive`）；`SESSIONS_UPDATE_CLIENT_READY`
+以该次返修提交为最终依据（P05 仍 IN_PROGRESS，REAL_FLOW_VERIFIED 仍为否）。详见 §3-G5a 与 evidence/P05.md。
+
 **增量（2026-09-14，代码检查点 `8cdd1381`）**：`sessions.update` 已按 G5a 的目标文件与不变量完成生产接线
 ——统一侧栏在**服务 Workspace 匹配后由其 AgentBox Session 投影接管展开内容**（新纯投影 + 版本单调缓存 +
 `agentbox-sessions/` 行与列表 + 侧栏改名/置顶 CAS + 当前会话置顶命令走同一 seam），矩阵中该行改为
@@ -282,7 +293,7 @@ lifecycle 外部缺口不变。详见 §3-G4 与 evidence/P05.md。
   联调验证；本端只保证请求语义、顺序、失败面与迟到保护。运行实际版本仍由接受回执的 `configVersion`
   固定，预览不冒充最终配置。
 
-**G5a `sessions.update` — 已接线（代码检查点 `8cdd1381`）**
+**G5a `sessions.update` — 已接线（代码检查点 `8cdd1381`；服务状态边界返修 `86911029`）**
 
 原缺口（只登记未修）已按目标文件与不变量实现，G5 由此拆为 G5a（已接）与 G5b（待接）：
 
@@ -302,10 +313,27 @@ lifecycle 外部缺口不变。详见 §3-G4 与 evidence/P05.md。
 - 缓存不变量（已由测试钉住）：同 id 只采纳 version ≥ 当前的服务记录（v7 之后到达的 v6 不覆盖），
   部分页不擦除其他 id；本阶段未改变 archived 记录在底层 cache 的保留策略（由投影过滤）。
 - 侧栏不变量（已由测试钉住）：本地与 WSL 都用**完整 `{kind,user,host}` + normalized path** 匹配服务
-  Workspace；匹配后其展开内容由服务投影接管——catalog 未 ready 显示诚实 loading、ready 且空显示中立
-  empty、有记录显示服务行，**绝不回落 legacy SessionInfo 预览**；WSL 不再对已匹配 Workspace 显示
-  “sessions unavailable”；未匹配的 shell 行行为不变；打开一条记录 = `selectWorkspaceView(shellId)` →
-  `navigate(sessionRoute(id))`，零 `workspaces.open`/send/harness/legacy 调用。
+  Workspace，**匹配只读缓存 `$agentBoxWorkspaces`，不看 service 相位**（服务可调用性与归属分离）；匹配后其
+  展开内容由服务投影接管——有缓存记录即显示服务行（loading/unavailable 附紧凑状态，绝不替换记录）、catalog
+  未 ready 显示诚实 loading、ready 且空显示中立 empty，**绝不回落 legacy SessionInfo 预览**；WSL 不再对已匹配
+  Workspace 显示 “sessions unavailable”；未匹配的 shell 行行为不变；打开一条记录 =
+  `selectWorkspaceView(shellId)` → `navigate(sessionRoute(id))`，零 `workspaces.open`/send/harness/legacy 调用。
+- 服务状态边界不变量（`86911029` 返修后，已由测试钉住）：服务 Workspace 归属只看缓存，loading/unavailable
+  不改变任何行的归属；有缓存时 unavailable 显示状态 + `service.detail`（纯文本、空则本地化 fallback），无缓存
+  时 unavailable 显示 unavailable（不是 spinner），loading/idle 或 catalog 未 ready 显示 loading，仅
+  ready + catalog ready 显示 empty；改名/置顶只在 `ready` 且 hello 声明 `sessions.update` 时可执行，其余状态
+  行仍可打开但零 wire 调用（跨服务下线的已打开改名对话框也不发送）；归档入口额外要求 `ready` +
+  `workspaces.archive`，旧 hello 不能让其越过服务不可用。
+- 验收（已执行）：`npx vitest run --project ui` 定向门 8 files / **76 tests passed**（exit 0，含
+  `agentbox-session-projection`、`wire-session-catalog`、`agentbox-service`、
+  `agentbox-session-list`、`agentbox-session-row`、`unified-workspace-list`、`workspace-row`、
+  `agentbox-session-commands`）；相关回归 5 files / 70 tests passed；`npm run typecheck` 三项目通过；
+  实际改动文件 ESLint 0 error / 0 warning；`git diff --check` 干净。
+- 服务状态边界返修验收（`86911029`）：定向门 2 files / **46 tests passed**（exit 0，
+  `agentbox-session-list`、`unified-workspace-list`，新增 12 例）；要求的相关回归 6 files / 40 tests passed；
+  扩大扫 `src/features/chat/sidebar` + `src/i18n` 34 files / 252 tests passed；`npm run typecheck` 三项目
+  通过；改动文件 ESLint 0 error / 0 warning；`git diff --check` 干净；新增断言在修复前 10 failed / 36 passed
+  （临时以 `git show HEAD:` 还原组件复跑，未改仓库）。
 - 改名/置顶不变量（已由测试钉住）：打开改名时捕获当时的 `id/version/displayName`，保存发送
   `{sessionId, expectedVersion, displayName}`（trim 后），每次意图新 requestId；不乐观改名、不写
   `$pinnedSessionIds`；服务规范化名称立即回显；`CONFLICT_VERSION`/typed failure 保留对话框、草稿与
@@ -458,6 +486,8 @@ dynamic connection slot            electron/composition/agentbox-service-composi
 | workspaces.browse 迟到保存返修门（`4a057609`，4 files / 40 tests） | 通过（exit 0） |
 | sessions.update 接线定向门（`8cdd1381`，8 files / 76 tests） | 通过（exit 0） |
 | sessions.update 相关回归门（`8cdd1381`，5 files / 70 tests） | 通过（exit 0） |
+| sessions.update 服务状态边界返修定向门（`86911029`，2 files / 46 tests） | 通过（exit 0） |
+| sessions.update 服务状态边界返修回归门（`86911029`，6 files / 40 tests） | 通过（exit 0） |
 | `git status --short` | 只含本阶段写集（见 §9） |
 
 矩阵完整性核验（一次性只读命令，不新增仓库脚本）：从 `WireMethods` 导出键、从本文件表格抽取
@@ -468,7 +498,10 @@ dynamic connection slot            electron/composition/agentbox-service-composi
 审计阶段写集：本文件（新增）、`evidence/P05.md`、`docs/desktop-product-delivery/status.md`；
 后续接线检查点（`940c9df4`、`3e207376`、`f6b457b5`、`a8142125`、`4a057609`、`8cdd1381`）的写集见各提交
 与 evidence/P05.md。`8cdd1381` 只改 `sessions.update` 相关写集（见 §3-G5a 目标文件），未触碰
-`sessions.archive`、legacy 侧栏数据面、wire schema 或后端。
+`sessions.archive`、legacy 侧栏数据面、wire schema 或后端。`86911029`（服务状态边界返修）只改
+`workspace-list/workspace-list.tsx`、`agentbox-sessions/agentbox-session-list.tsx`、两者测试与 i18n
+（`types.ts` 与六语言），同样未触碰 `sessions.archive`、store/application seam、命令接线、wire schema、
+Electron/preload 或后端；`SESSIONS_UPDATE_CLIENT_READY` 以该提交为最终依据。
 未修改 `types/wire/**` 合同、`types/wire/**`、contracts 文档、preload、Electron main、
 package/lock、后端与 Windows 构建树；未重跑完整测试、未跑 Windows、未安装依赖、未读后端密钥、
 未执行模型调用。
