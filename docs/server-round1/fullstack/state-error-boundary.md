@@ -25,13 +25,13 @@
 
 | Worker 位置 | 码 | 分类 |
 | --- | --- | --- |
-| `list_view_files`：FIFO/socket/设备；`view.get`：目标非普通文件 | `VIEW_SPECIAL_FILE` | 立即失败 |
+| `list_view_files`：FIFO/socket/设备；`view.get`：目标非普通文件或路径经符号链接解析 | `VIEW_SPECIAL_FILE` | 立即失败 |
 | `list_view_files`：访问条目 > 4096 | `VIEW_TRAVERSAL_LIMIT` | 立即失败 |
 | `list_view_files`/`view.list`：普通文件 > 1024；`view.prepare`：manifest > 1024 | `VIEW_FILE_LIMIT` | 立即失败 |
-| `view.get`：文件在读取中消失；目录在遍历中消失 | `VIEW_CHANGED` | 瞬态（有界重试） |
-| `view.get`：offset 超过当前文件末尾（文件被缩短） | `VIEW_CHANGED` | 瞬态（有界重试） |
-| `view.get`/`_view_bytes`：size/offset/digest 在读取中改变 | `SIDECAR_STATE_IDENTITY_CONFLICT` | 瞬态（有界重试） |
-| `view.get`：fetch range 非法、超过 artifact 上限、路径非法 | `VIEW_INVALID` | 立即失败 |
+| `view.get`：条目不存在（首次请求即无历史证明） | `VIEW_MISSING` | 立即失败；capture 对"刚列出过的路径"把它转换为 `SIDECAR_STATE_IDENTITY_CONFLICT` 重试 |
+| `read_view_entry`：fd 打开后 fstat 身份（dev/ino/size）改变，或读出超过上限 | `VIEW_CHANGED` | 瞬态（有界重试） |
+| `view.get`/`_view_bytes`：size/offset/digest 在分块读取中改变 | `SIDECAR_STATE_IDENTITY_CONFLICT` | 瞬态（有界重试） |
+| `view.get`：fetch range 非法、超过 artifact 上限、路径非法、首次 offset 越过末尾 | `VIEW_INVALID` | 立即失败 |
 | `view.get`/`view.list`：真实 I/O 故障（非 NotFound） | `VIEW_IO` | 立即失败 |
 | view 未提交 / commit 读回缺失 | `VIEW_INCOMPLETE` | 立即失败 |
 | commit 读回摘要不符 | `VIEW_DIGEST_MISMATCH` | 立即失败 |
@@ -46,13 +46,33 @@
 "确定性错误不再被改写"的原因：重试只对"字节还在动"的码合法；拒绝类码表达的是
 调用方必须看到的决定（政策或资源上限），重试不可能改变它，只会掩盖原因。
 
-## 3. 协议兼容性
+### 2.1 fd 锚定 no-follow 打开（Reviewer 复审 P0 修复）
+
+状态源是 Harness 可写 bind，"先 lstat 检查、再按路径打开"存在 TOCTOU：检查与打开之间把
+普通文件或父目录换成指向 view 外的符号链接，`fs::read` 会跟随。现 Worker 全部视图读取
+改为 **fd 锚定逐组件 no-follow**：`view.get`/`view.commit`/`view.list` 先把 view 目录
+打开为 fd，`open_beneath` 用 `openat(.., O_NOFOLLOW|O_DIRECTORY|O_CLOEXEC|O_NONBLOCK)`
+逐组件打开；读取用已验证 fd 的 `fstat` 取类型/大小，读以 artifact 上界为限（`take`），
+读后再 `fstat` 比较 (dev,ino,size)，不一致报 `VIEW_CHANGED`。反例测试：**末组件换链**
+（`state.db` 原子换成指向 view 外 sentinel 的链接 → `VIEW_SPECIAL_FILE`，sentinel 未被读）、
+**父目录换链**（`a` 换成外部目录链接 → 确定性硬失败，外部字节不会出现）、
+**超过上限**（`set_len(MAX+1)` → 打开后按 fd 大小拒绝，不做无界读）。
+列出时子目录在遍历中消失/变链按 churn 跳过（下一 snapshot 自然不同），其余保持类型化拒绝。
+
+## 3. 协议兼容性（错误码合同的精确化）
 
 只新增错误码值，帧格式与响应形状未变：失败仍是 1 个 `WorkerError` 帧、
 `{"requestId","ok":false,"error":{"code","message"}}`（`view_error_envelope_tests`
 逐帧断言 key 集合不增长，含新旧码各值）。因此 **ABW1 frame/manifest `wireVersion = 1`**
-与 **Worker control `PROTOCOL_VERSION = 3`** 均不变；兼容性说明写入
-`protocol.rs` 的版本注释，由上述测试锁定。
+与 **Worker control `PROTOCOL_VERSION = 3`** 均不变。
+
+错误码**是合同的一部分**，其扩展规则与混合世代语义已写入 `protocol.rs` 并由测试锁定：
+码集只做增量扩展；请求/响应永不增加码专属字段；客户端对**不认识的码一律视为拒绝、
+绝不重试**（fail closed）；sidecar 的重试清单只包含它已知含义为"字节在动"的码。
+因此混用两个世代只会向更严格方向退化：旧客户端遇到新 Worker 的新码直接拒绝；新客户端
+遇到旧 Worker 的共享 `VIEW_INVALID` 拒绝也直接拒绝（不再重试）——两个方向都不会把失败
+变成假绿。混合行为已被第一手验证：旧 c6 Worker + 新 sidecar 的复测中，旧码 `VIEW_INVALID`
+被立即拒绝而非重试（见 §4.1）。
 
 ## 4. c7 与五门复跑（串行，全部用 c7）
 
@@ -88,7 +108,61 @@ c7 首跑与 c6 对照跑（01:2x–01:3x +08:00）曾在**第一轮 state 捕�
   且 `annotate_known_blocker` 只在"观察到别名链接且 turn 失败"时输出历史诊断
   （绿跑不再误报 blocker）。
 
+## 4.2 Reviewer 复审后的修复验证（c8）
+
+Reviewer `CHANGES_REQUIRED` 的修复（§2.1/§7.1）落地后重建
+**`.acceptance-bundle-c8` = `sha256:514f48a9c24c8a13edefa4eb3aa5473b0f3a25d88a94aea1a19bb16ea2707975`**
+（取代而非覆盖 c7；c4–c7 摘要逐一核对未变）。用 c8 串行复跑：
+
+| 门 | 结果 |
+| --- | --- |
+| runtime-artifact-gate（c8） | exit 0，`RUNTIME_ARTIFACT_PROJECTION_GATE_OK` |
+| Pi（c8） | exit 0，`PI_PRODUCTION_CHAIN_GATE_OK` |
+| Hermes（c8） | exit 0，`HERMES_PRODUCTION_CHAIN_GATE_OK` |
+| OpenCode（c8） | exit 0，`OPENCODE_PRODUCTION_CHAIN_PREPARED` |
+| Codex（c8，默认模式） | **10 轮 exit 0**（`…_GATE_OK`）+ 2 轮失败（见下，均已第一手定位） |
+| Windows r4（c8） | exit 0，`BACKEND_41_E_WINDOWS_WSL_WIRE_OK`，`worker_digest=sha256:514f48a9…`，`tree_terminate`、`session/new→session/resume`、delta 9 < completed 12、8 秒静默默认租约 `elapsed_ms=8817` 完成 |
+| 独立 PostCheck（c8 实例） | exit 0，`…_POSTCHECK_CLEAN`（DataRoot/workspace/端口 18746/进程/view 全空） |
+| Python 全量 | **820 passed / 4 skipped / 0 failed**（+8：边界改约 6、gate 诊断 5、既有微调；4 项既有 skip 未扩大） |
+| Rust | fmt 干净；`cargo test --locked --release` **27 passed** |
+
+### 4.3 两个第一手定位的 Codex 原生行为发现（待用户裁决，未擅自处置）
+
+1. **技能/插件物化突发（`VIEW_FILE_LIMIT` 的根因）**：门内采样器在失败轮测得 view 峰值
+   **5529 个普通文件**，全部位于 `agentbox-sidecar/deployment/codex/native-state/.tmp/plugins/…`
+   —— 即 Codex 0.147.0 运行时把内置 plugin/skill 语料（react-best-practices、vercel、nvidia、
+   zoom 等）解包进 `$CODEX_HOME/.tmp/plugins/`，而该目录在声明 state 投影（`$CODEX_HOME`）内。
+   突发是瞬态的（绿跑峰值仅 114 文件），但它一旦与捕获重叠，Worker 列表上限 1024 立即
+   `VIEW_FILE_LIMIT`（确定性拒绝，行为符合本阶段合同）。这不是本修复引入的：旧码时代同一
+   条件重试 10 秒后报 `SIDECAR_STATE_NOT_SETTLED`。
+2. **凭据材料瞬时入 state（凭据扫描正确拦截）**：一轮中 sidecar 凭据扫描在原生 state 里
+   命中假 token（`SIDECAR_STATE_CONTAINS_SECRET`，扫描消息现含文件相对路径、绝不含凭据
+   内容）。约 1/15 概率复现；命中文件尚未捕获到（view 已被清理）。假端点轮 budget 内无额外
+   provider 请求，故最可能是 Codex 在某条路径（如 ephemeral 凭据或请求重试日志）把凭据
+   **瞬时写进自己的 home**。对付费真实模型门这是关键前置风险：真实 key 一旦入 state，
+   捕获扫描会（正确地）拒绝。
+
 ## 5. 全量验证与清理
+
+精确命令（原始输出留在本轮会话日志，不入 Git）：
+
+```text
+cargo fmt --check && cargo test --locked --release   # workers/agent-box-worker → 见本节计数
+cargo build --locked                                  # 刷新 target/debug 供跨进程测试
+PYTHONPATH=src:plugins/agent-box-runtime-wsl/src:plugins/agent-box-sandbox-bwrap/src:plugins/agent-box-harnesses/src \
+  python3 -m pytest -q tests/server/test_state_capture_error_boundary.py tests/server/test_state_capture_settle.py
+PYTHONPATH=src + 全部 plugins/*/src \
+  python3 -m pytest -q tests plugins/agent-box-harnesses/tests plugins/agent-box-runtime-wsl/tests \
+    plugins/agent-box-sandbox-bwrap/tests plugins/agent-box-runtime-local/tests
+scripts/server-round1/build-worker.sh workers/agent-box-worker/.acceptance-bundle-cN
+python3 scripts/server-round1/runtime-artifact-gate.py --worker <bundle> --json              → exit 0
+python3 scripts/server-round1/{codex,pi,hermes,opencode}-production-chain-gate.py --worker <bundle> --json → exit 0
+powershell.exe -File accept-e.ps1（-SourceRoot \\wsl.localhost\Ubuntu\… -DataRoot …\acceptance-server-r4-cN
+  -ManifestPath <bundle>\manifest.json -WireSchemaPath <前端生成工件> -LinuxWorkerPath <bundle>/agent-box-worker
+  -WorkspaceLinuxPath /tmp/agentbox-server-r4-cN -Port 18745 -Cleanup）  → exit 0（BACKEND_41_E_WINDOWS_WSL_WIRE_OK）
+  同参数 -PostCheck -InstanceId <lock_after_first>,<lock_after_final>     → exit 0（…_POSTCHECK_CLEAN）
+git diff --check <起点>..<HEAD>
+```
 
 - Python 全量（tests + 全部插件 tests）：**812 passed / 4 skipped / 0 failed**
   （较上轮 793 +19：错误边界 19 项新测；4 项既有平台/环境 skip 未扩大）。
@@ -126,6 +200,21 @@ c7 首跑与 c6 对照跑（01:2x–01:3x +08:00）曾在**第一轮 state 捕�
   `VERDICT: ACCEPT` 精确命中、含 `REVIEWER_CHANNEL_OK`，
   `REVIEWED_HEAD: 897a833…` 与 `WORKTREE_STATE: DIRTY` 与调用前实况一致；
 - 调用前后 `git status --porcelain` diff 为空：Reviewer 未产生任何仓库写入。
+
+## 7.1 Reviewer 第一轮结论与逐项处置（2026-09-15，CHANGES_REQUIRED → 本节即修复记录）
+
+固定 Reviewer（session `01a0a0f8…`，gpt-5.6-sol，read-only）对 `897a833..eefe652` 给出
+`CHANGES_REQUIRED`，逐项处置：
+
+| 级别 | 发现 | 处置 |
+| --- | --- | --- |
+| P0 | `view.get`/listing 先按路径检查后按路径打开，Harness 可写 bind 下可换链逃逸、绕过 64 MiB | §2.1：fd 锚定逐组件 no-follow + fd fstat + 有界读 + 读后身份复核；三个反例测试（换链/换父/超限） |
+| P1 | 首次越界 offset 与首次不存在的路径被归为 `VIEW_CHANGED`（无历史证明的"瞬态"） | Worker 改为确定性硬失败（`VIEW_INVALID`/`VIEW_MISSING`）；`_view_bytes` 在"刚列出过"的上下文把 `VIEW_MISSING` 转换为 `SIDECAR_STATE_IDENTITY_CONFLICT`；新增"首次越界=硬失败""缺路径=确定性码+capture 层转换""分块中截断→重试且字节不混合"三类反例 |
+| P2 | `protocol.rs` 注释称 code 是 opaque，与 sidecar 按 code 分类矛盾 | 注释改写为错误码合同：增量扩展、unknown code 一律拒绝不重试、混合世代向更严格方向退化；由 envelope 测试 + 未知码 fail-closed 测试锁定 |
+| P2 | gate blocker 注记因果过宽（任意 turn 失败 + 观察到链接即标注） | 仅"capture 阶段失败且码属 state/view 集合"才记 blocker；其余记 `stateSymlinkCoObservation`；新增 `tests/server/test_codex_gate_diagnostics.py` 5 例（含绿跑与无关失败反例） |
+| P2 | 提交范围 `git diff --check` 实际有 trailing whitespace，证据却称通过 | 已清除；本文件以修复后 HEAD 重新执行并记录准确范围 |
+| P2 | status.md 仍有旧 writer/旧 HEAD/Codex 未封装的现行表述、时间不精确 | 全部更新或标注日期化历史并指向取代项；`更新：` 行与 frontend_checked_at 改为精确时间（02:51 +08:00 复测） |
+| 证据缺口 | manifest 1024/1025 边界无直接回归；缺原始命令输出 | 新增 `a_manifest_over_the_file_limit_is_refused_at_prepare`；本文件记录全部命令与退出码（原始日志不入 Git，防凭据/噪声） |
 
 ## 8. 费用与凭据
 

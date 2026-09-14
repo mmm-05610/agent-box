@@ -48,6 +48,24 @@
   上一轮的 `DESKTOP_HANDOFF_INCONSISTENT` 被该 release 提交收口；wire 两摘要重算一致
   （TS `11e3b3e7…` / 工件 `5d4fa3bf…`）。工作树内仅 2 个长闲置进程，无写入者；
   **未取得写权、未记录 `FULLSTACK_INTEGRATION_OWNER`、未写前端任何文件**。
+- **Reviewer 复审闭环（§4.2 第一轮 → 修复）**：Reviewer 对 `897a833..eefe652` 给出
+  `CHANGES_REQUIRED`（P0 视图读取 TOCTOU、P1 无历史证明的"瞬态"分类、4×P2）。逐项修复：
+  Worker 视图读取全部改为 **fd 锚定逐组件 `openat(O_NOFOLLOW)`**（fd `fstat` 取类型/大小、
+  `take` 有界读、读后 `(dev,ino,size)` 身份复核）；首次越界 offset 与不存在的路径改为确定性
+  `VIEW_INVALID`/`VIEW_MISSING`，`_view_bytes` 在"刚列出过"的上下文把 `VIEW_MISSING` 转换为
+  `SIDECAR_STATE_IDENTITY_CONFLICT` 重试；`protocol.rs` 注释改写为错误码合同（增量扩展、
+  unknown code 一律拒绝不重试、混合世代向更严格方向退化）；gate blocker 注记因果化（仅
+  capture 阶段 + state/view 码，其余记 co-observation）并新增 5 例诊断测试；清理 trailing
+  whitespace；status 旧表述日期化。反例测试新增：末组件换链（外部 sentinel 不被读）、父目录
+  换链、超限不无界读、manifest 1025 拒绝、分块中截断→重试不混字、未知码 fail-closed。
+  修复后重建 **c8**（`sha256:514f48a9…`，c4–c7 未覆盖）复跑：runtime-artifact/Pi/Hermes/
+  OpenCode exit 0、Codex 10 轮 exit 0、Windows r4 + `-PostCheck…CLEAN`、python **820 passed/
+  4 skipped**、Rust **27 passed**。
+- **两个第一手定位的 Codex 原生行为发现（待用户裁决）**：①运行时把内置 plugin/skill 语料解包进
+  `$CODEX_HOME/.tmp/plugins/`（实测峰值 **5529 文件**、瞬态；与列表上限 1024 相撞即确定性
+  `VIEW_FILE_LIMIT`——旧行为同条件是重试 10s 后 `NOT_SETTLED`）；②约 1/15 轮凭据扫描在原生
+  state 命中假 token（扫描正确拒绝，命中文件待捕获）。均见
+  [state-error-boundary.md](state-error-boundary.md) §4.2/§4.3。
 - **Reviewer 自动化 §4.1 通道门通过**：固定 session 真实 `codex exec resume`（read-only、
   flock、无 bypass）exit 0，`VERDICT: ACCEPT` + `REVIEWER_CHANNEL_OK` 机械命中，
   调用前后仓库零写入。§4.2 当前阶段真实审查在阶段提交后执行。
