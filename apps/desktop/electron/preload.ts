@@ -14,7 +14,14 @@ const launchFlags = ipcRenderer.sendSync('hermes:launch-flags')
 
 contextBridge.exposeInMainWorld('agentBoxDesktop', {
   wire: {
-    request: request => ipcRenderer.invoke('agentbox:wire:request', request)
+    request: request => ipcRenderer.invoke('agentbox:wire:request', request),
+    onEvent: callback => {
+      const listener = (_event, frame) => callback(frame)
+
+      ipcRenderer.on('agentbox:wire:event', listener)
+
+      return () => ipcRenderer.removeListener('agentbox:wire:event', listener)
+    }
   }
 })
 

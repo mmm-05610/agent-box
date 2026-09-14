@@ -1,14 +1,18 @@
 import type { IpcMainInvokeEvent } from 'electron'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const host = vi.hoisted(() => ({ handle: vi.fn() }))
+const host = vi.hoisted(() => ({ getAllWindows: vi.fn(() => []), handle: vi.fn() }))
 
-vi.mock('electron', () => ({ ipcMain: { handle: host.handle } }))
+vi.mock('electron', () => ({ BrowserWindow: { getAllWindows: host.getAllWindows }, ipcMain: { handle: host.handle } }))
 
 import { registerWorkCoreWireIpc } from './workcore-wire-ipc'
 
 describe('Work Core wire IPC', () => {
-  beforeEach(() => host.handle.mockReset())
+  beforeEach(() => {
+    host.getAllWindows.mockReset()
+    host.getAllWindows.mockReturnValue([])
+    host.handle.mockReset()
+  })
 
   it('accepts only a matching known method, path, and envelope', async () => {
     const requestWire = vi.fn(async () => ({ jsonrpc: '2.0', id: 4, result: { items: [], nextCursor: null } }))
@@ -54,5 +58,31 @@ describe('Work Core wire IPC', () => {
       })
     ).toThrow('envelope does not match')
     expect(requestWire).not.toHaveBeenCalled()
+  })
+
+  it('forwards an injected lifecycle event source to live renderer windows and returns its cleanup', () => {
+    const send = vi.fn()
+    const unsubscribe = vi.fn()
+    let publish: ((frame: unknown) => void) | undefined
+
+    host.getAllWindows.mockReturnValue([
+      { isDestroyed: () => false, webContents: { send } },
+      { isDestroyed: () => true, webContents: { send: vi.fn() } }
+    ] as never)
+
+    const cleanup = registerWorkCoreWireIpc({
+      requestWire: vi.fn(),
+      subscribeWireEvents(listener) {
+        publish = listener
+
+        return unsubscribe
+      }
+    })
+
+    publish?.({ eventId: 'event-1' })
+
+    expect(send).toHaveBeenCalledWith('agentbox:wire:event', { eventId: 'event-1' })
+    cleanup()
+    expect(unsubscribe).toHaveBeenCalledTimes(1)
   })
 })

@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron'
+import { BrowserWindow, ipcMain } from 'electron'
 
 import type { AgentBoxWireDispatcher } from '../security/agentbox-wire-transport'
 
@@ -10,6 +10,9 @@ interface WorkCoreWireRequest {
 
 export interface RegisterWorkCoreWireIpcDeps {
   requestWire: AgentBoxWireDispatcher
+  /** Future lifecycle-owned stream source. The IPC layer only forwards opaque
+   * frames; renderer schema validation owns business meaning. */
+  subscribeWireEvents?: (listener: (frame: unknown) => void) => () => void
 }
 
 function parseWorkCoreWireRequest(value: unknown): WorkCoreWireRequest {
@@ -43,10 +46,22 @@ function parseWorkCoreWireRequest(value: unknown): WorkCoreWireRequest {
   return { body, method, path: expectedPath as WorkCoreWireRequest['path'] }
 }
 
-export function registerWorkCoreWireIpc({ requestWire }: RegisterWorkCoreWireIpcDeps): void {
+export function registerWorkCoreWireIpc({ requestWire, subscribeWireEvents }: RegisterWorkCoreWireIpcDeps): () => void {
   ipcMain.handle('agentbox:wire:request', (_event, value: unknown) => {
     const request = parseWorkCoreWireRequest(value)
 
     return requestWire({ body: request.body, path: request.path })
+  })
+
+  if (!subscribeWireEvents) {
+    return () => undefined
+  }
+
+  return subscribeWireEvents(frame => {
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (!window.isDestroyed()) {
+        window.webContents.send('agentbox:wire:event', frame)
+      }
+    }
   })
 }

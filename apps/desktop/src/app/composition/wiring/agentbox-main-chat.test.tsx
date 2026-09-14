@@ -22,6 +22,7 @@ import { useAgentBoxMainChat } from './agentbox-main-chat'
 const mocks = vi.hoisted(() => ({
   ensureCatalog: vi.fn(async () => undefined),
   hydrateHistory: vi.fn(async (_client: unknown, _sessionId: unknown) => undefined),
+  ingestEvent: vi.fn((_frame: unknown) => ({ outcome: 'applied' })),
   refreshQueue: vi.fn(async (_client: unknown, _sessionId: unknown) => undefined),
   requestStop: vi.fn(async (_client: unknown, _input: unknown) => ({
     executionId: 'execution-1',
@@ -39,6 +40,7 @@ vi.mock('@/application/session/agentbox-composer', () => ({
 }))
 vi.mock('@/application/session/wire-session-control', () => ({
   hydrateAgentBoxHistory: (client: unknown, sessionId: unknown) => mocks.hydrateHistory(client, sessionId),
+  ingestAgentBoxEvent: (frame: unknown) => mocks.ingestEvent(frame),
   refreshAgentBoxQueue: (client: unknown, sessionId: unknown) => mocks.refreshQueue(client, sessionId),
   requestAgentBoxStop: (client: unknown, input: unknown) => mocks.requestStop(client, input)
 }))
@@ -76,6 +78,8 @@ function wrapper(path: string) {
 
 beforeEach(() => {
   mocks.submit.mockReset()
+  mocks.ingestEvent.mockReset()
+  mocks.ingestEvent.mockReturnValue({ outcome: 'applied' })
   mocks.submit.mockResolvedValue({
     acceptedForDraft: true,
     decision: {
@@ -100,6 +104,7 @@ beforeEach(() => {
   $currentCwd.set('c:\\work\\app')
   $wslWorkspaces.set([])
   setSessionDraftExecutionContext(workspaceDraftScope(workspace.id), { overrides: [], profileId: 'profile-1' })
+  delete window.agentBoxDesktop
 })
 
 afterEach(() => cleanup())
@@ -158,5 +163,48 @@ describe('primary AgentBox chat production binding', () => {
       { id: 'client' },
       { executionId: 'execution-1', sessionId: 'session-1' }
     )
+  })
+
+  it('validates host event frames before ingest and unsubscribes with the route surface', () => {
+    const unsubscribe = vi.fn()
+    let listener: ((frame: unknown) => void) | undefined
+
+    window.agentBoxDesktop = {
+      wire: {
+        onEvent(callback) {
+          listener = callback
+
+          return unsubscribe
+        },
+        request: vi.fn()
+      }
+    }
+
+    const { unmount } = renderHook(useAgentBoxMainChat, { wrapper: wrapper('/new') })
+
+    act(() => listener?.({ not: 'a frame' }))
+    expect(mocks.ingestEvent).not.toHaveBeenCalled()
+
+    act(() =>
+      listener?.({
+        cursor: 'cursor-1',
+        emittedAt: '2026-09-14T00:00:00.000Z',
+        event: {
+          displayKind: 'visible',
+          kind: 'message.final',
+          messageId: 'message-1',
+          role: 'assistant',
+          sessionId: 'session-1',
+          text: 'hello'
+        },
+        eventId: 'event-1',
+        seq: 1,
+        sessionId: 'session-1'
+      })
+    )
+
+    expect(mocks.ingestEvent).toHaveBeenCalledTimes(1)
+    unmount()
+    expect(unsubscribe).toHaveBeenCalledTimes(1)
   })
 })

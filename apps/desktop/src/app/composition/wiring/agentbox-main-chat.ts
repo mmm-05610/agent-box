@@ -6,7 +6,12 @@ import { agentBoxRuntimeClient } from '@/api/agentbox-runtime-client'
 import { routeSessionId, sessionRoute } from '@/app/routes'
 import { ensureAgentBoxDesktopCatalog } from '@/application/agentbox-desktop-catalog'
 import { submitAgentBoxComposer } from '@/application/session/agentbox-composer'
-import { hydrateAgentBoxHistory, refreshAgentBoxQueue, requestAgentBoxStop } from '@/application/session/wire-session-control'
+import {
+  hydrateAgentBoxHistory,
+  ingestAgentBoxEvent,
+  refreshAgentBoxQueue,
+  requestAgentBoxStop
+} from '@/application/session/wire-session-control'
 import { resolveAgentBoxWorkspace } from '@/application/workspace/wire-workspace-catalog'
 import { $agentBoxQueues, $agentBoxSessionProjections, $agentBoxStopStates } from '@/store/agentbox-runtime'
 import {
@@ -20,7 +25,7 @@ import { $currentCwd } from '@/store/session'
 import { $workspaceViewSelectedId } from '@/store/workspace-view'
 import { $wslWorkspaces } from '@/store/wsl-workspace'
 import type { SubmitTextOptions } from '@/types/composer'
-import { asWireId } from '@/types/wire/wire-v1'
+import { asWireId, EventFrameSchema } from '@/types/wire/wire-v1'
 
 const BUSY_EXECUTION_STATES = new Set(['queued', 'dispatched', 'running', 'stopping', 'unknown'])
 
@@ -92,6 +97,28 @@ export function useAgentBoxMainChat() {
       () => undefined
     )
   }, [catalogReady, sessionId])
+
+  useEffect(() => {
+    const onEvent = window.agentBoxDesktop?.wire.onEvent
+
+    if (!onEvent) {
+      return
+    }
+
+    return onEvent(value => {
+      const parsed = EventFrameSchema.safeParse(value)
+
+      if (!parsed.success) {
+        return
+      }
+
+      const result = ingestAgentBoxEvent(parsed.data)
+
+      if (result.outcome === 'gap') {
+        void hydrateAgentBoxHistory(agentBoxRuntimeClient(), parsed.data.sessionId).catch(() => undefined)
+      }
+    })
+  }, [])
 
   const onSubmit = useCallback(
     async (text: string, options?: SubmitTextOptions) => {
