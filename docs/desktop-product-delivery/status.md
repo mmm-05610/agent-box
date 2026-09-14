@@ -3,11 +3,43 @@
 调度：ACTIVE_EXECUTOR_INCREMENT_AVAILABLE。本文件是产品工作树的执行事实；
 发布源初始表不代表实时状态。消费文档更新时保留执行状态行，只合入规则/新订单。
 
-## 执行快照（handoff-policy 每阶段必填）— 接管施工中
+## 执行快照（handoff-policy 每阶段必填）— P06 独立验收完成
 
-- updated_at: 2026-09-14 21:30 (+08:00)
+- updated_at: 2026-09-14 23:05 (+08:00)
 - 执行者: Zcode 前端产品 goal（新一轮会话，串行施工）；**已从 Codex 前端产品 goal 接管**
 - 工作树/分支: /home/maoqh/projects/agent-box-desktop-next-wsl-round1 @ feature/agentbox-desktop-product
+- 本阶段（P06 独立验收、证据交付与写权释放）起点核验: HEAD `9ecf1a0a`、
+  分支 feature/agentbox-desktop-product、`git status --short` 为空、`git diff --check` exit 0；
+  writer lease 仍为同一前端 goal 的 ACTIVE lease；WSL 无残留 Vite/Vitest/Playwright/Electron 进程，
+  Windows 构建树无 Electron/node 进程。执行方式：两个只读子代理（A 最终功能矩阵审计、
+  B 最终边界/交接审计，均禁止写文件/stage/commit/跑全量测试）与主执行者复核；主执行者单独持有
+  Linux 全量门、Windows 构建树与验收驱动的串行资源。**范围与结果**：
+  （a）三项目 typecheck、shared typecheck、tests-js、层序/合同守卫、构建全部 exit 0；完整 Desktop
+  Vitest **987 files（2 failed/983 passed/2 skipped）、10218 tests（4 failed/10208 passed/6 skipped）**，
+  其中 **UI 815 files / 7915 tests 全通过**、electron 172 files / 2303 tests（4 failed 为自建 loopback
+  服务在本 WSL 环境 ECONNREFUSED）；lint **exit 0 / 0 error / 141 warning**（全部为既有且不在本分支
+  改动文件内；唯一落在改动文件内的 preload 警告已按规则修掉）。
+  （b）**发现并修复三条可达 legacy 路径**：B10 失败面板 legacy 网关设置可经
+  `hermes:connections:test` 触发 `startHermes()`（**会启动运行时**）、B11 状态栏连接/网关切换器走
+  不受 `hermes:api` 门保护的 `hermes:connections:*`、B12 Agents/Cron/Webhooks/Starmap 视图及其
+  命令面板/状态栏入口——即上一阶段「已知 legacy 可达面已清零」的结论在**产品外壳面之外**不成立；
+  修复提交 `eef059a9`（含行为测试与正反例）。
+  （c）**Windows 原应用验收首轮 18 PASS / 2 FAIL，据此再查出两个真实缺陷并当场修复**：全屏 legacy
+  CONNECTING 遮罩在产品运行期永不退出（P06 硬性阻断项，实测覆盖 100% 视口，P02A 当时记为
+  PENDING 的同一现象）、渲染端仍向 main 发 `/api/config`（约 2s 轮询）与 `/api/profiles`；
+  已加 `GatewayConnectingOverlay` 必填 authority（产品传 `agentbox` → 不渲染）与渲染端唯一入口的
+  legacy REST 门（`src/api/legacy-rest.ts` + `src/app/composition/product-runtime.ts`，
+  在组合根 import 期应用）。
+  （d）最终 Windows 驱动 **20 PASS / 0 FAIL / 0 SKIP / 0 PENDING**：无遮罩（0.0%）、旧 Hermes
+  fake-boot/fake-error 环境被忽略且未启动运行时、真实命中点击可达侧栏、Settings 开合、
+  Profiles/产品设置诚实、命令面板无 legacy 行、Command Center 为 AgentBox authority、
+  发送 fail closed 不建假 Session、四视图深链落到诚实产品页、关闭后 20s 内启动进程树全空、
+  main 侧 legacy 拒绝 **0** 行（无 IPC）。
+  （e）loopback 两文件经 Windows 同测试 **2 files / 32 tests passed**，定性为 **WSL 环境基线**。
+  （f）交付 `evidence/P06.md`、`evidence/P06-assets/**`（6 截图 + results.json + 两日志 + SHA256SUMS）、
+  `evidence/DESKTOP_IMPLEMENTATION_HANDOFF.md` 与 P02/P04/P05 附录。完成后进入 release 检查点，
+  不再顺手修文档。
+
 - 本阶段（P05 返修：B9 关闭与 GREEN 时点更正）起点核验: HEAD `30e3cf42277d41ac8a5bda023c71e4bef7141ffb`、
   分支 feature/agentbox-desktop-product、`git status --short` 为空；writer lease 仍为同一前端 goal 的 ACTIVE
   lease，未发现同工作树写入者或残留 Electron/Vitest/Playwright 进程。单写者执行（未开子代理），只改
@@ -338,22 +370,31 @@
   　→ **P05 = `P05_GREEN — CLIENT_IMPLEMENTATION_COMPLETE`（成立于 `d31897dc`；`30e3cf42` 的同一标记
   因同检查点刚登记 B9 而作废，该点记为 `P05_PARTIAL`）**；仍不声明 `REAL_FLOW_VERIFIED`、
   P06 GREEN、DESKTOP_IMPLEMENTATION_READY（lifecycle connection 为后端/集成外部缺口）；
-  **B8 = `UNREACHABLE_OR_PROTECTED`；B9 已关闭**——无已知的 AgentBox 可达 legacy 调用路径；
-  P06 独立验收待续
+  **B8 = `UNREACHABLE_OR_PROTECTED`；B9 已关闭**；
+  **P06 独立验收入口已执行并收口**（`evidence/P06.md`）：在 P05 的「产品外壳面」之外另查出并关闭
+  B10/B11/B12 三条可达 legacy 路径，以及 Windows 原应用验收查出的连接遮罩与渲染端 legacy 请求；
+  最终 Windows 驱动 **20 PASS / 0 FAIL / 0 SKIP / 0 PENDING**，完整 UI 全通过，
+  loopback 两文件由 Windows 同测试裁决为 WSL 环境基线
 - 完成范围: P00；P01 全部返修（真机 27 PASS）；P07 检查点 1（语义映射）、检查点 2
   （wire-v1 候选：17 方法 + schema 测试 + JSON Schema 工件；已消费后端机械反馈并回应）；
   P02A（失败面非阻塞+可关闭、Artifacts 页退役、失败终态竞态修复与真机门）
-- 下一项: 本阶段到此停止写入，不开始 P06。剩余工作按其归属分列——
-  （1）**P06 独立集成验收**（前端本端可做的部分，含最终全量门）；
-  （2）**Server lifecycle connection 合同到达后接生产接线**，再验证 REAL_FLOW；
+- 下一项: 前端本端范围已全部交付，现停止写入并释放写权。剩余工作按其归属分列——
+  （1）**Server lifecycle connection 合同到达后接生产接线**（后端/全栈集成人），再验证 REAL_FLOW；
+  （2）**外围合同**（Skills/MCP/Data/备份恢复）下单后按既有诚实不可用页替换为真实页面；
+  （3）`history.snapshot` 旧页游标在 wire 允许时挂载「向上翻旧页」；
   （3）**B9 已关闭**（原入口 `features/chat/sidebar/filter-menu.tsx` 与命令面板贡献行过滤；
   `profile-switcher.tsx`、`store/profile-share.ts`、`api/profiles.ts` 保留为不可达的 legacy 兼容代码，
   将来若 AgentBox 需要 profile 打包能力，需先有 wire-v1 合同）；
   B8 按工单不删除、不重构插件 API，仅在将来误挂载时由 `hermes:api` 硬门保护。
   不再重新研究协议，不因矩阵 28/28 跳过上述任一项。
-- 阻断: **本端已知 legacy 可达面已清零**：B1–B7 与 B9 关闭，B8 属 `UNREACHABLE_OR_PROTECTED`；
-  剩余非本端项为 P04 production lifecycle connection（外部合同）与 P06 独立验收；
-  wire 摘要已锁定，真实全栈仍由后续集成人验证
+- 阻断: **本端无活动阻断**。B1–B7、B9 关闭；P06 另关闭 B10（失败面板 legacy 网关设置 →
+  `hermes:connections:test` → `startHermes()`）、B11（状态栏连接/网关切换器）与 B12
+  （Agents/Cron/Webhooks/Starmap 视图及入口）；B8 属 `UNREACHABLE_OR_PROTECTED`。
+  剩余非本端项为 P04 production lifecycle connection（外部合同）与外围合同；
+  wire 摘要已锁定，真实全栈仍由后续集成人验证。
+  **已知残余（如实登记）**：1 处渲染端 `/api/config` 读取被渲染端门拒绝、不产生 IPC、不触达 Hermes
+  （产品组合根的配置记录 + MCP 健康巡检），关闭需 wire 偏好项或 MCP 外围合同；
+  `SessionPickerOverlay` 潜在未门控但当前不可达；`SessionRecord` 旧页游标未挂载。
 
 - contract_semantics_version: core-semantics/1（APPROVED_SEMANTICS，2026-09-14）
 - wire_version/schema_digest: wire-v1 WIRE_LOCKED_FOR_IMPLEMENTATION；当前权威
@@ -369,7 +410,13 @@
   transport 已接线，28 个方法在 AgentBox 产品组合中全部有生产调用者（`cbdccf7c` 后 0 前端缺口）；
   摘要三方一致且工件可流式复现（`6ca5d17a` 复核）；Server lifecycle connection 来源待正式跨端合同。
   **该标签只覆盖 wire-v1 方法面，不覆盖 legacy REST 可达性**（见下行）
-- LEGACY_CLIENT_CLOSEOUT: **通过（阶段标记 `LEGACY_CLIENT_CLOSEOUT_READY`，`f7759148` + `a6b751ff`）**——
+- LEGACY_CLIENT_CLOSEOUT: **通过 + P06 追加权威门**。P05 阶段标记 `LEGACY_CLIENT_CLOSEOUT_READY`
+  （`f7759148` + `a6b751ff`）覆盖**产品外壳面**；P06 在此外另关闭 B10/B11/B12
+  （失败面板 legacy 网关设置、状态栏连接/网关切换器、四个 legacy 视图与入口），并新增渲染端
+  legacy REST 门（`src/api/legacy-rest.ts`）。**当前不存在会把 AgentBox 产品带向 legacy Hermes 的路径**：
+  渲染端不再发出 `hermes:api` 请求（Windows 驱动实测 main 侧拒绝 0 行），
+  `hermes:connections:test` 不再可达（其本地分支会 `startHermes()`）。残余如实登记见「阻断」行。
+  阶段标记 `f7759148` + `a6b751ff` 的语义如下——
   B1–B6 关闭：状态栏/命令面板/侧栏搜索/Archived 在产品 authority 下零 legacy 请求，未匹配本地行不再渲染
   legacy 预览，all-profiles 项目刷新在 `ensureBackend` 之前被结构门挡住且打开本地文件夹未破坏。
   **同批新发现仍未迁移**：Command Center 浮层（route 可达）与插件 SDK `host.status()`（B7/B8），
@@ -377,17 +424,41 @@
   见 `evidence/P05-final-audit.md` §10
 - REAL_FLOW_VERIFIED: 否（无真实 Server/Harness 链路证据）
 
-- frontend_implementation: PARTIAL（P02A、P02B1、P02B2、P02C1、P02C2、P02D/B3、Profile 默认配置
-  编辑、P03 主 route 服务投影、P05 sessions.update 统一侧栏接线（含 `86911029` 服务状态边界返修）、
-  P05 sessions.archive 统一侧栏归档/当前会话归档命令（`cbdccf7c`）与 **P05 legacy 客户端收口
-  （`f7759148` 结构门 + `a6b751ff` 面迁移：B1–B6 关闭）**已完成；剩余 P07 §9.5/§9.6/§9.8 fixture 深度门、
-  HTTP/WS transport 一致性与无连接可观测性，以及新登记的 B7/B8；P04/P05/P06 待收口）
+- frontend_implementation: **DESKTOP_IMPLEMENTATION_READY**（P06 独立验收完成，`evidence/P06.md` +
+  `evidence/DESKTOP_IMPLEMENTATION_HANDOFF.md`）——已批准且前端可独立完成的产品面、application/store、
+  wire 客户端与 Electron 客户端边界均已实现；无真实 Server 时应用可打开、离线/Unavailable 状态诚实且
+  不阻塞本地界面；AgentBox 产品不启动也不调用 legacy Hermes；核心合同客户端与行为 fixture 已锁定；
+  完整测试、Windows 原应用与交付材料达到前端交接标准。
+  **它不表示** `REAL_FLOW_VERIFIED`、真实 Server/Harness/模型已联调、全栈 GREEN 或外围合同已到。
+  （历史：同一行曾记录为 PARTIAL；分阶段完成记录见本文各检查点与 `evidence/P02..P07.md`。）
 - writer_lease: **ACTIVE — Zcode frontend goal**（2026-09-14 接管自 Codex 前端产品 goal；
   本阶段起点 `ad3feb16`、工作树 clean；两个 Luna 子代理（A 状态栏/命令面板、B 侧栏搜索/Archived）
   写集互不重叠且禁止 stage/commit，主执行者持有共享文件与组合接线、串行提交并写文档；
   完成后停止写入不 RELEASE；后端工作树只读，Windows 构建/验收资源串行）
 
 ## 测试与基线（接力会话实跑）
+
+- **P06 独立验收（`eef059a9` + 本轮修复，实跑）**：三项目 `npm run --workspace apps/desktop typecheck`
+  exit 0；`apps/shared` typecheck exit 0；`npm test --prefix tests-js` **8 files / 47 tests passed**；
+  层序/合同守卫（`renderer-layers.test.ts`、`renderer-layers.debt.test.ts`、`types/wire/fixtures/core-v1.test.ts`）
+  **3 files / 30 tests passed**；`npm run --workspace apps/desktop lint` **exit 0 / 0 error / 141 warning**
+  （135 `no-restricted-globals` + 6 `react-hooks/exhaustive-deps`，全部位于本分支未改动文件；
+  改动文件 0 warning）；`npm run --workspace apps/desktop build` exit 0，`src/`/`electron/` 无 TS 影子 `.js`
+  （仅保留 tracked 的两个真实插件 `.js`），dist 新于全部源码。
+  **完整 Desktop Vitest（正式最终门）**：`987 files（2 failed / 983 passed / 2 skipped）、
+  10218 tests（4 failed / 10208 passed / 6 skipped）`，其中 **UI 815 files / 7915 tests 全部通过**、
+  electron **172 files / 2303 tests（2 files / 4 tests failed）**——失败恒为
+  `legacy-hermes/api-transport.test.ts`（1）与 `host-capabilities/credentials/mcp-oauth-callback-ipc.test.ts`（3），
+  两文件自建 loopback 服务在本 WSL 环境 `ECONNREFUSED`、不 import 本阶段改动模块。
+  过程：修复前 983 files / 10182 tests（2/4 failed）→ 首轮修复 984 / 10194（2/4）→ 二轮修复 987 / 10218（2/4），
+  失败文件恒为同一对，计数只随新增测试上升。**Windows 同测试裁决**：上述两文件
+  `npx vitest run --project electron …` → **2 files / 32 tests passed, exit 0** ⇒ WSL 环境基线，非产品缺陷。
+  **Windows 原应用验收**：`apps/desktop/e2e/p06-independent-acceptance-driver.mjs` →
+  **20 PASS / 0 FAIL / 0 SKIP / 0 PENDING**（`evidence/P06-assets/results.json` + 6 张必需截图 + 两日志 + SHA256SUMS）；
+  关键读数：遮罩覆盖率 100% → **0.0%**、首窗 1018ms、main 侧 legacy 拒绝 **0** 行、
+  关闭后 20s 内启动进程树全空、假 `hermes` 从未被以 `serve` 调用。
+  驱动纯 helper 单测 `e2e/p06-independent-acceptance-driver.unit.test.ts` **15 tests passed**。
+  本阶段未读密钥、未运行模型、未改后端。
 
 - **P05 返修（`d31897dc`，实跑）**：B9 定向 4 文件（`features/chat/sidebar/filter-menu.test.tsx`（新增 5）、
   `chat-sidebar.integration.test.tsx`(10)、`chat-sidebar.workspace-assembly.test.tsx`(16)、
@@ -684,7 +755,7 @@ wire-review.md通道自39阶段协调。执行者下个检查点消费这些规�
 | P03 用例状态与API | IN_PROGRESS（主 route 生产调用者与 event reducer 接入已完成；真实 Server 源待 P04） | 与 P02 穿插 |
 | P04 宿主与遗留退役 | IN_PROGRESS（production request/Session-event transport + IPC + supervisor；两道急切 autostart 门已退役，**惰性 `hermes:api` 门已于 `f7759148` 收口**——agentbox runtime 下任何 `hermes:api` 请求都在路由/`ensureBackend` 之前以 `LEGACY_RUNTIME_DISABLED_FOR_PRODUCT` 拒绝；**HTTP/WS loopback 判据已统一、WS 无连接可观测已由 `4efd1ec5` 关闭（切片 9）**；B7 已于 `e087c976` 关闭；**B9 profile 分享 legacy 数据面已于 `d31897dc` 在 renderer 侧关闭（该点 electron/ 零改动，门与 transport 未变）**；B8 归类 `UNREACHABLE_OR_PROTECTED`（无已挂载消费点 + 硬门保护，非活动阻断）；Server connection 合同待后端） | 与 P03 穿插 |
 | P05 正式合同接入 | **`P05_GREEN — CLIENT_IMPLEMENTATION_COMPLETE`（成立于 `d31897dc`）**（`6ca5d17a` 最终审计：28 方法矩阵 **28 生产可达 / 0 前端缺口**、集合与计数机械全等、摘要三方一致、事件链生产接线完整；legacy 可达性 5 条 `ACTIVE_AGENTBOX_BLOCKER` + 1 条已上膛**已在 `f7759148`/`a6b751ff` 收口（B1–B6）**；**B7、命令面板 legacy 快捷项（含 `Toggle logs`）、§9.5/§9.6/§9.8 fixture 深度、HTTP/WS transport 一致性、陈旧 `IN_FLIGHT` 已由 `4efd1ec5`/`e087c976` 关闭；B9 profile 分享已由 `d31897dc` 关闭**；全量 UI 811 files / 7882 tests 全通过。`30e3cf42` 的 GREEN 声明因同检查点刚登记 B9 而**作废**，该点记为 `P05_PARTIAL`。仍不声明 `REAL_FLOW_VERIFIED`（lifecycle connection 为后端/集成外部缺口）、P06 GREEN、DESKTOP_IMPLEMENTATION_READY；**B8 = `UNREACHABLE_OR_PROTECTED`；B9 已关闭——无已知 AgentBox 可达 legacy 调用路径**） | wire 双端锁定 |
-| P06 前端验收与交接 | IMPLEMENTATION_HANDOFF_GATE（**前置未满足**：P05 的 legacy 客户端收口已完成，但 P07 fixture 深度门与 transport 一致性/无连接可观测性未完成；真实全栈门由后续集成人负责） | 本端独立范围未完成 |
+| P06 前端验收与交接 | **`P06_GREEN — FRONTEND_INDEPENDENT_ACCEPTANCE`**（`evidence/P06.md`：Linux/WSL 全门、Windows 同测试 loopback 裁决、Windows 原应用驱动 20 PASS/0 FAIL/0 SKIP/0 PENDING、静态只读核验、交付 handoff；`DESKTOP_IMPLEMENTATION_READY`；`REAL_FLOW_VERIFIED=否`，真实全栈门由后续集成人负责） | P05 已 GREEN、P07 wire 已锁定；lifecycle connection 属外部缺口，不阻塞本端 READY |
 | P07 核心合同与状态交接 | 检查点1–6已提交；WIRE_LOCKED（**检查点 3 的 fixture 深度经最终审计下调**：§9.5/§9.6/§9.8 无测试，不得声称完整覆盖） | 28 方法双端摘要一致；fixture/客户端已锁定 |
 
 ## 测试与证据基线（本轮实跑）

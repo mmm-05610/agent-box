@@ -1,0 +1,18 @@
+[warning] [legacy-rest] refused /api/config: LEGACY_RUNTIME_DISABLED_FOR_PRODUCT
+[warning] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+[error] [profiles] refreshProfiles failed after 3 attempt(s): Error: LEGACY_RUNTIME_DISABLED_FOR_PRODUCT: the AgentBox product runtime does not serve the legacy Hermes REST API
+    at m (file:///C:/Users/maoqh/agentbox-wsl-round1/apps/desktop/dist/assets/gateway-rpc-iRTVZUw9.js:1:7707)
+    at E (file:///C:/Users/maoqh/agentbox-wsl-round1/apps/desktop/dist/assets/gateway-rpc-iRTVZUw9.js:1:8419)
+    at O (file:///C:/Users/maoqh/agentbox-wsl-round1/apps/desktop/dist/assets/gateway-rpc-iRTVZUw9.js:1:8493)
+    at jt (file:///C:/Users/maoqh/agentbox-wsl-round1/apps/desktop/dist/assets/use-gateway-request-CQmPIz2O.js:1:11347)
+    at file:///C:/Users/maoqh/agentbox-wsl-round1/apps/desktop/dist/assets/intro-splash-B84qkVOG.js:2:11006
+    at async Object.profileRoutes (file:///C:/Users/maoqh/agentbox-wsl-round1/apps/desktop/dist/assets/index-D-n7GAQq.js:372:45497)
+    at async mCt (file:///C:/Users/maoqh/agentbox-wsl-round1/apps/desktop/dist/assets/index-D-n7GAQq.js:386:98806)
+    at async gCt (file:///C:/Users/maoqh/agentbox-wsl-round1/apps/desktop/dist/assets/index-D-n7GAQq.js:386:99566)
