@@ -40,6 +40,7 @@ import { type ActiveWork } from './app/quit-guard'
 import { createQuitPrompt } from './app/quit-prompt'
 import { configureSpellChecker as configureSpellCheckerImpl } from './app/spellcheck'
 import { USER_DATA_OVERRIDE } from './app/user-data'
+import { agentBoxServiceComposition } from './composition/agentbox-service-composition'
 import {
   closePreviewWatchers,
   dispatchRegistryApiRequest,
@@ -197,7 +198,6 @@ import {
   sshInventoryAttemptedAt,
   sshRosterCache
 } from './legacy-hermes/ssh-inventory'
-import { unavailableAgentBoxWireDispatcher } from './security/agentbox-wire-transport'
 import { installEmbedReferer } from './security/embed-referer'
 import {
   checkUpdates,
@@ -804,7 +804,12 @@ registerApiProxyIpc({
   persistDataUrlReadMaxMb,
 })
 
-registerWorkCoreWireIpc({ requestWire: unavailableAgentBoxWireDispatcher })
+const disposeWorkCoreWireIpc = registerWorkCoreWireIpc({
+  requestWire: agentBoxServiceComposition.requestWire,
+  subscribeWireEvents: agentBoxServiceComposition.subscribeWireEvents
+})
+
+app.on('will-quit', disposeWorkCoreWireIpc)
 
 registerFilesIpc({
   IS_WINDOWS,

@@ -100,11 +100,13 @@ export function registerWorkCoreWireIpc({ requestWire, subscribeWireEvents }: Re
     }
 
     owned?.delete(subscriptionId)
+
     if (owned?.size === 0) {
       subscriptions.delete(sender.id)
       destroyedListeners.get(sender.id)?.()
       destroyedListeners.delete(sender.id)
     }
+
     try {
       subscription.cleanup()
     } catch {
@@ -130,27 +132,35 @@ export function registerWorkCoreWireIpc({ requestWire, subscribeWireEvents }: Re
 
     const owned = subscriptions.get(event.sender.id) ?? new Map()
     subscriptions.set(event.sender.id, owned)
+
     if (!destroyedListeners.has(event.sender.id)) {
       const onDestroyed = () => {
         for (const subscriptionId of subscriptions.get(event.sender.id)?.keys() ?? []) {
           removeSubscription(event.sender, subscriptionId)
         }
+
         destroyedListeners.delete(event.sender.id)
       }
+
       event.sender.once('destroyed', onDestroyed)
       destroyedListeners.set(event.sender.id, () => event.sender.removeListener('destroyed', onDestroyed))
     }
+
     const entry = { cleanup: () => undefined, sender: event.sender }
+
     owned.set(input.subscriptionId, entry)
+
     try {
       const cleanup = subscribeWireEvents({ cursor: input.cursor, sessionId: input.sessionId }, frame => {
         const current = subscriptions.get(event.sender.id)?.get(input.subscriptionId)
+
         if (current?.sender !== event.sender || event.sender.isDestroyed()) {
           return
         }
 
         event.sender.send(EVENT_CHANNEL, { frame, subscriptionId: input.subscriptionId })
       })
+
       entry.cleanup = cleanup
     } catch {
       removeSubscription(event.sender, input.subscriptionId)
@@ -172,15 +182,19 @@ export function registerWorkCoreWireIpc({ requestWire, subscribeWireEvents }: Re
     for (const [senderId, owned] of subscriptions) {
       for (const subscriptionId of owned.keys()) {
         const sender = owned.get(subscriptionId)?.sender
+
         if (sender) {
           removeSubscription(sender, subscriptionId)
         }
       }
+
       subscriptions.delete(senderId)
     }
+
     for (const off of destroyedListeners.values()) {
       off()
     }
+
     destroyedListeners.clear()
     ipcMain.removeListener(SUBSCRIBE_CHANNEL, onSubscribe)
     ipcMain.removeListener(UNSUBSCRIBE_CHANNEL, onUnsubscribe)

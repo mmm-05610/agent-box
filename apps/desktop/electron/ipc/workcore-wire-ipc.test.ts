@@ -82,48 +82,64 @@ describe('Work Core wire IPC', () => {
       }
     })
 
+
     const subscribe = host.on.mock.calls.find(([channel]) => channel === 'agentbox:wire:events:subscribe')?.[1] as (
       event: { sender: typeof sender },
       value: unknown
     ) => void
+
     const unsubscribeHandler = host.on.mock.calls.find(([channel]) => channel === 'agentbox:wire:events:unsubscribe')?.[1] as (
       event: { sender: typeof sender },
       value: unknown
     ) => void
+
     expect(() => subscribe({ sender }, { sessionId: '', cursor: 'cursor-1', subscriptionId: 'bad' })).not.toThrow()
+
     subscribe({ sender }, { cursor: 'cursor-1', sessionId: 'session-1', subscriptionId: 'sub-1' })
+
     publish?.({ eventId: 'event-1' })
 
     expect(send).toHaveBeenCalledWith('agentbox:wire:event', {
       frame: { eventId: 'event-1' },
       subscriptionId: 'sub-1'
     })
+
     unsubscribeHandler({ sender }, { subscriptionId: 'sub-1' })
     unsubscribeHandler({ sender }, { subscriptionId: 'sub-1' })
+
     expect(unsubscribe).toHaveBeenCalledTimes(1)
+
     cleanup()
     expect(host.removeListener).toHaveBeenCalledTimes(2)
   })
 
   it('cleans a synchronously failing source and all subscriptions on sender destruction', () => {
     const cleanupOne = vi.fn()
+
     const cleanupTwo = vi.fn(() => {
       throw new Error('already closed')
     })
+
     const sender = { id: 11, isDestroyed: () => false, send: vi.fn(), once: vi.fn(), removeListener: vi.fn() }
     let destroyed: (() => void) | undefined
     sender.once.mockImplementation((_event: string, listener: () => void) => {
       destroyed = listener
     })
+
     let sourceCalls = 0
+
     const subscribeWireEvents = vi.fn((_input: unknown, _listener: (frame: unknown) => void) => {
       sourceCalls += 1
+
       if (sourceCalls === 1) {
         throw new Error('source unavailable')
       }
+
       return sourceCalls === 2 ? cleanupOne : cleanupTwo
     })
+
     const cleanup = registerWorkCoreWireIpc({ requestWire: vi.fn(), subscribeWireEvents })
+
     const subscribe = host.on.mock.calls.find(([channel]) => channel === 'agentbox:wire:events:subscribe')?.[1] as (
       event: { sender: typeof sender },
       value: unknown
