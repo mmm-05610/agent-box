@@ -333,3 +333,147 @@ describe('AgentBox Composer effective-config boundary', () => {
     expect(wire.call).not.toHaveBeenCalled()
   })
 })
+
+describe('AgentBox Composer pending recovery precedence', () => {
+  const overrides: ConfigOverride[] = [{ controlId: 'mode', value: 'fast' }]
+
+  const pendingSend = (scopeKey: string, intentKey: string, requestId: string) =>
+    $pendingAgentBoxSends.set({ items: { [scopeKey]: { intentKey, requestId: requestId as never } }, version: 1 })
+
+  it('settles the outstanding request before any configuration work happens', async () => {
+    pendingSend('workspace:workspace-1', '5', 'request-old-0001')
+
+    const wire = client(async method => {
+      if (method !== 'sendOutcome.query') {
+        throw new Error(`must not call ${method}`)
+      }
+
+      return { outcome: 'unknown' }
+    })
+
+    await expect(
+      submitAgentBoxComposer(wire, {
+        attachments: [],
+        draftVersion: 9,
+        overrides,
+        profileId: 'profile-1',
+        scopeKey: 'workspace:workspace-1',
+        sessionId: null,
+        text: 'a newer intent',
+        workspaceId: 'workspace-1'
+      })
+    ).resolves.toMatchObject({ acceptedForDraft: false, decision: { intentKey: '5', outcome: 'unknown' } })
+
+    expect(wire.call.mock.calls.map(call => call[0])).toEqual(['sendOutcome.query'])
+    expect(wire.call).toHaveBeenCalledWith('sendOutcome.query', { requestId: 'request-old-0001' })
+  })
+
+  it('recovers the outstanding request even when the current draft cannot be validated at all', async () => {
+    pendingSend('session-1', '4', 'request-old-0002')
+
+    const wire = client(async method => {
+      if (method !== 'sendOutcome.query') {
+        throw new Error(`must not call ${method}`)
+      }
+
+      return { outcome: 'unknown' }
+    })
+
+    await expect(
+      submitAgentBoxComposer(wire, {
+        attachments: [{ id: 'local', kind: 'image', label: 'local.png', previewUrl: 'data:image/png;base64,abc' }],
+        draftVersion: 9,
+        overrides,
+        profileId: null,
+        scopeKey: 'session-1',
+        sessionId: 'session-1',
+        text: 'different text',
+        workspaceId: null
+      })
+    ).resolves.toMatchObject({ acceptedForDraft: false, decision: { outcome: 'unknown' } })
+
+    expect(wire.call.mock.calls.map(call => call[0])).toEqual(['sendOutcome.query'])
+  })
+
+  it('keeps the newer draft when the recovered request was accepted under an older intent key', async () => {
+    pendingSend('workspace:workspace-1', '5', 'request-old-0003')
+
+    const wire = client(async () => ({
+      configVersion: 2,
+      executionId: asWireId('execution-old'),
+      outcome: 'accepted',
+      queueItemId: null,
+      sessionId: session.id
+    }))
+
+    const result = await submitAgentBoxComposer(wire, {
+      attachments: [],
+      draftVersion: 9,
+      overrides,
+      profileId: 'profile-1',
+      scopeKey: 'workspace:workspace-1',
+      sessionId: null,
+      text: 'newer draft',
+      workspaceId: 'workspace-1'
+    })
+
+    expect(result).toMatchObject({ acceptedForDraft: false, decision: { intentKey: '5', outcome: 'accepted' } })
+    expect(wire.call.mock.calls.map(call => call[0])).toEqual(['sendOutcome.query'])
+  })
+
+  it('holds the same requestId while the outcome stays unknown, and never mints a new one', async () => {
+    pendingSend('workspace:workspace-1', '5', 'request-old-0004')
+
+    const wire = client(async () => ({ outcome: 'unknown' }))
+
+    const submit = () =>
+      submitAgentBoxComposer(wire, {
+        attachments: [],
+        draftVersion: 9,
+        overrides,
+        profileId: 'profile-1',
+        scopeKey: 'workspace:workspace-1',
+        sessionId: null,
+        text: 'newer draft',
+        workspaceId: 'workspace-1'
+      })
+
+    await expect(submit()).resolves.toMatchObject({ decision: { outcome: 'unknown', requestId: 'request-old-0004' } })
+    await expect(submit()).resolves.toMatchObject({ decision: { outcome: 'unknown', requestId: 'request-old-0004' } })
+
+    expect(wire.call.mock.calls.map(call => call[0])).toEqual(['sendOutcome.query', 'sendOutcome.query'])
+    expect(
+      wire.call.mock.calls.every(call => (call[1] as { requestId: string }).requestId === 'request-old-0004')
+    ).toBe(true)
+    expect($pendingAgentBoxSends.get().items['workspace:workspace-1']?.requestId).toBe('request-old-0004')
+  })
+
+  it('clears a definitively rejected request and only lets the NEXT submit start a new intent', async () => {
+    pendingSend('workspace:workspace-1', '5', 'request-old-0005')
+
+    const wire = client(async method =>
+      method === 'sendOutcome.query'
+        ? { outcome: 'rejected_before_accept', reason: 'profile unavailable' }
+        : { effective: [], outcome: 'resolved' }
+    )
+
+    await expect(
+      submitAgentBoxComposer(wire, {
+        attachments: [],
+        draftVersion: 9,
+        overrides,
+        profileId: 'profile-1',
+        scopeKey: 'workspace:workspace-1',
+        sessionId: null,
+        text: 'newer draft',
+        workspaceId: 'workspace-1'
+      })
+    ).resolves.toMatchObject({
+      acceptedForDraft: false,
+      decision: { intentKey: '5', outcome: 'rejected', reason: 'profile unavailable' }
+    })
+
+    expect($pendingAgentBoxSends.get().items['workspace:workspace-1']).toBeUndefined()
+    expect(wire.call.mock.calls.map(call => call[0])).toEqual(['sendOutcome.query'])
+  })
+})

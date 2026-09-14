@@ -5,7 +5,12 @@ import { $pendingAgentBoxSends } from '@/store/agentbox-send-intents'
 import { $agentBoxSessions } from '@/store/agentbox-service'
 import { asRequestId, asWireId, type DraftMessage, type SessionRecord } from '@/types/wire/wire-v1'
 
-import { type ContinueSendIntent, type CreateAndSendIntent, sendAgentBoxMessage } from './wire-send'
+import {
+  type ContinueSendIntent,
+  type CreateAndSendIntent,
+  resolvePendingAgentBoxSend,
+  sendAgentBoxMessage
+} from './wire-send'
 
 const requestId = asRequestId('request-fixed-0001')
 const message: DraftMessage = { attachments: [], text: 'ship it' }
@@ -132,5 +137,32 @@ describe('sendAgentBoxMessage', () => {
       requestId
     })
     expect($pendingAgentBoxSends.get().items).toEqual({})
+  })
+})
+
+describe('resolvePendingAgentBoxSend', () => {
+  it('returns null without touching the transport when the scope has nothing outstanding', async () => {
+    const wire = client(async () => {
+      throw new Error('must not call')
+    })
+
+    await expect(resolvePendingAgentBoxSend(wire, continueIntent.scopeKey)).resolves.toBeNull()
+    expect(wire.call).not.toHaveBeenCalled()
+  })
+
+  it('settles an outstanding send by its own requestId and intent key', async () => {
+    $pendingAgentBoxSends.set({
+      items: { [continueIntent.scopeKey]: { intentKey: 'older-draft', requestId } },
+      version: 1
+    })
+    const wire = client(async () => ({ outcome: 'unknown' }))
+
+    await expect(resolvePendingAgentBoxSend(wire, continueIntent.scopeKey)).resolves.toEqual({
+      intentKey: 'older-draft',
+      outcome: 'unknown',
+      requestId
+    })
+    expect(wire.call.mock.calls.map(call => call[0])).toEqual(['sendOutcome.query'])
+    expect(wire.call).toHaveBeenCalledWith('sendOutcome.query', { requestId })
   })
 })

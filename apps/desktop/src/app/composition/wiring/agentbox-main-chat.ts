@@ -14,6 +14,7 @@ import {
 } from '@/application/session/wire-session-control'
 import { resolveAgentBoxWorkspace } from '@/application/workspace/wire-workspace-catalog'
 import { $agentBoxQueues, $agentBoxSessionProjections, $agentBoxStopStates } from '@/store/agentbox-runtime'
+import { $pendingAgentBoxSends, pendingAgentBoxSend } from '@/store/agentbox-send-intents'
 import {
   $agentBoxCatalogReadiness,
   $agentBoxHello,
@@ -87,21 +88,39 @@ export function useAgentBoxMainChat() {
   const busy = Boolean(execution && BUSY_EXECUTION_STATES.has(execution.state))
   const catalogReady = service.phase === 'ready' && readiness.sessions && readiness.workspaces
 
-  // Sending is only offered when the service declares BOTH the effective-config
-  // check and the send verb this route would use. A missing declaration is a
-  // missing declaration, not an error string to interpret.
+  // Recovering an unresolved send and creating a new one have different
+  // requirements. Recovery only needs the service to be callable and its query
+  // verb declared — the current draft's profile, workspace or configuration are
+  // not part of that request and must not block it.
+  // Subscribe for re-render on change; the reader below owns the stored shape
+  // and always reads the snapshot this render committed to.
+  useStore($pendingAgentBoxSends)
+  const pendingSend = draftScopeKey ? pendingAgentBoxSend(draftScopeKey) : null
+
+  // While something is outstanding, settling it is the ONLY submittable action:
+  // a new intent may not be created until the scope is clear, so the send verb
+  // and the effective-config check are not part of this gate.
+  const recoveryAvailable = Boolean(
+    pendingSend && draftScopeKey && catalogReady && agentBoxCapabilitySupported(hello, 'sendOutcome.query')
+  )
+
+  // A new send still requires the effective-config check and the send verb this
+  // route would use. A missing declaration is a missing declaration, not an
+  // error string to interpret.
   const sendCapabilityDeclared = agentBoxCapabilitySupported(
     hello,
     session ? 'sessions.send' : 'sessions.createAndSend'
   )
 
-  const sendAvailable = Boolean(
+  const newSendAvailable = Boolean(
     catalogReady &&
     workspace &&
     agentBoxCapabilitySupported(hello, 'config.resolve') &&
     sendCapabilityDeclared &&
     (session || profileId)
   )
+
+  const sendAvailable = pendingSend ? recoveryAvailable : newSendAvailable
 
   useEffect(() => {
     if (!catalogReady || !sessionId) {
@@ -212,11 +231,16 @@ export function useAgentBoxMainChat() {
     async (text: string, options?: SubmitTextOptions) => {
       if (
         !sendAvailable ||
-        !workspace ||
         !draftScopeKey ||
         options?.draftVersion === undefined ||
         options.composerScope !== draftScopeKey
       ) {
+        return false
+      }
+
+      // A pending recovery uses neither identity, so a Workspace that is not
+      // resolvable right now must not keep the old request unanswered.
+      if (!pendingSend && !workspace) {
         return false
       }
 
@@ -229,7 +253,7 @@ export function useAgentBoxMainChat() {
           scopeKey: draftScopeKey,
           sessionId,
           text,
-          workspaceId: workspace.id
+          workspaceId: workspace?.id ?? null
         })
 
         if (result.outcome === 'sent' && result.acceptedForDraft) {
@@ -249,7 +273,7 @@ export function useAgentBoxMainChat() {
         return false
       }
     },
-    [draftScopeKey, executionContext.overrides, navigate, profileId, sendAvailable, sessionId, workspace]
+    [draftScopeKey, executionContext.overrides, navigate, pendingSend, profileId, sendAvailable, sessionId, workspace]
   )
 
   const onCancel = useCallback(async () => {

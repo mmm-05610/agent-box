@@ -52,6 +52,22 @@ export interface SendAgentBoxMessageOptions {
 const defaultRequestId = (): RequestId => asRequestId(`desktop-${crypto.randomUUID()}`)
 
 /**
+ * An unresolved send for this scope, recovered by its ORIGINAL requestId. Once
+ * a send has a service-visible identity, only its own query can settle it: no
+ * current-draft message, attachment, identity or configuration takes part, and
+ * no fresh requestId may replace it. Returns null when nothing is outstanding,
+ * without touching the transport.
+ */
+export async function resolvePendingAgentBoxSend(
+  client: WireV1Client,
+  scopeKey: string
+): Promise<AgentBoxSendDecision | null> {
+  const previous = pendingAgentBoxSend(scopeKey)
+
+  return previous ? queryAgentBoxSendOutcome(client, scopeKey, previous.intentKey, previous.requestId) : null
+}
+
+/**
  * One durable send intent. A transport failure is UNKNOWN, never rejection:
  * the same request id is persisted and queried on retry. A changed draft uses
  * a changed intentKey and therefore gets a new identity without overwriting
@@ -62,10 +78,12 @@ export async function sendAgentBoxMessage(
   intent: AgentBoxSendIntent,
   options: SendAgentBoxMessageOptions = {}
 ): Promise<AgentBoxSendDecision> {
-  const previous = pendingAgentBoxSend(intent.scopeKey)
+  // Re-read the store here as well: two concurrent submits can both have seen
+  // "nothing pending" upstream, and only one of them may create an identity.
+  const pending = await resolvePendingAgentBoxSend(client, intent.scopeKey)
 
-  if (previous) {
-    return queryAgentBoxSendOutcome(client, intent.scopeKey, previous.intentKey, previous.requestId)
+  if (pending) {
+    return pending
   }
 
   const requestId = (options.createRequestId ?? defaultRequestId)()

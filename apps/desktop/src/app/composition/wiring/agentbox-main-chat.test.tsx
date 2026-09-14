@@ -10,6 +10,7 @@ import {
   $agentBoxStopStates,
   setAgentBoxSessionProjection
 } from '@/store/agentbox-runtime'
+import { $pendingAgentBoxSends } from '@/store/agentbox-send-intents'
 import {
   $agentBoxCatalogReadiness,
   $agentBoxHello,
@@ -412,5 +413,92 @@ describe('primary AgentBox chat capability gates', () => {
     const { result } = renderHook(useAgentBoxMainChat, { wrapper: wrapper('/session-1') })
 
     expect(result.current.sendAvailable).toBe(true)
+  })
+})
+
+describe('primary AgentBox chat pending-send recovery gate', () => {
+  const draftScope = workspaceDraftScope(workspace.id)
+
+  const withPending = (scopeKey: string) =>
+    $pendingAgentBoxSends.set({
+      items: { [scopeKey]: { intentKey: '4', requestId: asRequestId('request-old-0001') } },
+      version: 1
+    })
+
+  it('offers recovery with only the query verb declared, without needing the service Profile', async () => {
+    $agentBoxHello.set(hello(['sendOutcome.query']))
+    $draftExecutionContexts.set({})
+    withPending(draftScope)
+
+    const { result } = renderHook(useAgentBoxMainChat, { wrapper: wrapper('/new') })
+
+    expect(result.current.sendAvailable).toBe(true)
+
+    await act(async () => {
+      await result.current.onSubmit('recover it', {
+        attachments: [],
+        composerScope: draftScope,
+        draftVersion: 5
+      })
+    })
+
+    expect(mocks.submit).toHaveBeenCalledWith(
+      { id: 'client' },
+      expect.objectContaining({ profileId: null, sessionId: null, workspaceId: 'workspace-1' })
+    )
+  })
+
+  it('offers recovery on an existing Session route whose Workspace no longer resolves', async () => {
+    $agentBoxHello.set(hello(['sendOutcome.query']))
+    $agentBoxSessions.set({ [session.id]: session })
+    $agentBoxWorkspaces.set([])
+    withPending(session.id)
+
+    const { result } = renderHook(useAgentBoxMainChat, { wrapper: wrapper('/session-1') })
+
+    expect(result.current.workspace).toBeNull()
+    expect(result.current.sendAvailable).toBe(true)
+
+    await act(async () => {
+      await result.current.onSubmit('recover it', {
+        attachments: [],
+        composerScope: session.id,
+        draftVersion: 5
+      })
+    })
+
+    expect(mocks.submit).toHaveBeenCalledWith(
+      { id: 'client' },
+      expect.objectContaining({ sessionId: 'session-1', workspaceId: null })
+    )
+  })
+
+  it('still refuses a NEW send with that same minimal hello', async () => {
+    $agentBoxHello.set(hello(['sendOutcome.query']))
+
+    const { result } = renderHook(useAgentBoxMainChat, { wrapper: wrapper('/new') })
+
+    expect(result.current.sendAvailable).toBe(false)
+
+    await act(async () => {
+      await expect(
+        result.current.onSubmit('new intent', {
+          attachments: [],
+          composerScope: draftScope,
+          draftVersion: 5
+        })
+      ).resolves.toBe(false)
+    })
+
+    expect(mocks.submit).not.toHaveBeenCalled()
+  })
+
+  it('refuses recovery when the query verb itself is undeclared', async () => {
+    $agentBoxHello.set(hello(['config.resolve', 'sessions.createAndSend']))
+    withPending(draftScope)
+
+    const { result } = renderHook(useAgentBoxMainChat, { wrapper: wrapper('/new') })
+
+    expect(result.current.sendAvailable).toBe(false)
   })
 })

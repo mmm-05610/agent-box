@@ -1,15 +1,14 @@
 import type { WireV1Client } from '@/api/wire-v1-client'
 import { resolveComposerConfig } from '@/application/profile/wire-composer-profile'
 import type { ComposerAttachment } from '@/types/composer'
-import {
-  asWireId,
-  type AttachmentRef,
-  type ConfigOverride,
-  type DraftMessage,
-  type WireId
-} from '@/types/wire/wire-v1'
+import { asWireId, type AttachmentRef, type ConfigOverride, type DraftMessage, type WireId } from '@/types/wire/wire-v1'
 
-import { type AgentBoxSendDecision, type AgentBoxSendIntent, sendAgentBoxMessage } from './wire-send'
+import {
+  type AgentBoxSendDecision,
+  type AgentBoxSendIntent,
+  resolvePendingAgentBoxSend,
+  sendAgentBoxMessage
+} from './wire-send'
 import { refreshAgentBoxQueue } from './wire-session-control'
 
 export interface AgentBoxComposerSubmitInput {
@@ -55,7 +54,12 @@ function attachmentRef(attachment: ComposerAttachment): AttachmentRef | null {
 
   return {
     displayName: attachment.label,
-    mediaKind: attachment.kind === 'image' ? 'image' : attachment.kind === 'file' || attachment.kind === 'folder' ? 'file' : 'other',
+    mediaKind:
+      attachment.kind === 'image'
+        ? 'image'
+        : attachment.kind === 'file' || attachment.kind === 'folder'
+          ? 'file'
+          : 'other',
     ref
   }
 }
@@ -78,11 +82,12 @@ export function prepareAgentBoxDraftMessage(
 }
 
 /**
- * Production Composer → application send seam. It chooses create-vs-continue
- * from server identities only, resolves the effective configuration with the
- * service before anything is sent, preserves the draft version as the durable
- * intent key, and treats a queued acceptance as accepted before refreshing
- * the server-owned queue projection.
+ * Production Composer → application send seam. An unresolved earlier send owns
+ * the scope and is recovered first; only a scope with nothing outstanding sets
+ * up a new intent, choosing create-vs-continue from server identities only,
+ * resolving the effective configuration with the service, preserving the draft
+ * version as the durable intent key, and treating a queued acceptance as
+ * accepted before refreshing the server-owned queue projection.
  */
 export async function submitAgentBoxComposer(
   client: WireV1Client,
@@ -91,6 +96,22 @@ export async function submitAgentBoxComposer(
 ): Promise<AgentBoxComposerSubmitResult> {
   if (!Number.isSafeInteger(input.draftVersion) || input.draftVersion < 1) {
     return { acceptedForDraft: false, outcome: 'invalid', reason: 'DRAFT_VERSION_REQUIRED' }
+  }
+
+  // Highest priority: an earlier send already has a service-visible identity.
+  // Recovering it is the whole outcome — the current draft's message,
+  // attachments, identities and configuration never enter this path, and no
+  // new send is created behind the unresolved request.
+  const pending = await resolvePendingAgentBoxSend(client, input.scopeKey)
+
+  if (pending) {
+    const acceptedForDraft = pending.outcome === 'accepted' && pending.intentKey === String(input.draftVersion)
+
+    if (pending.outcome === 'accepted' && acceptedForDraft && pending.queueItemId) {
+      void (options.refreshQueue ?? refreshAgentBoxQueue)(client, pending.sessionId).catch(() => undefined)
+    }
+
+    return { acceptedForDraft, decision: pending, outcome: 'sent' }
   }
 
   const prepared = prepareAgentBoxDraftMessage(input.text, input.attachments)
