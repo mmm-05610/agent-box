@@ -1512,12 +1512,18 @@ fn list_view_files(
             .path()
             .symlink_metadata()
             .map_err(|_| ("VIEW_IO", "view metadata failed"))?;
-        if metadata.file_type().is_symlink() {
-            return Err(("VIEW_INVALID", "view contains a symlink"));
+        // A view lists regular files. Harnesses legitimately leave short-lived
+        // non-regular entries in their home - Codex writes argv0 alias symlinks
+        // under its home's tmp/ directory while it runs - and one of those must
+        // not invalidate the whole listing. Skipping is safe because a skipped
+        // entry is never declared in the manifest, and reads only ever serve
+        // declared regular files, so nothing can be resolved through it.
+        if metadata.file_type().is_symlink() || !(metadata.is_dir() || metadata.is_file()) {
+            continue;
         }
         if metadata.is_dir() {
             list_view_files(base, &entry.path(), files)?;
-        } else if metadata.is_file() {
+        } else {
             let relative = entry
                 .path()
                 .strip_prefix(base)
@@ -1528,8 +1534,6 @@ fn list_view_files(
             if files.len() > 1024 {
                 return Err(("VIEW_INVALID", "view exceeds file limit"));
             }
-        } else {
-            return Err(("VIEW_INVALID", "view contains a special file"));
         }
     }
     Ok(())
@@ -1581,5 +1585,35 @@ fn handle_secret(
             Ok(json!({"status":"cleaned","frameId":frame}))
         }
         _ => unreachable!(),
+    }
+}
+
+#[cfg(test)]
+mod view_listing_tests {
+    use super::*;
+
+    /// A non-regular entry inside a view must not invalidate the listing.
+    ///
+    /// Codex writes argv0 alias symlinks under its home while it runs; the
+    /// capture has to ignore them and still see the regular state files. Reads
+    /// stay strict: an entry that is not listed is never declared, so `view.get`
+    /// can never serve it.
+    #[test]
+    fn view_listing_skips_non_regular_entries_and_keeps_regular_files() {
+        let root =
+            std::env::temp_dir().join(format!("agentbox-view-listing-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("tmp").join("arg0")).unwrap();
+        fs::write(root.join("state.db"), b"state").unwrap();
+        std::os::unix::fs::symlink("alias-target", root.join("tmp").join("arg0").join("codex"))
+            .unwrap();
+        let mut files = Vec::new();
+        list_view_files(&root, &root, &mut files).unwrap();
+        let paths: Vec<String> = files
+            .iter()
+            .map(|item| item["path"].as_str().unwrap().to_string())
+            .collect();
+        assert_eq!(paths, vec!["state.db".to_string()]);
+        let _ = fs::remove_dir_all(&root);
     }
 }

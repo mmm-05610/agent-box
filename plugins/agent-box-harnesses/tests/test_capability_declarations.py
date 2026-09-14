@@ -56,6 +56,8 @@ ACCEPTANCE = "docs/server-round1/harness-integration/stage-c.md"
 #: "已观测到不支持"，而这里是"没有证据"。
 OBSERVED = "observed"
 NOT_OBSERVED = "not-observed"
+#: Evidence prefix for the Codex production chain gate run.
+CODEX_EVIDENCE = "[codex-production-packaging](../docs/server-round1/fullstack/codex-production-packaging.md)"
 
 #: 实现级观测依据：driver/sidecar 接缝的必需方法集合。
 SIDECAR_CONTRACT_EVIDENCE = (
@@ -64,9 +66,10 @@ SIDECAR_CONTRACT_EVIDENCE = (
 
 #: 一条"证据串"必须点出至少一个可复核的观测物，否则它只是形容词。
 RUNTIME_OBSERVATION_TOKENS = (
-    "门", "@1", "sidecar", "completed", "deltaSeq", "nativeSessionId", "nativeSessionIdStable",
-    "acpMethods", "createsInsideReopenPhase", "hostStarts", "storedMessages",
-    "promptCapabilities", "state.db", "message.delta",
+    "门", "@1", "sidecar", "completed", "deltaSeq", "completedSeq", "nativeSessionId",
+    "nativeSessionIdStable", "acpMethods", "createsInsideReopenPhase", "hostStarts",
+    "storedMessages", "promptCapabilities", "state.db", "message.delta",
+    "session/load", "session/resume", "/responses",
 )
 
 
@@ -81,17 +84,23 @@ def _cites_runtime_observation(evidence: object) -> bool:
 #: 转述。两边都由 test_the_golden_matrix_matches_the_declarations 交叉校验。
 FAMILY_MATRIX: dict[str, dict[str, tuple[bool, str, str]]] = {
     "codex": {
-        "start": (True, NOT_OBSERVED,
-                  "静态候选：有真实的 codex app_server / interactive 执行 provider，但**没有**生产封装"
-                  "（无 deploy/codex 原生配置、无全链门），没有任何一条运行证据"),
-        "observe": (True, NOT_OBSERVED, "静态候选；同上：没有生产封装，未运行"),
-        "finish": (True, NOT_OBSERVED, "静态候选；同上：没有生产封装，未运行"),
-        "attach": (True, NOT_OBSERVED, "静态候选；同上：没有生产封装，未运行"),
-        "stream": (True, NOT_OBSERVED, "静态候选；同上：没有生产封装，未运行"),
-        "permissions": (True, NOT_OBSERVED, "静态候选；同上：没有生产封装，未运行"),
-        "native_continuation": (True, NOT_OBSERVED,
-                                "静态候选：codex/continuation.py 是已注册的资源 provider，"
-                                "但没有生产封装与全链门，未运行"),
+        "start": (True, OBSERVED,
+                  f"{CODEX_EVIDENCE}：真实 codex-acp 1.1.14 + Codex app-server 0.147.0 经工件进入"
+                  " c4/c5 Worker+bwrap，首轮 create+prompt → completed，两轮各 1 次 provider 请求"),
+        "observe": (True, OBSERVED,
+                    f"{CODEX_EVIDENCE}：首轮拿到原生 session id，次轮以 session/list + session/load "
+                    "重开同一 id（nativeSessionIdStable=true）"),
+        "finish": (True, OBSERVED, f"{CODEX_EVIDENCE}：prompt 交付完成，终止前 delta 4 < completed 7"),
+        "attach": (True, NOT_OBSERVED,
+                   "静态候选保留；生产链里没有送过任何附件，未观测到原生附件能力"),
+        "stream": (True, OBSERVED,
+                   f"{CODEX_EVIDENCE}：/responses 流式增量先于 completed（deltaSeq 4 < completedSeq 7，"
+                   "次轮 10,12 < 15）"),
+        "permissions": (True, NOT_OBSERVED,
+                        "静态候选保留；生产链里没有任何 permission round-trip 被观测到"),
+        "native_continuation": (True, OBSERVED,
+                                f"{CODEX_EVIDENCE}：同一 native id + 次轮上下文含首轮 user/assistant + "
+                                "重开相位实测 ACP session/load（带重放，不是 session/resume）"),
         "steer": (False, NOT_OBSERVED, "未声明；codex 的 cancel 语义是中止，不是 steer"),
     },
     "pi": {
@@ -197,7 +206,7 @@ def _render_toml(raw: dict) -> str:
 def _production_claims(family: str) -> dict:
     """四家生产模板声明的 capabilityClaims（同一形状的接缝）。"""
     if family == "codex":
-        assert codex_production.HAS_PRODUCTION_DEPLOYMENT is False
+        assert codex_production.HAS_PRODUCTION_DEPLOYMENT is True
         return codex_production.capability_claims()
     module = {"pi": pi_production, "hermes": hermes_production, "opencode": opencode_production}[family]
     if family == "pi":
@@ -392,11 +401,19 @@ def test_the_golden_matrix_observed_column_matches_the_contract_levels(family):
             assert evidence != SIDECAR_CONTRACT_EVIDENCE, (family, capability_id)
 
 
-def test_the_four_families_that_have_no_production_wrapper_observe_nothing():
-    """Codex 没有生产封装 ⇒ 它的 observed 必须全部是 not-observed。"""
-    assert codex_production.HAS_PRODUCTION_DEPLOYMENT is False
-    assert codex_production.observed_capabilities() == frozenset()
-    assert {observed for _, observed, _ in FAMILY_MATRIX["codex"].values()} == {NOT_OBSERVED}
+def test_codex_observes_exactly_what_its_production_gate_proved():
+    """Codex 已有生产封装 ⇒ observed 只能等于门里真正发生的能力。
+
+    附件与审批没有在链路上真实发生过，因此即使静态候选声明了它们，也必须保持
+    not-observed；`steer` 从未声明，同样不得被"顺手"算成已观测。
+    """
+    assert codex_production.HAS_PRODUCTION_DEPLOYMENT is True
+    observed = {capability_id for capability_id, (_, state, _) in FAMILY_MATRIX["codex"].items()
+                if state == OBSERVED}
+    assert observed == {"start", "observe", "finish", "stream", "native_continuation"}
+    assert codex_production.observed_capabilities() == frozenset(observed)
+    for capability_id in ("attach", "permissions", "steer"):
+        assert FAMILY_MATRIX["codex"][capability_id][1] == NOT_OBSERVED, capability_id
 
 
 def test_the_four_families_matrix_summary_is_the_one_reported():
@@ -410,7 +427,7 @@ def test_the_four_families_matrix_summary_is_the_one_reported():
     assert summary == {
         "codex": {"declared": ["attach", "finish", "native_continuation", "observe",
                                "permissions", "start", "stream"],
-                  "observed": []},
+                  "observed": ["finish", "native_continuation", "observe", "start", "stream"]},
         "pi": {"declared": ["attach", "finish", "native_continuation", "observe", "start", "stream"],
                "observed": ["finish", "native_continuation", "observe", "start", "stream"]},
         "hermes": {"declared": ["finish", "native_continuation", "observe", "start", "stream"],

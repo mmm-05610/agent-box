@@ -112,8 +112,8 @@ def test_the_registry_static_view_never_reports_unrun_abilities_as_supported():
             assert item["supported"] is False, (definition.harness_type, item)
 
 
-def test_codex_without_a_production_deployment_supports_nothing_yet():
-    """No deployment, no run, no observation: every ability stays unsupported."""
+def test_codex_registry_view_still_reports_no_support_before_a_run():
+    """A deployment exists, but the static view is still a ceiling, not a claim."""
     registry = HarnessRegistry()
     definition = load_builtin_registry().get("codex")
     registry.register(HarnessDescriptor(
@@ -127,11 +127,14 @@ def test_codex_without_a_production_deployment_supports_nothing_yet():
         expected = (caps.CAPABILITY_NOT_OBSERVED if item["declared"]
                     else caps.CAPABILITY_NOT_DECLARED)
         assert item["reason"] == expected, item
-    # The plugin's own declaration agrees: no production deployment, no observation.
+    # The plugin now has a production deployment whose gate observed five
+    # abilities; the *static* view must still refuse to claim any of them, and
+    # the two abilities that never happened stay unobserved too.
     from agent_box_harnesses.codex import production
 
-    assert production.HAS_PRODUCTION_DEPLOYMENT is False
-    assert production.observed_capabilities() == frozenset()
+    assert production.HAS_PRODUCTION_DEPLOYMENT is True
+    assert production.observed_capabilities() == frozenset(
+        {"start", "observe", "finish", "stream", "native_continuation"})
 
 
 def test_the_static_profile_view_still_shows_the_declared_ceiling():
