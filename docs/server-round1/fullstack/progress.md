@@ -11,14 +11,14 @@ Windows 真机、`py.exe -3.12`、真实 `wsl.exe`、digest 固定的 release Wo
 `/tmp/agentbox-server-41-r4` 上单次执行 `accept-e.ps1 -Cleanup`，退出码 0：
 
 ```json
-{"result":"BACKEND_41_E_WINDOWS_WSL_WIRE_OK","windows_server":true,"distribution":"Ubuntu","server_id":"server_4ed8107385e8472d952f5de57a7c0b24","workspace_id":"ws_25ae49b556894d5cb77957b9cb967d8f","session_id":"session_16e47d3e0b804928a13123eb79482731","attachment_execution":"execution_55261433757d4447917c7846a9401c6a","cancelled_execution":"execution_72412c6706c04acb896af1b7088377b7","approval_execution":"execution_aae0a7326a3d414e941abd20d412c49e","profile_id":"profile_0cfa46a8a32b4954bafc08738a72812c","provider_model_id":"provider_8b1f90d93a1f48af8fc13908fa15889c","wire_event_stream":"wire.eventStream/1","worker_digest":"sha256:bb90e346bbd857f02eba8d267f47c3ce793d30c9894ca823dc09c482d886f5eb","r4":{"fixture":"tests/server/fixtures/stateful_acp_peer.mjs","harness":"hermes","state_projection":"/tmp/agentbox-home/sessions","timeout_ms":30000,"nonce":"STATEFUL-NONCE-R4-7F3A9C","session_id":"session_7961a0b9a2e44260bb6767d0585fbde2","first_execution":"execution_0abc8e9dfd21461bbdfbe68aefa15997","second_execution":"execution_f10e348364364c428052eed89f94ed8b","checkpoint_digest":"sha256:f8a6d19c1df4bc7fc32af445c5e64f97ca1f7f27a062c62e793b07303c4a23b1","checkpoint_native_id":"stateful-13","checkpoint_files":["native-state.json","reopen-method.txt"],"first_round_reopen":["session/new"],"second_round_reopen":["session/new","session/resume"],"delta_seq":10,"completed_seq":12,"stop_mode":"tree_terminate","lock_instance_after_first_stop":"server_381e665d2d8240dea39182dd995e4978","lock_instance_after_final_stop":"server_668faae8a4154b02b4465b0b21ee5a2a","server_id_after_restart":"server_4ed8107385e8472d952f5de57a7c0b24","cleanup_guards":{"data_root_without_owner_marker_refused":true,"data_root_with_mismatched_marker_refused":true,"data_root_with_owner_marker_accepted":true,"linked_data_root_target_refused":true,"data_root_that_is_not_a_directory_refused":true,"workspace_without_owner_marker_refused":true,"marked_workspace_accepted":true}},"data_root":"C:\\Users\\maoqh\\AppData\\Local\\AgentBox\\acceptance-server-41-r4","workspace":"/tmp/agentbox-server-41-r4"}
+{"approval_execution":"execution_c619a5fb923647ec9f3750e6546ffbcc","attachment_execution":"execution_fb479cdd3aad47e9b050f3db51fc0248","cancelled_execution":"execution_cd35d32508544be2b469371af56c42ad","data_root":"C:\\Users\\maoqh\\AppData\\Local\\AgentBox\\acceptance-server-41-r4","distribution":"Ubuntu","fixture":"explicit no-model ACP peer","profile_id":"profile_489c3e31ec5d457081e5570e64d10a83","provider_model_id":"provider_f8738a7bbf3a45088040d5b8c5060871","r4":{"checkpoint_digest":"sha256:a6525f3b20a69c19abac3ce3834982696bb3eb2eb0423829e76a01b37da5a06d","checkpoint_files":["native-state.json","reopen-method.txt"],"checkpoint_native_id":"stateful-13","cleanup_guards":{"data_root_that_is_not_a_directory_refused":true,"data_root_with_mismatched_marker_refused":true,"data_root_with_owner_marker_accepted":true,"data_root_without_owner_marker_refused":true,"linked_data_root_target_refused":true,"marked_workspace_accepted":true,"workspace_without_owner_marker_refused":true},"completed_seq":12,"delta_seq":10,"first_execution":"execution_387c3382ee694dd4b088813f6c7763f0","first_round_reopen":["session/new"],"fixture":"tests/server/fixtures/stateful_acp_peer.mjs","harness":"hermes","lock_instance_after_final_stop":"server_79296dd8029948d0bf7c18bff0ae24cf","lock_instance_after_first_stop":"server_6dd995a9dfd14795b6ad975f249ae9e9","nonce":"STATEFUL-NONCE-R4-7F3A9C","second_execution":"execution_71d57937cc8346faa45fe9df22ad8bf6","second_round_reopen":["session/new","session/resume"],"server_id_after_restart":"server_639bc04679554c66ac6b1e77661e70f1","session_id":"session_88a29fa110254843a6ceee9a12545e43","state_projection":"/tmp/agentbox-home/sessions","stop_mode":"tree_terminate","timeout_ms":30000},"result":"BACKEND_41_E_WINDOWS_WSL_WIRE_OK","server_id":"server_639bc04679554c66ac6b1e77661e70f1","session_id":"session_97b27f612778411f92c9bb68e1ef9a13","windows_server":true,"wire_event_stream":"wire.eventStream/1","worker_digest":"sha256:bb90e346bbd857f02eba8d267f47c3ce793d30c9894ca823dc09c482d886f5eb","workspace":"/tmp/agentbox-server-41-r4","workspace_id":"ws_cb0eb4a7e01541b4a622935e606b6b5f"}
 ```
 
 逐项证据：
 
 - **重启**：第一轮完成后按 `tree_terminate` 停止 Server（py.exe 启动器持有 python.exe 子进程，树终止才是
   真正的停止），随后以同一 DataRoot 重启并恢复 live；`server.hello` 返回同一稳定 server_id
-  `server_4ed8107385e8472d952f5de57a7c0b24`，而 DataRoot 锁的持有实例由
+  `server_639bc04679554c66ac6b1e77661e70f1`，而 DataRoot 锁的持有实例由
   `server_381e665d…` 变为 `server_668faae8…`，即锁已释放并由新进程重新获取。锁文件在持有期间被
   Windows 字节区间锁保护、不可读，因此“停后仍可读”本身即释放证据。
 - **同 native id resume**：第二轮 checkpoint 的 `nativeSessionId` 与第一轮相同（`stateful-13`），
@@ -47,6 +47,9 @@ Windows 真机、`py.exe -3.12`、真实 `wsl.exe`、digest 固定的 release Wo
   的 5 个参数化用例断言 turn=`failed`、Session 的 checkpoint digest/native id 保持原值、无该 turn 的
   delta，且 Core 账本记录唯一的 ambiguous dispatch 携带原因 `SIDECAR_CHECKPOINT_INVALID`，同时
   全 Session 只有首轮一次 dispatch accepted。
+
+上方 JSON 取自提交检查点上的独立复跑（同一脚本、同一锁定工件、退出码 0），此前一次同结构运行亦
+exit 0；两次的实例/会话标识不同，结构与断言语义一致，记录值即复跑值。
 
 环境与工件（本轮实测）：Windows 10.0.26200.9445、PowerShell 5.1.26100.9444、
 Windows Python 3.12.10（`C:\WINDOWS\py.exe -3.12`）、WSL `Ubuntu`、Node v22.23.2、`/usr/bin/bwrap`；
