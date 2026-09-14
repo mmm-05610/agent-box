@@ -42,9 +42,12 @@ Boundaries enforced by the gate itself:
     files reject writes with EROFS while the state directory accepts one, and
     `$HOME/.codex` resolves to the same directory as `CODEX_HOME`.
 
-**Current acceptance state**: the chain runs green end to end, in both the
-default and the external-artifact mode (last recorded here with c6; c7 is
-recorded in the state-error-boundary report). The first run did not: it stopped
+**Current acceptance state** (dated snapshots, newest last): the chain ran
+green end to end in both modes with c6 (2026-09-15 早期) and for 10 consecutive
+default-mode rounds with c7/c8; since then the native `.tmp/plugins`
+skill-materialization burst has become persistent on this machine and the gate
+is red with a deterministic `VIEW_FILE_LIMIT` (see the state-error-boundary
+report §4.3) pending the deployment-config decision. The first run did not: it stopped
 at the state capture with `VIEW_INVALID` and reported the derived code
 `CODEX_GATE_STATE_CONTAINS_NATIVE_ALIAS_SYMLINKS` with the observed links,
 because the Worker's view listing then refused any tree containing a symlink and
@@ -1681,35 +1684,19 @@ def run_requests(runs: list[list[dict]], index: int) -> list[dict]:
 #: The failure codes that belong to the state-capture step. Only a turn that
 #: failed *in that step* with one of these codes can be causally attributed to
 #: the alias-symlink problem; anything else is recorded as a co-observation.
-#: Only codes whose cause can plausibly *be* the alias symlinks belong here.
-#: `VIEW_FILE_LIMIT` and `SIDECAR_STATE_CONTAINS_SECRET` are deliberately
-#: excluded: both have first-hand, unrelated causes (a plugin-materialization
-#: file burst; credential material in native state), so attributing them to
-#: the alias links would misdirect a contract or config decision.
-STATE_CAPTURE_CODES = frozenset({
-    "VIEW_SPECIAL_FILE", "VIEW_TRAVERSAL_LIMIT", "VIEW_MISSING",
-    "VIEW_CHANGED", "SIDECAR_STATE_NOT_SETTLED", "SIDECAR_STATE_IDENTITY_CONFLICT",
-})
-
-
 def annotate_known_blocker(report: dict | None = None) -> None:
-    """Record the first-hand diagnosis of the alias-symlink blocker if it returns.
+    """Record alias-link observations next to a failed turn, without causal claims.
 
-    Historical, and kept because it was reproduced on a real run: the native
-    Codex CLI installs argv0 alias symlinks under `$CODEX_HOME/tmp/arg0/<random>/`
-    while it runs and removes them when it exits. That run failed at the state
-    capture with `VIEW_INVALID` because the Worker's view listing then refused
-    any tree containing a symlink, and the sidecar captured right after a `close`
-    that does not wait for the adapter process to exit. The listing now skips
-    non-regular entries, `view.get` still refuses them, and only a genuine
-    content change is retried, so a capture no longer depends on native cleanup
-    timing.
-
-    Causality is narrow by construction: the blocker is attached only when the
-    failed turn failed *in the capture step* with a state/view code. A turn that
-    failed for any other reason (credentials, adapter, provider) while links
-    happened to be observed is recorded as a co-observation instead, so the
-    blocker evidence cannot be polluted. Neither branch changes an outcome.
+    Historical context: the native Codex CLI installs argv0 alias symlinks under
+    `$CODEX_HOME/tmp/arg0/<random>/` while it runs, and one early run failed at
+    the state capture with `VIEW_INVALID` because the listing then refused any
+    tree containing a symlink. That diagnosis is preserved in the Codex
+    packaging report. It cannot be re-attached automatically: a code alone does
+    not prove the links caused the failure (the file-limit and secret-scan
+    failures each have first-hand unrelated causes), and the annotation has no
+    failing-path evidence to link. So every failure that coincides with the
+    observed links is recorded as a co-observation, and no `blocker` key is
+    produced at all. Nothing here changes an outcome.
     """
     report = REPORT if report is None else report
     diagnostics = report.get("diagnostics") or {}
@@ -1717,46 +1704,16 @@ def annotate_known_blocker(report: dict | None = None) -> None:
     observed = report.get("stateSymlinksObserved") or []
     if not observed or not turn.get("error_code"):
         return
-    capture_failed = turn.get("capture_state") == "failed"
-    state_code = turn.get("error_code") in STATE_CAPTURE_CODES
-    if not (capture_failed and state_code):
-        report["stateSymlinkCoObservation"] = {
-            "note": (
-                "alias links were observed while the turn failed for a reason "
-                "outside the state capture; recorded as a co-observation, not "
-                "a causal blocker"
-            ),
-            "observedStateSymlinks": observed[:8],
-            "turnErrorCode": turn.get("error_code"),
-            "turnCaptureState": turn.get("capture_state"),
-        }
-        return
-    report["blocker"] = {
-        "code": "CODEX_GATE_STATE_CONTAINS_NATIVE_ALIAS_SYMLINKS",
-        "layer": "Worker view listing + sidecar capture timing (neither is plugin-owned)",
+    report["stateSymlinkCoObservation"] = {
+        "note": (
+            "alias links were observed while the turn failed; the failure cause "
+            "is whatever its error code names - recorded as a co-observation, "
+            "never a causal blocker (the historical alias diagnosis lives in "
+            "the Codex packaging report)"
+        ),
         "observedStateSymlinks": observed[:8],
         "turnErrorCode": turn.get("error_code"),
-        "options": [
-            "A. capture the state after the native process has really exited: make the "
-            "sidecar's `close` bound-wait for the adapter process (or patch the vendored "
-            "bridge's AcpClient.close with a PATCHES.md entry). Verified: the aliases are gone "
-            "once the attempt's processes exit, so a settled home lists cleanly.",
-            "B. make the Worker's view listing report only regular files (skipping symlinks and "
-            "other non-regular entries) while `view.get` keeps refusing them: the sidecar reads "
-            "only listed paths, so nothing ever follows a link and a capture no longer depends "
-            "on native cleanup timing.",
-            "C. declare ephemeral state paths in stateProjection and have the Worker honour "
-            "them - strictly more surface than B, and it still needs the listing change.",
-        ],
-        "recommendation": "B as the robust half (no dependency on native cleanup) and A as the "
-                          "semantic half (a checkpoint is taken from a settled home).",
-        "resolution": "B was implemented in c5 (the listing skips non-regular entries; "
-                      "`view.get` still refuses them) and the capture became content-stable in "
-                      "c6 (two identical path+size+digest snapshots, `SIDECAR_STATE_NOT_SETTLED` "
-                      "at the deadline), so A was not needed. The annotation stays only for a "
-                      "run that fails with these links present.",
-        "verification": "scripts/server-round1/codex-production-chain-gate.py (this run) plus the "
-                        "reproduction in the Codex packaging report",
+        "turnCaptureState": turn.get("capture_state"),
     }
 
 

@@ -4,7 +4,7 @@
 已发生的1次可达性请求由后端受控进程读取仓库外 locator，未把内容写入仓库或输出。
 授权真实 credential 的 SecretStore→Worker 投影尚未执行，不以测试值路径冒充付费验收事实。
 
-## 2026-09-15 — state capture 类型化错误边界 + c7 + 前端最终交接收口（返修轮）
+## 2026-09-15 — state capture 类型化错误边界（c7 起步 → 现行 c8）+ 前端最终交接收口（返修轮）
 
 【历史轮次注：本节的错误码语义（"文件/目录消失、文件被缩短"=`VIEW_CHANGED`）与
 812/22 计数已被同日的 **Reviewer 复审修复轮（c8，820/27）** 取代——见下一节
@@ -65,8 +65,8 @@
   换链、超限不无界读、manifest 1025 拒绝、分块中截断→重试不混字、未知码 fail-closed。
   修复后重建 **c8**（`sha256:514f48a9…`，c4–c7 未覆盖；Worker 源在 c8 构建后未再变，
   c8 仍为现行 bundle）复跑：runtime-artifact/Pi/Hermes/OpenCode exit 0、Windows r4 +
-  `-PostCheck…CLEAN`（fresh 实例核对）、python **822 passed/4 skipped**、Rust **27 passed**
-  （820/22 为中间轮，已被取代）。Codex 门：间歇期 10 轮绿 + 当前连续 5 轮红（突发稳定期），
+  `-PostCheck…CLEAN`（fresh 实例核对）、python **820 passed/4 skipped**、Rust **27 passed**
+  （中间轮为 python 820 / Rust 27；更早 c7 轮为 812/22——均已日期化取代）。Codex 门：间歇期 10 轮绿 + 当前连续 5 轮红（突发稳定期），
   两个记录都如实保留、红不掩盖。
 - **两个第一手定位的 Codex 原生行为发现（待用户裁决）**：①运行时把内置 plugin/skill 语料解包进
   `$CODEX_HOME/.tmp/plugins/`（实测峰值 **5529 文件**；与列表上限 1024 相撞即确定性

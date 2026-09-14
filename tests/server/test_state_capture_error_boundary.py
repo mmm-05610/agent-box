@@ -603,6 +603,56 @@ def test_a_real_worker_names_every_view_failure_the_capture_classifies(tmp_path)
         client.close()
 
 
+def test_a_real_worker_capture_retries_a_file_truncated_mid_read(tmp_path):
+    """One full chain, no fixtures: real Worker process, real settle loop, and
+    a truncation that lands exactly after the first served chunk."""
+    require_worker()
+    client, root = real_worker(tmp_path)
+    try:
+        long_content = b"x" * 40_000
+        digest_value = "sha256:" + hashlib.sha256(long_content).hexdigest()
+        assert client.request("view.prepare", {"viewId": VIEW_ID, "files": [
+            {"path": f"{PREFIX}/long.db", "digest": digest_value, "size": len(long_content)},
+        ]})["status"] == "prepared"
+        split = 32_768
+        client.request("view.put", {
+            "viewId": VIEW_ID, "path": f"{PREFIX}/long.db", "offset": 0,
+            "data": base64.b64encode(long_content[:split]).decode(),
+        })
+        client.request("view.put", {
+            "viewId": VIEW_ID, "path": f"{PREFIX}/long.db", "offset": split,
+            "data": base64.b64encode(long_content[split:]).decode(),
+        })
+        assert client.request("view.commit", {"viewId": VIEW_ID})["status"] == "ready"
+        state_file = root / "views" / VIEW_ID / "ready" / PREFIX / "long.db"
+
+        class TruncatingBetweenChunks:
+            """Serves the real client, but truncates the declared file once a
+            second-chunk request is on the wire - deterministically, because
+            the truncation happens before the request is delegated."""
+
+            def __init__(self, inner):
+                self._inner = inner
+
+            def request(self, op, arguments=None, **keywords):
+                if op == "view.get" and int((arguments or {}).get("offset", 0)) > 0:
+                    state_file.write_bytes(b"tiny")
+                return self._inner.request(op, arguments, **keywords)
+
+            def __getattr__(self, name):
+                return getattr(self._inner, name)
+
+        channel = _WorkerChannels(
+            TruncatingBetweenChunks(client), "attempt-1", 1, VIEW_ID,
+            state_bundle_prefix=PREFIX,
+        )
+        captured = channel.capture_state(deadline_seconds=5.0, interval_seconds=0.05)
+        assert captured == {"long.db": b"tiny"}, captured
+        assert captured["long.db"] != long_content, "no mixed bytes may be served"
+    finally:
+        client.close()
+
+
 def test_a_real_worker_capture_fails_at_once_or_waits_for_a_settled_subtree(tmp_path):
     """The settle loop over a real Worker: a refusal now, a settled read later."""
     require_worker()

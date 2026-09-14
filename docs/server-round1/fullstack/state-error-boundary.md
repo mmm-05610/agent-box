@@ -161,7 +161,7 @@ Reviewer `CHANGES_REQUIRED` 的修复（§2.1/§7.1）落地后重建
 最终复跑（Worker 源自 c8 构建后未再变，`git diff <fix-commit> -- workers/` 为空，c8 摘要
 仍为现行 bundle；c4–c7 未覆盖）：runtime-artifact/Pi/Hermes/OpenCode **exit 0**；Windows r4
 （c8）**exit 0** + 独立 `-PostCheck…CLEAN`（本次 fresh 实例核对）；Python 全量
-**822 passed / 4 skipped / 0 failed**（820/27 为上一轮，已被取代）；Rust fmt 干净 +
+**820 passed / 4 skipped / 0 failed**（现行；中间计数 822 与更早 812/22 均已日期化取代）；Rust fmt 干净 +
 `cargo test --locked --release` **27 passed**；`git diff --check` 通过。
 **Codex 门现行状态：红**——`.tmp/plugins` 突发在本机已稳定复现（连续 5 轮峰值恰 5529 →
 确定性 `VIEW_FILE_LIMIT`），按 §4.3 待用户裁决；此前 10 轮绿的间歇期记录如实保留。
@@ -180,7 +180,9 @@ PYTHONPATH=src + 全部 plugins/*/src \
     plugins/agent-box-sandbox-bwrap/tests plugins/agent-box-runtime-local/tests
 scripts/server-round1/build-worker.sh workers/agent-box-worker/.acceptance-bundle-cN
 python3 scripts/server-round1/runtime-artifact-gate.py --worker <bundle> --json              → exit 0
-python3 scripts/server-round1/{codex,pi,hermes,opencode}-production-chain-gate.py --worker <bundle> --json → exit 0
+python3 scripts/server-round1/{pi,hermes,opencode}-production-chain-gate.py --worker <bundle> --json → exit 0（c7/c8 各轮均绿）
+python3 scripts/server-round1/codex-production-chain-gate.py --worker <bundle> --json
+  → c7 轮 10 连绿；c8 轮 10 连绿后转为连续红（.tmp/plugins 突发，§4.3），按日期各自如实记录
 powershell.exe -File accept-e.ps1（-SourceRoot \\wsl.localhost\Ubuntu\… -DataRoot …\acceptance-server-r4-cN
   -ManifestPath <bundle>\manifest.json -WireSchemaPath <前端生成工件> -LinuxWorkerPath <bundle>/agent-box-worker
   -WorkspaceLinuxPath /tmp/agentbox-server-r4-cN -Port 18745 -Cleanup）  → exit 0（BACKEND_41_E_WINDOWS_WSL_WIRE_OK）
@@ -188,7 +190,7 @@ powershell.exe -File accept-e.ps1（-SourceRoot \\wsl.localhost\Ubuntu\… -Data
 git diff --check <起点>..<HEAD>
 ```
 
-- 【已被 §4.2 的 c8 计数取代：python 820/4；Rust 27】c7 轮当时：Python 全量
+- 【已被 §4.2/§4.4 的现行计数取代：python 820/4；Rust 27】c7 轮当时：Python 全量
   812 passed / 4 skipped / 0 failed；Rust fmt 干净、`cargo test --locked --release`
   22 passed / 0 failed。
 - 残留：本轮五个门的临时根无残留；Windows DataRoot/workspace/端口/进程由 `-PostCheck`
@@ -196,7 +198,7 @@ git diff --check <起点>..<HEAD>
   `git diff --check` 通过。进程表里仅剩 pytest 的 `--delay-seconds 300` 清理助手
   （有界自退），不是门残留。
 
-## 6. 前端最终交接（只读复测 2026-09-15 01:4x，并于 02:51 以同一结论复测）
+## 6. 前端最终交接（只读复测 2026-09-15 02:51 +08:00，同一结论）
 
 - 工作树 `/home/maoqh/projects/agent-box-desktop-next-wsl-round1`，分支
   `feature/agentbox-desktop-product`，HEAD `8e7c138c96337fc20ed61d3c21100e6449c8ec95`

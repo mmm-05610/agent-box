@@ -34,40 +34,21 @@ def annotate(turn):
     return report
 
 
-def test_a_capture_failure_with_a_state_code_is_the_blocker():
-    report = annotate({
-        "state": "failed", "capture_state": "failed", "error_code": "VIEW_SPECIAL_FILE",
-    })
-    blocker = report["blocker"]
-    assert blocker["code"] == "CODEX_GATE_STATE_CONTAINS_NATIVE_ALIAS_SYMLINKS"
-    assert blocker["turnErrorCode"] == "VIEW_SPECIAL_FILE"
-    assert "stateSymlinkCoObservation" not in report
-
-
-def test_file_limit_and_secret_scan_never_become_alias_blockers():
-    """Both codes have first-hand unrelated causes (the plugin file burst;
-    credential material in native state), so they must stay co-observations."""
-    for error_code in ("VIEW_FILE_LIMIT", "SIDECAR_STATE_CONTAINS_SECRET"):
+def test_no_failure_ever_becomes_an_alias_blocker():
+    """A code alone never proves the links caused the failure - the file-limit
+    and secret-scan failures each have first-hand unrelated causes - so every
+    failure is a co-observation and no `blocker` key exists at all."""
+    for error_code in (
+        "VIEW_SPECIAL_FILE", "VIEW_FILE_LIMIT", "SIDECAR_STATE_CONTAINS_SECRET",
+        "CREDENTIAL_REQUIRED", "SIDECAR_OP_FAILED", "ADAPTER_EXITED", "WORKER_ERROR",
+    ):
         report = annotate({
             "state": "failed", "capture_state": "failed", "error_code": error_code,
         })
         assert "blocker" not in report, error_code
-        assert report["stateSymlinkCoObservation"]["turnErrorCode"] == error_code
-
-
-def test_an_unrelated_turn_failure_is_only_a_co_observation():
-    for error_code in ("CREDENTIAL_REQUIRED", "SIDECAR_OP_FAILED", "ADAPTER_EXITED"):
-        report = annotate({"state": "failed", "capture_state": "pending", "error_code": error_code})
-        assert "blocker" not in report, error_code
         co_observation = report["stateSymlinkCoObservation"]
         assert co_observation["turnErrorCode"] == error_code
         assert "co-observation" in co_observation["note"]
-
-
-def test_a_capture_failure_with_an_out_of_scope_code_stays_a_co_observation():
-    report = annotate({"state": "failed", "capture_state": "failed", "error_code": "WORKER_ERROR"})
-    assert "blocker" not in report
-    assert report["stateSymlinkCoObservation"]["turnCaptureState"] == "failed"
 
 
 def test_a_green_run_records_neither_blocker_nor_co_observation():
