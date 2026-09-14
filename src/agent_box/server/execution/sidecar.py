@@ -119,11 +119,13 @@ class WslSidecarLauncher:
 
     def __init__(
         self, connector, *, workspace: Mapping[str, Any], bundle: Mapping[str, bytes],
+        credential: bytes | None = None,
         timeout_ms: int = 600_000,
     ) -> None:
         self.connector = connector
         self.workspace = dict(workspace)
         self.bundle = {str(path): bytes(content) for path, content in bundle.items()}
+        self.credential = None if credential is None else bytes(credential)
         self.timeout_ms = timeout_ms
 
     def launch(self, environment: Mapping[str, str]):
@@ -131,6 +133,7 @@ class WslSidecarLauncher:
 
         attempt_id = f"sidecar-{uuid4().hex}"
         view_id = f"view-{attempt_id}"
+        secret_frame_id = "harness-credential"
         client = self.connector.client_for_workspace(
             distribution=self.workspace["distribution"],
             user=self.workspace["remote_user"],
@@ -162,11 +165,20 @@ class WslSidecarLauncher:
                     "AGENTBOX_SIDECAR_ISOLATED", "1",
                 ),
             }
+            secret = None
+            if self.credential is not None:
+                secret = client.request("secret.put", {
+                    "attemptId": attempt_id, "frameId": secret_frame_id,
+                    "data": base64.b64encode(self.credential).decode(),
+                })["path"]
             argv = compile_remote_sidecar_bwrap_argv(
                 workspace=self.workspace["remote_path"], runtime_view=runtime_view,
-                environment=guest_environment,
+                environment=guest_environment, secret=secret,
             )
-            channels = _WorkerChannels(client, attempt_id, 1, view_id)
+            channels = _WorkerChannels(
+                client, attempt_id, 1, view_id,
+                secret_frame_id if secret is not None else None,
+            )
             channels.subscribe()
             client.request(
                 "spawn", {"argv": argv, "timeoutMs": self.timeout_ms,
@@ -175,6 +187,13 @@ class WslSidecarLauncher:
             )
             return channels
         except BaseException:
+            if self.credential is not None:
+                try:
+                    client.request("secret.cleanup", {
+                        "attemptId": attempt_id, "frameId": secret_frame_id,
+                    }, timeout=2)
+                except BaseException:
+                    pass
             try:
                 client.request("view.cleanup", {"viewId": view_id}, timeout=2)
             except BaseException:
@@ -184,11 +203,15 @@ class WslSidecarLauncher:
 
 
 class _WorkerChannels:
-    def __init__(self, client, attempt_id: str, generation: int, view_id: str) -> None:
+    def __init__(
+        self, client, attempt_id: str, generation: int, view_id: str,
+        secret_frame_id: str | None = None,
+    ) -> None:
         self.client = client
         self.attempt_id = attempt_id
         self.generation = generation
         self.view_id = view_id
+        self.secret_frame_id = secret_frame_id
         self._chunks: queue.Queue = queue.Queue()
         self._unsubscribe = None
         self._disconnect_unsubscribe = None
@@ -259,11 +282,16 @@ class _WorkerChannels:
             try:
                 self.client.wait_terminal(self.attempt_id, self.generation, timeout=10)
             finally:
-                for op, arguments, identified in (
-                    ("result.ack", {}, True),
+                operations = [("result.ack", {}, True)]
+                if self.secret_frame_id is not None:
+                    operations.append(("secret.cleanup", {
+                        "attemptId": self.attempt_id, "frameId": self.secret_frame_id,
+                    }, False))
+                operations.extend((
                     ("view.cleanup", {"viewId": self.view_id}, False),
                     ("attempt.cleanup", {}, True),
-                ):
+                ))
+                for op, arguments, identified in operations:
                     try:
                         self.client.request(
                             op, arguments,
@@ -396,6 +424,7 @@ class SidecarHarnessPort:
     def __init__(
         self, launcher: SidecarLauncher, *, environment: Mapping[str, str],
         profile: str = "codex", adapter: Mapping[str, Any] | None = None,
+        model: str | None = None, credential_environment: str | None = None,
         state_directory: str = "/tmp/agentbox-sidecar",
         directory: str = "/workspace", on_event=None,
     ) -> None:
@@ -403,6 +432,8 @@ class SidecarHarnessPort:
         self.environment = dict(environment)
         self.profile = profile
         self.adapter = dict(adapter or {})
+        self.model = model
+        self.credential_environment = credential_environment
         self.state_directory = state_directory
         self.directory = directory
         self.on_event = on_event or (lambda *_: None)
@@ -425,11 +456,14 @@ class SidecarHarnessPort:
         try:
             registered = envelope.request({
                 "op": "register", "profile": self.profile, "launch": self.adapter,
+                "credentialEnvironment": self.credential_environment,
                 "stateDirectory": self.state_directory, "directory": self.directory,
                 "permissionRoundTrip": True, "permissionTimeoutMs": 60_000,
             })
             envelope.request({"op": "start"})
-            session = envelope.request({"op": "create", "title": execution_id})
+            session = envelope.request({
+                "op": "create", "title": execution_id, "model": self.model,
+            })
         except BaseException:
             envelope.close()
             raise
@@ -460,7 +494,7 @@ class SidecarHarnessPort:
             self._current = execution_id
         return envelope.request(
             {"op": "prompt", "sessionId": self._native_sessions[execution_id], "text": text,
-             "attachments": [dict(item) for item in attachments]},
+             "model": self.model, "attachments": [dict(item) for item in attachments]},
             timeout=600,
         )
 

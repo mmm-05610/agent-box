@@ -157,10 +157,15 @@ class SidecarExecutionBackend:
         profile_value = json.loads(self.objects.read(context["config_object_digest"]))
         configuration = dict(profile_value.get("configuration") or {})
         configuration.update(dict(overrides or {}))
-        effective = self.objects.publish(json.dumps({
+        effective_value = {
             "schema_version": 1, "harness_type": context["harness_type"],
             "configuration": configuration,
-        }, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode())
+        }
+        if profile_value.get("execution") is not None:
+            effective_value["execution"] = profile_value["execution"]
+        effective = self.objects.publish(json.dumps(
+            effective_value, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+        ).encode())
         work = self.work_service.create_work(
             "AgentBox Session Turn", metadata={"session_id": context["session_id"], "turn_id": turn_id},
         )

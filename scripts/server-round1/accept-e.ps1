@@ -69,6 +69,7 @@ $deployment = [ordered]@{
     pluginRoot = $pluginRoot
     harnesses = @([ordered]@{
         id = "pi"
+        modelControlId = "model"
         capabilityClaims = [ordered]@{ streaming = $true; approvals = $true; attachments = $true }
         controlOptions = [ordered]@{ model = @("fixture-model") }
         adapter = [ordered]@{

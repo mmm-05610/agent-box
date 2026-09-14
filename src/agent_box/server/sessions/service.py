@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, Mapping
 
 from agent_box.server.errors import ServerError, unavailable
 from agent_box.server.execution import HarnessRegistry, TurnExecutionPort
@@ -25,6 +25,10 @@ class SessionService:
         self.queue = queue
         self.execution = execution
         self.on_event = on_event or (lambda: None)
+        self.model_configs = None
+
+    def bind_model_configs(self, model_configs) -> None:
+        self.model_configs = model_configs
 
     def create_session(self, key: str, body: dict[str, Any]):
         return self.records.create_session(
@@ -42,31 +46,53 @@ class SessionService:
         """
         profile_id = kwargs.pop("profile_id")
         overrides = kwargs.pop("overrides", None)
-        self._assert_profile_executable(profile_id)
         if overrides:
             self._validate_overrides_for(profile_id, overrides)
-        kwargs["effective_config_object_digest"] = self._publish_effective_configuration(
+        effective, execution = self._effective_configuration(
             profile_id, overrides or [],
+        )
+        self._assert_profile_executable(profile_id, execution=execution)
+        kwargs["effective_config_object_digest"] = self._publish_effective_configuration(
+            profile_id, effective, execution,
         )
         kwargs["queue_records"] = self.queue
         kwargs["resolve_config_version"] = self._resolve_config_version
         return self.records.accept_intent(profile_id=profile_id, **kwargs)
 
     def _publish_effective_configuration(
-        self, profile_id: str, overrides: list[dict[str, Any]],
+        self, profile_id: str, configuration: dict[str, Any],
+        execution: Mapping[str, Any] | None,
     ) -> str:
+        profile = self.profiles.get(profile_id)
+        value = {
+            "schema_version": 1,
+            "harness_type": profile["harness_type"],
+            "configuration": configuration,
+        }
+        if execution is not None:
+            value["execution"] = dict(execution)
+        record = self.objects.publish(json.dumps(
+            value, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+        ).encode())
+        return record.digest
+
+    def _effective_configuration(
+        self, profile_id: str, overrides: list[dict[str, Any]],
+    ) -> tuple[dict[str, Any], dict[str, Any] | None]:
         profile = self.profiles.get(profile_id)
         stored = json.loads(self.objects.read(profile["config_object_digest"]))
         configuration = dict(stored.get("configuration") or {})
         configuration.update({item["controlId"]: item["value"] for item in overrides})
-        record = self.objects.publish(json.dumps({
-            "schema_version": 1,
-            "harness_type": profile["harness_type"],
-            "configuration": configuration,
-        }, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode())
-        return record.digest
+        execution = None
+        if self.model_configs is not None:
+            execution = self.model_configs.freeze_execution_configuration(
+                profile["harness_type"], configuration,
+            )
+        return configuration, execution
 
-    def _assert_profile_executable(self, profile_id: str) -> None:
+    def _assert_profile_executable(
+        self, profile_id: str, *, execution: Mapping[str, Any] | None = None,
+    ) -> None:
         profile = self.profiles.get(profile_id)
         harness_type = profile["harness_type"]
         if harness_type not in self.harnesses:
@@ -74,7 +100,7 @@ class SessionService:
         descriptor = self.harnesses.get(harness_type)
         if self.execution is None:
             raise unavailable("EXECUTION_CAPABILITY_UNAVAILABLE", "Turn execution is not configured")
-        credential_id = profile.get("credential_id")
+        credential_id = (execution or {}).get("credentialId") or profile.get("credential_id")
         if descriptor.credential_kind is not None:
             if not credential_id:
                 raise ServerError(

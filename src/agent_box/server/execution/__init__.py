@@ -27,6 +27,13 @@ class HarnessDescriptor:
 
     harness_type: str
     credential_kind: str | None = None
+    # A Harness deployment may declare which provider/model reference control
+    # selects the native model.  The Server resolves and freezes that reference
+    # generically; the plugin still owns what the native control means.
+    model_control_id: str | None = None
+    # Optional, declarative adapter environment key.  Credential bytes are
+    # never stored in this descriptor or in a configuration object.
+    credential_environment: str | None = None
     configuration_validator: Callable[[Any], None] | None = None
     capability_claims: Mapping[str, bool] = field(default_factory=dict)
     # Optional-value controls this Harness declares, in declaration order; the

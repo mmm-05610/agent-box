@@ -13,6 +13,7 @@ import io
 import json
 import os
 from pathlib import Path
+import re
 import secrets
 import subprocess
 from typing import Any
@@ -261,6 +262,7 @@ def build_runtime(
         try:
             execution = execution_factory(
                 session_records, objects, approval_records, notifier, connector_instance,
+                credentials, secrets_store,
             )
         except BaseException:
             owner.release()
@@ -280,6 +282,7 @@ def build_runtime(
                                      harnesses=registry, profiles=profile_records,
                                      credentials=credentials, queue=queue_records,
                                      execution=execution, on_event=notifier.notify)
+    session_service.bind_model_configs(provider_model_service)
     service = ProductService(
         workspace_service, profile_service, session_service,
         harnesses=registry, credentials=credentials, execution=execution,
@@ -325,14 +328,33 @@ def build_runtime_from_sidecar_deployment(
             raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
         harness_id = item["id"]
         adapter = item.get("adapter")
+        model_control_id = item.get("modelControlId")
+        credential_kind = item.get("credentialKind")
+        credential_environment = item.get("credentialEnvironment")
         if (harness_id in deployments or not isinstance(adapter, dict)
                 or not isinstance(adapter.get("command"), str)
                 or not isinstance(adapter.get("args", []), list)):
             raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
+        if model_control_id is not None and (
+            not isinstance(model_control_id, str) or not model_control_id
+        ):
+            raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
+        if credential_kind is not None and (
+            not isinstance(credential_kind, str) or not credential_kind
+        ):
+            raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
+        if credential_environment is not None and (
+            credential_kind is None
+            or not isinstance(credential_environment, str)
+            or re.fullmatch(r"[A-Z][A-Z0-9_]{0,63}", credential_environment) is None
+        ):
+            raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
         deployments[harness_id] = dict(item)
         registry.register(HarnessDescriptor(
             harness_id,
-            credential_kind=item.get("credentialKind"),
+            credential_kind=credential_kind,
+            model_control_id=model_control_id,
+            credential_environment=credential_environment,
             capability_claims=dict(item.get("capabilityClaims") or {}),
             control_options={
                 str(key): tuple(options)
@@ -342,7 +364,7 @@ def build_runtime_from_sidecar_deployment(
         ))
     bundle = sidecar_bundle_files(value.get("pluginRoot") or path.parent)
 
-    def factory(records, objects, approvals, notifier, connector):
+    def factory(records, objects, approvals, notifier, connector, credentials, secret_store):
         if connector is None:
             raise RuntimeError("WSL_CONNECTOR_UNAVAILABLE")
 
@@ -351,6 +373,16 @@ def build_runtime_from_sidecar_deployment(
                 deployment = deployments[context["harness_type"]]
             except KeyError as exc:
                 raise RuntimeError("HARNESS_DEPLOYMENT_UNAVAILABLE") from exc
+            frozen = json.loads(objects.read(context["config_object_digest"]))
+            execution = dict(frozen.get("execution") or {})
+            descriptor = registry.get(context["harness_type"])
+            credential_id = execution.get("credentialId") or context.get("credential_id")
+            credential = None
+            if credential_id is not None:
+                record = credentials.get(credential_id, kind=descriptor.credential_kind)
+                if secret_store is None:
+                    raise RuntimeError("CREDENTIAL_STORE_UNAVAILABLE")
+                credential = secret_store.read(record["secret_locator"])
             launcher = WslSidecarLauncher(
                 connector,
                 workspace={
@@ -359,11 +391,16 @@ def build_runtime_from_sidecar_deployment(
                     "connection_id": context["connection_id"],
                     "remote_path": context["remote_path"],
                 },
-                bundle=bundle, timeout_ms=int(deployment.get("timeoutMs", 600_000)),
+                bundle=bundle, credential=credential,
+                timeout_ms=int(deployment.get("timeoutMs", 600_000)),
             )
             return SidecarHarnessPort(
                 launcher, environment={"AGENTBOX_SIDECAR_ISOLATED": "1"},
                 profile=context["harness_type"], adapter=deployment["adapter"],
+                model=execution.get("model"),
+                credential_environment=(
+                    descriptor.credential_environment if credential is not None else None
+                ),
                 state_directory="/tmp/agentbox-sidecar-state", directory="/workspace",
                 on_event=on_event,
             )

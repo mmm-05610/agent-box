@@ -14,6 +14,7 @@ import pathlib
 import shutil
 import threading
 import time
+from types import SimpleNamespace
 
 import pytest
 
@@ -29,6 +30,7 @@ from agent_box.server.execution.sidecar import (
 )
 from agent_box_runtime_wsl import WorkerClient
 from agent_box.server.transport.http import create_app
+from agent_box.server.model_configs.service import ProviderModelService
 from fastapi.testclient import TestClient
 
 
@@ -410,10 +412,11 @@ def test_server_core_real_worker_persists_stream_before_terminal(tmp_path, monke
     assert not (tmp_path / "server-worker-root" / "views").exists()
 
 
-def _local_sidecar_runtime(tmp_path):
+def _local_sidecar_runtime(tmp_path, *, provider_model=False):
     registry = HarnessRegistry()
     registry.register(HarnessDescriptor(
         "pi", capability_claims={"streaming": True},
+        model_control_id="model" if provider_model else None,
         control_options={"model": ("initial", "queued", "later")},
     ))
 
@@ -427,7 +430,7 @@ def _local_sidecar_runtime(tmp_path):
             return {"connection_id": "connection", "distribution": "Ubuntu",
                     "user": os.environ["USER"], "path": str(tmp_path)}
 
-    def execution_factory(records, objects, approvals, notifier, _connector):
+    def execution_factory(records, objects, approvals, notifier, _connector, _credentials, _secrets):
         def port_factory(context, on_event):
             return SidecarHarnessPort(
                 LocalProcessLauncher(["node", str(SIDEcar_ENTRY)], cwd=str(PLUGIN)),
@@ -509,6 +512,65 @@ def test_success_dispatches_queued_turn_with_frozen_effective_configuration(tmp_
         assert runtime.queue.list(first["session"]["id"]) == []
 
 
+def test_wire_queue_freezes_provider_model_version_model_and_credential_id(tmp_path):
+    runtime = _local_sidecar_runtime(tmp_path, provider_model=True)
+    with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
+        provider = _wire_post(client, runtime.token, "providerModels.create", {
+            "requestId": "provider-freeze-create", "displayName": "DeepSeek",
+            "harness": "pi", "provider": "deepseek", "credentialId": None,
+            "configuration": [], "models": [{
+                "modelId": "deepseek-flash", "displayName": "Flash",
+                "availability": "available", "unavailableReason": None,
+            }],
+        })["providerModel"]
+        profile = _wire_post(client, runtime.token, "profiles.create", {
+            "requestId": "profile-freeze", "displayName": "Frozen", "harness": "pi",
+        })["profile"]
+        reference = {"providerId": provider["id"], "modelId": "deepseek-flash"}
+        configured = _wire_post(client, runtime.token, "profiles.updateConfig", {
+            "requestId": "profile-freeze-config", "profileId": profile["id"],
+            "expectedVersion": profile["version"],
+            "values": [{"controlId": "model", "value": reference}],
+        })["profile"]
+        opened = _wire_post(client, runtime.token, "workspaces.open", {
+            "requestId": "workspace-freeze", "path": str(tmp_path),
+            "environment": {"kind": "wsl", "host": "Ubuntu", "user": None},
+        })["workspace"]
+        first = _wire_post(client, runtime.token, "sessions.createAndSend", {
+            "requestId": "send-freeze-first", "workspaceId": opened["id"],
+            "profileId": configured["id"], "overrides": [],
+            "message": {"text": "delay-success", "attachments": []},
+        })
+        queued = _wire_post(client, runtime.token, "sessions.send", {
+            "requestId": "send-freeze-second", "sessionId": first["session"]["id"],
+            "overrides": [], "message": {"text": "queued", "attachments": []},
+        })
+        assert queued["queueItemId"] and queued["executionId"] is None
+        updated = _wire_post(client, runtime.token, "providerModels.update", {
+            "requestId": "provider-freeze-update", "providerModelId": provider["id"],
+            "expectedVersion": 1, "displayName": "Changed", "credentialId": None,
+            "configuration": [], "models": [{
+                "modelId": "new-model", "displayName": "New",
+                "availability": "available", "unavailableReason": None,
+            }],
+        })["providerModel"]
+        assert updated["version"] == 2
+        deadline = time.monotonic() + 8
+        while time.monotonic() < deadline:
+            session = runtime.repository.get_session(first["session"]["id"])
+            if len(session["turns"]) == 2 and session["turns"][1]["state"] == "completed":
+                break
+            time.sleep(0.02)
+        assert len(session["turns"]) == 2, session
+        context = runtime.repository.get_turn_context(session["turns"][1]["id"])
+        execution = json.loads(runtime.objects.read(context["config_object_digest"]))["execution"]
+        assert execution == {
+            "providerModelId": provider["id"], "providerModelVersion": 1,
+            "provider": "deepseek", "model": "deepseek-flash", "credentialId": None,
+            "configuration": {},
+        }
+
+
 @pytest.mark.parametrize("first_text,terminal", [
     ("wait-for-cancel", "cancelled"),
     ("delay-failure", "failed"),
@@ -553,7 +615,7 @@ def test_sidecar_permission_round_trip_uses_server_approval_store(tmp_path):
             return {"connection_id": "connection", "distribution": "Ubuntu",
                     "user": os.environ["USER"], "path": str(tmp_path)}
 
-    def execution_factory(records, objects, approvals, notifier, _connector):
+    def execution_factory(records, objects, approvals, notifier, _connector, _credentials, _secrets):
         def port_factory(context, on_event):
             return SidecarHarnessPort(
                 LocalProcessLauncher(["node", str(SIDEcar_ENTRY)], cwd=str(PLUGIN)),
@@ -617,3 +679,178 @@ def test_sidecar_permission_round_trip_uses_server_approval_store(tmp_path):
             for event in session["events"]
         )
         assert runtime.approvals.get(approval["approvalId"])["decision"] == "allow"
+
+
+class _EnvelopeChannels:
+    """In-memory sidecar envelope peer; never starts a process or opens a socket."""
+
+    def __init__(self):
+        self.requests = []
+        self.lines = []
+        self.closed = False
+        self._condition = threading.Condition()
+
+    def write_line(self, value):
+        request = json.loads(value)
+        self.requests.append(request)
+        op = request.get("op")
+        if op == "register":
+            result = {"profile": request["profile"], "provenance": {"commit": "fake"}}
+        elif op == "create":
+            result = {"sessionId": "native-fake"}
+        else:
+            result = {}
+        with self._condition:
+            self.lines.append(json.dumps({"id": request["id"], "ok": True, "result": result}) + "\n")
+            self._condition.notify_all()
+
+    def iter_chunks(self):
+        while True:
+            with self._condition:
+                while not self.lines and not self.closed:
+                    self._condition.wait(timeout=1)
+                if self.lines:
+                    yield self.lines.pop(0)
+                elif self.closed:
+                    return
+
+    def close(self):
+        with self._condition:
+            self.closed = True
+            self._condition.notify_all()
+
+
+class _CaptureLauncher:
+    def __init__(self):
+        self.channels = _EnvelopeChannels()
+
+    def launch(self, _environment):
+        return self.channels
+
+
+def test_sidecar_create_carries_model_and_only_credential_environment_declaration():
+    launcher = _CaptureLauncher()
+    port = SidecarHarnessPort(
+        launcher, environment={"AGENTBOX_SIDECAR_ISOLATED": "1"}, profile="pi",
+        model="deepseek-flash", credential_environment="DEEPSEEK_API_KEY",
+    )
+    try:
+        assert port.open_execution("exec-model") == "native-fake"
+        register, create = launcher.channels.requests[0], launcher.channels.requests[2]
+        assert register["credentialEnvironment"] == "DEEPSEEK_API_KEY"
+        assert "credential" not in register
+        assert create["model"] == "deepseek-flash"
+        assert "DEEPSEEK_API_KEY" not in json.dumps(create)
+    finally:
+        port.stop()
+
+
+def test_provider_model_freeze_checks_credential_kind_and_returns_immutable_projection():
+    descriptor = HarnessDescriptor(
+        "pi", credential_kind="api-key", model_control_id="model",
+    )
+    registry = HarnessRegistry()
+    registry.register(descriptor)
+    row = {
+        "id": "provider-1", "version": 3, "archived_at": None,
+        "harness_type": "pi", "provider_type": "deepseek", "credential_id": "cred-1",
+        "config_object_digest": "config", "models_object_digest": "models",
+    }
+
+    class Records:
+        def get(self, _id):
+            assert _id == "provider-1"
+            return dict(row)
+
+    class Objects:
+        def read(self, digest):
+            return json.dumps({"configuration": {"endpoint": "official"}} if digest == "config"
+                              else {"models": [{"modelId": "deepseek-flash", "availability": "available"}]})
+
+    class Credentials:
+        def __init__(self, accepted_kind): self.accepted_kind = accepted_kind; self.calls = []
+        def get(self, credential_id, *, kind):
+            self.calls.append((credential_id, kind))
+            if kind != self.accepted_kind:
+                raise SidecarError("CREDENTIAL_KIND_MISMATCH", "credential kind rejected")
+            return {"id": credential_id}
+
+    credentials = Credentials("api-key")
+    service = ProviderModelService(Records(), Objects(), harnesses=registry,
+                                   credentials=credentials, profiles=SimpleNamespace())
+    frozen = service.freeze_execution_configuration("pi", {
+        "model": {"providerId": "provider-1", "modelId": "deepseek-flash"},
+    })
+    assert frozen == {
+        "providerModelId": "provider-1", "providerModelVersion": 3,
+        "provider": "deepseek", "model": "deepseek-flash", "credentialId": "cred-1",
+        "configuration": {"endpoint": "official"},
+    }
+    row["version"] = 4
+    row["credential_id"] = "changed"
+    assert frozen["providerModelVersion"] == 3 and frozen["credentialId"] == "cred-1"
+    credentials.accepted_kind = "wrong-kind"
+    with pytest.raises(SidecarError, match="CREDENTIAL_KIND_MISMATCH"):
+        service.freeze_execution_configuration("pi", {
+            "model": {"providerId": "provider-1", "modelId": "deepseek-flash"},
+        })
+
+
+class _WorkerClientFake:
+    def __init__(self, *, fail_spawn=False):
+        self.calls = []
+        self.fail_spawn = fail_spawn
+        self.closed = False
+
+    def start(self): self.calls.append(("start", {}))
+    def request(self, op, arguments=None, **identity):
+        payload = {**(arguments or {}), **identity}
+        self.calls.append((op, payload))
+        if op == "view.commit": return {"path": "/worker/views/v/ready"}
+        if op == "secret.put": return {"path": "/worker/secrets/a/frame"}
+        if op == "spawn" and self.fail_spawn: raise RuntimeError("fake spawn refusal")
+        return {"accepted": True}
+    def subscribe_output(self, _listener): return lambda: None
+    def subscribe_disconnect(self, _listener): return lambda: None
+    def close_stdin(self, *_args, **_kwargs): self.calls.append(("close_stdin", {}))
+    def wait_terminal(self, *_args, **_kwargs): self.calls.append(("wait_terminal", {})); return {}
+    def close(self): self.closed = True
+
+
+class _WorkerConnectorFake:
+    def __init__(self, client): self.client = client
+    def client_for_workspace(self, **_kwargs): return self.client
+
+
+def _launcher_for_test(client):
+    return WslSidecarLauncher(
+        _WorkerConnectorFake(client),
+        workspace={"distribution": "Ubuntu", "remote_user": "tester",
+                   "connection_id": "connection", "remote_path": "/workspace"},
+        bundle={}, credential=b"fixture-secret", timeout_ms=5000,
+    )
+
+
+def test_wsl_sidecar_secret_is_readonly_mounted_and_cleanup_on_close(tmp_path):
+    client = _WorkerClientFake()
+    launcher = _launcher_for_test(client)
+    channels = launcher.launch({"AGENTBOX_SIDECAR_ISOLATED": "1"})
+    spawn_call = next(payload for op, payload in client.calls if op == "spawn")
+    argv = spawn_call["argv"]
+    assert "--ro-bind" in argv
+    assert "/worker/secrets/a/frame" in argv
+    assert "fixture-secret" not in "\0".join(argv)
+    channels.close()
+    ops = [op for op, _payload in client.calls]
+    assert ops.index("secret.put") < ops.index("spawn") < ops.index("secret.cleanup")
+    assert client.closed
+
+
+def test_wsl_sidecar_secret_cleanup_on_spawn_failure():
+    client = _WorkerClientFake(fail_spawn=True)
+    with pytest.raises(RuntimeError, match="fake spawn refusal"):
+        _launcher_for_test(client).launch({})
+    ops = [op for op, _payload in client.calls]
+    assert "secret.cleanup" in ops
+    assert "fixture-secret" not in json.dumps(client.calls)
+    assert client.closed

@@ -84,6 +84,54 @@ class ProviderModelService:
                         "PROFILE_CONFIGURATION_INVALID", "Referenced model was not found", status=422,
                     )
 
+    def freeze_execution_configuration(
+        self, harness: str, configuration: Mapping[str, Any],
+    ) -> dict[str, Any] | None:
+        """Resolve one declared model control into a non-secret immutable projection."""
+        descriptor = self.harnesses.get(harness)
+        control_id = descriptor.model_control_id
+        if control_id is None:
+            return None
+        reference = configuration.get(control_id)
+        if not isinstance(reference, Mapping):
+            raise ServerError(
+                "PROFILE_CONFIGURATION_INVALID",
+                f"Control {control_id} must select a Provider/Model configuration", status=422,
+            )
+        provider_id = reference.get("providerId")
+        model_id = reference.get("modelId")
+        if not isinstance(provider_id, str) or not provider_id or not isinstance(model_id, str) or not model_id:
+            raise ServerError(
+                "PROFILE_CONFIGURATION_INVALID", "Provider/Model reference is invalid", status=422,
+            )
+        row = self.records.get(provider_id)
+        if row["archived_at"] is not None or row["harness_type"] != harness:
+            raise ServerError(
+                "PROFILE_CONFIGURATION_INVALID",
+                "Provider/Model reference is archived or for a different Harness", status=422,
+            )
+        model = next((item for item in self._models(row) if item["modelId"] == model_id), None)
+        if model is None:
+            raise ServerError(
+                "PROFILE_CONFIGURATION_INVALID", "Referenced model was not found", status=422,
+            )
+        if model.get("availability") == "unavailable":
+            raise ServerError(
+                "PROFILE_CONFIGURATION_INVALID", "Referenced model is unavailable", status=422,
+            )
+        credential_id = row["credential_id"]
+        if descriptor.credential_kind is not None and credential_id is not None:
+            self.credentials.get(credential_id, kind=descriptor.credential_kind)
+        stored = json.loads(self.objects.read(row["config_object_digest"]))
+        return {
+            "providerModelId": row["id"],
+            "providerModelVersion": int(row["version"]),
+            "provider": row["provider_type"],
+            "model": model_id,
+            "credentialId": credential_id,
+            "configuration": dict(stored.get("configuration") or {}),
+        }
+
     def reference(self, provider_id: str, model_id: str) -> dict[str, Any]:
         row = self.records.get(provider_id)
         match = next((item for item in self._models(row) if item["modelId"] == model_id), None)

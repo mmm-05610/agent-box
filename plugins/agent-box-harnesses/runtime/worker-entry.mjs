@@ -13,6 +13,7 @@
  * the bounded execution projection this process runs in.
  */
 import { createHash, randomUUID } from "node:crypto"
+import { spawn } from "node:child_process"
 import { readFileSync } from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
@@ -40,6 +41,8 @@ function envelopeError(code, detail) {
 
 /** Permission decisions still in flight; every entry resolves to deny on timeout. */
 const pendingPermissions = new Map()
+const CREDENTIAL_PATH = "/runtime/secret/credential"
+const ENVIRONMENT_KEY = /^[A-Z][A-Z0-9_]{0,63}$/
 
 function makePermissionResolver(emit, timeoutMs) {
   return async ({ toolCall, options }) => {
@@ -81,6 +84,13 @@ async function main() {
   )
 
   let registration = null
+  let credentialValue = null
+
+  function safeText(value, maximum) {
+    let text = String(value ?? "")
+    if (credentialValue) text = text.replaceAll(credentialValue, "[REDACTED]")
+    return text.slice(0, maximum)
+  }
 
   function emit(message) {
     process.stdout.write(`${JSON.stringify(message)}\n`)
@@ -101,6 +111,22 @@ async function main() {
       if (registration) throw envelopeError("ALREADY_REGISTERED")
       if (!request.launch?.command) throw envelopeError("ADAPTER_LAUNCH_REQUIRED")
       const permissionTimeoutMs = request.permissionTimeoutMs ?? 0
+      const credentialEnvironment = request.credentialEnvironment
+      let spawnProcess
+      if (credentialEnvironment != null) {
+        if (typeof credentialEnvironment !== "string" || !ENVIRONMENT_KEY.test(credentialEnvironment)) {
+          throw envelopeError("CREDENTIAL_ENVIRONMENT_INVALID")
+        }
+        credentialValue = readFileSync(CREDENTIAL_PATH, "utf8").trim()
+        if (!credentialValue || credentialValue.length > 4096 || /[\r\n\0]/.test(credentialValue)) {
+          credentialValue = null
+          throw envelopeError("CREDENTIAL_MATERIAL_INVALID")
+        }
+        spawnProcess = (command, args, options = {}) => spawn(command, args, {
+          ...options,
+          env: { ...process.env, [credentialEnvironment]: credentialValue },
+        })
+      }
       registration = await createAcpRegistration({
         profile: resolveHarnessProfile(request.profile),
         directory: request.directory ?? process.cwd(),
@@ -110,8 +136,9 @@ async function main() {
           ? makePermissionResolver(emit, permissionTimeoutMs)
           : null,
         permissionTimeoutMs,
+        spawnProcess,
       })
-      wireForwarding(registration, emit)
+      wireForwarding(registration, emit, safeText)
       return {
         provenance: { commit: source.commit, ref: source.ref },
         profile: registration.profile.id,
@@ -168,6 +195,7 @@ async function main() {
       case "close": {
         registration.agent.close()
         registration = null
+        credentialValue = null
         return { closed: true }
       }
       default:
@@ -195,7 +223,7 @@ async function main() {
         ok: false,
         error: {
           code: error?.code ?? "SIDECAR_OP_FAILED",
-          message: String(error?.message ?? error).slice(0, 500),
+          message: safeText(error?.message ?? error, 500),
         },
       }),
     )
@@ -221,7 +249,7 @@ function permissionOption(options, decision, scope) {
   throw envelopeError("PERMISSION_OPTION_UNAVAILABLE")
 }
 
-function wireForwarding(registration, emit) {
+function wireForwarding(registration, emit, redact = (value, maximum) => String(value).slice(0, maximum)) {
   registration.agent.on("notification", (message) => {
     emit({ event: "acp_notification", data: message })
   })
@@ -229,10 +257,10 @@ function wireForwarding(registration, emit) {
     emit({ event: "permission", data: detail })
   })
   registration.agent.on("stderr", (line) => {
-    emit({ event: "stderr", data: { line: String(line).slice(0, 2000) } })
+    emit({ event: "stderr", data: { line: redact(line, 2000) } })
   })
   registration.agent.on("exit", (error) => {
-    emit({ event: "adapter_exit", data: { message: String(error?.message ?? error).slice(0, 500) } })
+    emit({ event: "adapter_exit", data: { message: redact(error?.message ?? error, 500) } })
   })
   registration.service.subscribe((event) => {
     emit({ event: "service", data: event })

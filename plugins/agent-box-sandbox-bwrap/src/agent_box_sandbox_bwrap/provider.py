@@ -132,6 +132,8 @@ def compile_remote_bwrap_argv(
 
 def compile_remote_sidecar_bwrap_argv(
     *, workspace: str, runtime_view: str, environment: Mapping[str, str],
+    secret: str | None = None,
+    secret_target: str = "/runtime/secret/credential",
     entrypoint: str = "/runtime/view/agentbox-sidecar/runtime/worker-entry.mjs",
 ) -> list[str]:
     """Compile the fixed Worker-hosted Harness sidecar template.
@@ -141,13 +143,15 @@ def compile_remote_sidecar_bwrap_argv(
     template deliberately selects only the system Node runtime and the single
     reviewed entrypoint; adapter/native semantics remain inside the sidecar.
     """
-    for value in (workspace, runtime_view):
+    for value in (workspace, runtime_view, *(() if secret is None else (secret,))):
         if (not isinstance(value, str) or not value.startswith("/") or "\x00" in value
                 or "//" in value or any(part in {".", ".."} for part in value.split("/"))
                 or str(PurePosixPath(value)) != value):
             raise ProjectionRejected("remote mount source is not a canonical absolute path")
     if entrypoint != "/runtime/view/agentbox-sidecar/runtime/worker-entry.mjs":
         raise ProjectionRejected("sidecar entrypoint is outside the fixed template")
+    if secret_target != "/runtime/secret/credential":
+        raise ProjectionRejected("sidecar secret target is outside the fixed template")
     for key, value in environment.items():
         if not _ENV_KEY.fullmatch(key) or len(value) > 8192 or "\x00" in value:
             raise ProjectionRejected("invalid remote environment")
@@ -164,10 +168,13 @@ def compile_remote_sidecar_bwrap_argv(
         "--dir", "/mnt", "--dir", "/mnt/wsl",
         "--ro-bind", "/etc/resolv.conf", "/mnt/wsl/resolv.conf",
         "--dir", "/workspace", "--dir", "/runtime", "--dir", "/runtime/view",
+        "--dir", "/runtime/secret",
         "--bind", workspace, "/workspace",
         "--ro-bind", runtime_view, "/runtime/view",
-        "--chdir", "/workspace", "--clearenv",
     ]
+    if secret is not None:
+        argv += ["--ro-bind", secret, secret_target]
+    argv += ["--chdir", "/workspace", "--clearenv"]
     for key, value in sorted(environment.items()):
         argv += ["--setenv", key, value]
     return argv + ["--", "/usr/bin/node", entrypoint]
