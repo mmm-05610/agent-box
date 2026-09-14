@@ -4,6 +4,40 @@
 已发生的1次可达性请求由后端受控进程读取仓库外 locator，未把内容写入仓库或输出。
 授权真实 credential 的 SecretStore→Worker 投影尚未执行，不以测试值路径冒充付费验收事实。
 
+## 2026-09-14 — 42-D Pi 生产封装与本地假端点全链
+
+详细证据：[pi-production-packaging.md](pi-production-packaging.md)。终态 **PI_PRODUCTION_CHAIN_PREPARED**；
+Pi 仍 **MODEL_NOT_VERIFIED**，`BACKEND_IMPLEMENTATION_READY` 未登记。
+
+- 真实 Pi 全链打通：Server → Core → sidecar deployment → c4 release Worker(ABW1 interactive) → bwrap →
+  **真实 `@automatalabs/pi-acp@0.5.0` + 真实 Pi 依赖闭包** → 本机 loopback 假 DeepSeek 兼容端点。
+  门 `scripts/server-round1/pi-production-chain-gate.py` 退出码 0。
+- Pi 运行时工件：`scripts/server-round1/build-pi-runtime-artifact.mjs`（只用现有 package-lock 与
+  node_modules，不联网、不跑 npm），317 包 / 15458 条目 / 64.9 MiB / tree digest
+  `sha256:afe238d3…`；双构建 digest 与 manifest 一致；输出只读、带 owner marker、原子发布，
+  未标记的非空输出**拒绝且不删除**。
+- 生产模板由插件拥有（`agent_box_harnesses.pi.production` + `deploy/pi/{models.json,settings.json}`），
+  与 `bc7d95b` 的 42-D 准备配置**逐字段相等**（测试跑 `model-validation-42d.mjs --dry-run` 比对），
+  官方根地址、`deepseek-flash`、64 tokens、thinking 禁用、agent/provider 重试双关；
+  loopback 覆盖只改 `baseUrl` 一个字段且不落盘为生产配置。
+- 两轮实测：provider 请求**恰 2 次**（`/chat/completions`，`model="deepseek-flash"`，`max_tokens=64`，
+  `thinking.type=disabled`，Authorization 与注入的假 token 相符、0 未授权、0 超预算）；delta 序号
+  4<7 与 11<14；第二轮请求含第一轮 user 与 assistant 内容；同一 Server Session 第二轮沿用同一
+  native id；重开时 adapter **重放了已存储轮次** → 走的是重放语义的 `session/load`（**不是**
+  `session/resume`），并已有直接观测证据。
+- 发现并修复真实公共缺陷：ACP 用空对象播发 session 能力（`resume: {}`），Python 侧 `bool({})`
+  把真实 Pi 判为不可续接，导致第二轮以 `SIDECAR_CHECKPOINT_INVALID` 失败；改为"存在且非 False
+  即视为已播发"，参数化 7 例回归，端到端复核第二轮恢复成功。
+- 未知模型在发 HTTP 前拒绝（0 新增请求，`Harness model is not available`）；缺凭据由 Server 以
+  `CREDENTIAL_REQUIRED` 拒绝且不派发。假 token 经既有 SecretStore→secret frame→sidecar 注入，
+  未出现在事件、checkpoint、报告或 Git；运行后 views/secrets/进程/临时目录全部清理。
+- 验证：构建器 11/11；模板 12/12；Server sidecar 91 passed；全量 python 444 passed/4 skipped
+  （上阶段基线 424/4，+20）；Node sidecar 25/25 与 42d 4/4；既有 runtime-artifact gate 仍 exit 0。
+- 模型调用 0、费用增量 ¥0；累计仍 1 次 / 12 tokens / <¥0.01。c4 仍无 Windows 平台证据（本阶段未跑 r4）。
+- 措辞修订：`runtime-artifact-gate.py` 与 `runtime-artifact-projection.md` 中原"本机无 wsl.exe"
+  改为准确表述——该门有意直接启动 WSL 内 release Worker 并使用相同 ABW1 协议，未经过
+  Windows Server→wsl.exe 路径，Windows c4 复验仍待后续。
+
 ## 2026-09-14 — 42-D 运行时工件投影底座（provider-neutral）
 
 详细证据：[runtime-artifact-projection.md](runtime-artifact-projection.md)。终态

@@ -159,8 +159,8 @@ c2/c3 **未覆盖、未删除**。**本阶段不运行 Windows r4**：c3 上的 
 
 ## 5. 真实 Worker + bwrap 门（无网络、无模型）
 
-命令与退出码（在 Linux/WSL 上直接驱动 release Worker；本机无 `wsl.exe`，connector 以与 Windows
-连接器相同的 ABW1 控制帧直接启动该二进制——Windows `wsl.exe` 路径是另行记录的历史证据，本阶段不重跑）：
+命令与退出码（**本门有意直接启动 WSL 内的 release Worker 并使用相同 ABW1 协议；未经过
+Windows Server→wsl.exe 路径。Windows c4 平台复验仍待后续。**）：
 
 ```text
 PYTHONPATH=<src + 全部 plugins/*/src> \
