@@ -12,6 +12,7 @@ import {
 } from '@/store/agentbox-runtime'
 import {
   $agentBoxCatalogReadiness,
+  $agentBoxHello,
   $agentBoxService,
   $agentBoxSessions,
   $agentBoxWorkspaces
@@ -20,7 +21,13 @@ import { $draftExecutionContexts, setSessionDraftExecutionContext, workspaceDraf
 import { $currentCwd } from '@/store/session'
 import { $workspaceViewSelectedId } from '@/store/workspace-view'
 import { $wslWorkspaces } from '@/store/wsl-workspace'
-import { asRequestId, asWireId, type SessionRecord, type WorkspaceRecord } from '@/types/wire/wire-v1'
+import {
+  asRequestId,
+  asWireId,
+  type SessionRecord,
+  WIRE_PROTOCOL_VERSION,
+  type WorkspaceRecord
+} from '@/types/wire/wire-v1'
 
 import { useAgentBoxMainChat } from './agentbox-main-chat'
 
@@ -49,6 +56,15 @@ vi.mock('@/application/session/wire-session-control', () => ({
   refreshAgentBoxQueue: (client: unknown, sessionId: unknown) => mocks.refreshQueue(client, sessionId),
   requestAgentBoxStop: (client: unknown, input: unknown) => mocks.requestStop(client, input)
 }))
+
+/** Only the capabilities the product path actually needs are declared; a test
+ *  that wants a missing one builds its own hello. */
+const hello = (ids: string[] = ['config.resolve', 'sessions.createAndSend', 'sessions.send']) => ({
+  auth: { required: false as const },
+  capabilities: ids.map(id => ({ id, supported: true })),
+  protocolVersion: WIRE_PROTOCOL_VERSION as typeof WIRE_PROTOCOL_VERSION,
+  serverId: asWireId('server-test')
+})
 
 const workspace: WorkspaceRecord = {
   accessibility: { executableForRole: true, readable: true, reasons: [], writable: true },
@@ -98,6 +114,7 @@ beforeEach(() => {
     outcome: 'sent'
   })
   $agentBoxService.set({ detail: null, phase: 'ready' })
+  $agentBoxHello.set(hello())
   $agentBoxCatalogReadiness.set({ sessions: true, workspaces: true })
   $agentBoxWorkspaces.set([workspace])
   $agentBoxSessions.set({})
@@ -270,6 +287,7 @@ describe('primary AgentBox chat production binding', () => {
       wire: {
         subscribeEvents(_input, callback) {
           listener = callback
+
           return unsubscribe
         },
         request: vi.fn()
@@ -343,5 +361,56 @@ describe('primary AgentBox chat production binding', () => {
     expect(unsubscribe).toHaveBeenCalledTimes(1)
     unmount()
     expect(unsubscribe).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('primary AgentBox chat capability gates', () => {
+  it('offers no send at all when the effective-config check is undeclared', async () => {
+    $agentBoxHello.set(hello(['sessions.createAndSend', 'sessions.send']))
+
+    const { result } = renderHook(useAgentBoxMainChat, { wrapper: wrapper('/new') })
+
+    expect(result.current.sendAvailable).toBe(false)
+
+    await act(async () => {
+      await expect(
+        result.current.onSubmit('ship it', {
+          attachments: [],
+          composerScope: workspaceDraftScope(workspace.id),
+          draftVersion: 4
+        })
+      ).resolves.toBe(false)
+    })
+
+    expect(mocks.submit).not.toHaveBeenCalled()
+  })
+
+  it('offers no send on an existing Session when that Session verb is undeclared', async () => {
+    $agentBoxHello.set(hello(['config.resolve', 'sessions.createAndSend']))
+    $agentBoxSessions.set({ [session.id]: session })
+
+    const { result } = renderHook(useAgentBoxMainChat, { wrapper: wrapper('/session-1') })
+
+    expect(result.current.sendAvailable).toBe(false)
+
+    await act(async () => {
+      await expect(
+        result.current.onSubmit('continue', {
+          attachments: [],
+          composerScope: 'session-1',
+          draftVersion: 5
+        })
+      ).resolves.toBe(false)
+    })
+
+    expect(mocks.submit).not.toHaveBeenCalled()
+  })
+
+  it('keeps sending available when both required verbs are declared', async () => {
+    $agentBoxSessions.set({ [session.id]: session })
+
+    const { result } = renderHook(useAgentBoxMainChat, { wrapper: wrapper('/session-1') })
+
+    expect(result.current.sendAvailable).toBe(true)
   })
 })

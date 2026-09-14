@@ -17,7 +17,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import { Tip } from '@/components/ui/tooltip'
 import { useI18n } from '@/i18n'
-import type { ComposerProfileState, ComposerProviderModelChoice } from '@/lib/composer/types'
+import type { Translations } from '@/i18n'
+import type {
+  ComposerConfigResolutionState,
+  ComposerProfileState,
+  ComposerProviderModelChoice
+} from '@/lib/composer/types'
 import { cn } from '@/lib/utils'
 import type { ConfigControl, ConfigOverride } from '@/types/wire/wire-v1'
 
@@ -105,7 +110,9 @@ export function ComposerProfileControls({ profile }: { profile: ComposerProfileS
               variant="ghost"
             >
               <Codicon aria-hidden name="account" size="0.875rem" />
-              <span className="truncate">{profile.switching ? copy.switchingProfile : selected?.displayName || copy.chooseProfile}</span>
+              <span className="truncate">
+                {profile.switching ? copy.switchingProfile : selected?.displayName || copy.chooseProfile}
+              </span>
               {selected ? (
                 <span className="max-w-20 truncate rounded bg-muted/70 px-1 py-0.5 text-[0.6rem] uppercase tracking-wide text-muted-foreground">
                   {selected.harness}
@@ -156,6 +163,7 @@ function TemporaryConfigPopover({ profile }: { profile: ComposerProfileState }) 
   const descriptor = profile.configDescriptor
   const disabled = !profile.selectedId || !descriptor
   const overrideCount = profile.overrides.length
+  const resolution = profile.configResolution ?? { status: 'idle' as const }
 
   return (
     <Popover>
@@ -185,11 +193,10 @@ function TemporaryConfigPopover({ profile }: { profile: ComposerProfileState }) 
         <div>
           <div className="text-xs font-medium text-foreground">{copy.temporaryConfig}</div>
           <div className="mt-0.5 text-[0.68rem] text-muted-foreground">
-            {descriptor?.effectTiming === 'immediate_declared'
-              ? copy.takesEffectImmediately
-              : copy.takesEffectNextSend}
+            {descriptor?.effectTiming === 'immediate_declared' ? copy.takesEffectImmediately : copy.takesEffectNextSend}
           </div>
         </div>
+        <ConfigResolutionNotice resolution={resolution} />
         {!descriptor || descriptor.controls.length === 0 ? (
           <div className="text-xs text-muted-foreground">{copy.temporaryConfigEmpty}</div>
         ) : (
@@ -209,10 +216,14 @@ function TemporaryConfigPopover({ profile }: { profile: ComposerProfileState }) 
                 }
                 overridden={profile.overrides.some(override => override.controlId === control.controlId)}
                 overrides={profile.overrides}
+                resolution={resolution}
               />
             ))}
           </div>
         )}
+        {/* The preview is not the running configuration: the run fixes its own
+            configuration only when the service accepts a send. */}
+        <div className="text-[0.62rem] text-muted-foreground">{copy.configFixesOnAccept}</div>
       </PopoverContent>
     </Popover>
   )
@@ -224,7 +235,8 @@ function ConfigControlField({
   onChange,
   overridden,
   overrides,
-  modelChoices
+  modelChoices,
+  resolution
 }: {
   control: ConfigControl
   locked: boolean
@@ -232,6 +244,7 @@ function ConfigControlField({
   overridden: boolean
   overrides: ConfigOverride[]
   modelChoices: ComposerProviderModelChoice[]
+  resolution: ComposerConfigResolutionState
 }) {
   const { t } = useI18n()
   const copy = t.composer
@@ -371,6 +384,109 @@ function ConfigControlField({
           </SelectContent>
         </Select>
       )}
+      <ConfigControlResolution control={control} resolution={resolution} />
+    </div>
+  )
+}
+
+/** The service's own verdict for one control: the effective value it computed,
+ *  or the reason it refused. Nothing here is derived client-side. */
+function ConfigControlResolution({
+  control,
+  resolution
+}: {
+  control: ConfigControl
+  resolution: ComposerConfigResolutionState
+}) {
+  const copy = useI18n().t.composer
+
+  if (resolution.status === 'rejected') {
+    const invalid = resolution.invalidControls.find(candidate => candidate.controlId === control.controlId)
+
+    return invalid ? (
+      <div className="text-[0.62rem] text-destructive" data-config-invalid={control.controlId}>
+        {invalid.reason}
+      </div>
+    ) : null
+  }
+
+  if (resolution.status !== 'resolved') {
+    return null
+  }
+
+  const effective = resolution.effective.find(candidate => candidate.controlId === control.controlId)
+
+  if (!effective || effective.value === null || effective.value === undefined) {
+    return null
+  }
+
+  return (
+    <div className="text-[0.62rem] text-muted-foreground" data-config-effective={control.controlId}>
+      {copy.configEffectiveValue}: {effectiveValueText(effective.value, copy)}
+    </div>
+  )
+}
+
+/** Short, data-only rendering of a service value: primitives as text, a model
+ *  reference as its two opaque ids, anything else as the neutral confirmed
+ *  wording. Nothing is executed and no markup is rendered. */
+export function effectiveValueText(value: unknown, copy: Translations['composer']): string {
+  if (typeof value === 'string') {
+    return value
+  }
+
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value)
+  }
+
+  if (value && typeof value === 'object') {
+    const candidate = value as { modelId?: unknown; providerId?: unknown }
+
+    if (typeof candidate.providerId === 'string' && typeof candidate.modelId === 'string') {
+      return `${candidate.providerId}: ${candidate.modelId}`
+    }
+  }
+
+  return copy.configEffectiveServiceConfirmed
+}
+
+function ConfigResolutionNotice({ resolution }: { resolution: ComposerConfigResolutionState }) {
+  const copy = useI18n().t.composer
+
+  if (resolution.status === 'idle') {
+    return null
+  }
+
+  if (resolution.status === 'resolving') {
+    return (
+      <div className="text-[0.68rem] text-muted-foreground" data-config-resolution="resolving">
+        {copy.configResolving}
+      </div>
+    )
+  }
+
+  if (resolution.status === 'resolved') {
+    return (
+      <div className="text-[0.68rem] text-muted-foreground" data-config-resolution="resolved">
+        {copy.configResolved}
+      </div>
+    )
+  }
+
+  if (resolution.status === 'rejected') {
+    return (
+      <div
+        className="rounded bg-destructive/10 px-2 py-1.5 text-[0.68rem] text-destructive"
+        data-config-resolution="rejected"
+      >
+        {copy.configRejected}
+      </div>
+    )
+  }
+
+  return (
+    <div className="text-[0.68rem] text-muted-foreground" data-config-resolution="unavailable">
+      {copy.configResolveUnavailable} {resolution.detail}
     </div>
   )
 }

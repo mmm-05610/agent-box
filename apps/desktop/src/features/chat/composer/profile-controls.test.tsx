@@ -282,3 +282,120 @@ describe('ComposerProfileControls', () => {
     ])
   })
 })
+
+describe('ComposerProfileControls service config preview', () => {
+  const withMode = (overrides: Partial<ComposerProfileState> = {}): ComposerProfileState =>
+    profileState({
+      configDescriptor: {
+        controls: [
+          { controlId: 'mode', currentValue: 'balanced', editable: true, kind: 'enum', values: ['fast', 'balanced'] }
+        ],
+        effectTiming: 'next_send',
+        profileId: asWireId('profile-reviewer'),
+        securityLockedIds: [],
+        workspaceId: asWireId('workspace-a')
+      },
+      ...overrides
+    })
+
+  const openPreview = async () => {
+    fireEvent.click(screen.getByRole('button', { name: 'Temporary settings' }))
+
+    return screen.findByText('Temporary settings')
+  }
+
+  it('shows the service effective value instead of the descriptor current value, and never claims it is running yet', async () => {
+    render(
+      <ComposerProfileControls
+        profile={withMode({
+          configResolution: { effective: [{ controlId: 'mode', value: 'fast' }], status: 'resolved' },
+          overrides: [{ controlId: 'mode', value: 'fast' }]
+        })}
+      />
+    )
+
+    await openPreview()
+
+    expect(screen.getByText('The service confirmed these effective values.')).toBeTruthy()
+    expect(screen.getByText('Effective: fast')).toBeTruthy()
+    expect(screen.queryByText('Effective: balanced')).toBeNull()
+    expect(screen.getByText('The running configuration is fixed only when the service accepts a send.')).toBeTruthy()
+  })
+
+  it('renders an opaque model reference exactly and never splits or rewrites its ids', async () => {
+    render(
+      <ComposerProfileControls
+        profile={withMode({
+          configDescriptor: {
+            controls: [
+              {
+                controlId: 'primary_model',
+                currentValue: 'primary',
+                editable: true,
+                kind: 'model_slot',
+                slots: [{ model: null, name: 'primary' }]
+              }
+            ],
+            effectTiming: 'next_send',
+            profileId: asWireId('profile-reviewer'),
+            securityLockedIds: [],
+            workspaceId: asWireId('workspace-a')
+          },
+          configResolution: {
+            effective: [
+              { controlId: 'primary_model', value: { modelId: 'vendor/family/model-v9', providerId: 'provider-a' } }
+            ],
+            status: 'resolved'
+          }
+        })}
+      />
+    )
+
+    await openPreview()
+
+    expect(screen.getByText('Effective: provider-a: vendor/family/model-v9')).toBeTruthy()
+  })
+
+  it('surfaces the service reason per control while leaving the rejected override editable', async () => {
+    render(
+      <ComposerProfileControls
+        profile={withMode({
+          configResolution: {
+            invalidControls: [{ controlId: 'mode', reason: 'UNSUPPORTED_VALUE' }],
+            status: 'rejected'
+          },
+          overrides: [{ controlId: 'mode', value: 'fast' }]
+        })}
+      />
+    )
+
+    await openPreview()
+
+    expect(screen.getByText('The service will not accept this configuration, so it cannot be sent.')).toBeTruthy()
+    expect(screen.getByText('UNSUPPORTED_VALUE')).toBeTruthy()
+    // The user keeps their value and can clear it back to the profile default.
+    expect(screen.getByRole('button', { name: 'Use profile default' })).toBeTruthy()
+    expect(screen.getByRole('combobox', { name: 'Mode' }).hasAttribute('disabled')).toBe(false)
+  })
+
+  it('reports an unavailable service check without pretending the configuration is valid', async () => {
+    render(
+      <ComposerProfileControls
+        profile={withMode({ configResolution: { detail: 'CAPABILITY_NOT_DECLARED', status: 'unavailable' } })}
+      />
+    )
+
+    await openPreview()
+
+    expect(screen.getByText('The service cannot confirm this configuration. CAPABILITY_NOT_DECLARED')).toBeTruthy()
+    expect(screen.queryByText('The service confirmed these effective values.')).toBeNull()
+  })
+
+  it('shows the in-flight service check while the answer is pending', async () => {
+    render(<ComposerProfileControls profile={withMode({ configResolution: { status: 'resolving' } })} />)
+
+    await openPreview()
+
+    expect(screen.getByText('Checking this configuration with the service…')).toBeTruthy()
+  })
+})

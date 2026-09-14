@@ -2,15 +2,18 @@ import { useStore } from '@nanostores/react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { agentBoxRuntimeClient } from '@/api/agentbox-runtime-client'
+import { wireCapability } from '@/api/wire-v1-client'
 import {
   ensureAgentBoxProfileCatalog,
+  resolveComposerConfig,
   selectComposerProfile,
   setComposerTemporaryOverrides
 } from '@/application/profile/wire-composer-profile'
 import { ensureAgentBoxProviderModelCatalog } from '@/application/provider-model/wire-provider-model-catalog'
 import { useI18n } from '@/i18n'
-import type { ComposerProfileState } from '@/lib/composer/types'
+import type { ComposerConfigResolutionState, ComposerProfileState } from '@/lib/composer/types'
 import {
+  $agentBoxHello,
   $agentBoxProfiles,
   $agentBoxProviderModels,
   $agentBoxService,
@@ -19,6 +22,15 @@ import {
 } from '@/store/agentbox-service'
 import { $draftExecutionContexts, composerDraftScopeKey } from '@/store/composer'
 import { $workspaceProfilePreferences } from '@/store/workspace-profile-preference'
+import type { ConfigOverride } from '@/types/wire/wire-v1'
+
+/** Stable identity for "no overrides yet" so the resolution effect does not
+ *  re-fire on every render while a scope has no stored runtime context. */
+const NO_OVERRIDES: ConfigOverride[] = []
+
+/** The service owns effective-configuration resolution; an undeclared method is
+ *  reported as such rather than requested and guessed at. */
+const CONFIG_RESOLVE = 'config.resolve'
 
 export function useComposerProfile({
   draftScope,
@@ -31,6 +43,7 @@ export function useComposerProfile({
 }): ComposerProfileState {
   const { t } = useI18n()
   const service = useStore($agentBoxService)
+  const hello = useStore($agentBoxHello)
   const profiles = useStore($agentBoxProfiles)
   const sessions = useStore($agentBoxSessions)
   const contexts = useStore($draftExecutionContexts)
@@ -38,9 +51,10 @@ export function useComposerProfile({
   const providerModels = useStore($agentBoxProviderModels)
   const workspaceProfilePreferences = useStore($workspaceProfilePreferences)
   const [switching, setSwitching] = useState(false)
+  const [configResolution, setConfigResolution] = useState<ComposerConfigResolutionState>({ status: 'idle' })
   const scope = composerDraftScopeKey(draftScope)
   const currentSession = sessionId ? sessions[sessionId] ?? null : null
-  const draftContext = contexts[scope] ?? { overrides: [], profileId: null }
+  const draftContext = contexts[scope] ?? { overrides: NO_OVERRIDES, profileId: null }
   const rememberedProfileId = workspaceId ? workspaceProfilePreferences[workspaceId] ?? null : null
   const rememberedProfileExists = profiles.some(profile => profile.id === rememberedProfileId)
 
@@ -127,8 +141,71 @@ export function useComposerProfile({
 
   const config = selectedId ? configStates[scope] : undefined
 
-  const hasModelSlot =
-    config?.status === 'ready' && config.descriptor?.controls.some(control => control.kind === 'model_slot')
+  const selectedDescriptor =
+    config?.status === 'ready' && config.descriptor && config.profileId === selectedId ? config.descriptor : null
+
+  // A preview of what the service would run for this exact scope, re-resolved
+  // whenever the profile, workspace or overrides change. Each run cancels its
+  // predecessor, so an answer for an older scope cannot repaint the current one.
+  useEffect(() => {
+    if (!selectedId || !workspaceId || !selectedDescriptor) {
+      setConfigResolution({ status: 'idle' })
+
+      return
+    }
+
+    const capability = hello
+      ? wireCapability(hello, CONFIG_RESOLVE)
+      : { id: CONFIG_RESOLVE, reason: 'CAPABILITY_NOT_DECLARED', supported: false }
+
+    // An undeclared method is reported, never requested: no transport call and
+    // no claim that the configuration is valid.
+    if (!capability.supported) {
+      setConfigResolution({ detail: capability.reason || 'CAPABILITY_NOT_DECLARED', status: 'unavailable' })
+
+      return
+    }
+
+    let current = true
+
+    setConfigResolution({ status: 'resolving' })
+
+    void resolveComposerConfig(agentBoxRuntimeClient(), {
+      overrides: draftContext.overrides,
+      profileId: selectedId,
+      workspaceId
+    }).then(
+      result => {
+        if (!current) {
+          return
+        }
+
+        // Exactly what the service returned — the preview is never completed
+        // from the descriptor, and a rejection never rewrites the overrides.
+        setConfigResolution(
+          result.outcome === 'resolved'
+            ? { effective: result.effective, status: 'resolved' }
+            : { invalidControls: result.invalidControls, status: 'rejected' }
+        )
+      },
+      (error: unknown) => {
+        if (!current) {
+          return
+        }
+
+        setConfigResolution({
+          detail: error instanceof Error ? error.message : String(error),
+          status: 'unavailable'
+        })
+      }
+    )
+
+    return () => {
+      current = false
+    }
+  }, [draftContext.overrides, hello, selectedDescriptor, selectedId, workspaceId])
+
+  const hasModelSlot = selectedDescriptor?.controls.some(control => control.kind === 'model_slot')
 
   useEffect(() => {
     if (hasModelSlot) {
@@ -155,6 +232,7 @@ export function useComposerProfile({
 
   return {
     configDescriptor: config?.status === 'ready' ? config.descriptor : config?.status === 'unavailable' ? null : undefined,
+    configResolution,
     onOverrideChange,
     onSelect,
     options,

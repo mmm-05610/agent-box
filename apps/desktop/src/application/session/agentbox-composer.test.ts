@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WireV1Client } from '@/api/wire-v1-client'
 import { $pendingAgentBoxSends } from '@/store/agentbox-send-intents'
 import { $agentBoxSessions } from '@/store/agentbox-service'
-import { asWireId, type SessionRecord } from '@/types/wire/wire-v1'
+import { asWireId, type ConfigOverride, type ConfigResolveResult, type SessionRecord } from '@/types/wire/wire-v1'
 
 import { prepareAgentBoxDraftMessage, submitAgentBoxComposer } from './agentbox-composer'
 
@@ -23,6 +23,23 @@ function client(call: (method: string, params: unknown) => Promise<unknown>) {
   return { call: vi.fn(call) } as unknown as WireV1Client & { call: ReturnType<typeof vi.fn> }
 }
 
+const resolved = (effective: Array<{ controlId: string; value: unknown }> = []): ConfigResolveResult => ({
+  effective,
+  outcome: 'resolved'
+})
+
+/** A service that answers the effective-config check and the send verb it is
+ *  actually asked about. */
+function wireService(answers: Record<string, unknown>) {
+  return client(async method => {
+    if (method in answers) {
+      return answers[method]
+    }
+
+    throw new Error(`unexpected method ${method}`)
+  })
+}
+
 beforeEach(() => {
   $pendingAgentBoxSends.set({ items: {}, version: 1 })
   $agentBoxSessions.set({})
@@ -30,7 +47,11 @@ beforeEach(() => {
 
 describe('AgentBox Composer application boundary', () => {
   it('creates a Session only on the first accepted send and uses the draft version as intent identity', async () => {
-    const wire = client(async (_method, params) => {
+    const wire = client(async (method, params) => {
+      if (method === 'config.resolve') {
+        return resolved()
+      }
+
       expect(params).toMatchObject({ workspaceId: 'workspace-1', profileId: 'profile-1' })
 
       return { configVersion: 1, executionId: asWireId('execution-1'), outcome: 'accepted', session }
@@ -52,12 +73,16 @@ describe('AgentBox Composer application boundary', () => {
   })
 
   it('sends a busy follow-up directly to sessions.send and refreshes the server queue after acceptance', async () => {
-    const wire = client(async () => ({
-      configVersion: 2,
-      executionId: null,
-      outcome: 'accepted',
-      queueItemId: asWireId('queue-1')
-    }))
+    const wire = client(async method =>
+      method === 'config.resolve'
+        ? resolved()
+        : {
+            configVersion: 2,
+            executionId: null,
+            outcome: 'accepted',
+            queueItemId: asWireId('queue-1')
+          }
+    )
 
     const refreshQueue = vi.fn(async () => undefined)
 
@@ -67,11 +92,11 @@ describe('AgentBox Composer application boundary', () => {
         attachments: [],
         draftVersion: 8,
         overrides: [],
-        profileId: null,
+        profileId: 'profile-1',
         scopeKey: 'session-1',
         sessionId: 'session-1',
         text: 'do this next',
-        workspaceId: null
+        workspaceId: 'workspace-1'
       },
       { refreshQueue }
     )
@@ -87,24 +112,28 @@ describe('AgentBox Composer application boundary', () => {
       version: 1
     })
 
-    const wire = client(async () => ({
-      configVersion: 1,
-      executionId: asWireId('execution-old'),
-      outcome: 'accepted',
-      queueItemId: null,
-      sessionId: asWireId('session-1')
-    }))
+    const wire = client(async method =>
+      method === 'config.resolve'
+        ? resolved()
+        : {
+            configVersion: 1,
+            executionId: asWireId('execution-old'),
+            outcome: 'accepted',
+            queueItemId: null,
+            sessionId: asWireId('session-1')
+          }
+    )
 
     await expect(
       submitAgentBoxComposer(wire, {
         attachments: [],
         draftVersion: 8,
         overrides: [],
-        profileId: null,
+        profileId: 'profile-1',
         scopeKey: 'session-1',
         sessionId: 'session-1',
         text: 'newer text',
-        workspaceId: null
+        workspaceId: 'workspace-1'
       })
     ).resolves.toMatchObject({ acceptedForDraft: false, decision: { intentKey: '7', outcome: 'accepted' } })
     expect(wire.call).toHaveBeenCalledWith('sendOutcome.query', { requestId: 'request-old' })
@@ -149,5 +178,158 @@ describe('AgentBox Composer application boundary', () => {
       },
       outcome: 'ready'
     })
+  })
+})
+
+describe('AgentBox Composer effective-config boundary', () => {
+  const overrides: ConfigOverride[] = [
+    { controlId: 'primary_model', value: { modelId: 'vendor/family/model-v9', providerId: 'provider-a' } },
+    { controlId: 'mode', value: 'fast' }
+  ]
+
+  it('resolves the exact snapshot before the first send and sends that same snapshot', async () => {
+    const wire = wireService({
+      'config.resolve': resolved([{ controlId: 'mode', value: 'fast' }]),
+      'sessions.createAndSend': {
+        configVersion: 3,
+        executionId: asWireId('execution-1'),
+        outcome: 'accepted',
+        session
+      }
+    })
+
+    const result = await submitAgentBoxComposer(wire, {
+      attachments: [],
+      draftVersion: 9,
+      overrides,
+      profileId: 'profile-1',
+      scopeKey: 'workspace:workspace-1',
+      sessionId: null,
+      text: 'ship it',
+      workspaceId: 'workspace-1'
+    })
+
+    expect(result).toMatchObject({ acceptedForDraft: true, outcome: 'sent' })
+    expect(wire.call.mock.calls.map(call => call[0])).toEqual(['config.resolve', 'sessions.createAndSend'])
+    expect(wire.call.mock.calls[0]?.[1]).toEqual({
+      overrides,
+      profileId: 'profile-1',
+      workspaceId: 'workspace-1'
+    })
+    expect(wire.call.mock.calls[1]?.[1]).toMatchObject({ overrides })
+    expect(wire.call.mock.calls[1]?.[1].overrides).toBe(wire.call.mock.calls[0]?.[1].overrides)
+  })
+
+  it('resolves with the existing Session identities before continuing it', async () => {
+    const wire = wireService({
+      'config.resolve': resolved(),
+      'sessions.send': {
+        configVersion: 4,
+        executionId: null,
+        outcome: 'accepted',
+        queueItemId: null
+      }
+    })
+
+    await submitAgentBoxComposer(wire, {
+      attachments: [],
+      draftVersion: 10,
+      overrides,
+      // Production passes the Session's own service identities; a cwd or a
+      // legacy SessionInfo never stands in for them.
+      profileId: String(session.profileId),
+      scopeKey: 'session-1',
+      sessionId: String(session.id),
+      text: 'continue',
+      workspaceId: String(session.workspaceId)
+    })
+
+    expect(wire.call.mock.calls.map(call => call[0])).toEqual(['config.resolve', 'sessions.send'])
+    expect(wire.call.mock.calls[0]?.[1]).toEqual({
+      overrides,
+      profileId: 'profile-1',
+      workspaceId: 'workspace-1'
+    })
+    expect(wire.call.mock.calls[1]?.[1]).toMatchObject({ sessionId: 'session-1' })
+  })
+
+  it('refuses to send a rejected configuration and keeps the service reasons', async () => {
+    const wire = wireService({
+      'config.resolve': {
+        invalidControls: [
+          { controlId: 'mode', reason: 'UNSUPPORTED_VALUE' },
+          { controlId: 'primary_model', reason: 'MODEL_NOT_AVAILABLE' }
+        ],
+        outcome: 'rejected'
+      }
+    })
+
+    await expect(
+      submitAgentBoxComposer(wire, {
+        attachments: [],
+        draftVersion: 11,
+        overrides,
+        profileId: 'profile-1',
+        scopeKey: 'workspace:workspace-1',
+        sessionId: null,
+        text: 'ship it',
+        workspaceId: 'workspace-1'
+      })
+    ).resolves.toEqual({
+      acceptedForDraft: false,
+      invalidControls: [
+        { controlId: 'mode', reason: 'UNSUPPORTED_VALUE' },
+        { controlId: 'primary_model', reason: 'MODEL_NOT_AVAILABLE' }
+      ],
+      outcome: 'invalid',
+      reason: 'CONFIG_REJECTED'
+    })
+
+    expect(wire.call.mock.calls.map(call => call[0])).toEqual(['config.resolve'])
+  })
+
+  it('sends nothing when the effective-config check fails in transport', async () => {
+    const wire = client(async method => {
+      if (method === 'config.resolve') {
+        throw new Error('OUTCOME_UNKNOWN')
+      }
+
+      throw new Error('must not send')
+    })
+
+    await expect(
+      submitAgentBoxComposer(wire, {
+        attachments: [],
+        draftVersion: 12,
+        overrides,
+        profileId: 'profile-1',
+        scopeKey: 'workspace:workspace-1',
+        sessionId: null,
+        text: 'ship it',
+        workspaceId: 'workspace-1'
+      })
+    ).rejects.toThrow('OUTCOME_UNKNOWN')
+
+    expect(wire.call.mock.calls.map(call => call[0])).toEqual(['config.resolve'])
+  })
+
+  it('requires the service identities for a continued Session instead of guessing them', async () => {
+    const wire = client(async () => {
+      throw new Error('must not call')
+    })
+
+    await expect(
+      submitAgentBoxComposer(wire, {
+        attachments: [],
+        draftVersion: 13,
+        overrides: [],
+        profileId: null,
+        scopeKey: 'session-1',
+        sessionId: 'session-1',
+        text: 'continue',
+        workspaceId: null
+      })
+    ).resolves.toEqual({ acceptedForDraft: false, outcome: 'invalid', reason: 'WORKSPACE_REQUIRED' })
+    expect(wire.call).not.toHaveBeenCalled()
   })
 })

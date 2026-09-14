@@ -4,9 +4,15 @@ import type { WireV1Client } from '@/api/wire-v1-client'
 import { $agentBoxProfiles, $agentBoxSessions, $draftConfigStates } from '@/store/agentbox-service'
 import { clearSessionDraft, sessionDraftExecutionContext } from '@/store/composer'
 import { $workspaceProfilePreferences } from '@/store/workspace-profile-preference'
-import { asWireId, type ConfigDescribeResult, type SessionRecord } from '@/types/wire/wire-v1'
+import {
+  asWireId,
+  type ConfigDescribeResult,
+  type ConfigOverride,
+  type ConfigResolveResult,
+  type SessionRecord
+} from '@/types/wire/wire-v1'
 
-import { selectComposerProfile } from './wire-composer-profile'
+import { resolveComposerConfig, selectComposerProfile } from './wire-composer-profile'
 
 const session = (profileId: string, version = 4): SessionRecord => ({
   archivedAt: null,
@@ -164,5 +170,62 @@ describe('selectComposerProfile', () => {
     expect($agentBoxSessions.get()['session-a']?.profileId).toBe('profile-b')
     expect(sessionDraftExecutionContext('session-a')).toEqual({ overrides: [], profileId: 'profile-b' })
     expect($workspaceProfilePreferences.get()['workspace-a']).toBe('profile-b')
+  })
+})
+
+describe('resolveComposerConfig', () => {
+  it('sends the exact scope and override snapshot to the service', async () => {
+    const result: ConfigResolveResult = {
+      effective: [
+        { controlId: 'primary_model', value: { modelId: 'vendor/family/model-v9', providerId: 'provider-a' } },
+        { controlId: 'mode', value: 'fast' }
+      ],
+      outcome: 'resolved'
+    }
+
+    const call = vi.fn(async () => result)
+    const client = { call } as unknown as WireV1Client
+
+    const overrides: ConfigOverride[] = [
+      { controlId: 'primary_model', value: { modelId: 'vendor/family/model-v9', providerId: 'provider-a' } },
+      { controlId: 'verbose', value: true }
+    ]
+
+    await expect(
+      resolveComposerConfig(client, { overrides, profileId: 'profile-a', workspaceId: 'workspace-a' })
+    ).resolves.toBe(result)
+    expect(call).toHaveBeenCalledWith('config.resolve', {
+      overrides,
+      profileId: 'profile-a',
+      workspaceId: 'workspace-a'
+    })
+  })
+
+  it('returns a rejection verbatim, including every control the service refused', async () => {
+    const result: ConfigResolveResult = {
+      invalidControls: [
+        { controlId: 'mode', reason: 'UNSUPPORTED_VALUE' },
+        { controlId: 'primary_model', reason: 'MODEL_NOT_AVAILABLE' }
+      ],
+      outcome: 'rejected'
+    }
+
+    const client = { call: vi.fn(async () => result) } as unknown as WireV1Client
+
+    await expect(
+      resolveComposerConfig(client, { overrides: [], profileId: 'profile-a', workspaceId: 'workspace-a' })
+    ).resolves.toEqual(result)
+  })
+
+  it('lets transport failures surface instead of manufacturing a resolved preview', async () => {
+    const client = {
+      call: vi.fn(async () => {
+        throw new Error('UNAVAILABLE')
+      })
+    } as unknown as WireV1Client
+
+    await expect(
+      resolveComposerConfig(client, { overrides: [], profileId: 'profile-a', workspaceId: 'workspace-a' })
+    ).rejects.toThrow('UNAVAILABLE')
   })
 })

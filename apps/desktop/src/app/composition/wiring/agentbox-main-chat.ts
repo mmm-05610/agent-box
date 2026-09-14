@@ -16,9 +16,11 @@ import { resolveAgentBoxWorkspace } from '@/application/workspace/wire-workspace
 import { $agentBoxQueues, $agentBoxSessionProjections, $agentBoxStopStates } from '@/store/agentbox-runtime'
 import {
   $agentBoxCatalogReadiness,
+  $agentBoxHello,
   $agentBoxService,
   $agentBoxSessions,
-  $agentBoxWorkspaces
+  $agentBoxWorkspaces,
+  agentBoxCapabilitySupported
 } from '@/store/agentbox-service'
 import { $draftExecutionContexts, composerDraftScopeKey, workspaceDraftScope } from '@/store/composer'
 import { $currentCwd } from '@/store/session'
@@ -33,6 +35,7 @@ export function useAgentBoxMainChat() {
   const location = useLocation()
   const navigate = useNavigate()
   const service = useStore($agentBoxService)
+  const hello = useStore($agentBoxHello)
   const readiness = useStore($agentBoxCatalogReadiness)
   const sessions = useStore($agentBoxSessions)
   const workspaces = useStore($agentBoxWorkspaces)
@@ -52,7 +55,7 @@ export function useAgentBoxMainChat() {
   }, [readiness.sessions, readiness.workspaces, service.phase])
 
   const routedId = routeSessionId(location.pathname)
-  const session = routedId ? sessions[routedId] ?? null : null
+  const session = routedId ? (sessions[routedId] ?? null) : null
 
   const selectedWsl = selectedWorkspaceId
     ? wslWorkspaces.find(workspace => workspace.id === selectedWorkspaceId)
@@ -61,13 +64,11 @@ export function useAgentBoxMainChat() {
   const workspace = useMemo(
     () =>
       session
-        ? workspaces.find(candidate => candidate.id === session.workspaceId) ?? null
+        ? (workspaces.find(candidate => candidate.id === session.workspaceId) ?? null)
         : resolveAgentBoxWorkspace(workspaces, {
             currentPath: selectedWorkspaceId ? currentCwd || null : null,
             selectedId: selectedWorkspaceId,
-            ...(selectedWsl
-              ? { wsl: { distribution: selectedWsl.distribution, rootPath: selectedWsl.rootPath } }
-              : {})
+            ...(selectedWsl ? { wsl: { distribution: selectedWsl.distribution, rootPath: selectedWsl.rootPath } } : {})
           }),
     [currentCwd, selectedWorkspaceId, selectedWsl, session, workspaces]
   )
@@ -85,11 +86,27 @@ export function useAgentBoxMainChat() {
   const execution = projection?.execution ?? null
   const busy = Boolean(execution && BUSY_EXECUTION_STATES.has(execution.state))
   const catalogReady = service.phase === 'ready' && readiness.sessions && readiness.workspaces
-  const sendAvailable = Boolean(catalogReady && workspace && (session || profileId))
+
+  // Sending is only offered when the service declares BOTH the effective-config
+  // check and the send verb this route would use. A missing declaration is a
+  // missing declaration, not an error string to interpret.
+  const sendCapabilityDeclared = agentBoxCapabilitySupported(
+    hello,
+    session ? 'sessions.send' : 'sessions.createAndSend'
+  )
+
+  const sendAvailable = Boolean(
+    catalogReady &&
+    workspace &&
+    agentBoxCapabilitySupported(hello, 'config.resolve') &&
+    sendCapabilityDeclared &&
+    (session || profileId)
+  )
 
   useEffect(() => {
     if (!catalogReady || !sessionId) {
       setStreamStart(null)
+
       return
     }
 
@@ -126,23 +143,28 @@ export function useAgentBoxMainChat() {
     let subscribed = true
     let alive = true
     let sourceStopped = false
+
     let unsubscribeSource: () => void = () => {}
+
     const unsubscribe = () => {
       if (sourceStopped) {
         return
       }
 
       sourceStopped = true
+
       try {
         unsubscribeSource()
       } catch {
         // Bridge cleanup is best-effort during unmount and route changes.
       }
     }
+
     const sourceCleanup = subscribeEvents({ cursor: streamStart.cursor, sessionId }, value => {
       if (!subscribed) {
         return
       }
+
       const parsed = EventFrameSchema.safeParse(value)
 
       if (!parsed.success) {
@@ -168,6 +190,7 @@ export function useAgentBoxMainChat() {
           .catch(() => undefined)
       }
     })
+
     unsubscribeSource = sourceCleanup
 
     if (sourceStopped) {
@@ -248,7 +271,7 @@ export function useAgentBoxMainChat() {
     onSubmit,
     profileId,
     projection,
-    queue: sessionId ? queues[sessionId] ?? [] : [],
+    queue: sessionId ? (queues[sessionId] ?? []) : [],
     runtimeAuthority: 'agentbox' as const,
     sendAvailable,
     service,

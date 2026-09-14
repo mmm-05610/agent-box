@@ -2216,6 +2216,13 @@ export interface Translations {
     securityLocked: string
     clearTemporaryValue: string
     configUnavailable: string
+    configResolving: string
+    configResolved: string
+    configRejected: string
+    configResolveUnavailable: string
+    configEffectiveValue: string
+    configEffectiveServiceConfirmed: string
+    configFixesOnAccept: string
     wakingProfile: (profile: string) => string
     placeholderStarting: string
     placeholderReconnecting: string

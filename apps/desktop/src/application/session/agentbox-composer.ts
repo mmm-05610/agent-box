@@ -1,4 +1,5 @@
 import type { WireV1Client } from '@/api/wire-v1-client'
+import { resolveComposerConfig } from '@/application/profile/wire-composer-profile'
 import type { ComposerAttachment } from '@/types/composer'
 import {
   asWireId,
@@ -22,8 +23,20 @@ export interface AgentBoxComposerSubmitInput {
   workspaceId: null | string
 }
 
+export interface AgentBoxInvalidControl {
+  controlId: string
+  reason: string
+}
+
 export type AgentBoxComposerSubmitResult =
-  | { acceptedForDraft: false; outcome: 'invalid'; reason: string }
+  | {
+      acceptedForDraft: false
+      /** Present when the service rejected the resolved configuration; every
+       *  returned controlId/reason is preserved for the user to act on. */
+      invalidControls?: AgentBoxInvalidControl[]
+      outcome: 'invalid'
+      reason: string
+    }
   | { acceptedForDraft: boolean; decision: AgentBoxSendDecision; outcome: 'sent' }
 
 export interface AgentBoxComposerSubmitOptions {
@@ -66,7 +79,8 @@ export function prepareAgentBoxDraftMessage(
 
 /**
  * Production Composer → application send seam. It chooses create-vs-continue
- * from server identities only, preserves the draft version as the durable
+ * from server identities only, resolves the effective configuration with the
+ * service before anything is sent, preserves the draft version as the durable
  * intent key, and treats a queued acceptance as accepted before refreshing
  * the server-owned queue projection.
  */
@@ -85,8 +99,39 @@ export async function submitAgentBoxComposer(
     return { acceptedForDraft: false, ...prepared }
   }
 
+  // Both identities are service-owned and required by every send: a new draft
+  // needs them to create, and an existing Session already carries them. They are
+  // never derived from a path or a legacy Session record.
+  if (!input.workspaceId || !input.profileId) {
+    return {
+      acceptedForDraft: false,
+      outcome: 'invalid',
+      reason: !input.workspaceId ? 'WORKSPACE_REQUIRED' : 'PROFILE_REQUIRED'
+    }
+  }
+
+  // The service decides whether this snapshot is runnable. A rejected config
+  // never reaches a send, and a transport/typed failure propagates instead of
+  // being reported as "the config is fine".
+  const resolution = await resolveComposerConfig(client, {
+    overrides: input.overrides,
+    profileId: input.profileId,
+    workspaceId: input.workspaceId
+  })
+
+  if (resolution.outcome === 'rejected') {
+    return {
+      acceptedForDraft: false,
+      invalidControls: resolution.invalidControls,
+      outcome: 'invalid',
+      reason: 'CONFIG_REJECTED'
+    }
+  }
+
   let intent: AgentBoxSendIntent
 
+  // The exact resolved snapshot is what the run is asked to accept — the same
+  // array, in the same order, with no re-derivation in between.
   if (input.sessionId) {
     intent = {
       intentKey: String(input.draftVersion),
@@ -97,14 +142,6 @@ export async function submitAgentBoxComposer(
       sessionId: asWireId(input.sessionId)
     }
   } else {
-    if (!input.workspaceId || !input.profileId) {
-      return {
-        acceptedForDraft: false,
-        outcome: 'invalid',
-        reason: !input.workspaceId ? 'WORKSPACE_REQUIRED' : 'PROFILE_REQUIRED'
-      }
-    }
-
     intent = {
       intentKey: String(input.draftVersion),
       kind: 'create',

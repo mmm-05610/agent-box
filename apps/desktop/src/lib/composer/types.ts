@@ -51,9 +51,27 @@ export interface ComposerProfileOption {
   unavailableReason?: string
 }
 
+export interface ComposerConfigInvalidControl {
+  controlId: string
+  reason: string
+}
+
+/** The service's answer for one exact scope: a PREVIEW of the effective
+ *  configuration, never the running one — a run fixes its configuration only
+ *  when it accepts a send (`configVersion` on the acceptance). The renderer
+ *  presents this; it never computes the effective value itself (core v1 §5). */
+export type ComposerConfigResolutionState =
+  | { status: 'idle' }
+  | { status: 'resolving' }
+  | { effective: Array<{ controlId: string; value: unknown }>; status: 'resolved' }
+  | { invalidControls: ComposerConfigInvalidControl[]; status: 'rejected' }
+  | { detail: string; status: 'unavailable' }
+
 export interface ComposerProfileState {
   modelChoices?: ComposerProviderModelChoice[]
   configDescriptor?: ConfigDescriptor | null
+  /** Server-side preview for the current profile/workspace/override scope. */
+  configResolution?: ComposerConfigResolutionState
   onOverrideChange: (overrides: ConfigOverride[]) => void
   onSelect: (profileId: string) => Promise<boolean> | boolean
   options: ComposerProfileOption[]

@@ -15,6 +15,8 @@ import { rememberWorkspaceProfile } from '@/store/workspace-profile-preference'
 import {
   asRequestId,
   asWireId,
+  type ConfigOverride,
+  type ConfigResolveResult,
   type ProfileRecord,
   type SessionRecord,
   type WireMethodName
@@ -163,6 +165,30 @@ export function setComposerTemporaryOverrides(scope: string, overrides: SessionD
   const current = sessionDraftExecutionContext(scope)
 
   setSessionDraftExecutionContext(scope, { ...current, overrides })
+}
+
+export interface ComposerConfigResolutionInput {
+  profileId: string
+  workspaceId: string
+  overrides: ConfigOverride[]
+}
+
+/**
+ * The service-side effective configuration for one exact scope. The renderer
+ * never computes this itself (core v1 §5: adapter default → profile default →
+ * explicit override, with security limits applied last); it only presents the
+ * answer. Read-only: no requestId, no draft/store writes, and the overrides
+ * cross the wire in their exact order and shape.
+ */
+export async function resolveComposerConfig(
+  client: WireV1Client,
+  input: ComposerConfigResolutionInput
+): Promise<ConfigResolveResult> {
+  return client.call('config.resolve', {
+    overrides: input.overrides,
+    profileId: asWireId(input.profileId),
+    workspaceId: asWireId(input.workspaceId)
+  })
 }
 
 export function profileMethodCapability(method: WireMethodName): boolean {
