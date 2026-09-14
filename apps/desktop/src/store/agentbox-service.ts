@@ -1,6 +1,12 @@
 import { atom } from 'nanostores'
 
-import type { ConfigDescriptor, ProfileRecord, ServerHelloResult, SessionRecord } from '@/types/wire/wire-v1'
+import type {
+  ConfigDescriptor,
+  ProfileRecord,
+  ServerHelloResult,
+  SessionRecord,
+  WorkspaceRecord
+} from '@/types/wire/wire-v1'
 
 export type AgentBoxServicePhase = 'idle' | 'loading' | 'ready' | 'unavailable'
 
@@ -16,11 +22,18 @@ export interface DraftConfigState {
   status: 'loading' | 'ready' | 'unavailable'
 }
 
+export interface AgentBoxCatalogReadiness {
+  sessions: boolean
+  workspaces: boolean
+}
+
 export const $agentBoxService = atom<AgentBoxServiceState>({ detail: null, phase: 'idle' })
 export const $agentBoxHello = atom<ServerHelloResult | null>(null)
 export const $agentBoxProfiles = atom<ProfileRecord[]>([])
+export const $agentBoxWorkspaces = atom<WorkspaceRecord[]>([])
 export const $agentBoxSessions = atom<Record<string, SessionRecord>>({})
 export const $draftConfigStates = atom<Record<string, DraftConfigState>>({})
+export const $agentBoxCatalogReadiness = atom<AgentBoxCatalogReadiness>({ sessions: false, workspaces: false })
 
 export function agentBoxCapabilitySupported(hello: ServerHelloResult | null, capabilityId: string): boolean {
   return hello?.capabilities.some(capability => capability.id === capabilityId && capability.supported) ?? false

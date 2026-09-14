@@ -66,6 +66,9 @@ export interface ChatBarProps {
   /** Selects the business authority for submit/queue/input behavior. AgentBox
    * never falls through to Hermes steering or the renderer-owned queue. */
   runtimeAuthority?: 'agentbox' | 'hermes'
+  /** Server-owned queue projection. AgentBox supplies this as presentation;
+   * the Composer never copies it into the renderer queue engine. */
+  serverQueue?: ReactNode
   focusKey?: string | null
   maxRecordingSeconds?: number
   state: ChatBarState

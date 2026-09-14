@@ -97,6 +97,7 @@ export function ChatBar({
   maxRecordingSeconds = 120,
   queueSessionKey,
   runtimeAuthority = 'hermes',
+  serverQueue,
   sessionId,
   state,
   onCancel,
@@ -301,7 +302,7 @@ export function ChatBar({
     sessionId
   })
 
-  const statusStackVisible = queuedPrompts.length > 0 || statusPresent
+  const statusStackVisible = queuedPrompts.length > 0 || Boolean(serverQueue) || (!agentBoxAuthority && statusPresent)
 
   // Halt vs. reach-the-queue: every interrupt lands on onCancel, but only the
   // gestures that MEAN "stop working" (Stop button, Esc) go through this
@@ -394,7 +395,15 @@ export function ChatBar({
 
   // Resting / reconnecting / starting placeholder text, re-rolled only on a real
   // conversation change.
-  const placeholder = useComposerPlaceholder({ disabled, reconnecting, sessionId })
+  const legacyPlaceholder = useComposerPlaceholder({ disabled, reconnecting, sessionId })
+
+  const placeholder = agentBoxAuthority
+    ? disabled
+      ? t.profiles.agentBoxUnavailable
+      : sessionId
+        ? t.composer.placeholderFollowUp
+        : t.composer.message
+    : legacyPlaceholder
 
   // Trigger / completion engine: @// detection, the adapter-driven item list,
   // popover selection, and chip insertion. The keydown nav block below consumes
@@ -1146,8 +1155,8 @@ export function ChatBar({
               5px transparent grab margin — so both strips carry the same inset
               and share one left edge with it. */}
           <div className={cn(composerFloatingStrip, 'px-[5px] pb-1.5 empty:hidden')}>
-            <ActionBadges sessionId={statusSessionId} />
-            <SuggestionPills sessionId={statusSessionId} />
+            {!agentBoxAuthority && <ActionBadges sessionId={statusSessionId} />}
+            {!agentBoxAuthority && <SuggestionPills sessionId={statusSessionId} />}
           </div>
           {/* Session-scoped status stack (todos, subagents, background tasks,
               queue). An in-flow dock child: the dock is bottom-anchored, so it
@@ -1156,7 +1165,9 @@ export function ChatBar({
           <ComposerStatusStack
             onSubmit={onSubmit}
             queue={
-              activeQueueSessionKey && queuedPrompts.length > 0 ? (
+              agentBoxAuthority ? (
+                serverQueue
+              ) : activeQueueSessionKey && queuedPrompts.length > 0 ? (
                 <QueuePanel
                   busy={busy}
                   editingId={queueEdit?.entryId ?? null}

@@ -13,19 +13,17 @@ import { Navigate, Route, Routes, useParams } from 'react-router'
 
 import { useStatusbarContributions } from '@/app/composition/registrations/chrome-contributions'
 import { useStatusbarItems } from '@/app/composition/registrations/statusbar-items'
-import { latestChatActions, latestSidebarActions } from '@/app/composition/wiring/latest-actions'
+import { latestSidebarActions } from '@/app/composition/wiring/latest-actions'
 import type { SidebarActions, WiringActions } from '@/app/composition/wiring/types'
 import { contributedRoutes, NEW_CHAT_ROUTE, ROUTES_AREA, sessionRoute, SETTINGS_ROUTE } from '@/app/routes'
 import { StatusbarControls } from '@/app/shell/chrome/statusbar/statusbar-controls'
 import { ContribBoundary, ContribRender } from '@/extension/contrib/react/boundary'
 import { useContributions } from '@/extension/contrib/react/use-contributions'
-import { ChatView } from '@/features/chat'
+import { AgentBoxChatView } from '@/features/chat/agentbox-chat-view'
 import { ChatSidebar } from '@/features/chat/sidebar'
-import { ModelMenuPanel } from '@/features/profiles/model-menu-panel'
 import { TerminalPaneChrome } from '@/features/right-sidebar/terminal/chrome'
 import { useStatusSnapshot } from '@/features/runtime/use-status-snapshot'
 import { $activeConnectionId } from '@/store/connections'
-import { $gateway } from '@/store/gateway'
 import { $activeGatewayProfile } from '@/store/profile'
 import { $freshDraftReady, $gatewayState } from '@/store/session'
 
@@ -105,46 +103,14 @@ export const StatusbarSurface = memo(function StatusbarSurface({
  *  the voice cap arrives as a prop. ChatView subscribes to its own session
  *  atoms, so streaming never round-trips through the controller. */
 export const ChatRoutesSurface = memo(function ChatRoutesSurface({
-  actions,
   maxVoiceRecordingSeconds
 }: {
   actions: WiringActions
   maxVoiceRecordingSeconds?: number
 }) {
-  const activeConnectionId = useStore($activeConnectionId)
-  const activeGatewayProfile = useStore($activeGatewayProfile)
-  const gateway = useStore($gateway)
-  const gatewayState = useStore($gatewayState)
   useContributions(ROUTES_AREA)
   const routeContributions = contributedRoutes()
-
-  const modelMenuContent = useMemo(
-    () =>
-      gatewayState === 'open' ? (
-        <ModelMenuPanel
-          gateway={gateway || undefined}
-          onSelectModel={actions.selectModel}
-          ownerConnectionId={activeConnectionId || undefined}
-          profile={activeGatewayProfile}
-          requestGateway={actions.requestGateway}
-        />
-      ) : null,
-    [actions, activeConnectionId, activeGatewayProfile, gateway, gatewayState]
-  )
-
-  const chatActions = useMemo(() => latestChatActions(actions), [actions])
-
-  const chatView = (
-    <ChatView
-      gateway={gateway}
-      maxVoiceRecordingSeconds={maxVoiceRecordingSeconds}
-      modelMenuContent={modelMenuContent}
-      modelOptionsOwnerConnectionId={activeConnectionId || undefined}
-      modelOptionsProfile={activeGatewayProfile}
-      requestModelOptionsForOwner={actions.requestGateway}
-      {...chatActions}
-    />
-  )
+  const chatView = <AgentBoxChatView maxVoiceRecordingSeconds={maxVoiceRecordingSeconds} />
 
   // FULL-PAGE views (not chat): a page is not a tab-able surface, so the zone's
   // tab strip stands down while one is showing. That is `paneChrome.headerVeto`
