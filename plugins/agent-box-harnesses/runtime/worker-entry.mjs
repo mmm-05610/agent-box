@@ -70,8 +70,10 @@ async function main() {
     fail({ code: error.code ?? "PROVENANCE_UNREADABLE", message: String(error.message) })
     return
   }
-  const { harnessProfile } = await import(path.join(bridgeSrc, "harness-profiles.js"))
   const { createAcpRegistration } = await import(path.join(bridgeSrc, "acp-registration.js"))
+  const { resolveHarnessProfile, registeredHarnessIDs } = await import(
+    path.join(here, "profile_extensions.mjs")
+  )
 
   let registration = null
 
@@ -84,12 +86,18 @@ async function main() {
 
   async function handle(request) {
     const { op, id } = request
+    if (op === "profiles") {
+      return {
+        provenance: { commit: source.commit, ref: source.ref },
+        profiles: registeredHarnessIDs(),
+      }
+    }
     if (op === "register") {
       if (registration) throw envelopeError("ALREADY_REGISTERED")
       if (!request.launch?.command) throw envelopeError("ADAPTER_LAUNCH_REQUIRED")
       const permissionTimeoutMs = request.permissionTimeoutMs ?? 0
       registration = await createAcpRegistration({
-        profile: harnessProfile(request.profile),
+        profile: resolveHarnessProfile(request.profile),
         directory: request.directory ?? process.cwd(),
         stateDirectory: request.stateDirectory,
         launch: { command: request.launch.command, args: request.launch.args ?? [] },

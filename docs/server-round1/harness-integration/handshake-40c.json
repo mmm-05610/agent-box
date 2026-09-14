@@ -1,0 +1,77 @@
+{
+  "generatedAt": "2026-09-14T01:22:35.748Z",
+  "note": "no credential provided; HOME/XDG redirected to an empty temp root",
+  "artifacts": {
+    "codex-acp": {
+      "present": true,
+      "version": "1.1.14",
+      "license": "Apache-2.0"
+    },
+    "pi-acp": {
+      "present": true,
+      "version": "0.5.0",
+      "license": "Apache-2.0"
+    },
+    "codex-binary": {
+      "present": true,
+      "bytes": 258278208
+    }
+  },
+  "codex": {
+    "family": "codex",
+    "outcome": "TYPED_FAILURE",
+    "elapsedMs": 452,
+    "error": "Internal error: CODEX_API_KEY or OPENAI_API_KEY is not set",
+    "bundledCodexVersion": {
+      "ok": true,
+      "exitCode": 0,
+      "output": "WARNING: proceeding, even though we could not create PATH aliases: Refusing to create helper binaries under temporary dir \"/tmp\" (codex_home: AbsolutePathBuf(\"/tmp/agentbox-handshake-syLeWK/.codex\")) "
+    },
+    "appServerSpawnSites": 2,
+    "execJsonlSites": 0
+  },
+  "pi": {
+    "family": "pi",
+    "outcome": "INITIALIZED",
+    "elapsedMs": 901,
+    "agentInfo": {
+      "name": "@automatalabs/pi-acp",
+      "title": "pi coding agent",
+      "version": "0.5.0"
+    },
+    "promptCapabilities": {
+      "image": true
+    },
+    "sessionCapabilities": {
+      "resume": {},
+      "fork": {},
+      "list": {},
+      "close": {}
+    }
+  },
+  "hermes": {
+    "family": "hermes",
+    "outcome": "INITIALIZED",
+    "elapsedMs": 1952,
+    "agentInfo": {
+      "name": "hermes-agent",
+      "version": "0.19.0"
+    },
+    "promptCapabilities": {
+      "image": true
+    },
+    "sessionCapabilities": {
+      "fork": {},
+      "list": {},
+      "resume": {}
+    },
+    "interpreterPathRequirement": "/home/maoqh/.local/lib/python3.12/site-packages"
+  },
+  "opencode": {
+    "family": "opencode",
+    "outcome": "HEALTH_OK",
+    "elapsedMs": 2188,
+    "port": 41917,
+    "executable": "/home/maoqh/.npm-global/bin/opencode"
+  }
+}

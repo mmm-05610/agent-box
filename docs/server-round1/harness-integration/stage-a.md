@@ -64,6 +64,11 @@ session-claim-server.js、agent-model-server.js 等控制面文件。
 - `vendor/`：两个顶层适配器 tarball 原样入库存档；全闭包用
   `npm ci --ignore-scripts` 按锁重建（任何提供同 integrity 的镜像可离线复现），
   完整 node_modules（约百 MB 平台二进制）不入 git。
+- **更正（40-C 发现）**：本节此前宣称的"干净重建"当时未校验安装产物。实测那一次
+  安装留下**被截断**的内嵌 codex 二进制（16,777,216 字节，应为 258,278,208），
+  运行时段错误。锁本身正确（同 tarball 的 sha512 与锁记录一致，干净重装后
+  `codex-cli 0.147.0` 正常）。**安装后必须校验平台二进制可执行**，见
+  [stage-c.md](stage-c.md#修正40-a-的一处证据错误重要)。
 - 运行时 `npx` 回退永不触达：envelope 强制显式 `launch.command`（绝对路径审查过的
   适配器可执行件），否则 register 报 `ADAPTER_LAUNCH_REQUIRED`。
 

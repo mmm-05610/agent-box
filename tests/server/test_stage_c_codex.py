@@ -288,6 +288,12 @@ def test_capture_failure_blocks_later_turn_and_never_acks(tmp_path):
         failed = _await_state(client, headers, session["session_id"], "failed")
         assert failed["status"] == "recovery_required"
         assert failed["turns"][0]["error_code"] == "CODEX_NATIVE_STATE_MISSING"
+        # The Turn terminal state is durable before the capture thread performs
+        # its non-acknowledging cleanup, so wait for that side effect with a
+        # deadline instead of racing it. The assertions themselves are unchanged.
+        deadline = time.monotonic() + 5
+        while transport.abandon_calls == 0 and time.monotonic() < deadline:
+            time.sleep(0.01)
         assert transport.cleanup_calls == 0
         assert transport.abandon_calls == 1
         assert next(item for item in runtime.repository.list_profiles()
