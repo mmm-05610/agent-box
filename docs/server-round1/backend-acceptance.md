@@ -91,7 +91,7 @@ Windows 持久化秘密使用既有 DPAPI 秘密存储；WSL 侧文件仅是投�
 
 ```text
 python3 -m pytest -q tests plugins/agent-box-runtime-wsl/tests plugins/agent-box-harnesses/tests
-→ 249 passed, 4 skipped, 0 failed
+→ 255 passed, 4 skipped, 0 failed（含 sidecar 集成 6 项）
 node --test plugins/agent-box-harnesses/tests/harness_remote/*.test.mjs → 25/25
 cargo test --release (workers/agent-box-worker) → 4/4
 ```
@@ -102,10 +102,18 @@ cargo test --release (workers/agent-box-worker) → 4/4
 ## 未达成 / 明确缺口（不掩饰）
 
 1. **41-E Windows 真机段未做**（平台不可用，如上）。
-2. **无模型执行**：`EXECUTION_CAPABILITY_UNAVAILABLE` 是生产默认；
-   Worker→sidecar 的 Python 封装（把 40-B 通道接到 40-C 侧车）尚未串接，
-   因此没有真实 Harness 执行路径可用。
+2. **Harness 执行路径已打通（本阶段新增）**：`server/execution/sidecar.py`
+   实现 AgentBox 侧的 envelope 客户端与 `SidecarHarnessPort`，
+   证据 `tests/server/test_harness_sidecar.py`（6/6）：隔离未启用即拒启、
+   profiles+provenance、**终止前 message.delta 在完成前可见**、
+   两个执行各自独立原生会话身份、未知 op/未知执行类型化报错。
+   真实 native peer 仍是受控 fake，因此这不是真实模型证据。
+   生产默认仍为 `EXECUTION_CAPABILITY_UNAVAILABLE`：
+   **经 WSL Worker（bwrap + interactive 通道）的部署接线尚未完成**，
+   目前只在本地进程启动器上验证。
 3. 事件长连通道仍为保留 SSE 面，wire 的 `wire.eventStream/1` 帧流未实现。
+   侧车的授权往返（`permission_request` → `approvals.decide` → `permission_decision`）
+   已在 envelope 层实现并投影为 `approval.requested`，但**尚未接进 Server 的审批仓储**。
 4. 附件内容读取/投递未实现（只存不透明引用）。
 5. 秘密扫描目前覆盖「配置字段拒绝」与「事件/错误体未包含凭据字段」，
    **未**做执行期投影回传的全量秘密扫描。

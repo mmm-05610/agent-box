@@ -24,7 +24,7 @@ for await (const line of rl) {
     send({ jsonrpc: "2.0", id, result: {} })
   } else if (method === "session/new") {
     sessions += 1
-    send({ jsonrpc: "2.0", id, result: { sessionId: `fake-native-${sessions}` } })
+    send({ jsonrpc: "2.0", id, result: { sessionId: `fake-native-${process.pid}-${sessions}` } })
   } else if (method === "session/load") {
     send({ jsonrpc: "2.0", id, result: { sessionId: params.sessionId } })
   } else if (method === "session/prompt") {

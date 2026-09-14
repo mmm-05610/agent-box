@@ -10,7 +10,7 @@
 | --- | --- | --- | --- |
 | [39](work-orders/39-server-boundaries.md) | **READY_FOR_HARNESS** | [阶段证据](../server-round1/server-boundary/stage-a-b-c.md)：幂等并发双派发缺陷先复现后修复、能力声明改为注册派生、双中立provider测试、legacy codex 退出生产装配 | wire反馈通道 [wire-review.md](../server-round1/wire-review.md) 已建立并写入首轮 |
 | [40](work-orders/40-four-harness-integration.md) | **FOUR_HARNESS_COMPONENTS_READY** | [40-A 底座](../server-round1/harness-integration/stage-a.md) / [40-B 通道](../server-round1/harness-integration/stage-b.md) / [40-C 矩阵](../server-round1/harness-integration/stage-c.md) / [40-D 汇总](../server-round1/harness-integration/stage-d.md) + [握手证据JSON](../server-round1/harness-integration/handshake-40c.json)：四家组件门 25/25；全量 227 passed/4 skipped/0 failed；Rust 4 passed；真实二进制零凭据握手 pi/hermes INITIALIZED、opencode HEALTH_OK、codex 诚实要求凭据 | 本单终态；Server 侧编排与 wire 锁定进入 41；真实模型门留待 42 §D |
-| [41](work-orders/41-core-service-acceptance.md) | **BACKEND_IMPLEMENTATION_PARTIAL** | [后端验收](../server-round1/backend-acceptance.md)：复用前端P07 wire-v1候选（未自造第二套）+16方法实现+schema v3迁移；全量 249 passed/4 skipped/0 failed；wire答复见[wire-review](../server-round1/wire-review.md) `ACCEPTED_WITH_MECHANICAL_CORRECTIONS` | 缺41-E Windows真机段与Worker→sidecar串接；补齐后方可转 READY，再进42 |
+| [41](work-orders/41-core-service-acceptance.md) | **BACKEND_IMPLEMENTATION_PARTIAL** | [后端验收](../server-round1/backend-acceptance.md)：复用前端P07 wire-v1候选（未自造第二套）+16方法实现+schema v3迁移；全量 255 passed/4 skipped/0 failed；wire答复见[wire-review](../server-round1/wire-review.md) `ACCEPTED_WITH_MECHANICAL_CORRECTIONS` | 缺41-E Windows真机段与经 WSL Worker 的部署接线；补齐后方可转 READY，再进42 |
 | [42](work-orders/42-fullstack-delivery.md) | **QUEUED** | 循环检查与双门后全栈接管已授权；DeepSeek官方API授权见§D | 后端READY后每5分钟检查前端；联调、修复、两仓提交 |
 | [37](work-orders/37-http-codex.md) | **SERVER_HTTP_CODEX_R1_PARTIAL** | [原完成审计](../server-round1/completion-audit.md) / [C/D证据](../server-round1/stage-c-d.md)保留；检查点5a45303/5b71393/cd5efbe/67c6b40。独立定向23 passed；同键并发双accept已由39复现并修复；能力不诚实已由39结构性修复 | abandon 断言经探针定性为**测试侧竞态**（终止状态持久化后约50ms才 abandon；负载高时10/10失败），已改为有界等待、断言强度不变，修后10/10通过；原生语义迁移由40执行 |
 | [38](work-orders/38-harness-extension-selection.md) | **HARNESS_EXTENSION_SELECTION_READY_FOR_DECISION** | 两轮 A/B/C 完成：[最终建议与边界](../server-round1/harness-selection/boundary.md)。保留有条件首选 `harness-remote v3.0.2`；零模型/凭据 | 首选已由40消费进入有门禁接入；不再等待决定 |
@@ -34,8 +34,9 @@
 - code_checkpoint_pair: 后端=41 提交HEAD；前端无交接检查点。
 - wire_status: WIRE_CANDIDATE_ACCEPTED_BY_BACKEND（对前端 wire-v1 工件 cd80103b3effbc4e）；
   未锁定：需双方登记同一摘要，前端尚未答复 wire-review.md 的3项确认。
-- backend_implementation_ready: 否（41-E Windows真机段未做；Worker→sidecar 未串接；
-  wire.eventStream/1 未实现；附件投递未实现）。
+- backend_implementation_ready: 否（41-E Windows真机段未做；经 WSL Worker 的部署接线未完成
+  —— 本地进程启动器上的 Server→sidecar→fake Harness 路径已通过 6 项集成测试；
+  wire.eventStream/1 未实现；附件投递未实现；侧车授权往返未接入审批仓储）。
 - integration_owner: NONE；workbench_model_verified_count: **0**（指本轮；组件门通过不等于真实模型可用）。
 - model_authorization: DEEPSEEK_OFFICIAL_AUTHORIZED_MAX_CNY_10；凭据locator见42 §D，不写内容。
 - 本轮调用数0，已知费用0，预留0；后续执行者统一记账，所有Harness/重试累计计算。
