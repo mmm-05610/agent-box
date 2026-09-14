@@ -10,7 +10,6 @@ import { getHermesConfigRecord } from '@/api/config'
 import { SESSION_IMPORT_ROUTE } from '@/app/routes'
 import {
   AGENTS_ROUTE,
-  ARTIFACTS_ROUTE,
   COMMAND_CENTER_ROUTE,
   CRON_ROUTE,
   navigateToWorkspacePage,
@@ -59,7 +58,6 @@ import {
   GitBranch,
   Layers3,
   MessageCircle,
-  Package,
   Palette,
   PawPrint,
   Plus,
@@ -399,13 +397,6 @@ export function CommandPaletteBody({ onExited }: { onExited: () => void }) {
             keywords: ['skills', 'tools', 'toolsets', 'mcp', 'capabilities'],
             label: cc.nav.skills.title,
             run: go(SKILLS_ROUTE)
-          },
-          {
-            action: 'nav.artifacts',
-            icon: Package,
-            id: 'nav-artifacts',
-            label: cc.nav.artifacts.title,
-            run: go(ARTIFACTS_ROUTE)
           },
           {
             action: 'nav.cron',

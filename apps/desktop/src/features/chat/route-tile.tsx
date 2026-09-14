@@ -9,7 +9,7 @@
 
 import { lazy, type ReactNode, Suspense } from 'react'
 
-import { ARTIFACTS_ROUTE, contributedRoutes, ROUTES_AREA, SKILLS_ROUTE } from '@/app/routes'
+import { contributedRoutes, ROUTES_AREA, SKILLS_ROUTE } from '@/app/routes'
 import { ContribBoundary, ContribRender } from '@/extension/contrib/react/boundary'
 import { useContributions } from '@/extension/contrib/react/use-contributions'
 import { $routeTiles, closeRouteTile, type RouteTile } from '@/store/route-tiles'
@@ -17,12 +17,12 @@ import { $routeTiles, closeRouteTile, type RouteTile } from '@/store/route-tiles
 import { paneMirror } from './pane-mirror'
 
 const SkillsView = lazy(async () => ({ default: (await import('../skills')).SkillsView }))
-const ArtifactsView = lazy(async () => ({ default: (await import('../artifacts')).ArtifactsView }))
 
 // Built-in page views + their pane titles, keyed by route.
 const BUILTIN_PAGES: Record<string, { render: () => ReactNode; title: string }> = {
-  [ARTIFACTS_ROUTE]: { render: () => <ArtifactsView />, title: 'Artifacts' },
-  [SKILLS_ROUTE]: { render: () => <SkillsView />, title: 'Capabilities' }
+  // The global Artifacts page is retired (P02A): session outputs stay in the
+  // chat; only Skills remains a workspace page.
+  [SKILLS_ROUTE]: { render: () => <SkillsView />, title: 'Skills' }
 }
 
 /** Humanize a route path into a tab title: `/my-atlas` → `My Atlas`. */
