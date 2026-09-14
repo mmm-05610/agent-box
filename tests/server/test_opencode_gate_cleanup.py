@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 import shutil
 import stat
+import subprocess
 import sys
 import tempfile
 
@@ -330,3 +331,109 @@ def test_the_gate_never_swallows_a_removal_failure_in_source():
     assert "DRIVER_AUDIT_OBSERVE" in source and "DRIVER_AUDIT_NEGATIVE" in source
     assert "OPENCODE_GATE_REOPEN_NOT_BY_STORAGE" in source
     assert "OPENCODE_GATE_STALE_SESSION_ACCEPTED" in source
+
+
+# --------------------------------------------------------------------------
+# 提交态回归：假 token 每次运行现生成，被扫描的永远是本次那个值
+# --------------------------------------------------------------------------
+
+#: 受扫描的 tracked fixture 路径（测试期间临时登记为 tracked，结束时完整撤销）。
+TOKEN_PROBE = (Path(__file__).resolve().parents[2] / "tests" / "server" / "fixtures"
+               / ".opencode-gate-token-probe")
+
+
+def frozen_token(module, monkeypatch, digit: str) -> str:
+    """把本次运行的 token_hex 固定下来，好让测试知道被扫描的确切值。
+
+    完整值只在运行期拼出来（前缀来自源码、后缀由测试计算），所以任何 tracked 文件里
+    都不存在这个字符串——这正是"扫描的是本次实际生成值"的前提。
+    """
+    monkeypatch.setattr(module.secrets, "token_hex", lambda length: digit * (2 * length))
+    return module.TOKEN_PREFIX + digit * 32
+
+
+def restore_probe(repo: Path, probe: Path) -> None:
+    """把临时登记的 fixture 从 index 与工作树里完整撤销。"""
+    subprocess.run(["git", "-C", str(repo), "reset", "-q", "--", str(probe)],
+                   check=False, capture_output=True, text=True, timeout=120)
+    probe.unlink(missing_ok=True)
+
+
+def test_the_dynamic_token_is_not_tracked_content(gate, monkeypatch, capsys):
+    """提交态下，本次运行的假 token 不得出现在 tracked 内容里。
+
+    门源码自己就在被扫描的树里：固定 token 会命中自己（这正是返修前提交后必红的
+    原因）。这里冻结生成值跑完整流程，再对**运行期实际生成的那个值**做 git 扫描。
+    """
+    token = frozen_token(gate, monkeypatch, "a")
+    restore_probe(gate.REPO, TOKEN_PROBE)
+    with pytest.raises(RuntimeError) as outside:
+        gate.current_token()
+    assert "OPENCODE_GATE_NO_ACTIVE_RUN" in str(outside.value), (
+        "运行窗口之外不得有可用的假 token")
+    assert gate.token_appears_in_tracked_content(gate.REPO, token) is False
+
+    stub_gate(gate, monkeypatch)
+    code, report = run_gate(gate, monkeypatch, capsys, "--worker", str(WORKER), "--json")
+    assert code == 0, report
+    assert report["cleanup"]["tokenInTrackedGitContent"] is False
+    assert gate.token_appears_in_tracked_content(gate.REPO, token) is False, (
+        "本次运行的假 token 出现在 tracked 内容里")
+    # 生成值不打印：门的输出里不得出现 token 本体。
+    assert token not in json.dumps(report)
+    # 运行窗口关闭后，token 不可再被取用。
+    with pytest.raises(RuntimeError):
+        gate.current_token()
+
+
+def test_each_run_generates_its_own_token(gate, monkeypatch, capsys):
+    """两次运行必须是两个不同的假 token（不是固定值换皮）。"""
+    seen: list[str] = []
+    real_scan = gate.token_appears_in_tracked_content
+
+    def recording_scan(root, value):
+        seen.append(value)
+        return real_scan(root, value)
+
+    monkeypatch.setattr(gate, "token_appears_in_tracked_content", recording_scan)
+    stub_gate(gate, monkeypatch)
+    for _ in range(2):
+        code, report = run_gate(gate, monkeypatch, capsys, "--worker", str(WORKER), "--json")
+        assert code == 0, report
+    assert len(seen) == 2
+    assert seen[0] != seen[1], "两次运行复用了同一个假 token"
+    for value in seen:
+        assert value.startswith(gate.TOKEN_PREFIX)
+        assert len(value) == len(gate.TOKEN_PREFIX) + 32
+        assert value not in GATE.read_text(encoding="utf-8"), "token 本体不得写回源码"
+
+
+def test_a_token_that_reaches_tracked_content_fails_the_gate(gate, monkeypatch, capsys):
+    """反证：本次 token 一旦进入受扫描的 tracked fixture，门必须以类型化错误失败。
+
+    fixture 只在本测试期间被登记为 tracked（intent-to-add），结束时连同 index 条目
+    一起撤销，工作树不留任何修改。
+    """
+    token = frozen_token(gate, monkeypatch, "b")
+    restore_probe(gate.REPO, TOKEN_PROBE)
+    TOKEN_PROBE.write_text(f"{token}\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(gate.REPO), "add", "-N", "--", str(TOKEN_PROBE)],
+                   check=True, capture_output=True, text=True, timeout=120)
+    try:
+        assert gate.token_appears_in_tracked_content(gate.REPO, token) is True, (
+            "被登记为 tracked 的 fixture 没有被扫描到，反证失去意义")
+        stub_gate(gate, monkeypatch)
+        code, report = run_gate(gate, monkeypatch, capsys, "--worker", str(WORKER), "--json")
+        assert code == 1, report
+        assert report["code"] == "OPENCODE_GATE_TOKEN_IN_GIT", report
+        assert report["cleanup"]["tokenInTrackedGitContent"] is True
+    finally:
+        restore_probe(gate.REPO, TOKEN_PROBE)
+    # 完整恢复：路径不存在、index 无条目、扫描重新归零。
+    assert not TOKEN_PROBE.exists()
+    status = subprocess.run(
+        ["git", "-C", str(gate.REPO), "status", "--porcelain", "--", str(TOKEN_PROBE)],
+        capture_output=True, text=True, timeout=120,
+    ).stdout.strip()
+    assert status == "", f"the token probe left tracked state behind: {status!r}"
+    assert gate.token_appears_in_tracked_content(gate.REPO, token) is False

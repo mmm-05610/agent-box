@@ -16,6 +16,7 @@ import json
 import os
 import pathlib
 import shutil
+import subprocess
 import threading
 
 import pytest
@@ -247,6 +248,78 @@ def test_registering_without_a_driver_still_uses_the_acp_registration(bundle, tm
         assert "HARNESS_PROFILE_UNREGISTERED" in refused.value.message
     finally:
         envelope.close()
+
+
+def test_a_driver_without_every_contract_method_is_refused(bundle, tmp_path):
+    """A missing operation is refused at registration, not mid-turn.
+
+    `status` is one of the operations this envelope exposes, so a driver that
+    omits it must not register at all - the refusal has to name the operation
+    that is missing.
+    """
+    incomplete = bundle / "agentbox-sidecar" / "deployment" / "fixture-incomplete" / "driver.mjs"
+    incomplete.parent.mkdir(parents=True)
+    incomplete.write_text(
+        "const noop = async () => {}\n"
+        "export async function createDriver() {\n"
+        "  return { start: noop, create: noop, open: noop, prompt: noop, abort: noop, close: noop }\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    envelope = open_envelope(bundle, tmp_path, [])
+    try:
+        with pytest.raises(SidecarError) as refused:
+            envelope.request({
+                "op": "register", "profile": "fixture-native",
+                "launch": launch_for(bundle, module=str(incomplete)),
+            })
+        assert refused.value.code == "DRIVER_METHOD_MISSING"
+        assert "status" in refused.value.message
+    finally:
+        envelope.close()
+
+
+CONFORMANCE_PROBE = r"""
+// `node -e` puts no script element in argv, so the first user argument is argv[1].
+const [seamPath, ...driverPaths] = process.argv.slice(1)
+const seam = await import(new URL("file://" + seamPath).href)
+const context = {
+  profileID: "contract-probe", command: "/bin/true", args: [], environment: {},
+  credentialEnvironment: null, hasCredential: false, directory: process.cwd(),
+  stateDirectory: null, emit: () => {}, redact: (value, maximum) => String(value ?? "").slice(0, maximum),
+  spawnProcess: () => { throw new Error("the contract probe must not spawn anything") },
+}
+const missing = {}
+for (const driverPath of driverPaths) {
+  const module = await import(new URL("file://" + driverPath).href)
+  const created = await module.createDriver(context)
+  missing[driverPath] = seam.DRIVER_METHODS.filter((name) => typeof created[name] !== "function")
+}
+process.stdout.write(JSON.stringify({
+  methods: seam.DRIVER_METHODS, missing,
+}) + "\n")
+"""
+
+
+def test_every_shipped_driver_implements_the_declared_contract():
+    """The seam's method list is the contract; both drivers must satisfy it.
+
+    The list is read from the seam module itself (one source of truth), and the
+    drivers are asked to construct an instance the same way the sidecar does.
+    """
+    drivers = [
+        FIXTURE_DRIVER,
+        PLUGIN / "deploy" / "opencode" / "driver-native.mjs",
+    ]
+    result = subprocess.run(
+        ["node", "--input-type=module", "-e", CONFORMANCE_PROBE,
+         str(PLUGIN / "runtime" / "native-driver.mjs"), *[str(path) for path in drivers]],
+        capture_output=True, text=True, timeout=120, cwd=str(REPO),
+    )
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout.strip().splitlines()[-1])
+    assert "status" in payload["methods"], "status is part of the declared contract"
+    assert payload["missing"] == {str(path): [] for path in drivers}, payload["missing"]
 
 
 def test_the_bundle_carries_the_driver_seam_module():

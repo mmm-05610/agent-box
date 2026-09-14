@@ -43,6 +43,7 @@ import http.server
 import json
 import os
 from pathlib import Path
+import secrets
 import shutil
 import socket
 import stat
@@ -59,8 +60,12 @@ WORKER_BUNDLE = REPO / "workers" / "agent-box-worker" / ".acceptance-bundle-c4" 
 AUTHORIZER = REPO / "scripts" / "server-round1" / "build-opencode-authorization.mjs"
 SCRIPT = "scripts/server-round1/opencode-production-chain-gate.py"
 
-#: 固定、显然为假、永不是凭据：只用来证明注入通道。
-FAKE_TOKEN = "opencode-gate-fake-token-3d8b41f6-non-secret"
+#: 每次运行现生成一个假凭据：前缀显然为假（永不是凭据），后缀是本次运行的随机值。
+#: 固定值曾在提交后必然命中"tracked Git 零命中"断言——源码自己就是被扫描的树，
+#: 于是门在提交态自证失败。改成运行期生成后，被扫描的永远是本次实际注入的那个值，
+#: 源码里只留前缀（前缀本身无法匹配完整 token）。生成值不打印、不进 argv，
+#: 生命周期由 `_FakeToken` 收在 main 的一次运行内，清理核验后立即丢弃。
+TOKEN_PREFIX = "agentbox-opencode-gate-fake-token-"
 NONCE_ROUND_1 = "OC-GATE-NONCE-1C7B42"
 NONCE_ROUND_2 = "OC-GATE-NONCE-2E5D93"
 #: 受控重试实验的标记：请求体里出现它就进入"一律 500"的观测模式。
@@ -90,6 +95,34 @@ GATE_LEASE_MS = 120_000
 #: 托管 host 停止后，监听端口消失的有界宽限（秒）。
 PORT_CLOSE_GRACE_SECONDS = 30.0
 REPORT: dict = {"result": "OPENCODE_PRODUCTION_CHAIN_GATE_FAILED", "script": SCRIPT}
+
+
+class _FakeToken:
+    """本次运行的一次性假凭据。只在 main 的运行窗口内存在，核验后清空。"""
+
+    def __init__(self) -> None:
+        self._value = ""
+
+    def value(self) -> str:
+        if not self._value:
+            self._value = TOKEN_PREFIX + secrets.token_hex(16)
+        return self._value
+
+    def bytes(self) -> bytes:
+        return self.value().encode()
+
+    def clear(self) -> None:
+        self._value = ""
+
+
+_ACTIVE: "_FakeToken | None" = None
+
+
+def current_token() -> "_FakeToken":
+    """本次运行的假凭据；运行窗口之外调用即失败（没有 token 可以被误用）。"""
+    if _ACTIVE is None:
+        raise RuntimeError("OPENCODE_GATE_NO_ACTIVE_RUN")
+    return _ACTIVE
 
 
 class GateFailure(Exception):
@@ -656,7 +689,7 @@ def scan_state(runtime, session: dict) -> dict:
     for item in checkpoint.get("files", []):
         content = runtime.objects.read(item["digest"])
         total += len(content)
-        if FAKE_TOKEN.encode() in content:
+        if current_token().bytes() in content:
             hits.append(item["path"])
     return {"files": len(checkpoint.get("files", [])), "bytes": total,
             "tokenHits": hits, "tokenInState": bool(hits),
@@ -856,8 +889,8 @@ def run_chain(temporary: Path, workspace: Path, worker: Path, authorization: dic
                 "injectedTokenReachedProvider": bool(endpoint.requests) and all(
                     item["authorizationMatchesInjectedToken"] for item in endpoint.requests),
                 "unauthorizedRequests": endpoint.unauthorized,
-                "tokenInEvents": FAKE_TOKEN in json.dumps(session["events"]),
-                "tokenInReportableState": FAKE_TOKEN in json.dumps(REPORT),
+                "tokenInEvents": current_token().value() in json.dumps(session["events"]),
+                "tokenInReportableState": current_token().value() in json.dumps(REPORT),
             }
             result["stateScan"] = scan_state(runtime, session)
             server_audit = read_driver_audit(workspace, DRIVER_AUDIT_NAME)
@@ -1074,7 +1107,7 @@ def observe_driver(temporary: Path, workspace: Path, worker: Path, authorization
             DirectWorkerConnector(temporary, worker, workspace),
             workspace={"distribution": "Ubuntu", "remote_user": os.environ["USER"],
                        "connection_id": "connection-opencode-observe", "remote_path": str(workspace)},
-            bundle=bundle, credential=FAKE_TOKEN.encode(),
+            bundle=bundle, credential=current_token().bytes(),
             executable_authorizations=(
                 {"path": authorization["source"], "digest": authorization["digest"]},),
             executable_mounts=((authorization["source"], production.BINARY_TARGET),),
@@ -1336,7 +1369,7 @@ def driver_negatives(temporary: Path, workspace: Path, worker: Path, authorizati
         DirectWorkerConnector(temporary, worker, workspace),
         workspace={"distribution": "Ubuntu", "remote_user": os.environ["USER"],
                    "connection_id": "connection-opencode-negative", "remote_path": str(workspace)},
-        bundle=bundle, credential=FAKE_TOKEN.encode(),
+        bundle=bundle, credential=current_token().bytes(),
         executable_authorizations=(
             {"path": authorization["source"], "digest": authorization["digest"]},),
         executable_mounts=((authorization["source"], production.BINARY_TARGET),),
@@ -1622,6 +1655,23 @@ def terminate_worker_cleanup_helpers(helpers: list[dict], *, timeout: float = 20
     return {"count": len(pids), "pids": pids[:8], "remaining": remaining}
 
 
+def token_appears_in_tracked_content(root: Path | str, value: str) -> bool:
+    """本次运行的假 token 是否出现在 root 仓库的 tracked 内容里。
+
+    只对调用方给出的完整值做逐字匹配：源码里的前缀、测试注入的值、以及运行期真实
+    生成的随机后缀，三者不会互相顶替。
+    """
+    if not isinstance(value, str) or not value:
+        raise ValueError("OPENCODE_GATE_EMPTY_TOKEN_SCAN")
+    found = subprocess.run(
+        ["git", "-C", str(root), "grep", "-q", "-F", "--", value],
+        capture_output=True, text=True, timeout=120,
+    )
+    if found.returncode not in (0, 1):
+        raise RuntimeError(f"git grep failed: {found.returncode}")
+    return found.returncode == 0
+
+
 def cleanup_check(temporary: Path, workspace: Path, token_path: Path, report: dict) -> None:
     """本次运行投影出去的东西一个都不能留下；任何残留都让门失败。
 
@@ -1654,16 +1704,13 @@ def cleanup_check(temporary: Path, workspace: Path, token_path: Path, report: di
     if token_path.exists():
         fail("OPENCODE_GATE_CLEANUP_FAILED", "the temporary fake token could not be removed")
     remove_tree(workspace)
-    token_in_git = subprocess.run(
-        ["git", "-C", str(REPO), "grep", "-q", "-F", "--", FAKE_TOKEN],
-        capture_output=True, text=True, timeout=120,
-    )
+    # 扫描的是**本次实际生成**的完整 token，而不是源码里的任何常量。
     report.setdefault("cleanup", {}).update({
         "workerProjectionsRemoved": True, "processesRemoved": True,
         "fakeTokenRemoved": not token_path.exists(), "workspaceRemoved": not workspace.exists(),
-        "tokenInTrackedGitContent": token_in_git.returncode == 0,
+        "tokenInTrackedGitContent": token_appears_in_tracked_content(REPO, current_token().value()),
     })
-    if token_in_git.returncode == 0:
+    if report["cleanup"]["tokenInTrackedGitContent"]:
         fail("OPENCODE_GATE_TOKEN_IN_GIT", "the temporary fake token appears in tracked content")
 
 
@@ -1697,6 +1744,7 @@ def verify_external_binary(binary: Path, expected: dict, report: dict) -> None:
 
 
 def main() -> int:
+    global _ACTIVE
     parser = argparse.ArgumentParser()
     parser.add_argument("--worker", default=str(WORKER_BUNDLE))
     parser.add_argument("--binary", default=None,
@@ -1712,6 +1760,8 @@ def main() -> int:
     cleanup_failure: GateFailure | None = None
     external_binary: Path | None = None
     external_expected: dict | None = None
+    # 假凭据只为这一次运行存在：进入运行前生成，收尾核验后立即丢弃。
+    _ACTIVE = _FakeToken()
 
     try:
         worker = Path(options.worker).resolve()
@@ -1757,7 +1807,7 @@ def main() -> int:
                 for key in production.ADAPTER_ENVIRONMENT),
         }
 
-        endpoint = FakeEndpoint(FAKE_TOKEN)
+        endpoint = FakeEndpoint(current_token().value())
         endpoint.assert_loopback_only()
         if len(production.documented_differences(endpoint.base_url)) != 1:
             fail("OPENCODE_GATE_OVERRIDE_NOT_MINIMAL",
@@ -1779,7 +1829,7 @@ def main() -> int:
 
         guard = compile_guard(temporary, REPORT)
         token_path = temporary / "opencode-gate-token"
-        token_path.write_bytes(FAKE_TOKEN.encode())
+        token_path.write_bytes(current_token().bytes())
         token_path.chmod(0o600)
 
         endpoint.start()
@@ -1875,6 +1925,8 @@ def main() -> int:
                 verify_external_binary(external_binary, external_expected, REPORT)
             except GateFailure as failure:
                 primary = GateFailure("OPENCODE_GATE_EXTERNAL_BINARY_DAMAGED", failure.message)
+        _ACTIVE.clear()
+        _ACTIVE = None
 
     if primary is None and cleanup_failure is not None:
         primary, cleanup_failure = cleanup_failure, None

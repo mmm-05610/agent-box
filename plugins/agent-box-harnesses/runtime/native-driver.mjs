@@ -30,7 +30,11 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 //: is the only place a driver module may be loaded from.
 const DEPLOYMENT_ROOT = path.join(path.resolve(here, ".."), "deployment")
 
-export const DRIVER_METHODS = ["start", "create", "open", "prompt", "abort", "close"]
+//: Every operation the sidecar can route to a driver, including `status`, which
+//: the envelope exposes and an operator or a later acceptance phase may call at
+//: any time. A driver that cannot answer all of them is refused at registration
+//: rather than failing in the middle of a turn.
+export const DRIVER_METHODS = ["start", "create", "open", "prompt", "abort", "close", "status"]
 
 function envelopeError(code, detail) {
   const error = new Error(detail ? `${code}: ${detail}` : code)
