@@ -1,0 +1,292 @@
+# P05 最终客户端矩阵审计（28 RPC + 事件流）
+
+日期：2026-09-14。审计 HEAD：`280b3cbcae6b84fe7fce85b99698fdeef0d8a94f`
+（分支 `feature/agentbox-desktop-product`，工作树 clean）。
+本文件只盘点**实际生产接线与缺口**，不修改生产代码。
+
+权威方法集合：`apps/desktop/src/types/wire/wire-v1.ts` 的 `WireMethods`（28 项）。
+摘要核对：TS 权威 `11e3b3e70d332585d31900c09ba063d95aa6b72b1904921c665fb72f81c10035`、
+生成工件 `5d4fa3bfeec6c3273c6073b37794e4ab2aca6e07e48184bc3a2b878c1fe5e4ed`，与后端
+`docs/server-round1/wire-review.md`（2026-09-14 12:15 `WIRE_LOCKED_FOR_IMPLEMENTATION`）
+登记的同一对摘要逐字节一致；后端已以该工件回归 `tests/server/test_wire_v1.py` 29 passed。
+
+## 判定规则（本矩阵如何得出结论）
+
+- **schema/client 列**只表示：方法在 `WireMethods` 中、且 `WireV1Client` 能按其
+  `Params/Result` schema 调用并校验。**通用 client 可调用任意方法，不等于生产已接**。
+- **application 入口**：非测试模块中真实发起调用的函数（fixture、`types/wire/**` 测试、
+  client 单元测试都**不算**入口）。
+- **生产调用者**：从 AgentBox 产品正常组合（`agentbox-main-chat` / `AgentBoxChatView` /
+  `ProfilesView` / Products Settings）到该入口的真实链路。旧 `requestGateway`、Hermes
+  gateway、legacy profile pool、legacy route 的调用**不算** AgentBox 生产接线。
+- **capability gate**：只承认来自 `server.hello` 的声明（`wireCapability` /
+  `agentBoxCapabilitySupported`）；不以方法存在、字符串命中或异常文本推断支持。
+- connection slot 当前为 null。若「UI/application → main-only transport」路径已完整，
+  该行仍判 `PRODUCTION_REACHABLE`，外部终态连接单独列在 §外部缺口，**不**把它当成本端缺口。
+
+| 状态 | 含义 |
+| --- | --- |
+| `PRODUCTION_REACHABLE` | AgentBox 正常生产组合能触达，不依赖 legacy Hermes |
+| `CLIENT_READY_NO_SURFACE` | typed application 入口存在，但批准产品当前没有直接 UI 触发点 |
+| `FIXTURE_ONLY_FRONTEND_GAP` | 只有 schema/fixture 或测试调用，而批准产品行为仍需要前端实现 |
+| `EXTERNAL_LIFECYCLE_BLOCKED` | 前端调用路径已完成，唯一缺口是正式 Server artifact/discovery/token/dynamic-port/readiness/owner connection |
+| `WAITING_PERIPHERAL_CONTRACT` | 不属于 28 方法的外围产品能力（只出现在 §附录 A） |
+| `NOT_APPLICABLE` | 合同明确无需独立生产入口（本矩阵 0 行） |
+
+## 1. 主矩阵（每方法一行，28 行）
+
+列含义：schema/client = 权威 schema 与 typed client；application 入口 = 真实调用点
+（文件:行）；生产调用者 = 产品组合链路；行为测试 = 现有行为门文件；状态见上表。
+`EXT` 标记表示该行的终态运行还依赖 §4 的同一外部 lifecycle connection。
+
+| 方法 | schema/client | application 入口 | 生产调用者 | 行为测试 | 状态 | 缺口/依据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| `server.hello` | ✓ `WireMethods`；`WireV1Client.hello()` `api/wire-v1-client.ts:121` | `refreshAgentBoxProfileCatalog` / `ensureAgentBoxProfileCatalog` `application/profile/wire-composer-profile.ts:39,65`（写 `$agentBoxHello`、`$agentBoxService`） | `useAgentBoxMainChat`→`ensureAgentBoxDesktopCatalog` `application/agentbox-desktop-catalog.ts:14`；`ProfilesView` 刷新 `features/profiles/index.tsx:102` | `api/wire-v1-client.test.ts`、`types/wire/fixtures/core-v1.test.ts` | `PRODUCTION_REACHABLE`（EXT） | 产品唯一能力来源：profiles/models 各 4 方法门、queue 控件门都读它；缺失能力 fail-closed（`wireCapability` 未声明即 `supported:false`） |
+| `workspaces.open` | ✓ schema | **无**（`application/` 无调用点） | **无** | `types/wire/fixtures/core-v1.test.ts:83,93`（§9 场景 2）、`types/wire/wire-v1.test.ts` | `FIXTURE_ONLY_FRONTEND_GAP` | 产品打开目录走 36R 本地/WSL 寄存器（`store/projects`、`api/workspace` 宿主桥），AgentBox 侧只用 `workspaces.list`+`resolveAgentBoxWorkspace`（`application/workspace/wire-workspace-catalog.ts:27`）解析**既有**记录；服务端无记录的目录不会被 open 登记，也拿不到 `created` 标记。见 §3-G1 |
+| `workspaces.list` | ✓ schema+client | `refreshAgentBoxWorkspaces` `application/workspace/wire-workspace-catalog.ts:17` | `ensureAgentBoxDesktopCatalog`←`useAgentBoxMainChat`（`app/composition/wiring/agentbox-main-chat.ts:50`） | `application/workspace/wire-workspace-catalog.test.ts` | `PRODUCTION_REACHABLE`（EXT） | 服务清单整体替换 `$agentBoxWorkspaces`；`resolveAgentBoxWorkspace` 按环境+规范化路径解析，本地与 WSL 同字符串不合并 |
+| `workspaces.browse` | ✓ schema | **无** | **无** | **无**（0 处引用） | `FIXTURE_ONLY_FRONTEND_GAP` | core §4「远端目录由 Worker 列举，Desktop 呈现」。当前远端枚举走 Electron 宿主 `api/workspace`（`listWslDirectories` 等，含 distribution/rootPath），不带 AgentBox 环境身份、`canOpen/canWrite` 分列与失败原因。见 §3-G2 |
+| `workspaces.archive` | ✓ schema | **无** | **无** | **无**（0 处引用） | `FIXTURE_ONLY_FRONTEND_GAP` | core §3/§4：归档=服务记录保留、不删文件/历史、跨客户端一致。侧栏现有「移除」是 renderer 本地隐藏（`store/workspace-view.ts`、文案 `workspaces.removeDesc`），没有服务归档调用。见 §3-G3 |
+| `profiles.list` | ✓ schema+client | `refreshAgentBoxProfileCatalog` `application/profile/wire-composer-profile.ts:39` | `ensureAgentBoxDesktopCatalog`（主聊天挂载）+ `ProfilesView` | `application/profile/wire-composer-profile.test.ts` | `PRODUCTION_REACHABLE`（EXT） | 先读 hello 的 `profiles.list` capability，未声明即抛出该 reason；失败保留上一投影并置 `$agentBoxService=unavailable` |
+| `profiles.create` | ✓ schema+client | `wireProfileMaintenancePort.create` `application/profile/profile-maintenance-port.ts:66` | `ProfilesView` 新建对话框（`features/profiles/index.tsx`），4 方法门（`features/profiles/index.tsx:86`） | `application/profile/profile-maintenance-port.test.ts`、`features/profiles/index.test.tsx` | `PRODUCTION_REACHABLE`（EXT） | requestId 每次新生成；只采纳服务返回 `ProfileRecord`；`profiles.create` 未声明则整页无维护控件 |
+| `profiles.update` | ✓ schema+client | `wireProfileMaintenancePort.update` `:71` | `ProfilesView` 改名/串行 CAS 首步 `features/profiles/index.tsx:309` | 同上 + `features/profiles/index.test.tsx`（CAS 顺序、改名成功/配置失败重试） | `PRODUCTION_REACHABLE`（EXT） | `expectedVersion` 用当前服务 version；成功后名称/version 采纳服务返回值（`af0c08e3` 返修） |
+| `profiles.archive` | ✓ schema+client | `wireProfileMaintenancePort.archive` `:87` | `ProfilesView` 归档确认框（`ConfirmDialog`） | 同上 | `PRODUCTION_REACHABLE`（EXT） | 归档后从投影移除；历史保留由服务负责，客户端不级联删除 |
+| `profiles.updateConfig` | ✓ schema+client | `wireProfileMaintenancePort.updateConfig` `:80` | `ProfilesView` 默认配置保存（`ProfileConfigEditor` + 整份 values） | `application/profile/profile-maintenance-port.test.ts`、`features/profiles/index.test.tsx`、`features/profiles/profile-config-editor.test.tsx` | `PRODUCTION_REACHABLE`（EXT） | 整份替换语义、锁定值原值带回、恢复默认即省略；`expectedVersion` 必须用上一步 `profiles.update` 返回的新 version；成功后重读 `config.describe` |
+| `providerModels.list` | ✓ schema+client | `refreshAgentBoxProviderModelCatalog` `application/provider-model/wire-provider-model-catalog.ts:15`；端口 `provider-model-maintenance-port.ts:60` | `useComposerProfile`（有 model_slot 时）、`ProfilesView`、Settings→Models | `wire-provider-model-catalog.test.ts`、`provider-model-maintenance-port.test.ts` | `PRODUCTION_REACHABLE`（EXT） | hello `providerModels.list` 门；single-flight、失败保留缓存；Harness 仅作 opaque 过滤数据 |
+| `providerModels.create` | ✓ schema+client | 端口 `:63` | Settings→Models（`features/settings/agentbox-model-settings.tsx:31-34` 4 方法门） | `provider-model-maintenance-port.test.ts`、`features/settings/agentbox-model-settings.test.tsx` | `PRODUCTION_REACHABLE`（EXT） | requestId + 服务返回记录采纳；pending 锁定输入防双发 |
+| `providerModels.update` | ✓ schema+client | 端口 `:72` | 同上 | 同上 | `PRODUCTION_REACHABLE`（EXT） | version CAS；失败保留上一权威行 |
+| `providerModels.archive` | ✓ schema+client | 端口 `:82` | 同上 | 同上 | `PRODUCTION_REACHABLE`（EXT） | `CONFLICT_REFERENCE` 不删除/替换 Profile 引用 |
+| `config.describe` | ✓ schema+client | `describeDraftConfig` `application/profile/wire-composer-profile.ts:85`；`loadProfileRuntimeDescriptor` `profile-maintenance-port.ts:109` | Composer 临时配置弹层（`useComposerProfile`）、Profiles 页配置区 | `wire-composer-profile.test.ts`、`features/profiles/index.test.tsx`、`profile-config-editor.test.tsx` | `PRODUCTION_REACHABLE`（EXT） | 描述控件/当前值/securityLockedIds/effectTiming；迟到描述按 scope 的 `profileId` 校验后丢弃。与 `config.resolve` 职责未互相代替：客户端不自行计算生效值 |
+| `config.resolve` | ✓ schema | **无** | **无** | **无**（0 处引用） | `FIXTURE_ONLY_FRONTEND_GAP` | core §5/§8：生效配置由服务计算（接入默认→Profile 默认→显式临时覆盖，安全限制不可覆盖）并可列 invalid。客户端目前只显示 descriptor 的 currentValue + 本地草稿覆盖，从不问服务"最终生效值"，也没有 invalid 呈现；运行实际版本目前只由接受回执的 `configVersion` 提供。见 §3-G4 |
+| `sessions.list` | ✓ schema+client | `refreshAgentBoxSessions` `application/session/wire-session-catalog.ts:19` | `ensureAgentBoxDesktopCatalog`←主聊天挂载 | `wire-session-catalog.test.ts`、`app/composition/wiring/agentbox-main-chat.test.tsx` | `PRODUCTION_REACHABLE`（EXT） | 服务分页合并进 `$agentBoxSessions`，部分页不擦除已学记录。**边界**：该投影当前只驱动主聊天面/Composer 选角；侧栏会话列表仍是 legacy Hermes（见 §5） |
+| `sessions.update` | ✓ schema+client | `updateAgentBoxSession` `wire-session-catalog.ts:39`（requestId+expectedVersion，采纳服务返回） | **无** | `wire-session-catalog.test.ts` | `FIXTURE_ONLY_FRONTEND_GAP` | 批准行为的触发点（侧栏改名/置顶）仍走 legacy session API（`store/session-pin-sync`、`api/sessions`）。需要前端把统一侧栏行为接到该方法并采纳服务版本。见 §3-G5 |
+| `sessions.archive` | ✓ schema+client | `archiveAgentBoxSession` `wire-session-catalog.ts:64` | **无** | `wire-session-catalog.test.ts` | `FIXTURE_ONLY_FRONTEND_GAP` | 同 G5：侧栏归档入口（`store/sidebar-archive`→`application/session-lists`）走 legacy Hermes 数据面；服务侧归档语义（不删历史）已编码但无产品调用者 |
+| `sessions.switchProfile` | ✓ schema+client | `selectComposerProfile` `application/profile/wire-composer-profile.ts:114` | Composer 角色选择器（`useComposerProfile`←`AgentBoxChatView`） | `wire-composer-profile.test.ts`、`features/chat/composer/profile-controls.test.tsx` | `PRODUCTION_REACHABLE`（EXT） | `expectedVersion=当前 session.version`、requestId；`confirmed/rejected` 都采纳服务返回 Session（rejected 保留旧实际值），迟到确认不覆盖更新意图 |
+| `sessions.createAndSend` | ✓ schema+client | `sendAgentBoxMessage` `application/session/wire-send.ts:60`（经 `submitAgentBoxComposer` `agentbox-composer.ts`） | Composer 提交 `agentbox-main-chat.ts:201`→`ChatBar.onSubmit` | `wire-send.test.ts`、`agentbox-composer.test.ts`、`types/wire/fixtures/core-v1.test.ts` | `PRODUCTION_REACHABLE`（EXT） | requestId 贯穿；`rejected_before_accept` 不造空 Session、草稿保留；transport 未知时用**同一** requestId 查询而非重发 |
+| `sessions.send` | ✓ schema+client | 同上 `:103` | 同上（既有 Session 续发） | 同上 + `api/wire-v1-client.test.ts` | `PRODUCTION_REACHABLE`（EXT） | 稳定 Session 关联；`queueItemId` 来自服务回执；未 stage 附件在传输前拒绝 |
+| `sendOutcome.query` | ✓ schema+client | `queryAgentBoxSendOutcome` `wire-send.ts:135`（同 requestId 复用 pending 记录） | Composer 提交路径的 pending/未知分支 `sendAgentBoxMessage:65-69,131` | `wire-send.test.ts`、`agentbox-composer.test.ts`、`types/wire/fixtures/core-v1.test.ts` | `PRODUCTION_REACHABLE`（EXT） | `unknown` 不作安全重发信号；`WireUnavailableError` 时回落 `unknown` 并保留 pending identity |
+| `queue.get` | ✓ schema+client | `refreshAgentBoxQueue` `application/session/wire-session-control.ts:29` | `useAgentBoxMainChat` 挂载/路由（`:100`）+ 发送后刷新（`agentbox-composer.ts`） | `wire-session-control.test.ts`、`agentbox-main-chat.test.tsx` | `PRODUCTION_REACHABLE`（EXT） | 服务队列权威投影；UI 上队列操作还需 hello `queue` + `state.queue.authority==='server'`（`chat-bar.tsx:159`）。注：侧栏/流处理中的 `Map.get('queue.get')` 是无关假命中，未计入 |
+| `queue.withdraw` | ✓ schema+client | `withdrawAgentBoxQueueItem` `:36` | `AgentBoxQueuePanel`←`AgentBoxChatView:203` | `wire-session-control.test.ts`、`features/chat/composer/agentbox-queue-panel.test.tsx` | `PRODUCTION_REACHABLE`（EXT） | requestId+expectedVersion；`too_late` 用服务返回项覆盖本地，不假装撤回 |
+| `runs.stop` | ✓ schema+client | `requestAgentBoxStop` `:63` | `useAgentBoxMainChat` onCancel（`:237`）←`ChatBar`/`Thread` onCancel | `wire-session-control.test.ts`、`agentbox-main-chat.test.tsx`、`api/wire-v1-client.test.ts` | `PRODUCTION_REACHABLE`（EXT） | `stop_requested≠stopped`：本地进 `stopping` 等终态事件；`unconfirmed` 进 `unconfirmed` 状态，不谎报已停止；失败保留原因 |
+| `approvals.decide` | ✓ schema+client | `decideAgentBoxApproval` `:101` | `AgentBoxApprovalPanel`←`AgentBoxChatView:202` | `agentbox-approval-panel.test.tsx`、`wire-session-control.test.ts` | `PRODUCTION_REACHABLE`（EXT） | `approvalId+expectedVersion+scope(once/bounded)`；决定只经服务权威，界面不自行标记已批准 |
+| `history.snapshot` | ✓ schema+client | `hydrateAgentBoxHistory` `:150` | `useAgentBoxMainChat` 挂载（`:100`）与 seq gap 补水（`:162`） | `wire-session-control.test.ts`、`agentbox-main-chat.test.tsx`、`types/wire/fixtures/core-v1.test.ts` | `PRODUCTION_REACHABLE`（EXT） | 与事件流是**同一恢复机制**：`snapshot.resumeCursor` 即订阅续点；`resync_required` 时清空重建并二次请求，仍失败则标 `needsResync`；`olderCursor` 只作向旧翻页 |
+
+### 状态计数
+
+| 状态 | 数量 | 方法 |
+| --- | --- | --- |
+| `PRODUCTION_REACHABLE` | **22** | server.hello、workspaces.list、profiles.list/create/update/archive/updateConfig、providerModels.list/create/update/archive、config.describe、sessions.list、sessions.switchProfile、sessions.createAndSend、sessions.send、sendOutcome.query、queue.get、queue.withdraw、runs.stop、approvals.decide、history.snapshot |
+| `CLIENT_READY_NO_SURFACE` | 0 | — |
+| `FIXTURE_ONLY_FRONTEND_GAP` | **6** | workspaces.open、workspaces.browse、workspaces.archive、config.resolve、sessions.update、sessions.archive |
+| `EXTERNAL_LIFECYCLE_BLOCKED` | **22 行同一外部缺口**（不等于前端缺口，见 §4） | 上表 22 个 `PRODUCTION_REACHABLE` 行的运行终态 |
+| `NOT_APPLICABLE` | 0 | — |
+| 合计 | 28 | 与 `WireMethods` 逐项一致（§6 核验） |
+
+## 2. 非 `PRODUCTION_REACHABLE` 逐项原因
+
+| 方法 | 为什么不是 PRODUCTION_REACHABLE |
+| --- | --- |
+| `workspaces.open` | 有 schema 与 §9 fixture 行为门（同环境+同路径重开保 id、`created` 标记、不建 Session），但 `application/` 无入口：产品打开目录只写 36R 本地/WSL 寄存器，AgentBox 侧仅用 `workspaces.list` 反查既有记录。服务端无记录的目录无法登记权威 Workspace。 |
+| `workspaces.browse` | 除 schema 外**零引用**（无入口、无 fixture、无测试）。批准行为（远端目录列举与呈现）当前由 Electron 宿主能力承担，缺 AgentBox 环境身份与 `canOpen/canWrite` 分列。 |
+| `workspaces.archive` | 除 schema 外零引用。侧栏"移除"是 renderer 本地隐藏，与服务归档（记录保留、跨客户端一致）不是同一语义。 |
+| `config.resolve` | 除 schema 外零引用。客户端只呈现 descriptor 当前值 + 本地临时覆盖，从不请求服务计算生效值/非法项，因此也没有被 `config.describe` 错误代替（两者职责在客户端均未被混用）。 |
+| `sessions.update` | application 入口存在且已测（requestId+expectedVersion+服务投影采纳），但**无生产调用者**：侧栏改名/置顶仍走 legacy Hermes 会话 API。 |
+| `sessions.archive` | 同上；侧栏归档入口（`store/sidebar-archive`/`application/session-lists`）走 legacy 数据面。 |
+
+## 3. 确证的前端缺口（目标文件 / 接口 / 不变量 / 建议验收）
+
+以下只登记，不在本阶段修。
+
+**G1 `workspaces.open` 未接（打开即登记）**
+- 目标文件：`src/application/workspace/wire-workspace-catalog.ts`（新增 open 用例）、
+  `src/app/composition/wiring/agentbox-main-chat.ts`（选中/打开路径调用）、
+  `src/features/chat/sidebar/workspace-list/*`（远端/WSL 行触发的选择意图）。
+- 接口：`workspaces.open({environmentId|environment, normalizedPath, requestId})` →
+  `{workspace, created}`。
+- 不变量：同 (environment, normalizedPath) 重复打开返回同一 id 且 `created=false`；打开**不**创建
+  Session、不启动 Harness；采纳服务返回的 WorkspaceRecord 为权威（本地路径字符串不是身份）。
+- 建议验收：组件/用例级 —— 选择同一 WSL 目录两次只产生一次"新建"、第二次 `created=false`；断言
+  调用序列中无 `sessions.*`；服务端已有记录时以服务返回覆盖本地行。
+
+**G2 `workspaces.browse` 未接（远端目录列举）**
+- 目标文件：`src/application/workspace/wire-workspace-catalog.ts` 或新
+  `wire-workspace-browser.ts`；远端/WSL 目录选择对话框。
+- 接口：`workspaces.browse({environmentId, path?, requestId})` → 目录条目 +
+  `canOpen/canWrite` 分列 + 失败原因；进度走 `workspace.connection` 事件。
+- 不变量：可读即可浏览，不因只读拒绝打开；环境连接、目录可访问、角色可运行分开报告；
+  不把 WSL 路径当本地路径，不做 Windows/Linux/UNC 语义替换。
+- 建议验收：只读目录仍可浏览并可打开；不可达环境给出真实失败原因而非空列表；失败不回落宿主
+  本地目录列举结果。
+
+**G3 `workspaces.archive` 未接（服务归档）**
+- 目标文件：侧栏工作区行的维护动作 + `wire-workspace-catalog.ts` 归档用例。
+- 接口：`workspaces.archive({workspaceId, expectedVersion, requestId})` → 服务 WorkspaceRecord。
+- 不变量：归档保留记录与文件、不级联删历史/Session；`CONFLICT_VERSION` 不本地覆盖；
+  活动入口仍可见且运行中任务不被停止。
+- 建议验收：归档后服务清单不再包含该行而本地文件/历史仍在；版本冲突保留服务投影并显示原因。
+
+**G4 `config.resolve` 未接（服务计算生效值）**
+- 目标文件：`src/application/profile/wire-composer-profile.ts`（草稿生效值用例）、
+  `src/features/chat/composer/profile-controls.tsx`（呈现生效值/invalid）。
+- 接口：`config.resolve({profileId, workspaceId, sessionId?, overrides})` → 生效值 + 限制/非法原因。
+- 不变量：生效配置由服务按「接入默认→Profile 默认→显式临时覆盖」计算，安全限制不可覆盖；
+  客户端不得本地推算生效值，也不得把草稿选择当生效值；解析失败不隐式启动任何执行。
+- 建议验收：本地覆盖与服务默认冲突时显示服务结论；被安全锁定的项以服务限制原因呈现而非客户端
+  自行拒绝。
+
+**G5 `sessions.update/archive` 未接（统一侧栏会话行为）**
+- 目标文件：`src/features/chat/sidebar/`（改名/置顶/归档入口）与其数据源
+  `src/application/session-lists.ts`；改用 `application/session/wire-session-catalog.ts`。
+- 接口：`sessions.update({sessionId, displayName?/pinned?/workspaceId?, expectedVersion, requestId})`、
+  `sessions.archive({sessionId, expectedVersion, requestId})`。
+- 不变量：改名/置顶/归档跨客户端一致且由服务版本 CAS；归档不删历史；`CONFLICT_VERSION` 保留服务
+  投影与用户输入，不静默后写覆盖。
+- 建议验收：两个入口（侧栏与命令面板）产生同一服务调用；版本冲突后界面保留服务值；归档后侧栏
+  由服务投影移除而历史仍可恢复。
+
+**次级观察（非产品阻断，建议下一机械实现一并处理）**
+- 现状：hello 能力门只覆盖 profiles 维护 4 方法、providerModels 维护 4 方法、`profiles.list`、
+  `providerModels.list` 与 queue 控件（`store/agentbox-service.ts:46,50`、
+  `features/profiles/index.tsx:86`、`features/settings/agentbox-model-settings.tsx:46`、
+  `features/chat/composer/chat-bar.tsx:159`）。
+  `sessions.*`、`workspaces.*`、`sessions.createAndSend/send`、`sendOutcome.query`、`runs.stop`、
+  `approvals.decide`、`history.snapshot` 的调用只依赖 `$agentBoxService.phase==='ready'`，不逐方法查
+  hello 声明；未声明时会以服务 typed 错误（`CAPABILITY_UNSUPPORTED`/`UNAVAILABLE`）呈现，而不是
+  在 UI 上提前禁用。建议为发送/停止/审批/队列这些"会假装成功"的入口补 hello 门（不猜测支持）。
+  建议验收：hello 缺少 `sessions.createAndSend` 时提交按钮禁用并给出该 reason，且不产生任何调用。
+
+## 4. `EXTERNAL_LIFECYCLE_BLOCKED` 的精确边界（单一外部缺口）
+
+上表 22 个 `PRODUCTION_REACHABLE` 方法的前端路径（UI/application → client → preload IPC →
+main-only transport）**已完整**，其中断点只有一处：**main 进程的 AgentBox connection slot 目前为
+null**。因此这些方法的运行终态都属于同一个 `EXTERNAL_LIFECYCLE_BLOCKED`，不是各自的缺口。
+
+缺口内容（后端合同侧）：Desktop 可锁定的 **Server artifact 解析、发现/动态端口公告、readiness
+判据、token 文件 ACL、进程 owner 与退出期限**。当前状态：
+
+- `electron/composition/agentbox-service-composition.ts:31,58`：`activeConnection` 初始 `null`，
+  `requestWire` 与 `subscribeWireEvents` 每次操作读取 `connectionSlot.current`。
+- `electron/security/agentbox-wire-transport.ts:98`：无连接时返回 `UNAVAILABLE` typed 错误
+  （无固定 8732、无测试替身、无 Hermes 回落）。
+- `electron/workcore/slot.ts`：生产未安装任何 lifecycle（只有测试安装）。
+- 事件流同样终止于此：`agentbox-wire-event-transport.ts` 连接为 null 时诚实 unavailable。
+
+一旦 lifecycle 在 readiness 后安装 `{endpoint, sessionToken}`，这 22 个方法与事件流即可在**不改
+客户端**的前提下进入真实联调；在此之前 REAL_FLOW 未验证，也不得声称。
+
+## 5. 遗留 Hermes 可达性结论
+
+结论：**AgentBox 产品主路径不含 Hermes 专属控制流**；残留项集中在产品外壳的一个共享侧栏数据源
+与几处已无触发点的挂载/死代码。
+
+| 面 | 结论 | 依据 |
+| --- | --- | --- |
+| 主 route / 聊天面 | 仅 `AgentBoxChatView`（`app/composition/registrations/surfaces.tsx:113`）；legacy `ChatView`（`features/chat/index.tsx`）只被 `wiring/types.ts` 作**类型**引用，未挂载 | 非测试导入链 |
+| Composer | `ChatBar` 以 `runtimeAuthority="agentbox"`、`gateway={null}`、`model.hidden=true` 挂载（`features/chat/agentbox-chat-view.tsx:133-197`） | 同文件 + `features/profiles` 模型控件中立化证据 |
+| Profiles / Models | `ProfilesView`（四方法 hello 门）、`AgentBoxModelSettings`（四方法 hello 门） | `features/profiles/index.tsx:86`、`features/settings/agentbox-model-settings.tsx:46` |
+| 冷启动 | renderer 与 Electron 两道 legacy 自动启动门均已关闭（P04 切片 4/5） | `evidence/P04.md` + `electron/app/product-runtime-policy.ts` |
+| 侧栏会话列表 | **仍为 legacy Hermes 数据面**：`ChatSidebar` 由产品外壳挂载（`surfaces.tsx:48`），其会话节点走 `application/session-lists.ts` → `api/sessions.ts` → `api/client.ts`（`window.hermesDesktop.api`），并以 `$gatewayState==='open'` 为条件（`chat-sidebar.tsx:540`） | 非测试导入链 + `api/client.ts:82-103` |
+| 工作区根列表 | 已是中立的 36R 行：本地行来自本机项目存储、WSL 行来自宿主能力；选择经中立 store 驱动 AgentBox 侧解析 | `features/chat/sidebar/workspace-list/workspace-list.tsx`、`agentbox-main-chat.ts` |
+| 旧 Profile 对话框 | `create/delete/rename-profile-dialog` 只被 `features/chat/sidebar/profile-switcher.tsx` 引用，而该组件**无任何挂载点** → 不可达（保留文件与其测试） | 非测试导入链 |
+| 旧模型浮层 | `ModelPickerOverlay`/`ModelVisibilityOverlay` 在 `features.tsx` 全应用挂载，但其开合来自 legacy 模型控件 store（`$modelPickerOpen`、`use-model-controls`），AgentBox 聊天面既隐藏模型 pill 也不驱动它们 → 挂载但无 AgentBox 触发点 | `features/profiles/model-picker-overlay.tsx:55`、`agentbox-chat-view.tsx:135` |
+| `plugins/hermes-bots` | 随包注册且默认开启（`src/extension/contrib/plugins.ts`），其数据面是 legacy gateway（`host.request('profiles.list'/'profiles.configure'/'profiles.get_asset'/'profiles.create')`）。这些**不是** wire-v1 方法，也不得计作 AgentBox 生产接线；其产品入口已在 P02A 退役 | `src/plugins/hermes-bots/**`、`evidence/P02.md` |
+
+允许保留（不视为缺陷）：显式 legacy 分支与宿主能力共用代码、历史迁移键、品牌/版权数据、
+只读旧历史兼容、以及上表中"挂载但无 AgentBox 触发点"的待退役项——退役按 P04 消费者审计账本
+逐项进行，本阶段只记录事实。
+
+## 6. 事件流（`wire.eventStream/1`，不计入 28 RPC）
+
+| 面 | 实现 | 证据 |
+| --- | --- | --- |
+| main-only token | Bearer 只进入 WS upgrade header（`electron/security/agentbox-wire-event-transport.ts:119`）；renderer 只见 `{sessionId, cursor}` | `src/global.d.ts`、`electron/preload.ts` |
+| Session/cursor 隔离 | main 以 `webContents.id + subscriptionId` 持有源；每帧校验 `frame.sessionId === sessionId` 后入 reducer | `agentbox-main-chat.ts:152`、`electron/ipc/workcore-wire-ipc.ts` |
+| schema 校验 | renderer 先 `EventFrameSchema.safeParse`，非法帧静默丢弃，不入 reducer | `agentbox-main-chat.ts:146` |
+| gap / history resync | seq 缺口 → 先退订再 `history.snapshot` 补水，从新 `resumeCursor` 重订阅 | `agentbox-main-chat.ts:158-166`、`wire-session-control.ts:150-192` |
+| cleanup | route 卸载/切换退订、Electron 侧返回源 cleanup、`will-quit` 释放 | `agentbox-main-chat.ts` subscription cleanup、`main.ts` will-quit |
+| 生产挂载 | `AgentBoxChatView` → `useAgentBoxMainChat`（hydration 取得非空 `resumeCursor` 后才订阅） | `agentbox-main-chat.ts:94-155` |
+| 状态 | 前端路径已完成；事件源与连接同属 §4 的同一外部 lifecycle 缺口 | `evidence/P04.md` 切片 6/7/8 |
+
+## 7. 生产调用链（架构附录）
+
+```text
+Renderer surface
+  ├── AgentBoxChatView            features/chat/agentbox-chat-view.tsx（唯一聊天面）
+  ├── ProfilesView                features/profiles/index.tsx（overlay，四方法 hello 门）
+  └── AgentBoxModelSettings       features/settings/product-settings.tsx → agentbox-model-settings.tsx
+        │
+        ▼
+application use case / port
+  ├── agentbox-main-chat.ts       主聊天编排（catalog、history、queue、stop、event ingest）
+  ├── agentbox-composer.ts        提交用例 → wire-send.ts
+  ├── wire-session-control.ts     queue/runs/approvals/history
+  ├── wire-session-catalog.ts     sessions.list/update/archive
+  ├── wire-workspace-catalog.ts   workspaces.list + 选择解析
+  ├── wire-composer-profile.ts    hello/profiles.list/config.describe/switchProfile
+  ├── profile-maintenance-port.ts        profiles.* + config.describe
+  ├── provider-model-maintenance-port.ts providerModels.*
+  └── wire-provider-model-catalog.ts     providerModels.list
+        │
+        ▼
+WireV1Client                      api/wire-v1-client.ts（信封/校验/typed 错误；无 fetch 默认）
+        │
+        ▼
+preload IPC                       electron/preload.ts → window.agentBoxDesktop.wire.{request,subscribeEvents}
+        │                          src/global.d.ts：renderer 不见 endpoint/token/subscription owner
+        ▼
+Electron request / event transport
+  ├── ipc/workcore-wire-ipc.ts        校验 method/信封一致；sender-owned 事件订阅
+  ├── security/agentbox-wire-transport.ts     HTTP dispatcher（Bearer 只在此处出现）
+  └── security/agentbox-wire-event-transport.ts WS（Bearer 只进 upgrade header）
+        │
+        ▼
+dynamic connection slot            electron/composition/agentbox-service-composition.ts
+  ├── connectionSlot.current       每次操作动态读取（HTTP 与 WS 共用同一 slot）
+  ├── slot = null                  诚实 UNAVAILABLE（无固定端口/无测试替身/无 Hermes 回落）
+  └── 生产 lifecycle                 未安装：electron/workcore/slot.ts 无安装者
+```
+
+四条不变量（与 `docs/architecture/electron-host-boundary.md` 一致，未重新设计目录）：
+
+1. renderer 不持有 endpoint/token，也没有默认 fetch/mock transport；
+2. HTTP 与 WS 共用同一个 main-only 动态 connection slot；
+3. slot 为 null 时如实返回 typed `UNAVAILABLE`，不伪造 ready、不猜端口/argv/data root；
+4. transport 与 client 均无 Hermes 回落；lifecycle connection 的正式来源仍是外部合同缺口。
+
+## 8. 核验命令与结果
+
+| 命令 | 结果 |
+| --- | --- |
+| `node -e "import('./src/types/wire/wire-v1.ts').then(m=>console.log(Object.keys(m.WireMethods).length))"`（apps/desktop） | `28` |
+| `WireMethods` 键与矩阵首列逐项比较（一次性只读 node + python 管道，排序后全等比较） | 28 ↔ 28 全等：无遗漏、无重复、无多余 |
+| `sha256sum src/types/wire/wire-v1.ts generated/wire-v1.schema.json` | `11e3b3e7…c10035` / `5d4fa3bf…5e4ed`，与后端登记一致 |
+| `grep -rn "\.call('" src --include=*.ts --include=*.tsx \| grep -v test` | 28 方法调用点全部落在上表 application 入口 |
+| `git diff --check` | 通过（exit 0，本次仅文档） |
+| `git status --short` | 只含本阶段写集（见 §9） |
+
+矩阵完整性核验（一次性只读命令，不新增仓库脚本）：从 `WireMethods` 导出键、从本文件表格抽取
+首列方法名，排序后逐项比较，要求 28 ↔ 28 全等。
+
+## 9. 写集与未决
+
+本阶段写集：本文件（新增）、`evidence/P05.md`、`docs/desktop-product-delivery/status.md`。
+未修改 `apps/**` 任何生产代码/测试、`types/wire/**`、contracts 文档、preload、Electron main、
+package/lock、后端与 Windows 构建树；未重跑完整测试、未跑 Windows、未安装依赖、未读后端密钥、
+未执行模型调用。
+
+未决（不因本审计消失）：
+- 真实 Server lifecycle connection（§4）→ 阻断 22 个方法与事件流的 REAL_FLOW 验证。
+- 6 个 `FIXTURE_ONLY_FRONTEND_GAP`（§3）→ 本端可独立补齐的下一机械实现批次。
+- 侧栏会话列表的 legacy 数据面（§5）→ P03/P04 迁移账本中最重的剩余消费者。
+- `wire-v1` 未纳入范围的增量（steer 语义、Worker 通道合同、快照分页参数）仍为外围合同。
+
+## 附录 A：外围能力（`WAITING_PERIPHERAL_CONTRACT`，不属 28 方法）
+
+| 能力 | 状态 | 说明 |
+| --- | --- | --- |
+| Skills / MCP 设置 | `WAITING_PERIPHERAL_CONTRACT` | 无已锁定 wire 方法；页面明确不可用，无假开关 |
+| Identities | `WAITING_PERIPHERAL_CONTRACT` | 同上 |
+| 本机 Harness 安装/更新 | `WAITING_PERIPHERAL_CONTRACT` | 同上；不复用 legacy 安装面 |
+| Data（备份/恢复/清理） | `WAITING_PERIPHERAL_CONTRACT` | 同上 |
+| Worker 通道建连方向/传输 | 外围合同 | core §1 允许非 TCP/复用 WSL/SSH；客户端只消费"已连接"事实 |
+| `sessions.send` steer 语义 | 未进入本核心 wire | 队列默认 follow-up 已编码；steering 并发语义无已批准细则 |
+| 快照分页粒度/事件批量上限 | 机械参数 | 倾向由服务端定，客户端按返回游标消费 |
