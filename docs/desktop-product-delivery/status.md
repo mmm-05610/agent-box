@@ -43,7 +43,8 @@
 - 已消费发布文档提交: 86d5a7b、61c7ff7、d3c0196、ffbcfaf
 - 当前检查点改动（workspaces.open 接线）: 已有本地/WSL 侧栏选择经 `workspaces.open` 登记为服务权威
   Workspace，并进入服务 Workspace 的新会话草稿（**不建 Session、不启 Harness**）。身份 exact：本地
-  `{local,null,null}` + 项目工作根，WSL `{wsl, actualUser, distribution}` + rootPath，path 不改写；
+  `{local,null,null}` + `project.path`（严格取项目自身文件夹；null/空串=无路径项目，不产生 open），
+  WSL `{wsl, actualUser, distribution}` + rootPath，path 不改写；
   唯一身份是服务返回的 `WorkspaceRecord.id`（shell row id 不参与命中，直查走显式 `serviceWorkspaceId`）。
   同一 target 单飞、迟到只入服务缓存不切回界面/草稿/选择；provisional shell 草稿经既有
   `migrateSessionDraft` 迁移到服务 scope（目标非空则不覆盖、两边不删除）；能力未声明不发请求并呈现 hello
@@ -185,12 +186,13 @@
 - workspaces.open 生产接线（3e207376）：验收 `npx vitest run --project ui
   src/application/workspace/wire-workspace-catalog.test.ts src/store/agentbox-service.test.ts
   src/app/composition/wiring/agentbox-main-chat.test.tsx src/features/chat/agentbox-chat-view.test.ts`
-  → **4 files / 48 tests passed，exit 0**；相关回归 4 files / 59 tests passed（agentbox-composer、
+  → **4 files / 50 tests passed，exit 0**；相关回归 4 files / 59 tests passed（agentbox-composer、
   wire-send、sidebar workspace assembly、composer store）；`src/features/chat` 全目录 94 files /
   627 tests passed；`npm run typecheck` 三项目通过；改动文件 ESLint 0 error / 0 warning；
   `git diff --check` 干净。覆盖本地/WSL exact payload、created=false 采纳服务 id、同 path 不同环境不互认、
   shell id 与无关 wire id 相同不误命中、服务已有记录不 open、单飞、迟到 A/B、capability/失败处理、
-  provisional→authoritative 草稿迁移（含目标非空不覆盖）、Session route 不 open。
+  provisional→authoritative 草稿迁移（含目标非空不覆盖）、无自身文件夹的项目（含其有 repo 路径者）与
+  Home bucket/空路径均不 open、Session route 不 open。
 - pending 恢复顺序返修（b6d0bc6f）：`npx vitest run --project ui
   src/application/session/wire-send.test.ts src/application/session/agentbox-composer.test.ts
   src/app/composition/wiring/agentbox-main-chat.test.tsx src/application/profile/wire-composer-profile.test.ts
