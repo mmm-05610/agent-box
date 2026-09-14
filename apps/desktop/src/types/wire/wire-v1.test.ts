@@ -77,6 +77,7 @@ describe('wire v1 envelope', () => {
     expect(WireErrorCodeSchema.options).toContain('OUTCOME_UNKNOWN')
     expect(WireResponseSchema.safeParse({ jsonrpc: '2.0', id: 't-1' }).success).toBe(false)
     expect(WireResponseSchema.safeParse({ jsonrpc: '2.0', id: 't-1', result: {}, error }).success).toBe(false)
+    expect(WireResponseSchema.safeParse({ jsonrpc: '2.0', id: null, result: {} }).success).toBe(false)
     expect(WireRequestSchema.safeParse({ jsonrpc: '2.0', id: 't-1', method: 'server.hello', params: {}, extra: true }).success).toBe(false)
   })
 

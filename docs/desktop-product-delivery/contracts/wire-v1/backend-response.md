@@ -25,8 +25,9 @@
 - `sessions.send` 把立即派发与 Server 队列接受编码为互斥形状：`executionId` 或
   `queueItemId` 恰有一个；`QueueItem` 明确携带提交时冻结的 `configVersion`。
 
-新权威摘要：`sha256:59529dfc4ca01dc5…`；新生成工件：
-`sha256:4f90256d5545af6a…`。在后端登记并通过同一工件前状态是
+当前权威摘要：`sha256:793bc995fd8199df…`；当前生成工件：
+`sha256:5f6bc31dd63444f6…`（P07 检查点 3 加入鉴权前错误的 null id 编码及可执行 fixture 后更新）。
+在后端登记并通过同一工件前状态是
 `WIRE_REVISION_PENDING_BACKEND`，不冒称已锁定。
 
 ## 从实际源码发现、需后端按新工件补齐的机械差异

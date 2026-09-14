@@ -5,7 +5,7 @@
 
 ## 执行快照（handoff-policy 每阶段必填）— 接管施工中
 
-- updated_at: 2026-09-14 09:58 (+08:00)
+- updated_at: 2026-09-14 10:08 (+08:00)
 - 执行者: Codex 前端产品 goal（接力会话）；**已从暂停的 Zcode 执行者接管**
 - 工作树/分支: /home/maoqh/projects/agent-box-desktop-next-wsl-round1 @ feature/agentbox-desktop-product
 - 接管核验: 用户指定交接 HEAD `5c0fbfe` 与实际 HEAD
@@ -13,33 +13,33 @@
   未发现该工作树、Windows 构建树的 Electron/Vite/Vitest/Playwright/验收驱动进程；
   dirty 集合仅为下列 4 项已授权交接改动。发布源规则文件与本执行树逐文件 SHA-256 一致，
   保留本文件实时进度，不复制发布源初始状态。
-- 代码检查点（已提交 HEAD）: `91305d8`（P02B1：Workspace 打开不建 Session）
+- 代码检查点（已提交 HEAD）: `a132a49`（P07 后端反馈回应与严格 schema）
   链: ebb1233（P00）→ 8d4b3df/47b5b47/dbb902f（P01 代码与几何修复）→ 26b32fc（P01 GREEN 证据）
   → 468e6ac/d7e9a57（发布源 d3c0196+ffbcfaf 导入）→ 893d560（P07 检查点2 wire-v1）
   → 957a523（P02A 盘点）→ 07f5386（P02A slice 1：失败面非阻塞）→ 3a25edc（P02A slice 2）
+  → df84838（P02A GREEN）→ 91305d8（P02B1）→ 2a5b65d（P02B2）→ a132a49（wire 回应）
 - 已消费发布文档提交: 86d5a7b、61c7ff7、d3c0196、ffbcfaf
-- 当前检查点改动: P02B2 将新会话草稿按稳定 Workspace ID、已有草稿按 Session lineage 隔离；
-  v4 持久化文本/安全附件引用并兼容 v3，发送结果按版本 compare-and-clear；WSL 主行进入草稿且
-  不把 Linux path 送入遗留本机探针。
-- 当前阶段: P00 GREEN；P01 GREEN；P07 检查点 1–2 完成；**P02A GREEN，P02B1 已提交，P02B2 待提交**
+- 当前检查点改动: P07 检查点 3：中立注入式 wire 客户端、事件重放投影、只读重连计划和
+  core §9 九组可执行 fixture；生产无默认 mock/fetch transport。
+- 当前阶段: P00 GREEN；P01 GREEN；**P07 检查点 1–3 完成**；P02A、P02B1、P02B2 已提交
 - 完成范围: P00；P01 全部返修（真机 27 PASS）；P07 检查点 1（语义映射）、检查点 2
   （wire-v1 候选：17 方法 + schema 测试 + JSON Schema 工件；已消费后端机械反馈并回应）；
   P02A（失败面非阻塞+可关闭、Artifacts 页退役、失败终态竞态修复与真机门）
-- 下一项: 提交 P02B2；继续 P02B Session 运行/离线/停止/队列表面，再进入 P02C 角色配置。
-- 阻断: 无真实阻断。剩余 P02B–D（上层产品）、P07 检查点 3（§9 fixture 矩阵）、
-  P03/P04/P05/P06 均未开工或待续
+- 下一项: 提交 P07 检查点 3/P03 client slice；继续 P02B Session 能力化表面，再进入 P02C。
+- 阻断: 无真实阻断。剩余 P02B3–D（上层产品）、P03 生产投影、P04 Electron transport/
+  legacy 退役、P05 生产接线和 P06 独立验收待续；wire 新摘要待后端登记但不阻塞本端施工
 
 - contract_semantics_version: core-semantics/1（APPROVED_SEMANTICS，2026-09-14）
 - wire_version/schema_digest: wire-v1 WIRE_REVISION_PENDING_BACKEND；权威
-  sha256:59529dfc4ca01dc5，工件 sha256:4f90256d5545af6a；已接受后端 hello 认证、宿主
+  sha256:793bc995fd8199df，工件 sha256:5f6bc31dd63444f6；已接受后端 hello 认证、宿主
   token 文件、Harness 仅作数据三项，并在 backend-response.md 登记实际源码待补差异
-- 合同测试: 15 项 schema/信封测试通过（src/types/wire/wire-v1.test.ts）；
-  覆盖缺口 = core v1 §9 九组场景的完整 fixture 矩阵（P07 检查点 3，未开工）
+- 合同测试: schema/client/fixture 3 files / 33 tests passed；core v1 §9 九组场景矩阵已完整执行；
+  真实 wire event stream 与后端投影差异仍是联调项，不以 fixture 伪称服务通过
 - UI_READY: 侧栏工作区列表（36R+P01）真机全绿；P02A 真机 8 PASS / 0 FAIL / 1 PENDING
-- CONTRACT_CLIENT_READY: 否（wire 未锁定）
+- CONTRACT_CLIENT_READY: 隔离客户端与 fixture READY；生产 Electron transport 待 P04，wire 新摘要待后端登记
 - REAL_FLOW_VERIFIED: 否（无真实 Server/Harness 链路证据）
 
-- frontend_implementation: PARTIAL（P02A、P02B1 完成；P02B2 待提交；B3/C/D 待施工）
+- frontend_implementation: PARTIAL（P02A、P02B1、P02B2 已提交；B3/C/D 待施工）
 - writer_lease: **ACTIVE — Codex frontend goal**（2026-09-14 09:20 +08:00 接管；
   后端工作树只读，Windows 构建/验收资源串行）
 
@@ -93,11 +93,11 @@ wire-review.md通道自39阶段协调。执行者下个检查点消费这些规�
 | P00 接管与基线 | GREEN | 旧Desktop会话无并发写入（evidence/P00.md） |
 | P01 36R收口 | GREEN | 真机 27 PASS/2 SKIP/1 PENDING（evidence/P01.md；本地打开 PENDING 转 P05） |
 | P02 上层产品 | IN_PROGRESS（P02A、P02B1 完成；P02B2 待提交；B3–D 待施工） | P01 已满足 |
-| P03 用例状态与API | READY_AFTER_P02 | P02 |
+| P03 用例状态与API | IN_PROGRESS（中立 client/replay slice 待提交） | 与 P02 穿插 |
 | P04 宿主与遗留退役 | READY_AFTER_P03 | P03 |
-| P05 正式合同接入 | SEMANTICS_AVAILABLE_WIRE_PENDING | core-semantics/1已批准；P07编制；真实服务证据另计 |
+| P05 正式合同接入 | WIRE_REVISION_PENDING_BACKEND | 新摘要待后端登记；独立客户端先行 |
 | P06 前端验收与交接 | IMPLEMENTATION_HANDOFF_GATE | 本端独立范围完成；真实全栈门由后续集成人负责 |
-| P07 核心合同与状态交接 | 检查点1完成；检查点2=wire-v1 编制 | 与P02–P05串行穿插 |
+| P07 核心合同与状态交接 | 检查点1–3完成（本轮待提交） | wire 摘要登记与 P02–P05 串行穿插 |
 
 ## 测试与证据基线（本轮实跑）
 

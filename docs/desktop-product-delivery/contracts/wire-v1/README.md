@@ -13,7 +13,7 @@ ACCEPTED_WITH_MECHANICAL_CORRECTIONS；新摘要待后端登记）。
 | 服务端评审面 | `generated/wire-v1.schema.json` | 由 `wireJsonSchemas()` 生成，禁止手改；重生成命令见下 |
 | 语义对照 | [semantics-map.md](semantics-map.md) | core v1 §8 每项能力 → 方法/事件/错误；幂等作用域逐方法登记；§9 场景 → fixture 计划 |
 
-摘要（SHA-256，前 16 位）：权威 `59529dfc4ca01dc5`；生成工件 `4f90256d5545af6a`。
+摘要（SHA-256，前 16 位）：权威 `793bc995fd8199df`；生成工件 `5f6bc31dd63444f6`。
 重生成：`cd apps/desktop && node --experimental-strip-types -e "import('./src/types/wire/wire-v1.ts').then(async m => { const fs = await import('node:fs'); fs.writeFileSync('../../docs/desktop-product-delivery/contracts/wire-v1/generated/wire-v1.schema.json', JSON.stringify(m.wireJsonSchemas(), null, 2) + '\\n') })"`
 
 **放置说明（机械选择）**：权威放 `src/types/wire/` 而非本目录，是为了让客户端直接
@@ -62,3 +62,6 @@ import 同一模块（类型/校验/导出同源，且不破坏 renderer 层序�
 本端回应：[backend-response.md](backend-response.md)。已接受 hello 认证、宿主读取受保护 token
 文件、Harness 仅作数据三项；新工件修复信封/能力约束并编码 Server 权威队列身份。后端仍需
 登记新摘要并补齐回应文件列出的事件投影与 wire event stream 差异。
+
+P07 检查点 3 已提供九组 §9 可执行 fixture、中立注入式客户端和纯事件重放投影。生产客户端没有
+默认 fetch/mock transport；Bearer token 仍只属于后续 P04 Electron transport。

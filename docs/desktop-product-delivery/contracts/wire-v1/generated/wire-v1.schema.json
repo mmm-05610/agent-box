@@ -43,10 +43,17 @@
       "id": {
         "anyOf": [
           {
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              }
+            ]
           },
           {
-            "type": "number"
+            "type": "null"
           }
         ]
       },

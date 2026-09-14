@@ -126,13 +126,18 @@ export type WireRequest = z.infer<typeof WireRequestSchema>
 export const WireResponseSchema = z
   .strictObject({
     jsonrpc: z.literal('2.0'),
-    id: z.union([z.string(), z.number()]),
+    /** Authentication/parse failures happen before a request id is trusted. */
+    id: z.union([z.string(), z.number()]).nullable(),
     result: z.unknown().optional(),
     error: WireErrorSchema.optional()
   })
   .superRefine((response, context) => {
     if (('result' in response) === ('error' in response)) {
       context.addIssue({ code: 'custom', message: 'A wire response must carry exactly one of result or error' })
+    }
+
+    if ('result' in response && response.id === null) {
+      context.addIssue({ code: 'custom', message: 'A successful response must carry its request id', path: ['id'] })
     }
   })
 export type WireResponse = z.infer<typeof WireResponseSchema>
@@ -381,13 +386,13 @@ export type ApprovalDecisionScope = z.infer<typeof ApprovalDecisionScopeSchema>
  *  optional cursor. Replay must be idempotent at the application layer
  *  (core v1 §7: replay restores presentation, never re-does work). */
 export const WireEventSchema = z.discriminatedUnion('kind', [
-  z.object({
+  z.strictObject({
     kind: z.literal('message.delta'), sessionId: WireIdSchema, messageId: WireIdSchema, text: z.string()
   }),
-  z.object({
+  z.strictObject({
     kind: z.literal('message.final'), sessionId: WireIdSchema, messageId: WireIdSchema, text: z.string()
   }),
-  z.object({
+  z.strictObject({
     kind: z.literal('tool.update'), sessionId: WireIdSchema, toolCallId: WireIdSchema,
     tool: z.string().nullable(),
     state: z.enum(['requested', 'running', 'awaiting_approval', 'completed', 'failed', 'denied']),
@@ -395,32 +400,32 @@ export const WireEventSchema = z.discriminatedUnion('kind', [
     /** Presentable result excerpt; full content is fetched, not streamed raw. */
     resultExcerpt: z.string().nullable().optional()
   }),
-  z.object({
+  z.strictObject({
     kind: z.literal('approval.requested'), sessionId: WireIdSchema, approval: ApprovalRequestSchema
   }),
-  z.object({
+  z.strictObject({
     kind: z.literal('approval.settled'), sessionId: WireIdSchema, approvalId: WireIdSchema,
     outcome: z.enum(['allowed', 'denied', 'expired', 'invalidated'])
   }),
-  z.object({
+  z.strictObject({
     kind: z.literal('config.changed'), sessionId: WireIdSchema,
     /** Which send this affects — the running one is never silently changed. */
     effectiveFor: z.enum(['next_send', 'immediate'])
   }),
-  z.object({
+  z.strictObject({
     kind: z.literal('execution.state'), sessionId: WireIdSchema, executionId: WireIdSchema,
     state: z.enum(['queued', 'dispatched', 'running', 'stopping', 'stopped', 'completed', 'failed', 'unknown']),
     /** Terminal states carry the reason; unknown ≠ failed (core v1 §6/§11). */
     reason: z.string().nullable().optional()
   }),
-  z.object({
+  z.strictObject({
     kind: z.literal('workspace.connection'), workspaceId: WireIdSchema,
     connection: WorkspaceRecordSchema.shape.connection
   })
 ])
 export type WireEvent = z.infer<typeof WireEventSchema>
 
-export const EventFrameSchema = z.object({
+export const EventFrameSchema = z.strictObject({
   /** Stable event identity — replay dedupes on this, never on position. */
   eventId: WireIdSchema,
   sessionId: WireIdSchema,

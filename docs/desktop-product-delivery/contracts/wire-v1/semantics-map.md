@@ -25,9 +25,13 @@
 config.changed / execution.state / workspace.connection`。
 不透传原生 raw 协议与秘密；Execution 只作后台身份字段，不进用户心智。
 
-## §9 必测场景 → fixture 计划（P07 检查点 3 执行；此处登记映射防漏）
+## §9 必测场景 → 可执行 fixture 矩阵（P07 检查点 3）
 
-| # | 场景 | fixture 落点 |
+矩阵清单：`apps/desktop/src/types/wire/fixtures/core-v1.ts`；执行验证：
+`core-v1.test.ts`。客户端真实序列化往返另见 `src/api/wire-v1-client.test.ts`，事件重放状态机在
+`src/application/session/wire-session-projection.ts`。测试 transport 必须显式注入，生产无 mock 默认。
+
+| # | 场景 | 已执行断言 |
 | --- | --- | --- |
 | 1 | 无 Server/无 Harness 仍开窗、业务写入诚实不可用 | hello→UNAVAILABLE；UI 不可用态（客户端侧测试） |
 | 2 | 两环境同路径不误认；重开保 id；不建 Session | workspaces.open 反例：同 path 不同 environment → 不同 id；重复 open → same id+created=false；无 sessions.* 调用断言 |
@@ -39,5 +43,5 @@ config.changed / execution.state / workspace.connection`。
 | 8 | Desktop 重连不派发；Server 重启先核对；Worker 消失不假称恢复 | 客户端重连仅 snapshot+subscribe（无 send）；execution.state=failed+reason='worker unreachable'（WORKER_UNREACHABLE） |
 | 9 | 远端受管工具限时现场、回传确认与清理分离、零材料进日志 | 传输层/服务端义务——客户端 fixture 仅断言事件不含秘密字段（负例：secrets 不在 WireEvent 形状中） |
 
-场景 1/8/9 的完整行为验证需隔离合同服务（检查点 3 的可执行验证），上表 fixture
-先以纯 schema/状态机断言覆盖可离线判定的部分。
+九组均已有离线可判定的 client/schema/application 行为门。真实 Server/Harness 义务仍由后端
+测试与最终联调验证；Desktop fixture 不连接生产服务、不调用模型，也不把 mock 接成默认 transport。
