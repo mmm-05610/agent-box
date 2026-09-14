@@ -36,7 +36,7 @@ type DiscoveryState =
   | { kind: 'unavailable'; reason: string }
   | { kind: 'error'; code: WslWorkspaceErrorCode | null }
 
-const CONFIG_RESOLVE_UNSUPPORTED = 'CAPABILITY_NOT_DECLARED'
+const BROWSE_CAPABILITY_UNSUPPORTED = 'CAPABILITY_NOT_DECLARED'
 
 /**
  * The round-36 WSL connection wizard, mounted once in the workspace sidebar:
@@ -78,7 +78,12 @@ export function WslWorkspaceWizard() {
   // method. Absence is reported, never replaced by host enumeration.
   const browseCapability = hello ? wireCapability(hello, 'workspaces.browse') : null
   const browseSupported = service.phase === 'ready' && Boolean(browseCapability?.supported)
-  const browseReason = browseCapability?.reason || CONFIG_RESOLVE_UNSUPPORTED
+  const browseReason = browseCapability?.reason || BROWSE_CAPABILITY_UNSUPPORTED
+
+  /** Any boundary that abandons the current wizard intent makes an in-flight
+   *  save stale: its answer may still have landed on the host, but it must not
+   *  select a Workspace, release a connection or close a dialog any more. */
+  const abandonPendingSave = () => saveTurns.current.begin()
 
   const runDiscovery = useCallback(async () => {
     setDiscovery({ kind: 'loading' })
@@ -111,7 +116,9 @@ export function WslWorkspaceWizard() {
     }
 
     // Fresh wizard per open: nothing from a previous attempt leaks in, and
-    // closing/cancelling never leaves a project behind.
+    // closing/cancelling never leaves a project behind. A new generation also
+    // means a previous wizard's in-flight save can never speak for this one.
+    abandonPendingSave()
     setStep('config')
     setDistribution('')
     setUser('')
@@ -128,6 +135,10 @@ export function WslWorkspaceWizard() {
     if (next) {
       return
     }
+
+    // The user gave up on this wizard, so a save still in flight is no longer
+    // its to finish: it must not select, release or close anything.
+    abandonPendingSave()
 
     // A cancelled or half-finished wizard persists nothing; the temporary
     // connection is released so it cannot linger on the host.
@@ -195,11 +206,15 @@ export function WslWorkspaceWizard() {
         return { message: failureText(t, result.code), ok: false }
       }
 
-      if (saveTurns.current.isCurrent(turn)) {
-        selectWorkspaceView(result.workspace.id)
-        void releaseWizardConnection(connectionId)
-        closeWslWorkspaceWizard()
+      // The answer may only act while this is still the wizard's current
+      // intent: a close, a Back or a fresh open in between owns the UI now.
+      if (!saveTurns.current.isCurrent(turn)) {
+        return { ok: true }
       }
+
+      selectWorkspaceView(result.workspace.id)
+      void releaseWizardConnection(connectionId)
+      closeWslWorkspaceWizard()
 
       return { ok: true }
     },
@@ -307,7 +322,10 @@ export function WslWorkspaceWizard() {
           <AgentBoxWorkspaceBrowser
             environment={target.environment}
             initialPath={target.initialPath}
-            onBack={() => setStep('config')}
+            onBack={() => {
+              abandonPendingSave()
+              setStep('config')
+            }}
             onChoose={save}
             port={browserPort}
           />
@@ -326,7 +344,9 @@ export function WslWorkspaceWizard() {
 
               if (step === 'browse' && connectionId) {
                 // Back to configuration keeps the selections; the connection
-                // stays valid until it expires.
+                // stays valid until it expires. The pending save belongs to the
+                // step being left, so it is abandoned here.
+                abandonPendingSave()
                 setStep('config')
 
                 return

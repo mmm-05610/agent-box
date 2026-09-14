@@ -141,6 +141,9 @@ export function AgentBoxWorkspaceBrowser({
 
   const listing = state.status === 'loading' || (state.status === 'ready' && state.listing)
   const currentPath = state.status === 'ready' ? state.path : input
+  // While a save is in flight the directory on screen is the one being saved:
+  // every way of moving away from it would fork the target from the UI.
+  const locked = choosing
 
   const choose = async () => {
     if (choosing || state.status !== 'ready' || state.listing) {
@@ -150,18 +153,30 @@ export function AgentBoxWorkspaceBrowser({
     setChoosing(true)
     setChooseMessage(null)
 
-    const outcome = await onChoose(state.path)
+    try {
+      const outcome = await onChoose(state.path)
 
-    if (!outcome.ok) {
-      // The browser stays exactly where it is; the caller shows the typed
-      // failure and the user can retry or navigate on.
+      // A save that answers after the surface is gone writes nothing: the
+      // caller may already have abandoned this wizard.
+      if (!alive.current) {
+        return
+      }
+
       setChoosing(false)
-      setChooseMessage(outcome.message)
 
-      return
+      if (!outcome.ok) {
+        // The browser stays exactly where it is; the caller shows the typed
+        // failure and the user can retry or navigate on.
+        setChooseMessage(outcome.message)
+      }
+    } catch (error) {
+      if (!alive.current) {
+        return
+      }
+
+      setChoosing(false)
+      setChooseMessage(error instanceof Error ? error.message : String(error))
     }
-
-    setChoosing(false)
   }
 
   return (
@@ -169,7 +184,7 @@ export function AgentBoxWorkspaceBrowser({
       <div className="flex items-center gap-1.5">
         <Button
           aria-label={t.common.back}
-          disabled={listing}
+          disabled={listing || locked}
           onClick={onBack}
           size="icon-sm"
           type="button"
@@ -179,7 +194,7 @@ export function AgentBoxWorkspaceBrowser({
         </Button>
         <Button
           aria-label={w.upOneLevel}
-          disabled={listing || (state.status === 'ready' && state.path === '/')}
+          disabled={listing || locked || (state.status === 'ready' && state.path === '/')}
           onClick={() => void browse(parentOf(currentPath))}
           size="icon-sm"
           type="button"
@@ -190,23 +205,31 @@ export function AgentBoxWorkspaceBrowser({
         <Input
           aria-label={w.pathLabel}
           className="h-7 flex-1 text-[0.75rem]"
+          disabled={locked}
           onChange={event => setInput(event.target.value)}
           onKeyDown={event => {
-            if (event.key === 'Enter') {
-              event.preventDefault()
+            if (event.key !== 'Enter') {
+              return
+            }
+
+            event.preventDefault()
+
+            // Disabled inputs do not reach a real user, but the guard is here
+            // too: a save in flight owns the directory it is saving.
+            if (!locked) {
               void browse(input)
             }
           }}
           placeholder={w.pathLabel}
           value={input}
         />
-        <Button disabled={listing} onClick={() => void browse(input)} size="sm" type="button" variant="ghost">
+        <Button disabled={listing || locked} onClick={() => void browse(input)} size="sm" type="button" variant="ghost">
           {w.goTo}
         </Button>
       </div>
 
       <label className="flex w-fit items-center gap-1.5 text-[0.6875rem] text-(--ui-text-tertiary)">
-        <Checkbox checked={showHidden} onCheckedChange={checked => setShowHidden(checked === true)} />
+        <Checkbox checked={showHidden} disabled={locked} onCheckedChange={checked => setShowHidden(checked === true)} />
         {w.showHidden}
       </label>
 
@@ -242,9 +265,11 @@ export function AgentBoxWorkspaceBrowser({
                 data-entry-can-open={String(entry.canOpen)}
                 data-entry-can-write={String(entry.canWrite)}
                 data-entry-kind={entry.kind}
-                disabled={!enterable}
+                disabled={!enterable || locked}
                 key={entry.name}
-                onClick={() => enterable && void browse(childOf(currentPath, entry.name), { canWrite: entry.canWrite })}
+                onClick={() =>
+                  enterable && !locked && void browse(childOf(currentPath, entry.name), { canWrite: entry.canWrite })
+                }
                 type="button"
               >
                 <Codicon

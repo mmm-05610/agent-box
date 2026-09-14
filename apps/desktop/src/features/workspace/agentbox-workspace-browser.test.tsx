@@ -383,3 +383,141 @@ describe('AgentBoxWorkspaceBrowser', () => {
     expect(chooseButton().hasAttribute('disabled')).toBe(false)
   })
 })
+
+describe('AgentBoxWorkspaceBrowser while a save is in flight', () => {
+  const listingWithOneDirectory = () => listing('/home/maoqh', [directory('projects'), directory('.hidden')])
+
+  const deferredChoose = () => {
+    let reject!: (reason: unknown) => void
+    let resolve!: (value: { message: string; ok: false } | { ok: true }) => void
+
+    const promise = new Promise<{ message: string; ok: false } | { ok: true }>((done, fail) => {
+      resolve = done
+      reject = fail
+    })
+
+    return { promise, reject, resolve }
+  }
+
+  it('locks every way of leaving the directory that is being saved', async () => {
+    const browse = vi.fn(async (_input: { path: string }) => listingWithOneDirectory())
+    const pending = deferredChoose()
+
+    renderBrowser({ onChoose: () => pending.promise, port: port(browse) })
+
+    await screen.findByText('projects')
+
+    // One captured button: its label turns into the saving state while busy.
+    const choose = chooseButton()
+
+    fireEvent.click(choose)
+
+    // The save owns the screen until it answers.
+    expect(screen.getByRole('button', { name: 'Back' }).hasAttribute('disabled')).toBe(true)
+    expect(screen.getByRole('button', { name: 'Up one level' }).hasAttribute('disabled')).toBe(true)
+    expect(pathInput().hasAttribute('disabled')).toBe(true)
+    expect(screen.getByRole('button', { name: 'Go' }).hasAttribute('disabled')).toBe(true)
+    expect(screen.getByRole('checkbox', { name: /hidden/ }).hasAttribute('disabled')).toBe(true)
+    expect(entryRow('projects').hasAttribute('disabled')).toBe(true)
+    expect(choose.hasAttribute('disabled')).toBe(true)
+
+    // None of them can produce a new intent, and the directory did not move.
+    fireEvent.click(entryRow('projects'))
+    fireEvent.keyDown(pathInput(), { key: 'Enter' })
+    expect(browse).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      pending.resolve({ ok: true })
+    })
+
+    expect(pathInput().value).toBe('/home/maoqh')
+  })
+
+  it('still reports a failed save while it is alive, then unlocks', async () => {
+    const browse = vi.fn(async (_input: { path: string }) => listingWithOneDirectory())
+    const pending = deferredChoose()
+
+    renderBrowser({ onChoose: () => pending.promise, port: port(browse) })
+
+    await screen.findByText('projects')
+    fireEvent.click(chooseButton())
+
+    await act(async () => {
+      pending.resolve({ message: 'Could not save the workspace', ok: false })
+    })
+
+    expect(await screen.findByText('Could not save the workspace')).toBeTruthy()
+    expect(chooseButton().hasAttribute('disabled')).toBe(false)
+    expect(pathInput().hasAttribute('disabled')).toBe(false)
+  })
+
+  it('writes nothing when a save answers after the surface is gone', async () => {
+    const failure = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const browse = vi.fn(async (_input: { path: string }) => listingWithOneDirectory())
+
+    const success = deferredChoose()
+    const view = renderBrowser({ onChoose: () => success.promise, port: port(browse) })
+
+    await screen.findByText('projects')
+    fireEvent.click(chooseButton())
+
+    view.unmount()
+
+    await act(async () => {
+      success.resolve({ ok: true })
+    })
+
+    expect(failure).not.toHaveBeenCalled()
+
+    // A fresh surface starts clean: nothing from the abandoned save leaked.
+    const next = deferredChoose()
+    renderBrowser({ onChoose: () => next.promise, port: port(browse) })
+    expect(await screen.findByText('projects')).toBeTruthy()
+    expect(chooseButton().hasAttribute('disabled')).toBe(false)
+    expect(screen.queryByText(/Could not save/)).toBeNull()
+
+    await act(async () => {
+      next.resolve({ ok: true })
+    })
+
+    failure.mockRestore()
+  })
+
+  it('swallows a failure and a throw that arrive after unmount', async () => {
+    const failure = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const browse = vi.fn(async (_input: { path: string }) => listingWithOneDirectory())
+
+    for (const settle of ['resolve-false', 'reject'] as const) {
+      const pending = deferredChoose()
+      const view = renderBrowser({ onChoose: () => pending.promise, port: port(browse) })
+
+      await screen.findByText('projects')
+      fireEvent.click(chooseButton())
+
+      view.unmount()
+
+      await act(async () => {
+        if (settle === 'resolve-false') {
+          pending.resolve({ message: 'Could not save the workspace', ok: false })
+        } else {
+          pending.reject(new Error('boom'))
+        }
+      })
+    }
+
+    expect(failure).not.toHaveBeenCalled()
+    failure.mockRestore()
+  })
+
+  it('shows a thrown save error safely instead of an unhandled rejection', async () => {
+    const browse = vi.fn(async (_input: { path: string }) => listingWithOneDirectory())
+
+    renderBrowser({ onChoose: () => Promise.reject(new Error('callback blew up')), port: port(browse) })
+
+    await screen.findByText('projects')
+    fireEvent.click(chooseButton())
+
+    expect(await screen.findByText('callback blew up')).toBeTruthy()
+    expect(chooseButton().hasAttribute('disabled')).toBe(false)
+  })
+})

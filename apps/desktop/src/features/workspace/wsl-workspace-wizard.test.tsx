@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { stubMenuDomApis, stubResizeObserver } from '@/dev/test/jsdom'
@@ -294,5 +294,122 @@ describe('WSL wizard workspace record adoption', () => {
     // Still browsing the parent directory, with the listing intact.
     expect(pathValue()).toBe('/home/maoqh')
     expect(screen.getByText('projects')).toBeTruthy()
+  })
+})
+
+describe('WSL wizard stale saves', () => {
+  const deferredSave = () => {
+    let settle!: (value: unknown) => void
+
+    const promise = new Promise(resolve => {
+      settle = resolve
+    })
+
+    return { promise, settle }
+  }
+
+  it('ignores a save that answers after the wizard was closed', async () => {
+    const pending = deferredSave()
+
+    mocks.save.mockReturnValueOnce(pending.promise as never)
+
+    render(<WslWorkspaceWizard />)
+
+    await connect()
+
+    fireEvent.click(screen.getByRole('button', { name: /Use this directory/ }))
+    await waitFor(() => expect(mocks.save).toHaveBeenCalledTimes(1))
+
+    // The user gives up while the host is still saving (the host's own save is
+    // not cancelled — only its answer stops mattering here). The dialog's own
+    // close is the only exit from the browse step.
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    await waitFor(() => expect($wslWorkspaceWizardOpen.get()).toBe(false))
+
+    const releasesAfterClose = mocks.releaseConnection.mock.calls.length
+
+    await act(async () => {
+      pending.settle({ ok: true, workspace: wslRecord({ id: 'wsl_late' }) })
+    })
+
+    expect($workspaceViewSelectedId.get()).toBeNull()
+    expect($wslWorkspaceWizardOpen.get()).toBe(false)
+    // The close path released the connection once; the stale answer did not.
+    expect(mocks.releaseConnection).toHaveBeenCalledTimes(releasesAfterClose)
+  })
+
+  it('cannot touch a wizard that was reopened after the old save started', async () => {
+    const pending = deferredSave()
+
+    mocks.save.mockReturnValueOnce(pending.promise as never)
+
+    render(<WslWorkspaceWizard />)
+
+    await connect()
+
+    fireEvent.click(screen.getByRole('button', { name: /Use this directory/ }))
+    await waitFor(() => expect(mocks.save).toHaveBeenCalledTimes(1))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    await waitFor(() => expect($wslWorkspaceWizardOpen.get()).toBe(false))
+
+    // A new wizard generation opens; its own discovery runs again.
+    $wslWorkspaceWizardOpen.set(true)
+    await screen.findByRole('button', { name: 'Connect' })
+
+    await act(async () => {
+      pending.settle({ ok: true, workspace: wslRecord({ id: 'wsl_late' }) })
+    })
+
+    // The new wizard is untouched: still open, nothing selected, and its
+    // configuration step is still what is on screen.
+    expect($wslWorkspaceWizardOpen.get()).toBe(true)
+    expect($workspaceViewSelectedId.get()).toBeNull()
+    expect(screen.getByRole('button', { name: 'Connect' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Use this directory/ })).toBeNull()
+  })
+
+  it('still selects and closes for the save that is current', async () => {
+    const pending = deferredSave()
+
+    mocks.save.mockReturnValueOnce(pending.promise as never)
+
+    render(<WslWorkspaceWizard />)
+
+    await connect()
+
+    fireEvent.click(screen.getByRole('button', { name: /Use this directory/ }))
+    await waitFor(() => expect(mocks.save).toHaveBeenCalledTimes(1))
+
+    await act(async () => {
+      pending.settle({ ok: true, workspace: wslRecord({ id: 'wsl_current' }) })
+    })
+
+    await waitFor(() => expect($workspaceViewSelectedId.get()).toBe('wsl_current'))
+    await waitFor(() => expect($wslWorkspaceWizardOpen.get()).toBe(false))
+    expect(mocks.releaseConnection).toHaveBeenCalledWith('conn-1')
+  })
+
+  it('abandons a pending save when the user steps back to configuration', async () => {
+    const pending = deferredSave()
+
+    mocks.save.mockReturnValueOnce(pending.promise as never)
+
+    render(<WslWorkspaceWizard />)
+
+    await connect()
+
+    fireEvent.click(screen.getByRole('button', { name: /Use this directory/ }))
+    await waitFor(() => expect(mocks.save).toHaveBeenCalledTimes(1))
+
+    fireEvent.click(footerButton('Back'))
+    expect(await screen.findByText('Configure WSL')).toBeTruthy()
+
+    await act(async () => {
+      pending.settle({ ok: true, workspace: wslRecord({ id: 'wsl_late' }) })
+    })
+
+    expect($workspaceViewSelectedId.get()).toBeNull()
+    expect($wslWorkspaceWizardOpen.get()).toBe(true)
   })
 })
