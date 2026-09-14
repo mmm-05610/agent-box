@@ -131,7 +131,11 @@ describe('startWorkspaceSession', () => {
 
   it('replaces an occupied chat with a workspace draft without creating a backend session', async () => {
     const activeSessionIdRef = { current: 'runtime-existing' as string | null }
-    const requestGateway = vi.fn(async () => ({ branch: 'main', cwd: '/workspace-next' }))
+
+    const requestGateway = vi.fn(async (_method: string, _params?: Record<string, unknown>) => ({
+      branch: 'main',
+      cwd: '/workspace-next'
+    }))
 
     const startFreshSessionDraft = vi.fn(() => {
       activeSessionIdRef.current = null
@@ -140,7 +144,7 @@ describe('startWorkspaceSession', () => {
     startWorkspaceSession({
       activeSessionIdRef,
       path: '/workspace-next',
-      requestGateway,
+      requestGateway: requestGateway as <T>(method: string, params?: Record<string, unknown>) => Promise<T>,
       startFreshSessionDraft
     })
 

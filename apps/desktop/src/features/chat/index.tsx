@@ -40,7 +40,7 @@ import { modelOptionsQueryKey, requestModelOptions } from '@/lib/model-options'
 import { titlebarHeaderBaseClass, titlebarHeaderShadowClass, titlebarHeaderTitleClass } from '@/lib/titlebar'
 import { useStoreSelector } from '@/lib/use-session-slice'
 import { cn } from '@/lib/utils'
-import { migrateSessionDraft } from '@/store/composer'
+import { migrateSessionDraft, workspaceDraftScope } from '@/store/composer'
 import { migrateQueuedPrompts, parkQueuedPrompts } from '@/store/composer-queue'
 import { $introSplash } from '@/store/intro-splash'
 import { $pinnedSessionIds } from '@/store/layout'
@@ -66,6 +66,7 @@ import {
 import { $focusedStoredSessionId, sessionTileDelegate } from '@/store/session-states'
 import { $transcriptTailBySessionId, transcriptTailState } from '@/store/transcript-tail'
 import { isAuxiliaryWindow, isWatchWindow } from '@/store/windows'
+import { $workspaceViewSelectedId } from '@/store/workspace-view'
 import type { ModelOptionsResponse } from '@/types/hermes'
 
 import { ChatDropOverlay } from './chat-drop-overlay'
@@ -454,6 +455,7 @@ const ChatViewContent = memo(function ChatViewContent({
   const messagesEmpty = useStore(view.$messagesEmpty)
   const lastVisibleIsUser = useStore(view.$lastVisibleIsUser)
   const selectedSessionId = useStore(view.$storedId)
+  const selectedWorkspaceId = useStore($workspaceViewSelectedId)
   const sessions = useStore($sessions)
   const resumeExhaustedSessionId = useStore($resumeExhaustedSessionId)
 
@@ -747,6 +749,7 @@ const ChatViewContent = memo(function ChatViewContent({
               busy={busy}
               cwd={currentCwd}
               disabled={!gatewayOpen}
+              draftScopeKey={isPrimary && selectedWorkspaceId ? workspaceDraftScope(selectedWorkspaceId) : null}
               focusKey={activeSessionId}
               gateway={gateway}
               maxRecordingSeconds={maxVoiceRecordingSeconds}

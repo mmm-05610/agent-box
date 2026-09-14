@@ -257,6 +257,7 @@ export function LocalWorkspaceRow({
 export interface WslWorkspaceRowProps {
   infoOpen: boolean
   item: WorkspaceListItem
+  onEnter?: (workspace: WslWorkspaceRecord) => void
   onRemove: (target: { id: string; name: string }) => void
   onRename: (target: { id: string; name: string }) => void
   state: WslWorkspaceValidationState | undefined
@@ -271,7 +272,7 @@ export interface WslWorkspaceRowProps {
  * SELECTS the workspace — connection info stays on its dedicated button and
  * menu entry, never on the main row.
  */
-export function WslWorkspaceRow({ infoOpen, item, onRemove, onRename, state, workspace }: WslWorkspaceRowProps) {
+export function WslWorkspaceRow({ infoOpen, item, onEnter, onRemove, onRename, state, workspace }: WslWorkspaceRowProps) {
   const { t } = useI18n()
   const w = t.wslWorkspace
   const validating = state?.status === 'validating'
@@ -292,7 +293,10 @@ export function WslWorkspaceRow({ infoOpen, item, onRemove, onRename, state, wor
         'flex min-w-0 shrink items-center gap-2 rounded-md bg-transparent p-0 text-left',
         selected && 'text-foreground'
       )}
-      onClick={() => selectWorkspaceView(workspace.id)}
+      onClick={() => {
+        selectWorkspaceView(workspace.id)
+        onEnter?.(workspace)
+      }}
       type="button"
     >
       {/* Two stacked lines, name first: the name must stay readable even

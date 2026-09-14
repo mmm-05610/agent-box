@@ -17,7 +17,6 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { type AppView } from '@/app/routes'
 import { SidebarProvider } from '@/components/ui/sidebar'
 import { makeSessionInfo } from '@/dev/test/session-info'
 import { $sidebarWorkspaceNodeOpen, setSidebarAgentsGrouped, setSidebarGrouping } from '@/store/layout'
@@ -88,18 +87,18 @@ const homeNode: SidebarProjectTree = {
   sessionCount: 0
 }
 
-function renderSidebar(currentView: AppView = 'chat') {
+function renderSidebar({ onNewSessionInWorkspace = noop }: { onNewSessionInWorkspace?: (path: null | string) => void } = {}) {
   return render(
     <MemoryRouter initialEntries={['/']}>
       <SidebarProvider>
         <ChatSidebar
-          currentView={currentView}
+          currentView="chat"
           onArchiveSession={noop}
           onBranchSession={noop}
           onDeleteSession={noop}
           onLoadMoreSessions={noop}
           onNavigate={noop}
-          onNewSessionInWorkspace={noop}
+          onNewSessionInWorkspace={onNewSessionInWorkspace}
           onNewSessionSplit={noop}
           onResumeSession={noop}
         />
@@ -243,10 +242,11 @@ describe('ChatSidebar workspace assembly (36R)', () => {
     expect(container.querySelector('[data-wsl-workspace-empty="wsl_ws_1"]')).not.toBeNull()
   })
 
-  it('clicking a WSL workspace main row selects the workspace — it does not open connection info', async () => {
+  it('clicking a WSL workspace main row selects it and enters a session-free draft', async () => {
     listWslWorkspaces.mockResolvedValue({ ok: true as const, workspaces: [wslRecord()] })
+    const onNewSessionInWorkspace = vi.fn()
 
-    const { container } = renderSidebar()
+    const { container } = renderSidebar({ onNewSessionInWorkspace })
 
     await waitFor(() => {
       expect(container.querySelector('[data-wsl-workspace-row="wsl_ws_1"]')).not.toBeNull()
@@ -260,6 +260,9 @@ describe('ChatSidebar workspace assembly (36R)', () => {
 
     // Selected via the same convention the local rows follow…
     expect(container.querySelector('[data-workspace-row-selected="wsl_ws_1"]')).not.toBeNull()
+    // The WSL workspace's stable selected id scopes the draft. Its Linux path
+    // must not be sent through the legacy local-host config probe.
+    expect(onNewSessionInWorkspace).toHaveBeenCalledWith(null)
     // …and the connection info dialog did NOT open: that is a secondary action,
     // never the main row's meaning.
     expect($wslWorkspaceInfoId.get()).toBeNull()

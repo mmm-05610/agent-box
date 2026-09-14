@@ -10,7 +10,7 @@ import { SLASH_COMMAND_RE } from '@/lib/chat-runtime'
 import type { ChatBarProps } from '@/lib/composer/types'
 import { triggerHaptic } from '@/lib/haptics'
 import { hasClarifyRequest, skipClarifyRequest } from '@/store/clarify'
-import { clearSessionDraft } from '@/store/composer'
+import { clearSessionDraftIfVersion, sessionDraftVersion } from '@/store/composer'
 import { resetBrowseState } from '@/store/composer-input-history'
 import { enqueueQueuedPrompt, type QueuedPromptEntry } from '@/store/composer-queue'
 import { hasMcpSetupRequest, skipMcpSetupRequest } from '@/store/mcp-setup'
@@ -40,7 +40,7 @@ interface UseComposerSubmitArgs {
   queuedPrompts: QueuedPromptEntry[]
   sessionId: string | null | undefined
   setComposerText: (value: string) => void
-  stashAt: (scope: string | null, text?: string, attachments?: ComposerAttachment[]) => void
+  stashAt: (scope: string | null, text?: string, attachments?: ComposerAttachment[]) => number
 }
 
 /**
@@ -86,8 +86,49 @@ export function useComposerSubmit({
   const dispatchSubmit = (text: string, attachments?: ComposerAttachment[], displayKind?: 'hidden') => {
     const submittedScope = activeQueueSessionKeyRef.current
     const submittedAttachments = attachments ?? []
+    // Bank the exact payload before handing control to an asynchronous
+    // transport. Its version is the compare-and-clear token for the response.
+    const submittedVersion = stashAt(submittedScope, text, submittedAttachments)
+
+    const bankNewerLiveIntent = () => {
+      if (activeQueueSessionKeyRef.current !== submittedScope) {
+        return false
+      }
+
+      const liveText = draftRef.current
+      const liveAttachments = scope.attachments.$attachments.get()
+
+      if (!liveText.trim() && liveAttachments.length === 0) {
+        return false
+      }
+
+      stashAt(submittedScope, liveText, liveAttachments)
+
+      return true
+    }
 
     const restore = () => {
+      if (bankNewerLiveIntent()) {
+        return
+      }
+
+      const currentVersion = sessionDraftVersion(submittedScope)
+
+      // A newer non-empty draft is newer user intent. A rejected old request
+      // must not repaint or overwrite it. An absent draft is allowed: leaving
+      // the composer after optimistic clear can legitimately stash emptiness.
+      if (currentVersion !== null && currentVersion !== submittedVersion) {
+        return
+      }
+
+      if (activeQueueSessionKeyRef.current !== submittedScope) {
+        if (currentVersion === null) {
+          stashAt(submittedScope, text, submittedAttachments)
+        }
+
+        return
+      }
+
       loadIntoComposer(text, submittedAttachments)
       // Use the scope captured at dispatch, not whatever session is focused
       // now — the gateway can reject well after the user has switched away,
@@ -101,7 +142,14 @@ export function useComposerSubmit({
         ? onSubmit(text, { attachments, composerScope: submittedScope, ...(displayKind ? { displayKind } : {}) })
         : onSubmit(text, { composerScope: submittedScope, ...(displayKind ? { displayKind } : {}) })
     )
-      .then(accepted => void (accepted === false ? restore() : clearSessionDraft(submittedScope)))
+      .then(accepted => {
+        if (accepted === false) {
+          restore()
+        } else {
+          bankNewerLiveIntent()
+          clearSessionDraftIfVersion(submittedScope, submittedVersion)
+        }
+      })
       .catch(restore)
   }
 

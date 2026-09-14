@@ -168,6 +168,11 @@ export function WorkspaceList({
             }
           }
           key={workspace.id}
+          // The selected workspace id is the draft identity. Passing its Linux
+          // path through the legacy local-workspace callback would make
+          // Electron probe it as a host path, so WSL enters a detached draft
+          // until the neutral wire client resolves the workspace by id.
+          onEnter={() => onNewSessionInWorkspace?.(null)}
           onRemove={setRemoveTarget}
           onRename={setRenameTarget}
           state={validation[workspace.id]}

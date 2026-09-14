@@ -90,6 +90,7 @@ export function ChatBar({
   busy,
   cwd,
   disabled,
+  draftScopeKey,
   focusKey,
   gateway,
   maxRecordingSeconds = 120,
@@ -150,7 +151,7 @@ export function ChatBar({
   // busy submit routes text to the queue instead of a steer (which would sit
   // undelivered behind the blocked tool batch). Drives the button affordance.
   const blockingPrompt = useStore(useMemo(() => sessionBlockingPrompt(sessionId ?? null), [sessionId]))
-  const activeQueueSessionKey = queueSessionKey || sessionId || null
+  const activeQueueSessionKey = queueSessionKey || sessionId || draftScopeKey || null
 
   // Status items (subagents, background processes) are keyed by the RUNTIME
   // session id — gateway events and process.list both speak that id. Only the

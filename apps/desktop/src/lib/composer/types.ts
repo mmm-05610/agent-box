@@ -42,6 +42,8 @@ export interface ChatBarProps {
   maxRecordingSeconds?: number
   state: ChatBarState
   gateway?: HermesGateway | null
+  /** Stable workspace identity for a not-yet-created Session draft. */
+  draftScopeKey?: string | null
   queueSessionKey?: string | null
   sessionId?: string | null
   cwd?: string | null

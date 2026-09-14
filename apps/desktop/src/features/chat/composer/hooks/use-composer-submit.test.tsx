@@ -6,6 +6,7 @@ import { type ComposerTarget, requestComposerSubmit } from '@/components/compose
 import { ComposerScopeProvider, ComposerSurfaceProvider, MAIN_COMPOSER_SCOPE } from '@/components/composer/scope'
 import { PaneVisibleContext } from '@/components/pane-shell/pane-visibility'
 import { $clarifyRequests } from '@/store/clarify'
+import { clearSessionDraft, stashSessionDraft, takeSessionDraft } from '@/store/composer'
 import { $gateway } from '@/store/gateway'
 import {
   clearAllPrompts,
@@ -26,6 +27,7 @@ interface SubmitHarnessOptions {
   scopeTarget?: ComposerTarget
   sessionKey?: string | null
   submitOnHide?: boolean
+  submitResult?: Promise<boolean>
   surfaceId?: string | null
   text?: string
   visible?: boolean
@@ -41,6 +43,7 @@ function renderSubmitHook({
   scopeTarget = 'main',
   sessionKey = 'stored-session',
   submitOnHide = false,
+  submitResult,
   surfaceId,
   text = '',
   visible = true
@@ -53,7 +56,7 @@ function renderSubmitHook({
   const editorRef = { current: editor }
   const onCancel = vi.fn()
   const onSteer = vi.fn(async () => true)
-  const onSubmit = vi.fn(async () => true)
+  const onSubmit = vi.fn(() => submitResult ?? Promise.resolve(true))
   const queueCurrentDraft = vi.fn(() => true)
   let updatePaneVisible: Dispatch<SetStateAction<boolean>> | undefined
 
@@ -114,13 +117,14 @@ function renderSubmitHook({
         queuedPrompts: [],
         sessionId: 'runtime-session',
         setComposerText: vi.fn(),
-        stashAt: vi.fn()
+        stashAt: (scope, value = '', items = []) => stashSessionDraft(scope, value, items)
       }),
     { wrapper: Wrapper }
   )
 
   return {
     clearDraft,
+    draftRef,
     hook,
     onCancel,
     onSteer,
@@ -266,6 +270,7 @@ describe('useComposerSubmit external request routing', () => {
 describe('useComposerSubmit busy-turn routing', () => {
   afterEach(() => {
     cleanup()
+    clearSessionDraft('stored-session')
     vi.restoreAllMocks()
   })
 
@@ -381,6 +386,26 @@ describe('useComposerSubmit busy-turn routing', () => {
     await waitFor(() =>
       expect(onSubmit).toHaveBeenCalledWith('hello', expect.objectContaining({ composerScope: 'stored-session' }))
     )
+  })
+
+  it('does not let a late accepted response clear text typed after submit', async () => {
+    let accept!: (accepted: boolean) => void
+
+    const submitResult = new Promise<boolean>(resolve => {
+      accept = resolve
+    })
+
+    const { draftRef, hook } = renderSubmitHook({ submitResult, text: 'first request' })
+
+    act(() => hook.result.current.submitDraft())
+
+    act(() => {
+      draftRef.current = 'typed while waiting'
+      stashSessionDraft('stored-session', draftRef.current, [])
+      accept(true)
+    })
+
+    await waitFor(() => expect(takeSessionDraft('stored-session').text).toBe('typed while waiting'))
   })
 })
 

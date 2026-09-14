@@ -1004,11 +1004,12 @@ export function ChatSidebar({
         onEnterProject(item.id)
       } else {
         selectWorkspaceView(item.id)
+        onNewSessionInWorkspace(null)
       }
 
       setSearchQuery('')
     },
-    [onEnterProject]
+    [onEnterProject, onNewSessionInWorkspace]
   )
 
   // The Sessions section is a project switcher in grouped mode: its label reads
