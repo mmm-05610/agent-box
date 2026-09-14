@@ -15,8 +15,10 @@ export interface AgentBoxWorkspaceSelection {
   serviceWorkspaceId?: null | string
   /** Local shell target: the folder the sidebar row stands for. */
   localPath?: null | string
-  /** WSL shell target: the host-verified identity plus the POSIX root path. */
-  wsl?: { distribution: string; rootPath: string } | null
+  /** WSL shell target: the host-verified identity plus the POSIX root path.
+   *  `user` is part of the identity, not decoration: the same distro and path
+   *  under another user is another location. */
+  wsl?: { distribution: string; rootPath: string; user: null | string } | null
 }
 
 export interface OpenAgentBoxWorkspaceInput {
@@ -65,10 +67,11 @@ export async function openAgentBoxWorkspace(
   })
 }
 
-/** Resolve a shell selection to a server-owned Workspace identity by
- *  environment + path. Local and WSL never collapse into one location even when
- *  their path strings are equal, and path comparison only ever reads the
- *  service's own normalizedPath. */
+/** Resolve a shell selection to a server-owned Workspace identity by the
+ *  COMPLETE environment identity ({kind, user, host}) plus path. The identity
+ *  fields are compared as opaque strings with no normalisation: a same-path
+ *  sibling distribution or another user in the same distro is a different
+ *  location. Path comparison only ever reads the service's own normalizedPath. */
 export function resolveAgentBoxWorkspace(
   workspaces: readonly WorkspaceRecord[],
   selection: AgentBoxWorkspaceSelection
@@ -82,14 +85,16 @@ export function resolveAgentBoxWorkspace(
   }
 
   if (selection.wsl) {
-    const rootPath = normalizedPath(selection.wsl.rootPath)
+    const { distribution, rootPath, user } = selection.wsl
+    const expectedPath = normalizedPath(rootPath)
 
     return (
       workspaces.find(
         workspace =>
           workspace.environment.kind === 'wsl' &&
-          workspace.environment.host === selection.wsl!.distribution &&
-          normalizedPath(workspace.normalizedPath) === rootPath
+          workspace.environment.host === distribution &&
+          workspace.environment.user === user &&
+          normalizedPath(workspace.normalizedPath) === expectedPath
       ) ?? null
     )
   }
@@ -100,10 +105,15 @@ export function resolveAgentBoxWorkspace(
 
   const localPath = normalizedPath(selection.localPath)
 
+  // A local location is the machine itself: any host or user on the record
+  // means it describes a different environment and must not be reused.
   return (
     workspaces.find(
       workspace =>
-        workspace.environment.kind === 'local' && normalizedPath(workspace.normalizedPath) === localPath
+        workspace.environment.kind === 'local' &&
+        workspace.environment.host === null &&
+        workspace.environment.user === null &&
+        normalizedPath(workspace.normalizedPath) === localPath
     ) ?? null
   )
 }

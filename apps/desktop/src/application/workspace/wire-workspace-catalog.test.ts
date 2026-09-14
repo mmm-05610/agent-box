@@ -120,10 +120,15 @@ describe('AgentBox Workspace catalog', () => {
     expect($agentBoxWorkspaces.get()).toEqual([])
   })
 
-  it('uses an explicit service id for a known Workspace and skips path matching', () => {
-    const direct = workspace('workspace-1', 'local', '/service/path')
+  it('uses an explicit service id for a known Workspace and skips every other rule', () => {
+    const direct = workspace('workspace-1', 'wsl', '/service/path', 'Ubuntu', 'someone-else')
 
-    expect(resolveAgentBoxWorkspace([direct], { serviceWorkspaceId: 'workspace-1' })).toBe(direct)
+    // A Session's own workspaceId is authoritative even when the shell
+    // selection could never have matched that record's identity.
+    expect(
+      resolveAgentBoxWorkspace([direct], { localPath: '/elsewhere', serviceWorkspaceId: 'workspace-1' })
+    ).toBe(direct)
+    expect(resolveAgentBoxWorkspace([direct], { serviceWorkspaceId: 'missing' })).toBeNull()
   })
 
   it('never lets a shell row id that happens to equal a Wire id become a hit', () => {
@@ -146,7 +151,9 @@ describe('AgentBox Workspace catalog', () => {
     const wsl = workspace('wsl-app', 'wsl', '/work/app', 'Ubuntu', 'me')
 
     expect(resolveAgentBoxWorkspace([local, wsl], { localPath: '/work/app' })).toBe(local)
-    expect(resolveAgentBoxWorkspace([local, wsl], { wsl: { distribution: 'Ubuntu', rootPath: '/work/app' } })).toBe(wsl)
+    expect(
+      resolveAgentBoxWorkspace([local, wsl], { wsl: { distribution: 'Ubuntu', rootPath: '/work/app', user: 'me' } })
+    ).toBe(wsl)
   })
 
   it('matches WSL by distribution and Linux path, never by a same-path sibling distro', () => {
@@ -154,8 +161,44 @@ describe('AgentBox Workspace catalog', () => {
     const debian = workspace('debian', 'wsl', '/home/me/app', 'Debian', 'me')
 
     expect(
-      resolveAgentBoxWorkspace([debian, ubuntu], { wsl: { distribution: 'Ubuntu', rootPath: '/home/me/app' } })
+      resolveAgentBoxWorkspace([debian, ubuntu], {
+        wsl: { distribution: 'Ubuntu', rootPath: '/home/me/app', user: 'me' }
+      })
     ).toBe(ubuntu)
+  })
+
+  it('keeps two users of the same distro and path apart', () => {
+    const alice = workspace('alice-app', 'wsl', '/home/app', 'Ubuntu', 'alice')
+    const bob = workspace('bob-app', 'wsl', '/home/app', 'Ubuntu', 'bob')
+
+    expect(
+      resolveAgentBoxWorkspace([bob, alice], { wsl: { distribution: 'Ubuntu', rootPath: '/home/app', user: 'alice' } })
+    ).toBe(alice)
+    expect(
+      resolveAgentBoxWorkspace([alice, bob], { wsl: { distribution: 'Ubuntu', rootPath: '/home/app', user: 'bob' } })
+    ).toBe(bob)
+  })
+
+  it('fails closed when only another user holds that distro and path', () => {
+    const bob = workspace('bob-app', 'wsl', '/home/app', 'Ubuntu', 'bob')
+
+    expect(
+      resolveAgentBoxWorkspace([bob], { wsl: { distribution: 'Ubuntu', rootPath: '/home/app', user: 'alice' } })
+    ).toBeNull()
+    // A record whose user is unknown is not the same identity either.
+    expect(
+      resolveAgentBoxWorkspace([workspace('unknown-user', 'wsl', '/home/app', 'Ubuntu', null)], {
+        wsl: { distribution: 'Ubuntu', rootPath: '/home/app', user: 'alice' }
+      })
+    ).toBeNull()
+  })
+
+  it('never reuses a local record that carries a host or a user', () => {
+    const machine = workspace('machine', 'local', '/work/app')
+    const remoteish = workspace('remoteish', 'local', '/work/app', 'some-host', 'someone')
+
+    expect(resolveAgentBoxWorkspace([remoteish], { localPath: '/work/app' })).toBeNull()
+    expect(resolveAgentBoxWorkspace([remoteish, machine], { localPath: '/work/app' })).toBe(machine)
   })
 
   it('fails closed when a shell selection cannot be proven equivalent to a service Workspace', () => {

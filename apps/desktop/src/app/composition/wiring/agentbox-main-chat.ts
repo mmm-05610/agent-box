@@ -68,7 +68,13 @@ const workspaceOpenAttempts = new Map<string, Promise<WorkspacesOpenResult>>()
  *  identity and POSIX path, a local row carries the desktop path as-is. */
 function selectionForTarget(target: AgentBoxShellWorkspaceTarget): AgentBoxWorkspaceSelection {
   return target.environment.kind === 'wsl'
-    ? { wsl: { distribution: target.environment.host ?? '', rootPath: target.path } }
+    ? {
+        wsl: {
+          distribution: target.environment.host ?? '',
+          rootPath: target.path,
+          user: target.environment.user
+        }
+      }
     : { localPath: target.path }
 }
 

@@ -96,7 +96,7 @@ const workspace: WorkspaceRecord = {
   connection: { state: 'connected' },
   createdAt: '2026-09-14T00:00:00.000Z',
   displayName: 'App',
-  environment: { host: null, kind: 'local', user: 'alice' },
+  environment: { host: null, kind: 'local', user: null },
   id: asWireId('workspace-1'),
   normalizedPath: 'C:/work/app',
   updatedAt: '2026-09-14T00:00:00.000Z',
@@ -876,6 +876,60 @@ describe('primary AgentBox chat Workspace registration', () => {
     expect(mocks.openWorkspace).not.toHaveBeenCalled()
     expect(result.current.workspace?.id).toBe('workspace-1')
     expect(result.current.draftScopeKey).toBe('session-1')
+  })
+
+  it('never adopts another user of the same distro and path, and registers as the verified user', async () => {
+    $workspaceViewSelectedId.set('wsl-row-1')
+    $wslWorkspaces.set([wslRecord({ actualUser: 'alice' })])
+    // The cache only holds this distro + path under a DIFFERENT user.
+    $agentBoxWorkspaces.set([
+      {
+        ...workspace,
+        environment: { host: 'Ubuntu', kind: 'wsl', user: 'bob' },
+        id: asWireId('workspace-bob'),
+        normalizedPath: '/home/me/app'
+      }
+    ])
+
+    const pending = deferredOpen()
+
+    mocks.openWorkspace.mockReturnValueOnce(pending.promise)
+
+    const { result } = renderHook(useAgentBoxMainChat, { wrapper: wrapper('/new') })
+
+    await flush()
+
+    expect(mocks.openWorkspace).toHaveBeenCalledTimes(1)
+    expect(mocks.openWorkspace).toHaveBeenCalledWith(
+      { id: 'client' },
+      { environment: { host: 'Ubuntu', kind: 'wsl', user: 'alice' }, path: '/home/me/app' }
+    )
+    // Bob's Workspace is not this row's Workspace.
+    expect(result.current.workspace).toBeNull()
+    expect(result.current.sendAvailable).toBe(false)
+    expect(result.current.workspaceOpen).toEqual({ status: 'opening' })
+    expect(result.current.draftScopeKey).toBe(workspaceDraftScope('wsl-row-1'))
+  })
+
+  it('adopts the record when the whole identity and the path already match', async () => {
+    $workspaceViewSelectedId.set('wsl-row-1')
+    $wslWorkspaces.set([wslRecord({ actualUser: 'alice' })])
+    $agentBoxWorkspaces.set([
+      {
+        ...workspace,
+        environment: { host: 'Ubuntu', kind: 'wsl', user: 'alice' },
+        id: asWireId('workspace-alice'),
+        normalizedPath: '/home/me/app'
+      }
+    ])
+
+    const { result } = renderHook(useAgentBoxMainChat, { wrapper: wrapper('/new') })
+
+    await flush()
+
+    expect(mocks.openWorkspace).not.toHaveBeenCalled()
+    expect(result.current.workspace?.id).toBe('workspace-alice')
+    expect(result.current.workspaceOpen).toEqual({ status: 'idle' })
   })
 })
 
