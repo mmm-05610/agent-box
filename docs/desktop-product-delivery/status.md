@@ -5,7 +5,7 @@
 
 ## 执行快照（handoff-policy 每阶段必填）— 接管施工中
 
-- updated_at: 2026-09-14 14:32 (+08:00)
+- updated_at: 2026-09-14 14:52 (+08:00)
 - 执行者: Codex 前端产品 goal（接力会话）；**已从暂停的 Zcode 执行者接管**
 - 工作树/分支: /home/maoqh/projects/agent-box-desktop-next-wsl-round1 @ feature/agentbox-desktop-product
 - 接管核验（历史，Zcode→Codex 交接）: 用户指定交接 HEAD `5c0fbfe` 与实际 HEAD
@@ -16,8 +16,7 @@
 - 本阶段起点核验: HEAD `1cbc4f58d602b212f55c7c4dd9c2bc38718cba83`、分支
   feature/agentbox-desktop-product、工作树 clean，无同工作树并发写入者；writer lease 仍为同一
   前端 goal 的 ACTIVE lease，本阶段串行施工，完成后停止写入并回报，不提前 RELEASE。
-- 代码检查点（已提交 HEAD）: `af0c08e3`（P02/P05 返修：服务权威名称回写）；本阶段为**只读审计 + 文档**，
-  无生产代码变化
+- 代码检查点（已提交 HEAD）: `940c9df4`（P05：`config.resolve` 生产接线）
   链: ebb1233（P00）→ 8d4b3df/47b5b47/dbb902f（P01 代码与几何修复）→ 26b32fc（P01 GREEN 证据）
   → 468e6ac/d7e9a57（发布源 d3c0196+ffbcfaf 导入）→ 893d560（P07 检查点2 wire-v1）
   → 957a523（P02A 盘点）→ 07f5386（P02A slice 1：失败面非阻塞）→ 3a25edc（P02A slice 2）
@@ -39,12 +38,14 @@
   → d6ec993（服务模型目录与临时槽）→ 2991bff（中立 Provider/Model 设置）
   → 1cbc4f58（Provider 模型检查点）→ dfcd7027（Profile 默认配置编辑与串行 CAS）
   → 88f3d934（enum/boolean 编辑覆盖）→ af0c08e3（返修：服务权威名称回写）
-  → 本阶段文档检查点（P05 客户端矩阵审计，evidence/P05-client-matrix.md）
+  → 矩阵审计文档检查点（evidence/P05-client-matrix.md）→ **940c9df4（config.resolve 生产接线）**
 - 已消费发布文档提交: 86d5a7b、61c7ff7、d3c0196、ffbcfaf
-- 当前检查点改动（只读审计）: 生成本端 28 方法客户端矩阵（每行一个状态：22 PRODUCTION_REACHABLE、
-  6 FIXTURE_ONLY_FRONTEND_GAP、0 CLIENT_READY_NO_SURFACE、0 NOT_APPLICABLE），并单列同一处外部
-  EXTERNAL_LIFECYCLE_BLOCKED（connection slot 为 null）与遗留 Hermes 可达性结论。**未修改任何生产
-  代码或测试**；6 个前端缺口只记录目标文件/接口/不变量/建议验收，留待下一机械实现批次。
+- 当前检查点改动（config.resolve 接线）: 已锁定 `config.resolve` 接入产品路径——application 窄函数
+  发 exact `{profileId, workspaceId, overrides}`；发送前强制服务校验（rejected→`invalidControls`
+  且零 send，transport/typed 失败零 send）；Composer 预览按 scope/overrides latest-wins 且 hello
+  未声明不发请求；`sendAvailable` 收紧为「hello 声明 `config.resolve` + 该路由的发送动词」。矩阵中
+  `config.resolve` 由 FIXTURE_ONLY_FRONTEND_GAP 改为 PRODUCTION_REACHABLE（EXT），汇总 **23
+  reachable / 5 gap**；G4 改写为接线记录（含原不变量与已执行验收）。
 - 上一检查点改动（返修）: 保存成功后除 upsert store 外，`profiles.update` 与 `profiles.updateConfig`
   两次被采纳的服务返回都立即回写本地 `displayName`（服务规范化名称必须显示在输入框、成功后不得
   残留 dirty/Save）；名称输入在保存未决期间进入与配置控件、保存按钮一致的禁用态，避免产生当前
@@ -61,9 +62,9 @@
 - 完成范围: P00；P01 全部返修（真机 27 PASS）；P07 检查点 1（语义映射）、检查点 2
   （wire-v1 候选：17 方法 + schema 测试 + JSON Schema 工件；已消费后端机械反馈并回应）；
   P02A（失败面非阻塞+可关闭、Artifacts 页退役、失败终态竞态修复与真机门）
-- 下一项: 按 evidence/P05-client-matrix.md §3 补 6 个前端缺口（workspaces.open/browse/archive、
-  config.resolve、sessions.update/archive 的目标文件与不变量已列出），随后按 P06 收口无模型独立
-  验收；Server lifecycle connection 合同到达后接生产接线。不再重新研究协议。
+- 下一项: 按 evidence/P05-client-matrix.md §3 补剩余 5 个前端缺口（workspaces.open/browse/archive、
+  sessions.update/archive 的目标文件与不变量已列出），随后按 P06 收口无模型独立验收；Server
+  lifecycle connection 合同到达后接生产接线。不再重新研究协议。
 - 阻断: 无真实阻断。剩余 P04 production lifecycle connection 与显式 legacy 消费者收口、
   P05 生产接线核查和 P06 独立验收待续；wire 摘要已锁定，真实全栈仍由后续集成人验证
 
@@ -165,6 +166,15 @@
   省略恢复默认、exact 模型引用与带斜杠 id）、
   双 model_slot 独立编辑、unavailable 禁选与目录外当前值、CAS 顺序 update(N)→updateConfig(N+1)、
   部分成功重试不重发改名、pending 连点单发、服务规范化后采用返回 descriptor、迟到 descriptor 不串写。
+- config.resolve 生产接线（940c9df4）：`npx vitest run --project ui
+  src/application/profile/wire-composer-profile.test.ts src/application/session/agentbox-composer.test.ts
+  src/features/chat/composer/profile-controls.test.tsx
+  src/app/composition/wiring/agentbox-main-chat.test.tsx
+  src/features/chat/composer/hooks/use-composer-profile.test.tsx` → **5 files / 46 tests passed，exit 0**；
+  回归面（composer 全目录 + legacy chat view + agentbox chat view）44 files / 264 tests passed；
+  `npm run typecheck` 三项目通过；实际改动 18 个 TS/TSX 文件 ESLint 0 error / 0 warning；
+  `git diff --check` 干净。认证 resolve→send 顺序、同一 overrides 快照、rejected 全原因零 send、
+  transport 失败零 send、latest-wins、切 scope 迟到保护、capability 零请求、预览 UI 四态。
 - P05 客户端矩阵审计（只读，本阶段文档检查点）：`WireMethods` 键数 28；矩阵 28 行与
   `WireMethods` 排序逐项比较全等（无重复/遗漏/多余）；每行恰好一个合法状态，脚本计数
   22 `PRODUCTION_REACHABLE` + 6 `FIXTURE_ONLY_FRONTEND_GAP` = 28，与表格声明一致；摘要与后端登记
@@ -222,7 +232,7 @@ wire-review.md通道自39阶段协调。执行者下个检查点消费这些规�
 | P02 上层产品 | IN_PROGRESS（A/B/C/D 主面与服务投影完成；Profile 默认配置编辑已接服务描述与串行 CAS；矩阵审计标出 6 项前端缺口） | P01 已满足 |
 | P03 用例状态与API | IN_PROGRESS（主 route 生产调用者与 event reducer 接入已完成；真实 Server 源待 P04） | 与 P02 穿插 |
 | P04 宿主与遗留退役 | IN_PROGRESS（production request/Session-event transport + IPC + supervisor；正常冷启动 Hermes 自动门已退役，Server connection合同待后端） | 与 P03 穿插 |
-| P05 正式合同接入 | IN_PROGRESS（28 方法客户端矩阵已审计：22 生产可达 / 6 前端缺口；lifecycle 外部缺口待续） | wire 双端锁定 |
+| P05 正式合同接入 | IN_PROGRESS（28 方法矩阵：23 生产可达 / 5 前端缺口；`config.resolve` 已接；lifecycle 外部缺口待续） | wire 双端锁定 |
 | P06 前端验收与交接 | IMPLEMENTATION_HANDOFF_GATE | 本端独立范围完成；真实全栈门由后续集成人负责 |
 | P07 核心合同与状态交接 | 检查点1–6已提交；WIRE_LOCKED | 28 方法双端摘要一致；fixture/客户端已锁定 |
 

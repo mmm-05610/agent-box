@@ -4,6 +4,10 @@
 （分支 `feature/agentbox-desktop-product`，工作树 clean）。
 本文件只盘点**实际生产接线与缺口**，不修改生产代码。
 
+**增量（2026-09-14，代码检查点 `940c9df4`）**：`config.resolve` 已按 G4 的目标文件与不变量完成生产接线
+（application 用例 + 发送前强制校验 + renderer 预览 latest-wins + hello 能力门），矩阵中该行改为
+`PRODUCTION_REACHABLE`（EXT），汇总 23 reachable / 5 gap；G4 改写为「已接线」记录，其余缺口不变。
+
 权威方法集合：`apps/desktop/src/types/wire/wire-v1.ts` 的 `WireMethods`（28 项）。
 摘要核对：TS 权威 `11e3b3e70d332585d31900c09ba063d95aa6b72b1904921c665fb72f81c10035`、
 生成工件 `5d4fa3bfeec6c3273c6073b37794e4ab2aca6e07e48184bc3a2b878c1fe5e4ed`，与后端
@@ -56,7 +60,7 @@
 | `providerModels.update` | ✓ schema+client | 端口 `:72` | 同上 | 同上 | `PRODUCTION_REACHABLE`（EXT） | version CAS；失败保留上一权威行 |
 | `providerModels.archive` | ✓ schema+client | 端口 `:82` | 同上 | 同上 | `PRODUCTION_REACHABLE`（EXT） | `CONFLICT_REFERENCE` 不删除/替换 Profile 引用 |
 | `config.describe` | ✓ schema+client | `describeDraftConfig` `application/profile/wire-composer-profile.ts:85`；`loadProfileRuntimeDescriptor` `profile-maintenance-port.ts:109` | Composer 临时配置弹层（`useComposerProfile`）、Profiles 页配置区 | `wire-composer-profile.test.ts`、`features/profiles/index.test.tsx`、`profile-config-editor.test.tsx` | `PRODUCTION_REACHABLE`（EXT） | 描述控件/当前值/securityLockedIds/effectTiming；迟到描述按 scope 的 `profileId` 校验后丢弃。与 `config.resolve` 职责未互相代替：客户端不自行计算生效值 |
-| `config.resolve` | ✓ schema | **无** | **无** | **无**（0 处引用） | `FIXTURE_ONLY_FRONTEND_GAP` | core §5/§8：生效配置由服务计算（接入默认→Profile 默认→显式临时覆盖，安全限制不可覆盖）并可列 invalid。客户端目前只显示 descriptor 的 currentValue + 本地草稿覆盖，从不问服务"最终生效值"，也没有 invalid 呈现；运行实际版本目前只由接受回执的 `configVersion` 提供。见 §3-G4 |
+| `config.resolve` | ✓ schema+client | `resolveComposerConfig` `application/profile/wire-composer-profile.ts:183`（exact `{profileId, workspaceId, overrides}`，只读、无 requestId）；提交侧 `submitAgentBoxComposer` `application/session/agentbox-composer.ts:116` 在构造 send intent 前强制调用 | Composer 提交路径（`agentbox-main-chat.ts:onSubmit`→`submitAgentBoxComposer`）+ 临时配置弹层预览（`useComposerProfile`→`ComposerProfileControls`） | `application/profile/wire-composer-profile.test.ts`、`application/session/agentbox-composer.test.ts`、`features/chat/composer/hooks/use-composer-profile.test.tsx`、`features/chat/composer/profile-controls.test.tsx`、`app/composition/wiring/agentbox-main-chat.test.tsx` | `PRODUCTION_REACHABLE`（EXT） | core §5/§8：生效值由服务按「接入默认→Profile 默认→临时覆盖→安全限制」计算，客户端不推算。发送前 resolved 才发（rejected→`invalidControls`+`CONFIG_REJECTED`，零 send；typed/transport 失败零 send）；预览按 scope/overrides latest-wins，hello 未声明即不发请求；运行实际版本仍只在服务接受发送时按回执 `configVersion` 固定。见 §3-G4 |
 | `sessions.list` | ✓ schema+client | `refreshAgentBoxSessions` `application/session/wire-session-catalog.ts:19` | `ensureAgentBoxDesktopCatalog`←主聊天挂载 | `wire-session-catalog.test.ts`、`app/composition/wiring/agentbox-main-chat.test.tsx` | `PRODUCTION_REACHABLE`（EXT） | 服务分页合并进 `$agentBoxSessions`，部分页不擦除已学记录。**边界**：该投影当前只驱动主聊天面/Composer 选角；侧栏会话列表仍是 legacy Hermes（见 §5） |
 | `sessions.update` | ✓ schema+client | `updateAgentBoxSession` `wire-session-catalog.ts:39`（requestId+expectedVersion，采纳服务返回） | **无** | `wire-session-catalog.test.ts` | `FIXTURE_ONLY_FRONTEND_GAP` | 批准行为的触发点（侧栏改名/置顶）仍走 legacy session API（`store/session-pin-sync`、`api/sessions`）。需要前端把统一侧栏行为接到该方法并采纳服务版本。见 §3-G5 |
 | `sessions.archive` | ✓ schema+client | `archiveAgentBoxSession` `wire-session-catalog.ts:64` | **无** | `wire-session-catalog.test.ts` | `FIXTURE_ONLY_FRONTEND_GAP` | 同 G5：侧栏归档入口（`store/sidebar-archive`→`application/session-lists`）走 legacy Hermes 数据面；服务侧归档语义（不删历史）已编码但无产品调用者 |
@@ -74,10 +78,10 @@
 
 | 状态 | 数量 | 方法 |
 | --- | --- | --- |
-| `PRODUCTION_REACHABLE` | **22** | server.hello、workspaces.list、profiles.list/create/update/archive/updateConfig、providerModels.list/create/update/archive、config.describe、sessions.list、sessions.switchProfile、sessions.createAndSend、sessions.send、sendOutcome.query、queue.get、queue.withdraw、runs.stop、approvals.decide、history.snapshot |
+| `PRODUCTION_REACHABLE` | **23** | server.hello、workspaces.list、profiles.list/create/update/archive/updateConfig、providerModels.list/create/update/archive、config.describe、**config.resolve**、sessions.list、sessions.switchProfile、sessions.createAndSend、sessions.send、sendOutcome.query、queue.get、queue.withdraw、runs.stop、approvals.decide、history.snapshot |
 | `CLIENT_READY_NO_SURFACE` | 0 | — |
-| `FIXTURE_ONLY_FRONTEND_GAP` | **6** | workspaces.open、workspaces.browse、workspaces.archive、config.resolve、sessions.update、sessions.archive |
-| `EXTERNAL_LIFECYCLE_BLOCKED` | **22 行同一外部缺口**（不等于前端缺口，见 §4） | 上表 22 个 `PRODUCTION_REACHABLE` 行的运行终态 |
+| `FIXTURE_ONLY_FRONTEND_GAP` | **5** | workspaces.open、workspaces.browse、workspaces.archive、sessions.update、sessions.archive |
+| `EXTERNAL_LIFECYCLE_BLOCKED` | **23 行同一外部缺口**（不等于前端缺口，见 §4） | 上表 23 个 `PRODUCTION_REACHABLE` 行的运行终态 |
 | `NOT_APPLICABLE` | 0 | — |
 | 合计 | 28 | 与 `WireMethods` 逐项一致（§6 核验） |
 
@@ -88,13 +92,14 @@
 | `workspaces.open` | 有 schema 与 §9 fixture 行为门（同环境+同路径重开保 id、`created` 标记、不建 Session），但 `application/` 无入口：产品打开目录只写 36R 本地/WSL 寄存器，AgentBox 侧仅用 `workspaces.list` 反查既有记录。服务端无记录的目录无法登记权威 Workspace。 |
 | `workspaces.browse` | 除 schema 外**零引用**（无入口、无 fixture、无测试）。批准行为（远端目录列举与呈现）当前由 Electron 宿主能力承担，缺 AgentBox 环境身份与 `canOpen/canWrite` 分列。 |
 | `workspaces.archive` | 除 schema 外零引用。侧栏"移除"是 renderer 本地隐藏，与服务归档（记录保留、跨客户端一致）不是同一语义。 |
-| `config.resolve` | 除 schema 外零引用。客户端只呈现 descriptor 当前值 + 本地临时覆盖，从不请求服务计算生效值/非法项，因此也没有被 `config.describe` 错误代替（两者职责在客户端均未被混用）。 |
+| `config.resolve` | ~~除 schema 外零引用~~ —— 已在代码检查点 `940c9df4` 接线（见 §3-G4），不再是缺口。 |
 | `sessions.update` | application 入口存在且已测（requestId+expectedVersion+服务投影采纳），但**无生产调用者**：侧栏改名/置顶仍走 legacy Hermes 会话 API。 |
 | `sessions.archive` | 同上；侧栏归档入口（`store/sidebar-archive`/`application/session-lists`）走 legacy 数据面。 |
 
 ## 3. 确证的前端缺口（目标文件 / 接口 / 不变量 / 建议验收）
 
-以下只登记，不在本阶段修。
+以下为审计时确认的缺口清单。其中 G4 已在后续代码检查点 `940c9df4` 落地（保留原条目并改写为接线记录，
+以便对照原不变量）；其余仍是本端可独立补齐的机械实现批次。
 
 **G1 `workspaces.open` 未接（打开即登记）**
 - 目标文件：`src/application/workspace/wire-workspace-catalog.ts`（新增 open 用例）、
@@ -124,14 +129,33 @@
   活动入口仍可见且运行中任务不被停止。
 - 建议验收：归档后服务清单不再包含该行而本地文件/历史仍在；版本冲突保留服务投影并显示原因。
 
-**G4 `config.resolve` 未接（服务计算生效值）**
-- 目标文件：`src/application/profile/wire-composer-profile.ts`（草稿生效值用例）、
-  `src/features/chat/composer/profile-controls.tsx`（呈现生效值/invalid）。
-- 接口：`config.resolve({profileId, workspaceId, sessionId?, overrides})` → 生效值 + 限制/非法原因。
-- 不变量：生效配置由服务按「接入默认→Profile 默认→显式临时覆盖」计算，安全限制不可覆盖；
-  客户端不得本地推算生效值，也不得把草稿选择当生效值；解析失败不隐式启动任何执行。
-- 建议验收：本地覆盖与服务默认冲突时显示服务结论；被安全锁定的项以服务限制原因呈现而非客户端
-  自行拒绝。
+**G4 `config.resolve` — 已接线（代码检查点 `940c9df4`）**
+
+原缺口（只登记未修）已按原目标文件与不变量实现，记录如下：
+
+- 目标文件（实际改动）：`src/application/profile/wire-composer-profile.ts`（`resolveComposerConfig`
+  + `ComposerConfigResolutionInput`）、`src/application/session/agentbox-composer.ts`（发送前强制
+  校验与 `invalidControls`）、`src/features/chat/composer/hooks/use-composer-profile.ts`（scope
+  预览/迟到保护/能力门）、`src/features/chat/composer/profile-controls.tsx`（预览呈现）、
+  `src/app/composition/wiring/agentbox-main-chat.ts`（sendAvailable 能力门）、
+  `src/lib/composer/types.ts`（`ComposerConfigResolutionState`）。
+- 接口（实现）：`resolveComposerConfig(client, {profileId, workspaceId, overrides})` →
+  `{outcome:'resolved', effective}` 或 `{outcome:'rejected', invalidControls}`；只做 WireId 转换与
+  `client.call('config.resolve', …)`，只读、不带 requestId、不写 draft/store、overrides 原序原值。
+- 不变量（已由测试钉住）：生效配置由服务计算，客户端不推算也不补造缺项；每次
+  `sessions.createAndSend`/`sessions.send` 之前必须用该次发送的 exact profile/workspace/overrides
+  快照解析一次，只有 resolved 才继续；rejected 返回 `invalidControls` 且 `sessions.*` 与
+  `sendOutcome.query` 调用为 0；transport/typed error 直接抛出且 send 调用为 0（不转成 rejected 或
+  resolved）；预览按 Profile/Workspace/overrides 变化重解析，旧请求迟到不得覆盖新 scope 或新
+  overrides，卸载后不写状态；hello 未声明 `config.resolve` 时不发请求并以该 reason 呈现；
+  安全锁定项仍不可编辑，服务 rejected 不清除用户值。
+- 验收（已执行）：`npx vitest run --project ui src/application/profile/wire-composer-profile.test.ts
+  src/application/session/agentbox-composer.test.ts src/features/chat/composer/profile-controls.test.tsx
+  src/app/composition/wiring/agentbox-main-chat.test.tsx
+  src/features/chat/composer/hooks/use-composer-profile.test.tsx` → 5 files / **46 tests passed**（exit 0）。
+- 仍属外部缺口（不变）：真实配置解析结果只能在 Server lifecycle connection 之后联调验证；本端只
+  保证请求语义、失败面与迟到保护。运行实际版本仍由接受回执的 `configVersion` 固定，预览不冒充
+  最终配置。
 
 **G5 `sessions.update/archive` 未接（统一侧栏会话行为）**
 - 目标文件：`src/features/chat/sidebar/`（改名/置顶/归档入口）与其数据源
@@ -156,7 +180,7 @@
 
 ## 4. `EXTERNAL_LIFECYCLE_BLOCKED` 的精确边界（单一外部缺口）
 
-上表 22 个 `PRODUCTION_REACHABLE` 方法的前端路径（UI/application → client → preload IPC →
+上表 23 个 `PRODUCTION_REACHABLE` 方法的前端路径（UI/application → client → preload IPC →
 main-only transport）**已完整**，其中断点只有一处：**main 进程的 AgentBox connection slot 目前为
 null**。因此这些方法的运行终态都属于同一个 `EXTERNAL_LIFECYCLE_BLOCKED`，不是各自的缺口。
 
@@ -170,7 +194,7 @@ null**。因此这些方法的运行终态都属于同一个 `EXTERNAL_LIFECYCLE
 - `electron/workcore/slot.ts`：生产未安装任何 lifecycle（只有测试安装）。
 - 事件流同样终止于此：`agentbox-wire-event-transport.ts` 连接为 null 时诚实 unavailable。
 
-一旦 lifecycle 在 readiness 后安装 `{endpoint, sessionToken}`，这 22 个方法与事件流即可在**不改
+一旦 lifecycle 在 readiness 后安装 `{endpoint, sessionToken}`，这 23 个方法与事件流即可在**不改
 客户端**的前提下进入真实联调；在此之前 REAL_FLOW 未验证，也不得声称。
 
 ## 5. 遗留 Hermes 可达性结论
@@ -260,7 +284,8 @@ dynamic connection slot            electron/composition/agentbox-service-composi
 | `WireMethods` 键与矩阵首列逐项比较（一次性只读 node + python 管道，排序后全等比较） | 28 ↔ 28 全等：无遗漏、无重复、无多余 |
 | `sha256sum src/types/wire/wire-v1.ts generated/wire-v1.schema.json` | `11e3b3e7…c10035` / `5d4fa3bf…5e4ed`，与后端登记一致 |
 | `grep -rn "\.call('" src --include=*.ts --include=*.tsx \| grep -v test` | 28 方法调用点全部落在上表 application 入口 |
-| `git diff --check` | 通过（exit 0，本次仅文档） |
+| `git diff --check` | 通过（exit 0） |
+| config.resolve 接线定向门（`940c9df4`，5 files / 46 tests） | 通过（exit 0） |
 | `git status --short` | 只含本阶段写集（见 §9） |
 
 矩阵完整性核验（一次性只读命令，不新增仓库脚本）：从 `WireMethods` 导出键、从本文件表格抽取
@@ -268,14 +293,15 @@ dynamic connection slot            electron/composition/agentbox-service-composi
 
 ## 9. 写集与未决
 
-本阶段写集：本文件（新增）、`evidence/P05.md`、`docs/desktop-product-delivery/status.md`。
-未修改 `apps/**` 任何生产代码/测试、`types/wire/**`、contracts 文档、preload、Electron main、
+审计阶段写集：本文件（新增）、`evidence/P05.md`、`docs/desktop-product-delivery/status.md`；
+后续 `config.resolve` 接线检查点 `940c9df4` 的写集见其提交与 evidence/P05.md。
+未修改 `types/wire/**` 合同、`types/wire/**`、contracts 文档、preload、Electron main、
 package/lock、后端与 Windows 构建树；未重跑完整测试、未跑 Windows、未安装依赖、未读后端密钥、
 未执行模型调用。
 
 未决（不因本审计消失）：
-- 真实 Server lifecycle connection（§4）→ 阻断 22 个方法与事件流的 REAL_FLOW 验证。
-- 6 个 `FIXTURE_ONLY_FRONTEND_GAP`（§3）→ 本端可独立补齐的下一机械实现批次。
+- 真实 Server lifecycle connection（§4）→ 阻断 23 个方法与事件流的 REAL_FLOW 验证。
+- 5 个 `FIXTURE_ONLY_FRONTEND_GAP`（§3）→ 本端可独立补齐的下一机械实现批次。
 - 侧栏会话列表的 legacy 数据面（§5）→ P03/P04 迁移账本中最重的剩余消费者。
 - `wire-v1` 未纳入范围的增量（steer 语义、Worker 通道合同、快照分页参数）仍为外围合同。
 
