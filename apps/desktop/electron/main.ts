@@ -36,6 +36,7 @@ import {
 } from './app/persisted-flags'
 import { createKeepAwake } from './app/power-save'
 import { createPowerState } from './app/power-state'
+import { DESKTOP_PRODUCT_RUNTIME, shouldAutostartLegacyHermes } from './app/product-runtime-policy'
 import { type ActiveWork } from './app/quit-guard'
 import { createQuitPrompt } from './app/quit-prompt'
 import { configureSpellChecker as configureSpellCheckerImpl } from './app/spellcheck'
@@ -802,6 +803,10 @@ registerApiProxyIpc({
   handleHermesApiRequest,
   getDataUrlReadMaxMb: () => getDataUrlReadMaxMb(),
   persistDataUrlReadMaxMb,
+  // Same runtime decision the window lifecycle uses for eager autostart, read
+  // as one boolean here: the legacy REST surface is served exactly when the
+  // product runtime IS the legacy Hermes runtime.
+  legacyApiAllowed: shouldAutostartLegacyHermes(DESKTOP_PRODUCT_RUNTIME),
 })
 
 const disposeWorkCoreWireIpc = registerWorkCoreWireIpc({
