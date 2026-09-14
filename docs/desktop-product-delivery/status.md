@@ -5,7 +5,7 @@
 
 ## 执行快照（handoff-policy 每阶段必填）— 接管施工中
 
-- updated_at: 2026-09-14 12:52 (+08:00)
+- updated_at: 2026-09-14 12:53 (+08:00)
 - 执行者: Codex 前端产品 goal（接力会话）；**已从暂停的 Zcode 执行者接管**
 - 工作树/分支: /home/maoqh/projects/agent-box-desktop-next-wsl-round1 @ feature/agentbox-desktop-product
 - 接管核验: 用户指定交接 HEAD `5c0fbfe` 与实际 HEAD
@@ -13,7 +13,7 @@
   未发现该工作树、Windows 构建树的 Electron/Vite/Vitest/Playwright/验收驱动进程；
   dirty 集合仅为下列 4 项已授权交接改动。发布源规则文件与本执行树逐文件 SHA-256 一致，
   保留本文件实时进度，不复制发布源初始状态。
-- 代码检查点（已提交 HEAD）: `342b9df`（P04 切片5 / Electron primary-window Hermes autostart 退役）
+- 代码检查点（已提交 HEAD）: `35659c5`（P04 切片7 / Session-cursor 事件 IPC 与 main-only WS transport）
   链: ebb1233（P00）→ 8d4b3df/47b5b47/dbb902f（P01 代码与几何修复）→ 26b32fc（P01 GREEN 证据）
   → 468e6ac/d7e9a57（发布源 d3c0196+ffbcfaf 导入）→ 893d560（P07 检查点2 wire-v1）
   → 957a523（P02A 盘点）→ 07f5386（P02A slice 1：失败面非阻塞）→ 3a25edc（P02A slice 2）
@@ -27,17 +27,19 @@
   → 3aba5c5（P07 queue 终态机械对齐）→ 7b38cf5（P04 WorkCore supervisor）
   → 34d9e48（P04 状态记录）→ 9d9adc0（renderer legacy autostart 退役）
   → 72b0371（P04 状态记录）→ 342b9df（Electron window autostart 退役）
+  → 08a116d（wire-v1 双端锁定登记）→ 00d8862（main-only WS event transport）
+  → 35659c5（Session/cursor IPC + renderer replay 接线）
 - 已消费发布文档提交: 86d5a7b、61c7ff7、d3c0196、ffbcfaf
-- 当前检查点改动: P04 按 Session/cursor 的事件 IPC 订阅仍由 Luna 施工；wire-v1 已获后端
-  同摘要锁定，合同 Luna 只机械更新三份登记文档，shared main/status 与最终验收由主代理持有。
+- 当前检查点改动: P04 按 Session/cursor 的事件 IPC 与 main-only WS transport 已提交；wire-v1
+  已获后端同摘要锁定。下一步由主代理串行审查 AgentBox connection slot 与 main 注册/退出清理。
 - 当前阶段: P00 GREEN；P01 GREEN；**P07 检查点 1–6 完成且 wire 已锁定**；
-  P02 A/B1/B2/C/D 与 B3 服务投影已提交；P03 纵切 1–4 已提交；P04 切片1–5已提交
+  P02 A/B1/B2/C/D 与 B3 服务投影已提交；P03 纵切 1–4 已提交；P04 切片1–7已提交
 - 完成范围: P00；P01 全部返修（真机 27 PASS）；P07 检查点 1（语义映射）、检查点 2
   （wire-v1 候选：17 方法 + schema 测试 + JSON Schema 工件；已消费后端机械反馈并回应）；
   P02A（失败面非阻塞+可关闭、Artifacts 页退役、失败终态竞态修复与真机门）
-- 下一项: 提交 queue 终态新摘要并等待后端登记；并行推进 P04 lifecycle 与主进程
-  遗留 Hermes 默认控制流退役，并准备无模型 Windows 独立验收。
-- 阻断: 无真实阻断。剩余 P04 production lifecycle/event transport 与显式 legacy 消费者收口、
+- 下一项: 串行接入 P04 AgentBox connection slot、HTTP/WS transport 与 main IPC cleanup；继续按
+  实际消费者核查 legacy Hermes 路径，并准备无模型 Windows 独立验收。
+- 阻断: 无真实阻断。剩余 P04 production lifecycle connection 与显式 legacy 消费者收口、
   P05 生产接线核查和 P06 独立验收待续；wire 摘要已锁定，真实全栈仍由后续集成人验证
 
 - contract_semantics_version: core-semantics/1（APPROVED_SEMANTICS，2026-09-14）
@@ -109,6 +111,12 @@
 - P04 宿主纵切 5：product runtime policy + main-window lifecycle 2 files / 7 tests passed；Electron
   typecheck、受影响文件 ESLint、Prettier 与 diff check 通过。正常 createWindow 对 AgentBox runtime
   调 legacy starter 0 次；仅显式 legacy 分支保留，不伪造 AgentBox ready。
+- P04 宿主纵切 6：事件 IPC 1 file / 4 tests、AgentBox chat 1 file / 8 tests passed；三项目
+  typecheck、ESLint（0 error，仅既有 formatting warnings）与 diff check 通过。订阅按 sender、Session、
+  cursor 隔离；gap 先退订后补水，逐帧 cursor 不重连，源异常/销毁/同步 gap 均不会泄漏 cleanup。
+- P04 宿主纵切 7：event transport 1 file / 11 tests passed；Electron typecheck、ESLint、Prettier 与
+  diff check 通过。动态读取 main-only connection，Bearer 仅在 WS upgrade header，限制 loopback；
+  不重连、不解释 frame、不回落 Hermes。production connection slot 仍待正式接线。
 
 ## 测试与基线（上一执行者交接时点，历史）
 
@@ -150,7 +158,7 @@ wire-review.md通道自39阶段协调。执行者下个检查点消费这些规�
 | P01 36R收口 | GREEN | 真机 27 PASS/2 SKIP/1 PENDING（evidence/P01.md；本地打开 PENDING 转 P05） |
 | P02 上层产品 | IN_PROGRESS（A、B1、B2、C、D 完成；B3 服务投影随 P03 收口） | P01 已满足 |
 | P03 用例状态与API | IN_PROGRESS（主 route 生产调用者与 event reducer 接入已完成；真实 Server 源待 P04） | 与 P02 穿插 |
-| P04 宿主与遗留退役 | IN_PROGRESS（request/event IPC + supervisor；renderer/Electron 正常冷启动 Hermes 自动门均退役） | 与 P03 穿插 |
+| P04 宿主与遗留退役 | IN_PROGRESS（request/Session-event IPC + HTTP/WS transport + supervisor；renderer/Electron 正常冷启动 Hermes 自动门均退役） | 与 P03 穿插 |
 | P05 正式合同接入 | WIRE_LOCKED_FOR_IMPLEMENTATION | 28 方法摘要双端锁定；production lifecycle/联调待续 |
 | P06 前端验收与交接 | IMPLEMENTATION_HANDOFF_GATE | 本端独立范围完成；真实全栈门由后续集成人负责 |
 | P07 核心合同与状态交接 | 检查点1–6已提交；WIRE_LOCKED | 28 方法双端摘要一致；fixture/客户端已锁定 |
