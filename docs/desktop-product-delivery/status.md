@@ -5,7 +5,7 @@
 
 ## 执行快照（handoff-policy 每阶段必填）— 接管施工中
 
-- updated_at: 2026-09-14 12:31 (+08:00)
+- updated_at: 2026-09-14 12:36 (+08:00)
 - 执行者: Codex 前端产品 goal（接力会话）；**已从暂停的 Zcode 执行者接管**
 - 工作树/分支: /home/maoqh/projects/agent-box-desktop-next-wsl-round1 @ feature/agentbox-desktop-product
 - 接管核验: 用户指定交接 HEAD `5c0fbfe` 与实际 HEAD
@@ -26,8 +26,8 @@
   → b9b816d（P04 event subscription seam）→ 292d351（P04 状态记录）
   → 3aba5c5（P07 queue 终态机械对齐）→ 7b38cf5（P04 WorkCore supervisor）
 - 已消费发布文档提交: 86d5a7b、61c7ff7、d3c0196、ffbcfaf
-- 当前检查点改动: P04 遗留自动启动退役分两道门施工：renderer `useGatewayBoot` 与 Electron
-  `createWindow` 各由一个 Luna 在互斥写集完成；shared main/preload/status 仍由主代理串行持有。
+- 当前检查点改动: P04 切片4（待提交）：AgentBox product renderer 显式关闭旧 Hermes gateway
+  autostart；Electron `createWindow` 冷启动门在独立写集继续施工，shared main/preload/status 由主代理持有。
 - 当前阶段: P00 GREEN；P01 GREEN；**P07 检查点 1–5 完成**；P02 A/B1/B2/C/D 已提交；
   P02B3 UI 边界与服务投影已接；P03 纵切 1–4 已提交；P04 切片1–2已提交
 - 完成范围: P00；P01 全部返修（真机 27 PASS）；P07 检查点 1（语义映射）、检查点 2
@@ -101,6 +101,9 @@
 - P04 宿主纵切 3：WorkCore 2 files / 13 tests passed；Electron typecheck、受影响文件 ESLint、
   Prettier 与 diff check 通过。supervisor 单飞协调六动词、null resolve 不 fallback、readiness 失败
   回收 owned process，shutdown/晚到启动不能发布 ready；production artifact/plan 仍待正式合同。
+- P04 宿主纵切 4：gateway boot 1 file / 48 tests passed；三项目 typecheck、受影响文件 ESLint 与
+  diff check 通过。产品 composition 在读取 Hermes bridge 前关闭 legacy autostart；gateway 不伪造
+  open，旧 boot overlay 退出，AgentBox availability 保持独立。
 
 ## 测试与基线（上一执行者交接时点，历史）
 
@@ -142,7 +145,7 @@ wire-review.md通道自39阶段协调。执行者下个检查点消费这些规�
 | P01 36R收口 | GREEN | 真机 27 PASS/2 SKIP/1 PENDING（evidence/P01.md；本地打开 PENDING 转 P05） |
 | P02 上层产品 | IN_PROGRESS（A、B1、B2、C、D 完成；B3 服务投影随 P03 收口） | P01 已满足 |
 | P03 用例状态与API | IN_PROGRESS（主 route 生产调用者与 event reducer 接入已完成；真实 Server 源待 P04） | 与 P02 穿插 |
-| P04 宿主与遗留退役 | IN_PROGRESS（窄 request/event IPC + generic supervisor 完成；production lifecycle/legacy 退役待续） | 与 P03 穿插 |
+| P04 宿主与遗留退役 | IN_PROGRESS（request/event IPC + supervisor；renderer autostart 已退役，Electron 冷启动门待提交） | 与 P03 穿插 |
 | P05 正式合同接入 | WIRE_REVISION_PENDING_BACKEND_CONFIRMATION | queue 终态新摘要待后端登记；独立客户端先行 |
 | P06 前端验收与交接 | IMPLEMENTATION_HANDOFF_GATE | 本端独立范围完成；真实全栈门由后续集成人负责 |
 | P07 核心合同与状态交接 | 检查点1–6已提交 | 28 方法 queue 终态新摘要待后端登记 |

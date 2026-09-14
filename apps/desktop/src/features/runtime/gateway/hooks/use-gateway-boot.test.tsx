@@ -256,16 +256,19 @@ function fakeDesktop() {
 
 function Harness({
   beforeConnectionSwitch = () => undefined,
+  legacyGatewayAutostart = true,
   refreshHermesConfig = async () => undefined,
   refreshSessions
 }: {
   beforeConnectionSwitch?: () => void
+  legacyGatewayAutostart?: boolean
   refreshHermesConfig?: (force?: boolean, shouldPublish?: () => boolean) => Promise<void>
   refreshSessions?: (shouldPublish?: () => boolean) => Promise<void>
 } = {}) {
   useGatewayBoot({
     beforeConnectionSwitch,
     handleGatewayEvent: () => undefined,
+    legacyGatewayAutostart,
     onConnectionReady: () => undefined,
     onGatewayReady: () => undefined,
     refreshHermesConfig,
@@ -369,6 +372,18 @@ async function advanceBackoff() {
 }
 
 describe('useGatewayBoot remote reconnect loop (real hook, fake socket)', () => {
+  it('can be disabled for AgentBox without consulting Hermes or opening a gateway', async () => {
+    const desktop = window.hermesDesktop as unknown as ReturnType<typeof fakeDesktop>
+
+    render(<Harness legacyGatewayAutostart={false} />)
+    await flushAsync()
+
+    expect(desktop.getConnection).not.toHaveBeenCalled()
+    expect(activeGateway()?.connectionState).not.toBe('open')
+    expect($gatewayState.get()).not.toBe('open')
+    expect($sessionsLoading.get()).toBe(false)
+    expect($desktopBoot.get().visible).toBe(false)
+  })
   it('INITIAL boot against a dead VPS: getConnection hangs (waitForHermes) → app sits in the connecting combo, then fails', async () => {
     // The report's actual path: a fresh launch pointed at an unreachable VPS.
     // startHermes()'s remote branch awaits waitForHermes() for 45s before it

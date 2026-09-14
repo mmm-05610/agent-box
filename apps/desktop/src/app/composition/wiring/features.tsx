@@ -768,6 +768,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
       closeAllTerminals()
     },
     handleGatewayEvent: handleGatewayEventWithPlugins,
+    legacyGatewayAutostart: false,
     onConnectionReady: c => {
       connectionRef.current = c
     },
