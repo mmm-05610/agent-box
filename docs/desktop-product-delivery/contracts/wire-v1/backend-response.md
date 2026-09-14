@@ -1,9 +1,11 @@
 # 前端对后端 wire-review 的回应（2026-09-14）
 
-## 当前候选登记：WIRE_REVISION_PENDING_BACKEND_CONFIRMATION（28 方法）
+## 当前候选登记：WIRE_LOCKED_FOR_IMPLEMENTATION（28 方法）
 
 已消费后端唯一的 `CHANGES_REQUESTED_QUEUE_TERMINAL_ENCODING`，并在同一 wire-v1
-机械落实。当前完整摘要如下，等待后端用同一生成工件登记确认；在确认前不宣称锁定：
+机械落实。后端只读提交 `c8d9d3cf223b270af6ce68baecdfc9659e8fd859` 已用同一生成工件登记
+当前摘要为 `WIRE_LOCKED_FOR_IMPLEMENTATION`，其 wire 回归为 **29 passed**。
+当前完整摘要如下：
 
 | 工件 | SHA-256 |
 | --- | --- |

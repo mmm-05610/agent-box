@@ -1,7 +1,7 @@
-# wire-v1 候选（WIRE_REVISION_PENDING_BACKEND_CONFIRMATION）— Desktop↔Server 核心合同单一编码
+# wire-v1 合同（WIRE_LOCKED_FOR_IMPLEMENTATION）— Desktop↔Server 核心合同单一编码
 
-状态：**WIRE_REVISION_PENDING_BACKEND_CONFIRMATION**（2026-09-14，已消费后端唯一队列终态
-机械更正；新摘要待后端登记，尚未锁定）。当前仍为 28 方法。
+状态：**WIRE_LOCKED_FOR_IMPLEMENTATION**（2026-09-14，已消费后端唯一队列终态机械更正；
+后端已用同一摘要登记确认）。当前仍为 28 方法。
 语义权威：[../core-semantics-v1.md](../core-semantics-v1.md)（APPROVED_SEMANTICS）——
 本候选只做已批准语义的机械编码，并把编码本身作为提案交后端核对；两者都不是生产端点授权。
 
