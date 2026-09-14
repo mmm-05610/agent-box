@@ -14,6 +14,15 @@ pub const MAX_PAYLOAD: usize = 64 * 1024;
 /// unchanged and every mismatch is a loud handshake failure, in both
 /// directions: a v3 client never silently accepts a v2 Worker and a v2 client
 /// is refused by a v3 Worker instead of degrading to unverified directories.
+///
+/// The version still stays 3 while error codes are added below it: `code` is an
+/// opaque string that a client reports as it arrived, the frame layout and the
+/// `{"ok":false,"error":{"code","message"}}` envelope are unchanged, and no
+/// request or response carries a code-specific field. Splitting the view
+/// refusals out of the one shared `VIEW_INVALID` (`VIEW_SPECIAL_FILE`,
+/// `VIEW_TRAVERSAL_LIMIT`, `VIEW_FILE_LIMIT`, plus the retryable `VIEW_CHANGED`)
+/// is additive in exactly that sense, and `view_error_envelope_tests` checks it
+/// frame by frame.
 pub const PROTOCOL_VERSION: u32 = 3;
 pub const MAX_RUNTIME_ARTIFACTS: usize = 8;
 

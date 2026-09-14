@@ -31,14 +31,36 @@ from agent_box.resource_contracts.harness_capabilities import (
 LEASE_POLL_SECONDS = 0.25
 
 #: Failures while reading a state subtree that mean "it is still moving", so the
-#: capture keeps waiting (bounded) instead of accepting a mixed snapshot. Bound
-#: violations and credential material are never treated as churn.
+#: capture keeps waiting (bounded) instead of accepting a mixed snapshot. The
+#: list is deliberately short: everything else - a refusal, a bound violation,
+#: credential material, a plain I/O fault - is reported as it happened, with the
+#: code that names it. Classification reads the code alone, never the message.
+#:
+#: Audited Worker view sites, and what their codes mean here:
+#:
+#:   VIEW_CHANGED          an entry, directory or file vanished, or a file
+#:                         shrank, while it was being listed or read - churn
+#:   VIEW_SPECIAL_FILE     a FIFO, socket or device, or an entry that is not a
+#:                         regular file - a refusal, never churn
+#:   VIEW_TRAVERSAL_LIMIT  more than 4096 visited entries - a refusal
+#:   VIEW_FILE_LIMIT       more than 1024 files, in a listing or a manifest
+#:   VIEW_INVALID          malformed identity, manifest, path or fetch range
+#:   VIEW_IO               a real listing, metadata, read or write fault
+#:   VIEW_INCOMPLETE       the view is not committed, or a file is missing
+#:   VIEW_DIGEST_MISMATCH  read-back did not match what was declared
 _STATE_TRANSIENT_CODES = frozenset({
-    "SIDECAR_STATE_IDENTITY_CONFLICT", "VIEW_INVALID", "VIEW_IO", "VIEW_INCOMPLETE",
+    "SIDECAR_STATE_IDENTITY_CONFLICT",  # raised here: size, offset or digest moved
+    "VIEW_CHANGED",                     # the Worker's own "the bytes moved" code
 })
 
 
 def _state_error_is_transient(error: BaseException) -> bool:
+    """Whether a capture may wait for this failure to go away.
+
+    Only the code decides. The same sentence can describe churn or a refusal, so
+    no message text is inspected here: an untyped or unknown failure is reported
+    as it arrived.
+    """
     code = getattr(error, "code", None)
     return isinstance(code, str) and code in _STATE_TRANSIENT_CODES
 
@@ -524,8 +546,11 @@ class _WorkerChannels:
 
         Returns the content identity of what was read plus the bytes themselves.
         Bound violations and credential material are typed failures; a file that
-        changes while it is being read surfaces as an identity conflict, which
-        the settle loop treats as "not settled yet".
+        changes while it is being read surfaces as an identity conflict, and a
+        file or directory that moves under the Worker's own read surfaces as
+        `VIEW_CHANGED`. Both mean "not settled yet" to the settle loop, which is
+        the only place that decides to wait - a special file, a traversal or
+        file-count overflow, or a plain fault is reported straight through.
         """
         if self.state_bundle_prefix is None:
             return {}, {}

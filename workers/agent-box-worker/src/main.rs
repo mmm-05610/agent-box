@@ -1332,7 +1332,7 @@ fn handle_view(root: &Path, op: &str, args: &Value) -> Result<Value, (&'static s
                 serde_json::from_value(args.get("files").cloned().unwrap_or(Value::Null))
                     .map_err(|_| ("VIEW_INVALID", "view manifest is invalid"))?;
             if files.len() > 1024 {
-                return Err(("VIEW_INVALID", "view manifest exceeds file limit"));
+                return Err(("VIEW_FILE_LIMIT", "view manifest exceeds file limit"));
             }
             let mut total = 0u64;
             let mut paths = HashSet::new();
@@ -1462,7 +1462,7 @@ fn handle_view(root: &Path, op: &str, args: &Value) -> Result<Value, (&'static s
             let mut visited = 0usize;
             list_view_files(&ready, &ready, &mut files, &mut visited)?;
             if files.len() > 1024 {
-                return Err(("VIEW_INVALID", "view exceeds file limit"));
+                return Err(("VIEW_FILE_LIMIT", "view exceeds file limit"));
             }
             files.sort_by(|left, right| left["path"].as_str().cmp(&right["path"].as_str()));
             Ok(json!({"status":"listed","files":files}))
@@ -1473,23 +1473,34 @@ fn handle_view(root: &Path, op: &str, args: &Value) -> Result<Value, (&'static s
             }
             let rel = safe_relative(value_string(args, "path")?)?;
             let target = dir.join("ready").join(rel);
-            let metadata = target
-                .symlink_metadata()
-                .map_err(|_| ("VIEW_INVALID", "view file is unavailable"))?;
-            if metadata.file_type().is_symlink()
-                || !metadata.is_file()
-                || metadata.len() as usize > MAX_ARTIFACT_BYTES
-            {
-                return Err(("VIEW_INVALID", "view file is not capturable"));
+            let metadata = view_entry_metadata(&target)?;
+            // A view lists regular files. An entry of any other type is either a
+            // special file that was never a view file, or a regular file that
+            // changed type under the read; both are refused, and the caller's
+            // classifier decides whether the second one is retryable.
+            if metadata.file_type().is_symlink() || !metadata.is_file() {
+                return Err(("VIEW_SPECIAL_FILE", "view file is not a regular file"));
             }
-            let bytes = fs::read(target).map_err(|_| ("VIEW_IO", "view file read failed"))?;
+            if metadata.len() as usize > MAX_ARTIFACT_BYTES {
+                return Err(("VIEW_INVALID", "view file exceeds the artifact bound"));
+            }
+            let bytes = read_view_bytes(&target)?;
             let offset = args.get("offset").and_then(Value::as_u64).unwrap_or(0) as usize;
             let maximum = args
                 .get("maxLength")
                 .and_then(Value::as_u64)
                 .unwrap_or(MAX_FETCH_BYTES as u64) as usize;
-            if offset > bytes.len() || maximum == 0 || maximum > MAX_FETCH_BYTES {
+            if maximum == 0 || maximum > MAX_FETCH_BYTES {
                 return Err(("VIEW_INVALID", "view fetch range is invalid"));
+            }
+            if offset > bytes.len() {
+                // Every offset but the first comes from this Worker's previous
+                // response, so an offset past the end means the file got shorter
+                // while it was being fetched.
+                return Err((
+                    "VIEW_CHANGED",
+                    "view file shrank below the requested offset",
+                ));
             }
             let end = (offset + maximum).min(bytes.len());
             Ok(
@@ -1506,22 +1517,47 @@ fn handle_view(root: &Path, op: &str, args: &Value) -> Result<Value, (&'static s
     }
 }
 
+/// List one view directory, distinguishing a subtree that moved under the walk
+/// from a plain fault: only the first is a content change a caller may retry.
+fn read_view_dir(directory: &Path) -> Result<fs::ReadDir, (&'static str, &'static str)> {
+    fs::read_dir(directory).map_err(|error| match error.kind() {
+        std::io::ErrorKind::NotFound => (
+            "VIEW_CHANGED",
+            "view directory vanished while it was being listed",
+        ),
+        _ => ("VIEW_IO", "view listing failed"),
+    })
+}
+
+/// The metadata of one view entry, distinguishing "it moved" from "it failed".
+fn view_entry_metadata(path: &Path) -> Result<fs::Metadata, (&'static str, &'static str)> {
+    path.symlink_metadata().map_err(|error| match error.kind() {
+        std::io::ErrorKind::NotFound => ("VIEW_CHANGED", "view entry vanished before it was read"),
+        _ => ("VIEW_IO", "view metadata failed"),
+    })
+}
+
+/// The bytes of one declared view file, distinguishing "it moved" from a fault.
+fn read_view_bytes(path: &Path) -> Result<Vec<u8>, (&'static str, &'static str)> {
+    fs::read(path).map_err(|error| match error.kind() {
+        std::io::ErrorKind::NotFound => ("VIEW_CHANGED", "view file vanished during the read"),
+        _ => ("VIEW_IO", "view file read failed"),
+    })
+}
+
 fn list_view_files(
     base: &Path,
     directory: &Path,
     files: &mut Vec<Value>,
     visited: &mut usize,
 ) -> Result<(), (&'static str, &'static str)> {
-    for entry in fs::read_dir(directory).map_err(|_| ("VIEW_IO", "view listing failed"))? {
+    for entry in read_view_dir(directory)? {
         let entry = entry.map_err(|_| ("VIEW_IO", "view listing failed"))?;
-        let metadata = entry
-            .path()
-            .symlink_metadata()
-            .map_err(|_| ("VIEW_IO", "view metadata failed"))?;
+        let metadata = view_entry_metadata(&entry.path())?;
         // Every visited entry costs one step, whatever its type.
         *visited += 1;
         if *visited > MAX_VIEW_TRAVERSAL_ENTRIES {
-            return Err(("VIEW_INVALID", "view exceeds traversal bound"));
+            return Err(("VIEW_TRAVERSAL_LIMIT", "view exceeds traversal bound"));
         }
         // A view lists regular files. Harnesses legitimately leave short-lived
         // symlinks in their home - Codex writes argv0 aliases under its tmp/
@@ -1543,12 +1579,12 @@ fn list_view_files(
                 .replace('\\', "/");
             files.push(json!({"path":relative,"size":metadata.len()}));
             if files.len() > 1024 {
-                return Err(("VIEW_INVALID", "view exceeds file limit"));
+                return Err(("VIEW_FILE_LIMIT", "view exceeds file limit"));
             }
         } else {
             // A FIFO, socket or device is not a view file, and silently leaving
             // it out would describe a directory that is not what is there.
-            return Err(("VIEW_INVALID", "view contains a special file"));
+            return Err(("VIEW_SPECIAL_FILE", "view contains a special file"));
         }
     }
     Ok(())
@@ -1652,7 +1688,7 @@ mod view_listing_tests {
         let name = std::ffi::CString::new(fifo.to_str().unwrap()).unwrap();
         assert_eq!(unsafe { libc::mkfifo(name.as_ptr(), 0o600) }, 0);
         let refused = listing(&root);
-        assert_eq!(refused.unwrap_err().0, "VIEW_INVALID");
+        assert_eq!(refused.unwrap_err().0, "VIEW_SPECIAL_FILE");
         let _ = fs::remove_dir_all(&root);
     }
 
@@ -1660,7 +1696,7 @@ mod view_listing_tests {
     fn a_unix_socket_is_refused_instead_of_skipped() {
         let root = scratch("view-socket");
         let _socket = UnixListener::bind(root.join("agent.sock")).unwrap();
-        assert_eq!(listing(&root).unwrap_err().0, "VIEW_INVALID");
+        assert_eq!(listing(&root).unwrap_err().0, "VIEW_SPECIAL_FILE");
         let _ = fs::remove_dir_all(&root);
     }
 
@@ -1675,7 +1711,108 @@ mod view_listing_tests {
             fs::create_dir(&directory).unwrap();
             std::os::unix::fs::symlink("nowhere", directory.join("alias")).unwrap();
         }
-        assert_eq!(listing(&root).unwrap_err().0, "VIEW_INVALID");
+        assert_eq!(listing(&root).unwrap_err().0, "VIEW_TRAVERSAL_LIMIT");
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_view_over_the_file_limit_is_refused_with_its_own_code() {
+        let root = scratch("view-too-many-files");
+        for index in 0..1025 {
+            fs::write(root.join(format!("f{index:04}")), b"x").unwrap();
+        }
+        assert_eq!(listing(&root).unwrap_err().0, "VIEW_FILE_LIMIT");
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// A directory that moved while it was listed is churn, not a plain fault.
+    #[test]
+    fn a_directory_that_vanished_mid_listing_is_reported_as_a_change() {
+        let root = scratch("view-vanished-dir");
+        fs::write(root.join("state.db"), b"state").unwrap();
+        let mut files = Vec::new();
+        let mut visited = 0usize;
+        let missing = root.join("gone");
+        assert_eq!(
+            list_view_files(&root, &missing, &mut files, &mut visited)
+                .unwrap_err()
+                .0,
+            "VIEW_CHANGED",
+        );
+        assert!(files.is_empty());
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    fn committed_view(root: &std::path::Path, id: &str) -> std::path::PathBuf {
+        let dir = root.join("views").join(id);
+        fs::create_dir_all(dir.join("ready")).unwrap();
+        fs::write(dir.join(".committed"), b"ready").unwrap();
+        dir
+    }
+
+    #[test]
+    fn a_file_that_shortened_under_the_fetch_is_reported_as_a_change() {
+        let root = scratch("view-shrunk");
+        let dir = committed_view(&root, "view-shrunk-1");
+        fs::write(dir.join("ready").join("state.db"), b"brief").unwrap();
+        let refused = handle_view(
+            &root,
+            "view.get",
+            &json!({"viewId":"view-shrunk-1","path":"state.db","offset":64}),
+        );
+        assert_eq!(refused.unwrap_err().0, "VIEW_CHANGED");
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_read_of_something_that_is_not_a_regular_file_is_refused() {
+        for (name, code, make) in [
+            ("view-get-symlink", "VIEW_SPECIAL_FILE", 0u8),
+            ("view-get-fifo", "VIEW_SPECIAL_FILE", 1u8),
+            ("view-get-missing", "VIEW_CHANGED", 2u8),
+        ] {
+            let root = scratch(name);
+            let dir = committed_view(&root, "view-1");
+            let ready = dir.join("ready").join("state.db");
+            match make {
+                0 => {
+                    fs::write(dir.join("ready").join("target"), b"state").unwrap();
+                    std::os::unix::fs::symlink("target", &ready).unwrap();
+                }
+                1 => {
+                    let path = std::ffi::CString::new(ready.to_str().unwrap()).unwrap();
+                    assert_eq!(unsafe { libc::mkfifo(path.as_ptr(), 0o600) }, 0);
+                }
+                _ => {}
+            }
+            assert_eq!(
+                handle_view(
+                    &root,
+                    "view.get",
+                    &json!({"viewId":"view-1","path":"state.db"})
+                )
+                .unwrap_err()
+                .0,
+                code,
+                "{name}",
+            );
+            let _ = fs::remove_dir_all(&root);
+        }
+    }
+
+    #[test]
+    fn a_committed_view_over_the_file_limit_is_refused_when_listed() {
+        let root = scratch("view-list-too-many");
+        let dir = committed_view(&root, "view-1");
+        for index in 0..1025 {
+            fs::write(dir.join("ready").join(format!("f{index:04}")), b"x").unwrap();
+        }
+        assert_eq!(
+            handle_view(&root, "view.list", &json!({"viewId":"view-1"}))
+                .unwrap_err()
+                .0,
+            "VIEW_FILE_LIMIT",
+        );
         let _ = fs::remove_dir_all(&root);
     }
 
@@ -1691,5 +1828,69 @@ mod view_listing_tests {
         );
         fs::remove_dir_all(&root).unwrap();
         assert!(!root.exists());
+    }
+}
+
+/// Adding error-code values must not change the control-protocol response shape.
+///
+/// The view refusals that used to share one code now have their own, and one of
+/// them (`VIEW_CHANGED`) is expected to be retried by a content-stability
+/// capture. Neither move alters what crosses the wire: a failed view request is
+/// still one `WorkerError` frame carrying one `error` object with exactly `code`
+/// and `message`, which is why `protocol::PROTOCOL_VERSION` stays 3.
+#[cfg(test)]
+mod view_error_envelope_tests {
+    use super::*;
+
+    async fn envelope(code: &str) -> Value {
+        let mut buffer = Vec::new();
+        write_error_for(&mut buffer, 7, "req-1", code, "a view refusal")
+            .await
+            .unwrap();
+        let frame = protocol::decode_frame(&buffer).unwrap();
+        assert_eq!(frame.kind, protocol::FrameKind::WorkerError);
+        assert_eq!(frame.sequence, 7);
+        serde_json::from_slice(&frame.payload).unwrap()
+    }
+
+    #[tokio::test]
+    async fn every_new_view_code_travels_in_the_same_error_envelope() {
+        for code in [
+            "VIEW_SPECIAL_FILE",
+            "VIEW_TRAVERSAL_LIMIT",
+            "VIEW_FILE_LIMIT",
+            "VIEW_CHANGED",
+            "VIEW_INVALID",
+        ] {
+            let payload = envelope(code).await;
+            assert_eq!(
+                payload.as_object().unwrap().len(),
+                3,
+                "the response shape must not grow: {payload}",
+            );
+            assert_eq!(payload["ok"], json!(false));
+            assert_eq!(payload["requestId"], json!("req-1"));
+            assert_eq!(
+                payload["error"].as_object().unwrap().len(),
+                2,
+                "the error object must not grow: {payload}",
+            );
+            assert_eq!(payload["error"]["code"], json!(code));
+            assert_eq!(payload["error"]["message"], json!("a view refusal"));
+        }
+    }
+
+    #[tokio::test]
+    async fn the_worker_still_answers_at_the_control_protocol_version_it_announces() {
+        // The client compares this number on handshake, so it is checked against
+        // the constant the same frame encoder uses rather than a literal here.
+        assert_eq!(protocol::PROTOCOL_VERSION, 3);
+        let mut buffer = Vec::new();
+        write_error(&mut buffer, 4, "VIEW_CHANGED", "a view refusal")
+            .await
+            .unwrap();
+        let frame = protocol::decode_frame(&buffer).unwrap();
+        let payload: Value = serde_json::from_slice(&frame.payload).unwrap();
+        assert_eq!(payload["error"]["code"], json!("VIEW_CHANGED"));
     }
 }

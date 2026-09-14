@@ -42,16 +42,16 @@ Boundaries enforced by the gate itself:
     files reject writes with EROFS while the state directory accepts one, and
     `$HOME/.codex` resolves to the same directory as `CODEX_HOME`.
 
-**Current acceptance state**: the chain below runs green end to end only once
-the state capture no longer sees the native CLI's transient argv0 alias symlinks
-(`$CODEX_HOME/tmp/arg0/<random>/`, removed when the process exits). On this
-tree the default run stops at that capture with `VIEW_INVALID` and reports the
-derived code `CODEX_GATE_STATE_CONTAINS_NATIVE_ALIAS_SYMLINKS` together with the
-observed links; the two independent fixes, and the first-hand reproduction, are
-in the Codex packaging report. Everything up to the capture - the isolated
-`CODEX_HOME`, the full `models.json`, the product model, the `/responses`
-request, the streamed delta and the silent first answer - is already observed in
-that failing run.
+**Current acceptance state**: the chain runs green end to end, in both the
+default and the external-artifact mode (last recorded here with c6; c7 is
+recorded in the state-error-boundary report). The first run did not: it stopped
+at the state capture with `VIEW_INVALID` and reported the derived code
+`CODEX_GATE_STATE_CONTAINS_NATIVE_ALIAS_SYMLINKS` with the observed links,
+because the Worker's view listing then refused any tree containing a symlink and
+the capture ran right after a `close` that does not wait for the native process
+to exit. Both halves are repaired - the listing skips non-regular entries while
+`view.get` keeps refusing them, and the capture retries only a genuine content
+change - and the first-hand reproduction is kept in the Codex packaging report.
 
     usage: codex-production-chain-gate.py [--worker PATH] [--artifact PATH]
                                          [--keep] [--json]
@@ -392,21 +392,35 @@ class FakeEndpoint:
 # --------------------------------------------------------------------------
 
 class StateSymlinkWatcher:
-    """Watch the Worker's own view for symlinks while an attempt runs.
+    """Watch the Worker's own view while an attempt runs.
 
     The native Codex CLI installs argv0 alias symlinks under
     `$CODEX_HOME/tmp/arg0/<random>/` for as long as it runs and removes them when
-    it exits. The Worker's view contract refuses to *list* a tree that contains a
-    symlink, so a capture taken while the CLI is alive cannot succeed. This
-    watcher records the first-hand evidence for that failure (paths and targets)
-    instead of leaving the operator with a bare `VIEW_INVALID`.
+    it exits. This watcher records that first-hand evidence (paths and targets),
+    which is what the view listing now skips instead of refusing and what the
+    capture no longer depends on: reads only ever serve declared regular files.
+    The record is kept because it is what the historical `VIEW_INVALID` failure
+    was diagnosed from.
+
+    It also samples how large that view gets, counting regular files the way the
+    Worker's listing does (symlinks are never followed or counted as files). The
+    listing refuses more than `VIEW_FILE_LIMIT` files, so the peak is what tells
+    a capture that failed with that code whether it met a tree that was still
+    being written or one that had settled.
     """
+
+    #: The Worker's own view-listing bound, recorded next to the peak so the
+    #: number can be read without opening the Worker source.
+    FILE_LIMIT = 1024
 
     def __init__(self, worker_root: Path, *, interval: float = 0.05, limit: int = 8) -> None:
         self.worker_root = worker_root
         self.interval = interval
         self.limit = limit
         self.observed: list[dict] = []
+        self.peak_files = 0
+        self.peak_files_at = ""
+        self.peak_special = 0
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run, daemon=True)
 
@@ -421,9 +435,16 @@ class StateSymlinkWatcher:
         views = self.worker_root / "views"
         while not self._stop.is_set():
             if views.is_dir():
+                for ready in sorted(views.glob("*/ready")):
+                    files, special = self._count(ready)
+                    if files > self.peak_files:
+                        self.peak_files = files
+                        self.peak_files_at = self._busiest(ready)
+                    if special > self.peak_special:
+                        self.peak_special = special
                 for location in sorted(views.glob("*/ready/**/native-state/**/*")):
                     if len(self.observed) >= self.limit:
-                        return
+                        break
                     try:
                         if location.is_symlink():
                             self.observed.append({
@@ -433,6 +454,38 @@ class StateSymlinkWatcher:
                     except OSError:
                         continue
             self._stop.wait(self.interval)
+
+    @staticmethod
+    def _count(ready: Path) -> tuple[int, int]:
+        """Regular files and non-regular, non-symlink entries, as a listing sees
+        them. A symlink is skipped by the listing, so it is not counted here."""
+        files = 0
+        special = 0
+        for root, directories, names in os.walk(ready):
+            for name in names:
+                try:
+                    status = os.lstat(os.path.join(root, name))
+                except OSError:
+                    continue
+                if stat.S_ISLNK(status.st_mode):
+                    continue
+                if stat.S_ISREG(status.st_mode):
+                    files += 1
+                else:
+                    special += 1
+        return files, special
+
+    @staticmethod
+    def _busiest(ready: Path) -> str:
+        """The subtree that holds most of the files, for the report."""
+        counts: dict[str, int] = {}
+        for root, _directories, names in os.walk(ready):
+            relative = os.path.relpath(root, ready).replace(os.sep, "/")
+            top = "/".join(relative.split("/")[:3]) if relative != "." else "."
+            counts[top] = counts.get(top, 0) + len(names)
+        if not counts:
+            return ""
+        return max(sorted(counts), key=lambda key: counts[key])
 
 
 class DirectWorkerConnector:
@@ -662,6 +715,13 @@ def main() -> int:
                 "silentFirstAnswerObservedSeconds": round(endpoint.silent_observed, 3),
             }
             REPORT["stateSymlinksObserved"] = watcher.observed
+            REPORT["stateProjectionObservation"] = {
+                "peakRegularFiles": watcher.peak_files,
+                "peakRegularFilesSubtree": watcher.peak_files_at,
+                "peakNonRegularEntries": watcher.peak_special,
+                "listingFileLimit": StateSymlinkWatcher.FILE_LIMIT,
+                "overListingLimit": watcher.peak_files > StateSymlinkWatcher.FILE_LIMIT,
+            }
         REPORT.update(outcome)
         if endpoint.over_budget:
             fail("CODEX_GATE_EXTRA_PROVIDER_REQUEST",
@@ -1588,22 +1648,23 @@ def run_requests(runs: list[list[dict]], index: int) -> list[dict]:
 
 
 def annotate_known_blocker() -> None:
-    """Name the one blocker this gate can currently hit, with its evidence.
+    """Record the first-hand diagnosis of the alias-symlink blocker if it returns.
 
-    The native Codex CLI installs argv0 alias symlinks under
-    `$CODEX_HOME/tmp/arg0/<random>/` while it runs and removes them when it
-    exits. The Worker's view contract refuses to list a tree containing a
-    symlink, and the sidecar captures right after a `close` that does not wait
-    for the adapter process to exit - so the capture of a Codex attempt fails
-    with `VIEW_INVALID` while everything before it (adapter, `app-server`,
-    Responses request, streaming delta) already worked. The annotation records
-    that diagnosis next to the failure instead of leaving a bare code; it never
-    turns a failure into a pass.
+    Historical, and kept because it was reproduced on a real run: the native
+    Codex CLI installs argv0 alias symlinks under `$CODEX_HOME/tmp/arg0/<random>/`
+    while it runs and removes them when it exits. That run failed at the state
+    capture with `VIEW_INVALID` because the Worker's view listing then refused
+    any tree containing a symlink, and the sidecar captured right after a `close`
+    that does not wait for the adapter process to exit. The listing now skips
+    non-regular entries, `view.get` still refuses them, and only a genuine
+    content change is retried, so a capture no longer depends on native cleanup
+    timing. The annotation fires only when a run both observed those links and
+    failed its turn; it never turns a failure into a pass.
     """
     diagnostics = REPORT.get("diagnostics") or {}
     turn = diagnostics.get("turn") or {}
     observed = REPORT.get("stateSymlinksObserved") or []
-    if turn.get("error_code") != "VIEW_INVALID" and not observed:
+    if not observed or not turn.get("error_code"):
         return
     REPORT["blocker"] = {
         "code": "CODEX_GATE_STATE_CONTAINS_NATIVE_ALIAS_SYMLINKS",
@@ -1624,6 +1685,11 @@ def annotate_known_blocker() -> None:
         ],
         "recommendation": "B as the robust half (no dependency on native cleanup) and A as the "
                           "semantic half (a checkpoint is taken from a settled home).",
+        "resolution": "B was implemented in c5 (the listing skips non-regular entries; "
+                      "`view.get` still refuses them) and the capture became content-stable in "
+                      "c6 (two identical path+size+digest snapshots, `SIDECAR_STATE_NOT_SETTLED` "
+                      "at the deadline), so A was not needed. The annotation stays only for a "
+                      "run that fails with these links present.",
         "verification": "scripts/server-round1/codex-production-chain-gate.py (this run) plus the "
                         "reproduction in the Codex packaging report",
     }
