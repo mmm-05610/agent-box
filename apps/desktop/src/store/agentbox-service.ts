@@ -87,6 +87,19 @@ export function setAgentBoxProviderModels(models: ProviderModelConfigRecord[]): 
   $agentBoxProviderModels.set(models.filter(model => !model.archivedAt))
 }
 
+/** The service record is authoritative: replace by id, drop archived records
+ *  from the live projection, and never merge by path or display name. */
+export function upsertAgentBoxWorkspace(workspace: WorkspaceRecord): void {
+  const workspaces = $agentBoxWorkspaces.get()
+  const next = workspaces.filter(candidate => candidate.id !== workspace.id)
+
+  if (!workspace.archivedAt) {
+    next.push(workspace)
+  }
+
+  $agentBoxWorkspaces.set(next)
+}
+
 export function upsertAgentBoxProviderModel(model: ProviderModelConfigRecord): void {
   const models = $agentBoxProviderModels.get()
   const next = models.filter(candidate => candidate.id !== model.id)

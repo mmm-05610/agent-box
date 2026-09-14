@@ -1,12 +1,36 @@
 import type { WireV1Client } from '@/api/wire-v1-client'
 import { $agentBoxWorkspaces } from '@/store/agentbox-service'
-import type { WorkspaceRecord } from '@/types/wire/wire-v1'
+import {
+  asRequestId,
+  type EnvironmentIdentity,
+  type RequestId,
+  type WorkspaceRecord,
+  type WorkspacesOpenResult
+} from '@/types/wire/wire-v1'
 
 export interface AgentBoxWorkspaceSelection {
-  currentPath: null | string
-  selectedId: null | string
-  wsl?: { distribution: string; rootPath: string }
+  /** A service-side Workspace id we already hold (an existing Session's
+   *  workspaceId). Shell row ids are a different namespace and never belong
+   *  here — a string that happens to match must not become a hit. */
+  serviceWorkspaceId?: null | string
+  /** Local shell target: the folder the sidebar row stands for. */
+  localPath?: null | string
+  /** WSL shell target: the host-verified identity plus the POSIX root path. */
+  wsl?: { distribution: string; rootPath: string } | null
 }
+
+export interface OpenAgentBoxWorkspaceInput {
+  environment: EnvironmentIdentity
+  /** The path as picked in that environment's own semantics — never rewritten. */
+  path: string
+  expectedVersion?: number
+}
+
+export interface OpenAgentBoxWorkspaceOptions {
+  createRequestId?: () => RequestId
+}
+
+const defaultRequestId = (): RequestId => asRequestId(`desktop-${crypto.randomUUID()}`)
 
 function normalizedPath(value: string): string {
   const normalized = value.trim().replaceAll('\\', '/').replace(/\/+$/, '')
@@ -21,14 +45,37 @@ export async function refreshAgentBoxWorkspaces(client: WireV1Client): Promise<W
   return result.items
 }
 
-/** Resolve a legacy shell selection to a server-owned Workspace identity.
- * IDs win. Path fallback is environment-qualified so equal strings exposed by
- * local and WSL can never collapse into one Workspace. */
+/**
+ * Registers an already-chosen environment + path with the service (core v1 §4:
+ * open = register-or-select, idempotent per location, never a Session and never
+ * a harness start). The path crosses the wire exactly as the shell holds it —
+ * no Windows/POSIX/UNC rewriting — and only the returned record is identity:
+ * callers use `workspace.id`, never the shell row id.
+ */
+export async function openAgentBoxWorkspace(
+  client: WireV1Client,
+  input: OpenAgentBoxWorkspaceInput,
+  options: OpenAgentBoxWorkspaceOptions = {}
+): Promise<WorkspacesOpenResult> {
+  return client.call('workspaces.open', {
+    environment: input.environment,
+    path: input.path,
+    ...(input.expectedVersion === undefined ? {} : { expectedVersion: input.expectedVersion }),
+    requestId: (options.createRequestId ?? defaultRequestId)()
+  })
+}
+
+/** Resolve a shell selection to a server-owned Workspace identity by
+ *  environment + path. Local and WSL never collapse into one location even when
+ *  their path strings are equal, and path comparison only ever reads the
+ *  service's own normalizedPath. */
 export function resolveAgentBoxWorkspace(
   workspaces: readonly WorkspaceRecord[],
   selection: AgentBoxWorkspaceSelection
 ): WorkspaceRecord | null {
-  const direct = selection.selectedId ? workspaces.find(workspace => workspace.id === selection.selectedId) : undefined
+  const direct = selection.serviceWorkspaceId
+    ? workspaces.find(workspace => workspace.id === selection.serviceWorkspaceId)
+    : undefined
 
   if (direct) {
     return direct
@@ -47,16 +94,16 @@ export function resolveAgentBoxWorkspace(
     )
   }
 
-  if (!selection.currentPath) {
+  if (!selection.localPath) {
     return null
   }
 
-  const currentPath = normalizedPath(selection.currentPath)
+  const localPath = normalizedPath(selection.localPath)
 
   return (
     workspaces.find(
       workspace =>
-        workspace.environment.kind === 'local' && normalizedPath(workspace.normalizedPath) === currentPath
+        workspace.environment.kind === 'local' && normalizedPath(workspace.normalizedPath) === localPath
     ) ?? null
   )
 }

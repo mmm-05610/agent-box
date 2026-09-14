@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { emptyWireSessionProjection } from '@/application/session/wire-session-projection'
 import { asWireId } from '@/types/wire/wire-v1'
 
-import { agentBoxProjectionMessages } from './agentbox-chat-view'
+import { agentBoxProjectionMessages, registrationReason } from './agentbox-chat-view'
 
 describe('AgentBox transcript projection', () => {
   it('reuses the normal message/tool card pipeline and keeps hidden rows hidden', () => {
@@ -51,5 +51,23 @@ describe('AgentBox transcript projection', () => {
         type: 'tool-call'
       }
     ])
+  })
+})
+
+describe('AgentBox workspace registration notice', () => {
+  const copy = { opening: 'Registering this workspace with the service…', unavailable: 'Not registered:' }
+
+  it('shows a wait while the registration is in flight', () => {
+    expect(registrationReason({ status: 'opening' }, copy, 'unavailable')).toBe(copy.opening)
+  })
+
+  it('reports the service reason when the registration cannot be made', () => {
+    expect(registrationReason({ detail: 'NOT_IMPLEMENTED', status: 'unavailable' }, copy, 'unavailable')).toBe(
+      'Not registered: NOT_IMPLEMENTED'
+    )
+  })
+
+  it('falls back to the neutral copy when there is no location to register', () => {
+    expect(registrationReason({ status: 'idle' }, copy, 'unavailable')).toBe('unavailable')
   })
 })

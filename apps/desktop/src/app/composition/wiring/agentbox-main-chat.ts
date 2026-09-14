@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 
 import { agentBoxRuntimeClient } from '@/api/agentbox-runtime-client'
+import { wireCapability } from '@/api/wire-v1-client'
 import { routeSessionId, sessionRoute } from '@/app/routes'
 import { ensureAgentBoxDesktopCatalog } from '@/application/agentbox-desktop-catalog'
 import { submitAgentBoxComposer } from '@/application/session/agentbox-composer'
@@ -12,7 +13,12 @@ import {
   refreshAgentBoxQueue,
   requestAgentBoxStop
 } from '@/application/session/wire-session-control'
-import { resolveAgentBoxWorkspace } from '@/application/workspace/wire-workspace-catalog'
+import {
+  type AgentBoxWorkspaceSelection,
+  openAgentBoxWorkspace,
+  type OpenAgentBoxWorkspaceInput,
+  resolveAgentBoxWorkspace
+} from '@/application/workspace/wire-workspace-catalog'
 import { $agentBoxQueues, $agentBoxSessionProjections, $agentBoxStopStates } from '@/store/agentbox-runtime'
 import { $pendingAgentBoxSends, pendingAgentBoxSend } from '@/store/agentbox-send-intents'
 import {
@@ -21,16 +27,70 @@ import {
   $agentBoxService,
   $agentBoxSessions,
   $agentBoxWorkspaces,
-  agentBoxCapabilitySupported
+  agentBoxCapabilitySupported,
+  upsertAgentBoxWorkspace
 } from '@/store/agentbox-service'
-import { $draftExecutionContexts, composerDraftScopeKey, workspaceDraftScope } from '@/store/composer'
-import { $currentCwd } from '@/store/session'
+import {
+  $draftExecutionContexts,
+  composerDraftScopeKey,
+  migrateSessionDraft,
+  workspaceDraftScope
+} from '@/store/composer'
+import { $projectTree, projectRootCwd } from '@/store/projects/scope'
 import { $workspaceViewSelectedId } from '@/store/workspace-view'
 import { $wslWorkspaces } from '@/store/wsl-workspace'
 import type { SubmitTextOptions } from '@/types/composer'
-import { asWireId, EventFrameSchema } from '@/types/wire/wire-v1'
+import { asWireId, EventFrameSchema, type WorkspacesOpenResult } from '@/types/wire/wire-v1'
 
 const BUSY_EXECUTION_STATES = new Set(['queued', 'dispatched', 'running', 'stopping', 'unknown'])
+
+/** The workspace registration the product asks for: an already-chosen shell
+ *  row, expressed in the service's own terms plus the shell row that owns the
+ *  draft until the service answers. */
+export interface AgentBoxShellWorkspaceTarget {
+  environment: OpenAgentBoxWorkspaceInput['environment']
+  path: string
+  shellId: string
+}
+
+export type AgentBoxWorkspaceOpenState =
+  { status: 'idle' } | { status: 'opening' } | { status: 'unavailable'; detail: string }
+
+const targetKey = (target: AgentBoxShellWorkspaceTarget): string =>
+  JSON.stringify([target.environment.kind, target.environment.host, target.environment.user, target.path])
+
+/** One in-flight registration per exact location. A re-render — or a second
+ *  surface on the same row — joins the attempt instead of minting another
+ *  requestId; a DIFFERENT location may start its own. */
+const workspaceOpenAttempts = new Map<string, Promise<WorkspacesOpenResult>>()
+
+/** The service-side terms of a shell target: WSL carries the host-verified
+ *  identity and POSIX path, a local row carries the desktop path as-is. */
+function selectionForTarget(target: AgentBoxShellWorkspaceTarget): AgentBoxWorkspaceSelection {
+  return target.environment.kind === 'wsl'
+    ? { wsl: { distribution: target.environment.host ?? '', rootPath: target.path } }
+    : { localPath: target.path }
+}
+
+function openShellWorkspaceOnce(
+  client: Parameters<typeof openAgentBoxWorkspace>[0],
+  target: AgentBoxShellWorkspaceTarget
+): Promise<WorkspacesOpenResult> {
+  const key = targetKey(target)
+  const existing = workspaceOpenAttempts.get(key)
+
+  if (existing) {
+    return existing
+  }
+
+  const attempt = openAgentBoxWorkspace(client, { environment: target.environment, path: target.path }).finally(() => {
+    workspaceOpenAttempts.delete(key)
+  })
+
+  workspaceOpenAttempts.set(key, attempt)
+
+  return attempt
+}
 
 export function useAgentBoxMainChat() {
   const location = useLocation()
@@ -45,8 +105,8 @@ export function useAgentBoxMainChat() {
   const stopStates = useStore($agentBoxStopStates)
   const executionContexts = useStore($draftExecutionContexts)
   const selectedWorkspaceId = useStore($workspaceViewSelectedId)
-  const currentCwd = useStore($currentCwd)
   const wslWorkspaces = useStore($wslWorkspaces)
+  const projectTree = useStore($projectTree)
   const [streamStart, setStreamStart] = useState<{ cursor: string; sessionId: string } | null>(null)
 
   useEffect(() => {
@@ -58,24 +118,46 @@ export function useAgentBoxMainChat() {
   const routedId = routeSessionId(location.pathname)
   const session = routedId ? (sessions[routedId] ?? null) : null
 
-  const selectedWsl = selectedWorkspaceId
-    ? wslWorkspaces.find(workspace => workspace.id === selectedWorkspaceId)
-    : undefined
+  // The shell's own record for the selected row: a WSL row first (it carries
+  // the host-verified identity), otherwise the project tree node. A Home bucket
+  // or a row with no working root has no location to register.
+  const shellTarget = useMemo<AgentBoxShellWorkspaceTarget | null>(() => {
+    if (session || !selectedWorkspaceId) {
+      return null
+    }
+
+    const selectedWsl = wslWorkspaces.find(workspace => workspace.id === selectedWorkspaceId)
+
+    if (selectedWsl) {
+      return selectedWsl.rootPath
+        ? {
+            environment: { host: selectedWsl.distribution, kind: 'wsl', user: selectedWsl.actualUser },
+            path: selectedWsl.rootPath,
+            shellId: selectedWsl.id
+          }
+        : null
+    }
+
+    const path = projectRootCwd(projectTree.find(node => node.id === selectedWorkspaceId))
+
+    return path ? { environment: { host: null, kind: 'local', user: null }, path, shellId: selectedWorkspaceId } : null
+  }, [projectTree, selectedWorkspaceId, session, wslWorkspaces])
 
   const workspace = useMemo(
     () =>
       session
-        ? (workspaces.find(candidate => candidate.id === session.workspaceId) ?? null)
-        : resolveAgentBoxWorkspace(workspaces, {
-            currentPath: selectedWorkspaceId ? currentCwd || null : null,
-            selectedId: selectedWorkspaceId,
-            ...(selectedWsl ? { wsl: { distribution: selectedWsl.distribution, rootPath: selectedWsl.rootPath } } : {})
-          }),
-    [currentCwd, selectedWorkspaceId, selectedWsl, session, workspaces]
+        ? resolveAgentBoxWorkspace(workspaces, { serviceWorkspaceId: session.workspaceId })
+        : resolveAgentBoxWorkspace(workspaces, shellTarget ? selectionForTarget(shellTarget) : {}),
+    [session, shellTarget, workspaces]
   )
 
   const sessionId = session?.id ?? null
-  const draftScopeKey = sessionId ?? (workspace ? workspaceDraftScope(workspace.id) : null)
+
+  // Until the service answers, the draft belongs to the shell row, so text,
+  // attachments, a profile and overrides all survive the registration.
+  const draftScopeKey =
+    sessionId ??
+    (workspace ? workspaceDraftScope(workspace.id) : shellTarget ? workspaceDraftScope(shellTarget.shellId) : null)
 
   const executionContext = executionContexts[composerDraftScopeKey(draftScopeKey)] ?? {
     overrides: [],
@@ -87,6 +169,68 @@ export function useAgentBoxMainChat() {
   const execution = projection?.execution ?? null
   const busy = Boolean(execution && BUSY_EXECUTION_STATES.has(execution.state))
   const catalogReady = service.phase === 'ready' && readiness.sessions && readiness.workspaces
+
+  const [workspaceOpen, setWorkspaceOpen] = useState<AgentBoxWorkspaceOpenState>({ status: 'idle' })
+
+  // Register an already-chosen shell row with the service. Only a location the
+  // service does not know yet is opened, an undeclared method is never called,
+  // and a failed registration changes nothing the user has: the shell row, the
+  // draft and the selection all stay where they are.
+  useEffect(() => {
+    if (!shellTarget || workspace || !catalogReady) {
+      setWorkspaceOpen({ status: 'idle' })
+
+      return
+    }
+
+    const capability = hello
+      ? wireCapability(hello, 'workspaces.open')
+      : { id: 'workspaces.open', reason: 'CAPABILITY_NOT_DECLARED', supported: false }
+
+    if (!capability.supported) {
+      setWorkspaceOpen({ detail: capability.reason || 'CAPABILITY_NOT_DECLARED', status: 'unavailable' })
+
+      return
+    }
+
+    let cancelled = false
+
+    setWorkspaceOpen({ status: 'opening' })
+
+    void openShellWorkspaceOnce(agentBoxRuntimeClient(), shellTarget).then(
+      result => {
+        // Re-read where the user is NOW: a late answer for an abandoned row may
+        // join the service cache, but it must not drag the interface, the draft
+        // or the selection back to that row.
+        if ($workspaceViewSelectedId.get() !== shellTarget.shellId) {
+          upsertAgentBoxWorkspace(result.workspace)
+
+          return
+        }
+
+        // Hand the unsent work over before the components switch scope; an
+        // already-used destination keeps its own content.
+        migrateSessionDraft(workspaceDraftScope(shellTarget.shellId), workspaceDraftScope(result.workspace.id))
+
+        if (!cancelled) {
+          upsertAgentBoxWorkspace(result.workspace)
+          setWorkspaceOpen({ status: 'idle' })
+        }
+      },
+      error => {
+        if (!cancelled) {
+          setWorkspaceOpen({
+            detail: error instanceof Error ? error.message : String(error),
+            status: 'unavailable'
+          })
+        }
+      }
+    )
+
+    return () => {
+      cancelled = true
+    }
+  }, [catalogReady, hello, shellTarget, workspace])
 
   // Recovering an unresolved send and creating a new one have different
   // requirements. Recovery only needs the service to be callable and its query
@@ -297,6 +441,7 @@ export function useAgentBoxMainChat() {
     projection,
     queue: sessionId ? (queues[sessionId] ?? []) : [],
     runtimeAuthority: 'agentbox' as const,
+    workspaceOpen,
     sendAvailable,
     service,
     session,

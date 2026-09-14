@@ -2081,6 +2081,8 @@ export const zhHant = defineLocale({
     securityLocked: '已由服務安全原則鎖定',
     clearTemporaryValue: '使用角色預設值',
     configUnavailable: '設定目前無法使用',
+    workspaceOpening: '正在向服務登記此工作區…',
+    workspaceUnavailable: '此工作區尚未在服務中登記。',
     configResolving: '正在由服務檢查目前設定…',
     configResolved: '服務已確認以下生效值。',
     configRejected: '服務不會接受這份設定，因此無法傳送。',

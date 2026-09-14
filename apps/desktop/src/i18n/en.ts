@@ -2499,6 +2499,8 @@ export const en: Translations = {
     securityLocked: 'Locked by the service security policy',
     clearTemporaryValue: 'Use profile default',
     configUnavailable: 'Configuration is unavailable',
+    workspaceOpening: 'Registering this workspace with the service…',
+    workspaceUnavailable: 'This workspace is not registered with the service.',
     configResolving: 'Checking this configuration with the service…',
     configResolved: 'The service confirmed these effective values.',
     configRejected: 'The service will not accept this configuration, so it cannot be sent.',

@@ -1781,6 +1781,8 @@ export const ar = defineLocale({
     securityLocked: 'مقفل بواسطة سياسة أمان الخدمة',
     clearTemporaryValue: 'استخدام إعداد الملف الشخصي الافتراضي',
     configUnavailable: 'الإعداد غير متاح',
+    workspaceOpening: 'جارٍ تسجيل مساحة العمل هذه لدى الخدمة…',
+    workspaceUnavailable: 'مساحة العمل هذه غير مسجلة لدى الخدمة.',
     configResolving: 'تتحقق الخدمة من هذا الإعداد…',
     configResolved: 'أكدت الخدمة القيم السارية التالية.',
     configRejected: 'لن تقبل الخدمة هذا الإعداد، لذا لا يمكن الإرسال.',

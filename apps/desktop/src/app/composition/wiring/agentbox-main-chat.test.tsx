@@ -18,8 +18,16 @@ import {
   $agentBoxSessions,
   $agentBoxWorkspaces
 } from '@/store/agentbox-service'
-import { $draftExecutionContexts, setSessionDraftExecutionContext, workspaceDraftScope } from '@/store/composer'
-import { $currentCwd } from '@/store/session'
+import {
+  $draftExecutionContexts,
+  clearSessionDraft,
+  sessionDraftExecutionContext,
+  setSessionDraftExecutionContext,
+  stashSessionDraft,
+  takeSessionDraft,
+  workspaceDraftScope
+} from '@/store/composer'
+import { $projectTree } from '@/store/projects/scope'
 import { $workspaceViewSelectedId } from '@/store/workspace-view'
 import { $wslWorkspaces } from '@/store/wsl-workspace'
 import {
@@ -27,13 +35,16 @@ import {
   asWireId,
   type SessionRecord,
   WIRE_PROTOCOL_VERSION,
-  type WorkspaceRecord
+  type WorkspaceRecord,
+  type WorkspacesOpenResult
 } from '@/types/wire/wire-v1'
+import type { WslWorkspaceRecord } from '@/types/workspace'
 
 import { useAgentBoxMainChat } from './agentbox-main-chat'
 
 const mocks = vi.hoisted(() => ({
   ensureCatalog: vi.fn(async () => undefined),
+  openWorkspace: vi.fn(),
   hydrateHistory: vi.fn(async (_client: unknown, _sessionId: unknown) => undefined),
   ingestEvent: vi.fn((_frame: unknown) => ({ outcome: 'applied' })),
   refreshQueue: vi.fn(async (_client: unknown, _sessionId: unknown) => undefined),
@@ -48,6 +59,10 @@ vi.mock('@/api/agentbox-runtime-client', () => ({ agentBoxRuntimeClient: () => (
 vi.mock('@/application/agentbox-desktop-catalog', () => ({
   ensureAgentBoxDesktopCatalog: () => mocks.ensureCatalog()
 }))
+vi.mock('@/application/workspace/wire-workspace-catalog', async importOriginal => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  openAgentBoxWorkspace: (...args: unknown[]) => mocks.openWorkspace(...args)
+}))
 vi.mock('@/application/session/agentbox-composer', () => ({
   submitAgentBoxComposer: (...args: unknown[]) => mocks.submit(...args)
 }))
@@ -60,11 +75,19 @@ vi.mock('@/application/session/wire-session-control', () => ({
 
 /** Only the capabilities the product path actually needs are declared; a test
  *  that wants a missing one builds its own hello. */
-const hello = (ids: string[] = ['config.resolve', 'sessions.createAndSend', 'sessions.send']) => ({
+const hello = (ids: string[] = ['config.resolve', 'sessions.createAndSend', 'sessions.send', 'workspaces.open']) => ({
   auth: { required: false as const },
   capabilities: ids.map(id => ({ id, supported: true })),
   protocolVersion: WIRE_PROTOCOL_VERSION as typeof WIRE_PROTOCOL_VERSION,
   serverId: asWireId('server-test')
+})
+
+const projectTreeNode = (id: string, path: string) => ({
+  id,
+  label: id,
+  path,
+  repos: [],
+  sessionCount: 0
 })
 
 const workspace: WorkspaceRecord = {
@@ -99,6 +122,8 @@ function wrapper(path: string) {
 }
 
 beforeEach(() => {
+  mocks.openWorkspace.mockReset()
+  mocks.openWorkspace.mockResolvedValue({ created: true, workspace } as WorkspacesOpenResult)
   mocks.submit.mockReset()
   mocks.ingestEvent.mockReset()
   mocks.ingestEvent.mockReturnValue({ outcome: 'applied' })
@@ -124,7 +149,9 @@ beforeEach(() => {
   $agentBoxStopStates.set({})
   $draftExecutionContexts.set({})
   $workspaceViewSelectedId.set('legacy-project-id')
-  $currentCwd.set('c:\\work\\app')
+  // The sidebar's own record for the selected row: a local project whose
+  // working root is the folder the service catalog lists.
+  $projectTree.set([projectTreeNode('legacy-project-id', 'c:\\work\\app')])
   $wslWorkspaces.set([])
   setSessionDraftExecutionContext(workspaceDraftScope(workspace.id), { overrides: [], profileId: 'profile-1' })
   delete window.agentBoxDesktop
@@ -500,5 +527,354 @@ describe('primary AgentBox chat pending-send recovery gate', () => {
     const { result } = renderHook(useAgentBoxMainChat, { wrapper: wrapper('/new') })
 
     expect(result.current.sendAvailable).toBe(false)
+  })
+})
+
+describe('primary AgentBox chat Workspace registration', () => {
+  const localEnvironment = { host: null, kind: 'local' as const, user: null }
+
+  afterEach(() => {
+    ;['legacy-project-id', 'proj-a', 'proj-b', 'workspace-a', 'workspace-b'].forEach(scope =>
+      clearSessionDraft(workspaceDraftScope(scope))
+    )
+  })
+
+  const flush = async () => {
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+  }
+
+  const deferredOpen = () => {
+    let settle!: (value: WorkspacesOpenResult) => void
+
+    const promise = new Promise<WorkspacesOpenResult>(resolve => {
+      settle = resolve
+    })
+
+    return { promise, settle }
+  }
+
+  const wslRecord = (overrides: Partial<WslWorkspaceRecord> = {}): WslWorkspaceRecord => ({
+    actualUser: 'me',
+    archivedAt: null,
+    configuredUser: null,
+    createdAt: 0,
+    distribution: 'Ubuntu',
+    id: 'wsl-row-1',
+    kind: 'wsl',
+    name: 'App (WSL)',
+    rootPath: '/home/me/app',
+    updatedAt: 0,
+    ...overrides
+  })
+
+  it('registers a selected local project once across re-renders and adopts what the service returned', async () => {
+    $agentBoxWorkspaces.set([])
+    const pending = deferredOpen()
+
+    mocks.openWorkspace.mockReturnValueOnce(pending.promise)
+
+    const { result, rerender } = renderHook(useAgentBoxMainChat, { wrapper: wrapper('/new') })
+
+    await flush()
+
+    expect(result.current.workspaceOpen).toEqual({ status: 'opening' })
+    expect(mocks.openWorkspace).toHaveBeenCalledTimes(1)
+    expect(mocks.openWorkspace).toHaveBeenCalledWith(
+      { id: 'client' },
+      { environment: localEnvironment, path: 'c:\\work\\app' }
+    )
+
+    rerender()
+    await flush()
+    expect(mocks.openWorkspace).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      pending.settle({ created: true, workspace })
+    })
+
+    expect(result.current.workspace?.id).toBe('workspace-1')
+    expect(result.current.workspaceOpen).toEqual({ status: 'idle' })
+    expect(result.current.draftScopeKey).toBe(workspaceDraftScope('workspace-1'))
+  })
+
+  it('registers a WSL row with the verified identity and the POSIX root exactly as saved', async () => {
+    $agentBoxWorkspaces.set([])
+    $workspaceViewSelectedId.set('wsl-row-1')
+    $wslWorkspaces.set([wslRecord()])
+
+    const wslWorkspace: WorkspaceRecord = {
+      ...workspace,
+      environment: { host: 'Ubuntu', kind: 'wsl', user: 'me' },
+      id: asWireId('workspace-wsl'),
+      normalizedPath: '/home/me/app'
+    }
+
+    mocks.openWorkspace.mockResolvedValue({ created: true, workspace: wslWorkspace })
+
+    const { result } = renderHook(useAgentBoxMainChat, { wrapper: wrapper('/new') })
+
+    await flush()
+
+    expect(mocks.openWorkspace).toHaveBeenCalledWith(
+      { id: 'client' },
+      { environment: { host: 'Ubuntu', kind: 'wsl', user: 'me' }, path: '/home/me/app' }
+    )
+    expect(result.current.workspace?.id).toBe('workspace-wsl')
+    // The path the chat now uses is the one the SERVICE returned.
+    expect(result.current.workspace?.normalizedPath).toBe('/home/me/app')
+    expect($agentBoxSessions.get()).toEqual({})
+    expect(mocks.submit).not.toHaveBeenCalled()
+  })
+
+  it('never treats an equal path string in another environment as the same location', async () => {
+    $agentBoxWorkspaces.set([{ ...workspace, environment: localEnvironment, normalizedPath: '/work/app' }])
+    $workspaceViewSelectedId.set('wsl-row-1')
+    $wslWorkspaces.set([wslRecord({ rootPath: '/work/app' })])
+
+    mocks.openWorkspace.mockResolvedValue({
+      created: true,
+      workspace: {
+        ...workspace,
+        environment: { host: 'Ubuntu', kind: 'wsl', user: 'me' },
+        id: asWireId('workspace-wsl'),
+        normalizedPath: '/work/app'
+      }
+    })
+
+    const { result } = renderHook(useAgentBoxMainChat, { wrapper: wrapper('/new') })
+
+    await flush()
+
+    expect(mocks.openWorkspace).toHaveBeenCalledWith(
+      { id: 'client' },
+      { environment: { host: 'Ubuntu', kind: 'wsl', user: 'me' }, path: '/work/app' }
+    )
+    expect(result.current.workspace?.id).toBe('workspace-wsl')
+  })
+
+  it('reuses a registered location instead of opening it again', async () => {
+    const { result } = renderHook(useAgentBoxMainChat, { wrapper: wrapper('/new') })
+
+    await flush()
+
+    expect(mocks.openWorkspace).not.toHaveBeenCalled()
+    expect(result.current.workspace?.id).toBe('workspace-1')
+    expect(result.current.workspaceOpen).toEqual({ status: 'idle' })
+  })
+
+  it('does not let a shell row id that equals an unrelated Wire id stand in for a location', async () => {
+    // The shell row is literally named 'workspace-1' — the same string as an
+    // unrelated service id — but its LOCATION is what decides.
+    $workspaceViewSelectedId.set('workspace-1')
+    $projectTree.set([projectTreeNode('workspace-1', 'c:\\work\\app')])
+    $agentBoxWorkspaces.set([
+      { ...workspace, id: asWireId('workspace-1'), normalizedPath: '/somewhere/else', version: 9 }
+    ])
+
+    mocks.openWorkspace.mockResolvedValue({
+      created: true,
+      workspace: { ...workspace, id: asWireId('workspace-registered'), version: 1 }
+    })
+
+    const { result } = renderHook(useAgentBoxMainChat, { wrapper: wrapper('/new') })
+
+    await flush()
+
+    expect(mocks.openWorkspace).toHaveBeenCalledTimes(1)
+    expect(result.current.workspace?.id).toBe('workspace-registered')
+    expect(result.current.workspace?.normalizedPath).toBe('C:/work/app')
+  })
+
+  it('adopts the service id when the location was already registered server-side', async () => {
+    $agentBoxWorkspaces.set([])
+
+    mocks.openWorkspace.mockResolvedValue({
+      created: false,
+      workspace: { ...workspace, id: asWireId('workspace-existing'), version: 3 }
+    })
+
+    const { result } = renderHook(useAgentBoxMainChat, { wrapper: wrapper('/new') })
+
+    await flush()
+
+    expect(result.current.workspace?.id).toBe('workspace-existing')
+    expect(result.current.workspace?.version).toBe(3)
+    expect(result.current.draftScopeKey).toBe(workspaceDraftScope('workspace-existing'))
+    expect($agentBoxSessions.get()).toEqual({})
+  })
+
+  it('moves an unsent draft from the shell scope to the service scope without touching sessions', async () => {
+    $agentBoxWorkspaces.set([])
+    $workspaceViewSelectedId.set('proj-a')
+    $projectTree.set([projectTreeNode('proj-a', 'C:/a')])
+
+    const provisionalScope = workspaceDraftScope('proj-a')
+
+    stashSessionDraft(provisionalScope, 'unsent text', [
+      { id: 'a1', kind: 'file', label: 'notes.txt', refText: '@file:staged/notes.txt' }
+    ])
+    setSessionDraftExecutionContext(provisionalScope, {
+      overrides: [{ controlId: 'mode', value: 'fast' }],
+      profileId: 'profile-1'
+    })
+
+    const pending = deferredOpen()
+
+    mocks.openWorkspace.mockReturnValueOnce(pending.promise)
+
+    const { result } = renderHook(useAgentBoxMainChat, { wrapper: wrapper('/new') })
+
+    await flush()
+    expect(result.current.draftScopeKey).toBe(provisionalScope)
+
+    await act(async () => {
+      pending.settle({
+        created: true,
+        workspace: { ...workspace, id: asWireId('workspace-a'), normalizedPath: 'C:/a' }
+      })
+    })
+
+    const authoritativeScope = workspaceDraftScope('workspace-a')
+
+    expect(takeSessionDraft(authoritativeScope).text).toBe('unsent text')
+    expect(takeSessionDraft(authoritativeScope).attachments).toHaveLength(1)
+    expect(sessionDraftExecutionContext(authoritativeScope)).toMatchObject({
+      overrides: [{ controlId: 'mode', value: 'fast' }],
+      profileId: 'profile-1'
+    })
+    expect(takeSessionDraft(provisionalScope).text).toBe('')
+    expect(result.current.draftScopeKey).toBe(authoritativeScope)
+    expect(mocks.submit).not.toHaveBeenCalled()
+  })
+
+  it('never overwrites a draft that already belongs to the service scope', async () => {
+    $agentBoxWorkspaces.set([])
+    $workspaceViewSelectedId.set('proj-a')
+    $projectTree.set([projectTreeNode('proj-a', 'C:/a')])
+
+    const provisionalScope = workspaceDraftScope('proj-a')
+    const authoritativeScope = workspaceDraftScope('workspace-a')
+
+    stashSessionDraft(provisionalScope, 'unsent shell text', [])
+    stashSessionDraft(authoritativeScope, 'already here', [])
+
+    const pending = deferredOpen()
+
+    mocks.openWorkspace.mockReturnValueOnce(pending.promise)
+
+    const { result } = renderHook(useAgentBoxMainChat, { wrapper: wrapper('/new') })
+
+    await flush()
+
+    await act(async () => {
+      pending.settle({
+        created: true,
+        workspace: { ...workspace, id: asWireId('workspace-a'), normalizedPath: 'C:/a' }
+      })
+    })
+
+    expect(takeSessionDraft(authoritativeScope).text).toBe('already here')
+    expect(takeSessionDraft(provisionalScope).text).toBe('unsent shell text')
+    expect(result.current.draftScopeKey).toBe(authoritativeScope)
+  })
+
+  it('caches a late answer for an abandoned row without switching the selection back to it', async () => {
+    $agentBoxWorkspaces.set([])
+    $workspaceViewSelectedId.set('proj-a')
+    $projectTree.set([projectTreeNode('proj-a', 'C:/a'), projectTreeNode('proj-b', 'C:/b')])
+
+    const first = deferredOpen()
+    const second = deferredOpen()
+
+    mocks.openWorkspace.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
+
+    const { result } = renderHook(useAgentBoxMainChat, { wrapper: wrapper('/new') })
+
+    await flush()
+    expect(mocks.openWorkspace).toHaveBeenCalledTimes(1)
+
+    act(() => $workspaceViewSelectedId.set('proj-b'))
+    await flush()
+    expect(mocks.openWorkspace).toHaveBeenCalledTimes(2)
+    expect(mocks.openWorkspace.mock.calls[1]?.[1]).toMatchObject({ path: 'C:/b' })
+
+    await act(async () => {
+      second.settle({
+        created: true,
+        workspace: { ...workspace, id: asWireId('workspace-b'), normalizedPath: 'C:/b' }
+      })
+    })
+
+    expect(result.current.workspace?.id).toBe('workspace-b')
+
+    // B's draft is the current one and stays untouched when A answers late.
+    stashSessionDraft(workspaceDraftScope('proj-b'), 'b draft', [])
+
+    await act(async () => {
+      first.settle({
+        created: true,
+        workspace: { ...workspace, id: asWireId('workspace-a'), normalizedPath: 'C:/a' }
+      })
+    })
+
+    expect(result.current.workspace?.id).toBe('workspace-b')
+    expect(result.current.draftScopeKey).toBe(workspaceDraftScope('workspace-b'))
+    expect(takeSessionDraft(workspaceDraftScope('proj-b')).text).toBe('b draft')
+    // The abandoned row still reached the service projection.
+    expect($agentBoxWorkspaces.get().map(record => record.id)).toContain('workspace-a')
+  })
+
+  it('reports an undeclared method without calling it and without retrying', async () => {
+    $agentBoxWorkspaces.set([])
+    $agentBoxHello.set(hello(['config.resolve', 'sessions.createAndSend', 'sessions.send']))
+
+    const { result, rerender } = renderHook(useAgentBoxMainChat, { wrapper: wrapper('/new') })
+
+    await flush()
+    rerender()
+    await flush()
+
+    expect(mocks.openWorkspace).not.toHaveBeenCalled()
+    expect(result.current.workspaceOpen).toEqual({ detail: 'CAPABILITY_NOT_DECLARED', status: 'unavailable' })
+    expect(result.current.sendAvailable).toBe(false)
+    expect(result.current.draftScopeKey).toBe(workspaceDraftScope('legacy-project-id'))
+  })
+
+  it('keeps the shell selection and the draft when the registration fails, and does not retry on its own', async () => {
+    $agentBoxWorkspaces.set([])
+
+    const provisionalScope = workspaceDraftScope('legacy-project-id')
+
+    stashSessionDraft(provisionalScope, 'still mine', [])
+    mocks.openWorkspace.mockRejectedValue(new Error('OUTCOME_UNKNOWN'))
+
+    const { result, rerender } = renderHook(useAgentBoxMainChat, { wrapper: wrapper('/new') })
+
+    await flush()
+    rerender()
+    await flush()
+
+    expect(mocks.openWorkspace).toHaveBeenCalledTimes(1)
+    expect(result.current.workspaceOpen).toEqual({ detail: 'OUTCOME_UNKNOWN', status: 'unavailable' })
+    expect(result.current.workspace).toBeNull()
+    expect(result.current.sendAvailable).toBe(false)
+    expect(result.current.draftScopeKey).toBe(provisionalScope)
+    expect(takeSessionDraft(provisionalScope).text).toBe('still mine')
+  })
+
+  it('uses the Session Workspace on a Session route and never registers anything', async () => {
+    $agentBoxSessions.set({ [session.id]: session })
+    $agentBoxWorkspaces.set([{ ...workspace, normalizedPath: '/wherever/the/session/lives' }])
+
+    const { result } = renderHook(useAgentBoxMainChat, { wrapper: wrapper('/session-1') })
+
+    await flush()
+
+    expect(mocks.openWorkspace).not.toHaveBeenCalled()
+    expect(result.current.workspace?.id).toBe('workspace-1')
+    expect(result.current.draftScopeKey).toBe('session-1')
   })
 })

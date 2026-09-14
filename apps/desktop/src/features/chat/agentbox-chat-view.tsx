@@ -84,6 +84,25 @@ export function agentBoxProjectionMessages(
   return messages
 }
 
+/**
+ * Why the composer cannot send yet while the service Workspace is the gate:
+ * an in-flight registration is a wait, a failed one reports the service's own
+ * reason, and a row with no location at all falls back to the neutral
+ * unavailable copy. The service record is the only source of connection facts,
+ * so nothing here claims a workspace is verified.
+ */
+export function registrationReason(
+  open: ReturnType<typeof useAgentBoxMainChat>['workspaceOpen'],
+  copy: { opening: string; unavailable: string },
+  fallback: string
+): string {
+  if (open.status === 'opening') {
+    return copy.opening
+  }
+
+  return open.status === 'unavailable' ? `${copy.unavailable} ${open.detail}` : fallback
+}
+
 function AgentBoxThreadRuntime({
   binding,
   children,
@@ -145,7 +164,11 @@ export function AgentBoxChatView({ maxVoiceRecordingSeconds }: { maxVoiceRecordi
     binding.service.phase === 'unavailable'
       ? binding.service.detail || t.profiles.agentBoxUnavailable
       : binding.catalogReady && !binding.workspace
-        ? t.profiles.agentBoxUnavailable
+        ? registrationReason(
+            binding.workspaceOpen,
+            { opening: t.composer.workspaceOpening, unavailable: t.composer.workspaceUnavailable },
+            t.profiles.agentBoxUnavailable
+          )
         : binding.catalogReady && !binding.session && !binding.profileId
           ? t.composer.profileRequired
           : null

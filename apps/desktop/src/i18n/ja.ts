@@ -2141,6 +2141,8 @@ export const ja = defineLocale({
     securityLocked: 'サービスのセキュリティポリシーによりロックされています',
     clearTemporaryValue: 'プロファイルの既定値を使用',
     configUnavailable: '設定を利用できません',
+    workspaceOpening: 'このワークスペースをサービスに登録しています…',
+    workspaceUnavailable: 'このワークスペースはサービスに登録されていません。',
     configResolving: 'サービスが現在の設定を確認しています…',
     configResolved: 'サービスが以下の有効値を確認しました。',
     configRejected: 'サービスがこの設定を受け付けないため、送信できません。',

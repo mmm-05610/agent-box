@@ -2658,6 +2658,8 @@ export const zh: Translations = {
     securityLocked: '已由服务安全策略锁定',
     clearTemporaryValue: '使用角色默认值',
     configUnavailable: '配置当前不可用',
+    workspaceOpening: '正在向服务登记此工作区…',
+    workspaceUnavailable: '此工作区尚未在服务中登记。',
     configResolving: '正在由服务检查当前配置…',
     configResolved: '服务已确认以下生效值。',
     configRejected: '服务不会接受这份配置，因此无法发送。',

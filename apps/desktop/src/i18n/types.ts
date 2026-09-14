@@ -2216,6 +2216,8 @@ export interface Translations {
     securityLocked: string
     clearTemporaryValue: string
     configUnavailable: string
+    workspaceOpening: string
+    workspaceUnavailable: string
     configResolving: string
     configResolved: string
     configRejected: string
