@@ -18,6 +18,7 @@ import { readFileSync } from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import readline from "node:readline"
+import { loadNativeDriver, redactDeep } from "./native-driver.mjs"
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const snapshotRoot = path.resolve(here, "..", "third_party", "harness_remote")
@@ -87,6 +88,10 @@ async function main() {
 
   let registration = null
   let credentialValue = null
+  // A deployment whose Harness speaks a native protocol rather than ACP names
+  // the reviewed module that drives it; exactly one of these two is set, and
+  // every operation below is routed to whichever the deployment declared.
+  let driver = null
   // The registration names the Harness this sidecar speaks for, so the product
   // model id a caller sends is translated into that Harness's own catalogue
   // value here rather than by any layer above.
@@ -100,6 +105,12 @@ async function main() {
 
   function emit(message) {
     process.stdout.write(`${JSON.stringify(message)}\n`)
+  }
+  // Upward events from a native driver pass through the same redaction an
+  // adapter's stderr does: whatever a driver puts in an event field, the
+  // credential value never reaches the envelope.
+  function driverEmit(message) {
+    emit(credentialValue ? redactDeep(message, credentialValue) : message)
   }
   function fail({ id = null, code, message }) {
     emit({ id, ok: false, error: { code, message: message ?? code } })
@@ -144,7 +155,7 @@ async function main() {
           throw envelopeError("CREDENTIAL_MATERIAL_INVALID")
         }
       }
-      if (Object.keys(adapterEnvironment).length || credentialValue) {
+      if (Object.keys(adapterEnvironment).length || credentialValue || request.launch.driver != null) {
         spawnProcess = (command, args, options = {}) => spawn(command, args, {
           ...options,
           env: {
@@ -152,6 +163,28 @@ async function main() {
             ...(credentialValue ? { [credentialEnvironment]: credentialValue } : {}),
           },
         })
+      }
+      if (request.launch.driver != null) {
+        registeredProfileID = request.profile
+        driver = await loadNativeDriver({
+          declaration: request.launch.driver,
+          request, emit: driverEmit, redact: safeText, spawnProcess,
+          directory: request.directory ?? process.cwd(),
+          stateDirectory: request.stateDirectory,
+          credentialEnvironment: credentialEnvironment ?? null,
+          hasCredential: Boolean(credentialValue),
+        })
+        return {
+          provenance: { commit: source.commit, ref: source.ref },
+          profile: request.profile,
+          driver: { module: request.launch.driver.module },
+          launch: {
+            command: request.launch.command,
+            args: Array.isArray(request.launch.args) ? request.launch.args : [],
+          },
+          capabilities: driver.capabilities ?? {},
+          contract: driver.contract ?? {},
+        }
       }
       const profile = resolveHarnessProfile(request.profile)
       registeredProfileID = request.profile
@@ -183,7 +216,65 @@ async function main() {
       pending.resolve(optionId)
       return { recorded: true }
     }
-    if (!registration) throw envelopeError("NOT_REGISTERED")
+    if (!registration && !driver) throw envelopeError("NOT_REGISTERED")
+    if (driver) {
+      // A native driver answers the same generic operations as an ACP
+      // registration. Which one is present is the deployment's decision; no
+      // branch below knows a Harness name.
+      switch (op) {
+        case "start": {
+          await driver.start()
+          const declared = driver.capabilities ?? {}
+          return {
+            agentInfo: declared.agentInfo ?? null,
+            promptCapabilities: declared.promptCapabilities ?? {},
+            sessionCapabilities: declared.sessionCapabilities ?? {},
+            processID: undefined,
+          }
+        }
+        case "create": {
+          const session = await driver.create({
+            title: request.title,
+            model: resolveNativeModel(registeredProfileID, request.model),
+          })
+          return {
+            sessionId: session?.sessionId ?? session?.id ?? null,
+            title: session?.title ?? null,
+          }
+        }
+        case "open": {
+          const session = await driver.open({
+            sessionId: request.sessionId,
+            model: resolveNativeModel(registeredProfileID, request.model),
+          })
+          return { sessionId: session?.sessionId ?? request.sessionId, claimed: true }
+        }
+        case "prompt": {
+          const result = await driver.prompt({
+            sessionId: request.sessionId,
+            text: request.text,
+            model: resolveNativeModel(registeredProfileID, request.model),
+            attachments: Array.isArray(request.attachments) ? request.attachments : [],
+          })
+          return result ?? { done: true }
+        }
+        case "abort": {
+          await driver.abort(request.sessionId)
+          return { aborted: true }
+        }
+        case "status": {
+          return (await driver.status(request.sessionId)) ?? {}
+        }
+        case "close": {
+          await driver.close()
+          driver = null
+          credentialValue = null
+          return { closed: true }
+        }
+        default:
+          throw envelopeError("UNKNOWN_OP")
+      }
+    }
     switch (op) {
       case "start": {
         await registration.agent.start()

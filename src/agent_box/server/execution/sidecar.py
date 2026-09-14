@@ -128,6 +128,7 @@ def sidecar_bundle_files(
     files = {
         "agentbox-sidecar/package.json": (runtime / "package.json").read_bytes(),
         "agentbox-sidecar/runtime/worker-entry.mjs": (runtime / "worker-entry.mjs").read_bytes(),
+        "agentbox-sidecar/runtime/native-driver.mjs": (runtime / "native-driver.mjs").read_bytes(),
         "agentbox-sidecar/runtime/profile_extensions.mjs": (
             runtime / "profile_extensions.mjs"
         ).read_bytes(),
@@ -818,6 +819,15 @@ class SidecarHarnessPort:
                 text = ((update.get("content") or {}).get("text") or "")
                 if text:
                     self.on_event(execution_id, "message.delta", {"text": text})
+        elif event == "message_delta":
+            # A deployment-declared native driver reports the same product fact
+            # as an ACP message chunk. The event name is the driver contract's,
+            # never a Harness's, so this mapping stays brand-free.
+            text = str(data.get("text") or "")
+            if text:
+                self.on_event(execution_id, "message.delta", {"text": text})
+        elif event == "driver_exit":
+            self.on_event(execution_id, "failed", {"code": "ADAPTER_EXIT"})
         elif event == "adapter_exit":
             self.on_event(execution_id, "failed", {"code": "ADAPTER_EXIT"})
         elif event == "permission_request":

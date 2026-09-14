@@ -163,7 +163,9 @@ def test_the_sidecar_glue_owns_the_same_model_mapping():
 
     The deployment template is Python; the translation is applied inside the
     sidecar process, which is JavaScript. Rather than keep two copies in step by
-    hand, the JavaScript module is asked for its table and compared.
+    hand, the JavaScript module is asked for its table and compared. The table
+    may hold other families, but it may not hold one without a production
+    template here - an alias with no template is drift by construction.
     """
     script = (
         "import('" + (RUNTIME / "profile_extensions.mjs").as_uri() + "').then((module) =>"
@@ -177,17 +179,32 @@ def test_the_sidecar_glue_owns_the_same_model_mapping():
                             timeout=60, cwd=str(REPO))
     assert result.returncode == 0, result.stderr
     payload = json.loads(result.stdout)
-    assert payload["aliases"] == {"pi": production.model_aliases()}
+    assert payload["aliases"]["pi"] == production.model_aliases()
+    families = {
+        path.parent.name for path in (REPO / "plugins" / "agent-box-harnesses" / "src"
+                                      / "agent_box_harnesses").glob("*/production.py")
+    }
+    assert set(payload["aliases"]) <= families, "an alias without a production template is drift"
     assert payload["translated"] == production.NATIVE_MODEL_VALUE
     assert payload["passthrough"] == "deepseek-flash"
     assert payload["empty"] is None
 
 
-def test_the_sidecar_applies_the_mapping_to_both_model_carrying_operations():
-    """create and prompt are the two envelope ops that carry a model."""
+def test_the_sidecar_applies_the_mapping_to_every_model_carrying_operation():
+    """Every envelope op that carries a model translates it, on both routes.
+
+    The sidecar has two routes now: the ACP registration (`create`, `prompt`)
+    and a deployment-declared native driver (`create`, `open`, `prompt`). A
+    model-bearing op on either route that skipped the translation would send the
+    product model id to a native catalogue that spells it differently.
+    """
     entry = (RUNTIME / "worker-entry.mjs").read_text(encoding="utf-8")
-    assert entry.count("resolveNativeModel(registeredProfileID, request.model)") == 2
-    assert "resolveNativeModel" in entry.split("const {", 1)[0] or "resolveNativeModel" in entry
+    translation = "resolveNativeModel(registeredProfileID, request.model)"
+    head, rest = entry.split("if (driver) {", 1)
+    assert translation not in head, "no model-bearing op precedes the route split"
+    driver_block, acp_block = rest.split("\n    switch (op) {", 1)
+    assert driver_block.count(translation) == 3, "driver create/open/prompt must translate"
+    assert acp_block.count(translation) == 2, "ACP create/prompt must translate"
     # No Harness name is branched on inside the sidecar entry point.
     for name in ("pi-acp", "automatalabs", "deepseek"):
         assert name not in entry, f"{name} must not appear in the generic sidecar entry"

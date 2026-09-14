@@ -376,6 +376,20 @@ def build_runtime_from_sidecar_deployment(
             bundle_path = f"agentbox-sidecar/deployment/{harness_id}/adapter.mjs"
             additional_bundle[bundle_path] = content
             adapter["args"] = [f"/runtime/view/{bundle_path}", *adapter.get("args", [])]
+        driver = adapter.pop("driver", None)
+        if driver is not None:
+            # A native Harness whose protocol is not ACP declares the module the
+            # sidecar must load instead, as a plugin file named by the
+            # deployment. Nothing here knows what that module speaks: the
+            # declaration is carried into the reviewed bundle and the fixed view
+            # path is what the sidecar loads, so no brand reaches this layer.
+            if (not isinstance(driver, dict) or set(driver) != {"source"}
+                    or not isinstance(driver.get("source"), str)):
+                raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
+            content = _sidecar_deployment_file(path, value, driver["source"])
+            driver_bundle_path = f"agentbox-sidecar/deployment/{harness_id}/driver.mjs"
+            additional_bundle[driver_bundle_path] = content
+            adapter["driver"] = {"module": f"/runtime/view/{driver_bundle_path}"}
         environment = adapter.get("environment") or {}
         if not isinstance(environment, dict) or any(
             not isinstance(key, str) or re.fullmatch(r"[A-Z][A-Z0-9_]{0,63}", key) is None

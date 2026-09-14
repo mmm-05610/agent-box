@@ -70,18 +70,19 @@ const REGISTERED = { ...HARNESS_PROFILES, ...AGENTBOX_HARNESS_PROFILES }
  * Product model id -> the value that Harness's own model catalogue advertises.
  *
  * A product ProviderModel carries the model id the user confirmed
- * (`deepseek-flash`); Pi's catalogue addresses that same model as
+ * (`deepseek-flash`); Pi's and OpenCode's catalogues address that same model as
  * `provider/model`. The translation belongs here, in the Harness extension
  * layer, because the Server, Core, Worker and bwrap layers must never branch on
  * a Harness name: they pass one opaque string and this table is the only place
  * that knows how a given Harness spells it. A Harness with no entry passes its
  * model through untouched.
  *
- * `agent_box_harnesses.pi.production` owns the same mapping for the deployment
- * template, and `test_pi_production_template.py` fails if the two disagree.
+ * Each Harness's own production template owns the same mapping, and the
+ * per-family template tests fail if a pair disagrees.
  */
 export const AGENTBOX_MODEL_ALIASES = {
   pi: { "deepseek-flash": "deepseek/deepseek-flash" },
+  opencode: { "deepseek-flash": "deepseek/deepseek-flash" },
 }
 
 export function resolveNativeModel(profileID, model) {
