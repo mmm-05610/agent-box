@@ -41,8 +41,9 @@ export interface ProfileMaintenancePort {
   create(intent: CreateProfileIntent): Promise<ProfileRecord>
   harnessChoices: ProfileHarnessChoice[]
   update(intent: UpdateProfileIntent): Promise<ProfileRecord>
-  /** Optional while profile presentation migrates to editable service config. */
-  updateConfig?(intent: UpdateProfileConfigIntent): Promise<ProfilesUpdateConfigResult>
+  /** Replaces the whole Profile configuration; the service validates and
+   *  normalizes. Returns the authoritative record for the next CAS step. */
+  updateConfig(intent: UpdateProfileConfigIntent): Promise<ProfilesUpdateConfigResult>
 }
 
 export interface WireProfileMaintenanceOptions {

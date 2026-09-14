@@ -1718,14 +1718,19 @@ export const zhHant = defineLocale({
     agentBoxMaintenanceUnavailable: '角色維護目前無法使用',
     agentBoxMaintenanceUnavailableDesc: '服務可以列出角色，但尚未宣告建立、編輯、封存或原生記憶控制能力。',
     agentBoxRuntimeConfig: '執行設定',
-    agentBoxRuntimeConfigDesc: '由服務描述的值；暫時調整請在輸入框旁進行。',
+    agentBoxRuntimeConfigDesc: '由服務描述的預設值；儲存會替換整份角色設定。',
     agentBoxCreateDesc: '選擇名稱和 Harness，其餘設定可稍後完成。',
     agentBoxHarnessChoice: 'Harness',
     agentBoxArchive: '封存',
     agentBoxArchiveTitle: '封存角色？',
     agentBoxArchiveDesc: name => `要封存「${name}」嗎？既有 Session 歷史會保留。`,
     agentBoxSaveProfile: '儲存角色',
-    agentBoxUpdateFailed: '無法更新角色'
+    agentBoxUpdateFailed: '無法更新角色',
+    agentBoxConfigLocked: '由服務鎖定',
+    agentBoxConfigRestoreDefault: '恢復預設',
+    agentBoxConfigModelUnverified: '未驗證',
+    agentBoxConfigSavedNextSend: '角色設定已儲存，將於下次傳送時生效。',
+    agentBoxConfigSaveFailed: '無法更新角色設定'
   },
 
   cron: {

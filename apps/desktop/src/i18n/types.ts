@@ -1892,6 +1892,11 @@ export interface Translations {
     agentBoxArchiveDesc: (name: string) => string
     agentBoxSaveProfile: string
     agentBoxUpdateFailed: string
+    agentBoxConfigLocked: string
+    agentBoxConfigRestoreDefault: string
+    agentBoxConfigModelUnverified: string
+    agentBoxConfigSavedNextSend: string
+    agentBoxConfigSaveFailed: string
   }
 
   cron: {

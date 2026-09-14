@@ -2109,14 +2109,19 @@ export const ru = defineLocale({
     agentBoxMaintenanceUnavailableDesc:
       'Сервис может перечислять профили, но не объявил создание, изменение, архивирование или управление встроенной памятью.',
     agentBoxRuntimeConfig: 'Конфигурация запуска',
-    agentBoxRuntimeConfigDesc: 'Значения описывает сервис. Временные изменения задаются рядом с полем ввода.',
+    agentBoxRuntimeConfigDesc: 'Значения по умолчанию, описанные сервисом. Сохранение заменяет всю конфигурацию профиля.',
     agentBoxCreateDesc: 'Выберите имя и Harness. Остальные настройки можно завершить позже.',
     agentBoxHarnessChoice: 'Harness',
     agentBoxArchive: 'Архивировать',
     agentBoxArchiveTitle: 'Архивировать профиль?',
     agentBoxArchiveDesc: name => `Архивировать «${name}»? История существующих Session сохранится.`,
     agentBoxSaveProfile: 'Сохранить профиль',
-    agentBoxUpdateFailed: 'Не удалось обновить профиль'
+    agentBoxUpdateFailed: 'Не удалось обновить профиль',
+    agentBoxConfigLocked: 'Заблокировано сервисом',
+    agentBoxConfigRestoreDefault: 'Вернуть по умолчанию',
+    agentBoxConfigModelUnverified: 'Не проверено',
+    agentBoxConfigSavedNextSend: 'Конфигурация профиля сохранена. Применяется при следующей отправке.',
+    agentBoxConfigSaveFailed: 'Не удалось обновить конфигурацию профиля'
   },
   cron: {
     close: 'Закрыть cron',

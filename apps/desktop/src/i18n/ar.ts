@@ -1457,14 +1457,19 @@ export const ar = defineLocale({
     agentBoxMaintenanceUnavailableDesc:
       'يمكن للخدمة سرد الملفات الشخصية، لكنها لم تعلن إمكانات الإنشاء أو التحرير أو الأرشفة أو الذاكرة الأصلية.',
     agentBoxRuntimeConfig: 'إعدادات التشغيل',
-    agentBoxRuntimeConfigDesc: 'قيم تصفها الخدمة. تُجرى التغييرات المؤقتة بجوار محرر الرسالة.',
+    agentBoxRuntimeConfigDesc: 'قيم افتراضية تصفها الخدمة. الحفظ يستبدل إعدادات الملف الشخصي بالكامل.',
     agentBoxCreateDesc: 'اختر اسمًا وHarness. يمكن إكمال بقية الإعدادات لاحقًا.',
     agentBoxHarnessChoice: 'Harness',
     agentBoxArchive: 'أرشفة',
     agentBoxArchiveTitle: 'أرشفة الملف الشخصي؟',
     agentBoxArchiveDesc: name => `هل تريد أرشفة «${name}»؟ سيبقى سجل Session الحالي.`,
     agentBoxSaveProfile: 'حفظ الملف الشخصي',
-    agentBoxUpdateFailed: 'تعذر تحديث الملف الشخصي'
+    agentBoxUpdateFailed: 'تعذر تحديث الملف الشخصي',
+    agentBoxConfigLocked: 'مقفل من الخدمة',
+    agentBoxConfigRestoreDefault: 'استعادة الافتراضي',
+    agentBoxConfigModelUnverified: 'غير مُتحقق منه',
+    agentBoxConfigSavedNextSend: 'تم حفظ إعدادات الملف الشخصي. تُطبَّق عند الإرسال التالي.',
+    agentBoxConfigSaveFailed: 'تعذر تحديث إعدادات الملف الشخصي'
   },
   cron: {
     close: 'إغلاق',

@@ -2281,14 +2281,19 @@ export const zh: Translations = {
     agentBoxMaintenanceUnavailable: '角色维护当前不可用',
     agentBoxMaintenanceUnavailableDesc: '服务可以列出角色，但尚未声明创建、编辑、归档或原生记忆控制能力。',
     agentBoxRuntimeConfig: '运行配置',
-    agentBoxRuntimeConfigDesc: '由服务描述的值；临时调整请在输入框旁进行。',
+    agentBoxRuntimeConfigDesc: '由服务描述的默认值；保存会替换整份角色配置。',
     agentBoxCreateDesc: '选择名称和 Harness，其余配置可以稍后完成。',
     agentBoxHarnessChoice: 'Harness',
     agentBoxArchive: '归档',
     agentBoxArchiveTitle: '归档角色？',
     agentBoxArchiveDesc: name => `要归档“${name}”吗？已有 Session 历史会保留。`,
     agentBoxSaveProfile: '保存角色',
-    agentBoxUpdateFailed: '无法更新角色'
+    agentBoxUpdateFailed: '无法更新角色',
+    agentBoxConfigLocked: '由服务锁定',
+    agentBoxConfigRestoreDefault: '恢复默认',
+    agentBoxConfigModelUnverified: '未验证',
+    agentBoxConfigSavedNextSend: '角色配置已保存，将在下次发送时生效。',
+    agentBoxConfigSaveFailed: '无法更新角色配置'
   },
 
   cron: {

@@ -22,6 +22,7 @@ import {
   wireProfileMaintenancePort
 } from '@/application/profile/profile-maintenance-port'
 import { ensureAgentBoxProfileCatalog } from '@/application/profile/wire-composer-profile'
+import { ensureAgentBoxProviderModelCatalog } from '@/application/provider-model/wire-provider-model-catalog'
 import { useRefreshHotkey } from '@/components/hooks/use-refresh-hotkey'
 import { PageLoader } from '@/components/page-loader'
 import { Button } from '@/components/ui/button'
@@ -42,11 +43,20 @@ import { normalize } from '@/lib/text'
 import {
   $agentBoxHello,
   $agentBoxProfiles,
+  $agentBoxProviderModels,
   $agentBoxService,
   agentBoxCapabilitySupported,
   upsertAgentBoxProfile
 } from '@/store/agentbox-service'
-import type { ConfigControl, ConfigDescriptor, ProfileRecord } from '@/types/wire/wire-v1'
+import type { ConfigControl, ConfigDescriptor, ProfileRecord, ProfilesUpdateConfigResult } from '@/types/wire/wire-v1'
+
+import {
+  buildProfileConfigValues,
+  emptyProfileConfigDraft,
+  isProfileConfigDirty,
+  type ProfileConfigDraft,
+  ProfileConfigEditor
+} from './profile-config-editor'
 
 export interface ProfilesViewProps {
   /** Explicit adapter override for isolated component tests. */
@@ -71,7 +81,9 @@ export function ProfilesView({ maintenance, onClose }: ProfilesViewProps) {
   const [archiveTarget, setArchiveTarget] = useState<ProfileRecord | null>(null)
 
   const productionMaintenance = useMemo(() => {
-    const methods = ['profiles.create', 'profiles.update', 'profiles.archive']
+    // Config editing is only offered when the service declares every method the
+    // save path uses — a partial set would render controls that cannot save.
+    const methods = ['profiles.create', 'profiles.update', 'profiles.updateConfig', 'profiles.archive']
 
     if (service.phase !== 'ready' || !methods.every(method => agentBoxCapabilitySupported(hello, method))) {
       return undefined
@@ -236,52 +248,97 @@ interface ProfileRowProps {
 function ProfileDetail({ maintenance, profile, serviceOffline }: ProfileDetailProps) {
   const { t } = useI18n()
   const copy = t.profiles
+  const providerModels = useStore($agentBoxProviderModels)
   const [displayName, setDisplayName] = useState(profile.displayName)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<null | string>(null)
+  const [savedFor, setSavedFor] = useState<null | ProfilesUpdateConfigResult['effectiveFor']>(null)
   const [descriptor, setDescriptor] = useState<DescriptorState>({ status: 'loading' })
-  const dirty = displayName.trim() !== profile.displayName
+  const [draft, setDraft] = useState<ProfileConfigDraft>(emptyProfileConfigDraft)
+
+  const readDescriptor = useCallback(async (): Promise<DescriptorState> => {
+    try {
+      return {
+        descriptor: await loadProfileRuntimeDescriptor(agentBoxRuntimeClient(), profile.id),
+        status: 'ready'
+      }
+    } catch (reason) {
+      return { detail: reason instanceof Error ? reason.message : copy.agentBoxUnavailable, status: 'unavailable' }
+    }
+  }, [copy.agentBoxUnavailable, profile.id])
 
   useEffect(() => {
     let current = true
+
     setDescriptor({ status: 'loading' })
 
-    void loadProfileRuntimeDescriptor(agentBoxRuntimeClient(), profile.id).then(
-      result => current && setDescriptor({ descriptor: result, status: 'ready' }),
-      reason =>
-        current &&
-        setDescriptor({
-          detail: reason instanceof Error ? reason.message : copy.agentBoxUnavailable,
-          status: 'unavailable'
-        })
-    )
+    void readDescriptor().then(state => current && setDescriptor(state))
 
     return () => {
       current = false
     }
-  }, [copy.agentBoxUnavailable, profile.id])
+  }, [readDescriptor])
+
+  const editableDescriptor = descriptor.status === 'ready' ? descriptor.descriptor : null
+  const hasModelSlot = editableDescriptor?.controls.some(control => control.kind === 'model_slot') ?? false
+  const configDirty = editableDescriptor ? isProfileConfigDirty(editableDescriptor, draft) : false
+  const dirty = displayName.trim() !== profile.displayName || configDirty
+
+  useEffect(() => {
+    if (hasModelSlot && maintenance) {
+      void ensureAgentBoxProviderModelCatalog(agentBoxRuntimeClient())
+    }
+  }, [hasModelSlot, maintenance])
 
   const save = async () => {
-    if (!maintenance || !dirty || !displayName.trim()) {
+    if (!maintenance || saving || !dirty || !displayName.trim()) {
       return
     }
 
     setSaving(true)
     setError(null)
+    setSavedFor(null)
 
     try {
-      const updated = await maintenance.update({
-        displayName: displayName.trim(),
-        expectedVersion: profile.version,
-        profileId: profile.id
-      })
+      let current = profile
+      const nextName = displayName.trim()
 
-      upsertAgentBoxProfile(updated)
+      // Rename first and reuse the version it returns: updateConfig replaces the
+      // whole configuration, so it must CAS against the version the rename just
+      // produced rather than the one this render started with.
+      if (nextName !== current.displayName) {
+        current = await maintenance.update({
+          displayName: nextName,
+          expectedVersion: current.version,
+          profileId: current.id
+        })
+
+        upsertAgentBoxProfile(current)
+      }
+
+      if (configDirty && editableDescriptor) {
+        const result = await maintenance.updateConfig({
+          expectedVersion: current.version,
+          profileId: current.id,
+          values: buildProfileConfigValues(editableDescriptor, draft)
+        })
+
+        upsertAgentBoxProfile(result.profile)
+        setDraft(emptyProfileConfigDraft())
+        setSavedFor(result.effectiveFor)
+        setDescriptor(await readDescriptor())
+      }
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : copy.agentBoxUpdateFailed)
+      // The failed step keeps the service's projection and the draft: a retry
+      // resumes from the version the successful step returned.
+      setError(reason instanceof Error ? reason.message : copy.agentBoxConfigSaveFailed)
     } finally {
       setSaving(false)
     }
+  }
+
+  const savedNotice: Record<ProfilesUpdateConfigResult['effectiveFor'], string> = {
+    next_send: copy.agentBoxConfigSavedNextSend
   }
 
   return (
@@ -319,6 +376,15 @@ function ProfileDetail({ maintenance, profile, serviceOffline }: ProfileDetailPr
 
       {error ? <div className="rounded bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</div> : null}
 
+      {savedFor ? (
+        <div
+          className="rounded bg-emerald-500/10 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300"
+          data-effective-for={savedFor}
+        >
+          {savedNotice[savedFor]}
+        </div>
+      ) : null}
+
       {!maintenance ? (
         <div className="rounded-lg border border-border bg-muted/20 px-3 py-2.5">
           <div className="text-xs font-medium text-foreground">{copy.agentBoxMaintenanceUnavailable}</div>
@@ -341,6 +407,15 @@ function ProfileDetail({ maintenance, profile, serviceOffline }: ProfileDetailPr
           <PageLoader className="min-h-24" label={copy.loading} />
         ) : descriptor.status === 'unavailable' ? (
           <div className="text-xs text-muted-foreground">{descriptor.detail}</div>
+        ) : maintenance ? (
+          <ProfileConfigEditor
+            descriptor={descriptor.descriptor}
+            disabled={saving}
+            draft={draft}
+            harness={profile.harness}
+            models={providerModels}
+            onChange={setDraft}
+          />
         ) : (
           <RuntimeConfigSummary controls={descriptor.descriptor.controls} />
         )}

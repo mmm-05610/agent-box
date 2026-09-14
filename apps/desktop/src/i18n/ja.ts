@@ -1775,14 +1775,19 @@ export const ja = defineLocale({
     agentBoxMaintenanceUnavailableDesc:
       'サービスはプロファイルを一覧できますが、作成、編集、アーカイブ、ネイティブメモリ操作を宣言していません。',
     agentBoxRuntimeConfig: '実行時設定',
-    agentBoxRuntimeConfigDesc: 'サービスが記述した値です。一時的な変更は入力欄の横で行います。',
+    agentBoxRuntimeConfigDesc: 'サービスが記述した既定値です。保存するとプロファイル設定全体が置き換わります。',
     agentBoxCreateDesc: '名前と Harness を選択します。残りの設定は後で完了できます。',
     agentBoxHarnessChoice: 'Harness',
     agentBoxArchive: 'アーカイブ',
     agentBoxArchiveTitle: 'プロファイルをアーカイブしますか？',
     agentBoxArchiveDesc: name => `「${name}」をアーカイブしますか？既存の Session 履歴は保持されます。`,
     agentBoxSaveProfile: 'プロファイルを保存',
-    agentBoxUpdateFailed: 'プロファイルを更新できませんでした'
+    agentBoxUpdateFailed: 'プロファイルを更新できませんでした',
+    agentBoxConfigLocked: 'サービスによりロック',
+    agentBoxConfigRestoreDefault: '既定値に戻す',
+    agentBoxConfigModelUnverified: '未検証',
+    agentBoxConfigSavedNextSend: 'プロファイル設定を保存しました。次回送信時に適用されます。',
+    agentBoxConfigSaveFailed: 'プロファイル設定を更新できませんでした'
   },
 
   cron: {

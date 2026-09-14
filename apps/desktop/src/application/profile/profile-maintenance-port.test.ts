@@ -67,7 +67,7 @@ describe('wireProfileMaintenancePort', () => {
     })
 
     await expect(
-      port.updateConfig!({
+      port.updateConfig({
         expectedVersion: 3,
         profileId: 'profile-1',
         values: [{ controlId: 'role', value: 'reviewer' }]

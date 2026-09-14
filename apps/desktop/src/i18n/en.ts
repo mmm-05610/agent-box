@@ -2117,14 +2117,19 @@ export const en: Translations = {
     agentBoxMaintenanceUnavailableDesc:
       'The service can list profiles, but has not declared create, edit, archive, or native-memory controls.',
     agentBoxRuntimeConfig: 'Runtime configuration',
-    agentBoxRuntimeConfigDesc: 'Service-described values. Temporary changes are made beside the composer.',
+    agentBoxRuntimeConfigDesc: 'Service-described defaults. Saving replaces the whole profile configuration.',
     agentBoxCreateDesc: 'Choose a name and Harness. The remaining configuration can be completed later.',
     agentBoxHarnessChoice: 'Harness',
     agentBoxArchive: 'Archive',
     agentBoxArchiveTitle: 'Archive profile?',
     agentBoxArchiveDesc: name => `Archive “${name}”? Existing Session history is kept.`,
     agentBoxSaveProfile: 'Save profile',
-    agentBoxUpdateFailed: 'Could not update profile'
+    agentBoxUpdateFailed: 'Could not update profile',
+    agentBoxConfigLocked: 'Locked by the service',
+    agentBoxConfigRestoreDefault: 'Restore default',
+    agentBoxConfigModelUnverified: 'Not verified',
+    agentBoxConfigSavedNextSend: 'Profile configuration saved. It applies to the next send.',
+    agentBoxConfigSaveFailed: 'Could not update the profile configuration'
   },
 
   cron: {
