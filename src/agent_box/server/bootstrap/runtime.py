@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import csv
+from datetime import datetime, timezone
 import io
 import os
 from pathlib import Path
@@ -16,6 +17,7 @@ import subprocess
 from typing import Any
 from uuid import uuid4
 
+from agent_box.server.approvals import ApprovalRecords
 from agent_box.server.credentials import CredentialRecords
 from agent_box.server.events import EventNotifier
 from agent_box.server.execution import HarnessRegistry, TurnExecutionPort
@@ -23,6 +25,8 @@ from agent_box.server.idempotency import IdempotentRecords
 from agent_box.server.profiles import ProfileRecords, ProfileService
 from agent_box.server.services import ProductService
 from agent_box.server.sessions import SessionRecords, SessionService
+from agent_box.server.sessions.queue import QueueRecords
+from agent_box.server.wire.handlers import WireService
 from agent_box.server.workspaces import WorkspaceRecords, WorkspaceService, WslConnectionPort
 from agent_box.storage import Database, ObjectStore, SecretStore
 
@@ -152,6 +156,9 @@ class ServerRuntime:
     secret_store: SecretStore | None = None
     harnesses: HarnessRegistry | None = None
     execution: TurnExecutionPort | None = None
+    wire: Any | None = None
+    approvals: ApprovalRecords | None = None
+    queue: QueueRecords | None = None
     started: bool = False
 
     def start(self) -> None:
@@ -182,6 +189,24 @@ class ServerRuntime:
             core_db.configure_database(None)
         self.owner.release()
         self.started = False
+
+
+def _server_id(database: Database) -> str:
+    """Return the stable, opaque identity this Server presents to clients.
+
+    It is generated once per data root and reused across restarts, so a client
+    can tell "the same Server came back" from "a different Server is here".
+    """
+    with database.transaction() as conn:
+        row = conn.execute("SELECT server_id FROM server_bootstrap WHERE singleton=1").fetchone()
+        if row is not None:
+            return str(row["server_id"])
+        identity = f"server_{uuid4().hex}"
+        conn.execute(
+            "INSERT INTO server_bootstrap(singleton,server_id,created_at) VALUES (1,?,?)",
+            (identity, datetime.now(timezone.utc).isoformat()),
+        )
+        return identity
 
 
 def build_runtime(
@@ -221,14 +246,16 @@ def build_runtime(
     workspace_records = WorkspaceRecords(database, idempotency)
     profile_records = ProfileRecords(database, idempotency)
     session_records = SessionRecords(database, idempotency)
+    queue_records = QueueRecords(database, idempotency)
+    approval_records = ApprovalRecords(database, append_event=session_records._append_session_event)
 
     workspace_service = WorkspaceService(workspace_records, idempotency, connector=connector_instance)
     profile_service = ProfileService(profile_records, idempotency, objects,
                                      harnesses=registry, credentials=credentials)
     session_service = SessionService(session_records, idempotency, objects,
                                      harnesses=registry, profiles=profile_records,
-                                     credentials=credentials, execution=execution,
-                                     on_event=notifier.notify)
+                                     credentials=credentials, queue=queue_records,
+                                     execution=execution, on_event=notifier.notify)
     service = ProductService(
         workspace_service, profile_service, session_service,
         harnesses=registry, credentials=credentials, execution=execution,
@@ -239,7 +266,14 @@ def build_runtime(
         database=database, idempotency=idempotency, credentials=credentials,
         workspaces=workspace_records, profiles=profile_records, sessions=session_records,
     )
+    wire = WireService(
+        server_id_provider=lambda: _server_id(database),
+        workspaces=workspace_service, profiles=profile_service, sessions=session_service,
+        queue=queue_records, approvals=approval_records, harnesses=registry,
+        objects=objects, execution=execution, cursor_secret=token.encode("utf-8"),
+    )
     return ServerRuntime(
         root, database, objects, repository, service, owner, token, token_path,
-        notifier, secrets_store, registry, execution,
+        notifier, secrets_store, registry, execution, wire,
+        approval_records, queue_records,
     )

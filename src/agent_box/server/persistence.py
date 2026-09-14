@@ -47,7 +47,15 @@ class ProductRepositoryView:
         self.workspaces.mark_verified(workspace_id)
 
     def list_profiles(self) -> list[dict[str, Any]]:
-        return self.profiles.list()
+        """Retained REST projection; the wire reads raw rows directly."""
+        return [{
+            "profile_id": row["id"], "name": row["name"],
+            "harness_type": row["harness_type"],
+            "config_revision": row["config_revision"],
+            "native_generation": row["native_generation"],
+            "credential_id": row["credential_id"], "run_state": row["run_state"],
+            "recovery_pending": bool(row["recovery_pending"]),
+        } for row in self.profiles.list()]
 
     def get_session(self, session_id: str) -> dict[str, Any]:
         return self.sessions.get_session(session_id)

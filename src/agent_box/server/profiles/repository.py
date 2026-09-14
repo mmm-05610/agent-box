@@ -61,14 +61,12 @@ class ProfileRecords:
             "SELECT 1 FROM server_profiles WHERE id=?", (profile_id,),
         ).fetchone() is not None
 
-    def list(self) -> list[dict[str, Any]]:
+    def list(self, *, include_archived: bool = True) -> list[dict[str, Any]]:
         with self.database.read() as conn:
-            rows = conn.execute("SELECT * FROM server_profiles ORDER BY created_at,id").fetchall()
-        return [{
-            "profile_id": row["id"], "name": row["name"],
-            "harness_type": row["harness_type"],
-            "config_revision": row["config_revision"],
-            "native_generation": row["native_generation"],
-            "credential_id": row["credential_id"], "run_state": row["run_state"],
-            "recovery_pending": bool(row["recovery_pending"]),
-        } for row in rows]
+            if include_archived:
+                rows = conn.execute("SELECT * FROM server_profiles ORDER BY created_at,id").fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM server_profiles WHERE archived_at IS NULL ORDER BY created_at,id"
+                ).fetchall()
+        return [dict(row) for row in rows]

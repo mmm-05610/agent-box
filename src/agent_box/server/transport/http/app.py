@@ -14,6 +14,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from agent_box.server.bootstrap import ServerRuntime
 from agent_box.server.errors import ServerError
+from agent_box.server.wire import WireError, decode_request, encode_error, encode_result
+from agent_box.server.wire.handlers import WIRE_VERSION
 
 
 class StrictModel(BaseModel):
@@ -101,8 +103,11 @@ def create_app(runtime: ServerRuntime) -> FastAPI:
         request: Request,
         authorization: Annotated[str | None, Header()] = None,
     ) -> None:
+        # A direct call (the wire route) has no dependency injection, so fall
+        # back to reading the header itself; the comparison is shared.
+        provided = authorization if authorization is not None else request.headers.get("authorization")
         expected = "Bearer " + runtime.token
-        if authorization is None or not secrets.compare_digest(authorization, expected):
+        if provided is None or not secrets.compare_digest(provided, expected):
             raise ServerError("AUTHENTICATION_REQUIRED", "A valid bearer token is required", status=401)
 
     def idempotency_key(
@@ -117,6 +122,43 @@ def create_app(runtime: ServerRuntime) -> FastAPI:
     @app.get("/live")
     def live():
         return {"status": "alive"}
+
+    @app.post("/wire/v1/{method}")
+    async def wire(method: str, request: Request, response: Response):
+        """wire/1 entry point: one method per request, JSON-RPC shaped.
+
+        Authentication is required for every method, including `server.hello`:
+        the host reads the per-instance token from the protected bootstrap file
+        in the data root, so an unauthenticated local process cannot even
+        enumerate this Server's capabilities.
+        """
+        try:
+            authorize(request)
+        except ServerError as exc:
+            return JSONResponse(status_code=exc.status, content=encode_error(
+                None, WireError.from_server_error(exc),
+            ))
+        try:
+            body = await request.json()
+        except Exception as exc:  # noqa: BLE001 - a malformed body is a client error
+            return JSONResponse(status_code=400, content=encode_error(
+                None, WireError("INVALID_REQUEST", f"Request body is not valid JSON: {exc}"),
+            ))
+        try:
+            request_id, wire_method, params = decode_request(body)
+        except WireError as exc:
+            return JSONResponse(status_code=400, content=encode_error(None, exc))
+        if wire_method != method:
+            return JSONResponse(status_code=400, content=encode_error(
+                request_id,
+                WireError("INVALID_REQUEST", "method does not match the request path"),
+            ))
+        try:
+            result = runtime.wire.dispatch(wire_method, params)
+        except WireError as exc:
+            return JSONResponse(status_code=200, content=encode_error(request_id, exc))
+        response.headers["X-Wire-Version"] = WIRE_VERSION
+        return encode_result(request_id, result)
 
     @app.get("/api/v1/readiness", dependencies=protected)
     def readiness():

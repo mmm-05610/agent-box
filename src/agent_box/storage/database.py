@@ -8,7 +8,7 @@ import threading
 from typing import Iterator
 
 
-PRODUCT_SCHEMA_VERSION = 2
+PRODUCT_SCHEMA_VERSION = 3
 
 
 class FutureSchemaError(RuntimeError):
@@ -28,6 +28,12 @@ CREATE TABLE IF NOT EXISTS server_workspaces (
     remote_user TEXT,
     remote_path TEXT NOT NULL,
     connection_state TEXT NOT NULL,
+    display_name TEXT,
+    version INTEGER NOT NULL DEFAULT 1,
+    archived_at TEXT,
+    env_kind TEXT NOT NULL DEFAULT 'wsl',
+    env_host TEXT,
+    normalized_path TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -41,6 +47,8 @@ CREATE TABLE IF NOT EXISTS server_profiles (
     credential_id TEXT,
     run_state TEXT NOT NULL DEFAULT 'idle',
     recovery_pending INTEGER NOT NULL DEFAULT 0,
+    display_name TEXT,
+    archived_at TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -57,6 +65,9 @@ CREATE TABLE IF NOT EXISTS server_sessions (
     checkpoint_object_digest TEXT,
     checkpoint_native_id TEXT,
     status TEXT NOT NULL DEFAULT 'ready',
+    display_name TEXT,
+    version INTEGER NOT NULL DEFAULT 1,
+    archived_at TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -75,6 +86,8 @@ CREATE TABLE IF NOT EXISTS server_turns (
     dispatch_id TEXT,
     result_object_digest TEXT,
     error_code TEXT,
+    stop_requested_at TEXT,
+    terminal_reason TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -101,6 +114,38 @@ CREATE TABLE IF NOT EXISTS server_idempotency (
     response_json TEXT NOT NULL,
     created_at TEXT NOT NULL,
     PRIMARY KEY (scope, key)
+);
+CREATE TABLE IF NOT EXISTS server_queue_items (
+    id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL REFERENCES server_sessions(id),
+    version INTEGER NOT NULL CHECK (version >= 1),
+    state TEXT NOT NULL,
+    profile_id TEXT NOT NULL,
+    config_version INTEGER NOT NULL,
+    request_id TEXT NOT NULL,
+    request_digest TEXT NOT NULL,
+    message_object_digest TEXT NOT NULL,
+    submitted_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS server_queue_order ON server_queue_items(session_id, submitted_at, id);
+CREATE TABLE IF NOT EXISTS server_approvals (
+    id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL REFERENCES server_sessions(id),
+    execution_id TEXT NOT NULL,
+    version INTEGER NOT NULL CHECK (version >= 1),
+    state TEXT NOT NULL,
+    decision TEXT,
+    scope_json TEXT,
+    request_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    settled_at TEXT
+);
+CREATE INDEX IF NOT EXISTS server_approvals_by_execution ON server_approvals(execution_id, created_at);
+CREATE TABLE IF NOT EXISTS server_bootstrap (
+    singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+    server_id TEXT NOT NULL,
+    created_at TEXT NOT NULL
 );
 """
 
@@ -133,6 +178,80 @@ def _migrate_1_to_2(conn: sqlite3.Connection) -> None:
         "ON server_turns(profile_id) WHERE state IN "
         "('accepted','dispatching','running','capturing')"
     )
+
+
+def _has_table(conn: sqlite3.Connection, table: str) -> bool:
+    return conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,),
+    ).fetchone() is not None
+
+
+def _columns(conn: sqlite3.Connection, table: str) -> set[str]:
+    return {row["name"] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+
+
+def _backfill(conn: sqlite3.Connection, table: str, target: str, source: str) -> None:
+    """Copy a legacy column into a new one where the new column is still null."""
+    if not _has_table(conn, table):
+        return
+    available = _columns(conn, table)
+    if target not in available or source not in available:
+        return
+    conn.execute(
+        f"UPDATE {table} SET {target}={source} WHERE {target} IS NULL"
+    )
+
+
+def _add_columns(conn: sqlite3.Connection, table: str, additions: dict[str, str]) -> None:
+    """Add missing columns to an existing table.
+
+    A table that does not exist yet is skipped: `_SCHEMA` creates every table
+    with the full column set, so an older data root that never had the table
+    does not need this migration to invent one.
+    """
+    if not _has_table(conn, table):
+        return
+    columns = _columns(conn, table)
+    for name, declaration in additions.items():
+        if name not in columns:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {declaration}")
+
+
+def _migrate_2_to_3(conn: sqlite3.Connection) -> None:
+    """Add the wire/1 record identity, version, and archive fields.
+
+    Nothing is rewritten or dropped: existing rows keep their identity and the
+    new columns receive the defaults that make them describe the same objects
+    (version 1, display name derived from the existing path/name, not archived).
+    """
+    _add_columns(conn, "server_workspaces", {
+        "display_name": "TEXT",
+        "version": "INTEGER NOT NULL DEFAULT 1",
+        "archived_at": "TEXT",
+        "env_kind": "TEXT NOT NULL DEFAULT 'wsl'",
+        "env_host": "TEXT",
+        "normalized_path": "TEXT",
+    })
+    _add_columns(conn, "server_sessions", {
+        "display_name": "TEXT",
+        "version": "INTEGER NOT NULL DEFAULT 1",
+        "archived_at": "TEXT",
+    })
+    _add_columns(conn, "server_profiles", {
+        "display_name": "TEXT",
+        "archived_at": "TEXT",
+    })
+    _add_columns(conn, "server_turns", {
+        "stop_requested_at": "TEXT",
+        "terminal_reason": "TEXT",
+    })
+    # Backfill from whatever columns this data root actually has. The identity
+    # of every existing row is preserved and nothing is rewritten or dropped.
+    _backfill(conn, "server_workspaces", "normalized_path", "remote_path")
+    _backfill(conn, "server_workspaces", "env_host", "distribution")
+    _backfill(conn, "server_workspaces", "display_name", "remote_path")
+    _backfill(conn, "server_sessions", "display_name", "id")
+    _backfill(conn, "server_profiles", "display_name", "name")
 
 
 class Database:
@@ -170,6 +289,8 @@ class Database:
                 current = int(version[0]) if version is not None else 0
             if current == 1:
                 _migrate_1_to_2(conn)
+            if current in (1, 2):
+                _migrate_2_to_3(conn)
             conn.executescript(_SCHEMA)
             conn.execute(
                 "INSERT OR IGNORE INTO agentbox_product_schema(singleton, version, applied_at) "

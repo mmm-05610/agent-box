@@ -49,8 +49,16 @@ class ProfileService:
         result["capabilities"] = self.harnesses.claims_for(harness_type)
         return status, result
 
-    def list(self) -> list[dict[str, Any]]:
-        items = self.records.list()
-        for item in items:
-            item["capabilities"] = self.harnesses.claims_for(item["harness_type"])
+    def list(self, *, include_archived: bool = True) -> list[dict[str, Any]]:
+        items = []
+        for row in self.records.list(include_archived=include_archived):
+            items.append({
+                "profile_id": row["id"], "name": row["name"],
+                "harness_type": row["harness_type"],
+                "config_revision": row["config_revision"],
+                "native_generation": row["native_generation"],
+                "credential_id": row["credential_id"], "run_state": row["run_state"],
+                "recovery_pending": bool(row["recovery_pending"]),
+                "capabilities": self.harnesses.claims_for(row["harness_type"]),
+            })
         return items

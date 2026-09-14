@@ -15,6 +15,12 @@ from agent_box.server.ids import now, opaque_id
 from agent_box.storage import Database
 
 
+def _version_error(message: str, current: dict[str, Any]) -> ServerError:
+    error = ServerError("RECORD_VERSION_CONFLICT", message, status=409)
+    error.current = current  # type: ignore[attr-defined]
+    return error
+
+
 class SessionRecords:
     def __init__(self, database: Database, idempotency: IdempotentRecords) -> None:
         self.database = database
@@ -48,6 +54,230 @@ class SessionRecords:
             )
             self.idempotency.insert(conn, "POST:/sessions", key, request_digest, 201, body)
             return 201, body
+
+    # -- wire/1 intent acceptance (one transaction owns it) ---------------
+
+    def accept_intent(
+        self, *, session_id: str | None, workspace_id: str | None, profile_id: str,
+        request_id: str, request_digest: str, message_object_digest: str,
+        overrides: list[dict[str, Any]] | None = None,
+        expected_version: int | None = None, queue_records=None,
+        resolve_config_version=None,
+    ) -> tuple[str, dict[str, Any]]:
+        """Accept one send intent atomically.
+
+        Returns `(outcome, body)` where outcome is `accepted` for the winner and
+        `replay` for a duplicate delivery of the same requestId. One
+        transaction either creates the Session with its first execution, or
+        enqueues a follow-up item behind the running execution; a duplicate
+        requestId never creates or dispatches anything.
+        """
+        scope = "sessions.send"
+        with self.database.transaction() as conn:
+            prior = self.idempotency.check(conn, scope, request_id, request_digest)
+            if prior:
+                return "replay", prior[1]
+
+            if session_id is None:
+                if workspace_id is None:
+                    raise ServerError("WORKSPACE_NOT_FOUND", "Workspace was not found", status=404)
+                if conn.execute(
+                    "SELECT 1 FROM server_workspaces WHERE id=?", (workspace_id,),
+                ).fetchone() is None:
+                    raise ServerError("WORKSPACE_NOT_FOUND", "Workspace was not found", status=404)
+                session_id = opaque_id("session")
+                timestamp = now()
+                conn.execute(
+                    "INSERT INTO server_sessions(id,workspace_id,profile_id,status,display_name,version,created_at,updated_at) "
+                    "VALUES (?,?,?,?,?,?,?,?)",
+                    (session_id, workspace_id, profile_id, "ready", None, 1, timestamp, timestamp),
+                )
+            else:
+                session = conn.execute(
+                    "SELECT * FROM server_sessions WHERE id=?", (session_id,),
+                ).fetchone()
+                if session is None:
+                    raise ServerError("SESSION_NOT_FOUND", "Session was not found", status=404)
+                if bool(session["archived_at"]):
+                    raise ServerError("SESSION_ARCHIVED", "Session is archived", status=409)
+                if expected_version is not None and int(session["version"]) != expected_version:
+                    raise ServerError(
+                        "RECORD_VERSION_CONFLICT",
+                        "Session changed before the send was accepted",
+                        status=409,
+                    )
+                if session["profile_id"] != profile_id:
+                    # A running Session may only switch role through the
+                    # explicit switch method, which can be refused.
+                    raise ServerError(
+                        "CAPABILITY_UNSUPPORTED",
+                        "Session is bound to a different role; switch the role first",
+                        status=409,
+                    )
+
+            profile = conn.execute(
+                "SELECT * FROM server_profiles WHERE id=?", (profile_id,),
+            ).fetchone()
+            if profile is None:
+                raise ServerError("PROFILE_NOT_FOUND", "Profile was not found", status=404)
+            if bool(profile["recovery_pending"]):
+                raise ServerError(
+                    "PROFILE_RECOVERY_REQUIRED",
+                    "Profile has unresolved recovery evidence",
+                    status=409,
+                )
+            config_version = int(profile["config_revision"])
+            if resolve_config_version is not None:
+                config_version = int(resolve_config_version(conn, profile, overrides))
+
+            active = conn.execute(
+                "SELECT * FROM server_turns WHERE session_id=? AND state IN "
+                "('accepted','dispatching','running','capturing') ORDER BY created_at LIMIT 1",
+                (session_id,),
+            ).fetchone()
+            if active is None:
+                execution_id = self._insert_execution(
+                    conn, session_id=session_id, profile=profile,
+                    config_version=config_version,
+                    input_object_digest=message_object_digest,
+                )
+                body = {
+                    "outcome": "accepted", "sessionId": session_id,
+                    "executionId": execution_id, "configVersion": config_version,
+                    "queued": False,
+                }
+            else:
+                if queue_records is None:
+                    raise ServerError(
+                        "QUEUE_ITEM_NOT_FOUND", "Queue storage is unavailable", status=503,
+                    )
+                item = queue_records.enqueue_in_transaction(
+                    conn, session_id=session_id, profile_id=profile_id,
+                    config_version=config_version, request_id=request_id,
+                    request_digest=request_digest,
+                    message_object_digest=message_object_digest,
+                )
+                body = {
+                    "outcome": "accepted", "sessionId": session_id,
+                    "executionId": None, "configVersion": config_version,
+                    "queued": True, "queueItemId": item["itemId"],
+                }
+
+            self.idempotency.insert(conn, scope, request_id, request_digest, 202, body)
+            return "accepted", body
+
+    def _insert_execution(
+        self, conn, *, session_id: str, profile, config_version: int,
+        input_object_digest: str,
+    ) -> str:
+        execution_id = opaque_id("execution")
+        timestamp = now()
+        try:
+            conn.execute(
+                "INSERT INTO server_turns(id,session_id,profile_id,profile_revision,native_generation,"
+                "state,capture_state,cleanup_state,input_object_digest,created_at,updated_at) "
+                "VALUES (?,?,?,?,?,'accepted','pending','pending',?,?,?)",
+                (execution_id, session_id, profile["id"], config_version,
+                 int(profile["native_generation"]), input_object_digest, timestamp, timestamp),
+            )
+        except Exception as exc:
+            if "UNIQUE constraint failed" in str(exc):
+                raise ServerError(
+                    "TURN_CONCURRENCY_CONFLICT",
+                    "Session or Profile already has an active execution",
+                    status=409,
+                ) from exc
+            raise
+        conn.execute(
+            "UPDATE server_profiles SET run_state='active',updated_at=? WHERE id=?",
+            (timestamp, profile["id"]),
+        )
+        conn.execute(
+            "UPDATE server_sessions SET status='active',version=version+1,updated_at=? WHERE id=?",
+            (timestamp, session_id),
+        )
+        self._append_session_event(
+            conn, session_id, execution_id, "turn.accepted",
+            {"state": "accepted", "profile_revision": config_version},
+        )
+        return execution_id
+
+    def switch_profile(
+        self, *, session_id: str, profile_id: str, expected_version: int, request_id: str,
+        request_digest: str,
+    ) -> tuple[str, dict[str, Any]]:
+        """Switch a Session's role, or refuse while an execution is running.
+
+        The old link is returned on refusal so the client keeps the real state
+        instead of the selection it attempted.
+        """
+        scope = f"sessions.switchProfile:{session_id}"
+        with self.database.transaction() as conn:
+            prior = self.idempotency.check(conn, scope, request_id, request_digest)
+            if prior:
+                return "replay", prior[1]
+            session = conn.execute(
+                "SELECT * FROM server_sessions WHERE id=?", (session_id,),
+            ).fetchone()
+            if session is None:
+                raise ServerError("SESSION_NOT_FOUND", "Session was not found", status=404)
+            if int(session["version"]) != expected_version:
+                raise _version_error(
+                    "Session changed before the role switch", self._session_view(conn, session_id),
+                )
+            if conn.execute(
+                "SELECT 1 FROM server_profiles WHERE id=?", (profile_id,),
+            ).fetchone() is None:
+                raise ServerError("PROFILE_NOT_FOUND", "Profile was not found", status=404)
+            active = conn.execute(
+                "SELECT 1 FROM server_turns WHERE session_id=? AND state IN "
+                "('accepted','dispatching','running','capturing') LIMIT 1",
+                (session_id,),
+            ).fetchone()
+            if active is not None:
+                body = {
+                    "outcome": "rejected",
+                    "reason": "execution_running",
+                    "session": self._session_view(conn, session_id),
+                }
+                self.idempotency.insert(conn, scope, request_id, request_digest, 200, body)
+                return "rejected", body
+            timestamp = now()
+            conn.execute(
+                "UPDATE server_sessions SET profile_id=?,version=version+1,updated_at=? WHERE id=?",
+                (profile_id, timestamp, session_id),
+            )
+            body = {"outcome": "confirmed", "session": self._session_view(conn, session_id)}
+            self.idempotency.insert(conn, scope, request_id, request_digest, 200, body)
+            return "confirmed", body
+
+    def intent_outcome(self, request_id: str) -> dict[str, Any]:
+        with self.database.read() as conn:
+            row = conn.execute(
+                "SELECT * FROM server_idempotency WHERE scope=? AND key=?",
+                ("sessions.send", request_id),
+            ).fetchone()
+        if row is None:
+            # "unknown" is not a safe-to-resend signal; the client must query
+            # with the original identifier rather than minting a new one.
+            return {"outcome": "unknown"}
+        body = json.loads(row["response_json"])
+        return {
+            "outcome": "accepted",
+            "sessionId": body["sessionId"],
+            "executionId": body.get("executionId"),
+        }
+
+    @staticmethod
+    def _session_view(conn, session_id: str) -> dict[str, Any]:
+        row = conn.execute("SELECT * FROM server_sessions WHERE id=?", (session_id,)).fetchone()
+        return {
+            "id": row["id"], "version": int(row["version"]),
+            "workspaceId": row["workspace_id"], "profileId": row["profile_id"],
+            "displayName": row["display_name"] or row["id"],
+            "archivedAt": row["archived_at"],
+            "createdAt": row["created_at"], "updatedAt": row["updated_at"],
+        }
 
     # -- turn acceptance (one transaction owns it) ------------------------
 
@@ -345,12 +575,35 @@ class SessionRecords:
         return {
             "session_id": row["id"], "workspace_id": row["workspace_id"],
             "profile_id": row["profile_id"], "status": row["status"],
+            "version": int(row["version"] or 1),
+            "display_name": row["display_name"], "archived_at": row["archived_at"],
             "checkpoint": ({"object_digest": row["checkpoint_object_digest"],
                             "native_id": row["checkpoint_native_id"]}
                            if row["checkpoint_object_digest"] else None),
             "turns": [dict(item) for item in turns],
             "events": [self._event_dict(item) for item in events],
+            "created_at": row["created_at"], "updated_at": row["updated_at"],
         }
+
+    def raw_events(self, session_id: str, after: int, *, limit: int = 500) -> list[Any]:
+        """Return stored event rows after `after`, for wire frame projection.
+
+        Deliberately returns raw rows: the wire layer owns kind projection, and
+        internal bookkeeping kinds must not be re-encoded here.
+        """
+        with self.database.read() as conn:
+            if conn.execute("SELECT 1 FROM server_sessions WHERE id=?", (session_id,)).fetchone() is None:
+                raise ServerError("SESSION_NOT_FOUND", "Session was not found", status=404)
+            maximum = conn.execute(
+                "SELECT COALESCE(MAX(seq),0) FROM server_session_events WHERE session_id=?", (session_id,)
+            ).fetchone()[0]
+            if after > maximum:
+                raise ServerError("EVENT_CURSOR_AHEAD", "Event cursor is beyond current history", status=409)
+            return conn.execute(
+                "SELECT seq,event_id,session_id,turn_id,kind,schema_version,data_json,created_at "
+                "FROM server_session_events WHERE session_id=? AND seq>? ORDER BY seq LIMIT ?",
+                (session_id, after, limit),
+            ).fetchall()
 
     def list_events(self, session_id: str, after: int, *, limit: int = 500) -> list[dict[str, Any]]:
         with self.database.read() as conn:

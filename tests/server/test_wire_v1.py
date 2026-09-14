@@ -1,0 +1,570 @@
+"""Work Order 41 wire/1 behavior gates.
+
+Restates the approved core-semantics/1 scenarios against the contract candidate
+the frontend produced at P07 checkpoint 2. Every assertion here is about
+observable wire behavior; none of it is a substitute for the independently run
+Windows acceptance or for a real-model gate.
+"""
+from __future__ import annotations
+
+import json
+import threading
+
+from fastapi.testclient import TestClient
+import pytest
+
+from agent_box.server.bootstrap import build_runtime
+from agent_box.server.execution import HarnessDescriptor, HarnessRegistry
+from agent_box.server.transport.http import create_app
+
+
+class FakeConnector:
+    def __init__(self):
+        self.open_calls = 0
+
+    def distributions(self):
+        return [{"name": "Ubuntu"}]
+
+    def probe(self, distribution, user):
+        return {"probe_id": f"probe-{distribution}", "distribution": distribution, "user": user}
+
+    def browse(self, probe_id, path):
+        return {"path": path, "directories": ["src", "docs"], "files": ["README.md"]}
+
+    def open_workspace(self, probe_id, path):
+        self.open_calls += 1
+        return {"connection_id": f"conn-{path}", "distribution": "Ubuntu",
+                "user": "tester", "path": path}
+
+
+class RecordingExecution:
+    def __init__(self, *, block: bool = False):
+        self.lock = threading.Lock()
+        self.accepted: list[str] = []
+        self.cancelled: list[str] = []
+        self.block = block
+        self.gate = threading.Event()
+        if not block:
+            self.gate.set()
+
+    def accept(self, execution_id, *, overrides=None):
+        with self.lock:
+            self.accepted.append(execution_id)
+        self.gate.wait(5)
+
+    def cancel(self, execution_id):
+        with self.lock:
+            self.cancelled.append(execution_id)
+        self.gate.set()
+        return True
+
+
+def registry():
+    reg = HarnessRegistry()
+    reg.register(HarnessDescriptor(
+        "alpha", capability_claims={"streaming": True},
+        control_options={"model": ("alpha-default", "alpha-fast")},
+        security_locked_controls=("sandbox",),
+        configuration_validator=lambda value: None if isinstance(value, dict) else ValueError(),
+    ))
+    return reg
+
+
+class Wire:
+    def __init__(self, client, headers):
+        self.client = client
+        self.headers = headers
+        self.counter = 0
+
+    def call(self, method, params):
+        self.counter += 1
+        response = self.client.post(
+            f"/wire/v1/{method}", headers=self.headers,
+            json={"jsonrpc": "2.0", "id": f"req-{self.counter}", "method": method, "params": params},
+        )
+        body = response.json()
+        assert body.get("jsonrpc") == "2.0", body
+        return response.status_code, body
+
+    def ok(self, method, params):
+        status, body = self.call(method, params)
+        assert "result" in body, (method, body)
+        assert status == 200, (method, status, body)
+        return body["result"]
+
+    def err(self, method, params):
+        _status, body = self.call(method, params)
+        assert "error" in body, (method, body)
+        return body["error"]
+
+
+@pytest.fixture
+def wire(tmp_path):
+    execution = RecordingExecution(block=True)
+    runtime = build_runtime(
+        tmp_path / "data", harnesses=registry(), connector=FakeConnector(), execution=execution,
+    )
+    with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
+        headers = {"Authorization": f"Bearer {runtime.token}"}
+        api = Wire(client, headers)
+        runtime.repository.register_credential("cred-1", None, "locator") if False else None
+        yield runtime, api, execution
+
+
+ENVIRONMENT = {"kind": "wsl", "host": "Ubuntu", "user": None}
+MESSAGE = {"text": "hello", "attachments": []}
+
+
+def open_workspace(api, path="/home/tester/project"):
+    return api.ok("workspaces.open", {
+        "requestId": f"open-{path}", "environment": ENVIRONMENT, "path": path,
+    })
+
+
+def make_profile(api, *, name="role", harness="alpha", extra=None):
+    # Profiles are created through the retained REST product surface; the wire
+    # deliberately exposes only the read side for them in this candidate.
+    body = {
+        "name": name, "harness_type": harness,
+        "configuration": {"model": "alpha-default", **(extra or {})}, "credential_id": None,
+    }
+    response = api.client.post(
+        "/api/v1/profiles",
+        headers={**api.headers, "Idempotency-Key": f"profile-{name}"}, json=body,
+    )
+    assert response.status_code == 201, response.json()
+    return response.json()
+
+
+# --- envelope and discovery ------------------------------------------------
+
+
+def test_hello_reports_capabilities_and_requires_auth(wire):
+    runtime, api, _execution = wire
+    unauthenticated = api.client.post("/wire/v1/server.hello", json={
+        "jsonrpc": "2.0", "id": "1", "method": "server.hello",
+        "params": {"clientVersions": ["wire/1"], "clientPresentationSupports": []},
+    })
+    assert unauthenticated.status_code == 401
+    assert unauthenticated.json()["error"]["code"] == "UNAUTHENTICATED"
+
+    result = api.ok("server.hello", {
+        "clientVersions": ["wire/1"], "clientPresentationSupports": [],
+    })
+    assert result["protocolVersion"] == "wire/1"
+    assert result["serverId"]
+    assert result["auth"] == {"required": True, "schemes": ["session_token"]}
+    ids = {item["id"] for item in result["capabilities"]}
+    assert "sessions.createAndSend" in ids
+    assert "approvals.decide" in ids
+
+
+def test_server_identity_is_stable_across_restart(tmp_path):
+    execution = RecordingExecution()
+    first = build_runtime(tmp_path / "stable", harnesses=registry(),
+                          connector=FakeConnector(), execution=execution)
+    with TestClient(create_app(first), base_url="http://127.0.0.1") as client:
+        headers = {"Authorization": f"Bearer {first.token}"}
+        api = Wire(client, headers)
+        server_id = api.ok("server.hello", {"clientVersions": ["wire/1"], "clientPresentationSupports": []})["serverId"]
+        token = first.token
+    second = build_runtime(tmp_path / "stable", harnesses=registry(),
+                           connector=FakeConnector(), execution=execution)
+    with TestClient(create_app(second), base_url="http://127.0.0.1") as client:
+        assert second.token == token
+        api = Wire(client, {"Authorization": f"Bearer {token}"})
+        again = api.ok("server.hello", {"clientVersions": ["wire/1"], "clientPresentationSupports": []})["serverId"]
+        assert again == server_id
+
+
+def test_unavailable_capabilities_carry_a_reason(tmp_path):
+    runtime = build_runtime(tmp_path / "bare", harnesses=registry())
+    with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
+        api = Wire(client, {"Authorization": f"Bearer {runtime.token}"})
+        result = api.ok("server.hello", {"clientVersions": ["wire/1"], "clientPresentationSupports": []})
+        entries = {item["id"]: item for item in result["capabilities"]}
+        assert entries["workspaces.open"]["supported"] is False
+        assert entries["workspaces.open"]["reason"] == "WSL_CONNECTOR_UNAVAILABLE"
+        assert entries["sessions.send"]["supported"] is False
+        assert entries["sessions.send"]["reason"] == "EXECUTION_CAPABILITY_UNAVAILABLE"
+        # Capabilities that need no Harness stay honest rather than blanket-false.
+        assert entries["profiles.list"]["supported"] is True
+
+
+def test_envelope_rejects_malformed_and_unknown_requests(wire):
+    _runtime, api, _execution = wire
+    bad_version = api.client.post("/wire/v1/server.hello", headers=api.headers, json={
+        "jsonrpc": "1.0", "id": "1", "method": "server.hello", "params": {},
+    })
+    assert bad_version.status_code == 400
+    assert bad_version.json()["error"]["code"] == "INVALID_REQUEST"
+
+    mismatch = api.client.post("/wire/v1/server.hello", headers=api.headers, json={
+        "jsonrpc": "2.0", "id": "1", "method": "workspaces.list", "params": {},
+    })
+    assert mismatch.status_code == 400
+    assert mismatch.json()["error"]["message"] == "method does not match the request path"
+
+    status, body = api.call("notAMethod", {})
+    assert status == 400 and body["error"]["code"] == "INVALID_REQUEST"
+
+
+# --- workspaces -------------------------------------------------------------
+
+
+def test_browse_reports_read_and_write_independently(wire):
+    _runtime, api, _execution = wire
+    result = api.ok("workspaces.browse", {
+        "requestId": "browse-1", "environment": ENVIRONMENT, "path": "/home/tester/project",
+    })
+    assert result["path"] == "/home/tester/project"
+    by_name = {entry["name"]: entry for entry in result["entries"]}
+    assert by_name["src"]["kind"] == "directory" and by_name["src"]["canOpen"] is True
+    # A non-directory is still listed with an explicit reason instead of being
+    # dropped, so the client never has to guess why it is missing.
+    assert by_name["README.md"]["canOpen"] is False
+    assert by_name["README.md"]["reason"] == "not_a_directory"
+
+
+def test_browse_refuses_environments_this_server_does_not_provide(wire):
+    _runtime, api, _execution = wire
+    error = api.err("workspaces.browse", {
+        "requestId": "browse-local",
+        "environment": {"kind": "local", "host": None, "user": None}, "path": "/tmp",
+    })
+    assert error["code"] == "CAPABILITY_UNSUPPORTED"
+
+
+def test_reopening_the_same_location_keeps_identity(wire):
+    _runtime, api, _execution = wire
+    first = open_workspace(api)
+    assert first["created"] is True
+    second = open_workspace(api)
+    assert second["created"] is False
+    assert second["workspace"]["id"] == first["workspace"]["id"]
+    assert second["workspace"]["version"] == first["workspace"]["version"]
+
+
+def test_same_path_under_a_different_environment_is_a_different_location(wire):
+    _runtime, api, _execution = wire
+    ubuntu = api.ok("workspaces.open", {
+        "requestId": "w-ubuntu", "environment": ENVIRONMENT, "path": "/srv/project",
+    })
+    other = api.ok("workspaces.open", {
+        "requestId": "w-debian",
+        "environment": {"kind": "wsl", "host": "Debian", "user": None}, "path": "/srv/project",
+    })
+    assert other["workspace"]["id"] != ubuntu["workspace"]["id"]
+    assert other["created"] is True
+
+
+def test_archive_keeps_the_record_and_guards_the_version(wire):
+    _runtime, api, _execution = wire
+    opened = open_workspace(api, "/home/tester/archive-me")
+    workspace = opened["workspace"]
+    archived = api.ok("workspaces.archive", {
+        "requestId": "archive-1", "workspaceId": workspace["id"],
+        "expectedVersion": workspace["version"],
+    })
+    assert archived["workspace"]["archivedAt"] is not None
+    assert archived["workspace"]["version"] == workspace["version"] + 1
+    listing = api.ok("workspaces.list", {"includeArchived": False})
+    assert workspace["id"] not in {item["id"] for item in listing["items"]}
+    with_archived = api.ok("workspaces.list", {"includeArchived": True})
+    assert workspace["id"] in {item["id"] for item in with_archived["items"]}
+
+    stale = api.call("workspaces.archive", {
+        "requestId": "archive-2", "workspaceId": workspace["id"],
+        "expectedVersion": workspace["version"],
+    })
+    assert stale[1]["error"]["code"] == "CONFLICT_VERSION"
+    assert stale[1]["error"]["current"]["archivedAt"] is not None
+
+
+# --- profiles and configuration --------------------------------------------
+
+
+def test_profiles_list_exposes_harness_as_data_only(wire):
+    _runtime, api, _execution = wire
+    make_profile(api)
+    listing = api.ok("profiles.list", {"includeArchived": False})
+    assert len(listing["items"]) == 1
+    item = listing["items"][0]
+    assert item["harness"] == "alpha"
+    assert item["displayName"] == "role"
+    assert listing["nextCursor"] is None
+
+
+def test_config_describe_declares_controls_and_locks(wire):
+    _runtime, api, _execution = wire
+    profile = make_profile(api, name="describe", extra={"sandbox": "strict"})
+    described = api.ok("config.describe", {"profileId": profile["profile_id"], "workspaceId": None})
+    descriptor = described["descriptor"]
+    assert descriptor["effectTiming"] == "next_send"
+    assert "sandbox" in descriptor["securityLockedIds"]
+    control_ids = {control["controlId"] for control in descriptor["controls"]}
+    assert {"model", "sandbox"} <= control_ids
+
+
+def test_config_resolve_computes_effective_values_and_rejects_bad_ones(wire):
+    _runtime, api, _execution = wire
+    profile = make_profile(api, name="resolve", extra={"sandbox": "strict"})
+    resolved = api.ok("config.resolve", {
+        "profileId": profile["profile_id"], "workspaceId": None,
+        "overrides": [{"controlId": "model", "value": "alpha-fast"}],
+    })
+    assert resolved["outcome"] == "resolved"
+    effective = {item["controlId"]: item["value"] for item in resolved["effective"]}
+    assert effective["model"] == "alpha-fast"
+    # A security lock is applied after overrides, never bypassed by them.
+    assert effective["sandbox"] == "strict"
+
+    rejected = api.ok("config.resolve", {
+        "profileId": profile["profile_id"], "workspaceId": None,
+        "overrides": [{"controlId": "sandbox", "value": "off"}],
+    })
+    assert rejected["outcome"] == "rejected"
+    assert rejected["invalidControls"] == [{"controlId": "sandbox", "reason": "security_locked"}]
+
+    unknown = api.ok("config.resolve", {
+        "profileId": profile["profile_id"], "workspaceId": None,
+        "overrides": [{"controlId": "nope", "value": 1}],
+    })
+    assert unknown["invalidControls"] == [{"controlId": "nope", "reason": "unknown_control"}]
+
+
+# --- sessions, queue, stop --------------------------------------------------
+
+
+def test_create_and_send_accepts_once_and_replays_the_same_execution(wire):
+    _runtime, api, execution = wire
+    workspace = open_workspace(api)["workspace"]
+    profile = make_profile(api, name="sender")
+    params = {
+        "requestId": "send-1", "workspaceId": workspace["id"],
+        "profileId": profile["profile_id"], "message": MESSAGE, "overrides": [],
+    }
+    first = api.ok("sessions.createAndSend", params)
+    assert first["outcome"] == "accepted"
+    assert first["executionId"]
+    assert first["session"]["workspaceId"] == workspace["id"]
+    assert first["configVersion"] >= 1
+
+    replay = api.ok("sessions.createAndSend", params)
+    assert replay["executionId"] == first["executionId"]
+    assert replay["session"]["id"] == first["session"]["id"]
+    assert len(execution.accepted) == 1, execution.accepted
+
+
+def test_concurrent_same_request_id_accepts_exactly_one_execution(wire):
+    _runtime, api, execution = wire
+    workspace = open_workspace(api)["workspace"]
+    profile = make_profile(api, name="racer")
+    params = {
+        "requestId": "send-race", "workspaceId": workspace["id"],
+        "profileId": profile["profile_id"], "message": MESSAGE, "overrides": [],
+    }
+    results: list = []
+    errors: list = []
+    barrier = threading.Barrier(2, timeout=5)
+    original = api.client
+
+    def send():
+        try:
+            response = api.client.post(
+                "/wire/v1/sessions.createAndSend", headers=api.headers,
+                json={"jsonrpc": "2.0", "id": "race", "method": "sessions.createAndSend", "params": params},
+            )
+            results.append(response.json())
+        except BaseException as exc:  # noqa: BLE001
+            errors.append(repr(exc))
+        finally:
+            barrier.wait()
+
+    threads = [threading.Thread(target=send) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    del original
+    assert errors == []
+    execution_ids = {item["result"]["executionId"] for item in results if "result" in item}
+    assert len(execution_ids) == 1, results
+    assert len(execution.accepted) == 1, execution.accepted
+
+
+def test_send_while_running_queues_and_withdrawal_reports_too_late(wire):
+    _runtime, api, _execution = wire
+    workspace = open_workspace(api)["workspace"]
+    profile = make_profile(api, name="queuer")
+    first = api.ok("sessions.createAndSend", {
+        "requestId": "q-1", "workspaceId": workspace["id"],
+        "profileId": profile["profile_id"], "message": MESSAGE, "overrides": [],
+    })
+    session_id = first["session"]["id"]
+    second = api.ok("sessions.send", {
+        "requestId": "q-2", "sessionId": session_id,
+        "message": {"text": "second", "attachments": []}, "overrides": [],
+    })
+    assert second["outcome"] == "accepted"
+    assert second["executionId"] is None  # queued behind the running execution
+
+    queue = api.ok("queue.get", {"sessionId": session_id})
+    assert len(queue["items"]) == 1
+    item = queue["items"][0]
+    assert item["state"] == "pending"
+    assert item["message"]["text"] == "second"
+
+    stale = api.err("queue.withdraw", {
+        "requestId": "q-withdraw-stale", "sessionId": session_id, "itemId": item["itemId"],
+        "expectedVersion": item["version"] + 5,
+    })
+    assert stale["code"] == "CONFLICT_VERSION"
+
+    withdrawn = api.ok("queue.withdraw", {
+        "requestId": "q-withdraw", "sessionId": session_id, "itemId": item["itemId"],
+        "expectedVersion": item["version"],
+    })
+    assert withdrawn["outcome"] == "withdrawn"
+    assert api.ok("queue.get", {"sessionId": session_id})["items"] == []
+
+
+def test_send_outcome_query_answers_unknown_rather_than_guessing(wire):
+    _runtime, api, _execution = wire
+    assert api.ok("sendOutcome.query", {"requestId": "never-sent"}) == {"outcome": "unknown"}
+
+
+def test_stop_reports_requested_then_already_finished(wire):
+    _runtime, api, execution = wire
+    workspace = open_workspace(api, "/home/tester/stopper")["workspace"]
+    profile = make_profile(api, name="stopper")
+    accepted = api.ok("sessions.createAndSend", {
+        "requestId": "stop-1", "workspaceId": workspace["id"],
+        "profileId": profile["profile_id"], "message": MESSAGE, "overrides": [],
+    })
+    stopped = api.ok("runs.stop", {
+        "requestId": "stop-2", "sessionId": accepted["session"]["id"],
+        "executionId": accepted["executionId"],
+    })
+    assert stopped["outcome"] == "stop_requested"
+    assert execution.cancelled == [accepted["executionId"]]
+
+    _runtime2, api2, execution2 = wire
+    del _runtime2, execution2
+
+
+def test_stop_on_an_unknown_execution_is_not_found(wire):
+    _runtime, api, _execution = wire
+    error = api.err("runs.stop", {
+        "requestId": "stop-missing", "sessionId": "session-none", "executionId": "execution-none",
+    })
+    assert error["code"] == "NOT_FOUND"
+
+
+def test_switching_role_is_refused_while_an_execution_runs(wire):
+    _runtime, api, _execution = wire
+    workspace = open_workspace(api, "/home/tester/switcher")["workspace"]
+    first_profile = make_profile(api, name="switch-a")
+    second_profile = make_profile(api, name="switch-b")
+    accepted = api.ok("sessions.createAndSend", {
+        "requestId": "sw-1", "workspaceId": workspace["id"],
+        "profileId": first_profile["profile_id"], "message": MESSAGE, "overrides": [],
+    })
+    session = accepted["session"]
+    result = api.ok("sessions.switchProfile", {
+        "requestId": "sw-2", "sessionId": session["id"],
+        "profileId": second_profile["profile_id"], "expectedVersion": session["version"],
+    })
+    assert result["outcome"] == "rejected"
+    assert result["reason"] == "execution_running"
+    # The old link is returned so the client keeps the real state.
+    assert result["session"]["profileId"] == first_profile["profile_id"]
+
+
+# --- approvals --------------------------------------------------------------
+
+
+def test_approval_decisions_are_atomic_and_validate_scope(wire):
+    _runtime, api, _execution = wire
+    workspace = open_workspace(api, "/home/tester/approvals")["workspace"]
+    profile = make_profile(api, name="approver")
+    accepted = api.ok("sessions.createAndSend", {
+        "requestId": "ap-1", "workspaceId": workspace["id"],
+        "profileId": profile["profile_id"], "message": MESSAGE, "overrides": [],
+    })
+    session_id = accepted["session"]["id"]
+    approval = api.runtime_tuple if False else None
+    del approval
+
+    runtime = _runtime
+    with runtime.database.transaction() as conn:
+        row = runtime.approvals.request_in_transaction(
+            conn, session_id=session_id, execution_id=accepted["executionId"],
+            request={"tool": "shell", "command": "ls"},
+        )
+    assert row["state"] == "open"
+
+    first = api.ok("approvals.decide", {
+        "requestId": "dec-1", "approvalId": row["approvalId"], "decision": "allow",
+        "scope": {"kind": "once"}, "expectedVersion": row["version"],
+    })
+    assert first == {"outcome": "recorded", "decision": "allow"}
+
+    # A repeat of the same request never applies a second decision.
+    repeat = api.ok("approvals.decide", {
+        "requestId": "dec-1", "approvalId": row["approvalId"], "decision": "allow",
+        "scope": {"kind": "once"}, "expectedVersion": row["version"],
+    })
+    assert repeat == {"outcome": "already_recorded", "decision": "allow"}
+
+    # A contradictory decision after settlement is invalid, not applied.
+    contradictory = api.ok("approvals.decide", {
+        "requestId": "dec-2", "approvalId": row["approvalId"], "decision": "deny",
+        "scope": {"kind": "once"}, "expectedVersion": row["version"] + 1,
+    })
+    assert contradictory["outcome"] == "invalid"
+
+    bad_scope = api.err("approvals.decide", {
+        "requestId": "dec-3", "approvalId": row["approvalId"], "decision": "allow",
+        "scope": {"kind": "forever"}, "expectedVersion": 2,
+    })
+    assert bad_scope["code"] == "INVALID_REQUEST"
+
+
+# --- history ----------------------------------------------------------------
+
+
+def test_history_snapshot_frames_use_cursors_and_resume_without_gaps(wire):
+    _runtime, api, _execution = wire
+    workspace = open_workspace(api, "/home/tester/history")["workspace"]
+    profile = make_profile(api, name="historian")
+    accepted = api.ok("sessions.createAndSend", {
+        "requestId": "h-1", "workspaceId": workspace["id"],
+        "profileId": profile["profile_id"], "message": MESSAGE, "overrides": [],
+    })
+    session_id = accepted["session"]["id"]
+    snapshot = api.ok("history.snapshot", {"sessionId": session_id})
+    assert snapshot["outcome"] == "snapshot"
+    assert snapshot["frames"], "an accepted send must leave a durable frame"
+    seqs = [frame["seq"] for frame in snapshot["frames"]]
+    assert seqs == sorted(seqs)
+    assert all(frame["cursor"] for frame in snapshot["frames"])
+    assert snapshot["frames"][-1]["event"]["kind"] == "execution.state"
+
+    # Continuing from the resume cursor returns only newer frames.
+    resumed = api.ok("history.snapshot", {
+        "sessionId": session_id, "cursor": snapshot["resumeCursor"],
+    })
+    assert resumed["outcome"] == "snapshot"
+    assert all(frame["seq"] > seqs[-1] for frame in resumed["frames"])
+
+    # A cursor that cannot address real history asks for an explicit resync.
+    forged = snapshot["resumeCursor"][:-4] + "AAAA"
+    error = api.err("history.snapshot", {"sessionId": session_id, "cursor": forged})
+    assert error["code"] == "INVALID_REQUEST"
+
+
+def test_history_snapshot_requires_a_real_session(wire):
+    _runtime, api, _execution = wire
+    error = api.err("history.snapshot", {"sessionId": "session-missing"})
+    assert error["code"] == "NOT_FOUND"

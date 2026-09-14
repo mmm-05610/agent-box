@@ -13,6 +13,7 @@ from agent_box.server.sessions.repository import SessionRecords
 class SessionService:
     def __init__(self, records: SessionRecords, idempotency, objects, *,
                  harnesses: HarnessRegistry, profiles, credentials,
+                 queue=None,
                  execution: TurnExecutionPort | None = None,
                  on_event=None) -> None:
         self.records = records
@@ -21,6 +22,7 @@ class SessionService:
         self.harnesses = harnesses
         self.profiles = profiles
         self.credentials = credentials
+        self.queue = queue
         self.execution = execution
         self.on_event = on_event or (lambda: None)
 
@@ -29,6 +31,75 @@ class SessionService:
             key=key, request_digest=digest(body),
             workspace_id=body["workspace_id"], profile_id=body["profile_id"],
         )
+
+    # -- wire/1 intent acceptance ------------------------------------------
+
+    def accept_intent(self, **kwargs: Any):
+        """Accept one send intent; the winner is the only dispatcher.
+
+        Configuration validation happens before acceptance so a rejected send
+        leaves no Session and no queued work behind (core-semantics/1 §6).
+        """
+        profile_id = kwargs.pop("profile_id")
+        overrides = kwargs.pop("overrides", None)
+        self._assert_profile_executable(profile_id)
+        if overrides:
+            self._validate_overrides_for(profile_id, overrides)
+        kwargs["queue_records"] = self.queue
+        kwargs["resolve_config_version"] = self._resolve_config_version
+        return self.records.accept_intent(profile_id=profile_id, **kwargs)
+
+    def _assert_profile_executable(self, profile_id: str) -> None:
+        profile = self.profiles.get(profile_id)
+        harness_type = profile["harness_type"]
+        if harness_type not in self.harnesses:
+            raise unavailable("CAPABILITY_UNSUPPORTED", "Session Harness is not configured")
+        descriptor = self.harnesses.get(harness_type)
+        if self.execution is None:
+            raise unavailable("EXECUTION_CAPABILITY_UNAVAILABLE", "Turn execution is not configured")
+        credential_id = profile.get("credential_id")
+        if descriptor.credential_kind is not None:
+            if not credential_id:
+                raise ServerError(
+                    "CREDENTIAL_REQUIRED", "Profile has no authorized credential", status=409,
+                )
+            self.credentials.get(credential_id, kind=descriptor.credential_kind)
+
+    def _validate_overrides_for(self, profile_id: str, overrides: list[dict[str, Any]]) -> None:
+        profile = self.profiles.get(profile_id)
+        descriptor = self.harnesses.get(profile["harness_type"])
+        locked = [item["controlId"] for item in overrides if item["controlId"] in descriptor.security_locked_controls]
+        if locked:
+            raise ServerError(
+                "PROFILE_CONFIGURATION_INVALID",
+                f"controls are security locked: {', '.join(sorted(locked))}",
+                status=422,
+            )
+        if descriptor.configuration_validator is None:
+            return
+        configured = json.loads(self.objects.read(profile["config_object_digest"]))
+        merged = dict(configured["configuration"])
+        merged.update({item["controlId"]: item["value"] for item in overrides})
+        try:
+            descriptor.configuration_validator(merged)
+        except (TypeError, ValueError) as exc:
+            raise ServerError("TURN_OVERRIDES_INVALID", str(exc), status=422) from exc
+
+    def _resolve_config_version(self, conn, profile, overrides) -> int:
+        """Freeze the effective configuration version at acceptance time.
+
+        The version is the Profile revision read inside the accepting
+        transaction: a later Profile edit bumps the revision, so a queued item
+        can still prove which configuration it was accepted under without the
+        Server keeping a second copy of that configuration.
+        """
+        del overrides
+        current = conn.execute(
+            "SELECT config_revision FROM server_profiles WHERE id=?", (profile["id"],),
+        ).fetchone()
+        if current is None:
+            raise ServerError("PROFILE_NOT_FOUND", "Profile was not found", status=404)
+        return int(current["config_revision"])
 
     def create_turn(self, session_id: str, key: str, body: dict[str, Any]):
         if self.execution is None:

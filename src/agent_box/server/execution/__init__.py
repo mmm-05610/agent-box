@@ -29,6 +29,13 @@ class HarnessDescriptor:
     credential_kind: str | None = None
     configuration_validator: Callable[[Any], None] | None = None
     capability_claims: Mapping[str, bool] = field(default_factory=dict)
+    # Optional-value controls this Harness declares, in declaration order; the
+    # first entry is the access-layer default. Only declared controls are
+    # offered, so a client never sees an invented option.
+    control_options: Mapping[str, tuple[Any, ...]] = field(default_factory=dict)
+    # Controls a security rule pins; they are reported as locked and cannot be
+    # overridden by a Profile default or a temporary override.
+    security_locked_controls: tuple[str, ...] = ()
 
 
 class HarnessRegistry:
