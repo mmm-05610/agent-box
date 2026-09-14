@@ -5,7 +5,7 @@
 
 ## 执行快照（handoff-policy 每阶段必填）— 接管施工中
 
-- updated_at: 2026-09-14 15:05 (+08:00)
+- updated_at: 2026-09-14 15:25 (+08:00)
 - 执行者: Codex 前端产品 goal（接力会话）；**已从暂停的 Zcode 执行者接管**
 - 工作树/分支: /home/maoqh/projects/agent-box-desktop-next-wsl-round1 @ feature/agentbox-desktop-product
 - 接管核验（历史，Zcode→Codex 交接）: 用户指定交接 HEAD `5c0fbfe` 与实际 HEAD
@@ -16,7 +16,7 @@
 - 本阶段起点核验: HEAD `1cbc4f58d602b212f55c7c4dd9c2bc38718cba83`、分支
   feature/agentbox-desktop-product、工作树 clean，无同工作树并发写入者；writer lease 仍为同一
   前端 goal 的 ACTIVE lease，本阶段串行施工，完成后停止写入并回报，不提前 RELEASE。
-- 代码检查点（已提交 HEAD）: `b6d0bc6f`（P05 返修：旧 pending 发送优先恢复）
+- 代码检查点（已提交 HEAD）: `3e207376`（P05：`workspaces.open` 生产接线）
   链: ebb1233（P00）→ 8d4b3df/47b5b47/dbb902f（P01 代码与几何修复）→ 26b32fc（P01 GREEN 证据）
   → 468e6ac/d7e9a57（发布源 d3c0196+ffbcfaf 导入）→ 893d560（P07 检查点2 wire-v1）
   → 957a523（P02A 盘点）→ 07f5386（P02A slice 1：失败面非阻塞）→ 3a25edc（P02A slice 2）
@@ -39,9 +39,17 @@
   → 1cbc4f58（Provider 模型检查点）→ dfcd7027（Profile 默认配置编辑与串行 CAS）
   → 88f3d934（enum/boolean 编辑覆盖）→ af0c08e3（返修：服务权威名称回写）
   → 矩阵审计文档检查点（evidence/P05-client-matrix.md）→ 940c9df4（config.resolve 生产接线）
-  → **b6d0bc6f（返修：旧 pending 发送优先恢复）**
+  → b6d0bc6f（返修：旧 pending 发送优先恢复）→ **3e207376（workspaces.open 生产接线）**
 - 已消费发布文档提交: 86d5a7b、61c7ff7、d3c0196、ffbcfaf
-- 当前检查点改动（pending 恢复顺序返修）: 发送边界顺序修正——已产生 `requestId` 的旧 pending 优先级
+- 当前检查点改动（workspaces.open 接线）: 已有本地/WSL 侧栏选择经 `workspaces.open` 登记为服务权威
+  Workspace，并进入服务 Workspace 的新会话草稿（**不建 Session、不启 Harness**）。身份 exact：本地
+  `{local,null,null}` + 项目工作根，WSL `{wsl, actualUser, distribution}` + rootPath，path 不改写；
+  唯一身份是服务返回的 `WorkspaceRecord.id`（shell row id 不参与命中，直查走显式 `serviceWorkspaceId`）。
+  同一 target 单飞、迟到只入服务缓存不切回界面/草稿/选择；provisional shell 草稿经既有
+  `migrateSessionDraft` 迁移到服务 scope（目标非空则不覆盖、两边不删除）；能力未声明不发请求并呈现 hello
+  reason，失败保留选择与草稿且不无限重试；服务 Workspace 未到前 `sendAvailable=false`。矩阵
+  `workspaces.open` 改为 PRODUCTION_REACHABLE（EXT），汇总 **24 reachable / 4 gap**；G1 改写为接线记录。
+- 上一检查点改动（pending 恢复顺序返修）: 发送边界顺序修正——已产生 `requestId` 的旧 pending 优先级
   最高，只以原 requestId 调 `sendOutcome.query`；当前草稿的配置 rejected/unavailable、Profile/Workspace
   缺失、附件未 stage、文本不同都不得阻断该恢复（`resolvePendingAgentBoxSend`，单一查询状态机，
   `sendAgentBoxMessage` 内部仍复检 pending 防并发）。生产能力门区分「恢复」与「新建」：有 pending 时
@@ -70,7 +78,7 @@
 - 完成范围: P00；P01 全部返修（真机 27 PASS）；P07 检查点 1（语义映射）、检查点 2
   （wire-v1 候选：17 方法 + schema 测试 + JSON Schema 工件；已消费后端机械反馈并回应）；
   P02A（失败面非阻塞+可关闭、Artifacts 页退役、失败终态竞态修复与真机门）
-- 下一项: 按 evidence/P05-client-matrix.md §3 补剩余 5 个前端缺口（workspaces.open/browse/archive、
+- 下一项: 按 evidence/P05-client-matrix.md §3 补剩余 4 个前端缺口（workspaces.browse/archive、
   sessions.update/archive 的目标文件与不变量已列出），随后按 P06 收口无模型独立验收；Server
   lifecycle connection 合同到达后接生产接线。不再重新研究协议。
 - 阻断: 无真实阻断。剩余 P04 production lifecycle connection 与显式 legacy 消费者收口、
@@ -174,6 +182,15 @@
   省略恢复默认、exact 模型引用与带斜杠 id）、
   双 model_slot 独立编辑、unavailable 禁选与目录外当前值、CAS 顺序 update(N)→updateConfig(N+1)、
   部分成功重试不重发改名、pending 连点单发、服务规范化后采用返回 descriptor、迟到 descriptor 不串写。
+- workspaces.open 生产接线（3e207376）：验收 `npx vitest run --project ui
+  src/application/workspace/wire-workspace-catalog.test.ts src/store/agentbox-service.test.ts
+  src/app/composition/wiring/agentbox-main-chat.test.tsx src/features/chat/agentbox-chat-view.test.ts`
+  → **4 files / 48 tests passed，exit 0**；相关回归 4 files / 59 tests passed（agentbox-composer、
+  wire-send、sidebar workspace assembly、composer store）；`src/features/chat` 全目录 94 files /
+  627 tests passed；`npm run typecheck` 三项目通过；改动文件 ESLint 0 error / 0 warning；
+  `git diff --check` 干净。覆盖本地/WSL exact payload、created=false 采纳服务 id、同 path 不同环境不互认、
+  shell id 与无关 wire id 相同不误命中、服务已有记录不 open、单飞、迟到 A/B、capability/失败处理、
+  provisional→authoritative 草稿迁移（含目标非空不覆盖）、Session route 不 open。
 - pending 恢复顺序返修（b6d0bc6f）：`npx vitest run --project ui
   src/application/session/wire-send.test.ts src/application/session/agentbox-composer.test.ts
   src/app/composition/wiring/agentbox-main-chat.test.tsx src/application/profile/wire-composer-profile.test.ts
@@ -247,10 +264,10 @@ wire-review.md通道自39阶段协调。执行者下个检查点消费这些规�
 | --- | --- | --- |
 | P00 接管与基线 | GREEN | 旧Desktop会话无并发写入（evidence/P00.md） |
 | P01 36R收口 | GREEN | 真机 27 PASS/2 SKIP/1 PENDING（evidence/P01.md；本地打开 PENDING 转 P05） |
-| P02 上层产品 | IN_PROGRESS（A/B/C/D 主面与服务投影完成；Profile 默认配置编辑已接服务描述与串行 CAS；矩阵审计标出 6 项前端缺口） | P01 已满足 |
+| P02 上层产品 | IN_PROGRESS（A/B/C/D 主面与服务投影完成；Profile 默认配置编辑与 Workspace 选择登记已接；矩阵剩 4 项前端缺口） | P01 已满足 |
 | P03 用例状态与API | IN_PROGRESS（主 route 生产调用者与 event reducer 接入已完成；真实 Server 源待 P04） | 与 P02 穿插 |
 | P04 宿主与遗留退役 | IN_PROGRESS（production request/Session-event transport + IPC + supervisor；正常冷启动 Hermes 自动门已退役，Server connection合同待后端） | 与 P03 穿插 |
-| P05 正式合同接入 | IN_PROGRESS（28 方法矩阵：23 生产可达 / 5 前端缺口；`config.resolve` 已接；lifecycle 外部缺口待续） | wire 双端锁定 |
+| P05 正式合同接入 | IN_PROGRESS（28 方法矩阵：24 生产可达 / 4 前端缺口；`config.resolve`、`workspaces.open` 已接；lifecycle 外部缺口待续） | wire 双端锁定 |
 | P06 前端验收与交接 | IMPLEMENTATION_HANDOFF_GATE | 本端独立范围完成；真实全栈门由后续集成人负责 |
 | P07 核心合同与状态交接 | 检查点1–6已提交；WIRE_LOCKED | 28 方法双端摘要一致；fixture/客户端已锁定 |
 
