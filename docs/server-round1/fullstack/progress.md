@@ -4,6 +4,128 @@
 已发生的1次可达性请求由后端受控进程读取仓库外 locator，未把内容写入仓库或输出。
 授权真实 credential 的 SecretStore→Worker 投影尚未执行，不以测试值路径冒充付费验收事实。
 
+## 2026-09-14 — Work Order 41 Windows r4 平台门通过
+
+Windows 真机、`py.exe -3.12`、真实 `wsl.exe`、digest 固定的 release Worker、locked 28 方法 wire schema、
+端口 18744、隔离 DataRoot `%LOCALAPPDATA%\AgentBox\acceptance-server-41-r4` 与 WSL workspace
+`/tmp/agentbox-server-41-r4` 上单次执行 `accept-e.ps1 -Cleanup`，退出码 0：
+
+```json
+{"result":"BACKEND_41_E_WINDOWS_WSL_WIRE_OK","windows_server":true,"distribution":"Ubuntu","server_id":"server_4ed8107385e8472d952f5de57a7c0b24","workspace_id":"ws_25ae49b556894d5cb77957b9cb967d8f","session_id":"session_16e47d3e0b804928a13123eb79482731","attachment_execution":"execution_55261433757d4447917c7846a9401c6a","cancelled_execution":"execution_72412c6706c04acb896af1b7088377b7","approval_execution":"execution_aae0a7326a3d414e941abd20d412c49e","profile_id":"profile_0cfa46a8a32b4954bafc08738a72812c","provider_model_id":"provider_8b1f90d93a1f48af8fc13908fa15889c","wire_event_stream":"wire.eventStream/1","worker_digest":"sha256:bb90e346bbd857f02eba8d267f47c3ce793d30c9894ca823dc09c482d886f5eb","r4":{"fixture":"tests/server/fixtures/stateful_acp_peer.mjs","harness":"hermes","state_projection":"/tmp/agentbox-home/sessions","timeout_ms":30000,"nonce":"STATEFUL-NONCE-R4-7F3A9C","session_id":"session_7961a0b9a2e44260bb6767d0585fbde2","first_execution":"execution_0abc8e9dfd21461bbdfbe68aefa15997","second_execution":"execution_f10e348364364c428052eed89f94ed8b","checkpoint_digest":"sha256:f8a6d19c1df4bc7fc32af445c5e64f97ca1f7f27a062c62e793b07303c4a23b1","checkpoint_native_id":"stateful-13","checkpoint_files":["native-state.json","reopen-method.txt"],"first_round_reopen":["session/new"],"second_round_reopen":["session/new","session/resume"],"delta_seq":10,"completed_seq":12,"stop_mode":"tree_terminate","lock_instance_after_first_stop":"server_381e665d2d8240dea39182dd995e4978","lock_instance_after_final_stop":"server_668faae8a4154b02b4465b0b21ee5a2a","server_id_after_restart":"server_4ed8107385e8472d952f5de57a7c0b24","cleanup_guards":{"data_root_without_owner_marker_refused":true,"data_root_with_mismatched_marker_refused":true,"data_root_with_owner_marker_accepted":true,"linked_data_root_target_refused":true,"data_root_that_is_not_a_directory_refused":true,"workspace_without_owner_marker_refused":true,"marked_workspace_accepted":true}},"data_root":"C:\\Users\\maoqh\\AppData\\Local\\AgentBox\\acceptance-server-41-r4","workspace":"/tmp/agentbox-server-41-r4"}
+```
+
+逐项证据：
+
+- **重启**：第一轮完成后按 `tree_terminate` 停止 Server（py.exe 启动器持有 python.exe 子进程，树终止才是
+  真正的停止），随后以同一 DataRoot 重启并恢复 live；`server.hello` 返回同一稳定 server_id
+  `server_4ed8107385e8472d952f5de57a7c0b24`，而 DataRoot 锁的持有实例由
+  `server_381e665d…` 变为 `server_668faae8…`，即锁已释放并由新进程重新获取。锁文件在持有期间被
+  Windows 字节区间锁保护、不可读，因此“停后仍可读”本身即释放证据。
+- **同 native id resume**：第二轮 checkpoint 的 `nativeSessionId` 与第一轮相同（`stateful-13`），
+  `sessions.get` 的 `checkpoint.native_id` 未变；fixture 在第二轮只接受
+  `session/load`/`session/resume`，遇到 `session/new` 会以 `-32011` 拒绝，而捕获到的
+  `reopen-method.txt` 记录第二轮实际发送的是 `session/resume`（首轮为 `session/new`），且第二轮
+  返回了首轮 nonce `STATEFUL-NONCE-R4-7F3A9C`。
+- **终止前 delta**：第二轮 `message.delta` 序号 10 早于 completed 状态帧序号 12，两者同一持久事件流。
+- **ObjectStore checkpoint**：从 Windows DataRoot `objects/sha256/…` 直接读取 Server 返回的 checkpoint，
+  重算内容摘要与 Server 给出的 digest 一致（未伪造、未改写）；`schema_version==2`、`resumable==true`、
+  `harnessType=="hermes"` 与 Profile 一致、`files` 非空且每个 `path`/`size`/`digest` 合法并能在
+  ObjectStore 中按 size 命中；`sourceExecutionId` 绑定该轮 Core execution。
+- **清理**：退出后 DataRoot 按 marker 删除（删除前重新校验 owner marker/非 reparse/非普通文件）、
+  WSL workspace 删除且 `test -e` 断言其确实不存在、端口 18744 无监听、无本轮 Server/Worker/sidecar
+  残留进程、Worker `views`/`secrets` 无残留。随后以独立进程再跑 `-PostCheck`（退出码 0）：
+
+```json
+{"check":"BACKEND_41_E_WINDOWS_POSTCHECK","data_root_absent":true,"workspace_absent":true,"port_listening":false,"residual_processes":[],"residue_scope":"instance","worker_view_residue":[],"result":"BACKEND_41_E_WINDOWS_POSTCHECK_CLEAN"}
+```
+
+- **恢复/清理反例**：无 owner marker、marker 不匹配、DataRoot 为 junction（reparse）、DataRoot 为普通文件、
+  WSL workspace 缺 marker 均被拒绝清理；正例（marker 正确、workspace 有 marker）被接受。
+  checkpoint 不可用时（schema 版本错、`resumable` 非真、native id 不符、checkpoint 对象缺失、
+  state 文件对象缺失）第二 turn 必须以失败告终、不得静默成功或新造 native 会话：
+  `tests/server/test_harness_sidecar.py::test_unusable_checkpoint_fails_the_turn_without_inventing_a_session`
+  的 5 个参数化用例断言 turn=`failed`、Session 的 checkpoint digest/native id 保持原值、无该 turn 的
+  delta，且 Core 账本记录唯一的 ambiguous dispatch 携带原因 `SIDECAR_CHECKPOINT_INVALID`，同时
+  全 Session 只有首轮一次 dispatch accepted。
+
+环境与工件（本轮实测）：Windows 10.0.26200.9445、PowerShell 5.1.26100.9444、
+Windows Python 3.12.10（`C:\WINDOWS\py.exe -3.12`）、WSL `Ubuntu`、Node v22.23.2、`/usr/bin/bwrap`；
+Worker `sha256:bb90e346bbd857f02eba8d267f47c3ce793d30c9894ca823dc09c482d886f5eb`
+（workerVersion 0.1.0 / wireVersion 1）；wire 生成工件
+`sha256:5d4fa3bfeec6c3273c6073b37794e4ab2aca6e07e48184bc3a2b878c1fe5e4ed`（28 方法，脚本启动前校验；
+前端 TS 权威 `11e3b3e70d332585d31900c09ba063d95aa6b72b1904921c665fb72f81c10035`，未改动前端）。
+
+`accept-e.ps1` 本轮修复的自身缺陷（首次失败的精确现象保留在下节）：
+
+1. 工作令指定的固定 bundle `workers/agent-box-worker/.acceptance-bundle-c2`（
+   `sha256:08e4e057aef068997eb4efaa3717096a4f3fad54fd182a568853d8ed97a803c2`，2026-09-13 20:45）
+   **早于 interactive channel 协议升级**（`05053f9`/`72d6258`），当前客户端发送的 bootstrap 带
+   `protocolVersion`/`executables`，旧 Worker 因 `deny_unknown_fields` 拒绝为 `invalid bootstrap`，
+   `workspaces.open` 直接 `WORKER_UNREACHABLE`。已按 `scripts/server-round1/build-worker.sh` 从当前
+   源码重建为 `.acceptance-bundle-c3`（cargo 已是最新，未触发重编译），digest `bb90e346…`，与 r3
+   证据中的 Worker digest 一致；c2 保持原样不再使用。
+2. 广覆盖 fixture `fake_acp_peer.mjs` 未声明任何 model 目录，而 sidecar 现已按 adapter 实际提供的
+   `configOptions` 校验模型，导致配置了 `fixture-model` 的 Profile 在 `create` 阶段被拒
+   （`SIDECAR_OP_FAILED: Harness model is not available: fixture-model`）。fixture 现在声明它唯一接受的
+   `fixture-model`，模型门因此在 Windows 真机链路上被真实走通，而不是把 Profile 的模型配置删掉绕过。
+3. `test -e -- <path>` 在 GNU test 下对存在与不存在都返回 2，使 workspace 残留断言**恒真**；
+   已改为读取退出码并把“无法求值”也算失败。这是 r3 记录中唯一被削弱的断言，现修复。
+4. 清理期的断言会把真正的失败替换掉（finally 抛错覆盖主异常）；现改为收集清理问题并与主失败
+   一起报告，且失败时保留 Server stdout/stderr 以便定位。
+5. `session/resume` 归属：带权威 journal 的 `pi` 档案重开走 `session/load`，本次 r4 的有状态 fixture
+   绑定无 journal 的 `hermes` 注册键才真正走 `session/resume`；两者现已分别断言，此前把 pi 的无模型
+   双轮门记作 `session/resume` 的说法按此更正。
+
+本阶段模型调用 **0**、费用增量 **¥0**；42 累计仍为 1 次/12 tokens/`<¥0.01`（上限 ¥10）。未读取任何密钥、
+未发模型请求、未改前端、未读 WO42 locator。
+
+41 平台门记为 `BACKEND_WINDOWS_R4_READY`。**不**登记整体 `BACKEND_IMPLEMENTATION_READY`：
+Pi/Hermes/OpenCode 生产封装与四家真实模型门仍未完成，前端也未满足双门，故仍未进入全栈联调。
+
+### 精确命令与结果
+
+```text
+powershell.exe -NoProfile -Command "[Parser]::ParseFile(accept-e.ps1)"        → PARSE_OK（语法/静态解析）
+git diff --check                                                              → 通过
+python -m pytest -q tests plugins/agent-box-harnesses/tests \
+  plugins/agent-box-runtime-wsl/tests plugins/agent-box-sandbox-bwrap/tests \
+  plugins/agent-box-runtime-local/tests
+  → 348 passed, 4 skipped, 0 failed（PYTHONPATH 覆盖 src 与全部插件 src）
+python -m pytest -q tests/server/test_harness_sidecar.py -k "state_projection|unusable_checkpoint"
+  → 7 passed（2 个 resume 门 + 5 个不可用 checkpoint 反例）
+node --test plugins/agent-box-harnesses/tests/harness_remote/*.test.mjs        → 25 passed, 0 failed
+node --test scripts/server-round1/model-validation-42d.test.mjs                → 4 passed, 0 failed
+cargo fmt --check && cargo test --locked --release（workers/agent-box-worker） → 4 passed, 0 failed
+powershell.exe -File accept-e.ps1 … -Port 18744 -Cleanup                       → exit 0（上方 JSON）
+powershell.exe -File accept-e.ps1 … -Port 18744 -PostCheck -InstanceId <两实例>  → exit 0（上方 JSON）
+```
+
+4 个 skip 为既有平台/显式环境条件项，未扩大。
+
+### 本轮首次失败记录（均已修复后重跑）
+
+1. `accept-e.ps1`（改后首跑）exit 1，原因是被断言掩盖：
+   `Residual Server/Worker/sidecar processes remain: wsl:254523 … agent-box-worker --cleanup-manifest
+   /tmp/pytest-of-maoqh/…`。定性：进程扫描过宽，匹配到同仓 pytest 留下的 `--delay-seconds 300`
+   清理助手以及脚本自身命令行；**不是**残留 Server/Worker。
+2. 修窄扫描后 exit 1：`workspaces.open failed: WORKER_UNREACHABLE`，Server 同期给出
+   `Worker control stream closed … invalid bootstrap`。定性：c2 bundle 早于协议升级（见上）。
+3. 换用重建 bundle 后 exit 1：`did not reach completed … state=failed error_code=EXECUTION_FAILED`。
+   读 Windows DataRoot 的 Core 账本得
+   `ExecutionDispatchAmbiguous error="SidecarError: SIDECAR_OP_FAILED: Harness model is not available:
+   fixture-model"`。定性：fixture 未声明 model 目录（见上）。
+4. 再次 exit 1：`First-round checkpoint is not bound to its own execution`。定性：断言比较对象写成
+   Server turn id，而 checkpoint 的 `sourceExecutionId` 是 Core execution id（turn 行的 `execution_id`）。
+5. 再次 exit 1：`另一个程序已锁定文件的一部分` + 清理期 `server.lock 正由另一进程使用`。定性：
+   Server 持有 `server.lock` 的字节区间锁时 `Get-Content` 必然失败；同时 stop 走 `taskkill /T /F`
+   树终止前不得读锁。改法见上（停止→读锁作为释放证据；清理问题不再掩盖主失败）。
+6. 再次 exit 1：`Second round did not reopen … session/resume: System.Object[]`。定性：`Get-R4ReopenMethods`
+   返回数组时被 `@()` 再包一层，比较的是内部数组而非最后一项；首轮只有一行故侥幸通过。
+
+其中第 5 次失败在隔离 DataRoot 留下未完成的删除（仅剩 `server.lock`，owner marker 已被部分删除）。
+已按“先核对再处理”的原则人工核对内容与路径后才删除该残留，另有一次 DataRoot 删除被 marker 守卫
+正确拒绝（左侧文件被占用），均未绕过守卫。
+
 ## 2026-09-14 13:24 +08:00 — native state 双轮纵向检查点
 
 - `3e4282b` 把部署声明的有界 native-state 子树从 Worker 回收到 Windows ObjectStore，并以 schema 2
@@ -16,7 +138,8 @@
   无 prompt；使用测试 credential，未读取授权 locator、未发模型请求。wheel 已包含官方完整 models JSON
   和固定 sidecar TOML。
 - 回归：Server `98 passed, 1 skipped`；WSL runtime+bwrap `43 passed`；本阶段定向 Python `71 passed`；
-  Node `13 passed`。累计费用仍为 1 次/12 tokens/`<¥0.01`。Windows r4 尚未运行，所以后端仍未 READY。
+  Node `13 passed`。累计费用仍为 1 次/12 tokens/`<¥0.01`。Windows r4 尚未运行；该结论随后由本文件顶部
+  的 r4 平台门小节取代（`BACKEND_WINDOWS_R4_READY`）。
 
 ## 2026-09-14 — Codex 官方 Responses 隔离投影检查点
 
@@ -46,7 +169,7 @@
   5 个冻结、kind mismatch、argv 非泄漏和启动异常清理反例。没有读取真实 locator、没有模型或网络
   请求，累计费用仍为 1 次/12 tokens/<¥0.01。
 - 此检查点只证明接线与组件生命周期。Pi/Hermes/OpenCode 的原生运行时工件/配置进入生产 bwrap
-  以及逐家真实模型门仍需完成；Windows r4 也尚未运行，后端状态不提前升级。
+  以及逐家真实模型门仍需完成；Windows r4 平台门已通过，但后端状态不提前升级。
 
 ## 2026-09-14 12:15 +08:00 — 28 方法 wire 重锁
 
@@ -55,7 +178,7 @@
   `5d4fa3bfeec6c3273c6073b37794e4ab2aca6e07e48184bc3a2b878c1fe5e4ed`。
 - 后端对该实际工件严格回归 `29 passed in 67.57s`，队列终态差异关闭，状态
   `WIRE_LOCKED_FOR_IMPLEMENTATION`。
-- 尚未进入全栈联调；下一后端门是 Windows r4 重确认。真实模型调用数与费用无变化：累计1次、
+- 尚未进入全栈联调；Windows r4 重确认已完成（见顶部）。真实模型调用数与费用无变化：累计1次、
   12 tokens、<¥0.01。
 
 ## A — 前端只读观察与 wire 增量协作
@@ -76,7 +199,7 @@
 
 | 门 | 判定 | 依据 |
 | --- | --- | --- |
-| BACKEND_IMPLEMENTATION_READY | **否（暂时）** | 28方法+队列终态已锁定并29/29；native state双轮恢复已由`3e4282b`证明；Pi/Hermes/OpenCode生产封装、逐家真实门与Windows r4待完成 |
+| BACKEND_IMPLEMENTATION_READY | **否（暂时）** | 28方法+队列终态已锁定并29/29；Windows r4 平台门已通过（含 native state 重启/`session/resume`/清理与独立 `-PostCheck`）；Pi/Hermes/OpenCode生产封装与逐家真实门待完成 |
 | DESKTOP_IMPLEMENTATION_READY | **否** | 前端自报 PARTIAL，且 `writer_lease=ACTIVE`（未释放）；独立实现/验收门未完 |
 
 因此仍**没有**记录 `FULLSTACK_INTEGRATION_OWNER`，**没有**接管前端工作树，
@@ -135,7 +258,8 @@
 
 ## E — 最终验收与提交
 
-未执行（依赖双门与真实门）。41 的25方法/Windows基线检查点为 `72d6258`；当前28方法收口待提交。
+未执行（依赖双门与真实门）。41 的25方法/Windows基线检查点为 `72d6258`；当前28方法收口已由 r4
+记录（见顶部），跨仓联调仍待双门。
 更早检查点见 status：
 `b84dc87`(39) → `38b28d6`(40-A) → `05053f9`(40-B) → `340fcad`(40-C) → `b70cd3f`(40-D)
 → `7e9ffd8`(41) → `8eeb422`(42-A 观察) → `978918d`(sidecar 桥)。

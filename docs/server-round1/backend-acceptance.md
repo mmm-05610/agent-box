@@ -1,10 +1,46 @@
 # Work Order 41 — 核心产品合同与后端独立验收
 
-日期：2026-09-14。当前状态：**`BACKEND_WINDOWS_R4_PENDING`**。分支
-`feature/server-harness-extension-v1`；native state代码检查点为 `3e4282b`，25方法/Windows基线检查点为
+日期：2026-09-14。当前状态：**`BACKEND_WINDOWS_R4_READY`**（Windows r4 平台门通过；整体后端仍非 READY）。
+分支 `feature/server-harness-extension-v1`；native state代码检查点为 `3e4282b`，25方法/Windows基线检查点为
 `72d6258`。此结论只代表后端独立门，不代表
 真实模型或全栈 Green。41 全程使用显式 no-model ACP fixture，未读模型凭据、未发模型请求，
 费用 ¥0；42 已有费用账继续单独累计。
+
+## E2 — Windows r4（`BACKEND_WINDOWS_R4_READY`）
+
+2026-09-14 单次执行 `scripts/server-round1/accept-e.ps1 -Port 18744 -Cleanup`，退出码 0：
+Windows `py.exe -3.12`（Python 3.12.10）启动真实 Server，真实 `wsl.exe` 启动
+`sha256:bb90e346bbd857f02eba8d267f47c3ce793d30c9894ca823dc09c482d886f5eb` 的 release Worker，
+经 bwrap 运行两个显式 no-model fixture（广覆盖 `fake_acp_peer.mjs` 与有状态
+`tests/server/fixtures/stateful_acp_peer.mjs`），wire 为锁定的 28 方法生成工件
+`sha256:5d4fa3bfeec6c3273c6073b37794e4ab2aca6e07e48184bc3a2b878c1fe5e4ed`。完整脱敏 JSON 与逐项
+证据见 [fullstack/progress.md](fullstack/progress.md) 的 r4 小节，要点：
+
+- 保留的旧门全部通过：Workspace、Profile/Provider-Model 维护、配置描述/拒绝、附件投递、
+  终止前增量、正式 WebSocket cursor、取消、审批、归档、历史保留。
+- 有状态门：第一轮写入固定 nonce 并 completed；从 Windows DataRoot ObjectStore 直接读取 Server
+  返回的 checkpoint（schema 2、`resumable:true`、`harnessType` 与 Profile 一致、files 的
+  path/size/digest 合法且能在 ObjectStore 命中、内容摘要与 Server 给出的 digest 一致）；
+  停止后同一 DataRoot 重启，锁持有实例改变且稳定 server_id 不变；第二轮经正式 wire `sessions.send`
+  恢复同一 native id、fixture 记录 ACP 动作为 `session/resume`（非 `session/new`）、回出首轮 nonce，
+  且 `message.delta`（seq 10）先于 completed（seq 12）。
+- 清理：DataRoot 按 owner marker 删除、WSL workspace 删除并断言不存在、端口无监听、无残留
+  Server/Worker/sidecar 进程、Worker views/secrets 无残留；随后独立进程 `-PostCheck` 再次复核通过。
+- 反例：无 marker / marker 不匹配 / reparse 目标 / 非目录拒绝清理；不可用 checkpoint 的 5 种变体
+  必须失败且不得新造 native 会话或静默成功。
+
+两个必须记录的工件更正：
+
+1. 工作令指定的 `.acceptance-bundle-c2`（`sha256:08e4e057…`）早于 interactive channel 协议升级，
+   与当前客户端 bootstrap 不兼容（旧 Worker 报 `invalid bootstrap`，Server 侧为 `WORKER_UNREACHABLE`）。
+   r4 实际使用从当前源码重建的 `.acceptance-bundle-c3`，digest `sha256:bb90e346…`，与 r3 证据一致。
+2. 广覆盖 fixture 原先不声明 model 目录，sidecar 的模型门因此拒绝配置的模型
+   （`SIDECAR_OP_FAILED: Harness model is not available: fixture-model`）；fixture 现声明其唯一接受的
+   `fixture-model`，模型门在真机链路上被真实走通。
+
+另外，此前把 `pi`（权威 journal 档案）的无模型双轮门记作 ACP `session/resume` 是不准确的：
+该档案重开走 `session/load`。r4 的有状态 fixture 绑定无 journal 的 `hermes` 注册键，才真正验证
+`session/resume`；两种行为现在都有断言。
 
 ## A — 单一 wire 合同（当前增量）
 
@@ -102,8 +138,9 @@ Worker/Server/sidecar 残留进程。WSL 输出含本机 NAT/localhost 警告乱
 首次尝试把 manifest 放 `/tmp`，Windows UNC 不可见，脚本在服务/数据创建前 exit 1；改为同一用户
 缓存目录后通过。没有绕过权限或把此误记为平台阻断。
 
-当前增量尚未跑 Windows r4；因此 r3 仍是旧代码证据，不能替代 `3e4282b` 的 Windows 独立重验，状态保持
-`BACKEND_WINDOWS_R4_PENDING`。
+历史轮说明：r3（端口 18743）为旧代码证据；r4 已在 `3e4282b` 的 native-state 路径上重跑并关闭 41
+平台门。但整体后端 READY 仍受 Pi/Hermes/OpenCode 生产封装、逐家真实模型门与前端双门约束，见
+[fullstack/progress.md](fullstack/progress.md)。
 
 ## 最终验证账
 
@@ -121,6 +158,16 @@ node --test plugins/agent-box-harnesses/tests/harness_remote/*.test.mjs
 → 25 passed, 0 failed
 
 cargo fmt --check && cargo test --locked --release
+→ 4 passed, 0 failed
+
+python -m pytest -q tests plugins/agent-box-harnesses/tests plugins/agent-box-runtime-wsl/tests \
+  plugins/agent-box-sandbox-bwrap/tests plugins/agent-box-runtime-local/tests
+→ 348 passed, 4 skipped, 0 failed（r4 增量后）
+
+python -m pytest -q tests/server/test_harness_sidecar.py -k "state_projection|unusable_checkpoint"
+→ 7 passed（ACP resume 门 2 + 不可用 checkpoint 反例 5）
+
+node --test scripts/server-round1/model-validation-42d.test.mjs
 → 4 passed, 0 failed
 ```
 
@@ -152,8 +199,8 @@ SecretStore 按 locator 读取、Worker `secret.put` 一次性帧、bwrap 固定
 环境注入以及所有退出路径的 `secret.cleanup`；模型进入 sidecar `create`/`prompt`，密钥不进入 argv、
 普通对象或事件。相关回归为 Server 45 passed、Worker/bwrap 32 passed、Node envelope 4 passed。
 这些是代码/组件证据，尚未冒充真实 Harness 模型证据。当前后端代码检查点为 `3e4282b`；41 的独立
-Windows 状态还须由 r4 对锁定工件与最新 native-state 路径重确认。整个后端 READY 仍另受四家生产封装/
-真实模型门约束。
+Windows 门已由 r4 对锁定工件与最新 native-state 路径重确认（见 E2）。整个后端 READY 仍另受
+四家生产封装/真实模型门约束。
 四家组件仍保持 40 的
 `COMPONENT_VERIFIED / MODEL_NOT_VERIFIED` 分账。Pi/Hermes/OpenCode 的 DeepSeek Provider 配置与
 独立真实模型门以及 Codex 官方 Responses 隔离配置验证进入 42-D；前端仍由其独立 writer 施工，当前不具备跨仓
