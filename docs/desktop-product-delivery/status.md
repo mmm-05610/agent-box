@@ -5,7 +5,7 @@
 
 ## 执行快照（handoff-policy 每阶段必填）— 接管施工中
 
-- updated_at: 2026-09-14 18:10 (+08:00)
+- updated_at: 2026-09-14 18:40 (+08:00)
 - 执行者: Zcode 前端产品 goal（新一轮会话，串行施工）；**已从 Codex 前端产品 goal 接管**
 - 工作树/分支: /home/maoqh/projects/agent-box-desktop-next-wsl-round1 @ feature/agentbox-desktop-product
 - 接管核验（历史，Zcode→Codex 交接）: 用户指定交接 HEAD `5c0fbfe` 与实际 HEAD
@@ -13,11 +13,13 @@
   未发现该工作树、Windows 构建树的 Electron/Vite/Vitest/Playwright/验收驱动进程；
   dirty 集合仅为下列 4 项已授权交接改动。发布源规则文件与本执行树逐文件 SHA-256 一致，
   保留本文件实时进度，不复制发布源初始状态。
-- 本阶段起点核验: HEAD `8973bae878253504a324a3512f9c666e7e13e8f6`、分支
+- 本阶段起点核验: HEAD `bd1b28b44a7565f6864d26b90bb30a991b0654e1`、分支
   feature/agentbox-desktop-product、工作树 clean，无同工作树并发写入者；writer lease 仍为同一
-  前端 goal 的 ACTIVE lease，本阶段串行施工（用户增量允许两个并行子代理，但两个候选写集在增量到达时
-  均已被主代理修改，按增量规则不再委派、改为串行完成），完成后停止写入并回报，不提前 RELEASE。
-- 代码检查点（已提交 HEAD）: `86911029`（P05 返修：sessions.update 侧栏投影的服务状态边界）
+  前端 goal 的 ACTIVE lease。本阶段按用户增量开了两个并行子代理（application/当前会话命令、
+  侧栏归档交互），两个写集互不重叠且在委派时均未被主代理修改；主代理负责 `features.tsx` 三分支装配、
+  定向/回归门、文档与提交。完成后停止写入并回报，不提前 RELEASE。
+- 代码检查点（已提交 HEAD）: `cbdccf7c`（P05 sessions.archive 生产接线：统一侧栏服务 Session 归档 +
+  当前会话归档命令；矩阵 28 reachable / 0 gap，阶段状态 SESSIONS_ARCHIVE_CLIENT_READY）
   链: ebb1233（P00）→ 8d4b3df/47b5b47/dbb902f（P01 代码与几何修复）→ 26b32fc（P01 GREEN 证据）
   → 468e6ac/d7e9a57（发布源 d3c0196+ffbcfaf 导入）→ 893d560（P07 检查点2 wire-v1）
   → 957a523（P02A 盘点）→ 07f5386（P02A slice 1：失败面非阻塞）→ 3a25edc（P02A slice 2）
@@ -47,9 +49,33 @@
   → **8cdd1381（sessions.update 生产接线：统一侧栏服务 Session 投影 + 改名/置顶 CAS + 当前会话置顶命令；
   SESSIONS_UPDATE_CLIENT_READY 原以本次提交为依据）**
   → **86911029（P05 返修：侧栏服务投影的服务状态边界 —— 归属与可调用性分离、缓存权威跨 loading/unavailable
-  保持、维护与归档 fail closed；SESSIONS_UPDATE_CLIENT_READY 以本次返修提交为最终依据）**
+  保持、维护与归档 fail closed）**
+  → **cbdccf7c（P05 sessions.archive 生产接线：统一侧栏服务 Session 归档（独立归档菜单项 + 唯一确认框与
+  exact CAS，不乐观隐藏、pending 单发、服务/能力消失零调用）+ 当前会话归档命令（route id 权威、同 seam 同
+  CAS、缺失/已归档 fail closed、不回落 legacy）；矩阵 28 reachable / 0 gap，SESSIONS_ARCHIVE_CLIENT_READY
+  以本次提交为最终依据）**
 - 已消费发布文档提交: 86d5a7b、61c7ff7、d3c0196、ffbcfaf
-- 当前检查点改动（sessions.update 侧栏投影服务状态边界返修）: 把 Workspace **归属**与**服务可调用性**分开——
+- 当前检查点改动（sessions.archive 生产接线，代码提交 `cbdccf7c`）: 归档的是服务 SessionRecord——底层
+  `$agentBoxSessions` **保留**归档记录（含服务返回的 `archivedAt`），侧栏纯投影因 `archivedAt !== null` 移除
+  该行；不删除历史/消息、不停止运行、不归档 Workspace/Profile、不触碰文件，不做 `SessionRecord`→`SessionInfo`
+  转换。application 侧 `archiveAgentBoxSession` 仍是唯一 seam，payload 收窄为显式 `{sessionId,
+  expectedVersion, requestId}`，每次意图新 requestId，只采纳服务返回记录（版本单调 upsert，store 的 archived
+  保留策略未改）。命令侧新增纯决策 `decideAgentBoxSessionArchive` 与生产入口
+  `archiveRoutedAgentBoxSession`（与 pin 命令同形）：Session route 要求服务 ready + hello 声明
+  `sessions.archive` + route id 记录已到 + `archivedAt === null`，缺一即 fail closed（`SERVICE_NOT_READY`/
+  `CAPABILITY_NOT_DECLARED`/`SESSION_RECORD_NOT_ARRIVED`/`ALREADY_ARCHIVED`），绝不回落同 id legacy Session；
+  非 Session route 保留 legacy 决策。侧栏 `AgentBoxSessionRow` 新增独立归档菜单项，
+  `AgentBoxSessionList` 持有唯一 `{displayName, sessionId, version}` target 与唯一 `ConfirmDialog`：确认前
+  不隐藏行、不发请求；确认时复检实时服务与能力，服务下线或能力消失 → 零 wire 调用、对话框保持并显示本地化
+  `archiveFailed`；pending 连点单发；`CONFLICT_VERSION` 保留对话框、记录与投影且不自动重试；返回未归档记录则
+  行保留并采用服务 version/名称；unavailable 时缓存行与真实状态继续显示但无归档入口；`sessions.update` 与
+  `sessions.archive` 能力门独立（只有 update / 只有 archive / 两者都有 / 两者都无四种组合各自正确）。
+  `features.tsx` 的当前会话归档命令（`session.archive` 快捷键）在 AgentBox route 走同一 CAS，成功后不导航、
+  不清 route、不停止运行；非 Session route 旧行为不变。i18n 新增 `menuArchive`/`archiveTitle`/`archiveDesc`/
+  `archiveFailed`（type 与六语言同步）。矩阵 `sessions.archive` 改为 `PRODUCTION_REACHABLE`（EXT），汇总
+  **28 reachable / 0 gap**；G5b 改写为接线记录；P05 仍 IN_PROGRESS（待下一阶段最终矩阵/fixture/legacy 审计），
+  REAL_FLOW_VERIFIED 仍为否。
+- 上一检查点改动（sessions.update 侧栏投影服务状态边界返修）: 把 Workspace **归属**与**服务可调用性**分开——
   `agentBoxWorkspaceFor` 只按缓存 `$agentBoxWorkspaces` 与既有完整 `{kind,user,host}` + normalized path 匹配，
   不再要求 `phase === 'ready'`，因此 loading/unavailable 期间本地行不再回落 legacy `SessionInfo` 预览、WSL 行
   不再回落「sessions unavailable」、已建立的 AgentBox 权威不消失；`agentBoxArchiveFor` 单独继续要求 `ready` +
@@ -124,16 +150,18 @@
   部分成功保留服务确认的名称/版本与草稿，重试不重发改名；成功后重读 describe 采用服务规范化结果。
 - 当前阶段: P00 GREEN；P01 GREEN；**P07 检查点 1–6 完成且 wire 已锁定**；
   P02 A/B1/B2/C（角色页只读→默认配置编辑）/D 与 B3 服务投影已提交；P03 纵切 1–4 已提交；
-  P04 切片1–8已提交；**P05 sessions.update 客户端接线已提交（`8cdd1381`）并经服务状态边界返修
-  （`86911029`，SESSIONS_UPDATE_CLIENT_READY 以该返修提交为最终依据，P05 仍 IN_PROGRESS）**
+  P04 切片1–8已提交；**P05 sessions.archive 客户端接线已提交（`cbdccf7c`，SESSIONS_ARCHIVE_CLIENT_READY
+  以该提交为最终依据）；28 方法矩阵 28 生产可达 / 0 前端缺口；P05 仍 IN_PROGRESS，等待下一阶段最终
+  矩阵/fixture/legacy 审计与 P06 独立验收**
 - 完成范围: P00；P01 全部返修（真机 27 PASS）；P07 检查点 1（语义映射）、检查点 2
   （wire-v1 候选：17 方法 + schema 测试 + JSON Schema 工件；已消费后端机械反馈并回应）；
   P02A（失败面非阻塞+可关闭、Artifacts 页退役、失败终态竞态修复与真机门）
-- 下一项: 按 evidence/P05-client-matrix.md §3-G5b 接 `sessions.archive`（目标文件与不变量已列出，串行扩展
-  G5a 已建的行与投影），随后按 P06 收口无模型独立验收；Server lifecycle connection 合同到达后接生产接线。
+- 下一项: 不自行启动 P05 最终审计或 P06。下一阶段按 P06 收口无模型独立验收（最终 28 方法矩阵/fixture
+  对账、前端 legacy 消费者剩余账本）；Server lifecycle connection 合同到达后接生产接线，再验证 REAL_FLOW。
   不再重新研究协议。
 - 阻断: 无真实阻断。剩余 P04 production lifecycle connection 与显式 legacy 消费者收口、
-  P05 生产接线核查和 P06 独立验收待续；wire 摘要已锁定，真实全栈仍由后续集成人验证
+  P05 最终矩阵/fixture/legacy 审计（28 方法已 28 生产可达 / 0 前端缺口）和 P06 独立验收待续；
+  wire 摘要已锁定，真实全栈仍由后续集成人验证
 
 - contract_semantics_version: core-semantics/1（APPROVED_SEMANTICS，2026-09-14）
 - wire_version/schema_digest: wire-v1 WIRE_LOCKED_FOR_IMPLEMENTATION；当前权威
@@ -144,16 +172,16 @@
   真实 wire event stream 与后端投影差异仍是联调项，不以 fixture 伪称服务通过
 - UI_READY: 侧栏工作区列表（36R+P01）真机全绿；P02A 真机 8 PASS / 0 FAIL / 1 PENDING
 - CONTRACT_CLIENT_READY: wire-v1 客户端/fixture 与 28 方法摘要 LOCKED；production request/event
-  transport 已接线，`profiles.updateConfig` 客户端与 Profile 默认配置编辑已接（组件级验证）；
+  transport 已接线，28 个方法在 AgentBox 产品组合中全部有生产调用者（`cbdccf7c` 后 0 前端缺口）；
   Server lifecycle connection 来源待正式跨端合同
 - REAL_FLOW_VERIFIED: 否（无真实 Server/Harness 链路证据）
 
 - frontend_implementation: PARTIAL（P02A、P02B1、P02B2、P02C1、P02C2、P02D/B3、Profile 默认配置
-  编辑、P03 主 route 服务投影与 P05 sessions.update 统一侧栏接线（含 `86911029` 服务状态边界返修）已完成；
-  P04/P05/P06 待收口）
+  编辑、P03 主 route 服务投影、P05 sessions.update 统一侧栏接线（含 `86911029` 服务状态边界返修）与
+  P05 sessions.archive 统一侧栏归档/当前会话归档命令（`cbdccf7c`）已完成；P04/P05/P06 待收口）
 - writer_lease: **ACTIVE — Zcode frontend goal**（2026-09-14 接管自 Codex 前端产品 goal；本阶段
-  起点 `8973bae8`、工作树 clean，本次返修起点 `de630b35`，完成后停止写入不 RELEASE；后端工作树只读，
-  Windows 构建/验收资源串行）
+  起点 `bd1b28b4`、工作树 clean，两个并行子代理写集互不重叠，完成后停止写入不 RELEASE；提交
+  `cbdccf7c` 后无未提交改动；后端工作树只读，Windows 构建/验收资源串行）
 
 ## 测试与基线（接力会话实跑）
 
@@ -262,6 +290,22 @@
   loading/catalog 未 ready 与缓存行并存、归档入口在旧 hello + unavailable 下消失且零 archive 调用、
   恢复 ready 后维护入口回归且无重复行、既有 CAS/conflict/pending 断言不降级；新增断言在修复前
   10 failed / 36 passed（临时以 `git show HEAD:` 还原组件复跑，未改仓库）。
+- sessions.archive 生产接线（cbdccf7c）：定向门 `npx vitest run --project ui
+  src/application/session/wire-session-catalog.test.ts
+  src/application/session/agentbox-session-projection.test.ts src/store/agentbox-service.test.ts
+  src/features/chat/sidebar/agentbox-sessions/agentbox-session-row.test.tsx
+  src/features/chat/sidebar/agentbox-sessions/agentbox-session-list.test.tsx
+  src/app/composition/wiring/agentbox-session-commands.test.ts` → **6 files / 77 tests passed，exit 0**；
+  相关回归 6 files / 93 tests passed（unified-workspace-list、workspace-row、agentbox-main-chat、
+  agentbox-chat-view、agentbox-composer、wire-send）；扩大扫 `src/features/chat/sidebar` + `src/i18n` +
+  `src/app` 114 files / 1042 tests passed；`npm run typecheck` 三项目通过；改动 16 个 TS/TSX 文件
+  ESLint 0 error / 0 warning；`git diff --check` 干净。覆盖：侧栏 exact `{sessionId, expectedVersion,
+  requestId}` 与唯一 requestId、确认前不隐藏、pending 连点单发、conflict 保留对话框/记录/投影、
+  服务下线与能力消失零 wire 调用、archived 返回后行消失而 `$agentBoxSessions[id]` 仍带 `archivedAt`、
+  未归档返回行保留并采用服务 version/名称、能力四组合、unavailable 缓存行无归档入口；
+  当前会话命令的 route 权威/同 seam 同 CAS/四种 fail closed/非 Session route 不回归；
+  无 runs.stop、无 send/update/workspaces.archive 级联；archive v3 后迟到 list v2 与 update v1 不复活
+  active 行而相同/更高版本仍权威采纳；测试内无源码文本断言与 SessionRecord→SessionInfo 转换。
 - 远端保存迟到响应返修（4a057609）：验收 `npx vitest run --project ui
   src/features/workspace/agentbox-workspace-browser.test.tsx
   src/features/workspace/wsl-workspace-wizard.test.tsx` → **2 files / 33 tests passed，exit 0**；扩大门
@@ -370,10 +414,10 @@ wire-review.md通道自39阶段协调。执行者下个检查点消费这些规�
 | --- | --- | --- |
 | P00 接管与基线 | GREEN | 旧Desktop会话无并发写入（evidence/P00.md） |
 | P01 36R收口 | GREEN | 真机 27 PASS/2 SKIP/1 PENDING（evidence/P01.md；本地打开 PENDING 转 P05） |
-| P02 上层产品 | IN_PROGRESS（A/B/C/D 主面与服务投影完成；Profile 默认配置编辑、Workspace 选择登记与统一侧栏服务 Session 投影/改名/置顶已接（含 `86911029` 服务状态边界返修：缓存归属跨 loading/unavailable 保持）；矩阵 27 生产可达 / 1 前端缺口） | P01 已满足 |
+| P02 上层产品 | IN_PROGRESS（A/B/C/D 主面与服务投影完成；Profile 默认配置编辑、Workspace 选择登记、统一侧栏服务 Session 投影/改名/置顶与 **Session 归档**已接（含 `86911029` 服务状态边界返修与 `cbdccf7c` 归档接线）；矩阵 28 生产可达 / 0 前端缺口） | P01 已满足 |
 | P03 用例状态与API | IN_PROGRESS（主 route 生产调用者与 event reducer 接入已完成；真实 Server 源待 P04） | 与 P02 穿插 |
 | P04 宿主与遗留退役 | IN_PROGRESS（production request/Session-event transport + IPC + supervisor；正常冷启动 Hermes 自动门已退役，Server connection合同待后端） | 与 P03 穿插 |
-| P05 正式合同接入 | IN_PROGRESS（SESSIONS_UPDATE_CLIENT_READY，以返修提交 `86911029` 为最终依据；28 方法矩阵：27 生产可达 / 1 前端缺口；`config.resolve`、`workspaces.open`、`workspaces.archive`、`workspaces.browse`、`sessions.update` 已接；唯一剩余前端缺口 sessions.archive；lifecycle 外部缺口待续） | wire 双端锁定 |
+| P05 正式合同接入 | IN_PROGRESS（SESSIONS_ARCHIVE_CLIENT_READY，以 `cbdccf7c` 为最终依据；28 方法矩阵：**28 生产可达 / 0 前端缺口**；`config.resolve`、`workspaces.open`、`workspaces.archive`、`workspaces.browse`、`sessions.update`、`sessions.archive` 已接；剩余为 lifecycle 外部缺口与下一阶段最终矩阵/fixture/legacy 审计） | wire 双端锁定 |
 | P06 前端验收与交接 | IMPLEMENTATION_HANDOFF_GATE | 本端独立范围完成；真实全栈门由后续集成人负责 |
 | P07 核心合同与状态交接 | 检查点1–6已提交；WIRE_LOCKED | 28 方法双端摘要一致；fixture/客户端已锁定 |
 
