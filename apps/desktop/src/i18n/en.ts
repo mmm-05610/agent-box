@@ -2051,7 +2051,24 @@ export const en: Translations = {
     failedLoadSoul: 'Failed to load SOUL.md',
     failedSaveSoul: 'Failed to save SOUL.md',
     failedCreate: 'Failed to create profile',
-    failedRename: 'Failed to rename profile'
+    failedRename: 'Failed to rename profile',
+    agentBoxHarness: 'Harness',
+    agentBoxVersion: 'Version',
+    agentBoxCapabilities: 'Capabilities',
+    agentBoxAvailable: 'Available',
+    agentBoxUnavailable: 'Unavailable',
+    agentBoxMaintenanceUnavailable: 'Profile maintenance is unavailable',
+    agentBoxMaintenanceUnavailableDesc:
+      'The service can list profiles, but has not declared create, edit, archive, or native-memory controls.',
+    agentBoxRuntimeConfig: 'Runtime configuration',
+    agentBoxRuntimeConfigDesc: 'Service-described values. Temporary changes are made beside the composer.',
+    agentBoxCreateDesc: 'Choose a name and Harness. The remaining configuration can be completed later.',
+    agentBoxHarnessChoice: 'Harness',
+    agentBoxArchive: 'Archive',
+    agentBoxArchiveTitle: 'Archive profile?',
+    agentBoxArchiveDesc: name => `Archive “${name}”? Existing Session history is kept.`,
+    agentBoxSaveProfile: 'Save profile',
+    agentBoxUpdateFailed: 'Could not update profile'
   },
 
   cron: {

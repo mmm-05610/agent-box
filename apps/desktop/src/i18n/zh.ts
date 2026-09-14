@@ -2217,7 +2217,23 @@ export const zh: Translations = {
     failedLoadSoul: '加载 SOUL.md 失败',
     failedSaveSoul: '保存 SOUL.md 失败',
     failedCreate: '创建配置档案失败',
-    failedRename: '重命名配置档案失败'
+    failedRename: '重命名配置档案失败',
+    agentBoxHarness: 'Harness',
+    agentBoxVersion: '版本',
+    agentBoxCapabilities: '能力',
+    agentBoxAvailable: '可用',
+    agentBoxUnavailable: '不可用',
+    agentBoxMaintenanceUnavailable: '角色维护当前不可用',
+    agentBoxMaintenanceUnavailableDesc: '服务可以列出角色，但尚未声明创建、编辑、归档或原生记忆控制能力。',
+    agentBoxRuntimeConfig: '运行配置',
+    agentBoxRuntimeConfigDesc: '由服务描述的值；临时调整请在输入框旁进行。',
+    agentBoxCreateDesc: '选择名称和 Harness，其余配置可以稍后完成。',
+    agentBoxHarnessChoice: 'Harness',
+    agentBoxArchive: '归档',
+    agentBoxArchiveTitle: '归档角色？',
+    agentBoxArchiveDesc: name => `要归档“${name}”吗？已有 Session 历史会保留。`,
+    agentBoxSaveProfile: '保存角色',
+    agentBoxUpdateFailed: '无法更新角色'
   },
 
   cron: {

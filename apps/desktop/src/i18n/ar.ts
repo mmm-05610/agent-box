@@ -1392,7 +1392,24 @@ export const ar = defineLocale({
     failedLoadSoul: 'فشل تحميل التعليمات',
     failedSaveSoul: 'فشل حفظ التعليمات',
     failedCreate: 'فشل الإنشاء',
-    failedRename: 'فشل إعادة التسمية'
+    failedRename: 'فشل إعادة التسمية',
+    agentBoxHarness: 'Harness',
+    agentBoxVersion: 'الإصدار',
+    agentBoxCapabilities: 'الإمكانات',
+    agentBoxAvailable: 'متاح',
+    agentBoxUnavailable: 'غير متاح',
+    agentBoxMaintenanceUnavailable: 'إدارة الملفات الشخصية غير متاحة',
+    agentBoxMaintenanceUnavailableDesc:
+      'يمكن للخدمة سرد الملفات الشخصية، لكنها لم تعلن إمكانات الإنشاء أو التحرير أو الأرشفة أو الذاكرة الأصلية.',
+    agentBoxRuntimeConfig: 'إعدادات التشغيل',
+    agentBoxRuntimeConfigDesc: 'قيم تصفها الخدمة. تُجرى التغييرات المؤقتة بجوار محرر الرسالة.',
+    agentBoxCreateDesc: 'اختر اسمًا وHarness. يمكن إكمال بقية الإعدادات لاحقًا.',
+    agentBoxHarnessChoice: 'Harness',
+    agentBoxArchive: 'أرشفة',
+    agentBoxArchiveTitle: 'أرشفة الملف الشخصي؟',
+    agentBoxArchiveDesc: name => `هل تريد أرشفة «${name}»؟ سيبقى سجل Session الحالي.`,
+    agentBoxSaveProfile: 'حفظ الملف الشخصي',
+    agentBoxUpdateFailed: 'تعذر تحديث الملف الشخصي'
   },
   cron: {
     close: 'إغلاق',

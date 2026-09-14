@@ -1654,7 +1654,23 @@ export const zhHant = defineLocale({
     failedLoadSoul: '載入 SOUL.md 失敗',
     failedSaveSoul: '儲存 SOUL.md 失敗',
     failedCreate: '建立設定檔失敗',
-    failedRename: '重新命名設定檔失敗'
+    failedRename: '重新命名設定檔失敗',
+    agentBoxHarness: 'Harness',
+    agentBoxVersion: '版本',
+    agentBoxCapabilities: '能力',
+    agentBoxAvailable: '可用',
+    agentBoxUnavailable: '無法使用',
+    agentBoxMaintenanceUnavailable: '角色維護目前無法使用',
+    agentBoxMaintenanceUnavailableDesc: '服務可以列出角色，但尚未宣告建立、編輯、封存或原生記憶控制能力。',
+    agentBoxRuntimeConfig: '執行設定',
+    agentBoxRuntimeConfigDesc: '由服務描述的值；暫時調整請在輸入框旁進行。',
+    agentBoxCreateDesc: '選擇名稱和 Harness，其餘設定可稍後完成。',
+    agentBoxHarnessChoice: 'Harness',
+    agentBoxArchive: '封存',
+    agentBoxArchiveTitle: '封存角色？',
+    agentBoxArchiveDesc: name => `要封存「${name}」嗎？既有 Session 歷史會保留。`,
+    agentBoxSaveProfile: '儲存角色',
+    agentBoxUpdateFailed: '無法更新角色'
   },
 
   cron: {

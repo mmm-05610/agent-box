@@ -2043,7 +2043,24 @@ export const ru = defineLocale({
     failedLoadSoul: 'Не удалось загрузить SOUL.md',
     failedSaveSoul: 'Не удалось сохранить SOUL.md',
     failedCreate: 'Не удалось создать профиль',
-    failedRename: 'Не удалось переименовать профиль'
+    failedRename: 'Не удалось переименовать профиль',
+    agentBoxHarness: 'Harness',
+    agentBoxVersion: 'Версия',
+    agentBoxCapabilities: 'Возможности',
+    agentBoxAvailable: 'Доступно',
+    agentBoxUnavailable: 'Недоступно',
+    agentBoxMaintenanceUnavailable: 'Управление профилями недоступно',
+    agentBoxMaintenanceUnavailableDesc:
+      'Сервис может перечислять профили, но не объявил создание, изменение, архивирование или управление встроенной памятью.',
+    agentBoxRuntimeConfig: 'Конфигурация запуска',
+    agentBoxRuntimeConfigDesc: 'Значения описывает сервис. Временные изменения задаются рядом с полем ввода.',
+    agentBoxCreateDesc: 'Выберите имя и Harness. Остальные настройки можно завершить позже.',
+    agentBoxHarnessChoice: 'Harness',
+    agentBoxArchive: 'Архивировать',
+    agentBoxArchiveTitle: 'Архивировать профиль?',
+    agentBoxArchiveDesc: name => `Архивировать «${name}»? История существующих Session сохранится.`,
+    agentBoxSaveProfile: 'Сохранить профиль',
+    agentBoxUpdateFailed: 'Не удалось обновить профиль'
   },
   cron: {
     close: 'Закрыть cron',

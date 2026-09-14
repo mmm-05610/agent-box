@@ -1838,6 +1838,22 @@ export interface Translations {
     failedSaveSoul: string
     failedCreate: string
     failedRename: string
+    agentBoxHarness: string
+    agentBoxVersion: string
+    agentBoxCapabilities: string
+    agentBoxAvailable: string
+    agentBoxUnavailable: string
+    agentBoxMaintenanceUnavailable: string
+    agentBoxMaintenanceUnavailableDesc: string
+    agentBoxRuntimeConfig: string
+    agentBoxRuntimeConfigDesc: string
+    agentBoxCreateDesc: string
+    agentBoxHarnessChoice: string
+    agentBoxArchive: string
+    agentBoxArchiveTitle: string
+    agentBoxArchiveDesc: (name: string) => string
+    agentBoxSaveProfile: string
+    agentBoxUpdateFailed: string
   }
 
   cron: {

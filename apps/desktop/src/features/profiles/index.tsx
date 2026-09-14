@@ -1,8 +1,7 @@
 import { useStore } from '@nanostores/react'
-import type * as React from 'react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
-import { getProfileSoul, updateProfileSoul } from '@/api/profiles'
+import { agentBoxRuntimeClient } from '@/api/agentbox-runtime-client'
 import {
   Panel,
   PanelAddButton,
@@ -12,355 +11,449 @@ import {
   PanelHeader,
   PanelList,
   PanelListRow,
-  type PanelMenuItem,
   PanelMeta,
   PanelPill,
   PanelSectionLabel
 } from '@/app/shell/layers/overlays/panel'
-import { refreshProfiles } from '@/application/profile/catalog'
-import { CodeEditor } from '@/components/chat/code-editor'
+import {
+  loadProfileRuntimeDescriptor,
+  type ProfileMaintenancePort
+} from '@/application/profile/profile-maintenance-port'
+import { ensureAgentBoxProfileCatalog } from '@/application/profile/wire-composer-profile'
 import { useRefreshHotkey } from '@/components/hooks/use-refresh-hotkey'
 import { PageLoader } from '@/components/page-loader'
 import { Button } from '@/components/ui/button'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
 import { ProfileGlyph } from '@/components/ui/profile-glyph'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useI18n } from '@/i18n'
-import { displayPath } from '@/lib/display-path'
-import { AlertTriangle, Save } from '@/lib/icons'
-import { resolveProfileColor } from '@/lib/profile-color'
 import { normalize } from '@/lib/text'
-import { notify, notifyError } from '@/store/notifications'
-import { $profileColors, profileLabel } from '@/store/profile'
-import { type ProfileInfo } from '@/types/hermes'
+import { $agentBoxProfiles, $agentBoxService, upsertAgentBoxProfile } from '@/store/agentbox-service'
+import type { ConfigControl, ConfigDescriptor, ProfileRecord } from '@/types/wire/wire-v1'
 
-import { CreateProfileDialog } from './create-profile-dialog'
-import { DeleteProfileDialog } from './delete-profile-dialog'
-import { RenameProfileDialog } from './rename-profile-dialog'
-
-interface ProfilesViewProps {
+export interface ProfilesViewProps {
+  /** INTERNAL_NOT_WIRE; absent in production until a maintenance contract is approved. */
+  maintenance?: ProfileMaintenancePort
   onClose: () => void
 }
 
-export function ProfilesView({ onClose }: ProfilesViewProps) {
+type DescriptorState =
+  | { descriptor: ConfigDescriptor; status: 'ready' }
+  | { detail: string; status: 'unavailable' }
+  | { status: 'loading' }
+
+export function ProfilesView({ maintenance, onClose }: ProfilesViewProps) {
   const { t } = useI18n()
-  const p = t.profiles
-  const [profiles, setProfiles] = useState<null | ProfileInfo[]>(null)
-  const [selectedName, setSelectedName] = useState<null | string>(null)
+  const copy = t.profiles
+  const profiles = useStore($agentBoxProfiles)
+  const service = useStore($agentBoxService)
+  const [selectedId, setSelectedId] = useState<null | string>(null)
   const [query, setQuery] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
-  const [pendingRename, setPendingRename] = useState<null | ProfileInfo>(null)
-  const [pendingDelete, setPendingDelete] = useState<null | ProfileInfo>(null)
+  const [archiveTarget, setArchiveTarget] = useState<ProfileRecord | null>(null)
 
   const refresh = useCallback(async () => {
-    try {
-      const list = await refreshProfiles()
-      setProfiles(list)
-      setSelectedName(current => {
-        if (current && list.some(p => p.name === current)) {
-          return current
-        }
-
-        return list.find(p => p.is_default)?.name ?? list[0]?.name ?? null
-      })
-    } catch (err) {
-      notifyError(err, p.failedLoad)
-    }
-  }, [p])
+    await ensureAgentBoxProfileCatalog(agentBoxRuntimeClient()).catch(() => undefined)
+  }, [])
 
   useRefreshHotkey(refresh)
 
   useEffect(() => {
-    void refresh()
-  }, [refresh])
+    if (service.phase === 'idle') {
+      void refresh()
+    }
+  }, [refresh, service.phase])
 
-  const selected = useMemo(() => {
-    if (!profiles) {
-      return null
+  useEffect(() => {
+    if (selectedId && profiles.some(profile => profile.id === selectedId)) {
+      return
     }
 
-    return profiles.find(p => p.name === selectedName) ?? profiles[0] ?? null
-  }, [profiles, selectedName])
+    setSelectedId(profiles[0]?.id ?? null)
+  }, [profiles, selectedId])
+
+  const selected = profiles.find(profile => profile.id === selectedId) ?? null
 
   const visibleProfiles = useMemo(() => {
-    const q = normalize(query)
+    const normalized = normalize(query)
 
-    if (!profiles || !q) {
-      return profiles ?? []
+    if (!normalized) {
+      return profiles
     }
 
-    return profiles.filter(
-      profile => profile.name.toLowerCase().includes(q) || (profile.model ?? '').toLowerCase().includes(q)
+    return profiles.filter(profile =>
+      [profile.displayName, profile.harness].some(value => value.toLowerCase().includes(normalized))
     )
   }, [profiles, query])
 
-  // The shared Create/Rename dialogs own the createProfile / renameProfile /
-  // updateProfileSoul calls; the panel just selects the resulting profile and
-  // re-pulls the list.
-  const selectAndRefresh = useCallback(
-    async (name: string) => {
-      setSelectedName(name)
-      await refresh()
-    },
-    [refresh]
-  )
+  const loading = profiles.length === 0 && (service.phase === 'idle' || service.phase === 'loading')
 
   return (
-    <Panel closeLabel={p.close} onClose={onClose}>
-      {!profiles ? (
-        <PageLoader label={p.loading} />
+    <Panel closeLabel={copy.close} onClose={onClose}>
+      {loading ? (
+        <PageLoader label={copy.loading} />
       ) : profiles.length === 0 ? (
         <PanelEmpty
           action={
-            <Button onClick={() => setCreateOpen(true)} size="sm">
-              {p.newProfile}
-            </Button>
+            maintenance ? (
+              <Button onClick={() => setCreateOpen(true)} size="sm">
+                {copy.newProfile}
+              </Button>
+            ) : undefined
           }
-          description={p.createDesc}
+          description={service.detail || (maintenance ? copy.agentBoxCreateDesc : copy.agentBoxMaintenanceUnavailableDesc)}
           icon="organization"
-          title={p.noProfiles}
+          title={maintenance ? copy.noProfiles : copy.agentBoxMaintenanceUnavailable}
         />
       ) : (
         <>
-          <PanelHeader subtitle={p.count(profiles.length)} title={p.title} />
+          <PanelHeader subtitle={copy.count(profiles.length)} title={copy.title} />
           <PanelBody>
             <PanelList
               onSearchChange={setQuery}
-              searchLabel={p.search}
-              searchPlaceholder={p.search}
+              searchLabel={copy.search}
+              searchPlaceholder={copy.search}
               searchValue={query}
             >
               {visibleProfiles.map(profile => (
                 <ProfileRow
-                  active={selected?.name === profile.name}
-                  key={profile.name}
-                  menuItems={
-                    profile.is_default
-                      ? // Renaming the default profile sets a presentation-only
-                        // display name (the canonical id stays "default").
-                        [{ icon: 'edit', label: p.renameMenu, onSelect: () => setPendingRename(profile) }]
-                      : [
-                          { icon: 'edit', label: p.renameMenu, onSelect: () => setPendingRename(profile) },
-                          {
-                            icon: 'trash',
-                            label: t.common.delete,
-                            onSelect: () => setPendingDelete(profile),
-                            tone: 'danger'
-                          }
-                        ]
-                  }
-                  onSelect={() => setSelectedName(profile.name)}
+                  active={profile.id === selectedId}
+                  key={profile.id}
+                  onArchive={maintenance ? () => setArchiveTarget(profile) : undefined}
+                  onSelect={() => setSelectedId(profile.id)}
                   profile={profile}
                 />
               ))}
-              <PanelAddButton label={p.newProfile} onClick={() => setCreateOpen(true)} />
+              {maintenance ? <PanelAddButton label={copy.newProfile} onClick={() => setCreateOpen(true)} /> : null}
             </PanelList>
 
             {selected ? (
-              <ProfileDetail key={selected.name} profile={selected} />
+              <ProfileDetail
+                key={selected.id}
+                maintenance={maintenance}
+                profile={selected}
+                serviceOffline={service.phase === 'unavailable'}
+              />
             ) : (
-              <PanelEmpty description={p.selectPrompt} icon="account" />
+              <PanelEmpty description={copy.selectPrompt} icon="account" />
             )}
           </PanelBody>
         </>
       )}
 
-      <RenameProfileDialog
-        currentName={pendingRename?.name ?? ''}
-        isDefault={pendingRename?.is_default ?? false}
-        onClose={() => setPendingRename(null)}
-        onRenamed={selectAndRefresh}
-        open={pendingRename !== null}
-      />
-
-      <CreateProfileDialog
+      <CreateAgentBoxProfileDialog
+        maintenance={maintenance}
         onClose={() => setCreateOpen(false)}
-        onCreated={selectAndRefresh}
+        onCreated={profile => {
+          upsertAgentBoxProfile(profile)
+          setSelectedId(profile.id)
+        }}
         open={createOpen}
-        profiles={profiles ?? []}
       />
 
-      <DeleteProfileDialog
-        onClose={() => setPendingDelete(null)}
-        onDeleted={async () => {
-          setSelectedName(null)
-          await refresh()
+      <ConfirmDialog
+        confirmLabel={copy.agentBoxArchive}
+        description={archiveTarget ? copy.agentBoxArchiveDesc(archiveTarget.displayName) : ''}
+        destructive
+        dismissOnConfirm
+        onClose={() => setArchiveTarget(null)}
+        onConfirm={async () => {
+          if (!archiveTarget || !maintenance) {
+            return
+          }
+
+          upsertAgentBoxProfile(
+            await maintenance.archive({ expectedVersion: archiveTarget.version, profileId: archiveTarget.id })
+          )
         }}
-        open={pendingDelete !== null}
-        profile={pendingDelete}
+        open={archiveTarget !== null}
+        title={copy.agentBoxArchiveTitle}
       />
     </Panel>
   )
 }
 
-function ProfileRow({
-  active,
-  menuItems,
-  onSelect,
-  profile
-}: {
-  active: boolean
-  menuItems: PanelMenuItem[]
-  onSelect: () => void
-  profile: ProfileInfo
-}) {
-  const colors = useStore($profileColors)
+function ProfileRow({ active, onArchive, onSelect, profile }: ProfileRowProps) {
+  const copy = useI18n().t.profiles
 
   return (
     <PanelListRow
       active={active}
-      lead={
-        <ProfileGlyph
-          aria-hidden="true"
-          color={resolveProfileColor(profile.name, colors)}
-          isDefault={profile.is_default}
-          name={profile.name}
-        />
-      }
-      menuItems={menuItems}
-      menuLabel={profileLabel(profile)}
+      lead={<ProfileGlyph aria-hidden="true" color={null} isDefault={false} name={profile.displayName} />}
+      menuItems={onArchive ? [{ icon: 'archive', label: copy.agentBoxArchive, onSelect: onArchive }] : []}
+      menuLabel={profile.displayName}
+      meta={profile.harness}
       onSelect={onSelect}
-      rowKey={profile.name}
-      title={profileLabel(profile)}
+      rowKey={profile.id}
+      title={profile.displayName}
     />
   )
 }
 
-function ProfileDetail({ profile }: { profile: ProfileInfo }) {
-  const { t } = useI18n()
-  const p = t.profiles
-
-  return (
-    <PanelDetail>
-      <header className="space-y-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-[0.95rem] font-semibold tracking-tight text-foreground">{profileLabel(profile)}</h3>
-            {profile.is_default && <PanelPill tone="good">{p.defaultBadge}</PanelPill>}
-            {profile.has_env && <PanelPill tone="muted">.env</PanelPill>}
-          </div>
-          <p
-            className="mt-1 truncate font-mono text-[0.66rem] text-muted-foreground/55"
-            title={displayPath(profile.path)}
-          >
-            {displayPath(profile.path)}
-          </p>
-        </div>
-
-        <PanelMeta
-          rows={[
-            {
-              label: p.modelLabel,
-              value: profile.model ? (
-                <span className="font-mono">
-                  {profile.model}
-                  {profile.provider ? <span className="text-muted-foreground/55"> · {profile.provider}</span> : null}
-                </span>
-              ) : (
-                <span className="text-muted-foreground/55">{p.notSet}</span>
-              )
-            },
-            { label: p.skillsLabel, value: profile.skill_count }
-          ]}
-        />
-      </header>
-
-      <SoulEditor profileName={profile.name} />
-    </PanelDetail>
-  )
+interface ProfileRowProps {
+  active: boolean
+  onArchive?: () => void
+  onSelect: () => void
+  profile: ProfileRecord
 }
 
-function SoulEditor({ profileName }: { profileName: string }) {
+function ProfileDetail({ maintenance, profile, serviceOffline }: ProfileDetailProps) {
   const { t } = useI18n()
-  const p = t.profiles
-  const [content, setContent] = useState('')
-  const [original, setOriginal] = useState('')
-  const [loading, setLoading] = useState(true)
+  const copy = t.profiles
+  const [displayName, setDisplayName] = useState(profile.displayName)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<null | string>(null)
-  const requestRef = useRef<string>(profileName)
+  const [descriptor, setDescriptor] = useState<DescriptorState>({ status: 'loading' })
+  const dirty = displayName.trim() !== profile.displayName
 
-  // eslint-disable-next-line no-restricted-syntax -- legitimate non-atom ref write (see eslint rule comment)
   useEffect(() => {
-    requestRef.current = profileName
-    setLoading(true)
-    setError(null)
-    setContent('')
-    setOriginal('')
+    let current = true
+    setDescriptor({ status: 'loading' })
 
-    void (async () => {
-      try {
-        const soul = await getProfileSoul(profileName)
+    void loadProfileRuntimeDescriptor(agentBoxRuntimeClient(), profile.id).then(
+      result => current && setDescriptor({ descriptor: result, status: 'ready' }),
+      reason =>
+        current &&
+        setDescriptor({
+          detail: reason instanceof Error ? reason.message : copy.agentBoxUnavailable,
+          status: 'unavailable'
+        })
+    )
 
-        if (requestRef.current === profileName) {
-          setContent(soul.content)
-          setOriginal(soul.content)
-        }
-      } catch (err) {
-        if (requestRef.current === profileName) {
-          setError(err instanceof Error ? err.message : p.failedLoadSoul)
-        }
-      } finally {
-        if (requestRef.current === profileName) {
-          setLoading(false)
-        }
-      }
-    })()
-  }, [p, profileName])
+    return () => {
+      current = false
+    }
+  }, [copy.agentBoxUnavailable, profile.id])
 
-  const dirty = content !== original
+  const save = async () => {
+    if (!maintenance || !dirty || !displayName.trim()) {
+      return
+    }
 
-  async function handleSave() {
     setSaving(true)
     setError(null)
 
     try {
-      await updateProfileSoul(profileName, content)
-      setOriginal(content)
-      notify({ kind: 'success', title: p.soulSaved, message: profileName })
-    } catch (err) {
-      setError(err instanceof Error ? err.message : p.failedSaveSoul)
+      const updated = await maintenance.update({
+        displayName: displayName.trim(),
+        expectedVersion: profile.version,
+        profileId: profile.id
+      })
+
+      upsertAgentBoxProfile(updated)
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : copy.agentBoxUpdateFailed)
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <section className="space-y-2">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
+    <PanelDetail className="space-y-5">
+      <header className="space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          {maintenance ? (
+            <Input
+              aria-label={copy.nameLabel}
+              className="max-w-sm text-sm font-semibold"
+              onChange={event => setDisplayName(event.currentTarget.value)}
+              value={displayName}
+            />
+          ) : (
+            <h3 className="text-[0.95rem] font-semibold tracking-tight text-foreground">{profile.displayName}</h3>
+          )}
+          {maintenance && dirty ? (
+            <Button disabled={saving || !displayName.trim()} onClick={() => void save()} size="sm">
+              {saving ? t.common.saving : copy.agentBoxSaveProfile}
+            </Button>
+          ) : null}
+        </div>
+
+        <PanelMeta
+          rows={[
+            { label: copy.agentBoxHarness, value: <PanelPill tone="muted">{profile.harness}</PanelPill> },
+            { label: copy.agentBoxVersion, value: profile.version },
+            {
+              label: copy.agentBoxCapabilities,
+              value: <ProfileCapabilities capabilities={profile.capabilities} />
+            }
+          ]}
+        />
+      </header>
+
+      {error ? <div className="rounded bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</div> : null}
+
+      {!maintenance ? (
+        <div className="rounded-lg border border-border bg-muted/20 px-3 py-2.5">
+          <div className="text-xs font-medium text-foreground">{copy.agentBoxMaintenanceUnavailable}</div>
+          <p className="mt-1 text-xs text-muted-foreground">{copy.agentBoxMaintenanceUnavailableDesc}</p>
+        </div>
+      ) : null}
+
+      {serviceOffline ? (
+        <div className="rounded bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+          {copy.agentBoxUnavailable}
+        </div>
+      ) : null}
+
+      <section className="space-y-2">
         <div>
-          <PanelSectionLabel className="text-[0.7rem] tracking-[0.14em]">SOUL.md</PanelSectionLabel>
-          <p className="text-xs text-muted-foreground">{p.soulDesc}</p>
+          <PanelSectionLabel>{copy.agentBoxRuntimeConfig}</PanelSectionLabel>
+          <p className="text-xs text-muted-foreground">{copy.agentBoxRuntimeConfigDesc}</p>
         </div>
-        {dirty && <span className="text-[0.65rem] text-muted-foreground">{p.unsavedChanges}</span>}
-      </div>
-
-      {loading ? (
-        <PageLoader className="min-h-44" label={p.loadingSoul} />
-      ) : (
-        <div className="min-h-48">
-          <CodeEditor
-            filePath="SOUL.md"
-            framed
-            initialValue={content}
-            key={profileName}
-            onChange={setContent}
-            onSave={() => void handleSave()}
-          />
-        </div>
-      )}
-
-      {error && (
-        <div className="flex items-start gap-2 rounded bg-destructive/10 px-3 py-2 text-xs text-destructive">
-          <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
-          <span>{error}</span>
-        </div>
-      )}
-
-      <div className="flex justify-end">
-        <Button disabled={!dirty || saving || loading} onClick={() => void handleSave()} size="sm">
-          <Save />
-          {saving ? p.saving : p.saveSoul}
-        </Button>
-      </div>
-    </section>
+        {descriptor.status === 'loading' ? (
+          <PageLoader className="min-h-24" label={copy.loading} />
+        ) : descriptor.status === 'unavailable' ? (
+          <div className="text-xs text-muted-foreground">{descriptor.detail}</div>
+        ) : (
+          <RuntimeConfigSummary controls={descriptor.descriptor.controls} />
+        )}
+      </section>
+    </PanelDetail>
   )
+}
+
+interface ProfileDetailProps {
+  maintenance?: ProfileMaintenancePort
+  profile: ProfileRecord
+  serviceOffline: boolean
+}
+
+function ProfileCapabilities({ capabilities }: { capabilities: Record<string, boolean> }) {
+  const copy = useI18n().t.profiles
+  const entries = Object.entries(capabilities)
+
+  if (entries.length === 0) {
+    return <span className="text-muted-foreground">{copy.agentBoxUnavailable}</span>
+  }
+
+  return (
+    <span className="flex flex-wrap gap-1">
+      {entries.map(([id, available]) => (
+        <PanelPill key={id} tone={available ? 'good' : 'muted'}>
+          {id} · {available ? copy.agentBoxAvailable : copy.agentBoxUnavailable}
+        </PanelPill>
+      ))}
+    </span>
+  )
+}
+
+function RuntimeConfigSummary({ controls }: { controls: ConfigControl[] }) {
+  const copy = useI18n().t.profiles
+
+  if (controls.length === 0) {
+    return <div className="text-xs text-muted-foreground">{copy.notSet}</div>
+  }
+
+  return (
+    <div className="divide-y divide-border rounded-lg border border-border">
+      {controls.map(control => (
+        <div className="flex items-start justify-between gap-4 px-3 py-2 text-xs" key={control.controlId}>
+          <span className="font-medium text-foreground">{control.controlId}</span>
+          <span className="max-w-[65%] text-right text-muted-foreground">
+            {control.kind === 'model_slot'
+              ? control.slots
+                  .map(slot =>
+                    slot.model ? `${slot.name}: ${slot.model.providerId}/${slot.model.modelId}` : `${slot.name}: —`
+                  )
+                  .join(' · ')
+              : String(control.currentValue ?? copy.notSet)}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function CreateAgentBoxProfileDialog({ maintenance, onClose, onCreated, open }: CreateProfileDialogProps) {
+  const { t } = useI18n()
+  const copy = t.profiles
+  const [displayName, setDisplayName] = useState('')
+  const [harness, setHarness] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<null | string>(null)
+
+  useEffect(() => {
+    if (!open) {
+      setDisplayName('')
+      setHarness('')
+      setError(null)
+    }
+  }, [open])
+
+  const create = async () => {
+    if (!maintenance || !displayName.trim() || !harness) {
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+
+    try {
+      const created = await maintenance.create({ displayName: displayName.trim(), harness })
+      onCreated(created)
+      onClose()
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : copy.failedCreate)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Dialog onOpenChange={value => !value && !saving && onClose()} open={open && Boolean(maintenance)}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{copy.newProfile}</DialogTitle>
+          <DialogDescription>{copy.agentBoxCreateDesc}</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3 py-1">
+          <label className="block space-y-1 text-xs">
+            <span className="font-medium text-foreground">{copy.nameLabel}</span>
+            <Input onChange={event => setDisplayName(event.currentTarget.value)} value={displayName} />
+          </label>
+          <label className="block space-y-1 text-xs">
+            <span className="font-medium text-foreground">{copy.agentBoxHarnessChoice}</span>
+            <Select onValueChange={setHarness} value={harness}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder={t.common.choose} />
+              </SelectTrigger>
+              <SelectContent>
+                {maintenance?.harnessChoices.map(choice => (
+                  <SelectItem key={choice.id} value={choice.id}>
+                    {choice.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </label>
+          {error ? <div className="rounded bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</div> : null}
+        </div>
+        <DialogFooter>
+          <Button disabled={saving} onClick={onClose} variant="ghost">
+            {t.common.cancel}
+          </Button>
+          <Button disabled={saving || !displayName.trim() || !harness} onClick={() => void create()}>
+            {saving ? t.common.saving : copy.createAction}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+interface CreateProfileDialogProps {
+  maintenance?: ProfileMaintenancePort
+  onClose: () => void
+  onCreated: (profile: ProfileRecord) => void
+  open: boolean
 }

@@ -29,3 +29,24 @@ export function setDraftConfigState(scope: string, state: DraftConfigState): voi
 export function upsertAgentBoxSession(session: SessionRecord): void {
   $agentBoxSessions.set({ ...$agentBoxSessions.get(), [session.id]: session })
 }
+
+export function upsertAgentBoxProfile(profile: ProfileRecord): void {
+  const profiles = $agentBoxProfiles.get()
+  const index = profiles.findIndex(candidate => candidate.id === profile.id)
+
+  if (profile.archivedAt) {
+    $agentBoxProfiles.set(profiles.filter(candidate => candidate.id !== profile.id))
+
+    return
+  }
+
+  if (index < 0) {
+    $agentBoxProfiles.set([...profiles, profile])
+
+    return
+  }
+
+  const next = [...profiles]
+  next[index] = profile
+  $agentBoxProfiles.set(next)
+}

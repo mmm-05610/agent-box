@@ -1,173 +1,142 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import type * as Nanostores from 'nanostores'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { deleteProfile } from '@/api/profiles'
-import { refreshProfiles } from '@/application/profile/catalog'
-import { selectProfile } from '@/application/profile/navigation'
-import { retireLocalProfileGateways } from '@/store/gateway'
-import { setActiveProfile } from '@/store/profile/catalog-state'
-import type { ProfileInfo } from '@/types/hermes'
+import type { ProfileMaintenancePort } from '@/application/profile/profile-maintenance-port'
+import { stubMenuDomApis, stubResizeObserver } from '@/dev/test/jsdom'
+import { $agentBoxProfiles, $agentBoxService } from '@/store/agentbox-service'
+import { asWireId, type ProfileRecord } from '@/types/wire/wire-v1'
 
 import { ProfilesView } from './index'
 
-// These tests pin the invariant this whole area exists to hold: the Manage
-// Profiles page and the sidebar rail share ONE set of profile dialogs, so both
-// "New Profile" entry points render the same modal (SOUL.md included), and
-// deleting the profile the gateway is on re-homes to default instead of
-// stranding it on a dead backend. The drift that motivated the fix got in
-// precisely because nothing rendered this view.
-
-afterEach(cleanup)
-
-// Real i18n (useI18n falls back to English with no provider), so labels are the
-// actual strings — no brittle key snapshot to maintain here.
-
-// CodeEditor is CodeMirror; the detail pane's SOUL editor doesn't matter to
-// these behaviors, so stub it out of the jsdom render.
-vi.mock('@/components/chat/code-editor', () => ({
-  CodeEditor: () => null
+const mocks = vi.hoisted(() => ({
+  ensureCatalog: vi.fn(async () => []),
+  loadDescriptor: vi.fn(async (profileId: string) => ({
+    controls: [
+      {
+        controlId: 'model',
+        currentValue: 'balanced',
+        editable: true,
+        kind: 'enum' as const,
+        values: ['fast', 'balanced']
+      }
+    ],
+    effectTiming: 'next_send' as const,
+    profileId: asWireId(profileId),
+    securityLockedIds: [],
+    workspaceId: null
+  }))
 }))
 
-vi.mock('@/api/profiles', () => ({
-  createProfile: vi.fn(async () => ({ name: 'x', ok: true, path: '/x' })),
-  deleteProfile: vi.fn(async () => ({ ok: true, path: '/x' })),
-  getProfileSoul: vi.fn(async () => ({ content: '', exists: true })),
-  renameProfile: vi.fn(async () => ({ name: 'x', ok: true, path: '/x' })),
-  updateProfileSoul: vi.fn(async () => ({ ok: true }))
+vi.mock('@/api/agentbox-runtime-client', () => ({ agentBoxRuntimeClient: () => ({}) }))
+vi.mock('@/application/profile/profile-maintenance-port', () => ({
+  loadProfileRuntimeDescriptor: (_client: unknown, profileId: string) => mocks.loadDescriptor(profileId)
+}))
+vi.mock('@/application/profile/wire-composer-profile', () => ({
+  ensureAgentBoxProfileCatalog: () => mocks.ensureCatalog()
 }))
 
-vi.mock('@/store/notifications', () => ({
-  notify: vi.fn(),
-  notifyError: vi.fn()
-}))
+stubMenuDomApis()
+stubResizeObserver()
 
-vi.mock('@/store/gateway', () => ({
-  retireLocalProfileGateways: vi.fn()
-}))
-
-const { $activeGatewayProfile: activeGateway, $profileColors } = vi.hoisted(() => {
-  const { atom } = require('nanostores') as typeof Nanostores
-
-  return {
-    $activeGatewayProfile: atom<string>('default'),
-    $profileColors: atom<Record<string, string>>({})
-  }
+const profile = (overrides: Partial<ProfileRecord> = {}): ProfileRecord => ({
+  archivedAt: null,
+  capabilities: { native_memory: true, resume: false },
+  createdAt: '2026-09-14T00:00:00.000Z',
+  displayName: 'Reviewer',
+  harness: 'opaque-alpha',
+  id: asWireId('profile-reviewer'),
+  updatedAt: '2026-09-14T00:00:00.000Z',
+  version: 3,
+  ...overrides
 })
 
-vi.mock('@/store/profile/appearance-preferences', () => ({ $profileColors }))
-vi.mock('@/store/profile/catalog-state', () => ({ setActiveProfile: vi.fn() }))
-vi.mock('@/lib/profile-identity', () => ({
-  normalizeProfileKey: (name: null | string | undefined) => (name ?? '').trim() || 'default',
-  profileLabel: (profile: { display_name?: string; name: string }) =>
-    (profile.display_name ?? '').trim() || profile.name
-}))
-vi.mock('@/store/profile/runtime-route-state', () => ({ $activeGatewayProfile: activeGateway }))
-vi.mock('@/application/profile/catalog', () => ({ refreshProfiles: vi.fn(async () => [] as ProfileInfo[]) }))
-vi.mock('@/application/profile/navigation', () => ({ selectProfile: vi.fn() }))
+const maintenancePort = (overrides: Partial<ProfileMaintenancePort> = {}): ProfileMaintenancePort => ({
+  archive: vi.fn(async intent =>
+    profile({ archivedAt: '2026-09-14T01:00:00.000Z', id: asWireId(intent.profileId), version: 4 })
+  ),
+  create: vi.fn(async intent =>
+    profile({ displayName: intent.displayName, harness: intent.harness, id: asWireId('profile-created'), version: 1 })
+  ),
+  harnessChoices: [
+    { id: 'opaque-alpha', label: 'Alpha toolbench' },
+    { id: 'opaque-beta', label: 'Beta toolbench' }
+  ],
+  update: vi.fn(async intent => profile({ displayName: intent.displayName, version: intent.expectedVersion + 1 })),
+  ...overrides
+})
 
-// The one non-default profile these tests act on. Its name doubles as the row's
-// accessible name, so the delete helper queries by it rather than a literal.
-const NAMED_PROFILE = 'work'
-
-function makeProfile(name: string, isDefault = false): ProfileInfo {
-  return {
-    has_env: false,
-    is_default: isDefault,
-    model: null,
-    name,
-    path: `/home/user/.hermes/profiles/${name}`,
-    provider: null,
-    skill_count: 0
-  }
+function realClick(element: HTMLElement): void {
+  fireEvent.pointerDown(element, { button: 0, pointerType: 'mouse' })
+  fireEvent.pointerUp(element, { button: 0, pointerType: 'mouse' })
+  fireEvent.click(element)
 }
 
-// Radix's trigger opens on the pointerdown/up pair, not the synthetic click
-// alone — fire the full sequence a real click produces.
-function realClick(el: HTMLElement) {
-  fireEvent.pointerDown(el, { button: 0, pointerType: 'mouse' })
-  fireEvent.pointerUp(el, { button: 0, pointerType: 'mouse' })
-  fireEvent.click(el)
-}
+afterEach(() => {
+  cleanup()
+  $agentBoxProfiles.set([])
+  $agentBoxService.set({ detail: null, phase: 'idle' })
+  mocks.ensureCatalog.mockClear()
+  mocks.loadDescriptor.mockClear()
+})
 
-// ProfilesView loads its list in a mount effect (refreshProfiles → setProfiles),
-// so the first paint is the loader and the rows commit a microtask later. Flush
-// that inside act() so the rows exist before anything queries them, and so the
-// mount setState isn't left unwrapped.
-async function renderProfilesView() {
-  await act(async () => {
+describe('AgentBox ProfilesView', () => {
+  it('renders the neutral service projection; Harness is a badge and capabilities stay service-declared', async () => {
+    $agentBoxProfiles.set([profile()])
+    $agentBoxService.set({ detail: null, phase: 'ready' })
+
     render(<ProfilesView onClose={vi.fn()} />)
-  })
-}
 
-// PanelListRow labels BOTH the row's select target and its kebab with the
-// profile name (`menuLabel={profile.name}`), so the name alone matches two
-// buttons. Only the kebab is a menu trigger, so `expanded` disambiguates.
-function findRowMenu(profileName: string) {
-  return screen.findByRole('button', { expanded: false, name: profileName })
-}
-
-// Open the (only non-default) row's actions menu → Delete → confirm. The
-// confirm click kicks off an async chain (deleteProfile → onDeleted refresh →
-// setProfiles, plus the re-home writes), so settle it inside act() to flush
-// those updates deterministically instead of leaking them past the assertions.
-async function deleteTheNamedProfile() {
-  realClick(await findRowMenu(NAMED_PROFILE))
-  fireEvent.click(await screen.findByRole('menuitem', { name: /delete/i }))
-  const confirm = await screen.findByRole('button', { name: 'Delete' })
-  await act(async () => {
-    fireEvent.click(confirm)
-  })
-}
-
-describe('ProfilesView', () => {
-  it('opens the shared create dialog with the SOUL.md field (parity with the rail)', async () => {
-    vi.mocked(refreshProfiles).mockResolvedValue([])
-
-    await renderProfilesView()
-
-    realClick(await screen.findByRole('button', { name: 'New profile' }))
-
-    const soul = await screen.findByLabelText(/SOUL\.md/i)
-
-    expect(soul.tagName).toBe('TEXTAREA')
-    expect(soul.getAttribute('id')).toBe('new-profile-soul')
+    expect(await screen.findByRole('heading', { name: 'Reviewer' })).toBeTruthy()
+    expect(screen.getAllByText('opaque-alpha').length).toBeGreaterThan(0)
+    expect(screen.getByText('native_memory · Available')).toBeTruthy()
+    expect(screen.getByText('resume · Unavailable')).toBeTruthy()
+    expect(screen.getByText('Profile maintenance is unavailable')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'New profile' })).toBeNull()
+    expect(await screen.findByText('balanced')).toBeTruthy()
   })
 
-  it('re-homes to default when the active profile is deleted', async () => {
-    const deleteProfileMock = vi.mocked(deleteProfile)
-    const retireLocalProfileGatewaysMock = vi.mocked(retireLocalProfileGateways)
+  it('keeps the last projection when editing fails instead of reporting local success', async () => {
+    const update = vi.fn(async () => {
+      throw new Error('CONFLICT_VERSION')
+    })
 
-    deleteProfileMock.mockClear()
-    retireLocalProfileGatewaysMock.mockClear()
-    vi.mocked(refreshProfiles).mockResolvedValue([makeProfile('default', true), makeProfile(NAMED_PROFILE)])
-    activeGateway.set(NAMED_PROFILE)
+    const maintenance = maintenancePort({ update })
+    $agentBoxProfiles.set([profile()])
+    $agentBoxService.set({ detail: null, phase: 'ready' })
 
-    await renderProfilesView()
-    await deleteTheNamedProfile()
+    render(<ProfilesView maintenance={maintenance} onClose={vi.fn()} />)
 
-    await waitFor(() => expect(deleteProfile).toHaveBeenCalledWith(NAMED_PROFILE))
-    expect(retireLocalProfileGateways).toHaveBeenCalledWith(NAMED_PROFILE)
-    expect(retireLocalProfileGatewaysMock.mock.invocationCallOrder[0]).toBeLessThan(
-      deleteProfileMock.mock.invocationCallOrder[0]
-    )
-    await waitFor(() => expect(selectProfile).toHaveBeenCalledWith('default'))
-    expect(setActiveProfile).toHaveBeenCalledWith('default')
+    const name = await screen.findByRole('textbox', { name: 'Name' })
+    fireEvent.change(name, { target: { value: 'New name' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save profile' }))
+
+    expect(await screen.findByText('CONFLICT_VERSION')).toBeTruthy()
+    expect($agentBoxProfiles.get()[0]?.displayName).toBe('Reviewer')
+    expect(update).toHaveBeenCalledWith({
+      displayName: 'New name',
+      expectedVersion: 3,
+      profileId: 'profile-reviewer'
+    })
   })
 
-  it('leaves the active profile alone when a different profile is deleted', async () => {
-    vi.mocked(selectProfile).mockClear()
-    vi.mocked(setActiveProfile).mockClear()
-    vi.mocked(refreshProfiles).mockResolvedValue([makeProfile('default', true), makeProfile(NAMED_PROFILE)])
-    activeGateway.set('default')
+  it('creates through the injected maintenance port and adopts only its returned record', async () => {
+    const maintenance = maintenancePort()
+    $agentBoxService.set({ detail: null, phase: 'ready' })
 
-    await renderProfilesView()
-    await deleteTheNamedProfile()
+    render(<ProfilesView maintenance={maintenance} onClose={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'New profile' }))
+    fireEvent.change(await screen.findByRole('textbox'), { target: { value: 'Builder' } })
 
-    await waitFor(() => expect(deleteProfile).toHaveBeenCalledWith(NAMED_PROFILE))
-    // The dialog closes once the delete settles; a non-active delete must not re-home.
-    await waitFor(() => expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull())
-    expect(selectProfile).not.toHaveBeenCalled()
-    expect(setActiveProfile).not.toHaveBeenCalled()
+    realClick(screen.getByRole('combobox'))
+    fireEvent.click(await screen.findByRole('option', { name: 'Beta toolbench' }))
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Create profile' }))
+    })
+
+    await waitFor(() => expect(maintenance.create).toHaveBeenCalledWith({ displayName: 'Builder', harness: 'opaque-beta' }))
+    expect($agentBoxProfiles.get()).toEqual([
+      expect.objectContaining({ displayName: 'Builder', harness: 'opaque-beta', id: 'profile-created' })
+    ])
   })
 })

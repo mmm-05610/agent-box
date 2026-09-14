@@ -1710,7 +1710,24 @@ export const ja = defineLocale({
     failedLoadSoul: 'SOUL.md の読み込みに失敗しました',
     failedSaveSoul: 'SOUL.md の保存に失敗しました',
     failedCreate: 'プロファイルの作成に失敗しました',
-    failedRename: 'プロファイルの名前変更に失敗しました'
+    failedRename: 'プロファイルの名前変更に失敗しました',
+    agentBoxHarness: 'Harness',
+    agentBoxVersion: 'バージョン',
+    agentBoxCapabilities: '機能',
+    agentBoxAvailable: '利用可能',
+    agentBoxUnavailable: '利用不可',
+    agentBoxMaintenanceUnavailable: 'プロファイルの管理を利用できません',
+    agentBoxMaintenanceUnavailableDesc:
+      'サービスはプロファイルを一覧できますが、作成、編集、アーカイブ、ネイティブメモリ操作を宣言していません。',
+    agentBoxRuntimeConfig: '実行時設定',
+    agentBoxRuntimeConfigDesc: 'サービスが記述した値です。一時的な変更は入力欄の横で行います。',
+    agentBoxCreateDesc: '名前と Harness を選択します。残りの設定は後で完了できます。',
+    agentBoxHarnessChoice: 'Harness',
+    agentBoxArchive: 'アーカイブ',
+    agentBoxArchiveTitle: 'プロファイルをアーカイブしますか？',
+    agentBoxArchiveDesc: name => `「${name}」をアーカイブしますか？既存の Session 履歴は保持されます。`,
+    agentBoxSaveProfile: 'プロファイルを保存',
+    agentBoxUpdateFailed: 'プロファイルを更新できませんでした'
   },
 
   cron: {
