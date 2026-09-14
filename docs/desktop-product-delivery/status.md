@@ -3,54 +3,54 @@
 调度：ACTIVE_EXECUTOR_INCREMENT_AVAILABLE。本文件是产品工作树的执行事实；
 发布源初始表不代表实时状态。消费文档更新时保留执行状态行，只合入规则/新订单。
 
-## 执行快照（handoff-policy 每阶段必填）— 交接记录
+## 执行快照（handoff-policy 每阶段必填）— 接管施工中
 
-- updated_at: 2026-09-14 04:10 (+08:00)
-- 执行者: 前端产品 goal（本会话）；**交回原因：用户指示暂停新增施工并交接写权**
+- updated_at: 2026-09-14 09:34 (+08:00)
+- 执行者: Codex 前端产品 goal（接力会话）；**已从暂停的 Zcode 执行者接管**
 - 工作树/分支: /home/maoqh/projects/agent-box-desktop-next-wsl-round1 @ feature/agentbox-desktop-product
-- 代码检查点（已提交 HEAD）: `3a25edc`（P02A slice 2：退役全局 Artifacts 页）
+- 接管核验: 用户指定交接 HEAD `5c0fbfe` 与实际 HEAD
+  `5c0fbfe119de5c2fe979e3964ad59223767398d7` 一致；接管前 `writer_lease=RELEASED`；
+  未发现该工作树、Windows 构建树的 Electron/Vite/Vitest/Playwright/验收驱动进程；
+  dirty 集合仅为下列 4 项已授权交接改动。发布源规则文件与本执行树逐文件 SHA-256 一致，
+  保留本文件实时进度，不复制发布源初始状态。
+- 代码检查点: P02A slice 3 收口（本次检查点提交；提交前基线 `5c0fbfe`）
   链: ebb1233（P00）→ 8d4b3df/47b5b47/dbb902f（P01 代码与几何修复）→ 26b32fc（P01 GREEN 证据）
   → 468e6ac/d7e9a57（发布源 d3c0196+ffbcfaf 导入）→ 893d560（P07 检查点2 wire-v1）
   → 957a523（P02A 盘点）→ 07f5386（P02A slice 1：失败面非阻塞）→ 3a25edc（P02A slice 2）
 - 已消费发布文档提交: 86d5a7b、61c7ff7、d3c0196、ffbcfaf
-- **未提交改动（原样保留，未 reset/stash/clean/删除）**:
-  1. `M apps/desktop/src/components/boot-failure-overlay.tsx` — 抑制条件收紧
-     （只在 onboarding 真的拥有屏幕时让位）+ 新增稳定钩子 `data-boot-failure-panel` /
-     `data-boot-failure-dismiss`（供真机驱动断言，不依赖本地化文案）
-  2. `M apps/desktop/src/components/boot-failure-overlay.test.tsx` — 新增 1 条反例：
-     就绪检查未决（configured===null）时失败面板仍须可见
-  3. `M apps/desktop/src/components/onboarding/index.tsx` — 首启门：就绪检查未决不再全屏遮罩
-     （产品决定 §1：无服务也能用壳；AGENTS.md 的 HERMES_EXECUTABLE_NOT_FOUND 不改写为假连接）
-  4. `?? apps/desktop/e2e/boot-nonblocking-p02a-driver.mjs` — P02A 真机驱动（新增）
-  5. `?? docs/validation/windows-acceptance-p02a/` — p02a4 真机证据（4 截图 + log）
-  6. `M evidence/P02.md` — 切片记录（本文件同批提交）
-- 当前阶段: P00 GREEN；P01 GREEN；P07 检查点 1–2 完成；**P02A 切片 1–2 已提交，
-  切片 3 未提交（代码就绪、真机重跑未做）**
+- 当前检查点改动: 接管的 4 项原样续作；另统一 onboarding 实际屏幕所有权，修复迟到进度
+  复活 boot 失败终态，补装配反例；保留 p02a6/p02a7 失败史与 p02a8 通过证据。
+- 当前阶段: P00 GREEN；P01 GREEN；P07 检查点 1–2 完成；**P02A GREEN，继续 P02B**
 - 完成范围: P00；P01 全部返修（真机 27 PASS）；P07 检查点 1（语义映射）、检查点 2
   （wire-v1 PROPOSED_WIRE：17 方法 + 12 项 schema 测试 + JSON Schema 工件）；
-  P02A slice 1（失败面非阻塞+可关闭）、slice 2（Artifacts 页退役）
-- 下一项（接手者第 1 件）: 同步 `boot-failure-overlay.tsx` 与
-  `e2e/boot-nonblocking-p02a-driver.mjs` 到 Windows 构建树 → `npm run build` →
-  `node e2e\boot-nonblocking-p02a-driver.mjs <sandbox> <out>` 重跑，预期 9 PASS
-  （无后端时 healthy 探针如实 PENDING）→ 与本切片一并提交 P02A 检查点
-- 阻断: 无真实阻断。剩余 P02A/P02B–D（上层产品）、P07 检查点 3（§9 fixture 矩阵）、
+  P02A（失败面非阻塞+可关闭、Artifacts 页退役、失败终态竞态修复与真机门）
+- 下一项: P02B Workspace/Session 纵向切片；并行消费 P07 后端 wire 机械反馈。
+- 阻断: 无真实阻断。剩余 P02B–D（上层产品）、P07 检查点 3（§9 fixture 矩阵）、
   P03/P04/P05/P06 均未开工或待续
 
 - contract_semantics_version: core-semantics/1（APPROVED_SEMANTICS，2026-09-14）
 - wire_version/schema_digest: wire-v1 PROPOSED_WIRE；权威 sha256:8e20ccd3e0718214，
   工件 sha256:cd80103b3effbc4e（contracts/wire-v1/README.md 登记）；后端 wire-review.md
-  尚未出现（无答复≠拒绝）
+  已出现但首段仍基于“P07 候选未产出”的旧时点，正在按实际双方文件机械核对
 - 合同测试: 12 项 schema/信封测试通过（src/types/wire/wire-v1.test.ts）；
   覆盖缺口 = core v1 §9 九组场景的完整 fixture 矩阵（P07 检查点 3，未开工）
-- UI_READY: 侧栏工作区列表（36R+P01）真机全绿；P02A 失败态非阻塞真机 7/9（2 项断言收尾见下）
+- UI_READY: 侧栏工作区列表（36R+P01）真机全绿；P02A 真机 8 PASS / 0 FAIL / 1 PENDING
 - CONTRACT_CLIENT_READY: 否（wire 未锁定）
 - REAL_FLOW_VERIFIED: 否（无真实 Server/Harness 链路证据）
 
-- frontend_implementation: PARTIAL（P02A 切片 3 未提交/未重跑；B/C/D 未开工）
-- writer_lease: **RELEASED**（本会话已停止全部写入；构建/驱动进程已确认退出；
-  无残留子代理。接管者与时间：待新 Codex 前端会话在原工作树接力时填写）
+- frontend_implementation: PARTIAL（P02A GREEN；B/C/D 待施工）
+- writer_lease: **ACTIVE — Codex frontend goal**（2026-09-14 09:20 +08:00 接管；
+  后端工作树只读，Windows 构建/验收资源串行）
 
-## 测试与基线（本轮实跑，交接时点）
+## 测试与基线（接力会话实跑）
+
+- 本地：P02A 相关组件/连接面 3 files / 22 tests passed；合并面 3 files / 31 tests passed；
+  改动文件 ESLint 0 error / 0 warning；三项目 typecheck 通过；`git diff --check` 干净。
+- Windows P02A：`docs/validation/windows-acceptance-p02a/runs/` 保留 p02a6/p02a7 两轮
+  7 PASS / 1 FAIL / 1 PENDING 诊断证据；p02a8 最终 **8 PASS / 0 FAIL / 1 PENDING，exit 0**。
+  PENDING 为无可达后端时的健康启动探针；所有失败态非阻塞必需门已执行并 PASS。
+
+## 测试与基线（上一执行者交接时点，历史）
 
 - 本地（WSL，`3a25edc` + 未提交改动）:
   - `npx vitest run --project ui src/components/boot-failure-overlay.test.tsx
@@ -88,7 +88,7 @@ wire-review.md通道自39阶段协调。执行者下个检查点消费这些规�
 | --- | --- | --- |
 | P00 接管与基线 | GREEN | 旧Desktop会话无并发写入（evidence/P00.md） |
 | P01 36R收口 | GREEN | 真机 27 PASS/2 SKIP/1 PENDING（evidence/P01.md；本地打开 PENDING 转 P05） |
-| P02 上层产品 | IN_PROGRESS（P02A 切片 1–2 已提交，切片 3 未提交） | P01 已满足 |
+| P02 上层产品 | IN_PROGRESS（P02A GREEN；P02B–D 待施工） | P01 已满足 |
 | P03 用例状态与API | READY_AFTER_P02 | P02 |
 | P04 宿主与遗留退役 | READY_AFTER_P03 | P03 |
 | P05 正式合同接入 | SEMANTICS_AVAILABLE_WIRE_PENDING | core-semantics/1已批准；P07编制；真实服务证据另计 |

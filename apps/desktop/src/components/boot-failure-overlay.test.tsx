@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { $bootFailureDismissed, $desktopBoot, dismissBootFailure } from '@/store/boot'
+import { $bootFailureDismissed, $desktopBoot, applyDesktopBootProgress, dismissBootFailure } from '@/store/boot'
 import { $desktopOnboarding } from '@/store/onboarding'
 
 import { BootFailureOverlay } from './boot-failure-overlay'
@@ -241,6 +241,85 @@ describe('BootFailureOverlay', () => {
   // with the backend down, the panel can be dismissed, and a DIFFERENT
   // failure re-arms it. The old full-screen mask (data-glass-opaque over
   // fixed inset-0) must be gone.
+  // P02A — a dead backend with a FRESH profile must still report the failure:
+  // the setup surface yields an unresolved readiness check, so it must not
+  // suppress the only honest state on screen.
+  it('shows the failure panel while the setup readiness check is unresolved', () => {
+    failBoot()
+    $desktopOnboarding.set({
+      configured: null,
+      firstRunSkipped: false,
+      flow: { currentModel: 'mock-model', label: 'Mock', providerSlug: 'mock', saving: false, status: 'confirming_model' },
+      manual: false,
+      mode: 'oauth',
+      providers: null,
+      reason: null,
+      requested: false,
+      localEndpoint: false
+    })
+
+    render(<BootFailureOverlay />)
+
+    expect(screen.getByRole('button', { name: /retry/i })).toBeTruthy()
+  })
+
+  it('keeps the failure terminal when an older running progress event arrives late', () => {
+    failBoot()
+    applyDesktopBootProgress({
+      error: null,
+      fakeMode: false,
+      message: 'Resolving Hermes backend',
+      phase: 'backend.resolve',
+      progress: 8,
+      running: true,
+      timestamp: Date.now() + 1
+    })
+
+    render(<BootFailureOverlay />)
+
+    expect($desktopBoot.get().running).toBe(false)
+    expect($desktopBoot.get().error).toBe('Could not connect to Hermes gateway')
+    expect(screen.getByRole('button', { name: /retry/i })).toBeTruthy()
+  })
+
+  it('shows the failure panel when onboarding cannot own the screen without an open gateway', () => {
+    failBoot()
+    $desktopOnboarding.set({
+      configured: false,
+      firstRunSkipped: false,
+      flow: { currentModel: 'mock-model', label: 'Mock', providerSlug: 'mock', saving: false, status: 'confirming_model' },
+      manual: false,
+      mode: 'oauth',
+      providers: null,
+      reason: null,
+      requested: false,
+      localEndpoint: false
+    })
+
+    render(<BootFailureOverlay onboardingEnabled={false} />)
+
+    expect(screen.getByRole('button', { name: /retry/i })).toBeTruthy()
+  })
+
+  it('yields to an active onboarding flow only when onboarding really owns the screen', () => {
+    failBoot()
+    $desktopOnboarding.set({
+      configured: false,
+      firstRunSkipped: false,
+      flow: { currentModel: 'mock-model', label: 'Mock', providerSlug: 'mock', saving: false, status: 'confirming_model' },
+      manual: false,
+      mode: 'oauth',
+      providers: null,
+      reason: null,
+      requested: false,
+      localEndpoint: false
+    })
+
+    render(<BootFailureOverlay onboardingEnabled />)
+
+    expect(screen.queryByRole('button', { name: /retry/i })).toBeNull()
+  })
+
   describe('non-blocking failure surface (P02A)', () => {
     it('renders as a floating panel without the full-screen glass mask', () => {
       failBoot()

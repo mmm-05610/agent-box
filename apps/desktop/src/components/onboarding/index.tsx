@@ -20,6 +20,7 @@ import {
   DEFAULT_MANUAL_ONBOARDING_REASON,
   DEFAULT_ONBOARDING_REASON,
   dismissFirstRunOnboarding,
+  doesDesktopOnboardingOwnScreen,
   type OnboardingContext,
   peekPendingProviderOAuth,
   refreshOnboarding,
@@ -300,11 +301,22 @@ export function DesktopOnboardingOverlay({
   // In manual mode the app is already configured, so the flow is "ready"
   // immediately — no runtime gate needed. Otherwise wait for the readiness
   // check (configured === false) before showing the picker.
-  const ready = onboarding.manual || (enabled && onboarding.configured === false)
+  const ready = doesDesktopOnboardingOwnScreen(onboarding, enabled)
+
+  // P02A: an UNRESOLVED readiness check must not mask the product. With the
+  // backend down `configured` never resolves, and a full-screen setup gate
+  // would hide a perfectly usable shell behind a question nobody can answer.
+  // Product decision §1: startup, service connection and tool availability
+  // are different facts. Only a CONFIRMED "setup is due" earns the gate; the
+  // no-runtime / backend-down cases show the shell plus an honest state.
+  if (!ready) {
+    return null
+  }
+
   const showPicker = flow.status === 'idle' || flow.status === 'success'
   // The final "you're in" screen drops the card chrome and floats centered on
   // the surface — same bare, cinematic treatment as the connecting overlay.
-  const bare = ready && !showPicker && flow.status === 'confirming_model'
+  const bare = !showPicker && flow.status === 'confirming_model'
 
   return (
     <div

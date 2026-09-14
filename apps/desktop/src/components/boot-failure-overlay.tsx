@@ -11,7 +11,7 @@ import { openExternalLink } from '@/lib/external-link'
 import { ChevronLeft, ExternalLink, FileText, Loader2, LogIn, RefreshCw, SlidersHorizontal, Wrench, X } from '@/lib/icons'
 import { $bootFailureDismissed, $desktopBoot, dismissBootFailure, isBootFailureDismissed } from '@/store/boot'
 import { notify, notifyError } from '@/store/notifications'
-import { $desktopOnboarding } from '@/store/onboarding'
+import { $desktopOnboarding, doesDesktopOnboardingOwnScreen } from '@/store/onboarding'
 
 import type { RemoteReauth } from './boot-failure-reauth'
 import {
@@ -28,6 +28,8 @@ interface BootFailureOverlayProps {
    *  the overlay never imports an app screen and the code-split stays put.
    *  Absent — or not yet resolved — the slot renders nothing. */
   GatewaySettingsView?: ComponentType<{ embedded?: boolean }>
+  /** Matches DesktopOnboardingOverlay.enabled at the composition seam. */
+  onboardingEnabled?: boolean
 }
 
 type BusyAction = 'local' | 'repair' | 'retry' | 'signin' | null
@@ -44,7 +46,7 @@ type RecoveryView = 'connect' | 'recovery'
 // exited during startup, bootstrap latched, …). Without this the app shell
 // renders dead — "gateway offline", no composer, only a toast — with no way
 // to retry, repair the install, switch the gateway, or find the logs.
-export function BootFailureOverlay({ GatewaySettingsView }: BootFailureOverlayProps) {
+export function BootFailureOverlay({ GatewaySettingsView, onboardingEnabled = false }: BootFailureOverlayProps) {
   const boot = useStore($desktopBoot)
   const dismissed = useStore($bootFailureDismissed)
   const onboarding = useStore($desktopOnboarding)
@@ -68,10 +70,17 @@ export function BootFailureOverlay({ GatewaySettingsView }: BootFailureOverlayPr
   const visible =
     boot.error !== null && !boot.running && !isBootFailureDismissed(boot.error, dismissed)
 
-  // While first-run onboarding owns the picker/flow we let it surface its own
-  // progress; the recovery overlay is for hard failures, which it covers via a
-  // higher z-index regardless of onboarding state.
-  const suppressed = onboarding.flow.status !== 'idle' && onboarding.flow.status !== 'error'
+  // While first-run onboarding ACTIVELY owns a flow we let it surface its own
+  // progress. P02A tightened this: the setup surface now yields an unresolved
+  // readiness check (no mask, no question nobody can answer), so suppression
+  // must require the setup flow to really be running against a confirmed
+  // first-run — otherwise a dead backend with a fresh profile would show no
+  // honest state at all.
+  const suppressed =
+    doesDesktopOnboardingOwnScreen(onboarding, onboardingEnabled) &&
+    onboarding.flow.status !== 'idle' &&
+    onboarding.flow.status !== 'error' &&
+    onboarding.flow.status !== 'success'
 
   useEffect(() => {
     if (!visible) {
@@ -383,7 +392,10 @@ export function BootFailureOverlay({ GatewaySettingsView }: BootFailureOverlayPr
 
   return (
     <div className="pointer-events-none fixed inset-0 z-(--z-setup) flex items-end justify-end p-4">
-      <div className="pointer-events-auto w-full max-w-[40rem] overflow-hidden rounded-xl border border-(--stroke-nous) bg-(--ui-chat-bubble-background) shadow-nous">
+      <div
+        className="pointer-events-auto w-full max-w-[40rem] overflow-hidden rounded-xl border border-(--stroke-nous) bg-(--ui-chat-bubble-background) shadow-nous"
+        data-boot-failure-panel=""
+      >
         <div className="flex items-start gap-3 px-5 py-4">
           <ErrorIcon className="mt-0.5" size="1.25rem" />
           <div className="min-w-0 flex-1">
@@ -409,6 +421,7 @@ export function BootFailureOverlay({ GatewaySettingsView }: BootFailureOverlayPr
           <button
             aria-label={copy.dismiss}
             className="grid size-6 shrink-0 place-items-center rounded-sm text-(--ui-text-tertiary) transition-colors hover:bg-(--ui-control-hover-background) hover:text-foreground"
+            data-boot-failure-dismiss=""
             onClick={() => boot.error && dismissBootFailure(boot.error)}
             title={copy.dismiss}
             type="button"

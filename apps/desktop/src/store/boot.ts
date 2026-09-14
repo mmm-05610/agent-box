@@ -30,6 +30,17 @@ function clampProgress(value: number) {
 
 export function applyDesktopBootProgress(progress: DesktopBootProgress) {
   const current = $desktopBoot.get()
+
+  // failDesktopBoot() is terminal for this boot cycle. Main-process progress
+  // can arrive after the renderer has classified the failure; retaining only
+  // current.error while accepting `running: true` produces an impossible
+  // state (failed and running) and hides the recovery panel. A deliberate
+  // retry/success uses resumeDesktopBootForRetry()/completeDesktopBoot(), so a
+  // generic error-free progress event has no authority to revive this cycle.
+  if (current.error !== null && !current.running && progress.error === null) {
+    return
+  }
+
   const nextProgress = clampProgress(progress.progress)
   const mergedProgress = progress.running ? Math.max(current.progress, nextProgress) : nextProgress
 

@@ -151,6 +151,16 @@ const INITIAL: DesktopOnboardingState = {
 
 export const $desktopOnboarding = atom<DesktopOnboardingState>(INITIAL)
 
+/**
+ * Single ownership rule for the full-screen onboarding surface. The renderer
+ * must not let another overlay yield merely because onboarding has progressed
+ * internally: automatic onboarding also needs an open gateway, and a skipped
+ * first run owns no screen at all.
+ */
+export function doesDesktopOnboardingOwnScreen(state: DesktopOnboardingState, enabled: boolean): boolean {
+  return state.manual || (!state.firstRunSkipped && enabled && state.configured === false)
+}
+
 let flowGeneration = 0
 let flowProfile: string | undefined
 let pollTimer: number | null = null

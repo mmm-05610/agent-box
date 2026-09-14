@@ -1146,7 +1146,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
       />
       <UpdatesOverlay />
       <GatewayConnectingOverlay />
-      <BootFailureOverlay GatewaySettingsView={GatewaySettingsView} />
+      <BootFailureOverlay GatewaySettingsView={GatewaySettingsView} onboardingEnabled={gatewayState === 'open'} />
       <CommandPalette />
       <PluginInstallModal />
       <PetGenerateOverlay />

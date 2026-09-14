@@ -1,0 +1,56 @@
+{
+  "allOk": true,
+  "counts": {
+    "PASS": 8,
+    "FAIL": 0,
+    "SKIP": 0,
+    "PENDING": 1
+  },
+  "steps": [
+    {
+      "step": "driver target",
+      "status": "PASS",
+      "detail": "electron.exe=C:\\Users\\maoqh\\agentbox-wsl-round1\\apps\\desktop\\node_modules\\electron\\dist\\electron.exe; dist=true"
+    },
+    {
+      "step": "failure state shows the recovery panel (not a dead shell)",
+      "status": "PASS",
+      "detail": "panel visible=true; buttons in panel=5 (must be >=2); dismiss present=true; panel text=\"Hermes couldn't startThe background gateway didn't come up. Try one of the recovery steps below. Nothing here deletes yo\""
+    },
+    {
+      "step": "the failure surface is not a full-screen glass mask",
+      "status": "PASS",
+      "detail": "largest [data-glass-opaque] covers 0.0% of the viewport (must be <90%); 0 such node(s); offender=none; topAtCenter=<div class=\"size-full overflow-x-hidden overflow-y-auto overscroll-contain\">; sidebarNodes=1; inputs=[checkbox:]; body=\"@keyframes hermes-zone-fade { from { opacity: 0.001 } to { opacity: 1 } } [data-tree-group] :is(aside, [data-slot=sidebar]) { border-left-width: 0; border-right-width: 0; box-shadow: none; } /* Old-shell titlebar BANDS (chat's session heade\""
+    },
+    {
+      "step": "the shell stays operable with the backend down (sidebar search takes input)",
+      "status": "PASS",
+      "detail": "hash  → #/settings (expected #/settings...)"
+    },
+    {
+      "step": "dismissing the failure clears the panel",
+      "status": "PASS",
+      "detail": "failure panels after dismissal=0 (must be 0)"
+    },
+    {
+      "step": "the shell stays operable after dismissal",
+      "status": "PASS",
+      "detail": "hash #/ → #/settings (expected #/settings...)"
+    },
+    {
+      "step": "retired global Artifacts page leaves no visible entry",
+      "status": "PASS",
+      "detail": "\"Open artifacts\" copy present anywhere on screen=false"
+    },
+    {
+      "step": "a boot with no injected failure shows the shell, not a failure panel",
+      "status": "PASS",
+      "detail": "failure panels=0 (must be 0); sidebar present=true"
+    },
+    {
+      "step": "the shell is operable on a healthy boot",
+      "status": "PENDING",
+      "detail": "no reachable backend in this sandbox: boot latched (failure panels=0, glass masks=1). The non-blocking failure contract covers this case; connect a backend to probe the healthy path."
+    }
+  ]
+}
