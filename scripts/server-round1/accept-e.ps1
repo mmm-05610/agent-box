@@ -304,6 +304,22 @@ $deployment = [ordered]@{
             }
             timeoutMs = 30000
             stateProjection = [ordered]@{ target = "/tmp/agentbox-home/sessions" }
+        },
+        # Third explicit no-model Harness: the same controlled ACP peer, told
+        # through its adapter environment to answer nothing for eight seconds.
+        # It exists to prove that an attempt quiet for longer than the Worker's
+        # five second lease still finishes, with no override of the lease.
+        [ordered]@{
+            id = "omp"
+            capabilityClaims = [ordered]@{ streaming = $true }
+            modelControlId = "model"
+            controlOptions = [ordered]@{ model = @("fixture-model") }
+            adapter = [ordered]@{
+                command = "/usr/bin/node"
+                args = @("/workspace/fake_acp_peer.mjs")
+                environment = [ordered]@{ AGENTBOX_FIXTURE_SILENCE_MS = "8000" }
+            }
+            timeoutMs = 30000
         }
     )
 }
@@ -314,6 +330,15 @@ if ($null -eq $statefulHarness -or $statefulHarness.Contains("credentialKind") -
     $statefulHarness.timeoutMs -gt 120000 -or
     $statefulHarness.stateProjection.target -ne "/tmp/agentbox-home/sessions") {
     throw "The native-state fixture Harness must declare no credential, no model control and a bounded state projection"
+}
+$leaseSilenceHarness = $deployment.harnesses | Where-Object { $_.id -eq "omp" }
+if ($null -eq $leaseSilenceHarness -or
+    $leaseSilenceHarness.Contains("credentialKind") -or
+    $leaseSilenceHarness.Contains("credentialEnvironment") -or
+    $leaseSilenceHarness.adapter.environment.AGENTBOX_FIXTURE_SILENCE_MS -ne "8000" -or
+    $leaseSilenceHarness.adapter.environment.Count -ne 1 -or
+    $leaseSilenceHarness.Contains("stateProjection")) {
+    throw "The lease-silence fixture Harness must declare exactly the silence and nothing else"
 }
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 [IO.File]::WriteAllText(
@@ -759,6 +784,72 @@ try {
     }
 
     # -----------------------------------------------------------------------
+    # Production default lease, eight seconds of silence. The fixture writes
+    # nothing until its declared silence has elapsed, nothing overrides the
+    # Worker lease, and the elapsed time is asserted so a fixture that answered
+    # early could not pass this step. Before this fix the Worker cancelled the
+    # attempt at five seconds.
+    # -----------------------------------------------------------------------
+    $silenceProvider = Invoke-Wire -Method "providerModels.create" -Headers $auth -Params @{
+        requestId = "accept-e-silence-provider"
+        displayName = "Silent fixture provider"
+        harness = "omp"
+        provider = "fixture"
+        credentialId = $null
+        configuration = @()
+        models = @(@{
+            modelId = "fixture-model"; displayName = "Fixture model"
+            availability = "unknown"; unavailableReason = $null
+        })
+    }
+    $silenceProfile = Invoke-Wire -Method "profiles.create" -Headers $auth -Params @{
+        requestId = "accept-e-silence-profile"
+        displayName = "Windows lease silence fixture"
+        harness = "omp"
+    }
+    $null = Invoke-Wire -Method "profiles.updateConfig" -Headers $auth -Params @{
+        requestId = "accept-e-silence-config"
+        profileId = $silenceProfile.profile.id
+        expectedVersion = $silenceProfile.profile.version
+        values = @(@{
+            controlId = "model"
+            value = @{ providerId = $silenceProvider.providerModel.id; modelId = "fixture-model" }
+        })
+    }
+    $silenceStarted = Get-Date
+    $silenceSend = Invoke-Wire -Method "sessions.createAndSend" -Headers $auth -Params @{
+        requestId = "accept-e-silence-send"
+        workspaceId = $opened.workspace.id
+        profileId = $silenceProfile.profile.id
+        overrides = @()
+        message = @{ text = "silent-success"; attachments = @() }
+    }
+    $null = Wait-TurnState -SessionId $silenceSend.session.id -ExecutionId $silenceSend.executionId `
+        -States @("completed") -Headers $auth
+    $silenceElapsedMs = [int]((Get-Date) - $silenceStarted).TotalMilliseconds
+    if ($silenceElapsedMs -lt 6000) {
+        throw "The quiet attempt did not stay quiet past the lease: ${silenceElapsedMs}ms"
+    }
+    $silenceSession = Invoke-RestMethod -Uri "$baseUrl/api/v1/sessions/$($silenceSend.session.id)" `
+        -Headers $auth
+    if ($silenceSession.turns[0].state -ne "completed") {
+        throw "A quiet attempt was not completed under the production lease"
+    }
+    $silenceDelta = @($silenceSession.events | Where-Object { $_.kind -eq "message.delta" })
+    if ($silenceDelta.Count -lt 1 -or $silenceDelta[-1].data.text -ne "controlled stream") {
+        throw "The quiet attempt produced no streamed answer"
+    }
+    # `turn.state` also carries transient transitions (accepted/running), so the
+    # counterexample is a terminal state other than completed.
+    $silenceBadStates = @($silenceSession.events | Where-Object {
+            $_.kind -eq "turn.state" -and
+            @("failed", "cancelled", "unknown") -contains $_.data.state
+        })
+    if ($silenceBadStates.Count -ne 0) {
+        throw "The quiet attempt recorded a non-completed turn state: $($silenceBadStates[-1].data.state)"
+    }
+
+    # -----------------------------------------------------------------------
     # Bounded native-state gate: two rounds on one Session, a real Server
     # restart in between, and the Windows DataRoot as the only durable
     # authority for the native checkpoint.
@@ -880,6 +971,19 @@ try {
         data_root = $DataRoot
         workspace = $WorkspaceLinuxPath
         fixture = "explicit no-model ACP peer"
+        lease_silence = [ordered]@{
+            fixture = "plugins/agent-box-harnesses/tests/harness_remote/fake_acp_peer.mjs"
+            harness = "omp"
+            declared_silence_ms = 8000
+            lease_ms = 5000
+            lease_override = $false
+            elapsed_ms = $silenceElapsedMs
+            session_id = $silenceSend.session.id
+            execution = $silenceSend.executionId
+            turn_state = $silenceSession.turns[0].state
+            delta_seq = $silenceDelta[0].seq
+            delta_text = $silenceDelta[-1].data.text
+        }
         r4 = [ordered]@{
             fixture = "tests/server/fixtures/stateful_acp_peer.mjs"
             harness = "hermes"
