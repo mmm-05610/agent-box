@@ -2,7 +2,21 @@
 
 日期：2026-09-14。本轮零泄漏：任何证据、日志、命令行参数均不含凭据内容；
 已发生的1次可达性请求由后端受控进程读取仓库外 locator，未把内容写入仓库或输出。
-受管 Harness 的 SecretStore→Worker 投影尚未执行，不以计划中的注入路径冒充已验事实。
+授权真实 credential 的 SecretStore→Worker 投影尚未执行，不以测试值路径冒充付费验收事实。
+
+## 2026-09-14 13:24 +08:00 — native state 双轮纵向检查点
+
+- `3e4282b` 把部署声明的有界 native-state 子树从 Worker 回收到 Windows ObjectStore，并以 schema 2
+  checkpoint 绑定 harness/native id 后投递到下一 turn。状态捕获限制 256 文件/8 MiB，验证路径、长度、
+  offset、digest 并扫描本次凭据原文；只读配置投影与可写 state target 冲突时在启动前拒绝。
+- 真实无模型门由两个全新的 sidecar 进程穿过 Server→Core→真实 Worker ABW1 interactive→bwrap：首轮
+  写入 nonce，第二轮必须以 ACP `session/resume` 打开同一 native id 并回答该 nonce；第二轮 delta 先于
+  completed，退出后 views/secrets 均不存在。
+- 真实 `codex-acp 1.1.14`→Codex app-server `0.147.0` 另行完成隔离配置读取门，仅到 session create、
+  无 prompt；使用测试 credential，未读取授权 locator、未发模型请求。wheel 已包含官方完整 models JSON
+  和固定 sidecar TOML。
+- 回归：Server `98 passed, 1 skipped`；WSL runtime+bwrap `43 passed`；本阶段定向 Python `71 passed`；
+  Node `13 passed`。累计费用仍为 1 次/12 tokens/`<¥0.01`。Windows r4 尚未运行，所以后端仍未 READY。
 
 ## 2026-09-14 — Codex 官方 Responses 隔离投影检查点
 
@@ -16,9 +30,9 @@
   Worker秘密帧注入的 `CODEX_API_KEY`，配置里没有 `experimental_bearer_token`。
 - 定向验证为 Python 53 passed、Node 25 passed，wheel确实包含完整目录；未读密钥、未发模型或网络请求，
   费用账不变。
-- 集成审阅发现并如实降级：当前每turn清理临时native home，只有native id、没有会话文件，尚不能证明
-  第二轮上下文或原生resume。下一检查点补通用有界捕获/Windows ObjectStore持久化/下一轮回投及密钥扫描，
-  不在Server/Core增加Codex分支。
+- 该检查点的集成审阅当时发现并如实降级：每turn清理临时native home，只有native id、没有会话文件，
+  尚不能证明第二轮上下文或原生resume。此历史缺口随后由 `3e4282b` 的通用有界捕获/Windows
+  ObjectStore持久化/下一轮回投与真实无模型双轮门关闭；Server/Core仍未增加Codex分支。
 
 ## 2026-09-14 12:44 +08:00 — 模型冻结与秘密投影代码检查点
 
@@ -62,7 +76,7 @@
 
 | 门 | 判定 | 依据 |
 | --- | --- | --- |
-| BACKEND_IMPLEMENTATION_READY | **否（暂时）** | 28方法+队列终态已锁定并29/29；native state捕获/恢复与Windows r4待完成 |
+| BACKEND_IMPLEMENTATION_READY | **否（暂时）** | 28方法+队列终态已锁定并29/29；native state双轮恢复已由`3e4282b`证明；Pi/Hermes/OpenCode生产封装、逐家真实门与Windows r4待完成 |
 | DESKTOP_IMPLEMENTATION_READY | **否** | 前端自报 PARTIAL，且 `writer_lease=ACTIVE`（未释放）；独立实现/验收门未完 |
 
 因此仍**没有**记录 `FULLSTACK_INTEGRATION_OWNER`，**没有**接管前端工作树，

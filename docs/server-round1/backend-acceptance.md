@@ -1,7 +1,8 @@
 # Work Order 41 — 核心产品合同与后端独立验收
 
-日期：2026-09-14。当前状态：**`BACKEND_NATIVE_RESUME_IN_PROGRESS`**。分支
-`feature/server-harness-extension-v1`；25方法/Windows基线检查点为 `72d6258`。此结论只代表后端独立门，不代表
+日期：2026-09-14。当前状态：**`BACKEND_WINDOWS_R4_PENDING`**。分支
+`feature/server-harness-extension-v1`；native state代码检查点为 `3e4282b`，25方法/Windows基线检查点为
+`72d6258`。此结论只代表后端独立门，不代表
 真实模型或全栈 Green。41 全程使用显式 no-model ACP fixture，未读模型凭据、未发模型请求，
 费用 ¥0；42 已有费用账继续单独累计。
 
@@ -11,8 +12,8 @@
 及发送结果回查，并以 `3aba5c5c` 提交队列终态修订，总计28方法。当前 TS 摘要
 `11e3b3e70d332585d31900c09ba063d95aa6b72b1904921c665fb72f81c10035`，生成工件
 `5d4fa3bfeec6c3273c6073b37794e4ab2aca6e07e48184bc3a2b878c1fe5e4ed`。后端直接按工件
-**29/29通过**，当前摘要已锁定，精确确认见 [wire-review.md](wire-review.md)。真实 native state
-捕获/恢复与 Windows r4 完成前，本文件不冒称最终 READY。
+**29/29通过**，当前摘要已锁定，精确确认见 [wire-review.md](wire-review.md)。Windows r4 完成前，
+本文件不冒称最终 READY。
 
 ### 已完成的25方法稳定基线
 
@@ -71,10 +72,17 @@ Windows Server → SessionService → Work Core → Harness extension port
 
 Worker 只持有带生命周期的运行投影；Server 是 Session/Profile/队列/事件权威。每个执行保存 Core
 work/execution/dispatch identity 与原生 Session id。`399d78d` 已把摘要固定的 adapter/native executable、
-只读非敏感配置、完整官方目录和一次性凭据接入同一生产链；Python 53、Node 25 与 wheel 包含性通过。
-审阅同时确认：仅保存 native id 不足以跨 turn resume，因为每次清理会销毁临时 native home；有界会话
-文件捕获→Windows ObjectStore→下一轮回投正在补齐，未完成前 checkpoint 继续诚实标 `resumable:false`。
-Server 重启把未完成执行封为 unknown/recovery_required；Worker 失联、投影回收和清理失败均有持久状态。
+只读非敏感配置、完整官方目录和一次性凭据接入同一生产链。`3e4282b` 进一步增加部署声明的唯一可写
+native-state 子树：sidecar 结束前先关闭原生 adapter 促使其落盘，再由 Worker 的 `view.list/view.get`
+在 256 文件/8 MiB 总量内回读，逐文件验证路径、size、offset 与 SHA-256，并拒绝出现本次凭据原文。
+Server 把文件作为不可变对象保存，在 schema 2 checkpoint 中绑定 harness/native id，下一 turn 只从
+Windows ObjectStore 校验后回投；Harness 类型切换不会误用旧状态。Core 与 Server 没有新增品牌分支。
+
+真实无模型门使用两个全新的 sidecar/ACP 进程：首轮 fixture 把 nonce 写入隔离 `$HOME/sessions`，首个
+checkpoint 为 `resumable:true`；第二轮必须从回投状态列出并以 `session/resume` 打开同一个 native id，
+然后回出首轮 nonce。该门真实经过 Server→SessionService→Core→Worker ABW1 interactive→bwrap→sidecar，
+并断言第二轮 `message.delta` 序号早于 completed、最终 Worker views/secrets 均清理。Server 重启仍把
+未完成执行封为 unknown/recovery_required；Worker 失联、投影回收和清理失败均有持久状态。
 
 ## E — Windows 独立验收
 
@@ -93,6 +101,9 @@ Worker/Server/sidecar 残留进程。WSL 输出含本机 NAT/localhost 警告乱
 
 首次尝试把 manifest 放 `/tmp`，Windows UNC 不可见，脚本在服务/数据创建前 exit 1；改为同一用户
 缓存目录后通过。没有绕过权限或把此误记为平台阻断。
+
+当前增量尚未跑 Windows r4；因此 r3 仍是旧代码证据，不能替代 `3e4282b` 的 Windows 独立重验，状态保持
+`BACKEND_WINDOWS_R4_PENDING`。
 
 ## 最终验证账
 
@@ -131,7 +142,7 @@ AGENT_BOX_WIRE_SCHEMA=<5d4fa3bf…前端生成工件> pytest -q tests/server/tes
 
 新工件接受 `completed/failed/cancelled` 终态事件，同时将 `queue.get` 限定为活动三态；此前唯一
 schema 失败关闭。当前 wire 已恢复 `WIRE_LOCKED_FOR_IMPLEMENTATION`。Windows r3 证据仍有效，
-但按本轮调度另跑 r4 重确认后才重新登记 `BACKEND_IMPLEMENTATION_READY`。
+但按本轮调度另跑 r4 重确认后才关闭41平台门；这不替代42-D逐家真实验证。
 
 ## 终态边界
 
@@ -140,9 +151,25 @@ schema 失败关闭。当前 wire 已恢复 `WIRE_LOCKED_FOR_IMPLEMENTATION`。W
 SecretStore 按 locator 读取、Worker `secret.put` 一次性帧、bwrap 固定只读秘密挂载、adapter 声明式
 环境注入以及所有退出路径的 `secret.cleanup`；模型进入 sidecar `create`/`prompt`，密钥不进入 argv、
 普通对象或事件。相关回归为 Server 45 passed、Worker/bwrap 32 passed、Node envelope 4 passed。
-这些是代码/组件证据，尚未冒充真实 Harness 模型证据。当前后端代码检查点为 `502f4b5`，只待
-Windows r4 对锁定工件重确认后恢复 READY。
+这些是代码/组件证据，尚未冒充真实 Harness 模型证据。当前后端代码检查点为 `3e4282b`；41 的独立
+Windows 状态还须由 r4 对锁定工件与最新 native-state 路径重确认。整个后端 READY 仍另受四家生产封装/
+真实模型门约束。
 四家组件仍保持 40 的
 `COMPONENT_VERIFIED / MODEL_NOT_VERIFIED` 分账。Pi/Hermes/OpenCode 的 DeepSeek Provider 配置与
 独立真实模型门以及 Codex 官方 Responses 隔离配置验证进入 42-D；前端仍由其独立 writer 施工，当前不具备跨仓
 写权，未执行全栈联调。
+
+### Native state / 官方 Codex 隔离配置增量（13:24）
+
+- 代码检查点：`3e4282b3f0b113a2573354c94465d872ac9a95e4`。
+- 无模型配置读取门：真实 Worker→bwrap→`codex-acp 1.1.14`→Codex app-server `0.147.0` 成功读取
+  AgentBox 隔离 `config.toml` 与官方完整 `models.json`，只执行 register/start/create 后退出；使用测试值
+  而非授权密钥，结果 `CODEX_ACP_APP_SERVER_CONFIG_READ_OK`，未发送 prompt、未产生付费请求。首次使用
+  已有临时 root 时按预期拒绝 `worker root owner marker is missing`，改用新的受管子目录后通过。
+- 受影响 Server 全套：`98 passed, 1 skipped`；WSL runtime+bwrap：`43 passed`；本阶段定向 Python：
+  `71 passed`；sidecar/四家 Node 合同：`13 passed`；`py_compile` 与 `git diff --check` 通过。
+- wheel 构建确认同时包含 76107 字节官方 `deepseek-models.json` 与 332 字节
+  `deepseek-sidecar-config.toml`。配置固定 `deepseek-flash`、DeepSeek 根 URL、Responses、high reasoning、
+  disabled web search 及隔离内绝对 catalog 路径，不含 token/bearer。
+- 本阶段未读取授权 locator、未发真实模型请求、未运行 Windows build；42 累计费用仍为 1 次/12 tokens/
+  `<¥0.01`。
