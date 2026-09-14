@@ -37,6 +37,187 @@ class WorkerError(RuntimeError):
         self.message = message
 
 
+class WorkerRequestLockTimeout(TimeoutError):
+    """等待请求串行化锁超时：本次请求没有写出任何帧。
+
+    它是 TimeoutError 的子类，所以既有的超时语义不变；保活 owner 用它区分
+    "锁被别的请求占用、这一拍没发出" 与 "帧已发出但 Worker 没回应"。
+    """
+
+
+def lease_heartbeat_interval(lease_ms: int) -> float:
+    """保活间隔：由租约派生，至多约 lease/3，且不小于 50 毫秒。
+
+    不写死任何只适合默认 5 秒租约的常量：Worker 接受的租约范围是
+    1000..=120000 毫秒，间隔必须跟着走。
+    """
+    return max(lease_ms / 3000, 0.05)
+
+
+def _heartbeat_timeout(interval: float) -> float:
+    """heartbeat 请求的超时必须短：静默期里的 cancel 要与它竞争同一把锁。"""
+    return min(2.0, interval)
+
+
+class LeaseKeepalive:
+    """拥有一个活跃 interactive attempt 的租约保活 owner。
+
+    已确证的缺陷：Worker 只在收到客户端帧时刷新 lease_deadline；interactive
+    轮次期间 Server 线程阻塞在 sidecar prompt 上、没有任何帧发出，默认 5 秒
+    租约就会让 Worker 取消仍在正常运行的进程（客户端随后看到
+    ``ATTEMPT_NOT_INTERACTIVE``）。本 owner 是那段静默期唯一的保活来源，
+    因此它的生命周期必须与该轮 attempt 严格绑定：
+
+    - 间隔由租约派生（``lease_heartbeat_interval``），``start()`` 后立即发第一拍；
+    - ``stop()``/``close()`` 幂等、join 线程，停止后心跳计数不再增长；
+    - heartbeat 失败记录为类型化 ``failure``（``WORKER_LEASE_HEARTBEAT_FAILED``，
+      根因保留在 message 与 ``__cause__`` 上）并停止保活，调用方据此把该轮变成
+      类型化失败，绝不静默续跑、也绝不让 prompt 无限等待；
+    - 心跳的响应只由它自己的请求路径消费；超时未消费的响应会被显式丢弃
+      （见 ``WorkerClient._abandon``），``_pending`` 里不留残渣。
+    """
+
+    def __init__(self, client: "WorkerClient", *, label: str = "attempt") -> None:
+        self._client = client
+        self._label = label
+        self._interval = lease_heartbeat_interval(client.lease_ms)
+        self._timeout = _heartbeat_timeout(self._interval)
+        # 串行化锁连续被别的请求占用多少拍算保活失效：3 拍 * 间隔已接近一整个
+        # 租约周期，此时 fail-closed 比继续假装保活更诚实。
+        self._skip_budget = 3
+        self._stop_event = threading.Event()
+        self._state_lock = threading.Lock()
+        self._thread: threading.Thread | None = None
+        self._started = False
+        self._heartbeats = 0
+        self._failure: WorkerError | None = None
+
+    @property
+    def label(self) -> str:
+        return self._label
+
+    @property
+    def interval(self) -> float:
+        """本 owner 的保活间隔（秒）。"""
+        return self._interval
+
+    @property
+    def timeout(self) -> float:
+        """单拍 heartbeat 请求的超时（秒）。"""
+        return self._timeout
+
+    @property
+    def heartbeats(self) -> int:
+        """本 owner 实际发出的 heartbeat 拍数（停止/失败后不再增长）。"""
+        with self._state_lock:
+            return self._heartbeats
+
+    @property
+    def failure(self) -> WorkerError | None:
+        """类型化失败；为 None 表示保活期间没有发生过 heartbeat 失败。"""
+        with self._state_lock:
+            return self._failure
+
+    @property
+    def thread(self) -> threading.Thread | None:
+        """仍在运行的保活线程（stop() join 成功后为 None）。"""
+        return self._thread
+
+    def start(self) -> None:
+        """开始保活：立即发第一拍，之后按租约派生的间隔继续。"""
+        with self._state_lock:
+            if self._started:
+                return
+            self._started = True
+        if self._client.closed:
+            # 客户端已经 close：没有可保活的连接，直接类型化失败，不起线程。
+            self._fail(WorkerError("WORKER_NOT_RUNNING", "Worker client is closed"))
+            return
+        self._thread = threading.Thread(
+            target=self._run, name=f"worker-lease-{self._label}", daemon=True,
+        )
+        self._thread.start()
+
+    def stop(self, *, join_timeout: float | None = None) -> None:
+        """停止保活并 join 线程；幂等，可在 finally 里无条件调用。"""
+        with self._state_lock:
+            self._stop_event.set()
+            thread = self._thread
+        if thread is not None and thread is not threading.current_thread():
+            # 线程最多再等一个在途 heartbeat（锁等待 + 响应等待都有界）。
+            thread.join(timeout=2 * self._timeout + 2.0 if join_timeout is None else join_timeout)
+        if thread is not None and thread.is_alive():
+            # 在途请求还没回来：保留句柄以便再次 join，不谎报已停止。
+            return
+        self._thread = None
+        forget = getattr(self._client, "_forget_keepalive", None)
+        if callable(forget):
+            forget(self)
+
+    def close(self) -> None:
+        """stop() 的别名：显式关闭与上下文管理器收敛到同一条路径。"""
+        self.stop()
+
+    def __enter__(self) -> "LeaseKeepalive":
+        self.start()
+        return self
+
+    def __exit__(self, *_args) -> None:
+        self.close()
+
+    def _run(self) -> None:
+        skips = 0
+        while not self._stop_event.is_set():
+            try:
+                # 先发一拍再睡：start() 之后立即进入保活，第一帧不必等满间隔。
+                self._beat()
+            except WorkerRequestLockTimeout:
+                # 锁被别的请求占用（例如静默期里的 write_stdin/cancel）：这一拍
+                # 没有发出，而占用者本身就在刷新租约，所以先容忍；连续跳过整个
+                # 租约周期的量之后按类型化失败收尾，绝不无限等待。
+                skips += 1
+                if skips > self._skip_budget:
+                    self._fail(WorkerError(
+                        "WORKER_REQUEST_LOCK_TIMEOUT",
+                        f"{self._label}: lease keepalive could not send a heartbeat",
+                    ))
+                    return
+            except BaseException as exc:
+                if self._stop_event.is_set():
+                    # stop()/close() 与在途 heartbeat 的竞态：这不是租约失败。
+                    return
+                self._fail(exc)
+                return
+            else:
+                skips = 0
+            if self._stop_event.wait(self._interval):
+                return
+
+    def _beat(self) -> None:
+        """发出一拍 heartbeat；锁被占用（一个帧都没发出）时计数回滚并抛出。"""
+        with self._state_lock:
+            self._heartbeats += 1
+        try:
+            self._client.request("heartbeat", timeout=self._timeout)
+        except WorkerRequestLockTimeout:
+            with self._state_lock:
+                self._heartbeats -= 1
+            raise
+
+    def _fail(self, exc: BaseException) -> None:
+        """把底层失败上浮成类型化失败；根因保留在 message 与 __cause__ 上。"""
+        root = getattr(exc, "code", None) or type(exc).__name__
+        detail = getattr(exc, "message", None) or str(exc)
+        error = WorkerError(
+            "WORKER_LEASE_HEARTBEAT_FAILED",
+            f"{self._label}: lease heartbeat failed ({root}): {detail}",
+        )
+        error.__cause__ = exc
+        with self._state_lock:
+            if self._failure is None:
+                self._failure = error
+
+
 def encode_frame(kind: int, stream_id: int, sequence: int, payload: bytes) -> bytes:
     if len(payload) > MAX_PAYLOAD:
         raise ValueError("worker payload exceeds bounded frame size")
@@ -110,6 +291,13 @@ class WorkerClient:
         self._request_sequence = 2
         self._terminals: dict[tuple[str, int], dict[str, Any]] = {}
         self._pending: dict[str, dict[str, Any]] = {}
+        # 已放弃请求的迟到响应：到达时显式丢弃，绝不留进 _pending。
+        self._abandoned: dict[str, None] = {}
+        # 请求串行化锁：序号递增、_write、响应路由只允许一个消费者进入。
+        self._request_lock = threading.RLock()
+        self._keepalive_lock = threading.Lock()
+        self._live_keepalives: list[LeaseKeepalive] = []
+        self._closed = False
         self._event_listeners: list[Callable[[dict[str, Any]], None]] = []
         self._disconnect_listeners: list[Callable[[WorkerError], None]] = []
 
@@ -200,6 +388,14 @@ class WorkerClient:
         attempt_id: str | None = None, generation: int | None = None,
         timeout: float = 10.0,
     ) -> dict[str, Any]:
+        # 所有出站请求共用一把互斥锁：_request_sequence 递增、帧写入与响应路由
+        # 必须串行，两个 request 消费者绝不交错到同一条 Worker 控制流上。
+        # 锁等待有界（不超过本次请求的超时），静默期的 cancel 不会被 heartbeat
+        # 无限饿死；拿不到锁时一个帧都没发出，所以这里可以安全地类型化上报。
+        if not self._request_lock.acquire(timeout=max(0.01, timeout)):
+            raise WorkerRequestLockTimeout(
+                "Worker request lock was busy; this request sent no frame"
+            )
         request_id = f"request-{uuid4().hex}"
         body: dict[str, Any] = {
             "requestId": request_id, "connectionId": self.connection_id,
@@ -210,33 +406,60 @@ class WorkerClient:
             body["attemptId"] = attempt_id
         if generation is not None:
             body["generation"] = generation
-        self._write(DATA, 0, self._request_sequence, body)
-        self._request_sequence += 1
-        deadline = time.monotonic() + timeout
-        while True:
-            if request_id in self._pending:
-                value = self._pending.pop(request_id)
-            else:
-                value = self._receive_json(max(0.01, deadline - time.monotonic()))
-            if value.get("event") == "process.terminal":
-                result = value["result"]
-                self._terminals[(result["attemptId"], result["generation"])] = result
-                continue
-            if self._dispatch_event(value):
-                continue
-            target = value.get("requestId")
-            if target != request_id:
-                if target:
-                    self._pending[target] = value
-                continue
-            if not value.get("ok"):
-                error = value.get("error") or {}
-                raise WorkerError(str(error.get("code", "WORKER_ERROR")), str(error.get("message", "Worker request failed")))
-            return value["result"]
+        deferred: list[dict[str, Any]] = []
+        responded = False
+        try:
+            deadline = time.monotonic() + timeout
+            self._write(DATA, 0, self._request_sequence, body)
+            self._request_sequence += 1
+            while True:
+                if request_id in self._pending:
+                    value = self._pending.pop(request_id)
+                else:
+                    try:
+                        # 短切片轮询：响应帧可能先被并发的 wait_terminal 消费者
+                        # 取走并回投到 _pending，切片保证我们很快重新检查它，
+                        # 而不是一直阻塞在自己那一次超时上。
+                        value = self._receive_json(
+                            min(0.05, max(0.01, deadline - time.monotonic()))
+                        )
+                    except TimeoutError:
+                        if time.monotonic() < deadline:
+                            continue
+                        raise
+                if value.get("event") == "process.terminal":
+                    result = value["result"]
+                    self._terminals[(result["attemptId"], result["generation"])] = result
+                    continue
+                if value.get("event"):
+                    # 事件分发放到锁外：监听器若在同一线程里再发请求也不会自锁。
+                    deferred.append(value)
+                    continue
+                target = value.get("requestId")
+                if target != request_id:
+                    if target:
+                        self._route(str(target), value)
+                    continue
+                responded = True
+                if not value.get("ok"):
+                    error = value.get("error") or {}
+                    raise WorkerError(str(error.get("code", "WORKER_ERROR")), str(error.get("message", "Worker request failed")))
+                return value["result"]
+        except BaseException:
+            if not responded:
+                # 超时/中断后才到达的响应会在路由处被显式丢弃，_pending 不留残渣。
+                self._abandon(request_id)
+            raise
+        finally:
+            self._request_lock.release()
+            for value in deferred:
+                self._dispatch_event(value)
 
     def wait_terminal(self, attempt_id: str, generation: int, *, timeout: float = 35.0) -> dict[str, Any]:
         key = (attempt_id, generation)
         deadline = time.monotonic() + timeout
+        # 既有语义原样保留：wait_terminal 仍然是第二个帧消费者，仍然自己发
+        # heartbeat（节拍与超时都不变）。
         heartbeat_at = time.monotonic() + self.lease_ms / 3000
         while time.monotonic() < deadline:
             if key in self._terminals:
@@ -257,27 +480,80 @@ class WorkerClient:
             elif self._dispatch_event(value):
                 pass
             elif value.get("requestId"):
-                self._pending[value["requestId"]] = value
+                # 既有语义不变：他人响应回投；已放弃请求的迟到响应直接丢弃。
+                self._route(str(value["requestId"]), value)
         raise TimeoutError("Worker terminal result timed out")
 
-    def close(self) -> None:
-        process, self._process = self._process, None
-        if process is None:
+    def _route(self, request_id: str, value: dict[str, Any]) -> None:
+        """把不属于当前消费者的响应回投给它的请求者。
+
+        已被放弃（超时/中断）的请求不会再有人消费，响应在这里显式丢弃，
+        保证 ``_pending`` 里不残留 heartbeat 之类的迟到响应。
+        """
+        if request_id in self._abandoned:
+            self._abandoned.pop(request_id, None)
             return
-        if process.stdin:
-            try:
-                process.stdin.close()
-            except OSError:
-                pass
+        self._pending[request_id] = value
+
+    def _abandon(self, request_id: str) -> None:
+        self._pending.pop(request_id, None)
+        self._abandoned[request_id] = None
+        while len(self._abandoned) > 64:  # 有界：断开连接时不会无限增长
+            self._abandoned.pop(next(iter(self._abandoned)))
+
+    def keep_lease(self, *, label: str = "attempt") -> LeaseKeepalive:
+        """为一个活跃 interactive attempt 创建租约保活 owner。
+
+        返回的 owner 由调用方负责 ``start()``/``stop()``；``close()`` 会兜底停止
+        所有仍然登记着的 owner，保证不存在遗留线程。
+        """
+        owner = LeaseKeepalive(self, label=label)
+        with self._keepalive_lock:
+            self._live_keepalives.append(owner)
+        return owner
+
+    def _forget_keepalive(self, owner: LeaseKeepalive) -> None:
+        with self._keepalive_lock:
+            if owner in self._live_keepalives:
+                self._live_keepalives.remove(owner)
+
+    def _stop_keepalives(self) -> None:
+        with self._keepalive_lock:
+            owners = list(self._live_keepalives)
+        for owner in owners:
+            owner.stop()
+
+    @property
+    def closed(self) -> bool:
+        return self._closed
+
+    def close(self) -> None:
+        self._closed = True
+        # 先停保活（join 线程），再拿串行化锁：之后不可能还有 _write 打向
+        # 正在被关闭的进程，也不可能再有新的 heartbeat 发出。
+        self._stop_keepalives()
+        acquired = self._request_lock.acquire(timeout=5.0)
         try:
-            process.wait(timeout=3)
-        except subprocess.TimeoutExpired:
-            process.terminate()
+            process, self._process = self._process, None
+            if process is None:
+                return
+            if process.stdin:
+                try:
+                    process.stdin.close()
+                except OSError:
+                    pass
             try:
-                process.wait(timeout=2)
+                process.wait(timeout=3)
             except subprocess.TimeoutExpired:
-                process.kill()
-                process.wait(timeout=2)
+                process.terminate()
+                try:
+                    process.wait(timeout=2)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait(timeout=2)
+        finally:
+            if acquired:
+                self._request_lock.release()
 
     def __enter__(self):
         self.start()
@@ -291,8 +567,13 @@ class WorkerClient:
         if process is None or process.stdin is None:
             raise WorkerError("WORKER_NOT_RUNNING", "Worker is not running")
         payload = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
-        process.stdin.write(encode_frame(kind, stream_id, sequence, payload))
-        process.stdin.flush()
+        try:
+            process.stdin.write(encode_frame(kind, stream_id, sequence, payload))
+            process.stdin.flush()
+        except OSError as exc:
+            # 写侧断连与读侧同型化：Worker 进程消失时调用方看到的工作流错误
+            # 必须是 WORKER_DISCONNECTED，而不是裸的 BrokenPipeError。
+            raise WorkerError("WORKER_DISCONNECTED", f"Worker control stream closed: {exc}") from exc
 
     def _read_loop(self) -> None:
         try:

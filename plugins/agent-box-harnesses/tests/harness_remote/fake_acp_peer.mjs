@@ -13,6 +13,14 @@ let pendingCancel = false
 let pendingPrompt = null
 let pendingPermission = null
 
+// Optional silence for the explicit `silent-success` prompt: the deployment's
+// adapter environment can raise it above the Worker's lease so a gate can prove
+// that an attempt quiet for longer than the lease still finishes. The default
+// is 0, and every existing prompt path is untouched.
+const SILENCE_MS = Number.parseInt(process.env.AGENTBOX_FIXTURE_SILENCE_MS ?? "0", 10)
+const promptSilenceMs = Number.isFinite(SILENCE_MS) && SILENCE_MS > 0 ? SILENCE_MS : 0
+const PROMPT_SILENCE_DEFAULT_MS = 8_000
+
 // The peer declares exactly the one model it accepts. A bridge that is asked for
 // a model resolves it against the options the harness advertised and refuses
 // anything not on the list, so a peer that advertises none is a harness that can
@@ -50,15 +58,26 @@ for await (const line of rl) {
     } })
   } else if (method === "session/prompt") {
     const image = params.prompt.find((item) => item.type === "image")
+    const text = params.prompt.find((item) => item.type === "text")?.text ?? ""
     const streamed = image
       ? `image:${image.mimeType}:${createHash("sha256").update(Buffer.from(image.data, "base64")).digest("hex")}`
       : "controlled stream"
-    // A live chunk must be observable before the terminal response arrives.
-    send({ jsonrpc: "2.0", method: "session/update", params: {
+    const streamUpdate = () => send({ jsonrpc: "2.0", method: "session/update", params: {
       sessionId: params.sessionId,
       update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: streamed } },
     } })
-    const text = params.prompt.find((item) => item.type === "text")?.text ?? ""
+    if (text.includes("silent-success")) {
+      // Write nothing at all for the declared silence, then answer: an attempt
+      // that is quiet past the Worker lease must still finish, and the only
+      // thing keeping the lease alive is the client's own traffic.
+      setTimeout(() => {
+        streamUpdate()
+        send({ jsonrpc: "2.0", id, result: { stopReason: "end_turn" } })
+      }, promptSilenceMs > 0 ? promptSilenceMs : PROMPT_SILENCE_DEFAULT_MS)
+      continue
+    }
+    // A live chunk must be observable before the terminal response arrives.
+    streamUpdate()
     if (text.includes("needs-permission")) {
       pendingPermission = { promptId: id, sessionId: params.sessionId }
       send({ jsonrpc: "2.0", id: 900, method: "session/request_permission", params: {

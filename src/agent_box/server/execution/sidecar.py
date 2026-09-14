@@ -22,6 +22,11 @@ from typing import Any, Callable, Mapping, Protocol, Sequence
 from uuid import uuid4
 
 
+#: How often a blocked channel reader re-checks its keepalive. Small enough that
+#: a failed lease ends the turn promptly, large enough not to spin.
+LEASE_POLL_SECONDS = 0.25
+
+
 class SidecarError(RuntimeError):
     def __init__(self, code: str, message: str) -> None:
         super().__init__(f"{code}: {message}")
@@ -326,12 +331,23 @@ class _WorkerChannels:
         self._unsubscribe = None
         self._disconnect_unsubscribe = None
         self._closed = False
+        # The Worker cancels any attempt whose client stays quiet past its
+        # lease, and a sidecar prompt is exactly such a client. This owner keeps
+        # the lease alive for as long as the attempt does; it is started in
+        # `subscribe()` (not here) because the launcher may hand us a client
+        # substitute that has no lease support at all.
+        self._lease_keepalive = None
 
     def subscribe(self) -> None:
         self._unsubscribe = self.client.subscribe_output(self._worker_event)
         subscribe_disconnect = getattr(self.client, "subscribe_disconnect", None)
         if callable(subscribe_disconnect):
             self._disconnect_unsubscribe = subscribe_disconnect(self._worker_disconnect)
+        keep_lease = getattr(self.client, "keep_lease", None)
+        if callable(keep_lease):
+            # Before `spawn`, so the very first silent stretch is covered too.
+            self._lease_keepalive = keep_lease(label=f"channels-{self.attempt_id}")
+            self._lease_keepalive.start()
 
     def _worker_disconnect(self, error) -> None:
         if not self._closed:
@@ -345,6 +361,7 @@ class _WorkerChannels:
                 or int(result.get("generation", -1)) != self.generation):
             return
         if event.get("event") == "process.terminal":
+            self._stop_lease()  # the attempt is over; nothing left to keep alive
             self._chunks.put(None)
             return
         if event.get("event") != "process.output" or result.get("stream") != "stdout":
@@ -384,12 +401,38 @@ class _WorkerChannels:
 
     def iter_chunks(self):
         while True:
-            item = self._chunks.get()
+            try:
+                item = self._chunks.get(timeout=LEASE_POLL_SECONDS)
+            except queue.Empty:
+                # A failed keepalive must end this turn - typed, and without
+                # waiting for a frame that will never arrive.
+                failure = self._lease_failure()
+                if failure is not None:
+                    raise failure
+                continue
             if item is None:
                 return
             if isinstance(item, BaseException):
                 raise item
             yield item
+
+    def _lease_failure(self) -> SidecarError | None:
+        """The keepalive's typed failure, if the lease could not be kept."""
+        owner = self._lease_keepalive
+        failure = getattr(owner, "failure", None) if owner is not None else None
+        if failure is None:
+            return None
+        code = getattr(failure, "code", None) or "WORKER_LEASE_HEARTBEAT_FAILED"
+        message = getattr(failure, "message", None) or str(failure)
+        return SidecarError(str(code), str(message))
+
+    def _stop_lease(self) -> None:
+        owner, self._lease_keepalive = self._lease_keepalive, None
+        if owner is not None:
+            try:
+                owner.stop()
+            except BaseException:  # noqa: BLE001 - stopping must never mask the turn
+                pass
 
     def capture_state(self) -> dict[str, bytes]:
         """Read back only the deployment-declared writable state subtree."""
@@ -485,6 +528,7 @@ class _WorkerChannels:
                     except BaseException:
                         pass
         finally:
+            self._stop_lease()
             self._forbidden_content = b""
             if self._unsubscribe:
                 self._unsubscribe()
@@ -517,6 +561,10 @@ class SidecarEnvelope:
         self._fatal: dict[str, Any] | None = None
         self._condition = threading.Condition()
         self._stderr: list[str] = []
+        # Set when the channel reader itself failed (for example a keepalive
+        # that could not keep the lease). The pending request must see that
+        # reason and its code, not a generic "sidecar exited".
+        self._reader_error: BaseException | None = None
         self._closed = threading.Event()
         self._reader = threading.Thread(target=self._read_loop, daemon=True)
         self._reader.start()
@@ -538,7 +586,7 @@ class SidecarEnvelope:
                         str(error.get("message", "")),
                     )
                 if self._closed.is_set():
-                    raise SidecarError("SIDECAR_CLOSED", "sidecar exited before answering")
+                    raise self._closed_error()
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
                     raise SidecarError("SIDECAR_TIMEOUT", f"no answer for {payload.get('op')}")
@@ -548,6 +596,20 @@ class SidecarEnvelope:
             error = answer.get("error") or {}
             raise SidecarError(str(error.get("code", "SIDECAR_ERROR")), str(error.get("message", "")))
         return answer.get("result") or {}
+
+    def _closed_error(self) -> "SidecarError":
+        """The reason the channel ended: the reader's own typed failure first.
+
+        A keepalive failure is a real cause and must reach the caller with its
+        code; "sidecar exited before answering" stays the fallback for every
+        ordinary close.
+        """
+        reader_error = self._reader_error
+        if isinstance(reader_error, SidecarError):
+            return reader_error
+        if reader_error is not None and getattr(reader_error, "code", None):
+            return SidecarError(str(reader_error.code), str(getattr(reader_error, "message", reader_error)))
+        return SidecarError("SIDECAR_CLOSED", "sidecar exited before answering")
 
     def close(self) -> None:
         try:
@@ -574,6 +636,7 @@ class SidecarEnvelope:
                     if line.strip():
                         self._line(line)
         except BaseException as exc:  # noqa: BLE001 - surfaced to the caller
+            self._reader_error = exc
             self._stderr.append(str(exc))
         finally:
             del stream

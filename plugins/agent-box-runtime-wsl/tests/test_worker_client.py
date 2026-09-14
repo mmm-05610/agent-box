@@ -6,11 +6,15 @@ import json
 import os
 from pathlib import Path
 import shutil
+import threading
 import time
 
 import pytest
 
-from agent_box_runtime_wsl.client import WorkerClient, WorkerError, encode_frame, read_frame, DATA
+from agent_box_runtime_wsl.client import (
+    DATA, LeaseKeepalive, WorkerClient, WorkerError, WorkerRequestLockTimeout,
+    encode_frame, lease_heartbeat_interval, read_frame,
+)
 
 
 REPO = Path(__file__).resolve().parents[3]
@@ -415,3 +419,220 @@ def test_real_worker_refuses_an_artifact_mount_it_did_not_verify(tmp_path):
     finally:
         client.close()
     assert not (worker_root / "views").exists()
+
+
+class _StubClient:
+    """最小替身：只用于确定性地触发心跳失败/锁占用路径。
+
+    真实门禁一律走上面的真 Worker；这里不需要帧、进程或协议。
+    """
+
+    def __init__(self, *, lease_ms=5_000, error=None) -> None:
+        self.lease_ms = lease_ms
+        self.closed = False
+        self.requests: list[tuple[str, float]] = []
+        self.error = error
+
+    def request(self, op, arguments=None, *, attempt_id=None, generation=None, timeout=10.0):
+        self.requests.append((op, timeout))
+        if self.error is not None:
+            raise self.error
+        return {"status": "ok"}
+
+
+def test_keepalive_interval_and_cadence_are_derived_from_the_lease():
+    """反例：间隔由租约派生（至多约 lease/3），不写死只适合 5 秒租约的常量。"""
+    for lease_ms in (1_000, 5_000, 120_000):
+        assert lease_heartbeat_interval(lease_ms) == pytest.approx(lease_ms / 3000)
+    assert lease_heartbeat_interval(30) == pytest.approx(0.05)  # 下界保护
+    client = _StubClient(lease_ms=300)
+    owner = LeaseKeepalive(client, label="cadence")
+    assert owner.interval == pytest.approx(0.1)
+    assert owner.timeout == pytest.approx(0.1)  # ≤ min(2.0, interval)
+    owner.start()
+    assert owner.thread is not None and owner.thread.name == "worker-lease-cadence"
+    deadline = time.monotonic() + 3
+    while owner.heartbeats < 3 and time.monotonic() < deadline:
+        time.sleep(0.01)
+    owner.stop()
+    assert owner.heartbeats >= 3
+    assert [op for op, _timeout in client.requests][:3] == ["heartbeat"] * 3
+    assert all(timeout <= min(2.0, owner.interval) + 1e-9 for _op, timeout in client.requests)
+    frozen = owner.heartbeats
+    time.sleep(0.3)
+    assert owner.heartbeats == frozen
+    assert owner.thread is None
+
+
+def test_keepalive_surfaces_a_typed_failure_instead_of_waiting_forever():
+    """反例 7（确定性替身版）：heartbeat 出错 → 类型化 failure，根因保留。
+
+    保活绝不静默续跑、也不让调用方无限等待：错误一旦发生就记录并停止。
+    """
+    client = _StubClient(lease_ms=300, error=WorkerError("WORKER_ERROR", "heartbeat rejected"))
+    owner = LeaseKeepalive(client, label="failing")
+    owner.start()
+    deadline = time.monotonic() + 3
+    while owner.failure is None and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert owner.failure is not None
+    assert owner.failure.code == "WORKER_LEASE_HEARTBEAT_FAILED"
+    assert "WORKER_ERROR" in owner.failure.message
+    assert "heartbeat rejected" in owner.failure.message
+    assert isinstance(owner.failure.__cause__, WorkerError)
+    heartbeats = owner.heartbeats
+    assert client.requests  # 失败的那一拍确实发出过
+    owner.stop()
+    owner.close()
+    owner.stop()  # 幂等
+    assert owner.heartbeats == heartbeats  # 失败之后不再有 heartbeat
+    assert owner.thread is None
+
+
+def test_keepalive_tolerates_a_busy_lock_then_fails_closed():
+    """串行化锁被占用时这一拍不发出、也不误报失败；连续跳过一整个租约周期的
+    量之后按类型化失败收尾（fail-closed），因为保活实际上已经没在起作用。"""
+    client = _StubClient(lease_ms=300, error=WorkerRequestLockTimeout("busy"))
+    owner = LeaseKeepalive(client, label="busy-lock")
+    owner.start()
+    deadline = time.monotonic() + 3
+    while owner.failure is None and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert owner.failure is not None
+    assert owner.failure.code == "WORKER_LEASE_HEARTBEAT_FAILED"
+    assert "WORKER_REQUEST_LOCK_TIMEOUT" in owner.failure.message
+    assert owner.heartbeats == 0  # 一个帧都没有发出：跳过不等于发出
+    owner.stop()
+    assert owner.thread is None
+
+
+def test_keepalive_stop_freezes_heartbeats_without_threads_or_residue(tmp_path):
+    """反例 4：stop() 幂等、join 线程、计数冻结、_pending 无心跳残渣。"""
+    client, project, _root = worker_client(tmp_path)
+    client.start()
+    owner = client.keep_lease(label="residue-check")
+    owner.start()
+    try:
+        assert client.request("browse", {"path": str(project)})["directories"] == []
+        deadline = time.monotonic() + 5
+        while owner.heartbeats < 2 and time.monotonic() < deadline:
+            time.sleep(0.02)
+        assert owner.heartbeats >= 2
+        assert owner.failure is None
+        owner.stop()
+        frozen = owner.heartbeats
+        time.sleep(2 * owner.interval)
+        assert owner.heartbeats == frozen
+        assert owner.thread is None
+        assert not [item for item in threading.enumerate() if item.name.startswith("worker-lease-")]
+        assert client._pending == {}  # 心跳响应由它自己的请求路径消费
+        # 停掉保活不影响连接健康：后续请求照常。
+        assert client.request("browse", {"path": str(project)})["directories"] == []
+    finally:
+        owner.stop()
+        client.close()
+
+
+def test_close_stops_a_running_keepalive(tmp_path):
+    """反例 4（close 那一半）：client.close() 之后不得再有 heartbeat/线程残留。"""
+    client, project, _root = worker_client(tmp_path)
+    client.start()
+    owner = client.keep_lease(label="closed-client")
+    owner.start()
+    deadline = time.monotonic() + 5
+    while owner.heartbeats < 1 and time.monotonic() < deadline:
+        time.sleep(0.02)
+    assert owner.heartbeats >= 1
+    client.close()
+    assert owner.thread is None
+    frozen = owner.heartbeats
+    time.sleep(4 * owner.interval)
+    assert owner.heartbeats == frozen
+    assert not [item for item in threading.enumerate() if item.name.startswith("worker-lease-")]
+    assert owner.failure is None  # 正常关闭不是租约失败
+    with pytest.raises(WorkerError):
+        # close() 之后不可能再写向已关闭的进程：写路径必须类型化失败。
+        client.request("browse", {"path": str(project)}, timeout=2)
+
+
+def test_lease_expiry_still_cancels_the_attempt_after_the_keepalive_stops(tmp_path):
+    """反例 8：停止保活后 Worker 的租约过期清理必须仍然生效。
+
+    保活只覆盖 owner 活着的时间：它不能把 orphan 变成永久存活，也不能在自己
+    停止后仍在刷新租约。这里全程不调用 wait_terminal，也不在停止后发任何帧，
+    直接观察 Worker 写出的 result.json。
+    """
+    client, project, root = worker_client(tmp_path, lease_ms=2_000)
+    client.start()
+    owner = client.keep_lease(label="orphan-guard")
+    owner.start()
+    try:
+        assert client.request("spawn", {
+            "argv": bwrap_argv(project, "sleep 60"),
+            "stdinBase64": "", "interactive": True, "timeoutMs": 60_000,
+        }, attempt_id="attempt-orphan", generation=1)["status"] == "accepted"
+        result = root / "results" / "attempt-orphan-1" / "result.json"
+        # 跨过多个租约周期：保活让 attempt 活着。
+        time.sleep(3.5)
+        assert owner.failure is None
+        assert not result.exists()
+        owner.stop()
+        # 停止之后不再有任何客户端帧，Worker 必须在一个租约边界内清掉它。
+        deadline = time.monotonic() + 8
+        while not result.exists() and time.monotonic() < deadline:
+            time.sleep(0.05)
+        assert result.exists()
+        assert json.loads(result.read_text(encoding="utf-8"))["cancelled"] is True
+    finally:
+        owner.stop()
+        client.close()
+
+
+def test_concurrent_requests_with_a_keepalive_keep_sequences_monotonic(tmp_path):
+    """反例 9（纯请求侧）：并发请求与保活 heartbeat 不串 requestId/序号。
+
+    序号由串行化锁保护：严格递增、无重复，每个响应回到它的请求者。
+    """
+    client, project, _root = worker_client(tmp_path)
+    (project / "input.txt").write_text("worker-controlled", encoding="utf-8")
+    written: list[tuple[int, str]] = []
+    original_write = client._write
+
+    def spy_write(kind, stream_id, sequence, value):
+        written.append((sequence, str(value.get("op"))))
+        return original_write(kind, stream_id, sequence, value)
+
+    client._write = spy_write
+    client.start()
+    owner = client.keep_lease(label="busy-requests")
+    owner.start()
+    errors: list[BaseException] = []
+
+    def requester():
+        try:
+            for _ in range(4):
+                assert client.request("browse", {"path": str(project)})["directories"] == []
+                fetched = client.request(
+                    "workspace.get", {"path": "input.txt", "offset": 0, "maxLength": 64},
+                )
+                assert base64.b64decode(fetched["data"]) == b"worker-controlled"
+        except BaseException as exc:
+            errors.append(exc)
+
+    try:
+        threads = [threading.Thread(target=requester) for _ in range(4)]
+        for item in threads:
+            item.start()
+        for item in threads:
+            item.join(timeout=30)
+        assert not errors, errors
+        owner.stop()  # 先冻结保活，再断言没有未消费响应
+        assert client._pending == {}
+        sequences = [sequence for sequence, _op in written]
+        assert sequences == sorted(sequences)
+        assert len(set(sequences)) == len(sequences)
+        ops = [op for _sequence, op in written]
+        assert "browse" in ops and "workspace.get" in ops and "heartbeat" in ops
+    finally:
+        owner.stop()
+        client.close()
