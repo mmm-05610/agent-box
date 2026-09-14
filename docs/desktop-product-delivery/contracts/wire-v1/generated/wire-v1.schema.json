@@ -629,7 +629,10 @@
                       "pending",
                       "dispatched",
                       "withdrawn",
-                      "paused"
+                      "paused",
+                      "completed",
+                      "failed",
+                      "cancelled"
                     ]
                   }
                 },
@@ -1224,7 +1227,10 @@
                   "pending",
                   "dispatched",
                   "withdrawn",
-                  "paused"
+                  "paused",
+                  "completed",
+                  "failed",
+                  "cancelled"
                 ]
               }
             },
@@ -5196,7 +5202,6 @@
               "enum": [
                 "pending",
                 "dispatched",
-                "withdrawn",
                 "paused"
               ]
             }
@@ -5334,7 +5339,10 @@
                   "pending",
                   "dispatched",
                   "withdrawn",
-                  "paused"
+                  "paused",
+                  "completed",
+                  "failed",
+                  "cancelled"
                 ]
               }
             },
@@ -5443,7 +5451,10 @@
                       "pending",
                       "dispatched",
                       "withdrawn",
-                      "paused"
+                      "paused",
+                      "completed",
+                      "failed",
+                      "cancelled"
                     ]
                   }
                 },
@@ -6233,7 +6244,10 @@
                                 "pending",
                                 "dispatched",
                                 "withdrawn",
-                                "paused"
+                                "paused",
+                                "completed",
+                                "failed",
+                                "cancelled"
                               ]
                             }
                           },

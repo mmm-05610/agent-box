@@ -146,6 +146,13 @@ describe('AgentBox stop and event projection', () => {
     expect($agentBoxQueues.get()[sessionId]).toEqual([])
   })
 
+  it.each(['completed', 'failed', 'cancelled'] as const)('removes %s queue items after the terminal event', state => {
+    ingestAgentBoxEvent(frame(0, { item: queueItem(), kind: 'queue.updated', sessionId }))
+    ingestAgentBoxEvent(frame(1, { item: queueItem({ state, version: 2 }), kind: 'queue.updated', sessionId }))
+
+    expect($agentBoxQueues.get()[sessionId]).toEqual([])
+  })
+
   it('deduplicates replay, projects tool facts, and marks a sequence gap for resync', () => {
     const tool = frame(0, {
       kind: 'tool.update',

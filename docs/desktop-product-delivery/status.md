@@ -5,7 +5,7 @@
 
 ## 执行快照（handoff-policy 每阶段必填）— 接管施工中
 
-- updated_at: 2026-09-14 12:09 (+08:00)
+- updated_at: 2026-09-14 12:17 (+08:00)
 - 执行者: Codex 前端产品 goal（接力会话）；**已从暂停的 Zcode 执行者接管**
 - 工作树/分支: /home/maoqh/projects/agent-box-desktop-next-wsl-round1 @ feature/agentbox-desktop-product
 - 接管核验: 用户指定交接 HEAD `5c0fbfe` 与实际 HEAD
@@ -25,23 +25,24 @@
   → ff05157（P03 Composer send seam）→ 2c3aa7f（P03 主 route 生产挂载）
   → b9b816d（P04 event subscription seam）
 - 已消费发布文档提交: 86d5a7b、61c7ff7、d3c0196、ffbcfaf
-- 当前检查点改动: 无；queue 终态合同机械修订与 WorkCore supervisor 已按互斥写集委派，
-  主代理保留 shared main/preload/status 与集成验收所有权。
+- 当前检查点改动: P07 检查点6（待提交）：queue 终态合同/reducer 已机械对齐后端唯一反馈；
+  WorkCore supervisor 在独立写集继续施工。主代理保留 shared main/preload/status 与集成验收所有权。
 - 当前阶段: P00 GREEN；P01 GREEN；**P07 检查点 1–5 完成**；P02 A/B1/B2/C/D 已提交；
   P02B3 UI 边界与服务投影已接；P03 纵切 1–4 已提交；P04 切片1–2已提交
 - 完成范围: P00；P01 全部返修（真机 27 PASS）；P07 检查点 1（语义映射）、检查点 2
   （wire-v1 候选：17 方法 + schema 测试 + JSON Schema 工件；已消费后端机械反馈并回应）；
   P02A（失败面非阻塞+可关闭、Artifacts 页退役、失败终态竞态修复与真机门）
-- 下一项: 串行对齐后端反馈中的 queue 终态枚举/reducer；随后推进 P04 lifecycle 与主进程
+- 下一项: 提交 queue 终态新摘要并等待后端登记；并行推进 P04 lifecycle 与主进程
   遗留 Hermes 默认控制流退役，并准备无模型 Windows 独立验收。
 - 阻断: 无真实阻断。剩余 P02B3–D（上层产品）、P03 生产投影、P04 Electron transport/
   legacy 退役、P05 生产接线和 P06 独立验收待续；wire 新摘要待后端登记但不阻塞本端施工
 
 - contract_semantics_version: core-semantics/1（APPROVED_SEMANTICS，2026-09-14）
-- wire_version/schema_digest: wire-v1 WIRE_REVISION_PENDING_BACKEND；当前权威
-  sha256:986889e47bcf5f25，工件 sha256:d3f7412710e7e951；原 17 方法已由后端按旧摘要
-  通过，核心维护与 Session/history 必要补差已合为 28 方法并待后端登记
-- 合同测试: schema/client/fixture 3 files / 34 tests passed；core v1 §9 九组场景矩阵已完整执行；
+- wire_version/schema_digest: wire-v1 WIRE_REVISION_PENDING_BACKEND_CONFIRMATION；当前权威
+  sha256:11e3b3e70d332585，工件 sha256:5d4fa3bfeec6c327；28 方法不变，已消费后端真实回归
+  唯一 queue terminal 机械更正，等待后端登记同一新摘要
+- 合同测试: schema/client/fixture 3 files / 34 tests passed；queue 终态合并面 2 files / 31 tests、
+  core fixture 1 file / 10 tests passed；core v1 §9 九组场景矩阵已完整执行；
   真实 wire event stream 与后端投影差异仍是联调项，不以 fixture 伪称服务通过
 - UI_READY: 侧栏工作区列表（36R+P01）真机全绿；P02A 真机 8 PASS / 0 FAIL / 1 PENDING
 - CONTRACT_CLIENT_READY: 隔离客户端与 fixture READY；生产 Electron transport 待 P04，wire 新摘要待后端登记
@@ -93,6 +94,9 @@
 - P04 宿主纵切 2：事件 IPC + route 投影 3 files / 18 tests passed；改动文件 ESLint 0/0；
   三项目 typecheck 通过。IPC/preload 保持帧不透明，renderer 先作 wire schema 校验；非法帧不入
   reducer，gap 请求 history resync，route 与 source 均有 cleanup。真实事件源仍待 lifecycle 接线。
+- P07 检查点 6：queue 终态合并面 2 files / 31 tests、core fixture 1 file / 10 tests passed；
+  renderer TypeScript、受影响文件 ESLint、schema 一致性与 diff check 通过。活动快照拒绝终态，
+  终态事件移除活动投影；新摘要待后端登记。
 
 ## 测试与基线（上一执行者交接时点，历史）
 
@@ -135,9 +139,9 @@ wire-review.md通道自39阶段协调。执行者下个检查点消费这些规�
 | P02 上层产品 | IN_PROGRESS（A、B1、B2、C、D 完成；B3 服务投影随 P03 收口） | P01 已满足 |
 | P03 用例状态与API | IN_PROGRESS（主 route 生产调用者与 event reducer 接入已完成；真实 Server 源待 P04） | 与 P02 穿插 |
 | P04 宿主与遗留退役 | IN_PROGRESS（窄 request/event IPC seam 完成；lifecycle/legacy 退役待续） | 与 P03 穿插 |
-| P05 正式合同接入 | WIRE_REVISION_PENDING_BACKEND | 新摘要待后端登记；独立客户端先行 |
+| P05 正式合同接入 | WIRE_REVISION_PENDING_BACKEND_CONFIRMATION | queue 终态新摘要待后端登记；独立客户端先行 |
 | P06 前端验收与交接 | IMPLEMENTATION_HANDOFF_GATE | 本端独立范围完成；真实全栈门由后续集成人负责 |
-| P07 核心合同与状态交接 | 检查点1–5已提交 | 28 方法摘要待后端登记 |
+| P07 核心合同与状态交接 | 检查点1–5已提交，检查点6待提交 | 28 方法 queue 终态新摘要待后端登记 |
 
 ## 测试与证据基线（本轮实跑）
 

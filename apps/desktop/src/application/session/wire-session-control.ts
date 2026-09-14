@@ -18,6 +18,8 @@ import {
 
 import { applyWireEventFrame, emptyWireSessionProjection, markWireProjectionResynced } from './wire-session-projection'
 
+const QUEUE_TERMINAL_STATES = new Set(['withdrawn', 'completed', 'failed', 'cancelled'])
+
 export interface WireSessionControlOptions {
   createRequestId?: () => RequestId
 }
@@ -139,7 +141,7 @@ export function ingestAgentBoxEvent(frame: EventFrame) {
       items[index] = event.item
     }
 
-    setAgentBoxQueue(frame.sessionId, items.filter(item => item.state !== 'withdrawn'))
+    setAgentBoxQueue(frame.sessionId, items.filter(item => !QUEUE_TERMINAL_STATES.has(item.state)))
   }
 
   return result

@@ -12,6 +12,7 @@ import {
   HistorySnapshotResultSchema,
   ProfilesUpdateConfigResultSchema,
   ProviderModelConfigRecordSchema,
+  QueueGetResultSchema,
   QueueItemSchema,
   SendOutcomeQueryResultSchema,
   ServerHelloResultSchema,
@@ -306,6 +307,21 @@ describe('wire v1 core behaviors pinned by schema shape', () => {
         state: 'pending'
       }).configVersion
     ).toBe(9)
+  })
+
+  it('keeps queue snapshots active while terminal transitions remain valid events', () => {
+    const terminal = {
+      itemId: asWireId('queue_terminal'),
+      version: 2,
+      submittedAt: '2026-09-14T00:00:00.000Z',
+      message: { text: 'done', attachments: [] },
+      profileId: asWireId('prof_1'),
+      configVersion: 9,
+      state: 'completed' as const
+    }
+
+    expect(QueueItemSchema.parse(terminal).state).toBe('completed')
+    expect(QueueGetResultSchema.safeParse({ items: [terminal] }).success).toBe(false)
   })
 
   it('event frames carry stable ids, session-scoped seq, and an opaque cursor', () => {

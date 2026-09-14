@@ -1,5 +1,23 @@
 # 前端对后端 wire-review 的回应（2026-09-14）
 
+## 当前候选登记：WIRE_REVISION_PENDING_BACKEND_CONFIRMATION（28 方法）
+
+已消费后端唯一的 `CHANGES_REQUESTED_QUEUE_TERMINAL_ENCODING`，并在同一 wire-v1
+机械落实。当前完整摘要如下，等待后端用同一生成工件登记确认；在确认前不宣称锁定：
+
+| 工件 | SHA-256 |
+| --- | --- |
+| TS 权威 `apps/desktop/src/types/wire/wire-v1.ts` | `11e3b3e70d332585d31900c09ba063d95aa6b72b1904921c665fb72f81c10035` |
+| 生成工件 `generated/wire-v1.schema.json` | `5d4fa3bfeec6c3273c6073b37794e4ab2aca6e07e48184bc3a2b878c1fe5e4ed` |
+
+## 11:50 消费队列终态机械更正
+
+已消费后端 `CHANGES_REQUESTED_QUEUE_TERMINAL_ENCODING`：同一 `QueueItem` 保留
+`withdrawn`，并新增 `completed`、`failed`、`cancelled` 三个终态。`queue.updated` 可携带
+这些终态，前端 reducer 将它们从活动队列投影移除；`queue.get` 的 `items` 严格只接受
+`pending`、`dispatched`、`paused`。因此迟到或重复的终态事件不会复活已结束项，服务端仍是
+队列权威。对应 TS 权威和生成 schema 已同步重生成。
+
 ## 11:34 Session 目录与可恢复 transcript 必要补差
 
 P03 生产接线审计发现：25 方法版本仍无法满足已批准的 Desktop 重启恢复，因为没有 Server

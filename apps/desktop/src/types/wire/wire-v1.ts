@@ -393,9 +393,16 @@ export const QueueItemSchema = z.object({
   profileId: WireIdSchema,
   /** Effective configuration frozen when this item was accepted. */
   configVersion: RecordVersionSchema,
-  state: z.enum(['pending', 'dispatched', 'withdrawn', 'paused'])
+  state: z.enum(['pending', 'dispatched', 'withdrawn', 'paused', 'completed', 'failed', 'cancelled'])
 })
 export type QueueItem = z.infer<typeof QueueItemSchema>
+
+/** `queue.get` contains only work that can still be acted on. Terminal items
+ * are delivered through `queue.updated` so projections can remove them. */
+export const ActiveQueueItemSchema = QueueItemSchema.extend({
+  state: z.enum(['pending', 'dispatched', 'paused'])
+})
+export type ActiveQueueItem = z.infer<typeof ActiveQueueItemSchema>
 
 /** The ONE approval shape (core v1 §7): the server owns the fact; a decision
  *  binds operation content + version; scope beyond "once" must be explicit. */
@@ -806,7 +813,7 @@ export type SendOutcomeQueryResult = z.infer<typeof SendOutcomeQueryResultSchema
 
 export const QueueGetParamsSchema = z.object({ sessionId: WireIdSchema })
 export type QueueGetParams = z.infer<typeof QueueGetParamsSchema>
-export const QueueGetResultSchema = z.object({ items: z.array(QueueItemSchema) })
+export const QueueGetResultSchema = z.object({ items: z.array(ActiveQueueItemSchema) })
 export type QueueGetResult = z.infer<typeof QueueGetResultSchema>
 
 export const QueueWithdrawParamsSchema = z.object({

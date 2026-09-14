@@ -1,7 +1,7 @@
-# wire-v1 候选（WIRE_REVISION_PENDING_BACKEND）— Desktop↔Server 核心合同单一编码
+# wire-v1 候选（WIRE_REVISION_PENDING_BACKEND_CONFIRMATION）— Desktop↔Server 核心合同单一编码
 
-状态：**WIRE_REVISION_PENDING_BACKEND**（2026-09-14，已消费后端
-ACCEPTED_WITH_MECHANICAL_CORRECTIONS；新摘要待后端登记）。
+状态：**WIRE_REVISION_PENDING_BACKEND_CONFIRMATION**（2026-09-14，已消费后端唯一队列终态
+机械更正；新摘要待后端登记，尚未锁定）。当前仍为 28 方法。
 语义权威：[../core-semantics-v1.md](../core-semantics-v1.md)（APPROVED_SEMANTICS）——
 本候选只做已批准语义的机械编码，并把编码本身作为提案交后端核对；两者都不是生产端点授权。
 
@@ -13,7 +13,9 @@ ACCEPTED_WITH_MECHANICAL_CORRECTIONS；新摘要待后端登记）。
 | 服务端评审面 | `generated/wire-v1.schema.json` | 由 `wireJsonSchemas()` 生成，禁止手改；重生成命令见下 |
 | 语义对照 | [semantics-map.md](semantics-map.md) | core v1 §8 每项能力 → 方法/事件/错误；幂等作用域逐方法登记；§9 场景 → fixture 计划 |
 
-摘要（SHA-256，前 16 位）：权威 `986889e47bcf5f25`；生成工件 `d3f7412710e7e951`。
+当前摘要（SHA-256）：权威
+`11e3b3e70d332585d31900c09ba063d95aa6b72b1904921c665fb72f81c10035`；生成工件
+`5d4fa3bfeec6c3273c6073b37794e4ab2aca6e07e48184bc3a2b878c1fe5e4ed`。
 重生成：`cd apps/desktop && node --experimental-strip-types -e "import('./src/types/wire/wire-v1.ts').then(async m => { const fs = await import('node:fs'); fs.writeFileSync('../../docs/desktop-product-delivery/contracts/wire-v1/generated/wire-v1.schema.json', JSON.stringify(m.wireJsonSchemas(), null, 2) + '\\n') })"`
 
 **放置说明（机械选择）**：权威放 `src/types/wire/` 而非本目录，是为了让客户端直接
