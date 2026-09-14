@@ -163,8 +163,10 @@ Reviewer `CHANGES_REQUIRED` 的修复（§2.1/§7.1）落地后重建
 （c8）**exit 0** + 独立 `-PostCheck…CLEAN`（本次 fresh 实例核对）；Python 全量
 **820 passed / 4 skipped / 0 failed**（现行；中间计数 822 与更早 812/22 均已日期化取代）；Rust fmt 干净 +
 `cargo test --locked --release` **27 passed**；`git diff --check` 通过。
-**Codex 门现行状态：红**——`.tmp/plugins` 突发在本机已稳定复现（连续 5 轮峰值恰 5529 →
-确定性 `VIEW_FILE_LIMIT`），按 §4.3 待用户裁决；此前 10 轮绿的间歇期记录如实保留。
+**Codex 门现行状态：未解决的红绿间歇**——`.tmp/plugins` 突发间歇性重叠捕获：2026-09-15
+晚间连续 5 轮红（峰值恰 5529 → 确定性 `VIEW_FILE_LIMIT`）；alias 诊断非因果化修复提交后
+**最近 3 轮绿**（`…_GATE_OK`，报告无 blocker 键、绿跑无任何注记键）。两种状态都如实记录，
+按 §4.3 待用户裁决。
 
 ## 5. 全量验证与清理
 

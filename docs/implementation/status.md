@@ -1,6 +1,6 @@
 # Backend Server — status
 
-更新：2026-09-15 03:5x +08:00（执行者：后端 goal 会话，分支 feature/server-harness-extension-v1）。
+更新：2026-09-15 04:11 +08:00（执行者：后端 goal 会话，分支 feature/server-harness-extension-v1）。
 37 的独立验收仍为 PARTIAL；历史证据保留。
 当前授权39→40→41→42。执行进度：39 完成；40 A/B/C/D 完成（四家组件门通过，
 无真实模型）；41 的 28 方法与队列终态已按前端 `3aba5c5c` 新摘要严格 29/29 重锁，Windows r4 平台门
@@ -56,8 +56,10 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   **RUNTIME_ARTIFACT_PROJECTION_READY**（工件投影底座）与 **四家生产封装全部完成**
   （Pi/Hermes/OpenCode/Codex \*_PRODUCTION_CHAIN_PREPARED，真实 adapter/agent + c5/c6/c7 Worker +
   bwrap + 本机假端点两轮，同一 native id、上下文与真实重开方法；**四家仍 MODEL_NOT_VERIFIED**）。
-  2026-09-15 完成 **state capture 类型化错误边界返修 + c7**（五门 + Windows r4/PostCheck 用 c7 串行
-  exit 0，见 [state-error-boundary.md](../server-round1/fullstack/state-error-boundary.md)）。
+  2026-09-15 完成 **state capture 类型化错误边界返修（c7 起步，经 Reviewer 复审修复后现行 c8）**：
+  runtime-artifact/Pi/Hermes/OpenCode 四门 + Windows r4/PostCheck 用 c8 串行 exit 0；Codex 门
+  为未解决的红绿间歇（见 codex_native_state_findings）；详见
+  [state-error-boundary.md](../server-round1/fullstack/state-error-boundary.md)。
   剩余唯一后端门为**四家真实模型门**（Worker 5s 租约缺陷已修：`WORKER_LEASE_KEEPALIVE_FIXED`），
   任一封装就绪都不折算为已通过）。
 - frontend_handoff: **DESKTOP_HANDOFF_CONSISTENT（按其自述成立；后端仍未接管）**——只读复测
@@ -204,9 +206,9 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   **`.acceptance-bundle-c8`**（`sha256:514f48a9c24c8a13edefa4eb3aa5473b0f3a25d88a94aea1a19bb16ea2707975`；
   Worker 源在 c8 构建后未再变——`git diff <fix-commit> -- workers/ 为空`，故 c8 摘要仍为现行 bundle；
   **c4–c7 未覆盖**，摘要逐一核对未变）。c8 上串行复跑：runtime-artifact/Pi/Hermes/OpenCode exit 0、
-  Windows r4 exit 0 + 独立 `-PostCheck…CLEAN`（实例核对）；Python 全量 **822 passed/4 skipped**；
-  Rust **27 passed**。Codex 门：10 轮绿（突发间歇期）+ 当前连续 5 轮红（突发稳定期），
-  均如实记录。
+  Windows r4 exit 0 + 独立 `-PostCheck…CLEAN`（实例核对）；Python 全量 **820 passed/4 skipped**
+  （822 为诊断测试并例前的中间计数，已被取代）；Rust **27 passed**。Codex 门：**未解决的
+  红绿间歇**——此前 10 轮绿 + 连续 5 轮红 + 最近 3 轮绿（诊断非因果化后实测），全部如实记录。
 - codex_native_state_findings: 两个**待用户裁决**的第一手发现（证据见
   [state-error-boundary.md](../server-round1/fullstack/state-error-boundary.md) §4.3）：
   ①Codex 0.147.0 运行时把内置 plugin/skill 语料解包进 `$CODEX_HOME/.tmp/plugins/`（实测峰值
@@ -360,7 +362,7 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   Rust fmt 干净 + `cargo test --locked --release` **27 passed**；
   runtime-artifact/Pi/Hermes/OpenCode 四门 + Windows r4/PostCheck 用 **c8** 串行 exit 0；
   **Windows r4 用 c8 通过 + 独立 `-PostCheck…CLEAN`**（8 秒静默 `elapsed_ms=8821`，实例核对）；`git diff --check` 通过。
-  （此前轮次 812/22、820/27 均已被本条取代。）
+  （此前轮次计数 812/22 与中间 820/27、822 均已被本条取代。）
   **Codex 门现行状态：红**——c8+现行脚本下 `.tmp/plugins` 技能物化突发在本机已稳定复现
   （连续 5 轮峰值恰 5529 文件 → 确定性 `VIEW_FILE_LIMIT`，见 codex_native_state_findings），
   裁决前不掩盖、不假绿；此前 c7 轮曾有 10 轮绿的记录（突发为间歇），两条记录都如实保留。
