@@ -286,6 +286,29 @@ describe('AgentBox ProfilesView', () => {
     expect($agentBoxProfiles.get()[0]).toMatchObject({ displayName: 'Renamed', version: 8 })
   })
 
+  it('adopts the display name the service normalized, leaving nothing left to save', async () => {
+    const update = vi.fn(async (_intent: { displayName: string }) =>
+      profile({ displayName: 'Builder (normalized)', version: 7 })
+    )
+
+    const updateConfig = vi.fn(async (_intent: UpdateProfileConfigIntent) => configResult())
+
+    $agentBoxProfiles.set([profile()])
+
+    render(<ProfilesView maintenance={maintenancePort({ update, updateConfig })} onClose={vi.fn()} />)
+
+    fireEvent.change(await screen.findByRole('textbox', { name: 'Name' }), { target: { value: 'builder' } })
+    fireEvent.click(saveButton())
+
+    await waitFor(() => expect(field('Name').value).toBe('Builder (normalized)'))
+    expect($agentBoxProfiles.get()[0]).toMatchObject({ displayName: 'Builder (normalized)', version: 7 })
+    expect(update).toHaveBeenCalledTimes(1)
+    expect(update).toHaveBeenCalledWith({ displayName: 'builder', expectedVersion: 3, profileId: 'profile-reviewer' })
+    expect(updateConfig).not.toHaveBeenCalled()
+    // The submitted value is gone, so there is no stale dirty state to save.
+    expect(screen.queryByRole('button', { name: 'Save profile' })).toBeNull()
+  })
+
   it('sends the whole configuration: untouched and locked values kept, restored values dropped', async () => {
     const updateConfig = vi.fn(async (_intent: UpdateProfileConfigIntent) => configResult())
     const update = vi.fn(async () => profile())
@@ -354,9 +377,9 @@ describe('AgentBox ProfilesView', () => {
     })
   })
 
-  it('keeps the renamed profile and the draft when only the configuration update fails', async () => {
+  it('keeps the service-normalized name and the draft when only the configuration update fails', async () => {
     const update = vi.fn(async (intent: { displayName: string }) =>
-      profile({ displayName: intent.displayName, version: 7 })
+      profile({ displayName: `${intent.displayName} (normalized)`, version: 7 })
     )
 
     const updateConfig = vi.fn(async (_intent: UpdateProfileConfigIntent) => {
@@ -373,7 +396,8 @@ describe('AgentBox ProfilesView', () => {
 
     await waitFor(() => expect(updateConfig).toHaveBeenCalledTimes(1))
     expect(await screen.findByText('CONFLICT_VERSION')).toBeTruthy()
-    expect($agentBoxProfiles.get()[0]).toMatchObject({ displayName: 'Renamed', version: 7 })
+    expect($agentBoxProfiles.get()[0]).toMatchObject({ displayName: 'Renamed (normalized)', version: 7 })
+    expect(field('Name').value).toBe('Renamed (normalized)')
     expect(field('Notes').value).toBe('edited')
 
     // Retrying resumes at the version the successful rename returned, and does
@@ -385,7 +409,7 @@ describe('AgentBox ProfilesView', () => {
     expect(updateConfig.mock.calls[1]?.[0]).toMatchObject({ expectedVersion: 7, profileId: 'profile-reviewer' })
   })
 
-  it('saves once while the save is still pending', async () => {
+  it('holds the name input and the configuration controls while a save is pending', async () => {
     let settle!: (result: ProfilesUpdateConfigResult) => void
 
     const updateConfig = vi.fn(
@@ -410,12 +434,17 @@ describe('AgentBox ProfilesView', () => {
 
     expect(updateConfig).toHaveBeenCalledTimes(1)
     expect(update).not.toHaveBeenCalled()
+    // Nothing may build intent the in-flight request cannot carry.
+    expect(field('Name').disabled).toBe(true)
+    expect(field('Notes').disabled).toBe(true)
+    expect(button.hasAttribute('disabled')).toBe(true)
 
     await act(async () => {
       settle(configResult({ profile: profile({ version: 4 }) }))
     })
 
     expect(await screen.findByText('Profile configuration saved. It applies to the next send.')).toBeTruthy()
+    expect(field('Name').disabled).toBe(false)
   })
 
   it('adopts the descriptor the service normalizes to after saving, and states the effect timing', async () => {

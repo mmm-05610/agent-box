@@ -313,7 +313,11 @@ function ProfileDetail({ maintenance, profile, serviceOffline }: ProfileDetailPr
           profileId: current.id
         })
 
+        // The service record is authoritative: adopt the name it returned,
+        // including any normalization, so the field never keeps showing a
+        // submission the service already replaced.
         upsertAgentBoxProfile(current)
+        setDisplayName(current.displayName)
       }
 
       if (configDirty && editableDescriptor) {
@@ -324,6 +328,7 @@ function ProfileDetail({ maintenance, profile, serviceOffline }: ProfileDetailPr
         })
 
         upsertAgentBoxProfile(result.profile)
+        setDisplayName(result.profile.displayName)
         setDraft(emptyProfileConfigDraft())
         setSavedFor(result.effectiveFor)
         setDescriptor(await readDescriptor())
@@ -349,6 +354,7 @@ function ProfileDetail({ maintenance, profile, serviceOffline }: ProfileDetailPr
             <Input
               aria-label={copy.nameLabel}
               className="max-w-sm text-sm font-semibold"
+              disabled={saving}
               onChange={event => setDisplayName(event.currentTarget.value)}
               value={displayName}
             />
