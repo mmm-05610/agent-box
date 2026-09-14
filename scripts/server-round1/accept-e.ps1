@@ -3,6 +3,7 @@ param(
     [Parameter(Mandatory = $true)][string]$SourceLinuxPath,
     [Parameter(Mandatory = $true)][string]$DataRoot,
     [Parameter(Mandatory = $true)][string]$ManifestPath,
+    [Parameter(Mandatory = $true)][string]$WireSchemaPath,
     [Parameter(Mandatory = $true)][string]$LinuxWorkerPath,
     [Parameter(Mandatory = $true)][string]$WorkspaceLinuxPath,
     [string]$Distribution = "Ubuntu",
@@ -18,6 +19,21 @@ if (Test-Path -LiteralPath $DataRoot) {
 }
 if (-not (Test-Path -LiteralPath $ManifestPath)) {
     throw "Worker manifest is unavailable to Windows: $ManifestPath"
+}
+if (-not (Test-Path -LiteralPath $WireSchemaPath -PathType Leaf)) {
+    throw "Locked wire schema is unavailable to Windows: $WireSchemaPath"
+}
+try {
+    $wireSchema = Get-Content -LiteralPath $WireSchemaPath -Raw | ConvertFrom-Json
+    $wireKeys = @($wireSchema.PSObject.Properties.Name)
+    $wireMethods = @($wireKeys | Where-Object { $_ -match '#params$' } |
+        ForEach-Object { $_ -replace '#params$', '' })
+    if ($wireMethods.Count -ne 28 -or
+        @($wireMethods | Where-Object { $wireKeys -notcontains ($_ + '#result') }).Count -ne 0) {
+        throw "Locked wire schema must contain 28 method parameter/result pairs"
+    }
+} catch {
+    throw "Locked wire schema validation failed: $($_.Exception.Message)"
 }
 
 $workspaceMarker = "$WorkspaceLinuxPath/.agentbox-server-r1-acceptance-e"
@@ -43,6 +59,7 @@ $env:PYTHONPATH = (Join-Path $SourceRoot "src") + ";" + `
     (Join-Path $SourceRoot "plugins/agent-box-sandbox-bwrap/src")
 $env:AGENT_BOX_WSL_WORKER_MANIFEST = $ManifestPath
 $env:AGENT_BOX_WSL_WORKER_LINUX_PATH = $LinuxWorkerPath
+$env:AGENT_BOX_WIRE_SCHEMA = $WireSchemaPath
 
 $pluginRoot = Join-Path $SourceRoot "plugins/agent-box-harnesses"
 $deploymentPath = Join-Path ([IO.Path]::GetTempPath()) `
@@ -373,12 +390,19 @@ try {
     if ($null -ne $socket) { $socket.Dispose() }
     if ($null -ne $process -and -not $process.HasExited) {
         Stop-Process -Id $process.Id -ErrorAction SilentlyContinue
-        $process.WaitForExit()
+        if (-not $process.WaitForExit(10000)) { throw "Server process did not exit during cleanup" }
     }
     Remove-Item -LiteralPath $stdoutPath, $stderrPath, $deploymentPath `
         -Force -ErrorAction SilentlyContinue
     if ($Cleanup -and (Test-Path -LiteralPath $DataRoot)) {
+        $dataItem = Get-Item -LiteralPath $DataRoot -Force
+        if (-not $dataItem.PSIsContainer -or (($dataItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0)) {
+            throw "Data cleanup refused: data root is not a real directory"
+        }
         $marker = Join-Path $DataRoot ".agentbox-server-root"
+        if (-not (Test-Path -LiteralPath $marker -PathType Leaf)) { throw "Data cleanup refused: owner marker missing" }
+        $markerItem = Get-Item -LiteralPath $marker -Force
+        if (($markerItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw "Data cleanup refused: owner marker is a link" }
         $markerText = (Get-Content -LiteralPath $marker -Raw) -replace "`r`n", "`n"
         if ($markerText -eq "agentbox-server-r1`n") {
             Remove-Item -LiteralPath $DataRoot -Recurse -Force
@@ -391,5 +415,13 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "Workspace cleanup refused: owner marker missing" }
         & wsl.exe --distribution $Distribution --exec /usr/bin/rm -r -- $WorkspaceLinuxPath
         if ($LASTEXITCODE -ne 0) { throw "Workspace cleanup failed" }
+        & wsl.exe --distribution $Distribution --exec /usr/bin/test -e -- $WorkspaceLinuxPath
+        if ($LASTEXITCODE -eq 0) { throw "Workspace cleanup left residual data" }
+        try {
+            $probe = New-Object Net.Sockets.TcpClient
+            $probe.Connect("127.0.0.1", $Port)
+            $probe.Dispose()
+            throw "Server port remains reachable after cleanup: $Port"
+        } catch [System.Net.Sockets.SocketException] { }
     }
 }

@@ -123,6 +123,11 @@ def test_windows_http_wsl_bwrap_two_turns_and_restart(tmp_path):
     second = _runtime(root, "server_22222222222222222222222222222222", secrets)
     with TestClient(create_app(second), base_url="http://127.0.0.1") as client:
         headers = {"Authorization": f"Bearer {token}"}
+        recovered = client.get(f"/api/v1/sessions/{session['session_id']}", headers=headers)
+        assert recovered.status_code == 200, recovered.json()
+        # Startup recovery must replay the Windows authority without creating
+        # another dispatch for either already-terminal turn.
+        assert [turn["state"] for turn in recovered.json()["turns"]] == ["completed", "completed"]
         third_turn = _post(client, headers, f"/api/v1/sessions/{session['session_id']}/turns", {
             "text": "recall after restart", "expected_profile_revision": 1,
         }, "turn-three")
