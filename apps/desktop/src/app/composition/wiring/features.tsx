@@ -36,7 +36,7 @@ import { useWindowControlsOverlayWidth } from '@/app/shell/platform/use-window-c
 import { useHermesConfigRecord } from '@/application/config/use-config-record'
 import { refreshActiveProfile } from '@/application/profile/catalog'
 import { getLatestSessionMessages } from '@/application/session-transcripts'
-import { mainChatOccupied, openSession } from '@/application/session/open-session'
+import { openSession } from '@/application/session/open-session'
 import { createSessionRpcDispatcher } from '@/application/session/session-rpc-dispatcher'
 import { useSessionHandback } from '@/application/session/window-handoff'
 import { closeAllTerminals } from '@/application/terminal/terminals'
@@ -547,20 +547,12 @@ export function ContribWiring({ children }: { children: ReactNode }) {
   // workspace; an explicit worktree path also drills the sidebar into that
   // project so the new lane is visible.
   //
-  // `openTab` is the sidebar "+" behavior: once a chat is loaded, stack a new
-  // tab instead of replacing it (see mainChatOccupied). The composer's
-  // "branch off into a new worktree" flow keeps the fresh-draft path — it
-  // prefills the MAIN composer right after, so it has to own that surface.
+  // Workspace selection always takes the existing product surface to a local
+  // draft. It must never spend a backend Session merely because main already
+  // displays history; the first Send is the creation boundary.
   const startSessionInWorkspace = useCallback(
-    (path: null | string, options?: { openTab?: boolean }) => {
+    (path: null | string) => {
       setWorkspaceScope('sessions')
-
-      if (options?.openTab && mainChatOccupied(activeSessionIdRef.current, $selectedStoredSessionId.get())) {
-        void openNewSessionTile('center', { cwd: path, listed: false })
-
-        return
-      }
-
       startWorkspaceSession({
         activeSessionIdRef,
         followActiveSessionCwd,
@@ -570,7 +562,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
         startFreshSessionDraft
       })
     },
-    [activeSessionIdRef, openNewSessionTile, requestGateway, startFreshSessionDraft]
+    [activeSessionIdRef, requestGateway, startFreshSessionDraft]
   )
 
   // Composer "branch off into a new worktree": open a fresh session anchored
@@ -585,7 +577,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     }
 
     lastStartWorkTokenRef.current = startWorkSessionRequest.token
-    startSessionInWorkspace(startWorkSessionRequest.path, { openTab: startWorkSessionRequest.openTab })
+    startSessionInWorkspace(startWorkSessionRequest.path)
 
     if (startWorkSessionRequest.draft) {
       requestComposerInsert(startWorkSessionRequest.draft, { target: 'main' })
@@ -953,7 +945,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     onEdit: editMessage,
     onLoadMoreSessions: loadMoreSessions,
     onNavigate: selectSidebarItem,
-    onNewSessionInWorkspace: path => startSessionInWorkspace(path, { openTab: true }),
+    onNewSessionInWorkspace: path => startSessionInWorkspace(path),
     onNewSessionSplit: (dir, opts) =>
       void openNewSessionTile(dir, {
         ...opts,

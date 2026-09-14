@@ -23,18 +23,14 @@ import { $projectTree, projectRootCwd } from './scope'
 
 /** Worktree/git doors: start work in a repo, branch listing and switching,
  *  worktree dialogs, and path reveal/copy. */
-export function goToProject(id: string, options?: { newSession?: boolean }): void {
+export function goToProject(id: string): void {
   setSidebarAgentsGrouped(true)
   enterProject(id)
-
-  if (!options?.newSession) {
-    return
-  }
 
   const cwd = projectRootCwd($projectTree.get().find(node => node.id === id))
 
   if (cwd) {
-    requestStartWorkSession(cwd, undefined, { openTab: true })
+    requestStartWorkSession(cwd)
   } else {
     requestFreshSession()
   }
@@ -152,8 +148,6 @@ export async function switchBranchInRepo(repoPath: string, branch: string): Prom
 // effect even if the path repeats.
 export interface StartWorkSessionRequest {
   draft?: string
-  /** Stack the fresh session as a tab when main already holds a chat (palette/⌘O opens-from-nowhere). */
-  openTab?: boolean
   path: string
   token: number
 }
@@ -197,7 +191,7 @@ export function closeWorktreeDialog(): void {
 
 let startWorkToken = 0
 
-export function requestStartWorkSession(path: string, draft?: string, options?: { openTab?: boolean }): void {
+export function requestStartWorkSession(path: string, draft?: string): void {
   const target = path.trim()
 
   if (!target) {
@@ -207,7 +201,6 @@ export function requestStartWorkSession(path: string, draft?: string, options?: 
   startWorkToken += 1
   $startWorkSessionRequest.set({
     draft: draft?.trim() || undefined,
-    openTab: options?.openTab || undefined,
     path: target,
     token: startWorkToken
   })
@@ -322,5 +315,5 @@ export async function openFolderAsProject(dir?: string): Promise<void> {
     }
   }
 
-  requestStartWorkSession(target, undefined, { openTab: true })
+  requestStartWorkSession(target)
 }

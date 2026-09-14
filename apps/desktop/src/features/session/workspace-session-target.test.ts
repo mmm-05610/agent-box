@@ -128,4 +128,26 @@ describe('startWorkspaceSession', () => {
 
     expect($newChatProfile.get()).toBe('work')
   })
+
+  it('replaces an occupied chat with a workspace draft without creating a backend session', async () => {
+    const activeSessionIdRef = { current: 'runtime-existing' as string | null }
+    const requestGateway = vi.fn(async () => ({ branch: 'main', cwd: '/workspace-next' }))
+
+    const startFreshSessionDraft = vi.fn(() => {
+      activeSessionIdRef.current = null
+    })
+
+    startWorkspaceSession({
+      activeSessionIdRef,
+      path: '/workspace-next',
+      requestGateway,
+      startFreshSessionDraft
+    })
+
+    await vi.waitFor(() => expect(requestGateway).toHaveBeenCalled())
+
+    expect(startFreshSessionDraft).toHaveBeenCalledWith({ workspaceTarget: '/workspace-next' })
+    expect(requestGateway.mock.calls.map(([method]) => method)).toEqual(['config.get'])
+    expect(requestGateway).not.toHaveBeenCalledWith('session.create', expect.anything())
+  })
 })

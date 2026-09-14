@@ -13,6 +13,7 @@ import {
   $projectScope,
   $projectsRpcAvailable,
   $projectTree,
+  $startWorkSessionRequest,
   $worktreeRefreshToken,
   ALL_PROJECTS,
   createProject,
@@ -991,6 +992,7 @@ describe('openFolderAsProject dedupe (round 36: pick a directory → open direct
     $projectTree.set([])
     $projectScope.set(ALL_PROJECTS)
     $projectsRpcAvailable.set(true)
+    $startWorkSessionRequest.set(null)
     setShowAllProfiles(false)
   })
 
@@ -1032,6 +1034,8 @@ describe('openFolderAsProject dedupe (round 36: pick a directory → open direct
     // Both opens entered the SAME project: no projects.create was ever sent,
     // and the sidebar scopes to it (the active pin lands via the RPC echo).
     expect(request).not.toHaveBeenCalledWith('projects.create', expect.anything())
+    expect(request).not.toHaveBeenCalledWith('session.create', expect.anything())
     expect($projectScope.get()).toBe('p_web')
+    expect($startWorkSessionRequest.get()).toMatchObject({ path: '/repos/website' })
   })
 })

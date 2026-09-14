@@ -973,8 +973,9 @@ export function ChatSidebar({
       }
 
       enterProject(id)
+      onNewSessionInWorkspace(project?.path ?? null)
     },
-    [projectModel, syncProjectCwd]
+    [onNewSessionInWorkspace, projectModel, syncProjectCwd]
   )
 
   // The unified workspace projection (36R): local rows from the ordered

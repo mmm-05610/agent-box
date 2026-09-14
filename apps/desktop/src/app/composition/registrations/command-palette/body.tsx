@@ -326,11 +326,10 @@ export function CommandPaletteBody({ onExited }: { onExited: () => void }) {
     const cc = t.commandCenter
 
     // Projects are the primary way the desktop scopes work, so they're jumpable
-    // from the palette. Plain select is a pure scope switch (sidebar enters the
-    // project — never spends main); ⌘-Enter / ⌘-click also starts a new session
-    // at the project root (stacked as a tab when main holds a chat), previewed
-    // by the label swap while ⌘ is held. Rows carry the project's own codicon,
-    // matching the sidebar. The pinned "Open folder…" row is the ⌘O upsert.
+    // from the palette. Selecting one opens its local new-session draft; the
+    // backend Session does not exist until the first Send. Rows carry the
+    // project's own codicon, matching the sidebar. The pinned "Open folder…"
+    // row is the ⌘O upsert.
     const projectGroup: PaletteGroup = {
       heading: cc.projects,
       items: [
@@ -343,14 +342,11 @@ export function CommandPaletteBody({ onExited }: { onExited: () => void }) {
           run: () => void openFolderAsProject()
         },
         ...filterVisibleProjects(projectTree, dismissedAutoProjects).map(project => ({
-          comboHint: 'mod+enter',
           icon: codiconIcon(project.icon || (project.isNoProject ? 'home' : 'folder-library')),
           id: `project-${project.id}`,
           keywords: ['project', 'workspace', 'go to', project.label, ...(project.path ? [project.path] : [])],
           label: project.label,
-          modLabel: cc.newSessionInProject(project.label),
-          runWithEvent: (event?: { ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean }) =>
-            goToProject(project.id, { newSession: Boolean(event?.metaKey || event?.ctrlKey) })
+          run: () => goToProject(project.id)
         }))
       ]
     }
