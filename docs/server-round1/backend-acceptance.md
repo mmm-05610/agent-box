@@ -1,10 +1,13 @@
 # Work Order 41 — 核心产品合同与后端独立验收
 
-日期：2026-09-14。当前状态：**`BACKEND_WINDOWS_R4_READY`**（Windows r4 平台门通过；整体后端仍非 READY）。
-分支 `feature/server-harness-extension-v1`；native state代码检查点为 `3e4282b`，25方法/Windows基线检查点为
-`72d6258`。此结论只代表后端独立门，不代表
-真实模型或全栈 Green。41 全程使用显式 no-model ACP fixture，未读模型凭据、未发模型请求，
-费用 ¥0；42 已有费用账继续单独累计。
+日期：2026-09-14。当前状态：**`BACKEND_WINDOWS_R4_READY`**（Windows r4 平台门通过；整体后端仍非
+READY，**未登记** `BACKEND_IMPLEMENTATION_READY`）。
+分支 `feature/server-harness-extension-v1`。三个 r4 相关检查点必须分开，不可互相替代：native-state
+实现基础为 `3e4282b`、r4 验收脚本/测试代码检查点为 `713b2e3`、已提交脚本上的 r4 复跑证据检查点为
+`87b17a3`；另列 25方法/Windows基线检查点 `72d6258`。`3e4282b` 只是 native-state 的实现基础，**不是**
+当前 r4 后端检查点。此结论只代表后端独立门，不代表真实模型或全栈 Green。41 全程使用显式 no-model
+ACP fixture，未读模型凭据、未发模型请求，费用 ¥0；42 已有费用账继续单独累计（累计 1 次/12 tokens/
+`<¥0.01`，上限 ¥10；本阶段增量 ¥0）。
 
 ## E2 — Windows r4（`BACKEND_WINDOWS_R4_READY`）
 
@@ -20,14 +23,24 @@ Windows `py.exe -3.12`（Python 3.12.10）启动真实 Server，真实 `wsl.exe`
   终止前增量、正式 WebSocket cursor、取消、审批、归档、历史保留。
 - 有状态门：第一轮写入固定 nonce 并 completed；从 Windows DataRoot ObjectStore 直接读取 Server
   返回的 checkpoint（schema 2、`resumable:true`、`harnessType` 与 Profile 一致、files 的
-  path/size/digest 合法且能在 ObjectStore 命中、内容摘要与 Server 给出的 digest 一致）；
-  停止后同一 DataRoot 重启，锁持有实例改变且稳定 server_id 不变；第二轮经正式 wire `sessions.send`
-  恢复同一 native id、fixture 记录 ACP 动作为 `session/resume`（非 `session/new`）、回出首轮 nonce，
-  且 `message.delta`（seq 10）先于 completed（seq 12）。
+  path/size/digest 合法且能在 ObjectStore 命中、内容摘要与 Server 给出的 digest 一致）；该
+  checkpoint 元数据经 Server 的 Session REST read projection（`GET /api/v1/sessions/{id}`）读取，
+  不是 wire 方法（wire 没有 `sessions.get`）。
+- 停止与重启语义：本轮实际 `stop_mode=tree_terminate`，即 `taskkill /T /F` 的**有界进程树强制终止**，
+  不是正常/graceful 关闭；它验证的是强制终止后的崩溃式重启恢复。重启后 DataRoot 锁的持有实例由
+  `server_6dd995a9dfd14795b6ad975f249ae9e9`（第一次停止后）变为
+  `server_79296dd8029948d0bf7c18bff0ae24cf`（最终停止后），证明锁已释放并被重启实例重新获取，而稳定
+  server_id `server_639bc04679554c66ac6b1e77661e70f1` 不变。
+- 第二轮经正式 wire `sessions.send` 恢复同一 native id、fixture 记录 ACP 动作为 `session/resume`
+  （非 `session/new`）、回出首轮 nonce，且 `message.delta`（seq 10）先于 completed（seq 12）。
 - 清理：DataRoot 按 owner marker 删除、WSL workspace 删除并断言不存在、端口无监听、无残留
   Server/Worker/sidecar 进程、Worker views/secrets 无残留；随后独立进程 `-PostCheck` 再次复核通过。
 - 反例：无 marker / marker 不匹配 / reparse 目标 / 非目录拒绝清理；不可用 checkpoint 的 5 种变体
   必须失败且不得新造 native 会话或静默成功。
+
+本节边界：r4 证明的是 `tree_terminate` 有界强制树终止后的**崩溃式重启**、DataRoot 锁释放/重新获取
+与 native `session/resume`；正常 Desktop/Server 生命周期退出（graceful 关闭路径）与最终清理仍保留为
+后续全栈最终验收项，本轮不宣称已覆盖。
 
 两个必须记录的工件更正：
 
@@ -48,8 +61,9 @@ Windows `py.exe -3.12`（Python 3.12.10）启动真实 Server，真实 `wsl.exe`
 及发送结果回查，并以 `3aba5c5c` 提交队列终态修订，总计28方法。当前 TS 摘要
 `11e3b3e70d332585d31900c09ba063d95aa6b72b1904921c665fb72f81c10035`，生成工件
 `5d4fa3bfeec6c3273c6073b37794e4ab2aca6e07e48184bc3a2b878c1fe5e4ed`。后端直接按工件
-**29/29通过**，当前摘要已锁定，精确确认见 [wire-review.md](wire-review.md)。Windows r4 完成前，
-本文件不冒称最终 READY。
+**29/29通过**，当前摘要已锁定，精确确认见 [wire-review.md](wire-review.md)。Windows 平台门已通过
+（r4 见下节），但整体 `BACKEND_IMPLEMENTATION_READY` 仍未登记：Pi/Hermes/OpenCode 生产封装与四家
+真实模型门待完成，前端双门也未满足。
 
 ### 已完成的25方法稳定基线
 
@@ -138,9 +152,10 @@ Worker/Server/sidecar 残留进程。WSL 输出含本机 NAT/localhost 警告乱
 首次尝试把 manifest 放 `/tmp`，Windows UNC 不可见，脚本在服务/数据创建前 exit 1；改为同一用户
 缓存目录后通过。没有绕过权限或把此误记为平台阻断。
 
-历史轮说明：r3（端口 18743）为旧代码证据；r4 已在 `3e4282b` 的 native-state 路径上重跑并关闭 41
-平台门。但整体后端 READY 仍受 Pi/Hermes/OpenCode 生产封装、逐家真实模型门与前端双门约束，见
-[fullstack/progress.md](fullstack/progress.md)。
+历史轮说明：r3（端口 18743）为旧代码证据；r4 的验收脚本/测试代码检查点为 `713b2e3`，其证据是在该
+已提交脚本上复跑取得（记录检查点 `87b17a3`），运行在 `3e4282b` 的 native-state 实现基础上并关闭 41
+平台门；`3e4282b` 本身不是 r4 检查点。但整体后端 READY 仍受 Pi/Hermes/OpenCode 生产封装、逐家真实
+模型门与前端双门约束，见 [fullstack/progress.md](fullstack/progress.md)。
 
 ## 最终验证账
 
@@ -198,13 +213,18 @@ schema 失败关闭。当前 wire 已恢复 `WIRE_LOCKED_FOR_IMPLEMENTATION`。W
 SecretStore 按 locator 读取、Worker `secret.put` 一次性帧、bwrap 固定只读秘密挂载、adapter 声明式
 环境注入以及所有退出路径的 `secret.cleanup`；模型进入 sidecar `create`/`prompt`，密钥不进入 argv、
 普通对象或事件。相关回归为 Server 45 passed、Worker/bwrap 32 passed、Node envelope 4 passed。
-这些是代码/组件证据，尚未冒充真实 Harness 模型证据。当前后端代码检查点为 `3e4282b`；41 的独立
-Windows 门已由 r4 对锁定工件与最新 native-state 路径重确认（见 E2）。整个后端 READY 仍另受
-四家生产封装/真实模型门约束。
+这些是代码/组件证据，尚未冒充真实 Harness 模型证据。r4 相关检查点为 native-state 实现基础
+`3e4282b`、r4 验收脚本/测试代码 `713b2e3`、已提交脚本上的 r4 复跑证据 `87b17a3`；41 的独立
+Windows 门已由 r4 对锁定工件与最新 native-state 路径重确认（见 E2），且 r4 的停止路径是
+`tree_terminate` 有界强制终止，不是正常退出。整个后端 READY 仍另受四家生产封装/真实模型门约束，
+当前**未登记** `BACKEND_IMPLEMENTATION_READY`；`workbench_model_verified_count=0`（四家真实模型验证
+数仍为 0），累计费用 1 次/12 tokens/`<¥0.01`（上限 ¥10），本阶段增量 ¥0。
 四家组件仍保持 40 的
 `COMPONENT_VERIFIED / MODEL_NOT_VERIFIED` 分账。Pi/Hermes/OpenCode 的 DeepSeek Provider 配置与
 独立真实模型门以及 Codex 官方 Responses 隔离配置验证进入 42-D；前端仍由其独立 writer 施工，当前不具备跨仓
-写权，未执行全栈联调。
+写权，未执行全栈联调。前端只读观察（2026-09-14 14:24 +08:00）：HEAD `b02093ce`、
+`frontend_implementation=PARTIAL`、`writer_lease=ACTIVE`、工作树 dirty，详见
+[fullstack/progress.md](fullstack/progress.md) §A。
 
 ### Native state / 官方 Codex 隔离配置增量（13:24）
 

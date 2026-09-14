@@ -16,13 +16,18 @@ Windows 真机、`py.exe -3.12`、真实 `wsl.exe`、digest 固定的 release Wo
 
 逐项证据：
 
-- **重启**：第一轮完成后按 `tree_terminate` 停止 Server（py.exe 启动器持有 python.exe 子进程，树终止才是
-  真正的停止），随后以同一 DataRoot 重启并恢复 live；`server.hello` 返回同一稳定 server_id
-  `server_639bc04679554c66ac6b1e77661e70f1`，而 DataRoot 锁的持有实例由
-  `server_381e665d…` 变为 `server_668faae8…`，即锁已释放并由新进程重新获取。锁文件在持有期间被
-  Windows 字节区间锁保护、不可读，因此“停后仍可读”本身即释放证据。
+- **崩溃式重启（`stop_mode=tree_terminate`）**：第一轮完成后，脚本以 `taskkill /T /F` 做**有界进程树
+  强制终止**才真正结束 Server（py.exe 启动器持有 python.exe 子进程），随后以同一 DataRoot 重启并
+  恢复 live；`server.hello` 返回同一稳定 server_id `server_639bc04679554c66ac6b1e77661e70f1`。
+  DataRoot 锁（`server.lock`）的持有实例在第一次停止后为
+  `server_6dd995a9dfd14795b6ad975f249ae9e9`，最终停止后为 `server_79296dd8029948d0bf7c18bff0ae24cf`；
+  两者不同，即锁已由前一实例释放并被重启后的实例重新获取（脚本把两者相等直接判为清理问题）。锁文件
+  在持有期间被 Windows 字节区间锁保护、不可读，因此“停后仍可读”本身即释放证据。
+  该路径是**强制终止后的恢复门**，**不是**正常/graceful 关闭：Server 的完整生命周期退出与最终清理
+  仍留作全栈最终验收项，本轮未覆盖。
 - **同 native id resume**：第二轮 checkpoint 的 `nativeSessionId` 与第一轮相同（`stateful-13`），
-  `sessions.get` 的 `checkpoint.native_id` 未变；fixture 在第二轮只接受
+  Server 的 Session REST read projection（`GET /api/v1/sessions/{id}`；wire 里没有，也不存在
+  `sessions.get` 方法）返回的 `checkpoint.native_id` 亦未变；fixture 在第二轮只接受
   `session/load`/`session/resume`，遇到 `session/new` 会以 `-32011` 拒绝，而捕获到的
   `reopen-method.txt` 记录第二轮实际发送的是 `session/resume`（首轮为 `session/new`），且第二轮
   返回了首轮 nonce `STATEFUL-NONCE-R4-7F3A9C`。
@@ -49,7 +54,12 @@ Windows 真机、`py.exe -3.12`、真实 `wsl.exe`、digest 固定的 release Wo
   全 Session 只有首轮一次 dispatch accepted。
 
 上方 JSON 取自提交检查点上的独立复跑（同一脚本、同一锁定工件、退出码 0），此前一次同结构运行亦
-exit 0；两次的实例/会话标识不同，结构与断言语义一致，记录值即复跑值。
+exit 0；两次的实例/会话标识不同，结构与断言语义一致，记录值即复跑值——本节的锁实例、稳定
+server_id、checkpoint digest 与其他标识一律以上方 JSON 为准，不引用首跑的旧值。
+
+检查点区分（三个不可互相替代）：native-state 实现基础为 `3e4282b`，r4 验收脚本/测试代码检查点为
+`713b2e3`，本节证据是**已提交脚本上的 r4 复跑结果**，记录检查点为 `87b17a3`。`3e4282b` 只是
+native-state 的实现基础，不是 r4 后端检查点。
 
 环境与工件（本轮实测）：Windows 10.0.26200.9445、PowerShell 5.1.26100.9444、
 Windows Python 3.12.10（`C:\WINDOWS\py.exe -3.12`）、WSL `Ubuntu`、Node v22.23.2、`/usr/bin/bwrap`；
@@ -84,6 +94,10 @@ Worker `sha256:bb90e346bbd857f02eba8d267f47c3ce793d30c9894ca823dc09c482d886f5eb`
 
 41 平台门记为 `BACKEND_WINDOWS_R4_READY`。**不**登记整体 `BACKEND_IMPLEMENTATION_READY`：
 Pi/Hermes/OpenCode 生产封装与四家真实模型门仍未完成，前端也未满足双门，故仍未进入全栈联调。
+r4 证明的是 `tree_terminate` 有界强制树终止后的崩溃式重启、DataRoot 锁释放/重新获取与 native
+`session/resume`；正常 Desktop/Server 生命周期退出与最终清理仍是后续全栈最终验收项，本轮不宣称
+已覆盖。`workbench_model_verified_count` 仍为 **0**；费用账仍为累计 1 次/12 tokens/`<¥0.01`
+（上限 ¥10），本阶段增量 ¥0。goal 未完成，也未进入全栈联调。
 
 ### 精确命令与结果
 
@@ -186,7 +200,30 @@ powershell.exe -File accept-e.ps1 … -Port 18744 -PostCheck -InstanceId <两实
 
 ## A — 前端只读观察与 wire 增量协作
 
-后端在41收口期间按42-A同等写权约束做只读检查（未写前端任何文件、未杀其进程、未发第二个 goal）：
+后端在41收口期间按42-A同等写权约束做只读检查（未写前端任何文件、未杀其进程、未发第二个 goal）。
+
+### 2026-09-14 14:24 +08:00 — 最新只读观察（本文件引用前端事实以此为准）
+
+- 工作树 `/home/maoqh/projects/agent-box-desktop-next-wsl-round1`，分支
+  `feature/agentbox-desktop-product`，实际 HEAD `b02093ce9ee60dfaea7867afefe3500262ec8cc0`
+  （`docs(desktop): audit the 28-method client matrix`，提交于 2026-09-14 14:11:55 +08:00）。
+  工作树 **dirty**：17 个已修改文件（composer/Profile/i18n 等生产与测试文件）+ 1 个未跟踪测试文件，
+  属正在施工；后端不取写权。
+- 其 `docs/desktop-product-delivery/status.md`：`frontend_implementation=PARTIAL`
+  （当前阶段为 P05 客户端矩阵只读审计：22 PRODUCTION_REACHABLE、6 FIXTURE_ONLY_FRONTEND_GAP、
+  0 CLIENT_READY_NO_SURFACE、1 EXTERNAL_LIFECYCLE_BLOCKED；P04 production lifecycle connection 与
+  P06 无模型独立验收待续，`REAL_FLOW_VERIFIED=否`），
+  `writer_lease=ACTIVE — Codex frontend goal`（09:20 接管；声明完成后停止写入并回报，不提前 RELEASE），
+  尚未达到 `DESKTOP_IMPLEMENTATION_READY`。该文件自述 `updated_at: 2026-09-14 14:32 (+08:00)`，
+  晚于其文件 mtime（14:11:24）与 HEAD 提交时间（14:11:55）；按只读观察如实记录并报告，不改前端。
+- wire 摘要未变：就地重算 `apps/desktop/src/types/wire/wire-v1.ts` =
+  `11e3b3e70d332585d31900c09ba063d95aa6b72b1904921c665fb72f81c10035`、
+  `docs/desktop-product-delivery/contracts/wire-v1/generated/wire-v1.schema.json` =
+  `5d4fa3bfeec6c3273c6073b37794e4ab2aca6e07e48184bc3a2b878c1fe5e4ed`，生成工件内仍为 28 个方法，
+  与后端锁定值一致，故锁保持 `WIRE_LOCKED_FOR_IMPLEMENTATION`：未重锁、未改合同。
+- 前端 ACTIVE/dirty 不是阻断，不构成接管条件；后端未写前端任何文件、未杀其进程。
+
+### 2026-09-14 12:15 +08:00 — 上一轮观察（历史）
 
 - 工作树 `/home/maoqh/projects/agent-box-desktop-next-wsl-round1`，2026-09-14 12:15 +08:00
   实际 HEAD `3aba5c5c8743401b964f80c88bd43e847fa3d5a8`；writer 正在 P04 下一切片，工作树非 clean。
@@ -202,7 +239,7 @@ powershell.exe -File accept-e.ps1 … -Port 18744 -PostCheck -InstanceId <两实
 
 | 门 | 判定 | 依据 |
 | --- | --- | --- |
-| BACKEND_IMPLEMENTATION_READY | **否（暂时）** | 28方法+队列终态已锁定并29/29；Windows r4 平台门已通过（含 native state 重启/`session/resume`/清理与独立 `-PostCheck`）；Pi/Hermes/OpenCode生产封装与逐家真实门待完成 |
+| BACKEND_IMPLEMENTATION_READY | **否（暂时）** | 28方法+队列终态已锁定并29/29；Windows r4 平台门已通过（`stop_mode=tree_terminate` 有界强制树终止后的崩溃式重启、DataRoot 锁释放/重新获取、同 native id `session/resume`、终止前 delta、ObjectStore checkpoint、清理与独立 `-PostCheck`；正常生命周期退出未覆盖）；Pi/Hermes/OpenCode生产封装与逐家真实门待完成 |
 | DESKTOP_IMPLEMENTATION_READY | **否** | 前端自报 PARTIAL，且 `writer_lease=ACTIVE`（未释放）；独立实现/验收门未完 |
 
 因此仍**没有**记录 `FULLSTACK_INTEGRATION_OWNER`，**没有**接管前端工作树，
@@ -261,8 +298,9 @@ powershell.exe -File accept-e.ps1 … -Port 18744 -PostCheck -InstanceId <两实
 
 ## E — 最终验收与提交
 
-未执行（依赖双门与真实门）。41 的25方法/Windows基线检查点为 `72d6258`；当前28方法收口已由 r4
-记录（见顶部），跨仓联调仍待双门。
+未执行（依赖双门与真实门）。41 的25方法/Windows基线检查点为 `72d6258`；r4 相关检查点为 native-state
+实现基础 `3e4282b`、r4 验收脚本/测试代码 `713b2e3`、已提交脚本上的 r4 复跑证据 `87b17a3`（见顶部），
+跨仓联调仍待双门。
 更早检查点见 status：
 `b84dc87`(39) → `38b28d6`(40-A) → `05053f9`(40-B) → `340fcad`(40-C) → `b70cd3f`(40-D)
 → `7e9ffd8`(41) → `8eeb422`(42-A 观察) → `978918d`(sidecar 桥)。
