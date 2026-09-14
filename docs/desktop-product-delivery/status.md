@@ -1029,3 +1029,38 @@ typecheck 当场暴露；新测试 4 条 ESLint warning 收口为 0。
 备份恢复）未下单；WSL loopback 基线 2 文件（r1 Windows 裁决仍有效，本轮未改相关模块）；
 4 个 Bot Mode Playwright spec 描述已退役的面且本就需外部真实 Hermes runtime（无则 skip），
 不在 P06 门内、本轮未改；dead legacy 模块与 `hermes-bots` 实现按既有先例保留不删。
+
+---
+
+## release（2026-09-15）：P06 product-surface closeout 结束，写权再次释放
+
+- updated_at: 2026-09-15（+08:00），**writer_lease = RELEASED**（本行之后本文件冻结）
+- 代码检查点: `3b22aae7`（产品面缺口修复 + 驱动扩展 + 测试）
+- 证据检查点: `b2dc261c`（`evidence/P06.md` §14、`evidence/P06-assets-r3/**`、
+  `DESKTOP_IMPLEMENTATION_HANDOFF.md`、P02/P04/P05 追加更正、本文件的执行快照）
+- **最终 HEAD 为本 release 检查点自身**——即 `git rev-parse HEAD`（`git log -1`），
+  它只改本文件，不含代码或证据变更
+- 提交链: `6ddf6be9`（起点，GREEN 暂停）→ `3b22aae7`（产品缺口修复 + 驱动扩展）→
+  `b2dc261c`（证据与状态记录）→ 本 release 检查点
+- **重新声明的终态**（以 r3 Windows 证据为据，`evidence/P06.md` §14.5）：
+  - **P06 = `P06_GREEN — FRONTEND_INDEPENDENT_ACCEPTANCE`** —— r3 驱动
+    **28 PASS / 0 FAIL / 0 SKIP / 0 PENDING，`allOk=true`，exit 0**，两道 legacy REST 门独立成立
+    （main refusals **0**；renderer `residualLegacyPaths` 严格 **`[]`**），Appearance（页面可操作 +
+    语言/resume/终端字体本地持久化 + 该阶段残余 `[]`）与 Bot Mode 退役均为必需步，
+    计数与 steps 机械一致
+  - **`DESKTOP_IMPLEMENTATION_READY`** —— 入口 `evidence/DESKTOP_IMPLEMENTATION_HANDOFF.md`
+  - `REAL_FLOW_VERIFIED = 否`（无真实 Server/Harness/模型链路证据）
+  - `AGENTBOX_DESKTOP_PRODUCT_GREEN = 否 / 待全栈`（外围能力矩阵未下单）
+- **历史保留**：`6ddf6be9` 的 GREEN 因三个产品缺口**暂停**（非作废记录）；r1 失败门证据
+  (`P06-assets/`)、r2 第一次失败 (`P06-assets-r2-attempt1/`)、r2 通过 (`P06-assets-r2/`)
+  与所有历史状态行一律保留，未删除、未改写。本 release 不追认旧结论，结论只建立在 r3 新证据上。
+- 用户通过本派单重新授予的**一次性前端写权已用完并交回**：停写范围含文档 amend。
+  原前端 goal 不因后端等待或其他原因自行恢复写入。
+- **停止写入前的逐项确认**：两个子代理已结束（A/B 均只在其写集内改动，未 stage/commit/改文档/
+  使用 Windows 树）；WSL 无残留 Vitest/Vite/Playwright/Electron/xvfb 进程，Windows 构建树无
+  electron/node/hermes 进程；`git status --short` 为空（含未跟踪文件）；`git diff --check` exit 0
+  （唯一提示是入库的 Windows 捕获日志 CRLF 的 CR，与 r2 证据同规格，规范化会改变捕获字节）。
+- **后端接管**：按 `docs/desktop-product-delivery/handoff-policy.md` 的 42 双门规则，读取本文件与
+  `evidence/DESKTOP_IMPLEMENTATION_HANDOFF.md`，核对分支/HEAD/摘要/可运行性，确认无新前端 writer、
+  无子代理、无未交接修改后，在正式派单指定的工作树记录 `FULLSTACK_INTEGRATION_OWNER` 并安装
+  lifecycle connection。**本轮未开始后端全栈联调，未改后端。**
