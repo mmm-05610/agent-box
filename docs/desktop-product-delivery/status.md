@@ -5,7 +5,7 @@
 
 ## 执行快照（handoff-policy 每阶段必填）— 接管施工中
 
-- updated_at: 2026-09-14 14:05 (+08:00)
+- updated_at: 2026-09-14 14:12 (+08:00)
 - 执行者: Codex 前端产品 goal（接力会话）；**已从暂停的 Zcode 执行者接管**
 - 工作树/分支: /home/maoqh/projects/agent-box-desktop-next-wsl-round1 @ feature/agentbox-desktop-product
 - 接管核验（历史，Zcode→Codex 交接）: 用户指定交接 HEAD `5c0fbfe` 与实际 HEAD
@@ -16,7 +16,7 @@
 - 本阶段起点核验: HEAD `1cbc4f58d602b212f55c7c4dd9c2bc38718cba83`、分支
   feature/agentbox-desktop-product、工作树 clean，无同工作树并发写入者；writer lease 仍为同一
   前端 goal 的 ACTIVE lease，本阶段串行施工，完成后停止写入并回报，不提前 RELEASE。
-- 代码检查点（已提交 HEAD）: `dfcd7027`（P02/P05：Profile 默认配置编辑与串行 CAS）
+- 代码检查点（已提交 HEAD）: `af0c08e3`（P02/P05 返修：服务权威名称回写）
   链: ebb1233（P00）→ 8d4b3df/47b5b47/dbb902f（P01 代码与几何修复）→ 26b32fc（P01 GREEN 证据）
   → 468e6ac/d7e9a57（发布源 d3c0196+ffbcfaf 导入）→ 893d560（P07 检查点2 wire-v1）
   → 957a523（P02A 盘点）→ 07f5386（P02A slice 1：失败面非阻塞）→ 3a25edc（P02A slice 2）
@@ -37,8 +37,13 @@
   → 0db8bc7（中立模型控件状态）→ 1331a1d（Profile/ProviderModel 维护端口）
   → d6ec993（服务模型目录与临时槽）→ 2991bff（中立 Provider/Model 设置）
   → 1cbc4f58（Provider 模型检查点）→ dfcd7027（Profile 默认配置编辑与串行 CAS）
+  → 88f3d934（enum/boolean 编辑覆盖）→ **af0c08e3（返修：服务权威名称回写）**
 - 已消费发布文档提交: 86d5a7b、61c7ff7、d3c0196、ffbcfaf
-- 当前检查点改动: Profiles 页从只读 `config.describe` 升级为可编辑的 Profile 默认配置，接到
+- 当前检查点改动（返修）: 保存成功后除 upsert store 外，`profiles.update` 与 `profiles.updateConfig`
+  两次被采纳的服务返回都立即回写本地 `displayName`（服务规范化名称必须显示在输入框、成功后不得
+  残留 dirty/Save）；名称输入在保存未决期间进入与配置控件、保存按钮一致的禁用态，避免产生当前
+  请求无法携带的新意图。串行 CAS、部分成功保留草稿与「重试只发 updateConfig」语义不变。
+- 上一检查点改动: Profiles 页从只读 `config.describe` 升级为可编辑的 Profile 默认配置，接到
   wire-v1 已锁定的 `profiles.updateConfig`（整份替换语义）。生产能力门要求
   `profiles.create`/`update`/`updateConfig`/`archive` 四条齐备，缺任一方法不渲染可保存控件；
   保存提交整份 `values`（未编辑与安全锁定值按服务当前值带回、显式恢复默认的控件省略、模型只发
@@ -154,6 +159,15 @@
   省略恢复默认、exact 模型引用与带斜杠 id）、
   双 model_slot 独立编辑、unavailable 禁选与目录外当前值、CAS 顺序 update(N)→updateConfig(N+1)、
   部分成功重试不重发改名、pending 连点单发、服务规范化后采用返回 descriptor、迟到 descriptor 不串写。
+- Profile 权威名称回写返修（af0c08e3）：`npx vitest run --project ui
+  src/features/profiles/index.test.tsx src/features/profiles/profile-config-editor.test.tsx
+  src/application/profile/profile-maintenance-port.test.ts` → **3 files / 27 tests passed，exit 0**
+  （Profiles 页 14 + 编辑器 10 + 端口 3）；`npm run typecheck` 三项目通过；改动 2 个文件
+  ESLint 0 error / 0 warning；`git diff --check` 干净。新增/加强 3 个行为测试：rename-only 服务
+  规范化（store 与输入框均显示返回值、Save 消失、update 仅 1 次）、改名成功而配置失败（规范化
+  名称 + 草稿保留、重试只发 updateConfig 且用 update 返回的 version、update 仍仅 1 次）、pending
+  （Name/配置输入与保存按钮均禁用、连点只 1 次服务调用）。变异校验：移除回写后恰好这 3 个测试
+  失败（11 passed / 3 failed），恢复后 14/14 通过。
 
 ## 测试与基线（上一执行者交接时点，历史）
 
