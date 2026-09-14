@@ -24,6 +24,7 @@ interface SubmitHarnessOptions {
   busy?: boolean
   compacting?: boolean
   inputDisabled?: boolean
+  runtimeAuthority?: 'agentbox' | 'hermes'
   scopeTarget?: ComposerTarget
   sessionKey?: string | null
   submitOnHide?: boolean
@@ -40,6 +41,7 @@ function renderSubmitHook({
   busy = false,
   compacting = false,
   inputDisabled = false,
+  runtimeAuthority = 'hermes',
   scopeTarget = 'main',
   sessionKey = 'stored-session',
   submitOnHide = false,
@@ -115,6 +117,7 @@ function renderSubmitHook({
         queueCurrentDraft,
         queueEdit: null,
         queuedPrompts: [],
+        runtimeAuthority,
         sessionId: 'runtime-session',
         setComposerText: vi.fn(),
         stashAt: (scope, value = '', items = []) => stashSessionDraft(scope, value, items)
@@ -356,6 +359,45 @@ describe('useComposerSubmit busy-turn routing', () => {
     expect(onSteer).not.toHaveBeenCalled()
     expect(onSubmit).not.toHaveBeenCalled()
     expect(queueCurrentDraft).not.toHaveBeenCalled()
+  })
+
+  it('submits a busy AgentBox follow-up to the server boundary without steering or local queueing', async () => {
+    const { hook, onCancel, onSteer, onSubmit, queueCurrentDraft } = renderSubmitHook({
+      busy: true,
+      runtimeAuthority: 'agentbox',
+      text: 'follow up after this'
+    })
+
+    act(() => hook.result.current.submitDraft())
+
+    await waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith('follow up after this', {
+        attachments: [],
+        composerScope: 'stored-session',
+        draftVersion: expect.any(Number)
+      })
+    )
+    expect(onSteer).not.toHaveBeenCalled()
+    expect(queueCurrentDraft).not.toHaveBeenCalled()
+    expect(onCancel).not.toHaveBeenCalled()
+  })
+
+  it('does not route AgentBox slash-shaped text through the Hermes inline command branch', async () => {
+    const { hook, onSubmit } = renderSubmitHook({
+      busy: true,
+      runtimeAuthority: 'agentbox',
+      text: '/status'
+    })
+
+    act(() => hook.result.current.submitDraft())
+
+    await waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith('/status', {
+        attachments: [],
+        composerScope: 'stored-session',
+        draftVersion: expect.any(Number)
+      })
+    )
   })
 
   it('submits a normal turn while idle', async () => {

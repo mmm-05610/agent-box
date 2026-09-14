@@ -63,6 +63,9 @@ export interface ComposerProfileState {
 export interface ChatBarProps {
   busy: boolean
   disabled: boolean
+  /** Selects the business authority for submit/queue/input behavior. AgentBox
+   * never falls through to Hermes steering or the renderer-owned queue. */
+  runtimeAuthority?: 'agentbox' | 'hermes'
   focusKey?: string | null
   maxRecordingSeconds?: number
   state: ChatBarState
