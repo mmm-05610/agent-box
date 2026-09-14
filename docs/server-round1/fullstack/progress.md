@@ -4,6 +4,42 @@
 已发生的1次可达性请求由后端受控进程读取仓库外 locator，未把内容写入仓库或输出。
 授权真实 credential 的 SecretStore→Worker 投影尚未执行，不以测试值路径冒充付费验收事实。
 
+## 2026-09-15 — 四家原生 HOME 隔离实施 + Codex 生产封装（并行两条 lane）
+
+详细证据：[profile-home-isolation.md](profile-home-isolation.md) §8b（隔离实施）、
+[codex-production-packaging.md](codex-production-packaging.md)（Codex 封装）。
+
+- **通用 HOME 投影底座**（Lane A，主执行者接缝）：新 `home_projection.py` 定义 `/runtime/home/**` 的
+  target 语法与 protected 关系；bwrap **按深度升序**发射所有 bind，保证"可写 state 是只读配置祖先"时
+  顺序正确（真实下标断言：RW state index 60 < RO config index 63；**旧顺序反证**：config 变成 0 字节空文件）；
+  runtime.py 派生 `_protected_state_paths` 并透传；主执行者把 guest 环境改为 `HOME=/runtime/home` 与
+  XDG 三元组、为 `SidecarHarnessPort` 增加受保护路径的**捕获排除**与**恢复拒绝**
+  （`SIDECAR_STATE_PROTECTED_PATH`）。
+- **三家迁移**（Lane A）：Pi → `.pi/agent` + `sessions`；Hermes → `.hermes`（确认 RO config **不被 state
+  bind 遮蔽、不进 checkpoint**，删除"bootstrap 物化配置"语义，改为 fail-closed 校验只读姿态）；OpenCode →
+  `.config/opencode` + `.local/share/opencode`。三条 gate 在新布局上重跑 **全部 exit 0**；通用 HOME 测试
+  35 项（sentinel/双重收敛/旧布局拒绝/受保护路径）。
+- **Codex 生产封装**（Lane B）：官方脚本 1.3.0（SHA `0a3a3370…`，只读、不执行）与完整 models.json
+  （76107B，与既有资产逐字节相同）；工件 20 包/529 条目/320.8MB/tree digest `sha256:9051b844…`（双构建一致；
+  codex-acp 1.1.14 + Codex 0.147.0）；生产配置（`wire_api=responses`、官方根、`model_catalog_json` 指向
+  隔离绝对路径、`env_key=CODEX_API_KEY`、`cli_auth_credentials_store=ephemeral`）。
+- **Codex 全链门 exit 0**（默认与外部工件两种模式）：两轮 completed、delta 4<7 与 10,12<15、`/responses`
+  路径、model 精确 `deepseek-flash`、**实测重开为 ACP `session/load`（带重放）**、`CODEX_HOME` 与
+  `$HOME/.codex` 收敛、host-home sentinel 不可见、RO 写入 EROFS、state 100 文件可续接、未知模型发包前拒绝、
+  取消与清理、外部工件保留且无残留。`HAS_PRODUCTION_DEPLOYMENT` 在门通过后才翻 True，能力观测只含真实
+  发生过的五项（attach/permissions 保持未观测）。
+- **本阶段发现并修复的两个通用缺陷**：①Worker `list_view_files` 遇符号链接即整份失败（Codex 必写 argv0
+  别名链接）→ 改为跳过非普通条目、`view.get` 仍拒绝（附 Rust 测试）；②四个 gate 的假端点在"从未 start"
+  时 `stop()` 会永久阻塞（实测 40 分钟挂起）→ stop 幂等，且 Codex gate 对缺失外部工件类型化快速失败，
+  **不静默重建**。
+- **bundle c4 → c5**（Worker 修复）：c4 未覆盖、仍为历史有效证据；协议版本仍 1。**Windows r4 用 c5 通过**
+  （`sha256:92eac03a…`、`state_projection=/runtime/home/sessions`、`session/new→session/resume`、
+  delta 9 < completed 12、8 秒静默在默认租约下完成）+ 独立 `-PostCheck` clean。
+- 验证：python 全量 **786 passed/4 skipped**；四家 gate + runtime-artifact gate 串行 exit 0（Codex 外部工件
+  模式另 exit 0）；node 25/25、13/13、42d 4/4、构建器 11/20/9/9；Rust fmt 干净 + 11 passed。
+- 模型调用 0、费用增量 ¥0；四家仍 MODEL_NOT_VERIFIED；workbench_model_verified_count=0；
+  BACKEND_IMPLEMENTATION_READY 未登记。
+
 ## 2026-09-14 — 能力合同诚实性返修（假阳性 + 命名空间边界 + 完成线程生命周期）
 
 - **假阳性（先复现后修）**：首版 `merge_capabilities` 把"声明了但**未观测**"的实现级能力算成

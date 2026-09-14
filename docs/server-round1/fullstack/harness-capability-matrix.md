@@ -90,16 +90,18 @@ Registry 静态视图、Codex 空观测、delta 前后、finish 前后与"不得
 
 | 家 | start | observe | finish | stream | attach | steer | permissions | native_continuation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| **Codex** | 声明 T / 未观测 → `supported=false`（全部能力） | 同 | 同 | 同 | 同 | F | 同 | 同 |
+| **Codex** | 声明 T / **已观测**（首轮 create+prompt → completed） | 声明 T / **已观测**（拿到原生 session id；次轮 session/list+load 同一 id） | 声明 T / **已观测**（delta 4 < completed 7） | 声明 T / **已观测**（`/responses` 流式增量先于 completed） | T / **未观测**（链路上从未送过附件） | F | T / **未观测**（无 permission round-trip） | 声明 T / **已观测**（同一 native id + 次轮上下文 + 实测 `session/load`） |
 | **Pi** | T / **已观测** | T / **已观测** | T / **已观测** | T / **已观测** | T / **未观测** | F | F | T / **已观测** |
 | **Hermes** | T / **已观测** | T / **已观测** | T / **已观测** | T / **已观测** | F | F | F | T / **已观测** |
 | **OpenCode** | T / **已观测** | T / **已观测** | T / **已观测** | T / **已观测** | F | F | F | T / **已观测** |
 
 逐项证据：
 
-- **Codex**：静态候选来自 registry（`start/observe/finish/attach/stream/permissions/native_continuation`）。
-  **尚无生产封装**，没有任何动态观测，因此 `observed` 一律未观测；`codex/production.py` 只有能力声明，
-  明确 `HAS_PRODUCTION_DEPLOYMENT = False`，不发明部署形状。
+- **Codex**：**已完成生产封装**（`codex-production-packaging.md`）：正式工件、官方配置、`CODEX_HOME`
+  隔离与全链门都齐备，`HAS_PRODUCTION_DEPLOYMENT = True`。观测到 `start/observe/finish/stream/
+  native_continuation`（证据：两轮 completed、delta 先于 completed、同一 native id、`session/load` 重放、
+  `/responses` 路径）；`attach`/`permissions` **没有在链路上真实发生过**，保持未观测——静态候选声明不等于
+  支持，这正是本轮修正过的规则。
 - **Pi**：`pi-production-chain-gate.py` 的两轮证据——`deltaSeq 4<7`、`completedSeq`、同一 `nativeSessionId`
   （`nativeSessionIdStable=true`）→ start/observe/finish/stream/native_continuation 已观测。`attach` 只有
   一半证据：真实握手确实播发 `promptCapabilities.image`，投递链路在代码上成立，但**没有任何一次运行送过
@@ -139,6 +141,7 @@ Registry 静态视图、Codex 空观测、delta 前后、finish 前后与"不得
 ## 7. 验证（本会话串行复跑）
 
 ```text
+python 全量（tests + 全部插件 tests）                                      → 786 passed / 4 skipped（HOME 轮）
 tests/server（能力真值表 + 命名空间边界 + 合同/集成/投影/sidecar）         → 见本轮复跑（诚实性返修后）
 plugins/agent-box-harnesses/tests（registry + 四家模板 + 能力合同）        → 112 passed / 3 skipped
 node --test plugins/.../harness_remote/*.test.mjs                          → 25 passed / 0 failed
@@ -161,8 +164,8 @@ Windows 证据要点：8 秒静默在**默认 5 秒租约**下完成（`elapsed_
   `workbench_model_verified_count = 0`。
 - **Codex 生产封装仍未完成**：其能力只有静态候选，没有任何动态观测。
 - **Pi 的 `attach`**：静态候选保留，有效能力为 false，直到有一次真实附件运行。
-- **Profile HOME 隔离**：`PROFILE_NATIVE_HOME_ISOLATION_DESIGN_LOCKED` /
-  `implementation=PENDING_HARDENING`，与本文件无关但同属后续工作。
+- **Profile HOME 隔离**：已实施（`PROFILE_NATIVE_HOME_ISOLATION_IMPLEMENTED`，四家
+  `DONE_FOR_FOUR_FAMILIES`），见 [profile-home-isolation.md](profile-home-isolation.md) §8b。
 - **两个"capabilities"命名空间绝不互相投影**：Work Core 的
   `ExecutionProvider.capabilities()` / `ExtensionRegistry.require_capability()` 回答的是"能不能向这个
   provider 要这个 operation"，键是 operation 名（`streaming`/`cancel`/`approvals`）；Harness canonical

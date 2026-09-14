@@ -3,14 +3,15 @@
 日期：2026-09-14。分支 `feature/server-harness-extension-v1`。状态：
 
 ```text
-PROFILE_NATIVE_HOME_ISOLATION_DESIGN_LOCKED
-implementation = PENDING_HARDENING
+PROFILE_NATIVE_HOME_ISOLATION_IMPLEMENTED
+implementation = DONE_FOR_FOUR_FAMILIES（Codex/Pi/Hermes/OpenCode 均已迁移并在新布局上重跑门）
 ```
 
-本文只**锁定设计**，不代表任何一家已实现、已迁移或已复验。它不构成
-`BACKEND_IMPLEMENTATION_READY`，不提高 `workbench_model_verified_count`，也不替代四家真实模型门。
-四家的现有假端点全链门在本设计实施前保持**历史有效**；完成目录迁移后**必须重跑**，不得用旧门
-为新区局背书。
+四家原生 HOME 隔离**已实施**：guest `HOME=/runtime/home`，各家专用变量与默认路径双重收敛，配置只读、
+state 有界可写，受保护的只读配置不进 checkpoint。四条假端点全链门（Pi/Hermes/OpenCode/Codex）已在
+新布局上**串行重跑**（Codex 另跑外部工件模式），Windows 复验改用新 bundle c5 并按新布局通过 + 独立
+`-PostCheck` clean。**本文件不构成 `BACKEND_IMPLEMENTATION_READY`，不提高
+`workbench_model_verified_count`，也不替代四家真实模型门**（四家仍 MODEL_NOT_VERIFIED）。
 
 ## 1. 核心决策（锁定）
 
@@ -188,9 +189,63 @@ guest 里找不到状态或写失败；只有变量 → 目录仍是宿主真实
 - **Worker 5 秒租约缺陷与本设计无关**（见 native-driver-seam.md §5）：它是"活跃 attempt 的帧来源"
   问题，独立修复；本设计不改变租约语义。
 
+## 8b. 实施结果（本阶段实测）
+
+### 通用合同（`plugins/agent-box-sandbox-bwrap/src/agent_box_sandbox_bwrap/home_projection.py`）
+
+- target 语法：`/runtime/home/` + 1..6 段，每段 `[A-Za-z0-9._-]{1,64}` 且非 `.`/`..`；拒绝相对/根/`//`/尾斜杠/
+  反斜杠/控制字符/NUL/越界/超深/超长/非 `PurePosixPath` 自身拼写；`projectionFiles.target` 是文件、
+  `stateProjection.target` 是目录；拒绝 target 相等、投影互嵌、state 落在投影子树内；**允许**投影文件
+  位于 state 子树内（记为 `_protected_state_paths`，相对 state 排序）。旧 `/tmp/agentbox-home/**` 一律拒绝。
+- **挂载顺序**：所有 bind 按 **深度升序** 发射（先祖先、后后代），因此"可写 state 是只读配置的祖先"时
+  顺序必然正确；真实下标证据：Hermes 形状 75 元素 argv 中 `--bind`（RW state）在 index 60、`--ro-bind`
+  （其内 config）在 index 63。**旧顺序的反证**（实测）：先 RO 后父目录 RW bind → guest 看到 **0 字节空文件**
+  （挂载点顶替），即静默丢配置。
+- 真实写入语义（本机 bwrap 0.9.0，同一编译产物只替换尾命令）：RO 配置读得到、写 `Read-only file system`
+  (rc=2)、`unlink` 得 `Device or resource busy`；state 文件写成功。
+- 嵌套父目录逐级 `--dir` 创建；`projectionFiles` 条目形状收紧为 `{source,target}`；投影 source 仍要求
+  真实非符号链接文件。
+
+### 四家最终目录 / 变量 / 权限
+
+| 家 | 只读投影 | 可写 state | 专用变量 | 受保护 state 路径 |
+| --- | --- | --- | --- | --- |
+| Codex | `/runtime/home/.codex/{config.toml,models.json}` | `/runtime/home/.codex` | `CODEX_HOME=/runtime/home/.codex` | `config.toml`、`models.json` |
+| Pi | `/runtime/home/.pi/agent/{models.json,settings.json}` | `/runtime/home/.pi/agent/sessions` | `PI_CODING_AGENT_DIR=/runtime/home/.pi/agent` | — |
+| Hermes | `/runtime/home/.hermes/config.yaml` | `/runtime/home/.hermes`（SQLite 三件套等） | `HERMES_HOME=/runtime/home/.hermes` | `config.yaml`（gate 另加 `sitecustomize.py`） |
+| OpenCode | `/runtime/home/.config/opencode/opencode.json` | `/runtime/home/.local/share/opencode` | `OPENCODE_CONFIG=…/opencode.json`（XDG 由 guest 环境给出） | — |
+
+guest 环境由通用 launcher 给出且与各家变量收敛：`HOME=/runtime/home`、`XDG_CONFIG_HOME=/runtime/home/.config`、
+`XDG_DATA_HOME=/runtime/home/.local/share`、`XDG_CACHE_HOME=/runtime/home/.cache`。
+
+### 双重收敛与 sentinel（实测）
+
+- 通用 fixture（无品牌）：受控临时 host-home 放 `HOST-HOME-SENTINEL`、Profile 投影放
+  `PROFILE-PROJECTION-SENTINEL` → guest 实读 Profile sentinel，宿主 home 与其 sentinel **均不可见**；
+  `/runtime/home` 内容恰为 `.config`/`.local`；去掉专用变量仍回落隔离 HOME。
+- 默认路径 vs 显式变量：`$HOME/.fixture` == 声明变量 == 同一 target；XDG 版本同理。
+- 各家：Pi journal 落在 `/runtime/home/.pi/agent/sessions` 并被回读；Hermes 工件启动钩子实测
+  `home=/runtime/home/.hermes config=/runtime/home/.hermes/config.yaml posture=read-only code=30`（18 次
+  启动一致）且 `writableTargets=[/runtime/home/.hermes, /workspace]`；OpenCode 驱动审计
+  `configPath=/runtime/home/.config/opencode/opencode.json`、`dataDirectory=/runtime/home/.local/share/opencode`
+  且配置写 `EROFS`。
+- **受保护配置不进 checkpoint**：Hermes 首轮 checkpoint 含 `state.db*` 而**不含** `config.yaml`；
+  恢复侧若 checkpoint 携带受保护相对路径 → 类型化 `SIDECAR_STATE_PROTECTED_PATH`（有专门测试）。
+
+### Codex 的 state 与 Worker 合同（本阶段发现并修复）
+
+Codex CLI 0.147.0 运行期**总会**在 `$CODEX_HOME/tmp/arg0/<random>/` 写 4 个 argv0 别名符号链接，进程退出时
+自行移除。Worker 的 view 列表原本"遇到符号链接即整份拒绝"，于是 Codex 的 state 捕获必然 `VIEW_INVALID`。
+修复（通用、无品牌）：Worker 的 `list_view_files` **跳过非普通条目**（符号链接/特殊文件），读取路径
+`view.get` 仍拒绝任何非普通文件；被跳过的条目不进 manifest，因此其目标永远不可能被解析。另在
+`SidecarHarnessPort.capture_execution` 增加**有界 settle 窗口**（两次相同 listing 即稳定，至多 5s）：
+`close` 之后原生进程可能仍在写自己的状态（追加 transcript、清理别名链接），此刻读树会拿到瞬时的
+listing/读取失败。两点都不是品牌分支。
+
 ## 9. 未完成声明
 
-- 本文**未实现**任何一家的目录迁移（`implementation = PENDING_HARDENING`）。
+- 四家目录迁移**已实施**（`implementation = DONE_FOR_FOUR_FAMILIES`，见 §8b）；Codex 生产封装见
+  [codex-production-packaging.md](codex-production-packaging.md)。
 - 不得据此登记 `BACKEND_IMPLEMENTATION_READY`；`workbench_model_verified_count` 仍为 0。
 - 四家真实模型门、Codex 生产封装、c4 的 Windows 复验各自独立推进，本设计不是它们的前置或替代。
   **Worker 5 秒租约缺陷已完成修复（`WORKER_LEASE_KEEPALIVE_FIXED`，含 Windows 真机 8 秒静默证据）**，
