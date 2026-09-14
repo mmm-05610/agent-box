@@ -11,7 +11,7 @@
 | [39](work-orders/39-server-boundaries.md) | **READY_FOR_HARNESS** | [阶段证据](../server-round1/server-boundary/stage-a-b-c.md)：幂等并发双派发缺陷先复现后修复、能力声明改为注册派生、双中立provider测试、legacy codex 退出生产装配 | wire反馈通道 [wire-review.md](../server-round1/wire-review.md) 已建立并写入首轮 |
 | [40](work-orders/40-four-harness-integration.md) | **FOUR_HARNESS_COMPONENTS_READY** | [40-A 底座](../server-round1/harness-integration/stage-a.md) / [40-B 通道](../server-round1/harness-integration/stage-b.md) / [40-C 矩阵](../server-round1/harness-integration/stage-c.md) / [40-D 汇总](../server-round1/harness-integration/stage-d.md) + [握手证据JSON](../server-round1/harness-integration/handshake-40c.json)：四家组件门 25/25；全量 227 passed/4 skipped/0 failed；Rust 4 passed；真实二进制零凭据握手 pi/hermes INITIALIZED、opencode HEALTH_OK、codex 诚实要求凭据 | 本单终态；Server 侧编排与 wire 锁定进入 41；真实模型门留待 42 §D |
 | [41](work-orders/41-core-service-acceptance.md) | **BACKEND_IMPLEMENTATION_PARTIAL** | [后端验收](../server-round1/backend-acceptance.md)：复用前端P07 wire-v1候选（未自造第二套）+16方法实现+schema v3迁移；全量 255 passed/4 skipped/0 failed；wire答复见[wire-review](../server-round1/wire-review.md) `ACCEPTED_WITH_MECHANICAL_CORRECTIONS` | 缺41-E Windows真机段与经 WSL Worker 的部署接线；补齐后方可转 READY，再进42 |
-| [42](work-orders/42-fullstack-delivery.md) | **QUEUED** | 循环检查与双门后全栈接管已授权；DeepSeek官方API授权见§D | 后端READY后每5分钟检查前端；联调、修复、两仓提交 |
+| [42](work-orders/42-fullstack-delivery.md) | **WAITING_FOR_DESKTOP**（双门未满足，未联调） | [进度与费用账](../server-round1/fullstack/progress.md)：前端只读检查（PARTIAL、writer_lease ACTIVE、wire未锁）；DeepSeek官方API可达（12 tokens）；**Codex家与DeepSeek协议不兼容**（codex 0.147.0 只收 Responses API，DeepSeek为chat形状） | 等前端READY+释放写权+wire锁定；Pi/Hermes/OpenCode 真实门待配置 |
 | [37](work-orders/37-http-codex.md) | **SERVER_HTTP_CODEX_R1_PARTIAL** | [原完成审计](../server-round1/completion-audit.md) / [C/D证据](../server-round1/stage-c-d.md)保留；检查点5a45303/5b71393/cd5efbe/67c6b40。独立定向23 passed；同键并发双accept已由39复现并修复；能力不诚实已由39结构性修复 | abandon 断言经探针定性为**测试侧竞态**（终止状态持久化后约50ms才 abandon；负载高时10/10失败），已改为有界等待、断言强度不变，修后10/10通过；原生语义迁移由40执行 |
 | [38](work-orders/38-harness-extension-selection.md) | **HARNESS_EXTENSION_SELECTION_READY_FOR_DECISION** | 两轮 A/B/C 完成：[最终建议与边界](../server-round1/harness-selection/boundary.md)。保留有条件首选 `harness-remote v3.0.2`；零模型/凭据 | 首选已由40消费进入有门禁接入；不再等待决定 |
 
@@ -39,7 +39,9 @@
   wire.eventStream/1 未实现；附件投递未实现；侧车授权往返未接入审批仓储）。
 - integration_owner: NONE；workbench_model_verified_count: **0**（指本轮；组件门通过不等于真实模型可用）。
 - model_authorization: DEEPSEEK_OFFICIAL_AUTHORIZED_MAX_CNY_10；凭据locator见42 §D，不写内容。
-- 本轮调用数0，已知费用0，预留0；后续执行者统一记账，所有Harness/重试累计计算。
+- 本轮调用数1（DeepSeek官方API可达性检查，12 tokens，<¥0.01；上限¥10），
+  预留0；Codex真实模型尝试在 session/new 阶段即失败、未发起模型请求。
+  后续执行者统一记账，所有Harness/重试累计计算。
 - 40 全量门实绩（40-D 记录）：python 227 passed/4 skipped/0 failed；node 25/25；
   cargo 4 passed。平台未执行项=Windows 真机 WSL 全链路与全部真实模型门。
 - four_harness_matrix（组件级）：
@@ -50,11 +52,14 @@
     真实二进制零凭据 INITIALIZED）；
   - opencode：COMPONENT_VERIFIED（同快照 ManagedOpenCodeHost；真实二进制 HEALTH_OK，
     不伪装为 ACP profile）。
-  - 四家均 **MODEL_NOT_VERIFIED**。
+  - 四家均 **MODEL_NOT_VERIFIED**；其中 **codex 已证伪**：内嵌 Codex 0.147.0 要求
+    `wire_api="responses"`，与 DeepSeek 官方 chat-completions 形状不兼容（证据见42进度文档）；
+    pi/hermes/opencode 的 Provider 配置未完成，未执行真实门。
 - 已知待办/风险：内嵌 codex 二进制安装后**必须校验**（本轮发现过一次截断安装，
   已更正40-A证据）；Hermes 启动有 lazy 依赖安装与 PYTHONPATH 要求，需生产级收口；
   Worker→sidecar 的 Python 封装尚未串接（属41）。
 - 调度维护：39即参与wire反馈，通道docs/server-round1/wire-review.md（首轮已写入）。
+- 42 双门（2026-09-14）：后端 READY=否、前端 READY=否 → 未记录集成人、未写前端、未联调。
 - 每阶段与goal结束前检查状态已更新；41READY后进入42等待，不提前报整体完成。
 
 以下是37/38历史说明，不覆盖39–42新授权。
