@@ -183,9 +183,23 @@ Worker 物化 `/runtime/secret/credential` → sidecar 注入 `DEEPSEEK_API_KEY`
   `AGENTBOX_EGRESS_BLOCKED` 并让该轮失败。
 - **凭据扫描**：捕获的 native state（checkpoint 内每个文件）与持久事件中**均无**假 token；
   gate 报告本身也不含 token 值。
-- **清理**：Worker `views/`、`secrets/` 无残留；无存活 Pi adapter 进程；临时假 token、workspace、
-  DataRoot、假端点与临时工件目录全部移除（`run.removed=true`）。清理失败不会覆盖主失败：清理检查
-  在报告已记录主结果之后执行，且以独立 code 失败。
+- **清理**：成功且非 `--keep` 的运行会**验证后**移除本次运行的临时根——先做身份校验（必须是本次
+  `mkdtemp` 返回的**完全相同**路径、位于系统临时目录、属主为本用户、无组/其他权限、非符号链接），
+  再把其中由 Pi 构建器发布的只读工件显式改写为可写（`cleanup.madeWritable=15510`），删除后复核
+  路径确已消失；JSON 记 `run.removed=true`，**任何残留都使退出码非零**。Worker `views/`、`secrets/`
+  无残留；无存活 Pi adapter 进程；临时假 token、workspace、DataRoot、假端点与临时工件目录全部移除。
+  `--artifact` 指向外部工件时该工件只读且**绝不删除、绝不改权限**（复核摘要与 0555 模式不变，记
+  `artifact.external=true`、`preservedAfterCleanup=true`）；`--keep` 明确报告保留路径且**不**声称
+  `removed=true`。清理失败不覆盖主失败：主失败保持为主因，另附脱敏 `cleanupFailure`，两者并存时仍
+  非零退出。
+- **清理假绿与本阶段返修（诚实留痕）**：初次提交时 `shutil.rmtree(temporary, ignore_errors=True)`
+  无法删除临时根内由 Pi 构建器发布的 0555/0444 工件（`rmtree` 需要目录写权限才能 unlink 其条目），
+  而 `ignore_errors=True` 把该失败吞掉；命令仍以 **0** 退出并留下 `/tmp/agentbox-pi-gate-*/`。当时
+  `run.removed` 已被如实算成 `false`，但没有任何机制因残留而失败，证据文档引用的却是更早一次
+  使用外部 `--artifact` 的运行（那时临时根内没有只读树、删除成功）并据此写成 `run.removed=true`。
+  返修：禁用 `ignore_errors`、显式处理只读工件、仅在身份校验通过后删除、任何残留非零退出，
+  并补 12 项定向测试（含注入删除失败、主失败与清理失败并存）。修复后默认运行（自行构建工件）
+  与外部 `--artifact` 运行均为 exit 0 + `run.removed=true` 且无任何残留。
 
 ## 4. 本阶段发现并修复的真实公共缺陷
 
@@ -246,6 +260,7 @@ python3 -m py_compile / node --check <全部改动文件>                       
 - **c4 仍无 Windows 平台证据**：本阶段按要求未运行 Windows r4、未占用 Windows 构建槽，直接驱动 WSL
   内的 release Worker（同一 ABW1 协议），Windows c4 复验留待后续。
 - 未做（后续阶段）：Hermes（隔离 Python 包闭包）与 OpenCode（单文件二进制沿用
-  `executableMounts`，不退化）的同级封装；三家真实模型门。
+  `executableMounts`，不退化）的同级封装；随后是 **Codex/Pi/Hermes/OpenCode 四家真实模型门**
+  （Pi 虽已封装，仍为 MODEL_NOT_VERIFIED，不能被计入已通过）。
 - 已知残余：重放 chunk 在 Server 侧不被登记（现有行为，见 §3）；工件摘要在 bootstrap 校验一次
   （既有 TOCTOU 窗口，与本阶段无关）；bwrap 网络姿态未改，本阶段靠只读守卫保证"仅 loopback"。

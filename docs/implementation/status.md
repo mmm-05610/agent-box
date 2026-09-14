@@ -15,8 +15,9 @@ checkpoint 由 Windows ObjectStore 校验、退出后按 marker 清理并独立 
 42-D 已完成 provider-neutral 的不可变运行时工件投影底座（**RUNTIME_ARTIFACT_PROJECTION_READY**），
 并在其上完成 **Pi 生产封装（PI_PRODUCTION_CHAIN_PREPARED）**：真实 `@automatalabs/pi-acp@0.5.0` 与真实
 Pi 依赖闭包经 c4 Worker+bwrap 连接本机 loopback 假 DeepSeek 端点，两轮同一 Server Session、同一
-native id、上下文与重放证据齐备；**这不是付费模型验收**（假端点、两个固定 nonce），Hermes/OpenCode
-封装与三家真实门仍未开始。
+native id、上下文与重放证据齐备。**Pi 因此只是封装就绪，仍是 MODEL_NOT_VERIFIED**（假端点、两个固定
+nonce，不是付费模型验收）。剩余的是 **Hermes/OpenCode 的生产封装**，而最终门始终是
+**Codex/Pi/Hermes/OpenCode 四家真实模型门**——两者不是同一件事，不得混写。
 DeepSeek 官方 API 授权见42 §D；累计发生 1 次 API 可达性调用（12 tokens，费用 <¥0.01），
 Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通过无模型读取门，二者都不能记作模型调用
 或 Harness 验收。
@@ -26,7 +27,7 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 | [39](work-orders/39-server-boundaries.md) | **READY_FOR_HARNESS** | [阶段证据](../server-round1/server-boundary/stage-a-b-c.md)：幂等并发双派发缺陷先复现后修复、能力声明改为注册派生、双中立provider测试、legacy codex 退出生产装配 | wire反馈通道 [wire-review.md](../server-round1/wire-review.md) 已建立并写入首轮 |
 | [40](work-orders/40-four-harness-integration.md) | **FOUR_HARNESS_COMPONENTS_READY** | [40-A 底座](../server-round1/harness-integration/stage-a.md) / [40-B 通道](../server-round1/harness-integration/stage-b.md) / [40-C 矩阵](../server-round1/harness-integration/stage-c.md) / [40-D 汇总](../server-round1/harness-integration/stage-d.md) + [握手证据JSON](../server-round1/harness-integration/handshake-40c.json)：四家组件门 25/25；全量 227 passed/4 skipped/0 failed；Rust 4 passed；真实二进制零凭据握手 pi/hermes INITIALIZED、opencode HEALTH_OK、codex 诚实要求凭据 | 本单终态；Server 侧编排与 wire 锁定进入 41；真实模型门留待 42 §D |
 | [41](work-orders/41-core-service-acceptance.md) | **BACKEND_WINDOWS_R4_READY** | [后端验收](../server-round1/backend-acceptance.md)：28 方法+队列终态严格 schema 回归 29/29；Windows r4 exit 0（保守旧门 + `tree_terminate` 强制树终止后的有状态崩溃式重启/同 native id `session/resume`/终止前 delta/ObjectStore checkpoint/marker 清理/独立 `-PostCheck`）；反例含 5 种不可用 checkpoint 与 4 种拒绝清理；全量 348 passed/4 skipped，Node 25/25+4/4，Rust 4/4 | 42 双门未满足，整体 READY 仍受约束 |
-| [42](work-orders/42-fullstack-delivery.md) | **PRE_GATE_WORK_IN_PROGRESS**（两端门当前均未满足，未联调） | [进度与费用账](../server-round1/fullstack/progress.md) + [运行时工件投影底座](../server-round1/fullstack/runtime-artifact-projection.md) + [Pi 生产封装](../server-round1/fullstack/pi-production-packaging.md)：工件投影 **RUNTIME_ARTIFACT_PROJECTION_READY**；Pi **PI_PRODUCTION_CHAIN_PREPARED**（真实 pi-acp 0.5.0 + 真实依赖闭包 + c4 Worker + bwrap + 本机假端点，两轮同一 native id，gate exit 0，`MODEL_NOT_VERIFIED`）；前端仍 PARTIAL、writer_lease ACTIVE、工作树 clean；28 方法 wire 摘要 15:48 就地重算未变；DeepSeek 官方 API 可达（12 tokens） | Hermes/OpenCode 同级封装 → 三家真实门；双门后联调 |
+| [42](work-orders/42-fullstack-delivery.md) | **PRE_GATE_WORK_IN_PROGRESS**（两端门当前均未满足，未联调） | [进度与费用账](../server-round1/fullstack/progress.md) + [运行时工件投影底座](../server-round1/fullstack/runtime-artifact-projection.md) + [Pi 生产封装](../server-round1/fullstack/pi-production-packaging.md)：工件投影 **RUNTIME_ARTIFACT_PROJECTION_READY**；Pi **PI_PRODUCTION_CHAIN_PREPARED**（真实 pi-acp 0.5.0 + 真实依赖闭包 + c4 Worker + bwrap + 本机假端点，两轮同一 native id，gate exit 0，`MODEL_NOT_VERIFIED`）；前端仍 PARTIAL、writer_lease ACTIVE、工作树 clean；28 方法 wire 摘要 15:48 就地重算未变；DeepSeek 官方 API 可达（12 tokens） | Hermes/OpenCode 同级封装 → **四家（Codex/Pi/Hermes/OpenCode）真实模型门**；双门后联调 |
 | [37](work-orders/37-http-codex.md) | **SERVER_HTTP_CODEX_R1_PARTIAL** | [原完成审计](../server-round1/completion-audit.md) / [C/D证据](../server-round1/stage-c-d.md)保留；检查点5a45303/5b71393/cd5efbe/67c6b40。独立定向23 passed；同键并发双accept已由39复现并修复；能力不诚实已由39结构性修复 | abandon 断言经探针定性为**测试侧竞态**（终止状态持久化后约50ms才 abandon；负载高时10/10失败），已改为有界等待、断言强度不变，修后10/10通过；原生语义迁移由40执行 |
 | [38](work-orders/38-harness-extension-selection.md) | **HARNESS_EXTENSION_SELECTION_READY_FOR_DECISION** | 两轮 A/B/C 完成：[最终建议与边界](../server-round1/harness-selection/boundary.md)。保留有条件首选 `harness-remote v3.0.2`；零模型/凭据 | 首选已由40消费进入有门禁接入；不再等待决定 |
 
@@ -36,7 +37,8 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   锁定摘要29/29；Windows r4 平台门通过，**BACKEND_WINDOWS_R4_READY**。42-D 已补
   **RUNTIME_ARTIFACT_PROJECTION_READY**（工件投影底座）与 **PI_PRODUCTION_CHAIN_PREPARED**
   （Pi 生产封装：真实 adapter/agent + c4 Worker + bwrap + 本机假端点两轮，同一 native id；
-  仍非 MODEL_VERIFIED）。须继续 Hermes/OpenCode 同级封装与三家真实门）。
+  仍是 MODEL_NOT_VERIFIED）。须继续 Hermes/OpenCode 同级封装，最终门为**四家真实模型门**
+  （Codex/Pi/Hermes/OpenCode），Pi 已封装不折算为已通过）。
 - frontend_observed_state: IN_PROGRESS（只读观察，2026-09-14 15:48 +08:00；前端已提交
   `docs(desktop): record the Workspace identity matching rule`，工作树仍 **clean**；
   其 status.md 自述 `frontend_implementation=PARTIAL`、写权仍 ACTIVE）。
@@ -64,6 +66,12 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   `max_tokens=64`、thinking 禁用、第二轮上下文含第一轮 user+assistant、重开为重放语义的
   `session/load`（**不是** `session/resume`）；未知模型在发 HTTP 前拒绝；缺凭据 Server 以
   `CREDENTIAL_REQUIRED` 拒绝。**Pi 仍 MODEL_NOT_VERIFIED**，`workbench_model_verified_count=0`）。
+- pi_gate_cleanup_fixed: Pi 全链 gate 首次提交存在**清理假绿**——`shutil.rmtree(..., ignore_errors=True)`
+  删不掉临时根内由 Pi 构建器发布的 0555/0444 工件，命令仍 exit 0 并留下 `/tmp/agentbox-pi-gate-*/`，
+  证据文档却写成 `run.removed=true`（取自更早一次使用外部 `--artifact` 的运行）。已返修：禁用
+  `ignore_errors`、显式处理只读工件、只在身份校验通过后删除、任何残留非零退出、`--keep`／外部
+  `--artifact` 语义保持；补 12 项定向测试（含注入删除失败、主失败与清理失败并存）。修复后默认与
+  外部 `--artifact` 运行均 exit 0 + `run.removed=true` 且无残留。
 - pi_production_defect_fixed: 真实 Pi 暴露既有公共缺陷——ACP 以空对象播发 session 能力
   （`sessionCapabilities.resume = {}`），Server 侧 `bool({})` 判为不可续接，导致第二轮以
   `SIDECAR_CHECKPOINT_INVALID` 失败；已改为"存在且非 False 即视为已播发"（中立、无品牌分支），
@@ -126,11 +134,12 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
     `deepseek-flash`）、Responses非敏感配置、adapter source、摘要固定native binary和`CODEX_API_KEY`
     首选认证接缝；`3e4282b` 固化隔离 TOML 并完成通用 native state 双轮 resume，实际 wheel 同时包含
     完整目录与TOML；真实 codex-acp→app-server 配置读取通过，但尚未发送真实模型请求。
-    pi/hermes/opencode 的无模型 Provider 配置准备已在 `bc7d95b` 完成；三家付费真实门仍未执行。
+    pi/hermes/opencode 的无模型 Provider 配置准备已在 `bc7d95b` 完成；**四家真实模型门
+    （Codex/Pi/Hermes/OpenCode）均仍未执行**，Pi 已完成生产封装但不因此计入已通过。
     三家的原生运行时工件进沙箱能力已由 42-D 的 `runtimeArtifactMounts` 底座补齐（中立、摘要固定、
     只读、可审计；真实 Worker+bwrap 无模型门通过）；**Pi 已完成生产封装**（真实 pi-acp 0.5.0 +
-    真实依赖闭包 + c4 Worker + bwrap + 本机假端点两轮，`PI_PRODUCTION_CHAIN_PREPARED`），
-    Hermes/OpenCode 的封装尚未开始。
+    真实依赖闭包 + c4 Worker + bwrap + 本机假端点两轮，`PI_PRODUCTION_CHAIN_PREPARED`，
+    仍 MODEL_NOT_VERIFIED），Hermes/OpenCode 的封装尚未开始；四家真实模型门均未执行。
 - 已知待办/风险：内嵌 codex 二进制安装后**必须校验**（本轮发现过一次截断安装，
   已更正40-A证据）；Hermes 启动有 lazy 依赖安装与 PYTHONPATH 要求，42-D 已提供其所需的
   **中立只读运行时工件投影**（隔离 Python 包闭包可声明为 artifact 树，不挂用户 site-packages），

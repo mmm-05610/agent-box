@@ -4,6 +4,30 @@
 已发生的1次可达性请求由后端受控进程读取仓库外 locator，未把内容写入仓库或输出。
 授权真实 credential 的 SecretStore→Worker 投影尚未执行，不以测试值路径冒充付费验收事实。
 
+## 2026-09-14 — Pi gate 清理假绿返修（单点验收）
+
+- **缺陷**：`pi-production-chain-gate.py` 首次提交用 `shutil.rmtree(temporary, ignore_errors=True)` 清理
+  临时根；临时根内由 Pi 构建器发布的工件是 0555/0444，`rmtree` 没有目录写权限就无法 unlink 其条目，
+  而 `ignore_errors=True` 把失败吞掉。结果：命令 **exit 0** 却在 `/tmp/agentbox-pi-gate-*/` 留下只读工件树；
+  `run.removed` 当时已被如实算成 `false`，但没有机制因残留而失败，证据文档又引用了更早一次使用外部
+  `--artifact` 的运行（临时根内无只读树、删除成功）而写成 `run.removed=true`。已复现（exit 0 + 残留）。
+- **返修**：禁用 `ignore_errors`；删除前先做身份校验（必须是本次 `mkdtemp` 返回的完全相同路径、位于系统
+  临时目录、属主为本用户、无组/其他权限、非符号链接）；对只读工件显式改写为可写后再删除，并复核路径
+  确已消失；**任何残留使退出码非零**；`--keep` 报告保留路径且不声称 `removed=true`；外部 `--artifact`
+  只读且绝不删除/改权限（复核摘要与模式，记 `preservedAfterCleanup=true`）；清理失败不覆盖主失败
+  （主失败为主因 + 脱敏 `cleanupFailure`，仍非零）。
+- **定向测试 12 项**：默认运行含 0555/0444 嵌套工件后无残留、`--keep` 确实保留、外部 `--artifact`
+  未被删改、身份/边界不满足时拒绝危险清理（不同路径/符号链接/组可访问/前缀不符/非目录）、注入删除失败
+  非零退出、主失败与清理失败并存时主失败证据不丢失、源码中不得再出现 `ignore_errors`。
+  另外：测试套件自身运行前后不新增任何临时根。
+- **残留清理**：报告指名的 `/tmp/agentbox-pi-gate-bvhe10su` 本次核查时**已不存在**；现场另有 6 个
+  返修前的残留根，其中 5 个通过身份校验（前缀/位置/属主/权限/含 Pi 构建器 marker）后用修复后的
+  gate 清理函数删除（`madeWritable` 分别 15461/9/11/15461/11），1 个不含 gate 内容（本会话调试用
+  临时目录）被**拒绝**并改用非递归 `rmdir` 清除。现 `/tmp/agentbox-pi-gate-*` 为空。
+- **修复后实测**：默认运行（自行构建工件）exit 0 + `run.removed=true` + `cleanup.madeWritable=15510`
+  + 无残留；外部 `--artifact` 运行 exit 0 + `preservedAfterCleanup=true` + 工件摘要与 0555 模式不变 + 无残留。
+- 模型调用 0、费用增量 ¥0；未读凭据、未改 Pi 生产配置、未动 ACP capability 修复与 Server/Core/Worker 合同。
+
 ## 2026-09-14 — 42-D Pi 生产封装与本地假端点全链
 
 详细证据：[pi-production-packaging.md](pi-production-packaging.md)。终态 **PI_PRODUCTION_CHAIN_PREPARED**；
@@ -162,7 +186,8 @@ Worker `sha256:bb90e346bbd857f02eba8d267f47c3ce793d30c9894ca823dc09c482d886f5eb`
 未发模型请求、未改前端、未读 WO42 locator。
 
 41 平台门记为 `BACKEND_WINDOWS_R4_READY`。**不**登记整体 `BACKEND_IMPLEMENTATION_READY`：
-Pi/Hermes/OpenCode 生产封装与四家真实模型门仍未完成，前端也未满足双门，故仍未进入全栈联调。
+Pi 生产封装已完成（PI_PRODUCTION_CHAIN_PREPARED，仍 MODEL_NOT_VERIFIED）；Hermes/OpenCode 生产封装与
+**四家（Codex/Pi/Hermes/OpenCode）真实模型门**仍未完成，前端也未满足双门，故仍未进入全栈联调。
 r4 证明的是 `tree_terminate` 有界强制树终止后的崩溃式重启、DataRoot 锁释放/重新获取与 native
 `session/resume`；正常 Desktop/Server 生命周期退出与最终清理仍是后续全栈最终验收项，本轮不宣称
 已覆盖。`workbench_model_verified_count` 仍为 **0**；费用账仍为累计 1 次/12 tokens/`<¥0.01`
@@ -349,7 +374,7 @@ powershell.exe -File accept-e.ps1 … -Port 18744 -PostCheck -InstanceId <两实
 
 ### 未完成
 
-- Pi / Hermes / OpenCode 三家的真实模型验收：无模型配置与有界 runner 已在 `bc7d95b` 完成，
+- Pi / Hermes / OpenCode（并入 Codex 后为四家）的真实模型验收：无模型配置与有界 runner 已在 `bc7d95b` 完成，
   `502f4b5` 完成生产 sidecar 的冻结/秘密投影基础；原生运行时封装及付费验证尚未完成。本轮仍未执行、
   未用组件结果冒充。
 - 42-D 的「UI 选择角色 → 首次发送 → 终止前内容 → 继续一轮 → 关闭重开恢复历史」
