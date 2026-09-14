@@ -134,7 +134,12 @@ schema 失败关闭。当前 wire 已恢复 `WIRE_LOCKED_FOR_IMPLEMENTATION`。W
 ## 终态边界
 
 `72d6258` 已满足当时25方法的 `BACKEND_IMPLEMENTATION_READY`；当前同一合同的28方法及队列终态
-已经锁定，后端代码检查点为 `847c818`。只待 Windows r4 对锁定工件重确认后恢复 READY。
+已经锁定。`502f4b5` 又补齐了 Provider/Model 精确版本冻结、Provider credential 优先解析、
+SecretStore 按 locator 读取、Worker `secret.put` 一次性帧、bwrap 固定只读秘密挂载、adapter 声明式
+环境注入以及所有退出路径的 `secret.cleanup`；模型进入 sidecar `create`/`prompt`，密钥不进入 argv、
+普通对象或事件。相关回归为 Server 45 passed、Worker/bwrap 32 passed、Node envelope 4 passed。
+这些是代码/组件证据，尚未冒充真实 Harness 模型证据。当前后端代码检查点为 `502f4b5`，只待
+Windows r4 对锁定工件重确认后恢复 READY。
 四家组件仍保持 40 的
 `COMPONENT_VERIFIED / MODEL_NOT_VERIFIED` 分账。Pi/Hermes/OpenCode 的 DeepSeek Provider 配置与
 独立真实模型门、Codex 协议不兼容记录，进入 42-D；前端仍由其独立 writer 施工，当前不具备跨仓

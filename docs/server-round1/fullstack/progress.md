@@ -4,6 +4,20 @@
 已发生的1次可达性请求由后端受控进程读取仓库外 locator，未把内容写入仓库或输出。
 受管 Harness 的 SecretStore→Worker 投影尚未执行，不以计划中的注入路径冒充已验事实。
 
+## 2026-09-14 12:44 +08:00 — 模型冻结与秘密投影代码检查点
+
+- `502f4b5` 将 Profile 的模型引用解析为包含 ProviderModel id/version、provider、model、credentialId
+  和非敏感配置的不可变 execution 投影；排队项继续持有同一对象摘要，后续 ProviderModel 更新不会
+  改写已接受工作。
+- 生产 sidecar 装配在派发时才把 credentialId 解析到 SecretStore；内容只经 Worker `secret.put`
+  进入一次性帧，并固定只读挂载到隔离内。adapter 只收到部署声明的环境名，模型进入原生
+  `create`/`prompt`；正常关闭、启动拒绝和 Worker 终态均安排秘密清理。
+- 定向验证：Server/wire 相关 45 passed，Worker/bwrap 32 passed，Node envelope 4 passed；其中新增
+  5 个冻结、kind mismatch、argv 非泄漏和启动异常清理反例。没有读取真实 locator、没有模型或网络
+  请求，累计费用仍为 1 次/12 tokens/<¥0.01。
+- 此检查点只证明接线与组件生命周期。Pi/Hermes/OpenCode 的原生运行时工件/配置进入生产 bwrap
+  以及逐家真实模型门仍需完成；Windows r4 也尚未运行，后端状态不提前升级。
+
 ## 2026-09-14 12:15 +08:00 — 28 方法 wire 重锁
 
 - 前端提交：`3aba5c5c8743401b964f80c88bd43e847fa3d5a8`；writer lease 仍 ACTIVE，未接管前端。
@@ -72,8 +86,9 @@
 
 ### 未完成
 
-- Pi / Hermes / OpenCode 三家的真实模型验收：每家的 Provider/Model 配置尚未完成
-  （需要各自的 provider 配置结构与模型目录对齐）。本轮未执行、未用组件结果冒充。
+- Pi / Hermes / OpenCode 三家的真实模型验收：无模型配置与有界 runner 已在 `bc7d95b` 完成，
+  `502f4b5` 完成生产 sidecar 的冻结/秘密投影基础；原生运行时封装及付费验证尚未完成。本轮仍未执行、
+  未用组件结果冒充。
 - 42-D 的「UI 选择角色 → 首次发送 → 终止前内容 → 继续一轮 → 关闭重开恢复历史」
   完整链路依赖 42-B 双门，未执行。
 
