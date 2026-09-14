@@ -150,20 +150,19 @@ import type { WiringActions, WiringApi } from './types'
 // Overlay views the controller mounts over the shell — lazy, load on demand.
 // The workspace-route full-page views (skills/artifacts) are the
 // ChatRoutesSurface's and live in ./surfaces.
-const AgentsView = lazy(async () => ({ default: (await import('@/features/agents')).AgentsView }))
 const CommandCenterView = lazy(async () => ({ default: (await import('@/features/command-center')).CommandCenterView }))
-const CronView = lazy(async () => ({ default: (await import('@/features/cron')).CronView }))
-const WebhooksView = lazy(async () => ({ default: (await import('@/features/webhooks')).WebhooksView }))
 const ProfilesView = lazy(async () => ({ default: (await import('@/features/profiles')).ProfilesView }))
 const SettingsView = lazy(async () => ({ default: (await import('@/features/settings')).SettingsView }))
-const StarmapView = lazy(async () => ({ default: (await import('@/features/starmap')).StarmapView }))
 
-// The boot-failure overlay embeds the real Settings → Gateway panel in its
-// recovery surface; the host hands it over as a prop so the overlay never
-// imports an app screen and the code-split lives here with the other views.
-const GatewaySettingsView = lazy(async () => ({
-  default: (await import('@/features/settings/gateway-settings')).GatewaySettings
-}))
+// Agents / Cron / Webhooks / Starmap are deliberately NOT code-split here. This
+// is the AgentBox product controller, and those views read the legacy Hermes
+// REST plane. Their routes land on the honest "not available" product page
+// instead (see ChatRoutesSurface's route table), and nothing offers an entry.
+//
+// The boot-failure overlay likewise gets no gateway/connection panel: that panel
+// is legacy Hermes connection management, and its "Test connection" button dials
+// `hermes:connections:test`, which can start the runtime. The overlay renders the
+// action only when a panel is handed in, so passing nothing removes the path.
 
 // Surfaces (the four wired panes), the render context + WiredPane, and the
 // WiringActions/WiringApi contracts all live in sibling modules — this file is
@@ -1188,7 +1187,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
       />
       <UpdatesOverlay />
       <GatewayConnectingOverlay />
-      <BootFailureOverlay GatewaySettingsView={GatewaySettingsView} onboardingEnabled={gatewayState === 'open'} />
+      <BootFailureOverlay onboardingEnabled={gatewayState === 'open'} />
       <CommandPalette />
       <PluginInstallModal />
       <PetGenerateOverlay />
@@ -1245,36 +1244,9 @@ export function ContribWiring({ children }: { children: ReactNode }) {
         </Suspense>
       )}
 
-      {agentsOpen && (
-        <Suspense fallback={null}>
-          <AgentsView onClose={closeOverlayToPreviousRoute} />
-        </Suspense>
-      )}
-
-      {cronOpen && (
-        <Suspense fallback={null}>
-          <CronView
-            onClose={closeOverlayToPreviousRoute}
-            onOpenSession={sessionId => openSession(sessionId, navigate)}
-          />
-        </Suspense>
-      )}
-
-      {webhooksOpen && (
-        <Suspense fallback={null}>
-          <WebhooksView onClose={closeOverlayToPreviousRoute} />
-        </Suspense>
-      )}
-
       {profilesOpen && (
         <Suspense fallback={null}>
           <ProfilesView onClose={closeOverlayToPreviousRoute} />
-        </Suspense>
-      )}
-
-      {starmapOpen && (
-        <Suspense fallback={null}>
-          <StarmapView onClose={closeOverlayToPreviousRoute} />
         </Suspense>
       )}
 

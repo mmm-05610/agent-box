@@ -69,8 +69,31 @@ import { CRON_ROUTE, SETTINGS_ROUTE, WEBHOOKS_ROUTE } from '../../routes'
 
 const EMPTY_USAGE: UsageStats = { calls: 0, input: 0, output: 0, total: 0 }
 
+/**
+ * Statusbar items whose data plane belongs to the legacy Hermes runtime: the
+ * connection/gateway switcher reads (and can dial) the legacy connection
+ * registry over `hermes:connections:*`, which sits OUTSIDE the `hermes:api`
+ * hard gate, and the agents/cron/webhooks entries open legacy data-plane views.
+ * The AgentBox product must not offer any of them — the authority alone
+ * decides, never gateway state or cache emptiness.
+ */
+export const LEGACY_STATUSBAR_ITEM_IDS: readonly string[] = ['agents', 'cron', 'gateway-switcher', 'webhooks']
+
+/**
+ * The one place the statusbar's authority rule lives, so it can be asserted
+ * without rendering the bar: under `'agentbox'` the legacy-data-plane items are
+ * dropped; under `'hermes'` the list is returned untouched.
+ */
+export function visibleStatusbarItems<T extends { id: string }>(
+  items: readonly T[],
+  authority: 'agentbox' | 'hermes'
+): readonly T[] {
+  return authority === 'agentbox' ? items.filter(item => !LEGACY_STATUSBAR_ITEM_IDS.includes(item.id)) : items
+}
+
 interface StatusbarItemsOptions {
   agentsOpen: boolean
+  authority: 'agentbox' | 'hermes'
   chatOpen: boolean
   commandCenterOpen: boolean
   extraLeftItems: readonly StatusbarItem[]
@@ -87,6 +110,7 @@ interface StatusbarItemsOptions {
 
 export function useStatusbarItems({
   agentsOpen,
+  authority,
   chatOpen,
   commandCenterOpen,
   extraLeftItems,
@@ -102,6 +126,7 @@ export function useStatusbarItems({
   const { t } = useI18n()
   const copy = t.shell.statusbar
   const fileMenu = t.fileMenu
+
   const primaryActiveSessionId = useStore($activeSessionId)
   const activeGatewayProfile = useStore($activeGatewayProfile)
   // What the button paints and flips is whether the terminal is ON SCREEN —
@@ -650,8 +675,8 @@ export function useStatusbarItems({
   )
 
   const leftStatusbarItems = useMemo(
-    () => [...coreLeftStatusbarItems, ...extraLeftItems],
-    [coreLeftStatusbarItems, extraLeftItems]
+    () => visibleStatusbarItems([...coreLeftStatusbarItems, ...extraLeftItems], authority),
+    [authority, coreLeftStatusbarItems, extraLeftItems]
   )
 
   const statusbarItems = useMemo(

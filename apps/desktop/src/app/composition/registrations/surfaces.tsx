@@ -89,6 +89,12 @@ export const StatusbarSurface = memo(function StatusbarSurface({
 
   const { leftStatusbarItems, statusbarItems } = useStatusbarItems({
     agentsOpen,
+    // Explicit product authority: it alone decides which statusbar items exist.
+    // The connection/gateway switcher talks to `hermes:connections:*`, which the
+    // `hermes:api` hard gate does not cover, and the agents/cron/webhooks
+    // entries open legacy data-plane views — none of them may be constructed for
+    // the AgentBox product.
+    authority: 'agentbox',
     chatOpen,
     commandCenterOpen,
     extraLeftItems,
@@ -131,18 +137,25 @@ export const ChatRoutesSurface = memo(function ChatRoutesSurface({
     </div>
   )
 
+  // The views the AgentBox product does not mount: Agents (retired by the
+  // product decision), Starmap and Webhooks (no approved product surface) and
+  // Cron (no AgentBox contract yet). Each had a legacy Hermes REST data plane —
+  // a deep link must land on the honest "not available" product page rather
+  // than an empty pane or that data plane. `/skills` set this precedent.
+  const unavailableView = <Navigate replace to={`${SETTINGS_ROUTE}?tab=product:resources`} />
+
   return (
     <Routes>
       <Route element={chatView} index />
       <Route element={chatView} path=":sessionId" />
-      <Route element={<Navigate replace to={`${SETTINGS_ROUTE}?tab=product:resources`} />} path="skills" />
-      <Route element={null} path="agents" />
+      <Route element={unavailableView} path="agents" />
+      <Route element={unavailableView} path="cron" />
       <Route element={null} path="command-center" />
-      <Route element={null} path="cron" />
       <Route element={null} path="profiles" />
       <Route element={null} path="settings" />
-      <Route element={null} path="starmap" />
-      <Route element={null} path="webhooks" />
+      <Route element={unavailableView} path="skills" />
+      <Route element={unavailableView} path="starmap" />
+      <Route element={unavailableView} path="webhooks" />
       {/* Registry-contributed pages (core features + plugins) render in the
           workspace pane like any built-in view — behind the same blast wall
           as every other contribution mount. */}

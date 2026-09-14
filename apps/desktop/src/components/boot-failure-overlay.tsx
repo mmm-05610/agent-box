@@ -266,12 +266,21 @@ export function BootFailureOverlay({ GatewaySettingsView, onboardingEnabled = fa
     busy?: Exclude<BusyAction, null>
   }
 
-  const settingsAction: RecoveryAction = {
-    key: 'settings',
-    label: copy.gatewaySettings,
-    onClick: () => setView('connect'),
-    icon: <SlidersHorizontal />
-  }
+  // The gateway/connection panel belongs to the legacy runtime and is handed in
+  // only by the shell that owns it. Without it there is nothing to open, so the
+  // action must not render a button that leads to an empty card — and the
+  // AgentBox product must not offer a legacy gateway/connection surface at all.
+  const settingsAction: RecoveryAction | null = GatewaySettingsView
+    ? {
+        key: 'settings',
+        label: copy.gatewaySettings,
+        onClick: () => setView('connect'),
+        icon: <SlidersHorizontal />
+      }
+    : null
+
+  const withSettings = (variant?: RecoveryVariant): RecoveryAction[] =>
+    settingsAction ? (variant ? [{ ...settingsAction, variant }] : [settingsAction]) : []
 
   const retryAction: RecoveryAction = {
     key: 'retry',
@@ -312,11 +321,10 @@ export function BootFailureOverlay({ GatewaySettingsView, onboardingEnabled = fa
         icon: <LogIn />,
         busy: 'signin'
       },
-      { ...settingsAction, variant: 'secondary' },
+      ...withSettings('secondary'),
       localAction
     ]
-    hint = copy.remoteSignInHint(label)
-  } else if (cloudDown) {
+    hint = copy.remoteSignInHint(label)  } else if (cloudDown) {
     // A Nous Cloud agent is down — the user cannot restart the managed
     // instance and Repair is local-only. Lead with the paths that actually
     // resolve it: check the portal (status/instance controls), switch to the
@@ -338,11 +346,11 @@ export function BootFailureOverlay({ GatewaySettingsView, onboardingEnabled = fa
         onClick: () => openExternalLink('https://discord.gg/NousResearch'),
         variant: 'ghost'
       },
-      { ...settingsAction, variant: 'ghost' }
+      ...withSettings('ghost')
     ]
     hint = copy.cloudDownHint
   } else if (remoteFailure) {
-    actions = [settingsAction, { ...retryAction, variant: 'secondary' }, localAction]
+    actions = [...withSettings(), { ...retryAction, variant: 'secondary' }, localAction]
     hint = copy.remoteFailureHint
   } else {
     // Local failure: Use-local is redundant with Retry (both re-target local), so
@@ -357,7 +365,7 @@ export function BootFailureOverlay({ GatewaySettingsView, onboardingEnabled = fa
         variant: 'secondary',
         busy: 'repair'
       },
-      { ...settingsAction, variant: 'ghost' }
+      ...withSettings('ghost')
     ]
     hint = notFound ? copy.notFoundHint : copy.repairHint
   }

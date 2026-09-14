@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('agentBoxDesktop', {
     request: request => ipcRenderer.invoke('agentbox:wire:request', request),
     subscribeEvents: ({ sessionId, cursor }, callback) => {
       const subscriptionId = `renderer-${++nextWireSubscriptionId}`
+
       const listener = (_event, payload) => {
         if (payload && typeof payload === 'object' && payload.subscriptionId === subscriptionId) {
           callback(payload.frame)

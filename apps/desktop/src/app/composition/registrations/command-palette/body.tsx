@@ -135,6 +135,16 @@ export interface CommandPaletteBodyProps {
  */
 export const LEGACY_PALETTE_ROW_IDS: readonly string[] = ['logs.toggle', 'profile.export', 'profile.import']
 
+/**
+ * Navigation rows for the views the AgentBox product does not mount: Agents (the
+ * management entry the product retires), Starmap and Webhooks (no approved
+ * product surface) and Cron (whose AgentBox contract does not exist yet). Their
+ * views read the legacy Hermes REST plane, so under `'agentbox'` the palette
+ * must not offer a route to them — the same rule as `LEGACY_PALETTE_ROW_IDS`,
+ * applied to the built-in "go to" group rather than the contribution group.
+ */
+export const LEGACY_VIEW_PALETTE_ROW_IDS: readonly string[] = ['nav-agents', 'nav-cron', 'nav-starmap']
+
 export function CommandPaletteBody({ authority, onExited }: CommandPaletteBodyProps) {
   const { t } = useI18n()
   const pendingPage = useStore($commandPalettePage)
@@ -311,6 +321,14 @@ export function CommandPaletteBody({ authority, onExited }: CommandPaletteBodyPr
     [authority, contributedItems]
   )
 
+  // The built-in "go to" rows for the views AgentBox does not mount are dropped
+  // the same way — a navigation row is how most users would reach them. See
+  // LEGACY_VIEW_PALETTE_ROW_IDS.
+  const hiddenLegacyViewRowIds = useMemo(
+    () => new Set(authority === 'agentbox' ? LEGACY_VIEW_PALETTE_ROW_IDS : []),
+    [authority]
+  )
+
   // The active repo's worktrees → "new conversation in <branch>". This is the
   // ⌘K-typed "I want to work on <branch>" reflex: each entry seeds a fresh
   // session anchored to that worktree's checkout (requestStartWorkSession),
@@ -403,23 +421,25 @@ export function CommandPaletteBody({ authority, onExited }: CommandPaletteBodyPr
             label: cc.nav.settings.title,
             run: go(SETTINGS_ROUTE)
           },
-          {
-            action: 'nav.cron',
-            icon: Clock,
-            id: 'nav-cron',
-            keywords: ['schedule', 'jobs'],
-            label: t.shell.statusbar.cron,
-            run: go(CRON_ROUTE)
-          },
-          { action: 'nav.profiles', icon: Users, id: 'nav-profiles', label: t.profiles.title, run: go(PROFILES_ROUTE) },
-          { action: 'nav.agents', icon: Cpu, id: 'nav-agents', label: t.agents.title, run: go(AGENTS_ROUTE) },
-          {
-            icon: Starmap,
-            id: 'nav-starmap',
-            keywords: ['star map', 'memory', 'memories', 'skills', 'graph', 'learning', 'constellation'],
-            label: t.starmap.title,
-            run: go(STARMAP_ROUTE)
-          }
+          ...[
+            {
+              action: 'nav.cron',
+              icon: Clock,
+              id: 'nav-cron',
+              keywords: ['schedule', 'jobs'],
+              label: t.shell.statusbar.cron,
+              run: go(CRON_ROUTE)
+            },
+            { action: 'nav.profiles', icon: Users, id: 'nav-profiles', label: t.profiles.title, run: go(PROFILES_ROUTE) },
+            { action: 'nav.agents', icon: Cpu, id: 'nav-agents', label: t.agents.title, run: go(AGENTS_ROUTE) },
+            {
+              icon: Starmap,
+              id: 'nav-starmap',
+              keywords: ['star map', 'memory', 'memories', 'skills', 'graph', 'learning', 'constellation'],
+              label: t.starmap.title,
+              run: go(STARMAP_ROUTE)
+            }
+          ].filter(row => !hiddenLegacyViewRowIds.has(row.id))
         ]
       },
       projectGroup,
@@ -581,6 +601,7 @@ export function CommandPaletteBody({ authority, onExited }: CommandPaletteBodyPr
     authority,
     dismissedAutoProjects,
     go,
+    hiddenLegacyViewRowIds,
     projectTree,
     selectTick,
     settingsEntryLabel,

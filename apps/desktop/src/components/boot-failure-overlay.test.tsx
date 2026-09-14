@@ -98,10 +98,26 @@ describe('BootFailureOverlay', () => {
     const restore = stubDesktop(remoteToken)
 
     try {
-      render(<BootFailureOverlay />)
+      render(<BootFailureOverlay GatewaySettingsView={StubGatewaySettingsView} />)
       await waitFor(() => expect(screen.queryByRole('button', { name: /repair/i })).toBeNull())
       expect(screen.getByRole('button', { name: /gateway settings/i })).toBeTruthy()
       expect(screen.getByRole('button', { name: /use local gateway/i })).toBeTruthy()
+    } finally {
+      restore()
+    }
+  })
+
+  it('offers no Gateway settings action when the host hands in no legacy panel', async () => {
+    // The AgentBox product passes no panel: the legacy gateway/connection
+    // surface — whose "Test connection" action dials hermes:connections:test and
+    // can start the runtime — must have no way in, on any failure kind.
+    const restore = stubDesktop(remoteToken)
+
+    try {
+      render(<BootFailureOverlay />)
+      await waitFor(() => expect(screen.queryByRole('button', { name: /repair/i })).toBeNull())
+      expect(screen.getByRole('button', { name: /use local gateway/i })).toBeTruthy()
+      expect(screen.queryByRole('button', { name: /gateway settings/i })).toBeNull()
     } finally {
       restore()
     }
@@ -216,7 +232,7 @@ describe('BootFailureOverlay', () => {
     })
 
     try {
-      render(<BootFailureOverlay />)
+      render(<BootFailureOverlay GatewaySettingsView={StubGatewaySettingsView} />)
       // Cloud-specific title + actionable recovery instead of the generic
       // remote-failure copy.
       expect(await screen.findByText(/Nous Cloud agent is down/i)).toBeTruthy()

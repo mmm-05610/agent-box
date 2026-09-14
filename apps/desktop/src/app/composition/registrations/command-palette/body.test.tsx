@@ -299,3 +299,36 @@ describe('CommandPaletteBody — contributed legacy shortcuts follow the authori
     expect(exportRun).toHaveBeenCalledTimes(1)
   })
 })
+
+// The built-in "go to" rows for views the AgentBox product does not mount. A
+// navigation row is the main way a user reaches them, so the authority has to
+// decide here too — the views behind them read the legacy Hermes REST plane.
+describe('CommandPaletteBody — views AgentBox does not mount follow the authority', () => {
+  const unmountedViewRows = [
+    { label: /^Spawn tree$/, query: 'spawn' },
+    { label: /^Cron$/, query: 'cron' },
+    { label: /^Memory Graph$/, query: 'memory' }
+  ] as const
+
+  it('offers no Agents/Cron/Starmap row under AgentBox authority', async () => {
+    renderPalette('agentbox')
+
+    for (const { label, query } of unmountedViewRows) {
+      searchFor(query)
+      await act(async () => {})
+
+      expect(screen.queryByRole('option', { name: label })).toBeNull()
+    }
+  })
+
+  it('keeps those rows under Hermes authority', async () => {
+    renderPalette('hermes')
+
+    for (const { label, query } of unmountedViewRows) {
+      searchFor(query)
+      await act(async () => {})
+
+      expect(screen.getByRole('option', { name: label })).toBeTruthy()
+    }
+  })
+})

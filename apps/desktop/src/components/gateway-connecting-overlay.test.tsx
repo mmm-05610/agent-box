@@ -22,6 +22,11 @@ import { GatewayConnectingOverlay } from './gateway-connecting-overlay'
 // boot.error null. The fix keeps the initial-boot overlay out of post-boot
 // reconnects, leaving chat/settings usable while the reconnect loop runs.
 
+// The gateway/connection panel is a prop now (the AgentBox product hands in
+// none, so its recovery surface cannot reach legacy connection management).
+// These cases describe the legacy shell, so they hand in the stub.
+const StubGatewaySettingsView = () => <div data-testid="stub-gateway-settings" />
+
 function resetStores() {
   setGatewayState('idle')
   $gatewaySwitching.set(false)
@@ -186,7 +191,7 @@ describe('connecting overlay vs recovery surface', () => {
       render(
         <>
           <GatewayConnectingOverlay />
-          <BootFailureOverlay />
+          <BootFailureOverlay GatewaySettingsView={StubGatewaySettingsView} />
         </>
       )
     })
