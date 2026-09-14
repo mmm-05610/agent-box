@@ -464,6 +464,12 @@ null**。因此这些方法的运行终态都属于同一个 `EXTERNAL_LIFECYCLE
 > 而 `startHermes()` 不读取产品 runtime 策略（全仓仅 `:7194` 一处消费）。另有 1 条条件路径
 > （持久化 "All profiles" 后 Open folder）与 1 条已上膛但当前无数据源的未匹配本地行预览。
 
+> **2026-09-14 收口检查点（已实施）**：上列四条 blocker 与 B5/B6 已按下表就地标注的方式关闭；
+> 结构门 `f7759148` 使 agentbox runtime 下 `hermes:api` 在任何路由/`ensureBackend` 之前即以稳定码
+> `LEGACY_RUNTIME_DISABLED_FOR_PRODUCT` 拒绝，面迁移 `a6b751ff` 让状态栏/命令面板/侧栏搜索/Archived/未匹配
+> 本地行读中立或服务数据源。最终状态与逐项行为证据见 [P05-final-audit.md](P05-final-audit.md) §10；
+> 同批新发现仍未迁移的 Command Center 浮层与插件 SDK `host.status()`（B7/B8）也登记在该节。
+
 **取代码的结论**：主 route 的聊天面确实只有 AgentBox 面；但**共享外壳**（状态栏、命令面板、侧栏搜索/归档）
 存在 `ACTIVE_AGENTBOX_BLOCKER`。下表逐面记录事实；其中"侧栏会话列表"一行**只对** `$gatewayState === 'open'`
 门控的部分成立，不得推广到状态栏/命令面板/搜索/归档。逐链记录、分类与最小写集见
@@ -472,14 +478,14 @@ null**。因此这些方法的运行终态都属于同一个 `EXTERNAL_LIFECYCLE
 | 面 | 结论 | 依据 |
 | --- | --- | --- |
 | 主 route / 聊天面 | 仅 `AgentBoxChatView`（`app/composition/registrations/surfaces.tsx:113`）；legacy `ChatView`（`features/chat/index.tsx`）只被 `wiring/types.ts` 作**类型**引用，未挂载 | 非测试导入链 |
-| 状态栏（**新增行**） | `StatusbarSurface`（`surfaces.tsx:62-78`）经 `use-status-snapshot.ts:44-60` **无条件**调 `getStatus()`（仅 visibility/focus 门），经 `hermes:api` 触达 legacy REST 并拉起 legacy 运行时 → `ACTIVE_AGENTBOX_BLOCKER` | 最终审计 §4.3 B1 |
-| 命令面板（**新增行**） | `features.tsx:1192` 常挂；打开时 `command-palette/body.tsx:203-206` 发 `listAllProfileSessions(200,1,'exclude')`，无 `enabled` 门 → `ACTIVE_AGENTBOX_BLOCKER` | 最终审计 §4.3 B2 |
-| 侧栏搜索 / Archived（**新增行**） | `chat-sidebar.tsx:438-469`（搜索）与 `:1153-1157`（归档）在 `showSessionSections` 可见时**不查** `$gatewayState` 即发 legacy REST → `ACTIVE_AGENTBOX_BLOCKER` | 最终审计 §4.3 B3/B4 |
+| 状态栏（**新增行**） | `StatusbarSurface`（`surfaces.tsx:62-78`）经 `use-status-snapshot.ts:44-60` **无条件**调 `getStatus()`（仅 visibility/focus 门），经 `hermes:api` 触达 legacy REST 并拉起 legacy 运行时 → `ACTIVE_AGENTBOX_BLOCKER`（**2026-09-14 已关闭**：组合层向 hook 注入 `null` 状态源，零 `getStatus`；见最终审计 §10.2） | 最终审计 §4.3 B1 |
+| 命令面板（**新增行**） | `features.tsx:1192` 常挂；打开时 `command-palette/body.tsx:203-206` 发 `listAllProfileSessions(200,1,'exclude')`，无 `enabled` 门 → `ACTIVE_AGENTBOX_BLOCKER`（**2026-09-14 已关闭**：会话行改读 `$agentBoxSessions`，legacy 枚举与 React Query 会话查询已移除；见 §10.2） | 最终审计 §4.3 B2 |
+| 侧栏搜索 / Archived（**新增行**） | `chat-sidebar.tsx:438-469`（搜索）与 `:1153-1157`（归档）在 `showSessionSections` 可见时**不查** `$gatewayState` 即发 legacy REST → `ACTIVE_AGENTBOX_BLOCKER`（**2026-09-14 已关闭**：`sessionAuthority='agentbox'` 下搜索为本地过滤、Archived 走服务 `sessions.list`；见 §10.2） | 最终审计 §4.3 B3/B4 |
 | Composer | `ChatBar` 以 `runtimeAuthority="agentbox"`、`gateway={null}`、`model.hidden=true` 挂载（`features/chat/agentbox-chat-view.tsx:133-197`） | 同文件 + `features/profiles` 模型控件中立化证据 |
 | Profiles / Models | `ProfilesView`（四方法 hello 门）、`AgentBoxModelSettings`（四方法 hello 门） | `features/profiles/index.tsx:86`、`features/settings/agentbox-model-settings.tsx:46` |
 | 冷启动 | renderer 与 Electron 两道 legacy 自动启动门均已关闭（P04 切片 4/5） | `evidence/P04.md` + `electron/app/product-runtime-policy.ts` |
 | 侧栏会话列表 | **部分迁移（`8cdd1381` + `cbdccf7c`）**：统一工作区列表里**已匹配服务 Workspace 的展开内容**改由 AgentBox 服务投影接管（`agentbox-sessions/` + `workspace-list`，零 legacy 调用），其上的改名/置顶（`sessions.update`）与归档（`sessions.archive`）都只走服务 seam，不再使用 legacy 归档入口；**未匹配的 shell 行、扁平/进入视图与遗留会话树**仍是 legacy Hermes 数据面——`ChatSidebar` 由产品外壳挂载（`surfaces.tsx:48`），其会话节点走 `application/session-lists.ts` → `api/sessions.ts` → `api/client.ts`（`window.hermesDesktop.api`）。**门控范围更正**：`$gatewayState==='open'`（`chat-sidebar.tsx:540`）只约束**批量会话树/项目树**这一批；侧栏**搜索**（`:438-469`）与 **Archived**（`:1153-1157`）不查该状态，属 §4.3 的 blocker | 非测试导入链 + `api/client.ts:82-103` + 最终审计 §4.3 B3/B4 |
-| 工作区根列表 | 已是中立的 36R 行：本地行来自本机项目存储、WSL 行来自宿主能力；选择经中立 store 驱动 AgentBox 侧解析；**未匹配本地行**的 legacy 预览分支（`workspace-list.tsx:150-166`）当前无数据源故不触发，但已上膛 | `features/chat/sidebar/workspace-list/workspace-list.tsx`、`agentbox-main-chat.ts`、最终审计 §4.3 B6 |
+| 工作区根列表 | 已是中立的 36R 行：本地行来自本机项目存储、WSL 行来自宿主能力；选择经中立 store 驱动 AgentBox 侧解析；**未匹配本地行**的 legacy 预览分支（`workspace-list.tsx:150-166`）当前无数据源故不触发，但已上膛（**2026-09-14 已关闭**：agentbox authority 下该分支不再渲染 legacy 预览，改中立文案；见 §10.2） | `features/chat/sidebar/workspace-list/workspace-list.tsx`、`agentbox-main-chat.ts`、最终审计 §4.3 B6 |
 | 旧 Profile 对话框 | `create/delete/rename-profile-dialog` 只被 `features/chat/sidebar/profile-switcher.tsx` 引用，而该组件**无任何挂载点** → 不可达（保留文件与其测试） | 非测试导入链 |
 | 旧模型浮层 | `ModelPickerOverlay`/`ModelVisibilityOverlay` 在 `features.tsx` 全应用挂载，但其开合来自 legacy 模型控件 store（`$modelPickerOpen`、`use-model-controls`），AgentBox 聊天面既隐藏模型 pill 也不驱动它们 → 挂载但无 AgentBox 触发点 | `features/profiles/model-picker-overlay.tsx:55`、`agentbox-chat-view.tsx:135` |
 | `plugins/hermes-bots` | 随包注册且默认开启（`src/extension/contrib/plugins.ts`），其数据面是 legacy gateway（`host.request('profiles.list'/'profiles.configure'/'profiles.get_asset'/'profiles.create')`）。这些**不是** wire-v1 方法，也不得计作 AgentBox 生产接线；其产品入口已在 P02A 退役，pane 注册被注释（`plugin.tsx:375-387`） | `src/plugins/hermes-bots/**`、`evidence/P02.md`、最终审计 §4.3 |

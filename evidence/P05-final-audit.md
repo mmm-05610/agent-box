@@ -23,6 +23,10 @@
 | REAL_FLOW_VERIFIED / P06 GREEN / DESKTOP_IMPLEMENTATION_READY | **不得声明** |
 | writer_lease | 保持 **ACTIVE** |
 
+> **2026-09-14 后续增量（已实施）**：本表记录的 legacy 可达性与阶段标记是**审计当时**的事实；
+> B1–B6 已按其后的收口检查点关闭（结构门 `f7759148`、面迁移 `a6b751ff`），最终状态、行为证据与
+> 新发现残留下文 **§10**。本文件 §1–§9 保持审计当时原样，不回填。
+
 一句话：**28 个 wire 方法的客户端接线确实完整，但"产品已完成"不成立**——AgentBox 正常产品外壳里仍有
 5 条不经任何 legacy 选择即可触达 Hermes REST 数据的路径，其中 4 条还会经 lazily 启动门拉起 legacy
 Hermes 运行时。方法矩阵完成与产品完成必须分开记账。
@@ -321,3 +325,68 @@ Data plane（两条，互不相通）
   `evidence/P05.md`、`evidence/P04.md`、`docs/desktop-product-delivery/status.md`。
   未修改任何 TS/TSX、测试、schema、合同、Electron、preload、package/lock 或后端文件。
 - 本文件不实施任何 legacy 修复，也不开始 P06。
+
+## 10. legacy 收口检查点（2026-09-14 后续增量，已实施）
+
+本阶段按 §6 的最小写集**先立 W4 结构门，再迁移 W1–W3 与 B6**。起点 HEAD `ad3feb16`，
+代码检查点 `f7759148`（`fix(desktop): block lazy Hermes API startup in AgentBox runtime`）与
+`a6b751ff`（`fix(desktop): retire reachable Hermes control flow from AgentBox surfaces`）。
+未修改后端、wire schema、preload、shared、package/lock；未跑 Windows、未运行模型、未读密钥。
+
+### 10.1 W4 结构门：`hermes:api` 的 main 侧运行时门
+
+| 项 | 事实 |
+| --- | --- |
+| 显式依赖 | `RegisterApiProxyIpcDeps.legacyApiAllowed: boolean`（`electron/ipc/api-proxy-ipc.ts`） |
+| 组合来源 | `main.ts` **只做组合**：`legacyApiAllowed: shouldAutostartLegacyHermes(DESKTOP_PRODUCT_RUNTIME)`；未新造第二套 runtime 常量，未在 `main.ts` 声明函数 |
+| 门的位置 | `hermes:api` handler 的**第一条语句**：早于请求解析（`profileNameFromDeleteRequest`）、deletion gate、`apiRequestRegistryConnectionId`、registry dispatch、`handleHermesApiRequest`、`ensureBackend` |
+| 拒绝行为 | 抛 `Error`，`code = 'LEGACY_RUNTIME_DISABLED_FOR_PRODUCT'` 且 message 以该码为前缀（渲染端只看到 message，故两处都带）；**不静默返回成功** |
+| 数据 URL 配置 IPC | `hermes:data-url-read-max:get/set` 不受影响（独立 channel，已测） |
+| 隔离 legacy 兼容 | `legacyApiAllowed: true`（显式 legacy runtime）时既有路由逐项保持：普通请求、connection-scoped profile delete、rename 的 deletion gate 与释放 |
+
+行为证据：`electron/ipc/api-proxy-ipc.test.ts`（新增 5 用例）+ `electron/app/product-runtime-policy.test.ts`
+（3 用例）＝ **electron 2 files / 8 tests passed**。禁用态断言 `handleHermesApiRequest` 0 次、
+`ensureBackend` 0 次、registry dispatch 0 次、deletion gate 0 次。
+
+### 10.2 B1–B6 最终状态与行为证据
+
+| # | 最终状态 | 迁移后的权威数据源 | 行为证据 |
+| --- | --- | --- | --- |
+| B1 状态栏 | **关闭** | `useStatusSnapshot(source \| null, gatewayState, gatewayScope)`；产品组合传 `null` → 不注册 timer/focus/visibility，零 `getStatus`/`requestGateway`，返回中立 null；hook 不再 import `@/api/config` | `use-status-snapshot.test.ts` 10 用例（含 null 态 0 次调用、无定时器、非 null→null 清理）；`surfaces.test.tsx` 断言 source 为 null |
+| B2 命令面板 | **关闭** | `$agentBoxSessions` → `projectAgentBoxPaletteSessions`（`archivedAt === null`；pinned → updatedAt desc → id tie-break）；行 label = `displayName`，打开用服务 id 走 `openSession` seam；`listAllProfileSessions` 与 React Query 会话查询已从该文件移除 | `body.test.tsx` 4 用例（legacy mock **会答复**却断言 0 次调用）、`palette-helpers.test.ts` 5 用例 |
+| B3 侧栏搜索 | **关闭** | `ChatSidebar` 显式 `sessionAuthority`；agentbox 下 `AgentBoxGlobalSessions mode="search"` 本地、大小写不敏感过滤 displayName 与服务 id，排除 archived | `agentbox-global-sessions.test.tsx`、`chat-sidebar.integration.test.tsx`（`$gatewayState` closed/open 翻转后 `searchSessions` 仍 0 次） |
+| B4 Archived | **关闭** | 同组件 `mode="archived"`：服务 ready 且 hello 声明 `sessions.list` 时**一次** `refreshAgentBoxSessions(client,{includeArchived:true})`；只显示 `archivedAt !== null`；typed failure 显示真实原因并保留缓存行；unavailable 保留缓存行 + 状态；未声明能力则明说 | 同上 + `unified-workspace-list.test.tsx`；legacy `loadArchivedSessions` 仅存在于 `sessionAuthority==='hermes'` 分支 |
+| B5 all-profiles 项目刷新 | **结构性挡住** | 该 REST 分支在 agentbox runtime 下于 `ensureBackend` **之前**被拒（10.1），零 `ensureBackend`／零 `startHermes`；打开本地文件夹未被破坏（见 10.3） | electron 门测试（禁用态 0 次 `ensureBackend`）；`store/projects.test.ts` 与全量 UI 继续通过 |
+| B6 未匹配本地行 | **关闭（不可达）** | agentbox authority 下不再渲染 legacy 预览，改中立文案；Home 桶不展开、不伪造行 | `unified-workspace-list.test.tsx` 新增用例 + `workspace-list.tsx` 分支 |
+
+组合接线（主执行者）：`surfaces.tsx` 的 `SidebarSurface` 显式传 `sessionAuthority="agentbox"`，
+`StatusbarSurface` 传 `null` 状态源；渲染端不重复定义 `DESKTOP_PRODUCT_RUNTIME`。
+
+### 10.3 B5 的"打开本地文件夹"核验（只读）
+
+`refreshProjectTreeAcrossProfiles()` 的失败被 `catch (err) { markProjectsRpcFailure(err) }` 吞掉，
+`refreshProjectTree()` 本身不 reject；`openFolderAsProject()` 因此继续走本地登记/进入项目路径
+（`store/projects/refresh.ts:161-186`、`store/projects/worktrees.ts:288`）。本阶段写集不含该 store，
+故未为其新增测试；结论为静态核验 + 既有 `store/projects.test.ts`（含 ALL_PROFILES 用例）继续通过。
+
+### 10.4 本阶段新发现（超出原 B1–B6，只登记不修）
+
+**B7（新）：Command Center 浮层仍是可达 legacy 数据面。** route `command-center` 在生产外壳可达
+（`app/composition/routing/overlay-routing.ts:22` `commandCenterOpen = currentView === 'command-center'`；
+状态栏 command-center 入口与命令面板 `cc-sessions` 行都导航到该 route），`features.tsx:1231-1241` 挂载
+`CommandCenterView`；其 System 分节 `refreshSystem` 调 `getStatus()`/`getLogs()`（`features/command-center/index.tsx:186-205`），
+maintenance/usage 分节还调 `getUsageAnalytics` 与 `api/system` 系列，并对 legacy `$sessions` 做 pin/export。
+原审计 §4 未覆盖该面。本阶段**未迁移**（不在任一写集内）：W4 门使其 legacy REST 调用只能得到
+`LEGACY_RUNTIME_DISABLED_FOR_PRODUCT`、不再拉起运行时，但它仍是产品外壳内可达的 legacy 面。
+
+**B8（新，低可达性）：插件 SDK 的 legacy 适配层**——`extension/sdk/host-system.ts` 的 `status()`（:62 直连
+`getStatus()`）与同文件的 `restartGateway()`/`listPersistedSessions()`/`onEvent` 都仍是 legacy 数据面，经
+`extension/sdk/index.ts:40` 暴露给插件；当前无已挂载的产品消费点（`plugins/hermes-bots` 的 pane 注册被注释），
+全仓 `src/plugins/**` 无 `system.status` 调用者。与 B7 同类，留待同批处理；本阶段未迁移。
+
+### 10.5 状态
+
+阶段成功标记 **`LEGACY_CLIENT_CLOSEOUT_READY`**；P05 保持 **IN_PROGRESS**
+（下阶段补 P07 §9.5/§9.6/§9.8 fixture 深度门与 HTTP/WS transport 一致性/无连接可观测性）。
+不得声明 P05_CLIENT_GREEN、REAL_FLOW_VERIFIED、P06 GREEN、DESKTOP_IMPLEMENTATION_READY；
+writer_lease 保持 **ACTIVE**。
