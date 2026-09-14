@@ -8,6 +8,16 @@ from .artifacts import (
     runtime_artifact_tree_summary,
     validate_runtime_artifact_target,
 )
+from .home_projection import (
+    GUEST_HOME,
+    HOME_TARGET_PREFIX,
+    MAX_TARGET_SEGMENTS,
+    PROJECTION_DIRECTORY,
+    PROJECTION_FILE,
+    HomeProjectionRejected,
+    home_projection_target,
+    protected_state_paths,
+)
 from .provider import (
     BwrapSandboxProvider,
     PROVIDER_ID,
@@ -21,5 +31,7 @@ __all__ = [
     "MAX_RUNTIME_ARTIFACT_ENTRIES", "MAX_RUNTIME_ARTIFACT_TREES",
     "RuntimeArtifactRejected", "runtime_artifact_name",
     "runtime_artifact_tree_digest", "runtime_artifact_tree_summary",
-    "validate_runtime_artifact_target",
+    "validate_runtime_artifact_target", "GUEST_HOME", "HOME_TARGET_PREFIX",
+    "MAX_TARGET_SEGMENTS", "PROJECTION_DIRECTORY", "PROJECTION_FILE",
+    "HomeProjectionRejected", "home_projection_target", "protected_state_paths",
 ]

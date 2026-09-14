@@ -30,6 +30,12 @@ from agent_box.resource_contracts.harness_capabilities import (
 #: a failed lease ends the turn promptly, large enough not to spin.
 LEASE_POLL_SECONDS = 0.25
 
+#: The guest's isolated home root. Every Harness home is a projection inside it:
+#: read-only configuration files and one bounded writable state subtree, both
+#: declared by the deployment. It is never the host home and never a Windows
+#: profile root.
+GUEST_HOME = "/runtime/home"
+
 
 class SidecarError(RuntimeError):
     def __init__(self, code: str, message: str) -> None:
@@ -211,6 +217,7 @@ class WslSidecarLauncher:
         projection_mounts: Sequence[tuple[str, str]] = (),
         state_bundle_prefix: str | None = None,
         state_target: str | None = None,
+        protected_state_paths: Sequence[str] = (),
         restored_state: Mapping[str, bytes] | None = None,
         timeout_ms: int = 120_000,
     ) -> None:
@@ -232,7 +239,15 @@ class WslSidecarLauncher:
         self.projection_mounts = tuple((str(source), str(target)) for source, target in projection_mounts)
         self.state_bundle_prefix = state_bundle_prefix
         self.state_target = state_target
+        #: Paths (relative to the state target) that a read-only projection owns
+        #: inside the writable state subtree. They are excluded from the
+        #: checkpoint by name and refused when a checkpoint tries to restore
+        #: one, rather than relying on the read-only overlay happening to hide
+        #: them.
+        self.protected_state_paths = tuple(_safe_relative_state_path(path) for path in protected_state_paths)
         if (state_bundle_prefix is None) != (state_target is None):
+            raise ValueError("SIDECAR_STATE_PROJECTION_INVALID")
+        if self.protected_state_paths and state_bundle_prefix is None:
             raise ValueError("SIDECAR_STATE_PROJECTION_INVALID")
         if state_bundle_prefix is not None:
             _safe_relative_state_path(state_bundle_prefix)
@@ -242,6 +257,8 @@ class WslSidecarLauncher:
             self.bundle[marker_path] = b"state-v1\n"
             for relative, content in (restored_state or {}).items():
                 _safe_relative_state_path(relative)
+                if relative in self.protected_state_paths:
+                    raise ValueError("SIDECAR_STATE_PROTECTED_PATH")
                 bundle_path = f"{state_bundle_prefix}/{relative}"
                 if bundle_path in self.bundle:
                     raise ValueError("SIDECAR_STATE_PATH_CONFLICT")
@@ -291,12 +308,16 @@ class WslSidecarLauncher:
                         "data": base64.b64encode(content[offset:offset + 32 * 1024]).decode(),
                     })
             runtime_view = client.request("view.commit", {"viewId": view_id})["path"]
+            # One isolated home root, and the XDG roots derived from it, so a
+            # Harness's default location and its explicit variable resolve to
+            # the same projection. The root is an execution-private mount
+            # namespace directory; the host home is never bound here.
             guest_environment = {
                 "PATH": "/usr/bin:/bin", "LANG": "C.UTF-8",
-                "HOME": "/tmp/agentbox-home",
-                "XDG_CONFIG_HOME": "/tmp/agentbox-home/xdg",
-                "XDG_CACHE_HOME": "/tmp/agentbox-home/xdg",
-                "XDG_DATA_HOME": "/tmp/agentbox-home/xdg",
+                "HOME": GUEST_HOME,
+                "XDG_CONFIG_HOME": f"{GUEST_HOME}/.config",
+                "XDG_CACHE_HOME": f"{GUEST_HOME}/.cache",
+                "XDG_DATA_HOME": f"{GUEST_HOME}/.local/share",
                 "AGENTBOX_SIDECAR_ISOLATED": environment.get(
                     "AGENTBOX_SIDECAR_ISOLATED", "1",
                 ),
@@ -327,6 +348,7 @@ class WslSidecarLauncher:
                 client, attempt_id, 1, view_id,
                 secret_frame_id if secret is not None else None,
                 state_bundle_prefix=self.state_bundle_prefix,
+                protected_state_paths=self.protected_state_paths,
                 forbidden_content=(credential_material or b"").strip(),
             )
             channels.subscribe()
@@ -357,6 +379,7 @@ class _WorkerChannels:
         self, client, attempt_id: str, generation: int, view_id: str,
         secret_frame_id: str | None = None,
         state_bundle_prefix: str | None = None,
+        protected_state_paths: Sequence[str] = (),
         forbidden_content: bytes = b"",
     ) -> None:
         self.client = client
@@ -365,6 +388,9 @@ class _WorkerChannels:
         self.view_id = view_id
         self.secret_frame_id = secret_frame_id
         self.state_bundle_prefix = state_bundle_prefix
+        #: Read-only configuration that lives *inside* the writable state
+        #: subtree. It is not state: it must not be captured into a checkpoint.
+        self.protected_state_paths = frozenset(protected_state_paths)
         self._forbidden_content = forbidden_content
         self._chunks: queue.Queue = queue.Queue()
         self._unsubscribe = None
@@ -473,6 +499,48 @@ class _WorkerChannels:
             except BaseException:  # noqa: BLE001 - stopping must never mask the turn
                 pass
 
+    #: A native Harness may still be finishing its own writes right after
+    #: `close` - appending transcript files, removing the short-lived alias
+    #: links it created while running. Reading the tree while it churns yields
+    #: transient listing or read failures, so a capture first waits, bounded,
+    #: for the tree to settle.
+    STATE_SETTLE_INTERVAL_SECONDS = 0.25
+    STATE_SETTLE_DEADLINE_SECONDS = 5.0
+
+    def settle_state(self, *, deadline_seconds: float | None = None,
+                     interval: float | None = None) -> None:
+        """Wait, bounded, until the state subtree stops changing.
+
+        Two identical consecutive listings mean the writer stopped. Transient
+        read errors are expected while waiting and are not swallowed away: if
+        the tree never settles this simply returns after the deadline and the
+        capture that follows reports its own honest failure.
+        """
+        if self.state_bundle_prefix is None:
+            return
+        deadline = time.monotonic() + (
+            self.STATE_SETTLE_DEADLINE_SECONDS if deadline_seconds is None else deadline_seconds
+        )
+        pause = self.STATE_SETTLE_INTERVAL_SECONDS if interval is None else interval
+        previous = None
+        while time.monotonic() < deadline:
+            try:
+                listing = self.client.request(
+                    "view.list", {"viewId": self.view_id}, timeout=5,
+                )
+                signature = sorted(
+                    (str(item.get("path")), int(item.get("size", -1)))
+                    for item in listing.get("files", ())
+                )
+            except BaseException:  # noqa: BLE001 - a churning tree is not a settled one
+                previous = None
+                time.sleep(pause)
+                continue
+            if signature == previous:
+                return
+            previous = signature
+            time.sleep(pause)
+
     def capture_state(self) -> dict[str, bytes]:
         """Read back only the deployment-declared writable state subtree."""
         if self.state_bundle_prefix is None:
@@ -490,6 +558,9 @@ class _WorkerChannels:
             if relative == ".agentbox-state":
                 continue
             _safe_relative_state_path(relative)
+            if relative in self.protected_state_paths:
+                # Declared read-only configuration, not captured state.
+                continue
             if not isinstance(size, int) or size < 0 or size > 8 * 1024 * 1024:
                 raise SidecarError("SIDECAR_STATE_OUTSIDE_BOUNDS", "state file exceeds bound")
             total += size
@@ -661,6 +732,11 @@ class SidecarEnvelope:
     def capture_state(self) -> dict[str, bytes]:
         capture = getattr(self._channels, "capture_state", None)
         return capture() if callable(capture) else {}
+
+    def settle_state(self) -> None:
+        settle = getattr(self._channels, "settle_state", None)
+        if callable(settle):
+            settle()
 
     # -- reader ------------------------------------------------------------
 
@@ -839,6 +915,9 @@ class SidecarHarnessPort:
             envelope.request({"op": "close"}, timeout=10)
             with self._lock:
                 self._native_closed.add(execution_id)
+            # A stopped Harness is not necessarily a quiet one: wait, bounded,
+            # for its state subtree to stop changing before reading it back.
+            envelope.settle_state()
         state = envelope.capture_state()
         # checkpoint 的可续接性读的是有效能力：静态声明了 native_continuation
         # 且本次执行真的被原生播发过，才允许声明 resumable。

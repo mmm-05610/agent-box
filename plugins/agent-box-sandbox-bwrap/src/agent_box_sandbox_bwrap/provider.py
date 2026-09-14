@@ -16,6 +16,10 @@ from agent_box.work_core.models import Ref, RefType
 from agent_box.work_core.registry import ProviderDescriptor, ResourceResolutionContext
 
 from .artifacts import validate_runtime_artifact_target
+from .home_projection import (
+    GUEST_HOME, PROJECTION_DIRECTORY, PROJECTION_FILE, home_projection_target,
+    protected_state_paths,
+)
 
 PROVIDER_ID = "bwrap-sandbox"
 _CAPS = ("filesystem.mounts@1", "filesystem.readonly@1", "filesystem.writable@1", "filesystem.tmpfs@1", "filesystem.symlink-safe@1", "network.none@1", "network.inherit@1", "env.bounded@1", "home.workspace@1", "digest.read-back@1")
@@ -132,6 +136,52 @@ def compile_remote_bwrap_argv(
     return argv + ["--", *command]
 
 
+def _guest_directory_list(
+    fixed: Sequence[str], targets: Sequence[str], directories: Sequence[str] = (),
+) -> list[str]:
+    """Every guest directory the bind list needs, shallowest first, once each.
+
+    A bind may only be mounted onto an existing mount point, so a nested target
+    (``/runtime/home/.fixture/tool/sessions``) is created level by level instead
+    of borrowing existence from a broader mount: the broader mount would
+    otherwise become its content.  ``directories`` names the targets that are
+    themselves directories (a writable state directory, a tmpfs); a *file*
+    target is never created as a directory, because bwrap must create the file
+    mount point itself - a pre-created directory would silently stand in for the
+    file.
+
+    The list is ordered by depth (then name) so a parent is always created
+    before a child, and it is derived from already-validated targets only, so a
+    rejected target cannot reach it.
+    """
+    values = {str(path) for path in fixed}
+    for target in targets:
+        for parent in PurePosixPath(target).parents:
+            values.add(str(parent))
+    values.update(str(path) for path in directories)
+    return sorted((value for value in values if value != "/"),
+                  key=lambda value: (len(PurePosixPath(value).parts), value))
+
+
+def _ordered_binds(entries: Sequence[tuple[int, int, str, str, str]]) -> list[tuple[str, str, str]]:
+    """Order every bind so a deeper target is never shadowed by its ancestor.
+
+    ``entries`` are ``(class, depth, flag, source, target)``.  bwrap applies
+    mounts in argv order and a later mount wins, so an ancestor bound after its
+    descendant would hide it.  Depth-ascending order makes the overlay
+    direction explicit: the writable state directory is bound first, and the
+    read-only configuration files *inside* it are bound after it, which is what
+    makes the reviewed file win over the state subtree it lives in.
+    """
+    ordered = sorted(entries, key=lambda entry: (entry[1], entry[0], entry[2], entry[4]))
+    return [(flag, source, target) for _class, _depth, flag, source, target in ordered]
+
+
+def _reject_colliding_targets(targets: Sequence[str]) -> None:
+    if len(set(targets)) != len(targets):
+        raise ProjectionRejected("sidecar mount targets collide")
+
+
 def compile_remote_sidecar_bwrap_argv(
     *, workspace: str, runtime_view: str, environment: Mapping[str, str],
     secret: str | None = None,
@@ -148,6 +198,15 @@ def compile_remote_sidecar_bwrap_argv(
     mounted read-only.  The project stays the only writable workspace.  This
     template deliberately selects only the system Node runtime and the single
     reviewed entrypoint; adapter/native semantics remain inside the sidecar.
+
+    Every Harness home is a projection inside one isolated guest home root: the
+    read-only files a deployment declared (`projection_mounts`) and the one
+    writable state directory it declared (`writable_projection_mounts`).  Their
+    targets are validated by the one home grammar (`home_projection`) and their
+    relations by the same derivation the Server uses, so a state directory can
+    never silently shadow a reviewed configuration file - the file is bound
+    after the state directory it lives in, and a state directory inside a
+    projected file is refused here as well as there.
 
     `runtime_artifact_mounts` are host-side immutable dependency directories
     the Worker verified against their declared tree digest.  They are mounted
@@ -167,19 +226,31 @@ def compile_remote_sidecar_bwrap_argv(
         _validate_remote_path(source)
         if re.fullmatch(r"/runtime/bin/[A-Za-z0-9._-]+", target) is None:
             raise ProjectionRejected("sidecar executable target is outside the fixed template")
+    projection_targets: list[str] = []
     for source, target in projection_mounts:
         _validate_remote_path(source)
         if not source.startswith(runtime_view + "/"):
             raise ProjectionRejected("sidecar projection source is outside the reviewed view")
-        if re.fullmatch(r"/tmp/agentbox-home/[A-Za-z0-9._-]+", target) is None:
-            raise ProjectionRejected("sidecar projection target is outside the fixed template")
+        projection_targets.append(home_projection_target(target, kind=PROJECTION_FILE))
+    writable_targets: list[str] = []
     for source, target in writable_projection_mounts:
         _validate_remote_path(source)
         if not source.startswith(runtime_view + "/"):
             raise ProjectionRejected("sidecar writable projection source is outside the reviewed view")
-        if re.fullmatch(r"/tmp/agentbox-home/[A-Za-z0-9._-]+", target) is None:
-            raise ProjectionRejected("sidecar writable projection target is outside the fixed template")
+        writable_targets.append(home_projection_target(target, kind=PROJECTION_DIRECTORY))
+    for state_target in writable_targets:
+        # The relations the Server derived `protected_state_paths` from are
+        # re-checked here, on the exact argv this function is about to emit: a
+        # writable directory inside a projected file cannot be expressed, and a
+        # projected file inside a writable directory is protected state.
+        protected_state_paths(projection_targets, state_target)
     _validate_runtime_artifact_mounts(runtime_artifact_mounts, workspace, runtime_view)
+    home_targets = [*projection_targets, *writable_targets]
+    _reject_colliding_targets([
+        *home_targets, *[target for _source, target in executable_mounts],
+        *[target for _source, target in runtime_artifact_mounts],
+        *([secret_target] if secret is not None else []),
+    ])
     for key, value in environment.items():
         if not _ENV_KEY.fullmatch(key) or len(value) > 8192 or "\x00" in value:
             raise ProjectionRejected("invalid remote environment")
@@ -192,27 +263,36 @@ def compile_remote_sidecar_bwrap_argv(
     ]
     for system in _SYSTEM_MOUNTS:
         argv += ["--ro-bind", system, system]
-    argv += [
-        "--dir", "/mnt", "--dir", "/mnt/wsl",
-        "--ro-bind", "/etc/resolv.conf", "/mnt/wsl/resolv.conf",
-        "--dir", "/workspace", "--dir", "/runtime", "--dir", "/runtime/view",
-        "--dir", "/runtime/secret", "--dir", "/runtime/bin",
-        "--dir", "/runtime/artifacts", "--dir", "/tmp/agentbox-home",
-        "--bind", workspace, "/workspace",
-        "--ro-bind", runtime_view, "/runtime/view",
+    # The remote template is WSL-specific. /etc/resolv.conf points to this
+    # WSL-owned file, so only its parent and that single file are recreated;
+    # the bind itself is ordered with every other mount below.
+    for directory in _guest_directory_list(
+        ("/workspace", "/runtime", GUEST_HOME, "/runtime/view", "/runtime/secret",
+         "/runtime/bin", "/runtime/artifacts", "/mnt/wsl"),
+        [*home_targets, secret_target],
+        writable_targets,
+    ):
+        argv += ["--dir", directory]
+    entries: list[tuple[int, int, str, str, str]] = [
+        # The project is the only writable workspace; the reviewed view, the
+        # executables and every verified artifact stay read-only.
+        (0, len(PurePosixPath("/workspace").parts), "--bind", workspace, "/workspace"),
+        (1, len(PurePosixPath("/runtime/view").parts), "--ro-bind", runtime_view, "/runtime/view"),
+        (1, len(PurePosixPath("/mnt/wsl/resolv.conf").parts), "--ro-bind",
+         "/etc/resolv.conf", "/mnt/wsl/resolv.conf"),
     ]
-    for _source, target in writable_projection_mounts:
-        argv += ["--dir", target]
     for source, target in executable_mounts:
-        argv += ["--ro-bind", source, target]
+        entries.append((1, len(PurePosixPath(target).parts), "--ro-bind", source, target))
     for source, target in projection_mounts:
-        argv += ["--ro-bind", source, target]
+        entries.append((2, len(PurePosixPath(target).parts), "--ro-bind", source, target))
     for source, target in runtime_artifact_mounts:
-        argv += ["--ro-bind", source, target]
+        entries.append((3, len(PurePosixPath(target).parts), "--ro-bind", source, target))
     for source, target in writable_projection_mounts:
-        argv += ["--bind", source, target]
+        entries.append((4, len(PurePosixPath(target).parts), "--bind", source, target))
     if secret is not None:
-        argv += ["--ro-bind", secret, secret_target]
+        entries.append((5, len(PurePosixPath(secret_target).parts), "--ro-bind", secret, secret_target))
+    for flag, source, target in _ordered_binds(entries):
+        argv += [flag, source, target]
     argv += ["--chdir", "/workspace", "--clearenv"]
     for key, value in sorted(environment.items()):
         argv += ["--setenv", key, value]
@@ -417,18 +497,34 @@ class ResolvedBwrapSandbox:
         if binary is None:
             raise SandboxUnavailable("bwrap binary is unavailable")
         argv = _minimal_rootfs_argv(binary, self.ref.network_mode)
-        for directory in ("/runtime", "/runtime/home", "/runtime/bin", "/runtime/hooks"):
+        secret_mounts = [(secret, self._secret_path(secret, attempt_key))
+                         for secret in mount_plan.secret_mounts]
+        for directory in _guest_directory_list(
+            ("/runtime", GUEST_HOME, "/runtime/bin", "/runtime/hooks"),
+            [*[target for _source, target, _access in mount_plan.mounts],
+             *mount_plan.tmpfs_targets,
+             *[secret.guest_target for secret, _path in secret_mounts]],
+        ):
             argv += ["--dir", directory]
-        for source, target, access in mount_plan.mounts: argv += ["--bind" if access == "rw" else "--ro-bind", str(self._source_path(source)), target]
-        # Secret mounts are emitted after their writable profile parent so the
-        # exact read-only child wins.  Paths are not included in public records.
-        for secret in mount_plan.secret_mounts:
-            argv += ["--ro-bind", str(self._secret_path(secret, attempt_key)), secret.guest_target]
+        entries: list[tuple[int, int, str, str, str]] = [
+            (0 if access == "rw" else 1, len(PurePosixPath(target).parts),
+             "--bind" if access == "rw" else "--ro-bind", str(self._source_path(source)), target)
+            for source, target, access in mount_plan.mounts
+        ]
+        # A secret is read-only and is emitted at its own depth, so it always
+        # wins over the writable profile parent it may live in.  Paths are not
+        # included in public records.
+        entries += [
+            (2, len(PurePosixPath(secret.guest_target).parts), "--ro-bind", str(path), secret.guest_target)
+            for secret, path in secret_mounts
+        ]
+        for flag, source, target in _ordered_binds(entries):
+            argv += [flag, source, target]
         for target in mount_plan.tmpfs_targets: argv += ["--tmpfs", target]
         argv += ["--chdir", cwd, "--clearenv"]
         for key, value in sorted(command.environment.items()): argv += ["--setenv", key, value]
         argv += ["--"] + list(command.argv)
-        public_argv = tuple("<secret-source>" if any(str(value) == str(self._secret_path(secret, attempt_key)) for secret in mount_plan.secret_mounts) else value for value in argv)
+        public_argv = tuple("<secret-source>" if any(str(value) == str(path) for _secret, path in secret_mounts) else value for value in argv)
         spec_digest = digest({"policy": self.ref.policy_digest, "mounts": mount_plan.digest, "command": command.digest, "argv": public_argv})
         record = self.provider.data_dir / "leases" / f"{spec_digest.removeprefix('sha256:')}.json"; record.parent.mkdir(parents=True, exist_ok=True)
         if not record.exists(): record.write_text(json.dumps({"spec_digest": spec_digest, "state": "wrapped", "secret_mounts": len(mount_plan.secret_mounts)}, sort_keys=True))

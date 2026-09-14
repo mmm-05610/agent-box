@@ -405,19 +405,20 @@ def build_runtime_from_sidecar_deployment(
         adapter["environment"] = dict(environment)
         deployment["adapter"] = adapter
         projection_mounts = []
+        projection_targets: list[str] = []
         for index, projection in enumerate(item.get("projectionFiles") or ()):
-            if not isinstance(projection, dict):
+            if not isinstance(projection, dict) or set(projection) != {"source", "target"}:
                 raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
             source = projection.get("source")
-            target = projection.get("target")
-            if (not isinstance(target, str)
-                    or re.fullmatch(r"/tmp/agentbox-home/[A-Za-z0-9._-]+", target) is None):
-                raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
+            # 目标先校验（同一个 guest home 语法，与 bwrap 侧共用一套实现），
+            # 再读源文件：一个越界/非规范的目标不该让 Server 先去读盘。
+            target = _home_projection_target(projection.get("target"), kind="file")
             content = _sidecar_deployment_file(path, value, source)
             suffix = Path(str(source)).name
             bundle_path = f"agentbox-sidecar/deployment/{harness_id}/projection-{index}-{suffix}"
             additional_bundle[bundle_path] = content
             projection_mounts.append((bundle_path, target))
+            projection_targets.append(target)
         deployment["_projection_mounts"] = tuple(projection_mounts)
         executable_authorizations = []
         executable_mounts = []
@@ -453,20 +454,26 @@ def build_runtime_from_sidecar_deployment(
         ):
             raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
         state_projection = item.get("stateProjection")
+        state_target: str | None = None
         if state_projection is not None:
             if (not isinstance(state_projection, dict)
                     or set(state_projection) != {"target"}
-                    or not isinstance(state_projection.get("target"), str)
-                    or re.fullmatch(
-                        r"/tmp/agentbox-home/[A-Za-z0-9._-]+", state_projection["target"],
-                    ) is None):
+                    or not isinstance(state_projection.get("target"), str)):
                 raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
-            if state_projection["target"] in {target for _source, target in projection_mounts}:
-                raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
+            state_target = _home_projection_target(
+                state_projection["target"], kind="directory",
+            )
+        # 受保护集合**派生**自这份声明本身：落在可写 state 子树里的只读投影文件
+        # （按 state 目标的相对路径记名）。它既不按家硬编码，也不依赖"overlay 恰好
+        # 遮住"——checkpoint 捕获按名字排除，恢复遇到同名相对路径直接类型化拒绝。
+        deployment["_protected_state_paths"] = _protected_state_paths(
+            tuple(projection_targets), state_target,
+        )
+        if state_target is not None:
             deployment["_state_bundle_prefix"] = (
                 f"agentbox-sidecar/deployment/{harness_id}/native-state"
             )
-            deployment["_state_target"] = state_projection["target"]
+            deployment["_state_target"] = state_target
         else:
             deployment["_state_bundle_prefix"] = None
             deployment["_state_target"] = None
@@ -533,6 +540,7 @@ def build_runtime_from_sidecar_deployment(
                 projection_mounts=deployment["_projection_mounts"],
                 state_bundle_prefix=deployment["_state_bundle_prefix"],
                 state_target=deployment["_state_target"],
+                protected_state_paths=deployment["_protected_state_paths"],
                 restored_state=restored_state,
                 timeout_ms=deployment["_timeout_ms"],
             )
@@ -558,6 +566,35 @@ def build_runtime_from_sidecar_deployment(
 
     return build_runtime(data_root, harnesses=registry, execution_factory=factory,
                         secret_store=secret_store)
+
+
+def _home_projection_target(target: Any, *, kind: str) -> str:
+    """Validate one declared guest-home target with the sandbox's own grammar.
+
+    The Server does not own the guest layout: the one implementation lives with
+    the sandbox that will actually create it, and this wrapper only translates
+    its typed refusal into the deployment-level error this loader reports.  A
+    deployment is therefore accepted here if and only if the compiler can mount
+    it.
+    """
+    from agent_box_sandbox_bwrap import HomeProjectionRejected, home_projection_target
+
+    try:
+        return home_projection_target(target, kind=kind)
+    except HomeProjectionRejected:
+        raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID") from None
+
+
+def _protected_state_paths(
+    projection_targets: tuple[str, ...], state_target: str | None,
+) -> tuple[str, ...]:
+    """Derive the read-only paths inside the writable state subtree."""
+    from agent_box_sandbox_bwrap import HomeProjectionRejected, protected_state_paths
+
+    try:
+        return protected_state_paths(projection_targets, state_target)
+    except HomeProjectionRejected:
+        raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID") from None
 
 
 def _runtime_artifact_declarations(value: Any) -> tuple[dict[str, str], ...]:

@@ -223,7 +223,7 @@ def test_sidecar_deployment_projects_bounded_files_and_register_metadata(tmp_pat
             "preferredAuthMethod": "secret-file",
             "adapter": {"command": "/usr/bin/node", "source": source.name,
                         "args": ["--safe"], "environment": {"MODE": "fixture"}},
-            "projectionFiles": [{"source": projection.name, "target": "/tmp/agentbox-home/settings.json"}],
+            "projectionFiles": [{"source": projection.name, "target": "/runtime/home/settings.json"}],
             "executableMounts": [{"source": "/usr/bin/node", "target": "/runtime/bin/node",
                                   "digest": "sha256:" + hashlib.sha256(pathlib.Path("/usr/bin/node").read_bytes()).hexdigest()}],
         }],
@@ -255,12 +255,16 @@ def _artifact_mount(**changes):
 @pytest.mark.parametrize("field", [
     {"adapter": {"command": "/usr/bin/node", "source": "../escape.mjs"}},
     {"adapter": {"command": "/usr/bin/node", "args": ["bad\x00arg"]}},
-    {"projectionFiles": [{"source": "settings.json", "target": "/runtime/home/x"}]},
+    {"projectionFiles": [{"source": "settings.json", "target": "/runtime/elsewhere/x"}]},
+    {"projectionFiles": [{"source": "settings.json", "target": "/tmp/agentbox-home/settings.json"}]},
     {"timeoutMs": 120_001},
     {"timeoutMs": True},
     {"timeoutMs": "30000"},
+    # The isolated home root is the template; these stay invalid because they
+    # escape it, not because the root moved.
     {"stateProjection": {"target": "/tmp/agentbox-home/sub/x"}},
-    {"stateProjection": {"target": "/runtime/home/state"}},
+    {"stateProjection": {"target": "/runtime/home/sub//x"}},
+    {"stateProjection": {"target": "/runtime/home/../escape"}},
     {"adapter": {"command": "/usr/bin/node", "environment": {"API_TOKEN": "secret"}}},
     # A runtime artifact declaration is validated on its shape only; the digest
     # and every overlap rule are settled by the Worker that can see the tree.
@@ -284,6 +288,7 @@ def _artifact_mount(**changes):
     _artifact_mount(target="/runtime/view/fixture-dep"),
     _artifact_mount(target="/runtime/secret/fixture-dep"),
     _artifact_mount(target="/tmp/agentbox-home/fixture-dep"),
+    _artifact_mount(target="/runtime/home/fixture-dep"),
     _artifact_mount(target="/tmp/agentbox-sidecar-state"),
     _artifact_mount(target="/workspace"),
     _artifact_mount(target="/home/tester/.local/lib/python3.12/site-packages"),
@@ -419,9 +424,9 @@ def test_sidecar_deployment_rejects_readonly_and_writable_target_collision(tmp_p
         "harnesses": [{
             "id": "pi", "adapter": {"command": "/usr/bin/node", "args": []},
             "projectionFiles": [{
-                "source": settings.name, "target": "/tmp/agentbox-home/sessions",
+                "source": settings.name, "target": "/runtime/home/sessions",
             }],
-            "stateProjection": {"target": "/tmp/agentbox-home/sessions"},
+            "stateProjection": {"target": "/runtime/home/sessions"},
         }],
     }), encoding="utf-8")
     with pytest.raises(RuntimeError, match="SIDECAR_DEPLOYMENT_INVALID"):
@@ -707,7 +712,7 @@ def _stateful_real_worker_runtime(tmp_path, monkeypatch, *, harness_id):
                        # The stateful peer advertises sessionCapabilities.resume, and the
                        # unified capability contract requires the static ceiling too.
                        "capabilityClaims": {"native_continuation": True},
-                       "stateProjection": {"target": "/tmp/agentbox-home/sessions"},
+                       "stateProjection": {"target": "/runtime/home/sessions"},
                        "adapter": {"command": "/usr/bin/node", "args": [],
                                    "source": STATEFUL_FIXTURE_RELATIVE}}],
     }), encoding="utf-8")

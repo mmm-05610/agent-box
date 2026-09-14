@@ -309,7 +309,7 @@ $deployment = [ordered]@{
                 args = @("/workspace/stateful_acp_peer.mjs")
             }
             timeoutMs = 30000
-            stateProjection = [ordered]@{ target = "/tmp/agentbox-home/sessions" }
+            stateProjection = [ordered]@{ target = "/runtime/home/sessions" }
         },
         # Third explicit no-model Harness: the same controlled ACP peer, told
         # through its adapter environment to answer nothing for eight seconds.
@@ -334,7 +334,7 @@ if ($null -eq $statefulHarness -or $statefulHarness.Contains("credentialKind") -
     $statefulHarness.Contains("credentialEnvironment") -or
     $statefulHarness.Contains("modelControlId") -or
     $statefulHarness.timeoutMs -gt 120000 -or
-    $statefulHarness.stateProjection.target -ne "/tmp/agentbox-home/sessions") {
+    $statefulHarness.stateProjection.target -ne "/runtime/home/sessions") {
     throw "The native-state fixture Harness must declare no credential, no model control and a bounded state projection"
 }
 $leaseSilenceHarness = $deployment.harnesses | Where-Object { $_.id -eq "omp" }
@@ -993,7 +993,7 @@ try {
         r4 = [ordered]@{
             fixture = "tests/server/fixtures/stateful_acp_peer.mjs"
             harness = "hermes"
-            state_projection = "/tmp/agentbox-home/sessions"
+            state_projection = "/runtime/home/sessions"
             timeout_ms = 30000
             nonce = $r4Nonce
             session_id = $r4First.session.id
