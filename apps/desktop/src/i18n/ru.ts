@@ -443,7 +443,31 @@ export const ru = defineLocale({
       models: {
         title: 'Модели',
         description: 'Настройка значений по умолчанию и слотов моделей, объявленных сервисом.',
-        boundary: 'Поля задаются описанием сервиса; Desktop не кодирует варианты провайдера или Harness.'
+        boundary: 'Поля задаются описанием сервиса; Desktop не кодирует варианты провайдера или Harness.',
+        serviceBoundary: 'Сервис AgentBox ещё не объявил управление моделями.',
+        unavailableDescription:
+          'Элементы управления появляются только после готовности сервиса и объявления всех операций моделей.',
+        add: 'Добавить конфигурацию модели',
+        loading: 'Загрузка конфигураций моделей…',
+        empty: 'Конфигураций моделей нет',
+        emptyDescription: 'Добавьте принадлежащую сервису конфигурацию провайдера/модели для Profiles.',
+        error: 'Не удалось загрузить конфигурации моделей',
+        retry: 'Повторить',
+        displayName: 'Отображаемое имя',
+        harness: 'Harness',
+        provider: 'Провайдер',
+        modelId: 'ID модели',
+        modelDisplayName: 'Название модели',
+        credential: 'Ссылка на учётные данные',
+        present: 'есть',
+        absent: 'нет',
+        save: 'Сохранить',
+        cancel: 'Отмена',
+        edit: 'Изменить',
+        archive: 'Архивировать',
+        addModel: 'Добавить модель',
+        removeModel: 'Удалить модель',
+        availability: { available: 'Доступна', unknown: 'Неизвестно', unavailable: 'Недоступна' }
       },
       resources: {
         title: 'Skills и MCP',

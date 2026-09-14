@@ -405,7 +405,34 @@ export interface Translations {
       unavailableDescription: string
       scope: string
       boundary: string
-      models: { title: string; description: string; boundary: string }
+      models: {
+        title: string
+        description: string
+        boundary: string
+        serviceBoundary: string
+        unavailableDescription: string
+        add: string
+        loading: string
+        empty: string
+        emptyDescription: string
+        error: string
+        retry: string
+        displayName: string
+        harness: string
+        provider: string
+        modelId: string
+        modelDisplayName: string
+        credential: string
+        present: string
+        absent: string
+        save: string
+        cancel: string
+        edit: string
+        archive: string
+        addModel: string
+        removeModel: string
+        availability: { available: string; unknown: string; unavailable: string }
+      }
       resources: { title: string; description: string; boundary: string }
       identities: { title: string; description: string; boundary: string }
       harnesses: { title: string; description: string; boundary: string }

@@ -462,7 +462,31 @@ export const en: Translations = {
       models: {
         title: 'Models',
         description: 'Configure model defaults and model slots declared by the service.',
-        boundary: 'Model fields come from service descriptors; Desktop does not hard-code provider or Harness options.'
+        boundary: 'Model fields come from service descriptors; Desktop does not hard-code provider or Harness options.',
+        serviceBoundary: 'The AgentBox service has not declared provider/model maintenance yet.',
+        unavailableDescription:
+          'Controls appear only when the AgentBox service is ready and declares every provider/model operation.',
+        add: 'Add model configuration',
+        loading: 'Loading model configurations…',
+        empty: 'No model configurations',
+        emptyDescription: 'Add a service-owned provider/model configuration to make it available to Profiles.',
+        error: 'Could not load model configurations',
+        retry: 'Retry',
+        displayName: 'Display name',
+        harness: 'Harness',
+        provider: 'Provider',
+        modelId: 'Model ID',
+        modelDisplayName: 'Model name',
+        credential: 'Credential reference',
+        present: 'present',
+        absent: 'absent',
+        save: 'Save',
+        cancel: 'Cancel',
+        edit: 'Edit',
+        archive: 'Archive',
+        addModel: 'Add model',
+        removeModel: 'Remove model',
+        availability: { available: 'Available', unknown: 'Unknown', unavailable: 'Unavailable' }
       },
       resources: {
         title: 'Skills & MCP',
