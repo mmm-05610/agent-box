@@ -620,7 +620,7 @@ powershell.exe -File accept-e.ps1 … -Port 18744 -PostCheck -InstanceId <两实
 
 | 门 | 判定 | 依据 |
 | --- | --- | --- |
-| BACKEND_IMPLEMENTATION_READY | **否（暂时）** | 28方法+队列终态已锁定并29/29；Windows r4 平台门已通过（`stop_mode=tree_terminate` 有界强制树终止后的崩溃式重启、DataRoot 锁释放/重新获取、同 native id `session/resume`、终止前 delta、ObjectStore checkpoint、清理与独立 `-PostCheck`；正常生命周期退出未覆盖）；Pi/Hermes/OpenCode生产封装与逐家真实门待完成 |
+| BACKEND_IMPLEMENTATION_READY | **否（暂时）** | 28方法+队列终态已锁定并29/29；Windows r4 平台门已通过（`stop_mode=tree_terminate` 有界强制树终止后的崩溃式重启、DataRoot 锁释放/重新获取、同 native id `session/resume`、终止前 delta、ObjectStore checkpoint、清理与独立 `-PostCheck`；正常生命周期退出未覆盖）；**Pi/Hermes/OpenCode 三家已完成生产封装（\*_PRODUCTION_CHAIN_PREPARED，仍 MODEL_NOT_VERIFIED）**；剩余的是 **Codex 生产封装、四家原生 HOME 实施、四家真实模型门** |
 | DESKTOP_IMPLEMENTATION_READY | **否** | 前端自报 PARTIAL，且 `writer_lease=ACTIVE`（未释放）；独立实现/验收门未完 |
 
 因此仍**没有**记录 `FULLSTACK_INTEGRATION_OWNER`，**没有**接管前端工作树，

@@ -192,5 +192,6 @@ guest 里找不到状态或写失败；只有变量 → 目录仍是宿主真实
 
 - 本文**未实现**任何一家的目录迁移（`implementation = PENDING_HARDENING`）。
 - 不得据此登记 `BACKEND_IMPLEMENTATION_READY`；`workbench_model_verified_count` 仍为 0。
-- 四家真实模型门、Codex 生产封装、Worker 租约修复、c4 的 Windows 复验各自独立推进，本设计不是它们
-  的前置或替代。
+- 四家真实模型门、Codex 生产封装、c4 的 Windows 复验各自独立推进，本设计不是它们的前置或替代。
+  **Worker 5 秒租约缺陷已完成修复（`WORKER_LEASE_KEEPALIVE_FIXED`，含 Windows 真机 8 秒静默证据）**，
+  不再列为当前缺口；本设计仍不改变租约语义。
