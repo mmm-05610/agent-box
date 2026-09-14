@@ -226,6 +226,33 @@ try {
     if (@($snapshot.frames | Where-Object { $_.event.kind -eq "message.delta" }).Count -lt 1) {
         throw "No persisted pre-terminal delta was found"
     }
+    $userFrames = @($snapshot.frames | Where-Object {
+        $_.event.kind -eq "message.final" -and $_.event.role -eq "user" -and `
+        $_.event.displayKind -eq "visible"
+    })
+    if ($userFrames.Count -ne 1 -or $userFrames[0].event.text -ne "Windows Worker attachment gate") {
+        throw "Accepted user message was not recoverable from Server history"
+    }
+    if (-not ($snapshot.PSObject.Properties.Name -contains "olderCursor")) {
+        throw "History did not expose the distinct backward-page cursor"
+    }
+    $sessionList = Invoke-Wire -Method "sessions.list" -Headers $auth -Params @{
+        workspaceId = $opened.workspace.id; includeArchived = $false; page = @{ limit = 1 }
+    }
+    if ($sessionList.items.Count -ne 1 -or $sessionList.items[0].id -ne $first.session.id) {
+        throw "Session was not discoverable from the authoritative catalog"
+    }
+    $sessionUpdated = Invoke-Wire -Method "sessions.update" -Headers $auth -Params @{
+        requestId = "accept-e-session-update"
+        sessionId = $first.session.id
+        expectedVersion = $sessionList.items[0].version
+        displayName = "Windows full vertical"
+        pinned = $true
+    }
+    if (-not $sessionUpdated.session.pinned -or `
+        $sessionUpdated.session.displayName -ne "Windows full vertical") {
+        throw "Session shared metadata was not persisted"
+    }
 
     $second = Invoke-Wire -Method "sessions.send" -Headers $auth -Params @{
         requestId = "accept-e-send-cancel"
@@ -285,6 +312,30 @@ try {
     if ($decision.outcome -ne "recorded") { throw "Approval decision was not recorded" }
     $null = Wait-TurnState -SessionId $first.session.id -ExecutionId $third.executionId `
         -States @("completed") -Headers $auth
+    $currentSessions = Invoke-Wire -Method "sessions.list" -Headers $auth -Params @{
+        workspaceId = $opened.workspace.id; includeArchived = $false
+    }
+    $currentSession = @($currentSessions.items | Where-Object { $_.id -eq $first.session.id })[0]
+    if ($null -eq $currentSession) { throw "Session disappeared before archive" }
+    $sessionArchived = Invoke-Wire -Method "sessions.archive" -Headers $auth -Params @{
+        requestId = "accept-e-session-archive"
+        sessionId = $first.session.id
+        expectedVersion = $currentSession.version
+    }
+    if ($null -eq $sessionArchived.session.archivedAt) {
+        throw "Session archive was not persisted"
+    }
+    $archivedSessions = Invoke-Wire -Method "sessions.list" -Headers $auth -Params @{
+        workspaceId = $opened.workspace.id; includeArchived = $true
+    }
+    if (@($archivedSessions.items | Where-Object { $_.id -eq $first.session.id }).Count -ne 1) {
+        throw "Archived Session identity was not retained"
+    }
+    $historyAfterArchive = Invoke-Wire -Method "history.snapshot" -Headers $auth `
+        -Params @{ sessionId = $first.session.id }
+    if ($historyAfterArchive.frames.Count -lt $snapshot.frames.Count) {
+        throw "Session archive removed retained history"
+    }
     $profileArchived = Invoke-Wire -Method "profiles.archive" -Headers $auth -Params @{
         requestId = "accept-e-profile-archive"
         profileId = $profile.id
@@ -306,6 +357,7 @@ try {
         distribution = $Distribution
         server_id = $hello.serverId
         workspace_id = $opened.workspace.id
+        session_id = $first.session.id
         attachment_execution = $first.executionId
         cancelled_execution = $second.executionId
         approval_execution = $third.executionId

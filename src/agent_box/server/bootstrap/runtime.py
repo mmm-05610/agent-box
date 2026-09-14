@@ -251,7 +251,10 @@ def build_runtime(
     profile_records = ProfileRecords(database, idempotency)
     provider_model_records = ProviderModelRecords(database, idempotency)
     session_records = SessionRecords(database, idempotency)
-    queue_records = QueueRecords(database, idempotency)
+    queue_records = QueueRecords(
+        database, idempotency, append_event=session_records._append_session_event,
+        objects=objects,
+    )
     approval_records = ApprovalRecords(database, append_event=session_records._append_session_event)
 
     if execution is None and execution_factory is not None:
@@ -264,8 +267,6 @@ def build_runtime(
             raise
     if execution is not None and hasattr(execution, "bind_queue"):
         execution.bind_queue(queue_records)
-        if hasattr(execution, "bind_queue"):
-            execution.bind_queue(queue_records)
 
     workspace_service = WorkspaceService(workspace_records, idempotency, connector=connector_instance)
     profile_service = ProfileService(profile_records, idempotency, objects,

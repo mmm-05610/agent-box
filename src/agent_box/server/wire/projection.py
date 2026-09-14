@@ -23,6 +23,7 @@ WIRE_EVENT_KINDS = frozenset({
     "approval.settled",
     "config.changed",
     "execution.state",
+    "queue.updated",
     "workspace.connection",
 })
 
@@ -37,6 +38,7 @@ _EVENT_KIND_MAP = {
     "approval.requested": "approval.requested",
     "approval.settled": "approval.settled",
     "config.changed": "config.changed",
+    "queue.updated": "queue.updated",
     "workspace.connection": "workspace.connection",
 }
 
@@ -111,6 +113,7 @@ def session_record(row: Mapping[str, Any]) -> dict[str, Any]:
         "workspaceId": row["workspace_id"],
         "profileId": row.get("profile_id"),
         "displayName": row.get("display_name") or row["id"],
+        "pinned": bool(row.get("pinned", False)),
         "archivedAt": row.get("archived_at"),
         "createdAt": row["created_at"],
         "updatedAt": row["updated_at"],
@@ -142,12 +145,13 @@ def event_frame(row: Mapping[str, Any], codec: Any) -> dict[str, Any] | None:
     raw = normalized.get("data_json")
     data = json.loads(raw) if isinstance(raw, str) else dict(normalized.get("data") or {})
     event = _event_body(kind, normalized, data)
-    seq = int(normalized["seq"])
+    raw_seq = int(normalized["seq"])
+    seq = int(normalized.get("wire_seq") or raw_seq)
     return {
         "eventId": normalized["event_id"],
         "sessionId": normalized["session_id"],
         "seq": seq,
-        "cursor": codec.encode(normalized["session_id"], seq),
+        "cursor": codec.encode(normalized["session_id"], raw_seq),
         "emittedAt": normalized["created_at"],
         "event": event,
     }
@@ -167,19 +171,29 @@ def _event_body(kind: str, row: Mapping[str, Any], data: Mapping[str, Any]) -> d
             body["reason"] = str(reason)
         return body
     if kind in {"message.delta", "message.final"}:
-        return {
+        body = {
             "kind": kind,
             "sessionId": session_id,
             "messageId": str(data.get("message_id") or row.get("turn_id") or "message"),
             "text": str(data.get("text", "")),
         }
+        if kind == "message.delta":
+            body["role"] = "assistant"
+        else:
+            body["role"] = str(data.get("role") or "assistant")
+            body["displayKind"] = str(data.get("display_kind") or "visible")
+        return body
     if kind == "tool.update":
         return {
             "kind": kind,
             "sessionId": session_id,
             "toolCallId": str(data.get("tool_call_id", "tool")),
+            "messageId": data.get("message_id"),
             "tool": data.get("tool"),
             "state": str(data.get("state", "requested")),
+            **({"summary": str(data["summary"])} if data.get("summary") is not None else {}),
+            **({"resultExcerpt": str(data["result_excerpt"])}
+               if data.get("result_excerpt") is not None else {}),
         }
     if kind == "approval.requested":
         request = data.get("request") if isinstance(data.get("request"), Mapping) else {}
@@ -225,6 +239,12 @@ def _event_body(kind: str, row: Mapping[str, Any], data: Mapping[str, Any]) -> d
             "kind": kind,
             "sessionId": session_id,
             "effectiveFor": str(data.get("effective_for") or "next_send"),
+        }
+    if kind == "queue.updated":
+        return {
+            "kind": kind,
+            "sessionId": session_id,
+            "item": dict(data["item"]),
         }
     if kind == "workspace.connection":
         return {

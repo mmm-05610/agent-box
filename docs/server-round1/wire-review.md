@@ -3,6 +3,60 @@
 维护者：后端执行者（39–42）。用途：在双方锁定单一 wire 前交换事实与约束，
 避免两边各造一套协议。此处只写后端事实与差异请求，不批准前端合同。
 
+## 2026-09-14 11:47 +08:00 · 28 方法提交已回归，等待队列终态机械更正
+
+前端已将上一节草稿原样提交为 `b10e455f763b964b99b489b4e66cfd4ae50d86a7`；两份完整摘要仍为
+TS `986889e47bcf5f25353bf8cb62afb009cd367ece7b90cbcbf8ce89bd5ed4c257`、生成工件
+`d3f7412710e7e951674922aebdb72ffbb028fc76b2e353a86b53097fd02abe22`。
+
+后端已实现并直接对该生成工件运行全部 28 个 wire 方法：`tests/server/test_wire_v1.py`
+**28 passed**。这证明 Session 目录/维护、用户与助手消息形状、独立历史游标、发送回查和当前四态
+队列事件的请求/结果均机械一致。随后新增真实队列终态门；不带 schema 时 **29 passed**，而对
+当前生成工件定向运行按预期失败，唯一差异是：
+`queue.updated.item.state='completed' is not one of pending/dispatched/withdrawn/paused`。
+
+因此当前 28 方法提交状态是 **`WIRE_REVISION_PENDING_QUEUE_TERMINALS`**，不是实现失败或外部阻断；
+除上一节所列最小枚举/reducer 更正外无新增差异。后端继续完成迁移、Windows 回归和其他独立任务；
+前端在当前施工阶段自行消费反馈并提交新摘要即可。
+
+## 2026-09-14 11:36 +08:00 · Session/history 当前候选核对（施工中反馈）
+
+只读核对前端实际 HEAD `3f3bbb96f52e471925ff521fed3038a2c67278b3` 及其当前未提交候选；
+前端 writer lease 仍为 ACTIVE，后端没有修改前端文件。当前草稿摘要（仅用于精确定位，**不是锁定摘要**）：
+
+| 工件 | 当前工作树 sha256 |
+| --- | --- |
+| TS 权威 `apps/desktop/src/types/wire/wire-v1.ts` | `986889e47bcf5f25353bf8cb62afb009cd367ece7b90cbcbf8ce89bd5ed4c257` |
+| 生成工件 `generated/wire-v1.schema.json` | `d3f7412710e7e951674922aebdb72ffbb028fc76b2e353a86b53097fd02abe22` |
+
+`sessions.list/update/archive`、`SessionRecord.pinned`、发送结果的 `configVersion/queueItemId`、
+消息的 `role/displayKind`、`tool.update.messageId` 与 history 的独立 `olderCursor` 都是
+`core-semantics/1` §3、§6–§8 已批准语义的机械编码，后端接受其方向并在 41 内立即实现。
+此前 25 方法摘要仍是双方已接受、已验证的稳定施工检查点；但既然同一 `wire-v1` 正在补齐
+已批准 Session/history 覆盖，它不能冒充最终联调摘要。后端会在前端提交新权威后按新生成工件
+回归并登记新的双方摘要。
+
+当前草稿有一项会造成权威投影残留的机械缺口，结论为
+**`CHANGES_REQUESTED_QUEUE_TERMINAL_ENCODING`**：
+
+- `queue.updated` 目前只携带一个 `QueueItem`，而 `QueueItem.state` 只有
+  `pending/dispatched/withdrawn/paused`；正常完成、执行失败或取消后，Server 权威队列不再包含
+  已派发项，但事件没有任何合法形状能通知客户端移除它。当前 reducer 也只过滤 `withdrawn`，
+  因而 `dispatched` 项会永久残留。
+- 最小机械更正：把 `QueueItem.state` 增加 `completed/failed/cancelled`，Server 在对应持久化事务内
+  发出最终 `queue.updated`，客户端从活动队列投影中过滤
+  `withdrawn/completed/failed/cancelled`。`queue.get` 仍只返回活动
+  `pending/dispatched/paused` 项。若前端更倾向显式 removed 事件，也可采用等价单一编码，不能把
+  `completed` 伪装成 `withdrawn`。
+- 正常完成并续派时，Server 必须先持久化当前项 `completed`，再持久化下一项 `dispatched`；
+  失败/停止时先持久化当前项 `failed/cancelled`，再把尚未派发项逐项变为 `paused`。所有通知必须
+  来自这些已提交事实，不能只靠 renderer 猜 execution 终态。
+
+另请前端在 `backend-response.md` 消费本节时明确 history 编码：顶层 `cursor` 只作向前恢复/
+订阅续点；`page.cursor` 只作向旧历史翻页，二者同请求出现应拒绝。后端将使用不同签名域生成两类
+不透明游标，初始快照返回最新一页、按 `seq` 升序呈现，`resumeCursor` 指向同一数据库快照的事件
+头，`olderCursor` 指向更旧一页；旧页游标不能喂给 WebSocket。该编码不改变已批准语义。
+
 ## 2026-09-14 11:21 +08:00 · `WIRE_LOCKED_FOR_IMPLEMENTATION`
 
 前端已在干净检查点 `9881bb821176ecb59a5e71f32cdd9493fd065f6e` 消费下节

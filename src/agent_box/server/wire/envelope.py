@@ -22,6 +22,7 @@ from agent_box.server.wire.errors import WireError
 
 METHOD_PATTERN = re.compile(r"^[a-z][a-zA-Z0-9]*(\.[a-z][a-zA-Z0-9]*)+$")
 CURSOR_PREFIX = "w1"
+OLDER_CURSOR_PREFIX = "w1o"
 
 
 class WireRequestError(WireError):
@@ -67,16 +68,31 @@ class CursorCodec:
         self._key = hashlib.sha256(secret).digest()
 
     def encode(self, session_id: str, seq: int) -> str:
-        payload = f"{CURSOR_PREFIX}:{session_id}:{seq}".encode("utf-8")
+        return self._encode(CURSOR_PREFIX, session_id, seq)
+
+    def encode_older(self, session_id: str, raw_seq: int) -> str:
+        """Mint a backward-history cursor that cannot resume the live feed."""
+        return self._encode(OLDER_CURSOR_PREFIX, session_id, raw_seq)
+
+    def _encode(self, prefix: str, session_id: str, seq: int) -> str:
+        payload = f"{prefix}:{session_id}:{seq}".encode("utf-8")
         signature = hmac.new(self._key, payload, hashlib.sha256).digest()[:12]
         return f"{payload.decode('utf-8')}:{base64.urlsafe_b64encode(signature).decode('ascii').rstrip('=')}"
 
     def decode(self, cursor: str, *, expected_session: str | None = None) -> tuple[str, int]:
+        return self._decode(cursor, CURSOR_PREFIX, expected_session=expected_session)
+
+    def decode_older(self, cursor: str, *, expected_session: str | None = None) -> tuple[str, int]:
+        return self._decode(cursor, OLDER_CURSOR_PREFIX, expected_session=expected_session)
+
+    def _decode(
+        self, cursor: str, expected_prefix: str, *, expected_session: str | None = None,
+    ) -> tuple[str, int]:
         try:
             prefix, session_id, raw_seq, raw_signature = cursor.split(":", 3)
         except (AttributeError, ValueError) as exc:
             raise WireError("INVALID_REQUEST", "cursor is not a wire/1 cursor") from exc
-        if prefix != CURSOR_PREFIX:
+        if prefix != expected_prefix:
             raise WireError("INVALID_REQUEST", "cursor generation is not supported")
         payload = f"{prefix}:{session_id}:{raw_seq}".encode("utf-8")
         padded = raw_signature + "=" * (-len(raw_signature) % 4)

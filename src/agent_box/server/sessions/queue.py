@@ -7,6 +7,7 @@ is refused once the item has been dispatched.
 """
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from agent_box.server.errors import ServerError
@@ -19,14 +20,20 @@ ACTIVE_STATES = ("pending", "dispatched", "paused")
 
 
 class QueueRecords:
-    def __init__(self, database: Database, idempotency: IdempotentRecords) -> None:
+    def __init__(
+        self, database: Database, idempotency: IdempotentRecords, *, append_event=None,
+        objects=None,
+    ) -> None:
         self.database = database
         self.idempotency = idempotency
+        self.append_event = append_event
+        self.objects = objects
 
     def enqueue_in_transaction(
         self, conn, *, session_id: str, profile_id: str, config_version: int,
         request_id: str, request_digest: str, message_object_digest: str,
         effective_config_object_digest: str | None = None,
+        public_message: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         item_id = opaque_id("queue")
         timestamp = now()
@@ -34,14 +41,19 @@ class QueueRecords:
             "INSERT INTO server_queue_items("
             "id,session_id,version,state,profile_id,config_version,request_id,"
             "request_digest,message_object_digest,effective_config_object_digest,"
-            "submitted_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            "public_message_json,submitted_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (item_id, session_id, 1, "pending", profile_id, config_version,
              request_id, request_digest, message_object_digest,
-             effective_config_object_digest, timestamp, timestamp),
+             effective_config_object_digest,
+             json.dumps(public_message, ensure_ascii=False, sort_keys=True)
+             if public_message is not None else None,
+             timestamp, timestamp),
         )
-        return self._row_to_item(conn.execute(
+        item = self._row_to_item(conn.execute(
             "SELECT * FROM server_queue_items WHERE id=?", (item_id,),
         ).fetchone())
+        self._append_updated(conn, item)
+        return item
 
     def list(self, session_id: str) -> list[dict[str, Any]]:
         with self.database.read() as conn:
@@ -95,6 +107,7 @@ class QueueRecords:
             updated = self._row_to_item(conn.execute(
                 "SELECT * FROM server_queue_items WHERE id=?", (item_id,),
             ).fetchone())
+            self._append_updated(conn, updated)
             body = {"outcome": "withdrawn", "item": updated}
             self.idempotency.insert(conn, scope, request_id, request_digest, 200, body)
             return 200, body
@@ -112,29 +125,66 @@ class QueueRecords:
             "UPDATE server_queue_items SET state='dispatched',version=version+1,updated_at=? WHERE id=?",
             (now(), row["id"]),
         )
-        return self._row_to_item(conn.execute(
+        item = self._row_to_item(conn.execute(
             "SELECT * FROM server_queue_items WHERE id=?", (row["id"],),
         ).fetchone())
+        self._append_updated(conn, item)
+        return item
 
     def pause_pending(self, conn, session_id: str, reason: str) -> int:
         """Pause queued work after a failure or user stop (core §6)."""
         del reason
+        rows = conn.execute(
+            "SELECT id FROM server_queue_items WHERE session_id=? AND state='pending' "
+            "ORDER BY submitted_at,id", (session_id,),
+        ).fetchall()
+        for row in rows:
+            conn.execute(
+                "UPDATE server_queue_items SET state='paused',version=version+1,updated_at=? "
+                "WHERE id=?", (now(), row["id"]),
+            )
+            self._append_updated(conn, self._row_to_item(conn.execute(
+                "SELECT * FROM server_queue_items WHERE id=?", (row["id"],),
+            ).fetchone()))
+        return len(rows)
+
+    def mark_terminal(self, conn, item_id: str, state: str) -> dict[str, Any] | None:
+        if state not in {"completed", "failed", "cancelled"}:
+            raise ValueError(f"invalid queue terminal state: {state}")
         cursor = conn.execute(
-            "UPDATE server_queue_items SET state='paused',version=version+1,updated_at=? "
-            "WHERE session_id=? AND state='pending'",
-            (now(), session_id),
+            "UPDATE server_queue_items SET state=?,version=version+1,updated_at=? "
+            "WHERE id=? AND state='dispatched'", (state, now(), item_id),
         )
-        return cursor.rowcount
+        if cursor.rowcount != 1:
+            return None
+        item = self._row_to_item(conn.execute(
+            "SELECT * FROM server_queue_items WHERE id=?", (item_id,),
+        ).fetchone())
+        self._append_updated(conn, item)
+        return item
+
+    def _append_updated(self, conn, item: dict[str, Any]) -> None:
+        if self.append_event is None:
+            return
+        public = {
+            key: item[key] for key in (
+                "itemId", "version", "submittedAt", "message", "profileId",
+                "configVersion", "state",
+            )
+        }
+        self.append_event(
+            conn, item["sessionId"], None, "queue.updated", {"item": public},
+        )
 
     @staticmethod
     def _require_session(conn, session_id: str) -> None:
         if conn.execute("SELECT 1 FROM server_sessions WHERE id=?", (session_id,)).fetchone() is None:
             raise ServerError("SESSION_NOT_FOUND", "Session was not found", status=404)
 
-    @staticmethod
-    def _row_to_item(row) -> dict[str, Any]:
-        return {
+    def _row_to_item(self, row) -> dict[str, Any]:
+        item = {
             "itemId": row["id"],
+            "sessionId": row["session_id"],
             "version": int(row["version"]),
             "submittedAt": row["submitted_at"],
             "messageText": row["message_object_digest"],
@@ -145,6 +195,19 @@ class QueueRecords:
             "_messageObjectDigest": row["message_object_digest"],
             "_effectiveConfigObjectDigest": row["effective_config_object_digest"],
         }
+        if row["public_message_json"] is not None:
+            item["message"] = json.loads(row["public_message_json"])
+        elif self.objects is not None:
+            stored = json.loads(self.objects.read(row["message_object_digest"]))
+            message = dict(stored.get("message") or stored)
+            item["message"] = {
+                "text": str(message.get("text", "")),
+                "attachments": [
+                    {key: attachment[key] for key in ("ref", "displayName", "mediaKind")}
+                    for attachment in message.get("attachments", ())
+                ],
+            }
+        return item
 
 
 def _with_current(error: ServerError, current: dict[str, Any]) -> ServerError:

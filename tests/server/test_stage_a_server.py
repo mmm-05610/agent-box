@@ -288,7 +288,7 @@ def test_schema_one_migrates_turn_identity_columns_idempotently(tmp_path):
     with database.read() as conn:
         assert conn.execute(
             "SELECT version FROM agentbox_product_schema WHERE singleton=1"
-        ).fetchone()[0] == 4
+        ).fetchone()[0] == 5
         row = conn.execute("SELECT * FROM server_turns WHERE id='turn-old'").fetchone()
         assert row["profile_id"] == "profile-old"
         assert {"work_id", "execution_id", "dispatch_id", "result_object_digest",
@@ -297,6 +297,18 @@ def test_schema_one_migrates_turn_identity_columns_idempotently(tmp_path):
         # The wire identity fields arrived with the same non-destructive pass.
         workspace = conn.execute("SELECT * FROM server_workspaces LIMIT 1").fetchone()
         assert workspace is None or {"version", "display_name", "normalized_path"} <= set(workspace.keys())
+        session_columns = {
+            row["name"] for row in conn.execute("PRAGMA table_info(server_sessions)").fetchall()
+        }
+        event_columns = {
+            row["name"] for row in conn.execute("PRAGMA table_info(server_session_events)").fetchall()
+        }
+        queue_columns = {
+            row["name"] for row in conn.execute("PRAGMA table_info(server_queue_items)").fetchall()
+        }
+        assert "pinned" in session_columns
+        assert "wire_seq" in event_columns
+        assert "public_message_json" in queue_columns
 
 
 def test_restart_seals_unfinished_turn_as_unknown_without_redispatch(tmp_path):

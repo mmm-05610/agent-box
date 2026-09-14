@@ -7,12 +7,19 @@ cannot both own an acceptance: the loser observes the committed receipt.
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, Mapping
 
 from agent_box.server.errors import ServerError
 from agent_box.server.idempotency import IdempotentRecords
 from agent_box.server.ids import now, opaque_id
 from agent_box.storage import Database
+
+
+WIRE_VISIBLE_EVENT_KINDS = frozenset({
+    "turn.accepted", "turn.state", "message.delta", "message.final", "tool.update",
+    "approval.requested", "approval.settled", "config.changed", "queue.updated",
+    "workspace.connection",
+})
 
 
 def _version_error(message: str, current: dict[str, Any]) -> ServerError:
@@ -60,6 +67,7 @@ class SessionRecords:
     def accept_intent(
         self, *, session_id: str | None, workspace_id: str | None, profile_id: str,
         request_id: str, request_digest: str, message_object_digest: str,
+        public_message: Mapping[str, Any],
         overrides: list[dict[str, Any]] | None = None,
         expected_version: int | None = None, queue_records=None,
         resolve_config_version=None,
@@ -133,6 +141,14 @@ class SessionRecords:
             if resolve_config_version is not None:
                 config_version = int(resolve_config_version(conn, profile, overrides))
 
+            self._append_session_event(
+                conn, session_id, None, "message.final",
+                {
+                    "message_id": opaque_id("message"), "role": "user",
+                    "display_kind": "visible", "text": str(public_message.get("text", "")),
+                },
+            )
+
             active = conn.execute(
                 "SELECT * FROM server_turns WHERE session_id=? AND state IN "
                 "('accepted','dispatching','running','capturing') ORDER BY created_at LIMIT 1",
@@ -161,6 +177,7 @@ class SessionRecords:
                     request_digest=request_digest,
                     message_object_digest=message_object_digest,
                     effective_config_object_digest=effective_config_object_digest,
+                    public_message=public_message,
                 )
                 body = {
                     "outcome": "accepted", "sessionId": session_id,
@@ -262,6 +279,112 @@ class SessionRecords:
             self.idempotency.insert(conn, scope, request_id, request_digest, 200, body)
             return "confirmed", body
 
+    def list_sessions(
+        self, *, workspace_id: str | None, include_archived: bool,
+        after_rowid: int = 0, limit: int = 200,
+    ) -> list[dict[str, Any]]:
+        """Return a stable keyset page of authoritative Session records."""
+        clauses = ["rowid>?"]
+        values: list[Any] = [after_rowid]
+        if workspace_id is not None:
+            clauses.append("workspace_id=?")
+            values.append(workspace_id)
+        if not include_archived:
+            clauses.append("archived_at IS NULL")
+        values.append(limit)
+        with self.database.read() as conn:
+            if workspace_id is not None and conn.execute(
+                "SELECT 1 FROM server_workspaces WHERE id=?", (workspace_id,),
+            ).fetchone() is None:
+                raise ServerError("WORKSPACE_NOT_FOUND", "Workspace was not found", status=404)
+            rows = conn.execute(
+                "SELECT rowid AS catalog_rowid,* FROM server_sessions WHERE "
+                + " AND ".join(clauses) + " ORDER BY rowid LIMIT ?",
+                tuple(values),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def update_session(
+        self, *, session_id: str, expected_version: int, request_id: str,
+        request_digest: str, display_name: str | None = None,
+        pinned: bool | None = None, workspace_id: str | None = None,
+    ) -> dict[str, Any]:
+        scope = f"sessions.update:{session_id}"
+        with self.database.transaction() as conn:
+            prior = self.idempotency.check(conn, scope, request_id, request_digest)
+            if prior:
+                return prior[1]["session"]
+            row = conn.execute(
+                "SELECT * FROM server_sessions WHERE id=?", (session_id,),
+            ).fetchone()
+            if row is None:
+                raise ServerError("SESSION_NOT_FOUND", "Session was not found", status=404)
+            current = self._session_view(conn, session_id)
+            if int(row["version"]) != expected_version:
+                raise _version_error("Session changed before the update", current)
+            if workspace_id is not None and workspace_id != row["workspace_id"]:
+                target = conn.execute(
+                    "SELECT * FROM server_workspaces WHERE id=?", (workspace_id,),
+                ).fetchone()
+                if target is None:
+                    raise ServerError("WORKSPACE_NOT_FOUND", "Workspace was not found", status=404)
+                if bool(target["archived_at"]):
+                    raise ServerError("WORKSPACE_ARCHIVED", "Workspace is archived", status=409)
+                active = conn.execute(
+                    "SELECT 1 FROM server_turns WHERE session_id=? AND state IN "
+                    "('accepted','dispatching','running','capturing') LIMIT 1",
+                    (session_id,),
+                ).fetchone()
+                if active is not None:
+                    raise ServerError(
+                        "CAPABILITY_UNSUPPORTED",
+                        "Session workspace cannot change while an execution is active",
+                        status=409,
+                    )
+            timestamp = now()
+            conn.execute(
+                "UPDATE server_sessions SET display_name=COALESCE(?,display_name),"
+                "pinned=COALESCE(?,pinned),workspace_id=COALESCE(?,workspace_id),"
+                "version=version+1,updated_at=? WHERE id=?",
+                (display_name, None if pinned is None else int(pinned), workspace_id,
+                 timestamp, session_id),
+            )
+            updated = self._session_view(conn, session_id)
+            self.idempotency.insert(
+                conn, scope, request_id, request_digest, 200, {"session": updated},
+            )
+            return updated
+
+    def archive_session(
+        self, *, session_id: str, expected_version: int, request_id: str,
+        request_digest: str,
+    ) -> dict[str, Any]:
+        scope = f"sessions.archive:{session_id}"
+        with self.database.transaction() as conn:
+            prior = self.idempotency.check(conn, scope, request_id, request_digest)
+            if prior:
+                return prior[1]["session"]
+            row = conn.execute(
+                "SELECT * FROM server_sessions WHERE id=?", (session_id,),
+            ).fetchone()
+            if row is None:
+                raise ServerError("SESSION_NOT_FOUND", "Session was not found", status=404)
+            if int(row["version"]) != expected_version:
+                raise _version_error(
+                    "Session changed before it was archived", self._session_view(conn, session_id),
+                )
+            timestamp = now()
+            conn.execute(
+                "UPDATE server_sessions SET archived_at=COALESCE(archived_at,?),"
+                "version=version+1,updated_at=? WHERE id=?",
+                (timestamp, timestamp, session_id),
+            )
+            updated = self._session_view(conn, session_id)
+            self.idempotency.insert(
+                conn, scope, request_id, request_digest, 200, {"session": updated},
+            )
+            return updated
+
     def intent_outcome(self, request_id: str) -> dict[str, Any]:
         with self.database.read() as conn:
             row = conn.execute(
@@ -277,6 +400,8 @@ class SessionRecords:
             "outcome": "accepted",
             "sessionId": body["sessionId"],
             "executionId": body.get("executionId"),
+            "configVersion": body["configVersion"],
+            "queueItemId": body.get("queueItemId"),
         }
 
     @staticmethod
@@ -286,6 +411,7 @@ class SessionRecords:
             "id": row["id"], "version": int(row["version"]),
             "workspaceId": row["workspace_id"], "profileId": row["profile_id"],
             "displayName": row["display_name"] or row["id"],
+            "pinned": bool(row["pinned"]),
             "archivedAt": row["archived_at"],
             "createdAt": row["created_at"], "updatedAt": row["updated_at"],
         }
@@ -488,14 +614,10 @@ class SessionRecords:
             self._append_session_event(
                 conn, row["session_id"], turn_id, "turn.state", {"state": "completed"},
             )
-            if row["queue_item_id"] is not None:
-                conn.execute(
-                    "UPDATE server_queue_items SET state='completed',version=version+1,updated_at=? "
-                    "WHERE id=? AND state='dispatched'",
-                    (timestamp, row["queue_item_id"]),
-                )
             next_execution_id = None
             if queue_records is not None:
+                if row["queue_item_id"] is not None:
+                    queue_records.mark_terminal(conn, row["queue_item_id"], "completed")
                 item = queue_records.claim_next(conn, row["session_id"])
                 if item is not None:
                     profile = conn.execute(
@@ -560,13 +682,9 @@ class SessionRecords:
                 (timestamp, row["profile_id"]),
             )
             if queue_records is not None:
+                if row["queue_item_id"] is not None:
+                    queue_records.mark_terminal(conn, row["queue_item_id"], "cancelled")
                 queue_records.pause_pending(conn, row["session_id"], "cancelled")
-            if row["queue_item_id"] is not None:
-                conn.execute(
-                    "UPDATE server_queue_items SET state='cancelled',version=version+1,updated_at=? "
-                    "WHERE id=? AND state='dispatched'",
-                    (timestamp, row["queue_item_id"]),
-                )
             return self._append_session_event(
                 conn, row["session_id"], turn_id, "turn.state",
                 {"state": "cancelled", "error_code": "TURN_CANCELLED"},
@@ -599,13 +717,9 @@ class SessionRecords:
                 (1 if recovery_required else 0, timestamp, row["profile_id"]),
             )
             if queue_records is not None:
+                if row["queue_item_id"] is not None:
+                    queue_records.mark_terminal(conn, row["queue_item_id"], "failed")
                 queue_records.pause_pending(conn, row["session_id"], code)
-            if row["queue_item_id"] is not None:
-                conn.execute(
-                    "UPDATE server_queue_items SET state='failed',version=version+1,updated_at=? "
-                    "WHERE id=? AND state='dispatched'",
-                    (timestamp, row["queue_item_id"]),
-                )
             self._append_session_event(
                 conn, row["session_id"], turn_id, "turn.capture",
                 {"state": capture_state, "error_code": code[:128]},
@@ -638,7 +752,8 @@ class SessionRecords:
             "session_id": row["id"], "workspace_id": row["workspace_id"],
             "profile_id": row["profile_id"], "status": row["status"],
             "version": int(row["version"] or 1),
-            "display_name": row["display_name"], "archived_at": row["archived_at"],
+            "display_name": row["display_name"], "pinned": bool(row["pinned"]),
+            "archived_at": row["archived_at"],
             "checkpoint": ({"object_digest": row["checkpoint_object_digest"],
                             "native_id": row["checkpoint_native_id"]}
                            if row["checkpoint_object_digest"] else None),
@@ -662,10 +777,63 @@ class SessionRecords:
             if after > maximum:
                 raise ServerError("EVENT_CURSOR_AHEAD", "Event cursor is beyond current history", status=409)
             return conn.execute(
-                "SELECT seq,event_id,session_id,turn_id,kind,schema_version,data_json,created_at "
+                "SELECT seq,wire_seq,event_id,session_id,turn_id,kind,schema_version,data_json,created_at "
                 "FROM server_session_events WHERE session_id=? AND seq>? ORDER BY seq LIMIT ?",
                 (session_id, after, limit),
             ).fetchall()
+
+    def history_page(
+        self, session_id: str, *, after: int | None = None,
+        before: int | None = None, limit: int = 200,
+    ) -> tuple[list[Any], int, bool]:
+        """Read a consistent history page and its raw event-log head.
+
+        `after` is a forward/live position. `before` is an exclusive backward
+        boundary. The returned rows are always in durable ascending order and
+        `has_older` only describes the backward view.
+        """
+        if after is not None and before is not None:
+            raise ValueError("history directions are mutually exclusive")
+        with self.database.read() as conn:
+            conn.execute("BEGIN")
+            if conn.execute(
+                "SELECT 1 FROM server_sessions WHERE id=?", (session_id,),
+            ).fetchone() is None:
+                raise ServerError("SESSION_NOT_FOUND", "Session was not found", status=404)
+            head = int(conn.execute(
+                "SELECT COALESCE(MAX(seq),0) FROM server_session_events WHERE session_id=?",
+                (session_id,),
+            ).fetchone()[0])
+            if after is not None:
+                if after > head:
+                    raise ServerError(
+                        "EVENT_CURSOR_AHEAD", "Event cursor is beyond current history", status=409,
+                    )
+                rows = conn.execute(
+                    "SELECT seq,wire_seq,event_id,session_id,turn_id,kind,schema_version,"
+                    "data_json,created_at FROM server_session_events "
+                    "WHERE session_id=? AND seq>? ORDER BY seq LIMIT ?",
+                    (session_id, after, limit),
+                ).fetchall()
+                return rows, head, False
+            boundary = head + 1 if before is None else before
+            if boundary > head + 1:
+                raise ServerError(
+                    "EVENT_CURSOR_AHEAD", "History page cursor is beyond current history", status=409,
+                )
+            descending = conn.execute(
+                "SELECT seq,wire_seq,event_id,session_id,turn_id,kind,schema_version,"
+                "data_json,created_at FROM server_session_events "
+                "WHERE session_id=? AND seq<? ORDER BY seq DESC LIMIT ?",
+                (session_id, boundary, limit),
+            ).fetchall()
+            rows = list(reversed(descending))
+            earliest = int(rows[0]["seq"]) if rows else boundary
+            has_older = conn.execute(
+                "SELECT 1 FROM server_session_events WHERE session_id=? AND seq<? LIMIT 1",
+                (session_id, earliest),
+            ).fetchone() is not None
+            return rows, head, has_older
 
     def list_events(self, session_id: str, after: int, *, limit: int = 500) -> list[dict[str, Any]]:
         with self.database.read() as conn:
@@ -677,7 +845,7 @@ class SessionRecords:
             if after > maximum:
                 raise ServerError("EVENT_CURSOR_AHEAD", "Event cursor is beyond current history", status=409)
             rows = conn.execute(
-                "SELECT seq,event_id,turn_id,kind,schema_version,data_json,created_at "
+                "SELECT seq,wire_seq,event_id,turn_id,kind,schema_version,data_json,created_at "
                 "FROM server_session_events WHERE session_id=? AND seq>? ORDER BY seq LIMIT ?",
                 (session_id, after, limit),
             ).fetchall()
@@ -696,14 +864,20 @@ class SessionRecords:
         ).fetchone()[0])
         event_id = opaque_id("event")
         created_at = now()
+        wire_seq = None
+        if kind in WIRE_VISIBLE_EVENT_KINDS:
+            wire_seq = int(conn.execute(
+                "SELECT COALESCE(MAX(wire_seq),0)+1 FROM server_session_events WHERE session_id=?",
+                (session_id,),
+            ).fetchone()[0])
         conn.execute(
-            "INSERT INTO server_session_events(session_id,seq,event_id,turn_id,kind,schema_version,data_json,created_at) "
-            "VALUES (?,?,?,?,?,?,?,?)",
-            (session_id, seq, event_id, turn_id, kind, 1,
+            "INSERT INTO server_session_events(session_id,seq,wire_seq,event_id,turn_id,kind,schema_version,data_json,created_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?)",
+            (session_id, seq, wire_seq, event_id, turn_id, kind, 1,
              json.dumps(data, ensure_ascii=False, sort_keys=True), created_at),
         )
         return {
-            "session_id": session_id, "seq": seq, "event_id": event_id,
+            "session_id": session_id, "seq": seq, "wire_seq": wire_seq, "event_id": event_id,
             "turn_id": turn_id, "kind": kind, "schema_version": 1,
             "data": data, "created_at": created_at,
         }

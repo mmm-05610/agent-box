@@ -41,6 +41,9 @@ CAPABILITY_IDS = (
     "providerModels.archive",
     "config.describe",
     "config.resolve",
+    "sessions.list",
+    "sessions.update",
+    "sessions.archive",
     "sessions.createAndSend",
     "sessions.send",
     "sessions.switchProfile",
@@ -77,6 +80,12 @@ _PARAM_SHAPES = {
     ),
     "config.describe": ({"profileId", "workspaceId"}, set()),
     "config.resolve": ({"profileId", "workspaceId", "overrides"}, set()),
+    "sessions.list": ({"includeArchived"}, {"workspaceId", "page"}),
+    "sessions.update": (
+        {"requestId", "sessionId", "expectedVersion"},
+        {"displayName", "pinned", "workspaceId"},
+    ),
+    "sessions.archive": ({"requestId", "sessionId", "expectedVersion"}, set()),
     "sessions.switchProfile": (
         {"requestId", "sessionId", "profileId", "expectedVersion"}, set(),
     ),
@@ -209,6 +218,9 @@ class WireService:
             "providerModels.archive": self.provider_models_archive,
             "config.describe": self.config_describe,
             "config.resolve": self.config_resolve,
+            "sessions.list": self.sessions_list,
+            "sessions.update": self.sessions_update,
+            "sessions.archive": self.sessions_archive,
             "sessions.createAndSend": self.sessions_create_and_send,
             "sessions.send": self.sessions_send,
             "sessions.switchProfile": self.sessions_switch_profile,
@@ -570,6 +582,86 @@ class WireService:
 
     # -- sessions -----------------------------------------------------------
 
+    def sessions_list(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        _require(params, "includeArchived")
+        include_archived = params["includeArchived"]
+        if not isinstance(include_archived, bool):
+            raise WireError("INVALID_REQUEST", "includeArchived must be a boolean")
+        workspace_id = params.get("workspaceId")
+        if workspace_id is not None:
+            workspace_id = _bounded(workspace_id, "workspaceId")
+        page = params.get("page") or {}
+        if not isinstance(page, Mapping) or set(page) - {"cursor", "limit"}:
+            raise WireError("INVALID_REQUEST", "page shape is invalid")
+        limit = page.get("limit", 200)
+        if isinstance(limit, bool) or not isinstance(limit, int) or not (1 <= limit <= 500):
+            raise WireError("INVALID_REQUEST", "page.limit must be between 1 and 500")
+        catalog_scope = "sessions_" + digest({
+            "workspaceId": workspace_id, "includeArchived": include_archived,
+        }).split(":", 1)[1][:24]
+        after_rowid = 0
+        if page.get("cursor") is not None:
+            _scope, after_rowid = self.codec.decode(
+                str(page["cursor"]), expected_session=catalog_scope,
+            )
+        rows = self.sessions.records.list_sessions(
+            workspace_id=workspace_id, include_archived=include_archived,
+            after_rowid=after_rowid, limit=limit + 1,
+        )
+        has_more = len(rows) > limit
+        visible = rows[:limit]
+        next_cursor = None
+        if has_more and visible:
+            next_cursor = self.codec.encode(catalog_scope, int(visible[-1]["catalog_rowid"]))
+        return {
+            "items": [session_record(row) for row in visible],
+            "nextCursor": next_cursor,
+        }
+
+    def sessions_update(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        _require(params, "requestId", "sessionId", "expectedVersion")
+        supplied = {name for name in ("displayName", "pinned", "workspaceId") if name in params}
+        if not supplied:
+            raise WireError("INVALID_REQUEST", "a Session update must change at least one field")
+        display_name = None
+        if "displayName" in params:
+            display_name = _bounded(params["displayName"], "displayName", 512)
+        pinned = params.get("pinned")
+        if "pinned" in params and not isinstance(pinned, bool):
+            raise WireError("INVALID_REQUEST", "pinned must be a boolean")
+        workspace_id = None
+        if "workspaceId" in params:
+            workspace_id = _bounded(params["workspaceId"], "workspaceId")
+        session_id = _bounded(params["sessionId"], "sessionId")
+        expected_version = _version(params["expectedVersion"])
+        request_body = {
+            "sessionId": session_id, "expectedVersion": expected_version,
+            **({"displayName": display_name} if "displayName" in params else {}),
+            **({"pinned": pinned} if "pinned" in params else {}),
+            **({"workspaceId": workspace_id} if "workspaceId" in params else {}),
+        }
+        updated = self.sessions.records.update_session(
+            session_id=session_id, expected_version=expected_version,
+            request_id=_bounded(params["requestId"], "requestId"),
+            request_digest=digest(request_body), display_name=display_name,
+            pinned=pinned if "pinned" in params else None,
+            workspace_id=workspace_id,
+        )
+        return {"session": updated}
+
+    def sessions_archive(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        _require(params, "requestId", "sessionId", "expectedVersion")
+        session_id = _bounded(params["sessionId"], "sessionId")
+        expected_version = _version(params["expectedVersion"])
+        archived = self.sessions.records.archive_session(
+            session_id=session_id, expected_version=expected_version,
+            request_id=_bounded(params["requestId"], "requestId"),
+            request_digest=digest({
+                "sessionId": session_id, "expectedVersion": expected_version,
+            }),
+        )
+        return {"session": archived}
+
     def sessions_create_and_send(self, params: Mapping[str, Any]) -> dict[str, Any]:
         _require(params, "requestId", "workspaceId", "profileId", "message", "overrides")
         workspace_id = _bounded(params["workspaceId"], "workspaceId")
@@ -581,12 +673,14 @@ class WireService:
             "workspaceId": params["workspaceId"], "profileId": params["profileId"],
             "message": message, "overrides": overrides,
         })
+        public_message = self._public_message(message)
         outcome, body = self.sessions.accept_intent(
             session_id=None,
             workspace_id=workspace_id,
             profile_id=_bounded(params["profileId"], "profileId"),
             request_id=request_id, request_digest=digest_value,
-            message_object_digest=self._publish_message(message), overrides=overrides,
+            message_object_digest=self._publish_message(message),
+            public_message=public_message, overrides=overrides,
         )
         if outcome == "accepted" and body.get("executionId"):
             self._dispatch(body["executionId"], overrides)
@@ -598,6 +692,7 @@ class WireService:
                     "id": session["session_id"], "version": session["version"],
                     "workspace_id": session["workspace_id"], "profile_id": session["profile_id"],
                     "display_name": session.get("display_name") or session["session_id"],
+                    "pinned": session.get("pinned", False),
                     "archived_at": session.get("archived_at"),
                     "created_at": session["created_at"], "updated_at": session["updated_at"],
                 }),
@@ -621,11 +716,13 @@ class WireService:
         digest_value = digest({
             "sessionId": session_id, "message": message, "overrides": overrides,
         })
+        public_message = self._public_message(message)
         outcome, body = self.sessions.accept_intent(
             session_id=session_id, workspace_id=None,
             profile_id=session["profile_id"], request_id=request_id,
             request_digest=digest_value,
-            message_object_digest=self._publish_message(message), overrides=overrides,
+            message_object_digest=self._publish_message(message),
+            public_message=public_message, overrides=overrides,
         )
         if outcome == "accepted" and body.get("executionId"):
             self._dispatch(body["executionId"], overrides)
@@ -688,7 +785,7 @@ class WireService:
         }
 
     def _queue_item(self, item: Mapping[str, Any]) -> dict[str, Any]:
-        body = self._stored_message(item["messageText"])
+        body = dict(item["message"]) if isinstance(item.get("message"), Mapping) else self._stored_message(item["messageText"])
         return {
             "itemId": item["itemId"], "version": item["version"],
             "submittedAt": item["submittedAt"], "message": body,
@@ -766,12 +863,24 @@ class WireService:
             raise WireError("INVALID_REQUEST", "page.limit must be an integer")
         if not (1 <= limit <= 500):
             raise WireError("INVALID_REQUEST", "page.limit must be between 1 and 500")
-        cursor_value = params.get("cursor") or page.get("cursor")
-        after = 0
-        if cursor_value:
-            _session, after = self.codec.decode(str(cursor_value), expected_session=session_id)
+        live_cursor = params.get("cursor")
+        older_cursor = page.get("cursor")
+        if live_cursor is not None and older_cursor is not None:
+            raise WireError(
+                "INVALID_REQUEST", "live resume and backward page cursors are mutually exclusive",
+            )
+        after = None
+        before = None
+        if live_cursor is not None:
+            _session, after = self.codec.decode(str(live_cursor), expected_session=session_id)
+        if older_cursor is not None:
+            _session, before = self.codec.decode_older(
+                str(older_cursor), expected_session=session_id,
+            )
         try:
-            rows = self.sessions.records.raw_events(session_id, after, limit=limit)
+            rows, head, has_older = self.sessions.records.history_page(
+                session_id, after=after, before=before, limit=limit,
+            )
         except ServerError as exc:
             if exc.code == "EVENT_CURSOR_AHEAD":
                 # An out-of-range cursor is answered with an explicit resync
@@ -779,13 +888,21 @@ class WireService:
                 return {"outcome": "resync_required", "reason": "cursor_beyond_history"}
             raise
         frames = [frame for frame in (event_frame(row, self.codec) for row in rows) if frame]
-        # Advance across internal bookkeeping rows too. Otherwise a trailing
-        # non-wire event would be queried forever by the live stream.
-        resume_seq = int(rows[-1]["seq"]) if rows else after
+        # Forward recovery advances by the returned raw log rows so additional
+        # batches remain readable. Initial/backward snapshots join live at the
+        # head read in the same SQLite snapshot, closing the subscribe window.
+        resume_seq = (
+            int(rows[-1]["seq"]) if after is not None and rows else
+            after if after is not None else head
+        )
+        next_older = None
+        if has_older and rows:
+            next_older = self.codec.encode_older(session_id, int(rows[0]["seq"]))
         return {
             "outcome": "snapshot",
             "frames": frames,
             "resumeCursor": self.codec.encode(session_id, resume_seq),
+            "olderCursor": next_older,
         }
 
     def event_stream_batch(
@@ -861,6 +978,16 @@ class WireService:
 
     def _publish_message(self, message: Mapping[str, Any]) -> str:
         return self.objects.publish(canonical({"schema_version": 1, "message": dict(message)})).digest
+
+    @staticmethod
+    def _public_message(message: Mapping[str, Any]) -> dict[str, Any]:
+        return {
+            "text": str(message.get("text", "")),
+            "attachments": [
+                {key: item[key] for key in ("ref", "displayName", "mediaKind")}
+                for item in message.get("attachments", ())
+            ],
+        }
 
     def _stored_message(self, digest_value: str) -> dict[str, Any]:
         stored = json.loads(self.objects.read(digest_value))

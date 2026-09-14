@@ -8,7 +8,7 @@ import threading
 from typing import Iterator
 
 
-PRODUCT_SCHEMA_VERSION = 4
+PRODUCT_SCHEMA_VERSION = 5
 
 
 class FutureSchemaError(RuntimeError):
@@ -80,6 +80,7 @@ CREATE TABLE IF NOT EXISTS server_sessions (
     checkpoint_native_id TEXT,
     status TEXT NOT NULL DEFAULT 'ready',
     display_name TEXT,
+    pinned INTEGER NOT NULL DEFAULT 0,
     version INTEGER NOT NULL DEFAULT 1,
     archived_at TEXT,
     created_at TEXT NOT NULL,
@@ -114,6 +115,7 @@ ON server_turns(profile_id) WHERE state IN ('accepted', 'dispatching', 'running'
 CREATE TABLE IF NOT EXISTS server_session_events (
     session_id TEXT NOT NULL REFERENCES server_sessions(id),
     seq INTEGER NOT NULL,
+    wire_seq INTEGER,
     event_id TEXT NOT NULL UNIQUE,
     turn_id TEXT,
     kind TEXT NOT NULL,
@@ -122,6 +124,8 @@ CREATE TABLE IF NOT EXISTS server_session_events (
     created_at TEXT NOT NULL,
     PRIMARY KEY (session_id, seq)
 );
+CREATE UNIQUE INDEX IF NOT EXISTS server_session_wire_order
+ON server_session_events(session_id, wire_seq) WHERE wire_seq IS NOT NULL;
 CREATE TABLE IF NOT EXISTS server_idempotency (
     scope TEXT NOT NULL,
     key TEXT NOT NULL,
@@ -142,6 +146,7 @@ CREATE TABLE IF NOT EXISTS server_queue_items (
     request_digest TEXT NOT NULL,
     message_object_digest TEXT NOT NULL,
     effective_config_object_digest TEXT,
+    public_message_json TEXT,
     submitted_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -293,6 +298,36 @@ def _migrate_3_to_4(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migrate_4_to_5(conn: sqlite3.Connection) -> None:
+    """Add shared Session metadata and a gap-free public event sequence."""
+    _add_columns(conn, "server_sessions", {
+        "pinned": "INTEGER NOT NULL DEFAULT 0",
+    })
+    _add_columns(conn, "server_queue_items", {
+        "public_message_json": "TEXT",
+    })
+    _add_columns(conn, "server_session_events", {
+        "wire_seq": "INTEGER",
+    })
+    if _has_table(conn, "server_session_events"):
+        visible = (
+            "'turn.accepted','turn.state','message.delta','message.final','tool.update',"
+            "'approval.requested','approval.settled','config.changed','queue.updated',"
+            "'workspace.connection'"
+        )
+        conn.execute(
+            "UPDATE server_session_events AS target SET wire_seq=("
+            "SELECT COUNT(*) FROM server_session_events AS prior "
+            "WHERE prior.session_id=target.session_id AND prior.seq<=target.seq "
+            f"AND prior.kind IN ({visible})) WHERE target.kind IN ({visible}) "
+            "AND target.wire_seq IS NULL"
+        )
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS server_session_wire_order "
+            "ON server_session_events(session_id,wire_seq) WHERE wire_seq IS NOT NULL"
+        )
+
+
 class Database:
     """One local SQLite file with explicit, bounded transaction scopes."""
 
@@ -332,6 +367,8 @@ class Database:
                 _migrate_2_to_3(conn)
             if current in (1, 2, 3):
                 _migrate_3_to_4(conn)
+            if current in (1, 2, 3, 4):
+                _migrate_4_to_5(conn)
             conn.executescript(_SCHEMA)
             conn.execute(
                 "INSERT OR IGNORE INTO agentbox_product_schema(singleton, version, applied_at) "

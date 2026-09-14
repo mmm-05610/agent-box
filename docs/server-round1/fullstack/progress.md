@@ -3,26 +3,26 @@
 日期：2026-09-14。本轮零泄漏：任何证据、日志、命令行参数均不含凭据内容；
 密钥只经进程环境变量传给受管 Harness 投影，且未写入任何文件或输出。
 
-## A — 后端完成后的前端只读等待
+## A — 前端只读观察与 wire 增量协作
 
 后端 41 READY 后按 42-A 做只读检查（未写前端任何文件、未杀其进程、未发第二个 goal）：
 
-- 工作树 `/home/maoqh/projects/agent-box-desktop-next-wsl-round1`，2026-09-14 11:21 +08:00
-  实际 HEAD `9881bb821176ecb59a5e71f32cdd9493fd065f6e`，工作树 clean。
+- 工作树 `/home/maoqh/projects/agent-box-desktop-next-wsl-round1`，2026-09-14 11:43 +08:00
+  实际 HEAD `b10e455f763b964b99b489b4e66cfd4ae50d86a7`；writer 正在 P03 下一切片，工作树非 clean。
 - 其自身 status：`frontend_implementation=PARTIAL`（P00/P01 GREEN、P02 A/B1/B2/C/D、
-  P03纵切1–2和 P07 25方法增量已提交；P03生产调用者及 P04–P06待续），
+  P03纵切1–2和 P07 28方法增量已提交；P03生产调用者及 P04–P06待续），
   `writer_lease=ACTIVE — Codex frontend goal`（09:20 接管），
   尚未达到 `DESKTOP_IMPLEMENTATION_READY`。
-- 前端已消费核心维护反馈并提交 25 方法新摘要；后端按实际生成工件 25/25 回归后在
-  [wire-review.md](../wire-review.md) 登记 `WIRE_LOCKED_FOR_IMPLEMENTATION`。前端下一阶段读取即可，
-  无需再等待用户逐字段批准。
+- 前端已消费核心维护反馈，并在同一 wire 提交 Session/history 28方法增量。后端对实际生成工件
+  28/28 回归通过；新增队列终态门证明当前 schema 无法表示 completed/failed/cancelled 后的移除，
+  已在 [wire-review.md](../wire-review.md) 给出最小机械更正。前端自行落实，无需用户逐字段批准。
 
 ## B — 双门判定（**均未满足，故未进入联调**）
 
 | 门 | 判定 | 依据 |
 | --- | --- | --- |
-| BACKEND_IMPLEMENTATION_READY | **是** | 41 A–E 完成；Windows原生Server→真实WSL Worker→bwrap exit 0；Python 266/4 skip、Node 25/25、Rust 4/4 |
-| DESKTOP_IMPLEMENTATION_READY | **否** | 前端自报 PARTIAL，且 `writer_lease=ACTIVE`（未释放）；同 wire 已锁定但实现/验收门未完 |
+| BACKEND_IMPLEMENTATION_READY | **否（暂时）** | 28方法主体及Windows r3增量门已完成；只等待队列终态新摘要与严格schema复验 |
+| DESKTOP_IMPLEMENTATION_READY | **否** | 前端自报 PARTIAL，且 `writer_lease=ACTIVE`（未释放）；28方法 wire 尚在机械重锁，独立实现/验收门未完 |
 
 因此仍**没有**记录 `FULLSTACK_INTEGRATION_OWNER`，**没有**接管前端工作树，
 **没有**启动跨端链路。这是纪律要求，不是进度不足的借口。
@@ -78,7 +78,8 @@
 
 ## E — 最终验收与提交
 
-未执行（依赖双门与真实门）。41 READY 代码/证据检查点为本次待提交；更早检查点见 status：
+未执行（依赖双门与真实门）。41 的25方法/Windows基线检查点为 `72d6258`；当前28方法收口待提交。
+更早检查点见 status：
 `b84dc87`(39) → `38b28d6`(40-A) → `05053f9`(40-B) → `340fcad`(40-C) → `b70cd3f`(40-D)
 → `7e9ffd8`(41) → `8eeb422`(42-A 观察) → `978918d`(sidecar 桥)。
 未 push、未 merge、未 force、未改动发布源或用户真实数据。

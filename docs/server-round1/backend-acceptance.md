@@ -1,11 +1,21 @@
 # Work Order 41 — 核心产品合同与后端独立验收
 
-日期：2026-09-14。状态：**`BACKEND_IMPLEMENTATION_READY`**。分支
-`feature/server-harness-extension-v1`；检查点为本次提交。此结论只代表后端独立门，不代表
+日期：2026-09-14。当前状态：**`BACKEND_WIRE_ALIGNMENT_IN_PROGRESS`**。分支
+`feature/server-harness-extension-v1`；25方法/Windows基线检查点为 `72d6258`。此结论只代表后端独立门，不代表
 真实模型或全栈 Green。41 全程使用显式 no-model ACP fixture，未读模型凭据、未发模型请求，
 费用 ¥0；42 已有费用账继续单独累计。
 
-## A — 单一 wire 合同
+## A — 单一 wire 合同（当前增量）
+
+前端随后在同一权威提交 `b10e455f763b964b99b489b4e66cfd4ae50d86a7`，补齐已批准的
+Session目录/维护、消息角色与用户消息、history双游标、queue事件及发送结果回查，总计28方法。
+当前 TS 摘要 `986889e47bcf5f25353bf8cb62afb009cd367ece7b90cbcbf8ce89bd5ed4c257`，生成工件
+`d3f7412710e7e951674922aebdb72ffbb028fc76b2e353a86b53097fd02abe22`。后端主体已直接按工件
+**28/28通过**，新增行为门在无schema时 **29/29通过**；当前工件唯一未对齐处是 queue.updated
+无法编码 completed/failed/cancelled 后的权威移除，精确反馈见 [wire-review.md](wire-review.md)。
+新摘要与Windows增量门完成前，本文件不冒称最终 READY。
+
+### 已完成的25方法稳定基线
 
 后端没有另造协议，直接消费前端执行树 `9881bb821176ecb59a5e71f32cdd9493fd065f6e`
 的同源 TS/JSON Schema。双方接受记录见 [wire-review.md](wire-review.md)，锁定状态为
@@ -33,8 +43,8 @@
 - `config.describe` 对模型槽返回后端验证的 availability；保存成功和模型可运行性分开。Harness
   默认/校验仍由注册扩展提供，Server 无品牌分支。
 
-数据 schema v4 非破坏迁移：为 Profile 增加独立记录版本，为执行/队列冻结 content-addressed
-effective config，并增加 Provider/Model 表；v1→v4 连续迁移与二次初始化通过。
+数据 schema v5 非破坏迁移：在 v4 的 Profile/执行/Provider-Model 基础上增加 Session `pinned`、
+队列公开消息投影与 gap-free wire 序号；v1→v5 连续迁移与二次初始化通过。
 
 ## C — 会话、队列、事件、审批与取消
 
@@ -70,13 +80,14 @@ work/execution/dispatch identity 与原生 Session id。当前组件声明 `resu
 入口：`scripts/server-round1/accept-e.ps1`。最终轮使用 Windows `py.exe -3.12` 启动真实 Server，
 由真实 `wsl.exe` 启动 digest 固定的 release Worker，再经 bwrap 运行显式 no-model ACP fixture。
 验证了 hello、Workspace、Profile/Provider-Model 维护、配置描述/拒绝、附件投递、终止前增量、
-WebSocket cursor、取消、审批和清理。结果：
+WebSocket cursor、取消、审批和清理。28方法增量后又在隔离 r3 重跑，并新增验证 Session目录、
+置顶/重命名/归档及归档后历史保留、用户消息角色恢复。结果：
 
 ```json
-{"result":"BACKEND_41_E_WINDOWS_WSL_WIRE_OK","windows_server":true,"distribution":"Ubuntu","server_id":"server_afe66eb19aa54f4c818fca607cbfb1c4","workspace_id":"ws_cae3f8fded1446cd85dde13930b012bc","attachment_execution":"execution_a4c29b292ac347509d5052604d23f7b6","cancelled_execution":"execution_625feaaa245e47468b7b6471cb4a0ca9","approval_execution":"execution_732a94ac015f43399fdef583c0b9dfff","profile_id":"profile_1ad682f987fb4bc0a8ec517b475bf997","provider_model_id":"provider_ea5e2549a50048af866a0b7dc43bd7a4","wire_event_stream":"wire.eventStream/1","worker_digest":"sha256:bb90e346bbd857f02eba8d267f47c3ce793d30c9894ca823dc09c482d886f5eb","fixture":"explicit no-model ACP peer"}
+{"result":"BACKEND_41_E_WINDOWS_WSL_WIRE_OK","windows_server":true,"distribution":"Ubuntu","server_id":"server_9eab21747f244cdbadf90640c9225237","workspace_id":"ws_62b4cf6c24144f09aba84e61d75a9994","session_id":"session_d4b2dce5deae4bc487d005b2e182dc96","attachment_execution":"execution_81921ef3716149f7b59df6fe91d64d5d","cancelled_execution":"execution_4405d51ef2624043a90e620c51ff6b89","approval_execution":"execution_6d114a16de354c85ad3c0e94a14866f5","profile_id":"profile_4c5c25e96dbc4e6f9ccd1daf170c25fe","provider_model_id":"provider_6c195f2d68c744ccb86910780dbb300e","wire_event_stream":"wire.eventStream/1","worker_digest":"sha256:bb90e346bbd857f02eba8d267f47c3ce793d30c9894ca823dc09c482d886f5eb","fixture":"explicit no-model ACP peer"}
 ```
 
-退出后复核：Windows data root=`false`、端口监听=`false`、WSL workspace cleanup exit=0，且无
+退出后复核（r3端口18743）：Windows data root=`false`、端口监听=`false`、WSL workspace cleanup exit=0，且无
 Worker/Server/sidecar 残留进程。WSL 输出含本机 NAT/localhost 警告乱码，但进程 exit 0、所有断言通过。
 
 首次尝试把 manifest 放 `/tmp`，Windows UNC 不可见，脚本在服务/数据创建前 exit 1；改为同一用户
@@ -85,11 +96,14 @@ Worker/Server/sidecar 残留进程。WSL 输出含本机 NAT/localhost 警告乱
 ## 最终验证账
 
 ```text
-AGENT_BOX_WIRE_SCHEMA=<c9be8a63…生成工件> pytest tests/server/test_wire_v1.py
-→ 25 passed
+AGENT_BOX_WIRE_SCHEMA=<d3f74127…28方法生成工件> pytest tests/server/test_wire_v1.py
+→ 28 passed（队列终态门加入前）
 
-同一 schema + pytest tests plugins/agent-box-runtime-wsl/tests plugins/agent-box-harnesses/tests
-→ 266 passed, 4 skipped, 0 failed
+pytest tests/server/test_wire_v1.py
+→ 29 passed；对当前schema定向执行终态门按预期1 failed，唯一差异为缺completed枚举
+
+pytest tests plugins/agent-box-runtime-wsl/tests plugins/agent-box-harnesses/tests
+→ 270 passed, 4 skipped, 0 failed
 
 node --test plugins/agent-box-harnesses/tests/harness_remote/*.test.mjs
 → 25 passed, 0 failed
@@ -98,13 +112,16 @@ cargo fmt --check && cargo test --locked --release
 → 4 passed, 0 failed
 ```
 
-4 个 skip 是既有平台/显式环境条件项，未扩大。一次全套命令因 `PYTHONPATH` 漏插件目录在收集期
-21 errors、0 tests，补齐所有插件 src 后取得上述最终结果；一次 Node 从 Worker 子目录展开通配符
+4 个 skip 是既有平台/显式环境条件项，未扩大。本轮增量全套首次命令再次因 `PYTHONPATH` 漏
+runtime-local/skills 等插件目录在收集期 7 errors、0 tests，补齐全部插件 src 后取得270/4；
+原25方法基线曾有一次收集期21 errors、0 tests；一次 Node 从 Worker 子目录展开通配符
 得到 0 tests，回仓根重跑取得 25/25。两次命令错误均不计作通过。
 
 ## 终态边界
 
-`BACKEND_IMPLEMENTATION_READY` 已满足；四家组件仍保持 40 的
+`72d6258` 已满足当时25方法的 `BACKEND_IMPLEMENTATION_READY`；当前因同一合同的28方法已批准增量
+暂时回到 `BACKEND_WIRE_ALIGNMENT_IN_PROGRESS`，待队列终态新摘要和Windows增量复验后恢复 READY。
+四家组件仍保持 40 的
 `COMPONENT_VERIFIED / MODEL_NOT_VERIFIED` 分账。Pi/Hermes/OpenCode 的 DeepSeek Provider 配置与
 独立真实模型门、Codex 协议不兼容记录，进入 42-D；前端仍由其独立 writer 施工，当前不具备跨仓
 写权，未执行全栈联调。

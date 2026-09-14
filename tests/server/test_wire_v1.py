@@ -592,6 +592,8 @@ def test_send_while_running_queues_and_withdrawal_reports_too_late(wire):
     assert item["message"]["text"] == "second"
     assert item["configVersion"] == second["configVersion"]
     assert item["itemId"] == second["queueItemId"]
+    queued_event = api.ok("history.snapshot", {"sessionId": session_id})["frames"][-1]["event"]
+    assert queued_event == {"kind": "queue.updated", "sessionId": session_id, "item": item}
 
     stale = api.err("queue.withdraw", {
         "requestId": "q-withdraw-stale", "sessionId": session_id, "itemId": item["itemId"],
@@ -604,6 +606,37 @@ def test_send_while_running_queues_and_withdrawal_reports_too_late(wire):
         "expectedVersion": item["version"],
     })
     assert withdrawn["outcome"] == "withdrawn"
+    assert api.ok("queue.get", {"sessionId": session_id})["items"] == []
+    withdrawn_event = api.ok("history.snapshot", {"sessionId": session_id})["frames"][-1]["event"]
+    assert withdrawn_event["kind"] == "queue.updated"
+    assert withdrawn_event["item"]["state"] == "withdrawn"
+
+
+def test_queue_terminal_events_remove_dispatched_items_without_guessing(wire):
+    runtime, api, _execution = wire
+    workspace = open_workspace(api, "/home/tester/queue-terminal")["workspace"]
+    profile = make_profile(api, name="queue-terminal")
+    first = api.ok("sessions.createAndSend", {
+        "requestId": "queue-terminal-one", "workspaceId": workspace["id"],
+        "profileId": profile["profile_id"], "message": MESSAGE, "overrides": [],
+    })
+    session_id = first["session"]["id"]
+    second = api.ok("sessions.send", {
+        "requestId": "queue-terminal-two", "sessionId": session_id,
+        "message": {"text": "next", "attachments": []}, "overrides": [],
+    })
+    with runtime.database.transaction() as conn:
+        claimed = runtime.queue.claim_next(conn, session_id)
+        assert claimed["itemId"] == second["queueItemId"]
+        runtime.queue.mark_terminal(conn, claimed["itemId"], "completed")
+
+    queue_events = [
+        frame["event"] for frame in api.ok("history.snapshot", {"sessionId": session_id})["frames"]
+        if frame["event"]["kind"] == "queue.updated"
+    ]
+    assert [event["item"]["state"] for event in queue_events] == [
+        "pending", "dispatched", "completed",
+    ]
     assert api.ok("queue.get", {"sessionId": session_id})["items"] == []
 
 
@@ -657,6 +690,78 @@ def test_switching_role_is_refused_while_an_execution_runs(wire):
     assert result["reason"] == "execution_running"
     # The old link is returned so the client keeps the real state.
     assert result["session"]["profileId"] == first_profile["profile_id"]
+
+
+def test_session_catalog_metadata_archive_and_pagination_are_server_owned(wire):
+    _runtime, api, _execution = wire
+    first_workspace = open_workspace(api, "/home/tester/catalog-a")["workspace"]
+    second_workspace = open_workspace(api, "/home/tester/catalog-b")["workspace"]
+    profile = make_profile(api, name="catalog-role")
+    accepted = api.ok("sessions.createAndSend", {
+        "requestId": "catalog-send-one", "workspaceId": first_workspace["id"],
+        "profileId": profile["profile_id"], "message": MESSAGE, "overrides": [],
+    })
+    session = accepted["session"]
+    assert session["pinned"] is False
+
+    renamed = api.ok("sessions.update", {
+        "requestId": "catalog-update-one", "sessionId": session["id"],
+        "expectedVersion": session["version"], "displayName": "Pinned work",
+        "pinned": True,
+    })["session"]
+    assert renamed["displayName"] == "Pinned work"
+    assert renamed["pinned"] is True
+    assert renamed["version"] == session["version"] + 1
+
+    stale = api.err("sessions.update", {
+        "requestId": "catalog-update-stale", "sessionId": session["id"],
+        "expectedVersion": session["version"], "displayName": "stale",
+    })
+    assert stale["code"] == "CONFLICT_VERSION"
+    assert stale["current"]["displayName"] == "Pinned work"
+
+    # Workspace switching is a real business update and must be refused while
+    # an execution is active instead of being simulated by the client.
+    busy = api.err("sessions.update", {
+        "requestId": "catalog-move-busy", "sessionId": session["id"],
+        "expectedVersion": renamed["version"], "workspaceId": second_workspace["id"],
+    })
+    assert busy["code"] == "CAPABILITY_UNSUPPORTED"
+
+    listing = api.ok("sessions.list", {
+        "workspaceId": first_workspace["id"], "includeArchived": False,
+        "page": {"limit": 1},
+    })
+    assert [item["id"] for item in listing["items"]] == [session["id"]]
+    assert listing["nextCursor"] is None
+
+    archived = api.ok("sessions.archive", {
+        "requestId": "catalog-archive-one", "sessionId": session["id"],
+        "expectedVersion": renamed["version"],
+    })["session"]
+    assert archived["archivedAt"] is not None
+    assert api.ok("sessions.list", {
+        "workspaceId": first_workspace["id"], "includeArchived": False,
+    })["items"] == []
+    assert api.ok("sessions.list", {
+        "workspaceId": first_workspace["id"], "includeArchived": True,
+    })["items"][0]["id"] == session["id"]
+
+
+def test_send_outcome_query_returns_the_frozen_acceptance_identity(wire):
+    _runtime, api, _execution = wire
+    workspace = open_workspace(api, "/home/tester/outcome-catalog")["workspace"]
+    profile = make_profile(api, name="outcome-catalog")
+    accepted = api.ok("sessions.createAndSend", {
+        "requestId": "outcome-catalog-send", "workspaceId": workspace["id"],
+        "profileId": profile["profile_id"], "message": MESSAGE, "overrides": [],
+    })
+    queried = api.ok("sendOutcome.query", {"requestId": "outcome-catalog-send"})
+    assert queried == {
+        "outcome": "accepted", "sessionId": accepted["session"]["id"],
+        "executionId": accepted["executionId"],
+        "configVersion": accepted["configVersion"], "queueItemId": None,
+    }
 
 
 # --- approvals --------------------------------------------------------------
@@ -758,22 +863,84 @@ def test_history_snapshot_frames_use_cursors_and_resume_without_gaps(wire):
     snapshot = api.ok("history.snapshot", {"sessionId": session_id})
     assert snapshot["outcome"] == "snapshot"
     assert snapshot["frames"], "an accepted send must leave a durable frame"
+    user_message = next(
+        frame for frame in snapshot["frames"]
+        if frame["event"]["kind"] == "message.final"
+        and frame["event"]["role"] == "user"
+    )
+    assert user_message["event"]["text"] == "hello"
+    assert user_message["event"]["displayKind"] == "visible"
     seqs = [frame["seq"] for frame in snapshot["frames"]]
     assert seqs == sorted(seqs)
     assert all(frame["cursor"] for frame in snapshot["frames"])
     assert snapshot["frames"][-1]["event"]["kind"] == "execution.state"
+    assert snapshot["olderCursor"] is None
+
+    # Internal capture bookkeeping can sit between public frames, but the
+    # EventFrame sequence seen by clients remains gap-free.
+    _runtime.repository.append_turn_event(
+        accepted["executionId"], "turn.capture", {"state": "capturing"},
+    )
+    _runtime.repository.append_turn_event(
+        accepted["executionId"], "message.delta", {"text": "after-internal"},
+    )
+    after_internal = api.ok("history.snapshot", {
+        "sessionId": session_id, "cursor": snapshot["resumeCursor"],
+    })
+    assert [frame["seq"] for frame in after_internal["frames"]] == [seqs[-1] + 1]
 
     # Continuing from the resume cursor returns only newer frames.
     resumed = api.ok("history.snapshot", {
-        "sessionId": session_id, "cursor": snapshot["resumeCursor"],
+        "sessionId": session_id, "cursor": after_internal["resumeCursor"],
     })
     assert resumed["outcome"] == "snapshot"
-    assert all(frame["seq"] > seqs[-1] for frame in resumed["frames"])
+    assert resumed["frames"] == []
 
     # A cursor that cannot address real history asks for an explicit resync.
     forged = snapshot["resumeCursor"][:-4] + "AAAA"
     error = api.err("history.snapshot", {"sessionId": session_id, "cursor": forged})
     assert error["code"] == "INVALID_REQUEST"
+
+
+def test_history_uses_distinct_backward_pages_and_live_resume_cursors(wire):
+    runtime, api, _execution = wire
+    workspace = open_workspace(api, "/home/tester/history-pages")["workspace"]
+    profile = make_profile(api, name="history-pages")
+    accepted = api.ok("sessions.createAndSend", {
+        "requestId": "history-pages-one", "workspaceId": workspace["id"],
+        "profileId": profile["profile_id"], "message": MESSAGE, "overrides": [],
+    })
+    session_id = accepted["session"]["id"]
+    for index in range(5):
+        runtime.repository.append_turn_event(
+            accepted["executionId"], "message.delta", {"text": str(index)},
+        )
+
+    latest = api.ok("history.snapshot", {
+        "sessionId": session_id, "page": {"limit": 2},
+    })
+    assert [frame["seq"] for frame in latest["frames"]] == sorted(
+        frame["seq"] for frame in latest["frames"]
+    )
+    assert latest["olderCursor"] is not None
+
+    older = api.ok("history.snapshot", {
+        "sessionId": session_id,
+        "page": {"cursor": latest["olderCursor"], "limit": 2},
+    })
+    assert older["frames"]
+    assert older["frames"][-1]["seq"] < latest["frames"][0]["seq"]
+    assert older["resumeCursor"] == latest["resumeCursor"]
+
+    # A backward-page cursor has a separate signing domain and cannot be used
+    # as a live resume cursor; mixing both directions is also ambiguous.
+    assert api.err("history.snapshot", {
+        "sessionId": session_id, "cursor": latest["olderCursor"],
+    })["code"] == "INVALID_REQUEST"
+    assert api.err("history.snapshot", {
+        "sessionId": session_id, "cursor": latest["resumeCursor"],
+        "page": {"cursor": latest["olderCursor"], "limit": 2},
+    })["code"] == "INVALID_REQUEST"
 
 
 def test_history_snapshot_requires_a_real_session(wire):
@@ -807,6 +974,7 @@ def test_wire_event_stream_resumes_from_snapshot_cursor_without_sse(wire):
         assert frame["sessionId"] == session_id
         assert frame["event"] == {
             "kind": "message.delta", "sessionId": session_id,
-            "messageId": accepted["executionId"], "text": "persisted before publish",
+            "messageId": accepted["executionId"], "role": "assistant",
+            "text": "persisted before publish",
         }
         assert frame["seq"] > snapshot["frames"][-1]["seq"]
