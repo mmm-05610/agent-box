@@ -88,7 +88,9 @@ class _ProcessChannels:
                 process.wait(timeout=3)
 
 
-def sidecar_bundle_files(plugin_root: Path | str) -> dict[str, bytes]:
+def sidecar_bundle_files(
+    plugin_root: Path | str, *, additional_files: Mapping[str, bytes] | None = None,
+) -> dict[str, bytes]:
     """Load the reviewed sidecar closure for one bounded Worker projection."""
     root = Path(plugin_root).resolve()
     runtime = root / "runtime"
@@ -109,6 +111,14 @@ def sidecar_bundle_files(plugin_root: Path | str) -> dict[str, bytes]:
         files[f"agentbox-sidecar/third_party/harness_remote/{relative}"] = (
             snapshot / relative
         ).read_bytes()
+    for relative, content in (additional_files or {}).items():
+        if (not isinstance(relative, str) or relative.startswith("/")
+                or "\x00" in relative or "//" in relative
+                or any(part in {"", ".", ".."} for part in relative.split("/"))):
+            raise ValueError("SIDECAR_BUNDLE_PATH_INVALID")
+        if relative in files:
+            raise ValueError("SIDECAR_BUNDLE_PATH_CONFLICT")
+        files[relative] = bytes(content)
     if len(files) > 1024 or sum(map(len, files.values())) > 64 * 1024 * 1024:
         raise ValueError("SIDECAR_BUNDLE_OUTSIDE_WORKER_BOUNDS")
     return files
@@ -120,12 +130,18 @@ class WslSidecarLauncher:
     def __init__(
         self, connector, *, workspace: Mapping[str, Any], bundle: Mapping[str, bytes],
         credential: bytes | None = None,
+        executable_authorizations: Sequence[Mapping[str, str]] = (),
+        executable_mounts: Sequence[tuple[str, str]] = (),
+        projection_mounts: Sequence[tuple[str, str]] = (),
         timeout_ms: int = 600_000,
     ) -> None:
         self.connector = connector
         self.workspace = dict(workspace)
         self.bundle = {str(path): bytes(content) for path, content in bundle.items()}
         self.credential = None if credential is None else bytes(credential)
+        self.executable_authorizations = tuple(dict(item) for item in executable_authorizations)
+        self.executable_mounts = tuple((str(source), str(target)) for source, target in executable_mounts)
+        self.projection_mounts = tuple((str(source), str(target)) for source, target in projection_mounts)
         self.timeout_ms = timeout_ms
 
     def launch(self, environment: Mapping[str, str]):
@@ -139,7 +155,7 @@ class WslSidecarLauncher:
             user=self.workspace["remote_user"],
             connection_id=self.workspace["connection_id"],
             workspace_path=self.workspace["remote_path"],
-            executable_authorizations=(),
+            executable_authorizations=self.executable_authorizations,
         )
         client.start()
         try:
@@ -174,6 +190,11 @@ class WslSidecarLauncher:
             argv = compile_remote_sidecar_bwrap_argv(
                 workspace=self.workspace["remote_path"], runtime_view=runtime_view,
                 environment=guest_environment, secret=secret,
+                executable_mounts=self.executable_mounts,
+                projection_mounts=tuple(
+                    (runtime_view + "/" + source, target)
+                    for source, target in self.projection_mounts
+                ),
             )
             channels = _WorkerChannels(
                 client, attempt_id, 1, view_id,
@@ -255,9 +276,22 @@ class _WorkerChannels:
             raise SidecarError("SIDECAR_CLOSED", "Worker sidecar is closed")
         content = (value + "\n").encode("utf-8")
         for offset in range(0, len(content), 60 * 1024):
-            self.client.write_stdin(
-                self.attempt_id, self.generation, content[offset:offset + 60 * 1024], timeout=10,
-            )
+            chunk = content[offset:offset + 60 * 1024]
+            deadline = time.monotonic() + 2
+            while True:
+                try:
+                    self.client.write_stdin(
+                        self.attempt_id, self.generation, chunk, timeout=10,
+                    )
+                    break
+                except BaseException as exc:
+                    # spawn acknowledgement precedes child-pipe installation.
+                    # ATTEMPT_NOT_READY is issued before any byte is written,
+                    # so this one narrow retry cannot duplicate input.
+                    if (getattr(exc, "code", None) != "ATTEMPT_NOT_READY"
+                            or time.monotonic() >= deadline):
+                        raise
+                    time.sleep(0.01)
 
     def iter_chunks(self):
         while True:
@@ -425,6 +459,7 @@ class SidecarHarnessPort:
         self, launcher: SidecarLauncher, *, environment: Mapping[str, str],
         profile: str = "codex", adapter: Mapping[str, Any] | None = None,
         model: str | None = None, credential_environment: str | None = None,
+        preferred_auth_method: str | None = None,
         state_directory: str = "/tmp/agentbox-sidecar",
         directory: str = "/workspace", on_event=None,
     ) -> None:
@@ -434,6 +469,7 @@ class SidecarHarnessPort:
         self.adapter = dict(adapter or {})
         self.model = model
         self.credential_environment = credential_environment
+        self.preferred_auth_method = preferred_auth_method
         self.state_directory = state_directory
         self.directory = directory
         self.on_event = on_event or (lambda *_: None)
@@ -457,6 +493,7 @@ class SidecarHarnessPort:
             registered = envelope.request({
                 "op": "register", "profile": self.profile, "launch": self.adapter,
                 "credentialEnvironment": self.credential_environment,
+                "preferredAuthMethod": self.preferred_auth_method,
                 "stateDirectory": self.state_directory, "directory": self.directory,
                 "permissionRoundTrip": True, "permissionTimeoutMs": 60_000,
             })

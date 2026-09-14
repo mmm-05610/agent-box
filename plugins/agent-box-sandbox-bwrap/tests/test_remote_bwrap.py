@@ -3,7 +3,9 @@ from __future__ import annotations
 import pytest
 
 from agent_box.extensions.runtime_composition import ProjectionRejected
-from agent_box_sandbox_bwrap import compile_remote_bwrap_argv
+from agent_box_sandbox_bwrap import (
+    compile_remote_bwrap_argv, compile_remote_sidecar_bwrap_argv,
+)
 
 
 def test_remote_codex_template_is_fixed_and_has_runtime_devices():
@@ -60,3 +62,39 @@ def test_remote_template_allows_only_codex_config_secret_target():
             command=("/runtime/bin/codex", "exec", "--json", "-"),
             environment={"HOME": "/runtime/home"},
         )
+
+
+def test_remote_sidecar_argv_uses_bounded_readonly_projection_targets():
+    argv = compile_remote_sidecar_bwrap_argv(
+        workspace="/workspace/project", runtime_view="/worker/views/view-1",
+        environment={"HOME": "/tmp/agentbox-home"},
+        executable_mounts=(("/worker/bin/node", "/runtime/bin/node"),),
+        projection_mounts=(("/worker/views/view-1/agentbox-sidecar/deployment/pi/settings.json",
+                            "/tmp/agentbox-home/settings.json"),),
+    )
+    assert argv[-2:] == ["/usr/bin/node", "/runtime/view/agentbox-sidecar/runtime/worker-entry.mjs"]
+    assert ["--ro-bind", "/worker/bin/node", "/runtime/bin/node"] == argv[
+        argv.index("/worker/bin/node") - 1:argv.index("/worker/bin/node") + 2
+    ]
+    assert ["--ro-bind", "/worker/views/view-1/agentbox-sidecar/deployment/pi/settings.json",
+            "/tmp/agentbox-home/settings.json"] == argv[
+        argv.index("/worker/views/view-1/agentbox-sidecar/deployment/pi/settings.json") - 1:
+        argv.index("/worker/views/view-1/agentbox-sidecar/deployment/pi/settings.json") + 2
+    ]
+
+
+@pytest.mark.parametrize("kwargs", [
+    {"projection_mounts": (("/worker/views/view-1/file", "/runtime/home/escape"),)},
+    {"projection_mounts": (("/worker/views/other/file", "/tmp/agentbox-home/x"),)},
+    {"executable_mounts": (("/worker/bin/node", "/runtime/bin/../escape"),)},
+    {"executable_mounts": (("/worker/bin/../node", "/runtime/bin/node"),)},
+    {"environment": {"API_TOKEN": "secret"}},
+])
+def test_remote_sidecar_argv_rejects_projection_and_credential_injection(kwargs):
+    values = {
+        "workspace": "/workspace/project", "runtime_view": "/worker/views/view-1",
+        "environment": {"HOME": "/tmp/agentbox-home"},
+    }
+    values.update(kwargs)
+    with pytest.raises(ProjectionRejected):
+        compile_remote_sidecar_bwrap_argv(**values)

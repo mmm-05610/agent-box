@@ -12,11 +12,11 @@ from datetime import datetime, timezone
 import io
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 import secrets
 import subprocess
-from typing import Any
+from typing import Any, Mapping
 from uuid import uuid4
 
 from agent_box.server.approvals import ApprovalRecords
@@ -314,7 +314,8 @@ def build_runtime_from_sidecar_deployment(
     """Compose registered Harnesses from an explicit non-secret deployment file."""
     path = Path(deployment_path).resolve()
     value = json.loads(path.read_text(encoding="utf-8"))
-    if value.get("schemaVersion") != 1 or not isinstance(value.get("harnesses"), list):
+    if (not isinstance(value, dict) or value.get("schemaVersion") != 1
+            or not isinstance(value.get("harnesses"), list)):
         raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
     from agent_box.server.execution import HarnessDescriptor, HarnessRegistry, SidecarExecutionBackend
     from agent_box.server.execution.sidecar import (
@@ -322,6 +323,7 @@ def build_runtime_from_sidecar_deployment(
     )
 
     deployments: dict[str, dict[str, Any]] = {}
+    additional_bundle: dict[str, bytes] = {}
     registry = HarnessRegistry()
     for item in value["harnesses"]:
         if not isinstance(item, dict) or not isinstance(item.get("id"), str):
@@ -331,9 +333,13 @@ def build_runtime_from_sidecar_deployment(
         model_control_id = item.get("modelControlId")
         credential_kind = item.get("credentialKind")
         credential_environment = item.get("credentialEnvironment")
-        if (harness_id in deployments or not isinstance(adapter, dict)
+        if (harness_id in deployments
+                or re.fullmatch(r"[a-z][a-z0-9._-]{0,63}", harness_id) is None
+                or not isinstance(adapter, dict)
                 or not isinstance(adapter.get("command"), str)
-                or not isinstance(adapter.get("args", []), list)):
+                or not isinstance(adapter.get("args", []), list)
+                or any(not isinstance(argument, str) or len(argument) > 8192 or "\x00" in argument
+                       for argument in adapter.get("args", []))):
             raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
         if model_control_id is not None and (
             not isinstance(model_control_id, str) or not model_control_id
@@ -349,7 +355,70 @@ def build_runtime_from_sidecar_deployment(
             or re.fullmatch(r"[A-Z][A-Z0-9_]{0,63}", credential_environment) is None
         ):
             raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
-        deployments[harness_id] = dict(item)
+        deployment = dict(item)
+        adapter = dict(adapter)
+        adapter_source = adapter.pop("source", None)
+        if adapter_source is not None:
+            if adapter["command"] != "/usr/bin/node":
+                raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
+            content = _sidecar_deployment_file(path, value, adapter_source)
+            bundle_path = f"agentbox-sidecar/deployment/{harness_id}/adapter.mjs"
+            additional_bundle[bundle_path] = content
+            adapter["args"] = [f"/runtime/view/{bundle_path}", *adapter.get("args", [])]
+        environment = adapter.get("environment") or {}
+        if not isinstance(environment, dict) or any(
+            not isinstance(key, str) or re.fullmatch(r"[A-Z][A-Z0-9_]{0,63}", key) is None
+            or re.search(r"TOKEN|SECRET|KEY|PASSWORD|CREDENTIAL|AUTH", key, re.I)
+            or not isinstance(setting, str) or len(setting) > 8192 or "\x00" in setting
+            or re.fullmatch(r"sk-[A-Za-z0-9_-]+", setting) is not None
+            for key, setting in environment.items()
+        ):
+            raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
+        adapter["environment"] = dict(environment)
+        deployment["adapter"] = adapter
+        projection_mounts = []
+        for index, projection in enumerate(item.get("projectionFiles") or ()):
+            if not isinstance(projection, dict):
+                raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
+            source = projection.get("source")
+            target = projection.get("target")
+            if (not isinstance(target, str)
+                    or re.fullmatch(r"/tmp/agentbox-home/[A-Za-z0-9._-]+", target) is None):
+                raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
+            content = _sidecar_deployment_file(path, value, source)
+            suffix = Path(str(source)).name
+            bundle_path = f"agentbox-sidecar/deployment/{harness_id}/projection-{index}-{suffix}"
+            additional_bundle[bundle_path] = content
+            projection_mounts.append((bundle_path, target))
+        deployment["_projection_mounts"] = tuple(projection_mounts)
+        executable_authorizations = []
+        executable_mounts = []
+        for executable in item.get("executableMounts") or ():
+            if not isinstance(executable, dict):
+                raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
+            source = executable.get("source")
+            target = executable.get("target")
+            digest_value = executable.get("digest")
+            if (not isinstance(source, str) or not source.startswith("/")
+                    or "//" in source or "\x00" in source
+                    or any(part in {".", ".."} for part in source.split("/"))
+                    or str(PurePosixPath(source)) != source
+                    or not isinstance(target, str)
+                    or re.fullmatch(r"/runtime/bin/[A-Za-z0-9._-]+", target) is None
+                    or not isinstance(digest_value, str)
+                    or re.fullmatch(r"sha256:[0-9a-f]{64}", digest_value) is None):
+                raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
+            executable_authorizations.append({"path": source, "digest": digest_value})
+            executable_mounts.append((source, target))
+        deployment["_executable_authorizations"] = tuple(executable_authorizations)
+        deployment["_executable_mounts"] = tuple(executable_mounts)
+        preferred_auth_method = item.get("preferredAuthMethod")
+        if preferred_auth_method is not None and (
+            not isinstance(preferred_auth_method, str)
+            or re.fullmatch(r"[a-z][a-z0-9._-]{0,63}", preferred_auth_method) is None
+        ):
+            raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
+        deployments[harness_id] = deployment
         registry.register(HarnessDescriptor(
             harness_id,
             credential_kind=credential_kind,
@@ -362,7 +431,9 @@ def build_runtime_from_sidecar_deployment(
             },
             security_locked_controls=tuple(item.get("securityLockedControls") or ()),
         ))
-    bundle = sidecar_bundle_files(value.get("pluginRoot") or path.parent)
+    bundle = sidecar_bundle_files(
+        value.get("pluginRoot") or path.parent, additional_files=additional_bundle,
+    )
 
     def factory(records, objects, approvals, notifier, connector, credentials, secret_store):
         if connector is None:
@@ -392,6 +463,9 @@ def build_runtime_from_sidecar_deployment(
                     "remote_path": context["remote_path"],
                 },
                 bundle=bundle, credential=credential,
+                executable_authorizations=deployment["_executable_authorizations"],
+                executable_mounts=deployment["_executable_mounts"],
+                projection_mounts=deployment["_projection_mounts"],
                 timeout_ms=int(deployment.get("timeoutMs", 600_000)),
             )
             return SidecarHarnessPort(
@@ -401,6 +475,7 @@ def build_runtime_from_sidecar_deployment(
                 credential_environment=(
                     descriptor.credential_environment if credential is not None else None
                 ),
+                preferred_auth_method=deployment.get("preferredAuthMethod"),
                 state_directory="/tmp/agentbox-sidecar-state", directory="/workspace",
                 on_event=on_event,
             )
@@ -411,3 +486,24 @@ def build_runtime_from_sidecar_deployment(
         )
 
     return build_runtime(data_root, harnesses=registry, execution_factory=factory)
+
+
+def _sidecar_deployment_file(
+    deployment_path: Path, deployment: Mapping[str, Any], relative: Any,
+) -> bytes:
+    """Read one non-secret plugin artifact named by the deployment."""
+    if (not isinstance(relative, str) or relative.startswith("/") or "\x00" in relative
+            or any(part in {"", ".", ".."} for part in relative.replace("\\", "/").split("/"))):
+        raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
+    root = Path(deployment.get("pluginRoot") or deployment_path.parent).resolve()
+    candidate = root.joinpath(*relative.replace("\\", "/").split("/"))
+    if candidate.is_symlink():
+        raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
+    try:
+        resolved = candidate.resolve(strict=True)
+        resolved.relative_to(root)
+    except (OSError, ValueError):
+        raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID") from None
+    if not resolved.is_file() or resolved.stat().st_size > 8 * 1024 * 1024:
+        raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
+    return resolved.read_bytes()

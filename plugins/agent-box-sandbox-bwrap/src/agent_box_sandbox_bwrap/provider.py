@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import hashlib, json, re, shutil, subprocess, tempfile
 from pathlib import Path, PurePosixPath
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 from agent_box.extensions.runtime_composition import (
     SANDBOX_CONTRACT_ID, HarnessCommandSpec, IsolatedProcessSpec, MountPlan,
@@ -134,6 +134,8 @@ def compile_remote_sidecar_bwrap_argv(
     *, workspace: str, runtime_view: str, environment: Mapping[str, str],
     secret: str | None = None,
     secret_target: str = "/runtime/secret/credential",
+    executable_mounts: Sequence[tuple[str, str]] = (),
+    projection_mounts: Sequence[tuple[str, str]] = (),
     entrypoint: str = "/runtime/view/agentbox-sidecar/runtime/worker-entry.mjs",
 ) -> list[str]:
     """Compile the fixed Worker-hosted Harness sidecar template.
@@ -152,6 +154,16 @@ def compile_remote_sidecar_bwrap_argv(
         raise ProjectionRejected("sidecar entrypoint is outside the fixed template")
     if secret_target != "/runtime/secret/credential":
         raise ProjectionRejected("sidecar secret target is outside the fixed template")
+    for source, target in executable_mounts:
+        _validate_remote_path(source)
+        if re.fullmatch(r"/runtime/bin/[A-Za-z0-9._-]+", target) is None:
+            raise ProjectionRejected("sidecar executable target is outside the fixed template")
+    for source, target in projection_mounts:
+        _validate_remote_path(source)
+        if not source.startswith(runtime_view + "/"):
+            raise ProjectionRejected("sidecar projection source is outside the reviewed view")
+        if re.fullmatch(r"/tmp/agentbox-home/[A-Za-z0-9._-]+", target) is None:
+            raise ProjectionRejected("sidecar projection target is outside the fixed template")
     for key, value in environment.items():
         if not _ENV_KEY.fullmatch(key) or len(value) > 8192 or "\x00" in value:
             raise ProjectionRejected("invalid remote environment")
@@ -168,16 +180,28 @@ def compile_remote_sidecar_bwrap_argv(
         "--dir", "/mnt", "--dir", "/mnt/wsl",
         "--ro-bind", "/etc/resolv.conf", "/mnt/wsl/resolv.conf",
         "--dir", "/workspace", "--dir", "/runtime", "--dir", "/runtime/view",
-        "--dir", "/runtime/secret",
+        "--dir", "/runtime/secret", "--dir", "/runtime/bin",
+        "--dir", "/tmp/agentbox-home",
         "--bind", workspace, "/workspace",
         "--ro-bind", runtime_view, "/runtime/view",
     ]
+    for source, target in executable_mounts:
+        argv += ["--ro-bind", source, target]
+    for source, target in projection_mounts:
+        argv += ["--ro-bind", source, target]
     if secret is not None:
         argv += ["--ro-bind", secret, secret_target]
     argv += ["--chdir", "/workspace", "--clearenv"]
     for key, value in sorted(environment.items()):
         argv += ["--setenv", key, value]
     return argv + ["--", "/usr/bin/node", entrypoint]
+
+
+def _validate_remote_path(value: str) -> None:
+    if (not isinstance(value, str) or not value.startswith("/") or "\x00" in value
+            or "//" in value or any(part in {".", ".."} for part in value.split("/"))
+            or str(PurePosixPath(value)) != value):
+        raise ProjectionRejected("remote mount source is not a canonical absolute path")
 
 @dataclass(frozen=True)
 class NegotiatedSandboxCapabilities:

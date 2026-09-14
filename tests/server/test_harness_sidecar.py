@@ -26,6 +26,7 @@ from agent_box.server.execution.sidecar import (
     SidecarError,
     SidecarHarnessPort,
     WslSidecarLauncher,
+    _WorkerChannels,
     sidecar_bundle_files,
 )
 from agent_box_runtime_wsl import WorkerClient
@@ -197,6 +198,62 @@ def test_sidecar_deployment_requires_wsl_connector_without_leaking_root_lock(tmp
     # Construction failure releases the single-writer data-root lease.
     runtime = build_runtime(root)
     runtime.stop()
+
+
+def test_sidecar_deployment_projects_bounded_files_and_register_metadata(tmp_path, monkeypatch):
+    source = tmp_path / "adapter.mjs"
+    source.write_text("export default {};\n", encoding="utf-8")
+    projection = tmp_path / "settings.json"
+    projection.write_text("{}\n", encoding="utf-8")
+    captured = {}
+    import agent_box.server.bootstrap.runtime as runtime_module
+    import agent_box.server.execution.sidecar as sidecar_module
+    monkeypatch.setattr(runtime_module, "_builtin_connector", lambda _instance_id: object())
+    monkeypatch.setattr(
+        sidecar_module, "sidecar_bundle_files",
+        lambda root, additional_files=None: captured.update({"files": dict(additional_files or {})}) or {},
+    )
+    deployment = tmp_path / "deployment.json"
+    deployment.write_text(json.dumps({
+        "schemaVersion": 1, "pluginRoot": str(tmp_path),
+        "harnesses": [{
+            "id": "pi", "credentialKind": "api-key",
+            "credentialEnvironment": "DEEPSEEK_API_KEY",
+            "preferredAuthMethod": "secret-file",
+            "adapter": {"command": "/usr/bin/node", "source": source.name,
+                        "args": ["--safe"], "environment": {"MODE": "fixture"}},
+            "projectionFiles": [{"source": projection.name, "target": "/tmp/agentbox-home/settings.json"}],
+            "executableMounts": [{"source": "/usr/bin/node", "target": "/runtime/bin/node",
+                                  "digest": "sha256:" + hashlib.sha256(pathlib.Path("/usr/bin/node").read_bytes()).hexdigest()}],
+        }],
+    }), encoding="utf-8")
+    runtime = runtime_module.build_runtime_from_sidecar_deployment(tmp_path / "server", deployment)
+    try:
+        assert set(captured["files"]) == {
+            "agentbox-sidecar/deployment/pi/adapter.mjs",
+            "agentbox-sidecar/deployment/pi/projection-0-settings.json",
+        }
+        assert captured["files"]["agentbox-sidecar/deployment/pi/adapter.mjs"] == source.read_bytes()
+        assert captured["files"]["agentbox-sidecar/deployment/pi/projection-0-settings.json"] == projection.read_bytes()
+    finally:
+        runtime.stop()
+
+
+@pytest.mark.parametrize("field", [
+    {"adapter": {"command": "/usr/bin/node", "source": "../escape.mjs"}},
+    {"adapter": {"command": "/usr/bin/node", "args": ["bad\x00arg"]}},
+    {"projectionFiles": [{"source": "settings.json", "target": "/runtime/home/x"}]},
+    {"adapter": {"command": "/usr/bin/node", "environment": {"API_TOKEN": "secret"}}},
+])
+def test_sidecar_deployment_rejects_unbounded_fields(tmp_path, field):
+    deployment = tmp_path / "deployment.json"
+    item = {"id": "pi", "adapter": {"command": "/usr/bin/node", "args": []}}
+    item.update(field)
+    deployment.write_text(json.dumps({
+        "schemaVersion": 1, "pluginRoot": str(PLUGIN), "harnesses": [item],
+    }), encoding="utf-8")
+    with pytest.raises(RuntimeError, match="SIDECAR_DEPLOYMENT_INVALID"):
+        build_runtime_from_sidecar_deployment(tmp_path / "server", deployment)
 
 
 def test_real_worker_bwrap_interactive_sidecar_streams_before_terminal(tmp_path):
@@ -854,3 +911,31 @@ def test_wsl_sidecar_secret_cleanup_on_spawn_failure():
     assert "secret.cleanup" in ops
     assert "fixture-secret" not in json.dumps(client.calls)
     assert client.closed
+
+
+class _StdinRetryClient:
+    def __init__(self, failures):
+        self.failures = list(failures)
+        self.writes = []
+
+    def write_stdin(self, attempt_id, generation, chunk, *, timeout):
+        self.writes.append((attempt_id, generation, chunk, timeout))
+        if self.failures:
+            error = self.failures.pop(0)
+            raise error
+
+
+def test_worker_channels_retries_only_attempt_not_ready_without_duplicate_bytes():
+    retry = SidecarError("ATTEMPT_NOT_READY", "child pipe is not installed")
+    client = _StdinRetryClient([retry])
+    channels = _WorkerChannels(client, "attempt-1", 1, "view-1")
+    channels.write_line("hello")
+    assert [item[2] for item in client.writes] == [b"hello\n", b"hello\n"]
+
+
+def test_worker_channels_does_not_retry_other_stdin_errors():
+    client = _StdinRetryClient([SidecarError("WORKER_DISCONNECTED", "gone")])
+    channels = _WorkerChannels(client, "attempt-1", 1, "view-1")
+    with pytest.raises(SidecarError, match="WORKER_DISCONNECTED"):
+        channels.write_line("hello")
+    assert len(client.writes) == 1

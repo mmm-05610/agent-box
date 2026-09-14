@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import hashlib
 import json
 import re
+from pathlib import Path
 from typing import Any, Callable, Mapping, Protocol
 
 from agent_box.resource_contracts import (
@@ -28,66 +30,20 @@ _EFFORTS = frozenset({"low", "medium", "high", "xhigh", "max"})
 _SESSION_PATH = re.compile(r"^sessions(?:/[A-Za-z0-9._-]+)+\.jsonl$")
 _DEEPSEEK_API_KEY = re.compile(rb"^sk-[A-Za-z0-9_-]{8,248}$")
 _DEEPSEEK_MODELS = frozenset({"deepseek-flash"})
+_DEEPSEEK_CATALOG_PATH = Path(__file__).with_name("deepseek-models.json")
+_DEEPSEEK_CATALOG_CANONICAL_SHA256 = "738ac1b92a557273ab0c128b286967e54cd993c9e901f93869f7e73581d591fa"
 
 
 def _deepseek_model_catalog() -> bytes:
-    """Return the bounded catalog fields needed by current Codex clients.
-
-    The values follow DeepSeek's official Codex setup 1.3.0.  AgentBox keeps
-    this non-secret projection small: Codex supplies its own base instructions.
-    """
-    return json.dumps({"models": [{
-        "slug": "deepseek-flash",
-        "prefer_websockets": False,
-        "support_verbosity": True,
-        "default_verbosity": "low",
-        "apply_patch_tool_type": "freeform",
-        "web_search_tool_type": "text",
-        "input_modalities": ["text", "image"],
-        "supports_image_detail_original": True,
-        "truncation_policy": {"mode": "tokens", "limit": 10_000},
-        "supports_parallel_tool_calls": True,
-        "tool_mode": None,
-        "multi_agent_version": "v2",
-        "use_responses_lite": False,
-        "include_skills_usage_instructions": False,
-        "auto_review_model_override": None,
-        "context_window": 1_048_576,
-        "max_context_window": 1_048_576,
-        "effective_context_window_percent": 95,
-        "auto_compact_token_limit": None,
-        "comp_hash": "3000",
-        "reasoning_summary_format": "experimental",
-        "default_reasoning_summary": "none",
-        "display_name": "DeepSeek-Flash",
-        "description": "Latest frontier agentic coding model with image input.",
-        "default_reasoning_level": "high",
-        "supported_reasoning_levels": [
-            {"effort": "low", "description": "Fast responses with lighter reasoning"},
-            {"effort": "high", "description": "Extra high reasoning depth"},
-            {"effort": "max", "description": "Maximum reasoning depth"},
-        ],
-        "shell_type": "shell_command",
-        "visibility": "list",
-        "minimal_client_version": "0.144.0",
-        "supported_in_api": True,
-        "availability_nux": None,
-        "upgrade": None,
-        "priority": 1,
-        "model_messages": {
-            "instructions_template": "You are Codex, a coding agent working in the user's workspace.",
-            "instructions_variables": {
-                "personality_default": "", "personality_friendly": "",
-                "personality_pragmatic": "",
-            },
-            "approvals": None,
-        },
-        "experimental_supported_tools": [],
-        "supports_search_tool": True,
-        "default_service_tier": None,
-        "supports_reasoning_summaries": True,
-        "base_instructions": "You are Codex, a coding agent working in the user's workspace.",
-    }]}, sort_keys=True, separators=(",", ":")).encode()
+    """Return the exact official 1.3.0 catalog from the checked-in asset."""
+    content = _DEEPSEEK_CATALOG_PATH.read_bytes()
+    catalog = json.loads(content)
+    if {item.get("slug") for item in catalog.get("models", [])} != {"deepseek-flash", "deepseek-v4-pro"}:
+        raise ValueError("CODEX_DEEPSEEK_CATALOG_INVALID")
+    canonical = json.dumps(catalog, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+    if hashlib.sha256(canonical).hexdigest() != _DEEPSEEK_CATALOG_CANONICAL_SHA256:
+        raise ValueError("CODEX_DEEPSEEK_CATALOG_DIGEST_MISMATCH")
+    return content
 
 
 @dataclass(frozen=True)
@@ -106,6 +62,37 @@ class RemoteCodexCredentialProjection:
     target: str
     content: bytes = field(repr=False)
     view_files: Mapping[str, bytes] = field(default_factory=dict, repr=False)
+
+
+def build_acp_sidecar_projection(catalog_path: str) -> RemoteCodexCredentialProjection:
+    """Build the non-sensitive DeepSeek config for the production ACP sidecar.
+
+    The catalog is mounted separately as an ordinary read-only view.  This
+    interface deliberately accepts no credential material and never emits the
+    legacy bearer-token setting used by the exec projection.
+    """
+    if not isinstance(catalog_path, str) or not catalog_path.startswith("/tmp/agentbox-home/"):
+        raise ValueError("CODEX_CATALOG_PATH_INVALID")
+    path = Path(catalog_path)
+    if (not path.is_absolute() or str(path) != catalog_path
+            or any(part in {"", ".", ".."} for part in path.parts)):
+        raise ValueError("CODEX_CATALOG_PATH_INVALID")
+    config = (
+        'model = "deepseek-flash"\n'
+        'model_provider = "deepseek"\n'
+        'preferred_auth_method = "apikey"\n'
+        'forced_login_method = "api"\n'
+        'model_reasoning_effort = "high"\n'
+        'web_search = "disabled"\n'
+        f'model_catalog_json = "{catalog_path}"\n'
+        '[model_providers.deepseek]\n'
+        'name = "deepseek"\n'
+        'base_url = "https://api.deepseek.com/"\n'
+        'wire_api = "responses"\n'
+    ).encode()
+    return RemoteCodexCredentialProjection(
+        "/tmp/agentbox-home/config.toml", config, {"models.json": _deepseek_model_catalog()},
+    )
 
 
 @dataclass(frozen=True)
@@ -193,6 +180,8 @@ def materialize_remote_credential(
         'model_provider = "deepseek"\n'
         'preferred_auth_method = "apikey"\n'
         'forced_login_method = "api"\n'
+        'model_reasoning_effort = "high"\n'
+        'web_search = "disabled"\n'
         'model_catalog_json = "/runtime/home/models.json"\n'
         '[model_providers.deepseek]\n'
         'name = "deepseek"\n'

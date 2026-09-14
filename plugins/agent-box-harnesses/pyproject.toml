@@ -16,6 +16,6 @@ hermes = "agent_box_harnesses.entrypoints:create_hermes"
 pi = "agent_box_harnesses.entrypoints:create_pi"
 
 [tool.setuptools.package-data]
-agent_box_harnesses = ["harnesses.toml"]
+agent_box_harnesses = ["harnesses.toml", "codex/*.json"]
 [tool.setuptools.packages.find]
 where = ["src"]

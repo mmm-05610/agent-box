@@ -43,6 +43,8 @@ function envelopeError(code, detail) {
 const pendingPermissions = new Map()
 const CREDENTIAL_PATH = "/runtime/secret/credential"
 const ENVIRONMENT_KEY = /^[A-Z][A-Z0-9_]{0,63}$/
+const AUTHENTICATION_KEY = /^(?:[a-z][a-z0-9._-]{0,63})$/
+const SENSITIVE_ENVIRONMENT_KEY = /(TOKEN|SECRET|KEY|PASSWORD|CREDENTIAL|AUTH)/i
 
 function makePermissionResolver(emit, timeoutMs) {
   return async ({ toolCall, options }) => {
@@ -112,6 +114,21 @@ async function main() {
       if (!request.launch?.command) throw envelopeError("ADAPTER_LAUNCH_REQUIRED")
       const permissionTimeoutMs = request.permissionTimeoutMs ?? 0
       const credentialEnvironment = request.credentialEnvironment
+      const adapterEnvironment = request.launch.environment ?? {}
+      if (!adapterEnvironment || typeof adapterEnvironment !== "object" || Array.isArray(adapterEnvironment)) {
+        throw envelopeError("ADAPTER_ENVIRONMENT_INVALID")
+      }
+      for (const [key, value] of Object.entries(adapterEnvironment)) {
+        if (!ENVIRONMENT_KEY.test(key) || SENSITIVE_ENVIRONMENT_KEY.test(key)
+            || typeof value !== "string" || value.length > 8192 || /[\0]/.test(value)
+            || /^sk-[A-Za-z0-9_-]+$/.test(value)) {
+          throw envelopeError("ADAPTER_ENVIRONMENT_INVALID")
+        }
+      }
+      const preferredAuthMethod = request.preferredAuthMethod
+      if (preferredAuthMethod != null && (
+        typeof preferredAuthMethod !== "string" || !AUTHENTICATION_KEY.test(preferredAuthMethod)
+      )) throw envelopeError("PREFERRED_AUTH_METHOD_INVALID")
       let spawnProcess
       if (credentialEnvironment != null) {
         if (typeof credentialEnvironment !== "string" || !ENVIRONMENT_KEY.test(credentialEnvironment)) {
@@ -122,13 +139,19 @@ async function main() {
           credentialValue = null
           throw envelopeError("CREDENTIAL_MATERIAL_INVALID")
         }
+      }
+      if (Object.keys(adapterEnvironment).length || credentialValue) {
         spawnProcess = (command, args, options = {}) => spawn(command, args, {
           ...options,
-          env: { ...process.env, [credentialEnvironment]: credentialValue },
+          env: {
+            ...process.env, ...adapterEnvironment,
+            ...(credentialValue ? { [credentialEnvironment]: credentialValue } : {}),
+          },
         })
       }
+      const profile = resolveHarnessProfile(request.profile)
       registration = await createAcpRegistration({
-        profile: resolveHarnessProfile(request.profile),
+        profile: preferredAuthMethod == null ? profile : { ...profile, authMethod: preferredAuthMethod },
         directory: request.directory ?? process.cwd(),
         stateDirectory: request.stateDirectory,
         launch: { command: request.launch.command, args: request.launch.args ?? [] },
