@@ -80,6 +80,10 @@ export const WireErrorCodeSchema = z.enum([
   'NOT_FOUND',
   /** The call's `expectedVersion` no longer matches; `current` rides along. */
   'CONFLICT_VERSION',
+  /** A record cannot be archived while another live record still refers to
+   *  it. `details.references` contains stable ids only, never display text or
+   *  credential material. */
+  'CONFLICT_REFERENCE',
   /** Same requestId as a stored request but a different payload (core v1 §3:
    *  dedupe is identity+content; a silent re-execution is forbidden). */
   'CONFLICT_REQUEST',
@@ -335,6 +339,31 @@ export type ConfigDescriptor = z.infer<typeof ConfigDescriptorSchema>
 export const ConfigOverrideSchema = z.object({ controlId: z.string(), value: z.unknown() })
 export type ConfigOverride = z.infer<typeof ConfigOverrideSchema>
 
+/** Reusable Provider/Model configuration. Credentials stay in the Server
+ *  SecretStore: only an opaque record id crosses this wire. Harness/provider
+ *  values are adapter data and never client-side dispatch keys. */
+export const ProviderModelConfigRecordSchema = z.strictObject({
+  id: WireIdSchema,
+  version: RecordVersionSchema,
+  displayName: z.string().min(1),
+  harness: z.string().min(1),
+  provider: z.string().min(1),
+  credentialId: WireIdSchema.nullable(),
+  configuration: z.array(ConfigOverrideSchema),
+  models: z.array(
+    z.strictObject({
+      modelId: z.string().min(1),
+      displayName: z.string().min(1),
+      availability: z.enum(['unknown', 'available', 'unavailable']),
+      unavailableReason: z.string().nullable()
+    })
+  ),
+  archivedAt: WireTimestampSchema.nullable(),
+  createdAt: WireTimestampSchema,
+  updatedAt: WireTimestampSchema
+})
+export type ProviderModelConfigRecord = z.infer<typeof ProviderModelConfigRecordSchema>
+
 // ─── Messages & events (core v1 §6: normalized, stable identity, ordered) ───
 
 export const AttachmentRefSchema = z.object({
@@ -505,6 +534,90 @@ export const ProfilesListParamsSchema = z.object({ includeArchived: z.boolean().
 export type ProfilesListParams = z.infer<typeof ProfilesListParamsSchema>
 export const ProfilesListResultSchema = paginated(ProfileRecordSchema)
 export type ProfilesListResult = z.infer<typeof ProfilesListResultSchema>
+
+export const ProfilesCreateParamsSchema = z.strictObject({
+  requestId: RequestIdSchema,
+  displayName: z.string().min(1),
+  harness: z.string().min(1)
+})
+export type ProfilesCreateParams = z.infer<typeof ProfilesCreateParamsSchema>
+export const ProfilesCreateResultSchema = z.strictObject({ profile: ProfileRecordSchema })
+export type ProfilesCreateResult = z.infer<typeof ProfilesCreateResultSchema>
+
+export const ProfilesUpdateParamsSchema = z.strictObject({
+  requestId: RequestIdSchema,
+  profileId: WireIdSchema,
+  expectedVersion: RecordVersionSchema,
+  displayName: z.string().min(1)
+})
+export type ProfilesUpdateParams = z.infer<typeof ProfilesUpdateParamsSchema>
+export const ProfilesUpdateResultSchema = z.strictObject({ profile: ProfileRecordSchema })
+export type ProfilesUpdateResult = z.infer<typeof ProfilesUpdateResultSchema>
+
+export const ProfilesArchiveParamsSchema = z.strictObject({
+  requestId: RequestIdSchema,
+  profileId: WireIdSchema,
+  expectedVersion: RecordVersionSchema
+})
+export type ProfilesArchiveParams = z.infer<typeof ProfilesArchiveParamsSchema>
+export const ProfilesArchiveResultSchema = z.strictObject({ profile: ProfileRecordSchema })
+export type ProfilesArchiveResult = z.infer<typeof ProfilesArchiveResultSchema>
+
+export const ProfilesUpdateConfigParamsSchema = z.strictObject({
+  requestId: RequestIdSchema,
+  profileId: WireIdSchema,
+  expectedVersion: RecordVersionSchema,
+  values: z.array(ConfigOverrideSchema)
+})
+export type ProfilesUpdateConfigParams = z.infer<typeof ProfilesUpdateConfigParamsSchema>
+export const ProfilesUpdateConfigResultSchema = z.strictObject({
+  profile: ProfileRecordSchema,
+  configVersion: RecordVersionSchema,
+  effectiveFor: z.literal('next_send')
+})
+export type ProfilesUpdateConfigResult = z.infer<typeof ProfilesUpdateConfigResultSchema>
+
+export const ProviderModelsListParamsSchema = z.strictObject({ includeArchived: z.boolean().default(false) })
+export type ProviderModelsListParams = z.infer<typeof ProviderModelsListParamsSchema>
+export const ProviderModelsListResultSchema = paginated(ProviderModelConfigRecordSchema)
+export type ProviderModelsListResult = z.infer<typeof ProviderModelsListResultSchema>
+
+const ProviderModelWriteFieldsSchema = z.strictObject({
+  displayName: z.string().min(1),
+  harness: z.string().min(1),
+  provider: z.string().min(1),
+  credentialId: WireIdSchema.nullable(),
+  configuration: z.array(ConfigOverrideSchema),
+  models: ProviderModelConfigRecordSchema.shape.models
+})
+
+export const ProviderModelsCreateParamsSchema = ProviderModelWriteFieldsSchema.extend({ requestId: RequestIdSchema })
+export type ProviderModelsCreateParams = z.infer<typeof ProviderModelsCreateParamsSchema>
+export const ProviderModelsCreateResultSchema = z.strictObject({
+  providerModel: ProviderModelConfigRecordSchema
+})
+export type ProviderModelsCreateResult = z.infer<typeof ProviderModelsCreateResultSchema>
+
+export const ProviderModelsUpdateParamsSchema = ProviderModelWriteFieldsSchema.omit({
+  harness: true,
+  provider: true
+}).extend({
+  requestId: RequestIdSchema,
+  providerModelId: WireIdSchema,
+  expectedVersion: RecordVersionSchema
+})
+export type ProviderModelsUpdateParams = z.infer<typeof ProviderModelsUpdateParamsSchema>
+export const ProviderModelsUpdateResultSchema = ProviderModelsCreateResultSchema
+export type ProviderModelsUpdateResult = z.infer<typeof ProviderModelsUpdateResultSchema>
+
+export const ProviderModelsArchiveParamsSchema = z.strictObject({
+  requestId: RequestIdSchema,
+  providerModelId: WireIdSchema,
+  expectedVersion: RecordVersionSchema
+})
+export type ProviderModelsArchiveParams = z.infer<typeof ProviderModelsArchiveParamsSchema>
+export const ProviderModelsArchiveResultSchema = ProviderModelsCreateResultSchema
+export type ProviderModelsArchiveResult = z.infer<typeof ProviderModelsArchiveResultSchema>
 
 export const ConfigDescribeParamsSchema = z.object({
   profileId: WireIdSchema,
@@ -724,6 +837,14 @@ export const WireMethods = {
   'workspaces.browse': [WorkspacesBrowseParamsSchema, WorkspacesBrowseResultSchema],
   'workspaces.archive': [WorkspacesArchiveParamsSchema, WorkspacesArchiveResultSchema],
   'profiles.list': [ProfilesListParamsSchema, ProfilesListResultSchema],
+  'profiles.create': [ProfilesCreateParamsSchema, ProfilesCreateResultSchema],
+  'profiles.update': [ProfilesUpdateParamsSchema, ProfilesUpdateResultSchema],
+  'profiles.archive': [ProfilesArchiveParamsSchema, ProfilesArchiveResultSchema],
+  'profiles.updateConfig': [ProfilesUpdateConfigParamsSchema, ProfilesUpdateConfigResultSchema],
+  'providerModels.list': [ProviderModelsListParamsSchema, ProviderModelsListResultSchema],
+  'providerModels.create': [ProviderModelsCreateParamsSchema, ProviderModelsCreateResultSchema],
+  'providerModels.update': [ProviderModelsUpdateParamsSchema, ProviderModelsUpdateResultSchema],
+  'providerModels.archive': [ProviderModelsArchiveParamsSchema, ProviderModelsArchiveResultSchema],
   'config.describe': [ConfigDescribeParamsSchema, ConfigDescribeResultSchema],
   'config.resolve': [ConfigResolveParamsSchema, ConfigResolveResultSchema],
   'sessions.switchProfile': [SessionsSwitchProfileParamsSchema, SessionsSwitchProfileResultSchema],

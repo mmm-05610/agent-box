@@ -10,6 +10,8 @@ import {
   ConfigDescribeResultSchema,
   EventFrameSchema,
   HistorySnapshotResultSchema,
+  ProfilesUpdateConfigResultSchema,
+  ProviderModelConfigRecordSchema,
   QueueItemSchema,
   SendOutcomeQueryResultSchema,
   ServerHelloResultSchema,
@@ -75,6 +77,7 @@ describe('wire v1 envelope', () => {
 
     expect(WireResponseSchema.parse(response)).toEqual(response)
     expect(WireErrorCodeSchema.options).toContain('OUTCOME_UNKNOWN')
+    expect(WireErrorCodeSchema.options).toContain('CONFLICT_REFERENCE')
     expect(WireResponseSchema.safeParse({ jsonrpc: '2.0', id: 't-1' }).success).toBe(false)
     expect(WireResponseSchema.safeParse({ jsonrpc: '2.0', id: 't-1', result: {}, error }).success).toBe(false)
     expect(WireResponseSchema.safeParse({ jsonrpc: '2.0', id: null, result: {} }).success).toBe(false)
@@ -84,7 +87,7 @@ describe('wire v1 envelope', () => {
   it('every registered method exposes params and result schemas', () => {
     const names = Object.keys(WireMethods)
 
-    expect(names.length).toBeGreaterThanOrEqual(17)
+    expect(names.length).toBe(25)
 
     for (const [name, [params, result]] of Object.entries(WireMethods)) {
       expect(params, `${name} params`).toBeDefined()
@@ -227,6 +230,48 @@ describe('wire v1 core behaviors pinned by schema shape', () => {
     expect(result.descriptor.controls.map(control => control.controlId)).toEqual(['model', 'sandbox'])
   })
 
+  it('keeps reusable Provider/Model credentials opaque and profile config next-send only', () => {
+    const providerModel = ProviderModelConfigRecordSchema.parse({
+      id: asWireId('provider_1'),
+      version: 2,
+      displayName: 'Private endpoint',
+      harness: 'opaque-alpha',
+      provider: 'opaque-provider',
+      credentialId: asWireId('credential_1'),
+      configuration: [{ controlId: 'base_url', value: 'https://example.invalid' }],
+      models: [
+        {
+          modelId: 'model-a',
+          displayName: 'Model A',
+          availability: 'unknown',
+          unavailableReason: null
+        }
+      ],
+      archivedAt: null,
+      createdAt: '2026-09-14T00:00:00.000Z',
+      updatedAt: '2026-09-14T00:00:00.000Z'
+    })
+
+    expect(providerModel.credentialId).toBe('credential_1')
+    expect(JSON.stringify(providerModel)).not.toContain('secret')
+    expect(
+      ProfilesUpdateConfigResultSchema.parse({
+        profile: {
+          id: asWireId('profile_1'),
+          version: 3,
+          displayName: 'Builder',
+          harness: 'opaque-alpha',
+          capabilities: {},
+          archivedAt: null,
+          createdAt: '2026-09-14T00:00:00.000Z',
+          updatedAt: '2026-09-14T00:00:00.000Z'
+        },
+        configVersion: 9,
+        effectiveFor: 'next_send'
+      }).effectiveFor
+    ).toBe('next_send')
+  })
+
   it('distinguishes a dispatched send from an accepted server-queued follow-up', () => {
     expect(
       SessionsSendResultSchema.parse({
@@ -283,6 +328,8 @@ describe('wire v1 JSON Schema projection', () => {
     expect(schemas['WireRequest']).toBeDefined()
     expect(schemas['workspaces.open#params']).toBeDefined()
     expect(schemas['approvals.decide#result']).toBeDefined()
+    expect(schemas['profiles.updateConfig#result']).toBeDefined()
+    expect(schemas['providerModels.archive#params']).toBeDefined()
     expect(Object.keys(schemas).length).toBeGreaterThanOrEqual(2 + 2 + WireMethodsCount * 2)
   })
 

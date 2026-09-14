@@ -16,8 +16,10 @@ import {
   PanelSectionLabel
 } from '@/app/shell/layers/overlays/panel'
 import {
+  harnessChoicesFromProfiles,
   loadProfileRuntimeDescriptor,
-  type ProfileMaintenancePort
+  type ProfileMaintenancePort,
+  wireProfileMaintenancePort
 } from '@/application/profile/profile-maintenance-port'
 import { ensureAgentBoxProfileCatalog } from '@/application/profile/wire-composer-profile'
 import { useRefreshHotkey } from '@/components/hooks/use-refresh-hotkey'
@@ -37,11 +39,17 @@ import { ProfileGlyph } from '@/components/ui/profile-glyph'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useI18n } from '@/i18n'
 import { normalize } from '@/lib/text'
-import { $agentBoxProfiles, $agentBoxService, upsertAgentBoxProfile } from '@/store/agentbox-service'
+import {
+  $agentBoxHello,
+  $agentBoxProfiles,
+  $agentBoxService,
+  agentBoxCapabilitySupported,
+  upsertAgentBoxProfile
+} from '@/store/agentbox-service'
 import type { ConfigControl, ConfigDescriptor, ProfileRecord } from '@/types/wire/wire-v1'
 
 export interface ProfilesViewProps {
-  /** INTERNAL_NOT_WIRE; absent in production until a maintenance contract is approved. */
+  /** Explicit adapter override for isolated component tests. */
   maintenance?: ProfileMaintenancePort
   onClose: () => void
 }
@@ -55,11 +63,28 @@ export function ProfilesView({ maintenance, onClose }: ProfilesViewProps) {
   const { t } = useI18n()
   const copy = t.profiles
   const profiles = useStore($agentBoxProfiles)
+  const hello = useStore($agentBoxHello)
   const service = useStore($agentBoxService)
   const [selectedId, setSelectedId] = useState<null | string>(null)
   const [query, setQuery] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
   const [archiveTarget, setArchiveTarget] = useState<ProfileRecord | null>(null)
+
+  const productionMaintenance = useMemo(() => {
+    const methods = ['profiles.create', 'profiles.update', 'profiles.archive']
+
+    if (service.phase !== 'ready' || !methods.every(method => agentBoxCapabilitySupported(hello, method))) {
+      return undefined
+    }
+
+    const harnessChoices = harnessChoicesFromProfiles(profiles)
+
+    return harnessChoices.length > 0
+      ? wireProfileMaintenancePort(agentBoxRuntimeClient(), { harnessChoices })
+      : undefined
+  }, [hello, profiles, service.phase])
+
+  const activeMaintenance = maintenance ?? productionMaintenance
 
   const refresh = useCallback(async () => {
     await ensureAgentBoxProfileCatalog(agentBoxRuntimeClient()).catch(() => undefined)
@@ -104,15 +129,17 @@ export function ProfilesView({ maintenance, onClose }: ProfilesViewProps) {
       ) : profiles.length === 0 ? (
         <PanelEmpty
           action={
-            maintenance ? (
+            activeMaintenance ? (
               <Button onClick={() => setCreateOpen(true)} size="sm">
                 {copy.newProfile}
               </Button>
             ) : undefined
           }
-          description={service.detail || (maintenance ? copy.agentBoxCreateDesc : copy.agentBoxMaintenanceUnavailableDesc)}
+          description={
+            service.detail || (activeMaintenance ? copy.agentBoxCreateDesc : copy.agentBoxMaintenanceUnavailableDesc)
+          }
           icon="organization"
-          title={maintenance ? copy.noProfiles : copy.agentBoxMaintenanceUnavailable}
+          title={activeMaintenance ? copy.noProfiles : copy.agentBoxMaintenanceUnavailable}
         />
       ) : (
         <>
@@ -128,18 +155,18 @@ export function ProfilesView({ maintenance, onClose }: ProfilesViewProps) {
                 <ProfileRow
                   active={profile.id === selectedId}
                   key={profile.id}
-                  onArchive={maintenance ? () => setArchiveTarget(profile) : undefined}
+                  onArchive={activeMaintenance ? () => setArchiveTarget(profile) : undefined}
                   onSelect={() => setSelectedId(profile.id)}
                   profile={profile}
                 />
               ))}
-              {maintenance ? <PanelAddButton label={copy.newProfile} onClick={() => setCreateOpen(true)} /> : null}
+              {activeMaintenance ? <PanelAddButton label={copy.newProfile} onClick={() => setCreateOpen(true)} /> : null}
             </PanelList>
 
             {selected ? (
               <ProfileDetail
                 key={selected.id}
-                maintenance={maintenance}
+                maintenance={activeMaintenance}
                 profile={selected}
                 serviceOffline={service.phase === 'unavailable'}
               />
@@ -151,7 +178,7 @@ export function ProfilesView({ maintenance, onClose }: ProfilesViewProps) {
       )}
 
       <CreateAgentBoxProfileDialog
-        maintenance={maintenance}
+        maintenance={activeMaintenance}
         onClose={() => setCreateOpen(false)}
         onCreated={profile => {
           upsertAgentBoxProfile(profile)
@@ -167,12 +194,12 @@ export function ProfilesView({ maintenance, onClose }: ProfilesViewProps) {
         dismissOnConfirm
         onClose={() => setArchiveTarget(null)}
         onConfirm={async () => {
-          if (!archiveTarget || !maintenance) {
+          if (!archiveTarget || !activeMaintenance) {
             return
           }
 
           upsertAgentBoxProfile(
-            await maintenance.archive({ expectedVersion: archiveTarget.version, profileId: archiveTarget.id })
+            await activeMaintenance.archive({ expectedVersion: archiveTarget.version, profileId: archiveTarget.id })
           )
         }}
         open={archiveTarget !== null}

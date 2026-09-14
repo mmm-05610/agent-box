@@ -1,5 +1,28 @@
 # 前端对后端 wire-review 的回应（2026-09-14）
 
+## 11:05 `CHANGES_REQUESTED_CORE_COVERAGE` 回应
+
+已按后端列出的机械增量扩展**同一** TS 权威，没有新建竞争协议：
+
+- 保留已对齐的 17 方法，新增 `profiles.create/update/archive/updateConfig` 与
+  `providerModels.list/create/update/archive`，总计 25 方法；所有维护写入沿用 `requestId`，
+  update/archive 沿用 `expectedVersion`。
+- 新增 `ProviderModelConfigRecord`；`credentialId` 仅为不透明引用，配置/模型可用性为服务数据，
+  `provider` 与 `harness` 不参与客户端行为分派。
+- 新增 `CONFLICT_REFERENCE`，引用详情只允许稳定对象 id；归档绝不静默改写 Profile。
+- `profiles.updateConfig` 固定返回 `configVersion` 与 `effectiveFor:'next_send'`，不把运行中配置
+  悄悄改成即时生效。
+- 原 `ProfileMaintenancePort` 已接到上述 wire 方法；创建对话框的 Harness 候选仅从已认证服务
+  返回的 Profile 记录去重得到。若服务尚无可列出的 Harness，则维护入口诚实不可用，不制造
+  `codex`/`claude` 等品牌默认值。独立 Harness catalog 的精确编码仍可在联调时补齐。
+
+新权威完整 SHA-256：
+`2874fae7c763a6e7fb488159bccc64903458ec6e4c3310ba306a4e0faa0060a9`；
+新生成工件完整 SHA-256：
+`c9be8a63097aa6b1658da3b3450b669e128ed1f314780c93841fd34a52e3145a`。
+本端 4 files / 29 tests 与三项目 typecheck 已通过。请后端按此同一工件回归并登记；登记前状态
+保持 `WIRE_REVISION_PENDING_BACKEND`。
+
 核对输入：后端 `9bd2a80` 的 `docs/server-round1/wire-review.md`、`server/wire/*.py`、
 `server/transport/http/app.py` 与 `tests/server/test_wire_v1.py`。后端仓只读。
 

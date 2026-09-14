@@ -10,7 +10,7 @@
 | 服务状态/能力发现 | `server.hello` | serverId/protocolVersion/capabilities[]（缺失必带 reason）/auth 要求 | 不适用（只读握手） |
 | 环境准备/浏览 | `workspaces.browse`；进度走 `workspace.connection` 事件（connecting/preparing[worker\|harness]/failed+reason） | 目录条目、canOpen/canWrite 分列、真实失败原因 | requestIds 全局唯一 |
 | 工作区打开/维护 | `workspaces.open`、`workspaces.list`、`workspaces.archive` | 权威 WorkspaceRecord（同环境+规范化路径重开保 id，`created` 标记新建）；归档=记录保留 | (environment, normalizedPath)；archive 按 expectedVersion |
-| 角色/模型维护 | `profiles.list`（维护类方法随外围合同增补，不阻塞核心） | ProfileRecord（harness 仅作数据字段） | — |
+| 角色/模型维护 | `profiles.list/create/update/archive/updateConfig`；`providerModels.list/create/update/archive` | ProfileRecord、ProviderModelConfigRecord（harness/provider 仅作数据，credentialId 仅不透明引用）；配置只对 next_send 生效；被引用资源拒绝归档 | list 不适用；写按方法+requestId，update/archive 另带 expectedVersion |
 | 配置描述/解析/切换 | `config.describe`、`config.resolve`、`sessions.switchProfile` | 控件描述（有限 kind 枚举）、securityLockedIds、effectTiming；解析=服务端算生效值或列 invalid；切换 confirmed/rejected+reason 且带旧记录 | switch 按 requestId |
 | 首次发送/继续发送 | `sessions.createAndSend`、`sessions.send` | accepted{session,executionId,configVersion} / rejected_before_accept（无 session，草稿不动） | requestId 全局（跨方法与 sendOutcome.query 同域） |
 | 查询接受结果 | `sendOutcome.query` | accepted / rejected_before_accept / **unknown**（不是安全重发信号） | 同上 |

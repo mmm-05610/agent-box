@@ -8,7 +8,7 @@
 | 版本 | 状态 | 覆盖 | 编制/实现入口 |
 | --- | --- | --- | --- |
 | [core-semantics/1](core-semantics-v1.md) | APPROVED_SEMANTICS | 生命周期、Worker/数据、Workspace、Profile/模型、消息/队列、审批/恢复 | 前端P07编制同一份wire候选；后端接单核对锁定；现有后端不宣称已实现 |
-| [wire-v1](wire-v1/README.md) | WIRE_REVISION_PENDING_BACKEND | core-semantics/1 的单一可执行 wire schema、错误、事件、幂等与版本 | 后端已接受并提机械更正；前端回应与新摘要见 `wire-v1/backend-response.md` |
+| [wire-v1](wire-v1/README.md) | WIRE_REVISION_PENDING_BACKEND | core-semantics/1 的单一可执行 wire schema、错误、事件、幂等、版本及核心 Profile/Provider-Model 维护 | 17 方法已对齐；前端已落实后端 11:05 核心覆盖增量，新 25 方法摘要待后端登记，见 `wire-v1/backend-response.md` |
 
 APPROVED_SEMANTICS允许通用类型/用例/测试实现；PROPOSED_WIRE允许隔离测试服务与客户端适配验证，
 不能宣称已获真实服务支持。双方核对单一可执行schema及安全引导后登记WIRE_LOCKED_FOR_IMPLEMENTATION，

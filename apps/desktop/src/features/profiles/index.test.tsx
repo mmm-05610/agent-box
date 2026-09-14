@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { ProfileMaintenancePort } from '@/application/profile/profile-maintenance-port'
 import { stubMenuDomApis, stubResizeObserver } from '@/dev/test/jsdom'
-import { $agentBoxProfiles, $agentBoxService } from '@/store/agentbox-service'
+import { $agentBoxHello, $agentBoxProfiles, $agentBoxService } from '@/store/agentbox-service'
 import { asWireId, type ProfileRecord } from '@/types/wire/wire-v1'
 
 import { ProfilesView } from './index'
@@ -29,7 +29,9 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@/api/agentbox-runtime-client', () => ({ agentBoxRuntimeClient: () => ({}) }))
 vi.mock('@/application/profile/profile-maintenance-port', () => ({
-  loadProfileRuntimeDescriptor: (_client: unknown, profileId: string) => mocks.loadDescriptor(profileId)
+  harnessChoicesFromProfiles: () => [],
+  loadProfileRuntimeDescriptor: (_client: unknown, profileId: string) => mocks.loadDescriptor(profileId),
+  wireProfileMaintenancePort: () => undefined
 }))
 vi.mock('@/application/profile/wire-composer-profile', () => ({
   ensureAgentBoxProfileCatalog: () => mocks.ensureCatalog()
@@ -74,6 +76,7 @@ function realClick(element: HTMLElement): void {
 afterEach(() => {
   cleanup()
   $agentBoxProfiles.set([])
+  $agentBoxHello.set(null)
   $agentBoxService.set({ detail: null, phase: 'idle' })
   mocks.ensureCatalog.mockClear()
   mocks.loadDescriptor.mockClear()
