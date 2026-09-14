@@ -184,7 +184,8 @@ scripts/server-round1/build-worker.sh workers/agent-box-worker/.acceptance-bundl
 python3 scripts/server-round1/runtime-artifact-gate.py --worker <bundle> --json              → exit 0
 python3 scripts/server-round1/{pi,hermes,opencode}-production-chain-gate.py --worker <bundle> --json → exit 0（c7/c8 各轮均绿）
 python3 scripts/server-round1/codex-production-chain-gate.py --worker <bundle> --json
-  → c7 轮 10 连绿；c8 轮 10 连绿后转为连续红（.tmp/plugins 突发，§4.3），按日期各自如实记录
+  → 【历史快照：本行的绿/红序列已由 §4.4 的现行结论"未解决的红绿间歇（10 绿→5 红→最近 3 绿）"
+  取代】c7 轮 10 连绿；c8 轮 10 连绿后于 2026-09-15 晚间出现连续 5 红（.tmp/plugins 突发，§4.3）
 powershell.exe -File accept-e.ps1（-SourceRoot \\wsl.localhost\Ubuntu\… -DataRoot …\acceptance-server-r4-cN
   -ManifestPath <bundle>\manifest.json -WireSchemaPath <前端生成工件> -LinuxWorkerPath <bundle>/agent-box-worker
   -WorkspaceLinuxPath /tmp/agentbox-server-r4-cN -Port 18745 -Cleanup）  → exit 0（BACKEND_41_E_WINDOWS_WSL_WIRE_OK）
