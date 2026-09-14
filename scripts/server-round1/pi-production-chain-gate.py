@@ -40,6 +40,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -58,14 +59,109 @@ FAKE_TOKEN = "pi-gate-fake-token-6f2c19d4-non-secret"
 NONCE_ROUND_1 = "PI-GATE-NONCE-1F4A9C"
 NONCE_ROUND_2 = "PI-GATE-NONCE-2B7D31"
 AUDIT_NAME = ".agentbox-egress-audit"
+#: Every temporary root this gate creates carries this prefix under the system
+#: temporary directory, which is what identifies a directory as ours to remove.
+TEMPORARY_PREFIX = "agentbox-pi-gate-"
 REPORT: dict = {"result": "PI_PRODUCTION_CHAIN_GATE_FAILED", "script": SCRIPT}
 
 
+class GateFailure(Exception):
+    """One gate failure, carried to `main` so cleanup always runs first."""
+
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(f"{code}: {message}")
+        self.code = code
+        self.message = message
+
+
 def fail(code: str, message: str) -> None:
-    REPORT["code"] = code
-    REPORT["error"] = message[:900]
-    print(json.dumps(REPORT, sort_keys=True))
-    raise SystemExit(1)
+    """Refuse with a typed code. Reporting and the exit code belong to `main`."""
+    raise GateFailure(code, message)
+
+
+# --------------------------------------------------------------------------
+# cleanup of this run's temporary root
+# --------------------------------------------------------------------------
+
+def assert_owned_root(root: Path, *, created: Path) -> None:
+    """Refuse to recursively delete anything that is not this run's temp root.
+
+    The identity is not a string the caller supplied: it is the exact path
+    `tempfile.mkdtemp` returned to this process, re-checked on disk (still the
+    directory it was, no symlink, our prefix, directly under the system
+    temporary directory, owned by us, and not group or world accessible).
+    """
+    if root != created:
+        fail("PI_GATE_CLEANUP_NOT_OWNED", "the path is not the directory this run created")
+    if not root.exists():
+        return
+    stats = os.lstat(root)
+    if stat.S_ISLNK(stats.st_mode) or not stat.S_ISDIR(stats.st_mode):
+        fail("PI_GATE_CLEANUP_NOT_OWNED", "the temporary root is no longer a directory")
+    if not root.name.startswith(TEMPORARY_PREFIX) or root.parent != Path(tempfile.gettempdir()):
+        fail("PI_GATE_CLEANUP_NOT_OWNED", "the temporary root is not one this gate creates")
+    if stats.st_uid != os.geteuid():
+        fail("PI_GATE_CLEANUP_NOT_OWNED", "the temporary root is not owned by this user")
+    if stats.st_mode & 0o077:
+        fail("PI_GATE_CLEANUP_NOT_OWNED", "the temporary root is group or world accessible")
+
+
+def make_tree_writable(root: Path) -> int:
+    """Re-enable write permission so a read-only projection can be removed.
+
+    The Pi runtime artifact this gate builds is published read-only (0555/0444)
+    by design, and `rmtree` cannot unlink entries from a directory it may not
+    write. Re-enabling write access inside a root this gate created is how that
+    artifact is retired; symlinks are never followed.
+    """
+    changed = 0
+    for directory, directories, files in os.walk(root, topdown=False):
+        for name in files:
+            location = Path(directory) / name
+            if location.is_symlink():
+                continue
+            os.chmod(location, 0o600)
+            changed += 1
+        for name in directories:
+            location = Path(directory) / name
+            if location.is_symlink():
+                continue
+            os.chmod(location, 0o700)
+            changed += 1
+    os.chmod(root, 0o700)
+    return changed + 1
+
+
+def remove_tree(path: Path, *, code: str = "PI_GATE_CLEANUP_FAILED") -> int:
+    """Remove one tree, or fail loudly. Never swallows a removal failure."""
+    if not path.exists():
+        return 0
+    changed = make_tree_writable(path)
+    try:
+        shutil.rmtree(path)
+    except OSError as error:
+        fail(code, f"could not remove {path.name}: {type(error).__name__}")
+    if path.exists():
+        fail(code, f"{path.name} still exists after removal")
+    return changed
+
+
+def assert_external_artifact_separate(artifact: Path, temporary: Path) -> None:
+    """An artifact the caller supplied is theirs and must stay out of our root.
+
+    If it lives inside the temporary root this run is about to delete, no
+    cleanup path can be both complete and safe, so the run is refused instead.
+    """
+    if artifact == temporary or temporary in artifact.parents:
+        fail("PI_GATE_ARTIFACT_INSIDE_TEMPORARY_ROOT",
+             "an external --artifact must live outside this run's temporary root")
+
+
+def cleanup_root(root: Path, *, created: Path) -> dict:
+    """Retire this run's temporary root and report whether it is really gone."""
+    assert_owned_root(root, created=created)
+    changed = remove_tree(root)
+    return {"removed": not root.exists(), "madeWritable": changed}
 
 
 # --------------------------------------------------------------------------
@@ -277,25 +373,32 @@ def main() -> int:
     parser.add_argument("--json", action="store_true")
     options = parser.parse_args()
 
-    worker = Path(options.worker).resolve()
-    REPORT["worker"] = {"path": str(worker)}
-    if not worker.is_file():
-        fail("PI_GATE_WORKER_MISSING", f"the release Worker binary is unavailable: {worker}")
-    if not shutil.which("bwrap"):
-        fail("PI_GATE_BWRAP_MISSING", "bubblewrap is unavailable")
-    REPORT["worker"]["sha256"] = "sha256:" + hashlib.sha256(worker.read_bytes()).hexdigest()
+    endpoint = None
+    created: Path | None = None
+    temporary: Path | None = None
+    primary: GateFailure | None = None
+    cleanup_failure: GateFailure | None = None
+    external_artifact: Path | None = None
 
-    # The plugin owns the deployment; this gate only adds a listed override set.
-    from agent_box_harnesses.pi import production
-
-    production_models = production.models_document()
-    official = production_models["providers"][production.PI_PROVIDER]["baseUrl"]
-    if official != production.OFFICIAL_BASE_URL:
-        fail("PI_GATE_TEMPLATE_NOT_OFFICIAL", f"the production template base URL is {official!r}")
-
-    endpoint = FakeEndpoint(FAKE_TOKEN)
-    endpoint.assert_loopback_only()
     try:
+        worker = Path(options.worker).resolve()
+        REPORT["worker"] = {"path": str(worker)}
+        if not worker.is_file():
+            fail("PI_GATE_WORKER_MISSING", f"the release Worker binary is unavailable: {worker}")
+        if not shutil.which("bwrap"):
+            fail("PI_GATE_BWRAP_MISSING", "bubblewrap is unavailable")
+        REPORT["worker"]["sha256"] = "sha256:" + hashlib.sha256(worker.read_bytes()).hexdigest()
+
+        # The plugin owns the deployment; this gate only adds a listed override set.
+        from agent_box_harnesses.pi import production
+
+        production_models = production.models_document()
+        official = production_models["providers"][production.PI_PROVIDER]["baseUrl"]
+        if official != production.OFFICIAL_BASE_URL:
+            fail("PI_GATE_TEMPLATE_NOT_OFFICIAL", f"the production template base URL is {official!r}")
+
+        endpoint = FakeEndpoint(FAKE_TOKEN)
+        endpoint.assert_loopback_only()
         differences = production.documented_differences(endpoint.base_url)
         REPORT["template"] = {
             "officialBaseUrl": official,
@@ -310,64 +413,107 @@ def main() -> int:
         if set(differences) != {f"providers.{production.PI_PROVIDER}.baseUrl"}:
             fail("PI_GATE_OVERRIDE_NOT_MINIMAL", f"the loopback override changed {sorted(differences)}")
 
-        temporary = Path(tempfile.mkdtemp(prefix="agentbox-pi-gate-"))
+        created = Path(tempfile.mkdtemp(prefix=TEMPORARY_PREFIX))
+        temporary = created
         workspace = temporary / "workspace"
         workspace.mkdir()
-        run = {"temporary": str(temporary), "workspace": str(workspace)}
-        REPORT["run"] = run
+        REPORT["run"] = {"temporary": str(temporary), "workspace": str(workspace)}
+
+        artifact = Path(options.artifact).resolve() if options.artifact else build_artifact(
+            temporary / "artifacts" / production.ARTIFACT_NAME, REPORT)
+        if options.artifact:
+            assert_external_artifact_separate(artifact, temporary)
+            external_artifact = artifact
+            REPORT["artifact"] = {"output": str(artifact), "external": True}
+        digest = verify_artifact(artifact, REPORT)
+
+        token_path = temporary / "pi-gate-token"
+        token_path.write_bytes(FAKE_TOKEN.encode())
+        token_path.chmod(0o600)
+
+        endpoint.start()
         try:
-            artifact = Path(options.artifact).resolve() if options.artifact else build_artifact(
-                temporary / "artifacts" / production.ARTIFACT_NAME, REPORT)
-            if options.artifact:
-                REPORT["artifact"] = {"output": str(artifact)}
-            digest = verify_artifact(artifact, REPORT)
-
-            token_path = temporary / "pi-gate-token"
-            token_path.write_bytes(FAKE_TOKEN.encode())
-            token_path.chmod(0o600)
-
-            endpoint.start()
-            try:
-                outcome = run_chain(
-                    temporary, workspace, worker, artifact, digest, endpoint, production, token_path,
-                )
-            finally:
-                endpoint.stop()
-            REPORT["provider"] = {
-                "requests": endpoint.requests, "paths": endpoint.paths,
-                "unauthorizedRequests": endpoint.unauthorized,
-                "requestsBeyondBudget": endpoint.over_budget,
-                "baseUrl": endpoint.base_url,
-            }
-            REPORT.update(outcome)
-            if endpoint.over_budget:
-                fail("PI_GATE_EXTRA_PROVIDER_REQUEST",
-                     f"{endpoint.over_budget} provider requests exceeded the two-round budget")
-
-            # The endpoint must have been the only way out of the guest.
-            audit = workspace / AUDIT_NAME
-            audit_lines = audit.read_text(encoding="utf-8").splitlines() if audit.is_file() else []
-            REPORT["egress"] = {
-                "guardLoaded": any(line.startswith("guard-loaded") for line in audit_lines),
-                "denied": [line for line in audit_lines if line.startswith("denied")],
-                "auditPresent": audit.is_file(),
-            }
-            if not REPORT["egress"]["guardLoaded"]:
-                fail("PI_GATE_EGRESS_GUARD_ABSENT", "the offline guard did not load in the adapter process")
-            if REPORT["egress"]["denied"]:
-                fail("PI_GATE_EGRESS_BLOCKED", f"the adapter tried to reach {REPORT['egress']['denied']}")
-            REPORT["reopenObservation"] = observe_reopen(
-                temporary, workspace, worker, artifact, digest, production)
-            cleanup_check(temporary, workspace, token_path)
-            REPORT["result"] = "PI_PRODUCTION_CHAIN_GATE_OK"
+            outcome = run_chain(
+                temporary, workspace, worker, artifact, digest, endpoint, production, token_path,
+            )
         finally:
+            endpoint.stop()
+        REPORT["provider"] = {
+            "requests": endpoint.requests, "paths": endpoint.paths,
+            "unauthorizedRequests": endpoint.unauthorized,
+            "requestsBeyondBudget": endpoint.over_budget,
+            "baseUrl": endpoint.base_url,
+        }
+        REPORT.update(outcome)
+        if endpoint.over_budget:
+            fail("PI_GATE_EXTRA_PROVIDER_REQUEST",
+                 f"{endpoint.over_budget} provider requests exceeded the two-round budget")
+
+        # The endpoint must have been the only way out of the guest.
+        audit = workspace / AUDIT_NAME
+        audit_lines = audit.read_text(encoding="utf-8").splitlines() if audit.is_file() else []
+        REPORT["egress"] = {
+            "guardLoaded": any(line.startswith("guard-loaded") for line in audit_lines),
+            "denied": [line for line in audit_lines if line.startswith("denied")],
+            "auditPresent": audit.is_file(),
+        }
+        if not REPORT["egress"]["guardLoaded"]:
+            fail("PI_GATE_EGRESS_GUARD_ABSENT", "the offline guard did not load in the adapter process")
+        if REPORT["egress"]["denied"]:
+            fail("PI_GATE_EGRESS_BLOCKED", f"the adapter tried to reach {REPORT['egress']['denied']}")
+        REPORT["reopenObservation"] = observe_reopen(
+            temporary, workspace, worker, artifact, digest, production)
+        cleanup_check(temporary, workspace, token_path)
+        REPORT["result"] = "PI_PRODUCTION_CHAIN_GATE_OK"
+    except GateFailure as failure:
+        primary = failure
+    except BaseException as error:  # an unexpected crash is a failure too
+        primary = GateFailure("PI_GATE_UNEXPECTED", f"{type(error).__name__}: {error}")
+    finally:
+        if endpoint is not None:
+            endpoint.stop()
+        if temporary is not None:
+            run = REPORT.setdefault("run", {})
             if options.keep:
+                # Keeping the tree is a supported outcome, reported as such.
+                run["removed"] = False
+                run["kept"] = str(temporary)
                 REPORT["kept"] = str(temporary)
             else:
-                shutil.rmtree(temporary, ignore_errors=True)
-                run["removed"] = not temporary.exists()
-    finally:
-        endpoint.stop()
+                try:
+                    outcome = cleanup_root(temporary, created=created)
+                    run["removed"] = bool(outcome["removed"])
+                    REPORT.setdefault("cleanup", {}).update(outcome)
+                except GateFailure as failure:
+                    # The tree is still on disk: `removed` reports that truth,
+                    # and the leftover is what makes this run fail.
+                    cleanup_failure = failure
+                    run["removed"] = not temporary.exists()
+                    REPORT["cleanupFailure"] = {
+                        "code": failure.code, "error": failure.message[:300],
+                    }
+        if external_artifact is not None and primary is None:
+            # The caller's artifact must survive untouched: re-derive its digest.
+            try:
+                verify_artifact(external_artifact, REPORT)
+                REPORT.setdefault("artifact", {})["preservedAfterCleanup"] = True
+            except GateFailure as failure:
+                primary = GateFailure("PI_GATE_EXTERNAL_ARTIFACT_DAMAGED", failure.message)
+
+    if primary is None and cleanup_failure is not None:
+        # A cleanup failure with no other cause is itself the failure.
+        primary, cleanup_failure = cleanup_failure, None
+
+    if primary is not None:
+        REPORT["result"] = "PI_PRODUCTION_CHAIN_GATE_FAILED"
+        REPORT["code"] = primary.code
+        REPORT["error"] = primary.message[:900]
+        if cleanup_failure is not None:
+            REPORT["cleanupFailure"] = {
+                "code": cleanup_failure.code, "error": cleanup_failure.message[:300],
+            }
+        print(json.dumps(REPORT, indent=2 if options.json else None, sort_keys=True))
+        return 1
     print(json.dumps(REPORT, indent=2 if options.json else None, sort_keys=True))
     return 0
 
@@ -744,11 +890,11 @@ def cleanup_check(temporary: Path, workspace: Path, token_path: Path) -> None:
     ).stdout.splitlines()
     if survivors:
         fail("PI_GATE_PI_PROCESS_ALIVE", f"a Pi adapter process survived: {survivors[:2]}")
-    for path in (token_path,):
-        if path.exists():
-            path.unlink()
-    for path in (workspace,):
-        shutil.rmtree(path, ignore_errors=True)
+    if token_path.exists():
+        token_path.unlink()
+    if token_path.exists():
+        fail("PI_GATE_CLEANUP_FAILED", "the temporary fake token could not be removed")
+    remove_tree(workspace)
     REPORT.setdefault("cleanup", {}).update({
         "workerProjectionsRemoved": True, "adapterProcessesRemoved": True,
         "fakeTokenRemoved": not token_path.exists(), "workspaceRemoved": not workspace.exists(),
