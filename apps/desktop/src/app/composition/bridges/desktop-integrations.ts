@@ -34,15 +34,40 @@ import type { SessionInfo } from '@/types/hermes'
 
 type RememberedSession = Pick<SessionInfo, '_lineage_root_id' | 'id' | 'profile'>
 
+/** Which runtime owns this mount: the AgentBox product shell or the legacy
+ *  Hermes shell. Same vocabulary as GatewayConnectingOverlay / the sidebar's
+ *  session authority — an explicit input, never inferred from gateway state,
+ *  errors or cache contents. */
+export type DesktopIntegrationAuthority = 'agentbox' | 'hermes'
+
 interface DesktopIntegrationsParams {
   activeProfile: string
+  /**
+   * The authority for the host integrations this hook installs. Required, like
+   * every other authority input in the shell (`useStatusbarItems`,
+   * `GatewayConnectingOverlay`, `CommandCenterView`): a caller has to state
+   * which runtime it mounts for, so no caller can pick up the legacy
+   * capabilities by forgetting to say.
+   *
+   * Only the legacy authority installs the MCP background health checker: its
+   * sweep reads `GET /api/config` and probes servers, so it must not exist
+   * under the AgentBox product runtime. A value other than `'hermes'` is the
+   * denial of that legacy capability, never a guess.
+   */
+  authority: DesktopIntegrationAuthority
   chatOpen: boolean
   hasPreview: boolean
   locationPathname: string
   navigate: (to: string, options?: { replace?: boolean }) => void
   profileReady: boolean
   refreshSessions: () => Promise<unknown> | unknown
-  /** `display.resume_last_session`; `undefined` while the config record is still loading. */
+  /**
+   * `display.resume_last_session` in the legacy shell; `undefined` while that
+   * config record is still loading. The AgentBox product shell never passes
+   * `undefined` — its decision is definite by construction
+   * (`resolveProductResumeLastSession`), so the restore resolves at cold start
+   * without waiting for any backend.
+   */
   resumeLastSession: boolean | undefined
   resumeExhaustedSessionId: null | string
   routedSessionId: null | string
@@ -59,6 +84,7 @@ interface DesktopIntegrationsParams {
  */
 export function useDesktopIntegrations({
   activeProfile,
+  authority,
   locationPathname,
   navigate,
   profileReady,
@@ -69,14 +95,24 @@ export function useDesktopIntegrations({
   runtimeIdByStoredSessionId,
   sessions
 }: DesktopIntegrationsParams): void {
+  // The MCP background health checker is a legacy Hermes capability: its sweep
+  // reads `GET /api/config` and probes configured servers. It exists only under
+  // the legacy authority — under the AgentBox product runtime the checker is
+  // never started and therefore never subscribed (see the `authority` param).
+  const installsLegacyMcpHealthChecker = authority === 'hermes'
+
   // Update polling — populates $desktopVersion/$updateStatus, which feed the
   // statusbar version pill and the update toasts. Also honors the main
   // process's "open updates" menu request.
   useEffect(() => {
     startUpdatePoller()
-    // Background MCP health: HTTP/SSE servers only (never spawns stdio),
-    // notifies on transitions into needs-auth/error with a Sign in action.
-    startMcpHealthChecker()
+
+    if (installsLegacyMcpHealthChecker) {
+      // Background MCP health: HTTP/SSE servers only (never spawns stdio),
+      // notifies on transitions into needs-auth/error with a Sign in action.
+      startMcpHealthChecker()
+    }
+
     // The native "Check for Updates…" menu item lives in the app menu next to
     // "About Hermes" — it is the OS-standard affordance for updating THIS app,
     // so it always opens the client overlay. Inheriting the connection-mode
@@ -87,9 +123,12 @@ export function useDesktopIntegrations({
     return () => {
       unsubscribe?.()
       stopUpdatePoller()
-      stopMcpHealthChecker()
+
+      if (installsLegacyMcpHealthChecker) {
+        stopMcpHealthChecker()
+      }
     }
-  }, [])
+  }, [installsLegacyMcpHealthChecker])
 
   // The renderer OWNS ⌘W: on macOS the native menu accelerator would else
   // close the window, so claim it unconditionally — the menu then routes ⌘W

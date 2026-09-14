@@ -794,3 +794,46 @@ wire-review.md通道自39阶段协调。执行者下个检查点消费这些规�
 
 初始36R基线39291df，整体PARTIAL。38研究READY_FOR_DECISION，不是Harness生产依赖批准。
 不继承旧GREEN，不因工单文件存在宣称功能已交付。
+
+---
+
+## 更正（2026-09-15）：P06 诚实性返修 — writer_lease=ACTIVE
+
+- **updated_at: 2026-09-15（+08:00），writer_lease = `ACTIVE — P06 honesty repair`**。
+  本行覆盖本文件此前所有 `RELEASED` 陈述的**当前**效力；旧记录一律保留，不删除、不改写。
+- **授权来源**：用户本派单显式重新授予**有限前端写权**（仅本返修范围）。原前端 goal 不自动恢复写入；
+  本会话完成后重新释放。
+
+### 暂停声明（不删除 9fe414a2 的历史记录）
+
+`9fe414a2` 所声明的 **`P06_GREEN — FRONTEND_INDEPENDENT_ACCEPTANCE`** 与
+**`DESKTOP_IMPLEMENTATION_READY`** 因**协调验收发现两个缺陷**而**暂停生效**（非作废记录，
+历史行保留于本文件与 `evidence/P06.md`）。两项缺陷均为**本端**缺陷，不是后端缺口：
+
+1. **`/api/config` 活动 legacy 控制流**：AgentBox 产品组合根仍以
+   `useHermesConfigRecord()`（`wiring/features.tsx:824`，供 `resume_last_session`）决定冷启动恢复；
+   `useDesktopIntegrations` 在 agentbox 下仍启动 MCP legacy 健康巡检
+   （`bridges/desktop-integrations.ts:79`）。两者都在渲染端 legacy REST 门前被拒、不触达 Hermes
+   ——但**产品仍在发起 legacy 请求**，而 P06 驱动把该事实只当作 detail 记录、不当作门，
+   于是 `no-legacy-rest-reached-main` 在 `residualLegacyPaths=["/api/config"]` 下仍判 PASS。
+   `evidence/P06.md` §6 把这一残余登记为 `WAITING_PERIPHERAL_CONTRACT` 属于**错误归类**：
+   它是本端可达的 legacy 控制流，不是外围合同缺失。
+2. **P06 驱动 fail-open**：`legacy-view-routes-retired` 的 `record(id, step, status, detail)`
+   参数顺序写错（`driver.mjs:556-562` 把 `no-legacy-rest-reached-main` 当作 step、把路由明细当作
+   status），使该步的 `status` 是描述文本而非 `PASS/FAIL`；`summarizeResults` 对未知 status
+   **静默忽略**，该步既不计入 counts（`results.json` 21 条 steps 对 20 个 counts）也不参与
+   `allOk`——**一次真实的 FAIL 会被无声吞掉**。驱动同时缺少「必需 step 缺失/重复/非法 status」
+   与「renderer `residualLegacyPaths` 必须严格为 `[]`」两条独立门。
+
+在返修与新 Windows r2 证据齐备之前，本文件**不维持** `P06_GREEN` / `DESKTOP_IMPLEMENTATION_READY`
+的现行效力。`REAL_FLOW_VERIFIED=否` 与 `AGENTBOX_DESKTOP_PRODUCT_GREEN=否` 不变。
+
+### 本轮返修范围（有限写权）
+
+- 产品 authority 与 legacy config/MCP 控制流：`app/composition/**`（组合边界停止安装/调用，
+  **不修改** `application/config/use-config-record.ts`、`store/mcp-health.ts` 的 Hermes 兼容实现）。
+- P06 驱动 fail-closed：`e2e/p06-*`（driver/helper/单测）。
+- 文档：`evidence/P06.md`、`evidence/DESKTOP_IMPLEMENTATION_HANDOFF.md`、
+  `evidence/P02.md`/`P04.md`/`P05.md`（只追加必要更正）、本文件。
+- 不动后端/wire schema/contracts/package/lock；不读密钥；不运行模型；不 reset/stash/clean/push/merge。
+- 旧 `evidence/P06-assets/` **原样保留**为失败门证据；新证据写入 `evidence/P06-assets-r2/`。

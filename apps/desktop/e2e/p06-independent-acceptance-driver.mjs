@@ -33,9 +33,11 @@
  * No model request is made, no credential is read, and the user's real
  * HERMES_HOME/userData are never touched. PASS/FAIL are executed steps; SKIP
  * means "not executable here"; PENDING means "honestly unsupported in this
- * environment" — and the required steps (window, overlay, sidebar, settings,
- * route retirement, exit, runtime process) are asserted never to be
- * PENDING/SKIP.
+ * environment" — and the required steps are asserted to be present exactly
+ * once and executed (missing, duplicated, PENDING, SKIP or illegally-statused
+ * required steps fail the run). "Does the product still issue legacy REST?" is
+ * two independent required gates — no request refused at the main-process door
+ * AND no residual renderer caller — that cannot substitute for each other.
  */
 
 /* eslint-disable no-undef -- page.evaluate callbacks run in the renderer. */
@@ -48,9 +50,13 @@ import path from 'node:path'
 
 import {
   collectDescendants,
+  countMainLegacyRestRefusals,
+  createStepRecorder,
   findLegacyPaletteEntries,
   hermesRuntimeProcesses,
-  pendingOrSkippedRequired,
+  legacyRestGate,
+  requiredStepIssues,
+  residualLegacyRestPaths,
   statesUnavailable,
   summarizeResults,
   worstGlassCoverage
@@ -83,10 +89,12 @@ const results = []
 const screenshots = []
 const notes = []
 
-function record(id, step, status, detail) {
-  results.push({ detail, id, status, step })
-  console.log(`${status}  ${id}  ${detail || ''}`)
-}
+// Every step goes through the helper's validating recorder: a status outside
+// PASS/FAIL/SKIP/PENDING throws at the call site instead of being recorded (and
+// then silently dropped by the summary) as prose.
+const record = createStepRecorder(results, entry => {
+  console.log(`${entry.status}  ${entry.id}  ${entry.detail || ''}`)
+})
 
 function note(text) {
   notes.push(text)
@@ -285,6 +293,32 @@ async function main() {
     executablePath: bin
   })
 
+  // Console capture must begin the moment a window exists. The renderer emits
+  // its boot-time legacy-REST refusals before `domcontentloaded`, and
+  // `legacy-rest.ts` reports each path once per session, so a line lost before
+  // the listener attaches can never be recovered later — the
+  // "no residual renderer caller" gate would then pass on evidence that was
+  // never collected. Registering on `window` (before `firstWindow()`) catches
+  // the window at creation; `captureStartedAtWindow` records whether that
+  // actually happened, and the gate fails closed when it cannot be proven.
+  const capturedPages = new WeakSet()
+  const captureStartedAt = new WeakMap()
+  let captureStartedAtWindow = false
+
+  function attachConsoleCapture(candidate, atWindowCreation) {
+    if (!candidate || capturedPages.has(candidate)) {
+      return
+    }
+
+    capturedPages.add(candidate)
+    captureStartedAt.set(candidate, atWindowCreation)
+
+    candidate.on('console', message => fs.appendFileSync(consoleLog, `[${message.type()}] ${message.text()}\n`))
+    candidate.on('pageerror', error => fs.appendFileSync(consoleLog, `[pageerror] ${error}\n`))
+  }
+
+  app.on('window', candidate => attachConsoleCapture(candidate, true))
+
   let page = null
   let treeRoots = []
 
@@ -297,9 +331,15 @@ async function main() {
     page = await app.firstWindow({ timeout: WINDOW_DEADLINE_MS })
     const appearedAfterMs = Date.now() - startedAt
 
+    // A window that already existed when the `window` listener was registered
+    // never fires the event; attach here too, without double-logging it.
+    attachConsoleCapture(page, false)
+
+    // The coverage claim belongs to THIS window's log: a later window captured
+    // from birth must not retroactively bless a first window attached to late.
+    captureStartedAtWindow = captureStartedAt.get(page) === true
+
     await page.waitForLoadState('domcontentloaded')
-    page.on('console', message => fs.appendFileSync(consoleLog, `[${message.type()}] ${message.text()}\n`))
-    page.on('pageerror', error => fs.appendFileSync(consoleLog, `[pageerror] ${error}\n`))
     await page.waitForTimeout(4000)
 
     // ── 1/2. Isolation and the absence of any service to talk to ────────────
@@ -555,7 +595,6 @@ async function main() {
 
     record(
       'legacy-view-routes-retired',
-  'no-legacy-rest-reached-main',
       'Cron/Agents/Starmap/Webhooks deep links land on the honest product page, not a legacy view',
       routesRetired ? 'PASS' : 'FAIL',
       routeChecks.map(check => `${check.route} → ${check.landed}`).join('; ')
@@ -601,10 +640,48 @@ async function main() {
     `process tree at close=${JSON.stringify(treeRoots)}; still alive after 20s=${JSON.stringify(leftover)}`
   )
 
-  // ── Evidence: screenshots, hashes, logs ─────────────────────────────────
+  // ── Evidence: logs, the two legacy-REST gates, screenshots, hashes ──────
+  const mainLogText = fs.readFileSync(mainLog, 'utf8')
+  const consoleText = fs.readFileSync(consoleLog, 'utf8')
+  const tokenish = /bearer\s+[a-z0-9._-]{8,}|sessionToken"?\s*[:=]\s*"?[a-z0-9._-]{8,}/i.test(mainLogText)
+
+  // The product must not even ASK for the legacy Hermes REST surface. Two
+  // independent required gates that cannot substitute for each other: a
+  // refusal at the main-process door proves a request was issued, and a
+  // renderer residual proves one was issued even when nothing counted it. The
+  // renderer gate additionally fails closed when the console capture was not
+  // live from window creation — an incomplete log cannot establish "no
+  // residual caller".
+  const mainRefusals = countMainLegacyRestRefusals(mainLogText)
+  const residualLegacyPaths = residualLegacyRestPaths(consoleText)
+  const restGate = legacyRestGate({ captureStartedAtWindow, mainRefusals, residualPaths: residualLegacyPaths })
+  const captureBasis = captureStartedAtWindow
+    ? 'attached at window creation, before the renderer could log anything'
+    : 'attached only after the first window was returned — earlier renderer output cannot be proven captured'
+
+  record(
+    'no-legacy-rest-reached-main',
+    'no legacy REST request is refused at the main-process door',
+    restGate.mainOk ? 'PASS' : 'FAIL',
+    `main-process refusals=${mainRefusals} (must be exactly 0)`
+  )
+
+  record(
+    'no-legacy-rest-issued-by-renderer',
+    'the renderer issues no legacy REST request, refused or otherwise',
+    restGate.rendererOk ? 'PASS' : 'FAIL',
+    `renderer residual legacy paths=${JSON.stringify(residualLegacyPaths)} (must be []); console capture ${captureBasis}; renderer-console.log=${consoleText.length} chars`
+  )
+
+  record(
+    'logs-token-free',
+    'the captured main-process log carries no token material',
+    tokenish ? 'FAIL' : 'PASS',
+    `main-process-safe.log=${mainLogText.length} chars; token-shaped material=${tokenish}; renderer-console.log=${consoleText.length} chars`
+  )
+
   const present = snapshotFiles()
   const missing = REQUIRED_SCREENSHOTS.filter(name => !present.includes(name))
-  const requiredPending = pendingOrSkippedRequired(results)
 
   if (missing.length > 0) {
     record('required-screenshots', 'every required screenshot was captured', 'FAIL', `missing=${JSON.stringify(missing)}`)
@@ -617,46 +694,18 @@ async function main() {
     )
   }
 
-  if (requiredPending.length > 0) {
-    record(
-      'required-steps-executed',
-      'no required step is PENDING or SKIP',
-      'FAIL',
-      JSON.stringify(requiredPending.map(step => step.id))
-    )
-  } else {
-    record('required-steps-executed', 'no required step is PENDING or SKIP', 'PASS', `${results.length} steps`)
-  }
-
-  const mainLogText = fs.readFileSync(mainLog, 'utf8')
-  const tokenish = /bearer\s+[a-z0-9._-]{8,}|sessionToken"?\s*[:=]\s*"?[a-z0-9._-]{8,}/i.test(mainLogText)
-  const consoleText = fs.readFileSync(consoleLog, 'utf8')
-  const residualLegacyPaths = [
-    ...new Set(
-      consoleText
-        .split(/\r?\n/)
-        .filter(line => line.includes('[legacy-rest] refused'))
-        .map(line => line.replace(/.*\[legacy-rest\] refused /, '').replace(/:.*$/, ''))
-    )
-  ]
-
-  // The product must not even ASK for the legacy Hermes REST surface: a refusal
-  // on the far side of the IPC still means the renderer issued the call, and
-  // the P06 gate is about the requests the product issues.
-  const refusedByMain = (mainLogText.match(/LEGACY_RUNTIME_DISABLED_FOR_PRODUCT/g) ?? []).length
+  // Recorded LAST so it sees every other step: missing, duplicated, PENDING,
+  // SKIP and illegally-statused required steps all fail it. It is itself not a
+  // required id — the gate cannot require its own prior existence.
+  const requiredIssues = requiredStepIssues(results)
 
   record(
-    'no-legacy-rest-reached-main',
-    'no legacy REST request left the renderer for the main process',
-    refusedByMain === 0 ? 'PASS' : 'FAIL',
-    `main-process refusals=${refusedByMain} (must be 0); residual renderer callers refused at the door=${JSON.stringify(residualLegacyPaths)}`
-  )
-
-  record(
-    'logs-token-free',
-    'the captured main-process log carries no token material',
-    tokenish ? 'FAIL' : 'PASS',
-    `main-process-safe.log=${mainLogText.length} chars; token-shaped material=${tokenish}; renderer-console.log=${fs.readFileSync(consoleLog, 'utf8').length} chars`
+    'required-steps-executed',
+    'every required step is present exactly once and executed',
+    requiredIssues.length === 0 ? 'PASS' : 'FAIL',
+    requiredIssues.length === 0
+      ? `${results.length + 1} steps, none missing/duplicated/PENDING/SKIP`
+      : JSON.stringify(requiredIssues)
   )
 
   const hashes = {}
@@ -671,20 +720,21 @@ async function main() {
 
   const final = summarizeResults(results)
   const report = {
+    allOk: final.allOk,
     counts: final.counts,
     executed: final.executed,
     finishedAt: new Date().toISOString(),
-    allOk: final.allOk,
     notes,
     screenshots,
     sha256: hashes,
-    steps: results
+    steps: results,
+    unknownStatuses: final.unknownStatuses
   }
 
   fs.writeFileSync(path.join(outDir, 'results.json'), JSON.stringify(report, null, 2), 'utf8')
 
   console.log(
-    `ACCEPTANCE: executed ${final.executed} → allOk=${final.allOk}; counts=${JSON.stringify(final.counts)} (allOk covers executed steps only; required steps must not be PENDING/SKIP)`
+    `ACCEPTANCE: executed ${final.executed} → allOk=${final.allOk}; counts=${JSON.stringify(final.counts)}; unknownStatuses=${JSON.stringify(final.unknownStatuses)} (allOk covers executed steps only; every required step must be present exactly once and must not be PENDING/SKIP)`
   )
   process.exit(final.allOk ? 0 : 1)
 }

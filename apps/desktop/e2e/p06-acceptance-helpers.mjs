@@ -4,7 +4,8 @@
  * They live here — not inside the driver's `page.evaluate` callbacks — so the
  * rules can be proven without launching Electron: what counts as a legacy
  * palette entry, what the arrival screen is allowed to be, how the step summary
- * aggregates, and which screenshots a run owes.
+ * aggregates, which required steps a run owes, and whether the product still
+ * issues legacy REST.
  */
 
 /** Rendered palette rows that belong to the legacy Hermes runtime. The driver
@@ -64,38 +65,137 @@ export function worstGlassCoverage(rects, viewportArea) {
   return worst
 }
 
+/** The only statuses a recorded step may carry. A run that produces anything
+ *  else is broken, not merely unusual, and must say so. */
+export const ACCEPTANCE_STATUSES = ['PASS', 'FAIL', 'SKIP', 'PENDING']
+
+/** Build one validated step record. Validation is structural, not a matter of
+ *  remembering argument order: a call with a status anywhere outside
+ *  `ACCEPTANCE_STATUSES` (a prose description that landed in the status slot,
+ *  for example) throws here, so prose can never be recorded as a status the
+ *  summary then drops. */
+export function makeAcceptanceStep(id, step, status, detail) {
+  if (!ACCEPTANCE_STATUSES.includes(status)) {
+    throw new Error(
+      `illegal acceptance status ${JSON.stringify(status)} for step ${JSON.stringify(id)}; expected one of ${ACCEPTANCE_STATUSES.join(', ')}`
+    )
+  }
+
+  return { detail: detail == null ? '' : String(detail), id: String(id), status, step: String(step) }
+}
+
+/** The driver's `record(id, step, status, detail)`, bound to the run's step
+ *  list. Every recorded step goes through `makeAcceptanceStep`, so no caller of
+ *  this recorder can put a run's step list and its log out of sync. */
+export function createStepRecorder(steps, onRecord) {
+  return function record(id, step, status, detail) {
+    const entry = makeAcceptanceStep(id, step, status, detail)
+
+    steps.push(entry)
+
+    if (typeof onRecord === 'function') {
+      onRecord(entry)
+    }
+
+    return entry
+  }
+}
+
 /** `results.json` aggregation. `allOk` covers EXECUTED steps only: a PENDING or
  *  SKIP is honesty about the environment, but it is not a pass either, so it
- *  can never make a required step look green. */
+ *  can never make a required step look green.
+ *
+ *  A status this function does not understand is an accounting error, not an
+ *  absence: it is collected in `unknownStatuses` and forces `allOk` false, so a
+ *  step the summary cannot classify can never be silently dropped from a green
+ *  run. Every input step is accounted for exactly once — the four counts plus
+ *  `unknownStatuses` — and `executed` is exactly `PASS + FAIL`. */
 export function summarizeResults(steps) {
   const counts = { PASS: 0, FAIL: 0, SKIP: 0, PENDING: 0 }
+  const unknownStatuses = []
 
   for (const step of steps) {
-    if (step.status in counts) {
+    if (ACCEPTANCE_STATUSES.includes(step.status)) {
       counts[step.status] += 1
+    } else {
+      unknownStatuses.push({ id: String(step.id), status: String(step.status) })
     }
   }
 
   const executed = counts.PASS + counts.FAIL
 
-  return { allOk: counts.FAIL === 0 && executed > 0, counts, executed }
+  return {
+    allOk: counts.FAIL === 0 && executed > 0 && unknownStatuses.length === 0,
+    counts,
+    executed,
+    unknownStatuses
+  }
 }
 
-/** Steps this driver is not allowed to leave unexecuted. "The window opened and
- *  the shell is usable" cannot be PENDING: it either happened here or the
- *  product is broken. */
+/** Steps this driver is not allowed to leave unexecuted or unrecorded. Every
+ *  step whose absence, duplication or non-execution would make a green run
+ *  dishonest belongs here — including BOTH legacy-REST gates, which must not
+ *  substitute for each other ("the request was refused" still means the
+ *  renderer issued one; "the renderer log is clean" still means a refusal was
+ *  counted). The gate step itself (`required-steps-executed`) and the
+ *  informational `driver-target` are deliberately absent: the gate cannot
+ *  require its own prior existence. */
 export const REQUIRED_STEP_IDS = [
+  'sandbox-isolation',
+  'no-service-provided',
   'window-appears',
   'no-blocking-overlay',
-  'sidebar-operable',
+  'workspace-entries',
+  'legacy-fake-boot-ignored',
+  'send-fails-closed',
   'settings-opens-closes',
+  'profiles-honest',
+  'product-settings-honest',
+  'command-center-agentbox',
+  'command-palette-agentbox',
+  'sidebar-operable',
   'legacy-view-routes-retired',
+  'no-hermes-process',
   'exit-no-orphans',
-  'no-hermes-process'
+  'required-screenshots',
+  'logs-token-free',
+  'no-legacy-rest-reached-main',
+  'no-legacy-rest-issued-by-renderer'
 ]
 
-export function pendingOrSkippedRequired(steps) {
-  return steps.filter(step => REQUIRED_STEP_IDS.includes(step.id) && (step.status === 'PENDING' || step.status === 'SKIP'))
+/** The required-step gate as a pure verdict: an empty issue list means every
+ *  required step is present exactly once and executed. Missing, duplicated,
+ *  PENDING, SKIP and illegally-statused required steps all produce issues, so
+ *  the gate step recorded from this list fails and `allOk` goes false with it.
+ *  A step that is not required never produces an issue: `driver-target` and the
+ *  gate step itself carry no honesty claim. */
+export function requiredStepIssues(steps) {
+  const issues = []
+
+  for (const id of REQUIRED_STEP_IDS) {
+    const matches = steps.filter(step => step.id === id)
+
+    if (matches.length === 0) {
+      issues.push({ id, kind: 'missing' })
+      continue
+    }
+
+    if (matches.length > 1) {
+      issues.push({ count: matches.length, id, kind: 'duplicated' })
+    }
+
+    for (const step of matches) {
+      if (step.status === 'PENDING') {
+        issues.push({ id, kind: 'pending' })
+      } else if (step.status === 'SKIP') {
+        issues.push({ id, kind: 'skipped' })
+      } else if (!ACCEPTANCE_STATUSES.includes(step.status)) {
+        issues.push({ id, kind: 'illegal-status', status: String(step.status) })
+      }
+    }
+  }
+
+  return issues
 }
 
 /** Every process descended from `rootPids`, transitively, including the roots.
@@ -144,4 +244,62 @@ export function collectDescendants(processes, rootPids) {
  *  running is never counted against the product. */
 export function hermesRuntimeProcesses(processes) {
   return processes.filter(entry => /hermes/i.test(String(entry.name || ''))).map(entry => ({ name: entry.name, pid: Number(entry.pid) }))
+}
+
+/** The renderer's one legacy-REST door (`src/api/legacy-rest.ts`) logs this
+ *  marker when the product runtime refuses a call; the main process refuses the
+ *  same surface with the code below (`electron/ipc/api-proxy-ipc.ts`). The
+ *  driver greps both logs for exactly these strings. */
+export const LEGACY_REST_MARKER = '[legacy-rest]'
+export const LEGACY_RUNTIME_DISABLED_FOR_PRODUCT = 'LEGACY_RUNTIME_DISABLED_FOR_PRODUCT'
+
+/** How many legacy-REST requests were refused at the main-process door. The
+ *  gate is zero: a refusal on the far side of the IPC still means the renderer
+ *  issued the call. */
+export function countMainLegacyRestRefusals(mainLogText) {
+  return String(mainLogText ?? '').split(LEGACY_RUNTIME_DISABLED_FOR_PRODUCT).length - 1
+}
+
+/** Every renderer console line that mentions the legacy-REST door, reduced to
+ *  the path that was asked for. Parsing is fail-closed: a line carrying the
+ *  marker counts even when its shape is not one this function recognises, so
+ *  "no line I recognised" can never pass for "no residual caller". Paths keep
+ *  first-seen order and are deduplicated for the report. */
+export function residualLegacyRestPaths(consoleText) {
+  const paths = []
+
+  for (const line of String(consoleText ?? '').split(/\r?\n/)) {
+    if (!line.includes(LEGACY_REST_MARKER)) {
+      continue
+    }
+
+    const afterMarker = line.slice(line.indexOf(LEGACY_REST_MARKER) + LEGACY_REST_MARKER.length).trim()
+    const head = afterMarker.split(':')[0].trim()
+    const path = head.replace(/^(?:refused|blocked|denied|rejected)\b\s*/i, '').trim()
+    const residual = path || head || afterMarker || LEGACY_REST_MARKER
+
+    if (!paths.includes(residual)) {
+      paths.push(residual)
+    }
+  }
+
+  return paths
+}
+
+/** The two legacy-REST gates, decided together so they cannot substitute for
+ *  each other. Zero main-process refusals says nothing when the renderer log
+ *  still shows a call it issued, and a clean renderer log says nothing when a
+ *  refusal was counted. The renderer gate additionally requires proof that the
+ *  console capture was attached at window creation: a log that may predate the
+ *  renderer's first request cannot establish that there was none, so an
+ *  unproven capture fails closed rather than passing on missing evidence. `ok`
+ *  is true only when both gates hold; a value that is not exactly the number
+ *  zero, not an array, or not the boolean true fails closed. */
+export function legacyRestGate({ captureStartedAtWindow, mainRefusals, residualPaths }) {
+  const mainOk = mainRefusals === 0
+  const residualsOk = Array.isArray(residualPaths) && residualPaths.length === 0
+  const captureOk = captureStartedAtWindow === true
+  const rendererOk = residualsOk && captureOk
+
+  return { captureOk, mainOk, ok: mainOk && rendererOk, rendererOk, residualsOk }
 }

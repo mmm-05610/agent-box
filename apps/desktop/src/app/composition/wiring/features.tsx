@@ -37,7 +37,6 @@ import {
 } from '@/app/routes'
 import { TitlebarControls } from '@/app/shell/chrome/titlebar/controls'
 import { useWindowControlsOverlayWidth } from '@/app/shell/platform/use-window-controls-overlay-width'
-import { useHermesConfigRecord } from '@/application/config/use-config-record'
 import { refreshActiveProfile } from '@/application/profile/catalog'
 import { getLatestSessionMessages } from '@/application/session-transcripts'
 import { openSession } from '@/application/session/open-session'
@@ -145,16 +144,17 @@ import {
 import { clearSessionTodos, setSessionTodos, todosForHydration } from '@/store/todos'
 import { isAuxiliaryWindow, isBrowserWindow, isHudWindow } from '@/store/windows'
 
-import { applyProductRuntimePolicy } from '../product-runtime'
+import { applyProductRuntimePolicy, resolveProductResumeLastSession } from '../product-runtime'
 
 import type { WiringActions, WiringApi } from './types'
 
 // This is the AgentBox product composition root, so the product runtime policy
 // is applied here — at import time, before any mounted surface can issue a
 // request — exactly as main.ts derives its own gate from the same runtime.
-// Without it the legacy REST refreshers the product still mounts (profile
-// catalog, config record) would issue `hermes:api` calls the main process
-// refuses: a reachable legacy call, whether or not it succeeds.
+// The product serves no legacy Hermes REST surface, so the composition must
+// not mount its callers either: the cold-start restore decision comes from
+// product-runtime.ts (never `GET /api/config`), and the MCP legacy health
+// checker is not started under the agentbox authority (desktop-integrations).
 applyProductRuntimePolicy()
 
 // Overlay views the controller mounts over the shell — lazy, load on demand.
@@ -818,17 +818,18 @@ export function ContribWiring({ children }: { children: ReactNode }) {
   // remembered-session restore, and cross-window session-list sync.
   const previewTarget = useStore($previewTarget)
 
-  // display.resume_last_session gates the cold-start restore. `undefined` while
-  // the record is still loading holds the restore latch open; a failed fetch
-  // falls back to the historical behavior (resume).
-  const configRecord = useHermesConfigRecord()
-
-  const resumeLastSession = configRecord.isPending
-    ? undefined
-    : (configRecord.data?.display as { resume_last_session?: unknown } | undefined)?.resume_last_session !== false
+  // Cold-start restore is a product policy (product-runtime.ts), not a setting
+  // read back from the legacy Hermes config record. The decision is definite —
+  // never `undefined` — so the restore resolves at cold start without waiting
+  // for any backend: the AgentBox product restores the last session/draft,
+  // exactly the outcome the failed legacy `GET /api/config` used to produce.
+  const resumeLastSession = resolveProductResumeLastSession()
 
   useDesktopIntegrations({
     activeProfile: normalizeProfileKey(activeGatewayProfile),
+    // Explicit product authority: it alone decides which host integrations
+    // exist. Under agentbox the MCP legacy health checker is never installed.
+    authority: 'agentbox',
     chatOpen,
     hasPreview: Boolean(previewTarget),
     locationPathname: location.pathname,
