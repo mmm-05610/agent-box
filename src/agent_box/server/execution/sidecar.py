@@ -88,6 +88,24 @@ class _ProcessChannels:
                 process.wait(timeout=3)
 
 
+def _require_matching_artifact_authorizations(
+    authorizations: Sequence[Mapping[str, str]],
+    mounts: Sequence[tuple[str, str]],
+) -> None:
+    """Every runtime artifact mount must carry its own declaration.
+
+    A mount without a declaration would reach bwrap unverified; a declaration
+    without a mount would be a claim the Server silently dropped.  Both are
+    refused here, before any Worker is contacted.
+    """
+    declared = {(str(item.get("path")), str(item.get("target"))) for item in authorizations}
+    mounted = {(str(source), str(target)) for source, target in mounts}
+    if len(declared) != len(authorizations) or len(mounted) != len(mounts):
+        raise ValueError("SIDECAR_RUNTIME_ARTIFACT_DECLARATION_DUPLICATED")
+    if declared != mounted:
+        raise ValueError("SIDECAR_RUNTIME_ARTIFACT_DECLARATION_MISMATCH")
+
+
 def sidecar_bundle_files(
     plugin_root: Path | str, *, additional_files: Mapping[str, bytes] | None = None,
 ) -> dict[str, bytes]:
@@ -132,6 +150,8 @@ class WslSidecarLauncher:
         credential: bytes | None = None,
         executable_authorizations: Sequence[Mapping[str, str]] = (),
         executable_mounts: Sequence[tuple[str, str]] = (),
+        runtime_artifact_authorizations: Sequence[Mapping[str, str]] = (),
+        runtime_artifact_mounts: Sequence[tuple[str, str]] = (),
         projection_mounts: Sequence[tuple[str, str]] = (),
         state_bundle_prefix: str | None = None,
         state_target: str | None = None,
@@ -144,6 +164,15 @@ class WslSidecarLauncher:
         self.credential = None if credential is None else bytes(credential)
         self.executable_authorizations = tuple(dict(item) for item in executable_authorizations)
         self.executable_mounts = tuple((str(source), str(target)) for source, target in executable_mounts)
+        self.runtime_artifact_authorizations = tuple(
+            dict(item) for item in runtime_artifact_authorizations
+        )
+        self.runtime_artifact_mounts = tuple(
+            (str(source), str(target)) for source, target in runtime_artifact_mounts
+        )
+        _require_matching_artifact_authorizations(
+            self.runtime_artifact_authorizations, self.runtime_artifact_mounts,
+        )
         self.projection_mounts = tuple((str(source), str(target)) for source, target in projection_mounts)
         self.state_bundle_prefix = state_bundle_prefix
         self.state_target = state_target
@@ -178,8 +207,21 @@ class WslSidecarLauncher:
             connection_id=self.workspace["connection_id"],
             workspace_path=self.workspace["remote_path"],
             executable_authorizations=self.executable_authorizations,
+            runtime_artifact_authorizations=self.runtime_artifact_authorizations,
         )
-        client.start()
+        try:
+            client.start()
+        except BaseException as error:
+            client.close()
+            # A Worker bootstrap refusal carries a code (an unsupported control
+            # protocol, or a runtime artifact tree whose digest did not match
+            # its declaration). Re-raise it as this layer's typed error so the
+            # reason survives into durable product state instead of a bare
+            # disconnect message.
+            code = getattr(error, "code", None)
+            if isinstance(code, str) and code:
+                raise SidecarError(code, str(error)) from error
+            raise
         try:
             manifest = [
                 {"path": path, "size": len(content), "digest": _sha256(content)}
@@ -222,6 +264,7 @@ class WslSidecarLauncher:
                     (runtime_view + "/" + source, target)
                     for source, target in self.projection_mounts
                 ),
+                runtime_artifact_mounts=self.runtime_artifact_mounts,
                 writable_projection_mounts=writable_projection_mounts,
             )
             channels = _WorkerChannels(

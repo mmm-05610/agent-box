@@ -7,10 +7,15 @@ pub const MAGIC: [u8; 4] = *b"ABW1";
 pub const VERSION: u16 = 1;
 pub const HEADER_LEN: usize = 60;
 pub const MAX_PAYLOAD: usize = 64 * 1024;
-/// Control-protocol generation. Version 2 adds bidirectional stdin writes and
-/// pre-terminal stdout/stderr events for long-lived attempts; the frame format
-/// itself is unchanged and the mismatch is always a loud handshake failure.
-pub const PROTOCOL_VERSION: u32 = 2;
+/// Control-protocol generation. Version 2 added bidirectional stdin writes and
+/// pre-terminal stdout/stderr events for long-lived attempts. Version 3 adds
+/// digest-pinned runtime artifact trees to the bootstrap, which the Worker
+/// verifies before it will bind one read-only. The frame format itself is
+/// unchanged and every mismatch is a loud handshake failure, in both
+/// directions: a v3 client never silently accepts a v2 Worker and a v2 client
+/// is refused by a v3 Worker instead of degrading to unverified directories.
+pub const PROTOCOL_VERSION: u32 = 3;
+pub const MAX_RUNTIME_ARTIFACTS: usize = 8;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
@@ -64,12 +69,26 @@ pub struct Bootstrap {
     pub protocol_version: u32,
     #[serde(default)]
     pub executables: Vec<ExecutableAuthorization>,
+    /// Digest-pinned runtime artifact directories the Server declared. The
+    /// Worker re-derives each digest inside WSL and refuses the whole
+    /// handshake on any mismatch, so a directory is only ever bind-mounted
+    /// read-only after it was verified here.
+    #[serde(default)]
+    pub runtime_artifacts: Vec<RuntimeArtifactAuthorization>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ExecutableAuthorization {
     pub path: String,
+    pub digest: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RuntimeArtifactAuthorization {
+    pub path: String,
+    pub target: String,
     pub digest: String,
 }
 
@@ -209,6 +228,19 @@ fn validate_bootstrap(value: &Bootstrap) -> Result<(), FrameError> {
     {
         return Err(FrameError::InvalidBootstrap);
     }
+    if value.runtime_artifacts.len() > MAX_RUNTIME_ARTIFACTS
+        || value.runtime_artifacts.iter().any(|item| {
+            !crate::artifacts::valid_declared_source(&item.path)
+                || !crate::artifacts::valid_target(&item.target)
+                || !item.digest.starts_with("sha256:")
+                || item.digest.len() != 71
+                || !item.digest[7..]
+                    .bytes()
+                    .all(|byte| byte.is_ascii_hexdigit())
+        })
+    {
+        return Err(FrameError::InvalidBootstrap);
+    }
     Ok(())
 }
 
@@ -246,11 +278,120 @@ mod tests {
             lease_ms: 5_000,
             protocol_version: PROTOCOL_VERSION,
             executables: Vec::new(),
+            runtime_artifacts: vec![RuntimeArtifactAuthorization {
+                path: "/opt/agentbox/artifacts/pi-node-modules".into(),
+                target: "/runtime/artifacts/pi-node-modules".into(),
+                digest: format!("sha256:{}", "b".repeat(64)),
+            }],
         };
         assert_eq!(
             decode_bootstrap(&encode_bootstrap(&value).unwrap()).unwrap(),
             value
         );
+    }
+
+    #[test]
+    fn bootstrap_refuses_malformed_runtime_artifacts() {
+        let base = |path: &str, target: &str, digest: String| Bootstrap {
+            worker_version: "0.1.0".into(),
+            worker_digest: format!("sha256:{}", "a".repeat(64)),
+            connection_id: "connection-test".into(),
+            project_id: "project-test".into(),
+            effective_user: "tester".into(),
+            instance_nonce: "nonce-test".into(),
+            server_instance_id: "server-test".into(),
+            lease_ms: 5_000,
+            protocol_version: PROTOCOL_VERSION,
+            executables: Vec::new(),
+            runtime_artifacts: vec![RuntimeArtifactAuthorization {
+                path: path.into(),
+                target: target.into(),
+                digest,
+            }],
+        };
+        let good = format!("sha256:{}", "c".repeat(64));
+        assert!(encode_bootstrap(&base(
+            "/opt/agentbox/artifacts/pi",
+            "/runtime/artifacts/pi",
+            good.clone()
+        ))
+        .is_ok());
+        for value in [
+            base("relative/pi", "/runtime/artifacts/pi", good.clone()),
+            base("/opt/agentbox/../pi", "/runtime/artifacts/pi", good.clone()),
+            base("/opt/agentbox//pi", "/runtime/artifacts/pi", good.clone()),
+            base(
+                "/opt/agentbox/artifacts/pi/",
+                "/runtime/artifacts/pi",
+                good.clone(),
+            ),
+            base(
+                "/opt/agentbox/artifacts/pi",
+                "/runtime/bin/pi",
+                good.clone(),
+            ),
+            base(
+                "/opt/agentbox/artifacts/pi",
+                "/runtime/artifacts/../pi",
+                good.clone(),
+            ),
+            base(
+                "/opt/agentbox/artifacts/pi",
+                "/runtime/artifacts/.hidden",
+                good.clone(),
+            ),
+            base(
+                "/opt/agentbox/artifacts/pi",
+                "/runtime/artifacts/pi",
+                "sha256:short".into(),
+            ),
+            base(
+                "/opt/agentbox/artifacts/pi",
+                "/runtime/artifacts/pi",
+                format!("sha256:{}", "z".repeat(64)),
+            ),
+        ] {
+            assert_eq!(encode_bootstrap(&value), Err(FrameError::InvalidBootstrap));
+        }
+        let mut too_many = base("/opt/agentbox/artifacts/pi", "/runtime/artifacts/pi", good);
+        too_many.runtime_artifacts = (0..MAX_RUNTIME_ARTIFACTS + 1)
+            .map(|index| RuntimeArtifactAuthorization {
+                path: format!("/opt/agentbox/artifacts/pi{index}"),
+                target: format!("/runtime/artifacts/pi{index}"),
+                digest: format!("sha256:{}", "d".repeat(64)),
+            })
+            .collect();
+        assert_eq!(
+            encode_bootstrap(&too_many),
+            Err(FrameError::InvalidBootstrap)
+        );
+    }
+
+    #[test]
+    fn a_previous_generation_client_is_not_accepted_as_current() {
+        // Work Order 40-B/41 clients sent protocolVersion 2. The bootstrap still
+        // decodes — the handshake must be able to answer — but it is not the
+        // current generation, so the Worker refuses instead of accepting a
+        // bootstrap whose runtime artifact trees it would never verify.
+        let previous = serde_json::json!({
+            "workerVersion": "0.1.0",
+            "workerDigest": format!("sha256:{}", "a".repeat(64)),
+            "connectionId": "connection-test",
+            "projectId": "project-test",
+            "effectiveUser": "tester",
+            "instanceNonce": "nonce-test",
+            "serverInstanceId": "server-test",
+            "leaseMs": 5_000,
+            "protocolVersion": 2,
+            "executables": [],
+        });
+        let payload = serde_json::to_vec(&previous).expect("previous bootstrap encodes");
+        let encoded = encode_frame(&Frame::new(FrameKind::Hello, 0, 1, payload))
+            .expect("previous bootstrap frame encodes");
+        let decoded = decode_bootstrap(&encoded).expect("previous bootstrap decodes");
+        assert_eq!(decoded.protocol_version, 2);
+        assert_ne!(decoded.protocol_version, PROTOCOL_VERSION);
+        assert!(decoded.runtime_artifacts.is_empty());
     }
 
     #[test]

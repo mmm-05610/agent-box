@@ -15,6 +15,8 @@ from agent_box.extensions.credentials import PreparedSecretMount
 from agent_box.work_core.models import Ref, RefType
 from agent_box.work_core.registry import ProviderDescriptor, ResourceResolutionContext
 
+from .artifacts import validate_runtime_artifact_target
+
 PROVIDER_ID = "bwrap-sandbox"
 _CAPS = ("filesystem.mounts@1", "filesystem.readonly@1", "filesystem.writable@1", "filesystem.tmpfs@1", "filesystem.symlink-safe@1", "network.none@1", "network.inherit@1", "env.bounded@1", "home.workspace@1", "digest.read-back@1")
 _ENV_KEY = re.compile(r"^[A-Z_][A-Z0-9_]{0,63}$")
@@ -137,6 +139,7 @@ def compile_remote_sidecar_bwrap_argv(
     executable_mounts: Sequence[tuple[str, str]] = (),
     projection_mounts: Sequence[tuple[str, str]] = (),
     writable_projection_mounts: Sequence[tuple[str, str]] = (),
+    runtime_artifact_mounts: Sequence[tuple[str, str]] = (),
     entrypoint: str = "/runtime/view/agentbox-sidecar/runtime/worker-entry.mjs",
 ) -> list[str]:
     """Compile the fixed Worker-hosted Harness sidecar template.
@@ -145,6 +148,11 @@ def compile_remote_sidecar_bwrap_argv(
     mounted read-only.  The project stays the only writable workspace.  This
     template deliberately selects only the system Node runtime and the single
     reviewed entrypoint; adapter/native semantics remain inside the sidecar.
+
+    `runtime_artifact_mounts` are host-side immutable dependency directories
+    the Worker verified against their declared tree digest.  They are mounted
+    read-only under `/runtime/artifacts/<stable-name>` so a Harness adapter can
+    reference its own artifacts by a path that is fixed here, not negotiated.
     """
     for value in (workspace, runtime_view, *(() if secret is None else (secret,))):
         if (not isinstance(value, str) or not value.startswith("/") or "\x00" in value
@@ -171,6 +179,7 @@ def compile_remote_sidecar_bwrap_argv(
             raise ProjectionRejected("sidecar writable projection source is outside the reviewed view")
         if re.fullmatch(r"/tmp/agentbox-home/[A-Za-z0-9._-]+", target) is None:
             raise ProjectionRejected("sidecar writable projection target is outside the fixed template")
+    _validate_runtime_artifact_mounts(runtime_artifact_mounts, workspace, runtime_view)
     for key, value in environment.items():
         if not _ENV_KEY.fullmatch(key) or len(value) > 8192 or "\x00" in value:
             raise ProjectionRejected("invalid remote environment")
@@ -188,7 +197,7 @@ def compile_remote_sidecar_bwrap_argv(
         "--ro-bind", "/etc/resolv.conf", "/mnt/wsl/resolv.conf",
         "--dir", "/workspace", "--dir", "/runtime", "--dir", "/runtime/view",
         "--dir", "/runtime/secret", "--dir", "/runtime/bin",
-        "--dir", "/tmp/agentbox-home",
+        "--dir", "/runtime/artifacts", "--dir", "/tmp/agentbox-home",
         "--bind", workspace, "/workspace",
         "--ro-bind", runtime_view, "/runtime/view",
     ]
@@ -198,6 +207,8 @@ def compile_remote_sidecar_bwrap_argv(
         argv += ["--ro-bind", source, target]
     for source, target in projection_mounts:
         argv += ["--ro-bind", source, target]
+    for source, target in runtime_artifact_mounts:
+        argv += ["--ro-bind", source, target]
     for source, target in writable_projection_mounts:
         argv += ["--bind", source, target]
     if secret is not None:
@@ -206,6 +217,32 @@ def compile_remote_sidecar_bwrap_argv(
     for key, value in sorted(environment.items()):
         argv += ["--setenv", key, value]
     return argv + ["--", "/usr/bin/node", entrypoint]
+
+
+def _validate_runtime_artifact_mounts(
+    mounts: Sequence[tuple[str, str]], workspace: str, runtime_view: str,
+) -> None:
+    """A runtime artifact is read-only, uniquely named, and not a project root.
+
+    The digest of each tree is verified by the Worker, which is the only actor
+    with the WSL filesystem; this compiler additionally refuses a declaration
+    that would hand the guest the project, the reviewed view or a parent of
+    either through the artifact namespace.
+    """
+    sources: set[str] = set()
+    targets: set[str] = set()
+    for source, target in mounts:
+        _validate_remote_path(source)
+        validate_runtime_artifact_target(target)
+        if source in sources or target in targets:
+            raise ProjectionRejected("runtime artifact declaration is duplicated")
+        if any(
+            source == root or root.startswith(source + "/") or source.startswith(root + "/")
+            for root in (workspace, runtime_view)
+        ):
+            raise ProjectionRejected("runtime artifact source overlaps an execution root")
+        sources.add(source)
+        targets.add(target)
 
 
 def _validate_remote_path(value: str) -> None:

@@ -24,7 +24,10 @@ def digest(path: Path) -> str:
     return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def worker_client(tmp_path, *, workspace=True, lease_ms=5_000, result_ttl_seconds=None):
+def worker_client(
+    tmp_path, *, workspace=True, lease_ms=5_000, result_ttl_seconds=None,
+    runtime_artifact_authorizations=(),
+):
     if not WORKER.is_file():
         pytest.skip("build the independent Worker before this test")
     project = tmp_path / "中文 空格"
@@ -40,6 +43,7 @@ def worker_client(tmp_path, *, workspace=True, lease_ms=5_000, result_ttl_second
         connection_id="connection-test", project_id="project-test",
         effective_user=os.environ["USER"], server_instance_id="server-test",
         lease_ms=lease_ms,
+        runtime_artifact_authorizations=runtime_artifact_authorizations,
     )
     return client, project, root
 
@@ -261,3 +265,153 @@ def test_disconnect_cancels_execution_reclaims_secret_and_expires_isolated_resul
     while result.exists() and time.monotonic() < deadline:
         time.sleep(0.05)
     assert not result.exists()
+
+
+def artifact_tree(tmp_path, name="fixture-dep"):
+    """A small immutable dependency directory, as a deployment would stage it."""
+    from agent_box_sandbox_bwrap import runtime_artifact_tree_digest
+
+    root = tmp_path / "artifacts" / name
+    (root / "nested").mkdir(parents=True)
+    (root / "dep.mjs").write_text("export const VALUE = 'fixed-value'\n", encoding="utf-8")
+    (root / "nested" / "extra.txt").write_text("extra\n", encoding="utf-8")
+    return root, runtime_artifact_tree_digest(root)
+
+
+def bwrap_argv_with_artifacts(project: Path, script: str, mounts):
+    argv = bwrap_argv(project, script)
+    injected = ["--dir", "/runtime/artifacts"]
+    for source, target in mounts:
+        injected += ["--ro-bind", str(source), target]
+    marker = argv.index("--chdir")
+    argv[marker:marker] = injected
+    return argv
+
+
+def test_real_worker_verifies_and_read_only_mounts_a_runtime_artifact_tree(tmp_path):
+    """The Worker is the authority: it re-derives the digest inside WSL."""
+    root, declared = artifact_tree(tmp_path)
+    client, project, worker_root = worker_client(
+        tmp_path,
+        runtime_artifact_authorizations=({
+            "path": str(root), "target": "/runtime/artifacts/fixture-dep",
+            "digest": declared,
+        },),
+    )
+    client.start()
+    try:
+        client.request("spawn", {
+            "argv": bwrap_argv_with_artifacts(
+                project,
+                "cat /runtime/artifacts/fixture-dep/dep.mjs; printf '|'; "
+                "cat /runtime/artifacts/fixture-dep/nested/extra.txt; "
+                "printf '|write:'; "
+                "(echo tampered > /runtime/artifacts/fixture-dep/written) 2>/dev/null "
+                "&& printf allowed || printf refused",
+                ((root, "/runtime/artifacts/fixture-dep"),),
+            ),
+            "timeoutMs": 20_000,
+        }, attempt_id="attempt-artifact", generation=1)
+        terminal = client.wait_terminal("attempt-artifact", 1, timeout=30)
+        assert terminal["exitCode"] == 0
+        stdout, _digest = fetch_all(client, "attempt-artifact", 1, "stdout")
+        assert stdout == b"export const VALUE = 'fixed-value'\n|extra\n|write:refused"
+        # The host tree is unchanged: the projection was read-only, and the
+        # guest's write attempt left nothing behind.
+        from agent_box_sandbox_bwrap import runtime_artifact_tree_digest
+
+        assert runtime_artifact_tree_digest(root) == declared
+        assert not (root / "written").exists()
+        assert client.request(
+            "result.ack", attempt_id="attempt-artifact", generation=1,
+        )["status"] == "acknowledged"
+        assert client.request(
+            "attempt.cleanup", attempt_id="attempt-artifact", generation=1,
+        )["status"] == "cleaned"
+    finally:
+        client.close()
+    assert not (worker_root / "views").exists()
+    assert not (worker_root / "secrets").exists()
+
+
+@pytest.mark.parametrize("declaration,mounts,expected", [
+    # A digest that does not match the real tree is a typed bootstrap refusal.
+    ("drift", (("authorized", "/runtime/artifacts/fixture-dep"),),
+     "RUNTIME_ARTIFACT_DIGEST_MISMATCH"),
+    # ... and so is a declaration whose root is a link, or overlaps the project.
+    ("symlink", (("root", "/runtime/artifacts/fixture-dep"),), "RUNTIME_ARTIFACT_ROOT_INVALID"),
+    ("workspace", (("workspace", "/runtime/artifacts/fixture-dep"),),
+     "RUNTIME_ARTIFACT_ROOT_OVERLAP"),
+    ("duplicate", (("authorized", "/runtime/artifacts/fixture-dep"),),
+     "RUNTIME_ARTIFACT_DUPLICATE"),
+])
+def test_real_worker_refuses_unverifiable_artifact_declarations(
+    tmp_path, declaration, mounts, expected,
+):
+    root, declared = artifact_tree(tmp_path)
+    declared_path = str(root)
+    if declaration == "drift":
+        declared = "sha256:" + "0" * 64
+    elif declaration == "symlink":
+        link = tmp_path / "link"
+        link.symlink_to(root, target_is_directory=True)
+        declared_path = str(link)
+    elif declaration == "workspace":
+        declared_path = str(tmp_path / "中文 空格")
+    item = {"path": declared_path, "target": "/runtime/artifacts/fixture-dep", "digest": declared}
+    authorizations = (item, item) if declaration == "duplicate" else (item,)
+    client, _project, _root = worker_client(
+        tmp_path, runtime_artifact_authorizations=authorizations,
+    )
+    with pytest.raises(WorkerError) as refused:
+        client.start()
+    assert refused.value.code == expected
+    client.close()
+
+
+def test_real_worker_refuses_an_artifact_mount_it_did_not_verify(tmp_path):
+    root, declared = artifact_tree(tmp_path)
+    outside = tmp_path / "unverified"
+    outside.mkdir()
+    (outside / "dep.mjs").write_text("outside\n", encoding="utf-8")
+    client, project, worker_root = worker_client(
+        tmp_path,
+        runtime_artifact_authorizations=({
+            "path": str(root), "target": "/runtime/artifacts/fixture-dep",
+            "digest": declared,
+        },),
+    )
+    client.start()
+    try:
+        for label, argv in (
+            ("unverified source", ((outside, "/runtime/artifacts/other"),)),
+            ("unnamed target", ((root, "/runtime/artifacts/other"),)),
+            ("host directory", ((Path("/home"), "/runtime/artifacts/home"),)),
+            ("project as artifact", ((project, "/runtime/artifacts/project"),)),
+        ):
+            with pytest.raises(WorkerError) as refused:
+                client.request(
+                    "spawn",
+                    {"argv": bwrap_argv_with_artifacts(
+                        project, "true", argv,
+                    ), "timeoutMs": 5_000},
+                    attempt_id=f"attempt-{abs(hash(label))}", generation=1,
+                )
+            assert refused.value.code == "RUNTIME_ARTIFACT_UNAUTHORIZED", label
+        # A verified artifact tree may not be mounted writable either.
+        writable = bwrap_argv_with_artifacts(
+            project, "true", (), )
+        writable = bwrap_argv(project, "true")
+        marker = writable.index("--chdir")
+        writable[marker:marker] = [
+            "--dir", "/runtime/artifacts", "--bind", str(root), "/runtime/artifacts/fixture-dep",
+        ]
+        with pytest.raises(WorkerError) as writable_refused:
+            client.request(
+                "spawn", {"argv": writable, "timeoutMs": 5_000},
+                attempt_id="attempt-writable-artifact", generation=1,
+            )
+        assert writable_refused.value.code == "RUNTIME_ARTIFACT_UNAUTHORIZED"
+    finally:
+        client.close()
+    assert not (worker_root / "views").exists()

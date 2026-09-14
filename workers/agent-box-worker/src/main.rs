@@ -1,3 +1,4 @@
+mod artifacts;
 mod protocol;
 
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
@@ -189,6 +190,23 @@ async fn serve(root: PathBuf, workspace: Option<PathBuf>, result_ttl_secs: u64) 
         ));
     }
     let authorized_executables = authorize_executables(&bootstrap.executables)?;
+    let authorized_artifacts = match authorize_runtime_artifacts(
+        &bootstrap.runtime_artifacts,
+        workspace.as_deref(),
+        &root,
+    ) {
+        Ok(value) => value,
+        Err(rejection) => {
+            // Refuse with a typed frame before exiting: a digest that does not
+            // match the declaration must be classifiable by the caller, not
+            // flattened into a generic disconnect.
+            write_error(&mut output, 1, rejection.code, &rejection.message).await?;
+            return Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                format!("{}: {}", rejection.code, rejection.message),
+            ));
+        }
+    };
     write_json(
         &mut output,
         FrameKind::HelloAck,
@@ -310,7 +328,10 @@ async fn serve(root: PathBuf, workspace: Option<PathBuf>, result_ttl_secs: u64) 
                         let Some(workspace) = workspace.clone() else {
                             write_error_for(&mut output, sequence, &request.request_id, "WORKSPACE_UNAUTHORIZED", "worker has no authorized workspace").await?; sequence += 1; continue;
                         };
-                        let spec = match parse_spawn(&request.arguments, &workspace, &root, &authorized_executables) {
+                        let spec = match parse_spawn(
+                            &request.arguments, &workspace, &root,
+                            &authorized_executables, &authorized_artifacts,
+                        ) {
                             Ok(value) => value,
                             Err((code, message)) => { write_error_for(&mut output, sequence, &request.request_id, code, message).await?; sequence += 1; continue; }
                         };
@@ -465,6 +486,7 @@ fn capabilities() -> Value {
         "spawn@1",
         "spawn.interactive@2",
         "attempt.write@2",
+        "runtime.artifact.mount@3",
         "observe@1",
         "cancel@1",
         "result@1",
@@ -797,6 +819,7 @@ fn parse_spawn(
     workspace: &Path,
     root: &Path,
     authorized_executables: &[PathBuf],
+    authorized_artifacts: &[VerifiedArtifact],
 ) -> Result<SpawnArgs, (&'static str, &'static str)> {
     let spec: SpawnArgs = serde_json::from_value(value.clone())
         .map_err(|_| ("SPAWN_INVALID", "spawn arguments are invalid"))?;
@@ -823,7 +846,13 @@ fn parse_spawn(
             "worker only starts bwrap-isolated processes",
         ));
     }
-    validate_bwrap(&spec.argv, workspace, root, authorized_executables)?;
+    validate_bwrap(
+        &spec.argv,
+        workspace,
+        root,
+        authorized_executables,
+        authorized_artifacts,
+    )?;
     if let Some(cwd) = &spec.cwd {
         let canonical = canonical_directory(Path::new(cwd))
             .map_err(|_| ("SPAWN_INVALID", "cwd is unavailable"))?;
@@ -838,6 +867,7 @@ fn validate_bwrap(
     workspace: &Path,
     root: &Path,
     authorized_executables: &[PathBuf],
+    authorized_artifacts: &[VerifiedArtifact],
 ) -> Result<(), (&'static str, &'static str)> {
     if !argv.iter().any(|v| v == "--die-with-parent")
         || !argv.iter().any(|v| v == "--new-session")
@@ -858,6 +888,24 @@ fn validate_bwrap(
                 let source = Path::new(&argv[i + 1])
                     .canonicalize()
                     .map_err(|_| ("BWRAP_POLICY_INVALID", "mount source is unavailable"))?;
+                let target = argv[i + 2].as_str();
+                let declared = authorized_artifacts
+                    .iter()
+                    .find(|item| item.path == source && item.target == target);
+                let artifact_shaped = target.starts_with(artifacts::TARGET_PREFIX)
+                    || authorized_artifacts.iter().any(|item| item.path == source);
+                if artifact_shaped {
+                    // A verified artifact tree is mounted read-only, at exactly
+                    // the target its declaration named, and never writable.
+                    if argv[i] != "--ro-bind" || declared.is_none() {
+                        return Err((
+                            "RUNTIME_ARTIFACT_UNAUTHORIZED",
+                            "runtime artifact mount is not authorized",
+                        ));
+                    }
+                    i += 3;
+                    continue;
+                }
                 let system = argv[i] == "--ro-bind"
                     && ["/usr", "/bin", "/lib", "/lib64", "/etc"]
                         .iter()
@@ -865,7 +913,7 @@ fn validate_bwrap(
                         .any(|value| source == value);
                 let wsl_resolver = argv[i] == "--ro-bind"
                     && argv[i + 1] == "/etc/resolv.conf"
-                    && argv[i + 2] == "/mnt/wsl/resolv.conf"
+                    && target == "/mnt/wsl/resolv.conf"
                     && Path::new("/etc/resolv.conf")
                         .canonicalize()
                         .is_ok_and(|value| source == value && source.is_file());
@@ -908,6 +956,80 @@ fn authorize_executables(values: &[protocol::ExecutableAuthorization]) -> io::Re
         result.push(path);
     }
     Ok(result)
+}
+
+/// One runtime artifact directory the Worker verified itself.
+struct VerifiedArtifact {
+    path: PathBuf,
+    target: String,
+}
+
+/// Verify every declared runtime artifact directory inside WSL, or refuse.
+///
+/// This is the authoritative step of the contract: the Server only checked the
+/// declaration's shape, so the digest, the real-directory requirement, the
+/// link prohibition and the overlap rules are settled here, in the
+/// distribution that will actually read the tree.
+fn authorize_runtime_artifacts(
+    values: &[protocol::RuntimeArtifactAuthorization],
+    workspace: Option<&Path>,
+    root: &Path,
+) -> Result<Vec<VerifiedArtifact>, artifacts::Rejected> {
+    let mut verified: Vec<VerifiedArtifact> = Vec::new();
+    for value in values {
+        let declared = Path::new(&value.path);
+        let metadata = fs::symlink_metadata(declared).map_err(|_| artifacts::Rejected {
+            code: "RUNTIME_ARTIFACT_ROOT_INVALID",
+            message: "runtime artifact root is unavailable".to_string(),
+        })?;
+        if metadata.file_type().is_symlink() {
+            return Err(artifacts::Rejected {
+                code: "RUNTIME_ARTIFACT_ROOT_INVALID",
+                message: "runtime artifact root must not be a symlink".to_string(),
+            });
+        }
+        let canonical = declared.canonicalize().map_err(|_| artifacts::Rejected {
+            code: "RUNTIME_ARTIFACT_ROOT_INVALID",
+            message: "runtime artifact root is unavailable".to_string(),
+        })?;
+        if canonical != declared {
+            return Err(artifacts::Rejected {
+                code: "RUNTIME_ARTIFACT_ROOT_INVALID",
+                message: "runtime artifact root must be a canonical absolute path".to_string(),
+            });
+        }
+        // A declared artifact may not be the workspace, contain it, or live
+        // inside it: those trees already have their own authority, and a
+        // user's project must never be re-mounted through this door.
+        let mut guarded = vec![root.to_path_buf()];
+        if let Some(workspace) = workspace {
+            guarded.push(workspace.to_path_buf());
+        }
+        if guarded
+            .iter()
+            .any(|other| other.starts_with(&canonical) || canonical.starts_with(other))
+        {
+            return Err(artifacts::Rejected {
+                code: "RUNTIME_ARTIFACT_ROOT_OVERLAP",
+                message: "runtime artifact root overlaps an authorized execution root".to_string(),
+            });
+        }
+        if verified
+            .iter()
+            .any(|item| item.path == canonical || item.target == value.target)
+        {
+            return Err(artifacts::Rejected {
+                code: "RUNTIME_ARTIFACT_DUPLICATE",
+                message: "runtime artifact declaration is duplicated".to_string(),
+            });
+        }
+        artifacts::verify_declared(&canonical, &value.digest)?;
+        verified.push(VerifiedArtifact {
+            path: canonical,
+            target: value.target.clone(),
+        });
+    }
+    Ok(verified)
 }
 
 async fn run_process(

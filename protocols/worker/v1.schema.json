@@ -26,7 +26,7 @@
     "bootstrap": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["workerVersion", "workerDigest", "connectionId", "projectId", "effectiveUser", "instanceNonce", "serverInstanceId", "leaseMs"],
+      "required": ["workerVersion", "workerDigest", "connectionId", "projectId", "effectiveUser", "instanceNonce", "serverInstanceId", "leaseMs", "protocolVersion"],
       "properties": {
         "workerVersion": {"type": "string", "minLength": 1, "maxLength": 1024},
         "workerDigest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
@@ -36,6 +36,10 @@
         "instanceNonce": {"$ref": "#/$defs/id"},
         "serverInstanceId": {"$ref": "#/$defs/id"},
         "leaseMs": {"type": "integer", "minimum": 1000, "maximum": 120000},
+        "protocolVersion": {
+          "description": "Control-protocol generation. Current is 3: runtime artifact trees are verified by the Worker. A different value is a loud, two-way handshake refusal.",
+          "const": 3
+        },
         "executables": {
           "type": "array", "maxItems": 16,
           "items": {
@@ -44,6 +48,30 @@
             "properties": {
               "path": {"type": "string", "minLength": 1, "maxLength": 4096},
               "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+            }
+          }
+        },
+        "runtimeArtifacts": {
+          "description": "Immutable runtime dependency directories. The Worker re-derives each treeDigest inside WSL and refuses the handshake on any mismatch; only then may bwrap read-only bind one at target.",
+          "type": "array", "maxItems": 8,
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["path", "target", "treeDigest"],
+            "properties": {
+              "path": {
+                "description": "Canonical absolute WSL path of a real directory, never a symlink.",
+                "type": "string", "minLength": 1, "maxLength": 4096,
+                "pattern": "^/[^\\u0000/]+(/[^\\u0000/]+)*$"
+              },
+              "target": {
+                "description": "Restricted guest mount point.",
+                "type": "string",
+                "pattern": "^/runtime/artifacts/[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+              },
+              "treeDigest": {
+                "description": "sha256 of the canonical tree encoding defined by protocols/worker/golden/runtime-artifact-tree-v1.json.",
+                "type": "string", "pattern": "^sha256:[0-9a-f]{64}$"
+              }
             }
           }
         }

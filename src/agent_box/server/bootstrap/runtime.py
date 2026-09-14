@@ -415,6 +415,12 @@ def build_runtime_from_sidecar_deployment(
             executable_mounts.append((source, target))
         deployment["_executable_authorizations"] = tuple(executable_authorizations)
         deployment["_executable_mounts"] = tuple(executable_mounts)
+        artifact_authorizations = _runtime_artifact_declarations(item.get("runtimeArtifactMounts"))
+        deployment["_runtime_artifact_authorizations"] = artifact_authorizations
+        deployment["_runtime_artifact_mounts"] = tuple(
+            (str(declaration["path"]), str(declaration["target"]))
+            for declaration in artifact_authorizations
+        )
         preferred_auth_method = item.get("preferredAuthMethod")
         if preferred_auth_method is not None and (
             not isinstance(preferred_auth_method, str)
@@ -490,6 +496,8 @@ def build_runtime_from_sidecar_deployment(
                 bundle=bundle, credential=credential,
                 executable_authorizations=deployment["_executable_authorizations"],
                 executable_mounts=deployment["_executable_mounts"],
+                runtime_artifact_authorizations=deployment["_runtime_artifact_authorizations"],
+                runtime_artifact_mounts=deployment["_runtime_artifact_mounts"],
                 projection_mounts=deployment["_projection_mounts"],
                 state_bundle_prefix=deployment["_state_bundle_prefix"],
                 state_target=deployment["_state_target"],
@@ -515,6 +523,55 @@ def build_runtime_from_sidecar_deployment(
         )
 
     return build_runtime(data_root, harnesses=registry, execution_factory=factory)
+
+
+def _runtime_artifact_declarations(value: Any) -> tuple[dict[str, str], ...]:
+    """Validate the shape of `runtimeArtifactMounts` and pass it through.
+
+    This is deliberately a shape check only.  A runtime artifact source is a
+    WSL path that does not exist on the Server, so existence, link status, the
+    tree digest and every overlap rule are settled by the Worker, inside the
+    distribution that will read the tree.  The Server's job is to refuse a
+    declaration that could not be verified at all, and to carry the
+    declaration's exact digests to the Worker unchanged.
+    """
+    from agent_box_sandbox_bwrap import (
+        MAX_RUNTIME_ARTIFACT_TREES, RuntimeArtifactRejected,
+        validate_runtime_artifact_target,
+    )
+
+    if value is None:
+        return ()
+    if not isinstance(value, list) or len(value) > MAX_RUNTIME_ARTIFACT_TREES:
+        raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
+    declarations: list[dict[str, str]] = []
+    paths: set[str] = set()
+    targets: set[str] = set()
+    for item in value:
+        if not isinstance(item, dict) or set(item) != {"source", "target", "treeDigest"}:
+            raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
+        source = item["source"]
+        target = item["target"]
+        digest_value = item["treeDigest"]
+        if (not isinstance(source, str) or not source.startswith("/")
+                or "\\" in source or "\x00" in source or "//" in source
+                or source.endswith("/")
+                or any(part in {"", ".", ".."} for part in source.split("/")[1:])
+                or str(PurePosixPath(source)) != source
+                or any(ord(character) < 0x20 or ord(character) == 0x7F for character in source)
+                or not isinstance(digest_value, str)
+                or re.fullmatch(r"sha256:[0-9a-f]{64}", digest_value) is None):
+            raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
+        try:
+            validate_runtime_artifact_target(target)
+        except RuntimeArtifactRejected:
+            raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID") from None
+        if source in paths or target in targets:
+            raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
+        paths.add(source)
+        targets.add(target)
+        declarations.append({"path": source, "target": target, "digest": digest_value})
+    return tuple(declarations)
 
 
 def _sidecar_deployment_file(

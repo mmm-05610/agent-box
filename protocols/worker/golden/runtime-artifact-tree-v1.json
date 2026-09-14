@@ -1,0 +1,41 @@
+{
+  "algorithm": "agentbox-runtime-artifact-tree-v1",
+  "digest": "sha256:181e781c13c3e820800bf054466f60b79fcbfe16afb693d485d94968d9cd9e31",
+  "entries": 9,
+  "bytes": 76,
+  "canonical_encoding_hex": "6167656e74626f782d72756e74696d652d61727469666163742d747265652d76310a000000000000000964000000064073636f7065640000000a4073636f70652f706b6766000000134073636f70652f706b672f696e6465782e6a7300000000000000234599d995a1e64beeff0f7c51b7c635127962ad2c956a7acb39aac92a37e34eb366000000076465702e6d6a7300000000000000234599d995a1e64beeff0f7c51b7c635127962ad2c956a7acb39aac92a37e34eb36400000009656d7074792d64697264000000066e6573746564640000000b6e65737465642f6465657066000000156e65737465642f646565702f696e6e65722e7478740000000000000006940a68104d3b690442453f4be394b0a14721a174127d84c1c2f834b7ad05d68466000000087a65726f2e7478740000000000000000e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "tree": [
+    {
+      "path": "nested/deep/inner.txt",
+      "kind": "file",
+      "content_base64": "aW5uZXIK"
+    },
+    {
+      "path": "empty-dir",
+      "kind": "dir"
+    },
+    {
+      "path": "@scope/pkg/index.js",
+      "kind": "file",
+      "content_base64": "ZXhwb3J0IGNvbnN0IFZBTFVFID0gJ2ZpeGVkLXZhbHVlJwo="
+    },
+    {
+      "path": "nested",
+      "kind": "dir"
+    },
+    {
+      "path": "zero.txt",
+      "kind": "file",
+      "content_base64": ""
+    },
+    {
+      "path": "nested/deep",
+      "kind": "dir"
+    },
+    {
+      "path": "dep.mjs",
+      "kind": "file",
+      "content_base64": "ZXhwb3J0IGNvbnN0IFZBTFVFID0gJ2ZpeGVkLXZhbHVlJwo="
+    }
+  ]
+}

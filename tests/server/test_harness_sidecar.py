@@ -240,6 +240,18 @@ def test_sidecar_deployment_projects_bounded_files_and_register_metadata(tmp_pat
         runtime.stop()
 
 
+ARTIFACT_DECLARED_DIGEST = "sha256:" + "a" * 64
+ARTIFACT_TARGET = "/runtime/artifacts/fixture-dep"
+
+
+def _artifact_mount(**changes):
+    item = {"source": "/opt/agentbox/artifacts/fixture-dep",
+            "target": "/runtime/artifacts/fixture-dep",
+            "treeDigest": ARTIFACT_DECLARED_DIGEST}
+    item.update(changes)
+    return {"runtimeArtifactMounts": [item]}
+
+
 @pytest.mark.parametrize("field", [
     {"adapter": {"command": "/usr/bin/node", "source": "../escape.mjs"}},
     {"adapter": {"command": "/usr/bin/node", "args": ["bad\x00arg"]}},
@@ -250,6 +262,51 @@ def test_sidecar_deployment_projects_bounded_files_and_register_metadata(tmp_pat
     {"stateProjection": {"target": "/tmp/agentbox-home/sub/x"}},
     {"stateProjection": {"target": "/runtime/home/state"}},
     {"adapter": {"command": "/usr/bin/node", "environment": {"API_TOKEN": "secret"}}},
+    # A runtime artifact declaration is validated on its shape only; the digest
+    # and every overlap rule are settled by the Worker that can see the tree.
+    {"runtimeArtifactMounts": {"source": "/opt/agentbox/artifacts/a"}},
+    _artifact_mount(extra="unexpected"),
+    _artifact_mount(source="relative/artifacts/a"),
+    _artifact_mount(source="/opt/../artifacts/a"),
+    _artifact_mount(source="/opt//artifacts/a"),
+    _artifact_mount(source="/opt/artifacts/a/"),
+    _artifact_mount(source="/opt\\artifacts\\a"),
+    _artifact_mount(source="/opt/artifacts/a\x00"),
+    _artifact_mount(source="/opt/artifacts/a\x1b"),
+    _artifact_mount(source="C:/Users/tester/artifacts/a"),
+    _artifact_mount(source=""),
+    _artifact_mount(target="/runtime/artifacts"),
+    _artifact_mount(target="/runtime/artifacts/"),
+    _artifact_mount(target="/runtime/artifacts/../fixture-dep"),
+    _artifact_mount(target="/runtime/artifacts/sub/fixture-dep"),
+    _artifact_mount(target="/runtime/artifacts/.hidden"),
+    _artifact_mount(target="/runtime/bin/fixture-dep"),
+    _artifact_mount(target="/runtime/view/fixture-dep"),
+    _artifact_mount(target="/runtime/secret/fixture-dep"),
+    _artifact_mount(target="/tmp/agentbox-home/fixture-dep"),
+    _artifact_mount(target="/tmp/agentbox-sidecar-state"),
+    _artifact_mount(target="/workspace"),
+    _artifact_mount(target="/home/tester/.local/lib/python3.12/site-packages"),
+    _artifact_mount(treeDigest="sha256:short"),
+    _artifact_mount(treeDigest="md5:" + "a" * 32),
+    _artifact_mount(treeDigest=ARTIFACT_DECLARED_DIGEST.upper()),
+    {"runtimeArtifactMounts": [
+        {"source": "/opt/agentbox/artifacts/a", "target": "/runtime/artifacts/a",
+         "treeDigest": ARTIFACT_DECLARED_DIGEST},
+        {"source": "/opt/agentbox/artifacts/a", "target": "/runtime/artifacts/b",
+         "treeDigest": ARTIFACT_DECLARED_DIGEST},
+    ]},
+    {"runtimeArtifactMounts": [
+        {"source": "/opt/agentbox/artifacts/a", "target": "/runtime/artifacts/a",
+         "treeDigest": ARTIFACT_DECLARED_DIGEST},
+        {"source": "/opt/agentbox/artifacts/b", "target": "/runtime/artifacts/a",
+         "treeDigest": ARTIFACT_DECLARED_DIGEST},
+    ]},
+    {"runtimeArtifactMounts": [
+        {"source": f"/opt/agentbox/artifacts/a{index}",
+         "target": f"/runtime/artifacts/a{index}", "treeDigest": ARTIFACT_DECLARED_DIGEST}
+        for index in range(9)
+    ]},
 ])
 def test_sidecar_deployment_rejects_unbounded_fields(tmp_path, field):
     deployment = tmp_path / "deployment.json"
@@ -260,6 +317,38 @@ def test_sidecar_deployment_rejects_unbounded_fields(tmp_path, field):
     }), encoding="utf-8")
     with pytest.raises(RuntimeError, match="SIDECAR_DEPLOYMENT_INVALID"):
         build_runtime_from_sidecar_deployment(tmp_path / "server", deployment)
+
+
+def test_sidecar_deployment_carries_digest_pinned_artifact_declarations(tmp_path, monkeypatch):
+    """The Server validates shape and passes the declaration through unchanged."""
+    captured = {}
+    import agent_box.server.bootstrap.runtime as runtime_module
+    import agent_box.server.execution.sidecar as sidecar_module
+    monkeypatch.setattr(runtime_module, "_builtin_connector", lambda _instance_id: object())
+    monkeypatch.setattr(
+        sidecar_module, "sidecar_bundle_files",
+        lambda root, additional_files=None: captured.update({"files": dict(additional_files or {})}) or {},
+    )
+    deployment = tmp_path / "deployment.json"
+    deployment.write_text(json.dumps({
+        "schemaVersion": 1, "pluginRoot": str(PLUGIN),
+        "harnesses": [{
+            "id": "pi", "adapter": {"command": "/usr/bin/node", "args": []},
+            "runtimeArtifactMounts": [
+                {"source": "/opt/agentbox/artifacts/pi-node-modules",
+                 "target": "/runtime/artifacts/pi-node-modules",
+                 "treeDigest": ARTIFACT_DECLARED_DIGEST},
+                {"source": "/opt/agentbox/artifacts/pi-native",
+                 "target": "/runtime/artifacts/pi-native",
+                 "treeDigest": "sha256:" + "b" * 64},
+            ],
+        }],
+    }), encoding="utf-8")
+    runtime = runtime_module.build_runtime_from_sidecar_deployment(tmp_path / "server", deployment)
+    runtime.stop()
+    # The declaration is not a bundle file: an artifact is a host directory the
+    # Worker verifies in place, never a copy uploaded into the reviewed view.
+    assert captured["files"] == {}
 
 
 def test_sidecar_deployment_rejects_readonly_and_writable_target_collision(tmp_path):
@@ -1258,6 +1347,154 @@ def test_wsl_sidecar_secret_cleanup_on_spawn_failure():
     assert client.closed
 
 
+class _RecordingConnector:
+    """Captures what the launcher hands to the WSL connector."""
+
+    def __init__(self, client):
+        self.client = client
+        self.kwargs = None
+
+    def client_for_workspace(self, **kwargs):
+        self.kwargs = kwargs
+        return self.client
+
+
+ARTIFACT_SOURCE = "/opt/agentbox/artifacts/fixture-dep"
+
+
+def test_wsl_sidecar_carries_runtime_artifacts_to_bootstrap_and_bwrap():
+    """One declaration becomes one bootstrap authorization and one ro-bind."""
+    declaration = {"path": ARTIFACT_SOURCE, "target": ARTIFACT_TARGET,
+                   "digest": ARTIFACT_DECLARED_DIGEST}
+    client = _RecordingWorkerClient()
+    connector = _RecordingConnector(client)
+    launcher = WslSidecarLauncher(
+        connector,
+        workspace={"distribution": "Ubuntu", "remote_user": "tester",
+                   "connection_id": "connection", "remote_path": "/workspace"},
+        bundle={}, timeout_ms=5000,
+        runtime_artifact_authorizations=(declaration,),
+        runtime_artifact_mounts=((ARTIFACT_SOURCE, ARTIFACT_TARGET),),
+    )
+    channels = launcher.launch({})
+    try:
+        assert connector.kwargs["runtime_artifact_authorizations"] == (declaration,)
+        argv = next(payload for op, payload in client.calls if op == "spawn")["argv"]
+        marker = argv.index(ARTIFACT_SOURCE)
+        assert argv[marker - 1:marker + 2] == ["--ro-bind", ARTIFACT_SOURCE, ARTIFACT_TARGET]
+        assert ["--dir", "/runtime/artifacts"] == argv[
+            argv.index("/runtime/artifacts") - 1:argv.index("/runtime/artifacts") + 1
+        ]
+        assert ARTIFACT_DECLARED_DIGEST not in json.dumps(client.calls)
+    finally:
+        channels.close()
+
+
+@pytest.mark.parametrize("authorizations,mounts", [
+    # A mount that carries no declaration would reach bwrap unverified.
+    ((), ((ARTIFACT_SOURCE, ARTIFACT_TARGET),)),
+    # A declaration the Server silently dropped is equally unacceptable.
+    (({"path": ARTIFACT_SOURCE, "target": ARTIFACT_TARGET,
+       "digest": ARTIFACT_DECLARED_DIGEST},), ()),
+    # Authorizing one directory while mounting another must not be possible.
+    (({"path": ARTIFACT_SOURCE, "target": ARTIFACT_TARGET,
+       "digest": ARTIFACT_DECLARED_DIGEST},),
+     (("/opt/agentbox/artifacts/other", ARTIFACT_TARGET),)),
+    (({"path": ARTIFACT_SOURCE, "target": ARTIFACT_TARGET,
+       "digest": ARTIFACT_DECLARED_DIGEST},),
+     ((ARTIFACT_SOURCE, "/runtime/artifacts/other"),)),
+    (({"path": ARTIFACT_SOURCE, "target": ARTIFACT_TARGET,
+       "digest": ARTIFACT_DECLARED_DIGEST},) * 2,
+     ((ARTIFACT_SOURCE, ARTIFACT_TARGET), (ARTIFACT_SOURCE, ARTIFACT_TARGET))),
+])
+def test_wsl_sidecar_refuses_artifact_declarations_that_do_not_match(
+    authorizations, mounts,
+):
+    with pytest.raises(ValueError, match="SIDECAR_RUNTIME_ARTIFACT_DECLARATION"):
+        WslSidecarLauncher(
+            _WorkerConnectorFake(_WorkerClientFake()),
+            workspace={"distribution": "Ubuntu", "remote_user": "tester",
+                       "connection_id": "connection", "remote_path": "/workspace"},
+            bundle={}, timeout_ms=5000,
+            runtime_artifact_authorizations=authorizations,
+            runtime_artifact_mounts=mounts,
+        )
+
+
+CHUNK = 32 * 1024
+
+
+class _RecordingWorkerClient:
+    """Records every control request so the bundle transfer can be audited."""
+
+    def __init__(self):
+        self.calls = []
+        self.closed = False
+
+    def start(self):
+        self.calls.append(("start", {}))
+
+    def request(self, op, arguments=None, **identity):
+        self.calls.append((op, dict(arguments or {})))
+        if op == "view.commit":
+            return {"path": "/worker/views/v/ready"}
+        if op == "secret.put":
+            return {"path": "/worker/secrets/a/frame"}
+        return {"accepted": True}
+
+    def subscribe_output(self, _listener): return lambda: None
+    def subscribe_disconnect(self, _listener): return lambda: None
+    def close_stdin(self, *_args, **_kwargs): pass
+    def wait_terminal(self, *_args, **_kwargs): return {}
+    def close(self): self.closed = True
+
+    def puts(self):
+        return [(payload["path"], payload["offset"]) for op, payload in self.calls if op == "view.put"]
+
+
+def test_sidecar_bundle_uploads_every_chunk_offset_exactly_once():
+    """Each (path, offset) is transferred once, in order, with no gap or repeat.
+
+    A repeated offset would duplicate a chunk, and the Worker appends at the
+    offset it is told the file already has — so a repeat is not a harmless
+    retry, it is a corrupt projection that the Worker must reject. This asserts
+    the client never emits one, by rebuilding each file from the uploaded
+    chunks as well as comparing the offset sequence itself.
+    """
+    content = bytes(range(256)) * 400          # 102 400 bytes: 4 chunks, last partial
+    small = b"small\n"
+    bundle = {"agentbox-sidecar/runtime/worker-entry.mjs": content,
+              "agentbox-sidecar/package.json": small}
+    client = _RecordingWorkerClient()
+    launcher = WslSidecarLauncher(
+        _WorkerConnectorFake(client),
+        workspace={"distribution": "Ubuntu", "remote_user": "tester",
+                   "connection_id": "connection", "remote_path": "/workspace"},
+        bundle=bundle, timeout_ms=5000,
+    )
+    channels = launcher.launch({})
+    try:
+        expected = [
+            (path, offset)
+            for path, value in sorted(bundle.items())
+            for offset in range(0, len(value), CHUNK)
+        ]
+        assert client.puts() == expected
+        assert len(client.puts()) == len(set(client.puts()))
+        rebuilt = {path: bytearray() for path in bundle}
+        for _op, payload in client.calls:
+            if _op != "view.put":
+                continue
+            rebuilt[payload["path"]][payload["offset"]:] = base64.b64decode(payload["data"])
+        assert {path: bytes(value) for path, value in rebuilt.items()} == bundle
+        manifest = next(payload for op, payload in client.calls if op == "view.prepare")
+        assert {item["path"]: item["size"] for item in manifest["files"]} == {
+            path: len(value) for path, value in sorted(bundle.items())
+        }
+    finally:
+        channels.close()
+
+
 class _StdinRetryClient:
     def __init__(self, failures):
         self.failures = list(failures)
@@ -1376,3 +1613,214 @@ def test_worker_channels_rejects_state_digest_change():
     channels = _WorkerChannels(client, "attempt", 1, "view", state_bundle_prefix=prefix)
     with pytest.raises(SidecarError, match="DIGEST"):
         channels.capture_state()
+
+
+ARTIFACT_PROBE_RELATIVE = "tests/server/fixtures/artifact_probe_acp_peer.mjs"
+ARTIFACT_DEPENDENCY = "export const VALUE = 'runtime-artifact-fixed-value'\n"
+
+
+def _release_worker():
+    """The release Worker under test; the acceptance bundle can be named instead."""
+    override = os.environ.get("AGENT_BOX_TEST_RELEASE_WORKER")
+    if override:
+        return pathlib.Path(override)
+    return REPO / "workers" / "agent-box-worker" / "target" / "release" / "agent-box-worker"
+
+
+class _ReleaseWorkerConnector:
+    """WSL connector bound to the release Worker build and this checkout.
+
+    Every other Worker test in this module drives the debug build; the runtime
+    artifact gate deliberately uses the release build so the projection is
+    proven on the artifact the Windows acceptance bundle is produced from.
+    """
+
+    def __init__(self, tmp_path, worker):
+        self.tmp_path = tmp_path
+        self.worker = worker
+
+    def distributions(self): return [{"name": "Ubuntu"}]
+
+    def probe(self, distribution, user):
+        return {"probe_id": "probe", "distribution": distribution, "user": user}
+
+    def browse(self, probe_id, path):
+        return {"path": path, "directories": [], "files": []}
+
+    def open_workspace(self, probe_id, path):
+        return {"connection_id": "connection-artifact", "distribution": "Ubuntu",
+                "user": os.environ["USER"], "path": str(REPO)}
+
+    def client_for_workspace(self, **arguments):
+        return WorkerClient(
+            [str(self.worker), "--root", str(self.tmp_path / "worker-root"),
+             "--workspace", str(REPO)],
+            worker_digest="sha256:" + hashlib.sha256(self.worker.read_bytes()).hexdigest(),
+            worker_version="0.1.0", connection_id=arguments["connection_id"],
+            project_id=arguments["connection_id"], effective_user=os.environ["USER"],
+            server_instance_id="server-artifact",
+            executable_authorizations=arguments.get("executable_authorizations", ()),
+            runtime_artifact_authorizations=arguments.get(
+                "runtime_artifact_authorizations", (),
+            ),
+        )
+
+
+def _artifact_runtime(tmp_path, monkeypatch, *, worker, tree, digest_value, adapter):
+    """A Server whose one Harness declares one digest-pinned artifact tree."""
+    deployment = tmp_path / "artifact-deployment.json"
+    deployment.write_text(json.dumps({
+        "schemaVersion": 1, "pluginRoot": str(PLUGIN),
+        "harnesses": [{
+            "id": "pi", "timeoutMs": 30_000,
+            "runtimeArtifactMounts": [{
+                "source": str(tree), "target": ARTIFACT_TARGET, "treeDigest": digest_value,
+            }],
+            "adapter": adapter,
+        }],
+    }), encoding="utf-8")
+    import agent_box.server.bootstrap.runtime as runtime_module
+    monkeypatch.setattr(
+        runtime_module, "_builtin_connector",
+        lambda _id: _ReleaseWorkerConnector(tmp_path, worker),
+    )
+    original_file = runtime_module._sidecar_deployment_file
+    fixture = pathlib.Path(__file__).parent / "fixtures" / "artifact_probe_acp_peer.mjs"
+    monkeypatch.setattr(
+        runtime_module, "_sidecar_deployment_file",
+        lambda root, value, relative: fixture.read_bytes()
+        if relative == ARTIFACT_PROBE_RELATIVE
+        else original_file(root, value, relative),
+    )
+    return build_runtime_from_sidecar_deployment(tmp_path / "server", deployment)
+
+
+def _artifact_tree(tmp_path, *, dependency=ARTIFACT_DEPENDENCY):
+    from agent_box_sandbox_bwrap import runtime_artifact_tree_digest
+
+    tree = tmp_path / "artifacts" / "fixture-dep"
+    (tree / "nested").mkdir(parents=True)
+    (tree / "dep.mjs").write_text(dependency, encoding="utf-8")
+    (tree / "nested" / "extra.txt").write_text("extra\n", encoding="utf-8")
+    return tree, runtime_artifact_tree_digest(tree)
+
+
+def test_release_worker_projects_a_runtime_artifact_tree_through_the_real_chain(
+    tmp_path, monkeypatch,
+):
+    """Server declaration -> bootstrap -> WSL Worker verification -> bwrap -> guest.
+
+    The fixture loads a dependency from /runtime/artifacts/fixture-dep and
+    reports the value that module exports, so the gate is the projected tree
+    itself and not a copy that reached the workspace some other way. No model
+    and no network are involved; this registers runtime artifact projection
+    only, never a Harness or model result.
+    """
+    worker = _release_worker()
+    if not worker.is_file() or not shutil.which("bwrap"):
+        pytest.skip("the release Worker and bwrap are required")
+    tree, declared = _artifact_tree(tmp_path)
+    runtime = _artifact_runtime(
+        tmp_path, monkeypatch, worker=worker, tree=tree, digest_value=declared,
+        adapter={"command": "/usr/bin/node", "args": [],
+                 "source": ARTIFACT_PROBE_RELATIVE,
+                 "environment": {"FAKE_PEER_ARTIFACT": ARTIFACT_TARGET}},
+    )
+    try:
+        with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
+            headers = {"Authorization": f"Bearer {runtime.token}"}
+            opened = _wire_post(client, runtime.token, "workspaces.open", {
+                "requestId": "open-artifact", "path": str(REPO),
+                "environment": {"kind": "wsl", "host": "Ubuntu", "user": os.environ["USER"]},
+            })["workspace"]
+            profile = client.post("/api/v1/profiles", headers={
+                **headers, "Idempotency-Key": "artifact-profile",
+            }, json={"name": "artifact", "harness_type": "pi", "configuration": {},
+                     "credential_id": None}).json()
+            sent = _wire_post(client, runtime.token, "sessions.createAndSend", {
+                "requestId": "artifact-turn", "workspaceId": opened["id"],
+                "profileId": profile["profile_id"], "overrides": [],
+                "message": {"text": "load the projected dependency", "attachments": []},
+            })
+            session = _wait_for_turn(runtime, sent["session"]["id"], 0, "completed")
+            delta = next(
+                event for event in session["events"]
+                if event.get("turn_id") == sent["executionId"] and event["kind"] == "message.delta"
+            )
+            declared_prefix = "artifact-probe:"
+            assert delta["data"]["text"].startswith(declared_prefix), delta["data"]
+            facts = json.loads(delta["data"]["text"][len(declared_prefix):])
+            assert facts["error"] is None
+            assert facts["value"] == "runtime-artifact-fixed-value"
+            assert facts["directory"] == ARTIFACT_TARGET
+            assert sorted(facts["entries"]) == ["dep.mjs", "nested", "nested/extra.txt"]
+            assert facts["writeBlocked"] is True
+    finally:
+        runtime.stop()
+
+    from agent_box_sandbox_bwrap import runtime_artifact_tree_digest
+
+    # The projection was read-only: neither the guest write nor the whole
+    # execution changed the declared tree.
+    assert runtime_artifact_tree_digest(tree) == declared
+    assert not (tree / "guest-write").exists()
+    _await_worker_projection_cleanup(tmp_path / "worker-root")
+
+
+def test_release_worker_refuses_a_runtime_artifact_tree_that_drifted(
+    tmp_path, monkeypatch,
+):
+    """A declared digest that no longer matches is a typed failure, not a mount.
+
+    The wrong digest is declared through the same production deployment file a
+    real deployment uses, so this is the Server-to-Worker path and not a unit
+    stub: the Worker re-derives the tree and refuses the handshake.
+    """
+    worker = _release_worker()
+    if not worker.is_file() or not shutil.which("bwrap"):
+        pytest.skip("the release Worker and bwrap are required")
+    tree, _real = _artifact_tree(tmp_path)
+    # A different tree: the digest is content-derived, so a copy of the same
+    # tree at another path would legitimately match and prove nothing.
+    _other, wrong = _artifact_tree(
+        tmp_path / "other", dependency="export const VALUE = 'other-tree'\n",
+    )
+    runtime = _artifact_runtime(
+        tmp_path, monkeypatch, worker=worker, tree=tree, digest_value=wrong,
+        adapter={"command": "/usr/bin/node", "args": [],
+                 "source": ARTIFACT_PROBE_RELATIVE,
+                 "environment": {"FAKE_PEER_ARTIFACT": ARTIFACT_TARGET}},
+    )
+    try:
+        with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
+            opened = _wire_post(client, runtime.token, "workspaces.open", {
+                "requestId": "open-drift", "path": str(REPO),
+                "environment": {"kind": "wsl", "host": "Ubuntu", "user": os.environ["USER"]},
+            })["workspace"]
+            profile = client.post("/api/v1/profiles", headers={
+                "Authorization": f"Bearer {runtime.token}", "Idempotency-Key": "drift-profile",
+            }, json={"name": "drift", "harness_type": "pi", "configuration": {},
+                     "credential_id": None}).json()
+            sent = _wire_post(client, runtime.token, "sessions.createAndSend", {
+                "requestId": "drift-turn", "workspaceId": opened["id"],
+                "profileId": profile["profile_id"], "overrides": [],
+                "message": {"text": "load the projected dependency", "attachments": []},
+            })
+            session = _wait_for_turn(runtime, sent["session"]["id"], 0, "failed")
+            # No session may be invented for a Harness that never started.
+            assert session["checkpoint"] is None
+            with runtime.database.read() as conn:
+                ledger = [
+                    json.loads(row["data_json"])
+                    for row in conn.execute(
+                        "SELECT data_json FROM core_events WHERE type=?",
+                        (EventType.EXECUTION_DISPATCH_AMBIGUOUS.value,),
+                    )
+                ]
+            assert len(ledger) == 1 and "RUNTIME_ARTIFACT_DIGEST_MISMATCH" in ledger[0]["error"], ledger
+            assert not any(
+                event["kind"] == "message.delta" for event in session["events"]
+            ), session["events"]
+    finally:
+        runtime.stop()
+    _await_worker_projection_cleanup(tmp_path / "worker-root")

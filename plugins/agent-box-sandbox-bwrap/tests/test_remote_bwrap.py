@@ -128,3 +128,70 @@ def test_remote_sidecar_argv_rejects_projection_and_credential_injection(kwargs)
     values.update(kwargs)
     with pytest.raises(ProjectionRejected):
         compile_remote_sidecar_bwrap_argv(**values)
+
+
+def test_remote_sidecar_mounts_runtime_artifacts_read_only_under_the_namespace():
+    argv = compile_remote_sidecar_bwrap_argv(
+        workspace="/workspace/project", runtime_view="/worker/views/view-1",
+        environment={"HOME": "/tmp/agentbox-home"},
+        runtime_artifact_mounts=(
+            ("/opt/agentbox/artifacts/pi-node-modules", "/runtime/artifacts/pi-node-modules"),
+            ("/opt/agentbox/artifacts/hermes-python", "/runtime/artifacts/hermes-python"),
+        ),
+    )
+    assert ["--dir", "/runtime/artifacts"] == argv[
+        argv.index("/runtime/artifacts") - 1:argv.index("/runtime/artifacts") + 1
+    ]
+    for source, target in (
+        ("/opt/agentbox/artifacts/pi-node-modules", "/runtime/artifacts/pi-node-modules"),
+        ("/opt/agentbox/artifacts/hermes-python", "/runtime/artifacts/hermes-python"),
+    ):
+        marker = argv.index(source)
+        assert argv[marker - 1:marker + 2] == ["--ro-bind", source, target]
+    # A verified artifact is never writable, and never mounted anywhere but the
+    # target its declaration named.
+    assert not any(
+        argv[index] == "--bind" and argv[index + 1].startswith("/opt/agentbox/artifacts/")
+        for index in range(len(argv) - 1)
+    )
+
+
+@pytest.mark.parametrize("mounts", [
+    (("/opt/agentbox/artifacts/pi", "/runtime/artifacts/pi/.."),),
+    (("/opt/agentbox/artifacts/pi", "/runtime/artifacts"),),
+    (("/opt/agentbox/artifacts/pi", "/runtime/artifacts/"),),
+    (("/opt/agentbox/artifacts/pi", "/runtime/bin/artifacts"),),
+    (("/opt/agentbox/artifacts/pi", "/runtime/view/artifacts"),),
+    (("/opt/agentbox/artifacts/pi", "/runtime/secret/artifacts"),),
+    (("/opt/agentbox/artifacts/pi", "/tmp/agentbox-home/pi"),),
+    (("/opt/agentbox/artifacts/pi", "/workspace/pi"),),
+    (("/opt/agentbox/artifacts/../escape", "/runtime/artifacts/pi"),),
+    (("relative/artifacts", "/runtime/artifacts/pi"),),
+    # The project and the reviewed view may not arrive via the artifact door.
+    (("/workspace/project", "/runtime/artifacts/project"),),
+    (("/workspace", "/runtime/artifacts/workspace"),),
+    (("/worker/views/view-1/agentbox-sidecar", "/runtime/artifacts/sidecar"),),
+    (("/worker/views", "/runtime/artifacts/views"),),
+])
+def test_remote_sidecar_rejects_unrestricted_artifact_mounts(mounts):
+    with pytest.raises(ProjectionRejected):
+        compile_remote_sidecar_bwrap_argv(
+            workspace="/workspace/project", runtime_view="/worker/views/view-1",
+            environment={"HOME": "/tmp/agentbox-home"},
+            runtime_artifact_mounts=mounts,
+        )
+
+
+def test_remote_sidecar_rejects_duplicate_artifact_source_or_target():
+    for mounts in (
+        (("/opt/agentbox/artifacts/pi", "/runtime/artifacts/pi"),
+         ("/opt/agentbox/artifacts/pi", "/runtime/artifacts/other")),
+        (("/opt/agentbox/artifacts/pi", "/runtime/artifacts/pi"),
+         ("/opt/agentbox/artifacts/other", "/runtime/artifacts/pi")),
+    ):
+        with pytest.raises(ProjectionRejected):
+            compile_remote_sidecar_bwrap_argv(
+                workspace="/workspace/project", runtime_view="/worker/views/view-1",
+                environment={"HOME": "/tmp/agentbox-home"},
+                runtime_artifact_mounts=mounts,
+            )

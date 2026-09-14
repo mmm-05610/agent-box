@@ -93,12 +93,14 @@ class WslConnector:
         self, *, distribution: str, user: str, connection_id: str,
         workspace_path: str,
         executable_authorizations: tuple[dict[str, str], ...] = (),
+        runtime_artifact_authorizations: tuple[dict[str, str], ...] = (),
     ) -> WorkerClient:
         probe = Probe("execution", distribution, user, float("inf"))
         return self._client(
             probe, project_id=connection_id, workspace=workspace_path,
             connection_id=connection_id,
             executable_authorizations=executable_authorizations,
+            runtime_artifact_authorizations=runtime_artifact_authorizations,
         )
 
     def read_workspace_file(
@@ -156,6 +158,7 @@ class WslConnector:
         self, probe: Probe, *, project_id: str, workspace: str | None = None,
         connection_id: str | None = None,
         executable_authorizations: tuple[dict[str, str], ...] = (),
+        runtime_artifact_authorizations: tuple[dict[str, str], ...] = (),
     ):
         command = ["wsl.exe", "--distribution", probe.distribution, "--user", probe.user,
                    "--exec", self.linux_worker_path, "--root",
@@ -168,6 +171,7 @@ class WslConnector:
             connection_id=connection_id or probe.probe_id, project_id=project_id,
             effective_user=probe.user, server_instance_id=self.server_instance_id,
             executable_authorizations=executable_authorizations,
+            runtime_artifact_authorizations=runtime_artifact_authorizations,
         )
 
     @staticmethod

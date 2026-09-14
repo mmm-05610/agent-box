@@ -22,10 +22,12 @@ HELLO_ACK = 2
 DATA = 5
 EXIT = 7
 WORKER_ERROR = 8
-# Control-protocol generation. The frame format is unchanged; version 2 adds
-# interactive spawn, attempt.write, and pre-terminal process.output events.
-# The mismatch is a loud handshake failure, never silent one-shot fallback.
-PROTOCOL_VERSION = 2
+# Control-protocol generation. The frame format is unchanged; version 2 added
+# interactive spawn, attempt.write, and pre-terminal process.output events;
+# version 3 adds digest-pinned runtime artifact trees the Worker verifies
+# inside WSL before bwrap may mount one read-only. Every mismatch is a loud
+# handshake failure in both directions, never a silent one-shot fallback.
+PROTOCOL_VERSION = 3
 
 
 class WorkerError(RuntimeError):
@@ -67,12 +69,26 @@ def _read_exact(stream: BinaryIO, size: int) -> bytes:
     return bytes(chunks)
 
 
+def _refusal(payload: bytes) -> WorkerError:
+    """Turn one Worker bootstrap refusal frame into a typed error."""
+    try:
+        value = json.loads(payload)
+    except ValueError:
+        return WorkerError("HANDSHAKE_REJECTED", "Worker refused the bootstrap")
+    error = value.get("error") if isinstance(value, dict) else None
+    if not isinstance(error, dict):
+        return WorkerError("HANDSHAKE_REJECTED", "Worker refused the bootstrap")
+    code = str(error.get("code") or "HANDSHAKE_REJECTED")
+    return WorkerError(code, str(error.get("message") or code))
+
+
 class WorkerClient:
     def __init__(
         self, command: Sequence[str], *, worker_digest: str, worker_version: str,
         connection_id: str, project_id: str, effective_user: str,
         server_instance_id: str, lease_ms: int = 5_000,
         executable_authorizations: Sequence[dict[str, str]] = (),
+        runtime_artifact_authorizations: Sequence[dict[str, str]] = (),
     ) -> None:
         self.command = tuple(command)
         self.worker_digest = worker_digest
@@ -84,6 +100,9 @@ class WorkerClient:
         self.lease_ms = lease_ms
         self.executable_authorizations = tuple(
             dict(item) for item in executable_authorizations
+        )
+        self.runtime_artifact_authorizations = tuple(
+            dict(item) for item in runtime_artifact_authorizations
         )
         self._process: subprocess.Popen | None = None
         self._frames: queue.Queue = queue.Queue()
@@ -148,9 +167,16 @@ class WorkerClient:
             "serverInstanceId": self.server_instance_id, "leaseMs": self.lease_ms,
             "protocolVersion": PROTOCOL_VERSION,
             "executables": list(self.executable_authorizations),
+            "runtimeArtifacts": list(self.runtime_artifact_authorizations),
         }
         self._write(HELLO, 0, 1, bootstrap)
         kind, _stream, _sequence, payload = self._next(timeout)
+        if kind == WORKER_ERROR:
+            # A bootstrap refusal is typed: the Worker answers the handshake it
+            # will not accept with a code, so a digest mismatch is never
+            # flattened into a generic disconnect.
+            self.close()
+            raise _refusal(payload)
         if kind != HELLO_ACK:
             self.close()
             raise WorkerError("HANDSHAKE_REJECTED", "Worker did not acknowledge bootstrap")

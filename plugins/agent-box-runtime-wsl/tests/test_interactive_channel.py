@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import json
 import os
 from pathlib import Path
 import shutil
@@ -56,12 +57,64 @@ def bwrap_argv(project: Path, script: str):
 
 
 def test_worker_rejects_unsupported_protocol_version_loudly(tmp_path, monkeypatch):
+    """A client one generation ahead is refused, never silently downgraded."""
     import agent_box_runtime_wsl.client as client_module
 
     client, _project = worker_client(tmp_path)
-    monkeypatch.setattr(client_module, "PROTOCOL_VERSION", 3)
+    monkeypatch.setattr(client_module, "PROTOCOL_VERSION", client_module.PROTOCOL_VERSION + 1)
     with pytest.raises(WorkerError, match="PROTOCOL_VERSION_UNSUPPORTED"):
         client.start()
+
+
+def test_worker_refuses_a_previous_generation_client(tmp_path, monkeypatch):
+    """A client one generation behind is refused too, in the other direction."""
+    import agent_box_runtime_wsl.client as client_module
+
+    client, _project = worker_client(tmp_path)
+    monkeypatch.setattr(client_module, "PROTOCOL_VERSION", client_module.PROTOCOL_VERSION - 1)
+    with pytest.raises(WorkerError, match="PROTOCOL_VERSION_UNSUPPORTED"):
+        client.start()
+
+
+def test_current_client_refuses_the_preserved_previous_generation_worker(tmp_path):
+    """The same refusal against a real previous-generation Worker binary.
+
+    `.acceptance-bundle-c3` is the Worker that shipped with the r3/r4 Windows
+    evidence: protocol generation 2, before runtime artifact trees. A current
+    client must fail loudly against it rather than reach a Worker that would
+    bind a declared directory without verifying its digest.
+    """
+    bundle = REPO / "workers" / "agent-box-worker" / ".acceptance-bundle-c3"
+    binary = bundle / "agent-box-worker"
+    manifest = bundle / "manifest.json"
+    if not binary.is_file() or not manifest.is_file():
+        pytest.skip("the preserved previous-generation acceptance bundle is unavailable")
+    recorded = json.loads(manifest.read_text(encoding="utf-8"))
+    # The bundle is only usable evidence if it is the binary it claims to be.
+    assert recorded["sha256"] == digest(binary)
+    project = tmp_path / "workspace"
+    project.mkdir()
+    client = WorkerClient(
+        [str(binary), "--root", str(tmp_path / "worker-root"), "--workspace", str(project)],
+        worker_digest=recorded["sha256"], worker_version=recorded["workerVersion"],
+        connection_id="connection-test", project_id="project-test",
+        effective_user=os.environ["USER"], server_instance_id="server-test",
+    )
+    with pytest.raises(WorkerError) as refused:
+        client.start()
+    # That Worker refuses the whole bootstrap before it ever compares
+    # generations, because `deny_unknown_fields` rejects the field it never
+    # knew. The refusal is loud and fail-closed — a v2 Worker can never be
+    # handed a runtime artifact declaration — and this is exactly the
+    # generation break the version bump records.
+    assert refused.value.code == "WORKER_DISCONNECTED"
+    assert "invalid bootstrap" in refused.value.message
+    client.close()
+    # The generations really are different, so the case above is not a typo in
+    # the fixture: this client speaks 3, that Worker speaks 2.
+    import agent_box_runtime_wsl.client as client_module
+
+    assert client_module.PROTOCOL_VERSION == 3
 
 
 def test_interactive_attempt_streams_output_and_takes_stdin_before_terminal(tmp_path):

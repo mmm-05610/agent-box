@@ -1,0 +1,14 @@
+{
+  "algorithm": "agentbox-runtime-artifact-tree-v1",
+  "digest": "sha256:19cf8e1e04c29e365dcaf71638aa128ef683487b5343f5d48d54bda7ee6ab2a9",
+  "entries": 1,
+  "bytes": 35,
+  "canonical_encoding_hex": "6167656e74626f782d72756e74696d652d61727469666163742d747265652d76310a000000000000000166000000076465702e6d6a7300000000000000234599d995a1e64beeff0f7c51b7c635127962ad2c956a7acb39aac92a37e34eb3",
+  "tree": [
+    {
+      "path": "dep.mjs",
+      "kind": "file",
+      "content_base64": "ZXhwb3J0IGNvbnN0IFZBTFVFID0gJ2ZpeGVkLXZhbHVlJwo="
+    }
+  ]
+}
