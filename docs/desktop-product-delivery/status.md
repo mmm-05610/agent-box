@@ -5,7 +5,7 @@
 
 ## 执行快照（handoff-policy 每阶段必填）— 接管施工中
 
-- updated_at: 2026-09-14 16:45 (+08:00)
+- updated_at: 2026-09-14 17:20 (+08:00)
 - 执行者: Codex 前端产品 goal（接力会话）；**已从暂停的 Zcode 执行者接管**
 - 工作树/分支: /home/maoqh/projects/agent-box-desktop-next-wsl-round1 @ feature/agentbox-desktop-product
 - 接管核验（历史，Zcode→Codex 交接）: 用户指定交接 HEAD `5c0fbfe` 与实际 HEAD
@@ -16,7 +16,7 @@
 - 本阶段起点核验: HEAD `1cbc4f58d602b212f55c7c4dd9c2bc38718cba83`、分支
   feature/agentbox-desktop-product、工作树 clean，无同工作树并发写入者；writer lease 仍为同一
   前端 goal 的 ACTIVE lease，本阶段串行施工，完成后停止写入并回报，不提前 RELEASE。
-- 代码检查点（已提交 HEAD）: `f6b457b5`（P05：`workspaces.archive` 生产接线）
+- 代码检查点（已提交 HEAD）: `a8142125`（P05：`workspaces.browse` 生产接线）
   链: ebb1233（P00）→ 8d4b3df/47b5b47/dbb902f（P01 代码与几何修复）→ 26b32fc（P01 GREEN 证据）
   → 468e6ac/d7e9a57（发布源 d3c0196+ffbcfaf 导入）→ 893d560（P07 检查点2 wire-v1）
   → 957a523（P02A 盘点）→ 07f5386（P02A slice 1：失败面非阻塞）→ 3a25edc（P02A slice 2）
@@ -40,10 +40,17 @@
   → 88f3d934（enum/boolean 编辑覆盖）→ af0c08e3（返修：服务权威名称回写）
   → 矩阵审计文档检查点（evidence/P05-client-matrix.md）→ 940c9df4（config.resolve 生产接线）
   → b6d0bc6f（返修：旧 pending 发送优先恢复）→ 3e207376（workspaces.open 生产接线）
-  → 072c7eac（返修：Workspace 身份完整三元组匹配）→ **f6b457b5（workspaces.archive 生产接线；阶段
-  WORKSPACES_ARCHIVE_CLIENT_READY）**
+  → 072c7eac（返修：Workspace 身份完整三元组匹配）→ f6b457b5（workspaces.archive 生产接线）
+  → **a8142125（workspaces.browse 生产接线；阶段 WORKSPACES_BROWSE_CLIENT_READY）**
 - 已消费发布文档提交: 86d5a7b、61c7ff7、d3c0196、ffbcfaf
-- 当前检查点改动（workspaces.archive 接线）: 统一侧栏新增独立的「Archive in AgentBox」：只归档 AgentBox
+- 当前检查点改动（workspaces.browse 接线）: WSL「Open remote folder」的目录枚举由宿主切到服务
+  （`workspaces.browse`）：宿主只 discover/connect/验证 `{distribution,user,home}` 并保存 shell 记录，产品
+  路径不再调用 `listWslDirectories` 且无兜底。浏览组件采用服务权威路径、latest-wins、失败保留上次清单、
+  只读可进入可选、不可打开禁用并显示服务 reason、file/other 不导航、隐藏项仅本地过滤；能力缺失/服务未就绪
+  时显示真实原因且零请求。确认目录后保存宿主记录并 `selectWorkspaceView`，由既有 workspaces.open 路径完成
+  登记（浏览本身不建 Session/不启 Harness）。矩阵 `workspaces.browse` 改为 PRODUCTION_REACHABLE（EXT），
+  汇总 **26 reachable / 2 gap**；G2 改写为接线记录。
+- 上一检查点改动（workspaces.archive 接线）: 统一侧栏新增独立的「Archive in AgentBox」：只归档 AgentBox
   Server 的 WorkspaceRecord（不删文件、不隐藏本地行、不删 WSL 宿主记录、不级联 Session/历史、不停止运行中
   任务），与本地 Hide 与宿主 Remove 是三个不同条目。匹配沿用完整 identity + normalized path，且需 service
   ready + hello 声明该能力；应用的 `archiveAgentBoxWorkspace` 只发 exact CAS 请求并返回服务记录、不写 store。
@@ -89,9 +96,9 @@
 - 完成范围: P00；P01 全部返修（真机 27 PASS）；P07 检查点 1（语义映射）、检查点 2
   （wire-v1 候选：17 方法 + schema 测试 + JSON Schema 工件；已消费后端机械反馈并回应）；
   P02A（失败面非阻塞+可关闭、Artifacts 页退役、失败终态竞态修复与真机门）
-- 下一项: 按 evidence/P05-client-matrix.md §3 补剩余 3 个前端缺口（workspaces.browse、sessions.update/archive
-  的目标文件与不变量已列出），随后按 P06 收口无模型独立验收；Server lifecycle connection 合同到达后接生产
-  接线。不再重新研究协议。
+- 下一项: 按 evidence/P05-client-matrix.md §3 补剩余 2 个前端缺口（sessions.update/archive 的目标文件与
+  不变量已列出），随后按 P06 收口无模型独立验收；Server lifecycle connection 合同到达后接生产接线。不再
+  重新研究协议。
 - 阻断: 无真实阻断。剩余 P04 production lifecycle connection 与显式 legacy 消费者收口、
   P05 生产接线核查和 P06 独立验收待续；wire 摘要已锁定，真实全栈仍由后续集成人验证
 
@@ -193,6 +200,14 @@
   省略恢复默认、exact 模型引用与带斜杠 id）、
   双 model_slot 独立编辑、unavailable 禁选与目录外当前值、CAS 顺序 update(N)→updateConfig(N+1)、
   部分成功重试不重发改名、pending 连点单发、服务规范化后采用返回 descriptor、迟到 descriptor 不串写。
+- workspaces.browse 生产接线（a8142125）：验收 `npx vitest run --project ui
+  src/application/workspace/wire-workspace-browser.test.ts src/application/workspace/latest-wins.test.ts
+  src/features/workspace/agentbox-workspace-browser.test.tsx
+  src/features/workspace/wsl-workspace-wizard.test.tsx` → **4 files / 31 tests passed，exit 0**；
+  相关回归 5 files / 90 tests passed（wire-workspace-catalog、wsl-workspace-usecases、agentbox-main-chat、
+  unified workspace list、sidebar workspace assembly）；`src/features/chat` + `src/features/workspace`
+  96 files / 664 tests passed；`npm run typecheck` 三项目通过；改动文件 ESLint 0 error / 0 warning；
+  `git diff --check` 干净。
 - workspaces.archive 生产接线（f6b457b5）：验收 `npx vitest run --project ui
   src/application/workspace/wire-workspace-catalog.test.ts
   src/features/chat/sidebar/unified-workspace-list.test.tsx
@@ -288,7 +303,7 @@ wire-review.md通道自39阶段协调。执行者下个检查点消费这些规�
 | P02 上层产品 | IN_PROGRESS（A/B/C/D 主面与服务投影完成；Profile 默认配置编辑与 Workspace 选择登记已接；矩阵剩 4 项前端缺口） | P01 已满足 |
 | P03 用例状态与API | IN_PROGRESS（主 route 生产调用者与 event reducer 接入已完成；真实 Server 源待 P04） | 与 P02 穿插 |
 | P04 宿主与遗留退役 | IN_PROGRESS（production request/Session-event transport + IPC + supervisor；正常冷启动 Hermes 自动门已退役，Server connection合同待后端） | 与 P03 穿插 |
-| P05 正式合同接入 | IN_PROGRESS（WORKSPACES_ARCHIVE_CLIENT_READY；28 方法矩阵：25 生产可达 / 3 前端缺口；`config.resolve`、`workspaces.open`、`workspaces.archive` 已接；lifecycle 外部缺口待续） | wire 双端锁定 |
+| P05 正式合同接入 | IN_PROGRESS（WORKSPACES_BROWSE_CLIENT_READY；28 方法矩阵：26 生产可达 / 2 前端缺口；`config.resolve`、`workspaces.open`、`workspaces.archive`、`workspaces.browse` 已接；lifecycle 外部缺口待续） | wire 双端锁定 |
 | P06 前端验收与交接 | IMPLEMENTATION_HANDOFF_GATE | 本端独立范围完成；真实全栈门由后续集成人负责 |
 | P07 核心合同与状态交接 | 检查点1–6已提交；WIRE_LOCKED | 28 方法双端摘要一致；fixture/客户端已锁定 |
 

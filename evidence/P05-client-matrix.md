@@ -8,6 +8,13 @@
 （application 用例 + 发送前强制校验 + renderer 预览 latest-wins + hello 能力门），矩阵中该行改为
 `PRODUCTION_REACHABLE`（EXT），汇总 23 reachable / 5 gap；G4 改写为「已接线」记录，其余缺口不变。
 
+**增量（2026-09-14，代码检查点 `a8142125`）**：`workspaces.browse` 已接入 WSL「Open remote folder」流程——
+宿主只负责 discover/connect/验证 {distribution,user,home} 与保存 shell 记录，**目录枚举改由服务**
+（`workspaces.browse`，`features/workspace/agentbox-workspace-browser.tsx`），产品路径不再调用
+`listWslDirectories` 且无兜底。矩阵中该行改为 `PRODUCTION_REACHABLE`（EXT），汇总 **26 reachable / 2 gap**；
+G2 改写为「已接线」记录，剩余缺口为 sessions.update、sessions.archive。阶段状态记为
+`WORKSPACES_BROWSE_CLIENT_READY`（P05 仍 IN_PROGRESS）。lifecycle 外部缺口不变。
+
 **增量（2026-09-14，代码检查点 `f6b457b5`）**：`workspaces.archive` 已接入统一工作区侧栏（本地 `ProjectMenu`/
 右键菜单与 WSL kebab 各自出现独立的「Archive in AgentBox」，只归档服务记录：不动文件、不隐藏本地行、不删
 WSL 宿主记录、不级联 Session/历史/Profile、不停止运行中任务），矩阵中该行改为 `PRODUCTION_REACHABLE`（EXT），
@@ -71,7 +78,7 @@ lifecycle 外部缺口不变。详见 §3-G4 与 evidence/P05.md。
 | `server.hello` | ✓ `WireMethods`；`WireV1Client.hello()` `api/wire-v1-client.ts:121` | `refreshAgentBoxProfileCatalog` / `ensureAgentBoxProfileCatalog` `application/profile/wire-composer-profile.ts:39,65`（写 `$agentBoxHello`、`$agentBoxService`） | `useAgentBoxMainChat`→`ensureAgentBoxDesktopCatalog` `application/agentbox-desktop-catalog.ts:14`；`ProfilesView` 刷新 `features/profiles/index.tsx:102` | `api/wire-v1-client.test.ts`、`types/wire/fixtures/core-v1.test.ts` | `PRODUCTION_REACHABLE`（EXT） | 产品唯一能力来源：profiles/models 各 4 方法门、queue 控件门都读它；缺失能力 fail-closed（`wireCapability` 未声明即 `supported:false`） |
 | `workspaces.open` | ✓ schema+client | `openAgentBoxWorkspace` `application/workspace/wire-workspace-catalog.ts`（exact environment/path、每次 attempt 新 requestId、expectedVersion 仅在提供时发送）；store `upsertAgentBoxWorkspace` | `useAgentBoxMainChat` 的自动登记 effect（`app/composition/wiring/agentbox-main-chat.ts`）：非 Session 路由 + 有效 shell target + catalog ready + hello 声明 + 服务尚无匹配记录 | `application/workspace/wire-workspace-catalog.test.ts`、`store/agentbox-service.test.ts`、`app/composition/wiring/agentbox-main-chat.test.tsx`、`features/chat/agentbox-chat-view.test.ts` | `PRODUCTION_REACHABLE`（EXT） | core §4：open = register-or-select，幂等于 (environment, normalizedPath)，不建 Session、不启 Harness；本地/ WSL 同 path 字符串不互认，shell row id 不作 wire id（只经显式 `serviceWorkspaceId` 命中）；同 target 单飞、迟到只入缓存不切回；草稿由 provisional shell scope 迁移到服务 scope。见 §3-G1 |
 | `workspaces.list` | ✓ schema+client | `refreshAgentBoxWorkspaces` `application/workspace/wire-workspace-catalog.ts:17` | `ensureAgentBoxDesktopCatalog`←`useAgentBoxMainChat`（`app/composition/wiring/agentbox-main-chat.ts:50`） | `application/workspace/wire-workspace-catalog.test.ts` | `PRODUCTION_REACHABLE`（EXT） | 服务清单整体替换 `$agentBoxWorkspaces`；`resolveAgentBoxWorkspace` 按环境+规范化路径解析，本地与 WSL 同字符串不合并 |
-| `workspaces.browse` | ✓ schema | **无** | **无** | **无**（0 处引用） | `FIXTURE_ONLY_FRONTEND_GAP` | core §4「远端目录由 Worker 列举，Desktop 呈现」。当前远端枚举走 Electron 宿主 `api/workspace`（`listWslDirectories` 等，含 distribution/rootPath），不带 AgentBox 环境身份、`canOpen/canWrite` 分列与失败原因。见 §3-G2 |
+| `workspaces.browse` | ✓ schema+client | `wireAgentBoxWorkspaceBrowserPort` `application/workspace/wire-workspace-browser.ts`（exact `{requestId, environment, path}`，每次意图新 requestId，返回结果原样） | WSL 向导的目录浏览步骤（`features/workspace/wsl-workspace-wizard.tsx` → `AgentBoxWorkspaceBrowser`），仅在 service ready + hello 声明时提供 | `application/workspace/wire-workspace-browser.test.ts`、`features/workspace/agentbox-workspace-browser.test.tsx`、`features/workspace/wsl-workspace-wizard.test.tsx`、`application/workspace/latest-wins.test.ts` | `PRODUCTION_REACHABLE`（EXT） | core §4：远端目录由 Worker 列举、Desktop 呈现；`canOpen`/`canWrite`/`reason` 只作服务事实呈现（不可打开禁用并显示 reason，只读可进入且可选），服务返回的 path 为权威路径；latest-wins 丢弃旧响应、失败保留上次清单；宿主只做 discover/connect/验证与保存，**无 listWslDirectories 兜底**。见 §3-G2 |
 | `workspaces.archive` | ✓ schema+client | `archiveAgentBoxWorkspace` `application/workspace/wire-workspace-catalog.ts`（exact `{workspaceId, expectedVersion, requestId}`，只返回服务记录、不写 store） | 侧栏工作区行菜单（`features/chat/sidebar/workspace-list/workspace-list.tsx` 持有唯一 ConfirmDialog 与 target；本地 `ProjectMenu`/右键菜单与 WSL kebab 只拿到注入回调） | `application/workspace/wire-workspace-catalog.test.ts`、`features/chat/sidebar/unified-workspace-list.test.tsx`、`features/chat/sidebar/workspace-list/workspace-row.test.tsx`、`features/chat/sidebar/projects/project-menu.test.tsx` | `PRODUCTION_REACHABLE`（EXT） | core §3/§4：归档的是服务 WorkspaceRecord（记录保留、不级联、不停止运行），匹配用完整 `{kind,user,host}` + normalized path 且 hello 必须声明该能力；成功时**先清 neutral selection 再移除服务投影**，避免主聊天观察到「仍选中但服务记录消失」而立即 `workspaces.open` 反向恢复；CONFLICT_VERSION 保持对话框打开、投影与选择不变。见 §3-G3 |
 | `profiles.list` | ✓ schema+client | `refreshAgentBoxProfileCatalog` `application/profile/wire-composer-profile.ts:39` | `ensureAgentBoxDesktopCatalog`（主聊天挂载）+ `ProfilesView` | `application/profile/wire-composer-profile.test.ts` | `PRODUCTION_REACHABLE`（EXT） | 先读 hello 的 `profiles.list` capability，未声明即抛出该 reason；失败保留上一投影并置 `$agentBoxService=unavailable` |
 | `profiles.create` | ✓ schema+client | `wireProfileMaintenancePort.create` `application/profile/profile-maintenance-port.ts:66` | `ProfilesView` 新建对话框（`features/profiles/index.tsx`），4 方法门（`features/profiles/index.tsx:86`） | `application/profile/profile-maintenance-port.test.ts`、`features/profiles/index.test.tsx` | `PRODUCTION_REACHABLE`（EXT） | requestId 每次新生成；只采纳服务返回 `ProfileRecord`；`profiles.create` 未声明则整页无维护控件 |
@@ -103,8 +110,8 @@ lifecycle 外部缺口不变。详见 §3-G4 与 evidence/P05.md。
 | --- | --- | --- |
 | `PRODUCTION_REACHABLE` | **25** | server.hello、workspaces.open、**workspaces.archive**、workspaces.list、profiles.list/create/update/archive/updateConfig、providerModels.list/create/update/archive、config.describe、config.resolve、sessions.list、sessions.switchProfile、sessions.createAndSend、sessions.send、sendOutcome.query、queue.get、queue.withdraw、runs.stop、approvals.decide、history.snapshot |
 | `CLIENT_READY_NO_SURFACE` | 0 | — |
-| `FIXTURE_ONLY_FRONTEND_GAP` | **3** | workspaces.browse、sessions.update、sessions.archive |
-| `EXTERNAL_LIFECYCLE_BLOCKED` | **25 行同一外部缺口**（不等于前端缺口，见 §4） | 上表 25 个 `PRODUCTION_REACHABLE` 行的运行终态 |
+| `FIXTURE_ONLY_FRONTEND_GAP` | **2** | sessions.update、sessions.archive |
+| `EXTERNAL_LIFECYCLE_BLOCKED` | **26 行同一外部缺口**（不等于前端缺口，见 §4） | 上表 26 个 `PRODUCTION_REACHABLE` 行的运行终态 |
 | `NOT_APPLICABLE` | 0 | — |
 | 合计 | 28 | 与 `WireMethods` 逐项一致（§6 核验） |
 
@@ -158,15 +165,37 @@ lifecycle 外部缺口不变。详见 §3-G4 与 evidence/P05.md。
   联调验证；服务 WorkspaceRecord 的 connection/accessibility 事实不由本端推断，本端也不显示"已连接/已
   验证"。`workspaces.browse`/`workspaces.archive` 仍不在本阶段范围。
 
-**G2 `workspaces.browse` 未接（远端目录列举）**
-- 目标文件：`src/application/workspace/wire-workspace-catalog.ts` 或新
-  `wire-workspace-browser.ts`；远端/WSL 目录选择对话框。
-- 接口：`workspaces.browse({environmentId, path?, requestId})` → 目录条目 +
-  `canOpen/canWrite` 分列 + 失败原因；进度走 `workspace.connection` 事件。
-- 不变量：可读即可浏览，不因只读拒绝打开；环境连接、目录可访问、角色可运行分开报告；
-  不把 WSL 路径当本地路径，不做 Windows/Linux/UNC 语义替换。
-- 建议验收：只读目录仍可浏览并可打开；不可达环境给出真实失败原因而非空列表；失败不回落宿主
-  本地目录列举结果。
+**G2 `workspaces.browse` — 已接线（代码检查点 `a8142125`）**
+
+原缺口（只登记未修）已按原目标文件与不变量实现：
+
+- 目标文件（实际改动/新增）：`application/workspace/wire-workspace-browser.ts`（端口）、
+  `features/workspace/agentbox-workspace-browser.tsx`（浏览组件）、
+  `features/workspace/wsl-workspace-wizard.tsx`（接入与能力门）。
+- 接口（实现）：`wireAgentBoxWorkspaceBrowserPort(client, {createRequestId?})` →
+  `browse({environment, path})` → `workspaces.browse({requestId, environment, path})`；每次意图一个新
+  requestId；结果（含 `canOpen`/`canWrite`/`reason`）原样返回；typed/transport 错误原样抛出；不写 store、
+  不调用 open、不创建 Workspace/Session、不自行计算权限。测试替身只经显式 port 注入，不是生产默认。
+- 职责边界（已由测试钉住）：宿主保留 `discoverWsl`/`connectWsl`/`cancelWslOperation`/
+  `releaseWslConnection`/`saveWslWorkspaceFromWizard`，并继续验证 `{distribution, user, home}`；**目录枚举
+  完全由服务承担**，`listWslDirectories` 在产品路径调用次数为 0，失败时不回落宿主枚举；service 未 ready 或
+  hello 未声明 `workspaces.browse` 时显示真实原因且不发请求、不伪装空目录。
+- 不变量（已由测试钉住）：采用服务返回的 `result.path` 为权威路径；手输/父目录/子目录都发新请求；A→B
+  latest-wins（迟到的成功与失败都不覆盖 B），卸载后不写 state；`kind==='directory' && canOpen` 才可进入，
+  `canOpen=false` 禁用并显示 reason（点击零请求），`canOpen && !canWrite` 可进入且仍可选择（显示只读），
+  file/other 只显示不导航；隐藏项只做本地过滤、不产生额外 wire 字段或请求；浏览失败保留上次成功清单与
+  输入；成功浏览即证明可读，选择当前目录不要求 canWrite；浏览/选择本身不创建 Session、不启动 Harness。
+- 接入顺序（已由测试钉住）：host connect 成功后用 `{kind:'wsl', host:distribution, user:result.user}` 与
+  `result.home` 起浏览；确认目录 → `saveWslWorkspaceFromWizard` → 采纳宿主记录 → `selectWorkspaceView(
+  record.id)` → 释放临时 connection → 关闭；**不直接调用 workspaces.open**（由既有 useAgentBoxMainChat
+  观察 shell selection 后执行）；保存失败保持浏览器与目录并显示既有 typed failure、可重试；Back 保留已验证
+  connection，Close 释放。
+- 验收（已执行）：`npx vitest run --project ui src/application/workspace/wire-workspace-browser.test.ts
+  src/application/workspace/latest-wins.test.ts src/features/workspace/agentbox-workspace-browser.test.tsx
+  src/features/workspace/wsl-workspace-wizard.test.tsx` → 4 files / **31 tests passed**（exit 0）；相关回归
+  5 files / 90 tests passed；`src/features/chat` + `src/features/workspace` 96 files / 664 tests passed。
+- 仍属外部缺口（不变）：真实目录列表、访问性与连接进度只能在 Server lifecycle connection 之后联调验证。
+  `workspace.connection` 事件进度不由本端假造，保持既有事件边界，留待联调证据。
 
 **G3 `workspaces.archive` — 已接线（代码检查点 `f6b457b5`）**
 
@@ -258,7 +287,7 @@ lifecycle 外部缺口不变。详见 §3-G4 与 evidence/P05.md。
 
 ## 4. `EXTERNAL_LIFECYCLE_BLOCKED` 的精确边界（单一外部缺口）
 
-上表 25 个 `PRODUCTION_REACHABLE` 方法的前端路径（UI/application → client → preload IPC →
+上表 26 个 `PRODUCTION_REACHABLE` 方法的前端路径（UI/application → client → preload IPC →
 main-only transport）**已完整**，其中断点只有一处：**main 进程的 AgentBox connection slot 目前为
 null**。因此这些方法的运行终态都属于同一个 `EXTERNAL_LIFECYCLE_BLOCKED`，不是各自的缺口。
 
@@ -272,7 +301,7 @@ null**。因此这些方法的运行终态都属于同一个 `EXTERNAL_LIFECYCLE
 - `electron/workcore/slot.ts`：生产未安装任何 lifecycle（只有测试安装）。
 - 事件流同样终止于此：`agentbox-wire-event-transport.ts` 连接为 null 时诚实 unavailable。
 
-一旦 lifecycle 在 readiness 后安装 `{endpoint, sessionToken}`，这 25 个方法与事件流即可在**不改
+一旦 lifecycle 在 readiness 后安装 `{endpoint, sessionToken}`，这 26 个方法与事件流即可在**不改
 客户端**的前提下进入真实联调；在此之前 REAL_FLOW 未验证，也不得声称。
 
 ## 5. 遗留 Hermes 可达性结论
@@ -367,6 +396,7 @@ dynamic connection slot            electron/composition/agentbox-service-composi
 | pending 恢复顺序定向门（`b6d0bc6f`，6 files / 62 tests） | 通过（exit 0） |
 | workspaces.open 接线定向门（`3e207376` + 收口 + 身份匹配返修，4 files / 55 tests） | 通过（exit 0） |
 | workspaces.archive 接线定向门（`f6b457b5`，4 files / 45 tests） | 通过（exit 0） |
+| workspaces.browse 接线定向门（`a8142125`，4 files / 31 tests） | 通过（exit 0） |
 | `git status --short` | 只含本阶段写集（见 §9） |
 
 矩阵完整性核验（一次性只读命令，不新增仓库脚本）：从 `WireMethods` 导出键、从本文件表格抽取
@@ -381,8 +411,8 @@ package/lock、后端与 Windows 构建树；未重跑完整测试、未跑 Wind
 未执行模型调用。
 
 未决（不因本审计消失）：
-- 真实 Server lifecycle connection（§4）→ 阻断 25 个方法与事件流的 REAL_FLOW 验证。
-- 3 个 `FIXTURE_ONLY_FRONTEND_GAP`（§3）→ 本端可独立补齐的下一机械实现批次。
+- 真实 Server lifecycle connection（§4）→ 阻断 26 个方法与事件流的 REAL_FLOW 验证。
+- 2 个 `FIXTURE_ONLY_FRONTEND_GAP`（§3）→ 本端可独立补齐的下一机械实现批次。
 - 侧栏会话列表的 legacy 数据面（§5）→ P03/P04 迁移账本中最重的剩余消费者。
 - `wire-v1` 未纳入范围的增量（steer 语义、Worker 通道合同、快照分页参数）仍为外围合同。
 
