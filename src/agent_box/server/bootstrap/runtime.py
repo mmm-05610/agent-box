@@ -329,6 +329,9 @@ def build_runtime_from_sidecar_deployment(
     from agent_box.server.execution.sidecar import (
         SidecarHarnessPort, WslSidecarLauncher, sidecar_bundle_files,
     )
+    from agent_box.resource_contracts.harness_capabilities import (
+        CapabilityDeclarationError, validate_claims,
+    )
 
     deployments: dict[str, dict[str, Any]] = {}
     additional_bundle: dict[str, bytes] = {}
@@ -468,12 +471,19 @@ def build_runtime_from_sidecar_deployment(
             deployment["_state_bundle_prefix"] = None
             deployment["_state_target"] = None
         deployments[harness_id] = deployment
+        # 能力声明是部署座位上的唯一入口：canonical id + 真 bool，其它一律类型化拒绝。
+        # 任何生产模板都只能经过这里，不能再各自手写一套不受校验的字典。
+        raw_claims = item.get("capabilityClaims")
+        try:
+            capability_claims = {} if raw_claims is None else validate_claims(raw_claims)
+        except CapabilityDeclarationError as exc:
+            raise RuntimeError(f"SIDECAR_DEPLOYMENT_INVALID: {exc.code}") from exc
         registry.register(HarnessDescriptor(
             harness_id,
             credential_kind=credential_kind,
             model_control_id=model_control_id,
             credential_environment=credential_environment,
-            capability_claims=dict(item.get("capabilityClaims") or {}),
+            capability_claims=capability_claims,
             control_options={
                 str(key): tuple(options)
                 for key, options in dict(item.get("controlOptions") or {}).items()
@@ -536,6 +546,8 @@ def build_runtime_from_sidecar_deployment(
                 preferred_auth_method=deployment.get("preferredAuthMethod"),
                 resume_native_id=resume_native_id,
                 state_directory="/tmp/agentbox-sidecar-state", directory="/workspace",
+                # 静态上限只能来自已校验的注册声明（不依赖 port 的默认值）。
+                declared_capabilities=descriptor.capability_claims,
                 on_event=on_event,
             )
 

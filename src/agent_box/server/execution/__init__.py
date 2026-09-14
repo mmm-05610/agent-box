@@ -8,6 +8,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable, Mapping, Protocol
 
+from agent_box.resource_contracts.harness_capabilities import (
+    CapabilityDeclaration,
+    capability_view as _capability_view,
+    merge_capabilities,
+    validate_claims,
+)
+
 
 class TurnExecutionPort(Protocol):
     """Product-facing dispatch surface; plugins own the native semantics."""
@@ -20,9 +27,10 @@ class TurnExecutionPort(Protocol):
 class HarnessDescriptor:
     """One registered Harness extension as the Server may describe it.
 
-    `capability_claims` may contain only abilities the registered
-    implementation actually demonstrates; unverified abilities stay absent
-    rather than defaulting to true.
+    `capability_claims` is the *static ceiling*: it is validated against the
+    versioned canonical contract at construction time, so a production template
+    cannot smuggle in a second, unchecked dictionary. Unverified abilities stay
+    false rather than defaulting to true.
     """
 
     harness_type: str
@@ -43,6 +51,13 @@ class HarnessDescriptor:
     # Controls a security rule pins; they are reported as locked and cannot be
     # overridden by a Profile default or a temporary override.
     security_locked_controls: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        # 声明只能是 canonical id + 真 bool；装配期就失败，而不是等到某次执行
+        # 才把漂移写法当成“支持”。校验后按 canonical 次序冻结为普通字典快照。
+        object.__setattr__(
+            self, "capability_claims", validate_claims(self.capability_claims),
+        )
 
 
 class HarnessRegistry:
@@ -66,8 +81,24 @@ class HarnessRegistry:
         return tuple(sorted(self._descriptors))
 
     def claims_for(self, harness_type: str) -> dict[str, bool]:
+        """External-compatible shape: {canonical id: declared}; unknown → {}."""
+        return self.canonical_claims(harness_type)
+
+    def canonical_claims(self, harness_type: str) -> dict[str, bool]:
+        """registry 派生的 canonical 静态声明（Profile 视图的唯一来源）。"""
         descriptor = self._descriptors.get(harness_type)
         return dict(descriptor.capability_claims) if descriptor else {}
+
+    def capability_declarations(self, harness_type: str) -> tuple[CapabilityDeclaration, ...]:
+        """静态 canonical 视图（无任何运行时观测；未注册 → 空）。"""
+        descriptor = self._descriptors.get(harness_type)
+        if descriptor is None:
+            return ()
+        return merge_capabilities(descriptor.capability_claims, {})
+
+    def capability_view(self, harness_type: str) -> dict[str, Any]:
+        """静态 canonical 视图字典，形状与运行时视图一致。"""
+        return _capability_view(harness_type, self.capability_declarations(harness_type))
 
     def __contains__(self, harness_type: str) -> bool:
         return harness_type in self._descriptors

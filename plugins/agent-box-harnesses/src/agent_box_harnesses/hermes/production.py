@@ -81,6 +81,8 @@ import json
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+from ..registry.capability_claims import capability_claims as _derive_capability_claims
+
 #: The block the configuration declares carries the product's provider identity in
 #: its content: the official DeepSeek root, the credential reference, the
 #: transport, the request body options and the model catalogue.
@@ -215,6 +217,16 @@ LOOPBACK_GUARD_TARGET = f"{AGENT_HOME}/{SITECUSTOMIZE_NAME}"
 
 class HermesProductionTemplateError(ValueError):
     """A deployment declaration this template refuses to emit."""
+
+
+def capability_claims() -> dict[str, bool]:
+    """本模板部署时声明的 canonical 能力（派生自注册表，不手写）。
+
+    `native_continuation` 是**已观测**项：全链门直接看到 Hermes 以 `session/resume`
+    重开同一个 native session（无重放）并回投 `state.db`。`attach` 与 `permissions`
+    不声明——没有任何运行时证据。
+    """
+    return _derive_capability_claims("hermes")
 
 
 def config_yaml_text() -> str:
@@ -380,6 +392,11 @@ def harness_deployment(
     deployment: dict[str, Any] = {
         "id": "hermes",
         "timeoutMs": timeout_ms,
+        # 能力声明**派生**自注册表（`harnesses.toml`），不由本模板手写：see
+        # `registry.capability_claims`。该表里 hermes 已包含 `native_continuation`
+        # （全链门直接观测到同 native id 的 `session/resume` 重开），并且**不**包含
+        # `attach`/`permissions`——本模板无权自行加项。
+        "capabilityClaims": capability_claims(),
         "credentialKind": CREDENTIAL_KIND,
         "credentialEnvironment": CREDENTIAL_ENVIRONMENT,
         "runtimeArtifactMounts": [dict(item) for item in mounts],

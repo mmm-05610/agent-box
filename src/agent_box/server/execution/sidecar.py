@@ -21,6 +21,10 @@ import time
 from typing import Any, Callable, Mapping, Protocol, Sequence
 from uuid import uuid4
 
+from agent_box.resource_contracts.harness_capabilities import (
+    CapabilityDeclaration, capability_view, merge_capabilities, validate_claims,
+)
+
 
 #: How often a blocked channel reader re-checks its keepalive. Small enough that
 #: a failed lease ends the turn promptly, large enough not to spin.
@@ -67,9 +71,23 @@ class _ProcessChannels:
         self.process = process
 
     def write_line(self, value: str) -> None:
-        assert self.process.stdin
-        self.process.stdin.write((value + "\n").encode("utf-8"))
-        self.process.stdin.flush()
+        """Write one envelope line, or refuse with the same typed error as the
+        Worker channels do.
+
+        A cancelled or already-finished execution can reach this after its
+        channel was closed; the caller (`SidecarHarnessPort.cancel`) treats a
+        typed closed-sidecar error as "nothing left to cancel", while a bare
+        ValueError from a closed file object would escape it and fail the whole
+        server shutdown.
+        """
+        stream = self.process.stdin
+        if stream is None or getattr(stream, "closed", False):
+            raise SidecarError("SIDECAR_CLOSED", "sidecar channel is closed")
+        try:
+            stream.write((value + "\n").encode("utf-8"))
+            stream.flush()
+        except (ValueError, OSError) as exc:
+            raise SidecarError("SIDECAR_CLOSED", "sidecar channel is closed") from exc
 
     def iter_chunks(self):
         assert self.process.stdout
@@ -93,15 +111,31 @@ class _ProcessChannels:
                 process.wait(timeout=3)
 
 
-def _advertised(capability: Any) -> bool:
-    """True when a Harness advertised a capability, however ACP spelled it.
+def _advertised(capability: Any) -> bool | None:
+    """A native capability advertisement, read as the tri-state it really is.
 
     ACP marks a session capability by its presence, conventionally as an empty
     object. Treating the value as a boolean would make every such Harness look
     incapable in Python, where `{}` is falsy but an absent or explicitly false
-    value is the only honest "no".
+    value is the only honest "no". A missing key (or an explicit null) is not an
+    advertisement at all and stays "not observed".
     """
-    return capability is not None and capability is not False
+    if capability is None:
+        return None
+    if capability is False:
+        return False
+    return True
+
+
+def _advertised_image(capability: Any) -> bool | None:
+    """`promptCapabilities.image`: only an explicit truth is an observation.
+
+    A missing or explicitly false value stays "not observed": attachment
+    support is never inferred from a default policy or from a nearby ability.
+    """
+    if capability is None or capability is False:
+        return None
+    return True
 
 
 def _require_matching_artifact_authorizations(
@@ -134,6 +168,11 @@ def sidecar_bundle_files(
         "agentbox-sidecar/package.json": (runtime / "package.json").read_bytes(),
         "agentbox-sidecar/runtime/worker-entry.mjs": (runtime / "worker-entry.mjs").read_bytes(),
         "agentbox-sidecar/runtime/native-driver.mjs": (runtime / "native-driver.mjs").read_bytes(),
+        # The validated static ceiling, so the sidecar can refuse to project a
+        # capability its Harness never declared instead of guessing.
+        "agentbox-sidecar/runtime/capability_declarations.json": (
+            runtime / "capability_declarations.json"
+        ).read_bytes(),
         "agentbox-sidecar/runtime/profile_extensions.mjs": (
             runtime / "profile_extensions.mjs"
         ).read_bytes(),
@@ -680,19 +719,29 @@ class SidecarHarnessPort:
     The native session id is kept per execution on the instance; nothing here
     is class-level state, so two ports in one process cannot share or overwrite
     each other's identity.
+
+    The port also owns the *effective* capability view of each execution: the
+    deployment's static declaration intersected with what the native side really
+    demonstrated during that execution. Downstream behaviour (checkpoint
+    resumability, attachment dispatch) reads that view, so a declared ability
+    never becomes a product promise on its own, and an observed ability never
+    exceeds what was declared.
     """
 
     def __init__(
         self, launcher: SidecarLauncher, *, environment: Mapping[str, str],
-        profile: str = "codex", adapter: Mapping[str, Any] | None = None,
+        profile: str = "", adapter: Mapping[str, Any] | None = None,
         model: str | None = None, credential_environment: str | None = None,
         preferred_auth_method: str | None = None,
         resume_native_id: str | None = None,
         state_directory: str = "/tmp/agentbox-sidecar",
         directory: str = "/workspace", on_event=None,
+        declared_capabilities: Mapping[str, bool] | None = None,
     ) -> None:
         self.launcher = launcher
         self.environment = dict(environment)
+        # 调用方必须给出部署声明的 harness 类型；空值会在 register 时被 sidecar
+        # 以 HARNESS_PROFILE_UNREGISTERED 拒绝，这里不替任何一家猜一个默认名字。
         self.profile = profile
         self.adapter = dict(adapter or {})
         self.model = model
@@ -702,13 +751,21 @@ class SidecarHarnessPort:
         self.state_directory = state_directory
         self.directory = directory
         self.on_event = on_event or (lambda *_: None)
+        # 静态上限：只能来自部署/插件声明（经 canonical 校验）；缺省按“全部 false”
+        # 处理——不猜、不默认 true。
+        if declared_capabilities is None:
+            self.declared_capabilities: dict[str, bool] = {}
+        else:
+            self.declared_capabilities = validate_claims(declared_capabilities)
         self._sessions: dict[str, SidecarEnvelope] = {}
         self._native_sessions: dict[str, str] = {}
         self._approvals: dict[str, tuple[str, str]] = {}
-        self._resumable: dict[str, bool] = {}
         self._native_closed: set[str] = set()
+        # 本次执行的原生观测与观测来源；observed 只反映这一次执行，绝不回写静态声明。
+        self._observed: dict[str, dict[str, bool | None]] = {}
+        self._evidence: dict[str, dict[str, str]] = {}
         self._current: str = ""
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
 
     def open_execution(self, execution_id: str) -> str:
         """Open a sidecar, register the profile, and open one native session.
@@ -719,6 +776,8 @@ class SidecarHarnessPort:
         with self._lock:
             if execution_id in self._sessions:
                 return self._native_sessions[execution_id]
+            # 早于 start/create 设置：原生在打开会话时播发的事件也属于这次执行。
+            self._current = execution_id
         envelope = SidecarEnvelope(self.launcher.launch(self.environment), on_event=self._forward)
         try:
             registered = envelope.request({
@@ -733,8 +792,10 @@ class SidecarHarnessPort:
                 session = envelope.request({
                     "op": "create", "title": execution_id, "model": self.model,
                 })
+                session_operation = "create"
             else:
                 session = envelope.request({"op": "open", "sessionId": self.resume_native_id})
+                session_operation = "open"
         except BaseException:
             envelope.close()
             raise
@@ -745,15 +806,25 @@ class SidecarHarnessPort:
         with self._lock:
             self._sessions[execution_id] = envelope
             self._native_sessions[execution_id] = native
-            # ACP advertises a session capability as the presence of an object
-            # marker (`resume: {}`), not as a boolean, and an empty mapping is
-            # falsy in Python - so raw truthiness would report every
-            # conventional ACP Harness as unable to resume. A capability counts
-            # as advertised when it is present and not explicitly false.
-            self._resumable[execution_id] = _advertised(
-                (started.get("sessionCapabilities") or {}).get("resume"),
-            )
             self._current = execution_id
+            # 运行时观测只记录原生真正给出的事实，且只属于本次执行：
+            # - start 操作合同已注册且被真实调用，这就是 start 的观测来源；
+            # - create/open 返回了原生会话身份，这就是 observe 的观测来源；
+            # - 会话/提示能力按原生播发读取（空对象算播发，null/缺失是“未观测”）。
+            self._record_observation(execution_id, "start", True, "sidecar.operation.start")
+            self._record_observation(
+                execution_id, "observe", True, f"sidecar.operation.{session_operation}",
+            )
+            self._record_observation(
+                execution_id, "native_continuation",
+                _advertised((started.get("sessionCapabilities") or {}).get("resume")),
+                "sessionCapabilities.resume",
+            )
+            self._record_observation(
+                execution_id, "attach",
+                _advertised_image((started.get("promptCapabilities") or {}).get("image")),
+                "promptCapabilities.image",
+            )
         self.on_event(execution_id, "started", {
             "nativeSessionId": native, "provenance": registered.get("provenance"),
         })
@@ -769,8 +840,9 @@ class SidecarHarnessPort:
             with self._lock:
                 self._native_closed.add(execution_id)
         state = envelope.capture_state()
-        with self._lock:
-            resumable = self._resumable.get(execution_id, False)
+        # checkpoint 的可续接性读的是有效能力：静态声明了 native_continuation
+        # 且本次执行真的被原生播发过，才允许声明 resumable。
+        resumable = self._effective_supported(execution_id, "native_continuation")
         return state, resumable
 
     def accept(self, execution_id: str, *, overrides: Mapping[str, Any] | None = None) -> None:
@@ -783,13 +855,24 @@ class SidecarHarnessPort:
         attachments: Sequence[Mapping[str, Any]] = (),
     ) -> dict[str, Any]:
         envelope = self._require(execution_id)
+        items = [dict(item) for item in attachments]
+        if items and not self._effective_supported(execution_id, "attach"):
+            # 有效 attach=false 时在派发前类型化拒绝：附件要么被原生真正支持，
+            # 要么带着明确错误失败，绝不静默丢弃。
+            raise SidecarError(
+                "ATTACHMENT_UNSUPPORTED",
+                "this execution has no effective 'attach' capability",
+            )
         with self._lock:
             self._current = execution_id
-        return envelope.request(
+        result = envelope.request(
             {"op": "prompt", "sessionId": self._native_sessions[execution_id], "text": text,
-             "model": self.model, "attachments": [dict(item) for item in attachments]},
+             "model": self.model, "attachments": items},
             timeout=600,
         )
+        # prompt 返回即完成合同被真实调用，这是 finish 的观测来源。
+        self._record_observation(execution_id, "finish", True, "sidecar.operation.prompt")
+        return result
 
     def cancel(self, execution_id: str) -> bool:
         with self._lock:
@@ -807,7 +890,8 @@ class SidecarHarnessPort:
         with self._lock:
             envelope = self._sessions.pop(execution_id, None)
             self._native_sessions.pop(execution_id, None)
-            self._resumable.pop(execution_id, None)
+            self._observed.pop(execution_id, None)
+            self._evidence.pop(execution_id, None)
             native_closed = execution_id in self._native_closed
             self._native_closed.discard(execution_id)
             self._approvals = {
@@ -826,7 +910,8 @@ class SidecarHarnessPort:
             sessions = list(self._sessions.values())
             self._sessions.clear()
             self._native_sessions.clear()
-            self._resumable.clear()
+            self._observed.clear()
+            self._evidence.clear()
             self._native_closed.clear()
             self._approvals.clear()
         for envelope in sessions:
@@ -857,6 +942,47 @@ class SidecarHarnessPort:
             "decision": decision, "scope": dict(scope),
         }, timeout=10)
 
+    def effective_capabilities(self, execution_id: str) -> dict:
+        """该 execution 的 canonical 能力视图（静态声明 ∩ 本次运行时观测）。
+
+        形状与 ``harness_capabilities.capability_view`` 一致：``declared`` 永远是静态
+        上限，``observed`` 三态且随执行过程更新（例如首条 delta 到达后
+        ``stream.observed=true``），``supported`` 是两者合并后的结论。未知 execution
+        抛出与 `_native`/`_require` 一致的 ``EXECUTION_UNKNOWN``。
+        """
+        with self._lock:
+            if execution_id not in self._sessions:
+                raise SidecarError("EXECUTION_UNKNOWN", "no sidecar for this execution")
+        return capability_view(self.profile, self._effective(execution_id))
+
+    def _effective(self, execution_id: str) -> tuple[CapabilityDeclaration, ...]:
+        with self._lock:
+            observed = dict(self._observed.get(execution_id) or {})
+            evidence = dict(self._evidence.get(execution_id) or {})
+        return merge_capabilities(self.declared_capabilities, observed, evidence=evidence)
+
+    def _effective_supported(self, execution_id: str, capability_id: str) -> bool:
+        for declaration in self._effective(execution_id):
+            if declaration.id == capability_id:
+                return declaration.supported
+        return False
+
+    def _record_observation(
+        self, execution_id: str, capability_id: str, value: bool | None,
+        evidence: str | None = None,
+    ) -> None:
+        """记录一条本次执行的原生事实。
+
+        ``None`` 表示"没有观测到"，既不写观测也不覆盖已有观测——观测是单调事实，
+        而且它只影响本次执行的合并结果，不会回写任何静态声明。
+        """
+        if value is None:
+            return
+        with self._lock:
+            self._observed.setdefault(execution_id, {})[capability_id] = value
+            if evidence is not None:
+                self._evidence.setdefault(execution_id, {})[capability_id] = evidence
+
     def _native(self, execution_id: str) -> str:
         native = self._native_sessions.get(execution_id)
         if native is None:
@@ -881,6 +1007,11 @@ class SidecarHarnessPort:
             if update.get("sessionUpdate") == "agent_message_chunk":
                 text = ((update.get("content") or {}).get("text") or "")
                 if text:
+                    # 收到一条流式增量，就是 stream 被真实观测到的证据；两条传输
+                    # （ACP 与 deployment-declared driver）在这里汇成同一个产品事实。
+                    self._record_observation(
+                        execution_id, "stream", True, "sidecar.event.message.delta",
+                    )
                     self.on_event(execution_id, "message.delta", {"text": text})
         elif event == "message_delta":
             # A deployment-declared native driver reports the same product fact
@@ -888,10 +1019,21 @@ class SidecarHarnessPort:
             # never a Harness's, so this mapping stays brand-free.
             text = str(data.get("text") or "")
             if text:
+                self._record_observation(
+                    execution_id, "stream", True, "sidecar.event.message.delta",
+                )
                 self.on_event(execution_id, "message.delta", {"text": text})
         elif event == "driver_exit":
             self.on_event(execution_id, "failed", {"code": "ADAPTER_EXIT"})
         elif event == "adapter_exit":
             self.on_event(execution_id, "failed", {"code": "ADAPTER_EXIT"})
         elif event == "permission_request":
+            # 只有真实发生了 permission round-trip、并且插件静态声明了
+            # permissions 时，才把它算作观测；否则保持“未观测”，绝不因为一次
+            # 原生请求或某种 deny 默认就宣称支持审批。请求本身仍然如实上报。
+            if self.declared_capabilities.get("permissions"):
+                self._record_observation(
+                    execution_id, "permissions", True,
+                    "sidecar.operation.permission_request",
+                )
             self.on_event(execution_id, "approval.requested", {"request": data})

@@ -50,7 +50,9 @@ class ProfileService:
             harness_type=harness_type, config_digest=record.digest,
             credential_id=body.get("credential_id"),
         )
-        result["capabilities"] = self.harnesses.claims_for(harness_type)
+        # capabilities 永远来自 registry 的 canonical 静态声明（已校验的已注册扩展），
+        # 不来自数据库行里的任何旧快照。
+        result["capabilities"] = self.harnesses.canonical_claims(harness_type)
         return status, result
 
     def list(self, *, include_archived: bool = True) -> list[dict[str, Any]]:
@@ -63,7 +65,7 @@ class ProfileService:
                 "native_generation": row["native_generation"],
                 "credential_id": row["credential_id"], "run_state": row["run_state"],
                 "recovery_pending": bool(row["recovery_pending"]),
-                "capabilities": self.harnesses.claims_for(row["harness_type"]),
+                "capabilities": self.harnesses.canonical_claims(row["harness_type"]),
             })
         return items
 

@@ -32,6 +32,8 @@ import json
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+from ..registry.capability_claims import capability_claims as _derive_capability_claims
+
 OPENCODE_PROVIDER = "deepseek"
 #: 产品/ProviderModel 模型 id（用户确认过的那个），不得被静默改写。
 PRODUCT_MODEL_ID = "deepseek-flash"
@@ -97,6 +99,17 @@ CONFIG_SOURCE = "deploy/opencode/opencode.json"
 
 class OpenCodeProductionTemplateError(ValueError):
     """本模板拒绝输出的部署声明。"""
+
+
+def capability_claims() -> dict[str, bool]:
+    """本模板部署时声明的 canonical 能力（派生自注册表，不手写）。
+
+    `native_continuation` 是**已观测**项：门的重开相位 `createsInsideReopenPhase=[]`
+    且 native session id 不变。`attach` 不声明：驱动在发包前以
+    `OPENCODE_ATTACHMENTS_UNSUPPORTED` 显式拒绝附件，原生 `promptCapabilities.image`
+    也是 false。`permissions` 无任何运行时证据。
+    """
+    return _derive_capability_claims("opencode")
 
 
 def config_document() -> dict[str, Any]:
@@ -188,6 +201,11 @@ def harness_deployment(
     return {
         "id": "opencode",
         "timeoutMs": timeout_ms,
+        # 能力声明**派生**自注册表（`harnesses.toml`），不由本模板手写：see
+        # `registry.capability_claims`。该表里 opencode 已包含 `native_continuation`
+        # （门的重开相位 `createsInsideReopenPhase=[]` + 同一 native session id），
+        # 并且**不**包含 `attach`（驱动显式拒绝附件）与 `permissions`。
+        "capabilityClaims": capability_claims(),
         "credentialKind": CREDENTIAL_KIND,
         "credentialEnvironment": CREDENTIAL_ENVIRONMENT,
         "modelControlId": MODEL_CONTROL_ID,

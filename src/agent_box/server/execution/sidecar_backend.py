@@ -12,7 +12,7 @@ from pathlib import PurePosixPath
 from typing import Any, Callable, Mapping
 
 from agent_box.resource_contracts import AgentBoxProfileV1, PromptFragmentV1, WorkspaceV1
-from agent_box.server.execution.sidecar import SidecarHarnessPort
+from agent_box.server.execution.sidecar import SidecarError, SidecarHarnessPort
 from agent_box.work_core import (
     ExecutionFinalizationRequest, ExecutionProjection, ExecutionStartReceipt,
     Freshness, Outcome, Phase, ProviderDescriptor, Ref, RefType,
@@ -223,23 +223,22 @@ class SidecarExecutionBackend:
         port = self.port_factory(context, lambda execution_id, kind, data: self._native_event(
             execution_id, kind, data, port,
         ))
-        native_id = port.open_execution(turn_id)
-        run = _Run(turn_id, "", core_execution_id, dispatch_id, port, native_id, threading.Event())
-        attachments = []
-        file_refs = []
+        # 附件先投影出来（有界对象读取），再打开执行：有效 attach=false 时必须在派发前
+        # 类型化拒绝，而不是打开一个原生会话再静默丢弃附件。
         stored = json.loads(self.objects.read(context["input_object_digest"]))
-        for item in (stored.get("message") or stored).get("attachments", ()):
-            digest_value = item.get("_contentDigest")
-            if not digest_value:
-                continue
-            if item.get("mediaKind") == "image":
-                attachments.append({
-                    "mime": item.get("_mime") or "application/octet-stream",
-                    "filename": item.get("displayName") or item.get("ref"),
-                    "data": base64.b64encode(self.objects.read(digest_value)).decode(),
-                })
-            else:
-                file_refs.append(str(item.get("ref")))
+        attachments, file_refs = _sidecar_attachments(self.objects, stored)
+        native_id = port.open_execution(turn_id)
+        if attachments and not _effective_attachment_support(port, turn_id):
+            # 拒绝时不留一个没有归属的原生会话（否则 _complete 永远不会回收它）。
+            try:
+                port.close_execution(turn_id)
+            except BaseException:
+                pass
+            raise SidecarError(
+                "ATTACHMENT_UNSUPPORTED",
+                "this execution has no effective 'attach' capability",
+            )
+        run = _Run(turn_id, "", core_execution_id, dispatch_id, port, native_id, threading.Event())
         prompt_content = prompt.content
         if file_refs:
             prompt_content += "\n\nWorkspace attachments (validated):\n" + "\n".join(
@@ -415,6 +414,46 @@ class SidecarExecutionBackend:
         for run in runs:
             run.done.wait(max(0, deadline - time.monotonic()))
         return all(run.done.is_set() for run in runs)
+
+
+def _sidecar_attachments(
+    objects, stored: Mapping[str, Any],
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """Project stored attachments into (native image attachments, file refs).
+
+    Image bytes are read from the bounded object store only when the attachment
+    carries a content digest; every other attachment stays a workspace file
+    reference that the prompt text may name.
+    """
+    attachments: list[dict[str, Any]] = []
+    file_refs: list[str] = []
+    for item in (stored.get("message") or stored).get("attachments", ()):
+        digest_value = item.get("_contentDigest")
+        if not digest_value:
+            continue
+        if item.get("mediaKind") == "image":
+            attachments.append({
+                "mime": item.get("_mime") or "application/octet-stream",
+                "filename": item.get("displayName") or item.get("ref"),
+                "data": base64.b64encode(objects.read(digest_value)).decode(),
+            })
+        else:
+            file_refs.append(str(item.get("ref")))
+    return attachments, file_refs
+
+
+def _effective_attachment_support(port, execution_id: str) -> bool:
+    """Read the effective `attach` capability from the port's canonical view.
+
+    The answer comes from the intersection of the deployment's static
+    declaration and what this execution actually observed, never from a stored
+    snapshot or from the mere presence of an attachment.
+    """
+    view = port.effective_capabilities(execution_id)
+    for entry in view.get("capabilities", ()):
+        if entry.get("id") == "attach":
+            return bool(entry.get("supported"))
+    return False
 
 
 def _safe_code(exc: BaseException) -> str:

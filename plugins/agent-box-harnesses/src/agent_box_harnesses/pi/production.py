@@ -30,6 +30,8 @@ import json
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+from ..registry.capability_claims import capability_claims as _derive_capability_claims
+
 PI_PROVIDER = "deepseek"
 #: The product/ProviderModel model id the user confirmed. It must never change
 #: silently: the native catalogue value below is derived from it.
@@ -88,6 +90,16 @@ SETTINGS_SOURCE = "deploy/pi/settings.json"
 
 class PiProductionTemplateError(ValueError):
     """A deployment declaration this template refuses to emit."""
+
+
+def capability_claims() -> dict[str, bool]:
+    """本模板部署时声明的 canonical 能力（派生自注册表，不手写）。
+
+    `attach` 是**静态候选**：真实握手播发过 `promptCapabilities {image}`，投递链路
+    也在代码上成立，但没有一次运行真的送过非空附件，所以它只是声明上限、不是观测
+    结论。观测结论由链门的证据表决定，本模板无权改写。
+    """
+    return _derive_capability_claims("pi")
 
 
 def models_document() -> dict[str, Any]:
@@ -171,6 +183,10 @@ def harness_deployment(
     return {
         "id": "pi",
         "timeoutMs": timeout_ms,
+        # 能力声明**派生**自注册表（`harnesses.toml`），不由本模板手写：see
+        # `registry.capability_claims`。它是静态声明上限，测试逐项断言 true 项 == TOML，
+        # 因此"生产部署声明的能力"与"注册表声明的能力"不可能漂移。
+        "capabilityClaims": capability_claims(),
         "credentialKind": CREDENTIAL_KIND,
         "credentialEnvironment": CREDENTIAL_ENVIRONMENT,
         "modelControlId": MODEL_CONTROL_ID,
