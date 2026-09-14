@@ -4,6 +4,122 @@
 已发生的1次可达性请求由后端受控进程读取仓库外 locator，未把内容写入仓库或输出。
 授权真实 credential 的 SecretStore→Worker 投影尚未执行，不以测试值路径冒充付费验收事实。
 
+## 2026-09-14 — 42-D Hermes 与 OpenCode 生产封装（并行两条）
+
+详细证据：[hermes-production-packaging.md](hermes-production-packaging.md) /
+[opencode-production-packaging.md](opencode-production-packaging.md) /
+[通用原生 driver 接缝](native-driver-seam.md)。终态 **HERMES_PRODUCTION_CHAIN_PREPARED** 与
+**OPENCODE_PRODUCTION_CHAIN_PREPARED**，两家仍 **MODEL_NOT_VERIFIED**，
+`BACKEND_IMPLEMENTATION_READY` 未登记、`workbench_model_verified_count` 仍 0。
+
+### Hermes（子代理 A，专属写集）
+
+- **隔离 Python 运行闭包**：`scripts/server-round1/build-hermes-runtime-artifact.mjs`，只读已安装
+  发行版（**不跑 pip、不联网**），从 `hermes_agent-0.19.0` 的 `Requires-Dist` 递归解析（marker 按
+  linux/posix/cpython3.12 求值，win32-only 排除），**60 包 / 4 765 条目 / 108 441 979 字节**，
+  tree digest `sha256:b3fb1e4be73552d07f4be9081b966d7db8a8e0dbf23be3062965f577f1cf662a`；
+  双构建一致；0555/0444 只读、owner marker、manifest 在树外、原子发布；`python3 -S` 自足性导入
+  13 个模块全部落在工件内。**未挂用户 site-packages**。已声明偏差：`rich` 声明 `==14.3.3` 而本机
+  实装 `15.0.0`（全机无 14.3.3），如实登记为 `pinDeviations`，不写作"已固定"。
+- 工件含两个**声明过的** overlay：`agentbox_hermes_bootstrap.py`、`sitecustomize.py`
+  （原因：Hermes 的原生会话库是 `$HERMES_HOME/state.db` 文件，而通用 `stateProjection` 只能持久化
+  一个目录子项 → `HERMES_HOME` 必须就是那个持久目录，只读投影的 `config.yaml` 由工件的
+  bootstrap 物化进去；不 patch Hermes 任何代码）。
+- **生产模板**（`hermes/production.py` + `deploy/hermes/config.yaml`）与
+  `model-validation-42d.mjs --family hermes --dry-run` 的 `config` **逐字段相等**；官方根
+  `https://api.deepseek.com`、64 输出上限、`agent.api_max_retries=1`（声明上界
+  `maxProviderAttempts=2`）、`DEEPSEEK_API_KEY` 仅环境引用；**不声明产品模型控制**
+  （Hermes 0.19 只播发 ACP `models`、对 `session/set_config_option` 返回空列表，上游 bridge
+  只认后者 → 任何冻结模型值都会在发包前被判不可用）。
+- **全链门** `scripts/server-round1/hermes-production-chain-gate.py` exit 0（本会话复跑）：
+  两轮 delta 4<7 与 11<14；每轮**恰 1 次** provider 请求（合计 2，`requestsBeyondBudget=0`、
+  `unauthorizedRequests=0`）；第二轮请求体含第一轮 user+assistant；checkpoint
+  `schema_version=2`/`resumable=true`/`harnessType=hermes`，state 含 `state.db`/`state.db-wal`
+  与物化的 `config.yaml`（10 文件 1 085 661 字节，**零 token 命中**）；重开方法**直接观测**为
+  ACP `new_session → resume_session`（**不是** `session/load`）；注入一次 500 → 实测仅 1 次尝试、
+  不重试；未知模型与 `deepseek-flash` 都在发包前被拒（0 新增请求）；缺凭据由 Server
+  `CREDENTIAL_REQUIRED` 拒绝且不派发；清理 `removed=true` 无残留；外部 `--artifact`/`--keep`
+  语义与 Pi 同级。
+- **实测残余（真实模型门前必须先解决）**：产品模型 `deepseek-flash` 在本家 native 面不可寻址，
+  有效模型被 Hermes 自己的静态折叠规则（`hermes_cli.model_normalize._normalize_for_deepseek`，
+  纯字符串、不联网）改写为 **`deepseek-chat`**；门已把"本轮实际生效模型 = 记录值"做成硬断言
+  （漂移即失败），并登记为白名单（只有 `deepseek-flash`）冲突。另有 Hermes 原生探针外联
+  （`api.deepseek.com` 默认端点、`models.dev`、`openrouter.ai`）被只读守门逐类拒绝（
+  `unclassified=0`、零非 loopback 成功连接）。
+
+### OpenCode（子代理 B，专属写集）
+
+- **单文件二进制授权**：`scripts/server-round1/build-opencode-authorization.mjs` 解析入口符号链接 →
+  真实文件 `/home/maoqh/.npm-global/lib/node_modules/opencode-ai/bin/opencode.exe`，
+  **184 498 304 字节**、ELF 64-bit、版本 **1.18.21**、digest
+  `sha256:c9485f62576606dbde6404647405df2401fada964b7f669f799dc125dbbeff99`；经既有
+  `executableMounts`（摘要固定、只读）进入 bwrap 到 `/runtime/bin/opencode`，**未退化为整目录或
+  PATH 信任**；guest 内复核 `--version=1.18.21`、写 `/runtime/bin` 得 `EROFS`。
+- **原生路径，不伪装 ACP**：新增中立 **driver 接缝**（见 native-driver-seam.md），
+  `deploy/opencode/driver-native.mjs` 用上游 `ManagedOpenCodeHost` 托管 `opencode serve`
+  （loopback + 一次性基本认证），SSE 增量 → 中性 `message_delta`；Server/Core/Worker/bwrap 无
+  OpenCode 分支。
+- **生产配置** `deploy/opencode/opencode.json` 与 42d dry-run `config` 逐字段相等；官方根、64 输出
+  上限（实测进入请求体 `max_tokens=64`；`OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX` 因键名含 `TOKEN`
+  被 Server 规则拒绝，未声明）、thinking 关闭、自动更新/模型目录/LSP 下载关闭、
+  `{env:DEEPSEEK_API_KEY}` 仅环境引用。
+- **全链门** `scripts/server-round1/opencode-production-chain-gate.py` exit 0（本会话复跑）：
+  两轮 delta 4,5,6<9 与 13,14,15<18（真分片流式）；第二轮请求含第一轮 user+assistant；
+  checkpoint 4 个状态文件（`opencode.db`+`-wal`/`-shm`+日志）、`resumable=true`、native id 两轮相同；
+  重开相位 `createsInsideReopenPhase=[]`、`hostStarts≥2`、托管端口事后全部关闭；
+  provider 请求**恰 2 次**、`requestsBeyondBudget=0`、`unauthorizedRequests=0`；受控重试实验实测
+  **6 次**尝试（取代 42d 无证据的 12），声明上界 `MEASURED_RETRY_ATTEMPTS=6`；未知模型发包前拒绝、
+  缺凭据 `CREDENTIAL_REQUIRED`、坏 checkpoint `SIDECAR_CHECKPOINT_INVALID`、漂移二进制被 Worker
+  引导拒绝；token 在事件/状态（827 KB）/报告/Git 零命中；清理 `removed=true`。
+- 残余：驱动显式拒绝附件（不静默丢弃）；原生日志会进入 checkpoint（已扫描无凭据）。
+
+### 通用接缝：中立原生 driver
+
+- 新增 `plugins/agent-box-harnesses/runtime/native-driver.mjs`（加载规则 + 事件深红删）、
+  `worker-entry.mjs` 的 driver op 路由、`runtime.py` 的 `adapter.driver` 打包、
+  `sidecar.py` 的 `message_delta`/`driver_exit` 映射与 bundle 收录；
+  通用测试 `tests/server/test_sidecar_native_driver.py` 17 项（含"未声明 driver 时仍走 ACP 注册"与
+  模块越界/缺入口拒绝）。ACP 路径回归：`test_harness_sidecar.py` 91 passed、Node 25/25。
+- 一次性探针（未入库）在真实 c4 Worker+bwrap 上证明：模块投递与加载、凭据经 `spawnProcess` 进到
+  driver 的**孙进程**（`CRED_OK`）、可写 state 投影回读为 checkpoint 并在下一轮回投、native id 稳定。
+
+### 本阶段发现的通用缺陷（未修复，阻塞四家真实模型门）
+
+- **Worker 默认 5 秒租约会取消"客户端静默"的运行中 attempt**。代码级：只有客户端帧刷新
+  `lease_deadline`，而一轮 prompt 飞行中 Server 不发任何帧（心跳只在 `wait_terminal` 里发）。
+  第一手复现：同一 fixture 驱动静默 8 秒，`lease_ms=5000`（生产默认）下轮次被取消并最终以
+  `WorkerError: attempt does not accept stdin writes` 结束；仅把租约改成 `120000` 后两轮
+  `completed`、checkpoint 与回投正常。既有假端点门因为毫秒级应答从未暴露。
+  详见 [native-driver-seam.md](native-driver-seam.md) §5；**修好之前不启动四家真实模型门**。
+
+### 验证与计数（本会话串行复跑）
+
+```text
+python3 scripts/server-round1/hermes-production-chain-gate.py          → exit 0（HERMES_PRODUCTION_CHAIN_GATE_OK）
+python3 scripts/server-round1/opencode-production-chain-gate.py        → exit 0（OPENCODE_PRODUCTION_CHAIN_PREPARED）
+python3 scripts/server-round1/pi-production-chain-gate.py              → exit 0（PI_PRODUCTION_CHAIN_GATE_OK，底座未退化）
+python3 scripts/server-round1/runtime-artifact-gate.py --worker <c4>   → exit 0（RUNTIME_ARTIFACT_PROJECTION_GATE_OK）
+node --test plugins/agent-box-harnesses/tests/harness_remote/*.test.mjs→ 25 passed / 0 failed
+node --test scripts/server-round1/model-validation-42d.test.mjs        → 4 passed / 0 failed
+node --test build-pi-runtime-artifact.test.mjs                         → 11 passed / 0 failed
+node --test build-hermes-runtime-artifact.test.mjs                     → 20 passed / 0 failed
+node --test build-opencode-authorization.test.mjs                      → 9 passed / 0 failed
+python3 -m pytest -q tests plugins/agent-box-harnesses/tests \
+  plugins/agent-box-runtime-wsl/tests plugins/agent-box-sandbox-bwrap/tests \
+  plugins/agent-box-runtime-local/tests                                → 529 passed / 4 skipped / 0 failed
+git diff --check                                                       → 干净
+精确秘密扫描（本阶段改动与报告）                                        → 无命中（未读任何真实 secret locator）
+```
+
+上一阶段基线 python 444 passed/4 skipped；本阶段 +85 项（Hermes 36、OpenCode 25、driver 接缝 17、
+Pi 别名/翻译断言加强 2、其余为参数化增量）。4 个 skip 为既有平台/环境条件项，未扩大。
+
+- **模型调用 0、费用增量 ¥0**；累计仍为 1 次 / 12 tokens / `<¥0.01`（上限 ¥10）。未读任何真实凭据
+  （假 token 由各家门自建、0600、用后删除）；未访问任何非 loopback 目的地。
+- 清理：本阶段三个门（Hermes/OpenCode/Pi）的临时根、Worker view/secret、假 token、托管进程与端口
+  全部移除；`pgrep`/`ss` 无残留（早前手工探测遗留的 `opencode serve` 也已终止）。
+- c4 仍**无 Windows 平台证据**（本阶段未跑 Windows r4）；Windows r4 复验与四家真实模型门均待后续。
+
 ## 2026-09-14 — Pi gate 清理假绿返修（单点验收）
 
 - **缺陷**：`pi-production-chain-gate.py` 首次提交用 `shutil.rmtree(temporary, ignore_errors=True)` 清理
